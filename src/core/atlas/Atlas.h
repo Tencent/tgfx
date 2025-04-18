@@ -40,49 +40,58 @@ class Atlas {
   ErrorCode addToAtlas(ResourceProvider*, int width, int height, const void* image,
                        AtlasLocator* atlasLocator);
 
-  ErrorCode addToAtlasWithoutFillImage(PlacementPtr<Glyph> glyph);
+  ErrorCode addToAtlasWithoutFillImage(const Glyph& glyph, AtlasToken nextFlushToken,
+                                       AtlasLocator& atlasLocator);
 
   bool getGlyphLocator(const BytesKey& glyphKey, AtlasLocator& atlasLocator) const;
 
   bool fillGlyphImage(AtlasLocator& locator, void* image) const;
 
-  const std::shared_ptr<TextureProxy>* getTextureProxy() const {
+  const std::vector<std::shared_ptr<TextureProxy>>& getTextureProxies() const {
     return textureProxies;
+  }
+
+  const std::vector<std::shared_ptr<Image>>& getImages() const {
+    return images;
   }
 
   uint64_t atlasGeneration() const {
     return _atlasGeneration;
   }
 
-  bool hasGlyph(const BytesKey& glyphKey) const {
-    return glyphs.find(glyphKey) != glyphs.end();
-  }
+  bool hasGlyph(const BytesKey& glyphKey) const;
 
-  uint32_t numActivePages() const {
-    return _numActivePages;
-  }
-
-  void compact(AtlasToken) {
-  }
+  void compact(AtlasToken);
 
   uint32_t maxPages() const {
-    return _maxPages;
+    return static_cast<uint32_t>(pages.size());
   }
 
-  void uploadToTexture(Context* context);
+  //To ensure the atlas does not evict a given entry,the client must set the  use token
+  void setLastUseToken(const PlotLocator& plotLocator, AtlasToken token) {
+    auto plotIndex = plotLocator.plotIndex();
+    DEBUG_ASSERT(plotIndex < numPlots);
+    auto pageIndex = plotLocator.pageIndex();
+    DEBUG_ASSERT(pageIndex < pages.size());
+    auto plot = pages[pageIndex].plotArray[plotIndex].get();
+    DEBUG_ASSERT(plot != nullptr);
+    makeMRU(plot, pageIndex);
+    plot->setLastUseToken(token);
+  }
+
+  void clearEvictionPlotTexture(Context* context);
 
  private:
   Atlas(ProxyProvider* proxyProvider, PixelFormat pixelFormat, int width, int height, int plotWidth,
         int plotHeight, AtlasGenerationCounter* generationCounter, std::string_view label);
 
-  bool createPages(AtlasGenerationCounter*);
-
-  std::shared_ptr<TextureProxy>* getTextureProxies() {
-    return textureProxies;
-  }
+  void makeMRU(Plot* plot, uint32_t pageIndex);
 
   bool activateNewPage();
-  bool addToPageWithoutFillImage(PlacementPtr<Glyph> glyph, int pageIndex);
+  bool addToPageWithoutFillImage(const Glyph& glyph, int pageIndex, AtlasLocator& atlasLocator);
+
+  void evictionPlot(Plot* plot);
+  void deactivateLastPage();
 
   struct Page {
     std::unique_ptr<std::unique_ptr<Plot>[]> plotArray;
@@ -91,11 +100,13 @@ class Atlas {
 
   ProxyProvider* proxyProvider = nullptr;
   PixelFormat pixelFormat;
-  std::shared_ptr<TextureProxy> textureProxies[PlotLocator::kMaxMultitexturePages];
-  Page pages[PlotLocator::kMaxMultitexturePages];
-  uint32_t _maxPages;
-  uint32_t _numActivePages;
+  AtlasGenerationCounter* const generationCounter;
+  std::vector<std::shared_ptr<TextureProxy>> textureProxies;
+  std::vector<std::shared_ptr<Image>> images;
+  std::vector<Page> pages;
   uint64_t _atlasGeneration;
+  AtlasToken previousFlushToken;
+  int flushesSinceLastUse;
   uint32_t numPlots;
   int bytesPerPixel;
   int textureWidth;
@@ -104,9 +115,10 @@ class Atlas {
   int plotHeight;
   const std::string label;
 
-  std::map<uint32_t, std::set<Plot*>> dirtyPlots;
+  std::vector<PlotEvictionCallback*> evictionCallbacks;
 
-  BytesKeyMap<PlacementPtr<Glyph>> glyphs;
+  BytesKeyMap<AtlasLocator> locatorMap;
+  std::map<uint32_t, std::set<Plot*>> evictionPlots;
 };
 
 class AtlasConfig {

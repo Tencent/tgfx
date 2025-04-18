@@ -40,14 +40,19 @@ void AtlasManager::releaseAll() {
   }
 }
 
-const std::shared_ptr<TextureProxy>* AtlasManager::getTextureProxy(MaskFormat maskFormat,
-                                                                   unsigned int* numActiveProxies) {
+const std::vector<std::shared_ptr<TextureProxy>>& AtlasManager::getTextureProxies(
+    MaskFormat maskFormat) {
   if (this->initAtlas(maskFormat)) {
-    *numActiveProxies = this->getAtlas(maskFormat)->numActivePages();
-    return this->getAtlas(maskFormat)->getTextureProxy();
+    return this->getAtlas(maskFormat)->getTextureProxies();
   }
-  *numActiveProxies = 0;
-  return nullptr;
+  return {};
+}
+
+const std::vector<std::shared_ptr<Image>>& AtlasManager::getImages(MaskFormat maskFormat) {
+  if (this->initAtlas(maskFormat)) {
+    return this->getAtlas(maskFormat)->getImages();
+  }
+  return {};
 }
 
 // bool AtlasManager::hasGlyph(MaskFormat format, Glyph* glyph) {
@@ -86,9 +91,11 @@ bool AtlasManager::hasGlyph(MaskFormat maskFormat, const BytesKey& key) const {
   return this->getAtlas(maskFormat)->hasGlyph(key);
 }
 
-Atlas::ErrorCode AtlasManager::addGlyphToAtlasWithoutFillImage(PlacementPtr<Glyph> glyph) const {
-  auto maskFormat = glyph->maskFormat();
-  return getAtlas(maskFormat)->addToAtlasWithoutFillImage(std::move(glyph));
+Atlas::ErrorCode AtlasManager::addGlyphToAtlasWithoutFillImage(const Glyph& glyph,
+                                                               AtlasToken nextFlushToken,
+                                                               AtlasLocator& atlasLocator) const {
+  return getAtlas(glyph.maskFormat())
+      ->addToAtlasWithoutFillImage(glyph, nextFlushToken, atlasLocator);
 }
 
 bool AtlasManager::getGlyphLocator(MaskFormat maskFormat, const BytesKey& key,
@@ -100,11 +107,10 @@ bool AtlasManager::fillGlyphImage(MaskFormat maskFormat, AtlasLocator& locator, 
   return this->getAtlas(maskFormat)->fillGlyphImage(locator, image);
 }
 
-void AtlasManager::uploadToTexture() {
-  for (int i = 0; i < kMaskFormatCount; i++) {
-    if (atlases[i] != nullptr) {
-      atlases[i]->uploadToTexture(context);
-    }
+void AtlasManager::setPlotUseToken(PlotUseUpdater& plotUseUpdater, const PlotLocator& plotLocator,
+                                   MaskFormat maskFormat, AtlasToken useToken) {
+  if (plotUseUpdater.add(plotLocator)) {
+    getAtlas(maskFormat)->setLastUseToken(plotLocator, useToken);
   }
 }
 

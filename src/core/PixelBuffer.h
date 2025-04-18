@@ -96,6 +96,8 @@ class PixelBuffer : public ImageBuffer {
   virtual void onUnlockPixels() const = 0;
   virtual std::shared_ptr<Texture> onBindToHardwareTexture(Context* context) const = 0;
 
+  bool onUploadTexture(std::shared_ptr<Texture> texture, Point offset) override;
+
  private:
   mutable std::mutex locker = {};
   ImageInfo _info = {};

@@ -22,9 +22,9 @@ Plot::Plot(int pageIndex, int plotIndex, AtlasGenerationCounter* generationCount
            int offsetY, int width, int height, int bytesPerPixel)
     : generationCounter(generationCounter), _pageIndex(pageIndex), _plotIndex(plotIndex),
       _genID(generationCounter->next()), width(width), height(height),
-      pixelOffset(Point::Make(offsetX * width, offsetY * height)), bytesPerPixel(bytesPerPixel),
+      _pixelOffset(Point::Make(offsetX * width, offsetY * height)), bytesPerPixel(bytesPerPixel),
       rectPack(width, height),
-      plotLocator(static_cast<uint32_t>(pageIndex), static_cast<uint32_t>(plotIndex), _genID) {
+      _plotLocator(static_cast<uint32_t>(pageIndex), static_cast<uint32_t>(plotIndex), _genID) {
   dirtyRect.setEmpty();
   cachedRect.setEmpty();
 }
@@ -76,12 +76,13 @@ bool Plot::addRect(int imageWidth, int imageHeight, AtlasLocator& atlasLocator) 
     }
     memset(data, 0, size);
   }
+
   auto rectX = static_cast<int>(location.x) + padding;
   auto rectY = static_cast<int>(location.y) + padding;
   auto rect = Rect::MakeXYWH(rectX, rectY, imageWidth, imageHeight);
-  rect.offset(pixelOffset.x, pixelOffset.y);
+  rect.offset(_pixelOffset.x, _pixelOffset.y);
   atlasLocator.updateRect(rect);
-  atlasLocator.setPlotLocator(plotLocator);
+  atlasLocator.setPlotLocator(_plotLocator);
   dirtyRect.join(rect);
   return true;
 }
@@ -89,8 +90,9 @@ bool Plot::addRect(int imageWidth, int imageHeight, AtlasLocator& atlasLocator) 
 void Plot::resetRects() {
   rectPack.reset();
   _genID = generationCounter->next();
-  plotLocator =
+  _plotLocator =
       PlotLocator(static_cast<uint32_t>(_pageIndex), static_cast<uint32_t>(_plotIndex), _genID);
+  _lastUseToken = AtlasToken::InvalidToken();
   if (data) {
     memset(data, 0, static_cast<size_t>(bytesPerPixel * width * height));
   }

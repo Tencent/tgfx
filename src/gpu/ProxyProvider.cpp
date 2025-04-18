@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ProxyProvider.h"
-#include "core/AtlasSource.h"
 #include "core/ShapeRasterizer.h"
 #include "core/shapes/MatrixShape.h"
 #include "core/utils/UniqueID.h"
@@ -32,7 +31,6 @@
 #include "gpu/tasks/TextureCreateTask.h"
 #include "gpu/tasks/TextureFlattenTask.h"
 #include "gpu/tasks/TextureUploadTask.h"
-#include "tasks/AtlasBufferUploadTask.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -153,81 +151,6 @@ std::shared_ptr<GpuShapeProxy> ProxyProvider::createGpuShapeProxy(std::shared_pt
       new DefaultTextureProxy(textureProxyKey, width, height, false, true));
   addResourceProxy(textureProxy, textureKey);
   return std::make_shared<GpuShapeProxy>(drawingMatrix, triangleProxy, textureProxy);
-}
-
-std::shared_ptr<AtlasProxy> ProxyProvider::createAtlasProxy(
-    const UniqueKey& uniqueKey, std::shared_ptr<GlyphRunList> glyphRunList, const Matrix& viewMatrix,
-    const Stroke* stroke, uint32_t renderFlags /* = 0*/) {
-  if (glyphRunList == nullptr) {
-    return nullptr;
-  }
-
-  auto proxyKey = GetProxyKey(uniqueKey, renderFlags);
-
-  std::unique_ptr<DataSource<AtlasBuffer>> dataSource = nullptr;
-
-  auto atlasSource = std::make_unique<AtlasSource>(context->atlasManager(), std::move(glyphRunList),
-                                                   viewMatrix, stroke);
-  const auto& drawGlyphs = atlasSource->getDrawGlyphs();
-  if (drawGlyphs.size() == 0) {
-    return nullptr;
-  }
-
-  // bool allProxyReady = true;
-  // for (size_t i = 0; i < proxyCount; i++) {
-  //   auto vertexId = UniqueID::Next();
-  //   auto indexId = UniqueID::Next();
-  //   auto vertexKey = UniqueKey::Append(uniqueKey, &vertexId, 1);
-  //   auto indexKey = UniqueKey::Append(uniqueKey, &indexId, 1);
-  //   auto proxy = findOrWrapGpuBufferProxy(proxyKey);
-  //   if (proxy != nullptr) {
-  //     allProxyReady = false;
-  //     break;
-  //   }
-  // }
-  //
-  // if (allProxyReady) {
-  //
-  // }
-
-  if (!(renderFlags & RenderFlags::DisableAsyncTask)) {
-    dataSource = DataSource<AtlasBuffer>::Async(std::move(atlasSource));
-  } else {
-    dataSource = std::move(atlasSource);
-  }
-
-  static const auto IndexType = UniqueID::Next();
-
-  std::vector<std::pair<UniqueKey, UniqueKey>> atlasProxyKeys;
-  std::vector<AtlasGeometryProxy> geometryProxies;
-  for (auto& [maskFormat, pageDrawGlyphs] : drawGlyphs) {
-    for (auto& [pageIndex, _] : pageDrawGlyphs) {
-      auto mask = static_cast<uint32_t>(maskFormat);
-      auto vertexProxyKey = UniqueKey::Append(uniqueKey, &mask, 1);
-      vertexProxyKey = UniqueKey::Append(vertexProxyKey, &pageIndex, 1);
-      auto indexProxyKey = UniqueKey::Append(vertexProxyKey, &IndexType, 1);
-      auto vertexProxy =
-          std::shared_ptr<GpuBufferProxy>(new GpuBufferProxy(vertexProxyKey, BufferType::Vertex));
-      auto indexProxy =
-          std::shared_ptr<GpuBufferProxy>(new GpuBufferProxy(indexProxyKey, BufferType::Index));
-      addResourceProxy(vertexProxy, vertexProxyKey);
-      addResourceProxy(indexProxy, indexProxyKey);
-      geometryProxies.push_back({maskFormat, pageIndex, vertexProxy, indexProxy});
-      atlasProxyKeys.push_back({vertexProxyKey, indexProxyKey});
-    }
-  }
-
-  auto task = context->drawingBuffer()->makeNode<AtlasBufferUploadTask>(uniqueKey, atlasProxyKeys,
-                                                                        std::move(dataSource));
-  context->drawingManager()->addResourceTask(std::move(task));
-
-  return std::make_shared<AtlasProxy>(std::move(geometryProxies));
-
-  // auto triangleProxyKey = UniqueKey::Append(uniqueKey, &TriangleShapeType, 1);
-  // auto triangleProxy =
-  //     std::shared_ptr<GpuBufferProxy>(new GpuBufferProxy(triangleProxyKey, BufferType::Vertex));
-  // addResourceProxy(triangleProxy, triangleProxyKey);
-  // return std::make_shared<AtlasProxy>(triangleProxy);
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(

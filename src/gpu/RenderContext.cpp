@@ -22,11 +22,41 @@
 #include "core/PathTriangulator.h"
 #include "core/Rasterizer.h"
 //#include "core/TextAtlas.h"
+#include "core/atlas/AtlasManager.h"
+#include "core/images/TextureImage.h"
 #include "core/utils/Caster.h"
+#include "core/utils/MathExtra.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/tasks/TextAtlasUploadTask.h"
 
 namespace tgfx {
+
+static void computeAtlasKey(GlyphFace* glyphFace, GlyphID glyphID, const Stroke* stroke,
+                            BytesKey& key) {
+  float fontSize = 0.f;
+  uint32_t typeFaceID = 0;
+  float strokeWidth = 0.f;
+  bool fauxBold = false;
+  bool fauxItalic = false;
+  if (stroke != nullptr) {
+    strokeWidth = stroke->width;
+  }
+  Font font;
+  if (glyphFace->asFont(&font)) {
+    fontSize = font.getSize();
+    typeFaceID = font.getTypeface()->uniqueID();
+    fauxBold = font.isFauxBold();
+    fauxItalic = font.isFauxItalic();
+  }
+  key.write(fontSize);
+  key.write(typeFaceID);
+  key.write(strokeWidth);
+  key.write(fauxBold);
+  key.write(fauxItalic);  //matrix
+  key.write(glyphID);
+}
+
 RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
                              bool clearAll, Surface* surface)
     : renderTarget(std::move(proxy)), renderFlags(renderFlags), surface(surface) {
@@ -161,64 +191,112 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
     return;
   }
   auto maxScale = state.matrix.getMaxScale();
-  if (maxScale <= 0.0f) {
+  if (maxScale <= 0.0f || renderTarget == nullptr) {
     return;
   }
 
-  if (auto compositor = getOpsCompositor()) {
-    compositor->fillGlyphRuns(glyphRunList, state, fill, stroke);
+  Context* context = renderTarget->getContext();
+  if (context == nullptr) {
+    return;
+  }
+  auto atlasManager = renderTarget->getContext()->atlasManager();
+  if (atlasManager == nullptr) {
+    return;
   }
 
-  // auto textAtlas = TextAtlas::Make(renderTarget->getContext(), glyphRunList, maxScale, stroke);
-  // AtlasLocator locator;
-  // Parameters parameters = {};
-  //
-  // for (auto& glyphRun : glyphRunList->glyphRuns()) {
-  //   for (size_t i = 0; i < glyphRun.glyphs.size(); ++i) {
-  //     auto glyph = glyphRun.glyphs[i];
-  //     if (!textAtlas->getLocator(glyph, &locator)) {
-  //       continue;
-  //     }
-  //     auto matrix = tgfx::Matrix::I();
-  //     matrix.postTranslate(locator.glyphBounds.x(), locator.glyphBounds.y());
-  //     matrix.postScale(1 / maxScale, 1 / maxScale);
-  //     matrix.postTranslate(glyphRun.positions[i].x, glyphRun.positions[i].y);
-  //     parameters.matrices.emplace_back(matrix);
-  //     parameters.rects.emplace_back(locator.location);
-  //     if (parameters.imageIndex != locator.imageIndex) {
-  //       drawAtlas(state, textAtlas->getAtlasImage(parameters.imageIndex),
-  //                 parameters.matrices.data(), parameters.rects.data(), nullptr,
-  //                 parameters.matrices.size(), {}, fill);
-  //       parameters = {};
-  //       parameters.imageIndex = locator.imageIndex;
-  //     }
-  //   }
-  // }
-  // drawAtlas(state, textAtlas->getAtlasImage(parameters.imageIndex), parameters.matrices.data(),
-  //           parameters.rects.data(), nullptr, parameters.matrices.size(), {}, fill);
+  Glyph glyph;
+  auto nextFlushToken = context->drawingManager()->nextFlushToken();
+  PlotUseUpdater plotUseUpdater;
+  auto hasScale = !FloatNearlyEqual(maxScale, 1.0f);
+  for (auto& run : glyphRunList->glyphRuns()) {
+    auto scaledGlyphFace = run.glyphFace;
+    if (hasScale) {
+      scaledGlyphFace = run.glyphFace->makeScaled(maxScale);
+    }
+    size_t index = 0;
+    for (auto& glyphID : run.glyphs) {
+      auto glyphPosition = run.positions[index++];
+      std::vector<GlyphID> glyphs{glyphID};
+      std::vector<Point> positions{glyphPosition};
+      GlyphRun glyphRun(run.glyphFace, std::move(glyphs), std::move(positions));
+      auto runList = std::make_shared<GlyphRunList>(std::move(glyphRun));
+      auto bounds = runList->getBounds(maxScale);
+      auto noStrokeBounds = bounds;
+      if (stroke) {
+        stroke->applyToBounds(&bounds);
+      }
+      bounds.scale(maxScale, maxScale);
+      if (stroke) {
+        noStrokeBounds.scale(maxScale, maxScale);
+        auto positionOffsetX = (bounds.x() - noStrokeBounds.x()) / maxScale;
+        auto positionOffsetY = (bounds.y() - noStrokeBounds.y()) / maxScale;
+        glyphPosition.offset(positionOffsetX, positionOffsetY);
+      }
 
-  //  auto bounds = glyphRunList->getBounds(maxScale);
-  //  if (stroke) {
-  //    stroke->applyToBounds(&bounds);
-  //  }
-  //  bounds.scale(maxScale, maxScale);
-  //  auto rasterizeMatrix = Matrix::MakeScale(maxScale);
-  //  rasterizeMatrix.postTranslate(-bounds.x(), -bounds.y());
-  //  auto invert = Matrix::I();
-  //  if (!rasterizeMatrix.invert(&invert)) {
-  //    return;
-  //  }
-  //  auto newState = state;
-  //  newState.matrix.preConcat(invert);
-  //  auto width = static_cast<int>(ceilf(bounds.width()));
-  //  auto height = static_cast<int>(ceilf(bounds.height()));
-  //  auto rasterizer = Rasterizer::MakeFrom(width, height, std::move(glyphRunList), fill.antiAlias,
-  //                                         rasterizeMatrix, stroke);
-  //  auto image = Image::MakeFrom(std::move(rasterizer));
-  //  if (image == nullptr) {
-  //    return;
-  //  }
-  //  drawImage(std::move(image), {}, newState, fill.makeWithMatrix(rasterizeMatrix));
+      auto width = static_cast<int>(ceilf(bounds.width()));
+      auto height = static_cast<int>(ceilf(bounds.height()));
+
+      auto minDimension = std::min(width, height);
+      auto maxDimension = std::max(width, height);
+      if (minDimension <= 0 || maxDimension > 256) {
+        continue;
+      }
+
+      BytesKey glyphKey;
+      computeAtlasKey(scaledGlyphFace.get(), glyphID, stroke, glyphKey);
+      auto maskFormat = scaledGlyphFace->hasColor() ? MaskFormat::RGBA : MaskFormat::A8;
+      auto& textureProxies = atlasManager->getTextureProxies(maskFormat);
+      auto& atlasImages = atlasManager->getImages(maskFormat);
+
+      DEBUG_ASSERT(atlasImages.size() == textureProxies.size());
+
+      AtlasLocator locator;
+      if (!atlasManager->hasGlyph(maskFormat, glyphKey)) {
+        glyph._key = glyphKey;
+        glyph._maskFormat = maskFormat;
+        glyph._glyphId = glyphID;
+        glyph._width = width;
+        glyph._height = height;
+
+        atlasManager->addGlyphToAtlasWithoutFillImage(glyph, nextFlushToken, locator);
+        auto rasterizeMatrix = Matrix::MakeScale(maxScale);
+        rasterizeMatrix.postTranslate(-bounds.x(), -bounds.y());
+
+        auto rasterizer = Rasterizer::MakeFrom(width, height, std::move(runList), fill.antiAlias,
+                                               rasterizeMatrix, stroke);
+        auto asyncDecoding = !(renderFlags & RenderFlags::DisableAsyncTask);
+        auto source = ImageSource::MakeFrom(std::move(rasterizer), false, asyncDecoding);
+        auto uniqueKey = UniqueKey::Make();
+        auto offset = Point::Make(locator.getLocation().left, locator.getLocation().top);
+        auto task = context->drawingBuffer()->makeNode<TextAtlasUploadTask>(
+            uniqueKey, std::move(source), textureProxies[locator.pageIndex()], offset);
+        context->drawingManager()->addResourceTask(std::move(task));
+
+      } else {
+        atlasManager->getGlyphLocator(maskFormat, glyphKey, locator);
+      }
+
+      atlasManager->setPlotUseToken(plotUseUpdater, locator.plotLocator(), maskFormat,
+                                    nextFlushToken);
+
+      auto image = atlasImages[locator.pageIndex()];
+      if (image == nullptr) {
+        continue;
+      }
+
+      auto glyphBounds = scaledGlyphFace->getBounds(glyphID);
+
+      auto rect = locator.getLocation();
+      auto newState = state;
+      newState.matrix = Matrix::MakeTrans(glyphBounds.x(), glyphBounds.y());
+      newState.matrix.postScale(1.f / maxScale, 1.f / maxScale);
+      newState.matrix.postTranslate(glyphPosition.x, glyphPosition.y);
+      newState.matrix.postConcat(state.matrix);
+      newState.matrix.preTranslate(-rect.x(), -rect.y());
+
+      drawImageRect(std::move(image), rect, {}, newState, fill);
+    }
+  }
 }
 
 void RenderContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {

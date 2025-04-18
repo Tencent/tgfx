@@ -58,14 +58,14 @@ HGLRC CreateGLContext(HDC deviceContext, HGLRC sharedContext) {
   auto wglInterface = WGLInterface::Get();
   if (wglInterface->createContextAttribsSupport) {
     const int coreProfileAttribs[] = {
-      WGL_CONTEXT_MAJOR_VERSION,
-      wglInterface->glMajorMax,
-      WGL_CONTEXT_MINOR_VERSION,
-      wglInterface->glMinorMax,
-      WGL_CONTEXT_PROFILE_MASK,
-      WGL_CONTEXT_CORE_PROFILE_BIT,
-      0,
-  };
+        WGL_CONTEXT_MAJOR_VERSION,
+        wglInterface->glMajorMax,
+        WGL_CONTEXT_MINOR_VERSION,
+        wglInterface->glMinorMax,
+        WGL_CONTEXT_PROFILE_MASK,
+        WGL_CONTEXT_CORE_PROFILE_BIT,
+        0,
+    };
     glContext =
         wglInterface->wglCreateContextAttribs(deviceContext, sharedContext, coreProfileAttribs);
   }

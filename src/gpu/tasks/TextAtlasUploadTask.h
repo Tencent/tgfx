@@ -15,10 +15,29 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#include "AtlasBuffer.h"
+
+#pragma once
+
+#include "ResourceTask.h"
+#include "core/ImageSource.h"
+#include "gpu/proxies/TextureProxy.h"
 
 namespace tgfx {
-std::shared_ptr<AtlasBuffer> AtlasBuffer::MakeFrom(std::vector<AtlasGeometryData> geometryDatas) {
-  return std::shared_ptr<AtlasBuffer>(new AtlasBuffer(std::move(geometryDatas)));
-}
+class TextAtlasUploadTask : public ResourceTask {
+ public:
+  TextAtlasUploadTask(UniqueKey uniqueKey, std::shared_ptr<DataSource<ImageBuffer>> source,
+                      std::shared_ptr<TextureProxy> proxy, Point atlasOffset);
+  bool execute(Context* context) override;
+
+ protected:
+  std::shared_ptr<Resource> onMakeResource(Context*) override {
+    // The execute() method is already overridden, so this method should never be called.
+    return nullptr;
+  }
+
+ private:
+  std::shared_ptr<DataSource<ImageBuffer>> source = nullptr;
+  std::shared_ptr<TextureProxy> textureProxy = nullptr;
+  Point atlasOffset = Point::Zero();
+};
 }  // namespace tgfx

@@ -17,41 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include "AtlasBuffer.h"
-#include "DataSource.h"
-#include "core/GlyphRunList.h"
-#include "core/atlas/AtlasManager.h"
+
+#include "core/atlas/AtlasTypes.h"
 
 namespace tgfx {
-
-class AtlasSource : public DataSource<AtlasBuffer> {
+class FlushCallbackObject {
  public:
-  using PageGlyphMap = std::map<uint32_t, std::vector<PlacementPtr<DrawGlyph>>>;
-
-  AtlasSource(AtlasManager* atlasManager, std::shared_ptr<GlyphRunList> glyphRunList, const Matrix& viewMatrix,
-              const Stroke* stroke);
-  size_t getBufferCount() const {
-    return drawGlyphs.size();
-  }
-
-
-  const std::map<MaskFormat, PageGlyphMap>& getDrawGlyphs() const {
-    return drawGlyphs;
-  }
-
-  std::shared_ptr<AtlasBuffer> getData() const override;
-
-
-  std::vector<AtlasGeometryData> makeGeometries() const;
-
- private:
-  AtlasManager* atlasManager;
-  Matrix viewMatrix = Matrix::I();
-  std::shared_ptr<Stroke> stroke = nullptr;
-  std::shared_ptr<GlyphRunList> glyphRunList;
-
-  std::map<MaskFormat, PageGlyphMap> drawGlyphs;
-
-  void computeAtlasLocator();
+  virtual ~FlushCallbackObject() = default;
+  virtual void preFlush() = 0;
+  virtual void postFlush(AtlasToken startTokenForNextFlush) = 0;
 };
 }  // namespace tgfx

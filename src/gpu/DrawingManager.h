@@ -20,6 +20,8 @@
 
 #include <unordered_map>
 #include <vector>
+#include "FlushCallbackObject.h"
+#include "core/atlas/AtlasTypes.h"
 #include "gpu/OpsCompositor.h"
 #include "gpu/tasks/OpsRenderTask.h"
 #include "gpu/tasks/RenderTask.h"
@@ -61,6 +63,10 @@ class DrawingManager {
    */
   bool flush();
 
+  AtlasToken nextFlushToken() const;
+
+  void addFlushCallbackObject(FlushCallbackObject*);
+
  private:
   Context* context = nullptr;
   PlacementBuffer* drawingBuffer = nullptr;
@@ -70,6 +76,8 @@ class DrawingManager {
   PlacementList<RenderTask> renderTasks = {};
   std::list<std::shared_ptr<OpsCompositor>> compositors = {};
   ResourceKeyMap<ResourceTask*> resourceTaskMap = {};
+  TokenTracker tokenTracker;
+  std::vector<FlushCallbackObject*> flushCallbackObjects = {};
 
   friend class OpsCompositor;
 };

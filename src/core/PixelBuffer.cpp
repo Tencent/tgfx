@@ -18,7 +18,9 @@
 
 #include "core/PixelBuffer.h"
 #include "core/utils/PixelFormatUtil.h"
+#include "gpu/Gpu.h"
 #include "tgfx/gpu/Device.h"
+#include "utils/MathExtra.h"
 
 namespace tgfx {
 class RasterPixelBuffer : public PixelBuffer {
@@ -151,4 +153,17 @@ std::shared_ptr<Texture> PixelBuffer::onMakeTexture(Context* context, bool mipma
   onUnlockPixels();
   return texture;
 }
+
+bool PixelBuffer::onUploadTexture(std::shared_ptr<Texture> texture, Point offset) {
+  auto gpu = texture->getContext()->gpu();
+  auto pixels = lockPixels();
+  if (pixels == nullptr) {
+    return false;
+  }
+  auto rect = Rect::MakeXYWH(offset.x, offset.y, 1.f * width(), 1.f * height());
+  gpu->writePixels(texture->getSampler(), rect, pixels, info().rowBytes());
+  unlockPixels();
+  return true;
+}
+
 }  // namespace tgfx

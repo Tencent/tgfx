@@ -38,6 +38,7 @@ Context::Context(Device* device) : _device(device) {
   _resourceProvider = new ResourceProvider(this);
   _proxyProvider = new ProxyProvider(this);
   _atlasManager = new AtlasManager(this);
+  _drawingManager->addFlushCallbackObject(_atlasManager);
 }
 
 Context::~Context() {

@@ -25,9 +25,6 @@
 namespace tgfx {
 class Glyph {
  public:
-  Glyph(const BytesKey& key) : _key(key) {
-  }
-
   ~Glyph();
 
   GlyphID glyphId() const {
@@ -81,6 +78,7 @@ class Glyph {
   AtlasLocator _locator;
 
   friend class AtlasSource;
+  friend class RenderContext;
 };
 
 struct DrawGlyph {

@@ -24,24 +24,27 @@
 #include "core/utils/PixelFormatUtil.h"
 #include "core/utils/PlacementBuffer.h"
 #include "core/utils/PlacementPtr.h"
+#include "gpu/FlushCallbackObject.h"
 #include "gpu/ProxyProvider.h"
 
 namespace tgfx {
-class AtlasManager : public AtlasGenerationCounter {
+class AtlasManager : public AtlasGenerationCounter, public FlushCallbackObject {
  public:
   explicit AtlasManager(Context* context);
 
   ~AtlasManager();
 
-  const std::shared_ptr<TextureProxy>* getTextureProxy(MaskFormat maskFormat,
-                                                       unsigned int* numActiveProxies);
+  const std::vector<std::shared_ptr<TextureProxy>>& getTextureProxies(MaskFormat maskFormat);
+
+  const std::vector<std::shared_ptr<Image>>& getImages(MaskFormat maskFormat);
 
   void releaseAll();
   bool hasGlyph(MaskFormat, const BytesKey& key) const;
 
   bool getGlyphLocator(MaskFormat, const BytesKey& key, AtlasLocator& locator) const;
 
-  Atlas::ErrorCode addGlyphToAtlasWithoutFillImage(PlacementPtr<Glyph> glyph) const;
+  Atlas::ErrorCode addGlyphToAtlasWithoutFillImage(const Glyph& glyph, AtlasToken nextFlushToken,
+                                                   AtlasLocator&) const;
 
   bool fillGlyphImage(MaskFormat, AtlasLocator& locator, void* image) const;
 
@@ -55,7 +58,24 @@ class AtlasManager : public AtlasGenerationCounter {
     return _glyphCacheBuffer;
   }
 
-  void uploadToTexture();
+  void setPlotUseToken(PlotUseUpdater&, const PlotLocator&, MaskFormat, AtlasToken);
+
+  void preFlush() override {
+    for (const auto& atlas : atlases) {
+      if (atlas == nullptr) {
+        continue;
+      }
+      atlas->clearEvictionPlotTexture(context);
+    }
+  }
+  void postFlush(AtlasToken startTokenForNextFlush) override {
+    for (const auto& atlas : atlases) {
+      if (atlas == nullptr) {
+        continue;
+      }
+      atlas->compact(startTokenForNextFlush);
+    }
+  }
 
  private:
   bool initAtlas(MaskFormat format);

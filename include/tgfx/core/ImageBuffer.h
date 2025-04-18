@@ -20,6 +20,7 @@
 
 #include "tgfx/core/Data.h"
 #include "tgfx/core/ImageInfo.h"
+#include "tgfx/core/Point.h"
 #include "tgfx/core/YUVColorSpace.h"
 #include "tgfx/core/YUVData.h"
 #include "tgfx/platform/HardwareBuffer.h"
@@ -109,8 +110,11 @@ class ImageBuffer {
    */
   virtual std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const = 0;
 
-  //virtual  onUploadTexture(Texture texture ,Point offset,mipmap);
+  virtual bool onUploadTexture(std::shared_ptr<Texture>, Point) {
+    return true;
+  }
 
   friend class Texture;
+  friend class TextAtlasUploadTask;
 };
 }  // namespace tgfx

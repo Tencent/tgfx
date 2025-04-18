@@ -122,6 +122,11 @@ void DrawingManager::addResourceTask(PlacementNode<ResourceTask> resourceTask) {
 }
 
 bool DrawingManager::flush() {
+  // Prepare any onFlush op lists (e.g. atlases).
+  for (auto flushCallbackObject : flushCallbackObjects) {
+    flushCallbackObject->preFlush();
+  }
+
   while (!compositors.empty()) {
     auto compositor = compositors.back();
     // The makeClosed() method may add more compositors to the list.
@@ -156,6 +161,19 @@ bool DrawingManager::flush() {
     task.execute(renderPass.get());
   }
   renderTasks.clear();
+  tokenTracker.advanceFlushToken();
+  for (auto flushCallbackObject : flushCallbackObjects) {
+    flushCallbackObject->postFlush(tokenTracker.nextFlushToken());
+  }
   return true;
 }
+
+AtlasToken DrawingManager::nextFlushToken() const {
+  return tokenTracker.nextFlushToken();
+}
+
+void DrawingManager::addFlushCallbackObject(FlushCallbackObject* flushCallbackObject) {
+  flushCallbackObjects.push_back(flushCallbackObject);
+}
+
 }  // namespace tgfx

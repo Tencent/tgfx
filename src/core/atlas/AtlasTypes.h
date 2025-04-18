@@ -98,15 +98,31 @@ class AtlasToken {
   uint64_t sequenceNumber;
 };
 
+class TokenTracker {
+ public:
+  /*
+   * Get the next flush token. in DrawingManger::flush()
+   */
+  AtlasToken nextFlushToken() const {
+    return currentFlushToken.next();
+  }
+  void advanceFlushToken() {
+    ++currentFlushToken;
+  }
+
+ private:
+  AtlasToken currentFlushToken = AtlasToken::InvalidToken();
+};
+
 class PlotLocator {
  public:
-  inline static constexpr auto kMaxMultitexturePages = 4;
-  inline static constexpr auto kMaxPlot = 32;
+  inline static constexpr size_t kMaxResidentPages = 4;
+  inline static constexpr uint32_t kMaxPlots = 32;
 
   PlotLocator(uint32_t pageIndex, uint32_t plotIndex, uint64_t generation)
       : _genID(generation), _plotIndex(plotIndex), _pageIndex(pageIndex) {
-    DEBUG_ASSERT(pageIndex < kMaxMultitexturePages);
-    DEBUG_ASSERT(plotIndex < kMaxPlot);
+    DEBUG_ASSERT(pageIndex < kMaxResidentPages);
+    DEBUG_ASSERT(plotIndex < kMaxPlots);
     DEBUG_ASSERT(generation < ((uint64_t)1 << 48));
   }
 
@@ -141,33 +157,88 @@ class PlotLocator {
   uint64_t _pageIndex : 8;
 };
 
+/**
+ * An interface for eviction callbacks. Whenever an atlas evicts a specific PlotLocator,
+ * it will call all the registered listeners so they can process the eviction.
+ */
+class PlotEvictionCallback {
+ public:
+  virtual ~PlotEvictionCallback() = default;
+  virtual void evict(const PlotLocator&) = 0;
+};
+
 class AtlasLocator {
  public:
   const Rect& getLocation() const {
     return location;
   }
+
+  const PlotLocator& plotLocator() const {
+    return _plotLocator;
+  }
+
   uint32_t pageIndex() const {
-    return plotLocator.pageIndex();
+    return _plotLocator.pageIndex();
   }
   uint32_t plotIndex() const {
-    return plotLocator.plotIndex();
+    return _plotLocator.plotIndex();
   }
 
   uint64_t genID() const {
-    return plotLocator.genID();
+    return _plotLocator.genID();
   }
 
   void updateRect(const Rect& rect) {
     location = rect;
   }
 
-  void setPlotLocator(const PlotLocator& locator) {
-    this->plotLocator = locator;
+  void setPlotLocator(const PlotLocator& plotLocator) {
+    this->_plotLocator = plotLocator;
   }
 
  private:
-  PlotLocator plotLocator;
+  PlotLocator _plotLocator;
   Rect location = Rect::MakeEmpty();
+};
+
+class PlotUseUpdater {
+ public:
+  bool add(const PlotLocator& plotLocator) {
+    auto pageIndex = plotLocator.pageIndex();
+    auto plotIndex = plotLocator.plotIndex();
+
+    if (find(pageIndex, plotIndex)) {
+      return false;
+    }
+    set(pageIndex, plotIndex);
+    return true;
+  }
+
+  void reset() {
+    plotAlreadyUpdated.clear();
+  }
+
+ private:
+  bool find(uint32_t pageIndex, uint32_t plotIndex) const {
+    DEBUG_ASSERT(plotIndex < PlotLocator::kMaxPlots);
+    if (pageIndex >= plotAlreadyUpdated.size()) {
+      return false;
+    }
+    return static_cast<bool>((plotAlreadyUpdated[pageIndex] >> plotIndex) & 1);
+  }
+
+  void set(uint32_t pageIndex, uint32_t plotIndex) {
+    DEBUG_ASSERT(!find(pageIndex, plotIndex));
+    if (pageIndex >= plotAlreadyUpdated.size()) {
+      auto count = pageIndex - plotAlreadyUpdated.size() + 1;
+      for (auto i = 0; i < count; ++i) {
+        plotAlreadyUpdated.emplace_back(0);
+      }
+    }
+    plotAlreadyUpdated[pageIndex] |= (1 << plotIndex);
+  }
+
+  std::vector<uint32_t> plotAlreadyUpdated;
 };
 
 class Plot {
@@ -189,6 +260,14 @@ class Plot {
     return _genID;
   }
 
+  const PlotLocator& plotLocator() const {
+    return _plotLocator;
+  }
+
+  const Point& pixelOffset() const {
+    return _pixelOffset;
+  }
+
   bool addSubImage(int imageWidth, int imageHeight, const void* image,
                    AtlasLocator& atlasLocator) const;
 
@@ -198,7 +277,27 @@ class Plot {
 
   std::tuple<const void*, Rect, size_t> prepareForUpload();
 
+  AtlasToken lastUseToken() const {
+    return _lastUseToken;
+  }
+  void setLastUseToken(AtlasToken token) {
+    _lastUseToken = token;
+  }
+
+  int flushesSinceLastUsed() const {
+    return _flushesSinceLastUsed;
+  }
+  void resetFlushesSinceLastUsed() {
+    _flushesSinceLastUsed = 0;
+  }
+  void increaseFlushesSinceLastUsed() {
+    ++_flushesSinceLastUsed;
+  }
+
  private:
+  AtlasToken _lastUseToken = AtlasToken::InvalidToken();
+  int _flushesSinceLastUsed = 0;
+
   AtlasGenerationCounter* const generationCounter = nullptr;
   const int _pageIndex;
   const int _plotIndex;
@@ -206,12 +305,11 @@ class Plot {
   mutable unsigned char* data = nullptr;
   const int width;
   const int height;
-  const Point pixelOffset;
+  const Point _pixelOffset;
   const int bytesPerPixel;
   RectPackSkyline rectPack;
-  PlotLocator plotLocator;
+  PlotLocator _plotLocator;
   const int padding = 1;
-
   Rect dirtyRect = Rect::MakeEmpty();
   Rect cachedRect = Rect::MakeEmpty();
 };

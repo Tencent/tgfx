@@ -20,7 +20,6 @@
 
 #include "core/ImageSource.h"
 #include "gpu/AAType.h"
-#include "gpu/proxies/AtlasProxy.h"
 #include "gpu/proxies/GpuBufferProxy.h"
 #include "gpu/proxies/GpuShapeProxy.h"
 #include "gpu/proxies/RenderTargetProxy.h"
@@ -72,10 +71,6 @@ class ProxyProvider {
   std::shared_ptr<GpuShapeProxy> createGpuShapeProxy(std::shared_ptr<Shape> shape, AAType aaType,
                                                      const Rect& clipBounds,
                                                      uint32_t renderFlags = 0);
-
-  std::shared_ptr<AtlasProxy> createAtlasProxy(const UniqueKey& uniqueKey,
-                                               std::shared_ptr<GlyphRunList> glyphRunList,
-                                               const Matrix& viewMatrix,const Stroke* stroke, uint32_t renderFlags = 0);
 
   /*
    * Creates a TextureProxy for the given ImageBuffer. The image buffer will be released after being

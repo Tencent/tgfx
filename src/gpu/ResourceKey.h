@@ -209,6 +209,7 @@ class UniqueKey : public ResourceKey {
 
   friend class ResourceHandle;
   friend class LazyUniqueKey;
+  friend class RenderContext;
 };
 
 /**
