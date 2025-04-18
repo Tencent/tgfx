@@ -20,9 +20,6 @@
 #include <algorithm>
 #include <cstdlib>
 #include <string>
-#include <thread>
-#include <vector>
-#include "TaskWorkerThread.h"
 #include "core/utils/Log.h"
 
 #ifdef __APPLE__
@@ -30,6 +27,7 @@
 #endif
 
 namespace tgfx {
+static constexpr auto THREAD_TIMEOUT = std::chrono::seconds(10);
 static constexpr uint32_t THREAD_POOL_SIZE = 32;
 static constexpr uint32_t TASK_QUEUE_SIZE = 4096;
 
@@ -48,9 +46,46 @@ int GetCPUCores() {
   return cpuCores;
 }
 
+TaskWorkerThread::~TaskWorkerThread() {
+  if (thread) {
+    if (_exitWhileIdle) {
+      thread->detach();
+    } else if (thread->joinable()) {
+      thread->join();
+    }
+    delete thread;
+  }
+  --TaskGroup::GetInstance()->totalThreads;
+}
+
+bool TaskWorkerThread::start() {
+  if (thread) {
+    return true;
+  }
+  thread = new (std::nothrow) std::thread(TaskGroup::RunLoop, this);
+  return thread != nullptr;
+}
+
 TaskGroup* TaskGroup::GetInstance() {
   static auto& taskGroup = *new TaskGroup();
   return &taskGroup;
+}
+
+void TaskGroup::RunLoop(TaskWorkerThread* thread) {
+  auto taskGroup = TaskGroup::GetInstance();
+  while (!taskGroup->exited) {
+    auto task = taskGroup->popTask();
+    if (task == nullptr) {
+      if (thread->_exitWhileIdle) {
+        // TaskGroup no longer manages threads marked with exitWhileIdle,
+        // so the thread must self-destruct here
+        delete thread;
+        break;
+      }
+      continue;
+    }
+    task->execute();
+  }
 }
 
 void OnAppExit() {
@@ -68,13 +103,11 @@ TaskGroup::TaskGroup() {
 bool TaskGroup::checkThreads() {
   static const int CPUCores = GetCPUCores();
   static const int MaxThreads = CPUCores > 16 ? 16 : CPUCores;
-  if (!TaskWorkerThread::HasWaitingThread() && totalThreads < MaxThreads) {
-    auto thread = TaskWorkerThread::Create();
+  if (waitingThreads == 0 && totalThreads < MaxThreads) {
+    auto thread = new TaskWorkerThread();
     if (thread->start()) {
       threads->enqueue(thread);
-      totalThreads++;
-    } else {
-      delete thread;
+      ++totalThreads;
     }
   } else {
     return true;
@@ -92,50 +125,46 @@ bool TaskGroup::pushTask(std::shared_ptr<Task> task) {
   if (!tasks->enqueue(std::move(task))) {
     return false;
   }
-  TaskWorkerThread::NotifyNewTask();
+  if (waitingThreads > 0) {
+    condition.notify_one();
+  }
   return true;
 }
 
 std::shared_ptr<Task> TaskGroup::popTask() {
-  return tasks->dequeue();
+  std::unique_lock<std::mutex> autoLock(locker);
+  while (!exited) {
+    auto task = tasks->dequeue();
+    if (task) {
+      return task;
+    }
+    ++waitingThreads;
+    auto status = condition.wait_for(autoLock, THREAD_TIMEOUT);
+    --waitingThreads;
+    if (exited || status == std::cv_status::timeout) {
+      return nullptr;
+    }
+  }
+  return nullptr;
 }
 
 void TaskGroup::exit() {
   exited = true;
-  releaseThreadsInternal(true);
-  delete tasks;
+  condition.notify_all();
+  TaskWorkerThread* thread = nullptr;
+  while ((thread = threads->dequeue()) != nullptr) {
+    delete thread;
+  }
   delete threads;
+  delete tasks;
+  DEBUG_ASSERT(totalThreads == 0);
+  DEBUG_ASSERT(waitingThreads == 0);
 }
 
 void TaskGroup::releaseThreads() {
-  if (exited) {
-    return;
-  }
-  // stop accepting new tasks before clearing threads
-  exited = true;
-  releaseThreadsInternal(false);
-  // continue to accept new tasks
-  exited = false;
-}
-
-void TaskGroup::releaseThreadsInternal(bool wait) {
   TaskWorkerThread* thread = nullptr;
-  std::vector<TaskWorkerThread*> threadsToDelete;
   while ((thread = threads->dequeue()) != nullptr) {
-    if (wait) {
-      thread->exit();
-      threadsToDelete.push_back(thread);
-    } else {
-      // Note: Immediate deletion here would cause a crash becasue the threadProc will use the
-      // thread object.
-      // Threads in idle state will self-destruct after completing total tasks.
-      thread->exitWhileIdle();
-    }
-  }
-  totalThreads = 0;
-  TaskWorkerThread::NotifyExit();
-  for (auto thread : threadsToDelete) {
-    delete thread;
+    thread->_exitWhileIdle = true;
   }
 }
 }  // namespace tgfx

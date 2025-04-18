@@ -18,28 +18,44 @@
 
 #pragma once
 
+#include <condition_variable>
+#include <list>
+#include <mutex>
+#include <thread>
+#include <vector>
 #include "LockFreeQueue.h"
-#include "core/utils/TaskWorkerThread.h"
 #include "tgfx/core/Task.h"
 
 namespace tgfx {
+class TaskWorkerThread {
+ public:
+  ~TaskWorkerThread();
+
+ private:
+  bool start();
+  std::thread* thread = nullptr;
+  std::atomic_bool _exitWhileIdle = false;
+  friend class TaskGroup;
+};
+
 class TaskGroup {
  private:
+  std::mutex locker = {};
+  std::condition_variable condition = {};
   std::atomic_int totalThreads = 0;
   std::atomic_bool exited = false;
+  std::atomic_int waitingThreads = 0;
   LockFreeQueue<std::shared_ptr<Task>>* tasks = nullptr;
   LockFreeQueue<TaskWorkerThread*>* threads = nullptr;
   static TaskGroup* GetInstance();
+  static void RunLoop(TaskWorkerThread* thread);
 
   TaskGroup();
   bool checkThreads();
   bool pushTask(std::shared_ptr<Task> task);
   std::shared_ptr<Task> popTask();
-
   void exit();
   void releaseThreads();
-
-  void releaseThreadsInternal(bool wait);
 
   friend class Task;
   friend class TaskWorkerThread;

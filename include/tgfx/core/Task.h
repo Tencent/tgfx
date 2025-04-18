@@ -55,7 +55,7 @@ enum class TaskStatus {
 class Task {
  public:
   /**
-   * Releases all thread resources when the task threads are idle.
+   * Releases all worker threads after completing current tasks.
    */
   static void ReleaseThreads();
 
@@ -112,7 +112,6 @@ class Task {
   void execute();
 
   friend class TaskGroup;
-  friend class TaskWorkerThread;
 };
 
 }  // namespace tgfx
