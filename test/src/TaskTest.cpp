@@ -18,8 +18,8 @@
 
 #include <vector>
 #include "base/TGFXTest.h"
-#include "tgfx/core/Task.h"
 #include "core/utils/TaskGroup.h"
+#include "tgfx/core/Task.h"
 
 namespace tgfx {
 TGFX_TEST(TaskTest, release) {
