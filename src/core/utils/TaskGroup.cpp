@@ -59,13 +59,6 @@ struct RunLoopParams {
 #endif
 };
 
-static void ReleaseThread(std::thread* thread) {
-  if (thread->joinable()) {
-    thread->join();
-  }
-  delete thread;
-}
-
 void TaskGroup::RunLoop(RunLoopParams params) {
 #ifdef __OHOS__
   if (params.cpuMask != 0) {
@@ -171,6 +164,13 @@ void TaskGroup::shutdown() {
   clean();
   // continue to accept new tasks
   exited = false;
+}
+
+static void ReleaseThread(std::thread* thread) {
+  if (thread->joinable()) {
+    thread->join();
+  }
+  delete thread;
 }
 
 void TaskGroup::clean() {
