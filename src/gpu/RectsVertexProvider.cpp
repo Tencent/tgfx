@@ -118,20 +118,21 @@ class NonAARectVertexProvider : public RectsVertexProvider {
   }
 };
 
-PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(BlockBuffer* buffer,
-                                                                const Rect& rect, AAType aaType) {
+std::unique_ptr<RectsVertexProvider> RectsVertexProvider::MakeFrom(BlockBuffer* buffer,
+                                                                   const Rect& rect,
+                                                                   AAType aaType) {
   if (rect.isEmpty()) {
     return nullptr;
   }
   auto record = buffer->make<RectRecord>(rect, Matrix::I());
   auto rects = buffer->makeArray<RectRecord>(&record, 1);
   if (aaType == AAType::Coverage) {
-    return buffer->make<AARectsVertexProvider>(std::move(rects), aaType, false, false);
+    return std::make_unique<AARectsVertexProvider>(std::move(rects), aaType, false, false);
   }
-  return buffer->make<NonAARectVertexProvider>(std::move(rects), aaType, false, false);
+  return std::make_unique<NonAARectVertexProvider>(std::move(rects), aaType, false, false);
 }
 
-PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
+std::unique_ptr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
     BlockBuffer* buffer, std::vector<PlacementPtr<RectRecord>>&& rects, AAType aaType,
     bool needUVCoord) {
   if (rects.empty()) {
@@ -159,9 +160,9 @@ PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
   }
   auto array = buffer->makeArray(std::move(rects));
   if (aaType == AAType::Coverage) {
-    return buffer->make<AARectsVertexProvider>(std::move(array), aaType, hasUVCoord, hasColor);
+    return std::make_unique<AARectsVertexProvider>(std::move(array), aaType, hasUVCoord, hasColor);
   }
-  return buffer->make<NonAARectVertexProvider>(std::move(array), aaType, hasUVCoord, hasColor);
+  return std::make_unique<NonAARectVertexProvider>(std::move(array), aaType, hasUVCoord, hasColor);
 }
 
 RectsVertexProvider::RectsVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType,

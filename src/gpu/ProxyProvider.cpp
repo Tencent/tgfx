@@ -75,7 +75,7 @@ std::shared_ptr<GpuBufferProxy> ProxyProvider::createGpuBufferProxy(
 }
 
 std::pair<std::shared_ptr<GpuBufferProxy>, size_t> ProxyProvider::createSharedVertexBuffer(
-    PlacementPtr<VertexProvider> provider, uint32_t renderFlags) {
+    std::unique_ptr<VertexProvider> provider, uint32_t renderFlags) {
   if (provider == nullptr) {
     return {nullptr, 0};
   }

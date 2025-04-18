@@ -43,9 +43,9 @@ class RRectsVertexProvider : public VertexProvider {
   /**
    * Creates a new RRectsVertexProvider from a list of RRect records.
    */
-  static PlacementPtr<RRectsVertexProvider> MakeFrom(BlockBuffer* blockBuffer,
-                                                     std::vector<PlacementPtr<RRectRecord>>&& rects,
-                                                     AAType aaType, bool useScale);
+  static std::unique_ptr<RRectsVertexProvider> MakeFrom(
+      BlockBuffer* blockBuffer, std::vector<PlacementPtr<RRectRecord>>&& rects, AAType aaType,
+      bool useScale);
 
   /**
    * Returns the number of round rects in the provider.
@@ -93,7 +93,5 @@ class RRectsVertexProvider : public VertexProvider {
 
   RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool useScale,
                        bool hasColor);
-
-  friend class BlockBuffer;
 };
 }  // namespace tgfx

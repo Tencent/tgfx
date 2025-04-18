@@ -72,7 +72,7 @@ class ProxyProvider {
    * buffer where the vertices are stored.
    */
   std::pair<std::shared_ptr<GpuBufferProxy>, size_t> createSharedVertexBuffer(
-      PlacementPtr<VertexProvider> provider, uint32_t renderFlags = 0);
+      std::unique_ptr<VertexProvider> provider, uint32_t renderFlags = 0);
 
   /**
    * Creates a GpuShapeProxy for the given Shape. The shape will be released after being uploaded to

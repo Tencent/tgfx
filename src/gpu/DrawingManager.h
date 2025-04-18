@@ -61,6 +61,11 @@ class DrawingManager {
    */
   bool flush();
 
+  /**
+   * Releases all resources associated with the drawing manager.
+   */
+  void releaseAll();
+
  private:
   Context* context = nullptr;
   BlockBuffer* drawingBuffer = nullptr;

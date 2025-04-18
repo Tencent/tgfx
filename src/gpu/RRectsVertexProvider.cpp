@@ -51,7 +51,7 @@ namespace tgfx {
 // geometry but make the inner rect degenerate (either a point or a horizontal or
 // vertical line).
 
-PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
+std::unique_ptr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
     BlockBuffer* buffer, std::vector<PlacementPtr<RRectRecord>>&& rects, AAType aaType,
     bool useScale) {
   if (rects.empty()) {
@@ -68,7 +68,8 @@ PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
     }
   }
   auto array = buffer->makeArray(std::move(rects));
-  return buffer->make<RRectsVertexProvider>(std::move(array), aaType, useScale, hasColor);
+  return std::unique_ptr<RRectsVertexProvider>(
+      new RRectsVertexProvider(std::move(array), aaType, useScale, hasColor));
 }
 
 static void WriteUByte4Color(float* vertices, int& index, const Color& color) {

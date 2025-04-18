@@ -26,7 +26,7 @@
 
 namespace tgfx {
 PlacementPtr<RRectDrawOp> RRectDrawOp::Make(Context* context,
-                                            PlacementPtr<RRectsVertexProvider> provider,
+                                            std::unique_ptr<RRectsVertexProvider> provider,
                                             uint32_t renderFlags) {
   if (provider == nullptr) {
     return nullptr;

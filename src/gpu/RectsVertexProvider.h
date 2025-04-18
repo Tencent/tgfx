@@ -43,15 +43,15 @@ class RectsVertexProvider : public VertexProvider {
   /**
    * Creates a new RectsVertexProvider from a single rect.
    */
-  static PlacementPtr<RectsVertexProvider> MakeFrom(BlockBuffer* buffer, const Rect& rect,
-                                                    AAType aaType);
+  static std::unique_ptr<RectsVertexProvider> MakeFrom(BlockBuffer* buffer, const Rect& rect,
+                                                       AAType aaType);
 
   /**
    * Creates a new RectsVertexProvider from a list of rect records.
    */
-  static PlacementPtr<RectsVertexProvider> MakeFrom(BlockBuffer* buffer,
-                                                    std::vector<PlacementPtr<RectRecord>>&& rects,
-                                                    AAType aaType, bool needUVCoord);
+  static std::unique_ptr<RectsVertexProvider> MakeFrom(
+      BlockBuffer* buffer, std::vector<PlacementPtr<RectRecord>>&& rects, AAType aaType,
+      bool needUVCoord);
 
   /**
    * Returns the number of rects in the provider.
