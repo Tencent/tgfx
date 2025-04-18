@@ -51,7 +51,6 @@ class TaskGroup {
   void clean();
 
   friend class Task;
-  friend class TaskRunLoop;
   friend void OnAppExit();
 };
 }  // namespace tgfx

@@ -17,7 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TaskGroup.h"
+#include <algorithm>
 #include <cstdlib>
+#include <string>
+#include "core/utils/Log.h"
 
 #ifdef __APPLE__
 #include <sys/sysctl.h>
@@ -55,6 +58,13 @@ struct RunLoopParams {
   uint64_t cpuMask = 0;
 #endif
 };
+
+static void ReleaseThread(std::thread* thread) {
+  if (thread->joinable()) {
+    thread->join();
+  }
+  delete thread;
+}
 
 void TaskGroup::RunLoop(RunLoopParams params) {
 #ifdef __OHOS__
@@ -94,13 +104,15 @@ bool TaskGroup::checkThreads() {
   static const int MaxThreads = CPUCores > 16 ? 16 : CPUCores;
   if (waitingThreads == 0 && totalThreads < MaxThreads) {
 #ifdef __OHOS__
-    auto thread = new std::thread(
-        RunLoop, RunLoopParams{this, static_cast<uint64_t>(MaxThreads - 1 - totalThreads)});
+    auto thread = new (std::nothrow) std::thread(
+        &TaskGroup::RunLoop, RunLoopParams{this, static_cast<uint64_t>(MaxThreads - 1 - totalThreads)});
 #else
-    auto thread = new std::thread(RunLoop, RunLoopParams{this});
+    auto thread = new (std::nothrow) std::thread(&TaskGroup::RunLoop, RunLoopParams{this});
 #endif
-    threads->enqueue(thread);
-    totalThreads++;
+    if (thread) {
+      threads->enqueue(thread);
+      totalThreads++;
+    }
   } else {
     return true;
   }
@@ -165,10 +177,7 @@ void TaskGroup::clean() {
   condition.notify_all();
   std::thread* thread = nullptr;
   while ((thread = threads->dequeue()) != nullptr) {
-    if (thread->joinable()) {
-      thread->join();
-    }
-    delete thread;
+    ReleaseThread(thread);
   }
   while (tasks->dequeue() != nullptr) {
   }
