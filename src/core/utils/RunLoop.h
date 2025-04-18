@@ -36,7 +36,7 @@ class RunLoop {
   }
 
  private:
-  static void Execute();
+  static void ThreadProc(RunLoop* runLoop);
   std::thread* thread = nullptr;
   std::atomic_bool exited = false;
   bool waitingWhileDealloc = false;

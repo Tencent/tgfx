@@ -72,6 +72,8 @@ bool TaskGroup::checkThreads() {
     if (thread->start()) {
       threads->enqueue(thread);
       totalThreads++;
+    } else {
+      delete thread;
     }
   } else {
     return true;

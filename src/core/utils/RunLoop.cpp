@@ -48,20 +48,19 @@ bool RunLoop::start() {
   if (thread) {
     return true;
   }
-  thread = new (std::nothrow) std::thread([this]() {
-    while (!exited) {
-      Execute();
-    }
-  });
+  thread = new (std::nothrow) std::thread(ThreadProc, this);
   return thread != nullptr;
 }
 
-void RunLoop::Execute() {
-  auto task = TaskGroup::GetInstance()->popTask();
-  if (task == nullptr) {
-    return;
+void RunLoop::ThreadProc(RunLoop* runLoop) {
+  auto group = TaskGroup::GetInstance();
+  while (!runLoop->exited) {
+    auto task = group->popTask();
+    if (task == nullptr) {
+      continue;
+    }
+    task->execute();
   }
-  task->execute();
 }
 
 }  // namespace tgfx
