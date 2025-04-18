@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TaskRunLoop.h"
+#include "TaskWorkerThread.h"
 #include <condition_variable>
 #include <mutex>
 #include "TaskGroup.h"
@@ -26,25 +26,25 @@ static std::mutex locker = {};
 static std::condition_variable condition = {};
 static std::atomic_int waitingThreads = 0;
 
-void TaskRunLoop::NotifyNewTask() {
+void TaskWorkerThread::NotifyNewTask() {
   if (waitingThreads > 0) {
     condition.notify_one();
   }
 }
 
-void TaskRunLoop::NotifyExit() {
+void TaskWorkerThread::NotifyExit() {
   condition.notify_all();
 }
 
-bool TaskRunLoop::HasWaitingRunLoop() {
+bool TaskWorkerThread::HasWaitingThread() {
   return waitingThreads > 0;
 }
 
-TaskRunLoop* TaskRunLoop::Create() {
-  return new TaskRunLoop();
+TaskWorkerThread* TaskWorkerThread::Create() {
+  return new TaskWorkerThread();
 }
 
-TaskRunLoop::~TaskRunLoop() {
+TaskWorkerThread::~TaskWorkerThread() {
   if (!thread) {
     return;
   }
@@ -58,15 +58,15 @@ TaskRunLoop::~TaskRunLoop() {
   delete thread;
 }
 
-void TaskRunLoop::exit() {
+void TaskWorkerThread::exit() {
   exited = true;
 }
 
-void TaskRunLoop::exitWhileIdle() {
+void TaskWorkerThread::exitWhileIdle() {
   _exitWhileIdle = true;
 }
 
-bool TaskRunLoop::start() {
+bool TaskWorkerThread::start() {
   if (thread) {
     return true;
   }
@@ -74,18 +74,21 @@ bool TaskRunLoop::start() {
   return thread != nullptr;
 }
 
-void TaskRunLoop::ThreadProc(TaskRunLoop* runLoop) {
+void TaskWorkerThread::ThreadProc(TaskWorkerThread* thread) {
   auto group = TaskGroup::GetInstance();
   std::unique_lock<std::mutex> autoLock(locker);
-  while (!runLoop->exited) {
+  while (!thread->exited) {
     auto task = group->popTask();
     if (!task) {
-      if (runLoop->_exitWhileIdle) {
+      if (thread->_exitWhileIdle) {
+        // TaskGroup is not responsible for managing the lifecycle of threads that need to exit,
+        // so we delete the thread here
+        delete thread;
         break;
       }
-      waitingThreads++;
+      ++waitingThreads;
       condition.wait(autoLock);
-      waitingThreads--;
+      --waitingThreads;
       continue;
     }
     task->execute();

@@ -21,7 +21,8 @@
 #include <cstdlib>
 #include <string>
 #include <thread>
-#include "TaskRunLoop.h"
+#include <vector>
+#include "TaskWorkerThread.h"
 #include "core/utils/Log.h"
 
 #ifdef __APPLE__
@@ -59,39 +60,39 @@ void OnAppExit() {
 }
 
 TaskGroup::TaskGroup() {
-  runLoops = new LockFreeQueue<TaskRunLoop*>(THREAD_POOL_SIZE);
+  threads = new LockFreeQueue<TaskWorkerThread*>(THREAD_POOL_SIZE);
   tasks = new LockFreeQueue<std::shared_ptr<Task>>(TASK_QUEUE_SIZE);
   std::atexit(OnAppExit);
 }
 
-bool TaskGroup::checkRunLoops() {
+bool TaskGroup::checkThreads() {
   static const int CPUCores = GetCPUCores();
-  static const int MaxRunLoops = CPUCores > 16 ? 16 : CPUCores;
-  if (!TaskRunLoop::HasWaitingRunLoop() && totalRunLoops < MaxRunLoops) {
-    auto runLoop = TaskRunLoop::Create();
-    if (runLoop->start()) {
-      runLoops->enqueue(runLoop);
-      totalRunLoops++;
+  static const int MaxThreads = CPUCores > 16 ? 16 : CPUCores;
+  if (!TaskWorkerThread::HasWaitingThread() && totalThreads < MaxThreads) {
+    auto thread = TaskWorkerThread::Create();
+    if (thread->start()) {
+      threads->enqueue(thread);
+      totalThreads++;
     } else {
-      delete runLoop;
+      delete thread;
     }
   } else {
     return true;
   }
-  return totalRunLoops > 0;
+  return totalThreads > 0;
 }
 
 bool TaskGroup::pushTask(std::shared_ptr<Task> task) {
 #ifndef TGFX_USE_THREADS
   return false;
 #endif
-  if (exited || !checkRunLoops()) {
+  if (exited || !checkThreads()) {
     return false;
   }
   if (!tasks->enqueue(std::move(task))) {
     return false;
   }
-  TaskRunLoop::NotifyNewTask();
+  TaskWorkerThread::NotifyNewTask();
   return true;
 }
 
@@ -101,38 +102,40 @@ std::shared_ptr<Task> TaskGroup::popTask() {
 
 void TaskGroup::exit() {
   exited = true;
-  releaseRunLoopsInternal(true);
+  releaseThreadsInternal(true);
   delete tasks;
-  delete runLoops;
-  DEBUG_ASSERT(TaskRunLoop::HasWaitingRunLoop() == false);
+  delete threads;
 }
 
-void TaskGroup::releaseRunLoops() {
+void TaskGroup::releaseThreads() {
   if (exited) {
     return;
   }
   // stop accepting new tasks before clearing threads
   exited = true;
-  releaseRunLoopsInternal(false);
+  releaseThreadsInternal(false);
   // continue to accept new tasks
   exited = false;
 }
 
-void TaskGroup::releaseRunLoopsInternal(bool wait) {
-  TaskRunLoop* runLoop = nullptr;
-  std::vector<TaskRunLoop*> runLoopsToDelete;
-  while ((runLoop = runLoops->dequeue()) != nullptr) {
+void TaskGroup::releaseThreadsInternal(bool wait) {
+  TaskWorkerThread* thread = nullptr;
+  std::vector<TaskWorkerThread*> threadsToDelete;
+  while ((thread = threads->dequeue()) != nullptr) {
     if (wait) {
-      runLoop->exit();
+      thread->exit();
+      threadsToDelete.push_back(thread);
     } else {
-      runLoop->exitWhileIdle();
+      // Note: Immediate deletion here would cause a crash becasue the threadProc will use the
+      // thread object.
+      // Threads in idle state will self-destruct after completing total tasks.
+      thread->exitWhileIdle();
     }
-    runLoopsToDelete.push_back(runLoop);
   }
-  totalRunLoops = 0;
-  TaskRunLoop::NotifyExit();
-  for (auto runloop : runLoopsToDelete) {
-    delete runloop;
+  totalThreads = 0;
+  TaskWorkerThread::NotifyExit();
+  for (auto thread : threadsToDelete) {
+    delete thread;
   }
 }
 }  // namespace tgfx

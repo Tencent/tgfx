@@ -112,7 +112,7 @@ class Task {
   void execute();
 
   friend class TaskGroup;
-  friend class TaskRunLoop;
+  friend class TaskWorkerThread;
 };
 
 }  // namespace tgfx

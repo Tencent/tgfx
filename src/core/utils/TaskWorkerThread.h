@@ -23,17 +23,17 @@
 #include "tgfx/core/Task.h"
 
 namespace tgfx {
-class TaskRunLoop {
+class TaskWorkerThread {
  public:
   static void NotifyNewTask();
 
   static void NotifyExit();
 
-  static bool HasWaitingRunLoop();
+  static bool HasWaitingThread();
 
-  static TaskRunLoop* Create();
+  static TaskWorkerThread* Create();
 
-  virtual ~TaskRunLoop();
+  virtual ~TaskWorkerThread();
 
   bool start();
 
@@ -42,7 +42,7 @@ class TaskRunLoop {
   void exitWhileIdle();
 
  private:
-  static void ThreadProc(TaskRunLoop* runLoop);
+  static void ThreadProc(TaskWorkerThread* thread);
   std::thread* thread = nullptr;
   std::atomic_bool exited = false;
   std::atomic_bool _exitWhileIdle = false;

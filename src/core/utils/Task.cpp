@@ -35,7 +35,7 @@ class BlockTask : public Task {
 };
 
 void Task::ReleaseThreads() {
-  TaskGroup::GetInstance()->releaseRunLoops();
+  TaskGroup::GetInstance()->releaseThreads();
 }
 
 std::shared_ptr<Task> Task::Run(std::function<void()> block) {

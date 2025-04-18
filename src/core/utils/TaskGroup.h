@@ -19,30 +19,30 @@
 #pragma once
 
 #include "LockFreeQueue.h"
-#include "core/utils/TaskRunLoop.h"
+#include "core/utils/TaskWorkerThread.h"
 #include "tgfx/core/Task.h"
 
 namespace tgfx {
 class TaskGroup {
  private:
-  std::atomic_int totalRunLoops = 0;
+  std::atomic_int totalThreads = 0;
   std::atomic_bool exited = false;
   LockFreeQueue<std::shared_ptr<Task>>* tasks = nullptr;
-  LockFreeQueue<TaskRunLoop*>* runLoops = nullptr;
+  LockFreeQueue<TaskWorkerThread*>* threads = nullptr;
   static TaskGroup* GetInstance();
 
   TaskGroup();
-  bool checkRunLoops();
+  bool checkThreads();
   bool pushTask(std::shared_ptr<Task> task);
   std::shared_ptr<Task> popTask();
 
   void exit();
-  void releaseRunLoops();
+  void releaseThreads();
 
-  void releaseRunLoopsInternal(bool wait);
+  void releaseThreadsInternal(bool wait);
 
   friend class Task;
-  friend class TaskRunLoop;
+  friend class TaskWorkerThread;
   friend void OnAppExit();
 };
 }  // namespace tgfx
