@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <thread>
 
 namespace tgfx {
@@ -28,7 +29,7 @@ class RunLoop {
 
   bool start();
 
-  void exit(bool waitingWhileDestroy = false);
+  void exit(bool waitingWhileDealloc = false);
 
  protected:
   explicit RunLoop() {
@@ -38,6 +39,6 @@ class RunLoop {
   static void Execute();
   std::thread* thread = nullptr;
   std::atomic_bool exited = false;
-  bool waitingWhileDestroy = false;
+  bool waitingWhileDealloc = false;
 };
 }  // namespace tgfx
