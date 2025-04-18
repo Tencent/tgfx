@@ -97,8 +97,9 @@ bool TaskGroup::checkThreads() {
   static const int MaxThreads = CPUCores > 16 ? 16 : CPUCores;
   if (waitingThreads == 0 && totalThreads < MaxThreads) {
 #ifdef __OHOS__
-    auto thread = new (std::nothrow) std::thread(
-        &TaskGroup::RunLoop, RunLoopParams{this, static_cast<uint64_t>(MaxThreads - 1 - totalThreads)});
+    auto thread = new (std::nothrow)
+        std::thread(&TaskGroup::RunLoop,
+                    RunLoopParams{this, static_cast<uint64_t>(MaxThreads - 1 - totalThreads)});
 #else
     auto thread = new (std::nothrow) std::thread(&TaskGroup::RunLoop, RunLoopParams{this});
 #endif
