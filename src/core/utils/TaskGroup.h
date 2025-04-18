@@ -27,6 +27,17 @@
 #include "tgfx/core/Task.h"
 
 namespace tgfx {
+class TaskThread {
+ public:
+  ~TaskThread();
+
+ private:
+  bool start();
+  std::thread* thread = nullptr;
+  std::atomic_bool exitWhileIdle = false;
+  friend class TaskGroup;
+};
+
 class TaskGroup {
  private:
   std::mutex locker = {};
@@ -35,17 +46,19 @@ class TaskGroup {
   std::atomic_bool exited = false;
   std::atomic_int waitingThreads = 0;
   LockFreeQueue<std::shared_ptr<Task>>* tasks = nullptr;
-  LockFreeQueue<std::thread*>* threads = nullptr;
+  LockFreeQueue<TaskThread*>* threads = nullptr;
   static TaskGroup* GetInstance();
-  static void RunLoop(TaskGroup* taskGroup);
+  static void RunLoop(TaskThread* thread);
 
   TaskGroup();
   bool checkThreads();
   bool pushTask(std::shared_ptr<Task> task);
   std::shared_ptr<Task> popTask();
   void exit();
+  void releaseThreads();
 
   friend class Task;
+  friend class TaskThread;
   friend void OnAppExit();
 };
 }  // namespace tgfx
