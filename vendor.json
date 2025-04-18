@@ -25,32 +25,6 @@
       }
     },
     {
-      "name": "tracy",
-      "cmake": {
-        "targets": [
-          "TracyClient"
-        ],
-        "arguments": [
-          "-DCMAKE_CXX_FLAGS=\"-w\""
-        ]
-      }
-    },
-    {
-      "name": "tracyServer",
-      "dir": "tracy/serverLib",
-      "cmake": {
-        "targets": [
-          "TracyServer",
-          "TracyNfd",
-          "TracyZstd",
-          "capstone"
-        ],
-        "arguments": [
-          "-DCMAKE_CXX_FLAGS=\"-w\""
-        ]
-      }
-    },
-    {
       "name": "zlib",
       "cmake": {
         "targets": [
@@ -109,6 +83,9 @@
           "android",
           "ios",
           "ohos"
+        ],
+        "arguments": [
+          "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
         ]
       }
     },
@@ -125,7 +102,8 @@
           "${BUILD_DIR}/jconfig.h"
         ],
         "arguments": [
-          "-DWITH_SIMD=FALSE"
+          "-DWITH_SIMD=FALSE",
+          "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
         ],
         "platforms": [
           "web"
@@ -140,9 +118,6 @@
       "cmake": {
         "targets": [
           "png_static"
-        ],
-        "arguments": [
-          "-DPNG_BUILD_ZLIB=ON"
         ],
         "includes": [
           "${SOURCE_DIR}/png.h",
@@ -167,7 +142,6 @@
           "png_static"
         ],
         "arguments": [
-          "-DPNG_BUILD_ZLIB=ON",
           "-DPNG_ARM_NEON=on"
         ],
         "includes": [
@@ -192,7 +166,6 @@
         ],
         "arguments": [
           "-DANDROID=TRUE",
-          "-DPNG_BUILD_ZLIB=ON",
           "-DPNG_ARM_NEON=on"
         ],
         "includes": [
@@ -219,6 +192,7 @@
           "-DCMAKE_DISABLE_FIND_PACKAGE_BZip2=TRUE",
           "-DCMAKE_DISABLE_FIND_PACKAGE_HarfBuzz=TRUE",
           "-DFT_DISABLE_BROTLI=TRUE",
+          "-DFT_REQUIRE_PNG=TRUE",
           "-DCMAKE_C_FLAGS=\"-w\""
         ]
       }
@@ -233,7 +207,8 @@
           "-DHB_HAVE_FREETYPE=OFF",
           "-DHB_HAVE_CORETEXT=OFF",
           "-Wno-dev",
-          "-DCMAKE_CXX_FLAGS=\"-w -DHB_LEAN -DHB_MINI -DHB_NO_UCD_UNASSIGNED -DNDEBUG -D__OPTIMIZE_SIZE__\""
+          "-DCMAKE_CXX_FLAGS=\"-w -DHB_LEAN -DHB_MINI -DHB_NO_UCD_UNASSIGNED -DNDEBUG -D__OPTIMIZE_SIZE__\"",
+          "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
         ]
       }
     },

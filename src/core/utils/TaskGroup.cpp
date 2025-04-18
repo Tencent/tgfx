@@ -20,7 +20,6 @@
 #include <algorithm>
 #include <cstdlib>
 #include <string>
-#include "Profiling.h"
 #include "core/utils/Log.h"
 
 #ifdef __APPLE__
@@ -30,7 +29,7 @@
 namespace tgfx {
 static constexpr auto THREAD_TIMEOUT = std::chrono::seconds(10);
 static constexpr uint32_t THREAD_POOL_SIZE = 32;
-static constexpr uint32_t TASK_QUEUE_SIZE = 1024;
+static constexpr uint32_t TASK_QUEUE_SIZE = 4096;
 
 int GetCPUCores() {
   int cpuCores = 0;
@@ -53,7 +52,6 @@ TaskGroup* TaskGroup::GetInstance() {
 }
 
 void TaskGroup::RunLoop(TaskGroup* taskGroup) {
-  TRACE_THREAD;
   while (!taskGroup->exited) {
     auto task = taskGroup->popTask();
     if (task == nullptr) {
@@ -98,7 +96,7 @@ bool TaskGroup::checkThreads() {
 }
 
 bool TaskGroup::pushTask(std::shared_ptr<Task> task) {
-#if defined(TGFX_BUILD_FOR_WEB) && !defined(__EMSCRIPTEN_PTHREADS__)
+#ifndef TGFX_USE_THREADS
   return false;
 #endif
   if (exited || !checkThreads()) {

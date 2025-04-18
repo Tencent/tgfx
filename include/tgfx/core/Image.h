@@ -107,7 +107,7 @@ class Image {
 
   /**
    * Creates an Image from the given picture with the specified width, height, and matrix.
-   * The picture will be drawn onto the Image using the provided matrix.The returned Image holds a
+   * The picture will be drawn onto the Image using the provided matrix. The returned Image holds a
    * reference to the picture and replays the drawing commands until it is actually required.
    * Note: This method may return a different type of Image other than PictureImage if the picture
    * is simple enough.

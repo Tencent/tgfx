@@ -28,7 +28,10 @@
 
 namespace tgfx {
 
-#define MAX_BLUR_SIGMA 3.0f
+// When a 1px wide line segment is scaled down to 0.25 in both width and height, it can still provide acceptable image
+// information. However, when the sigma exceeds 40, the line segment becomes so blurred that it is almost invisible.
+// Therefore, 10 is chosen as the MAX_BLUR_SIGMA.
+#define MAX_BLUR_SIGMA 10.f
 
 std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrinessY,
                                                TileMode tileMode) {
@@ -49,9 +52,10 @@ static void Blur1D(PlacementPtr<FragmentProcessor> source,
   if (!renderTarget) {
     return;
   }
-  auto drawingManager = renderTarget->getContext()->drawingManager();
-  auto processor =
-      GaussianBlur1DFragmentProcessor::Make(std::move(source), sigma, direction, stepLength);
+  auto context = renderTarget->getContext();
+  auto drawingManager = context->drawingManager();
+  auto processor = GaussianBlur1DFragmentProcessor::Make(
+      context->drawingBuffer(), std::move(source), sigma, direction, stepLength, MAX_BLUR_SIGMA);
   drawingManager->fillRTWithFP(renderTarget, std::move(processor), renderFlags);
 }
 

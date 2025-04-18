@@ -16,34 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "VertexProvider.h"
 
-#include <stdint.h>
-#include <stdio.h>
-#include <string>
-#include "ViewData.h"
-
-class UserData {
- public:
-  UserData();
-  UserData(const char* program, uint64_t time);
-
-  bool Valid() const {
-    return !program.empty();
+namespace tgfx {
+AsyncVertexSource::~AsyncVertexSource() {
+  // The vertex source might have objects created in shared memory (like BlockBuffer), so we
+  // need to wait for the task to finish before destroying it.
+  for (auto& task : tasks) {
+    task->cancelOrWait();
   }
+}
 
-  void LoadState(ViewData& data);
-  void SaveState(const ViewData& data);
-  void StateShouldBePreserved();
-
- private:
-  FILE* OpenFile(const char* filename, bool write);
-  void Remove(const char* filename);
-
-  std::string program;
-  uint64_t time;
-
-  std::string description;
-
-  bool preserveState;
-};
+std::shared_ptr<Data> AsyncVertexSource::getData() const {
+  for (auto& task : tasks) {
+    task->wait();
+  }
+  return data;
+}
+}  // namespace tgfx

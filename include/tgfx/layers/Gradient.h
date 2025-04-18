@@ -178,8 +178,8 @@ class LinearGradient : public Gradient {
   std::shared_ptr<Shader> onGetShader() const override;
 
  private:
-  Point _startPoint = Point::Zero();
-  Point _endPoint = Point::Zero();
+  Point _startPoint = {};
+  Point _endPoint = {};
 
   LinearGradient(const Point& startPoint, const Point& endPoint, const std::vector<Color>& colors,
                  const std::vector<float>& positions)
@@ -228,7 +228,7 @@ class RadialGradient : public Gradient {
   std::shared_ptr<Shader> onGetShader() const override;
 
  private:
-  Point _center = Point::Zero();
+  Point _center = {};
   float _radius = 0;
 
   RadialGradient(const Point& center, float radius, const std::vector<Color>& colors,
@@ -290,7 +290,7 @@ class ConicGradient : public Gradient {
   std::shared_ptr<Shader> onGetShader() const override;
 
  private:
-  Point _center = Point::Zero();
+  Point _center = {};
   float _startAngle = 0;
   float _endAngle = 0;
 
@@ -341,7 +341,7 @@ class DiamondGradient : public Gradient {
   std::shared_ptr<Shader> onGetShader() const override;
 
  private:
-  Point _center = Point::Zero();
+  Point _center = {};
   float _halfDiagonal = 0;
 
   DiamondGradient(const Point& center, float halfDiagonal, const std::vector<Color>& colors,

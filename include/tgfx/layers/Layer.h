@@ -111,7 +111,7 @@ class Layer {
    * is BlendMode::SrcOver.
    */
   BlendMode blendMode() const {
-    return _blendMode;
+    return static_cast<BlendMode>(bitFields.blendMode);
   }
 
   /**
@@ -535,6 +535,11 @@ class Layer {
    */
   void invalidateDescendents();
 
+  /**
+   * Marks the layer's background as changed and needing to be redrawn.
+   */
+  void invalidateBackground();
+
   void onAttachToRoot(Layer* owner);
 
   void onDetachFromRoot();
@@ -585,19 +590,20 @@ class Layer {
 
   struct {
     bool dirtyContent : 1;      // need to update content
-    bool dirtyDescendents : 1;  // need to redraw child layers
-    bool dirtyTransform : 1;    // need to redraw the layer, property such as alpha,
-                                // blendMode, matrix, etc.
+    bool dirtyDescendents : 1;  // need to redraw the layer's descendents
+    bool dirtyTransform : 1;    // need to redraw the layer
+    bool dirtyBackground : 1;   // need to redraw the layer's background, only mark while sibling is
+                                // changed.
     bool visible : 1;
     bool shouldRasterize : 1;
     bool allowsEdgeAntialiasing : 1;
     bool allowsGroupOpacity : 1;
     bool excludeChildEffectsInLayerStyle : 1;
+    uint8_t blendMode : 5;
   } bitFields = {};
   std::string _name;
   float _alpha = 1.0f;
-  BlendMode _blendMode = BlendMode::SrcOver;
-  Matrix _matrix = Matrix::I();
+  Matrix _matrix = {};
   float _rasterizationScale = 1.0f;
   std::vector<std::shared_ptr<LayerFilter>> _filters = {};
   std::shared_ptr<Layer> _mask = nullptr;

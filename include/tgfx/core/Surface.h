@@ -196,8 +196,6 @@ class Surface {
   bool aboutToDraw(bool discardContent = false);
   void contentChanged();
 
-  void forceResolveRenderTarget();
-
   friend class RenderContext;
 };
 }  // namespace tgfx

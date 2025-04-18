@@ -18,44 +18,24 @@
 
 #pragma once
 
-#include <QGraphicsView>
-#include <QMainWindow>
-#include <QVBoxLayout>
-#include <QWidget>
-#include <thread>
-#include "TracyWorker.hpp"
-#include "Utility.h"
-#include "View.h"
+#include <cstddef>
+#include <deque>
 
-class View;
-class MainView : public QWidget {
-  Q_OBJECT
+namespace tgfx {
+/**
+ * A tracker that keeps track of the maximum value of the last N values added.
+ */
+class MaxValueTracker {
  public:
-  static std::thread loadThread;
+  MaxValueTracker(size_t maxSize);
 
-  MainView(QWidget* parent = nullptr);
-  ~MainView();
+  void addValue(size_t value);
 
-  void connectClient(const char* address, uint16_t port);
-  void openFile();
-  void openToolView();
-  void openWebsocketServer();
-
-  void changeViewModeButton(bool pause);
-  Q_SLOT void changeViewMode(bool pause);
-  Q_SLOT void quitReadFile();
-  Q_SLOT void saveFile();
-  Q_SLOT void discardConnect();
-  Q_SLOT void statView();
-  Q_SIGNAL void statusChange(ProfilerStatus status);
-
- protected:
-  void initToolView();
-  void reopenToolView();
+  size_t getMaxValue() const;
 
  private:
-  QWidget* toolView;
-  QWidget* connectView;
-  View* centorView;
-  QVBoxLayout* layout;
+  size_t _maxSize;
+  std::deque<size_t> _values;
 };
+
+}  // namespace tgfx

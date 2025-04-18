@@ -19,15 +19,16 @@
 #include "GLEllipseGeometryProcessor.h"
 
 namespace tgfx {
-PlacementPtr<EllipseGeometryProcessor> EllipseGeometryProcessor::Make(PlacementBuffer* buffer,
-                                                                      int width, int height,
-                                                                      bool stroke, bool useScale) {
-  return buffer->make<GLEllipseGeometryProcessor>(width, height, stroke, useScale);
+PlacementPtr<EllipseGeometryProcessor> EllipseGeometryProcessor::Make(
+    BlockBuffer* buffer, int width, int height, bool stroke, bool useScale,
+    std::optional<Color> commonColor) {
+  return buffer->make<GLEllipseGeometryProcessor>(width, height, stroke, useScale, commonColor);
 }
 
 GLEllipseGeometryProcessor::GLEllipseGeometryProcessor(int width, int height, bool stroke,
-                                                       bool useScale)
-    : EllipseGeometryProcessor(width, height, stroke, useScale) {
+                                                       bool useScale,
+                                                       std::optional<Color> commonColor)
+    : EllipseGeometryProcessor(width, height, stroke, useScale, commonColor) {
 }
 
 void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -48,9 +49,15 @@ void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
 
   auto* fragBuilder = args.fragBuilder;
   // setup pass through color
-  auto color = varyingHandler->addVarying("Color", SLType::Float4);
-  vertBuilder->codeAppendf("%s = %s;", color.vsOut().c_str(), inColor.name().c_str());
-  fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), color.fsIn().c_str());
+  if (commonColor.has_value()) {
+    auto colorName =
+        args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "Color");
+    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
+  } else {
+    auto color = varyingHandler->addVarying("Color", SLType::Float4);
+    vertBuilder->codeAppendf("%s = %s;", color.vsOut().c_str(), inColor.name().c_str());
+    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), color.fsIn().c_str());
+  }
 
   // Setup position
   args.vertBuilder->emitNormalizedPosition(inPosition.name());
@@ -126,5 +133,8 @@ void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
 void GLEllipseGeometryProcessor::setData(UniformBuffer* uniformBuffer,
                                          FPCoordTransformIter* transformIter) const {
   setTransformDataHelper(Matrix::I(), uniformBuffer, transformIter);
+  if (commonColor.has_value()) {
+    uniformBuffer->setData("Color", *commonColor);
+  }
 }
 }  // namespace tgfx

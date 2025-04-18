@@ -27,7 +27,6 @@
 #include <utility>
 #include "core/utils/Log.h"
 #include "svg/SVGAttributeParser.h"
-#include "svg/SVGLengthContext.h"
 #include "svg/SVGNodeConstructor.h"
 #include "svg/SVGRenderContext.h"
 #include "tgfx/core/Canvas.h"
@@ -36,6 +35,7 @@
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/svg/SVGAttribute.h"
+#include "tgfx/svg/SVGLengthContext.h"
 #include "tgfx/svg/SVGTypes.h"
 #include "tgfx/svg/SVGValue.h"
 #include "tgfx/svg/node/SVGContainer.h"
@@ -70,7 +70,7 @@ std::shared_ptr<SVGDOM> SVGDOM::Make(Stream& stream, std::shared_ptr<TextShaper>
 
 SVGDOM::SVGDOM(std::shared_ptr<SVGRoot> root, std::shared_ptr<TextShaper> textShaper,
                SVGIDMapper&& mapper)
-    : root(std::move(root)), nodeIDMapper(std::move(mapper)), textShaper(std::move(textShaper)) {
+    : root(std::move(root)), _nodeIDMapper(std::move(mapper)), textShaper(std::move(textShaper)) {
 }
 
 const std::shared_ptr<SVGRoot>& SVGDOM::getRoot() const {
@@ -99,7 +99,7 @@ void SVGDOM::render(Canvas* canvas) {
   SVGLengthContext lengthContext(drawSize);
   SVGPresentationContext presentationContext;
 
-  SVGRenderContext renderContext(canvas, textShaper, nodeIDMapper, lengthContext,
+  SVGRenderContext renderContext(canvas, textShaper, _nodeIDMapper, lengthContext,
                                  presentationContext, {nullptr, nullptr}, canvas->getMatrix());
 
   root->render(renderContext);

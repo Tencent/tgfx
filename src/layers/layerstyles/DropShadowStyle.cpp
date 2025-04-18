@@ -100,7 +100,7 @@ void DropShadowStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Imag
   auto opaqueFilter = ImageFilter::ColorFilter(ColorFilter::AlphaThreshold(OPAQUE_THRESHOLD));
   auto opaqueImage = content->makeWithFilter(opaqueFilter);
 
-  auto offset = Point::Zero();
+  Point offset = {};
   auto filter = getShadowFilter(contentScale);
   if (!filter) {
     return;
@@ -121,7 +121,7 @@ void DropShadowStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Imag
 
 void DropShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, float contentScale,
                              float alpha, BlendMode blendMode) {
-  onDrawWithExtraSource(canvas, content, contentScale, nullptr, Point::Zero(), alpha, blendMode);
+  onDrawWithExtraSource(canvas, content, contentScale, nullptr, {}, alpha, blendMode);
 }
 
 std::shared_ptr<ImageFilter> DropShadowStyle::getShadowFilter(float scale) {

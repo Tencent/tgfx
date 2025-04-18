@@ -24,7 +24,7 @@
 namespace tgfx {
 class PorterDuffXferProcessor : public XferProcessor {
  public:
-  static PlacementPtr<PorterDuffXferProcessor> Make(PlacementBuffer* buffer, BlendMode blend,
+  static PlacementPtr<PorterDuffXferProcessor> Make(BlockBuffer* buffer, BlendMode blend,
                                                     DstTextureInfo dstTextureInfo);
 
   std::string name() const override {

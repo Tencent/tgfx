@@ -38,7 +38,7 @@ class SubsetImage : public TransformImage {
     return static_cast<int>(bounds.height());
   }
 
-  Rect bounds = Rect::MakeEmpty();
+  Rect bounds = {};
 
  protected:
   Type type() const override {

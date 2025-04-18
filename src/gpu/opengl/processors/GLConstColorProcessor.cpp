@@ -19,7 +19,7 @@
 #include "GLConstColorProcessor.h"
 
 namespace tgfx {
-PlacementPtr<ConstColorProcessor> ConstColorProcessor::Make(PlacementBuffer* buffer, Color color,
+PlacementPtr<ConstColorProcessor> ConstColorProcessor::Make(BlockBuffer* buffer, Color color,
                                                             InputMode mode) {
   return buffer->make<GLConstColorProcessor>(color, mode);
 }

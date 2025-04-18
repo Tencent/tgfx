@@ -19,7 +19,7 @@
 #include "GLConicGradientLayout.h"
 
 namespace tgfx {
-PlacementPtr<ConicGradientLayout> ConicGradientLayout::Make(PlacementBuffer* buffer, Matrix matrix,
+PlacementPtr<ConicGradientLayout> ConicGradientLayout::Make(BlockBuffer* buffer, Matrix matrix,
                                                             float bias, float scale) {
   return buffer->make<GLConicGradientLayout>(matrix, bias, scale);
 }

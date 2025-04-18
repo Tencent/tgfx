@@ -89,7 +89,7 @@ class CustomPathGlyphFace : public GlyphFace {
     }
 
     if (glyphID < 1 || glyphID > 3) {
-      return Rect::MakeEmpty();
+      return {};
     }
     Rect bounds = Rect::MakeXYWH(50 * (glyphID - 1), 0, 50, 50);
     bounds.scale(_scale, _scale);
@@ -151,7 +151,7 @@ class CustomImageGlyphFace : public GlyphFace {
 
   Rect getBounds(GlyphID glyphID) const override {
     if (glyphID < 3 || glyphID > 6) {
-      return Rect::MakeEmpty();
+      return {};
     }
     Rect bounds = Rect::MakeXYWH(50 * (glyphID - 1), 0, 50, 50);
     bounds.scale(_scale, _scale);

@@ -20,19 +20,29 @@
 #include "core/MeasureContext.h"
 #include "core/Records.h"
 #include "core/TransformContext.h"
+#include "core/utils/BlockBuffer.h"
 #include "core/utils/Log.h"
 #include "tgfx/core/Canvas.h"
-#include "tgfx/core/Surface.h"
+#include "tgfx/core/Image.h"
 
 namespace tgfx {
-Picture::Picture(std::vector<Record*> records, bool hasUnboundedFill)
-    : records(std::move(records)), _hasUnboundedFill(hasUnboundedFill) {
+Picture::Picture(std::shared_ptr<BlockData> data, std::vector<PlacementPtr<Record>> recordList,
+                 size_t drawCount)
+    : blockData(std::move(data)), records(std::move(recordList)), drawCount(drawCount) {
+  DEBUG_ASSERT(blockData != nullptr);
+  DEBUG_ASSERT(!records.empty());
+  bool hasInverseClip = true;
+  for (auto& record : records) {
+    if (record->hasUnboundedFill(hasInverseClip)) {
+      _hasUnboundedFill = true;
+      break;
+    }
+  }
 }
 
 Picture::~Picture() {
-  for (auto& record : records) {
-    delete record;
-  }
+  // Make sure the records are cleared before the block data is destroyed.
+  records.clear();
 }
 
 Rect Picture::getBounds(const Matrix* matrix) const {
@@ -43,22 +53,23 @@ Rect Picture::getBounds(const Matrix* matrix) const {
 }
 
 void Picture::playback(Canvas* canvas) const {
-  if (canvas == nullptr) {
-    return;
+  if (canvas != nullptr) {
+    playback(canvas->drawContext, *canvas->mcState);
   }
-  playback(canvas->drawContext, *canvas->mcState);
 }
 
 void Picture::playback(DrawContext* drawContext, const MCState& state) const {
   DEBUG_ASSERT(drawContext != nullptr);
-  auto transformContext = TransformContext::Make(drawContext, state.matrix, state.clip);
-  if (transformContext) {
-    drawContext = transformContext.get();
-  } else if (state.clip.isEmpty() && !state.clip.isInverseFillType()) {
+  if (state.clip.isEmpty() && !state.clip.isInverseFillType()) {
     return;
   }
+  TransformContext transformContext(drawContext, state);
+  if (transformContext.type() != TransformContext::Type::None) {
+    drawContext = &transformContext;
+  }
+  PlaybackContext playbackContext = {};
   for (auto& record : records) {
-    record->playback(drawContext);
+    record->playback(drawContext, &playbackContext);
   }
 }
 
@@ -86,15 +97,19 @@ static bool GetClipRect(const Path& clip, const Matrix* matrix, Rect* clipRect) 
 
 std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
                                         const ISize* clipSize) const {
-  if (records.size() != 1) {
+  if (drawCount != 1) {
     return nullptr;
   }
-  auto record = records[0];
+  MCState state = {};
+  Fill fill = {};
+  auto record = firstDrawRecord(&state, &fill);
+  if (record == nullptr) {
+    return nullptr;
+  }
   if (record->type() != RecordType::DrawImage && record->type() != RecordType::DrawImageRect) {
     return nullptr;
   }
   auto imageRecord = static_cast<const DrawImage*>(record);
-  auto& fill = imageRecord->fill;
   if (fill.maskFilter || fill.colorFilter) {
     return nullptr;
   }
@@ -104,18 +119,18 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
       return nullptr;
     }
   }
-  auto imageMatrix = imageRecord->state.matrix;
+  auto imageMatrix = state.matrix;
   if (matrix) {
     imageMatrix.postConcat(*matrix);
   }
   if (!imageMatrix.isTranslate()) {
     return nullptr;
   }
-  auto clipRect = Rect::MakeEmpty();
-  if (!GetClipRect(imageRecord->state.clip, matrix, &clipRect)) {
+  Rect clipRect = {};
+  if (!GetClipRect(state.clip, matrix, &clipRect)) {
     return nullptr;
   }
-  auto subset = Rect::MakeEmpty();
+  Rect subset = {};
   if (clipSize != nullptr) {
     subset = Rect::MakeWH(clipSize->width, clipSize->height);
     if (!clipRect.isEmpty() && !clipRect.contains(subset)) {
@@ -125,7 +140,7 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
     subset = clipRect;
   }
   if (record->type() == RecordType::DrawImageRect) {
-    image = image->makeSubset(static_cast<const DrawImageRect*>(imageRecord)->rect);
+    image = image->makeSubset(static_cast<const DrawImageRect*>(record)->rect);
     DEBUG_ASSERT(image != nullptr);
   }
   auto offsetX = imageMatrix.getTranslateX();
@@ -148,6 +163,39 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
     offset->set(offsetX, offsetY);
   }
   return image;
+}
+
+const Record* Picture::firstDrawRecord(tgfx::MCState* state, tgfx::Fill* fill) const {
+  for (auto& record : records) {
+    if (record->type() > RecordType::SetFill) {
+      return record.get();
+    }
+    switch (record->type()) {
+      case RecordType::SetMatrix:
+        if (state) {
+          state->matrix = static_cast<SetMatrix*>(record.get())->matrix;
+        }
+        break;
+      case RecordType::SetClip:
+        if (state) {
+          state->clip = static_cast<SetClip*>(record.get())->clip;
+        }
+        break;
+      case RecordType::SetColor:
+        if (fill) {
+          fill->color = static_cast<SetColor*>(record.get())->color;
+        }
+        break;
+      case RecordType::SetFill:
+        if (fill) {
+          *fill = static_cast<SetFill*>(record.get())->fill;
+        }
+        break;
+      default:
+        break;
+    }
+  }
+  return nullptr;
 }
 
 }  // namespace tgfx

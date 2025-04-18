@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/PathEffect.h"
+#include "AdaptiveDashEffect.h"
 #include "core/PathRef.h"
 
 namespace tgfx {
@@ -40,7 +41,11 @@ class SkPathEffectWrapper : public PathEffect {
   sk_sp<SkPathEffect> pathEffect = nullptr;
 };
 
-std::shared_ptr<PathEffect> PathEffect::MakeDash(const float* intervals, int count, float phase) {
+std::shared_ptr<PathEffect> PathEffect::MakeDash(const float* intervals, int count, float phase,
+                                                 bool adaptive) {
+  if (adaptive) {
+    return std::make_shared<AdaptiveDashEffect>(intervals, count, phase);
+  }
   auto effect = SkDashPathEffect::Make(intervals, count, phase);
   if (effect == nullptr) {
     return nullptr;

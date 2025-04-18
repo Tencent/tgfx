@@ -26,8 +26,8 @@ namespace tgfx {
  * Round Rect.
  */
 struct RRect {
-  Rect rect = Rect::MakeEmpty();
-  Point radii = Point::Zero();
+  Rect rect = {};
+  Point radii = {};
 
   /**
    * Returns true if the bounds are a simple rectangle.

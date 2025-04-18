@@ -45,7 +45,7 @@ class RGBAAAImage : public SubsetImage {
   std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override;
 
  private:
-  Point alphaStart = Point::Zero();
+  Point alphaStart = {};
 
   RGBAAAImage(std::shared_ptr<Image> source, const Rect& bounds, const Point& alphaStart);
 };

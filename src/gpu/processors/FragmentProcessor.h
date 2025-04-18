@@ -43,7 +43,7 @@ class FPArgs {
 
   Context* context = nullptr;
   uint32_t renderFlags = 0;
-  Rect drawRect = Rect::MakeEmpty();
+  Rect drawRect = {};
 };
 
 class FragmentProcessor : public Processor {
@@ -79,14 +79,14 @@ class FragmentProcessor : public Processor {
    *  parent's input alpha. The passed in FP will not receive an input color.
    */
   static PlacementPtr<FragmentProcessor> MulChildByInputAlpha(
-      PlacementBuffer* buffer, PlacementPtr<FragmentProcessor> child);
+      BlockBuffer* buffer, PlacementPtr<FragmentProcessor> child);
 
   /**
    * Returns the input color, modulated by the child's alpha. The passed in FP will not receive an
    * input color.
    * @param inverted false: output = input * child.a; true: output = input * (1 - child.a)
    */
-  static PlacementPtr<FragmentProcessor> MulInputByChildAlpha(PlacementBuffer* buffer,
+  static PlacementPtr<FragmentProcessor> MulInputByChildAlpha(BlockBuffer* buffer,
                                                               PlacementPtr<FragmentProcessor> child,
                                                               bool inverted = false);
 
@@ -95,7 +95,7 @@ class FragmentProcessor : public Processor {
    * This is equivalent to running them in series (`g`, then `f`). This is not the same as
    * transfer-mode composition; there is no blending step.
    */
-  static PlacementPtr<FragmentProcessor> Compose(PlacementBuffer* buffer,
+  static PlacementPtr<FragmentProcessor> Compose(BlockBuffer* buffer,
                                                  PlacementPtr<FragmentProcessor> f,
                                                  PlacementPtr<FragmentProcessor> g);
 

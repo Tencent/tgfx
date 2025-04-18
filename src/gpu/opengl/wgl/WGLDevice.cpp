@@ -19,6 +19,9 @@
 #include "tgfx/gpu/opengl/wgl/WGLDevice.h"
 
 namespace tgfx {
+void* GLDevice::CurrentNativeHandle() {
+  return wglGetCurrentContext();
+}
 
 std::shared_ptr<GLDevice> GLDevice::Current() {
   auto glContext = wglGetCurrentContext();

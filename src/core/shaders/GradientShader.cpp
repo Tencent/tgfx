@@ -185,7 +185,7 @@ static Matrix PointsToUnitMatrix(const Point& startPoint, const Point& endPoint)
   float mag = Point::Length(vec.x, vec.y);
   float inv = mag != 0 ? 1 / mag : 0;
   vec.set(vec.x * inv, vec.y * inv);
-  auto matrix = Matrix::I();
+  Matrix matrix = {};
   matrix.setSinCos(-vec.y, vec.x, startPoint.x, startPoint.y);
   matrix.postTranslate(-startPoint.x, -startPoint.y);
   matrix.postScale(inv, inv);
@@ -193,7 +193,7 @@ static Matrix PointsToUnitMatrix(const Point& startPoint, const Point& endPoint)
 }
 
 static std::array<Point, 2> UnitMatrixToPoints(const Matrix& matrix) {
-  Matrix invertMatrix = Matrix::I();
+  Matrix invertMatrix = {};
   matrix.invert(&invertMatrix);
   std::array<Point, 2> points{Point::Make(0, 0), Point::Make(1, 0)};
   invertMatrix.mapPoints(points.data(), 2);
@@ -233,7 +233,7 @@ static Matrix RadialToUnitMatrix(const Point& center, float radius) {
 }
 
 static std::tuple<Point, float> UnitMatrixToRadial(const Matrix& matrix) {
-  auto invertMatrix = Matrix::I();
+  Matrix invertMatrix = {};
   matrix.invert(&invertMatrix);
   std::array<Point, 2> points{Point::Make(0, 0), Point::Make(1, 0)};
   invertMatrix.mapPoints(points.data(), 2);
@@ -287,7 +287,7 @@ GradientType ConicGradientShader::asGradient(GradientInfo* info) const {
   if (info) {
     info->colors = originalColors;
     info->positions = originalPositions;
-    auto center = Point::Zero();
+    Point center = {};
     pointsToUnit.mapPoints(&center, 1);
     info->points[0] = center * -1.f;
     info->radiuses[0] = -bias * 360.f;

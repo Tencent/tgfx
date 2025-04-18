@@ -24,7 +24,6 @@
 #include <string>
 #include <unordered_map>
 #include "core/utils/Log.h"
-#include "svg/SVGLengthContext.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/MaskFilter.h"
 #include "tgfx/core/Matrix.h"
@@ -39,6 +38,7 @@
 #include "tgfx/gpu/Context.h"
 #include "tgfx/svg/SVGAttribute.h"
 #include "tgfx/svg/SVGDOM.h"
+#include "tgfx/svg/SVGLengthContext.h"
 #include "tgfx/svg/SVGTypes.h"
 #include "tgfx/svg/TextShaper.h"
 
@@ -244,6 +244,6 @@ class SVGRenderContext {
   // Current object bounding box scope.
   const OBBScope scope;
 
-  Matrix _matrix = Matrix::I();
+  Matrix _matrix = {};
 };
 }  // namespace tgfx

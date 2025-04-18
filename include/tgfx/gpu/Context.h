@@ -31,7 +31,8 @@ class DrawingManager;
 class Gpu;
 class ResourceProvider;
 class ProxyProvider;
-class PlacementBuffer;
+class BlockBuffer;
+class MaxValueTracker;
 class AtlasManager;
 
 /**
@@ -74,7 +75,7 @@ class Context {
     return _drawingManager;
   }
 
-  PlacementBuffer* drawingBuffer() const {
+  BlockBuffer* drawingBuffer() const {
     return _drawingBuffer;
   }
 
@@ -204,8 +205,8 @@ class Context {
   DrawingManager* _drawingManager = nullptr;
   ResourceProvider* _resourceProvider = nullptr;
   ProxyProvider* _proxyProvider = nullptr;
-  PlacementBuffer* _drawingBuffer = nullptr;
-  std::deque<size_t> drawingBufferSizes = {};
+  BlockBuffer* _drawingBuffer = nullptr;
+  MaxValueTracker* _maxValueTracker = nullptr;
   AtlasManager* _atlasManager = nullptr;
 
   void releaseAll(bool releaseGPU);

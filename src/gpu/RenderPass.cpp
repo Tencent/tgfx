@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RenderPass.h"
-#include "core/utils/Profiling.h"
 #include "gpu/Gpu.h"
 
 namespace tgfx {
@@ -50,11 +49,11 @@ void RenderPass::bindProgramAndScissorClip(const ProgramInfo* programInfo,
 }
 
 void RenderPass::bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
-                             std::shared_ptr<GpuBuffer> vertexBuffer) {
+                             std::shared_ptr<GpuBuffer> vertexBuffer, size_t vertexOffset) {
   if (drawPipelineStatus != DrawPipelineStatus::Ok) {
     return;
   }
-  if (!onBindBuffers(std::move(indexBuffer), std::move(vertexBuffer), nullptr)) {
+  if (!onBindBuffers(std::move(indexBuffer), std::move(vertexBuffer), vertexOffset, nullptr)) {
     drawPipelineStatus = DrawPipelineStatus::FailedToBind;
   }
 }
@@ -64,13 +63,12 @@ void RenderPass::bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
   if (drawPipelineStatus != DrawPipelineStatus::Ok) {
     return;
   }
-  if (!onBindBuffers(std::move(indexBuffer), nullptr, std::move(vertexData))) {
+  if (!onBindBuffers(std::move(indexBuffer), nullptr, 0, std::move(vertexData))) {
     drawPipelineStatus = DrawPipelineStatus::FailedToBind;
   }
 }
 
 void RenderPass::draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) {
-  TRACE_DRAW(primitiveType == PrimitiveType::TriangleStrip ? vertexCount - 2 : vertexCount / 3);
   if (drawPipelineStatus != DrawPipelineStatus::Ok) {
     return;
   }
@@ -79,7 +77,6 @@ void RenderPass::draw(PrimitiveType primitiveType, size_t baseVertex, size_t ver
 }
 
 void RenderPass::drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) {
-  TRACE_DRAW(indexCount / 3);
   if (drawPipelineStatus != DrawPipelineStatus::Ok) {
     return;
   }

@@ -20,7 +20,7 @@
 
 namespace tgfx {
 PlacementPtr<DeviceSpaceTextureEffect> DeviceSpaceTextureEffect::Make(
-    PlacementBuffer* buffer, std::shared_ptr<TextureProxy> textureProxy, const Matrix& uvMatrix) {
+    BlockBuffer* buffer, std::shared_ptr<TextureProxy> textureProxy, const Matrix& uvMatrix) {
   if (textureProxy == nullptr) {
     return nullptr;
   }

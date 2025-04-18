@@ -48,6 +48,9 @@ class DataSource {
 	 * immediately.
    */
   static std::unique_ptr<DataSource> Async(std::unique_ptr<DataSource> source) {
+#ifndef TGFX_USE_THREADS
+    return source;
+#endif
     if (source == nullptr) {
       return nullptr;
     }
@@ -116,7 +119,9 @@ class AsyncDataSource : public DataSource<T> {
   }
 
   ~AsyncDataSource() override {
-    task->cancel();
+    // The data source might have objects created in shared memory (like BlockBuffer), so we
+    // need to wait for the task to finish before destroying it.
+    task->cancelOrWait();
   }
 
   std::shared_ptr<T> getData() const override {

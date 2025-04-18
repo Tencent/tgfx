@@ -18,6 +18,7 @@
 
 #include "DecodedImage.h"
 #include "BufferImage.h"
+#include "core/ImageSource.h"
 #include "gpu/ProxyProvider.h"
 
 namespace tgfx {

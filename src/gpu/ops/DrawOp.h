@@ -59,7 +59,7 @@ class DrawOp : public Op {
   }
 
  protected:
-  Rect _scissorRect = Rect::MakeEmpty();
+  Rect _scissorRect = {};
   std::vector<PlacementPtr<FragmentProcessor>> colors = {};
   std::vector<PlacementPtr<FragmentProcessor>> coverages = {};
   PlacementPtr<XferProcessor> xferProcessor = nullptr;

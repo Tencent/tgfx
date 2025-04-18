@@ -26,21 +26,12 @@ namespace tgfx {
  */
 class TransformContext : public DrawContext {
  public:
-  /**
-   * Creates a new transform context that applies the given matrix to the state. Returns nullptr if
-   * the matrix is identity or the drawContext is nullptr.
-   */
-  static std::unique_ptr<TransformContext> Make(DrawContext* drawContext, const Matrix& matrix);
+  enum class Type { None, Matrix, Clip, Both };
 
-  /**
-   * Creates a new transform context that applies the given matrix and clip to the state. Returns
-   * nullptr if the matrix is identity and the clip is wide open, or the drawContext is nullptr, or
-   * the clip is empty.
-   */
-  static std::unique_ptr<TransformContext> Make(DrawContext* drawContext, const Matrix& matrix,
-                                                const Path& clip);
+  TransformContext(DrawContext* drawContext, const MCState& state);
 
-  explicit TransformContext(DrawContext* drawContext) : drawContext(drawContext) {
+  Type type() const {
+    return _type;
   }
 
   void drawFill(const MCState& state, const Fill& fill) override {
@@ -84,10 +75,13 @@ class TransformContext : public DrawContext {
     drawContext->drawLayer(std::move(picture), std::move(filter), transform(state), fill);
   }
 
- protected:
-  virtual MCState transform(const MCState& state) = 0;
-
  private:
+  Type _type = Type::None;
   DrawContext* drawContext = nullptr;
+  MCState initState = {};
+  Path lastClip = {};
+  Path lastIntersectedClip = {};
+
+  MCState transform(const MCState& state);
 };
 }  // namespace tgfx

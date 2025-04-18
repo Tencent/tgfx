@@ -33,7 +33,7 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Picture> picture, int wid
   if (matrix && !matrix->invertible()) {
     return nullptr;
   }
-  if (picture->records.size() == 1) {
+  if (picture->drawCount == 1) {
     ISize clipSize = {width, height};
     auto image = picture->asImage(nullptr, matrix, &clipSize);
     if (image) {
@@ -117,7 +117,7 @@ bool PictureImage::drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget,
     return false;
   }
   RenderContext renderContext(renderTarget, renderFlags, true);
-  auto totalMatrix = Matrix::I();
+  Matrix totalMatrix = {};
   if (offset) {
     totalMatrix.preTranslate(offset->x, offset->y);
   }

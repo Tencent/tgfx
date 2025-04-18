@@ -231,11 +231,10 @@ TGFX_TEST(SVGExportTest, UnsupportedGradient) {
   std::string compareString =
       "<?xml version=\"1.0\" encoding=\"utf-8\" ?><svg xmlns=\"http://www.w3.org/2000/svg\" "
       "xmlns:xlink=\"http://www.w3.org/1999/xlink\" width=\"200\" "
-      "height=\"200\"><defs><linearGradient id=\"gradient_0\" gradientUnits=\"objectBoundingBox\" "
-      "x1=\"0\" y1=\"0\" x2=\"1\" y2=\"0\"><stop offset=\"0\" stop-color=\"#F00\"/><stop "
-      "offset=\"0.5\" stop-color=\"#00F\"/><stop offset=\"1\" "
-      "stop-color=\"#000\"/></linearGradient></defs><rect fill=\"url(#gradient_0)\" x=\"50\" "
-      "y=\"50\" width=\"100\" height=\"100\"/></svg>";
+      "height=\"200\"><defs><radialGradient id=\"gradient_0\" gradientUnits=\"userSpaceOnUse\" "
+      "r=\"0\" cx=\"100\" cy=\"100\"><stop offset=\"0\" stop-color=\"#F00\"/><stop offset=\"0.5\" "
+      "stop-color=\"#00F\"/><stop offset=\"1\" stop-color=\"#000\"/></radialGradient></defs><rect "
+      "fill=\"url(#gradient_0)\" x=\"50\" y=\"50\" width=\"100\" height=\"100\"/></svg>";
 
   ContextScope scope;
   auto* context = scope.getContext();
@@ -661,5 +660,4 @@ TGFX_TEST(SVGExportTest, InvertPictureImageMask) {
   readStream->read(buffer.data(), buffer.size());
   EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), SVGString);
 }
-
 }  // namespace tgfx

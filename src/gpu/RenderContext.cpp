@@ -21,7 +21,6 @@
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
 #include "core/Rasterizer.h"
-//#include "core/TextAtlas.h"
 #include "core/atlas/AtlasManager.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/Caster.h"
@@ -102,7 +101,7 @@ void RenderContext::drawRRect(const RRect& rRect, const MCState& state, const Fi
 static Rect ToLocalBounds(const Rect& bounds, const Matrix& viewMatrix) {
   Matrix invertMatrix = {};
   if (!viewMatrix.invert(&invertMatrix)) {
-    return Rect::MakeEmpty();
+    return {};
   }
   auto localBounds = bounds;
   invertMatrix.mapRect(&localBounds);
@@ -150,36 +149,6 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect
     auto offsetMatrix = Matrix::MakeTrans(subset.left, subset.top);
     compositor->fillImage(subsetImage->source, imageRect, samplingOptions, imageState,
                           fill.makeWithMatrix(offsetMatrix));
-  }
-}
-
-struct Parameters {
-  size_t imageIndex = 0;
-  std::vector<tgfx::Matrix> matrices;
-  std::vector<tgfx::Rect> rects;
-};
-
-void RenderContext::drawAtlas(const MCState& mcState, std::shared_ptr<Image> atlas,
-                              const Matrix matrix[], const Rect tex[], const Color colors[],
-                              size_t count, const SamplingOptions& sampling, const Fill& fill) {
-  auto state = mcState;
-  auto atlasRect = Rect::MakeWH(atlas->width(), atlas->height());
-  for (size_t i = 0; i < count; ++i) {
-    auto rect = tex[i];
-    if (!rect.intersect(atlasRect)) {
-      continue;
-    }
-    state.matrix = mcState.matrix * matrix[i];
-    state.matrix.preTranslate(-rect.x(), -rect.y());
-    auto glyphFill = fill;
-    if (colors) {
-      glyphFill.color = colors[i];
-    }
-    if (rect == atlasRect) {
-      drawImage(atlas, sampling, state, glyphFill);
-    } else {
-      drawImageRect(atlas, rect, sampling, state, glyphFill);
-    }
   }
 }
 
@@ -337,7 +306,7 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
   }
   MCState drawState = state;
   if (filter) {
-    auto offset = Point::Zero();
+    Point offset = {};
     image = image->makeWithFilter(std::move(filter), &offset);
     if (image == nullptr) {
       return;

@@ -26,13 +26,13 @@
 #include "tgfx/core/Buffer.h"
 
 namespace tgfx {
-PlacementNode<ShapeDrawOp> ShapeDrawOp::Make(std::shared_ptr<GpuShapeProxy> shapeProxy, Color color,
-                                             const Matrix& uvMatrix, AAType aaType) {
+PlacementPtr<ShapeDrawOp> ShapeDrawOp::Make(std::shared_ptr<GpuShapeProxy> shapeProxy, Color color,
+                                            const Matrix& uvMatrix, AAType aaType) {
   if (shapeProxy == nullptr) {
     return nullptr;
   }
   auto drawingBuffer = shapeProxy->getContext()->drawingBuffer();
-  return drawingBuffer->makeNode<ShapeDrawOp>(std::move(shapeProxy), color, uvMatrix, aaType);
+  return drawingBuffer->make<ShapeDrawOp>(std::move(shapeProxy), color, uvMatrix, aaType);
 }
 
 ShapeDrawOp::ShapeDrawOp(std::shared_ptr<GpuShapeProxy> shapeProxy, Color color,
@@ -54,7 +54,7 @@ void ShapeDrawOp::execute(RenderPass* renderPass) {
     if (textureProxy == nullptr) {
       return;
     }
-    Matrix maskMatrix = Matrix::I();
+    Matrix maskMatrix = {};
     if (!realUVMatrix.invert(&maskMatrix)) {
       return;
     }
