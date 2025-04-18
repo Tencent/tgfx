@@ -120,6 +120,7 @@ file(GLOB_RECURSE SRC_FILES
         src/core/images/*.*
         src/core/shaders/*.*
         src/core/shapes/*.*
+        src/core/utils/*.*
         src/gpu/ops/*.*
         src/gpu/processors/*.*
         src/gpu/proxies/*.*
@@ -130,7 +131,6 @@ file(GLOB PLATFORM_COMMON_FILES
         src/gpu/*.*
         src/core/codecs/*.*
         src/core/vectors/*.*
-        src/core/utils/*.*
         src/platform/*.*)
 list(APPEND TGFX_FILES ${PLATFORM_COMMON_FILES})
 
@@ -323,14 +323,6 @@ list(APPEND TGFX_INCLUDES third_party/skcms)
 if (TGFX_BUILD_SVG)
     list(APPEND TGFX_STATIC_VENDORS expat)
     list(APPEND TGFX_INCLUDES third_party/expat)
-endif ()
-
-if (WIN32)
-    file(GLOB_RECURSE THREAD_FILES src/core/utils/winthread/*.*)
-    list(APPEND TGFX_FILES ${THREAD_FILES})
-else ()
-    file(GLOB_RECURSE THREAD_FILES src/core/utils/pthread/*.*)
-    list(APPEND TGFX_FILES ${THREAD_FILES})
 endif ()
 
 if (WEB)
