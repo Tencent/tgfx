@@ -397,7 +397,8 @@ bool needs_new_font(PDFFont* font, GlyphID glyphID, TypefaceMetrics::FontType in
 
   auto scaleContext =
       ScalerContext::Make(font->strike().strikeSpec.typeface, font->strike().strikeSpec.textSize);
-  bool hasUnmodifiedPath = scaleContext->generatePath(glyphID, false, false, nullptr);
+  Path glyphPath;
+  bool hasUnmodifiedPath = scaleContext->generatePath(glyphID, false, false, &glyphPath);
   bool convertedToType3 = font->getType() == TypefaceMetrics::FontType::Other;
   return convertedToType3 == hasUnmodifiedPath;
 }

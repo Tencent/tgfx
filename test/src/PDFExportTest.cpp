@@ -95,7 +95,9 @@ TGFX_TEST(PDFExportTest, EmptyPDF) {
     //   canvas->drawPath(*path, strokePaint);
     // }
     //char T
-    { canvas->drawSimpleText("T", 55, 175, font, textPaint); }
+    {
+      canvas->drawSimpleText("杨", 55, 175, font, textPaint);
+    }
 
     // //G
     // std::tie(success, path) = PathMakeFromSVGString(
