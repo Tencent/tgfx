@@ -58,6 +58,10 @@ class Task {
    * Waits for all executing tasks to complete, removes all pending queued tasks, and releases all
    * thread resources. After calling this, the Task system should not be used until new tasks are
    * submitted.
+   *
+   * Note: On HarmonyOS platform, it's recommended to call this when app enters background, as the
+   * CPU affinity settings may become invalid after foreground/background switches.
+   * Recreating threads with proper affinity can maintain optimal rendering performance.
    */
   static void Shutdown();
 
