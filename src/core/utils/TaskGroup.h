@@ -44,6 +44,9 @@ class TaskGroup {
   bool pushTask(std::shared_ptr<Task> task);
   std::shared_ptr<Task> popTask();
   void exit();
+  void releaseResources();
+
+  void releaseResourcesInternal();
 
   friend class Task;
   friend void OnAppExit();

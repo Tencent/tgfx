@@ -55,6 +55,13 @@ enum class TaskStatus {
 class Task {
  public:
   /**
+   * Waits for all executing tasks to complete, removes all pending queued tasks, and releases all
+   * thread resources. After calling this, the Task system should not be used until new tasks are
+   * submitted.
+   */
+  static void ReleaseResources();
+
+  /**
    * Submits a code block for asynchronous execution immediately and returns a Task wraps the code
    * block. Hold a reference to the returned Task if you want to cancel it or wait for it to finish
    * execution. Returns nullptr if the block is nullptr.

@@ -130,13 +130,30 @@ std::shared_ptr<Task> TaskGroup::popTask() {
 
 void TaskGroup::exit() {
   exited = true;
+  releaseResourceInternal();
+  delete tasks;
+  delete threads;
+}
+
+void TaskGroup::releaseResources() {
+  if (exited) {
+    return;
+  }
+  // stop accepting new tasks before clearing threads
+  exited = true;
+  releaseResourceInternal();
+  // continue to accept new tasks
+  exited = false;
+}
+
+void TaskGroup::releaseResourcesInternal() {
   condition.notify_all();
   std::thread* thread = nullptr;
   while ((thread = threads->dequeue()) != nullptr) {
     ReleaseThread(thread);
   }
-  delete threads;
-  delete tasks;
+  while (tasks->dequeue() != nullptr) {
+  }
   totalThreads = 0;
   waitingThreads = 0;
 }

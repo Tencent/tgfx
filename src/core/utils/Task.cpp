@@ -34,6 +34,10 @@ class BlockTask : public Task {
   std::function<void()> block;
 };
 
+void Task::ReleaseResources() {
+  TaskGroup::GetInstance()->releaseResources();
+}
+
 std::shared_ptr<Task> Task::Run(std::function<void()> block) {
   if (block == nullptr) {
     return nullptr;
