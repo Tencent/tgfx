@@ -46,9 +46,9 @@ int GetCPUCores() {
   return cpuCores;
 }
 
-TaskWorkerThread::~TaskWorkerThread() {
+TaskThread::~TaskThread() {
   if (thread) {
-    if (_exitWhileIdle) {
+    if (exitWhileIdle) {
       thread->detach();
     } else if (thread->joinable()) {
       thread->join();
@@ -58,7 +58,7 @@ TaskWorkerThread::~TaskWorkerThread() {
   --TaskGroup::GetInstance()->totalThreads;
 }
 
-bool TaskWorkerThread::start() {
+bool TaskThread::start() {
   if (thread) {
     return true;
   }
@@ -71,12 +71,12 @@ TaskGroup* TaskGroup::GetInstance() {
   return &taskGroup;
 }
 
-void TaskGroup::RunLoop(TaskWorkerThread* thread) {
+void TaskGroup::RunLoop(TaskThread* thread) {
   auto taskGroup = TaskGroup::GetInstance();
   while (!taskGroup->exited) {
     auto task = taskGroup->popTask();
     if (task == nullptr) {
-      if (thread->_exitWhileIdle) {
+      if (thread->exitWhileIdle) {
         // TaskGroup no longer manages threads marked with exitWhileIdle,
         // so the thread must self-destruct here
         delete thread;
@@ -95,7 +95,7 @@ void OnAppExit() {
 }
 
 TaskGroup::TaskGroup() {
-  threads = new LockFreeQueue<TaskWorkerThread*>(THREAD_POOL_SIZE);
+  threads = new LockFreeQueue<TaskThread*>(THREAD_POOL_SIZE);
   tasks = new LockFreeQueue<std::shared_ptr<Task>>(TASK_QUEUE_SIZE);
   std::atexit(OnAppExit);
 }
@@ -104,7 +104,7 @@ bool TaskGroup::checkThreads() {
   static const int CPUCores = GetCPUCores();
   static const int MaxThreads = CPUCores > 16 ? 16 : CPUCores;
   if (waitingThreads == 0 && totalThreads < MaxThreads) {
-    auto thread = new TaskWorkerThread();
+    auto thread = new TaskThread();
     if (thread->start()) {
       threads->enqueue(thread);
       ++totalThreads;
@@ -151,7 +151,7 @@ std::shared_ptr<Task> TaskGroup::popTask() {
 void TaskGroup::exit() {
   exited = true;
   condition.notify_all();
-  TaskWorkerThread* thread = nullptr;
+  TaskThread* thread = nullptr;
   while ((thread = threads->dequeue()) != nullptr) {
     delete thread;
   }
@@ -162,9 +162,9 @@ void TaskGroup::exit() {
 }
 
 void TaskGroup::releaseThreads() {
-  TaskWorkerThread* thread = nullptr;
+  TaskThread* thread = nullptr;
   while ((thread = threads->dequeue()) != nullptr) {
-    thread->_exitWhileIdle = true;
+    thread->exitWhileIdle = true;
   }
 }
 }  // namespace tgfx
