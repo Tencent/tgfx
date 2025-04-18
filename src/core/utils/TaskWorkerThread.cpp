@@ -81,8 +81,8 @@ void TaskWorkerThread::ThreadProc(TaskWorkerThread* thread) {
     auto task = group->popTask();
     if (!task) {
       if (thread->_exitWhileIdle) {
-        // TaskGroup is not responsible for managing the lifecycle of threads that need to exit,
-        // so we delete the thread here
+        // TaskGroup no longer manages threads marked with exitWhileIdle,
+        // so the thread must self-destruct here
         delete thread;
         break;
       }
