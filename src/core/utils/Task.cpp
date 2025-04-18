@@ -34,6 +34,10 @@ class BlockTask : public Task {
   std::function<void()> block;
 };
 
+void Task::Shutdown() {
+  TaskGroup::GetInstance()->shutdown();
+}
+
 std::shared_ptr<Task> Task::Run(std::function<void()> block) {
   if (block == nullptr) {
     return nullptr;

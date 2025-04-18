@@ -17,10 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TaskGroup.h"
-#include <algorithm>
 #include <cstdlib>
-#include <string>
-#include "core/utils/Log.h"
 
 #ifdef __APPLE__
 #include <sys/sysctl.h>
@@ -51,8 +48,26 @@ TaskGroup* TaskGroup::GetInstance() {
   return &taskGroup;
 }
 
-void TaskGroup::RunLoop(void* arg) {
-  auto taskGroup = static_cast<TaskGroup*>(arg);
+struct RunLoopParams {
+  TaskGroup* taskGroup = nullptr;
+
+#ifdef __OHOS__
+  uint64_t cpuMask = 0;
+#endif
+};
+
+void TaskGroup::RunLoop(RunLoopParams params) {
+#ifdef __OHOS__
+  if (params.cpuMask != 0) {
+    cpu_set_t cpuset;
+    CPU_ZERO(&cpuset);
+    CPU_SET(params.cpuMask, &cpuset);
+    if (sched_setaffinity(0, sizeof(cpu_set_t), &cpuset) != 0) {
+      LOGE("Failed to set CPU affinity");
+    }
+  }
+#endif
+  auto taskGroup = params.taskGroup;
   while (!taskGroup->exited) {
     auto task = taskGroup->popTask();
     if (task == nullptr) {
@@ -69,7 +84,7 @@ void OnAppExit() {
 }
 
 TaskGroup::TaskGroup() {
-  threads = new LockFreeQueue<Thread*>(THREAD_POOL_SIZE);
+  threads = new LockFreeQueue<std::thread*>(THREAD_POOL_SIZE);
   tasks = new LockFreeQueue<std::shared_ptr<Task>>(TASK_QUEUE_SIZE);
   std::atexit(OnAppExit);
 }
@@ -78,12 +93,14 @@ bool TaskGroup::checkThreads() {
   static const int CPUCores = GetCPUCores();
   static const int MaxThreads = CPUCores > 16 ? 16 : CPUCores;
   if (waitingThreads == 0 && totalThreads < MaxThreads) {
-    auto thread = Thread::Create([this]() { RunLoop(this); }, Thread::Priority::Highest);
-    if (thread) {
-      thread->start();
-      threads->enqueue(thread);
-      totalThreads++;
-    }
+#ifdef __OHOS__
+    auto thread = new std::thread(
+        RunLoop, RunLoopParams{this, static_cast<uint64_t>(MaxThreads - 1 - totalThreads)});
+#else
+    auto thread = new std::thread(RunLoop, RunLoopParams{this});
+#endif
+    threads->enqueue(thread);
+    totalThreads++;
   } else {
     return true;
   }
@@ -124,16 +141,39 @@ std::shared_ptr<Task> TaskGroup::popTask() {
 }
 
 void TaskGroup::exit() {
+  if (exited) {
+    return;
+  }
   exited = true;
+  clean();
+  delete tasks;
+  delete threads;
+}
+
+void TaskGroup::shutdown() {
+  if (exited) {
+    return;
+  }
+  // stop accepting new tasks before clearing threads
+  exited = true;
+  clean();
+  // continue to accept new tasks
+  exited = false;
+}
+
+void TaskGroup::clean() {
   condition.notify_all();
-  Thread* thread = nullptr;
+  std::thread* thread = nullptr;
   while ((thread = threads->dequeue()) != nullptr) {
-    thread->join();
+    if (thread->joinable()) {
+      thread->join();
+    }
     delete thread;
   }
-  delete threads;
-  delete tasks;
+  while (tasks->dequeue() != nullptr) {
+  }
   totalThreads = 0;
   waitingThreads = 0;
 }
+
 }  // namespace tgfx

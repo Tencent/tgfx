@@ -24,10 +24,12 @@
 #include <thread>
 #include <vector>
 #include "LockFreeQueue.h"
-#include "Thread.h"
 #include "tgfx/core/Task.h"
 
 namespace tgfx {
+
+struct RunLoopParams;
+
 class TaskGroup {
  private:
   std::mutex locker = {};
@@ -36,17 +38,20 @@ class TaskGroup {
   std::atomic_bool exited = false;
   std::atomic_int waitingThreads = 0;
   LockFreeQueue<std::shared_ptr<Task>>* tasks = nullptr;
-  LockFreeQueue<Thread*>* threads = nullptr;
+  LockFreeQueue<std::thread*>* threads = nullptr;
   static TaskGroup* GetInstance();
-  static void RunLoop(void* taskGroup);
+  static void RunLoop(RunLoopParams taskGroup);
 
   TaskGroup();
   bool checkThreads();
   bool pushTask(std::shared_ptr<Task> task);
   std::shared_ptr<Task> popTask();
   void exit();
+  void shutdown();
+  void clean();
 
   friend class Task;
+  friend class TaskRunLoop;
   friend void OnAppExit();
 };
 }  // namespace tgfx
