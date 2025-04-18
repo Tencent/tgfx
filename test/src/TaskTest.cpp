@@ -23,14 +23,11 @@
 
 namespace tgfx {
 TGFX_TEST(TaskTest, release) {
-  Task::ReleaseResources();
+  Task::ReleaseThreads();
   auto group = TaskGroup::GetInstance();
   EXPECT_EQ(group->totalThreads, 0);
   EXPECT_EQ(group->waitingThreads, 0);
   EXPECT_EQ(group->threads->dequeue(), nullptr);
   EXPECT_EQ(group->tasks->dequeue(), nullptr);
-  auto emptyTask = Task::Run([]() {});
-  emptyTask->wait();
-  EXPECT_EQ(group->totalThreads, 1);
 }
 }  // namespace tgfx

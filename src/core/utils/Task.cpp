@@ -34,8 +34,8 @@ class BlockTask : public Task {
   std::function<void()> block;
 };
 
-void Task::ReleaseResources() {
-  TaskGroup::GetInstance()->releaseResources();
+void Task::ReleaseThreads() {
+  TaskGroup::GetInstance()->releaseThreads();
 }
 
 std::shared_ptr<Task> Task::Run(std::function<void()> block) {

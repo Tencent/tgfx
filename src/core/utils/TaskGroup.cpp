@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <string>
+#include "RunLoop.h"
 #include "core/utils/Log.h"
 
 #ifdef __APPLE__
@@ -51,23 +52,6 @@ TaskGroup* TaskGroup::GetInstance() {
   return &taskGroup;
 }
 
-void TaskGroup::RunLoop(TaskGroup* taskGroup) {
-  while (!taskGroup->exited) {
-    auto task = taskGroup->popTask();
-    if (task == nullptr) {
-      continue;
-    }
-    task->execute();
-  }
-}
-
-static void ReleaseThread(std::thread* thread) {
-  if (thread->joinable()) {
-    thread->join();
-  }
-  delete thread;
-}
-
 void OnAppExit() {
   // Forces all pending tasks to be finished when the app is exiting to prevent accessing wild
   // pointers.
@@ -75,7 +59,7 @@ void OnAppExit() {
 }
 
 TaskGroup::TaskGroup() {
-  threads = new LockFreeQueue<std::thread*>(THREAD_POOL_SIZE);
+  threads = new LockFreeQueue<RunLoop*>(THREAD_POOL_SIZE);
   tasks = new LockFreeQueue<std::shared_ptr<Task>>(TASK_QUEUE_SIZE);
   std::atexit(OnAppExit);
 }
@@ -84,8 +68,8 @@ bool TaskGroup::checkThreads() {
   static const int CPUCores = GetCPUCores();
   static const int MaxThreads = CPUCores > 16 ? 16 : CPUCores;
   if (waitingThreads == 0 && totalThreads < MaxThreads) {
-    auto thread = new (std::nothrow) std::thread(&TaskGroup::RunLoop, this);
-    if (thread) {
+    auto thread = RunLoop::Create();
+    if (thread->start()) {
       threads->enqueue(thread);
       totalThreads++;
     }
@@ -130,27 +114,28 @@ std::shared_ptr<Task> TaskGroup::popTask() {
 
 void TaskGroup::exit() {
   exited = true;
-  releaseResourcesInternal();
+  releaseThreadsInternal(true);
   delete tasks;
   delete threads;
 }
 
-void TaskGroup::releaseResources() {
+void TaskGroup::releaseThreads() {
   if (exited) {
     return;
   }
   // stop accepting new tasks before clearing threads
   exited = true;
-  releaseResourcesInternal();
+  releaseThreadsInternal(false);
   // continue to accept new tasks
   exited = false;
 }
 
-void TaskGroup::releaseResourcesInternal() {
+void TaskGroup::releaseThreadsInternal(bool wait) {
   condition.notify_all();
-  std::thread* thread = nullptr;
+  RunLoop* thread = nullptr;
   while ((thread = threads->dequeue()) != nullptr) {
-    ReleaseThread(thread);
+    thread->exit(wait);
+    delete thread;
   }
   while (tasks->dequeue() != nullptr) {
   }
