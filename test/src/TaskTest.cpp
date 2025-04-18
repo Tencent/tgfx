@@ -25,9 +25,8 @@ namespace tgfx {
 TGFX_TEST(TaskTest, release) {
   Task::ReleaseThreads();
   auto group = TaskGroup::GetInstance();
-  EXPECT_EQ(group->totalThreads, 0);
-  EXPECT_EQ(group->waitingThreads, 0);
-  EXPECT_EQ(group->threads->dequeue(), nullptr);
-  EXPECT_EQ(group->tasks->dequeue(), nullptr);
+  EXPECT_EQ(group->totalRunLoops, 0);
+  EXPECT_EQ(TaskRunLoop::HasWaitingRunLoop(), true);
+  EXPECT_EQ(group->runLoops->dequeue(), nullptr);
 }
 }  // namespace tgfx

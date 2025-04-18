@@ -16,20 +16,39 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "RunLoop.h"
+#include "TaskRunLoop.h"
+#include <condition_variable>
+#include <mutex>
 #include "TaskGroup.h"
 
 namespace tgfx {
+static std::mutex locker = {};
+static std::condition_variable condition = {};
+static std::atomic_int waitingThreads = 0;
 
-RunLoop* RunLoop::Create() {
-  return new RunLoop();
+void TaskRunLoop::NotifyNewTask() {
+  if (waitingThreads > 0) {
+    condition.notify_one();
+  }
 }
 
-RunLoop::~RunLoop() {
+void TaskRunLoop::NotifyExit() {
+  condition.notify_all();
+}
+
+bool TaskRunLoop::HasWaitingRunLoop() {
+  return waitingThreads > 0;
+}
+
+TaskRunLoop* TaskRunLoop::Create() {
+  return new TaskRunLoop();
+}
+
+TaskRunLoop::~TaskRunLoop() {
   if (!thread) {
     return;
   }
-  if (waitingWhileDealloc) {
+  if (!_exitWhileIdle) {
     if (thread->joinable()) {
       thread->join();
     }
@@ -39,12 +58,15 @@ RunLoop::~RunLoop() {
   delete thread;
 }
 
-void RunLoop::exit(bool wait) {
-  waitingWhileDealloc = wait;
+void TaskRunLoop::exit() {
   exited = true;
 }
 
-bool RunLoop::start() {
+void TaskRunLoop::exitWhileIdle() {
+  _exitWhileIdle = true;
+}
+
+bool TaskRunLoop::start() {
   if (thread) {
     return true;
   }
@@ -52,11 +74,18 @@ bool RunLoop::start() {
   return thread != nullptr;
 }
 
-void RunLoop::ThreadProc(RunLoop* runLoop) {
+void TaskRunLoop::ThreadProc(TaskRunLoop* runLoop) {
   auto group = TaskGroup::GetInstance();
+  std::unique_lock<std::mutex> autoLock(locker);
   while (!runLoop->exited) {
     auto task = group->popTask();
-    if (task == nullptr) {
+    if (!task) {
+      if (runLoop->_exitWhileIdle) {
+        break;
+      }
+      waitingThreads++;
+      condition.wait(autoLock);
+      waitingThreads--;
       continue;
     }
     task->execute();

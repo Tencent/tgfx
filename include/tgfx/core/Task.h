@@ -55,8 +55,7 @@ enum class TaskStatus {
 class Task {
  public:
   /**
-   * Removes all pending queued tasks, and releases all thread resources asynchronously.
-   * After calling this, the Task system should not be used until new tasks are submitted.
+   * Releases all thread resources when the task threads are idle.
    */
   static void ReleaseThreads();
 
@@ -113,7 +112,7 @@ class Task {
   void execute();
 
   friend class TaskGroup;
-  friend class RunLoop;
+  friend class TaskRunLoop;
 };
 
 }  // namespace tgfx

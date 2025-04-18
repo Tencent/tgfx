@@ -20,25 +20,31 @@
 
 #include <atomic>
 #include <thread>
+#include "tgfx/core/Task.h"
 
 namespace tgfx {
-class RunLoop {
+class TaskRunLoop {
  public:
-  static RunLoop* Create();
-  virtual ~RunLoop();
+  static void NotifyNewTask();
+
+  static void NotifyExit();
+
+  static bool HasWaitingRunLoop();
+
+  static TaskRunLoop* Create();
+
+  virtual ~TaskRunLoop();
 
   bool start();
 
-  void exit(bool waitingWhileDealloc = false);
+  void exit();
 
- protected:
-  explicit RunLoop() {
-  }
+  void exitWhileIdle();
 
  private:
-  static void ThreadProc(RunLoop* runLoop);
+  static void ThreadProc(TaskRunLoop* runLoop);
   std::thread* thread = nullptr;
   std::atomic_bool exited = false;
-  bool waitingWhileDealloc = false;
+  std::atomic_bool _exitWhileIdle = false;
 };
 }  // namespace tgfx

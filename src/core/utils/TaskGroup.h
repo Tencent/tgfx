@@ -18,38 +18,31 @@
 
 #pragma once
 
-#include <condition_variable>
-#include <list>
-#include <mutex>
-#include <thread>
-#include <vector>
 #include "LockFreeQueue.h"
-#include "core/utils/RunLoop.h"
+#include "core/utils/TaskRunLoop.h"
 #include "tgfx/core/Task.h"
 
 namespace tgfx {
 class TaskGroup {
  private:
-  std::mutex locker = {};
-  std::condition_variable condition = {};
-  std::atomic_int totalThreads = 0;
+  std::atomic_int totalRunLoops = 0;
   std::atomic_bool exited = false;
-  std::atomic_int waitingThreads = 0;
   LockFreeQueue<std::shared_ptr<Task>>* tasks = nullptr;
-  LockFreeQueue<RunLoop*>* threads = nullptr;
+  LockFreeQueue<TaskRunLoop*>* runLoops = nullptr;
   static TaskGroup* GetInstance();
 
   TaskGroup();
-  bool checkThreads();
+  bool checkRunLoops();
   bool pushTask(std::shared_ptr<Task> task);
   std::shared_ptr<Task> popTask();
-  void exit();
-  void releaseThreads();
 
-  void releaseThreadsInternal(bool wait);
+  void exit();
+  void releaseRunLoops();
+
+  void releaseRunLoopsInternal(bool wait);
 
   friend class Task;
-  friend class RunLoop;
+  friend class TaskRunLoop;
   friend void OnAppExit();
 };
 }  // namespace tgfx
