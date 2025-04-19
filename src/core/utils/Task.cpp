@@ -65,12 +65,11 @@ void Task::cancel() {
 }
 
 void Task::wait() {
-  auto oldStatus = _status.load(std::memory_order_relaxed);
+  auto oldStatus = _status.load(std::memory_order_acquire);
   if (oldStatus == TaskStatus::Canceled || oldStatus == TaskStatus::Finished) {
     return;
   }
-  // If wait() is called from the thread pool, all threads might block, leaving no thread to execute
-  // this task. To avoid deadlock, execute the task directly on the current thread if it's queued.
+
   if (oldStatus == TaskStatus::Queueing) {
     if (_status.compare_exchange_weak(oldStatus, TaskStatus::Executing, std::memory_order_acq_rel,
                                       std::memory_order_relaxed)) {
@@ -82,27 +81,32 @@ void Task::wait() {
       return;
     }
   }
+
   std::unique_lock<std::mutex> autoLock(locker);
-  if (_status.load(std::memory_order_acquire) == TaskStatus::Executing) {
-    condition.wait(autoLock);
-  }
+  condition.wait(autoLock, [this]() {
+    auto currentStatus = _status.load(std::memory_order_acquire);
+    return currentStatus == TaskStatus::Finished || currentStatus == TaskStatus::Canceled;
+  });
 }
 
 void Task::cancelOrWait() {
-  auto currentStatus = _status.load(std::memory_order_relaxed);
+  auto currentStatus = _status.load(std::memory_order_acquire);
   if (currentStatus == TaskStatus::Canceled || currentStatus == TaskStatus::Finished) {
     return;
   }
+
   if (currentStatus == TaskStatus::Queueing) {
-    if (_status.compare_exchange_weak(currentStatus, TaskStatus::Canceled,
-                                      std::memory_order_acq_rel, std::memory_order_relaxed)) {
+    if (_status.compare_exchange_weak(currentStatus, TaskStatus::Canceled, std::memory_order_acq_rel,
+                                      std::memory_order_relaxed)) {
       return;
     }
   }
+
   std::unique_lock<std::mutex> autoLock(locker);
-  if (_status.load(std::memory_order_acquire) == TaskStatus::Executing) {
-    condition.wait(autoLock);
-  }
+  condition.wait(autoLock, [this]() {
+    auto currentStatus = _status.load(std::memory_order_acquire);
+    return currentStatus == TaskStatus::Finished || currentStatus == TaskStatus::Canceled;
+  });
 }
 
 void Task::execute() {
