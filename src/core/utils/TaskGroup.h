@@ -29,7 +29,13 @@
 namespace tgfx {
 class TaskThread {
  public:
-  ~TaskThread();
+  static int MaxThreadCount();
+  static TaskThread* Create();
+  virtual ~TaskThread();
+
+ protected:
+  virtual void preRun() {
+  }
 
  private:
   bool start();

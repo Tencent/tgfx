@@ -46,6 +46,18 @@ int GetCPUCores() {
   return cpuCores;
 }
 
+int TaskThread::MaxThreadCount() {
+  static const int CPUCores = GetCPUCores();
+  static const int MaxThreads = CPUCores > 16 ? 16 : CPUCores;
+  return MaxThreads;
+}
+
+#ifndef __OHOS__
+TaskThread* TaskThread::Create() {
+  return new TaskThread();
+}
+#endif
+
 TaskThread::~TaskThread() {
   if (thread) {
     if (exitWhileIdle) {
@@ -72,6 +84,7 @@ TaskGroup* TaskGroup::GetInstance() {
 }
 
 void TaskGroup::RunLoop(TaskThread* thread) {
+  preRun();
   auto taskGroup = TaskGroup::GetInstance();
   while (!taskGroup->exited) {
     auto task = taskGroup->popTask();
@@ -101,9 +114,7 @@ TaskGroup::TaskGroup() {
 }
 
 bool TaskGroup::checkThreads() {
-  static const int CPUCores = GetCPUCores();
-  static const int MaxThreads = CPUCores > 16 ? 16 : CPUCores;
-  if (waitingThreads == 0 && totalThreads < MaxThreads) {
+  if (waitingThreads == 0 && totalThreads < TaskThread::MaxThreadCount()) {
     auto thread = new TaskThread();
     if (thread->start()) {
       threads->enqueue(thread);
