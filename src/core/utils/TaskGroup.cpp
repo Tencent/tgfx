@@ -84,7 +84,7 @@ TaskGroup* TaskGroup::GetInstance() {
 }
 
 void TaskGroup::RunLoop(TaskThread* thread) {
-  preRun();
+  thread->preRun();
   auto taskGroup = TaskGroup::GetInstance();
   while (!taskGroup->exited) {
     auto task = taskGroup->popTask();

@@ -1,5 +1,6 @@
 #include "napi/native_api.h"
 #include <ace/xcomponent/native_interface_xcomponent.h>
+#include "tgfx/core/Task.h"
 #include "tgfx/gpu/opengl/egl/EGLWindow.h"
 #include "drawers/AppHost.h"
 #include "drawers/Drawer.h"
@@ -70,6 +71,11 @@ static void Draw(int index) {
   context->flushAndSubmit();
   window->present(context);
   device->unlock();
+}
+
+static napi_value ReleaseThreads(napi_env, napi_callback_info) {
+  tgfx::Task::ReleaseThreads();
+  return nullptr;
 }
 
 static napi_value OnDraw(napi_env env, napi_callback_info info) {
@@ -163,8 +169,8 @@ static napi_value Init(napi_env env, napi_value exports) {
   napi_property_descriptor desc[] = {
       {"draw", nullptr, OnDraw, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"updateDensity", nullptr, OnUpdateDensity, nullptr, nullptr, nullptr, napi_default, nullptr},
-      {"addImageFromEncoded", nullptr, AddImageFromEncoded, nullptr, nullptr, nullptr, napi_default,
-       nullptr}};
+      {"addImageFromEncoded", nullptr, AddImageFromEncoded, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"releaseThreads", nullptr, ReleaseThreads, nullptr, nullptr, nullptr, napi_default, nullptr}};
   napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
   RegisterCallback(env, exports);
   return exports;
