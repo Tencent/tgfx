@@ -47,15 +47,14 @@ int GetCPUCores() {
 }
 
 TaskThread::~TaskThread() {
+  std::lock_guard<std::mutex> autoLock(releaseLocker);
   if (thread) {
-    if (exitWhileIdle) {
-      thread->detach();
-    } else if (thread->joinable()) {
+    if (thread->joinable()) {
       thread->join();
     }
     delete thread;
+    thread = nullptr;
   }
-  --TaskGroup::GetInstance()->totalThreads;
 }
 
 bool TaskThread::start() {
@@ -64,6 +63,17 @@ bool TaskThread::start() {
   }
   thread = new (std::nothrow) std::thread(TaskGroup::RunLoop, this);
   return thread != nullptr;
+}
+
+void TaskThread::detach() {
+  std::lock_guard<std::mutex> autoLock(releaseLocker);
+  if (thread) {
+    if (thread->joinable()) {
+      thread->detach();
+    }
+    delete thread;
+    thread = nullptr;
+  }
 }
 
 TaskGroup* TaskGroup::GetInstance() {
@@ -76,16 +86,19 @@ void TaskGroup::RunLoop(TaskThread* thread) {
   while (!taskGroup->exited) {
     auto task = taskGroup->popTask();
     if (task == nullptr) {
+      // if exited, the thread must be joined and deleted by taskgroup
+      if (taskGroup->exited) {
+        break;
+      }
       if (thread->exitWhileIdle) {
-        // TaskGroup no longer manages threads marked with exitWhileIdle,
-        // so the thread must self-destruct here
-        delete thread;
+        thread->detach();
         break;
       }
       continue;
     }
     task->execute();
   }
+  --taskGroup->totalThreads;
 }
 
 void OnAppExit() {
@@ -151,18 +164,24 @@ std::shared_ptr<Task> TaskGroup::popTask() {
 void TaskGroup::exit() {
   exited = true;
   condition.notify_all();
+  for (auto thread : idleThreads) {
+    delete thread;
+  }
   TaskThread* thread = nullptr;
   while ((thread = threads->dequeue()) != nullptr) {
     delete thread;
   }
   delete threads;
   delete tasks;
+  DEBUG_ASSERT(totalThreads == 0)
+  DEBUG_ASSERT(waitingThreads == 0)
 }
 
 void TaskGroup::releaseThreads() {
   TaskThread* thread = nullptr;
   while ((thread = threads->dequeue()) != nullptr) {
     thread->exitWhileIdle = true;
+    idleThreads.push_back(thread);
   }
 }
 }  // namespace tgfx
