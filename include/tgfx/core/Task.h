@@ -57,8 +57,8 @@ class Task {
   /**
    * Release all task threads once the pending tasks have completed.
    *
-   * Note: On HarmonyOS platform, it's recommended to call this when app enters background.
-   * Recreating threads with proper affinity can maintain optimal rendering performance.
+   * Note: On HarmonyOS platform, some thread configurations may become invalid after app enters
+   * background. It's recommended to call this method when app enters background.
    */
   static void ReleaseThreads();
 
