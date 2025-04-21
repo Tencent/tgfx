@@ -33,12 +33,8 @@ class TaskThread {
 
  private:
   bool start();
-  void detach();
   std::thread* thread = nullptr;
-  std::atomic_bool exitWhileIdle = false;
-  // if thread detach when the taskgroup is exiting, the thread will be deleted twice.
-  // so we need to use a locker to prevent this situation.
-  std::mutex releaseLocker = {};
+  std::atomic_bool exited = false;
   friend class TaskGroup;
 };
 
@@ -51,16 +47,13 @@ class TaskGroup {
   std::atomic_int waitingThreads = 0;
   LockFreeQueue<std::shared_ptr<Task>>* tasks = nullptr;
   LockFreeQueue<TaskThread*>* threads = nullptr;
-  //The idleThread only maintains the TaskThread wrapper, while the actual thread object gets
-  //released.
-  std::list<TaskThread*> idleThreads = {};
   static TaskGroup* GetInstance();
   static void RunLoop(TaskThread* thread);
 
   TaskGroup();
   bool checkThreads();
   bool pushTask(std::shared_ptr<Task> task);
-  std::shared_ptr<Task> popTask();
+  std::shared_ptr<Task> popTask(bool immediate);
   void exit();
   void releaseThreads();
 

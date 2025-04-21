@@ -47,14 +47,13 @@ int GetCPUCores() {
 }
 
 TaskThread::~TaskThread() {
-  std::lock_guard<std::mutex> autoLock(releaseLocker);
   if (thread) {
     if (thread->joinable()) {
       thread->join();
     }
     delete thread;
-    thread = nullptr;
   }
+  --TaskGroup::GetInstance()->totalThreads;
 }
 
 bool TaskThread::start() {
@@ -65,17 +64,6 @@ bool TaskThread::start() {
   return thread != nullptr;
 }
 
-void TaskThread::detach() {
-  std::lock_guard<std::mutex> autoLock(releaseLocker);
-  if (thread) {
-    if (thread->joinable()) {
-      thread->detach();
-    }
-    delete thread;
-    thread = nullptr;
-  }
-}
-
 TaskGroup* TaskGroup::GetInstance() {
   static auto& taskGroup = *new TaskGroup();
   return &taskGroup;
@@ -84,21 +72,15 @@ TaskGroup* TaskGroup::GetInstance() {
 void TaskGroup::RunLoop(TaskThread* thread) {
   auto taskGroup = TaskGroup::GetInstance();
   while (!taskGroup->exited) {
-    auto task = taskGroup->popTask();
+    auto task = taskGroup->popTask(thread->exited);
     if (task == nullptr) {
-      // if exited, the thread must be joined and deleted by taskgroup
-      if (taskGroup->exited) {
-        break;
-      }
-      if (thread->exitWhileIdle) {
-        thread->detach();
+      if (thread->exited) {
         break;
       }
       continue;
     }
     task->execute();
   }
-  --taskGroup->totalThreads;
 }
 
 void OnAppExit() {
@@ -144,11 +126,11 @@ bool TaskGroup::pushTask(std::shared_ptr<Task> task) {
   return true;
 }
 
-std::shared_ptr<Task> TaskGroup::popTask() {
+std::shared_ptr<Task> TaskGroup::popTask(bool immediate) {
   std::unique_lock<std::mutex> autoLock(locker);
   while (!exited) {
     auto task = tasks->dequeue();
-    if (task) {
+    if (task || immediate) {
       return task;
     }
     ++waitingThreads;
@@ -164,9 +146,6 @@ std::shared_ptr<Task> TaskGroup::popTask() {
 void TaskGroup::exit() {
   exited = true;
   condition.notify_all();
-  for (auto thread : idleThreads) {
-    delete thread;
-  }
   TaskThread* thread = nullptr;
   while ((thread = threads->dequeue()) != nullptr) {
     delete thread;
@@ -179,9 +158,13 @@ void TaskGroup::exit() {
 
 void TaskGroup::releaseThreads() {
   TaskThread* thread = nullptr;
+  std::vector<TaskThread*> threadsToDeleted(THREAD_POOL_SIZE);
   while ((thread = threads->dequeue()) != nullptr) {
-    thread->exitWhileIdle = true;
-    idleThreads.push_back(thread);
+    thread->exited = true;
+  }
+  condition.notify_all();
+  for (auto threadToDeleted : threadsToDeleted) {
+    delete threadToDeleted;
   }
 }
 }  // namespace tgfx
