@@ -55,7 +55,7 @@ enum class TaskStatus {
 class Task {
  public:
   /**
-   * Release all task threads once the pending tasks have completed.
+   * Blocks until all queued tasks finish execution, then release all threads.
    *
    * Note: On HarmonyOS platform, some thread configurations may become invalid after app enters
    * background. It's recommended to call this method when app enters background.
@@ -81,7 +81,7 @@ class Task {
    * Return the current status of the Task.
    */
   TaskStatus status() const {
-    return _status.load(std::memory_order_relaxed);
+    return _status.load(std::memory_order_acquire);
   }
 
   /**

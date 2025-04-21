@@ -60,9 +60,7 @@ TaskThread* TaskThread::Create() {
 
 TaskThread::~TaskThread() {
   if (thread) {
-    if (exitWhileIdle) {
-      thread->detach();
-    } else if (thread->joinable()) {
+    if (thread->joinable()) {
       thread->join();
     }
     delete thread;
@@ -87,12 +85,9 @@ void TaskGroup::RunLoop(TaskThread* thread) {
   thread->preRun();
   auto taskGroup = TaskGroup::GetInstance();
   while (!taskGroup->exited) {
-    auto task = taskGroup->popTask();
+    auto task = taskGroup->popTask(thread->exited);
     if (task == nullptr) {
-      if (thread->exitWhileIdle) {
-        // TaskGroup no longer manages threads marked with exitWhileIdle,
-        // so the thread must self-destruct here
-        delete thread;
+      if (thread->exited) {
         break;
       }
       continue;
@@ -142,11 +137,11 @@ bool TaskGroup::pushTask(std::shared_ptr<Task> task) {
   return true;
 }
 
-std::shared_ptr<Task> TaskGroup::popTask() {
+std::shared_ptr<Task> TaskGroup::popTask(bool immediate) {
   std::unique_lock<std::mutex> autoLock(locker);
   while (!exited) {
     auto task = tasks->dequeue();
-    if (task) {
+    if (task || immediate) {
       return task;
     }
     ++waitingThreads;
@@ -168,12 +163,19 @@ void TaskGroup::exit() {
   }
   delete threads;
   delete tasks;
+  DEBUG_ASSERT(totalThreads == 0)
+  DEBUG_ASSERT(waitingThreads == 0)
 }
 
 void TaskGroup::releaseThreads() {
   TaskThread* thread = nullptr;
+  std::vector<TaskThread*> threadsToDeleted(THREAD_POOL_SIZE);
   while ((thread = threads->dequeue()) != nullptr) {
-    thread->exitWhileIdle = true;
+    thread->exited = true;
+  }
+  condition.notify_all();
+  for (auto threadToDeleted : threadsToDeleted) {
+    delete threadToDeleted;
   }
 }
 }  // namespace tgfx

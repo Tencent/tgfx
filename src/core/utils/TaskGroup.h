@@ -40,7 +40,7 @@ class TaskThread {
  private:
   bool start();
   std::thread* thread = nullptr;
-  std::atomic_bool exitWhileIdle = false;
+  std::atomic_bool exited = false;
   friend class TaskGroup;
 };
 
@@ -59,7 +59,7 @@ class TaskGroup {
   TaskGroup();
   bool checkThreads();
   bool pushTask(std::shared_ptr<Task> task);
-  std::shared_ptr<Task> popTask();
+  std::shared_ptr<Task> popTask(bool immediate);
   void exit();
   void releaseThreads();
 
