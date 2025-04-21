@@ -71,12 +71,16 @@ TaskGroup* TaskGroup::GetInstance() {
 
 void TaskGroup::RunLoop(TaskThread* thread) {
   auto taskGroup = TaskGroup::GetInstance();
+  std::unique_lock<std::mutex> autoLocker(taskGroup->locker);
   while (!taskGroup->exited) {
-    auto task = taskGroup->popTask(thread->exited);
+    auto task = taskGroup->popTask();
     if (task == nullptr) {
       if (thread->exited) {
         break;
       }
+      ++taskGroup->waitingThreads;
+      taskGroup->condition.wait_for(autoLocker, THREAD_TIMEOUT);
+      --taskGroup->waitingThreads;
       continue;
     }
     task->execute();
@@ -126,21 +130,8 @@ bool TaskGroup::pushTask(std::shared_ptr<Task> task) {
   return true;
 }
 
-std::shared_ptr<Task> TaskGroup::popTask(bool immediate) {
-  std::unique_lock<std::mutex> autoLock(locker);
-  while (!exited) {
-    auto task = tasks->dequeue();
-    if (task || immediate) {
-      return task;
-    }
-    ++waitingThreads;
-    auto status = condition.wait_for(autoLock, THREAD_TIMEOUT);
-    --waitingThreads;
-    if (exited || status == std::cv_status::timeout) {
-      return nullptr;
-    }
-  }
-  return nullptr;
+std::shared_ptr<Task> TaskGroup::popTask() {
+  return tasks->dequeue();
 }
 
 void TaskGroup::exit() {
@@ -158,9 +149,11 @@ void TaskGroup::exit() {
 
 void TaskGroup::releaseThreads() {
   TaskThread* thread = nullptr;
-  std::vector<TaskThread*> threadsToDeleted(THREAD_POOL_SIZE);
+  std::vector<TaskThread*> threadsToDeleted;
+  threadsToDeleted.reserve(THREAD_POOL_SIZE);
   while ((thread = threads->dequeue()) != nullptr) {
     thread->exited = true;
+    threadsToDeleted.push_back(thread);
   }
   condition.notify_all();
   for (auto threadToDeleted : threadsToDeleted) {

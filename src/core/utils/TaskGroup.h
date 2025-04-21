@@ -53,7 +53,7 @@ class TaskGroup {
   TaskGroup();
   bool checkThreads();
   bool pushTask(std::shared_ptr<Task> task);
-  std::shared_ptr<Task> popTask(bool immediate);
+  std::shared_ptr<Task> popTask();
   void exit();
   void releaseThreads();
 
