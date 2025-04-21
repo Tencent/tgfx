@@ -78,7 +78,7 @@ class Task {
    * Return the current status of the Task.
    */
   TaskStatus status() const {
-    return _status.load(std::memory_order_relaxed);
+    return _status.load(std::memory_order_acquire);
   }
 
   /**
