@@ -66,7 +66,7 @@ class LockFreeQueue {
 
   T dequeue() {
     uint32_t newHead = 0;
-    uint32_t oldHead = head.load(std::memory_order_relaxed);
+    uint32_t oldHead = head.load(std::memory_order_acquire);
     T element = nullptr;
 
     do {
@@ -81,7 +81,7 @@ class LockFreeQueue {
     queuePool[getIndex(newHead)] = nullptr;
 
     uint32_t newHeadPosition = 0;
-    uint32_t oldHeadPosition = headPosition.load(std::memory_order_relaxed);
+    uint32_t oldHeadPosition = headPosition.load(std::memory_order_acquire);
     do {
       newHeadPosition = oldHeadPosition + 1;
     } while (!headPosition.compare_exchange_weak(
@@ -91,7 +91,7 @@ class LockFreeQueue {
 
   bool enqueue(const T& element) {
     uint32_t newTail = 0;
-    uint32_t oldTail = tail.load(std::memory_order_relaxed);
+    uint32_t oldTail = tail.load(std::memory_order_acquire);
 
     do {
       if (getIndex(oldTail) == getIndex(headPosition.load(std::memory_order_acquire))) {
@@ -105,7 +105,7 @@ class LockFreeQueue {
     queuePool[getIndex(oldTail)] = std::move(element);
 
     uint32_t newTailPosition = 0;
-    uint32_t oldTailPosition = tailPosition.load(std::memory_order_relaxed);
+    uint32_t oldTailPosition = tailPosition.load(std::memory_order_acquire);
     do {
       newTailPosition = oldTailPosition + 1;
     } while (!tailPosition.compare_exchange_weak(

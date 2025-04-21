@@ -55,7 +55,8 @@ enum class TaskStatus {
 class Task {
  public:
   /**
-   * Release all task threads once the pending tasks have completed.
+   * Release all task threads once the pending tasks have completed. This method will block the
+   * current thread.
    */
   static void ReleaseThreads();
 
@@ -78,7 +79,7 @@ class Task {
    * Return the current status of the Task.
    */
   TaskStatus status() const {
-    return _status.load(std::memory_order_relaxed);
+    return _status.load(std::memory_order_acquire);
   }
 
   /**

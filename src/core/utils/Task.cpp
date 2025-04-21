@@ -35,7 +35,7 @@ class BlockTask : public Task {
 };
 
 void Task::ReleaseThreads() {
-  TaskGroup::GetInstance()->releaseThreads();
+  TaskGroup::GetInstance()->releaseThreads(false);
 }
 
 std::shared_ptr<Task> Task::Run(std::function<void()> block) {
@@ -57,7 +57,7 @@ void Task::Run(std::shared_ptr<Task> task) {
 }
 
 void Task::cancel() {
-  auto currentStatus = _status.load(std::memory_order_relaxed);
+  auto currentStatus = _status.load(std::memory_order_acquire);
   if (currentStatus == TaskStatus::Queueing) {
     _status.compare_exchange_weak(currentStatus, TaskStatus::Canceled, std::memory_order_acq_rel,
                                   std::memory_order_relaxed);
@@ -65,7 +65,7 @@ void Task::cancel() {
 }
 
 void Task::wait() {
-  auto oldStatus = _status.load(std::memory_order_relaxed);
+  auto oldStatus = _status.load(std::memory_order_acquire);
   if (oldStatus == TaskStatus::Canceled || oldStatus == TaskStatus::Finished) {
     return;
   }
@@ -89,7 +89,7 @@ void Task::wait() {
 }
 
 void Task::cancelOrWait() {
-  auto currentStatus = _status.load(std::memory_order_relaxed);
+  auto currentStatus = _status.load(std::memory_order_acquire);
   if (currentStatus == TaskStatus::Canceled || currentStatus == TaskStatus::Finished) {
     return;
   }
@@ -106,7 +106,7 @@ void Task::cancelOrWait() {
 }
 
 void Task::execute() {
-  auto oldStatus = _status.load(std::memory_order_relaxed);
+  auto oldStatus = _status.load(std::memory_order_acquire);
   if (oldStatus == TaskStatus::Queueing &&
       _status.compare_exchange_weak(oldStatus, TaskStatus::Executing, std::memory_order_acq_rel,
                                     std::memory_order_relaxed)) {
