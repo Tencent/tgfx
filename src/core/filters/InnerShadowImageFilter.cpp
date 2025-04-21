@@ -53,17 +53,38 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
     // transparent, the image after applying the filter will be transparent.
     return nullptr;
   }
-  source = source->makeRasterized();
-  // get inverted shadow mask
-  auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);
+
+  auto drawBounds = args.drawRect;
+  auto fpMatrix = Matrix::I();
   if (uvMatrix != nullptr) {
-    shadowMatrix.preConcat(*uvMatrix);
+    drawBounds = uvMatrix->mapRect(drawBounds);
+    fpMatrix = *uvMatrix;
   }
+  auto clipBounds = drawBounds;
+  clipBounds.offset(-dx, -dy);
+  clipBounds.join(drawBounds);
+  auto sourceRect = Rect::MakeXYWH(0, 0, source->width(), source->height());
+  if (blurFilter) {
+    // outset the bounds to include the blur radius
+    clipBounds = blurFilter->filterBounds(clipBounds);
+  }
+
+  clipBounds.intersect(sourceRect);
+  source = source->makeSubset(clipBounds);
+  source = source->makeRasterized();
+  fpMatrix.postConcat(Matrix::MakeTrans(-clipBounds.left, -clipBounds.top));
+
+  auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);
+  shadowMatrix.preConcat(fpMatrix);
+  auto newArgs = args;
+  newArgs.drawRect = Rect::MakeWH(source->width(), source->height());
   PlacementPtr<FragmentProcessor> invertShadowMask;
   if (blurFilter != nullptr) {
-    invertShadowMask = blurFilter->asFragmentProcessor(source, args, sampling, &shadowMatrix);
+    newArgs.drawRect = blurFilter->filterBounds(newArgs.drawRect);
+    newArgs.drawRect.intersect(args.drawRect);
+    invertShadowMask = blurFilter->asFragmentProcessor(source, newArgs, sampling, &shadowMatrix);
   } else {
-    invertShadowMask = FragmentProcessor::Make(source, args, TileMode::Decal, TileMode::Decal,
+    invertShadowMask = FragmentProcessor::Make(source, newArgs, TileMode::Decal, TileMode::Decal,
                                                sampling, &shadowMatrix);
   }
   auto buffer = args.context->drawingBuffer();
@@ -73,8 +94,8 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
   auto colorShadowProcessor = XfermodeFragmentProcessor::MakeFromTwoProcessors(
       buffer, std::move(colorProcessor), std::move(invertShadowMask), BlendMode::SrcOut);
 
-  auto imageProcessor = FragmentProcessor::Make(std::move(source), args, TileMode::Decal,
-                                                TileMode::Decal, sampling, uvMatrix);
+  auto imageProcessor = FragmentProcessor::Make(std::move(source), newArgs, TileMode::Decal,
+                                                TileMode::Decal, sampling, &fpMatrix);
 
   if (shadowOnly) {
     // mask the image with origin image

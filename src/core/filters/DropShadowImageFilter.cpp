@@ -64,16 +64,40 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
     // transparent, the image after applying the filter will be transparent.
     return nullptr;
   }
-  source = source->makeRasterized();
   PlacementPtr<FragmentProcessor> shadowProcessor;
-  auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);
+
+  auto drawBounds = args.drawRect;
+  auto fpMatrix = Matrix::I();
   if (uvMatrix != nullptr) {
-    shadowMatrix.preConcat(*uvMatrix);
+    drawBounds = uvMatrix->mapRect(drawBounds);
+    fpMatrix = *uvMatrix;
   }
+
+  auto clipBounds = drawBounds;
+  clipBounds.offset(-dx, -dy);
+  clipBounds.join(drawBounds);
+
+  auto sourceRect = Rect::MakeXYWH(0, 0, source->width(), source->height());
+  if (blurFilter) {
+    // outset the bounds to include the blur radius
+    clipBounds = blurFilter->filterBounds(clipBounds);
+  }
+
+  clipBounds.intersect(sourceRect);
+  source = source->makeSubset(clipBounds);
+  source = source->makeRasterized();
+  fpMatrix.postConcat(Matrix::MakeTrans(-clipBounds.left, -clipBounds.top));
+
+  auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);
+  shadowMatrix.preConcat(fpMatrix);
+  auto newArgs = args;
+  newArgs.drawRect = Rect::MakeWH(source->width(), source->height());
   if (blurFilter != nullptr) {
-    shadowProcessor = blurFilter->asFragmentProcessor(source, args, sampling, &shadowMatrix);
+    newArgs.drawRect = blurFilter->filterBounds(newArgs.drawRect);
+    newArgs.drawRect.intersect(args.drawRect);
+    shadowProcessor = blurFilter->asFragmentProcessor(source, newArgs, sampling, &shadowMatrix);
   } else {
-    shadowProcessor = FragmentProcessor::Make(source, args, TileMode::Decal, TileMode::Decal,
+    shadowProcessor = FragmentProcessor::Make(source, newArgs, TileMode::Decal, TileMode::Decal,
                                               sampling, &shadowMatrix);
   }
   if (shadowProcessor == nullptr) {
@@ -86,8 +110,8 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
   if (shadowOnly) {
     return colorShadowProcessor;
   }
-  auto imageProcessor = FragmentProcessor::Make(std::move(source), args, TileMode::Decal,
-                                                TileMode::Decal, sampling, uvMatrix);
+  auto imageProcessor = FragmentProcessor::Make(std::move(source), newArgs, TileMode::Decal,
+                                                TileMode::Decal, sampling, &fpMatrix);
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(
       buffer, std::move(imageProcessor), std::move(colorShadowProcessor), BlendMode::SrcOver);
 }
