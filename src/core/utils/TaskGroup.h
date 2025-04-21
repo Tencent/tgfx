@@ -38,7 +38,7 @@ class TaskGroup {
   LockFreeQueue<std::shared_ptr<Task>>* tasks = nullptr;
   LockFreeQueue<std::thread*>* threads = nullptr;
   static TaskGroup* GetInstance();
-  static void RunLoop(TaskGroup* taskGroup);
+  static void RunLoop(TaskGroup* taskGroup, int coreMask);
 
   TaskGroup();
   bool checkThreads();

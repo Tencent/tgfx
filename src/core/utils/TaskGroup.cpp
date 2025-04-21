@@ -20,6 +20,7 @@
 #include <algorithm>
 #include <cstdlib>
 #include <string>
+#include "USE.h"
 #include "core/utils/Log.h"
 
 #ifdef __APPLE__
@@ -56,20 +57,23 @@ TaskGroup* TaskGroup::GetInstance() {
   return &taskGroup;
 }
 
-static const int CPUCores = GetCPUCores();
-static const int MaxThreads = CPUCores > 16 ? 16 : CPUCores;
-
-void TaskGroup::RunLoop(TaskGroup* taskGroup) {
 #ifdef __OHOS__
-  auto cpuMask = MaxThreads - taskGroup->totalThreads - 1;
-  if (cpuMask != 0) {
+static void initThread(int coreMask) {
+  if (coreMask != 0) {
     cpu_set_t cpuset;
     CPU_ZERO(&cpuset);
-    CPU_SET(cpuMask, &cpuset);
+    CPU_SET(coreMask, &cpuset);
     sched_setaffinity(0, sizeof(cpu_set_t), &cpuset);
   }
+}
 #endif
 
+void TaskGroup::RunLoop(TaskGroup* taskGroup, int coreMask) {
+#ifdef __OHOS__
+  initThread(coreMask);
+#else
+  USE(coreMask);
+#endif
   while (true) {
     auto task = taskGroup->popTask();
     if (task == nullptr) {
@@ -95,8 +99,11 @@ TaskGroup::TaskGroup() {
 }
 
 bool TaskGroup::checkThreads() {
-  if (waitingThreads == 0 && totalThreads < MaxThreads) {
-    auto thread = new (std::nothrow) std::thread(TaskGroup::RunLoop, this);
+  static const int CPUCores = GetCPUCores();
+  static const int MaxThreads = CPUCores > 16 ? 16 : CPUCores;
+  int coreMask = MaxThreads - totalThreads;
+  if (waitingThreads == 0 && coreMask > 0) {
+    auto thread = new (std::nothrow) std::thread(TaskGroup::RunLoop, this, coreMask);
     if (thread) {
       threads->enqueue(thread);
       ++totalThreads;
