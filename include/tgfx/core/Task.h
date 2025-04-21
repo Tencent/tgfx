@@ -55,8 +55,8 @@ enum class TaskStatus {
 class Task {
  public:
   /**
-   * Blocks until all queued tasks finish execution, then release all threads.
-   *
+   * Release all task threads once the pending tasks have completed. This method will block the
+   * current thread.
    * Note: On HarmonyOS platform, some thread configurations may become invalid after app enters
    * background. It's recommended to call this method when app enters background.
    */
