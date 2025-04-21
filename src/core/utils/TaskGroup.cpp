@@ -46,41 +46,18 @@ int GetCPUCores() {
   return cpuCores;
 }
 
-TaskThread::~TaskThread() {
-  if (thread) {
-    if (thread->joinable()) {
-      thread->join();
-    }
-    delete thread;
-  }
-  --TaskGroup::GetInstance()->totalThreads;
-}
-
-bool TaskThread::start() {
-  if (thread) {
-    return true;
-  }
-  thread = new (std::nothrow) std::thread(TaskGroup::RunLoop, this);
-  return thread != nullptr;
-}
-
 TaskGroup* TaskGroup::GetInstance() {
   static auto& taskGroup = *new TaskGroup();
   return &taskGroup;
 }
 
-void TaskGroup::RunLoop(TaskThread* thread) {
-  auto taskGroup = TaskGroup::GetInstance();
-  std::unique_lock<std::mutex> autoLocker(taskGroup->locker);
-  while (!taskGroup->exited) {
+void TaskGroup::RunLoop(TaskGroup* taskGroup) {
+  while (true) {
     auto task = taskGroup->popTask();
     if (task == nullptr) {
-      if (thread->exited) {
+      if (taskGroup->exited) {
         break;
       }
-      ++taskGroup->waitingThreads;
-      taskGroup->condition.wait_for(autoLocker, THREAD_TIMEOUT);
-      --taskGroup->waitingThreads;
       continue;
     }
     task->execute();
@@ -94,7 +71,7 @@ void OnAppExit() {
 }
 
 TaskGroup::TaskGroup() {
-  threads = new LockFreeQueue<TaskThread*>(THREAD_POOL_SIZE);
+  threads = new LockFreeQueue<std::thread*>(THREAD_POOL_SIZE);
   tasks = new LockFreeQueue<std::shared_ptr<Task>>(TASK_QUEUE_SIZE);
   std::atexit(OnAppExit);
 }
@@ -103,8 +80,8 @@ bool TaskGroup::checkThreads() {
   static const int CPUCores = GetCPUCores();
   static const int MaxThreads = CPUCores > 16 ? 16 : CPUCores;
   if (waitingThreads == 0 && totalThreads < MaxThreads) {
-    auto thread = new TaskThread();
-    if (thread->start()) {
+    auto thread = new (std::nothrow) std::thread(TaskGroup::RunLoop, this);
+    if (thread) {
       threads->enqueue(thread);
       ++totalThreads;
     }
@@ -131,33 +108,47 @@ bool TaskGroup::pushTask(std::shared_ptr<Task> task) {
 }
 
 std::shared_ptr<Task> TaskGroup::popTask() {
-  return tasks->dequeue();
+  std::unique_lock<std::mutex> autoLock(locker);
+  while (!exited) {
+    auto task = tasks->dequeue();
+    if (task || exited) {
+      return task;
+    }
+    ++waitingThreads;
+    auto status = condition.wait_for(autoLock, THREAD_TIMEOUT);
+    --waitingThreads;
+    if (status == std::cv_status::timeout) {
+      return nullptr;
+    }
+  }
+  return nullptr;
 }
 
 void TaskGroup::exit() {
-  exited = true;
-  condition.notify_all();
-  TaskThread* thread = nullptr;
-  while ((thread = threads->dequeue()) != nullptr) {
-    delete thread;
-  }
-  delete threads;
-  delete tasks;
-  DEBUG_ASSERT(totalThreads == 0)
-  DEBUG_ASSERT(waitingThreads == 0)
+  releaseThreads(true);
 }
 
-void TaskGroup::releaseThreads() {
-  TaskThread* thread = nullptr;
-  std::vector<TaskThread*> threadsToDeleted;
-  threadsToDeleted.reserve(THREAD_POOL_SIZE);
-  while ((thread = threads->dequeue()) != nullptr) {
-    thread->exited = true;
-    threadsToDeleted.push_back(thread);
+static void ReleaseThread(std::thread* thread) {
+  if (thread->joinable()) {
+    thread->join();
   }
+  delete thread;
+}
+
+void TaskGroup::releaseThreads(bool exit) {
+  exited = true;
   condition.notify_all();
-  for (auto threadToDeleted : threadsToDeleted) {
-    delete threadToDeleted;
+  std::thread* thread = nullptr;
+  while ((thread = threads->dequeue()) != nullptr) {
+    ReleaseThread(thread);
+  }
+  totalThreads = 0;
+  DEBUG_ASSERT(waitingThreads == 0)
+  if (exit) {
+    delete threads;
+    delete tasks;
+  } else {
+    exited = false;
   }
 }
 }  // namespace tgfx

@@ -55,7 +55,8 @@ enum class TaskStatus {
 class Task {
  public:
   /**
-   * Blocks until all queued tasks finish execution, then release all threads.
+   * Release all task threads once the pending tasks have completed. This method will block the
+   * current thread.
    */
   static void ReleaseThreads();
 
