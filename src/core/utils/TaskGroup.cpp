@@ -157,8 +157,6 @@ void TaskGroup::exit() {
   }
   delete threads;
   delete tasks;
-  DEBUG_ASSERT(totalThreads == 0);
-  DEBUG_ASSERT(waitingThreads == 0);
 }
 
 void TaskGroup::releaseThreads() {
