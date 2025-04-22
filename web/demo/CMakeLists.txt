@@ -18,17 +18,14 @@ file(GLOB_RECURSE HELLO_2D_FILES src/*.cpp)
 if (DEFINED EMSCRIPTEN)
     add_executable(hello2d ${HELLO_2D_FILES})
     list(APPEND H2D_COMPILE_OPTIONS -fno-rtti -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0)
-    if(NOT EMSCRIPTEN_VERSION)
-        message(FATAL_ERROR "Failed to get emsdk version. Please ensure emsdk is properly installed and configured.")
-    endif()
-    if (EMSCRIPTEN_VERSION AND ${EMSCRIPTEN_VERSION} VERSION_LESS "4.0.4")
-        list(APPEND H2D_LINK_OPTIONS -sUSE_ES6_IMPORT_META=0)
-    elseif (EMSCRIPTEN_VERSION AND ${EMSCRIPTEN_VERSION} VERSION_GREATER_EQUAL "4.0.4" AND ${EMSCRIPTEN_VERSION} VERSION_LESS "4.0.6")
-        message(FATAL_ERROR "Emscripten version ${EMSCRIPTEN_VERSION} is not supported. Please upgrade to 4.0.6 or higher.")
-    endif ()
     list(APPEND H2D_LINK_OPTIONS --no-entry -lembind -fno-rtti -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0 -sEXPORT_NAME='Hello2D' -sWASM=1 -sASYNCIFY
             -sMAX_WEBGL_VERSION=2 -sEXPORTED_RUNTIME_METHODS=['GL','Asyncify'] -sMODULARIZE=1
             -sENVIRONMENT='web,worker' -sEXPORT_ES6=1 -sASYNCIFY_STACK_SIZE=16384)
+    if (${EMSCRIPTEN_VERSION} VERSION_LESS "4.0.4")
+        list(APPEND H2D_LINK_OPTIONS -sUSE_ES6_IMPORT_META=0)
+    elseif (${EMSCRIPTEN_VERSION} VERSION_GREATER_EQUAL "4.0.4" AND ${EMSCRIPTEN_VERSION} VERSION_LESS "4.0.6")
+        message(FATAL_ERROR "Emscripten version ${EMSCRIPTEN_VERSION} is not supported. Please upgrade to 4.0.6 or higher.")
+    endif ()
     if (EMSCRIPTEN_PTHREADS)
         list(APPEND H2D_LINK_OPTIONS -sUSE_PTHREADS=1 -sINITIAL_MEMORY=32MB -sALLOW_MEMORY_GROWTH=1
                 -sPTHREAD_POOL_SIZE=navigator.hardwareConcurrency -sPROXY_TO_PTHREAD=1
