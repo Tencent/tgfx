@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "core/ScalerContext.h"
 #include "core/utils/MathExtra.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/layers/DisplayList.h"
@@ -80,7 +81,7 @@ class CustomPathGlyphFace : public GlyphFace {
     return nullptr;
   }
 
-  Rect getImageTransform(GlyphID glyphID, Matrix* matrix) const override {
+  Rect getImageTransform(GlyphID /*glyphID*/, Matrix* /*matrix*/) const override {
     return {};
   }
 
@@ -232,7 +233,7 @@ class CustomPathGlyphFace2 : public GlyphFace, std::enable_shared_from_this<Cust
     return nullptr;
   }
 
-  Rect getImageTransform(GlyphID glyphID, Matrix* matrix) const override {
+  Rect getImageTransform(GlyphID /*glyphID*/, Matrix* /*matrix*/) const override {
     return {};
   }
 
@@ -279,11 +280,16 @@ class CustomImageGlyphFace2 : public GlyphFace,
   }
 
   std::shared_ptr<ImageBuffer> getImage(GlyphID glyphID, bool tryHardware = true) const override {
-    return fontEmoji.getImage(glyphID, tryHardware);
+    return fontEmoji.scalerContext->generateImage(glyphID, tryHardware);
   }
 
   Rect getImageTransform(GlyphID glyphID, Matrix* matrix) const override {
-    return fontEmoji.getImageTransform(glyphID, matrix);
+    auto& scalerContext = fontEmoji.scalerContext;
+    auto bounds = scalerContext->getImageTransform(glyphID, matrix);
+    if (matrix && fontEmoji.fauxItalic) {
+      matrix->postSkew(ITALIC_SKEW, 0);
+    }
+    return bounds;
   }
 
   Rect getBounds(GlyphID glyphID) const override {
