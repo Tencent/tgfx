@@ -72,13 +72,13 @@ class SVGDOM {
   void render(Canvas* canvas);
 
   /**
-   * Sets the size of the container where the SVG will be rendered.
+   * Sets the size of the container that the SVG will be rendered into.
    */
   void setContainerSize(const Size& size);
 
   /**
-   * Gets the size of the container where the SVG will be rendered. If not explicitly set, it 
-   * defaults to the size of the root node. 
+   * Sets the size of the container that the SVG will be rendered into. If not set, the size of the
+   * root node will be used by default.
    */
   Size getContainerSize() const;
 
