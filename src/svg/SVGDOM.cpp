@@ -21,23 +21,14 @@
 #include <cstring>
 #include <ctime>
 #include <memory>
-#include <string>
-#include <tuple>
-#include <unordered_map>
 #include <utility>
-#include "core/utils/Log.h"
-#include "svg/SVGAttributeParser.h"
 #include "svg/SVGNodeConstructor.h"
 #include "svg/SVGRenderContext.h"
 #include "tgfx/core/Canvas.h"
-#include "tgfx/core/Data.h"
-#include "tgfx/core/Recorder.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
-#include "tgfx/svg/SVGAttribute.h"
 #include "tgfx/svg/SVGLengthContext.h"
 #include "tgfx/svg/SVGTypes.h"
-#include "tgfx/svg/SVGValue.h"
 #include "tgfx/svg/node/SVGContainer.h"
 #include "tgfx/svg/node/SVGNode.h"
 #include "tgfx/svg/xml/XMLDOM.h"
@@ -78,20 +69,7 @@ const std::shared_ptr<SVGRoot>& SVGDOM::getRoot() const {
 }
 
 void SVGDOM::render(Canvas* canvas) {
-  // If the container size is not set, use the size of the root SVG element.
-  auto drawSize = containerSize;
-  if (drawSize.isEmpty()) {
-    auto rootWidth = root->getWidth();
-    auto rootHeight = root->getHeight();
-    if (root->getViewBox().has_value()) {
-      SVGLengthContext viewportLengthContext(root->getViewBox()->size());
-      drawSize = Size::Make(
-          viewportLengthContext.resolve(rootWidth, SVGLengthContext::LengthType::Horizontal),
-          viewportLengthContext.resolve(rootHeight, SVGLengthContext::LengthType::Vertical));
-    } else {
-      drawSize = Size::Make(rootWidth.value(), rootHeight.value());
-    }
-  }
+  auto drawSize = getContainerSize();
   if (!canvas || !root || drawSize.isEmpty()) {
     return;
   }
@@ -105,8 +83,25 @@ void SVGDOM::render(Canvas* canvas) {
   root->render(renderContext);
 }
 
-const Size& SVGDOM::getContainerSize() const {
-  return containerSize;
+Size SVGDOM::getContainerSize() const {
+  // If the container size is not set, use the size of the root SVG element.
+  auto drawSize = containerSize;
+  if (drawSize.isEmpty()) {
+    auto rootWidth = root->getWidth();
+    auto rootHeight = root->getHeight();
+    if (root->getViewBox().has_value()) {
+      SVGLengthContext viewportLengthContext(root->getViewBox()->size());
+      drawSize = Size::Make(
+          viewportLengthContext.resolve(rootWidth, SVGLengthContext::LengthType::Horizontal),
+          viewportLengthContext.resolve(rootHeight, SVGLengthContext::LengthType::Vertical));
+    } else {
+      SVGLengthContext viewportLengthContext(Size::Make(100, 100));
+      drawSize = Size::Make(
+          viewportLengthContext.resolve(rootWidth, SVGLengthContext::LengthType::Horizontal),
+          viewportLengthContext.resolve(rootHeight, SVGLengthContext::LengthType::Vertical));
+    }
+  }
+  return drawSize;
 }
 
 void SVGDOM::setContainerSize(const Size& size) {
