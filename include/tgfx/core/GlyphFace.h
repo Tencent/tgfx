@@ -62,11 +62,9 @@ class GlyphFace {
   virtual bool getPath(GlyphID glyphID, Path* path) const = 0;
 
   /**
-   * Creates an Image capturing the content of the specified glyph. The returned matrix should apply
-   * to the glyph image when drawing. Please note that the fauxBold is not supported for this
-   * method.
+   * Creates an ImageBuffer capturing the content of the specified glyph. This is a synchronous method
    */
-  virtual std::shared_ptr<Image> getImage(GlyphID glyphID, Matrix* matrix) const = 0;
+  virtual std::shared_ptr<ImageBuffer> getImage(GlyphID glyphID, bool tryHardware = true) const = 0;
 
   /**
    * Returns the bounding box of the specified glyph.
@@ -80,7 +78,13 @@ class GlyphFace {
    */
   virtual bool asFont(Font* font) const = 0;
 
+  /**
+  * Returns the transformed glyph matrix along with its bounds.
+  */
+  virtual Rect getImageTransform(GlyphID glyphID, Matrix* matrix) const = 0;
+
  protected:
   GlyphFace() = default;
 };
+
 }  // namespace tgfx

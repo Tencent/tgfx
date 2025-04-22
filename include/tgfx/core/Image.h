@@ -303,7 +303,8 @@ class Image {
     Rasterized,
     RGBAAA,
     Texture,
-    Subset
+    Subset,
+    Glyph
   };
 
   virtual Type type() const = 0;
