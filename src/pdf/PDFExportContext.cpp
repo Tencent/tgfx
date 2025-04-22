@@ -638,6 +638,9 @@ void PDFExportContext::drawInnerShadowAfterLayer(const Record* record,
   PlaybackContext playbackContext = {};
   record->playback(&measureContext, &playbackContext);
   auto pictureBounds = measureContext.getBounds();
+  if (pictureBounds.isEmpty()) {
+    return;
+  }
 
   auto surface = Surface::Make(document->context(), static_cast<int>(pictureBounds.width()),
                                static_cast<int>(pictureBounds.height()));

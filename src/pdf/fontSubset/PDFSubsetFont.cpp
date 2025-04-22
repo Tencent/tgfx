@@ -20,7 +20,9 @@
 #include <_types/_uint32_t.h>
 #include <cstddef>
 #include <cstdlib>
+#include <iostream>
 #include <memory>
+#include <utility>
 #include "hb-subset.h"
 #include "hb.h"
 #include "pdf/PDFFont.h"
@@ -109,8 +111,10 @@ std::shared_ptr<Data> subset_harfbuzz(const std::shared_ptr<Typeface>& typeface,
     return nullptr;
   }
   hb_set_t* glyphs = hb_subset_input_glyph_set(input.get());
-  glyphUsage.getSetValues(
-      [&glyphs](size_t gid) { hb_set_add(glyphs, static_cast<hb_codepoint_t>(gid)); });
+  glyphUsage.getSetValues([&glyphs](size_t gid) {
+    std::cout << gid << std::endl;
+    hb_set_add(glyphs, static_cast<hb_codepoint_t>(gid));
+  });
 
   HBFace subset = make_subset(input.get(), face.get(), glyphUsage.has(0));
   if (!subset) {
@@ -118,10 +122,15 @@ std::shared_ptr<Data> subset_harfbuzz(const std::shared_ptr<Typeface>& typeface,
     return extract_cff_data(face.get());
   }
 
+  hb_blob_t* subset_blob = hb_face_reference_blob(subset.get());
+  FILE* fp = fopen("/Users/yg/Downloads/tgfx_subset.otf", "wb");
+  fwrite(hb_blob_get_data(subset_blob, nullptr), 1, hb_blob_get_length(subset_blob), fp);
+  fclose(fp);
+
   // Extract subset CFF if available
-  if (auto cffData = extract_cff_data(subset.get())) {
-    return cffData;
-  }
+  // if (auto cffData = extract_cff_data(subset.get())) {
+  //   return cffData;
+  // }
 
   HBBlob result(hb_face_reference_blob(subset.get()), hb_blob_destroy);
   return to_data(std::move(result));

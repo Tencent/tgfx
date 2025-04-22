@@ -391,7 +391,7 @@ void PDFFont::emitSubsetType0(PDFDocument* document) const {
 
   auto newCIDFont = PDFDictionary::Make("Font");
   // TODO(YGaurora): Add FontDescriptor to CIDFont.
-  // newCIDFont->insertRef("FontDescriptor", document->emit(*descriptor));
+  newCIDFont->insertRef("FontDescriptor", document->emit(*descriptor));
   newCIDFont->insertName("BaseFont", metrics.postScriptName);
 
   switch (type) {

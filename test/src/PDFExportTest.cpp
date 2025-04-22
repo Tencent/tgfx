@@ -16,11 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <hb-subset.h>
+#include <hb.h>
+#include <cstdio>
 #include <filesystem>
 #include <memory>
 #include "base/TGFXTest.h"
 #include "svg/SVGUtils.h"
 #include "tgfx/core/Color.h"
+#include "tgfx/core/Data.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Paint.h"
@@ -28,6 +32,7 @@
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
+#include "tgfx/core/Stream.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/pdf/PDFMetadata.h"
 #include "utils/ProjectPath.h"
@@ -44,19 +49,19 @@ TGFX_TEST(PDFExportTest, EmptyPDF) {
   PDFMetadata metadata;
   metadata.title = "Empty PDF";
   // metadata.PDFA = true;
-  metadata.compressionLevel = PDFMetadata::CompressionLevel::Average;
-  // metadata.compressionLevel = PDFMetadata::CompressionLevel::None;
+  // metadata.compressionLevel = PDFMetadata::CompressionLevel::Average;
+  metadata.compressionLevel = PDFMetadata::CompressionLevel::None;
 
   ContextScope scope;
   auto* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto document = MakePDFDocument(PDFStream, context, metadata);
-  auto* canvas = document->beginPage(1000.f, 250.f);
+  auto* canvas = document->beginPage(1000.f, 500.f);
   canvas->translate(40.0, 20.0);
 
   auto typeface =
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
-  Font font(typeface, 200.f);
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  Font font(typeface, 150.f);
   {
     Paint strokePaint;
     strokePaint.setColor(Color::Blue());
@@ -65,7 +70,7 @@ TGFX_TEST(PDFExportTest, EmptyPDF) {
     strokePaint.setStroke(stroke);
 
     Paint textPaint;
-    textPaint.setColor(Color::Black());
+    textPaint.setColor(Color::Green());
 
     // bool success = false;
     // std::shared_ptr<Path> path = nullptr;
@@ -96,7 +101,7 @@ TGFX_TEST(PDFExportTest, EmptyPDF) {
     // }
     //char T
     {
-      canvas->drawSimpleText("杨", 55, 175, font, textPaint);
+      canvas->drawSimpleText("TGFX by 杨", 55, 425, font, textPaint);
     }
 
     // //G
@@ -127,7 +132,7 @@ TGFX_TEST(PDFExportTest, EmptyPDF) {
     // //char G
     // { canvas->drawSimpleText("G", 250, 175, font, textPaint); }
 
-    // //X
+    //X
     // std::tie(success, path) = PathMakeFromSVGString(
     //     "M917.168 0.0357666L866.632 106.116L917.228 212.168L811.148 161.632L705.096 "
     //     "212.228L755.632 106.148L705.036 0.0961968L811.116 50.632L917.168 0.0357666Z");
@@ -158,7 +163,7 @@ TGFX_TEST(PDFExportTest, EmptyPDF) {
     //   canvas->drawSimpleText("X", 750, 175, font, textPaint);
     // }
 
-    // //F
+    //F
     // std::tie(success, path) = PathMakeFromSVGString("M656 5.99997H456V206H536V86H656V5.99997Z");
     // if (success) {
     //   Paint paint;
@@ -290,6 +295,39 @@ TGFX_TEST(PDFExportTest, tryMask) {
   document->endPage();
   document->close();
   PDFStream->flush();
+}
+
+TGFX_TEST(PDFExportTest, harfbuzz_subset) {
+  // 1. 加载原始字体
+  auto fileData =
+      Data::MakeFromFile("/Users/yg/code/c++_space/tgfx/resources/font/NotoSerifSC-Regular.otf");
+  hb_blob_t* blob = hb_blob_create(reinterpret_cast<const char*>(fileData->data()),
+                                   static_cast<uint32_t>(fileData->size()), HB_MEMORY_MODE_READONLY,
+                                   nullptr, nullptr);
+
+  hb_face_t* face = hb_face_create(blob, 0);
+
+  // 2. 创建子集输入参数
+  hb_subset_input_t* input = hb_subset_input_create_or_fail();
+
+  // 3. 添加需保留的 Unicode 字符
+  hb_set_t* unicodes = hb_subset_input_unicode_set(input);
+  hb_set_add(unicodes, 'A');  // 添加单个字符
+  // hb_set_add_range(unicodes, 0x4E00, 0x9FFF);  // 添加汉字区块
+
+  // 4. 执行子集化
+  hb_face_t* subset_face = hb_subset_or_fail(face, input);
+
+  // 5. 导出为字体文件
+  hb_blob_t* subset_blob = hb_face_reference_blob(subset_face);
+  FILE* fp = fopen("/Users/yg/Downloads/subset_tgfx.otf", "wb");
+  fwrite(hb_blob_get_data(subset_blob, nullptr), 1, hb_blob_get_length(subset_blob), fp);
+  fclose(fp);
+
+  // 6. 释放资源
+  hb_subset_input_destroy(input);
+  hb_face_destroy(face);
+  hb_blob_destroy(blob);
 }
 
 }  // namespace tgfx
