@@ -64,12 +64,36 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
     // transparent, the image after applying the filter will be transparent.
     return nullptr;
   }
-  source = source->makeRasterized();
   PlacementPtr<FragmentProcessor> shadowProcessor;
-  auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);
+
+  auto drawBounds = args.drawRect;
+  auto fpMatrix = Matrix::I();
   if (uvMatrix != nullptr) {
-    shadowMatrix.preConcat(*uvMatrix);
+    drawBounds = uvMatrix->mapRect(drawBounds);
+    fpMatrix = *uvMatrix;
   }
+
+  auto clipBounds = drawBounds;
+  clipBounds.offset(-dx, -dy);
+  if (!shadowOnly) {
+    // if shadowOnly is false, we need to include the original image bounds
+    clipBounds.join(drawBounds);
+  }
+  if (blurFilter) {
+    // outset the bounds to include the blur radius
+    clipBounds = blurFilter->filterBounds(clipBounds);
+  }
+  auto sourceRect = Rect::MakeXYWH(0, 0, source->width(), source->height());
+  clipBounds.intersect(sourceRect);
+  source = source->makeSubset(clipBounds);
+  source = source->makeRasterized();
+
+  // add the subset offset to the matrix
+  fpMatrix.postConcat(Matrix::MakeTrans(-clipBounds.left, -clipBounds.top));
+
+  auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);
+  shadowMatrix.preConcat(fpMatrix);
+
   if (blurFilter != nullptr) {
     shadowProcessor = blurFilter->asFragmentProcessor(source, args, sampling, &shadowMatrix);
   } else {
@@ -87,7 +111,7 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
     return colorShadowProcessor;
   }
   auto imageProcessor = FragmentProcessor::Make(std::move(source), args, TileMode::Decal,
-                                                TileMode::Decal, sampling, uvMatrix);
+                                                TileMode::Decal, sampling, &fpMatrix);
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(
       buffer, std::move(imageProcessor), std::move(colorShadowProcessor), BlendMode::SrcOver);
 }
