@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/FontGlyphFace.h"
+#include "core/ScalerContext.h"
 
 namespace tgfx {
 std::shared_ptr<GlyphFace> GlyphFace::Wrap(Font font) {
@@ -47,7 +48,7 @@ bool FontGlyphFace::getPath(GlyphID glyphID, Path* path) const {
 }
 
 std::shared_ptr<ImageBuffer> FontGlyphFace::getImage(GlyphID glyphID, bool tryHardware) const {
-  return _font.getImage(glyphID, tryHardware);
+  return _font.scalerContext->generateImage(glyphID, tryHardware);
 }
 
 Rect FontGlyphFace::getBounds(GlyphID glyphID) const {
@@ -63,7 +64,12 @@ bool FontGlyphFace::asFont(Font* font) const {
 }
 
 Rect FontGlyphFace::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
-  return _font.getImageTransform(glyphID, matrix);
+  auto& scalerContext = _font.scalerContext;
+  auto bounds = scalerContext->getImageTransform(glyphID, matrix);
+  if (matrix && _font.fauxItalic) {
+    matrix->postSkew(ITALIC_SKEW, 0);
+  }
+  return bounds;
 }
 
 }  // namespace tgfx

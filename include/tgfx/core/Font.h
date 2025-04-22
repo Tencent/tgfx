@@ -151,9 +151,7 @@ class Font {
    * to the glyph image when drawing. Please note that the fauxBold is not supported for this
    * method.
    */
-  std::shared_ptr<ImageBuffer> getImage(GlyphID glyphID, bool tryHardware = true) const;
-
-  Rect getImageTransform(GlyphID glyphID, Matrix* matrix) const;
+  std::shared_ptr<Image> getImage(GlyphID glyphID, Matrix* matrix) const;
 
   /**
    * Compares two fonts for equality.
@@ -171,5 +169,7 @@ class Font {
   std::shared_ptr<ScalerContext> scalerContext = nullptr;
   bool fauxBold = false;
   bool fauxItalic = false;
+
+  friend class FontGlyphFace;
 };
 }  // namespace tgfx

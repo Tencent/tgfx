@@ -19,9 +19,9 @@
 #include "GlyphImage.h"
 
 namespace tgfx {
-class GlyphImageGenerator final : public ImageGenerator {
+class GlyphFaceGenerator final : public ImageGenerator {
  public:
-  GlyphImageGenerator(int width, int height, std::shared_ptr<GlyphFace> glyphFace, GlyphID glyphID)
+  GlyphFaceGenerator(int width, int height, std::shared_ptr<GlyphFace> glyphFace, GlyphID glyphID)
       : ImageGenerator(width, height), glyphFace(std::move(glyphFace)), glyphID(glyphID) {
   }
 
@@ -51,7 +51,7 @@ std::shared_ptr<Image> GlyphImage::MakeFrom(std::shared_ptr<GlyphFace> glyphFace
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
   auto generator =
-      std::make_shared<GlyphImageGenerator>(width, height, std::move(glyphFace), glyphID);
+      std::make_shared<GlyphFaceGenerator>(width, height, std::move(glyphFace), glyphID);
   auto image = std::shared_ptr<GlyphImage>(new GlyphImage(std::move(generator)));
   image->weakThis = image;
   return image;
