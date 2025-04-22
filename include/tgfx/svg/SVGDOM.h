@@ -20,7 +20,6 @@
 
 #include <memory>
 #include "tgfx/core/Canvas.h"
-#include "tgfx/core/Data.h"
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Stream.h"
@@ -73,14 +72,15 @@ class SVGDOM {
   void render(Canvas* canvas);
 
   /**
-   * Sets the size of the container that the SVG will be rendered into.
+   * Sets the size of the container where the SVG will be rendered.
    */
   void setContainerSize(const Size& size);
 
   /**
-   * Returns the size of the container that the SVG will be rendered into.
+   * Gets the size of the container where the SVG will be rendered. If not explicitly set, it 
+   * defaults to the size of the root node. 
    */
-  const Size& getContainerSize() const;
+  Size getContainerSize() const;
 
   /**
    * Returns the ID mapper for the SVG nodes.
