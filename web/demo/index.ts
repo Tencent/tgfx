@@ -26,7 +26,10 @@ let shareData: ShareData = new ShareData();
 if (typeof window !== 'undefined') {
     window.onload = async () => {
         try {
-            shareData.Hello2DModule = await Hello2D({ locateFile: (file: string) => './wasm-mt/' + file });
+            shareData.Hello2DModule = await Hello2D({
+                locateFile: (file: string) => './wasm-mt/' + file ,
+                mainScriptUrlOrBlob: './wasm-mt/hello2d.js'
+            });
             TGFXBind(shareData.Hello2DModule);
 
             let tgfxView = shareData.Hello2DModule.TGFXThreadsView.MakeFrom('#hello2d');
@@ -50,7 +53,7 @@ if (typeof window !== 'undefined') {
 
     window.onresize = () => {
         onresizeEvent(shareData);
-        window.setTimeout(updateSize(shareData), 300);
+        window.setTimeout(() => updateSize(shareData), 300);
     };
 
     window.onclick = () => {

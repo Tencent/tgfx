@@ -21,23 +21,14 @@
 #include <cstring>
 #include <ctime>
 #include <memory>
-#include <string>
-#include <tuple>
-#include <unordered_map>
 #include <utility>
-#include "core/utils/Log.h"
-#include "svg/SVGAttributeParser.h"
-#include "svg/SVGLengthContext.h"
 #include "svg/SVGNodeConstructor.h"
 #include "svg/SVGRenderContext.h"
 #include "tgfx/core/Canvas.h"
-#include "tgfx/core/Data.h"
-#include "tgfx/core/Recorder.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
-#include "tgfx/svg/SVGAttribute.h"
+#include "tgfx/svg/SVGLengthContext.h"
 #include "tgfx/svg/SVGTypes.h"
-#include "tgfx/svg/SVGValue.h"
 #include "tgfx/svg/node/SVGContainer.h"
 #include "tgfx/svg/node/SVGNode.h"
 #include "tgfx/svg/xml/XMLDOM.h"
@@ -70,7 +61,7 @@ std::shared_ptr<SVGDOM> SVGDOM::Make(Stream& stream, std::shared_ptr<TextShaper>
 
 SVGDOM::SVGDOM(std::shared_ptr<SVGRoot> root, std::shared_ptr<TextShaper> textShaper,
                SVGIDMapper&& mapper)
-    : root(std::move(root)), nodeIDMapper(std::move(mapper)), textShaper(std::move(textShaper)) {
+    : root(std::move(root)), _nodeIDMapper(std::move(mapper)), textShaper(std::move(textShaper)) {
 }
 
 const std::shared_ptr<SVGRoot>& SVGDOM::getRoot() const {
@@ -78,6 +69,21 @@ const std::shared_ptr<SVGRoot>& SVGDOM::getRoot() const {
 }
 
 void SVGDOM::render(Canvas* canvas) {
+  auto drawSize = getContainerSize();
+  if (!canvas || !root || drawSize.isEmpty()) {
+    return;
+  }
+
+  SVGLengthContext lengthContext(drawSize);
+  SVGPresentationContext presentationContext;
+
+  SVGRenderContext renderContext(canvas, textShaper, _nodeIDMapper, lengthContext,
+                                 presentationContext, {nullptr, nullptr}, canvas->getMatrix());
+
+  root->render(renderContext);
+}
+
+Size SVGDOM::getContainerSize() const {
   // If the container size is not set, use the size of the root SVG element.
   auto drawSize = containerSize;
   if (drawSize.isEmpty()) {
@@ -89,24 +95,13 @@ void SVGDOM::render(Canvas* canvas) {
           viewportLengthContext.resolve(rootWidth, SVGLengthContext::LengthType::Horizontal),
           viewportLengthContext.resolve(rootHeight, SVGLengthContext::LengthType::Vertical));
     } else {
-      drawSize = Size::Make(rootWidth.value(), rootHeight.value());
+      SVGLengthContext viewportLengthContext(Size::Make(100, 100));
+      drawSize = Size::Make(
+          viewportLengthContext.resolve(rootWidth, SVGLengthContext::LengthType::Horizontal),
+          viewportLengthContext.resolve(rootHeight, SVGLengthContext::LengthType::Vertical));
     }
   }
-  if (!canvas || !root || drawSize.isEmpty()) {
-    return;
-  }
-
-  SVGLengthContext lengthContext(drawSize);
-  SVGPresentationContext presentationContext;
-
-  SVGRenderContext renderContext(canvas, textShaper, nodeIDMapper, lengthContext,
-                                 presentationContext, {nullptr, nullptr}, canvas->getMatrix());
-
-  root->render(renderContext);
-}
-
-const Size& SVGDOM::getContainerSize() const {
-  return containerSize;
+  return drawSize;
 }
 
 void SVGDOM::setContainerSize(const Size& size) {

@@ -7,7 +7,7 @@
     "common": [
       {
         "url": "${PAG_GROUP}/vendor_tools.git",
-        "commit": "cd6d0b0ceeac7d06d56f9a1b7bd85c76fd3bf708",
+        "commit": "ccd8bbde5fd67c02ef6d65297d6b38b34acc2a07",
         "dir": "third_party/vendor_tools"
       },
       {
@@ -52,7 +52,7 @@
       },
       {
         "url": "https://github.com/google/googletest.git",
-        "commit": "6910c9d9165801d8827d628cb72eb7ea9dd538c5",
+        "commit": "e2239ee6043f73722e7aa812a459f54a28552929",
         "dir": "third_party/googletest"
       },
       {

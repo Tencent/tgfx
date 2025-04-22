@@ -42,7 +42,7 @@ if (typeof window !== 'undefined') {
 
     window.onresize = () => {
         onresizeEvent(shareData);
-        window.setTimeout(updateSize(shareData), 300);
+        window.setTimeout(() => updateSize(shareData), 300);
     };
 
     window.onclick = () => {

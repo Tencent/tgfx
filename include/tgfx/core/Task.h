@@ -55,6 +55,12 @@ enum class TaskStatus {
 class Task {
  public:
   /**
+   * Release all task threads once the pending tasks have completed. This method will block the
+   * current thread.
+   */
+  static void ReleaseThreads();
+
+  /**
    * Submits a code block for asynchronous execution immediately and returns a Task wraps the code
    * block. Hold a reference to the returned Task if you want to cancel it or wait for it to finish
    * execution. Returns nullptr if the block is nullptr.
@@ -73,7 +79,7 @@ class Task {
    * Return the current status of the Task.
    */
   TaskStatus status() const {
-    return _status.load(std::memory_order_relaxed);
+    return _status.load(std::memory_order_acquire);
   }
 
   /**

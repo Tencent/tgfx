@@ -25,20 +25,20 @@
 
 namespace tgfx {
 
-class SkSVGFeLightSource : public SVGHiddenContainer {
+class SVGFeLightSource : public SVGHiddenContainer {
  public:
   void appendChild(std::shared_ptr<SVGNode>) final {
   }
 
  protected:
-  explicit SkSVGFeLightSource(SVGTag tag) : INHERITED(tag) {
+  explicit SVGFeLightSource(SVGTag tag) : INHERITED(tag) {
   }
 
  private:
   using INHERITED = SVGHiddenContainer;
 };
 
-class SVGFeDistantLight final : public SkSVGFeLightSource {
+class SVGFeDistantLight final : public SVGFeLightSource {
  public:
   static std::shared_ptr<SVGFeDistantLight> Make() {
     return std::shared_ptr<SVGFeDistantLight>(new SVGFeDistantLight());
@@ -55,10 +55,10 @@ class SVGFeDistantLight final : public SkSVGFeLightSource {
 
   bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
-  using INHERITED = SkSVGFeLightSource;
+  using INHERITED = SVGFeLightSource;
 };
 
-class SVGFePointLight final : public SkSVGFeLightSource {
+class SVGFePointLight final : public SVGFeLightSource {
  public:
   static std::shared_ptr<SVGFePointLight> Make() {
     return std::shared_ptr<SVGFePointLight>(new SVGFePointLight());
@@ -74,10 +74,10 @@ class SVGFePointLight final : public SkSVGFeLightSource {
 
   bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
-  using INHERITED = SkSVGFeLightSource;
+  using INHERITED = SVGFeLightSource;
 };
 
-class SVGFeSpotLight final : public SkSVGFeLightSource {
+class SVGFeSpotLight final : public SVGFeLightSource {
  public:
   static std::shared_ptr<SVGFeSpotLight> Make() {
     return std::shared_ptr<SVGFeSpotLight>(new SVGFeSpotLight());
@@ -99,7 +99,7 @@ class SVGFeSpotLight final : public SkSVGFeLightSource {
 
   bool parseAndSetAttribute(const std::string& name, const std::string& value) override;
 
-  using INHERITED = SkSVGFeLightSource;
+  using INHERITED = SVGFeLightSource;
 };
 
 }  // namespace tgfx

@@ -44,7 +44,7 @@ std::shared_ptr<Shader> SVGRadialGradient::onMakeShader(const SVGRenderContext& 
                                                         const std::vector<float>& position,
                                                         TileMode, const Matrix& matrix) const {
   SVGLengthContext lengthContext = context.lengthContext();
-  lengthContext.setPatternUnits(getGradientUnits());
+  lengthContext.setBoundingBoxUnits(getGradientUnits());
 
   auto radius = lengthContext.resolve(R, SVGLengthContext::LengthType::Other);
   auto center = Point::Make(lengthContext.resolve(Cx, SVGLengthContext::LengthType::Horizontal),

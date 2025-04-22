@@ -33,7 +33,7 @@ SVGTransformableNode::SVGTransformableNode(SVGTag tag) : INHERITED(tag) {
 bool SVGTransformableNode::onPrepareToRender(SVGRenderContext* context) const {
   if (!transform.isIdentity()) {
     auto tempTransform = transform;
-    if (auto unit = context->lengthContext().getPatternUnits();
+    if (auto unit = context->lengthContext().getBoundingBoxUnits();
         unit.has_value() &&
         unit.value().type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
       tempTransform.postScale(context->lengthContext().viewPort().width,

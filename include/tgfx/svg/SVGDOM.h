@@ -20,7 +20,6 @@
 
 #include <memory>
 #include "tgfx/core/Canvas.h"
-#include "tgfx/core/Data.h"
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Stream.h"
@@ -78,9 +77,17 @@ class SVGDOM {
   void setContainerSize(const Size& size);
 
   /**
-   * Returns the size of the container that the SVG will be rendered into.
+   * Gets the size of the container that the SVG will be rendered into. If not set, the size of the
+   * root node will be used by default.
    */
-  const Size& getContainerSize() const;
+  Size getContainerSize() const;
+
+  /**
+   * Returns the ID mapper for the SVG nodes.
+   */
+  const SVGIDMapper& nodeIDMapper() const {
+    return _nodeIDMapper;
+  }
 
  private:
   /**
@@ -90,7 +97,7 @@ class SVGDOM {
          SVGIDMapper&& mapper);
 
   const std::shared_ptr<SVGRoot> root = nullptr;
-  const SVGIDMapper nodeIDMapper = {};
+  const SVGIDMapper _nodeIDMapper = {};
   const std::shared_ptr<TextShaper> textShaper = nullptr;
   Size containerSize = {};
 };

@@ -42,7 +42,7 @@ bool SVGMask::parseAndSetAttribute(const std::string& n, const std::string& v) {
 
 Rect SVGMask::bounds(const SVGRenderContext& context) const {
   auto lengthContext = context.lengthContext();
-  lengthContext.setPatternUnits(MaskUnits);
+  lengthContext.setBoundingBoxUnits(MaskUnits);
   SVGRenderContext resolveContext(context, lengthContext);
   if (Width.has_value() && Height.has_value()) {
     return resolveContext.resolveOBBRect(X.value_or(SVGLength(0, SVGLength::Unit::Number)),

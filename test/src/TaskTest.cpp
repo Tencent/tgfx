@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,39 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <condition_variable>
-#include <list>
-#include <mutex>
-#include <thread>
 #include <vector>
-#include "LockFreeQueue.h"
+#include "base/TGFXTest.h"
+#include "core/utils/TaskGroup.h"
 #include "tgfx/core/Task.h"
 
 namespace tgfx {
-
-class TaskGroup {
- private:
-  std::mutex locker = {};
-  std::condition_variable condition = {};
-  std::atomic_int totalThreads = 0;
-  std::atomic_bool exited = false;
-  std::atomic_int waitingThreads = 0;
-  LockFreeQueue<std::shared_ptr<Task>>* tasks = nullptr;
-  LockFreeQueue<std::thread*>* threads = nullptr;
-  static TaskGroup* GetInstance();
-  static void RunLoop(TaskGroup* taskGroup);
-
-  TaskGroup();
-  bool checkThreads();
-  bool pushTask(std::shared_ptr<Task> task);
-  std::shared_ptr<Task> popTask();
-  void exit();
-  void releaseThreads(bool exit);
-
-  friend class Task;
-  friend class TaskThread;
-  friend void OnAppExit();
-};
+TGFX_TEST(TaskTest, release) {
+  Task::ReleaseThreads();
+  auto group = TaskGroup::GetInstance();
+  EXPECT_EQ(group->threads->dequeue(), nullptr);
+  EXPECT_EQ(group->waitingThreads, 0);
+  EXPECT_EQ(group->totalThreads, 0);
+  EXPECT_EQ(group->tasks->dequeue(), nullptr);
+}
 }  // namespace tgfx
