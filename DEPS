@@ -52,7 +52,7 @@
       },
       {
         "url": "https://github.com/google/googletest.git",
-        "commit": "6910c9d9165801d8827d628cb72eb7ea9dd538c5",
+        "commit": "e2239ee6043f73722e7aa812a459f54a28552929",
         "dir": "third_party/googletest"
       },
       {
