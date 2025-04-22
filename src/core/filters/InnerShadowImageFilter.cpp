@@ -63,6 +63,7 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
   auto clipBounds = drawBounds;
   clipBounds.offset(-dx, -dy);
   clipBounds.join(drawBounds);
+
   auto sourceRect = Rect::MakeXYWH(0, 0, source->width(), source->height());
   if (blurFilter) {
     // outset the bounds to include the blur radius
@@ -72,19 +73,17 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
   clipBounds.intersect(sourceRect);
   source = source->makeSubset(clipBounds);
   source = source->makeRasterized();
+
+  // add the subset offset to the matrix
   fpMatrix.postConcat(Matrix::MakeTrans(-clipBounds.left, -clipBounds.top));
 
   auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);
   shadowMatrix.preConcat(fpMatrix);
-  auto newArgs = args;
-  newArgs.drawRect = Rect::MakeWH(source->width(), source->height());
   PlacementPtr<FragmentProcessor> invertShadowMask;
   if (blurFilter != nullptr) {
-    newArgs.drawRect = blurFilter->filterBounds(newArgs.drawRect);
-    newArgs.drawRect.intersect(args.drawRect);
-    invertShadowMask = blurFilter->asFragmentProcessor(source, newArgs, sampling, &shadowMatrix);
+    invertShadowMask = blurFilter->asFragmentProcessor(source, args, sampling, &shadowMatrix);
   } else {
-    invertShadowMask = FragmentProcessor::Make(source, newArgs, TileMode::Decal, TileMode::Decal,
+    invertShadowMask = FragmentProcessor::Make(source, args, TileMode::Decal, TileMode::Decal,
                                                sampling, &shadowMatrix);
   }
   auto buffer = args.context->drawingBuffer();
@@ -94,7 +93,7 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
   auto colorShadowProcessor = XfermodeFragmentProcessor::MakeFromTwoProcessors(
       buffer, std::move(colorProcessor), std::move(invertShadowMask), BlendMode::SrcOut);
 
-  auto imageProcessor = FragmentProcessor::Make(std::move(source), newArgs, TileMode::Decal,
+  auto imageProcessor = FragmentProcessor::Make(std::move(source), args, TileMode::Decal,
                                                 TileMode::Decal, sampling, &fpMatrix);
 
   if (shadowOnly) {
