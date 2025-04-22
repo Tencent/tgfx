@@ -77,7 +77,7 @@ class SVGDOM {
   void setContainerSize(const Size& size);
 
   /**
-   * Sets the size of the container that the SVG will be rendered into. If not set, the size of the
+   * Gets the size of the container that the SVG will be rendered into. If not set, the size of the
    * root node will be used by default.
    */
   Size getContainerSize() const;
