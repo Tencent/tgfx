@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,33 +17,23 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+
+#include "GeneratorImage.h"
 #include "tgfx/core/GlyphFace.h"
+#include "tgfx/core/Image.h"
 
 namespace tgfx {
-class FontGlyphFace final : public GlyphFace {
+class GlyphImage final : public GeneratorImage {
  public:
-  bool hasColor() const override;
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<GlyphFace> glyphFace, GlyphID glyphId,
+                                         Matrix* matrix);
 
-  bool hasOutlines() const override;
-
-  std::shared_ptr<GlyphFace> makeScaled(float scale) const override;
-
-  bool getPath(GlyphID glyphID, Path* path) const override;
-
-  std::shared_ptr<ImageBuffer> getImage(GlyphID glyphID, bool tryHardware = true) const override;
-
-  Rect getBounds(GlyphID glyphID) const override;
-
-  bool asFont(Font* font) const override;
-
-  Rect getImageTransform(GlyphID glyphID, Matrix* matrix) const override;
-
- private:
-  explicit FontGlyphFace(Font font) : _font(std::move(font)) {
+ protected:
+  Type type() const override {
+    return Type::Glyph;
   }
 
-  Font _font = {};
-
-  friend class GlyphFace;
+ private:
+  explicit GlyphImage(std::shared_ptr<ImageGenerator> generator);
 };
-}  // namespace tgfx
+}  //namespace tgfx

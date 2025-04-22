@@ -75,8 +75,13 @@ class CustomPathGlyphFace : public GlyphFace {
     }
   }
 
-  std::shared_ptr<Image> getImage(GlyphID /*glyphID*/, Matrix* /*matrix*/) const override {
+  std::shared_ptr<ImageBuffer> getImage(GlyphID /*glyphID*/,
+                                        bool /* tryHardware = true*/) const override {
     return nullptr;
+  }
+
+  Rect getImageTransform(GlyphID glyphID, Matrix* matrix) const override {
+    return {};
   }
 
   Rect getBounds(GlyphID glyphID) const override {
@@ -121,7 +126,7 @@ class CustomImageGlyphFace : public GlyphFace {
     return false;
   }
 
-  std::shared_ptr<Image> getImage(GlyphID glyphID, Matrix* matrix) const override {
+  std::shared_ptr<ImageBuffer> getImage(GlyphID glyphID, bool tryHardware = true) const override {
     std::string imagePath;
     switch (glyphID) {
       case 4:
@@ -137,8 +142,13 @@ class CustomImageGlyphFace : public GlyphFace {
         return nullptr;
     }
 
+    auto codec = ImageCodec::MakeFrom(ProjectPath::Absolute(imagePath));
+    return codec->makeBuffer(tryHardware);
+  }
+
+  Rect getImageTransform(GlyphID glyphID, Matrix* matrix) const override {
     matrix->setScale(0.25f * _scale, 0.25f * _scale);
-    return Image::MakeFromFile(ProjectPath::Absolute(imagePath));
+    return getBounds(glyphID);
   }
 
   Rect getBounds(GlyphID glyphID) const override {
@@ -217,8 +227,13 @@ class CustomPathGlyphFace2 : public GlyphFace, std::enable_shared_from_this<Cust
     return font20.getPath(glyphID, path);
   }
 
-  std::shared_ptr<Image> getImage(GlyphID /*glyphID*/, Matrix* /*matrix*/) const override {
+  std::shared_ptr<ImageBuffer> getImage(GlyphID /*glyphID*/,
+                                        bool /* tryHardware = true*/) const override {
     return nullptr;
+  }
+
+  Rect getImageTransform(GlyphID glyphID, Matrix* matrix) const override {
+    return {};
   }
 
   Rect getBounds(GlyphID glyphID) const override {
@@ -263,8 +278,12 @@ class CustomImageGlyphFace2 : public GlyphFace,
     return false;
   }
 
-  std::shared_ptr<Image> getImage(GlyphID glyphID, Matrix* matrix) const override {
-    return fontEmoji.getImage(glyphID, matrix);
+  std::shared_ptr<ImageBuffer> getImage(GlyphID glyphID, bool tryHardware = true) const override {
+    return fontEmoji.getImage(glyphID, tryHardware);
+  }
+
+  Rect getImageTransform(GlyphID glyphID, Matrix* matrix) const override {
+    return fontEmoji.getImageTransform(glyphID, matrix);
   }
 
   Rect getBounds(GlyphID glyphID) const override {

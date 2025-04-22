@@ -46,8 +46,8 @@ bool FontGlyphFace::getPath(GlyphID glyphID, Path* path) const {
   return _font.getPath(glyphID, path);
 }
 
-std::shared_ptr<Image> FontGlyphFace::getImage(GlyphID glyphID, Matrix* matrix) const {
-  return _font.getImage(glyphID, matrix);
+std::shared_ptr<ImageBuffer> FontGlyphFace::getImage(GlyphID glyphID, bool tryHardware) const {
+  return _font.getImage(glyphID, tryHardware);
 }
 
 Rect FontGlyphFace::getBounds(GlyphID glyphID) const {
@@ -61,4 +61,9 @@ bool FontGlyphFace::asFont(Font* font) const {
 
   return true;
 }
+
+Rect FontGlyphFace::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
+  return _font.getImageTransform(glyphID, matrix);
+}
+
 }  // namespace tgfx
