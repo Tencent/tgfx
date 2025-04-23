@@ -16,14 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GlyphImage.h"
+#pragma once
+
+#include "tgfx/core/Glyphface.h"
+#include "tgfx/core/ImageGenerator.h"
 
 namespace tgfx {
 class GlyphFaceGenerator final : public ImageGenerator {
  public:
-  GlyphFaceGenerator(int width, int height, std::shared_ptr<GlyphFace> glyphFace, GlyphID glyphID)
-      : ImageGenerator(width, height), glyphFace(std::move(glyphFace)), glyphID(glyphID) {
-  }
+  static std::shared_ptr<GlyphFaceGenerator> MakeFrom(std::shared_ptr<GlyphFace> glyphFace,
+                                                      GlyphID glyphID, Matrix* matrix);
 
   bool isAlphaOnly() const override {
     return !glyphFace->hasColor();
@@ -35,30 +37,11 @@ class GlyphFaceGenerator final : public ImageGenerator {
   }
 
  private:
+  GlyphFaceGenerator(int width, int height, std::shared_ptr<GlyphFace> glyphFace, GlyphID glyphID)
+      : ImageGenerator(width, height), glyphFace(std::move(glyphFace)), glyphID(glyphID) {
+  }
+
   std::shared_ptr<GlyphFace> glyphFace = nullptr;
   GlyphID glyphID = 0;
 };
-
-std::shared_ptr<Image> GlyphImage::MakeFrom(std::shared_ptr<GlyphFace> glyphFace, GlyphID glyphID,
-                                            Matrix* matrix) {
-  if (glyphFace == nullptr) {
-    return nullptr;
-  }
-  auto bounds = glyphFace->getImageTransform(glyphID, matrix);
-  if (bounds.isEmpty()) {
-    return nullptr;
-  }
-  auto width = static_cast<int>(ceilf(bounds.width()));
-  auto height = static_cast<int>(ceilf(bounds.height()));
-  auto generator =
-      std::make_shared<GlyphFaceGenerator>(width, height, std::move(glyphFace), glyphID);
-  auto image = std::shared_ptr<GlyphImage>(new GlyphImage(std::move(generator)));
-  image->weakThis = image;
-  return image;
-}
-
-GlyphImage::GlyphImage(std::shared_ptr<ImageGenerator> generator)
-    : GeneratorImage(UniqueKey::Make(), std::move(generator)) {
-}
-
-}  //namespace tgfx
+}  // namespace tgfx

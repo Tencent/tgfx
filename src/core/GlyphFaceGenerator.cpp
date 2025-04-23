@@ -16,24 +16,22 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "GeneratorImage.h"
-#include "tgfx/core/GlyphFace.h"
-#include "tgfx/core/Image.h"
+#include "GlyphFaceGenerator.h"
 
 namespace tgfx {
-class GlyphImage final : public GeneratorImage {
- public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<GlyphFace> glyphFace, GlyphID glyphId,
-                                         Matrix* matrix);
-
- protected:
-  Type type() const override {
-    return Type::Glyph;
+std::shared_ptr<GlyphFaceGenerator> GlyphFaceGenerator::MakeFrom(
+    std::shared_ptr<GlyphFace> glyphFace, GlyphID glyphID, Matrix* matrix) {
+  if (glyphFace == nullptr) {
+    return nullptr;
   }
-
- private:
-  explicit GlyphImage(std::shared_ptr<ImageGenerator> generator);
-};
-}  //namespace tgfx
+  auto bounds = glyphFace->getImageTransform(glyphID, matrix);
+  if (bounds.isEmpty()) {
+    return nullptr;
+  }
+  auto width = static_cast<int>(ceilf(bounds.width()));
+  auto height = static_cast<int>(ceilf(bounds.height()));
+  auto generator = std::shared_ptr<GlyphFaceGenerator>(
+      new GlyphFaceGenerator(width, height, glyphFace, glyphID));
+  return generator;
+}
+}  // namespace tgfx

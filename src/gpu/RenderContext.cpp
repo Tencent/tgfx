@@ -18,10 +18,10 @@
 
 #include "RenderContext.h"
 #include <tgfx/core/Surface.h>
+#include "core/GlyphFaceGenerator.h"
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
 #include "core/Rasterizer.h"
-#include "core/images/GlyphImage.h"
 #include "core/utils/Caster.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
@@ -230,7 +230,8 @@ void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
     for (size_t i = 0; i < glyphCount; ++i) {
       const auto& glyphID = glyphIDs[i];
       const auto& position = positions[i];
-      auto glyphImage = GlyphImage::MakeFrom(glyphFace, glyphID, &glyphState.matrix);
+      auto generator = GlyphFaceGenerator::MakeFrom(glyphFace, glyphID, &glyphState.matrix);
+      auto glyphImage = Image::MakeFrom(std::move(generator));
       if (glyphImage == nullptr) {
         continue;
       }

@@ -20,7 +20,6 @@
 
 #include <memory>
 #include "tgfx/core/Font.h"
-#include "tgfx/core/Image.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Typeface.h"
 
@@ -79,12 +78,11 @@ class GlyphFace {
   virtual bool asFont(Font* font) const = 0;
 
   /**
-  * Returns the transformed glyph matrix along with its bounds.
-  */
+   * Returns the transformed glyph matrix along with its bounds.
+   */
   virtual Rect getImageTransform(GlyphID glyphID, Matrix* matrix) const = 0;
 
  protected:
   GlyphFace() = default;
 };
-
 }  // namespace tgfx
