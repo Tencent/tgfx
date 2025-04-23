@@ -70,7 +70,7 @@ class LockFreeQueue {
     T element = nullptr;
 
     do {
-      newHead = oldHead + 1;
+      newHead = getIndex(oldHead + 1);
       if (newHead == tailPosition.load(std::memory_order_acquire)) {
         return nullptr;
       }
@@ -83,7 +83,7 @@ class LockFreeQueue {
     uint32_t newHeadPosition = 0;
     uint32_t oldHeadPosition = headPosition.load(std::memory_order_acquire);
     do {
-      newHeadPosition = oldHeadPosition + 1;
+      newHeadPosition = getIndex(oldHeadPosition + 1);
     } while (!headPosition.compare_exchange_weak(
         oldHeadPosition, newHeadPosition, std::memory_order_acq_rel, std::memory_order_relaxed));
     return element;
@@ -98,7 +98,7 @@ class LockFreeQueue {
         LOGI("The queue has reached its maximum capacity, capacity: %u!\n", _capacity);
         return false;
       }
-      newTail = oldTail + 1;
+      newTail = getIndex(oldTail + 1);
     } while (!tail.compare_exchange_weak(oldTail, newTail, std::memory_order_acq_rel,
                                          std::memory_order_relaxed));
 
@@ -107,7 +107,7 @@ class LockFreeQueue {
     uint32_t newTailPosition = 0;
     uint32_t oldTailPosition = tailPosition.load(std::memory_order_acquire);
     do {
-      newTailPosition = oldTailPosition + 1;
+      newTailPosition = getIndex(oldTailPosition + 1);
     } while (!tailPosition.compare_exchange_weak(
         oldTailPosition, newTailPosition, std::memory_order_acq_rel, std::memory_order_relaxed));
     return true;
