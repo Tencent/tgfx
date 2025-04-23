@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "tgfx/core/Glyphface.h"
+#include "tgfx/core/GlyphFace.h"
 #include "tgfx/core/ImageGenerator.h"
 
 namespace tgfx {
