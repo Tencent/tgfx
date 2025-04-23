@@ -149,7 +149,23 @@ class CustomImageGlyphFace : public GlyphFace {
 
   Rect getImageTransform(GlyphID glyphID, Matrix* matrix) const override {
     matrix->setScale(0.25f * _scale, 0.25f * _scale);
-    return getBounds(glyphID);
+    std::string imagePath;
+    switch (glyphID) {
+      case 4:
+        imagePath = "resources/assets/glyph1.png";
+        break;
+      case 5:
+        imagePath = "resources/assets/glyph2.png";
+        break;
+      case 6:
+        imagePath = "resources/assets/glyph3.png";
+        break;
+      default:
+        return {};
+    }
+
+    auto codec = ImageCodec::MakeFrom(ProjectPath::Absolute(imagePath));
+    return Rect::MakeWH(codec->width(), codec->height());
   }
 
   Rect getBounds(GlyphID glyphID) const override {
