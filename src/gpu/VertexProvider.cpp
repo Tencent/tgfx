@@ -17,13 +17,24 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "VertexProvider.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
+void VertexProviderTask::onExecute() {
+  DEBUG_ASSERT(provider != nullptr);
+  provider->getVertices(vertices);
+  provider = nullptr;
+}
+
+void VertexProviderTask::onCancel() {
+  provider = nullptr;
+}
+
 AsyncVertexSource::~AsyncVertexSource() {
   // The vertex source might have objects created in shared memory (like BlockBuffer), so we
   // need to wait for the task to finish before destroying it.
   for (auto& task : tasks) {
-    task->cancelOrWait();
+    task->cancel();
   }
 }
 
