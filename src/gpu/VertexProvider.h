@@ -49,9 +49,9 @@ class VertexProviderTask : public Task {
   }
 
  protected:
-  void onExecute() override {
-    provider->getVertices(vertices);
-  }
+  void onExecute() override;
+
+  void onCancel() override;
 
  private:
   PlacementPtr<VertexProvider> provider = nullptr;
