@@ -38,18 +38,6 @@ class FontGlyphImageCodec : public ImageCodec {
     return scalerContext->readPixels(glyphID, dstInfo, dstPixels);
   }
 
- protected:
-  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override {
-    auto pixelBuffer = PixelBuffer::Make(width(), height(), isAlphaOnly(), tryHardware);
-    if (pixelBuffer == nullptr) {
-      return nullptr;
-    }
-    auto pixels = pixelBuffer->lockPixels();
-    auto result = readPixels(pixelBuffer->info(), pixels);
-    pixelBuffer->unlockPixels();
-    return result ? pixelBuffer : nullptr;
-  }
-
  private:
   std::shared_ptr<ScalerContext> scalerContext = nullptr;
   GlyphID glyphID = 0;

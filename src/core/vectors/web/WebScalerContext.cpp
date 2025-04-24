@@ -20,6 +20,7 @@
 #include "WebTypeface.h"
 #include "core/utils/Log.h"
 #include "platform/web/WebImageBuffer.h"
+#include "tgfx/core/Buffer.h"
 
 using namespace emscripten;
 
@@ -77,13 +78,37 @@ Rect WebScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const 
   return bounds;
 }
 
-std::shared_ptr<ImageBuffer> WebScalerContext::generateImage(GlyphID glyphID, bool) const {
+bool WebScalerContext::readPixels(GlyphID glyphID, const ImageInfo& dstInfo,
+                                  void* dstPixels) const {
+  if (dstInfo.isEmpty() || dstPixels == nullptr) {
+    return false;
+  }
   auto bounds = scalerContext.call<Rect>("getBounds", getText(glyphID), false, false);
   if (bounds.isEmpty()) {
-    return nullptr;
+    return false;
   }
-  auto buffer = scalerContext.call<val>("generateImage", getText(glyphID), bounds);
-  return WebImageBuffer::MakeAdopted(std::move(buffer));
+  auto image = scalerContext.call<val>("generateImage", getText(glyphID), bounds);
+  if (!image.as<bool>()) {
+    return false;
+  }
+
+  auto width = static_cast<int>(bounds.width());
+  auto height = static_cast<int>(bounds.height());
+  auto data = val::module_property("tgfx").call<val>(
+      "readImagePixels", val::module_property("module"), image, width, height);
+  if (!data.as<bool>()) {
+    return false;
+  }
+  auto length = data["length"].as<size_t>();
+  if (length == 0) {
+    return false;
+  }
+
+  auto memory = val::module_property("HEAPU8")["buffer"];
+  auto memoryView =
+      val::global("Uint8Array").new_(memory, reinterpret_cast<uintptr_t>(dstPixels), length);
+  memoryView.call<void>("set", data);
+  return true;
 }
 
 std::string WebScalerContext::getText(GlyphID glyphID) const {
