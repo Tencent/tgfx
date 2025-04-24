@@ -66,50 +66,48 @@ class LockFreeQueue {
 
   T dequeue() {
     uint32_t newHead = 0;
-    uint32_t oldHead = head.load(std::memory_order_relaxed);
+    uint32_t oldHead = head.load(std::memory_order_acquire);
     T element = nullptr;
 
     do {
-      newHead = oldHead + 1;
+      newHead = getIndex(oldHead + 1);
       if (newHead == tailPosition.load(std::memory_order_acquire)) {
         return nullptr;
       }
-      element = queuePool[getIndex(newHead)];
+      element = queuePool[newHead];
     } while (!head.compare_exchange_weak(oldHead, newHead, std::memory_order_acq_rel,
                                          std::memory_order_relaxed));
 
-    queuePool[getIndex(newHead)] = nullptr;
+    queuePool[newHead] = nullptr;
 
-    uint32_t newHeadPosition = 0;
-    uint32_t oldHeadPosition = headPosition.load(std::memory_order_relaxed);
+    uint32_t oldHeadPosition = 0;
     do {
-      newHeadPosition = oldHeadPosition + 1;
+      oldHeadPosition = getIndex(newHead - 1);
     } while (!headPosition.compare_exchange_weak(
-        oldHeadPosition, newHeadPosition, std::memory_order_acq_rel, std::memory_order_relaxed));
+        oldHeadPosition, newHead, std::memory_order_acq_rel, std::memory_order_relaxed));
     return element;
   }
 
   bool enqueue(const T& element) {
     uint32_t newTail = 0;
-    uint32_t oldTail = tail.load(std::memory_order_relaxed);
+    uint32_t oldTail = tail.load(std::memory_order_acquire);
 
     do {
-      if (getIndex(oldTail) == getIndex(headPosition.load(std::memory_order_acquire))) {
+      if (oldTail == headPosition.load(std::memory_order_acquire)) {
         LOGI("The queue has reached its maximum capacity, capacity: %u!\n", _capacity);
         return false;
       }
-      newTail = oldTail + 1;
+      newTail = getIndex(oldTail + 1);
     } while (!tail.compare_exchange_weak(oldTail, newTail, std::memory_order_acq_rel,
                                          std::memory_order_relaxed));
 
-    queuePool[getIndex(oldTail)] = std::move(element);
+    queuePool[oldTail] = std::move(element);
 
-    uint32_t newTailPosition = 0;
-    uint32_t oldTailPosition = tailPosition.load(std::memory_order_relaxed);
+    uint32_t oldTailPosition = 0;
     do {
-      newTailPosition = oldTailPosition + 1;
+      oldTailPosition = getIndex(newTail - 1);
     } while (!tailPosition.compare_exchange_weak(
-        oldTailPosition, newTailPosition, std::memory_order_acq_rel, std::memory_order_relaxed));
+        oldTailPosition, newTail, std::memory_order_acq_rel, std::memory_order_relaxed));
     return true;
   }
 

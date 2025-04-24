@@ -18,23 +18,24 @@
 
 #include "tgfx/core/Font.h"
 #include "ScalerContext.h"
+#include "core/PixelBuffer.h"
 
 namespace tgfx {
 
-class GlyphImageGenerator : public ImageGenerator {
+class FontGlyphImageCodec : public ImageCodec {
  public:
-  GlyphImageGenerator(int width, int height, std::shared_ptr<ScalerContext> scalerContext,
+  FontGlyphImageCodec(int width, int height, std::shared_ptr<ScalerContext> scalerContext,
                       GlyphID glyphID)
-      : ImageGenerator(width, height), scalerContext(std::move(scalerContext)), glyphID(glyphID) {
+      : ImageCodec(width, height, Orientation::LeftTop), scalerContext(std::move(scalerContext)),
+        glyphID(glyphID) {
   }
 
   bool isAlphaOnly() const override {
     return !scalerContext->hasColor();
   }
 
- protected:
-  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override {
-    return scalerContext->generateImage(glyphID, tryHardware);
+  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override {
+    return scalerContext->readPixels(glyphID, dstInfo, dstPixels);
   }
 
  private:
@@ -130,7 +131,7 @@ bool Font::getPath(GlyphID glyphID, Path* path) const {
   return scalerContext->generatePath(glyphID, fauxBold, fauxItalic, path);
 }
 
-std::shared_ptr<Image> Font::getImage(GlyphID glyphID, Matrix* matrix) const {
+std::shared_ptr<ImageCodec> Font::getImage(GlyphID glyphID, Matrix* matrix) const {
   if (glyphID == 0) {
     return nullptr;
   }
@@ -143,8 +144,7 @@ std::shared_ptr<Image> Font::getImage(GlyphID glyphID, Matrix* matrix) const {
   }
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
-  auto generator = std::make_shared<GlyphImageGenerator>(width, height, scalerContext, glyphID);
-  return Image::MakeFrom(std::move(generator));
+  return std::make_shared<FontGlyphImageCodec>(width, height, scalerContext, glyphID);
 }
 
 bool Font::operator==(const Font& font) const {

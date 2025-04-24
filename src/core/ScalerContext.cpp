@@ -48,8 +48,8 @@ class EmptyScalerContext : public ScalerContext {
     return {};
   }
 
-  std::shared_ptr<ImageBuffer> generateImage(GlyphID, bool) const override {
-    return nullptr;
+  bool readPixels(GlyphID, const ImageInfo&, void*) const override {
+    return false;
   }
 };
 

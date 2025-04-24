@@ -127,6 +127,7 @@ bool Context::purgeResourcesUntilMemoryTo(size_t bytesLimit, bool scratchResourc
 }
 
 void Context::releaseAll(bool releaseGPU) {
+  _drawingManager->releaseAll();
   _resourceProvider->releaseAll();
   _programCache->releaseAll(releaseGPU);
   _resourceCache->releaseAll(releaseGPU);

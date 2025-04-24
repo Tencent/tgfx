@@ -55,6 +55,12 @@ enum class TaskStatus {
 class Task {
  public:
   /**
+   * Release all task threads once the pending tasks have completed. This method will block the
+   * current thread.
+   */
+  static void ReleaseThreads();
+
+  /**
    * Submits a code block for asynchronous execution immediately and returns a Task wraps the code
    * block. Hold a reference to the returned Task if you want to cancel it or wait for it to finish
    * execution. Returns nullptr if the block is nullptr.
@@ -73,12 +79,12 @@ class Task {
    * Return the current status of the Task.
    */
   TaskStatus status() const {
-    return _status.load(std::memory_order_relaxed);
+    return _status.load(std::memory_order_acquire);
   }
 
   /**
-   * Requests the Task to skip executing its Runnable object. Cancellation does not affect the
-   * execution of a Task that has already begun. This method does not block the current thread.
+   * Cancels the Task if it is still in the queue, otherwise blocks the calling thread for the Task
+   * to finish its execution. Returns immediately if the Task is finished or canceled.
    */
   void cancel();
 
@@ -89,15 +95,19 @@ class Task {
    */
   void wait();
 
-  /**
-   * Cancels the Task if it is still in the queue, otherwise waits for the Task to finish its
-   * execution. Returns immediately if the Task is finished or canceled, otherwise blocks the
-   * current thread.
-   */
-  void cancelOrWait();
-
  protected:
+  /**
+   * Override this method to define the Task's execution logic. It is called when the Task runs and
+   * can only be executed once.
+   */
   virtual void onExecute() = 0;
+
+  /**
+   * Override this method to define the logic for canceling the Task. It is called when the Task is
+   * canceled and will only be executed once.
+   */
+  virtual void onCancel() {
+  }
 
  private:
   std::mutex locker = {};

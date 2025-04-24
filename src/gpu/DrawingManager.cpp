@@ -179,4 +179,13 @@ void DrawingManager::addFlushCallbackObject(FlushCallbackObject* flushCallbackOb
   flushCallbackObjects.push_back(flushCallbackObject);
 }
 
+
+void DrawingManager::releaseAll() {
+  compositors.clear();
+  resourceTasks.clear();
+  resourceTaskMap = {};
+  flattenTasks.clear();
+  renderTasks.clear();
+}
+
 }  // namespace tgfx

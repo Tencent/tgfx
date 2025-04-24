@@ -16,32 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "VertexProvider.h"
-#include "core/utils/Log.h"
+#include <vector>
+#include "base/TGFXTest.h"
+#include "core/utils/TaskGroup.h"
+#include "tgfx/core/Task.h"
 
 namespace tgfx {
-void VertexProviderTask::onExecute() {
-  DEBUG_ASSERT(provider != nullptr);
-  provider->getVertices(vertices);
-  provider = nullptr;
-}
-
-void VertexProviderTask::onCancel() {
-  provider = nullptr;
-}
-
-AsyncVertexSource::~AsyncVertexSource() {
-  // The vertex source might have objects created in shared memory (like BlockBuffer), so we
-  // need to wait for the task to finish before destroying it.
-  for (auto& task : tasks) {
-    task->cancel();
-  }
-}
-
-std::shared_ptr<Data> AsyncVertexSource::getData() const {
-  for (auto& task : tasks) {
-    task->wait();
-  }
-  return data;
+TGFX_TEST(TaskTest, release) {
+  Task::ReleaseThreads();
+  auto group = TaskGroup::GetInstance();
+  EXPECT_EQ(group->threads->dequeue(), nullptr);
+  EXPECT_EQ(group->waitingThreads, 0);
+  EXPECT_EQ(group->totalThreads, 0);
+  EXPECT_EQ(group->tasks->dequeue(), nullptr);
 }
 }  // namespace tgfx

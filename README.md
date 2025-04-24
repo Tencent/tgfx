@@ -251,7 +251,7 @@ just add the suffix ":st" to each command. For example:
 ```
 npm run build:st
 npm run build:st:debug
-npm run serser:st
+npm run server:st
 ``` 
 
 To build the demo project in CLion, open the `Settings` panel and go to `Build, Execution, Deployment` > `CMake`.
