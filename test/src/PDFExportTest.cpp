@@ -32,7 +32,6 @@
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
-#include "tgfx/core/Stream.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/pdf/PDFMetadata.h"
 #include "utils/ProjectPath.h"

@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFFont.h"
-#include <_types/_uint16_t.h>
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
@@ -26,7 +25,6 @@
 #include <utility>
 #include "core/ScalerContext.h"
 #include "core/TypefaceMetrics.h"
-#include "core/utils/Caster.h"
 #include "core/utils/Log.h"
 #include "pdf/PDFDocument.h"
 #include "pdf/PDFExportContext.h"
@@ -40,13 +38,9 @@
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Font.h"
-#include "tgfx/core/GlyphFace.h"
-#include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix.h"
-#include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
-#include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Stream.h"
@@ -60,16 +54,45 @@ namespace tgfx {
 // non-symbolic, so always call it symbolic.  (PDF 1.4 spec, section 5.7.1)
 constexpr int32_t PDFSymbolic = 4;
 
-inline float from_font_units(float scaled, uint16_t emSize) {
+namespace {
+inline float FromFontUnits(float scaled, uint16_t emSize) {
   return emSize == 1000 ? scaled : scaled * 1000 / emSize;
 }
 
-inline float scaleFromFontUnits(int16_t val, uint16_t emSize) {
-  return from_font_units(val, emSize);
+inline float ScaleFromFontUnits(int16_t val, uint16_t emSize) {
+  return FromFontUnits(val, emSize);
 }
 
+bool CanEmbed(const TypefaceMetrics& metrics) {
+  return !(metrics.flags & TypefaceMetrics::FontFlags::NotEmbeddable);
+}
+
+bool CanSubset(const TypefaceMetrics& metrics) {
+  return !(metrics.flags & TypefaceMetrics::FontFlags::NotSubsettable);
+}
+
+void SetGlyphWidthAndBoundingBox(float width, Rect box,
+                                 const std::shared_ptr<MemoryWriteStream>& content) {
+  PDFUtils::AppendFloat(width, content);
+  content->writeText(" 0 ");
+  content->writeText(std::to_string(static_cast<int>(box.left)));
+  content->writeText(" ");
+  content->writeText(std::to_string(static_cast<int>(box.top)));
+  content->writeText(" ");
+  content->writeText(std::to_string(static_cast<int>(box.right)));
+  content->writeText(" ");
+  content->writeText(std::to_string(static_cast<int>(box.bottom)));
+  content->writeText(" d1\n");
+}
+
+GlyphID FirstNonzeroGlyphForSingleByteEncoding(GlyphID glyphID) {
+  return glyphID != 0 ? glyphID - ((glyphID - 1) % 255) : 1;
+}
+
+}  // namespace
+
 PDFStrike::PDFStrike(PDFStrikeSpec strikeSpec, PDFDocument* document)
-    : strikeSpec(strikeSpec), fDoc(document) {
+    : strikeSpec(std::move(strikeSpec)), document(document) {
 }
 
 std::shared_ptr<PDFStrike> PDFStrike::Make(PDFDocument* doc, const Font& font) {
@@ -165,7 +188,6 @@ const TypefaceMetrics* PDFFont::GetMetrics(std::shared_ptr<Typeface> typeface,
         // uint16_t g = font.unicharToGlyph(c);
         auto glyphID = font.getGlyphID(c);
         auto bounds = font.getBounds(glyphID);
-        ;
         stemV = std::min(stemV, static_cast<int16_t>(std::round(bounds.width())));
       }
       metrics->fStemV = stemV;
@@ -191,8 +213,8 @@ PDFFont::~PDFFont() = default;
 
 PDFFont::PDFFont(const PDFStrike* strike, GlyphID firstGlyphID, GlyphID lastGlyphID,
                  TypefaceMetrics::FontType fontType, PDFIndirectReference indirectReference)
-    : fStrike(strike), fGlyphUsage(firstGlyphID, lastGlyphID),
-      fIndirectReference(indirectReference), fFontType(fontType) {
+    : _strike(strike), _glyphUsage(firstGlyphID, lastGlyphID),
+      _indirectReference(indirectReference), fontType(fontType) {
   // Always include glyph 0
   this->noteGlyphUsage(0);
 }
@@ -201,20 +223,23 @@ void PDFFont::PopulateCommonFontDescriptor(PDFDictionary* descriptor,
                                            const TypefaceMetrics& metrics, uint16_t emSize,
                                            int16_t defaultWidth) {
   descriptor->insertName("FontName", metrics.postScriptName);
-  descriptor->insertInt("Flags", static_cast<size_t>(metrics.style | PDFSymbolic));
-  descriptor->insertScalar("Ascent", scaleFromFontUnits(metrics.fAscent, emSize));
-  descriptor->insertScalar("Descent", scaleFromFontUnits(metrics.fDescent, emSize));
-  descriptor->insertScalar("StemV", scaleFromFontUnits(metrics.fStemV, emSize));
-  descriptor->insertScalar("CapHeight", scaleFromFontUnits(metrics.fCapHeight, emSize));
-  descriptor->insertInt("ItalicAngle", metrics.fItalicAngle);
-  descriptor->insertObject(
-      "FontBBox",
-      MakePDFArray(scaleFromFontUnits(static_cast<int16_t>(metrics.fBBox.left), emSize),
-                   scaleFromFontUnits(static_cast<int16_t>(metrics.fBBox.bottom), emSize),
-                   scaleFromFontUnits(static_cast<int16_t>(metrics.fBBox.right), emSize),
-                   scaleFromFontUnits(static_cast<int16_t>(metrics.fBBox.top), emSize)));
+  // descriptor->insertInt("Flags", static_cast<size_t>(metrics.style | PDFSymbolic));
+  // descriptor->insertScalar("Ascent", scaleFromFontUnits(metrics.fAscent, emSize));
+  // descriptor->insertScalar("Descent", scaleFromFontUnits(metrics.fDescent, emSize));
+  // descriptor->insertScalar("StemV", scaleFromFontUnits(metrics.fStemV, emSize));
+  // descriptor->insertScalar("CapHeight", scaleFromFontUnits(metrics.fCapHeight, emSize));
+  // descriptor->insertInt("ItalicAngle", metrics.fItalicAngle);
+  // descriptor->insertObject(
+  //     "FontBBox",
+  //     MakePDFArray(scaleFromFontUnits(static_cast<int16_t>(metrics.fBBox.left), emSize),
+  //                  scaleFromFontUnits(static_cast<int16_t>(metrics.fBBox.bottom), emSize),
+  //                  scaleFromFontUnits(static_cast<int16_t>(metrics.fBBox.right), emSize),
+  //                  scaleFromFontUnits(static_cast<int16_t>(metrics.fBBox.top), emSize)));
+  descriptor->insertInt("Flags", 32);
+  descriptor->insertInt("ItalicAngle", 0);
+  descriptor->insertObject("FontBBox", MakePDFArray(0.f, 0.f, 0.f, 0.f));
   if (defaultWidth > 0) {
-    descriptor->insertScalar("MissingWidth", scaleFromFontUnits(defaultWidth, emSize));
+    descriptor->insertScalar("MissingWidth", ScaleFromFontUnits(defaultWidth, emSize));
   }
 }
 
@@ -229,13 +254,9 @@ TypefaceMetrics::FontType PDFFont::FontType(const PDFStrike& /*pdfStrike*/,
   return metrics.type;
 }
 
-static GlyphID first_nonzero_glyph_for_single_byte_encoding(GlyphID glyphID) {
-  return glyphID != 0 ? glyphID - ((glyphID - 1) % 255) : 1;
-}
-
 PDFFont* PDFStrike::getFontResource(GlyphID glyphID) {
   auto typeface = strikeSpec.typeface;
-  const auto* fontMetrics = PDFFont::GetMetrics(typeface, fDoc);
+  const auto* fontMetrics = PDFFont::GetMetrics(typeface, document);
   DEBUG_ASSERT(fontMetrics);  // SkPDFDevice::internalDrawText ensures the typeface is good.
                               // GetMetrics only returns null to signify a bad typeface.
   const auto& metrics = *fontMetrics;
@@ -255,9 +276,9 @@ PDFFont* PDFStrike::getFontResource(GlyphID glyphID) {
   // }
 
   bool multibyte = PDFFont::IsMultiByte(type);
-  GlyphID subsetCode = multibyte ? 0 : first_nonzero_glyph_for_single_byte_encoding(glyphID);
-  auto iter = fFontMap.find(subsetCode);
-  if (iter != fFontMap.end()) {
+  GlyphID subsetCode = multibyte ? 0 : FirstNonzeroGlyphForSingleByteEncoding(glyphID);
+  auto iter = fontMap.find(subsetCode);
+  if (iter != fontMap.end()) {
     // DEBUG_ASSERT(multibyte == font->multiByteGlyphs());
     return iter->second.get();
   }
@@ -272,11 +293,11 @@ PDFFont* PDFStrike::getFontResource(GlyphID glyphID) {
     firstNonZeroGlyph = subsetCode;
     lastGlyph = std::min<GlyphID>(lastGlyph, 254 + subsetCode);
   }
-  auto ref = fDoc->reserveRef();
+  auto ref = document->reserveRef();
   auto pdfFont =
       std::unique_ptr<PDFFont>(new PDFFont(this, firstNonZeroGlyph, lastGlyph, type, ref));
-  fFontMap[subsetCode] = std::move(pdfFont);
-  return fFontMap[subsetCode].get();
+  fontMap[subsetCode] = std::move(pdfFont);
+  return fontMap[subsetCode].get();
 }
 
 const std::vector<Unichar>& PDFFont::GetUnicodeMap(const Typeface& typeface,
@@ -292,31 +313,6 @@ const std::vector<Unichar>& PDFFont::GetUnicodeMap(const Typeface& typeface,
   return document->fToUnicodeMap[id];
 }
 
-namespace {
-
-bool can_embed(const TypefaceMetrics& metrics) {
-  return !(metrics.flags & TypefaceMetrics::FontFlags::NotEmbeddable);
-}
-
-bool can_subset(const TypefaceMetrics& metrics) {
-  return !(metrics.flags & TypefaceMetrics::FontFlags::NotSubsettable);
-}
-
-void setGlyphWidthAndBoundingBox(float width, Rect box,
-                                 const std::shared_ptr<MemoryWriteStream>& content) {
-  PDFUtils::AppendFloat(width, content);
-  content->writeText(" 0 ");
-  content->writeText(std::to_string(static_cast<int>(box.left)));
-  content->writeText(" ");
-  content->writeText(std::to_string(static_cast<int>(box.top)));
-  content->writeText(" ");
-  content->writeText(std::to_string(static_cast<int>(box.right)));
-  content->writeText(" ");
-  content->writeText(std::to_string(static_cast<int>(box.bottom)));
-  content->writeText(" d1\n");
-}
-}  // namespace
-
 ///////////////////////////////////////////////////////////////////////////////
 //  Type0Font
 ///////////////////////////////////////////////////////////////////////////////
@@ -328,7 +324,7 @@ void PDFFont::emitSubsetType0(PDFDocument* document) const {
     return;
   }
   const TypefaceMetrics& metrics = *metricsPtr;
-  DEBUG_ASSERT(can_embed(metrics));
+  DEBUG_ASSERT(CanEmbed(metrics));
   TypefaceMetrics::FontType type = getType();
 
   auto descriptor = PDFDictionary::Make("FontDescriptor");
@@ -346,7 +342,7 @@ void PDFFont::emitSubsetType0(PDFDocument* document) const {
     // Instead use FontFile3 CIDFontType0C (bare CFF) which is PDF 1.3 (2000).
     // See b/352098914
     std::shared_ptr<Data> subsetFontData = nullptr;
-    if (can_subset(metrics)) {
+    if (CanSubset(metrics)) {
       DEBUG_ASSERT(firstGlyphID() == 1);
       // If the face has CFF the subsetter will always return just the CFF.
       subsetFontData = PDFSubsetFont(typeface, glyphUsage());
@@ -438,7 +434,7 @@ void PDFFont::emitSubsetType0(PDFDocument* document) const {
 
   const std::vector<Unichar>& glyphToUnicode = PDFFont::GetUnicodeMap(*typeface, document);
   DEBUG_ASSERT(static_cast<size_t>(typeface->glyphsCount()) == glyphToUnicode.size());
-  auto toUnicode = PDFMakeToUnicodeCmap(glyphToUnicode.data(), &fGlyphUsage, multiByteGlyphs(),
+  auto toUnicode = PDFMakeToUnicodeCmap(glyphToUnicode.data(), &_glyphUsage, multiByteGlyphs(),
                                         firstGlyphID(), lastGlyphID());
   fontDictionary.insertRef("ToUnicode", PDFStreamOut(nullptr, std::move(toUnicode), document));
 
@@ -587,7 +583,7 @@ PDFIndirectReference type3_descriptor(PDFDocument* doc, const std::shared_ptr<Ty
 }  // namespace
 
 void PDFFont::emitSubsetType3(PDFDocument* doc) const {
-  const PDFStrike& pdfStrike = *fStrike;
+  const PDFStrike& pdfStrike = *_strike;
   GlyphID firstGlyphID = this->firstGlyphID();
   GlyphID lastGlyphID = this->lastGlyphID();
   const PDFGlyphUse& subset = glyphUsage();
@@ -694,7 +690,7 @@ void PDFFont::emitSubsetType3(PDFDocument* doc) const {
     Path glyphPath;
     Matrix glyphImageMatrix;
     if (!typeface->hasColor() && scaleContext->generatePath(glyphID, false, false, &glyphPath)) {
-      setGlyphWidthAndBoundingBox(advance, glyphBBox, content);
+      SetGlyphWidthAndBoundingBox(advance, glyphBBox, content);
       PDFUtils::EmitPath(glyphPath, true, content);
       PDFUtils::PaintPath(PathFillType::Winding, content);
     } else {
@@ -729,7 +725,7 @@ void PDFFont::emitSubsetType3(PDFDocument* doc) const {
         smallBBox = Matrix::MakeScale(bitmapScale).mapRect(smallBBox);
         smallBBox.roundOut();
         bbox.join(smallBBox);
-        setGlyphWidthAndBoundingBox(advance, smallBBox, content);
+        SetGlyphWidthAndBoundingBox(advance, smallBBox, content);
 
         PDFUtils::AppendFloat(bitmapScale, content);
         content->writeText(" 0 0 ");
@@ -781,7 +777,7 @@ void PDFFont::emitSubsetType3(PDFDocument* doc) const {
         std::snprintf(buffer, sizeof(buffer), "G%d", smaskGraphicState.fValue);
         graphicStates->insertRef(buffer, smaskGraphicState);
       } else {
-        setGlyphWidthAndBoundingBox(advance, glyphBBox, content);
+        SetGlyphWidthAndBoundingBox(advance, glyphBBox, content);
       }
     }
 
@@ -827,7 +823,7 @@ void PDFFont::emitSubsetType3(PDFDocument* doc) const {
 }
 
 void PDFFont::emitSubset(PDFDocument* document) const {
-  switch (fFontType) {
+  switch (fontType) {
     case TypefaceMetrics::FontType::Type1CID:
     case TypefaceMetrics::FontType::TrueType:
     case TypefaceMetrics::FontType::CFF:

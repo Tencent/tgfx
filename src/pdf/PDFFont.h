@@ -27,7 +27,6 @@
 #include "pdf/PDFTypes.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Font.h"
-#include "tgfx/core/GlyphFace.h"
 #include "tgfx/core/Typeface.h"
 
 namespace tgfx {
@@ -49,21 +48,14 @@ class PDFStrike {
   static std::shared_ptr<PDFStrike> Make(PDFDocument* doc, const Font& font);
 
   /** Get the font resource for the glyph.
-     *  The returned SkPDFFont is owned by the SkPDFStrike.
-     *  @param glyph  The glyph of interest
-     */
+   *  The returned SkPDFFont is owned by the SkPDFStrike.
+   *  @param glyph  The glyph of interest
+   */
   PDFFont* getFontResource(GlyphID glyphID);
 
-  // struct Traits {
-  //   static const SkDescriptor& GetKey(const std::shared_ptr<SkPDFStrike>& strike);
-  //   static uint32_t Hash(const SkDescriptor& descriptor);
-  // };
-
   const PDFStrikeSpec strikeSpec;
-  // const SkPDFStrikeSpec fImage;
-  // const bool fHasMaskFilter;
-  PDFDocument* fDoc;
-  std::unordered_map<GlyphID, std::unique_ptr<PDFFont>> fFontMap;
+  PDFDocument* document;
+  std::unordered_map<GlyphID, std::unique_ptr<PDFFont>> fontMap;
 
  private:
   PDFStrike(PDFStrikeSpec strikeSpec, PDFDocument* document);
@@ -78,11 +70,12 @@ class PDFFont {
   PDFFont(const PDFFont&) = delete;
   PDFFont& operator=(const PDFFont&) = delete;
 
-  /** Returns the font type represented in this font.  For Type0 fonts,
-     *  returns the type of the descendant font.
-     */
+  /** 
+   * Returns the font type represented in this font. For Type0 fonts, returns the type of the
+   * descendant font. 
+   */
   TypefaceMetrics::FontType getType() const {
-    return fFontType;
+    return fontType;
   }
 
   static TypefaceMetrics::FontType FontType(const PDFStrike& pdfStrike,
@@ -97,19 +90,23 @@ class PDFFont {
            type == TypefaceMetrics::FontType::TrueType || type == TypefaceMetrics::FontType::CFF;
   }
 
-  /** Returns true if this font encoding supports glyph IDs above 255.
-     */
+  /** 
+   * Returns true if this font encoding supports glyph IDs above 255.
+   */
   bool multiByteGlyphs() const {
     return PDFFont::IsMultiByte(this->getType());
   }
 
-  /** Return true if this font has an encoding for the passed glyph id.
-     */
+  /** 
+   * Return true if this font has an encoding for the passed glyph id.
+   */
   bool hasGlyph(GlyphID gid) const {
     return (gid >= this->firstGlyphID() && gid <= this->lastGlyphID()) || gid == 0;
   }
 
-  /** Convert the input glyph ID into the font encoding.  */
+  /** 
+   * Convert the input glyph ID into the font encoding.
+   */
   GlyphID glyphToPDFFontEncoding(GlyphID gid) const {
     if (this->multiByteGlyphs() || gid == 0) {
       return gid;
@@ -121,17 +118,17 @@ class PDFFont {
 
   void noteGlyphUsage(GlyphID glyph) {
     DEBUG_ASSERT(this->hasGlyph(glyph));
-    fGlyphUsage.set(glyph);
+    _glyphUsage.set(glyph);
   }
 
   PDFIndirectReference indirectReference() const {
-    return fIndirectReference;
+    return _indirectReference;
   }
 
   /** Gets SkAdvancedTypefaceMetrics, and caches the result.
-     *  @param typeface can not be nullptr.
-     *  @return nullptr only when typeface is bad.
-     */
+   *  @param typeface can not be nullptr.
+   *  @return nullptr only when typeface is bad.
+   */
   static const TypefaceMetrics* GetMetrics(std::shared_ptr<Typeface> typeface,
                                            PDFDocument* document);
 
@@ -147,19 +144,19 @@ class PDFFont {
   static bool CanEmbedTypeface(const Typeface&, PDFDocument*);
 
   GlyphID firstGlyphID() const {
-    return fGlyphUsage.firstNonZero();
+    return _glyphUsage.firstNonZero();
   }
 
   GlyphID lastGlyphID() const {
-    return fGlyphUsage.lastGlyph();
+    return _glyphUsage.lastGlyph();
   }
 
   const PDFGlyphUse& glyphUsage() const {
-    return fGlyphUsage;
+    return _glyphUsage;
   }
 
   const PDFStrike& strike() const {
-    return *fStrike;
+    return *_strike;
   }
 
   static std::shared_ptr<Data> GetTypefaceData(const std::shared_ptr<Typeface>& typeface) {
@@ -170,10 +167,10 @@ class PDFFont {
   void emitSubsetType0(PDFDocument* document) const;
   void emitSubsetType3(PDFDocument* doc) const;
 
-  const PDFStrike* fStrike;
-  PDFGlyphUse fGlyphUsage;
-  PDFIndirectReference fIndirectReference;
-  TypefaceMetrics::FontType fFontType;
+  const PDFStrike* _strike;
+  PDFGlyphUse _glyphUsage;
+  PDFIndirectReference _indirectReference;
+  TypefaceMetrics::FontType fontType;
 
   PDFFont(const PDFStrike*, GlyphID firstGlyphID, GlyphID lastGlyphID,
           TypefaceMetrics::FontType fontType, PDFIndirectReference indirectReference);

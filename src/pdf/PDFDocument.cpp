@@ -249,7 +249,7 @@ void end_indirect_object(const std::shared_ptr<WriteStream>& stream) {
 std::vector<const PDFFont*> get_fonts(const PDFDocument& canon) {
   std::vector<const PDFFont*> fonts;
   for (const auto& [_, strike] : canon.fStrikes) {
-    for (const auto& [unused, font] : strike->fFontMap) {
+    for (const auto& [unused, font] : strike->fontMap) {
       fonts.push_back(font.get());
     }
   }
