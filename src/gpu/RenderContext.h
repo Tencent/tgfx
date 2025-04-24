@@ -77,6 +77,10 @@ class RenderContext : public DrawContext {
   OpsCompositor* getOpsCompositor(bool discardContent = false);
   void replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRenderTarget,
                            std::shared_ptr<Image> oldContent);
+  void glyphDirectMaskDrawing(const GlyphRun& glyphRun, const MCState& state, const Fill& fill,
+                              const Stroke* stroke, GlyphRun& rejectedGlyphRun);
+  void glyphPathDrawing(const GlyphRun& glyphRun, const MCState& state, const Fill& fill,
+                        const Stroke* stroke, GlyphRun& rejectedGlyphRun);
 
   friend class Surface;
 };

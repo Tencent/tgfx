@@ -152,9 +152,4 @@ bool Font::operator==(const Font& font) const {
          scalerContext->textSize == font.scalerContext->textSize && fauxBold == font.fauxBold &&
          fauxItalic == font.fauxItalic;
 }
-
-std::shared_ptr<ImageBuffer> Font::generateImage(GlyphID glyphID) const {
-  return scalerContext->generateImage(glyphID, true);
-}
-
 }  // namespace tgfx

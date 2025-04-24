@@ -79,10 +79,6 @@ class CustomPathGlyphFace : public GlyphFace {
     return nullptr;
   }
 
-  std::shared_ptr<ImageBuffer> generateImage(GlyphID /*glyphID*/) const override {
-    return nullptr;
-  }
-
   Rect getBounds(GlyphID glyphID) const override {
     if (glyphID == 100) {
       return Rect::MakeXYWH(0.0f, 0.0f, 100.0f, 100.0f);
@@ -98,6 +94,10 @@ class CustomPathGlyphFace : public GlyphFace {
 
   bool asFont(Font* /*font*/) const override {
     return false;
+  }
+
+  float getScale() const override {
+    return _scale;
   }
 
  private:
@@ -145,10 +145,6 @@ class CustomImageGlyphFace : public GlyphFace {
     return Image::MakeFromFile(ProjectPath::Absolute(imagePath));
   }
 
-  std::shared_ptr<ImageBuffer> generateImage(GlyphID /*glyphID*/) const override {
-    return nullptr;
-  }
-
   Rect getBounds(GlyphID glyphID) const override {
     if (glyphID < 3 || glyphID > 6) {
       return {};
@@ -160,6 +156,10 @@ class CustomImageGlyphFace : public GlyphFace {
 
   bool asFont(Font* /*font*/) const override {
     return false;
+  }
+
+  float getScale() const override {
+    return _scale;
   }
 
  private:
@@ -229,10 +229,6 @@ class CustomPathGlyphFace2 : public GlyphFace, std::enable_shared_from_this<Cust
     return nullptr;
   }
 
-  std::shared_ptr<ImageBuffer> generateImage(GlyphID /*glyphID*/) const override {
-    return nullptr;
-  }
-
   Rect getBounds(GlyphID glyphID) const override {
     if (glyphID == 8699 || glyphID == 16266) {
       return font40.getBounds(glyphID);
@@ -245,6 +241,10 @@ class CustomPathGlyphFace2 : public GlyphFace, std::enable_shared_from_this<Cust
 
   bool asFont(Font* /*font*/) const override {
     return false;
+  }
+
+  float getScale() const override {
+    return _scale;
   }
 
  private:
@@ -279,16 +279,16 @@ class CustomImageGlyphFace2 : public GlyphFace,
     return fontEmoji.getImage(glyphID, matrix);
   }
 
-  std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphID) const override {
-    return fontEmoji.generateImage(glyphID);
-  }
-
   Rect getBounds(GlyphID glyphID) const override {
     return fontEmoji.getBounds(glyphID);
   }
 
   bool asFont(Font* /*font*/) const override {
     return false;
+  }
+
+  float getScale() const override {
+    return _scale;
   }
 
  private:

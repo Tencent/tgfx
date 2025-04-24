@@ -32,11 +32,11 @@ class FontGlyphFace final : public GlyphFace {
 
   std::shared_ptr<Image> getImage(GlyphID glyphID, Matrix* matrix) const override;
 
-  std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphID) const override;
-
   Rect getBounds(GlyphID glyphID) const override;
 
   bool asFont(Font* font) const override;
+
+  virtual float getScale() const override;
 
  private:
   explicit FontGlyphFace(Font font) : _font(std::move(font)) {

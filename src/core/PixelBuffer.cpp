@@ -154,7 +154,7 @@ std::shared_ptr<Texture> PixelBuffer::onMakeTexture(Context* context, bool mipma
   return texture;
 }
 
-bool PixelBuffer::onUploadTexture(std::shared_ptr<Texture> texture, Point offset) {
+bool PixelBuffer::onUploadTexture(std::shared_ptr<Texture> texture, const Point& offset) {
   auto gpu = texture->getContext()->gpu();
   auto pixels = lockPixels();
   if (pixels == nullptr) {

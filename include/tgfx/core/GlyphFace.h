@@ -68,8 +68,6 @@ class GlyphFace {
    */
   virtual std::shared_ptr<Image> getImage(GlyphID glyphID, Matrix* matrix) const = 0;
 
-  virtual std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphID) const = 0;
-
   /**
    * Returns the bounding box of the specified glyph.
    */
@@ -81,6 +79,11 @@ class GlyphFace {
    * unchanged.
    */
   virtual bool asFont(Font* font) const = 0;
+
+  /*
+   * Returns the scale of this GlyphFace
+   */
+  virtual float getScale() const = 0;
 
  protected:
   GlyphFace() = default;

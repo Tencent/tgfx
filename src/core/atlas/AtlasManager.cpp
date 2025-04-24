@@ -27,7 +27,7 @@ static int MaskFromatToAtlasIndex(MaskFormat format) {
 }
 
 AtlasManager::AtlasManager(Context* context) : context(context) {
-  _glyphCacheBuffer = new PlacementBuffer(1 << 14);
+  _glyphCacheBuffer = new BlockBuffer(1 << 14);
 }
 
 AtlasManager::~AtlasManager() {

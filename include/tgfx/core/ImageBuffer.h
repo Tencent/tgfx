@@ -110,7 +110,7 @@ class ImageBuffer {
    */
   virtual std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const = 0;
 
-  virtual bool onUploadTexture(std::shared_ptr<Texture>, Point) {
+  virtual bool onUploadTexture(std::shared_ptr<Texture>, const Point&) {
     return true;
   }
 

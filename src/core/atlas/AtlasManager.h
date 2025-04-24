@@ -21,9 +21,6 @@
 #include <memory>
 #include "Atlas.h"
 #include "AtlasTypes.h"
-#include "core/utils/PixelFormatUtil.h"
-#include "core/utils/PlacementBuffer.h"
-#include "core/utils/PlacementPtr.h"
 #include "gpu/FlushCallbackObject.h"
 #include "gpu/ProxyProvider.h"
 
@@ -54,7 +51,7 @@ class AtlasManager : public AtlasGenerationCounter, public FlushCallbackObject {
     return context;
   }
 
-  PlacementBuffer* glyphCacheBuffer() const {
+  BlockBuffer* glyphCacheBuffer() const {
     return _glyphCacheBuffer;
   }
 
@@ -83,6 +80,6 @@ class AtlasManager : public AtlasGenerationCounter, public FlushCallbackObject {
   Atlas* getAtlas(MaskFormat format) const;
   Context* context = nullptr;
   std::unique_ptr<Atlas> atlases[kMaskFormatCount];
-  PlacementBuffer* _glyphCacheBuffer = nullptr;
+  BlockBuffer* _glyphCacheBuffer = nullptr;
 };
 }  // namespace tgfx
