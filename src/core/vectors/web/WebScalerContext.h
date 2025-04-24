@@ -37,7 +37,7 @@ class WebScalerContext : public ScalerContext {
 
   Rect getImageTransform(GlyphID glyphID, Matrix* matrix) const override;
 
-  std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphID, bool tryHardware) const override;
+  bool readPixels(GlyphID glyphID, const ImageInfo& dstInfo, void* dstPixels) const override;
 
  private:
   emscripten::val scalerContext = emscripten::val::null();
