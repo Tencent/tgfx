@@ -28,20 +28,29 @@ class AutoLayerForImageFilter {
  public:
   AutoLayerForImageFilter(Canvas* canvas, std::shared_ptr<ImageFilter> imageFilter)
       : canvas(canvas) {
-    DEBUG_ASSERT(imageFilter != nullptr);
-    Paint layerPaint = {};
-    layerPaint.setImageFilter(std::move(imageFilter));
-    savedCount = canvas->saveLayer(&layerPaint);
+    if (imageFilter != nullptr) {
+      Paint layerPaint = {};
+      layerPaint.setImageFilter(std::move(imageFilter));
+      savedCount = canvas->saveLayer(&layerPaint);
+    }
   }
 
   ~AutoLayerForImageFilter() {
-    canvas->restoreToCount(savedCount);
+    if (savedCount >= 0) {
+      canvas->restoreToCount(savedCount);
+    }
   }
 
  private:
   Canvas* canvas = nullptr;
-  int savedCount = 0;
+  int savedCount = -1;
 };
+
+#define SaveLayerForImageFilter(canvas, imageFilter)                                  \
+  std::unique_ptr<AutoLayerForImageFilter> autoLayer = nullptr;                       \
+  if (auto filter = imageFilter) {                                                    \
+    autoLayer = std::make_unique<AutoLayerForImageFilter>(canvas, std::move(filter)); \
+  }
 
 static Fill GetFillStyle(const Paint* paint) {
   return paint ? paint->getFill() : Fill();
@@ -171,12 +180,8 @@ void Canvas::drawColor(const Color& color, BlendMode blendMode) {
 }
 
 void Canvas::drawPaint(const Paint& paint) {
-  if (auto imageFilter = paint.getImageFilter()) {
-    AutoLayerForImageFilter autoLayer(this, std::move(imageFilter));
-    drawContext->drawFill(*mcState, paint.getFill());
-  } else {
-    drawContext->drawFill(*mcState, paint.getFill());
-  }
+  SaveLayerForImageFilter(this, paint.getImageFilter());
+  drawContext->drawFill(*mcState, paint.getFill());
 }
 
 void Canvas::drawLine(float x0, float y0, float x1, float y1, const Paint& paint) {
@@ -198,12 +203,8 @@ void Canvas::drawRect(const Rect& rect, const Paint& paint) {
   if (rect.isEmpty()) {
     return;
   }
-  if (auto imageFilter = paint.getImageFilter()) {
-    AutoLayerForImageFilter autoLayer(this, std::move(imageFilter));
-    drawContext->drawRect(rect, *mcState, paint.getFill());
-  } else {
-    drawContext->drawRect(rect, *mcState, paint.getFill());
-  }
+  SaveLayerForImageFilter(this, paint.getImageFilter());
+  drawContext->drawRect(rect, *mcState, paint.getFill());
 }
 
 void Canvas::drawOval(const Rect& oval, const Paint& paint) {
@@ -239,12 +240,8 @@ void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
   if (rRect.rect.isEmpty()) {
     return;
   }
-  if (auto imageFilter = paint.getImageFilter()) {
-    AutoLayerForImageFilter autoLayer(this, std::move(imageFilter));
-    drawContext->drawRRect(rRect, *mcState, paint.getFill());
-  } else {
-    drawContext->drawRRect(rRect, *mcState, paint.getFill());
-  }
+  SaveLayerForImageFilter(this, paint.getImageFilter());
+  drawContext->drawRRect(rRect, *mcState, paint.getFill());
 }
 
 void Canvas::drawPath(const Path& path, const Paint& paint) {
@@ -258,39 +255,31 @@ void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
     // a line has no fill to draw.
     return;
   }
-  if (auto imageFilter = paint.getImageFilter()) {
-    AutoLayerForImageFilter autoLayer(this, std::move(imageFilter));
-    drawShape(std::move(shape), *mcState, paint.getFill());
-  } else {
-    drawShape(std::move(shape), *mcState, paint.getFill());
-  }
-}
-
-void Canvas::drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) {
+  SaveLayerForImageFilter(this, paint.getImageFilter());
   Path path = {};
   if (shape->isSimplePath(&path) && path.isEmpty() && path.isInverseFillType()) {
     // No geometry to draw, so draw the fill instead.
-    drawContext->drawFill(*mcState, fill);
+    drawContext->drawFill(*mcState, paint.getFill());
     return;
   }
   if (!shape->isInverseFillType()) {
     Rect rect = {};
     if (shape->isRect(&rect)) {
-      drawContext->drawRect(rect, state, fill);
+      drawContext->drawRect(rect, *mcState, paint.getFill());
       return;
     }
     RRect rRect = {};
     if (shape->isOval(&rect)) {
       rRect.setOval(rect);
-      drawContext->drawRRect(rRect, state, fill);
+      drawContext->drawRRect(rRect, *mcState, paint.getFill());
       return;
     }
     if (shape->isRRect(&rRect)) {
-      drawContext->drawRRect(rRect, state, fill);
+      drawContext->drawRRect(rRect, *mcState, paint.getFill());
       return;
     }
   }
-  drawContext->drawShape(std::move(shape), state, fill);
+  drawContext->drawShape(std::move(shape), *mcState, paint.getFill());
 }
 
 static SamplingOptions GetDefaultSamplingOptions(Image* image) {
@@ -365,16 +354,11 @@ void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t 
   if (glyphCount == 0 || glyphFace == nullptr) {
     return;
   }
+  SaveLayerForImageFilter(this, paint.getImageFilter());
   GlyphRun glyphRun(glyphFace, {glyphs, glyphs + glyphCount}, {positions, positions + glyphCount});
   auto glyphRunList = std::make_shared<GlyphRunList>(std::move(glyphRun));
-  if (auto imageFilter = paint.getImageFilter()) {
-    AutoLayerForImageFilter autoLayer(this, std::move(imageFilter));
-    drawContext->drawGlyphRunList(std::move(glyphRunList), *mcState, paint.getFill(),
-                                  paint.getStroke());
-  } else {
-    drawContext->drawGlyphRunList(std::move(glyphRunList), *mcState, paint.getFill(),
-                                  paint.getStroke());
-  }
+  drawContext->drawGlyphRunList(std::move(glyphRunList), *mcState, paint.getFill(),
+                                paint.getStroke());
 }
 
 void Canvas::drawTextBlob(std::shared_ptr<TextBlob> textBlob, float x, float y,
@@ -382,20 +366,12 @@ void Canvas::drawTextBlob(std::shared_ptr<TextBlob> textBlob, float x, float y,
   if (textBlob == nullptr) {
     return;
   }
+  SaveLayerForImageFilter(this, paint.getImageFilter());
   auto state = *mcState;
   state.matrix.preTranslate(x, y);
-  if (auto imageFilter = paint.getImageFilter()) {
-    AutoLayerForImageFilter autoLayer(this, std::move(imageFilter));
-    drawTextBlob(textBlob.get(), state, paint.getFill(), paint.getStroke());
-  } else {
-    drawTextBlob(textBlob.get(), state, paint.getFill(), paint.getStroke());
-  }
-}
-
-void Canvas::drawTextBlob(const TextBlob* textBlob, const MCState& state, const Fill& fill,
-                          const Stroke* stroke) {
+  auto stroke = paint.getStroke();
   for (auto& glyphRunList : textBlob->glyphRunLists) {
-    drawContext->drawGlyphRunList(glyphRunList, state, fill, stroke);
+    drawContext->drawGlyphRunList(glyphRunList, state, paint.getFill(), stroke);
   }
 }
 
@@ -463,18 +439,7 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
   if (!atlas->isAlphaOnly()) {
     fill.shader = nullptr;
   }
-  auto imageFilter = paint != nullptr ? paint->getImageFilter() : nullptr;
-  if (imageFilter) {
-    AutoLayerForImageFilter autoLayer(this, std::move(imageFilter));
-    drawAtlas(std::move(atlas), matrix, tex, colors, count, sampling, fill);
-  } else {
-    drawAtlas(std::move(atlas), matrix, tex, colors, count, sampling, fill);
-  }
-}
-
-void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], const Rect tex[],
-                       const Color colors[], size_t count, const SamplingOptions& sampling,
-                       const Fill& fill) {
+  SaveLayerForImageFilter(this, paint ? paint->getImageFilter() : nullptr);
   auto state = *mcState;
   auto atlasRect = Rect::MakeWH(atlas->width(), atlas->height());
   for (size_t i = 0; i < count; ++i) {
