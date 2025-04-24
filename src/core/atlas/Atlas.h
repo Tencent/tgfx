@@ -23,10 +23,10 @@
 #include <set>
 #include "core/atlas/AtlasTypes.h"
 #include "core/atlas/Glyph.h"
-#include "core/utils/PlacementPtr.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "tgfx/core/Size.h"
+#include "tgfx/core/Image.h"
 
 namespace tgfx {
 class Atlas {
