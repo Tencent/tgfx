@@ -229,7 +229,8 @@ void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
     for (size_t i = 0; i < glyphCount; ++i) {
       const auto& glyphID = glyphIDs[i];
       const auto& position = positions[i];
-      auto glyphImage = glyphFace->getImage(glyphID, &glyphState.matrix);
+      auto glyphCodec = glyphFace->getImage(glyphID, &glyphState.matrix);
+      auto glyphImage = Image::MakeFrom(glyphCodec);
       if (glyphImage == nullptr) {
         continue;
       }
