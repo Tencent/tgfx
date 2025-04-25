@@ -64,16 +64,24 @@ enum class BlendModeCoeff {
   IDA,
 };
 
+enum class BlendEquation {
+  // Basic blend equations.
+  Add,              //<! Cs*S + Cd*D
+  Subtract,         //<! Cs*S - Cd*D
+  ReverseSubtract,  //<! Cd*D - Cs*S
+};
+
 struct BlendInfo {
   BlendModeCoeff srcBlend;
   BlendModeCoeff dstBlend;
+  BlendEquation equation;
 };
 
 /**
  * Returns true if 'mode' is a coefficient-based blend mode. If true is returned, the mode's src and
  * dst coefficient functions are set in 'src' and 'dst'.
  */
-bool BlendModeAsCoeff(BlendMode mode, BlendInfo* blendInfo = nullptr);
+bool BlendModeAsCoeff(BlendMode mode, bool hasCoverage = false, BlendInfo* blendInfo = nullptr);
 
 enum class OpacityType {
   // The opacity is unknown

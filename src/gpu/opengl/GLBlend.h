@@ -25,7 +25,8 @@ namespace tgfx {
 // Appends GLSL code to fragment that assigns a specified blend of the srcColor and dstColor
 // variables to the outColor variable.
 void AppendMode(FragmentShaderBuilder* fsBuilder, const std::string& srcColor,
-                const std::string& dstColor, const std::string& outColor, BlendMode blendMode);
+                const std::string& dstColor, const std::string& outColor, BlendMode blendMode,
+                bool hasCoverage);
 
 const char* BlendModeName(BlendMode mode);
 }  // namespace tgfx

@@ -20,43 +20,104 @@
 #include <utility>
 
 namespace tgfx {
-// clang-format off
-static constexpr std::pair<BlendModeCoeff, BlendModeCoeff> Coeffs[] = {
-  // For Porter-Duff blend functions, color = src * src coeff + dst * dst coeff
-  // src coeff               dst coeff                  blend func
-  // -------------------     --------------------       ----------
-  { BlendModeCoeff::Zero,    BlendModeCoeff::Zero }, // clear
-  { BlendModeCoeff::One,     BlendModeCoeff::Zero }, // src
-  { BlendModeCoeff::Zero,    BlendModeCoeff::One  }, // dst
-  { BlendModeCoeff::One,     BlendModeCoeff::ISA  }, // src-over
-  { BlendModeCoeff::IDA,     BlendModeCoeff::One  }, // dst-over
-  { BlendModeCoeff::DA,      BlendModeCoeff::Zero }, // src-in
-  { BlendModeCoeff::Zero,    BlendModeCoeff::SA   }, // dst-in
-  { BlendModeCoeff::IDA,     BlendModeCoeff::Zero }, // src-out
-  { BlendModeCoeff::Zero,    BlendModeCoeff::ISA  }, // dst-out
-  { BlendModeCoeff::DA,      BlendModeCoeff::ISA  }, // src-atop
-  { BlendModeCoeff::IDA,     BlendModeCoeff::SA   }, // dst-atop
-  { BlendModeCoeff::IDA,     BlendModeCoeff::ISA  }, // xor
-  { BlendModeCoeff::One,     BlendModeCoeff::One  }, // plus
-  { BlendModeCoeff::Zero,    BlendModeCoeff::SC   }, // modulate
-  { BlendModeCoeff::One,     BlendModeCoeff::ISC  }, // screen
-};
-// clang-format on
 
-bool BlendModeAsCoeff(BlendMode mode, BlendInfo* blendInfo) {
+/**
+ * This table outlines the blend formulas we will use with each xfermode, with and without coverage,
+ * with and without an opaque input color. Optimization properties are deduced at compile time so we
+ * can make runtime decisions quickly. RGB coverage is not supported.
+ */
+// Array dimensions: [15 blend modes][2 alphaOnly][2 isOpaque]
+static constexpr std::pair<BlendModeCoeff, BlendModeCoeff> Coeffs[2][2][15] = {
+    {// No coverage, input color unknown
+     {
+         {BlendModeCoeff::Zero, BlendModeCoeff::Zero},  // clear
+         {BlendModeCoeff::One, BlendModeCoeff::Zero},   // src
+         {BlendModeCoeff::Zero, BlendModeCoeff::One},   // dst
+         {BlendModeCoeff::One, BlendModeCoeff::ISA},    // src-over
+         {BlendModeCoeff::IDA, BlendModeCoeff::One},    // dst-over
+         {BlendModeCoeff::DA, BlendModeCoeff::Zero},    // src-in
+         {BlendModeCoeff::Zero, BlendModeCoeff::SA},    // dst-in
+         {BlendModeCoeff::IDA, BlendModeCoeff::Zero},   // src-out
+         {BlendModeCoeff::Zero, BlendModeCoeff::ISA},   // dst-out
+         {BlendModeCoeff::DA, BlendModeCoeff::ISA},     // src-atop
+         {BlendModeCoeff::IDA, BlendModeCoeff::SA},     // dst-atop
+         {BlendModeCoeff::IDA, BlendModeCoeff::ISA},    // xor
+         {BlendModeCoeff::One, BlendModeCoeff::One},    // plus
+         {BlendModeCoeff::Zero, BlendModeCoeff::SC},    // modulate
+         {BlendModeCoeff::One, BlendModeCoeff::ISC}     // screen
+     },
+     // Has coverage, input color unknown
+     {
+         {BlendModeCoeff::Zero, BlendModeCoeff::Zero},  // clear
+         {BlendModeCoeff::One, BlendModeCoeff::Zero},   // src
+         {BlendModeCoeff::Zero, BlendModeCoeff::One},   // dst
+         {BlendModeCoeff::One, BlendModeCoeff::ISA},    // src-over
+         {BlendModeCoeff::IDA, BlendModeCoeff::One},    // dst-over
+         {BlendModeCoeff::DA, BlendModeCoeff::Zero},    // src-in
+         {BlendModeCoeff::Zero, BlendModeCoeff::SA},    // dst-in
+         {BlendModeCoeff::IDA, BlendModeCoeff::Zero},   // src-out
+         {BlendModeCoeff::Zero, BlendModeCoeff::ISA},   // dst-out
+         {BlendModeCoeff::DA, BlendModeCoeff::ISA},     // src-atop
+         {BlendModeCoeff::IDA, BlendModeCoeff::SA},     // dst-atop
+         {BlendModeCoeff::IDA, BlendModeCoeff::ISA},    // xor
+         {BlendModeCoeff::One, BlendModeCoeff::One},    // plus
+         {BlendModeCoeff::Zero, BlendModeCoeff::SC},    // modulate
+         {BlendModeCoeff::One, BlendModeCoeff::ISC}     // screen
+     }},
+    {// No coverage, input color opaque
+     {
+         {BlendModeCoeff::Zero, BlendModeCoeff::Zero},  // clear
+         {BlendModeCoeff::One, BlendModeCoeff::Zero},   // src
+         {BlendModeCoeff::Zero, BlendModeCoeff::One},   // dst
+         {BlendModeCoeff::One, BlendModeCoeff::ISA},    // src-over
+         {BlendModeCoeff::IDA, BlendModeCoeff::One},    // dst-over
+         {BlendModeCoeff::DA, BlendModeCoeff::Zero},    // src-in
+         {BlendModeCoeff::Zero, BlendModeCoeff::One},   // dst-in
+         {BlendModeCoeff::IDA, BlendModeCoeff::Zero},   // src-out
+         {BlendModeCoeff::Zero, BlendModeCoeff::Zero},  // dst-out
+         {BlendModeCoeff::DA, BlendModeCoeff::Zero},    // src-atop
+         {BlendModeCoeff::IDA, BlendModeCoeff::One},    // dst-atop
+         {BlendModeCoeff::IDA, BlendModeCoeff::Zero},   // xor
+         {BlendModeCoeff::One, BlendModeCoeff::One},    // plus
+         {BlendModeCoeff::Zero, BlendModeCoeff::SC},    // modulate
+         {BlendModeCoeff::One, BlendModeCoeff::ISC}     // screen
+     },
+     // Has coverage, input color opaque
+     {
+         {BlendModeCoeff::Zero, BlendModeCoeff::Zero},  // clear
+         {BlendModeCoeff::One, BlendModeCoeff::ISA},    // src
+         {BlendModeCoeff::Zero, BlendModeCoeff::One},   // dst
+         {BlendModeCoeff::One, BlendModeCoeff::ISA},    // src-over
+         {BlendModeCoeff::IDA, BlendModeCoeff::One},    // dst-over
+         {BlendModeCoeff::DA, BlendModeCoeff::ISA},     // src-in
+         {BlendModeCoeff::Zero, BlendModeCoeff::One},   // dst-in
+         {BlendModeCoeff::IDA, BlendModeCoeff::ISA},    // src-out
+         {BlendModeCoeff::Zero, BlendModeCoeff::Zero},  // dst-out
+         {BlendModeCoeff::DA, BlendModeCoeff::ISA},     // src-atop
+         {BlendModeCoeff::IDA, BlendModeCoeff::One},    // dst-atop
+         {BlendModeCoeff::IDA, BlendModeCoeff::ISA},    // xor
+         {BlendModeCoeff::One, BlendModeCoeff::One},    // plus
+         {BlendModeCoeff::Zero, BlendModeCoeff::SC},    // modulate
+         {BlendModeCoeff::One, BlendModeCoeff::ISC}     // screen
+     }}};
+
+bool BlendModeAsCoeff(BlendMode mode, bool hasCoverage, BlendInfo* blendInfo) {
   if (mode > BlendMode::Screen) {
     return false;
   }
   if (blendInfo != nullptr) {
-    blendInfo->srcBlend = Coeffs[static_cast<int>(mode)].first;
-    blendInfo->dstBlend = Coeffs[static_cast<int>(mode)].second;
+    // Array dimensions: [has coverage][is opaque][blend mode]
+    // Note: alphaOnly parameter is currently unused in this implementation
+    const auto& coeff = Coeffs[0][hasCoverage][static_cast<int>(mode)];
+    blendInfo->srcBlend = coeff.first;
+    blendInfo->dstBlend = coeff.second;
   }
   return true;
 }
 
 bool BlendModeIsOpaque(BlendMode mode, OpacityType srcColorOpacity) {
   BlendInfo blendInfo = {};
-  if (!BlendModeAsCoeff(mode, &blendInfo)) {
+  if (!BlendModeAsCoeff(mode, false, &blendInfo)) {
     return false;
   }
   switch (blendInfo.srcBlend) {

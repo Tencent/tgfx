@@ -36,7 +36,7 @@ class Pipeline : public ProgramInfo {
   Pipeline(PlacementPtr<GeometryProcessor> geometryProcessor,
            std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors,
            size_t numColorProcessors, PlacementPtr<XferProcessor> xferProcessor,
-           BlendMode blendMode, const Swizzle* outputSwizzle);
+           BlendMode blendMode, const Swizzle* outputSwizzle, bool hasCoverageProcessor);
 
   size_t numColorFragmentProcessors() const {
     return numColorProcessors;

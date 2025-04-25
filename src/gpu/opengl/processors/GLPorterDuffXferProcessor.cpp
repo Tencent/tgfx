@@ -66,7 +66,7 @@ void GLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
 
   const char* outColor = "localOutputColor";
   fragBuilder->codeAppendf("vec4 %s;", outColor);
-  AppendMode(fragBuilder, args.inputColor, dstColor, outColor, blendMode);
+  AppendMode(fragBuilder, args.inputColor, dstColor, outColor, blendMode, true);
   fragBuilder->codeAppendf("%s = %s * %s + (vec4(1.0) - %s) * %s;", outColor,
                            args.inputCoverage.c_str(), outColor, args.inputCoverage.c_str(),
                            dstColor.c_str());
