@@ -16,7 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "base/TGFXTest.h"
 #include "core/PathRef.h"
 #include "core/Records.h"
 #include "core/images/ResourceImage.h"
