@@ -244,27 +244,27 @@ bool CGScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItal
   }
   auto transform = GetTransform(fauxItalic);
   auto cgGlyph = static_cast<CGGlyph>(glyphID);
-  if (path) {
-    auto cgPath = CTFontCreatePathForGlyph(ctFont, cgGlyph, &transform);
-    if (cgPath) {
-      CTPathGeometrySink sink;
-      CGPathApply(cgPath, &sink, CTPathGeometrySink::ApplyElement);
-      *path = sink.path();
-      CFRelease(cgPath);
-      if (fauxBold) {
-        auto strokePath = *path;
-        Stroke stroke(textSize * fauxBoldScale);
-        stroke.applyToPath(&strokePath);
-        path->addPath(strokePath, PathOp::Union);
-      }
-    } else {
-      path->reset();
+  auto cgPath = CTFontCreatePathForGlyph(ctFont, cgGlyph, &transform);
+  if (cgPath) {
+    if (!path) {
+      return true;
+    }
+    CTPathGeometrySink sink;
+    CGPathApply(cgPath, &sink, CTPathGeometrySink::ApplyElement);
+    *path = sink.path();
+    CFRelease(cgPath);
+    if (fauxBold) {
+      auto strokePath = *path;
+      Stroke stroke(textSize * fauxBoldScale);
+      stroke.applyToPath(&strokePath);
+      path->addPath(strokePath, PathOp::Union);
     }
     return true;
   } else {
-    auto bound =
-        CTFontGetBoundingRectsForGlyphs(ctFont, kCTFontOrientationDefault, &cgGlyph, nullptr, 1);
-    return !CGRectIsEmpty(bound);
+    if (path) {
+      path->reset();
+    }
+    return false;
   }
 }
 
