@@ -428,9 +428,15 @@ bool FTScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItal
 
   auto err = FT_Load_Glyph(face, glyphID, flags);
   if (err != FT_Err_Ok || face->glyph->format != FT_GLYPH_FORMAT_OUTLINE) {
-    path->reset();
+    if (path) {
+      path->reset();
+    }
     return false;
   }
+  if (!path) {  // no path to fill, just return
+    return true;
+  }
+
   if (fauxBold) {
     ApplyEmbolden(face, face->glyph, glyphID, loadGlyphFlags);
   }

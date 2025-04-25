@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/vectors/coregraphics/CGScalerContext.h"
+#include <CoreText/CTFont.h>
+#include <CoreText/CTFontDescriptor.h>
 #include "core/ScalerContext.h"
 #include "core/utils/Log.h"
 #include "platform/apple/BitmapContextUtil.h"
@@ -242,22 +244,28 @@ bool CGScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItal
   }
   auto transform = GetTransform(fauxItalic);
   auto cgGlyph = static_cast<CGGlyph>(glyphID);
-  auto cgPath = CTFontCreatePathForGlyph(ctFont, cgGlyph, &transform);
-  if (cgPath) {
-    CTPathGeometrySink sink;
-    CGPathApply(cgPath, &sink, CTPathGeometrySink::ApplyElement);
-    *path = sink.path();
-    CFRelease(cgPath);
-    if (fauxBold) {
-      auto strokePath = *path;
-      Stroke stroke(textSize * fauxBoldScale);
-      stroke.applyToPath(&strokePath);
-      path->addPath(strokePath, PathOp::Union);
+  if (path) {
+    auto cgPath = CTFontCreatePathForGlyph(ctFont, cgGlyph, &transform);
+    if (cgPath) {
+      CTPathGeometrySink sink;
+      CGPathApply(cgPath, &sink, CTPathGeometrySink::ApplyElement);
+      *path = sink.path();
+      CFRelease(cgPath);
+      if (fauxBold) {
+        auto strokePath = *path;
+        Stroke stroke(textSize * fauxBoldScale);
+        stroke.applyToPath(&strokePath);
+        path->addPath(strokePath, PathOp::Union);
+      }
+    } else {
+      path->reset();
     }
+    return true;
   } else {
-    path->reset();
+    auto bound =
+        CTFontGetBoundingRectsForGlyphs(ctFont, kCTFontOrientationDefault, &cgGlyph, nullptr, 1);
+    return !CGRectIsEmpty(bound);
   }
-  return true;
 }
 
 Rect CGScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {

@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "base/TGFXTest.h"
 #include "core/PathRef.h"
 #include "core/Records.h"
 #include "core/images/ResourceImage.h"
@@ -1613,5 +1614,15 @@ TGFX_TEST(CanvasTest, AdaptiveDashEffect) {
   effect->filterPath(&path);
   canvas->drawPath(path, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/AdaptiveDashEffect"));
+}
+
+TGFX_TEST(CanvasTest, FontGetPath) {
+  auto typeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  Font font(typeface, 50.f);
+  //锟斤拷
+  auto glyphID = font.getGlyphID("锟");
+  bool havePath = font.getPath(glyphID, nullptr);
+  EXPECT_TRUE(havePath);
 }
 }  // namespace tgfx
