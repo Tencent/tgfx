@@ -1620,9 +1620,14 @@ TGFX_TEST(CanvasTest, FontGetPath) {
   auto typeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
   Font font(typeface, 50.f);
-  //锟斤拷
-  auto glyphID = font.getGlyphID("锟");
-  bool havePath = font.getPath(glyphID, nullptr);
+  GlyphID glyphID = font.getGlyphID("∞");
+  bool nullptrHavePath = font.getPath(glyphID, nullptr);
+  EXPECT_TRUE(nullptrHavePath);
+  Path path = {};
+  bool havePath = font.getPath(glyphID, &path);
   EXPECT_TRUE(havePath);
+  EXPECT_FALSE(path.isEmpty());
+
+  EXPECT_EQ(nullptrHavePath, havePath);
 }
 }  // namespace tgfx
