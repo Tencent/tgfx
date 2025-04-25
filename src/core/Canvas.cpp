@@ -21,6 +21,8 @@
 #include "core/LayerUnrollContext.h"
 #include "core/RecordingContext.h"
 #include "core/utils/Log.h"
+#include "shapes/PathShape.h"
+#include "shapes/StrokeShape.h"
 #include "tgfx/core/Surface.h"
 
 namespace tgfx {
@@ -46,10 +48,10 @@ class AutoLayerForImageFilter {
   int savedCount = -1;
 };
 
-#define SaveLayerForImageFilter(canvas, imageFilter)                                  \
-  std::unique_ptr<AutoLayerForImageFilter> autoLayer = nullptr;                       \
-  if (auto filter = imageFilter) {                                                    \
-    autoLayer = std::make_unique<AutoLayerForImageFilter>(canvas, std::move(filter)); \
+#define SaveLayerForImageFilter(imageFilter)                                        \
+  std::unique_ptr<AutoLayerForImageFilter> autoLayer = nullptr;                     \
+  if (auto filter = imageFilter) {                                                  \
+    autoLayer = std::make_unique<AutoLayerForImageFilter>(this, std::move(filter)); \
   }
 
 static Fill GetFillStyle(const Paint* paint) {
@@ -180,7 +182,7 @@ void Canvas::drawColor(const Color& color, BlendMode blendMode) {
 }
 
 void Canvas::drawPaint(const Paint& paint) {
-  SaveLayerForImageFilter(this, paint.getImageFilter());
+  SaveLayerForImageFilter(paint.getImageFilter());
   drawContext->drawFill(*mcState, paint.getFill());
 }
 
@@ -203,7 +205,7 @@ void Canvas::drawRect(const Rect& rect, const Paint& paint) {
   if (rect.isEmpty()) {
     return;
   }
-  SaveLayerForImageFilter(this, paint.getImageFilter());
+  SaveLayerForImageFilter(paint.getImageFilter());
   drawContext->drawRect(rect, *mcState, paint.getFill());
 }
 
@@ -240,46 +242,116 @@ void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
   if (rRect.rect.isEmpty()) {
     return;
   }
-  SaveLayerForImageFilter(this, paint.getImageFilter());
+  SaveLayerForImageFilter(paint.getImageFilter());
   drawContext->drawRRect(rRect, *mcState, paint.getFill());
 }
 
 void Canvas::drawPath(const Path& path, const Paint& paint) {
+  SaveLayerForImageFilter(paint.getImageFilter());
+  if (drawSimplePath(path, *mcState, paint.getFill(), paint.getStroke())) {
+    return;
+  }
   auto shape = Shape::MakeFrom(path);
-  drawShape(std::move(shape), paint);
+  shape = Shape::ApplyStroke(std::move(shape), paint.getStroke());
+  if (shape != nullptr) {
+    drawContext->drawShape(std::move(shape), *mcState, paint.getFill());
+  }
+}
+
+/// Check if the line is axis-aligned and convert it to a rect
+static bool StrokeLineIsRect(const Stroke& stroke, const Point line[2], Rect* rect) {
+  if (stroke.cap == LineCap::Round) {
+    return false;
+  }
+  // check if the line is axis-aligned
+  if (line[0].x != line[1].x && line[0].y != line[1].y) {
+    return false;
+  }
+  // use the stroke width and line cap to convert the line to a rect
+  auto left = std::min(line[0].x, line[1].x);
+  auto top = std::min(line[0].y, line[1].y);
+  auto right = std::max(line[0].x, line[1].x);
+  auto bottom = std::max(line[0].y, line[1].y);
+  auto halfWidth = stroke.width / 2.0f;
+  if (stroke.cap == LineCap::Square) {
+    if (rect) {
+      rect->setLTRB(left - halfWidth, top - halfWidth, right + halfWidth, bottom + halfWidth);
+    }
+    return true;
+  }
+  if (rect) {
+    if (left == right) {
+      rect->setLTRB(left - halfWidth, top, right + halfWidth, bottom);
+    } else {
+      rect->setLTRB(left, top - halfWidth, right, bottom + halfWidth);
+    }
+  }
+  return true;
+}
+
+bool Canvas::drawSimplePath(const Path& path, const MCState& state, const Fill& fill,
+                            const Stroke* stroke) const {
+  if (path.isEmpty()) {
+    if (path.isInverseFillType()) {
+      // No geometry to draw, so draw the fill instead.
+      drawContext->drawFill(state, fill);
+    }
+    return true;
+  }
+  Rect rect = {};
+  Point line[2] = {};
+  if (path.isLine(line)) {
+    if (!stroke) {
+      // a line has no fill to draw.
+      return true;
+    }
+    if (StrokeLineIsRect(*stroke, line, &rect)) {
+      drawContext->drawRect(rect, state, fill);
+      return true;
+    }
+  }
+  if (stroke == nullptr) {
+    if (path.isRect(&rect)) {
+      drawContext->drawRect(rect, state, fill);
+      return true;
+    }
+    RRect rRect = {};
+    if (path.isOval(&rect)) {
+      rRect.setOval(rect);
+      drawContext->drawRRect(rRect, state, fill);
+      return true;
+    }
+    if (path.isRRect(&rRect)) {
+      drawContext->drawRRect(rRect, state, fill);
+      return true;
+    }
+  }
+  return false;
 }
 
 void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
+  if (shape == nullptr) {
+    return;
+  }
+  SaveLayerForImageFilter(paint.getImageFilter());
+  Path* path = nullptr;
+  auto stroke = paint.getStroke();
+  if (shape->type() == Shape::Type::Path) {
+    path = &std::static_pointer_cast<PathShape>(shape)->path;
+  } else if (!stroke && shape->type() == Shape::Type::Stroke) {
+    auto strokeShape = std::static_pointer_cast<StrokeShape>(shape);
+    if (strokeShape->shape->isSimplePath()) {
+      path = &std::static_pointer_cast<PathShape>(strokeShape->shape)->path;
+      stroke = &strokeShape->stroke;
+    }
+  }
+  if (path && drawSimplePath(*path, *mcState, paint.getFill(), stroke)) {
+    return;
+  }
   shape = Shape::ApplyStroke(std::move(shape), paint.getStroke());
-  if (shape == nullptr || shape->isLine()) {
-    // a line has no fill to draw.
-    return;
+  if (shape != nullptr) {
+    drawContext->drawShape(std::move(shape), *mcState, paint.getFill());
   }
-  SaveLayerForImageFilter(this, paint.getImageFilter());
-  Path path = {};
-  if (shape->isSimplePath(&path) && path.isEmpty() && path.isInverseFillType()) {
-    // No geometry to draw, so draw the fill instead.
-    drawContext->drawFill(*mcState, paint.getFill());
-    return;
-  }
-  if (!shape->isInverseFillType()) {
-    Rect rect = {};
-    if (shape->isRect(&rect)) {
-      drawContext->drawRect(rect, *mcState, paint.getFill());
-      return;
-    }
-    RRect rRect = {};
-    if (shape->isOval(&rect)) {
-      rRect.setOval(rect);
-      drawContext->drawRRect(rRect, *mcState, paint.getFill());
-      return;
-    }
-    if (shape->isRRect(&rRect)) {
-      drawContext->drawRRect(rRect, *mcState, paint.getFill());
-      return;
-    }
-  }
-  drawContext->drawShape(std::move(shape), *mcState, paint.getFill());
 }
 
 static SamplingOptions GetDefaultSamplingOptions(Image* image) {
@@ -354,7 +426,7 @@ void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t 
   if (glyphCount == 0 || glyphFace == nullptr) {
     return;
   }
-  SaveLayerForImageFilter(this, paint.getImageFilter());
+  SaveLayerForImageFilter(paint.getImageFilter());
   GlyphRun glyphRun(glyphFace, {glyphs, glyphs + glyphCount}, {positions, positions + glyphCount});
   auto glyphRunList = std::make_shared<GlyphRunList>(std::move(glyphRun));
   drawContext->drawGlyphRunList(std::move(glyphRunList), *mcState, paint.getFill(),
@@ -366,7 +438,7 @@ void Canvas::drawTextBlob(std::shared_ptr<TextBlob> textBlob, float x, float y,
   if (textBlob == nullptr) {
     return;
   }
-  SaveLayerForImageFilter(this, paint.getImageFilter());
+  SaveLayerForImageFilter(paint.getImageFilter());
   auto state = *mcState;
   state.matrix.preTranslate(x, y);
   auto stroke = paint.getStroke();
@@ -439,7 +511,7 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
   if (!atlas->isAlphaOnly()) {
     fill.shader = nullptr;
   }
-  SaveLayerForImageFilter(this, paint ? paint->getImageFilter() : nullptr);
+  SaveLayerForImageFilter(paint ? paint->getImageFilter() : nullptr);
   auto state = *mcState;
   auto atlasRect = Rect::MakeWH(atlas->width(), atlas->height());
   for (size_t i = 0; i < count; ++i) {
