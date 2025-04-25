@@ -87,19 +87,12 @@ bool WebScalerContext::readPixels(GlyphID glyphID, const ImageInfo& dstInfo,
   if (bounds.isEmpty()) {
     return false;
   }
-  auto image = scalerContext.call<val>("generateImage", getText(glyphID), bounds);
-  if (!image.as<bool>()) {
+  auto imageData = scalerContext.call<val>("readPixels", getText(glyphID), bounds);
+  if (!imageData.as<bool>()) {
     return false;
   }
 
-  auto width = static_cast<int>(bounds.width());
-  auto height = static_cast<int>(bounds.height());
-  auto data = val::module_property("tgfx").call<val>(
-      "readImagePixels", val::module_property("module"), image, width, height);
-  if (!data.as<bool>()) {
-    return false;
-  }
-  auto length = data["length"].as<size_t>();
+  auto length = imageData["length"].as<size_t>();
   if (length == 0) {
     return false;
   }
@@ -107,7 +100,7 @@ bool WebScalerContext::readPixels(GlyphID glyphID, const ImageInfo& dstInfo,
   auto memory = val::module_property("HEAPU8")["buffer"];
   auto memoryView =
       val::global("Uint8Array").new_(memory, reinterpret_cast<uintptr_t>(dstPixels), length);
-  memoryView.call<void>("set", data);
+  memoryView.call<void>("set", imageData);
   return true;
 }
 
