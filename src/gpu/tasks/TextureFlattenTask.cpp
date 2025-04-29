@@ -77,9 +77,11 @@ bool TextureFlattenTask::execute(RenderPass* renderPass) {
   const auto& swizzle = caps->getWriteSwizzle(format);
   std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors = {};
   fragmentProcessors.emplace_back(std::move(colorProcessor));
+  BlendFormula srcFormula;
+  BlendModeAsCoeff(BlendMode::Src, false, &srcFormula);
   auto pipeline =
       std::make_unique<Pipeline>(std::move(geometryProcessor), std::move(fragmentProcessors), 1,
-                                 nullptr, BlendMode::Src, &swizzle, false);
+                                 nullptr, srcFormula, &swizzle);
   auto quad = Quad::MakeFrom(Rect::MakeWH(renderTarget->width(), renderTarget->height()));
   auto vertexData = quad.toTriangleStrips();
   renderPass->bindProgramAndScissorClip(pipeline.get(), {});

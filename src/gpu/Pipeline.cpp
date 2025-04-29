@@ -25,11 +25,11 @@ namespace tgfx {
 Pipeline::Pipeline(PlacementPtr<GeometryProcessor> geometryProcessor,
                    std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors,
                    size_t numColorProcessors, PlacementPtr<XferProcessor> xferProcessor,
-                   BlendMode blendMode, const Swizzle* outputSwizzle, bool hasCoverageProcessor)
+                   BlendFormula blendFormula, const Swizzle* outputSwizzle)
     : geometryProcessor(std::move(geometryProcessor)),
       fragmentProcessors(std::move(fragmentProcessors)), numColorProcessors(numColorProcessors),
-      xferProcessor(std::move(xferProcessor)), _outputSwizzle(outputSwizzle) {
-  BlendModeAsCoeff(blendMode, hasCoverageProcessor, &_blendInfo);
+      xferProcessor(std::move(xferProcessor)), _blendFormula(std::move(blendFormula)),
+      _outputSwizzle(outputSwizzle) {
   updateProcessorIndices();
 }
 

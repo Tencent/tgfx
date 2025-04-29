@@ -30,6 +30,7 @@
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "processors/PorterDuffXferProcessor.h"
+#include "processors/ShaderPDXferProcessor.h"
 
 namespace tgfx {
 /**
@@ -130,6 +131,12 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
       ShapeDrawOp::Make(std::move(shapeProxy), fill.color.premultiply(), uvMatrix, aaType);
   addDrawOp(std::move(drawOp), clip, fill, localBounds, deviceBounds);
 }
+
+void OpsCompositor::fillGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
+                                     const MCState& state, const Fill& fill) {
+
+}
+
 
 void OpsCompositor::discardAll() {
   ops.clear();
@@ -547,12 +554,8 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
   }
   op->setScissorRect(scissorRect);
   op->setBlendMode(fill.blendMode);
-  if (!BlendModeAsCoeff(fill.blendMode)) {
-    auto dstTextureInfo = makeDstTextureInfo(deviceBounds, aaType);
-    auto xferProcessor =
-        PorterDuffXferProcessor::Make(drawingBuffer(), fill.blendMode, std::move(dstTextureInfo));
-    op->setXferProcessor(std::move(xferProcessor));
-  }
+  auto dstTextureInfo = makeDstTextureInfo(deviceBounds, aaType);
+  op->setDstTextureInfo(dstTextureInfo);
   ops.emplace_back(std::move(op));
 }
 }  // namespace tgfx

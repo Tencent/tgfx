@@ -428,8 +428,8 @@ static bool AppendPorterDuffTerm(FragmentShaderBuilder* fsBuilder, BlendModeCoef
 
 void AppendMode(FragmentShaderBuilder* fsBuilder, const std::string& srcColor,
                 const std::string& dstColor, const std::string& outColor, BlendMode blendMode,
-                bool hasCoverageProcessor) {
-  BlendInfo blendInfo = {};
+                bool hasCoverageProcessor, BlendFormula* blendFormula) {
+  BlendFormula blendInfo = {};
   if (BlendModeAsCoeff(blendMode, hasCoverageProcessor, &blendInfo)) {
     // The only coeff mode that can go out of range is plus.
     bool clamp = blendMode == BlendMode::PlusLighter;
@@ -452,6 +452,9 @@ void AppendMode(FragmentShaderBuilder* fsBuilder, const std::string& srcColor,
     fsBuilder->codeAppend(";");
   } else {
     HandleBlendModes(fsBuilder, srcColor, dstColor, outColor, blendMode);
+  }
+  if (blendFormula) {
+    *blendFormula = blendInfo;
   }
 }
 

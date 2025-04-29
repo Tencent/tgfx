@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "gpu/Blend.h"
 #include "gpu/FragmentShaderBuilder.h"
 #include "tgfx/core/BlendMode.h"
 
@@ -26,7 +27,7 @@ namespace tgfx {
 // variables to the outColor variable.
 void AppendMode(FragmentShaderBuilder* fsBuilder, const std::string& srcColor,
                 const std::string& dstColor, const std::string& outColor, BlendMode blendMode,
-                bool hasCoverage);
+                bool hasCoverage, BlendFormula* blendFormula = nullptr);
 
 const char* BlendModeName(BlendMode mode);
 }  // namespace tgfx

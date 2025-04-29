@@ -40,16 +40,16 @@ class DrawOp : public Op {
     blendMode = mode;
   }
 
-  void setXferProcessor(PlacementPtr<XferProcessor> processor) {
-    xferProcessor = std::move(processor);
-  }
-
   void addColorFP(PlacementPtr<FragmentProcessor> colorProcessor) {
     colors.emplace_back(std::move(colorProcessor));
   }
 
   void addCoverageFP(PlacementPtr<FragmentProcessor> coverageProcessor) {
     coverages.emplace_back(std::move(coverageProcessor));
+  }
+
+  void setDstTextureInfo(const DstTextureInfo& dstTextureInfo) {
+    _dstTextureInfo = dstTextureInfo;
   }
 
  protected:
@@ -64,5 +64,6 @@ class DrawOp : public Op {
   std::vector<PlacementPtr<FragmentProcessor>> coverages = {};
   PlacementPtr<XferProcessor> xferProcessor = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
+  DstTextureInfo _dstTextureInfo = {};
 };
 }  // namespace tgfx

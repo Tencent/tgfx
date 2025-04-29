@@ -76,14 +76,22 @@ static void UpdateScissor(Context* context, const Rect& scissorRect) {
 }
 
 static const unsigned gXfermodeCoeff2Blend[] = {
-    GL_ZERO,      GL_ONE,
-    GL_SRC_COLOR, GL_ONE_MINUS_SRC_COLOR,
-    GL_DST_COLOR, GL_ONE_MINUS_DST_COLOR,
-    GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA,
-    GL_DST_ALPHA, GL_ONE_MINUS_DST_ALPHA,
+    GL_ZERO,       GL_ONE,
+    GL_SRC_COLOR,  GL_ONE_MINUS_SRC_COLOR,
+    GL_DST_COLOR,  GL_ONE_MINUS_DST_COLOR,
+    GL_SRC_ALPHA,  GL_ONE_MINUS_SRC_ALPHA,
+    GL_DST_ALPHA,  GL_ONE_MINUS_DST_ALPHA,
+    GL_SRC1_COLOR, GL_ONE_MINUS_SRC1_COLOR,
+    GL_SRC1_ALPHA, GL_ONE_MINUS_SRC1_ALPHA,
 };
 
-static void UpdateBlend(Context* context, const BlendInfo* blendFactors) {
+static const unsigned gXfermodeEquation2Blend[] = {
+    GL_FUNC_ADD,
+    GL_FUNC_SUBTRACT,
+    GL_FUNC_REVERSE_SUBTRACT,
+};
+
+static void UpdateBlend(Context* context, const BlendFormula* blendFactors) {
   auto gl = GLFunctions::Get(context);
   auto caps = GLCaps::Get(context);
   if (caps->frameBufferFetchSupport && caps->frameBufferFetchRequiresEnablePerSample) {
@@ -94,14 +102,16 @@ static void UpdateBlend(Context* context, const BlendInfo* blendFactors) {
     }
   }
   if (blendFactors == nullptr || (blendFactors->srcBlend == BlendModeCoeff::One &&
-                                  blendFactors->dstBlend == BlendModeCoeff::Zero)) {
+                                  blendFactors->dstBlend == BlendModeCoeff::Zero &&
+                                  (blendFactors->equation == BlendEquation::Add ||
+                                   blendFactors->equation == BlendEquation::Subtract))) {
     // There is no need to enable blending if the blend mode is src.
     gl->disable(GL_BLEND);
   } else {
     gl->enable(GL_BLEND);
     gl->blendFunc(gXfermodeCoeff2Blend[static_cast<int>(blendFactors->srcBlend)],
                   gXfermodeCoeff2Blend[static_cast<int>(blendFactors->dstBlend)]);
-    gl->blendEquation(GL_FUNC_ADD);
+    gl->blendEquation(gXfermodeEquation2Blend[static_cast<int>(blendFactors->equation)]);
   }
 }
 
@@ -134,7 +144,7 @@ bool GLRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
   auto* program = static_cast<GLProgram*>(_program);
   gl->useProgram(program->programID());
   UpdateScissor(context, scissorRect);
-  UpdateBlend(context, programInfo->blendInfo());
+  UpdateBlend(context, programInfo->blendFormula());
   if (programInfo->requiresBarrier()) {
     gl->textureBarrier();
   }

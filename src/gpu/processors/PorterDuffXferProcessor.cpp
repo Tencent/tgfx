@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,13 +19,15 @@
 #include "PorterDuffXferProcessor.h"
 
 namespace tgfx {
+
+void PorterDuffXferProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) const {
+  bytesKey->write(static_cast<uint32_t>(blendFormula.primaryOutputType |
+                                        (blendFormula.secondaryOutputType << 3)));
+}
+
 const Texture* PorterDuffXferProcessor::dstTexture() const {
   auto textureProxy = dstTextureInfo.textureProxy;
   return textureProxy ? textureProxy->getTexture().get() : nullptr;
 }
 
-void PorterDuffXferProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) const {
-  bytesKey->write(classID());
-  bytesKey->write(static_cast<uint32_t>(blendMode));
-}
 }  // namespace tgfx

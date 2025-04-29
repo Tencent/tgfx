@@ -36,7 +36,7 @@ class Pipeline : public ProgramInfo {
   Pipeline(PlacementPtr<GeometryProcessor> geometryProcessor,
            std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors,
            size_t numColorProcessors, PlacementPtr<XferProcessor> xferProcessor,
-           BlendMode blendMode, const Swizzle* outputSwizzle, bool hasCoverageProcessor);
+           BlendFormula blendFormula, const Swizzle* outputSwizzle);
 
   size_t numColorFragmentProcessors() const {
     return numColorProcessors;
@@ -64,8 +64,8 @@ class Pipeline : public ProgramInfo {
     return xferProcessor != nullptr && xferProcessor->requiresBarrier();
   }
 
-  const BlendInfo* blendInfo() const override {
-    return xferProcessor == nullptr ? &_blendInfo : nullptr;
+  const BlendFormula* blendFormula() const override {
+    return &_blendFormula;
   }
 
   void getUniforms(UniformBuffer* uniformBuffer) const override;
@@ -91,7 +91,7 @@ class Pipeline : public ProgramInfo {
   // This value is also the index in fragmentProcessors where coverage processors begin.
   size_t numColorProcessors = 0;
   PlacementPtr<XferProcessor> xferProcessor = nullptr;
-  BlendInfo _blendInfo = {};
+  BlendFormula _blendFormula = {};
   const Swizzle* _outputSwizzle = nullptr;
 
   void updateProcessorIndices();
