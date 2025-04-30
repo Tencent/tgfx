@@ -17,10 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFUnion.h"
-#include <cstring>
-#include <memory>
-#include <string>
-#include <utility>
 #include "core/utils/Log.h"
 #include "pdf/PDFTypes.h"
 #include "pdf/PDFUtils.h"

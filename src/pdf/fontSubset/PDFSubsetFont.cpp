@@ -17,10 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFSubsetFont.h"
-#include <cstddef>
-#include <cstdlib>
-#include <memory>
-#include <utility>
 #include "hb-subset.h"
 #include "hb.h"
 #include "pdf/PDFFont.h"

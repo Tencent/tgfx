@@ -17,12 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFType1Font.h"
-#include <cmath>
-#include <memory>
-#include <string>
-#include <vector>
 #include "core/ScalerContext.h"
-#include "core/TypefaceMetrics.h"
 #include "core/utils/Log.h"
 #include "pdf/PDFDocument.h"
 #include "pdf/PDFFont.h"
@@ -225,8 +220,8 @@ std::shared_ptr<Data> convert_type1_font_stream(const std::shared_ptr<Data>& src
   return Data::MakeAdopted(data, length, Data::FreeProc);
 }
 
-inline bool can_embed(const TypefaceMetrics& metrics) {
-  return !(metrics.flags & TypefaceMetrics::FontFlags::NotEmbeddable);
+inline bool can_embed(const FontMetrics& metrics) {
+  return !(metrics.flags & FontMetrics::FontFlags::NotEmbeddable);
 }
 
 inline float from_font_units(float scaled, uint16_t emSize) {
@@ -235,7 +230,7 @@ inline float from_font_units(float scaled, uint16_t emSize) {
 
 PDFIndirectReference make_type1_font_descriptor(PDFDocument* doc,
                                                 const PDFStrikeSpec& pdfStrikeSpec,
-                                                const TypefaceMetrics* info) {
+                                                const FontMetrics* info) {
   auto descriptor = PDFDictionary::Make("FontDescriptor");
   auto emSize = static_cast<uint16_t>(std::round(pdfStrikeSpec.unitsPerEM));
   if (info) {
@@ -275,12 +270,13 @@ const std::vector<std::string>& type_1_glyph_names(PDFDocument* canon,
 
 PDFIndirectReference type1_font_descriptor(PDFDocument* doc, const PDFStrikeSpec& pdfStrikeSpec) {
   auto typeface = pdfStrikeSpec.typeface;
+  auto textSize = pdfStrikeSpec.textSize;
   auto typefaceID = typeface->uniqueID();
   auto iter = doc->fFontDescriptors.find(typefaceID);
   if (iter != doc->fFontDescriptors.end()) {
     return iter->second;
   }
-  const TypefaceMetrics* info = PDFFont::GetMetrics(typeface, doc);
+  const FontMetrics* info = PDFFont::GetMetrics(typeface, textSize, doc);
   auto fontDescriptor = make_type1_font_descriptor(doc, pdfStrikeSpec, info);
   doc->fFontDescriptors[typefaceID] = fontDescriptor;
   return fontDescriptor;
@@ -289,6 +285,7 @@ PDFIndirectReference type1_font_descriptor(PDFDocument* doc, const PDFStrikeSpec
 
 void EmitSubsetType1(const PDFFont& pdfFont, PDFDocument* document) {
   auto typeface = pdfFont.strike().strikeSpec.typeface;
+  auto textSize = pdfFont.strike().strikeSpec.textSize;
   auto glyphNames = type_1_glyph_names(document, typeface);
   auto scaleContext = ScalerContext::Make(typeface, pdfFont.strike().strikeSpec.textSize);
 
@@ -299,7 +296,7 @@ void EmitSubsetType1(const PDFFont& pdfFont, PDFDocument* document) {
   fontDictionary->insertRef("FontDescriptor",
                             type1_font_descriptor(document, pdfFont.strike().strikeSpec));
   fontDictionary->insertName("Subtype", "Type1");
-  if (const TypefaceMetrics* info = PDFFont::GetMetrics(typeface, document)) {
+  if (const auto* info = PDFFont::GetMetrics(typeface, textSize, document)) {
     fontDictionary->insertName("BaseFont", info->postScriptName);
   }
 

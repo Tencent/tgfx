@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <string>
 namespace tgfx {
 class FontMetrics {
  public:
@@ -65,5 +66,36 @@ class FontMetrics {
    * Underline position relative to baseline.
    */
   float underlinePosition = 0;
+
+  std::string postScriptName;
+
+  enum StyleFlags {
+    FixedPitch = 0x00000001,
+    Serif = 0x00000002,
+    Script = 0x00000008,
+    Italic = 0x00000040,
+    AllCaps = 0x00010000,
+    SmallCaps = 0x00020000,
+    ForceBold = 0x00040000
+  };
+
+  enum class FontType {
+    Type1,
+    Type1CID,
+    CFF,
+    TrueType,
+    Other,
+  };
+
+  enum FontFlags {
+    Variable = 1 << 0,        //!<May be true for Type1, CFF, or TrueType fonts.
+    NotEmbeddable = 1 << 1,   //!<May not be embedded.
+    NotSubsettable = 1 << 2,  //!<May not be subset.
+    AltDataFormat = 1 << 3,   //!<Data compressed. Table access may still work.
+  };
+
+  StyleFlags style = static_cast<StyleFlags>(0);  // Font style characteristics.
+  FontType type = FontType::Other;
+  FontFlags flags = static_cast<FontFlags>(0);  // Global font flags.
 };
 }  // namespace tgfx

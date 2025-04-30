@@ -17,9 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFShader.h"
-#include <cmath>
-#include <memory>
-#include <utility>
 #include "core/utils/Caster.h"
 #include "core/utils/Log.h"
 #include "pdf/PDFDocument.h"

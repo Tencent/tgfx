@@ -155,11 +155,7 @@ class Typeface {
    */
   virtual std::vector<Unichar> getGlyphToUnicodeMap() const;
 
-  std::unique_ptr<TypefaceMetrics> getMetrics() const;
-
   virtual std::shared_ptr<Data> openData() const = 0;
-
-  virtual std::unique_ptr<TypefaceMetrics> onGetMetrics() const = 0;
 
   mutable std::mutex locker = {};
 
@@ -167,6 +163,7 @@ class Typeface {
   std::unordered_map<float, std::weak_ptr<ScalerContext>> scalerContexts = {};
 
   friend class ScalerContext;
+  friend class FTScalerContext;
   friend class GlyphConverter;
   friend class PDFFont;
 };

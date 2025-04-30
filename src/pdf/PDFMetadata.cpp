@@ -17,17 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/pdf/PDFMetadata.h"
-#include <_types/_uint32_t.h>
-#include <cmath>
-#include <cstdio>
-#include <memory>
-#include <string>
-#include <utility>
-#include <vector>
 #include "pdf/PDFDocument.h"
 #include "pdf/PDFTag.h"
 #include "pdf/PDFTypes.h"
-#include "tgfx/core/Point.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {

@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFGraphicStackState.h"
-#include <memory>
 #include "core/MCState.h"
 #include "core/utils/Log.h"
 #include "pdf/PDFUtils.h"

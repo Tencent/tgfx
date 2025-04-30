@@ -17,11 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFUtils.h"
-#include <_types/_uint8_t.h>
-#include <cmath>
-#include <cstddef>
-#include <memory>
-#include <string>
 #include "pdf/FloatToDecimal.h"
 #include "pdf/PDFResourceDictionary.h"
 #include "pdf/PDFTypes.h"

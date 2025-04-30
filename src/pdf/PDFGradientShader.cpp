@@ -17,14 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFGradientShader.h"
-#include <_types/_uint32_t.h>
-#include <_types/_uint8_t.h>
-#include <cmath>
-#include <cstddef>
-#include <functional>
-#include <memory>
-#include <utility>
-#include <vector>
 #include "core/shaders/GradientShader.h"
 #include "core/utils/Caster.h"
 #include "core/utils/Log.h"
@@ -39,7 +31,6 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
-#include "tgfx/core/Size.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/TileMode.h"
 #include "tgfx/core/WriteStream.h"

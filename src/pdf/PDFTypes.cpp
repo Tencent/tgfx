@@ -17,10 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFTypes.h"
-#include <cstddef>
-#include <memory>
-#include <string>
-#include <utility>
 #include "core/utils/Log.h"
 #include "pdf/DeflateStream.h"
 #include "pdf/PDFDocument.h"

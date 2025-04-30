@@ -24,8 +24,8 @@
 #include <string>
 #include <utility>
 #include "core/ScalerContext.h"
-#include "core/TypefaceMetrics.h"
 #include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
 #include "pdf/PDFDocument.h"
 #include "pdf/PDFExportContext.h"
 #include "pdf/PDFFormXObject.h"
@@ -38,6 +38,7 @@
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Font.h"
+#include "tgfx/core/FontMetrics.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
@@ -63,12 +64,12 @@ inline float ScaleFromFontUnits(int16_t val, uint16_t emSize) {
   return FromFontUnits(val, emSize);
 }
 
-bool CanEmbed(const TypefaceMetrics& metrics) {
-  return !(metrics.flags & TypefaceMetrics::FontFlags::NotEmbeddable);
+bool CanEmbed(const FontMetrics& metrics) {
+  return !(metrics.flags & FontMetrics::FontFlags::NotEmbeddable);
 }
 
-bool CanSubset(const TypefaceMetrics& metrics) {
-  return !(metrics.flags & TypefaceMetrics::FontFlags::NotSubsettable);
+bool CanSubset(const FontMetrics& metrics) {
+  return !(metrics.flags & FontMetrics::FontFlags::NotSubsettable);
 }
 
 void SetGlyphWidthAndBoundingBox(float width, Rect box,
@@ -156,72 +157,52 @@ std::shared_ptr<PDFStrike> PDFStrike::Make(PDFDocument* doc, const Font& font) {
   return strike;
 }
 
-const TypefaceMetrics* PDFFont::GetMetrics(std::shared_ptr<Typeface> typeface,
-                                           PDFDocument* document) {
+const FontMetrics* PDFFont::GetMetrics(const std::shared_ptr<Typeface>& typeface, float textSize,
+                                       PDFDocument* document) {
   auto id = typeface->uniqueID();
-  auto iter = document->fTypefaceMetrics.find(id);
-  if (iter != document->fTypefaceMetrics.end()) {
+  auto iter = document->fontMetrics.find(id);
+  if (iter != document->fontMetrics.end()) {
     return iter->second.get();  // canon retains ownership.
   }
 
   auto count = typeface->glyphsCount();
   if (count <= 0 || count > 1 + UINT16_MAX) {
     // Cache nullptr to skip this check.  Use SkSafeUnref().
-    document->fTypefaceMetrics[id] = nullptr;
+    document->fontMetrics[id] = nullptr;
     return nullptr;
   }
 
-  auto metrics = typeface->getMetrics();
-  if (!metrics) {
-    metrics = std::make_unique<TypefaceMetrics>();
-  }
-  if (0 == metrics->fStemV || 0 == metrics->fCapHeight) {
-    Font font;
-    // font.setHinting(SkFontHinting::kNone);
-    font.setTypeface(typeface);
-    font.setSize(1000);
-    if (0 == metrics->fStemV) {
-      // Figure out a good guess for StemV - Min width of i, I, !, 1.
-      // This probably isn't very good with an italic font.
-      int16_t stemV = SHRT_MAX;
-      for (char c : {'i', 'I', '!', '1'}) {
-        // uint16_t g = font.unicharToGlyph(c);
-        auto glyphID = font.getGlyphID(c);
-        auto bounds = font.getBounds(glyphID);
-        stemV = std::min(stemV, static_cast<int16_t>(std::round(bounds.width())));
-      }
-      metrics->fStemV = stemV;
+  Font font;
+  font.setTypeface(typeface);
+  font.setSize(textSize);
+  auto metrics = font.getMetrics();
+  if (metrics.capHeight == 0) {
+    float capHeight = 0;
+    for (char c : {'M', 'X'}) {
+      auto glyphID = font.getGlyphID(c);
+      auto bounds = font.getBounds(glyphID);
+      capHeight += bounds.height();
     }
-    if (0 == metrics->fCapHeight) {
-      // Figure out a good guess for CapHeight: average the height of M and X.
-      float capHeight = 0;
-      for (char c : {'M', 'X'}) {
-        auto glyphID = font.getGlyphID(c);
-        auto bounds = font.getBounds(glyphID);
-        capHeight += bounds.height();
-      }
-      metrics->fCapHeight = static_cast<int16_t>(std::round(capHeight / 2));
-    }
+    metrics.capHeight = static_cast<int16_t>(std::round(capHeight / 2));
   }
   // Fonts are always subset, so always prepend the subset tag.
-  metrics->postScriptName = document->nextFontSubsetTag() + metrics->postScriptName;
-  document->fTypefaceMetrics[id] = std::move(metrics);
-  return document->fTypefaceMetrics[id].get();
+  metrics.postScriptName = document->nextFontSubsetTag() + metrics.postScriptName;
+  document->fontMetrics[id] = std::make_unique<FontMetrics>(metrics);
+  return document->fontMetrics[id].get();
 }
 
 PDFFont::~PDFFont() = default;
 
 PDFFont::PDFFont(const PDFStrike* strike, GlyphID firstGlyphID, GlyphID lastGlyphID,
-                 TypefaceMetrics::FontType fontType, PDFIndirectReference indirectReference)
+                 FontMetrics::FontType fontType, PDFIndirectReference indirectReference)
     : _strike(strike), _glyphUsage(firstGlyphID, lastGlyphID),
       _indirectReference(indirectReference), fontType(fontType) {
   // Always include glyph 0
   this->noteGlyphUsage(0);
 }
 
-void PDFFont::PopulateCommonFontDescriptor(PDFDictionary* descriptor,
-                                           const TypefaceMetrics& metrics, uint16_t emSize,
-                                           int16_t defaultWidth) {
+void PDFFont::PopulateCommonFontDescriptor(PDFDictionary* descriptor, const FontMetrics& metrics,
+                                           uint16_t emSize, int16_t defaultWidth) {
   descriptor->insertName("FontName", metrics.postScriptName);
   // descriptor->insertInt("Flags", static_cast<size_t>(metrics.style | PDFSymbolic));
   // descriptor->insertScalar("Ascent", scaleFromFontUnits(metrics.fAscent, emSize));
@@ -243,20 +224,21 @@ void PDFFont::PopulateCommonFontDescriptor(PDFDictionary* descriptor,
   }
 }
 
-TypefaceMetrics::FontType PDFFont::FontType(const PDFStrike& /*pdfStrike*/,
-                                            const TypefaceMetrics& metrics) {
-  if (metrics.flags & TypefaceMetrics::FontFlags::Variable ||
-      metrics.flags & TypefaceMetrics::FontFlags::AltDataFormat ||
-      metrics.flags & TypefaceMetrics::FontFlags::NotEmbeddable /*|| pdfStrike.fHasMaskFilter*/) {
+FontMetrics::FontType PDFFont::FontType(const PDFStrike& /*pdfStrike*/,
+                                        const FontMetrics& metrics) {
+  if (metrics.flags & FontMetrics::FontFlags::Variable ||
+      metrics.flags & FontMetrics::FontFlags::AltDataFormat ||
+      metrics.flags & FontMetrics::FontFlags::NotEmbeddable /*|| pdfStrike.fHasMaskFilter*/) {
     // force Type3 fallback.
-    return TypefaceMetrics::FontType::Other;
+    return FontMetrics::FontType::Other;
   }
   return metrics.type;
 }
 
 PDFFont* PDFStrike::getFontResource(GlyphID glyphID) {
   auto typeface = strikeSpec.typeface;
-  const auto* fontMetrics = PDFFont::GetMetrics(typeface, document);
+  auto textSize = strikeSpec.textSize;
+  const auto* fontMetrics = PDFFont::GetMetrics(typeface, textSize, document);
   DEBUG_ASSERT(fontMetrics);  // SkPDFDevice::internalDrawText ensures the typeface is good.
                               // GetMetrics only returns null to signify a bad typeface.
   const auto& metrics = *fontMetrics;
@@ -268,11 +250,11 @@ PDFFont* PDFStrike::getFontResource(GlyphID glyphID) {
   // (no path effect, stroking, fake bolding, extra matrix, mask filter).
   // 3. Will PDF viewers draw this glyph the way we want
   // (at the moment this means an unmodified glyph path).
-  TypefaceMetrics::FontType type = PDFFont::FontType(*this, metrics);
+  FontMetrics::FontType type = PDFFont::FontType(*this, metrics);
   // Keep the type (and original data) if the glyph is empty or the glyph has an unmodified path.
   // Otherwise, fall back to Type3.
   // if (!(glyph.isEmpty() || (glyph->path() && !glyph->pathIsModified()))) {
-  //   type = SkAdvancedTypefaceMetrics::kOther_Font;
+  //   type = SkAdvancedFontMetrics::kOther_Font;
   // }
 
   bool multibyte = PDFFont::IsMultiByte(type);
@@ -319,13 +301,14 @@ const std::vector<Unichar>& PDFFont::GetUnicodeMap(const Typeface& typeface,
 
 void PDFFont::emitSubsetType0(PDFDocument* document) const {
   auto typeface = strike().strikeSpec.typeface;
-  const auto* metricsPtr = PDFFont::GetMetrics(typeface, document);
+  auto textSize = strike().strikeSpec.textSize;
+  const auto* metricsPtr = PDFFont::GetMetrics(typeface, textSize, document);
   if (!metricsPtr) {
     return;
   }
-  const TypefaceMetrics& metrics = *metricsPtr;
+  const FontMetrics& metrics = *metricsPtr;
   DEBUG_ASSERT(CanEmbed(metrics));
-  TypefaceMetrics::FontType type = getType();
+  FontMetrics::FontType type = getType();
 
   auto descriptor = PDFDictionary::Make("FontDescriptor");
   auto emSize = static_cast<uint16_t>(std::round(strike().strikeSpec.unitsPerEM));
@@ -337,7 +320,7 @@ void PDFFont::emitSubsetType0(PDFDocument* document) const {
     return;
   }
 
-  if (type == TypefaceMetrics::FontType::TrueType || type == TypefaceMetrics::FontType::CFF) {
+  if (type == FontMetrics::FontType::TrueType || type == FontMetrics::FontType::CFF) {
     // Avoid use of FontFile3 OpenType (OpenType with CFF) which is PDF 1.6 (2004).
     // Instead use FontFile3 CIDFontType0C (bare CFF) which is PDF 1.3 (2000).
     // See b/352098914
@@ -365,7 +348,7 @@ void PDFFont::emitSubsetType0(PDFDocument* document) const {
     auto streamDictionary = PDFDictionary::Make();
     streamDictionary->insertInt("Length1", subsetFontStream->size());
     const char* fontFileKey;
-    if (type == TypefaceMetrics::FontType::TrueType) {
+    if (type == FontMetrics::FontType::TrueType) {
       fontFileKey = "FontFile2";
     } else {
       streamDictionary->insertName("Subtype", "CIDFontType0C");
@@ -374,7 +357,7 @@ void PDFFont::emitSubsetType0(PDFDocument* document) const {
     auto fontStreamRef = PDFStreamOut(std::move(streamDictionary), std::move(subsetFontStream),
                                       document, PDFSteamCompressionEnabled::Yes);
     descriptor->insertRef(fontFileKey, fontStreamRef);
-  } else if (type == TypefaceMetrics::FontType::Type1CID) {
+  } else if (type == FontMetrics::FontType::Type1CID) {
     auto streamDictionary = PDFDictionary::Make();
     streamDictionary->insertName("Subtype", "CIDFontType0C");
     auto fontStream = Stream::MakeFromData(fontData);
@@ -391,14 +374,14 @@ void PDFFont::emitSubsetType0(PDFDocument* document) const {
   newCIDFont->insertName("BaseFont", metrics.postScriptName);
 
   switch (type) {
-    case TypefaceMetrics::FontType::Type1CID:
+    case FontMetrics::FontType::Type1CID:
       newCIDFont->insertName("Subtype", "CIDFontType0");
       break;
-    case TypefaceMetrics::FontType::CFF:
+    case FontMetrics::FontType::CFF:
       newCIDFont->insertName("Subtype", "CIDFontType0");
       newCIDFont->insertName("CIDToGIDMap", "Identity");
       break;
-    case TypefaceMetrics::FontType::TrueType:
+    case FontMetrics::FontType::TrueType:
       newCIDFont->insertName("Subtype", "CIDFontType2");
       newCIDFont->insertName("CIDToGIDMap", "Identity");
       break;
@@ -507,19 +490,17 @@ PDFIndirectReference type3_descriptor(PDFDocument* doc, const std::shared_ptr<Ty
   // descriptor.insertInt("FontWeight", std::clamp(weight, 1, 9) * 100);
   descriptor.insertInt("FontWeight", 400);
 
-  if (const auto* metrics = PDFFont::GetMetrics(typeface, doc)) {
+  if (const auto* metrics = PDFFont::GetMetrics(typeface, 1000.f, doc)) {
     // Type3 FontDescriptor does not require all the same fields.
     descriptor.insertName("FontName", metrics->postScriptName);
-    descriptor.insertInt("ItalicAngle", metrics->fItalicAngle);
+    // descriptor.insertInt("ItalicAngle", metrics->fItalicAngle);
     fontDescriptorFlags |= static_cast<int32_t>(metrics->style);
     // Adobe requests CapHeight, XHeight, and StemV be added
     // to "greatly help our workflow downstream".
-    if (metrics->fCapHeight != 0) {
-      descriptor.insertInt("CapHeight", metrics->fCapHeight);
+    if (!FloatNearlyZero(metrics->capHeight)) {
+      descriptor.insertInt("CapHeight", static_cast<int>(metrics->capHeight));
     }
-    if (metrics->fStemV != 0) {
-      descriptor.insertInt("StemV", metrics->fStemV);
-    }
+
     if (xHeight != 0) {
       descriptor.insertScalar("XHeight", xHeight);
     }
@@ -530,56 +511,6 @@ PDFIndirectReference type3_descriptor(PDFDocument* doc, const std::shared_ptr<Ty
   return ref;
 }
 
-// struct ImageAndOffset {
-//   std::shared_ptr<Image> fImage;
-//   Point fOffset;
-// };
-
-// static ImageAndOffset to_image(GlyphID gid, SkBulkGlyphMetricsAndImages* smallGlyphs) {
-//   const SkGlyph* glyph = smallGlyphs->glyph(SkPackedGlyphID{gid});
-//   SkMask mask = glyph->mask();
-//   if (!mask.fImage) {
-//     return {nullptr, {0, 0}};
-//   }
-//   SkIRect bounds = mask.fBounds;
-//   SkBitmap bm;
-//   switch (mask.fFormat) {
-//     case SkMask::kBW_Format: {
-//       // Make a gray image, used to smask a rectangle.
-//       // TODO: emit as MaskImage?
-//       const SkISize size = bounds.size();
-//       bm.allocPixels(SkImageInfo::Make(size, kGray_8_SkColorType, kUnknown_SkAlphaType));
-//       for (int y = 0; y < bm.height(); ++y) {
-//         for (int x8 = 0; x8 < bm.width(); x8 += 8) {
-//           uint8_t v = *mask.getAddr1(x8 + bounds.x(), y + bounds.y());
-//           int e = std::min(x8 + 8, bm.width());
-//           for (int x = x8; x < e; ++x) {
-//             *bm.getAddr8(x, y) = (v >> (x & 0x7)) & 0x1 ? 0xFF : 0x00;
-//           }
-//         }
-//       }
-//       bm.setImmutable();
-//       return {bm.asImage(), {bounds.x(), bounds.y()}};
-//     }
-//     case SkMask::kA8_Format:
-//     case SkMask::k3D_Format:  // just do the A8 part
-//       // Make a gray image, used to smask a rectangle.
-//       return {SkImages::RasterFromData(
-//                   SkImageInfo::Make(bounds.size(), kGray_8_SkColorType, kUnknown_SkAlphaType),
-//                   SkData::MakeWithCopy(mask.fImage, mask.computeImageSize()), mask.fRowBytes),
-//               {bounds.x(), bounds.y()}};
-//     case SkMask::kARGB32_Format:
-//       // These will be drawn as images directly.
-//       return {SkImages::RasterFromData(
-//                   SkImageInfo::MakeN32Premul(bounds.size()),
-//                   SkData::MakeWithCopy(mask.fImage, mask.computeTotalImageSize()), mask.fRowBytes),
-//               {bounds.x(), bounds.y()}};
-//     case SkMask::kLCD16_Format:
-//     default:
-//       SkASSERT(false);
-//       return {nullptr, {0, 0}};
-//   }
-// }
 }  // namespace
 
 void PDFFont::emitSubsetType3(PDFDocument* doc) const {
@@ -824,12 +755,12 @@ void PDFFont::emitSubsetType3(PDFDocument* doc) const {
 
 void PDFFont::emitSubset(PDFDocument* document) const {
   switch (fontType) {
-    case TypefaceMetrics::FontType::Type1CID:
-    case TypefaceMetrics::FontType::TrueType:
-    case TypefaceMetrics::FontType::CFF:
+    case FontMetrics::FontType::Type1CID:
+    case FontMetrics::FontType::TrueType:
+    case FontMetrics::FontType::CFF:
       return emitSubsetType0(document);
 #ifndef SK_PDF_DO_NOT_SUPPORT_TYPE_1_FONTS
-    case TypefaceMetrics::FontType::Type1:
+    case FontMetrics::FontType::Type1:
       return EmitSubsetType1(*this, document);
 #endif
     default:

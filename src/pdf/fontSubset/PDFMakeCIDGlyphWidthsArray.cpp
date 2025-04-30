@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFMakeCIDGlyphWidthsArray.h"
-#include <cstddef>
-#include <vector>
 #include "core/ScalerContext.h"
 #include "pdf/PDFFont.h"
 #include "pdf/PDFGlyphUse.h"

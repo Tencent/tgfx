@@ -63,6 +63,8 @@ class FTScalerContext : public ScalerContext {
 
   FTTypeface* ftTypeface() const;
 
+  bool isOpentypeFontDataStandardFormat() const;
+
   float textScale = 1.0f;
   Point extraScale = Point::Make(1.f, 1.f);
   FT_Size ftSize = nullptr;

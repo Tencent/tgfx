@@ -76,7 +76,7 @@ TGFX_TEST(PDFExportTest, EmptyPDF) {
 
     {
       // canvas->clipRect(Rect::MakeWH(200, 200));
-      canvas->drawCircle(Point::Make(200, 200), 200.f, textPaint);
+      // canvas->drawCircle(Point::Make(200, 200), 200.f, textPaint);
     }
     // bool success = false;
     // std::shared_ptr<Path> path = nullptr;
@@ -107,9 +107,9 @@ TGFX_TEST(PDFExportTest, EmptyPDF) {
     // }
 
     //char T
-    // {
-    //   canvas->drawSimpleText("TGFX by 杨", 55, 425, font, textPaint);
-    // }
+    {
+      canvas->drawSimpleText("TGFX by 杨", 55, 425, font, textPaint);
+    }
 
     // //G
     // std::tie(success, path) = PathMakeFromSVGString(

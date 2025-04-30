@@ -19,7 +19,6 @@
 #pragma once
 
 #include <mutex>
-#include "core/TypefaceMetrics.h"
 #include "ft2build.h"
 #include FT_FREETYPE_H
 #include "FTFontData.h"
@@ -60,8 +59,6 @@ class FTTypeface : public Typeface {
   std::vector<Unichar> getGlyphToUnicodeMap() const override;
 #endif
   std::shared_ptr<Data> openData() const override;
-
-  std::unique_ptr<TypefaceMetrics> onGetMetrics() const override;
 
  private:
   uint32_t _uniqueID = 0;

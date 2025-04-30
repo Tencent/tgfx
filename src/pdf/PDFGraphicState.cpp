@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFGraphicState.h"
-#include <_types/_uint8_t.h>
 #include "pdf/PDFDocument.h"
 #include "pdf/PDFTypes.h"
 #include "pdf/PDFUtils.h"

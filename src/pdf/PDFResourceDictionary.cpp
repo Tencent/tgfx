@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFResourceDictionary.h"
-#include <cstddef>
-#include <string>
 #include "pdf/PDFTypes.h"
 
 namespace tgfx {

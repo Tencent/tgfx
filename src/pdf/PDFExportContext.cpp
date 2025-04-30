@@ -29,7 +29,6 @@
 #include "core/MeasureContext.h"
 #include "core/Records.h"
 #include "core/ScalerContext.h"
-#include "core/TypefaceMetrics.h"
 #include "core/filters/DropShadowImageFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
 #include "core/images/PictureImage.h"
@@ -51,6 +50,7 @@
 #include "tgfx/core/ColorType.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Fill.h"
+#include "tgfx/core/FontMetrics.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/ImageInfo.h"
@@ -327,7 +327,7 @@ class GlyphPositioner {
     this->flush();
     fPDFFont = pdfFont;
     // Reader 2020.013.20064 incorrectly advances some Type3 fonts https://crbug.com/1226960
-    bool convertedToType3 = fPDFFont->getType() == TypefaceMetrics::FontType::Other;
+    bool convertedToType3 = fPDFFont->getType() == FontMetrics::FontType::Other;
     bool thousandEM = fPDFFont->strike().strikeSpec.unitsPerEM == 1000;
     fViewersAgreeOnAdvancesInFont = thousandEM || !convertedToType3;
   }
@@ -388,11 +388,11 @@ Unichar map_glyph(const std::vector<Unichar>& glyphToUnicode, GlyphID glyph) {
   return glyph < glyphToUnicode.size() ? glyphToUnicode[glyph] : -1;
 }
 
-bool needs_new_font(PDFFont* font, GlyphID glyphID, TypefaceMetrics::FontType initialFontType) {
+bool needs_new_font(PDFFont* font, GlyphID glyphID, FontMetrics::FontType initialFontType) {
   if (!font || !font->hasGlyph(glyphID)) {
     return true;
   }
-  if (initialFontType == TypefaceMetrics::FontType::Other) {
+  if (initialFontType == FontMetrics::FontType::Other) {
     return false;
   }
 
@@ -400,7 +400,7 @@ bool needs_new_font(PDFFont* font, GlyphID glyphID, TypefaceMetrics::FontType in
       ScalerContext::Make(font->strike().strikeSpec.typeface, font->strike().strikeSpec.textSize);
   Path glyphPath;
   bool hasUnmodifiedPath = scaleContext->generatePath(glyphID, false, false, &glyphPath);
-  bool convertedToType3 = font->getType() == TypefaceMetrics::FontType::Other;
+  bool convertedToType3 = font->getType() == FontMetrics::FontType::Other;
   return convertedToType3 == hasUnmodifiedPath;
 }
 }  // namespace
@@ -429,8 +429,9 @@ void PDFExportContext::onDrawGlyphRun(const GlyphRun& glyphRun, const MCState& s
   }
 
   auto typeface = pdfStrike->strikeSpec.typeface;
+  auto textSize = pdfStrike->strikeSpec.textSize;
 
-  const auto* metrics = PDFFont::GetMetrics(typeface, document);
+  const auto* metrics = PDFFont::GetMetrics(typeface, textSize, document);
   if (!metrics) {
     return;
   }
@@ -438,12 +439,11 @@ void PDFExportContext::onDrawGlyphRun(const GlyphRun& glyphRun, const MCState& s
   const auto& glyphToUnicode = PDFFont::GetUnicodeMap(*typeface, document);
 
   // TODO: FontType should probably be on PDFStrike?
-  TypefaceMetrics::FontType initialFontType = PDFFont::FontType(*pdfStrike, *metrics);
+  FontMetrics::FontType initialFontType = PDFFont::FontType(*pdfStrike, *metrics);
 
   // SkClusterator clusterator(glyphRun);
 
   // The size, skewX, and scaleX are applied here.
-  float textSize = glyphRunFont.getSize();
   float advanceScale = textSize * 1.f / pdfStrike->strikeSpec.unitsPerEM;
 
   // textScaleX and textScaleY are used to get a conservative bounding box for glyphs.

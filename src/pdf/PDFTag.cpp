@@ -17,11 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFTag.h"
-#include <_types/_uint32_t.h>
-#include <cstddef>
-#include <memory>
-#include <string>
-#include <unordered_map>
 #include "core/utils/Log.h"
 #include "pdf/PDFDocument.h"
 #include "pdf/PDFTypes.h"

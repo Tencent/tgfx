@@ -17,9 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFMakeToUnicodeCmap.h"
-#include <cstddef>
-#include <memory>
-#include <string>
 #include "pdf/PDFGlyphUse.h"
 #include "pdf/PDFUtils.h"
 #include "tgfx/core/Stream.h"

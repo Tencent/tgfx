@@ -17,10 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFMetadataUtils.h"
-#include <array>
-#include <cstdio>
-#include <string>
-#include <valarray>
 #include "core/utils/Log.h"
 #include "pdf/PDFTypes.h"
 #include "pdf/PDFUtils.h"

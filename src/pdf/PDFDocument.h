@@ -20,7 +20,6 @@
 
 #include <unordered_map>
 #include <utility>
-#include "core/TypefaceMetrics.h"
 #include "pdf/PDFExportContext.h"
 #include "pdf/PDFFont.h"
 #include "pdf/PDFGraphicState.h"
@@ -29,6 +28,7 @@
 #include "pdf/PDFUtils.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Document.h"
+#include "tgfx/core/FontMetrics.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
@@ -173,7 +173,7 @@ class PDFDocument : public Document {
   //   skia_private::THashMap<SkBitmapKey, SkPDFIndirectReference> fPDFBitmapMap;
   //   skia_private::THashMap<SkPDFIccProfileKey, SkPDFIndirectReference, SkPDFIccProfileKey::Hash>
   //       fICCProfileMap;
-  std::unordered_map<uint32_t, std::unique_ptr<TypefaceMetrics>> fTypefaceMetrics;
+  std::unordered_map<uint32_t, std::unique_ptr<FontMetrics>> fontMetrics;
   std::unordered_map<uint32_t, std::vector<std::string>> fType1GlyphNames;
   std::unordered_map<uint32_t, std::vector<Unichar>> fToUnicodeMap;
   std::unordered_map<uint32_t, PDFIndirectReference> fFontDescriptors;

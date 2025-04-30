@@ -22,11 +22,11 @@
 #include <string>
 #include <unordered_map>
 #include <utility>
-#include "core/TypefaceMetrics.h"
 #include "pdf/PDFGlyphUse.h"
 #include "pdf/PDFTypes.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Font.h"
+#include "tgfx/core/FontMetrics.h"
 #include "tgfx/core/Typeface.h"
 
 namespace tgfx {
@@ -74,20 +74,19 @@ class PDFFont {
    * Returns the font type represented in this font. For Type0 fonts, returns the type of the
    * descendant font. 
    */
-  TypefaceMetrics::FontType getType() const {
+  FontMetrics::FontType getType() const {
     return fontType;
   }
 
-  static TypefaceMetrics::FontType FontType(const PDFStrike& pdfStrike,
-                                            const TypefaceMetrics& metrics);
+  static FontMetrics::FontType FontType(const PDFStrike& pdfStrike, const FontMetrics& metrics);
 
   static void GetType1GlyphNames(const Typeface& /*facetype*/, std::string*) {
     // facetype. .getPostScriptGlyphNames(dst);
   }
 
-  static bool IsMultiByte(TypefaceMetrics::FontType type) {
-    return type == TypefaceMetrics::FontType::Type1 ||
-           type == TypefaceMetrics::FontType::TrueType || type == TypefaceMetrics::FontType::CFF;
+  static bool IsMultiByte(FontMetrics::FontType type) {
+    return type == FontMetrics::FontType::Type1 || type == FontMetrics::FontType::TrueType ||
+           type == FontMetrics::FontType::CFF;
   }
 
   /** 
@@ -129,14 +128,13 @@ class PDFFont {
    *  @param typeface can not be nullptr.
    *  @return nullptr only when typeface is bad.
    */
-  static const TypefaceMetrics* GetMetrics(std::shared_ptr<Typeface> typeface,
-                                           PDFDocument* document);
+  static const FontMetrics* GetMetrics(const std::shared_ptr<Typeface>& typeface, float textSize,
+                                       PDFDocument* document);
 
   static const std::vector<Unichar>& GetUnicodeMap(const Typeface& typeface, PDFDocument* document);
 
-  static void PopulateCommonFontDescriptor(PDFDictionary* descriptor,
-                                           const TypefaceMetrics& metrics, uint16_t emSize,
-                                           int16_t defaultWidth);
+  static void PopulateCommonFontDescriptor(PDFDictionary* descriptor, const FontMetrics& metrics,
+                                           uint16_t emSize, int16_t defaultWidth);
 
   void emitSubset(PDFDocument*) const;
 
@@ -170,10 +168,10 @@ class PDFFont {
   const PDFStrike* _strike;
   PDFGlyphUse _glyphUsage;
   PDFIndirectReference _indirectReference;
-  TypefaceMetrics::FontType fontType;
+  FontMetrics::FontType fontType;
 
   PDFFont(const PDFStrike*, GlyphID firstGlyphID, GlyphID lastGlyphID,
-          TypefaceMetrics::FontType fontType, PDFIndirectReference indirectReference);
+          FontMetrics::FontType fontType, PDFIndirectReference indirectReference);
 
   friend class PDFStrike;
 };
