@@ -17,15 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FTTypeface.h"
-#include <sys/_types/_int16_t.h>
-#include <array>
-#include <cstddef>
-#include <cstring>
-#include <memory>
 #include "FTLibrary.h"
 #include "tgfx/core/Data.h"
-#include "tgfx/core/Rect.h"
-#include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
 #include FT_TRUETYPE_TABLES_H
 #include FT_FONT_FORMATS_H

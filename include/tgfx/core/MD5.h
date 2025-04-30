@@ -18,8 +18,7 @@
 
 #pragma once
 
-#include <cstddef>
-#include <string>
+#include <array>
 #include "tgfx/core/WriteStream.h"
 
 namespace tgfx {

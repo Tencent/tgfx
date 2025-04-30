@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "pdf/PDFBitmap.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/EncodedFormat.h"
 #include "tgfx/core/ImageGenerator.h"

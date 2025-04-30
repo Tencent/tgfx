@@ -39,6 +39,7 @@
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/FontMetrics.h"
+#include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
@@ -686,7 +687,7 @@ void PDFFont::emitSubsetType3(PDFDocument* doc) const {
         const auto imageSize = ISize::Make(glyphImage->width(), glyphImage->height());
         PDFExportContext glyphDevice(imageSize, doc);
         Canvas canvas(&glyphDevice);
-        canvas.drawImage(glyphImage);
+        canvas.drawImage(Image::MakeFrom(glyphImage));
         PDFIndirectReference sMask =
             MakePDFFormXObject(doc, glyphDevice.getContent(),
                                MakePDFArray(0, 0, glyphImage->width(), glyphImage->height()),

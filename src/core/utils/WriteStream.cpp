@@ -17,9 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/WriteStream.h"
-#include <_types/_uint8_t.h>
-#include <cstring>
-#include <vector>
 #include "tgfx/core/Data.h"
 
 namespace tgfx {
