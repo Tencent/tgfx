@@ -19,6 +19,7 @@
 #pragma once
 
 #include <array>
+#include <cstring>
 #include "tgfx/core/WriteStream.h"
 
 namespace tgfx {

@@ -36,7 +36,8 @@ class PDFFont;
 class PDFStrikeSpec {
  public:
   PDFStrikeSpec(std::shared_ptr<Typeface> typeface, float size, float em)
-      : typeface(std::move(typeface)), textSize(size), unitsPerEM(em) {};
+      : typeface(std::move(typeface)), textSize(size), unitsPerEM(em) {
+  }
 
   std::shared_ptr<Typeface> typeface;
   const float textSize;

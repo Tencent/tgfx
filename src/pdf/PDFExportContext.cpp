@@ -823,7 +823,7 @@ namespace {
 //   *mask = SkMaskBuilder();  // destructive;
 //   return img;
 // }
-}
+}  // namespace
 
 void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                                        const SamplingOptions& sampling, const MCState& state,

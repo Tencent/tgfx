@@ -77,8 +77,7 @@ TGFX_TEST(PDFExportTest, EmptyPDF) {
     {
       // canvas->clipRect(Rect::MakeWH(200, 200));
       // canvas->drawCircle(Point::Make(200, 200), 200.f, textPaint);
-    }
-    // bool success = false;
+    }  // bool success = false;
     // std::shared_ptr<Path> path = nullptr;
 
     //T

@@ -29,10 +29,10 @@ Document::~Document() {
 }
 
 Canvas* Document::beginPage(float pageWidth, float pageHeight, const Rect* contentRect) {
-  if(pageWidth <= 0 || pageHeight <= 0||state == State::Closed) {
+  if (pageWidth <= 0 || pageHeight <= 0 || state == State::Closed) {
     return nullptr;
   }
-  if(state == State::InPage) {
+  if (state == State::InPage) {
     endPage();
   }
   auto* canvas = onBeginPage(pageWidth, pageHeight);
@@ -49,7 +49,7 @@ Canvas* Document::beginPage(float pageWidth, float pageHeight, const Rect* conte
 }
 
 void Document::endPage() {
-  if(state == State::InPage) {
+  if (state == State::InPage) {
     onEndPage();
     state = State::BetweenPages;
   }
@@ -72,7 +72,7 @@ void Document::close() {
 }
 
 void Document::abort() {
-  if(state != State::Closed) {
+  if (state != State::Closed) {
     onAbort();
     state = State::Closed;
   }
