@@ -18,10 +18,6 @@
 
 #pragma once
 
-#include <_types/_uint32_t.h>
-#include <cstddef>
-#include <memory>
-#include <string>
 #include <unordered_map>
 #include <utility>
 #include "core/TypefaceMetrics.h"
@@ -51,31 +47,31 @@ class PDFOffsetMap {
   int emitCrossReferenceTable(const std::shared_ptr<WriteStream>& stream) const;
 
  private:
-  std::vector<int> fOffsets;
-  size_t fBaseOffset = SIZE_MAX;
+  std::vector<int> offsets;
+  size_t baseOffset = SIZE_MAX;
 };
 
 struct SkPDFNamedDestination {
-  std::shared_ptr<Data> fName;
-  Point fPoint;
-  PDFIndirectReference fPage;
+  std::shared_ptr<Data> name;
+  Point point;
+  PDFIndirectReference page;
 };
 
 struct PDFLink {
   enum class Type {
-    kNone,
-    kUrl,
-    kNamedDestination,
+    None,
+    Url,
+    NamedDestination,
   };
 
   PDFLink(Type type, std::shared_ptr<Data> data, const Rect& rect, int nodeId)
-      : fType(type), fData(std::move(data)), fRect(rect), fNodeId(nodeId) {
+      : type(type), data(std::move(data)), rect(rect), nodeId(nodeId) {
   }
 
-  const Type fType;
-  const std::shared_ptr<Data> fData;
-  const Rect fRect;
-  const int fNodeId;
+  const Type type;
+  const std::shared_ptr<Data> data;
+  const Rect rect;
+  const int nodeId;
 };
 
 class PDFDocument : public Document {
@@ -160,10 +156,10 @@ class PDFDocument : public Document {
   void incrementJobCount();
   void signalJobComplete();
   size_t currentPageIndex() {
-    return fPages.size();
+    return pages.size();
   }
   size_t pageCount() {
-    return fPageRefs.size();
+    return pageRefs.size();
   }
 
   const Matrix& currentPageTransform() const;
@@ -194,12 +190,12 @@ class PDFDocument : public Document {
 
  private:
   Context* _context = nullptr;
-  PDFOffsetMap fOffsetMap;
+  PDFOffsetMap offsetMap;
   Canvas* canvas = nullptr;
   PDFExportContext* drawContext = nullptr;
 
-  std::vector<std::unique_ptr<PDFDictionary>> fPages;
-  std::vector<PDFIndirectReference> fPageRefs;
+  std::vector<std::unique_ptr<PDFDictionary>> pages;
+  std::vector<PDFIndirectReference> pageRefs;
 
   //   sk_sp<SkPDFDevice> fPageDevice;
   std::atomic<int> fNextObjectNumber = {1};

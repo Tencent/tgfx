@@ -47,29 +47,29 @@ size_t difference(size_t minuend, size_t subtrahend) {
 }  // namespace
 
 void PDFOffsetMap::markStartOfDocument(const std::shared_ptr<WriteStream>& stream) {
-  fBaseOffset = stream->bytesWritten();
+  baseOffset = stream->bytesWritten();
 }
 
 void PDFOffsetMap::markStartOfObject(int referenceNumber,
                                      const std::shared_ptr<WriteStream>& stream) {
   DEBUG_ASSERT(referenceNumber > 0);
   auto index = static_cast<size_t>(referenceNumber - 1);
-  if (index >= fOffsets.size()) {
-    fOffsets.resize(index + 1);
+  if (index >= offsets.size()) {
+    offsets.resize(index + 1);
   }
-  fOffsets[index] = static_cast<int>(difference(stream->bytesWritten(), fBaseOffset));
+  offsets[index] = static_cast<int>(difference(stream->bytesWritten(), baseOffset));
 }
 
 size_t PDFOffsetMap::objectCount() const {
-  return fOffsets.size() + 1;  // Include the special zeroth object in the count.
+  return offsets.size() + 1;  // Include the special zeroth object in the count.
 }
 
 int PDFOffsetMap::emitCrossReferenceTable(const std::shared_ptr<WriteStream>& stream) const {
-  int xRefFileOffset = static_cast<int>(difference(stream->bytesWritten(), fBaseOffset));
+  int xRefFileOffset = static_cast<int>(difference(stream->bytesWritten(), baseOffset));
   stream->writeText("xref\n0 ");
   stream->writeText(std::to_string(objectCount()));
   stream->writeText("\n0000000000 65535 f \n");
-  for (int offset : fOffsets) {
+  for (int offset : offsets) {
     DEBUG_ASSERT(offset > 0);  // Offset was set.
     auto offsetString = std::to_string(offset);
     if (offsetString.size() < 10) {
@@ -206,12 +206,12 @@ PDFIndirectReference append_destinations(
   for (const SkPDFNamedDestination& dest : namedDestinations) {
     auto pdfDest = MakePDFArray();
     pdfDest->reserve(5);
-    pdfDest->appendRef(dest.fPage);
+    pdfDest->appendRef(dest.page);
     pdfDest->appendName("XYZ");
-    pdfDest->appendScalar(dest.fPoint.x);
-    pdfDest->appendScalar(dest.fPoint.y);
+    pdfDest->appendScalar(dest.point.x);
+    pdfDest->appendScalar(dest.point.y);
     pdfDest->appendInt(0);  // Leave zoom unchanged
-    destinations.insertObject(ToValidUtf8String(*dest.fName), std::move(pdfDest));
+    destinations.insertObject(ToValidUtf8String(*dest.name), std::move(pdfDest));
   }
   return doc->emit(destinations);
 }
@@ -292,11 +292,11 @@ const Matrix& PDFDocument::currentPageTransform() const {
 }
 
 Canvas* PDFDocument::onBeginPage(float width, float height) {
-  if (fPages.empty()) {
+  if (pages.empty()) {
     // if this is the first page if the document.
     {
       std::lock_guard<std::mutex> autoLock(fMutex);
-      serializeHeader(&fOffsetMap, stream());
+      serializeHeader(&offsetMap, stream());
     }
 
     fInfoDict = this->emit(*PDFMetadataUtils::MakeDocumentInformationDict(_metadata));
@@ -330,7 +330,7 @@ Canvas* PDFDocument::onBeginPage(float width, float height) {
   drawContext = new PDFExportContext(pageSize, this, initialTransform);
   canvas = new Canvas(drawContext);
 
-  fPageRefs.push_back(this->reserveRef());
+  pageRefs.push_back(this->reserveRef());
   // return &fCanvas;
   return canvas;
 }
@@ -347,7 +347,7 @@ void PDFDocument::onEndPage() {
   auto pageContent = drawContext->getContent();
 
   auto resourceDict = drawContext->makeResourceDict();
-  DEBUG_ASSERT(!fPageRefs.empty());
+  DEBUG_ASSERT(!pageRefs.empty());
 
   page->insertObject("Resources", std::move(resourceDict));
   page->insertObject("MediaBox", PDFUtils::RectToArray(Rect::MakeSize(mediaSize)));
@@ -363,7 +363,7 @@ void PDFDocument::onEndPage() {
   // The StructParents unique identifier for each page is just its
   // 0-based page index.
   page->insertInt("StructParents", static_cast<int>(this->currentPageIndex()));
-  fPages.emplace_back(std::move(page));
+  pages.emplace_back(std::move(page));
 
   delete canvas;
   canvas = nullptr;
@@ -373,7 +373,7 @@ void PDFDocument::onEndPage() {
 
 void PDFDocument::onClose() {
   // SkASSERT(fCanvas.imageInfo().dimensions().isZero());
-  if (fPages.empty()) {
+  if (pages.empty()) {
     this->waitForJobs();
     return;
   }
@@ -386,7 +386,7 @@ void PDFDocument::onClose() {
     docCatalog->insertObject("OutputIntents", make_srgb_output_intents(this));
   }
 
-  docCatalog->insertRef("Pages", generate_page_tree(this, std::move(fPages), fPageRefs));
+  docCatalog->insertRef("Pages", generate_page_tree(this, std::move(pages), pageRefs));
 
   if (!fNamedDestinations.empty()) {
     docCatalog->insertRef("Dests", append_destinations(this, fNamedDestinations));
@@ -430,7 +430,7 @@ void PDFDocument::onClose() {
   this->waitForJobs();
   {
     std::lock_guard<std::mutex> autoLock(fMutex);
-    serialize_footer(fOffsetMap, stream(), fInfoDict, docCatalogRef, fUUID);
+    serialize_footer(offsetMap, stream(), fInfoDict, docCatalogRef, fUUID);
   }
 }
 
@@ -470,7 +470,7 @@ PDFIndirectReference PDFDocument::emit(const PDFObject& object, PDFIndirectRefer
 }
 
 std::shared_ptr<WriteStream> PDFDocument::beginObject(PDFIndirectReference ref) {
-  begin_indirect_object(&fOffsetMap, ref, stream());
+  begin_indirect_object(&offsetMap, ref, stream());
   return stream();
 }
 
@@ -479,8 +479,8 @@ void PDFDocument::endObject() {
 }
 
 PDFIndirectReference PDFDocument::getPage(size_t pageIndex) const {
-  DEBUG_ASSERT(pageIndex < fPageRefs.size());
-  return fPageRefs[pageIndex];
+  DEBUG_ASSERT(pageIndex < pageRefs.size());
+  return pageRefs[pageIndex];
 }
 
 }  // namespace tgfx

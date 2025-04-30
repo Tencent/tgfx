@@ -30,7 +30,6 @@
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Fill.h"
-#include "tgfx/core/GlyphRun.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"
@@ -87,7 +86,7 @@ class PDFExportContext : public DrawContext {
  private:
   void reset();
 
-  void onDrawPath(const MCState& state, const Path& path, const Fill& fill, bool pathIsMutable);
+  void onDrawPath(const MCState& state, const Path& path, const Fill& fill);
 
   void onDrawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                        const SamplingOptions& sampling, const MCState& state, const Fill& fill);
@@ -98,11 +97,11 @@ class PDFExportContext : public DrawContext {
   void onDrawGlyphRunAsPath(const GlyphRun& glyphRun, const MCState& state, const Fill& fill,
                             const Stroke* stroke);
 
-  std::shared_ptr<MemoryWriteStream> setUpContentEntry(const MCState* state, const Matrix& matrix,
+  std::shared_ptr<MemoryWriteStream> setUpContentEntry(const MCState& state, const Matrix& matrix,
                                                        const Fill& fill, float scale,
                                                        PDFIndirectReference* destination);
 
-  void finishContentEntry(const MCState* state, BlendMode blendMode,
+  void finishContentEntry(const MCState& state, BlendMode blendMode,
                           PDFIndirectReference destination, Path* path);
 
   bool isContentEmpty();
@@ -123,17 +122,17 @@ class PDFExportContext : public DrawContext {
   void setGraphicState(PDFIndirectReference graphicState,
                        const std::shared_ptr<MemoryWriteStream>& stream);
 
-  void drawFormXObject(PDFIndirectReference xObject, std::shared_ptr<MemoryWriteStream> stream,
-                       Path* shape);
+  void drawFormXObject(PDFIndirectReference xObject,
+                       const std::shared_ptr<MemoryWriteStream>& stream, Path* shape);
 
   void drawDropShadowBeforeLayer(const std::shared_ptr<Picture>& picture,
                                  const DropShadowImageFilter* dropShadowFilter,
                                  const MCState& state, const Fill& fill);
 
-  static void DrawInnerShadowAfterLayer(const std::shared_ptr<Picture>& picture,
-                                        const std::shared_ptr<ImageFilter>& imageFilter,
-                                        const MCState& state, const Fill& fill, Context* context,
-                                        PDFExportContext* pdfExportContext);
+  // static void DrawInnerShadowAfterLayer(const std::shared_ptr<Picture>& picture,
+  //                                       const std::shared_ptr<ImageFilter>& imageFilter,
+  //                                       const MCState& state, const Fill& fill, Context* context,
+  //                                       PDFExportContext* pdfExportContext);
 
   void drawInnerShadowAfterLayer(const Record* record,
                                  const InnerShadowImageFilter* innerShadowFilter,
@@ -156,10 +155,10 @@ class PDFExportContext : public DrawContext {
   std::shared_ptr<MemoryWriteStream> contentBuffer = nullptr;
   PDFGraphicStackState fActiveStackState;
 
-  std::unordered_set<PDFIndirectReference> fGraphicStateResources;
-  std::unordered_set<PDFIndirectReference> fXObjectResources;
-  std::unordered_set<PDFIndirectReference> fShaderResources;
-  std::unordered_set<PDFIndirectReference> fFontResources;
+  std::unordered_set<PDFIndirectReference> graphicStateResources;
+  std::unordered_set<PDFIndirectReference> xObjectResources;
+  std::unordered_set<PDFIndirectReference> shaderResources;
+  std::unordered_set<PDFIndirectReference> fontResources;
 
   friend class ScopedContentEntry;
 };

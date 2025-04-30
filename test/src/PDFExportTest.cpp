@@ -29,11 +29,14 @@
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/Point.h"
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Stroke.h"
+#include "tgfx/core/TileMode.h"
 #include "tgfx/pdf/PDFMetadata.h"
+#include "tgfx/svg/SVGDOM.h"
 #include "utils/ProjectPath.h"
 #include "utils/TestUtils.h"
 
@@ -71,6 +74,10 @@ TGFX_TEST(PDFExportTest, EmptyPDF) {
     Paint textPaint;
     textPaint.setColor(Color::Green());
 
+    {
+      // canvas->clipRect(Rect::MakeWH(200, 200));
+      canvas->drawCircle(Point::Make(200, 200), 200.f, textPaint);
+    }
     // bool success = false;
     // std::shared_ptr<Path> path = nullptr;
 
@@ -98,10 +105,11 @@ TGFX_TEST(PDFExportTest, EmptyPDF) {
     //   strokePaint.setImageFilter(blurFilter);
     //   canvas->drawPath(*path, strokePaint);
     // }
+
     //char T
-    {
-      canvas->drawSimpleText("TGFX by 杨", 55, 425, font, textPaint);
-    }
+    // {
+    //   canvas->drawSimpleText("TGFX by 杨", 55, 425, font, textPaint);
+    // }
 
     // //G
     // std::tie(success, path) = PathMakeFromSVGString(
@@ -187,72 +195,48 @@ TGFX_TEST(PDFExportTest, EmptyPDF) {
   PDFStream->flush();
 }
 
-TGFX_TEST(PDFExportTest, trySomething) {
-  auto pdfPath = ProjectPath::Absolute("test/out/EmptyPDF.pdf");
-  std::filesystem::path filePath = pdfPath;
+TGFX_TEST(PDFExportTest, SVG) {
+  auto path = ProjectPath::Absolute("test/out/SVG_PDF.pdf");
+  std::filesystem::path filePath = path;
   std::filesystem::create_directories(filePath.parent_path());
-  auto PDFStream = WriteStream::MakeFromFile(pdfPath);
+  auto PDFStream = WriteStream::MakeFromFile(path);
 
   PDFMetadata metadata;
   metadata.title = "Empty PDF";
-  metadata.compressionLevel = PDFMetadata::CompressionLevel::Average;
+  // metadata.PDFA = true;
+  // metadata.compressionLevel = PDFMetadata::CompressionLevel::Average;
+  metadata.compressionLevel = PDFMetadata::CompressionLevel::None;
 
   ContextScope scope;
   auto* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto document = MakePDFDocument(PDFStream, context, metadata);
-  auto* canvas = document->beginPage(1000.f, 250.f);
 
-  Paint colorPaint;
-  colorPaint.setColor(Color::Blue());
+  auto stream = Stream::MakeFromFile(ProjectPath::Absolute("resources/apitest/SVG/complex6.svg"));
+  ASSERT_TRUE(stream != nullptr);
 
-  Paint filterPaint;
-  auto imageFilter = ImageFilter::InnerShadowOnly(50, 50, 20, 20, Color::Red());
-  filterPaint.setImageFilter(imageFilter);
-  // auto blurFilter = ImageFilter::Blur(25, 25, TileMode::Decal);
-  // filterPaint.setImageFilter(blurFilter);
+  auto SVGDom = SVGDOM::Make(*stream);
+  auto rootNode = SVGDom->getRoot();
+  ASSERT_TRUE(rootNode != nullptr);
 
   Recorder recorder;
-  auto* s = recorder.beginRecording();
-  bool success = false;
-  std::shared_ptr<Path> path = nullptr;
-  std::tie(success, path) = PathMakeFromSVGString("M114.5 206L228.382 8.74997H0.617676L114.5 206Z");
-  s->drawPath(*path, colorPaint);
+  auto* picCanvas = recorder.beginRecording();
+  SVGDom->render(picCanvas);
   auto picture = recorder.finishRecordingAsPicture();
 
-  canvas->saveLayer(&filterPaint);
-  // for (auto* record : picture->records) {
-  //   record->playback(canvas->drawContext);
-  // }
-  canvas->translate(50, 50);
-  // canvas->drawPicture(picture);
-  canvas->drawPath(*path, colorPaint);
-  canvas->restore();
+  auto size = SVGDom->getContainerSize();
+
+  auto document = MakePDFDocument(PDFStream, context, metadata);
+  auto* PDFCanvas = document->beginPage(size.width, size.height);
+
+  PDFCanvas->drawPicture(picture);
+
+  document->endPage();
+  document->close();
+  PDFStream->flush();
 }
 
-TGFX_TEST(PDFExportTest, X) {
-  ContextScope scope;
-  auto* context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 500, 500);
-  auto* canvas = surface->getCanvas();
-  canvas->clear();
-
-  auto image = MakeImage("resources/apitest/apple.png");
-
-  Paint paint;
-  auto maskShader = Shader::MakeImageShader(std::move(image), TileMode::Repeat, TileMode::Repeat);
-  paint.setShader(maskShader);
-  // canvas->drawRect(Rect::MakeWH(500, 500), paint);
-  canvas->drawPaint(paint);
-
-  // canvas->drawImage(image);
-
-  EXPECT_TRUE(Baseline::Compare(surface, "PDFTest/X"));
-}
-
-TGFX_TEST(PDFExportTest, tryMask) {
-  auto path = ProjectPath::Absolute("test/out/EmptyPDF.pdf");
+TGFX_TEST(PDFExportTest, Image) {
+  auto path = ProjectPath::Absolute("test/out/ImagePDF.pdf");
   std::filesystem::path filePath = path;
   std::filesystem::create_directories(filePath.parent_path());
   auto PDFStream = WriteStream::MakeFromFile(path);
@@ -265,35 +249,27 @@ TGFX_TEST(PDFExportTest, tryMask) {
   auto* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto document = MakePDFDocument(PDFStream, context, metadata);
-  auto* canvas = document->beginPage(1000.f, 250.f);
-
-  // Recorder recorder;
-  // auto* pictureCanvas = recorder.beginRecording();
-  // Paint picturePaint;
-  // auto gradientShader = tgfx::Shader::MakeLinearGradient(
-  //     tgfx::Point{0.f, 0.f}, tgfx::Point{200.f, 200.f},
-  //     {tgfx::Color::FromRGBA(255, 255, 255, 255), tgfx::Color::FromRGBA(0, 0, 0, 120)}, {0.0, 1.0});
-  // picturePaint.setShader(gradientShader);
-  // pictureCanvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), picturePaint);
-  // auto picture = recorder.finishRecordingAsPicture();
-  // auto image = Image::MakeFrom(picture, 200, 200);
-
-  auto image = MakeImage("resources/apitest/apple.png");
-  image = image->makeTextureImage(context);
+  auto* canvas = document->beginPage(300.f, 300.f);
 
   Paint paint;
-  paint.setColor(Color::Blue());
-  auto maskShader = Shader::MakeImageShader(std::move(image), TileMode::Repeat, TileMode::Repeat);
-  auto maskFilter = MaskFilter::MakeShader(std::move(maskShader));
-  maskFilter = maskFilter->makeWithMatrix(Matrix::MakeTrans(45, 45));
-  paint.setMaskFilter(std::move(maskFilter));
+  auto image = MakeImage("resources/apitest/apple.png");
+  auto imageShader = Shader::MakeImageShader(image, TileMode::Repeat, TileMode::Repeat);
+  paint.setShader(imageShader);
 
-  canvas->drawRect(Rect::MakeWH(150, 150), paint);
-  // canvas->drawRect(Rect::MakeXYWH(50, 50, 100, 100), picturePaint);
+  canvas->translate(20, 20);
+  canvas->drawRect(Rect::MakeXYWH(0, 0, 96, 96), paint);
 
   document->endPage();
   document->close();
   PDFStream->flush();
+
+  {
+    auto surface = Surface::Make(context, 300, 300);
+    auto* GPUcanvas = surface->getCanvas();
+    GPUcanvas->translate(20, 20);
+    GPUcanvas->drawRect(Rect::MakeXYWH(0, 0, 96, 96), paint);
+    EXPECT_TRUE(Baseline::Compare(surface, "PDFTest/image"));
+  }
 }
 
 TGFX_TEST(PDFExportTest, harfbuzz_subset) {

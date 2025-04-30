@@ -18,10 +18,13 @@
 
 #include "PDFGraphicStackState.h"
 #include <memory>
+#include "core/MCState.h"
 #include "core/utils/Log.h"
 #include "pdf/PDFUtils.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
+#include "tgfx/core/Path.h"
+#include "tgfx/core/PathTypes.h"
 #include "tgfx/core/WriteStream.h"
 
 namespace tgfx {
@@ -37,219 +40,123 @@ void emit_pdf_color(Color color, const std::shared_ptr<WriteStream>& result) {
   result->writeText(" ");
 }
 
-// static SkRect rect_intersect(SkRect u, SkRect v) {
-//   if (u.isEmpty() || v.isEmpty()) {
-//     return {0, 0, 0, 0};
-//   }
-//   return u.intersect(v) ? u : SkRect{0, 0, 0, 0};
-// }
+void append_clip(const MCState& state, const std::shared_ptr<MemoryWriteStream>& stream) {
+  if (state.clip.isRect()) {
+    auto bound = state.clip.getBounds();
+    PDFUtils::AppendRectangle(bound, stream);
+    stream->writeText("W* n\n");
+  } else {
+    PDFUtils::EmitPath(state.clip, false, stream);
+    auto clipFill = state.clip.getFillType();
+    if (clipFill == PathFillType::EvenOdd) {
+      stream->writeText("W* n\n");
+    } else {
+      stream->writeText("W n\n");
+    }
+  }
+}
 
-// // Test to see if the clipstack is a simple rect, If so, we can avoid all PathOps code
-// // and speed thing up.
-// static bool is_rect(const SkClipStack& clipStack, const SkRect& bounds, SkRect* dst) {
-//   SkRect currentClip = bounds;
-//   SkClipStack::Iter iter(clipStack, SkClipStack::Iter::kBottom_IterStart);
-//   while (const SkClipStack::Element* element = iter.next()) {
-//     SkRect elementRect{0, 0, 0, 0};
-//     switch (element->getDeviceSpaceType()) {
-//       case SkClipStack::Element::DeviceSpaceType::kEmpty:
-//         break;
-//       case SkClipStack::Element::DeviceSpaceType::kRect:
-//         elementRect = element->getDeviceSpaceRect();
-//         break;
-//       default:
-//         return false;
-//     }
-//     if (element->isReplaceOp()) {
-//       currentClip = rect_intersect(bounds, elementRect);
-//     } else if (element->getOp() == SkClipOp::kIntersect) {
-//       currentClip = rect_intersect(currentClip, elementRect);
-//     } else {
-//       return false;
-//     }
-//   }
-//   *dst = currentClip;
-//   return true;
-// }
-
-// // TODO: When there's no expanding clip ops, this function may not be necessary anymore.
-// static bool is_complex_clip(const SkClipStack& stack) {
-//   SkClipStack::Iter iter(stack, SkClipStack::Iter::kBottom_IterStart);
-//   while (const SkClipStack::Element* element = iter.next()) {
-//     if (element->isReplaceOp()) {
-//       return true;
-//     }
-//   }
-//   return false;
-// }
-
-// template <typename F>
-// static void apply_clip(const SkClipStack& stack, const SkRect& outerBounds, F fn) {
-//   // assumes clipstack is not complex.
-//   constexpr SkRect kHuge{-30000, -30000, 30000, 30000};
-//   SkClipStack::Iter iter(stack, SkClipStack::Iter::kBottom_IterStart);
-//   SkRect bounds = outerBounds;
-//   while (const SkClipStack::Element* element = iter.next()) {
-//     SkPath operand;
-//     element->asDeviceSpacePath(&operand);
-//     SkPathOp op;
-//     switch (element->getOp()) {
-//       case SkClipOp::kDifference:
-//         op = kDifference_SkPathOp;
-//         break;
-//       case SkClipOp::kIntersect:
-//         op = kIntersect_SkPathOp;
-//         break;
-//     }
-//     if (op == kDifference_SkPathOp || operand.isInverseFillType() ||
-//         !kHuge.contains(operand.getBounds())) {
-//       Op(SkPath::Rect(bounds), operand, op, &operand);
-//     }
-//     SkASSERT(!operand.isInverseFillType());
-//     fn(operand);
-//     if (!bounds.intersect(operand.getBounds())) {
-//       return;  // return early;
-//     }
-//   }
-// }
-
-// static void append_clip_path(const SkPath& clipPath, SkWStream* wStream) {
-//   SkPDFUtils::EmitPath(clipPath, SkPaint::kFill_Style, wStream);
-//   SkPathFillType clipFill = clipPath.getFillType();
-//   NOT_IMPLEMENTED(clipFill == SkPathFillType::kInverseEvenOdd, false);
-//   NOT_IMPLEMENTED(clipFill == SkPathFillType::kInverseWinding, false);
-//   if (clipFill == SkPathFillType::kEvenOdd) {
-//     wStream->writeText("W* n\n");
-//   } else {
-//     wStream->writeText("W n\n");
-//   }
-// }
-
-// static void append_clip(const SkClipStack& clipStack, const SkIRect& bounds, SkWStream* wStream) {
-//   // The bounds are slightly outset to ensure this is correct in the
-//   // face of floating-point accuracy and possible SkRegion bitmap
-//   // approximations.
-//   SkRect outsetBounds = SkRect::Make(bounds.makeOutset(1, 1));
-
-//   SkRect clipStackRect;
-//   if (is_rect(clipStack, outsetBounds, &clipStackRect)) {
-//     SkPDFUtils::AppendRectangle(clipStackRect, wStream);
-//     wStream->writeText("W* n\n");
-//     return;
-//   }
-
-//   if (is_complex_clip(clipStack)) {
-//     SkPath clipPath;
-//     SkClipStack_AsPath(clipStack, &clipPath);
-//     if (Op(clipPath, SkPath::Rect(outsetBounds), kIntersect_SkPathOp, &clipPath)) {
-//       append_clip_path(clipPath, wStream);
-//     }
-//     // If Op() fails (pathological case; e.g. input values are
-//     // extremely large or NaN), emit no clip at all.
-//   } else {
-//     apply_clip(clipStack, outsetBounds,
-//                [wStream](const SkPath& path) { append_clip_path(path, wStream); });
-//   }
-// }
 }  // namespace
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void PDFGraphicStackState::updateClip(const MCState& /*state*/, const Rect& /*bounds*/) {
-  // uint32_t clipStackGenID = clipStack ? clipStack->getTopmostGenID() : SkClipStack::kWideOpenGenID;
-  // if (clipStackGenID == currentEntry()->fClipStackGenID) {
-  //   return;
-  // }
-  // while (fStackDepth > 0) {
-  //   this->pop();
-  //   if (clipStackGenID == currentEntry()->fClipStackGenID) {
-  //     return;
-  //   }
-  // }
-  // SkASSERT(currentEntry()->fClipStackGenID == SkClipStack::kWideOpenGenID);
-  // if (clipStackGenID != SkClipStack::kWideOpenGenID) {
-  //   SkASSERT(clipStack);
-  //   this->push();
+void PDFGraphicStackState::updateClip(const MCState& state) {
+  if (state.clip.isEmpty()) {
+    return;
+  }
+  const auto& currentState = this->currentEntry()->state;
+  if (currentState.clip.isSame(state.clip) && currentState.matrix == state.matrix) {
+    return;
+  }
+  while (stackDepth > 0) {
+    pop();
+    if (currentState.clip.isSame(state.clip) && currentState.matrix == state.matrix) {
+      return;
+    }
+  }
 
-  //   currentEntry()->fClipStackGenID = clipStackGenID;
-  //   append_clip(*clipStack, bounds, fContentStream);
-  // }
+  push();
+  this->currentEntry()->state = state;
+  append_clip(state, contentStream);
 }
 
 void PDFGraphicStackState::updateMatrix(const Matrix& matrix) {
-  if (matrix == currentEntry()->fMatrix) {
+  if (matrix == currentEntry()->matrix) {
     return;
   }
 
-  if (!currentEntry()->fMatrix.isIdentity()) {
-    DEBUG_ASSERT(fStackDepth > 0);
-    DEBUG_ASSERT(fEntries[fStackDepth].fClipStackGenID ==
-                 fEntries[fStackDepth - 1].fClipStackGenID);
-    this->pop();
-    DEBUG_ASSERT(currentEntry()->fMatrix.isIdentity());
+  if (!currentEntry()->matrix.isIdentity()) {
+    DEBUG_ASSERT(stackDepth > 0);
+    const auto& currentState = entries[stackDepth].state;
+    const auto& previousState = entries[stackDepth - 1].state;
+
+    DEBUG_ASSERT(currentState.clip.isSame(previousState.clip) &&
+                 currentState.matrix == previousState.matrix);
+    pop();
+    DEBUG_ASSERT(currentEntry()->matrix.isIdentity());
   }
 
   if (matrix.isIdentity()) {
     return;
   }
 
-  this->push();
-  PDFUtils::AppendTransform(matrix, fContentStream);
-  currentEntry()->fMatrix = matrix;
+  push();
+  PDFUtils::AppendTransform(matrix, contentStream);
+  currentEntry()->matrix = matrix;
 }
 
 void PDFGraphicStackState::updateDrawingState(const PDFGraphicStackState::Entry& state) {
   // PDF treats a shader as a color, so we only set one or the other.
-  if (state.fShaderIndex >= 0) {
-    if (state.fShaderIndex != currentEntry()->fShaderIndex) {
-      PDFUtils::ApplyPattern(state.fShaderIndex, fContentStream);
-      currentEntry()->fShaderIndex = state.fShaderIndex;
+  if (state.shaderIndex >= 0) {
+    if (state.shaderIndex != currentEntry()->shaderIndex) {
+      PDFUtils::ApplyPattern(state.shaderIndex, contentStream);
+      currentEntry()->shaderIndex = state.shaderIndex;
     }
-  } else if (state.fColor != currentEntry()->fColor || currentEntry()->fShaderIndex >= 0) {
-    emit_pdf_color(state.fColor, fContentStream);
-    fContentStream->writeText("RG ");
-    emit_pdf_color(state.fColor, fContentStream);
-    fContentStream->writeText("rg\n");
-    currentEntry()->fColor = state.fColor;
-    currentEntry()->fShaderIndex = -1;
+  } else if (state.color != currentEntry()->color || currentEntry()->shaderIndex >= 0) {
+    emit_pdf_color(state.color, contentStream);
+    contentStream->writeText("RG ");
+    emit_pdf_color(state.color, contentStream);
+    contentStream->writeText("rg\n");
+    currentEntry()->color = state.color;
+    currentEntry()->shaderIndex = -1;
   }
 
-  if (state.fGraphicStateIndex != currentEntry()->fGraphicStateIndex) {
-    PDFUtils::ApplyGraphicState(state.fGraphicStateIndex, fContentStream);
-    currentEntry()->fGraphicStateIndex = state.fGraphicStateIndex;
+  if (state.graphicStateIndex != currentEntry()->graphicStateIndex) {
+    PDFUtils::ApplyGraphicState(state.graphicStateIndex, contentStream);
+    currentEntry()->graphicStateIndex = state.graphicStateIndex;
   }
 
-  if (state.fTextScaleX != 0) {
-    if (state.fTextScaleX != currentEntry()->fTextScaleX) {
-      float pdfScale = state.fTextScaleX * 100;
-      PDFUtils::AppendFloat(pdfScale, fContentStream);
-      fContentStream->writeText(" Tz\n");
-      currentEntry()->fTextScaleX = state.fTextScaleX;
+  if (state.textScaleX != 0) {
+    if (state.textScaleX != currentEntry()->textScaleX) {
+      float pdfScale = state.textScaleX * 100;
+      PDFUtils::AppendFloat(pdfScale, contentStream);
+      contentStream->writeText(" Tz\n");
+      currentEntry()->textScaleX = state.textScaleX;
     }
   }
 }
 
 void PDFGraphicStackState::push() {
-  DEBUG_ASSERT(fStackDepth < MaxStackDepth);
-  fContentStream->writeText("q\n");
-  ++fStackDepth;
-  fEntries[fStackDepth] = fEntries[fStackDepth - 1];
+  DEBUG_ASSERT(stackDepth < MaxStackDepth);
+  contentStream->writeText("q\n");
+  ++stackDepth;
+  entries[stackDepth] = entries[stackDepth - 1];
 }
 
 void PDFGraphicStackState::pop() {
-  DEBUG_ASSERT(fStackDepth > 0);
-  fContentStream->writeText("Q\n");
-  fEntries[fStackDepth] = PDFGraphicStackState::Entry();
-  --fStackDepth;
+  DEBUG_ASSERT(stackDepth > 0);
+  contentStream->writeText("Q\n");
+  entries[stackDepth] = PDFGraphicStackState::Entry();
+  --stackDepth;
 }
 
 void PDFGraphicStackState::drainStack() {
-  if (fContentStream) {
-    while (fStackDepth) {
+  if (contentStream) {
+    while (stackDepth) {
       this->pop();
     }
   }
-  DEBUG_ASSERT(fStackDepth == 0);
+  DEBUG_ASSERT(stackDepth == 0);
 }
 
 }  // namespace tgfx
