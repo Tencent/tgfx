@@ -20,7 +20,7 @@
 
 #include <memory>
 #include "tgfx/core/Font.h"
-#include "tgfx/core/Image.h"
+#include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Typeface.h"
 
@@ -66,7 +66,7 @@ class GlyphFace {
    * to the glyph image when drawing. Please note that the fauxBold is not supported for this
    * method.
    */
-  virtual std::shared_ptr<Image> getImage(GlyphID glyphID, Matrix* matrix) const = 0;
+  virtual std::shared_ptr<ImageCodec> getImage(GlyphID glyphID, Matrix* matrix) const = 0;
 
   /**
    * Returns the bounding box of the specified glyph.

@@ -41,7 +41,11 @@ Rect RenderContext::getClipBounds(const Path& clip) {
   if (clip.isInverseFillType()) {
     return renderTarget->bounds();
   }
-  return clip.isEmpty() ? Rect::MakeEmpty() : clip.getBounds();
+  auto bounds = clip.getBounds();
+  if (!bounds.intersect(renderTarget->bounds())) {
+    bounds.setEmpty();
+  }
+  return bounds;
 }
 
 void RenderContext::drawFill(const MCState& state, const Fill& fill) {
@@ -137,15 +141,16 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   if (stroke) {
     stroke->applyToBounds(&bounds);
   }
-  bounds.scale(maxScale, maxScale);
-  auto rasterizeMatrix = Matrix::MakeScale(maxScale);
-  rasterizeMatrix.postTranslate(-bounds.x(), -bounds.y());
-  Matrix invert = {};
-  if (!rasterizeMatrix.invert(&invert)) {
+  state.matrix.mapRect(&bounds);  // To device space
+  auto clipBounds = getClipBounds(state.clip);
+  if (clipBounds.isEmpty()) {
     return;
   }
-  auto newState = state;
-  newState.matrix.preConcat(invert);
+  if (!bounds.intersect(clipBounds)) {
+    return;
+  }
+  auto rasterizeMatrix = state.matrix;
+  rasterizeMatrix.postTranslate(-bounds.x(), -bounds.y());
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
   auto rasterizer = Rasterizer::MakeFrom(width, height, std::move(glyphRunList), fill.antiAlias,
@@ -154,6 +159,8 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   if (image == nullptr) {
     return;
   }
+  auto newState = state;
+  newState.matrix = Matrix::MakeTrans(bounds.x(), bounds.y());
   drawImage(std::move(image), {}, newState, fill.makeWithMatrix(rasterizeMatrix));
 }
 
@@ -229,7 +236,8 @@ void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
     for (size_t i = 0; i < glyphCount; ++i) {
       const auto& glyphID = glyphIDs[i];
       const auto& position = positions[i];
-      auto glyphImage = glyphFace->getImage(glyphID, &glyphState.matrix);
+      auto glyphCodec = glyphFace->getImage(glyphID, &glyphState.matrix);
+      auto glyphImage = Image::MakeFrom(glyphCodec);
       if (glyphImage == nullptr) {
         continue;
       }
