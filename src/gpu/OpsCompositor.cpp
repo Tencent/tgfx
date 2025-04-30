@@ -119,10 +119,16 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
       localBounds = shape->getBounds();
       localBounds = ClipLocalBounds(localBounds, state.matrix, clipBounds);
     }
+    if (localBounds.isEmpty()) {
+      return;
+    }
   }
   shape = Shape::ApplyMatrix(std::move(shape), state.matrix);
   if (needDeviceBounds) {
     deviceBounds = shape->isInverseFillType() ? clipBounds : shape->getBounds();
+    if (deviceBounds.isEmpty() || !deviceBounds.intersect(renderTarget->bounds())) {
+      return;
+    }
   }
   auto aaType = getAAType(fill);
   auto shapeProxy = proxyProvider()->createGpuShapeProxy(shape, aaType, clipBounds, renderFlags);
