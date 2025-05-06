@@ -136,7 +136,7 @@ unsigned LoadGLShader(Context* context, unsigned shaderType, const std::string& 
 }
 
 void ClearGLError(Context* context) {
-#if defined(TGFX_BUILD_FOR_WEB) && !defined(DEBUG)
+#ifdef TGFX_BUILD_FOR_WEB
   USE(context);
 #else
   auto gl = GLFunctions::Get(context);
@@ -146,7 +146,7 @@ void ClearGLError(Context* context) {
 }
 
 bool CheckGLErrorImpl(Context* context, std::string file, int line) {
-#if defined(TGFX_BUILD_FOR_WEB) && !defined(DEBUG)
+#ifdef TGFX_BUILD_FOR_WEB
   USE(context);
   USE(file);
   USE(line);

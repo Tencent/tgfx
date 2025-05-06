@@ -127,7 +127,7 @@ static bool CreateRenderBuffer(const Texture* texture, unsigned& frameBufferID,
   gl->bindFramebuffer(GL_FRAMEBUFFER, frameBufferID);
   gl->framebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER,
                               renderBufferID);
-#if defined(TGFX_BUILD_FOR_WEB) && !defined(DEBUG)
+#ifdef TGFX_BUILD_FOR_WEB
   return true;
 #else
   return gl->checkFramebufferStatus(GL_FRAMEBUFFER) == GL_FRAMEBUFFER_COMPLETE;
@@ -162,7 +162,7 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(const Texture* texture, int
   }
   gl->bindFramebuffer(GL_FRAMEBUFFER, frameBufferRead);
   FrameBufferTexture2D(context, glSampler->target, glSampler->id, sampleCount);
-#if defined(DEBUG) || !defined(TGFX_BUILD_FOR_WEB)
+#ifndef TGFX_BUILD_FOR_WEB
   if (gl->checkFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
     ReleaseResource(context, frameBufferRead, frameBufferDraw, renderBufferId);
     return nullptr;

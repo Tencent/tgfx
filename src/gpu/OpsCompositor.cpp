@@ -128,8 +128,9 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
   auto shapeProxy = proxyProvider()->createGpuShapeProxy(shape, aaType, clipBounds, renderFlags);
   auto drawOp =
       ShapeDrawOp::Make(std::move(shapeProxy), fill.color.premultiply(), uvMatrix, aaType);
-  addDrawOp(std::move(drawOp), clip, fill, localBounds, deviceBounds, needLocalBounds,
-            needDeviceBounds);
+  addDrawOp(std::move(drawOp), clip, fill,
+            needLocalBounds ? std::optional{localBounds} : std::nullopt,
+            needDeviceBounds ? std::optional{deviceBounds} : std::nullopt);
 }
 
 void OpsCompositor::discardAll() {
@@ -273,8 +274,9 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     }
     drawOp->addColorFP(std::move(processor));
   }
-  addDrawOp(std::move(drawOp), clip, fill, localBounds, deviceBounds, needLocalBounds,
-            needDeviceBounds);
+  addDrawOp(std::move(drawOp), clip, fill,
+            needLocalBounds ? std::optional{localBounds} : std::nullopt,
+            needDeviceBounds ? std::optional{deviceBounds} : std::nullopt);
 }
 
 static void FlipYIfNeeded(Rect* rect, std::shared_ptr<RenderTargetProxy> renderTarget) {
@@ -510,23 +512,24 @@ DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AATyp
 }
 
 void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const Fill& fill,
-                              const Rect& localBounds, const Rect& deviceBounds,
-                              bool needLocalBounds, bool needDeviceBounds) {
+                              const std::optional<Rect>& localBounds,
+                              const std::optional<Rect>& deviceBounds) {
   if (op == nullptr || fill.nothingToDraw() || (clip.isEmpty() && !clip.isInverseFillType())) {
     return;
   }
   DEBUG_ASSERT(renderTarget != nullptr);
-  if (needLocalBounds && localBounds.isEmpty()) {
+  if (localBounds.has_value() && localBounds->isEmpty()) {
     return;
   }
 
-  auto clipDeviceBounds = deviceBounds;
-  if (needDeviceBounds &&
-      (clipDeviceBounds.isEmpty() || !clipDeviceBounds.intersect(renderTarget->bounds()))) {
-    return;
+  auto clipDeviceBounds = Rect::MakeEmpty();
+  if (deviceBounds.has_value()) {
+    clipDeviceBounds = *deviceBounds;
+    if (clipDeviceBounds.isEmpty() || !clipDeviceBounds.intersect(renderTarget->bounds())) {
+      return;
+    }
   }
-
-  FPArgs args = {context, renderFlags, localBounds};
+  FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty())};
   if (fill.shader) {
     if (auto processor = FragmentProcessor::Make(fill.shader, args)) {
       op->addColorFP(std::move(processor));
