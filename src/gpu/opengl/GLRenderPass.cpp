@@ -232,7 +232,7 @@ bool GLRenderPass::copyAsBlit(Texture* texture, int srcX, int srcY) {
   gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, glSampler->target, glSampler->id,
                            0);
   auto sourceFrameBufferID = static_cast<GLRenderTarget*>(_renderTarget.get())->getFrameBufferID();
-#ifndef TGFX_BUILD_FOR_WEB
+#if defined(DEBUG) || !defined(TGFX_BUILD_FOR_WEB)
   if (gl->checkFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
     gl->bindFramebuffer(GL_FRAMEBUFFER, sourceFrameBufferID);
     return false;

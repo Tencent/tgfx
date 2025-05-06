@@ -119,7 +119,8 @@ class OpsCompositor {
                                                                  Rect* scissorRect);
   DstTextureInfo makeDstTextureInfo(const Rect& deviceBounds, AAType aaType);
   void addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const Fill& fill,
-                 const Rect& localBounds, const Rect& deviceBounds);
+                 const Rect& localBounds, const Rect& deviceBounds, bool needLocalBounds,
+                 bool needDeviceBounds);
 
   friend class DrawingManager;
 };
