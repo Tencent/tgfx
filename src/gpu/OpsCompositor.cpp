@@ -117,7 +117,7 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
       localBounds = ToLocalBounds(clipBounds, state.matrix);
     } else {
       localBounds = shape->getBounds();
-      localBounds = ClipLocalBounds(localBounds.value(), state.matrix, clipBounds);
+      localBounds = ClipLocalBounds(*localBounds, state.matrix, clipBounds);
     }
   }
   shape = Shape::ApplyMatrix(std::move(shape), state.matrix);
