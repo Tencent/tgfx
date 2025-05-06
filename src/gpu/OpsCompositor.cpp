@@ -107,8 +107,8 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
   if (!state.matrix.invert(&uvMatrix)) {
     return;
   }
-  Rect localBounds = {};
-  Rect deviceBounds = {};
+  std::optional<Rect> localBounds = std::nullopt;
+  std::optional<Rect> deviceBounds = std::nullopt;
   auto [needLocalBounds, needDeviceBounds] = needComputeBounds(fill);
   auto& clip = state.clip;
   auto clipBounds = getClipBounds(clip);
@@ -117,7 +117,7 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
       localBounds = ToLocalBounds(clipBounds, state.matrix);
     } else {
       localBounds = shape->getBounds();
-      localBounds = ClipLocalBounds(localBounds, state.matrix, clipBounds);
+      localBounds = ClipLocalBounds(*localBounds, state.matrix, clipBounds);
     }
   }
   shape = Shape::ApplyMatrix(std::move(shape), state.matrix);
@@ -211,13 +211,17 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
   std::swap(pendingClip, clip);
   std::swap(pendingFill, fill);
   PlacementPtr<DrawOp> drawOp = nullptr;
-  Rect localBounds = {};
-  Rect deviceBounds = {};
+  std::optional<Rect> localBounds = std::nullopt;
+  std::optional<Rect> deviceBounds = std::nullopt;
   auto [needLocalBounds, needDeviceBounds] = needComputeBounds(fill, type == PendingOpType::Image);
   auto aaType = getAAType(fill);
   Rect clipBounds = {};
   if (needLocalBounds) {
     clipBounds = getClipBounds(clip);
+    localBounds = Rect::MakeEmpty();
+  }
+  if (needDeviceBounds) {
+    deviceBounds = Rect::MakeEmpty();
   }
   switch (type) {
     case PendingOpType::Rect:
@@ -232,13 +236,13 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     case PendingOpType::Image: {
       if (needLocalBounds) {
         for (auto& rect : pendingRects) {
-          localBounds.join(ClipLocalBounds(rect->rect, rect->viewMatrix, clipBounds));
+          localBounds->join(ClipLocalBounds(rect->rect, rect->viewMatrix, clipBounds));
         }
       }
       if (needDeviceBounds) {
         for (auto& record : pendingRects) {
           auto rect = record->viewMatrix.mapRect(record->rect);
-          deviceBounds.join(rect);
+          deviceBounds->join(rect);
         }
       }
       auto provider = RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects),
@@ -249,11 +253,11 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
       if (needLocalBounds || needDeviceBounds) {
         for (auto& record : pendingRRects) {
           auto rect = record->viewMatrix.mapRect(record->rRect.rect);
-          deviceBounds.join(rect);
+          deviceBounds->join(rect);
         }
         localBounds = deviceBounds;
-        if (!localBounds.intersect(clipBounds)) {
-          localBounds.setEmpty();
+        if (!localBounds->intersect(clipBounds)) {
+          localBounds->setEmpty();
         }
       }
       auto provider = RRectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRRects),
@@ -265,7 +269,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
   }
 
   if (type == PendingOpType::Image) {
-    FPArgs args = {context, renderFlags, localBounds};
+    FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty())};
     auto processor = FragmentProcessor::Make(std::move(pendingImage), args, pendingSampling);
     if (processor == nullptr) {
       return;
@@ -508,12 +512,17 @@ DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AATyp
 }
 
 void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const Fill& fill,
-                              const Rect& localBounds, const Rect& deviceBounds) {
+                              const std::optional<Rect>& localBounds,
+                              const std::optional<Rect>& deviceBounds) {
   if (op == nullptr || fill.nothingToDraw() || (clip.isEmpty() && !clip.isInverseFillType())) {
     return;
   }
   DEBUG_ASSERT(renderTarget != nullptr);
-  FPArgs args = {context, renderFlags, localBounds};
+  if (localBounds.has_value() && localBounds->isEmpty()) {
+    return;
+  }
+
+  FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty())};
   if (fill.shader) {
     if (auto processor = FragmentProcessor::Make(fill.shader, args)) {
       op->addColorFP(std::move(processor));
@@ -548,7 +557,10 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
   op->setScissorRect(scissorRect);
   op->setBlendMode(fill.blendMode);
   if (!BlendModeAsCoeff(fill.blendMode)) {
-    auto dstTextureInfo = makeDstTextureInfo(deviceBounds, aaType);
+    auto dstTextureInfo = makeDstTextureInfo(deviceBounds.value_or(Rect::MakeEmpty()), aaType);
+    if (!context->caps()->frameBufferFetchSupport && dstTextureInfo.textureProxy == nullptr) {
+      return;
+    }
     auto xferProcessor =
         PorterDuffXferProcessor::Make(drawingBuffer(), fill.blendMode, std::move(dstTextureInfo));
     op->setXferProcessor(std::move(xferProcessor));
