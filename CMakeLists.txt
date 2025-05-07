@@ -11,6 +11,7 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 # Options for building tgfx
 option(TGFX_BUILD_SVG "Enable building the SVG module" OFF)
+option(TGFX_BUILD_PDF "Enable building the PDF module" OFF)
 option(TGFX_BUILD_LAYERS "Enable building the layers module" OFF)
 option(TGFX_BUILD_DRAWERS "Enable building the tgfx-drawers library for testing" OFF)
 option(TGFX_USE_OPENGL "Use OpenGL as the GPU backend" ON)
@@ -84,6 +85,7 @@ if (TGFX_USE_FREETYPE)
 endif ()
 
 message("TGFX_BUILD_SVG: ${TGFX_BUILD_SVG}")
+message("TGFX_BUILD_PDF: ${TGFX_BUILD_PDF}")
 message("TGFX_BUILD_LAYERS: ${TGFX_BUILD_LAYERS}")
 message("TGFX_USE_OPENGL: ${TGFX_USE_OPENGL}")
 message("TGFX_USE_QT: ${TGFX_USE_QT}")
