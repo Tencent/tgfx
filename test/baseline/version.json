@@ -72,6 +72,10 @@
         "SimpleLayerTreeDrawer": "15e0e39",
         "SimpleText": "15e0e39"
     },
+    "DstTextureTest": {
+        "EmptyLocalBounds": "be94e666",
+        "OutOfRenderTarget": "be94e666"
+    },
     "FilterTest": {
         "AlphaThreshold": "5012d73",
         "AlphaThreshold_empty": "500c87a",
@@ -215,7 +219,7 @@
         "complex4": "50136952",
         "complex5": "50136952",
         "complex6": "50136952",
-        "complex7": "50136952",
+        "complex7": "be94e666",
         "jpg_image": "b1db872",
         "mask": "da364e8",
         "path": "50136952",
