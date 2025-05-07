@@ -47,7 +47,7 @@
       },
       {
         "url": "https://github.com/harfbuzz/harfbuzz.git",
-        "commit": "f1f2be776bcd994fa9262622e1a7098a066e5cf7",
+        "commit": "63cdd745ffc77150b702a1800f5f961842db25f8",
         "dir": "third_party/harfbuzz"
       },
       {
