@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 3.13)
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 project(Hello2D)
-# Disable error for the web platform.
-SET_PROPERTY(GLOBAL PROPERTY TARGET_SUPPORTS_SHARED_LIBS true)
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 set(CMAKE_CXX_STANDARD 17)
