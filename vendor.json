@@ -201,8 +201,7 @@
       "name": "harfbuzz",
       "cmake": {
         "targets": [
-          "harfbuzz",
-          "harfbuzz-subset"
+          "harfbuzz"
         ],
         "arguments": [
           "-DHB_HAVE_FREETYPE=OFF",
