@@ -21,12 +21,12 @@
 
 namespace tgfx {
 PlacementPtr<FragmentProcessor> XfermodeFragmentProcessor::MakeFromSrcProcessor(
-    PlacementBuffer* buffer, PlacementPtr<FragmentProcessor> src, BlendMode mode) {
+    BlockBuffer* buffer, PlacementPtr<FragmentProcessor> src, BlendMode mode) {
   return MakeFromTwoProcessors(buffer, std::move(src), nullptr, mode);
 }
 
 PlacementPtr<FragmentProcessor> XfermodeFragmentProcessor::MakeFromDstProcessor(
-    PlacementBuffer* buffer, PlacementPtr<FragmentProcessor> dst, BlendMode mode) {
+    BlockBuffer* buffer, PlacementPtr<FragmentProcessor> dst, BlendMode mode) {
   return MakeFromTwoProcessors(buffer, nullptr, std::move(dst), mode);
 }
 

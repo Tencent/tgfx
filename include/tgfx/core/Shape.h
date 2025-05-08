@@ -94,41 +94,19 @@ class Shape {
   virtual ~Shape() = default;
 
   /**
-   * Returns true if the Shape is a Line and stores points in line. Otherwise, returns false and
-   * leaves line unchanged.
+   * Returns true if the Shape contains a simple path that can be directly retrieved using getPath()
+   * without extra computation.
    */
-  virtual bool isLine(Point line[2] = nullptr) const;
-
-  /**
-   * Returns true if the Shape is a Rect and stores the Rect in rect. Otherwise, returns false and
-   * leaves rect unchanged.
-   */
-  virtual bool isRect(Rect* rect = nullptr) const;
-
-  /**
-   * Returns true if the Shape is an oval or circle and stores the bounding Rect in bounds.
-   * Otherwise, returns false and leaves the bounds unchanged.
-   */
-  virtual bool isOval(Rect* bounds = nullptr) const;
-
-  /**
-   * Returns true if the Shape is a RRect and stores the RRect in rRect. Otherwise, returns false
-   * and leaves rRect unchanged. Please note that this method returns false if the path is
-   * representable as oval, circle, or Rect.
-   */
-  virtual bool isRRect(RRect* rRect = nullptr) const;
-
-  /**
-   * Returns true if the Shape is a simple path without any deferred operations. If it is, the
-   * backing Path is stored in the provided path parameter. Otherwise, it returns false and leaves
-   * the path parameter unchanged.
-   */
-  virtual bool isSimplePath(Path* path = nullptr) const;
+  virtual bool isSimplePath() const {
+    return false;
+  }
 
   /**
    * Returns true if the PathFillType of the computed path is InverseWinding or InverseEvenOdd.
    */
-  virtual bool isInverseFillType() const;
+  virtual bool isInverseFillType() const {
+    return false;
+  }
 
   /**
    * Returns the bounding box of the Shape. The bounds might be larger than the actual shape because

@@ -41,7 +41,7 @@ class DrawingManager {
   std::shared_ptr<OpsCompositor> addOpsCompositor(std::shared_ptr<RenderTargetProxy> renderTarget,
                                                   uint32_t renderFlags);
 
-  void addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget, PlacementList<Op> ops);
+  void addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget, PlacementArray<Op> ops);
 
   void addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> renderTarget,
                           std::vector<std::shared_ptr<TextureProxy>> inputs,
@@ -54,20 +54,25 @@ class DrawingManager {
   void addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
                                std::shared_ptr<TextureProxy> dest);
 
-  void addResourceTask(PlacementNode<ResourceTask> resourceTask);
+  void addResourceTask(PlacementPtr<ResourceTask> resourceTask);
 
   /**
    * Returns true if any render tasks were executed.
    */
   bool flush();
 
+  /**
+   * Releases all tasks associated with the drawing manager.
+   */
+  void releaseAll();
+
  private:
   Context* context = nullptr;
-  PlacementBuffer* drawingBuffer = nullptr;
+  BlockBuffer* drawingBuffer = nullptr;
   std::unique_ptr<RenderPass> renderPass = nullptr;
-  PlacementList<ResourceTask> resourceTasks = {};
-  PlacementList<TextureFlattenTask> flattenTasks = {};
-  PlacementList<RenderTask> renderTasks = {};
+  std::vector<PlacementPtr<ResourceTask>> resourceTasks = {};
+  std::vector<PlacementPtr<TextureFlattenTask>> flattenTasks = {};
+  std::vector<PlacementPtr<RenderTask>> renderTasks = {};
   std::list<std::shared_ptr<OpsCompositor>> compositors = {};
   ResourceKeyMap<ResourceTask*> resourceTaskMap = {};
 

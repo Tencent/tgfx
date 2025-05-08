@@ -137,7 +137,7 @@ class TextLayer : public Layer {
 
  private:
   std::string _text;
-  Color _textColor = Color::White();
+  Color _textColor = {};
   Font _font = {};
   float _width = 0;
   float _height = 0;

@@ -53,62 +53,6 @@ Path MatrixShape::getPath() const {
   return path;
 }
 
-bool MatrixShape::isLine(Point line[2]) const {
-  if (!shape->isLine(line)) {
-    return false;
-  }
-  if (line) {
-    matrix.mapPoints(line, 2);
-  }
-  return true;
-}
-
-bool MatrixShape::isRect(Rect* rect) const {
-  if (!matrix.rectStaysRect()) {
-    return false;
-  }
-  if (!shape->isRect(rect)) {
-    return false;
-  }
-  if (rect) {
-    matrix.mapRect(rect);
-  }
-  return true;
-}
-
-bool MatrixShape::isOval(Rect* bounds) const {
-  if (!matrix.rectStaysRect()) {
-    return false;
-  }
-  if (!shape->isOval(bounds)) {
-    return false;
-  }
-  if (bounds) {
-    matrix.mapRect(bounds);
-  }
-  return true;
-}
-
-bool MatrixShape::isRRect(RRect* rRect) const {
-  if (!matrix.rectStaysRect()) {
-    return false;
-  }
-  if (!shape->isRRect(rRect)) {
-    return false;
-  }
-  if (rRect) {
-    matrix.mapRect(&rRect->rect);
-    matrix.mapPoints(&rRect->radii, 1);
-    if (rRect->radii.x < 0.0f) {
-      rRect->radii.x = -rRect->radii.x;
-    }
-    if (rRect->radii.y < 0.0f) {
-      rRect->radii.y = -rRect->radii.y;
-    }
-  }
-  return true;
-}
-
 UniqueKey MatrixShape::getUniqueKey() const {
   static const auto SingleScaleMatrixShapeType = UniqueID::Next();
   static const auto BothScalesShapeType = UniqueID::Next();

@@ -46,7 +46,7 @@ bool FontGlyphFace::getPath(GlyphID glyphID, Path* path) const {
   return _font.getPath(glyphID, path);
 }
 
-std::shared_ptr<Image> FontGlyphFace::getImage(GlyphID glyphID, Matrix* matrix) const {
+std::shared_ptr<ImageCodec> FontGlyphFace::getImage(GlyphID glyphID, Matrix* matrix) const {
   return _font.getImage(glyphID, matrix);
 }
 

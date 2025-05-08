@@ -40,6 +40,9 @@ class MatrixShader final : public Shader {
 
   std::shared_ptr<Shader> makeWithMatrix(const Matrix& viewMatrix) const override;
 
+  std::shared_ptr<Shader> source = nullptr;
+  Matrix matrix = {};
+
  protected:
   Type type() const override {
     return Type::Matrix;
@@ -49,10 +52,6 @@ class MatrixShader final : public Shader {
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                       const Matrix* uvMatrix) const override;
-
- private:
-  std::shared_ptr<Shader> source = nullptr;
-  Matrix matrix = Matrix::I();
 
   MatrixShader(std::shared_ptr<Shader> source, const Matrix& matrix);
   friend class ShaderSerialization;

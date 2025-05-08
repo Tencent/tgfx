@@ -29,21 +29,21 @@ class PathShape : public Shape {
   explicit PathShape(Path path) : path(std::move(path)) {
   }
 
-  bool isLine(Point line[2] = nullptr) const override;
+  bool isSimplePath() const override {
+    return true;
+  }
 
-  bool isRect(Rect* rect = nullptr) const override;
+  bool isInverseFillType() const override {
+    return path.isInverseFillType();
+  }
 
-  bool isOval(Rect* bounds = nullptr) const override;
+  Rect getBounds() const override {
+    return path.getBounds();
+  }
 
-  bool isRRect(RRect* rRect = nullptr) const override;
-
-  bool isSimplePath(Path* path) const override;
-
-  bool isInverseFillType() const override;
-
-  Rect getBounds() const override;
-
-  Path getPath() const override;
+  Path getPath() const override {
+    return path;
+  }
 
   Path path = {};
 

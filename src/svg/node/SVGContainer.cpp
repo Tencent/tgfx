@@ -62,8 +62,7 @@ Path SVGContainer::onAsPath(const SVGRenderContext& context) const {
 }
 
 Rect SVGContainer::onObjectBoundingBox(const SVGRenderContext& context) const {
-  Rect bounds = Rect::MakeEmpty();
-
+  Rect bounds = {};
   for (const auto& child : children) {
     const Rect childBounds = child->objectBoundingBox(context);
     bounds.join(childBounds);

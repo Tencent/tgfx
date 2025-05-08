@@ -23,14 +23,16 @@
 namespace tgfx {
 class ResolveOp : public Op {
  public:
-  static PlacementNode<ResolveOp> Make(Context* context, const Rect& bounds);
-
-  explicit ResolveOp(const Rect& bounds) : bounds(bounds) {
-  }
+  static PlacementPtr<ResolveOp> Make(Context* context, const Rect& bounds);
 
   void execute(RenderPass* renderPass) override;
 
  private:
-  Rect bounds = Rect::MakeEmpty();
+  Rect bounds = {};
+
+  explicit ResolveOp(const Rect& bounds) : bounds(bounds) {
+  }
+
+  friend BlockBuffer;
 };
 }  // namespace tgfx

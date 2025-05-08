@@ -103,7 +103,7 @@ class SolidLayer : public Layer {
   std::unique_ptr<LayerContent> onUpdateContent() override;
 
  private:
-  Color _color = Color::White();
+  Color _color = {};
   float _width = 0;
   float _height = 0;
   float _radiusX = 0;

@@ -7,27 +7,27 @@
     "common": [
       {
         "url": "${PAG_GROUP}/vendor_tools.git",
-        "commit": "ef445edee3335b3ee30bd79afea76c0419947401",
+        "commit": "ccd8bbde5fd67c02ef6d65297d6b38b34acc2a07",
         "dir": "third_party/vendor_tools"
       },
       {
         "url": "${PAG_GROUP}/pathkit.git",
-        "commit": "3a2d34b8e1465f264067f4e8c535c0fecfb98f9c",
+        "commit": "ad22a7e8c5708f1f12c1653b98ea7a554218af65",
         "dir": "third_party/pathkit"
       },
       {
         "url": "${PAG_GROUP}/skcms.git",
-        "commit": "0084176aa5808a668666846c356ae6503a3b2447",
+        "commit": "2d0ea94be31ed31438c3c7a57752a601ba83ff2c",
         "dir": "third_party/skcms"
       },
       {
         "url": "https://github.com/madler/zlib.git",
-        "commit": "cacf7f1d4e3d44d871b605da3b647f07d718623f",
+        "commit": "51b7f2abdade71cd9bb0e7a373ef2610ec6f9daf",
         "dir": "third_party/zlib"
       },
       {
         "url": "https://github.com/glennrp/libpng.git",
-        "commit": "f135775ad4e5d4408d2e12ffcc71bb36e6b48551",
+        "commit": "872555f4ba910252783af1507f9e7fe1653be252",
         "dir": "third_party/libpng"
       },
       {
@@ -64,11 +64,6 @@
         "url": "https://github.com/libexpat/libexpat.git",
         "commit": "88b3ed553d8ad335559254863a33360d55b9f1d6",
         "dir": "third_party/expat"
-      },
-      {
-        "url": "https://github.com/libpag/tracy.git",
-        "commit": "ef23cd6ed597767200fe320721a99d824e3193f6",
-        "dir": "third_party/tracy"
       },
       {
         "url": "https://github.com/google/flatbuffers.git",

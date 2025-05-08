@@ -82,7 +82,7 @@ class ShapeStyle : public LayerProperty {
  private:
   float _alpha = 1.0f;
   BlendMode _blendMode = BlendMode::SrcOver;
-  Matrix _matrix = Matrix::I();
+  Matrix _matrix = {};
 
   friend class ShapeLayer;
   friend class ShapeStyleSerialization;

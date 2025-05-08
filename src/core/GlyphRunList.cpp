@@ -49,10 +49,10 @@ GlyphRunList::GlyphRunList(std::vector<GlyphRun> glyphRuns) : _glyphRuns(std::mo
 
 Rect GlyphRunList::getBounds(float resolutionScale) const {
   if (resolutionScale <= 0.0f) {
-    return Rect::MakeEmpty();
+    return {};
   }
   auto hasScale = !FloatNearlyEqual(resolutionScale, 1.0f);
-  auto totalBounds = Rect::MakeEmpty();
+  Rect totalBounds = {};
   for (auto& run : _glyphRuns) {
     auto glyphFace = run.glyphFace;
     if (hasScale) {

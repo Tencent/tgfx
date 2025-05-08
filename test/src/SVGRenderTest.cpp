@@ -97,8 +97,9 @@ TGFX_TEST(SVGRenderTest, PathSVG) {
   ContextScope scope;
   auto* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, static_cast<int>(rootNode->getWidth().value()),
-                               static_cast<int>(rootNode->getHeight().value()));
+  auto size = SVGDom->getContainerSize();
+  auto surface =
+      Surface::Make(context, static_cast<int>(size.width), static_cast<int>(size.height));
   auto* canvas = surface->getCanvas();
 
   SVGDom->render(canvas);
@@ -115,8 +116,9 @@ TGFX_TEST(SVGRenderTest, PNGImageSVG) {
   ContextScope scope;
   auto* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, static_cast<int>(rootNode->getWidth().value()),
-                               static_cast<int>(rootNode->getHeight().value()));
+  auto size = SVGDom->getContainerSize();
+  auto surface =
+      Surface::Make(context, static_cast<int>(size.width), static_cast<int>(size.height));
   auto* canvas = surface->getCanvas();
 
   SVGDom->render(canvas);
@@ -133,8 +135,9 @@ TGFX_TEST(SVGRenderTest, JPGImageSVG) {
   ContextScope scope;
   auto* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, static_cast<int>(rootNode->getWidth().value()),
-                               static_cast<int>(rootNode->getHeight().value()));
+  auto size = SVGDom->getContainerSize();
+  auto surface =
+      Surface::Make(context, static_cast<int>(size.width), static_cast<int>(size.height));
   auto* canvas = surface->getCanvas();
 
   SVGDom->render(canvas);
@@ -151,8 +154,9 @@ TGFX_TEST(SVGRenderTest, MaskSVG) {
   ContextScope scope;
   auto* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, static_cast<int>(rootNode->getWidth().value()),
-                               static_cast<int>(rootNode->getHeight().value()));
+  auto size = SVGDom->getContainerSize();
+  auto surface =
+      Surface::Make(context, static_cast<int>(size.width), static_cast<int>(size.height));
   auto* canvas = surface->getCanvas();
 
   SVGDom->render(canvas);
@@ -170,8 +174,9 @@ TGFX_TEST(SVGRenderTest, GradientSVG) {
   ContextScope scope;
   auto* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, static_cast<int>(rootNode->getWidth().value()),
-                               static_cast<int>(rootNode->getHeight().value()));
+  auto size = SVGDom->getContainerSize();
+  auto surface =
+      Surface::Make(context, static_cast<int>(size.width), static_cast<int>(size.height));
   auto* canvas = surface->getCanvas();
 
   SVGDom->render(canvas);
@@ -188,8 +193,9 @@ TGFX_TEST(SVGRenderTest, BlurSVG) {
   ContextScope scope;
   auto* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, static_cast<int>(rootNode->getWidth().value()),
-                               static_cast<int>(rootNode->getHeight().value()));
+  auto size = SVGDom->getContainerSize();
+  auto surface =
+      Surface::Make(context, static_cast<int>(size.width), static_cast<int>(size.height));
   auto* canvas = surface->getCanvas();
 
   SVGDom->render(canvas);
@@ -211,8 +217,9 @@ TGFX_TEST(SVGRenderTest, TextSVG) {
   ContextScope scope;
   auto* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, static_cast<int>(rootNode->getWidth().value()),
-                               static_cast<int>(rootNode->getHeight().value()));
+  auto size = SVGDom->getContainerSize();
+  auto surface =
+      Surface::Make(context, static_cast<int>(size.width), static_cast<int>(size.height));
   auto* canvas = surface->getCanvas();
 
   SVGDom->render(canvas);
@@ -234,8 +241,9 @@ TGFX_TEST(SVGRenderTest, TextFontSVG) {
   ContextScope scope;
   auto* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, static_cast<int>(rootNode->getWidth().value()),
-                               static_cast<int>(rootNode->getHeight().value()));
+  auto size = SVGDom->getContainerSize();
+  auto surface =
+      Surface::Make(context, static_cast<int>(size.width), static_cast<int>(size.height));
   auto* canvas = surface->getCanvas();
 
   SVGDom->render(canvas);
@@ -259,8 +267,9 @@ TGFX_TEST(SVGRenderTest, TextEmojiSVG) {
   ContextScope scope;
   auto* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, static_cast<int>(rootNode->getWidth().value()),
-                               static_cast<int>(rootNode->getHeight().value()));
+  auto size = SVGDom->getContainerSize();
+  auto surface =
+      Surface::Make(context, static_cast<int>(size.width), static_cast<int>(size.height));
   auto* canvas = surface->getCanvas();
 
   SVGDom->render(canvas);
@@ -395,8 +404,9 @@ TGFX_TEST(SVGRenderTest, ReferenceStyleSVG) {
   ContextScope scope;
   auto* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, static_cast<int>(rootNode->getWidth().value()),
-                               static_cast<int>(rootNode->getHeight().value()));
+  auto size = SVGDom->getContainerSize();
+  auto surface =
+      Surface::Make(context, static_cast<int>(size.width), static_cast<int>(size.height));
   auto* canvas = surface->getCanvas();
 
   SVGDom->render(canvas);

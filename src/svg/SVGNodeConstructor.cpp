@@ -107,7 +107,7 @@ bool SVGNodeConstructor::SetLengthAttribute(SVGNode& node, SVGAttribute attr,
 bool SVGNodeConstructor::SetViewBoxAttribute(SVGNode& node, SVGAttribute attr,
                                              const std::string& stringValue) {
   SVGViewBoxType viewBox;
-  SVGAttributeParser parser(stringValue);
+  SVGAttributeParser parser(stringValue.c_str(), stringValue.length());
   if (!parser.parseViewBox(&viewBox)) {
     return false;
   }
@@ -130,7 +130,7 @@ bool SVGNodeConstructor::SetObjectBoundingBoxUnitsAttribute(SVGNode& node, SVGAt
 bool SVGNodeConstructor::SetPreserveAspectRatioAttribute(SVGNode& node, SVGAttribute attr,
                                                          const std::string& stringValue) {
   SVGPreserveAspectRatio par;
-  SVGAttributeParser parser(stringValue);
+  SVGAttributeParser parser(stringValue.c_str(), stringValue.length());
   if (!parser.parsePreserveAspectRatio(&par)) {
     return false;
   }

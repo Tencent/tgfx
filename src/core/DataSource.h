@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "core/utils/Log.h"
 #include "tgfx/core/Task.h"
 
 namespace tgfx {
@@ -48,6 +49,9 @@ class DataSource {
 	 * immediately.
    */
   static std::unique_ptr<DataSource> Async(std::unique_ptr<DataSource> source) {
+#ifndef TGFX_USE_THREADS
+    return source;
+#endif
     if (source == nullptr) {
       return nullptr;
     }
@@ -95,7 +99,13 @@ class DataTask : public Task {
 
  protected:
   void onExecute() override {
+    DEBUG_ASSERT(source != nullptr);
     data = source->getData();
+    source = nullptr;
+  }
+
+  void onCancel() override {
+    source = nullptr;
   }
 
  private:
@@ -116,9 +126,9 @@ class AsyncDataSource : public DataSource<T> {
   }
 
   ~AsyncDataSource() override {
-    // The data source might have objects created in shared memory (like PlacementBuffer), so we
+    // The data source might have objects created in shared memory (like BlockBuffer), so we
     // need to wait for the task to finish before destroying it.
-    task->cancelOrWait();
+    task->cancel();
   }
 
   std::shared_ptr<T> getData() const override {

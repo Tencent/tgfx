@@ -45,6 +45,8 @@ class ShapeContent : public LayerContent {
     return bounds;
   }
 
+  Rect getTightBounds() const override;
+
   void draw(Canvas* canvas, const Paint& paint) const override;
 
   bool drawFills(Canvas* canvas, const Paint& paint, bool forContour) const;
@@ -54,7 +56,7 @@ class ShapeContent : public LayerContent {
   bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
 
  private:
-  Rect bounds = Rect::MakeEmpty();
+  Rect bounds = {};
   std::shared_ptr<Shape> fillShape = nullptr;
   std::shared_ptr<Shape> strokeShape = nullptr;
   std::vector<ShapePaint> paintList = {};

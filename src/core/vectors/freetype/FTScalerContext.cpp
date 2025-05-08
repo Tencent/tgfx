@@ -454,7 +454,7 @@ void FTScalerContext::getBBoxForCurrentGlyph(FT_BBox* bbox) const {
 
 Rect FTScalerContext::getBounds(tgfx::GlyphID glyphID, bool fauxBold, bool fauxItalic) const {
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
-  auto bounds = Rect::MakeEmpty();
+  Rect bounds = {};
   if (setupSize(fauxItalic)) {
     return bounds;
   }
@@ -527,7 +527,7 @@ float FTScalerContext::getAdvanceInternal(GlyphID glyphID, bool verticalText) co
 Point FTScalerContext::getVerticalOffset(GlyphID glyphID) const {
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   if (glyphID == 0 || setupSize(false)) {
-    return Point::Zero();
+    return {};
   }
   FontMetrics metrics = {};
   getFontMetricsInternal(&metrics);
@@ -551,7 +551,7 @@ Rect FTScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
   auto glyphFlags = loadGlyphFlags | static_cast<FT_Int32>(FT_LOAD_BITMAP_METRICS_ONLY);
   glyphFlags &= ~FT_LOAD_NO_BITMAP;
   if (!loadBitmapGlyph(glyphID, glyphFlags)) {
-    return Rect::MakeEmpty();
+    return {};
   }
   auto face = ftTypeface()->face;
   if (matrix) {
@@ -564,22 +564,15 @@ Rect FTScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
       static_cast<float>(face->glyph->bitmap.width), static_cast<float>(face->glyph->bitmap.rows));
 }
 
-std::shared_ptr<ImageBuffer> FTScalerContext::generateImage(GlyphID glyphID,
-                                                            bool tryHardware) const {
+bool FTScalerContext::readPixels(GlyphID glyphID, const ImageInfo& dstInfo, void* dstPixels) const {
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   auto glyphFlags = loadGlyphFlags;
   glyphFlags |= FT_LOAD_RENDER;
   glyphFlags &= ~FT_LOAD_NO_BITMAP;
   if (!loadBitmapGlyph(glyphID, glyphFlags)) {
-    return nullptr;
+    return false;
   }
   auto ftBitmap = ftTypeface()->face->glyph->bitmap;
-  auto alphaOnly = ftBitmap.pixel_mode == FT_PIXEL_MODE_GRAY;
-  Bitmap bitmap(static_cast<int>(ftBitmap.width), static_cast<int>(ftBitmap.rows), alphaOnly,
-                tryHardware);
-  if (bitmap.isEmpty()) {
-    return nullptr;
-  }
   auto width = ftBitmap.width;
   auto height = ftBitmap.rows;
   auto src = reinterpret_cast<const uint8_t*>(ftBitmap.buffer);
@@ -587,17 +580,17 @@ std::shared_ptr<ImageBuffer> FTScalerContext::generateImage(GlyphID glyphID,
   auto srcRB = ftBitmap.pitch;
   auto srcFormat = ftBitmap.pixel_mode == FT_PIXEL_MODE_GRAY ? gfx::skcms_PixelFormat_A_8
                                                              : gfx::skcms_PixelFormat_BGRA_8888;
-  Pixmap bm(bitmap);
-  auto dst = static_cast<uint8_t*>(bm.writablePixels());
-  auto dstRB = bm.rowBytes();
-  auto dstFormat = ToPixelFormat(bm.colorType());
+
+  auto dst = static_cast<uint8_t*>(dstPixels);
+  auto dstRB = dstInfo.rowBytes();
+  auto dstFormat = ToPixelFormat(dstInfo.colorType());
   for (size_t i = 0; i < height; i++) {
     gfx::skcms_Transform(src, srcFormat, gfx::skcms_AlphaFormat_PremulAsEncoded, nullptr, dst,
                          dstFormat, gfx::skcms_AlphaFormat_PremulAsEncoded, nullptr, width);
     src += srcRB;
     dst += dstRB;
   }
-  return bitmap.makeBuffer();
+  return true;
 }
 
 bool FTScalerContext::loadBitmapGlyph(GlyphID glyphID, FT_Int32 glyphFlags) const {

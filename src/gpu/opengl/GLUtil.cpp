@@ -121,7 +121,7 @@ unsigned LoadGLShader(Context* context, unsigned shaderType, const std::string& 
   const char* files[] = {source.c_str()};
   gl->shaderSource(shader, 1, files, nullptr);
   gl->compileShader(shader);
-#ifndef TGFX_BUILD_FOR_WEB
+#if defined(DEBUG) || !defined(TGFX_BUILD_FOR_WEB)
   int success;
   gl->getShaderiv(shader, GL_COMPILE_STATUS, &success);
   if (!success) {

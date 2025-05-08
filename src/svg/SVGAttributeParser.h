@@ -32,7 +32,7 @@ namespace tgfx {
 
 class SVGAttributeParser {
  public:
-  explicit SVGAttributeParser(std::string);
+  explicit SVGAttributeParser(const char* str, size_t length);
 
   bool parseInteger(SVGIntegerType*);
   bool parseViewBox(SVGViewBoxType*);
@@ -49,7 +49,7 @@ class SVGAttributeParser {
   static ParseResult<T> parse(const std::string& value) {
     ParseResult<T> result;
     T parsedValue;
-    if (SVGAttributeParser(value).parse(&parsedValue)) {
+    if (SVGAttributeParser(value.c_str(), value.length()).parse(&parsedValue)) {
       result = parsedValue;
     }
     return result;

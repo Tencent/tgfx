@@ -31,7 +31,8 @@ class DrawingManager;
 class Gpu;
 class ResourceProvider;
 class ProxyProvider;
-class PlacementBuffer;
+class BlockBuffer;
+class MaxValueTracker;
 
 /**
  * Context is the main interface to the GPU. It is used to create and manage GPU resources, and to
@@ -73,7 +74,7 @@ class Context {
     return _drawingManager;
   }
 
-  PlacementBuffer* drawingBuffer() const {
+  BlockBuffer* drawingBuffer() const {
     return _drawingBuffer;
   }
 
@@ -199,11 +200,10 @@ class Context {
   DrawingManager* _drawingManager = nullptr;
   ResourceProvider* _resourceProvider = nullptr;
   ProxyProvider* _proxyProvider = nullptr;
-  PlacementBuffer* _drawingBuffer = nullptr;
-  std::deque<size_t> drawingBufferSizes = {};
+  BlockBuffer* _drawingBuffer = nullptr;
+  MaxValueTracker* _maxValueTracker = nullptr;
 
   void releaseAll(bool releaseGPU);
-  void clearDrawingBuffer();
 
   friend class Device;
   friend class Resource;

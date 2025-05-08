@@ -20,7 +20,6 @@
 #include <algorithm>
 #include <cstdlib>
 #include <string>
-#include "Profiling.h"
 #include "core/utils/Log.h"
 
 #ifdef __APPLE__
@@ -30,7 +29,7 @@
 namespace tgfx {
 static constexpr auto THREAD_TIMEOUT = std::chrono::seconds(10);
 static constexpr uint32_t THREAD_POOL_SIZE = 32;
-static constexpr uint32_t TASK_QUEUE_SIZE = 1024;
+static constexpr uint32_t TASK_QUEUE_SIZE = 4096;
 
 int GetCPUCores() {
   int cpuCores = 0;
@@ -53,21 +52,16 @@ TaskGroup* TaskGroup::GetInstance() {
 }
 
 void TaskGroup::RunLoop(TaskGroup* taskGroup) {
-  TRACE_THREAD;
-  while (!taskGroup->exited) {
+  while (true) {
     auto task = taskGroup->popTask();
     if (task == nullptr) {
+      if (taskGroup->exited) {
+        break;
+      }
       continue;
     }
     task->execute();
   }
-}
-
-static void ReleaseThread(std::thread* thread) {
-  if (thread->joinable()) {
-    thread->join();
-  }
-  delete thread;
 }
 
 void OnAppExit() {
@@ -86,10 +80,10 @@ bool TaskGroup::checkThreads() {
   static const int CPUCores = GetCPUCores();
   static const int MaxThreads = CPUCores > 16 ? 16 : CPUCores;
   if (waitingThreads == 0 && totalThreads < MaxThreads) {
-    auto thread = new (std::nothrow) std::thread(&TaskGroup::RunLoop, this);
+    auto thread = new (std::nothrow) std::thread(TaskGroup::RunLoop, this);
     if (thread) {
       threads->enqueue(thread);
-      totalThreads++;
+      ++totalThreads;
     }
   } else {
     return true;
@@ -98,7 +92,7 @@ bool TaskGroup::checkThreads() {
 }
 
 bool TaskGroup::pushTask(std::shared_ptr<Task> task) {
-#if defined(TGFX_BUILD_FOR_WEB) && !defined(__EMSCRIPTEN_PTHREADS__)
+#ifndef TGFX_USE_THREADS
   return false;
 #endif
   if (exited || !checkThreads()) {
@@ -117,13 +111,13 @@ std::shared_ptr<Task> TaskGroup::popTask() {
   std::unique_lock<std::mutex> autoLock(locker);
   while (!exited) {
     auto task = tasks->dequeue();
-    if (task) {
+    if (task || exited) {
       return task;
     }
-    waitingThreads++;
+    ++waitingThreads;
     auto status = condition.wait_for(autoLock, THREAD_TIMEOUT);
-    waitingThreads--;
-    if (exited || status == std::cv_status::timeout) {
+    --waitingThreads;
+    if (status == std::cv_status::timeout) {
       return nullptr;
     }
   }
@@ -131,15 +125,30 @@ std::shared_ptr<Task> TaskGroup::popTask() {
 }
 
 void TaskGroup::exit() {
+  releaseThreads(true);
+}
+
+static void ReleaseThread(std::thread* thread) {
+  if (thread->joinable()) {
+    thread->join();
+  }
+  delete thread;
+}
+
+void TaskGroup::releaseThreads(bool exit) {
   exited = true;
   condition.notify_all();
   std::thread* thread = nullptr;
   while ((thread = threads->dequeue()) != nullptr) {
     ReleaseThread(thread);
   }
-  delete threads;
-  delete tasks;
   totalThreads = 0;
-  waitingThreads = 0;
+  DEBUG_ASSERT(waitingThreads == 0)
+  if (exit) {
+    delete threads;
+    delete tasks;
+  } else {
+    exited = false;
+  }
 }
 }  // namespace tgfx

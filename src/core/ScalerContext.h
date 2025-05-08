@@ -62,7 +62,7 @@ class ScalerContext {
 
   virtual Rect getImageTransform(GlyphID glyphID, Matrix* matrix) const = 0;
 
-  virtual std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphID, bool tryHardware) const = 0;
+  virtual bool readPixels(GlyphID glyphID, const ImageInfo& dstInfo, void* dstPixels) const = 0;
 
  protected:
   // Note: This could be nullptr.

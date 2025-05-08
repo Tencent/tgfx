@@ -59,8 +59,8 @@ inline bool is_hex(char c) {
 
 namespace tgfx {
 
-SVGAttributeParser::SVGAttributeParser(std::string attributeString)
-    : currentPos(attributeString.data()), endPos(currentPos + attributeString.size()) {
+SVGAttributeParser::SVGAttributeParser(const char* str, size_t length)
+    : currentPos(str), endPos(str + length) {
 }
 
 template <typename F>
@@ -728,7 +728,7 @@ bool SVGAttributeParser::parseSkewYToken(Matrix* matrix) {
 // https://www.w3.org/TR/SVG11/coords.html#TransformAttribute
 template <>
 bool SVGAttributeParser::parse(SVGTransformType* t) {
-  Matrix matrix = Matrix::I();
+  Matrix matrix = {};
 
   bool parsed = false;
   while (true) {

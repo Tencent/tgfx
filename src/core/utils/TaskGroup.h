@@ -27,6 +27,7 @@
 #include "tgfx/core/Task.h"
 
 namespace tgfx {
+
 class TaskGroup {
  private:
   std::mutex locker = {};
@@ -44,8 +45,10 @@ class TaskGroup {
   bool pushTask(std::shared_ptr<Task> task);
   std::shared_ptr<Task> popTask();
   void exit();
+  void releaseThreads(bool exit);
 
   friend class Task;
+  friend class TaskThread;
   friend void OnAppExit();
 };
 }  // namespace tgfx

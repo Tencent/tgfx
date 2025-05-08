@@ -38,9 +38,9 @@ class TextContent : public LayerContent {
   bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
 
  private:
-  Rect bounds = Rect::MakeEmpty();
+  Rect bounds = {};
   std::shared_ptr<TextBlob> textBlob = nullptr;
-  Color textColor = Color::White();
+  Color textColor = {};
 
   static bool HitTestPointInternal(float localX, float localY,
                                    const std::shared_ptr<GlyphRunList>& glyphRunList);

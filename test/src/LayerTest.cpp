@@ -358,6 +358,36 @@ TGFX_TEST(LayerTest, Layer_localToGlobal) {
   EXPECT_EQ(pointGInGlobal, Point::Make(35.0f, 60.0f));
 }
 
+TGFX_TEST(LayerTest, getTightBounds) {
+  auto root = Layer::Make();
+  root->setMatrix(Matrix::MakeTrans(10, 10));
+
+  auto rectShape = ShapeLayer::Make();
+  auto rect = Rect::MakeXYWH(0.f, 0.f, 100.f, 100.f);
+  Path path = {};
+  path.addRect(rect);
+  rectShape->setPath(path);
+  rectShape->setFillStyle(SolidColor::Make(Color::Red()));
+  auto strokeStyle = SolidColor::Make(Color::Black());
+  rectShape->setStrokeStyle(strokeStyle);
+  rectShape->setLineWidth(10);
+  rectShape->setStrokeAlign(StrokeAlign::Outside);
+  root->addChild(rectShape);
+  auto bounds = root->getBounds(nullptr, true);
+  EXPECT_FLOAT_EQ(bounds.height(), 120);
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto width = static_cast<int>(bounds.width());
+  auto height = static_cast<int>(bounds.height());
+  auto surface = Surface::Make(context, width, height);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->root()->addChild(root);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/getTightBounds"));
+}
+
 TGFX_TEST(LayerTest, getbounds) {
   auto root = Layer::Make();
   root->setMatrix(Matrix::MakeTrans(30, 30));
@@ -2330,4 +2360,34 @@ TGFX_TEST(LayerTest, RasterizedBackground) {
   EXPECT_TRUE(rasterizedContent ==
               static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
 }
+
+TGFX_TEST(LayerTest, AdaptiveDashEffect) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 400);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  canvas->drawColor(Color::White());
+  Path path = {};
+  path.addRect(50, 50, 250, 150);
+  path.addOval(Rect::MakeXYWH(50, 200, 200, 50));
+  path.moveTo(50, 300);
+  path.cubicTo(100, 300, 100, 350, 150, 350);
+  path.quadTo(200, 350, 200, 300);
+  std::vector<float> dashList = {10.f, 10.f};
+  auto shapeLayer = ShapeLayer::Make();
+  shapeLayer->setPath(path);
+  auto strokeStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0));
+  shapeLayer->setLineWidth(1);
+  shapeLayer->setStrokeStyle(strokeStyle);
+  shapeLayer->setLineDashAdaptive(true);
+  shapeLayer->setLineDashPattern(dashList);
+  shapeLayer->setLineDashPhase(5);
+  DisplayList displayList;
+  displayList.root()->addChild(shapeLayer);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/AdaptiveDashEffect"));
+}
+
 }  // namespace tgfx

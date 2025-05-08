@@ -33,6 +33,7 @@
 #include "core/shaders/ImageShader.h"
 #include "tgfx/core/Fill.h"
 #include "tgfx/core/ImageFilter.h"
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/gpu/Context.h"
@@ -71,8 +72,10 @@ class ElementWriter {
   void addShaderResources(const std::shared_ptr<Shader>& shader, Context* context,
                           Resources* resources);
   void addColorShaderResources(const ColorShader* shader, Resources* resources);
-  void addGradientShaderResources(const GradientShader* shader, Resources* resources);
-  void addImageShaderResources(const ImageShader* shader, Context* context, Resources* resources);
+  void addGradientShaderResources(const GradientShader* shader, const Matrix& matrix,
+                                  Resources* resources);
+  void addImageShaderResources(const ImageShader* shader, const Matrix& matrix, Context* context,
+                               Resources* resources);
 
   void addBlendColorFilterResources(const ModeColorFilter* modeColorFilter, Resources* resources);
 
@@ -97,9 +100,9 @@ class ElementWriter {
   void addFillAndStroke(const Fill& fill, const Stroke* stroke, const Resources& resources);
 
   void addGradientColors(const GradientInfo& info);
-  std::string addLinearGradientDef(const GradientInfo& info);
-  std::string addRadialGradientDef(const GradientInfo& info);
-  std::string addUnsupportedGradientDef(const GradientInfo& info);
+  std::string addLinearGradientDef(const GradientInfo& info, const Matrix& matrix);
+  std::string addRadialGradientDef(const GradientInfo& info, const Matrix& matrix);
+  std::string addUnsupportedGradientDef(const GradientInfo& info, const Matrix& matrix);
 
   void addBlurImageFilter(const BlurImageFilter* filter);
   void addDropShadowImageFilter(const DropShadowImageFilter* filter);

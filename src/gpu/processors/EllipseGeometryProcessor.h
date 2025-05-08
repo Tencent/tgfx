@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "GeometryProcessor.h"
 
 namespace tgfx {
@@ -31,8 +32,9 @@ namespace tgfx {
  */
 class EllipseGeometryProcessor : public GeometryProcessor {
  public:
-  static PlacementPtr<EllipseGeometryProcessor> Make(PlacementBuffer* buffer, int width, int height,
-                                                     bool stroke, bool useScale);
+  static PlacementPtr<EllipseGeometryProcessor> Make(BlockBuffer* buffer, int width, int height,
+                                                     bool stroke, bool useScale,
+                                                     std::optional<Color> commonColor);
 
   std::string name() const override {
     return "EllipseGeometryProcessor";
@@ -41,7 +43,8 @@ class EllipseGeometryProcessor : public GeometryProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  EllipseGeometryProcessor(int width, int height, bool stroke, bool useScale);
+  EllipseGeometryProcessor(int width, int height, bool stroke, bool useScale,
+                           std::optional<Color> commonColor);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
@@ -54,5 +57,6 @@ class EllipseGeometryProcessor : public GeometryProcessor {
   int height = 1;
   bool stroke;
   bool useScale;
+  std::optional<Color> commonColor = std::nullopt;
 };
 }  // namespace tgfx

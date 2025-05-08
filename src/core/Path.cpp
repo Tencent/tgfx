@@ -251,7 +251,7 @@ void Path::arcTo(float rx, float ry, float xAxisRotate, PathArcSize largeArc, bo
   auto midPointDistance = (srcPoints[0] - srcPoints[1]) * 0.5f;
 
   auto pointTransform = Matrix::MakeRotate(-xAxisRotate);
-  auto transformedMidPoint = Point::Zero();
+  Point transformedMidPoint = {};
   pointTransform.mapPoints(&transformedMidPoint, &midPointDistance, 1);
   auto squareRx = rx * rx;
   auto squareRy = ry * ry;

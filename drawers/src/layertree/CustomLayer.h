@@ -26,7 +26,8 @@ namespace drawers {
 class CustomLayerContent : public tgfx::LayerContent {
  public:
   explicit CustomLayerContent(std::shared_ptr<tgfx::TextBlob> textBlob)
-      : _textBlob(std::move(textBlob)) {};
+      : _textBlob(std::move(textBlob)){};
+
   tgfx::Rect getBounds() const override {
     return _textBlob->getBounds();
   }

@@ -41,7 +41,11 @@ Rect RenderContext::getClipBounds(const Path& clip) {
   if (clip.isInverseFillType()) {
     return renderTarget->bounds();
   }
-  return clip.isEmpty() ? Rect::MakeEmpty() : clip.getBounds();
+  auto bounds = clip.getBounds();
+  if (!bounds.intersect(renderTarget->bounds())) {
+    bounds.setEmpty();
+  }
+  return bounds;
 }
 
 void RenderContext::drawFill(const MCState& state, const Fill& fill) {
@@ -71,7 +75,7 @@ void RenderContext::drawRRect(const RRect& rRect, const MCState& state, const Fi
 static Rect ToLocalBounds(const Rect& bounds, const Matrix& viewMatrix) {
   Matrix invertMatrix = {};
   if (!viewMatrix.invert(&invertMatrix)) {
-    return Rect::MakeEmpty();
+    return {};
   }
   auto localBounds = bounds;
   invertMatrix.mapRect(&localBounds);
@@ -137,15 +141,16 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   if (stroke) {
     stroke->applyToBounds(&bounds);
   }
-  bounds.scale(maxScale, maxScale);
-  auto rasterizeMatrix = Matrix::MakeScale(maxScale);
-  rasterizeMatrix.postTranslate(-bounds.x(), -bounds.y());
-  auto invert = Matrix::I();
-  if (!rasterizeMatrix.invert(&invert)) {
+  state.matrix.mapRect(&bounds);  // To device space
+  auto clipBounds = getClipBounds(state.clip);
+  if (clipBounds.isEmpty()) {
     return;
   }
-  auto newState = state;
-  newState.matrix.preConcat(invert);
+  if (!bounds.intersect(clipBounds)) {
+    return;
+  }
+  auto rasterizeMatrix = state.matrix;
+  rasterizeMatrix.postTranslate(-bounds.x(), -bounds.y());
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
   auto rasterizer = Rasterizer::MakeFrom(width, height, std::move(glyphRunList), fill.antiAlias,
@@ -154,6 +159,8 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   if (image == nullptr) {
     return;
   }
+  auto newState = state;
+  newState.matrix = Matrix::MakeTrans(bounds.x(), bounds.y());
   drawImage(std::move(image), {}, newState, fill.makeWithMatrix(rasterizeMatrix));
 }
 
@@ -195,7 +202,7 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
   }
   MCState drawState = state;
   if (filter) {
-    auto offset = Point::Zero();
+    Point offset = {};
     image = image->makeWithFilter(std::move(filter), &offset);
     if (image == nullptr) {
       return;
@@ -229,7 +236,8 @@ void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
     for (size_t i = 0; i < glyphCount; ++i) {
       const auto& glyphID = glyphIDs[i];
       const auto& position = positions[i];
-      auto glyphImage = glyphFace->getImage(glyphID, &glyphState.matrix);
+      auto glyphCodec = glyphFace->getImage(glyphID, &glyphState.matrix);
+      auto glyphImage = Image::MakeFrom(glyphCodec);
       if (glyphImage == nullptr) {
         continue;
       }
@@ -275,7 +283,7 @@ void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRe
                  oldContent->height() == renderTarget->height());
     auto drawingManager = renderTarget->getContext()->drawingManager();
     opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
-    Fill fill = {Color::White(), BlendMode::Src, false};
+    Fill fill = {{}, BlendMode::Src, false};
     opsCompositor->fillImage(std::move(oldContent), renderTarget->bounds(), {}, MCState{}, fill);
   }
 }

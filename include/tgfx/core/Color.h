@@ -30,26 +30,6 @@ namespace tgfx {
  */
 struct Color {
   /**
-   * Red component.
-   */
-  float red;
-
-  /**
-   * Green component.
-   */
-  float green;
-
-  /**
-   * Blue component.
-   */
-  float blue;
-
-  /**
-   * Alpha component.
-   */
-  float alpha;
-
-  /**
    * Returns a fully transparent Color.
    */
   static const Color& Transparent();
@@ -83,6 +63,42 @@ struct Color {
    * Returns color value from 8-bit component values.
    */
   static Color FromRGBA(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255);
+
+  /**
+   * Constructs an opaque white Color.
+   */
+  constexpr Color() : red(1.0f), green(1.0f), blue(1.0f), alpha(1.0f) {
+  }
+
+  /**
+   * Constructs a Color with the specified red, green, blue, and alpha values.
+   * @param r  red component
+   * @param g  green component
+   * @param b  blue component
+   * @param a  alpha component
+   */
+  constexpr Color(float r, float g, float b, float a = 1.0f) : red(r), green(g), blue(b), alpha(a) {
+  }
+
+  /**
+   * Red component.
+   */
+  float red;
+
+  /**
+   * Green component.
+   */
+  float green;
+
+  /**
+   * Blue component.
+   */
+  float blue;
+
+  /**
+   * Alpha component.
+   */
+  float alpha;
 
   /**
    * Compares Color with other, and returns true if all components are equal.

@@ -35,6 +35,10 @@ class SVGTransformableNode : public SVGNode {
     transform = t;
   }
 
+  const SVGTransformType& getTransform() const {
+    return transform;
+  }
+
  protected:
   SVGTransformableNode(SVGTag tag);
 
@@ -47,7 +51,7 @@ class SVGTransformableNode : public SVGNode {
   void mapToParent(Rect* rect) const;
 
  private:
-  SVGTransformType transform;
+  SVGTransformType transform = {};
 
   using INHERITED = SVGNode;
 };

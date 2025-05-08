@@ -78,7 +78,7 @@ void GeometryProcessor::setTransformDataHelper(const Matrix& uvMatrix, UniformBu
                                                FPCoordTransformIter* transformIter) const {
   int i = 0;
   while (const CoordTransform* coordTransform = transformIter->next()) {
-    Matrix combined = Matrix::I();
+    Matrix combined = {};
     combined.setConcat(coordTransform->getTotalMatrix(), uvMatrix);
     std::string uniformName = TRANSFORM_UNIFORM_PREFIX;
     uniformName += std::to_string(i);

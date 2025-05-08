@@ -20,7 +20,7 @@
 
 namespace tgfx {
 PlacementPtr<ColorMatrixFragmentProcessor> ColorMatrixFragmentProcessor::Make(
-    PlacementBuffer* buffer, const std::array<float, 20>& matrix) {
+    BlockBuffer* buffer, const std::array<float, 20>& matrix) {
   return buffer->make<GLColorMatrixFragmentProcessor>(matrix);
 }
 
