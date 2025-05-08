@@ -23,9 +23,6 @@ namespace tgfx {
 class LayerFilter;
 class LayerFilterSerialization {
  public:
-  using memberType =
-      std::variant<std::reference_wrapper<std::unique_ptr<Rect>>, std::shared_ptr<ImageFilter>>;
-
   static std::shared_ptr<Data> serializeLayerFilter(LayerFilter* layerFilter);
 
  private:

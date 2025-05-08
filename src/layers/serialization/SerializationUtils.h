@@ -24,13 +24,6 @@
 #include <tgfx/layers/TextAlign.h>
 #include <string>
 
-#define UNCOPIED_PACK(name)              \
-  name() = delete;                       \
-  name(const name&) = delete;            \
-  name(name&&) = delete;                 \
-  name& operator=(const name&) = delete; \
-  name& operator=(name&&) = delete;
-
 namespace tgfx {
 class SerializeUtils {
  public:

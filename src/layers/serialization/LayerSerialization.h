@@ -30,13 +30,6 @@ class Layer;
 
 class LayerSerialization {
  public:
-  using memberType =
-      std::variant<Matrix, std::vector<std::shared_ptr<LayerFilter>>, std::shared_ptr<Layer>,
-                   Layer*, std::reference_wrapper<std::unique_ptr<Rect>>,
-                   std::reference_wrapper<std::unique_ptr<LayerContent>>,
-                   std::vector<std::shared_ptr<Layer>>, std::vector<std::shared_ptr<LayerStyle>>,
-                   std::shared_ptr<LayerFilter>, std::shared_ptr<LayerStyle>>;
-
   static std::shared_ptr<Data> serializeTreeNode(
       std::shared_ptr<Layer> layer,
       std::unordered_map<uint64_t, std::shared_ptr<tgfx::Layer>>& layerMap);
