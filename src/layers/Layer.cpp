@@ -397,8 +397,7 @@ bool Layer::replaceChild(std::shared_ptr<Layer> oldChild, std::shared_ptr<Layer>
 
 Rect Layer::getBounds(const Layer* targetCoordinateSpace, bool computeTightBounds) {
   Rect bounds = {};
-  auto content = getContent();
-  if (content) {
+  if (auto content = getContent()) {
     if (computeTightBounds) {
       bounds.join(content->getTightBounds());
     } else {
@@ -424,7 +423,6 @@ Rect Layer::getBounds(const Layer* targetCoordinateSpace, bool computeTightBound
       }
     }
     child->getMatrixWithScrollRect().mapRect(&childBounds);
-
     bounds.join(childBounds);
   }
 
@@ -510,14 +508,6 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   drawLayer(args, canvas, alpha, blendMode);
 }
 
-void Layer::invalidate() {
-  if (maskOwner) {
-    maskOwner->invalidateTransform();
-  } else if (_parent) {
-    _parent->invalidateDescendents();
-  }
-}
-
 void Layer::invalidateTransform() {
   if (bitFields.dirtyTransform) {
     return;
@@ -548,6 +538,15 @@ void Layer::invalidateDescendents() {
 
 void Layer::invalidateBackground() {
   bitFields.dirtyBackground = true;
+}
+
+void Layer::invalidate() {
+  if (_parent) {
+    _parent->invalidateDescendents();
+  }
+  if (maskOwner) {
+    maskOwner->invalidateTransform();
+  }
 }
 
 std::unique_ptr<LayerContent> Layer::onUpdateContent() {
@@ -712,6 +711,10 @@ std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float con
 
 void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
   DEBUG_ASSERT(canvas != nullptr);
+  if (args.renderRect && !args.renderRect->intersects(renderBounds)) {
+    cleanDirtyFlags();
+    return;
+  }
   if (auto rasterizedCache = getRasterizedCache(args)) {
     rasterizedCache->draw(canvas, getLayerPaint(alpha, blendMode));
   } else if (blendMode != BlendMode::SrcOver || (alpha < 1.0f && allowsGroupOpacity()) ||
@@ -828,8 +831,7 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, Laye
         child->bitFields.dirtyBackground || child->bitFields.dirtyTransform;
     if (!child->visible() || child->_alpha <= 0) {
       if (args.cleanDirtyFlags) {
-        child->bitFields.dirtyTransform = false;
-        child->bitFields.dirtyBackground = false;
+        child->cleanDirtyFlags();
       }
       continue;
     }
@@ -1025,6 +1027,69 @@ bool Layer::getLayersUnderPointInternal(float x, float y,
 
 bool Layer::hasValidMask() const {
   return _mask && _mask->root() == root() && _mask->bitFields.visible;
+}
+
+void Layer::updateRenderBounds(const Matrix& renderMatrix, const Rect* clipRect, bool forceDirty) {
+  if (!forceDirty && !bitFields.dirtyDescendents) {
+    return;
+  }
+  if (auto content = getContent()) {
+    renderBounds = renderMatrix.mapRect(content->getBounds());
+  } else {
+    renderBounds = {};
+  }
+  Rect childScrollRect = {};
+  for (auto& child : _children) {
+    if (!child->bitFields.visible || child->_alpha <= 0) {
+      continue;
+    }
+    auto childMatrix = child->getMatrixWithScrollRect();
+    childMatrix.postConcat(renderMatrix);
+    auto childClipRect = clipRect;
+    if (child->_scrollRect) {
+      childScrollRect = childMatrix.mapRect(*child->_scrollRect);
+      if (clipRect && !childScrollRect.intersect(*clipRect)) {
+        childScrollRect = {};
+      }
+      childClipRect = &childScrollRect;
+    }
+    auto childForceDirty = forceDirty || child->bitFields.dirtyTransform;
+    child->updateRenderBounds(childMatrix, childClipRect, childForceDirty);
+    if (!child->maskOwner) {
+      renderBounds.join(child->renderBounds);
+    }
+  }
+  if (!_layerStyles.empty() || !_filters.empty()) {
+    auto contentScale = renderMatrix.getMaxScale();
+    auto layerBounds = renderBounds;
+    for (auto& layerStyle : _layerStyles) {
+      auto styleBounds = layerStyle->filterBounds(layerBounds, contentScale);
+      renderBounds.join(styleBounds);
+    }
+    auto filter = getImageFilter(contentScale);
+    if (filter) {
+      renderBounds = filter->filterBounds(renderBounds);
+    }
+  }
+  if (clipRect && !renderBounds.intersect(*clipRect)) {
+    renderBounds = {};
+  }
+}
+
+void Layer::cleanDirtyFlags() {
+  if (bitFields.dirtyDescendents) {
+    for (auto& child : _children) {
+      if (!child->maskOwner) {
+        child->cleanDirtyFlags();
+      }
+    }
+  }
+  bitFields.dirtyTransform = false;
+  bitFields.dirtyDescendents = false;
+  bitFields.dirtyContent = false;
+  if (_mask) {
+    _mask->cleanDirtyFlags();
+  }
 }
 
 }  // namespace tgfx
