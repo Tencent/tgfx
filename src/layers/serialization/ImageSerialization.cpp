@@ -15,7 +15,7 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#ifdef TGFX_ENABLE_PROFILING
+#ifdef TGFX_ENABLE_LAYER_INSPECTOR
 
 #include "ImageSerialization.h"
 

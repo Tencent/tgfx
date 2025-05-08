@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#ifdef TGFX_ENABLE_PROFILING
+#ifdef TGFX_ENABLE_LAYER_INSPECTOR
 
 #include "ColorFilterSerialization.h"
 #include "core/filters/AlphaThresholdColorFilter.h"

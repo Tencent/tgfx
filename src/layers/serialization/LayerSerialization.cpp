@@ -15,7 +15,7 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#ifdef TGFX_ENABLE_PROFILING
+#ifdef TGFX_ENABLE_LAYER_INSPECTOR
 
 #include "LayerSerialization.h"
 #include <tgfx/layers/ImageLayer.h>
@@ -160,9 +160,6 @@ void LayerSerialization::serializeShapeLayerImpl(flexbuffers::Builder& fbb, Laye
   SerializeUtils::setFlexBufferMap(fbb, "LineDashPhase", shapeLayer->_lineDashPhase);
   SerializeUtils::setFlexBufferMap(fbb, "StrokeStart", shapeLayer->_strokeStart);
   SerializeUtils::setFlexBufferMap(fbb, "StrokeEnd", shapeLayer->_strokeEnd);
-  SerializeUtils::setFlexBufferMap(fbb, "StrokeAlign",
-                                   SerializeUtils::strokeAlignToString(shapeLayer->_strokeAlign));
-  SerializeUtils::setFlexBufferMap(fbb, "StrokeOnTop", shapeLayer->_strokeOnTop);
 }
 void LayerSerialization::serializeSolidLayerImpl(flexbuffers::Builder& fbb, Layer* layer) {
   serializeBasicLayerImpl(fbb, layer);

@@ -15,7 +15,7 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#ifdef TGFX_ENABLE_PROFILING
+#ifdef TGFX_ENABLE_LAYER_INSPECTOR
 
 #include "ShapeSerialization.h"
 
@@ -32,10 +32,6 @@ std::shared_ptr<Data> ShapeSerialization::serializeShape(Shape* shape) {
 }
 void ShapeSerialization::serializeShapeImpl(flexbuffers::Builder& fbb, Shape* shape) {
   SerializeUtils::setFlexBufferMap(fbb, "Type", SerializeUtils::shapeTypeToString(shape->type()));
-  SerializeUtils::setFlexBufferMap(fbb, "IsLine", shape->isLine());
-  SerializeUtils::setFlexBufferMap(fbb, "IsRect", shape->isRect());
-  SerializeUtils::setFlexBufferMap(fbb, "IsOval", shape->isOval());
-  SerializeUtils::setFlexBufferMap(fbb, "IsRRect", shape->isRRect());
   SerializeUtils::setFlexBufferMap(fbb, "IsSimplePath", shape->isSimplePath());
   SerializeUtils::setFlexBufferMap(fbb, "IsInverseFillType", shape->isInverseFillType());
 }
