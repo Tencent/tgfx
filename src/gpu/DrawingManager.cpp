@@ -38,7 +38,9 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   auto provider = RectsVertexProvider::MakeFrom(drawingBuffer, bounds, AAType::None);
   auto op = RectDrawOp::Make(renderTarget->getContext(), std::move(provider), renderFlags);
   op->addColorFP(std::move(processor));
-  op->setBlendMode(BlendMode::Src);
+  BlendFormula blendFormula;
+  BlendModeAsCoeff(BlendMode::Src, false, &blendFormula);
+  op->setBlendFormula(blendFormula);
   auto ops = drawingBuffer->makeArray<Op>(&op, 1);
   auto task = drawingBuffer->make<OpsRenderTask>(renderTarget, std::move(ops));
   renderTasks.emplace_back(std::move(task));

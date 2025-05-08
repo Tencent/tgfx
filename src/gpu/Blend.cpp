@@ -146,4 +146,15 @@ bool BlendModeIsOpaque(BlendMode mode, OpacityType srcColorOpacity) {
       return false;
   }
 }
+
+bool BlendModeNeedDesTexture(BlendMode mode, bool hasCoverage) {
+  if (mode == BlendMode::SrcOver || mode == BlendMode::Src) {
+    return false;
+  }
+  if (hasCoverage || !BlendModeAsCoeff(mode, hasCoverage)) {
+    return true;
+  }
+  return false;
+}
+
 }  // namespace tgfx

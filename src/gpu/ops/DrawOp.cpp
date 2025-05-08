@@ -26,29 +26,14 @@ PlacementPtr<Pipeline> DrawOp::createPipeline(RenderPass* renderPass,
   auto numColorProcessors = colors.size();
   auto fragmentProcessors = std::move(colors);
   fragmentProcessors.reserve(numColorProcessors + coverages.size());
-  bool hasCoverage = !coverages.empty();
   for (auto& coverage : coverages) {
     fragmentProcessors.emplace_back(std::move(coverage));
   }
   auto format = renderPass->renderTarget()->format();
   auto context = renderPass->getContext();
   const auto& swizzle = context->caps()->getWriteSwizzle(format);
-  BlendFormula formula;
-  PlacementPtr<XferProcessor> xferProcessor = nullptr;
-  if (!BlendModeAsCoeff(blendMode, hasCoverage, &formula)) {
-    xferProcessor = ShaderPDXferProcessor::Make(renderPass->getContext()->drawingBuffer(),
-                                                blendMode, std::move(_dstTextureInfo));
-  } else if (hasCoverage) {
-    xferProcessor = PorterDuffXferProcessor::Make(renderPass->getContext()->drawingBuffer(),
-                                                  formula, _dstTextureInfo);
-    if (formula.needSecondaryOutput()) {
-      // we calculate the output color in the processor, so use the src color as the final
-      // output.
-      BlendModeAsCoeff(BlendMode::Src, false, &formula);
-    }
-  }
   return context->drawingBuffer()->make<Pipeline>(std::move(gp), std::move(fragmentProcessors),
-                                                  numColorProcessors, std::move(xferProcessor),
-                                                  formula, &swizzle);
+                                                  numColorProcessors, std::move(_xferProcessor),
+                                                  _formula, &swizzle);
 }
 }  // namespace tgfx

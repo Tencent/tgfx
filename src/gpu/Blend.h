@@ -171,4 +171,10 @@ enum class OpacityType {
  * Returns true if 'mode' is opaque given the src color opacity.
  */
 bool BlendModeIsOpaque(BlendMode mode, OpacityType srcColorOpacity);
+
+/**
+ * Returns true if the blend mode needs a destination texture.
+ */
+bool BlendModeNeedDesTexture(BlendMode mode, bool hasCoverage);
+
 }  // namespace tgfx

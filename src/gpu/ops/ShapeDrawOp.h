@@ -30,6 +30,7 @@ class ShapeDrawOp : public DrawOp {
 
   void execute(RenderPass* renderPass) override;
 
+  bool hasCoverage() const override;
  private:
   std::shared_ptr<GpuShapeProxy> shapeProxy = nullptr;
   Color color = Color::Transparent();

@@ -91,4 +91,9 @@ void ShapeDrawOp::execute(RenderPass* renderPass) {
   }
   renderPass->draw(PrimitiveType::Triangles, 0, vertexCount);
 }
+
+bool ShapeDrawOp::hasCoverage() const {
+  return DrawOp::hasCoverage() || (shapeProxy && shapeProxy->getTriangles() != nullptr);
+}
+
 }  // namespace tgfx
