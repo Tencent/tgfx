@@ -426,6 +426,8 @@ class Canvas {
   std::stack<std::unique_ptr<CanvasState>> stateStack;
 
   explicit Canvas(DrawContext* drawContext, Surface* surface = nullptr);
+  bool drawSimplePath(const Path& path, const MCState& state, const Fill& fill,
+                      const Stroke* stroke) const;
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling, const Paint* paint,
                  const Matrix* extraMatrix);
   void drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const Fill& fill,

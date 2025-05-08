@@ -27,22 +27,6 @@ class InverseShape : public Shape {
   explicit InverseShape(std::shared_ptr<Shape> shape) : shape(std::move(shape)) {
   }
 
-  bool isLine(Point line[2] = nullptr) const override {
-    return shape->isLine(line);
-  }
-
-  bool isRect(Rect* rect = nullptr) const override {
-    return shape->isRect(rect);
-  }
-
-  bool isOval(Rect* bounds = nullptr) const override {
-    return shape->isOval(bounds);
-  }
-
-  bool isRRect(RRect* rRect = nullptr) const override {
-    return shape->isRRect(rRect);
-  }
-
   bool isInverseFillType() const override {
     return !shape->isInverseFillType();
   }

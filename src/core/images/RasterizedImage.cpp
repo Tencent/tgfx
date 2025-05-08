@@ -39,6 +39,14 @@ std::shared_ptr<Image> RasterizedImage::MakeFrom(std::shared_ptr<Image> source,
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
+  if (rasterizationScale != 1.0f && sampling.mipmapMode != MipmapMode::None &&
+      !source->hasMipmaps()) {
+    // Generate mipmaps for the source image if required by the sampling options.
+    auto newSource = source->makeMipmapped(true);
+    if (newSource != nullptr) {
+      source = std::move(newSource);
+    }
+  }
   auto result = std::shared_ptr<RasterizedImage>(
       new RasterizedImage(UniqueKey::Make(), std::move(source), rasterizationScale, sampling));
   result->weakThis = result;
@@ -48,7 +56,7 @@ std::shared_ptr<Image> RasterizedImage::MakeFrom(std::shared_ptr<Image> source,
 RasterizedImage::RasterizedImage(UniqueKey uniqueKey, std::shared_ptr<Image> source,
                                  float rasterizationScale, const SamplingOptions& sampling)
     : OffscreenImage(std::move(uniqueKey)), source(std::move(source)),
-      rasterizationScale(rasterizationScale), sampling((sampling)) {
+      rasterizationScale(rasterizationScale), sampling(sampling) {
 }
 
 int RasterizedImage::width() const {

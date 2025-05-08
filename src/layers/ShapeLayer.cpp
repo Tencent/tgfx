@@ -31,16 +31,12 @@ Path ShapeLayer::path() const {
   if (_shape == nullptr) {
     return {};
   }
-  Path path = {};
-  if (_shape->isSimplePath(&path)) {
-    return path;
-  }
-  return {};
+  return _shape->isSimplePath() ? _shape->getPath() : Path();
 }
 
 void ShapeLayer::setPath(Path path) {
   Path oldPath = {};
-  if (_shape && _shape->isSimplePath(&oldPath) && oldPath == path) {
+  if (_shape && _shape->isSimplePath() && _shape->getPath() == path) {
     return;
   }
   _shape = Shape::MakeFrom(std::move(path));

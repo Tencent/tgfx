@@ -423,10 +423,12 @@ class Layer {
    * targetCoordinateSpace layer. If the targetCoordinateSpace is nullptr, this method returns a
    * rectangle that defines the area of the layer relative to its own coordinates.
    * @param targetCoordinateSpace The layer that defines the coordinate system to use.
+   * @param computeTightBounds Determines whether to calculate the exact tight bounding box (true)
+   * or a general bounding box that may be larger but is faster to compute (false).
    * @return The rectangle that defines the area of the layer relative to the targetCoordinateSpace
    * layer's coordinate system.
    */
-  Rect getBounds(const Layer* targetCoordinateSpace = nullptr);
+  Rect getBounds(const Layer* targetCoordinateSpace = nullptr, bool computeTightBounds = false);
 
   /**
    * Converts the point from the root's (global) coordinates to the layer's (local) coordinates.

@@ -41,6 +41,8 @@ class ShapeContent : public LayerContent {
     return bounds;
   }
 
+  Rect getTightBounds() const override;
+
   void draw(Canvas* canvas, const Paint& paint) const override;
 
   bool drawFills(Canvas* canvas, const Paint& paint, bool forContour) const;
