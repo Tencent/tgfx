@@ -23,7 +23,7 @@
 namespace tgfx {
 class AlphaThresholdColorFilter : public ColorFilter {
  public:
-  explicit AlphaThresholdColorFilter(float threshold) : threshold(threshold) {};
+  explicit AlphaThresholdColorFilter(float threshold) : threshold(threshold){};
 
  protected:
   Type type() const override {
