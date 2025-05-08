@@ -79,7 +79,6 @@ void* WebGLProcGetter::getProcAddress(const char* name) const {
   N(glFlush)
   N(glFramebufferRenderbuffer)
   N(glFramebufferTexture2D)
-  N(glFramebufferTexture2DMultisample)
   N(glFrontFace)
   N(glGenBuffers)
   N(glGenFramebuffers)
