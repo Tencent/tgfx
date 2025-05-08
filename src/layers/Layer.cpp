@@ -395,17 +395,22 @@ bool Layer::replaceChild(std::shared_ptr<Layer> oldChild, std::shared_ptr<Layer>
   return true;
 }
 
-Rect Layer::getBounds(const Layer* targetCoordinateSpace) {
+Rect Layer::getBounds(const Layer* targetCoordinateSpace, bool computeTightBounds) {
   Rect bounds = {};
   auto content = getContent();
   if (content) {
-    bounds.join(content->getBounds());
+    if (computeTightBounds) {
+      bounds.join(content->getTightBounds());
+    }
+    else {
+      bounds.join(content->getBounds());
+    }
   }
   for (const auto& child : _children) {
     if (!child->visible() || child->maskOwner) {
       continue;
     }
-    auto childBounds = child->getBounds();
+    auto childBounds = child->getBounds(nullptr, computeTightBounds);
     if (child->_scrollRect) {
       if (!childBounds.intersect(*child->_scrollRect)) {
         continue;
@@ -413,7 +418,7 @@ Rect Layer::getBounds(const Layer* targetCoordinateSpace) {
     }
     if (child->hasValidMask()) {
       auto relativeMatrix = child->_mask->getRelativeMatrix(child.get());
-      auto maskBounds = child->_mask->getBounds();
+      auto maskBounds = child->_mask->getBounds(nullptr, computeTightBounds);
       auto maskBoundsToCurrentLayer = relativeMatrix.mapRect(maskBounds);
       if (!childBounds.intersect(maskBoundsToCurrentLayer)) {
         continue;

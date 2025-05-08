@@ -25,6 +25,10 @@ Rect RasterizedContent::getBounds() const {
   return bounds;
 }
 
+Rect RasterizedContent::getTightBounds() const {
+  return getBounds();
+}
+
 void RasterizedContent::draw(Canvas* canvas, const Paint& paint) const {
   canvas->drawImage(image, matrix, &paint);
 }

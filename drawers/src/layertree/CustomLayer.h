@@ -27,8 +27,13 @@ class CustomLayerContent : public tgfx::LayerContent {
  public:
   explicit CustomLayerContent(std::shared_ptr<tgfx::TextBlob> textBlob)
       : _textBlob(std::move(textBlob)){};
+
   tgfx::Rect getBounds() const override {
     return _textBlob->getBounds();
+  }
+
+  tgfx::Rect getTightBounds() const override {
+    return getBounds();
   }
 
   void draw(tgfx::Canvas* canvas, const tgfx::Paint& paint) const override {

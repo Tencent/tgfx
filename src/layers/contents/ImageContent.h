@@ -30,6 +30,8 @@ class ImageContent : public LayerContent {
 
   Rect getBounds() const override;
 
+  Rect getTightBounds() const override;
+
   void draw(Canvas* canvas, const Paint& paint) const override;
 
   bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;

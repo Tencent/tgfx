@@ -30,6 +30,19 @@ ShapeContent::ShapeContent(std::shared_ptr<Shape> fill, std::shared_ptr<Shape> s
     bounds.join(strokeShape->getBounds());
   }
 }
+
+Rect ShapeContent::getTightBounds() const {
+  Rect tightBounds = {};
+  if (fillShape) {
+    tightBounds = fillShape->getPath().getBounds();
+  }
+  if (strokeShape) {
+    tightBounds.join(strokeShape->getPath().getBounds());
+  }
+  return tightBounds;
+}
+
+
 void ShapeContent::draw(Canvas* canvas, const Paint& paint) const {
   drawFills(canvas, paint, false);
   drawStrokes(canvas, paint, false);

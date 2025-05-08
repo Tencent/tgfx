@@ -358,6 +358,36 @@ TGFX_TEST(LayerTest, Layer_localToGlobal) {
   EXPECT_EQ(pointGInGlobal, Point::Make(35.0f, 60.0f));
 }
 
+TGFX_TEST(LayerTest, testBounds) {
+  auto root = Layer::Make();
+  root->setMatrix(Matrix::MakeTrans(10, 10));
+
+  auto rectShape = ShapeLayer::Make();
+  auto rect = Rect::MakeXYWH(0.f, 0.f, 100.f, 100.f);
+  Path path = {};
+  path.addRect(rect);
+  rectShape->setPath(path);
+  rectShape->setFillStyle(SolidColor::Make(Color::Red()));
+  auto strokeStyle = SolidColor::Make(Color::Black());
+  rectShape->setStrokeStyle(strokeStyle);
+  rectShape->setLineWidth(10);
+  rectShape->setStrokeAlign(StrokeAlign::Outside);
+  root->addChild(rectShape);
+  auto bounds = root->getBounds(nullptr, true);
+  EXPECT_FLOAT_EQ(bounds.height(), 120);
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto width = static_cast<int>(bounds.width());
+  auto height = static_cast<int>(bounds.height());
+  auto surface = Surface::Make(context, width, height);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->root()->addChild(root);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/testBounds"));
+}
+
 TGFX_TEST(LayerTest, getbounds) {
   auto root = Layer::Make();
   root->setMatrix(Matrix::MakeTrans(30, 30));

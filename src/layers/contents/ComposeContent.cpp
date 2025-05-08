@@ -38,6 +38,14 @@ Rect ComposeContent::getBounds() const {
   return bounds;
 }
 
+Rect ComposeContent::getTightBounds() const {
+  Rect bounds = {};
+  for (const auto& content : contents) {
+    bounds.join(content->getTightBounds());
+  }
+  return bounds;
+}
+
 void ComposeContent::draw(Canvas* canvas, const Paint& paint) const {
   for (const auto& content : contents) {
     content->draw(canvas, paint);
