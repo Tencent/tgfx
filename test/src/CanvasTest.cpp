@@ -1614,4 +1614,40 @@ TGFX_TEST(CanvasTest, AdaptiveDashEffect) {
   canvas->drawPath(path, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/AdaptiveDashEffect"));
 }
+
+TGFX_TEST(CanvasTest, BlendFormula) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200 * (1 + static_cast<int>(BlendMode::Screen)), 400);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::FromRGBA(100, 100, 100, 128));
+  Path linePath = {};
+  linePath.addRect(50, 50, 150, 150);
+  linePath.moveTo(50, 50);
+  linePath.lineTo(150, 50);
+  linePath.lineTo(150, 170);
+  linePath.lineTo(50, 120);
+  linePath.lineTo(100, 170);
+  for (int i = 0; i < 100; ++i) {
+    // make sure the path will be rasterized as coverage
+    linePath.lineTo(90 + i, 50 + i);
+  }
+  Paint linePaint = {};
+  linePaint.setColor(Color::FromRGBA(255, 0, 0, 128));
+  linePaint.setStyle(PaintStyle::Stroke);
+  linePaint.setStroke(Stroke(10));
+  Paint rectPaint = {};
+  rectPaint.setColor(Color::FromRGBA(255, 0, 0, 128));
+  for (int i = 0; i <= static_cast<int>(BlendMode::Screen); ++i) {
+    // auto i = BlendMode::DstOut;
+    linePaint.setBlendMode(static_cast<BlendMode>(i));
+    canvas->drawPath(linePath, linePaint);
+    // rect is not rasterized as coverage
+    rectPaint.setBlendMode(static_cast<BlendMode>(i));
+    canvas->drawRect(Rect::MakeXYWH(25, 200, 150, 150), rectPaint);
+    canvas->translate(200, 0);
+  }
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/BlendFormula"));
+}
 }  // namespace tgfx

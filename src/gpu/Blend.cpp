@@ -106,14 +106,13 @@ static constexpr BlendFormula Coeffs[2][15] = {
         /* screen */ MakeCoeffFormula(BlendModeCoeff::One, BlendModeCoeff::ISC),
     }};
 
-bool BlendModeAsCoeff(BlendMode mode, bool hasCoverage, BlendFormula* blendInfo) {
+bool BlendModeAsCoeff(BlendMode mode, bool hasCoverage, BlendFormula* blendFormula) {
   if (mode > BlendMode::Screen) {
     return false;
   }
-  if (blendInfo != nullptr) {
-    // Note: alphaOnly parameter is currently unused in this implementation
+  if (blendFormula != nullptr) {
     const auto& formula = Coeffs[hasCoverage][static_cast<int>(mode)];
-    *blendInfo = formula;
+    *blendFormula = formula;
   }
   return true;
 }
@@ -123,8 +122,8 @@ bool BlendModeIsOpaque(BlendMode mode, OpacityType srcColorOpacity) {
   if (!BlendModeAsCoeff(mode, false, &blendFormula)) {
     return false;
   }
-  // we get blendInfo without coverage, so equation is always Add.
-  switch (blendFormula.srcBlend) {
+  switch (blendFormula.srcCoeff()) {
+    case BlendModeCoeff::Zero:
     case BlendModeCoeff::DA:
     case BlendModeCoeff::DC:
     case BlendModeCoeff::IDA:
@@ -133,7 +132,7 @@ bool BlendModeIsOpaque(BlendMode mode, OpacityType srcColorOpacity) {
     default:
       break;
   }
-  switch (blendFormula.dstBlend) {
+  switch (blendFormula.dstCoeff()) {
     case BlendModeCoeff::Zero:
       return true;
     case BlendModeCoeff::ISA:

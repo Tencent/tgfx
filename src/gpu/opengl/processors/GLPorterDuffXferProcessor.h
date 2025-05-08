@@ -22,7 +22,8 @@
 namespace tgfx {
 class GLPorterDuffXferProcessor : public PorterDuffXferProcessor {
  public:
-  explicit GLPorterDuffXferProcessor(const BlendFormula& blendFormula, const DstTextureInfo& dstTextureInfo);
+  explicit GLPorterDuffXferProcessor(const BlendFormula& blendFormula,
+                                     const DstTextureInfo& dstTextureInfo);
 
   void emitCode(const EmitArgs& args) const override;
 

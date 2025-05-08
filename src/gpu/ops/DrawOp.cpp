@@ -49,6 +49,6 @@ PlacementPtr<Pipeline> DrawOp::createPipeline(RenderPass* renderPass,
   }
   return context->drawingBuffer()->make<Pipeline>(std::move(gp), std::move(fragmentProcessors),
                                                   numColorProcessors, std::move(xferProcessor),
-                                                  std::move(formula), &swizzle);
+                                                  formula, &swizzle);
 }
 }  // namespace tgfx

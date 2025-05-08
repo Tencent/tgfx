@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <cstdint>
+#include <cstring>
 #include "tgfx/core/BlendMode.h"
 
 namespace tgfx {
@@ -89,40 +91,70 @@ enum class BlendEquation {
 
 struct BlendFormula {
   /**
-     * Values the shader can write to primary and secondary outputs. These are all modulated by
-     * coverage. We will ignore the multiplies when not using coverage.
-     */
-  enum OutputType {
+    * Values the shader can write to primary and secondary outputs. These are all modulated by
+    * coverage. We will ignore the multiplies when not using coverage.
+    */
+  enum class OutputType {
     None,         //<! 0
     Coverage,     //<! inputCoverage
     Modulate,     //<! inputColor * inputCoverage
     SAModulate,   //<! inputColor.a * inputCoverage
     ISAModulate,  //<! (1 - inputColor.a) * inputCoverage
     ISCModulate,  //<! (1 - inputColor) * inputCoverage
-
   };
-  OutputType primaryOutputType = Coverage;
-  OutputType secondaryOutputType = None;
-  BlendModeCoeff srcBlend = BlendModeCoeff::One;
-  BlendModeCoeff dstBlend = BlendModeCoeff::Zero;
-  BlendEquation equation = BlendEquation::Add;
-  BlendFormula() = default;
+
+  BlendFormula() {
+    memset(&bitFields, 0, sizeof(bitFields));
+  }
+
   constexpr BlendFormula(OutputType primaryOutputType, OutputType secondaryOutputType,
-                         BlendEquation eq, BlendModeCoeff src, BlendModeCoeff dst)
-      : primaryOutputType(primaryOutputType), secondaryOutputType(secondaryOutputType),
-        srcBlend(src), dstBlend(dst), equation(eq) {
+                         BlendEquation eq, BlendModeCoeff src, BlendModeCoeff dst) {
+    bitFields.primaryOutputType = static_cast<uint8_t>(primaryOutputType);
+    bitFields.secondaryOutputType = static_cast<uint8_t>(secondaryOutputType);
+    bitFields.equation = static_cast<uint8_t>(eq);
+    bitFields.srcCoeff = static_cast<uint8_t>(src);
+    bitFields.dstCoeff = static_cast<uint8_t>(dst);
   }
 
   bool needSecondaryOutput() const {
-    return secondaryOutputType != OutputType::None;
+    return static_cast<OutputType>(bitFields.secondaryOutputType) != OutputType::None;
   }
+
+  OutputType primaryOutputType() const {
+    return static_cast<OutputType>(bitFields.primaryOutputType);
+  }
+
+  OutputType secondaryOutputType() const {
+    return static_cast<OutputType>(bitFields.secondaryOutputType);
+  }
+
+  BlendEquation equation() const {
+    return static_cast<BlendEquation>(bitFields.equation);
+  }
+
+  BlendModeCoeff srcCoeff() const {
+    return static_cast<BlendModeCoeff>(bitFields.srcCoeff);
+  }
+
+  BlendModeCoeff dstCoeff() const {
+    return static_cast<BlendModeCoeff>(bitFields.dstCoeff);
+  }
+
+ private:
+  struct {
+    uint8_t primaryOutputType : 3;
+    uint8_t secondaryOutputType : 3;
+    uint8_t srcCoeff : 4;
+    uint8_t dstCoeff : 4;
+    uint8_t equation : 2;
+  } bitFields = {};
 };
 
 /**
- * Returns true if 'mode' is a coefficient-based blend mode. If true is returned, the mode's src and
- * dst coefficient functions are set in 'src' and 'dst'.
+ * Determines if the given blend mode is coefficient-based and retrieves the blend formula if so.
  */
-bool BlendModeAsCoeff(BlendMode mode, bool hasCoverage = false, BlendFormula* blendInfo = nullptr);
+bool BlendModeAsCoeff(BlendMode mode, bool hasCoverage = false,
+                      BlendFormula* blendFormula = nullptr);
 
 enum class OpacityType {
   // The opacity is unknown

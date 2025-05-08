@@ -132,12 +132,6 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
   addDrawOp(std::move(drawOp), clip, fill, localBounds, deviceBounds);
 }
 
-void OpsCompositor::fillGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
-                                     const MCState& state, const Fill& fill) {
-
-}
-
-
 void OpsCompositor::discardAll() {
   ops.clear();
   if (pendingType != PendingOpType::Unknown) {

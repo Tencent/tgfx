@@ -440,9 +440,9 @@ void AppendMode(FragmentShaderBuilder* fsBuilder, const std::string& srcColor,
     }
     // append src blend
     bool didAppend =
-        AppendPorterDuffTerm(fsBuilder, blendInfo.srcBlend, srcColor, srcColor, dstColor, false);
+        AppendPorterDuffTerm(fsBuilder, blendInfo.srcCoeff(), srcColor, srcColor, dstColor, false);
     // append dst blend
-    if (!AppendPorterDuffTerm(fsBuilder, blendInfo.dstBlend, dstColor, srcColor, dstColor,
+    if (!AppendPorterDuffTerm(fsBuilder, blendInfo.dstCoeff(), dstColor, srcColor, dstColor,
                               didAppend)) {
       fsBuilder->codeAppend("vec4(0, 0, 0, 0)");
     }

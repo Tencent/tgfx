@@ -27,22 +27,22 @@ static void AppendOutputColor(FragmentShaderBuilder* fragBuilder,
     case BlendFormula::OutputType::None:
       fragBuilder->codeAppendf("%s = vec4(0.0);", output.c_str());
       break;
-    case BlendFormula::Coverage:
+    case BlendFormula::OutputType::Coverage:
       fragBuilder->codeAppendf("%s = %s;", output.c_str(), inCoverage.c_str());
       break;
-    case BlendFormula::Modulate:
+    case BlendFormula::OutputType::Modulate:
       fragBuilder->codeAppendf("%s = %s * %s;", output.c_str(), inColor.c_str(),
                                inCoverage.c_str());
       break;
-    case BlendFormula::SAModulate:
+    case BlendFormula::OutputType::SAModulate:
       fragBuilder->codeAppendf("%s = %s.a * %s;", output.c_str(), inColor.c_str(),
                                inCoverage.c_str());
       break;
-    case BlendFormula::ISAModulate:
+    case BlendFormula::OutputType::ISAModulate:
       fragBuilder->codeAppendf("%s = (1.0 - %s.a) * %s;", output.c_str(), inColor.c_str(),
                                inCoverage.c_str());
       break;
-    case BlendFormula::ISCModulate:
+    case BlendFormula::OutputType::ISCModulate:
       fragBuilder->codeAppendf("%s = (vec4(1.0) - %s) * %s;", output.c_str(), inColor.c_str(),
                                inCoverage.c_str());
       break;
@@ -143,10 +143,10 @@ void GLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
   std::string primaryOutputColor = "primaryOutputColor";
 
   args.fragBuilder->codeAppendf("vec4 %s = vec4(0.0);", primaryOutputColor.c_str());
-  AppendOutputColor(args.fragBuilder, blendFormula.primaryOutputType, primaryOutputColor,
+  AppendOutputColor(args.fragBuilder, blendFormula.primaryOutputType(), primaryOutputColor,
                     args.inputColor, args.inputCoverage);
   if (!blendFormula.needSecondaryOutput()) {
-    fragBuilder->codeAppendf("%s = %s", args.outputColor.c_str(), primaryOutputColor.c_str());
+    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), primaryOutputColor.c_str());
     return;
   }
 
@@ -182,11 +182,12 @@ void GLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
 
   std::string secondaryOutputColor = "secondaryOutputColor";
   args.fragBuilder->codeAppendf("vec4 %s = vec4(0.0);", secondaryOutputColor.c_str());
-  AppendOutputColor(args.fragBuilder, blendFormula.secondaryOutputType, secondaryOutputColor,
+  AppendOutputColor(args.fragBuilder, blendFormula.secondaryOutputType(), secondaryOutputColor,
                     args.inputColor, args.inputCoverage);
 
-  AppendBlend(args.fragBuilder, blendFormula.equation, blendFormula.srcBlend, blendFormula.dstBlend,
-              primaryOutputColor, secondaryOutputColor, dstColor, args.outputColor);
+  AppendBlend(args.fragBuilder, blendFormula.equation(), blendFormula.srcCoeff(),
+              blendFormula.dstCoeff(), primaryOutputColor, secondaryOutputColor, dstColor,
+              args.outputColor);
 }
 
 void GLPorterDuffXferProcessor::setData(UniformBuffer*) const {

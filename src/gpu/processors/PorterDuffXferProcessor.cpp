@@ -21,8 +21,11 @@
 namespace tgfx {
 
 void PorterDuffXferProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) const {
-  bytesKey->write(static_cast<uint32_t>(blendFormula.primaryOutputType |
-                                        (blendFormula.secondaryOutputType << 3)));
+  bytesKey->write(static_cast<uint32_t>(blendFormula.primaryOutputType()) |
+                  (static_cast<uint32_t>(blendFormula.secondaryOutputType()) << 3) |
+                  (static_cast<uint32_t>(blendFormula.equation()) << 6) |
+                  (static_cast<uint32_t>(blendFormula.srcCoeff()) << 8) |
+                  (static_cast<uint32_t>(blendFormula.dstCoeff()) << 12));
 }
 
 const Texture* PorterDuffXferProcessor::dstTexture() const {

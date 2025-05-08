@@ -101,17 +101,17 @@ static void UpdateBlend(Context* context, const BlendFormula* blendFactors) {
       gl->disable(GL_FETCH_PER_SAMPLE_ARM);
     }
   }
-  if (blendFactors == nullptr || (blendFactors->srcBlend == BlendModeCoeff::One &&
-                                  blendFactors->dstBlend == BlendModeCoeff::Zero &&
-                                  (blendFactors->equation == BlendEquation::Add ||
-                                   blendFactors->equation == BlendEquation::Subtract))) {
+  if (blendFactors == nullptr || (blendFactors->srcCoeff() == BlendModeCoeff::One &&
+                                  blendFactors->dstCoeff() == BlendModeCoeff::Zero &&
+                                  (blendFactors->equation() == BlendEquation::Add ||
+                                   blendFactors->equation() == BlendEquation::Subtract))) {
     // There is no need to enable blending if the blend mode is src.
     gl->disable(GL_BLEND);
   } else {
     gl->enable(GL_BLEND);
-    gl->blendFunc(gXfermodeCoeff2Blend[static_cast<int>(blendFactors->srcBlend)],
-                  gXfermodeCoeff2Blend[static_cast<int>(blendFactors->dstBlend)]);
-    gl->blendEquation(gXfermodeEquation2Blend[static_cast<int>(blendFactors->equation)]);
+    gl->blendFunc(gXfermodeCoeff2Blend[static_cast<int>(blendFactors->srcCoeff())],
+                  gXfermodeCoeff2Blend[static_cast<int>(blendFactors->dstCoeff())]);
+    gl->blendEquation(gXfermodeEquation2Blend[static_cast<int>(blendFactors->equation())]);
   }
 }
 

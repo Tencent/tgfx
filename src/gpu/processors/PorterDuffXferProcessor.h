@@ -20,7 +20,6 @@
 
 #include "gpu/Blend.h"
 #include "gpu/processors/XferProcessor.h"
-#include "tgfx/core/BlendMode.h"
 
 namespace tgfx {
 class PorterDuffXferProcessor : public XferProcessor {
