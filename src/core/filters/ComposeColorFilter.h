@@ -40,5 +40,6 @@ class ComposeColorFilter : public ColorFilter {
   std::shared_ptr<ColorFilter> outer = nullptr;
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(Context* context) const override;
+  friend class ColorFilterSerialization;
 };
 }  // namespace tgfx

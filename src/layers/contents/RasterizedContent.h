@@ -27,6 +27,10 @@ class RasterizedContent : public LayerContent {
       : _contextID(contextID), image(std::move(image)), matrix(matrix) {
   }
 
+  LayerContentType Type() const override {
+    return LayerContentType::RasterizedContent;
+  }
+
   /**
    * Returns the unique ID of the associated GPU device.
    */
@@ -52,5 +56,6 @@ class RasterizedContent : public LayerContent {
   uint32_t _contextID = 0;
   std::shared_ptr<Image> image = nullptr;
   Matrix matrix = Matrix::I();
+  friend class LayerContentSerialization;
 };
 }  // namespace tgfx

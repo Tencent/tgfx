@@ -28,6 +28,10 @@ class ImageContent : public LayerContent {
       : image(std::move(image)), sampling(sampling) {
   }
 
+  LayerContentType Type() const override {
+    return LayerContentType::ImageContent;
+  }
+
   Rect getBounds() const override;
 
   void draw(Canvas* canvas, const Paint& paint) const override;
@@ -37,5 +41,6 @@ class ImageContent : public LayerContent {
  private:
   std::shared_ptr<Image> image = nullptr;
   SamplingOptions sampling = {};
+  friend class LayerContentSerialization;
 };
 }  // namespace tgfx

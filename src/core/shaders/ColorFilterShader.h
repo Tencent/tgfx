@@ -50,5 +50,6 @@ class ColorFilterShader : public Shader {
  private:
   std::shared_ptr<Shader> shader;
   std::shared_ptr<ColorFilter> colorFilter;
+  friend class ShaderSerialization;
 };
 }  // namespace tgfx

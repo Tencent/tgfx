@@ -55,5 +55,6 @@ class MatrixShader final : public Shader {
   Matrix matrix = Matrix::I();
 
   MatrixShader(std::shared_ptr<Shader> source, const Matrix& matrix);
+  friend class ShaderSerialization;
 };
 }  // namespace tgfx

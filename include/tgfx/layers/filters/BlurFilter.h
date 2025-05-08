@@ -34,6 +34,10 @@ class BlurFilter : public LayerFilter {
   static std::shared_ptr<BlurFilter> Make(float blurrinessX, float blurrinessY,
                                           TileMode tileMode = TileMode::Decal);
 
+  LayerFilterType Type() const override {
+    return LayerFilterType::BlurFilter;
+  }
+
   /**
    * The Gaussian sigma value for blurring along the Y axis.
    */
@@ -80,6 +84,7 @@ class BlurFilter : public LayerFilter {
   float _blurrinessX = 0.0f;
   float _blurrinessY = 0.0f;
   TileMode _tileMode = TileMode::Decal;
+  friend class LayerFilterSerialization;
 };
 
 }  // namespace tgfx

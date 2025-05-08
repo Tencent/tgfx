@@ -21,6 +21,17 @@
 #include "tgfx/core/Canvas.h"
 
 namespace tgfx {
+
+enum class LayerContentType {
+  LayerContent,
+  ComposeContent,
+  ImageContent,
+  RasterizedContent,
+  ShapeContent,
+  SolidContent,
+  TextContent
+};
+
 /**
  * LayerContent represents the content of a layer, such as a shape, image, or text. LayerContent is
  * immutable and cannot be changed after it is created.
@@ -34,6 +45,9 @@ class LayerContent {
 
   virtual ~LayerContent() = default;
 
+  virtual LayerContentType Type() const {
+    return LayerContentType::LayerContent;
+  }
   /**
    * Returns the bounds of the content.
    */

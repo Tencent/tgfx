@@ -22,6 +22,9 @@
 #include "tgfx/layers/LayerProperty.h"
 
 namespace tgfx {
+
+enum class ShapeStyleType { Gradient, ImagePattern, SolidColor };
+
 /**
  * ShapeStyle specifies the source color(s) for what is being drawn in a shape layer. There are
  * three types of ShapeStyle: SolidColor, Gradient, and ImagePattern. Note: All ShapeStyle objects
@@ -29,6 +32,7 @@ namespace tgfx {
  */
 class ShapeStyle : public LayerProperty {
  public:
+  virtual ShapeStyleType getType() const = 0;
   /**
    * Returns the alpha transparency value of the shape style. Valid values are 0 (fully transparent)
    * to 1 (fully opaque). The default value is 1.
@@ -81,5 +85,6 @@ class ShapeStyle : public LayerProperty {
   Matrix _matrix = Matrix::I();
 
   friend class ShapeLayer;
+  friend class ShapeStyleSerialization;
 };
 }  // namespace tgfx

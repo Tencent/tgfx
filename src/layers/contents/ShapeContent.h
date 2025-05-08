@@ -37,6 +37,10 @@ class ShapeContent : public LayerContent {
   ShapeContent(std::shared_ptr<Shape> fill, std::shared_ptr<Shape> stroke,
                std::vector<ShapePaint> paintList, size_t fillPaintCount);
 
+  LayerContentType Type() const override {
+    return LayerContentType::ShapeContent;
+  }
+
   Rect getBounds() const override {
     return bounds;
   }
@@ -55,5 +59,6 @@ class ShapeContent : public LayerContent {
   std::shared_ptr<Shape> strokeShape = nullptr;
   std::vector<ShapePaint> paintList = {};
   size_t fillPaintCount = 0;
+  friend class LayerContentSerialization;
 };
 }  // namespace tgfx

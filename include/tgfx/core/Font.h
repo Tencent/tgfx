@@ -169,5 +169,6 @@ class Font {
   std::shared_ptr<ScalerContext> scalerContext = nullptr;
   bool fauxBold = false;
   bool fauxItalic = false;
+  friend class FontSerialization;
 };
 }  // namespace tgfx

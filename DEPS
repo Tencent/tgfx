@@ -69,6 +69,11 @@
         "url": "https://github.com/libpag/tracy.git",
         "commit": "ef23cd6ed597767200fe320721a99d824e3193f6",
         "dir": "third_party/tracy"
+      },
+      {
+        "url": "https://github.com/google/flatbuffers.git",
+        "commit": "1c514626e83c20fffa8557e75641848e1e15cd5e",
+        "dir": "third_party/flatbuffers"
       }
     ]
   },

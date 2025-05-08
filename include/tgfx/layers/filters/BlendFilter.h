@@ -34,6 +34,10 @@ class BlendFilter : public LayerFilter {
    */
   static std::shared_ptr<BlendFilter> Make(const Color& color, BlendMode mode);
 
+  LayerFilterType Type() const override {
+    return LayerFilterType::BlendFilter;
+  }
+
   /**
    * Returns the constant color to be used when blending.
    */
@@ -68,5 +72,6 @@ class BlendFilter : public LayerFilter {
 
   Color _color = Color::Transparent();
   BlendMode _blendMode = BlendMode::SrcOver;
+  friend class LayerFilterSerialization;
 };
 }  // namespace tgfx

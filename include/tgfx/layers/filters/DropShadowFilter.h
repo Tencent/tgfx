@@ -33,6 +33,10 @@ class DropShadowFilter : public LayerFilter {
                                                 float blurrinessY, const Color& color,
                                                 bool dropsShadowOnly = false);
 
+  LayerFilterType Type() const override {
+    return LayerFilterType::DropShadowFilter;
+  }
+
   /**
    * The x offset of the shadow.
    */
@@ -122,6 +126,7 @@ class DropShadowFilter : public LayerFilter {
   float _blurrinessY = 0.0f;
   Color _color = Color::Black();
   bool _dropsShadowOnly = false;
+  friend class LayerFilterSerialization;
 };
 
 }  // namespace tgfx

@@ -162,5 +162,7 @@ class Shape {
   friend class ShapeDrawOp;
   friend class ProxyProvider;
   friend class Canvas;
+  friend class SerializeUtils;
+  friend class ShapeSerialization;
 };
 }  // namespace tgfx

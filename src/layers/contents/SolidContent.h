@@ -25,6 +25,10 @@ class SolidContent : public LayerContent {
  public:
   SolidContent(const RRect& rRect, const Color& color);
 
+  LayerContentType Type() const override {
+    return LayerContentType::SolidContent;
+  }
+
   Rect getBounds() const override {
     return _rRect.rect;
   }

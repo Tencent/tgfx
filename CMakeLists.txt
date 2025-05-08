@@ -299,6 +299,8 @@ if (TGFX_ENABLE_PROFILING)
     list(APPEND TGFX_STATIC_VENDORS tracy)
     list(APPEND TGFX_INCLUDES third_party/tracy)
     list(APPEND TGFX_DEFINES TGFX_ENABLE_PROFILING)
+
+    list(APPEND TGFX_INCLUDES third_party/flatbuffers/include)
 endif ()
 
 list(APPEND TGFX_STATIC_VENDORS pathkit)

@@ -86,5 +86,6 @@ class GlyphRunList {
 
  private:
   std::vector<GlyphRun> _glyphRuns = {};
+  friend class glyphRunListSerialization;
 };
 }  // namespace tgfx

@@ -177,5 +177,7 @@ class Shader {
 
   friend class FragmentProcessor;
   friend class Caster;
+  friend class SerializeUtils;
+  friend class ShaderSerialization;
 };
 }  // namespace tgfx

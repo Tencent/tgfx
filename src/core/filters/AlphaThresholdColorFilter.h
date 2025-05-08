@@ -23,7 +23,7 @@
 namespace tgfx {
 class AlphaThresholdColorFilter : public ColorFilter {
  public:
-  explicit AlphaThresholdColorFilter(float threshold) : threshold(threshold){};
+  explicit AlphaThresholdColorFilter(float threshold) : threshold(threshold) {};
 
  protected:
   Type type() const override {
@@ -36,5 +36,6 @@ class AlphaThresholdColorFilter : public ColorFilter {
   PlacementPtr<FragmentProcessor> asFragmentProcessor(Context* context) const override;
 
   float threshold = 0.0f;
+  friend class ColorFilterSerialization;
 };
 }  // namespace tgfx

@@ -96,5 +96,6 @@ class TextBlob {
   friend class Canvas;
   friend class GlyphRunList;
   friend class Mask;
+  friend class TextBlobSerialization;
 };
 }  // namespace tgfx

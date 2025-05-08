@@ -100,5 +100,6 @@ class RuntimeEffect {
 
   friend class RuntimeDrawTask;
   friend class RuntimeImageFilter;
+  friend class RuntimeEffectSerialization;
 };
 }  // namespace tgfx

@@ -27,6 +27,10 @@ class ComposeContent : public LayerContent {
       : contents(std::move(contents)) {
   }
 
+  LayerContentType Type() const override {
+    return LayerContentType::ComposeContent;
+  }
+
   Rect getBounds() const override;
 
   void draw(Canvas* canvas, const Paint& paint) const override;
@@ -35,5 +39,6 @@ class ComposeContent : public LayerContent {
 
  private:
   std::vector<std::unique_ptr<LayerContent>> contents = {};
+  friend class LayerContentSerialization;
 };
 }  // namespace tgfx

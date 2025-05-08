@@ -25,6 +25,10 @@ class TextContent : public LayerContent {
  public:
   TextContent(std::shared_ptr<TextBlob> textBlob, Color textColor);
 
+  LayerContentType Type() const override {
+    return LayerContentType::TextContent;
+  }
+
   Rect getBounds() const override {
     return bounds;
   }
@@ -40,5 +44,6 @@ class TextContent : public LayerContent {
 
   static bool HitTestPointInternal(float localX, float localY,
                                    const std::shared_ptr<GlyphRunList>& glyphRunList);
+  friend class LayerContentSerialization;
 };
 }  // namespace tgfx
