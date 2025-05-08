@@ -401,8 +401,7 @@ Rect Layer::getBounds(const Layer* targetCoordinateSpace, bool computeTightBound
   if (content) {
     if (computeTightBounds) {
       bounds.join(content->getTightBounds());
-    }
-    else {
+    } else {
       bounds.join(content->getBounds());
     }
   }

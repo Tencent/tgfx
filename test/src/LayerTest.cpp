@@ -358,7 +358,7 @@ TGFX_TEST(LayerTest, Layer_localToGlobal) {
   EXPECT_EQ(pointGInGlobal, Point::Make(35.0f, 60.0f));
 }
 
-TGFX_TEST(LayerTest, testBounds) {
+TGFX_TEST(LayerTest, getTightBounds) {
   auto root = Layer::Make();
   root->setMatrix(Matrix::MakeTrans(10, 10));
 
@@ -385,7 +385,7 @@ TGFX_TEST(LayerTest, testBounds) {
   auto displayList = std::make_unique<DisplayList>();
   displayList->root()->addChild(root);
   displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/testBounds"));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/getTightBounds"));
 }
 
 TGFX_TEST(LayerTest, getbounds) {

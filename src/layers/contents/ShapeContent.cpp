@@ -42,7 +42,6 @@ Rect ShapeContent::getTightBounds() const {
   return tightBounds;
 }
 
-
 void ShapeContent::draw(Canvas* canvas, const Paint& paint) const {
   drawFills(canvas, paint, false);
   drawStrokes(canvas, paint, false);
