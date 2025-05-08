@@ -29,10 +29,6 @@ class SolidContent : public LayerContent {
     return _rRect.rect;
   }
 
-  Rect getTightBounds() const override {
-    return getBounds();
-  }
-
   void draw(Canvas* canvas, const Paint& paint) const override;
 
   bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;

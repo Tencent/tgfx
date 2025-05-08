@@ -29,10 +29,6 @@ class TextContent : public LayerContent {
     return bounds;
   }
 
-  Rect getTightBounds() const override {
-    return getBounds();
-  }
-
   void draw(Canvas* canvas, const Paint& paint) const override;
 
   bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;

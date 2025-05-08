@@ -23,10 +23,6 @@ Rect ImageContent::getBounds() const {
   return Rect::MakeXYWH(0, 0, image->width(), image->height());
 }
 
-Rect ImageContent::getTightBounds() const {
-  return getBounds();
-}
-
 void ImageContent::draw(Canvas* canvas, const Paint& paint) const {
   canvas->drawImage(image, sampling, &paint);
 }

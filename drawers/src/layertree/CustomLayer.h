@@ -32,10 +32,6 @@ class CustomLayerContent : public tgfx::LayerContent {
     return _textBlob->getBounds();
   }
 
-  tgfx::Rect getTightBounds() const override {
-    return getBounds();
-  }
-
   void draw(tgfx::Canvas* canvas, const tgfx::Paint& paint) const override {
     auto textPaint = paint;
     textPaint.setColor(tgfx::Color::Black());

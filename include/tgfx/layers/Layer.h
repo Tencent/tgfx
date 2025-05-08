@@ -423,9 +423,8 @@ class Layer {
    * targetCoordinateSpace layer. If the targetCoordinateSpace is nullptr, this method returns a
    * rectangle that defines the area of the layer relative to its own coordinates.
    * @param targetCoordinateSpace The layer that defines the coordinate system to use.
-   * @param computeTightBounds Whether to calculate the tight bounding box (true) or just the bounding
-   * box(false), calculating a tight bounding box adds computational cost but results in a absolutely
-   * correct bounding box for the scene.
+   * @param computeTightBounds Determines whether to calculate the exact tight bounding box (true)
+   * or a general bounding box that may be larger but is faster to compute (false).
    * @return The rectangle that defines the area of the layer relative to the targetCoordinateSpace
    * layer's coordinate system.
    */

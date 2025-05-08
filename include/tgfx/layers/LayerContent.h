@@ -42,7 +42,9 @@ class LayerContent {
   /**
    * Returns the tight bounds of the content.
    */
-  virtual Rect getTightBounds() const = 0;
+  virtual Rect getTightBounds() const {
+    return getBounds();
+  }
 
   /**
    * Draws the content to the given canvas with the given paint.
