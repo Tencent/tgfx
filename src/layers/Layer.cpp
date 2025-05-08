@@ -1079,17 +1079,12 @@ void Layer::updateRenderBounds(const Matrix& renderMatrix, const Rect* clipRect,
 void Layer::cleanDirtyFlags() {
   if (bitFields.dirtyDescendents) {
     for (auto& child : _children) {
-      if (!child->maskOwner) {
-        child->cleanDirtyFlags();
-      }
+      child->cleanDirtyFlags();
     }
   }
   bitFields.dirtyTransform = false;
   bitFields.dirtyDescendents = false;
   bitFields.dirtyContent = false;
-  if (_mask) {
-    _mask->cleanDirtyFlags();
-  }
 }
 
 }  // namespace tgfx
