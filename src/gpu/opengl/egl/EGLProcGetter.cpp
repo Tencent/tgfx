@@ -18,7 +18,7 @@
 
 #include "EGLProcGetter.h"
 #include <EGL/egl.h>
-#include <GLES2/gl2.h>
+#include <GLES3/gl3.h>
 #include <cstring>
 
 namespace tgfx {
@@ -42,7 +42,7 @@ static void* egl_get_gl_proc(void*, const char name[]) {
   M(glBindVertexArray)
   M(glBlendColor)
   M(glBlendEquation)
-  M(glBendEquationSeparate)
+  M(glBlendEquationSeparate)
   M(glBlendFunc)
   M(glBlendFuncSeparate)
   M(glBufferData)
