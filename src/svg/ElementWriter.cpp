@@ -425,7 +425,7 @@ void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader, Co
   };
   auto [decomposedShader, matrix] = shaderDecomposer(shader);
 
-  Types::ShaderType type = Types::Get(decomposedShader);
+  auto type = Types::Get(decomposedShader);
   switch (type) {
     case Types::ShaderType::Color:
       addColorShaderResources(static_cast<const ColorShader*>(decomposedShader), resources);
@@ -712,7 +712,7 @@ void ElementWriter::addMaskResources(const std::shared_ptr<MaskFilter>& maskFilt
   }
 
   auto maskShader = maskShaderFilter->getShader();
-  Types::ShaderType type = Types::Get(maskShader.get());
+  auto type = Types::Get(maskShader.get());
   switch (type) {
     case Types::ShaderType::Image: {
       auto imageShader = static_cast<const ImageShader*>(maskShader.get());
