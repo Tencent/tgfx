@@ -61,6 +61,9 @@ class BlendFilter : public LayerFilter {
   void setBlendMode(BlendMode mode);
 
  protected:
+  LayerFilterType Type() const override {
+    return LayerFilterType::BlendFilter;
+  }
   std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) override;
 
  private:
@@ -68,5 +71,6 @@ class BlendFilter : public LayerFilter {
 
   Color _color = Color::Transparent();
   BlendMode _blendMode = BlendMode::SrcOver;
+  friend class LayerFilterSerialization;
 };
 }  // namespace tgfx

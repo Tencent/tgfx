@@ -22,6 +22,7 @@
 #include "tgfx/layers/LayerProperty.h"
 
 namespace tgfx {
+
 /**
  * ShapeStyle specifies the source color(s) for what is being drawn in a shape layer. There are
  * three types of ShapeStyle: SolidColor, Gradient, and ImagePattern. Note: All ShapeStyle objects
@@ -68,6 +69,8 @@ class ShapeStyle : public LayerProperty {
   void setMatrix(const Matrix& value);
 
  protected:
+  enum class ShapeStyleType { Gradient, ImagePattern, SolidColor };
+  virtual ShapeStyleType getType() const = 0;
   std::shared_ptr<Shader> getShader() const;
 
   /**
@@ -81,5 +84,6 @@ class ShapeStyle : public LayerProperty {
   Matrix _matrix = {};
 
   friend class ShapeLayer;
+  friend class ShapeStyleSerialization;
 };
 }  // namespace tgfx

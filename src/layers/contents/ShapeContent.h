@@ -51,11 +51,17 @@ class ShapeContent : public LayerContent {
 
   bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
 
+ protected:
+  LayerContentType Type() const override {
+    return LayerContentType::ShapeContent;
+  }
+
  private:
   Rect bounds = {};
   std::shared_ptr<Shape> fillShape = nullptr;
   std::shared_ptr<Shape> strokeShape = nullptr;
   std::vector<ShapePaint> paintList = {};
   size_t fillPaintCount = 0;
+  friend class LayerContentSerialization;
 };
 }  // namespace tgfx

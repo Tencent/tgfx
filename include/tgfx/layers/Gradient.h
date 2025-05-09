@@ -131,12 +131,16 @@ class Gradient : public ShapeStyle {
   void setPositions(std::vector<float> positions);
 
  protected:
+  ShapeStyleType getType() const override {
+    return ShapeStyleType::Gradient;
+  }
   std::vector<Color> _colors;
   std::vector<float> _positions;
 
   Gradient(const std::vector<Color>& colors, const std::vector<float>& positions)
       : _colors(colors), _positions(positions) {
   }
+  friend class ShapeStyleSerialization;
 };
 
 /**
@@ -237,6 +241,7 @@ class RadialGradient : public Gradient {
   }
 
   friend class Gradient;
+  friend class ShapeStyleSerialization;
 };
 
 /**
@@ -300,6 +305,7 @@ class ConicGradient : public Gradient {
   }
 
   friend class Gradient;
+  friend class ShapeStyleSerialization;
 };
 
 /**
@@ -350,6 +356,7 @@ class DiamondGradient : public Gradient {
   }
 
   friend class Gradient;
+  friend class ShapeStyleSerialization;
 };
 
 }  // namespace tgfx

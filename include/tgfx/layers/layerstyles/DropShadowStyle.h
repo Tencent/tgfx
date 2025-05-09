@@ -33,6 +33,10 @@ class DropShadowStyle : public LayerStyle {
                                                float blurrinessY, const Color& color,
                                                bool showBehindLayer = true);
 
+  LayerStyleType Type() const override {
+    return LayerStyleType::DropShadow;
+  }
+
   /**
    * The x offset of the shadow.
    */
@@ -143,5 +147,6 @@ class DropShadowStyle : public LayerStyle {
   std::shared_ptr<ImageFilter> shadowFilter = nullptr;
 
   friend class Layer;
+  friend class LayerStyleSerialization;
 };
 }  // namespace tgfx

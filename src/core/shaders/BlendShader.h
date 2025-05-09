@@ -43,5 +43,6 @@ class BlendShader : public Shader {
   BlendMode mode;
   std::shared_ptr<Shader> dst;
   std::shared_ptr<Shader> src;
+  friend class ShaderSerialization;
 };
 }  // namespace tgfx

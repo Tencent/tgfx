@@ -73,6 +73,9 @@ class BlurFilter : public LayerFilter {
   void setTileMode(TileMode tileMode);
 
  protected:
+  LayerFilterType Type() const override {
+    return LayerFilterType::BlurFilter;
+  }
   std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) override;
 
  private:
@@ -80,6 +83,7 @@ class BlurFilter : public LayerFilter {
   float _blurrinessX = 0.0f;
   float _blurrinessY = 0.0f;
   TileMode _tileMode = TileMode::Decal;
+  friend class LayerFilterSerialization;
 };
 
 }  // namespace tgfx

@@ -33,6 +33,11 @@ class TextContent : public LayerContent {
 
   bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
 
+ protected:
+  LayerContentType Type() const override {
+    return LayerContentType::TextContent;
+  }
+
  private:
   Rect bounds = {};
   std::shared_ptr<TextBlob> textBlob = nullptr;
@@ -40,5 +45,6 @@ class TextContent : public LayerContent {
 
   static bool HitTestPointInternal(float localX, float localY,
                                    const std::shared_ptr<GlyphRunList>& glyphRunList);
+  friend class LayerContentSerialization;
 };
 }  // namespace tgfx

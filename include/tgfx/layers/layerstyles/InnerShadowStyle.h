@@ -33,6 +33,10 @@ class InnerShadowStyle : public LayerStyle {
   static std::shared_ptr<InnerShadowStyle> Make(float offsetX, float offsetY, float blurrinessX,
                                                 float blurrinessY, const Color& color);
 
+  LayerStyleType Type() const override {
+    return LayerStyleType::InnerShadow;
+  }
+
   /**
    * The x offset of the shadow.
    */
@@ -117,5 +121,6 @@ class InnerShadowStyle : public LayerStyle {
   Color _color = Color::Black();
   std::shared_ptr<ImageFilter> shadowFilter = nullptr;
   float currentScale = 0.0f;
+  friend class LayerStyleSerialization;
 };
 }  // namespace tgfx

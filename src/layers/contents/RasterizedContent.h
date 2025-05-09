@@ -48,9 +48,15 @@ class RasterizedContent : public LayerContent {
     return matrix;
   }
 
+ protected:
+  LayerContentType Type() const override {
+    return LayerContentType::RasterizedContent;
+  }
+
  private:
   uint32_t _contextID = 0;
   std::shared_ptr<Image> image = nullptr;
   Matrix matrix = {};
+  friend class LayerContentSerialization;
 };
 }  // namespace tgfx

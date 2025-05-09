@@ -42,6 +42,9 @@ class ImagePattern : public ShapeStyle {
                                             const SamplingOptions& sampling = {});
 
  protected:
+  ShapeStyleType getType() const override {
+    return ShapeStyleType::ImagePattern;
+  }
   std::shared_ptr<Shader> onGetShader() const override;
 
  private:
@@ -52,5 +55,6 @@ class ImagePattern : public ShapeStyle {
 
   ImagePattern(std::shared_ptr<Image> image, TileMode tileModeX, TileMode tileModeY,
                const SamplingOptions& sampling);
+  friend class ShapeStyleSerialization;
 };
 }  // namespace tgfx

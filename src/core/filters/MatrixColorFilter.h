@@ -42,5 +42,6 @@ class MatrixColorFilter : public ColorFilter {
   bool alphaIsUnchanged;
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(Context* context) const override;
+  friend class ColorFilterSerialization;
 };
 }  // namespace tgfx

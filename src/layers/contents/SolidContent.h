@@ -33,6 +33,11 @@ class SolidContent : public LayerContent {
 
   bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
 
+ protected:
+  LayerContentType Type() const override {
+    return LayerContentType::SolidContent;
+  }
+
  private:
   RRect _rRect;
   Color _color;

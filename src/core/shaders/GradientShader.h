@@ -67,6 +67,7 @@ class GradientShader : public Shader {
 
   const Matrix pointsToUnit;
   bool colorsAreOpaque = false;
+  friend class ShaderSerialization;
 };
 
 class LinearGradientShader : public GradientShader {

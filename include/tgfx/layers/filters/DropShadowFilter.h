@@ -111,6 +111,9 @@ class DropShadowFilter : public LayerFilter {
   void setDropsShadowOnly(bool value);
 
  protected:
+  LayerFilterType Type() const override {
+    return LayerFilterType::DropShadowFilter;
+  }
   std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) override;
 
  private:
@@ -122,6 +125,7 @@ class DropShadowFilter : public LayerFilter {
   float _blurrinessY = 0.0f;
   Color _color = Color::Black();
   bool _dropsShadowOnly = false;
+  friend class LayerFilterSerialization;
 };
 
 }  // namespace tgfx

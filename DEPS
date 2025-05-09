@@ -64,6 +64,11 @@
         "url": "https://github.com/libexpat/libexpat.git",
         "commit": "88b3ed553d8ad335559254863a33360d55b9f1d6",
         "dir": "third_party/expat"
+      },
+      {
+        "url": "https://github.com/google/flatbuffers.git",
+        "commit": "1c514626e83c20fffa8557e75641848e1e15cd5e",
+        "dir": "third_party/flatbuffers"
       }
     ]
   },

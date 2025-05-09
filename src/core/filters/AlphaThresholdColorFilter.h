@@ -36,5 +36,6 @@ class AlphaThresholdColorFilter : public ColorFilter {
   PlacementPtr<FragmentProcessor> asFragmentProcessor(Context* context) const override;
 
   float threshold = 0.0f;
+  friend class ColorFilterSerialization;
 };
 }  // namespace tgfx

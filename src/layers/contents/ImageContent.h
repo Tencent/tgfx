@@ -34,8 +34,14 @@ class ImageContent : public LayerContent {
 
   bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
 
+ protected:
+  LayerContentType Type() const override {
+    return LayerContentType::ImageContent;
+  }
+
  private:
   std::shared_ptr<Image> image = nullptr;
   SamplingOptions sampling = {};
+  friend class LayerContentSerialization;
 };
 }  // namespace tgfx
