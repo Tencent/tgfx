@@ -507,15 +507,15 @@ void AppendCoeffBlend(FragmentShaderBuilder* fsBuilder, const std::string& srcCo
 
   switch (formula.equation()) {
     case BlendEquation::Add:
-      fsBuilder->codeAppendf("%s = clamp(%s + %s, 0, 1);", outColor.c_str(), srcWithCoeff,
+      fsBuilder->codeAppendf("%s = clamp(%s + %s, 0.0, 1.0);", outColor.c_str(), srcWithCoeff,
                              dstWithCoeff);
       break;
     case BlendEquation::Subtract:
-      fsBuilder->codeAppendf("%s = clamp(%s - %s , 0, 1);", outColor.c_str(), srcWithCoeff,
+      fsBuilder->codeAppendf("%s = clamp(%s - %s , 0.0, 1.0);", outColor.c_str(), srcWithCoeff,
                              dstWithCoeff);
       break;
     case BlendEquation::ReverseSubtract:
-      fsBuilder->codeAppendf("%s = clamp(%s - %s, 0, 1);", outColor.c_str(), dstWithCoeff,
+      fsBuilder->codeAppendf("%s = clamp(%s - %s, 0.0, 1.0);", outColor.c_str(), dstWithCoeff,
                              srcWithCoeff);
       break;
     default:

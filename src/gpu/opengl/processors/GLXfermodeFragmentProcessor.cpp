@@ -47,7 +47,7 @@ GLXfermodeFragmentProcessor::GLXfermodeFragmentProcessor(PlacementPtr<FragmentPr
 
 void GLXfermodeFragmentProcessor::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
-  std::string coverage = "vec4(1.0f)";
+  std::string coverage = "vec4(1.0)";
   if (child == XfermodeFragmentProcessor::Child::TwoChild) {
     std::string inputColor = "inputColor";
     fragBuilder->codeAppendf("vec4 inputColor = vec4(%s.rgb, 1.0);", args.inputColor.c_str());
