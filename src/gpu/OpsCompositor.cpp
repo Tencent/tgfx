@@ -214,7 +214,8 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
   auto [needLocalBounds, needDeviceBounds] = needComputeBounds(
-      fill, fill.maskFilter != nullptr || !clip.isEmpty(), type == PendingOpType::Image);
+      fill, fill.maskFilter != nullptr || !clip.isEmpty() || clip.isInverseFillType(),
+      type == PendingOpType::Image);
   auto aaType = getAAType(fill);
   Rect clipBounds = {};
   if (needLocalBounds) {
@@ -470,9 +471,6 @@ std::pair<PlacementPtr<FragmentProcessor>, bool> OpsCompositor::getClipMaskFP(co
 }
 
 DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AAType aaType) {
-  if (deviceBounds.isEmpty()) {
-    return {};
-  }
   auto caps = context->caps();
   if (caps->frameBufferFetchSupport) {
     return {};
@@ -480,6 +478,9 @@ DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AATyp
   Rect bounds = {};
   auto textureProxy = caps->textureBarrierSupport ? renderTarget->getTextureProxy() : nullptr;
   if (textureProxy == nullptr || renderTarget->sampleCount() > 1) {
+    if (deviceBounds.isEmpty()) {
+      return {};
+    }
     bounds = deviceBounds;
     if (aaType != AAType::None) {
       bounds.outset(1.0f, 1.0f);
