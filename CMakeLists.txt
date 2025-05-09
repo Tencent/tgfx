@@ -335,7 +335,7 @@ if (TGFX_BUILD_SVG)
 endif ()
 if (TGFX_BUILD_PDF)
     list(APPEND TGFX_STATIC_VENDORS harfbuzz)
-    list(APPEND TGFX_INCLUDES third_party/harfbuzz)
+    list(APPEND TGFX_INCLUDES third_party/harfbuzz/src)
 endif ()
 
 if (WEB)
@@ -548,11 +548,10 @@ if (TGFX_BUILD_TESTS)
     list(APPEND TGFX_TEST_LIBS tgfx-drawers tgfx ${TGFX_SHARED_LIBS})
     list(APPEND TGFX_TEST_INCLUDES src test/src third_party/json/include)
 
-    add_vendor_target(test-vendor STATIC_VENDORS harfbuzz googletest)
+    add_vendor_target(test-vendor STATIC_VENDORS googletest)
     find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)
     list(APPEND TGFX_TEST_LIBS ${TEST_VENDOR_STATIC_LIBRARIES})
     list(APPEND TGFX_TEST_INCLUDES
-            third_party/harfbuzz/src
             third_party/googletest/googletest
             third_party/googletest/googletest/include)
 

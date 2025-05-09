@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFSubsetFont.h"
+#include "hb-subset-repacker.h"
+#include "hb-subset.h"
+#include "hb.h"
 #include "pdf/PDFFont.h"
-#include "src/hb-subset-repacker.h"
-#include "src/hb-subset.h"
-#include "src/hb.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Stream.h"
 
