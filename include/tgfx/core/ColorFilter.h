@@ -106,6 +106,7 @@ class ColorFilter {
    * Returns true if the specified color filter is equivalent to this ColorFilter.
    */
   virtual bool isEqual(const ColorFilter* colorFilter) const = 0;
+
  private:
   virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(Context* context) const = 0;
 
