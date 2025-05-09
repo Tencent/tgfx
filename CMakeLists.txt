@@ -335,7 +335,7 @@ if (TGFX_BUILD_SVG)
 endif ()
 if (TGFX_BUILD_PDF)
     list(APPEND TGFX_STATIC_VENDORS harfbuzz)
-    list(APPEND TGFX_INCLUDES third_party/harfbuzz/src)
+    list(APPEND TGFX_INCLUDES third_party/harfbuzz)
 endif ()
 
 if (WEB)
