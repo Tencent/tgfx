@@ -34,10 +34,6 @@ class BlendFilter : public LayerFilter {
    */
   static std::shared_ptr<BlendFilter> Make(const Color& color, BlendMode mode);
 
-  LayerFilterType Type() const override {
-    return LayerFilterType::BlendFilter;
-  }
-
   /**
    * Returns the constant color to be used when blending.
    */
@@ -65,6 +61,9 @@ class BlendFilter : public LayerFilter {
   void setBlendMode(BlendMode mode);
 
  protected:
+  LayerFilterType Type() const override {
+    return LayerFilterType::BlendFilter;
+  }
   std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) override;
 
  private:

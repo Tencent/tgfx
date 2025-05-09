@@ -28,15 +28,16 @@ class ImageContent : public LayerContent {
       : image(std::move(image)), sampling(sampling) {
   }
 
-  LayerContentType Type() const override {
-    return LayerContentType::ImageContent;
-  }
-
   Rect getBounds() const override;
 
   void draw(Canvas* canvas, const Paint& paint) const override;
 
   bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
+
+ protected:
+  LayerContentType Type() const override {
+    return LayerContentType::ImageContent;
+  }
 
  private:
   std::shared_ptr<Image> image = nullptr;

@@ -27,10 +27,6 @@ class RasterizedContent : public LayerContent {
       : _contextID(contextID), image(std::move(image)), matrix(matrix) {
   }
 
-  LayerContentType Type() const override {
-    return LayerContentType::RasterizedContent;
-  }
-
   /**
    * Returns the unique ID of the associated GPU device.
    */
@@ -50,6 +46,11 @@ class RasterizedContent : public LayerContent {
 
   Matrix getMatrix() const {
     return matrix;
+  }
+
+ protected:
+  LayerContentType Type() const override {
+    return LayerContentType::RasterizedContent;
   }
 
  private:

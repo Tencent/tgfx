@@ -40,11 +40,11 @@ class ImagePattern : public ShapeStyle {
                                             TileMode tileModeX = TileMode::Clamp,
                                             TileMode tileModeY = TileMode::Clamp,
                                             const SamplingOptions& sampling = {});
+
+ protected:
   ShapeStyleType getType() const override {
     return ShapeStyleType::ImagePattern;
   }
-
- protected:
   std::shared_ptr<Shader> onGetShader() const override;
 
  private:

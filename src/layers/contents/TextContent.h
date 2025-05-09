@@ -25,10 +25,6 @@ class TextContent : public LayerContent {
  public:
   TextContent(std::shared_ptr<TextBlob> textBlob, Color textColor);
 
-  LayerContentType Type() const override {
-    return LayerContentType::TextContent;
-  }
-
   Rect getBounds() const override {
     return bounds;
   }
@@ -36,6 +32,11 @@ class TextContent : public LayerContent {
   void draw(Canvas* canvas, const Paint& paint) const override;
 
   bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
+
+ protected:
+  LayerContentType Type() const override {
+    return LayerContentType::TextContent;
+  }
 
  private:
   Rect bounds = {};

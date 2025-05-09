@@ -33,10 +33,6 @@ class DropShadowFilter : public LayerFilter {
                                                 float blurrinessY, const Color& color,
                                                 bool dropsShadowOnly = false);
 
-  LayerFilterType Type() const override {
-    return LayerFilterType::DropShadowFilter;
-  }
-
   /**
    * The x offset of the shadow.
    */
@@ -115,6 +111,9 @@ class DropShadowFilter : public LayerFilter {
   void setDropsShadowOnly(bool value);
 
  protected:
+  LayerFilterType Type() const override {
+    return LayerFilterType::DropShadowFilter;
+  }
   std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) override;
 
  private:

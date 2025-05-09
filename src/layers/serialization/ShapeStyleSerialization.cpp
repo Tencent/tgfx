@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -15,7 +15,7 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#ifdef TGFX_ENABLE_LAYER_INSPECTOR
+#ifdef TGFX_USE_INSPECTOR
 
 #include "ShapeStyleSerialization.h"
 #include <tgfx/layers/Gradient.h>
@@ -33,13 +33,13 @@ std::shared_ptr<Data> ShapeStyleSerialization::serializeShapeStyle(ShapeStyle* s
   SerializeUtils::serializeBegin(fbb, "LayerAttribute", startMap, contentMap);
   auto type = shapeStyle->getType();
   switch (type) {
-    case ShapeStyleType::Gradient:
+    case ShapeStyle::ShapeStyleType::Gradient:
       serializeGradientImpl(fbb, shapeStyle);
       break;
-    case ShapeStyleType::ImagePattern:
+    case ShapeStyle::ShapeStyleType::ImagePattern:
       serializeImagePatternImpl(fbb, shapeStyle);
       break;
-    case ShapeStyleType::SolidColor:
+    case ShapeStyle::ShapeStyleType::SolidColor:
       serializeSolidColorImpl(fbb, shapeStyle);
       break;
   }

@@ -37,10 +37,6 @@ class ShapeContent : public LayerContent {
   ShapeContent(std::shared_ptr<Shape> fill, std::shared_ptr<Shape> stroke,
                std::vector<ShapePaint> paintList, size_t fillPaintCount);
 
-  LayerContentType Type() const override {
-    return LayerContentType::ShapeContent;
-  }
-
   Rect getBounds() const override {
     return bounds;
   }
@@ -54,6 +50,11 @@ class ShapeContent : public LayerContent {
   bool drawStrokes(Canvas* canvas, const Paint& paint, bool forContour) const;
 
   bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
+
+ protected:
+  LayerContentType Type() const override {
+    return LayerContentType::ShapeContent;
+  }
 
  private:
   Rect bounds = {};

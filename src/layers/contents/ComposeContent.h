@@ -27,10 +27,6 @@ class ComposeContent : public LayerContent {
       : contents(std::move(contents)) {
   }
 
-  LayerContentType Type() const override {
-    return LayerContentType::ComposeContent;
-  }
-
   Rect getBounds() const override;
 
   Rect getTightBounds() const override;
@@ -38,6 +34,11 @@ class ComposeContent : public LayerContent {
   void draw(Canvas* canvas, const Paint& paint) const override;
 
   bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
+
+ protected:
+  LayerContentType Type() const override {
+    return LayerContentType::ComposeContent;
+  }
 
  private:
   std::vector<std::unique_ptr<LayerContent>> contents = {};

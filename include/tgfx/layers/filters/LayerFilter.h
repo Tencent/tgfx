@@ -23,14 +23,6 @@
 
 namespace tgfx {
 
-enum class LayerFilterType {
-  LayerFilter,
-  BlendFilter,
-  BlurFilter,
-  ColorMatrixFliter,
-  DropShadowFilter,
-  InnerShadowFilter
-};
 /**
  * LayerFilter represents a filter that applies effects to a layer, such as blurs, shadows, or color
  * adjustments. It creates a new offscreen image that replaces the original layer content.
@@ -38,9 +30,6 @@ enum class LayerFilterType {
  */
 class LayerFilter : public LayerProperty {
  public:
-  virtual LayerFilterType Type() const {
-    return LayerFilterType::LayerFilter;
-  }
   /**
    * Returns the current image filter for the given scale factor. If the filter has not been
    * created yet, it will be created and cached.
@@ -50,6 +39,18 @@ class LayerFilter : public LayerProperty {
   std::shared_ptr<ImageFilter> getImageFilter(float scale);
 
  protected:
+  enum class LayerFilterType {
+    LayerFilter,
+    BlendFilter,
+    BlurFilter,
+    ColorMatrixFliter,
+    DropShadowFilter,
+    InnerShadowFilter
+  };
+
+  virtual LayerFilterType Type() const {
+    return LayerFilterType::LayerFilter;
+  }
   /**
    * Creates a new image filter for the given scale factor. When it is necessary to recreate the
    * ImageFilter, the onCreateImageFilter method will be called.

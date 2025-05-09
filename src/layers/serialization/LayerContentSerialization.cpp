@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -15,7 +15,7 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#ifdef TGFX_ENABLE_LAYER_INSPECTOR
+#ifdef TGFX_USE_INSPECTOR
 
 #include "LayerContentSerialization.h"
 #include "layers/contents/ComposeContent.h"
@@ -34,25 +34,25 @@ std::shared_ptr<Data> LayerContentSerialization::serializeLayerContent(LayerCont
   SerializeUtils::serializeBegin(fbb, "LayerAttribute", startMap, contentMap);
   auto type = layerContent->Type();
   switch (type) {
-    case LayerContentType::LayerContent:
+    case LayerContent::LayerContentType::LayerContent:
       serializeBasicLayerContentImpl(fbb, layerContent);
       break;
-    case LayerContentType::ComposeContent:
+    case LayerContent::LayerContentType::ComposeContent:
       serializeComposeContentImpl(fbb, layerContent);
       break;
-    case LayerContentType::ImageContent:
+    case LayerContent::LayerContentType::ImageContent:
       serializeImageContentImpl(fbb, layerContent);
       break;
-    case LayerContentType::RasterizedContent:
+    case LayerContent::LayerContentType::RasterizedContent:
       serializeRasterizedContentImpl(fbb, layerContent);
       break;
-    case LayerContentType::ShapeContent:
+    case LayerContent::LayerContentType::ShapeContent:
       serializeShapeContentImpl(fbb, layerContent);
       break;
-    case LayerContentType::SolidContent:
+    case LayerContent::LayerContentType::SolidContent:
       serializeSolidContentImpl(fbb, layerContent);
       break;
-    case LayerContentType::TextContent:
+    case LayerContent::LayerContentType::TextContent:
       serializeTextContentImpl(fbb, layerContent);
       break;
   }

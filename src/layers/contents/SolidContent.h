@@ -25,10 +25,6 @@ class SolidContent : public LayerContent {
  public:
   SolidContent(const RRect& rRect, const Color& color);
 
-  LayerContentType Type() const override {
-    return LayerContentType::SolidContent;
-  }
-
   Rect getBounds() const override {
     return _rRect.rect;
   }
@@ -36,6 +32,11 @@ class SolidContent : public LayerContent {
   void draw(Canvas* canvas, const Paint& paint) const override;
 
   bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
+
+ protected:
+  LayerContentType Type() const override {
+    return LayerContentType::SolidContent;
+  }
 
  private:
   RRect _rRect;

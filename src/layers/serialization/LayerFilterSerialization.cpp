@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -15,7 +15,7 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#ifdef TGFX_ENABLE_LAYER_INSPECTOR
+#ifdef TGFX_USE_INSPECTOR
 
 #include "LayerFilterSerialization.h"
 #include <tgfx/layers/filters/BlendFilter.h>
@@ -35,22 +35,22 @@ std::shared_ptr<Data> LayerFilterSerialization::serializeLayerFilter(LayerFilter
   SerializeUtils::serializeBegin(fbb, "LayerAttribute", startMap, contentMap);
   auto type = layerFilter->Type();
   switch (type) {
-    case LayerFilterType::LayerFilter:
+    case LayerFilter::LayerFilterType::LayerFilter:
       serializeBasicLayerFilterImpl(fbb, layerFilter);
       break;
-    case LayerFilterType::BlendFilter:
+    case LayerFilter::LayerFilterType::BlendFilter:
       serializeBlendFilterImpl(fbb, layerFilter);
       break;
-    case LayerFilterType::BlurFilter:
+    case LayerFilter::LayerFilterType::BlurFilter:
       serializeBlurFilterImpl(fbb, layerFilter);
       break;
-    case LayerFilterType::ColorMatrixFliter:
+    case LayerFilter::LayerFilterType::ColorMatrixFliter:
       serializeColorMatrixFilterImpl(fbb, layerFilter);
       break;
-    case LayerFilterType::DropShadowFilter:
+    case LayerFilter::LayerFilterType::DropShadowFilter:
       serializeDropShadowFilterImpl(fbb, layerFilter);
       break;
-    case LayerFilterType::InnerShadowFilter:
+    case LayerFilter::LayerFilterType::InnerShadowFilter:
       serializeInnerShadowFilterImpl(fbb, layerFilter);
       break;
   }

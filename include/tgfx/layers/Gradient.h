@@ -98,10 +98,6 @@ class Gradient : public ShapeStyle {
                                                       const std::vector<Color>& colors,
                                                       const std::vector<float>& positions = {});
 
-  ShapeStyleType getType() const override {
-    return ShapeStyleType::Gradient;
-  }
-
   /**
    * Returns the gradient type. Possible values are GradientType::Linear, GradientType::Radial, and
    * GradientType::Conic.
@@ -135,6 +131,9 @@ class Gradient : public ShapeStyle {
   void setPositions(std::vector<float> positions);
 
  protected:
+  ShapeStyleType getType() const override {
+    return ShapeStyleType::Gradient;
+  }
   std::vector<Color> _colors;
   std::vector<float> _positions;
 

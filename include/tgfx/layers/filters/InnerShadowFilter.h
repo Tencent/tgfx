@@ -34,10 +34,6 @@ class InnerShadowFilter : public LayerFilter {
                                                  float blurrinessY, const Color& color,
                                                  bool innerShadowOnly = false);
 
-  LayerFilterType Type() const override {
-    return LayerFilterType::InnerShadowFilter;
-  }
-
   /**
    * The x offset of the shadow.
    */
@@ -116,6 +112,9 @@ class InnerShadowFilter : public LayerFilter {
   void setInnerShadowOnly(bool value);
 
  protected:
+  LayerFilterType Type() const override {
+    return LayerFilterType::InnerShadowFilter;
+  }
   std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) override;
 
  private:
