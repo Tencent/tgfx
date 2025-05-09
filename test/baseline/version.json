@@ -1,6 +1,7 @@
 {
     "CanvasTest": {
         "AdaptiveDashEffect": "330279d",
+        "BlendFormula": "2f202813",
         "Clip": "d010fb8",
         "ClipAll": "d0e35c3",
         "DiscardContent": "4c590832",
@@ -134,8 +135,8 @@
         "filterTest": "c475bfb",
         "filters": "c475bfb",
         "getBounds": "15e0e39",
-        "getTightBounds": "8bd92e6",
         "getLayersUnderPoint": "50136952",
+        "getTightBounds": "8bd92e6",
         "greyColorMatrix": "a1605b2",
         "identityMatrix": "a1605b2",
         "imageLayer": "e5103ae6",

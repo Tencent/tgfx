@@ -566,7 +566,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
     if (!BlendModeAsCoeff(fill.blendMode, op->hasCoverage(), &formula)) {
       xferProcessor =
           ShaderPDXferProcessor::Make(drawingBuffer(), fill.blendMode, std::move(dstTextureInfo));
-      BlendModeAsCoeff(BlendMode::SrcOver, false, &formula);
+      BlendModeAsCoeff(BlendMode::Src, false, &formula);
     } else {
       xferProcessor = PorterDuffXferProcessor::Make(drawingBuffer(), formula, dstTextureInfo);
       if (formula.needSecondaryOutput()) {
