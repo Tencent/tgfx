@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLPorterDuffXferProcessor.h"
-#include "gpu/Blend.h"
 #include "gpu/opengl/GLBlend.h"
 
 namespace tgfx {
@@ -65,18 +64,15 @@ void GLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
     fragBuilder->codeAppend(";");
   }
 
-  if (blendFormula) {
-    AppendCoeffBlend(args.fragBuilder, args.inputColor, args.inputCoverage, dstColor,
-                     args.outputColor, blendFormula.value());
-    return;
-  }
-
   const char* outColor = "localOutputColor";
   fragBuilder->codeAppendf("vec4 %s;", outColor);
   AppendMode(fragBuilder, args.inputColor, args.inputCoverage, dstColor, outColor, blendMode, true);
-  fragBuilder->codeAppendf("%s = %s * %s + (vec4(1.0) - %s) * %s;", outColor,
-                           args.inputCoverage.c_str(), outColor, args.inputCoverage.c_str(),
-                           dstColor.c_str());
+
+  if (!BlendModeAsCoeff(blendMode, true)) {
+    fragBuilder->codeAppendf("%s = %s * %s + (vec4(1.0) - %s) * %s;", outColor,
+                             args.inputCoverage.c_str(), outColor, args.inputCoverage.c_str(),
+                             dstColor.c_str());
+  }
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), outColor);
 }
 

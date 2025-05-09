@@ -45,14 +45,9 @@ class PorterDuffXferProcessor : public XferProcessor {
 
   PorterDuffXferProcessor(BlendMode blend, DstTextureInfo dstTextureInfo)
       : XferProcessor(ClassID()), blendMode(blend), dstTextureInfo(std::move(dstTextureInfo)) {
-    BlendFormula formula = {};
-    if (BlendModeAsCoeff(blend, true, &formula)) {
-      blendFormula.emplace(formula);
-    }
   }
 
   BlendMode blendMode = BlendMode::SrcOver;
-  std::optional<BlendFormula> blendFormula = std::nullopt;
   DstTextureInfo dstTextureInfo = {};
 };
 }  // namespace tgfx

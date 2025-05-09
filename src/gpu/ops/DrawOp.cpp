@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawOp.h"
-#include "gpu/processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
 PlacementPtr<Pipeline> DrawOp::createPipeline(RenderPass* renderPass,
@@ -32,7 +31,7 @@ PlacementPtr<Pipeline> DrawOp::createPipeline(RenderPass* renderPass,
   auto context = renderPass->getContext();
   const auto& swizzle = context->caps()->getWriteSwizzle(format);
   return context->drawingBuffer()->make<Pipeline>(std::move(gp), std::move(fragmentProcessors),
-                                                  numColorProcessors, std::move(_xferProcessor),
+                                                  numColorProcessors, std::move(xferProcessor),
                                                   blendMode, &swizzle);
 }
 }  // namespace tgfx

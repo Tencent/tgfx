@@ -555,17 +555,16 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
     op->addCoverageFP(std::move(clipMask));
   }
   op->setScissorRect(scissorRect);
-  PlacementPtr<XferProcessor> xferProcessor = nullptr;
+  op->setBlendMode(fill.blendMode);
   if (BlendModeNeedDesTexture(fill.blendMode, op->hasCoverage())) {
     auto dstTextureInfo = makeDstTextureInfo(deviceBounds.value_or(Rect::MakeEmpty()), aaType);
     if (!context->caps()->frameBufferFetchSupport && dstTextureInfo.textureProxy == nullptr) {
       return;
     }
-    xferProcessor =
+    auto xferProcessor =
         PorterDuffXferProcessor::Make(drawingBuffer(), fill.blendMode, std::move(dstTextureInfo));
     op->setXferProcessor(std::move(xferProcessor));
   }
-  op->setBlendMode(fill.blendMode);
   ops.emplace_back(std::move(op));
 }
 }  // namespace tgfx

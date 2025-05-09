@@ -36,8 +36,12 @@ class DrawOp : public Op {
     _scissorRect = scissorRect;
   }
 
-  void setBlendMode(const BlendMode& blend) {
-    blendMode = blend;
+  void setBlendMode(BlendMode mode) {
+    blendMode = mode;
+  }
+
+  void setXferProcessor(PlacementPtr<XferProcessor> processor) {
+    xferProcessor = std::move(processor);
   }
 
   void addColorFP(PlacementPtr<FragmentProcessor> colorProcessor) {
@@ -52,10 +56,6 @@ class DrawOp : public Op {
     return !coverages.empty();
   }
 
-  void setXferProcessor(PlacementPtr<XferProcessor> xferProcessor) {
-    _xferProcessor = std::move(xferProcessor);
-  }
-
  protected:
   AAType aaType = AAType::None;
 
@@ -66,7 +66,7 @@ class DrawOp : public Op {
   Rect _scissorRect = {};
   std::vector<PlacementPtr<FragmentProcessor>> colors = {};
   std::vector<PlacementPtr<FragmentProcessor>> coverages = {};
-  PlacementPtr<XferProcessor> _xferProcessor = nullptr;
+  PlacementPtr<XferProcessor> xferProcessor = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
 };
 }  // namespace tgfx

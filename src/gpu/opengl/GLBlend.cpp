@@ -390,11 +390,6 @@ static constexpr OutputHandler kOutputHandlers[] = {
     OutputHandler_None,       OutputHandler_Coverage,    OutputHandler_Modulate,
     OutputHandler_SAModulate, OutputHandler_ISAModulate, OutputHandler_ISCModulate};
 
-void AppendOutputColorTerm(FragmentShaderBuilder* fragBuilder, BlendFormula::OutputType outputType,
-                           const std::string& inColor, const std::string& inCoverage) {
-  kOutputHandlers[static_cast<int>(outputType)](fragBuilder, inColor.c_str(), inCoverage.c_str());
-}
-
 static void CoeffHandler_ONE(FragmentShaderBuilder* fsBuilder, const char*, const char*,
                              const char*) {
   fsBuilder->codeAppend(";");
@@ -481,13 +476,15 @@ void AppendCoeffBlend(FragmentShaderBuilder* fsBuilder, const std::string& srcCo
                       const std::string& outColor, const BlendFormula& formula) {
   std::string primaryOutputColor = "primaryOutputColor";
   fsBuilder->codeAppendf("vec4 %s = ", primaryOutputColor.c_str());
-  AppendOutputColorTerm(fsBuilder, formula.primaryOutputType(), srcColor, coverageColor);
+  kOutputHandlers[static_cast<int>(formula.primaryOutputType())](fsBuilder, srcColor.c_str(),
+                                                                 coverageColor.c_str());
 
   std::string secondaryOutputColor;
   if (formula.needSecondaryOutput()) {
     secondaryOutputColor = "secondaryOutputColor";
     fsBuilder->codeAppendf("vec4 %s = ", secondaryOutputColor.c_str());
-    AppendOutputColorTerm(fsBuilder, formula.secondaryOutputType(), srcColor, coverageColor);
+    kOutputHandlers[static_cast<int>(formula.secondaryOutputType())](fsBuilder, srcColor.c_str(),
+                                                                     coverageColor.c_str());
   }
 
   auto dstWithCoeff = "dst";
