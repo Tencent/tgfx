@@ -423,10 +423,12 @@ class Layer {
    * targetCoordinateSpace layer. If the targetCoordinateSpace is nullptr, this method returns a
    * rectangle that defines the area of the layer relative to its own coordinates.
    * @param targetCoordinateSpace The layer that defines the coordinate system to use.
+   * @param computeTightBounds Determines whether to calculate the exact tight bounding box (true)
+   * or a general bounding box that may be larger but is faster to compute (false).
    * @return The rectangle that defines the area of the layer relative to the targetCoordinateSpace
    * layer's coordinate system.
    */
-  Rect getBounds(const Layer* targetCoordinateSpace = nullptr);
+  Rect getBounds(const Layer* targetCoordinateSpace = nullptr, bool computeTightBounds = false);
 
   /**
    * Converts the point from the root's (global) coordinates to the layer's (local) coordinates.
@@ -514,7 +516,7 @@ class Layer {
    * @param alpha The alpha transparency value used for drawing the layer content.
    * @param forContour Whether to draw the layer content for the contour.
    * @param drawChildren A callback function that draws the children of the layer. if the function
-   * return false, the content above children should not be drawn.
+   * returns false, the content above children should not be drawn.
    */
   virtual void drawContents(LayerContent* content, Canvas* canvas, float alpha, bool forContour,
                             const std::function<bool()>& drawChildren) const;
@@ -539,6 +541,8 @@ class Layer {
    * Marks the layer's background as changed and needing to be redrawn.
    */
   void invalidateBackground();
+
+  void invalidate();
 
   void onAttachToRoot(Layer* owner);
 
@@ -586,14 +590,16 @@ class Layer {
 
   bool hasValidMask() const;
 
-  void invalidate();
+  void updateRenderBounds(const Matrix& renderMatrix, const Rect* clipRect = nullptr,
+                          bool forceDirty = false);
+
+  void cleanDirtyFlags();
 
   struct {
-    bool dirtyContent : 1;      // need to update content
-    bool dirtyDescendents : 1;  // need to redraw the layer's descendents
-    bool dirtyTransform : 1;    // need to redraw the layer
-    bool dirtyBackground : 1;   // need to redraw the layer's background, only mark while sibling is
-                                // changed.
+    bool dirtyContent : 1;      // layer's content needs updating
+    bool dirtyDescendents : 1;  // a descendant layer needs redrawing
+    bool dirtyTransform : 1;    // the layer and its children need redrawing
+    bool dirtyBackground : 1;   // the background needs redrawing, triggered by sibling changes
     bool visible : 1;
     bool shouldRasterize : 1;
     bool allowsEdgeAntialiasing : 1;
@@ -615,6 +621,7 @@ class Layer {
   std::unique_ptr<LayerContent> rasterizedContent = nullptr;
   std::vector<std::shared_ptr<Layer>> _children = {};
   std::vector<std::shared_ptr<LayerStyle>> _layerStyles = {};
+  Rect renderBounds = {};
 
   friend class DisplayList;
   friend class LayerProperty;

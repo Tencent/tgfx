@@ -39,7 +39,15 @@ bool DisplayList::render(Surface* surface, bool replaceAll) {
   if (replaceAll) {
     canvas->clear();
   }
+  _root->updateRenderBounds(Matrix::I());
+  Rect renderRect = Rect::MakeWH(surface->width(), surface->height());
+  Matrix inverse = {};
+  if (!canvas->getMatrix().invert(&inverse)) {
+    return true;
+  }
+  renderRect = inverse.mapRect(renderRect);
   DrawArgs args(surface->getContext(), true);
+  args.renderRect = &renderRect;
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
   surfaceContentVersion = surface->contentVersion();
   surfaceID = surface->uniqueID();

@@ -53,11 +53,8 @@ class LayerFilter : public LayerProperty {
 
  private:
   bool dirty = true;
-
   float lastScale = 1.0f;
-
   std::unique_ptr<Rect> _clipBounds = nullptr;
-
   std::shared_ptr<ImageFilter> lastFilter;
 };
 }  // namespace tgfx

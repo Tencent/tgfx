@@ -134,6 +134,7 @@
         "filterTest": "c475bfb",
         "filters": "c475bfb",
         "getBounds": "15e0e39",
+        "getTightBounds": "8bd92e6",
         "getLayersUnderPoint": "50136952",
         "greyColorMatrix": "a1605b2",
         "identityMatrix": "a1605b2",
