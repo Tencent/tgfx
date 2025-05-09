@@ -109,7 +109,7 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
   }
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
-  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(fill);
+  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(fill, true);
   auto& clip = state.clip;
   auto clipBounds = getClipBounds(clip);
   if (needLocalBounds) {
@@ -213,7 +213,8 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
   PlacementPtr<DrawOp> drawOp = nullptr;
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
-  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(fill, type == PendingOpType::Image);
+  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(
+      fill, fill.maskFilter != nullptr || !clip.isEmpty(), type == PendingOpType::Image);
   auto aaType = getAAType(fill);
   Rect clipBounds = {};
   if (needLocalBounds) {
@@ -351,10 +352,11 @@ AAType OpsCompositor::getAAType(const Fill& fill) const {
   return AAType::None;
 }
 
-std::pair<bool, bool> OpsCompositor::needComputeBounds(const Fill& fill, bool hasImageFill) {
+std::pair<bool, bool> OpsCompositor::needComputeBounds(const Fill& fill, bool hasCoverage,
+                                                       bool hasImageFill) {
   bool needLocalBounds = hasImageFill || fill.shader != nullptr || fill.maskFilter != nullptr;
   bool needDeviceBounds = false;
-  if (!BlendModeAsCoeff(fill.blendMode)) {
+  if (BlendModeNeedDesTexture(fill.blendMode, hasCoverage)) {
     auto caps = context->caps();
     if (!caps->frameBufferFetchSupport &&
         (!caps->textureBarrierSupport || renderTarget->getTextureProxy() == nullptr ||
@@ -468,6 +470,9 @@ std::pair<PlacementPtr<FragmentProcessor>, bool> OpsCompositor::getClipMaskFP(co
 }
 
 DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AAType aaType) {
+  if (deviceBounds.isEmpty()) {
+    return {};
+  }
   auto caps = context->caps();
   if (caps->frameBufferFetchSupport) {
     return {};

@@ -151,7 +151,9 @@ bool BlendModeNeedDesTexture(BlendMode mode, bool hasCoverage) {
   if (mode == BlendMode::SrcOver) {
     return false;
   }
-  if (hasCoverage || !BlendModeAsCoeff(mode, hasCoverage)) {
+  BlendFormula formula;
+  if (!BlendModeAsCoeff(mode, hasCoverage, &formula) || formula.needSecondaryOutput() ||
+      formula.primaryOutputType() != BlendFormula::OutputType::Modulate) {
     return true;
   }
   return false;
