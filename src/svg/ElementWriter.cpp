@@ -254,8 +254,7 @@ Resources ElementWriter::addImageFilterResource(const std::shared_ptr<ImageFilte
         break;
       }
       case Types::ImageFilterType::InnerShadow: {
-        auto innerShadowFilter =
-            static_cast<const InnerShadowImageFilter*>(imageFilter.get());
+        auto innerShadowFilter = static_cast<const InnerShadowImageFilter*>(imageFilter.get());
         bound = innerShadowFilter->filterBounds(bound);
         filterElement.addAttribute("x", bound.x());
         filterElement.addAttribute("y", bound.y());
@@ -390,10 +389,12 @@ Resources ElementWriter::addResources(const Fill& fill, Context* context,
     auto type = Types::Get(colorFilter.get());
     switch (type) {
       case Types::ColorFilterType::Blend:
-        addBlendColorFilterResources(static_cast<const ModeColorFilter*>(colorFilter.get()), &resources);
+        addBlendColorFilterResources(static_cast<const ModeColorFilter*>(colorFilter.get()),
+                                     &resources);
         break;
       case Types::ColorFilterType::Matrix: {
-        addMatrixColorFilterResources(static_cast<const MatrixColorFilter*>(colorFilter.get()), &resources);
+        addMatrixColorFilterResources(static_cast<const MatrixColorFilter*>(colorFilter.get()),
+                                      &resources);
         break;
       }
       default:
@@ -430,10 +431,12 @@ void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader, Co
       addColorShaderResources(static_cast<const ColorShader*>(decomposedShader), resources);
       break;
     case Types::ShaderType::Gradient:
-      addGradientShaderResources(static_cast<const GradientShader*>(decomposedShader), matrix, resources);
+      addGradientShaderResources(static_cast<const GradientShader*>(decomposedShader), matrix,
+                                 resources);
       break;
     case Types::ShaderType::Image:
-      addImageShaderResources(static_cast<const ImageShader*>(decomposedShader), matrix, context, resources);
+      addImageShaderResources(static_cast<const ImageShader*>(decomposedShader), matrix, context,
+                              resources);
       break;
     default:
       // TODO(YGaurora):
@@ -756,7 +759,8 @@ void ElementWriter::addImageMaskResources(const ImageShader* imageShader,
   auto image = imageShader->image;
   Types::ImageType type = Types::Get(image.get());
   if (type == Types::ImageType::Picture) {
-    addPictureImageMaskResources(static_cast<const PictureImage*>(image.get()), filterID, svgContext);
+    addPictureImageMaskResources(static_cast<const PictureImage*>(image.get()), filterID,
+                                 svgContext);
   } else {
     addRenderImageMaskResources(imageShader, filterID, context);
   }

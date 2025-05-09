@@ -19,11 +19,11 @@
 #pragma once
 
 #include <tgfx/layers/LayerContent.h>
+#include "core/utils/Log.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/MaskFilter.h"
 #include "tgfx/core/Shader.h"
-#include "core/utils/Log.h"
 
 namespace tgfx {
 class Types {

@@ -160,8 +160,7 @@ bool OpsCompositor::CompareFill(const Fill& a, const Fill& b) {
     }
   }
   if (a.colorFilter != b.colorFilter) {
-    if (!a.colorFilter || !b.colorFilter ||
-        !a.colorFilter->isEqual(b.colorFilter.get())) {
+    if (!a.colorFilter || !b.colorFilter || !a.colorFilter->isEqual(b.colorFilter.get())) {
       return false;
     }
   }

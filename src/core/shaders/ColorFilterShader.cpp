@@ -35,8 +35,7 @@ bool ColorFilterShader::isEqual(const Shader* otherShader) const {
     return false;
   }
   auto other = static_cast<const ColorFilterShader*>(otherShader);
-  return colorFilter->isEqual(other->colorFilter.get()) &&
-         shader->isEqual(other->shader.get());
+  return colorFilter->isEqual(other->colorFilter.get()) && shader->isEqual(other->shader.get());
 }
 
 PlacementPtr<FragmentProcessor> ColorFilterShader::asFragmentProcessor(

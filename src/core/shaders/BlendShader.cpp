@@ -54,8 +54,7 @@ bool BlendShader::isEqual(const Shader* shader) const {
     return false;
   }
   auto other = static_cast<const BlendShader*>(shader);
-  return mode == other->mode && dst->isEqual(other->dst.get()) &&
-         src->isEqual(other->src.get());
+  return mode == other->mode && dst->isEqual(other->dst.get()) && src->isEqual(other->src.get());
 }
 
 PlacementPtr<FragmentProcessor> BlendShader::asFragmentProcessor(const FPArgs& args,
