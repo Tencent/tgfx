@@ -93,7 +93,7 @@ void ShapeDrawOp::execute(RenderPass* renderPass) {
 }
 
 bool ShapeDrawOp::hasCoverage() const {
-  return DrawOp::hasCoverage() || (shapeProxy && shapeProxy->getTriangles() != nullptr);
+  return DrawOp::hasCoverage() || (shapeProxy && shapeProxy->getTriangles() == nullptr);
 }
 
 }  // namespace tgfx

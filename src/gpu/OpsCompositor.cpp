@@ -576,6 +576,8 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
       }
     }
     op->setXferProcessor(std::move(xferProcessor));
+  } else {
+    BlendModeAsCoeff(fill.blendMode, false, &formula);
   }
   op->setBlendFormula(formula);
   ops.emplace_back(std::move(op));
