@@ -36,7 +36,7 @@ class Pipeline : public ProgramInfo {
   Pipeline(PlacementPtr<GeometryProcessor> geometryProcessor,
            std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors,
            size_t numColorProcessors, PlacementPtr<XferProcessor> xferProcessor,
-           BlendFormula blendFormula, const Swizzle* outputSwizzle);
+           BlendMode blendMode, const Swizzle* outputSwizzle);
 
   size_t numColorFragmentProcessors() const {
     return numColorProcessors;
@@ -65,7 +65,7 @@ class Pipeline : public ProgramInfo {
   }
 
   const BlendFormula* blendFormula() const override {
-    return &_blendFormula;
+    return xferProcessor == nullptr ? &_blendFormula : nullptr;
   }
 
   void getUniforms(UniformBuffer* uniformBuffer) const override;

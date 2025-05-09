@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,140 +17,25 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLPorterDuffXferProcessor.h"
+#include "gpu/Blend.h"
+#include "gpu/opengl/GLBlend.h"
 
 namespace tgfx {
-
-static void AppendOutputColor(FragmentShaderBuilder* fragBuilder,
-                              BlendFormula::OutputType outputType, const std::string& output,
-                              const std::string& inColor, const std::string& inCoverage) {
-  switch (outputType) {
-    case BlendFormula::OutputType::None:
-      fragBuilder->codeAppendf("%s = vec4(0.0);", output.c_str());
-      break;
-    case BlendFormula::OutputType::Coverage:
-      fragBuilder->codeAppendf("%s = %s;", output.c_str(), inCoverage.c_str());
-      break;
-    case BlendFormula::OutputType::Modulate:
-      fragBuilder->codeAppendf("%s = %s * %s;", output.c_str(), inColor.c_str(),
-                               inCoverage.c_str());
-      break;
-    case BlendFormula::OutputType::SAModulate:
-      fragBuilder->codeAppendf("%s = %s.a * %s;", output.c_str(), inColor.c_str(),
-                               inCoverage.c_str());
-      break;
-    case BlendFormula::OutputType::ISAModulate:
-      fragBuilder->codeAppendf("%s = (1.0 - %s.a) * %s;", output.c_str(), inColor.c_str(),
-                               inCoverage.c_str());
-      break;
-    case BlendFormula::OutputType::ISCModulate:
-      fragBuilder->codeAppendf("%s = (vec4(1.0) - %s) * %s;", output.c_str(), inColor.c_str(),
-                               inCoverage.c_str());
-      break;
-    default:
-      break;
-  }
+PlacementPtr<PorterDuffXferProcessor> PorterDuffXferProcessor::Make(BlockBuffer* buffer,
+                                                                    BlendMode blend,
+                                                                    DstTextureInfo dstTextureInfo) {
+  return buffer->make<GLPorterDuffXferProcessor>(blend, std::move(dstTextureInfo));
 }
 
-static void AppendCoeff(FragmentShaderBuilder* fragBuilder, BlendModeCoeff coeff,
-                        const std::string& input1, const std::string& input2,
-                        const std::string& dstColor, const std::string& output) {
-  switch (coeff) {
-    case BlendModeCoeff::Zero:
-      fragBuilder->codeAppendf("%s = vec4(0.0);", output.c_str());
-      break;
-    case BlendModeCoeff::One:
-      fragBuilder->codeAppendf("%s = vec4(1.0);", output.c_str());
-      break;
-    case BlendModeCoeff::SC:
-      fragBuilder->codeAppendf("%s = %s;", output.c_str(), input1.c_str());
-      break;
-    case BlendModeCoeff::ISC:
-      fragBuilder->codeAppendf("%s = (1.0 - %s);", output.c_str(), input1.c_str(), input2.c_str());
-      break;
-    case BlendModeCoeff::DC:
-      fragBuilder->codeAppendf("%s = %s;", output.c_str(), dstColor.c_str());
-      break;
-    case BlendModeCoeff::IDC:
-      fragBuilder->codeAppendf("%s = (1.0 - %s);", output.c_str(), dstColor.c_str());
-      break;
-    case BlendModeCoeff::SA:
-      fragBuilder->codeAppendf("%s = vec4(%s.a);", output.c_str(), input1.c_str());
-      break;
-    case BlendModeCoeff::ISA:
-      fragBuilder->codeAppendf("%s = vec4(1.0 - %s.a);", output.c_str(), input1.c_str());
-      break;
-    case BlendModeCoeff::DA:
-      fragBuilder->codeAppendf("%s = vec4(%s.a);", output.c_str(), dstColor.c_str());
-      break;
-    case BlendModeCoeff::IDA:
-      fragBuilder->codeAppendf("%s = vec4(1.0 - %s.a);", output.c_str(), dstColor.c_str());
-      break;
-    case BlendModeCoeff::S2A:
-      fragBuilder->codeAppendf("%s = vec4(%s.a);", output.c_str(), input2.c_str());
-      break;
-    case BlendModeCoeff::IS2A:
-      fragBuilder->codeAppendf("%s = vec4(1.0 - %s.a);", output.c_str(), input2.c_str());
-      break;
-    case BlendModeCoeff::S2C:
-      fragBuilder->codeAppendf("%s = %s;", output.c_str(), input2.c_str());
-      break;
-    case BlendModeCoeff::IS2C:
-      fragBuilder->codeAppendf("%s = (1.0 - %s);", output.c_str(), input2.c_str());
-      break;
-  }
-}
-
-static void AppendBlend(FragmentShaderBuilder* fragBuilder, BlendEquation equation,
-                        BlendModeCoeff srcCoeff, BlendModeCoeff dstCoeff, const std::string& input1,
-                        const std::string& input2, const std::string& dstColor,
-                        const std::string& output) {
-  auto dstCoeffName = "dstCoeff";
-  fragBuilder->codeAppendf("vec4 %s = vec4(1.0f);", dstCoeffName);
-  AppendCoeff(fragBuilder, dstCoeff, input1, input2, dstColor, dstCoeffName);
-  auto srcCoeffName = "srcCoeff";
-  fragBuilder->codeAppendf("vec4 %s = vec4(1.0f);", srcCoeffName);
-  AppendCoeff(fragBuilder, srcCoeff, input1, input2, dstColor, srcCoeffName);
-  switch (equation) {
-    case BlendEquation::Add:
-      fragBuilder->codeAppendf("%s = %s * %s + %s * %s;", output.c_str(), input1.c_str(),
-                               srcCoeffName, dstColor.c_str(), dstCoeffName);
-      break;
-    case BlendEquation::Subtract:
-      fragBuilder->codeAppendf("%s = %s * %s - %s * %s;", output.c_str(), input1.c_str(),
-                               srcCoeffName, dstColor.c_str(), dstCoeffName);
-      break;
-    case BlendEquation::ReverseSubtract:
-      fragBuilder->codeAppendf("%s = %s * %s - %s * %s;", output.c_str(), dstColor.c_str(),
-                               dstCoeffName, input1.c_str(), srcCoeffName);
-      break;
-  }
-}
-
-PlacementPtr<PorterDuffXferProcessor> PorterDuffXferProcessor::Make(
-    BlockBuffer* buffer, const BlendFormula& formula, const DstTextureInfo& dstTextureInfo) {
-  return buffer->make<GLPorterDuffXferProcessor>(formula, dstTextureInfo);
-}
-
-GLPorterDuffXferProcessor::GLPorterDuffXferProcessor(const BlendFormula& blendFormula,
-                                                     const DstTextureInfo& dstTextureInfo)
-    : PorterDuffXferProcessor(blendFormula, dstTextureInfo) {
+GLPorterDuffXferProcessor::GLPorterDuffXferProcessor(BlendMode blend, DstTextureInfo dstTextureInfo)
+    : PorterDuffXferProcessor(blend, std::move(dstTextureInfo)) {
 }
 
 void GLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
-  auto fragBuilder = args.fragBuilder;
-  auto uniformHandler = args.uniformHandler;
-
-  std::string primaryOutputColor = "primaryOutputColor";
-
-  args.fragBuilder->codeAppendf("vec4 %s = vec4(0.0);", primaryOutputColor.c_str());
-  AppendOutputColor(args.fragBuilder, blendFormula.primaryOutputType(), primaryOutputColor,
-                    args.inputColor, args.inputCoverage);
-  if (!blendFormula.needSecondaryOutput()) {
-    fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), primaryOutputColor.c_str());
-    return;
-  }
-
+  auto* fragBuilder = args.fragBuilder;
+  auto* uniformHandler = args.uniformHandler;
   const auto& dstColor = fragBuilder->dstColor();
+
   if (args.dstTextureSamplerHandle.isValid()) {
     // While shaders typically don't output negative coverage, we use <= as a precaution against
     // floating point precision errors. We only check the rgb values since the alpha might not be
@@ -180,17 +65,40 @@ void GLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
     fragBuilder->codeAppend(";");
   }
 
-  std::string secondaryOutputColor = "secondaryOutputColor";
-  args.fragBuilder->codeAppendf("vec4 %s = vec4(0.0);", secondaryOutputColor.c_str());
-  AppendOutputColor(args.fragBuilder, blendFormula.secondaryOutputType(), secondaryOutputColor,
-                    args.inputColor, args.inputCoverage);
+  if (blendFormula) {
+    AppendCoeffBlend(args.fragBuilder, args.inputColor, args.inputCoverage, dstColor,
+                     args.outputColor, blendFormula.value());
+    return;
+  }
 
-  AppendBlend(args.fragBuilder, blendFormula.equation(), blendFormula.srcCoeff(),
-              blendFormula.dstCoeff(), primaryOutputColor, secondaryOutputColor, dstColor,
-              args.outputColor);
+  const char* outColor = "localOutputColor";
+  fragBuilder->codeAppendf("vec4 %s;", outColor);
+  AppendMode(fragBuilder, args.inputColor, args.inputCoverage, dstColor, outColor, blendMode, true);
+  fragBuilder->codeAppendf("%s = %s * %s + (vec4(1.0) - %s) * %s;", outColor,
+                           args.inputCoverage.c_str(), outColor, args.inputCoverage.c_str(),
+                           dstColor.c_str());
+  fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), outColor);
 }
 
-void GLPorterDuffXferProcessor::setData(UniformBuffer*) const {
+void GLPorterDuffXferProcessor::setData(UniformBuffer* uniformBuffer) const {
+  if (dstTextureInfo.textureProxy == nullptr) {
+    return;
+  }
+  auto dstTexture = dstTextureInfo.textureProxy->getTexture();
+  if (dstTexture == nullptr) {
+    return;
+  }
+  uniformBuffer->setData("DstTextureUpperLeft", dstTextureInfo.offset);
+  int width;
+  int height;
+  if (dstTexture->getSampler()->type() == SamplerType::Rectangle) {
+    width = 1;
+    height = 1;
+  } else {
+    width = dstTexture->width();
+    height = dstTexture->height();
+  }
+  float scales[] = {1.f / static_cast<float>(width), 1.f / static_cast<float>(height)};
+  uniformBuffer->setData("DstTextureCoordScale", scales);
 }
-
 }  // namespace tgfx

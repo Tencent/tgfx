@@ -30,7 +30,6 @@
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
 #include "processors/PorterDuffXferProcessor.h"
-#include "processors/ShaderPDXferProcessor.h"
 
 namespace tgfx {
 /**
@@ -556,30 +555,17 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
     op->addCoverageFP(std::move(clipMask));
   }
   op->setScissorRect(scissorRect);
-  BlendFormula formula;
   PlacementPtr<XferProcessor> xferProcessor = nullptr;
   if (BlendModeNeedDesTexture(fill.blendMode, op->hasCoverage())) {
     auto dstTextureInfo = makeDstTextureInfo(deviceBounds.value_or(Rect::MakeEmpty()), aaType);
     if (!context->caps()->frameBufferFetchSupport && dstTextureInfo.textureProxy == nullptr) {
       return;
     }
-    if (!BlendModeAsCoeff(fill.blendMode, op->hasCoverage(), &formula)) {
-      xferProcessor =
-          ShaderPDXferProcessor::Make(drawingBuffer(), fill.blendMode, std::move(dstTextureInfo));
-      BlendModeAsCoeff(BlendMode::Src, false, &formula);
-    } else {
-      xferProcessor = PorterDuffXferProcessor::Make(drawingBuffer(), formula, dstTextureInfo);
-      if (formula.needSecondaryOutput()) {
-        // we calculate the output color in the processor, so use the src color as the final
-        // output.
-        BlendModeAsCoeff(BlendMode::Src, false, &formula);
-      }
-    }
+    xferProcessor =
+        PorterDuffXferProcessor::Make(drawingBuffer(), fill.blendMode, std::move(dstTextureInfo));
     op->setXferProcessor(std::move(xferProcessor));
-  } else {
-    BlendModeAsCoeff(fill.blendMode, false, &formula);
   }
-  op->setBlendFormula(formula);
+  op->setBlendMode(fill.blendMode);
   ops.emplace_back(std::move(op));
 }
 }  // namespace tgfx

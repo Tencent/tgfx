@@ -36,8 +36,8 @@ class DrawOp : public Op {
     _scissorRect = scissorRect;
   }
 
-  void setBlendFormula(const BlendFormula& formula) {
-    _formula = formula;
+  void setBlendMode(const BlendMode& blend) {
+    blendMode = blend;
   }
 
   void addColorFP(PlacementPtr<FragmentProcessor> colorProcessor) {
@@ -67,6 +67,6 @@ class DrawOp : public Op {
   std::vector<PlacementPtr<FragmentProcessor>> colors = {};
   std::vector<PlacementPtr<FragmentProcessor>> coverages = {};
   PlacementPtr<XferProcessor> _xferProcessor = nullptr;
-  BlendFormula _formula = {};
+  BlendMode blendMode = BlendMode::SrcOver;
 };
 }  // namespace tgfx
