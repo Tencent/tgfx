@@ -104,7 +104,12 @@ struct BlendFormula {
   };
 
   BlendFormula() {
-    memset(&bitFields, 0, sizeof(bitFields));
+    // default to src-over blendmode
+    bitFields.equation = static_cast<uint8_t>(BlendEquation::Add);
+    bitFields.srcCoeff = static_cast<uint8_t>(BlendModeCoeff::One);
+    bitFields.dstCoeff = static_cast<uint8_t>(BlendModeCoeff::ISA);
+    bitFields.primaryOutputType = static_cast<uint8_t>(OutputType::Modulate);
+    bitFields.secondaryOutputType = static_cast<uint8_t>(OutputType::None);
   }
 
   constexpr BlendFormula(OutputType primaryOutputType, OutputType secondaryOutputType,
