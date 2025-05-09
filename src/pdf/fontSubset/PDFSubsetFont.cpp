@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFSubsetFont.h"
+#include "hb-subset-repacker.h"
 #include "hb-subset.h"
 #include "hb.h"
 #include "pdf/PDFFont.h"
