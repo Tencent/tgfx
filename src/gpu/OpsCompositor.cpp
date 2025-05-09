@@ -20,7 +20,7 @@
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
 #include "core/Rasterizer.h"
-#include "core/utils/Caster.h"
+#include "core/utils/Types.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/ClearOp.h"
@@ -150,19 +150,18 @@ static bool CompareFill(const Fill& a, const Fill& b) {
     return false;
   }
   if (a.shader != b.shader) {
-    if (!a.shader || !b.shader || !Caster::Compare(a.shader.get(), b.shader.get())) {
+    if (!a.shader || !b.shader || !Types::Compare(a.shader.get(), b.shader.get())) {
       return false;
     }
   }
   if (a.maskFilter != b.maskFilter) {
-    if (!a.maskFilter || !b.maskFilter ||
-        !Caster::Compare(a.maskFilter.get(), b.maskFilter.get())) {
+    if (!a.maskFilter || !b.maskFilter || !Types::Compare(a.maskFilter.get(), b.maskFilter.get())) {
       return false;
     }
   }
   if (a.colorFilter != b.colorFilter) {
     if (!a.colorFilter || !b.colorFilter ||
-        !Caster::Compare(a.colorFilter.get(), b.colorFilter.get())) {
+        !Types::Compare(a.colorFilter.get(), b.colorFilter.get())) {
       return false;
     }
   }

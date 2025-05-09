@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ImageShader.h"
-#include "core/utils/Caster.h"
+#include "core/utils/Types.h"
 #include "gpu/TextureSampler.h"
 #include "gpu/ops/DrawOp.h"
 #include "gpu/processors/TiledTextureEffect.h"
@@ -36,9 +36,11 @@ std::shared_ptr<Shader> Shader::MakeImageShader(std::shared_ptr<Image> image, Ti
 }
 
 bool ImageShader::isEqual(const Shader* shader) const {
-  auto other = Caster::AsImageShader(shader);
-  return other && image == other->image && tileModeX == other->tileModeX &&
-         tileModeY == other->tileModeY && sampling == other->sampling;
+  Types::ShaderType type = Types::Get(shader);
+  if (type != Types::ShaderType::Image) return false;
+  auto other = static_cast<const ImageShader*>(shader);
+  return image == other->image && tileModeX == other->tileModeX && tileModeY == other->tileModeY &&
+         sampling == other->sampling;
 }
 
 PlacementPtr<FragmentProcessor> ImageShader::asFragmentProcessor(const FPArgs& args,

@@ -176,6 +176,6 @@ class Shader {
                                                               const Matrix* uvMatrix) const = 0;
 
   friend class FragmentProcessor;
-  friend class Caster;
+  friend class Types;
 };
 }  // namespace tgfx

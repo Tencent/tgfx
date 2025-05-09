@@ -23,9 +23,10 @@
 #include "ElementWriter.h"
 #include "SVGUtils.h"
 #include "core/CanvasState.h"
-#include "core/utils/Caster.h"
+#include "core/images/CodecImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/Types.h"
 #include "svg/SVGTextBuilder.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Fill.h"
@@ -323,9 +324,11 @@ bool SVGExportContext::RequiresViewportReset(const Fill& fill) {
     return false;
   }
 
-  if (const auto* imageShader = Caster::AsImageShader(shader.get())) {
+  if (Types::Get(shader.get()) == Types::ShaderType::Image) {
+    const auto* imageShader = static_cast<const ImageShader*>(shader.get());
     return imageShader->tileModeX == TileMode::Repeat || imageShader->tileModeY == TileMode::Repeat;
   }
+
   return false;
 }
 
@@ -398,10 +401,9 @@ Bitmap SVGExportContext::ImageExportToBitmap(Context* context,
 }
 
 std::shared_ptr<Data> SVGExportContext::ImageToEncodedData(const std::shared_ptr<Image>& image) {
-  const auto* codecImage = Caster::AsCodecImage(image.get());
-  if (!codecImage) {
-    return nullptr;
-  }
+  Types::ImageType type = Types::Get(image.get());
+  if (type != Types::ImageType::Codec) return nullptr;
+  const auto* codecImage = static_cast<const CodecImage*>(image.get());
   auto imageCodec = codecImage->codec();
   return imageCodec->getEncodedData();
 }
