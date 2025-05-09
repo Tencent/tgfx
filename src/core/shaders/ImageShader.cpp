@@ -36,8 +36,10 @@ std::shared_ptr<Shader> Shader::MakeImageShader(std::shared_ptr<Image> image, Ti
 }
 
 bool ImageShader::isEqual(const Shader* shader) const {
-  Types::ShaderType type = Types::Get(shader);
-  if (type != Types::ShaderType::Image) return false;
+  auto type = Types::Get(shader);
+  if (type != Types::ShaderType::Image) {
+    return false;
+  }
   auto other = static_cast<const ImageShader*>(shader);
   return image == other->image && tileModeX == other->tileModeX && tileModeY == other->tileModeY &&
          sampling == other->sampling;

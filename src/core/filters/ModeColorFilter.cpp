@@ -60,8 +60,10 @@ bool ModeColorFilter::asColorMode(Color* color, BlendMode* mode) const {
 }
 
 bool ModeColorFilter::isEqual(const ColorFilter* colorFilter) const {
-  Types::ColorFilterType type = Types::Get(colorFilter);
-  if (type != Types::ColorFilterType::Blend) return false;
+  auto type = Types::Get(colorFilter);
+  if (type != Types::ColorFilterType::Blend) {
+    return false;
+  }
   auto other = static_cast<const ModeColorFilter*>(colorFilter);
   return color == other->color && mode == other->mode;
 }

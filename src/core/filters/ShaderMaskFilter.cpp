@@ -35,10 +35,12 @@ std::shared_ptr<MaskFilter> ShaderMaskFilter::makeWithMatrix(const Matrix& viewM
 }
 
 bool ShaderMaskFilter::isEqual(const MaskFilter* maskFilter) const {
-  Types::MaskFilterType type = Types::Get(maskFilter);
-  if (type != Types::MaskFilterType::Shader) return false;
+  auto type = Types::Get(maskFilter);
+  if (type != Types::MaskFilterType::Shader) {
+    return false;
+  }
   auto other = static_cast<const ShaderMaskFilter*>(maskFilter);
-  return inverted == other->inverted && Types::Compare(shader.get(), other->shader.get());
+  return inverted == other->inverted && shader->isEqual(other->shader.get());
 }
 
 PlacementPtr<FragmentProcessor> ShaderMaskFilter::asFragmentProcessor(

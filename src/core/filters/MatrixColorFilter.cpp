@@ -37,8 +37,10 @@ MatrixColorFilter::MatrixColorFilter(const std::array<float, 20>& matrix)
 }
 
 bool MatrixColorFilter::isEqual(const ColorFilter* colorFilter) const {
-  Types::ColorFilterType type = Types::Get(colorFilter);
-  if (type != Types::ColorFilterType::Matrix) return false;
+  auto type = Types::Get(colorFilter);
+  if (type != Types::ColorFilterType::Matrix) {
+    return false;
+  }
   auto other = static_cast<const MatrixColorFilter*>(colorFilter);
   return matrix == other->matrix;
 }

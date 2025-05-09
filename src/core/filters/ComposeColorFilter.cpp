@@ -45,8 +45,10 @@ bool ComposeColorFilter::isAlphaUnchanged() const {
 }
 
 bool ComposeColorFilter::isEqual(const ColorFilter* colorFilter) const {
-  Types::ColorFilterType type = Types::Get(colorFilter);
-  if (type != Types::ColorFilterType::Compose) return false;
+  auto type = Types::Get(colorFilter);
+  if (type != Types::ColorFilterType::Compose) {
+    return false;
+  }
   auto other = static_cast<const ComposeColorFilter*>(colorFilter);
   return inner->isEqual(other->inner.get()) && outer->isEqual(other->outer.get());
 }

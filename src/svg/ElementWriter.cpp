@@ -229,10 +229,10 @@ Resources ElementWriter::addImageFilterResource(const std::shared_ptr<ImageFilte
   {
     ElementWriter filterElement("filter", writer);
     filterElement.addAttribute("id", filterID);
-    Types::ImageFilterType type = Types::Get(imageFilter.get());
+    auto type = Types::Get(imageFilter.get());
     switch (type) {
       case Types::ImageFilterType::Blur: {
-        const auto* blurFilter = static_cast<const BlurImageFilter*>(imageFilter.get());
+        auto blurFilter = static_cast<const BlurImageFilter*>(imageFilter.get());
         bound = blurFilter->filterBounds(bound);
         filterElement.addAttribute("x", bound.x());
         filterElement.addAttribute("y", bound.y());
@@ -243,7 +243,7 @@ Resources ElementWriter::addImageFilterResource(const std::shared_ptr<ImageFilte
         break;
       }
       case Types::ImageFilterType::DropShadow: {
-        const auto* dropShadowFilter = static_cast<const DropShadowImageFilter*>(imageFilter.get());
+        auto dropShadowFilter = static_cast<const DropShadowImageFilter*>(imageFilter.get());
         bound = dropShadowFilter->filterBounds(bound);
         filterElement.addAttribute("x", bound.x());
         filterElement.addAttribute("y", bound.y());
@@ -254,7 +254,7 @@ Resources ElementWriter::addImageFilterResource(const std::shared_ptr<ImageFilte
         break;
       }
       case Types::ImageFilterType::InnerShadow: {
-        const auto* innerShadowFilter =
+        auto innerShadowFilter =
             static_cast<const InnerShadowImageFilter*>(imageFilter.get());
         bound = innerShadowFilter->filterBounds(bound);
         filterElement.addAttribute("x", bound.x());
@@ -295,7 +295,7 @@ void ElementWriter::addDropShadowImageFilter(const DropShadowImageFilter* filter
   {
     ElementWriter blurElement("feGaussianBlur", writer);
     if (Types::Get(filter->blurFilter.get()) == Types::ImageFilterType::Blur) {
-      const auto* blurFilter = static_cast<const BlurImageFilter*>(filter->blurFilter.get());
+      auto blurFilter = static_cast<const BlurImageFilter*>(filter->blurFilter.get());
       blurElement.addAttribute("stdDeviation",
                                std::max(blurFilter->blurrinessX, blurFilter->blurrinessY) / 2.f);
       blurElement.addAttribute("result", "blur");
@@ -349,7 +349,7 @@ void ElementWriter::addInnerShadowImageFilter(const InnerShadowImageFilter* filt
   {
     ElementWriter blurElement("feGaussianBlur", writer);
     if (Types::Get(filter->blurFilter.get()) == Types::ImageFilterType::Blur) {
-      const auto* blurFilter = static_cast<const BlurImageFilter*>(filter->blurFilter.get());
+      auto blurFilter = static_cast<const BlurImageFilter*>(filter->blurFilter.get());
       blurElement.addAttribute("stdDeviation",
                                std::max(blurFilter->blurrinessX, blurFilter->blurrinessY) / 2.f);
     }
@@ -387,16 +387,13 @@ Resources ElementWriter::addResources(const Fill& fill, Context* context,
   }
 
   if (auto colorFilter = fill.colorFilter) {
-    Types::ColorFilterType type = Types::Get(colorFilter.get());
+    auto type = Types::Get(colorFilter.get());
     switch (type) {
-      case Types::ColorFilterType::Blend: {
-        const auto* blendFilter = static_cast<const ModeColorFilter*>(colorFilter.get());
-        addBlendColorFilterResources(blendFilter, &resources);
+      case Types::ColorFilterType::Blend:
+        addBlendColorFilterResources(static_cast<const ModeColorFilter*>(colorFilter.get()), &resources);
         break;
-      }
       case Types::ColorFilterType::Matrix: {
-        const auto* matrixFilter = static_cast<const MatrixColorFilter*>(colorFilter.get());
-        addMatrixColorFilterResources(matrixFilter, &resources);
+        addMatrixColorFilterResources(static_cast<const MatrixColorFilter*>(colorFilter.get()), &resources);
         break;
       }
       default:
@@ -419,7 +416,7 @@ void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader, Co
     const Shader* tempShader = decomposedShader.get();
 
     while (Types::Get(tempShader) == Types::ShaderType::Matrix) {
-      const auto* matrixShader = static_cast<const MatrixShader*>(tempShader);
+      auto matrixShader = static_cast<const MatrixShader*>(tempShader);
       matrix = matrix * matrixShader->matrix;
       tempShader = matrixShader->source.get();
     };
@@ -429,21 +426,15 @@ void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader, Co
 
   Types::ShaderType type = Types::Get(decomposedShader);
   switch (type) {
-    case Types::ShaderType::Color: {
-      const auto* colorShader = static_cast<const ColorShader*>(decomposedShader);
-      addColorShaderResources(colorShader, resources);
+    case Types::ShaderType::Color:
+      addColorShaderResources(static_cast<const ColorShader*>(decomposedShader), resources);
       break;
-    }
-    case Types::ShaderType::Gradient: {
-      const auto* gradientShader = static_cast<const GradientShader*>(decomposedShader);
-      addGradientShaderResources(gradientShader, matrix, resources);
+    case Types::ShaderType::Gradient:
+      addGradientShaderResources(static_cast<const GradientShader*>(decomposedShader), matrix, resources);
       break;
-    }
-    case Types::ShaderType::Image: {
-      const auto* imageShader = static_cast<const ImageShader*>(decomposedShader);
-      addImageShaderResources(imageShader, matrix, context, resources);
+    case Types::ShaderType::Image:
+      addImageShaderResources(static_cast<const ImageShader*>(decomposedShader), matrix, context, resources);
       break;
-    }
     default:
       // TODO(YGaurora):
       // Export color filter shaders as color filters.
@@ -699,7 +690,7 @@ void ElementWriter::addMaskResources(const std::shared_ptr<MaskFilter>& maskFilt
     return;
   }
 
-  const auto* maskShaderFilter = static_cast<const ShaderMaskFilter*>(maskFilter.get());
+  auto maskShaderFilter = static_cast<const ShaderMaskFilter*>(maskFilter.get());
 
   bool inverse = maskShaderFilter->isInverted();
   std::string filterID;
@@ -721,7 +712,7 @@ void ElementWriter::addMaskResources(const std::shared_ptr<MaskFilter>& maskFilt
   Types::ShaderType type = Types::Get(maskShader.get());
   switch (type) {
     case Types::ShaderType::Image: {
-      const auto* imageShader = static_cast<const ImageShader*>(maskShader.get());
+      auto imageShader = static_cast<const ImageShader*>(maskShader.get());
       auto image = imageShader->image;
 
       ElementWriter maskElement("mask", writer);
@@ -765,8 +756,7 @@ void ElementWriter::addImageMaskResources(const ImageShader* imageShader,
   auto image = imageShader->image;
   Types::ImageType type = Types::Get(image.get());
   if (type == Types::ImageType::Picture) {
-    const auto* pictureImage = static_cast<const PictureImage*>(image.get());
-    addPictureImageMaskResources(pictureImage, filterID, svgContext);
+    addPictureImageMaskResources(static_cast<const PictureImage*>(image.get()), filterID, svgContext);
   } else {
     addRenderImageMaskResources(imageShader, filterID, context);
   }

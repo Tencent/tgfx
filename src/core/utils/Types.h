@@ -23,6 +23,7 @@
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/MaskFilter.h"
 #include "tgfx/core/Shader.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
 class Types {
@@ -33,14 +34,29 @@ class Types {
   using ImageType = Image::Type;
   using MaskFilterType = MaskFilter::Type;
 
-  static ShaderType Get(const Shader* shader);
-  static ImageFilterType Get(const ImageFilter* imageFilter);
-  static ColorFilterType Get(const ColorFilter* colorFilter);
-  static ImageType Get(const Image* image);
-  static MaskFilterType Get(const MaskFilter* maskFilter);
+  static ShaderType Get(const Shader* shader) {
+    DEBUG_ASSERT(shader != nullptr);
+    return shader->type();
+  }
 
-  static bool Compare(const Shader* shader, const Shader* other);
-  static bool Compare(const ColorFilter* colorFilter, const ColorFilter* other);
-  static bool Compare(const MaskFilter* maskFilter, const MaskFilter* other);
+  static ImageFilterType Get(const ImageFilter* imageFilter) {
+    DEBUG_ASSERT(imageFilter != nullptr)
+    return imageFilter->type();
+  }
+
+  static ColorFilterType Get(const ColorFilter* colorFilter) {
+    DEBUG_ASSERT(colorFilter != nullptr)
+    return colorFilter->type();
+  }
+
+  static ImageType Get(const Image* image) {
+    DEBUG_ASSERT(image != nullptr)
+    return image->type();
+  }
+
+  static MaskFilterType Get(const MaskFilter* maskFilter) {
+    DEBUG_ASSERT(maskFilter != nullptr)
+    return maskFilter->type();
+  }
 };
 }  // namespace tgfx

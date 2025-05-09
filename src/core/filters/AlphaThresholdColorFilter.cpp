@@ -28,8 +28,10 @@ std::shared_ptr<ColorFilter> ColorFilter::AlphaThreshold(float threshold) {
 }
 
 bool AlphaThresholdColorFilter::isEqual(const ColorFilter* colorFilter) const {
-  Types::ColorFilterType type = Types::Get(colorFilter);
-  if (type != Types::ColorFilterType::AlphaThreshold) return false;
+  auto type = Types::Get(colorFilter);
+  if (type != Types::ColorFilterType::AlphaThreshold) {
+    return false;
+  }
   auto other = static_cast<const AlphaThresholdColorFilter*>(colorFilter);
   return threshold == other->threshold;
 }

@@ -48,10 +48,12 @@ std::shared_ptr<Shader> MatrixShader::makeWithMatrix(const Matrix& viewMatrix) c
 }
 
 bool MatrixShader::isEqual(const Shader* shader) const {
-  Types::ShaderType type = Types::Get(shader);
-  if (type != Types::ShaderType::Matrix) return false;
+  auto type = Types::Get(shader);
+  if (type != Types::ShaderType::Matrix) {
+    return false;
+  }
   auto other = static_cast<const MatrixShader*>(shader);
-  return matrix == other->matrix && Types::Compare(source.get(), other->source.get());
+  return matrix == other->matrix && source->isEqual(other->source.get());
 }
 
 PlacementPtr<FragmentProcessor> MatrixShader::asFragmentProcessor(const FPArgs& args,

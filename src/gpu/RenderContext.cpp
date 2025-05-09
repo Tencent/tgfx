@@ -111,7 +111,7 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect
     // There is no scaling for the source image, so we can disable mipmaps to save memory.
     samplingOptions.mipmapMode = MipmapMode::None;
   }
-  Types::ImageType type = Types::Get(image.get());
+  auto type = Types::Get(image.get());
   if (type != Types::ImageType::Subset) {
     compositor->fillImage(std::move(image), rect, samplingOptions, state, fill);
   } else {

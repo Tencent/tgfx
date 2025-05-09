@@ -37,8 +37,10 @@ bool ColorShader::asColor(Color* output) const {
 }
 
 bool ColorShader::isEqual(const Shader* shader) const {
-  Types::ShaderType type = Types::Get(shader);
-  if (type != Types::ShaderType::Color) return false;
+  auto type = Types::Get(shader);
+  if (type != Types::ShaderType::Color) {
+    return false;
+  }
   auto other = static_cast<const ColorShader*>(shader);
   return color == other->color;
 }
