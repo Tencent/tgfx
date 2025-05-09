@@ -5,6 +5,7 @@ function make_dir() {
   mkdir -p $1
 }
 echo "shell log - autotest start"
+rm -rf third_party/harfbuzz
 ./install_tools.sh
 
 echo $(pwd)
