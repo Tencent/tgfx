@@ -259,11 +259,11 @@ PDFIndirectReference make_type1_font_descriptor(PDFDocument* doc,
 const std::vector<std::string>& type_1_glyph_names(PDFDocument* canon,
                                                    const std::shared_ptr<Typeface>& typeface) {
   auto typefaceID = typeface->uniqueID();
-  auto iter = canon->fType1GlyphNames.find(typefaceID);
-  if (iter == canon->fType1GlyphNames.end()) {
+  auto iter = canon->type1GlyphNames.find(typefaceID);
+  if (iter == canon->type1GlyphNames.end()) {
     std::vector<std::string> names(typeface->glyphsCount());
     PDFFont::GetType1GlyphNames(*typeface, names.data());
-    canon->fType1GlyphNames[typefaceID] = std::move(names);
+    canon->type1GlyphNames[typefaceID] = std::move(names);
   }
   return iter->second;
 }
@@ -272,13 +272,13 @@ PDFIndirectReference type1_font_descriptor(PDFDocument* doc, const PDFStrikeSpec
   auto typeface = pdfStrikeSpec.typeface;
   auto textSize = pdfStrikeSpec.textSize;
   auto typefaceID = typeface->uniqueID();
-  auto iter = doc->fFontDescriptors.find(typefaceID);
-  if (iter != doc->fFontDescriptors.end()) {
+  auto iter = doc->fontDescriptors.find(typefaceID);
+  if (iter != doc->fontDescriptors.end()) {
     return iter->second;
   }
   const FontMetrics* info = PDFFont::GetMetrics(typeface, textSize, doc);
   auto fontDescriptor = make_type1_font_descriptor(doc, pdfStrikeSpec, info);
-  doc->fFontDescriptors[typefaceID] = fontDescriptor;
+  doc->fontDescriptors[typefaceID] = fontDescriptor;
   return fontDescriptor;
 }
 }  // namespace

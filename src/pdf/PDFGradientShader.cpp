@@ -650,7 +650,7 @@ PDFIndirectReference create_smask_graphic_state(PDFDocument* doc,
   PDFIndirectReference luminosityShader = find_pdf_shader(doc, std::move(luminosityState), false);
   auto resources = get_gradient_resource_dict(luminosityShader, PDFIndirectReference());
   auto bbox = state.fBBox;
-  auto contentStream = create_pattern_fill_content(-1, luminosityShader.fValue, bbox);
+  auto contentStream = create_pattern_fill_content(-1, luminosityShader.value, bbox);
   auto contentData = contentStream->readData();
   auto alphaMask = MakePDFFormXObject(doc, contentData, PDFUtils::RectToArray(bbox),
                                       std::move(resources), Matrix::I(), "DeviceRGB");
@@ -678,7 +678,7 @@ PDFIndirectReference make_alpha_function_shader(PDFDocument* doc,
 
   auto resourceDict = get_gradient_resource_dict(colorShader, alphaGsRef);
 
-  auto colorStream = create_pattern_fill_content(alphaGsRef.fValue, colorShader.fValue, bbox);
+  auto colorStream = create_pattern_fill_content(alphaGsRef.value, colorShader.value, bbox);
   auto alphaFunctionShader = PDFDictionary::Make();
   PDFUtils::PopulateTilingPatternDict(alphaFunctionShader.get(), bbox, std::move(resourceDict),
                                       Matrix::I());

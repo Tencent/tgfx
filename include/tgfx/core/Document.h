@@ -21,7 +21,6 @@
 #include <memory>
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Rect.h"
-#include "tgfx/core/Size.h"
 #include "tgfx/core/WriteStream.h"
 
 namespace tgfx {

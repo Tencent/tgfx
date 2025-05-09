@@ -94,14 +94,6 @@ void serializeHeader(PDFOffsetMap* offsetMap, const std::shared_ptr<WriteStream>
   // to prevent the file from being misidentified as text. Here we use TGFX with high bits set.
 }
 
-// PDFIndirectReference make_srgb_color_profile(PDFDocument* doc) {
-//  auto dict = PDFDictionary::Make();
-//   dict->insertInt("N", 3);
-//   dict->insertObject("Range", MakePDFArray(0, 1, 0, 1, 0, 1));
-//   return SkPDFStreamOut(std::move(dict), SkMemoryStream::Make(SkSrgbIcm()), doc,
-//                         SkPDFSteamCompressionEnabled::Yes);
-// }
-
 std::unique_ptr<PDFArray> make_srgb_output_intents(PDFDocument* /*doc*/) {
   // sRGB is specified by HTML, CSS, and SVG.
   auto outputIntent = PDFDictionary::Make("OutputIntent");
@@ -201,9 +193,9 @@ std::string ToValidUtf8String(const Data& d) {
 }
 
 PDFIndirectReference append_destinations(
-    PDFDocument* doc, const std::vector<SkPDFNamedDestination>& namedDestinations) {
+    PDFDocument* doc, const std::vector<PDFNamedDestination>& namedDestinations) {
   PDFDictionary destinations;
-  for (const SkPDFNamedDestination& dest : namedDestinations) {
+  for (const PDFNamedDestination& dest : namedDestinations) {
     auto pdfDest = MakePDFArray();
     pdfDest->reserve(5);
     pdfDest->appendRef(dest.page);
@@ -237,8 +229,8 @@ void serialize_footer(const PDFOffsetMap& offsetMap, const std::shared_ptr<Write
 
 void begin_indirect_object(PDFOffsetMap* offsetMap, PDFIndirectReference ref,
                            const std::shared_ptr<WriteStream>& stream) {
-  offsetMap->markStartOfObject(ref.fValue, stream);
-  stream->writeText(std::to_string(ref.fValue));
+  offsetMap->markStartOfObject(ref.value, stream);
+  stream->writeText(std::to_string(ref.value));
   stream->writeText(" 0 obj\n");  // Generation number is always 0.
 }
 
@@ -248,7 +240,7 @@ void end_indirect_object(const std::shared_ptr<WriteStream>& stream) {
 
 std::vector<const PDFFont*> get_fonts(const PDFDocument& canon) {
   std::vector<const PDFFont*> fonts;
-  for (const auto& [_, strike] : canon.fStrikes) {
+  for (const auto& [_, strike] : canon.strikes) {
     for (const auto& [unused, font] : strike->fontMap) {
       fonts.push_back(font.get());
     }
@@ -256,7 +248,7 @@ std::vector<const PDFFont*> get_fonts(const PDFDocument& canon) {
 
   // Sort so the output PDF is reproducible.
   std::sort(fonts.begin(), fonts.end(), [](const PDFFont* a, const PDFFont* b) {
-    return a->indirectReference().fValue < b->indirectReference().fValue;
+    return a->indirectReference().value < b->indirectReference().value;
   });
   return fonts;
 }
@@ -267,11 +259,11 @@ PDFDocument::PDFDocument(std::shared_ptr<WriteStream> stream, Context* context, 
     : Document(std::move(stream)), _context(context), _metadata(std::move(meta)) {
   constexpr float DpiForRasterScaleOne = 72.0f;
   if (_metadata.rasterDPI != DpiForRasterScaleOne) {
-    fInverseRasterScale = DpiForRasterScaleOne / _metadata.rasterDPI;
-    fRasterScale = _metadata.rasterDPI / DpiForRasterScaleOne;
+    inverseRasterScale = DpiForRasterScaleOne / _metadata.rasterDPI;
+    rasterScale = _metadata.rasterDPI / DpiForRasterScaleOne;
   }
   if (_metadata.structureElementTreeRoot) {
-    fTagTree.init(_metadata.structureElementTreeRoot, _metadata.outline);
+    tagTree.init(_metadata.structureElementTreeRoot, _metadata.outline);
   }
 }
 
@@ -294,38 +286,27 @@ const Matrix& PDFDocument::currentPageTransform() const {
 Canvas* PDFDocument::onBeginPage(float width, float height) {
   if (pages.empty()) {
     // if this is the first page if the document.
-    {
-      std::lock_guard<std::mutex> autoLock(fMutex);
-      serializeHeader(&offsetMap, stream());
-    }
+    serializeHeader(&offsetMap, stream());
 
-    fInfoDict = this->emit(*PDFMetadataUtils::MakeDocumentInformationDict(_metadata));
+    infoDictionary = this->emit(*PDFMetadataUtils::MakeDocumentInformationDict(_metadata));
     if (_metadata.PDFA) {
-      fUUID = PDFMetadataUtils::CreateUUID(_metadata);
+      documentUUID = PDFMetadataUtils::CreateUUID(_metadata);
       // We use the same UUID for Document ID and Instance ID since this
-      // is the first revision of this document (and Skia does not
-      // support revising existing PDF documents).
+      // is the first revision of this document.
       // If we are not in PDF/A mode, don't use a UUID since testing
       // works best with reproducible outputs.
-      fXMP = PDFMetadataUtils::MakeXMPObject(_metadata, fUUID, fUUID, this);
+      documentXMP = PDFMetadataUtils::MakeXMPObject(_metadata, documentUUID, documentUUID, this);
     }
   }
 
   // By scaling the page at the device level, we will create bitmap layer
   // devices at the rasterized scale, not the 72dpi scale.  Bitmap layer
   // devices are created when saveLayer is called with an ImageFilter;  see
-  // SkPDFDevice::onCreateDevice().
-  ISize pageSize = {static_cast<int>(std::round(width * fRasterScale)),
-                    static_cast<int>(std::round(height * fRasterScale))};
+  ISize pageSize = {static_cast<int>(std::round(width * rasterScale)),
+                    static_cast<int>(std::round(height * rasterScale))};
   Matrix initialTransform;
-  // Skia uses the top left as the origin but PDF natively has the origin at the
-  // bottom left. This matrix corrects for that, as well as the raster scale.
-  initialTransform.setScale(fInverseRasterScale, -fInverseRasterScale);
-  initialTransform.setTranslateY(fInverseRasterScale * pageSize.height);
-
-  // fPageDevice = sk_make_sp<SkPDFDevice>(pageSize, this, initialTransform);
-  // reset_object(&fCanvas, fPageDevice);
-  // fCanvas.scale(fRasterScale, fRasterScale);
+  initialTransform.setScale(inverseRasterScale, -inverseRasterScale);
+  initialTransform.setTranslateY(inverseRasterScale * pageSize.height);
 
   drawContext = new PDFExportContext(pageSize, this, initialTransform);
   canvas = new Canvas(drawContext);
@@ -336,14 +317,10 @@ Canvas* PDFDocument::onBeginPage(float width, float height) {
 }
 
 void PDFDocument::onEndPage() {
-  // SkASSERT(!fCanvas.imageInfo().dimensions().isZero());
-  // reset_object(&fCanvas);
-  // SkASSERT(fPageDevice);
-
   auto page = PDFDictionary::Make("Page");
 
-  auto mediaSize = ISize::Make(drawContext->pageSize().width * fInverseRasterScale,
-                               drawContext->pageSize().height * fInverseRasterScale);
+  auto mediaSize = ISize::Make(drawContext->pageSize().width * inverseRasterScale,
+                               drawContext->pageSize().height * inverseRasterScale);
   auto pageContent = drawContext->getContent();
 
   auto resourceDict = drawContext->makeResourceDict();
@@ -351,11 +328,6 @@ void PDFDocument::onEndPage() {
 
   page->insertObject("Resources", std::move(resourceDict));
   page->insertObject("MediaBox", PDFUtils::RectToArray(Rect::MakeSize(mediaSize)));
-
-  // if (std::unique_ptr<PDFArray> annotations = getAnnotations()) {
-  //   page->insertObject("Annots", std::move(annotations));
-  //   fCurrentPageLinks.clear();
-  // }
 
   auto contentStream = Stream::MakeFromData(pageContent);
   page->insertRef("Contents", PDFStreamOut(nullptr, std::move(contentStream), this));
@@ -372,15 +344,13 @@ void PDFDocument::onEndPage() {
 }
 
 void PDFDocument::onClose() {
-  // SkASSERT(fCanvas.imageInfo().dimensions().isZero());
   if (pages.empty()) {
-    this->waitForJobs();
     return;
   }
   auto docCatalog = PDFDictionary::Make("Catalog");
   if (_metadata.PDFA) {
-    DEBUG_ASSERT(fXMP != PDFIndirectReference());
-    docCatalog->insertRef("Metadata", fXMP);
+    DEBUG_ASSERT(documentXMP != PDFIndirectReference());
+    docCatalog->insertRef("Metadata", documentXMP);
     // Don't specify OutputIntents if we are not in PDF/A mode since
     // no one has ever asked for this feature.
     docCatalog->insertObject("OutputIntents", make_srgb_output_intents(this));
@@ -388,20 +358,20 @@ void PDFDocument::onClose() {
 
   docCatalog->insertRef("Pages", generate_page_tree(this, std::move(pages), pageRefs));
 
-  if (!fNamedDestinations.empty()) {
-    docCatalog->insertRef("Dests", append_destinations(this, fNamedDestinations));
-    fNamedDestinations.clear();
+  if (!namedDestinations.empty()) {
+    docCatalog->insertRef("Dests", append_destinations(this, namedDestinations));
+    namedDestinations.clear();
   }
 
   // Handle tagged PDFs.
-  if (PDFIndirectReference root = fTagTree.makeStructTreeRoot(this)) {
+  if (PDFIndirectReference root = tagTree.makeStructTreeRoot(this)) {
     // In the document catalog, indicate that this PDF is tagged.
     auto markInfo = PDFDictionary::Make("MarkInfo");
     markInfo->insertBool("Marked", true);
     docCatalog->insertObject("MarkInfo", std::move(markInfo));
     docCatalog->insertRef("StructTreeRoot", root);
 
-    if (PDFIndirectReference outline = fTagTree.makeOutline(this)) {
+    if (PDFIndirectReference outline = tagTree.makeOutline(this)) {
       docCatalog->insertRef("Outlines", outline);
     }
   }
@@ -415,7 +385,7 @@ void PDFDocument::onClose() {
 
   auto lang = _metadata.lang;
   if (lang.empty()) {
-    lang = fTagTree.getRootLanguage();
+    lang = tagTree.getRootLanguage();
   }
   if (!lang.empty()) {
     docCatalog->insertTextString("Lang", lang);
@@ -427,30 +397,20 @@ void PDFDocument::onClose() {
     f->emitSubset(this);
   }
 
-  this->waitForJobs();
   {
-    std::lock_guard<std::mutex> autoLock(fMutex);
-    serialize_footer(offsetMap, stream(), fInfoDict, docCatalogRef, fUUID);
+    serialize_footer(offsetMap, stream(), infoDictionary, docCatalogRef, documentUUID);
   }
 }
 
 void PDFDocument::onAbort() {
 }
 
-void PDFDocument::waitForJobs() {
-  // fJobCount can increase while we wait.
-  // while (fJobCount > 0) {
-  //   fSemaphore.wait();
-  //   --fJobCount;
-  // }
-}
-
 std::string PDFDocument::nextFontSubsetTag() {
   // PDF 32000-1:2008 Section 9.6.4 FontSubsets "The tag shall consist of six uppercase letters"
   // "followed by a plus sign" "different subsets in the same PDF file shall have different tags."
   // There are 26^6 or 308,915,776 possible values. So start in range then increment and mod.
-  uint32_t thisFontSubsetTag = fNextFontSubsetTag;
-  fNextFontSubsetTag = (fNextFontSubsetTag + 1u) % 308915776u;
+  uint32_t thisFontSubsetTag = nextFontSubsetTag_;
+  nextFontSubsetTag_ = (nextFontSubsetTag_ + 1u) % 308915776u;
 
   std::string subsetTag(7, ' ');
   char* subsetTagData = subsetTag.data();
@@ -463,7 +423,6 @@ std::string PDFDocument::nextFontSubsetTag() {
 }
 
 PDFIndirectReference PDFDocument::emit(const PDFObject& object, PDFIndirectReference ref) {
-  std::lock_guard<std::mutex> autoLock(fMutex);
   object.emitObject(this->beginObject(ref));
   this->endObject();
   return ref;

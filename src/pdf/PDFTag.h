@@ -64,48 +64,48 @@ struct PDFTagNode {
     return std::string(buffer);
   }
 
-  std::unique_ptr<std::vector<PDFTagNode>> fChildren = nullptr;
+  std::unique_ptr<std::vector<PDFTagNode>> children = nullptr;
   struct MarkedContentInfo {
-    Location fLocation;
-    int fMarkId;
+    Location location;
+    int markId;
   };
-  std::vector<MarkedContentInfo> fMarkedContent;
-  int fNodeId;
-  bool fWantTitle;
-  std::string fTypeString;
-  std::string fTitle;
-  std::string fAlt;
-  std::string fLang;
-  PDFIndirectReference fRef;
+  std::vector<MarkedContentInfo> markedContent;
+  int nodeId;
+  bool wantTitle;
+  std::string typeString;
+  std::string title;
+  std::string alt;
+  std::string lang;
+  PDFIndirectReference ref;
   enum class State {
-    kUnknown,
-    kYes,
-    kNo,
+    Unknown,
+    Yes,
+    No,
   };
-  State fCanDiscard = State::kUnknown;
-  std::unique_ptr<PDFArray> fAttributes;
+  State canDiscard = State::Unknown;
+  std::unique_ptr<PDFArray> attributes;
   struct AnnotationInfo {
-    unsigned fPageIndex;
-    PDFIndirectReference fAnnotationRef;
+    unsigned pageIndex;
+    PDFIndirectReference annotationRef;
   };
-  std::vector<AnnotationInfo> fAnnotations;
+  std::vector<AnnotationInfo> annotations;
 };
 
-class SkPDFTagTree {
+class PDFTagTree {
  public:
-  SkPDFTagTree();
-  SkPDFTagTree(const SkPDFTagTree&) = delete;
-  SkPDFTagTree& operator=(const SkPDFTagTree&) = delete;
-  ~SkPDFTagTree();
+  PDFTagTree();
+  PDFTagTree(const PDFTagTree&) = delete;
+  PDFTagTree& operator=(const PDFTagTree&) = delete;
+  ~PDFTagTree();
 
   void init(PDFStructureElementNode*, PDFMetadata::Outline);
 
   class Mark {
-    PDFTagNode* const fNode;
-    size_t const fMarkIndex;
+    PDFTagNode* const node;
+    size_t const markIndex;
 
    public:
-    Mark(PDFTagNode* node, size_t index) : fNode(node), fMarkIndex(index) {
+    Mark(PDFTagNode* node, size_t index) : node(node), markIndex(index) {
     }
     Mark() : Mark(nullptr, 0) {
     }
@@ -115,19 +115,14 @@ class SkPDFTagTree {
     Mark& operator=(Mark&&) = delete;
 
     explicit operator bool() const {
-      return fNode;
+      return node;
     }
     int id();
     Point& point();
   };
 
-  // Used to allow marked content to refer to its corresponding structure
-  // tree node, via a page entry in the parent tree. Returns a false mark if
-  // nodeId is 0.
   Mark createMarkIdForNodeId(int nodeId, unsigned pageIndex, Point);
-  // Used to allow annotations to refer to their corresponding structure
-  // tree node, via the struct parent tree. Returns -1 if no struct parent
-  // key.
+
   int createStructParentKeyForNodeId(int nodeId, unsigned pageIndex);
 
   void addNodeAnnotation(int nodeId, PDFIndirectReference annotationRef, unsigned pageIndex);
@@ -137,24 +132,22 @@ class SkPDFTagTree {
   std::string getRootLanguage();
 
  private:
-  // An entry in a map from a node ID to an indirect reference to its
-  // corresponding structure element node.
   struct IDTreeEntry {
     int nodeId;
     PDFIndirectReference ref;
   };
 
-  void Copy(PDFStructureElementNode& node, PDFTagNode* dst,
+  void Copy(PDFStructureElementNode& node, PDFTagNode* destination,
             std::unordered_map<int, PDFTagNode*>* nodeMap, bool wantTitle);
   PDFIndirectReference PrepareTagTreeToEmit(PDFIndirectReference parent, PDFTagNode* node,
                                             PDFDocument* doc);
 
-  std::unordered_map<int, PDFTagNode*> fNodeMap;
-  std::unique_ptr<PDFTagNode> fRoot = nullptr;
-  PDFMetadata::Outline fOutline;
-  std::vector<std::vector<PDFTagNode*>> fMarksPerPage;
-  std::vector<IDTreeEntry> fIdTreeEntries;
-  std::vector<int> fParentTreeAnnotationNodeIds;
+  std::unordered_map<int, PDFTagNode*> nodeMap;
+  std::unique_ptr<PDFTagNode> root = nullptr;
+  PDFMetadata::Outline outline;
+  std::vector<std::vector<PDFTagNode*>> marksPerPage;
+  std::vector<IDTreeEntry> IDTreeEntries;
+  std::vector<int> parentTreeAnnotationNodeIds;
 };
 
 }  // namespace tgfx

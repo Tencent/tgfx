@@ -29,18 +29,18 @@ namespace tgfx {
 class PDFDocument;
 
 struct PDFIndirectReference {
-  int fValue = -1;
+  int value = -1;
 
   explicit operator bool() const {
-    return fValue != -1;
+    return value != -1;
   }
 
   bool operator==(PDFIndirectReference v) const {
-    return fValue == v.fValue;
+    return value == v.value;
   }
 
   bool operator!=(PDFIndirectReference v) const {
-    return fValue != v.fValue;
+    return value != v.value;
   }
 };
 
@@ -54,10 +54,8 @@ class PDFObject {
   PDFObject& operator=(PDFObject&&) = delete;
   PDFObject& operator=(const PDFObject&) = delete;
 
-  /** Subclasses must implement this method to print the object to the
-   *  PDF file.
-   *  @param catalog  The object catalog to use.
-   *  @param stream   The writable output stream to send the output to.
+  /* 
+   * Subclasses must implement this method to print the object to the PDF file.
    */
   virtual void emitObject(const std::shared_ptr<WriteStream>& stream) const = 0;
 };
@@ -89,8 +87,9 @@ class PDFArray final : public PDFObject {
   void emitObject(const std::shared_ptr<WriteStream>& stream) const override;
 
  private:
-  std::vector<PDFUnion> fValues;
   void append(PDFUnion&& value);
+
+  std::vector<PDFUnion> values;
 };
 
 static inline void PDFArrayAppend(PDFArray* array, int value) {
@@ -142,7 +141,6 @@ class PDFDictionary final : public PDFObject {
   void insertInt(const char key[], int32_t value);
   void insertInt(const char key[], size_t value);
   void insertScalar(const char key[], float value);
-  // void insertColorComponentF(const char key[], float value);
   void insertName(const char key[], const char nameValue[]);
   void insertName(const char key[], std::string nameValue);
   void insertByteString(const char key[], const char value[]);
@@ -175,7 +173,7 @@ namespace std {
 template <>
 struct std::hash<tgfx::PDFIndirectReference> {
   std::size_t operator()(const tgfx::PDFIndirectReference& s) const {
-    return std::hash<int>()(s.fValue);
+    return std::hash<int>()(s.value);
   }
 };
 }  // namespace std

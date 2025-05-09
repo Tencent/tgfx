@@ -26,17 +26,44 @@
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
-
 class PDFArray;
+struct PDFMetadata;
 
+/**
+ * Creates a PDF document.
+ * @param stream The output stream where the PDF file will be written.
+ * @param context The GPU context used for processing images.
+ * @param metadata Metadata describing the PDF file.
+ * @return A Document object that provides interfaces for import operations.
+ */
+std::shared_ptr<Document> MakePDFDocument(std::shared_ptr<WriteStream> stream, Context* context,
+                                          PDFMetadata metadata);
+
+/**
+ * Supports writing custom PDF objects. 
+ * Users need to construct element node objects and their attribute lists according to their own
+ * requirements. The object structure is as follows:
+ *
+ * ElementNode
+ *   ├── children
+ *       ├── ChildElementNode1
+ *       ├── ChildElementNode2
+ *   ├── attributes
+ *       ├── owner1 [name1:value1, name2:value2, ...]
+ *       ├── owner2 [name1:value1, name2:value2, ...]
+ */
+
+/**
+ * PDFAttributeList is a helper class to manage the attributes of a PDF structure element node. 
+ * Each attribute must have an owner (e.g. "Layout", "List", "Table", etc) and an attribute name
+ * (e.g. "BBox", "RowSpan", etc.) from PDF32000_2008 14.8.5, and then a value of the proper type
+ * according to the spec.
+ */
 class PDFAttributeList {
  public:
   PDFAttributeList();
   ~PDFAttributeList();
 
-  // Each attribute must have an owner (e.g. "Layout", "List", "Table", etc)
-  // and an attribute name (e.g. "BBox", "RowSpan", etc.) from PDF32000_2008 14.8.5,
-  // and then a value of the proper type according to the spec.
   void appendInt(const std::string& owner, const std::string& name, int value);
   void appendFloat(const std::string& owner, const std::string& name, float value);
   void appendName(const std::string& owner, const std::string& attrName, const std::string& value);
@@ -46,11 +73,15 @@ class PDFAttributeList {
                          const std::vector<int>& nodeIds);
 
  private:
-  std::unique_ptr<PDFArray> fAttrs;
+  std::unique_ptr<PDFArray> attrs;
 
-  friend class SkPDFTagTree;
+  friend class PDFTagTree;
 };
 
+/**
+ * A custom class representing a PDF structure element node. It includes details such as the node 
+ * type, child nodes, and associated attributes.
+ */
 struct PDFStructureElementNode {
   std::string typeString;
   std::vector<std::unique_ptr<PDFStructureElementNode>> children = {};
@@ -61,9 +92,12 @@ struct PDFStructureElementNode {
   std::string lang;
 };
 
+/**
+ * DateTime structure to represent date and time information. If not set, it defaults to the current
+ * system time.
+ */
 struct DateTime {
-  int16_t timeZoneMinutes = 0;  // The number of minutes that this
-                                // is ahead of or behind UTC.
+  int16_t timeZoneMinutes = 0;  // The number of minutes that this is ahead of or behind UTC.
   uint16_t year = 1;            //!< e.g. 2005
   uint8_t month = 1;            //!< 1..12
   uint8_t dayOfWeek = 0;        //!< 0..6, 0==Sunday
@@ -76,75 +110,84 @@ struct DateTime {
 };
 
 struct PDFMetadata {
-  /** The document's title.
-    */
-  std::string title = {};
+  /** 
+   * The document's title.
+   */
+  std::string title;
 
-  /** The name of the person who created the document.
-    */
-  std::string author = {};
+  /** 
+   * The name of the person who created the document.
+   */
+  std::string author;
 
-  /** The subject of the document.
-    */
-  std::string subject = {};
+  /** 
+   * The subject of the document.
+   */
+  std::string subject;
 
-  /** Keywords associated with the document.  Commas may be used to delineate
-        keywords within the string.
-    */
-  std::string keywords = {};
+  /** 
+   * Keywords associated with the document.  Commas may be used to delineate keywords within the
+   * string.
+   */
+  std::string keywords;
 
-  /** If the document was converted to PDF from another format,
-        the name of the conforming product that created the
-        original document from which it was converted.
-    */
-  std::string creator = {};
+  /** 
+   * If the document was converted to PDF from another format, the name of the conforming product
+   * that created the original document from which it was converted.
+   */
+  std::string creator;
 
-  /** The product that is converting this document to PDF.
-    */
+  /** 
+   * The product that is converting this document to PDF.
+   */
   std::string producer = "TGFX/PDF";
 
-  /** The date and time the document was created.
-        The zero default value represents an unknown/unset time.
-    */
+  /**
+   * The date and time the document was created. The zero default value represents an unknown/unset
+   * time.
+   */
   DateTime creation = {0, 0, 0, 0, 0, 0, 0, 0};
 
-  /** The date and time the document was most recently modified.
-        The zero default value represents an unknown/unset time.
-    */
+  /** 
+   * The date and time the document was most recently modified. The zero default value represents
+   * an unknown/unset time.
+   */
   DateTime modified = {0, 0, 0, 0, 0, 0, 0, 0};
 
-  /** The natural language of the text in the PDF. If fLang is empty, the root
-        StructureElementNode::fLang will be used (if not empty). Text not in
-        this language should be marked with StructureElementNode::fLang.
-    */
-  std::string lang = {};
+  /** 
+   * The natural language of the text in the PDF. If fLang is empty, the root 
+   * StructureElementNode::lang will be used (if not empty). Text not in this language should be
+   * marked with StructureElementNode::lang.
+   */
+  std::string lang;
 
-  /** The DPI (pixels-per-inch) at which features without native PDF support
-        will be rasterized (e.g. draw image with perspective, draw text with
-        perspective, ...)  A larger DPI would create a PDF that reflects the
-        original intent with better fidelity, but it can make for larger PDF
-        files too, which would use more memory while rendering, and it would be
-        slower to be processed or sent online or to printer.
-    */
+  /** 
+   * The DPI (pixels-per-inch) at which features without native PDF support will be rasterized
+   * (e.g. draw image with perspective, draw text with perspective, ...)
+   * A larger DPI would create a PDF that reflects the original intent with better fidelity, but it
+   * can make for larger PDF files too, which would use more memory while rendering, and it would be
+   * slower to be processed or sent online or to printer.
+   */
   float rasterDPI = ScalarDefaultRasterDPI;
 
-  /** If true, include XMP metadata, a document UUID, and sRGB output intent
-        information.  This adds length to the document and makes it
-        non-reproducable, but are necessary features for PDF/A-2b conformance
-    */
+  /** 
+   * If true, include XMP metadata, a document UUID, and sRGB output intent information.  This adds
+   * length to the document and makes it non-reproducable, but are necessary features for PDF/A-2b
+   * conformance
+   */
   bool PDFA = false;
 
-  /** Encoding quality controls the trade-off between size and quality. By
-        default this is set to 101 percent, which corresponds to lossless
-        encoding. If this value is set to a value <= 100, and the image is
-        opaque, it will be encoded (using JPEG) with that quality setting.
-    */
+  /** 
+   * Encoding quality controls the trade-off between size and quality. By default this is set to 101
+   * percent, which corresponds to lossless encoding. If this value is set to a value <= 100, and
+   * the image is opaque, it will be encoded (using JPEG) with that quality setting.
+   */
   int encodingQuality = 101;
 
-  /** An optional tree of structured document tags that provide
-        a semantic representation of the content. The caller
-        should retain ownership.
-    */
+  /** 
+   * An optional tree of structured document tags that provide a semantic representation of the 
+   * content. The caller should retain ownership.
+   */
   PDFStructureElementNode* structureElementTreeRoot = nullptr;
 
   enum class Outline {
@@ -154,9 +197,10 @@ struct PDFMetadata {
 
   Outline outline = Outline::None;
 
-  /** PDF streams may be compressed to save space.
-        Use this to specify the desired compression vs time tradeoff.
-    */
+  /** 
+   * PDF streams may be compressed to save space. Use this to specify the desired compression vs
+   * time tradeoff.
+   */
   enum class CompressionLevel : int {
     Default = -1,
     None = 0,
@@ -167,8 +211,5 @@ struct PDFMetadata {
 
   CompressionLevel compressionLevel = CompressionLevel::Default;
 };
-
-std::shared_ptr<Document> MakePDFDocument(std::shared_ptr<WriteStream> stream, Context* context,
-                                          PDFMetadata metadata);
 
 }  // namespace tgfx

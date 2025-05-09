@@ -52,7 +52,7 @@ void add_subdict(const std::vector<PDFIndirectReference>& resourceList, PDFResou
   if (!resourceList.empty()) {
     auto resources = PDFDictionary::Make();
     for (auto ref : resourceList) {
-      resources->insertRef(get_resource_name(type, ref.fValue), ref);
+      resources->insertRef(get_resource_name(type, ref.value), ref);
     }
     destination->insertObject(resource_name(type), std::move(resources));
   }

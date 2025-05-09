@@ -42,8 +42,11 @@ namespace tgfx {
 class PDFOffsetMap {
  public:
   void markStartOfDocument(const std::shared_ptr<WriteStream>& stream);
+
   void markStartOfObject(int referenceNumber, const std::shared_ptr<WriteStream>& stream);
+
   size_t objectCount() const;
+
   int emitCrossReferenceTable(const std::shared_ptr<WriteStream>& stream) const;
 
  private:
@@ -51,7 +54,7 @@ class PDFOffsetMap {
   size_t baseOffset = SIZE_MAX;
 };
 
-struct SkPDFNamedDestination {
+struct PDFNamedDestination {
   std::shared_ptr<Data> name;
   Point point;
   PDFIndirectReference page;
@@ -77,10 +80,15 @@ struct PDFLink {
 class PDFDocument : public Document {
  public:
   PDFDocument(std::shared_ptr<WriteStream> stream, Context* context, PDFMetadata Metadata);
+
   ~PDFDocument() override;
+
   Canvas* onBeginPage(float width, float height) override;
+
   void onEndPage() override;
+
   void onClose() override;
+
   void onAbort() override;
 
   static std::unique_ptr<Canvas> MakeCanvas(PDFExportContext* drawContext);
@@ -89,24 +97,14 @@ class PDFDocument : public Document {
     return _context;
   }
 
-  /**
-       Serialize the object, as well as any other objects it
-       indirectly refers to.  If any any other objects have been added
-       to the SkPDFObjNumMap without serializing them, they will be
-       serialized as well.
-
-       It might go without saying that objects should not be changed
-       after calling serialize, since those changes will be too late.
-     */
-
   PDFIndirectReference emit(const PDFObject& object, PDFIndirectReference ref);
+
   PDFIndirectReference emit(const PDFObject& object) {
     return this->emit(object, this->reserveRef());
   }
 
   template <typename T>
   void emitStream(const PDFDictionary& dict, T writeStream, PDFIndirectReference ref) {
-    std::lock_guard<std::mutex> autoLock(fMutex);
     auto stream = this->beginObject(ref);
     dict.emitObject(stream);
     stream->writeText(" stream\n");
@@ -125,36 +123,13 @@ class PDFDocument : public Document {
     return drawContext != nullptr;
   }
 
-  //   PDFIndirectReference currentPage() const {
-  //     return SkASSERT(this->hasCurrentPage() && !fPageRefs.empty()), fPageRefs.back();
-  //   }
-
-  //   // Used to allow marked content to refer to its corresponding structure
-  //   // tree node, via a page entry in the parent tree. Returns -1 if no
-  //   // mark ID.
-  //   SkPDFTagTree::Mark createMarkIdForNodeId(int nodeId, SkPoint);
-  //   // Used to allow annotations to refer to their corresponding structure
-  //   // tree node, via the struct parent tree. Returns -1 if no struct parent
-  //   // key.
-  //   int createStructParentKeyForNodeId(int nodeId);
-
-  //   void addNodeTitle(int nodeId, SkSpan<const char>);
-
-  //   std::unique_ptr<SkPDFArray> getAnnotations();
-
   PDFIndirectReference reserveRef() {
-    return PDFIndirectReference{fNextObjectNumber++};
+    return PDFIndirectReference{nextObjectNumber++};
   }
 
   // Returns a tag to prepend to a PostScript name of a subset font. Includes the '+'.
   std::string nextFontSubsetTag();
 
-  // SkExecutor* executor() const {
-  //   return fExecutor;
-  // }
-
-  void incrementJobCount();
-  void signalJobComplete();
   size_t currentPageIndex() {
     return pages.size();
   }
@@ -164,61 +139,41 @@ class PDFDocument : public Document {
 
   const Matrix& currentPageTransform() const;
 
-  //   // Canonicalized objects
-  //   std::unordered_map<SkPDFImageShaderKey, PDFIndirectReference, SkPDFImageShaderKey::Hash>
-  //       fImageShaderMap;
-  //   skia_private::THashMap<SkPDFGradientShader::Key, SkPDFIndirectReference,
-  //                          SkPDFGradientShader::KeyHash>
-  //       fGradientPatternMap;
-  //   skia_private::THashMap<SkBitmapKey, SkPDFIndirectReference> fPDFBitmapMap;
-  //   skia_private::THashMap<SkPDFIccProfileKey, SkPDFIndirectReference, SkPDFIccProfileKey::Hash>
-  //       fICCProfileMap;
+  //fImageShaderMap
+  //fGradientPatternMap
+  //fPDFBitmapMap
+  //fICCProfileMap
+  //fStrokeGSMap
   std::unordered_map<uint32_t, std::unique_ptr<FontMetrics>> fontMetrics;
-  std::unordered_map<uint32_t, std::vector<std::string>> fType1GlyphNames;
-  std::unordered_map<uint32_t, std::vector<Unichar>> fToUnicodeMap;
-  std::unordered_map<uint32_t, PDFIndirectReference> fFontDescriptors;
-  std::unordered_map<uint32_t, PDFIndirectReference> fType3FontDescriptors;
-  std::unordered_map<uint32_t, std::shared_ptr<PDFStrike>> fStrikes;
-  //   skia_private::THashMap<SkPDFStrokeGraphicState, SkPDFIndirectReference,
-  //                          SkPDFStrokeGraphicState::Hash>
-  //       fStrokeGSMap;
-  std::unordered_map<PDFFillGraphicState, PDFIndirectReference> fFillGSMap;
-  //   SkPDFIndirectReference fInvertFunction;
-  PDFIndirectReference fNoSmaskGraphicState;
-  //   std::vector<std::unique_ptr<SkPDFLink>> fCurrentPageLinks;
-  std::vector<SkPDFNamedDestination> fNamedDestinations;
+  std::unordered_map<uint32_t, std::vector<std::string>> type1GlyphNames;
+  std::unordered_map<uint32_t, std::vector<Unichar>> toUnicodeMap;
+  std::unordered_map<uint32_t, PDFIndirectReference> fontDescriptors;
+  std::unordered_map<uint32_t, PDFIndirectReference> type3FontDescriptors;
+  std::unordered_map<uint32_t, std::shared_ptr<PDFStrike>> strikes;
+  std::unordered_map<PDFFillGraphicState, PDFIndirectReference> fillGSMap;
+  PDFIndirectReference noSmaskGraphicState;
+  std::vector<PDFNamedDestination> namedDestinations;
 
  private:
+  std::shared_ptr<WriteStream> beginObject(PDFIndirectReference ref);
+
+  void endObject();
+
   Context* _context = nullptr;
   PDFOffsetMap offsetMap;
   Canvas* canvas = nullptr;
   PDFExportContext* drawContext = nullptr;
-
   std::vector<std::unique_ptr<PDFDictionary>> pages;
   std::vector<PDFIndirectReference> pageRefs;
-
-  //   sk_sp<SkPDFDevice> fPageDevice;
-  std::atomic<int> fNextObjectNumber = {1};
-  // std::atomic<int> fJobCount = {0};
-  uint32_t fNextFontSubsetTag = {0};
-  UUID fUUID;
-  PDFIndirectReference fInfoDict;
-  PDFIndirectReference fXMP;
+  std::atomic<int> nextObjectNumber = {1};
+  uint32_t nextFontSubsetTag_ = {0};
+  UUID documentUUID;
+  PDFIndirectReference infoDictionary;
+  PDFIndirectReference documentXMP;
   PDFMetadata _metadata;
-  float fRasterScale = 1;
-  float fInverseRasterScale = 1;
-  //   SkExecutor* fExecutor = nullptr;
-
-  // For tagged PDFs.
-  SkPDFTagTree fTagTree;
-
-  std::mutex fMutex;
-  // SkSemaphore fSemaphore;
-
-  void waitForJobs();
-
-  std::shared_ptr<WriteStream> beginObject(PDFIndirectReference ref);
-  void endObject();
+  float rasterScale = 1;
+  float inverseRasterScale = 1;
+  PDFTagTree tagTree;
 };
 
 }  // namespace tgfx

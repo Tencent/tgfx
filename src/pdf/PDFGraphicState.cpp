@@ -42,7 +42,7 @@ PDFIndirectReference PDFGraphicState::GetGraphicStateForPaint(PDFDocument* docum
   auto mode = fill.blendMode;
 
   PDFFillGraphicState fillKey = {fill.color.alpha, filter_pdf_blend_mode(mode)};
-  auto& fillMap = document->fFillGSMap;
+  auto& fillMap = document->fillGSMap;
   auto iter = fillMap.find(fillKey);
   if (iter != fillMap.end()) {
     return iter->second;

@@ -304,7 +304,7 @@ Fill clean_paint(const Fill& srcFill) {
 
 int add_resource(std::unordered_set<PDFIndirectReference>& resources, PDFIndirectReference ref) {
   resources.insert(ref);
-  return ref.fValue;
+  return ref.value;
 }
 }  // namespace
 
@@ -312,76 +312,76 @@ namespace {
 class GlyphPositioner {
  public:
   GlyphPositioner(std::shared_ptr<MemoryWriteStream> content, float textSkewX, Point origin)
-      : fContent(std::move(content)), fCurrentMatrixOrigin(origin), fTextSkewX(textSkewX) {
+      : content(std::move(content)), currentMatrixOrigin(origin), textSkewX(textSkewX) {
   }
   ~GlyphPositioner() {
     this->flush();
   }
   void flush() {
-    if (fInText) {
-      fContent->writeText("> Tj\n");
-      fInText = false;
+    if (inText) {
+      content->writeText("> Tj\n");
+      inText = false;
     }
   }
   void setFont(PDFFont* pdfFont) {
     this->flush();
-    fPDFFont = pdfFont;
+    PDFFont = pdfFont;
     // Reader 2020.013.20064 incorrectly advances some Type3 fonts https://crbug.com/1226960
-    bool convertedToType3 = fPDFFont->getType() == FontMetrics::FontType::Other;
-    bool thousandEM = fPDFFont->strike().strikeSpec.unitsPerEM == 1000;
-    fViewersAgreeOnAdvancesInFont = thousandEM || !convertedToType3;
+    bool convertedToType3 = PDFFont->getType() == FontMetrics::FontType::Other;
+    bool thousandEM = PDFFont->strike().strikeSpec.unitsPerEM == 1000;
+    viewersAgreeOnAdvancesInFont = thousandEM || !convertedToType3;
   }
 
   void writeGlyph(uint16_t glyph, float advanceWidth, Point xy) {
-    if (!fInitialized) {
+    if (!initialized) {
       // Flip the text about the x-axis to account for origin swap and include
       // the passed parameters.
-      fContent->writeText("1 0 ");
-      PDFUtils::AppendFloat(-fTextSkewX, fContent);
-      fContent->writeText(" -1 ");
-      PDFUtils::AppendFloat(fCurrentMatrixOrigin.x, fContent);
-      fContent->writeText(" ");
-      PDFUtils::AppendFloat(fCurrentMatrixOrigin.y, fContent);
-      fContent->writeText(" Tm\n");
-      fCurrentMatrixOrigin.set(0.0f, 0.0f);
-      fInitialized = true;
+      content->writeText("1 0 ");
+      PDFUtils::AppendFloat(-textSkewX, content);
+      content->writeText(" -1 ");
+      PDFUtils::AppendFloat(currentMatrixOrigin.x, content);
+      content->writeText(" ");
+      PDFUtils::AppendFloat(currentMatrixOrigin.y, content);
+      content->writeText(" Tm\n");
+      currentMatrixOrigin.set(0.0f, 0.0f);
+      initialized = true;
     }
-    Point position = xy - fCurrentMatrixOrigin;
-    if (!fViewersAgreeOnXAdvance || position != Point{fXAdvance, 0}) {
+    Point position = xy - currentMatrixOrigin;
+    if (!viewersAgreeOnXAdvance || position != Point{XAdvance, 0}) {
       this->flush();
-      PDFUtils::AppendFloat(position.x - (position.y * fTextSkewX), fContent);
-      fContent->writeText(" ");
-      PDFUtils::AppendFloat(-position.y, fContent);
-      fContent->writeText(" Td ");
-      fCurrentMatrixOrigin = xy;
-      fXAdvance = 0;
-      fViewersAgreeOnXAdvance = true;
+      PDFUtils::AppendFloat(position.x - (position.y * textSkewX), content);
+      content->writeText(" ");
+      PDFUtils::AppendFloat(-position.y, content);
+      content->writeText(" Td ");
+      currentMatrixOrigin = xy;
+      XAdvance = 0;
+      viewersAgreeOnXAdvance = true;
     }
-    fXAdvance += advanceWidth;
-    if (!fViewersAgreeOnAdvancesInFont) {
-      fViewersAgreeOnXAdvance = false;
+    XAdvance += advanceWidth;
+    if (!viewersAgreeOnAdvancesInFont) {
+      viewersAgreeOnXAdvance = false;
     }
-    if (!fInText) {
-      fContent->writeText("<");
-      fInText = true;
+    if (!inText) {
+      content->writeText("<");
+      inText = true;
     }
-    if (fPDFFont->multiByteGlyphs()) {
-      PDFUtils::WriteUInt16BE(fContent, glyph);
+    if (PDFFont->multiByteGlyphs()) {
+      PDFUtils::WriteUInt16BE(content, glyph);
     } else {
-      PDFUtils::WriteUInt8(fContent, static_cast<uint8_t>(glyph));
+      PDFUtils::WriteUInt8(content, static_cast<uint8_t>(glyph));
     }
   }
 
  private:
-  std::shared_ptr<MemoryWriteStream> fContent;
-  PDFFont* fPDFFont = nullptr;
-  Point fCurrentMatrixOrigin;
-  float fXAdvance = 0.0f;
-  bool fViewersAgreeOnAdvancesInFont = true;
-  bool fViewersAgreeOnXAdvance = true;
-  float fTextSkewX;
-  bool fInText = false;
-  bool fInitialized = false;
+  std::shared_ptr<MemoryWriteStream> content;
+  PDFFont* PDFFont = nullptr;
+  Point currentMatrixOrigin;
+  float XAdvance = 0.0f;
+  bool viewersAgreeOnAdvancesInFont = true;
+  bool viewersAgreeOnXAdvance = true;
+  float textSkewX;
+  bool inText = false;
+  bool initialized = false;
 };
 
 Unichar map_glyph(const std::vector<Unichar>& glyphToUnicode, GlyphID glyph) {
@@ -773,13 +773,7 @@ void PDFExportContext::onDrawPath(const MCState& state, const Path& path, const 
     return;
   }
 
-  constexpr float ToleranceScale = 0.0625f;  // smaller = better conics (circles).
-  Point scalePoint{0, 0};
-  matrix.mapXY(1.0f, 1.0f, &scalePoint);
-  float matrixScale = scalePoint.length();
-  float tolerance = matrixScale > 0.0f ? ToleranceScale / matrixScale : ToleranceScale;
-
-  PDFUtils::EmitPath(path, false, content, tolerance);
+  PDFUtils::EmitPath(path, false, content);
   PDFUtils::PaintPath(path.getFillType(), content);
 }
 
@@ -1054,7 +1048,7 @@ std::vector<PDFIndirectReference> sort(const std::unordered_set<PDFIndirectRefer
     dst.push_back(ref);
   }
   std::sort(dst.begin(), dst.end(),
-            [](PDFIndirectReference a, PDFIndirectReference b) { return a.fValue < b.fValue; });
+            [](PDFIndirectReference a, PDFIndirectReference b) { return a.value < b.value; });
   return dst;
 }
 }  // namespace
@@ -1364,7 +1358,7 @@ void PDFExportContext::drawFormXObject(PDFIndirectReference xObject,
 }
 
 void PDFExportContext::clearMaskOnGraphicState(const std::shared_ptr<MemoryWriteStream>& stream) {
-  auto& noSMaskGS = document->fNoSmaskGraphicState;
+  auto& noSMaskGS = document->noSmaskGraphicState;
   if (!noSMaskGS) {
     auto tmp = PDFDictionary::Make("ExtGState");
     tmp->insertName("SMask", "None");
@@ -1479,15 +1473,9 @@ void PDFExportContext::drawPathWithFilter(const MCState& state, const Path& orig
           picture ? PDFGraphicState::SMaskMode::Alpha : PDFGraphicState::SMaskMode::Luminosity,
           document),
       contentEntry.stream());
-  // PDFUtils::AppendRectangle(maskBound, contentEntry.stream());
-  {
-    constexpr float ToleranceScale = 0.0625f;  // smaller = better conics (circles).
-    Point scalePoint{0, 0};
-    matrix.mapXY(1.0f, 1.0f, &scalePoint);
-    float matrixScale = scalePoint.length();
-    float tolerance = matrixScale > 0.0f ? ToleranceScale / matrixScale : ToleranceScale;
-    PDFUtils::EmitPath(path, false, contentEntry.stream(), tolerance);
-  }
+
+  PDFUtils::EmitPath(path, false, contentEntry.stream());
+
   PDFUtils::PaintPath(path.getFillType(), contentEntry.stream());
   clearMaskOnGraphicState(contentEntry.stream());
 }

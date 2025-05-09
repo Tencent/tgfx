@@ -20,7 +20,6 @@
 
 #include <memory>
 #include <string>
-#include "tgfx/core/Color.h"
 #include "tgfx/core/WriteStream.h"
 namespace tgfx {
 
@@ -29,8 +28,6 @@ struct PDFIndirectReference;
 
 class PDFUnion {
  public:
-  // Move constructor and assignment operator destroy the argument
-  // and steal their references (if needed).
   PDFUnion& operator=(const PDFUnion&) = delete;
   PDFUnion(const PDFUnion&) = delete;
   PDFUnion(PDFUnion&&) noexcept;

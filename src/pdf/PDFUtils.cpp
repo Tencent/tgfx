@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFUtils.h"
+#include "core/utils/Log.h"
 #include "pdf/FloatToDecimal.h"
 #include "pdf/PDFResourceDictionary.h"
 #include "pdf/PDFTypes.h"
@@ -29,9 +30,8 @@
 namespace tgfx {
 
 namespace {
-// return "x/pow(10, places)", given 0<x<pow(10, places)
-// result points to places+2 chars.
-size_t print_permil_as_decimal(int x, char* result, int places) {
+
+size_t PrintPermilAsDecimal(int x, char* result, int places) {
   result[0] = '.';
   for (int i = places; i > 0; --i) {
     result[i] = '0' + x % 10;
@@ -45,6 +45,10 @@ size_t print_permil_as_decimal(int x, char* result, int places) {
   }
   result[j + 1] = '\0';
   return j + 1;
+}
+
+constexpr int IntPow(int base, unsigned exp, int acc = 1) {
+  return exp < 1 ? acc : IntPow(base * base, exp / 2, (exp % 2) ? acc * base : acc);
 }
 
 }  // namespace
@@ -65,22 +69,18 @@ size_t PDFUtils::ColorToDecimal(uint8_t value, char result[5]) {
     return 1;
   }
   int x = static_cast<int>(std::round((1000.0 / 255.0) * value));
-  return print_permil_as_decimal(x, result, 3);
-}
-
-static constexpr int int_pow(int base, unsigned exp, int acc = 1) {
-  return exp < 1 ? acc : int_pow(base * base, exp / 2, (exp % 2) ? acc * base : acc);
+  return PrintPermilAsDecimal(x, result, 3);
 }
 
 size_t PDFUtils::ColorToDecimal(float value, char result[6]) {
-  constexpr int factor = int_pow(10, 4);
+  constexpr int factor = IntPow(10, 4);
   int x = static_cast<int>(std::round(value * factor));
   if (x >= factor || x <= 0) {  // clamp to 0-1
     result[0] = x > 0 ? '1' : '0';
     result[1] = '\0';
     return 1;
   }
-  return print_permil_as_decimal(x, result, 4);
+  return PrintPermilAsDecimal(x, result, 4);
 }
 
 void PDFUtils::GetDateTime(DateTime* dataTime) {
@@ -98,6 +98,38 @@ void PDFUtils::GetDateTime(DateTime* dataTime) {
     dataTime->hour = static_cast<uint8_t>(tstruct.tm_hour);
     dataTime->minute = static_cast<uint8_t>(tstruct.tm_min);
     dataTime->second = static_cast<uint8_t>(tstruct.tm_sec);
+  }
+}
+
+void PDFUtils::AppendColorComponent(uint8_t value, const std::shared_ptr<WriteStream>& stream) {
+  char buffer[5];
+  size_t len = ColorToDecimal(value, buffer);
+  stream->write(buffer, len);
+}
+
+void PDFUtils::AppendColorComponent(float value, const std::shared_ptr<WriteStream>& stream) {
+  char buffer[7];
+  size_t len = ColorToDecimal(value, buffer);
+  stream->write(buffer, len);
+}
+
+void PDFUtils::WriteUInt8(const std::shared_ptr<WriteStream>& stream, uint8_t value) {
+  char result[2] = {HexadecimalDigits::upper[value >> 4], HexadecimalDigits::upper[value & 0xF]};
+  stream->write(result, 2);
+}
+
+void PDFUtils::WriteUInt16BE(const std::shared_ptr<WriteStream>& stream, uint16_t value) {
+  char result[4] = {
+      HexadecimalDigits::upper[value >> 12], HexadecimalDigits::upper[0xF & (value >> 8)],
+      HexadecimalDigits::upper[0xF & (value >> 4)], HexadecimalDigits::upper[0xF & (value)]};
+  stream->write(result, 4);
+}
+
+void PDFUtils::WriteUTF16beHex(const std::shared_ptr<WriteStream>& stream, Unichar utf32) {
+  auto UTF16String = UTF::ToUTF16(utf32);
+  WriteUInt16BE(stream, static_cast<uint16_t>(UTF16String[0]));
+  if (UTF16String.size() == 2) {
+    WriteUInt16BE(stream, static_cast<uint16_t>(UTF16String[1]));
   }
 }
 
@@ -210,7 +242,7 @@ void ClosePath(const std::shared_ptr<WriteStream>& content) {
 }  // namespace
 
 void PDFUtils::EmitPath(const Path& path, bool doConsumeDegerates,
-                        const std::shared_ptr<MemoryWriteStream>& content, float /*tolerance*/) {
+                        const std::shared_ptr<MemoryWriteStream>& content) {
   if (path.isEmpty()) {
     PDFUtils::AppendRectangle({0, 0, 0, 0}, content);
     return;

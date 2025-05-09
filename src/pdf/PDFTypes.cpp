@@ -28,18 +28,18 @@
 namespace tgfx {
 
 size_t PDFArray::size() const {
-  return fValues.size();
+  return values.size();
 }
 
 void PDFArray::reserve(size_t length) {
-  fValues.reserve(length);
+  values.reserve(length);
 }
 
 void PDFArray::emitObject(const std::shared_ptr<WriteStream>& stream) const {
   stream->writeText("[");
-  for (size_t i = 0; i < fValues.size(); i++) {
-    fValues[i].emitObject(stream);
-    if (i + 1 < fValues.size()) {
+  for (size_t i = 0; i < values.size(); i++) {
+    values[i].emitObject(stream);
+    if (i + 1 < values.size()) {
       stream->writeText(" ");
     }
   }
@@ -47,7 +47,7 @@ void PDFArray::emitObject(const std::shared_ptr<WriteStream>& stream) const {
 }
 
 void PDFArray::append(PDFUnion&& value) {
-  fValues.emplace_back(std::move(value));
+  values.emplace_back(std::move(value));
 }
 
 void PDFArray::appendInt(int32_t value) {

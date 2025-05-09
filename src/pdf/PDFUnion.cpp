@@ -319,8 +319,8 @@ PDFUnion PDFUnion::Object(std::unique_ptr<PDFObject> object) {
 }
 
 PDFUnion PDFUnion::Ref(PDFIndirectReference ref) {
-  DEBUG_ASSERT(ref.fValue > 0);
-  return PDFUnion(Type::Ref, static_cast<int32_t>(ref.fValue));
+  DEBUG_ASSERT(ref.value > 0);
+  return PDFUnion(Type::Ref, static_cast<int32_t>(ref.value));
 }
 
 }  // namespace tgfx

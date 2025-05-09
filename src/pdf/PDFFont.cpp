@@ -125,8 +125,8 @@ std::shared_ptr<PDFStrike> PDFStrike::Make(PDFDocument* doc, const Font& font) {
   float pathStrikeEM = canonFont.getSize();
   auto typefaceID = font.getTypeface()->uniqueID();
   // SkStrikeSpec pathStrikeSpec = SkStrikeSpec::MakeWithNoDevice(canonFont, &pathPaint);
-  auto iter = doc->fStrikes.find(typefaceID);
-  if (iter != doc->fStrikes.end()) {
+  auto iter = doc->strikes.find(typefaceID);
+  if (iter != doc->strikes.end()) {
     return iter->second;
   }
 
@@ -154,7 +154,7 @@ std::shared_ptr<PDFStrike> PDFStrike::Make(PDFDocument* doc, const Font& font) {
   //     strike(new SkPDFStrike(SkPDFStrikeSpec(pathStrikeSpec, pathStrikeEM),
   //                            SkPDFStrikeSpec(imageStrikeSpec, imageStrikeEM),
   //                            pathPaint.getMaskFilter(), doc));
-  doc->fStrikes[typefaceID] = strike;
+  doc->strikes[typefaceID] = strike;
   return strike;
 }
 
@@ -287,13 +287,13 @@ const std::vector<Unichar>& PDFFont::GetUnicodeMap(const Typeface& typeface,
                                                    PDFDocument* document) {
   DEBUG_ASSERT(document);
   auto id = typeface.uniqueID();
-  auto iter = document->fToUnicodeMap.find(id);
-  if (iter != document->fToUnicodeMap.end()) {
+  auto iter = document->toUnicodeMap.find(id);
+  if (iter != document->toUnicodeMap.end()) {
     return iter->second;
   }
   std::vector<Unichar> buffer = typeface.getGlyphToUnicodeMap();
-  document->fToUnicodeMap[id] = buffer;
-  return document->fToUnicodeMap[id];
+  document->toUnicodeMap[id] = buffer;
+  return document->toUnicodeMap[id];
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -463,8 +463,8 @@ struct SingleByteGlyphIdIterator {
 
 PDFIndirectReference type3_descriptor(PDFDocument* doc, const std::shared_ptr<Typeface>& typeface,
                                       float xHeight) {
-  auto iter = doc->fType3FontDescriptors.find(typeface->uniqueID());
-  if (iter != doc->fType3FontDescriptors.end()) {
+  auto iter = doc->type3FontDescriptors.find(typeface->uniqueID());
+  if (iter != doc->type3FontDescriptors.end()) {
     return iter->second;
   }
 
@@ -508,7 +508,7 @@ PDFIndirectReference type3_descriptor(PDFDocument* doc, const std::shared_ptr<Ty
   }
   descriptor.insertInt("Flags", fontDescriptorFlags);
   auto ref = doc->emit(descriptor);
-  doc->fType3FontDescriptors[typeface->uniqueID()] = ref;
+  doc->type3FontDescriptors[typeface->uniqueID()] = ref;
   return ref;
 }
 
@@ -696,7 +696,7 @@ void PDFFont::emitSubsetType3(PDFDocument* doc) const {
         // Use Form XObject as SMask (luminosity) on the graphics state
         PDFIndirectReference smaskGraphicState = PDFGraphicState::GetSMaskGraphicState(
             sMask, false, PDFGraphicState::SMaskMode::Luminosity, doc);
-        PDFUtils::ApplyGraphicState(smaskGraphicState.fValue, content);
+        PDFUtils::ApplyGraphicState(smaskGraphicState.value, content);
 
         // Draw a rectangle the size of the glyph (masked by SMask)
         PDFUtils::AppendRectangle(Rect::MakeWH(glyphImage->width(), glyphImage->height()), content);
@@ -706,7 +706,7 @@ void PDFFont::emitSubsetType3(PDFDocument* doc) const {
         char buffer[16];
         std::snprintf(buffer, sizeof(buffer), "g%X", glyphID);
         xObjects->insertRef(buffer, sMask);
-        std::snprintf(buffer, sizeof(buffer), "G%d", smaskGraphicState.fValue);
+        std::snprintf(buffer, sizeof(buffer), "G%d", smaskGraphicState.value);
         graphicStates->insertRef(buffer, smaskGraphicState);
       } else {
         SetGlyphWidthAndBoundingBox(advance, glyphBBox, content);

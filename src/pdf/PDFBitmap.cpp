@@ -113,53 +113,19 @@ uint32_t get_neighbor_avg_color(const Pixmap& pixmap, int xOrig, int yOrig) {
     auto avgR = static_cast<uint8_t>(r / n);
     auto avgG = static_cast<uint8_t>(g / n);
     auto avgB = static_cast<uint8_t>(b / n);
-    return static_cast<uint32_t>((static_cast<uint32_t>(avgR) << 16) |
-                                 (static_cast<uint32_t>(avgG) << 8) |
-                                 static_cast<uint32_t>(avgB) << 0);
+    return ((static_cast<uint32_t>(avgR) << 16) | (static_cast<uint32_t>(avgG) << 8) |
+            static_cast<uint32_t>(avgB) << 0);
   }
   return 0x00000000;
 }
 
 bool do_jpeg(std::shared_ptr<Data> data, YUVColorSpace /*imageColorSpace*/, PDFDocument* doc,
              ISize size, PDFIndirectReference ref) {
-  // static constexpr const SkCodecs::Decoder decoders[] = {
-  //     SkJpegDecoder::Decoder(),
-  // };
-  // std::unique_ptr<SkCodec> codec = SkCodec::MakeFromData(data, decoders);
   if (!JpegCodec::IsJpeg(data)) {
     return false;
   }
 
   ISize jpegSize = size;
-  // const SkEncodedInfo& encodedInfo = SkPDFBitmap::GetEncodedInfo(*codec);
-  // SkEncodedInfo::Color jpegColorType = encodedInfo.color();
-  // SkEncodedOrigin exifOrientation = codec->getOrigin();
-
-  // bool yuv = jpegColorType == SkEncodedInfo::kYUV_Color;
-  // bool goodColorType = yuv || jpegColorType == SkEncodedInfo::kGray_Color;
-  // if (jpegSize != size  // Safety check.
-  //     || !goodColorType || kTopLeft_SkEncodedOrigin != exifOrientation) {
-  //   return false;
-  // }
-
-  // int channels = yuv ? 3 : 1;
-  // PDFUnion colorSpace = yuv ? PDFUnion::Name("DeviceRGB") : PDFUnion::Name("DeviceGray");
-
-  // if (sk_sp<SkData> encodedIccProfileData = encodedInfo.profileData();
-  //     encodedIccProfileData && !icc_channel_mismatch(encodedInfo.profile(), channels)) {
-  //   colorSpace = write_icc_profile(doc, std::move(encodedIccProfileData), channels);
-  // } else if (const skcms_ICCProfile* codecIccProfile = codec->getICCProfile();
-  //            codecIccProfile && !icc_channel_mismatch(codecIccProfile, channels)) {
-  //   sk_sp<SkData> codecIccData = SkWriteICCProfile(codecIccProfile, "");
-  //   colorSpace = write_icc_profile(doc, std::move(codecIccData), channels);
-  // } else if (imageColorSpace) {
-  //   skcms_ICCProfile imageIccProfile;
-  //   imageColorSpace->toProfile(&imageIccProfile);
-  //   if (!icc_channel_mismatch(&imageIccProfile, channels)) {
-  //     sk_sp<SkData> imageIccData = SkWriteICCProfile(&imageIccProfile, "");
-  //     colorSpace = write_icc_profile(doc, std::move(imageIccData), channels);
-  //   }
-  // }
   auto colorSpace = PDFUnion::Name("DeviceRGB");
   auto streamWriter = [&data](const std::shared_ptr<WriteStream>& stream) {
     stream->write(data->data(), data->size());
@@ -192,7 +158,7 @@ void do_deflated_alpha(const Pixmap& pixmap, PDFDocument* document, PDFIndirectR
     uint8_t* bufferPointer = byteBuffer;
     for (int y = 0; y < pixmap.height(); ++y) {
       const auto* scanline =
-          reinterpret_cast<const uint8_t*>(pixelPointer + static_cast<size_t>(y) * rowBytes);
+          reinterpret_cast<const uint8_t*>(pixelPointer + (static_cast<size_t>(y) * rowBytes));
       for (int x = 0; x < pixmap.width(); ++x) {
         *bufferPointer++ = *scanline++;
         if (bufferPointer == bufferStop) {
@@ -325,16 +291,6 @@ void do_deflated_image(const Pixmap& pixmap, PDFDocument* document, bool isOpaqu
     deflateWStream->finalize();
   }
 
-  //TODO (YGaurora)
-  // if (pm.colorSpace()) {
-  //   skcms_ICCProfile iccProfile;
-  //   pm.colorSpace()->toProfile(&iccProfile);
-  //   if (!icc_channel_mismatch(&iccProfile, channels)) {
-  //     sk_sp<SkData> iccData = SkWriteICCProfile(&iccProfile, "");
-  //     colorSpace = write_icc_profile(doc, std::move(iccData), channels);
-  //   }
-  // }
-
   int length = static_cast<int>(buffer->bytesWritten());
   auto imageSize = ISize::Make(pixmap.width(), pixmap.height());
   //TODO (YGaurora) optimize this data copy
@@ -393,16 +349,6 @@ PDFIndirectReference PDFBitmap::Serialize(const std::shared_ptr<Image>& image,
   DEBUG_ASSERT(image);
   DEBUG_ASSERT(document);
   auto ref = document->reserveRef();
-  // if (SkExecutor* executor = doc->executor()) {
-  //   SkRef(img);
-  //   doc->incrementJobCount();
-  //   executor->add([img, encodingQuality, doc, ref]() {
-  //     serialize_image(img, encodingQuality, doc, ref);
-  //     SkSafeUnref(img);
-  //     doc->signalJobComplete();
-  //   });
-  //   return ref;
-  // }
   SerializeImage(image, encodingQuality, document, ref);
   return ref;
 }

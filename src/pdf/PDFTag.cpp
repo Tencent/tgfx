@@ -25,201 +25,201 @@ constexpr int FirstAnnotationStructParentKey = 100000;
 
 namespace tgfx {
 
-SkPDFTagTree::SkPDFTagTree() = default;
+PDFTagTree::PDFTagTree() = default;
 
-SkPDFTagTree::~SkPDFTagTree() = default;
+PDFTagTree::~PDFTagTree() = default;
 
 // static
-void SkPDFTagTree::Copy(PDFStructureElementNode& node, PDFTagNode* dst,
-                        std::unordered_map<int, PDFTagNode*>* nodeMap, bool wantTitle) {
+void PDFTagTree::Copy(PDFStructureElementNode& node, PDFTagNode* dst,
+                      std::unordered_map<int, PDFTagNode*>* nodeMap, bool wantTitle) {
   nodeMap->insert({node.nodeId, dst});
   for (int nodeId : node.additionalNodeIds) {
     DEBUG_ASSERT(nodeMap->find(nodeId) == nodeMap->end());
     nodeMap->insert({nodeId, dst});
   }
-  dst->fNodeId = node.nodeId;
+  dst->nodeId = node.nodeId;
 
   // Accumulate title text, need to be in sync with create_outline_from_headers
   const char* type = node.typeString.c_str();
-  wantTitle |= fOutline == PDFMetadata::Outline::StructureElementHeaders && type[0] == 'H' &&
+  wantTitle |= outline == PDFMetadata::Outline::StructureElementHeaders && type[0] == 'H' &&
                '1' <= type[1] && type[1] <= '6';
-  dst->fWantTitle = wantTitle;
+  dst->wantTitle = wantTitle;
 
-  dst->fTypeString = node.typeString;
-  dst->fAlt = node.alt;
-  dst->fLang = node.lang;
+  dst->typeString = node.typeString;
+  dst->alt = node.alt;
+  dst->lang = node.lang;
 
   size_t childCount = node.children.size();
   auto children = std::make_unique<std::vector<PDFTagNode>>(childCount);
   for (size_t i = 0; i < childCount; ++i) {
     Copy(*node.children[i], &(*children)[i], nodeMap, wantTitle);
   }
-  dst->fChildren = std::move(children);
-  dst->fAttributes = std::move(node.attributes.fAttrs);
+  dst->children = std::move(children);
+  dst->attributes = std::move(node.attributes.attrs);
 }
 
-void SkPDFTagTree::init(PDFStructureElementNode* node, PDFMetadata::Outline outline) {
+void PDFTagTree::init(PDFStructureElementNode* node, PDFMetadata::Outline inputOutline) {
   if (node) {
-    fRoot = std::make_unique<PDFTagNode>();
-    fOutline = outline;
-    Copy(*node, fRoot.get(), &fNodeMap, false);
+    root = std::make_unique<PDFTagNode>();
+    outline = inputOutline;
+    Copy(*node, root.get(), &nodeMap, false);
   }
 }
 
-int SkPDFTagTree::Mark::id() {
-  return fNode ? fNode->fMarkedContent[fMarkIndex].fMarkId : -1;
+int PDFTagTree::Mark::id() {
+  return node ? node->markedContent[markIndex].markId : -1;
 }
 
-Point& SkPDFTagTree::Mark::point() {
-  return fNode->fMarkedContent[fMarkIndex].fLocation.point;
+Point& PDFTagTree::Mark::point() {
+  return node->markedContent[markIndex].location.point;
 }
 
-auto SkPDFTagTree::createMarkIdForNodeId(int nodeId, unsigned pageIndex, Point point) -> Mark {
-  if (!fRoot) {
+auto PDFTagTree::createMarkIdForNodeId(int nodeId, unsigned pageIndex, Point point) -> Mark {
+  if (!root) {
     return Mark();
   }
-  auto iter = fNodeMap.find(nodeId);
-  if (iter == fNodeMap.end()) {
+  auto iter = nodeMap.find(nodeId);
+  if (iter == nodeMap.end()) {
     return Mark();
   }
   PDFTagNode* tag = iter->second;
   DEBUG_ASSERT(tag);
-  fMarksPerPage.resize(std::max(static_cast<uint32_t>(fMarksPerPage.size()), pageIndex + 1));
-  auto pageMarks = fMarksPerPage[pageIndex];
+  marksPerPage.resize(std::max(static_cast<uint32_t>(marksPerPage.size()), pageIndex + 1));
+  auto pageMarks = marksPerPage[pageIndex];
   auto markID = pageMarks.size();
-  tag->fMarkedContent.push_back({{point, pageIndex}, static_cast<int>(markID)});
+  tag->markedContent.push_back({{point, pageIndex}, static_cast<int>(markID)});
   pageMarks.push_back(tag);
-  return Mark(tag, tag->fMarkedContent.size() - 1);
+  return Mark(tag, tag->markedContent.size() - 1);
 }
 
-int SkPDFTagTree::createStructParentKeyForNodeId(int nodeId, unsigned) {
-  if (!fRoot) {
+int PDFTagTree::createStructParentKeyForNodeId(int nodeId, unsigned) {
+  if (!root) {
     return -1;
   }
-  auto iter = fNodeMap.find(nodeId);
-  if (iter == fNodeMap.end()) {
+  auto iter = nodeMap.find(nodeId);
+  if (iter == nodeMap.end()) {
     return -1;
   }
   PDFTagNode* tag = iter->second;
   DEBUG_ASSERT(tag);
 
-  tag->fCanDiscard = PDFTagNode::State::kNo;
+  tag->canDiscard = PDFTagNode::State::No;
 
   int nextStructParentKey =
-      FirstAnnotationStructParentKey + static_cast<int>(fParentTreeAnnotationNodeIds.size());
-  fParentTreeAnnotationNodeIds.push_back(nodeId);
+      FirstAnnotationStructParentKey + static_cast<int>(parentTreeAnnotationNodeIds.size());
+  parentTreeAnnotationNodeIds.push_back(nodeId);
   return nextStructParentKey;
 }
 
 static bool can_discard(PDFTagNode* node) {
-  if (node->fCanDiscard == PDFTagNode::State::kYes) {
+  if (node->canDiscard == PDFTagNode::State::Yes) {
     return true;
   }
-  if (node->fCanDiscard == PDFTagNode::State::kNo) {
+  if (node->canDiscard == PDFTagNode::State::No) {
     return false;
   }
-  if (!node->fMarkedContent.empty()) {
-    node->fCanDiscard = PDFTagNode::State::kNo;
+  if (!node->markedContent.empty()) {
+    node->canDiscard = PDFTagNode::State::No;
     return false;
   }
-  for (size_t i = 0; i < node->fChildren->size(); ++i) {
-    auto* child = &(*node->fChildren)[i];
+  for (size_t i = 0; i < node->children->size(); ++i) {
+    auto* child = &(*node->children)[i];
     if (!can_discard(child)) {
-      node->fCanDiscard = PDFTagNode::State::kNo;
+      node->canDiscard = PDFTagNode::State::No;
       return false;
     }
   }
-  node->fCanDiscard = PDFTagNode::State::kYes;
+  node->canDiscard = PDFTagNode::State::Yes;
   return true;
 }
 
-PDFIndirectReference SkPDFTagTree::PrepareTagTreeToEmit(PDFIndirectReference parent,
-                                                        PDFTagNode* node, PDFDocument* doc) {
+PDFIndirectReference PDFTagTree::PrepareTagTreeToEmit(PDFIndirectReference parent, PDFTagNode* node,
+                                                      PDFDocument* doc) {
   PDFIndirectReference ref = doc->reserveRef();
   std::unique_ptr<PDFArray> kids = MakePDFArray();
-  const auto& children = node->fChildren;
+  const auto& children = node->children;
   for (size_t i = 0; i < children->size(); ++i) {
     auto* child = &(*children)[i];
     if (!(can_discard(child))) {
       kids->appendRef(PrepareTagTreeToEmit(ref, child, doc));
     }
   }
-  for (const PDFTagNode::MarkedContentInfo& info : node->fMarkedContent) {
+  for (const PDFTagNode::MarkedContentInfo& info : node->markedContent) {
     std::unique_ptr<PDFDictionary> mcr = PDFDictionary::Make("MCR");
-    mcr->insertRef("Pg", doc->getPage(info.fLocation.pageIndex));
-    mcr->insertInt("MCID", info.fMarkId);
+    mcr->insertRef("Pg", doc->getPage(info.location.pageIndex));
+    mcr->insertInt("MCID", info.markId);
     kids->appendObject(std::move(mcr));
   }
-  for (const PDFTagNode::AnnotationInfo& annotationInfo : node->fAnnotations) {
+  for (const PDFTagNode::AnnotationInfo& annotationInfo : node->annotations) {
     std::unique_ptr<PDFDictionary> annotationDict = PDFDictionary::Make("OBJR");
-    annotationDict->insertRef("Obj", annotationInfo.fAnnotationRef);
-    annotationDict->insertRef("Pg", doc->getPage(annotationInfo.fPageIndex));
+    annotationDict->insertRef("Obj", annotationInfo.annotationRef);
+    annotationDict->insertRef("Pg", doc->getPage(annotationInfo.pageIndex));
     kids->appendObject(std::move(annotationDict));
   }
-  node->fRef = ref;
+  node->ref = ref;
   auto dict = PDFDictionary::Make("StructElem");
-  dict->insertName("S", node->fTypeString.empty() ? "NonStruct" : node->fTypeString.c_str());
-  if (!node->fAlt.empty()) {
-    dict->insertTextString("Alt", node->fAlt);
+  dict->insertName("S", node->typeString.empty() ? "NonStruct" : node->typeString.c_str());
+  if (!node->alt.empty()) {
+    dict->insertTextString("Alt", node->alt);
   }
-  if (!node->fLang.empty()) {
-    dict->insertTextString("Lang", node->fLang);
+  if (!node->lang.empty()) {
+    dict->insertTextString("Lang", node->lang);
   }
   dict->insertRef("P", parent);
   dict->insertObject("K", std::move(kids));
-  if (node->fAttributes) {
-    dict->insertObject("A", std::move(node->fAttributes));
+  if (node->attributes) {
+    dict->insertObject("A", std::move(node->attributes));
   }
 
   // Each node has a unique ID that also needs to be referenced
   // in a separate IDTree node, along with the lowest and highest
   // unique ID string.
-  auto idString = PDFTagNode::nodeIdToString(node->fNodeId);
+  auto idString = PDFTagNode::nodeIdToString(node->nodeId);
   dict->insertByteString("ID", idString.c_str());
-  IDTreeEntry idTreeEntry = {node->fNodeId, ref};
-  fIdTreeEntries.push_back(idTreeEntry);
+  IDTreeEntry idTreeEntry = {node->nodeId, ref};
+  IDTreeEntries.push_back(idTreeEntry);
 
   return doc->emit(*dict, ref);
 }
 
-void SkPDFTagTree::addNodeAnnotation(int nodeId, PDFIndirectReference annotationRef,
-                                     unsigned pageIndex) {
-  if (!fRoot) {
+void PDFTagTree::addNodeAnnotation(int nodeId, PDFIndirectReference annotationRef,
+                                   unsigned pageIndex) {
+  if (!root) {
     return;
   }
-  auto iter = fNodeMap.find(nodeId);
-  if (iter == fNodeMap.end()) {
+  auto iter = nodeMap.find(nodeId);
+  if (iter == nodeMap.end()) {
     return;
   }
   auto* tag = iter->second;
   DEBUG_ASSERT(tag);
 
   PDFTagNode::AnnotationInfo annotationInfo = {pageIndex, annotationRef};
-  tag->fAnnotations.push_back(annotationInfo);
+  tag->annotations.push_back(annotationInfo);
 }
 
-void SkPDFTagTree::addNodeTitle(int nodeId, const std::vector<char>& title) {
-  if (!fRoot) {
+void PDFTagTree::addNodeTitle(int nodeId, const std::vector<char>& title) {
+  if (!root) {
     return;
   }
-  auto iter = fNodeMap.find(nodeId);
-  if (iter == fNodeMap.end()) {
+  auto iter = nodeMap.find(nodeId);
+  if (iter == nodeMap.end()) {
     return;
   }
   auto* tag = iter->second;
   DEBUG_ASSERT(tag);
 
-  if (tag->fWantTitle) {
-    tag->fTitle.append(title.data(), title.size());
+  if (tag->wantTitle) {
+    tag->title.append(title.data(), title.size());
     // Arbitrary cutoff for size.
-    if (tag->fTitle.size() > 1023) {
-      tag->fWantTitle = false;
+    if (tag->title.size() > 1023) {
+      tag->wantTitle = false;
     }
   }
 }
 
-PDFIndirectReference SkPDFTagTree::makeStructTreeRoot(PDFDocument* doc) {
-  if (!fRoot || can_discard(fRoot.get())) {
+PDFIndirectReference PDFTagTree::makeStructTreeRoot(PDFDocument* doc) {
+  if (!root || can_discard(root.get())) {
     return PDFIndirectReference();
   }
 
@@ -229,7 +229,7 @@ PDFIndirectReference SkPDFTagTree::makeStructTreeRoot(PDFDocument* doc) {
 
   // Build the StructTreeRoot.
   PDFDictionary structTreeRoot("StructTreeRoot");
-  structTreeRoot.insertRef("K", PrepareTagTreeToEmit(ref, fRoot.get(), doc));
+  structTreeRoot.insertRef("K", PrepareTagTreeToEmit(ref, root.get(), doc));
   structTreeRoot.insertInt("ParentTreeNextKey", static_cast<int>(pageCount));
 
   // Build the parent tree, which consists of two things:
@@ -241,30 +241,30 @@ PDFIndirectReference SkPDFTagTree::makeStructTreeRoot(PDFDocument* doc) {
   auto parentTreeNums = MakePDFArray();
 
   // First, one entry per page.
-  DEBUG_ASSERT(static_cast<uint32_t>(fMarksPerPage.size()) <= pageCount);
-  for (size_t j = 0; j < fMarksPerPage.size(); ++j) {
-    auto pageMarks = fMarksPerPage[j];
+  DEBUG_ASSERT(static_cast<uint32_t>(marksPerPage.size()) <= pageCount);
+  for (size_t j = 0; j < marksPerPage.size(); ++j) {
+    auto pageMarks = marksPerPage[j];
     PDFArray markToTagArray;
     for (PDFTagNode* mark : pageMarks) {
-      DEBUG_ASSERT(mark->fRef);
-      markToTagArray.appendRef(mark->fRef);
+      DEBUG_ASSERT(mark->ref);
+      markToTagArray.appendRef(mark->ref);
     }
     parentTreeNums->appendInt(static_cast<int>(j));
     parentTreeNums->appendRef(doc->emit(markToTagArray));
   }
 
   // Then, one entry per annotation.
-  for (size_t j = 0; j < fParentTreeAnnotationNodeIds.size(); ++j) {
-    int nodeId = fParentTreeAnnotationNodeIds[j];
+  for (size_t j = 0; j < parentTreeAnnotationNodeIds.size(); ++j) {
+    int nodeId = parentTreeAnnotationNodeIds[j];
     int structParentKey = FirstAnnotationStructParentKey + static_cast<int>(j);
 
-    auto iter = fNodeMap.find(nodeId);
-    if (iter == fNodeMap.end()) {
+    auto iter = nodeMap.find(nodeId);
+    if (iter == nodeMap.end()) {
       continue;
     }
     auto* tag = iter->second;
     parentTreeNums->appendInt(structParentKey);
-    parentTreeNums->appendRef(tag->fRef);
+    parentTreeNums->appendRef(tag->ref);
   }
 
   parentTree.insertObject("Nums", std::move(parentTreeNums));
@@ -272,20 +272,20 @@ PDFIndirectReference SkPDFTagTree::makeStructTreeRoot(PDFDocument* doc) {
 
   // Build the IDTree, a mapping from every unique ID string to
   // a reference to its corresponding structure element node.
-  if (!fIdTreeEntries.empty()) {
-    std::sort(fIdTreeEntries.begin(), fIdTreeEntries.end(),
+  if (!IDTreeEntries.empty()) {
+    std::sort(IDTreeEntries.begin(), IDTreeEntries.end(),
               [](const IDTreeEntry& a, const IDTreeEntry& b) { return a.nodeId < b.nodeId; });
 
     PDFDictionary idTree;
     PDFDictionary idTreeLeaf;
     auto limits = MakePDFArray();
-    auto lowestNodeIdString = PDFTagNode::nodeIdToString(fIdTreeEntries.begin()->nodeId);
+    auto lowestNodeIdString = PDFTagNode::nodeIdToString(IDTreeEntries.begin()->nodeId);
     limits->appendByteString(lowestNodeIdString);
-    auto highestNodeIdString = PDFTagNode::nodeIdToString(fIdTreeEntries.rbegin()->nodeId);
+    auto highestNodeIdString = PDFTagNode::nodeIdToString(IDTreeEntries.rbegin()->nodeId);
     limits->appendByteString(highestNodeIdString);
     idTreeLeaf.insertObject("Limits", std::move(limits));
     auto names = MakePDFArray();
-    for (const IDTreeEntry& entry : fIdTreeEntries) {
+    for (const IDTreeEntry& entry : IDTreeEntries) {
       auto idString = PDFTagNode::nodeIdToString(entry.nodeId);
       names->appendByteString(idString);
       names->appendRef(entry.ref);
@@ -358,22 +358,22 @@ struct OutlineEntry {
 
 OutlineEntry::Content create_outline_entry_content(PDFTagNode* const node) {
   std::string text;
-  if (!node->fTitle.empty()) {
-    text = node->fTitle;
-  } else if (!node->fAlt.empty()) {
-    text = node->fAlt;
+  if (!node->title.empty()) {
+    text = node->title;
+  } else if (!node->alt.empty()) {
+    text = node->alt;
   }
 
   // The uppermost/leftmost point on the earliest page of this node's marks.
   Location markPoint;
-  for (auto&& mark : node->fMarkedContent) {
-    markPoint.accumulate(mark.fLocation);
+  for (auto&& mark : node->markedContent) {
+    markPoint.accumulate(mark.location);
   }
 
   OutlineEntry::Content content{std::move(text), std::move(markPoint)};
 
   // Accumulate children
-  const auto& children = node->fChildren;
+  const auto& children = node->children;
   for (auto&& child : *children) {
     if (can_discard(&child)) {
       continue;
@@ -384,7 +384,7 @@ OutlineEntry::Content create_outline_entry_content(PDFTagNode* const node) {
 }
 void create_outline_from_headers(PDFDocument* const doc, PDFTagNode* const node,
                                  std::vector<OutlineEntry*>& stack) {
-  char const* type = node->fTypeString.c_str();
+  char const* type = node->typeString.c_str();
   if (type[0] == 'H' && '1' <= type[1] && type[1] <= '6') {
     int level = type[1] - '0';
     while (level <= stack.back()->fHeaderLevel) {
@@ -392,13 +392,13 @@ void create_outline_from_headers(PDFDocument* const doc, PDFTagNode* const node,
     }
     OutlineEntry::Content content = create_outline_entry_content(node);
     if (!content.fText.empty()) {
-      OutlineEntry e{std::move(content), level, doc->reserveRef(), node->fRef};
+      OutlineEntry e{std::move(content), level, doc->reserveRef(), node->ref};
       stack.push_back(&stack.back()->fChildren.emplace_back(std::move(e)));
       return;
     }
   }
 
-  const auto& children = node->fChildren;
+  const auto& children = node->children;
   for (auto&& child : *children) {
     if (can_discard(&child)) {
       continue;
@@ -409,16 +409,16 @@ void create_outline_from_headers(PDFDocument* const doc, PDFTagNode* const node,
 
 }  // namespace
 
-PDFIndirectReference SkPDFTagTree::makeOutline(PDFDocument* doc) {
-  if (!fRoot || can_discard(fRoot.get()) ||
-      fOutline != PDFMetadata::Outline::StructureElementHeaders) {
+PDFIndirectReference PDFTagTree::makeOutline(PDFDocument* doc) {
+  if (!root || can_discard(root.get()) ||
+      outline != PDFMetadata::Outline::StructureElementHeaders) {
     return PDFIndirectReference();
   }
 
   std::vector<OutlineEntry*> stack;
   OutlineEntry top{{"", Location()}, 0, {}, {}};
   stack.push_back(&top);
-  create_outline_from_headers(doc, fRoot.get(), stack);
+  create_outline_from_headers(doc, root.get(), stack);
   if (top.fChildren.empty()) {
     return PDFIndirectReference();
   }
@@ -432,8 +432,8 @@ PDFIndirectReference SkPDFTagTree::makeOutline(PDFDocument* doc) {
   return doc->emit(outline, outlineRef);
 }
 
-std::string SkPDFTagTree::getRootLanguage() {
-  return fRoot ? fRoot->fLang : "";
+std::string PDFTagTree::getRootLanguage() {
+  return root ? root->lang : "";
 }
 
 }  // namespace tgfx

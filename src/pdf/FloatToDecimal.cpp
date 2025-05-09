@@ -88,7 +88,7 @@ double pow10(int e) {
 }  // namespace
 
 /** Write a string into output, including a terminating '\0' (for
-    unit testing).  Return strlen(output) (for SkWStream::write) The
+    unit testing).  Return strlen(output) The
     resulting string will be in the form /[-]?([0-9]*.)?[0-9]+/ and
     sscanf(output, "%f", &x) will return the original value iff the
     value is finite. This function accepts all possible input values.
