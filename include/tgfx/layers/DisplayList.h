@@ -40,6 +40,27 @@ class DisplayList {
   Layer* root() const;
 
   /**
+   * Returns the current view matrix of the display list. The view matrix determines which part of
+   * the display list is rendered on the surface by transforming the entire layer tree. For example,
+   * to render the display list starting at (100, 100), set the viewMatrix to
+   * Matrix::Make(-100, -100). Using the viewMatrix to move or scale the layer tree is more
+   * efficient than applying it directly to the root layer, as it avoids invalidating the layer
+   * tree's internal caches.
+   */
+  const Matrix& viewMatrix() const {
+    return _viewMatrix;
+  }
+
+  /**
+   * Sets the view matrix for the display list. The view matrix determines which part of the display
+   * list is rendered on the surface by transforming the entire layer tree. For example, to render
+   * the display list starting at (100, 100), set the viewMatrix to Matrix::Make(-100, -100). Using
+   * the viewMatrix to move or scale the layer tree is more efficient than applying it directly to
+   * the root layer, as it avoids invalidating the layer tree's internal caches.
+   */
+  void setViewMatrix(const Matrix& viewMatrix);
+
+  /**
    * Renders the display list onto the given surface.
    * @param surface The surface to render the display list on.
    * @param replaceAll If true, the surface will be cleared before rendering the display list.
@@ -50,6 +71,7 @@ class DisplayList {
 
  private:
   std::shared_ptr<Layer> _root = nullptr;
+  Matrix _viewMatrix = {};
   uint32_t surfaceContentVersion = 0u;
   uint32_t surfaceID = 0u;
 };
