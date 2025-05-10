@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <optional>
 #include "gpu/processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {

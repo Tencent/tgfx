@@ -19,7 +19,6 @@
 #include "Pipeline.h"
 #include "gpu/ProgramBuilder.h"
 #include "gpu/TextureSampler.h"
-#include "gpu/processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
 Pipeline::Pipeline(PlacementPtr<GeometryProcessor> geometryProcessor,
@@ -29,8 +28,8 @@ Pipeline::Pipeline(PlacementPtr<GeometryProcessor> geometryProcessor,
     : geometryProcessor(std::move(geometryProcessor)),
       fragmentProcessors(std::move(fragmentProcessors)), numColorProcessors(numColorProcessors),
       xferProcessor(std::move(xferProcessor)), _outputSwizzle(outputSwizzle) {
-  BlendModeAsCoeff(blendMode, &_blendInfo);
   updateProcessorIndices();
+  BlendModeAsCoeff(blendMode, numColorProcessors < this->fragmentProcessors.size(), &_blendFormula);
 }
 
 void Pipeline::updateProcessorIndices() {

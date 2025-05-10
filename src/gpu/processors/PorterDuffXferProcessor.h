@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "gpu/Blend.h"
 #include "gpu/processors/XferProcessor.h"
 #include "tgfx/core/BlendMode.h"
 
@@ -33,7 +34,7 @@ class PorterDuffXferProcessor : public XferProcessor {
 
   const Texture* dstTexture() const override;
 
-  virtual bool requiresBarrier() const override {
+  bool requiresBarrier() const override {
     return dstTextureInfo.requiresBarrier;
   }
 

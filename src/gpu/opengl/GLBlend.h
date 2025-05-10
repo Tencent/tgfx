@@ -17,15 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
 #include "gpu/FragmentShaderBuilder.h"
 #include "tgfx/core/BlendMode.h"
 
 namespace tgfx {
-// Appends GLSL code to fragment that assigns a specified blend of the srcColor and dstColor
-// variables to the outColor variable.
+// Appends GLSL code to fragment that assigns a specified blend of the srcColor, coverageColor and
+// dstColor variables to the outColor variable.
 void AppendMode(FragmentShaderBuilder* fsBuilder, const std::string& srcColor,
-                const std::string& dstColor, const std::string& outColor, BlendMode blendMode);
+                const std::string& coverageColor, const std::string& dstColor,
+                const std::string& outColor, BlendMode blendMode, bool hasCoverage);
 
 const char* BlendModeName(BlendMode mode);
 }  // namespace tgfx

@@ -41,7 +41,7 @@ class ProgramInfo {
    * Returns the blend info for the draw. A nullptr is returned if the draw does not require
    * blending.
    */
-  virtual const BlendInfo* blendInfo() const = 0;
+  virtual const BlendFormula* blendFormula() const = 0;
 
   /**
    * Returns true if the draw requires a texture barrier.
