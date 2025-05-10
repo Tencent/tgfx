@@ -20,14 +20,13 @@
 
 #include <memory>
 #include "gpu/FragmentShaderBuilder.h"
+#include "gpu/Texture.h"
 #include "gpu/UniformBuffer.h"
 #include "gpu/UniformHandler.h"
 #include "gpu/processors/Processor.h"
-#include "gpu/proxies/TextureProxy.h"
-
 namespace tgfx {
 struct DstTextureInfo {
-  std::shared_ptr<TextureProxy> textureProxy = nullptr;
+  std::shared_ptr<Texture> texture = nullptr;
   Point offset = {};
   bool requiresBarrier = false;
 };

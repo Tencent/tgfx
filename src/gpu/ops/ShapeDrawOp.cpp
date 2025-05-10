@@ -79,6 +79,9 @@ void ShapeDrawOp::execute(RenderPass* renderPass) {
       DefaultGeometryProcessor::Make(drawingBuffer, color, renderTarget->width(),
                                      renderTarget->height(), aaType, viewMatrix, realUVMatrix);
   auto pipeline = createPipeline(renderPass, std::move(gp));
+  if (pipeline == nullptr) {
+    return;
+  }
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   auto vertexDataSize = vertexBuffer ? vertexBuffer->size() : vertexData->size();
   auto vertexCount = aaType == AAType::Coverage
@@ -90,10 +93,6 @@ void ShapeDrawOp::execute(RenderPass* renderPass) {
     renderPass->bindBuffers(nullptr, vertexData);
   }
   renderPass->draw(PrimitiveType::Triangles, 0, vertexCount);
-}
-
-bool ShapeDrawOp::hasCoverage() const {
-  return DrawOp::hasCoverage() || (shapeProxy && shapeProxy->getTriangles() == nullptr);
 }
 
 }  // namespace tgfx

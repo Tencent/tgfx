@@ -69,6 +69,9 @@ void RRectDrawOp::execute(RenderPass* renderPass) {
   auto gp = EllipseGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
                                            renderTarget->height(), false, useScale, commonColor);
   auto pipeline = createPipeline(renderPass, std::move(gp));
+  if (pipeline == nullptr) {
+    return;
+  }
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   renderPass->bindBuffers(indexBuffer, vertexBuffer, vertexBufferOffset);
   auto numIndicesPerRRect = ResourceProvider::NumIndicesPerRRect();

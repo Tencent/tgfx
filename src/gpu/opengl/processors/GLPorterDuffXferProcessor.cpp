@@ -77,10 +77,10 @@ void GLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
 }
 
 void GLPorterDuffXferProcessor::setData(UniformBuffer* uniformBuffer) const {
-  if (dstTextureInfo.textureProxy == nullptr) {
+  if (dstTextureInfo.texture == nullptr) {
     return;
   }
-  auto dstTexture = dstTextureInfo.textureProxy->getTexture();
+  auto dstTexture = dstTextureInfo.texture;
   if (dstTexture == nullptr) {
     return;
   }
