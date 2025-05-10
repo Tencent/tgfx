@@ -134,15 +134,16 @@
         "filterTest": "c475bfb",
         "filters": "c475bfb",
         "getBounds": "15e0e39",
-        "getTightBounds": "8bd92e6",
         "getLayersUnderPoint": "50136952",
+        "getTightBounds": "8bd92e6",
         "greyColorMatrix": "a1605b2",
         "identityMatrix": "a1605b2",
         "imageLayer": "e5103ae6",
         "imageMask": "c475bfb",
         "innerShadow": "2cb2474",
         "shapeMask": "99c36f0c",
-        "textMask": "15e0e39"
+        "textMask": "15e0e39",
+        "viewMatrix": "cc234d6f"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",

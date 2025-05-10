@@ -29,6 +29,14 @@ Layer* DisplayList::root() const {
   return _root.get();
 }
 
+void DisplayList::setViewMatrix(const Matrix& viewMatrix) {
+  if (_viewMatrix == viewMatrix) {
+    return;
+  }
+  surfaceContentVersion++;
+  _viewMatrix = viewMatrix;
+}
+
 bool DisplayList::render(Surface* surface, bool replaceAll) {
   if (!surface ||
       (replaceAll && surface->uniqueID() == surfaceID &&
@@ -40,11 +48,12 @@ bool DisplayList::render(Surface* surface, bool replaceAll) {
     canvas->clear();
   }
   _root->updateRenderBounds(Matrix::I());
-  Rect renderRect = Rect::MakeWH(surface->width(), surface->height());
   Matrix inverse = {};
-  if (!canvas->getMatrix().invert(&inverse)) {
+  if (!_viewMatrix.invert(&inverse)) {
     return true;
   }
+  canvas->setMatrix(_viewMatrix);
+  Rect renderRect = Rect::MakeWH(surface->width(), surface->height());
   renderRect = inverse.mapRect(renderRect);
   DrawArgs args(surface->getContext(), true);
   args.renderRect = &renderRect;
