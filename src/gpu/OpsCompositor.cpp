@@ -20,7 +20,7 @@
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
 #include "core/Rasterizer.h"
-#include "core/utils/Caster.h"
+#include "core/utils/Types.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/ClearOp.h"
@@ -144,25 +144,23 @@ void OpsCompositor::discardAll() {
   }
 }
 
-static bool CompareFill(const Fill& a, const Fill& b) {
+bool OpsCompositor::CompareFill(const Fill& a, const Fill& b) {
   // Ignore the color differences.
   if (a.antiAlias != b.antiAlias || a.blendMode != b.blendMode) {
     return false;
   }
   if (a.shader != b.shader) {
-    if (!a.shader || !b.shader || !Caster::Compare(a.shader.get(), b.shader.get())) {
+    if (!a.shader || !b.shader || !a.shader->isEqual(b.shader.get())) {
       return false;
     }
   }
   if (a.maskFilter != b.maskFilter) {
-    if (!a.maskFilter || !b.maskFilter ||
-        !Caster::Compare(a.maskFilter.get(), b.maskFilter.get())) {
+    if (!a.maskFilter || !b.maskFilter || !a.maskFilter->isEqual(b.maskFilter.get())) {
       return false;
     }
   }
   if (a.colorFilter != b.colorFilter) {
-    if (!a.colorFilter || !b.colorFilter ||
-        !Caster::Compare(a.colorFilter.get(), b.colorFilter.get())) {
+    if (!a.colorFilter || !b.colorFilter || !a.colorFilter->isEqual(b.colorFilter.get())) {
       return false;
     }
   }

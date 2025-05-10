@@ -62,6 +62,6 @@ class MaskFilter {
                                                               const Matrix* uvMatrix) const = 0;
 
   friend class OpsCompositor;
-  friend class Caster;
+  friend class Types;
 };
 }  // namespace tgfx
