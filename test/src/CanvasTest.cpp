@@ -16,6 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <tgfx/layers/DisplayList.h>
+#include <tgfx/layers/Layer.h>
+#include <tgfx/layers/ShapeLayer.h>
+#include <tgfx/layers/SolidColor.h>
 #include "core/PathRef.h"
 #include "core/Records.h"
 #include "core/images/ResourceImage.h"
@@ -1650,4 +1654,436 @@ TGFX_TEST(CanvasTest, BlendFormula) {
   }
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/BlendFormula"));
 }
+
+/// @brief 曲线线段（兼容直线）
+struct Curve {
+  /// @brief 起点
+  tgfx::Point from;
+  /// @brief 终点
+  tgfx::Point to;
+  /// @brief 起点的控制点
+  tgfx::Point control_from;
+  /// @brief 终点的控制点
+  tgfx::Point control_to;
+  /// @brief 是否为贝塞尔曲线
+  bool is_bezier;
+};
+
+/// @brief 用于构建路径的参数
+struct CurvesParam {
+  /// @brief 首尾相接的曲线线段集合
+  std::vector<Curve> curves;
+  /// @brief 是否闭合
+  bool is_closed;
+};
+
+struct VectorVertex {
+  float x;  // 归一化的点
+  float y;
+  float cornerRadius = 0;
+};
+
+// 用来计算圆角的数据结构
+struct VectorVertexDegree {
+  VectorVertex vertex;  // 顶点
+  float degree = 0.0f;  // 顶点角度, 弧度制; 0 表示顶点处不是拐角
+};
+
+VectorVertex calculate_star_vertex(const tgfx::Point& size, const uint32_t count,
+                                   const float corner_radius, float ratio, const uint32_t index,
+                                   bool is_inner_corner) {
+  float a = size.x / 2;
+  float b = size.y / 2;
+
+  if (is_inner_corner) {
+    std::cout << "Hello " << "\t" << __FUNCTION__ << " " << __FILE_NAME__ << ":" << __LINE__
+              << " \n";
+    float theta = static_cast<float>(M_PI_2 - 2 * M_PI * (index + 0.5) / count);  // 内圈顶点
+    float x = a + a * ratio * cos(theta);
+    float y = b - b * ratio * sin(theta);
+    return VectorVertex{.x = x, .y = y, .cornerRadius = corner_radius};
+  } else {
+    std::cout << "Hello " << "\t" << __FUNCTION__ << " " << __FILE_NAME__ << ":" << __LINE__
+              << " \n";
+    float theta = static_cast<float>(M_PI_2 - 2 * M_PI * index / count);  // 外圈顶点
+    float x = a + a * cos(theta);
+    float y = b - b * sin(theta);
+    return VectorVertex{.x = x, .y = y, .cornerRadius = corner_radius};
+  }
+}
+
+extern inline float calculate_distance_between_points(const VectorVertex& a,
+                                                      const VectorVertex& b) {
+  float dx = a.x - b.x;
+  float dy = a.y - b.y;
+  return std::sqrt(dx * dx + dy * dy);
+}
+
+extern inline float calculate_distance_between_points(const tgfx::Point& a, const tgfx::Point& b) {
+  float dx = a.x - b.x;
+  float dy = a.y - b.y;
+  return std::sqrt(dx * dx + dy * dy);
+}
+
+float calculate_corner_degree(const VectorVertex& prev_vertex, const VectorVertex& current_vertex,
+                              const VectorVertex& next_vertex) {
+  // 计算三边长度
+  float ab = calculate_distance_between_points(prev_vertex, current_vertex);
+  float bc = calculate_distance_between_points(next_vertex, current_vertex);
+  float ac = calculate_distance_between_points(prev_vertex, next_vertex);
+
+  // 余弦定理，求出 cos B 点的值
+  float cos_b =
+      static_cast<float>((std::pow(ab, 2) + std::pow(bc, 2) - std::pow(ac, 2)) / (2 * ab * bc));
+  cos_b = std::min(1.0f, std::max(-1.0f, cos_b));  // 防止 cos_b 超出范围
+  // 求出 B 点的角度
+  float degree = std::acos(cos_b);
+  return degree;
+}
+
+void get_vertex_degrees_from_vertices(const std::vector<VectorVertex>& vertices,
+                                      std::vector<VectorVertexDegree>& vertex_degrees) {
+  for (size_t i = 0; i < vertices.size(); i++) {
+    auto prev_vertex = vertices[(i - 1 + vertices.size()) % vertices.size()];
+    auto current_vertex = vertices[i];
+    auto next_vertex = vertices[(i + 1) % vertices.size()];
+    // 计算当前顶点的角度
+    float degree = calculate_corner_degree(prev_vertex, current_vertex, next_vertex);
+    vertex_degrees.push_back(VectorVertexDegree{current_vertex, degree});
+  }
+}
+
+void calculate_star_vertex_degrees(const tgfx::Point& size, const uint32_t count, const float ratio,
+                                   const float corner_radius,
+                                   std::vector<VectorVertexDegree>& vertex_degrees) {
+  // 计算多边形的顶点集
+  std::vector<VectorVertex> vertices;
+  for (uint32_t i = 0; i < count; i++) {
+    vertices.push_back(
+        calculate_star_vertex(size, count, corner_radius, ratio, i, false));  // 外圈顶点
+    vertices.push_back(
+        calculate_star_vertex(size, count, corner_radius, ratio, i, true));  // 内圈顶点
+  }
+  // 获取顶点和角度的结构体集
+  get_vertex_degrees_from_vertices(vertices, vertex_degrees);
+}
+
+bool has_corner_radius(const VectorVertex& vertex) {
+  return vertex.cornerRadius > 0;
+}
+
+bool is_equal(float a, float b) {
+  return std::abs(a - b) < 0.00001;
+}
+
+float calculate_corner_length(float corner_radius, float degree) {
+  return is_equal(degree, 0.0f) ? 0.0f : corner_radius / std::tan(degree / 2);
+}
+
+// 计算线段与线段倒圆角的实际渲染半径，算法参考文档：https://iwiki.woa.com/p/4012033729
+// prev_vertex 对应 A，current_vertex 对应 B，next_vertex 对应 C
+float calculate_line_to_line_corner_radius(const VectorVertexDegree& prev_vertex_degree,
+                                           const VectorVertexDegree& current_vertex_degree,
+                                           const VectorVertexDegree& next_vertex_degree) {
+  auto prev_vertex = prev_vertex_degree.vertex;
+  auto current_vertex = current_vertex_degree.vertex;
+  auto next_vertex = next_vertex_degree.vertex;
+  // 计AB、BC边长度
+  float ab = calculate_distance_between_points(prev_vertex, current_vertex);
+  float bc = calculate_distance_between_points(next_vertex, current_vertex);
+
+  float corner_r_a = prev_vertex.cornerRadius;     // A 点的设定倒角半径
+  float corner_r_b = current_vertex.cornerRadius;  // B 点的设定倒角半径
+  float corner_r_c = next_vertex.cornerRadius;     // C 点的设定倒角半径
+
+  // 计算倒角拐点到顶点的距离
+  float corner_length_a = calculate_corner_length(corner_r_a, prev_vertex_degree.degree);
+  float corner_length_b = calculate_corner_length(corner_r_b, current_vertex_degree.degree);
+  float corner_length_c = calculate_corner_length(corner_r_c, next_vertex_degree.degree);
+
+  // 实际拐角长度不大于最短边长
+  float render_corner_length = std::min(corner_length_b, std::min(ab, bc));
+  // 如果相邻点拐角长度与当前点拐角长度和大于边长，则当前点的渲染拐角长度按照比例竞争
+  if (has_corner_radius(prev_vertex) && corner_length_a + corner_length_b > ab) {
+    render_corner_length =
+        std::min(corner_length_b / (corner_length_a + corner_length_b) * ab, render_corner_length);
+  }
+  if (has_corner_radius(next_vertex) && corner_length_c + corner_length_b > bc) {
+    render_corner_length =
+        std::min(corner_length_b / (corner_length_c + corner_length_b) * bc, render_corner_length);
+  }
+
+  // 计算实际渲染半径
+  return render_corner_length * std::tan(current_vertex_degree.degree / 2);
+}
+
+void calculate_polygon_corner_radii(std::vector<VectorVertexDegree>& vertex_degrees,
+                                    std::vector<float>& radii) {
+  for (size_t current_vertex_index = 0; current_vertex_index < vertex_degrees.size();
+       current_vertex_index++) {
+    auto previous_vertex_degree =
+        vertex_degrees[(current_vertex_index - 1 + vertex_degrees.size()) % vertex_degrees.size()];
+    auto current_vertex_degree = vertex_degrees[current_vertex_index];
+    auto next_vertex_degree = vertex_degrees[(current_vertex_index + 1) % vertex_degrees.size()];
+    // 计算当前顶点的渲染半径
+    radii.push_back(calculate_line_to_line_corner_radius(
+        previous_vertex_degree, current_vertex_degree, next_vertex_degree));
+  }
+}
+
+// 计算控制点与节点间的距离: h=4/3*(1-cos(θ/2))/sin(θ/2)
+float calculate_arc_sector_control_distance(const float radius, const float degree) {
+  return static_cast<float>(4.0 / 3.0 * (1 - std::cos(degree / 2)) / std::sin(degree / 2)) * radius;
+}
+
+// 计算倒角 bezier 曲线（prev_vertex 为 A 点，current_vertex 为 B 点，next_vertex 为 C 点）
+Curve fit_corner_curve(const VectorVertexDegree& prev_vertex_degree,
+                       const VectorVertexDegree& current_vertex_degree,
+                       const VectorVertexDegree& next_vertex_degree) {
+  Curve curve;
+
+  // 计算当前角点（B 点）实际渲染半径
+  float render_corner_radius = calculate_line_to_line_corner_radius(
+      prev_vertex_degree, current_vertex_degree, next_vertex_degree);
+  if (is_equal(render_corner_radius, 0.f)) {  // 如果渲染半径为 0，直接返回
+    return curve;
+  }
+
+  // 计算当前角点（B 点）角度
+  float degree_b = current_vertex_degree.degree;
+  // 计算当前角点（B 点）到倒角拐点的距离
+  float corner_length = calculate_corner_length(render_corner_radius, degree_b);
+  // 计算控制点和节点间的距离
+  float control_distance = calculate_arc_sector_control_distance(
+      render_corner_radius, static_cast<float>(M_PI - degree_b));
+
+  // 计算 AB、BC 线段的长度
+  float ab =
+      calculate_distance_between_points(prev_vertex_degree.vertex, current_vertex_degree.vertex);
+  float bc =
+      calculate_distance_between_points(next_vertex_degree.vertex, current_vertex_degree.vertex);
+  // 计算节点 P0, P1 （P0 在 AB 线段上， P1 在 BC 线段上）
+  curve.from = {
+      current_vertex_degree.vertex.x +
+          (prev_vertex_degree.vertex.x - current_vertex_degree.vertex.x) * corner_length / ab,
+      current_vertex_degree.vertex.y +
+          (prev_vertex_degree.vertex.y - current_vertex_degree.vertex.y) * corner_length / ab};
+  curve.to = {
+      current_vertex_degree.vertex.x +
+          (next_vertex_degree.vertex.x - current_vertex_degree.vertex.x) * corner_length / bc,
+      current_vertex_degree.vertex.y +
+          (next_vertex_degree.vertex.y - current_vertex_degree.vertex.y) * corner_length / bc};
+  // 计算控制点 C0, C1
+  curve.control_from = {curve.from.x + (current_vertex_degree.vertex.x - curve.from.x) *
+                                           control_distance / corner_length,
+                        curve.from.y + (current_vertex_degree.vertex.y - curve.from.y) *
+                                           control_distance / corner_length};
+  curve.control_to = {
+      curve.to.x + (current_vertex_degree.vertex.x - curve.to.x) * control_distance / corner_length,
+      curve.to.y +
+          (current_vertex_degree.vertex.y - curve.to.y) * control_distance / corner_length};
+  curve.is_bezier = true;
+
+  return curve;
+}
+
+tgfx::Point calculate_point_on_segment_coordinates(const tgfx::Point& start, const tgfx::Point& end,
+                                                   const float distance_from_start) {
+  float segment_length = calculate_distance_between_points(start, end);
+  float ratio = distance_from_start / segment_length;
+  return tgfx::Point::Make(start.x + (end.x - start.x) * ratio,
+                           start.y + (end.y - start.y) * ratio);
+}
+
+Curve get_polygon_line_curve(const VectorVertexDegree& from, const VectorVertexDegree& to,
+                             const float from_render_radius, const float to_render_radius) {
+  auto from_point = tgfx::Point::Make(from.vertex.x, from.vertex.y);
+  auto to_point = tgfx::Point::Make(to.vertex.x, to.vertex.y);
+  // 计算拐角长度
+  float from_corner_length = calculate_corner_length(from_render_radius, from.degree);
+  float to_corner_length = calculate_corner_length(to_render_radius, to.degree);
+  return Curve{
+      .from = calculate_point_on_segment_coordinates(from_point, to_point, from_corner_length),
+      .to = calculate_point_on_segment_coordinates(to_point, from_point, to_corner_length),
+      .is_bezier = false};
+}
+
+CurvesParam calculate_star_param(const tgfx::Point& size, const uint32_t count, const float ratio,
+                                 const float corner_radius) {
+  CurvesParam param;
+  // 计算顶点与顶点角度的数据结构集
+  std::vector<VectorVertexDegree> vertex_degrees;
+  calculate_star_vertex_degrees(size, count, ratio, corner_radius, vertex_degrees);
+  // 计算各顶点渲染半径
+  std::vector<float> corner_render_radii;
+  calculate_polygon_corner_radii(vertex_degrees, corner_render_radii);
+
+  // 构建多边形路径
+  uint32_t vertices_count = static_cast<uint32_t>(vertex_degrees.size());
+  if (has_corner_radius(vertex_degrees[0].vertex)) {
+    // 有圆角情况
+    for (uint32_t current_vertex_index = 0; current_vertex_index < vertices_count;
+         current_vertex_index++) {
+      auto prev_vertex_degree =
+          vertex_degrees[(current_vertex_index - 1 + vertices_count) % vertices_count];
+      auto current_vertex_degree = vertex_degrees[current_vertex_index];
+      auto next_vertex_degree = vertex_degrees[(current_vertex_index + 1) % vertices_count];
+      auto current_corner_radius = corner_render_radii[current_vertex_index];
+      auto next_corner_radius = corner_render_radii[(current_vertex_index + 1) % vertices_count];
+      // 计算倒角路径
+      param.curves.push_back(
+          fit_corner_curve(prev_vertex_degree, current_vertex_degree, next_vertex_degree));
+      // 计算直线路径
+      param.curves.push_back(get_polygon_line_curve(current_vertex_degree, next_vertex_degree,
+                                                    current_corner_radius, next_corner_radius));
+    }
+  } else {
+    // 无圆角情况
+    for (uint32_t current_vertex_index = 0; current_vertex_index < vertices_count;
+         current_vertex_index++) {
+      auto current_vertex_degree = vertex_degrees[current_vertex_index];
+      auto next_vertex_degree = vertex_degrees[(current_vertex_index + 1) % vertices_count];
+      // 计算直线路径
+      param.curves.push_back(
+          get_polygon_line_curve(current_vertex_degree, next_vertex_degree, 0, 0));
+    }
+  }
+
+  param.is_closed = true;
+  return param;
+}
+
+std::shared_ptr<tgfx::Shape> create_curves_shape(const std::vector<CurvesParam>& params) {
+  tgfx::Path path;
+
+  // 每一组 curves 是一个封闭路径
+  for (const auto& [curves, is_closed] : params) {
+    // 每一个 curve 是一条线段
+    for (size_t i = 0; i < curves.size(); i++) {
+      const auto& [from, to, control_from, control_to, is_bezier] = curves[i];
+
+      if (i == 0) {
+        path.moveTo(from.x, from.y);
+      }
+
+      if (is_bezier) {
+        path.cubicTo(control_from.x, control_from.y, control_to.x, control_to.y, to.x, to.y);
+      } else {
+        path.lineTo(to.x, to.y);
+      }
+    }
+
+    if (is_closed) {
+      path.close();
+    }
+  }
+
+  return tgfx::Shape::MakeFrom(path);
+}
+//
+// float computePathArea(const Path& path) {
+//
+//   bool hasFirstPoint = false;
+//   float area = 0.0f;
+//
+//   for (;;) {
+//     SkPath::Verb verb = iter.next(pts);
+//     if (verb == SkPath::kDone_Verb) break;
+//
+//
+//   return area * 0.5f;
+// }
+
+bool isPathCCW(const Path& path) {
+  return computePathArea(path) > 0;
+}
+
+TGFX_TEST(CanvasTest, dash2) {
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 400);
+
+  auto vector = tgfx::Point::Make(194.f, 253.00001525878906f);
+  auto point_count = 5;
+  auto inner_radius = 0.81f;
+  auto corner_radius = 1.f;
+  auto params =
+      calculate_star_param(vector, static_cast<uint32_t>(point_count), inner_radius, corner_radius);
+  auto shape = create_curves_shape({params});
+
+  auto path = shape->getPath();
+  float dash_array[] = {2, 2};
+  auto effect = PathEffect::MakeDash(dash_array, 2, 1, true);
+  effect->filterPath(&path);
+  auto dashPath = path;
+  Stroke stroke(2.0f);
+  stroke.applyToPath(&path);
+  PathIterator iter = [](PathVerb verb, const Point points[4], void*) {
+    switch (verb) {
+      case PathVerb::Move:
+        firstPoint = pts[0];
+      prevPoint = pts[0];
+      hasFirstPoint = true;
+      break;
+      case PathVerb::Line:
+        if (hasFirstPoint) {
+          area += (prevPoint.x() * pts[0].y() - pts[0].x() * prevPoint.y());
+          prevPoint = pts[0];
+        }
+      break;
+      case PathVerb::Close:
+        if (hasFirstPoint) {
+          area += (prevPoint.x() * firstPoint.y() - firstPoint.x() * prevPoint.y());
+        }
+      break;
+      // 对于曲线，可以用分段线近似，或者忽略
+      default:
+        // 复杂曲线可用细分近似
+          break;
+    }
+  }
+  };
+  // path.decompose(iter);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
+                                    SVGExportFlags::DisablePrettyXML);
+  auto* canvas = exporter->getCanvas();
+  auto shapePath = shape->getPath();
+  // shapePath.decompose(iter);
+
+  path.addPath(dashPath, PathOp::Difference);
+  canvas->drawPath(path, Paint());
+
+  exporter->close();
+
+  auto SVGString = SVGStream->readString();
+  LOGE(SVGString.c_str());
+
+  LOGE("----");
+
+
+
+  // auto shapeLayer = tgfx::ShapeLayer::Make();
+  // shapeLayer->setShape(shape);
+  // shapeLayer->setLineWidth(1.0f);
+  // shapeLayer->setStrokeAlign(tgfx::StrokeAlign::Outside);
+  // shapeLayer->setStrokeStyle(tgfx::SolidColor::Make(tgfx::Color::Black()));
+  // shapeLayer->setLineDashAdaptive(true);
+  // shapeLayer->setLineDashPattern({2, 2});
+  // shapeLayer->setLineDashPhase(1);
+  //
+  // DisplayList displayList;
+  // displayList.root()->addChild(shapeLayer);
+   canvas = surface->getCanvas();
+  Paint paint;
+  paint.setColor(tgfx::Color::Black());
+  canvas->drawPath(path, paint);
+  // canvas->drawPath(path, paint);
+  // displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/dash2"));
+}
+
 }  // namespace tgfx
