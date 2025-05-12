@@ -373,7 +373,7 @@ TGFX_TEST(LayerTest, getTightBounds) {
   rectShape->setLineWidth(10);
   rectShape->setStrokeAlign(StrokeAlign::Outside);
   root->addChild(rectShape);
-  auto bounds = rectShape->getBounds(nullptr, true);
+  auto bounds = rectShape->getBounds(root.get(), true);
   EXPECT_FLOAT_EQ(bounds.height(), 120);
 
   auto lineShape = ShapeLayer::Make();
@@ -387,14 +387,27 @@ TGFX_TEST(LayerTest, getTightBounds) {
   auto matrix = Matrix::MakeRotate(50);
   matrix.postConcat(Matrix::MakeTrans(150, 20));
   lineShape->setMatrix(matrix);
+
+  auto lineShapeChild = ShapeLayer::Make();
+  Path linePath2 = {};
+  linePath2.moveTo(0, 0);
+  linePath2.lineTo(100, 0);
+  linePath2.lineTo(50, 20);
+  linePath2.lineTo(20, -20);
+  lineShapeChild->setPath(linePath2);
+  lineShapeChild->setStrokeStyle(SolidColor::Make(Color::Red()));
+  matrix = Matrix::MakeTrans(100, 20);
+  lineShapeChild->setMatrix(matrix);
+  lineShape->addChild(lineShapeChild);
+
   root->addChild(lineShape);
-  bounds = lineShape->getBounds(nullptr, true);
-  EXPECT_FLOAT_EQ(bounds.width(), 65.0447998f);
-  EXPECT_FLOAT_EQ(bounds.height(), 77.3664932f);
+  bounds = lineShape->getBounds(root.get(), true);
+  EXPECT_FLOAT_EQ(bounds.width(), 114.002686f);
+  EXPECT_FLOAT_EQ(bounds.height(), 166.826691f);
 
   auto lineBoundsShape = ShapeLayer::Make();
   Path lineBoundsRect = {};
-  lineBoundsRect.addRect(Rect::MakeXYWH(150.f, 20.f, bounds.width(), bounds.height()));
+  lineBoundsRect.addRect(bounds);
   lineBoundsShape->setPath(lineBoundsRect);
   lineBoundsShape->setStrokeStyle(SolidColor::Make(Color::Green()));
   root->addChild(lineBoundsShape);
@@ -402,7 +415,7 @@ TGFX_TEST(LayerTest, getTightBounds) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 250, 150);
+  auto surface = Surface::Make(context, 350, 250);
   auto displayList = std::make_unique<DisplayList>();
   displayList->root()->addChild(root);
   displayList->render(surface.get());
