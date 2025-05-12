@@ -180,6 +180,6 @@ bool BlendModeIsOpaque(BlendMode mode, OpacityType srcColorOpacity);
 /**
  * Returns true if the blend mode needs a destination texture.
  */
-bool BlendModeNeedDesTexture(BlendMode mode, bool hasCoverage);
+bool BlendModeNeedDstTexture(BlendMode mode, bool hasCoverage);
 
 }  // namespace tgfx

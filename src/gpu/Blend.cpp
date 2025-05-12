@@ -147,7 +147,7 @@ bool BlendModeIsOpaque(BlendMode mode, OpacityType srcColorOpacity) {
   }
 }
 
-bool BlendModeNeedDesTexture(BlendMode mode, bool hasCoverage) {
+bool BlendModeNeedDstTexture(BlendMode mode, bool hasCoverage) {
   if (mode == BlendMode::SrcOver) {
     return false;
   }
