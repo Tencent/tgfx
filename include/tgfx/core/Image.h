@@ -347,8 +347,8 @@ class Image {
   friend class RGBAAAImage;
   friend class RasterizedImage;
   friend class ImageShader;
-  friend class Caster;
-  friend class ImageSerialization;
-  friend class SerializeUtils;
+  friend class Types;
+ friend class ImageSerialization;
+ friend class SerializeUtils;
 };
 }  // namespace tgfx

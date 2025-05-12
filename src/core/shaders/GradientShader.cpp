@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GradientShader.h"
-#include "core/utils/Caster.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/Types.h"
 #include "gpu/ResourceProvider.h"
 #include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/ConicGradientLayout.h"

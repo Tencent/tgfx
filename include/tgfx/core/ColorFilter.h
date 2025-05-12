@@ -114,8 +114,8 @@ class ColorFilter {
   friend class ColorFilterShader;
   friend class ComposeColorFilter;
   friend class ColorImageFilter;
-  friend class Caster;
-  friend class ColorFilterSerialization;
-  friend class SerializeUtils;
+  friend class Types;
+ friend class ColorFilterSerialization;
+ friend class SerializeUtils;
 };
 }  // namespace tgfx

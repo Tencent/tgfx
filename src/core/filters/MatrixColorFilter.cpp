@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MatrixColorFilter.h"
-#include "core/utils/Caster.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/Types.h"
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
 
 namespace tgfx {
@@ -37,8 +37,12 @@ MatrixColorFilter::MatrixColorFilter(const std::array<float, 20>& matrix)
 }
 
 bool MatrixColorFilter::isEqual(const ColorFilter* colorFilter) const {
-  auto other = Caster::AsMatrixColorFilter(colorFilter);
-  return other && matrix == other->matrix;
+  auto type = Types::Get(colorFilter);
+  if (type != Types::ColorFilterType::Matrix) {
+    return false;
+  }
+  auto other = static_cast<const MatrixColorFilter*>(colorFilter);
+  return matrix == other->matrix;
 }
 
 PlacementPtr<FragmentProcessor> MatrixColorFilter::asFragmentProcessor(Context* context) const {

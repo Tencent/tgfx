@@ -169,8 +169,8 @@ class ImageFilter {
   friend class InnerShadowImageFilter;
   friend class ComposeImageFilter;
   friend class FilterImage;
-  friend class Caster;
-  friend class ImageFilterSerialization;
-  friend class SerializeUtils;
+  friend class Types;
+ friend class ImageFilterSerialization;
+ friend class SerializeUtils;
 };
 }  // namespace tgfx
