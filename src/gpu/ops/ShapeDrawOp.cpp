@@ -79,9 +79,6 @@ void ShapeDrawOp::execute(RenderPass* renderPass) {
       DefaultGeometryProcessor::Make(drawingBuffer, color, renderTarget->width(),
                                      renderTarget->height(), aaType, viewMatrix, realUVMatrix);
   auto pipeline = createPipeline(renderPass, std::move(gp));
-  if (pipeline == nullptr) {
-    return;
-  }
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   auto vertexDataSize = vertexBuffer ? vertexBuffer->size() : vertexData->size();
   auto vertexCount = aaType == AAType::Coverage

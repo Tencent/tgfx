@@ -20,7 +20,8 @@
 
 namespace tgfx {
 const Texture* PorterDuffXferProcessor::dstTexture() const {
-  return dstTextureInfo.texture.get();
+  auto textureProxy = dstTextureInfo.textureProxy;
+  return textureProxy ? textureProxy->getTexture().get() : nullptr;
 }
 
 void PorterDuffXferProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) const {

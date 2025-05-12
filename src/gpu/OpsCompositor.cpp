@@ -128,7 +128,7 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
   auto shapeProxy = proxyProvider()->createGpuShapeProxy(shape, aaType, clipBounds, renderFlags);
   auto drawOp =
       ShapeDrawOp::Make(std::move(shapeProxy), fill.color.premultiply(), uvMatrix, aaType);
-  addDrawOp(std::move(drawOp), clip, fill, localBounds, deviceBounds, true);
+  addDrawOp(std::move(drawOp), clip, fill, localBounds, deviceBounds);
 }
 
 void OpsCompositor::discardAll() {
@@ -213,9 +213,9 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
   PlacementPtr<DrawOp> drawOp = nullptr;
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
-  bool hasCoverage = fill.maskFilter != nullptr || !clip.isEmpty() || clip.isInverseFillType();
-  auto [needLocalBounds, needDeviceBounds] =
-      needComputeBounds(fill, hasCoverage, type == PendingOpType::Image);
+  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(
+      fill, fill.maskFilter != nullptr || !clip.isEmpty() || clip.isInverseFillType(),
+      type == PendingOpType::Image);
   auto aaType = getAAType(fill);
   Rect clipBounds = {};
   if (needLocalBounds) {
@@ -278,7 +278,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     }
     drawOp->addColorFP(std::move(processor));
   }
-  addDrawOp(std::move(drawOp), clip, fill, localBounds, deviceBounds, false);
+  addDrawOp(std::move(drawOp), clip, fill, localBounds, deviceBounds);
 }
 
 static void FlipYIfNeeded(Rect* rect, std::shared_ptr<RenderTargetProxy> renderTarget) {
@@ -470,7 +470,7 @@ std::pair<PlacementPtr<FragmentProcessor>, bool> OpsCompositor::getClipMaskFP(co
   return {FragmentProcessor::MulInputByChildAlpha(buffer, std::move(processor)), true};
 }
 
-Rect OpsCompositor::makeDstTextureBounds(const Rect& deviceBounds, AAType aaType) {
+DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AAType aaType) {
   auto caps = context->caps();
   if (caps->frameBufferFetchSupport) {
     return {};
@@ -491,12 +491,35 @@ Rect OpsCompositor::makeDstTextureBounds(const Rect& deviceBounds, AAType aaType
     }
     FlipYIfNeeded(&bounds, renderTarget);
   }
-  return bounds;
+  DstTextureInfo dstTextureInfo = {};
+  if (textureProxy != nullptr) {
+    if (renderTarget->sampleCount() > 1) {
+      auto resolveOp = ResolveOp::Make(context, bounds);
+      if (resolveOp) {
+        ops.emplace_back(std::move(resolveOp));
+      }
+    }
+    dstTextureInfo.textureProxy = std::move(textureProxy);
+    dstTextureInfo.requiresBarrier = true;
+    return dstTextureInfo;
+  }
+  dstTextureInfo.offset = {bounds.x(), bounds.y()};
+  textureProxy = proxyProvider()->createTextureProxy(
+      {}, static_cast<int>(bounds.width()), static_cast<int>(bounds.height()),
+      renderTarget->format(), false, renderTarget->origin());
+  auto dstTextureCopyOp = DstTextureCopyOp::Make(textureProxy, static_cast<int>(bounds.x()),
+                                                 static_cast<int>(bounds.y()));
+  if (dstTextureCopyOp == nullptr) {
+    return {};
+  }
+  ops.emplace_back(std::move(dstTextureCopyOp));
+  dstTextureInfo.textureProxy = std::move(textureProxy);
+  return dstTextureInfo;
 }
 
 void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const Fill& fill,
                               const std::optional<Rect>& localBounds,
-                              const std::optional<Rect>& deviceBounds, bool hasExtraCoverage) {
+                              const std::optional<Rect>& deviceBounds) {
   if (op == nullptr || fill.nothingToDraw() || (clip.isEmpty() && !clip.isInverseFillType())) {
     return;
   }
@@ -506,7 +529,6 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
   }
 
   FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty())};
-  bool hasCoverage = hasExtraCoverage;
   if (fill.shader) {
     if (auto processor = FragmentProcessor::Make(fill.shader, args)) {
       op->addColorFP(std::move(processor));
@@ -524,7 +546,6 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
   if (fill.maskFilter) {
     if (auto processor = fill.maskFilter->asFragmentProcessor(args, nullptr)) {
       op->addCoverageFP(std::move(processor));
-      hasCoverage = true;
     } else {
       // if mask is empty, nothing to draw
       return;
@@ -538,20 +559,17 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
       return;
     }
     op->addCoverageFP(std::move(clipMask));
-    hasCoverage = true;
   }
   op->setScissorRect(scissorRect);
   op->setBlendMode(fill.blendMode);
-  if (BlendModeNeedDesTexture(fill.blendMode, hasCoverage)) {
-    auto dstTextureBounds = makeDstTextureBounds(deviceBounds.value_or(Rect::MakeEmpty()), aaType);
-    auto caps = context->caps();
-    if ((!caps->frameBufferFetchSupport &&
-         (!caps->textureBarrierSupport || renderTarget->getTextureProxy() == nullptr ||
-          renderTarget->sampleCount() > 1) &&
-         dstTextureBounds.isEmpty())) {
+  if (BlendModeNeedDesTexture(fill.blendMode, op->hasCoverage())) {
+    auto dstTextureInfo = makeDstTextureInfo(deviceBounds.value_or(Rect::MakeEmpty()), aaType);
+    if (!context->caps()->frameBufferFetchSupport && dstTextureInfo.textureProxy == nullptr) {
       return;
     }
-    op->setDeviceBounds(dstTextureBounds);
+    auto xferProcessor =
+        PorterDuffXferProcessor::Make(drawingBuffer(), fill.blendMode, std::move(dstTextureInfo));
+    op->setXferProcessor(std::move(xferProcessor));
   }
   ops.emplace_back(std::move(op));
 }
