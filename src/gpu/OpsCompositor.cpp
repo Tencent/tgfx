@@ -109,7 +109,7 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
   }
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
-  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(fill);
+  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(fill, true);
   auto& clip = state.clip;
   auto clipBounds = getClipBounds(clip);
   if (needLocalBounds) {
@@ -211,7 +211,9 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
   PlacementPtr<DrawOp> drawOp = nullptr;
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
-  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(fill, type == PendingOpType::Image);
+  bool hasCoverage = fill.maskFilter != nullptr || !clip.isEmpty() || clip.isInverseFillType();
+  auto [needLocalBounds, needDeviceBounds] =
+      needComputeBounds(fill, hasCoverage, type == PendingOpType::Image);
   auto aaType = getAAType(fill);
   Rect clipBounds = {};
   if (needLocalBounds) {
@@ -349,10 +351,11 @@ AAType OpsCompositor::getAAType(const Fill& fill) const {
   return AAType::None;
 }
 
-std::pair<bool, bool> OpsCompositor::needComputeBounds(const Fill& fill, bool hasImageFill) {
+std::pair<bool, bool> OpsCompositor::needComputeBounds(const Fill& fill, bool hasCoverage,
+                                                       bool hasImageFill) {
   bool needLocalBounds = hasImageFill || fill.shader != nullptr || fill.maskFilter != nullptr;
   bool needDeviceBounds = false;
-  if (!BlendModeAsCoeff(fill.blendMode)) {
+  if (BlendModeNeedDstTexture(fill.blendMode, hasCoverage)) {
     auto caps = context->caps();
     if (!caps->frameBufferFetchSupport &&
         (!caps->textureBarrierSupport || renderTarget->getTextureProxy() == nullptr ||
@@ -473,6 +476,9 @@ DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AATyp
   Rect bounds = {};
   auto textureProxy = caps->textureBarrierSupport ? renderTarget->getTextureProxy() : nullptr;
   if (textureProxy == nullptr || renderTarget->sampleCount() > 1) {
+    if (deviceBounds.isEmpty()) {
+      return {};
+    }
     bounds = deviceBounds;
     if (aaType != AAType::None) {
       bounds.outset(1.0f, 1.0f);
@@ -554,7 +560,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
   }
   op->setScissorRect(scissorRect);
   op->setBlendMode(fill.blendMode);
-  if (!BlendModeAsCoeff(fill.blendMode)) {
+  if (BlendModeNeedDstTexture(fill.blendMode, op->hasCoverage())) {
     auto dstTextureInfo = makeDstTextureInfo(deviceBounds.value_or(Rect::MakeEmpty()), aaType);
     if (!context->caps()->frameBufferFetchSupport && dstTextureInfo.textureProxy == nullptr) {
       return;

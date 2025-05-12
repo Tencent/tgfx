@@ -354,101 +354,181 @@ static void HandleBlendModes(FragmentShaderBuilder* fsBuilder, const std::string
   }
 }
 
-static void CoeffHandler_ONE(FragmentShaderBuilder*, const char*, const char*) {
+static void OutputHandler_None(FragmentShaderBuilder* fragBuilder, const char*, const char*) {
+  fragBuilder->codeAppendf("vec4(0.0);");
+}
+
+static void OutputHandler_Coverage(FragmentShaderBuilder* fragBuilder, const char*,
+                                   const char* coverage) {
+  fragBuilder->codeAppendf("%s;", coverage);
+}
+
+static void OutputHandler_Modulate(FragmentShaderBuilder* fragBuilder, const char* srcColor,
+                                   const char* coverage) {
+  fragBuilder->codeAppendf("%s * %s;", srcColor, coverage);
+}
+
+static void OutputHandler_SAModulate(FragmentShaderBuilder* fragBuilder, const char* srcColor,
+                                     const char* coverage) {
+  fragBuilder->codeAppendf("%s.a * %s;", srcColor, coverage);
+}
+
+static void OutputHandler_ISAModulate(FragmentShaderBuilder* fragBuilder, const char* srcColor,
+                                      const char* coverage) {
+  fragBuilder->codeAppendf("(1.0 - %s.a) * %s;", srcColor, coverage);
+}
+
+static void OutputHandler_ISCModulate(FragmentShaderBuilder* fragBuilder, const char* srcColor,
+                                      const char* coverage) {
+  fragBuilder->codeAppendf("(vec4(1.0) - %s) * %s;", srcColor, coverage);
+}
+
+using OutputHandler = void (*)(FragmentShaderBuilder* fragBuilder, const char* srcColor,
+                               const char* coverage);
+
+static constexpr OutputHandler kOutputHandlers[] = {
+    OutputHandler_None,       OutputHandler_Coverage,    OutputHandler_Modulate,
+    OutputHandler_SAModulate, OutputHandler_ISAModulate, OutputHandler_ISCModulate};
+
+static void CoeffHandler_ONE(FragmentShaderBuilder* fsBuilder, const char*, const char*,
+                             const char*) {
+  fsBuilder->codeAppend(";");
 }
 
 static void CoeffHandler_SRC_COLOR(FragmentShaderBuilder* fsBuilder, const char* srcColorName,
-                                   const char*) {
-  fsBuilder->codeAppendf(" * %s", srcColorName);
+                                   const char*, const char*) {
+  fsBuilder->codeAppendf(" * %s;", srcColorName);
 }
 
 static void CoeffHandler_ONE_MINUS_SRC_COLOR(FragmentShaderBuilder* fsBuilder,
-                                             const char* srcColorName, const char*) {
-  fsBuilder->codeAppendf(" * (vec4(1.0) - %s)", srcColorName);
+                                             const char* srcColorName, const char*, const char*) {
+  fsBuilder->codeAppendf(" * (vec4(1.0) - %s);", srcColorName);
 }
 
-static void CoeffHandler_DST_COLOR(FragmentShaderBuilder* fsBuilder, const char*,
+static void CoeffHandler_DST_COLOR(FragmentShaderBuilder* fsBuilder, const char*, const char*,
                                    const char* dstColorName) {
-  fsBuilder->codeAppendf(" * %s", dstColorName);
+  fsBuilder->codeAppendf(" * %s;", dstColorName);
 }
 
 static void CoeffHandler_ONE_MINUS_DST_COLOR(FragmentShaderBuilder* fsBuilder, const char*,
-                                             const char* dstColorName) {
-  fsBuilder->codeAppendf(" * (vec4(1.0) - %s)", dstColorName);
+                                             const char*, const char* dstColorName) {
+  fsBuilder->codeAppendf(" * (vec4(1.0) - %s);", dstColorName);
 }
 
 static void CoeffHandler_SRC_ALPHA(FragmentShaderBuilder* fsBuilder, const char* srcColorName,
-                                   const char*) {
-  fsBuilder->codeAppendf(" * %s.a", srcColorName);
+                                   const char*, const char*) {
+  fsBuilder->codeAppendf(" * %s.a;", srcColorName);
 }
 
 static void CoeffHandler_ONE_MINUS_SRC_ALPHA(FragmentShaderBuilder* fsBuilder,
-                                             const char* srcColorName, const char*) {
-  fsBuilder->codeAppendf(" * (1.0 - %s.a)", srcColorName);
+                                             const char* srcColorName, const char*, const char*) {
+  fsBuilder->codeAppendf(" * (1.0 - %s.a);", srcColorName);
 }
 
-static void CoeffHandler_DST_ALPHA(FragmentShaderBuilder* fsBuilder, const char*,
+static void CoeffHandler_DST_ALPHA(FragmentShaderBuilder* fsBuilder, const char*, const char*,
                                    const char* dstColorName) {
-  fsBuilder->codeAppendf(" * %s.a", dstColorName);
+  fsBuilder->codeAppendf(" * %s.a;", dstColorName);
 }
 
 static void CoeffHandler_ONE_MINUS_DST_ALPHA(FragmentShaderBuilder* fsBuilder, const char*,
-                                             const char* dstColorName) {
-  fsBuilder->codeAppendf(" * (1.0 - %s.a)", dstColorName);
+                                             const char*, const char* dstColorName) {
+  fsBuilder->codeAppendf(" * (1.0 - %s.a);", dstColorName);
+}
+
+static void CoeffHandler_SRC1_COLOR(FragmentShaderBuilder* fsBuilder, const char*,
+                                    const char* src1ColorName, const char*) {
+  fsBuilder->codeAppendf(" * %s;", src1ColorName);
+}
+static void CoeffHandler_ONE_MINUS_SRC1_COLOR(FragmentShaderBuilder* fsBuilder, const char*,
+                                              const char* src1ColorName, const char*) {
+  fsBuilder->codeAppendf(" * (vec4(1.0) - %s);", src1ColorName);
+}
+
+static void CoeffHandler_SRC1_ALPHA(FragmentShaderBuilder* fsBuilder, const char*,
+                                    const char* src1ColorName, const char*) {
+  fsBuilder->codeAppendf(" * (vec4(1.0) - %s);", src1ColorName);
+}
+
+static void CoeffHandler_ONE_MINUS_SRC1_ALPHA(FragmentShaderBuilder* fsBuilder, const char*,
+                                              const char* src1ColorName, const char*) {
+  fsBuilder->codeAppendf(" * (vec4(1.0) - %s);", src1ColorName);
 }
 
 using CoeffHandler = void (*)(FragmentShaderBuilder* fsBuilder, const char* srcColorName,
-                              const char* dstColorName);
+                              const char* src1ColorName, const char* dstColorName);
 
-static constexpr CoeffHandler kCoeffHandleMap[] = {CoeffHandler_ONE,
-                                                   CoeffHandler_SRC_COLOR,
-                                                   CoeffHandler_ONE_MINUS_SRC_COLOR,
-                                                   CoeffHandler_DST_COLOR,
-                                                   CoeffHandler_ONE_MINUS_DST_COLOR,
-                                                   CoeffHandler_SRC_ALPHA,
-                                                   CoeffHandler_ONE_MINUS_SRC_ALPHA,
-                                                   CoeffHandler_DST_ALPHA,
-                                                   CoeffHandler_ONE_MINUS_DST_ALPHA};
+static constexpr CoeffHandler kCoeffHandlers[] = {CoeffHandler_ONE,
+                                                  CoeffHandler_SRC_COLOR,
+                                                  CoeffHandler_ONE_MINUS_SRC_COLOR,
+                                                  CoeffHandler_DST_COLOR,
+                                                  CoeffHandler_ONE_MINUS_DST_COLOR,
+                                                  CoeffHandler_SRC_ALPHA,
+                                                  CoeffHandler_ONE_MINUS_SRC_ALPHA,
+                                                  CoeffHandler_DST_ALPHA,
+                                                  CoeffHandler_ONE_MINUS_DST_ALPHA,
+                                                  CoeffHandler_SRC1_COLOR,
+                                                  CoeffHandler_ONE_MINUS_SRC1_COLOR,
+                                                  CoeffHandler_SRC1_ALPHA,
+                                                  CoeffHandler_ONE_MINUS_SRC1_ALPHA};
 
-static bool AppendPorterDuffTerm(FragmentShaderBuilder* fsBuilder, BlendModeCoeff coeff,
-                                 const std::string& colorName, const std::string& srcColorName,
-                                 const std::string& dstColorName, bool hasPrevious) {
-  if (BlendModeCoeff::Zero == coeff) {
-    return hasPrevious;
+void AppendCoeffBlend(FragmentShaderBuilder* fsBuilder, const std::string& srcColor,
+                      const std::string& coverageColor, const std::string& dstColor,
+                      const std::string& outColor, const BlendFormula& formula) {
+  std::string primaryOutputColor = "primaryOutputColor";
+  fsBuilder->codeAppendf("vec4 %s = ", primaryOutputColor.c_str());
+  kOutputHandlers[static_cast<int>(formula.primaryOutputType())](fsBuilder, srcColor.c_str(),
+                                                                 coverageColor.c_str());
+
+  std::string secondaryOutputColor;
+  if (formula.needSecondaryOutput()) {
+    secondaryOutputColor = "secondaryOutputColor";
+    fsBuilder->codeAppendf("vec4 %s = ", secondaryOutputColor.c_str());
+    kOutputHandlers[static_cast<int>(formula.secondaryOutputType())](fsBuilder, srcColor.c_str(),
+                                                                     coverageColor.c_str());
+  }
+
+  auto dstWithCoeff = "dst";
+  if (formula.dstCoeff() == BlendModeCoeff::Zero) {
+    fsBuilder->codeAppendf("vec4 %s = vec4(0.0);", dstWithCoeff);
   } else {
-    if (hasPrevious) {
-      fsBuilder->codeAppend(" + ");
-    }
-    fsBuilder->codeAppendf("%s", colorName.c_str());
-    kCoeffHandleMap[static_cast<int>(coeff) - 1](fsBuilder, srcColorName.c_str(),
-                                                 dstColorName.c_str());
-    return true;
+    fsBuilder->codeAppendf("vec4 %s = %s", dstWithCoeff, dstColor.c_str());
+    kCoeffHandlers[static_cast<int>(formula.dstCoeff()) - 1](
+        fsBuilder, primaryOutputColor.c_str(), secondaryOutputColor.c_str(), dstColor.c_str());
+  }
+
+  auto srcWithCoeff = "src";
+  if (formula.srcCoeff() == BlendModeCoeff::Zero) {
+    fsBuilder->codeAppendf("vec4 %s = vec4(0.0);", srcWithCoeff);
+  } else {
+    fsBuilder->codeAppendf("vec4 %s = %s", srcWithCoeff, primaryOutputColor.c_str());
+    kCoeffHandlers[static_cast<int>(formula.srcCoeff()) - 1](
+        fsBuilder, primaryOutputColor.c_str(), secondaryOutputColor.c_str(), dstColor.c_str());
+  }
+
+  switch (formula.equation()) {
+    case BlendEquation::Add:
+      fsBuilder->codeAppendf("%s = clamp(%s + %s, 0.0, 1.0);", outColor.c_str(), srcWithCoeff,
+                             dstWithCoeff);
+      break;
+    case BlendEquation::Subtract:
+      fsBuilder->codeAppendf("%s = clamp(%s - %s , 0.0, 1.0);", outColor.c_str(), srcWithCoeff,
+                             dstWithCoeff);
+      break;
+    case BlendEquation::ReverseSubtract:
+      fsBuilder->codeAppendf("%s = clamp(%s - %s, 0.0, 1.0);", outColor.c_str(), dstWithCoeff,
+                             srcWithCoeff);
+      break;
+    default:
+      break;
   }
 }
 
 void AppendMode(FragmentShaderBuilder* fsBuilder, const std::string& srcColor,
-                const std::string& dstColor, const std::string& outColor, BlendMode blendMode) {
-  BlendInfo blendInfo = {};
-  if (BlendModeAsCoeff(blendMode, &blendInfo)) {
-    // The only coeff mode that can go out of range is plus.
-    bool clamp = blendMode == BlendMode::PlusLighter;
-
-    fsBuilder->codeAppendf("%s = ", outColor.c_str());
-    if (clamp) {
-      fsBuilder->codeAppend("clamp(");
-    }
-    // append src blend
-    bool didAppend =
-        AppendPorterDuffTerm(fsBuilder, blendInfo.srcBlend, srcColor, srcColor, dstColor, false);
-    // append dst blend
-    if (!AppendPorterDuffTerm(fsBuilder, blendInfo.dstBlend, dstColor, srcColor, dstColor,
-                              didAppend)) {
-      fsBuilder->codeAppend("vec4(0, 0, 0, 0)");
-    }
-    if (clamp) {
-      fsBuilder->codeAppend(", 0, 1);");
-    }
-    fsBuilder->codeAppend(";");
+                const std::string& coverageColor, const std::string& dstColor,
+                const std::string& outColor, BlendMode blendMode, bool hasCoverageProcessor) {
+  BlendFormula blendInfo = {};
+  if (BlendModeAsCoeff(blendMode, hasCoverageProcessor, &blendInfo)) {
+    AppendCoeffBlend(fsBuilder, srcColor, coverageColor, dstColor, outColor, blendInfo);
   } else {
     HandleBlendModes(fsBuilder, srcColor, dstColor, outColor, blendMode);
   }

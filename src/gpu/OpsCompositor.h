@@ -111,7 +111,8 @@ class OpsCompositor {
   bool canAppend(PendingOpType type, const Path& clip, const Fill& fill) const;
   void flushPendingOps(PendingOpType type = PendingOpType::Unknown, Path clip = {}, Fill fill = {});
   AAType getAAType(const Fill& fill) const;
-  std::pair<bool, bool> needComputeBounds(const Fill& fill, bool hasImageFill = false);
+  std::pair<bool, bool> needComputeBounds(const Fill& fill, bool hasCoverage,
+                                          bool hasImageFill = false);
   Rect getClipBounds(const Path& clip);
   std::shared_ptr<TextureProxy> getClipTexture(const Path& clip, AAType aaType);
   std::pair<std::optional<Rect>, bool> getClipRect(const Path& clip);
