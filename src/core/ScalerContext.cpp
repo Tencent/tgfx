@@ -44,11 +44,15 @@ class EmptyScalerContext : public ScalerContext {
     return false;
   }
 
-  Rect getImageTransform(GlyphID, Matrix*) const override {
+  Rect getImageTransform(const GlyphStyle&, Matrix*) const override {
     return {};
   }
 
-  bool readPixels(GlyphID, const ImageInfo&, void*) const override {
+  bool readPixels(const GlyphStyle&, const ImageInfo&, void*) const override {
+    return false;
+  }
+
+  bool canUseImage(const GlyphStyle& glyphStyle) const override {
     return false;
   }
 };

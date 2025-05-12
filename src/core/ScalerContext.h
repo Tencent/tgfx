@@ -20,11 +20,20 @@
 
 #include "tgfx/core/FontMetrics.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/Stroke.h"
 #include "tgfx/core/Typeface.h"
 
 namespace tgfx {
 static constexpr float ITALIC_SKEW = -0.20f;
+
+struct GlyphStyle {
+  GlyphID glyphID{0};
+  bool fauxBold{false};
+  bool fauxItalic{false};
+  const Stroke* stroke{nullptr};
+};
 
 class ScalerContext {
  public:
@@ -60,9 +69,12 @@ class ScalerContext {
 
   virtual bool generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic, Path* path) const = 0;
 
-  virtual Rect getImageTransform(GlyphID glyphID, Matrix* matrix) const = 0;
+  virtual Rect getImageTransform(const GlyphStyle& glyphStyle, Matrix* matrix) const = 0;
 
-  virtual bool readPixels(GlyphID glyphID, const ImageInfo& dstInfo, void* dstPixels) const = 0;
+  virtual bool readPixels(const GlyphStyle& glyphStyle, const ImageInfo& dstInfo,
+                          void* dstPixels) const = 0;
+
+  virtual bool canUseImage(const GlyphStyle& glyphStyle) const = 0;
 
  protected:
   // Note: This could be nullptr.

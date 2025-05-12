@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,32 +17,25 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include "tgfx/core/GlyphFace.h"
+
+#include "core/GlyphDrawer.h"
 
 namespace tgfx {
-class FontGlyphFace final : public GlyphFace {
+class FTGlyphDrawer : public GlyphDrawer {
  public:
-  bool hasColor() const override;
-
-  bool hasOutlines() const override;
-
-  std::shared_ptr<GlyphFace> makeScaled(float scale) const override;
-
-  bool getPath(GlyphID glyphID, Path* path) const override;
-
-  std::shared_ptr<ImageCodec> getImage(GlyphID glyphID, const Stroke* stroke,
-                                       Matrix* matrix) const override;
-
-  Rect getBounds(GlyphID glyphID) const override;
-
-  bool asFont(Font* font) const override;
-
- private:
-  explicit FontGlyphFace(Font font) : _font(std::move(font)) {
+  explicit FTGlyphDrawer(const Matrix& matrix, bool antiAlias, bool needsGammaCorrection)
+      : GlyphDrawer(matrix, antiAlias, needsGammaCorrection) {
   }
 
-  Font _font = {};
+ protected:
+  bool onFillGlyph(const GlyphFace*, GlyphID, const Stroke*, const ImageInfo&, void*) override {
+    return false;
+  }
+  bool onFillPath(const Path& path, const Matrix& mat, const ImageInfo& dstInfo,
+                  void* dstPixels) override;
 
-  friend class GlyphFace;
+  bool onFillText(const GlyphRunList*, const Stroke*, const Matrix&, bool) override {
+    return false;
+  }
 };
 }  // namespace tgfx

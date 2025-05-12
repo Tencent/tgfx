@@ -44,6 +44,8 @@ class CGScalerContext : public ScalerContext {
 
   bool readPixels(GlyphID glyphID, const ImageInfo& dstInfo, void* dstPixels) const override;
 
+  bool canUseImage(const GlyphStyle& glyphStyle) const override;
+
  private:
   float fauxBoldScale = 1.0f;
   CTFontRef ctFont = nullptr;

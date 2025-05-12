@@ -303,4 +303,9 @@ bool CGScalerContext::readPixels(GlyphID glyphID, const ImageInfo& dstInfo, void
   CGContextRelease(cgContext);
   return true;
 }
+
+bool CGScalerContext::canUseImage(const GlyphStyle& glyphStyle) {
+  return glyphStyle.stroke == nullptr && !glyphStyle.fauxBold;
+}
+
 }  // namespace tgfx
