@@ -49,8 +49,8 @@ class RasterizedContent : public LayerContent {
   }
 
  protected:
-  LayerContentType Type() const override {
-    return LayerContentType::RasterizedContent;
+  Type type() const override {
+    return Type::RasterizedContent;
   }
 
  private:

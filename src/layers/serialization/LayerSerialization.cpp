@@ -29,6 +29,7 @@
 namespace tgfx {
 
 std::shared_ptr<Data> LayerSerialization::serializeLayer(Layer* layer) {
+  DEBUG_ASSERT(layer != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;

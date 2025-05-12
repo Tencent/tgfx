@@ -22,6 +22,7 @@
 namespace tgfx {
 
 std::shared_ptr<Data> RectSerialization::serializeRect(Rect* rect) {
+  DEBUG_ASSERT(rect != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;

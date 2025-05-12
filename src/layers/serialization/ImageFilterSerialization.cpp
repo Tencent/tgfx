@@ -28,6 +28,7 @@
 namespace tgfx {
 
 std::shared_ptr<Data> ImageFilterSerialization::serializeImageFilter(ImageFilter* imageFilter) {
+  DEBUG_ASSERT(imageFilter != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;

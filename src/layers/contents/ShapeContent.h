@@ -52,8 +52,8 @@ class ShapeContent : public LayerContent {
   bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
 
  protected:
-  LayerContentType Type() const override {
-    return LayerContentType::ShapeContent;
+  Type type() const override {
+    return Type::ShapeContent;
   }
 
  private:

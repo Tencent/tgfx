@@ -69,8 +69,8 @@ class ShapeStyle : public LayerProperty {
   void setMatrix(const Matrix& value);
 
  protected:
-  enum class ShapeStyleType { Gradient, ImagePattern, SolidColor };
-  virtual ShapeStyleType getType() const = 0;
+  enum class Type { Gradient, ImagePattern, SolidColor };
+  virtual Type getType() const = 0;
   std::shared_ptr<Shader> getShader() const;
 
   /**
@@ -83,6 +83,7 @@ class ShapeStyle : public LayerProperty {
   BlendMode _blendMode = BlendMode::SrcOver;
   Matrix _matrix = {};
 
+  friend class Types;
   friend class ShapeLayer;
   friend class ShapeStyleSerialization;
 };

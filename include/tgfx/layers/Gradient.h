@@ -131,8 +131,8 @@ class Gradient : public ShapeStyle {
   void setPositions(std::vector<float> positions);
 
  protected:
-  ShapeStyleType getType() const override {
-    return ShapeStyleType::Gradient;
+  Type getType() const override {
+    return Type::Gradient;
   }
   std::vector<Color> _colors;
   std::vector<float> _positions;

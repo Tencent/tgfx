@@ -28,6 +28,7 @@
 namespace tgfx {
 
 std::shared_ptr<Data> ShaderSerialization::serializeShader(Shader* shader) {
+  DEBUG_ASSERT(shader != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;

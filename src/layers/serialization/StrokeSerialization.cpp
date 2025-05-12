@@ -22,6 +22,7 @@
 namespace tgfx {
 
 std::shared_ptr<Data> StrokeSerialization::serializeStroke(Stroke* stroke) {
+  DEBUG_ASSERT(stroke != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;

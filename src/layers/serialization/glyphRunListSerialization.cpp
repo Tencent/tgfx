@@ -23,6 +23,7 @@
 namespace tgfx {
 
 std::shared_ptr<Data> glyphRunListSerialization::serializeglyphRunList(GlyphRunList* glyphRunList) {
+  DEBUG_ASSERT(glyphRunList != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
@@ -30,7 +31,6 @@ std::shared_ptr<Data> glyphRunListSerialization::serializeglyphRunList(GlyphRunL
   serializeglyphRunListImpl(fbb, glyphRunList);
   SerializeUtils::serializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
-  ;
 }
 
 void glyphRunListSerialization::serializeglyphRunListImpl(flexbuffers::Builder& fbb,

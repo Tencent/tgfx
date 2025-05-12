@@ -22,6 +22,7 @@
 namespace tgfx {
 
 std::shared_ptr<Data> TypeFaceSerialization::serializeTypeFace(Typeface* typeface) {
+  DEBUG_ASSERT(typeface != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;

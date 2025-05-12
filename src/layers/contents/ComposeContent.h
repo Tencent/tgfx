@@ -36,8 +36,8 @@ class ComposeContent : public LayerContent {
   bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
 
  protected:
-  LayerContentType Type() const override {
-    return LayerContentType::ComposeContent;
+  Type type() const override {
+    return Type::ComposeContent;
   }
 
  private:

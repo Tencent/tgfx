@@ -28,31 +28,32 @@
 namespace tgfx {
 
 std::shared_ptr<Data> LayerContentSerialization::serializeLayerContent(LayerContent* layerContent) {
+  DEBUG_ASSERT(layerContent != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
   SerializeUtils::serializeBegin(fbb, "LayerAttribute", startMap, contentMap);
-  auto type = layerContent->Type();
+  auto type = layerContent->type();
   switch (type) {
-    case LayerContent::LayerContentType::LayerContent:
+    case LayerContent::Type::LayerContent:
       serializeBasicLayerContentImpl(fbb, layerContent);
       break;
-    case LayerContent::LayerContentType::ComposeContent:
+    case LayerContent::Type::ComposeContent:
       serializeComposeContentImpl(fbb, layerContent);
       break;
-    case LayerContent::LayerContentType::ImageContent:
+    case LayerContent::Type::ImageContent:
       serializeImageContentImpl(fbb, layerContent);
       break;
-    case LayerContent::LayerContentType::RasterizedContent:
+    case LayerContent::Type::RasterizedContent:
       serializeRasterizedContentImpl(fbb, layerContent);
       break;
-    case LayerContent::LayerContentType::ShapeContent:
+    case LayerContent::Type::ShapeContent:
       serializeShapeContentImpl(fbb, layerContent);
       break;
-    case LayerContent::LayerContentType::SolidContent:
+    case LayerContent::Type::SolidContent:
       serializeSolidContentImpl(fbb, layerContent);
       break;
-    case LayerContent::LayerContentType::TextContent:
+    case LayerContent::Type::TextContent:
       serializeTextContentImpl(fbb, layerContent);
       break;
   }

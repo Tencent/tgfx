@@ -22,6 +22,7 @@
 namespace tgfx {
 
 std::shared_ptr<Data> glyphRunSerialization::serializeGlyphRun(GlyphRun* glyphRun) {
+  DEBUG_ASSERT(glyphRun != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;

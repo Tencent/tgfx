@@ -22,6 +22,7 @@
 namespace tgfx {
 
 std::shared_ptr<Data> ShapeSerialization::serializeShape(Shape* shape) {
+  DEBUG_ASSERT(shape != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;

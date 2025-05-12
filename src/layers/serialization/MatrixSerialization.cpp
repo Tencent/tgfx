@@ -23,6 +23,7 @@
 namespace tgfx {
 
 std::shared_ptr<Data> MatrixSerialization::serializeMatrix(Matrix* matrix) {
+  DEBUG_ASSERT(matrix != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;

@@ -29,28 +29,29 @@
 namespace tgfx {
 
 std::shared_ptr<Data> LayerFilterSerialization::serializeLayerFilter(LayerFilter* layerFilter) {
+  DEBUG_ASSERT(layerFilter != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
   SerializeUtils::serializeBegin(fbb, "LayerAttribute", startMap, contentMap);
-  auto type = layerFilter->Type();
+  auto type = layerFilter->type();
   switch (type) {
-    case LayerFilter::LayerFilterType::LayerFilter:
+    case LayerFilter::Type::LayerFilter:
       serializeBasicLayerFilterImpl(fbb, layerFilter);
       break;
-    case LayerFilter::LayerFilterType::BlendFilter:
+    case LayerFilter::Type::BlendFilter:
       serializeBlendFilterImpl(fbb, layerFilter);
       break;
-    case LayerFilter::LayerFilterType::BlurFilter:
+    case LayerFilter::Type::BlurFilter:
       serializeBlurFilterImpl(fbb, layerFilter);
       break;
-    case LayerFilter::LayerFilterType::ColorMatrixFliter:
+    case LayerFilter::Type::ColorMatrixFliter:
       serializeColorMatrixFilterImpl(fbb, layerFilter);
       break;
-    case LayerFilter::LayerFilterType::DropShadowFilter:
+    case LayerFilter::Type::DropShadowFilter:
       serializeDropShadowFilterImpl(fbb, layerFilter);
       break;
-    case LayerFilter::LayerFilterType::InnerShadowFilter:
+    case LayerFilter::Type::InnerShadowFilter:
       serializeInnerShadowFilterImpl(fbb, layerFilter);
       break;
   }

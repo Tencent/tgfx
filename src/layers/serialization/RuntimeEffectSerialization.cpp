@@ -23,6 +23,7 @@ namespace tgfx {
 
 std::shared_ptr<Data> RuntimeEffectSerialization::serializeRuntimeEffect(
     RuntimeEffect* runtimeEffet) {
+  DEBUG_ASSERT(runtimeEffet != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;

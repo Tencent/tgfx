@@ -22,6 +22,7 @@ namespace tgfx {
 
 std::shared_ptr<Data> SamplingOptionsSerialization::serializeSamplingOptions(
     SamplingOptions* samplingOptions) {
+  DEBUG_ASSERT(samplingOptions != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;

@@ -27,6 +27,7 @@
 namespace tgfx {
 
 std::shared_ptr<Data> ColorFilterSerialization::serializeColorFilter(ColorFilter* colorFilter) {
+  DEBUG_ASSERT(colorFilter != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;

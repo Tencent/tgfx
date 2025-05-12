@@ -22,6 +22,7 @@
 namespace tgfx {
 
 std::shared_ptr<Data> TextBlobSerialization::serializeTextBlob(TextBlob* textBlob) {
+  DEBUG_ASSERT(textBlob != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;

@@ -61,7 +61,7 @@ class LayerContent {
   virtual bool hitTestPoint(float localX, float localY, bool pixelHitTest) = 0;
 
  protected:
-  enum class LayerContentType {
+  enum class Type {
     LayerContent,
     ComposeContent,
     ImageContent,
@@ -70,9 +70,10 @@ class LayerContent {
     SolidContent,
     TextContent
   };
-  virtual LayerContentType Type() const {
-    return LayerContentType::LayerContent;
+  virtual Type type() const {
+    return Type::LayerContent;
   }
+  friend class Types;
   friend class LayerContentSerialization;
 };
 }  // namespace tgfx

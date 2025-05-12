@@ -22,6 +22,7 @@
 namespace tgfx {
 
 std::shared_ptr<Data> PointSerialization::serializePoint(Point* point) {
+  DEBUG_ASSERT(point != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;

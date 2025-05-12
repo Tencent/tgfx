@@ -23,6 +23,7 @@ namespace tgfx {
 
 std::shared_ptr<Data> ScalerContextSerialization::serializeScalerContext(
     ScalerContext* scalerContext) {
+  DEBUG_ASSERT(scalerContext != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;

@@ -22,6 +22,7 @@
 namespace tgfx {
 
 std::shared_ptr<Data> GlyphFaceSerialization::serializeGlyphFace(GlyphFace* glyphFace) {
+  DEBUG_ASSERT(glyphFace != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
@@ -29,7 +30,6 @@ std::shared_ptr<Data> GlyphFaceSerialization::serializeGlyphFace(GlyphFace* glyp
   serializeGlyphFaceImpl(fbb, glyphFace);
   SerializeUtils::serializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
-  ;
 }
 void GlyphFaceSerialization::serializeGlyphFaceImpl(flexbuffers::Builder& fbb,
                                                     GlyphFace* glyphFace) {

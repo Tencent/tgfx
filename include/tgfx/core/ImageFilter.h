@@ -170,7 +170,6 @@ class ImageFilter {
   friend class ComposeImageFilter;
   friend class FilterImage;
   friend class Types;
- friend class ImageFilterSerialization;
- friend class SerializeUtils;
+  friend class ImageFilterSerialization;
 };
 }  // namespace tgfx

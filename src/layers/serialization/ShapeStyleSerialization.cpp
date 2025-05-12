@@ -27,19 +27,20 @@
 namespace tgfx {
 
 std::shared_ptr<Data> ShapeStyleSerialization::serializeShapeStyle(ShapeStyle* shapeStyle) {
+  DEBUG_ASSERT(shapeStyle != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
   SerializeUtils::serializeBegin(fbb, "LayerAttribute", startMap, contentMap);
   auto type = shapeStyle->getType();
   switch (type) {
-    case ShapeStyle::ShapeStyleType::Gradient:
+    case ShapeStyle::Type::Gradient:
       serializeGradientImpl(fbb, shapeStyle);
       break;
-    case ShapeStyle::ShapeStyleType::ImagePattern:
+    case ShapeStyle::Type::ImagePattern:
       serializeImagePatternImpl(fbb, shapeStyle);
       break;
-    case ShapeStyle::ShapeStyleType::SolidColor:
+    case ShapeStyle::Type::SolidColor:
       serializeSolidColorImpl(fbb, shapeStyle);
       break;
   }

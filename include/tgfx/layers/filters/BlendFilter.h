@@ -61,8 +61,8 @@ class BlendFilter : public LayerFilter {
   void setBlendMode(BlendMode mode);
 
  protected:
-  LayerFilterType Type() const override {
-    return LayerFilterType::BlendFilter;
+  Type type() const override {
+    return Type::BlendFilter;
   }
   std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) override;
 

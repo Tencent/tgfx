@@ -46,8 +46,8 @@ class SolidColor : public ShapeStyle {
   void setColor(const Color& color);
 
  protected:
-  ShapeStyleType getType() const override {
-    return ShapeStyleType::SolidColor;
+  Type getType() const override {
+    return Type::SolidColor;
   }
   std::shared_ptr<Shader> onGetShader() const override;
 

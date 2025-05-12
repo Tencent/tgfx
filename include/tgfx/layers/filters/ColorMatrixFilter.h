@@ -61,8 +61,8 @@ class ColorMatrixFilter : public LayerFilter {
   void setMatrix(const std::array<float, 20>& matrix);
 
  protected:
-  LayerFilterType Type() const override {
-    return LayerFilterType::ColorMatrixFliter;
+  Type type() const override {
+    return Type::ColorMatrixFliter;
   }
   std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) override;
 

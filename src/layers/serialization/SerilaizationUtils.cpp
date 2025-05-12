@@ -82,14 +82,14 @@ std::string SerializeUtils::tileModeToString(TileMode tileMode) {
   return m[tileMode];
 }
 
-std::string SerializeUtils::imageTypeToString(Image::Type type) {
-  static std::unordered_map<Image::Type, const char*> m = {
-      {Image::Type::Buffer, "Buffer"},         {Image::Type::Codec, "Codec"},
-      {Image::Type::Decoded, "Decoded"},       {Image::Type::Filter, "Filter"},
-      {Image::Type::Generator, "Generator"},   {Image::Type::Mipmap, "Mipmap"},
-      {Image::Type::Orient, "Orient"},         {Image::Type::Picture, "Picture"},
-      {Image::Type::Rasterized, "Rasterized"}, {Image::Type::RGBAAA, "RGBAA"},
-      {Image::Type::Texture, "Texture"},       {Image::Type::Subset, "Subset"}};
+std::string SerializeUtils::imageTypeToString(Types::ImageType type) {
+  static std::unordered_map<Types::ImageType, const char*> m = {
+      {Types::ImageType::Buffer, "Buffer"},         {Types::ImageType::Codec, "Codec"},
+      {Types::ImageType::Decoded, "Decoded"},       {Types::ImageType::Filter, "Filter"},
+      {Types::ImageType::Generator, "Generator"},   {Types::ImageType::Mipmap, "Mipmap"},
+      {Types::ImageType::Orient, "Orient"},         {Types::ImageType::Picture, "Picture"},
+      {Types::ImageType::Rasterized, "Rasterized"}, {Types::ImageType::RGBAAA, "RGBAA"},
+      {Types::ImageType::Texture, "Texture"},       {Types::ImageType::Subset, "Subset"}};
   return m[type];
 }
 
@@ -106,20 +106,20 @@ std::string SerializeUtils::mipmapModeToString(MipmapMode mode) {
   return m[mode];
 }
 
-std::string SerializeUtils::shapeTypeToString(Shape::Type type) {
-  static std::unordered_map<Shape::Type, const char*> m = {
-      {Shape::Type::Append, "Append"}, {Shape::Type::Effect, "Effect"},
-      {Shape::Type::Glyph, "Glyph"},   {Shape::Type::Inverse, "Inverse"},
-      {Shape::Type::Matrix, "Matrix"}, {Shape::Type::Merge, "Merge"},
-      {Shape::Type::Path, "Path"},     {Shape::Type::Provider, "Provider"},
-      {Shape::Type::Stroke, "Stroke"}};
+std::string SerializeUtils::shapeTypeToString(Types::ShapeType type) {
+  static std::unordered_map<Types::ShapeType, const char*> m = {
+      {Types::ShapeType::Append, "Append"}, {Types::ShapeType::Effect, "Effect"},
+      {Types::ShapeType::Glyph, "Glyph"},   {Types::ShapeType::Inverse, "Inverse"},
+      {Types::ShapeType::Matrix, "Matrix"}, {Types::ShapeType::Merge, "Merge"},
+      {Types::ShapeType::Path, "Path"},     {Types::ShapeType::Provider, "Provider"},
+      {Types::ShapeType::Stroke, "Stroke"}};
   return m[type];
 }
-std::string SerializeUtils::shaderTypeToString(Shader::Type type) {
-  static std::unordered_map<Shader::Type, const char*> m = {
-      {Shader::Type::Color, "Color"},   {Shader::Type::ColorFilter, "ColorFilter"},
-      {Shader::Type::Image, "Image"},   {Shader::Type::Blend, "Blend"},
-      {Shader::Type::Matrix, "Matrix"}, {Shader::Type::Gradient, "Gradient"}};
+std::string SerializeUtils::shaderTypeToString(Types::ShaderType type) {
+  static std::unordered_map<Types::ShaderType, const char*> m = {
+      {Types::ShaderType::Color, "Color"},   {Types::ShaderType::ColorFilter, "ColorFilter"},
+      {Types::ShaderType::Image, "Image"},   {Types::ShaderType::Blend, "Blend"},
+      {Types::ShaderType::Matrix, "Matrix"}, {Types::ShaderType::Gradient, "Gradient"}};
   return m[type];
 }
 std::string SerializeUtils::lineCapToString(LineCap lineCap) {
@@ -134,22 +134,22 @@ std::string SerializeUtils::lineJoinToString(LineJoin lineJoin) {
                                                         {LineJoin::Bevel, "Bevel"}};
   return m[lineJoin];
 }
-std::string SerializeUtils::imageFilterTypeToString(ImageFilter::Type type) {
-  static std::unordered_map<ImageFilter::Type, const char*> m = {
-      {ImageFilter::Type::Blur, "Blur"},
-      {ImageFilter::Type::Color, "Color"},
-      {ImageFilter::Type::Compose, "Compose"},
-      {ImageFilter::Type::Runtime, "Runtime"},
-      {ImageFilter::Type::DropShadow, "DropShadow"},
-      {ImageFilter::Type::InnerShadow, "InnerShadow"}};
+std::string SerializeUtils::imageFilterTypeToString(Types::ImageFilterType type) {
+  static std::unordered_map<Types::ImageFilterType, const char*> m = {
+      {Types::ImageFilterType::Blur, "Blur"},
+      {Types::ImageFilterType::Color, "Color"},
+      {Types::ImageFilterType::Compose, "Compose"},
+      {Types::ImageFilterType::Runtime, "Runtime"},
+      {Types::ImageFilterType::DropShadow, "DropShadow"},
+      {Types::ImageFilterType::InnerShadow, "InnerShadow"}};
   return m[type];
 }
-std::string SerializeUtils::colorFilterTypeToString(ColorFilter::Type type) {
-  static std::unordered_map<ColorFilter::Type, const char*> m = {
-      {ColorFilter::Type::Blend, "Blend"},
-      {ColorFilter::Type::Matrix, "Matrix"},
-      {ColorFilter::Type::AlphaThreshold, "AlphaThreshold"},
-      {ColorFilter::Type::Compose, "Compose"}};
+std::string SerializeUtils::colorFilterTypeToString(Types::ColorFilterType type) {
+  static std::unordered_map<Types::ColorFilterType, const char*> m = {
+      {Types::ColorFilterType::Blend, "Blend"},
+      {Types::ColorFilterType::Matrix, "Matrix"},
+      {Types::ColorFilterType::AlphaThreshold, "AlphaThreshold"},
+      {Types::ColorFilterType::Compose, "Compose"}};
   return m[type];
 }
 void SerializeUtils::serializeBegin(flexbuffers::Builder& fbb, const std::string& type,

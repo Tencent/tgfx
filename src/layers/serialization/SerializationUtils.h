@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <core/utils/Types.h>
 #include <flatbuffers/flexbuffers.h>
 #include <tgfx/layers/Layer.h>
 #include <tgfx/layers/ShapeLayer.h>
@@ -32,15 +33,15 @@ class SerializeUtils {
   static std::string strokeAlignToString(StrokeAlign align);
   static std::string textAlignToString(TextAlign align);
   static std::string tileModeToString(TileMode tileMode);
-  static std::string imageTypeToString(Image::Type type);
+  static std::string imageTypeToString(Types::ImageType type);
   static std::string filterModeToString(FilterMode mode);
   static std::string mipmapModeToString(MipmapMode mode);
-  static std::string shapeTypeToString(Shape::Type type);
-  static std::string shaderTypeToString(Shader::Type type);
+  static std::string shapeTypeToString(Types::ShapeType type);
+  static std::string shaderTypeToString(Types::ShaderType type);
   static std::string lineCapToString(LineCap lineCap);
   static std::string lineJoinToString(LineJoin lineJoin);
-  static std::string imageFilterTypeToString(ImageFilter::Type type);
-  static std::string colorFilterTypeToString(ColorFilter::Type type);
+  static std::string imageFilterTypeToString(Types::ImageFilterType type);
+  static std::string colorFilterTypeToString(Types::ColorFilterType type);
 
   static void serializeBegin(flexbuffers::Builder& fbb, const std::string& type, size_t& mapStart,
                              size_t& contentStart);

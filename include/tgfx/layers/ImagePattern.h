@@ -42,8 +42,8 @@ class ImagePattern : public ShapeStyle {
                                             const SamplingOptions& sampling = {});
 
  protected:
-  ShapeStyleType getType() const override {
-    return ShapeStyleType::ImagePattern;
+  Type getType() const override {
+    return Type::ImagePattern;
   }
   std::shared_ptr<Shader> onGetShader() const override;
 

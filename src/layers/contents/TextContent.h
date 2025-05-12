@@ -34,8 +34,8 @@ class TextContent : public LayerContent {
   bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
 
  protected:
-  LayerContentType Type() const override {
-    return LayerContentType::TextContent;
+  Type type() const override {
+    return Type::TextContent;
   }
 
  private:
