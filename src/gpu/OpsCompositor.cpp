@@ -251,6 +251,9 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     } break;
     case PendingOpType::RRect: {
       if (needLocalBounds || needDeviceBounds) {
+        if (!deviceBounds.has_value()) {
+          deviceBounds = Rect::MakeEmpty();
+        }
         for (auto& record : pendingRRects) {
           auto rect = record->viewMatrix.mapRect(record->rRect.rect);
           deviceBounds->join(rect);
