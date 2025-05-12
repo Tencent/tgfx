@@ -42,7 +42,7 @@ class LayerContent {
   /**
    * Returns the tight bounds of the content.
    */
-  virtual Rect getTightBounds() const {
+  virtual Rect getTightBounds(const Matrix&) const {
     return getBounds();
   }
 

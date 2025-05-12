@@ -399,7 +399,7 @@ Rect Layer::getBounds(const Layer* targetCoordinateSpace, bool computeTightBound
   Rect bounds = {};
   if (auto content = getContent()) {
     if (computeTightBounds) {
-      bounds.join(content->getTightBounds());
+      bounds.join(content->getTightBounds(matrix()));
     } else {
       bounds.join(content->getBounds());
     }
