@@ -211,9 +211,9 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
   PlacementPtr<DrawOp> drawOp = nullptr;
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
-  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(
-      fill, fill.maskFilter != nullptr || !clip.isEmpty() || clip.isInverseFillType(),
-      type == PendingOpType::Image);
+  bool hasCoverage = fill.maskFilter != nullptr || !clip.isEmpty() || clip.isInverseFillType();
+  auto [needLocalBounds, needDeviceBounds] =
+      needComputeBounds(fill, hasCoverage, type == PendingOpType::Image);
   auto aaType = getAAType(fill);
   Rect clipBounds = {};
   if (needLocalBounds) {
