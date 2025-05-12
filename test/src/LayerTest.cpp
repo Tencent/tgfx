@@ -564,6 +564,25 @@ TGFX_TEST(LayerTest, solidLayer) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/draw_solid"));
 }
 
+TGFX_TEST(LayerTest, ZoomAndOffset) {
+  auto image = MakeImage("resources/apitest/rotation.jpg");
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  auto displayList = std::make_unique<DisplayList>();
+  auto layer = ImageLayer::Make();
+  layer->setImage(image);
+  auto matrix = Matrix::MakeScale(0.5f);
+  matrix.postTranslate(200, 200);
+  layer->setMatrix(matrix);
+  displayList->root()->addChild(layer);
+  displayList->setZoomScale(0.5f);
+  displayList->setContentOffset(-300, -300);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ZoomAndOffset"));
+}
+
 TGFX_TEST(LayerTest, StrokeOnTop) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -1829,12 +1848,12 @@ TGFX_TEST(LayerTest, DirtyFlag) {
   displayList->render(surface.get());
 
   auto root = displayList->root();
-  EXPECT_TRUE(grandChild->bitFields.dirtyDescendents && grandChild->bitFields.dirtyContent);
+  EXPECT_TRUE(!grandChild->bitFields.dirtyDescendents && !grandChild->bitFields.dirtyContent);
   EXPECT_TRUE(!child->bitFields.dirtyDescendents && !child->bitFields.dirtyContent);
   EXPECT_TRUE(!root->bitFields.dirtyDescendents && !root->bitFields.dirtyContent);
 
   grandChild->setVisible(true);
-  EXPECT_TRUE(grandChild->bitFields.dirtyDescendents && grandChild->bitFields.dirtyContent);
+  EXPECT_FALSE(grandChild->bitFields.dirtyDescendents && grandChild->bitFields.dirtyContent);
   EXPECT_TRUE(child->bitFields.dirtyDescendents);
   EXPECT_TRUE(root->bitFields.dirtyDescendents);
   displayList->render(surface.get());

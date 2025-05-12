@@ -47,5 +47,6 @@ class DrawArgs {
   DrawMode drawMode = DrawMode::Normal;
   // Whether the background has changed.
   bool backgroundChanged = false;
+  Rect* renderRect = nullptr;
 };
 }  // namespace tgfx
