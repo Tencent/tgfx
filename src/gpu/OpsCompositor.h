@@ -111,7 +111,8 @@ class OpsCompositor {
   bool canAppend(PendingOpType type, const Path& clip, const Fill& fill) const;
   void flushPendingOps(PendingOpType type = PendingOpType::Unknown, Path clip = {}, Fill fill = {});
   AAType getAAType(const Fill& fill) const;
-  std::pair<bool, bool> needComputeBounds(const Fill& fill, bool hasImageFill = false);
+  std::pair<bool, bool> needComputeBounds(const Fill& fill, bool hasCoverage,
+                                          bool hasImageFill = false);
   Rect getClipBounds(const Path& clip);
   std::shared_ptr<TextureProxy> getClipTexture(const Path& clip, AAType aaType);
   std::pair<std::optional<Rect>, bool> getClipRect(const Path& clip);
@@ -119,7 +120,8 @@ class OpsCompositor {
                                                                  Rect* scissorRect);
   DstTextureInfo makeDstTextureInfo(const Rect& deviceBounds, AAType aaType);
   void addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const Fill& fill,
-                 const Rect& localBounds, const Rect& deviceBounds);
+                 const std::optional<Rect>& localBounds, const std::optional<Rect>& deviceBounds);
+  static bool CompareFill(const Fill& a, const Fill& b);
 
   friend class DrawingManager;
 };

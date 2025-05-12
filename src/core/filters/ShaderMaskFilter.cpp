@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShaderMaskFilter.h"
-#include "core/utils/Caster.h"
+#include "core/utils/Types.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 
@@ -35,8 +35,12 @@ std::shared_ptr<MaskFilter> ShaderMaskFilter::makeWithMatrix(const Matrix& viewM
 }
 
 bool ShaderMaskFilter::isEqual(const MaskFilter* maskFilter) const {
-  auto other = Caster::AsShaderMaskFilter(maskFilter);
-  return other && inverted == other->inverted && Caster::Compare(shader.get(), other->shader.get());
+  auto type = Types::Get(maskFilter);
+  if (type != Types::MaskFilterType::Shader) {
+    return false;
+  }
+  auto other = static_cast<const ShaderMaskFilter*>(maskFilter);
+  return inverted == other->inverted && shader->isEqual(other->shader.get());
 }
 
 PlacementPtr<FragmentProcessor> ShaderMaskFilter::asFragmentProcessor(

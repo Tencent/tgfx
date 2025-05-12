@@ -763,7 +763,7 @@ TGFX_TEST(TextAlignTest, TextAlignPrint) {
   std::string text = "ab\rcd\nef\r\ngh\n\rij\tk\r\r\rp";
   auto textLayer = TextLayer::Make();
   textLayer->setText(text);
-  text = textLayer->PreprocessNewLines(text);
+  text = TextLayer::PreprocessNewLines(text);
   EXPECT_EQ(text, "ab\ncd\nef\ngh\n\nij\tk\n\n\np");
 }
 }  // namespace tgfx

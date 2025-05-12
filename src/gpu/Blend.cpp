@@ -17,49 +17,113 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Blend.h"
-#include <utility>
 
 namespace tgfx {
-// clang-format off
-static constexpr std::pair<BlendModeCoeff, BlendModeCoeff> Coeffs[] = {
-  // For Porter-Duff blend functions, color = src * src coeff + dst * dst coeff
-  // src coeff               dst coeff                  blend func
-  // -------------------     --------------------       ----------
-  { BlendModeCoeff::Zero,    BlendModeCoeff::Zero }, // clear
-  { BlendModeCoeff::One,     BlendModeCoeff::Zero }, // src
-  { BlendModeCoeff::Zero,    BlendModeCoeff::One  }, // dst
-  { BlendModeCoeff::One,     BlendModeCoeff::ISA  }, // src-over
-  { BlendModeCoeff::IDA,     BlendModeCoeff::One  }, // dst-over
-  { BlendModeCoeff::DA,      BlendModeCoeff::Zero }, // src-in
-  { BlendModeCoeff::Zero,    BlendModeCoeff::SA   }, // dst-in
-  { BlendModeCoeff::IDA,     BlendModeCoeff::Zero }, // src-out
-  { BlendModeCoeff::Zero,    BlendModeCoeff::ISA  }, // dst-out
-  { BlendModeCoeff::DA,      BlendModeCoeff::ISA  }, // src-atop
-  { BlendModeCoeff::IDA,     BlendModeCoeff::SA   }, // dst-atop
-  { BlendModeCoeff::IDA,     BlendModeCoeff::ISA  }, // xor
-  { BlendModeCoeff::One,     BlendModeCoeff::One  }, // plus
-  { BlendModeCoeff::Zero,    BlendModeCoeff::SC   }, // modulate
-  { BlendModeCoeff::One,     BlendModeCoeff::ISC  }, // screen
-};
-// clang-format on
 
-bool BlendModeAsCoeff(BlendMode mode, BlendInfo* blendInfo) {
+/**
+ * When there is no coverage, or the blend mode can tweak alpha for coverage, we use the standard
+ * Porter Duff formula.
+ */
+constexpr BlendFormula MakeCoeffFormula(BlendModeCoeff srcCoeff, BlendModeCoeff dstCoeff) {
+  // When the coeffs are (Zero, Zero) or (Zero, One) we set the primary output to none.
+  return (BlendModeCoeff::Zero == srcCoeff &&
+          (BlendModeCoeff::Zero == dstCoeff || BlendModeCoeff::One == dstCoeff))
+             ? BlendFormula{BlendFormula::OutputType::None, BlendFormula::OutputType::None,
+                            BlendEquation::Add, BlendModeCoeff::Zero, dstCoeff}
+             : BlendFormula{BlendFormula::OutputType::Modulate, BlendFormula::OutputType::None,
+                            BlendEquation::Add, srcCoeff, dstCoeff};
+}
+
+/**
+ * Basic coeff formula similar to MakeCoeffFormula but we will make the src f*Sa.
+ */
+constexpr BlendFormula MakeSAModulateFormula(BlendModeCoeff srcCoeff, BlendModeCoeff dstCoeff) {
+  return {BlendFormula::OutputType::SAModulate, BlendFormula::OutputType::None, BlendEquation::Add,
+          srcCoeff, dstCoeff};
+}
+
+/**
+ * When there is coverage, the equation with f=coverage is:
+ * D' = f * S * srcCoeff + D * (1 - [f * (1 - dstCoeff)])
+ */
+constexpr BlendFormula MakeCoverageFormula(BlendFormula::OutputType oneMinusDstCoeffModulateOutput,
+                                           BlendModeCoeff srcCoeff) {
+  return {BlendFormula::OutputType::Modulate, oneMinusDstCoeffModulateOutput, BlendEquation::Add,
+          srcCoeff, BlendModeCoeff::IS2C};
+}
+
+/**
+ * When there is coverage and the src coeff is Zero.
+ */
+constexpr BlendFormula MakeCoverageSrcCoeffZeroFormula(
+    BlendFormula::OutputType oneMinusDstCoeffModulateOutput) {
+  return {oneMinusDstCoeffModulateOutput, BlendFormula::OutputType::None,
+          BlendEquation::ReverseSubtract, BlendModeCoeff::DC, BlendModeCoeff::One};
+}
+
+/**
+ * When there is coverage and the dst coeff is Zero.
+ */
+constexpr BlendFormula MakeCoverageDstCoeffZeroFormula(BlendModeCoeff srcCoeff) {
+  return {BlendFormula::OutputType::Modulate, BlendFormula::OutputType::Coverage,
+          BlendEquation::Add, srcCoeff, BlendModeCoeff::IS2A};
+}
+
+static constexpr BlendFormula Coeffs[2][15] = {
+    {
+        /* clear */ MakeCoeffFormula(BlendModeCoeff::Zero, BlendModeCoeff::Zero),
+        /* src */ MakeCoeffFormula(BlendModeCoeff::One, BlendModeCoeff::Zero),
+        /* dst */ MakeCoeffFormula(BlendModeCoeff::Zero, BlendModeCoeff::One),
+        /* src-over */ MakeCoeffFormula(BlendModeCoeff::One, BlendModeCoeff::ISA),
+        /* dst-over */ MakeCoeffFormula(BlendModeCoeff::IDA, BlendModeCoeff::One),
+        /* src-in */ MakeCoeffFormula(BlendModeCoeff::DA, BlendModeCoeff::Zero),
+        /* dst-in */ MakeCoeffFormula(BlendModeCoeff::Zero, BlendModeCoeff::SA),
+        /* src-out */ MakeCoeffFormula(BlendModeCoeff::IDA, BlendModeCoeff::Zero),
+        /* dst-out */ MakeCoeffFormula(BlendModeCoeff::Zero, BlendModeCoeff::ISA),
+        /* src-atop */ MakeCoeffFormula(BlendModeCoeff::DA, BlendModeCoeff::ISA),
+        /* dst-atop */ MakeCoeffFormula(BlendModeCoeff::IDA, BlendModeCoeff::SA),
+        /* xor */ MakeCoeffFormula(BlendModeCoeff::IDA, BlendModeCoeff::ISA),
+        /* plus */ MakeCoeffFormula(BlendModeCoeff::One, BlendModeCoeff::One),
+        /* modulate */ MakeCoeffFormula(BlendModeCoeff::Zero, BlendModeCoeff::SC),
+        /* screen */ MakeCoeffFormula(BlendModeCoeff::One, BlendModeCoeff::ISC),
+    },
+    /*>> Has coverage, input color unknown <<*/ {
+        /* clear */ MakeCoverageSrcCoeffZeroFormula(BlendFormula::OutputType::Coverage),
+        /* src */ MakeCoverageDstCoeffZeroFormula(BlendModeCoeff::One),
+        /* dst */ MakeCoeffFormula(BlendModeCoeff::Zero, BlendModeCoeff::One),
+        /* src-over */ MakeCoeffFormula(BlendModeCoeff::One, BlendModeCoeff::ISA),
+        /* dst-over */ MakeCoeffFormula(BlendModeCoeff::IDA, BlendModeCoeff::One),
+        /* src-in */ MakeCoverageDstCoeffZeroFormula(BlendModeCoeff::DA),
+        /* dst-in */ MakeCoverageSrcCoeffZeroFormula(BlendFormula::OutputType::ISAModulate),
+        /* src-out */ MakeCoverageDstCoeffZeroFormula(BlendModeCoeff::IDA),
+        /* dst-out */ MakeCoeffFormula(BlendModeCoeff::Zero, BlendModeCoeff::ISA),
+        /* src-atop */ MakeCoeffFormula(BlendModeCoeff::DA, BlendModeCoeff::ISA),
+        /* dst-atop */
+        MakeCoverageFormula(BlendFormula::OutputType::ISAModulate, BlendModeCoeff::IDA),
+        /* xor */ MakeCoeffFormula(BlendModeCoeff::IDA, BlendModeCoeff::ISA),
+        /* plus */ MakeCoeffFormula(BlendModeCoeff::One, BlendModeCoeff::One),
+        /* modulate */ MakeCoverageSrcCoeffZeroFormula(BlendFormula::OutputType::ISCModulate),
+        /* screen */ MakeCoeffFormula(BlendModeCoeff::One, BlendModeCoeff::ISC),
+    }};
+
+bool BlendModeAsCoeff(BlendMode mode, bool hasCoverage, BlendFormula* blendFormula) {
   if (mode > BlendMode::Screen) {
     return false;
   }
-  if (blendInfo != nullptr) {
-    blendInfo->srcBlend = Coeffs[static_cast<int>(mode)].first;
-    blendInfo->dstBlend = Coeffs[static_cast<int>(mode)].second;
+  if (blendFormula != nullptr) {
+    const auto& formula = Coeffs[hasCoverage][static_cast<int>(mode)];
+    *blendFormula = formula;
   }
   return true;
 }
 
 bool BlendModeIsOpaque(BlendMode mode, OpacityType srcColorOpacity) {
-  BlendInfo blendInfo = {};
-  if (!BlendModeAsCoeff(mode, &blendInfo)) {
+  BlendFormula blendFormula = {};
+  if (!BlendModeAsCoeff(mode, false, &blendFormula)) {
     return false;
   }
-  switch (blendInfo.srcBlend) {
+  switch (blendFormula.srcCoeff()) {
+    case BlendModeCoeff::Zero:
     case BlendModeCoeff::DA:
     case BlendModeCoeff::DC:
     case BlendModeCoeff::IDA:
@@ -68,7 +132,7 @@ bool BlendModeIsOpaque(BlendMode mode, OpacityType srcColorOpacity) {
     default:
       break;
   }
-  switch (blendInfo.dstBlend) {
+  switch (blendFormula.dstCoeff()) {
     case BlendModeCoeff::Zero:
       return true;
     case BlendModeCoeff::ISA:
@@ -82,4 +146,17 @@ bool BlendModeIsOpaque(BlendMode mode, OpacityType srcColorOpacity) {
       return false;
   }
 }
+
+bool BlendModeNeedDstTexture(BlendMode mode, bool hasCoverage) {
+  if (mode == BlendMode::SrcOver) {
+    return false;
+  }
+  BlendFormula formula;
+  if (!BlendModeAsCoeff(mode, hasCoverage, &formula) || formula.needSecondaryOutput() ||
+      formula.primaryOutputType() != BlendFormula::OutputType::Modulate) {
+    return true;
+  }
+  return false;
+}
+
 }  // namespace tgfx

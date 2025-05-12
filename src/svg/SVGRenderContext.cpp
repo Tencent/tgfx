@@ -254,7 +254,7 @@ std::shared_ptr<ImageFilter> SVGRenderContext::applyFilter(const SVGFuncIRI& fil
     return nullptr;
   }
 
-  const auto* filterNode = reinterpret_cast<const SVGFilter*>(node.get());
+  auto filterNode = reinterpret_cast<const SVGFilter*>(node.get());
   return filterNode->buildFilterDAG(*this);
 }
 

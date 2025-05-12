@@ -40,6 +40,13 @@ class LayerContent {
   virtual Rect getBounds() const = 0;
 
   /**
+   * Returns the tight bounds of the content.
+   */
+  virtual Rect getTightBounds() const {
+    return getBounds();
+  }
+
+  /**
    * Draws the content to the given canvas with the given paint.
    */
   virtual void draw(Canvas* canvas, const Paint& paint) const = 0;
