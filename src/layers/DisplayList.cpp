@@ -29,22 +29,42 @@ Layer* DisplayList::root() const {
   return _root.get();
 }
 
+void DisplayList::setZoomScale(float zoomScale) {
+  if (zoomScale == _zoomScale) {
+    return;
+  }
+  surfaceContentVersion++;
+  _zoomScale = zoomScale;
+}
+
+void DisplayList::setContentOffset(float offsetX, float offsetY) {
+  if (offsetX == _contentOffset.x && offsetY == _contentOffset.y) {
+    return;
+  }
+  surfaceContentVersion++;
+  _contentOffset.x = offsetX;
+  _contentOffset.y = offsetY;
+}
+
 bool DisplayList::render(Surface* surface, bool replaceAll) {
   if (!surface ||
       (replaceAll && surface->uniqueID() == surfaceID &&
        surface->contentVersion() == surfaceContentVersion && !_root->bitFields.dirtyDescendents)) {
     return false;
   }
+  _root->updateRenderBounds(Matrix::I());
   auto canvas = surface->getCanvas();
   if (replaceAll) {
     canvas->clear();
   }
-  _root->updateRenderBounds(Matrix::I());
-  Rect renderRect = Rect::MakeWH(surface->width(), surface->height());
-  Matrix inverse = {};
-  if (!canvas->getMatrix().invert(&inverse)) {
+  auto matrix = Matrix::MakeScale(_zoomScale);
+  matrix.postTranslate(_contentOffset.x, _contentOffset.y);
+  canvas->setMatrix(matrix);
+  auto inverse = Matrix::I();
+  if (!matrix.invert(&inverse)) {
     return true;
   }
+  auto renderRect = Rect::MakeWH(surface->width(), surface->height());
   renderRect = inverse.mapRect(renderRect);
   DrawArgs args(surface->getContext(), true);
   args.renderRect = &renderRect;

@@ -67,7 +67,7 @@ class Picture {
 
  private:
   std::shared_ptr<BlockData> blockData = nullptr;
-  std::vector<PlacementPtr<Record>> records;
+  std::vector<PlacementPtr<Record>> records = {};
   size_t drawCount = 0;
   bool _hasUnboundedFill = false;
 

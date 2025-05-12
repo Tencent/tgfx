@@ -40,6 +40,43 @@ class DisplayList {
   Layer* root() const;
 
   /**
+   * Returns the current scale factor applied to the layer tree. This factor determines how much the
+   * layer tree is scaled during rendering. Adjusting the zoomScale to scale the layer tree is more
+   * efficient than applying a matrix directly, as it avoids invalidating the layer tree's internal
+   * caches. The default value is 1.0f.
+   */
+  float zoomScale() const {
+    return _zoomScale;
+  }
+
+  /**
+   * Sets the scale factor for the layer tree. This factor determines how much the layer tree is
+   * scaled during rendering. Adjusting the zoomScale to scale the layer tree is more efficient than
+   * applying a matrix directly, as it avoids invalidating the layer tree's internal caches. The
+   * default value is 1.0f.
+   */
+  void setZoomScale(float zoomScale);
+
+  /**
+   * Returns the current content offset of the layer tree after applying the zoomScale. This offset
+   * determines how far the origin of the layer tree is shifted relative to the surface's origin.
+   * Adjusting the contentOffset to move the layer tree is more efficient than applying a matrix
+   * directly, as it avoids invalidating the layer tree's internal caches. The default value is
+   * (0, 0).
+   */
+  const Point& contentOffset() const {
+    return _contentOffset;
+  }
+
+  /**
+   * Sets the content offset of the layer tree after applying the zoomScale. This offset determines
+   * how far the origin of the layer tree is shifted relative to the surface's origin. Adjusting the
+   * contentOffset to move the layer tree is more efficient than applying a matrix directly, as it
+   * avoids invalidating the layer tree's internal caches. The default value is (0, 0).
+   */
+  void setContentOffset(float offsetX, float offsetY);
+
+  /**
    * Renders the display list onto the given surface.
    * @param surface The surface to render the display list on.
    * @param replaceAll If true, the surface will be cleared before rendering the display list.
@@ -50,6 +87,8 @@ class DisplayList {
 
  private:
   std::shared_ptr<Layer> _root = nullptr;
+  float _zoomScale = 1.0f;
+  Point _contentOffset = {};
   uint32_t surfaceContentVersion = 0u;
   uint32_t surfaceID = 0u;
 };
