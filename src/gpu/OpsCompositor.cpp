@@ -220,9 +220,6 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     clipBounds = getClipBounds(clip);
     localBounds = Rect::MakeEmpty();
   }
-  if (needDeviceBounds) {
-    deviceBounds = Rect::MakeEmpty();
-  }
   switch (type) {
     case PendingOpType::Rect:
       if (pendingRects.size() == 1) {
@@ -240,6 +237,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
         }
       }
       if (needDeviceBounds) {
+        deviceBounds = Rect::MakeEmpty();
         for (auto& record : pendingRects) {
           auto rect = record->viewMatrix.mapRect(record->rect);
           deviceBounds->join(rect);
@@ -251,9 +249,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     } break;
     case PendingOpType::RRect: {
       if (needLocalBounds || needDeviceBounds) {
-        if (!deviceBounds.has_value()) {
-          deviceBounds = Rect::MakeEmpty();
-        }
+        deviceBounds = Rect::MakeEmpty();
         for (auto& record : pendingRRects) {
           auto rect = record->viewMatrix.mapRect(record->rRect.rect);
           deviceBounds->join(rect);
