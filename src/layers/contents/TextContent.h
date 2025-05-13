@@ -40,11 +40,12 @@ class TextContent : public LayerContent {
 
  private:
   Rect bounds = {};
-  std::shared_ptr<TextBlob> textBlob = nullptr;
-  Color textColor = {};
 
   static bool HitTestPointInternal(float localX, float localY,
                                    const std::shared_ptr<GlyphRunList>& glyphRunList);
-  friend class LayerContentSerialization;
+
+ public:
+  std::shared_ptr<TextBlob> textBlob = nullptr;
+  Color textColor = {};
 };
 }  // namespace tgfx

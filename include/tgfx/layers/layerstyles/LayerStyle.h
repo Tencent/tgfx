@@ -165,6 +165,5 @@ class LayerStyle : public LayerProperty {
 
  private:
   BlendMode _blendMode = BlendMode::SrcOver;
-  friend class LayerStyleSerialization;
 };
 }  // namespace tgfx

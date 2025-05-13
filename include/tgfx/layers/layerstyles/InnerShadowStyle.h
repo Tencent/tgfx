@@ -121,6 +121,5 @@ class InnerShadowStyle : public LayerStyle {
   Color _color = Color::Black();
   std::shared_ptr<ImageFilter> shadowFilter = nullptr;
   float currentScale = 0.0f;
-  friend class LayerStyleSerialization;
 };
 }  // namespace tgfx

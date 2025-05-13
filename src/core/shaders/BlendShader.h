@@ -29,6 +29,10 @@ class BlendShader : public Shader {
 
   std::shared_ptr<Shader> makeWithMatrix(const Matrix& viewMatrix) const override;
 
+  BlendMode mode;
+  std::shared_ptr<Shader> dst;
+  std::shared_ptr<Shader> src;
+
  protected:
   Type type() const override {
     return Type::Blend;
@@ -38,11 +42,5 @@ class BlendShader : public Shader {
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                       const Matrix* uvMatrix) const override;
-
- private:
-  BlendMode mode;
-  std::shared_ptr<Shader> dst;
-  std::shared_ptr<Shader> src;
-  friend class ShaderSerialization;
 };
 }  // namespace tgfx

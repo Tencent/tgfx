@@ -85,6 +85,5 @@ class ShapeStyle : public LayerProperty {
 
   friend class Types;
   friend class ShapeLayer;
-  friend class ShapeStyleSerialization;
 };
 }  // namespace tgfx

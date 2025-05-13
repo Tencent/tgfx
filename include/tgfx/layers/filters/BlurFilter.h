@@ -83,7 +83,6 @@ class BlurFilter : public LayerFilter {
   float _blurrinessX = 0.0f;
   float _blurrinessY = 0.0f;
   TileMode _tileMode = TileMode::Decal;
-  friend class LayerFilterSerialization;
 };
 
 }  // namespace tgfx

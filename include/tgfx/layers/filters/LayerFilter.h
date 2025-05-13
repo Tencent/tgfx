@@ -71,6 +71,5 @@ class LayerFilter : public LayerProperty {
   std::shared_ptr<ImageFilter> lastFilter;
 
   friend class Types;
-  friend class LayerFilterSerialization;
 };
 }  // namespace tgfx

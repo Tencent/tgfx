@@ -322,6 +322,5 @@ class ShapeLayer : public Layer {
 
   Paint getPaint(float alpha) const;
   std::shared_ptr<Shape> createStrokeShape() const;
-  friend class LayerSerialization;
 };
 }  // namespace tgfx

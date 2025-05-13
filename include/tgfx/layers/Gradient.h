@@ -140,7 +140,6 @@ class Gradient : public ShapeStyle {
   Gradient(const std::vector<Color>& colors, const std::vector<float>& positions)
       : _colors(colors), _positions(positions) {
   }
-  friend class ShapeStyleSerialization;
 };
 
 /**

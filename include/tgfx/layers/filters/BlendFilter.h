@@ -71,6 +71,5 @@ class BlendFilter : public LayerFilter {
 
   Color _color = Color::Transparent();
   BlendMode _blendMode = BlendMode::SrcOver;
-  friend class LayerFilterSerialization;
 };
 }  // namespace tgfx

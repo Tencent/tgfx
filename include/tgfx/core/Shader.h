@@ -181,6 +181,5 @@ class Shader {
   friend class MatrixShader;
   friend class FragmentProcessor;
   friend class Types;
-  friend class ShaderSerialization;
 };
 }  // namespace tgfx

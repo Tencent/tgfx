@@ -74,6 +74,5 @@ class LayerContent {
     return Type::LayerContent;
   }
   friend class Types;
-  friend class LayerContentSerialization;
 };
 }  // namespace tgfx

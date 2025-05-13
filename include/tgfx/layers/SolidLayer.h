@@ -108,7 +108,6 @@ class SolidLayer : public Layer {
   float _height = 0;
   float _radiusX = 0;
   float _radiusY = 0;
-  friend class LayerSerialization;
 };
 
 }  // namespace tgfx

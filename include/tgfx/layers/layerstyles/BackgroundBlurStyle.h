@@ -100,7 +100,6 @@ class BackgroundBlurStyle : public LayerStyle {
   float _blurrinessY = 0;
 
   TileMode _tileMode = TileMode::Mirror;
-  friend class LayerStyleSerialization;
 };
 
 }  // namespace tgfx

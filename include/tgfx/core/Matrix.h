@@ -750,6 +750,5 @@ class Matrix {
 
   bool invertNonIdentity(Matrix* inverse) const;
   bool getMinMaxScaleFactors(float results[2]) const;
-  friend class MatrixSerialization;
 };
 }  // namespace tgfx

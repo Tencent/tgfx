@@ -161,6 +161,5 @@ class TextLayer : public Layer {
   void buildGlyphRunList(const std::vector<std::shared_ptr<GlyphInfo>>& finalGlyphs,
                          const std::vector<Point>& positions,
                          std::vector<GlyphRun>& glyphRunList) const;
-  friend class LayerSerialization;
 };
 }  // namespace tgfx

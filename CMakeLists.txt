@@ -32,7 +32,7 @@ if (NOT WEB OR EMSCRIPTEN_PTHREADS)
 endif ()
 
 if (CMAKE_BUILD_TYPE MATCHES "Debug")
-    option(TGFX_USE_INSPECTOR "Enable Profiling" ON)
+    option(TGFX_USE_INSPECTOR "Enable profiling support for the TGFX Inspector tool" ON)
 endif ()
 
 if (APPLE OR (WEB AND NOT TGFX_USE_THREADS))
@@ -323,6 +323,8 @@ endif ()
 if (TGFX_USE_INSPECTOR)
     list(APPEND TGFX_DEFINES TGFX_USE_INSPECTOR)
     list(APPEND TGFX_INCLUDES third_party/flatbuffers/include)
+    file(GLOB_RECURSE SERIALIZATION_FILE src/serialization/*.*)
+    list(APPEND TGFX_FILES ${SERIALIZATION_FILE})
 endif ()
 
 list(APPEND TGFX_STATIC_VENDORS pathkit)

@@ -125,7 +125,6 @@ class DropShadowFilter : public LayerFilter {
   float _blurrinessY = 0.0f;
   Color _color = Color::Black();
   bool _dropsShadowOnly = false;
-  friend class LayerFilterSerialization;
 };
 
 }  // namespace tgfx

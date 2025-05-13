@@ -54,6 +54,5 @@ class MatrixShader final : public Shader {
                                                       const Matrix* uvMatrix) const override;
 
   MatrixShader(std::shared_ptr<Shader> source, const Matrix& matrix);
-  friend class ShaderSerialization;
 };
 }  // namespace tgfx

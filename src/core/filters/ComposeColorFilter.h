@@ -28,6 +28,9 @@ class ComposeColorFilter : public ColorFilter {
 
   bool isAlphaUnchanged() const override;
 
+  std::shared_ptr<ColorFilter> inner = nullptr;
+  std::shared_ptr<ColorFilter> outer = nullptr;
+
  protected:
   Type type() const override {
     return Type::Compose;
@@ -36,10 +39,6 @@ class ComposeColorFilter : public ColorFilter {
   bool isEqual(const ColorFilter* colorFilter) const override;
 
  private:
-  std::shared_ptr<ColorFilter> inner = nullptr;
-  std::shared_ptr<ColorFilter> outer = nullptr;
-
   PlacementPtr<FragmentProcessor> asFragmentProcessor(Context* context) const override;
-  friend class ColorFilterSerialization;
 };
 }  // namespace tgfx

@@ -70,6 +70,5 @@ class ImageLayer : public Layer {
  private:
   SamplingOptions _sampling;
   std::shared_ptr<Image> _image = nullptr;
-  friend class LayerSerialization;
 };
 }  // namespace tgfx
