@@ -400,33 +400,32 @@ Rect Layer::getBounds(const Layer* targetCoordinateSpace, bool computeTightBound
   return getBoundsInternal(matrix, computeTightBounds);
 }
 
-Rect Layer::getBoundsInternal(const tgfx::Matrix& relativeMatrix, bool computeTightBounds) {
+Rect Layer::getBoundsInternal(const Matrix& relativeMatrix, bool computeTightBounds) {
   Rect bounds = {};
   if (auto content = getContent()) {
     if (computeTightBounds) {
       bounds.join(content->getTightBounds(relativeMatrix));
     } else {
-      bounds.join(content->getBounds());
+      bounds.join(relativeMatrix.mapRect(content->getBounds()));
     }
   }
   for (const auto& child : _children) {
     if (!child->visible() || child->maskOwner) {
       continue;
     }
-    Matrix childRelativeMatrix = relativeMatrix;
-    childRelativeMatrix.preConcat(child->matrix());
-    auto childBounds = child->getBoundsInternal(childRelativeMatrix, computeTightBounds);
+    Matrix childMatrix = child->getMatrixWithScrollRect();
+    childMatrix.postConcat(relativeMatrix);
+    auto childBounds = child->getBoundsInternal(childMatrix, computeTightBounds);
     if (child->_scrollRect) {
-      auto relatvieScrollRect = relativeMatrix.mapRect(*child->_scrollRect);
+      auto relatvieScrollRect = childMatrix.mapRect(*child->_scrollRect);
       if (!childBounds.intersect(relatvieScrollRect)) {
         continue;
       }
     }
     if (child->hasValidMask()) {
       auto maskRelativeMatrix = child->_mask->getRelativeMatrix(child.get());
-      Matrix tempRelativeMatrix = childRelativeMatrix;
-      tempRelativeMatrix.preConcat(maskRelativeMatrix);
-      auto maskBounds = child->_mask->getBoundsInternal(tempRelativeMatrix, computeTightBounds);
+      maskRelativeMatrix.postConcat(childMatrix);
+      auto maskBounds = child->_mask->getBoundsInternal(maskRelativeMatrix, computeTightBounds);
       if (!childBounds.intersect(maskBounds)) {
         continue;
       }
@@ -438,6 +437,7 @@ Rect Layer::getBoundsInternal(const tgfx::Matrix& relativeMatrix, bool computeTi
     auto layerBounds = bounds;
     for (auto& layerStyle : _layerStyles) {
       auto styleBounds = layerStyle->filterBounds(layerBounds, 1.0f);
+      styleBounds = relativeMatrix.mapRect(styleBounds);
       bounds.join(styleBounds);
     }
   }

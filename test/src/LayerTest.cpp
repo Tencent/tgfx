@@ -424,7 +424,7 @@ TGFX_TEST(LayerTest, getTightBounds) {
 
 TGFX_TEST(LayerTest, getbounds) {
   auto root = Layer::Make();
-  root->setMatrix(Matrix::MakeTrans(30, 30));
+  root->setMatrix(Matrix::MakeTrans(10, 10));
 
   auto child = TextLayer::Make();
   child->setMatrix(Matrix::MakeRotate(20));
@@ -463,15 +463,15 @@ TGFX_TEST(LayerTest, getbounds) {
   EXPECT_FLOAT_EQ(bounds.right, 94.183533f);
   EXPECT_FLOAT_EQ(bounds.bottom, 62.044159f);
   bounds = child->getBounds(root.get());
-  EXPECT_FLOAT_EQ(bounds.left, -20.280657f);
-  EXPECT_FLOAT_EQ(bounds.top, -20.787683f);
-  EXPECT_FLOAT_EQ(bounds.right, 96.194153f);
-  EXPECT_FLOAT_EQ(bounds.bottom, 90.515099f);
+  EXPECT_FLOAT_EQ(bounds.left, -8.96520996f);
+  EXPECT_FLOAT_EQ(bounds.top, -4.63719559f);
+  EXPECT_FLOAT_EQ(bounds.right, 83.0033798f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 77.3243255f);
   bounds = child->getBounds(cousin.get());
-  EXPECT_FLOAT_EQ(bounds.left, -30.280657f);
-  EXPECT_FLOAT_EQ(bounds.top, -30.787683f);
-  EXPECT_FLOAT_EQ(bounds.right, 86.194153f);
-  EXPECT_FLOAT_EQ(bounds.bottom, 80.515099f);
+  EXPECT_FLOAT_EQ(bounds.left, -18.96521f);
+  EXPECT_FLOAT_EQ(bounds.top, -14.6371956f);
+  EXPECT_FLOAT_EQ(bounds.right, 73.0033798f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 67.3243255f);
 
   auto displayList = std::make_unique<DisplayList>();
   displayList->root()->addChild(root);
@@ -481,15 +481,15 @@ TGFX_TEST(LayerTest, getbounds) {
   EXPECT_FLOAT_EQ(bounds.right, 94.183533f);
   EXPECT_FLOAT_EQ(bounds.bottom, 62.044159f);
   bounds = child->getBounds(root.get());
-  EXPECT_FLOAT_EQ(bounds.left, -20.280657f);
-  EXPECT_FLOAT_EQ(bounds.top, -20.787683f);
-  EXPECT_FLOAT_EQ(bounds.right, 96.194153f);
-  EXPECT_FLOAT_EQ(bounds.bottom, 90.515099f);
+  EXPECT_FLOAT_EQ(bounds.left, -8.96520996f);
+  EXPECT_FLOAT_EQ(bounds.top, -4.63719559f);
+  EXPECT_FLOAT_EQ(bounds.right, 83.0033798f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 77.3243255f);
   bounds = child->getBounds(cousin.get());
-  EXPECT_FLOAT_EQ(bounds.left, -30.280657f);
-  EXPECT_FLOAT_EQ(bounds.top, -30.787683f);
-  EXPECT_FLOAT_EQ(bounds.right, 86.194153f);
-  EXPECT_FLOAT_EQ(bounds.bottom, 80.515099f);
+  EXPECT_FLOAT_EQ(bounds.left, -18.96521f);
+  EXPECT_FLOAT_EQ(bounds.top, -14.6371956f);
+  EXPECT_FLOAT_EQ(bounds.right, 73.0033798f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 67.3243255f);
 
   ContextScope scope;
   auto context = scope.getContext();
@@ -674,7 +674,7 @@ TGFX_TEST(LayerTest, FilterTest) {
   displayList->root()->addChild(layer);
   displayList->render(surface.get());
   auto bounds = displayList->root()->getBounds();
-  EXPECT_EQ(Rect::MakeLTRB(126.5f, 126.5f, 1725.5f, 2229.5f), bounds);
+  EXPECT_EQ(Rect::MakeLTRB(53.f, 53.f, 1739.f, 2243.f), bounds);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/filterTest"));
 }
 
@@ -696,7 +696,7 @@ TGFX_TEST(LayerTest, filterClip) {
   displayList->root()->addChild(layer);
   displayList->render(surface.get());
   auto bounds = displayList->root()->getBounds();
-  EXPECT_EQ(Rect::MakeLTRB(45.f, 45.f, 1562.f, 2066.f), bounds);
+  EXPECT_EQ(Rect::MakeLTRB(40.f, 40.f, 1562.f, 2066.f), bounds);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/filterClip"));
 }
 
@@ -1148,7 +1148,7 @@ TGFX_TEST(LayerTest, textMask) {
   imageLayer1->setMask(alphaTextLayer);
 
   auto alphaLayerBounds = alphaLayer->getBounds();
-  EXPECT_EQ(alphaLayerBounds, Rect::MakeXYWH(1927.0f, 896.0f, 826.5f, 340.5f));
+  EXPECT_EQ(alphaLayerBounds, Rect::MakeLTRB(1927.0f, 897.0f, 2754.f, 1236.f));
 
   // Vector mask effect
   auto imageLayer2 = ImageLayer::Make();
