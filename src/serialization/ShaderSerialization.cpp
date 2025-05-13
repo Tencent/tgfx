@@ -60,12 +60,14 @@ void ShaderSerialization::SerializeBasicShaderImpl(flexbuffers::Builder& fbb, Sh
   SerializeUtils::SetFlexBufferMap(fbb, "type",
                                    SerializeUtils::ShaderTypeToString(Types::Get(shader)));
 }
+
 void ShaderSerialization::SerializeColorShaderImpl(flexbuffers::Builder& fbb, Shader* shader) {
   SerializeBasicShaderImpl(fbb, shader);
   ColorShader* colorShader = static_cast<ColorShader*>(shader);
   (void)colorShader;
   SerializeUtils::SetFlexBufferMap(fbb, "color", "", false, true);
 }
+
 void ShaderSerialization::SerializeColorFilterShaderImpl(flexbuffers::Builder& fbb,
                                                          Shader* shader) {
   SerializeBasicShaderImpl(fbb, shader);
@@ -77,6 +79,7 @@ void ShaderSerialization::SerializeColorFilterShaderImpl(flexbuffers::Builder& f
                                    reinterpret_cast<uint64_t>(colorFilterShader->shader.get()),
                                    true, colorFilterShader->shader != nullptr);
 }
+
 void ShaderSerialization::SerializeImageShaderImpl(flexbuffers::Builder& fbb, Shader* shader) {
   SerializeBasicShaderImpl(fbb, shader);
   ImageShader* imageShader = static_cast<ImageShader*>(shader);
@@ -122,6 +125,5 @@ void ShaderSerialization::SerializeGradientShaderImpl(flexbuffers::Builder& fbb,
   SerializeUtils::SetFlexBufferMap(fbb, "pointsToUnit", "", false, true);
   SerializeUtils::SetFlexBufferMap(fbb, "colorsAreOpaque", gradientShader->colorsAreOpaque);
 }
-
 }  // namespace tgfx
 #endif

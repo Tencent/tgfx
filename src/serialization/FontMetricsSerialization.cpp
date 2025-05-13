@@ -31,6 +31,7 @@ std::shared_ptr<Data> FontMetricsSerialization::Serialize(FontMetrics* fontMeric
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
+
 void FontMetricsSerialization::SerializeScalerContextImpl(flexbuffers::Builder& fbb,
                                                           FontMetrics* fontMetrics) {
   SerializeUtils::SetFlexBufferMap(fbb, "top", fontMetrics->top);

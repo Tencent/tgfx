@@ -47,6 +47,7 @@ std::shared_ptr<Data> ShapeStyleSerialization::Serialize(ShapeStyle* shapeStyle)
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
+
 void ShapeStyleSerialization::SerializeShapeStyleImpl(flexbuffers::Builder& fbb,
                                                       ShapeStyle* shapeStyle) {
   SerializeUtils::SetFlexBufferMap(fbb, "shapeStyleType",
@@ -56,6 +57,7 @@ void ShapeStyleSerialization::SerializeShapeStyleImpl(flexbuffers::Builder& fbb,
                                    SerializeUtils::BlendModeToString(shapeStyle->blendMode()));
   SerializeUtils::SetFlexBufferMap(fbb, "matrix", "", false, true);
 }
+
 void ShapeStyleSerialization::SerializeImagePatternImpl(flexbuffers::Builder& fbb,
                                                         ShapeStyle* shapeStyle) {
   SerializeShapeStyleImpl(fbb, shapeStyle);
@@ -69,6 +71,7 @@ void ShapeStyleSerialization::SerializeImagePatternImpl(flexbuffers::Builder& fb
                                    SerializeUtils::TileModeToString(imagePattern->tileModeY()));
   SerializeUtils::SetFlexBufferMap(fbb, "sampling", "", false, true);
 }
+
 void ShapeStyleSerialization::SerializeGradientImpl(flexbuffers::Builder& fbb,
                                                     ShapeStyle* shapeStyle) {
   SerializeShapeStyleImpl(fbb, shapeStyle);
@@ -98,6 +101,7 @@ void ShapeStyleSerialization::SerializeGradientImpl(flexbuffers::Builder& fbb,
       LOGE("Unknown layer type!");
   }
 }
+
 void ShapeStyleSerialization::SerializeLinearGradientImpl(flexbuffers::Builder& fbb,
                                                           ShapeStyle* shapeStyle) {
   LinearGradient* lineGradient = static_cast<LinearGradient*>(shapeStyle);
@@ -105,12 +109,14 @@ void ShapeStyleSerialization::SerializeLinearGradientImpl(flexbuffers::Builder& 
   SerializeUtils::SetFlexBufferMap(fbb, "startPoint", "", false, true);
   SerializeUtils::SetFlexBufferMap(fbb, "endPoint", "", false, true);
 }
+
 void ShapeStyleSerialization::SerializeRadialGradientImpl(flexbuffers::Builder& fbb,
                                                           ShapeStyle* shapeStyle) {
   RadialGradient* radialGradient = static_cast<RadialGradient*>(shapeStyle);
   SerializeUtils::SetFlexBufferMap(fbb, "center", "", false, true);
   SerializeUtils::SetFlexBufferMap(fbb, "radius", radialGradient->radius());
 }
+
 void ShapeStyleSerialization::SerializeConicGradientImpl(flexbuffers::Builder& fbb,
                                                          ShapeStyle* shapeStyle) {
   ConicGradient* conicGradient = static_cast<ConicGradient*>(shapeStyle);
@@ -118,12 +124,14 @@ void ShapeStyleSerialization::SerializeConicGradientImpl(flexbuffers::Builder& f
   SerializeUtils::SetFlexBufferMap(fbb, "startAngle", conicGradient->startAngle());
   SerializeUtils::SetFlexBufferMap(fbb, "endAngle", conicGradient->endAngle());
 }
+
 void ShapeStyleSerialization::SerializeDiamondGradientImpl(flexbuffers::Builder& fbb,
                                                            ShapeStyle* shapeStyle) {
   DiamondGradient* diamondGradient = static_cast<DiamondGradient*>(shapeStyle);
   SerializeUtils::SetFlexBufferMap(fbb, "center", "", false, true);
   SerializeUtils::SetFlexBufferMap(fbb, "halfDiagonal", diamondGradient->halfDiagonal());
 }
+
 void ShapeStyleSerialization::SerializeSolidColorImpl(flexbuffers::Builder& fbb,
                                                       ShapeStyle* shapeStyle) {
   SerializeShapeStyleImpl(fbb, shapeStyle);

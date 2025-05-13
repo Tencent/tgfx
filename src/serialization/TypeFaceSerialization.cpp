@@ -31,6 +31,7 @@ std::shared_ptr<Data> TypeFaceSerialization::Serialize(Typeface* typeface) {
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
+
 void TypeFaceSerialization::SerializeTypeFaceImpl(flexbuffers::Builder& fbb, Typeface* typeface) {
   SerializeUtils::SetFlexBufferMap(fbb, "uniqueID", typeface->uniqueID());
   SerializeUtils::SetFlexBufferMap(fbb, "fontFamily", typeface->fontFamily());

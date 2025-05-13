@@ -31,6 +31,7 @@ std::shared_ptr<Data> PointSerialization::Serialize(Point* point) {
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
+
 void PointSerialization::SerializePointImpl(flexbuffers::Builder& fbb, Point* point) {
   SerializeUtils::SetFlexBufferMap(fbb, "x", point->x);
   SerializeUtils::SetFlexBufferMap(fbb, "y", point->y);

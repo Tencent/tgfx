@@ -31,6 +31,7 @@ std::shared_ptr<Data> GlyphFaceSerialization::Serialize(GlyphFace* glyphFace) {
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
+
 void GlyphFaceSerialization::SerializeGlyphFaceImpl(flexbuffers::Builder& fbb,
                                                     GlyphFace* glyphFace) {
   SerializeUtils::SetFlexBufferMap(fbb, "hasColor", glyphFace->hasColor());

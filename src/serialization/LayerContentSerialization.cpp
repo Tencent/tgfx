@@ -60,11 +60,13 @@ std::shared_ptr<Data> LayerContentSerialization::Serialize(LayerContent* layerCo
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
+
 void LayerContentSerialization::SerializeBasicLayerContentImpl(flexbuffers::Builder& fbb,
                                                                LayerContent* layerContent) {
   (void)fbb;
   (void)layerContent;
 }
+
 void LayerContentSerialization::SerializeComposeContentImpl(flexbuffers::Builder& fbb,
                                                             LayerContent* layerContent) {
   SerializeBasicLayerContentImpl(fbb, layerContent);
@@ -72,6 +74,7 @@ void LayerContentSerialization::SerializeComposeContentImpl(flexbuffers::Builder
   auto contentsSize = static_cast<unsigned int>(composeContent->contents.size());
   SerializeUtils::SetFlexBufferMap(fbb, "contents", contentsSize, false, contentsSize);
 }
+
 void LayerContentSerialization::SerializeImageContentImpl(flexbuffers::Builder& fbb,
                                                           LayerContent* layerContent) {
   SerializeBasicLayerContentImpl(fbb, layerContent);
@@ -81,6 +84,7 @@ void LayerContentSerialization::SerializeImageContentImpl(flexbuffers::Builder& 
                                    imageContent->image != nullptr);
   SerializeUtils::SetFlexBufferMap(fbb, "sampling", "", false, true);
 }
+
 void LayerContentSerialization::SerializeRasterizedContentImpl(flexbuffers::Builder& fbb,
                                                                LayerContent* layerContent) {
   SerializeBasicLayerContentImpl(fbb, layerContent);
@@ -91,6 +95,7 @@ void LayerContentSerialization::SerializeRasterizedContentImpl(flexbuffers::Buil
                                    image != nullptr);
   SerializeUtils::SetFlexBufferMap(fbb, "matrix", "", false, true);
 }
+
 void LayerContentSerialization::SerializeShapeContentImpl(flexbuffers::Builder& fbb,
                                                           LayerContent* layerContent) {
   SerializeBasicLayerContentImpl(fbb, layerContent);
@@ -106,6 +111,7 @@ void LayerContentSerialization::SerializeShapeContentImpl(flexbuffers::Builder& 
   SerializeUtils::SetFlexBufferMap(fbb, "paintList", paintListSize, false, paintListSize);
   SerializeUtils::SetFlexBufferMap(fbb, "fillPaintCount", shapeContent->fillPaintCount);
 }
+
 void LayerContentSerialization::SerializeSolidContentImpl(flexbuffers::Builder& fbb,
                                                           LayerContent* layerContent) {
   SerializeBasicLayerContentImpl(fbb, layerContent);
@@ -113,6 +119,7 @@ void LayerContentSerialization::SerializeSolidContentImpl(flexbuffers::Builder& 
   SerializeUtils::SetFlexBufferMap(fbb, "rRect", "", false, true);
   SerializeUtils::SetFlexBufferMap(fbb, "color", "", false, true);
 }
+
 void LayerContentSerialization::SerializeTextContentImpl(flexbuffers::Builder& fbb,
                                                          LayerContent* layerContent) {
   SerializeBasicLayerContentImpl(fbb, layerContent);

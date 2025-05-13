@@ -58,11 +58,13 @@ std::shared_ptr<Data> LayerFilterSerialization::Serialize(LayerFilter* layerFilt
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
+
 void LayerFilterSerialization::SerializeBasicLayerFilterImpl(flexbuffers::Builder& fbb,
                                                              LayerFilter* layerFilter) {
   SerializeUtils::SetFlexBufferMap(
       fbb, "Type", SerializeUtils::LayerFilterTypeToString(Types::Get(layerFilter)));
 }
+
 void LayerFilterSerialization::SerializeBlendFilterImpl(flexbuffers::Builder& fbb,
                                                         LayerFilter* layerFilter) {
   SerializeBasicLayerFilterImpl(fbb, layerFilter);
@@ -71,6 +73,7 @@ void LayerFilterSerialization::SerializeBlendFilterImpl(flexbuffers::Builder& fb
   SerializeUtils::SetFlexBufferMap(fbb, "blendMode",
                                    SerializeUtils::BlendModeToString(blendFilter->blendMode()));
 }
+
 void LayerFilterSerialization::SerializeBlurFilterImpl(flexbuffers::Builder& fbb,
                                                        LayerFilter* layerFilter) {
   SerializeBasicLayerFilterImpl(fbb, layerFilter);
@@ -80,12 +83,14 @@ void LayerFilterSerialization::SerializeBlurFilterImpl(flexbuffers::Builder& fbb
   SerializeUtils::SetFlexBufferMap(fbb, "tileMode",
                                    SerializeUtils::TileModeToString(blurFilter->tileMode()));
 }
+
 void LayerFilterSerialization::SerializeColorMatrixFilterImpl(flexbuffers::Builder& fbb,
                                                               LayerFilter* layerFilter) {
   SerializeBasicLayerFilterImpl(fbb, layerFilter);
   //ColorMatrixFilter* colorMatrixFilter = static_cast<ColorMatrixFilter*>(layerFilter);
   SerializeUtils::SetFlexBufferMap(fbb, "matrix", "", false, true);
 }
+
 void LayerFilterSerialization::SerializeDropShadowFilterImpl(flexbuffers::Builder& fbb,
                                                              LayerFilter* layerFilter) {
   SerializeBasicLayerFilterImpl(fbb, layerFilter);
@@ -97,6 +102,7 @@ void LayerFilterSerialization::SerializeDropShadowFilterImpl(flexbuffers::Builde
   SerializeUtils::SetFlexBufferMap(fbb, "color", "", false, true);
   SerializeUtils::SetFlexBufferMap(fbb, "dropShadowOnly", dropShadowFilter->dropsShadowOnly());
 }
+
 void LayerFilterSerialization::SerializeInnerShadowFilterImpl(flexbuffers::Builder& fbb,
                                                               LayerFilter* layerFilter) {
   SerializeBasicLayerFilterImpl(fbb, layerFilter);

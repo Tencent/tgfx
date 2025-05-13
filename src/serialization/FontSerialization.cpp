@@ -31,6 +31,7 @@ std::shared_ptr<Data> FontSerialization::Serialize(Font* font) {
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
+
 void FontSerialization::SerializeFontImpl(flexbuffers::Builder& fbb, Font* font) {
   auto typeFace = font->getTypeface();
   SerializeUtils::SetFlexBufferMap(fbb, "typeFace", reinterpret_cast<uint64_t>(typeFace.get()),

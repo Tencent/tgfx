@@ -31,6 +31,7 @@ std::shared_ptr<Data> StrokeSerialization::Serialize(Stroke* stroke) {
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
+
 void StrokeSerialization::SerializeStrokeImpl(flexbuffers::Builder& fbb, Stroke* stroke) {
   SerializeUtils::SetFlexBufferMap(fbb, "width", stroke->width);
   SerializeUtils::SetFlexBufferMap(fbb, "cap", SerializeUtils::LineCapToString(stroke->cap));

@@ -51,11 +51,13 @@ std::shared_ptr<Data> ColorFilterSerialization::Serialize(ColorFilter* colorFilt
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
+
 void ColorFilterSerialization::SerializeColorFilterImpl(flexbuffers::Builder& fbb,
                                                         ColorFilter* colorFilter) {
   SerializeUtils::SetFlexBufferMap(
       fbb, "type", SerializeUtils::ColorFilterTypeToString(Types::Get(colorFilter)));
 }
+
 void ColorFilterSerialization::SerializeComposeColorFilterImpl(flexbuffers::Builder& fbb,
                                                                ColorFilter* colorFilter) {
   SerializeColorFilterImpl(fbb, colorFilter);
@@ -67,6 +69,7 @@ void ColorFilterSerialization::SerializeComposeColorFilterImpl(flexbuffers::Buil
                                    reinterpret_cast<uint64_t>(composeColorFilter->outer.get()),
                                    true, composeColorFilter->outer != nullptr);
 }
+
 void ColorFilterSerialization::SerializeAlphaThreadholdColorFilterImpl(flexbuffers::Builder& fbb,
                                                                        ColorFilter* colorFilter) {
   SerializeColorFilterImpl(fbb, colorFilter);
@@ -74,6 +77,7 @@ void ColorFilterSerialization::SerializeAlphaThreadholdColorFilterImpl(flexbuffe
       static_cast<AlphaThresholdColorFilter*>(colorFilter);
   SerializeUtils::SetFlexBufferMap(fbb, "threshold", alphaThresholdColorFilter->threshold);
 }
+
 void ColorFilterSerialization::SerializeMatrixColorFilterImpl(flexbuffers::Builder& fbb,
                                                               ColorFilter* colorFilter) {
   SerializeColorFilterImpl(fbb, colorFilter);
@@ -81,6 +85,7 @@ void ColorFilterSerialization::SerializeMatrixColorFilterImpl(flexbuffers::Build
   SerializeUtils::SetFlexBufferMap(fbb, "matrix", 20, false, true);
   SerializeUtils::SetFlexBufferMap(fbb, "alphaIsUnchanged", matrixColorFilter->alphaIsUnchanged);
 }
+
 void ColorFilterSerialization::SerializeModeColorFilterImpl(flexbuffers::Builder& fbb,
                                                             ColorFilter* colorFilter) {
   SerializeColorFilterImpl(fbb, colorFilter);

@@ -31,6 +31,7 @@ std::shared_ptr<Data> ShapeSerialization::Serialize(Shape* shape) {
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
+
 void ShapeSerialization::SerializeShapeImpl(flexbuffers::Builder& fbb, Shape* shape) {
   SerializeUtils::SetFlexBufferMap(fbb, "type",
                                    SerializeUtils::ShapeTypeToString(Types::Get(shape)));

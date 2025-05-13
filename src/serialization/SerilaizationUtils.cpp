@@ -21,6 +21,7 @@
 #include "core/images/FilterImage.h"
 
 namespace tgfx {
+
 std::string SerializeUtils::LayerTypeToString(LayerType type) {
   static std::unordered_map<LayerType, const char*> m = {
       {LayerType::Layer, "Layer"},      {LayerType::Image, "ImageLayer"},
@@ -28,6 +29,7 @@ std::string SerializeUtils::LayerTypeToString(LayerType type) {
       {LayerType::Text, "TextLayer"},   {LayerType::Solid, "SolidLayer"}};
   return m[type];
 }
+
 std::string SerializeUtils::BlendModeToString(BlendMode mode) {
   static std::unordered_map<BlendMode, const char*> m = {{BlendMode::Clear, "Clear"},
                                                          {BlendMode::Src, "Src"},
@@ -61,12 +63,14 @@ std::string SerializeUtils::BlendModeToString(BlendMode mode) {
                                                          {BlendMode::PlusDarker, "PlusDarker"}};
   return m[mode];
 }
+
 std::string SerializeUtils::StrokeAlignToString(StrokeAlign align) {
   static std::unordered_map<StrokeAlign, const char*> m = {{StrokeAlign::Center, "Center"},
                                                            {StrokeAlign::Inside, "Inside"},
                                                            {StrokeAlign::Outside, "Outside"}};
   return m[align];
 }
+
 std::string SerializeUtils::TextAlignToString(TextAlign align) {
   static std::unordered_map<TextAlign, const char*> m = {{TextAlign::Left, "Left"},
                                                          {TextAlign::Right, "Right"},
@@ -74,6 +78,7 @@ std::string SerializeUtils::TextAlignToString(TextAlign align) {
                                                          {TextAlign::Justify, "Justify"}};
   return m[align];
 }
+
 std::string SerializeUtils::TileModeToString(TileMode tileMode) {
   static std::unordered_map<TileMode, const char*> m = {{TileMode::Clamp, "Clamp"},
                                                         {TileMode::Repeat, "Repeat"},
@@ -115,6 +120,7 @@ std::string SerializeUtils::ShapeTypeToString(Types::ShapeType type) {
       {Types::ShapeType::Stroke, "Stroke"}};
   return m[type];
 }
+
 std::string SerializeUtils::ShaderTypeToString(Types::ShaderType type) {
   static std::unordered_map<Types::ShaderType, const char*> m = {
       {Types::ShaderType::Color, "Color"},   {Types::ShaderType::ColorFilter, "ColorFilter"},
@@ -122,18 +128,21 @@ std::string SerializeUtils::ShaderTypeToString(Types::ShaderType type) {
       {Types::ShaderType::Matrix, "Matrix"}, {Types::ShaderType::Gradient, "Gradient"}};
   return m[type];
 }
+
 std::string SerializeUtils::LineCapToString(LineCap lineCap) {
   static std::unordered_map<LineCap, const char*> m = {{LineCap::Butt, "Butt"},
                                                        {LineCap::Round, "Round"},
                                                        {LineCap::Square, "Square"}};
   return m[lineCap];
 }
+
 std::string SerializeUtils::LineJoinToString(LineJoin lineJoin) {
   static std::unordered_map<LineJoin, const char*> m = {{LineJoin::Miter, "Miter"},
                                                         {LineJoin::Round, "Round"},
                                                         {LineJoin::Bevel, "Bevel"}};
   return m[lineJoin];
 }
+
 std::string SerializeUtils::ImageFilterTypeToString(Types::ImageFilterType type) {
   static std::unordered_map<Types::ImageFilterType, const char*> m = {
       {Types::ImageFilterType::Blur, "Blur"},
@@ -144,6 +153,7 @@ std::string SerializeUtils::ImageFilterTypeToString(Types::ImageFilterType type)
       {Types::ImageFilterType::InnerShadow, "InnerShadow"}};
   return m[type];
 }
+
 std::string SerializeUtils::ColorFilterTypeToString(Types::ColorFilterType type) {
   static std::unordered_map<Types::ColorFilterType, const char*> m = {
       {Types::ColorFilterType::Blend, "Blend"},
@@ -204,6 +214,7 @@ std::string SerializeUtils::GradientTypeToString(GradientType type) {
                                                             {GradientType::Radial, "Radial"}};
   return m[type];
 }
+
 std::string SerializeUtils::PathFillTypeToString(PathFillType type) {
   static std::unordered_map<PathFillType, const char*> m = {
       {PathFillType::Winding, "Winding"},
@@ -212,6 +223,7 @@ std::string SerializeUtils::PathFillTypeToString(PathFillType type) {
       {PathFillType::InverseEvenOdd, "InverseEvenOdd"}};
   return m[type];
 }
+
 void SerializeUtils::SerializeBegin(flexbuffers::Builder& fbb, const std::string& type,
                                     size_t& mapStart, size_t& contentStart) {
   mapStart = fbb.StartMap();
@@ -220,6 +232,7 @@ void SerializeUtils::SerializeBegin(flexbuffers::Builder& fbb, const std::string
   fbb.Key("Content");
   contentStart = fbb.StartMap();
 }
+
 void SerializeUtils::SerializeEnd(flexbuffers::Builder& fbb, size_t mapStart, size_t contentStart) {
   fbb.EndMap(contentStart);
   fbb.EndMap(mapStart);
@@ -316,6 +329,5 @@ void SerializeUtils::SetFlexBufferMap<bool>(flexbuffers::Builder& fbb, const cha
     fbb.Bool("IsAddress", isAddress);
   });
 }
-
 }  // namespace tgfx
 #endif

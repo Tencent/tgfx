@@ -32,6 +32,7 @@ std::shared_ptr<Data> ColorSerialization::Serialize(Color* color) {
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
+
 void ColorSerialization::SerializeColorImpl(flexbuffers::Builder& fbb, Color* color) {
   SerializeUtils::SetFlexBufferMap(fbb, "red", color->red);
   SerializeUtils::SetFlexBufferMap(fbb, "green", color->green);

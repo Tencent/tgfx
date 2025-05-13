@@ -31,6 +31,7 @@ std::shared_ptr<Data> ShapePaintSerialization::Serialize(ShapePaint* shapePaint)
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
+
 void ShapePaintSerialization::SerializeShapePaintImpl(flexbuffers::Builder& fbb,
                                                       ShapePaint* shapePaint) {
   SerializeUtils::SetFlexBufferMap(fbb, "shader",

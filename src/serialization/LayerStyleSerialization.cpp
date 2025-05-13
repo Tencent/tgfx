@@ -26,6 +26,7 @@
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
+
 std::shared_ptr<Data> LayerStyleSerialization::Serialize(LayerStyle* layerStyle) {
   DEBUG_ASSERT(layerStyle != nullptr)
   flexbuffers::Builder fbb;
@@ -50,6 +51,7 @@ std::shared_ptr<Data> LayerStyleSerialization::Serialize(LayerStyle* layerStyle)
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
+
 void LayerStyleSerialization::SerializeBasicLayerStyleImpl(flexbuffers::Builder& fbb,
                                                            LayerStyle* layerStyle) {
   SerializeUtils::SetFlexBufferMap(fbb, "type",
@@ -62,6 +64,7 @@ void LayerStyleSerialization::SerializeBasicLayerStyleImpl(flexbuffers::Builder&
       fbb, "extraSourceType",
       SerializeUtils::LayerStyleExtraSourceTypeToString(layerStyle->extraSourceType()));
 }
+
 void LayerStyleSerialization::SerializeBackGroundBlurStyleImpl(flexbuffers::Builder& fbb,
                                                                LayerStyle* layerStyle) {
   SerializeBasicLayerStyleImpl(fbb, layerStyle);
@@ -71,6 +74,7 @@ void LayerStyleSerialization::SerializeBackGroundBlurStyleImpl(flexbuffers::Buil
   SerializeUtils::SetFlexBufferMap(
       fbb, "tileMode", SerializeUtils::TileModeToString(backgroundBlurStyle->tileMode()));
 }
+
 void LayerStyleSerialization::SerializeDropShadowStyleImpl(flexbuffers::Builder& fbb,
                                                            LayerStyle* layerStyle) {
   SerializeBasicLayerStyleImpl(fbb, layerStyle);
@@ -82,6 +86,7 @@ void LayerStyleSerialization::SerializeDropShadowStyleImpl(flexbuffers::Builder&
   SerializeUtils::SetFlexBufferMap(fbb, "color", "", false, true);
   SerializeUtils::SetFlexBufferMap(fbb, "showBehindLayer", dropShadowStyle->showBehindLayer());
 }
+
 void LayerStyleSerialization::SerializeInnerShadowStyleImpl(flexbuffers::Builder& fbb,
                                                             LayerStyle* layerStyle) {
   SerializeBasicLayerStyleImpl(fbb, layerStyle);

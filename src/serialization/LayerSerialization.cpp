@@ -127,6 +127,7 @@ void LayerSerialization::SerializeBasicLayerImpl(flexbuffers::Builder& fbb, Laye
   auto layerStylesSize = static_cast<unsigned int>(layerStyles.size());
   SerializeUtils::SetFlexBufferMap(fbb, "layerStyles", layerStylesSize, false, layerStylesSize);
 }
+
 void LayerSerialization::SerializeImageLayerImpl(flexbuffers::Builder& fbb, Layer* layer) {
   SerializeBasicLayerImpl(fbb, layer);
   ImageLayer* imageLayer = static_cast<ImageLayer*>(layer);
@@ -135,6 +136,7 @@ void LayerSerialization::SerializeImageLayerImpl(flexbuffers::Builder& fbb, Laye
   SerializeUtils::SetFlexBufferMap(fbb, "image", reinterpret_cast<uint64_t>(image.get()), true,
                                    image != nullptr);
 }
+
 void LayerSerialization::SerializeShapeLayerImpl(flexbuffers::Builder& fbb, Layer* layer) {
   SerializeBasicLayerImpl(fbb, layer);
   ShapeLayer* shapeLayer = static_cast<ShapeLayer*>(layer);
@@ -165,6 +167,7 @@ void LayerSerialization::SerializeShapeLayerImpl(flexbuffers::Builder& fbb, Laye
                                    SerializeUtils::StrokeAlignToString(shapeLayer->strokeAlign()));
   SerializeUtils::SetFlexBufferMap(fbb, "strokeOnTop", shapeLayer->strokeOnTop());
 }
+
 void LayerSerialization::SerializeSolidLayerImpl(flexbuffers::Builder& fbb, Layer* layer) {
   SerializeBasicLayerImpl(fbb, layer);
   SolidLayer* solidLayer = static_cast<SolidLayer*>(layer);
@@ -174,6 +177,7 @@ void LayerSerialization::SerializeSolidLayerImpl(flexbuffers::Builder& fbb, Laye
   SerializeUtils::SetFlexBufferMap(fbb, "radiusX", solidLayer->radiusX());
   SerializeUtils::SetFlexBufferMap(fbb, "radiusY", solidLayer->radiusY());
 }
+
 void LayerSerialization::SerializeTextLayerImpl(flexbuffers::Builder& fbb, Layer* layer) {
   SerializeBasicLayerImpl(fbb, layer);
   TextLayer* textLayer = static_cast<TextLayer*>(layer);

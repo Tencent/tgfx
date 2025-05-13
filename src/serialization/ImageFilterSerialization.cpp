@@ -58,11 +58,13 @@ std::shared_ptr<Data> ImageFilterSerialization::Serialize(ImageFilter* imageFilt
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
+
 void ImageFilterSerialization::serializeImageFilterImpl(flexbuffers::Builder& fbb,
                                                         ImageFilter* imageFilter) {
   SerializeUtils::SetFlexBufferMap(
       fbb, "type", SerializeUtils::ImageFilterTypeToString(Types::Get(imageFilter)));
 }
+
 void ImageFilterSerialization::serializeColorImageFilter(flexbuffers::Builder& fbb,
                                                          ImageFilter* imageFilter) {
   serializeImageFilterImpl(fbb, imageFilter);
@@ -71,6 +73,7 @@ void ImageFilterSerialization::serializeColorImageFilter(flexbuffers::Builder& f
                                    reinterpret_cast<uint64_t>(colorImageFilter->filter.get()), true,
                                    colorImageFilter->filter != nullptr);
 }
+
 void ImageFilterSerialization::serializeBlurImageFilter(flexbuffers::Builder& fbb,
                                                         ImageFilter* imageFilter) {
   serializeImageFilterImpl(fbb, imageFilter);
@@ -80,6 +83,7 @@ void ImageFilterSerialization::serializeBlurImageFilter(flexbuffers::Builder& fb
   SerializeUtils::SetFlexBufferMap(fbb, "tileMode",
                                    SerializeUtils::TileModeToString(blurImageFilter->tileMode));
 }
+
 void ImageFilterSerialization::serializeComposeImageFilter(flexbuffers::Builder& fbb,
                                                            ImageFilter* imageFilter) {
   serializeImageFilterImpl(fbb, imageFilter);
@@ -87,6 +91,7 @@ void ImageFilterSerialization::serializeComposeImageFilter(flexbuffers::Builder&
   auto filtersSize = static_cast<unsigned int>(composeImageFilter->filters.size());
   SerializeUtils::SetFlexBufferMap(fbb, "filters", filtersSize, false, filtersSize);
 }
+
 void ImageFilterSerialization::serializeDropShadowImageFilter(flexbuffers::Builder& fbb,
                                                               ImageFilter* imageFilter) {
   serializeImageFilterImpl(fbb, imageFilter);
@@ -99,6 +104,7 @@ void ImageFilterSerialization::serializeDropShadowImageFilter(flexbuffers::Build
   SerializeUtils::SetFlexBufferMap(fbb, "color", "", false, true);
   SerializeUtils::SetFlexBufferMap(fbb, "shadowOnly", dropShadowImageFilter->shadowOnly);
 }
+
 void ImageFilterSerialization::serializeInnerShadowImageFilter(flexbuffers::Builder& fbb,
                                                                ImageFilter* imageFilter) {
   serializeImageFilterImpl(fbb, imageFilter);
@@ -112,6 +118,7 @@ void ImageFilterSerialization::serializeInnerShadowImageFilter(flexbuffers::Buil
   SerializeUtils::SetFlexBufferMap(fbb, "color", "", false, true);
   SerializeUtils::SetFlexBufferMap(fbb, "shadowOnly", innerShadowImageFilter->shadowOnly);
 }
+
 void ImageFilterSerialization::serializeRuntimeImageFilter(flexbuffers::Builder& fbb,
                                                            ImageFilter* imageFilter) {
   serializeImageFilterImpl(fbb, imageFilter);

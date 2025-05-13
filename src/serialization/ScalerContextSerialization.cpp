@@ -31,6 +31,7 @@ std::shared_ptr<Data> ScalerContextSerialization::Serialize(ScalerContext* scale
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
+
 void ScalerContextSerialization::SerializeScalerContextImpl(flexbuffers::Builder& fbb,
                                                             ScalerContext* scaler_context) {
   auto typeFace = scaler_context->getTypeface();
