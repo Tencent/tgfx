@@ -33,9 +33,8 @@ std::shared_ptr<Data> TextBlobSerialization::Serialize(TextBlob* textBlob) {
 }
 
 void TextBlobSerialization::SerializeTextBlobImpl(flexbuffers::Builder& fbb, TextBlob* textBlob) {
-  auto glyphRunListsSize = static_cast<unsigned int>(textBlob->glyphRunLists.size());
-  SerializeUtils::SetFlexBufferMap(fbb, "GlyphRunLists", glyphRunListsSize, false,
-                                   glyphRunListsSize);
+  (void)fbb;
+  (void)textBlob;
 }
 
 }  // namespace tgfx

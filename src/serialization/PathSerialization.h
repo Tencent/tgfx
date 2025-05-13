@@ -15,25 +15,18 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#ifdef TGFX_USE_INSPECTOR
 
-#include "PointSerialization.h"
+#pragma once
+
+#include <tgfx/core/Data.h>
+#include "SerializationUtils.h"
 
 namespace tgfx {
+class PathSerialization {
+ public:
+  static std::shared_ptr<Data> Serialize(Path* path);
 
-std::shared_ptr<Data> PointSerialization::Serialize(Point* point) {
-  DEBUG_ASSERT(point != nullptr)
-  flexbuffers::Builder fbb;
-  size_t startMap;
-  size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
-  SerializePointImpl(fbb, point);
-  SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
-  return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
-}
-void PointSerialization::SerializePointImpl(flexbuffers::Builder& fbb, Point* point) {
-  SerializeUtils::SetFlexBufferMap(fbb, "x", point->x);
-  SerializeUtils::SetFlexBufferMap(fbb, "y", point->y);
-}
+ private:
+  static void SerializePathImpl(flexbuffers::Builder& fbb, Path* path);
+};
 }  // namespace tgfx
-#endif

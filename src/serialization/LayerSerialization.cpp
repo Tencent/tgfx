@@ -93,98 +93,98 @@ void LayerSerialization::SerializeTreeNodeImpl(
 }
 
 void LayerSerialization::SerializeBasicLayerImpl(flexbuffers::Builder& fbb, Layer* layer) {
-  SerializeUtils::SetFlexBufferMap(fbb, "Type", SerializeUtils::LayerTypeToString(layer->type()));
-  SerializeUtils::SetFlexBufferMap(fbb, "Visible", layer->visible());
-  SerializeUtils::SetFlexBufferMap(fbb, "ShouldRasterize", layer->shouldRasterize());
-  SerializeUtils::SetFlexBufferMap(fbb, "AllowsEdgeAntialiasing", layer->allowsEdgeAntialiasing());
-  SerializeUtils::SetFlexBufferMap(fbb, "AllowsGroupOpacity", layer->allowsGroupOpacity());
-  SerializeUtils::SetFlexBufferMap(fbb, "ExcludeChildEffectsInLayerStyle",
+  SerializeUtils::SetFlexBufferMap(fbb, "type", SerializeUtils::LayerTypeToString(layer->type()));
+  SerializeUtils::SetFlexBufferMap(fbb, "visible", layer->visible());
+  SerializeUtils::SetFlexBufferMap(fbb, "shouldRasterize", layer->shouldRasterize());
+  SerializeUtils::SetFlexBufferMap(fbb, "allowsEdgeAntialiasing", layer->allowsEdgeAntialiasing());
+  SerializeUtils::SetFlexBufferMap(fbb, "allowsGroupOpacity", layer->allowsGroupOpacity());
+  SerializeUtils::SetFlexBufferMap(fbb, "excludeChildEffectsInLayerStyle",
                                    layer->excludeChildEffectsInLayerStyle());
-  SerializeUtils::SetFlexBufferMap(fbb, "BlendMode",
+  SerializeUtils::SetFlexBufferMap(fbb, "blendMode",
                                    SerializeUtils::BlendModeToString(layer->blendMode()));
-  SerializeUtils::SetFlexBufferMap(fbb, "Name", layer->name());
-  SerializeUtils::SetFlexBufferMap(fbb, "Alpha", layer->alpha());
-  SerializeUtils::SetFlexBufferMap(fbb, "Matrix", "", false, true);
-  SerializeUtils::SetFlexBufferMap(fbb, "Position", "", false, true);
-  SerializeUtils::SetFlexBufferMap(fbb, "RasterizationScale", layer->rasterizationScale());
+  SerializeUtils::SetFlexBufferMap(fbb, "name", layer->name());
+  SerializeUtils::SetFlexBufferMap(fbb, "alpha", layer->alpha());
+  SerializeUtils::SetFlexBufferMap(fbb, "matrix", "", false, true);
+  SerializeUtils::SetFlexBufferMap(fbb, "position", "", false, true);
+  SerializeUtils::SetFlexBufferMap(fbb, "rasterizationScale", layer->rasterizationScale());
   auto filters = layer->filters();
   auto filterSize = static_cast<unsigned int>(filters.size());
-  SerializeUtils::SetFlexBufferMap(fbb, "Filters", filterSize, false, filterSize);
+  SerializeUtils::SetFlexBufferMap(fbb, "filters", filterSize, false, filterSize);
   auto mask = layer->mask();
-  SerializeUtils::SetFlexBufferMap(fbb, "Mask", reinterpret_cast<uint64_t>(mask.get()), true,
+  SerializeUtils::SetFlexBufferMap(fbb, "mask", reinterpret_cast<uint64_t>(mask.get()), true,
                                    mask != nullptr);
-  SerializeUtils::SetFlexBufferMap(fbb, "ScrollRect", "", false, true);
+  SerializeUtils::SetFlexBufferMap(fbb, "scrollRect", "", false, true);
   auto root = layer->root();
-  SerializeUtils::SetFlexBufferMap(fbb, "Root", reinterpret_cast<uint64_t>(root), true,
+  SerializeUtils::SetFlexBufferMap(fbb, "root", reinterpret_cast<uint64_t>(root), true,
                                    root != nullptr);
   auto parent = layer->parent();
-  SerializeUtils::SetFlexBufferMap(fbb, "Parent", reinterpret_cast<uint64_t>(parent.get()), true,
+  SerializeUtils::SetFlexBufferMap(fbb, "parent", reinterpret_cast<uint64_t>(parent.get()), true,
                                    parent != nullptr);
   auto children = layer->children();
   auto childrenSize = static_cast<unsigned int>(children.size());
-  SerializeUtils::SetFlexBufferMap(fbb, "Children", childrenSize, false, childrenSize);
+  SerializeUtils::SetFlexBufferMap(fbb, "children", childrenSize, false, childrenSize);
   auto layerStyles = layer->layerStyles();
   auto layerStylesSize = static_cast<unsigned int>(layerStyles.size());
-  SerializeUtils::SetFlexBufferMap(fbb, "LayerStyles", layerStylesSize, false, layerStylesSize);
+  SerializeUtils::SetFlexBufferMap(fbb, "layerStyles", layerStylesSize, false, layerStylesSize);
 }
 void LayerSerialization::SerializeImageLayerImpl(flexbuffers::Builder& fbb, Layer* layer) {
   SerializeBasicLayerImpl(fbb, layer);
   ImageLayer* imageLayer = static_cast<ImageLayer*>(layer);
-  SerializeUtils::SetFlexBufferMap(fbb, "Sampling", "", false, true);
+  SerializeUtils::SetFlexBufferMap(fbb, "sampling", "", false, true);
   auto image = imageLayer->image();
-  SerializeUtils::SetFlexBufferMap(fbb, "Image", reinterpret_cast<uint64_t>(image.get()), true,
+  SerializeUtils::SetFlexBufferMap(fbb, "image", reinterpret_cast<uint64_t>(image.get()), true,
                                    image != nullptr);
 }
 void LayerSerialization::SerializeShapeLayerImpl(flexbuffers::Builder& fbb, Layer* layer) {
   SerializeBasicLayerImpl(fbb, layer);
   ShapeLayer* shapeLayer = static_cast<ShapeLayer*>(layer);
   auto shape = shapeLayer->shape();
-  SerializeUtils::SetFlexBufferMap(fbb, "Shape", reinterpret_cast<uint64_t>(shape.get()), true,
+  SerializeUtils::SetFlexBufferMap(fbb, "shape", reinterpret_cast<uint64_t>(shape.get()), true,
                                    shape != nullptr);
   auto fillStyles = shapeLayer->fillStyles();
   auto fillStylesSize = static_cast<unsigned int>(fillStyles.size());
-  SerializeUtils::SetFlexBufferMap(fbb, "FillStyles", fillStylesSize, false, fillStylesSize);
+  SerializeUtils::SetFlexBufferMap(fbb, "fillStyles", fillStylesSize, false, fillStylesSize);
   auto strokeStyles = shapeLayer->strokeStyles();
   auto strokeStylesSize = static_cast<unsigned int>(strokeStyles.size());
-  SerializeUtils::SetFlexBufferMap(fbb, "StrokeStyles", strokeStylesSize, false, strokeStylesSize);
-  SerializeUtils::SetFlexBufferMap(fbb, "LineCap",
+  SerializeUtils::SetFlexBufferMap(fbb, "strokeStyles", strokeStylesSize, false, strokeStylesSize);
+  SerializeUtils::SetFlexBufferMap(fbb, "lineCap",
                                    SerializeUtils::LineCapToString(shapeLayer->lineCap()));
-  SerializeUtils::SetFlexBufferMap(fbb, "LineJoin",
+  SerializeUtils::SetFlexBufferMap(fbb, "lineJoin",
                                    SerializeUtils::LineJoinToString(shapeLayer->lineJoin()));
-  SerializeUtils::SetFlexBufferMap(fbb, "MiterLimit", shapeLayer->miterLimit());
-  SerializeUtils::SetFlexBufferMap(fbb, "LineWidth", shapeLayer->lineWidth());
+  SerializeUtils::SetFlexBufferMap(fbb, "miterLimit", shapeLayer->miterLimit());
+  SerializeUtils::SetFlexBufferMap(fbb, "lineWidth", shapeLayer->lineWidth());
   auto lineDashPattern = shapeLayer->lineDashPattern();
   auto lineDashPatternSize = static_cast<unsigned int>(lineDashPattern.size());
-  SerializeUtils::SetFlexBufferMap(fbb, "LineDashPattern", lineDashPatternSize, false,
+  SerializeUtils::SetFlexBufferMap(fbb, "lineDashPattern", lineDashPatternSize, false,
                                    lineDashPatternSize);
-  SerializeUtils::SetFlexBufferMap(fbb, "LineDashPhase", shapeLayer->lineDashPhase());
-  SerializeUtils::SetFlexBufferMap(fbb, "StrokeStart", shapeLayer->strokeStart());
-  SerializeUtils::SetFlexBufferMap(fbb, "StrokeEnd", shapeLayer->strokeEnd());
-  SerializeUtils::SetFlexBufferMap(fbb, "LineDashAdaptive", shapeLayer->lineDashAdaptive());
-  SerializeUtils::SetFlexBufferMap(fbb, "StrokeAlign",
+  SerializeUtils::SetFlexBufferMap(fbb, "lineDashPhase", shapeLayer->lineDashPhase());
+  SerializeUtils::SetFlexBufferMap(fbb, "strokeStart", shapeLayer->strokeStart());
+  SerializeUtils::SetFlexBufferMap(fbb, "strokeEnd", shapeLayer->strokeEnd());
+  SerializeUtils::SetFlexBufferMap(fbb, "lineDashAdaptive", shapeLayer->lineDashAdaptive());
+  SerializeUtils::SetFlexBufferMap(fbb, "strokeAlign",
                                    SerializeUtils::StrokeAlignToString(shapeLayer->strokeAlign()));
-  SerializeUtils::SetFlexBufferMap(fbb, "StrokeOnTop", shapeLayer->strokeOnTop());
+  SerializeUtils::SetFlexBufferMap(fbb, "strokeOnTop", shapeLayer->strokeOnTop());
 }
 void LayerSerialization::SerializeSolidLayerImpl(flexbuffers::Builder& fbb, Layer* layer) {
   SerializeBasicLayerImpl(fbb, layer);
   SolidLayer* solidLayer = static_cast<SolidLayer*>(layer);
-  SerializeUtils::SetFlexBufferMap(fbb, "Color", "", false, true);
-  SerializeUtils::SetFlexBufferMap(fbb, "Width", solidLayer->width());
-  SerializeUtils::SetFlexBufferMap(fbb, "Height", solidLayer->height());
-  SerializeUtils::SetFlexBufferMap(fbb, "RadiusX", solidLayer->radiusX());
-  SerializeUtils::SetFlexBufferMap(fbb, "RadiusY", solidLayer->radiusY());
+  SerializeUtils::SetFlexBufferMap(fbb, "color", "", false, true);
+  SerializeUtils::SetFlexBufferMap(fbb, "width", solidLayer->width());
+  SerializeUtils::SetFlexBufferMap(fbb, "height", solidLayer->height());
+  SerializeUtils::SetFlexBufferMap(fbb, "radiusX", solidLayer->radiusX());
+  SerializeUtils::SetFlexBufferMap(fbb, "radiusY", solidLayer->radiusY());
 }
 void LayerSerialization::SerializeTextLayerImpl(flexbuffers::Builder& fbb, Layer* layer) {
   SerializeBasicLayerImpl(fbb, layer);
   TextLayer* textLayer = static_cast<TextLayer*>(layer);
-  SerializeUtils::SetFlexBufferMap(fbb, "Text", textLayer->text());
-  SerializeUtils::SetFlexBufferMap(fbb, "TextColor", "", false, true);
-  SerializeUtils::SetFlexBufferMap(fbb, "Font", "", false, true);
-  SerializeUtils::SetFlexBufferMap(fbb, "Width", textLayer->width());
-  SerializeUtils::SetFlexBufferMap(fbb, "Height", textLayer->height());
-  SerializeUtils::SetFlexBufferMap(fbb, "TextAlign",
+  SerializeUtils::SetFlexBufferMap(fbb, "text", textLayer->text());
+  SerializeUtils::SetFlexBufferMap(fbb, "textColor", "", false, true);
+  SerializeUtils::SetFlexBufferMap(fbb, "font", "", false, true);
+  SerializeUtils::SetFlexBufferMap(fbb, "width", textLayer->width());
+  SerializeUtils::SetFlexBufferMap(fbb, "height", textLayer->height());
+  SerializeUtils::SetFlexBufferMap(fbb, "textAlign",
                                    SerializeUtils::TextAlignToString(textLayer->textAlign()));
-  SerializeUtils::SetFlexBufferMap(fbb, "AutoWrap", textLayer->autoWrap());
+  SerializeUtils::SetFlexBufferMap(fbb, "autoWrap", textLayer->autoWrap());
 }
 }  // namespace tgfx
 #endif

@@ -35,11 +35,11 @@ std::shared_ptr<Data> glyphRunListSerialization::Serialize(GlyphRunList* glyphRu
 
 void glyphRunListSerialization::SerializeglyphRunListImpl(flexbuffers::Builder& fbb,
                                                           GlyphRunList* glyphRunList) {
-  SerializeUtils::SetFlexBufferMap(fbb, "HasColor", glyphRunList->hasColor());
-  SerializeUtils::SetFlexBufferMap(fbb, "HasOutlines", glyphRunList->hasOutlines());
+  SerializeUtils::SetFlexBufferMap(fbb, "hasColor", glyphRunList->hasColor());
+  SerializeUtils::SetFlexBufferMap(fbb, "hasOutlines", glyphRunList->hasOutlines());
   auto glyphRuns = glyphRunList->glyphRuns();
   auto glyhRunsSize = static_cast<unsigned int>(glyphRuns.size());
-  SerializeUtils::SetFlexBufferMap(fbb, "GlyphRuns", glyhRunsSize, false, glyhRunsSize);
+  SerializeUtils::SetFlexBufferMap(fbb, "glyphRuns", glyhRunsSize, false, glyhRunsSize);
 }
 }  // namespace tgfx
 #endif

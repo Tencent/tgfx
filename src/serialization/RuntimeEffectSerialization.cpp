@@ -34,8 +34,8 @@ std::shared_ptr<Data> RuntimeEffectSerialization::Serialize(RuntimeEffect* runti
 
 void RuntimeEffectSerialization::SerializeRuntimeEffectImpl(flexbuffers::Builder& fbb,
                                                             RuntimeEffect* runtimeEffet) {
-  SerializeUtils::SetFlexBufferMap(fbb, "UniqueType", "", false, true);
-  SerializeUtils::SetFlexBufferMap(fbb, "SampleCount", runtimeEffet->sampleCount());
+  SerializeUtils::SetFlexBufferMap(fbb, "uniqueType", "", false, true);
+  SerializeUtils::SetFlexBufferMap(fbb, "sampleCount", runtimeEffet->sampleCount());
 }
 }  // namespace tgfx
 #endif

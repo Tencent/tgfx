@@ -32,14 +32,14 @@ std::shared_ptr<Data> TypeFaceSerialization::Serialize(Typeface* typeface) {
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
 void TypeFaceSerialization::SerializeTypeFaceImpl(flexbuffers::Builder& fbb, Typeface* typeface) {
-  SerializeUtils::SetFlexBufferMap(fbb, "UniqueID", typeface->uniqueID());
-  SerializeUtils::SetFlexBufferMap(fbb, "FontFamily", typeface->fontFamily());
-  SerializeUtils::SetFlexBufferMap(fbb, "FontStyle", typeface->fontStyle());
-  SerializeUtils::SetFlexBufferMap(fbb, "GlyphsCount",
+  SerializeUtils::SetFlexBufferMap(fbb, "uniqueID", typeface->uniqueID());
+  SerializeUtils::SetFlexBufferMap(fbb, "fontFamily", typeface->fontFamily());
+  SerializeUtils::SetFlexBufferMap(fbb, "fontStyle", typeface->fontStyle());
+  SerializeUtils::SetFlexBufferMap(fbb, "glyphsCount",
                                    static_cast<uint32_t>(typeface->glyphsCount()));
-  SerializeUtils::SetFlexBufferMap(fbb, "UnitsPerEm", typeface->unitsPerEm());
-  SerializeUtils::SetFlexBufferMap(fbb, "HasColor", typeface->hasColor());
-  SerializeUtils::SetFlexBufferMap(fbb, "HasOutlines", typeface->hasOutlines());
+  SerializeUtils::SetFlexBufferMap(fbb, "unitsPerEm", typeface->unitsPerEm());
+  SerializeUtils::SetFlexBufferMap(fbb, "hasColor", typeface->hasColor());
+  SerializeUtils::SetFlexBufferMap(fbb, "hasOutlines", typeface->hasOutlines());
 }
 }  // namespace tgfx
 #endif

@@ -29,10 +29,14 @@ class ColorFilterSerialization {
 
  private:
   static void SerializeColorFilterImpl(flexbuffers::Builder& fbb, ColorFilter* colorFilter);
+
   static void SerializeComposeColorFilterImpl(flexbuffers::Builder& fbb, ColorFilter* colorFilter);
+
   static void SerializeAlphaThreadholdColorFilterImpl(flexbuffers::Builder& fbb,
                                                       ColorFilter* colorFilter);
+
   static void SerializeMatrixColorFilterImpl(flexbuffers::Builder& fbb, ColorFilter* colorFilter);
+
   static void SerializeModeColorFilterImpl(flexbuffers::Builder& fbb, ColorFilter* colorFilter);
 };
 }  // namespace tgfx

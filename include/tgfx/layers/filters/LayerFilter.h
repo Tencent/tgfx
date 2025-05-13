@@ -22,7 +22,6 @@
 #include "tgfx/layers/LayerProperty.h"
 
 namespace tgfx {
-
 /**
  * LayerFilter represents a filter that applies effects to a layer, such as blurs, shadows, or color
  * adjustments. It creates a new offscreen image that replaces the original layer content.

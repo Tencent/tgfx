@@ -33,13 +33,13 @@ std::shared_ptr<Data> glyphRunSerialization::Serialize(GlyphRun* glyphRun) {
 }
 
 void glyphRunSerialization::SerializeGlyphRunImpl(flexbuffers::Builder& fbb, GlyphRun* glyphRun) {
-  SerializeUtils::SetFlexBufferMap(fbb, "GlyphFace",
+  SerializeUtils::SetFlexBufferMap(fbb, "glyphFace",
                                    reinterpret_cast<uint64_t>(glyphRun->glyphFace.get()), true,
                                    glyphRun->glyphFace != nullptr);
   auto glyphsSize = static_cast<unsigned int>(glyphRun->glyphs.size());
-  SerializeUtils::SetFlexBufferMap(fbb, "Glyphs", glyphsSize, false, glyphsSize);
+  SerializeUtils::SetFlexBufferMap(fbb, "glyphs", glyphsSize, false, glyphsSize);
   auto positionsSize = static_cast<unsigned int>(glyphRun->positions.size());
-  SerializeUtils::SetFlexBufferMap(fbb, "Positions", positionsSize, false, positionsSize);
+  SerializeUtils::SetFlexBufferMap(fbb, "positions", positionsSize, false, positionsSize);
 }
 }  // namespace tgfx
 #endif

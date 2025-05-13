@@ -33,14 +33,14 @@ std::shared_ptr<Data> ImageSerialization::Serialize(Image* image) {
 }
 
 void ImageSerialization::SerializeImageImpl(flexbuffers::Builder& fbb, Image* image) {
-  SerializeUtils::SetFlexBufferMap(fbb, "Type",
+  SerializeUtils::SetFlexBufferMap(fbb, "type",
                                    SerializeUtils::ImageTypeToString(Types::Get(image)));
-  SerializeUtils::SetFlexBufferMap(fbb, "Width", image->width());
-  SerializeUtils::SetFlexBufferMap(fbb, "Height", image->height());
-  SerializeUtils::SetFlexBufferMap(fbb, "IsAlphaOnly", image->isAlphaOnly());
-  SerializeUtils::SetFlexBufferMap(fbb, "HasMipmaps", image->hasMipmaps());
-  SerializeUtils::SetFlexBufferMap(fbb, "IsFullyDecoded", image->isFullyDecoded());
-  SerializeUtils::SetFlexBufferMap(fbb, "IsTextureBacked", image->isTextureBacked());
+  SerializeUtils::SetFlexBufferMap(fbb, "width", image->width());
+  SerializeUtils::SetFlexBufferMap(fbb, "height", image->height());
+  SerializeUtils::SetFlexBufferMap(fbb, "isAlphaOnly", image->isAlphaOnly());
+  SerializeUtils::SetFlexBufferMap(fbb, "hasMipmaps", image->hasMipmaps());
+  SerializeUtils::SetFlexBufferMap(fbb, "isFullyDecoded", image->isFullyDecoded());
+  SerializeUtils::SetFlexBufferMap(fbb, "isTextureBacked", image->isTextureBacked());
 }
 }  // namespace tgfx
 #endif

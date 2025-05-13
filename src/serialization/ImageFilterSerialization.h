@@ -28,11 +28,17 @@ class ImageFilterSerialization {
 
  private:
   static void serializeImageFilterImpl(flexbuffers::Builder& fbb, ImageFilter* imageFilter);
+
   static void serializeColorImageFilter(flexbuffers::Builder& fbb, ImageFilter* imageFilter);
+
   static void serializeBlurImageFilter(flexbuffers::Builder& fbb, ImageFilter* imageFilter);
+
   static void serializeComposeImageFilter(flexbuffers::Builder& fbb, ImageFilter* imageFilter);
+
   static void serializeDropShadowImageFilter(flexbuffers::Builder& fbb, ImageFilter* imageFilter);
+
   static void serializeInnerShadowImageFilter(flexbuffers::Builder& fbb, ImageFilter* imageFilter);
+
   static void serializeRuntimeImageFilter(flexbuffers::Builder& fbb, ImageFilter* imageFilter);
 };
 }  // namespace tgfx

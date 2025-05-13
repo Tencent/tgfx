@@ -54,16 +54,16 @@ std::shared_ptr<Data> ColorFilterSerialization::Serialize(ColorFilter* colorFilt
 void ColorFilterSerialization::SerializeColorFilterImpl(flexbuffers::Builder& fbb,
                                                         ColorFilter* colorFilter) {
   SerializeUtils::SetFlexBufferMap(
-      fbb, "Type", SerializeUtils::ColorFilterTypeToString(Types::Get(colorFilter)));
+      fbb, "type", SerializeUtils::ColorFilterTypeToString(Types::Get(colorFilter)));
 }
 void ColorFilterSerialization::SerializeComposeColorFilterImpl(flexbuffers::Builder& fbb,
                                                                ColorFilter* colorFilter) {
   SerializeColorFilterImpl(fbb, colorFilter);
   ComposeColorFilter* composeColorFilter = static_cast<ComposeColorFilter*>(colorFilter);
-  SerializeUtils::SetFlexBufferMap(fbb, "Inner",
+  SerializeUtils::SetFlexBufferMap(fbb, "inner",
                                    reinterpret_cast<uint64_t>(composeColorFilter->inner.get()),
                                    true, composeColorFilter->inner != nullptr);
-  SerializeUtils::SetFlexBufferMap(fbb, "Outer",
+  SerializeUtils::SetFlexBufferMap(fbb, "outer",
                                    reinterpret_cast<uint64_t>(composeColorFilter->outer.get()),
                                    true, composeColorFilter->outer != nullptr);
 }
@@ -72,21 +72,21 @@ void ColorFilterSerialization::SerializeAlphaThreadholdColorFilterImpl(flexbuffe
   SerializeColorFilterImpl(fbb, colorFilter);
   AlphaThresholdColorFilter* alphaThresholdColorFilter =
       static_cast<AlphaThresholdColorFilter*>(colorFilter);
-  SerializeUtils::SetFlexBufferMap(fbb, "Threshold", alphaThresholdColorFilter->threshold);
+  SerializeUtils::SetFlexBufferMap(fbb, "threshold", alphaThresholdColorFilter->threshold);
 }
 void ColorFilterSerialization::SerializeMatrixColorFilterImpl(flexbuffers::Builder& fbb,
                                                               ColorFilter* colorFilter) {
   SerializeColorFilterImpl(fbb, colorFilter);
   MatrixColorFilter* matrixColorFilter = static_cast<MatrixColorFilter*>(colorFilter);
-  SerializeUtils::SetFlexBufferMap(fbb, "Matrix", 20, false, true);
-  SerializeUtils::SetFlexBufferMap(fbb, "AlphaIsUnchanged", matrixColorFilter->alphaIsUnchanged);
+  SerializeUtils::SetFlexBufferMap(fbb, "matrix", 20, false, true);
+  SerializeUtils::SetFlexBufferMap(fbb, "alphaIsUnchanged", matrixColorFilter->alphaIsUnchanged);
 }
 void ColorFilterSerialization::SerializeModeColorFilterImpl(flexbuffers::Builder& fbb,
                                                             ColorFilter* colorFilter) {
   SerializeColorFilterImpl(fbb, colorFilter);
   ModeColorFilter* modeColorFilter = static_cast<ModeColorFilter*>(colorFilter);
-  SerializeUtils::SetFlexBufferMap(fbb, "Color", "", false, true);
-  SerializeUtils::SetFlexBufferMap(fbb, "Mode",
+  SerializeUtils::SetFlexBufferMap(fbb, "color", "", false, true);
+  SerializeUtils::SetFlexBufferMap(fbb, "mode",
                                    SerializeUtils::BlendModeToString(modeColorFilter->mode));
 }
 }  // namespace tgfx

@@ -33,10 +33,10 @@ std::shared_ptr<Data> RectSerialization::Serialize(Rect* rect) {
 }
 
 void RectSerialization::SerializeRectImpl(flexbuffers::Builder& fbb, Rect* rect) {
-  SerializeUtils::SetFlexBufferMap(fbb, "Left", rect->left);
-  SerializeUtils::SetFlexBufferMap(fbb, "Top", rect->top);
-  SerializeUtils::SetFlexBufferMap(fbb, "Right", rect->right);
-  SerializeUtils::SetFlexBufferMap(fbb, "Bottom", rect->bottom);
+  SerializeUtils::SetFlexBufferMap(fbb, "left", rect->left);
+  SerializeUtils::SetFlexBufferMap(fbb, "top", rect->top);
+  SerializeUtils::SetFlexBufferMap(fbb, "right", rect->right);
+  SerializeUtils::SetFlexBufferMap(fbb, "bottom", rect->bottom);
 }
 }  // namespace tgfx
 #endif

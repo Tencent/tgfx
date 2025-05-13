@@ -34,8 +34,8 @@ std::shared_ptr<Data> RRectSerialization::Serialize(RRect* rrect) {
 
 void RRectSerialization::SerializeRRectImpl(flexbuffers::Builder& fbb, RRect* rrect) {
   (void)rrect;
-  SerializeUtils::SetFlexBufferMap(fbb, "Rect", "", false, true);
-  SerializeUtils::SetFlexBufferMap(fbb, "Radii", "", false, true);
+  SerializeUtils::SetFlexBufferMap(fbb, "rect", "", false, true);
+  SerializeUtils::SetFlexBufferMap(fbb, "radii", "", false, true);
 }
 
 }  // namespace tgfx

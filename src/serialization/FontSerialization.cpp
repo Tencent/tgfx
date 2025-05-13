@@ -33,14 +33,14 @@ std::shared_ptr<Data> FontSerialization::Serialize(Font* font) {
 }
 void FontSerialization::SerializeFontImpl(flexbuffers::Builder& fbb, Font* font) {
   auto typeFace = font->getTypeface();
-  SerializeUtils::SetFlexBufferMap(fbb, "TypeFace", reinterpret_cast<uint64_t>(typeFace.get()),
+  SerializeUtils::SetFlexBufferMap(fbb, "typeFace", reinterpret_cast<uint64_t>(typeFace.get()),
                                    true, typeFace != nullptr);
-  SerializeUtils::SetFlexBufferMap(fbb, "HasColor", font->hasColor());
-  SerializeUtils::SetFlexBufferMap(fbb, "HasOutlines", font->hasOutlines());
-  SerializeUtils::SetFlexBufferMap(fbb, "Size", font->getSize());
-  SerializeUtils::SetFlexBufferMap(fbb, "IsFauxBold", font->isFauxBold());
-  SerializeUtils::SetFlexBufferMap(fbb, "IsFauxItalic", font->isFauxItalic());
-  SerializeUtils::SetFlexBufferMap(fbb, "Metrics", "", false, true);
+  SerializeUtils::SetFlexBufferMap(fbb, "hasColor", font->hasColor());
+  SerializeUtils::SetFlexBufferMap(fbb, "hasOutlines", font->hasOutlines());
+  SerializeUtils::SetFlexBufferMap(fbb, "size", font->getSize());
+  SerializeUtils::SetFlexBufferMap(fbb, "isFauxBold", font->isFauxBold());
+  SerializeUtils::SetFlexBufferMap(fbb, "isFauxItalic", font->isFauxItalic());
+  SerializeUtils::SetFlexBufferMap(fbb, "metrics", "", false, true);
 }
 }  // namespace tgfx
 #endif

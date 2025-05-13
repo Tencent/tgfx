@@ -31,11 +31,17 @@ class LayerContentSerialization {
 
  private:
   static void SerializeBasicLayerContentImpl(flexbuffers::Builder& fbb, LayerContent* layerContent);
+
   static void SerializeComposeContentImpl(flexbuffers::Builder& fbb, LayerContent* layerContent);
+
   static void SerializeImageContentImpl(flexbuffers::Builder& fbb, LayerContent* layerContent);
+
   static void SerializeRasterizedContentImpl(flexbuffers::Builder& fbb, LayerContent* layerContent);
+
   static void SerializeShapeContentImpl(flexbuffers::Builder& fbb, LayerContent* layerContent);
+
   static void SerializeSolidContentImpl(flexbuffers::Builder& fbb, LayerContent* layerContent);
+
   static void SerializeTextContentImpl(flexbuffers::Builder& fbb, LayerContent* layerContent);
 };
 }  // namespace tgfx

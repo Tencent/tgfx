@@ -15,31 +15,32 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#ifdef TGFX_USE_INSPECTOR
 
-#include "ShapePaintSerialization.h"
+#include "PathSerialization.h"
 
 namespace tgfx {
 
-std::shared_ptr<Data> ShapePaintSerialization::Serialize(ShapePaint* shapePaint) {
-  DEBUG_ASSERT(shapePaint != nullptr)
+std::shared_ptr<Data> PathSerialization::Serialize(Path* path) {
+  DEBUG_ASSERT(path != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
   SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
-  SerializeShapePaintImpl(fbb, shapePaint);
+  SerializePathImpl(fbb, path);
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
-void ShapePaintSerialization::SerializeShapePaintImpl(flexbuffers::Builder& fbb,
-                                                      ShapePaint* shapePaint) {
-  SerializeUtils::SetFlexBufferMap(fbb, "shader",
-                                   reinterpret_cast<uint64_t>(shapePaint->shader.get()), true,
-                                   shapePaint->shader != nullptr);
 
-  SerializeUtils::SetFlexBufferMap(fbb, "alpha", shapePaint->alpha);
-  SerializeUtils::SetFlexBufferMap(fbb, "blendMode",
-                                   SerializeUtils::BlendModeToString(shapePaint->blendMode));
+void PathSerialization::SerializePathImpl(flexbuffers::Builder& fbb, Path* path) {
+  SerializeUtils::SetFlexBufferMap(fbb, "fillType",
+                                   SerializeUtils::PathFillTypeToString(path->getFillType()));
+  SerializeUtils::SetFlexBufferMap(fbb, "isInverseFillType", path->isInverseFillType());
+  SerializeUtils::SetFlexBufferMap(fbb, "isLine", path->isLine());
+  SerializeUtils::SetFlexBufferMap(fbb, "isRect", path->isRect());
+  SerializeUtils::SetFlexBufferMap(fbb, "isOval", path->isOval());
+  SerializeUtils::SetFlexBufferMap(fbb, "bounds", "", false, true);
+  SerializeUtils::SetFlexBufferMap(fbb, "isEmpty", path->isEmpty());
+  SerializeUtils::SetFlexBufferMap(fbb, "countPoints", path->countPoints());
+  SerializeUtils::SetFlexBufferMap(fbb, "countVerbs", path->countVerbs());
 }
 }  // namespace tgfx
-#endif

@@ -33,17 +33,17 @@ std::shared_ptr<Data> FontMetricsSerialization::Serialize(FontMetrics* fontMeric
 }
 void FontMetricsSerialization::SerializeScalerContextImpl(flexbuffers::Builder& fbb,
                                                           FontMetrics* fontMetrics) {
-  SerializeUtils::SetFlexBufferMap(fbb, "Top", fontMetrics->top);
-  SerializeUtils::SetFlexBufferMap(fbb, "Ascent", fontMetrics->ascent);
-  SerializeUtils::SetFlexBufferMap(fbb, "Descent", fontMetrics->descent);
-  SerializeUtils::SetFlexBufferMap(fbb, "Bottom", fontMetrics->bottom);
-  SerializeUtils::SetFlexBufferMap(fbb, "Leading", fontMetrics->leading);
+  SerializeUtils::SetFlexBufferMap(fbb, "top", fontMetrics->top);
+  SerializeUtils::SetFlexBufferMap(fbb, "ascent", fontMetrics->ascent);
+  SerializeUtils::SetFlexBufferMap(fbb, "descent", fontMetrics->descent);
+  SerializeUtils::SetFlexBufferMap(fbb, "bottom", fontMetrics->bottom);
+  SerializeUtils::SetFlexBufferMap(fbb, "leading", fontMetrics->leading);
   SerializeUtils::SetFlexBufferMap(fbb, "xMin", fontMetrics->xMin);
   SerializeUtils::SetFlexBufferMap(fbb, "xMax", fontMetrics->xMax);
   SerializeUtils::SetFlexBufferMap(fbb, "xHeight", fontMetrics->xHeight);
-  SerializeUtils::SetFlexBufferMap(fbb, "CapHeight", fontMetrics->capHeight);
-  SerializeUtils::SetFlexBufferMap(fbb, "UnderlineThickness", fontMetrics->underlineThickness);
-  SerializeUtils::SetFlexBufferMap(fbb, "UnderlinePosition", fontMetrics->underlinePosition);
+  SerializeUtils::SetFlexBufferMap(fbb, "capHeight", fontMetrics->capHeight);
+  SerializeUtils::SetFlexBufferMap(fbb, "underlineThickness", fontMetrics->underlineThickness);
+  SerializeUtils::SetFlexBufferMap(fbb, "underlinePosition", fontMetrics->underlinePosition);
 }
 }  // namespace tgfx
 #endif

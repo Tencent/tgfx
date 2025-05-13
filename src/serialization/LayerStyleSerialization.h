@@ -29,8 +29,11 @@ class LayerStyleSerialization {
 
  private:
   static void SerializeBasicLayerStyleImpl(flexbuffers::Builder& fbb, LayerStyle* layerStyle);
+
   static void SerializeBackGroundBlurStyleImpl(flexbuffers::Builder& fbb, LayerStyle* layerStyle);
+
   static void SerializeDropShadowStyleImpl(flexbuffers::Builder& fbb, LayerStyle* layerStyle);
+
   static void SerializeInnerShadowStyleImpl(flexbuffers::Builder& fbb, LayerStyle* layerStyle);
 };
 }  // namespace tgfx

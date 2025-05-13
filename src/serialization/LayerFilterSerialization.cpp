@@ -67,46 +67,46 @@ void LayerFilterSerialization::SerializeBlendFilterImpl(flexbuffers::Builder& fb
                                                         LayerFilter* layerFilter) {
   SerializeBasicLayerFilterImpl(fbb, layerFilter);
   BlendFilter* blendFilter = static_cast<BlendFilter*>(layerFilter);
-  SerializeUtils::SetFlexBufferMap(fbb, "Color", "", false, true);
-  SerializeUtils::SetFlexBufferMap(fbb, "BlendMode",
+  SerializeUtils::SetFlexBufferMap(fbb, "color", "", false, true);
+  SerializeUtils::SetFlexBufferMap(fbb, "blendMode",
                                    SerializeUtils::BlendModeToString(blendFilter->blendMode()));
 }
 void LayerFilterSerialization::SerializeBlurFilterImpl(flexbuffers::Builder& fbb,
                                                        LayerFilter* layerFilter) {
   SerializeBasicLayerFilterImpl(fbb, layerFilter);
   BlurFilter* blurFilter = static_cast<BlurFilter*>(layerFilter);
-  SerializeUtils::SetFlexBufferMap(fbb, "BlurrinessX", blurFilter->blurrinessX());
-  SerializeUtils::SetFlexBufferMap(fbb, "BlurrinessY", blurFilter->blurrinessY());
-  SerializeUtils::SetFlexBufferMap(fbb, "TileMode",
+  SerializeUtils::SetFlexBufferMap(fbb, "blurrinessX", blurFilter->blurrinessX());
+  SerializeUtils::SetFlexBufferMap(fbb, "blurrinessY", blurFilter->blurrinessY());
+  SerializeUtils::SetFlexBufferMap(fbb, "tileMode",
                                    SerializeUtils::TileModeToString(blurFilter->tileMode()));
 }
 void LayerFilterSerialization::SerializeColorMatrixFilterImpl(flexbuffers::Builder& fbb,
                                                               LayerFilter* layerFilter) {
   SerializeBasicLayerFilterImpl(fbb, layerFilter);
   //ColorMatrixFilter* colorMatrixFilter = static_cast<ColorMatrixFilter*>(layerFilter);
-  SerializeUtils::SetFlexBufferMap(fbb, "Matrix", "", false, true);
+  SerializeUtils::SetFlexBufferMap(fbb, "matrix", "", false, true);
 }
 void LayerFilterSerialization::SerializeDropShadowFilterImpl(flexbuffers::Builder& fbb,
                                                              LayerFilter* layerFilter) {
   SerializeBasicLayerFilterImpl(fbb, layerFilter);
   DropShadowFilter* dropShadowFilter = static_cast<DropShadowFilter*>(layerFilter);
-  SerializeUtils::SetFlexBufferMap(fbb, "OffsetX", dropShadowFilter->offsetX());
-  SerializeUtils::SetFlexBufferMap(fbb, "OffsetY", dropShadowFilter->offsetY());
-  SerializeUtils::SetFlexBufferMap(fbb, "BlurrinessX", dropShadowFilter->blurrinessX());
-  SerializeUtils::SetFlexBufferMap(fbb, "BlurrinessY", dropShadowFilter->blurrinessY());
-  SerializeUtils::SetFlexBufferMap(fbb, "Color", "", false, true);
-  SerializeUtils::SetFlexBufferMap(fbb, "DropShadowOnly", dropShadowFilter->dropsShadowOnly());
+  SerializeUtils::SetFlexBufferMap(fbb, "offsetX", dropShadowFilter->offsetX());
+  SerializeUtils::SetFlexBufferMap(fbb, "offsetY", dropShadowFilter->offsetY());
+  SerializeUtils::SetFlexBufferMap(fbb, "blurrinessX", dropShadowFilter->blurrinessX());
+  SerializeUtils::SetFlexBufferMap(fbb, "blurrinessY", dropShadowFilter->blurrinessY());
+  SerializeUtils::SetFlexBufferMap(fbb, "color", "", false, true);
+  SerializeUtils::SetFlexBufferMap(fbb, "dropShadowOnly", dropShadowFilter->dropsShadowOnly());
 }
 void LayerFilterSerialization::SerializeInnerShadowFilterImpl(flexbuffers::Builder& fbb,
                                                               LayerFilter* layerFilter) {
   SerializeBasicLayerFilterImpl(fbb, layerFilter);
   InnerShadowFilter* innerShadowFilter = static_cast<InnerShadowFilter*>(layerFilter);
-  SerializeUtils::SetFlexBufferMap(fbb, "OffsetX", innerShadowFilter->offsetX());
-  SerializeUtils::SetFlexBufferMap(fbb, "OffsetY", innerShadowFilter->offsetY());
-  SerializeUtils::SetFlexBufferMap(fbb, "BlurrinessX", innerShadowFilter->blurrinessX());
-  SerializeUtils::SetFlexBufferMap(fbb, "BlurrinessY", innerShadowFilter->blurrinessY());
-  SerializeUtils::SetFlexBufferMap(fbb, "Color", "", false, true);
-  SerializeUtils::SetFlexBufferMap(fbb, "InnerShadowOnly", innerShadowFilter->innerShadowOnly());
+  SerializeUtils::SetFlexBufferMap(fbb, "offsetX", innerShadowFilter->offsetX());
+  SerializeUtils::SetFlexBufferMap(fbb, "offsetY", innerShadowFilter->offsetY());
+  SerializeUtils::SetFlexBufferMap(fbb, "blurrinessX", innerShadowFilter->blurrinessX());
+  SerializeUtils::SetFlexBufferMap(fbb, "blurrinessY", innerShadowFilter->blurrinessY());
+  SerializeUtils::SetFlexBufferMap(fbb, "color", "", false, true);
+  SerializeUtils::SetFlexBufferMap(fbb, "innerShadowOnly", innerShadowFilter->innerShadowOnly());
 }
 }  // namespace tgfx
 #endif

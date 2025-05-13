@@ -28,11 +28,17 @@ class ShaderSerialization {
 
  private:
   static void SerializeBasicShaderImpl(flexbuffers::Builder& fbb, Shader* shader);
+
   static void SerializeColorShaderImpl(flexbuffers::Builder& fbb, Shader* shader);
+
   static void SerializeColorFilterShaderImpl(flexbuffers::Builder& fbb, Shader* shader);
+
   static void SerializeImageShaderImpl(flexbuffers::Builder& fbb, Shader* shader);
+
   static void SerializeBlendShaderImpl(flexbuffers::Builder& fbb, Shader* shader);
+
   static void SerializeMatrixShaderImpl(flexbuffers::Builder& fbb, Shader* shader);
+
   static void SerializeGradientShaderImpl(flexbuffers::Builder& fbb, Shader* shader);
 };
 }  // namespace tgfx

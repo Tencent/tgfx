@@ -33,9 +33,9 @@ std::shared_ptr<Data> SamplingOptionsSerialization::Serialize(SamplingOptions* s
 
 void SamplingOptionsSerialization::SerializeSamplingOptionsImpl(flexbuffers::Builder& fbb,
                                                                 SamplingOptions* samplingOptions) {
-  SerializeUtils::SetFlexBufferMap(fbb, "FilterMode",
+  SerializeUtils::SetFlexBufferMap(fbb, "filterMode",
                                    SerializeUtils::FilterModeToString(samplingOptions->filterMode));
-  SerializeUtils::SetFlexBufferMap(fbb, "MipmapMode",
+  SerializeUtils::SetFlexBufferMap(fbb, "mipmapMode",
                                    SerializeUtils::MipmapModeToString(samplingOptions->mipmapMode));
 }
 }  // namespace tgfx

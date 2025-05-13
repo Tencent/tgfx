@@ -27,10 +27,15 @@ class LayerFilterSerialization {
 
  private:
   static void SerializeBasicLayerFilterImpl(flexbuffers::Builder& fbb, LayerFilter* layerFilter);
+
   static void SerializeBlendFilterImpl(flexbuffers::Builder& fbb, LayerFilter* layerFilter);
+
   static void SerializeBlurFilterImpl(flexbuffers::Builder& fbb, LayerFilter* layerFilter);
+
   static void SerializeColorMatrixFilterImpl(flexbuffers::Builder& fbb, LayerFilter* layerFilter);
+
   static void SerializeDropShadowFilterImpl(flexbuffers::Builder& fbb, LayerFilter* layerFilter);
+
   static void SerializeInnerShadowFilterImpl(flexbuffers::Builder& fbb, LayerFilter* layerFilter);
 };
 }  // namespace tgfx

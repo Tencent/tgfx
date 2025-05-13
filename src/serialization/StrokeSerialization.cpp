@@ -32,10 +32,10 @@ std::shared_ptr<Data> StrokeSerialization::Serialize(Stroke* stroke) {
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
 void StrokeSerialization::SerializeStrokeImpl(flexbuffers::Builder& fbb, Stroke* stroke) {
-  SerializeUtils::SetFlexBufferMap(fbb, "Width", stroke->width);
-  SerializeUtils::SetFlexBufferMap(fbb, "Cap", SerializeUtils::LineCapToString(stroke->cap));
-  SerializeUtils::SetFlexBufferMap(fbb, "Join", SerializeUtils::LineJoinToString(stroke->join));
-  SerializeUtils::SetFlexBufferMap(fbb, "MiterLimit", stroke->miterLimit);
+  SerializeUtils::SetFlexBufferMap(fbb, "width", stroke->width);
+  SerializeUtils::SetFlexBufferMap(fbb, "cap", SerializeUtils::LineCapToString(stroke->cap));
+  SerializeUtils::SetFlexBufferMap(fbb, "join", SerializeUtils::LineJoinToString(stroke->join));
+  SerializeUtils::SetFlexBufferMap(fbb, "miterLimit", stroke->miterLimit);
 }
 }  // namespace tgfx
 #endif

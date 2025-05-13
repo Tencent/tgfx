@@ -76,6 +76,7 @@ class BlurFilter : public LayerFilter {
   Type type() const override {
     return Type::BlurFilter;
   }
+
   std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) override;
 
  private:

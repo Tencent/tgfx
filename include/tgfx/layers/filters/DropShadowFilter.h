@@ -114,6 +114,7 @@ class DropShadowFilter : public LayerFilter {
   Type type() const override {
     return Type::DropShadowFilter;
   }
+
   std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) override;
 
  private:

@@ -32,10 +32,12 @@ std::shared_ptr<Data> ShapeSerialization::Serialize(Shape* shape) {
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
 void ShapeSerialization::SerializeShapeImpl(flexbuffers::Builder& fbb, Shape* shape) {
-  SerializeUtils::SetFlexBufferMap(fbb, "Type",
+  SerializeUtils::SetFlexBufferMap(fbb, "type",
                                    SerializeUtils::ShapeTypeToString(Types::Get(shape)));
-  SerializeUtils::SetFlexBufferMap(fbb, "IsSimplePath", shape->isSimplePath());
-  SerializeUtils::SetFlexBufferMap(fbb, "IsInverseFillType", shape->isInverseFillType());
+  SerializeUtils::SetFlexBufferMap(fbb, "isSimplePath", shape->isSimplePath());
+  SerializeUtils::SetFlexBufferMap(fbb, "isInverseFillType", shape->isInverseFillType());
+  SerializeUtils::SetFlexBufferMap(fbb, "bounds", "", false, true);
+  SerializeUtils::SetFlexBufferMap(fbb, "path", "", false, true);
 }
 }  // namespace tgfx
 #endif

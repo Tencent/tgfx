@@ -42,9 +42,13 @@ class LayerSerialization {
       std::unordered_map<uint64_t, std::shared_ptr<tgfx::Layer>>& layerMap);
 
   static void SerializeBasicLayerImpl(flexbuffers::Builder& fbb, Layer* layer);
+
   static void SerializeImageLayerImpl(flexbuffers::Builder& fbb, Layer* layer);
+
   static void SerializeShapeLayerImpl(flexbuffers::Builder& fbb, Layer* layer);
+
   static void SerializeSolidLayerImpl(flexbuffers::Builder& fbb, Layer* layer);
+
   static void SerializeTextLayerImpl(flexbuffers::Builder& fbb, Layer* layer);
 };
 }  // namespace tgfx

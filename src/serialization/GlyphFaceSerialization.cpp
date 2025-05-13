@@ -33,8 +33,8 @@ std::shared_ptr<Data> GlyphFaceSerialization::Serialize(GlyphFace* glyphFace) {
 }
 void GlyphFaceSerialization::SerializeGlyphFaceImpl(flexbuffers::Builder& fbb,
                                                     GlyphFace* glyphFace) {
-  SerializeUtils::SetFlexBufferMap(fbb, "HasColor", glyphFace->hasColor());
-  SerializeUtils::SetFlexBufferMap(fbb, "HasOutlines", glyphFace->hasOutlines());
+  SerializeUtils::SetFlexBufferMap(fbb, "hasColor", glyphFace->hasColor());
+  SerializeUtils::SetFlexBufferMap(fbb, "hasOutlines", glyphFace->hasOutlines());
 }
 }  // namespace tgfx
 #endif

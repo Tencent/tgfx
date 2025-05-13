@@ -204,7 +204,14 @@ std::string SerializeUtils::GradientTypeToString(GradientType type) {
                                                             {GradientType::Radial, "Radial"}};
   return m[type];
 }
-
+std::string SerializeUtils::PathFillTypeToString(PathFillType type) {
+  static std::unordered_map<PathFillType, const char*> m = {
+      {PathFillType::Winding, "Winding"},
+      {PathFillType::EvenOdd, "EvenOdd"},
+      {PathFillType::InverseWinding, "InverseWinding"},
+      {PathFillType::InverseEvenOdd, "InverseEvenOdd"}};
+  return m[type];
+}
 void SerializeUtils::SerializeBegin(flexbuffers::Builder& fbb, const std::string& type,
                                     size_t& mapStart, size_t& contentStart) {
   mapStart = fbb.StartMap();

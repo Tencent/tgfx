@@ -115,6 +115,7 @@ class InnerShadowFilter : public LayerFilter {
   Type type() const override {
     return Type::InnerShadowFilter;
   }
+
   std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) override;
 
  private:

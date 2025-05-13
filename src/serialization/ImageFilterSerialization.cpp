@@ -61,13 +61,13 @@ std::shared_ptr<Data> ImageFilterSerialization::Serialize(ImageFilter* imageFilt
 void ImageFilterSerialization::serializeImageFilterImpl(flexbuffers::Builder& fbb,
                                                         ImageFilter* imageFilter) {
   SerializeUtils::SetFlexBufferMap(
-      fbb, "Type", SerializeUtils::ImageFilterTypeToString(Types::Get(imageFilter)));
+      fbb, "type", SerializeUtils::ImageFilterTypeToString(Types::Get(imageFilter)));
 }
 void ImageFilterSerialization::serializeColorImageFilter(flexbuffers::Builder& fbb,
                                                          ImageFilter* imageFilter) {
   serializeImageFilterImpl(fbb, imageFilter);
   ColorImageFilter* colorImageFilter = static_cast<ColorImageFilter*>(imageFilter);
-  SerializeUtils::SetFlexBufferMap(fbb, "Filter",
+  SerializeUtils::SetFlexBufferMap(fbb, "filter",
                                    reinterpret_cast<uint64_t>(colorImageFilter->filter.get()), true,
                                    colorImageFilter->filter != nullptr);
 }
@@ -75,9 +75,9 @@ void ImageFilterSerialization::serializeBlurImageFilter(flexbuffers::Builder& fb
                                                         ImageFilter* imageFilter) {
   serializeImageFilterImpl(fbb, imageFilter);
   BlurImageFilter* blurImageFilter = static_cast<BlurImageFilter*>(imageFilter);
-  SerializeUtils::SetFlexBufferMap(fbb, "BlurrinessX", blurImageFilter->blurrinessX);
-  SerializeUtils::SetFlexBufferMap(fbb, "BlurrinessY", blurImageFilter->blurrinessY);
-  SerializeUtils::SetFlexBufferMap(fbb, "TileMode",
+  SerializeUtils::SetFlexBufferMap(fbb, "blurrinessX", blurImageFilter->blurrinessX);
+  SerializeUtils::SetFlexBufferMap(fbb, "blurrinessY", blurImageFilter->blurrinessY);
+  SerializeUtils::SetFlexBufferMap(fbb, "tileMode",
                                    SerializeUtils::TileModeToString(blurImageFilter->tileMode));
 }
 void ImageFilterSerialization::serializeComposeImageFilter(flexbuffers::Builder& fbb,
@@ -85,38 +85,38 @@ void ImageFilterSerialization::serializeComposeImageFilter(flexbuffers::Builder&
   serializeImageFilterImpl(fbb, imageFilter);
   ComposeImageFilter* composeImageFilter = static_cast<ComposeImageFilter*>(imageFilter);
   auto filtersSize = static_cast<unsigned int>(composeImageFilter->filters.size());
-  SerializeUtils::SetFlexBufferMap(fbb, "Filters", filtersSize, false, filtersSize);
+  SerializeUtils::SetFlexBufferMap(fbb, "filters", filtersSize, false, filtersSize);
 }
 void ImageFilterSerialization::serializeDropShadowImageFilter(flexbuffers::Builder& fbb,
                                                               ImageFilter* imageFilter) {
   serializeImageFilterImpl(fbb, imageFilter);
   DropShadowImageFilter* dropShadowImageFilter = static_cast<DropShadowImageFilter*>(imageFilter);
-  SerializeUtils::SetFlexBufferMap(fbb, "DX", dropShadowImageFilter->dx);
-  SerializeUtils::SetFlexBufferMap(fbb, "DY", dropShadowImageFilter->dy);
+  SerializeUtils::SetFlexBufferMap(fbb, "dx", dropShadowImageFilter->dx);
+  SerializeUtils::SetFlexBufferMap(fbb, "dy", dropShadowImageFilter->dy);
   SerializeUtils::SetFlexBufferMap(
-      fbb, "BlurFilter", reinterpret_cast<uint64_t>(dropShadowImageFilter->blurFilter.get()), true,
+      fbb, "blurFilter", reinterpret_cast<uint64_t>(dropShadowImageFilter->blurFilter.get()), true,
       dropShadowImageFilter->blurFilter != nullptr);
-  SerializeUtils::SetFlexBufferMap(fbb, "Color", "", false, true);
-  SerializeUtils::SetFlexBufferMap(fbb, "ShadowOnly", dropShadowImageFilter->shadowOnly);
+  SerializeUtils::SetFlexBufferMap(fbb, "color", "", false, true);
+  SerializeUtils::SetFlexBufferMap(fbb, "shadowOnly", dropShadowImageFilter->shadowOnly);
 }
 void ImageFilterSerialization::serializeInnerShadowImageFilter(flexbuffers::Builder& fbb,
                                                                ImageFilter* imageFilter) {
   serializeImageFilterImpl(fbb, imageFilter);
   InnerShadowImageFilter* innerShadowImageFilter =
       static_cast<InnerShadowImageFilter*>(imageFilter);
-  SerializeUtils::SetFlexBufferMap(fbb, "DX", innerShadowImageFilter->dx);
-  SerializeUtils::SetFlexBufferMap(fbb, "DY", innerShadowImageFilter->dy);
+  SerializeUtils::SetFlexBufferMap(fbb, "dx", innerShadowImageFilter->dx);
+  SerializeUtils::SetFlexBufferMap(fbb, "dy", innerShadowImageFilter->dy);
   SerializeUtils::SetFlexBufferMap(
-      fbb, "BlurFilter", reinterpret_cast<uint64_t>(innerShadowImageFilter->blurFilter.get()), true,
+      fbb, "blurFilter", reinterpret_cast<uint64_t>(innerShadowImageFilter->blurFilter.get()), true,
       innerShadowImageFilter->blurFilter != nullptr);
-  SerializeUtils::SetFlexBufferMap(fbb, "Color", "", false, true);
-  SerializeUtils::SetFlexBufferMap(fbb, "ShadowOnly", innerShadowImageFilter->shadowOnly);
+  SerializeUtils::SetFlexBufferMap(fbb, "color", "", false, true);
+  SerializeUtils::SetFlexBufferMap(fbb, "shadowOnly", innerShadowImageFilter->shadowOnly);
 }
 void ImageFilterSerialization::serializeRuntimeImageFilter(flexbuffers::Builder& fbb,
                                                            ImageFilter* imageFilter) {
   serializeImageFilterImpl(fbb, imageFilter);
   RuntimeImageFilter* runtimeImageFilter = static_cast<RuntimeImageFilter*>(imageFilter);
-  SerializeUtils::SetFlexBufferMap(fbb, "Effect",
+  SerializeUtils::SetFlexBufferMap(fbb, "effect",
                                    reinterpret_cast<uint64_t>(runtimeImageFilter->effect.get()),
                                    true, runtimeImageFilter->effect != nullptr);
 }

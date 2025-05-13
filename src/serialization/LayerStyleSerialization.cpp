@@ -52,46 +52,45 @@ std::shared_ptr<Data> LayerStyleSerialization::Serialize(LayerStyle* layerStyle)
 }
 void LayerStyleSerialization::SerializeBasicLayerStyleImpl(flexbuffers::Builder& fbb,
                                                            LayerStyle* layerStyle) {
-  SerializeUtils::SetFlexBufferMap(fbb, "Type",
+  SerializeUtils::SetFlexBufferMap(fbb, "type",
                                    SerializeUtils::LayerStyleTypeToString(layerStyle->Type()));
-  SerializeUtils::SetFlexBufferMap(fbb, "BlendMode",
+  SerializeUtils::SetFlexBufferMap(fbb, "blendMode",
                                    SerializeUtils::BlendModeToString(layerStyle->blendMode()));
   SerializeUtils::SetFlexBufferMap(
-      fbb, "LayerStylePosition",
-      SerializeUtils::LayerStylePositionToString(layerStyle->position()));
+      fbb, "position", SerializeUtils::LayerStylePositionToString(layerStyle->position()));
   SerializeUtils::SetFlexBufferMap(
-      fbb, "ExtraSourceType",
+      fbb, "extraSourceType",
       SerializeUtils::LayerStyleExtraSourceTypeToString(layerStyle->extraSourceType()));
 }
 void LayerStyleSerialization::SerializeBackGroundBlurStyleImpl(flexbuffers::Builder& fbb,
                                                                LayerStyle* layerStyle) {
   SerializeBasicLayerStyleImpl(fbb, layerStyle);
   BackgroundBlurStyle* backgroundBlurStyle = static_cast<BackgroundBlurStyle*>(layerStyle);
-  SerializeUtils::SetFlexBufferMap(fbb, "BlurrinessX", backgroundBlurStyle->blurrinessX());
-  SerializeUtils::SetFlexBufferMap(fbb, "BlurrinessY", backgroundBlurStyle->blurrinessY());
+  SerializeUtils::SetFlexBufferMap(fbb, "blurrinessX", backgroundBlurStyle->blurrinessX());
+  SerializeUtils::SetFlexBufferMap(fbb, "blurrinessY", backgroundBlurStyle->blurrinessY());
   SerializeUtils::SetFlexBufferMap(
-      fbb, "TileMode", SerializeUtils::TileModeToString(backgroundBlurStyle->tileMode()));
+      fbb, "tileMode", SerializeUtils::TileModeToString(backgroundBlurStyle->tileMode()));
 }
 void LayerStyleSerialization::SerializeDropShadowStyleImpl(flexbuffers::Builder& fbb,
                                                            LayerStyle* layerStyle) {
   SerializeBasicLayerStyleImpl(fbb, layerStyle);
   DropShadowStyle* dropShadowStyle = static_cast<DropShadowStyle*>(layerStyle);
-  SerializeUtils::SetFlexBufferMap(fbb, "OffsetX", dropShadowStyle->offsetX());
-  SerializeUtils::SetFlexBufferMap(fbb, "OffsetY", dropShadowStyle->offsetY());
-  SerializeUtils::SetFlexBufferMap(fbb, "BlurrinessX", dropShadowStyle->blurrinessX());
-  SerializeUtils::SetFlexBufferMap(fbb, "BlurrinessY", dropShadowStyle->blurrinessY());
-  SerializeUtils::SetFlexBufferMap(fbb, "Color", "", false, true);
-  SerializeUtils::SetFlexBufferMap(fbb, "ShowBehindLayer", dropShadowStyle->showBehindLayer());
+  SerializeUtils::SetFlexBufferMap(fbb, "offsetX", dropShadowStyle->offsetX());
+  SerializeUtils::SetFlexBufferMap(fbb, "offsetY", dropShadowStyle->offsetY());
+  SerializeUtils::SetFlexBufferMap(fbb, "blurrinessX", dropShadowStyle->blurrinessX());
+  SerializeUtils::SetFlexBufferMap(fbb, "blurrinessY", dropShadowStyle->blurrinessY());
+  SerializeUtils::SetFlexBufferMap(fbb, "color", "", false, true);
+  SerializeUtils::SetFlexBufferMap(fbb, "showBehindLayer", dropShadowStyle->showBehindLayer());
 }
 void LayerStyleSerialization::SerializeInnerShadowStyleImpl(flexbuffers::Builder& fbb,
                                                             LayerStyle* layerStyle) {
   SerializeBasicLayerStyleImpl(fbb, layerStyle);
   InnerShadowStyle* innerShadowStyle = static_cast<InnerShadowStyle*>(layerStyle);
-  SerializeUtils::SetFlexBufferMap(fbb, "OffsetX", innerShadowStyle->offsetX());
-  SerializeUtils::SetFlexBufferMap(fbb, "OffsetY", innerShadowStyle->offsetY());
-  SerializeUtils::SetFlexBufferMap(fbb, "BlurrinessX", innerShadowStyle->blurrinessX());
-  SerializeUtils::SetFlexBufferMap(fbb, "BlurrinessY", innerShadowStyle->blurrinessY());
-  SerializeUtils::SetFlexBufferMap(fbb, "Color", "", false, true);
+  SerializeUtils::SetFlexBufferMap(fbb, "offsetX", innerShadowStyle->offsetX());
+  SerializeUtils::SetFlexBufferMap(fbb, "offsetY", innerShadowStyle->offsetY());
+  SerializeUtils::SetFlexBufferMap(fbb, "blurrinessX", innerShadowStyle->blurrinessX());
+  SerializeUtils::SetFlexBufferMap(fbb, "blurrinessY", innerShadowStyle->blurrinessY());
+  SerializeUtils::SetFlexBufferMap(fbb, "color", "", false, true);
 }
 }  // namespace tgfx
 #endif
