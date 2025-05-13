@@ -38,6 +38,18 @@ class LayerFilter : public LayerProperty {
   std::shared_ptr<ImageFilter> getImageFilter(float scale);
 
  protected:
+  enum class Type {
+    LayerFilter,
+    BlendFilter,
+    BlurFilter,
+    ColorMatrixFliter,
+    DropShadowFilter,
+    InnerShadowFilter
+  };
+
+  virtual Type type() const {
+    return Type::LayerFilter;
+  }
   /**
    * Creates a new image filter for the given scale factor. When it is necessary to recreate the
    * ImageFilter, the onCreateImageFilter method will be called.
@@ -56,5 +68,7 @@ class LayerFilter : public LayerProperty {
   float lastScale = 1.0f;
   std::unique_ptr<Rect> _clipBounds = nullptr;
   std::shared_ptr<ImageFilter> lastFilter;
+
+  friend class Types;
 };
 }  // namespace tgfx

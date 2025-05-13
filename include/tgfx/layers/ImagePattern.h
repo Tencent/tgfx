@@ -41,14 +41,34 @@ class ImagePattern : public ShapeStyle {
                                             TileMode tileModeY = TileMode::Clamp,
                                             const SamplingOptions& sampling = {});
 
+  std::shared_ptr<Image> image() const {
+    return _image;
+  }
+
+  TileMode tileModeX() const {
+    return _tileModeX;
+  }
+
+  TileMode tileModeY() const {
+    return _tileModeY;
+  }
+
+  SamplingOptions samplingOptions() const {
+    return _sampling;
+  }
+
  protected:
+  Type getType() const override {
+    return Type::ImagePattern;
+  }
+
   std::shared_ptr<Shader> onGetShader() const override;
 
  private:
-  std::shared_ptr<Image> image = nullptr;
-  TileMode tileModeX = TileMode::Clamp;
-  TileMode tileModeY = TileMode::Clamp;
-  SamplingOptions sampling = {};
+  std::shared_ptr<Image> _image = nullptr;
+  TileMode _tileModeX = TileMode::Clamp;
+  TileMode _tileModeY = TileMode::Clamp;
+  SamplingOptions _sampling = {};
 
   ImagePattern(std::shared_ptr<Image> image, TileMode tileModeX, TileMode tileModeY,
                const SamplingOptions& sampling);

@@ -35,7 +35,11 @@ class ComposeContent : public LayerContent {
 
   bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
 
- private:
   std::vector<std::unique_ptr<LayerContent>> contents = {};
+
+ protected:
+  Type type() const override {
+    return Type::ComposeContent;
+  }
 };
 }  // namespace tgfx

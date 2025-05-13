@@ -31,11 +31,11 @@ std::shared_ptr<ImagePattern> ImagePattern::Make(std::shared_ptr<Image> image, T
 
 ImagePattern::ImagePattern(std::shared_ptr<Image> image, TileMode tileModeX, TileMode tileModeY,
                            const SamplingOptions& sampling)
-    : image(std::move(image)), tileModeX(tileModeX), tileModeY(tileModeY), sampling(sampling) {
+    : _image(std::move(image)), _tileModeX(tileModeX), _tileModeY(tileModeY), _sampling(sampling) {
 }
 
 std::shared_ptr<Shader> ImagePattern::onGetShader() const {
-  return Shader::MakeImageShader(image, tileModeX, tileModeY, sampling);
+  return Shader::MakeImageShader(_image, _tileModeX, _tileModeY, _sampling);
 }
 
 }  // namespace tgfx
