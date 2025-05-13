@@ -140,5 +140,6 @@ class Shape {
   friend class ShapeDrawOp;
   friend class ProxyProvider;
   friend class Canvas;
+  friend class Types;
 };
 }  // namespace tgfx

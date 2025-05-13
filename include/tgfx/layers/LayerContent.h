@@ -58,5 +58,22 @@ class LayerContent {
     * checks the bounding box.
   */
   virtual bool hitTestPoint(float localX, float localY, bool pixelHitTest) = 0;
+
+ protected:
+  enum class Type {
+    LayerContent,
+    ComposeContent,
+    ImageContent,
+    RasterizedContent,
+    ShapeContent,
+    SolidContent,
+    TextContent
+  };
+
+  virtual Type type() const {
+    return Type::LayerContent;
+  }
+
+  friend class Types;
 };
 }  // namespace tgfx
