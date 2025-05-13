@@ -109,20 +109,20 @@ void ShapeStyleSerialization::SerializeRadialGradientImpl(flexbuffers::Builder& 
                                                           ShapeStyle* shapeStyle) {
   RadialGradient* radialGradient = static_cast<RadialGradient*>(shapeStyle);
   SerializeUtils::SetFlexBufferMap(fbb, "Center", "", false, true);
-  SerializeUtils::SetFlexBufferMap(fbb, "Radius", radialGradient->_radius);
+  SerializeUtils::SetFlexBufferMap(fbb, "Radius", radialGradient->radius());
 }
 void ShapeStyleSerialization::SerializeConicGradientImpl(flexbuffers::Builder& fbb,
                                                          ShapeStyle* shapeStyle) {
   ConicGradient* conicGradient = static_cast<ConicGradient*>(shapeStyle);
   SerializeUtils::SetFlexBufferMap(fbb, "Center", "", false, true);
-  SerializeUtils::SetFlexBufferMap(fbb, "StartAngle", conicGradient->_startAngle);
-  SerializeUtils::SetFlexBufferMap(fbb, "EndAngle", conicGradient->_endAngle);
+  SerializeUtils::SetFlexBufferMap(fbb, "StartAngle", conicGradient->startAngle());
+  SerializeUtils::SetFlexBufferMap(fbb, "EndAngle", conicGradient->endAngle());
 }
 void ShapeStyleSerialization::SerializeDiamondGradientImpl(flexbuffers::Builder& fbb,
                                                            ShapeStyle* shapeStyle) {
   DiamondGradient* diamondGradient = static_cast<DiamondGradient*>(shapeStyle);
   SerializeUtils::SetFlexBufferMap(fbb, "Center", "", false, true);
-  SerializeUtils::SetFlexBufferMap(fbb, "HalfDiagonal", diamondGradient->_halfDiagonal);
+  SerializeUtils::SetFlexBufferMap(fbb, "HalfDiagonal", diamondGradient->halfDiagonal());
 }
 void ShapeStyleSerialization::SerializeSolidColorImpl(flexbuffers::Builder& fbb,
                                                       ShapeStyle* shapeStyle) {

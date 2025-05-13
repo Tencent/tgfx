@@ -240,7 +240,6 @@ class RadialGradient : public Gradient {
   }
 
   friend class Gradient;
-  friend class ShapeStyleSerialization;
 };
 
 /**
@@ -304,7 +303,6 @@ class ConicGradient : public Gradient {
   }
 
   friend class Gradient;
-  friend class ShapeStyleSerialization;
 };
 
 /**
@@ -355,7 +353,6 @@ class DiamondGradient : public Gradient {
   }
 
   friend class Gradient;
-  friend class ShapeStyleSerialization;
 };
 
 }  // namespace tgfx

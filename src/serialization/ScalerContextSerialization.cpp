@@ -33,10 +33,11 @@ std::shared_ptr<Data> ScalerContextSerialization::Serialize(ScalerContext* scale
 }
 void ScalerContextSerialization::SerializeScalerContextImpl(flexbuffers::Builder& fbb,
                                                             ScalerContext* scaler_context) {
+  auto typeFace = scaler_context->getTypeface();
   SerializeUtils::SetFlexBufferMap(fbb, "TypeFace",
-                                   reinterpret_cast<uint64_t>(scaler_context->typeface.get()), true,
-                                   scaler_context->typeface != nullptr);
-  SerializeUtils::SetFlexBufferMap(fbb, "TextSize", scaler_context->textSize);
+                                   reinterpret_cast<uint64_t>(typeFace.get()), true,
+                                   typeFace != nullptr);
+  SerializeUtils::SetFlexBufferMap(fbb, "TextSize", scaler_context->getSize());
   SerializeUtils::SetFlexBufferMap(fbb, "FontMetrics", "", false, true);
 }
 }  // namespace tgfx

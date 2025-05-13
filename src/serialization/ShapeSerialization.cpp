@@ -32,7 +32,7 @@ std::shared_ptr<Data> ShapeSerialization::Serialize(Shape* shape) {
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
 void ShapeSerialization::SerializeShapeImpl(flexbuffers::Builder& fbb, Shape* shape) {
-  SerializeUtils::SetFlexBufferMap(fbb, "Type", SerializeUtils::ShapeTypeToString(shape->type()));
+  SerializeUtils::SetFlexBufferMap(fbb, "Type", SerializeUtils::ShapeTypeToString(Types::Get(shape)));
   SerializeUtils::SetFlexBufferMap(fbb, "IsSimplePath", shape->isSimplePath());
   SerializeUtils::SetFlexBufferMap(fbb, "IsInverseFillType", shape->isInverseFillType());
 }

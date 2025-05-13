@@ -75,6 +75,5 @@ class ScalerContext {
   static std::shared_ptr<ScalerContext> CreateNew(std::shared_ptr<Typeface> typeface, float size);
 
   friend class Font;
-  friend class ScalerContextSerialization;
 };
 }  // namespace tgfx
