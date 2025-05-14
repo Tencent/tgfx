@@ -400,13 +400,13 @@ Rect Layer::getBounds(const Layer* targetCoordinateSpace, bool computeTightBound
   return getBoundsInternal(matrix, computeTightBounds);
 }
 
-Rect Layer::getBoundsInternal(const Matrix& relativeMatrix, bool computeTightBounds) {
+Rect Layer::getBoundsInternal(const Matrix& coordinateMatrix, bool computeTightBounds) {
   Rect bounds = {};
   if (auto content = getContent()) {
     if (computeTightBounds) {
-      bounds.join(content->getTightBounds(relativeMatrix));
+      bounds.join(content->getTightBounds(coordinateMatrix));
     } else {
-      bounds.join(content->getBounds(relativeMatrix));
+      bounds.join(coordinateMatrix.mapRect(content->getBounds()));
     }
   }
   for (const auto& child : _children) {
@@ -414,7 +414,7 @@ Rect Layer::getBoundsInternal(const Matrix& relativeMatrix, bool computeTightBou
       continue;
     }
     auto childMatrix = child->getMatrixWithScrollRect();
-    childMatrix.postConcat(relativeMatrix);
+    childMatrix.postConcat(coordinateMatrix);
     auto childBounds = child->getBoundsInternal(childMatrix, computeTightBounds);
     if (child->_scrollRect) {
       auto relatvieScrollRect = childMatrix.mapRect(*child->_scrollRect);
@@ -433,18 +433,18 @@ Rect Layer::getBoundsInternal(const Matrix& relativeMatrix, bool computeTightBou
     bounds.join(childBounds);
   }
 
-  auto contentScale = relativeMatrix.getMaxScale();
-  if (!_layerStyles.empty()) {
+  if (!_layerStyles.empty() || !_filters.empty()) {
+    auto contentScale = coordinateMatrix.getMaxScale();
     auto layerBounds = bounds;
     for (auto& layerStyle : _layerStyles) {
       auto styleBounds = layerStyle->filterBounds(layerBounds, contentScale);
       bounds.join(styleBounds);
     }
-  }
 
-  auto filter = getImageFilter(contentScale);
-  if (filter) {
-    bounds = filter->filterBounds(bounds);
+    auto filter = getImageFilter(contentScale);
+    if (filter) {
+      bounds = filter->filterBounds(bounds);
+    }
   }
 
   return bounds;
@@ -1037,7 +1037,7 @@ void Layer::updateRenderBounds(const Matrix& renderMatrix, const Rect* clipRect,
     return;
   }
   if (auto content = getContent()) {
-    renderBounds = content->getBounds(renderMatrix);
+    renderBounds = renderMatrix.mapRect(content->getBounds());
   } else {
     renderBounds = {};
   }

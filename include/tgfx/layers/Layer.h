@@ -544,7 +544,7 @@ class Layer {
 
   void invalidate();
 
-  Rect getBoundsInternal(const Matrix& matrix, bool computeTightBounds);
+  Rect getBoundsInternal(const Matrix& coordinateMatrix, bool computeTightBounds);
 
   void onAttachToRoot(Layer* owner);
 
