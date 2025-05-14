@@ -136,6 +136,10 @@ Rect CGScalerContext::getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic)
     bounds.outset(fauxBoldSize, fauxBoldSize);
   }
   bounds.roundOut();
+  // Expand the bounds by 1 pixel, to give CG room for anti-aliasing.
+  // Note that this outset is to allow room for LCD smoothed glyphs. However, the correct outset
+  // is not currently known, as CG dilates the outlines by some percentage.
+  // Note that if this context is A8 and not back-forming from LCD, there is no need to outset.
   bounds.outset(1.f, 1.f);
   return bounds;
 }
@@ -260,9 +264,10 @@ bool CGScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItal
   return true;
 }
 
-Rect CGScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
+Rect CGScalerContext::getImageTransform(const GlyphStyle& glyphStyle, Matrix* matrix) const {
   CGRect cgBounds;
-  CTFontGetBoundingRectsForGlyphs(ctFont, kCTFontOrientationHorizontal, &glyphID, &cgBounds, 1);
+  CTFontGetBoundingRectsForGlyphs(ctFont, kCTFontOrientationHorizontal, &glyphStyle.glyphID,
+                                  &cgBounds, 1);
   if (CGRectIsEmpty(cgBounds)) {
     return {};
   }
@@ -278,12 +283,13 @@ Rect CGScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
   return bounds;
 }
 
-bool CGScalerContext::readPixels(GlyphID glyphID, const ImageInfo& dstInfo, void* dstPixels) const {
+bool CGScalerContext::readPixels(const GlyphStyle& glyphStyle, const ImageInfo& dstInfo,
+                                 void* dstPixels) const {
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }
 
-  auto bounds = getImageTransform(glyphID, nullptr);
+  auto bounds = getImageTransform(glyphStyle, nullptr);
   auto width = static_cast<int>(bounds.width());
   auto height = static_cast<int>(bounds.height());
   if (width <= 0 || height <= 0) {
@@ -299,13 +305,13 @@ bool CGScalerContext::readPixels(GlyphID glyphID, const ImageInfo& dstInfo, void
   CGContextSetShouldAntialias(cgContext, true);
   CGContextSetShouldSmoothFonts(cgContext, true);
   auto point = CGPointMake(-bounds.left, bounds.bottom);
-  CTFontDrawGlyphs(ctFont, &glyphID, &point, 1, cgContext);
+  CTFontDrawGlyphs(ctFont, &glyphStyle.glyphID, &point, 1, cgContext);
   CGContextRelease(cgContext);
   return true;
 }
 
-bool CGScalerContext::canUseImage(const GlyphStyle& glyphStyle) {
-  return glyphStyle.stroke == nullptr && !glyphStyle.fauxBold;
+bool CGScalerContext::canUseImage(const GlyphStyle& glyphStyle) const {
+  return hasColor() || (glyphStyle.stroke == nullptr && !glyphStyle.fauxBold);
 }
 
 }  // namespace tgfx

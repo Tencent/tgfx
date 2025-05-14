@@ -52,7 +52,7 @@ class EmptyScalerContext : public ScalerContext {
     return false;
   }
 
-  bool canUseImage(const GlyphStyle& glyphStyle) const override {
+  bool canUseImage(const GlyphStyle&) const override {
     return false;
   }
 };

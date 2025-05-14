@@ -19,15 +19,17 @@
 #pragma once
 
 #include "core/GlyphDrawer.h"
+#include "tgfx/core/Path.h"
 
 namespace tgfx {
-class FTGlyphDrawer : public GlyphDrawer {
+class CGGlyphDrawer : public GlyphDrawer {
  public:
-  explicit FTGlyphDrawer(float resolutionScale, bool antiAlias, bool needsGammaCorrection)
+  explicit CGGlyphDrawer(float resolutionScale, bool antiAlias, bool needsGammaCorrection)
       : GlyphDrawer(resolutionScale, antiAlias, needsGammaCorrection) {
   }
 
  protected:
-  bool onFillPath(const Path& path, const ImageInfo& dstInfo, void* dstPixels) override;
+  bool onFillPath(const Path& path, const ImageInfo& dstInfo,
+                  void* dstPixels) override;
 };
 }  // namespace tgfx

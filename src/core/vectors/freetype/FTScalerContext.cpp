@@ -627,6 +627,6 @@ FTTypeface* FTScalerContext::ftTypeface() const {
   return static_cast<FTTypeface*>(typeface.get());
 }
 bool FTScalerContext::canUseImage(const GlyphStyle& glyphStyle) const {
-  return glyphStyle.stroke == nullptr && !glyphStyle.fauxBold;
+  return hasColor() || (glyphStyle.stroke == nullptr && !glyphStyle.fauxBold);
 }
 }  // namespace tgfx

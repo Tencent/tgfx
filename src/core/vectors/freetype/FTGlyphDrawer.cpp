@@ -86,8 +86,7 @@ std::shared_ptr<GlyphDrawer> GlyphDrawer::Make(const Matrix& matrix, bool antiAl
   return std::make_shared<FTGlyphDrawer>(matrix, antiAlias, needsGammaCorrection);
 }
 
-bool FTGlyphDrawer::onFillPath(const Path& path, const Matrix& mat, const ImageInfo& dstInfo,
-                               void* dstPixels) {
+bool FTGlyphDrawer::onFillPath(const Path& path, const ImageInfo& dstInfo, void* dstPixels) {
   if (dstPixels == nullptr) {
     return false;
   }
@@ -95,8 +94,7 @@ bool FTGlyphDrawer::onFillPath(const Path& path, const Matrix& mat, const ImageI
     return false;
   }
   auto finalPath = path;
-  auto totalMatrix = mat;
-  totalMatrix.postScale(1, -1);
+  auto totalMatrix = Matrix::MakeScale(1, -1);
   totalMatrix.postTranslate(0, static_cast<float>(dstInfo.height()));
   finalPath.transform(totalMatrix);
   if (finalPath.isInverseFillType()) {

@@ -19,7 +19,6 @@
 #include "GlyphImageCodec.h"
 #include "core/GlyphDrawer.h"
 #include "core/ScalerContext.h"
-#include "png.h"
 
 namespace tgfx {
 std::shared_ptr<GlyphImageCodec> GlyphImageCodec::MakeFrom(std::shared_ptr<GlyphFace> glyphFace,
@@ -28,30 +27,13 @@ std::shared_ptr<GlyphImageCodec> GlyphImageCodec::MakeFrom(std::shared_ptr<Glyph
   if (glyphFace == nullptr) {
     return nullptr;
   }
-
-  Rect glyphBounds;
-  if (glyphFace->hasColor()) {
-    Font font;
-    if (glyphFace->asFont(&font)) {
-      glyphBounds = font.scalerContext->getImageTransform({glyphID}, nullptr);
-    } else {
-      auto imageCodec = glyphFace->getImage(glyphID, nullptr, nullptr);
-      glyphBounds = Rect::MakeWH(imageCodec->width(), imageCodec->height());
-    }
-  } else {
-    glyphBounds = glyphFace->getBounds(glyphID);
-    if (stroke != nullptr) {
-      glyphBounds.scale(1.f / resolutionScale, 1.f / resolutionScale);
-      stroke->applyToBounds(&glyphBounds);
-      glyphBounds.scale(resolutionScale, resolutionScale);
-    }
-  }
+  Rect glyphBounds = GlyphDrawer::GetGlyphBounds(glyphFace.get(), glyphID, resolutionScale, stroke);
   if (glyphBounds.isEmpty()) {
     return nullptr;
   }
 
-  return std::shared_ptr<GlyphImageCodec>(
-      new GlyphImageCodec(std::move(glyphFace), glyphID, glyphBounds, stroke, resolutionScale));
+  return std::shared_ptr<GlyphImageCodec>(new GlyphImageCodec(
+      std::move(glyphFace), glyphID, glyphBounds, stroke, resolutionScale));
 }
 
 GlyphImageCodec::GlyphImageCodec(std::shared_ptr<GlyphFace> glyphFace, GlyphID glyphID,
@@ -67,15 +49,15 @@ GlyphImageCodec::GlyphImageCodec(std::shared_ptr<GlyphFace> glyphFace, GlyphID g
 }
 
 void GlyphImageCodec::calculateMatrix() {
-  bool useImage = glyphFace->hasColor();
-  if (!useImage) {
-    Font font;
-    if (glyphFace->asFont(&font)) {
-      GlyphStyle glyphStyle{glyphID, font.isFauxBold(), font.isFauxItalic(), stroke};
-      useImage = font.scalerContext->canUseImage(glyphStyle);
-    }
+  Font font;
+  bool canUseImage = false;
+  if (glyphFace->asFont(&font)) {
+    GlyphStyle glyphStyle{glyphID, font.isFauxBold(), font.isFauxItalic(), stroke};
+    canUseImage = font.scalerContext->canUseImage(glyphStyle);
+  } else {
+    canUseImage = glyphFace->hasColor();
   }
-  if (useImage) {
+  if (canUseImage) {
     imageCodec = glyphFace->getImage(glyphID, stroke, &matrix);
   }
   if (imageCodec == nullptr) {
@@ -91,31 +73,10 @@ bool GlyphImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) cons
   if (imageCodec != nullptr) {
     return imageCodec->readPixels(dstInfo, dstPixels);
   }
-
-  Path glyphPath;
-  if (!glyphFace->getPath(glyphID, &glyphPath)) {
-    return false;
-  }
-
-  if (glyphPath.isEmpty()) {
-    return false;
-  }
-
-  if (stroke != nullptr) {
-    auto scale = 1.0f / resolutionScale;
-    glyphPath.transform(Matrix::MakeScale(scale, scale));
-    stroke->applyToPath(&glyphPath);
-    scale = resolutionScale;
-    glyphPath.transform(Matrix::MakeScale(scale, scale));
-  }
-
-  glyphPath.transform(Matrix::MakeTrans(-bounds.x(), -bounds.y()));
-
-  auto glyphDrawer = GlyphDrawer::Make({}, true, true);
+  auto glyphDrawer = GlyphDrawer::Make(resolutionScale, true, true);
   if (glyphDrawer == nullptr) {
     return false;
   }
-
-  return glyphDrawer->fillPath(glyphPath, {}, dstInfo, dstPixels);
+  return glyphDrawer->fillGlyph(glyphFace.get(), glyphID, stroke, dstInfo, dstPixels);
 }
 }  // namespace tgfx

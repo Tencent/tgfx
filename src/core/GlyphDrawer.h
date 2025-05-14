@@ -26,33 +26,30 @@
 namespace tgfx {
 class GlyphDrawer {
  public:
-  static std::shared_ptr<GlyphDrawer> Make(const Matrix& matrix, bool antiAlias,
+  static std::shared_ptr<GlyphDrawer> Make(float resolutionScale, bool antiAlias,
                                            bool needsGammaCorrection);
+
+  static Rect GetGlyphBounds(const GlyphFace* glyphFace, GlyphID glyphID, float resolutionScale,
+                             const Stroke* stroke);
 
   virtual ~GlyphDrawer() = default;
 
   bool fillGlyph(const GlyphFace* glyphFace, GlyphID, const Stroke* stroke,
                  const ImageInfo& dstInfo, void* dstPixels);
 
-  bool fillPath(const Path& path, const Matrix& matrix, const ImageInfo& dstInfo, void* dstPixels);
-
-  bool fillText(const GlyphRunList* glyphRunList, const Stroke* stroke, const ImageInfo& dstInfo,
-                void* dstPixels);
+  bool fillPath(const Path& path, const ImageInfo& dstInfo, void* dstPixels);
 
  protected:
   static const std::array<uint8_t, 256>& GammaTable();
 
-  explicit GlyphDrawer(const Matrix& matrix, bool antiAlias, bool needsGammaCorrection);
+  explicit GlyphDrawer(float resolutionScale, bool antiAlias, bool needsGammaCorrection);
 
   virtual bool onFillGlyph(const GlyphFace* glyphFace, GlyphID glyphID, const Stroke* stroke,
-                           const ImageInfo& dstInfo, void* dstPixels) = 0;
+                           const Rect& glyphBounds, const ImageInfo& dstInfo, void* dstPixels);
 
-  virtual bool onFillPath(const Path& path, const Matrix& mat, const ImageInfo& dstInfo,
-                          void* dstPixels) = 0;
+  virtual bool onFillPath(const Path& path, const ImageInfo& dstInfo, void* dstPixels) = 0;
 
-  virtual bool onFillText(const GlyphRunList*, const Stroke*, const Matrix&, bool) = 0;
-
-  Matrix matrix;
+  float resolutionScale = 1.f;
   bool antiAlias = false;
   bool needsGammaCorrection = true;
 };

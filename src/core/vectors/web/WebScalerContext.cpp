@@ -20,7 +20,6 @@
 #include "WebTypeface.h"
 #include "core/utils/Log.h"
 #include "platform/web/WebImageBuffer.h"
-#include "tgfx/core/Buffer.h"
 
 using namespace emscripten;
 
@@ -67,8 +66,9 @@ bool WebScalerContext::generatePath(GlyphID, bool, bool, Path*) const {
   return false;
 }
 
-Rect WebScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
-  auto bounds = scalerContext.call<Rect>("getBounds", getText(glyphID), false, false);
+Rect WebScalerContext::getImageTransform(const GlyphStyle& glyphStyle, Matrix* matrix) const {
+  auto bounds = scalerContext.call<Rect>("getBounds", getText(glyphStyle.glyphID),
+                                         glyphStyle.fauxBold, glyphStyle.fauxItalic);
   if (bounds.isEmpty()) {
     return {};
   }
@@ -78,16 +78,18 @@ Rect WebScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const 
   return bounds;
 }
 
-bool WebScalerContext::readPixels(GlyphID glyphID, const ImageInfo& dstInfo,
+bool WebScalerContext::readPixels(const GlyphStyle& glyphStyle, const ImageInfo& dstInfo,
                                   void* dstPixels) const {
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }
-  auto bounds = scalerContext.call<Rect>("getBounds", getText(glyphID), false, false);
+  auto bounds = scalerContext.call<Rect>("getBounds", getText(glyphStyle.glyphID),
+                                         glyphStyle.fauxBold, glyphStyle.fauxItalic);
   if (bounds.isEmpty()) {
     return false;
   }
-  auto imageData = scalerContext.call<val>("readPixels", getText(glyphID), bounds);
+  auto imageData = scalerContext.call<val>("readPixels", getText(glyphStyle.glyphID), bounds,
+                                           glyphStyle.fauxBold, glyphStyle.fauxItalic);
   if (!imageData.as<bool>()) {
     return false;
   }
@@ -97,10 +99,28 @@ bool WebScalerContext::readPixels(GlyphID glyphID, const ImageInfo& dstInfo,
     return false;
   }
 
-  auto memory = val::module_property("HEAPU8")["buffer"];
-  auto memoryView =
-      val::global("Uint8Array").new_(memory, reinterpret_cast<uintptr_t>(dstPixels), length);
-  memoryView.call<void>("set", imageData);
+  if (dstInfo.isAlphaOnly()) {
+    auto buffer = new (std::nothrow) int8_t[length];
+    if (buffer == nullptr) {
+      return false;
+    }
+    auto memory = val::module_property("HEAPU8")["buffer"];
+    auto memoryView =
+        val::global("Uint8Array").new_(memory, reinterpret_cast<uintptr_t>(buffer), length);
+    memoryView.call<void>("set", imageData);
+
+    auto RGBAInfo = ImageInfo::Make(dstInfo.width(), dstInfo.height(), ColorType::RGBA_8888,
+                                    AlphaType::Premultiplied);
+    Pixmap RGBAMap(RGBAInfo, buffer);
+    RGBAMap.readPixels(dstInfo, dstPixels);
+    delete[] buffer;
+  } else {
+    auto memory = val::module_property("HEAPU8")["buffer"];
+    auto memoryView =
+        val::global("Uint8Array").new_(memory, reinterpret_cast<uintptr_t>(dstPixels), length);
+    memoryView.call<void>("set", imageData);
+  }
+
   return true;
 }
 

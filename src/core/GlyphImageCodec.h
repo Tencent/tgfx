@@ -50,7 +50,7 @@ class GlyphImageCodec : public ImageCodec {
 
   std::shared_ptr<GlyphFace> glyphFace = nullptr;
   GlyphID glyphID = 0;
-  mutable Matrix matrix = {};
+  Matrix matrix = {};
   Stroke* stroke = nullptr;
   float resolutionScale;
   Rect bounds = {};

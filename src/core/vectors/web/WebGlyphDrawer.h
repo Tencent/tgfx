@@ -21,13 +21,18 @@
 #include "core/GlyphDrawer.h"
 
 namespace tgfx {
-class FTGlyphDrawer : public GlyphDrawer {
+class WebGlyphDrawer : public GlyphDrawer {
  public:
-  explicit FTGlyphDrawer(float resolutionScale, bool antiAlias, bool needsGammaCorrection)
+  explicit WebGlyphDrawer(float resolutionScale, bool antiAlias, bool needsGammaCorrection)
       : GlyphDrawer(resolutionScale, antiAlias, needsGammaCorrection) {
   }
 
  protected:
-  bool onFillPath(const Path& path, const ImageInfo& dstInfo, void* dstPixels) override;
+  bool onFillGlyph(const GlyphFace* glyphFace, GlyphID glyphID, const Stroke* stroke,
+                   const Rect& glyphBounds, const ImageInfo& dstInfo, void* dstPixels) override;
+
+  bool onFillPath(const Path&, const ImageInfo&, void*) override {
+    return false;
+  }
 };
 }  // namespace tgfx

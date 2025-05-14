@@ -17,10 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/GlyphDrawer.h"
+#include "core/ScalerContext.h"
 
 namespace tgfx {
-GlyphDrawer::GlyphDrawer(const Matrix& matrix, bool antiAlias, bool needsGammaCorrection)
-    : matrix(matrix), antiAlias(antiAlias), needsGammaCorrection(needsGammaCorrection) {
+GlyphDrawer::GlyphDrawer(float resolutionScale, bool antiAlias, bool needsGammaCorrection)
+    : resolutionScale(resolutionScale), antiAlias(antiAlias),
+      needsGammaCorrection(needsGammaCorrection) {
 }
 
 static float LinearToSRGB(float linear) {
@@ -46,53 +48,77 @@ const std::array<uint8_t, 256>& GlyphDrawer::GammaTable() {
   return table;
 }
 
-bool GlyphDrawer::fillText(const GlyphRunList* glyphRunList, const Stroke* stroke,
-                           const ImageInfo& dstInfo, void* dstPixels) {
-  if (glyphRunList->hasColor()) {
-    return false;
-  }
-  if (onFillText(glyphRunList, stroke, matrix, antiAlias)) {
-    return true;
-  }
-  Path path = {};
-  if (!glyphRunList->getPath(&path, matrix.getMaxScale())) {
-    return false;
-  }
-  if (stroke) {
-    stroke->applyToPath(&path);
-  }
-  path.transform(matrix);
-  onFillPath(path, {}, dstInfo, dstPixels);
-  return true;
-}
-
 bool GlyphDrawer::fillGlyph(const GlyphFace* glyphFace, GlyphID glyphID, const Stroke* stroke,
                             const ImageInfo& dstInfo, void* dstPixels) {
   if (glyphFace == nullptr || glyphFace->hasColor() || dstPixels == nullptr) {
     return false;
   }
-  if (onFillGlyph(glyphFace, glyphID, stroke, dstInfo, dstPixels)) {
-    return true;
-  }
-
-  Path path = {};
-  if (!glyphFace->getPath(glyphID, &path)) {
+  auto bounds = GetGlyphBounds(glyphFace, glyphID, resolutionScale, stroke);
+  if (bounds.isEmpty()) {
     return false;
   }
-
-  if (stroke != nullptr) {
-    stroke->applyToPath(&path);
+  if (onFillGlyph(glyphFace, glyphID, stroke, bounds, dstInfo, dstPixels)) {
+    return true;
   }
-  path.transform(matrix);
-  return onFillPath(path, {}, dstInfo, dstPixels);
+  Path glyphPath = {};
+  if (!glyphFace->getPath(glyphID, &glyphPath)) {
+    return false;
+  }
+  if (glyphPath.isEmpty()) {
+    return false;
+  }
+  if (stroke != nullptr) {
+    auto scale = 1.0f / resolutionScale;
+    glyphPath.transform(Matrix::MakeScale(scale, scale));
+    stroke->applyToPath(&glyphPath);
+    scale = resolutionScale;
+    glyphPath.transform(Matrix::MakeScale(scale, scale));
+  }
+  glyphPath.transform(Matrix::MakeTrans(-bounds.x(), -bounds.y()));
+  return onFillPath(glyphPath, dstInfo, dstPixels);
 }
 
-bool GlyphDrawer::fillPath(const Path& path, const Matrix& mat, const ImageInfo& dstInfo,
-                           void* dstPixels) {
+bool GlyphDrawer::fillPath(const Path& path, const ImageInfo& dstInfo, void* dstPixels) {
   if (dstPixels == nullptr || path.isEmpty()) {
     return false;
   }
-  return onFillPath(path, mat, dstInfo, dstPixels);
+  return onFillPath(path, dstInfo, dstPixels);
+}
+
+Rect GlyphDrawer::GetGlyphBounds(const GlyphFace* glyphFace, GlyphID glyphID, float resolutionScale,
+                                 const Stroke* stroke) {
+  Rect bounds = {};
+  if (glyphFace == nullptr) {
+    return bounds;
+  }
+  Font font;
+  bool canUseImage = false;
+  if (glyphFace->asFont(&font)) {
+    GlyphStyle glyphStyle{glyphID, font.isFauxBold(), font.isFauxItalic(), stroke};
+    canUseImage = font.scalerContext->canUseImage(glyphStyle);
+    if (canUseImage) {
+      bounds = font.scalerContext->getImageTransform(glyphStyle, nullptr);
+    } else {
+      bounds = font.getBounds(glyphID);
+    }
+  } else {
+    canUseImage = glyphFace->hasColor();
+    auto imageCodec = glyphFace->getImage(glyphID, nullptr, nullptr);
+    bounds = Rect::MakeWH(imageCodec->width(), imageCodec->height());
+  }
+  if (bounds.isEmpty()) {
+    return bounds;
+  }
+  if (!glyphFace->hasColor() && stroke != nullptr) {
+    bounds.scale(1.f / resolutionScale, 1.f / resolutionScale);
+    stroke->applyToBounds(&bounds);
+    bounds.scale(resolutionScale, resolutionScale);
+  }
+  return bounds;
+}
+bool GlyphDrawer::onFillGlyph(const GlyphFace*, GlyphID, const Stroke*, const Rect&,
+                              const ImageInfo&, void*) {
+  return false;
 }
 
 }  //namespace tgfx

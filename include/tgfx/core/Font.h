@@ -172,5 +172,6 @@ class Font {
   bool fauxItalic = false;
 
   friend class GlyphImageCodec;
+  friend class GlyphDrawer;
 };
 }  // namespace tgfx
