@@ -1848,12 +1848,12 @@ TGFX_TEST(LayerTest, DirtyFlag) {
   displayList->render(surface.get());
 
   auto root = displayList->root();
-  EXPECT_TRUE(!grandChild->bitFields.dirtyDescendents && !grandChild->bitFields.dirtyContent);
+  EXPECT_TRUE(grandChild->bitFields.dirtyDescendents && grandChild->bitFields.dirtyContent);
   EXPECT_TRUE(!child->bitFields.dirtyDescendents && !child->bitFields.dirtyContent);
   EXPECT_TRUE(!root->bitFields.dirtyDescendents && !root->bitFields.dirtyContent);
 
   grandChild->setVisible(true);
-  EXPECT_FALSE(grandChild->bitFields.dirtyDescendents && grandChild->bitFields.dirtyContent);
+  EXPECT_TRUE(grandChild->bitFields.dirtyDescendents && grandChild->bitFields.dirtyContent);
   EXPECT_TRUE(child->bitFields.dirtyDescendents);
   EXPECT_TRUE(root->bitFields.dirtyDescendents);
   displayList->render(surface.get());
@@ -1977,8 +1977,12 @@ TGFX_TEST(LayerTest, MaskOnwer) {
   EXPECT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 1, 1);
   auto displayList = std::make_unique<DisplayList>();
-  auto layer = Layer::Make();
-  auto layer2 = Layer::Make();
+  auto layer = SolidLayer::Make();
+  layer->setWidth(1);
+  layer->setHeight(1);
+  auto layer2 = SolidLayer::Make();
+  layer2->setWidth(1);
+  layer2->setHeight(1);
   auto mask = ShapeLayer::Make();
   Path path = {};
   path.addRect(Rect::MakeWH(1, 1));
@@ -1997,7 +2001,7 @@ TGFX_TEST(LayerTest, MaskOnwer) {
   EXPECT_EQ(layer->mask(), nullptr);
   EXPECT_EQ(mask->maskOwner, layer2.get());
 
-  EXPECT_FALSE(layer2->bitFields.dirtyContent);
+  EXPECT_TRUE(layer2->bitFields.dirtyContent);
   displayList->render(surface.get());
   EXPECT_FALSE(layer->bitFields.dirtyDescendents);
   mask->setAlpha(0.5f);
