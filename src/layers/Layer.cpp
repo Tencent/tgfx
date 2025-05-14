@@ -396,52 +396,55 @@ bool Layer::replaceChild(std::shared_ptr<Layer> oldChild, std::shared_ptr<Layer>
 }
 
 Rect Layer::getBounds(const Layer* targetCoordinateSpace, bool computeTightBounds) {
+  auto matrix = getRelativeMatrix(targetCoordinateSpace);
+  return getBoundsInternal(matrix, computeTightBounds);
+}
+
+Rect Layer::getBoundsInternal(const Matrix& coordinateMatrix, bool computeTightBounds) {
   Rect bounds = {};
   if (auto content = getContent()) {
     if (computeTightBounds) {
-      bounds.join(content->getTightBounds());
+      bounds.join(content->getTightBounds(coordinateMatrix));
     } else {
-      bounds.join(content->getBounds());
+      bounds.join(coordinateMatrix.mapRect(content->getBounds()));
     }
   }
   for (const auto& child : _children) {
     if (!child->visible() || child->maskOwner) {
       continue;
     }
-    auto childBounds = child->getBounds(nullptr, computeTightBounds);
+    auto childMatrix = child->getMatrixWithScrollRect();
+    childMatrix.postConcat(coordinateMatrix);
+    auto childBounds = child->getBoundsInternal(childMatrix, computeTightBounds);
     if (child->_scrollRect) {
-      if (!childBounds.intersect(*child->_scrollRect)) {
+      auto relatvieScrollRect = childMatrix.mapRect(*child->_scrollRect);
+      if (!childBounds.intersect(relatvieScrollRect)) {
         continue;
       }
     }
     if (child->hasValidMask()) {
-      auto relativeMatrix = child->_mask->getRelativeMatrix(child.get());
-      auto maskBounds = child->_mask->getBounds(nullptr, computeTightBounds);
-      auto maskBoundsToCurrentLayer = relativeMatrix.mapRect(maskBounds);
-      if (!childBounds.intersect(maskBoundsToCurrentLayer)) {
+      auto maskRelativeMatrix = child->_mask->getRelativeMatrix(child.get());
+      maskRelativeMatrix.postConcat(childMatrix);
+      auto maskBounds = child->_mask->getBoundsInternal(maskRelativeMatrix, computeTightBounds);
+      if (!childBounds.intersect(maskBounds)) {
         continue;
       }
     }
-    child->getMatrixWithScrollRect().mapRect(&childBounds);
     bounds.join(childBounds);
   }
 
-  if (!_layerStyles.empty()) {
+  if (!_layerStyles.empty() || !_filters.empty()) {
+    auto contentScale = coordinateMatrix.getMaxScale();
     auto layerBounds = bounds;
     for (auto& layerStyle : _layerStyles) {
-      auto styleBounds = layerStyle->filterBounds(layerBounds, 1.0f);
+      auto styleBounds = layerStyle->filterBounds(layerBounds, contentScale);
       bounds.join(styleBounds);
     }
-  }
 
-  auto filter = getImageFilter(1.0f);
-  if (filter) {
-    bounds = filter->filterBounds(bounds);
-  }
-
-  if (targetCoordinateSpace && targetCoordinateSpace != this) {
-    auto relativeMatrix = getRelativeMatrix(targetCoordinateSpace);
-    relativeMatrix.mapRect(&bounds);
+    auto filter = getImageFilter(contentScale);
+    if (filter) {
+      bounds = filter->filterBounds(bounds);
+    }
   }
 
   return bounds;
