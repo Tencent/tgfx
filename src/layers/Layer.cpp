@@ -712,7 +712,8 @@ std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float con
 void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
   DEBUG_ASSERT(canvas != nullptr);
   if (args.renderRect && !args.renderRect->intersects(renderBounds)) {
-    cleanDirtyFlags();
+    bitFields.dirtyTransform = false;
+    bitFields.dirtyBackground = false;
     return;
   }
   if (auto rasterizedCache = getRasterizedCache(args)) {
@@ -831,7 +832,8 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, Laye
         child->bitFields.dirtyBackground || child->bitFields.dirtyTransform;
     if (!child->visible() || child->_alpha <= 0) {
       if (args.cleanDirtyFlags) {
-        child->cleanDirtyFlags();
+        child->bitFields.dirtyTransform = false;
+        child->bitFields.dirtyBackground = false;
       }
       continue;
     }
@@ -1074,17 +1076,6 @@ void Layer::updateRenderBounds(const Matrix& renderMatrix, const Rect* clipRect,
   if (clipRect && !renderBounds.intersect(*clipRect)) {
     renderBounds = {};
   }
-}
-
-void Layer::cleanDirtyFlags() {
-  if (bitFields.dirtyDescendents) {
-    for (auto& child : _children) {
-      child->cleanDirtyFlags();
-    }
-  }
-  bitFields.dirtyTransform = false;
-  bitFields.dirtyDescendents = false;
-  bitFields.dirtyContent = false;
 }
 
 }  // namespace tgfx

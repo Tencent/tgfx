@@ -593,8 +593,6 @@ class Layer {
   void updateRenderBounds(const Matrix& renderMatrix, const Rect* clipRect = nullptr,
                           bool forceDirty = false);
 
-  void cleanDirtyFlags();
-
   struct {
     bool dirtyContent : 1;      // layer's content needs updating
     bool dirtyDescendents : 1;  // a descendant layer needs redrawing
