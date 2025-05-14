@@ -32,8 +32,8 @@ std::shared_ptr<GlyphImageCodec> GlyphImageCodec::MakeFrom(std::shared_ptr<Glyph
     return nullptr;
   }
 
-  return std::shared_ptr<GlyphImageCodec>(new GlyphImageCodec(
-      std::move(glyphFace), glyphID, glyphBounds, stroke, resolutionScale));
+  return std::shared_ptr<GlyphImageCodec>(
+      new GlyphImageCodec(std::move(glyphFace), glyphID, glyphBounds, stroke, resolutionScale));
 }
 
 GlyphImageCodec::GlyphImageCodec(std::shared_ptr<GlyphFace> glyphFace, GlyphID glyphID,

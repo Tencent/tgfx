@@ -29,7 +29,6 @@ class CGGlyphDrawer : public GlyphDrawer {
   }
 
  protected:
-  bool onFillPath(const Path& path, const ImageInfo& dstInfo,
-                  void* dstPixels) override;
+  bool onFillPath(const Path& path, const ImageInfo& dstInfo, void* dstPixels) override;
 };
 }  // namespace tgfx

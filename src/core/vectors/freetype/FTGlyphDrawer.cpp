@@ -81,9 +81,9 @@ static void SpanFunc(int y, int count, const FT_Span* spans, void* user) {
   }
 }
 
-std::shared_ptr<GlyphDrawer> GlyphDrawer::Make(const Matrix& matrix, bool antiAlias,
+std::shared_ptr<GlyphDrawer> GlyphDrawer::Make(float resolutionScale, bool antiAlias,
                                                bool needsGammaCorrection) {
-  return std::make_shared<FTGlyphDrawer>(matrix, antiAlias, needsGammaCorrection);
+  return std::make_shared<FTGlyphDrawer>(resolutionScale, antiAlias, needsGammaCorrection);
 }
 
 bool FTGlyphDrawer::onFillPath(const Path& path, const ImageInfo& dstInfo, void* dstPixels) {
