@@ -1848,12 +1848,12 @@ TGFX_TEST(LayerTest, DirtyFlag) {
   displayList->render(surface.get());
 
   auto root = displayList->root();
-  EXPECT_TRUE(!grandChild->bitFields.dirtyDescendents && !grandChild->bitFields.dirtyContent);
+  EXPECT_TRUE(!grandChild->bitFields.dirtyDescendents && grandChild->bitFields.dirtyContent);
   EXPECT_TRUE(!child->bitFields.dirtyDescendents && !child->bitFields.dirtyContent);
   EXPECT_TRUE(!root->bitFields.dirtyDescendents && !root->bitFields.dirtyContent);
 
   grandChild->setVisible(true);
-  EXPECT_FALSE(grandChild->bitFields.dirtyDescendents && grandChild->bitFields.dirtyContent);
+  EXPECT_TRUE(!grandChild->bitFields.dirtyDescendents && grandChild->bitFields.dirtyContent);
   EXPECT_TRUE(child->bitFields.dirtyDescendents);
   EXPECT_TRUE(root->bitFields.dirtyDescendents);
   displayList->render(surface.get());

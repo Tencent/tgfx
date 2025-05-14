@@ -1084,7 +1084,8 @@ void Layer::cleanDirtyFlags() {
   }
   bitFields.dirtyTransform = false;
   bitFields.dirtyDescendents = false;
-  bitFields.dirtyContent = false;
+  // should not clean dirtyContent here, dirtyContent is used to determine if the content
+  // needs to be updated.
 }
 
 }  // namespace tgfx
