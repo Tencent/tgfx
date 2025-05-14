@@ -31,9 +31,11 @@ class TextContent : public LayerContent {
 
   Rect getTightBounds(const Matrix& matrix) const override {
     Path textPath = {};
-    textBlob->getPath(&textPath);
-    textPath.transform(matrix);
-    return textPath.getBounds();
+    if (textBlob->getPath(&textPath)) {
+      textPath.transform(matrix);
+      return textPath.getBounds();
+    }
+    return bounds;
   }
 
   void draw(Canvas* canvas, const Paint& paint) const override;

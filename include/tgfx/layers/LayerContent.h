@@ -40,7 +40,14 @@ class LayerContent {
   virtual Rect getBounds() const = 0;
 
   /**
-   * Returns the tight bounds of the content.
+   * Returns the bounds of the content mapped by Matrix.
+   */
+  virtual Rect getBounds(const Matrix& matrix) const {
+    return matrix.mapRect(getBounds());
+  }
+
+  /**
+   * Returns the tight bounds of the content mapped by Matrix.
    */
   virtual Rect getTightBounds(const Matrix& matrix) const {
     return matrix.mapRect(getBounds());

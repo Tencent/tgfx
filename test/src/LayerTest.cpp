@@ -674,7 +674,7 @@ TGFX_TEST(LayerTest, FilterTest) {
   displayList->root()->addChild(layer);
   displayList->render(surface.get());
   auto bounds = displayList->root()->getBounds();
-  EXPECT_EQ(Rect::MakeLTRB(53.f, 53.f, 1739.f, 2243.f), bounds);
+  EXPECT_EQ(Rect::MakeLTRB(131.f, 131.f, 1721.f, 2225.f), bounds);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/filterTest"));
 }
 
@@ -696,7 +696,7 @@ TGFX_TEST(LayerTest, filterClip) {
   displayList->root()->addChild(layer);
   displayList->render(surface.get());
   auto bounds = displayList->root()->getBounds();
-  EXPECT_EQ(Rect::MakeLTRB(40.f, 40.f, 1562.f, 2066.f), bounds);
+  EXPECT_EQ(Rect::MakeLTRB(45.f, 45.f, 1562.f, 2066.f), bounds);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/filterClip"));
 }
 

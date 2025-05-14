@@ -38,6 +38,14 @@ Rect ComposeContent::getBounds() const {
   return bounds;
 }
 
+Rect ComposeContent::getBounds(const Matrix& matrix) const {
+  Rect bounds = {};
+  for (const auto& content : contents) {
+    bounds.join(content->getBounds(matrix));
+  }
+  return bounds;
+}
+
 Rect ComposeContent::getTightBounds(const Matrix& matrix) const {
   Rect bounds = {};
   for (const auto& content : contents) {

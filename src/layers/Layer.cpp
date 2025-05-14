@@ -406,14 +406,14 @@ Rect Layer::getBoundsInternal(const Matrix& relativeMatrix, bool computeTightBou
     if (computeTightBounds) {
       bounds.join(content->getTightBounds(relativeMatrix));
     } else {
-      bounds.join(relativeMatrix.mapRect(content->getBounds()));
+      bounds.join(content->getBounds(relativeMatrix));
     }
   }
   for (const auto& child : _children) {
     if (!child->visible() || child->maskOwner) {
       continue;
     }
-    Matrix childMatrix = child->getMatrixWithScrollRect();
+    auto childMatrix = child->getMatrixWithScrollRect();
     childMatrix.postConcat(relativeMatrix);
     auto childBounds = child->getBoundsInternal(childMatrix, computeTightBounds);
     if (child->_scrollRect) {
@@ -433,16 +433,16 @@ Rect Layer::getBoundsInternal(const Matrix& relativeMatrix, bool computeTightBou
     bounds.join(childBounds);
   }
 
+  auto contentScale = relativeMatrix.getMaxScale();
   if (!_layerStyles.empty()) {
     auto layerBounds = bounds;
     for (auto& layerStyle : _layerStyles) {
-      auto styleBounds = layerStyle->filterBounds(layerBounds, 1.0f);
-      styleBounds = relativeMatrix.mapRect(styleBounds);
+      auto styleBounds = layerStyle->filterBounds(layerBounds, contentScale);
       bounds.join(styleBounds);
     }
   }
 
-  auto filter = getImageFilter(1.0f);
+  auto filter = getImageFilter(contentScale);
   if (filter) {
     bounds = filter->filterBounds(bounds);
   }
@@ -1037,7 +1037,7 @@ void Layer::updateRenderBounds(const Matrix& renderMatrix, const Rect* clipRect,
     return;
   }
   if (auto content = getContent()) {
-    renderBounds = renderMatrix.mapRect(content->getBounds());
+    renderBounds = content->getBounds(renderMatrix);
   } else {
     renderBounds = {};
   }
