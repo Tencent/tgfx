@@ -30,6 +30,7 @@ class MatrixColorFilter : public ColorFilter {
   }
 
   std::array<float, 20> matrix;
+  bool alphaIsUnchanged;
 
  protected:
   Type type() const override {
@@ -39,8 +40,6 @@ class MatrixColorFilter : public ColorFilter {
   bool isEqual(const ColorFilter* colorFilter) const override;
 
  private:
-  bool alphaIsUnchanged;
-
   PlacementPtr<FragmentProcessor> asFragmentProcessor(Context* context) const override;
 };
 }  // namespace tgfx

@@ -33,6 +33,10 @@ class InnerShadowStyle : public LayerStyle {
   static std::shared_ptr<InnerShadowStyle> Make(float offsetX, float offsetY, float blurrinessX,
                                                 float blurrinessY, const Color& color);
 
+  LayerStyleType Type() const override {
+    return LayerStyleType::InnerShadow;
+  }
+
   /**
    * The x offset of the shadow.
    */

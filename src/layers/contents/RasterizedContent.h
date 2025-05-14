@@ -48,6 +48,11 @@ class RasterizedContent : public LayerContent {
     return matrix;
   }
 
+ protected:
+  Type type() const override {
+    return Type::RasterizedContent;
+  }
+
  private:
   uint32_t _contextID = 0;
   std::shared_ptr<Image> image = nullptr;

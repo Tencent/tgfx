@@ -19,6 +19,8 @@
 #pragma once
 
 #include <tgfx/layers/LayerContent.h>
+#include <tgfx/layers/ShapeStyle.h>
+#include <tgfx/layers/filters/LayerFilter.h>
 #include "core/utils/Log.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/ImageFilter.h"
@@ -33,6 +35,10 @@ class Types {
   using ColorFilterType = ColorFilter::Type;
   using ImageType = Image::Type;
   using MaskFilterType = MaskFilter::Type;
+  using ShapeType = Shape::Type;
+  using LayerContentType = LayerContent::Type;
+  using ShapeStyleType = ShapeStyle::Type;
+  using LayerFilterType = LayerFilter::Type;
 
   static ShaderType Get(const Shader* shader) {
     DEBUG_ASSERT(shader != nullptr);
@@ -57,6 +63,26 @@ class Types {
   static MaskFilterType Get(const MaskFilter* maskFilter) {
     DEBUG_ASSERT(maskFilter != nullptr)
     return maskFilter->type();
+  }
+
+  static ShapeType Get(const Shape* shape) {
+    DEBUG_ASSERT(shape != nullptr)
+    return shape->type();
+  }
+
+  static LayerContentType Get(const LayerContent* layerContent) {
+    DEBUG_ASSERT(layerContent != nullptr)
+    return layerContent->type();
+  }
+
+  static ShapeStyleType Get(const ShapeStyle* shapeStyle) {
+    DEBUG_ASSERT(shapeStyle != nullptr)
+    return shapeStyle->getType();
+  }
+
+  static LayerFilterType Get(const LayerFilter* layerFilter) {
+    DEBUG_ASSERT(layerFilter != nullptr)
+    return layerFilter->type();
   }
 };
 }  // namespace tgfx
