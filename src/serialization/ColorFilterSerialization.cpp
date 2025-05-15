@@ -95,7 +95,9 @@ void ColorFilterSerialization::SerializeMatrixColorFilterImpl(flexbuffers::Build
 
   auto matrixID = SerializeUtils::GetObjID();
   auto matrix = matrixColorFilter->matrix;
-  SerializeUtils::SetFlexBufferMap(fbb, "matrix", 20, false, true, matrixID);
+  auto matrixSize = matrix.size();
+  SerializeUtils::SetFlexBufferMap(fbb, "matrix", static_cast<uint32_t>(matrixSize), false, true,
+                                   matrixID);
   SerializeUtils::FillMap(matrix, matrixID, map);
 
   SerializeUtils::SetFlexBufferMap(fbb, "alphaIsUnchanged", matrixColorFilter->alphaIsUnchanged);
