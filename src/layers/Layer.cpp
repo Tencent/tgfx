@@ -396,52 +396,55 @@ bool Layer::replaceChild(std::shared_ptr<Layer> oldChild, std::shared_ptr<Layer>
 }
 
 Rect Layer::getBounds(const Layer* targetCoordinateSpace, bool computeTightBounds) {
+  auto matrix = getRelativeMatrix(targetCoordinateSpace);
+  return getBoundsInternal(matrix, computeTightBounds);
+}
+
+Rect Layer::getBoundsInternal(const Matrix& coordinateMatrix, bool computeTightBounds) {
   Rect bounds = {};
   if (auto content = getContent()) {
     if (computeTightBounds) {
-      bounds.join(content->getTightBounds());
+      bounds.join(content->getTightBounds(coordinateMatrix));
     } else {
-      bounds.join(content->getBounds());
+      bounds.join(coordinateMatrix.mapRect(content->getBounds()));
     }
   }
   for (const auto& child : _children) {
     if (!child->visible() || child->maskOwner) {
       continue;
     }
-    auto childBounds = child->getBounds(nullptr, computeTightBounds);
+    auto childMatrix = child->getMatrixWithScrollRect();
+    childMatrix.postConcat(coordinateMatrix);
+    auto childBounds = child->getBoundsInternal(childMatrix, computeTightBounds);
     if (child->_scrollRect) {
-      if (!childBounds.intersect(*child->_scrollRect)) {
+      auto relatvieScrollRect = childMatrix.mapRect(*child->_scrollRect);
+      if (!childBounds.intersect(relatvieScrollRect)) {
         continue;
       }
     }
     if (child->hasValidMask()) {
-      auto relativeMatrix = child->_mask->getRelativeMatrix(child.get());
-      auto maskBounds = child->_mask->getBounds(nullptr, computeTightBounds);
-      auto maskBoundsToCurrentLayer = relativeMatrix.mapRect(maskBounds);
-      if (!childBounds.intersect(maskBoundsToCurrentLayer)) {
+      auto maskRelativeMatrix = child->_mask->getRelativeMatrix(child.get());
+      maskRelativeMatrix.postConcat(childMatrix);
+      auto maskBounds = child->_mask->getBoundsInternal(maskRelativeMatrix, computeTightBounds);
+      if (!childBounds.intersect(maskBounds)) {
         continue;
       }
     }
-    child->getMatrixWithScrollRect().mapRect(&childBounds);
     bounds.join(childBounds);
   }
 
-  if (!_layerStyles.empty()) {
+  if (!_layerStyles.empty() || !_filters.empty()) {
+    auto contentScale = coordinateMatrix.getMaxScale();
     auto layerBounds = bounds;
     for (auto& layerStyle : _layerStyles) {
-      auto styleBounds = layerStyle->filterBounds(layerBounds, 1.0f);
+      auto styleBounds = layerStyle->filterBounds(layerBounds, contentScale);
       bounds.join(styleBounds);
     }
-  }
 
-  auto filter = getImageFilter(1.0f);
-  if (filter) {
-    bounds = filter->filterBounds(bounds);
-  }
-
-  if (targetCoordinateSpace && targetCoordinateSpace != this) {
-    auto relativeMatrix = getRelativeMatrix(targetCoordinateSpace);
-    relativeMatrix.mapRect(&bounds);
+    auto filter = getImageFilter(contentScale);
+    if (filter) {
+      bounds = filter->filterBounds(bounds);
+    }
   }
 
   return bounds;
@@ -712,7 +715,8 @@ std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float con
 void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
   DEBUG_ASSERT(canvas != nullptr);
   if (args.renderRect && !args.renderRect->intersects(renderBounds)) {
-    cleanDirtyFlags();
+    bitFields.dirtyTransform = false;
+    bitFields.dirtyBackground = false;
     return;
   }
   if (auto rasterizedCache = getRasterizedCache(args)) {
@@ -831,7 +835,8 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, Laye
         child->bitFields.dirtyBackground || child->bitFields.dirtyTransform;
     if (!child->visible() || child->_alpha <= 0) {
       if (args.cleanDirtyFlags) {
-        child->cleanDirtyFlags();
+        child->bitFields.dirtyTransform = false;
+        child->bitFields.dirtyBackground = false;
       }
       continue;
     }
@@ -1074,17 +1079,6 @@ void Layer::updateRenderBounds(const Matrix& renderMatrix, const Rect* clipRect,
   if (clipRect && !renderBounds.intersect(*clipRect)) {
     renderBounds = {};
   }
-}
-
-void Layer::cleanDirtyFlags() {
-  if (bitFields.dirtyDescendents) {
-    for (auto& child : _children) {
-      child->cleanDirtyFlags();
-    }
-  }
-  bitFields.dirtyTransform = false;
-  bitFields.dirtyDescendents = false;
-  bitFields.dirtyContent = false;
 }
 
 }  // namespace tgfx

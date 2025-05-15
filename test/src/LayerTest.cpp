@@ -373,15 +373,49 @@ TGFX_TEST(LayerTest, getTightBounds) {
   rectShape->setLineWidth(10);
   rectShape->setStrokeAlign(StrokeAlign::Outside);
   root->addChild(rectShape);
-  auto bounds = root->getBounds(nullptr, true);
+  auto bounds = rectShape->getBounds(root.get(), true);
   EXPECT_FLOAT_EQ(bounds.height(), 120);
+
+  auto lineShape = ShapeLayer::Make();
+  Path linePath = {};
+  linePath.moveTo(0, 0);
+  linePath.lineTo(100, 0);
+  linePath.lineTo(50, 20);
+  linePath.lineTo(20, -20);
+  lineShape->setPath(linePath);
+  lineShape->setStrokeStyle(SolidColor::Make(Color::Red()));
+  auto matrix = Matrix::MakeRotate(50);
+  matrix.postConcat(Matrix::MakeTrans(150, 20));
+  lineShape->setMatrix(matrix);
+
+  auto lineShapeChild = ShapeLayer::Make();
+  Path linePath2 = {};
+  linePath2.moveTo(0, 0);
+  linePath2.lineTo(100, 0);
+  linePath2.lineTo(50, 20);
+  linePath2.lineTo(20, -20);
+  lineShapeChild->setPath(linePath2);
+  lineShapeChild->setStrokeStyle(SolidColor::Make(Color::Red()));
+  matrix = Matrix::MakeTrans(100, 20);
+  lineShapeChild->setMatrix(matrix);
+  lineShape->addChild(lineShapeChild);
+
+  root->addChild(lineShape);
+  bounds = lineShape->getBounds(root.get(), true);
+  EXPECT_FLOAT_EQ(bounds.width(), 114.002686f);
+  EXPECT_FLOAT_EQ(bounds.height(), 166.826691f);
+
+  auto lineBoundsShape = ShapeLayer::Make();
+  Path lineBoundsRect = {};
+  lineBoundsRect.addRect(bounds);
+  lineBoundsShape->setPath(lineBoundsRect);
+  lineBoundsShape->setStrokeStyle(SolidColor::Make(Color::Green()));
+  root->addChild(lineBoundsShape);
 
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto width = static_cast<int>(bounds.width());
-  auto height = static_cast<int>(bounds.height());
-  auto surface = Surface::Make(context, width, height);
+  auto surface = Surface::Make(context, 350, 250);
   auto displayList = std::make_unique<DisplayList>();
   displayList->root()->addChild(root);
   displayList->render(surface.get());
@@ -390,7 +424,7 @@ TGFX_TEST(LayerTest, getTightBounds) {
 
 TGFX_TEST(LayerTest, getbounds) {
   auto root = Layer::Make();
-  root->setMatrix(Matrix::MakeTrans(30, 30));
+  root->setMatrix(Matrix::MakeTrans(10, 10));
 
   auto child = TextLayer::Make();
   child->setMatrix(Matrix::MakeRotate(20));
@@ -429,15 +463,15 @@ TGFX_TEST(LayerTest, getbounds) {
   EXPECT_FLOAT_EQ(bounds.right, 94.183533f);
   EXPECT_FLOAT_EQ(bounds.bottom, 62.044159f);
   bounds = child->getBounds(root.get());
-  EXPECT_FLOAT_EQ(bounds.left, -20.280657f);
-  EXPECT_FLOAT_EQ(bounds.top, -20.787683f);
-  EXPECT_FLOAT_EQ(bounds.right, 96.194153f);
-  EXPECT_FLOAT_EQ(bounds.bottom, 90.515099f);
+  EXPECT_FLOAT_EQ(bounds.left, -8.96520996f);
+  EXPECT_FLOAT_EQ(bounds.top, -4.63719559f);
+  EXPECT_FLOAT_EQ(bounds.right, 83.0033798f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 77.3243255f);
   bounds = child->getBounds(cousin.get());
-  EXPECT_FLOAT_EQ(bounds.left, -30.280657f);
-  EXPECT_FLOAT_EQ(bounds.top, -30.787683f);
-  EXPECT_FLOAT_EQ(bounds.right, 86.194153f);
-  EXPECT_FLOAT_EQ(bounds.bottom, 80.515099f);
+  EXPECT_FLOAT_EQ(bounds.left, -18.96521f);
+  EXPECT_FLOAT_EQ(bounds.top, -14.6371956f);
+  EXPECT_FLOAT_EQ(bounds.right, 73.0033798f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 67.3243255f);
 
   auto displayList = std::make_unique<DisplayList>();
   displayList->root()->addChild(root);
@@ -447,15 +481,15 @@ TGFX_TEST(LayerTest, getbounds) {
   EXPECT_FLOAT_EQ(bounds.right, 94.183533f);
   EXPECT_FLOAT_EQ(bounds.bottom, 62.044159f);
   bounds = child->getBounds(root.get());
-  EXPECT_FLOAT_EQ(bounds.left, -20.280657f);
-  EXPECT_FLOAT_EQ(bounds.top, -20.787683f);
-  EXPECT_FLOAT_EQ(bounds.right, 96.194153f);
-  EXPECT_FLOAT_EQ(bounds.bottom, 90.515099f);
+  EXPECT_FLOAT_EQ(bounds.left, -8.96520996f);
+  EXPECT_FLOAT_EQ(bounds.top, -4.63719559f);
+  EXPECT_FLOAT_EQ(bounds.right, 83.0033798f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 77.3243255f);
   bounds = child->getBounds(cousin.get());
-  EXPECT_FLOAT_EQ(bounds.left, -30.280657f);
-  EXPECT_FLOAT_EQ(bounds.top, -30.787683f);
-  EXPECT_FLOAT_EQ(bounds.right, 86.194153f);
-  EXPECT_FLOAT_EQ(bounds.bottom, 80.515099f);
+  EXPECT_FLOAT_EQ(bounds.left, -18.96521f);
+  EXPECT_FLOAT_EQ(bounds.top, -14.6371956f);
+  EXPECT_FLOAT_EQ(bounds.right, 73.0033798f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 67.3243255f);
 
   ContextScope scope;
   auto context = scope.getContext();
@@ -640,7 +674,7 @@ TGFX_TEST(LayerTest, FilterTest) {
   displayList->root()->addChild(layer);
   displayList->render(surface.get());
   auto bounds = displayList->root()->getBounds();
-  EXPECT_EQ(Rect::MakeLTRB(126.5f, 126.5f, 1725.5f, 2229.5f), bounds);
+  EXPECT_EQ(Rect::MakeLTRB(131.f, 131.f, 1721.f, 2225.f), bounds);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/filterTest"));
 }
 
@@ -1114,7 +1148,7 @@ TGFX_TEST(LayerTest, textMask) {
   imageLayer1->setMask(alphaTextLayer);
 
   auto alphaLayerBounds = alphaLayer->getBounds();
-  EXPECT_EQ(alphaLayerBounds, Rect::MakeXYWH(1927.0f, 896.0f, 826.5f, 340.5f));
+  EXPECT_EQ(alphaLayerBounds, Rect::MakeLTRB(1927.0f, 897.0f, 2754.f, 1236.f));
 
   // Vector mask effect
   auto imageLayer2 = ImageLayer::Make();
@@ -1848,12 +1882,12 @@ TGFX_TEST(LayerTest, DirtyFlag) {
   displayList->render(surface.get());
 
   auto root = displayList->root();
-  EXPECT_TRUE(!grandChild->bitFields.dirtyDescendents && !grandChild->bitFields.dirtyContent);
+  EXPECT_TRUE(grandChild->bitFields.dirtyDescendents && grandChild->bitFields.dirtyContent);
   EXPECT_TRUE(!child->bitFields.dirtyDescendents && !child->bitFields.dirtyContent);
   EXPECT_TRUE(!root->bitFields.dirtyDescendents && !root->bitFields.dirtyContent);
 
   grandChild->setVisible(true);
-  EXPECT_FALSE(grandChild->bitFields.dirtyDescendents && grandChild->bitFields.dirtyContent);
+  EXPECT_TRUE(grandChild->bitFields.dirtyDescendents && grandChild->bitFields.dirtyContent);
   EXPECT_TRUE(child->bitFields.dirtyDescendents);
   EXPECT_TRUE(root->bitFields.dirtyDescendents);
   displayList->render(surface.get());
@@ -1977,8 +2011,12 @@ TGFX_TEST(LayerTest, MaskOnwer) {
   EXPECT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 1, 1);
   auto displayList = std::make_unique<DisplayList>();
-  auto layer = Layer::Make();
-  auto layer2 = Layer::Make();
+  auto layer = SolidLayer::Make();
+  layer->setWidth(1);
+  layer->setHeight(1);
+  auto layer2 = SolidLayer::Make();
+  layer2->setWidth(1);
+  layer2->setHeight(1);
   auto mask = ShapeLayer::Make();
   Path path = {};
   path.addRect(Rect::MakeWH(1, 1));
@@ -1997,7 +2035,7 @@ TGFX_TEST(LayerTest, MaskOnwer) {
   EXPECT_EQ(layer->mask(), nullptr);
   EXPECT_EQ(mask->maskOwner, layer2.get());
 
-  EXPECT_FALSE(layer2->bitFields.dirtyContent);
+  EXPECT_TRUE(layer2->bitFields.dirtyContent);
   displayList->render(surface.get());
   EXPECT_FALSE(layer->bitFields.dirtyDescendents);
   mask->setAlpha(0.5f);

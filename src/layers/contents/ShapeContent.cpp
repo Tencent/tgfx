@@ -31,13 +31,17 @@ ShapeContent::ShapeContent(std::shared_ptr<Shape> fill, std::shared_ptr<Shape> s
   }
 }
 
-Rect ShapeContent::getTightBounds() const {
+Rect ShapeContent::getTightBounds(const Matrix& matrix) const {
   Rect tightBounds = {};
   if (fillShape) {
-    tightBounds = fillShape->getPath().getBounds();
+    auto path = fillShape->getPath();
+    path.transform(matrix);
+    tightBounds = path.getBounds();
   }
   if (strokeShape) {
-    tightBounds.join(strokeShape->getPath().getBounds());
+    auto path = strokeShape->getPath();
+    path.transform(matrix);
+    tightBounds.join(path.getBounds());
   }
   return tightBounds;
 }
