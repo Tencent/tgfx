@@ -24,9 +24,9 @@
 namespace tgfx {
 class TypeFaceSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(Typeface* typeface);
+  static std::shared_ptr<Data> Serialize(const Typeface* typeface);
 
  private:
-  static void SerializeTypeFaceImpl(flexbuffers::Builder& fbb, Typeface* typeface);
+  static void SerializeTypeFaceImpl(flexbuffers::Builder& fbb, const Typeface* typeface);
 };
 }  // namespace tgfx

@@ -24,9 +24,9 @@
 namespace tgfx {
 class FontMetricsSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(FontMetrics* fontMerics);
+  static std::shared_ptr<Data> Serialize(const FontMetrics* fontMerics);
 
  private:
-  static void SerializeScalerContextImpl(flexbuffers::Builder& fbb, FontMetrics* fontMetrics);
+  static void SerializeScalerContextImpl(flexbuffers::Builder& fbb, const FontMetrics* fontMetrics);
 };
 }  // namespace tgfx

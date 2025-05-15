@@ -21,24 +21,33 @@
 
 namespace tgfx {
 
-std::shared_ptr<Data> ShapeSerialization::Serialize(Shape* shape) {
+std::shared_ptr<Data> ShapeSerialization::Serialize(const Shape* shape, SerializeUtils::Map* map) {
   DEBUG_ASSERT(shape != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
   SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
-  SerializeShapeImpl(fbb, shape);
+  SerializeShapeImpl(fbb, shape, map);
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
 
-void ShapeSerialization::SerializeShapeImpl(flexbuffers::Builder& fbb, Shape* shape) {
+void ShapeSerialization::SerializeShapeImpl(flexbuffers::Builder& fbb, const Shape* shape,
+                                            SerializeUtils::Map* map) {
   SerializeUtils::SetFlexBufferMap(fbb, "type",
                                    SerializeUtils::ShapeTypeToString(Types::Get(shape)));
   SerializeUtils::SetFlexBufferMap(fbb, "isSimplePath", shape->isSimplePath());
   SerializeUtils::SetFlexBufferMap(fbb, "isInverseFillType", shape->isInverseFillType());
-  SerializeUtils::SetFlexBufferMap(fbb, "bounds", "", false, true);
-  SerializeUtils::SetFlexBufferMap(fbb, "path", "", false, true);
+
+  auto boundsID = SerializeUtils::GetObjID();
+  auto bounds = shape->getBounds();
+  SerializeUtils::SetFlexBufferMap(fbb, "bounds", "", false, true, boundsID);
+  SerializeUtils::FillMap(bounds, boundsID, map);
+
+  auto pathID = SerializeUtils::GetObjID();
+  auto path = shape->getPath();
+  SerializeUtils::SetFlexBufferMap(fbb, "path", "", false, true, pathID);
+  SerializeUtils::FillMap(path, pathID, map);
 }
 }  // namespace tgfx
 #endif

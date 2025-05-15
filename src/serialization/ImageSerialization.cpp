@@ -21,7 +21,7 @@
 
 namespace tgfx {
 
-std::shared_ptr<Data> ImageSerialization::Serialize(Image* image) {
+std::shared_ptr<Data> ImageSerialization::Serialize(const Image* image) {
   DEBUG_ASSERT(image != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -32,7 +32,7 @@ std::shared_ptr<Data> ImageSerialization::Serialize(Image* image) {
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
 
-void ImageSerialization::SerializeImageImpl(flexbuffers::Builder& fbb, Image* image) {
+void ImageSerialization::SerializeImageImpl(flexbuffers::Builder& fbb, const Image* image) {
   SerializeUtils::SetFlexBufferMap(fbb, "type",
                                    SerializeUtils::ImageTypeToString(Types::Get(image)));
   SerializeUtils::SetFlexBufferMap(fbb, "width", image->width());

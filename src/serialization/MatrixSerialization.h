@@ -24,9 +24,9 @@
 namespace tgfx {
 class MatrixSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(Matrix* matrix);
+  static std::shared_ptr<Data> Serialize(const Matrix* matrix);
 
  private:
-  static void SerializeMatrixImpl(flexbuffers::Builder& fbb, Matrix* matrix);
+  static void SerializeMatrixImpl(flexbuffers::Builder& fbb, const Matrix* matrix);
 };
 }  // namespace tgfx

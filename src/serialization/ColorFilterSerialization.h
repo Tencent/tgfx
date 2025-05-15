@@ -25,18 +25,24 @@ namespace tgfx {
 
 class ColorFilterSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(ColorFilter* colorFilter);
+  static std::shared_ptr<Data> Serialize(const ColorFilter* colorFilter, SerializeUtils::Map* map);
 
  private:
-  static void SerializeColorFilterImpl(flexbuffers::Builder& fbb, ColorFilter* colorFilter);
+  static void SerializeColorFilterImpl(flexbuffers::Builder& fbb, const ColorFilter* colorFilter);
 
-  static void SerializeComposeColorFilterImpl(flexbuffers::Builder& fbb, ColorFilter* colorFilter);
+  static void SerializeComposeColorFilterImpl(flexbuffers::Builder& fbb,
+                                              const ColorFilter* colorFilter,
+                                              SerializeUtils::Map* map);
 
   static void SerializeAlphaThreadholdColorFilterImpl(flexbuffers::Builder& fbb,
-                                                      ColorFilter* colorFilter);
+                                                      const ColorFilter* colorFilter);
 
-  static void SerializeMatrixColorFilterImpl(flexbuffers::Builder& fbb, ColorFilter* colorFilter);
+  static void SerializeMatrixColorFilterImpl(flexbuffers::Builder& fbb,
+                                             const ColorFilter* colorFilter,
+                                             SerializeUtils::Map* map);
 
-  static void SerializeModeColorFilterImpl(flexbuffers::Builder& fbb, ColorFilter* colorFilter);
+  static void SerializeModeColorFilterImpl(flexbuffers::Builder& fbb,
+                                           const ColorFilter* colorFilter,
+                                           SerializeUtils::Map* map);
 };
 }  // namespace tgfx

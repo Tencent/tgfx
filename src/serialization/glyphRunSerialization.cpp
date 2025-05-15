@@ -21,25 +21,39 @@
 
 namespace tgfx {
 
-std::shared_ptr<Data> glyphRunSerialization::Serialize(GlyphRun* glyphRun) {
+std::shared_ptr<Data> glyphRunSerialization::Serialize(const GlyphRun* glyphRun,
+                                                       SerializeUtils::Map* map) {
   DEBUG_ASSERT(glyphRun != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
   SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
-  SerializeGlyphRunImpl(fbb, glyphRun);
+  SerializeGlyphRunImpl(fbb, glyphRun, map);
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
 
-void glyphRunSerialization::SerializeGlyphRunImpl(flexbuffers::Builder& fbb, GlyphRun* glyphRun) {
-  SerializeUtils::SetFlexBufferMap(fbb, "glyphFace",
-                                   reinterpret_cast<uint64_t>(glyphRun->glyphFace.get()), true,
-                                   glyphRun->glyphFace != nullptr);
-  auto glyphsSize = static_cast<unsigned int>(glyphRun->glyphs.size());
-  SerializeUtils::SetFlexBufferMap(fbb, "glyphs", glyphsSize, false, glyphsSize);
-  auto positionsSize = static_cast<unsigned int>(glyphRun->positions.size());
-  SerializeUtils::SetFlexBufferMap(fbb, "positions", positionsSize, false, positionsSize);
+void glyphRunSerialization::SerializeGlyphRunImpl(flexbuffers::Builder& fbb,
+                                                  const GlyphRun* glyphRun,
+                                                  SerializeUtils::Map* map) {
+  auto glyphFaceID = SerializeUtils::GetObjID();
+  auto glyphFace = glyphRun->glyphFace;
+  SerializeUtils::SetFlexBufferMap(fbb, "glyphFace", reinterpret_cast<uint64_t>(glyphFace.get()),
+                                   true, glyphFace != nullptr, glyphFaceID);
+  SerializeUtils::FillMap(glyphFace, glyphFaceID, map);
+
+  auto glyphsID = SerializeUtils::GetObjID();
+  auto glyphs = glyphRun->glyphs;
+  auto glyphsSize = static_cast<unsigned int>(glyphs.size());
+  SerializeUtils::SetFlexBufferMap(fbb, "glyphs", glyphsSize, false, glyphsSize, glyphsID);
+  SerializeUtils::FillMap(glyphs, glyphsID, map);
+
+  auto positionsID = SerializeUtils::GetObjID();
+  auto positions = glyphRun->positions;
+  auto positionsSize = static_cast<unsigned int>(positions.size());
+  SerializeUtils::SetFlexBufferMap(fbb, "positions", positionsSize, false, positionsSize,
+                                   positionsID);
+  SerializeUtils::FillMap(positions, positionsID, map);
 }
 }  // namespace tgfx
 #endif
