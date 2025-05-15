@@ -21,7 +21,7 @@
 
 namespace tgfx {
 
-std::shared_ptr<Data> RectSerialization::Serialize(Rect* rect) {
+std::shared_ptr<Data> RectSerialization::Serialize(const Rect* rect) {
   DEBUG_ASSERT(rect != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -32,7 +32,7 @@ std::shared_ptr<Data> RectSerialization::Serialize(Rect* rect) {
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
 
-void RectSerialization::SerializeRectImpl(flexbuffers::Builder& fbb, Rect* rect) {
+void RectSerialization::SerializeRectImpl(flexbuffers::Builder& fbb, const Rect* rect) {
   SerializeUtils::SetFlexBufferMap(fbb, "left", rect->left);
   SerializeUtils::SetFlexBufferMap(fbb, "top", rect->top);
   SerializeUtils::SetFlexBufferMap(fbb, "right", rect->right);

@@ -24,9 +24,9 @@
 namespace tgfx {
 class PointSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(Point* point);
+  static std::shared_ptr<Data> Serialize(const Point* point);
 
  private:
-  static void SerializePointImpl(flexbuffers::Builder& fbb, Point* point);
+  static void SerializePointImpl(flexbuffers::Builder& fbb, const Point* point);
 };
 }  // namespace tgfx

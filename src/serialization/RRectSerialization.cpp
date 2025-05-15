@@ -21,21 +21,31 @@
 
 namespace tgfx {
 
-std::shared_ptr<Data> RRectSerialization::Serialize(RRect* rrect) {
+std::shared_ptr<Data> RRectSerialization::Serialize(const RRect* rrect,
+                                                    SerializeUtils::MapRef map) {
   DEBUG_ASSERT(rrect != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
   SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
-  SerializeRRectImpl(fbb, rrect);
+  SerializeRRectImpl(fbb, rrect, map);
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
 
-void RRectSerialization::SerializeRRectImpl(flexbuffers::Builder& fbb, RRect* rrect) {
+void RRectSerialization::SerializeRRectImpl(flexbuffers::Builder& fbb, const RRect* rrect,
+                                            SerializeUtils::MapRef map) {
   (void)rrect;
-  SerializeUtils::SetFlexBufferMap(fbb, "rect", "", false, true);
-  SerializeUtils::SetFlexBufferMap(fbb, "radii", "", false, true);
+
+  auto rectID = SerializeUtils::GetObjID();
+  auto rect = rrect->rect;
+  SerializeUtils::SetFlexBufferMap(fbb, "rect", "", false, true, rectID);
+  SerializeUtils::FillMap(rect, rectID, map);
+
+  auto radiiID = SerializeUtils::GetObjID();
+  auto radii = rrect->radii;
+  SerializeUtils::SetFlexBufferMap(fbb, "radii", "", false, true, radiiID);
+  SerializeUtils::FillMap(radii, radiiID, map);
 }
 
 }  // namespace tgfx

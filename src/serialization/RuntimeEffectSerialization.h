@@ -24,9 +24,10 @@
 namespace tgfx {
 class RuntimeEffectSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(RuntimeEffect* runtimeEffet);
+  static std::shared_ptr<Data> Serialize(const RuntimeEffect* runtimeEffet);
 
  private:
-  static void SerializeRuntimeEffectImpl(flexbuffers::Builder& fbb, RuntimeEffect* runtimeEffet);
+  static void SerializeRuntimeEffectImpl(flexbuffers::Builder& fbb,
+                                         const RuntimeEffect* runtimeEffet);
 };
 }  // namespace tgfx

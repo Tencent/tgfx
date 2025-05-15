@@ -23,19 +23,28 @@ namespace tgfx {
 class LayerFilter;
 class LayerFilterSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(LayerFilter* layerFilter);
+  static std::shared_ptr<Data> Serialize(const LayerFilter* layerFilter,
+                                         SerializeUtils::MapRef map);
 
  private:
-  static void SerializeBasicLayerFilterImpl(flexbuffers::Builder& fbb, LayerFilter* layerFilter);
+  static void SerializeBasicLayerFilterImpl(flexbuffers::Builder& fbb,
+                                            const LayerFilter* layerFilter);
 
-  static void SerializeBlendFilterImpl(flexbuffers::Builder& fbb, LayerFilter* layerFilter);
+  static void SerializeBlendFilterImpl(flexbuffers::Builder& fbb, const LayerFilter* layerFilter,
+                                       SerializeUtils::MapRef map);
 
-  static void SerializeBlurFilterImpl(flexbuffers::Builder& fbb, LayerFilter* layerFilter);
+  static void SerializeBlurFilterImpl(flexbuffers::Builder& fbb, const LayerFilter* layerFilter);
 
-  static void SerializeColorMatrixFilterImpl(flexbuffers::Builder& fbb, LayerFilter* layerFilter);
+  static void SerializeColorMatrixFilterImpl(flexbuffers::Builder& fbb,
+                                             const LayerFilter* layerFilter,
+                                             SerializeUtils::MapRef map);
 
-  static void SerializeDropShadowFilterImpl(flexbuffers::Builder& fbb, LayerFilter* layerFilter);
+  static void SerializeDropShadowFilterImpl(flexbuffers::Builder& fbb,
+                                            const LayerFilter* layerFilter,
+                                            SerializeUtils::MapRef map);
 
-  static void SerializeInnerShadowFilterImpl(flexbuffers::Builder& fbb, LayerFilter* layerFilter);
+  static void SerializeInnerShadowFilterImpl(flexbuffers::Builder& fbb,
+                                             const LayerFilter* layerFilter,
+                                             SerializeUtils::MapRef map);
 };
 }  // namespace tgfx

@@ -24,10 +24,10 @@
 namespace tgfx {
 class SamplingOptionsSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(SamplingOptions* samplingOptions);
+  static std::shared_ptr<Data> Serialize(const SamplingOptions* samplingOptions);
 
  private:
   static void SerializeSamplingOptionsImpl(flexbuffers::Builder& fbb,
-                                           SamplingOptions* samplingOptions);
+                                           const SamplingOptions* samplingOptions);
 };
 }  // namespace tgfx

@@ -29,6 +29,9 @@
 namespace tgfx {
 class SerializeUtils {
  public:
+  using Map = std::unordered_map<uint64_t, std::function<std::shared_ptr<Data>()>>;
+  using MapRef = Map&;
+
   static std::string LayerTypeToString(LayerType type);
 
   static std::string BlendModeToString(BlendMode mode);
@@ -76,16 +79,108 @@ class SerializeUtils {
 
   static void SerializeEnd(flexbuffers::Builder& fbb, size_t mapStart, size_t contentStart);
 
-  template <typename T>
-  static void SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key, T value,
-                               bool isAddress = false, bool isExpandable = false) {
-    (void)fbb;
-    (void)value;
-    (void)key;
-    (void)isExpandable;
-    (void)isAddress;
-    assert(false);
-  }
-};
+  static uint64_t GetObjID();
 
+  static void SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key, const char* value,
+                               bool isAddress = false, bool isExpandable = false,
+                               std::optional<uint64_t> objID = std::nullopt);
+
+  static void SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key, std::string value,
+                               bool isAddress = false, bool isExpandable = false,
+                               std::optional<uint64_t> objID = std::nullopt);
+
+  static void SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key, int value,
+                               bool isAddress = false, bool isExpandable = false,
+                               std::optional<uint64_t> objID = std::nullopt);
+
+  static void SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key, unsigned int value,
+                               bool isAddress = false, bool isExpandable = false,
+                               std::optional<uint64_t> objID = std::nullopt);
+
+  static void SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key, uint64_t value,
+                               bool isAddress = false, bool isExpandable = false,
+                               std::optional<uint64_t> objID = std::nullopt);
+
+  static void SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key, float value,
+                               bool isAddress = false, bool isExpandable = false,
+                               std::optional<uint64_t> objID = std::nullopt);
+
+  static void SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key, double value,
+                               bool isAddress = false, bool isExpandable = false,
+                               std::optional<uint64_t> objID = std::nullopt);
+
+  static void SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key, bool value,
+                               bool isAddress = false, bool isExpandable = false,
+                               std::optional<uint64_t> objID = std::nullopt);
+
+  static void FillMap(const Matrix& matrix, uint64_t objID, MapRef map);
+
+  static void FillMap(const Point& point, uint64_t objID, MapRef map);
+
+  static void FillMap(const Rect& rect, uint64_t objID, MapRef map);
+
+  static void FillMap(const SamplingOptions& sampling, uint64_t objID, MapRef map);
+
+  static void FillMap(const Color& color, uint64_t objID, MapRef map);
+
+  static void FillMap(const Font& font, uint64_t objID, MapRef map);
+
+  static void FillMap(const FontMetrics& fontMetrics, uint64_t objID, MapRef map);
+
+  static void FillMap(const GlyphRun& glyphRun, uint64_t objID, MapRef map);
+
+  static void FillMap(const Path& path, uint64_t objID, MapRef map);
+
+  static void FillMap(const std::shared_ptr<LayerFilter>& layerFilter, uint64_t objID, MapRef map);
+
+  static void FillMap(const std::shared_ptr<Layer>& layer, uint64_t objID, MapRef map);
+
+  static void FillMap(const std::shared_ptr<LayerStyle>& layerStyle, uint64_t objID, MapRef map);
+
+  static void FillMap(const std::shared_ptr<Image>& image, uint64_t objID, MapRef map);
+
+  static void FillMap(const std::shared_ptr<Shape>& shape, uint64_t objID, MapRef map);
+
+  static void FillMap(const std::shared_ptr<ShapeStyle>& shapeStyle, uint64_t objID, MapRef map);
+
+  static void FillMap(const std::shared_ptr<ColorFilter>& colorFilter, uint64_t objID, MapRef map);
+
+  static void FillMap(const std::shared_ptr<Typeface>& typeFace, uint64_t objID, MapRef map);
+
+  static void FillMap(const std::shared_ptr<GlyphFace>& glyphFace, uint64_t objID, MapRef map);
+
+  static void FillMap(const std::shared_ptr<ImageFilter>& imageFilter, uint64_t objID, MapRef map);
+
+  static void FillMap(const std::shared_ptr<RuntimeEffect>& runtimeEffect, uint64_t objID,
+                      MapRef map);
+
+  static void FillMap(const std::shared_ptr<Shader>& shader, uint64_t objID, MapRef map);
+
+  static void FillMap(const std::vector<std::shared_ptr<LayerFilter>>& filters, uint64_t objID,
+                      MapRef map);
+
+  static void FillMap(const std::vector<std::shared_ptr<Layer>>& children, uint64_t objID,
+                      MapRef map);
+
+  static void FillMap(const std::vector<std::shared_ptr<LayerStyle>>& layerStyles, uint64_t objID,
+                      MapRef map);
+
+  static void FillMap(const std::vector<std::shared_ptr<ShapeStyle>>& shapeStyles, uint64_t objID,
+                      MapRef map);
+
+  static void FillMap(const std::vector<float>& floatVec, uint64_t objID, MapRef map);
+
+  static void FillMap(const std::array<float, 20>& matrix, uint64_t objID, MapRef map);
+
+  static void FillMap(const std::vector<GlyphRun>& glyphRuns, uint64_t objID, MapRef map);
+
+  static void FillMap(const std::vector<GlyphID>& glyphs, uint64_t objID, MapRef map);
+
+  static void FillMap(const std::vector<Point>& points, uint64_t objID, MapRef map);
+
+  static void FillMap(const std::vector<std::shared_ptr<ImageFilter>>& imageFilters, uint64_t objID,
+                      MapRef map);
+
+  static void FillMap(const std::vector<Color>& colors, uint64_t objID, MapRef map);
+};
 }  // namespace tgfx

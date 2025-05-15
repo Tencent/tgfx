@@ -34,21 +34,26 @@ class LayerSerialization {
       std::shared_ptr<Layer> layer,
       std::unordered_map<uint64_t, std::shared_ptr<tgfx::Layer>>& layerMap);
 
-  static std::shared_ptr<Data> SerializeLayer(Layer* layer);
+  static std::shared_ptr<Data> SerializeLayer(const Layer* layer, SerializeUtils::MapRef map);
 
  private:
   static void SerializeTreeNodeImpl(
       flexbuffers::Builder& fbb, std::shared_ptr<Layer> layer,
       std::unordered_map<uint64_t, std::shared_ptr<tgfx::Layer>>& layerMap);
 
-  static void SerializeBasicLayerImpl(flexbuffers::Builder& fbb, Layer* layer);
+  static void SerializeBasicLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
+                                      SerializeUtils::MapRef map);
 
-  static void SerializeImageLayerImpl(flexbuffers::Builder& fbb, Layer* layer);
+  static void SerializeImageLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
+                                      SerializeUtils::MapRef map);
 
-  static void SerializeShapeLayerImpl(flexbuffers::Builder& fbb, Layer* layer);
+  static void SerializeShapeLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
+                                      SerializeUtils::MapRef map);
 
-  static void SerializeSolidLayerImpl(flexbuffers::Builder& fbb, Layer* layer);
+  static void SerializeSolidLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
+                                      SerializeUtils::MapRef map);
 
-  static void SerializeTextLayerImpl(flexbuffers::Builder& fbb, Layer* layer);
+  static void SerializeTextLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
+                                     SerializeUtils::MapRef map);
 };
 }  // namespace tgfx

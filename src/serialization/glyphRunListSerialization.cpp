@@ -22,24 +22,30 @@
 
 namespace tgfx {
 
-std::shared_ptr<Data> glyphRunListSerialization::Serialize(GlyphRunList* glyphRunList) {
+std::shared_ptr<Data> glyphRunListSerialization::Serialize(const GlyphRunList* glyphRunList,
+                                                           SerializeUtils::MapRef map) {
   DEBUG_ASSERT(glyphRunList != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
   SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
-  SerializeglyphRunListImpl(fbb, glyphRunList);
+  SerializeglyphRunListImpl(fbb, glyphRunList, map);
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
 
 void glyphRunListSerialization::SerializeglyphRunListImpl(flexbuffers::Builder& fbb,
-                                                          GlyphRunList* glyphRunList) {
+                                                          const GlyphRunList* glyphRunList,
+                                                          SerializeUtils::MapRef map) {
   SerializeUtils::SetFlexBufferMap(fbb, "hasColor", glyphRunList->hasColor());
   SerializeUtils::SetFlexBufferMap(fbb, "hasOutlines", glyphRunList->hasOutlines());
+
+  auto glyphRunsID = SerializeUtils::GetObjID();
   auto glyphRuns = glyphRunList->glyphRuns();
   auto glyhRunsSize = static_cast<unsigned int>(glyphRuns.size());
-  SerializeUtils::SetFlexBufferMap(fbb, "glyphRuns", glyhRunsSize, false, glyhRunsSize);
+  SerializeUtils::SetFlexBufferMap(fbb, "glyphRuns", glyhRunsSize, false, glyhRunsSize,
+                                   glyphRunsID);
+  SerializeUtils::FillMap(glyphRuns, glyphRunsID, map);
 }
 }  // namespace tgfx
 #endif

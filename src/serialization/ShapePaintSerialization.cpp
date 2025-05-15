@@ -21,22 +21,26 @@
 
 namespace tgfx {
 
-std::shared_ptr<Data> ShapePaintSerialization::Serialize(ShapePaint* shapePaint) {
+std::shared_ptr<Data> ShapePaintSerialization::Serialize(const ShapePaint* shapePaint,
+                                                         SerializeUtils::MapRef map) {
   DEBUG_ASSERT(shapePaint != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
   SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
-  SerializeShapePaintImpl(fbb, shapePaint);
+  SerializeShapePaintImpl(fbb, shapePaint, map);
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
 
 void ShapePaintSerialization::SerializeShapePaintImpl(flexbuffers::Builder& fbb,
-                                                      ShapePaint* shapePaint) {
-  SerializeUtils::SetFlexBufferMap(fbb, "shader",
-                                   reinterpret_cast<uint64_t>(shapePaint->shader.get()), true,
-                                   shapePaint->shader != nullptr);
+                                                      const ShapePaint* shapePaint,
+                                                      SerializeUtils::MapRef map) {
+  auto shaderID = SerializeUtils::GetObjID();
+  auto shader = shapePaint->shader;
+  SerializeUtils::SetFlexBufferMap(fbb, "shader", reinterpret_cast<uint64_t>(shader.get()), true,
+                                   shader != nullptr, shaderID);
+  SerializeUtils::FillMap(shader, shaderID, map);
 
   SerializeUtils::SetFlexBufferMap(fbb, "alpha", shapePaint->alpha);
   SerializeUtils::SetFlexBufferMap(fbb, "blendMode",

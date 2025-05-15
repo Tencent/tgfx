@@ -24,21 +24,29 @@
 namespace tgfx {
 class ImageFilterSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(ImageFilter* imageFilter);
+  static std::shared_ptr<Data> Serialize(const ImageFilter* imageFilter,
+                                         SerializeUtils::MapRef map);
 
  private:
-  static void serializeImageFilterImpl(flexbuffers::Builder& fbb, ImageFilter* imageFilter);
+  static void serializeImageFilterImpl(flexbuffers::Builder& fbb, const ImageFilter* imageFilter);
 
-  static void serializeColorImageFilter(flexbuffers::Builder& fbb, ImageFilter* imageFilter);
+  static void serializeColorImageFilter(flexbuffers::Builder& fbb, const ImageFilter* imageFilter,
+                                        SerializeUtils::MapRef map);
 
-  static void serializeBlurImageFilter(flexbuffers::Builder& fbb, ImageFilter* imageFilter);
+  static void serializeBlurImageFilter(flexbuffers::Builder& fbb, const ImageFilter* imageFilter);
 
-  static void serializeComposeImageFilter(flexbuffers::Builder& fbb, ImageFilter* imageFilter);
+  static void serializeComposeImageFilter(flexbuffers::Builder& fbb, const ImageFilter* imageFilter,
+                                          SerializeUtils::MapRef map);
 
-  static void serializeDropShadowImageFilter(flexbuffers::Builder& fbb, ImageFilter* imageFilter);
+  static void serializeDropShadowImageFilter(flexbuffers::Builder& fbb,
+                                             const ImageFilter* imageFilter,
+                                             SerializeUtils::MapRef map);
 
-  static void serializeInnerShadowImageFilter(flexbuffers::Builder& fbb, ImageFilter* imageFilter);
+  static void serializeInnerShadowImageFilter(flexbuffers::Builder& fbb,
+                                              const ImageFilter* imageFilter,
+                                              SerializeUtils::MapRef map);
 
-  static void serializeRuntimeImageFilter(flexbuffers::Builder& fbb, ImageFilter* imageFilter);
+  static void serializeRuntimeImageFilter(flexbuffers::Builder& fbb, const ImageFilter* imageFilter,
+                                          SerializeUtils::MapRef map);
 };
 }  // namespace tgfx

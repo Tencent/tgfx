@@ -21,7 +21,7 @@
 
 namespace tgfx {
 
-std::shared_ptr<Data> TypeFaceSerialization::Serialize(Typeface* typeface) {
+std::shared_ptr<Data> TypeFaceSerialization::Serialize(const Typeface* typeface) {
   DEBUG_ASSERT(typeface != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -32,7 +32,8 @@ std::shared_ptr<Data> TypeFaceSerialization::Serialize(Typeface* typeface) {
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
 
-void TypeFaceSerialization::SerializeTypeFaceImpl(flexbuffers::Builder& fbb, Typeface* typeface) {
+void TypeFaceSerialization::SerializeTypeFaceImpl(flexbuffers::Builder& fbb,
+                                                  const Typeface* typeface) {
   SerializeUtils::SetFlexBufferMap(fbb, "uniqueID", typeface->uniqueID());
   SerializeUtils::SetFlexBufferMap(fbb, "fontFamily", typeface->fontFamily());
   SerializeUtils::SetFlexBufferMap(fbb, "fontStyle", typeface->fontStyle());
