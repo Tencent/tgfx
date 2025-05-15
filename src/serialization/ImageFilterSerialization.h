@@ -24,29 +24,28 @@
 namespace tgfx {
 class ImageFilterSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(const ImageFilter* imageFilter,
-                                         SerializeUtils::MapRef map);
+  static std::shared_ptr<Data> Serialize(const ImageFilter* imageFilter, SerializeUtils::Map* map);
 
  private:
   static void serializeImageFilterImpl(flexbuffers::Builder& fbb, const ImageFilter* imageFilter);
 
   static void serializeColorImageFilter(flexbuffers::Builder& fbb, const ImageFilter* imageFilter,
-                                        SerializeUtils::MapRef map);
+                                        SerializeUtils::Map* map);
 
   static void serializeBlurImageFilter(flexbuffers::Builder& fbb, const ImageFilter* imageFilter);
 
   static void serializeComposeImageFilter(flexbuffers::Builder& fbb, const ImageFilter* imageFilter,
-                                          SerializeUtils::MapRef map);
+                                          SerializeUtils::Map* map);
 
   static void serializeDropShadowImageFilter(flexbuffers::Builder& fbb,
                                              const ImageFilter* imageFilter,
-                                             SerializeUtils::MapRef map);
+                                             SerializeUtils::Map* map);
 
   static void serializeInnerShadowImageFilter(flexbuffers::Builder& fbb,
                                               const ImageFilter* imageFilter,
-                                              SerializeUtils::MapRef map);
+                                              SerializeUtils::Map* map);
 
   static void serializeRuntimeImageFilter(flexbuffers::Builder& fbb, const ImageFilter* imageFilter,
-                                          SerializeUtils::MapRef map);
+                                          SerializeUtils::Map* map);
 };
 }  // namespace tgfx

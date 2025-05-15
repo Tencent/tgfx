@@ -21,7 +21,7 @@
 
 namespace tgfx {
 
-std::shared_ptr<Data> FontSerialization::Serialize(const Font* font, SerializeUtils::MapRef map) {
+std::shared_ptr<Data> FontSerialization::Serialize(const Font* font, SerializeUtils::Map* map) {
   DEBUG_ASSERT(font != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -33,7 +33,7 @@ std::shared_ptr<Data> FontSerialization::Serialize(const Font* font, SerializeUt
 }
 
 void FontSerialization::SerializeFontImpl(flexbuffers::Builder& fbb, const Font* font,
-                                          SerializeUtils::MapRef map) {
+                                          SerializeUtils::Map* map) {
   auto typeFace = font->getTypeface();
   auto typeFaceID = SerializeUtils::GetObjID();
   SerializeUtils::SetFlexBufferMap(fbb, "typeFace", reinterpret_cast<uint64_t>(typeFace.get()),

@@ -25,10 +25,10 @@ namespace tgfx {
 class glyphRunListSerialization {
  public:
   static std::shared_ptr<Data> Serialize(const GlyphRunList* glyphRunList,
-                                         SerializeUtils::MapRef map);
+                                         SerializeUtils::Map* map);
 
  private:
   static void SerializeglyphRunListImpl(flexbuffers::Builder& fbb, const GlyphRunList* glyphRunList,
-                                        SerializeUtils::MapRef map);
+                                        SerializeUtils::Map* map);
 };
 }  // namespace tgfx

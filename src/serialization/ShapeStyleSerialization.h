@@ -25,25 +25,25 @@ namespace tgfx {
 class ShapeStyle;
 class ShapeStyleSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(const ShapeStyle* shapeStyle, SerializeUtils::MapRef map);
+  static std::shared_ptr<Data> Serialize(const ShapeStyle* shapeStyle, SerializeUtils::Map* map);
 
  private:
   static void SerializeShapeStyleImpl(flexbuffers::Builder& fbb, const ShapeStyle* shapeStyle,
-                                      SerializeUtils::MapRef map);
+                                      SerializeUtils::Map* map);
   static void SerializeImagePatternImpl(flexbuffers::Builder& fbb, const ShapeStyle* shapeStyle,
-                                        SerializeUtils::MapRef map);
+                                        SerializeUtils::Map* map);
   static void SerializeGradientImpl(flexbuffers::Builder& fbb, const ShapeStyle* shapeStyle,
-                                    SerializeUtils::MapRef map);
+                                    SerializeUtils::Map* map);
   static void SerializeLinearGradientImpl(flexbuffers::Builder& fbb, const ShapeStyle* shapeStyle,
-                                          SerializeUtils::MapRef map);
+                                          SerializeUtils::Map* map);
   static void SerializeRadialGradientImpl(flexbuffers::Builder& fbb, const ShapeStyle* shapeStyle,
-                                          SerializeUtils::MapRef map);
+                                          SerializeUtils::Map* map);
   static void SerializeConicGradientImpl(flexbuffers::Builder& fbb, const ShapeStyle* shapeStyle,
-                                         SerializeUtils::MapRef map);
+                                         SerializeUtils::Map* map);
   static void SerializeDiamondGradientImpl(flexbuffers::Builder& fbb, const ShapeStyle* shapeStyle,
-                                           SerializeUtils::MapRef map);
+                                           SerializeUtils::Map* map);
   static void SerializeSolidColorImpl(flexbuffers::Builder& fbb, const ShapeStyle* shapeStyle,
-                                      SerializeUtils::MapRef map);
+                                      SerializeUtils::Map* map);
 };
 
 }  // namespace tgfx

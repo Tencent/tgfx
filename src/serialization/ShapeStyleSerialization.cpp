@@ -27,7 +27,7 @@
 namespace tgfx {
 
 std::shared_ptr<Data> ShapeStyleSerialization::Serialize(const ShapeStyle* shapeStyle,
-                                                         SerializeUtils::MapRef map) {
+                                                         SerializeUtils::Map* map) {
   DEBUG_ASSERT(shapeStyle != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -51,7 +51,7 @@ std::shared_ptr<Data> ShapeStyleSerialization::Serialize(const ShapeStyle* shape
 
 void ShapeStyleSerialization::SerializeShapeStyleImpl(flexbuffers::Builder& fbb,
                                                       const ShapeStyle* shapeStyle,
-                                                      SerializeUtils::MapRef map) {
+                                                      SerializeUtils::Map* map) {
   SerializeUtils::SetFlexBufferMap(fbb, "shapeStyleType",
                                    SerializeUtils::ShapeStyleTypeToString(Types::Get(shapeStyle)));
   SerializeUtils::SetFlexBufferMap(fbb, "alpha", shapeStyle->alpha());
@@ -66,7 +66,7 @@ void ShapeStyleSerialization::SerializeShapeStyleImpl(flexbuffers::Builder& fbb,
 
 void ShapeStyleSerialization::SerializeImagePatternImpl(flexbuffers::Builder& fbb,
                                                         const ShapeStyle* shapeStyle,
-                                                        SerializeUtils::MapRef map) {
+                                                        SerializeUtils::Map* map) {
   SerializeShapeStyleImpl(fbb, shapeStyle, map);
   const ImagePattern* imagePattern = static_cast<const ImagePattern*>(shapeStyle);
 
@@ -89,7 +89,7 @@ void ShapeStyleSerialization::SerializeImagePatternImpl(flexbuffers::Builder& fb
 
 void ShapeStyleSerialization::SerializeGradientImpl(flexbuffers::Builder& fbb,
                                                     const ShapeStyle* shapeStyle,
-                                                    SerializeUtils::MapRef map) {
+                                                    SerializeUtils::Map* map) {
   SerializeShapeStyleImpl(fbb, shapeStyle, map);
   const Gradient* gradient = static_cast<const Gradient*>(shapeStyle);
 
@@ -128,7 +128,7 @@ void ShapeStyleSerialization::SerializeGradientImpl(flexbuffers::Builder& fbb,
 
 void ShapeStyleSerialization::SerializeLinearGradientImpl(flexbuffers::Builder& fbb,
                                                           const ShapeStyle* shapeStyle,
-                                                          SerializeUtils::MapRef map) {
+                                                          SerializeUtils::Map* map) {
   const LinearGradient* lineGradient = static_cast<const LinearGradient*>(shapeStyle);
 
   auto startPointID = SerializeUtils::GetObjID();
@@ -144,7 +144,7 @@ void ShapeStyleSerialization::SerializeLinearGradientImpl(flexbuffers::Builder& 
 
 void ShapeStyleSerialization::SerializeRadialGradientImpl(flexbuffers::Builder& fbb,
                                                           const ShapeStyle* shapeStyle,
-                                                          SerializeUtils::MapRef map) {
+                                                          SerializeUtils::Map* map) {
   const RadialGradient* radialGradient = static_cast<const RadialGradient*>(shapeStyle);
 
   auto centerID = SerializeUtils::GetObjID();
@@ -157,7 +157,7 @@ void ShapeStyleSerialization::SerializeRadialGradientImpl(flexbuffers::Builder& 
 
 void ShapeStyleSerialization::SerializeConicGradientImpl(flexbuffers::Builder& fbb,
                                                          const ShapeStyle* shapeStyle,
-                                                         SerializeUtils::MapRef map) {
+                                                         SerializeUtils::Map* map) {
   const ConicGradient* conicGradient = static_cast<const ConicGradient*>(shapeStyle);
 
   auto centerID = SerializeUtils::GetObjID();
@@ -171,7 +171,7 @@ void ShapeStyleSerialization::SerializeConicGradientImpl(flexbuffers::Builder& f
 
 void ShapeStyleSerialization::SerializeDiamondGradientImpl(flexbuffers::Builder& fbb,
                                                            const ShapeStyle* shapeStyle,
-                                                           SerializeUtils::MapRef map) {
+                                                           SerializeUtils::Map* map) {
   const DiamondGradient* diamondGradient = static_cast<const DiamondGradient*>(shapeStyle);
 
   auto centerID = SerializeUtils::GetObjID();
@@ -184,7 +184,7 @@ void ShapeStyleSerialization::SerializeDiamondGradientImpl(flexbuffers::Builder&
 
 void ShapeStyleSerialization::SerializeSolidColorImpl(flexbuffers::Builder& fbb,
                                                       const ShapeStyle* shapeStyle,
-                                                      SerializeUtils::MapRef map) {
+                                                      SerializeUtils::Map* map) {
   SerializeShapeStyleImpl(fbb, shapeStyle, map);
   const SolidColor* solidColor = static_cast<const SolidColor*>(shapeStyle);
 

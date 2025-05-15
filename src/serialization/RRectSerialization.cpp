@@ -21,8 +21,7 @@
 
 namespace tgfx {
 
-std::shared_ptr<Data> RRectSerialization::Serialize(const RRect* rrect,
-                                                    SerializeUtils::MapRef map) {
+std::shared_ptr<Data> RRectSerialization::Serialize(const RRect* rrect, SerializeUtils::Map* map) {
   DEBUG_ASSERT(rrect != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -34,7 +33,7 @@ std::shared_ptr<Data> RRectSerialization::Serialize(const RRect* rrect,
 }
 
 void RRectSerialization::SerializeRRectImpl(flexbuffers::Builder& fbb, const RRect* rrect,
-                                            SerializeUtils::MapRef map) {
+                                            SerializeUtils::Map* map) {
   (void)rrect;
 
   auto rectID = SerializeUtils::GetObjID();

@@ -24,27 +24,27 @@
 namespace tgfx {
 class ShaderSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(const Shader* shader, SerializeUtils::MapRef map);
+  static std::shared_ptr<Data> Serialize(const Shader* shader, SerializeUtils::Map* map);
 
  private:
   static void SerializeBasicShaderImpl(flexbuffers::Builder& fbb, const Shader* shader);
 
   static void SerializeColorShaderImpl(flexbuffers::Builder& fbb, const Shader* shader,
-                                       SerializeUtils::MapRef map);
+                                       SerializeUtils::Map* map);
 
   static void SerializeColorFilterShaderImpl(flexbuffers::Builder& fbb, const Shader* shader,
-                                             SerializeUtils::MapRef map);
+                                             SerializeUtils::Map* map);
 
   static void SerializeImageShaderImpl(flexbuffers::Builder& fbb, const Shader* shader,
-                                       SerializeUtils::MapRef map);
+                                       SerializeUtils::Map* map);
 
   static void SerializeBlendShaderImpl(flexbuffers::Builder& fbb, const Shader* shader,
-                                       SerializeUtils::MapRef map);
+                                       SerializeUtils::Map* map);
 
   static void SerializeMatrixShaderImpl(flexbuffers::Builder& fbb, const Shader* shader,
-                                        SerializeUtils::MapRef map);
+                                        SerializeUtils::Map* map);
 
   static void SerializeGradientShaderImpl(flexbuffers::Builder& fbb, const Shader* shader,
-                                          SerializeUtils::MapRef map);
+                                          SerializeUtils::Map* map);
 };
 }  // namespace tgfx

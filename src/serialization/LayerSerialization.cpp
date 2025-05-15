@@ -29,7 +29,7 @@
 namespace tgfx {
 
 std::shared_ptr<Data> LayerSerialization::SerializeLayer(const Layer* layer,
-                                                         SerializeUtils::MapRef map) {
+                                                         SerializeUtils::Map* map) {
   DEBUG_ASSERT(layer != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -94,7 +94,7 @@ void LayerSerialization::SerializeTreeNodeImpl(
 }
 
 void LayerSerialization::SerializeBasicLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
-                                                 SerializeUtils::MapRef map) {
+                                                 SerializeUtils::Map* map) {
   SerializeUtils::SetFlexBufferMap(fbb, "type", SerializeUtils::LayerTypeToString(layer->type()));
   SerializeUtils::SetFlexBufferMap(fbb, "visible", layer->visible());
   SerializeUtils::SetFlexBufferMap(fbb, "shouldRasterize", layer->shouldRasterize());
@@ -179,7 +179,7 @@ void LayerSerialization::SerializeBasicLayerImpl(flexbuffers::Builder& fbb, cons
 }
 
 void LayerSerialization::SerializeImageLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
-                                                 SerializeUtils::MapRef map) {
+                                                 SerializeUtils::Map* map) {
   SerializeBasicLayerImpl(fbb, layer, map);
   const ImageLayer* imageLayer = static_cast<const ImageLayer*>(layer);
 
@@ -196,7 +196,7 @@ void LayerSerialization::SerializeImageLayerImpl(flexbuffers::Builder& fbb, cons
 }
 
 void LayerSerialization::SerializeShapeLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
-                                                 SerializeUtils::MapRef map) {
+                                                 SerializeUtils::Map* map) {
   SerializeBasicLayerImpl(fbb, layer, map);
   const ShapeLayer* shapeLayer = static_cast<const ShapeLayer*>(layer);
 
@@ -244,7 +244,7 @@ void LayerSerialization::SerializeShapeLayerImpl(flexbuffers::Builder& fbb, cons
 }
 
 void LayerSerialization::SerializeSolidLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
-                                                 SerializeUtils::MapRef map) {
+                                                 SerializeUtils::Map* map) {
   SerializeBasicLayerImpl(fbb, layer, map);
   const SolidLayer* solidLayer = static_cast<const SolidLayer*>(layer);
 
@@ -260,7 +260,7 @@ void LayerSerialization::SerializeSolidLayerImpl(flexbuffers::Builder& fbb, cons
 }
 
 void LayerSerialization::SerializeTextLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
-                                                SerializeUtils::MapRef map) {
+                                                SerializeUtils::Map* map) {
   SerializeBasicLayerImpl(fbb, layer, map);
   const TextLayer* textLayer = static_cast<const TextLayer*>(layer);
   SerializeUtils::SetFlexBufferMap(fbb, "text", textLayer->text());

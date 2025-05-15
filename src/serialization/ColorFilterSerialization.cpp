@@ -28,7 +28,7 @@
 namespace tgfx {
 
 std::shared_ptr<Data> ColorFilterSerialization::Serialize(const ColorFilter* colorFilter,
-                                                          SerializeUtils::MapRef map) {
+                                                          SerializeUtils::Map* map) {
   DEBUG_ASSERT(colorFilter != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -61,7 +61,7 @@ void ColorFilterSerialization::SerializeColorFilterImpl(flexbuffers::Builder& fb
 
 void ColorFilterSerialization::SerializeComposeColorFilterImpl(flexbuffers::Builder& fbb,
                                                                const ColorFilter* colorFilter,
-                                                               SerializeUtils::MapRef map) {
+                                                               SerializeUtils::Map* map) {
   SerializeColorFilterImpl(fbb, colorFilter);
   const ComposeColorFilter* composeColorFilter =
       static_cast<const ComposeColorFilter*>(colorFilter);
@@ -89,7 +89,7 @@ void ColorFilterSerialization::SerializeAlphaThreadholdColorFilterImpl(
 
 void ColorFilterSerialization::SerializeMatrixColorFilterImpl(flexbuffers::Builder& fbb,
                                                               const ColorFilter* colorFilter,
-                                                              SerializeUtils::MapRef map) {
+                                                              SerializeUtils::Map* map) {
   SerializeColorFilterImpl(fbb, colorFilter);
   const MatrixColorFilter* matrixColorFilter = static_cast<const MatrixColorFilter*>(colorFilter);
 
@@ -105,7 +105,7 @@ void ColorFilterSerialization::SerializeMatrixColorFilterImpl(flexbuffers::Build
 
 void ColorFilterSerialization::SerializeModeColorFilterImpl(flexbuffers::Builder& fbb,
                                                             const ColorFilter* colorFilter,
-                                                            SerializeUtils::MapRef map) {
+                                                            SerializeUtils::Map* map) {
   SerializeColorFilterImpl(fbb, colorFilter);
   const ModeColorFilter* modeColorFilter = static_cast<const ModeColorFilter*>(colorFilter);
   auto colorID = SerializeUtils::GetObjID();

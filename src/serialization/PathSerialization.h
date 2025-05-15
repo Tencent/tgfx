@@ -24,10 +24,10 @@
 namespace tgfx {
 class PathSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(const Path* path, SerializeUtils::MapRef map);
+  static std::shared_ptr<Data> Serialize(const Path* path, SerializeUtils::Map* map);
 
  private:
   static void SerializePathImpl(flexbuffers::Builder& fbb, const Path* path,
-                                SerializeUtils::MapRef map);
+                                SerializeUtils::Map* map);
 };
 }  // namespace tgfx

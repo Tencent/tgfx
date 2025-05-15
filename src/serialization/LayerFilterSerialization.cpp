@@ -29,7 +29,7 @@
 namespace tgfx {
 
 std::shared_ptr<Data> LayerFilterSerialization::Serialize(const LayerFilter* layerFilter,
-                                                          SerializeUtils::MapRef map) {
+                                                          SerializeUtils::Map* map) {
   DEBUG_ASSERT(layerFilter != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -68,7 +68,7 @@ void LayerFilterSerialization::SerializeBasicLayerFilterImpl(flexbuffers::Builde
 
 void LayerFilterSerialization::SerializeBlendFilterImpl(flexbuffers::Builder& fbb,
                                                         const LayerFilter* layerFilter,
-                                                        SerializeUtils::MapRef map) {
+                                                        SerializeUtils::Map* map) {
   SerializeBasicLayerFilterImpl(fbb, layerFilter);
   const BlendFilter* blendFilter = static_cast<const BlendFilter*>(layerFilter);
   auto colorID = SerializeUtils::GetObjID();
@@ -91,7 +91,7 @@ void LayerFilterSerialization::SerializeBlurFilterImpl(flexbuffers::Builder& fbb
 
 void LayerFilterSerialization::SerializeColorMatrixFilterImpl(flexbuffers::Builder& fbb,
                                                               const LayerFilter* layerFilter,
-                                                              SerializeUtils::MapRef map) {
+                                                              SerializeUtils::Map* map) {
   SerializeBasicLayerFilterImpl(fbb, layerFilter);
   const ColorMatrixFilter* colorMatrixFilter = static_cast<const ColorMatrixFilter*>(layerFilter);
 
@@ -103,7 +103,7 @@ void LayerFilterSerialization::SerializeColorMatrixFilterImpl(flexbuffers::Build
 
 void LayerFilterSerialization::SerializeDropShadowFilterImpl(flexbuffers::Builder& fbb,
                                                              const LayerFilter* layerFilter,
-                                                             SerializeUtils::MapRef map) {
+                                                             SerializeUtils::Map* map) {
   SerializeBasicLayerFilterImpl(fbb, layerFilter);
   const DropShadowFilter* dropShadowFilter = static_cast<const DropShadowFilter*>(layerFilter);
   SerializeUtils::SetFlexBufferMap(fbb, "offsetX", dropShadowFilter->offsetX());
@@ -121,7 +121,7 @@ void LayerFilterSerialization::SerializeDropShadowFilterImpl(flexbuffers::Builde
 
 void LayerFilterSerialization::SerializeInnerShadowFilterImpl(flexbuffers::Builder& fbb,
                                                               const LayerFilter* layerFilter,
-                                                              SerializeUtils::MapRef map) {
+                                                              SerializeUtils::Map* map) {
   SerializeBasicLayerFilterImpl(fbb, layerFilter);
   const InnerShadowFilter* innerShadowFilter = static_cast<const InnerShadowFilter*>(layerFilter);
   SerializeUtils::SetFlexBufferMap(fbb, "offsetX", innerShadowFilter->offsetX());

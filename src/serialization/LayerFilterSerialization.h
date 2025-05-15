@@ -23,28 +23,27 @@ namespace tgfx {
 class LayerFilter;
 class LayerFilterSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(const LayerFilter* layerFilter,
-                                         SerializeUtils::MapRef map);
+  static std::shared_ptr<Data> Serialize(const LayerFilter* layerFilter, SerializeUtils::Map* map);
 
  private:
   static void SerializeBasicLayerFilterImpl(flexbuffers::Builder& fbb,
                                             const LayerFilter* layerFilter);
 
   static void SerializeBlendFilterImpl(flexbuffers::Builder& fbb, const LayerFilter* layerFilter,
-                                       SerializeUtils::MapRef map);
+                                       SerializeUtils::Map* map);
 
   static void SerializeBlurFilterImpl(flexbuffers::Builder& fbb, const LayerFilter* layerFilter);
 
   static void SerializeColorMatrixFilterImpl(flexbuffers::Builder& fbb,
                                              const LayerFilter* layerFilter,
-                                             SerializeUtils::MapRef map);
+                                             SerializeUtils::Map* map);
 
   static void SerializeDropShadowFilterImpl(flexbuffers::Builder& fbb,
                                             const LayerFilter* layerFilter,
-                                            SerializeUtils::MapRef map);
+                                            SerializeUtils::Map* map);
 
   static void SerializeInnerShadowFilterImpl(flexbuffers::Builder& fbb,
                                              const LayerFilter* layerFilter,
-                                             SerializeUtils::MapRef map);
+                                             SerializeUtils::Map* map);
 };
 }  // namespace tgfx

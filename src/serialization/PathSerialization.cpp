@@ -20,7 +20,7 @@
 
 namespace tgfx {
 
-std::shared_ptr<Data> PathSerialization::Serialize(const Path* path, SerializeUtils::MapRef map) {
+std::shared_ptr<Data> PathSerialization::Serialize(const Path* path, SerializeUtils::Map* map) {
   DEBUG_ASSERT(path != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -32,7 +32,7 @@ std::shared_ptr<Data> PathSerialization::Serialize(const Path* path, SerializeUt
 }
 
 void PathSerialization::SerializePathImpl(flexbuffers::Builder& fbb, const Path* path,
-                                          SerializeUtils::MapRef map) {
+                                          SerializeUtils::Map* map) {
   SerializeUtils::SetFlexBufferMap(fbb, "fillType",
                                    SerializeUtils::PathFillTypeToString(path->getFillType()));
   SerializeUtils::SetFlexBufferMap(fbb, "isInverseFillType", path->isInverseFillType());

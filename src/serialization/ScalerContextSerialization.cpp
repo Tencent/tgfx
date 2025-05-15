@@ -22,7 +22,7 @@
 namespace tgfx {
 
 std::shared_ptr<Data> ScalerContextSerialization::Serialize(const ScalerContext* scalerContext,
-                                                            SerializeUtils::MapRef map) {
+                                                            SerializeUtils::Map* map) {
   DEBUG_ASSERT(scalerContext != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -35,7 +35,7 @@ std::shared_ptr<Data> ScalerContextSerialization::Serialize(const ScalerContext*
 
 void ScalerContextSerialization::SerializeScalerContextImpl(flexbuffers::Builder& fbb,
                                                             const ScalerContext* scaler_context,
-                                                            SerializeUtils::MapRef map) {
+                                                            SerializeUtils::Map* map) {
   auto typeFace = scaler_context->getTypeface();
   auto typeFaceID = SerializeUtils::GetObjID();
   SerializeUtils::SetFlexBufferMap(fbb, "typeFace", reinterpret_cast<uint64_t>(typeFace.get()),

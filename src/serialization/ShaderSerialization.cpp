@@ -28,7 +28,7 @@
 namespace tgfx {
 
 std::shared_ptr<Data> ShaderSerialization::Serialize(const Shader* shader,
-                                                     SerializeUtils::MapRef map) {
+                                                     SerializeUtils::Map* map) {
   DEBUG_ASSERT(shader != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -64,7 +64,7 @@ void ShaderSerialization::SerializeBasicShaderImpl(flexbuffers::Builder& fbb,
 }
 
 void ShaderSerialization::SerializeColorShaderImpl(flexbuffers::Builder& fbb, const Shader* shader,
-                                                   SerializeUtils::MapRef map) {
+                                                   SerializeUtils::Map* map) {
   SerializeBasicShaderImpl(fbb, shader);
   const ColorShader* colorShader = static_cast<const ColorShader*>(shader);
 
@@ -76,7 +76,7 @@ void ShaderSerialization::SerializeColorShaderImpl(flexbuffers::Builder& fbb, co
 
 void ShaderSerialization::SerializeColorFilterShaderImpl(flexbuffers::Builder& fbb,
                                                          const Shader* shader,
-                                                         SerializeUtils::MapRef map) {
+                                                         SerializeUtils::Map* map) {
   SerializeBasicShaderImpl(fbb, shader);
   const ColorFilterShader* colorFilterShader = static_cast<const ColorFilterShader*>(shader);
 
@@ -97,7 +97,7 @@ void ShaderSerialization::SerializeColorFilterShaderImpl(flexbuffers::Builder& f
 }
 
 void ShaderSerialization::SerializeImageShaderImpl(flexbuffers::Builder& fbb, const Shader* shader,
-                                                   SerializeUtils::MapRef map) {
+                                                   SerializeUtils::Map* map) {
   SerializeBasicShaderImpl(fbb, shader);
   const ImageShader* imageShader = static_cast<const ImageShader*>(shader);
 
@@ -119,7 +119,7 @@ void ShaderSerialization::SerializeImageShaderImpl(flexbuffers::Builder& fbb, co
 }
 
 void ShaderSerialization::SerializeBlendShaderImpl(flexbuffers::Builder& fbb, const Shader* shader,
-                                                   SerializeUtils::MapRef map) {
+                                                   SerializeUtils::Map* map) {
   SerializeBasicShaderImpl(fbb, shader);
   const BlendShader* blendShader = static_cast<const BlendShader*>(shader);
   SerializeUtils::SetFlexBufferMap(fbb, "blendMode",
@@ -139,7 +139,7 @@ void ShaderSerialization::SerializeBlendShaderImpl(flexbuffers::Builder& fbb, co
 }
 
 void ShaderSerialization::SerializeMatrixShaderImpl(flexbuffers::Builder& fbb, const Shader* shader,
-                                                    SerializeUtils::MapRef map) {
+                                                    SerializeUtils::Map* map) {
   SerializeBasicShaderImpl(fbb, shader);
   const MatrixShader* matrixShader = static_cast<const MatrixShader*>(shader);
 
@@ -157,7 +157,7 @@ void ShaderSerialization::SerializeMatrixShaderImpl(flexbuffers::Builder& fbb, c
 
 void ShaderSerialization::SerializeGradientShaderImpl(flexbuffers::Builder& fbb,
                                                       const Shader* shader,
-                                                      SerializeUtils::MapRef map) {
+                                                      SerializeUtils::Map* map) {
   SerializeBasicShaderImpl(fbb, shader);
   const GradientShader* gradientShader = static_cast<const GradientShader*>(shader);
 

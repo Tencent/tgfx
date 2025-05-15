@@ -29,7 +29,7 @@
 namespace tgfx {
 
 std::shared_ptr<Data> ImageFilterSerialization::Serialize(const ImageFilter* imageFilter,
-                                                          SerializeUtils::MapRef map) {
+                                                          SerializeUtils::Map* map) {
   DEBUG_ASSERT(imageFilter != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -68,7 +68,7 @@ void ImageFilterSerialization::serializeImageFilterImpl(flexbuffers::Builder& fb
 
 void ImageFilterSerialization::serializeColorImageFilter(flexbuffers::Builder& fbb,
                                                          const ImageFilter* imageFilter,
-                                                         SerializeUtils::MapRef map) {
+                                                         SerializeUtils::Map* map) {
   serializeImageFilterImpl(fbb, imageFilter);
   const ColorImageFilter* colorImageFilter = static_cast<const ColorImageFilter*>(imageFilter);
 
@@ -91,7 +91,7 @@ void ImageFilterSerialization::serializeBlurImageFilter(flexbuffers::Builder& fb
 
 void ImageFilterSerialization::serializeComposeImageFilter(flexbuffers::Builder& fbb,
                                                            const ImageFilter* imageFilter,
-                                                           SerializeUtils::MapRef map) {
+                                                           SerializeUtils::Map* map) {
   serializeImageFilterImpl(fbb, imageFilter);
   const ComposeImageFilter* composeImageFilter =
       static_cast<const ComposeImageFilter*>(imageFilter);
@@ -105,7 +105,7 @@ void ImageFilterSerialization::serializeComposeImageFilter(flexbuffers::Builder&
 
 void ImageFilterSerialization::serializeDropShadowImageFilter(flexbuffers::Builder& fbb,
                                                               const ImageFilter* imageFilter,
-                                                              SerializeUtils::MapRef map) {
+                                                              SerializeUtils::Map* map) {
   serializeImageFilterImpl(fbb, imageFilter);
   const DropShadowImageFilter* dropShadowImageFilter =
       static_cast<const DropShadowImageFilter*>(imageFilter);
@@ -128,7 +128,7 @@ void ImageFilterSerialization::serializeDropShadowImageFilter(flexbuffers::Build
 
 void ImageFilterSerialization::serializeInnerShadowImageFilter(flexbuffers::Builder& fbb,
                                                                const ImageFilter* imageFilter,
-                                                               SerializeUtils::MapRef map) {
+                                                               SerializeUtils::Map* map) {
   serializeImageFilterImpl(fbb, imageFilter);
   const InnerShadowImageFilter* innerShadowImageFilter =
       static_cast<const InnerShadowImageFilter*>(imageFilter);
@@ -151,7 +151,7 @@ void ImageFilterSerialization::serializeInnerShadowImageFilter(flexbuffers::Buil
 
 void ImageFilterSerialization::serializeRuntimeImageFilter(flexbuffers::Builder& fbb,
                                                            const ImageFilter* imageFilter,
-                                                           SerializeUtils::MapRef map) {
+                                                           SerializeUtils::Map* map) {
   serializeImageFilterImpl(fbb, imageFilter);
   const RuntimeImageFilter* runtimeImageFilter =
       static_cast<const RuntimeImageFilter*>(imageFilter);

@@ -22,7 +22,7 @@
 namespace tgfx {
 
 std::shared_ptr<Data> glyphRunSerialization::Serialize(const GlyphRun* glyphRun,
-                                                       SerializeUtils::MapRef map) {
+                                                       SerializeUtils::Map* map) {
   DEBUG_ASSERT(glyphRun != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -35,7 +35,7 @@ std::shared_ptr<Data> glyphRunSerialization::Serialize(const GlyphRun* glyphRun,
 
 void glyphRunSerialization::SerializeGlyphRunImpl(flexbuffers::Builder& fbb,
                                                   const GlyphRun* glyphRun,
-                                                  SerializeUtils::MapRef map) {
+                                                  SerializeUtils::Map* map) {
   auto glyphFaceID = SerializeUtils::GetObjID();
   auto glyphFace = glyphRun->glyphFace;
   SerializeUtils::SetFlexBufferMap(fbb, "glyphFace", reinterpret_cast<uint64_t>(glyphFace.get()),

@@ -21,8 +21,7 @@
 
 namespace tgfx {
 
-std::shared_ptr<Data> ShapeSerialization::Serialize(const Shape* shape,
-                                                    SerializeUtils::MapRef map) {
+std::shared_ptr<Data> ShapeSerialization::Serialize(const Shape* shape, SerializeUtils::Map* map) {
   DEBUG_ASSERT(shape != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -34,7 +33,7 @@ std::shared_ptr<Data> ShapeSerialization::Serialize(const Shape* shape,
 }
 
 void ShapeSerialization::SerializeShapeImpl(flexbuffers::Builder& fbb, const Shape* shape,
-                                            SerializeUtils::MapRef map) {
+                                            SerializeUtils::Map* map) {
   SerializeUtils::SetFlexBufferMap(fbb, "type",
                                    SerializeUtils::ShapeTypeToString(Types::Get(shape)));
   SerializeUtils::SetFlexBufferMap(fbb, "isSimplePath", shape->isSimplePath());
