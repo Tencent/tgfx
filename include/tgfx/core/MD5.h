@@ -36,6 +36,7 @@ class HexadecimalDigits {
 class MD5 : public WriteStream {
  public:
   MD5();
+
   bool write(const void* data, size_t size) final;
 
   size_t bytesWritten() const final {
@@ -65,7 +66,7 @@ class MD5 : public WriteStream {
  private:
   uint64_t byteCount;  // number of bytes, modulo 2^64
   uint32_t state[4];   // state (ABCD)
-  uint8_t buffer[64];  // input buffer
+  uint8_t buffer[64];
 };
 
 }  // namespace tgfx

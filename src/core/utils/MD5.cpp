@@ -24,14 +24,12 @@ namespace {
 struct F {
   uint32_t operator()(uint32_t x, uint32_t y, uint32_t z) {
     return ((y ^ z) & x) ^ z;
-    //return (x & y) | ((~x) & z); //equivelent but slower
   }
 };
 
 struct G {
   uint32_t operator()(uint32_t x, uint32_t y, uint32_t z) {
     return (x & z) | (y & (~z));
-    //return ((x ^ y) & z) ^ y; //equivelent but slower
   }
 };
 
@@ -185,8 +183,8 @@ std::string to_hex_string(const uint8_t* data, const std::array<char, 16> hexDig
   std::string hexString(2 * sizeof(MD5::Digest::data), '\0');
   for (size_t i = 0; i < sizeof(MD5::Digest::data); ++i) {
     uint8_t byte = data[i];
-    hexString[2 * i + 0] = hexDigits[byte >> 4];
-    hexString[2 * i + 1] = hexDigits[byte & 0xF];
+    hexString[(2 * i) + 0] = hexDigits[byte >> 4];
+    hexString[(2 * i) + 1] = hexDigits[byte & 0xF];
   }
   return hexString;
 }

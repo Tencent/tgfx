@@ -155,6 +155,9 @@ class Bitmap {
     return _info.isAlphaOnly();
   }
 
+  /**
+   * Returns true if the alpha type of the pixels is opaque.
+   */
   bool isOpaque() const {
     return _info.isOpaque();
   }

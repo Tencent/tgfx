@@ -732,6 +732,10 @@ class Matrix {
    */
   bool isFinite() const;
 
+  /**
+   * Converts the matrix into an affine transformation and returns it as an array of six floats.
+   * The values are ordered as: scaleX, skewX, transX, skewY, scaleY, transY.
+   */
   std::array<float, 6> asAffine() const;
 
  private:

@@ -65,6 +65,9 @@ class ImageInfo {
     return _colorType == ColorType::ALPHA_8;
   }
 
+  /**
+   * Returns true if the alpha type of the pixels is opaque.
+   */
   bool isOpaque() const {
     return _alphaType == AlphaType::Opaque;
   }

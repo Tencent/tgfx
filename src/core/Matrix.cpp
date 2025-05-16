@@ -438,12 +438,12 @@ const Matrix& Matrix::I() {
 }
 
 std::array<float, 6> Matrix::asAffine() const {
-  static constexpr int AFFINE_SCALE_X = 0;  //!< horizontal scale factor
-  static constexpr int AFFINE_SKEW_Y = 1;   //!< vertical skew factor
-  static constexpr int AFFINE_SKEW_X = 2;   //!< horizontal skew factor
-  static constexpr int AFFINE_SCALE_Y = 3;  //!< vertical scale factor
-  static constexpr int AFFINE_TRANS_X = 4;  //!< horizontal translation
-  static constexpr int AFFINE_TRANS_Y = 5;  //!< vertical translation
+  static constexpr int AFFINE_SCALE_X = 0;
+  static constexpr int AFFINE_SKEW_Y = 1;
+  static constexpr int AFFINE_SKEW_X = 2;
+  static constexpr int AFFINE_SCALE_Y = 3;
+  static constexpr int AFFINE_TRANS_X = 4;
+  static constexpr int AFFINE_TRANS_Y = 5;
 
   std::array<float, 6> affine;
   affine[AFFINE_SCALE_X] = values[SCALE_X];
