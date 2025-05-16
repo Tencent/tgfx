@@ -51,6 +51,10 @@ class EmptyScalerContext : public ScalerContext {
   bool readPixels(GlyphID, const ImageInfo&, void*) const override {
     return false;
   }
+
+  bool canUseImage(bool, const Stroke*) const override {
+    return false;
+  }
 };
 
 std::shared_ptr<ScalerContext> ScalerContext::MakeEmpty(float size) {

@@ -50,7 +50,7 @@ export const readImagePixels = (module: TGFX, image: CanvasImageSource, width: n
         return null;
     }
     const canvas = getCanvas2D(width, height);
-    const ctx = canvas.getContext('2d') as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
+    const ctx = canvas.getContext('2d', {willReadFrequently: true}) as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
     if (!ctx) {
         return null;
     }

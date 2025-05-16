@@ -599,7 +599,7 @@ bool FTScalerContext::loadBitmapGlyph(GlyphID glyphID, FT_Int32 glyphFlags) cons
   }
   auto face = ftTypeface()->face;
   auto err = FT_Load_Glyph(face, glyphID, glyphFlags);
-  if (err != FT_Err_Ok || face->glyph->format != FT_GLYPH_FORMAT_BITMAP) {
+  if (err != FT_Err_Ok) {
     return false;
   }
   auto ftBitmap = face->glyph->bitmap;
@@ -616,5 +616,8 @@ Matrix FTScalerContext::getExtraMatrix(bool fauxItalic) const {
 
 FTTypeface* FTScalerContext::ftTypeface() const {
   return static_cast<FTTypeface*>(typeface.get());
+}
+bool FTScalerContext::canUseImage(bool fauxBold, const Stroke* stroke) const {
+  return hasColor() || (stroke == nullptr && !fauxBold);
 }
 }  // namespace tgfx

@@ -21,6 +21,7 @@
 #include "tgfx/core/FontMetrics.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/Stroke.h"
 #include "tgfx/core/Typeface.h"
 
 namespace tgfx {
@@ -63,6 +64,8 @@ class ScalerContext {
   virtual Rect getImageTransform(GlyphID glyphID, Matrix* matrix) const = 0;
 
   virtual bool readPixels(GlyphID glyphID, const ImageInfo& dstInfo, void* dstPixels) const = 0;
+
+  virtual bool canUseImage(bool fauxBold, const Stroke* stroke) const = 0;
 
  protected:
   // Note: This could be nullptr.

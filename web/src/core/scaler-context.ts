@@ -149,7 +149,7 @@ export class ScalerContext {
         const width = bounds.right - bounds.left;
         const height = bounds.bottom - bounds.top
         const canvas = getCanvas2D(width, height);
-        const context = canvas.getContext('2d') as CanvasRenderingContext2D;
+        const context = canvas.getContext('2d',{willReadFrequently: true}) as CanvasRenderingContext2D;
         context.font = this.fontString(false, false);
         context.fillText(text, -bounds.left, -bounds.top);
         const {data} = context.getImageData(0, 0, width, height);
@@ -208,4 +208,13 @@ export class ScalerContext {
         };
     }
 
+    public getImageData(canvas:HTMLCanvasElement | OffscreenCanvas){
+        const context = canvas.getContext('2d',{willReadFrequently: true}) as CanvasRenderingContext2D;
+        const {data} = context.getImageData(0, 0, canvas.width, canvas.height);
+        releaseCanvas2D(canvas);
+        if (data.length === 0) {
+            return null;
+        }
+        return new Uint8Array(data);
+    }
 }

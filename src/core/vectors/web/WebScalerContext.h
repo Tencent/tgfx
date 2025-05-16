@@ -39,6 +39,10 @@ class WebScalerContext : public ScalerContext {
 
   bool readPixels(GlyphID glyphID, const ImageInfo& dstInfo, void* dstPixels) const override;
 
+  bool canUseImage(bool, const Stroke*) const override {
+    return hasColor();
+  }
+
  private:
   emscripten::val scalerContext = emscripten::val::null();
 

@@ -63,10 +63,11 @@ class GlyphFace {
 
   /**
    * Creates an Image capturing the content of the specified glyph. The returned matrix should apply
-   * to the glyph image when drawing. Please note that the fauxBold is not supported for this
-   * method.
+   * to the glyph image when drawing. Returns nullptr if the glyph is not part of this GlyphFace,
+   * cannot be rendered as an image, or if the stroke is unsupported.
    */
-  virtual std::shared_ptr<ImageCodec> getImage(GlyphID glyphID, Matrix* matrix) const = 0;
+  virtual std::shared_ptr<ImageCodec> getImage(GlyphID glyphID, const Stroke* stroke,
+                                               Matrix* matrix) const = 0;
 
   /**
    * Returns the bounding box of the specified glyph.

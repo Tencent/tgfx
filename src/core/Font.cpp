@@ -131,10 +131,16 @@ bool Font::getPath(GlyphID glyphID, Path* path) const {
   return scalerContext->generatePath(glyphID, fauxBold, fauxItalic, path);
 }
 
-std::shared_ptr<ImageCodec> Font::getImage(GlyphID glyphID, Matrix* matrix) const {
+std::shared_ptr<ImageCodec> Font::getImage(GlyphID glyphID, const Stroke* stroke,
+                                           Matrix* matrix) const {
   if (glyphID == 0) {
     return nullptr;
   }
+
+  if (!scalerContext->canUseImage(fauxBold, stroke)) {
+    return nullptr;
+  }
+
   auto bounds = scalerContext->getImageTransform(glyphID, matrix);
   if (bounds.isEmpty()) {
     return nullptr;

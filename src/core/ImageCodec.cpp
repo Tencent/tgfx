@@ -139,6 +139,7 @@ std::shared_ptr<ImageBuffer> ImageCodec::onMakeBuffer(bool tryHardware) const {
     return nullptr;
   }
   auto pixels = pixelBuffer->lockPixels();
+  memset(pixels, 0, pixelBuffer->info().byteSize());
   auto result = readPixels(pixelBuffer->info(), pixels);
   pixelBuffer->unlockPixels();
   return result ? pixelBuffer : nullptr;

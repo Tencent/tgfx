@@ -46,6 +46,8 @@ class FTScalerContext : public ScalerContext {
 
   bool readPixels(GlyphID glyphID, const ImageInfo& dstInfo, void* dstPixels) const override;
 
+  bool canUseImage(bool fauxBold, const Stroke* stroke) const override;
+
  private:
   int setupSize(bool fauxItalic) const;
 
