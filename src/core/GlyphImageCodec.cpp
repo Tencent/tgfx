@@ -18,48 +18,32 @@
 
 #include "GlyphImageCodec.h"
 #include "core/GlyphDrawer.h"
-#include "core/ScalerContext.h"
 
 namespace tgfx {
 std::shared_ptr<GlyphImageCodec> GlyphImageCodec::MakeFrom(std::shared_ptr<GlyphFace> glyphFace,
-                                                           GlyphID glyphID, const Stroke* stroke,
-                                                           float resolutionScale) {
-  if (glyphFace == nullptr) {
+                                                           GlyphID glyphID, float resolutionScale,
+                                                           const Stroke* stroke) {
+  if (glyphFace == nullptr || glyphID == 0) {
     return nullptr;
   }
   Rect glyphBounds = GlyphDrawer::GetGlyphBounds(glyphFace.get(), glyphID, resolutionScale, stroke);
   if (glyphBounds.isEmpty()) {
     return nullptr;
   }
-
   return std::shared_ptr<GlyphImageCodec>(
-      new GlyphImageCodec(std::move(glyphFace), glyphID, glyphBounds, stroke, resolutionScale));
+      new GlyphImageCodec(std::move(glyphFace), glyphID, glyphBounds, resolutionScale, stroke));
 }
 
 GlyphImageCodec::GlyphImageCodec(std::shared_ptr<GlyphFace> glyphFace, GlyphID glyphID,
-                                 const Rect& bounds, const Stroke* s, float resolutionScale)
+                                 const Rect& bounds, float resolutionScale, const Stroke* s)
     : ImageCodec(static_cast<int>(std::ceilf(bounds.width())),
                  static_cast<int>(std::ceilf(bounds.height())), Orientation::LeftTop),
-      glyphFace(std::move(glyphFace)), glyphID(glyphID), resolutionScale(resolutionScale),
-      bounds(bounds) {
+      glyphFace(std::move(glyphFace)), bounds(bounds), resolutionScale(resolutionScale),
+      glyphID(glyphID) {
   if (s != nullptr) {
     stroke = new Stroke(*s);
   }
-  calculateMatrix();
-}
-
-void GlyphImageCodec::calculateMatrix() {
-  Font font;
-  bool canUseImage = false;
-  if (glyphFace->asFont(&font)) {
-    GlyphStyle glyphStyle{glyphID, font.isFauxBold(), font.isFauxItalic(), stroke};
-    canUseImage = font.scalerContext->canUseImage(glyphStyle);
-  } else {
-    canUseImage = glyphFace->hasColor();
-  }
-  if (canUseImage) {
-    imageCodec = glyphFace->getImage(glyphID, stroke, &matrix);
-  }
+  imageCodec = this->glyphFace->getImage(glyphID, stroke, &matrix);
   if (imageCodec == nullptr) {
     matrix = Matrix::MakeTrans(bounds.x(), bounds.y());
   }

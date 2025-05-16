@@ -33,9 +33,6 @@ std::shared_ptr<GlyphDrawer> GlyphDrawer::Make(float resolutionScale, bool antiA
 bool WebGlyphDrawer::onFillGlyph(const GlyphFace* glyphFace, GlyphID glyphID, const Stroke* stroke,
                                  const Rect& glyphBounds, const ImageInfo& dstInfo,
                                  void* dstPixels) {
-  if (glyphFace == nullptr || glyphFace == 0) {
-    return false;
-  }
   Font font = {};
   if (!glyphFace->asFont(&font)) {
     return false;
@@ -50,7 +47,6 @@ bool WebGlyphDrawer::onFillGlyph(const GlyphFace* glyphFace, GlyphID glyphID, co
   if (!scalerContext.as<bool>()) {
     return false;
   }
-
   auto canvas =
       val::module_property("tgfx").call<val>("createCanvas2D", dstInfo.width(), dstInfo.height());
   if (!canvas.as<bool>()) {
@@ -60,15 +56,12 @@ bool WebGlyphDrawer::onFillGlyph(const GlyphFace* glyphFace, GlyphID glyphID, co
   if (!webMaskClass.as<bool>()) {
     return false;
   }
-
   auto webMask = webMaskClass.call<val>("create", canvas);
   if (!webMask.as<bool>()) {
     return false;
   }
-
   auto texts = std::vector<std::string>{typeface->getText(glyphID)};
   auto points = std::vector<Point>{Point::Zero()};
-
   auto webFont = val::object();
   webFont.set("name", typeface->fontFamily());
   webFont.set("style", typeface->fontStyle());
@@ -86,21 +79,30 @@ bool WebGlyphDrawer::onFillGlyph(const GlyphFace* glyphFace, GlyphID glyphID, co
   if (!imageData.as<bool>()) {
     return false;
   }
-  auto length = static_cast<size_t>(dstInfo.width() * dstInfo.height() * 4);
-  auto buffer = new (std::nothrow) int8_t[length];
-  if (buffer == nullptr) {
+  auto length = imageData["length"].as<size_t>();
+  if (length == 0 || length % 4 != 0) {
     return false;
   }
   auto memory = val::module_property("HEAPU8")["buffer"];
-  auto memoryView =
-      val::global("Uint8Array").new_(memory, reinterpret_cast<uintptr_t>(buffer), length);
-  memoryView.call<void>("set", imageData);
+  if (dstInfo.isAlphaOnly()) {
+    auto buffer = new (std::nothrow) int8_t[length];
+    if (buffer == nullptr) {
+      return false;
+    }
+    auto memoryView =
+        val::global("Uint8Array").new_(memory, reinterpret_cast<uintptr_t>(buffer), length);
+    memoryView.call<void>("set", imageData);
 
-  auto RGBAInfo = ImageInfo::Make(dstInfo.width(), dstInfo.height(), ColorType::RGBA_8888,
-                                  AlphaType::Premultiplied);
-  Pixmap RGBAMap(RGBAInfo, buffer);
-  RGBAMap.readPixels(dstInfo, dstPixels);
-  delete[] buffer;
+    auto RGBAInfo = ImageInfo::Make(dstInfo.width(), dstInfo.height(), ColorType::RGBA_8888,
+                                    AlphaType::Premultiplied);
+    Pixmap RGBAMap(RGBAInfo, buffer);
+    RGBAMap.readPixels(dstInfo, dstPixels);
+    delete[] buffer;
+  } else {
+    auto memoryView =
+        val::global("Uint8Array").new_(memory, reinterpret_cast<uintptr_t>(dstPixels), length);
+    memoryView.call<void>("set", imageData);
+  }
   return true;
 }
 }  // namespace tgfx

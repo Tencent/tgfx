@@ -25,12 +25,9 @@ namespace tgfx {
 class FontGlyphImageCodec : public ImageCodec {
  public:
   FontGlyphImageCodec(int width, int height, std::shared_ptr<ScalerContext> scalerContext,
-                      GlyphID glyphID, bool fauxBold, bool fauxItalic, const Stroke* s)
+                      GlyphID glyphID)
       : ImageCodec(width, height, Orientation::LeftTop), scalerContext(std::move(scalerContext)),
-        glyphID(glyphID), fauxBold(fauxBold), fauxItalic(fauxItalic) {
-    if (s) {
-      stroke = std::make_unique<Stroke>(*s);
-    }
+        glyphID(glyphID) {
   }
 
   bool isAlphaOnly() const override {
@@ -38,16 +35,12 @@ class FontGlyphImageCodec : public ImageCodec {
   }
 
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override {
-    return scalerContext->readPixels({glyphID, fauxBold, fauxItalic, stroke.get()}, dstInfo,
-                                     dstPixels);
+    return scalerContext->readPixels(glyphID, dstInfo, dstPixels);
   }
 
  private:
   std::shared_ptr<ScalerContext> scalerContext = nullptr;
   GlyphID glyphID = 0;
-  bool fauxBold = false;
-  bool fauxItalic = false;
-  std::unique_ptr<Stroke> stroke = nullptr;
 };
 
 Font::Font() : scalerContext(ScalerContext::MakeEmpty(0.0f)) {
@@ -143,7 +136,12 @@ std::shared_ptr<ImageCodec> Font::getImage(GlyphID glyphID, const Stroke* stroke
   if (glyphID == 0) {
     return nullptr;
   }
-  auto bounds = scalerContext->getImageTransform({glyphID, fauxBold, fauxItalic, stroke}, matrix);
+
+  if (!scalerContext->canUseImage(fauxBold, stroke)) {
+    return nullptr;
+  }
+
+  auto bounds = scalerContext->getImageTransform(glyphID, matrix);
   if (bounds.isEmpty()) {
     return nullptr;
   }
@@ -152,8 +150,7 @@ std::shared_ptr<ImageCodec> Font::getImage(GlyphID glyphID, const Stroke* stroke
   }
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
-  return std::make_shared<FontGlyphImageCodec>(width, height, scalerContext, glyphID, fauxBold,
-                                               fauxItalic, stroke);
+  return std::make_shared<FontGlyphImageCodec>(width, height, scalerContext, glyphID);
 }
 
 bool Font::operator==(const Font& font) const {

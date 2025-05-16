@@ -35,13 +35,12 @@ class WebScalerContext : public ScalerContext {
 
   bool generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic, Path* path) const override;
 
-  Rect getImageTransform(const GlyphStyle& glyphStyle, Matrix* matrix) const override;
+  Rect getImageTransform(GlyphID glyphID, Matrix* matrix) const override;
 
-  bool readPixels(const GlyphStyle& glyphStyle, const ImageInfo& dstInfo,
-                  void* dstPixels) const override;
+  bool readPixels(GlyphID glyphID, const ImageInfo& dstInfo, void* dstPixels) const override;
 
-  bool canUseImage(const GlyphStyle& glyphStyle) const override {
-    return glyphStyle.stroke == nullptr;
+  bool canUseImage(bool, const Stroke*) const override {
+    return hasColor();
   }
 
  private:

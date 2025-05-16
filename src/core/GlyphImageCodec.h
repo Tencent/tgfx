@@ -22,13 +22,13 @@
 
 namespace tgfx {
 /**
- * A Rasterizer that rasterizes a set of glyphs.
+ * An ImageCodec that rasterizes a glyph.
  */
 class GlyphImageCodec : public ImageCodec {
  public:
   static std::shared_ptr<GlyphImageCodec> MakeFrom(std::shared_ptr<GlyphFace> glyphFace,
-                                                   GlyphID glyphID, const Stroke* stroke = nullptr,
-                                                   float resolutionScale = 1.0f);
+                                                   GlyphID glyphID, float resolutionScale,
+                                                   const Stroke* stroke = nullptr);
 
   ~GlyphImageCodec() override;
 
@@ -44,16 +44,14 @@ class GlyphImageCodec : public ImageCodec {
 
  private:
   GlyphImageCodec(std::shared_ptr<GlyphFace> glyphFace, GlyphID glyphID, const Rect& bounds,
-                  const Stroke* stroke, float resolutionScale);
-
-  void calculateMatrix();
+                  float resolutionScale, const Stroke* stroke);
 
   std::shared_ptr<GlyphFace> glyphFace = nullptr;
-  GlyphID glyphID = 0;
-  Matrix matrix = {};
-  Stroke* stroke = nullptr;
-  float resolutionScale;
-  Rect bounds = {};
   std::shared_ptr<ImageCodec> imageCodec = nullptr;
+  Matrix matrix = {};
+  Rect bounds = {};
+  Stroke* stroke = nullptr;
+  float resolutionScale = 1.f;
+  GlyphID glyphID = 0;
 };
 }  // namespace tgfx

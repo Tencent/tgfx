@@ -87,12 +87,6 @@ std::shared_ptr<GlyphDrawer> GlyphDrawer::Make(float resolutionScale, bool antiA
 }
 
 bool FTGlyphDrawer::onFillPath(const Path& path, const ImageInfo& dstInfo, void* dstPixels) {
-  if (dstPixels == nullptr) {
-    return false;
-  }
-  if (path.isEmpty()) {
-    return false;
-  }
   auto finalPath = path;
   auto totalMatrix = Matrix::MakeScale(1, -1);
   totalMatrix.postTranslate(0, static_cast<float>(dstInfo.height()));
@@ -102,7 +96,6 @@ bool FTGlyphDrawer::onFillPath(const Path& path, const ImageInfo& dstInfo, void*
     maskPath.addRect(Rect::MakeWH(dstInfo.width(), dstInfo.height()));
     finalPath.addPath(maskPath, PathOp::Intersect);
   }
-
   FTPath ftPath = {};
   finalPath.decompose(Iterator, &ftPath);
   auto fillType = finalPath.getFillType();

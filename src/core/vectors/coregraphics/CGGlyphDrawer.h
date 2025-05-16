@@ -22,7 +22,7 @@
 #include "tgfx/core/Path.h"
 
 namespace tgfx {
-class CGGlyphDrawer : public GlyphDrawer {
+class CGGlyphDrawer final : public GlyphDrawer {
  public:
   explicit CGGlyphDrawer(float resolutionScale, bool antiAlias, bool needsGammaCorrection)
       : GlyphDrawer(resolutionScale, antiAlias, needsGammaCorrection) {

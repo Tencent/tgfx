@@ -50,7 +50,7 @@ const std::array<uint8_t, 256>& GlyphDrawer::GammaTable() {
 
 bool GlyphDrawer::fillGlyph(const GlyphFace* glyphFace, GlyphID glyphID, const Stroke* stroke,
                             const ImageInfo& dstInfo, void* dstPixels) {
-  if (glyphFace == nullptr || glyphFace->hasColor() || dstPixels == nullptr) {
+  if (glyphFace == nullptr || dstPixels == nullptr || glyphID == 0) {
     return false;
   }
   auto bounds = GetGlyphBounds(glyphFace, glyphID, resolutionScale, stroke);
@@ -92,17 +92,13 @@ Rect GlyphDrawer::GetGlyphBounds(const GlyphFace* glyphFace, GlyphID glyphID, fl
     return bounds;
   }
   Font font;
-  bool canUseImage = false;
   if (glyphFace->asFont(&font)) {
-    GlyphStyle glyphStyle{glyphID, font.isFauxBold(), font.isFauxItalic(), stroke};
-    canUseImage = font.scalerContext->canUseImage(glyphStyle);
-    if (canUseImage) {
-      bounds = font.scalerContext->getImageTransform(glyphStyle, nullptr);
+    if (font.scalerContext->canUseImage(font.isFauxBold(), stroke)) {
+      bounds = font.scalerContext->getImageTransform(glyphID, nullptr);
     } else {
       bounds = font.getBounds(glyphID);
     }
   } else {
-    canUseImage = glyphFace->hasColor();
     auto imageCodec = glyphFace->getImage(glyphID, nullptr, nullptr);
     bounds = Rect::MakeWH(imageCodec->width(), imageCodec->height());
   }

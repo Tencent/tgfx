@@ -149,5 +149,4 @@ bool CGGlyphDrawer::onFillPath(const Path& path, const ImageInfo& dstInfo, void*
   CGImageRelease(image);
   return true;
 }
-
 }  // namespace tgfx

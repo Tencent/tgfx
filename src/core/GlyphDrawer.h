@@ -19,24 +19,42 @@
 #pragma once
 
 #include <array>
-#include "core/GlyphRunList.h"
 #include "tgfx/core/GlyphFace.h"
 #include "tgfx/core/Stroke.h"
 
 namespace tgfx {
+/**
+ * GlyphDrawer is a utility class used to render a specific glyph or path into a given pixel buffer.
+ * It first attempts to draw the glyph using platform APIs; if that fails, it retrieves the glyph’s
+ * path and fills it manually.You can also use it to fill a path directly.
+ */
 class GlyphDrawer {
  public:
+  /**
+   * Creates a new GlyphDrawer instance with the specified resolution scale, anti-aliasing setting,
+   * and gamma correction flag. Anti-aliasing and gamma correction are recommended for glyph rendering,
+   * while gamma correction is generally unnecessary for regular path rendering.
+   */
   static std::shared_ptr<GlyphDrawer> Make(float resolutionScale, bool antiAlias,
                                            bool needsGammaCorrection);
 
+  /**
+   * Calculate the bounds of the glyph in pixels, taking into account the resolution scale and stroke.
+   */
   static Rect GetGlyphBounds(const GlyphFace* glyphFace, GlyphID glyphID, float resolutionScale,
                              const Stroke* stroke);
 
   virtual ~GlyphDrawer() = default;
 
+  /**
+   * Fills the specified glyph into the pixel buffer. Returns true if successful.
+   */
   bool fillGlyph(const GlyphFace* glyphFace, GlyphID, const Stroke* stroke,
                  const ImageInfo& dstInfo, void* dstPixels);
 
+  /**
+   * Fills the specified path into the pixel buffer. Returns true if successful.
+   */
   bool fillPath(const Path& path, const ImageInfo& dstInfo, void* dstPixels);
 
  protected:

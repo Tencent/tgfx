@@ -21,7 +21,7 @@
 #include "core/GlyphDrawer.h"
 
 namespace tgfx {
-class FTGlyphDrawer : public GlyphDrawer {
+class FTGlyphDrawer final : public GlyphDrawer {
  public:
   explicit FTGlyphDrawer(float resolutionScale, bool antiAlias, bool needsGammaCorrection)
       : GlyphDrawer(resolutionScale, antiAlias, needsGammaCorrection) {
