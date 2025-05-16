@@ -21,7 +21,7 @@
 
 namespace tgfx {
 
-std::shared_ptr<Data> GlyphFaceSerialization::Serialize(GlyphFace* glyphFace) {
+std::shared_ptr<Data> GlyphFaceSerialization::Serialize(const GlyphFace* glyphFace) {
   DEBUG_ASSERT(glyphFace != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -33,7 +33,7 @@ std::shared_ptr<Data> GlyphFaceSerialization::Serialize(GlyphFace* glyphFace) {
 }
 
 void GlyphFaceSerialization::SerializeGlyphFaceImpl(flexbuffers::Builder& fbb,
-                                                    GlyphFace* glyphFace) {
+                                                    const GlyphFace* glyphFace) {
   SerializeUtils::SetFlexBufferMap(fbb, "hasColor", glyphFace->hasColor());
   SerializeUtils::SetFlexBufferMap(fbb, "hasOutlines", glyphFace->hasOutlines());
 }

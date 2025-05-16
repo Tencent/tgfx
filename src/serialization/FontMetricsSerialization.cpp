@@ -21,7 +21,7 @@
 
 namespace tgfx {
 
-std::shared_ptr<Data> FontMetricsSerialization::Serialize(FontMetrics* fontMerics) {
+std::shared_ptr<Data> FontMetricsSerialization::Serialize(const FontMetrics* fontMerics) {
   DEBUG_ASSERT(fontMerics != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -33,7 +33,7 @@ std::shared_ptr<Data> FontMetricsSerialization::Serialize(FontMetrics* fontMeric
 }
 
 void FontMetricsSerialization::SerializeScalerContextImpl(flexbuffers::Builder& fbb,
-                                                          FontMetrics* fontMetrics) {
+                                                          const FontMetrics* fontMetrics) {
   SerializeUtils::SetFlexBufferMap(fbb, "top", fontMetrics->top);
   SerializeUtils::SetFlexBufferMap(fbb, "ascent", fontMetrics->ascent);
   SerializeUtils::SetFlexBufferMap(fbb, "descent", fontMetrics->descent);

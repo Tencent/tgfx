@@ -29,6 +29,15 @@ class TextContent : public LayerContent {
     return bounds;
   }
 
+  Rect getTightBounds(const Matrix& matrix) const override {
+    Path textPath = {};
+    if (textBlob->getPath(&textPath)) {
+      textPath.transform(matrix);
+      return textPath.getBounds();
+    }
+    return bounds;
+  }
+
   void draw(Canvas* canvas, const Paint& paint) const override;
 
   bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;

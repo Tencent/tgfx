@@ -24,9 +24,9 @@
 namespace tgfx {
 class ImageSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(Image* image);
+  static std::shared_ptr<Data> Serialize(const Image* image);
 
  private:
-  static void SerializeImageImpl(flexbuffers::Builder& fbb, Image* image);
+  static void SerializeImageImpl(flexbuffers::Builder& fbb, const Image* image);
 };
 }  // namespace tgfx

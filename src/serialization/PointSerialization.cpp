@@ -21,7 +21,7 @@
 
 namespace tgfx {
 
-std::shared_ptr<Data> PointSerialization::Serialize(Point* point) {
+std::shared_ptr<Data> PointSerialization::Serialize(const Point* point) {
   DEBUG_ASSERT(point != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -32,7 +32,7 @@ std::shared_ptr<Data> PointSerialization::Serialize(Point* point) {
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
 
-void PointSerialization::SerializePointImpl(flexbuffers::Builder& fbb, Point* point) {
+void PointSerialization::SerializePointImpl(flexbuffers::Builder& fbb, const Point* point) {
   SerializeUtils::SetFlexBufferMap(fbb, "x", point->x);
   SerializeUtils::SetFlexBufferMap(fbb, "y", point->y);
 }

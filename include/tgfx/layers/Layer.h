@@ -544,6 +544,8 @@ class Layer {
 
   void invalidate();
 
+  Rect getBoundsInternal(const Matrix& coordinateMatrix, bool computeTightBounds);
+
   void onAttachToRoot(Layer* owner);
 
   void onDetachFromRoot();
@@ -593,8 +595,6 @@ class Layer {
   void updateRenderBounds(const Matrix& renderMatrix, const Rect* clipRect = nullptr,
                           bool forceDirty = false);
 
-  void cleanDirtyFlags();
-
   struct {
     bool dirtyContent : 1;      // layer's content needs updating
     bool dirtyDescendents : 1;  // a descendant layer needs redrawing
@@ -625,5 +625,6 @@ class Layer {
 
   friend class DisplayList;
   friend class LayerProperty;
+  friend class LayerSerialization;
 };
 }  // namespace tgfx

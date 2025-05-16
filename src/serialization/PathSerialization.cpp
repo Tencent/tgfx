@@ -15,32 +15,39 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
+#ifdef TGFX_USE_INSPECTOR
 #include "PathSerialization.h"
 
 namespace tgfx {
 
-std::shared_ptr<Data> PathSerialization::Serialize(Path* path) {
+std::shared_ptr<Data> PathSerialization::Serialize(const Path* path, SerializeUtils::Map* map) {
   DEBUG_ASSERT(path != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
   SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
-  SerializePathImpl(fbb, path);
+  SerializePathImpl(fbb, path, map);
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
 
-void PathSerialization::SerializePathImpl(flexbuffers::Builder& fbb, Path* path) {
+void PathSerialization::SerializePathImpl(flexbuffers::Builder& fbb, const Path* path,
+                                          SerializeUtils::Map* map) {
   SerializeUtils::SetFlexBufferMap(fbb, "fillType",
                                    SerializeUtils::PathFillTypeToString(path->getFillType()));
   SerializeUtils::SetFlexBufferMap(fbb, "isInverseFillType", path->isInverseFillType());
   SerializeUtils::SetFlexBufferMap(fbb, "isLine", path->isLine());
   SerializeUtils::SetFlexBufferMap(fbb, "isRect", path->isRect());
   SerializeUtils::SetFlexBufferMap(fbb, "isOval", path->isOval());
-  SerializeUtils::SetFlexBufferMap(fbb, "bounds", "", false, true);
+
+  auto boundsID = SerializeUtils::GetObjID();
+  auto bounds = path->getBounds();
+  SerializeUtils::SetFlexBufferMap(fbb, "bounds", "", false, true, boundsID);
+  SerializeUtils::FillMap(bounds, boundsID, map);
+
   SerializeUtils::SetFlexBufferMap(fbb, "isEmpty", path->isEmpty());
   SerializeUtils::SetFlexBufferMap(fbb, "countPoints", path->countPoints());
   SerializeUtils::SetFlexBufferMap(fbb, "countVerbs", path->countVerbs());
 }
 }  // namespace tgfx
+#endif

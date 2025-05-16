@@ -24,9 +24,9 @@
 namespace tgfx {
 class StrokeSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(Stroke* stroke);
+  static std::shared_ptr<Data> Serialize(const Stroke* stroke);
 
  private:
-  static void SerializeStrokeImpl(flexbuffers::Builder& fbb, Stroke* stroke);
+  static void SerializeStrokeImpl(flexbuffers::Builder& fbb, const Stroke* stroke);
 };
 }  // namespace tgfx

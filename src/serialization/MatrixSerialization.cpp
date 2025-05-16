@@ -22,7 +22,7 @@
 
 namespace tgfx {
 
-std::shared_ptr<Data> MatrixSerialization::Serialize(Matrix* matrix) {
+std::shared_ptr<Data> MatrixSerialization::Serialize(const Matrix* matrix) {
   DEBUG_ASSERT(matrix != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -33,7 +33,7 @@ std::shared_ptr<Data> MatrixSerialization::Serialize(Matrix* matrix) {
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
 
-void MatrixSerialization::SerializeMatrixImpl(flexbuffers::Builder& fbb, Matrix* matrix) {
+void MatrixSerialization::SerializeMatrixImpl(flexbuffers::Builder& fbb, const Matrix* matrix) {
   for (int i = 0; i < 6; i++) {
     std::stringstream ss;
     ss << "[" << i << "]";

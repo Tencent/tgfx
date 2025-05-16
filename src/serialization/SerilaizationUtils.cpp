@@ -15,10 +15,31 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#ifdef TGFX_USE_INSPECTOR
 
+#ifdef TGFX_USE_INSPECTOR
+#include "ColorFilterSerialization.h"
+#include "ColorSerialization.h"
+#include "FontMetricsSerialization.h"
+#include "FontSerialization.h"
+#include "GlyphFaceSerialization.h"
+#include "ImageFilterSerialization.h"
+#include "ImageSerialization.h"
+#include "LayerFilterSerialization.h"
+#include "LayerSerialization.h"
+#include "LayerStyleSerialization.h"
+#include "MatrixSerialization.h"
+#include "PathSerialization.h"
+#include "PointSerialization.h"
+#include "RectSerialization.h"
+#include "RuntimeEffectSerialization.h"
+#include "SamplingOptionsSerialization.h"
 #include "SerializationUtils.h"
+#include "ShaderSerialization.h"
+#include "ShapeSerialization.h"
+#include "ShapeStyleSerialization.h"
+#include "TypeFaceSerialization.h"
 #include "core/images/FilterImage.h"
+#include "glyphRunSerialization.h"
 
 namespace tgfx {
 
@@ -239,94 +260,461 @@ void SerializeUtils::SerializeEnd(flexbuffers::Builder& fbb, size_t mapStart, si
   fbb.Finish();
 }
 
-template <>
-void SerializeUtils::SetFlexBufferMap<const char*>(flexbuffers::Builder& fbb, const char* key,
-                                                   const char* value, bool isAddress,
-                                                   bool isExpandable) {
+uint64_t SerializeUtils::GetObjID() {
+  static uint64_t objID = 0;
+  return objID++;
+}
+
+void SerializeUtils::FillMap(const Matrix& matrix, uint64_t objID, Map* map) {
+  (*map)[objID] = [matrix]() { return MatrixSerialization::Serialize(&matrix); };
+}
+
+void SerializeUtils::FillMap(const Point& point, uint64_t objID, Map* map) {
+  (*map)[objID] = [point]() { return PointSerialization::Serialize(&point); };
+}
+
+void SerializeUtils::FillMap(const std::vector<std::shared_ptr<LayerFilter>>& filters,
+                             uint64_t objID, Map* map) {
+  (*map)[objID] = [filters, &map]() {
+    flexbuffers::Builder fbb;
+    size_t startMap;
+    size_t contentMap;
+    SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+    for (size_t i = 0; i < filters.size(); i++) {
+      std::stringstream ss;
+      ss << "[" << i << "]";
+      const auto& filter = filters[i];
+      auto filterID = SerializeUtils::GetObjID();
+      SerializeUtils::SetFlexBufferMap(fbb, ss.str().c_str(),
+                                       reinterpret_cast<uint64_t>(filter.get()), true,
+                                       filter != nullptr, filterID);
+      FillMap(filter, filterID, map);
+    }
+    SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
+    return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
+  };
+}
+
+void SerializeUtils::FillMap(const std::shared_ptr<LayerFilter>& layerFilter, uint64_t objID,
+                             Map* map) {
+  if (layerFilter == nullptr) {
+    return;
+  }
+  (*map)[objID] = [layerFilter, &map]() {
+    return LayerFilterSerialization::Serialize(layerFilter.get(), map);
+  };
+}
+
+void SerializeUtils::FillMap(const std::shared_ptr<Layer>& layer, uint64_t objID, Map* map) {
+  if (layer == nullptr) {
+    return;
+  }
+  (*map)[objID] = [layer, &map]() { return LayerSerialization::SerializeLayer(layer.get(), map); };
+}
+
+void SerializeUtils::FillMap(const Rect& rect, uint64_t objID, Map* map) {
+  (*map)[objID] = [rect]() { return RectSerialization::Serialize(&rect); };
+}
+
+void SerializeUtils::FillMap(const std::vector<std::shared_ptr<Layer>>& children, uint64_t objID,
+                             Map* map) {
+  (*map)[objID] = [children, &map]() {
+    flexbuffers::Builder fbb;
+    size_t startMap;
+    size_t contentMap;
+    SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+    for (size_t i = 0; i < children.size(); i++) {
+      std::stringstream ss;
+      ss << "[" << i << "]";
+      const auto& child = children[i];
+      auto childID = SerializeUtils::GetObjID();
+      SerializeUtils::SetFlexBufferMap(fbb, ss.str().c_str(),
+                                       reinterpret_cast<uint64_t>(child.get()), true,
+                                       child != nullptr, childID);
+      FillMap(child, childID, map);
+    }
+    SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
+    return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
+  };
+}
+
+void SerializeUtils::FillMap(const std::vector<std::shared_ptr<LayerStyle>>& layerStyles,
+                             uint64_t objID, Map* map) {
+  (*map)[objID] = [layerStyles, &map]() {
+    flexbuffers::Builder fbb;
+    size_t startMap;
+    size_t contentMap;
+    SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+    for (size_t i = 0; i < layerStyles.size(); i++) {
+      std::stringstream ss;
+      ss << "[" << i << "]";
+      const auto& layerStyle = layerStyles[i];
+      auto layerStyleID = SerializeUtils::GetObjID();
+      SerializeUtils::SetFlexBufferMap(fbb, ss.str().c_str(),
+                                       reinterpret_cast<uint64_t>(layerStyle.get()), true,
+                                       layerStyle != nullptr, layerStyleID);
+      FillMap(layerStyle, layerStyleID, map);
+    }
+    SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
+    return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
+  };
+}
+
+void SerializeUtils::FillMap(const std::shared_ptr<LayerStyle>& layerStyle, uint64_t objID,
+                             Map* map) {
+  if (layerStyle == nullptr) {
+    return;
+  }
+  (*map)[objID] = [layerStyle, &map]() {
+    return LayerStyleSerialization::Serialize(layerStyle.get(), map);
+  };
+}
+
+void SerializeUtils::FillMap(const SamplingOptions& sampling, uint64_t objID, Map* map) {
+  (*map)[objID] = [sampling]() { return SamplingOptionsSerialization::Serialize(&sampling); };
+}
+
+void SerializeUtils::FillMap(const std::shared_ptr<Image>& image, uint64_t objID, Map* map) {
+  if (image == nullptr) {
+    return;
+  }
+  (*map)[objID] = [image]() { return ImageSerialization::Serialize(image.get()); };
+}
+
+void SerializeUtils::FillMap(const std::shared_ptr<Shape>& shape, uint64_t objID, Map* map) {
+  if (shape == nullptr) {
+    return;
+  }
+  (*map)[objID] = [shape, &map]() { return ShapeSerialization::Serialize(shape.get(), map); };
+}
+
+void SerializeUtils::FillMap(const std::vector<std::shared_ptr<ShapeStyle>>& shapeStyles,
+                             uint64_t objID, Map* map) {
+  (*map)[objID] = [shapeStyles, &map]() {
+    flexbuffers::Builder fbb;
+    size_t startMap;
+    size_t contentMap;
+    SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+    for (size_t i = 0; i < shapeStyles.size(); i++) {
+      std::stringstream ss;
+      ss << "[" << i << "]";
+      const auto& shapeStyle = shapeStyles[i];
+      auto shapeStyleID = SerializeUtils::GetObjID();
+      SerializeUtils::SetFlexBufferMap(fbb, ss.str().c_str(),
+                                       reinterpret_cast<uint64_t>(shapeStyle.get()), true,
+                                       shapeStyle != nullptr, shapeStyleID);
+      FillMap(shapeStyle, shapeStyleID, map);
+    }
+    SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
+    return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
+  };
+}
+
+void SerializeUtils::FillMap(const std::shared_ptr<ShapeStyle>& shapeStyle, uint64_t objID,
+                             Map* map) {
+  if (shapeStyle == nullptr) {
+    return;
+  }
+  (*map)[objID] = [shapeStyle, &map]() {
+    return ShapeStyleSerialization::Serialize(shapeStyle.get(), map);
+  };
+}
+
+void SerializeUtils::FillMap(const std::shared_ptr<ColorFilter>& colorFilter, uint64_t objID,
+                             Map* map) {
+  if (colorFilter == nullptr) {
+    return;
+  }
+  (*map)[objID] = [colorFilter, &map]() {
+    return ColorFilterSerialization::Serialize(colorFilter.get(), map);
+  };
+}
+
+void SerializeUtils::FillMap(const std::shared_ptr<Typeface>& typeFace, uint64_t objID, Map* map) {
+  if (typeFace == nullptr) {
+    return;
+  }
+  (*map)[objID] = [typeFace]() { return TypeFaceSerialization::Serialize(typeFace.get()); };
+}
+
+void SerializeUtils::FillMap(const std::shared_ptr<GlyphFace>& glyphFace, uint64_t objID,
+                             Map* map) {
+  if (glyphFace == nullptr) {
+    return;
+  }
+  (*map)[objID] = [glyphFace]() { return GlyphFaceSerialization::Serialize(glyphFace.get()); };
+}
+
+void SerializeUtils::FillMap(const std::shared_ptr<ImageFilter>& imageFilter, uint64_t objID,
+                             Map* map) {
+  if (imageFilter == nullptr) {
+    return;
+  }
+  (*map)[objID] = [imageFilter, &map]() {
+    return ImageFilterSerialization::Serialize(imageFilter.get(), map);
+  };
+}
+
+void SerializeUtils::FillMap(const std::shared_ptr<RuntimeEffect>& runtimeEffect, uint64_t objID,
+                             Map* map) {
+  if (runtimeEffect == nullptr) {
+    return;
+  }
+  (*map)[objID] = [runtimeEffect]() {
+    return RuntimeEffectSerialization::Serialize(runtimeEffect.get());
+  };
+}
+
+void SerializeUtils::FillMap(const std::shared_ptr<Shader>& shader, uint64_t objID, Map* map) {
+  if (shader == nullptr) {
+    return;
+  }
+  (*map)[objID] = [shader, &map]() { return ShaderSerialization::Serialize(shader.get(), map); };
+}
+
+void SerializeUtils::FillMap(const std::vector<float>& floatVec, uint64_t objID, Map* map) {
+  (*map)[objID] = [floatVec]() {
+    flexbuffers::Builder fbb;
+    size_t startMap;
+    size_t contentMap;
+    SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+    for (size_t i = 0; i < floatVec.size(); i++) {
+      std::stringstream ss;
+      ss << "[" << i << "]";
+      auto value = floatVec[i];
+      SerializeUtils::SetFlexBufferMap(fbb, ss.str().c_str(), value);
+    }
+    SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
+    return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
+  };
+}
+
+void SerializeUtils::FillMap(const std::array<float, 20>& matrix, uint64_t objID, Map* map) {
+  (*map)[objID] = [matrix]() {
+    flexbuffers::Builder fbb;
+    size_t startMap;
+    size_t contentMap;
+    SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+    for (size_t i = 0; i < 20; i++) {
+      std::stringstream ss;
+      ss << "[" << i << "]";
+      auto value = matrix[i];
+      SerializeUtils::SetFlexBufferMap(fbb, ss.str().c_str(), value);
+    }
+    SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
+    return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
+  };
+}
+
+void SerializeUtils::FillMap(const std::vector<GlyphRun>& glyphRuns, uint64_t objID, Map* map) {
+  (*map)[objID] = [glyphRuns, &map]() {
+    flexbuffers::Builder fbb;
+    size_t startMap;
+    size_t contentMap;
+    SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+    for (size_t i = 0; i < glyphRuns.size(); i++) {
+      std::stringstream ss;
+      ss << "[" << i << "]";
+      const auto& glyphRun = glyphRuns[i];
+      auto glyphRunID = SerializeUtils::GetObjID();
+      SerializeUtils::SetFlexBufferMap(fbb, ss.str().c_str(), "", false, true, glyphRunID);
+      FillMap(glyphRun, glyphRunID, map);
+    }
+    SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
+    return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
+  };
+}
+
+void SerializeUtils::FillMap(const std::vector<GlyphID>& glyphs, uint64_t objID, Map* map) {
+  (*map)[objID] = [glyphs]() {
+    flexbuffers::Builder fbb;
+    size_t startMap;
+    size_t contentMap;
+    SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+    for (size_t i = 0; i < glyphs.size(); i++) {
+      std::stringstream ss;
+      ss << "[" << i << "]";
+      auto value = glyphs[i];
+      SerializeUtils::SetFlexBufferMap(fbb, ss.str().c_str(), static_cast<uint32_t>(value));
+    }
+    SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
+    return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
+  };
+}
+
+void SerializeUtils::FillMap(const std::vector<Point>& points, uint64_t objID, Map* map) {
+  (*map)[objID] = [points, &map]() {
+    flexbuffers::Builder fbb;
+    size_t startMap;
+    size_t contentMap;
+    SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+    for (size_t i = 0; i < points.size(); i++) {
+      std::stringstream ss;
+      ss << "[" << i << "]";
+      auto point = points[i];
+      auto pointID = SerializeUtils::GetObjID();
+      SerializeUtils::SetFlexBufferMap(fbb, ss.str().c_str(), "", false, true, pointID);
+      FillMap(point, pointID, map);
+    }
+    SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
+    return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
+  };
+}
+
+void SerializeUtils::FillMap(const std::vector<std::shared_ptr<ImageFilter>>& imageFilters,
+                             uint64_t objID, Map* map) {
+  (*map)[objID] = [imageFilters, &map]() {
+    flexbuffers::Builder fbb;
+    size_t startMap;
+    size_t contentMap;
+    SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+    for (size_t i = 0; i < imageFilters.size(); i++) {
+      std::stringstream ss;
+      ss << "[" << i << "]";
+      const auto& imageFilter = imageFilters[i];
+      auto imageFilterID = SerializeUtils::GetObjID();
+      SerializeUtils::SetFlexBufferMap(fbb, ss.str().c_str(),
+                                       reinterpret_cast<uint64_t>(imageFilter.get()), true,
+                                       imageFilter != nullptr, imageFilterID);
+      FillMap(imageFilter, imageFilterID, map);
+    }
+    SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
+    return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
+  };
+}
+
+void SerializeUtils::FillMap(const std::vector<Color>& colors, uint64_t objID, Map* map) {
+  (*map)[objID] = [colors, &map]() {
+    flexbuffers::Builder fbb;
+    size_t startMap;
+    size_t contentMap;
+    SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+    for (size_t i = 0; i < colors.size(); i++) {
+      std::stringstream ss;
+      ss << "[" << i << "]";
+      auto color = colors[i];
+      auto colorID = SerializeUtils::GetObjID();
+      SerializeUtils::SetFlexBufferMap(fbb, ss.str().c_str(), "", false, true, colorID);
+      FillMap(color, colorID, map);
+    }
+    SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
+    return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
+  };
+}
+
+void SerializeUtils::FillMap(const Color& color, uint64_t objID, Map* map) {
+  (*map)[objID] = [color]() { return ColorSerialization::Serialize(&color); };
+}
+
+void SerializeUtils::FillMap(const Font& font, uint64_t objID, Map* map) {
+  (*map)[objID] = [font, &map]() { return FontSerialization::Serialize(&font, map); };
+}
+
+void SerializeUtils::FillMap(const FontMetrics& fontMetrics, uint64_t objID, Map* map) {
+  (*map)[objID] = [fontMetrics]() { return FontMetricsSerialization::Serialize(&fontMetrics); };
+}
+
+void SerializeUtils::FillMap(const GlyphRun& glyphRun, uint64_t objID, Map* map) {
+  (*map)[objID] = [glyphRun, &map]() { return glyphRunSerialization::Serialize(&glyphRun, map); };
+}
+
+void SerializeUtils::FillMap(const Path& path, uint64_t objID, Map* map) {
+  (*map)[objID] = [path, &map]() { return PathSerialization::Serialize(&path, map); };
+}
+
+void SerializeUtils::SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key, const char* value,
+                                      bool isAddress, bool isExpandable,
+                                      std::optional<uint64_t> objID) {
   fbb.Key(key);
   fbb.Map([&]() {
     fbb.String("Value", value);
     fbb.Bool("IsExpandable", isExpandable);
     fbb.Bool("IsAddress", isAddress);
+    objID ? fbb.UInt("objID", objID.value()) : fbb.Null("objID");
   });
 }
 
-template <>
-void SerializeUtils::SetFlexBufferMap<std::string>(flexbuffers::Builder& fbb, const char* key,
-                                                   std::string value, bool isAddress,
-                                                   bool isExpandable) {
+void SerializeUtils::SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key, std::string value,
+                                      bool isAddress, bool isExpandable,
+                                      std::optional<uint64_t> objID) {
   fbb.Key(key);
   fbb.Map([&]() {
     fbb.String("Value", value);
     fbb.Bool("IsExpandable", isExpandable);
     fbb.Bool("IsAddress", isAddress);
+    objID ? fbb.UInt("objID", objID.value()) : fbb.Null("objID");
   });
 }
 
-template <>
-void SerializeUtils::SetFlexBufferMap<int>(flexbuffers::Builder& fbb, const char* key, int value,
-                                           bool isAddress, bool isExpandable) {
+void SerializeUtils::SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key, int value,
+                                      bool isAddress, bool isExpandable,
+                                      std::optional<uint64_t> objID) {
   fbb.Key(key);
   fbb.Map([&]() {
     fbb.Int("Value", value);
     fbb.Bool("IsExpandable", isExpandable);
     fbb.Bool("IsAddress", isAddress);
+    objID ? fbb.UInt("objID", objID.value()) : fbb.Null("objID");
   });
 }
 
-template <>
-void SerializeUtils::SetFlexBufferMap<unsigned int>(flexbuffers::Builder& fbb, const char* key,
-                                                    unsigned int value, bool isAddress,
-                                                    bool isExpandable) {
+void SerializeUtils::SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key,
+                                      unsigned int value, bool isAddress, bool isExpandable,
+                                      std::optional<uint64_t> objID) {
   fbb.Key(key);
   fbb.Map([&]() {
     fbb.UInt("Value", value);
     fbb.Bool("IsExpandable", isExpandable);
     fbb.Bool("IsAddress", isAddress);
+    objID ? fbb.UInt("objID", objID.value()) : fbb.Null("objID");
   });
 }
 
-template <>
-void SerializeUtils::SetFlexBufferMap<uint64_t>(flexbuffers::Builder& fbb, const char* key,
-                                                uint64_t value, bool isAddress, bool isExpandable) {
+void SerializeUtils::SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key, uint64_t value,
+                                      bool isAddress, bool isExpandable,
+                                      std::optional<uint64_t> objID) {
   fbb.Key(key);
   fbb.Map([&]() {
     fbb.UInt("Value", value);
     fbb.Bool("IsExpandable", isExpandable);
     fbb.Bool("IsAddress", isAddress);
+    objID ? fbb.UInt("objID", objID.value()) : fbb.Null("objID");
   });
 }
 
-template <>
-void SerializeUtils::SetFlexBufferMap<float>(flexbuffers::Builder& fbb, const char* key,
-                                             float value, bool isAddress, bool isExpandable) {
+void SerializeUtils::SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key, float value,
+                                      bool isAddress, bool isExpandable,
+                                      std::optional<uint64_t> objID) {
   fbb.Key(key);
   fbb.Map([&]() {
     fbb.Float("Value", value);
     fbb.Bool("IsExpandable", isExpandable);
     fbb.Bool("IsAddress", isAddress);
+    objID ? fbb.UInt("objID", objID.value()) : fbb.Null("objID");
   });
 }
 
-template <>
-void SerializeUtils::SetFlexBufferMap<double>(flexbuffers::Builder& fbb, const char* key,
-                                              double value, bool isAddress, bool isExpandable) {
+void SerializeUtils::SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key, double value,
+                                      bool isAddress, bool isExpandable,
+                                      std::optional<uint64_t> objID) {
   fbb.Key(key);
   fbb.Map([&]() {
     fbb.Double("Value", value);
     fbb.Bool("IsExpandable", isExpandable);
     fbb.Bool("IsAddress", isAddress);
+    objID ? fbb.UInt("objID", objID.value()) : fbb.Null("objID");
   });
 }
 
-template <>
-void SerializeUtils::SetFlexBufferMap<bool>(flexbuffers::Builder& fbb, const char* key, bool value,
-                                            bool isAddress, bool isExpandable) {
+void SerializeUtils::SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key, bool value,
+                                      bool isAddress, bool isExpandable,
+                                      std::optional<uint64_t> objID) {
   fbb.Key(key);
   fbb.Map([&]() {
     fbb.Bool("Value", value);
     fbb.Bool("IsExpandable", isExpandable);
     fbb.Bool("IsAddress", isAddress);
+    objID ? fbb.UInt("objID", objID.value()) : fbb.Null("objID");
   });
 }
 }  // namespace tgfx

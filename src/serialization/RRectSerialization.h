@@ -24,9 +24,10 @@
 namespace tgfx {
 class RRectSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(RRect* rrect);
+  static std::shared_ptr<Data> Serialize(const RRect* rrect, SerializeUtils::Map* map);
 
  private:
-  static void SerializeRRectImpl(flexbuffers::Builder& fbb, RRect* rrect);
+  static void SerializeRRectImpl(flexbuffers::Builder& fbb, const RRect* rrect,
+                                 SerializeUtils::Map* map);
 };
 }  // namespace tgfx

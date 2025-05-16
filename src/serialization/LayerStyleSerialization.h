@@ -25,15 +25,18 @@ namespace tgfx {
 class LayerStyle;
 class LayerStyleSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(LayerStyle* layerStyle);
+  static std::shared_ptr<Data> Serialize(const LayerStyle* layerStyle, SerializeUtils::Map* map);
 
  private:
-  static void SerializeBasicLayerStyleImpl(flexbuffers::Builder& fbb, LayerStyle* layerStyle);
+  static void SerializeBasicLayerStyleImpl(flexbuffers::Builder& fbb, const LayerStyle* layerStyle);
 
-  static void SerializeBackGroundBlurStyleImpl(flexbuffers::Builder& fbb, LayerStyle* layerStyle);
+  static void SerializeBackGroundBlurStyleImpl(flexbuffers::Builder& fbb,
+                                               const LayerStyle* layerStyle);
 
-  static void SerializeDropShadowStyleImpl(flexbuffers::Builder& fbb, LayerStyle* layerStyle);
+  static void SerializeDropShadowStyleImpl(flexbuffers::Builder& fbb, const LayerStyle* layerStyle,
+                                           SerializeUtils::Map* map);
 
-  static void SerializeInnerShadowStyleImpl(flexbuffers::Builder& fbb, LayerStyle* layerStyle);
+  static void SerializeInnerShadowStyleImpl(flexbuffers::Builder& fbb, const LayerStyle* layerStyle,
+                                            SerializeUtils::Map* map);
 };
 }  // namespace tgfx

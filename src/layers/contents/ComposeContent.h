@@ -29,7 +29,7 @@ class ComposeContent : public LayerContent {
 
   Rect getBounds() const override;
 
-  Rect getTightBounds() const override;
+  Rect getTightBounds(const Matrix& matrix) const override;
 
   void draw(Canvas* canvas, const Paint& paint) const override;
 

@@ -20,7 +20,8 @@
 
 namespace tgfx {
 
-std::shared_ptr<Data> SamplingOptionsSerialization::Serialize(SamplingOptions* samplingOptions) {
+std::shared_ptr<Data> SamplingOptionsSerialization::Serialize(
+    const SamplingOptions* samplingOptions) {
   DEBUG_ASSERT(samplingOptions != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -31,8 +32,8 @@ std::shared_ptr<Data> SamplingOptionsSerialization::Serialize(SamplingOptions* s
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
 
-void SamplingOptionsSerialization::SerializeSamplingOptionsImpl(flexbuffers::Builder& fbb,
-                                                                SamplingOptions* samplingOptions) {
+void SamplingOptionsSerialization::SerializeSamplingOptionsImpl(
+    flexbuffers::Builder& fbb, const SamplingOptions* samplingOptions) {
   SerializeUtils::SetFlexBufferMap(fbb, "filterMode",
                                    SerializeUtils::FilterModeToString(samplingOptions->filterMode));
   SerializeUtils::SetFlexBufferMap(fbb, "mipmapMode",
