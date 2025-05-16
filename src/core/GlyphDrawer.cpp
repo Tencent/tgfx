@@ -112,9 +112,9 @@ Rect GlyphDrawer::GetGlyphBounds(const GlyphFace* glyphFace, GlyphID glyphID, fl
   }
   return bounds;
 }
+
 bool GlyphDrawer::onFillGlyph(const GlyphFace*, GlyphID, const Stroke*, const Rect&,
                               const ImageInfo&, void*) {
   return false;
 }
-
 }  //namespace tgfx

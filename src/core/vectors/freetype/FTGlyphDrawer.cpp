@@ -117,5 +117,4 @@ bool FTGlyphDrawer::onFillPath(const Path& path, const ImageInfo& dstInfo, void*
   }
   return true;
 }
-
 }  // namespace tgfx
