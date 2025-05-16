@@ -481,7 +481,9 @@ TGFX_TEST(LayerTest, shapeLayer) {
     auto rect = Rect::MakeXYWH(10, 10 + 100 * i, 140, 80);
     Path path = {};
     path.addRect(rect);
+    path.setFillType(PathFillType::EvenOdd);
     shapeLayer->setPath(path);
+    shapeLayer->setLineDashAdaptive(true);
     shapeLayer->removeFillStyles();
     std::shared_ptr<ShapeStyle> fillStyle = nullptr;
     switch (i) {

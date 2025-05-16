@@ -1696,15 +1696,15 @@ VectorVertex calculate_star_vertex(const tgfx::Point& size, const uint32_t count
   float b = size.y / 2;
 
   if (is_inner_corner) {
-    std::cout << "Hello " << "\t" << __FUNCTION__ << " " << __FILE_NAME__ << ":" << __LINE__
-              << " \n";
+    std::cout << "Hello "
+              << "\t" << __FUNCTION__ << " " << __FILE_NAME__ << ":" << __LINE__ << " \n";
     float theta = static_cast<float>(M_PI_2 - 2 * M_PI * (index + 0.5) / count);  // 内圈顶点
     float x = a + a * ratio * cos(theta);
     float y = b - b * ratio * sin(theta);
     return VectorVertex{.x = x, .y = y, .cornerRadius = corner_radius};
   } else {
-    std::cout << "Hello " << "\t" << __FUNCTION__ << " " << __FILE_NAME__ << ":" << __LINE__
-              << " \n";
+    std::cout << "Hello "
+              << "\t" << __FUNCTION__ << " " << __FILE_NAME__ << ":" << __LINE__ << " \n";
     float theta = static_cast<float>(M_PI_2 - 2 * M_PI * index / count);  // 外圈顶点
     float x = a + a * cos(theta);
     float y = b - b * sin(theta);
@@ -1980,23 +1980,105 @@ std::shared_ptr<tgfx::Shape> create_curves_shape(const std::vector<CurvesParam>&
 
   return tgfx::Shape::MakeFrom(path);
 }
-//
-// float computePathArea(const Path& path) {
-//
-//   bool hasFirstPoint = false;
-//   float area = 0.0f;
-//
-//   for (;;) {
-//     SkPath::Verb verb = iter.next(pts);
-//     if (verb == SkPath::kDone_Verb) break;
-//
-//
-//   return area * 0.5f;
-// }
 
-bool isPathCCW(const Path& path) {
-  return computePathArea(path) > 0;
+inline bool IsEven(int x) {
+  return !(x & 1);
 }
+
+using namespace pk;
+// // Structure to hold path segment information
+// struct Contour {
+//   std::vector<std::unique_ptr<SkPathMeasure>> segments;
+//   bool isClosed = false;
+// };
+//
+// // Build contours from path
+// std::vector<Contour> BuildContours(const Path& path) {
+//   std::vector<Contour> contours;
+//   bool hasMoveTo = false;
+//   auto skPath = PathRef::ReadAccess(path);
+//   SkPoint pts[4];
+//   SkPath::Verb verb;
+//   SkPath::Iter iter(skPath, false);
+//
+//   while ((verb = iter.next(pts)) != SkPath::kDone_Verb) {
+//     Contour contour;
+//     bool isClosed = false;
+//     SkPoint lastPoint = {0, 0};
+//     SkPoint firstPoint = {0, 0};
+//
+//     do {
+//       if (hasMoveTo && verb == SkPath::kMove_Verb) {
+//         break;  // New contour
+//       }
+//
+//       if (contour.segments.empty()) {
+//         firstPoint = pts[0];
+//       }
+//
+//       SkPath segmentPath;
+//       switch (verb) {
+//         case SkPath::kLine_Verb:
+//           segmentPath.moveTo(pts[0]);
+//           segmentPath.lineTo(pts[1]);
+//           lastPoint = pts[1];
+//           break;
+//
+//         case SkPath::kQuad_Verb:
+//           segmentPath.moveTo(pts[0]);
+//           segmentPath.quadTo(pts[1], pts[2]);
+//           lastPoint = pts[2];
+//           break;
+//
+//         case SkPath::kConic_Verb:
+//           segmentPath.moveTo(pts[0]);
+//           segmentPath.conicTo(pts[1], pts[2], iter.conicWeight());
+//           lastPoint = pts[2];
+//           break;
+//
+//         case SkPath::kCubic_Verb:
+//           segmentPath.moveTo(pts[0]);
+//           segmentPath.cubicTo(pts[1], pts[2], pts[3]);
+//           lastPoint = pts[3];
+//           break;
+//
+//         case SkPath::kMove_Verb:
+//           hasMoveTo = true;
+//           break;
+//
+//         case SkPath::kClose_Verb:
+//           isClosed = true;
+//           break;
+//
+//         default:
+//           continue;
+//       }
+//       auto measure = std::make_unique<SkPathMeasure>(segmentPath, false);
+//       if (measure->getLength() > 0) {
+//         contour.segments.push_back(std::move(measure));
+//       }
+//     } while ((verb = iter.next(pts)) != SkPath::kDone_Verb);
+//
+//     // Handle closed path
+//     if (isClosed) {
+//       contour.isClosed = true;
+//       if (auto distance = SkPoint::Distance(lastPoint, firstPoint); distance > 0) {
+//         SkPath closingSegment;
+//         closingSegment.moveTo(lastPoint);
+//         closingSegment.lineTo(firstPoint);
+//         auto measure = std::make_unique<SkPathMeasure>(closingSegment, false);
+//         if (measure->getLength() > 0) {
+//           contour.segments.push_back(std::move(measure));
+//         }
+//       }
+//     }
+//
+//     if (!contour.segments.empty()) {
+//       contours.push_back(std::move(contour));
+//     }
+//   }
+//   return contours;
+// }
 
 TGFX_TEST(CanvasTest, dash2) {
 
@@ -2013,76 +2095,18 @@ TGFX_TEST(CanvasTest, dash2) {
       calculate_star_param(vector, static_cast<uint32_t>(point_count), inner_radius, corner_radius);
   auto shape = create_curves_shape({params});
 
-  auto path = shape->getPath();
-  float dash_array[] = {2, 2};
-  auto effect = PathEffect::MakeDash(dash_array, 2, 1, true);
-  effect->filterPath(&path);
-  auto dashPath = path;
+  auto dashPath = shape->getPath();
+  float dash_array[] = {100, 100};
+  auto effect = PathEffect::MakeDash(dash_array, 2, 50, true);
+  effect->filterPath(&dashPath);
   Stroke stroke(2.0f);
-  stroke.applyToPath(&path);
-  PathIterator iter = [](PathVerb verb, const Point points[4], void*) {
-    switch (verb) {
-      case PathVerb::Move:
-        firstPoint = pts[0];
-      prevPoint = pts[0];
-      hasFirstPoint = true;
-      break;
-      case PathVerb::Line:
-        if (hasFirstPoint) {
-          area += (prevPoint.x() * pts[0].y() - pts[0].x() * prevPoint.y());
-          prevPoint = pts[0];
-        }
-      break;
-      case PathVerb::Close:
-        if (hasFirstPoint) {
-          area += (prevPoint.x() * firstPoint.y() - firstPoint.x() * prevPoint.y());
-        }
-      break;
-      // 对于曲线，可以用分段线近似，或者忽略
-      default:
-        // 复杂曲线可用细分近似
-          break;
-    }
-  }
-  };
-  // path.decompose(iter);
+  stroke.applyToPath(&dashPath);
+  auto canvas = surface->getCanvas();
+  dashPath.addPath(shape->getPath(), PathOp::Difference);
 
-  auto SVGStream = MemoryWriteStream::Make();
-  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(200, 200),
-                                    SVGExportFlags::DisablePrettyXML);
-  auto* canvas = exporter->getCanvas();
-  auto shapePath = shape->getPath();
-  // shapePath.decompose(iter);
-
-  path.addPath(dashPath, PathOp::Difference);
-  canvas->drawPath(path, Paint());
-
-  exporter->close();
-
-  auto SVGString = SVGStream->readString();
-  LOGE(SVGString.c_str());
-
-  LOGE("----");
-
-
-
-  // auto shapeLayer = tgfx::ShapeLayer::Make();
-  // shapeLayer->setShape(shape);
-  // shapeLayer->setLineWidth(1.0f);
-  // shapeLayer->setStrokeAlign(tgfx::StrokeAlign::Outside);
-  // shapeLayer->setStrokeStyle(tgfx::SolidColor::Make(tgfx::Color::Black()));
-  // shapeLayer->setLineDashAdaptive(true);
-  // shapeLayer->setLineDashPattern({2, 2});
-  // shapeLayer->setLineDashPhase(1);
-  //
-  // DisplayList displayList;
-  // displayList.root()->addChild(shapeLayer);
-   canvas = surface->getCanvas();
   Paint paint;
   paint.setColor(tgfx::Color::Black());
-  canvas->drawPath(path, paint);
-  // canvas->drawPath(path, paint);
-  // displayList.render(surface.get());
+  canvas->drawPath(dashPath, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/dash2"));
 }
 

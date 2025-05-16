@@ -332,12 +332,11 @@ std::shared_ptr<Shape> ShapeLayer::createStrokeShape() const {
   if (strokeAlign != StrokeAlign::Center) {
     auto tempStroke = stroke;
     tempStroke.width *= 2;
-    auto shapeWithoutStroke = strokeShape;
     strokeShape = Shape::ApplyStroke(std::move(strokeShape), &tempStroke);
     if (strokeAlign == StrokeAlign::Inside) {
-      strokeShape = Shape::Merge(std::move(strokeShape), shapeWithoutStroke, PathOp::Intersect);
+      strokeShape = Shape::Merge(std::move(strokeShape), _shape, PathOp::Intersect);
     } else {
-      strokeShape = Shape::Merge(std::move(strokeShape), shapeWithoutStroke, PathOp::Difference);
+      strokeShape = Shape::Merge(std::move(strokeShape), _shape, PathOp::Difference);
     }
   } else {
     strokeShape = Shape::ApplyStroke(std::move(strokeShape), &stroke);

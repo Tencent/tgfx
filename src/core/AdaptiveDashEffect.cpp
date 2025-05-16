@@ -34,7 +34,7 @@ struct Contour {
 };
 
 // Build contours from path
-std::vector<Contour> BuildContours(const Path& path) {
+std::vector<Contour> BuildContours(const Path& path, float minSegmentLength) {
   std::vector<Contour> contours;
   bool hasMoveTo = false;
   auto skPath = PathRef::ReadAccess(path);
@@ -47,73 +47,82 @@ std::vector<Contour> BuildContours(const Path& path) {
     bool isClosed = false;
     SkPoint lastPoint = {0, 0};
     SkPoint firstPoint = {0, 0};
+    SkPath segmentPath;
+    SkPath lastSegmentPath;
+    bool segmentStarted = false;
 
     do {
       if (hasMoveTo && verb == SkPath::kMove_Verb) {
-        break;  // New contour
+        break;
       }
+      if (contour.segments.empty()) firstPoint = pts[0];
 
-      if (contour.segments.empty()) {
-        firstPoint = pts[0];
+      if (!segmentStarted && verb != SkPath::kClose_Verb) {
+        segmentPath.moveTo(pts[0]);
       }
-
-      SkPath segmentPath;
       switch (verb) {
         case SkPath::kLine_Verb:
-          segmentPath.moveTo(pts[0]);
           segmentPath.lineTo(pts[1]);
+          lastSegmentPath.lineTo(pts[1]);
           lastPoint = pts[1];
           break;
-
         case SkPath::kQuad_Verb:
-          segmentPath.moveTo(pts[0]);
           segmentPath.quadTo(pts[1], pts[2]);
+          lastSegmentPath.quadTo(pts[1], pts[2]);
           lastPoint = pts[2];
           break;
-
         case SkPath::kConic_Verb:
-          segmentPath.moveTo(pts[0]);
           segmentPath.conicTo(pts[1], pts[2], iter.conicWeight());
+          lastSegmentPath.conicTo(pts[1], pts[2], iter.conicWeight());
           lastPoint = pts[2];
           break;
-
         case SkPath::kCubic_Verb:
-          segmentPath.moveTo(pts[0]);
           segmentPath.cubicTo(pts[1], pts[2], pts[3]);
+          lastSegmentPath.cubicTo(pts[1], pts[2], pts[3]);
           lastPoint = pts[3];
           break;
-
         case SkPath::kMove_Verb:
           hasMoveTo = true;
           break;
-
         case SkPath::kClose_Verb:
           isClosed = true;
           break;
-
         default:
           continue;
       }
       auto measure = std::make_unique<SkPathMeasure>(segmentPath, false);
-      if (measure->getLength() > 0) {
+      float segLen = measure->getLength();
+      segmentStarted = true;
+      if (segLen >= minSegmentLength) {
         contour.segments.push_back(std::move(measure));
+        lastSegmentPath = segmentPath;
+        segmentPath.reset();
+        segmentStarted = false;
       }
     } while ((verb = iter.next(pts)) != SkPath::kDone_Verb);
 
-    // Handle closed path
     if (isClosed) {
       contour.isClosed = true;
       if (auto distance = SkPoint::Distance(lastPoint, firstPoint); distance > 0) {
-        SkPath closingSegment;
-        closingSegment.moveTo(lastPoint);
-        closingSegment.lineTo(firstPoint);
-        auto measure = std::make_unique<SkPathMeasure>(closingSegment, false);
-        if (measure->getLength() > 0) {
+        if (!segmentStarted || segmentPath.countVerbs() == 0) {
+          segmentPath.moveTo(lastPoint);
+        }
+        segmentPath.lineTo(firstPoint);
+        lastSegmentPath.lineTo(firstPoint);
+        segmentStarted = true;
+        auto measure = std::make_unique<SkPathMeasure>(segmentPath, false);
+        if (measure->getLength() > minSegmentLength) {
           contour.segments.push_back(std::move(measure));
+          lastSegmentPath = segmentPath;
+          segmentPath.reset();
+          segmentStarted = false;
         }
       }
     }
 
+    if (segmentStarted && segmentPath.countVerbs() > 0) {
+      contour.segments.back() = std::make_unique<SkPathMeasure>(lastSegmentPath, false);
+    }
     if (!contour.segments.empty()) {
       contours.push_back(std::move(contour));
     }
@@ -153,7 +162,7 @@ bool AdaptiveDashEffect::filterPath(Path* path) const {
     return true;
   }
 
-  const auto contours = BuildContours(*path);
+  const auto contours = BuildContours(*path, 2.0f);
   if (contours.empty()) {
     path->reset();
     return true;
