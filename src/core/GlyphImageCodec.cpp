@@ -36,8 +36,8 @@ std::shared_ptr<GlyphImageCodec> GlyphImageCodec::MakeFrom(std::shared_ptr<Glyph
 
 GlyphImageCodec::GlyphImageCodec(std::shared_ptr<GlyphFace> glyphFace, GlyphID glyphID,
                                  const Rect& bounds, float resolutionScale, const Stroke* s)
-    : ImageCodec(static_cast<int>(std::ceilf(bounds.width())),
-                 static_cast<int>(std::ceilf(bounds.height())), Orientation::LeftTop),
+    : ImageCodec(static_cast<int>(ceilf(bounds.width())), static_cast<int>(ceilf(bounds.height())),
+                 Orientation::LeftTop),
       glyphFace(std::move(glyphFace)), bounds(bounds), resolutionScale(resolutionScale),
       glyphID(glyphID) {
   if (s != nullptr) {
