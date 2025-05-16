@@ -20,6 +20,7 @@
 #include "WebTypeface.h"
 #include "core/utils/Log.h"
 #include "platform/web/WebImageBuffer.h"
+#include "tgfx/core/Buffer.h"
 
 using namespace emscripten;
 
@@ -90,10 +91,12 @@ bool WebScalerContext::readPixels(GlyphID glyphID, const ImageInfo& dstInfo,
   if (!imageData.as<bool>()) {
     return false;
   }
+
   auto length = imageData["length"].as<size_t>();
   if (length == 0) {
     return false;
   }
+
   auto memory = val::module_property("HEAPU8")["buffer"];
   auto memoryView =
       val::global("Uint8Array").new_(memory, reinterpret_cast<uintptr_t>(dstPixels), length);
