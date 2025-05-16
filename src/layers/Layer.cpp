@@ -690,9 +690,11 @@ std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float con
   if (FloatNearlyZero(contentScale)) {
     return nullptr;
   }
-  auto picture = CreatePicture(args, contentScale, [this](const DrawArgs& args, Canvas* canvas) {
-    drawDirectly(args, canvas, 1.0f);
-  });
+  auto drawArgs = args;
+  drawArgs.renderRect = nullptr;
+  auto picture = CreatePicture(
+      drawArgs, contentScale,
+      [this](const DrawArgs& args, Canvas* canvas) { drawDirectly(args, canvas, 1.0f); });
   if (!picture) {
     return nullptr;
   }
@@ -858,6 +860,9 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, Laye
 }
 
 void Layer::drawBackground(const DrawArgs& args, Canvas* canvas, float* contentAlpha) {
+  if (args.renderRect && !args.renderRect->intersects(renderBounds)) {
+    return;
+  }
   float alpha = 1.0f;
   if (contentAlpha == nullptr) {
     contentAlpha = &alpha;
@@ -933,6 +938,12 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     //effects are always included when drawing the background.
     drawArgs.excludeEffects = false;
     drawArgs.drawMode = DrawMode::Background;
+    auto backgroundRect = renderBounds;
+    if (args.renderRect) {
+      backgroundRect.intersect(*args.renderRect);
+      drawArgs.renderRect = &backgroundRect;
+    }
+
     auto backgroundDrawer = [this](const DrawArgs& args, Canvas* canvas) {
       auto bounds = getBounds();
       canvas->clipRect(bounds);
