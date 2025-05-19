@@ -2,10 +2,10 @@ import QtQuick 2.5
 import QtQuick.Window 2.13
 import Frames 1.0
 
-Item {
+Window {
     id: wind
     visible: true
-    //flags: Qt.FramelessWindowHint
+    flags: Qt.FramelessWindowHint
 
     FramesView {
         id: frameView

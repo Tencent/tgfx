@@ -1,4 +1,4 @@
-/////////////////////////////////////////////////////////////////////////////////////////////////
+  /////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
@@ -191,7 +191,7 @@ class StatisticsModel : public QAbstractTableModel {
  private:
   View* view = nullptr;
   ViewData* viewData = nullptr;
-  tracy::Worker* worker = nullptr;
+  tracy::Worker* worker = nullptr;//
   FramesView* framesView = nullptr;
   const tracy::FrameData* frames = nullptr;
   QVector<float> fps;

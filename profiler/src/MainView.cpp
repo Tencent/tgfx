@@ -53,10 +53,10 @@ void MainView::saveFile() {
   }
 }
 
-void MainView::changeViewModeButton(bool pause) {
-  auto profilerWindow = (ProfilerWindow*)parentWidget();
-  profilerWindow->changePlayAction(pause);
-}
+// void MainView::changeViewModeButton(bool pause) {
+//   auto profilerWindow = (ProfilerWindow*)parentWidget();
+//   profilerWindow->changePlayAction(pause);
+// }
 
 void MainView::changeViewMode(bool pause) {
   if (centorView) {
@@ -86,6 +86,7 @@ void MainView::statView() {
   }
 }
 
+//according to addr and port to connect
 void MainView::connectClient(const char* address, const uint16_t port) {
   toolView->setParent(nullptr);
   Config config;

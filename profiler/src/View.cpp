@@ -31,7 +31,6 @@
 #include "MainView.h"
 #include "StatisticModel.h"
 #include "TableItem.h"
-#include "TimelineView.h"
 #include "TracySysUtil.hpp"
 #include "src/profiler/TracyFileselector.hpp"
 
@@ -172,10 +171,10 @@ View::~View() {
   }
 }
 
-void View::changeViewModeButton(ViewMode mode) {
-  auto mainView = (MainView*)parentWidget();
-  mainView->changeViewModeButton(mode == ViewMode::Paused);
-}
+// void View::changeViewModeButton(ViewMode mode) {
+//   auto mainView = (MainView*)parentWidget();
+//   mainView->changeViewModeButton(mode == ViewMode::Paused);
+// }
 
 void View::openStatisticsView() {
   if (tabWidget->count() < 2) {
@@ -291,49 +290,14 @@ void View::ViewImpl() {
   auto framesWidget = createWindowContainer(quickWindow);
   framesWidget->setFixedHeight(100);
 
-  tabWidget = new QTabWidget(this);
-  tabWidget->setTabPosition(QTabWidget::South);
-  tabWidget->setStyleSheet(
-      "QTabWidget::pane {"
-      "border: 1px solid #555555;"
-      "background-color: #343131;"
-      "}"
-      "QTabBar::tab{"
-      "background-color: #3F3F3F;"
-      "color: white;"
-      "padding: 8px 16px;"
-      "border: 1px solid #555555;"
-      "border-bottom-color: #3F3F3F;"
-      "border-top-left-radius: 4px;"
-      "border-top-right-radius: 4px;"
-      "min-width: 100px;"
-      "}"
-      "QTabBar::tab:selected{"
-      "background-color: #555555;"
-      "border-bottom-color: #555555;"
-      "}"
-      "QTabBar::tab:hover{"
-      "background-color: #4A4A4A;"
-      "}");
 
-  qmlRegisterType<tracy::Worker>("tracy", 1, 0, "TracyWorker");
-  qmlRegisterType<TimelineView>("Timeline", 1, 0, "TimelineView");
-  timelineEngine = new QQmlApplicationEngine;
-  timelineEngine->rootContext()->setContextProperty("workerPtr", (unsigned long long)&worker);
-  timelineEngine->rootContext()->setContextProperty("viewDataPtr", &viewData);
-  timelineEngine->rootContext()->setContextProperty("viewModePtr", (unsigned long long)&viewMode);
-  timelineEngine->load(QUrl(QStringLiteral("qrc:/qml/Timeline.qml")));
-  quickWindow = static_cast<QQuickWindow*>(timelineEngine->rootObjects().first());
-  auto timelineWidget = createWindowContainer(quickWindow);
-  tabWidget->addTab(timelineWidget, "Timeline View");
 
   //connect
   auto framesWindow = qobject_cast<QQuickWindow*>(framesEngine->rootObjects().first());
-  auto timelineWindow = qobject_cast<QQuickWindow*>(timelineEngine->rootObjects().first());
+
 
   framesView = framesWindow->findChild<FramesView*>("framesView");
-  timelineView = timelineWindow->findChild<TimelineView*>("timelineView");
-  connect(framesView, &FramesView::statRangeChanged, timelineView, &TimelineView::zoomToRangeFrame);
+
 
   layout->addWidget(framesWidget);
   layout->addWidget(tabWidget);

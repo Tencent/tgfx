@@ -41,7 +41,7 @@ class MainView : public QWidget {
   void openToolView();
   void openWebsocketServer();
 
-  void changeViewModeButton(bool pause);
+  //void changeViewModeButton(bool pause);
   Q_SLOT void changeViewMode(bool pause);
   Q_SLOT void quitReadFile();
   Q_SLOT void saveFile();

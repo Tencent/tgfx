@@ -25,14 +25,13 @@
 #include "MainView.h"
 #include "SourceView.h"
 #include "StatisticModel.h"
-#include "TimelineController.h"
-#include "TimelineView.h"
 #include "TracyEvent.hpp"
 #include "TracyFileRead.hpp"
 #include "TracyFileWrite.hpp"
 #include "TracyWorker.hpp"
 #include "UserData.h"
 #include "ViewData.h"
+#include "StartView.h"
 
 class SaveFileDialog : public QDialog {
   Q_OBJECT
@@ -75,7 +74,7 @@ class View : public QWidget {
   void saveFile();
   void initView();
   void ViewImpl();
-  Q_SLOT void changeViewModeButton(ViewMode mode);
+  //Q_SLOT void changeViewModeButton(ViewMode mode);
   Q_SLOT void openStatisticsView();
 
   void timerEvent(QTimerEvent* event) override;
@@ -102,6 +101,7 @@ class View : public QWidget {
   QQmlApplicationEngine* timelineEngine;
   QQmlApplicationEngine* framesEngine;
   QQmlApplicationEngine* statEngine;
+  QQmlApplicationEngine* starEngine;
   std::thread saveThread;
   std::string filenameStaging;
 
@@ -109,6 +109,7 @@ class View : public QWidget {
   FramesView* framesView = nullptr;
   TimelineView* timelineView = nullptr;
   StatisticsModel* statModel = nullptr;
+  //StartView* startView = nullptr;
   SaveFileDialog* saveFileDialog = nullptr;
   QDialog* connectDialog = nullptr;
   int timerId;

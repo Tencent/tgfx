@@ -24,13 +24,13 @@ class ProfilerWindow : public QMainWindow {
   Q_OBJECT
  public:
   ProfilerWindow(QMainWindow* parent = nullptr);
-  void initWindow();
-  void initConnect();
-  void changeViewMode();
-  void reversalPlayAction();
-  void changePlayAction(bool pause);
-  Q_SLOT void pushPlayAction();
-  Q_SLOT void updateToolBar(ProfilerStatus status);
+  //void initWindow();
+  //void initConnect();
+  //void changeViewMode();
+  //void reversalPlayAction();
+  //void changePlayAction(bool pause);
+  //Q_SLOT void pushPlayAction();
+  //Q_SLOT void updateToolBar(ProfilerStatus status);
 
  protected:
   void initToolBar();
