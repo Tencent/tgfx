@@ -240,6 +240,32 @@
           "-DCMAKE_C_FLAGS=\"-w\""
         ]
       }
+    },
+    {
+      "name": "tracy",
+      "cmake": {
+        "targets": [
+          "TracyClient"
+        ],
+        "arguments": [
+          "-DCMAKE_CXX_FLAGS=\"-w\""
+        ]
+      }
+    },
+    {
+      "name": "tracyServer",
+      "dir": "tracy/serverLib",
+      "cmake": {
+        "targets": [
+          "TracyServer",
+          "TracyNfd",
+          "TracyZstd",
+          "capstone"
+        ],
+        "arguments": [
+          "-DCMAKE_CXX_FLAGS=\"-w\""
+        ]
+      }
     }
   ]
 }

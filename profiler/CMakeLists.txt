@@ -22,7 +22,8 @@ list(APPEND TGFX_STATIC_VENDORS tracyServer)
 list(APPEND TGFX_PROFILER_INCLUDE
         ../third_party/tracy/server
         ../third_party/tracy/profiler
-        ../third_party/tracy/public/common)
+        ../third_party/tracy/public/common
+        ../third_party/flatbuffers/include)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -49,9 +50,10 @@ if (${QT_VERSION_MAJOR} LESS 6)
     SET(CMAKE_OSX_ARCHITECTURES x86_64)
 endif ()
 
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Widgets OpenGL Qml Quick)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Widgets OpenGL Qml Quick WebSockets Network)
 list(APPEND TGFX_PROFILER_LIBS Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets
-        Qt${QT_VERSION_MAJOR}::OpenGL Qt${QT_VERSION_MAJOR}::Qml Qt${QT_VERSION_MAJOR}::Quick)
+        Qt${QT_VERSION_MAJOR}::OpenGL Qt${QT_VERSION_MAJOR}::Qml Qt${QT_VERSION_MAJOR}::Quick
+        Qt${QT_VERSION_MAJOR}::WebSockets Qt${QT_VERSION_MAJOR}::Network)
 if (${QT_VERSION} VERSION_LESS "5.15")
     function(qt_add_resources outfiles)
         qt5_add_resources("${outfiles}" ${ARGN})
@@ -95,7 +97,7 @@ elseif (WIN32)
 endif ()
 
 list(APPEND TGFX_PROFILER_SRC src)
-file(GLOB TGFX_PROFILER_FILES src/*.*)
+file(GLOB TGFX_PROFILER_FILES src/*.* src/socket/*.* src/generate/*.* src/layerInspector/*.*)
 
 find_vendor_libraries(tgfx-vendor STATIC TGFX_VENDOR_STATIC_LIBRARIES)
 list(APPEND TGFX_PROFILER_STATIC_LIBS ${TGFX_VENDOR_STATIC_LIBRARIES})
@@ -104,4 +106,4 @@ add_executable(Profiler ${RC_FILES} ${TGFX_PROFILER_FILES} ${QT_RESOURCES})
 add_dependencies(Profiler tgfx-vendor)
 target_include_directories(Profiler PUBLIC ${TGFX_PROFILER_SRC})
 target_include_directories(Profiler SYSTEM PRIVATE ${TGFX_PROFILER_INCLUDE})
-target_link_libraries(Profiler tgfx ${TGFX_PROFILER_LIBS} ${APPKIT_LIBRARY} "-framework UniformTypeIdentifiers")
+target_link_libraries(Profiler tgfx ${TGFX_PROFILER_LIBS})

@@ -27,6 +27,7 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
+#include "tgfx/layers/LayerInspector.h"
 
 namespace tgfx {
 static std::atomic_bool AllowsEdgeAntialiasing = true;
@@ -294,6 +295,10 @@ bool Layer::addChildAt(std::shared_ptr<Layer> child, int index) {
   child->onAttachToRoot(_root);
   child->invalidateTransform();
   invalidateDescendents();
+#ifdef TGFX_USE_INSPECTOR
+  auto& layerInspector = LayerInspector::GetLayerInspector();
+  layerInspector.setDirty(_root, child);
+#endif
   return true;
 }
 
@@ -340,6 +345,10 @@ std::shared_ptr<Layer> Layer::removeChildAt(int index) {
     _children[static_cast<size_t>(index)]->invalidateBackground();
   }
   invalidateDescendents();
+#ifdef TGFX_USE_INSPECTOR
+  auto& layerInspector = LayerInspector::GetLayerInspector();
+  layerInspector.setDirty(_root, child);
+#endif
   return child;
 }
 

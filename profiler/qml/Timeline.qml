@@ -1,17 +1,18 @@
 import QtQuick 2.5
 import QtQuick.Window 2.13
-import Frames 1.0
+import Timeline 1.0
+import QtQuick.Controls 2.13
 
 Window {
     id: wind
     visible: true
-    width: _width
-    height: 50
+    width: 800
+    height: 600
     flags: Qt.FramelessWindowHint
     color: "transparent"
 
-    FramesView {
-        id: framesView
+    TimelineView {
+        id: timelineView
         worker: _worker
         viewData: _viewData
         viewMode: _viewMode
@@ -19,6 +20,13 @@ Window {
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         anchors.right: parent.right
-        objectName: "framesView"
+        objectName: "timelineView"
+
+
     }
+
+
+
+
+
 }

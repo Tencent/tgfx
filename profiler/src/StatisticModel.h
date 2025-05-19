@@ -1,4 +1,4 @@
-  /////////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
@@ -19,23 +19,12 @@
 #pragma once
 
 #include <qabstractitemmodel.h>
-#include "FramesView.h"
 #include "SourceContents.h"
-#include "SourceView.h"
 #include "TracyVector.hpp"
 #include "ViewData.h"
 
-class View;
-class SourceView;
-class FramesView;
 class StatisticsModel : public QAbstractTableModel {
   Q_OBJECT
-  Q_PROPERTY(QString totalZoneCount READ getTotalZoneCount NOTIFY zoneCountChanged)
-  Q_PROPERTY(QString visibleZoneCount READ getVisibleZoneCount NOTIFY zoneCountChanged)
-  Q_PROPERTY(bool rangeActive READ isRangeActive WRITE setRangeActive NOTIFY rangeActiveChanged)
-  Q_PROPERTY(QString filterText READ getFilterText WRITE setFilterText NOTIFY filterTextChanged)
-  Q_PROPERTY(int accumulationMode READ getAccumulationMode WRITE setAccumulationMode NOTIFY
-                 accumulationModeChanged)
 
  public:
   enum class AccumulationMode { SelfOnly, AllChildren, NonReentrantChildren };
@@ -56,18 +45,6 @@ class StatisticsModel : public QAbstractTableModel {
     Gpu = 2,
   };
 
-  enum Role {
-    nameRole = Qt::UserRole + 1,
-    locationRole = Qt::UserRole + 2,
-    totalTimeRole = Qt::UserRole + 3,
-    countRole = Qt::UserRole + 4,
-    mtpcRole = Qt::UserRole + 5,
-    threadCountRole = Qt::UserRole + 6,
-    colorRole = Qt::UserRole + 7,
-    percentageRole = Qt::UserRole + 8,
-    totalTimeRawRole = Qt::UserRole + 9,
-  };
-
   struct SrcLocZonesSlim {
     int16_t srcloc;
     uint16_t numThreads;
@@ -84,119 +61,74 @@ class StatisticsModel : public QAbstractTableModel {
     uint16_t threadNum = 0;
   };
 
-  explicit StatisticsModel(tracy::Worker* w, ViewData* vd, View* v, QObject* parent = nullptr);
+  explicit StatisticsModel(tracy::Worker& w, ViewData& vd, View* v, QObject* parent = nullptr);
   ~StatisticsModel();
 
-  /////*column role & data*/////
-  int rowCount(const QModelIndex& parent) const override;
-  int columnCount(const QModelIndex& parent) const override;
+  //init row and column
+  int rowCount(const QModelIndex& parent = QModelIndex()) const override;
+  int columnCount(const QModelIndex& parent = QModelIndex()) const override;
   QVariant data(const QModelIndex& index, int role) const override;
   QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
-  QHash<int, QByteArray> roleNames() const override;
+  void sort(int column, Qt::SortOrder order) override;
 
-  QString getTotalZoneCount() const {
-    return QString::number(totalZoneCount);
+  size_t getTotalZoneCount() const {
+    return totalZoneCount;
   }
-
-  QString getVisibleZoneCount() const {
-    return QString::number(srcData.size());
+  size_t getVisibleZoneCount() const {
+    return srcData.size();
   }
-
+  tracy::Worker& getWorker() const {
+    return worker;
+  }
   SourceContents getSource() const {
     return source;
   }
-
   const tracy::Vector<SrcLocZonesSlim>& getSrcData() const {
     return srcData;
   }
+  int64_t getZoneChildTimeFast(const tracy::ZoneEvent& zone);
+  uint32_t getRawSrcLocColor(const tracy::SourceLocation& srcloc, int depth);
+  uint32_t getStrLocColor(const tracy::SourceLocation& srcloc, int depth);
+  const tracy::SourceLocation& getSrcLocFromIndex(const QModelIndex& index) const;
 
-  QString getFilterText() const {
-    return filterText;
+  bool isZoneReentry(const tracy::ZoneEvent& zone) const;
+  bool isZoneReentry(const tracy::ZoneEvent& zone, uint64_t tid) const;
+
+  //source data...
+  void openSource(const char* fileName, int line, const tracy::Worker& worker, const View* view);
+  void parseSource(const char* fileName, const tracy::Worker& worker, const View* view);
+
+  AccumulationMode accumulationMode() const {
+    return statAccumulationMode;
   }
-
-  QColor getTextColor() const {
-    return QColor(255, 255, 255, 230);
-  }
-
-  int getAccumulationMode() const {
-    return static_cast<int>(statAccumulationMode);
-  }
-
   StatMode statisticMode() const {
     return statisticsMode;
   }
-
   QString FilterText() const {
     return filterText;
   }
 
-  /////*Icon utilities*/////
-  uint32_t getRawSrcLocColor(const tracy::SourceLocation& srcloc, int depth) const;
-  uint32_t getStrLocColor(const tracy::SourceLocation& srcloc, int depth) const;
-  const tracy::SourceLocation& getSrcLocFromIndex(const QModelIndex& index) const;
-
-  /////*data utilities*/////
-  bool isZoneReentry(const tracy::ZoneEvent& zone) const;
-  bool isZoneReentry(const tracy::ZoneEvent& zone, uint64_t tid) const;
-  int64_t getZoneChildTimeFast(const tracy::ZoneEvent& zone);
-
-  //////*view source*/////
-  void openSource(const char* fileName, int line, const tracy::Worker* worker, const View* view);
-  void parseSource(const char* fileName, const tracy::Worker* worker, const View* view);
-  void viewSource(const char* fileName, int line);
-  static bool srcFileValid(const char* fn, uint64_t olderThan, const tracy::Worker& worker,
-                           View* view);
-
-  /////*range selected*/////
-  bool isRangeActive() const;
-  void setRangeActive(bool active);
-
-  Q_SLOT void setFilterText(const QString& filter);
-  Q_SLOT void setStatRange(int startTime, int endTime, bool active);
-
+  Q_SLOT void setAccumulationMode(AccumulationMode mode);
   Q_SLOT void setStatisticsMode(StatMode mode);
+  Q_SLOT void setFilterText(const QString& filter);
+  Q_SLOT void refreshData();
+  Q_SLOT void setStatRange(int64_t start, int64_t end, bool active);
 
-  Q_SIGNAL void statisticsModeChanged();
-  Q_SIGNAL void statisticsUpdated();
-  Q_SIGNAL void zoneCountChanged();
-  Q_SIGNAL void rangeActiveChanged();
-  Q_SIGNAL void filterTextChanged();
   Q_SIGNAL void accumulationModeChanged();
-
-  void refreshFrameData();
-  bool isRunning();
-
-  QVector<float>& getDrawCall();
-  QVector<float>& getTriangles();
-  Q_INVOKABLE uint32_t getFirstFrame() const;
-  Q_INVOKABLE uint32_t getLastFrame() const;
-  Q_INVOKABLE QVector<float>& getFps();
-  Q_INVOKABLE float getMaxFps() const;
-  Q_INVOKABLE float getMinFps() const;
-  Q_INVOKABLE float getAvgFps() const;
-  Q_INVOKABLE float getMaxDrawCall() const;
-  Q_INVOKABLE float getMinDrawCall() const;
-  Q_INVOKABLE float getMaxTriangles() const;
-  Q_INVOKABLE float getMinTriangles() const;
-  Q_INVOKABLE void openSource(int row);
-  Q_INVOKABLE void setAccumulationMode(int mode);
-  Q_INVOKABLE void updateZoneCountLabels();
-  Q_INVOKABLE void sort(int column, Qt::SortOrder order) override;
-  Q_INVOKABLE void clearFilter();
+  Q_SIGNAL void statisticsModeChanged();
+  Q_SIGNAL void filterTextChanged();
+  Q_SIGNAL void statisticsUpdated();
 
  protected:
   void refreshInstrumentationData();
+  void refreshSamplingData();
+  void refreshGpuData();
   bool matchFilter(const QString& name, const QString& location) const;
 
  private:
   View* view = nullptr;
-  ViewData* viewData = nullptr;
-  tracy::Worker* worker = nullptr;//
-  FramesView* framesView = nullptr;
-  const tracy::FrameData* frames = nullptr;
-  QVector<float> fps;
-  QVector<float> drawCall;
-  QVector<float> triangle;
+  ViewData& viewData;
+  tracy::Worker& worker;
 
   tracy::Vector<SrcLocZonesSlim> srcData;
   tracy::unordered_flat_map<int16_t, StatCache> statCache;
@@ -208,19 +140,10 @@ class StatisticsModel : public QAbstractTableModel {
 
   QString filterText;
   Qt::SortOrder sortOrder;
-  int sortColumn = TotalTimeColumn;
 
-  Range stateRange;
   int statMode;
   int targetLine = 0;
   int selectedLine = 0;
   uint64_t targetAddr;
   size_t totalZoneCount;
-
-  SourceView* srcView = nullptr;
-  QString srcViewFile;
-  QTimer* dataRefreshTimer;
-
-  template <typename Func>
-  float calculateStatInRange(const QVector<float>& data, Func comparefunc, float initValue) const;
 };

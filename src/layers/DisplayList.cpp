@@ -18,11 +18,16 @@
 
 #include "tgfx/layers/DisplayList.h"
 #include "layers/DrawArgs.h"
+#include "tgfx/layers/LayerInspector.h"
 
 namespace tgfx {
 
 DisplayList::DisplayList() : _root(Layer::Make()) {
   _root->_root = _root.get();
+#ifdef TGFX_USE_INSPECTOR
+  auto& layerInspector = LayerInspector::GetLayerInspector();
+  layerInspector.setDisplayList(this);
+#endif
 }
 
 Layer* DisplayList::root() const {
@@ -71,6 +76,13 @@ bool DisplayList::render(Surface* surface, bool replaceAll) {
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
   surfaceContentVersion = surface->contentVersion();
   surfaceID = surface->uniqueID();
+
+#ifdef TGFX_USE_INSPECTOR
+  auto& layerInspector = LayerInspector::GetLayerInspector();
+  layerInspector.serializingLayerTree();
+  layerInspector.setCallBack();
+#endif
+
   return true;
 }
 

@@ -91,5 +91,7 @@ class DisplayList {
   Point _contentOffset = {};
   uint32_t surfaceContentVersion = 0u;
   uint32_t surfaceID = 0u;
+
+  friend class LayerInspector;
 };
 }  // namespace tgfx

@@ -299,6 +299,9 @@ if (TGFX_USE_INSPECTOR)
     list(APPEND TGFX_INCLUDES third_party/flatbuffers/include)
     file(GLOB_RECURSE SERIALIZATION_FILE src/serialization/*.*)
     list(APPEND TGFX_FILES ${SERIALIZATION_FILE})
+
+    list(APPEND TGFX_STATIC_VENDORS tracy)
+    list(APPEND TGFX_INCLUDES third_party/tracy)
 endif ()
 
 if (TGFX_USE_QT)

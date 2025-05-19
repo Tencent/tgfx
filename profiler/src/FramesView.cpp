@@ -20,16 +20,17 @@
 #include <qevent.h>
 #include <QSGImageNode>
 #include <QToolTip>
+#include "TimelineView.h"
 #include "TracyPrint.hpp"
 #include "tgfx/gpu/opengl/qt/QGLWindow.h"
 
-FramesView::FramesView(QQuickItem* parent)
-    : QQuickItem(parent), appHost(AppHostInstance::GetAppHostInstance()) {
+FramesView::FramesView(QQuickItem* parent) : QQuickItem(parent) {
   setFlag(ItemHasContents, true);
   setFlag(ItemAcceptsInputMethod, true);
   setFlag(ItemIsFocusScope, true);
   setAcceptedMouseButtons(Qt::AllButtons);
   setAcceptHoverEvents(true);
+  createAppHost();
 }
 
 FramesView::~FramesView() {
@@ -48,10 +49,10 @@ uint64_t FramesView::getFrameNumber(const tracy::FrameData& frameData, uint64_t 
 }
 
 uint32_t GetFrameColor(uint64_t time, uint64_t target) {
-  return time > target * 2   ? 0xFF8888FF
-         : time > target     ? 0xFF88FFFF
-         : time > target / 2 ? 0xFF88FF88
-                             : 0xFFFFCC88;
+  return time > target * 2   ? 0xFF2222DD
+         : time > target     ? 0xFF22DDDD
+         : time > target / 2 ? 0xFF22DD22
+                             : 0xFFDD9900;
 }
 
 int GetFrameWidth(int frameScale) {
@@ -78,60 +79,23 @@ void FramesView::draw() {
   }
   auto canvas = surface->getCanvas();
   canvas->clear();
-  canvas->setMatrix(tgfx::Matrix::MakeScale(appHost->density(), appHost->density()));
-  drawRect(canvas, 0, 0, static_cast<float>(width()), static_cast<float>(height()), 0xFF2E2E2E);
+  drawRect(canvas, 0, 0, static_cast<float>(width()), static_cast<float>(height()), 0xFF000000);
   drawFrames(canvas);
+  canvas->setMatrix(tgfx::Matrix::MakeScale(appHost->density(), appHost->density()));
   context->flushAndSubmit();
   tgfxWindow->present(context);
   device->unlock();
 }
 
-void FramesView::drawSelect(tgfx::Canvas* canvas, std::pair<int, int>& range, int onScreen,
-                            int frameWidth, int group, uint32_t color) {
-  auto transparentColor = color & 0x55FFFFFF;
-  if (range.second > viewData->frameStart &&
-      range.first < viewData->frameStart + onScreen * group) {
-    auto x1 =
-        std::min(onScreen * frameWidth, (range.second - viewData->frameStart) * frameWidth / group);
-    auto x0 = std::max(0, (range.first - viewData->frameStart) * frameWidth / group);
-    if (x0 == x1) x1 = x0 + frameWidth;
-    auto fx1 = static_cast<float>(x1);
-    auto fx0 = static_cast<float>(x0);
-    auto h = static_cast<float>(height());
-    if (x1 - x0 >= 3) {
-      drawRect(canvas, 2.f + fx0, 0, fx1 - fx0, h, transparentColor);
-      auto p1 = tgfx::Point{2.f + fx0, -1.f};
-      auto p2 = tgfx::Point{2.f + fx0, h - 1.f};
-      auto p3 = tgfx::Point{fx1, -1.f};
-      auto p4 = tgfx::Point{fx1, h - 1.f};
-
-      drawLine(canvas, p1, p2, color);
-      drawLine(canvas, p3, p4, color);
-    } else {
-      drawRect(canvas, 2.f + fx0, 0, fx1 - fx0, h, transparentColor);
-    }
-  }
-}
-
-void FramesView::drawSelectFrame(tgfx::Canvas* canvas, int onScreen, int frameWidth, int group) {
-  auto range = worker->GetFrameRange(*frames, viewData->zvStart, viewData->zvEnd);
-  if (range.first != -1) {
-    selectedStartFrame = range.first;
-    selectedEndFrame = range.second;
-  }
-  drawSelect(canvas, range, onScreen, frameWidth, group, 0xFF7259A3);
-}
-
 void FramesView::drawFrames(tgfx::Canvas* canvas) {
   assert(worker->GetFrameCount(*frames) != 0);
+  canvas->save();
   canvas->translate(viewOffset, 0);
 
-  drawBackground(canvas);
-  const int w = static_cast<int>(width() - placeWidth);
   const int frameWidth = GetFrameWidth(viewData->frameScale);
   const int group = GetFrameGroup(viewData->frameScale);
   const int total = static_cast<int>(worker->GetFrameCount(*frames));
-  const int onScreen = (w - 2) / frameWidth;
+  const int onScreen = (static_cast<int>(width()) - 2) / frameWidth;
 
   if (*viewMode != ViewMode::Paused) {
     viewData->frameStart = (total < onScreen * group) ? 0 : total - onScreen * group;
@@ -147,6 +111,7 @@ void FramesView::drawFrames(tgfx::Canvas* canvas) {
     }
   }
 
+  drawBackground(canvas);
   int i = 0, idx = 0;
   while (i < onScreen && viewData->frameStart + idx < total) {
     auto frameTime = worker->GetFrameTime(*frames, size_t(viewData->frameStart + idx));
@@ -176,7 +141,50 @@ void FramesView::drawFrames(tgfx::Canvas* canvas) {
     idx += group;
   }
 
-  drawSelectFrame(canvas, onScreen, frameWidth, group);
+  //draw selection
+  auto range = worker->GetFrameRange(*frames, viewData->zvStart, viewData->zvEnd);
+
+  if (range.first != -1) {
+    selectedStartFrame = range.first;
+    selectedEndFrame = range.second;
+  }
+
+  const auto zrange = std::make_pair(selectedStartFrame, selectedEndFrame);
+
+  if (zrange.second > viewData->frameStart &&
+      zrange.first < viewData->frameStart + onScreen * group) {
+    auto x1 = std::min(onScreen * frameWidth,
+                       (zrange.second - viewData->frameStart) * frameWidth / group);
+    auto x0 = std::max(0, (zrange.first - viewData->frameStart) * frameWidth / group);
+    if (x0 == x1) x1 = x0 + frameWidth;
+    auto fx1 = static_cast<float>(x1);
+    auto fx0 = static_cast<float>(x0);
+    auto h = static_cast<float>(height());
+    if (x1 - x0 >= 3) {
+      drawRect(canvas, 2.f + fx0, 0, fx1 - fx0, h, 0x55DD22DD);
+      auto p1 = tgfx::Point{2.f + fx0, -1.f};
+      auto p2 = tgfx::Point{2.f + fx0, h - 1.f};
+      auto p3 = tgfx::Point{fx1, -1.f};
+      auto p4 = tgfx::Point{fx1, h - 1.f};
+
+      drawLine(canvas, p1, p2, 0x55FF55FF);
+      drawLine(canvas, p3, p4, 0x55FF55FF);
+    } else {
+      drawRect(canvas, 2.f + fx0, 0, fx1 - fx0, h, 0x55FF55FF);
+    }
+  }
+  canvas->restore();
+}
+
+void FramesView::createAppHost() {
+  appHost = std::make_unique<AppHost>();
+#ifdef __APPLE__
+  auto defaultTypeface = tgfx::Typeface::MakeFromName("PingFang SC", "");
+  auto emojiTypeface = tgfx::Typeface::MakeFromName("Apple Color Emoji", "");
+#else
+  auto defaultTypeface = tgfx::Typeface::MakeFromName("Microsoft YaHei", "");
+#endif
+  appHost->addTypeface("default", defaultTypeface);
 }
 
 void FramesView::setViewToLastFrames() {
@@ -221,41 +229,27 @@ QSGNode* FramesView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
 
 void FramesView::drawBackground(tgfx::Canvas* canvas) {
   const auto dpos = tgfx::Point{0.f, 0.f};
-  const auto h = static_cast<float>(height());
-  const auto w = static_cast<float>(width());
-  auto fontSize = 12.f;
 
-  auto p1 = tgfx::Point{w - placeWidth, 0};
-  auto p2 = tgfx::Point{placeWidth, h};
-  auto textXStart = p1.x + p2.x / 2;
-  drawRect(canvas, p1, p2, 0x66BB7DC8);
+  const uint64_t frameTarget = 1000 * 1000 * 1000 / viewData->frameTarget;
 
-  p1 = dpos + tgfx::Point{0, round(h - h * frameTarget * 2 / MaxFrameTime)};
-  p2 = dpos + tgfx::Point{w, round(h - h * frameTarget * 2 / MaxFrameTime)};
+  auto p1 =
+      dpos +
+      tgfx::Point{0, round((float)height() - (float)height() * frameTarget * 2 / MaxFrameTime)};
+  auto p2 =
+      dpos + tgfx::Point{(float)width(),
+                         round((float)height() - (float)height() * frameTarget * 2 / MaxFrameTime)};
   drawLine(canvas, p1, p2, 0x442222DD);
-  auto textFps = "30FPS";
-  auto textBounds = getTextSize(appHost.get(), textFps, 0, fontSize);
-  auto textPoint = tgfx::Point{textXStart - textBounds.width() / 2, p2.y + textBounds.height() / 2};
-  drawTextWithBlackRect(canvas, appHost.get(), textFps, textPoint.x, textPoint.y, 0xFF2222DD,
-                        fontSize);
 
-  p1 = dpos + tgfx::Point{0, round(h - h * frameTarget / MaxFrameTime)};
-  p2 = dpos + tgfx::Point{w, round(h - h * frameTarget / MaxFrameTime)};
+  p1 = dpos + tgfx::Point{0, round((float)height() - float(height() * frameTarget / MaxFrameTime))};
+  p2 = dpos + tgfx::Point{(float)width(),
+                          round((float)height() - (float)height() * frameTarget / MaxFrameTime)};
   drawLine(canvas, p1, p2, 0x4422DDDD);
-  textFps = "60FPS";
-  textBounds = getTextSize(appHost.get(), textFps, 0, fontSize);
-  textPoint = tgfx::Point{textXStart - textBounds.width() / 2, p2.y + textBounds.height() / 2};
-  drawTextWithBlackRect(canvas, appHost.get(), textFps, textPoint.x, textPoint.y, 0xFF22DDDD,
-                        fontSize);
 
-  p1 = dpos + tgfx::Point{0, round(h - h * frameTarget / 2 / MaxFrameTime)};
-  p2 = dpos + tgfx::Point{w, round(h - h * frameTarget / 2 / MaxFrameTime)};
+  p1 = dpos +
+       tgfx::Point{0, round((float)height() - (float)height() * frameTarget / 2 / MaxFrameTime)};
+  p2 = dpos + tgfx::Point{(float)width(), round((float)height() -
+                                                (float)height() * frameTarget / 2 / MaxFrameTime)};
   drawLine(canvas, p1, p2, 0x4422DD22);
-  textFps = "120FPS";
-  textBounds = getTextSize(appHost.get(), textFps, 0, fontSize);
-  textPoint = tgfx::Point{textXStart - textBounds.width() / 2, p2.y + textBounds.height() / 2};
-  drawTextWithBlackRect(canvas, appHost.get(), textFps, textPoint.x, textPoint.y, 0xFF22DD22,
-                        fontSize);
 }
 
 void FramesView::wheelEvent(QWheelEvent* event) {
@@ -287,13 +281,14 @@ void FramesView::mousePressEvent(QMouseEvent* event) {
       const int sel = viewData->frameStart + off;
 
       if (size_t(sel) < total) {
-        dragStartFrame = sel;
         isLeftDagging = true;
         *viewMode = ViewMode::Paused;
-        viewData->zvStart = worker->GetFrameBegin(*frames, size_t(sel));
-        viewData->zvEnd = worker->GetFrameEnd(*frames, size_t(sel + group - 1));
-        if (viewData->zvStart == viewData->zvEnd) {
-          viewData->zvStart--;
+        dragStartFrame = sel;
+
+        if (timelineView) {
+          viewData->zvStart = worker->GetFrameBegin(*frames, size_t(sel));
+          viewData->zvEnd = worker->GetFrameEnd(*frames, size_t(sel));
+          if (viewData->zvStart == viewData->zvEnd) viewData->zvStart--;
         }
         update();
       }
@@ -303,12 +298,11 @@ void FramesView::mousePressEvent(QMouseEvent* event) {
   }
 
   if (event->button() == Qt::RightButton) {
+    isRightDragging = true;
     lastRightDragPos = event->pos();
     setCursor(Qt::ClosedHandCursor);
     event->accept();
-    return;
   }
-  QQuickItem::mousePressEvent(event);
 }
 
 void FramesView::mouseMoveEvent(QMouseEvent* event) {
@@ -317,7 +311,7 @@ void FramesView::mouseMoveEvent(QMouseEvent* event) {
   const int group = GetFrameGroup(viewData->frameScale);
   const auto total = worker->GetFrameCount(*frames);
 
-  if (event->buttons() & Qt::LeftButton) {
+  if (isLeftDagging && (event->buttons() & Qt::LeftButton)) {
     const auto mx = pos.x();
     if (mx > 0 && mx < width() - 1) {
 
@@ -339,14 +333,17 @@ void FramesView::mouseMoveEvent(QMouseEvent* event) {
         viewData->zvStart = t0;
         viewData->zvEnd = t1;
 
-        Q_EMIT statRangeChanged(selectedStartFrame, selectedEndFrame, false);
+        if (timelineView) {
+          timelineView->zoomToRange(t0, t1, false);
+        }
+        Q_EMIT statRangeChanged(t0, t1, true);
       }
     }
     event->accept();
     return;
   }
 
-  if (event->buttons() & Qt::RightButton) {
+  if (isRightDragging && (event->buttons() & Qt::RightButton)) {
     *viewMode = ViewMode::Paused;
     const auto delta = (event->pos().x() - lastRightDragPos.x());
     if (abs(delta) >= frameWidth) {
@@ -362,6 +359,7 @@ void FramesView::mouseMoveEvent(QMouseEvent* event) {
 
 void FramesView::mouseReleaseEvent(QMouseEvent* event) {
   if (event->button() == Qt::RightButton) {
+    isRightDragging = false;
     setCursor(Qt::ArrowCursor);
     event->accept();
     return;
@@ -381,13 +379,16 @@ void FramesView::mouseReleaseEvent(QMouseEvent* event) {
 
       if (sel == dragStartFrame) {
         selectedStartFrame = sel;
-        selectedEndFrame = sel + group - 1;
+        selectedEndFrame = sel;
         int64_t startTime = worker->GetFrameBegin(*frames, static_cast<size_t>(sel));
-        int64_t endTime = worker->GetFrameEnd(*frames, static_cast<size_t>(selectedEndFrame));
+        int64_t endTime = worker->GetFrameEnd(*frames, static_cast<size_t>(sel));
         viewData->zvStart = startTime;
         viewData->zvEnd = endTime;
         if (viewData->zvStart == viewData->zvEnd) viewData->zvStart--;
-        Q_EMIT statRangeChanged(selectedStartFrame, selectedEndFrame, false);
+        if (timelineView) {
+          timelineView->zoomToRange(startTime, endTime, false);
+        }
+        Q_EMIT statRangeChanged(startTime, endTime, true);
       }
     }
     update();
@@ -400,15 +401,10 @@ void FramesView::hoverMoveEvent(QHoverEvent* event) {
     QQuickItem::hoverMoveEvent(event);
     return;
   }
-  const auto w = static_cast<float>(width());
-  const auto mouseX = int(event->position().x());
-  if (mouseX < 0 || mouseX > w - placeWidth) {
-    QToolTip::hideText();
-    return;
-  }
 
   const int frameWidth = GetFrameWidth(viewData->frameScale);
   const int group = GetFrameGroup(viewData->frameScale);
+  const auto mouseX = int(event->position().x());
   const auto adjustedX = mouseX - int(viewOffset);
   const auto offset = adjustedX * group / frameWidth;
   const auto total = int(worker->GetFrameCount(*frames));
