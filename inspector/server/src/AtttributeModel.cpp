@@ -1,5 +1,3 @@
-
-
 #include "AtttributeModel.h"
 #include <QAbstractItemModel>
 
