@@ -18,7 +18,6 @@ option(TGFX_USE_QT "Enable building with the Qt framework." OFF)
 option(TGFX_USE_SWIFTSHADER "Enable building with the SwiftShader library" OFF)
 option(TGFX_USE_ANGLE "Enable building with the ANGLE library" OFF)
 option(TGFX_USE_FASTER_BLUR "Enable a faster blur algorithm instead of the standard Gaussian blur" ON)
-option(TGFX_USE_INSPECTOR "Enable Inspector tool" ON)
 
 # When enabled, ImageBuffers created from web native codecs won’t be fully decoded right away.
 # Instead, they will use promise-awaiting calls before generating textures, allowing multiple
@@ -295,6 +294,11 @@ if (TGFX_USE_INSPECTOR)
     add_subdirectory(${INSPECTOR_DIR} inspector EXCLUDE_FROM_ALL)
     list(APPEND TGFX_STATIC_LIBS $<TARGET_FILE:inspector>)
     list(APPEND TGFX_DEPEND_TARGETS inspector)
+
+    list(APPEND TGFX_DEFINES TGFX_USE_INSPECTOR)
+    list(APPEND TGFX_INCLUDES third_party/flatbuffers/include)
+    file(GLOB_RECURSE SERIALIZATION_FILE src/serialization/*.*)
+    list(APPEND TGFX_FILES ${SERIALIZATION_FILE})
 endif ()
 
 if (TGFX_USE_QT)
@@ -328,13 +332,6 @@ elseif (TGFX_USE_ANGLE)
     list(APPEND TGFX_FILES ${GPU_PLATFORM_FILES})
 else ()
     set(TGFX_USE_NATIVE_GL ON)
-endif ()
-
-if (TGFX_USE_INSPECTOR)
-    list(APPEND TGFX_DEFINES TGFX_USE_INSPECTOR)
-    list(APPEND TGFX_INCLUDES third_party/flatbuffers/include)
-    file(GLOB_RECURSE SERIALIZATION_FILE src/serialization/*.*)
-    list(APPEND TGFX_FILES ${SERIALIZATION_FILE})
 endif ()
 
 list(APPEND TGFX_STATIC_VENDORS pathkit)

@@ -56,6 +56,141 @@ typedef SOCKET socket_t;
 typedef int socket_t;
 #endif
 
+#ifdef __EMSCRIPTEN__
+bool WebSocketClient::Message::readRaw(std::string& buf, int len) {
+    if (type == MessageType::Close || data.length() < len) {
+        return false;
+    }
+    buf = data.substr(0, len);
+    if (data.length() > len) {
+        data = data.substr(len, data.length() - len);
+    }
+    else {
+        data.clear();
+    }
+    return true;
+}
+
+WebSocketClient::WebSocketClient(const char* url) {
+    EmscriptenWebSocketCreateAttributes ws_attrs = {url, NULL, EM_FALSE};
+    ws = emscripten_websocket_new(&ws_attrs);
+    if (!ws)
+    {
+        error = "emscripten_websocket_new: ";
+        error += std::to_string(ws);
+        return;
+    }
+
+    emscripten_websocket_set_onopen_callback(ws, this, onOpen);
+    emscripten_websocket_set_onerror_callback(ws, this, onError);
+    emscripten_websocket_set_onclose_callback(ws, this, onClose);
+    emscripten_websocket_set_onmessage_callback(ws, this, onMessage);
+
+    for(;;)
+    {
+        unsigned short ready_state = 0;
+        emscripten_websocket_get_ready_state(ws, &ready_state);
+        if(ready_state == 0)
+        {
+            sleep(1);
+        }
+        else if(ready_state == 1) // connect
+        {
+            break;
+        }
+        else if (ready_state == 2)
+        {
+            error = "Socket closing while connecting";
+            break;
+        }
+        else if (ready_state == 3)
+        {
+            error = "Socket closing while connecting";
+            break;
+        }
+        else
+        {
+            error = "Socket has invalid ready state while connecting";
+            break;
+        }
+    }
+}
+
+bool WebSocketClient::hasMessage()
+{
+    return !queue.empty();
+}
+
+bool WebSocketClient::sendMessage(char* text, int textLength){
+    EMSCRIPTEN_RESULT ret = emscripten_websocket_send_binary(ws, text, textLength);
+    if (ret != EMSCRIPTEN_RESULT_SUCCESS) {
+        error = "emscripten_websocket_send_utf8_text: ";
+        error += std::to_string(ret);
+        return true;
+    }
+    return true;
+}
+
+WebSocketClient::Message* WebSocketClient::recvMssage(){
+    uint64_t lastTime = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+    while (queue.empty() )
+    {
+        const auto t = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+        if (t - lastTime > 3000000000 )
+        {
+            return nullptr;
+        }
+    }
+    buffer = std::move( queue.front() );
+    queue.pop();
+    return &buffer;
+}
+
+bool WebSocketClient::recvMssageImmdiately(Message& message)
+{
+    if(queue.empty())
+    {
+        return false;
+    }
+    message = std::move(queue.front());
+    queue.pop();
+    return true;
+}
+
+EM_BOOL WebSocketClient::onOpen(int eventType, const EmscriptenWebSocketOpenEvent *websocketEvent, void *userData) {
+    auto wsClient = static_cast<WebSocketClient*>(userData);
+    wsClient->isConnect = true;
+    return EM_TRUE;
+}
+
+EM_BOOL WebSocketClient::onClose(int eventType, const EmscriptenWebSocketCloseEvent *websocketEvent, void *userData) {
+    auto wsClient = static_cast<WebSocketClient*>(userData);
+    wsClient->queue.push(Message
+    {
+        MessageType::Close,
+        websocketEvent->reason
+    });
+    wsClient->isConnect = false;
+    return EM_TRUE;
+}
+
+EM_BOOL WebSocketClient::onError(int eventType, const EmscriptenWebSocketErrorEvent *websocketEvent, void *userData) {
+    auto wsClient = static_cast<WebSocketClient*>(userData);
+    wsClient->error = "communication error";
+    return EM_TRUE;
+}
+
+EM_BOOL WebSocketClient::onMessage(int eventType, const EmscriptenWebSocketMessageEvent *websocketEvent, void *userData) {
+    auto wsClient = static_cast<WebSocketClient*>(userData);
+    wsClient->queue.push(Message
+    {
+        websocketEvent->isText ? MessageType::Text : MessageType::Binary,
+        { websocketEvent->data, websocketEvent->data + websocketEvent->numBytes - (websocketEvent->isText ? 1 : 0) }
+    });
+    return EM_TRUE;
+}
+#endif
+
 enum { BufSize = 128 * 1024 };
 
 Socket::Socket()

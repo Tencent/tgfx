@@ -22,7 +22,49 @@
 #include <cstdint>
 #include <memory>
 
+#ifdef __EMSCRIPTEN__
+#include <queue>
+#include <emscripten.h>
+#include <emscripten/websocket.h>
+#include <emscripten/threading.h>
+#endif
+
 namespace inspector {
+
+#ifdef __EMSCRIPTEN__
+struct WebSocketClient {
+  enum MessageType
+  {
+    Text,
+    Binary,
+    Close,
+};
+
+  struct Message
+  {
+    MessageType type;
+    std::string data;
+    bool readRaw(std::string& buf, int len);
+  };
+
+  EMSCRIPTEN_WEBSOCKET_T ws;
+  bool isConnect = false;
+  std::queue<Message> queue;
+  std::string error;
+  Message buffer;
+
+  WebSocketClient(const char* url);
+  bool hasMessage();
+  bool sendMessage(char* text, int textLength);
+  Message* recvMssage();
+  bool recvMssageImmdiately(Message& message);
+  static EM_BOOL onOpen(int eventType, const EmscriptenWebSocketOpenEvent *websocketEvent, void *userData);
+  static EM_BOOL onClose(int eventType, const EmscriptenWebSocketCloseEvent *websocketEvent, void *userData);
+  static EM_BOOL onError(int eventType, const EmscriptenWebSocketErrorEvent *websocketEvent, void *userData);
+  static EM_BOOL onMessage(int eventType, const EmscriptenWebSocketMessageEvent *websocketEvent, void *userData);
+};
+#endif
+
 class Socket {
  public:
   Socket();
