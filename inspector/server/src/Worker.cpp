@@ -1,0 +1,411 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making tgfx available.
+//
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+//  in compliance with the License. You may obtain a copy of the License at
+//
+//      https://opensource.org/licenses/BSD-3-Clause
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include "Worker.h"
+#include <cassert>
+#include "DecodeStream.h"
+#include "EncodeStream.h"
+#include "FileTags.h"
+#include "LZ4.h"
+#include "Protocol.h"
+#include "Queue.h"
+#include "TagHeader.h"
+#include "tgfx/core/Data.h"
+
+namespace inspector {
+bool IsQueryPrio(ServerQuery type) {
+  return type < ServerQuery::ServerQueryDisconnect;
+}
+
+Worker::Worker(const char* addr, uint16_t port) : addr(addr), port(port) {
+  workThread = std::thread([this] { Exec(); });
+  netThread = std::thread([this] { Network(); });
+}
+
+Worker::~Worker() {
+  serverQueryQueue.clear();
+  serverQueryQueuePrio.clear();
+}
+
+bool Worker::Open(const std::string& filePath) {
+  auto data = tgfx::Data::MakeFromFile(filePath);
+  DecodeStream stream(&dataContext, data->bytes(), static_cast<uint32_t>(data->size()));
+  auto body = ReadBodyBytes(&stream);
+  if (dataContext.hasException()) {
+    return false;
+  }
+  ReadTags(&body, ReadTagsOfFile);
+  if (dataContext.hasException()) {
+    return false;
+  }
+
+  return true;
+}
+
+bool Worker::Save(const std::string&) {
+  EncodeStream bodyBytes(&dataContext);
+  WriteTagsOfFile(&bodyBytes);
+
+  EncodeStream fileBytes(&dataContext);
+  fileBytes.writeInt8('T');
+  fileBytes.writeInt8('G');
+  fileBytes.writeInt8('F');
+  fileBytes.writeInt8('X');
+  fileBytes.writeUint8(ProtocolVersion);
+  fileBytes.writeEncodedUint32(bodyBytes.length());
+  fileBytes.writeBytes(&bodyBytes);
+
+  return true;
+}
+
+DecodeStream Worker::ReadBodyBytes(DecodeStream* stream) {
+  DecodeStream emptyStream(stream->context);
+
+  auto T = stream->readInt8();
+  auto G = stream->readInt8();
+  auto F = stream->readInt8();
+  auto X = stream->readInt8();
+  if (T != 'T' || G != 'G' || F != 'F' || X != 'X') {
+    InspectorThrowError(stream->context, "Invalid ISP file header");
+    return emptyStream;
+  }
+
+  auto version = stream->readUint8();
+  if (version > ProtocolVersion) {
+    InspectorThrowError(stream->context, "Isp file version is too high");
+    return emptyStream;
+  }
+  auto bodyLength = stream->readUint32();
+  bodyLength = std::min(bodyLength, stream->bytesAvailable());
+  return stream->readBytes(bodyLength);
+}
+
+int64_t Worker::GetFrameTime(const FrameData& fd, size_t idx) const {
+  if(fd.continuous) {
+    if(idx < fd.frames.size() - 1) {
+      return fd.frames[idx+1].start - fd.frames[idx].start;
+    }
+    assert(dataContext.lastTime != 0);
+    return dataContext.lastTime - fd.frames.back().start;
+  }
+  const auto& frame = fd.frames[idx];
+  if(frame.end >= 0) {
+    return frame.end - frame.start;
+  }
+  return dataContext.lastTime - fd.frames.back().start;
+}
+
+int64_t Worker::GetLastTime() const {
+  return dataContext.lastTime;
+}
+
+void Worker::Shutdown() {
+  isShutDown.store(true, std::memory_order_relaxed);
+}
+
+#define CLOSE_EXEC                                     \
+  Shutdown();                                          \
+  netWriteCv.notify_one();                             \
+  sock.Close();                                        \
+  isConnected.store(false, std::memory_order_relaxed); \
+  return;
+
+void Worker::Exec() {
+  auto ShouldExit = [this] {
+    return isShutDown.load( std::memory_order_relaxed );
+  };
+
+  while (true) {
+    if (isShutDown.load(std::memory_order_relaxed)) {
+      return;
+    }
+    if (sock.Connect(addr.c_str(), port)) {
+      break;
+    }
+    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+  }
+
+  sock.Send(HandshakeShibboleth, HandshakeShibbolethSize);
+  uint32_t protocolVersion = ProtocolVersion;
+  sock.Send(&protocolVersion, sizeof(protocolVersion));
+  HandshakeStatus handshake;
+  if (!sock.Read(&handshake, sizeof(handshake), 10, ShouldExit)) {
+    this->handshake.store(HandshakeDropped, std::memory_order_relaxed);
+    CLOSE_EXEC;
+  }
+  this->handshake.store(handshake, std::memory_order_relaxed);
+  switch (handshake) {
+    case HandshakeWelcome:
+      break;
+    case HandshakeProtocolMismatch:
+    case HandshakeNotAvailable:
+    default:
+      CLOSE_EXEC;
+  }
+  {
+    WelcomeMessage welcome;
+    if (!sock.Read(&welcome, sizeof(welcome), 10, ShouldExit)) {
+      this->handshake.store(HandshakeDropped, std::memory_order_relaxed);
+      CLOSE_EXEC;
+    }
+    dataContext.baseTime = welcome.initBegin;
+    const auto initEnd = TscTime(welcome.initEnd);
+    dataContext.framebase->frames.push_back(FrameEvent{0, -1, 0, 0, -1});
+    dataContext.framebase->frames.push_back(FrameEvent{initEnd, -1, 0, 0, -1});
+    dataContext.lastTime = initEnd;
+  }
+  // leave space for terminate request
+  serverQuerySpaceLeft = serverQuerySpaceBase =
+      size_t(std::min(sock.GetSendBufSize() / ServerQueryPacketSize, 8 * 1024) - 4);
+  hasData.store(true, std::memory_order_release);
+
+  LZ4_setStreamDecode((LZ4_streamDecode_t*)lz4Stream, nullptr, 0);
+  isConnected.store(true, std::memory_order_relaxed);
+  {
+    std::lock_guard<std::mutex> lock(netWriteLock);
+    netWriteCnt = 2;
+    netWriteCv.notify_one();
+  }
+
+  while (true) {
+    if (isShutDown.load(std::memory_order_relaxed)) {
+      QueryTerminate();
+      CLOSE_EXEC;
+    }
+
+    NetBuffer netbuf;
+    {
+      std::unique_lock<std::mutex> lock(netReadLock);
+      netReadCv.wait(lock, [this] { return !netRead.empty(); });
+      netbuf = netRead.front();
+      netRead.erase(netRead.begin());
+    }
+
+    if (netbuf.bufferOffset < 0) {
+      CLOSE_EXEC;
+    }
+
+    const char* ptr = dataBuffer + netbuf.bufferOffset;
+    const char* end = ptr + netbuf.size;
+
+    {
+      std::lock_guard<std::mutex> lock(dataContext.lock);
+      while (ptr < end) {
+        auto ev = (const QueueItem*)ptr;
+        if (!DispatchProcess(*ev, ptr)) {
+          QueryTerminate();
+          CLOSE_EXEC;
+        }
+      }
+
+      {
+        std::lock_guard<std::mutex> lockNet(netWriteLock);
+        ++netWriteCnt;
+        netWriteCv.notify_one();
+      }
+
+      if (serverQuerySpaceLeft > 0 && !serverQueryQueuePrio.empty()) {
+        const auto toSend = std::min(serverQuerySpaceLeft, serverQueryQueuePrio.size());
+        sock.Send(serverQueryQueuePrio.data(), toSend * ServerQueryPacketSize);
+        serverQuerySpaceLeft -= toSend;
+        if (toSend == serverQueryQueuePrio.size()) {
+          serverQueryQueuePrio.clear();
+        } else {
+          serverQueryQueuePrio.erase(serverQueryQueuePrio.begin(),
+                                     serverQueryQueuePrio.begin() + long(toSend));
+        }
+      }
+      if (serverQuerySpaceLeft > 0 && !serverQueryQueue.empty()) {
+        const auto toSend = std::min(serverQuerySpaceLeft, serverQueryQueue.size());
+        sock.Send(serverQueryQueue.data(), toSend * ServerQueryPacketSize);
+        serverQuerySpaceLeft -= toSend;
+        if (toSend == serverQueryQueue.size()) {
+          serverQueryQueue.clear();
+        } else {
+          serverQueryQueue.erase(serverQueryQueue.begin(), serverQueryQueue.begin() + long(toSend));
+        }
+      }
+    }
+  }
+}
+
+#define CLOSE_NETWORK                            \
+  std::lock_guard<std::mutex> lock(netReadLock); \
+  netRead.push_back(NetBuffer{ -1, 0 });         \
+  netReadCv.notify_one();
+
+void Worker::Network() {
+  auto ShouldExit = [this] {
+    return isShutDown.load( std::memory_order_relaxed );
+  };
+
+  auto lz4buf = std::unique_ptr<char[]>(new char[LZ4Size]);
+  while (true) {
+    {
+      std::unique_lock<std::mutex> lock(netWriteLock);
+      netWriteCv.wait(
+          lock, [this] { return netWriteCnt > 0 || isShutDown.load(std::memory_order_relaxed); });
+      if (isShutDown.load(std::memory_order_relaxed)) {
+        CLOSE_NETWORK;
+      }
+      netWriteCnt--;
+    }
+
+    auto buf = dataBuffer + bufferOffset;
+    lz4sz_t lz4sz;
+    if (!sock.Read(&lz4sz, sizeof(lz4sz), 10, ShouldExit)) {
+      CLOSE_NETWORK;
+    }
+    if (!sock.Read(lz4buf.get(), static_cast<size_t>(lz4sz), 10, ShouldExit)) {
+      CLOSE_NETWORK;
+    }
+    auto bb = bytes.load(std::memory_order_relaxed);
+    bytes.store(bb + sizeof(lz4sz) + static_cast<size_t>(lz4sz), std::memory_order_relaxed);
+
+    auto sz = LZ4_decompress_safe_continue((LZ4_streamDecode_t*)lz4Stream, lz4buf.get(), buf, lz4sz,
+                                           TargetFrameSize);
+    assert(sz >= 0);
+    bb = decBytes.load(std::memory_order_relaxed);
+    decBytes.store(bb + static_cast<uint64_t>(sz), std::memory_order_relaxed);
+
+    {
+      std::lock_guard<std::mutex> lock(netReadLock);
+      netRead.push_back(NetBuffer{bufferOffset, sz});
+      netReadCv.notify_one();
+    }
+
+    bufferOffset += sz;
+    if (bufferOffset > TargetFrameSize * 2) {
+      bufferOffset = 0;
+    }
+  }
+}
+
+void Worker::NewOpTask(std::shared_ptr<OpTaskData> opTask) {
+  ++dataContext.opTaskCount;
+
+  auto& stack = dataContext.opTaskStack;
+  const auto size = stack.size();
+  if (size == 0) {
+    stack.push_back(opTask);
+    opTask->id = static_cast<uint32_t>(dataContext.opTasks.size());
+    dataContext.opTasks.push_back(opTask);
+  }
+  else {
+    auto& back = stack.back();
+    if (dataContext.opChilds.find(opTask->id) == dataContext.opChilds.end()) {
+      dataContext.opChilds[back->id] = std::vector<uint32_t>{opTask->id};
+    }
+    else {
+      dataContext.opChilds[back->id].push_back(opTask->id);
+    }
+  }
+  stack.push_back(opTask);
+}
+
+void Worker::Query(ServerQuery type, uint64_t data, uint32_t extra) {
+  ServerQueryPacket query{ type, data, extra};
+  if (serverQuerySpaceLeft > 0 && serverQueryQueuePrio.empty() && serverQueryQueue.empty()) {
+    serverQuerySpaceLeft--;
+    sock.Send(&query, ServerQueryPacketSize);
+  }
+  else if(IsQueryPrio(type)) {
+    serverQueryQueuePrio.push_back(query);
+  }
+  else {
+    serverQueryQueue.push_back(query);
+  }
+}
+
+void Worker::QueryTerminate() {
+  ServerQueryPacket query{ServerQueryTerminate, 0, 0};
+  sock.Send(&query, ServerQueryPacketSize);
+}
+
+bool Worker::DispatchProcess(const QueueItem& ev, const char*) {
+  return Process(ev);
+}
+
+bool Worker::Process(const QueueItem& ev) {
+  switch (ev.hdr.type) {
+    case QueueType::OperateBegin:
+      ProcessOperateBegin(ev.operateBegin);
+      break;
+    case QueueType::OperateEnd:
+      ProcessOperateEnd(ev.operateEnd);
+      break;
+    case QueueType::FrameMarkMsg:
+      ProcessFrameMark(ev.frameMark);
+      break;
+    case QueueType::KeepAlive:
+      break;
+  }
+  return true;
+}
+
+int64_t RefTime(int64_t& reference, int64_t delta) {
+  const auto refTime = reference + delta;
+  reference = refTime;
+  return refTime;
+}
+
+void Worker::ProcessOperateBegin(const QueueOperateBegin& ev) {
+  std::shared_ptr<OpTaskData> opTask(new OpTaskData);
+  const auto start = TscTime(RefTime(refTime, ev.time));
+  opTask->start = start;
+  opTask->end = -1;
+  opTask->type = ev.type;
+
+  NewOpTask(std::move(opTask));
+}
+
+void Worker::ProcessOperateEnd(const QueueOperateEnd& ev) {
+  auto& stack = dataContext.opTaskStack;
+  assert(!stack.empty());
+  auto opTask = stack.back();
+  stack.pop_back();
+  assert(opTask->end == -1);
+  const auto timeEnd = TscTime(RefTime(refTime, ev.time));
+  opTask->end = timeEnd;
+  assert(timeEnd >= opTask->start);
+}
+
+void Worker::ProcessFrameMark(const QueueFrameMark& ev) {
+  auto fd = dataContext.frames.Retrieve(ev.name, [](uint64_t) {
+    auto fd = new FrameData;
+    return fd;
+  }, [this](uint64_t name) {
+    Query(ServerQueryFrameName, name);
+  });
+
+  const auto time = TscTime(ev.time);
+  fd->frames.push_back(FrameEvent{ time, -1, 0, 0, -1});
+  if (dataContext.lastTime < time) {
+    dataContext.lastTime = time;
+  }
+
+  const auto timespan = GetFrameTime(*fd, fd->frames.size() - 1);
+  if (timespan > 0) {
+    fd->min = std::min(fd->min, timespan);
+    fd->max = std::max(fd->max, timespan);
+    fd->total += timespan;
+    fd->sumSq += double(timespan * timespan);
+  }
+}
+
+}  // namespace inspector

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawingManager.h"
+#include "InspectorDefine.h"
 #include "ProxyProvider.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
@@ -121,6 +122,7 @@ void DrawingManager::addResourceTask(PlacementPtr<ResourceTask> resourceTask) {
 }
 
 bool DrawingManager::flush() {
+  TaskMark(OpTaskType::Flush);
   while (!compositors.empty()) {
     auto compositor = compositors.back();
     // The makeClosed() method may add more compositors to the list.
@@ -134,8 +136,12 @@ bool DrawingManager::flush() {
     proxyProvider->clearSharedVertexBuffer();
     return false;
   }
-  for (auto& task : resourceTasks) {
-    task->execute(context);
+
+  {
+    TaskMark(OpTaskType::ResourceTask);
+    for (auto& task : resourceTasks) {
+      task->execute(context);
+    }
   }
   resourceTasks.clear();
   resourceTaskMap = {};
@@ -155,8 +161,11 @@ bool DrawingManager::flush() {
     task->execute(renderPass.get());
   }
   flattenTasks.clear();
-  for (auto& task : renderTasks) {
-    task->execute(renderPass.get());
+  {
+    TaskMark(OpTaskType::RenderTask);
+    for (auto& task : renderTasks) {
+      task->execute(renderPass.get());
+    }
   }
   renderTasks.clear();
   return true;

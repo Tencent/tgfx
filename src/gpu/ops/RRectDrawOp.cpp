@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RRectDrawOp.h"
+#include <InspectorDefine.h>
 #include "core/DataSource.h"
 #include "gpu/GpuBuffer.h"
 #include "gpu/ProxyProvider.h"
@@ -52,6 +53,7 @@ RRectDrawOp::RRectDrawOp(RRectsVertexProvider* provider)
 }
 
 void RRectDrawOp::execute(RenderPass* renderPass) {
+  OperateMark(OpTaskType::RRectDrawOp);
   if (indexBufferProxy == nullptr) {
     return;
   }
