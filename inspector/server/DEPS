@@ -1,0 +1,28 @@
+{
+  "version": "1.3.12",
+  "vars": {
+    "PAG_GROUP": "https://github.com/libpag"
+  },
+  "repos": {
+    "common": [
+      {
+        "url": "${PAG_GROUP}/vendor_tools.git",
+        "commit": "76b266c30e3314678a0d8daeb5b40a9389ea5544",
+        "dir": "third_party/vendor_tools"
+      },
+      {
+        "url": "https://github.com/KDAB/KDDockWidgets.git",
+        "commit": "bdf4e7bd4ee49c961cac8a0caff44c25ca2a06b4",
+        "dir": "third_party/KDDockWidgets"
+      }
+    ]
+  },
+  "actions": {
+    "common": [
+      {
+        "command": "depsync --clean",
+        "dir": "third_party"
+      }
+    ]
+  }
+}

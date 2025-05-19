@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.13)
 project(inspectorTool)
 
+include(./third_party/vendor_tools/vendor.cmake)
+
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 cmake_policy(SET CMP0063 NEW)
@@ -36,9 +38,9 @@ if (${QT_VERSION_MAJOR} LESS 6)
     SET(CMAKE_OSX_ARCHITECTURES x86_64)
 endif ()
 
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Widgets OpenGL qml Quick)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Widgets OpenGL qml Quick QuickControls2)
 list(APPEND TGFX_INSPECTOR_LIBS Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets
-        Qt${QT_VERSION_MAJOR}::OpenGL Qt${QT_VERSION_MAJOR}::Qml Qt${QT_VERSION_MAJOR}::Quick)
+        Qt${QT_VERSION_MAJOR}::OpenGL Qt${QT_VERSION_MAJOR}::Qml Qt${QT_VERSION_MAJOR}::Quick Qt${QT_VERSION_MAJOR}::QuickControls2)
 if (${QT_VERSION} VERSION_LESS "5.15")
     function(qt_add_resources outfiles)
         qt5_add_resources("${outfiles}" ${ARGN})
@@ -87,7 +89,14 @@ file(GLOB TGFX_INSPECTOR_FILES src/*.* src/tags/*.*)
 list(APPEND TGFX_INSPECTOR_COMMON_SRC ${INSPECTOR_COMMON_DIR})
 file(GLOB TGFX_INSPECTOR_COMMON_FILES ${INSPECTOR_COMMON_DIR}/*.*)
 
+list(APPEND INSPECTOR_STATIC_VENDORS KDDockWidgets)
+add_vendor_target(inspector-vendor STATIC_VENDORS ${INSPECTOR_STATIC_VENDORS})
+find_vendor_libraries(inspector-vendor STATIC INSPECTOR_VENDOR_STATIC_LIBRARIES)
+list(APPEND INSPECTOR_STATIC_LIBS ${INSPECTOR_VENDOR_STATIC_LIBRARIES})
+
+list(APPEND TGFX_INSPECTOR_INCLUDE ./third_party/KDDockWidgets/src/fwd_headers)
+
 add_executable(inspectorTool ${RC_FILES} ${TGFX_INSPECTOR_FILES} ${TGFX_INSPECTOR_COMMON_FILES} ${QT_RESOURCES})
 target_include_directories(inspectorTool PUBLIC ${TGFX_INSPECTOR_SRC} ${TGFX_INSPECTOR_COMMON_SRC})
 target_include_directories(inspectorTool SYSTEM PRIVATE ${TGFX_INSPECTOR_INCLUDE})
-target_link_libraries(inspectorTool tgfx ${TGFX_INSPECTOR_LIBS})
+target_link_libraries(inspectorTool tgfx ${TGFX_INSPECTOR_LIBS} ${INSPECTOR_STATIC_LIBS})

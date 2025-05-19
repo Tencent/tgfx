@@ -1,0 +1,20 @@
+{
+  "source": "third_party",
+  "out": "third_party/out",
+  "vendors": [
+    {
+      "name": "KDDockWidgets",
+      "cmake": {
+        "targets": [
+          "kddockwidgets"
+        ],
+        "arguments": [
+          "-DKDDockWidgets_QT6=ON",
+          "-DKDDockWidgets_STATIC=ON",
+          "-DKDDockWidgets_FRONTENDS=\"qtquick\"",
+          "-DCMAKE_CONFIGURATION_TYPES=\"Release\""
+        ]
+      }
+    }
+  ]
+}
