@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShapeDrawOp.h"
+#include <InspectorDefine.h>
 #include "core/PathTriangulator.h"
 #include "core/utils/Log.h"
 #include "gpu/ProxyProvider.h"
@@ -41,6 +42,7 @@ ShapeDrawOp::ShapeDrawOp(std::shared_ptr<GpuShapeProxy> shapeProxy, Color color,
 }
 
 void ShapeDrawOp::execute(RenderPass* renderPass) {
+  OperateMark(OpTaskType::ShapeDrawOp);
   if (shapeProxy == nullptr) {
     return;
   }

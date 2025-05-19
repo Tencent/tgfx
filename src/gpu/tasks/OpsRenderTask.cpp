@@ -17,11 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OpsRenderTask.h"
+#include <InspectorDefine.h>
 #include "gpu/Gpu.h"
 #include "gpu/RenderPass.h"
 
 namespace tgfx {
 bool OpsRenderTask::execute(RenderPass* renderPass) {
+  TaskMark(OpTaskType::OpsRenderTask);
   if (ops.empty() || renderTargetProxy == nullptr) {
     return false;
   }

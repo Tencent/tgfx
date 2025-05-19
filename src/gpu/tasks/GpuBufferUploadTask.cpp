@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GpuBufferUploadTask.h"
+#include <InspectorDefine.h>
 #include "tgfx/core/Task.h"
 
 namespace tgfx {
@@ -26,6 +27,7 @@ GpuBufferUploadTask::GpuBufferUploadTask(UniqueKey uniqueKey, BufferType bufferT
 }
 
 std::shared_ptr<Resource> GpuBufferUploadTask::onMakeResource(Context* context) {
+  TaskMark(OpTaskType::GpuUploadTask);
   if (source == nullptr) {
     return nullptr;
   }

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureFlattenTask.h"
+#include <InspectorDefine.h>
 #include "core/utils/Log.h"
 #include "gpu/Gpu.h"
 #include "gpu/Pipeline.h"
@@ -57,6 +58,7 @@ bool TextureFlattenTask::prepare(Context* context) {
 }
 
 bool TextureFlattenTask::execute(RenderPass* renderPass) {
+  TaskMark(OpTaskType::TextureFlattenTask);
   if (renderTarget == nullptr) {
     return false;
   }

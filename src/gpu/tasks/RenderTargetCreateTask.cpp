@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RenderTargetCreateTask.h"
+#include <InspectorDefine.h>
 #include "core/utils/Log.h"
 #include "gpu/RenderTarget.h"
 #include "gpu/Texture.h"
@@ -30,6 +31,7 @@ RenderTargetCreateTask::RenderTargetCreateTask(UniqueKey uniqueKey,
 }
 
 std::shared_ptr<Resource> RenderTargetCreateTask::onMakeResource(Context*) {
+  TaskMark(OpTaskType::RenderTargetCreateTask);
   auto texture = textureProxy->getTexture();
   if (texture == nullptr) {
     LOGE("RenderTargetCreateTask::onMakeResource() Failed to get the associated texture!");

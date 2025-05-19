@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ResolveOp.h"
+#include <InspectorDefine.h>
 #include "gpu/RenderPass.h"
 
 namespace tgfx {
@@ -28,6 +29,7 @@ PlacementPtr<ResolveOp> ResolveOp::Make(Context* context, const Rect& bounds) {
 }
 
 void ResolveOp::execute(RenderPass* renderPass) {
+  OperateMark(OpTaskType::ResolveOp);
   renderPass->resolve(bounds);
 }
 

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Window.h"
+#include <InspectorDefine.h>
 #include "core/utils/Log.h"
 #include "tgfx/gpu/Device.h"
 
@@ -57,6 +58,7 @@ void Window::freeSurface() {
 }
 
 void Window::present(Context* context, int64_t presentationTime) {
+  FrameMark;
   std::lock_guard<std::mutex> autoLock(locker);
   if (!checkContext(context)) {
     return;

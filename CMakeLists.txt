@@ -18,6 +18,7 @@ option(TGFX_USE_QT "Enable building with the Qt framework." OFF)
 option(TGFX_USE_SWIFTSHADER "Enable building with the SwiftShader library" OFF)
 option(TGFX_USE_ANGLE "Enable building with the ANGLE library" OFF)
 option(TGFX_USE_FASTER_BLUR "Enable a faster blur algorithm instead of the standard Gaussian blur" ON)
+option(TGFX_USE_INSPECTOR "Enable Inspector tool" ON)
 
 # When enabled, ImageBuffers created from web native codecs won’t be fully decoded right away.
 # Instead, they will use promise-awaiting calls before generating textures, allowing multiple
@@ -287,6 +288,15 @@ endif ()
 
 file(GLOB_RECURSE EGL_PLATFORM_FILES src/gpu/opengl/egl/*.*)
 
+if (TGFX_USE_INSPECTOR)
+    set(INSPECTOR_DIR ${CMAKE_CURRENT_LIST_DIR}/inspector)
+    list(APPEND TGFX_INCLUDES ${INSPECTOR_DIR}/client/include ${INSPECTOR_DIR}/client/src ${INSPECTOR_DIR}/common)
+#    list(APPEND TGFX_INCLUDES ${INSPECTOR_DIR}/client/include)
+    add_subdirectory(${INSPECTOR_DIR} inspector EXCLUDE_FROM_ALL)
+    list(APPEND TGFX_STATIC_LIBS $<TARGET_FILE:inspector>)
+    list(APPEND TGFX_DEPEND_TARGETS inspector)
+endif ()
+
 if (TGFX_USE_QT)
     set(CMAKE_AUTOMOC ON)
     # need to set the CMAKE_PREFIX_PATH to local QT installation path, for example :
@@ -506,7 +516,7 @@ if (TGFX_EXCLUDE_FILES)
 endif ()
 
 add_library(tgfx STATIC ${TGFX_FILES})
-add_dependencies(tgfx tgfx-vendor)
+add_dependencies(tgfx tgfx-vendor ${TGFX_DEPEND_TARGETS})
 target_compile_definitions(tgfx PUBLIC ${TGFX_DEFINES})
 target_compile_options(tgfx PUBLIC ${TGFX_COMPILE_OPTIONS})
 target_include_directories(tgfx PUBLIC include PRIVATE src)
