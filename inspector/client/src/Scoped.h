@@ -28,7 +28,7 @@ class Scoped {
   Scoped& operator=(const Scoped&) = delete;
   Scoped& operator=(Scoped&&) = delete;
 
-  Scoped(uint8_t type, bool isActive) : active(isActive) {
+  Scoped(uint8_t type, bool isActive) : active(isActive), type(type) {
     if (!active) {
       return;
     }
@@ -39,15 +39,17 @@ class Scoped {
   }
 
   ~Scoped() {
-    if (active) {
+    if (!active) {
       return;
     }
     QueuePrepare(QueueType::OperateEnd);
     MemWrite(&item->operateEnd.time, Inspector::GetTime());
+    MemWrite(&item->operateEnd.type, type);
     QueueCommit(operateEnd);
   }
 
  private:
   bool active;
+  uint8_t type;
 };
 }  // namespace inspector

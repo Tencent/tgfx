@@ -16,9 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <atomic>
-#include <new>
 #include "Inspector.h"
+#include <atomic>
+#include <iostream>
+#include <new>
 #include "Alloc.h"
 #include "LZ4.h"
 #include "Protocol.h"
@@ -89,9 +90,9 @@ uint32_t GetThreadHandle() {
 Inspector::Inspector()
     : epoch(std::chrono::duration_cast<std::chrono::seconds>(
                 std::chrono::system_clock::now().time_since_epoch())
-                .count()),
+                .count()), dataBuffer((char*)inspectorMalloc(TargetFrameSize * 3)), lz4Buf((char*)inspectorMalloc(LZ4Size + sizeof(lz4sz_t))),
       shutdown(false), timeBegin(0), frameCount(0), isConnect(false), serialQueue(1024 * 1024),
-      serialDequeue(1024 * 1024) {
+      serialDequeue(1024 * 1024), lz4Stream(LZ4_createStream()) {
   SpawnWorkerThreads();
 }
 
@@ -122,7 +123,7 @@ void Inspector::SpawnWorkerThreads() {
 
 bool Inspector::HandleServerQuery() {
   ServerQueryPacket payload;
-  if (this->sock->Read(&payload, sizeof(payload), 10)) {
+  if (!this->sock->Read(&payload, sizeof(payload), 10)) {
     return false;
   }
   uint8_t type;
@@ -360,32 +361,30 @@ Inspector::DequeueStatus Inspector::DequeueSerial() {
     while (item != end) {
       // uint64_t ptr;
       auto idx = MemRead<uint8_t>(&item->hdr.idx);
-      if (idx < (int)QueueType::KeepAlive) {
-        switch ((QueueType)idx) {
-          case QueueType::OperateBegin: {
-            // ThreadCtxCheckSerial(operateBeginThread);
-            auto t = MemRead<int64_t>(&item->operateBegin.time);
-            auto dt = t - refThread;
-            refThread = t;
-            MemWrite(&item->operateBegin.time, dt);
-            break;
-          }
-          case QueueType::OperateEnd: {
-            // ThreadCtxCheckSerial(operateEndThread);
-            auto t = MemRead<int64_t>(&item->operateEnd.time);
-            auto dt = t - refThread;
-            refThread = t;
-            MemWrite(&item->operateEnd.time, dt);
-            break;
-          }
-          default:
-            break;
+      switch ((QueueType)idx) {
+        case QueueType::OperateBegin: {
+          // ThreadCtxCheckSerial(operateBeginThread);
+          auto t = MemRead<int64_t>(&item->operateBegin.time);
+          auto dt = t - refThread;
+          refThread = t;
+          MemWrite(&item->operateBegin.time, dt);
+          break;
         }
-        if (!AppendData(item, QueueDataSize[idx])) {
-          return DequeueStatus::ConnectionLost;
+        case QueueType::OperateEnd: {
+          // ThreadCtxCheckSerial(operateEndThread);
+          auto t = MemRead<int64_t>(&item->operateEnd.time);
+          auto dt = t - refThread;
+          refThread = t;
+          MemWrite(&item->operateEnd.time, dt);
+          break;
         }
-        ++item;
+        default:
+          break;
       }
+      if (!AppendData(item, QueueDataSize[idx])) {
+        return DequeueStatus::ConnectionLost;
+      }
+      ++item;
     }
     refTimeThread = refThread;
     serialDequeue.clear();

@@ -258,6 +258,10 @@ int Socket::Send(const void* _buf, size_t len) {
   while (len > 0) {
     auto ret = send(sock, buf, len, MSG_NOSIGNAL);
     if (ret == -1) {
+      if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
+        continue;
+      }
+      printf("%s\n", strerror(errno));
       return -1;
     }
     len -= static_cast<size_t>(ret);

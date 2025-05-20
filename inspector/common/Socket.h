@@ -44,8 +44,12 @@ class Socket {
   bool Read(void* buf, size_t len, int timeout, ShouldExit exitCb) {
     auto cbuf = (char*)buf;
     while (len > 0) {
-      if (exitCb()) return false;
-      if (!ReadImpl(cbuf, len, timeout)) return false;
+      if (exitCb()) {
+       return false;
+      }
+      if (!ReadImpl(cbuf, len, timeout)) {
+       return false;
+      }
     }
     return true;
   }

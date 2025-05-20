@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <iostream>
 #include <mutex>
 #include <thread>
 #include "FastVector.h"
@@ -74,7 +75,6 @@ class Inspector {
     auto item = QueueSerial();
     MemWrite(&item->hdr.type, QueueType::FrameMarkMsg);
     MemWrite(&item->frameMark.time, GetTime());
-    MemWrite(&item->frameMark.name, uint64_t(name));
     QueueSerialFinish();
   }
 
@@ -102,7 +102,7 @@ class Inspector {
 
   bool NeetDataSize(size_t len) {
     assert(len <= TargetFrameSize);
-    bool ret = false;
+    bool ret = true;
     if (size_t(dataBufferOffset - dataBufferStart) + len > TargetFrameSize) {
       ret = CommitData();
     }
@@ -121,6 +121,8 @@ class Inspector {
 
  private:
   int64_t epoch;
+  char* dataBuffer = nullptr;
+  char* lz4Buf = nullptr;
   std::atomic<bool> shutdown;
   std::atomic<int64_t> timeBegin;
   std::atomic<uint64_t> frameCount;
@@ -141,8 +143,6 @@ class Inspector {
   std::mutex programNameLock;
 
   void* lz4Stream = nullptr;  // LZ4_stream_t*
-  char* lz4Buf = nullptr;
-  char* dataBuffer = nullptr;
   int dataBufferOffset;
   int dataBufferStart;
 };
