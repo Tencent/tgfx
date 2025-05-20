@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#ifdef TGFX_USE_INSPECTOR
 #include <functional>
 #include <chrono>
 #include "tgfx/layers/LayerInspector.h"
@@ -156,4 +157,5 @@ void LayerInspector::serializingLayerTree() {
     m_HighLightLayerIndex = m_HoverdLayer->getChildIndex(highlightLayer);
   }
 }
+#endif
 

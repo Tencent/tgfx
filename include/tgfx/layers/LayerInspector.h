@@ -20,7 +20,6 @@
 #include <vector>
 #include <functional>
 
-#include "serialization/SerializationUtils.h"
 #include "tgfx/layers/Layer.h"
 #include "tgfx/layers/DisplayList.h"
 
@@ -55,7 +54,7 @@ private:
     LayerInspector();
 private:
     std::unordered_map<uint64_t, std::shared_ptr<tgfx::Layer>> m_LayerMap;
-    std::unordered_map<uint64_t, SerializeUtils::Map> m_LayerComplexObjMap;
+    std::unordered_map<uint64_t, std::unordered_map<uint64_t, std::function<std::shared_ptr<Data>()>>> m_LayerComplexObjMap;
     uint64_t m_HoveredAddress;
     uint64_t m_SelectedAddress;
     std::shared_ptr<tgfx::Layer> m_HoverdLayer;

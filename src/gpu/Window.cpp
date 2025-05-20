@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Window.h"
-#include <InspectorDefine.h>
+#include "core/utils/Profiling.h"
 #include "core/utils/Log.h"
 #include "tgfx/gpu/Device.h"
 

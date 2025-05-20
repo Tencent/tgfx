@@ -27,7 +27,9 @@
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
+#ifdef TGFX_USE_INSPECTOR
 #include "tgfx/layers/LayerInspector.h"
+#endif
 
 namespace tgfx {
 static std::atomic_bool AllowsEdgeAntialiasing = true;

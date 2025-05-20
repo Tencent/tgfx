@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShapeBufferUploadTask.h"
-#include <InspectorDefine.h>
+#include "core/utils/Profiling.h"
 #include "gpu/GpuBuffer.h"
 #include "gpu/Texture.h"
 

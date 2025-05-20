@@ -21,6 +21,7 @@
 
 #include "public/common/TracySystem.hpp"
 #include "public/tracy/Tracy.hpp"
+#include <InspectorDefine.h>
 
 #if defined(_MSC_VER)
 #define TRACE_FUNC __FUNCSIG__
@@ -82,4 +83,10 @@ inline std::string GetThreadName() {
 
 #define LAYER_DATA(data)
 #define LAYER_CALLBACK(x)
+
+#define FrameMark
+
+#define ScopedMark(type, active)
+#define OperateMark(type)
+#define TaskMark(type)
 #endif

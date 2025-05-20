@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OpsRenderTask.h"
-#include <InspectorDefine.h>
+#include "core/utils/Profiling.h"
 #include "gpu/Gpu.h"
 #include "gpu/RenderPass.h"
 

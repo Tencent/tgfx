@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DstTextureCopyOp.h"
-#include <InspectorDefine.h>
+#include "core/utils/Profiling.h"
 #include "core/utils/Log.h"
 #include "gpu/Gpu.h"
 #include "gpu/RenderPass.h"

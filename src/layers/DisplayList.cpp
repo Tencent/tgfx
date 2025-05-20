@@ -18,7 +18,10 @@
 
 #include "tgfx/layers/DisplayList.h"
 #include "layers/DrawArgs.h"
+
+#ifdef TGFX_USE_INSPECTOR
 #include "tgfx/layers/LayerInspector.h"
+#endif
 
 namespace tgfx {
 
