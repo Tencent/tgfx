@@ -117,7 +117,6 @@ bool CGPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) con
   if (dstPixels == nullptr || dstInfo.isEmpty()) {
     return false;
   }
-
   auto path = shape->getPath();
   if (path.isEmpty()) {
     return false;
@@ -126,7 +125,6 @@ bool CGPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) con
   if (cgContext == nullptr) {
     return false;
   }
-
   auto totalMatrix = Matrix::MakeScale(1, -1);
   totalMatrix.postTranslate(0, static_cast<float>(dstInfo.height()));
   path.transform(totalMatrix);
