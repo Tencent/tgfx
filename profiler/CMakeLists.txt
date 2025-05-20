@@ -40,7 +40,7 @@ endif ()
 
 list(APPEND PROFILER_COMPILE_OPTIONS -Wno-error)
 
-option(TGFX_ENABLE_PROFILING "Enable Profiling" OFF)
+option(TGFX_USE_INSPECTOR "Enable Profiling" OFF)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/../ ./tgfx)
 
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core)
