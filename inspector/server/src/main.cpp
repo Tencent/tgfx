@@ -1,10 +1,40 @@
-#include <iostream>
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making tgfx available.
+//
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+//  in compliance with the License. You may obtain a copy of the License at
+//
+//      https://opensource.org/licenses/BSD-3-Clause
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "Worker.h"
+#include <QFont>
+#include "ProfilerApplication.h"
+#include "ProfilerWindow.h"
+#include "qwidget.h"
+#include <QQuickStyle>
+
+#include <kddockwidgets/Config.h>
+#include <kddockwidgets/qtquick/views/DockWidget.h>
+#include <kddockwidgets/qtquick/ViewFactory.h>
+
+
+class CustomViewFactory : public KDDockWidgets::QtQuick::ViewFactory
+{
+public:
+  ~CustomViewFactory() override;
 
 int main() {
   auto worker = inspector::Worker("127.0.0.1", 8086);
-  printf("%lld\n", worker.GetLastTime());
+  printf("%lld", worker.GetLastTime());
   while(true) {
 
   }
