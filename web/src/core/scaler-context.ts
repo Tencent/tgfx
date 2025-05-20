@@ -145,12 +145,12 @@ export class ScalerContext {
         return context.measureText(text).width;
     }
 
-    public readPixels(text: string, bounds: Rect) {
+    public readPixels(text: string, bounds: Rect, fauxBold: boolean, fauxItalic: boolean) {
         const width = bounds.right - bounds.left;
         const height = bounds.bottom - bounds.top
         const canvas = getCanvas2D(width, height);
         const context = canvas.getContext('2d',{willReadFrequently: true}) as CanvasRenderingContext2D;
-        context.font = this.fontString(false, false);
+        context.font = this.fontString(fauxBold, fauxItalic);
         context.fillText(text, -bounds.left, -bounds.top);
         const {data} = context.getImageData(0, 0, width, height);
         releaseCanvas2D(canvas);

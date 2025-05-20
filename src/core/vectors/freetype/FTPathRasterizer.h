@@ -18,16 +18,16 @@
 
 #pragma once
 
-#include "core/GlyphDrawer.h"
+#include "core/PathRasterizer.h"
 
 namespace tgfx {
-class FTGlyphDrawer final : public GlyphDrawer {
+class FTPathRasterizer final : public PathRasterizer {
  public:
-  explicit FTGlyphDrawer(float resolutionScale, bool antiAlias, bool needsGammaCorrection)
-      : GlyphDrawer(resolutionScale, antiAlias, needsGammaCorrection) {
+  explicit FTPathRasterizer(int width, int height, std::shared_ptr<Shape> shape, bool antiAlias,
+                            bool needsGammaCorrection)
+      : PathRasterizer(width, height, std::move(shape), antiAlias, needsGammaCorrection) {
   }
 
- protected:
-  bool onFillPath(const Path& path, const ImageInfo& dstInfo, void* dstPixels) override;
+  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 };
 }  // namespace tgfx

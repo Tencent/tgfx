@@ -40,11 +40,10 @@ class CGScalerContext : public ScalerContext {
 
   bool generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic, Path* path) const override;
 
-  Rect getImageTransform(GlyphID glyphID, Matrix* matrix) const override;
+  Rect getImageTransform(const GlyphStyle& glyphStyle, Matrix* matrix) const override;
 
-  bool readPixels(GlyphID glyphID, const ImageInfo& dstInfo, void* dstPixels) const override;
-
-  bool canUseImage(bool fauxBold, const Stroke* stroke) const override;
+  bool readPixels(const GlyphStyle& glyphStyle, const ImageInfo& dstInfo,
+                  void* dstPixels) const override;
 
  private:
   float fauxBoldScale = 1.0f;

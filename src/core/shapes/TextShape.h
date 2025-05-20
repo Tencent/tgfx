@@ -18,40 +18,35 @@
 
 #pragma once
 
-#include "core/Rasterizer.h"
+#include "core/GlyphRunList.h"
+#include "gpu/ResourceKey.h"
+#include "tgfx/core/Shape.h"
 
 namespace tgfx {
 /**
- * An ImageCodec that rasterizes a glyph.
+ * Shape that contains a GlyphRunList.
  */
-class GlyphImageCodec : public ImageCodec {
+class TextShape : public Shape {
  public:
-  static std::shared_ptr<GlyphImageCodec> MakeFrom(std::shared_ptr<GlyphFace> glyphFace,
-                                                   GlyphID glyphID, float resolutionScale,
-                                                   const Stroke* stroke = nullptr);
-
-  ~GlyphImageCodec() override;
-
-  bool isAlphaOnly() const override {
-    return !glyphFace->hasColor();
+  explicit TextShape(std::shared_ptr<GlyphRunList> glyphRunList)
+      : glyphRunList(std::move(glyphRunList)) {
   }
 
-  const Matrix& getImageTransform() const {
-    return matrix;
+  Rect getBounds() const override;
+
+  Path getPath() const override;
+
+ protected:
+  Type type() const override {
+    return Type::Text;
   }
 
-  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
+  UniqueKey getUniqueKey() const override {
+    return uniqueKey.get();
+  }
 
  private:
-  GlyphImageCodec(std::shared_ptr<GlyphFace> glyphFace, GlyphID glyphID, const Rect& bounds,
-                  float resolutionScale, const Stroke* stroke);
-
-  std::shared_ptr<GlyphFace> glyphFace = nullptr;
-  std::shared_ptr<ImageCodec> imageCodec = nullptr;
-  Matrix matrix = {};
-  Rect bounds = {};
-  Stroke* stroke = nullptr;
-  float resolutionScale = 1.f;
-  GlyphID glyphID = 0;
+  LazyUniqueKey uniqueKey = {};
+  std::shared_ptr<GlyphRunList> glyphRunList = nullptr;
 };
 }  // namespace tgfx

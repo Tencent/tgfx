@@ -149,7 +149,7 @@ class Font {
 
   /**
    * Creates an Image capturing the content of the specified glyph. The returned matrix should apply
-   * to the glyph image when drawing. Returns nullptr if the glyph is not part of this GlyphFace,
+   * to the glyph image when drawing. Returns nullptr if the glyph is not part of this Font,
    * cannot be rendered as an image, or if the stroke is unsupported.
    */
   std::shared_ptr<ImageCodec> getImage(GlyphID glyphID, const Stroke* stroke, Matrix* matrix) const;
@@ -170,7 +170,5 @@ class Font {
   std::shared_ptr<ScalerContext> scalerContext = nullptr;
   bool fauxBold = false;
   bool fauxItalic = false;
-
-  friend class GlyphDrawer;
 };
 }  // namespace tgfx

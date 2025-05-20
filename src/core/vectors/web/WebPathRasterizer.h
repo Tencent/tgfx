@@ -16,32 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GlyphShape.h"
+#pragma once
+
+#include "core/PathRasterizer.h"
 
 namespace tgfx {
-std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<GlyphFace> glyphFace, GlyphID glyphID) {
-  if (glyphFace == nullptr || glyphID == 0) {
-    return nullptr;
+class WebPathRasterizer final : public PathRasterizer {
+ public:
+  explicit WebPathRasterizer(int width, int height, std::shared_ptr<Shape> shape, bool antiAlias,
+                             bool needsGammaCorrection)
+      : PathRasterizer(width, height, std::move(shape), antiAlias, needsGammaCorrection) {
   }
-  if (!glyphFace->hasOutlines()) {
-    return nullptr;
-  }
-  return std::make_shared<GlyphShape>(std::move(glyphFace), glyphID);
-}
 
-GlyphShape::GlyphShape(std::shared_ptr<GlyphFace> glyphFace, GlyphID glyphID)
-    : glyphFace(std::move(glyphFace)), glyphID(glyphID) {
-}
-
-Path GlyphShape::getPath() const {
-  Path path = {};
-  if (!glyphFace->getPath(glyphID, &path)) {
-    return {};
-  }
-  return path;
-}
-
-Rect GlyphShape::getBounds() const {
-  return glyphFace->getBounds(glyphID);
-}
+  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
+};
 }  // namespace tgfx

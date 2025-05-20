@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "CGGlyphDrawer.h"
+#include "CGPathRasterizer.h"
 #include <CoreGraphics/CGBitmapContext.h>
 #include "core/PixelBuffer.h"
 #include "platform/apple/BitmapContextUtil.h"
@@ -101,27 +101,39 @@ static CGImageRef CreateCGImage(const Path& path, void* pixels, const ImageInfo&
   return image;
 }
 
-std::shared_ptr<GlyphDrawer> GlyphDrawer::Make(float resolutionScale, bool antiAlias,
-                                               bool needsGammaCorrection) {
-  return std::make_shared<CGGlyphDrawer>(resolutionScale, antiAlias, needsGammaCorrection);
+std::shared_ptr<PathRasterizer> PathRasterizer::Make(std::shared_ptr<Shape> shape, bool antiAlias,
+                                                     bool needsGammaCorrection) {
+  auto bounds = shape->getBounds();
+  if (bounds.isEmpty()) {
+    return nullptr;
+  }
+  auto width = static_cast<int>(ceilf(bounds.width()));
+  auto height = static_cast<int>(ceilf(bounds.height()));
+  return std::make_shared<CGPathRasterizer>(width, height, std::move(shape), antiAlias,
+                                            needsGammaCorrection);
 }
 
-bool CGGlyphDrawer::onFillPath(const Path& path, const ImageInfo& dstInfo, void* dstPixels) {
-  if (dstPixels == nullptr || path.isEmpty()) {
+bool CGPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
+  if (dstPixels == nullptr || dstInfo.isEmpty()) {
+    return false;
+  }
+
+  auto path = shape->getPath();
+  if (path.isEmpty()) {
     return false;
   }
   auto cgContext = CreateBitmapContext(dstInfo, dstPixels);
   if (cgContext == nullptr) {
     return false;
   }
-  auto finalPath = path;
+
   auto totalMatrix = Matrix::MakeScale(1, -1);
   totalMatrix.postTranslate(0, static_cast<float>(dstInfo.height()));
-  finalPath.transform(totalMatrix);
-  auto bounds = finalPath.getBounds();
+  path.transform(totalMatrix);
+  auto bounds = path.getBounds();
   bounds.roundOut();
   if (!needsGammaCorrection) {
-    DrawPath(finalPath, cgContext, dstInfo, antiAlias);
+    DrawPath(path, cgContext, dstInfo, antiAlias);
   }
   auto width = static_cast<int>(bounds.width());
   auto height = static_cast<int>(bounds.height());
@@ -136,8 +148,8 @@ bool CGGlyphDrawer::onFillPath(const Path& path, const ImageInfo& dstInfo, void*
     return false;
   }
   memset(tempPixels, 0, tempBuffer->info().byteSize());
-  auto image = CreateCGImage(finalPath, tempPixels, tempBuffer->info(), antiAlias, bounds.left,
-                             bounds.top, GlyphDrawer::GammaTable());
+  auto image = CreateCGImage(path, tempPixels, tempBuffer->info(), antiAlias, bounds.left,
+                             bounds.top, PathRasterizer::GammaTable());
   tempBuffer->unlockPixels();
   if (image == nullptr) {
     CGContextRelease(cgContext);
@@ -149,4 +161,5 @@ bool CGGlyphDrawer::onFillPath(const Path& path, const ImageInfo& dstInfo, void*
   CGImageRelease(image);
   return true;
 }
+
 }  // namespace tgfx

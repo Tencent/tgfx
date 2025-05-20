@@ -135,10 +135,11 @@ std::string SerializeUtils::MipmapModeToString(MipmapMode mode) {
 std::string SerializeUtils::ShapeTypeToString(Types::ShapeType type) {
   static std::unordered_map<Types::ShapeType, const char*> m = {
       {Types::ShapeType::Append, "Append"}, {Types::ShapeType::Effect, "Effect"},
-      {Types::ShapeType::Glyph, "Glyph"},   {Types::ShapeType::Inverse, "Inverse"},
+      {Types::ShapeType::Text, "Text"},     {Types::ShapeType::Inverse, "Inverse"},
       {Types::ShapeType::Matrix, "Matrix"}, {Types::ShapeType::Merge, "Merge"},
       {Types::ShapeType::Path, "Path"},     {Types::ShapeType::Provider, "Provider"},
-      {Types::ShapeType::Stroke, "Stroke"}};
+      {Types::ShapeType::Stroke, "Stroke"}, {Types::ShapeType::Glyph, "Glyph"},
+  };
   return m[type];
 }
 

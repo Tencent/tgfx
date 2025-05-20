@@ -16,7 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "FTGlyphDrawer.h"
+#include "FTPathRasterizer.h"
+#include "../../PathRasterizer.h"
 #include "FTLibrary.h"
 #include "FTPath.h"
 
@@ -81,31 +82,44 @@ static void SpanFunc(int y, int count, const FT_Span* spans, void* user) {
   }
 }
 
-std::shared_ptr<GlyphDrawer> GlyphDrawer::Make(float resolutionScale, bool antiAlias,
-                                               bool needsGammaCorrection) {
-  return std::make_shared<FTGlyphDrawer>(resolutionScale, antiAlias, needsGammaCorrection);
+std::shared_ptr<PathRasterizer> PathRasterizer::Make(std::shared_ptr<Shape> shape, bool antiAlias,
+                                                     bool needsGammaCorrection) {
+  auto bounds = shape->getBounds();
+  if (bounds.isEmpty()) {
+    return nullptr;
+  }
+  auto width = static_cast<int>(ceilf(bounds.width()));
+  auto height = static_cast<int>(ceilf(bounds.height()));
+  return std::make_shared<FTPathRasterizer>(width, height, std::move(shape), antiAlias,
+                                            needsGammaCorrection);
 }
 
-bool FTGlyphDrawer::onFillPath(const Path& path, const ImageInfo& dstInfo, void* dstPixels) {
-  auto finalPath = path;
+bool FTPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
+  if (dstPixels == nullptr || dstInfo.isEmpty()) {
+    return false;
+  }
+  auto path = shape->getPath();
+  if (path.isEmpty()) {
+    return false;
+  }
   auto totalMatrix = Matrix::MakeScale(1, -1);
   totalMatrix.postTranslate(0, static_cast<float>(dstInfo.height()));
-  finalPath.transform(totalMatrix);
-  if (finalPath.isInverseFillType()) {
+  path.transform(totalMatrix);
+  if (path.isInverseFillType()) {
     Path maskPath = {};
     maskPath.addRect(Rect::MakeWH(dstInfo.width(), dstInfo.height()));
-    finalPath.addPath(maskPath, PathOp::Intersect);
+    path.addPath(maskPath, PathOp::Intersect);
   }
   FTPath ftPath = {};
-  finalPath.decompose(Iterator, &ftPath);
-  auto fillType = finalPath.getFillType();
+  path.decompose(Iterator, &ftPath);
+  auto fillType = path.getFillType();
   ftPath.setEvenOdd(fillType == PathFillType::EvenOdd || fillType == PathFillType::InverseEvenOdd);
   auto outlines = ftPath.getOutlines();
   auto ftLibrary = FTLibrary::Get();
   auto buffer = static_cast<unsigned char*>(dstPixels);
   auto rows = dstInfo.height();
   auto pitch = static_cast<int>(dstInfo.rowBytes());
-  RasterTarget target = {buffer + (rows - 1) * pitch, pitch, GlyphDrawer::GammaTable().data()};
+  RasterTarget target = {buffer + (rows - 1) * pitch, pitch, PathRasterizer::GammaTable().data()};
   FT_Raster_Params params;
   params.flags = FT_RASTER_FLAG_DIRECT | FT_RASTER_FLAG_CLIP | FT_RASTER_FLAG_AA;
   params.gray_spans = SpanFunc;

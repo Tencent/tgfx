@@ -16,23 +16,27 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "WebPathRasterizer.h"
+#include <emscripten/val.h>
+#include "WebMask.h"
+#include "tgfx/core/Font.h"
 
-#include "core/GlyphDrawer.h"
+using namespace emscripten;
 
 namespace tgfx {
-class WebGlyphDrawer final : public GlyphDrawer {
- public:
-  explicit WebGlyphDrawer(float resolutionScale, bool antiAlias, bool needsGammaCorrection)
-      : GlyphDrawer(resolutionScale, antiAlias, needsGammaCorrection) {
+std::shared_ptr<PathRasterizer> PathRasterizer::Make(std::shared_ptr<Shape> shape, bool antiAlias,
+                                                     bool needsGammaCorrection) {
+  auto bounds = shape->getBounds();
+  if (bounds.isEmpty()) {
+    return nullptr;
   }
+  auto width = static_cast<int>(ceilf(bounds.width()));
+  auto height = static_cast<int>(ceilf(bounds.height()));
+  return std::make_shared<WebPathRasterizer>(width, height, shape, antiAlias, needsGammaCorrection);
+}
 
- protected:
-  bool onFillGlyph(const GlyphFace* glyphFace, GlyphID glyphID, const Stroke* stroke,
-                   const Rect& glyphBounds, const ImageInfo& dstInfo, void* dstPixels) override;
+bool WebPathRasterizer::readPixels(const ImageInfo&, void*) const {
+  return false;
+}
 
-  bool onFillPath(const Path&, const ImageInfo&, void*) override {
-    return false;
-  }
-};
 }  // namespace tgfx
