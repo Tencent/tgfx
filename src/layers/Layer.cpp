@@ -715,8 +715,7 @@ std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float con
 void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
   DEBUG_ASSERT(canvas != nullptr);
   if (args.renderRect && !args.renderRect->intersects(renderBounds)) {
-    bitFields.dirtyTransform = false;
-    bitFields.dirtyBackground = false;
+    cleanDirtyFlags();
     return;
   }
   if (auto rasterizedCache = getRasterizedCache(args)) {
@@ -835,8 +834,7 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, Laye
         child->bitFields.dirtyBackground || child->bitFields.dirtyTransform;
     if (!child->visible() || child->_alpha <= 0) {
       if (args.cleanDirtyFlags) {
-        child->bitFields.dirtyTransform = false;
-        child->bitFields.dirtyBackground = false;
+        child->cleanDirtyFlags();
       }
       continue;
     }
@@ -1081,4 +1079,16 @@ void Layer::updateRenderBounds(const Matrix& renderMatrix, const Rect* clipRect,
   }
 }
 
+void Layer::cleanDirtyFlags() {
+  if (bitFields.dirtyDescendents) {
+    for (auto& child : _children) {
+      child->cleanDirtyFlags();
+    }
+  }
+  // we should not clean content dirty flag here, because it use to determine if the content
+  // need to be updated.
+  bitFields.dirtyTransform = false;
+  bitFields.dirtyDescendents = false;
+  bitFields.dirtyBackground = false;
+}
 }  // namespace tgfx
