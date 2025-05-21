@@ -52,7 +52,7 @@ bool DisplayList::render(Surface* surface, bool replaceAll) {
        surface->contentVersion() == surfaceContentVersion && !_root->bitFields.dirtyDescendents)) {
     return false;
   }
-  _root->updateRenderBounds(Matrix::I());
+  _root->updateRenderBounds();
   auto canvas = surface->getCanvas();
   if (replaceAll) {
     canvas->clear();
