@@ -236,7 +236,7 @@ void Layer::setScrollRect(const Rect& rect) {
   invalidateTransform();
 }
 
-void Layer::setLayerStyles(const std::vector<std::shared_ptr<LayerStyle>>& value) {
+void Layer::setLayerStyles(std::vector<std::shared_ptr<LayerStyle>> value) {
   if (_layerStyles.size() == value.size() &&
       std::equal(_layerStyles.begin(), _layerStyles.end(), value.begin())) {
     return;
@@ -440,13 +440,10 @@ Rect Layer::getBoundsInternal(const Matrix& coordinateMatrix, bool computeTightB
       auto styleBounds = layerStyle->filterBounds(layerBounds, contentScale);
       bounds.join(styleBounds);
     }
-
-    auto filter = getImageFilter(contentScale);
-    if (filter) {
-      bounds = filter->filterBounds(bounds);
+    for (auto& filter : _filters) {
+      bounds = filter->filterBounds(bounds, contentScale);
     }
   }
-
   return bounds;
 }
 
@@ -690,9 +687,11 @@ std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float con
   if (FloatNearlyZero(contentScale)) {
     return nullptr;
   }
-  auto picture = CreatePicture(args, contentScale, [this](const DrawArgs& args, Canvas* canvas) {
-    drawDirectly(args, canvas, 1.0f);
-  });
+  auto drawArgs = args;
+  drawArgs.renderRect = nullptr;
+  auto picture = CreatePicture(
+      drawArgs, contentScale,
+      [this](const DrawArgs& args, Canvas* canvas) { drawDirectly(args, canvas, 1.0f); });
   if (!picture) {
     return nullptr;
   }
@@ -931,6 +930,12 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     //effects are always included when drawing the background.
     drawArgs.excludeEffects = false;
     drawArgs.drawMode = DrawMode::Background;
+    auto backgroundRect = renderBounds;
+    if (args.renderRect) {
+      backgroundRect.intersect(*args.renderRect);
+      drawArgs.renderRect = &backgroundRect;
+    }
+
     auto backgroundDrawer = [this](const DrawArgs& args, Canvas* canvas) {
       auto bounds = getBounds();
       canvas->clipRect(bounds);
@@ -1069,9 +1074,8 @@ void Layer::updateRenderBounds(const Matrix& renderMatrix, const Rect* clipRect,
       auto styleBounds = layerStyle->filterBounds(layerBounds, contentScale);
       renderBounds.join(styleBounds);
     }
-    auto filter = getImageFilter(contentScale);
-    if (filter) {
-      renderBounds = filter->filterBounds(renderBounds);
+    for (auto& filter : _filters) {
+      renderBounds = filter->filterBounds(renderBounds, contentScale);
     }
   }
   if (clipRect && !renderBounds.intersect(*clipRect)) {

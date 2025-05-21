@@ -46,7 +46,7 @@ std::shared_ptr<Data> LayerFilterSerialization::Serialize(const LayerFilter* lay
     case Types::LayerFilterType::BlurFilter:
       SerializeBlurFilterImpl(fbb, layerFilter);
       break;
-    case Types::LayerFilterType::ColorMatrixFliter:
+    case Types::LayerFilterType::ColorMatrixFilter:
       SerializeColorMatrixFilterImpl(fbb, layerFilter, map);
       break;
     case Types::LayerFilterType::DropShadowFilter:
