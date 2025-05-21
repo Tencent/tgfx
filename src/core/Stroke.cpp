@@ -62,12 +62,12 @@ bool Stroke::applyToPath(Path* path, float resolutionScale) const {
   return paint.getFillPath(skPath, &skPath, nullptr, resolutionScale);
 }
 
-void Stroke::applyToBounds(Rect* bounds) const {
+void Stroke::applyToBounds(Rect* bounds, bool ignoreMiterLimit) const {
   if (bounds == nullptr) {
     return;
   }
   auto expand = width * 0.5f;
-  if (join == LineJoin::Miter) {
+  if (!ignoreMiterLimit && join == LineJoin::Miter) {
     expand *= miterLimit;
   }
   expand = ceilf(expand);

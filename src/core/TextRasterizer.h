@@ -16,31 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GlyphRasterizer.h"
-#include "tgfx/core/Mask.h"
+#pragma once
+
+#include "core/Rasterizer.h"
 
 namespace tgfx {
-GlyphRasterizer::GlyphRasterizer(int width, int height, std::shared_ptr<GlyphRunList> glyphRunList,
-                                 bool antiAlias, const Matrix& matrix, const Stroke* s)
-    : Rasterizer(width, height), glyphRunList(std::move(glyphRunList)), antiAlias(antiAlias),
-      matrix(matrix) {
-  if (s != nullptr) {
-    stroke = new Stroke(*s);
-  }
-}
+/**
+ * A Rasterizer that rasterizes a set of glyphs.
+ */
+class TextRasterizer : public Rasterizer {
+ public:
+  TextRasterizer(int width, int height, std::shared_ptr<GlyphRunList> glyphRunList, bool antiAlias,
+                 const Matrix& matrix, const Stroke* stroke);
 
-GlyphRasterizer::~GlyphRasterizer() {
-  delete stroke;
-}
+  ~TextRasterizer() override;
 
-std::shared_ptr<ImageBuffer> GlyphRasterizer::onMakeBuffer(bool tryHardware) const {
-  auto mask = Mask::Make(width(), height(), tryHardware);
-  if (!mask) {
-    return nullptr;
-  }
-  mask->setAntiAlias(antiAlias);
-  mask->setMatrix(matrix);
-  mask->fillText(glyphRunList.get(), stroke);
-  return mask->makeBuffer();
-}
+ protected:
+  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
+
+ private:
+  std::shared_ptr<GlyphRunList> glyphRunList = nullptr;
+  bool antiAlias = true;
+  Matrix matrix = {};
+  Stroke* stroke = nullptr;
+};
 }  // namespace tgfx

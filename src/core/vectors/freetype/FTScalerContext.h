@@ -42,9 +42,10 @@ class FTScalerContext : public ScalerContext {
 
   bool generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic, Path* path) const override;
 
-  Rect getImageTransform(const GlyphStyle& glyphStyle, Matrix* matrix) const override;
+  Rect getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
+                         Matrix* matrix) const override;
 
-  bool readPixels(const GlyphStyle& glyphStyle, const ImageInfo& dstInfo,
+  bool readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke, const ImageInfo& dstInfo,
                   void* dstPixels) const override;
 
  private:

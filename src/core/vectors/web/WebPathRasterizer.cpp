@@ -19,13 +19,16 @@
 #include "WebPathRasterizer.h"
 #include <emscripten/val.h>
 #include "WebMask.h"
-#include "tgfx/core/Font.h"
+#include "WebUtil.h"
 
 using namespace emscripten;
 
 namespace tgfx {
 std::shared_ptr<PathRasterizer> PathRasterizer::Make(std::shared_ptr<Shape> shape, bool antiAlias,
                                                      bool needsGammaCorrection) {
+  if (shape == nullptr) {
+    return nullptr;
+  }
   auto bounds = shape->getBounds();
   if (bounds.isEmpty()) {
     return nullptr;
@@ -35,8 +38,60 @@ std::shared_ptr<PathRasterizer> PathRasterizer::Make(std::shared_ptr<Shape> shap
   return std::make_shared<WebPathRasterizer>(width, height, shape, antiAlias, needsGammaCorrection);
 }
 
-bool WebPathRasterizer::readPixels(const ImageInfo&, void*) const {
-  return false;
+static void Iterator(PathVerb verb, const Point points[4], void* info) {
+  auto path2D = reinterpret_cast<val*>(info);
+  switch (verb) {
+    case PathVerb::Move:
+      path2D->call<void>("moveTo", points[0].x, points[0].y);
+      break;
+    case PathVerb::Line:
+      path2D->call<void>("lineTo", points[1].x, points[1].y);
+      break;
+    case PathVerb::Quad:
+      path2D->call<void>("quadraticCurveTo", points[1].x, points[1].y, points[2].x, points[2].y);
+      break;
+    case PathVerb::Cubic:
+      path2D->call<void>("bezierCurveTo", points[1].x, points[1].y, points[2].x, points[2].y,
+                         points[3].x, points[3].y);
+      break;
+    case PathVerb::Close:
+      path2D->call<void>("closePath");
+      break;
+  }
 }
 
+bool WebPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
+  if (dstPixels == nullptr || dstInfo.isEmpty()) {
+    return false;
+  }
+  auto path = shape->getPath();
+  if (path.isEmpty()) {
+    return false;
+  }
+  auto path2DClass = val::global("Path2D");
+  if (!path2DClass.as<bool>()) {
+    return false;
+  }
+  auto canvas =
+      val::module_property("tgfx").call<val>("createCanvas2D", dstInfo.width(), dstInfo.height());
+  if (!canvas.as<bool>()) {
+    return false;
+  }
+  auto webMaskClass = val::module_property("WebMask");
+  if (!webMaskClass.as<bool>()) {
+    return false;
+  }
+  auto webMask = webMaskClass.call<val>("create", canvas);
+  if (!webMask.as<bool>()) {
+    return false;
+  }
+  auto path2D = path2DClass.new_();
+  path.decompose(Iterator, &path2D);
+  webMask.call<void>("fillPath", path2D, path.getFillType());
+  auto imageData = webMask.call<val>("getImageData");
+  if (!imageData.as<bool>()) {
+    return false;
+  }
+  return ReadPixelsFromCanvasImage(imageData, dstInfo, dstPixels);
+}
 }  // namespace tgfx

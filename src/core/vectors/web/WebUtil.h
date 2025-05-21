@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,26 +18,14 @@
 
 #pragma once
 
-#include "core/Rasterizer.h"
+#include <emscripten/val.h>
+#include "tgfx/core/ImageInfo.h"
 
 namespace tgfx {
 /**
- * A Rasterizer that rasterizes a set of glyphs.
+ * Reads pixel data from an image and writes it to the destination buffer.The canvasImageData
+ * is in the RGBA_8888 format obtained from CanvasRenderingContext2D.getImageData()
  */
-class GlyphRasterizer : public Rasterizer {
- public:
-  GlyphRasterizer(int width, int height, std::shared_ptr<GlyphRunList> glyphRunList, bool antiAlias,
-                  const Matrix& matrix, const Stroke* stroke);
-
-  ~GlyphRasterizer() override;
-
- protected:
-  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
-
- private:
-  std::shared_ptr<GlyphRunList> glyphRunList = nullptr;
-  bool antiAlias = true;
-  Matrix matrix = {};
-  Stroke* stroke = nullptr;
-};
+bool ReadPixelsFromCanvasImage(emscripten::val canvasImageData, const ImageInfo& dstInfo,
+                               void* dstPixels);
 }  // namespace tgfx

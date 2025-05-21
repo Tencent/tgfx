@@ -103,6 +103,9 @@ static CGImageRef CreateCGImage(const Path& path, void* pixels, const ImageInfo&
 
 std::shared_ptr<PathRasterizer> PathRasterizer::Make(std::shared_ptr<Shape> shape, bool antiAlias,
                                                      bool needsGammaCorrection) {
+  if (shape == nullptr) {
+    return nullptr;
+  }
   auto bounds = shape->getBounds();
   if (bounds.isEmpty()) {
     return nullptr;

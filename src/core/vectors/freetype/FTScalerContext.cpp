@@ -546,15 +546,16 @@ static gfx::skcms_PixelFormat ToPixelFormat(ColorType colorType) {
   }
 }
 
-Rect FTScalerContext::getImageTransform(const GlyphStyle& glyphStyle, Matrix* matrix) const {
-  if (!hasColor() && (glyphStyle.stroke != nullptr || glyphStyle.fauxBold)) {
+Rect FTScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
+                                        Matrix* matrix) const {
+  if (!hasColor() && (stroke != nullptr || fauxBold)) {
     return {};
   }
 
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   auto glyphFlags = loadGlyphFlags | static_cast<FT_Int32>(FT_LOAD_BITMAP_METRICS_ONLY);
   glyphFlags &= ~FT_LOAD_NO_BITMAP;
-  if (!loadBitmapGlyph(glyphStyle.glyphID, glyphFlags)) {
+  if (!loadBitmapGlyph(glyphID, glyphFlags)) {
     return {};
   }
   auto face = ftTypeface()->face;
@@ -568,17 +569,16 @@ Rect FTScalerContext::getImageTransform(const GlyphStyle& glyphStyle, Matrix* ma
       static_cast<float>(face->glyph->bitmap.width), static_cast<float>(face->glyph->bitmap.rows));
 }
 
-bool FTScalerContext::readPixels(const GlyphStyle& glyphStyle, const ImageInfo& dstInfo,
+bool FTScalerContext::readPixels(GlyphID glyphID, bool, const Stroke*, const ImageInfo& dstInfo,
                                  void* dstPixels) const {
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }
-
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   auto glyphFlags = loadGlyphFlags;
   glyphFlags |= FT_LOAD_RENDER;
   glyphFlags &= ~FT_LOAD_NO_BITMAP;
-  if (!loadBitmapGlyph(glyphStyle.glyphID, glyphFlags)) {
+  if (!loadBitmapGlyph(glyphID, glyphFlags)) {
     return false;
   }
   auto ftBitmap = ftTypeface()->face->glyph->bitmap;

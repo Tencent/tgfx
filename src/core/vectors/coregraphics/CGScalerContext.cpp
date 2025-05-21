@@ -264,14 +264,14 @@ bool CGScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItal
   return true;
 }
 
-Rect CGScalerContext::getImageTransform(const GlyphStyle& glyphStyle, Matrix* matrix) const {
-  if (!hasColor() && (glyphStyle.stroke != nullptr || glyphStyle.fauxBold)) {
+Rect CGScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
+                                        Matrix* matrix) const {
+  if (!hasColor() && (stroke != nullptr || fauxBold)) {
     return {};
   }
 
   CGRect cgBounds;
-  CTFontGetBoundingRectsForGlyphs(ctFont, kCTFontOrientationHorizontal, &glyphStyle.glyphID,
-                                  &cgBounds, 1);
+  CTFontGetBoundingRectsForGlyphs(ctFont, kCTFontOrientationHorizontal, &glyphID, &cgBounds, 1);
   if (CGRectIsEmpty(cgBounds)) {
     return {};
   }
@@ -287,13 +287,12 @@ Rect CGScalerContext::getImageTransform(const GlyphStyle& glyphStyle, Matrix* ma
   return bounds;
 }
 
-bool CGScalerContext::readPixels(const GlyphStyle& glyphStyle, const ImageInfo& dstInfo,
-                                 void* dstPixels) const {
+bool CGScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
+                                 const ImageInfo& dstInfo, void* dstPixels) const {
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }
-
-  auto bounds = getImageTransform(glyphStyle, nullptr);
+  auto bounds = getImageTransform(glyphID, fauxBold, stroke, nullptr);
   auto width = static_cast<int>(bounds.width());
   auto height = static_cast<int>(bounds.height());
   if (width <= 0 || height <= 0) {
@@ -309,7 +308,7 @@ bool CGScalerContext::readPixels(const GlyphStyle& glyphStyle, const ImageInfo& 
   CGContextSetShouldAntialias(cgContext, true);
   CGContextSetShouldSmoothFonts(cgContext, true);
   auto point = CGPointMake(-bounds.left, bounds.bottom);
-  CTFontDrawGlyphs(ctFont, &glyphStyle.glyphID, &point, 1, cgContext);
+  CTFontDrawGlyphs(ctFont, &glyphID, &point, 1, cgContext);
   CGContextRelease(cgContext);
   return true;
 }

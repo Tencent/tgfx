@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FTPathRasterizer.h"
-#include "../../PathRasterizer.h"
 #include "FTLibrary.h"
 #include "FTPath.h"
 
@@ -84,6 +83,9 @@ static void SpanFunc(int y, int count, const FT_Span* spans, void* user) {
 
 std::shared_ptr<PathRasterizer> PathRasterizer::Make(std::shared_ptr<Shape> shape, bool antiAlias,
                                                      bool needsGammaCorrection) {
+  if (shape == nullptr) {
+    return nullptr;
+  }
   auto bounds = shape->getBounds();
   if (bounds.isEmpty()) {
     return nullptr;
@@ -116,8 +118,23 @@ bool FTPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) con
   ftPath.setEvenOdd(fillType == PathFillType::EvenOdd || fillType == PathFillType::InverseEvenOdd);
   auto outlines = ftPath.getOutlines();
   auto ftLibrary = FTLibrary::Get();
+  if (!needsGammaCorrection) {
+    FT_Bitmap bitmap;
+    bitmap.width = static_cast<unsigned>(dstInfo.width());
+    bitmap.rows = static_cast<unsigned>(dstInfo.height());
+    bitmap.pitch = static_cast<int>(dstInfo.rowBytes());
+    bitmap.buffer = static_cast<unsigned char*>(dstPixels);
+    bitmap.pixel_mode = FT_PIXEL_MODE_GRAY;
+    bitmap.num_grays = 256;
+    for (auto& outline : outlines) {
+      FT_Outline_Get_Bitmap(ftLibrary, &(outline->outline), &bitmap);
+    }
+    return true;
+  }
   auto buffer = static_cast<unsigned char*>(dstPixels);
   auto rows = dstInfo.height();
+  // Anti-aliasing is always enabled because FreeType generates only 1-bit masks when it's off,
+  // and we haven't implemented conversion from 1-bit to 8-bit masks yet.
   auto pitch = static_cast<int>(dstInfo.rowBytes());
   RasterTarget target = {buffer + (rows - 1) * pitch, pitch, PathRasterizer::GammaTable().data()};
   FT_Raster_Params params;
