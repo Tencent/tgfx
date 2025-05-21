@@ -22,6 +22,7 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "layers/DrawArgs.h"
+#include "layers/RegionTransformer.h"
 #include "layers/contents/RasterizedContent.h"
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Surface.h"
@@ -1037,49 +1038,42 @@ bool Layer::hasValidMask() const {
   return _mask && _mask->root() == root() && _mask->bitFields.visible;
 }
 
-void Layer::updateRenderBounds(const Matrix& renderMatrix, const Rect* clipRect, bool forceDirty) {
+void Layer::updateRenderBounds(const Matrix& renderMatrix,
+                               std::shared_ptr<RegionTransformer> transformer, bool forceDirty) {
   if (!forceDirty && !bitFields.dirtyDescendents) {
     return;
   }
+  if (!_layerStyles.empty() || !_filters.empty()) {
+    auto contentScale = renderMatrix.getMaxScale();
+    transformer =
+        RegionTransformer::MakeFromFilters(_filters, contentScale, std::move(transformer));
+    transformer =
+        RegionTransformer::MakeFromStyles(_layerStyles, contentScale, std::move(transformer));
+  }
   if (auto content = getContent()) {
     renderBounds = renderMatrix.mapRect(content->getBounds());
+    if (transformer) {
+      transformer->transform(&renderBounds);
+    }
   } else {
     renderBounds = {};
   }
-  Rect childScrollRect = {};
   for (auto& child : _children) {
     if (!child->bitFields.visible || child->_alpha <= 0) {
       continue;
     }
     auto childMatrix = child->getMatrixWithScrollRect();
     childMatrix.postConcat(renderMatrix);
-    auto childClipRect = clipRect;
+    auto childTransformer = transformer;
     if (child->_scrollRect) {
-      childScrollRect = childMatrix.mapRect(*child->_scrollRect);
-      if (clipRect && !childScrollRect.intersect(*clipRect)) {
-        childScrollRect = {};
-      }
-      childClipRect = &childScrollRect;
+      auto childScrollRect = childMatrix.mapRect(*child->_scrollRect);
+      childTransformer = RegionTransformer::MakeFromClip(childScrollRect, childTransformer);
     }
     auto childForceDirty = forceDirty || child->bitFields.dirtyTransform;
-    child->updateRenderBounds(childMatrix, childClipRect, childForceDirty);
+    child->updateRenderBounds(childMatrix, childTransformer, childForceDirty);
     if (!child->maskOwner) {
       renderBounds.join(child->renderBounds);
     }
-  }
-  if (!_layerStyles.empty() || !_filters.empty()) {
-    auto contentScale = renderMatrix.getMaxScale();
-    auto layerBounds = renderBounds;
-    for (auto& layerStyle : _layerStyles) {
-      auto styleBounds = layerStyle->filterBounds(layerBounds, contentScale);
-      renderBounds.join(styleBounds);
-    }
-    for (auto& filter : _filters) {
-      renderBounds = filter->filterBounds(renderBounds, contentScale);
-    }
-  }
-  if (clipRect && !renderBounds.intersect(*clipRect)) {
-    renderBounds = {};
   }
 }
 

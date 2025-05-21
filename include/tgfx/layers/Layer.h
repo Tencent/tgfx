@@ -31,6 +31,7 @@ namespace tgfx {
 
 class DisplayList;
 class DrawArgs;
+class RegionTransformer;
 struct LayerStyleSource;
 
 /**
@@ -592,7 +593,8 @@ class Layer {
 
   bool hasValidMask() const;
 
-  void updateRenderBounds(const Matrix& renderMatrix = {}, const Rect* clipRect = nullptr,
+  void updateRenderBounds(const Matrix& renderMatrix = {},
+                          std::shared_ptr<RegionTransformer> transformer = nullptr,
                           bool forceDirty = false);
 
   void cleanDirtyFlags();
