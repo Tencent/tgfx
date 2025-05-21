@@ -856,6 +856,9 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, Laye
 }
 
 void Layer::drawBackground(const DrawArgs& args, Canvas* canvas, float* contentAlpha) {
+  if (args.renderRect && !args.renderRect->intersects(renderBounds)) {
+    return;
+  }
   float alpha = 1.0f;
   if (contentAlpha == nullptr) {
     contentAlpha = &alpha;
