@@ -652,7 +652,7 @@ std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
   return ImageFilter::Compose(filters);
 }
 
-LayerContent* Layer::getRasterizedCache(const DrawArgs& args) {
+LayerContent* Layer::getRasterizedCache(const DrawArgs& args, float contentScale) {
   if (!bitFields.shouldRasterize || args.context == nullptr) {
     return nullptr;
   }
@@ -669,7 +669,7 @@ LayerContent* Layer::getRasterizedCache(const DrawArgs& args) {
     return content;
   }
   Matrix drawingMatrix = {};
-  auto image = getRasterizedImage(args, _rasterizationScale, &drawingMatrix);
+  auto image = getRasterizedImage(args, contentScale, &drawingMatrix);
   if (image == nullptr) {
     return nullptr;
   }
@@ -718,7 +718,11 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
     cleanDirtyFlags();
     return;
   }
-  if (auto rasterizedCache = getRasterizedCache(args)) {
+  float contentScale = _rasterizationScale;
+  if (_rasterizationScale == 0.0f) {
+    contentScale = canvas->getMatrix().getMaxScale();
+  }
+  if (auto rasterizedCache = getRasterizedCache(args, contentScale)) {
     rasterizedCache->draw(canvas, getLayerPaint(alpha, blendMode));
   } else if (blendMode != BlendMode::SrcOver || (alpha < 1.0f && allowsGroupOpacity()) ||
              (!_filters.empty() && !args.excludeEffects) || hasValidMask()) {

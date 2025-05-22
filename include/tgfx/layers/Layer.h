@@ -565,7 +565,7 @@ class Layer {
 
   std::shared_ptr<ImageFilter> getImageFilter(float contentScale);
 
-  LayerContent* getRasterizedCache(const DrawArgs& args);
+  LayerContent* getRasterizedCache(const DrawArgs& args, float contentScale);
 
   std::shared_ptr<Image> getRasterizedImage(const DrawArgs& args, float contentScale,
                                             Matrix* drawingMatrix);
@@ -614,7 +614,7 @@ class Layer {
   std::string _name;
   float _alpha = 1.0f;
   Matrix _matrix = {};
-  float _rasterizationScale = 1.0f;
+  float _rasterizationScale = 0.0f;
   std::vector<std::shared_ptr<LayerFilter>> _filters = {};
   std::shared_ptr<Layer> _mask = nullptr;
   Layer* maskOwner = nullptr;
