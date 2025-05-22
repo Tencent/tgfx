@@ -25,7 +25,7 @@ void ReadVertexBufferTag(DecodeStream* stream) {
   auto count = stream->readEncodedUint32();
   auto context = dynamic_cast<DataContext*>(stream->context);
   auto& vertexBuffer = context->vertexDatas;
-  for(uint32_t i = 0; i < count; ++i) {
+  for (uint32_t i = 0; i < count; ++i) {
     auto childIndex = stream->readEncodedUint32();
 
     auto ptr = std::make_shared<VertexData>();
@@ -38,9 +38,10 @@ void ReadVertexBufferTag(DecodeStream* stream) {
   }
 }
 
-TagType WriteVertexBufferTag(EncodeStream* stream, std::unordered_map<uint32_t, std::shared_ptr<VertexData>>* vertexDatas) {
+TagType WriteVertexBufferTag(
+    EncodeStream* stream, std::unordered_map<uint32_t, std::shared_ptr<VertexData>>* vertexDatas) {
   stream->writeEncodedUint32(static_cast<uint32_t>(vertexDatas->size()));
-  for (const auto& vertexBuffer: *vertexDatas) {
+  for (const auto& vertexBuffer : *vertexDatas) {
     stream->writeEncodedUint32(vertexBuffer.first);
 
     auto vertexData = vertexBuffer.second;
@@ -53,4 +54,4 @@ TagType WriteVertexBufferTag(EncodeStream* stream, std::unordered_map<uint32_t, 
   return TagType::VertexBuffer;
 }
 
-}
+}  // namespace inspector

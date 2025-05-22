@@ -22,7 +22,7 @@
 #include "EncodeStream.h"
 
 namespace inspector {
-enum TagType: uint8_t {
+enum TagType : uint8_t {
   End,
   Frame,
   OpTask,
@@ -49,4 +49,4 @@ void WriteTag(EncodeStream* stream, T parameter, TagType (*writer)(EncodeStream*
   auto code = writer(&bytes, parameter);
   WriteTagHeader(stream, &bytes, code);
 }
-}
+}  // namespace inspector

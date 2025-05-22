@@ -19,7 +19,6 @@
 #include "Worker.h"
 #include <cassert>
 #include <iostream>
-
 #include "DecodeStream.h"
 #include "EncodeStream.h"
 #include "FileTags.h"
@@ -34,10 +33,17 @@ bool IsQueryPrio(ServerQuery type) {
   return type < ServerQuery::ServerQueryDisconnect;
 }
 
-Worker::Worker(const char* addr, uint16_t port) : addr(addr), port(port), lz4Stream(LZ4_createStreamDecode()),
-  dataBuffer(new char[TargetFrameSize * 3 + 1]), bufferOffset(0){
+Worker::Worker(const char* addr, uint16_t port)
+    : addr(addr), port(port), lz4Stream(LZ4_createStreamDecode()),
+      dataBuffer(new char[TargetFrameSize * 3 + 1]), bufferOffset(0) {
   workThread = std::thread([this] { Exec(); });
   netThread = std::thread([this] { Network(); });
+}
+
+Worker::Worker(std::string& filePath)
+    : addr(""), port(0), lz4Stream(nullptr), dataBuffer(nullptr), bufferOffset(0) {
+  if (!Open(filePath)) {
+  }
 }
 
 Worker::~Worker() {
@@ -99,15 +105,15 @@ DecodeStream Worker::ReadBodyBytes(DecodeStream* stream) {
 }
 
 int64_t Worker::GetFrameTime(const FrameData& fd, size_t idx) const {
-  if(fd.continuous) {
-    if(idx < fd.frames.size() - 1) {
-      return fd.frames[idx+1].start - fd.frames[idx].start;
+  if (fd.continuous) {
+    if (idx < fd.frames.size() - 1) {
+      return fd.frames[idx + 1].start - fd.frames[idx].start;
     }
     assert(dataContext.lastTime != 0);
     return dataContext.lastTime - fd.frames.back().start;
   }
   const auto& frame = fd.frames[idx];
-  if(frame.end >= 0) {
+  if (frame.end >= 0) {
     return frame.end - frame.start;
   }
   return dataContext.lastTime - fd.frames.back().start;
@@ -115,6 +121,10 @@ int64_t Worker::GetFrameTime(const FrameData& fd, size_t idx) const {
 
 int64_t Worker::GetLastTime() const {
   return dataContext.lastTime;
+}
+
+FrameData* Worker::GetFrameData() {
+  return &dataContext.frameData;
 }
 
 void Worker::Shutdown() {
@@ -129,9 +139,7 @@ void Worker::Shutdown() {
   return;
 
 void Worker::Exec() {
-  auto ShouldExit = [this] {
-    return isShutDown.load( std::memory_order_relaxed );
-  };
+  auto ShouldExit = [this] { return isShutDown.load(std::memory_order_relaxed); };
 
   while (true) {
     if (isShutDown.load(std::memory_order_relaxed)) {
@@ -250,14 +258,12 @@ void Worker::Exec() {
 
 #define CLOSE_NETWORK                            \
   std::lock_guard<std::mutex> lock(netReadLock); \
-  netRead.push_back(NetBuffer{ -1, 0 });         \
+  netRead.push_back(NetBuffer{-1, 0});           \
   netReadCv.notify_one();                        \
   return;
 
 void Worker::Network() {
-  auto ShouldExit = [this] {
-    return isShutDown.load( std::memory_order_relaxed );
-  };
+  auto ShouldExit = [this] { return isShutDown.load(std::memory_order_relaxed); };
 
   auto lz4buf = std::unique_ptr<char[]>(new char[LZ4Size]);
   while (true) {
@@ -312,8 +318,7 @@ void Worker::NewOpTask(std::shared_ptr<OpTaskData> opTask) {
     auto& back = stack.back();
     if (dataContext.opChilds.find(opTask->id) == dataContext.opChilds.end()) {
       dataContext.opChilds[back->id] = std::vector<uint32_t>{opTask->id};
-    }
-    else {
+    } else {
       dataContext.opChilds[back->id].push_back(opTask->id);
     }
   }
@@ -321,15 +326,13 @@ void Worker::NewOpTask(std::shared_ptr<OpTaskData> opTask) {
 }
 
 void Worker::Query(ServerQuery type, uint64_t data, uint32_t extra) {
-  ServerQueryPacket query{ type, data, extra};
+  ServerQueryPacket query{type, data, extra};
   if (serverQuerySpaceLeft > 0 && serverQueryQueuePrio.empty() && serverQueryQueue.empty()) {
     serverQuerySpaceLeft--;
     sock.Send(&query, ServerQueryPacketSize);
-  }
-  else if(IsQueryPrio(type)) {
+  } else if (IsQueryPrio(type)) {
     serverQueryQueuePrio.push_back(query);
-  }
-  else {
+  } else {
     serverQueryQueue.push_back(query);
   }
 }
@@ -393,7 +396,7 @@ void Worker::ProcessFrameMark(const QueueFrameMark& ev) {
   auto& fd = dataContext.frameData;
 
   const auto time = TscTime(ev.time);
-  fd.frames.push_back(FrameEvent{ time, -1, 0, 0, -1});
+  fd.frames.push_back(FrameEvent{time, -1, 0, 0, -1});
   if (dataContext.lastTime < time) {
     dataContext.lastTime = time;
   }

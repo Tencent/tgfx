@@ -42,9 +42,9 @@ void ReadDataHead(std::vector<DataHead>& dataHead, DecodeStream* stream) {
 
 void WriteDataHead(const std::vector<DataHead>& dataHead, EncodeStream* stream) {
   stream->writeEncodedUint32(static_cast<uint32_t>(dataHead.size()));
-  for (const auto& data: dataHead) {
+  for (const auto& data : dataHead) {
     stream->writeUint8(data.type);
     stream->writeUint16(data.size);
   }
 }
-}
+}  // namespace inspector

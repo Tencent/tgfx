@@ -45,10 +45,10 @@ class Socket {
     auto cbuf = (char*)buf;
     while (len > 0) {
       if (exitCb()) {
-       return false;
+        return false;
       }
       if (!ReadImpl(cbuf, len, timeout)) {
-       return false;
+        return false;
       }
     }
     return true;

@@ -44,7 +44,6 @@ static std::atomic<InspectorData*> inspectorData{nullptr};
 BroadcastMessage& GetBroadcastMessage(const char* procname, size_t pnsz, size_t& len,
                                       uint16_t port) {
   static BroadcastMessage msg;
-  msg.broadcastVersion = BroadcastVersion;
   msg.protocolVersion = ProtocolVersion;
   msg.listenPort = port;
   msg.pid = GetPid();
@@ -90,9 +89,11 @@ uint32_t GetThreadHandle() {
 Inspector::Inspector()
     : epoch(std::chrono::duration_cast<std::chrono::seconds>(
                 std::chrono::system_clock::now().time_since_epoch())
-                .count()), dataBuffer((char*)inspectorMalloc(TargetFrameSize * 3)), lz4Buf((char*)inspectorMalloc(LZ4Size + sizeof(lz4sz_t))),
-      shutdown(false), timeBegin(0), frameCount(0), isConnect(false), serialQueue(1024 * 1024),
-      serialDequeue(1024 * 1024), lz4Stream(LZ4_createStream()) {
+                .count()),
+      dataBuffer((char*)inspectorMalloc(TargetFrameSize * 3)),
+      lz4Buf((char*)inspectorMalloc(LZ4Size + sizeof(lz4sz_t))), shutdown(false), timeBegin(0),
+      frameCount(0), isConnect(false), serialQueue(1024 * 1024), serialDequeue(1024 * 1024),
+      lz4Stream(LZ4_createStream()) {
   SpawnWorkerThreads();
 }
 
@@ -263,8 +264,7 @@ void Inspector::Worker() {
       const auto serialStatus = DequeueSerial();
       if (serialStatus == DequeueStatus::ConnectionLost) {
         break;
-      }
-      else if (serialStatus == DequeueStatus::QueueEmpty) {
+      } else if (serialStatus == DequeueStatus::QueueEmpty) {
         if (ShouldExit()) {
           break;
         }
@@ -281,13 +281,11 @@ void Inspector::Worker() {
             }
 
             keepAlive = 0;
-          }
-          else if (!this->sock->HasData()) {
+          } else if (!this->sock->HasData()) {
             ++keepAlive;
             std::this_thread::sleep_for(std::chrono::microseconds(10));
           }
-        }
-        else {
+        } else {
           keepAlive = 0;
         }
 

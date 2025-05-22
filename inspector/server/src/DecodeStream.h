@@ -233,4 +233,4 @@ class DecodeStream final {
 
   bool checkEndOfFile(uint32_t bytesToRead);
 };
-}  // namespace pag
+}  // namespace inspector

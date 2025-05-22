@@ -24,4 +24,4 @@ struct EnumClassHash {
     return static_cast<size_t>(t);
   }
 };
-}
+}  // namespace inspector

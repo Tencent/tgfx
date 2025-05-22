@@ -25,4 +25,4 @@ namespace inspector {
 void ReadOpTaskTag(DecodeStream* stream);
 
 TagType WriteOpTaskTag(EncodeStream* stream, DataContext* context);
-}
+}  // namespace inspector

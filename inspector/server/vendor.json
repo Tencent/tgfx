@@ -1,0 +1,20 @@
+{
+  "source": "third_party",
+  "out": "third_party/out",
+  "vendors": [
+    {
+      "name": "KDDockWidgets",
+      "cmake": {
+        "targets": [
+          "kddockwidgets"
+        ],
+        "arguments": [
+          "-DKDDockWidgets_QT6=ON",
+          "-DKDDockWidgets_STATIC=ON",
+          "-DKDDW_FRONTEND_QTQUICK=ON",
+          "-DCMAKE_PREFIX_PATH=\"/Users/lifengdy/Qt/6.8.1/macos/lib/cmake\""
+        ]
+      }
+    }
+  ]
+}

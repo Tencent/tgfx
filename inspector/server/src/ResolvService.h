@@ -15,15 +15,39 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+
 #pragma once
-#include <unordered_map>
-#include "DecodeStream.h"
-#include "InspectorEvent.h"
-#include "TagHeader.h"
+
+#include <atomic>
+#include <condition_variable>
+#include <cstdint>
+#include <functional>
+#include <string>
+#include <thread>
+#include <vector>
 
 namespace inspector {
-void ReadPropertyTag(DecodeStream* stream);
 
-TagType WritePropertyTag(EncodeStream* stream,
-                         std::unordered_map<uint32_t, std::shared_ptr<PropertyData>>* properties);
+class ResolvService {
+  struct QueueItem {
+    uint32_t ip;
+    std::function<void(std::string&&)> callback;
+  };
+
+ public:
+  ResolvService(uint16_t port);
+  ~ResolvService();
+
+  void Query(uint32_t ip, const std::function<void(std::string&&)>& callback);
+
+ private:
+  void Worker();
+
+  std::atomic<bool> exit;
+  std::mutex mutex;
+  std::condition_variable conditionVariable;
+  std::vector<QueueItem> queue;
+  uint16_t port;
+  std::thread thread;
+};
 }  // namespace inspector

@@ -23,4 +23,4 @@
 namespace inspector {
 void ReadTagsOfFile(DecodeStream* stream, TagType type);
 void WriteTagsOfFile(EncodeStream* stream);
-}
+}  // namespace inspector

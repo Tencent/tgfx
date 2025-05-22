@@ -32,7 +32,7 @@ TagHeader ReadTagHeader(DecodeStream* stream) {
   return header;
 }
 
-void ReadTags(DecodeStream* stream, void (*reader)(DecodeStream*, TagType)){
+void ReadTags(DecodeStream* stream, void (*reader)(DecodeStream*, TagType)) {
   auto header = ReadTagHeader(stream);
   if (stream->context->hasException()) {
     return;
@@ -71,4 +71,4 @@ void WriteEndTag(EncodeStream* stream) {
   stream->writeUint16(0);
 }
 
-}
+}  // namespace inspector

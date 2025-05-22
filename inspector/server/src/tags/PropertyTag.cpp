@@ -32,17 +32,20 @@ void ReadPropertyTag(DecodeStream* stream) {
     ReadDataHead(ptr->processName, stream);
 
     auto summaryDataCount = stream->readEncodedUint32();
-    memcpy(ptr->summaryData.data(), stream->readBytes(summaryDataCount).data(), summaryDataCount * sizeof(uint8_t));
+    memcpy(ptr->summaryData.data(), stream->readBytes(summaryDataCount).data(),
+           summaryDataCount * sizeof(uint8_t));
     auto processDataCount = stream->readEncodedUint32();
-    memcpy(ptr->processData.data(), stream->readBytes(processDataCount).data(), processDataCount * sizeof(uint8_t));
+    memcpy(ptr->processData.data(), stream->readBytes(processDataCount).data(),
+           processDataCount * sizeof(uint8_t));
 
     properties[opIndex] = ptr;
   }
 }
 
-TagType WritePropertyTag(EncodeStream* stream, std::unordered_map<uint32_t, std::shared_ptr<PropertyData>>* properties) {
+TagType WritePropertyTag(EncodeStream* stream,
+                         std::unordered_map<uint32_t, std::shared_ptr<PropertyData>>* properties) {
   stream->writeEncodedUint32(static_cast<uint32_t>(properties->size()));
-  for(const auto& property: *properties) {
+  for (const auto& property : *properties) {
     stream->writeEncodedUint32(property.first);
     WriteDataHead(property.second->summaryName, stream);
     WriteDataHead(property.second->processName, stream);
@@ -59,4 +62,4 @@ TagType WritePropertyTag(EncodeStream* stream, std::unordered_map<uint32_t, std:
   }
   return TagType::Property;
 }
-}
+}  // namespace inspector

@@ -22,5 +22,6 @@
 namespace inspector {
 void ReadVertexBufferTag(DecodeStream* stream);
 
-TagType WriteVertexBufferTag(EncodeStream* stream, std::unordered_map<uint32_t, std::shared_ptr<VertexData>>* vertexDatas);
-}
+TagType WriteVertexBufferTag(
+    EncodeStream* stream, std::unordered_map<uint32_t, std::shared_ptr<VertexData>>* vertexDatas);
+}  // namespace inspector

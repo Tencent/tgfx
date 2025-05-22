@@ -17,13 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include "InspectorEvent.h"
 #include "StreamContext.h"
 #include "StringDiscovery.h"
-#include "InspectorEvent.h"
 
 namespace inspector {
-class DataContext: public StreamContext {
-public:
+class DataContext : public StreamContext {
+ public:
   std::mutex lock;
   StringDiscovery<FrameData*> frames;
   FrameData frameData;
@@ -38,4 +38,4 @@ public:
   int64_t baseTime = 0;
   int64_t lastTime = 0;
 };
-}
+}  // namespace inspector

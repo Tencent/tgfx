@@ -42,7 +42,6 @@ enum HandshakeStatus : uint8_t {
 };
 
 struct BroadcastMessage {
-  uint16_t broadcastVersion;
   uint16_t listenPort;
   uint32_t protocolVersion;
   uint64_t pid;
@@ -65,7 +64,7 @@ struct ServerQueryPacket {
 
 enum { ServerQueryPacketSize = sizeof(ServerQueryPacket) };
 
-enum OpTaskType: uint8_t {
+enum OpTaskType : uint8_t {
   Unknown = 0,
   Flush,
   ResourceTask,
