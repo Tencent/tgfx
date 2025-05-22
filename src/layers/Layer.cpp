@@ -661,10 +661,8 @@ LayerContent* Layer::getRasterizedCache(const DrawArgs& args, const Matrix& rend
   }
   auto contextID = args.context->uniqueID();
   auto content = static_cast<RasterizedContent*>(rasterizedContent.get());
-  float contentScale = _rasterizationScale;
-  if (_rasterizationScale == 0.0f) {
-    contentScale = renderMatrix.getMaxScale();
-  }
+  float contentScale =
+      _rasterizationScale == 0.0f ? renderMatrix.getMaxScale() : _rasterizationScale;
   if (content && content->contextID() == contextID && content->contentScale() == contentScale) {
     return content;
   }
