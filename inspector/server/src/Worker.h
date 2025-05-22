@@ -54,7 +54,7 @@ class Worker {
   void NewOpTask(std::shared_ptr<OpTaskData> opTask);
   void Query(ServerQuery type, uint64_t data, uint32_t extra = 0);
   void QueryTerminate();
-  bool DispatchProcess(const QueueItem& ev, const char* ptr);
+  bool DispatchProcess(const QueueItem& ev, const char*& ptr);
   bool Process(const QueueItem& ev);
   void ProcessOperateBegin(const QueueOperateBegin& ev);
   void ProcessOperateEnd(const QueueOperateEnd& ev);

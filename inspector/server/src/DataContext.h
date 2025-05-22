@@ -26,6 +26,7 @@ class DataContext: public StreamContext {
 public:
   std::mutex lock;
   StringDiscovery<FrameData*> frames;
+  FrameData frameData;
   std::vector<std::shared_ptr<OpTaskData>> opTasks;
   std::vector<std::shared_ptr<OpTaskData>> opTaskStack;
   std::unordered_map<uint32_t, std::vector<uint32_t>> opChilds;

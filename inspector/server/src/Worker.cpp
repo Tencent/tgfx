@@ -18,6 +18,8 @@
 
 #include "Worker.h"
 #include <cassert>
+#include <iostream>
+
 #include "DecodeStream.h"
 #include "EncodeStream.h"
 #include "FileTags.h"
@@ -32,7 +34,8 @@ bool IsQueryPrio(ServerQuery type) {
   return type < ServerQuery::ServerQueryDisconnect;
 }
 
-Worker::Worker(const char* addr, uint16_t port) : addr(addr), port(port) {
+Worker::Worker(const char* addr, uint16_t port) : addr(addr), port(port), lz4Stream(LZ4_createStreamDecode()),
+  dataBuffer(new char[TargetFrameSize * 3 + 1]), bufferOffset(0){
   workThread = std::thread([this] { Exec(); });
   netThread = std::thread([this] { Network(); });
 }
@@ -120,8 +123,8 @@ void Worker::Shutdown() {
 
 #define CLOSE_EXEC                                     \
   Shutdown();                                          \
-  netWriteCv.notify_one();                             \
   sock.Close();                                        \
+  netWriteCv.notify_one();                             \
   isConnected.store(false, std::memory_order_relaxed); \
   return;
 
@@ -157,6 +160,7 @@ void Worker::Exec() {
     default:
       CLOSE_EXEC;
   }
+
   {
     WelcomeMessage welcome;
     if (!sock.Read(&welcome, sizeof(welcome), 10, ShouldExit)) {
@@ -165,8 +169,8 @@ void Worker::Exec() {
     }
     dataContext.baseTime = welcome.initBegin;
     const auto initEnd = TscTime(welcome.initEnd);
-    dataContext.framebase->frames.push_back(FrameEvent{0, -1, 0, 0, -1});
-    dataContext.framebase->frames.push_back(FrameEvent{initEnd, -1, 0, 0, -1});
+    dataContext.frameData.frames.push_back(FrameEvent{0, -1, 0, 0, -1});
+    dataContext.frameData.frames.push_back(FrameEvent{initEnd, -1, 0, 0, -1});
     dataContext.lastTime = initEnd;
   }
   // leave space for terminate request
@@ -247,7 +251,8 @@ void Worker::Exec() {
 #define CLOSE_NETWORK                            \
   std::lock_guard<std::mutex> lock(netReadLock); \
   netRead.push_back(NetBuffer{ -1, 0 });         \
-  netReadCv.notify_one();
+  netReadCv.notify_one();                        \
+  return;
 
 void Worker::Network() {
   auto ShouldExit = [this] {
@@ -301,12 +306,9 @@ void Worker::NewOpTask(std::shared_ptr<OpTaskData> opTask) {
 
   auto& stack = dataContext.opTaskStack;
   const auto size = stack.size();
-  if (size == 0) {
-    stack.push_back(opTask);
-    opTask->id = static_cast<uint32_t>(dataContext.opTasks.size());
-    dataContext.opTasks.push_back(opTask);
-  }
-  else {
+  opTask->id = static_cast<uint32_t>(dataContext.opTasks.size());
+  dataContext.opTasks.push_back(opTask);
+  if (size != 0) {
     auto& back = stack.back();
     if (dataContext.opChilds.find(opTask->id) == dataContext.opChilds.end()) {
       dataContext.opChilds[back->id] = std::vector<uint32_t>{opTask->id};
@@ -337,7 +339,8 @@ void Worker::QueryTerminate() {
   sock.Send(&query, ServerQueryPacketSize);
 }
 
-bool Worker::DispatchProcess(const QueueItem& ev, const char*) {
+bool Worker::DispatchProcess(const QueueItem& ev, const char*& test) {
+  test += QueueDataSize[ev.hdr.idx];
   return Process(ev);
 }
 
@@ -380,31 +383,27 @@ void Worker::ProcessOperateEnd(const QueueOperateEnd& ev) {
   auto opTask = stack.back();
   stack.pop_back();
   assert(opTask->end == -1);
+  assert(opTask->type == ev.type);
   const auto timeEnd = TscTime(RefTime(refTime, ev.time));
   opTask->end = timeEnd;
   assert(timeEnd >= opTask->start);
 }
 
 void Worker::ProcessFrameMark(const QueueFrameMark& ev) {
-  auto fd = dataContext.frames.Retrieve(ev.name, [](uint64_t) {
-    auto fd = new FrameData;
-    return fd;
-  }, [this](uint64_t name) {
-    Query(ServerQueryFrameName, name);
-  });
+  auto& fd = dataContext.frameData;
 
   const auto time = TscTime(ev.time);
-  fd->frames.push_back(FrameEvent{ time, -1, 0, 0, -1});
+  fd.frames.push_back(FrameEvent{ time, -1, 0, 0, -1});
   if (dataContext.lastTime < time) {
     dataContext.lastTime = time;
   }
 
-  const auto timespan = GetFrameTime(*fd, fd->frames.size() - 1);
+  const auto timespan = GetFrameTime(fd, fd.frames.size() - 1);
   if (timespan > 0) {
-    fd->min = std::min(fd->min, timespan);
-    fd->max = std::max(fd->max, timespan);
-    fd->total += timespan;
-    fd->sumSq += double(timespan * timespan);
+    fd.min = std::min(fd.min, timespan);
+    fd.max = std::max(fd.max, timespan);
+    fd.total += timespan;
+    fd.sumSq += double(timespan * timespan);
   }
 }
 

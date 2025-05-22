@@ -19,8 +19,9 @@
 #pragma once
 #include <cstdint>
 namespace inspector {
-
 enum class QueueType : uint8_t { OperateBegin, OperateEnd, KeepAlive, FrameMarkMsg };
+
+#pragma pack(push, 1)
 
 struct QueueHeader {
   union {
@@ -29,18 +30,20 @@ struct QueueHeader {
   };
 };
 
-struct QueueOperateBegin {
+struct QueueOperaterBase {
   int64_t time;
+};
+
+struct QueueOperateBegin: QueueOperaterBase {
   uint8_t type;
 };
 
-struct QueueOperateEnd {
-  int64_t time;
+struct QueueOperateEnd: QueueOperaterBase {
+  uint8_t type;
 };
 
 struct QueueFrameMark {
   int64_t time;
-  uint64_t name;  // ptr
 };
 
 struct QueueItem {
@@ -51,6 +54,8 @@ struct QueueItem {
     QueueOperateEnd operateEnd;
   };
 };
+
+#pragma pack(pop)
 
 enum { QueueItemSize = sizeof(QueueItem) };
 static constexpr size_t QueueDataSize[] = {sizeof(QueueHeader) + sizeof(QueueOperateBegin),
