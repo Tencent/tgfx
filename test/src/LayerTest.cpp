@@ -20,6 +20,7 @@
 #include <vector>
 #include "core/filters/BlurImageFilter.h"
 #include "core/shaders/GradientShader.h"
+#include "layers/RootLayer.h"
 #include "layers/contents/RasterizedContent.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/layers/DisplayList.h"
@@ -1885,13 +1886,13 @@ TGFX_TEST(LayerTest, DirtyFlag) {
   displayList->render(surface.get());
 
   auto root = displayList->root();
-  EXPECT_TRUE(!grandChild->bitFields.dirtyDescendents);
+  EXPECT_TRUE(grandChild->bitFields.dirtyDescendents);
   EXPECT_TRUE(grandChild->layerContent == nullptr && grandChild->bitFields.dirtyContent);
   EXPECT_TRUE(!child->bitFields.dirtyDescendents && !child->bitFields.dirtyContent);
   EXPECT_TRUE(!root->bitFields.dirtyDescendents && !root->bitFields.dirtyContent);
 
   grandChild->setVisible(true);
-  EXPECT_TRUE(!grandChild->bitFields.dirtyDescendents);
+  EXPECT_TRUE(grandChild->bitFields.dirtyDescendents);
   EXPECT_TRUE(grandChild->layerContent == nullptr && grandChild->bitFields.dirtyContent);
   EXPECT_TRUE(child->bitFields.dirtyDescendents);
   EXPECT_TRUE(root->bitFields.dirtyDescendents);
@@ -2421,7 +2422,10 @@ TGFX_TEST(LayerTest, RasterizedBackground) {
   parent->replaceChild(layerNextChild, background);
   rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent ==
+  // Ideally, rasterizedContent should remain unchanged here, but we need to call root->invalidateRect()
+  // whenever a layer is removed or its index changes. As a result, dirty rects are always treated
+  // as background changes. This is a trade-off between performance and correctness.
+  EXPECT_TRUE(rasterizedContent !=
               static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
 }
 

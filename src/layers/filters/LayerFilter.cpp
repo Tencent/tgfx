@@ -40,7 +40,7 @@ Rect LayerFilter::filterBounds(const Rect& srcRect, float contentScale) {
 void LayerFilter::invalidateFilter() {
   lastFilter = nullptr;
   dirty = true;
-  invalidate();
+  invalidateTransform();
 }
 
 }  // namespace tgfx

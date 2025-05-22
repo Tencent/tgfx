@@ -18,10 +18,11 @@
 
 #include "tgfx/layers/DisplayList.h"
 #include "layers/DrawArgs.h"
+#include "layers/RootLayer.h"
 
 namespace tgfx {
 
-DisplayList::DisplayList() : _root(Layer::Make()) {
+DisplayList::DisplayList() : _root(RootLayer::Make()) {
   _root->_root = _root.get();
 }
 
@@ -47,12 +48,14 @@ void DisplayList::setContentOffset(float offsetX, float offsetY) {
 }
 
 bool DisplayList::render(Surface* surface, bool replaceAll) {
-  if (!surface ||
-      (replaceAll && surface->uniqueID() == surfaceID &&
-       surface->contentVersion() == surfaceContentVersion && !_root->bitFields.dirtyDescendents)) {
+  if (!surface) {
     return false;
   }
-  _root->updateRenderBounds();
+  auto dirtyRegions = _root->updateDirtyRegions();
+  if (replaceAll && surface->uniqueID() == surfaceID &&
+      surface->contentVersion() == surfaceContentVersion && dirtyRegions.empty()) {
+    return false;
+  }
   auto canvas = surface->getCanvas();
   if (replaceAll) {
     canvas->clear();
@@ -66,7 +69,7 @@ bool DisplayList::render(Surface* surface, bool replaceAll) {
   }
   auto renderRect = Rect::MakeWH(surface->width(), surface->height());
   renderRect = inverse.mapRect(renderRect);
-  DrawArgs args(surface->getContext(), true);
+  DrawArgs args(surface->getContext());
   args.renderRect = &renderRect;
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
   surfaceContentVersion = surface->contentVersion();

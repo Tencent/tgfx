@@ -32,6 +32,7 @@ namespace tgfx {
 class DisplayList;
 class DrawArgs;
 class RegionTransformer;
+class RootLayer;
 struct LayerStyleSource;
 
 /**
@@ -310,9 +311,7 @@ class Layer {
    * Returns the root layer of the calling layer. A DisplayList has only one root layer. If a layer
    * is not added to a display list, its root property is set to nullptr.
    */
-  Layer* root() const {
-    return _root;
-  }
+  Layer* root() const;
 
   /**
    * Returns the parent layer that contains the calling layer.
@@ -539,16 +538,11 @@ class Layer {
    */
   void invalidateDescendents();
 
-  /**
-   * Marks the layer's background as changed and needing to be redrawn.
-   */
-  void invalidateBackground();
-
   void invalidate();
 
   Rect getBoundsInternal(const Matrix& coordinateMatrix, bool computeTightBounds);
 
-  void onAttachToRoot(Layer* owner);
+  void onAttachToRoot(RootLayer* rootLayer);
 
   void onDetachFromRoot();
 
@@ -598,13 +592,18 @@ class Layer {
                           std::shared_ptr<RegionTransformer> transformer = nullptr,
                           bool forceDirty = false);
 
-  void cleanDirtyFlags();
+  void checkBackgroundStyles(const Matrix& renderMatrix);
+
+  void updateBackgroundBounds(const Matrix& renderMatrix);
+
+  void propagateHasBackgroundStyleFlags();
 
   struct {
-    bool dirtyContent : 1;      // layer's content needs updating
-    bool dirtyDescendents : 1;  // a descendant layer needs redrawing
-    bool dirtyTransform : 1;    // the layer and its children need redrawing
-    bool dirtyBackground : 1;   // the background needs redrawing, triggered by sibling changes
+    bool dirtyContent : 1;        // layer's content needs updating
+    bool dirtyContentBounds : 1;  // layer's content bounds needs updating
+    bool dirtyDescendents : 1;    // a descendant layer needs redrawing
+    bool dirtyTransform : 1;      // the layer and its children need redrawing
+    bool hasBackgroundStyle : 1;  // the layer or any of its descendants has a background style
     bool visible : 1;
     bool shouldRasterize : 1;
     bool allowsEdgeAntialiasing : 1;
@@ -620,14 +619,16 @@ class Layer {
   std::shared_ptr<Layer> _mask = nullptr;
   Layer* maskOwner = nullptr;
   std::unique_ptr<Rect> _scrollRect = nullptr;
-  Layer* _root = nullptr;
+  RootLayer* _root = nullptr;
   Layer* _parent = nullptr;
   std::unique_ptr<LayerContent> layerContent = nullptr;
   std::unique_ptr<LayerContent> rasterizedContent = nullptr;
   std::vector<std::shared_ptr<Layer>> _children = {};
   std::vector<std::shared_ptr<LayerStyle>> _layerStyles = {};
-  Rect renderBounds = {};
+  Rect renderBounds = {};         // in global coordinates
+  Rect* contentBounds = nullptr;  //  in global coordinates
 
+  friend class RootLayer;
   friend class DisplayList;
   friend class LayerProperty;
   friend class LayerSerialization;

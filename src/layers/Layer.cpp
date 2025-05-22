@@ -23,6 +23,7 @@
 #include "core/utils/MathExtra.h"
 #include "layers/DrawArgs.h"
 #include "layers/RegionTransformer.h"
+#include "layers/RootLayer.h"
 #include "layers/contents/RasterizedContent.h"
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Surface.h"
@@ -101,6 +102,7 @@ Layer::~Layer() {
     _mask->maskOwner = nullptr;
   }
   removeChildren();
+  delete contentBounds;
 }
 
 Layer::Layer() {
@@ -233,6 +235,10 @@ void Layer::setScrollRect(const Rect& rect) {
   invalidateTransform();
 }
 
+Layer* Layer::root() const {
+  return _root;
+}
+
 void Layer::setLayerStyles(std::vector<std::shared_ptr<LayerStyle>> value) {
   if (_layerStyles.size() == value.size() &&
       std::equal(_layerStyles.begin(), _layerStyles.end(), value.begin())) {
@@ -333,8 +339,9 @@ std::shared_ptr<Layer> Layer::removeChildAt(int index) {
   child->_parent = nullptr;
   child->onDetachFromRoot();
   _children.erase(_children.begin() + index);
-  if (static_cast<size_t>(index) < _children.size()) {
-    _children[static_cast<size_t>(index)]->invalidateBackground();
+  if (_root) {
+    _root->invalidateRect(child->renderBounds);
+    child->renderBounds = {};
   }
   invalidateDescendents();
   return child;
@@ -370,8 +377,11 @@ bool Layer::setChildIndex(std::shared_ptr<Layer> child, int index) {
   }
   _children.erase(_children.begin() + oldIndex);
   _children.insert(_children.begin() + index, child);
-  if (oldIndex < index) {
-    _children[static_cast<size_t>(oldIndex)]->invalidateBackground();
+  if (_root) {
+    // Immediately invalidate the old render bounds, as this may affect the background of the above
+    // layer styles.
+    _root->invalidateRect(child->renderBounds);
+    child->renderBounds = {};
   }
   child->invalidateTransform();
   invalidateDescendents();
@@ -518,9 +528,7 @@ void Layer::invalidateContent() {
     return;
   }
   bitFields.dirtyContent = true;
-  if (!_children.empty()) {
-    _children.front()->invalidateBackground();
-  }
+  bitFields.dirtyContentBounds = true;
   invalidateDescendents();
 }
 
@@ -531,10 +539,6 @@ void Layer::invalidateDescendents() {
   bitFields.dirtyDescendents = true;
   rasterizedContent = nullptr;
   invalidate();
-}
-
-void Layer::invalidateBackground() {
-  bitFields.dirtyBackground = true;
 }
 
 void Layer::invalidate() {
@@ -562,10 +566,10 @@ void Layer::detachProperty(LayerProperty* property) const {
   }
 }
 
-void Layer::onAttachToRoot(Layer* owner) {
-  _root = owner;
+void Layer::onAttachToRoot(RootLayer* rootLayer) {
+  _root = rootLayer;
   for (auto& child : _children) {
-    child->onAttachToRoot(owner);
+    child->onAttachToRoot(rootLayer);
   }
 }
 
@@ -652,13 +656,6 @@ LayerContent* Layer::getRasterizedCache(const DrawArgs& args, const Matrix& rend
   if (!bitFields.shouldRasterize || args.context == nullptr) {
     return nullptr;
   }
-  auto hasBackgroundStyle =
-      std::find_if(_layerStyles.begin(), _layerStyles.end(), [](const auto& style) {
-        return style->extraSourceType() == LayerStyleExtraSourceType::Background;
-      }) != _layerStyles.end();
-  if (hasBackgroundStyle && args.backgroundChanged) {
-    rasterizedContent = nullptr;
-  }
   auto contextID = args.context->uniqueID();
   auto content = static_cast<RasterizedContent*>(rasterizedContent.get());
   float contentScale =
@@ -713,7 +710,6 @@ std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float con
 void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
   DEBUG_ASSERT(canvas != nullptr);
   if (args.renderRect && !args.renderRect->intersects(renderBounds)) {
-    cleanDirtyFlags();
     return;
   }
   if (auto rasterizedCache = getRasterizedCache(args, canvas->getMatrix())) {
@@ -724,10 +720,6 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
   } else {
     // draw directly
     drawDirectly(args, canvas, alpha);
-  }
-  if (args.cleanDirtyFlags) {
-    bitFields.dirtyTransform = false;
-    bitFields.dirtyBackground = false;
   }
 }
 
@@ -828,12 +820,7 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, Laye
     if (child->maskOwner) {
       continue;
     }
-    childArgs.backgroundChanged |=
-        child->bitFields.dirtyBackground || child->bitFields.dirtyTransform;
     if (!child->visible() || child->_alpha <= 0) {
-      if (args.cleanDirtyFlags) {
-        child->cleanDirtyFlags();
-      }
       continue;
     }
 
@@ -842,13 +829,8 @@ bool Layer::drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, Laye
     if (child->_scrollRect) {
       canvas->clipRect(*child->_scrollRect);
     }
-    auto childDirtyDescendents = child->bitFields.dirtyDescendents;
     child->drawLayer(childArgs, canvas, child->_alpha * alpha,
                      static_cast<BlendMode>(child->bitFields.blendMode));
-    childArgs.backgroundChanged |= childDirtyDescendents;
-  }
-  if (args.cleanDirtyFlags) {
-    bitFields.dirtyDescendents = false;
   }
   return true;
 }
@@ -899,7 +881,8 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
   };
 
   // null context prohibits the use of rasterizedCache during the drawing process.
-  DrawArgs drawArgs(nullptr, false, bitFields.excludeChildEffectsInLayerStyle);
+  DrawArgs drawArgs(nullptr, bitFields.excludeChildEffectsInLayerStyle);
+  drawArgs.renderRect = args.renderRect;
   auto contentPicture = CreatePicture(drawArgs, contentScale, drawLayerContents);
   Point contentOffset = {};
   auto content = CreatePictureImage(std::move(contentPicture), &contentOffset);
@@ -933,7 +916,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     drawArgs.excludeEffects = false;
     drawArgs.drawMode = DrawMode::Background;
     auto backgroundRect = renderBounds;
-    if (args.renderRect) {
+    if (drawArgs.renderRect) {
       backgroundRect.intersect(*args.renderRect);
       drawArgs.renderRect = &backgroundRect;
     }
@@ -1042,8 +1025,15 @@ bool Layer::hasValidMask() const {
 void Layer::updateRenderBounds(const Matrix& renderMatrix,
                                std::shared_ptr<RegionTransformer> transformer, bool forceDirty) {
   if (!forceDirty && !bitFields.dirtyDescendents) {
+    if (bitFields.hasBackgroundStyle) {
+      propagateHasBackgroundStyleFlags();
+      if (_root->hasDirtyRegions()) {
+        checkBackgroundStyles(renderMatrix);
+      }
+    }
     return;
   }
+  bitFields.hasBackgroundStyle = false;
   if (!_layerStyles.empty() || !_filters.empty()) {
     auto contentScale = renderMatrix.getMaxScale();
     transformer =
@@ -1051,16 +1041,32 @@ void Layer::updateRenderBounds(const Matrix& renderMatrix,
     transformer =
         RegionTransformer::MakeFromStyles(_layerStyles, contentScale, std::move(transformer));
   }
-  if (auto content = getContent()) {
-    renderBounds = renderMatrix.mapRect(content->getBounds());
-    if (transformer) {
-      transformer->transform(&renderBounds);
+  auto content = getContent();
+  if (bitFields.dirtyContentBounds || (forceDirty && content)) {
+    if (contentBounds) {
+      _root->invalidateRect(*contentBounds);
+    } else {
+      contentBounds = new Rect();
     }
+    if (content) {
+      *contentBounds = renderMatrix.mapRect(content->getBounds());
+      if (transformer) {
+        transformer->transform(contentBounds);
+      }
+      _root->invalidateRect(*contentBounds);
+    } else {
+      contentBounds->setEmpty();
+    }
+    bitFields.dirtyContentBounds = false;
+  }
+  if (contentBounds) {
+    renderBounds = *contentBounds;
   } else {
-    renderBounds = {};
+    renderBounds.setEmpty();
   }
   for (auto& child : _children) {
     if (!child->bitFields.visible || child->_alpha <= 0) {
+      child->bitFields.dirtyTransform = false;
       continue;
     }
     auto childMatrix = child->getMatrixWithScrollRect();
@@ -1072,22 +1078,69 @@ void Layer::updateRenderBounds(const Matrix& renderMatrix,
     }
     auto childForceDirty = forceDirty || child->bitFields.dirtyTransform;
     child->updateRenderBounds(childMatrix, childTransformer, childForceDirty);
+    child->bitFields.dirtyTransform = false;
     if (!child->maskOwner) {
       renderBounds.join(child->renderBounds);
     }
   }
-}
-
-void Layer::cleanDirtyFlags() {
-  if (bitFields.dirtyDescendents) {
-    for (auto& child : _children) {
-      child->cleanDirtyFlags();
+  auto hasBackgroundStyle = false;
+  for (auto& style : _layerStyles) {
+    if (style->extraSourceType() == LayerStyleExtraSourceType::Background) {
+      hasBackgroundStyle = true;
+      break;
     }
   }
-  // we should not clean content dirty flag here, because it use to determine if the content
-  // need to be updated.
-  bitFields.dirtyTransform = false;
+  if (hasBackgroundStyle) {
+    bitFields.hasBackgroundStyle = true;
+    propagateHasBackgroundStyleFlags();
+    updateBackgroundBounds(renderMatrix);
+  }
   bitFields.dirtyDescendents = false;
-  bitFields.dirtyBackground = false;
 }
+
+void Layer::checkBackgroundStyles(const Matrix& renderMatrix) {
+  for (auto& child : _children) {
+    if (!child->bitFields.hasBackgroundStyle || !child->bitFields.visible || child->_alpha <= 0) {
+      continue;
+    }
+    auto childMatrix = child->getMatrixWithScrollRect();
+    childMatrix.postConcat(renderMatrix);
+    child->checkBackgroundStyles(childMatrix);
+  }
+  updateBackgroundBounds(renderMatrix);
+}
+
+void Layer::updateBackgroundBounds(const Matrix& renderMatrix) {
+  auto contentScale = renderMatrix.getMaxScale();
+  auto backgroundChanged = false;
+  for (auto& style : _layerStyles) {
+    if (style->extraSourceType() != LayerStyleExtraSourceType::Background) {
+      continue;
+    }
+    if (_root->invalidateBackground(renderBounds, style.get(), contentScale)) {
+      backgroundChanged = true;
+    }
+  }
+  if (backgroundChanged) {
+    auto layer = this;
+    while (layer) {
+      if (layer->bitFields.dirtyDescendents) {
+        break;
+      }
+      layer->rasterizedContent = nullptr;
+      if (!layer->maskOwner) {
+        layer = layer->_parent;
+      }
+    }
+  }
+}
+
+void Layer::propagateHasBackgroundStyleFlags() {
+  auto layer = _parent;
+  while (layer && !layer->bitFields.hasBackgroundStyle) {
+    layer->bitFields.hasBackgroundStyle = true;
+    layer = layer->_parent;
+  }
+}
+
 }  // namespace tgfx

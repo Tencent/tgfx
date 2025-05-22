@@ -35,7 +35,13 @@ class LayerProperty {
    *  Called when the property is invalidated. This method will notify the layer that the content
    *  of the layer should be invalidated.
    */
-  void invalidate();
+  void invalidateContent();
+
+  /**
+   *  Called when the property is invalidated. This method will notify the layer that the
+   *  transformation of the layer should be invalidated.
+   */
+  void invalidateTransform();
 
  private:
   void attachToLayer(const Layer* layer);
