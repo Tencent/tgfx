@@ -179,7 +179,7 @@ static bool ParseVP8L(WebpFile& webpFile, DecodeInfo& decodeInfo,
     if (!VP8LCheckSignature(vp8xHeader)) return false;
     int w, h, a;
     VP8LBitReader br;
-    VP8LInitBitReader(&br, vp8xHeader, 10);
+    VP8LInitBitReader(&br, vp8xHeader, VP8L_FRAME_HEADER_SIZE);
     if (!ReadImageInfo(&br, &w, &h, &a)) {
       free(vp8xHeader);
       return false;
