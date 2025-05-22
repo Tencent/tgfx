@@ -175,11 +175,12 @@ class Layer {
   void setShouldRasterize(bool value);
 
   /**
-   * The scale at which to rasterize content, relative to the coordinate space of the layer. When
-   * the value in the shouldRasterize property is true, the layer uses this property to determine
-   * whether to scale the rasterized content (and by how much). The default value of this property
-   * is 1.0, which indicates that the layer should be rasterized at its current size. Larger values
-   * magnify the content and smaller values shrink it.
+   * The scale factor used to rasterize the content, relative to the layer’s coordinate space. When
+   * shouldRasterize is true, this property determines how much to scale the rasterized content.
+   * A value of 1.0 means the layer is rasterized at its current size. Values greater than 1.0
+   * enlarge the content, while values less than 1.0 shrink it. If set to an invalid value (less
+   * than or equal to 0), the layer is rasterized at its drawn size, which may cause the cache to be
+   * invalidated frequently if the drawn scale changes often. The default value is 0.0.
    */
   float rasterizationScale() const {
     return _rasterizationScale;
@@ -565,7 +566,7 @@ class Layer {
 
   std::shared_ptr<ImageFilter> getImageFilter(float contentScale);
 
-  LayerContent* getRasterizedCache(const DrawArgs& args);
+  LayerContent* getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix);
 
   std::shared_ptr<Image> getRasterizedImage(const DrawArgs& args, float contentScale,
                                             Matrix* drawingMatrix);
@@ -614,7 +615,7 @@ class Layer {
   std::string _name;
   float _alpha = 1.0f;
   Matrix _matrix = {};
-  float _rasterizationScale = 1.0f;
+  float _rasterizationScale = 0.0f;
   std::vector<std::shared_ptr<LayerFilter>> _filters = {};
   std::shared_ptr<Layer> _mask = nullptr;
   Layer* maskOwner = nullptr;

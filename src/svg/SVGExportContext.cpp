@@ -261,7 +261,7 @@ void SVGExportContext::exportGlyphsAsImage(const std::shared_ptr<GlyphRunList>& 
                                            const MCState& state, const Fill& fill) {
   auto viewMatrix = state.matrix;
   auto scale = viewMatrix.getMaxScale();
-  if (scale <= 0) {
+  if (FloatNearlyZero(scale)) {
     return;
   }
   viewMatrix.preScale(1.0f / scale, 1.0f / scale);

@@ -165,11 +165,7 @@ void Layer::setRasterizationScale(float value) {
   if (_rasterizationScale < 0) {
     _rasterizationScale = 0;
   }
-  if (_rasterizationScale == value) {
-    return;
-  }
   _rasterizationScale = value;
-  invalidateTransform();
 }
 
 void Layer::setAllowsEdgeAntialiasing(bool value) {
@@ -652,7 +648,7 @@ std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
   return ImageFilter::Compose(filters);
 }
 
-LayerContent* Layer::getRasterizedCache(const DrawArgs& args) {
+LayerContent* Layer::getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix) {
   if (!bitFields.shouldRasterize || args.context == nullptr) {
     return nullptr;
   }
@@ -665,11 +661,13 @@ LayerContent* Layer::getRasterizedCache(const DrawArgs& args) {
   }
   auto contextID = args.context->uniqueID();
   auto content = static_cast<RasterizedContent*>(rasterizedContent.get());
-  if (content && content->contextID() == contextID) {
+  float contentScale =
+      _rasterizationScale == 0.0f ? renderMatrix.getMaxScale() : _rasterizationScale;
+  if (content && content->contextID() == contextID && content->contentScale() == contentScale) {
     return content;
   }
   Matrix drawingMatrix = {};
-  auto image = getRasterizedImage(args, _rasterizationScale, &drawingMatrix);
+  auto image = getRasterizedImage(args, contentScale, &drawingMatrix);
   if (image == nullptr) {
     return nullptr;
   }
@@ -678,7 +676,7 @@ LayerContent* Layer::getRasterizedCache(const DrawArgs& args) {
     return nullptr;
   }
   rasterizedContent =
-      std::make_unique<RasterizedContent>(contextID, std::move(image), drawingMatrix);
+      std::make_unique<RasterizedContent>(contextID, contentScale, std::move(image), drawingMatrix);
   return rasterizedContent.get();
 }
 
@@ -718,7 +716,7 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
     cleanDirtyFlags();
     return;
   }
-  if (auto rasterizedCache = getRasterizedCache(args)) {
+  if (auto rasterizedCache = getRasterizedCache(args, canvas->getMatrix())) {
     rasterizedCache->draw(canvas, getLayerPaint(alpha, blendMode));
   } else if (blendMode != BlendMode::SrcOver || (alpha < 1.0f && allowsGroupOpacity()) ||
              (!_filters.empty() && !args.excludeEffects) || hasValidMask()) {
