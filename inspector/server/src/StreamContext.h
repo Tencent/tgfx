@@ -21,12 +21,11 @@
 #include <string>
 #include <vector>
 
-namespace inspector
-{
+namespace inspector {
 static constexpr uint8_t LENGTH_FOR_STORE_NUM_BITS = 5;
 
 class StreamContext {
-public:
+ public:
   virtual ~StreamContext() = default;
 
   bool throwException(const std::string& message) {
@@ -48,9 +47,9 @@ inline size_t BitsToBytes(size_t capacity) {
   return static_cast<size_t>(ceil(capacity * 0.125));
 }
 
-#define InspectorThrowError(context, message) \
-  if ((context)->throwException(message)) {  \
+#define InspectorThrowError(context, message)                                   \
+  if ((context)->throwException(message)) {                                     \
     printf("ISP Decoding Failed \"%s\" at %s:%d", message, __FILE__, __LINE__); \
   }
 
-}
+}  // namespace inspector

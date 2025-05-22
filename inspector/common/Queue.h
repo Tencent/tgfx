@@ -34,11 +34,11 @@ struct QueueOperaterBase {
   int64_t time;
 };
 
-struct QueueOperateBegin: QueueOperaterBase {
+struct QueueOperateBegin : QueueOperaterBase {
   uint8_t type;
 };
 
-struct QueueOperateEnd: QueueOperaterBase {
+struct QueueOperateEnd : QueueOperaterBase {
   uint8_t type;
 };
 
@@ -58,8 +58,7 @@ struct QueueItem {
 #pragma pack(pop)
 
 enum { QueueItemSize = sizeof(QueueItem) };
-static constexpr size_t QueueDataSize[] = {sizeof(QueueHeader) + sizeof(QueueOperateBegin),
-                                           sizeof(QueueHeader) + sizeof(QueueOperateEnd),
-                                           sizeof(QueueHeader),
-                                           sizeof(QueueHeader) + sizeof(QueueFrameMark)};
+static constexpr size_t QueueDataSize[] = {
+    sizeof(QueueHeader) + sizeof(QueueOperateBegin), sizeof(QueueHeader) + sizeof(QueueOperateEnd),
+    sizeof(QueueHeader), sizeof(QueueHeader) + sizeof(QueueFrameMark)};
 }  // namespace inspector

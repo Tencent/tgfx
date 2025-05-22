@@ -19,6 +19,7 @@
 #pragma once
 #include <tgfx/core/Data.h>
 #include <cstdint>
+#include <vector>
 #include "Protocol.h"
 
 namespace inspector {
@@ -26,7 +27,6 @@ namespace inspector {
 #define SPATIAL_PRECISION 0.05f
 #define BEZIER_PRECISION 0.005f
 #define GRADIENT_PRECISION 0.00002f
-
 
 struct StringLocation {
   const char* ptr;
@@ -40,12 +40,11 @@ struct FrameEvent {
   int64_t triangles;
   int32_t frameImage;
 };
-enum { FrameEventSize = sizeof( FrameEvent ) };
+enum { FrameEventSize = sizeof(FrameEvent) };
 
 struct FrameData {
-  uint64_t name;
   std::vector<FrameEvent> frames;
-  uint8_t continuous;
+  uint8_t continuous = 0;
 
   int64_t min = std::numeric_limits<int64_t>::max();
   int64_t max = std::numeric_limits<int64_t>::min();
@@ -61,15 +60,7 @@ struct OpTaskData {
 };
 enum { OpTaskDataSize = sizeof(OpTaskData) };
 
-enum DataType: uint8_t {
-  Color,
-  Vect,
-  Mat4,
-  Int,
-  Float,
-  String,
-  Count
-};
+enum DataType : uint8_t { Color, Vect, Mat4, Int, Float, String, Count };
 
 struct DataHead {
   DataType type;

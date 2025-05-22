@@ -290,4 +290,4 @@ bool DecodeStream::checkEndOfFile(uint32_t bytesToRead) {
   }
   return false;
 }
-}  // namespace pag
+}  // namespace inspector

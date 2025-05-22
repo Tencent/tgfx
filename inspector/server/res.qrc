@@ -1,35 +1,10 @@
 <RCC>
     <qresource prefix="/">
-        <file>qml/Timeline.qml</file>
-        <file>qml/Frames.qml</file>
-        <file>qml/Statistics.qml</file>
         <file>qml/StartView.qml</file>
         <file>qml/InspectorView.qml</file>
+        <file>qml/Separator2.qml</file>
         <file>qml/TabBar.qml</file>
         <file>qml/TitleBar.qml</file>
-        <file>qml/Separator.qml</file>
-        <file>qml/Separator2.qml</file>
-        <file>qml/Guest1.qml</file>
-        <file>qml/Guest.qml</file>
-        <file>qml/ShaderView.qml</file>
-        <file>qml/MeshView.qml</file>
-        <file>qml/FramesDock.qml</file>
         <file>qml/AttributeView.qml</file>
-        <file>icons/power.png</file>
-        <file>icons/save.png</file>
-        <file>icons/pause.png</file>
-        <file>icons/next.png</file>
-        <file>icons/stop.png</file>
-        <file>icons/discard.png</file>
-        <file>icons/statistics.png</file>
-        <file>icons/InspectorIcon.png</file>
-        <file>icons/InspectorIcon2.png</file>
-        <file>icons/InspectorIcon3.png</file>
-        <file>icons/InspectorIcon4.png</file>
-        <file>icons/LayerTreeIcon.png</file>
-        <file>icons/openfile.png</file>
-        <file>icons/disconnected.png</file>
-        <file>icons/savefile.png</file>
-        <file>icons/capture.png</file>
     </qresource>
 </RCC>

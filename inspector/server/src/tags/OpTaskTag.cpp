@@ -53,7 +53,7 @@ void ReadOpTaskTag(DecodeStream* stream) {
 TagType WriteOpTaskTag(EncodeStream* stream, DataContext* context) {
   const auto& opTasks = context->opTasks;
   stream->writeEncodedUint64(opTasks.size());
-  for (const auto& opTask: opTasks) {
+  for (const auto& opTask : opTasks) {
     stream->writeEncodedInt64(opTask->start);
     stream->writeEncodedInt64(opTask->end);
     stream->writeUint8(opTask->type);
@@ -61,15 +61,15 @@ TagType WriteOpTaskTag(EncodeStream* stream, DataContext* context) {
 
   const auto& opChilds = context->opChilds;
   stream->writeEncodedUint64(opChilds.size());
-  for (const auto& opChild: opChilds) {
+  for (const auto& opChild : opChilds) {
     auto& childs = opChild.second;
     stream->writeEncodedUint32(opChild.first);
     stream->writeEncodedUint32(static_cast<uint32_t>(childs.size()));
-    for (const auto& child: childs) {
+    for (const auto& child : childs) {
       stream->writeEncodedUint32(child);
     }
   }
   return TagType::Property;
 }
 
-}
+}  // namespace inspector

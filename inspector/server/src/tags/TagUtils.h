@@ -28,4 +28,4 @@ void WriteTimeOffset(EncodeStream* stream, int64_t& refTime, int64_t time);
 
 void ReadDataHead(std::vector<DataHead>& dataHead, DecodeStream* stream);
 void WriteDataHead(const std::vector<DataHead>& dataHead, EncodeStream* stream);
-}
+}  // namespace inspector

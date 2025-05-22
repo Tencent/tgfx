@@ -223,4 +223,4 @@ class EncodeStream final {
   void bitPositionChanged(size_t offset);
   void positionChanged(size_t offset);
 };
-}  // namespace pag
+}  // namespace inspector

@@ -292,7 +292,7 @@ ApplicationWindow {
                             }
 
                             Text {
-                                text: modelData.caddress + ":" + modelData.ports
+                                text: modelData.caddress + ":" + modelData.port
                                 color: "#aaaaaa"
                                 font.pixelSize: 10
                                 width: parent.width
@@ -305,8 +305,8 @@ ApplicationWindow {
                             anchors.fill: parent
                             hoverEnabled: true
                             onDoubleClicked: {
-                                if (startViewModel) {
-                                    startViewModel.connectToClient(modelData.clientId)
+                                if (startViewModel && modelData) {
+                                    startViewModel.connectToClient(modelData)
                                 }
                             }
                         }
@@ -327,7 +327,7 @@ ApplicationWindow {
 
                 Text {
                     anchors.centerIn: parent
-                    text: clientsList.count === 0 ? "Waitting for project start" : ""
+                    text: clientsList.count === 0 ? "Waiting for project start" : ""
                     color: "#44ffffff"
                     font.pixelSize: 14
                 }

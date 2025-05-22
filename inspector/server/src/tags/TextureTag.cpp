@@ -30,7 +30,7 @@ void ReadTextureTag(DecodeStream* stream) {
     auto& inputTextures = ptr->inputTextures;
     auto inputTexturesCount = stream->readEncodedUint32();
     inputTextures.reserve(inputTexturesCount);
-    for(uint32_t j = 0; j < inputTexturesCount; ++j) {
+    for (uint32_t j = 0; j < inputTexturesCount; ++j) {
       inputTextures[j] = stream->readData();
     }
     ptr->outputTexture = stream->readData();
@@ -39,13 +39,14 @@ void ReadTextureTag(DecodeStream* stream) {
   }
 }
 
-TagType WriteTextureTag(EncodeStream* stream, std::unordered_map<uint32_t, std::shared_ptr<TextureData>>* textures) {
+TagType WriteTextureTag(EncodeStream* stream,
+                        std::unordered_map<uint32_t, std::shared_ptr<TextureData>>* textures) {
   stream->writeEncodedUint32(static_cast<uint32_t>(textures->size()));
-  for (const auto& texture: *textures) {
+  for (const auto& texture : *textures) {
     stream->writeEncodedUint32(texture.first);
     const auto& textureData = texture.second;
     stream->writeEncodedUint32(static_cast<uint32_t>(textureData->inputTextures.size()));
-    for(const auto& inputTexture: textureData->inputTextures) {
+    for (const auto& inputTexture : textureData->inputTextures) {
       stream->writeData(inputTexture.get());
     }
     stream->writeData(textureData->outputTexture.get());
@@ -54,4 +55,4 @@ TagType WriteTextureTag(EncodeStream* stream, std::unordered_map<uint32_t, std::
   return TagType::Texture;
 }
 
-}
+}  // namespace inspector

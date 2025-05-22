@@ -20,12 +20,12 @@
 #include <cstdint>
 #include <string>
 #include <thread>
+#include "DataContext.h"
+#include "DecodeStream.h"
 #include "Protocol.h"
 #include "Queue.h"
 #include "Socket.h"
 #include "StringDiscovery.h"
-#include "DataContext.h"
-#include "DecodeStream.h"
 
 namespace inspector {
 class Worker {
@@ -36,6 +36,7 @@ class Worker {
   };
 
   Worker(const char* addr, uint16_t port);
+  Worker(std::string& filePath);
   ~Worker();
 
   bool Open(const std::string& filePath);
@@ -43,6 +44,7 @@ class Worker {
 
   int64_t GetFrameTime(const FrameData& fd, size_t idx) const;
   int64_t GetLastTime() const;
+  FrameData* GetFrameData();
 
  private:
   DecodeStream ReadBodyBytes(DecodeStream* stream);
@@ -103,8 +105,8 @@ class Worker {
   std::vector<ServerQueryPacket> serverQueryQueuePrio;
   // Control the rate at which query requests are sent to the server to avoid
   // excessive server pressure caused by sending too many requests
-  size_t serverQuerySpaceLeft;
-  size_t serverQuerySpaceBase;
+  size_t serverQuerySpaceLeft = 0;
+  size_t serverQuerySpaceBase = 0;
 
   int64_t refTime = 0;
 };

@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "EncodeStream.h"
-#include <string>
 #include <memory>
+#include <string>
 
 namespace inspector {
 
@@ -318,4 +318,4 @@ void EncodeStream::positionChanged(size_t offset) {
     _length = _position;
   }
 }
-}  // namespace pag
+}  // namespace inspector

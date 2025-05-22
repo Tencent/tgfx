@@ -34,11 +34,10 @@ struct SourceData {
   const char* function;
 };
 
-#define QueuePrepare(_type)              \
+#define QueuePrepare(_type)             \
   auto item = Inspector::QueueSerial(); \
   MemWrite(&item->hdr.type, _type);
-#define QueueCommit(name)                          \
-  Inspector::QueueSerialFinish();
+#define QueueCommit(name) Inspector::QueueSerialFinish();
 
 class Inspector;
 Inspector& GetInspector();
