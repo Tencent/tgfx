@@ -18,40 +18,10 @@
 
 #include "tgfx/core/Font.h"
 #include "ScalerContext.h"
+#include "core/GlyphRasterizer.h"
 #include "core/PixelBuffer.h"
 
 namespace tgfx {
-
-class GlyphRasterizer : public ImageCodec {
- public:
-  GlyphRasterizer(int width, int height, std::shared_ptr<ScalerContext> scalerContext,
-                  GlyphID glyphID, bool fauxBold, const Stroke* s)
-      : ImageCodec(width, height, Orientation::LeftTop), scalerContext(std::move(scalerContext)),
-        glyphID(glyphID), fauxBold(fauxBold) {
-    if (s != nullptr) {
-      stroke = new Stroke(*s);
-    }
-  }
-
-  ~GlyphRasterizer() override {
-    delete stroke;
-  }
-
-  bool isAlphaOnly() const override {
-    return !scalerContext->hasColor();
-  }
-
-  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override {
-    return scalerContext->readPixels(glyphID, fauxBold, stroke, dstInfo, dstPixels);
-  }
-
- private:
-  std::shared_ptr<ScalerContext> scalerContext = nullptr;
-  GlyphID glyphID = 0;
-  bool fauxBold = false;
-  Stroke* stroke = nullptr;
-};
-
 Font::Font() : scalerContext(ScalerContext::MakeEmpty(0.0f)) {
 }
 
@@ -164,7 +134,7 @@ std::shared_ptr<ImageCodec> Font::getImage(GlyphID glyphID, const Stroke* stroke
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
   return std::make_shared<GlyphRasterizer>(width, height, scalerContext, glyphID, fauxBold,
-                                           adjustMitterStroke.get());
+                                           std::move(adjustMitterStroke));
 }
 
 bool Font::operator==(const Font& font) const {
