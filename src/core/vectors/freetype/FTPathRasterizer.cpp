@@ -19,6 +19,8 @@
 #include "FTPathRasterizer.h"
 #include "FTLibrary.h"
 #include "FTPath.h"
+#include "FTUtil.h"
+#include "core/utils/GammaCorrection.h"
 
 namespace tgfx {
 static void Iterator(PathVerb verb, const Point points[4], void* info) {
@@ -39,45 +41,6 @@ static void Iterator(PathVerb verb, const Point points[4], void* info) {
     case PathVerb::Close:
       path->close();
       break;
-  }
-}
-
-struct RasterTarget {
-  unsigned char* origin;
-  int pitch;
-  const uint8_t* gammaTable;
-};
-
-static void SpanFunc(int y, int count, const FT_Span* spans, void* user) {
-  auto* target = reinterpret_cast<RasterTarget*>(user);
-  for (int i = 0; i < count; i++) {
-    auto* q = target->origin - target->pitch * y + spans[i].x;
-    auto c = target->gammaTable[spans[i].coverage];
-    auto aCount = spans[i].len;
-    /**
-     * For small-spans it is faster to do it by ourselves than calling memset.
-     * This is mainly due to the cost of the function call.
-     */
-    switch (aCount) {
-      case 7:
-        *q++ = c;
-      case 6:
-        *q++ = c;
-      case 5:
-        *q++ = c;
-      case 4:
-        *q++ = c;
-      case 3:
-        *q++ = c;
-      case 2:
-        *q++ = c;
-      case 1:
-        *q = c;
-      case 0:
-        break;
-      default:
-        memset(q, c, aCount);
-    }
   }
 }
 
@@ -136,10 +99,10 @@ bool FTPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) con
   // Anti-aliasing is always enabled because FreeType generates only 1-bit masks when it's off,
   // and we haven't implemented conversion from 1-bit to 8-bit masks yet.
   auto pitch = static_cast<int>(dstInfo.rowBytes());
-  RasterTarget target = {buffer + (rows - 1) * pitch, pitch, PathRasterizer::GammaTable().data()};
+  RasterTarget target = {buffer + (rows - 1) * pitch, pitch, GammaTable().data()};
   FT_Raster_Params params;
   params.flags = FT_RASTER_FLAG_DIRECT | FT_RASTER_FLAG_CLIP | FT_RASTER_FLAG_AA;
-  params.gray_spans = SpanFunc;
+  params.gray_spans = GraySpanFunc;
   params.user = &target;
   params.clip_box = {0, 0, static_cast<FT_Pos>(dstInfo.width()),
                      static_cast<FT_Pos>(dstInfo.height())};

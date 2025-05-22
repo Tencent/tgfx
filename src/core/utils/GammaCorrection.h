@@ -16,13 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/PathRasterizer.h"
-#include "core/ScalerContext.h"
+#pragma once
+
+#include <array>
 
 namespace tgfx {
-PathRasterizer::PathRasterizer(int width, int height, std::shared_ptr<Shape> shape, bool antiAlias,
-                               bool needsGammaCorrection)
-    : ImageCodec(width, height, Orientation::LeftTop), shape(std::move(shape)),
-      antiAlias(antiAlias), needsGammaCorrection(needsGammaCorrection) {
-}
-}  //namespace tgfx
+const std::array<uint8_t, 256>& GammaTable();
+}  // namespace tgfx

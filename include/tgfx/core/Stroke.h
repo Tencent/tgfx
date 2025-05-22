@@ -89,7 +89,7 @@ class Stroke {
   /**
    * Applies the stroke options to the given bounds.
    */
-  void applyToBounds(Rect* bounds, bool ignoreMiterLimit = false) const;
+  void applyToBounds(Rect* bounds) const;
 
   /**
    * The thickness of the pen used to outline the paths or glyphs.

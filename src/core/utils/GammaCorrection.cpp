@@ -15,14 +15,29 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
-#include "core/PathRasterizer.h"
-#include "core/ScalerContext.h"
+#include "GammaCorrection.h"
+#include <cmath>
 
 namespace tgfx {
-PathRasterizer::PathRasterizer(int width, int height, std::shared_ptr<Shape> shape, bool antiAlias,
-                               bool needsGammaCorrection)
-    : ImageCodec(width, height, Orientation::LeftTop), shape(std::move(shape)),
-      antiAlias(antiAlias), needsGammaCorrection(needsGammaCorrection) {
+static float LinearToSRGB(float linear) {
+  // The magic numbers are derived from the sRGB specification.
+  // See http://www.color.org/chardata/rgb/srgb.xalter.
+  if (linear <= 0.0031308f) {
+    return linear * 12.92f;
+  }
+  return 1.055f * std::pow(linear, 1.f / 2.4f) - 0.055f;
 }
-}  //namespace tgfx
+const std::array<uint8_t, 256>& GammaTable() {
+  static const std::array<uint8_t, 256> table = [] {
+    std::array<uint8_t, 256> table{};
+    table[0] = 0;
+    table[255] = 255;
+    for (size_t i = 1; i < 255; ++i) {
+      auto v = std::roundf(LinearToSRGB(static_cast<float>(i) / 255.f) * 255.f);
+      table[i] = static_cast<uint8_t>(v);
+    }
+    return table;
+  }();
+  return table;
+}
+}  // namespace tgfx

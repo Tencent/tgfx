@@ -27,7 +27,7 @@ bool ReadPixelsFromCanvasImage(emscripten::val canvasImageData, const ImageInfo&
   }
   auto length = canvasImageData["length"].as<size_t>();
   auto memory = emscripten::val::module_property("HEAPU8")["buffer"];
-  if (dstInfo.isAlphaOnly()) {
+  if (dstInfo.colorType() != ColorType::RGBA_8888) {
     if (length == 0 || length % 4 != 0) {
       return false;
     }

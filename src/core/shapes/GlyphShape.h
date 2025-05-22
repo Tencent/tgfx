@@ -44,7 +44,7 @@ class GlyphShape final : public Shape {
 
  private:
   LazyUniqueKey uniqueKey = {};
-  std::shared_ptr<GlyphFace> glyphFace;
+  std::shared_ptr<GlyphFace> glyphFace = nullptr;
   GlyphID glyphID = 0;
 };
 }  // namespace tgfx

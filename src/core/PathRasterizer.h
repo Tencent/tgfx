@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <array>
 #include "tgfx/core/GlyphFace.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Shape.h"
@@ -44,8 +43,6 @@ class PathRasterizer : public ImageCodec {
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override = 0;
 
  protected:
-  static const std::array<uint8_t, 256>& GammaTable();
-
   explicit PathRasterizer(int width, int height, std::shared_ptr<Shape> shape, bool antiAlias,
                           bool needsGammaCorrection);
 

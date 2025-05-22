@@ -30,6 +30,9 @@ class GlyphRasterizer : public ImageCodec {
         glyphID(glyphID), fauxBold(fauxBold) {
     if (s != nullptr) {
       stroke = new Stroke(*s);
+      //Glyph stroke rarely creates sharp angles, so setting miterLimit = 1.0f helps
+      //produce tighter bounding box.
+      stroke->miterLimit = 1.0f;
     }
   }
 

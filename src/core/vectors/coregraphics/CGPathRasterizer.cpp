@@ -19,6 +19,7 @@
 #include "CGPathRasterizer.h"
 #include <CoreGraphics/CGBitmapContext.h>
 #include "core/PixelBuffer.h"
+#include "core/utils/GammaCorrection.h"
 #include "platform/apple/BitmapContextUtil.h"
 #include "tgfx/core/PathTypes.h"
 
@@ -150,7 +151,7 @@ bool CGPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) con
   }
   memset(tempPixels, 0, tempBuffer->info().byteSize());
   auto image = CreateCGImage(path, tempPixels, tempBuffer->info(), antiAlias, bounds.left,
-                             bounds.top, PathRasterizer::GammaTable());
+                             bounds.top, GammaTable());
   tempBuffer->unlockPixels();
   if (image == nullptr) {
     CGContextRelease(cgContext);

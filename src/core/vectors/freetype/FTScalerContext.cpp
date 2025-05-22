@@ -24,6 +24,7 @@
 #include FT_SIZES_H
 #include FT_TRUETYPE_TABLES_H
 #include "FTUtil.h"
+#include "core/utils/GammaCorrection.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "skcms.h"
@@ -45,6 +46,28 @@ static FT_Fixed FloatToFTFixed(float x) {
   x = x < MaxS32FitsInFloat ? x : MaxS32FitsInFloat;
   x = x > MinS32FitsInFloat ? x : MinS32FitsInFloat;
   return static_cast<FT_Fixed>(x * (1 << 16));
+}
+
+static void RenderOutLineGlyph(FT_Face face, const ImageInfo& dstInfo, void* dstPixels) {
+  auto buffer = static_cast<unsigned char*>(dstPixels);
+  int rows = dstInfo.height();
+  int pitch = static_cast<int>(dstInfo.rowBytes());
+
+  RasterTarget target = {buffer + (rows - 1) * pitch, pitch, GammaTable().data()};
+  FT_Raster_Params params;
+  params.flags = FT_RASTER_FLAG_DIRECT | FT_RASTER_FLAG_CLIP | FT_RASTER_FLAG_AA;
+  params.gray_spans = GraySpanFunc;
+  params.user = &target;
+  params.clip_box = {0, 0, static_cast<FT_Pos>(dstInfo.width()),
+                     static_cast<FT_Pos>(dstInfo.height())};
+  auto outline = &face->glyph->outline;
+  FT_BBox bbox;
+  FT_Outline_Get_CBox(outline, &bbox);
+  // outset the box to integral boundaries
+  bbox.xMin &= ~63;
+  bbox.yMin &= ~63;
+  FT_Outline_Translate(outline, -bbox.xMin, -bbox.yMin);
+  FT_Outline_Render(face->glyph->library, outline, &params);
 }
 
 std::shared_ptr<ScalerContext> ScalerContext::CreateNew(std::shared_ptr<Typeface> typeface,
@@ -417,22 +440,9 @@ bool FTScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItal
                                    Path* path) const {
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   auto face = ftTypeface()->face;
-  // FT_IS_SCALABLE is documented to mean the face contains outline glyphs.
-  if (!FT_IS_SCALABLE(face) || setupSize(fauxItalic)) {
+  if (!loadOutlineGlyph(face, glyphID, fauxBold, fauxItalic)) {
     path->reset();
     return false;
-  }
-  auto flags = loadGlyphFlags;
-  flags |= FT_LOAD_NO_BITMAP;  // ignore embedded bitmaps so we're sure to get the outline
-  flags &= ~FT_LOAD_RENDER;    // don't scan convert (we just want the outline)
-
-  auto err = FT_Load_Glyph(face, glyphID, flags);
-  if (err != FT_Err_Ok || face->glyph->format != FT_GLYPH_FORMAT_OUTLINE) {
-    path->reset();
-    return false;
-  }
-  if (fauxBold) {
-    ApplyEmbolden(face, face->glyph, glyphID, loadGlyphFlags);
   }
   if (!GenerateGlyphPath(face, path)) {
     path->reset();
@@ -551,6 +561,13 @@ Rect FTScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const St
   if (!hasColor() && (stroke != nullptr || fauxBold)) {
     return {};
   }
+  if (!hasColor()) {
+    const auto bounds = getBounds(glyphID, fauxBold, false);
+    if (matrix) {
+      matrix->setTranslate(bounds.x(), bounds.y());
+    }
+    return bounds;
+  }
 
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   auto glyphFlags = loadGlyphFlags | static_cast<FT_Int32>(FT_LOAD_BITMAP_METRICS_ONLY);
@@ -569,35 +586,44 @@ Rect FTScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const St
       static_cast<float>(face->glyph->bitmap.width), static_cast<float>(face->glyph->bitmap.rows));
 }
 
-bool FTScalerContext::readPixels(GlyphID glyphID, bool, const Stroke*, const ImageInfo& dstInfo,
-                                 void* dstPixels) const {
+bool FTScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*,
+                                 const ImageInfo& dstInfo, void* dstPixels) const {
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }
-  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
-  auto glyphFlags = loadGlyphFlags;
-  glyphFlags |= FT_LOAD_RENDER;
-  glyphFlags &= ~FT_LOAD_NO_BITMAP;
-  if (!loadBitmapGlyph(glyphID, glyphFlags)) {
-    return false;
-  }
-  auto ftBitmap = ftTypeface()->face->glyph->bitmap;
-  auto width = ftBitmap.width;
-  auto height = ftBitmap.rows;
-  auto src = reinterpret_cast<const uint8_t*>(ftBitmap.buffer);
-  // FT_Bitmap::pitch is an int and allowed to be negative.
-  auto srcRB = ftBitmap.pitch;
-  auto srcFormat = ftBitmap.pixel_mode == FT_PIXEL_MODE_GRAY ? gfx::skcms_PixelFormat_A_8
-                                                             : gfx::skcms_PixelFormat_BGRA_8888;
+  if (hasColor()) {
+    std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
+    auto glyphFlags = loadGlyphFlags;
+    glyphFlags |= FT_LOAD_RENDER;
+    glyphFlags &= ~FT_LOAD_NO_BITMAP;
+    if (!loadBitmapGlyph(glyphID, glyphFlags)) {
+      return false;
+    }
+    auto ftBitmap = ftTypeface()->face->glyph->bitmap;
+    auto width = ftBitmap.width;
+    auto height = ftBitmap.rows;
+    auto src = reinterpret_cast<const uint8_t*>(ftBitmap.buffer);
+    // FT_Bitmap::pitch is an int and allowed to be negative.
+    auto srcRB = ftBitmap.pitch;
+    auto srcFormat = ftBitmap.pixel_mode == FT_PIXEL_MODE_GRAY ? gfx::skcms_PixelFormat_A_8
+                                                               : gfx::skcms_PixelFormat_BGRA_8888;
 
-  auto dst = static_cast<uint8_t*>(dstPixels);
-  auto dstRB = dstInfo.rowBytes();
-  auto dstFormat = ToPixelFormat(dstInfo.colorType());
-  for (size_t i = 0; i < height; i++) {
-    gfx::skcms_Transform(src, srcFormat, gfx::skcms_AlphaFormat_PremulAsEncoded, nullptr, dst,
-                         dstFormat, gfx::skcms_AlphaFormat_PremulAsEncoded, nullptr, width);
-    src += srcRB;
-    dst += dstRB;
+    auto dst = static_cast<uint8_t*>(dstPixels);
+    auto dstRB = dstInfo.rowBytes();
+    auto dstFormat = ToPixelFormat(dstInfo.colorType());
+    for (size_t i = 0; i < height; i++) {
+      gfx::skcms_Transform(src, srcFormat, gfx::skcms_AlphaFormat_PremulAsEncoded, nullptr, dst,
+                           dstFormat, gfx::skcms_AlphaFormat_PremulAsEncoded, nullptr, width);
+      src += srcRB;
+      dst += dstRB;
+    }
+  } else {
+    std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
+    auto face = ftTypeface()->face;
+    if (!loadOutlineGlyph(face, glyphID, fauxBold, false)) {
+      return false;
+    }
+    RenderOutLineGlyph(face, dstInfo, dstPixels);
   }
   return true;
 }
@@ -608,7 +634,7 @@ bool FTScalerContext::loadBitmapGlyph(GlyphID glyphID, FT_Int32 glyphFlags) cons
   }
   auto face = ftTypeface()->face;
   auto err = FT_Load_Glyph(face, glyphID, glyphFlags);
-  if (err != FT_Err_Ok) {
+  if (err != FT_Err_Ok || face->glyph->format != FT_GLYPH_FORMAT_BITMAP) {
     return false;
   }
   auto ftBitmap = face->glyph->bitmap;
@@ -625,5 +651,24 @@ Matrix FTScalerContext::getExtraMatrix(bool fauxItalic) const {
 
 FTTypeface* FTScalerContext::ftTypeface() const {
   return static_cast<FTTypeface*>(typeface.get());
+}
+
+bool FTScalerContext::loadOutlineGlyph(FT_Face face, GlyphID glyphID, bool fauxBold,
+                                       bool fauxItalic) const {
+  // FT_IS_SCALABLE is documented to mean the face contains outline glyphs.
+  if (!FT_IS_SCALABLE(face) || setupSize(fauxItalic)) {
+    return false;
+  }
+  auto flags = loadGlyphFlags;
+  flags |= FT_LOAD_NO_BITMAP;  // ignore embedded bitmaps so we're sure to get the outline
+  flags &= ~FT_LOAD_RENDER;    // don't scan convert (we just want the outline)
+  auto err = FT_Load_Glyph(face, glyphID, flags);
+  if (err != FT_Err_Ok || face->glyph->format != FT_GLYPH_FORMAT_OUTLINE) {
+    return false;
+  }
+  if (fauxBold) {
+    ApplyEmbolden(face, face->glyph, glyphID, flags);
+  }
+  return true;
 }
 }  // namespace tgfx
