@@ -35,6 +35,8 @@ static float RectArea(const Rect& rect) {
   return (rect.right - rect.left) * (rect.bottom - rect.top);
 }
 
+// Restructure two overlapping rectangles to remove their intersection while still covering the same
+// or a larger area
 static void DecomposeRect(Rect* rectA, Rect* rectB) {
   // Ensure rectA and rectB overlap
   DEBUG_ASSERT(rectA->intersects(*rectB));
