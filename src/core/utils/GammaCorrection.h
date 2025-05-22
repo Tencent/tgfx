@@ -19,6 +19,7 @@
 #pragma once
 
 #include <array>
+#include <cstdint>
 
 namespace tgfx {
 const std::array<uint8_t, 256>& GammaTable();
