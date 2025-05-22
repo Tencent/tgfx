@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WebScalerContext.h"
+#include "ReadPixelsFromCanvasImage.h"
 #include "WebTypeface.h"
-#include "WebUtil.h"
 #include "core/utils/Log.h"
 #include "platform/web/WebImageBuffer.h"
 

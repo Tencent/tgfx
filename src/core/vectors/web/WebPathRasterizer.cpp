@@ -18,8 +18,8 @@
 
 #include "WebPathRasterizer.h"
 #include <emscripten/val.h>
+#include "ReadPixelsFromCanvasImage.h"
 #include "WebMask.h"
-#include "WebUtil.h"
 
 using namespace emscripten;
 

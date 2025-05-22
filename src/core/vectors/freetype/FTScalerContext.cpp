@@ -17,12 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FTScalerContext.h"
-#include <cmath>
 #include "ft2build.h"
 #include FT_BITMAP_H
 #include FT_OUTLINE_H
 #include FT_SIZES_H
 #include FT_TRUETYPE_TABLES_H
+#include "FTRasterTarget.h"
 #include "FTUtil.h"
 #include "core/utils/GammaCorrection.h"
 #include "core/utils/Log.h"
@@ -53,7 +53,8 @@ static void RenderOutLineGlyph(FT_Face face, const ImageInfo& dstInfo, void* dst
   int rows = dstInfo.height();
   int pitch = static_cast<int>(dstInfo.rowBytes());
 
-  RasterTarget target = {buffer + (rows - 1) * pitch, pitch, GammaTable().data()};
+  FTRasterTarget target = {buffer + (rows - 1) * pitch, pitch,
+                           GammaCorrection::GammaTable().data()};
   FT_Raster_Params params;
   params.flags = FT_RASTER_FLAG_DIRECT | FT_RASTER_FLAG_CLIP | FT_RASTER_FLAG_AA;
   params.gray_spans = GraySpanFunc;
@@ -558,7 +559,7 @@ static gfx::skcms_PixelFormat ToPixelFormat(ColorType colorType) {
 
 Rect FTScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
                                         Matrix* matrix) const {
-  if (!hasColor() && (stroke != nullptr || fauxBold)) {
+  if (!hasColor() && stroke != nullptr) {
     return {};
   }
   if (!hasColor()) {
@@ -591,39 +592,41 @@ bool FTScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*,
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }
-  if (hasColor()) {
-    std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
-    auto glyphFlags = loadGlyphFlags;
-    glyphFlags |= FT_LOAD_RENDER;
-    glyphFlags &= ~FT_LOAD_NO_BITMAP;
-    if (!loadBitmapGlyph(glyphID, glyphFlags)) {
-      return false;
-    }
-    auto ftBitmap = ftTypeface()->face->glyph->bitmap;
-    auto width = ftBitmap.width;
-    auto height = ftBitmap.rows;
-    auto src = reinterpret_cast<const uint8_t*>(ftBitmap.buffer);
-    // FT_Bitmap::pitch is an int and allowed to be negative.
-    auto srcRB = ftBitmap.pitch;
-    auto srcFormat = ftBitmap.pixel_mode == FT_PIXEL_MODE_GRAY ? gfx::skcms_PixelFormat_A_8
-                                                               : gfx::skcms_PixelFormat_BGRA_8888;
-
-    auto dst = static_cast<uint8_t*>(dstPixels);
-    auto dstRB = dstInfo.rowBytes();
-    auto dstFormat = ToPixelFormat(dstInfo.colorType());
-    for (size_t i = 0; i < height; i++) {
-      gfx::skcms_Transform(src, srcFormat, gfx::skcms_AlphaFormat_PremulAsEncoded, nullptr, dst,
-                           dstFormat, gfx::skcms_AlphaFormat_PremulAsEncoded, nullptr, width);
-      src += srcRB;
-      dst += dstRB;
-    }
-  } else {
-    std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
+  // Note: In the hasColor() function, freeType has an internal lock. Placing this method later
+  // would cause repeated locking and lead to a deadlock.
+  bool colorFont = hasColor();
+  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
+  if (!colorFont) {
     auto face = ftTypeface()->face;
     if (!loadOutlineGlyph(face, glyphID, fauxBold, false)) {
       return false;
     }
     RenderOutLineGlyph(face, dstInfo, dstPixels);
+    return true;
+  }
+  auto glyphFlags = loadGlyphFlags;
+  glyphFlags |= FT_LOAD_RENDER;
+  glyphFlags &= ~FT_LOAD_NO_BITMAP;
+  if (!loadBitmapGlyph(glyphID, glyphFlags)) {
+    return false;
+  }
+  auto ftBitmap = ftTypeface()->face->glyph->bitmap;
+  auto width = ftBitmap.width;
+  auto height = ftBitmap.rows;
+  auto src = reinterpret_cast<const uint8_t*>(ftBitmap.buffer);
+  // FT_Bitmap::pitch is an int and allowed to be negative.
+  auto srcRB = ftBitmap.pitch;
+  auto srcFormat = ftBitmap.pixel_mode == FT_PIXEL_MODE_GRAY ? gfx::skcms_PixelFormat_A_8
+                                                             : gfx::skcms_PixelFormat_BGRA_8888;
+
+  auto dst = static_cast<uint8_t*>(dstPixels);
+  auto dstRB = dstInfo.rowBytes();
+  auto dstFormat = ToPixelFormat(dstInfo.colorType());
+  for (size_t i = 0; i < height; i++) {
+    gfx::skcms_Transform(src, srcFormat, gfx::skcms_AlphaFormat_PremulAsEncoded, nullptr, dst,
+                         dstFormat, gfx::skcms_AlphaFormat_PremulAsEncoded, nullptr, width);
+    src += srcRB;
+    dst += dstRB;
   }
   return true;
 }

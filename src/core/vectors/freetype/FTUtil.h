@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <array>
 #include <memory>
 #include "ft2build.h"
 #include FT_FREETYPE_H
@@ -43,12 +42,4 @@ inline FT_F26Dot6 FDot6Ceil(FT_F26Dot6 x) {
 inline FT_F26Dot6 FDot6Round(FT_F26Dot6 x) {
   return (((x) + 32) >> 6);
 }
-
-struct RasterTarget {
-  unsigned char* origin;
-  int pitch;
-  const uint8_t* gammaTable;
-};
-
-void GraySpanFunc(int y, int count, const FT_Span* spans, void* user);
 }  // namespace tgfx

@@ -151,7 +151,7 @@ bool CGPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) con
   }
   memset(tempPixels, 0, tempBuffer->info().byteSize());
   auto image = CreateCGImage(path, tempPixels, tempBuffer->info(), antiAlias, bounds.left,
-                             bounds.top, GammaTable());
+                             bounds.top, GammaCorrection::GammaTable());
   tempBuffer->unlockPixels();
   if (image == nullptr) {
     CGContextRelease(cgContext);

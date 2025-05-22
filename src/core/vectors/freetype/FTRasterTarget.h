@@ -16,39 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "FTUtil.h"
+#pragma once
+
+#include "ft2build.h"
+#include FT_FREETYPE_H
 
 namespace tgfx {
-void GraySpanFunc(int y, int count, const FT_Span* spans, void* user) {
-  auto* target = reinterpret_cast<RasterTarget*>(user);
-  for (int i = 0; i < count; i++) {
-    auto* q = target->origin - target->pitch * y + spans[i].x;
-    auto c = target->gammaTable[spans[i].coverage];
-    auto aCount = spans[i].len;
-    /**
-     * For small-spans it is faster to do it by ourselves than calling memset.
-     * This is mainly due to the cost of the function call.
-     */
-    switch (aCount) {
-      case 7:
-        *q++ = c;
-      case 6:
-        *q++ = c;
-      case 5:
-        *q++ = c;
-      case 4:
-        *q++ = c;
-      case 3:
-        *q++ = c;
-      case 2:
-        *q++ = c;
-      case 1:
-        *q = c;
-      case 0:
-        break;
-      default:
-        memset(q, c, aCount);
-    }
-  }
-}
+struct FTRasterTarget {
+  unsigned char* origin;
+  int pitch;
+  const uint8_t* gammaTable;
+};
+
+void GraySpanFunc(int y, int count, const FT_Span* spans, void* user);
 }  // namespace tgfx

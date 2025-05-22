@@ -19,7 +19,7 @@
 #include "FTPathRasterizer.h"
 #include "FTLibrary.h"
 #include "FTPath.h"
-#include "FTUtil.h"
+#include "FTRasterTarget.h"
 #include "core/utils/GammaCorrection.h"
 
 namespace tgfx {
@@ -99,7 +99,8 @@ bool FTPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) con
   // Anti-aliasing is always enabled because FreeType generates only 1-bit masks when it's off,
   // and we haven't implemented conversion from 1-bit to 8-bit masks yet.
   auto pitch = static_cast<int>(dstInfo.rowBytes());
-  RasterTarget target = {buffer + (rows - 1) * pitch, pitch, GammaTable().data()};
+  FTRasterTarget target = {buffer + (rows - 1) * pitch, pitch,
+                           GammaCorrection::GammaTable().data()};
   FT_Raster_Params params;
   params.flags = FT_RASTER_FLAG_DIRECT | FT_RASTER_FLAG_CLIP | FT_RASTER_FLAG_AA;
   params.gray_spans = GraySpanFunc;

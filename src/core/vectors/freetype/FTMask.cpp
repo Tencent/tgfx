@@ -19,6 +19,7 @@
 #include "FTMask.h"
 #include "FTLibrary.h"
 #include "FTPath.h"
+#include "FTRasterTarget.h"
 #include "core/utils/USE.h"
 #include "tgfx/core/Pixmap.h"
 
@@ -102,7 +103,7 @@ void FTMask::onFillPath(const Path& path, const Matrix& matrix, bool antiAlias,
   auto buffer = static_cast<unsigned char*>(pixels);
   int rows = info.height();
   int pitch = static_cast<int>(info.rowBytes());
-  RasterTarget target = {};
+  FTRasterTarget target = {};
   target.origin = buffer + (rows - 1) * pitch;
   target.pitch = pitch;
   target.gammaTable = PixelRefMask::GammaTable().data();

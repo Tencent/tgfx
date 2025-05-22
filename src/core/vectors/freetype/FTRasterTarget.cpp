@@ -15,30 +15,40 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#include "GammaCorrection.h"
-#include <cmath>
+
+#include "FTRasterTarget.h"
 
 namespace tgfx {
-static float LinearToSRGB(float linear) {
-  // The magic numbers are derived from the sRGB specification.
-  // See http://www.color.org/chardata/rgb/srgb.xalter.
-  if (linear <= 0.0031308f) {
-    return linear * 12.92f;
-  }
-  return 1.055f * std::pow(linear, 1.f / 2.4f) - 0.055f;
-}
-
-const std::array<uint8_t, 256>& GammaCorrection::GammaTable() {
-  static const std::array<uint8_t, 256> table = [] {
-    std::array<uint8_t, 256> table{};
-    table[0] = 0;
-    table[255] = 255;
-    for (size_t i = 1; i < 255; ++i) {
-      auto v = std::roundf(LinearToSRGB(static_cast<float>(i) / 255.f) * 255.f);
-      table[i] = static_cast<uint8_t>(v);
+void GraySpanFunc(int y, int count, const FT_Span* spans, void* user) {
+  auto* target = reinterpret_cast<FTRasterTarget*>(user);
+  for (int i = 0; i < count; i++) {
+    auto* q = target->origin - target->pitch * y + spans[i].x;
+    auto c = target->gammaTable[spans[i].coverage];
+    auto aCount = spans[i].len;
+    /**
+     * For small-spans it is faster to do it by ourselves than calling memset.
+     * This is mainly due to the cost of the function call.
+     */
+    switch (aCount) {
+      case 7:
+        *q++ = c;
+      case 6:
+        *q++ = c;
+      case 5:
+        *q++ = c;
+      case 4:
+        *q++ = c;
+      case 3:
+        *q++ = c;
+      case 2:
+        *q++ = c;
+      case 1:
+        *q = c;
+      case 0:
+        break;
+      default:
+        memset(q, c, aCount);
     }
-    return table;
-  }();
-  return table;
+  }
 }
 }  // namespace tgfx
