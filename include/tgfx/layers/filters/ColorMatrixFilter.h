@@ -62,7 +62,7 @@ class ColorMatrixFilter : public LayerFilter {
 
  protected:
   Type type() const override {
-    return Type::ColorMatrixFliter;
+    return Type::ColorMatrixFilter;
   }
 
   std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) override;

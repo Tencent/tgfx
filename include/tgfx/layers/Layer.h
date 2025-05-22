@@ -31,6 +31,7 @@ namespace tgfx {
 
 class DisplayList;
 class DrawArgs;
+class RegionTransformer;
 struct LayerStyleSource;
 
 /**
@@ -233,7 +234,7 @@ class Layer {
   /**
    * Sets the list of layer styles applied to the layer.
    */
-  void setLayerStyles(const std::vector<std::shared_ptr<LayerStyle>>& value);
+  void setLayerStyles(std::vector<std::shared_ptr<LayerStyle>> value);
 
   /**
    * Whether to exclude child effects in the layer style. If true, child layer
@@ -592,8 +593,11 @@ class Layer {
 
   bool hasValidMask() const;
 
-  void updateRenderBounds(const Matrix& renderMatrix, const Rect* clipRect = nullptr,
+  void updateRenderBounds(const Matrix& renderMatrix = {},
+                          std::shared_ptr<RegionTransformer> transformer = nullptr,
                           bool forceDirty = false);
+
+  void cleanDirtyFlags();
 
   struct {
     bool dirtyContent : 1;      // layer's content needs updating

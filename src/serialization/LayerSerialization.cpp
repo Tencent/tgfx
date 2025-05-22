@@ -137,7 +137,7 @@ void LayerSerialization::SerializeBasicLayerImpl(flexbuffers::Builder& fbb, cons
   SerializeUtils::FillMap(scrollRect, scrollRectID, map);
 
   auto rootID = SerializeUtils::GetObjID();
-  std::shared_ptr<Layer> root = layer->_root ? layer->_root->weakThis.lock() : nullptr;
+  std::shared_ptr<Layer> root = layer->root() ? layer->root()->weakThis.lock() : nullptr;
   SerializeUtils::SetFlexBufferMap(fbb, "root", reinterpret_cast<uint64_t>(root.get()), true,
                                    root != nullptr, rootID);
   SerializeUtils::FillMap(root, rootID, map);
