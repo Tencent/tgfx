@@ -18,33 +18,36 @@
 
 #pragma once
 
-#include "gpu/ResourceKey.h"
 #include "tgfx/core/GlyphFace.h"
+#include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
 /**
- * Shape that contains a GlyphFace and GlyphID.
+ * A Rasterizer that rasterizes a give shape.
  */
-class GlyphShape final : public Shape {
+class PathRasterizer : public ImageCodec {
  public:
-  explicit GlyphShape(std::shared_ptr<GlyphFace> glyphFace, GlyphID glyphID);
+  /**
+   * Creates a new PathRasterizer instance with the specified shape,anti-aliasing setting,
+   * and gamma correction flag. Anti-aliasing and gamma correction are recommended for glyph path rendering,
+   * while gamma correction is generally unnecessary for regular path rendering.
+   */
+  static std::shared_ptr<PathRasterizer> Make(std::shared_ptr<Shape> shape, bool antiAlias,
+                                              bool needsGammaCorrection = false);
 
-  Rect getBounds() const override;
+  bool isAlphaOnly() const override {
+    return true;
+  }
 
-  Path getPath() const override;
+  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override = 0;
 
  protected:
-  Type type() const override {
-    return Type::Glyph;
-  }
-  UniqueKey getUniqueKey() const override {
-    return uniqueKey.get();
-  }
+  explicit PathRasterizer(int width, int height, std::shared_ptr<Shape> shape, bool antiAlias,
+                          bool needsGammaCorrection);
 
- private:
-  LazyUniqueKey uniqueKey = {};
-  std::shared_ptr<GlyphFace> glyphFace = nullptr;
-  GlyphID glyphID = 0;
+  std::shared_ptr<Shape> shape = nullptr;
+  bool antiAlias = false;
+  bool needsGammaCorrection = false;
 };
 }  // namespace tgfx

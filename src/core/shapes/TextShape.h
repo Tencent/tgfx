@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,17 +16,37 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GlyphRasterizer.h"
+#pragma once
+
+#include "core/GlyphRunList.h"
+#include "gpu/ResourceKey.h"
+#include "tgfx/core/Shape.h"
 
 namespace tgfx {
-GlyphRasterizer::GlyphRasterizer(int width, int height,
-                                 std::shared_ptr<ScalerContext> scalerContext, GlyphID glyphID,
-                                 bool fauxBold, std::unique_ptr<Stroke> stroke)
-    : ImageCodec(width, height, Orientation::LeftTop), scalerContext(std::move(scalerContext)),
-      glyphID(glyphID), fauxBold(fauxBold), stroke(std::move(stroke)) {
-}
+/**
+ * Shape that contains a GlyphRunList.
+ */
+class TextShape : public Shape {
+ public:
+  explicit TextShape(std::shared_ptr<GlyphRunList> glyphRunList)
+      : glyphRunList(std::move(glyphRunList)) {
+  }
 
-bool GlyphRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
-  return scalerContext->readPixels(glyphID, fauxBold, stroke.get(), dstInfo, dstPixels);
-}
+  Rect getBounds() const override;
+
+  Path getPath() const override;
+
+ protected:
+  Type type() const override {
+    return Type::Text;
+  }
+
+  UniqueKey getUniqueKey() const override {
+    return uniqueKey.get();
+  }
+
+ private:
+  LazyUniqueKey uniqueKey = {};
+  std::shared_ptr<GlyphRunList> glyphRunList = nullptr;
+};
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,17 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GlyphRasterizer.h"
+#pragma once
+
+#include "core/Rasterizer.h"
 
 namespace tgfx {
-GlyphRasterizer::GlyphRasterizer(int width, int height,
-                                 std::shared_ptr<ScalerContext> scalerContext, GlyphID glyphID,
-                                 bool fauxBold, std::unique_ptr<Stroke> stroke)
-    : ImageCodec(width, height, Orientation::LeftTop), scalerContext(std::move(scalerContext)),
-      glyphID(glyphID), fauxBold(fauxBold), stroke(std::move(stroke)) {
-}
+/**
+ * A Rasterizer that rasterizes a set of glyphs.
+ */
+class TextRasterizer : public Rasterizer {
+ public:
+  TextRasterizer(int width, int height, std::shared_ptr<GlyphRunList> glyphRunList, bool antiAlias,
+                 const Matrix& matrix, const Stroke* stroke);
 
-bool GlyphRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
-  return scalerContext->readPixels(glyphID, fauxBold, stroke.get(), dstInfo, dstPixels);
-}
+  ~TextRasterizer() override;
+
+ protected:
+  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
+
+ private:
+  std::shared_ptr<GlyphRunList> glyphRunList = nullptr;
+  bool antiAlias = true;
+  Matrix matrix = {};
+  Stroke* stroke = nullptr;
+};
 }  // namespace tgfx

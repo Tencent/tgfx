@@ -16,17 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GlyphRasterizer.h"
+#pragma once
+
+#include <array>
+#include <cstdint>
 
 namespace tgfx {
-GlyphRasterizer::GlyphRasterizer(int width, int height,
-                                 std::shared_ptr<ScalerContext> scalerContext, GlyphID glyphID,
-                                 bool fauxBold, std::unique_ptr<Stroke> stroke)
-    : ImageCodec(width, height, Orientation::LeftTop), scalerContext(std::move(scalerContext)),
-      glyphID(glyphID), fauxBold(fauxBold), stroke(std::move(stroke)) {
-}
-
-bool GlyphRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
-  return scalerContext->readPixels(glyphID, fauxBold, stroke.get(), dstInfo, dstPixels);
-}
+class GammaCorrection {
+ public:
+  static const std::array<uint8_t, 256>& GammaTable();
+};
 }  // namespace tgfx

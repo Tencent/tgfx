@@ -16,17 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GlyphRasterizer.h"
+#pragma once
+
+#include <cstdint>
+#include "ft2build.h"
+#include FT_FREETYPE_H
 
 namespace tgfx {
-GlyphRasterizer::GlyphRasterizer(int width, int height,
-                                 std::shared_ptr<ScalerContext> scalerContext, GlyphID glyphID,
-                                 bool fauxBold, std::unique_ptr<Stroke> stroke)
-    : ImageCodec(width, height, Orientation::LeftTop), scalerContext(std::move(scalerContext)),
-      glyphID(glyphID), fauxBold(fauxBold), stroke(std::move(stroke)) {
-}
+struct FTRasterTarget {
+  unsigned char* origin;
+  int pitch;
+  const uint8_t* gammaTable;
+};
 
-bool GlyphRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
-  return scalerContext->readPixels(glyphID, fauxBold, stroke.get(), dstInfo, dstPixels);
-}
+void GraySpanFunc(int y, int count, const FT_Span* spans, void* user);
 }  // namespace tgfx

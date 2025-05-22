@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "WebScalerContext.h"
+#include "ReadPixelsFromCanvasImage.h"
 #include "WebTypeface.h"
 #include "core/utils/Log.h"
 #include "platform/web/WebImageBuffer.h"
-#include "tgfx/core/Buffer.h"
 
 using namespace emscripten;
 
@@ -67,10 +67,15 @@ bool WebScalerContext::generatePath(GlyphID, bool, bool, Path*) const {
   return false;
 }
 
-Rect WebScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
-  auto bounds = scalerContext.call<Rect>("getBounds", getText(glyphID), false, false);
+Rect WebScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
+                                         Matrix* matrix) const {
+  auto bounds =
+      scalerContext.call<Rect>("getBounds", getText(glyphID), !hasColor() && fauxBold, false);
   if (bounds.isEmpty()) {
     return {};
+  }
+  if (!hasColor() && stroke != nullptr) {
+    stroke->applyToBounds(&bounds);
   }
   if (matrix) {
     matrix->setTranslate(bounds.left, bounds.top);
@@ -78,30 +83,28 @@ Rect WebScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const 
   return bounds;
 }
 
-bool WebScalerContext::readPixels(GlyphID glyphID, const ImageInfo& dstInfo,
-                                  void* dstPixels) const {
+bool WebScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
+                                  const ImageInfo& dstInfo, void* dstPixels) const {
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }
-  auto bounds = scalerContext.call<Rect>("getBounds", getText(glyphID), false, false);
+  auto properFauxBold = !hasColor() && fauxBold;
+  auto bounds = scalerContext.call<Rect>("getBounds", getText(glyphID), properFauxBold, false);
   if (bounds.isEmpty()) {
     return false;
   }
-  auto imageData = scalerContext.call<val>("readPixels", getText(glyphID), bounds);
+  emscripten::val imageData = emscripten::val::null();
+  if (!hasColor() && stroke != nullptr) {
+    stroke->applyToBounds(&bounds);
+    imageData =
+        scalerContext.call<val>("readPixels", getText(glyphID), bounds, properFauxBold, *stroke);
+  } else {
+    imageData = scalerContext.call<val>("readPixels", getText(glyphID), bounds, properFauxBold);
+  }
   if (!imageData.as<bool>()) {
     return false;
   }
-
-  auto length = imageData["length"].as<size_t>();
-  if (length == 0) {
-    return false;
-  }
-
-  auto memory = val::module_property("HEAPU8")["buffer"];
-  auto memoryView =
-      val::global("Uint8Array").new_(memory, reinterpret_cast<uintptr_t>(dstPixels), length);
-  memoryView.call<void>("set", imageData);
-  return true;
+  return ReadPixelsFromCanvasImage(imageData, dstInfo, dstPixels);
 }
 
 std::string WebScalerContext::getText(GlyphID glyphID) const {

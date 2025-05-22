@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,17 +16,33 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GlyphRasterizer.h"
+#include "TextShape.h"
+#include "core/GlyphRunList.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
-GlyphRasterizer::GlyphRasterizer(int width, int height,
-                                 std::shared_ptr<ScalerContext> scalerContext, GlyphID glyphID,
-                                 bool fauxBold, std::unique_ptr<Stroke> stroke)
-    : ImageCodec(width, height, Orientation::LeftTop), scalerContext(std::move(scalerContext)),
-      glyphID(glyphID), fauxBold(fauxBold), stroke(std::move(stroke)) {
+std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<TextBlob> textBlob) {
+  auto glyphRunLists = GlyphRunList::Unwrap(textBlob.get());
+  if (glyphRunLists == nullptr || glyphRunLists->size() != 1) {
+    return nullptr;
+  }
+  auto glyphRunList = (*glyphRunLists)[0];
+  if (!glyphRunList->hasOutlines()) {
+    return nullptr;
+  }
+  return std::make_shared<TextShape>(std::move(glyphRunList));
 }
 
-bool GlyphRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
-  return scalerContext->readPixels(glyphID, fauxBold, stroke.get(), dstInfo, dstPixels);
+Rect TextShape::getBounds() const {
+  return glyphRunList->getBounds();
+}
+
+Path TextShape::getPath() const {
+  Path path = {};
+  if (!glyphRunList->getPath(&path)) {
+    LOGE("TextShape::getPath() Failed to get path from GlyphRunList!");
+    return {};
+  }
+  return path;
 }
 }  // namespace tgfx

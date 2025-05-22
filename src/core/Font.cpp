@@ -18,31 +18,10 @@
 
 #include "tgfx/core/Font.h"
 #include "ScalerContext.h"
+#include "core/GlyphRasterizer.h"
 #include "core/PixelBuffer.h"
 
 namespace tgfx {
-
-class FontGlyphImageCodec : public ImageCodec {
- public:
-  FontGlyphImageCodec(int width, int height, std::shared_ptr<ScalerContext> scalerContext,
-                      GlyphID glyphID)
-      : ImageCodec(width, height, Orientation::LeftTop), scalerContext(std::move(scalerContext)),
-        glyphID(glyphID) {
-  }
-
-  bool isAlphaOnly() const override {
-    return !scalerContext->hasColor();
-  }
-
-  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override {
-    return scalerContext->readPixels(glyphID, dstInfo, dstPixels);
-  }
-
- private:
-  std::shared_ptr<ScalerContext> scalerContext = nullptr;
-  GlyphID glyphID = 0;
-};
-
 Font::Font() : scalerContext(ScalerContext::MakeEmpty(0.0f)) {
 }
 
@@ -131,11 +110,21 @@ bool Font::getPath(GlyphID glyphID, Path* path) const {
   return scalerContext->generatePath(glyphID, fauxBold, fauxItalic, path);
 }
 
-std::shared_ptr<ImageCodec> Font::getImage(GlyphID glyphID, Matrix* matrix) const {
+std::shared_ptr<ImageCodec> Font::getImage(GlyphID glyphID, const Stroke* stroke,
+                                           Matrix* matrix) const {
   if (glyphID == 0) {
     return nullptr;
   }
-  auto bounds = scalerContext->getImageTransform(glyphID, matrix);
+
+  std::unique_ptr<Stroke> adjustMitterStroke = nullptr;
+  if (stroke != nullptr) {
+    adjustMitterStroke = std::make_unique<Stroke>(*stroke);
+    // Glyph stroke rarely creates sharp angles, so setting miterLimit = 1.0f
+    // helps produce tighter bounding box.
+    adjustMitterStroke->miterLimit = 1.0f;
+  }
+  auto bounds =
+      scalerContext->getImageTransform(glyphID, fauxBold, adjustMitterStroke.get(), matrix);
   if (bounds.isEmpty()) {
     return nullptr;
   }
@@ -144,7 +133,8 @@ std::shared_ptr<ImageCodec> Font::getImage(GlyphID glyphID, Matrix* matrix) cons
   }
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
-  return std::make_shared<FontGlyphImageCodec>(width, height, scalerContext, glyphID);
+  return std::make_shared<GlyphRasterizer>(width, height, scalerContext, glyphID, fauxBold,
+                                           std::move(adjustMitterStroke));
 }
 
 bool Font::operator==(const Font& font) const {
