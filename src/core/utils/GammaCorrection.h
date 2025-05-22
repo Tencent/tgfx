@@ -25,10 +25,5 @@ namespace tgfx {
 class GammaCorrection {
  public:
   static const std::array<uint8_t, 256>& GammaTable();
-
-  GammaCorrection() = delete;
-  ~GammaCorrection() = delete;
-  GammaCorrection(const GammaCorrection&) = delete;
-  GammaCorrection& operator=(const GammaCorrection&) = delete;
 };
 }  // namespace tgfx

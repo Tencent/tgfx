@@ -34,7 +34,7 @@ class PathRasterizer : public ImageCodec {
    * while gamma correction is generally unnecessary for regular path rendering.
    */
   static std::shared_ptr<PathRasterizer> Make(std::shared_ptr<Shape> shape, bool antiAlias,
-                                              bool needsGammaCorrection);
+                                              bool needsGammaCorrection = false);
 
   bool isAlphaOnly() const override {
     return true;
@@ -48,6 +48,6 @@ class PathRasterizer : public ImageCodec {
 
   std::shared_ptr<Shape> shape = nullptr;
   bool antiAlias = false;
-  bool needsGammaCorrection = true;
+  bool needsGammaCorrection = false;
 };
 }  // namespace tgfx
