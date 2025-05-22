@@ -83,7 +83,7 @@ Item {
                 delegate: Rectangle {
                     width: ListView.view.width
                     height: 32
-                    color: "#535353"  // 统一背景色
+                    color: "#535353"
 
                     Row {
                         anchors.fill: parent
@@ -219,7 +219,6 @@ Item {
                         }
                     }
 
-                    // 鼠标悬停效果
                     MouseArea {
                         anchors.fill: parent
                         hoverEnabled: true

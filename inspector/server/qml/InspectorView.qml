@@ -77,9 +77,7 @@ ApplicationWindow {
                 text: qsTr("Close")
                 shortcut: StandardKey.Close
                 onTriggered: {
-                    // 先隐藏窗口再清理，避免残留
                     inspectorView.hide()
-                    // 调用C++方法打开StartView
                     inspectorViewModel.openStartView()
                 }
             }

@@ -7,49 +7,67 @@ import com.kdab.dockwidgets 2.0 as KDDW
 
 ApplicationWindow {
     id: startView
-    width: 1000
+    width: 800
     height: 600
+    minimumWidth: 400
+    minimumHeight: 300
+    maximumWidth: 1600
+    maximumHeight: 1200
     visible: true
     title: "Inspector-welcome"
-    color: "#333333"
-    property int selectedIndex: -1
+    color: "#383838"
+    property int selectedIndex: 0
+    property int selectedFilePathIndex: -1
+    property int selectedClientIndex: -1
 
 
-    ///*function*///
     Column {
-        anchors.top: parent.top
-        anchors.left: parent.left
-        anchors.right: parent.right
+        anchors.fill: parent
         spacing: 0
+        clip: true
 
-        Rectangle {
+        Item {
             width: parent.width
-            height: 30
-            color: "#535353"
-            border.color: "black"
-            border.width: 1
+            height: 2
+        }
 
-            Text {
-                anchors.left: parent.left
-                anchors.leftMargin: 10
-                anchors.verticalCenter: parent.verticalCenter
-                text: "Open File"
-                color: "white"
-                font.pixelSize: 14
+        ///* open file area header*///
+        Column {
+            spacing: 2
+            width: parent.width
+
+            Rectangle {
+                width: parent.width
+                height: 30
+                color: "#535353"
+
+                Text {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 10
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "Open File"
+                    color: "white"
+                    font.pixelSize: 14
+                }
             }
         }
 
-        ///* recent file and drag file open*///
+        Item {
+            width: parent.width
+            height: 2
+        }
+
+
+        ///* open file and drag open file area *///
         Row {
             width: parent.width
-            height: 200
-            spacing: 1
+            height: (parent.height - 110) * 0.45
+            spacing: 2
 
-            //todo: use a listView or another view to show the recent file, need to consider the C++
             Rectangle {
                 width: parent.width / 2
                 height: parent.height
-                color: "#2d2d2d"
+                color: "#434343"
 
                 Text {
                     id: recentFilesTitle
@@ -76,7 +94,17 @@ ApplicationWindow {
                     delegate: Rectangle {
                         width: recentFilesList.width
                         height: 40
-                        color: mouseArea.containsMouse ? "#6b6b6b" : "transparent"
+                        color: {
+                            if(mouseArea.containsMouse) {
+                                return "#6b6b6b"
+                            }
+                            else if(index === selectedFilePathIndex) {
+                                return "#6b6b6b"
+                            }
+                            else {
+                                return "transparent"
+                            }
+                        }
                         radius: 3
 
                         Column {
@@ -96,7 +124,7 @@ ApplicationWindow {
 
                             Text {
                                 text: modelData.filesPath
-                                color: "#aaaaaa"
+                                color: "#dddddd"
                                 font.pixelSize: 10
                                 width: parent.width
                                 elide: Text.ElideMiddle
@@ -107,40 +135,26 @@ ApplicationWindow {
                             id: mouseArea
                             anchors.fill: parent
                             hoverEnabled: true
+                            onClicked: {
+                                selectedFilePathIndex = index
+                            }
                             onDoubleClicked: {
-                                if (startViewModel) {
+                                if (startViewModel && selectedIndex === 0) {
                                     startViewModel.openFile(modelData.filesPath)
                                 }
+                                else if(selectedIndex === 1) {
+                                    console.error("Error: Cannot open file by double-clicking in LayerTree mode")
+                                }
                             }
-                        }
-                    }
-
-                    ScrollBar.vertical: ScrollBar {
-                        policy: ScrollBar.AsNeeded
-                        background: Rectangle {
-                            color: "#2d2d2d"
-                        }
-                        contentItem: Rectangle {
-                            color: "#535353"
-                            implicitWidth: 6
-                            radius: 3
                         }
                     }
                 }
             }
 
             Rectangle {
-                width: 1
-                height: parent.height
-                color: "black"
-                visible: true
-            }
-
-            //todo: define a drop area to openfile, need to consider the C++
-            Rectangle {
                 width: parent.width / 2
                 height: parent.height
-                color: "#2d2d2d"
+                color: "#434343"
 
                 Text {
                     id: dragAreaTitle
@@ -161,9 +175,7 @@ ApplicationWindow {
                     anchors.right: parent.right
                     anchors.bottom: parent.bottom
                     anchors.margins: 20
-                    color: dropArea.containsMouse ? "#3d3d3d" : "#2d2d2d"
-                    border.color: dropArea.containsDrag ? "#666666" : "#444444"
-                    border.width: 2
+                    color: dropArea.containsMouse ? "#2d2d2d" : "#434343"
                     radius: 5
 
                     Image {
@@ -186,67 +198,75 @@ ApplicationWindow {
                         id: dropArea
                         anchors.fill: parent
 
-                            onDropped: function(drop) {
-                                if (drop.hasUrls) {
-                                    var fileUrl = drop.urls[0];
-                                    var filePath;
-                                    if (Qt.platform.os === "windows") {
-                                        filePath = fileUrl.toString().replace(/^(file:\/{3})|^file:\//, "");
-                                    } else {
-                                        filePath = fileUrl.toString().replace(/^(file:\/{2})|^file:\//, "");
-                                    }
-                                    filePath = decodeURIComponent(filePath);
-                                    if (startViewModel) {
-                                        startViewModel.openFile(filePath);
-                                    }
+                        onDropped: function(drop) {
+                            if (drop.hasUrls) {
+                                var fileUrl = drop.urls[0];
+                                var filePath;
+                                if (Qt.platform.os === "windows") {
+                                    filePath = fileUrl.toString().replace(/^(file:\/{3})|^file:\//, "");
+                                } else {
+                                    filePath = fileUrl.toString().replace(/^(file:\/{2})|^file:\//, "");
+                                }
+                                filePath = decodeURIComponent(filePath);
+                                if (startViewModel) {
+                                    startViewModel.openFile(filePath);
                                 }
                             }
+                        }
 
                         onEntered: {
                             dropContainer.color = "#3d3d3d"
                         }
 
                         onExited: {
-                            dropContainer.color = "#2d2d2d"
+                            dropContainer.color = "#434343"
                         }
                     }
                 }
             }
         }
 
-        ///*seperator*///
-        Rectangle {
+        Item {
             width: parent.width
-            height: 1
-            color: "#383838"
+            height: 2
         }
 
-        Rectangle {
+        ///* open client and select launcher header*///
+        Column {
+            spacing: 2
             width: parent.width
-            height: 30
-            color: "#535353"
-            border.color: "black"
-            border.width: 1
 
-            Text {
-                anchors.left: parent.left
-                anchors.leftMargin: 10
-                anchors.verticalCenter: parent.verticalCenter
-                text: "Start Connection"
-                color: "white"
-                font.pixelSize: 14
+            Rectangle {
+                width: parent.width
+                height: 30
+                color: "#535353"
+
+                Text {
+                    anchors.left: parent.left
+                    anchors.leftMargin: 10
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: "Start Connection"
+                    color: "white"
+                    font.pixelSize: 14
+                }
             }
         }
 
+        Item {
+            width: parent.width
+            height: 2
+        }
+
+        ///* open client and select launcher area *///
         Row {
             width: parent.width
-            height: 200
-            spacing: 1
+            height: (parent.height - 110) * 0.55
+            spacing: 2
 
             Rectangle {
                 width: parent.width / 2
                 height: parent.height
-                color: "#2d2d2d"
+                color: "#434343"
 
                 Text {
                     id: clientsTitle
@@ -273,7 +293,17 @@ ApplicationWindow {
                     delegate: Rectangle {
                         width: clientsList.width
                         height: 40
-                        color: mouseArea.containsMouse ? "#6b6b6b" : "transparent"
+                        color: {
+                            if(mouseArea.containsMouse) {
+                                return "#6b6b6b"
+                            }
+                            else if(index === selectedClientIndex) {
+                                return "#6b6b6b"
+                            }
+                            else {
+                                return "transparent"
+                            }
+                        }
                         radius: 3
 
                         Column {
@@ -292,7 +322,7 @@ ApplicationWindow {
                             }
 
                             Text {
-                                text: modelData.caddress + ":" + modelData.port
+                                text: modelData.caddress + ":" + modelData.ports
                                 color: "#aaaaaa"
                                 font.pixelSize: 10
                                 width: parent.width
@@ -304,47 +334,34 @@ ApplicationWindow {
                             id: mouseArea
                             anchors.fill: parent
                             hoverEnabled: true
+                            onClicked: {
+                                selectedClientIndex = index
+                            }
+
                             onDoubleClicked: {
-                                if (startViewModel && modelData) {
-                                    startViewModel.connectToClient(modelData)
+                                if (startViewModel && selectedIndex === 0) {
+                                    startViewModel.connectToClient(modelData.clientId)
+                                }
+                                else if(selectedIndex === 1) {
+                                    //todo: open the layer tree
                                 }
                             }
-                        }
-                    }
-
-                    ScrollBar.vertical: ScrollBar {
-                        policy: ScrollBar.AsNeeded
-                        background: Rectangle {
-                            color: "#2d2d2d"
-                        }
-                        contentItem: Rectangle {
-                            color: "#535353"
-                            implicitWidth: 6
-                            radius: 3
                         }
                     }
                 }
 
                 Text {
                     anchors.centerIn: parent
-                    text: clientsList.count === 0 ? "Waiting for project start" : ""
+                    text: clientsList.count === 0 ? "Waitting for project start..." : ""
                     color: "#44ffffff"
                     font.pixelSize: 14
                 }
             }
 
-            //seperator
-            Rectangle {
-                width: 1
-                height: parent.height
-                color: "black"
-                visible: true
-            }
-
             Rectangle {
                 width: parent.width / 2
                 height: parent.height
-                color: "#2d2d2d"
+                color: "#434343"
 
 
                 Row {
@@ -379,7 +396,6 @@ ApplicationWindow {
                         }
 
                         MouseArea {
-                            //id: frameCaptureArea
                             anchors.fill: parent
                             onClicked: selectedIndex = 0
                         }
@@ -409,7 +425,6 @@ ApplicationWindow {
                         }
 
                         MouseArea {
-                            //id: layerTreeArea
                             anchors.fill: parent
                             onClicked: selectedIndex = 1
                         }
@@ -417,71 +432,111 @@ ApplicationWindow {
                 }
             }
         }
-    }
 
-    ///* cancel and launch button*///
-    Row {
-        anchors.right: parent.right
-        anchors.bottom: parent.bottom
-        anchors.margins: 20
-        spacing: 10
+        Item {
+            width: parent.width
+            height: 2
+        }
 
+        ///* cancel and launch button *///
         Rectangle {
-            id: cancelBtn
-            width: 100
-            height: 30
-            radius: 3
-            color: cancelArea.containsMouse ? "#535353" : "#444444"
+            width: parent.width
+            height: 40
+            color: "#535353"
 
-            Text {
-                anchors.centerIn: parent
-                text: "Cancel"
-                color: "white"
-                font.pixelSize: 14
-            }
+            Row {
+                anchors.right: parent.right
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.rightMargin: 20
+                spacing: 10
 
-            MouseArea {
-                id: cancelArea
-                anchors.fill: parent
-                hoverEnabled: true
-                onClicked: {
-                    Qt.quit();
+
+                Rectangle {
+                    id: cancelBtn
+                    width: 100
+                    height: 30
+                    radius: 3
+                    color: cancelArea.containsMouse ? "#444444" : "#535353"
+                    border.color: "#383838"
+                    border.width: 1
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "Cancel"
+                        color: "white"
+                        font.pixelSize: 14
+                    }
+
+                    MouseArea {
+                        id: cancelArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        onClicked: Qt.quit()
+                    }
+                }
+
+
+                Rectangle {
+                    id: launchBtn
+                    width: 100
+                    height: 30
+                    radius: 3
+                    property bool canLaunch:
+                        (selectedFilePathIndex !== -1 && selectedIndex === 0) ||
+                        (selectedClientIndex !== -1 && selectedIndex === 1)
+                    color: {
+                        if(!canLaunch){
+                            return "#666666"
+                        }
+                        else if(launchArea.containsMouse){
+                            return "#444444"
+                        }
+                        else{
+                            return "#535353"
+                        }
+                    }
+                    border.color: canLaunch ? "#383838" : "#666666"
+                    border.width: 1
+                    opacity: canLaunch ? 1.0 : 0.6
+
+                    Text {
+                        anchors.centerIn: parent
+                        text: "Launch"
+                        color: "white"
+                        font.pixelSize: 14
+                    }
+
+                    MouseArea {
+                        id: launchArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        enabled: launchBtn.canLaunch
+                        onClicked: {
+                            if(launchBtn.canLaunch){
+                                if(selectedIndex === 0 && selectedFilePathIndex !== -1){
+                                    var selectedFilePath = startViewModel.fileItems[selectedFilePathIndex].filesPath
+                                    startViewModel.openFile(selectedFilePath)
+                                }
+                                else if(selectedIndex === 0 && selectedClientIndex !== -1){
+                                    var selectedClientId = startViewModel.clientItems[selectedClientIndex].clientId
+                                    startViewModel.connectToClient(selectedClientId)
+                                }
+                                else if(selectedIndex === 1 && selectedClientIndex !== -1){
+                                    var selectedClientId = startViewModel.clientItems[selectedClientIndex].clientId
+                                    startViewModel.connectToClient(selectedClientId)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
 
-        Rectangle {
-            id: launchBtn
-            width: 100
-            height: 30
-            radius: 3
-            color: launchArea.containsMouse ? "#535353" : "#444444"
-
-
-            Text {
-                anchors.centerIn: parent
-                text: "Launch"
-                color: "white"
-                font.pixelSize: 14
+        Connections {
+            target: startViewModel
+            function onCloseWindow() {
+                startView.close()
             }
-
-
-            MouseArea {
-                id: launchArea
-                anchors.fill: parent
-                hoverEnabled: true
-                onClicked: {
-                    //todo: launch the main view
-                }
-            }
-        }
-    }
-
-
-    Connections {
-        target: startViewModel
-        function onCloseWindow() {
-            startView.close();
         }
     }
 }

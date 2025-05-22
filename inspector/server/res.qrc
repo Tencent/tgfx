@@ -6,5 +6,8 @@
         <file>qml/TabBar.qml</file>
         <file>qml/TitleBar.qml</file>
         <file>qml/AttributeView.qml</file>
+        <file>icons/InspectorIcon.png</file>
+        <file>icons/LayerTreeIcon.png</file>
+        <file>icons/openfile.png</file>
     </qresource>
 </RCC>
