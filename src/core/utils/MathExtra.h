@@ -19,7 +19,7 @@
 #pragma once
 
 #include <cmath>
-#include <memory>
+#include <cstring>
 
 namespace tgfx {
 static constexpr float M_PI_F = static_cast<float>(M_PI);
