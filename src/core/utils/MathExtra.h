@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cmath>
+#include <cstring>
 
 namespace tgfx {
 static constexpr float M_PI_F = static_cast<float>(M_PI);
@@ -58,6 +59,34 @@ inline bool FloatsAreFinite(const float array[], int count) {
     prod *= array[i];
   }
   return prod == 0;
+}
+
+/** Convert a sign-bit int (i.e. float interpreted as int) into a 2s compliement
+    int. This also converts -0 (0x80000000) to 0. Doing this to a float allows
+    it to be compared using normal C operators (<, <=, etc.)
+*/
+inline int32_t SignBitTo2sCompliment(int32_t x) {
+  if (x < 0) {
+    x &= 0x7FFFFFFF;
+    x = -x;
+  }
+  return x;
+}
+
+// from http://randomascii.wordpress.com/2012/02/25/comparing-floating-point-numbers-2012-edition/
+/*
+ * This function is used to compare two floating point numbers for equality
+ * within a certain number of ULPs (units in the last place). It is useful
+ * for comparing floating point numbers that may have small rounding errors.
+ */
+inline bool AreWithinUlps(float a, float b, int epsilon) {
+  int32_t ia, ib;
+  memcpy(&ia, &a, sizeof(float));
+  memcpy(&ib, &b, sizeof(float));
+  ia = SignBitTo2sCompliment(ia);
+  ib = SignBitTo2sCompliment(ib);
+  // Find the difference in ULPs.
+  return ia < ib + epsilon && ib < ia + epsilon;
 }
 
 /**
