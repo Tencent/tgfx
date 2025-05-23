@@ -43,12 +43,32 @@ static void DecomposeRect(Rect* rectA, Rect* rectB) {
 
   // Step 1: Build the 3 rect slabs on the y-axis
   Rect rects[3];
-  rects[0] = {rectA->left, std::min(rectA->top, rectB->top), rectA->right,
-              std::max(rectA->top, rectB->top)};
-  rects[2] = {rectA->left, std::min(rectA->bottom, rectB->bottom), rectA->right,
-              std::max(rectA->bottom, rectB->bottom)};
-  rects[1] = {std::min(rectA->left, rectB->left), rects[0].bottom,
-              std::max(rectA->right, rectB->right), rects[2].top};
+  if (rectA->top < rectB->top) {
+    rects[0].top = rectA->top;
+    rects[0].bottom = rectB->top;
+    rects[0].left = rectA->left;
+    rects[0].right = rectA->right;
+  } else {
+    rects[0].top = rectB->top;
+    rects[0].bottom = rectA->top;
+    rects[0].left = rectB->left;
+    rects[0].right = rectB->right;
+  }
+  if (rectA->bottom < rectB->bottom) {
+    rects[2].top = rectA->bottom;
+    rects[2].bottom = rectB->bottom;
+    rects[2].left = rectB->left;
+    rects[2].right = rectB->right;
+  } else {
+    rects[2].top = rectB->bottom;
+    rects[2].bottom = rectA->bottom;
+    rects[2].left = rectA->left;
+    rects[2].right = rectA->right;
+  }
+  rects[1].top = rects[0].bottom;
+  rects[1].bottom = rects[2].top;
+  rects[1].left = std::min(rectA->left, rectB->left);
+  rects[1].right = std::max(rectA->right, rectB->right);
 
   // Step 2: Compute areas
   float areas[3];
