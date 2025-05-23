@@ -16,17 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GlyphRasterizer.h"
+#pragma once
+
+#include <emscripten/val.h>
+#include "tgfx/core/ImageInfo.h"
 
 namespace tgfx {
-GlyphRasterizer::GlyphRasterizer(int width, int height,
-                                 std::shared_ptr<ScalerContext> scalerContext, GlyphID glyphID,
-                                 bool fauxBold, std::unique_ptr<Stroke> stroke)
-    : ImageCodec(width, height, Orientation::LeftTop), scalerContext(std::move(scalerContext)),
-      glyphID(glyphID), fauxBold(fauxBold), stroke(std::move(stroke)) {
-}
-
-bool GlyphRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
-  return scalerContext->readPixels(glyphID, fauxBold, stroke.get(), dstInfo, dstPixels);
-}
+/**
+ * Reads pixel data from an image and writes it to the destination buffer.The canvasImageData
+ * is in the RGBA_8888 format obtained from CanvasRenderingContext2D.getImageData()
+ */
+bool ReadPixelsFromCanvasImage(emscripten::val canvasImageData, const ImageInfo& dstInfo,
+                               void* dstPixels);
 }  // namespace tgfx

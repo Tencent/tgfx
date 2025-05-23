@@ -30,7 +30,8 @@ class FontGlyphFace final : public GlyphFace {
 
   bool getPath(GlyphID glyphID, Path* path) const override;
 
-  std::shared_ptr<ImageCodec> getImage(GlyphID glyphID, Matrix* matrix) const override;
+  std::shared_ptr<ImageCodec> getImage(GlyphID glyphID, const Stroke* stroke,
+                                       Matrix* matrix) const override;
 
   Rect getBounds(GlyphID glyphID) const override;
 

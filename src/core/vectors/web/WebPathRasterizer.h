@@ -16,17 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GlyphRasterizer.h"
+#pragma once
+
+#include "core/PathRasterizer.h"
 
 namespace tgfx {
-GlyphRasterizer::GlyphRasterizer(int width, int height,
-                                 std::shared_ptr<ScalerContext> scalerContext, GlyphID glyphID,
-                                 bool fauxBold, std::unique_ptr<Stroke> stroke)
-    : ImageCodec(width, height, Orientation::LeftTop), scalerContext(std::move(scalerContext)),
-      glyphID(glyphID), fauxBold(fauxBold), stroke(std::move(stroke)) {
-}
+class WebPathRasterizer final : public PathRasterizer {
+ public:
+  explicit WebPathRasterizer(int width, int height, std::shared_ptr<Shape> shape, bool antiAlias,
+                             bool needsGammaCorrection)
+      : PathRasterizer(width, height, std::move(shape), antiAlias, needsGammaCorrection) {
+  }
 
-bool GlyphRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
-  return scalerContext->readPixels(glyphID, fauxBold, stroke.get(), dstInfo, dstPixels);
-}
+  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
+};
 }  // namespace tgfx
