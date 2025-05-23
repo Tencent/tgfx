@@ -34,7 +34,7 @@ void DisplayList::setZoomScale(float zoomScale) {
   if (zoomScale == _zoomScale) {
     return;
   }
-  surfaceContentVersion++;
+  _hasContentChanged = true;
   _zoomScale = zoomScale;
 }
 
@@ -42,22 +42,23 @@ void DisplayList::setContentOffset(float offsetX, float offsetY) {
   if (offsetX == _contentOffset.x && offsetY == _contentOffset.y) {
     return;
   }
-  surfaceContentVersion++;
+  _hasContentChanged = true;
   _contentOffset.x = offsetX;
   _contentOffset.y = offsetY;
 }
 
-bool DisplayList::render(Surface* surface, bool replaceAll) {
+bool DisplayList::hasContentChanged() const {
+  return _hasContentChanged || _root->bitFields.dirtyDescendents;
+}
+
+void DisplayList::render(Surface* surface, bool autoClear) {
   if (!surface) {
-    return false;
+    return;
   }
-  auto dirtyRegions = _root->updateDirtyRegions();
-  if (replaceAll && surface->uniqueID() == surfaceID &&
-      surface->contentVersion() == surfaceContentVersion && dirtyRegions.empty()) {
-    return false;
-  }
+  _hasContentChanged = false;
+  _root->updateDirtyRegions();
   auto canvas = surface->getCanvas();
-  if (replaceAll) {
+  if (autoClear) {
     canvas->clear();
   }
   auto matrix = Matrix::MakeScale(_zoomScale);
@@ -65,16 +66,13 @@ bool DisplayList::render(Surface* surface, bool replaceAll) {
   canvas->setMatrix(matrix);
   auto inverse = Matrix::I();
   if (!matrix.invert(&inverse)) {
-    return true;
+    return;
   }
   auto renderRect = Rect::MakeWH(surface->width(), surface->height());
   renderRect = inverse.mapRect(renderRect);
   DrawArgs args(surface->getContext());
   args.renderRect = &renderRect;
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
-  surfaceContentVersion = surface->contentVersion();
-  surfaceID = surface->uniqueID();
-  return true;
 }
 
 }  // namespace tgfx
