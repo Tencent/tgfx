@@ -460,7 +460,7 @@ std::pair<PlacementPtr<FragmentProcessor>, bool> OpsCompositor::getClipMaskFP(co
   auto uvMatrix = Matrix::MakeTrans(-clipBounds.left, -clipBounds.top);
   if (renderTarget->origin() == ImageOrigin::BottomLeft) {
     auto flipYMatrix = Matrix::MakeScale(1.0f, -1.0f);
-    flipYMatrix.postTranslate(0, -static_cast<float>(renderTarget->height()));
+    flipYMatrix.postTranslate(0, static_cast<float>(renderTarget->height()));
     uvMatrix.preConcat(flipYMatrix);
   }
   auto processor = DeviceSpaceTextureEffect::Make(buffer, std::move(textureProxy), uvMatrix);
