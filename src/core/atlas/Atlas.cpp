@@ -349,7 +349,7 @@ ISize AtlasConfig::plotDimensions(MaskFormat maskFormat) const {
     auto plotHeight = atlasDimensions.height >= 2048 ? 512 : 256;
     return {plogtWidth, plotHeight};
   } else {
-    return {256, 256};
+    return {512, 512};
   }
 }
 

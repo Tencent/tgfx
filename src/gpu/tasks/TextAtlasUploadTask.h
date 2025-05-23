@@ -21,11 +21,12 @@
 #include "ResourceTask.h"
 #include "core/ImageSource.h"
 #include "gpu/proxies/TextureProxy.h"
+#include "core/PixelBuffer.h"
 
 namespace tgfx {
 class TextAtlasUploadTask : public ResourceTask {
  public:
-  TextAtlasUploadTask(UniqueKey uniqueKey, std::shared_ptr<DataSource<ImageBuffer>> source,
+  TextAtlasUploadTask(UniqueKey uniqueKey, std::shared_ptr<DataSource<PixelBuffer>> source,
                       std::shared_ptr<TextureProxy> proxy, Point atlasOffset);
   bool execute(Context* context) override;
 
@@ -36,7 +37,7 @@ class TextAtlasUploadTask : public ResourceTask {
   }
 
  private:
-  std::shared_ptr<DataSource<ImageBuffer>> source = nullptr;
+  std::shared_ptr<DataSource<PixelBuffer>> source = nullptr;
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
   Point atlasOffset = Point::Zero();
 };

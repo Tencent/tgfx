@@ -15,3 +15,48 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include "core/GlyphSource.h"
+
+namespace tgfx {
+
+std::shared_ptr<PixelBuffer> onMakePixelBuffer(const std::shared_ptr<ImageCodec>& imageCodec,
+                                          bool tryHardware) {
+  auto pixelBuffer = PixelBuffer::Make(imageCodec->width(), imageCodec->height(),
+                                       imageCodec->isAlphaOnly(), tryHardware);
+  if (pixelBuffer == nullptr) {
+    return nullptr;
+  }
+  auto pixels = pixelBuffer->lockPixels();
+  auto result = imageCodec->readPixels(pixelBuffer->info(), pixels);
+  pixelBuffer->unlockPixels();
+  return result ? pixelBuffer : nullptr;
+}
+
+std::unique_ptr<DataSource<PixelBuffer>> GlyphSource::MakeFrom(
+    std::shared_ptr<ImageCodec> imageCodec, bool tryHardware, bool asyncDecoding) {
+  if (imageCodec == nullptr) {
+    return nullptr;
+  }
+  if (asyncDecoding && !imageCodec->asyncSupport()) {
+    auto pixelBuffer = onMakePixelBuffer(imageCodec,tryHardware);
+    if (pixelBuffer == nullptr) {
+      return nullptr;
+    }
+    return Wrap(std::move(pixelBuffer));
+  }
+  auto glyphSource = std::make_unique<GlyphSource>(std::move(imageCodec), tryHardware);
+  if (asyncDecoding) {
+    return Async(std::move(glyphSource));
+  }
+  return glyphSource;
+}
+
+GlyphSource::GlyphSource(std::shared_ptr<ImageCodec> imageCodec, bool tryHardware)
+    : imageCodec(std::move(imageCodec)), tryHardware(tryHardware) {
+}
+
+std::shared_ptr<PixelBuffer> GlyphSource::getData() const {
+  return onMakePixelBuffer(imageCodec, tryHardware);
+}
+}  // namespace tgfx

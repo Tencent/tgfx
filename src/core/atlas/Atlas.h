@@ -25,8 +25,8 @@
 #include "core/atlas/Glyph.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/proxies/TextureProxy.h"
-#include "tgfx/core/Size.h"
 #include "tgfx/core/Image.h"
+#include "tgfx/core/Size.h"
 
 namespace tgfx {
 class Atlas {

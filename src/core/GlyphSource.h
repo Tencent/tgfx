@@ -15,3 +15,25 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+
+#pragma once
+
+#include "core/DataSource.h"
+#include "core/PixelBuffer.h"
+#include "tgfx/core/ImageCodec.h"
+
+namespace tgfx {
+class GlyphSource : public DataSource<PixelBuffer> {
+ public:
+  static std::unique_ptr<DataSource> MakeFrom(std::shared_ptr<ImageCodec> imageCodec,
+                                              bool tryHardware = true, bool asyncDecoding = true);
+
+  std::shared_ptr<PixelBuffer> getData() const override;
+
+  GlyphSource(std::shared_ptr<ImageCodec> imageCodec, bool tryHardware = true);
+
+ private:
+  std::shared_ptr<ImageCodec> imageCodec = nullptr;
+  bool tryHardware = true;
+};
+}  // namespace tgfx

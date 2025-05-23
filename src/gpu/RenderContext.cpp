@@ -18,6 +18,8 @@
 
 #include "RenderContext.h"
 #include <tgfx/core/Surface.h>
+
+#include "core/GlyphSource.h"
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
 #include "core/Rasterizer.h"
@@ -155,10 +157,10 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect
 void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
                                      const MCState& state, const Fill& fill, const Stroke* stroke) {
   DEBUG_ASSERT(glyphRunList != nullptr);
-  if (glyphRunList->hasColor()) {
-    drawColorGlyphs(std::move(glyphRunList), state, fill);
-    return;
-  }
+  // if (glyphRunList->hasColor()) {
+  //   drawColorGlyphs(std::move(glyphRunList), state, fill);
+  //   return;
+  // }
   auto maxScale = state.matrix.getMaxScale();
   if (maxScale <= 0.0f || renderTarget == nullptr || renderTarget->getContext() == nullptr) {
     return;
@@ -347,6 +349,9 @@ void RenderContext::glyphDirectMaskDrawing(const GlyphRun& glyphRun, const MCSta
   if (hasScale) {
     scaledGlyphFace = glyphRun.glyphFace->makeScaled(maxScale);
   }
+
+  bool hasColor = scaledGlyphFace->hasColor();
+
   size_t index = 0;
   for (auto& glyphID : glyphRun.glyphs) {
     auto glyphPosition = glyphRun.positions[index++];
@@ -388,9 +393,17 @@ void RenderContext::glyphDirectMaskDrawing(const GlyphRun& glyphRun, const MCSta
 
     DEBUG_ASSERT(atlasImages.size() == textureProxies.size());
 
+    auto viewMatrix = state.matrix;
+    viewMatrix.preScale(1.0f / maxScale, 1.0f / maxScale);
+    auto glyphState = state;
     AtlasLocator locator;
     Matrix rasterizeMatrix = {};
     if (!atlasManager->hasGlyph(maskFormat, glyphKey)) {
+      auto glyphCodec = scaledGlyphFace->getImage(glyphID,&glyphState.matrix);
+      if (hasColor) {
+        width = glyphCodec->width();
+        height = glyphCodec->height();
+      }
       glyph._key = std::move(glyphKey);
       glyph._maskFormat = maskFormat;
       glyph._glyphId = glyphID;
@@ -401,10 +414,13 @@ void RenderContext::glyphDirectMaskDrawing(const GlyphRun& glyphRun, const MCSta
       rasterizeMatrix = Matrix::MakeScale(maxScale);
       rasterizeMatrix.postTranslate(-bounds.x(), -bounds.y());
 
-      auto rasterizer = Rasterizer::MakeFrom(width, height, std::move(runList), fill.antiAlias,
-                                             rasterizeMatrix, stroke);
+
+      auto source = GlyphSource::MakeFrom(glyphCodec);
+
+      //auto rasterizer = Rasterizer::MakeFrom(width, height, std::move(runList), fill.antiAlias,
+                                            // rasterizeMatrix, stroke);
       auto asyncDecoding = !(renderFlags & RenderFlags::DisableAsyncTask);
-      auto source = ImageSource::MakeFrom(std::move(rasterizer), false, asyncDecoding);
+      //auto source = ImageSource::MakeFrom(std::move(rasterizer), false, asyncDecoding);
       auto uniqueKey = UniqueKey::Make();
       auto offset = Point::Make(locator.getLocation().left, locator.getLocation().top);
       auto task = context->drawingBuffer()->make<TextAtlasUploadTask>(
@@ -412,6 +428,9 @@ void RenderContext::glyphDirectMaskDrawing(const GlyphRun& glyphRun, const MCSta
       context->drawingManager()->addResourceTask(std::move(task));
 
     } else {
+      if (hasColor) {
+        scaledGlyphFace->getImage(glyphID,&glyphState.matrix);
+      }
       atlasManager->getGlyphLocator(maskFormat, glyphKey, locator);
     }
 
@@ -425,17 +444,22 @@ void RenderContext::glyphDirectMaskDrawing(const GlyphRun& glyphRun, const MCSta
       continue;
     }
 
-    auto glyphBounds = scaledGlyphFace->getBounds(glyphID);
-
     auto rect = locator.getLocation();
-    auto newState = state;
-    newState.matrix = Matrix::MakeTrans(glyphBounds.x(), glyphBounds.y());
-    newState.matrix.postScale(1.f / maxScale, 1.f / maxScale);
-    newState.matrix.postTranslate(glyphPosition.x, glyphPosition.y);
-    newState.matrix.postConcat(state.matrix);
-    newState.matrix.preTranslate(-rect.x(), -rect.y());
+    if (hasColor) {
+      glyphState.matrix.postTranslate(glyphPosition.x * maxScale, glyphPosition.y * maxScale);
+      glyphState.matrix.postConcat(viewMatrix);
+      glyphState.matrix.preTranslate(-rect.x(), -rect.y());
+    }else {
+      auto glyphBounds = scaledGlyphFace->getBounds(glyphID);
+      glyphState.matrix = Matrix::MakeTrans(glyphBounds.x(), glyphBounds.y());
+      glyphState.matrix.postScale(1.f / maxScale, 1.f / maxScale);
+      glyphState.matrix.postTranslate(glyphPosition.x, glyphPosition.y);
+      glyphState.matrix.postConcat(state.matrix);
+      glyphState.matrix.preTranslate(-rect.x(), -rect.y());
+    }
 
-    drawImageRect(std::move(image), rect, {}, newState, fill.makeWithMatrix(rasterizeMatrix));
+    drawImageRect(std::move(image), rect, {}, glyphState, fill.makeWithMatrix(rasterizeMatrix));
+    //drawImageRect(std::move(image), rect, {}, glyphState, fill.makeWithMatrix(rasterizeMatrix));
   }
 }
 

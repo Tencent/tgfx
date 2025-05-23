@@ -22,7 +22,7 @@
 namespace tgfx {
 
 TextAtlasUploadTask::TextAtlasUploadTask(UniqueKey uniqueKey,
-                                         std::shared_ptr<DataSource<ImageBuffer>> source,
+                                         std::shared_ptr<DataSource<PixelBuffer>> source,
                                          std::shared_ptr<TextureProxy> textureProxy,
                                          Point atlasOffset)
     : ResourceTask(std::move(uniqueKey)), source(std::move(source)),
@@ -33,12 +33,12 @@ bool TextAtlasUploadTask::execute(Context*) {
   if (source == nullptr || textureProxy == nullptr) {
     return false;
   }
-  auto imageBuffer = source->getData();
-  if (imageBuffer == nullptr) {
-    LOGE("TextAtlasUploadTask::execute() imageBuffer is nullptr!");
+  auto pixelBuffer = source->getData();
+  if (pixelBuffer == nullptr) {
+    LOGE("TextAtlasUploadTask::execute() pixelBuffer is nullptr!");
     return nullptr;
   }
-  auto result = imageBuffer->onUploadTexture(textureProxy->getTexture(), atlasOffset);
+  auto result = pixelBuffer->onUploadTexture(textureProxy->getTexture(), atlasOffset);
   if (!result) {
     LOGE("TextAtlasUploadTask::execute() Failed to upload the texture!");
   } else {
