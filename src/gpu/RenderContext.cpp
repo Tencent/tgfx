@@ -269,9 +269,6 @@ OpsCompositor* RenderContext::getOpsCompositor(bool discardContent) {
   if (opsCompositor == nullptr || opsCompositor->isClosed()) {
     auto drawingManager = renderTarget->getContext()->drawingManager();
     opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
-    if (surface) {
-      surface->contentChanged();
-    }
   } else if (discardContent) {
     opsCompositor->discardAll();
   }

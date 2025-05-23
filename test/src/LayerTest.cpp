@@ -1198,12 +1198,12 @@ TGFX_TEST(LayerTest, textMask) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/textMask"));
 }
 
-TGFX_TEST(LayerTest, ContentVersion) {
+TGFX_TEST(LayerTest, HasContentChanged) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  auto surface = Surface::Make(context, 100, 100);
+  auto surface = Surface::Make(context, 150, 150);
   DisplayList displayList;
   auto shapeLayer = ShapeLayer::Make();
   Path path;
@@ -1211,37 +1211,23 @@ TGFX_TEST(LayerTest, ContentVersion) {
   shapeLayer->setPath(path);
   shapeLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 0, 0)));
   displayList.root()->addChild(shapeLayer);
-  context->flush();
-  auto contentVersion = surface->contentVersion();
+  EXPECT_TRUE(displayList.hasContentChanged());
   displayList.render(surface.get());
   context->flush();
-  EXPECT_NE(surface->contentVersion(), contentVersion);
-  contentVersion = surface->contentVersion();
-  displayList.render(surface.get());
-  context->flush();
-  EXPECT_EQ(surface->contentVersion(), contentVersion);
+  EXPECT_FALSE(displayList.hasContentChanged());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/HasContentChanged_Org"));
+  displayList.setContentOffset(50, 50);
+  EXPECT_TRUE(displayList.hasContentChanged());
   displayList.render(surface.get(), false);
   context->flush();
-  EXPECT_NE(surface->contentVersion(), contentVersion);
-  contentVersion = surface->contentVersion();
-  surface->getCanvas()->clear();
-  context->flush();
-  EXPECT_NE(surface->contentVersion(), contentVersion);
-  contentVersion = surface->contentVersion();
+  EXPECT_FALSE(displayList.hasContentChanged());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/HasContentChanged_Offset"));
+  displayList.setZoomScale(0.5f);
+  EXPECT_TRUE(displayList.hasContentChanged());
   displayList.render(surface.get());
   context->flush();
-  EXPECT_NE(surface->contentVersion(), contentVersion);
-  contentVersion = surface->contentVersion();
-
-  auto surface2 = Surface::Make(context, 100, 100);
-  context->flush();
-  EXPECT_EQ(surface2->contentVersion(), 1u);
-  displayList.render(surface2.get());
-  context->flush();
-  EXPECT_NE(surface2->contentVersion(), 1u);
-  displayList.render(surface.get());
-  context->flush();
-  EXPECT_NE(surface->contentVersion(), contentVersion);
+  EXPECT_FALSE(displayList.hasContentChanged());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/HasContentChanged_Zoom"));
 }
 
 /**
