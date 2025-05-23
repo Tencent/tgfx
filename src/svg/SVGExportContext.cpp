@@ -109,7 +109,8 @@ void SVGExportContext::drawRect(const Rect& rect, const MCState& state, const Fi
   }
 }
 
-void SVGExportContext::drawRRect(const RRect& roundRect, const MCState& state, const Fill& fill) {
+void SVGExportContext::drawRRect(const RRect& roundRect, const MCState& state, const Fill& fill,
+                                 const Stroke&) {
   if (!state.clip.contains(roundRect.rect)) {
     applyClipPath(state.clip);
   }

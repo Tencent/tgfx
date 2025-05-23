@@ -1632,6 +1632,59 @@ TGFX_TEST(LayerTest, hitTestPoint) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Layer_hitTestPoint"));
 }
 
+TGFX_TEST(LayerTest, drawRRect) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 1000, 600);
+  auto canvas = surface->getCanvas();
+
+  auto fillPaint = Paint();
+  fillPaint.setStyle(PaintStyle::Fill);
+  fillPaint.setColor(Color::Red());
+  Rect rect = Rect::MakeXYWH(50, 50, 200, 160);
+  RRect rRect = {};
+  rRect.setRectXY(rect, 10.f, 10.f);
+  canvas->drawRRect(rRect, fillPaint);
+
+  auto strokePaint = Paint();
+  strokePaint.setStyle(PaintStyle::Stroke);
+  strokePaint.setStrokeWidth(10.0f);
+  strokePaint.setColor(Color::Red());
+
+  Rect rect1 = Rect::MakeXYWH(300, 50, 200, 160);
+  RRect rRect1 = {};
+  rRect1.setRectXY(rect1, 10.f, 10.f);
+  canvas->drawRRect(rRect1, strokePaint);
+
+  Rect rect2 = Rect::MakeXYWH(600, 50, 200, 160);
+  RRect rRect2 = {};
+  rRect2.setRectXY(rect2, 15.f, 10.f);
+  canvas->drawRRect(rRect2, strokePaint);
+
+  Rect rect3 = Rect::MakeXYWH(50, 300, 200, 160);
+  RRect rRect3 = {};
+  rRect3.setRectXY(rect3, 100.f, 150.f);
+  canvas->drawRRect(rRect3, strokePaint);
+
+  Rect rect4 = Rect::MakeXYWH(300, 300, 200, 160);
+  RRect rRect4 = {};
+  rRect4.setRectXY(rect4, 50.f, 10.f);
+  canvas->drawRRect(rRect4, strokePaint);
+
+  auto strokePaint2 = Paint();
+  strokePaint2.setStyle(PaintStyle::Stroke);
+  strokePaint2.setStrokeWidth(50.0f);
+  strokePaint2.setColor(Color::Red());
+
+  Rect rect5 = Rect::MakeXYWH(600, 300, 200, 160);
+  RRect rRect5 = {};
+  rRect5.setRectXY(rect5, 20.f, 10.f);
+  canvas->drawRRect(rRect5, strokePaint2);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Layer_drawRRect"));
+}
+
 /**
  * The schematic diagram is as follows:
  * https://www.geogebra.org/classic/nxwbmmrp

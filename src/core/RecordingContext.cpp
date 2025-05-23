@@ -74,7 +74,8 @@ void RecordingContext::drawRect(const Rect& rect, const MCState& state, const Fi
   drawCount++;
 }
 
-void RecordingContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill) {
+void RecordingContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
+                                 const Stroke&) {
   recordStateAndFill(state, fill);
   auto record = blockBuffer.make<DrawRRect>(rRect);
   records.emplace_back(std::move(record));
