@@ -35,14 +35,14 @@ class TaskGroup {
   std::atomic_int totalThreads = 0;
   std::atomic_bool exited = false;
   std::atomic_int waitingThreads = 0;
-  LockFreeQueue<std::shared_ptr<Task>>* tasks = nullptr;
+  std::vector<LockFreeQueue<std::shared_ptr<Task>>*> priorityQueues = {};
   LockFreeQueue<std::thread*>* threads = nullptr;
   static TaskGroup* GetInstance();
   static void RunLoop(TaskGroup* taskGroup);
 
   TaskGroup();
   bool checkThreads();
-  bool pushTask(std::shared_ptr<Task> task);
+  bool pushTask(std::shared_ptr<Task> task, TaskPriority priority);
   std::shared_ptr<Task> popTask();
   void exit();
   void releaseThreads(bool exit);
