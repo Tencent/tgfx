@@ -849,6 +849,7 @@ TGFX_TEST(LayerTest, PassthroughAndNormal) {
 
   root->setMatrix(Matrix::MakeTrans(400, 50));
   root->setShouldRasterize(false);
+  displayList.setPartialRefreshEnabled(false);
   displayList.render(surface.get(), false);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PassThoughAndNormal"));
 }

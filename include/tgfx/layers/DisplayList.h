@@ -79,6 +79,23 @@ class DisplayList {
   void setContentOffset(float offsetX, float offsetY);
 
   /**
+   * Returns true if partial refresh is enabled. When partial refresh is on, only the dirty regions
+   * of the display list are rendered, instead of redrawing the entire list. This can improve
+   * performance when only a small part of the display list changes. However, enabling partial
+   * refresh may cause some blending issues, since all layers are drawn onto a cached surface before
+   * being drawn to the target surface. Partial refresh also requires extra memory to cache the
+   * previous frame. The default is false.
+   */
+  bool partialRefreshEnabled() const {
+    return _partialRefreshEnabled;
+  }
+
+  /**
+   * Sets whether partial refresh is enabled. The default value is false.
+   */
+  void setPartialRefreshEnabled(bool partialRefreshEnabled);
+
+  /**
    * Returns true if the content of the display list has changed since the last rendering. This can
    * be used to determine if the display list needs to be re-rendered.
    */
@@ -94,8 +111,15 @@ class DisplayList {
 
  private:
   std::shared_ptr<RootLayer> _root = nullptr;
+  std::shared_ptr<Surface> frameCache = nullptr;
   float _zoomScale = 1.0f;
   Point _contentOffset = {};
+  bool _partialRefreshEnabled = false;
   bool _hasContentChanged = false;
+  float lastZoomScale = 1.0f;
+  Point lastContentOffset = {};
+
+  bool renderPartially(Surface* surface, bool autoClear, const Rect& renderRect,
+                       std::vector<Rect> dirtyRegions);
 };
 }  // namespace tgfx
