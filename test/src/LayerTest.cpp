@@ -2480,6 +2480,7 @@ TGFX_TEST(LayerTest, BottomLeftSurface) {
 
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BottomLeftSurface"));
 }
+
 TGFX_TEST(LayerTest, DecomposeRectTest) {
   ContextScope scope;
   auto context = scope.getContext();
