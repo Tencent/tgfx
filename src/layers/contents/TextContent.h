@@ -29,16 +29,32 @@ class TextContent : public LayerContent {
     return bounds;
   }
 
+  Rect getTightBounds(const Matrix& matrix) const override {
+    Path textPath = {};
+    if (textBlob->getPath(&textPath)) {
+      textPath.transform(matrix);
+      return textPath.getBounds();
+    }
+    return bounds;
+  }
+
   void draw(Canvas* canvas, const Paint& paint) const override;
 
   bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
 
+ protected:
+  Type type() const override {
+    return Type::TextContent;
+  }
+
  private:
   Rect bounds = {};
-  std::shared_ptr<TextBlob> textBlob = nullptr;
-  Color textColor = {};
 
   static bool HitTestPointInternal(float localX, float localY,
                                    const std::shared_ptr<GlyphRunList>& glyphRunList);
+
+ public:
+  std::shared_ptr<TextBlob> textBlob = nullptr;
+  Color textColor = {};
 };
 }  // namespace tgfx

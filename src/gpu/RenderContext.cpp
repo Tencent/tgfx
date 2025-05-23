@@ -25,8 +25,9 @@
 #include "core/Rasterizer.h"
 #include "core/atlas/AtlasManager.h"
 #include "core/images/TextureImage.h"
-#include "core/utils/Caster.h"
+#include "core/images/SubsetImage.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/Types.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/tasks/TextAtlasUploadTask.h"
@@ -73,7 +74,11 @@ Rect RenderContext::getClipBounds(const Path& clip) {
   if (clip.isInverseFillType()) {
     return renderTarget->bounds();
   }
-  return clip.isEmpty() ? Rect::MakeEmpty() : clip.getBounds();
+  auto bounds = clip.getBounds();
+  if (!bounds.intersect(renderTarget->bounds())) {
+    bounds.setEmpty();
+  }
+  return bounds;
 }
 
 void RenderContext::drawFill(const MCState& state, const Fill& fill) {
@@ -138,11 +143,12 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect
     // There is no scaling for the source image, so we can disable mipmaps to save memory.
     samplingOptions.mipmapMode = MipmapMode::None;
   }
-  auto subsetImage = Caster::AsSubsetImage(image.get());
-  if (subsetImage == nullptr) {
+  auto type = Types::Get(image.get());
+  if (type != Types::ImageType::Subset) {
     compositor->fillImage(std::move(image), rect, samplingOptions, state, fill);
   } else {
     // Unwrap the subset image to maximize the merging of draw calls.
+    auto subsetImage = static_cast<const SubsetImage*>(image.get());
     auto imageRect = rect;
     auto imageState = state;
     auto& subset = subsetImage->bounds;
@@ -162,9 +168,34 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   //   return;
   // }
   auto maxScale = state.matrix.getMaxScale();
-  if (maxScale <= 0.0f || renderTarget == nullptr || renderTarget->getContext() == nullptr) {
+  if (FloatNearlyZero(maxScale)|| renderTarget == nullptr || renderTarget->getContext() == nullptr) {
     return;
   }
+  auto bounds = glyphRunList->getBounds(maxScale);
+  if (stroke) {
+    stroke->applyToBounds(&bounds);
+  }
+  state.matrix.mapRect(&bounds);  // To device space
+  auto clipBounds = getClipBounds(state.clip);
+  if (clipBounds.isEmpty()) {
+    return;
+  }
+  if (!bounds.intersect(clipBounds)) {
+    return;
+  }
+  auto rasterizeMatrix = state.matrix;
+  rasterizeMatrix.postTranslate(-bounds.x(), -bounds.y());
+  auto width = static_cast<int>(ceilf(bounds.width()));
+  auto height = static_cast<int>(ceilf(bounds.height()));
+  auto rasterizer = Rasterizer::MakeFrom(width, height, std::move(glyphRunList), fill.antiAlias,
+                                         rasterizeMatrix, stroke);
+  auto image = Image::MakeFrom(std::move(rasterizer));
+  if (image == nullptr) {
+    return;
+  }
+  auto newState = state;
+  newState.matrix = Matrix::MakeTrans(bounds.x(), bounds.y());
+  drawImage(std::move(image), {}, newState, fill.makeWithMatrix(rasterizeMatrix));
 
   size_t maxGlyphRunCount = 0;
   for (const auto& run : glyphRunList->glyphRuns()) {
@@ -275,7 +306,7 @@ void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
     for (size_t i = 0; i < glyphCount; ++i) {
       const auto& glyphID = glyphIDs[i];
       const auto& position = positions[i];
-      auto glyphCodec = glyphFace->getImage(glyphID, &glyphState.matrix);
+      auto glyphCodec = glyphFace->getImage(glyphID, nullptr, &glyphState.matrix);
       auto glyphImage = Image::MakeFrom(glyphCodec);
       if (glyphImage == nullptr) {
         continue;
@@ -322,7 +353,7 @@ void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRe
                  oldContent->height() == renderTarget->height());
     auto drawingManager = renderTarget->getContext()->drawingManager();
     opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
-    Fill fill = {Color::White(), BlendMode::Src, false};
+    Fill fill = {{}, BlendMode::Src, false};
     opsCompositor->fillImage(std::move(oldContent), renderTarget->bounds(), {}, MCState{}, fill);
   }
 }
@@ -399,7 +430,7 @@ void RenderContext::glyphDirectMaskDrawing(const GlyphRun& glyphRun, const MCSta
     AtlasLocator locator;
     Matrix rasterizeMatrix = {};
     if (!atlasManager->hasGlyph(maskFormat, glyphKey)) {
-      auto glyphCodec = scaledGlyphFace->getImage(glyphID,&glyphState.matrix);
+      auto glyphCodec = scaledGlyphFace->getImage(glyphID, nullptr, &glyphState.matrix);
       if (hasColor) {
         width = glyphCodec->width();
         height = glyphCodec->height();
@@ -429,7 +460,7 @@ void RenderContext::glyphDirectMaskDrawing(const GlyphRun& glyphRun, const MCSta
 
     } else {
       if (hasColor) {
-        scaledGlyphFace->getImage(glyphID,&glyphState.matrix);
+        scaledGlyphFace->getImage(glyphID, nullptr, &glyphState.matrix);
       }
       atlasManager->getGlyphLocator(maskFormat, glyphKey, locator);
     }

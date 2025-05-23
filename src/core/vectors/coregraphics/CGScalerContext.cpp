@@ -136,6 +136,10 @@ Rect CGScalerContext::getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic)
     bounds.outset(fauxBoldSize, fauxBoldSize);
   }
   bounds.roundOut();
+  // Expand the bounds by 1 pixel, to give CG room for anti-aliasing.
+  // Note that this outset is to allow room for LCD smoothed glyphs. However, the correct outset
+  // is not currently known, as CG dilates the outlines by some percentage.
+  // Note that if this context is A8 and not back-forming from LCD, there is no need to outset.
   bounds.outset(1.f, 1.f);
   return bounds;
 }
@@ -260,7 +264,12 @@ bool CGScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItal
   return true;
 }
 
-Rect CGScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
+Rect CGScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
+                                        Matrix* matrix) const {
+  if (!hasColor() && (stroke != nullptr || fauxBold)) {
+    return {};
+  }
+
   CGRect cgBounds;
   CTFontGetBoundingRectsForGlyphs(ctFont, kCTFontOrientationHorizontal, &glyphID, &cgBounds, 1);
   if (CGRectIsEmpty(cgBounds)) {
@@ -278,12 +287,12 @@ Rect CGScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
   return bounds;
 }
 
-bool CGScalerContext::readPixels(GlyphID glyphID, const ImageInfo& dstInfo, void* dstPixels) const {
+bool CGScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
+                                 const ImageInfo& dstInfo, void* dstPixels) const {
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }
-
-  auto bounds = getImageTransform(glyphID, nullptr);
+  auto bounds = getImageTransform(glyphID, fauxBold, stroke, nullptr);
   auto width = static_cast<int>(bounds.width());
   auto height = static_cast<int>(bounds.height());
   if (width <= 0 || height <= 0) {

@@ -37,6 +37,9 @@ class ColorFilterShader : public Shader {
 
   std::shared_ptr<Shader> makeWithMatrix(const Matrix& viewMatrix) const override;
 
+  std::shared_ptr<Shader> shader;
+  std::shared_ptr<ColorFilter> colorFilter;
+
  protected:
   Type type() const override {
     return Type::ColorFilter;
@@ -46,9 +49,5 @@ class ColorFilterShader : public Shader {
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                       const Matrix* uvMatrix) const override;
-
- private:
-  std::shared_ptr<Shader> shader;
-  std::shared_ptr<ColorFilter> colorFilter;
 };
 }  // namespace tgfx

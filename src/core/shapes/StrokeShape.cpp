@@ -62,40 +62,6 @@ Path StrokeShape::getPath() const {
   return path;
 }
 
-bool StrokeShape::isRect(Rect* rect) const {
-  if (stroke.cap == LineCap::Round) {
-    return false;
-  }
-  Point line[2] = {};
-  if (!shape->isLine(line)) {
-    return false;
-  }
-  // check if the line is axis-aligned
-  if (line[0].x != line[1].x && line[0].y != line[1].y) {
-    return false;
-  }
-  // use the stroke width and line cap to convert the line to a rect
-  auto left = std::min(line[0].x, line[1].x);
-  auto top = std::min(line[0].y, line[1].y);
-  auto right = std::max(line[0].x, line[1].x);
-  auto bottom = std::max(line[0].y, line[1].y);
-  auto halfWidth = stroke.width / 2.0f;
-  if (stroke.cap == LineCap::Square) {
-    if (rect) {
-      rect->setLTRB(left - halfWidth, top - halfWidth, right + halfWidth, bottom + halfWidth);
-    }
-    return true;
-  }
-  if (rect) {
-    if (left == right) {
-      rect->setLTRB(left - halfWidth, top, right + halfWidth, bottom);
-    } else {
-      rect->setLTRB(left, top - halfWidth, right, bottom + halfWidth);
-    }
-  }
-  return true;
-}
-
 UniqueKey StrokeShape::getUniqueKey() const {
   static const auto WidthStrokeShapeType = UniqueID::Next();
   static const auto CapJoinStrokeShapeType = UniqueID::Next();

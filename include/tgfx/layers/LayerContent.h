@@ -40,6 +40,13 @@ class LayerContent {
   virtual Rect getBounds() const = 0;
 
   /**
+   * Returns the tight bounds of the content mapped by Matrix.
+   */
+  virtual Rect getTightBounds(const Matrix& matrix) const {
+    return matrix.mapRect(getBounds());
+  }
+
+  /**
    * Draws the content to the given canvas with the given paint.
    */
   virtual void draw(Canvas* canvas, const Paint& paint) const = 0;
@@ -51,5 +58,22 @@ class LayerContent {
     * checks the bounding box.
   */
   virtual bool hitTestPoint(float localX, float localY, bool pixelHitTest) = 0;
+
+ protected:
+  enum class Type {
+    LayerContent,
+    ComposeContent,
+    ImageContent,
+    RasterizedContent,
+    ShapeContent,
+    SolidContent,
+    TextContent
+  };
+
+  virtual Type type() const {
+    return Type::LayerContent;
+  }
+
+  friend class Types;
 };
 }  // namespace tgfx

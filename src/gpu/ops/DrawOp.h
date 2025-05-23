@@ -52,6 +52,10 @@ class DrawOp : public Op {
     coverages.emplace_back(std::move(coverageProcessor));
   }
 
+  virtual bool hasCoverage() const {
+    return !coverages.empty();
+  }
+
  protected:
   AAType aaType = AAType::None;
 

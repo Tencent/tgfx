@@ -68,6 +68,10 @@ class ShapeStyle : public LayerProperty {
   void setMatrix(const Matrix& value);
 
  protected:
+  enum class Type { Gradient, ImagePattern, SolidColor };
+
+  virtual Type getType() const = 0;
+
   std::shared_ptr<Shader> getShader() const;
 
   /**
@@ -80,6 +84,7 @@ class ShapeStyle : public LayerProperty {
   BlendMode _blendMode = BlendMode::SrcOver;
   Matrix _matrix = {};
 
+  friend class Types;
   friend class ShapeLayer;
 };
 }  // namespace tgfx

@@ -23,9 +23,10 @@
 #include "ElementWriter.h"
 #include "SVGUtils.h"
 #include "core/CanvasState.h"
-#include "core/utils/Caster.h"
+#include "core/images/CodecImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/Types.h"
 #include "svg/SVGTextBuilder.h"
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/Fill.h"
@@ -260,7 +261,7 @@ void SVGExportContext::exportGlyphsAsImage(const std::shared_ptr<GlyphRunList>& 
                                            const MCState& state, const Fill& fill) {
   auto viewMatrix = state.matrix;
   auto scale = viewMatrix.getMaxScale();
-  if (scale <= 0) {
+  if (FloatNearlyZero(scale)) {
     return;
   }
   viewMatrix.preScale(1.0f / scale, 1.0f / scale);
@@ -277,7 +278,7 @@ void SVGExportContext::exportGlyphsAsImage(const std::shared_ptr<GlyphRunList>& 
     for (size_t i = 0; i < glyphCount; ++i) {
       const auto& glyphID = glyphIDs[i];
       const auto& position = positions[i];
-      auto glyphCodec = glyphFace->getImage(glyphID, &glyphState.matrix);
+      auto glyphCodec = glyphFace->getImage(glyphID, nullptr, &glyphState.matrix);
       auto glyphImage = Image::MakeFrom(glyphCodec);
       if (glyphImage == nullptr) {
         continue;
@@ -323,9 +324,11 @@ bool SVGExportContext::RequiresViewportReset(const Fill& fill) {
     return false;
   }
 
-  if (const auto* imageShader = Caster::AsImageShader(shader.get())) {
+  if (Types::Get(shader.get()) == Types::ShaderType::Image) {
+    auto imageShader = static_cast<const ImageShader*>(shader.get());
     return imageShader->tileModeX == TileMode::Repeat || imageShader->tileModeY == TileMode::Repeat;
   }
+
   return false;
 }
 
@@ -398,10 +401,9 @@ Bitmap SVGExportContext::ImageExportToBitmap(Context* context,
 }
 
 std::shared_ptr<Data> SVGExportContext::ImageToEncodedData(const std::shared_ptr<Image>& image) {
-  const auto* codecImage = Caster::AsCodecImage(image.get());
-  if (!codecImage) {
-    return nullptr;
-  }
+  Types::ImageType type = Types::Get(image.get());
+  if (type != Types::ImageType::Codec) return nullptr;
+  auto codecImage = static_cast<const CodecImage*>(image.get());
   auto imageCodec = codecImage->codec();
   return imageCodec->getEncodedData();
 }

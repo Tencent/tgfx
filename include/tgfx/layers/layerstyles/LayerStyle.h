@@ -52,6 +52,8 @@ enum class LayerStyleExtraSourceType {
   Background
 };
 
+enum class LayerStyleType { LayerStyle, BackgroundBlur, DropShadow, InnerShadow };
+
 /**
  * LayerStyle is used to change the appearance of a layer. Unlike LayerFilter, it does not create a
  * new offscreen image to replace the original layer content. Instead, it adds visual elements
@@ -60,6 +62,10 @@ enum class LayerStyleExtraSourceType {
  */
 class LayerStyle : public LayerProperty {
  public:
+  virtual LayerStyleType Type() const {
+    return LayerStyleType::LayerStyle;
+  };
+
   /**
    * The blend mode used to composite the layer style with the existing content on the canvas.
    */

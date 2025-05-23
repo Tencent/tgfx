@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,26 +18,28 @@
 
 #pragma once
 
-#include "core/Rasterizer.h"
+#include "core/ScalerContext.h"
+#include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
 /**
- * A Rasterizer that rasterizes a set of glyphs.
+ * A Rasterizer that rasterizes a give Glyph.
  */
-class GlyphRasterizer : public Rasterizer {
+class GlyphRasterizer : public ImageCodec {
  public:
-  GlyphRasterizer(int width, int height, std::shared_ptr<GlyphRunList> glyphRunList, bool antiAlias,
-                  const Matrix& matrix, const Stroke* stroke);
+  GlyphRasterizer(int width, int height, std::shared_ptr<ScalerContext> scalerContext,
+                  GlyphID glyphID, bool fauxBold, std::unique_ptr<Stroke> stroke);
 
-  ~GlyphRasterizer() override;
+  bool isAlphaOnly() const override {
+    return !scalerContext->hasColor();
+  }
 
- protected:
-  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
+  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 
  private:
-  std::shared_ptr<GlyphRunList> glyphRunList = nullptr;
-  bool antiAlias = true;
-  Matrix matrix = {};
-  Stroke* stroke = nullptr;
+  std::shared_ptr<ScalerContext> scalerContext = nullptr;
+  GlyphID glyphID = 0;
+  bool fauxBold = false;
+  std::unique_ptr<Stroke> stroke = nullptr;
 };
 }  // namespace tgfx

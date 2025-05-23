@@ -7,7 +7,7 @@
     "common": [
       {
         "url": "${PAG_GROUP}/vendor_tools.git",
-        "commit": "ccd8bbde5fd67c02ef6d65297d6b38b34acc2a07",
+        "commit": "76b266c30e3314678a0d8daeb5b40a9389ea5544",
         "dir": "third_party/vendor_tools"
       },
       {
@@ -64,6 +64,11 @@
         "url": "https://github.com/libexpat/libexpat.git",
         "commit": "88b3ed553d8ad335559254863a33360d55b9f1d6",
         "dir": "third_party/expat"
+      },
+      {
+        "url": "https://github.com/google/flatbuffers.git",
+        "commit": "1c514626e83c20fffa8557e75641848e1e15cd5e",
+        "dir": "third_party/flatbuffers"
       }
     ]
   },

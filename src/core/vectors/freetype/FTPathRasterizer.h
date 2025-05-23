@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,30 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/Shape.h"
+#pragma once
+
+#include "core/PathRasterizer.h"
 
 namespace tgfx {
-bool Shape::isLine(Point*) const {
-  return false;
-}
+class FTPathRasterizer final : public PathRasterizer {
+ public:
+  explicit FTPathRasterizer(int width, int height, std::shared_ptr<Shape> shape, bool antiAlias,
+                            bool needsGammaCorrection)
+      : PathRasterizer(width, height, std::move(shape), antiAlias, needsGammaCorrection) {
+  }
 
-bool Shape::isRect(Rect*) const {
-  return false;
-}
-
-bool Shape::isOval(Rect*) const {
-  return false;
-}
-
-bool Shape::isRRect(RRect*) const {
-  return false;
-}
-
-bool Shape::isSimplePath(Path*) const {
-  return false;
-}
-
-bool Shape::isInverseFillType() const {
-  return false;
-}
+  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
+};
 }  // namespace tgfx
