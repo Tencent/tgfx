@@ -29,6 +29,14 @@ bool RRect::isOval() const {
 
 void RRect::setRectXY(const Rect& r, float radiusX, float radiusY) {
   rect = r.makeSorted();
+  if (radiusX < 0 || radiusY < 0) {
+    radiusX = radiusY = 0;
+  }
+  if (r.width() < radiusX + radiusX || r.height() < radiusY + radiusY) {
+    float scale = std::min(r.width() / (radiusX + radiusY), r.height() / (radiusY + radiusY));
+    radiusX *= scale;
+    radiusY *= scale;
+  }
   radii = {radiusX, radiusY};
 }
 

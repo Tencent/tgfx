@@ -79,12 +79,21 @@ static void WriteUByte4Color(float* vertices, int& index, const Color& color) {
   bytes[3] = static_cast<uint8_t>(color.alpha * 255);
 }
 
+static float FloatInvert(float value) {
+  return value == 0.0f ? 1e6f : 1 / value;
+}
+
 RRectsVertexProvider::RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType,
                                            bool useScale, bool hasColor)
     : rects(std::move(rects)) {
   bitFields.aaType = static_cast<uint8_t>(aaType);
   bitFields.useScale = useScale;
   bitFields.hasColor = hasColor;
+  if (this->rects.size() > 0 && this->rects.front()->stroke.width > 0.0f) {
+    bitFields.hasStroke = true;
+  } else {
+    bitFields.hasStroke = false;
+  }
 }
 
 size_t RRectsVertexProvider::vertexCount() const {
@@ -105,28 +114,45 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
     auto scales = viewMatrix.getAxisScales();
     rRect.scale(scales.x, scales.y);
     viewMatrix.preScale(1 / scales.x, 1 / scales.y);
-    float reciprocalRadii[4] = {1e6f, 1e6f, 1e6f, 1e6f};
-    if (rRect.radii.x > 0) {
-      reciprocalRadii[0] = 1.f / rRect.radii.x;
+
+    bool stroked = false;
+    auto stroke = record->stroke;
+    float xRadius = rRect.radii.x;
+    float yRadius = rRect.radii.y;
+    float innerXRadius = 0;
+    float innerYRadius = 0;
+    auto rectBounds = rRect.rect;
+    if (stroke.width > 0) {
+      float halfStrokeWidth = stroke.width / 2;
+      innerXRadius = rRect.radii.x - halfStrokeWidth;
+      innerYRadius = rRect.radii.y - halfStrokeWidth;
+      stroked = innerXRadius > 0 && innerYRadius > 0;
+      xRadius += halfStrokeWidth;
+      yRadius += halfStrokeWidth;
+      rectBounds.outset(halfStrokeWidth, halfStrokeWidth);
     }
-    if (rRect.radii.y > 0) {
-      reciprocalRadii[1] = 1.f / rRect.radii.y;
-    }
+
+    float reciprocalRadii[4] = {FloatInvert(xRadius), FloatInvert(yRadius),
+                                FloatInvert(innerXRadius), FloatInvert(innerYRadius)};
+    // If the stroke width is exactly double the radius, the inner radii will be zero.
+    // Pin to a large value, to avoid infinities in the shader. crbug.com/1139750
+    reciprocalRadii[2] = std::min(reciprocalRadii[2], 1e6f);
+    reciprocalRadii[3] = std::min(reciprocalRadii[3], 1e6f);
     // On MSAA, bloat enough to guarantee any pixel that might be touched by the rRect has
     // full sample coverage.
     float aaBloat = aaType == AAType::MSAA ? FLOAT_SQRT2 : .5f;
     // Extend out the radii to antialias.
-    float xOuterRadius = rRect.radii.x + aaBloat;
-    float yOuterRadius = rRect.radii.y + aaBloat;
+    float xOuterRadius = xRadius + aaBloat;
+    float yOuterRadius = yRadius + aaBloat;
 
     float xMaxOffset = xOuterRadius;
     float yMaxOffset = yOuterRadius;
-    //  if (!stroked) {
-    // For filled RRectRecords we map a unit circle in the vertex attributes rather than
-    // computing an ellipse and modifying that distance, so we normalize to 1.
-    xMaxOffset /= rRect.radii.x;
-    yMaxOffset /= rRect.radii.y;
-    //  }
+    if (!stroked) {
+      // For filled RRectRecords we map a unit circle in the vertex attributes rather than
+      // computing an ellipse and modifying that distance, so we normalize to 1.
+      xMaxOffset /= xRadius;
+      yMaxOffset /= yRadius;
+    }
     auto bounds = rRect.rect.makeOutset(aaBloat, aaBloat);
     float yCoords[4] = {bounds.top, bounds.top + yOuterRadius, bounds.bottom - yOuterRadius,
                         bounds.bottom};
@@ -134,7 +160,7 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
         yMaxOffset,
         FLOAT_NEARLY_ZERO,  // we're using inversesqrt() in shader, so can't be exactly 0
         FLOAT_NEARLY_ZERO, yMaxOffset};
-    auto maxRadius = std::max(rRect.radii.x, rRect.radii.y);
+    auto maxRadius = std::max(xRadius, yRadius);
     for (int i = 0; i < 4; ++i) {
       auto point = Point::Make(bounds.left, yCoords[i]);
       viewMatrix.mapPoints(&point, 1);

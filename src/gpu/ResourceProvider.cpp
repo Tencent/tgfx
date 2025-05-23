@@ -164,24 +164,25 @@ static const uint16_t* gStandardRRectIndices = gOverstrokeRRectIndices + kOverst
 // static constexpr int kIndicesPerOverstrokeRRect =
 //    kOverstrokeIndicesCount + kCornerIndicesCount + kEdgeIndicesCount;
 // fill count skips overstroke indices and includes center
-static constexpr size_t kIndicesPerRRect =
+static constexpr size_t kIndicesPerFillRRect =
     kCornerIndicesCount + kEdgeIndicesCount + kCenterIndicesCount;
 // stroke count is fill count minus center indices
-// static constexpr int kIndicesPerStrokeRRect = kCornerIndicesCount + kEdgeIndicesCount;
+static constexpr int kIndicesPerStrokeRRect = kCornerIndicesCount + kEdgeIndicesCount;
 
 class RRectIndicesProvider : public DataSource<Data> {
  public:
-  explicit RRectIndicesProvider(size_t rectSize) : rectSize(rectSize) {
+  explicit RRectIndicesProvider(size_t rectSize, RRectType type) : rectSize(rectSize), type(type) {
   }
 
   std::shared_ptr<Data> getData() const override {
-    auto bufferSize = rectSize * kIndicesPerRRect * sizeof(uint16_t);
+    auto indicesCount = ResourceProvider::NumIndicesPerRRect(type);
+    auto bufferSize = rectSize * indicesCount * sizeof(uint16_t);
     Buffer buffer(bufferSize);
     auto indices = reinterpret_cast<uint16_t*>(buffer.data());
     int index = 0;
     for (size_t i = 0; i < rectSize; ++i) {
       auto offset = static_cast<uint16_t>(i * 16);
-      for (size_t j = 0; j < kIndicesPerRRect; ++j) {
+      for (size_t j = 0; j < indicesCount; ++j) {
         indices[index++] = gStandardRRectIndices[j] + offset;
       }
     }
@@ -190,19 +191,28 @@ class RRectIndicesProvider : public DataSource<Data> {
 
  private:
   size_t rectSize = 0;
+  RRectType type = RRectType::FillType;
 };
 
-std::shared_ptr<GpuBufferProxy> ResourceProvider::rRectIndexBuffer() {
-  if (_rRectIndexBuffer == nullptr) {
-    auto provider = std::make_unique<RRectIndicesProvider>(RRectDrawOp::MaxNumRRects);
-    _rRectIndexBuffer =
-        GpuBufferProxy::MakeFrom(context, std::move(provider), BufferType::Index, 0);
+std::shared_ptr<GpuBufferProxy> ResourceProvider::rRectIndexBuffer(RRectType type) {
+  auto indexBuffer = type == RRectType::FillType ? _rRectFillIndexBuffer : _rRectStrokeIndexBuffer;
+  if (indexBuffer == nullptr) {
+    auto provider = std::make_unique<RRectIndicesProvider>(RRectDrawOp::MaxNumRRects, type);
+    indexBuffer = GpuBufferProxy::MakeFrom(context, std::move(provider), BufferType::Index, 0);
   }
-  return _rRectIndexBuffer;
+  return indexBuffer;
 }
 
-uint16_t ResourceProvider::NumIndicesPerRRect() {
-  return kIndicesPerRRect;
+uint16_t ResourceProvider::NumIndicesPerRRect(RRectType type) {
+  switch (type) {
+    case RRectType::FillType:
+      return kIndicesPerFillRRect;
+    case RRectType::StrokeType:
+      return kIndicesPerStrokeRRect;
+    default:
+      break;
+  }
+  ABORT("Invalid type");
 }
 
 void ResourceProvider::releaseAll() {

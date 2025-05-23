@@ -21,6 +21,7 @@
 #include "core/LayerUnrollContext.h"
 #include "core/RecordingContext.h"
 #include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
 #include "shapes/PathShape.h"
 #include "shapes/StrokeShape.h"
 #include "tgfx/core/Surface.h"
@@ -227,13 +228,62 @@ void Canvas::drawRoundRect(const Rect& rect, float radiusX, float radiusY, const
   drawRRect(rRect, paint);
 }
 
+static bool UseDrawPath(const Paint& paint, const Point& radii, const Matrix& viewMatrix) {
+  auto stroke = paint.getStroke();
+  if (!stroke) {
+    return false;
+  }
+  if (!viewMatrix.rectStaysRect()) {
+    return false;
+  }
+  float xRadius = std::fabs(viewMatrix.getScaleX() * radii.x + viewMatrix.getSkewY() * radii.y);
+  float yRadius = std::fabs(viewMatrix.getSkewX() * radii.x + viewMatrix.getScaleY() * radii.y);
+  Point scaledStroke = {};
+  scaledStroke.x = std::fabs(stroke->width * (viewMatrix.getScaleX() + viewMatrix.getSkewY()));
+  scaledStroke.y = std::fabs(stroke->width * (viewMatrix.getSkewX() + viewMatrix.getScaleY()));
+
+  // Half of strokewidth is greater than radius
+  if (scaledStroke.x * 0.5f > xRadius || scaledStroke.y * 0.5f > yRadius) {
+    return true;
+  }
+  // Handle thick strokes for near-circular ellipses
+  if (stroke->width > 1.0f && (radii.x * 0.5f > radii.y || radii.y * 0.5f > radii.x)) {
+    return true;
+  }
+  // The matrix may have a rotation by an odd multiple of 90 degrees.
+  if (viewMatrix.getScaleX() == 0) {
+    std::swap(xRadius, yRadius);
+    std::swap(scaledStroke.x, scaledStroke.y);
+  }
+
+  if (FloatNearlyZero(scaledStroke.length())) {
+    scaledStroke.set(0.5f, 0.5f);
+  } else {
+    scaledStroke *= 0.5f;
+  }
+
+  // Handle thick strokes for near-circular ellipses
+  if (scaledStroke.length() > 0.5f && (0.5f * xRadius > yRadius || 0.5f * yRadius > xRadius)) {
+    return true;
+  }
+
+  // Curvature of the stroke is less than curvature of the ellipse
+  if (scaledStroke.x * radii.y * radii.y < scaledStroke.y * scaledStroke.y * radii.x) {
+    return true;
+  }
+  if (scaledStroke.y * radii.x * radii.x < scaledStroke.x * scaledStroke.x * radii.y) {
+    return true;
+  }
+  return false;
+}
+
 void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
   auto& radii = rRect.radii;
   if (radii.x < 0.5f && radii.y < 0.5f) {
     drawRect(rRect.rect, paint);
     return;
   }
-  if (paint.getStroke()) {
+  if (UseDrawPath(paint, radii, mcState->matrix)) {
     Path path = {};
     path.addRRect(rRect);
     drawPath(path, paint);
@@ -243,7 +293,8 @@ void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
-  drawContext->drawRRect(rRect, *mcState, paint.getFill());
+  auto stroke = paint.getStroke() ? *paint.getStroke() : Stroke(0);
+  drawContext->drawRRect(rRect, *mcState, paint.getFill(), stroke);
 }
 
 void Canvas::drawPath(const Path& path, const Paint& paint) {
