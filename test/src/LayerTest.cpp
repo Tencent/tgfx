@@ -20,6 +20,7 @@
 #include <vector>
 #include "core/filters/BlurImageFilter.h"
 #include "core/shaders/GradientShader.h"
+#include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
 #include "layers/contents/RasterizedContent.h"
 #include "tgfx/core/PathEffect.h"
@@ -2444,4 +2445,285 @@ TGFX_TEST(LayerTest, AdaptiveDashEffect) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/AdaptiveDashEffect"));
 }
 
+TGFX_TEST(LayerTest, DecomposeRectTest) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 1024, 800);
+  auto canvas = surface->getCanvas();
+  auto displayList = std::make_unique<DisplayList>();
+  auto rootLayer = Layer::Make();
+  displayList->root()->addChild(rootLayer);
+
+  auto shapeLayer1 = ShapeLayer::Make();
+  shapeLayer1->setStrokeStyle(SolidColor::Make(Color::Black()));
+  auto path1 = Path();
+  path1.addRect(Rect::MakeXYWH(40, 40, 100, 140));
+  shapeLayer1->setPath(path1);
+  // rootLayer->addChild(shapeLayer1);
+  auto bounds1 = shapeLayer1->getBounds();
+  shapeLayer1->getGlobalMatrix().mapRect(&bounds1);
+
+  auto shapeLayer2 = ShapeLayer::Make();
+  shapeLayer2->setStrokeStyle(SolidColor::Make(Color::Black()));
+  auto path2 = Path();
+  path2.addRect(Rect::MakeXYWH(120, 20, 60, 220));
+  shapeLayer2->setPath(path2);
+  // rootLayer->addChild(shapeLayer2);
+  auto bounds2 = shapeLayer2->getBounds();
+  shapeLayer2->getGlobalMatrix().mapRect(&bounds2);
+
+  auto shapeLayer3 = ShapeLayer::Make();
+  shapeLayer3->setStrokeStyle(SolidColor::Make(Color::Black()));
+  auto path3 = Path();
+  path3.addRect(Rect::MakeXYWH(60, 80, 40, 60));
+  shapeLayer3->setPath(path3);
+  // rootLayer->addChild(shapeLayer3);
+  auto bounds3 = shapeLayer3->getBounds();
+  shapeLayer3->getGlobalMatrix().mapRect(&bounds3);
+
+  auto shapeLayer4 = ShapeLayer::Make();
+  shapeLayer4->setStrokeStyle(SolidColor::Make(Color::Black()));
+  auto path4 = Path();
+  path4.addRect(Rect::MakeXYWH(800, 40, 80, 100));
+  shapeLayer4->setPath(path4);
+  // rootLayer->addChild(shapeLayer4);
+  auto bounds4 = shapeLayer4->getBounds();
+  shapeLayer4->getGlobalMatrix().mapRect(&bounds4);
+
+  auto shapeLayer5 = ShapeLayer::Make();
+  shapeLayer5->setStrokeStyle(SolidColor::Make(Color::Black()));
+  auto path5 = Path();
+  path5.addRect(Rect::MakeXYWH(840, 110, 120, 130));
+  shapeLayer5->setPath(path5);
+  // rootLayer->addChild(shapeLayer5);
+  auto bounds5 = shapeLayer5->getBounds();
+  shapeLayer5->getGlobalMatrix().mapRect(&bounds5);
+
+  auto shapeLayer6 = ShapeLayer::Make();
+  shapeLayer6->setStrokeStyle(SolidColor::Make(Color::Black()));
+  auto path6 = Path();
+  path6.addRect(Rect::MakeXYWH(80, 460, 120, 180));
+  shapeLayer6->setPath(path6);
+  // rootLayer->addChild(shapeLayer6);
+  auto bounds6 = shapeLayer6->getBounds();
+  shapeLayer6->getGlobalMatrix().mapRect(&bounds6);
+
+  auto shapeLayer7 = ShapeLayer::Make();
+  shapeLayer7->setStrokeStyle(SolidColor::Make(Color::Black()));
+  auto path7 = Path();
+  path7.addRect(Rect::MakeXYWH(20, 600, 240, 100));
+  shapeLayer7->setPath(path7);
+  // rootLayer->addChild(shapeLayer7);
+  auto bounds7 = shapeLayer7->getBounds();
+  shapeLayer7->getGlobalMatrix().mapRect(&bounds7);
+
+  auto shapeLayer8 = ShapeLayer::Make();
+  shapeLayer8->setStrokeStyle(SolidColor::Make(Color::Black()));
+  auto path8 = Path();
+  path8.addRect(Rect::MakeXYWH(300, 500, 100, 140));
+  shapeLayer8->setPath(path8);
+  // rootLayer->addChild(shapeLayer8);
+  auto bounds8 = shapeLayer8->getBounds();
+  shapeLayer8->getGlobalMatrix().mapRect(&bounds8);
+
+  auto shapeLayer9 = ShapeLayer::Make();
+  shapeLayer9->setStrokeStyle(SolidColor::Make(Color::Black()));
+  auto path9 = Path();
+  path9.addRect(Rect::MakeXYWH(220, 460, 140, 50));
+  shapeLayer9->setPath(path9);
+  // rootLayer->addChild(shapeLayer9);
+  auto bounds9 = shapeLayer9->getBounds();
+  shapeLayer9->getGlobalMatrix().mapRect(&bounds9);
+
+  auto shapeLayer10 = ShapeLayer::Make();
+  shapeLayer10->setStrokeStyle(SolidColor::Make(Color::Black()));
+  auto path10 = Path();
+  path10.addRect(Rect::MakeXYWH(820, 420, 140, 200));
+  shapeLayer10->setPath(path10);
+  // rootLayer->addChild(shapeLayer10);
+  auto bounds10 = shapeLayer10->getBounds();
+  shapeLayer10->getGlobalMatrix().mapRect(&bounds10);
+
+  auto shapeLayer11 = ShapeLayer::Make();
+  shapeLayer11->setStrokeStyle(SolidColor::Make(Color::Black()));
+  auto path11 = Path();
+  path11.addRect(Rect::MakeXYWH(850, 540, 80, 40));
+  shapeLayer11->setPath(path11);
+  // rootLayer->addChild(shapeLayer11);
+  auto bounds11 = shapeLayer11->getBounds();
+  shapeLayer11->getGlobalMatrix().mapRect(&bounds11);
+
+  Paint paint = {};
+
+  // Draw the shape layer
+  canvas->clear();
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(2.0f);
+  paint.setColor(Color::FromRGBA(100, 200, 50, 255));
+  canvas->drawRect(bounds1, paint);
+  canvas->drawRect(bounds2, paint);
+  canvas->drawRect(bounds3, paint);
+  // Draw the dirty rects
+  paint.setStyle(PaintStyle::Fill);
+  paint.setColor(Color::FromRGBA(255, 0, 255, 255));
+  paint.setBlendMode(BlendMode::DstOver);
+  rootLayer->removeChildren();
+  rootLayer->addChild(shapeLayer1);
+  rootLayer->addChild(shapeLayer2);
+  rootLayer->addChild(shapeLayer3);
+  auto dirtyRects = displayList->_root->updateDirtyRegions();
+  canvas->drawRect(dirtyRects[0], paint);
+  canvas->drawRect(dirtyRects[1], paint);
+  canvas->drawRect(dirtyRects[2], paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DecomposeRectTest1"));
+
+  // Draw the shape layer
+  canvas->clear();
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(2.0f);
+  paint.setColor(Color::FromRGBA(100, 200, 50, 255));
+  canvas->drawRect(bounds1, paint);
+  canvas->drawRect(bounds2, paint);
+  canvas->drawRect(bounds3, paint);
+  canvas->drawRect(bounds4, paint);
+  canvas->drawRect(bounds5, paint);
+  // Draw the dirty rects
+  paint.setStyle(PaintStyle::Fill);
+  paint.setColor(Color::FromRGBA(255, 0, 255, 255));
+  paint.setBlendMode(BlendMode::DstOver);
+  rootLayer->removeChildren();
+  rootLayer->addChild(shapeLayer1);
+  rootLayer->addChild(shapeLayer2);
+  rootLayer->addChild(shapeLayer3);
+  rootLayer->addChild(shapeLayer4);
+  rootLayer->addChild(shapeLayer5);
+  dirtyRects = displayList->_root->updateDirtyRegions();
+  canvas->drawRect(dirtyRects[0], paint);
+  canvas->drawRect(dirtyRects[1], paint);
+  canvas->drawRect(dirtyRects[2], paint);
+  canvas->drawRect(dirtyRects[3], paint);
+  canvas->drawRect(dirtyRects[4], paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DecomposeRectTest2"));
+
+  // Draw the shape layer
+  canvas->clear();
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(2.0f);
+  paint.setColor(Color::FromRGBA(100, 200, 50, 255));
+  canvas->drawRect(bounds1, paint);
+  canvas->drawRect(bounds2, paint);
+  canvas->drawRect(bounds3, paint);
+  canvas->drawRect(bounds4, paint);
+  canvas->drawRect(bounds5, paint);
+  canvas->drawRect(bounds6, paint);
+  canvas->drawRect(bounds7, paint);
+  // Draw the dirty rects
+  paint.setStyle(PaintStyle::Fill);
+  paint.setColor(Color::FromRGBA(255, 0, 255, 255));
+  paint.setBlendMode(BlendMode::DstOver);
+  rootLayer->removeChildren();
+  rootLayer->addChild(shapeLayer1);
+  rootLayer->addChild(shapeLayer2);
+  rootLayer->addChild(shapeLayer3);
+  rootLayer->addChild(shapeLayer4);
+  rootLayer->addChild(shapeLayer5);
+  rootLayer->addChild(shapeLayer6);
+  rootLayer->addChild(shapeLayer7);
+  dirtyRects = displayList->_root->updateDirtyRegions();
+  canvas->drawRect(dirtyRects[0], paint);
+  canvas->drawRect(dirtyRects[1], paint);
+  canvas->drawRect(dirtyRects[2], paint);
+  canvas->drawRect(dirtyRects[3], paint);
+  canvas->drawRect(dirtyRects[4], paint);
+  canvas->drawRect(dirtyRects[5], paint);
+  canvas->drawRect(dirtyRects[6], paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DecomposeRectTest3"));
+
+  // Draw the shape layer
+  canvas->clear();
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(2.0f);
+  paint.setColor(Color::FromRGBA(100, 200, 50, 255));
+  canvas->drawRect(bounds1, paint);
+  canvas->drawRect(bounds2, paint);
+  canvas->drawRect(bounds3, paint);
+  canvas->drawRect(bounds4, paint);
+  canvas->drawRect(bounds5, paint);
+  canvas->drawRect(bounds6, paint);
+  canvas->drawRect(bounds7, paint);
+  canvas->drawRect(bounds8, paint);
+  canvas->drawRect(bounds9, paint);
+  // Draw the dirty rects
+  paint.setStyle(PaintStyle::Fill);
+  paint.setColor(Color::FromRGBA(255, 0, 255, 255));
+  paint.setBlendMode(BlendMode::DstOver);
+  rootLayer->removeChildren();
+  rootLayer->addChild(shapeLayer1);
+  rootLayer->addChild(shapeLayer2);
+  rootLayer->addChild(shapeLayer3);
+  rootLayer->addChild(shapeLayer4);
+  rootLayer->addChild(shapeLayer5);
+  rootLayer->addChild(shapeLayer6);
+  rootLayer->addChild(shapeLayer7);
+  rootLayer->addChild(shapeLayer8);
+  rootLayer->addChild(shapeLayer9);
+  dirtyRects = displayList->_root->updateDirtyRegions();
+  canvas->drawRect(dirtyRects[0], paint);
+  canvas->drawRect(dirtyRects[1], paint);
+  canvas->drawRect(dirtyRects[2], paint);
+  canvas->drawRect(dirtyRects[3], paint);
+  canvas->drawRect(dirtyRects[4], paint);
+  canvas->drawRect(dirtyRects[5], paint);
+  canvas->drawRect(dirtyRects[6], paint);
+  canvas->drawRect(dirtyRects[7], paint);
+  canvas->drawRect(dirtyRects[8], paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DecomposeRectTest4"));
+
+  // Draw the shape layer
+  canvas->clear();
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(2.0f);
+  paint.setColor(Color::FromRGBA(100, 200, 50, 255));
+  canvas->drawRect(bounds1, paint);
+  canvas->drawRect(bounds2, paint);
+  canvas->drawRect(bounds3, paint);
+  canvas->drawRect(bounds4, paint);
+  canvas->drawRect(bounds5, paint);
+  canvas->drawRect(bounds6, paint);
+  canvas->drawRect(bounds7, paint);
+  canvas->drawRect(bounds8, paint);
+  canvas->drawRect(bounds9, paint);
+  canvas->drawRect(bounds10, paint);
+  canvas->drawRect(bounds11, paint);
+  // Draw the dirty rects
+  paint.setStyle(PaintStyle::Fill);
+  paint.setColor(Color::FromRGBA(255, 0, 255, 255));
+  paint.setBlendMode(BlendMode::DstOver);
+  rootLayer->removeChildren();
+  rootLayer->addChild(shapeLayer1);
+  rootLayer->addChild(shapeLayer2);
+  rootLayer->addChild(shapeLayer3);
+  rootLayer->addChild(shapeLayer4);
+  rootLayer->addChild(shapeLayer5);
+  rootLayer->addChild(shapeLayer6);
+  rootLayer->addChild(shapeLayer7);
+  rootLayer->addChild(shapeLayer8);
+  rootLayer->addChild(shapeLayer9);
+  rootLayer->addChild(shapeLayer10);
+  rootLayer->addChild(shapeLayer11);
+  dirtyRects = displayList->_root->updateDirtyRegions();
+  canvas->drawRect(dirtyRects[0], paint);
+  canvas->drawRect(dirtyRects[1], paint);
+  canvas->drawRect(dirtyRects[2], paint);
+  canvas->drawRect(dirtyRects[3], paint);
+  canvas->drawRect(dirtyRects[4], paint);
+  canvas->drawRect(dirtyRects[5], paint);
+  canvas->drawRect(dirtyRects[6], paint);
+  canvas->drawRect(dirtyRects[7], paint);
+  canvas->drawRect(dirtyRects[8], paint);
+  canvas->drawRect(dirtyRects[9], paint);
+  canvas->drawRect(dirtyRects[10], paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DecomposeRectTest5"));
+}
 }  // namespace tgfx
