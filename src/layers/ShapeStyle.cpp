@@ -24,7 +24,7 @@ void ShapeStyle::setAlpha(float value) {
     return;
   }
   _alpha = value;
-  invalidate();
+  invalidateContent();
 }
 
 void ShapeStyle::setBlendMode(BlendMode value) {
@@ -32,7 +32,7 @@ void ShapeStyle::setBlendMode(BlendMode value) {
     return;
   }
   _blendMode = value;
-  invalidate();
+  invalidateContent();
 }
 
 void ShapeStyle::setMatrix(const Matrix& value) {
@@ -40,7 +40,7 @@ void ShapeStyle::setMatrix(const Matrix& value) {
     return;
   }
   _matrix = value;
-  invalidate();
+  invalidateContent();
 }
 
 std::shared_ptr<Shader> ShapeStyle::getShader() const {

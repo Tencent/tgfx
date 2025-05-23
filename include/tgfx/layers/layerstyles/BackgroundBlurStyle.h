@@ -80,6 +80,8 @@ class BackgroundBlurStyle : public LayerStyle {
     return srcRect;
   }
 
+  Rect filterBackground(const Rect& srcRect, float contentScale) override;
+
   LayerStyleExtraSourceType extraSourceType() const override {
     return _blurrinessX > 0 && _blurrinessY > 0 ? LayerStyleExtraSourceType::Background
                                                 : LayerStyleExtraSourceType::None;
@@ -94,12 +96,15 @@ class BackgroundBlurStyle : public LayerStyle {
                              float alpha, BlendMode blendMode) override;
 
  private:
-  explicit BackgroundBlurStyle(float blurrinessX, float blurrinessY, TileMode tileMode);
+  BackgroundBlurStyle(float blurrinessX, float blurrinessY, TileMode tileMode);
+
+  std::shared_ptr<ImageFilter> getBackgroundFilter(float contentScale);
 
   float _blurrinessX = 0;
   float _blurrinessY = 0;
-
   TileMode _tileMode = TileMode::Mirror;
+  std::shared_ptr<ImageFilter> backgroundFilter = nullptr;
+  float currentScale = 0.0f;
 };
 
 }  // namespace tgfx

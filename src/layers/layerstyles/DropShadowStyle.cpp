@@ -75,7 +75,7 @@ void DropShadowStyle::setShowBehindLayer(bool showBehindLayer) {
     return;
   }
   _showBehindLayer = showBehindLayer;
-  invalidate();
+  invalidateTransform();
 }
 
 DropShadowStyle::DropShadowStyle(float offsetX, float offsetY, float blurrinessX, float blurrinessY,
@@ -138,7 +138,7 @@ std::shared_ptr<ImageFilter> DropShadowStyle::getShadowFilter(float scale) {
 
 void DropShadowStyle::invalidateFilter() {
   shadowFilter = nullptr;
-  invalidate();
+  invalidateTransform();
 }
 
 }  // namespace tgfx

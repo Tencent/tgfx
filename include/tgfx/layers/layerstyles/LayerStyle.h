@@ -93,6 +93,15 @@ class LayerStyle : public LayerProperty {
   virtual Rect filterBounds(const Rect& srcRect, float contentScale) = 0;
 
   /**
+   * Returns the bounds of the background content after applying the layer style.
+   * @param srcRect The scaled bounds of the background content.
+   * @param contentScale The scale factor of the background bounds relative to its original size.
+   * Some layerStyles have size-related parameters that must be adjusted with this scale factor.
+   * @return The bounds of the background content.
+   */
+  virtual Rect filterBackground(const Rect& srcRect, float contentScale);
+
+  /**
    * Applies the layer style to the scaled image of the layer content and draws it on the canvas.
    * @param canvas The canvas to draw the layer style on.
    * @param content The scaled layer content to apply the layer style to.

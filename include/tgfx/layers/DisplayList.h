@@ -22,6 +22,8 @@
 #include "tgfx/layers/Layer.h"
 
 namespace tgfx {
+class RootLayer;
+
 /**
  * DisplayList represents a collection of layers can be drawn to a Surface. Note: All layers in the
  * display list are not thread-safe and should only be accessed from a single thread.
@@ -86,7 +88,7 @@ class DisplayList {
   bool render(Surface* surface, bool replaceAll = true);
 
  private:
-  std::shared_ptr<Layer> _root = nullptr;
+  std::shared_ptr<RootLayer> _root = nullptr;
   float _zoomScale = 1.0f;
   Point _contentOffset = {};
   uint32_t surfaceContentVersion = 0u;

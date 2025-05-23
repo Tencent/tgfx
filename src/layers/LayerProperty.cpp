@@ -21,10 +21,18 @@
 
 namespace tgfx {
 
-void LayerProperty::invalidate() {
+void LayerProperty::invalidateContent() {
   for (auto& owner : owners) {
     if (auto layer = owner.lock()) {
       layer->invalidateContent();
+    }
+  }
+}
+
+void LayerProperty::invalidateTransform() {
+  for (auto& owner : owners) {
+    if (auto layer = owner.lock()) {
+      layer->invalidateTransform();
     }
   }
 }
