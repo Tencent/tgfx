@@ -20,6 +20,7 @@
 #include <vector>
 #include "core/filters/BlurImageFilter.h"
 #include "core/shaders/GradientShader.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 #include "layers/RootLayer.h"
 #include "layers/contents/RasterizedContent.h"
 #include "tgfx/core/PathEffect.h"
@@ -2497,4 +2498,39 @@ TGFX_TEST(LayerTest, AdaptiveDashEffect) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/AdaptiveDashEffect"));
 }
 
+TGFX_TEST(LayerTest, BottomLeftSurface) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto proxy = tgfx::RenderTargetProxy::MakeFallback(context, 200, 200, false, 1, false,
+                                                     ImageOrigin::BottomLeft);
+  auto surface = Surface::MakeFrom(std::move(proxy), 0, true);
+
+  // parent
+  auto parentFrame = tgfx::Rect::MakeXYWH(60, 110, 40, 40);
+
+  auto childFrame = tgfx::Rect::MakeWH(150, 150);
+  auto childLayer = tgfx::ShapeLayer::Make();
+  childLayer->setExcludeChildEffectsInLayerStyle(true);
+
+  tgfx::Path childPath;
+  childPath.addRect(childFrame);
+  childLayer->setPath(childPath);
+  childLayer->setFillStyles({tgfx::SolidColor::Make(tgfx::Color::Red())});
+
+  // contents
+  auto contentsLayer = tgfx::Layer::Make();
+  contentsLayer->setMatrix(tgfx::Matrix::MakeRotate(3));
+  contentsLayer->setScrollRect(parentFrame);
+  auto childMatrix = tgfx::Matrix::MakeTrans(50, 100);
+  childMatrix.postRotate(3);
+  contentsLayer->setMatrix(childMatrix);
+  contentsLayer->addChild(childLayer);
+  DisplayList displayList;
+
+  displayList.root()->addChild(contentsLayer);
+  displayList.render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BottomLeftSurface"));
+}
 }  // namespace tgfx
