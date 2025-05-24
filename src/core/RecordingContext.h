@@ -62,8 +62,9 @@ class RecordingContext : public DrawContext {
   size_t drawCount = 0;
   MCState lastState = {};
   Fill lastFill = {};
+  Stroke lastStroke = Stroke(0);
 
   void recordState(const MCState& state);
-  void recordStateAndFill(const MCState& state, const Fill& fill);
+  void recordStateAndFill(const MCState& state, const Fill& fill, const Stroke& stroke = Stroke(0));
 };
 }  // namespace tgfx
