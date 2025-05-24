@@ -1645,7 +1645,7 @@ TGFX_TEST(LayerTest, drawRRect) {
   fillPaint.setColor(Color::Red());
   Rect rect = Rect::MakeXYWH(50, 50, 200, 160);
   RRect rRect = {};
-  rRect.setRectXY(rect, 10.f, 10.f);
+  rRect.setRectXY(rect, 10.0f, 10.0f);
   canvas->drawRRect(rRect, fillPaint);
 
   auto strokePaint = Paint();
@@ -1655,22 +1655,22 @@ TGFX_TEST(LayerTest, drawRRect) {
 
   Rect rect1 = Rect::MakeXYWH(300, 50, 200, 160);
   RRect rRect1 = {};
-  rRect1.setRectXY(rect1, 10.f, 10.f);
+  rRect1.setRectXY(rect1, 10.0f, 10.0f);
   canvas->drawRRect(rRect1, strokePaint);
 
   Rect rect2 = Rect::MakeXYWH(600, 50, 200, 160);
   RRect rRect2 = {};
-  rRect2.setRectXY(rect2, 15.f, 10.f);
+  rRect2.setRectXY(rect2, 15.0f, 10.0f);
   canvas->drawRRect(rRect2, strokePaint);
 
   Rect rect3 = Rect::MakeXYWH(50, 300, 200, 160);
   RRect rRect3 = {};
-  rRect3.setRectXY(rect3, 100.f, 150.f);
+  rRect3.setRectXY(rect3, 100.0f, 150.0f);
   canvas->drawRRect(rRect3, strokePaint);
 
   Rect rect4 = Rect::MakeXYWH(300, 300, 200, 160);
   RRect rRect4 = {};
-  rRect4.setRectXY(rect4, 50.f, 10.f);
+  rRect4.setRectXY(rect4, 50.0f, 10.0f);
   canvas->drawRRect(rRect4, strokePaint);
 
   auto strokePaint2 = Paint();
