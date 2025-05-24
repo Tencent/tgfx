@@ -169,7 +169,8 @@ static bool CompareStroke(const Stroke& a, const Stroke& b) {
   return a.width == b.width && a.cap == b.cap && a.join == b.join && a.miterLimit == b.miterLimit;
 }
 
-void RecordingContext::recordStateAndFill(const MCState& state, const Fill& fill, const Stroke& stroke) {
+void RecordingContext::recordStateAndFill(const MCState& state, const Fill& fill,
+                                          const Stroke& stroke) {
   recordState(state);
   if (!CompareFill(lastFill, fill)) {
     auto record = blockBuffer.make<SetFill>(fill);
