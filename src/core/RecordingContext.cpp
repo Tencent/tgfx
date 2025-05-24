@@ -74,8 +74,9 @@ void RecordingContext::drawRect(const Rect& rect, const MCState& state, const Fi
   drawCount++;
 }
 
-void RecordingContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill) {
-  recordStateAndFill(state, fill);
+void RecordingContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
+                                 const Stroke& stroke) {
+  recordStateAndFill(state, fill, stroke);
   auto record = blockBuffer.make<DrawRRect>(rRect);
   records.emplace_back(std::move(record));
   drawCount++;
@@ -164,7 +165,12 @@ static bool CompareFill(const Fill& a, const Fill& b) {
          a.maskFilter == b.maskFilter && a.colorFilter == b.colorFilter;
 }
 
-void RecordingContext::recordStateAndFill(const MCState& state, const Fill& fill) {
+static bool CompareStroke(const Stroke& a, const Stroke& b) {
+  return a.width == b.width && a.cap == b.cap && a.join == b.join && a.miterLimit == b.miterLimit;
+}
+
+void RecordingContext::recordStateAndFill(const MCState& state, const Fill& fill,
+                                          const Stroke& stroke) {
   recordState(state);
   if (!CompareFill(lastFill, fill)) {
     auto record = blockBuffer.make<SetFill>(fill);
@@ -174,6 +180,11 @@ void RecordingContext::recordStateAndFill(const MCState& state, const Fill& fill
     auto record = blockBuffer.make<SetColor>(fill.color);
     records.emplace_back(std::move(record));
     lastFill.color = fill.color;
+  }
+  if (!CompareStroke(lastStroke, stroke)) {
+    auto record = blockBuffer.make<SetStroke>(stroke);
+    records.emplace_back(std::move(record));
+    lastStroke = stroke;
   }
 }
 }  // namespace tgfx

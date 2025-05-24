@@ -69,14 +69,15 @@ void OpsCompositor::fillRect(const Rect& rect, const MCState& state, const Fill&
   pendingRects.emplace_back(std::move(record));
 }
 
-void OpsCompositor::fillRRect(const RRect& rRect, const MCState& state, const Fill& fill) {
+void OpsCompositor::fillRRect(const RRect& rRect, const MCState& state, const Fill& fill,
+                              const Stroke& stroke) {
   DEBUG_ASSERT(!rRect.rect.isEmpty());
   auto rectFill = fill.makeWithMatrix(state.matrix);
-  if (!canAppend(PendingOpType::RRect, state.clip, rectFill)) {
-    flushPendingOps(PendingOpType::RRect, state.clip, rectFill);
+  if (!canAppend(PendingOpType::RRect, state.clip, rectFill, stroke)) {
+    flushPendingOps(PendingOpType::RRect, state.clip, rectFill, stroke);
   }
   auto record =
-      drawingBuffer()->make<RRectRecord>(rRect, state.matrix, rectFill.color.premultiply());
+      drawingBuffer()->make<RRectRecord>(rRect, state.matrix, rectFill.color.premultiply(), stroke);
   pendingRRects.emplace_back(std::move(record));
 }
 
@@ -167,8 +168,17 @@ bool OpsCompositor::CompareFill(const Fill& a, const Fill& b) {
   return true;
 }
 
-bool OpsCompositor::canAppend(PendingOpType type, const Path& clip, const Fill& fill) const {
-  if (pendingType != type || !pendingClip.isSame(clip) || !CompareFill(pendingFill, fill)) {
+static bool CompareStroke(const Stroke& a, const Stroke& b) {
+  if ((a.width == 0.0f) != (b.width == 0.0f)) {
+    return false;
+  }
+  return true;
+}
+
+bool OpsCompositor::canAppend(PendingOpType type, const Path& clip, const Fill& fill,
+                              const Stroke& stroke) const {
+  if (pendingType != type || !pendingClip.isSame(clip) || !CompareFill(pendingFill, fill) ||
+      !CompareStroke(pendingStroke, stroke)) {
     return false;
   }
   switch (pendingType) {
@@ -196,18 +206,20 @@ static bool RRectUseScale(Context* context) {
   return !context->caps()->floatIs32Bits;
 }
 
-void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
+void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill, Stroke stroke) {
   if (pendingType == PendingOpType::Unknown) {
     if (type != PendingOpType::Unknown) {
       pendingType = type;
       pendingClip = clip;
       pendingFill = fill;
+      pendingStroke = stroke;
     }
     return;
   }
   std::swap(pendingType, type);
   std::swap(pendingClip, clip);
   std::swap(pendingFill, fill);
+  std::swap(pendingStroke, stroke);
   PlacementPtr<DrawOp> drawOp = nullptr;
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;

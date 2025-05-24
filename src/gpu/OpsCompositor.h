@@ -58,7 +58,8 @@ class OpsCompositor {
   /**
    * Fills the given rrect with the given state and fill.
    */
-  void fillRRect(const RRect& rRect, const MCState& state, const Fill& fill);
+  void fillRRect(const RRect& rRect, const MCState& state, const Fill& fill,
+                 const Stroke& stroke = Stroke(0));
 
   /**
    * Fills the given shape with the given state and fill.
@@ -93,6 +94,7 @@ class OpsCompositor {
   PendingOpType pendingType = PendingOpType::Unknown;
   Path pendingClip = {};
   Fill pendingFill = {};
+  Stroke pendingStroke = Stroke(0);
   std::shared_ptr<Image> pendingImage = nullptr;
   SamplingOptions pendingSampling = {};
   std::vector<PlacementPtr<RectRecord>> pendingRects = {};
@@ -110,8 +112,10 @@ class OpsCompositor {
   }
 
   bool drawAsClear(const Rect& rect, const MCState& state, const Fill& fill);
-  bool canAppend(PendingOpType type, const Path& clip, const Fill& fill) const;
-  void flushPendingOps(PendingOpType type = PendingOpType::Unknown, Path clip = {}, Fill fill = {});
+  bool canAppend(PendingOpType type, const Path& clip, const Fill& fill,
+                 const Stroke& stroke = Stroke(0)) const;
+  void flushPendingOps(PendingOpType type = PendingOpType::Unknown, Path clip = {}, Fill fill = {},
+                       Stroke stroke = Stroke(0));
   AAType getAAType(const Fill& fill) const;
   std::pair<bool, bool> needComputeBounds(const Fill& fill, bool hasCoverage,
                                           bool hasImageFill = false);

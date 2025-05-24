@@ -26,6 +26,7 @@ enum class RecordType {
   SetClip,
   SetColor,
   SetFill,
+  SetStroke,
   DrawFill,
   DrawRect,
   DrawRRect,
@@ -42,6 +43,7 @@ class PlaybackContext {
  public:
   MCState state = {};
   Fill fill = {};
+  Stroke stroke = Stroke(0);
 };
 
 class Record {
@@ -126,6 +128,22 @@ class SetFill : public Record {
   Fill fill = {};
 };
 
+class SetStroke : public Record {
+ public:
+  explicit SetStroke(Stroke stroke) : stroke(stroke) {
+  }
+
+  RecordType type() const override {
+    return RecordType::SetStroke;
+  }
+
+  void playback(DrawContext*, PlaybackContext* playback) const override {
+    playback->stroke = stroke;
+  }
+
+  Stroke stroke = {};
+};
+
 class DrawFill : public Record {
  public:
   RecordType type() const override {
@@ -167,7 +185,7 @@ class DrawRRect : public Record {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawRRect(rRect, playback->state, playback->fill);
+    context->drawRRect(rRect, playback->state, playback->fill, playback->stroke);
   }
 
   RRect rRect;

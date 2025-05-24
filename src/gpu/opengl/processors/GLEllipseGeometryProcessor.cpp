@@ -124,7 +124,7 @@ void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
     } else {
       fragBuilder->codeAppend("invlen = inversesqrt(grad_dot);");
     }
-    fragBuilder->codeAppend("edgeAlpha *= saturate(0.5+test*invlen);");
+    fragBuilder->codeAppend("edgeAlpha *= clamp(0.5+test*invlen, 0.0, 1.0);");
   }
 
   fragBuilder->codeAppendf("%s = vec4(edgeAlpha);", args.outputCoverage.c_str());

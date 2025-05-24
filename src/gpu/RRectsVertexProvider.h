@@ -23,16 +23,19 @@
 #include "gpu/VertexProvider.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/RRect.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
 struct RRectRecord {
-  RRectRecord(const RRect& rRect, const Matrix& viewMatrix, Color color = {})
-      : rRect(rRect), viewMatrix(viewMatrix), color(color) {
+  RRectRecord(const RRect& rRect, const Matrix& viewMatrix, Color color = {},
+              Stroke stroke = Stroke(0))
+      : rRect(rRect), viewMatrix(viewMatrix), color(color), stroke(stroke) {
   }
 
   RRect rRect;
   Matrix viewMatrix;
   Color color;
+  Stroke stroke;
 };
 
 /**
@@ -72,6 +75,10 @@ class RRectsVertexProvider : public VertexProvider {
     return bitFields.hasColor;
   }
 
+  bool hasStroke() const {
+    return bitFields.hasStroke;
+  }
+
   /**
    * Returns the first color in the provider. If no color record exists, a white color is returned.
    */
@@ -89,6 +96,7 @@ class RRectsVertexProvider : public VertexProvider {
     uint8_t aaType : 2;
     bool useScale : 1;
     bool hasColor : 1;
+    bool hasStroke : 1;
   } bitFields = {};
 
   RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool useScale,
