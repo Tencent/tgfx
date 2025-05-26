@@ -33,7 +33,7 @@ std::shared_ptr<Data> LayerStyleSerialization::Serialize(const LayerStyle* layer
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+  SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
   auto type = layerStyle->Type();
   switch (type) {
     case LayerStyleType::LayerStyle:

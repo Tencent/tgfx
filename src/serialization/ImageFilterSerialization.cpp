@@ -34,7 +34,7 @@ std::shared_ptr<Data> ImageFilterSerialization::Serialize(const ImageFilter* ima
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+  SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
   auto type = Types::Get(imageFilter);
   switch (type) {
     case Types::ImageFilterType::Blur:

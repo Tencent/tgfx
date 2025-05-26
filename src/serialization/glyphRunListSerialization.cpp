@@ -28,7 +28,7 @@ std::shared_ptr<Data> glyphRunListSerialization::Serialize(const GlyphRunList* g
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+  SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
   SerializeglyphRunListImpl(fbb, glyphRunList, map);
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());

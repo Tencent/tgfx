@@ -33,7 +33,7 @@ std::shared_ptr<Data> ColorFilterSerialization::Serialize(const ColorFilter* col
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+  SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
   auto type = Types::Get(colorFilter);
   switch (type) {
     case Types::ColorFilterType::Blend:

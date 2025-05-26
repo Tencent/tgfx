@@ -26,7 +26,7 @@ std::shared_ptr<Data> GlyphFaceSerialization::Serialize(const GlyphFace* glyphFa
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+  SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
   SerializeGlyphFaceImpl(fbb, glyphFace);
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());

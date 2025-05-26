@@ -10,5 +10,7 @@
         <file>icons/InspectorIcon.png</file>
         <file>icons/LayerTreeIcon.png</file>
         <file>icons/openfile.png</file>
+        <file>qml/layerInspector/LayerAttribute.qml</file>
+        <file>qml/layerInspector/LayerTree.qml</file>
     </qresource>
 </RCC>

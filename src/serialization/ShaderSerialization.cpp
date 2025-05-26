@@ -33,7 +33,7 @@ std::shared_ptr<Data> ShaderSerialization::Serialize(const Shader* shader,
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+  SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
   auto type = Types::Get(shader);
   switch (type) {
     case Types::ShaderType::Color:

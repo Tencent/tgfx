@@ -27,14 +27,15 @@
 #include "tgfx/layers/Layer.h"
 
 namespace tgfx {
+extern const std::string HighLightLayerName;
 
 std::shared_ptr<Data> LayerSerialization::SerializeLayer(const Layer* layer,
-                                                         SerializeUtils::Map* map) {
+                                                         SerializeUtils::Map* map, const std::string& typeName) {
   DEBUG_ASSERT(layer != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+  SerializeUtils::SerializeBegin(fbb, typeName, startMap, contentMap);
   auto type = layer->type();
   switch (type) {
     case LayerType::Image:
@@ -86,7 +87,9 @@ void LayerSerialization::SerializeTreeNodeImpl(
   auto startVector = fbb.StartVector();
   std::vector<std::shared_ptr<Layer>> children = layer->children();
   for (const auto& child : children) {
-    SerializeTreeNodeImpl(fbb, child, layerMap);
+    if(child->name() != HighLightLayerName) {
+      SerializeTreeNodeImpl(fbb, child, layerMap);
+    }
   }
   fbb.EndVector(startVector, false, false);
   fbb.EndMap(startMap);

@@ -133,6 +133,19 @@ void StartView::connectToClient(QObject* object) {
   }
 }
 
+void StartView::connectToClientByLayerInspector(QObject* object) {
+  auto client = dynamic_cast<ClientData*>(object);
+  if(client) {
+    if(layerProfilerView) {
+      delete layerProfilerView;
+      layerProfilerView = nullptr;
+    }
+    layerProfilerView = new LayerProfilerView(QString::fromStdString(client->address), 8084, nullptr);
+    layerProfilerView->show();
+    Q_EMIT closeWindow();
+  }
+}
+
 void StartView::showStartView() {
   QQmlApplicationEngine* engine = new QQmlApplicationEngine(this);
   engine->rootContext()->setContextProperty("startViewModel", this);

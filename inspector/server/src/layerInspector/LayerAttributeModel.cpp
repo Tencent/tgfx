@@ -1,0 +1,168 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making tgfx available.
+//
+//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+//  in compliance with the License. You may obtain a copy of the License at
+//
+//      https://opensource.org/licenses/BSD-3-Clause
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include "LayerAttributeModel.h"
+
+template<typename T>
+LayerItem* SetSingleAttribute(LayerItem* parent,
+  const char* key, T value, bool isExpandable, bool isAddress, uint64_t objID) {
+  QVariantList var;
+  QVariant ID;
+  var << key << value << isExpandable << isAddress << objID;
+  parent->appendChild(std::make_unique<LayerItem>(var, parent));
+  return parent->child(parent->childCount() - 1);
+}
+
+LayerAttributeModel::LayerAttributeModel(QObject* parent)
+  :LayerModel(parent)
+{
+  currentExpandItem = rootItem.get();
+  currentExpandItemindex = QModelIndex();
+  currentRow = 0;
+  m_CurrentLayerAddress = 0;
+}
+
+void LayerAttributeModel::setLayerAttribute(const flexbuffers::Map &map) {
+  beginResetModel();
+  rootItem = std::make_shared<LayerItem>(QVariantList{"LayerName", "LayerAddress"});
+  ProcessLayerAttribute(map, rootItem.get());
+  addressToLayerData[m_CurrentLayerAddress].layerItem = rootItem;
+  endResetModel();
+  emit modelReset();
+}
+
+void LayerAttributeModel::setLayerSubAttribute(const flexbuffers::Map &map) {
+  auto size = map.Keys().size();
+  beginInsertRows(currentExpandItemindex, 0, (int)(--size));
+  ProcessLayerAttribute(map, currentExpandItem);
+  endInsertRows();
+  emit expandItemRow(currentRow);
+}
+
+QVariant LayerAttributeModel::data(const QModelIndex& index, int role) const {
+  if (!index.isValid() || role != Qt::DisplayRole)
+    return {};
+
+  const auto *item = static_cast<const LayerItem*>(index.internalPointer());
+  if(item->data(index.column()).userType() == QMetaType::Float) {
+    auto floatitem = item->data(index.column()).toFloat();
+    return QString::number(floatitem, 'f', 2);
+  }
+  if(index.column() == 1 && item->data(3).toBool()) {
+    auto address = item->data(1).toULongLong();
+    if(address) {
+       return QString("0x%1").arg(address, 0, 16);
+    }else {
+      return "nullptr";
+    }
+  }
+  return item->data(index.column());
+}
+
+bool LayerAttributeModel::isExpandable(const QModelIndex &index) {
+  if (!index.isValid())
+    return false;
+  const auto *item = static_cast<const LayerItem*>(index.internalPointer());
+  return item->data(2).toBool();
+}
+
+void LayerAttributeModel::switchToLayer(uint64_t address) {
+  m_CurrentLayerAddress = address;
+  beginResetModel();
+  rootItem = addressToLayerData[address].layerItem;
+  endResetModel();
+  for(const auto& rowData : addressToLayerData[address].rowDatas) {
+    switch (rowData.op) {
+      case RowOp::Collapse:
+        emit collapseItemRow(rowData.row);
+        break;
+      case RowOp::Expand:
+        emit expandItemRow(rowData.row);
+        break;
+    }
+  }
+}
+
+void LayerAttributeModel::flushTree() {
+  if(m_CurrentLayerAddress) {
+    if(isExistedInLayerMap(m_CurrentLayerAddress)) {
+      addressToLayerData.erase(m_CurrentLayerAddress);
+      emit flushLayerAttribute(m_CurrentLayerAddress);
+    }
+  }
+}
+
+void LayerAttributeModel::clearAttribute() {
+  beginResetModel();
+  rootItem = std::make_shared<LayerItem>(QVariantList{"LayerName", "LayerAddress"});
+  endResetModel();
+}
+
+void LayerAttributeModel::expandSubAttribute(const QModelIndex &index, int row) {
+  if (!index.isValid())
+    return;
+  currentExpandItemindex = index;
+  currentExpandItem = static_cast<LayerItem*>(index.internalPointer());
+  currentRow = row;
+  uint64_t objID = currentExpandItem->data(4).toULongLong();
+  emit expandSubAttributeSignal(objID);
+  addressToLayerData[m_CurrentLayerAddress].rowDatas.push_back({RowOp::Expand, row});
+}
+
+void LayerAttributeModel::collapseRow(int row) {
+  addressToLayerData[m_CurrentLayerAddress].rowDatas.push_back({RowOp::Collapse, row});
+}
+
+void LayerAttributeModel::expandRow(int row) {
+  addressToLayerData[m_CurrentLayerAddress].rowDatas.push_back({RowOp::Expand, row});
+}
+
+void LayerAttributeModel::ProcessLayerAttribute(const flexbuffers::Map& contentMap, LayerItem* item) {
+  auto keys = contentMap.Keys();
+  for(size_t i = 0; i < keys.size(); i++) {
+    std::string key = keys[i].AsString().str();
+    auto valueMap = contentMap[key].AsMap();
+    bool isExpandable = valueMap["IsExpandable"].AsBool();
+    bool isAddress = valueMap["IsAddress"].AsBool();
+    uint64_t objID;
+    if(valueMap["objID"].GetType() == flexbuffers::FBT_NULL) {
+      objID = 0;
+    }else {
+      objID = valueMap["objID"].AsUInt64();
+    }
+    switch (valueMap["Value"].GetType()) {
+      case flexbuffers::FBT_UINT:
+        SetSingleAttribute(item, key.c_str(), valueMap["Value"].AsUInt64(), isExpandable, isAddress, objID);
+        break;
+      case flexbuffers::FBT_INT:
+        SetSingleAttribute(item, key.c_str(), valueMap["Value"].AsInt64(), isExpandable, isAddress, objID);
+        break;
+      case flexbuffers::FBT_FLOAT:
+        SetSingleAttribute(item, key.c_str(), valueMap["Value"].AsFloat(), isExpandable, isAddress, objID);
+        break;
+      case flexbuffers::FBT_STRING:
+        SetSingleAttribute(item, key.c_str(), valueMap["Value"].AsString().c_str(), isExpandable, isAddress, objID);
+        break;
+      case flexbuffers::FBT_BOOL:
+        SetSingleAttribute(item, key.c_str(), valueMap["Value"].AsBool(), isExpandable, isAddress, objID);
+        break;
+      default:
+        qDebug() << "Unknown value type!";
+    }
+  }
+}

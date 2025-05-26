@@ -18,6 +18,7 @@
 #pragma once
 
 #include "Inspector.h"
+#include "LayerProfiler.h"
 #include "Scoped.h"
 
 #define FrameMark inspector::Inspector::SendFrameMark(nullptr)
@@ -25,3 +26,6 @@
 #define ScopedMark(type, active) inspector::Scoped scoped(type, active)
 #define OperateMark(type) ScopedMark(type, true)
 #define TaskMark(type) ScopedMark(type, true)
+
+#define LAYER_DATA(data) inspector::LayerProfiler::SendLayerData(data)
+#define LAYER_CALLBACK(func) inspector::LayerProfiler::SetLayerCallBack(func)

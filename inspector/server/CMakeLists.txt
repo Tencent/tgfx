@@ -29,6 +29,7 @@ if (QT_VERSION)
     endif ()
 endif ()
 
+option(TGFX_USE_INSPECTOR "Enable profiling support for the TGFX Inspector tool" OFF)
 add_subdirectory(../.. ./tgfx)
 
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Core)
@@ -38,9 +39,10 @@ if (${QT_VERSION_MAJOR} LESS 6)
     SET(CMAKE_OSX_ARCHITECTURES x86_64)
 endif ()
 
-find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Widgets OpenGL qml Quick)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Widgets OpenGL qml Quick WebSockets Network)
 list(APPEND TGFX_INSPECTOR_LIBS Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets
-        Qt${QT_VERSION_MAJOR}::OpenGL Qt${QT_VERSION_MAJOR}::Qml Qt${QT_VERSION_MAJOR}::Quick)
+        Qt${QT_VERSION_MAJOR}::OpenGL Qt${QT_VERSION_MAJOR}::Qml Qt${QT_VERSION_MAJOR}::Quick
+        Qt${QT_VERSION_MAJOR}::WebSockets Qt${QT_VERSION_MAJOR}::Network)
 if (${QT_VERSION} VERSION_LESS "5.15")
     function(qt_add_resources outfiles)
         qt5_add_resources("${outfiles}" ${ARGN})
@@ -84,7 +86,7 @@ elseif (WIN32)
 endif ()
 
 list(APPEND TGFX_INSPECTOR_SRC src src/tags)
-file(GLOB TGFX_INSPECTOR_FILES src/*.* src/tags/*.*)
+file(GLOB TGFX_INSPECTOR_FILES src/*.* src/tags/*.* src/socket/*.* src/layerInspector/*.*)
 
 list(APPEND TGFX_INSPECTOR_COMMON_SRC ${INSPECTOR_COMMON_DIR})
 file(GLOB TGFX_INSPECTOR_COMMON_FILES ${INSPECTOR_COMMON_DIR}/*.*)

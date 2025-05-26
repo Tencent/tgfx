@@ -135,11 +135,10 @@ std::string SerializeUtils::MipmapModeToString(MipmapMode mode) {
 std::string SerializeUtils::ShapeTypeToString(Types::ShapeType type) {
   static std::unordered_map<Types::ShapeType, const char*> m = {
       {Types::ShapeType::Append, "Append"}, {Types::ShapeType::Effect, "Effect"},
-      {Types::ShapeType::Text, "Text"},     {Types::ShapeType::Inverse, "Inverse"},
+      {Types::ShapeType::Glyph, "Glyph"},   {Types::ShapeType::Inverse, "Inverse"},
       {Types::ShapeType::Matrix, "Matrix"}, {Types::ShapeType::Merge, "Merge"},
       {Types::ShapeType::Path, "Path"},     {Types::ShapeType::Provider, "Provider"},
-      {Types::ShapeType::Stroke, "Stroke"}, {Types::ShapeType::Glyph, "Glyph"},
-  };
+      {Types::ShapeType::Stroke, "Stroke"}};
   return m[type];
 }
 
@@ -276,11 +275,11 @@ void SerializeUtils::FillMap(const Point& point, uint64_t objID, Map* map) {
 
 void SerializeUtils::FillMap(const std::vector<std::shared_ptr<LayerFilter>>& filters,
                              uint64_t objID, Map* map) {
-  (*map)[objID] = [filters, &map]() {
+  (*map)[objID] = [filters, map]() {
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
     for (size_t i = 0; i < filters.size(); i++) {
       std::stringstream ss;
       ss << "[" << i << "]";
@@ -301,7 +300,7 @@ void SerializeUtils::FillMap(const std::shared_ptr<LayerFilter>& layerFilter, ui
   if (layerFilter == nullptr) {
     return;
   }
-  (*map)[objID] = [layerFilter, &map]() {
+  (*map)[objID] = [layerFilter, map]() {
     return LayerFilterSerialization::Serialize(layerFilter.get(), map);
   };
 }
@@ -310,7 +309,7 @@ void SerializeUtils::FillMap(const std::shared_ptr<Layer>& layer, uint64_t objID
   if (layer == nullptr) {
     return;
   }
-  (*map)[objID] = [layer, &map]() { return LayerSerialization::SerializeLayer(layer.get(), map); };
+  (*map)[objID] = [layer, map]() { return LayerSerialization::SerializeLayer(layer.get(), map); };
 }
 
 void SerializeUtils::FillMap(const Rect& rect, uint64_t objID, Map* map) {
@@ -319,11 +318,11 @@ void SerializeUtils::FillMap(const Rect& rect, uint64_t objID, Map* map) {
 
 void SerializeUtils::FillMap(const std::vector<std::shared_ptr<Layer>>& children, uint64_t objID,
                              Map* map) {
-  (*map)[objID] = [children, &map]() {
+  (*map)[objID] = [children, map]() {
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
     for (size_t i = 0; i < children.size(); i++) {
       std::stringstream ss;
       ss << "[" << i << "]";
@@ -341,11 +340,11 @@ void SerializeUtils::FillMap(const std::vector<std::shared_ptr<Layer>>& children
 
 void SerializeUtils::FillMap(const std::vector<std::shared_ptr<LayerStyle>>& layerStyles,
                              uint64_t objID, Map* map) {
-  (*map)[objID] = [layerStyles, &map]() {
+  (*map)[objID] = [layerStyles, map]() {
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
     for (size_t i = 0; i < layerStyles.size(); i++) {
       std::stringstream ss;
       ss << "[" << i << "]";
@@ -366,7 +365,7 @@ void SerializeUtils::FillMap(const std::shared_ptr<LayerStyle>& layerStyle, uint
   if (layerStyle == nullptr) {
     return;
   }
-  (*map)[objID] = [layerStyle, &map]() {
+  (*map)[objID] = [layerStyle, map]() {
     return LayerStyleSerialization::Serialize(layerStyle.get(), map);
   };
 }
@@ -386,16 +385,16 @@ void SerializeUtils::FillMap(const std::shared_ptr<Shape>& shape, uint64_t objID
   if (shape == nullptr) {
     return;
   }
-  (*map)[objID] = [shape, &map]() { return ShapeSerialization::Serialize(shape.get(), map); };
+  (*map)[objID] = [shape, map]() { return ShapeSerialization::Serialize(shape.get(), map); };
 }
 
 void SerializeUtils::FillMap(const std::vector<std::shared_ptr<ShapeStyle>>& shapeStyles,
                              uint64_t objID, Map* map) {
-  (*map)[objID] = [shapeStyles, &map]() {
+  (*map)[objID] = [shapeStyles, map]() {
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
     for (size_t i = 0; i < shapeStyles.size(); i++) {
       std::stringstream ss;
       ss << "[" << i << "]";
@@ -416,7 +415,7 @@ void SerializeUtils::FillMap(const std::shared_ptr<ShapeStyle>& shapeStyle, uint
   if (shapeStyle == nullptr) {
     return;
   }
-  (*map)[objID] = [shapeStyle, &map]() {
+  (*map)[objID] = [shapeStyle, map]() {
     return ShapeStyleSerialization::Serialize(shapeStyle.get(), map);
   };
 }
@@ -426,7 +425,7 @@ void SerializeUtils::FillMap(const std::shared_ptr<ColorFilter>& colorFilter, ui
   if (colorFilter == nullptr) {
     return;
   }
-  (*map)[objID] = [colorFilter, &map]() {
+  (*map)[objID] = [colorFilter, map]() {
     return ColorFilterSerialization::Serialize(colorFilter.get(), map);
   };
 }
@@ -451,7 +450,7 @@ void SerializeUtils::FillMap(const std::shared_ptr<ImageFilter>& imageFilter, ui
   if (imageFilter == nullptr) {
     return;
   }
-  (*map)[objID] = [imageFilter, &map]() {
+  (*map)[objID] = [imageFilter, map]() {
     return ImageFilterSerialization::Serialize(imageFilter.get(), map);
   };
 }
@@ -470,7 +469,7 @@ void SerializeUtils::FillMap(const std::shared_ptr<Shader>& shader, uint64_t obj
   if (shader == nullptr) {
     return;
   }
-  (*map)[objID] = [shader, &map]() { return ShaderSerialization::Serialize(shader.get(), map); };
+  (*map)[objID] = [shader, map]() { return ShaderSerialization::Serialize(shader.get(), map); };
 }
 
 void SerializeUtils::FillMap(const std::vector<float>& floatVec, uint64_t objID, Map* map) {
@@ -478,7 +477,7 @@ void SerializeUtils::FillMap(const std::vector<float>& floatVec, uint64_t objID,
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
     for (size_t i = 0; i < floatVec.size(); i++) {
       std::stringstream ss;
       ss << "[" << i << "]";
@@ -495,7 +494,7 @@ void SerializeUtils::FillMap(const std::array<float, 20>& matrix, uint64_t objID
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
     for (size_t i = 0; i < 20; i++) {
       std::stringstream ss;
       ss << "[" << i << "]";
@@ -508,11 +507,11 @@ void SerializeUtils::FillMap(const std::array<float, 20>& matrix, uint64_t objID
 }
 
 void SerializeUtils::FillMap(const std::vector<GlyphRun>& glyphRuns, uint64_t objID, Map* map) {
-  (*map)[objID] = [glyphRuns, &map]() {
+  (*map)[objID] = [glyphRuns, map]() {
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
     for (size_t i = 0; i < glyphRuns.size(); i++) {
       std::stringstream ss;
       ss << "[" << i << "]";
@@ -531,7 +530,7 @@ void SerializeUtils::FillMap(const std::vector<GlyphID>& glyphs, uint64_t objID,
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
     for (size_t i = 0; i < glyphs.size(); i++) {
       std::stringstream ss;
       ss << "[" << i << "]";
@@ -544,11 +543,11 @@ void SerializeUtils::FillMap(const std::vector<GlyphID>& glyphs, uint64_t objID,
 }
 
 void SerializeUtils::FillMap(const std::vector<Point>& points, uint64_t objID, Map* map) {
-  (*map)[objID] = [points, &map]() {
+  (*map)[objID] = [points, map]() {
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
     for (size_t i = 0; i < points.size(); i++) {
       std::stringstream ss;
       ss << "[" << i << "]";
@@ -564,11 +563,11 @@ void SerializeUtils::FillMap(const std::vector<Point>& points, uint64_t objID, M
 
 void SerializeUtils::FillMap(const std::vector<std::shared_ptr<ImageFilter>>& imageFilters,
                              uint64_t objID, Map* map) {
-  (*map)[objID] = [imageFilters, &map]() {
+  (*map)[objID] = [imageFilters, map]() {
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
     for (size_t i = 0; i < imageFilters.size(); i++) {
       std::stringstream ss;
       ss << "[" << i << "]";
@@ -585,11 +584,11 @@ void SerializeUtils::FillMap(const std::vector<std::shared_ptr<ImageFilter>>& im
 }
 
 void SerializeUtils::FillMap(const std::vector<Color>& colors, uint64_t objID, Map* map) {
-  (*map)[objID] = [colors, &map]() {
+  (*map)[objID] = [colors, map]() {
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
     for (size_t i = 0; i < colors.size(); i++) {
       std::stringstream ss;
       ss << "[" << i << "]";
@@ -608,7 +607,7 @@ void SerializeUtils::FillMap(const Color& color, uint64_t objID, Map* map) {
 }
 
 void SerializeUtils::FillMap(const Font& font, uint64_t objID, Map* map) {
-  (*map)[objID] = [font, &map]() { return FontSerialization::Serialize(&font, map); };
+  (*map)[objID] = [font, map]() { return FontSerialization::Serialize(&font, map); };
 }
 
 void SerializeUtils::FillMap(const FontMetrics& fontMetrics, uint64_t objID, Map* map) {
@@ -616,11 +615,11 @@ void SerializeUtils::FillMap(const FontMetrics& fontMetrics, uint64_t objID, Map
 }
 
 void SerializeUtils::FillMap(const GlyphRun& glyphRun, uint64_t objID, Map* map) {
-  (*map)[objID] = [glyphRun, &map]() { return glyphRunSerialization::Serialize(&glyphRun, map); };
+  (*map)[objID] = [glyphRun, map]() { return glyphRunSerialization::Serialize(&glyphRun, map); };
 }
 
 void SerializeUtils::FillMap(const Path& path, uint64_t objID, Map* map) {
-  (*map)[objID] = [path, &map]() { return PathSerialization::Serialize(&path, map); };
+  (*map)[objID] = [path, map]() { return PathSerialization::Serialize(&path, map); };
 }
 
 void SerializeUtils::SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key, const char* value,

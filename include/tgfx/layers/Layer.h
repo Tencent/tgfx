@@ -632,5 +632,6 @@ class Layer {
   friend class DisplayList;
   friend class LayerProperty;
   friend class LayerSerialization;
+  friend class LayerInspector;
 };
 }  // namespace tgfx

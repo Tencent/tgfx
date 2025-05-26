@@ -339,11 +339,12 @@ ApplicationWindow {
                             }
 
                             onDoubleClicked: {
-                                if (startViewModel && selectedIndex === 0) {
-                                    startViewModel.connectToClient(modelData)
-                                }
-                                else if(selectedIndex === 1) {
-                                    //todo: open the layer tree
+                                if (startViewModel) {
+                                    if(selectedIndex === 0){
+                                        startViewModel.connectToClient(modelData)
+                                    }else if(selectedIndex === 1){
+                                        startViewModel.connectToClientByLayerInspector(modelData)
+                                    }
                                 }
                             }
                         }

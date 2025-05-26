@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShapeDrawOp.h"
-#include <InspectorDefine.h>
+#include "core/utils/Profiling.h"
 #include "core/PathTriangulator.h"
 #include "core/utils/Log.h"
 #include "gpu/ProxyProvider.h"

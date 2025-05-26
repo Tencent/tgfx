@@ -20,10 +20,18 @@
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
 
+#ifdef TGFX_USE_INSPECTOR
+#include "tgfx/layers/LayerInspector.h"
+#endif
+
 namespace tgfx {
 
 DisplayList::DisplayList() : _root(RootLayer::Make()) {
   _root->_root = _root.get();
+#ifdef TGFX_USE_INSPECTOR
+  auto& layerInspector = LayerInspector::GetLayerInspector();
+  layerInspector.setDisplayList(this);
+#endif
 }
 
 Layer* DisplayList::root() const {
@@ -73,6 +81,12 @@ void DisplayList::render(Surface* surface, bool autoClear) {
   DrawArgs args(surface->getContext());
   args.renderRect = &renderRect;
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
+
+#ifdef TGFX_USE_INSPECTOR
+  auto& layerInspector = LayerInspector::GetLayerInspector();
+  //layerInspector.serializingLayerTree();
+  layerInspector.setCallBack();
+#endif
 }
 
 }  // namespace tgfx
