@@ -37,27 +37,6 @@ std::shared_ptr<Shape> Shape::Merge(std::shared_ptr<Shape> first, std::shared_pt
   return std::make_shared<MergeShape>(std::move(first), std::move(second), pathOp);
 }
 
-bool MergeShape::isRect(Rect* rect) const {
-  if (pathOp != PathOp::Intersect) {
-    return false;
-  }
-  Rect firstRect = {};
-  if (!first->isRect(&firstRect)) {
-    return false;
-  }
-  Rect secondRect = {};
-  if (!second->isRect(&secondRect)) {
-    return false;
-  }
-  if (rect) {
-    if (!firstRect.intersect(secondRect)) {
-      return false;
-    }
-    *rect = firstRect;
-  }
-  return true;
-}
-
 bool MergeShape::isInverseFillType() const {
   switch (pathOp) {
     case PathOp::Difference:

@@ -25,7 +25,11 @@ void LayerStyle::setBlendMode(BlendMode blendMode) {
     return;
   }
   _blendMode = blendMode;
-  invalidate();
+  invalidateTransform();
+}
+
+Rect LayerStyle::filterBackground(const Rect& srcRect, float) {
+  return srcRect;
 }
 
 void LayerStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content,

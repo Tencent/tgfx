@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,19 +18,17 @@
 
 #pragma once
 
-#include "core/GlyphRunList.h"
 #include "gpu/ResourceKey.h"
+#include "tgfx/core/GlyphFace.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
 /**
- * Shape that contains a GlyphRunList.
+ * Shape that contains a GlyphFace and GlyphID.
  */
-class GlyphShape : public Shape {
+class GlyphShape final : public Shape {
  public:
-  explicit GlyphShape(std::shared_ptr<GlyphRunList> glyphRunList)
-      : glyphRunList(std::move(glyphRunList)) {
-  }
+  explicit GlyphShape(std::shared_ptr<GlyphFace> glyphFace, GlyphID glyphID);
 
   Rect getBounds() const override;
 
@@ -40,13 +38,13 @@ class GlyphShape : public Shape {
   Type type() const override {
     return Type::Glyph;
   }
-
   UniqueKey getUniqueKey() const override {
     return uniqueKey.get();
   }
 
  private:
   LazyUniqueKey uniqueKey = {};
-  std::shared_ptr<GlyphRunList> glyphRunList = nullptr;
+  std::shared_ptr<GlyphFace> glyphFace = nullptr;
+  GlyphID glyphID = 0;
 };
 }  // namespace tgfx

@@ -32,6 +32,10 @@ if (NOT WEB OR EMSCRIPTEN_PTHREADS)
     option(TGFX_USE_THREADS "Enable support for multithreaded rendering" ON)
 endif ()
 
+if (CMAKE_BUILD_TYPE MATCHES "Debug")
+    option(TGFX_USE_INSPECTOR "Enable profiling support for the TGFX Inspector tool" ON)
+endif ()
+
 if (APPLE OR (WEB AND NOT TGFX_USE_THREADS))
     option(TGFX_USE_FREETYPE "Use Freetype as the vector backend" OFF)
 else ()
@@ -326,6 +330,12 @@ else ()
     set(TGFX_USE_NATIVE_GL ON)
 endif ()
 
+if (TGFX_USE_INSPECTOR)
+    list(APPEND TGFX_DEFINES TGFX_USE_INSPECTOR)
+    list(APPEND TGFX_INCLUDES third_party/flatbuffers/include)
+    file(GLOB_RECURSE SERIALIZATION_FILE src/serialization/*.*)
+    list(APPEND TGFX_FILES ${SERIALIZATION_FILE})
+endif ()
 
 list(APPEND TGFX_STATIC_VENDORS pathkit)
 list(APPEND TGFX_INCLUDES third_party/pathkit)

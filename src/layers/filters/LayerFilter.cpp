@@ -29,10 +29,18 @@ std::shared_ptr<ImageFilter> LayerFilter::getImageFilter(float scale) {
   return lastFilter;
 }
 
+Rect LayerFilter::filterBounds(const Rect& srcRect, float contentScale) {
+  auto filter = getImageFilter(contentScale);
+  if (!filter) {
+    return srcRect;
+  }
+  return filter->filterBounds(srcRect);
+}
+
 void LayerFilter::invalidateFilter() {
   lastFilter = nullptr;
   dirty = true;
-  invalidate();
+  invalidateTransform();
 }
 
 }  // namespace tgfx

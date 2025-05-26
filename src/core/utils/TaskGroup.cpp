@@ -29,7 +29,8 @@
 namespace tgfx {
 static constexpr auto THREAD_TIMEOUT = std::chrono::seconds(10);
 static constexpr uint32_t THREAD_POOL_SIZE = 32;
-static constexpr uint32_t TASK_QUEUE_SIZE = 4096;
+static constexpr uint32_t TASK_QUEUE_SIZE = 8192;
+static constexpr int TASK_PRIORITY_SIZE = 3;
 
 int GetCPUCores() {
   int cpuCores = 0;
@@ -72,7 +73,11 @@ void OnAppExit() {
 
 TaskGroup::TaskGroup() {
   threads = new LockFreeQueue<std::thread*>(THREAD_POOL_SIZE);
-  tasks = new LockFreeQueue<std::shared_ptr<Task>>(TASK_QUEUE_SIZE);
+  priorityQueues.reserve(TASK_PRIORITY_SIZE);
+  for (int i = 0; i < TASK_PRIORITY_SIZE; i++) {
+    auto queue = new LockFreeQueue<std::shared_ptr<Task>>(TASK_QUEUE_SIZE);
+    priorityQueues.push_back(queue);
+  }
   std::atexit(OnAppExit);
 }
 
@@ -91,14 +96,15 @@ bool TaskGroup::checkThreads() {
   return totalThreads > 0;
 }
 
-bool TaskGroup::pushTask(std::shared_ptr<Task> task) {
+bool TaskGroup::pushTask(std::shared_ptr<Task> task, TaskPriority priority) {
 #ifndef TGFX_USE_THREADS
   return false;
 #endif
   if (exited || !checkThreads()) {
     return false;
   }
-  if (!tasks->enqueue(std::move(task))) {
+  auto& queue = priorityQueues[static_cast<size_t>(priority)];
+  if (!queue->enqueue(std::move(task))) {
     return false;
   }
   if (waitingThreads > 0) {
@@ -110,9 +116,13 @@ bool TaskGroup::pushTask(std::shared_ptr<Task> task) {
 std::shared_ptr<Task> TaskGroup::popTask() {
   std::unique_lock<std::mutex> autoLock(locker);
   while (!exited) {
-    auto task = tasks->dequeue();
-    if (task || exited) {
-      return task;
+    for (auto& queue : priorityQueues) {
+      if (auto task = queue->dequeue()) {
+        return task;
+      }
+    }
+    if (exited) {
+      return nullptr;
     }
     ++waitingThreads;
     auto status = condition.wait_for(autoLock, THREAD_TIMEOUT);
@@ -146,7 +156,10 @@ void TaskGroup::releaseThreads(bool exit) {
   DEBUG_ASSERT(waitingThreads == 0)
   if (exit) {
     delete threads;
-    delete tasks;
+    for (auto& queue : priorityQueues) {
+      delete queue;
+    }
+    priorityQueues.clear();
   } else {
     exited = false;
   }

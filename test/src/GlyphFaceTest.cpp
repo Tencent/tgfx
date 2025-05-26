@@ -75,7 +75,8 @@ class CustomPathGlyphFace : public GlyphFace {
     }
   }
 
-  std::shared_ptr<Image> getImage(GlyphID /*glyphID*/, Matrix* /*matrix*/) const override {
+  std::shared_ptr<ImageCodec> getImage(GlyphID /*glyphID*/, const Stroke* /*stroke*/,
+                                       Matrix* /*matrix*/) const override {
     return nullptr;
   }
 
@@ -121,7 +122,8 @@ class CustomImageGlyphFace : public GlyphFace {
     return false;
   }
 
-  std::shared_ptr<Image> getImage(GlyphID glyphID, Matrix* matrix) const override {
+  std::shared_ptr<ImageCodec> getImage(GlyphID glyphID, const Stroke*,
+                                       Matrix* matrix) const override {
     std::string imagePath;
     switch (glyphID) {
       case 4:
@@ -138,7 +140,7 @@ class CustomImageGlyphFace : public GlyphFace {
     }
 
     matrix->setScale(0.25f * _scale, 0.25f * _scale);
-    return Image::MakeFromFile(ProjectPath::Absolute(imagePath));
+    return ImageCodec::MakeFrom(ProjectPath::Absolute(imagePath));
   }
 
   Rect getBounds(GlyphID glyphID) const override {
@@ -217,7 +219,8 @@ class CustomPathGlyphFace2 : public GlyphFace, std::enable_shared_from_this<Cust
     return font20.getPath(glyphID, path);
   }
 
-  std::shared_ptr<Image> getImage(GlyphID /*glyphID*/, Matrix* /*matrix*/) const override {
+  std::shared_ptr<ImageCodec> getImage(GlyphID /*glyphID*/, const Stroke* /*stroke*/,
+                                       Matrix* /*matrix*/) const override {
     return nullptr;
   }
 
@@ -263,8 +266,9 @@ class CustomImageGlyphFace2 : public GlyphFace,
     return false;
   }
 
-  std::shared_ptr<Image> getImage(GlyphID glyphID, Matrix* matrix) const override {
-    return fontEmoji.getImage(glyphID, matrix);
+  std::shared_ptr<ImageCodec> getImage(GlyphID glyphID, const Stroke* stroke,
+                                       Matrix* matrix) const override {
+    return fontEmoji.getImage(glyphID, stroke, matrix);
   }
 
   Rect getBounds(GlyphID glyphID) const override {

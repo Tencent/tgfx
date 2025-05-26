@@ -170,4 +170,13 @@ bool DrawingManager::flush() {
   renderTasks.clear();
   return true;
 }
+
+void DrawingManager::releaseAll() {
+  compositors.clear();
+  resourceTasks.clear();
+  resourceTaskMap = {};
+  flattenTasks.clear();
+  renderTasks.clear();
+}
+
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,32 +17,31 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GlyphShape.h"
-#include "core/GlyphRunList.h"
-#include "core/utils/Log.h"
 
 namespace tgfx {
-std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<TextBlob> textBlob) {
-  auto glyphRunLists = GlyphRunList::Unwrap(textBlob.get());
-  if (glyphRunLists == nullptr || glyphRunLists->size() != 1) {
+std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<GlyphFace> glyphFace, GlyphID glyphID) {
+  if (glyphFace == nullptr || glyphID == 0) {
     return nullptr;
   }
-  auto glyphRunList = (*glyphRunLists)[0];
-  if (!glyphRunList->hasOutlines()) {
+  if (!glyphFace->hasOutlines()) {
     return nullptr;
   }
-  return std::make_shared<GlyphShape>(std::move(glyphRunList));
+  return std::make_shared<GlyphShape>(std::move(glyphFace), glyphID);
 }
 
-Rect GlyphShape::getBounds() const {
-  return glyphRunList->getBounds();
+GlyphShape::GlyphShape(std::shared_ptr<GlyphFace> glyphFace, GlyphID glyphID)
+    : glyphFace(std::move(glyphFace)), glyphID(glyphID) {
 }
 
 Path GlyphShape::getPath() const {
   Path path = {};
-  if (!glyphRunList->getPath(&path)) {
-    LOGE("TextShape::getPath() Failed to get path from GlyphRunList!");
+  if (!glyphFace->getPath(glyphID, &path)) {
     return {};
   }
   return path;
+}
+
+Rect GlyphShape::getBounds() const {
+  return glyphFace->getBounds(glyphID);
 }
 }  // namespace tgfx

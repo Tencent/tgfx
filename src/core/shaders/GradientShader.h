@@ -53,6 +53,8 @@ class GradientShader : public Shader {
 
   std::vector<Color> originalColors = {};
   std::vector<float> originalPositions = {};
+  const Matrix pointsToUnit;
+  bool colorsAreOpaque = false;
 
  protected:
   Type type() const override {
@@ -64,9 +66,6 @@ class GradientShader : public Shader {
     // GradientShaders with the same GradientInfo struct will not be considered equal.
     return shader == this;
   }
-
-  const Matrix pointsToUnit;
-  bool colorsAreOpaque = false;
 };
 
 class LinearGradientShader : public GradientShader {

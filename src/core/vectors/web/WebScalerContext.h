@@ -35,9 +35,11 @@ class WebScalerContext : public ScalerContext {
 
   bool generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic, Path* path) const override;
 
-  Rect getImageTransform(GlyphID glyphID, Matrix* matrix) const override;
+  Rect getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
+                         Matrix* matrix) const override;
 
-  std::shared_ptr<ImageBuffer> generateImage(GlyphID glyphID, bool tryHardware) const override;
+  bool readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke, const ImageInfo& dstInfo,
+                  void* dstPixels) const override;
 
  private:
   emscripten::val scalerContext = emscripten::val::null();

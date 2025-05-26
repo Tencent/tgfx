@@ -20,6 +20,8 @@
 #include <vector>
 #include "core/filters/BlurImageFilter.h"
 #include "core/shaders/GradientShader.h"
+#include "gpu/proxies/RenderTargetProxy.h"
+#include "layers/RootLayer.h"
 #include "layers/contents/RasterizedContent.h"
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/layers/DisplayList.h"
@@ -358,9 +360,73 @@ TGFX_TEST(LayerTest, Layer_localToGlobal) {
   EXPECT_EQ(pointGInGlobal, Point::Make(35.0f, 60.0f));
 }
 
+TGFX_TEST(LayerTest, getTightBounds) {
+  auto root = Layer::Make();
+  root->setMatrix(Matrix::MakeTrans(10, 10));
+
+  auto rectShape = ShapeLayer::Make();
+  auto rect = Rect::MakeXYWH(0.f, 0.f, 100.f, 100.f);
+  Path path = {};
+  path.addRect(rect);
+  rectShape->setPath(path);
+  rectShape->setFillStyle(SolidColor::Make(Color::Red()));
+  auto strokeStyle = SolidColor::Make(Color::Black());
+  rectShape->setStrokeStyle(strokeStyle);
+  rectShape->setLineWidth(10);
+  rectShape->setStrokeAlign(StrokeAlign::Outside);
+  root->addChild(rectShape);
+  auto bounds = rectShape->getBounds(root.get(), true);
+  EXPECT_FLOAT_EQ(bounds.height(), 120);
+
+  auto lineShape = ShapeLayer::Make();
+  Path linePath = {};
+  linePath.moveTo(0, 0);
+  linePath.lineTo(100, 0);
+  linePath.lineTo(50, 20);
+  linePath.lineTo(20, -20);
+  lineShape->setPath(linePath);
+  lineShape->setStrokeStyle(SolidColor::Make(Color::Red()));
+  auto matrix = Matrix::MakeRotate(50);
+  matrix.postConcat(Matrix::MakeTrans(150, 20));
+  lineShape->setMatrix(matrix);
+
+  auto lineShapeChild = ShapeLayer::Make();
+  Path linePath2 = {};
+  linePath2.moveTo(0, 0);
+  linePath2.lineTo(100, 0);
+  linePath2.lineTo(50, 20);
+  linePath2.lineTo(20, -20);
+  lineShapeChild->setPath(linePath2);
+  lineShapeChild->setStrokeStyle(SolidColor::Make(Color::Red()));
+  matrix = Matrix::MakeTrans(100, 20);
+  lineShapeChild->setMatrix(matrix);
+  lineShape->addChild(lineShapeChild);
+
+  root->addChild(lineShape);
+  bounds = lineShape->getBounds(root.get(), true);
+  EXPECT_FLOAT_EQ(bounds.width(), 114.002686f);
+  EXPECT_FLOAT_EQ(bounds.height(), 166.826691f);
+
+  auto lineBoundsShape = ShapeLayer::Make();
+  Path lineBoundsRect = {};
+  lineBoundsRect.addRect(bounds);
+  lineBoundsShape->setPath(lineBoundsRect);
+  lineBoundsShape->setStrokeStyle(SolidColor::Make(Color::Green()));
+  root->addChild(lineBoundsShape);
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 350, 250);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->root()->addChild(root);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/getTightBounds"));
+}
+
 TGFX_TEST(LayerTest, getbounds) {
   auto root = Layer::Make();
-  root->setMatrix(Matrix::MakeTrans(30, 30));
+  root->setMatrix(Matrix::MakeTrans(10, 10));
 
   auto child = TextLayer::Make();
   child->setMatrix(Matrix::MakeRotate(20));
@@ -399,15 +465,15 @@ TGFX_TEST(LayerTest, getbounds) {
   EXPECT_FLOAT_EQ(bounds.right, 94.183533f);
   EXPECT_FLOAT_EQ(bounds.bottom, 62.044159f);
   bounds = child->getBounds(root.get());
-  EXPECT_FLOAT_EQ(bounds.left, -20.280657f);
-  EXPECT_FLOAT_EQ(bounds.top, -20.787683f);
-  EXPECT_FLOAT_EQ(bounds.right, 96.194153f);
-  EXPECT_FLOAT_EQ(bounds.bottom, 90.515099f);
+  EXPECT_FLOAT_EQ(bounds.left, -8.96520996f);
+  EXPECT_FLOAT_EQ(bounds.top, -4.63719559f);
+  EXPECT_FLOAT_EQ(bounds.right, 83.0033798f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 77.3243255f);
   bounds = child->getBounds(cousin.get());
-  EXPECT_FLOAT_EQ(bounds.left, -30.280657f);
-  EXPECT_FLOAT_EQ(bounds.top, -30.787683f);
-  EXPECT_FLOAT_EQ(bounds.right, 86.194153f);
-  EXPECT_FLOAT_EQ(bounds.bottom, 80.515099f);
+  EXPECT_FLOAT_EQ(bounds.left, -18.96521f);
+  EXPECT_FLOAT_EQ(bounds.top, -14.6371956f);
+  EXPECT_FLOAT_EQ(bounds.right, 73.0033798f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 67.3243255f);
 
   auto displayList = std::make_unique<DisplayList>();
   displayList->root()->addChild(root);
@@ -417,15 +483,15 @@ TGFX_TEST(LayerTest, getbounds) {
   EXPECT_FLOAT_EQ(bounds.right, 94.183533f);
   EXPECT_FLOAT_EQ(bounds.bottom, 62.044159f);
   bounds = child->getBounds(root.get());
-  EXPECT_FLOAT_EQ(bounds.left, -20.280657f);
-  EXPECT_FLOAT_EQ(bounds.top, -20.787683f);
-  EXPECT_FLOAT_EQ(bounds.right, 96.194153f);
-  EXPECT_FLOAT_EQ(bounds.bottom, 90.515099f);
+  EXPECT_FLOAT_EQ(bounds.left, -8.96520996f);
+  EXPECT_FLOAT_EQ(bounds.top, -4.63719559f);
+  EXPECT_FLOAT_EQ(bounds.right, 83.0033798f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 77.3243255f);
   bounds = child->getBounds(cousin.get());
-  EXPECT_FLOAT_EQ(bounds.left, -30.280657f);
-  EXPECT_FLOAT_EQ(bounds.top, -30.787683f);
-  EXPECT_FLOAT_EQ(bounds.right, 86.194153f);
-  EXPECT_FLOAT_EQ(bounds.bottom, 80.515099f);
+  EXPECT_FLOAT_EQ(bounds.left, -18.96521f);
+  EXPECT_FLOAT_EQ(bounds.top, -14.6371956f);
+  EXPECT_FLOAT_EQ(bounds.right, 73.0033798f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 67.3243255f);
 
   ContextScope scope;
   auto context = scope.getContext();
@@ -534,6 +600,25 @@ TGFX_TEST(LayerTest, solidLayer) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/draw_solid"));
 }
 
+TGFX_TEST(LayerTest, ZoomAndOffset) {
+  auto image = MakeImage("resources/apitest/rotation.jpg");
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  auto displayList = std::make_unique<DisplayList>();
+  auto layer = ImageLayer::Make();
+  layer->setImage(image);
+  auto matrix = Matrix::MakeScale(0.5f);
+  matrix.postTranslate(200, 200);
+  layer->setMatrix(matrix);
+  displayList->root()->addChild(layer);
+  displayList->setZoomScale(0.5f);
+  displayList->setContentOffset(-300, -300);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ZoomAndOffset"));
+}
+
 TGFX_TEST(LayerTest, StrokeOnTop) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -591,7 +676,7 @@ TGFX_TEST(LayerTest, FilterTest) {
   displayList->root()->addChild(layer);
   displayList->render(surface.get());
   auto bounds = displayList->root()->getBounds();
-  EXPECT_EQ(Rect::MakeLTRB(126.5f, 126.5f, 1725.5f, 2229.5f), bounds);
+  EXPECT_EQ(Rect::MakeLTRB(131.f, 131.f, 1721.f, 2225.f), bounds);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/filterTest"));
 }
 
@@ -1065,7 +1150,7 @@ TGFX_TEST(LayerTest, textMask) {
   imageLayer1->setMask(alphaTextLayer);
 
   auto alphaLayerBounds = alphaLayer->getBounds();
-  EXPECT_EQ(alphaLayerBounds, Rect::MakeXYWH(1927.0f, 896.0f, 826.5f, 340.5f));
+  EXPECT_EQ(alphaLayerBounds, Rect::MakeLTRB(1927.0f, 897.0f, 2754.f, 1236.f));
 
   // Vector mask effect
   auto imageLayer2 = ImageLayer::Make();
@@ -1114,12 +1199,12 @@ TGFX_TEST(LayerTest, textMask) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/textMask"));
 }
 
-TGFX_TEST(LayerTest, ContentVersion) {
+TGFX_TEST(LayerTest, HasContentChanged) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  auto surface = Surface::Make(context, 100, 100);
+  auto surface = Surface::Make(context, 150, 150);
   DisplayList displayList;
   auto shapeLayer = ShapeLayer::Make();
   Path path;
@@ -1127,37 +1212,23 @@ TGFX_TEST(LayerTest, ContentVersion) {
   shapeLayer->setPath(path);
   shapeLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 0, 0)));
   displayList.root()->addChild(shapeLayer);
-  context->flush();
-  auto contentVersion = surface->contentVersion();
+  EXPECT_TRUE(displayList.hasContentChanged());
   displayList.render(surface.get());
   context->flush();
-  EXPECT_NE(surface->contentVersion(), contentVersion);
-  contentVersion = surface->contentVersion();
-  displayList.render(surface.get());
-  context->flush();
-  EXPECT_EQ(surface->contentVersion(), contentVersion);
+  EXPECT_FALSE(displayList.hasContentChanged());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/HasContentChanged_Org"));
+  displayList.setContentOffset(50, 50);
+  EXPECT_TRUE(displayList.hasContentChanged());
   displayList.render(surface.get(), false);
   context->flush();
-  EXPECT_NE(surface->contentVersion(), contentVersion);
-  contentVersion = surface->contentVersion();
-  surface->getCanvas()->clear();
-  context->flush();
-  EXPECT_NE(surface->contentVersion(), contentVersion);
-  contentVersion = surface->contentVersion();
+  EXPECT_FALSE(displayList.hasContentChanged());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/HasContentChanged_Offset"));
+  displayList.setZoomScale(0.5f);
+  EXPECT_TRUE(displayList.hasContentChanged());
   displayList.render(surface.get());
   context->flush();
-  EXPECT_NE(surface->contentVersion(), contentVersion);
-  contentVersion = surface->contentVersion();
-
-  auto surface2 = Surface::Make(context, 100, 100);
-  context->flush();
-  EXPECT_EQ(surface2->contentVersion(), 1u);
-  displayList.render(surface2.get());
-  context->flush();
-  EXPECT_NE(surface2->contentVersion(), 1u);
-  displayList.render(surface.get());
-  context->flush();
-  EXPECT_NE(surface->contentVersion(), contentVersion);
+  EXPECT_FALSE(displayList.hasContentChanged());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/HasContentChanged_Zoom"));
 }
 
 /**
@@ -1784,37 +1855,44 @@ TGFX_TEST(LayerTest, DirtyFlag) {
   ASSERT_TRUE(context != nullptr);
   auto displayList = std::make_unique<DisplayList>();
   auto surface = Surface::Make(context, 100, 100);
-  auto child = ImageLayer::Make();
-  auto image = MakeImage("resources/apitest/imageReplacement.png");
-  EXPECT_TRUE(image != nullptr);
-  child->setImage(image);
+  auto child = Layer::Make();
   displayList->root()->addChild(child);
 
   auto grandChild = ImageLayer::Make();
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  EXPECT_TRUE(image != nullptr);
   grandChild->setImage(image);
   grandChild->setMatrix(Matrix::MakeTrans(10, 10));
   grandChild->setVisible(false);
   child->addChild(grandChild);
 
+  auto child2 = ImageLayer::Make();
+  child2->setImage(image);
+  displayList->root()->addChild(child2);
+
   displayList->render(surface.get());
 
   auto root = displayList->root();
-  EXPECT_TRUE(grandChild->bitFields.dirtyDescendents && grandChild->bitFields.dirtyContent);
+  EXPECT_TRUE(grandChild->bitFields.dirtyDescendents);
+  EXPECT_TRUE(grandChild->layerContent == nullptr && grandChild->bitFields.dirtyContent);
   EXPECT_TRUE(!child->bitFields.dirtyDescendents && !child->bitFields.dirtyContent);
   EXPECT_TRUE(!root->bitFields.dirtyDescendents && !root->bitFields.dirtyContent);
 
   grandChild->setVisible(true);
-  EXPECT_TRUE(grandChild->bitFields.dirtyDescendents && grandChild->bitFields.dirtyContent);
+  EXPECT_TRUE(grandChild->bitFields.dirtyDescendents);
+  EXPECT_TRUE(grandChild->layerContent == nullptr && grandChild->bitFields.dirtyContent);
   EXPECT_TRUE(child->bitFields.dirtyDescendents);
   EXPECT_TRUE(root->bitFields.dirtyDescendents);
   displayList->render(surface.get());
 
   EXPECT_TRUE(!grandChild->bitFields.dirtyDescendents && !grandChild->bitFields.dirtyContent);
+  EXPECT_TRUE(grandChild->layerContent != nullptr);
   EXPECT_TRUE(!child->bitFields.dirtyDescendents && !child->bitFields.dirtyContent);
   EXPECT_TRUE(!root->bitFields.dirtyDescendents && !root->bitFields.dirtyContent);
 
   child->setVisible(false);
   EXPECT_TRUE(!grandChild->bitFields.dirtyDescendents && !grandChild->bitFields.dirtyContent);
+  EXPECT_TRUE(grandChild->layerContent != nullptr);
   EXPECT_TRUE(!child->bitFields.dirtyDescendents && !child->bitFields.dirtyContent);
   EXPECT_TRUE(root->bitFields.dirtyDescendents && !root->bitFields.dirtyContent);
 }
@@ -1928,8 +2006,12 @@ TGFX_TEST(LayerTest, MaskOnwer) {
   EXPECT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 1, 1);
   auto displayList = std::make_unique<DisplayList>();
-  auto layer = Layer::Make();
-  auto layer2 = Layer::Make();
+  auto layer = SolidLayer::Make();
+  layer->setWidth(1);
+  layer->setHeight(1);
+  auto layer2 = SolidLayer::Make();
+  layer2->setWidth(1);
+  layer2->setHeight(1);
   auto mask = ShapeLayer::Make();
   Path path = {};
   path.addRect(Rect::MakeWH(1, 1));
@@ -1948,7 +2030,7 @@ TGFX_TEST(LayerTest, MaskOnwer) {
   EXPECT_EQ(layer->mask(), nullptr);
   EXPECT_EQ(mask->maskOwner, layer2.get());
 
-  EXPECT_FALSE(layer2->bitFields.dirtyContent);
+  EXPECT_TRUE(layer2->bitFields.dirtyContent);
   displayList->render(surface.get());
   EXPECT_FALSE(layer->bitFields.dirtyDescendents);
   mask->setAlpha(0.5f);
@@ -2327,7 +2409,10 @@ TGFX_TEST(LayerTest, RasterizedBackground) {
   parent->replaceChild(layerNextChild, background);
   rasterizedContent = static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage();
   displayList->render(surface.get());
-  EXPECT_TRUE(rasterizedContent ==
+  // Ideally, rasterizedContent should remain unchanged here, but we need to call root->invalidateRect()
+  // whenever a layer is removed or its index changes. As a result, dirty rects are always treated
+  // as background changes. This is a trade-off between performance and correctness.
+  EXPECT_TRUE(rasterizedContent !=
               static_cast<RasterizedContent*>(child->rasterizedContent.get())->getImage());
 }
 
@@ -2360,4 +2445,321 @@ TGFX_TEST(LayerTest, AdaptiveDashEffect) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/AdaptiveDashEffect"));
 }
 
+TGFX_TEST(LayerTest, BottomLeftSurface) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto proxy = tgfx::RenderTargetProxy::MakeFallback(context, 200, 200, false, 1, false,
+                                                     ImageOrigin::BottomLeft);
+  auto surface = Surface::MakeFrom(std::move(proxy), 0, true);
+
+  // parent
+  auto parentFrame = tgfx::Rect::MakeXYWH(60, 110, 40, 40);
+
+  auto childFrame = tgfx::Rect::MakeWH(150, 150);
+  auto childLayer = tgfx::ShapeLayer::Make();
+  childLayer->setExcludeChildEffectsInLayerStyle(true);
+
+  tgfx::Path childPath;
+  childPath.addRect(childFrame);
+  childLayer->setPath(childPath);
+  childLayer->setFillStyles({tgfx::SolidColor::Make(tgfx::Color::Red())});
+
+  // contents
+  auto contentsLayer = tgfx::Layer::Make();
+  contentsLayer->setMatrix(tgfx::Matrix::MakeRotate(3));
+  contentsLayer->setScrollRect(parentFrame);
+  auto childMatrix = tgfx::Matrix::MakeTrans(50, 100);
+  childMatrix.postRotate(3);
+  contentsLayer->setMatrix(childMatrix);
+  contentsLayer->addChild(childLayer);
+  DisplayList displayList;
+
+  displayList.root()->addChild(contentsLayer);
+  displayList.render(surface.get());
+
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BottomLeftSurface"));
+}
+
+TGFX_TEST(LayerTest, DecomposeRectTest) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 1024, 800);
+  auto canvas = surface->getCanvas();
+  auto displayList = std::make_unique<DisplayList>();
+  auto rootLayer = Layer::Make();
+  displayList->root()->addChild(rootLayer);
+
+  auto shapeLayer1 = ShapeLayer::Make();
+  shapeLayer1->setStrokeStyle(SolidColor::Make(Color::Black()));
+  auto path1 = Path();
+  path1.addRect(Rect::MakeXYWH(40, 40, 100, 140));
+  shapeLayer1->setPath(path1);
+  // rootLayer->addChild(shapeLayer1);
+  auto bounds1 = shapeLayer1->getBounds();
+  shapeLayer1->getGlobalMatrix().mapRect(&bounds1);
+
+  auto shapeLayer2 = ShapeLayer::Make();
+  shapeLayer2->setStrokeStyle(SolidColor::Make(Color::Black()));
+  auto path2 = Path();
+  path2.addRect(Rect::MakeXYWH(120, 20, 60, 220));
+  shapeLayer2->setPath(path2);
+  // rootLayer->addChild(shapeLayer2);
+  auto bounds2 = shapeLayer2->getBounds();
+  shapeLayer2->getGlobalMatrix().mapRect(&bounds2);
+
+  auto shapeLayer3 = ShapeLayer::Make();
+  shapeLayer3->setStrokeStyle(SolidColor::Make(Color::Black()));
+  auto path3 = Path();
+  path3.addRect(Rect::MakeXYWH(60, 80, 40, 60));
+  shapeLayer3->setPath(path3);
+  // rootLayer->addChild(shapeLayer3);
+  auto bounds3 = shapeLayer3->getBounds();
+  shapeLayer3->getGlobalMatrix().mapRect(&bounds3);
+
+  auto shapeLayer4 = ShapeLayer::Make();
+  shapeLayer4->setStrokeStyle(SolidColor::Make(Color::Black()));
+  auto path4 = Path();
+  path4.addRect(Rect::MakeXYWH(800, 40, 80, 100));
+  shapeLayer4->setPath(path4);
+  // rootLayer->addChild(shapeLayer4);
+  auto bounds4 = shapeLayer4->getBounds();
+  shapeLayer4->getGlobalMatrix().mapRect(&bounds4);
+
+  auto shapeLayer5 = ShapeLayer::Make();
+  shapeLayer5->setStrokeStyle(SolidColor::Make(Color::Black()));
+  auto path5 = Path();
+  path5.addRect(Rect::MakeXYWH(840, 110, 120, 130));
+  shapeLayer5->setPath(path5);
+  // rootLayer->addChild(shapeLayer5);
+  auto bounds5 = shapeLayer5->getBounds();
+  shapeLayer5->getGlobalMatrix().mapRect(&bounds5);
+
+  auto shapeLayer6 = ShapeLayer::Make();
+  shapeLayer6->setStrokeStyle(SolidColor::Make(Color::Black()));
+  auto path6 = Path();
+  path6.addRect(Rect::MakeXYWH(80, 460, 120, 180));
+  shapeLayer6->setPath(path6);
+  // rootLayer->addChild(shapeLayer6);
+  auto bounds6 = shapeLayer6->getBounds();
+  shapeLayer6->getGlobalMatrix().mapRect(&bounds6);
+
+  auto shapeLayer7 = ShapeLayer::Make();
+  shapeLayer7->setStrokeStyle(SolidColor::Make(Color::Black()));
+  auto path7 = Path();
+  path7.addRect(Rect::MakeXYWH(20, 600, 240, 100));
+  shapeLayer7->setPath(path7);
+  // rootLayer->addChild(shapeLayer7);
+  auto bounds7 = shapeLayer7->getBounds();
+  shapeLayer7->getGlobalMatrix().mapRect(&bounds7);
+
+  auto shapeLayer8 = ShapeLayer::Make();
+  shapeLayer8->setStrokeStyle(SolidColor::Make(Color::Black()));
+  auto path8 = Path();
+  path8.addRect(Rect::MakeXYWH(300, 500, 100, 140));
+  shapeLayer8->setPath(path8);
+  // rootLayer->addChild(shapeLayer8);
+  auto bounds8 = shapeLayer8->getBounds();
+  shapeLayer8->getGlobalMatrix().mapRect(&bounds8);
+
+  auto shapeLayer9 = ShapeLayer::Make();
+  shapeLayer9->setStrokeStyle(SolidColor::Make(Color::Black()));
+  auto path9 = Path();
+  path9.addRect(Rect::MakeXYWH(220, 460, 140, 50));
+  shapeLayer9->setPath(path9);
+  // rootLayer->addChild(shapeLayer9);
+  auto bounds9 = shapeLayer9->getBounds();
+  shapeLayer9->getGlobalMatrix().mapRect(&bounds9);
+
+  auto shapeLayer10 = ShapeLayer::Make();
+  shapeLayer10->setStrokeStyle(SolidColor::Make(Color::Black()));
+  auto path10 = Path();
+  path10.addRect(Rect::MakeXYWH(820, 420, 140, 200));
+  shapeLayer10->setPath(path10);
+  // rootLayer->addChild(shapeLayer10);
+  auto bounds10 = shapeLayer10->getBounds();
+  shapeLayer10->getGlobalMatrix().mapRect(&bounds10);
+
+  auto shapeLayer11 = ShapeLayer::Make();
+  shapeLayer11->setStrokeStyle(SolidColor::Make(Color::Black()));
+  auto path11 = Path();
+  path11.addRect(Rect::MakeXYWH(850, 540, 80, 40));
+  shapeLayer11->setPath(path11);
+  // rootLayer->addChild(shapeLayer11);
+  auto bounds11 = shapeLayer11->getBounds();
+  shapeLayer11->getGlobalMatrix().mapRect(&bounds11);
+
+  Paint paint = {};
+
+  // Draw the shape layer
+  canvas->clear();
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(2.0f);
+  paint.setColor(Color::FromRGBA(100, 200, 50, 255));
+  canvas->drawRect(bounds1, paint);
+  canvas->drawRect(bounds2, paint);
+  canvas->drawRect(bounds3, paint);
+  // Draw the dirty rects
+  paint.setStyle(PaintStyle::Fill);
+  paint.setColor(Color::FromRGBA(255, 0, 255, 255));
+  paint.setBlendMode(BlendMode::DstOver);
+  rootLayer->removeChildren();
+  rootLayer->addChild(shapeLayer1);
+  rootLayer->addChild(shapeLayer2);
+  rootLayer->addChild(shapeLayer3);
+  auto dirtyRects = displayList->_root->updateDirtyRegions();
+  canvas->drawRect(dirtyRects[0], paint);
+  canvas->drawRect(dirtyRects[1], paint);
+  canvas->drawRect(dirtyRects[2], paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DecomposeRectTest1"));
+
+  // Draw the shape layer
+  canvas->clear();
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(2.0f);
+  paint.setColor(Color::FromRGBA(100, 200, 50, 255));
+  canvas->drawRect(bounds1, paint);
+  canvas->drawRect(bounds2, paint);
+  canvas->drawRect(bounds3, paint);
+  canvas->drawRect(bounds4, paint);
+  canvas->drawRect(bounds5, paint);
+  // Draw the dirty rects
+  paint.setStyle(PaintStyle::Fill);
+  paint.setColor(Color::FromRGBA(255, 0, 255, 255));
+  paint.setBlendMode(BlendMode::DstOver);
+  rootLayer->removeChildren();
+  rootLayer->addChild(shapeLayer1);
+  rootLayer->addChild(shapeLayer2);
+  rootLayer->addChild(shapeLayer3);
+  rootLayer->addChild(shapeLayer4);
+  rootLayer->addChild(shapeLayer5);
+  dirtyRects = displayList->_root->updateDirtyRegions();
+  canvas->drawRect(dirtyRects[0], paint);
+  canvas->drawRect(dirtyRects[1], paint);
+  canvas->drawRect(dirtyRects[2], paint);
+  canvas->drawRect(dirtyRects[3], paint);
+  canvas->drawRect(dirtyRects[4], paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DecomposeRectTest2"));
+
+  // Draw the shape layer
+  canvas->clear();
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(2.0f);
+  paint.setColor(Color::FromRGBA(100, 200, 50, 255));
+  canvas->drawRect(bounds1, paint);
+  canvas->drawRect(bounds2, paint);
+  canvas->drawRect(bounds3, paint);
+  canvas->drawRect(bounds4, paint);
+  canvas->drawRect(bounds5, paint);
+  canvas->drawRect(bounds6, paint);
+  canvas->drawRect(bounds7, paint);
+  // Draw the dirty rects
+  paint.setStyle(PaintStyle::Fill);
+  paint.setColor(Color::FromRGBA(255, 0, 255, 255));
+  paint.setBlendMode(BlendMode::DstOver);
+  rootLayer->removeChildren();
+  rootLayer->addChild(shapeLayer1);
+  rootLayer->addChild(shapeLayer2);
+  rootLayer->addChild(shapeLayer3);
+  rootLayer->addChild(shapeLayer4);
+  rootLayer->addChild(shapeLayer5);
+  rootLayer->addChild(shapeLayer6);
+  rootLayer->addChild(shapeLayer7);
+  dirtyRects = displayList->_root->updateDirtyRegions();
+  canvas->drawRect(dirtyRects[0], paint);
+  canvas->drawRect(dirtyRects[1], paint);
+  canvas->drawRect(dirtyRects[2], paint);
+  canvas->drawRect(dirtyRects[3], paint);
+  canvas->drawRect(dirtyRects[4], paint);
+  canvas->drawRect(dirtyRects[5], paint);
+  canvas->drawRect(dirtyRects[6], paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DecomposeRectTest3"));
+
+  // Draw the shape layer
+  canvas->clear();
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(2.0f);
+  paint.setColor(Color::FromRGBA(100, 200, 50, 255));
+  canvas->drawRect(bounds1, paint);
+  canvas->drawRect(bounds2, paint);
+  canvas->drawRect(bounds3, paint);
+  canvas->drawRect(bounds4, paint);
+  canvas->drawRect(bounds5, paint);
+  canvas->drawRect(bounds6, paint);
+  canvas->drawRect(bounds7, paint);
+  canvas->drawRect(bounds8, paint);
+  canvas->drawRect(bounds9, paint);
+  // Draw the dirty rects
+  paint.setStyle(PaintStyle::Fill);
+  paint.setColor(Color::FromRGBA(255, 0, 255, 255));
+  paint.setBlendMode(BlendMode::DstOver);
+  rootLayer->removeChildren();
+  rootLayer->addChild(shapeLayer1);
+  rootLayer->addChild(shapeLayer2);
+  rootLayer->addChild(shapeLayer3);
+  rootLayer->addChild(shapeLayer4);
+  rootLayer->addChild(shapeLayer5);
+  rootLayer->addChild(shapeLayer6);
+  rootLayer->addChild(shapeLayer7);
+  rootLayer->addChild(shapeLayer8);
+  rootLayer->addChild(shapeLayer9);
+  dirtyRects = displayList->_root->updateDirtyRegions();
+  canvas->drawRect(dirtyRects[0], paint);
+  canvas->drawRect(dirtyRects[1], paint);
+  canvas->drawRect(dirtyRects[2], paint);
+  canvas->drawRect(dirtyRects[3], paint);
+  canvas->drawRect(dirtyRects[4], paint);
+  canvas->drawRect(dirtyRects[5], paint);
+  canvas->drawRect(dirtyRects[6], paint);
+  canvas->drawRect(dirtyRects[7], paint);
+  canvas->drawRect(dirtyRects[8], paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DecomposeRectTest4"));
+
+  // Draw the shape layer
+  canvas->clear();
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(2.0f);
+  paint.setColor(Color::FromRGBA(100, 200, 50, 255));
+  canvas->drawRect(bounds1, paint);
+  canvas->drawRect(bounds2, paint);
+  canvas->drawRect(bounds3, paint);
+  canvas->drawRect(bounds4, paint);
+  canvas->drawRect(bounds5, paint);
+  canvas->drawRect(bounds6, paint);
+  canvas->drawRect(bounds7, paint);
+  canvas->drawRect(bounds8, paint);
+  canvas->drawRect(bounds9, paint);
+  canvas->drawRect(bounds10, paint);
+  canvas->drawRect(bounds11, paint);
+  // Draw the dirty rects
+  paint.setStyle(PaintStyle::Fill);
+  paint.setColor(Color::FromRGBA(255, 0, 255, 255));
+  paint.setBlendMode(BlendMode::DstOver);
+  rootLayer->removeChildren();
+  rootLayer->addChild(shapeLayer1);
+  rootLayer->addChild(shapeLayer2);
+  rootLayer->addChild(shapeLayer3);
+  rootLayer->addChild(shapeLayer4);
+  rootLayer->addChild(shapeLayer5);
+  rootLayer->addChild(shapeLayer6);
+  rootLayer->addChild(shapeLayer7);
+  rootLayer->addChild(shapeLayer8);
+  rootLayer->addChild(shapeLayer9);
+  rootLayer->addChild(shapeLayer10);
+  rootLayer->addChild(shapeLayer11);
+  dirtyRects = displayList->_root->updateDirtyRegions();
+  canvas->drawRect(dirtyRects[0], paint);
+  canvas->drawRect(dirtyRects[1], paint);
+  canvas->drawRect(dirtyRects[2], paint);
+  canvas->drawRect(dirtyRects[3], paint);
+  canvas->drawRect(dirtyRects[4], paint);
+  canvas->drawRect(dirtyRects[5], paint);
+  canvas->drawRect(dirtyRects[6], paint);
+  canvas->drawRect(dirtyRects[7], paint);
+  canvas->drawRect(dirtyRects[8], paint);
+  canvas->drawRect(dirtyRects[9], paint);
+  canvas->drawRect(dirtyRects[10], paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DecomposeRectTest5"));
+}
 }  // namespace tgfx

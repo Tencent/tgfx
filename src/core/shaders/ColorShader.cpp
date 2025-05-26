@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ColorShader.h"
-#include "core/utils/Caster.h"
+#include "core/utils/Types.h"
 #include "gpu/processors/ConstColorProcessor.h"
 
 namespace tgfx {
@@ -37,8 +37,12 @@ bool ColorShader::asColor(Color* output) const {
 }
 
 bool ColorShader::isEqual(const Shader* shader) const {
-  auto other = Caster::AsColorShader(shader);
-  return other && color == other->color;
+  auto type = Types::Get(shader);
+  if (type != Types::ShaderType::Color) {
+    return false;
+  }
+  auto other = static_cast<const ColorShader*>(shader);
+  return color == other->color;
 }
 
 PlacementPtr<FragmentProcessor> ColorShader::asFragmentProcessor(const FPArgs& args,

@@ -31,14 +31,6 @@ class MatrixShape : public Shape {
       : shape(std::move(shape)), matrix(matrix) {
   }
 
-  bool isLine(Point line[2] = nullptr) const override;
-
-  bool isRect(Rect* rect = nullptr) const override;
-
-  bool isOval(Rect* bounds = nullptr) const override;
-
-  bool isRRect(RRect* rRect = nullptr) const override;
-
   bool isInverseFillType() const override {
     return shape->isInverseFillType();
   }

@@ -48,7 +48,7 @@ GlyphRunList::GlyphRunList(std::vector<GlyphRun> glyphRuns) : _glyphRuns(std::mo
 }
 
 Rect GlyphRunList::getBounds(float resolutionScale) const {
-  if (resolutionScale <= 0.0f) {
+  if (FloatNearlyZero(resolutionScale)) {
     return {};
   }
   auto hasScale = !FloatNearlyEqual(resolutionScale, 1.0f);
@@ -77,7 +77,7 @@ Rect GlyphRunList::getBounds(float resolutionScale) const {
 }
 
 bool GlyphRunList::getPath(Path* path, float resolutionScale) const {
-  if (resolutionScale <= 0.0f || !hasOutlines()) {
+  if (FloatNearlyZero(resolutionScale) || !hasOutlines()) {
     return false;
   }
   auto hasScale = !FloatNearlyEqual(resolutionScale, 1.0f);

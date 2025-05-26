@@ -32,8 +32,6 @@ class StrokeShape : public Shape {
       : shape(std::move(shape)), stroke(stroke) {
   }
 
-  bool isRect(Rect* rect = nullptr) const override;
-
   bool isInverseFillType() const override {
     return shape->isInverseFillType();
   }

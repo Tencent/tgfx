@@ -33,8 +33,12 @@ class SolidContent : public LayerContent {
 
   bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
 
- private:
   RRect _rRect;
   Color _color;
+
+ protected:
+  Type type() const override {
+    return Type::SolidContent;
+  }
 };
 }  // namespace tgfx

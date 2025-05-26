@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Rasterizer.h"
-#include "core/GlyphRasterizer.h"
 #include "core/ShapeRasterizer.h"
+#include "core/TextRasterizer.h"
 
 namespace tgfx {
 std::shared_ptr<Rasterizer> Rasterizer::MakeFrom(int width, int height,
@@ -28,8 +28,8 @@ std::shared_ptr<Rasterizer> Rasterizer::MakeFrom(int width, int height,
   if (glyphRunList == nullptr || width <= 0 || height <= 0) {
     return nullptr;
   }
-  return std::make_shared<GlyphRasterizer>(width, height, std::move(glyphRunList), antiAlias,
-                                           matrix, stroke);
+  return std::make_shared<TextRasterizer>(width, height, std::move(glyphRunList), antiAlias, matrix,
+                                          stroke);
 }
 
 std::shared_ptr<Rasterizer> Rasterizer::MakeFrom(int width, int height, Path path, bool antiAlias,
