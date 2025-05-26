@@ -20,9 +20,7 @@
 #include "tgfx/layers/DisplayList.h"
 
 namespace drawers {
-
 LayerTreeDrawer::LayerTreeDrawer(const std::string& name) : Drawer(name + "Drawer") {
-  displayList.setPartialRefreshEnabled(true);
 }
 
 void LayerTreeDrawer::onDraw(tgfx::Canvas* canvas, const AppHost* host) {

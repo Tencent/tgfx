@@ -84,7 +84,7 @@ class DisplayList {
    * performance when only a small part of the display list changes. However, enabling partial
    * refresh may cause some blending issues, since all layers are drawn onto a cached surface before
    * being drawn to the target surface. Partial refresh also requires extra memory to cache the
-   * previous frame. The default is false.
+   * previous frame. The default is true.
    */
   bool partialRefreshEnabled() const {
     return _partialRefreshEnabled;
@@ -114,7 +114,7 @@ class DisplayList {
   std::shared_ptr<Surface> frameCache = nullptr;
   float _zoomScale = 1.0f;
   Point _contentOffset = {};
-  bool _partialRefreshEnabled = false;
+  bool _partialRefreshEnabled = true;
   bool _hasContentChanged = false;
   float lastZoomScale = 1.0f;
   Point lastContentOffset = {};
