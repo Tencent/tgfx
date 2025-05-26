@@ -2046,6 +2046,8 @@ TGFX_TEST(LayerTest, BackgroundBlur) {
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 150, 150);
+  auto canvas = surface->getCanvas();
+  canvas->clipRect(Rect::MakeWH(150, 150));
   auto displayList = std::make_unique<DisplayList>();
   auto solidLayer = SolidLayer::Make();
   solidLayer->setColor(Color::Blue());
