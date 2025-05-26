@@ -18,12 +18,10 @@
 
 #include "LayerTreeModel.h"
 
-LayerTreeModel::LayerTreeModel(QObject* parent)
-  :LayerModel(parent)
-{
+LayerTreeModel::LayerTreeModel(QObject* parent) : LayerModel(parent) {
 }
 
-void LayerTreeModel::setLayerTreeData(const flexbuffers::Map &contentMap) {
+void LayerTreeModel::setLayerTreeData(const flexbuffers::Map& contentMap) {
   beginResetModel();
   m_AddressToItem.clear();
   rootItem->clear();
@@ -33,8 +31,8 @@ void LayerTreeModel::setLayerTreeData(const flexbuffers::Map &contentMap) {
 }
 
 bool LayerTreeModel::selectLayer(uint64_t address) {
- QModelIndex index = indexFromAddress(address);
-  if(index.isValid()) {
+  QModelIndex index = indexFromAddress(address);
+  if (index.isValid()) {
     emit selectIndex(index);
     return true;
   }
@@ -42,15 +40,13 @@ bool LayerTreeModel::selectLayer(uint64_t address) {
 }
 
 QVariant LayerTreeModel::data(const QModelIndex& index, int role) const {
-  if (!index.isValid() || role != Qt::DisplayRole)
-    return {};
+  if (!index.isValid() || role != Qt::DisplayRole) return {};
 
-  const auto *item = static_cast<const LayerItem*>(index.internalPointer());
+  const auto* item = static_cast<const LayerItem*>(index.internalPointer());
   bool convertFlag = false;
   auto address = item->data(index.column()).toULongLong(&convertFlag);
-  if(convertFlag) {
-    if(address != 0)
-      return QString("0x%1").arg(address, 0, 16);
+  if (convertFlag) {
+    if (address != 0) return QString("0x%1").arg(address, 0, 16);
     else
       return QString("nullptr");
   }
@@ -62,7 +58,7 @@ void LayerTreeModel::flushLayerTree() {
 }
 
 void LayerTreeModel::MouseSelectedIndex(QModelIndex index) {
-  if(index.isValid()) {
+  if (index.isValid()) {
     auto item = static_cast<LayerItem*>((index.internalPointer()));
     uint64_t address = item->data(1).toULongLong();
     emit selectAddress(address);
@@ -70,7 +66,7 @@ void LayerTreeModel::MouseSelectedIndex(QModelIndex index) {
 }
 
 void LayerTreeModel::MouseHoveredIndex(QModelIndex index) {
-  if(index.isValid()) {
+  if (index.isValid()) {
     auto item = static_cast<LayerItem*>((index.internalPointer()));
     emit hoveredAddress(item->data(1).toULongLong());
   }
@@ -78,7 +74,7 @@ void LayerTreeModel::MouseHoveredIndex(QModelIndex index) {
 
 QModelIndex LayerTreeModel::indexFromAddress(uint64_t address) const {
   auto item = m_AddressToItem.value(address, nullptr);
-  if(!item || item == rootItem.get()) return QModelIndex();
+  if (!item || item == rootItem.get()) return QModelIndex();
 
   int row = item->row();
   return createIndex(row, 0, item);
@@ -92,7 +88,7 @@ void LayerTreeModel::setupModelData(const flexbuffers::Map& contentMap, LayerIte
   m_AddressToItem.insert(address, parent->child(parent->childCount() - 1));
   auto children = contentMap["Children"].AsVector();
   size_t childrenSize = children.size();
-  for(size_t i = 0; i < childrenSize; i++) {
+  for (size_t i = 0; i < childrenSize; i++) {
     auto childMap = children[i].AsMap();
     setupModelData(childMap, parent->child(parent->childCount() - 1));
   }

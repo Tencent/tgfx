@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RenderTargetCreateTask.h"
-#include "core/utils/Profiling.h"
 #include "core/utils/Log.h"
+#include "core/utils/Profiling.h"
 #include "gpu/RenderTarget.h"
 #include "gpu/Texture.h"
 

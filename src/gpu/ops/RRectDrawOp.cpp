@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RRectDrawOp.h"
-#include "core/utils/Profiling.h"
 #include "core/DataSource.h"
+#include "core/utils/Profiling.h"
 #include "gpu/GpuBuffer.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ResourceProvider.h"

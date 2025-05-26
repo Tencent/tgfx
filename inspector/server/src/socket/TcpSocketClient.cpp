@@ -17,11 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TcpSocketClient.h"
-
 #include <utility>
 TcpSocketClient::TcpSocketClient(QObject* parent, QString ip, quint16 port)
-  :QObject(parent), m_IsConnection(false)
-{
+    : QObject(parent), m_IsConnection(false) {
   m_TcpSocket = new QTcpSocket(this);
 
   connect(m_TcpSocket, &QTcpSocket::connected, this, &TcpSocketClient::onSocketConnected);
@@ -35,12 +33,12 @@ TcpSocketClient::TcpSocketClient(QObject* parent, QString ip, quint16 port)
 TcpSocketClient::~TcpSocketClient() {
 }
 void TcpSocketClient::connection(QString ip, quint16 port) {
-  if(!m_IsConnection) {
+  if (!m_IsConnection) {
     m_TcpSocket->connectToHost(ip, port);
   }
 }
 void TcpSocketClient::sendData(const QByteArray& data) {
-  if(!m_IsConnection) {
+  if (!m_IsConnection) {
     qDebug() << "Server is not connected!\n";
     return;
   }

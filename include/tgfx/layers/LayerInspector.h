@@ -16,53 +16,53 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma once
+#include <functional>
 #include <unordered_map>
 #include <vector>
-#include <functional>
-
-#include "tgfx/layers/Layer.h"
 #include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/Layer.h"
 
 namespace tgfx {
 
 class LayerInspector {
-public:
-    static LayerInspector& GetLayerInspector() {
-        static LayerInspector instance;
-        return instance;
-    }
+ public:
+  static LayerInspector& GetLayerInspector() {
+    static LayerInspector instance;
+    return instance;
+  }
 
-    LayerInspector(const LayerInspector&) = delete;
-    LayerInspector(LayerInspector&&) = delete;
-    LayerInspector& operator==(const LayerInspector&) = delete;
-    LayerInspector& operator==(LayerInspector&&) = delete;
-    ~LayerInspector() = default;
+  LayerInspector(const LayerInspector&) = delete;
+  LayerInspector(LayerInspector&&) = delete;
+  LayerInspector& operator==(const LayerInspector&) = delete;
+  LayerInspector& operator==(LayerInspector&&) = delete;
+  ~LayerInspector() = default;
 
-    void setDisplayList(tgfx::DisplayList* displayList);
-    //void setDirty(Layer* root, std::shared_ptr<Layer> child);
-    void serializingLayerTree();
-    void serializingLayerAttribute(const std::shared_ptr<tgfx::Layer>& layer);
-    void FeedBackDataProcess(const std::vector<uint8_t>& data);
-    void setCallBack();
-    void pickedLayer(float x, float y);
-private:
-    void AddHighLightOverlay(Color color, std::shared_ptr<Layer> hovedLayer);
-    void SendPickedLayerAddress(const std::shared_ptr<tgfx::Layer>& layer);
-    void SendFlushAttributeAck(uint64_t address);
-    LayerInspector();
-private:
-    std::unordered_map<uint64_t, std::shared_ptr<tgfx::Layer>> m_LayerMap;
-    std::unordered_map<uint64_t, std::unordered_map<uint64_t, std::function<std::shared_ptr<Data>()>>> m_LayerComplexObjMap;
-    uint64_t m_HoveredAddress;
-    uint64_t m_SelectedAddress;
-    uint64_t m_ExpandID;
-    std::shared_ptr<tgfx::Layer> m_HoverdLayer;
-    int m_HighLightLayerIndex = 0;
-    bool m_HoverdSwitch = false;
-    tgfx::DisplayList* m_DisplayList;
-    //bool m_IsDirty = false;
+  void setDisplayList(tgfx::DisplayList* displayList);
+  //void setDirty(Layer* root, std::shared_ptr<Layer> child);
+  void serializingLayerTree();
+  void serializingLayerAttribute(const std::shared_ptr<tgfx::Layer>& layer);
+  void FeedBackDataProcess(const std::vector<uint8_t>& data);
+  void setCallBack();
+  void pickedLayer(float x, float y);
+
+ private:
+  void AddHighLightOverlay(Color color, std::shared_ptr<Layer> hovedLayer);
+  void SendPickedLayerAddress(const std::shared_ptr<tgfx::Layer>& layer);
+  void SendFlushAttributeAck(uint64_t address);
+  LayerInspector();
+
+ private:
+  std::unordered_map<uint64_t, std::shared_ptr<tgfx::Layer>> m_LayerMap;
+  std::unordered_map<uint64_t, std::unordered_map<uint64_t, std::function<std::shared_ptr<Data>()>>>
+      m_LayerComplexObjMap;
+  uint64_t m_HoveredAddress;
+  uint64_t m_SelectedAddress;
+  uint64_t m_ExpandID;
+  std::shared_ptr<tgfx::Layer> m_HoverdLayer;
+  int m_HighLightLayerIndex = 0;
+  bool m_HoverdSwitch = false;
+  tgfx::DisplayList* m_DisplayList;
+  //bool m_IsDirty = false;
 };
 
-}
-
-
+}  // namespace tgfx

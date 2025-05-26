@@ -21,10 +21,7 @@
 #include <flatbuffers/flexbuffers.h>
 #include "LayerModel.h"
 
-enum class RowOp {
-  Expand,
-  Collapse
-};
+enum class RowOp { Expand, Collapse };
 
 struct RowData {
   RowOp op;
@@ -32,20 +29,20 @@ struct RowData {
 };
 
 struct LayerData {
-  std::shared_ptr<LayerItem>  layerItem;
+  std::shared_ptr<LayerItem> layerItem;
   std::vector<RowData> rowDatas;
 };
 
-class LayerAttributeModel : public LayerModel{
+class LayerAttributeModel : public LayerModel {
   Q_OBJECT
   QML_NAMED_ELEMENT(LayerAttributeModel)
-public:
+ public:
   Q_DISABLE_COPY_MOVE(LayerAttributeModel)
   explicit LayerAttributeModel(QObject* parent = nullptr);
   ~LayerAttributeModel() override = default;
   void setLayerAttribute(const flexbuffers::Map& map);
   void setLayerSubAttribute(const flexbuffers::Map& map);
-  QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
+  QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
   void SetCurrentAddress(uint64_t address) {
     m_CurrentLayerAddress = address;
   }
@@ -58,25 +55,24 @@ public:
   void switchToLayer(uint64_t address);
   void flushTree();
   void clearAttribute();
-  Q_INVOKABLE bool isExpandable(const QModelIndex &index);
-  Q_INVOKABLE void expandSubAttribute(const QModelIndex &index, int row);
+  Q_INVOKABLE bool isExpandable(const QModelIndex& index);
+  Q_INVOKABLE void expandSubAttribute(const QModelIndex& index, int row);
   Q_INVOKABLE void collapseRow(int row);
   Q_INVOKABLE void expandRow(int row);
-  signals:
+ signals:
   void expandSubAttributeSignal(uint64_t id);
   void expandItemRow(int row);
   void collapseItemRow(int row);
   void flushLayerAttribute(uint64_t address);
   void modelReset();
-private:
+
+ private:
   void ProcessLayerAttribute(const flexbuffers::Map& contentMap, LayerItem* item);
-private:
+
+ private:
   uint64_t m_CurrentLayerAddress;
   LayerItem* currentExpandItem;
   QModelIndex currentExpandItemindex;
   int currentRow;
   std::unordered_map<uint64_t, LayerData> addressToLayerData;
 };
-
-
-

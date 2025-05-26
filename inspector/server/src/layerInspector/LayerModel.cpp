@@ -19,23 +19,19 @@
 #include "LayerModel.h"
 
 LayerModel::LayerModel(QObject* parent)
-  :QAbstractItemModel(parent),
-  rootItem(std::make_shared<LayerItem>(QVariantList{"LayerName", "LayerAddress"}))
-{
+    : QAbstractItemModel(parent),
+      rootItem(std::make_shared<LayerItem>(QVariantList{"LayerName", "LayerAddress"})) {
 }
 
 LayerModel::~LayerModel() = default;
 
 QModelIndex LayerModel::index(int row, int column, const QModelIndex& parent) const {
-  if (!hasIndex(row, column, parent))
-    return {};
+  if (!hasIndex(row, column, parent)) return {};
 
-  LayerItem *parentItem = parent.isValid()
-                             ? static_cast<LayerItem*>(parent.internalPointer())
-                             : rootItem.get();
+  LayerItem* parentItem =
+      parent.isValid() ? static_cast<LayerItem*>(parent.internalPointer()) : rootItem.get();
 
-  if (auto *childItem = parentItem->child(row))
-    return createIndex(row, column, childItem);
+  if (auto* childItem = parentItem->child(row)) return createIndex(row, column, childItem);
   return {};
 }
 
@@ -45,38 +41,33 @@ QModelIndex LayerModel::parent(const QModelIndex& child) const {
   }
 
   auto childItem = static_cast<LayerItem*>(child.internalPointer());
-  LayerItem *parentItem = childItem->parentItem();
+  LayerItem* parentItem = childItem->parentItem();
 
-  if(parentItem != rootItem.get()) {
+  if (parentItem != rootItem.get()) {
     return createIndex(parentItem->row(), 0, parentItem);
   }
   return QModelIndex();
 }
 
 int LayerModel::rowCount(const QModelIndex& parent) const {
-  if (parent.column() > 0)
-    return 0;
+  if (parent.column() > 0) return 0;
 
-  const LayerItem *parentItem = parent.isValid()
-                                   ? static_cast<const LayerItem*>(parent.internalPointer())
-                                   : rootItem.get();
+  const LayerItem* parentItem =
+      parent.isValid() ? static_cast<const LayerItem*>(parent.internalPointer()) : rootItem.get();
 
   return parentItem->childCount();
 }
 
 int LayerModel::columnCount(const QModelIndex& parent) const {
-  if (parent.isValid())
-    return static_cast<LayerItem*>(parent.internalPointer())->columnCount();
+  if (parent.isValid()) return static_cast<LayerItem*>(parent.internalPointer())->columnCount();
   return rootItem->columnCount();
 }
 
-
 Qt::ItemFlags LayerModel::flags(const QModelIndex& index) const {
-  return index.isValid()
-           ? QAbstractItemModel::flags(index) : Qt::ItemFlags(Qt::NoItemFlags);
+  return index.isValid() ? QAbstractItemModel::flags(index) : Qt::ItemFlags(Qt::NoItemFlags);
 }
 
 QVariant LayerModel::headerData(int section, Qt::Orientation orientation, int role) const {
-  return orientation == Qt::Horizontal && role == Qt::DisplayRole
-           ? rootItem->data(section) : QVariant{};
+  return orientation == Qt::Horizontal && role == Qt::DisplayRole ? rootItem->data(section)
+                                                                  : QVariant{};
 }

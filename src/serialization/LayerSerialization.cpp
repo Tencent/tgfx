@@ -30,7 +30,8 @@ namespace tgfx {
 extern const std::string HighLightLayerName;
 
 std::shared_ptr<Data> LayerSerialization::SerializeLayer(const Layer* layer,
-                                                         SerializeUtils::Map* map, const std::string& typeName) {
+                                                         SerializeUtils::Map* map,
+                                                         const std::string& typeName) {
   DEBUG_ASSERT(layer != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -87,7 +88,7 @@ void LayerSerialization::SerializeTreeNodeImpl(
   auto startVector = fbb.StartVector();
   std::vector<std::shared_ptr<Layer>> children = layer->children();
   for (const auto& child : children) {
-    if(child->name() != HighLightLayerName) {
+    if (child->name() != HighLightLayerName) {
       SerializeTreeNodeImpl(fbb, child, layerMap);
     }
   }

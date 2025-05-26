@@ -18,8 +18,7 @@
 
 #include "WebSocketServer.h"
 
-WebSocketServer::WebSocketServer(quint16 port, QObject* parent)
-  :QObject(parent), m_port(port) {
+WebSocketServer::WebSocketServer(quint16 port, QObject* parent) : QObject(parent), m_port(port) {
   // 创建 WebSocket 服务器
   m_server = new QWebSocketServer("My WebSocket Server", QWebSocketServer::NonSecureMode, this);
 
@@ -41,7 +40,7 @@ void WebSocketServer::listen() {
 }
 
 void WebSocketServer::SendData(const QByteArray& data) {
-  if(m_ClientSocket) {
+  if (m_ClientSocket) {
     m_ClientSocket->sendBinaryMessage(data);
   }
 }
@@ -51,10 +50,12 @@ void WebSocketServer::onNewConnection() {
   m_ClientSocket = m_server->nextPendingConnection();
 
   // 处理客户端文本消息
-  connect(m_ClientSocket, &QWebSocket::textMessageReceived, this, &WebSocketServer::onTextMessageReceived);
+  connect(m_ClientSocket, &QWebSocket::textMessageReceived, this,
+          &WebSocketServer::onTextMessageReceived);
 
   // 处理客户端二进制消息
-  connect(m_ClientSocket, &QWebSocket::binaryMessageReceived, this, &WebSocketServer::onBinaryMessageReceived);
+  connect(m_ClientSocket, &QWebSocket::binaryMessageReceived, this,
+          &WebSocketServer::onBinaryMessageReceived);
 
   // 处理客户端断开连接
   connect(m_ClientSocket, &QWebSocket::disconnected, this, &WebSocketServer::onClientDisconnected);
@@ -66,7 +67,7 @@ void WebSocketServer::onNewConnection() {
 
 void WebSocketServer::onTextMessageReceived(const QString& message) {
   // 获取发送消息的客户端
-  QWebSocket *clientSocket = qobject_cast<QWebSocket *>(sender());
+  QWebSocket* clientSocket = qobject_cast<QWebSocket*>(sender());
 
   if (clientSocket) {
     qDebug() << "Received text message from client:" << message;
@@ -76,7 +77,7 @@ void WebSocketServer::onTextMessageReceived(const QString& message) {
 
 void WebSocketServer::onBinaryMessageReceived(const QByteArray& message) {
   // 获取发送消息的客户端
-  QWebSocket *clientSocket = qobject_cast<QWebSocket *>(sender());
+  QWebSocket* clientSocket = qobject_cast<QWebSocket*>(sender());
 
   if (clientSocket) {
     qDebug() << "Received binary message from client, size:" << message.size();
@@ -86,7 +87,7 @@ void WebSocketServer::onBinaryMessageReceived(const QByteArray& message) {
 
 void WebSocketServer::onClientDisconnected() {
   // 获取断开连接的客户端
-  QWebSocket *clientSocket = qobject_cast<QWebSocket *>(sender());
+  QWebSocket* clientSocket = qobject_cast<QWebSocket*>(sender());
 
   if (clientSocket) {
     qDebug() << "Client disconnected:" << clientSocket->peerAddress().toString();

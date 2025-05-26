@@ -17,30 +17,31 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include <QtWebSockets/QWebSocketServer>
 #include <QtWebSockets/QWebSocket>
-class WebSocketServer : public QObject{
+#include <QtWebSockets/QWebSocketServer>
+class WebSocketServer : public QObject {
   Q_OBJECT
-public:
-  WebSocketServer(quint16 port, QObject *parent = nullptr);
+ public:
+  WebSocketServer(quint16 port, QObject* parent = nullptr);
   bool hasClientConnect() const {
     return m_HasClientConnect;
   }
   void close();
   void listen();
   void SendData(const QByteArray& data);
-  Q_SIGNALS:
-    void ClientConnected();
-  void ClientBinaryData(const QByteArray &message);
+ Q_SIGNALS:
+  void ClientConnected();
+  void ClientBinaryData(const QByteArray& message);
   void ClientTextData(const QString& message);
   void ClientDisconnected();
-  private slots:
-    void onNewConnection();
-  void onTextMessageReceived(const QString &message);
-  void onBinaryMessageReceived(const QByteArray &message);
+ private slots:
+  void onNewConnection();
+  void onTextMessageReceived(const QString& message);
+  void onBinaryMessageReceived(const QByteArray& message);
   void onClientDisconnected();
-private:
-  QWebSocketServer *m_server;
+
+ private:
+  QWebSocketServer* m_server;
   QWebSocket* m_ClientSocket;
   quint16 m_port;
   bool m_HasClientConnect = false;

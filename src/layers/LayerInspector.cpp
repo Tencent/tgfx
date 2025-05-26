@@ -17,14 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #ifdef TGFX_USE_INSPECTOR
-#include <functional>
-#include <chrono>
 #include "tgfx/layers/LayerInspector.h"
+#include <chrono>
+#include <functional>
+#include "core/utils/Profiling.h"
+#include "serialization/LayerSerialization.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/SolidColor.h"
-#include "serialization/LayerSerialization.h"
-#include "core/utils/Profiling.h"
-
 
 namespace tgfx {
 
@@ -37,11 +36,11 @@ void LayerInspector::setCallBack() {
 }
 
 void LayerInspector::pickedLayer(float x, float y) {
-  if(m_HoverdSwitch) {
+  if (m_HoverdSwitch) {
     auto layers = m_DisplayList->root()->getLayersUnderPoint(x, y);
-    for(auto layer : layers) {
-      if(layer->name() != HighLightLayerName) {
-        if(reinterpret_cast<uint64_t>(layer.get()) != m_SelectedAddress) {
+    for (auto layer : layers) {
+      if (layer->name() != HighLightLayerName) {
+        if (reinterpret_cast<uint64_t>(layer.get()) != m_SelectedAddress) {
           SendPickedLayerAddress(layer);
         }
         AddHighLightOverlay(tgfx::Color::FromRGBA(111, 166, 219), layer);
@@ -69,12 +68,12 @@ void LayerInspector::serializingLayerTree() {
   // if (m_IsDirty) {
   m_LayerMap.clear();
 
-  std::shared_ptr<Data> data =
-      tgfx::LayerSerialization::SerializeTreeNode(m_DisplayList->root()->weakThis.lock(), m_LayerMap);
+  std::shared_ptr<Data> data = tgfx::LayerSerialization::SerializeTreeNode(
+      m_DisplayList->root()->weakThis.lock(), m_LayerMap);
   std::vector<uint8_t> blob(data->bytes(), data->bytes() + data->size());
 
   LAYER_DATA(blob);
-    // m_IsDirty = false;
+  // m_IsDirty = false;
   // }
 }
 
@@ -105,75 +104,74 @@ void LayerInspector::SendFlushAttributeAck(uint64_t address) {
 }
 
 void LayerInspector::serializingLayerAttribute(const std::shared_ptr<tgfx::Layer>& layer) {
-    if(!layer) return;
-    auto& pathObjMap = m_LayerComplexObjMap[reinterpret_cast<uint64_t>(layer.get())];
-    auto data = LayerSerialization::SerializeLayer(layer.get(), &pathObjMap, "LayerAttribute");
+  if (!layer) return;
+  auto& pathObjMap = m_LayerComplexObjMap[reinterpret_cast<uint64_t>(layer.get())];
+  auto data = LayerSerialization::SerializeLayer(layer.get(), &pathObjMap, "LayerAttribute");
+  std::vector<uint8_t> blob(data->bytes(), data->bytes() + data->size());
+  LAYER_DATA(blob);
+}
+
+void LayerInspector::FeedBackDataProcess(const std::vector<uint8_t>& data) {
+  if (data.size() == 0) {
+    return;
+  }
+  auto map = flexbuffers::GetRoot(data.data(), data.size()).AsMap();
+  auto type = map["Type"].AsString().str();
+  if (type == "EnalbeLayerInspect") {
+    m_HoverdSwitch = map["Value"].AsUInt64();
+    if (!m_HoverdSwitch && m_HoverdLayer) {
+      m_HoverdLayer->removeChildren(m_HighLightLayerIndex);
+      m_HoverdLayer = nullptr;
+    }
+  } else if (type == "HoverLayerAddress") {
+    if (m_HoverdSwitch) {
+      m_HoveredAddress = map["Value"].AsUInt64();
+      AddHighLightOverlay(tgfx::Color::FromRGBA(111, 166, 219), m_LayerMap[m_HoveredAddress]);
+    }
+  } else if (type == "SelectedLayerAddress") {
+    m_SelectedAddress = map["Value"].AsUInt64();
+  } else if (type == "SerializeAttribute") {
+    serializingLayerAttribute(m_LayerMap[m_SelectedAddress]);
+  } else if (type == "SerializeSubAttribute") {
+    m_ExpandID = map["Value"].AsUInt64();
+    std::shared_ptr<Data> data = m_LayerComplexObjMap[m_SelectedAddress][m_ExpandID]();
     std::vector<uint8_t> blob(data->bytes(), data->bytes() + data->size());
     LAYER_DATA(blob);
-  }
-
-  void LayerInspector::FeedBackDataProcess(const std::vector<uint8_t>& data) {
-    if(data.size() == 0) {
-      return;
+  } else if (type == "FlushAttribute") {
+    uint64_t address = map["Value"].AsUInt64();
+    if (m_LayerComplexObjMap.find(address) != m_LayerComplexObjMap.end()) {
+      m_LayerComplexObjMap.erase(address);
     }
-    auto map = flexbuffers::GetRoot(data.data(), data.size()).AsMap();
-    auto type = map["Type"].AsString().str();
-    if(type == "EnalbeLayerInspect") {
-      m_HoverdSwitch = map["Value"].AsUInt64();
-      if(!m_HoverdSwitch && m_HoverdLayer) {
-        m_HoverdLayer->removeChildren(m_HighLightLayerIndex);
-        m_HoverdLayer = nullptr;
-      }
-    }else if(type == "HoverLayerAddress") {
-      if(m_HoverdSwitch) {
-        m_HoveredAddress = map["Value"].AsUInt64();
-        AddHighLightOverlay(tgfx::Color::FromRGBA(111, 166, 219), m_LayerMap[m_HoveredAddress]);
-      }
-    }else if(type == "SelectedLayerAddress") {
-      m_SelectedAddress = map["Value"].AsUInt64();
-    }else if(type == "SerializeAttribute") {
-      serializingLayerAttribute(m_LayerMap[m_SelectedAddress]);
-    }else if(type == "SerializeSubAttribute") {
-      m_ExpandID = map["Value"].AsUInt64();
-      std::shared_ptr<Data> data = m_LayerComplexObjMap[m_SelectedAddress][m_ExpandID]();
-      std::vector<uint8_t> blob(data->bytes(), data->bytes() + data->size());
-      LAYER_DATA(blob);
-    }else if(type == "FlushAttribute") {
-      uint64_t address = map["Value"].AsUInt64();
-      if(m_LayerComplexObjMap.find(address) != m_LayerComplexObjMap.end()) {
-        m_LayerComplexObjMap.erase(address);
-      }
-      SendFlushAttributeAck(address);
-    }else if(type == "FlushLayerTree") {
-      serializingLayerTree();
-    }
-  }
-
-  void LayerInspector::AddHighLightOverlay(Color color, std::shared_ptr<Layer> hovedLayer) {
-    if(!hovedLayer) {
-      return;
-    }
-
-    if(hovedLayer == m_HoverdLayer) {
-      return;
-    }
-
-    if(m_HoverdLayer) {
-      m_HoverdLayer->removeChildren(m_HighLightLayerIndex);
-    }
-
-    m_HoverdLayer = hovedLayer;
-    auto highlightLayer = tgfx::ShapeLayer::Make();
-    highlightLayer->setName(HighLightLayerName);
-    highlightLayer->setBlendMode(tgfx::BlendMode::SrcOver);
-    auto rectPath = tgfx::Path();
-    rectPath.addRect(m_HoverdLayer->getBounds());
-    highlightLayer->setFillStyle(tgfx::SolidColor::Make(color));
-    highlightLayer->setPath(rectPath);
-    highlightLayer->setAlpha(0.66f);
-    m_HoverdLayer->addChild(highlightLayer);
-    m_HighLightLayerIndex = m_HoverdLayer->getChildIndex(highlightLayer);
+    SendFlushAttributeAck(address);
+  } else if (type == "FlushLayerTree") {
+    serializingLayerTree();
   }
 }
-#endif
 
+void LayerInspector::AddHighLightOverlay(Color color, std::shared_ptr<Layer> hovedLayer) {
+  if (!hovedLayer) {
+    return;
+  }
+
+  if (hovedLayer == m_HoverdLayer) {
+    return;
+  }
+
+  if (m_HoverdLayer) {
+    m_HoverdLayer->removeChildren(m_HighLightLayerIndex);
+  }
+
+  m_HoverdLayer = hovedLayer;
+  auto highlightLayer = tgfx::ShapeLayer::Make();
+  highlightLayer->setName(HighLightLayerName);
+  highlightLayer->setBlendMode(tgfx::BlendMode::SrcOver);
+  auto rectPath = tgfx::Path();
+  rectPath.addRect(m_HoverdLayer->getBounds());
+  highlightLayer->setFillStyle(tgfx::SolidColor::Make(color));
+  highlightLayer->setPath(rectPath);
+  highlightLayer->setAlpha(0.66f);
+  m_HoverdLayer->addChild(highlightLayer);
+  m_HighLightLayerIndex = m_HoverdLayer->getChildIndex(highlightLayer);
+}
+}  // namespace tgfx
+#endif

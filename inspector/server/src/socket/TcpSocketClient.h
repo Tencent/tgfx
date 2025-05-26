@@ -20,9 +20,9 @@
 
 #include <QTcpSocket>
 
-class TcpSocketClient : public QObject{
+class TcpSocketClient : public QObject {
   Q_OBJECT
-public:
+ public:
   TcpSocketClient(QObject* parent, QString ip, quint16 port);
   ~TcpSocketClient() override;
   void connection(QString ip, quint16 port);
@@ -30,17 +30,15 @@ public:
   bool hasClientConnect() const {
     return m_IsConnection;
   }
-  Q_SIGNALS:
-  void ServerBinaryData(const QByteArray &message);
-private slots:
+ Q_SIGNALS:
+  void ServerBinaryData(const QByteArray& message);
+ private slots:
   void onSocketConnected();
   void onSocketDisconnected();
   void onSocketReadyRead();
   void onSocketErrorOccurred(QAbstractSocket::SocketError error);
-private:
+
+ private:
   bool m_IsConnection;
   QTcpSocket* m_TcpSocket;
 };
-
-
-

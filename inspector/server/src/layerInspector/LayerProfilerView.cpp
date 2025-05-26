@@ -16,41 +16,39 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "LayerProfilerView.h"
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QQmlContext>
 #include <QQuickWindow>
-#include <QHBoxLayout>
-
 
 LayerProfilerView::LayerProfilerView(QString ip, quint16 port, QWidget* parent)
-  :QWidget(parent),
-  m_WebSocketServer(nullptr),
-  m_TcpSocketClient(new TcpSocketClient(this, ip, port)),
-  m_LayerTreeModel(new LayerTreeModel(this)),
-  m_LayerAttributeModel(new LayerAttributeModel(this))
-{
+    : QWidget(parent), m_WebSocketServer(nullptr),
+      m_TcpSocketClient(new TcpSocketClient(this, ip, port)),
+      m_LayerTreeModel(new LayerTreeModel(this)),
+      m_LayerAttributeModel(new LayerAttributeModel(this)) {
   LayerProlfilerQMLImpl();
   connect(m_TcpSocketClient, &TcpSocketClient::ServerBinaryData, this,
-    &LayerProfilerView::ProcessMessage);
+          &LayerProfilerView::ProcessMessage);
 
-  connect(m_LayerTreeModel, &LayerTreeModel::selectAddress, [this](uint64_t address) {
-    processSelectedLayer(address);
-  });
+  connect(m_LayerTreeModel, &LayerTreeModel::selectAddress,
+          [this](uint64_t address) { processSelectedLayer(address); });
 
   connect(m_LayerTreeModel, &LayerTreeModel::hoveredAddress, [this](uint64_t address) {
     auto data = feedBackData("HoverLayerAddress", address);
     m_TcpSocketClient->sendData(data);
   });
 
-  connect(m_LayerAttributeModel, &LayerAttributeModel::expandSubAttributeSignal, [this](uint64_t id) {
-    auto data = feedBackData("SerializeSubAttribute", id);
-    m_TcpSocketClient->sendData(data);
-  });
+  connect(m_LayerAttributeModel, &LayerAttributeModel::expandSubAttributeSignal,
+          [this](uint64_t id) {
+            auto data = feedBackData("SerializeSubAttribute", id);
+            m_TcpSocketClient->sendData(data);
+          });
 
-  connect(m_LayerAttributeModel, &LayerAttributeModel::flushLayerAttribute, [this](uint64_t address) {
-    auto data = feedBackData("FlushAttribute", address);
-    m_TcpSocketClient->sendData(data);
-  });
+  connect(m_LayerAttributeModel, &LayerAttributeModel::flushLayerAttribute,
+          [this](uint64_t address) {
+            auto data = feedBackData("FlushAttribute", address);
+            m_TcpSocketClient->sendData(data);
+          });
 
   connect(m_LayerTreeModel, &LayerTreeModel::flushLayerTreeSignal, [this]() {
     auto data = feedBackData("FlushLayerTree", UINT64_MAX);
@@ -59,32 +57,31 @@ LayerProfilerView::LayerProfilerView(QString ip, quint16 port, QWidget* parent)
 }
 
 LayerProfilerView::LayerProfilerView(QWidget* parent)
-  :QWidget(parent),
-  m_WebSocketServer(new WebSocketServer(8085)),
-  m_LayerTreeModel(new LayerTreeModel(this)),
-  m_LayerAttributeModel(new LayerAttributeModel(this))
-{
+    : QWidget(parent), m_WebSocketServer(new WebSocketServer(8085)),
+      m_LayerTreeModel(new LayerTreeModel(this)),
+      m_LayerAttributeModel(new LayerAttributeModel(this)) {
   LayerProlfilerQMLImpl();
   connect(m_WebSocketServer, &WebSocketServer::ClientBinaryData, this,
-    &LayerProfilerView::ProcessMessage);
-  connect(m_LayerTreeModel, &LayerTreeModel::selectAddress, [this](uint64_t address) {
-    processSelectedLayer(address);
-  });
+          &LayerProfilerView::ProcessMessage);
+  connect(m_LayerTreeModel, &LayerTreeModel::selectAddress,
+          [this](uint64_t address) { processSelectedLayer(address); });
 
   connect(m_LayerTreeModel, &LayerTreeModel::hoveredAddress, [this](uint64_t address) {
     auto data = feedBackData("HoverLayerAddress", address);
     m_WebSocketServer->SendData(data);
   });
 
-  connect(m_LayerAttributeModel, &LayerAttributeModel::expandSubAttributeSignal, [this](uint64_t id) {
-    auto data = feedBackData("SerializeSubAttribute", id);
-    m_WebSocketServer->SendData(data);
-  });
+  connect(m_LayerAttributeModel, &LayerAttributeModel::expandSubAttributeSignal,
+          [this](uint64_t id) {
+            auto data = feedBackData("SerializeSubAttribute", id);
+            m_WebSocketServer->SendData(data);
+          });
 
-  connect(m_LayerAttributeModel, &LayerAttributeModel::flushLayerAttribute, [this](uint64_t address) {
-    auto data = feedBackData("FlushAttribute", address);
-    m_WebSocketServer->SendData(data);
-  });
+  connect(m_LayerAttributeModel, &LayerAttributeModel::flushLayerAttribute,
+          [this](uint64_t address) {
+            auto data = feedBackData("FlushAttribute", address);
+            m_WebSocketServer->SendData(data);
+          });
 
   connect(m_LayerTreeModel, &LayerTreeModel::flushLayerTreeSignal, [this]() {
     auto data = feedBackData("FlushLayerTree", UINT64_MAX);
@@ -93,16 +90,13 @@ LayerProfilerView::LayerProfilerView(QWidget* parent)
 }
 
 LayerProfilerView::~LayerProfilerView() {
-  if(m_WebSocketServer)
-    m_WebSocketServer->close();
+  if (m_WebSocketServer) m_WebSocketServer->close();
 }
 
 void LayerProfilerView::SetHoveredSwitchState(bool state) {
   auto data = feedBackData("EnalbeLayerInspect", state);
-  if(m_WebSocketServer)
-    m_WebSocketServer->SendData(data);
-  if(m_TcpSocketClient)
-    m_TcpSocketClient->sendData(data);
+  if (m_WebSocketServer) m_WebSocketServer->SendData(data);
+  if (m_TcpSocketClient) m_TcpSocketClient->sendData(data);
 }
 
 void LayerProfilerView::flushAttribute() {
@@ -126,11 +120,13 @@ void LayerProfilerView::LayerProlfilerQMLImpl() {
   layerTreeWidget->setSizePolicy(QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Expanding);
 
   m_LayerAttributeEngine = new QQmlApplicationEngine();
-  m_LayerAttributeEngine->rootContext()->setContextProperty("_layerAttributeModel", m_LayerAttributeModel);
+  m_LayerAttributeEngine->rootContext()->setContextProperty("_layerAttributeModel",
+                                                            m_LayerAttributeModel);
   m_LayerAttributeEngine->load(QUrl(QStringLiteral("qrc:/qml/layerInspector/LayerAttribute.qml")));
   auto quickWindow1 = static_cast<QQuickWindow*>(m_LayerAttributeEngine->rootObjects().first());
   auto layerAttributeWidget = createWindowContainer(quickWindow1);
-  layerAttributeWidget->setSizePolicy(QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Expanding);
+  layerAttributeWidget->setSizePolicy(QSizePolicy::Policy::Expanding,
+                                      QSizePolicy::Policy::Expanding);
 
   layout->addWidget(layerTreeWidget);
   layout->addWidget(layerAttributeWidget);
@@ -142,29 +138,29 @@ void LayerProfilerView::ProcessMessage(const QByteArray& message) {
   auto map = flexbuffers::GetRoot((const uint8_t*)ptr, (size_t)message.size()).AsMap();
   std::string type = map["Type"].AsString().str();
   auto contentMap = map["Content"].AsMap();
-  if(type == "LayerTree") {
+  if (type == "LayerTree") {
     m_LayerTreeModel->setLayerTreeData(contentMap);
     auto currentAddress = m_LayerAttributeModel->GetCurrentAddress();
-    if(!m_LayerTreeModel->selectLayer(currentAddress)) {
+    if (!m_LayerTreeModel->selectLayer(currentAddress)) {
       m_LayerAttributeModel->clearAttribute();
     }
-  }else if(type == "LayerAttribute") {
+  } else if (type == "LayerAttribute") {
     m_LayerAttributeModel->setLayerAttribute(contentMap);
-  }else if(type == "LayerSubAttribute") {
+  } else if (type == "LayerSubAttribute") {
     m_LayerAttributeModel->setLayerSubAttribute(contentMap);
-  }else if(type == "PickedLayerAddress") {
+  } else if (type == "PickedLayerAddress") {
     auto address = contentMap["Address"].AsUInt64();
     processSelectedLayer(address);
     m_LayerTreeModel->selectLayer(address);
-  }else if(type == "FlushAttributeAck") {
+  } else if (type == "FlushAttributeAck") {
     auto address = contentMap["Address"].AsUInt64();
     processSelectedLayer(address);
-  }else {
+  } else {
     qDebug() << "Unknown message type!";
   }
 }
 
-QByteArray LayerProfilerView::feedBackData(const std::string &type, uint64_t value) {
+QByteArray LayerProfilerView::feedBackData(const std::string& type, uint64_t value) {
   flexbuffers::Builder fbb;
   auto mapStart = fbb.StartMap();
   fbb.Key("Type");
@@ -178,26 +174,22 @@ QByteArray LayerProfilerView::feedBackData(const std::string &type, uint64_t val
 
 void LayerProfilerView::sendSelectedAddress(uint64_t address) {
   auto data = feedBackData("SelectedLayerAddress", address);
-  if(m_WebSocketServer)
-    m_WebSocketServer->SendData(data);
-  if(m_TcpSocketClient)
-    m_TcpSocketClient->sendData(data);
+  if (m_WebSocketServer) m_WebSocketServer->SendData(data);
+  if (m_TcpSocketClient) m_TcpSocketClient->sendData(data);
 }
 
 void LayerProfilerView::sendSerializeAttributeAddress(uint64_t address) {
   auto data = feedBackData("SerializeAttribute", address);
-  if(m_WebSocketServer)
-    m_WebSocketServer->SendData(data);
-  if(m_TcpSocketClient)
-    m_TcpSocketClient->sendData(data);
+  if (m_WebSocketServer) m_WebSocketServer->SendData(data);
+  if (m_TcpSocketClient) m_TcpSocketClient->sendData(data);
 }
 
 void LayerProfilerView::processSelectedLayer(uint64_t address) {
   sendSelectedAddress(address);
   m_LayerAttributeModel->SetCurrentAddress(address);
-  if(m_LayerAttributeModel->isExistedInLayerMap(address)) {
+  if (m_LayerAttributeModel->isExistedInLayerMap(address)) {
     m_LayerAttributeModel->switchToLayer(address);
-  }else {
+  } else {
     sendSerializeAttributeAddress(address);
   }
 }

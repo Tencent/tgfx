@@ -18,31 +18,31 @@
 
 #pragma once
 
-#include "LayerModel.h"
 #include <flatbuffers/flexbuffers.h>
+#include "LayerModel.h"
 
-class LayerTreeModel : public LayerModel{
+class LayerTreeModel : public LayerModel {
   Q_OBJECT
   QML_NAMED_ELEMENT(LayerTreeModel)
-public:
+ public:
   Q_DISABLE_COPY_MOVE(LayerTreeModel)
   explicit LayerTreeModel(QObject* parent = nullptr);
   ~LayerTreeModel() override = default;
   void setLayerTreeData(const flexbuffers::Map& contentMap);
   bool selectLayer(uint64_t address);
-  QVariant data(const QModelIndex &index, int role = Qt::DisplayRole) const override;
+  QVariant data(const QModelIndex& index, int role = Qt::DisplayRole) const override;
   void flushLayerTree();
   Q_INVOKABLE void MouseSelectedIndex(QModelIndex index);
   Q_INVOKABLE void MouseHoveredIndex(QModelIndex index);
-signals:
+ signals:
   void selectIndex(QModelIndex index);
   void expandAllTree();
   void selectAddress(uint64_t address);
   void hoveredAddress(uint64_t address);
   void flushLayerTreeSignal();
-private:
+
+ private:
   QModelIndex indexFromAddress(uint64_t address) const;
   void setupModelData(const flexbuffers::Map& contentMap, LayerItem* parent);
   QHash<uint64_t, LayerItem*> m_AddressToItem;
 };
-

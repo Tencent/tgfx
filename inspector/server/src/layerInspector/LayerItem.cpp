@@ -19,8 +19,7 @@
 #include "LayerItem.h"
 
 LayerItem::LayerItem(QVariantList data, LayerItem* parentItem)
-  : m_itemData(std::move(data)), m_parentItem(parentItem)
-{
+    : m_itemData(std::move(data)), m_parentItem(parentItem) {
 }
 
 void LayerItem::appendChild(std::unique_ptr<LayerItem>&& child) {
@@ -28,7 +27,7 @@ void LayerItem::appendChild(std::unique_ptr<LayerItem>&& child) {
 }
 
 LayerItem* LayerItem::child(int row) {
-  return row >=0 && row < childCount() ? m_childItems.at((uint64_t)row).get() : nullptr;
+  return row >= 0 && row < childCount() ? m_childItems.at((uint64_t)row).get() : nullptr;
 }
 
 int LayerItem::childCount() const {
@@ -44,14 +43,11 @@ QVariant LayerItem::data(int column) const {
 }
 
 int LayerItem::row() const {
-  if(m_parentItem == nullptr)
-    return 0;
-  const auto it = std::find_if(m_parentItem->m_childItems.cbegin(),
-    m_parentItem->m_childItems.cend(), [this](const std::unique_ptr<LayerItem>& treeItem)
-    {
-      return treeItem.get() == this;
-    });
-  if(it != m_parentItem->m_childItems.cend()) {
+  if (m_parentItem == nullptr) return 0;
+  const auto it = std::find_if(
+      m_parentItem->m_childItems.cbegin(), m_parentItem->m_childItems.cend(),
+      [this](const std::unique_ptr<LayerItem>& treeItem) { return treeItem.get() == this; });
+  if (it != m_parentItem->m_childItems.cend()) {
     return (int)std::distance(m_parentItem->m_childItems.cbegin(), it);
   }
   Q_ASSERT(false);

@@ -17,41 +17,39 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include <QWidget>
+#include <QtGui/qwindow.h>
 #include <QDialog>
 #include <QQmlApplicationEngine>
-#include <QtGui/qwindow.h>
-
-#include "socket/WebSocketServer.h"
-#include "socket/TcpSocketClient.h"
-#include "LayerTreeModel.h"
+#include <QWidget>
 #include "LayerAttributeModel.h"
+#include "LayerTreeModel.h"
 #include "flatbuffers/flexbuffers.h"
+#include "socket/TcpSocketClient.h"
+#include "socket/WebSocketServer.h"
 
-class LayerProfilerView : public QWidget
-{
+class LayerProfilerView : public QWidget {
   Q_OBJECT
-public:
+ public:
   LayerProfilerView(QString ip, quint16 port, QWidget* parent = nullptr);
   explicit LayerProfilerView(QWidget* parent = nullptr);
   ~LayerProfilerView() override;
   bool hasWebSocketConnection() const {
-    if(m_WebSocketServer)
-      return m_WebSocketServer->hasClientConnect();
+    if (m_WebSocketServer) return m_WebSocketServer->hasClientConnect();
     return false;
   }
   bool hasSocketConnection() const {
-    if(m_TcpSocketClient)
-      return m_TcpSocketClient->hasClientConnect();
+    if (m_TcpSocketClient) return m_TcpSocketClient->hasClientConnect();
     return false;
   }
   Q_INVOKABLE void SetHoveredSwitchState(bool state);
   Q_INVOKABLE void flushAttribute();
   Q_INVOKABLE void flushLayerTree();
-protected:
+
+ protected:
   void LayerProlfilerQMLImpl();
   void ProcessMessage(const QByteArray& message);
-private:
+
+ private:
   QByteArray feedBackData(const std::string& type, uint64_t value);
 
   void sendSelectedAddress(uint64_t address);
@@ -59,7 +57,8 @@ private:
   void sendSerializeAttributeAddress(uint64_t address);
 
   void processSelectedLayer(uint64_t address);
-private:
+
+ private:
   WebSocketServer* m_WebSocketServer;
   TcpSocketClient* m_TcpSocketClient;
   QQmlApplicationEngine* m_LayerTreeEngine;

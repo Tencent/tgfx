@@ -929,7 +929,7 @@ class ConcurrentQueue {
           tailBlock(nullptr), parent(parent_) {
     }
 
-    virtual ~ProducerBase(){};
+    virtual ~ProducerBase() {};
 
     template <class NotifyThread, class ProcessData>
     inline size_t dequeue_bulk(NotifyThread notifyThread, ProcessData processData) {

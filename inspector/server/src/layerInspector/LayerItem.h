@@ -19,25 +19,24 @@
 #pragma once
 #include <QVariantList>
 
-class LayerItem{
-public:
-  explicit LayerItem(QVariantList data, LayerItem *parentItem = nullptr);
+class LayerItem {
+ public:
+  explicit LayerItem(QVariantList data, LayerItem* parentItem = nullptr);
 
-  void appendChild(std::unique_ptr<LayerItem> &&child);
+  void appendChild(std::unique_ptr<LayerItem>&& child);
 
-  LayerItem *child(int row);
+  LayerItem* child(int row);
   int childCount() const;
   int columnCount() const;
   QVariant data(int column) const;
   int row() const;
-  LayerItem *parentItem();
+  LayerItem* parentItem();
   void clear() {
     m_childItems.clear();
   }
-private:
+
+ private:
   std::vector<std::unique_ptr<LayerItem>> m_childItems;
   QVariantList m_itemData;
-  LayerItem *m_parentItem;
+  LayerItem* m_parentItem;
 };
-
-

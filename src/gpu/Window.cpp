@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Window.h"
-#include "core/utils/Profiling.h"
 #include "core/utils/Log.h"
+#include "core/utils/Profiling.h"
 #include "tgfx/gpu/Device.h"
 
 namespace tgfx {

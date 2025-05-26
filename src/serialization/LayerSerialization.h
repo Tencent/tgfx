@@ -34,7 +34,8 @@ class LayerSerialization {
       std::shared_ptr<Layer> layer,
       std::unordered_map<uint64_t, std::shared_ptr<tgfx::Layer>>& layerMap);
 
-  static std::shared_ptr<Data> SerializeLayer(const Layer* layer, SerializeUtils::Map* map, const std::string& typeName = "LayerSubAttribute");
+  static std::shared_ptr<Data> SerializeLayer(const Layer* layer, SerializeUtils::Map* map,
+                                              const std::string& typeName = "LayerSubAttribute");
 
  private:
   static void SerializeTreeNodeImpl(

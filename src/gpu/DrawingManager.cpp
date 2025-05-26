@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawingManager.h"
-#include "core/utils/Profiling.h"
 #include "ProxyProvider.h"
+#include "core/utils/Profiling.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/tasks/RenderTargetCopyTask.h"
