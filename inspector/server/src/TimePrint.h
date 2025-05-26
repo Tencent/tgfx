@@ -17,37 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include <QMainWindow>
-#include "StartView.h"
-#include "ViewData.h"
-#include "Worker.h"
+#include <cstdint>
 
 namespace inspector {
-class InspectorView : public QObject {
-  Q_OBJECT
-
- public:
-  InspectorView(std::string filePath, int width, QObject* parent = nullptr);
-  InspectorView(std::string& addr, uint16_t port, int width, QObject* parent = nullptr);
-  ~InspectorView();
-
-  void initView();
-  void cleanView();
-  Q_INVOKABLE void openStartView();
-  Q_INVOKABLE void openTaskView();
-
- private:
-  int width;
-  Worker worker;
-  ViewData viewData;
-  const FrameData* frames;
-  bool connected = false;
-  QQmlApplicationEngine* ispEngine = nullptr;
-  QQmlApplicationEngine* framesEngine = nullptr;
-  QQmlApplicationEngine* atttributeEngine = nullptr;
-  QQmlApplicationEngine* meshEngine = nullptr;
-  QQmlApplicationEngine* shaderEngine = nullptr;
-  QQmlApplicationEngine* textureEngine = nullptr;
-};
+const char* TimeToString(int64_t ns);
+const char* TimeToStringExact(int64_t ns);
 }  // namespace inspector

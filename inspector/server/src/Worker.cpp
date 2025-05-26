@@ -123,8 +123,24 @@ int64_t Worker::GetLastTime() const {
   return dataContext.lastTime;
 }
 
+int64_t Worker::GetFrameStart(uint32_t index) const {
+  return dataContext.frameData.frames[index].start;
+}
+
+int64_t Worker::GetFrameDrawCall(uint32_t index) const {
+  return dataContext.frameData.frames[index].drawCall;
+}
+
+int64_t Worker::GetFrameTriangles(uint32_t index) const {
+  return dataContext.frameData.frames[index].triangles;
+}
+
 FrameData* Worker::GetFrameData() {
   return &dataContext.frameData;
+}
+
+size_t Worker::GetFrameCount() const {
+  return dataContext.frameData.frames.size();
 }
 
 void Worker::Shutdown() {

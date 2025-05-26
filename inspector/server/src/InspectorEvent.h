@@ -44,7 +44,7 @@ enum { FrameEventSize = sizeof(FrameEvent) };
 
 struct FrameData {
   std::vector<FrameEvent> frames;
-  uint8_t continuous = 0;
+  uint8_t continuous = 1;
 
   int64_t min = std::numeric_limits<int64_t>::max();
   int64_t max = std::numeric_limits<int64_t>::min();

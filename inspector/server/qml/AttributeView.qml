@@ -6,7 +6,6 @@ import AtttributeModel 1.0
 Item {
     id: root
     width: 1120
-
     height: 800
 
     AtttributeModel {
@@ -18,7 +17,6 @@ Item {
     }
 
     property bool isOpSelected: true
-
     Rectangle {
         anchors.fill: parent
         color: "#535353"

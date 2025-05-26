@@ -34,9 +34,7 @@ namespace inspector {
 class ClientData : public QObject {
   Q_OBJECT
   Q_PROPERTY(QString procName READ getProcName CONSTANT)
-  Q_PROPERTY(QString caddress READ getAddress CONSTANT)
-  Q_PROPERTY(uint16_t ports READ getPort CONSTANT)
-  Q_PROPERTY(QString clientName READ getClientName CONSTANT)
+  Q_PROPERTY(QString address READ getAddress CONSTANT)
   Q_PROPERTY(uint16_t port READ getPort CONSTANT)
  public:
   ClientData(int64_t time, uint32_t protoVer, int32_t activeTime, uint16_t port, uint64_t pid,
@@ -47,9 +45,6 @@ class ClientData : public QObject {
   }
   QString getAddress() const {
     return QString::fromStdString(address);
-  }
-  QString getClientName() const {
-    return QString::fromStdString(procName);
   }
   uint16_t getPort() const {
     return port;

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <QObject>
 #include <cstdint>
 #include <string>
 #include <thread>
@@ -28,7 +29,7 @@
 #include "StringDiscovery.h"
 
 namespace inspector {
-class Worker {
+class Worker : public QObject {
  public:
   struct NetBuffer {
     int bufferOffset;
@@ -44,6 +45,11 @@ class Worker {
 
   int64_t GetFrameTime(const FrameData& fd, size_t idx) const;
   int64_t GetLastTime() const;
+  int64_t GetFrameStart(uint32_t index) const;
+  int64_t GetFrameDrawCall(uint32_t index) const;
+  int64_t GetFrameTriangles(uint32_t index) const;
+  size_t GetFrameCount() const;
+
   FrameData* GetFrameData();
 
  private:

@@ -42,16 +42,13 @@ StartView::StartView(QObject* parent) : QObject(parent), resolv(port) {
 StartView::~StartView() {
   saveRecentFiles();
   qDeleteAll(fileItems);
-
   if (broadcastTimer) {
     broadcastTimer->stop();
     delete broadcastTimer;
   }
-
   for (auto& it : clients) {
     delete it.second;
   }
-
   clients.clear();
   broadcastListen.reset();
 }
@@ -86,29 +83,22 @@ void StartView::addRecentFile(const QString& fPath) {
   if (fPath.isEmpty()) {
     return;
   }
-
   recentFiles.removeAll(fPath);
   recentFiles.prepend(fPath);
-
   if (lastOpenFile != fPath) {
     lastOpenFile = fPath;
     Q_EMIT lastOpenFileChanged();
   }
-
   while (recentFiles.size() >= 15) {
     recentFiles.removeLast();
   }
-
   qDeleteAll(fileItems);
   fileItems.clear();
-
   for (const QString& file : recentFiles) {
     fileItems.append(new FileItem(file, QFileInfo(file).fileName(), this));
   }
-
   Q_EMIT fileItemsChanged();
   Q_EMIT recentFilesChanged();
-
   saveRecentFiles();
 }
 
@@ -134,7 +124,12 @@ QVector<QObject*> StartView::getClientItems() const {
 void StartView::connectToClient(QObject* object) {
   auto client = dynamic_cast<ClientData*>(object);
   if (client) {
-    Q_EMIT openConnectView(client->getAddress(), client->getPort());
+    if (inspectorView) {
+      delete inspectorView;
+    }
+    inspectorView = new InspectorView(client->address, client->port, 1920, this);
+    inspectorView->initView();
+    Q_EMIT closeWindow();
   }
 }
 

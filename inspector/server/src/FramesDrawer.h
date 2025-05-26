@@ -17,24 +17,24 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include "TracyWorker.hpp"
+#include "AppHost.h"
 #include "ViewData.h"
+#include "Worker.h"
 #include "tgfx/gpu/opengl/qt/QGLWindow.h"
 
+namespace inspector {
 #define FRAME_VIEW_HEIGHT 50
 
 constexpr int64_t MaxFrameTime = 50 * 1000 * 1000;
 
 class TimelineView;
-class FramesView : public QQuickItem {
+class FramesDrawer : public QQuickItem {
   Q_OBJECT
-  Q_PROPERTY(unsigned long long worker READ getWorker WRITE setWorker)
-  Q_PROPERTY(ViewData* viewData READ getViewDataPtr WRITE setViewData)
-  Q_PROPERTY(unsigned long long viewMode READ getViewMode WRITE setViewMode)
+  Q_PROPERTY(Worker* worker READ getWorker WRITE setWorker)
+  Q_PROPERTY(ViewData* viewData READ getViewData WRITE setViewData)
  public:
-  FramesView(QQuickItem* parent = nullptr);
-  ~FramesView();
-  void setViewToLastFrames();
+  FramesDrawer(QQuickItem* parent = nullptr);
+  ~FramesDrawer() = default;
 
   void wheelEvent(QWheelEvent* event) override;
   void mouseMoveEvent(QMouseEvent* event) override;
@@ -42,67 +42,43 @@ class FramesView : public QQuickItem {
   void mouseReleaseEvent(QMouseEvent* event) override;
   void hoverMoveEvent(QHoverEvent* event) override;
 
-  uint64_t getFrameNumber(const tracy::FrameData& frameData, uint64_t i);
-
-  unsigned long long getWorker() const {
-    return (unsigned long long)worker;
+  Worker* getWorker() const {
+    return worker;
   }
-  void setWorker(unsigned long long _worker) {
-    worker = (tracy::Worker*)(_worker);
-    frames = worker->GetFramesBase();
+  void setWorker(Worker* worker) {
+    this->worker = worker;
+    frames = worker->GetFrameData();
   }
 
-  ViewData* getViewDataPtr() const {
+  ViewData* getViewData() const {
     return viewData;
   }
-  void setViewData(ViewData* _viewData) {
-    viewData = _viewData;
-    if (viewData) {
-      frameTarget = 1000 * 1000 * 1000 / viewData->frameTarget;
-    }
+  void setViewData(ViewData* viewData) {
+    this->viewData = viewData;
   }
-
-  unsigned long long getViewMode() const {
-    return (unsigned long long)viewMode;
-  }
-  void setViewMode(unsigned long long _viewMode) {
-    viewMode = (ViewMode*)_viewMode;
-  }
-
-  //signals
-  Q_SIGNAL void selectFrameHightlight(int64_t start, int64_t end);
-  Q_SIGNAL void changeViewMode(ViewMode mode);
-  Q_SIGNAL void statRangeChanged(int startFrame, int endFrame, bool acive);
 
  protected:
   void draw();
   void drawFrames(tgfx::Canvas* canvas);
   void drawBackground(tgfx::Canvas* canvas);
-  void drawSelectFrame(tgfx::Canvas* canvas, int onScreen, int frameWidth, int group);
-  void drawSelect(tgfx::Canvas* canvas, std::pair<int, int>& range, int onScreen, int frameWidth,
-                  int group, uint32_t color);
+  void drawSelectFrame(tgfx::Canvas* canvas, int onScreen, int frameWidth);
+  void drawSelect(tgfx::Canvas* canvas, std::pair<uint32_t, uint32_t>& range, int onScreen,
+                  int frameWidth, uint32_t color);
   QSGNode* updatePaintNode(QSGNode* node, UpdatePaintNodeData*) override;
 
  private:
-  tracy::Worker* worker = nullptr;
+  Worker* worker = nullptr;
+  const FrameData* frames = nullptr;
   ViewData* viewData = nullptr;
-  ViewMode* viewMode = nullptr;
-  const tracy::FrameData* frames = nullptr;
 
   uint64_t frameTarget;
   std::shared_ptr<tgfx::QGLWindow> tgfxWindow = nullptr;
   std::shared_ptr<AppHost> appHost = nullptr;
 
-  //hover tip
-  uint64_t frameHover = 0;
-
   //Left button
   float viewOffset = 0.0f;
   float placeWidth = 50.f;
-  bool isLeftDagging;
-  int selectedStartFrame;
-  int selectedEndFrame;
-  int dragStartFrame;
 
   QPoint lastRightDragPos;
 };
+}  // namespace inspector

@@ -20,6 +20,7 @@
 #include <kddockwidgets/qtquick/Platform.h>
 #include <QQmlContext>
 #include "AtttributeModel.h"
+#include "FramesDrawer.h"
 #include "TaskTreeModel.h"
 
 namespace inspector {
@@ -29,24 +30,26 @@ InspectorView::InspectorView(std::string filePath, int width, QObject* parent)
   frames = worker.GetFrameData();
 }
 
+InspectorView::InspectorView(std::string& addr, uint16_t port, int width, QObject* parent)
+    : QObject(parent), width(width), worker(addr.c_str(), port) {
+  frames = worker.GetFrameData();
+}
+
 InspectorView::~InspectorView() {
   cleanView();
 }
 
 void InspectorView::initView() {
   cleanView();
-
-  // qmlRegisterType<FramesView>("Frames", 1, 0, "FramesView");
+  qmlRegisterType<FramesDrawer>("FramesDrawer", 1, 0, "FramesDrawer");
   qmlRegisterType<TaskTreeModel>("TaskTreeModel", 1, 0, "TaskTreeModel");
   qmlRegisterType<AtttributeModel>("AtttributeModel", 1, 0, "AtttributeModel");
-
   ispEngine = new QQmlApplicationEngine(this);
-  ispEngine->rootContext()->setContextProperty("workerPtr", (unsigned long long)&worker);
+  ispEngine->rootContext()->setContextProperty("workerPtr", &worker);
+  ispEngine->rootContext()->setContextProperty("viewDataPtr", &viewData);
   ispEngine->rootContext()->setContextProperty("inspectorViewModel", this);
-
   KDDockWidgets::QtQuick::Platform::instance()->setQmlEngine(ispEngine);
   ispEngine->load((QUrl("qrc:/qml/InspectorView.qml")));
-
   if (ispEngine->rootObjects().isEmpty()) {
     qWarning() << "Failed to load InspectorView.qml";
     return;
@@ -60,11 +63,6 @@ void InspectorView::initView() {
 }
 
 void InspectorView::cleanView() {
-  if (ispWindow) {
-    ispWindow->close();
-    ispWindow = nullptr;
-  }
-
   if (ispEngine) {
     ispEngine->deleteLater();
     ispEngine = nullptr;
@@ -73,7 +71,7 @@ void InspectorView::cleanView() {
 
 void InspectorView::openStartView() {
   cleanView();
-  StartView* startView = new StartView(this);
+  auto startView = new StartView(this);
   startView->showStartView();
 }
 

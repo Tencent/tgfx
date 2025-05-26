@@ -322,7 +322,7 @@ ApplicationWindow {
                             }
 
                             Text {
-                                text: modelData.caddress + ":" + modelData.ports
+                                text: modelData.address + ":" + modelData.port
                                 color: "#aaaaaa"
                                 font.pixelSize: 10
                                 width: parent.width
@@ -340,7 +340,7 @@ ApplicationWindow {
 
                             onDoubleClicked: {
                                 if (startViewModel && selectedIndex === 0) {
-                                    startViewModel.connectToClient(modelData.clientId)
+                                    startViewModel.connectToClient(modelData)
                                 }
                                 else if(selectedIndex === 1) {
                                     //todo: open the layer tree

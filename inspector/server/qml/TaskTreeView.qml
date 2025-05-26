@@ -17,14 +17,11 @@ Item {
         typeTreeModel.createTestData()
     }
 
-
-
     Rectangle {
         anchors.fill: parent
         color: "#535353"
         z: -1
     }
-
 
     TaskTreeModel {
         id: typeTreeModel
@@ -33,9 +30,6 @@ Item {
     TaskTreeModel {
         id: taskTreeModel
     }
-
-
-
 
     Column {
         id: column
@@ -54,7 +48,6 @@ Item {
                 anchors.fill: parent
                 anchors.margins: 5
                 spacing: 2
-
                 ///* left combobox to select the type *///
                 ComboBox {
                     id: searchSwitch
@@ -88,14 +81,12 @@ Item {
                     delegate: ItemDelegate {
                         width: searchSwitch.width
                         height: 30
-
                         contentItem: Text {
                             text: modelData
                             color: "white"
                             verticalAlignment: Text.AlignVCenter
                             leftPadding: 10
                         }
-
                         background: Rectangle {
                             color: highlighted ? "#636363" : "#424242"
                         }
@@ -107,13 +98,11 @@ Item {
                         width: searchSwitch.width
                         implicitHeight: contentItem.implicitHeight
                         padding: 1
-
                         contentItem: ListView {
                             clip: true
                             implicitHeight: contentHeight
                             model: searchSwitch.popup.visible ? searchSwitch.delegateModel : null
                         }
-
                         background: Rectangle {
                             color: "#424242"
                             border.color: "#333333"
@@ -121,7 +110,6 @@ Item {
                         }
                     }
                 }
-
                 ///* right text field to search for a name *///
                 Item {
                     width: parent.width * 0.7
@@ -134,24 +122,20 @@ Item {
                         placeholderText: "Enter name or regex..."
                         color: "white"
                         placeholderTextColor: "#aaaaaa"
-
                         background: Rectangle {
                             color: "#424242"
                             border.color: "#333333"
                             border.width: 1
                         }
-
                         onTextChanged: {
                             taskTreeModel.setTextFilter(text)
                         }
                     }
-
                     ///* right combobox to select the type *///
                     Item {
                         id: taskFilterSelector
                         anchors.fill: parent
                         visible: searchSwitch.currentText === "Type"
-
                         function updateTaskTreeFilter() {
                             let selectedTypesList = Object.keys(selectedTypes).filter(
                                     key => selectedTypes[key]
@@ -168,26 +152,20 @@ Item {
                             taskTreeView.forceLayout()
                             console.log("视图刷新完成")
                         }
-
                         property var selectedTypes: ({})
                         property bool isOpen: false
-
                         Rectangle {
                             id: taskTypeDisplay
                             anchors.fill: parent
                             color: "#424242"
                             border.color: "#333333"
                             border.width: 1
-
-
                             Item {
                                 anchors.fill: parent
                                 anchors.margins: 5
-
                                 Row {
                                     anchors.fill: parent
                                     spacing: 6
-
                                     Text {
                                         width: parent.width - 20
                                         height: parent.height
@@ -198,7 +176,6 @@ Item {
                                         color: "white"
                                         elide: Text.ElideRight
                                     }
-
                                     Text {
                                         height: parent.height
                                         verticalAlignment: Text.AlignVCenter
@@ -207,7 +184,6 @@ Item {
                                     }
                                 }
                             }
-
                             MouseArea {
                                 anchors.fill: parent
                                 onClicked: {
@@ -228,7 +204,6 @@ Item {
                             height: Math.min(400, typeTreeView.contentHeight)
                             padding: 0
                             closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
-
                             background: Rectangle {
                                 color: "#535353"
                                 border.color: "#333333"

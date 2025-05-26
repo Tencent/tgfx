@@ -2,7 +2,7 @@ import QtQuick 2.6
 import QtQuick.Window 2.15
 import QtQuick.Controls 2.12
 import QtQuick.Layouts 1.15
-import Frames 1.0
+import FramesDrawer 1.0
 import com.kdab.dockwidgets 2.0 as KDDW
 //import QtQuick.Controls.macOS 2.15
 
@@ -207,15 +207,14 @@ ApplicationWindow {
                 Layout.preferredHeight: 100
                 color: "#535353"
 
-                FramesView {
+                FramesDrawer {
                     worker: workerPtr
                     viewData: viewDataPtr
-                    viewMode: viewModePtr
                     anchors.left: parent.left
                     anchors.top: parent.top
                     anchors.bottom: parent.bottom
                     anchors.right: parent.right
-                    objectName: "framesView"
+                    objectName: "frameDrawer"
                 }
             }
 
@@ -313,8 +312,7 @@ ApplicationWindow {
                 KDDW.DockWidget {
                     id: frameDock
                     uniqueName: "Frame"
-                    source: "qrc:/qml/FramesDock.qml"
-
+                    source: "qrc:/qml/TaskTreeView.qml"
                 }
 
                 KDDW.DockWidget {
