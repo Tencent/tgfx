@@ -500,6 +500,7 @@ TGFX_TEST(LayerTest, getbounds) {
   auto width = static_cast<int>(rootBounds.width());
   auto height = static_cast<int>(rootBounds.height());
   auto surface = Surface::Make(context, width, height);
+  displayList->setPartialRefreshEnabled(true);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/getBounds"));
 }

@@ -127,7 +127,8 @@ bool DisplayList::renderPartially(Surface* surface, bool autoClear, const Rect& 
   if (autoClear) {
     paint.setBlendMode(BlendMode::Src);
   }
-  canvas->drawImage(frameCache->makeImageSnapshot(), &paint);
+  static SamplingOptions sampling(FilterMode::Nearest);
+  canvas->drawImage(frameCache->makeImageSnapshot(), sampling, &paint);
   return true;
 }
 
