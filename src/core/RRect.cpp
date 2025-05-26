@@ -33,7 +33,7 @@ void RRect::setRectXY(const Rect& r, float radiusX, float radiusY) {
     radiusX = radiusY = 0;
   }
   if (r.width() < radiusX + radiusX || r.height() < radiusY + radiusY) {
-    float scale = std::min(r.width() / (radiusX + radiusY), r.height() / (radiusY + radiusY));
+    float scale = std::min(r.width() / (radiusX + radiusX), r.height() / (radiusY + radiusY));
     radiusX *= scale;
     radiusY *= scale;
   }
