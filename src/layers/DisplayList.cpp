@@ -47,6 +47,16 @@ void DisplayList::setContentOffset(float offsetX, float offsetY) {
   _contentOffset.y = offsetY;
 }
 
+void DisplayList::setPartialRefreshEnabled(bool partialRefreshEnabled) {
+  if (_partialRefreshEnabled == partialRefreshEnabled) {
+    return;
+  }
+  _partialRefreshEnabled = partialRefreshEnabled;
+  if (!_partialRefreshEnabled) {
+    frameCache = nullptr;
+  }
+}
+
 bool DisplayList::hasContentChanged() const {
   return _hasContentChanged || _root->bitFields.dirtyDescendents;
 }
@@ -56,23 +66,70 @@ void DisplayList::render(Surface* surface, bool autoClear) {
     return;
   }
   _hasContentChanged = false;
-  _root->updateDirtyRegions();
-  auto canvas = surface->getCanvas();
-  if (autoClear) {
-    canvas->clear();
-  }
-  auto matrix = Matrix::MakeScale(_zoomScale);
-  matrix.postTranslate(_contentOffset.x, _contentOffset.y);
-  canvas->setMatrix(matrix);
+  auto dirtyRegions = _root->updateDirtyRegions();
+  auto viewMatrix = Matrix::MakeScale(_zoomScale);
+  viewMatrix.postTranslate(_contentOffset.x, _contentOffset.y);
   auto inverse = Matrix::I();
-  if (!matrix.invert(&inverse)) {
+  if (!viewMatrix.invert(&inverse)) {
     return;
   }
   auto renderRect = Rect::MakeWH(surface->width(), surface->height());
   renderRect = inverse.mapRect(renderRect);
+  auto canvas = surface->getCanvas();
+  canvas->setMatrix(viewMatrix);
+  if (_partialRefreshEnabled &&
+      renderPartially(surface, autoClear, renderRect, std::move(dirtyRegions))) {
+    return;
+  }
+  if (autoClear) {
+    canvas->clear();
+  }
   DrawArgs args(surface->getContext());
   args.renderRect = &renderRect;
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
+}
+
+bool DisplayList::renderPartially(Surface* surface, bool autoClear, const Rect& renderRect,
+                                  std::vector<Rect> dirtyRegions) {
+  auto context = surface->getContext();
+  bool frameCacheChanged = false;
+  if (frameCache == nullptr || frameCache->getContext() != context ||
+      frameCache->width() != surface->width() || frameCache->height() != surface->height()) {
+    frameCache = Surface::Make(context, surface->width(), surface->height(), ColorType::RGBA_8888,
+                               1, false, surface->renderFlags());
+    if (frameCache == nullptr) {
+      return false;
+    }
+    frameCacheChanged = true;
+  }
+  if (frameCacheChanged || lastZoomScale != _zoomScale || lastContentOffset != _contentOffset) {
+    dirtyRegions = {renderRect};
+    lastZoomScale = _zoomScale;
+    lastContentOffset = _contentOffset;
+  }
+  auto cacheCanvas = frameCache->getCanvas();
+  auto canvas = surface->getCanvas();
+  cacheCanvas->setMatrix(canvas->getMatrix());
+  DrawArgs args(context);
+  for (auto& region : dirtyRegions) {
+    if (!region.intersect(renderRect)) {
+      continue;
+    }
+    AutoCanvasRestore autoRestore(cacheCanvas);
+    args.renderRect = &region;
+    cacheCanvas->clipRect(region);
+    cacheCanvas->clear();
+    _root->drawLayer(args, cacheCanvas, 1.0f, BlendMode::SrcOver);
+  }
+  canvas->resetMatrix();
+  Paint paint = {};
+  paint.setAntiAlias(false);
+  if (autoClear) {
+    paint.setBlendMode(BlendMode::Src);
+  }
+  static SamplingOptions sampling(FilterMode::Nearest);
+  canvas->drawImage(frameCache->makeImageSnapshot(), sampling, &paint);
+  return true;
 }
 
 }  // namespace tgfx

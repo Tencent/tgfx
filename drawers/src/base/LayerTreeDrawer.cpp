@@ -20,7 +20,6 @@
 #include "tgfx/layers/DisplayList.h"
 
 namespace drawers {
-
 LayerTreeDrawer::LayerTreeDrawer(const std::string& name) : Drawer(name + "Drawer") {
 }
 

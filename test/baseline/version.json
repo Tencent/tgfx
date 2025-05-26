@@ -66,11 +66,11 @@
     },
     "DrawersTest": {
         "ConicGradient": "69683f78",
-        "CustomLayerTreeDrawer": "c475bfb",
+        "CustomLayerTreeDrawer": "0224fbeb",
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "da590da",
         "ImageWithShadow": "50136952",
-        "SimpleLayerTreeDrawer": "15e0e39",
+        "SimpleLayerTreeDrawer": "0224fbeb",
         "SimpleText": "15e0e39"
     },
     "DstTextureTest": {
@@ -144,7 +144,7 @@
         "filterClip": "c475bfb",
         "filterTest": "c475bfb",
         "filters": "c475bfb",
-        "getBounds": "ae4290b3",
+        "getBounds": "0224fbeb",
         "getLayersUnderPoint": "50136952",
         "getTightBounds": "ae4290b3",
         "greyColorMatrix": "a1605b2",
