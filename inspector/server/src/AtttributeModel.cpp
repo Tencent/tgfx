@@ -140,7 +140,7 @@ void AtttributeModel::loadAttributeData(unsigned long long attributeDataPtr) {
   refreshAtttibuteData();
 }
 
-void AtttributeModel::updateSelectedTask(const OperateData& opData, const QString& name) {
+void AtttributeModel::updateSelectedTask(const OpTaskData& opData, const QString& name) {
   currentTaskData = opData;
   currentTaskName = name;
   hasSelectedTask = true;
@@ -152,7 +152,7 @@ void AtttributeModel::updateSelectedTask(const OperateData& opData, const QStrin
   int64_t duration = currentTaskData.end - static_cast<int64_t>(currentTaskData.start);
 
   atttributeList.append({"名称", currentTaskName});
-  atttributeList.append({"操作ID", QString::number(currentTaskData.opId)});
+  atttributeList.append({"操作ID", QString::number(currentTaskData.id)});
   atttributeList.append({"开始时间", QString::number(currentTaskData.start) + " ms"});
   atttributeList.append({"结束时间", QString::number(currentTaskData.end) + " ms"});
   atttributeList.append({"持续时间", QString::number(duration) + " ms"});

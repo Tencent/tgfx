@@ -54,7 +54,6 @@ void InspectorView::initView() {
     qWarning() << "Failed to load InspectorView.qml";
     return;
   }
-
   auto ispWindow = qobject_cast<QWindow*>(ispEngine->rootObjects().first());
   if (ispWindow) {
     ispWindow->setTitle("Inspector");

@@ -13,8 +13,8 @@ Item {
 
     Component.onCompleted: {
         taskTreeModel.setAttributeModel(attributeModel)
-        taskTreeModel.createTestData()
-        typeTreeModel.createTestData()
+        // taskTreeModel.createTestData()
+        // typeTreeModel.createTestData()
     }
 
     Rectangle {
@@ -57,10 +57,10 @@ Item {
 
                     onCurrentTextChanged: {
                         if(currentText === "Name") {
-                            taskTreeModel.clearTypeFilter()
+                            // taskTreeModel.clearTypeFilter()
                         }
                         else {
-                            taskTreeModel.clearTextFilter()
+                            // taskTreeModel.clearTextFilter()
                         }
                     }
 
@@ -128,7 +128,7 @@ Item {
                             border.width: 1
                         }
                         onTextChanged: {
-                            taskTreeModel.setTextFilter(text)
+                            // taskTreeModel.setTextFilter(text)
                         }
                     }
                     ///* right combobox to select the type *///
@@ -141,12 +141,12 @@ Item {
                                     key => selectedTypes[key]
                             )
                             if (selectedTypesList.length > 0) {
-                                taskTreeModel.setTypeFilter(selectedTypesList);
-                                console.log("过滤后模型行数:", taskTreeModel.rowCount())
-                                taskTreeView.forceLayout()
+                                // taskTreeModel.setTypeFilter(selectedTypesList);
+                                // console.log("过滤后模型行数:", taskTreeModel.rowCount())
+                                // taskTreeView.forceLayout()
                             } else {
-                                taskTreeModel.clearTypeFilter();
-                                console.log("清除过滤后模型行数:", taskTreeModel.rowCount())
+                                // taskTreeModel.clearTypeFilter();
+                                // console.log("清除过滤后模型行数:", taskTreeModel.rowCount())
                             }
                             // 强制刷新视图
                             taskTreeView.forceLayout()
@@ -447,13 +447,6 @@ Item {
                                 treeItem.treeView.toggleExpanded(row);
                             }
                         }
-
-                        // onDoubleClicked: {
-                        //     if(!treeItem.hasChildren){
-                        //         taskTreeView.selectedTask(treeItem.treeView.index(row))
-                        //     }
-                        //
-                        // }
                         hoverEnabled: true
                         onEntered: parent.color = "#636363"
                         onExited: parent.color = "transparent"
@@ -547,5 +540,9 @@ Item {
                 }
             }
         }
+    }
+
+    function refreshData() {
+        model.refresh()
     }
 }

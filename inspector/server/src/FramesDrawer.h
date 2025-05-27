@@ -57,6 +57,8 @@ class FramesDrawer : public QQuickItem {
     this->viewData = viewData;
   }
 
+  Q_SIGNAL void selectFrame();
+
  protected:
   void draw();
   void drawFrames(tgfx::Canvas* canvas);

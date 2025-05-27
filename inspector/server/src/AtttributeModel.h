@@ -62,7 +62,7 @@ class AtttributeModel : public QAbstractItemModel {
   }
 
   Q_INVOKABLE void loadAttributeData(unsigned long long attributeDataPtr);
-  Q_INVOKABLE void updateSelectedTask(const OperateData& opData, const QString& name);
+  Q_INVOKABLE void updateSelectedTask(const OpTaskData& opData, const QString& name);
   //Q_INVOKABLE void clearData();
 
   Q_SIGNAL void opSelectedChanged();
@@ -83,7 +83,7 @@ class AtttributeModel : public QAbstractItemModel {
 
   std::unordered_map<uint64_t, PropertyData> properties;
 
-  OperateData currentTaskData;
+  OpTaskData currentTaskData;
   QString currentTaskName;
   bool hasSelectedTask = false;
 };

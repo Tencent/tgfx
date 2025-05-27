@@ -208,6 +208,7 @@ ApplicationWindow {
                 color: "#535353"
 
                 FramesDrawer {
+                    id: frameDrawer
                     worker: workerPtr
                     viewData: viewDataPtr
                     anchors.left: parent.left
@@ -332,7 +333,7 @@ ApplicationWindow {
                 Component.onCompleted: {
                     addDockWidget(frameDock, KDDW.KDDockWidgets.Location_OnLeft, null, Qt.size(200, 0));
                     addDockWidget(attributeDock, KDDW.KDDockWidgets.Location_OnRight, frameDock, Qt.size(1200, 0));
-
+                    frameDrawer.selectFrame.connect(frameDock.item.refreshData)
                 }
             }
         }
@@ -341,7 +342,6 @@ ApplicationWindow {
     KDDW.LayoutSaver {
         id: layoutSaver
     }
-
 }
 
 
