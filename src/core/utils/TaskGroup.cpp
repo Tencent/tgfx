@@ -19,7 +19,6 @@
 #include "TaskGroup.h"
 #include <algorithm>
 #include <cstdlib>
-#include <string>
 #include "core/utils/Log.h"
 
 #ifdef __APPLE__
@@ -72,10 +71,10 @@ void OnAppExit() {
 }
 
 TaskGroup::TaskGroup() {
-  threads = new LockFreeQueue<std::thread*>(THREAD_POOL_SIZE);
+  threads = new moodycamel::ConcurrentQueue<std::thread*>(THREAD_POOL_SIZE);
   priorityQueues.reserve(TASK_PRIORITY_SIZE);
   for (int i = 0; i < TASK_PRIORITY_SIZE; i++) {
-    auto queue = new LockFreeQueue<std::shared_ptr<Task>>(TASK_QUEUE_SIZE);
+    auto queue = new moodycamel::ConcurrentQueue<std::shared_ptr<Task>>(TASK_QUEUE_SIZE);
     priorityQueues.push_back(queue);
   }
   std::atexit(OnAppExit);
@@ -87,8 +86,12 @@ bool TaskGroup::checkThreads() {
   if (waitingThreads == 0 && totalThreads < MaxThreads) {
     auto thread = new (std::nothrow) std::thread(TaskGroup::RunLoop, this);
     if (thread) {
-      threads->enqueue(thread);
-      ++totalThreads;
+      if (threads->enqueue(thread)) {
+        ++totalThreads;
+      } else {
+        delete thread;
+        return false;
+      }
     }
   } else {
     return true;
@@ -104,7 +107,7 @@ bool TaskGroup::pushTask(std::shared_ptr<Task> task, TaskPriority priority) {
     return false;
   }
   auto& queue = priorityQueues[static_cast<size_t>(priority)];
-  if (!queue->enqueue(std::move(task))) {
+  if (!queue->enqueue(task)) {
     return false;
   }
   if (waitingThreads > 0) {
@@ -116,8 +119,9 @@ bool TaskGroup::pushTask(std::shared_ptr<Task> task, TaskPriority priority) {
 std::shared_ptr<Task> TaskGroup::popTask() {
   std::unique_lock<std::mutex> autoLock(locker);
   while (!exited) {
+    std::shared_ptr<Task> task = nullptr;
     for (auto& queue : priorityQueues) {
-      if (auto task = queue->dequeue()) {
+      if (queue->try_dequeue(task)) {
         return task;
       }
     }
@@ -149,7 +153,7 @@ void TaskGroup::releaseThreads(bool exit) {
   exited = true;
   condition.notify_all();
   std::thread* thread = nullptr;
-  while ((thread = threads->dequeue()) != nullptr) {
+  while (threads->try_dequeue(thread)) {
     ReleaseThread(thread);
   }
   totalThreads = 0;
