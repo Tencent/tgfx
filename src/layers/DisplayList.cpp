@@ -60,11 +60,11 @@ void DisplayList::setPartialRefreshEnabled(bool partialRefreshEnabled) {
   }
 }
 
-void DisplayList::setShowDirtyRegions(bool showDirtyRegions) {
-  if (_showDirtyRegions == showDirtyRegions) {
+void DisplayList::showDirtyRegions(bool show) {
+  if (_showDirtyRegions == show) {
     return;
   }
-  _showDirtyRegions = showDirtyRegions;
+  _showDirtyRegions = show;
   if (!_showDirtyRegions) {
     lastDirtyRegions = {};
   }

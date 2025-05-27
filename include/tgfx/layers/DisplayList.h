@@ -97,20 +97,11 @@ class DisplayList {
   void setPartialRefreshEnabled(bool partialRefreshEnabled);
 
   /**
-   * Returns true if the dirty regions of the display list are highlighted during rendering. This is
-   * useful for debugging to visualize which parts of the display list are being updated. The
-   * default value is false.
-   */
-  bool showDirtyRegions() const {
-    return _showDirtyRegions;
-  }
-
-  /**
    * Sets whether to show dirty regions during rendering. When enabled, the dirty regions will be
    * highlighted in the rendered output. This is useful for debugging to visualize which parts of
    * the display list are being updated. The default value is false.
    */
-  void setShowDirtyRegions(bool showDirtyRegions);
+  void showDirtyRegions(bool show);
 
   /**
    * Returns true if the content of the display list has changed since the last rendering. This can
