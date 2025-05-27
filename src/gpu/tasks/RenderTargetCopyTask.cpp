@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RenderTargetCopyTask.h"
-#include <InspectorDefine.h>
+#include "core/utils/Profiling.h"
 
 namespace tgfx {
 RenderTargetCopyTask::RenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,

@@ -34,6 +34,8 @@ class ColorShader : public Shader {
     return weakThis.lock();
   }
 
+  Color color;
+
  protected:
   Type type() const override {
     return Type::Color;
@@ -43,8 +45,5 @@ class ColorShader : public Shader {
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                       const Matrix* uvMatrix) const override;
-
- private:
-  Color color;
 };
 }  // namespace tgfx

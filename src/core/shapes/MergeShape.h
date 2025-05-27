@@ -31,8 +31,6 @@ class MergeShape : public Shape {
       : first(std::move(first)), second(std::move(second)), pathOp(pathOp) {
   }
 
-  bool isRect(Rect* rect = nullptr) const override;
-
   bool isInverseFillType() const override;
 
   Rect getBounds() const override;

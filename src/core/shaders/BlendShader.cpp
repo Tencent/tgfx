@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BlendShader.h"
-#include "core/utils/Caster.h"
+#include "core/utils/Types.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
 
@@ -49,9 +49,12 @@ std::shared_ptr<Shader> BlendShader::makeWithMatrix(const Matrix& viewMatrix) co
 }
 
 bool BlendShader::isEqual(const Shader* shader) const {
-  auto other = Caster::AsBlendShader(shader);
-  return other && mode == other->mode && Caster::Compare(dst.get(), other->dst.get()) &&
-         Caster::Compare(src.get(), other->src.get());
+  auto type = Types::Get(shader);
+  if (type != Types::ShaderType::Blend) {
+    return false;
+  }
+  auto other = static_cast<const BlendShader*>(shader);
+  return mode == other->mode && dst->isEqual(other->dst.get()) && src->isEqual(other->src.get());
 }
 
 PlacementPtr<FragmentProcessor> BlendShader::asFragmentProcessor(const FPArgs& args,

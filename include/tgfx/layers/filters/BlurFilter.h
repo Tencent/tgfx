@@ -73,6 +73,10 @@ class BlurFilter : public LayerFilter {
   void setTileMode(TileMode tileMode);
 
  protected:
+  Type type() const override {
+    return Type::BlurFilter;
+  }
+
   std::shared_ptr<ImageFilter> onCreateImageFilter(float scale) override;
 
  private:

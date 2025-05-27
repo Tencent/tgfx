@@ -37,7 +37,28 @@ class LayerFilter : public LayerProperty {
    */
   std::shared_ptr<ImageFilter> getImageFilter(float scale);
 
+  /**
+   * Returns the bounds of the layer filter after applying it to the scaled layer bounds.
+   * @param srcRect The scaled bounds of the layer content.
+   * @param contentScale The scale factor of the layer bounds relative to its original size.
+   * Some layer filters have size-related parameters that must be adjusted with this scale factor.
+   * @return The bounds of the layer filter.
+   */
+  Rect filterBounds(const Rect& srcRect, float contentScale);
+
  protected:
+  enum class Type {
+    LayerFilter,
+    BlendFilter,
+    BlurFilter,
+    ColorMatrixFilter,
+    DropShadowFilter,
+    InnerShadowFilter
+  };
+
+  virtual Type type() const {
+    return Type::LayerFilter;
+  }
   /**
    * Creates a new image filter for the given scale factor. When it is necessary to recreate the
    * ImageFilter, the onCreateImageFilter method will be called.
@@ -53,11 +74,10 @@ class LayerFilter : public LayerProperty {
 
  private:
   bool dirty = true;
-
   float lastScale = 1.0f;
-
   std::unique_ptr<Rect> _clipBounds = nullptr;
-
   std::shared_ptr<ImageFilter> lastFilter;
+
+  friend class Types;
 };
 }  // namespace tgfx

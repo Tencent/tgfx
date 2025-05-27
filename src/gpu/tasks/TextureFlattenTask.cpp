@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureFlattenTask.h"
-#include <InspectorDefine.h>
 #include "core/utils/Log.h"
+#include "core/utils/Profiling.h"
 #include "gpu/Gpu.h"
 #include "gpu/Pipeline.h"
 #include "gpu/Quad.h"

@@ -18,7 +18,7 @@
 
 #include "EGLProcGetter.h"
 #include <EGL/egl.h>
-#include <GLES2/gl2.h>
+#include <GLES3/gl3.h>
 #include <cstring>
 
 namespace tgfx {
@@ -41,12 +41,15 @@ static void* egl_get_gl_proc(void*, const char name[]) {
   M(glBindTexture)
   M(glBlendColor)
   M(glBlendEquation)
+  M(glBlendEquationSeparate)
   M(glBlendFunc)
+  M(glBlendFuncSeparate)
   M(glBufferData)
   M(glBufferSubData)
   M(glCheckFramebufferStatus)
   M(glClear)
   M(glClearColor)
+  M(glClearDepthf)
   M(glClearStencil)
   M(glColorMask)
   M(glCompileShader)
@@ -62,12 +65,14 @@ static void* egl_get_gl_proc(void*, const char name[]) {
   M(glDeleteRenderbuffers)
   M(glDeleteShader)
   M(glDeleteTextures)
+  M(glDepthFunc)
   M(glDepthMask)
   M(glDisable)
   M(glDisableVertexAttribArray)
   M(glDrawArrays)
   M(glDrawElements)
   M(glEnable)
+  M(glIsEnabled)
   M(glEnableVertexAttribArray)
   M(glFinish)
   M(glFlush)
@@ -83,6 +88,7 @@ static void* egl_get_gl_proc(void*, const char name[]) {
   M(glGetError)
   M(glGetFramebufferAttachmentParameteriv)
   M(glGetIntegerv)
+  M(glGetBooleanv)
   M(glGetProgramInfoLog)
   M(glGetProgramiv)
   M(glGetRenderbufferParameteriv)
@@ -90,6 +96,9 @@ static void* egl_get_gl_proc(void*, const char name[]) {
   M(glGetShaderPrecisionFormat)
   M(glGetShaderiv)
   M(glGetString)
+  M(glGetVertexAttribiv)
+  M(glGetVertexAttribPointerv)
+  M(glGetAttribLocation)
   M(glGetUniformLocation)
   M(glIsTexture)
   M(glLineWidth)

@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShapeDrawOp.h"
-#include <InspectorDefine.h>
 #include "core/PathTriangulator.h"
 #include "core/utils/Log.h"
+#include "core/utils/Profiling.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
@@ -93,4 +93,9 @@ void ShapeDrawOp::execute(RenderPass* renderPass) {
   }
   renderPass->draw(PrimitiveType::Triangles, 0, vertexCount);
 }
+
+bool ShapeDrawOp::hasCoverage() const {
+  return true;
+}
+
 }  // namespace tgfx

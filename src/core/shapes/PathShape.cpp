@@ -27,41 +27,6 @@ std::shared_ptr<Shape> Shape::MakeFrom(Path path) {
   return std::make_shared<PathShape>(std::move(path));
 }
 
-bool PathShape::isLine(Point line[2]) const {
-  return path.isLine(line);
-}
-
-bool PathShape::isRect(Rect* rect) const {
-  return path.isRect(rect);
-}
-
-bool PathShape::isOval(Rect* bounds) const {
-  return path.isOval(bounds);
-}
-
-bool PathShape::isRRect(RRect* rRect) const {
-  return path.isRRect(rRect);
-}
-
-bool PathShape::isSimplePath(Path* result) const {
-  if (result) {
-    *result = path;
-  }
-  return true;
-}
-
-bool PathShape::isInverseFillType() const {
-  return path.isInverseFillType();
-}
-
-Rect PathShape::getBounds() const {
-  return path.getBounds();
-}
-
-Path PathShape::getPath() const {
-  return path;
-}
-
 UniqueKey PathShape::getUniqueKey() const {
   return PathRef::GetUniqueKey(path);
 }

@@ -30,7 +30,7 @@ void BackgroundBlurStyle::setBlurrinessX(float blurriness) {
     return;
   }
   _blurrinessX = blurriness;
-  invalidate();
+  invalidateTransform();
 }
 
 void BackgroundBlurStyle::setBlurrinessY(float blurriness) {
@@ -38,7 +38,7 @@ void BackgroundBlurStyle::setBlurrinessY(float blurriness) {
     return;
   }
   _blurrinessY = blurriness;
-  invalidate();
+  invalidateTransform();
 }
 
 void BackgroundBlurStyle::setTileMode(TileMode tileMode) {
@@ -46,7 +46,15 @@ void BackgroundBlurStyle::setTileMode(TileMode tileMode) {
     return;
   }
   _tileMode = tileMode;
-  invalidate();
+  invalidateTransform();
+}
+
+Rect BackgroundBlurStyle::filterBackground(const Rect& srcRect, float contentScale) {
+  auto filter = getBackgroundFilter(contentScale);
+  if (!filter) {
+    return srcRect;
+  }
+  return filter->filterBounds(srcRect);
 }
 
 void BackgroundBlurStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Image> content,
@@ -65,11 +73,10 @@ void BackgroundBlurStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<
   canvas->drawImage(content, &maskPaint);
 
   // create blurred background
-  auto blur =
-      ImageFilter::Blur(_blurrinessX * contentScale, _blurrinessX * contentScale, _tileMode);
+  auto blurFilter = getBackgroundFilter(contentScale);
   Point backgroundOffset = {};
   auto clipRect = Rect::MakeWH(extraSource->width(), extraSource->height());
-  auto blurBackground = extraSource->makeWithFilter(blur, &backgroundOffset, &clipRect);
+  auto blurBackground = extraSource->makeWithFilter(blurFilter, &backgroundOffset, &clipRect);
   backgroundOffset += extraSourceOffset;
 
   auto maskShader = Shader::MakeImageShader(content, TileMode::Decal, TileMode::Decal);
@@ -86,6 +93,16 @@ void BackgroundBlurStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<
 
 BackgroundBlurStyle::BackgroundBlurStyle(float blurrinessX, float blurrinessY, TileMode tileMode)
     : _blurrinessX(blurrinessX), _blurrinessY(blurrinessY), _tileMode(tileMode) {
+}
+
+std::shared_ptr<ImageFilter> BackgroundBlurStyle::getBackgroundFilter(float contentScale) {
+  if (backgroundFilter && contentScale == currentScale) {
+    return backgroundFilter;
+  }
+  currentScale = contentScale;
+  backgroundFilter =
+      ImageFilter::Blur(_blurrinessX * contentScale, _blurrinessX * contentScale, _tileMode);
+  return backgroundFilter;
 }
 
 }  // namespace tgfx

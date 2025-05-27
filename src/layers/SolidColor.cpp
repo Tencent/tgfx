@@ -28,7 +28,7 @@ void SolidColor::setColor(const Color& color) {
     return;
   }
   _color = color;
-  invalidate();
+  invalidateContent();
 }
 
 std::shared_ptr<Shader> SolidColor::onGetShader() const {

@@ -270,7 +270,8 @@ static int g_debuglog_enable = 1;
   }
 #else
 #define DEBUGLOG(l, ...) \
-  {} /* disabled */
+  {                      \
+  } /* disabled */
 #endif
 
 static int LZ4_isAligned(const void* ptr, size_t alignment) {
@@ -304,7 +305,7 @@ typedef size_t uptrval; /* generally true, except OpenVMS-64 */
 #if defined(__x86_64__)
 typedef U64 reg_t; /* 64-bits in x32 mode */
 #else
-typedef size_t reg_t;   /* 32-bits in x32 mode */
+typedef size_t reg_t; /* 32-bits in x32 mode */
 #endif
 
 typedef enum { notLimited = 0, limitedOutput = 1, fillOutput = 2 } limitedOutput_directive;
@@ -1121,7 +1122,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic_validated(
         if (((tableType != byU16) || (LZ4_DISTANCE_MAX < LZ4_DISTANCE_ABSOLUTE_MAX)) &&
             (matchIndex + LZ4_DISTANCE_MAX < current)) {
           continue;
-        }                                                   /* too far */
+        } /* too far */
         assert((current - matchIndex) <= LZ4_DISTANCE_MAX); /* match now expected within distance */
 
         if (LZ4_read32(match) == LZ4_read32(ip)) {
@@ -1390,7 +1391,7 @@ LZ4_FORCE_INLINE int LZ4_compress_generic(
 
   if ((U32)srcSize > (U32)LZ4_MAX_INPUT_SIZE) {
     return 0;
-  }                   /* Unsupported srcSize, too large (or negative) */
+  } /* Unsupported srcSize, too large (or negative) */
   if (srcSize == 0) { /* src == NULL supported if srcSize == 0 */
     if (outputDirective != notLimited && dstCapacity <= 0)
       return 0; /* no output, can't write anything */
@@ -1984,7 +1985,7 @@ LZ4_FORCE_INLINE int LZ4_decompress_unsafe_generic(
         return -1;
       }
     } /* match */
-  }   /* main loop */
+  } /* main loop */
   return (int)(ip - istart);
 }
 

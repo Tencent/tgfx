@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RectDrawOp.h"
-#include <InspectorDefine.h>
+#include "core/utils/Profiling.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
 #include "gpu/ResourceProvider.h"

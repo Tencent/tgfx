@@ -19,8 +19,9 @@
 #pragma once
 
 #include "tgfx/core/FontMetrics.h"
-#include "tgfx/core/Image.h"
+#include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/Stroke.h"
 #include "tgfx/core/Typeface.h"
 
 namespace tgfx {
@@ -148,10 +149,10 @@ class Font {
 
   /**
    * Creates an Image capturing the content of the specified glyph. The returned matrix should apply
-   * to the glyph image when drawing. Please note that the fauxBold is not supported for this
-   * method.
+   * to the glyph image when drawing. Returns nullptr if the glyph is not part of this Font,
+   * cannot be rendered as an image, or if the stroke is unsupported.
    */
-  std::shared_ptr<Image> getImage(GlyphID glyphID, Matrix* matrix) const;
+  std::shared_ptr<ImageCodec> getImage(GlyphID glyphID, const Stroke* stroke, Matrix* matrix) const;
 
   /**
    * Compares two fonts for equality.

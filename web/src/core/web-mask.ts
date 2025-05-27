@@ -20,6 +20,7 @@ import {TGFXModule} from '../tgfx-module';
 import {ctor, Point, Vector} from '../types';
 import {ScalerContext} from './scaler-context';
 import {Matrix} from './matrix';
+import {releaseCanvas2D} from '../utils/canvas';
 
 export interface WebFont {
     name: string;
@@ -32,28 +33,6 @@ export interface WebFont {
 export class WebMask {
     public static create(canvas: HTMLCanvasElement | OffscreenCanvas) {
         return new WebMask(canvas);
-    }
-
-    private static getLineCap(cap: ctor): CanvasLineCap {
-        switch (cap) {
-            case TGFXModule.TGFXLineCap.Round:
-                return 'round';
-            case TGFXModule.TGFXLineCap.Square:
-                return 'square';
-            default:
-                return 'butt';
-        }
-    }
-
-    private static getLineJoin(join: ctor): CanvasLineJoin {
-        switch (join) {
-            case TGFXModule.TGFXLineJoin.Round:
-                return 'round';
-            case TGFXModule.TGFXLineJoin.Bevel:
-                return 'bevel';
-            default:
-                return 'miter';
-        }
     }
 
     protected canvas: HTMLCanvasElement | OffscreenCanvas;
@@ -106,9 +85,9 @@ export class WebMask {
         const matrix = new Matrix(matrixWasmIns);
         this.context.setTransform(matrix.a, matrix.b, matrix.c, matrix.d, matrix.tx, matrix.ty);
         this.context.font = scalerContext.fontString(webFont.bold, webFont.italic);
-        this.context.lineJoin = WebMask.getLineJoin(stroke.join);
+        this.context.lineJoin = ScalerContext.getLineJoin(stroke.join);
         this.context.miterLimit = stroke.miterLimit;
-        this.context.lineCap = WebMask.getLineCap(stroke.cap);
+        this.context.lineCap = ScalerContext.getLineCap(stroke.cap);
         this.context.lineWidth = stroke.width;
         for (let i = 0; i < texts.size(); i++) {
             const position = positions.get(i);
@@ -118,5 +97,18 @@ export class WebMask {
 
     public clear() {
         this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+
+    public getImageData(){
+        if (this.canvas == null){
+            return null;
+        }
+        const context = this.canvas.getContext('2d',{willReadFrequently: true}) as CanvasRenderingContext2D;
+        const {data} = context.getImageData(0, 0, this.canvas.width, this.canvas.height);
+        releaseCanvas2D(this.canvas);
+        if (data.length === 0) {
+            return null;
+        }
+        return new Uint8Array(data);
     }
 }

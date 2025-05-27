@@ -21,7 +21,9 @@
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
 #include "core/Rasterizer.h"
-#include "core/utils/Caster.h"
+#include "core/images/SubsetImage.h"
+#include "core/utils/MathExtra.h"
+#include "core/utils/Types.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 
@@ -41,7 +43,11 @@ Rect RenderContext::getClipBounds(const Path& clip) {
   if (clip.isInverseFillType()) {
     return renderTarget->bounds();
   }
-  return clip.isEmpty() ? Rect::MakeEmpty() : clip.getBounds();
+  auto bounds = clip.getBounds();
+  if (!bounds.intersect(renderTarget->bounds())) {
+    bounds.setEmpty();
+  }
+  return bounds;
 }
 
 void RenderContext::drawFill(const MCState& state, const Fill& fill) {
@@ -106,11 +112,12 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect
     // There is no scaling for the source image, so we can disable mipmaps to save memory.
     samplingOptions.mipmapMode = MipmapMode::None;
   }
-  auto subsetImage = Caster::AsSubsetImage(image.get());
-  if (subsetImage == nullptr) {
+  auto type = Types::Get(image.get());
+  if (type != Types::ImageType::Subset) {
     compositor->fillImage(std::move(image), rect, samplingOptions, state, fill);
   } else {
     // Unwrap the subset image to maximize the merging of draw calls.
+    auto subsetImage = static_cast<const SubsetImage*>(image.get());
     auto imageRect = rect;
     auto imageState = state;
     auto& subset = subsetImage->bounds;
@@ -130,22 +137,23 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
     return;
   }
   auto maxScale = state.matrix.getMaxScale();
-  if (maxScale <= 0.0f) {
+  if (FloatNearlyZero(maxScale)) {
     return;
   }
   auto bounds = glyphRunList->getBounds(maxScale);
   if (stroke) {
     stroke->applyToBounds(&bounds);
   }
-  bounds.scale(maxScale, maxScale);
-  auto rasterizeMatrix = Matrix::MakeScale(maxScale);
-  rasterizeMatrix.postTranslate(-bounds.x(), -bounds.y());
-  Matrix invert = {};
-  if (!rasterizeMatrix.invert(&invert)) {
+  state.matrix.mapRect(&bounds);  // To device space
+  auto clipBounds = getClipBounds(state.clip);
+  if (clipBounds.isEmpty()) {
     return;
   }
-  auto newState = state;
-  newState.matrix.preConcat(invert);
+  if (!bounds.intersect(clipBounds)) {
+    return;
+  }
+  auto rasterizeMatrix = state.matrix;
+  rasterizeMatrix.postTranslate(-bounds.x(), -bounds.y());
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
   auto rasterizer = Rasterizer::MakeFrom(width, height, std::move(glyphRunList), fill.antiAlias,
@@ -154,6 +162,8 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   if (image == nullptr) {
     return;
   }
+  auto newState = state;
+  newState.matrix = Matrix::MakeTrans(bounds.x(), bounds.y());
   drawImage(std::move(image), {}, newState, fill.makeWithMatrix(rasterizeMatrix));
 }
 
@@ -214,7 +224,7 @@ void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
                                     const MCState& state, const Fill& fill) {
   auto viewMatrix = state.matrix;
   auto scale = viewMatrix.getMaxScale();
-  if (scale <= 0) {
+  if (FloatNearlyZero(scale)) {
     return;
   }
   viewMatrix.preScale(1.0f / scale, 1.0f / scale);
@@ -229,7 +239,8 @@ void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
     for (size_t i = 0; i < glyphCount; ++i) {
       const auto& glyphID = glyphIDs[i];
       const auto& position = positions[i];
-      auto glyphImage = glyphFace->getImage(glyphID, &glyphState.matrix);
+      auto glyphCodec = glyphFace->getImage(glyphID, nullptr, &glyphState.matrix);
+      auto glyphImage = Image::MakeFrom(glyphCodec);
       if (glyphImage == nullptr) {
         continue;
       }
@@ -258,9 +269,6 @@ OpsCompositor* RenderContext::getOpsCompositor(bool discardContent) {
   if (opsCompositor == nullptr || opsCompositor->isClosed()) {
     auto drawingManager = renderTarget->getContext()->drawingManager();
     opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
-    if (surface) {
-      surface->contentChanged();
-    }
   } else if (discardContent) {
     opsCompositor->discardAll();
   }

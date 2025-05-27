@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RuntimeDrawTask.h"
-#include <InspectorDefine.h>
+#include "core/utils/Profiling.h"
 #include "gpu/RuntimeResource.h"
 
 namespace tgfx {

@@ -97,14 +97,6 @@ class Surface {
   }
 
   /**
-   * Returns the content version of the Surface, which increments whenever the content changes. The
-   * initial version is 1.
-   */
-  uint32_t contentVersion() const {
-    return _contentVersion;
-  }
-
-  /**
    * Retrieves the context associated with this Surface.
    */
   Context* getContext() const;
@@ -185,7 +177,6 @@ class Surface {
   RenderContext* renderContext = nullptr;
   Canvas* canvas = nullptr;
   std::shared_ptr<Image> cachedImage = nullptr;
-  uint32_t _contentVersion = 1u;
 
   static std::shared_ptr<Surface> MakeFrom(std::shared_ptr<RenderTargetProxy> renderTargetProxy,
                                            uint32_t renderFlags = 0, bool clearAll = false);
@@ -194,7 +185,6 @@ class Surface {
           bool clearAll = false);
 
   bool aboutToDraw(bool discardContent = false);
-  void contentChanged();
 
   friend class RenderContext;
 };

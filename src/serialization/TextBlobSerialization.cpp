@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -15,31 +15,28 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+#ifdef TGFX_USE_INSPECTOR
 
-#include "tgfx/core/Shape.h"
+#include "TextBlobSerialization.h"
 
 namespace tgfx {
-bool Shape::isLine(Point*) const {
-  return false;
+
+std::shared_ptr<Data> TextBlobSerialization::Serialize(const TextBlob* textBlob) {
+  DEBUG_ASSERT(textBlob != nullptr)
+  flexbuffers::Builder fbb;
+  size_t startMap;
+  size_t contentMap;
+  SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
+  SerializeTextBlobImpl(fbb, textBlob);
+  SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
+  return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
 
-bool Shape::isRect(Rect*) const {
-  return false;
+void TextBlobSerialization::SerializeTextBlobImpl(flexbuffers::Builder& fbb,
+                                                  const TextBlob* textBlob) {
+  (void)fbb;
+  (void)textBlob;
 }
 
-bool Shape::isOval(Rect*) const {
-  return false;
-}
-
-bool Shape::isRRect(RRect*) const {
-  return false;
-}
-
-bool Shape::isSimplePath(Path*) const {
-  return false;
-}
-
-bool Shape::isInverseFillType() const {
-  return false;
-}
 }  // namespace tgfx
+#endif

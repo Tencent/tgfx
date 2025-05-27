@@ -115,7 +115,7 @@ std::shared_ptr<ImageFilter> InnerShadowStyle::getShadowFilter(float scale) {
 void InnerShadowStyle::invalidateFilter() {
   shadowFilter = nullptr;
   currentScale = 0.0f;
-  invalidate();
+  invalidateTransform();
 }
 
 }  // namespace tgfx

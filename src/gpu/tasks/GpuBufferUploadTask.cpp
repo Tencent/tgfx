@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GpuBufferUploadTask.h"
-#include <InspectorDefine.h>
+#include "core/utils/Profiling.h"
 #include "tgfx/core/Task.h"
 
 namespace tgfx {

@@ -110,7 +110,7 @@
 #elif defined(LZ4_DLL_IMPORT) && (LZ4_DLL_IMPORT == 1)
 #define LZ4LIB_API      \
   __declspec(dllimport) \
-      LZ4LIB_VISIBILITY /* It isn't required but allows to generate better code, saving a function pointer load from the IAT and an indirect jump.*/
+  LZ4LIB_VISIBILITY /* It isn't required but allows to generate better code, saving a function pointer load from the IAT and an indirect jump.*/
 #else
 #define LZ4LIB_API LZ4LIB_VISIBILITY
 #endif

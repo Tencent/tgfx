@@ -18,32 +18,75 @@
 
 #include "tgfx/layers/DisplayList.h"
 #include "layers/DrawArgs.h"
+#include "layers/RootLayer.h"
+
+#ifdef TGFX_USE_INSPECTOR
+#include "tgfx/layers/LayerInspector.h"
+#endif
 
 namespace tgfx {
 
-DisplayList::DisplayList() : _root(Layer::Make()) {
+DisplayList::DisplayList() : _root(RootLayer::Make()) {
   _root->_root = _root.get();
+#ifdef TGFX_USE_INSPECTOR
+  auto& layerInspector = LayerInspector::GetLayerInspector();
+  layerInspector.setDisplayList(this);
+#endif
 }
 
 Layer* DisplayList::root() const {
   return _root.get();
 }
 
-bool DisplayList::render(Surface* surface, bool replaceAll) {
-  if (!surface ||
-      (replaceAll && surface->uniqueID() == surfaceID &&
-       surface->contentVersion() == surfaceContentVersion && !_root->bitFields.dirtyDescendents)) {
-    return false;
+void DisplayList::setZoomScale(float zoomScale) {
+  if (zoomScale == _zoomScale) {
+    return;
   }
+  _hasContentChanged = true;
+  _zoomScale = zoomScale;
+}
+
+void DisplayList::setContentOffset(float offsetX, float offsetY) {
+  if (offsetX == _contentOffset.x && offsetY == _contentOffset.y) {
+    return;
+  }
+  _hasContentChanged = true;
+  _contentOffset.x = offsetX;
+  _contentOffset.y = offsetY;
+}
+
+bool DisplayList::hasContentChanged() const {
+  return _hasContentChanged || _root->bitFields.dirtyDescendents;
+}
+
+void DisplayList::render(Surface* surface, bool autoClear) {
+  if (!surface) {
+    return;
+  }
+  _hasContentChanged = false;
+  _root->updateDirtyRegions();
   auto canvas = surface->getCanvas();
-  if (replaceAll) {
+  if (autoClear) {
     canvas->clear();
   }
-  DrawArgs args(surface->getContext(), true);
+  auto matrix = Matrix::MakeScale(_zoomScale);
+  matrix.postTranslate(_contentOffset.x, _contentOffset.y);
+  canvas->setMatrix(matrix);
+  auto inverse = Matrix::I();
+  if (!matrix.invert(&inverse)) {
+    return;
+  }
+  auto renderRect = Rect::MakeWH(surface->width(), surface->height());
+  renderRect = inverse.mapRect(renderRect);
+  DrawArgs args(surface->getContext());
+  args.renderRect = &renderRect;
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
-  surfaceContentVersion = surface->contentVersion();
-  surfaceID = surface->uniqueID();
-  return true;
+
+#ifdef TGFX_USE_INSPECTOR
+  auto& layerInspector = LayerInspector::GetLayerInspector();
+  //layerInspector.serializingLayerTree();
+  layerInspector.setCallBack();
+#endif
 }
 
 }  // namespace tgfx

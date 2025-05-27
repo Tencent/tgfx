@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ClearOp.h"
-#include <InspectorDefine.h>
+#include "core/utils/Profiling.h"
 #include "gpu/RenderPass.h"
 
 namespace tgfx {

@@ -38,29 +38,39 @@ void Task::ReleaseThreads() {
   TaskGroup::GetInstance()->releaseThreads(false);
 }
 
-std::shared_ptr<Task> Task::Run(std::function<void()> block) {
+std::shared_ptr<Task> Task::Run(std::function<void()> block, TaskPriority priority) {
   if (block == nullptr) {
     return nullptr;
   }
   auto task = std::make_shared<BlockTask>(std::move(block));
-  Run(task);
+  Run(task, priority);
   return task;
 }
 
-void Task::Run(std::shared_ptr<Task> task) {
+void Task::Run(std::shared_ptr<Task> task, TaskPriority priority) {
   if (task == nullptr) {
     return;
   }
-  if (!TaskGroup::GetInstance()->pushTask(task)) {
+  if (!TaskGroup::GetInstance()->pushTask(task, priority)) {
     task->execute();
   }
 }
 
 void Task::cancel() {
   auto currentStatus = _status.load(std::memory_order_acquire);
+  if (currentStatus == TaskStatus::Canceled || currentStatus == TaskStatus::Finished) {
+    return;
+  }
   if (currentStatus == TaskStatus::Queueing) {
-    _status.compare_exchange_weak(currentStatus, TaskStatus::Canceled, std::memory_order_acq_rel,
-                                  std::memory_order_relaxed);
+    if (_status.compare_exchange_weak(currentStatus, TaskStatus::Canceled,
+                                      std::memory_order_acq_rel, std::memory_order_relaxed)) {
+      onCancel();
+      return;
+    }
+  }
+  std::unique_lock<std::mutex> autoLock(locker);
+  if (_status.load(std::memory_order_acquire) == TaskStatus::Executing) {
+    condition.wait(autoLock);
   }
 }
 
@@ -79,23 +89,6 @@ void Task::wait() {
       while (!_status.compare_exchange_weak(oldStatus, TaskStatus::Finished,
                                             std::memory_order_acq_rel, std::memory_order_relaxed)) {
       }
-      return;
-    }
-  }
-  std::unique_lock<std::mutex> autoLock(locker);
-  if (_status.load(std::memory_order_acquire) == TaskStatus::Executing) {
-    condition.wait(autoLock);
-  }
-}
-
-void Task::cancelOrWait() {
-  auto currentStatus = _status.load(std::memory_order_acquire);
-  if (currentStatus == TaskStatus::Canceled || currentStatus == TaskStatus::Finished) {
-    return;
-  }
-  if (currentStatus == TaskStatus::Queueing) {
-    if (_status.compare_exchange_weak(currentStatus, TaskStatus::Canceled,
-                                      std::memory_order_acq_rel, std::memory_order_relaxed)) {
       return;
     }
   }

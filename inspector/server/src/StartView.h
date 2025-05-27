@@ -28,6 +28,7 @@
 #include "InspectorView.h"
 #include "ResolvService.h"
 #include "Socket.h"
+#include "layerInspector/LayerProfilerView.h"
 
 namespace inspector {
 
@@ -133,6 +134,7 @@ class StartView : public QObject {
   Q_INVOKABLE QVector<QObject*> getClientItems() const;
 
   Q_INVOKABLE void connectToClient(QObject* object);
+  Q_INVOKABLE void connectToClientByLayerInspector(QObject* object);
 
   Q_SIGNAL void clientItemsChanged();
   Q_SIGNAL void openConnectView(const QString& address, uint16_t port);
@@ -148,6 +150,8 @@ class StartView : public QObject {
 
  private:
   InspectorView* inspectorView = nullptr;
+  LayerProfilerView* layerProfilerView = nullptr;
+
   QLabel* filesPath = nullptr;
   QString lastOpenFile;
   QStringList recentFiles;

@@ -19,6 +19,7 @@
 #include "FTMask.h"
 #include "FTLibrary.h"
 #include "FTPath.h"
+#include "FTRasterTarget.h"
 #include "core/utils/USE.h"
 #include "tgfx/core/Pixmap.h"
 
@@ -51,45 +52,6 @@ std::shared_ptr<Mask> Mask::Make(int width, int height, bool tryHardware) {
   }
   pixelRef->clear();
   return std::make_shared<FTMask>(std::move(pixelRef));
-}
-
-struct RasterTarget {
-  unsigned char* origin;
-  int pitch;
-  const uint8_t* gammaTable;
-};
-
-static void SpanFunc(int y, int count, const FT_Span* spans, void* user) {
-  auto* target = reinterpret_cast<RasterTarget*>(user);
-  for (int i = 0; i < count; i++) {
-    auto* q = target->origin - target->pitch * y + spans[i].x;
-    auto c = target->gammaTable[spans[i].coverage];
-    auto aCount = spans[i].len;
-    /**
-     * For small-spans it is faster to do it by ourselves than calling memset.
-     * This is mainly due to the cost of the function call.
-     */
-    switch (aCount) {
-      case 7:
-        *q++ = c;
-      case 6:
-        *q++ = c;
-      case 5:
-        *q++ = c;
-      case 4:
-        *q++ = c;
-      case 3:
-        *q++ = c;
-      case 2:
-        *q++ = c;
-      case 1:
-        *q = c;
-      case 0:
-        break;
-      default:
-        memset(q, c, aCount);
-    }
-  }
 }
 
 void FTMask::onFillPath(const Path& path, const Matrix& matrix, bool antiAlias,
@@ -141,13 +103,13 @@ void FTMask::onFillPath(const Path& path, const Matrix& matrix, bool antiAlias,
   auto buffer = static_cast<unsigned char*>(pixels);
   int rows = info.height();
   int pitch = static_cast<int>(info.rowBytes());
-  RasterTarget target = {};
+  FTRasterTarget target = {};
   target.origin = buffer + (rows - 1) * pitch;
   target.pitch = pitch;
   target.gammaTable = PixelRefMask::GammaTable().data();
   FT_Raster_Params params;
   params.flags = FT_RASTER_FLAG_DIRECT | FT_RASTER_FLAG_CLIP | FT_RASTER_FLAG_AA;
-  params.gray_spans = SpanFunc;
+  params.gray_spans = GraySpanFunc;
   params.user = &target;
   auto& clip = params.clip_box;
   clip.xMin = 0;
