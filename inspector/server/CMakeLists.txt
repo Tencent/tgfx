@@ -97,7 +97,7 @@ find_vendor_libraries(inspector-vendor STATIC INSPECTOR_VENDOR_STATIC_LIBRARIES)
 list(APPEND TGFX_INSPECTOR_LIBS ${INSPECTOR_VENDOR_STATIC_LIBRARIES})
 list(APPEND TGFX_INSPECTOR_DEFINE KDDW_FRONTEND_QTQUICK KDDW_FRONTEND_QT KDDW_QTGUI_TYPES)
 
-list(APPEND TGFX_INSPECTOR_INCLUDE ./third_party/KDDockWidgets/src/fwd_headers)
+list(APPEND TGFX_INSPECTOR_INCLUDE ./third_party/KDDockWidgets/src/fwd_headers ./third_party/flatbuffers/include)
 
 add_executable(inspectorTool ${RC_FILES} ${TGFX_INSPECTOR_FILES} ${TGFX_INSPECTOR_COMMON_FILES} ${QT_RESOURCES})
 target_include_directories(inspectorTool PUBLIC ${TGFX_INSPECTOR_SRC} ${TGFX_INSPECTOR_COMMON_SRC})
