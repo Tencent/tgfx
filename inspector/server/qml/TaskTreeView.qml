@@ -39,15 +39,13 @@ Item {
             width: parent.width
             height: 40
             color: "#535353"
-            border {
-                width: 1
-                color: "#333333"
-            }
+
 
             Row {
                 anchors.fill: parent
                 anchors.margins: 5
                 spacing: 2
+
                 ///* left combobox to select the type *///
                 ComboBox {
                     id: searchSwitch
@@ -65,30 +63,29 @@ Item {
                     }
 
                     background: Rectangle {
-                        color: "#424242"
-                        border.color: "#333333"
-                        border.width: 1
-                        radius: 2
+                        color: "#383838"
                     }
 
                     contentItem: Text {
                         leftPadding: 10
                         text: searchSwitch.displayText
-                        color: "white"
+                        color: "#DDDDDD"
                         verticalAlignment: Text.AlignVCenter
                     }
 
                     delegate: ItemDelegate {
                         width: searchSwitch.width
                         height: 30
+
                         contentItem: Text {
                             text: modelData
-                            color: "white"
+                            color: "#DDDDDD"
                             verticalAlignment: Text.AlignVCenter
                             leftPadding: 10
                         }
+
                         background: Rectangle {
-                            color: highlighted ? "#636363" : "#424242"
+                            color: "#383838"
                         }
                     }
 
@@ -98,18 +95,15 @@ Item {
                         width: searchSwitch.width
                         implicitHeight: contentItem.implicitHeight
                         padding: 1
+
                         contentItem: ListView {
                             clip: true
                             implicitHeight: contentHeight
                             model: searchSwitch.popup.visible ? searchSwitch.delegateModel : null
                         }
-                        background: Rectangle {
-                            color: "#424242"
-                            border.color: "#333333"
-                            border.width: 1
-                        }
                     }
                 }
+
                 ///* right text field to search for a name *///
                 Item {
                     width: parent.width * 0.7
@@ -120,22 +114,24 @@ Item {
                         anchors.fill: parent
                         visible: searchSwitch.currentText === "Name"
                         placeholderText: "Enter name or regex..."
-                        color: "white"
+                        color: "#DDDDDD"
                         placeholderTextColor: "#aaaaaa"
+
                         background: Rectangle {
-                            color: "#424242"
-                            border.color: "#333333"
-                            border.width: 1
+                            color: "#383838"
                         }
+
                         onTextChanged: {
                             taskTreeModel.setTextFilter(text)
                         }
                     }
+
                     ///* right combobox to select the type *///
                     Item {
                         id: taskFilterSelector
                         anchors.fill: parent
                         visible: searchSwitch.currentText === "Type"
+
                         function updateTaskTreeFilter() {
                             let selectedTypesList = Object.keys(selectedTypes).filter(
                                     key => selectedTypes[key]
@@ -152,20 +148,24 @@ Item {
                             taskTreeView.forceLayout()
                             console.log("视图刷新完成")
                         }
+
                         property var selectedTypes: ({})
                         property bool isOpen: false
+
                         Rectangle {
                             id: taskTypeDisplay
                             anchors.fill: parent
-                            color: "#424242"
-                            border.color: "#333333"
-                            border.width: 1
+                            color: "#383838"
+
+
                             Item {
                                 anchors.fill: parent
                                 anchors.margins: 5
+
                                 Row {
                                     anchors.fill: parent
                                     spacing: 6
+
                                     Text {
                                         width: parent.width - 20
                                         height: parent.height
@@ -173,17 +173,19 @@ Item {
                                         text: Object.keys(taskFilterSelector.selectedTypes).length > 0
                                             ? Object.keys(taskFilterSelector.selectedTypes).join(", ")
                                             : "Select types..."
-                                        color: "white"
+                                        color: "#DDDDDD"
                                         elide: Text.ElideRight
                                     }
+
                                     Text {
                                         height: parent.height
                                         verticalAlignment: Text.AlignVCenter
                                         text: taskFilterSelector.isOpen ? "▲" : "▼"
-                                        color: "white"
+                                        color: "#DDDDDD"
                                     }
                                 }
                             }
+
                             MouseArea {
                                 anchors.fill: parent
                                 onClicked: {
@@ -204,10 +206,9 @@ Item {
                             height: Math.min(400, typeTreeView.contentHeight)
                             padding: 0
                             closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+
                             background: Rectangle {
                                 color: "#535353"
-                                border.color: "#333333"
-                                border.width: 1
                             }
 
                             contentItem: TreeView {
@@ -273,7 +274,7 @@ Item {
                                                     Text {
                                                         anchors.centerIn: parent
                                                         text: checkbox.checked ? "✓" : ""
-                                                        color: "white"
+                                                        color: "#DDDDDD"
                                                         font.pixelSize: 14
                                                         visible: checkbox.checked
                                                     }
@@ -311,13 +312,13 @@ Item {
                                                 visible: treeTypeItem.hasChildren
                                                 text: treeTypeItem.expanded ? "▼" : "▶"
                                                 leftPadding: 8
-                                                color: "white"
+                                                color: "#DDDDDD"
                                                 width: 20
                                             }
 
                                             Text {
                                                 text: treeTypeItem.name
-                                                color: "white"
+                                                color: "#DDDDDD"
                                                 elide: Text.ElideRight
                                             }
                                         }
@@ -342,9 +343,19 @@ Item {
             width: parent.width
             height: 40
             color: "#535353"
-            border {
-                width: 1
-                color: "#333333"
+
+            Rectangle {
+                width: parent.width
+                height: 2
+                anchors.top: parent.top
+                color: "#383838"
+            }
+
+            Rectangle {
+                width: parent.width
+                height: 2
+                anchors.bottom: parent.bottom
+                color: "#383838"
             }
 
             Row {
@@ -357,14 +368,15 @@ Item {
                     Text {
                         anchors.centerIn: parent
                         text: "Weight"
-                        color: "white"
+                        color: "#DDDDDD"
                         font.bold: true
+                        clip: true
                     }
                     Rectangle {
                         width: 1
                         height: parent.height
                         anchors.right: parent.right
-                        color: "#333333"
+                        color: "#383838"
                     }
                 }
 
@@ -375,14 +387,15 @@ Item {
                     Text {
                         anchors.centerIn: parent
                         text: "Self"
-                        color: "white"
+                        color: "#DDDDDD"
                         font.bold: true
+                        clip: true
                     }
                     Rectangle {
                         width: 1
                         height: parent.height
                         anchors.right: parent.right
-                        color: "#333333"
+                        color: "#383838"
                     }
                 }
 
@@ -393,14 +406,9 @@ Item {
                     Text {
                         anchors.centerIn: parent
                         text: "Task"
-                        color: "white"
+                        color: "#DDDDDD"
                         font.bold: true
-                    }
-                    Rectangle {
-                        width: 1
-                        height: parent.height
-                        anchors.right: parent.right
-                        color: "#333333"
+                        clip: true
                     }
                 }
             }
@@ -428,7 +436,6 @@ Item {
                 required property int startTime
                 required property int endTime
                 required property int duration
-                //required property int childPosition
                 required property int row
                 required property int index
 
@@ -443,19 +450,13 @@ Item {
                     MouseArea {
                         anchors.fill: parent
                         onClicked: {
-                            if(treeItem.hasChildren) {
-                                treeItem.treeView.toggleExpanded(row);
+                            if (treeItem.hasChildren) {
+                                treeItem.treeView.toggleExpanded(row)
                             }
                         }
 
-                        // onDoubleClicked: {
-                        //     if(!treeItem.hasChildren){
-                        //         taskTreeView.selectedTask(treeItem.treeView.index(row))
-                        //     }
-                        //
-                        // }
                         hoverEnabled: true
-                        onEntered: parent.color = "#636363"
+                        onEntered: parent.color = "#6b6b6b"
                         onExited: parent.color = "transparent"
                     }
 
@@ -469,13 +470,15 @@ Item {
                             Text {
                                 anchors.centerIn: parent
                                 text: treeItem.duration.toFixed(2) + "ms"
-                                color: "white"
+                                color: "#DDDDDD"
+                                clip: true
+                                width: parent.width
                             }
                             Rectangle {
                                 width: 1
                                 height: parent.height
                                 anchors.right: parent.right
-                                color: "#333333"
+                                color: "#383838"
                             }
                         }
 
@@ -486,13 +489,15 @@ Item {
                             Text {
                                 anchors.centerIn: parent
                                 text: (treeItem.endTime - treeItem.startTime).toFixed(2) + "ms"
-                                color: "white"
+                                color: "#DDDDDD"
+                                clip: true
+                                width: parent.width
                             }
                             Rectangle {
                                 width: 1
                                 height: parent.height
                                 anchors.right: parent.right
-                                color: "#333333"
+                                color: "#383838"
                             }
                         }
 
@@ -519,21 +524,15 @@ Item {
                                     visible: treeItem.hasChildren
                                     text: treeItem.expanded ? "▼" : "▶"
                                     leftPadding: 5
-                                    color: "white"
+                                    color: "#DDDDDD"
                                     width: 20
                                 }
 
                                 Text {
                                     text: treeItem.name
-                                    color: "white"
+                                    color: "#DDDDDD"
                                     elide: Text.ElideRight
                                 }
-                            }
-                            Rectangle {
-                                width: 1
-                                height: parent.height
-                                anchors.right: parent.right
-                                color: "#333333"
                             }
                         }
                     }
@@ -542,7 +541,7 @@ Item {
                         width: parent.width
                         height: 1
                         anchors.bottom: parent.bottom
-                        color: "#333333"
+                        color: "#383838"
                     }
                 }
             }

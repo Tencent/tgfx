@@ -6,10 +6,17 @@
         <file>qml/TabBar.qml</file>
         <file>qml/TitleBar.qml</file>
         <file>qml/TaskTreeView.qml</file>
+        <file>qml/TextureView.qml</file>
+        <file>qml/TextureDrawer.qml</file>
+        <file>qml/FramesView.qml</file>
+        <file>qml/MyGroup.qml</file>
         <file>qml/AttributeView.qml</file>
         <file>icons/InspectorIcon.png</file>
         <file>icons/LayerTreeIcon.png</file>
         <file>icons/openfile.png</file>
+        <file>icons/capture.png</file>
+        <file>icons/savefile.png</file>
+        <file>icons/disconnected.png</file>
         <file>qml/layerInspector/LayerAttribute.qml</file>
         <file>qml/layerInspector/LayerTree.qml</file>
     </qresource>

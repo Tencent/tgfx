@@ -46,7 +46,7 @@ ApplicationWindow {
                     anchors.leftMargin: 10
                     anchors.verticalCenter: parent.verticalCenter
                     text: "Open File"
-                    color: "white"
+                    color: "#DDDDDD"
                     font.pixelSize: 14
                 }
             }
@@ -76,7 +76,7 @@ ApplicationWindow {
                     anchors.leftMargin: 10
                     anchors.topMargin: 5
                     text: "Recent File"
-                    color: "white"
+                    color: "#DDDDDD"
                     font.pixelSize: 14
                 }
 
@@ -116,7 +116,7 @@ ApplicationWindow {
 
                             Text {
                                 text: modelData.filesName
-                                color: "white"
+                                color: "#DDDDDD"
                                 font.pixelSize: 12
                                 width: parent.width
                                 elide: Text.ElideMiddle
@@ -163,7 +163,7 @@ ApplicationWindow {
                     anchors.leftMargin: 10
                     anchors.topMargin: 5
                     text: "Drag Open File"
-                    color: "white"
+                    color: "#DDDDDD"
                     font.pixelSize: 14
                 }
 
@@ -246,7 +246,7 @@ ApplicationWindow {
                     anchors.leftMargin: 10
                     anchors.verticalCenter: parent.verticalCenter
                     text: "Start Connection"
-                    color: "white"
+                    color: "#DDDDDD"
                     font.pixelSize: 14
                 }
             }
@@ -275,7 +275,7 @@ ApplicationWindow {
                     anchors.leftMargin: 10
                     anchors.topMargin: 5
                     text: "Clients"
-                    color: "white"
+                    color: "#DDDDDD"
                     font.pixelSize: 14
                 }
 
@@ -315,7 +315,7 @@ ApplicationWindow {
 
                             Text {
                                 text: modelData.procName
-                                color: "white"
+                                color: "#DDDDDD"
                                 font.pixelSize: 12
                                 width: parent.width
                                 elide: Text.ElideMiddle
@@ -390,7 +390,7 @@ ApplicationWindow {
                             }
                             Text {
                                 text: "FrameCapture"
-                                color: "white"
+                                color: "#DDDDDD"
                                 font.pixelSize: 14
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
@@ -419,7 +419,7 @@ ApplicationWindow {
                             }
                             Text {
                                 text: "LayerTree"
-                                color: "white"
+                                color: "#DDDDDD"
                                 font.pixelSize: 14
                                 anchors.horizontalCenter: parent.horizontalCenter
                             }
@@ -464,7 +464,7 @@ ApplicationWindow {
                     Text {
                         anchors.centerIn: parent
                         text: "Cancel"
-                        color: "white"
+                        color: "#DDDDDD"
                         font.pixelSize: 14
                     }
 
@@ -503,7 +503,7 @@ ApplicationWindow {
                     Text {
                         anchors.centerIn: parent
                         text: "Launch"
-                        color: "white"
+                        color: "#DDDDDD"
                         font.pixelSize: 14
                     }
 

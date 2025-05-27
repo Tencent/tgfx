@@ -36,34 +36,21 @@ KDDW.TabBarBase {
         z: root.mouseAreaZ.z + 1
 
         anchors.fill: parent
-        spacing: 0
+        spacing: 5
 
         property int hoveredIndex: -1
 
         Repeater {
             model: root.groupCpp ? root.groupCpp.tabBar.dockWidgetModel : 0
-                Rectangle {
-                    id: tab
-                    height: parent.height
-                    width: 150
-                    readonly property bool isCurrent: index == root.groupCpp.currentIndex
-                    color: (isCurrent ? "#535353" : "#434343")
-                    border.color: "black"  // 非当前tab边框设为黑色
-                    border.width: isCurrent ? 0 : 1  // 当前tab不显示边框
+            Rectangle {
+                id: tab
+                height: parent.height
+                width: 150
+                readonly property bool isCurrent: index == root.groupCpp.currentIndex
+                color: (isCurrent ? "#535353" : "#434343")
 
-                    // 当前tab的特殊边框处理(只显示上、左、右边框)
-                    Rectangle {
-                        visible: isCurrent
-                        anchors {
-                            top: parent.top
-                            left: parent.left
-                            right: parent.right
-                        }
-                        height: 1  // 边框高度
-                        color: "black"  // 当前tab的上边框设为黑色
-                    }
 
-                    readonly property int tabIndex: index
+                readonly property int tabIndex: index
 
                 Text {
                     anchors.centerIn: parent

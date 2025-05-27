@@ -21,6 +21,7 @@
 #include <kddockwidgets/qtquick/views/DockWidget.h>
 #include <qwidget.h>
 #include "StartView.h"
+#include <QQuickStyle>
 
 class CustomViewFactory : public KDDockWidgets::QtQuick::ViewFactory {
  public:
@@ -37,6 +38,10 @@ class CustomViewFactory : public KDDockWidgets::QtQuick::ViewFactory {
   QUrl titleBarFilename() const override {
     return QUrl("qrc:/qml/TitleBar.qml");
   }
+
+  QUrl groupFilename() const override {
+    return QUrl("qrc:/qml/MyGroup.qml");
+  }
 };
 
 int main(int argc, char* argv[]) {
@@ -48,6 +53,7 @@ int main(int argc, char* argv[]) {
   defaultFormat.setProfile(QSurfaceFormat::CoreProfile);
   QSurfaceFormat::setDefaultFormat(defaultFormat);
   qputenv("QT_LOGGING_RULES", "qt.qpa.*=false");
+  QQuickStyle::setStyle("Basic");
 
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
   QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
@@ -67,6 +73,7 @@ int main(int argc, char* argv[]) {
   }
 
   auto& config = KDDockWidgets::Config::self();
+  config.setSeparatorThickness(2);
   auto flags = config.flags() | KDDockWidgets::Config::Flag_TitleBarIsFocusable |
                KDDockWidgets::Config::Flag_HideTitleBarWhenTabsVisible;
 
