@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/DisplayList.h"
+#include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
 
@@ -67,29 +69,29 @@ void DisplayList::render(Surface* surface, bool autoClear) {
   }
   _hasContentChanged = false;
   auto dirtyRegions = _root->updateDirtyRegions();
-  auto viewMatrix = Matrix::MakeScale(_zoomScale);
-  viewMatrix.postTranslate(_contentOffset.x, _contentOffset.y);
-  auto inverse = Matrix::I();
-  if (!viewMatrix.invert(&inverse)) {
+  if (FloatNearlyZero(_zoomScale)) {
     return;
   }
-  auto renderRect = Rect::MakeWH(surface->width(), surface->height());
-  renderRect = inverse.mapRect(renderRect);
+  if (_partialRefreshEnabled && renderPartially(surface, autoClear, std::move(dirtyRegions))) {
+    return;
+  }
+  auto viewMatrix = getViewMatrix();
+  auto inverse = Matrix::I();
+  DEBUG_ASSERT(viewMatrix.invertible());
+  viewMatrix.invert(&inverse);
   auto canvas = surface->getCanvas();
   canvas->setMatrix(viewMatrix);
-  if (_partialRefreshEnabled &&
-      renderPartially(surface, autoClear, renderRect, std::move(dirtyRegions))) {
-    return;
-  }
   if (autoClear) {
     canvas->clear();
   }
   DrawArgs args(surface->getContext());
+  auto renderRect = Rect::MakeWH(surface->width(), surface->height());
+  renderRect = inverse.mapRect(renderRect);
   args.renderRect = &renderRect;
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }
 
-bool DisplayList::renderPartially(Surface* surface, bool autoClear, const Rect& renderRect,
+bool DisplayList::renderPartially(Surface* surface, bool autoClear,
                                   std::vector<Rect> dirtyRegions) {
   auto context = surface->getContext();
   bool frameCacheChanged = false;
@@ -102,23 +104,38 @@ bool DisplayList::renderPartially(Surface* surface, bool autoClear, const Rect& 
     }
     frameCacheChanged = true;
   }
+  auto viewMatrix = getViewMatrix();
+  auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
   if (frameCacheChanged || lastZoomScale != _zoomScale || lastContentOffset != _contentOffset) {
-    dirtyRegions = {renderRect};
+    dirtyRegions = {surfaceRect};
     lastZoomScale = _zoomScale;
     lastContentOffset = _contentOffset;
+  } else {
+    for (auto& region : dirtyRegions) {
+      viewMatrix.mapRect(&region);  // Map the region to the surface coordinate system.
+      region.outset(0.5f, 0.5f);    // Expand by 0.5 pixels to preserve antialiasing results.
+      region.roundOut();
+      if (!region.intersect(surfaceRect)) {
+        region.setEmpty();
+      }
+    }
   }
+  auto inverse = Matrix::I();
+  DEBUG_ASSERT(viewMatrix.invertible());
+  viewMatrix.invert(&inverse);
   auto cacheCanvas = frameCache->getCanvas();
   auto canvas = surface->getCanvas();
-  cacheCanvas->setMatrix(canvas->getMatrix());
   DrawArgs args(context);
   for (auto& region : dirtyRegions) {
-    if (!region.intersect(renderRect)) {
+    if (region.isEmpty()) {
       continue;
     }
     AutoCanvasRestore autoRestore(cacheCanvas);
-    args.renderRect = &region;
     cacheCanvas->clipRect(region);
     cacheCanvas->clear();
+    cacheCanvas->setMatrix(viewMatrix);
+    auto renderRect = inverse.mapRect(region);
+    args.renderRect = &renderRect;
     _root->drawLayer(args, cacheCanvas, 1.0f, BlendMode::SrcOver);
   }
   canvas->resetMatrix();
@@ -130,6 +147,12 @@ bool DisplayList::renderPartially(Surface* surface, bool autoClear, const Rect& 
   static SamplingOptions sampling(FilterMode::Nearest);
   canvas->drawImage(frameCache->makeImageSnapshot(), sampling, &paint);
   return true;
+}
+
+Matrix DisplayList::getViewMatrix() const {
+  auto viewMatrix = Matrix::MakeScale(_zoomScale);
+  viewMatrix.postTranslate(_contentOffset.x, _contentOffset.y);
+  return viewMatrix;
 }
 
 }  // namespace tgfx
