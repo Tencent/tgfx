@@ -28,7 +28,6 @@
 namespace tgfx {
 static constexpr auto THREAD_TIMEOUT = std::chrono::seconds(10);
 static constexpr uint32_t THREAD_POOL_SIZE = 32;
-static constexpr uint32_t TASK_QUEUE_SIZE = 8192;
 static constexpr int TASK_PRIORITY_SIZE = 3;
 
 int GetCPUCores() {
@@ -74,7 +73,7 @@ TaskGroup::TaskGroup() {
   threads = new moodycamel::ConcurrentQueue<std::thread*>(THREAD_POOL_SIZE);
   priorityQueues.reserve(TASK_PRIORITY_SIZE);
   for (int i = 0; i < TASK_PRIORITY_SIZE; i++) {
-    auto queue = new moodycamel::ConcurrentQueue<std::shared_ptr<Task>>(TASK_QUEUE_SIZE);
+    auto queue = new moodycamel::ConcurrentQueue<std::shared_ptr<Task>>();
     priorityQueues.push_back(queue);
   }
   std::atexit(OnAppExit);
