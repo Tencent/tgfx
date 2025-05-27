@@ -176,7 +176,7 @@ std::shared_ptr<Image> Image::makeMipmapped(bool enabled) const {
 
 std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {
   auto rect = subset;
-  rect.round();
+  rect.roundOut();
   auto bounds = Rect::MakeWH(width(), height());
   if (bounds == rect) {
     return weakThis.lock();

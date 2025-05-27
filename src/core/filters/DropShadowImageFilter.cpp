@@ -84,7 +84,9 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
     clipBounds = blurFilter->filterBounds(clipBounds);
   }
   auto sourceRect = Rect::MakeXYWH(0, 0, source->width(), source->height());
-  clipBounds.intersect(sourceRect);
+  if (!clipBounds.intersect(sourceRect)) {
+    return nullptr;
+  }
   source = source->makeSubset(clipBounds);
   source = source->makeRasterized();
 

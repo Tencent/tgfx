@@ -32,11 +32,19 @@
 #include "gpu/ops/RectDrawOp.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Canvas.h"
+#include "tgfx/core/Color.h"
 #include "tgfx/core/Fill.h"
+#include "tgfx/core/Image.h"
 #include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/ImageReader.h"
 #include "tgfx/core/Mask.h"
+#include "tgfx/core/Matrix.h"
+#include "tgfx/core/Paint.h"
+#include "tgfx/core/Path.h"
 #include "tgfx/core/Recorder.h"
+#include "tgfx/core/Rect.h"
+#include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 #include "utils/TestUtils.h"
@@ -1660,5 +1668,29 @@ TGFX_TEST(CanvasTest, BlendFormula) {
     canvas->translate(200, 0);
   }
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/BlendFormula"));
+}
+
+TGFX_TEST(CanvasTest, ShadowBoundIntersect) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 400);
+  auto* canvas = surface->getCanvas();
+
+  Recorder shadowRecorder = {};
+  auto* picCanvas = shadowRecorder.beginRecording();
+  Paint dropShadowPaint = {};
+  dropShadowPaint.setImageFilter(ImageFilter::DropShadowOnly(0, -8.f, .5f, .5f, Color::Red()));
+  picCanvas->saveLayer(&dropShadowPaint);
+  picCanvas->translate(2.2f, 2.2f);
+  picCanvas->drawRect(Rect::MakeWH(150, 8), Paint());
+  picCanvas->restore();
+  auto picture = shadowRecorder.finishRecordingAsPicture();
+  auto image = Image::MakeFrom(picture, 150, 8);
+
+  canvas->clipRect(Rect::MakeXYWH(0.f, 4.f, 80.8f, 3.7f));
+  canvas->translate(0.7f, 0.7f);
+  canvas->drawImage(image);
+  context->flush();
 }
 }  // namespace tgfx
