@@ -23,6 +23,7 @@
 #include "layers/RootLayer.h"
 
 namespace tgfx {
+static constexpr size_t MAX_DIRTY_REGION_FRAMES = 5;
 
 DisplayList::DisplayList() : _root(RootLayer::Make()) {
   _root->_root = _root.get();
@@ -59,8 +60,29 @@ void DisplayList::setPartialRefreshEnabled(bool partialRefreshEnabled) {
   }
 }
 
+void DisplayList::setShowDirtyRegions(bool showDirtyRegions) {
+  if (_showDirtyRegions == showDirtyRegions) {
+    return;
+  }
+  _showDirtyRegions = showDirtyRegions;
+  if (!_showDirtyRegions) {
+    lastDirtyRegions = {};
+  }
+}
+
 bool DisplayList::hasContentChanged() const {
-  return _hasContentChanged || _root->bitFields.dirtyDescendents;
+  if (_hasContentChanged || _root->bitFields.dirtyDescendents) {
+    return true;
+  }
+  if (!_showDirtyRegions) {
+    return false;
+  }
+  for (auto& regions : lastDirtyRegions) {
+    if (!regions.empty()) {
+      return true;
+    }
+  }
+  return false;
 }
 
 void DisplayList::render(Surface* surface, bool autoClear) {
@@ -125,7 +147,6 @@ bool DisplayList::renderPartially(Surface* surface, bool autoClear,
   viewMatrix.invert(&inverse);
   auto cacheCanvas = frameCache->getCanvas();
   auto canvas = surface->getCanvas();
-  DrawArgs args(context);
   for (auto& region : dirtyRegions) {
     if (region.isEmpty()) {
       continue;
@@ -134,6 +155,7 @@ bool DisplayList::renderPartially(Surface* surface, bool autoClear,
     cacheCanvas->clipRect(region);
     cacheCanvas->clear();
     cacheCanvas->setMatrix(viewMatrix);
+    DrawArgs args(context);
     auto renderRect = inverse.mapRect(region);
     args.renderRect = &renderRect;
     _root->drawLayer(args, cacheCanvas, 1.0f, BlendMode::SrcOver);
@@ -146,7 +168,33 @@ bool DisplayList::renderPartially(Surface* surface, bool autoClear,
   }
   static SamplingOptions sampling(FilterMode::Nearest);
   canvas->drawImage(frameCache->makeImageSnapshot(), sampling, &paint);
+  if (_showDirtyRegions) {
+    renderDirtyRegions(canvas, std::move(dirtyRegions));
+  }
   return true;
+}
+
+void DisplayList::renderDirtyRegions(Canvas* canvas, std::vector<Rect> dirtyRegions) {
+  if (lastDirtyRegions.empty()) {
+    for (size_t i = 0; i < MAX_DIRTY_REGION_FRAMES; ++i) {
+      lastDirtyRegions.emplace_back();
+    }
+  }
+  lastDirtyRegions.push_back(std::move(dirtyRegions));
+  lastDirtyRegions.pop_front();
+  Paint dirtyPaint = {};
+  dirtyPaint.setAntiAlias(false);
+  dirtyPaint.setColor(Color::Red());
+  dirtyPaint.setStyle(PaintStyle::Stroke);
+  for (auto& regions : lastDirtyRegions) {
+    for (auto& region : regions) {
+      if (region.isEmpty()) {
+        continue;
+      }
+      region.inset(0.25f, 0.25f);
+      canvas->drawRect(region, dirtyPaint);
+    }
+  }
 }
 
 Matrix DisplayList::getViewMatrix() const {

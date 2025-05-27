@@ -21,6 +21,9 @@
 #include "tgfx/layers/Layer.h"
 
 namespace tgfx {
+// Maximum number of dirty regions that can be tracked in the root layer.
+static constexpr size_t MAX_DIRTY_REGIONS = 3;
+
 /**
  * The RootLayer class represents the root layer of a display list. It is the top-level layer that
  * contains all other layers in the display list. The root layer cannot be added to another layer.
