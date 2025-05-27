@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/DisplayList.h"
+#include "core/utils/Log.h"
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
 
@@ -106,13 +107,25 @@ bool DisplayList::renderPartially(Surface* surface, bool autoClear, const Rect& 
     dirtyRegions = {renderRect};
     lastZoomScale = _zoomScale;
     lastContentOffset = _contentOffset;
+  } else {
+    DEBUG_ASSERT(_zoomScale != 0);
+    auto expand = 1.0f / _zoomScale;
+    for (auto& region : dirtyRegions) {
+      if (!region.intersects(renderRect)) {
+        region.setEmpty();
+        continue;
+      }
+      // Add a small margin to avoid artifacts caused by antialiasing.
+      region.outset(expand, expand);
+      region.intersect(renderRect);
+    }
   }
   auto cacheCanvas = frameCache->getCanvas();
   auto canvas = surface->getCanvas();
   cacheCanvas->setMatrix(canvas->getMatrix());
   DrawArgs args(context);
   for (auto& region : dirtyRegions) {
-    if (!region.intersect(renderRect)) {
+    if (region.isEmpty()) {
       continue;
     }
     AutoCanvasRestore autoRestore(cacheCanvas);
