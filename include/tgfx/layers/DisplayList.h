@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <deque>
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/Layer.h"
 
@@ -96,6 +97,22 @@ class DisplayList {
   void setPartialRefreshEnabled(bool partialRefreshEnabled);
 
   /**
+   * Returns true if the dirty regions of the display list are highlighted during rendering. This is
+   * useful for debugging to visualize which parts of the display list are being updated. The
+   * default value is false.
+   */
+  bool showDirtyRegions() const {
+    return _showDirtyRegions;
+  }
+
+  /**
+   * Sets whether to show dirty regions during rendering. When enabled, the dirty regions will be
+   * highlighted in the rendered output. This is useful for debugging to visualize which parts of
+   * the display list are being updated. The default value is false.
+   */
+  void setShowDirtyRegions(bool showDirtyRegions);
+
+  /**
    * Returns true if the content of the display list has changed since the last rendering. This can
    * be used to determine if the display list needs to be re-rendered.
    */
@@ -115,12 +132,14 @@ class DisplayList {
   float _zoomScale = 1.0f;
   Point _contentOffset = {};
   bool _partialRefreshEnabled = true;
+  bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
   float lastZoomScale = 1.0f;
   Point lastContentOffset = {};
+  std::deque<std::vector<Rect>> lastDirtyRegions = {};
 
   bool renderPartially(Surface* surface, bool autoClear, std::vector<Rect> dirtyRegions);
-
+  void renderDirtyRegions(Canvas* canvas, std::vector<Rect> dirtyRegions);
   Matrix getViewMatrix() const;
 };
 }  // namespace tgfx
