@@ -22,6 +22,7 @@
 #include "AtttributeModel.h"
 #include "FramesDrawer.h"
 #include "TaskTreeModel.h"
+#include "kddockwidgets/qtquick/views/Group.h"
 
 namespace inspector {
 
@@ -44,6 +45,9 @@ void InspectorView::initView() {
   qmlRegisterType<FramesDrawer>("FramesDrawer", 1, 0, "FramesDrawer");
   qmlRegisterType<TaskTreeModel>("TaskTreeModel", 1, 0, "TaskTreeModel");
   qmlRegisterType<AtttributeModel>("AtttributeModel", 1, 0, "AtttributeModel");
+  qmlRegisterUncreatableType<KDDockWidgets::QtQuick::Group>("com.kdab.dockwidgets", 2, 0,
+                                               "GroupView", QStringLiteral("Internal usage only"));
+
   ispEngine = new QQmlApplicationEngine(this);
   ispEngine->rootContext()->setContextProperty("workerPtr", &worker);
   ispEngine->rootContext()->setContextProperty("viewDataPtr", &viewData);
