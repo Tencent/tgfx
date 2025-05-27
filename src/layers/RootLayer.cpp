@@ -170,6 +170,10 @@ bool RootLayer::invalidateBackground(const Rect& drawRect, LayerStyle* layerStyl
 
 std::vector<Rect> RootLayer::updateDirtyRegions() {
   updateRenderBounds();
+  for (auto& rect : dirtyRects) {
+    rect.outset(0.5f, 0.5f);  // Add a 0.5-pixel outset to preserve antialiasing results.
+    rect.roundOut();
+  }
   while (mergeDirtyList(false)) {
   }
   dirtyAreas.clear();
