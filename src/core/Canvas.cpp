@@ -21,6 +21,7 @@
 #include "core/LayerUnrollContext.h"
 #include "core/RecordingContext.h"
 #include "core/utils/Log.h"
+#include "shapes/MatrixShape.h"
 #include "shapes/PathShape.h"
 #include "shapes/StrokeShape.h"
 #include "tgfx/core/Surface.h"
@@ -178,12 +179,12 @@ void Canvas::clear(const Color& color) {
 }
 
 void Canvas::drawColor(const Color& color, BlendMode blendMode) {
-  drawContext->drawFill(*mcState, {color, blendMode});
+  drawFill(*mcState, {color, blendMode});
 }
 
 void Canvas::drawPaint(const Paint& paint) {
   SaveLayerForImageFilter(paint.getImageFilter());
-  drawContext->drawFill(*mcState, paint.getFill());
+  drawFill(*mcState, paint.getFill());
 }
 
 void Canvas::drawLine(float x0, float y0, float x1, float y1, const Paint& paint) {
@@ -248,14 +249,7 @@ void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
 
 void Canvas::drawPath(const Path& path, const Paint& paint) {
   SaveLayerForImageFilter(paint.getImageFilter());
-  if (drawSimplePath(path, *mcState, paint.getFill(), paint.getStroke())) {
-    return;
-  }
-  auto shape = Shape::MakeFrom(path);
-  shape = Shape::ApplyStroke(std::move(shape), paint.getStroke());
-  if (shape != nullptr) {
-    drawContext->drawShape(std::move(shape), *mcState, paint.getFill());
-  }
+  drawPath(path, *mcState, paint.getFill(), paint.getStroke());
 }
 
 /// Check if the line is axis-aligned and convert it to a rect
@@ -289,44 +283,54 @@ static bool StrokeLineIsRect(const Stroke& stroke, const Point line[2], Rect* re
   return true;
 }
 
-bool Canvas::drawSimplePath(const Path& path, const MCState& state, const Fill& fill,
-                            const Stroke* stroke) const {
+void Canvas::drawPath(const Path& path, const MCState& state, const Fill& fill,
+                      const Stroke* stroke) const {
   if (path.isEmpty()) {
     if (path.isInverseFillType()) {
       // No geometry to draw, so draw the fill instead.
-      drawContext->drawFill(state, fill);
+      drawFill(state, fill);
     }
-    return true;
+    return;
   }
   Rect rect = {};
   Point line[2] = {};
   if (path.isLine(line)) {
     if (!stroke) {
       // a line has no fill to draw.
-      return true;
+      return;
     }
     if (StrokeLineIsRect(*stroke, line, &rect)) {
       drawContext->drawRect(rect, state, fill);
-      return true;
+      return;
     }
   }
   if (stroke == nullptr) {
     if (path.isRect(&rect)) {
       drawContext->drawRect(rect, state, fill);
-      return true;
+      return;
     }
     RRect rRect = {};
     if (path.isOval(&rect)) {
       rRect.setOval(rect);
       drawContext->drawRRect(rRect, state, fill);
-      return true;
+      return;
     }
     if (path.isRRect(&rRect)) {
       drawContext->drawRRect(rRect, state, fill);
-      return true;
+      return;
     }
+    drawContext->drawPath(path, state, fill);
+  } else {
+    auto shape = Shape::MakeFrom(path);
+    if (shape == nullptr) {
+      return;
+    }
+    shape = Shape::ApplyStroke(std::move(shape), stroke);
+    if (shape == nullptr) {
+      return;
+    }
+    drawContext->drawShape(shape, state, fill);
   }
-  return false;
 }
 
 void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
@@ -344,8 +348,15 @@ void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
       path = &std::static_pointer_cast<PathShape>(strokeShape->shape)->path;
       stroke = &strokeShape->stroke;
     }
+  } else if (!stroke && shape->type() == Shape::Type::Matrix) {
+    auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);
+    if (matrixShape->shape->isSimplePath()) {
+      path = &std::static_pointer_cast<PathShape>(matrixShape->shape)->path;
+      mcState->matrix.preConcat(matrixShape->matrix);
+    }
   }
-  if (path && drawSimplePath(*path, *mcState, paint.getFill(), stroke)) {
+  if (path) {
+    drawPath(*path, *mcState, paint.getFill(), stroke);
     return;
   }
   shape = Shape::ApplyStroke(std::move(shape), paint.getStroke());
@@ -532,4 +543,16 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
     }
   }
 }
+
+void Canvas::drawFill(const MCState& state, const Fill& fill) const {
+  if (state.clip.isEmpty()) {
+    if (!state.clip.isInverseFillType()) {
+      return;
+    }
+    drawContext->drawFill(fill.makeWithMatrix(state.matrix));
+  } else {
+    drawPath(state.clip, {}, fill.makeWithMatrix(state.matrix), nullptr);
+  }
+}
+
 }  // namespace tgfx
