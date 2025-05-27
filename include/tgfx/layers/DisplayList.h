@@ -119,7 +119,8 @@ class DisplayList {
   float lastZoomScale = 1.0f;
   Point lastContentOffset = {};
 
-  bool renderPartially(Surface* surface, bool autoClear, const Rect& renderRect,
-                       std::vector<Rect> dirtyRegions);
+  bool renderPartially(Surface* surface, bool autoClear, std::vector<Rect> dirtyRegions);
+
+  Matrix getViewMatrix() const;
 };
 }  // namespace tgfx
