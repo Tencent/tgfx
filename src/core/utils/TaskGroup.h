@@ -23,7 +23,7 @@
 #include <mutex>
 #include <thread>
 #include <vector>
-#include "LockFreeQueue.h"
+#include "concurrentqueue.h"
 #include "tgfx/core/Task.h"
 
 namespace tgfx {
@@ -35,8 +35,8 @@ class TaskGroup {
   std::atomic_int totalThreads = 0;
   std::atomic_bool exited = false;
   std::atomic_int waitingThreads = 0;
-  std::vector<LockFreeQueue<std::shared_ptr<Task>>*> priorityQueues = {};
-  LockFreeQueue<std::thread*>* threads = nullptr;
+  std::vector<moodycamel::ConcurrentQueue<std::shared_ptr<Task>>*> priorityQueues = {};
+  moodycamel::ConcurrentQueue<std::thread*>* threads = nullptr;
   static TaskGroup* GetInstance();
   static void RunLoop(TaskGroup* taskGroup);
 
