@@ -43,7 +43,7 @@ Rectangle {
     Loader {
         id: titleBar
         readonly property QtObject titleBarCpp: root.titleBarCpp
-        source: root.groupCpp ? KDDockWidgets.Singletons.widgetFactory.titleBarFilename() : "qrc:/qml/TitleBar.qml"
+        source: "qrc:/qml/TitleBar.qml"
 
         anchors {
             top: parent ? parent.top : undefined
@@ -60,7 +60,7 @@ Rectangle {
         readonly property GroupView groupCpp: root.groupCpp
         readonly property bool hasCustomMouseEventRedirector: root.hasCustomMouseEventRedirector
 
-        source: groupCpp ? KDDockWidgets.Singletons.widgetFactory.tabbarFilename() : "qrc:/qml/TabBar.qml"
+        source: "qrc:/qml/TabBar.qml"
 
         function topAnchor() {
             if (root.tabsAtTop) {

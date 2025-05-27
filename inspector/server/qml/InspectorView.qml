@@ -211,12 +211,8 @@ ApplicationWindow {
                     id: framesViewLoader
                     source: "qrc:/qml/FramesView.qml"
                     anchors.fill: parent
-                    onLoaded: {
-                        item.worker = workerPtr
-                        item.viewData = viewDataPtr
-                        item.viewMode = viewModePtr
-                        item.objectName = "framesDrawer"
-                    }
+                    property var loaderWorker: workerPtr
+                    property var loaderViewData: viewDataPtr
                 }
             }
 

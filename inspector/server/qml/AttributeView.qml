@@ -11,9 +11,6 @@ Item {
     AtttributeModel {
         id: attributeModel
         isOpSelected: root.isOpSelected
-        Component.onCompleted: {
-            console.log("Model loaded, row count:", rowCount())
-        }
     }
 
     property bool isOpSelected: true

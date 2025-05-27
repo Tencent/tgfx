@@ -11,11 +11,11 @@ Item {
         id: attributeModel
     }
 
-    Component.onCompleted: {
-        taskTreeModel.setAttributeModel(attributeModel)
-        taskTreeModel.createTestData()
-        typeTreeModel.createTestData()
-    }
+    // Component.onCompleted: {
+    //     taskTreeModel.setAttributeModel(attributeModel)
+    //     //taskTreeModel.createTestData()
+    //     typeTreeModel.createTestData()
+    // }
 
     Rectangle {
         anchors.fill: parent
@@ -53,17 +53,20 @@ Item {
                     height: 30
                     model: ["Name", "Type"]
 
-                    onCurrentTextChanged: {
-                        if(currentText === "Name") {
-                            taskTreeModel.clearTypeFilter()
-                        }
-                        else {
-                            taskTreeModel.clearTextFilter()
-                        }
-                    }
+                    // onCurrentTextChanged: {
+                    //     if(currentText === "Name") {
+                    //         taskTreeModel.clearTypeFilter()
+                    //     }
+                    //     else {
+                    //         taskTreeModel.clearTextFilter()
+                    //     }
+                    // }
 
                     background: Rectangle {
                         color: "#383838"
+                        border.color: "#333333"
+                        border.width: 1
+                        radius: 2
                     }
 
                     contentItem: Text {
@@ -101,6 +104,13 @@ Item {
                             implicitHeight: contentHeight
                             model: searchSwitch.popup.visible ? searchSwitch.delegateModel : null
                         }
+
+                        background: Rectangle {
+                            color: "#383838"
+                            border.color: "#333333"
+                            border.width: 1
+                            radius: 2
+                        }
                     }
                 }
 
@@ -119,6 +129,8 @@ Item {
 
                         background: Rectangle {
                             color: "#383838"
+                            border.color: "#333333"
+                            border.width: 1
                         }
 
                         onTextChanged: {
@@ -156,6 +168,8 @@ Item {
                             id: taskTypeDisplay
                             anchors.fill: parent
                             color: "#383838"
+                            border.color: "#333333"
+                            border.width: 1
 
 
                             Item {
