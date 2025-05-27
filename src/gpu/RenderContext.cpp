@@ -22,6 +22,7 @@
 #include "core/PathTriangulator.h"
 #include "core/Rasterizer.h"
 #include "core/images/SubsetImage.h"
+#include "core/utils/MathExtra.h"
 #include "core/utils/Types.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
@@ -136,7 +137,7 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
     return;
   }
   auto maxScale = state.matrix.getMaxScale();
-  if (maxScale <= 0.0f) {
+  if (FloatNearlyZero(maxScale)) {
     return;
   }
   auto bounds = glyphRunList->getBounds(maxScale);
@@ -223,7 +224,7 @@ void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
                                     const MCState& state, const Fill& fill) {
   auto viewMatrix = state.matrix;
   auto scale = viewMatrix.getMaxScale();
-  if (scale <= 0) {
+  if (FloatNearlyZero(scale)) {
     return;
   }
   viewMatrix.preScale(1.0f / scale, 1.0f / scale);
@@ -238,7 +239,7 @@ void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
     for (size_t i = 0; i < glyphCount; ++i) {
       const auto& glyphID = glyphIDs[i];
       const auto& position = positions[i];
-      auto glyphCodec = glyphFace->getImage(glyphID, &glyphState.matrix);
+      auto glyphCodec = glyphFace->getImage(glyphID, nullptr, &glyphState.matrix);
       auto glyphImage = Image::MakeFrom(glyphCodec);
       if (glyphImage == nullptr) {
         continue;
@@ -268,9 +269,6 @@ OpsCompositor* RenderContext::getOpsCompositor(bool discardContent) {
   if (opsCompositor == nullptr || opsCompositor->isClosed()) {
     auto drawingManager = renderTarget->getContext()->drawingManager();
     opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
-    if (surface) {
-      surface->contentChanged();
-    }
   } else if (discardContent) {
     opsCompositor->discardAll();
   }

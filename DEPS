@@ -69,6 +69,11 @@
         "url": "https://github.com/google/flatbuffers.git",
         "commit": "1c514626e83c20fffa8557e75641848e1e15cd5e",
         "dir": "third_party/flatbuffers"
+      },
+      {
+         "url": "https://github.com/cameron314/concurrentqueue.git",
+         "commit": "6dd38b8a1dbaa7863aa907045f32308a56a6ff5d",
+         "dir": "third_party/concurrentqueue"
       }
     ]
   },

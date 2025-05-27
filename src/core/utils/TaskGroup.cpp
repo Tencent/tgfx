@@ -19,7 +19,6 @@
 #include "TaskGroup.h"
 #include <algorithm>
 #include <cstdlib>
-#include <string>
 #include "core/utils/Log.h"
 
 #ifdef __APPLE__
@@ -29,7 +28,7 @@
 namespace tgfx {
 static constexpr auto THREAD_TIMEOUT = std::chrono::seconds(10);
 static constexpr uint32_t THREAD_POOL_SIZE = 32;
-static constexpr uint32_t TASK_QUEUE_SIZE = 4096;
+static constexpr int TASK_PRIORITY_SIZE = 3;
 
 int GetCPUCores() {
   int cpuCores = 0;
@@ -71,8 +70,12 @@ void OnAppExit() {
 }
 
 TaskGroup::TaskGroup() {
-  threads = new LockFreeQueue<std::thread*>(THREAD_POOL_SIZE);
-  tasks = new LockFreeQueue<std::shared_ptr<Task>>(TASK_QUEUE_SIZE);
+  threads = new moodycamel::ConcurrentQueue<std::thread*>(THREAD_POOL_SIZE);
+  priorityQueues.reserve(TASK_PRIORITY_SIZE);
+  for (int i = 0; i < TASK_PRIORITY_SIZE; i++) {
+    auto queue = new moodycamel::ConcurrentQueue<std::shared_ptr<Task>>();
+    priorityQueues.push_back(queue);
+  }
   std::atexit(OnAppExit);
 }
 
@@ -82,8 +85,12 @@ bool TaskGroup::checkThreads() {
   if (waitingThreads == 0 && totalThreads < MaxThreads) {
     auto thread = new (std::nothrow) std::thread(TaskGroup::RunLoop, this);
     if (thread) {
-      threads->enqueue(thread);
-      ++totalThreads;
+      if (threads->enqueue(thread)) {
+        ++totalThreads;
+      } else {
+        delete thread;
+        return false;
+      }
     }
   } else {
     return true;
@@ -91,14 +98,15 @@ bool TaskGroup::checkThreads() {
   return totalThreads > 0;
 }
 
-bool TaskGroup::pushTask(std::shared_ptr<Task> task) {
+bool TaskGroup::pushTask(std::shared_ptr<Task> task, TaskPriority priority) {
 #ifndef TGFX_USE_THREADS
   return false;
 #endif
   if (exited || !checkThreads()) {
     return false;
   }
-  if (!tasks->enqueue(std::move(task))) {
+  auto& queue = priorityQueues[static_cast<size_t>(priority)];
+  if (!queue->enqueue(task)) {
     return false;
   }
   if (waitingThreads > 0) {
@@ -110,9 +118,14 @@ bool TaskGroup::pushTask(std::shared_ptr<Task> task) {
 std::shared_ptr<Task> TaskGroup::popTask() {
   std::unique_lock<std::mutex> autoLock(locker);
   while (!exited) {
-    auto task = tasks->dequeue();
-    if (task || exited) {
-      return task;
+    std::shared_ptr<Task> task = nullptr;
+    for (auto& queue : priorityQueues) {
+      if (queue->try_dequeue(task)) {
+        return task;
+      }
+    }
+    if (exited) {
+      return nullptr;
     }
     ++waitingThreads;
     auto status = condition.wait_for(autoLock, THREAD_TIMEOUT);
@@ -139,14 +152,17 @@ void TaskGroup::releaseThreads(bool exit) {
   exited = true;
   condition.notify_all();
   std::thread* thread = nullptr;
-  while ((thread = threads->dequeue()) != nullptr) {
+  while (threads->try_dequeue(thread)) {
     ReleaseThread(thread);
   }
   totalThreads = 0;
   DEBUG_ASSERT(waitingThreads == 0)
   if (exit) {
     delete threads;
-    delete tasks;
+    for (auto& queue : priorityQueues) {
+      delete queue;
+    }
+    priorityQueues.clear();
   } else {
     exited = false;
   }

@@ -42,9 +42,11 @@ class FTScalerContext : public ScalerContext {
 
   bool generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic, Path* path) const override;
 
-  Rect getImageTransform(GlyphID glyphID, Matrix* matrix) const override;
+  Rect getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
+                         Matrix* matrix) const override;
 
-  bool readPixels(GlyphID glyphID, const ImageInfo& dstInfo, void* dstPixels) const override;
+  bool readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke, const ImageInfo& dstInfo,
+                  void* dstPixels) const override;
 
  private:
   int setupSize(bool fauxItalic) const;
@@ -62,6 +64,8 @@ class FTScalerContext : public ScalerContext {
   Matrix getExtraMatrix(bool fauxItalic) const;
 
   FTTypeface* ftTypeface() const;
+
+  bool loadOutlineGlyph(FT_Face face, GlyphID glyphID, bool fauxBold, bool fauxItalic) const;
 
   float textScale = 1.0f;
   Point extraScale = Point::Make(1.f, 1.f);

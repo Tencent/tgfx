@@ -38,20 +38,20 @@ void Task::ReleaseThreads() {
   TaskGroup::GetInstance()->releaseThreads(false);
 }
 
-std::shared_ptr<Task> Task::Run(std::function<void()> block) {
+std::shared_ptr<Task> Task::Run(std::function<void()> block, TaskPriority priority) {
   if (block == nullptr) {
     return nullptr;
   }
   auto task = std::make_shared<BlockTask>(std::move(block));
-  Run(task);
+  Run(task, priority);
   return task;
 }
 
-void Task::Run(std::shared_ptr<Task> task) {
+void Task::Run(std::shared_ptr<Task> task, TaskPriority priority) {
   if (task == nullptr) {
     return;
   }
-  if (!TaskGroup::GetInstance()->pushTask(task)) {
+  if (!TaskGroup::GetInstance()->pushTask(task, priority)) {
     task->execute();
   }
 }

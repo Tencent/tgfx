@@ -349,7 +349,7 @@ float Matrix::getMinScale() const {
   if (getMinMaxScaleFactors(results)) {
     return results[0];
   }
-  return -1.0f;
+  return 0.0f;
 }
 
 float Matrix::getMaxScale() const {
@@ -357,7 +357,7 @@ float Matrix::getMaxScale() const {
   if (getMinMaxScaleFactors(results)) {
     return results[1];
   }
-  return -1.0f;
+  return 0.0f;
 }
 
 Point Matrix::getAxisScales() const {

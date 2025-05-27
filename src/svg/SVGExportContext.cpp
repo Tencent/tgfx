@@ -261,7 +261,7 @@ void SVGExportContext::exportGlyphsAsImage(const std::shared_ptr<GlyphRunList>& 
                                            const MCState& state, const Fill& fill) {
   auto viewMatrix = state.matrix;
   auto scale = viewMatrix.getMaxScale();
-  if (scale <= 0) {
+  if (FloatNearlyZero(scale)) {
     return;
   }
   viewMatrix.preScale(1.0f / scale, 1.0f / scale);
@@ -278,7 +278,7 @@ void SVGExportContext::exportGlyphsAsImage(const std::shared_ptr<GlyphRunList>& 
     for (size_t i = 0; i < glyphCount; ++i) {
       const auto& glyphID = glyphIDs[i];
       const auto& position = positions[i];
-      auto glyphCodec = glyphFace->getImage(glyphID, &glyphState.matrix);
+      auto glyphCodec = glyphFace->getImage(glyphID, nullptr, &glyphState.matrix);
       auto glyphImage = Image::MakeFrom(glyphCodec);
       if (glyphImage == nullptr) {
         continue;

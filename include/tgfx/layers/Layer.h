@@ -32,6 +32,7 @@ namespace tgfx {
 class DisplayList;
 class DrawArgs;
 class RegionTransformer;
+class RootLayer;
 struct LayerStyleSource;
 
 /**
@@ -175,11 +176,12 @@ class Layer {
   void setShouldRasterize(bool value);
 
   /**
-   * The scale at which to rasterize content, relative to the coordinate space of the layer. When
-   * the value in the shouldRasterize property is true, the layer uses this property to determine
-   * whether to scale the rasterized content (and by how much). The default value of this property
-   * is 1.0, which indicates that the layer should be rasterized at its current size. Larger values
-   * magnify the content and smaller values shrink it.
+   * The scale factor used to rasterize the content, relative to the layer’s coordinate space. When
+   * shouldRasterize is true, this property determines how much to scale the rasterized content.
+   * A value of 1.0 means the layer is rasterized at its current size. Values greater than 1.0
+   * enlarge the content, while values less than 1.0 shrink it. If set to an invalid value (less
+   * than or equal to 0), the layer is rasterized at its drawn size, which may cause the cache to be
+   * invalidated frequently if the drawn scale changes often. The default value is 0.0.
    */
   float rasterizationScale() const {
     return _rasterizationScale;
@@ -309,9 +311,7 @@ class Layer {
    * Returns the root layer of the calling layer. A DisplayList has only one root layer. If a layer
    * is not added to a display list, its root property is set to nullptr.
    */
-  Layer* root() const {
-    return _root;
-  }
+  Layer* root() const;
 
   /**
    * Returns the parent layer that contains the calling layer.
@@ -538,16 +538,11 @@ class Layer {
    */
   void invalidateDescendents();
 
-  /**
-   * Marks the layer's background as changed and needing to be redrawn.
-   */
-  void invalidateBackground();
-
   void invalidate();
 
   Rect getBoundsInternal(const Matrix& coordinateMatrix, bool computeTightBounds);
 
-  void onAttachToRoot(Layer* owner);
+  void onAttachToRoot(RootLayer* rootLayer);
 
   void onDetachFromRoot();
 
@@ -565,7 +560,7 @@ class Layer {
 
   std::shared_ptr<ImageFilter> getImageFilter(float contentScale);
 
-  LayerContent* getRasterizedCache(const DrawArgs& args);
+  LayerContent* getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix);
 
   std::shared_ptr<Image> getRasterizedImage(const DrawArgs& args, float contentScale,
                                             Matrix* drawingMatrix);
@@ -597,13 +592,18 @@ class Layer {
                           std::shared_ptr<RegionTransformer> transformer = nullptr,
                           bool forceDirty = false);
 
-  void cleanDirtyFlags();
+  void checkBackgroundStyles(const Matrix& renderMatrix);
+
+  void updateBackgroundBounds(const Matrix& renderMatrix);
+
+  void propagateHasBackgroundStyleFlags();
 
   struct {
-    bool dirtyContent : 1;      // layer's content needs updating
-    bool dirtyDescendents : 1;  // a descendant layer needs redrawing
-    bool dirtyTransform : 1;    // the layer and its children need redrawing
-    bool dirtyBackground : 1;   // the background needs redrawing, triggered by sibling changes
+    bool dirtyContent : 1;        // layer's content needs updating
+    bool dirtyContentBounds : 1;  // layer's content bounds needs updating
+    bool dirtyDescendents : 1;    // a descendant layer needs redrawing
+    bool dirtyTransform : 1;      // the layer and its children need redrawing
+    bool hasBackgroundStyle : 1;  // the layer or any of its descendants has a background style
     bool visible : 1;
     bool shouldRasterize : 1;
     bool allowsEdgeAntialiasing : 1;
@@ -614,19 +614,21 @@ class Layer {
   std::string _name;
   float _alpha = 1.0f;
   Matrix _matrix = {};
-  float _rasterizationScale = 1.0f;
+  float _rasterizationScale = 0.0f;
   std::vector<std::shared_ptr<LayerFilter>> _filters = {};
   std::shared_ptr<Layer> _mask = nullptr;
   Layer* maskOwner = nullptr;
   std::unique_ptr<Rect> _scrollRect = nullptr;
-  Layer* _root = nullptr;
+  RootLayer* _root = nullptr;
   Layer* _parent = nullptr;
   std::unique_ptr<LayerContent> layerContent = nullptr;
   std::unique_ptr<LayerContent> rasterizedContent = nullptr;
   std::vector<std::shared_ptr<Layer>> _children = {};
   std::vector<std::shared_ptr<LayerStyle>> _layerStyles = {};
-  Rect renderBounds = {};
+  Rect renderBounds = {};         // in global coordinates
+  Rect* contentBounds = nullptr;  //  in global coordinates
 
+  friend class RootLayer;
   friend class DisplayList;
   friend class LayerProperty;
   friend class LayerSerialization;

@@ -31,22 +31,17 @@ class DrawArgs {
  public:
   DrawArgs() = default;
 
-  DrawArgs(Context* context, bool cleanDirtyFlags = false, bool excludeEffects = false,
-           DrawMode drawMode = DrawMode::Normal)
-      : context(context), cleanDirtyFlags(cleanDirtyFlags), excludeEffects(excludeEffects),
-        drawMode(drawMode) {
+  DrawArgs(Context* context, bool excludeEffects = false, DrawMode drawMode = DrawMode::Normal)
+      : context(context), excludeEffects(excludeEffects), drawMode(drawMode) {
   }
 
   // The GPU context to be used during the drawing process. Note: this could be nullptr.
   Context* context = nullptr;
-  // Whether to clean the dirty flags of the associated Layer during the drawing process.
-  bool cleanDirtyFlags = false;
   // Whether to exclude effects during the drawing process.
   bool excludeEffects = false;
   // Determines the draw mode of the Layer.
   DrawMode drawMode = DrawMode::Normal;
-  // Whether the background has changed.
-  bool backgroundChanged = false;
+  // The rectangle area to be drawn. This is used for clipping the drawing area.
   Rect* renderRect = nullptr;
 };
 }  // namespace tgfx

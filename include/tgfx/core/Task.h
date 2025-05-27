@@ -50,6 +50,25 @@ enum class TaskStatus {
 };
 
 /**
+ * Defines the priority levels for a Task.
+ */
+enum class TaskPriority {
+  /**
+   * The Task has the highest priority and will be executed first.
+   */
+  High,
+  /**
+   * The Task has a medium priority and will be executed after high-priority tasks. This is the
+   * default priority.
+   */
+  Medium,
+  /**
+   * The Task has the lowest priority and will be executed last.
+   */
+  Low
+};
+
+/**
  * The Task class manages the concurrent execution of one or more code blocks.
  */
 class Task {
@@ -63,15 +82,21 @@ class Task {
   /**
    * Submits a code block for asynchronous execution immediately and returns a Task wraps the code
    * block. Hold a reference to the returned Task if you want to cancel it or wait for it to finish
-   * execution. Returns nullptr if the block is nullptr.
+   * execution.
+   * @param block The code block to be executed.
+   * @param priority The priority of the Task. The default is TaskPriority::Medium.
+   * @return nullptr if the block is nullptr, otherwise a shared pointer to the Task.
    */
-  static std::shared_ptr<Task> Run(std::function<void()> block);
+  static std::shared_ptr<Task> Run(std::function<void()> block,
+                                   TaskPriority priority = TaskPriority::Medium);
 
   /**
    * Submits a Task for asynchronous execution immediately. Hold a reference to the Task if you want
    * to cancel it or wait for it to finish execution. Does nothing if the Task is nullptr.
+   * @param task The Task to be executed.
+   * @param priority The priority of the Task. The default is TaskPriority::Medium.
    */
-  static void Run(std::shared_ptr<Task> task);
+  static void Run(std::shared_ptr<Task> task, TaskPriority priority = TaskPriority::Medium);
 
   virtual ~Task() = default;
 

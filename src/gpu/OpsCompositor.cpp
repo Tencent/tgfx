@@ -387,7 +387,8 @@ std::pair<std::optional<Rect>, bool> OpsCompositor::getClipRect(const Path& clip
     if (rect != renderTarget->bounds()) {
       return {rect, true};
     }
-    return {{}, false};
+    // Cannot return '{}' as an empty Rect, since it would be interpreted as std::nullopt.
+    return {Rect::MakeEmpty(), false};
   }
   return {rect, false};
 }
@@ -460,7 +461,7 @@ std::pair<PlacementPtr<FragmentProcessor>, bool> OpsCompositor::getClipMaskFP(co
   auto uvMatrix = Matrix::MakeTrans(-clipBounds.left, -clipBounds.top);
   if (renderTarget->origin() == ImageOrigin::BottomLeft) {
     auto flipYMatrix = Matrix::MakeScale(1.0f, -1.0f);
-    flipYMatrix.postTranslate(0, -static_cast<float>(renderTarget->height()));
+    flipYMatrix.postTranslate(0, static_cast<float>(renderTarget->height()));
     uvMatrix.preConcat(flipYMatrix);
   }
   auto processor = DeviceSpaceTextureEffect::Make(buffer, std::move(textureProxy), uvMatrix);

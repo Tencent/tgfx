@@ -144,6 +144,6 @@ class Mask {
   bool fillText(const GlyphRunList* glyphRunList, const Stroke* stroke = nullptr);
 
   friend class ImageReader;
-  friend class GlyphRasterizer;
+  friend class TextRasterizer;
 };
 }  // namespace tgfx
