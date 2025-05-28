@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,15 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "LayerProfilerView.h"
 #include "StartView.h"
-#include "kddockwidgets/qtquick/Platform.h"
-#include "kddockwidgets/qtquick/ViewFactory.h"
+#include <kddockwidgets/qtquick/Platform.h>
+#include <kddockwidgets/qtquick/ViewFactory.h>
 #include <kddockwidgets/core/DockWidget.h>
+#include <kddockwidgets/Config.h>
+#include <kddockwidgets/qtquick/views/Group.h>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QQmlContext>
 #include <QQuickWindow>
-
-#include "../../third_party/KDDockWidgets/src/Config.h"
 
 class LayerProfilerViewFactory : public KDDockWidgets::QtQuick::ViewFactory {
 public:
@@ -41,6 +41,10 @@ public:
 
   QUrl titleBarFilename() const override {
     return QUrl("qrc:/qml/layerInspector/LayerProfilerTitleBar.qml");
+  }
+
+  QUrl groupFilename() const override {
+    return QUrl("qrc:/qml/layerInspector/LayerInspectorGroup.qml");
   }
 };
 
@@ -144,29 +148,8 @@ void LayerProfilerView::cleanView() {
 }
 
 void LayerProfilerView::LayerProlfilerQMLImpl() {
-  // setFixedSize(1920, 1080);
-  // auto layout = new QHBoxLayout(this);
-  // layout->setContentsMargins(0, 0, 0, 0);
-  // m_LayerTreeEngine = new QQmlApplicationEngine();
-  // m_LayerTreeEngine->rootContext()->setContextProperty("_layerTreeModel", m_LayerTreeModel);
-  // m_LayerTreeEngine->rootContext()->setContextProperty("_layerProfileView", this);
-  // m_LayerTreeEngine->load(QUrl(QStringLiteral("qrc:/qml/layerInspector/LayerTree.qml")));
-  // auto quickWindow = static_cast<QQuickWindow*>(m_LayerTreeEngine->rootObjects().first());
-  // auto layerTreeWidget = createWindowContainer(quickWindow);
-  // layerTreeWidget->setSizePolicy(QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Expanding);
-  //
-  // m_LayerAttributeEngine = new QQmlApplicationEngine();
-  // m_LayerAttributeEngine->rootContext()->setContextProperty("_layerAttributeModel",
-  //                                                           m_LayerAttributeModel);
-  // m_LayerAttributeEngine->load(QUrl(QStringLiteral("qrc:/qml/layerInspector/LayerAttribute.qml")));
-  // auto quickWindow1 = static_cast<QQuickWindow*>(m_LayerAttributeEngine->rootObjects().first());
-  // auto layerAttributeWidget = createWindowContainer(quickWindow1);
-  // layerAttributeWidget->setSizePolicy(QSizePolicy::Policy::Expanding,
-  //                                     QSizePolicy::Policy::Expanding);
-  //
-  // layout->addWidget(layerTreeWidget);
-  // layout->addWidget(layerAttributeWidget);
-  // layout->setSpacing(0);
+  qmlRegisterUncreatableType<KDDockWidgets::QtQuick::Group>("com.kdab.dockwidgets", 2, 0,
+                                           "GroupView", QStringLiteral("Internal usage only"));
   KDDockWidgets::Config::self().setViewFactory(new LayerProfilerViewFactory);
   auto func = [](KDDockWidgets::DropLocation loc,
                 const KDDockWidgets::Core::DockWidget::List &source,
@@ -201,7 +184,6 @@ void LayerProfilerView::LayerProlfilerQMLImpl() {
 
   auto window = qobject_cast<QWindow*>(m_LayerTreeEngine->rootObjects().first());
   if (window) {
-    //window->setTitle("LayerProfiler");
     window->show();
   }
 

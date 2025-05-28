@@ -110,7 +110,7 @@ KDDW.TitleBarBase {
             width: height
 
             Image {
-                source: "qrc:/img/close.png"
+                source: "qrc:/icons/layerInspector/close.svg"
                 anchors.fill: parent
 
                 MouseArea {
