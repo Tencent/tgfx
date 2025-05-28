@@ -30,6 +30,7 @@ enum class PendingOpType {
   Image,
   Rect,
   RRect,
+  StrokeRRect,
   Shape,
 };
 
@@ -58,8 +59,13 @@ class OpsCompositor {
   /**
    * Fills the given rrect with the given state and fill.
    */
-  void fillRRect(const RRect& rRect, const MCState& state, const Fill& fill,
-                 const Stroke& stroke = Stroke(0));
+  void fillRRect(const RRect& rRect, const MCState& state, const Fill& fill);
+
+  /**
+   * Fills the given rrect's stroke with the given state and fill.
+   */
+  void strokeRRect(const RRect& rRect, const MCState& state, const Fill& fill,
+                   const Stroke* stroke);
 
   /**
    * Fills the given shape with the given state and fill.
@@ -94,11 +100,12 @@ class OpsCompositor {
   PendingOpType pendingType = PendingOpType::Unknown;
   Path pendingClip = {};
   Fill pendingFill = {};
-  Stroke pendingStroke = Stroke(0);
+  Stroke* pendingStroke = nullptr;
   std::shared_ptr<Image> pendingImage = nullptr;
   SamplingOptions pendingSampling = {};
   std::vector<PlacementPtr<RectRecord>> pendingRects = {};
   std::vector<PlacementPtr<RRectRecord>> pendingRRects = {};
+  std::vector<PlacementPtr<RRectRecord>> pendingStokeRRects = {};
   std::vector<PlacementPtr<Op>> ops = {};
 
   static bool CompareFill(const Fill& a, const Fill& b);
@@ -113,9 +120,9 @@ class OpsCompositor {
 
   bool drawAsClear(const Rect& rect, const MCState& state, const Fill& fill);
   bool canAppend(PendingOpType type, const Path& clip, const Fill& fill,
-                 const Stroke& stroke = Stroke(0)) const;
+                 const Stroke* stroke = nullptr) const;
   void flushPendingOps(PendingOpType type = PendingOpType::Unknown, Path clip = {}, Fill fill = {},
-                       Stroke stroke = Stroke(0));
+                       Stroke* stroke = nullptr);
   AAType getAAType(const Fill& fill) const;
   std::pair<bool, bool> needComputeBounds(const Fill& fill, bool hasCoverage,
                                           bool hasImageFill = false);

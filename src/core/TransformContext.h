@@ -43,7 +43,7 @@ class TransformContext : public DrawContext {
   }
 
   void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
-                 const Stroke& stroke) override {
+                 const Stroke* stroke = nullptr) override {
     drawContext->drawRRect(rRect, transform(state), fill, stroke);
   }
 

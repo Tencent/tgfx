@@ -37,7 +37,7 @@ class RecordingContext : public DrawContext {
   void drawRect(const Rect& rect, const MCState& state, const Fill& fill) override;
 
   void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
-                 const Stroke& stroke = Stroke(0)) override;
+                 const Stroke* stroke = nullptr) override;
 
   void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) override;
 
@@ -62,9 +62,8 @@ class RecordingContext : public DrawContext {
   size_t drawCount = 0;
   MCState lastState = {};
   Fill lastFill = {};
-  Stroke lastStroke = Stroke(0);
 
   void recordState(const MCState& state);
-  void recordStateAndFill(const MCState& state, const Fill& fill, const Stroke& stroke = Stroke(0));
+  void recordStateAndFill(const MCState& state, const Fill& fill);
 };
 }  // namespace tgfx

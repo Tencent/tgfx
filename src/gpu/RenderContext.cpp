@@ -69,9 +69,13 @@ void RenderContext::drawRect(const Rect& rect, const MCState& state, const Fill&
 }
 
 void RenderContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
-                              const Stroke& stroke) {
+                              const Stroke* stroke) {
   if (auto compositor = getOpsCompositor()) {
-    compositor->fillRRect(rRect, state, fill, stroke);
+    if (stroke) {
+      compositor->strokeRRect(rRect, state, fill, stroke);
+    } else {
+      compositor->fillRRect(rRect, state, fill);
+    }
   }
 }
 

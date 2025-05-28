@@ -293,8 +293,7 @@ void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
-  auto stroke = paint.getStroke() ? *paint.getStroke() : Stroke(0);
-  drawContext->drawRRect(rRect, *mcState, paint.getFill(), stroke);
+  drawContext->drawRRect(rRect, *mcState, paint.getFill(), paint.getStroke());
 }
 
 void Canvas::drawPath(const Path& path, const Paint& paint) {
