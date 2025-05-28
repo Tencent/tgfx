@@ -16,13 +16,36 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "LayerProfilerView.h"
+#include "StartView.h"
+#include "kddockwidgets/qtquick/Platform.h"
+#include "kddockwidgets/qtquick/ViewFactory.h"
+#include <kddockwidgets/core/DockWidget.h>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QQmlContext>
 #include <QQuickWindow>
 
-LayerProfilerView::LayerProfilerView(QString ip, quint16 port, QWidget* parent)
-    : QWidget(parent), m_WebSocketServer(nullptr),
+#include "../../third_party/KDDockWidgets/src/Config.h"
+
+class LayerProfilerViewFactory : public KDDockWidgets::QtQuick::ViewFactory {
+public:
+  ~LayerProfilerViewFactory() override = default;
+
+  QUrl tabbarFilename() const override {
+    return QUrl("qrc:/qml/TabBar.qml");
+  }
+
+  QUrl separatorFilename() const override {
+    return QUrl("qrc:/qml/Separator2.qml");
+  }
+
+  QUrl titleBarFilename() const override {
+    return QUrl("qrc:/qml/layerInspector/LayerProfilerTitleBar.qml");
+  }
+};
+
+LayerProfilerView::LayerProfilerView(QString ip, quint16 port)
+    : QObject(nullptr), m_WebSocketServer(nullptr),
       m_TcpSocketClient(new TcpSocketClient(this, ip, port)),
       m_LayerTreeModel(new LayerTreeModel(this)),
       m_LayerAttributeModel(new LayerAttributeModel(this)) {
@@ -56,8 +79,8 @@ LayerProfilerView::LayerProfilerView(QString ip, quint16 port, QWidget* parent)
   });
 }
 
-LayerProfilerView::LayerProfilerView(QWidget* parent)
-    : QWidget(parent), m_WebSocketServer(new WebSocketServer(8085)),
+LayerProfilerView::LayerProfilerView()
+    : QObject(nullptr), m_WebSocketServer(new WebSocketServer(8085)),
       m_LayerTreeModel(new LayerTreeModel(this)),
       m_LayerAttributeModel(new LayerAttributeModel(this)) {
   LayerProlfilerQMLImpl();
@@ -107,30 +130,81 @@ void LayerProfilerView::flushLayerTree() {
   m_LayerTreeModel->flushLayerTree();
 }
 
+void LayerProfilerView::openStartView() {
+  cleanView();
+  auto startView = new inspector::StartView(this);
+  startView->showStartView();
+}
+
+void LayerProfilerView::cleanView() {
+    if (m_LayerTreeEngine) {
+      m_LayerTreeEngine->deleteLater();
+      m_LayerTreeEngine = nullptr;
+    }
+}
+
 void LayerProfilerView::LayerProlfilerQMLImpl() {
-  setFixedSize(1920, 1080);
-  auto layout = new QHBoxLayout(this);
-  layout->setContentsMargins(0, 0, 0, 0);
+  // setFixedSize(1920, 1080);
+  // auto layout = new QHBoxLayout(this);
+  // layout->setContentsMargins(0, 0, 0, 0);
+  // m_LayerTreeEngine = new QQmlApplicationEngine();
+  // m_LayerTreeEngine->rootContext()->setContextProperty("_layerTreeModel", m_LayerTreeModel);
+  // m_LayerTreeEngine->rootContext()->setContextProperty("_layerProfileView", this);
+  // m_LayerTreeEngine->load(QUrl(QStringLiteral("qrc:/qml/layerInspector/LayerTree.qml")));
+  // auto quickWindow = static_cast<QQuickWindow*>(m_LayerTreeEngine->rootObjects().first());
+  // auto layerTreeWidget = createWindowContainer(quickWindow);
+  // layerTreeWidget->setSizePolicy(QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Expanding);
+  //
+  // m_LayerAttributeEngine = new QQmlApplicationEngine();
+  // m_LayerAttributeEngine->rootContext()->setContextProperty("_layerAttributeModel",
+  //                                                           m_LayerAttributeModel);
+  // m_LayerAttributeEngine->load(QUrl(QStringLiteral("qrc:/qml/layerInspector/LayerAttribute.qml")));
+  // auto quickWindow1 = static_cast<QQuickWindow*>(m_LayerAttributeEngine->rootObjects().first());
+  // auto layerAttributeWidget = createWindowContainer(quickWindow1);
+  // layerAttributeWidget->setSizePolicy(QSizePolicy::Policy::Expanding,
+  //                                     QSizePolicy::Policy::Expanding);
+  //
+  // layout->addWidget(layerTreeWidget);
+  // layout->addWidget(layerAttributeWidget);
+  // layout->setSpacing(0);
+  KDDockWidgets::Config::self().setViewFactory(new LayerProfilerViewFactory);
+  auto func = [](KDDockWidgets::DropLocation loc,
+                const KDDockWidgets::Core::DockWidget::List &source,
+                const KDDockWidgets::Core::DockWidget::List &target,
+                KDDockWidgets::Core::DropArea *) {
+    KDDW_UNUSED(target);
+    bool isDraggingRenderTree =
+      std::find_if(source.cbegin(), source.cend(),
+      [](KDDockWidgets::Core::DockWidget *dw) {
+            return dw->uniqueName() == QLatin1String("RenderTree");
+          })
+      != source.cend();
+    bool isDraggingAttribute = std::find_if(source.cbegin(), source.cend(),
+      [](KDDockWidgets::Core::DockWidget *dw) {
+            return dw->uniqueName() == QLatin1String("Attribute");
+          })
+      != source.cend();
+    return (loc & (KDDockWidgets::DropLocation_Inner | KDDockWidgets::DropLocation_Outter)) || !(isDraggingRenderTree||isDraggingAttribute);
+  };
+  KDDockWidgets::Config::self().setDropIndicatorAllowedFunc(func);
   m_LayerTreeEngine = new QQmlApplicationEngine();
+  m_LayerTreeEngine->rootContext()->setContextProperty("_layerAttributeModel",
+                                                            m_LayerAttributeModel);
   m_LayerTreeEngine->rootContext()->setContextProperty("_layerTreeModel", m_LayerTreeModel);
   m_LayerTreeEngine->rootContext()->setContextProperty("_layerProfileView", this);
-  m_LayerTreeEngine->load(QUrl(QStringLiteral("qrc:/qml/layerInspector/LayerTree.qml")));
-  auto quickWindow = static_cast<QQuickWindow*>(m_LayerTreeEngine->rootObjects().first());
-  auto layerTreeWidget = createWindowContainer(quickWindow);
-  layerTreeWidget->setSizePolicy(QSizePolicy::Policy::Expanding, QSizePolicy::Policy::Expanding);
+  KDDockWidgets::QtQuick::Platform::instance()->setQmlEngine(m_LayerTreeEngine);
+  m_LayerTreeEngine->load("qrc:/qml/layerInspector/LayerProfilerView.qml");
+  if (m_LayerTreeEngine->rootObjects().isEmpty()) {
+    qWarning() << "Failed to load LayerProfilerView.qml";
+    return;
+  }
 
-  m_LayerAttributeEngine = new QQmlApplicationEngine();
-  m_LayerAttributeEngine->rootContext()->setContextProperty("_layerAttributeModel",
-                                                            m_LayerAttributeModel);
-  m_LayerAttributeEngine->load(QUrl(QStringLiteral("qrc:/qml/layerInspector/LayerAttribute.qml")));
-  auto quickWindow1 = static_cast<QQuickWindow*>(m_LayerAttributeEngine->rootObjects().first());
-  auto layerAttributeWidget = createWindowContainer(quickWindow1);
-  layerAttributeWidget->setSizePolicy(QSizePolicy::Policy::Expanding,
-                                      QSizePolicy::Policy::Expanding);
+  auto window = qobject_cast<QWindow*>(m_LayerTreeEngine->rootObjects().first());
+  if (window) {
+    //window->setTitle("LayerProfiler");
+    window->show();
+  }
 
-  layout->addWidget(layerTreeWidget);
-  layout->addWidget(layerAttributeWidget);
-  layout->setSpacing(0);
 }
 
 void LayerProfilerView::ProcessMessage(const QByteArray& message) {

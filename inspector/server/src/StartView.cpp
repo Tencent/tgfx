@@ -141,8 +141,7 @@ void StartView::connectToClientByLayerInspector(QObject* object) {
       layerProfilerView = nullptr;
     }
     layerProfilerView =
-        new LayerProfilerView(QString::fromStdString(client->address), 8084, nullptr);
-    layerProfilerView->show();
+        new LayerProfilerView(QString::fromStdString(client->address), 8084);
     Q_EMIT closeWindow();
   }
 }

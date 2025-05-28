@@ -20,18 +20,18 @@
 #include <QtGui/qwindow.h>
 #include <QDialog>
 #include <QQmlApplicationEngine>
-#include <QWidget>
 #include "LayerAttributeModel.h"
 #include "LayerTreeModel.h"
 #include "flatbuffers/flexbuffers.h"
 #include "socket/TcpSocketClient.h"
 #include "socket/WebSocketServer.h"
 
-class LayerProfilerView : public QWidget {
+
+class LayerProfilerView : public QObject {
   Q_OBJECT
  public:
-  LayerProfilerView(QString ip, quint16 port, QWidget* parent = nullptr);
-  explicit LayerProfilerView(QWidget* parent = nullptr);
+  LayerProfilerView(QString ip, quint16 port);
+  explicit LayerProfilerView();
   ~LayerProfilerView() override;
   bool hasWebSocketConnection() const {
     if (m_WebSocketServer) return m_WebSocketServer->hasClientConnect();
@@ -44,6 +44,8 @@ class LayerProfilerView : public QWidget {
   Q_INVOKABLE void SetHoveredSwitchState(bool state);
   Q_INVOKABLE void flushAttribute();
   Q_INVOKABLE void flushLayerTree();
+  Q_INVOKABLE void openStartView();
+  void cleanView();
 
  protected:
   void LayerProlfilerQMLImpl();
