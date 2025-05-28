@@ -186,7 +186,7 @@ bool OpsCompositor::CompareFill(const Fill& a, const Fill& b) {
 
 static bool CompareStroke(const Stroke* a, const Stroke* b) {
   if (a == nullptr || b == nullptr) {
-    return false;
+    return true;
   }
   if ((a->width == 0.0f) != (b->width == 0.0f)) {
     return false;
