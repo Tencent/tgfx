@@ -43,7 +43,6 @@ class PlaybackContext {
  public:
   MCState state = {};
   Fill fill = {};
-  Stroke stroke = Stroke(0);
 };
 
 class Record {
