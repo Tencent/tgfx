@@ -436,7 +436,8 @@ std::pair<std::optional<Rect>, bool> OpsCompositor::getClipRect(const Path& clip
     if (rect != renderTarget->bounds()) {
       return {rect, true};
     }
-    return {{}, false};
+    // Cannot return '{}' as an empty Rect, since it would be interpreted as std::nullopt.
+    return {Rect::MakeEmpty(), false};
   }
   return {rect, false};
 }

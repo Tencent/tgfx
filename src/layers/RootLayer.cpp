@@ -21,8 +21,6 @@
 #include "core/utils/Log.h"
 
 namespace tgfx {
-static constexpr size_t MAX_DIRTY_AREAS = 4;
-
 static float UnionArea(const Rect& rect1, const Rect& rect2) {
   auto left = rect1.left < rect2.left ? rect1.left : rect2.left;
   auto right = rect1.right > rect2.right ? rect1.right : rect2.right;
@@ -110,10 +108,10 @@ void RootLayer::invalidateRect(const Rect& rect) {
   if (rect.isEmpty()) {
     return;
   }
-  DEBUG_ASSERT(dirtyRects.size() <= MAX_DIRTY_AREAS);
+  DEBUG_ASSERT(dirtyRects.size() <= MAX_DIRTY_REGIONS);
   dirtyRects.push_back(rect);
   dirtyAreas.push_back(RectArea(rect));
-  mergeDirtyList(dirtyRects.size() == MAX_DIRTY_AREAS);
+  mergeDirtyList(dirtyRects.size() == MAX_DIRTY_REGIONS + 1);
 }
 
 bool RootLayer::mergeDirtyList(bool forceMerge) {

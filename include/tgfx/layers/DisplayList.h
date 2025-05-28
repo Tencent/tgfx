@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <deque>
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/Layer.h"
 
@@ -79,6 +80,30 @@ class DisplayList {
   void setContentOffset(float offsetX, float offsetY);
 
   /**
+   * Returns true if partial refresh is enabled. When partial refresh is on, only the dirty regions
+   * of the display list are rendered, instead of redrawing the entire list. This can improve
+   * performance when only a small part of the display list changes. However, enabling partial
+   * refresh may cause some blending issues, since all layers are drawn onto a cached surface before
+   * being drawn to the target surface. Partial refresh also requires extra memory to cache the
+   * previous frame. The default is true.
+   */
+  bool partialRefreshEnabled() const {
+    return _partialRefreshEnabled;
+  }
+
+  /**
+   * Sets whether partial refresh is enabled. The default value is false.
+   */
+  void setPartialRefreshEnabled(bool partialRefreshEnabled);
+
+  /**
+   * Sets whether to show dirty regions during rendering. When enabled, the dirty regions will be
+   * highlighted in the rendered output. This is useful for debugging to visualize which parts of
+   * the display list are being updated. The default value is false.
+   */
+  void showDirtyRegions(bool show);
+
+  /**
    * Returns true if the content of the display list has changed since the last rendering. This can
    * be used to determine if the display list needs to be re-rendered.
    */
@@ -94,8 +119,18 @@ class DisplayList {
 
  private:
   std::shared_ptr<RootLayer> _root = nullptr;
+  std::shared_ptr<Surface> frameCache = nullptr;
   float _zoomScale = 1.0f;
   Point _contentOffset = {};
+  bool _partialRefreshEnabled = true;
+  bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
+  float lastZoomScale = 1.0f;
+  Point lastContentOffset = {};
+  std::deque<std::vector<Rect>> lastDirtyRegions = {};
+
+  bool renderPartially(Surface* surface, bool autoClear, std::vector<Rect> dirtyRegions);
+  void renderDirtyRegions(Canvas* canvas, std::vector<Rect> dirtyRegions);
+  Matrix getViewMatrix() const;
 };
 }  // namespace tgfx
