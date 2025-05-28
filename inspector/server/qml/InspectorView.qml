@@ -4,7 +4,6 @@ import QtQuick.Controls 2.12
 import QtQuick.Layouts 1.15
 import FramesDrawer 1.0
 import com.kdab.dockwidgets 2.0 as KDDW
-//import QtQuick.Controls.macOS 2.15
 
 
 ApplicationWindow {
@@ -165,12 +164,12 @@ ApplicationWindow {
             }
 
             Action {
-                text: qsTr("Shader")
+                text: qsTr("Texture")
                 shortcut: "Ctrl+Shift+H"
                 onTriggered: {
-                    if (dockingArea && attributeDock && shaderDock) {
-                        shaderDock.visible = true;
-                        attributeDock.addDockWidgetAsTab(shaderDock);
+                    if (dockingArea && attributeDock && textureDock) {
+                        textureDock.visible = true;
+                        attributeDock.addDockWidgetAsTab(textureDock);
                     }
                 }
             }
@@ -193,12 +192,12 @@ ApplicationWindow {
     Rectangle {
         id: mainContainer
         anchors.fill: parent
-        color: "#2d2d2d"
+        color: "#383838"
 
         ColumnLayout {
             anchors.fill: parent
-            anchors.margins: 0
-            spacing: 1
+            anchors.margins: 1
+            spacing: 0
 
 
             Rectangle {
@@ -207,15 +206,20 @@ ApplicationWindow {
                 Layout.preferredHeight: 100
                 color: "#535353"
 
-                FramesDrawer {
-                    worker: workerPtr
-                    viewData: viewDataPtr
-                    anchors.left: parent.left
-                    anchors.top: parent.top
-                    anchors.bottom: parent.bottom
-                    anchors.right: parent.right
-                    objectName: "frameDrawer"
+
+                Loader {
+                    id: framesViewLoader
+                    source: "qrc:/qml/FramesView.qml"
+                    anchors.fill: parent
+                    property var loaderWorker: workerPtr
+                    property var loaderViewData: viewDataPtr
                 }
+            }
+
+
+            Item {
+                width: parent.width
+                height: 2
             }
 
             Rectangle {
@@ -252,7 +256,7 @@ ApplicationWindow {
                                 console.log("Disconnect clicked")
                             }
                         }
-                   }
+                    }
 
                     Item {
                         height: 32
@@ -309,29 +313,30 @@ ApplicationWindow {
                 uniqueName: "MainInspectorLayout"
 
 
+
                 KDDW.DockWidget {
-                    id: frameDock
-                    uniqueName: "Frame"
+                    id: taskDock
+                    uniqueName: "Task"
                     source: "qrc:/qml/TaskTreeView.qml"
+
                 }
 
                 KDDW.DockWidget {
                     id: attributeDock
                     uniqueName: "Attribute"
                     source: "qrc:/qml/AttributeView.qml"
-                    width: parent.width * 0.7
                 }
 
-                // KDDW.DockWidget {
-                //     id: shaderDock
-                //     uniqueName: "Shader"
-                //     source: "qrc:/qml/ShaderView.qml"
-                //     visible: false
-                // }
+                KDDW.DockWidget {
+                    id: textureDock
+                    uniqueName: "Texture"
+                    source: "qrc:/qml/TextureView.qml"
+                    visible: false
+                }
 
                 Component.onCompleted: {
-                    addDockWidget(frameDock, KDDW.KDDockWidgets.Location_OnLeft, null, Qt.size(200, 0));
-                    addDockWidget(attributeDock, KDDW.KDDockWidgets.Location_OnRight, frameDock, Qt.size(1200, 0));
+                    addDockWidget(attributeDock, KDDW.KDDockWidgets.Location_OnRight, null, Qt.size(1500, 0));
+                    addDockWidget(taskDock, KDDW.KDDockWidgets.Location_OnLeft, attributeDock, Qt.size(420, 0));
 
                 }
             }

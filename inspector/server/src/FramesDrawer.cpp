@@ -231,6 +231,7 @@ void FramesDrawer::mousePressEvent(QMouseEvent* event) {
       if (sel < total) {
         viewData->selectFrame = sel;
         update();
+        Q_EMIT selectFrame();
       }
     }
     event->accept();

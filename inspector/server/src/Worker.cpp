@@ -139,6 +139,10 @@ FrameData* Worker::GetFrameData() {
   return &dataContext.frameData;
 }
 
+const DataContext& Worker::GetDataContext() const {
+  return dataContext;
+}
+
 size_t Worker::GetFrameCount() const {
   return dataContext.frameData.frames.size();
 }

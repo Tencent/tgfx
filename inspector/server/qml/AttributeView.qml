@@ -11,9 +11,6 @@ Item {
     AtttributeModel {
         id: attributeModel
         isOpSelected: root.isOpSelected
-        Component.onCompleted: {
-            console.log("Model loaded, row count:", rowCount())
-        }
     }
 
     property bool isOpSelected: true
@@ -47,7 +44,7 @@ Item {
                     anchors.left: parent.left
                     anchors.leftMargin: 10
                     text: summarySection.summaryExpanded ? "▼" : "▶"
-                    color: "white"
+                    color: "#dddddd"
                     font.pixelSize: 15
                 }
 
@@ -56,7 +53,7 @@ Item {
                     anchors.left: parent.left
                     anchors.leftMargin: 30
                     text: "Summary"
-                    color: "white"
+                    color: "#dddddd"
                     font.pixelSize: 14
                     font.bold: true
                 }
@@ -95,7 +92,7 @@ Item {
                             leftPadding: 20
                             verticalAlignment: Text.AlignVCenter
                             text: model.key
-                            color: "white"
+                            color: "#dddddd"
                             font.pixelSize: 14
                             elide: Text.ElideRight
                         }
@@ -105,13 +102,12 @@ Item {
                             height: parent.height
                             verticalAlignment: Text.AlignVCenter
                             text: model.value
-                            color: "white"
+                            color: "#dddddd"
                             font.pixelSize: 14
                             elide: Text.ElideRight
                         }
                     }
 
-                    // 鼠标悬停效果
                     MouseArea {
                         anchors.fill: parent
                         hoverEnabled: true
@@ -126,10 +122,53 @@ Item {
             }
         }
 
+
         Rectangle {
+            id: separator
             width: parent.width
-            height: 1
-            color:"#333333"
+            height: 5
+            color: "#535353"
+            z: 2
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: parent.width - 2
+                height: 2
+                color: "#333333"
+            }
+
+            MouseArea {
+                id: dragArea
+                anchors {
+                    fill: parent
+                    topMargin: -5
+                    bottomMargin: -5
+                }
+                hoverEnabled: true
+                cursorShape: Qt.SplitVCursor
+                property real startY
+                property real initialSummaryHeight
+
+                onPressed: {
+                    startY = mouseY
+                    initialSummaryHeight = summaryList.height
+                }
+
+                onPositionChanged: (mouse) => {
+                    if (pressed) {
+                        const delta = mouse.y - startY
+                        const newHeight = Math.max(0, initialSummaryHeight + delta)
+
+                        // 确保高度不小于最小值且不大于最大值
+                        if (newHeight >= 0 && summarySection.summaryExpanded) {
+                            summaryList.height = Math.min(newHeight, 400) // 设置最大高度为400
+                        }
+                    }
+                }
+
+                onEntered: separator.color = "#444444"
+                onExited: separator.color = "#535353"
+            }
         }
 
         Rectangle {
@@ -152,7 +191,7 @@ Item {
                     anchors.left: parent.left
                     anchors.leftMargin: 10
                     text: processesSection.processesExpanded ? "▼" : "▶"
-                    color: "white"
+                    color: "#dddddd"
                     font.pixelSize: 14
                 }
 
@@ -161,7 +200,7 @@ Item {
                     anchors.left: parent.left
                     anchors.leftMargin: 30
                     text: "Processes"
-                    color: "white"
+                    color: "#dddddd"
                     font.pixelSize: 14
                     font.bold: true
                 }
@@ -201,7 +240,7 @@ Item {
                             leftPadding: 20
                             verticalAlignment: Text.AlignVCenter
                             text: model.key
-                            color: "white"
+                            color: "#dddddd"
                             font.pixelSize: 14
                             elide: Text.ElideRight
                         }
@@ -211,7 +250,7 @@ Item {
                             height: parent.height
                             verticalAlignment: Text.AlignVCenter
                             text: model.value
-                            color: "white"
+                            color: "#dddddd"
                             font.pixelSize: 14
                             elide: Text.ElideRight
                         }

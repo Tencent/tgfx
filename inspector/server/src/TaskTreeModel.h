@@ -20,69 +20,74 @@
 #include <QAbstractItemModel>
 #include <QQmlEngine>
 #include "InspectorEvent.h"
+#include "ViewData.h"
+#include "Worker.h"
 
 namespace inspector {
-
-struct OperateData {
-  uint64_t start;
-  int64_t end;
-  uint8_t type;
-  uint32_t opId;
-};
 
 class AtttributeModel;
 class TaskItem {
  public:
-  explicit TaskItem(const OperateData& _opData, const QString& name, TaskItem* parent = nullptr)
-      : opData(_opData), opName(name), parentItem(parent) {
-  }
-  ~TaskItem() {
-    qDeleteAll(childrenItems);
+  explicit TaskItem(OpTaskData* opData)
+      : opTaskData(opData) {
   }
 
   void appendChild(TaskItem* child) {
-    return childrenItems.append(child);
+    return childrenItems.push_back(child);
   }
-  TaskItem* childAt(int row) {
-    return (row >= 0 && row < childrenItems.size()) ? childrenItems.at(row) : nullptr;
+
+  void setParent(TaskItem* parent) {
+    parentItem = parent;
   }
+
+  TaskItem* childAt(uint32_t row) {
+    return (row >= 0 && row < childrenItems.size()) ? childrenItems[row] : nullptr;
+  }
+
   int childCount() const {
     return static_cast<int>(childrenItems.size());
   }
+
   TaskItem* getParentItem() const {
     return parentItem;
   }
-  const QString& getName() const {
-    return opName;
+
+  const QString getName() const {
+    return "test";
   }
-  const OperateData& getOpData() const {
-    return opData;
+
+  const OpTaskData& getOpData() const {
+    return *opTaskData;
   }
+
   int64_t startTime() const {
-    return static_cast<int64_t>(opData.start);
+    return opTaskData->start;
   }
+
   int64_t endTime() const {
-    return opData.end;
+    return opTaskData->end;
   }
+
   uint8_t getType() const {
-    return opData.type;
+    return opTaskData->type;
   }
+
   uint32_t getOpId() const {
-    return opData.opId;
+    return opTaskData->id;
+  }
+
+  void setIndex(int index) {
+    this->index = index;
   }
 
   int row() const {
-    if (parentItem) {
-      return static_cast<int>(parentItem->childrenItems.indexOf(const_cast<TaskItem*>(this)));
-    }
-    return 0;
+    return index;
   }
 
- private:
-  OperateData opData;
-  QString opName;
-  TaskItem* parentItem;
-  QVector<TaskItem*> childrenItems;
+  int index = 0;
+  OpTaskData* opTaskData;
+  TaskItem* parentItem = nullptr;
+  std::vector<TaskItem*> childrenItems;
 };
 
 class TaskTreeModel : public QAbstractItemModel {
@@ -104,49 +109,30 @@ class TaskTreeModel : public QAbstractItemModel {
   ///* TreeModel *///
   QHash<int, QByteArray> roleNames() const override;
   QVariant data(const QModelIndex& index, int role) const override;
-  QModelIndex index(int row, int column, const QModelIndex& parent = QModelIndex()) const override;
+  QModelIndex index(int row, int column, const QModelIndex& parent) const override;
   QModelIndex parent(const QModelIndex& index) const override;
   int rowCount(const QModelIndex& parent) const override;
   int columnCount(const QModelIndex& parent) const override;
 
-  void getTaskData(const std::vector<FrameEvent>& frames, const std::vector<OperateData>& opTasks,
-                   QStringList& typeNames, int startFrameIndex, int endFrameIndex);
-  QModelIndex getIndexByopId(uint32_t opId) const;
-
-  ///* used to create load real data from worker *///
-  ///* similar to refreshInstrumentData() *///
-  Q_INVOKABLE void createTestData();
+  Q_INVOKABLE void deleteTree(TaskItem* root);
   Q_INVOKABLE void selectedTask(const QModelIndex& index);
   Q_INVOKABLE void setAttributeModel(AtttributeModel* model);
 
-  ///* filter *///
-  Q_INVOKABLE void setTypeFilter(const QStringList& types);
-  Q_INVOKABLE void setTextFilter(const QString& text);
-  Q_INVOKABLE void clearTypeFilter();
-  Q_INVOKABLE void clearTextFilter();
+  Q_SLOT void refreshData();
 
-  Q_SIGNAL void taskSelected(const OperateData& opData, const QString& name, uint32_t opId);
+  Q_SIGNAL void taskSelected(const OpTaskData& opData, const QString& name, uint32_t opId);
   Q_SIGNAL void filterChanged();
 
  protected:
-  TaskItem* buildTaskTree(const std::vector<OperateData>& opTasks, const QStringList& typeName,
-                          const QSet<int>& taskIndex);
-  void createOpIdNode(TaskItem* root, bool clearFirst = true);
-  TaskItem* findNodeByOpId(uint32_t opId) const;
-  TaskItem* findParentForTask(const OperateData& task, const QMap<uint32_t, TaskItem*>& opIdMap,
-                              TaskItem* rootItem) const;
-  QSet<int> getTaskIndexInRange(const std::vector<FrameEvent>& frames,
-                                const std::vector<OperateData>& opTask, int startFrameIndex,
-                                int endFrameIndex) const;
-
+  TaskItem* processTaskLevel(const std::vector<std::shared_ptr<OpTaskData>>& opTasks,
+                             std::unordered_map<uint32_t, std::vector<unsigned int>> opChilds);
   bool matchesFilter(const QString& name) const;
 
  private:
-  AtttributeModel* atttributeModel = nullptr;
-  std::vector<OperateData> opTask;
-  std::vector<FrameEvent> frames;
-  QStringList sourceLocationExpand;
+  Worker* worker = nullptr;
+  ViewData* viewData = nullptr;
   TaskItem* rootItem = nullptr;
+  AtttributeModel* atttributeModel = nullptr;
   QStringList typeFilter;
   QStringList typeName;
   QString textFilter;

@@ -51,6 +51,7 @@ class Worker : public QObject {
   size_t GetFrameCount() const;
 
   FrameData* GetFrameData();
+  const DataContext& GetDataContext() const;
 
  private:
   DecodeStream ReadBodyBytes(DecodeStream* stream);
