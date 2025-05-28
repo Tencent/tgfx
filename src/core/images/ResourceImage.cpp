@@ -19,6 +19,7 @@
 #include "ResourceImage.h"
 #include "core/images/MipmapImage.h"
 #include "gpu/ops/RectDrawOp.h"
+#include "gpu/processors/AtlasMaskEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
@@ -52,6 +53,9 @@ PlacementPtr<FragmentProcessor> ResourceImage::asFragmentProcessor(const FPArgs&
                                                                    const Matrix* uvMatrix) const {
   TPArgs tpArgs(args.context, args.renderFlags, hasMipmaps());
   auto proxy = onLockTextureProxy(tpArgs, uniqueKey);
+  if (args.atlas) {
+    return AtlasMaskEffect::Make(std::move(proxy), sampling);
+  }
   return TiledTextureEffect::Make(std::move(proxy), tileModeX, tileModeY, sampling, uvMatrix,
                                   isAlphaOnly());
 }
