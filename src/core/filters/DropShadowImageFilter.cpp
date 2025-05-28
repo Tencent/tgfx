@@ -89,7 +89,9 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
     return nullptr;
   }
   source = source->makeSubset(clipBounds);
-  DEBUG_ASSERT(source != nullptr);
+  if (!source) {
+    return nullptr;
+  }
   source = source->makeRasterized();
 
   // add the subset offset to the matrix
