@@ -1686,9 +1686,9 @@ TGFX_TEST(CanvasTest, ShadowBoundIntersect) {
   picCanvas->drawRect(Rect::MakeWH(150, 8), Paint());
   picCanvas->restore();
   auto picture = shadowRecorder.finishRecordingAsPicture();
-  auto image = Image::MakeFrom(picture, 150, 8);
+  auto image = Image::MakeFrom(picture, 150, 150);
 
-  canvas->clipRect(Rect::MakeXYWH(0.f, 4.f, 80.8f, 3.7f));
+  canvas->clipRect(Rect::MakeXYWH(0.f, 4.f, 80.f, 3.7f));
   canvas->translate(0.7f, 0.7f);
   canvas->drawImage(image);
   context->flush();
