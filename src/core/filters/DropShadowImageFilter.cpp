@@ -18,6 +18,7 @@
 
 #include "DropShadowImageFilter.h"
 #include "core/images/TextureImage.h"
+#include "core/utils/Log.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
@@ -88,6 +89,7 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
     return nullptr;
   }
   source = source->makeSubset(clipBounds);
+  DEBUG_ASSERT(source != nullptr);
   source = source->makeRasterized();
 
   // add the subset offset to the matrix

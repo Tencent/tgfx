@@ -70,11 +70,11 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
     clipBounds = blurFilter->filterBounds(clipBounds);
   }
 
-  clipBounds.intersect(sourceRect);
   if (!clipBounds.intersect(sourceRect)) {
     return nullptr;
   }
   source = source->makeSubset(clipBounds);
+  DEBUG_ASSERT(source != nullptr);
   source = source->makeRasterized();
 
   // add the subset offset to the matrix
