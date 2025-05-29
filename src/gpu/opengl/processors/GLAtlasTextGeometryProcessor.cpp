@@ -20,13 +20,15 @@
 
 namespace tgfx {
 PlacementPtr<AtlasTextGeometryProcessor> AtlasTextGeometryProcessor::Make(
-    BlockBuffer* buffer, int width, int height, AAType aa, std::optional<Color> commonColor) {
-  return buffer->make<GLAtlasTextGeometryProcessor>(width, height, aa, commonColor);
+    BlockBuffer* buffer, int width, int height, AAType aa, std::optional<Color> commonColor,
+    const Matrix& uvMatrix) {
+  return buffer->make<GLAtlasTextGeometryProcessor>(width, height, aa, commonColor, uvMatrix);
 }
 
 GLAtlasTextGeometryProcessor::GLAtlasTextGeometryProcessor(int width, int height, AAType aa,
-                                                           std::optional<Color> commonColor)
-    : AtlasTextGeometryProcessor(width, height, aa, commonColor) {
+                                                           std::optional<Color> commonColor,
+                                                           const Matrix& uvMatrix)
+    : AtlasTextGeometryProcessor(width, height, aa, commonColor, uvMatrix) {
 }
 
 void GLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -74,7 +76,7 @@ void GLAtlasTextGeometryProcessor::setData(UniformBuffer* uniformBuffer,
                                            FPCoordTransformIter* transformIter) const {
   float atlasSizeInv[2] = {1.f / static_cast<float>(width), 1.f / static_cast<float>(height)};
   uniformBuffer->setData(atlasSizeUniformName, atlasSizeInv);
-  setTransformDataHelper(Matrix::I(), uniformBuffer, transformIter);
+  setTransformDataHelper(uvMatrix, uniformBuffer, transformIter);
   if (commonColor.has_value()) {
     uniformBuffer->setData("Color", *commonColor);
   }

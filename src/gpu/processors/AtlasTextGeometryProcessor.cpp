@@ -20,8 +20,10 @@
 
 namespace tgfx {
 AtlasTextGeometryProcessor::AtlasTextGeometryProcessor(int width, int height, AAType aa,
-                                                       std::optional<Color> commonColor)
-    : GeometryProcessor(ClassID()), width(width), height(height), commonColor(commonColor) {
+                                                       std::optional<Color> commonColor,
+                                                       const Matrix& uvMatrix)
+    : GeometryProcessor(ClassID()), width(width), height(height), commonColor(commonColor),
+      uvMatrix(uvMatrix) {
   position = {"aPosition", SLType::Float2};
   if (aa == AAType::Coverage) {
     coverage = {"inCoverage", SLType::Float};

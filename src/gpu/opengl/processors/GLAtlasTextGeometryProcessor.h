@@ -24,7 +24,8 @@
 namespace tgfx {
 class GLAtlasTextGeometryProcessor : public AtlasTextGeometryProcessor {
  public:
-  GLAtlasTextGeometryProcessor(int width, int height, AAType aa, std::optional<Color> commonColor);
+  GLAtlasTextGeometryProcessor(int width, int height, AAType aa, std::optional<Color> commonColor,
+                               const Matrix& uvMatrix);
   void emitCode(EmitArgs&) const override;
 
   void setData(UniformBuffer* uniformBuffer,

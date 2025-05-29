@@ -26,7 +26,8 @@ namespace tgfx {
 class AtlasTextGeometryProcessor : public GeometryProcessor {
  public:
   static PlacementPtr<AtlasTextGeometryProcessor> Make(BlockBuffer* buffer, int width, int height,
-                                                       AAType aa, std::optional<Color> commonColor);
+                                                       AAType aa, std::optional<Color> commonColor,
+                                                       const Matrix& uvMatrix);
   std::string name() const override {
     return "AtlasTextGeometryProcessor";
   }
@@ -34,7 +35,8 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  AtlasTextGeometryProcessor(int width, int height, AAType aa, std::optional<Color> commonColor);
+  AtlasTextGeometryProcessor(int width, int height, AAType aa, std::optional<Color> commonColor,
+                             const Matrix& uvMatrix);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
@@ -47,5 +49,6 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
   int height = 1;
   AAType aa = AAType::None;
   std::optional<Color> commonColor = std::nullopt;
+  Matrix uvMatrix = {};
 };
 }  // namespace tgfx

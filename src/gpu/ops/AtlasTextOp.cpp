@@ -27,12 +27,13 @@
 namespace tgfx {
 PlacementPtr<AtlasTextOp> AtlasTextOp::Make(Context* context,
                                             PlacementPtr<RectsVertexProvider> provider,
-                                            uint32_t renderFlags, int atlasWidth, int atlasHeight) {
+                                            uint32_t renderFlags, int atlasWidth, int atlasHeight,
+                                            const Matrix& uvMatrix) {
   if (provider == nullptr || atlasWidth == 0 || atlasHeight == 0) {
     return nullptr;
   }
-  auto atlasTextOp =
-      context->drawingBuffer()->make<AtlasTextOp>(provider.get(), atlasWidth, atlasHeight);
+  auto atlasTextOp = context->drawingBuffer()->make<AtlasTextOp>(provider.get(), atlasWidth,
+                                                                 atlasHeight, uvMatrix);
   if (provider->aaType() == AAType::Coverage) {
     atlasTextOp->indexBufferProxy = context->resourceProvider()->aaQuadIndexBuffer();
   } else if (provider->rectCount() > 1) {
@@ -49,9 +50,10 @@ PlacementPtr<AtlasTextOp> AtlasTextOp::Make(Context* context,
   return atlasTextOp;
 }
 
-AtlasTextOp::AtlasTextOp(RectsVertexProvider* provider, int atlasWidth, int atlasHeight)
+AtlasTextOp::AtlasTextOp(RectsVertexProvider* provider, int atlasWidth, int atlasHeight,
+                         const Matrix& uvMatrix)
     : DrawOp(provider->aaType()), rectCount(provider->rectCount()), atlasWidth(atlasWidth),
-      atlasHeight(atlasHeight) {
+      atlasHeight(atlasHeight), uvMatrix(uvMatrix) {
   if (!provider->hasColor()) {
     commonColor = provider->firstColor();
   }
@@ -72,8 +74,8 @@ void AtlasTextOp::execute(RenderPass* renderPass) {
   }
 
   auto drawingBuffer = renderPass->getContext()->drawingBuffer();
-  auto gp =
-      AtlasTextGeometryProcessor::Make(drawingBuffer, atlasWidth, atlasHeight, aaType, commonColor);
+  auto gp = AtlasTextGeometryProcessor::Make(drawingBuffer, atlasWidth, atlasHeight, aaType,
+                                             commonColor, uvMatrix);
   auto pipeline = createPipeline(renderPass, std::move(gp));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   renderPass->bindBuffers(indexBuffer, vertexBuffer, vertexBufferOffset);
