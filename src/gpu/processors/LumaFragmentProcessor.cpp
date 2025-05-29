@@ -19,7 +19,7 @@
 #include "gpu/processors/LumaFragmentProcessor.h"
 namespace tgfx {
 
-void LumaFragmentProcessor::computeProcessorKey(Context* context, BytesKey* bytesKey) const {
+void LumaFragmentProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) const {
   bytesKey->write(classID());
 }
 

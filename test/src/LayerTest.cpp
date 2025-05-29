@@ -1043,7 +1043,7 @@ TGFX_TEST(LayerTest, shapeMask) {
       Matrix::MakeAll(1.0f, 0, 300 + static_cast<float>(image->width()) * 0.5f, 0, 1.0f, 300);
   alphaShaperLayer->setMatrix(alphaMaskMatrix);
   imageLayer1->setMask(alphaShaperLayer);
-  imageLayer1->setMaskType(MaskType::Alpha);
+  imageLayer1->setMaskStyle(MaskStyle::Alpha);
 
   // Vector mask effect
   auto imageLayer2 = ImageLayer::Make();
@@ -1053,7 +1053,7 @@ TGFX_TEST(LayerTest, shapeMask) {
       Matrix::MakeAll(0.5f, 0, 0, 0, 0.5f, static_cast<float>(image->height()) * 0.5f);
   imageLayer2->setMatrix(image2Matrix);
   imageLayer2->setAlpha(1.0f);
-  imageLayer2->setMaskType(MaskType::Vector);
+  imageLayer2->setMaskStyle(MaskStyle::Vector);
 
   auto vectorShaperLayer = ShapeLayer::Make();
   vectorShaperLayer->setPath(path);
@@ -1073,7 +1073,7 @@ TGFX_TEST(LayerTest, shapeMask) {
                                       static_cast<float>(image->height()) * 0.5f);
   imageLayer3->setMatrix(image3Matrix);
   imageLayer3->setAlpha(1.0f);
-  imageLayer3->setMaskType(MaskType::Luminance);
+  imageLayer3->setMaskStyle(MaskStyle::Luminance);
 
   auto lumaShaperLayer = ShapeLayer::Make();
   lumaShaperLayer->setPath(path);

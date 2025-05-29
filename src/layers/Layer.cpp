@@ -223,11 +223,11 @@ void Layer::setMask(std::shared_ptr<Layer> value) {
   invalidateTransform();
 }
 
-void Layer::setMaskType(MaskType value) {
-  if (_maskType == value) {
+void Layer::setMaskStyle(MaskStyle value) {
+  if (_maskStyle == value) {
     return;
   }
-  _maskType = value;
+  _maskStyle = value;
   if (_mask) {
     invalidateTransform();
   }
@@ -749,7 +749,7 @@ Matrix Layer::getRelativeMatrix(const Layer* targetCoordinateSpace) const {
 
 std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float scale) {
   auto maskArgs = args;
-  maskArgs.drawMode = _maskType != MaskType::Vector ? DrawMode::Normal : DrawMode::Contour;
+  maskArgs.drawMode = _maskStyle != MaskStyle::Vector ? DrawMode::Normal : DrawMode::Contour;
   auto maskPicture = CreatePicture(args, scale, [this](const DrawArgs& args, Canvas* canvas) {
     _mask->drawLayer(args, canvas, _mask->_alpha, BlendMode::SrcOver);
   });
@@ -761,7 +761,7 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
   if (maskContentImage == nullptr) {
     return nullptr;
   }
-  if (_maskType == MaskType::Luminance) {
+  if (_maskStyle == MaskStyle::Luminance) {
     maskContentImage =
         maskContentImage->makeWithFilter(ImageFilter::ColorFilter(ColorFilter::Luma()));
   }
