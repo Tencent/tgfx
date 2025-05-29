@@ -36,12 +36,12 @@ class AtlasTextOp final : public DrawOp {
  private:
   size_t rectCount = 0;
   std::optional<Color> commonColor = std::nullopt;
-  Matrix uvMatrix = {};
   std::shared_ptr<GpuBufferProxy> indexBufferProxy = nullptr;
   std::shared_ptr<GpuBufferProxy> vertexBufferProxy = nullptr;
   size_t vertexBufferOffset = 0;
   int atlasWidth = 1;
   int atlasHeight = 1;
+  Matrix uvMatrix = {};
 
   explicit AtlasTextOp(RectsVertexProvider* provider, int atlasWidth, int atlasHeight,
                        const Matrix& uvMatrix);
