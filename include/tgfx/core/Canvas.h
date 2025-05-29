@@ -435,6 +435,9 @@ class Canvas {
   void drawFill(const MCState& state, const Fill& fill) const;
   void resetStateStack();
 
+  static Path* UnwrapShape(std::shared_ptr<Shape> shape, const Stroke** pathStroke,
+                           Matrix* pathMatrix);
+
   friend class Surface;
   friend class Picture;
   friend class Recorder;

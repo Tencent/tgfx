@@ -333,35 +333,46 @@ void Canvas::drawPath(const Path& path, const MCState& state, const Fill& fill,
   }
 }
 
+Path* Canvas::UnwrapShape(std::shared_ptr<Shape> shape, const Stroke** pathStroke,
+                          Matrix* pathMatrix) {
+  DEBUG_ASSERT(pathMatrix != nullptr);
+  DEBUG_ASSERT(pathStroke != nullptr);
+  if (shape->type() == Shape::Type::Path) {
+    return &std::static_pointer_cast<PathShape>(shape)->path;
+  }
+  if (*pathStroke == nullptr && shape->type() == Shape::Type::Stroke) {
+    auto strokeShape = std::static_pointer_cast<StrokeShape>(shape);
+    if (strokeShape->shape->isSimplePath()) {
+      *pathStroke = &strokeShape->stroke;
+      return &std::static_pointer_cast<PathShape>(strokeShape->shape)->path;
+    }
+  } else if (*pathStroke == nullptr && shape->type() == Shape::Type::Matrix) {
+    auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);
+    Matrix matrix = matrixShape->matrix;
+    auto path = UnwrapShape(matrixShape->shape, pathStroke, &matrix);
+    if (path) {
+      pathMatrix->preConcat(matrix);
+    }
+    return path;
+  }
+  return nullptr;
+}
+
 void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
   if (shape == nullptr) {
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
-  Path* path = nullptr;
   auto stroke = paint.getStroke();
-  if (shape->type() == Shape::Type::Path) {
-    path = &std::static_pointer_cast<PathShape>(shape)->path;
-  } else if (!stroke && shape->type() == Shape::Type::Stroke) {
-    auto strokeShape = std::static_pointer_cast<StrokeShape>(shape);
-    if (strokeShape->shape->isSimplePath()) {
-      path = &std::static_pointer_cast<PathShape>(strokeShape->shape)->path;
-      stroke = &strokeShape->stroke;
-    }
-  } else if (!stroke && shape->type() == Shape::Type::Matrix) {
-    auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);
-    if (matrixShape->shape->isSimplePath()) {
-      path = &std::static_pointer_cast<PathShape>(matrixShape->shape)->path;
-      mcState->matrix.preConcat(matrixShape->matrix);
-    }
-  }
+  auto state = *mcState;
+  auto path = UnwrapShape(shape, &stroke, &state.matrix);
   if (path) {
-    drawPath(*path, *mcState, paint.getFill(), stroke);
+    drawPath(*path, state, paint.getFill(), stroke);
     return;
   }
   shape = Shape::ApplyStroke(std::move(shape), paint.getStroke());
   if (shape != nullptr) {
-    drawContext->drawShape(std::move(shape), *mcState, paint.getFill());
+    drawContext->drawShape(std::move(shape), state, paint.getFill());
   }
 }
 
