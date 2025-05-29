@@ -29,6 +29,7 @@ enum class RecordType {
   DrawFill,
   DrawRect,
   DrawRRect,
+  DrawPath,
   DrawShape,
   DrawImage,
   DrawImageRect,
@@ -137,7 +138,7 @@ class DrawFill : public Record {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawFill(playback->state, playback->fill);
+    context->drawFill(playback->fill);
   }
 };
 
@@ -171,6 +172,26 @@ class DrawRRect : public Record {
   }
 
   RRect rRect;
+};
+
+class DrawPath : public Record {
+ public:
+  explicit DrawPath(Path path) : path(std::move(path)) {
+  }
+
+  RecordType type() const override {
+    return RecordType::DrawPath;
+  }
+
+  bool hasUnboundedFill(bool& hasInverseClip) const override {
+    return hasInverseClip && path.isInverseFillType();
+  }
+
+  void playback(DrawContext* context, PlaybackContext* playback) const override {
+    context->drawPath(path, playback->state, playback->fill);
+  }
+
+  Path path;
 };
 
 class DrawShape : public Record {
