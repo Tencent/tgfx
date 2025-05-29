@@ -223,6 +223,16 @@ void Layer::setMask(std::shared_ptr<Layer> value) {
   invalidateTransform();
 }
 
+void Layer::setMaskType(MaskType value) {
+  if (_maskType == value) {
+    return;
+  }
+  _maskType = value;
+  if (_mask) {
+    invalidateTransform();
+  }
+}
+
 void Layer::setScrollRect(const Rect& rect) {
   if ((_scrollRect && *_scrollRect == rect) || (!_scrollRect && rect.isEmpty())) {
     return;
@@ -738,6 +748,8 @@ Matrix Layer::getRelativeMatrix(const Layer* targetCoordinateSpace) const {
 }
 
 std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float scale) {
+  auto maskArgs = args;
+  maskArgs.drawMode = _maskType != MaskType::Vector ? DrawMode::Normal : DrawMode::Contour;
   auto maskPicture = CreatePicture(args, scale, [this](const DrawArgs& args, Canvas* canvas) {
     _mask->drawLayer(args, canvas, _mask->_alpha, BlendMode::SrcOver);
   });
@@ -748,6 +760,10 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
   auto maskContentImage = CreatePictureImage(std::move(maskPicture), &maskImageOffset);
   if (maskContentImage == nullptr) {
     return nullptr;
+  }
+  if (_maskType == MaskType::Luminance) {
+    maskContentImage =
+        maskContentImage->makeWithFilter(ImageFilter::ColorFilter(ColorFilter::Luma()));
   }
   auto relativeMatrix = _mask->getRelativeMatrix(this);
   relativeMatrix.preScale(1.0f / scale, 1.0f / scale);
