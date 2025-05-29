@@ -20,8 +20,7 @@
 #include "core/utils/Log.h"
 
 namespace tgfx {
-void MeasureContext::drawFill(const MCState& state, const Fill& fill) {
-  addDeviceBounds(state.clip, fill, {}, true);
+void MeasureContext::drawFill(const Fill&) {
 }
 
 void MeasureContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
@@ -30,6 +29,11 @@ void MeasureContext::drawRect(const Rect& rect, const MCState& state, const Fill
 
 void MeasureContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill) {
   addLocalBounds(state, fill, rRect.rect);
+}
+
+void MeasureContext::drawPath(const Path& path, const MCState& state, const Fill& fill) {
+  auto localBounds = path.getBounds();
+  addLocalBounds(state, fill, localBounds, path.isInverseFillType());
 }
 
 void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
