@@ -42,10 +42,9 @@ void GLClampedGradientEffect::emitCode(EmitArgs& args) const {
   std::string _child1 = "_child1";
   emitChild(gradLayoutIndex, &_child1, args);
   fragBuilder->codeAppendf("vec4 t = %s;", _child1.c_str());
-  //fragBuilder->codeAppend("if (t.y < 0.0) {");
-  // fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
-  // fragBuilder->codeAppend("} else if (t.x <= 0.0) {");
-  fragBuilder->codeAppend("if (t.x <= 0.0) {");
+  fragBuilder->codeAppend("if (t.y < 0.0) {");
+  fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
+  fragBuilder->codeAppend("} else if (t.x <= 0.0) {");
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), leftBorderColorName.c_str());
   fragBuilder->codeAppend("} else if (t.x >= 1.0) {");
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), rightBorderColorName.c_str());
