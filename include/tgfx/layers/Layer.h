@@ -286,14 +286,14 @@ class Layer {
   void setMask(std::shared_ptr<Layer> value);
 
   /**
-   * Returns the style of mask used by the layer. The default value is MaskStyle::Alpha.
+   * Returns the mask style used by the layer. The default value is MaskStyle::Alpha.
    */
   MaskStyle maskStyle() const {
     return _maskStyle;
   }
 
   /**
-   * Sets the style of mask used by the layer.
+   * Sets the mask style used by the layer.
    */
   void setMaskStyle(MaskStyle value);
 

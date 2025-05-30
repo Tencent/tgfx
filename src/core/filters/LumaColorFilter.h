@@ -21,6 +21,10 @@
 #include "tgfx/core/ColorFilter.h"
 
 namespace tgfx {
+/**
+ * LumaFilter cannot be replaced by MatrixFilter because MatrixFilter uses non-premultiplied RGBA,
+ * while LumaFilter uses premultiplied RGBA.
+ */
 class LumaColorFilter : public ColorFilter {
  protected:
   Type type() const override {

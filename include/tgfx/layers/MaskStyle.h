@@ -24,15 +24,15 @@ namespace tgfx {
  */
 enum class MaskStyle {
   /**
-   * Uses mask layer's transparency as mask.
+   * Uses the target layer's transparency as a mask.
    */
   Alpha,
   /**
-   * Uses mask layer's contour as mask.
+   * Uses mask layer's contour as a mask.
    */
   Vector,
   /**
-   * Uses mask layer's luminance as mask.
+   * Uses mask layer's luminance as a mask.
    */
   Luminance
 };
