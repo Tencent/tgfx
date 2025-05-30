@@ -19,6 +19,7 @@
 #pragma once
 #include <QAbstractItemModel>
 #include <QQmlEngine>
+#include <QtWidgets/QTreeView>
 #include "InspectorEvent.h"
 #include "ViewData.h"
 #include "Worker.h"
@@ -28,9 +29,8 @@ namespace inspector {
 class AtttributeModel;
 class TaskItem {
  public:
-  explicit TaskItem(OpTaskData* opData)
-      : opTaskData(opData) {
-  }
+  explicit TaskItem(QVariantList data, uint32_t opId)
+      :opId(opId), itemData(std::move(data))  {}
 
   void appendChild(TaskItem* child) {
     return childrenItems.push_back(child);
@@ -44,6 +44,10 @@ class TaskItem {
     return (row >= 0 && row < childrenItems.size()) ? childrenItems[row] : nullptr;
   }
 
+  int columnCount() const {
+    return int(itemData.count());
+  }
+
   int childCount() const {
     return static_cast<int>(childrenItems.size());
   }
@@ -52,28 +56,8 @@ class TaskItem {
     return parentItem;
   }
 
-  const QString getName() const {
-    return "test";
-  }
-
-  const OpTaskData& getOpData() const {
-    return *opTaskData;
-  }
-
-  int64_t startTime() const {
-    return opTaskData->start;
-  }
-
-  int64_t endTime() const {
-    return opTaskData->end;
-  }
-
-  uint8_t getType() const {
-    return opTaskData->type;
-  }
-
-  uint32_t getOpId() const {
-    return opTaskData->id;
+  QVariant data(int column) const {
+    return itemData.value(column);
   }
 
   void setIndex(int index) {
@@ -81,11 +65,22 @@ class TaskItem {
   }
 
   int row() const {
-    return index;
+    if (parentItem == nullptr)
+      return 0;
+    const auto it = std::find_if(parentItem->childrenItems.cbegin(), parentItem->childrenItems.cend(),
+                                 [this](TaskItem* treeItem) {
+                                     return treeItem == this;
+                                 });
+
+    if (it != parentItem->childrenItems.cend()) {
+      return int(std::distance(parentItem->childrenItems.cbegin(), it));
+    }
+    Q_ASSERT(false); // should not happen
   }
 
   int index = 0;
-  OpTaskData* opTaskData;
+  uint32_t opId;
+  QVariantList itemData;
   TaskItem* parentItem = nullptr;
   std::vector<TaskItem*> childrenItems;
 };
@@ -97,17 +92,17 @@ class TaskTreeModel : public QAbstractItemModel {
     NameRole = Qt::UserRole + 1,
     StartTimeRole,
     EndTimeRole,
+    RowCountRole,
     DurationRole,
     TypeRole,
     OpIdRole,
     TaskIndexRole
   };
 
-  explicit TaskTreeModel(QObject* parent = nullptr);
+  explicit TaskTreeModel(Worker* worker, ViewData* viewData, QObject* parent = nullptr);
   ~TaskTreeModel() override;
 
   ///* TreeModel *///
-  QHash<int, QByteArray> roleNames() const override;
   QVariant data(const QModelIndex& index, int role) const override;
   QModelIndex index(int row, int column, const QModelIndex& parent) const override;
   QModelIndex parent(const QModelIndex& index) const override;
@@ -124,8 +119,9 @@ class TaskTreeModel : public QAbstractItemModel {
   Q_SIGNAL void filterChanged();
 
  protected:
-  TaskItem* processTaskLevel(const std::vector<std::shared_ptr<OpTaskData>>& opTasks,
-                             std::unordered_map<uint32_t, std::vector<unsigned int>> opChilds);
+  TaskItem* processTaskLevel(int64_t selectFrameTime,
+                             const std::vector<std::shared_ptr<OpTaskData>>& opTasks,
+                             const std::unordered_map<uint32_t, std::vector<unsigned int>>& opChilds);
   bool matchesFilter(const QString& name) const;
 
  private:

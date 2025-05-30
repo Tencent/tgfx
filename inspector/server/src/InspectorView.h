@@ -20,6 +20,7 @@
 
 #include <QMainWindow>
 #include "StartView.h"
+#include "TaskTreeModel.h"
 #include "ViewData.h"
 #include "Worker.h"
 
@@ -30,9 +31,10 @@ class InspectorView : public QObject {
  public:
   InspectorView(std::string filePath, int width, QObject* parent = nullptr);
   InspectorView(std::string& addr, uint16_t port, int width, QObject* parent = nullptr);
-  ~InspectorView();
+  ~InspectorView() override;
 
   void initView();
+  void initConnect();
   void cleanView();
   Q_INVOKABLE void openStartView();
   Q_INVOKABLE void openTaskView();
@@ -41,13 +43,8 @@ class InspectorView : public QObject {
   int width;
   Worker worker;
   ViewData viewData;
-  const FrameData* frames;
   bool connected = false;
   QQmlApplicationEngine* ispEngine = nullptr;
-  QQmlApplicationEngine* framesEngine = nullptr;
-  QQmlApplicationEngine* atttributeEngine = nullptr;
-  QQmlApplicationEngine* meshEngine = nullptr;
-  QQmlApplicationEngine* shaderEngine = nullptr;
-  QQmlApplicationEngine* textureEngine = nullptr;
+  TaskTreeModel* taskTreeModel = nullptr;
 };
 }  // namespace inspector

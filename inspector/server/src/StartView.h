@@ -28,7 +28,7 @@
 #include "InspectorView.h"
 #include "ResolvService.h"
 #include "Socket.h"
-#include "layerInspector/LayerProfilerView.h"
+// #include "layerInspector/LayerProfilerView.h"
 
 namespace inspector {
 
@@ -150,7 +150,7 @@ class StartView : public QObject {
 
  private:
   InspectorView* inspectorView = nullptr;
-  LayerProfilerView* layerProfilerView = nullptr;
+  // LayerProfilerView* layerProfilerView = nullptr;
 
   QLabel* filesPath = nullptr;
   QString lastOpenFile;

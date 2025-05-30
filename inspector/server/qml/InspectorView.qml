@@ -188,6 +188,7 @@ ApplicationWindow {
         }
     }
 
+    property bool isConnectSelectFrame: false
 
     Rectangle {
         id: mainContainer
@@ -199,27 +200,21 @@ ApplicationWindow {
             anchors.margins: 1
             spacing: 0
 
-
             Rectangle {
                 id: framesContainer
                 Layout.fillWidth: true
                 Layout.preferredHeight: 100
                 color: "#535353"
 
-
                 Loader {
                     id: framesViewLoader
                     source: "qrc:/qml/FramesView.qml"
                     anchors.fill: parent
                     onLoaded: {
-                        item.worker = workerPtr
-                        item.viewData = viewDataPtr
-                        item.viewMode = viewModePtr
                         item.objectName = "framesDrawer"
                     }
                 }
             }
-
 
             Item {
                 width: parent.width
@@ -316,13 +311,10 @@ ApplicationWindow {
                 Layout.fillHeight: true
                 uniqueName: "MainInspectorLayout"
 
-
-
                 KDDW.DockWidget {
                     id: taskDock
                     uniqueName: "Task"
                     source: "qrc:/qml/TaskTreeView.qml"
-
                 }
 
                 KDDW.DockWidget {
@@ -341,7 +333,6 @@ ApplicationWindow {
                 Component.onCompleted: {
                     addDockWidget(attributeDock, KDDW.KDDockWidgets.Location_OnRight, null, Qt.size(1500, 0));
                     addDockWidget(taskDock, KDDW.KDDockWidgets.Location_OnLeft, attributeDock, Qt.size(420, 0));
-
                 }
             }
         }

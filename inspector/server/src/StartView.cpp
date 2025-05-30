@@ -74,7 +74,6 @@ void StartView::openFile(const QString& fPath) {
   if (filesPath) {
     filesPath->setText(fPath);
     inspectorView = new InspectorView(fPath.toStdString(), 1920, this);
-    inspectorView->initView();
     Q_EMIT closeWindow();
   }
 }
@@ -128,7 +127,6 @@ void StartView::connectToClient(QObject* object) {
       delete inspectorView;
     }
     inspectorView = new InspectorView(client->address, client->port, 1920, this);
-    inspectorView->initView();
     Q_EMIT closeWindow();
   }
 }
@@ -136,14 +134,14 @@ void StartView::connectToClient(QObject* object) {
 void StartView::connectToClientByLayerInspector(QObject* object) {
   auto client = dynamic_cast<ClientData*>(object);
   if (client) {
-    if (layerProfilerView) {
-      delete layerProfilerView;
-      layerProfilerView = nullptr;
-    }
-    layerProfilerView =
-        new LayerProfilerView(QString::fromStdString(client->address), 8084, nullptr);
-    layerProfilerView->show();
-    Q_EMIT closeWindow();
+    // if (layerProfilerView) {
+    //   delete layerProfilerView;
+    //   layerProfilerView = nullptr;
+    // }
+    // layerProfilerView =
+    //     new LayerProfilerView(QString::fromStdString(client->address), 8084, nullptr);
+    // layerProfilerView->show();
+    // Q_EMIT closeWindow();
   }
 }
 
