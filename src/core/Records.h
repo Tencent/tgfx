@@ -29,6 +29,7 @@ enum class RecordType {
   DrawFill,
   DrawRect,
   DrawRRect,
+  StrokeRRect,
   DrawPath,
   DrawShape,
   DrawImage,
@@ -168,10 +169,27 @@ class DrawRRect : public Record {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawRRect(rRect, playback->state, playback->fill);
+    context->drawRRect(rRect, playback->state, playback->fill, nullptr);
   }
 
   RRect rRect;
+};
+
+class StrokeRRect : public Record {
+ public:
+  StrokeRRect(const RRect& rRect, const Stroke& stroke) : rRect(rRect), stroke(stroke) {
+  }
+
+  RecordType type() const override {
+    return RecordType::StrokeRRect;
+  }
+
+  void playback(DrawContext* context, PlaybackContext* playback) const override {
+    context->drawRRect(rRect, playback->state, playback->fill, &stroke);
+  }
+
+  RRect rRect;
+  Stroke stroke;
 };
 
 class DrawPath : public Record {

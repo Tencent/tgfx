@@ -51,8 +51,9 @@ class TransformContext : public DrawContext {
     drawContext->drawRect(rect, transform(state), fill);
   }
 
-  void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill) override {
-    drawContext->drawRRect(rRect, transform(state), fill);
+  void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
+                 const Stroke* stroke = nullptr) override {
+    drawContext->drawRRect(rRect, transform(state), fill, stroke);
   }
 
   void drawPath(const Path& path, const MCState& state, const Fill& fill) override {

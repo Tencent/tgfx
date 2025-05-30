@@ -36,7 +36,8 @@ class RecordingContext : public DrawContext {
 
   void drawRect(const Rect& rect, const MCState& state, const Fill& fill) override;
 
-  void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill) override;
+  void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
+                 const Stroke* stroke) override;
 
   void drawPath(const Path& path, const MCState& state, const Fill& fill) override;
 

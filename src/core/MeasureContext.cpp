@@ -27,8 +27,13 @@ void MeasureContext::drawRect(const Rect& rect, const MCState& state, const Fill
   addLocalBounds(state, fill, rect);
 }
 
-void MeasureContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill) {
-  addLocalBounds(state, fill, rRect.rect);
+void MeasureContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
+                               const Stroke* stroke) {
+  auto rect = rRect.rect;
+  if (stroke) {
+    stroke->applyToBounds(&rect);
+  }
+  addLocalBounds(state, fill, rect, false);
 }
 
 void MeasureContext::drawPath(const Path& path, const MCState& state, const Fill& fill) {

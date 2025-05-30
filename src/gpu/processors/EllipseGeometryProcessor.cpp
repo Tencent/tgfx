@@ -38,7 +38,7 @@ EllipseGeometryProcessor::EllipseGeometryProcessor(int width, int height, bool s
 
 void EllipseGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t flags = stroke ? 1 : 0;
-  flags = commonColor.has_value() ? 2 : 0;
+  flags |= commonColor.has_value() ? 2 : 0;
   bytesKey->write(flags);
 }
 }  // namespace tgfx
