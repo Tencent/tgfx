@@ -34,8 +34,17 @@ class TransformContext : public DrawContext {
     return _type;
   }
 
-  void drawFill(const MCState& state, const Fill& fill) override {
-    drawContext->drawFill(transform(state), fill);
+  void drawFill(const Fill& fill) override {
+    switch (_type) {
+      case Type::None:
+      case Type::Matrix:
+        drawContext->drawFill(fill.makeWithMatrix(initState.matrix));
+        break;
+      default:
+        auto state = transform({});
+        drawContext->drawPath(state.clip, {}, fill.makeWithMatrix(state.matrix));
+        break;
+    }
   }
 
   void drawRect(const Rect& rect, const MCState& state, const Fill& fill) override {
@@ -45,6 +54,10 @@ class TransformContext : public DrawContext {
   void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
                  const Stroke* stroke = nullptr) override {
     drawContext->drawRRect(rRect, transform(state), fill, stroke);
+  }
+
+  void drawPath(const Path& path, const MCState& state, const Fill& fill) override {
+    drawContext->drawPath(path, transform(state), fill);
   }
 
   void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) override {

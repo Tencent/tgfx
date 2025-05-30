@@ -53,14 +53,14 @@ std::shared_ptr<Picture> RecordingContext::finishRecordingAsPicture() {
   return picture;
 }
 
-void RecordingContext::drawFill(const MCState& state, const Fill& fill) {
-  if (state.clip.isInverseFillType() && state.clip.isEmpty() && fill.isOpaque()) {
+void RecordingContext::drawFill(const Fill& fill) {
+  if (fill.isOpaque()) {
     // The clip is wide open, and the fill is opaque, so we can discard all previous records as
     // they are now invisible.
     clear();
   }
   if (fill.color.alpha > 0.0f) {
-    recordStateAndFill(state, fill);
+    recordStateAndFill({}, fill);
     auto record = blockBuffer.make<DrawFill>();
     records.emplace_back(std::move(record));
     drawCount++;
@@ -83,6 +83,13 @@ void RecordingContext::drawRRect(const RRect& rRect, const MCState& state, const
   } else {
     record = blockBuffer.make<DrawRRect>(rRect);
   }
+  records.emplace_back(std::move(record));
+  drawCount++;
+}
+
+void RecordingContext::drawPath(const Path& path, const MCState& state, const Fill& fill) {
+  recordStateAndFill(state, fill);
+  auto record = blockBuffer.make<DrawPath>(path);
   records.emplace_back(std::move(record));
   drawCount++;
 }

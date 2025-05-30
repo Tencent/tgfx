@@ -48,6 +48,9 @@ std::shared_ptr<Data> ColorFilterSerialization::Serialize(const ColorFilter* col
     case Types::ColorFilterType::AlphaThreshold:
       SerializeAlphaThreadholdColorFilterImpl(fbb, colorFilter);
       break;
+    case Types::ColorFilterType::Luma:
+      SerializeColorFilterImpl(fbb, colorFilter);
+      break;
   }
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());

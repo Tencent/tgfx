@@ -33,12 +33,14 @@ class RenderContext : public DrawContext {
     return renderTarget->getContext();
   }
 
-  void drawFill(const MCState& state, const Fill& fill) override;
+  void drawFill(const Fill& fill) override;
 
   void drawRect(const Rect& rect, const MCState& state, const Fill& fill) override;
 
   void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
                  const Stroke* stroke) override;
+
+  void drawPath(const Path& path, const MCState& state, const Fill& fill) override;
 
   void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) override;
 

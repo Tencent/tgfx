@@ -71,15 +71,8 @@ SVGExportContext::SVGExportContext(Context* context, const Rect& viewBox,
   }
 }
 
-void SVGExportContext::drawFill(const MCState& state, const Fill& fill) {
-  auto newFill = fill;
-  if (newFill.shader) {
-    newFill.shader = newFill.shader->makeWithMatrix(state.matrix);
-  }
-  if (newFill.maskFilter) {
-    newFill.maskFilter = newFill.maskFilter->makeWithMatrix(state.matrix);
-  }
-  drawRect(viewBox, MCState{state.clip}, newFill);
+void SVGExportContext::drawFill(const Fill& fill) {
+  drawRect(viewBox, {}, fill);
 }
 
 void SVGExportContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
@@ -132,18 +125,22 @@ void SVGExportContext::drawRRect(const RRect& roundRect, const MCState& state, c
   }
 }
 
-void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                                 const Fill& fill) {
-  if (!state.clip.contains(shape->getBounds())) {
+void SVGExportContext::drawPath(const Path& path, const MCState& state, const Fill& fill) {
+  if (!state.clip.contains(path.getBounds())) {
     applyClipPath(state.clip);
   }
-  auto path = shape->getPath();
   ElementWriter pathElement("path", context, this, writer.get(), resourceBucket.get(),
                             exportFlags & SVGExportFlags::DisableWarnings, state, fill);
   pathElement.addPathAttributes(path, tgfx::SVGExportContext::PathEncodingType());
   if (path.getFillType() == PathFillType::EvenOdd) {
     pathElement.addAttribute("fill-rule", "evenodd");
   }
+}
+
+void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
+                                 const Fill& fill) {
+  DEBUG_ASSERT(shape != nullptr);
+  drawPath(shape->getPath(), state, fill);
 }
 
 void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
