@@ -24,6 +24,7 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/layers/LayerContent.h"
 #include "tgfx/layers/LayerType.h"
+#include "tgfx/layers/MaskStyle.h"
 #include "tgfx/layers/filters/LayerFilter.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
@@ -283,6 +284,18 @@ class Layer {
    * Sets the layer used as a mask for the calling layer.
    */
   void setMask(std::shared_ptr<Layer> value);
+
+  /**
+   * Returns the mask style used by the layer. The default value is MaskStyle::Alpha.
+   */
+  MaskStyle maskStyle() const {
+    return _maskStyle;
+  }
+
+  /**
+   * Sets the mask style used by the layer.
+   */
+  void setMaskStyle(MaskStyle value);
 
   /**
    * Returns the scroll rectangle bounds of the layer. The layer is cropped to the size defined by
@@ -615,6 +628,7 @@ class Layer {
   float _alpha = 1.0f;
   Matrix _matrix = {};
   float _rasterizationScale = 0.0f;
+  MaskStyle _maskStyle = MaskStyle::Alpha;
   std::vector<std::shared_ptr<LayerFilter>> _filters = {};
   std::shared_ptr<Layer> _mask = nullptr;
   Layer* maskOwner = nullptr;
