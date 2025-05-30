@@ -30,7 +30,11 @@ void MeasureContext::drawRect(const Rect& rect, const MCState& state, const Fill
 
 void MeasureContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
                                const Stroke* stroke) {
-  addLocalBounds(state, fill, rRect.rect, false, stroke);
+  auto rect = rRect.rect;
+  if (stroke) {
+    stroke->applyToBounds(&rect);
+  }
+  addLocalBounds(state, fill, rect, false);
 }
 
 void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
@@ -78,18 +82,15 @@ void MeasureContext::drawPicture(std::shared_ptr<Picture> picture, const MCState
 }
 
 void MeasureContext::addLocalBounds(const MCState& state, const Fill& fill, const Rect& localBounds,
-                                    bool unbounded, const Stroke* stroke) {
+                                    bool unbounded) {
   auto deviceBounds = state.matrix.mapRect(localBounds);
-  addDeviceBounds(state.clip, fill, deviceBounds, unbounded, stroke);
+  addDeviceBounds(state.clip, fill, deviceBounds, unbounded);
 }
 
 void MeasureContext::addDeviceBounds(const Path& clip, const Fill& fill, const Rect& deviceBounds,
-                                     bool unbounded, const Stroke* stroke) {
+                                     bool unbounded) {
   if (fill.nothingToDraw()) {
     return;
-  }
-  if (stroke) {
-    stroke->applyToBounds(&bounds);
   }
   if (clip.isInverseFillType()) {
     bounds.join(deviceBounds);

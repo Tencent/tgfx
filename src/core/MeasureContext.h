@@ -55,8 +55,8 @@ class MeasureContext : public DrawContext {
   Rect bounds = {};
 
   void addLocalBounds(const MCState& state, const Fill& fill, const Rect& localBounds,
-                      bool unbounded = false, const Stroke* stroke = nullptr);
+                      bool unbounded = false);
   void addDeviceBounds(const Path& clip, const Fill& fill, const Rect& deviceBounds,
-                       bool unbounded = false, const Stroke* stroke = nullptr);
+                       bool unbounded = false);
 };
 }  // namespace tgfx

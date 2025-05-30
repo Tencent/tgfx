@@ -44,9 +44,10 @@ class RRectsVertexProvider : public VertexProvider {
   /**
    * Creates a new RRectsVertexProvider from a list of RRect records.
    */
-  static PlacementPtr<RRectsVertexProvider> MakeFrom(
-      BlockBuffer* blockBuffer, std::vector<PlacementPtr<RRectRecord>>&& rects, AAType aaType,
-      bool useScale, std::vector<PlacementPtr<Stroke>>&& strokes = {});
+  static PlacementPtr<RRectsVertexProvider> MakeFrom(BlockBuffer* blockBuffer,
+                                                     std::vector<PlacementPtr<RRectRecord>>&& rects,
+                                                     AAType aaType, bool useScale,
+                                                     std::vector<PlacementPtr<Stroke>>&& strokes);
 
   /**
    * Returns the number of round rects in the provider.
