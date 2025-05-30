@@ -28,11 +28,11 @@ enum class MaskStyle {
    */
   Alpha,
   /**
-   * Uses mask layer's contour as a mask.
+   * Uses the target layer's contour as a mask.
    */
   Vector,
   /**
-   * Uses mask layer's luminance as a mask.
+   * Uses the target layer's luminance as a mask.
    */
   Luminance
 };
