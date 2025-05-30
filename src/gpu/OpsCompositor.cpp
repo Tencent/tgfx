@@ -69,22 +69,13 @@ void OpsCompositor::fillRect(const Rect& rect, const MCState& state, const Fill&
   pendingRects.emplace_back(std::move(record));
 }
 
-static bool CompareStroke(const Stroke& a, const Stroke* b) {
-  float bWidth = b ? b->width : 0.0f;
-  if ((a.width == 0.0f) != (bWidth == 0.0f)) {
-    return false;
-  }
-  return true;
-}
-
 void OpsCompositor::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
                               const Stroke* stroke) {
   DEBUG_ASSERT(!rRect.rect.isEmpty());
   auto rectFill = fill.makeWithMatrix(state.matrix);
   if (!canAppend(PendingOpType::RRect, state.clip, rectFill) ||
-      !CompareStroke(pendingStroke, stroke)) {
+      (pendingStrokes.empty() != (stroke == nullptr))) {
     flushPendingOps(PendingOpType::RRect, state.clip, rectFill);
-    pendingStroke = stroke ? *stroke : Stroke(0);
   }
   auto record =
       drawingBuffer()->make<RRectRecord>(rRect, state.matrix, rectFill.color.premultiply());

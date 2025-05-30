@@ -56,7 +56,7 @@ class OpsCompositor {
   void fillRect(const Rect& rect, const MCState& state, const Fill& fill);
 
   /**
-   * Draw the given rrect or rrect's stroke with the given state and fill.
+   * Draw the given rrect with the given state, fill and optional stroke.
    */
   void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill, const Stroke* stroke);
 
@@ -93,7 +93,6 @@ class OpsCompositor {
   PendingOpType pendingType = PendingOpType::Unknown;
   Path pendingClip = {};
   Fill pendingFill = {};
-  Stroke pendingStroke = Stroke(0);
   std::shared_ptr<Image> pendingImage = nullptr;
   SamplingOptions pendingSampling = {};
   std::vector<PlacementPtr<RectRecord>> pendingRects = {};
