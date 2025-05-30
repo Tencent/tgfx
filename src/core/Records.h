@@ -191,7 +191,7 @@ class StrokeRRect : public Record {
   RRect rRect;
   Stroke stroke;
 };
-  
+
 class DrawPath : public Record {
  public:
   explicit DrawPath(Path path) : path(std::move(path)) {
