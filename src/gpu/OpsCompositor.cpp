@@ -69,32 +69,30 @@ void OpsCompositor::fillRect(const Rect& rect, const MCState& state, const Fill&
   pendingRects.emplace_back(std::move(record));
 }
 
-void OpsCompositor::fillRRect(const RRect& rRect, const MCState& state, const Fill& fill) {
+static bool CompareStroke(const Stroke& a, const Stroke* b) {
+  float bWidth = b ? b->width : 0.0f;
+  if ((a.width == 0.0f) != (bWidth == 0.0f)) {
+    return false;
+  }
+  return true;
+}
+
+void OpsCompositor::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
+                              const Stroke* stroke) {
   DEBUG_ASSERT(!rRect.rect.isEmpty());
   auto rectFill = fill.makeWithMatrix(state.matrix);
-  if (!canAppend(PendingOpType::RRect, state.clip, rectFill)) {
+  if (!canAppend(PendingOpType::RRect, state.clip, rectFill) ||
+      !CompareStroke(pendingStroke, stroke)) {
     flushPendingOps(PendingOpType::RRect, state.clip, rectFill);
+    pendingStroke = stroke ? *stroke : Stroke(0);
   }
   auto record =
       drawingBuffer()->make<RRectRecord>(rRect, state.matrix, rectFill.color.premultiply());
   pendingRRects.emplace_back(std::move(record));
-}
-
-void OpsCompositor::strokeRRect(const RRect& rRect, const MCState& state, const Fill& fill,
-                                const Stroke* stroke) {
-  DEBUG_ASSERT(!rRect.rect.isEmpty());
-  if (stroke == nullptr || stroke->width <= 0.0f) {
-    fillRRect(rRect, state, fill);
-    return;
+  if (stroke) {
+    auto strokeRecord = drawingBuffer()->make<Stroke>(*stroke);
+    pendingStrokes.emplace_back(std::move(strokeRecord));
   }
-  auto rectFill = fill.makeWithMatrix(state.matrix);
-  auto strokeInternal = const_cast<Stroke*>(stroke);
-  if (!canAppend(PendingOpType::StrokeRRect, state.clip, rectFill, strokeInternal)) {
-    flushPendingOps(PendingOpType::StrokeRRect, state.clip, rectFill, strokeInternal);
-  }
-  auto record = drawingBuffer()->make<RRectRecord>(rRect, state.matrix,
-                                                   rectFill.color.premultiply(), *strokeInternal);
-  pendingStokeRRects.emplace_back(std::move(record));
 }
 
 static Rect ToLocalBounds(const Rect& bounds, const Matrix& viewMatrix) {
@@ -158,6 +156,7 @@ void OpsCompositor::discardAll() {
     pendingSampling = {};
     pendingRects.clear();
     pendingRRects.clear();
+    pendingStrokes.clear();
   }
 }
 
@@ -184,20 +183,8 @@ bool OpsCompositor::CompareFill(const Fill& a, const Fill& b) {
   return true;
 }
 
-static bool CompareStroke(const Stroke* a, const Stroke* b) {
-  if (a == nullptr || b == nullptr) {
-    return true;
-  }
-  if ((a->width == 0.0f) != (b->width == 0.0f)) {
-    return false;
-  }
-  return true;
-}
-
-bool OpsCompositor::canAppend(PendingOpType type, const Path& clip, const Fill& fill,
-                              const Stroke* stroke) const {
-  if (pendingType != type || !pendingClip.isSame(clip) || !CompareFill(pendingFill, fill) ||
-      !CompareStroke(pendingStroke, stroke)) {
+bool OpsCompositor::canAppend(PendingOpType type, const Path& clip, const Fill& fill) const {
+  if (pendingType != type || !pendingClip.isSame(clip) || !CompareFill(pendingFill, fill)) {
     return false;
   }
   switch (pendingType) {
@@ -205,8 +192,6 @@ bool OpsCompositor::canAppend(PendingOpType type, const Path& clip, const Fill& 
       return pendingRects.size() < RectDrawOp::MaxNumRects;
     case PendingOpType::RRect:
       return pendingRRects.size() < RRectDrawOp::MaxNumRRects;
-    case PendingOpType::StrokeRRect:
-      return pendingStokeRRects.size() < RRectDrawOp::MaxNumRRects;
     default:
       break;
   }
@@ -227,20 +212,18 @@ static bool RRectUseScale(Context* context) {
   return !context->caps()->floatIs32Bits;
 }
 
-void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill, Stroke* stroke) {
+void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
   if (pendingType == PendingOpType::Unknown) {
     if (type != PendingOpType::Unknown) {
       pendingType = type;
       pendingClip = clip;
       pendingFill = fill;
-      pendingStroke = stroke;
     }
     return;
   }
   std::swap(pendingType, type);
   std::swap(pendingClip, clip);
   std::swap(pendingFill, fill);
-  std::swap(pendingStroke, stroke);
   PlacementPtr<DrawOp> drawOp = nullptr;
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
@@ -292,24 +275,9 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill, St
           localBounds->setEmpty();
         }
       }
-      auto provider = RRectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRRects),
-                                                     aaType, RRectUseScale(context));
-      drawOp = RRectDrawOp::Make(context, std::move(provider), renderFlags);
-    } break;
-    case PendingOpType::StrokeRRect: {
-      if (needLocalBounds || needDeviceBounds) {
-        deviceBounds = Rect::MakeEmpty();
-        for (auto& record : pendingStokeRRects) {
-          auto rect = record->viewMatrix.mapRect(record->rRect.rect);
-          deviceBounds->join(rect);
-        }
-        localBounds = deviceBounds;
-        if (!localBounds->intersect(clipBounds)) {
-          localBounds->setEmpty();
-        }
-      }
-      auto provider = RRectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingStokeRRects),
-                                                     aaType, RRectUseScale(context));
+      auto provider =
+          RRectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRRects), aaType,
+                                         RRectUseScale(context), std::move(pendingStrokes));
       drawOp = RRectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     default:

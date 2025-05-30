@@ -27,15 +27,13 @@
 
 namespace tgfx {
 struct RRectRecord {
-  RRectRecord(const RRect& rRect, const Matrix& viewMatrix, Color color = {},
-              Stroke stroke = Stroke(0))
-      : rRect(rRect), viewMatrix(viewMatrix), color(color), stroke(stroke) {
+  RRectRecord(const RRect& rRect, const Matrix& viewMatrix, Color color = {})
+      : rRect(rRect), viewMatrix(viewMatrix), color(color) {
   }
 
   RRect rRect;
   Matrix viewMatrix;
   Color color;
-  Stroke stroke;
 };
 
 /**
@@ -46,9 +44,9 @@ class RRectsVertexProvider : public VertexProvider {
   /**
    * Creates a new RRectsVertexProvider from a list of RRect records.
    */
-  static PlacementPtr<RRectsVertexProvider> MakeFrom(BlockBuffer* blockBuffer,
-                                                     std::vector<PlacementPtr<RRectRecord>>&& rects,
-                                                     AAType aaType, bool useScale);
+  static PlacementPtr<RRectsVertexProvider> MakeFrom(
+      BlockBuffer* blockBuffer, std::vector<PlacementPtr<RRectRecord>>&& rects, AAType aaType,
+      bool useScale, std::vector<PlacementPtr<Stroke>>&& strokes = {});
 
   /**
    * Returns the number of round rects in the provider.
@@ -92,6 +90,7 @@ class RRectsVertexProvider : public VertexProvider {
 
  private:
   PlacementArray<RRectRecord> rects = {};
+  PlacementArray<Stroke> strokes = {};
   struct {
     uint8_t aaType : 2;
     bool useScale : 1;
@@ -100,7 +99,7 @@ class RRectsVertexProvider : public VertexProvider {
   } bitFields = {};
 
   RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool useScale,
-                       bool hasColor);
+                       bool hasColor, PlacementArray<Stroke>&& strokes = {});
 
   friend class BlockBuffer;
 };

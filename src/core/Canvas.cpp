@@ -368,11 +368,11 @@ bool Canvas::drawSimplePath(const Path& path, const MCState& state, const Fill& 
     RRect rRect = {};
     if (path.isOval(&rect)) {
       rRect.setOval(rect);
-      drawContext->drawRRect(rRect, state, fill);
+      drawContext->drawRRect(rRect, state, fill, stroke);
       return true;
     }
     if (path.isRRect(&rRect)) {
-      drawContext->drawRRect(rRect, state, fill);
+      drawContext->drawRRect(rRect, state, fill, stroke);
       return true;
     }
   }

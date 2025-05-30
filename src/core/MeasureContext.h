@@ -32,7 +32,7 @@ class MeasureContext : public DrawContext {
   void drawRect(const Rect& rect, const MCState& state, const Fill& fill) override;
 
   void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
-                 const Stroke* stroke = nullptr) override;
+                 const Stroke* stroke) override;
 
   void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) override;
 
@@ -55,8 +55,8 @@ class MeasureContext : public DrawContext {
   Rect bounds = {};
 
   void addLocalBounds(const MCState& state, const Fill& fill, const Rect& localBounds,
-                      bool unbounded = false);
+                      bool unbounded = false, const Stroke* stroke = nullptr);
   void addDeviceBounds(const Path& clip, const Fill& fill, const Rect& deviceBounds,
-                       bool unbounded = false);
+                       bool unbounded = false, const Stroke* stroke = nullptr);
 };
 }  // namespace tgfx

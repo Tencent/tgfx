@@ -53,7 +53,7 @@ namespace tgfx {
 
 PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
     BlockBuffer* buffer, std::vector<PlacementPtr<RRectRecord>>&& rects, AAType aaType,
-    bool useScale) {
+    bool useScale, std::vector<PlacementPtr<Stroke>>&& strokes) {
   if (rects.empty()) {
     return nullptr;
   }
@@ -68,7 +68,9 @@ PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
     }
   }
   auto array = buffer->makeArray(std::move(rects));
-  return buffer->make<RRectsVertexProvider>(std::move(array), aaType, useScale, hasColor);
+  auto strokeArray = buffer->makeArray(std::move(strokes));
+  return buffer->make<RRectsVertexProvider>(std::move(array), aaType, useScale, hasColor,
+                                            std::move(strokeArray));
 }
 
 static void WriteUByte4Color(float* vertices, int& index, const Color& color) {
@@ -84,12 +86,14 @@ static float FloatInvert(float value) {
 }
 
 RRectsVertexProvider::RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType,
-                                           bool useScale, bool hasColor)
-    : rects(std::move(rects)) {
+                                           bool useScale, bool hasColor,
+                                           PlacementArray<Stroke>&& strokes)
+    : rects(std::move(rects)), strokes(std::move(strokes)) {
   bitFields.aaType = static_cast<uint8_t>(aaType);
   bitFields.useScale = useScale;
   bitFields.hasColor = hasColor;
-  if (this->rects.size() > 0 && this->rects.front()->stroke.width > 0.0f) {
+
+  if (!this->strokes.empty()) {
     bitFields.hasStroke = true;
   } else {
     bitFields.hasStroke = false;
@@ -107,6 +111,7 @@ size_t RRectsVertexProvider::vertexCount() const {
 void RRectsVertexProvider::getVertices(float* vertices) const {
   auto index = 0;
   auto aaType = static_cast<AAType>(bitFields.aaType);
+  size_t currentIndex = 0;
   for (auto& record : rects) {
     auto viewMatrix = record->viewMatrix;
     auto rRect = record->rRect;
@@ -116,14 +121,14 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
     viewMatrix.preScale(1 / scales.x, 1 / scales.y);
 
     bool stroked = false;
-    auto stroke = record->stroke;
+    auto stroke = strokes.size() > currentIndex ? strokes[currentIndex].get() : nullptr;
     float xRadius = rRect.radii.x;
     float yRadius = rRect.radii.y;
     float innerXRadius = 0;
     float innerYRadius = 0;
     auto rectBounds = rRect.rect;
-    if (stroke.width > 0) {
-      float halfStrokeWidth = stroke.width / 2;
+    if (stroke && stroke->width > 0.0f) {
+      float halfStrokeWidth = stroke->width / 2;
       innerXRadius = rRect.radii.x - halfStrokeWidth;
       innerYRadius = rRect.radii.y - halfStrokeWidth;
       stroked = innerXRadius > 0 && innerYRadius > 0;
@@ -230,6 +235,7 @@ void RRectsVertexProvider::getVertices(float* vertices) const {
       vertices[index++] = reciprocalRadii[2];
       vertices[index++] = reciprocalRadii[3];
     }
+    currentIndex++;
   }
 }
 }  // namespace tgfx
