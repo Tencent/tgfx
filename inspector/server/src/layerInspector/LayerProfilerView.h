@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -20,18 +20,18 @@
 #include <QtGui/qwindow.h>
 #include <QDialog>
 #include <QQmlApplicationEngine>
-#include <QWidget>
 #include "LayerAttributeModel.h"
 #include "LayerTreeModel.h"
 #include "flatbuffers/flexbuffers.h"
 #include "socket/TcpSocketClient.h"
 #include "socket/WebSocketServer.h"
 
-class LayerProfilerView : public QWidget {
+
+class LayerProfilerView : public QObject {
   Q_OBJECT
  public:
-  LayerProfilerView(QString ip, quint16 port, QWidget* parent = nullptr);
-  explicit LayerProfilerView(QWidget* parent = nullptr);
+  LayerProfilerView(QString ip, quint16 port);
+  explicit LayerProfilerView();
   ~LayerProfilerView() override;
   bool hasWebSocketConnection() const {
     if (m_WebSocketServer) return m_WebSocketServer->hasClientConnect();
@@ -44,6 +44,8 @@ class LayerProfilerView : public QWidget {
   Q_INVOKABLE void SetHoveredSwitchState(bool state);
   Q_INVOKABLE void flushAttribute();
   Q_INVOKABLE void flushLayerTree();
+  Q_INVOKABLE void openStartView();
+  void cleanView();
 
  protected:
   void LayerProlfilerQMLImpl();

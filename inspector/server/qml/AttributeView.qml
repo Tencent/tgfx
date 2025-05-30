@@ -11,8 +11,6 @@ Item {
     AtttributeModel {
         id: attributeModel
         isOpSelected: root.isOpSelected
-        Component.onCompleted: {
-        }
     }
 
     property bool isOpSelected: true

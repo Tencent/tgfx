@@ -34,7 +34,7 @@ Item {
                     Text {
                         id: frameInfo
                         /* get the data from model */
-                        text: model.getFirstFrame()
+                        text: /*model.getFirstFrame()*/ "0"
                         color: "#DDDDDD"
                         font.pixelSize: 14
                     }

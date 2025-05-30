@@ -43,7 +43,7 @@ Rectangle {
     Loader {
         id: titleBar
         readonly property QtObject titleBarCpp: root.titleBarCpp
-        source: "qrc:/qml/TitleBar.qml"
+        source: "qrc:/qml/layerInspector/LayerProfilerTitleBar.qml"
 
         anchors {
             top: parent ? parent.top : undefined

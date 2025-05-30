@@ -484,7 +484,7 @@ ApplicationWindow {
                     radius: 3
                     property bool canLaunch:
                         (selectedFilePathIndex !== -1 && selectedIndex === 0) ||
-                        (selectedClientIndex !== -1 && selectedIndex === 1)
+                        (selectedClientIndex !== -1)
                     color: {
                         if(!canLaunch){
                             return "#666666"
@@ -518,13 +518,13 @@ ApplicationWindow {
                                     var selectedFilePath = startViewModel.fileItems[selectedFilePathIndex].filesPath
                                     startViewModel.openFile(selectedFilePath)
                                 }
-                                else if(selectedIndex === 0 && selectedClientIndex !== -1){
-                                    var selectedClientId = startViewModel.clientItems[selectedClientIndex].clientId
-                                    startViewModel.connectToClient(selectedClientId)
-                                }
-                                else if(selectedIndex === 1 && selectedClientIndex !== -1){
-                                    var selectedClientId = startViewModel.clientItems[selectedClientIndex].clientId
-                                    startViewModel.connectToClient(selectedClientId)
+                                else if(selectedClientIndex !== -1){
+                                    var selectedClient = startViewModel.clientItems[selectedClientIndex]
+                                    if(selectedIndex === 0){
+                                        startViewModel.connectToClient(selectedClient)
+                                    } else if(selectedIndex === 1){
+                                        startViewModel.connectToClientByLayerInspector(selectedClient)
+                                    }
                                 }
                             }
                         }

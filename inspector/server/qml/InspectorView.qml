@@ -188,7 +188,6 @@ ApplicationWindow {
         }
     }
 
-    property bool isConnectSelectFrame: false
 
     Rectangle {
         id: mainContainer
@@ -200,11 +199,13 @@ ApplicationWindow {
             anchors.margins: 1
             spacing: 0
 
+
             Rectangle {
                 id: framesContainer
                 Layout.fillWidth: true
                 Layout.preferredHeight: 100
                 color: "#535353"
+
 
                 Loader {
                     id: framesViewLoader
@@ -215,6 +216,7 @@ ApplicationWindow {
                     }
                 }
             }
+
 
             Item {
                 width: parent.width

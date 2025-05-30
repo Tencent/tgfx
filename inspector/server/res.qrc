@@ -20,5 +20,13 @@
         <file>icons/disconnected.png</file>
         <file>qml/layerInspector/LayerAttribute.qml</file>
         <file>qml/layerInspector/LayerTree.qml</file>
+        <file>qml/layerInspector/LayerProfilerView.qml</file>
+        <file>qml/layerInspector/LayerProfilerTitleBar.qml</file>
+        <file>qml/layerInspector/LayerInspectorGroup.qml</file>
+        <file>icons/layerInspector/attribute.png</file>
+        <file>icons/layerInspector/flush.svg</file>
+        <file>icons/layerInspector/mouse.svg</file>
+        <file>icons/layerInspector/tree.png</file>
+        <file>icons/layerInspector/close.svg</file>
     </qresource>
 </RCC>
