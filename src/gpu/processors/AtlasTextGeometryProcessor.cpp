@@ -19,10 +19,10 @@
 #include "AtlasTextGeometryProcessor.h"
 
 namespace tgfx {
-AtlasTextGeometryProcessor::AtlasTextGeometryProcessor(int width, int height, AAType aa,
-                                                       std::optional<Color> commonColor,
+AtlasTextGeometryProcessor::AtlasTextGeometryProcessor(std::shared_ptr<TextureProxy> textureProxy,
+                                                       AAType aa, std::optional<Color> commonColor,
                                                        const Matrix& uvMatrix)
-    : GeometryProcessor(ClassID()), width(width), height(height), commonColor(commonColor),
+    : GeometryProcessor(ClassID()), textureProxy(std::move(textureProxy)), commonColor(commonColor),
       uvMatrix(uvMatrix) {
   position = {"aPosition", SLType::Float2};
   if (aa == AAType::Coverage) {
@@ -37,7 +37,7 @@ AtlasTextGeometryProcessor::AtlasTextGeometryProcessor(int width, int height, AA
 void AtlasTextGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t flags = aa == AAType::Coverage ? 1 : 0;
   flags |= commonColor.has_value() ? 2 : 0;
-  flags |= 8;
+  flags |= textureProxy->isAlphaOnly() ? 4 : 0;
   bytesKey->write(flags);
 }
 }  // namespace tgfx

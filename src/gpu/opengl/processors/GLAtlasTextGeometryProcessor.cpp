@@ -17,18 +17,20 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLAtlasTextGeometryProcessor.h"
+#include "gpu/opengl/GLGpu.h"
 
 namespace tgfx {
 PlacementPtr<AtlasTextGeometryProcessor> AtlasTextGeometryProcessor::Make(
-    BlockBuffer* buffer, int width, int height, AAType aa, std::optional<Color> commonColor,
-    const Matrix& uvMatrix) {
-  return buffer->make<GLAtlasTextGeometryProcessor>(width, height, aa, commonColor, uvMatrix);
+    BlockBuffer* buffer, std::shared_ptr<TextureProxy> textureProxy, AAType aa,
+    std::optional<Color> commonColor, const Matrix& uvMatrix) {
+  return buffer->make<GLAtlasTextGeometryProcessor>(std::move(textureProxy), aa, commonColor,
+                                                    uvMatrix);
 }
 
-GLAtlasTextGeometryProcessor::GLAtlasTextGeometryProcessor(int width, int height, AAType aa,
-                                                           std::optional<Color> commonColor,
-                                                           const Matrix& uvMatrix)
-    : AtlasTextGeometryProcessor(width, height, aa, commonColor, uvMatrix) {
+GLAtlasTextGeometryProcessor::GLAtlasTextGeometryProcessor(
+    std::shared_ptr<TextureProxy> textureProxy, AAType aa, std::optional<Color> commonColor,
+    const Matrix& uvMatrix)
+    : AtlasTextGeometryProcessor(std::move(textureProxy), aa, commonColor, uvMatrix) {
 }
 
 void GLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -42,11 +44,11 @@ void GLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
   auto atlasName =
       uniformHandler->addUniform(ShaderFlags::Vertex, SLType::Float2, atlasSizeUniformName);
 
-  auto varying = varyingHandler->addVarying("textureCoords", SLType::Float2);
+  auto samplerVarying = varyingHandler->addVarying("textureCoords", SLType::Float2);
   emitTransforms(vertBuilder, varyingHandler, uniformHandler, position.asShaderVar(),
                  args.fpCoordTransformHandler);
   auto uvName = uvCoord.asShaderVar().name();
-  vertBuilder->codeAppendf("%s = %s * %s;", varying.vsOut().c_str(), uvName.c_str(),
+  vertBuilder->codeAppendf("%s = %s * %s;", samplerVarying.vsOut().c_str(), uvName.c_str(),
                            atlasName.c_str());
 
   if (aa == AAType::Coverage) {
@@ -67,6 +69,19 @@ void GLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
     vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), color.name().c_str());
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
   }
+  auto texture = textureProxy->getTexture();
+  DEBUG_ASSERT(texture != nullptr);
+  DEBUG_ASSERT(texture->getSampler() != nullptr);
+  auto samplerHandle = uniformHandler->addSampler(texture->getSampler(), "TextureSampler");
+  fragBuilder->codeAppend("vec4 color = ");
+  fragBuilder->appendTextureLookup(samplerHandle, samplerVarying.vsOut());
+  fragBuilder->codeAppend(";");
+  if (texture->isAlphaOnly()) {
+    fragBuilder->codeAppendf("%s = color.a * %s;", args.outputColor.c_str(),
+                             args.outputColor.c_str());
+  } else {
+    fragBuilder->codeAppendf("%s = color;", args.outputColor.c_str());
+  }
 
   // Emit the vertex position to the hardware in the normalized window coordinates it expects.
   args.vertBuilder->emitNormalizedPosition(position.name());
@@ -74,11 +89,29 @@ void GLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
 
 void GLAtlasTextGeometryProcessor::setData(UniformBuffer* uniformBuffer,
                                            FPCoordTransformIter* transformIter) const {
-  float atlasSizeInv[2] = {1.f / static_cast<float>(width), 1.f / static_cast<float>(height)};
+  float atlasSizeInv[2] = {1.f / static_cast<float>(textureProxy->width()),
+                           1.f / static_cast<float>(textureProxy->height())};
   uniformBuffer->setData(atlasSizeUniformName, atlasSizeInv);
   setTransformDataHelper(uvMatrix, uniformBuffer, transformIter);
   if (commonColor.has_value()) {
     uniformBuffer->setData("Color", *commonColor);
   }
 }
+
+void GLAtlasTextGeometryProcessor::onBindTexture(int textureUint,
+                                                 const SamplerState& samplerState) const {
+  if (textureProxy == nullptr || textureProxy->getTexture() == nullptr) {
+    return;
+  }
+  auto context = textureProxy->getContext();
+  if (context == nullptr) {
+    return;
+  }
+  auto gpu = static_cast<GLGpu*>(context->gpu());
+  if (gpu == nullptr) {
+    return;
+  }
+  gpu->bindTexture(textureUint, textureProxy->getTexture()->getSampler(), samplerState);
+}
+
 }  // namespace tgfx

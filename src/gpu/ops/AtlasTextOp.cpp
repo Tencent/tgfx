@@ -25,15 +25,31 @@
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
+
+int getSamplerCount(const std::vector<PlacementPtr<FragmentProcessor>>& colors,
+                    const std::vector<PlacementPtr<FragmentProcessor>>& coverages) {
+  int samplerCount = 0;
+  for (const auto& color : colors) {
+    samplerCount += static_cast<int>(color->numTextureSamplers());
+  }
+  for (const auto& coverage : coverages) {
+    samplerCount += static_cast<int>(coverage->numTextureSamplers());
+  }
+  return samplerCount;
+}
+
 PlacementPtr<AtlasTextOp> AtlasTextOp::Make(Context* context,
                                             PlacementPtr<RectsVertexProvider> provider,
-                                            uint32_t renderFlags, int atlasWidth, int atlasHeight,
+                                            uint32_t renderFlags,
+                                            std::shared_ptr<TextureProxy> textureProxy,
+                                            const SamplingOptions& sampling,
                                             const Matrix& uvMatrix) {
-  if (provider == nullptr || atlasWidth == 0 || atlasHeight == 0) {
+  if (provider == nullptr || textureProxy == nullptr || textureProxy->width() <= 0 ||
+      textureProxy->height() <= 0) {
     return nullptr;
   }
-  auto atlasTextOp = context->drawingBuffer()->make<AtlasTextOp>(provider.get(), atlasWidth,
-                                                                 atlasHeight, uvMatrix);
+  auto atlasTextOp = context->drawingBuffer()->make<AtlasTextOp>(
+      provider.get(), std::move(textureProxy), sampling, uvMatrix);
   if (provider->aaType() == AAType::Coverage) {
     atlasTextOp->indexBufferProxy = context->resourceProvider()->aaQuadIndexBuffer();
   } else if (provider->rectCount() > 1) {
@@ -50,10 +66,10 @@ PlacementPtr<AtlasTextOp> AtlasTextOp::Make(Context* context,
   return atlasTextOp;
 }
 
-AtlasTextOp::AtlasTextOp(RectsVertexProvider* provider, int atlasWidth, int atlasHeight,
-                         const Matrix& uvMatrix)
-    : DrawOp(provider->aaType()), rectCount(provider->rectCount()), atlasWidth(atlasWidth),
-      atlasHeight(atlasHeight), uvMatrix(uvMatrix) {
+AtlasTextOp::AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureProxy> textureProxy,
+                         const SamplingOptions& sampling, const Matrix& uvMatrix)
+    : DrawOp(provider->aaType()), rectCount(provider->rectCount()),
+      textureProxy(std::move(textureProxy)), textureSamplerState(sampling), uvMatrix(uvMatrix) {
   if (!provider->hasColor()) {
     commonColor = provider->firstColor();
   }
@@ -72,12 +88,16 @@ void AtlasTextOp::execute(RenderPass* renderPass) {
   if (vertexBuffer == nullptr) {
     return;
   }
-
+  int samplerCount = getSamplerCount(colors, coverages);
   auto drawingBuffer = renderPass->getContext()->drawingBuffer();
-  auto gp = AtlasTextGeometryProcessor::Make(drawingBuffer, atlasWidth, atlasHeight, aaType,
-                                             commonColor, uvMatrix);
-  auto pipeline = createPipeline(renderPass, std::move(gp));
+  auto atlasGeometryProcessor =
+      AtlasTextGeometryProcessor::Make(drawingBuffer, textureProxy, aaType, commonColor, uvMatrix);
+  auto pipeline = createPipeline(renderPass, std::move(atlasGeometryProcessor));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
+  if (auto gp = static_cast<const AtlasTextGeometryProcessor*>(pipeline->getGeometryProcessor());
+      gp != nullptr) {
+    gp->onBindTexture(samplerCount, textureSamplerState);
+  }
   renderPass->bindBuffers(indexBuffer, vertexBuffer, vertexBufferOffset);
   if (indexBuffer != nullptr) {
     uint16_t numIndicesPerQuad;
