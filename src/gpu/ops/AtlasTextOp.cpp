@@ -25,19 +25,6 @@
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
-
-int getSamplerCount(const std::vector<PlacementPtr<FragmentProcessor>>& colors,
-                    const std::vector<PlacementPtr<FragmentProcessor>>& coverages) {
-  int samplerCount = 0;
-  for (const auto& color : colors) {
-    samplerCount += static_cast<int>(color->numTextureSamplers());
-  }
-  for (const auto& coverage : coverages) {
-    samplerCount += static_cast<int>(coverage->numTextureSamplers());
-  }
-  return samplerCount;
-}
-
 PlacementPtr<AtlasTextOp> AtlasTextOp::Make(Context* context,
                                             PlacementPtr<RectsVertexProvider> provider,
                                             uint32_t renderFlags,
@@ -69,7 +56,7 @@ PlacementPtr<AtlasTextOp> AtlasTextOp::Make(Context* context,
 AtlasTextOp::AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureProxy> textureProxy,
                          const SamplingOptions& sampling, const Matrix& uvMatrix)
     : DrawOp(provider->aaType()), rectCount(provider->rectCount()),
-      textureProxy(std::move(textureProxy)), textureSamplerState(sampling), uvMatrix(uvMatrix) {
+      textureProxy(std::move(textureProxy)), sampling(sampling), uvMatrix(uvMatrix) {
   if (!provider->hasColor()) {
     commonColor = provider->firstColor();
   }
@@ -88,16 +75,12 @@ void AtlasTextOp::execute(RenderPass* renderPass) {
   if (vertexBuffer == nullptr) {
     return;
   }
-  int samplerCount = getSamplerCount(colors, coverages);
+
   auto drawingBuffer = renderPass->getContext()->drawingBuffer();
-  auto atlasGeometryProcessor =
-      AtlasTextGeometryProcessor::Make(drawingBuffer, textureProxy, aaType, commonColor, uvMatrix);
+  auto atlasGeometryProcessor = AtlasTextGeometryProcessor::Make(
+      drawingBuffer, textureProxy, sampling, aaType, commonColor, uvMatrix);
   auto pipeline = createPipeline(renderPass, std::move(atlasGeometryProcessor));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
-  if (auto gp = static_cast<const AtlasTextGeometryProcessor*>(pipeline->getGeometryProcessor());
-      gp != nullptr) {
-    gp->onBindTexture(samplerCount, textureSamplerState);
-  }
   renderPass->bindBuffers(indexBuffer, vertexBuffer, vertexBufferOffset);
   if (indexBuffer != nullptr) {
     uint16_t numIndicesPerQuad;

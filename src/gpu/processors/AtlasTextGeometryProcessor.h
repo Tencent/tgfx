@@ -27,21 +27,30 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
  public:
   static PlacementPtr<AtlasTextGeometryProcessor> Make(BlockBuffer* buffer,
                                                        std::shared_ptr<TextureProxy> textureProxy,
-                                                       AAType aa, std::optional<Color> commonColor,
+                                                       const SamplingOptions& sampling, AAType aa,
+                                                       std::optional<Color> commonColor,
                                                        const Matrix& uvMatrix);
   std::string name() const override {
     return "AtlasTextGeometryProcessor";
   }
 
-  virtual void onBindTexture(int textureUint, const SamplerState& samplerState) const = 0;
-
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  AtlasTextGeometryProcessor(std::shared_ptr<TextureProxy> textureProxy, AAType aa,
+  AtlasTextGeometryProcessor(std::shared_ptr<TextureProxy> textureProxy,
+                             const SamplingOptions& sampling, AAType aa,
                              std::optional<Color> commonColor, const Matrix& uvMatrix);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
+
+  const TextureSampler* onTextureSampler(size_t index) const override {
+    DEBUG_ASSERT(index < textureSamplers.size());
+    return textureSamplers[index];
+  }
+
+  SamplerState onSamplerState(size_t) const override {
+    return samplerState;
+  }
 
   Attribute position;  // May contain coverage as last channel
   Attribute coverage;
@@ -49,9 +58,10 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
   Attribute color;
 
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
-
   AAType aa = AAType::None;
   std::optional<Color> commonColor = std::nullopt;
   Matrix uvMatrix = {};
+  std::vector<const TextureSampler*> textureSamplers;
+  SamplerState samplerState;
 };
 }  // namespace tgfx

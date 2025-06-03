@@ -41,7 +41,7 @@ class AtlasTextOp final : public DrawOp {
   std::shared_ptr<GpuBufferProxy> vertexBufferProxy = nullptr;
   size_t vertexBufferOffset = 0;
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
-  SamplerState textureSamplerState;
+  SamplingOptions sampling;
   Matrix uvMatrix = {};
 
   explicit AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureProxy> textureProxy,

@@ -21,16 +21,17 @@
 
 namespace tgfx {
 PlacementPtr<AtlasTextGeometryProcessor> AtlasTextGeometryProcessor::Make(
-    BlockBuffer* buffer, std::shared_ptr<TextureProxy> textureProxy, AAType aa,
-    std::optional<Color> commonColor, const Matrix& uvMatrix) {
-  return buffer->make<GLAtlasTextGeometryProcessor>(std::move(textureProxy), aa, commonColor,
-                                                    uvMatrix);
+    BlockBuffer* buffer, std::shared_ptr<TextureProxy> textureProxy,
+    const SamplingOptions& sampling, AAType aa, std::optional<Color> commonColor,
+    const Matrix& uvMatrix) {
+  return buffer->make<GLAtlasTextGeometryProcessor>(std::move(textureProxy), sampling, aa,
+                                                    commonColor, uvMatrix);
 }
 
 GLAtlasTextGeometryProcessor::GLAtlasTextGeometryProcessor(
-    std::shared_ptr<TextureProxy> textureProxy, AAType aa, std::optional<Color> commonColor,
-    const Matrix& uvMatrix)
-    : AtlasTextGeometryProcessor(std::move(textureProxy), aa, commonColor, uvMatrix) {
+    std::shared_ptr<TextureProxy> textureProxy, const SamplingOptions& sampling, AAType aa,
+    std::optional<Color> commonColor, const Matrix& uvMatrix)
+    : AtlasTextGeometryProcessor(std::move(textureProxy), sampling, aa, commonColor, uvMatrix) {
 }
 
 void GLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -97,21 +98,4 @@ void GLAtlasTextGeometryProcessor::setData(UniformBuffer* uniformBuffer,
     uniformBuffer->setData("Color", *commonColor);
   }
 }
-
-void GLAtlasTextGeometryProcessor::onBindTexture(int textureUint,
-                                                 const SamplerState& samplerState) const {
-  if (textureProxy == nullptr || textureProxy->getTexture() == nullptr) {
-    return;
-  }
-  auto context = textureProxy->getContext();
-  if (context == nullptr) {
-    return;
-  }
-  auto gpu = static_cast<GLGpu*>(context->gpu());
-  if (gpu == nullptr) {
-    return;
-  }
-  gpu->bindTexture(textureUint, textureProxy->getTexture()->getSampler(), samplerState);
-}
-
 }  // namespace tgfx
