@@ -50,9 +50,6 @@ std::shared_ptr<PathRasterizer> PathRasterizer::Make(int width, int height,
   if (shape == nullptr || width <= 0 || height <= 0) {
     return nullptr;
   }
-  if (shape->getBounds().isEmpty()) {
-    return nullptr;
-  }
   return std::make_shared<FTPathRasterizer>(width, height, std::move(shape), antiAlias,
                                             needsGammaCorrection);
 }
