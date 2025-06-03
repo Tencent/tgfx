@@ -15,6 +15,7 @@
         <file>icons/LayerTreeIcon.png</file>
         <file>icons/openfile.png</file>
         <file>icons/capture.png</file>
+        <file>icons/arrow_icon.png</file>
         <file>icons/savefile.png</file>
         <file>icons/disconnected.png</file>
         <file>qml/layerInspector/LayerAttribute.qml</file>

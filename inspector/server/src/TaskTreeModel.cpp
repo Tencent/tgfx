@@ -20,61 +20,25 @@
 #include <QRegularExpression>
 #include <unordered_set>
 #include "AtttributeModel.h"
+#include "TimePrint.h"
 
 namespace inspector {
-TaskTreeModel::TaskTreeModel(QObject* parent) : QAbstractItemModel(parent) {
+TaskTreeModel::TaskTreeModel(Worker* worker, ViewData* viewData, QObject* parent)
+  : QAbstractItemModel(parent), worker(worker), viewData(viewData) {
+  refreshData();
 }
 
 TaskTreeModel::~TaskTreeModel() {
   deleteTree(rootItem);
 }
 
-QHash<int, QByteArray> TaskTreeModel::roleNames() const {
-  QHash<int, QByteArray> roles;
-  roles[NameRole] = "name";
-  roles[StartTimeRole] = "startTime";
-  roles[EndTimeRole] = "endTime";
-  roles[DurationRole] = "duration";
-  roles[TypeRole] = "type";
-  roles[OpIdRole] = "opId";
-  roles[TaskIndexRole] = "taskIndex";
-  return roles;
-}
-
 QVariant TaskTreeModel::data(const QModelIndex& index, int role) const {
-  if (!index.isValid() || !rootItem) {
+  if (!index.isValid() || rootItem == nullptr || role != Qt::DisplayRole) {
     return {};
   }
 
-  auto& dataContext = worker->GetDataContext();
-  auto& opTasks = dataContext.opTasks;
   auto item = static_cast<TaskItem*>(index.internalPointer());
-  switch (role) {
-    case NameRole:
-      return item->getName();
-    case StartTimeRole:
-      return static_cast<qint64>(item->getOpData().start);
-    case EndTimeRole:
-      return static_cast<qint64>(item->getOpData().end);
-    case DurationRole:
-      return static_cast<qint64>(item->getOpData().end) -
-             static_cast<qint64>(item->getOpData().start);
-    case TypeRole:
-      return static_cast<uint>(item->getType());
-    case OpIdRole:
-      return static_cast<uint>(item->getOpId());
-    case TaskIndexRole: {
-      const uint32_t opId = item->getOpId();
-      for (size_t i = 0; i < opTasks.size(); ++i) {
-        if (opTasks[i]->id == opId) {
-          return static_cast<int>(i);
-        }
-      }
-      return -1;
-    }
-    default:
-      return {};
-  }
+  return item->data(index.column());
 }
 
 QModelIndex TaskTreeModel::index(int row, int column, const QModelIndex& parent) const {
@@ -82,14 +46,10 @@ QModelIndex TaskTreeModel::index(int row, int column, const QModelIndex& parent)
     return {};
   }
 
-  TaskItem* parentItem = nullptr;
-  if (!parent.isValid()) {
-    parentItem = rootItem;
-  } else {
-    parentItem = static_cast<TaskItem*>(parent.internalPointer());
-  }
-  auto childItem = parentItem->childAt(static_cast<uint32_t>(row));
-  if (childItem) {
+  TaskItem* parentItem = parent.isValid()
+                               ? static_cast<TaskItem*>(parent.internalPointer())
+                               : rootItem;
+  if (auto childItem = parentItem->childAt(static_cast<uint32_t>(row))) {
     return createIndex(row, column, childItem);
   }
   return {};
@@ -120,12 +80,17 @@ int TaskTreeModel::rowCount(const QModelIndex& parent) const {
     parentItem = static_cast<TaskItem*>(parent.internalPointer());
   }
 
-  return parentItem ? parentItem->childCount() : 0;
+  if (!parentItem) {
+    return 0;
+  }
+  return parentItem->childCount();
 }
 
 int TaskTreeModel::columnCount(const QModelIndex& parent) const {
-  Q_UNUSED(parent)
-  return 1;
+  if (parent.isValid()) {
+    return static_cast<TaskItem*>(parent.internalPointer())->columnCount();
+  }
+  return rootItem ? rootItem->columnCount() : 3;
 }
 
 bool TaskTreeModel::matchesFilter(const QString& name) const {
@@ -158,34 +123,60 @@ void TaskTreeModel::refreshData() {
   auto selectFrame = viewData->selectFrame;
   const auto& frameData = worker->GetFrameData()->frames;
   if (selectFrame > frameData.size() || selectFrame < 2) {
+    endResetModel();
     return;
   }
   const auto selectFrameData = frameData[selectFrame];
-  auto& dataContext = worker->GetDataContext();
+  auto nextFrame = selectFrame + 1;
+  if (selectFrame == frameData.size()) {
+    nextFrame = 0;
+  }
+  const auto& dataContext = worker->GetDataContext();
+  auto selectFrameTime = worker->GetFrameTime(dataContext.frameData, selectFrame);
   auto& opTasks = dataContext.opTasks;
   auto opChilds = dataContext.opChilds;
+  std::unordered_map<uint32_t, std::vector<uint32_t>> selectChilds;
   std::vector<std::shared_ptr<OpTaskData>> selectFrameOpTasks;
   for (const auto& iter : opTasks) {
-    if (iter->start > selectFrameData.end) {
+    if (nextFrame && iter->start > frameData[nextFrame].start) {
       break;
     }
     if (iter->start > selectFrameData.start) {
       selectFrameOpTasks.push_back(iter);
+      if (opChilds.find(iter->id) != opChilds.end()) {
+        auto& tmp = opChilds[iter->id];
+        selectChilds[iter->id] = tmp;
+      }
     }
   }
   deleteTree(rootItem);
-  rootItem = processTaskLevel(selectFrameOpTasks, opChilds);
+  rootItem = processTaskLevel(selectFrameTime, selectFrameOpTasks, selectChilds);
+
+  endResetModel();
 }
 
 TaskItem* TaskTreeModel::processTaskLevel(
+    int64_t selectFrameTime,
     const std::vector<std::shared_ptr<OpTaskData>>& opTasks,
-    std::unordered_map<uint32_t, std::vector<unsigned int>> opChilds) {
+    const std::unordered_map<uint32_t, std::vector<unsigned int>>& opChilds) {
+  TaskItem* root = nullptr;
+  // this step is very importent
+  QVariantList emptyColumnData {tr("opTaskName"), tr("opTaskTime"), tr("opTaskWeight")};
+  if (opTasks.empty()) {
+    root = new TaskItem(emptyColumnData, static_cast<uint32_t>(0));
+    return root;
+  }
+
   std::unordered_map<uint32_t, TaskItem*> nodeMap;
   for (auto& opTask: opTasks) {
-    nodeMap[opTask->id] = new TaskItem(opTask.get());
+    QVariantList columnData;
+    auto opTaskTime = opTask->end - opTask->start;
+    columnData << OpTaskName[opTask->type];
+    columnData << TimeToString(opTaskTime);
+    columnData << opTaskTime / selectFrameTime * 100;
+    nodeMap[opTask->id] = new TaskItem(columnData, opTask->id);
   }
   std::unordered_set<uint32_t> childNodes;
-  TaskItem* root = nullptr;
   for (const auto& pair: opChilds) {
     for (auto childIndex: pair.second) {
       childNodes.insert(childIndex);
@@ -198,16 +189,14 @@ TaskItem* TaskTreeModel::processTaskLevel(
         root = nodeMap[i];
       }
       else {
-        auto emptyOpTaskData = new OpTaskData();
-        root = new TaskItem(emptyOpTaskData);
+        root = new TaskItem(emptyColumnData, static_cast<uint32_t>(0));
         break;
       }
     }
   }
 
   if (root == nullptr) {
-    auto emptyOpTaskData = new OpTaskData();
-    root = new TaskItem(emptyOpTaskData);
+    root = new TaskItem(emptyColumnData, static_cast<uint32_t>(0));
   }
   for (const auto& pair: opChilds) {
     auto parendIndex = pair.first;
@@ -220,16 +209,15 @@ TaskItem* TaskTreeModel::processTaskLevel(
       childNode->setParent(parentNode);
     }
   }
-  if (root->getType() == OpTaskType::Unknown) {
-    for (uint32_t i = 0; i < opTasks.size(); ++i) {
-      auto node = nodeMap[i];
+  if (root->opId == 0) {
+    for (const auto& opTask: opTasks) {
+      auto node = nodeMap[opTask->id];
       if (node->getParentItem() == nullptr && node != root) {
         root->appendChild(node);
         node->setParent(root);
       }
     }
   }
-
   return root;
 }
 
@@ -240,7 +228,6 @@ void TaskTreeModel::selectedTask(const QModelIndex& index) {
 
   TaskItem* item = static_cast<TaskItem*>(index.internalPointer());
   if (item) {
-    Q_EMIT taskSelected(item->getOpData(), item->getName(), item->getOpId());
   }
 }
 

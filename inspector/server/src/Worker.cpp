@@ -336,7 +336,7 @@ void Worker::NewOpTask(std::shared_ptr<OpTaskData> opTask) {
   dataContext.opTasks.push_back(opTask);
   if (size != 0) {
     auto& back = stack.back();
-    if (dataContext.opChilds.find(opTask->id) == dataContext.opChilds.end()) {
+    if (dataContext.opChilds.find(back->id) == dataContext.opChilds.end()) {
       dataContext.opChilds[back->id] = std::vector<uint32_t>{opTask->id};
     } else {
       dataContext.opChilds[back->id].push_back(opTask->id);

@@ -20,6 +20,7 @@
 #include <tgfx/core/Data.h>
 #include <cstdint>
 #include <vector>
+#include <unordered_map>
 #include "Protocol.h"
 
 namespace inspector {
@@ -59,6 +60,30 @@ struct OpTaskData {
   uint8_t type = OpTaskType::Unknown;
 };
 enum { OpTaskDataSize = sizeof(OpTaskData) };
+
+static std::unordered_map<uint8_t, const char*> OpTaskName = {
+  {OpTaskType::Unknown, "Unknown"},
+  {OpTaskType::Flush, "Flush"},
+  {OpTaskType::ResourceTask, "ResourceTask"},
+  {OpTaskType::TextureUploadTask, "TextureUploadTask"},
+  {OpTaskType::ShapeBufferUploadTask, "ShapeBufferUploadTask"},
+  {OpTaskType::GpuUploadTask, "GpuUploadTask"},
+  {OpTaskType::TextureCreateTask, "TextureCreateTask"},
+  {OpTaskType::RenderTargetCreateTask, "RenderTargetCreateTask"},
+  {OpTaskType::TextureFlattenTask, "TextureFlattenTask"},
+  {OpTaskType::RenderTask, "RenderTask"},
+  {OpTaskType::RenderTargetCopyTask, "RenderTargetCopyTask"},
+  {OpTaskType::RuntimeDrawTask, "RuntimeDrawTask"},
+  {OpTaskType::TextureResolveTask, "TextureResolveTask"},
+  {OpTaskType::OpsRenderTask, "OpsRenderTask"},
+  {OpTaskType::ClearOp, "ClearOp"},
+  {OpTaskType::RectDrawOp, "RectDrawOp"},
+  {OpTaskType::RRectDrawOp, "RRectDrawOp"},
+  {OpTaskType::ShapeDrawOp, "ShapeDrawOp"},
+  {OpTaskType::DstTextureCopyOp, "DstTextureCopyOp"},
+  {OpTaskType::ResolveOp, "ResolveOp"},
+  {OpTaskType::OpTaskTypeSize, "OpTaskTypeSize"},
+};
 
 enum DataType : uint8_t { Color, Vect, Mat4, Int, Float, String, Count };
 

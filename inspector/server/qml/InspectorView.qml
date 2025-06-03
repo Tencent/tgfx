@@ -211,8 +211,9 @@ ApplicationWindow {
                     id: framesViewLoader
                     source: "qrc:/qml/FramesView.qml"
                     anchors.fill: parent
-                    property var loaderWorker: workerPtr
-                    property var loaderViewData: viewDataPtr
+                    onLoaded: {
+                        item.objectName = "framesDrawer"
+                    }
                 }
             }
 
@@ -312,13 +313,10 @@ ApplicationWindow {
                 Layout.fillHeight: true
                 uniqueName: "MainInspectorLayout"
 
-
-
                 KDDW.DockWidget {
                     id: taskDock
                     uniqueName: "Task"
                     source: "qrc:/qml/TaskTreeView.qml"
-
                 }
 
                 KDDW.DockWidget {
@@ -337,7 +335,6 @@ ApplicationWindow {
                 Component.onCompleted: {
                     addDockWidget(attributeDock, KDDW.KDDockWidgets.Location_OnRight, null, Qt.size(1500, 0));
                     addDockWidget(taskDock, KDDW.KDDockWidgets.Location_OnLeft, attributeDock, Qt.size(420, 0));
-
                 }
             }
         }

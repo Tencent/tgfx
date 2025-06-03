@@ -6,9 +6,6 @@ Item {
     id: wind
     visible: true
 
-    property var worker: framesViewLoader ? framesViewLoader.loaderWorker : null
-    property var viewData: framesViewLoader ? framesViewLoader.loaderViewData : null
-
     Row {
         anchors.fill: parent
         spacing: 0
@@ -79,8 +76,8 @@ Item {
 
         FramesDrawer {
             id: frameDrawer
-            worker: wind.worker
-            viewData: wind.viewData
+            worker: workerPtr
+            viewData: viewDataPtr
             width: parent.width - frameInfoArea.width
             height: parent.height
             objectName: "framesDrawer"

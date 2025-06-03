@@ -41,8 +41,8 @@ endif ()
 
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Core Widgets OpenGL qml Quick WebSockets Network QuickControls2)
 list(APPEND TGFX_INSPECTOR_LIBS Qt${QT_VERSION_MAJOR}::Core Qt${QT_VERSION_MAJOR}::Widgets
-        Qt${QT_VERSION_MAJOR}::OpenGL Qt${QT_VERSION_MAJOR}::Qml Qt${QT_VERSION_MAJOR}::Quick
-        Qt${QT_VERSION_MAJOR}::WebSockets Qt${QT_VERSION_MAJOR}::Network Qt${QT_VERSION_MAJOR}::QuickControls2)
+        Qt${QT_VERSION_MAJOR}::WebSockets Qt${QT_VERSION_MAJOR}::OpenGL Qt${QT_VERSION_MAJOR}::Qml Qt${QT_VERSION_MAJOR}::Quick
+        Qt${QT_VERSION_MAJOR}::Network Qt${QT_VERSION_MAJOR}::QuickControls2)
 if (${QT_VERSION} VERSION_LESS "5.15")
     function(qt_add_resources outfiles)
         qt5_add_resources("${outfiles}" ${ARGN})
@@ -85,7 +85,7 @@ elseif (WIN32)
     list(APPEND TGFX_INSPECTOR_LIBS ${ws2_32_LIB})
 endif ()
 
-list(APPEND TGFX_INSPECTOR_SRC src src/tags)
+list(APPEND TGFX_INSPECTOR_SRC src src/tags src/socket/*.* src/layerInspector/*.*)
 file(GLOB TGFX_INSPECTOR_FILES src/*.* src/tags/*.* src/socket/*.* src/layerInspector/*.*)
 
 list(APPEND TGFX_INSPECTOR_COMMON_SRC ${INSPECTOR_COMMON_DIR})

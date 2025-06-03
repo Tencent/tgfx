@@ -28,15 +28,20 @@ namespace inspector {
 
 InspectorView::InspectorView(std::string filePath, int width, QObject* parent)
     : QObject(parent), width(width), worker(filePath) {
-  frames = worker.GetFrameData();
+  initView();
+  initConnect();
 }
 
 InspectorView::InspectorView(std::string& addr, uint16_t port, int width, QObject* parent)
     : QObject(parent), width(width), worker(addr.c_str(), port) {
-  frames = worker.GetFrameData();
+  initView();
+  initConnect();
 }
 
 InspectorView::~InspectorView() {
+  if (taskTreeModel) {
+    delete taskTreeModel;
+  }
   cleanView();
 }
 
@@ -47,11 +52,12 @@ void InspectorView::initView() {
   qmlRegisterType<AtttributeModel>("AtttributeModel", 1, 0, "AtttributeModel");
   qmlRegisterUncreatableType<KDDockWidgets::QtQuick::Group>("com.kdab.dockwidgets", 2, 0,
                                                "GroupView", QStringLiteral("Internal usage only"));
-
+  taskTreeModel = new TaskTreeModel(&worker, &viewData, this);
   ispEngine = new QQmlApplicationEngine(this);
   ispEngine->rootContext()->setContextProperty("workerPtr", &worker);
   ispEngine->rootContext()->setContextProperty("viewDataPtr", &viewData);
   ispEngine->rootContext()->setContextProperty("inspectorViewModel", this);
+  ispEngine->rootContext()->setContextProperty("taskTreeModel", taskTreeModel);
   KDDockWidgets::QtQuick::Platform::instance()->setQmlEngine(ispEngine);
   ispEngine->load((QUrl("qrc:/qml/InspectorView.qml")));
   if (ispEngine->rootObjects().isEmpty()) {
@@ -63,6 +69,19 @@ void InspectorView::initView() {
     ispWindow->setTitle("Inspector");
     ispWindow->show();
   }
+  initConnect();
+}
+
+void InspectorView::initConnect() {
+  if (!ispEngine) {
+    return;
+  }
+  auto inspectorWindow = qobject_cast<QWindow*>(ispEngine->rootObjects().first());
+  if (!inspectorWindow) {
+    return;
+  }
+  auto frameDrawer = inspectorWindow->findChild<FramesDrawer*>("framesDrawer");
+  connect(frameDrawer, &FramesDrawer::selectFrame, taskTreeModel, &TaskTreeModel::refreshData);
 }
 
 void InspectorView::cleanView() {
