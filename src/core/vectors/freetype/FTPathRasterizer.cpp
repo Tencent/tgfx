@@ -44,21 +44,6 @@ static void Iterator(PathVerb verb, const Point points[4], void* info) {
   }
 }
 
-std::shared_ptr<PathRasterizer> PathRasterizer::Make(std::shared_ptr<Shape> shape, bool antiAlias,
-                                                     bool needsGammaCorrection) {
-  if (shape == nullptr) {
-    return nullptr;
-  }
-  auto bounds = shape->getBounds();
-  if (bounds.isEmpty()) {
-    return nullptr;
-  }
-  auto width = static_cast<int>(ceilf(bounds.width()));
-  auto height = static_cast<int>(ceilf(bounds.height()));
-  return std::make_shared<FTPathRasterizer>(width, height, std::move(shape), antiAlias,
-                                            needsGammaCorrection);
-}
-
 std::shared_ptr<PathRasterizer> PathRasterizer::Make(int width, int height,
                                                      std::shared_ptr<Shape> shape, bool antiAlias,
                                                      bool needsGammaCorrection) {
