@@ -23,8 +23,8 @@ AtlasTextGeometryProcessor::AtlasTextGeometryProcessor(std::shared_ptr<TexturePr
                                                        const SamplingOptions& sampling, AAType aa,
                                                        std::optional<Color> commonColor,
                                                        const Matrix& uvMatrix)
-    : GeometryProcessor(ClassID()), textureProxy(std::move(textureProxy)), commonColor(commonColor),
-      samplerState(sampling), uvMatrix(uvMatrix) {
+    : GeometryProcessor(ClassID()), textureProxy(std::move(textureProxy)), samplerState(sampling),
+      commonColor(commonColor), uvMatrix(uvMatrix) {
   position = {"aPosition", SLType::Float2};
   if (aa == AAType::Coverage) {
     coverage = {"inCoverage", SLType::Float};

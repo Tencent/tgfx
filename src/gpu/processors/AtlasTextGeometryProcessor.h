@@ -58,10 +58,10 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
   Attribute color;
 
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
+  SamplerState samplerState;
   AAType aa = AAType::None;
   std::optional<Color> commonColor = std::nullopt;
   Matrix uvMatrix = {};
   std::vector<const TextureSampler*> textureSamplers;
-  SamplerState samplerState;
 };
 }  // namespace tgfx
