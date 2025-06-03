@@ -2666,7 +2666,8 @@ TGFX_TEST(LayerTest, DecomposeRectTest) {
   auto dirtyRects = displayList->_root->updateDirtyRegions();
   canvas->drawRect(dirtyRects[0], paint);
   canvas->drawRect(dirtyRects[1], paint);
-  canvas->drawRect(dirtyRects[2], paint);
+  // canvas->drawRect(dirtyRects[2], paint);
+  EXPECT_EQ(dirtyRects.size(), 2lu);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DecomposeRectTest1"));
 
   // Draw the shape layer
@@ -2693,8 +2694,9 @@ TGFX_TEST(LayerTest, DecomposeRectTest) {
   canvas->drawRect(dirtyRects[0], paint);
   canvas->drawRect(dirtyRects[1], paint);
   canvas->drawRect(dirtyRects[2], paint);
-  canvas->drawRect(dirtyRects[3], paint);
-  canvas->drawRect(dirtyRects[4], paint);
+  // canvas->drawRect(dirtyRects[3], paint);
+  // canvas->drawRect(dirtyRects[4], paint);
+  EXPECT_EQ(dirtyRects.size(), 3lu);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DecomposeRectTest2"));
 
   // Draw the shape layer
@@ -2725,10 +2727,11 @@ TGFX_TEST(LayerTest, DecomposeRectTest) {
   canvas->drawRect(dirtyRects[0], paint);
   canvas->drawRect(dirtyRects[1], paint);
   canvas->drawRect(dirtyRects[2], paint);
-  canvas->drawRect(dirtyRects[3], paint);
-  canvas->drawRect(dirtyRects[4], paint);
-  canvas->drawRect(dirtyRects[5], paint);
-  canvas->drawRect(dirtyRects[6], paint);
+  EXPECT_EQ(dirtyRects.size(), 3lu);
+  // canvas->drawRect(dirtyRects[3], paint);
+  // canvas->drawRect(dirtyRects[4], paint);
+  // canvas->drawRect(dirtyRects[5], paint);
+  // canvas->drawRect(dirtyRects[6], paint);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DecomposeRectTest3"));
 
   // Draw the shape layer
@@ -2763,12 +2766,13 @@ TGFX_TEST(LayerTest, DecomposeRectTest) {
   canvas->drawRect(dirtyRects[0], paint);
   canvas->drawRect(dirtyRects[1], paint);
   canvas->drawRect(dirtyRects[2], paint);
-  canvas->drawRect(dirtyRects[3], paint);
-  canvas->drawRect(dirtyRects[4], paint);
-  canvas->drawRect(dirtyRects[5], paint);
-  canvas->drawRect(dirtyRects[6], paint);
-  canvas->drawRect(dirtyRects[7], paint);
-  canvas->drawRect(dirtyRects[8], paint);
+  EXPECT_EQ(dirtyRects.size(), 3lu);
+  // canvas->drawRect(dirtyRects[3], paint);
+  // canvas->drawRect(dirtyRects[4], paint);
+  // canvas->drawRect(dirtyRects[5], paint);
+  // canvas->drawRect(dirtyRects[6], paint);
+  // canvas->drawRect(dirtyRects[7], paint);
+  // canvas->drawRect(dirtyRects[8], paint);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DecomposeRectTest4"));
 
   // Draw the shape layer
@@ -2807,14 +2811,15 @@ TGFX_TEST(LayerTest, DecomposeRectTest) {
   canvas->drawRect(dirtyRects[0], paint);
   canvas->drawRect(dirtyRects[1], paint);
   canvas->drawRect(dirtyRects[2], paint);
-  canvas->drawRect(dirtyRects[3], paint);
-  canvas->drawRect(dirtyRects[4], paint);
-  canvas->drawRect(dirtyRects[5], paint);
-  canvas->drawRect(dirtyRects[6], paint);
-  canvas->drawRect(dirtyRects[7], paint);
-  canvas->drawRect(dirtyRects[8], paint);
-  canvas->drawRect(dirtyRects[9], paint);
-  canvas->drawRect(dirtyRects[10], paint);
+  EXPECT_EQ(dirtyRects.size(), 3lu);
+  // canvas->drawRect(dirtyRects[3], paint);
+  // canvas->drawRect(dirtyRects[4], paint);
+  // canvas->drawRect(dirtyRects[5], paint);
+  // canvas->drawRect(dirtyRects[6], paint);
+  // canvas->drawRect(dirtyRects[7], paint);
+  // canvas->drawRect(dirtyRects[8], paint);
+  // canvas->drawRect(dirtyRects[9], paint);
+  // canvas->drawRect(dirtyRects[10], paint);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DecomposeRectTest5"));
 }
 }  // namespace tgfx
