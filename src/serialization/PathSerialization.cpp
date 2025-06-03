@@ -20,7 +20,7 @@
 
 namespace tgfx {
 
-std::shared_ptr<Data> PathSerialization::Serialize(const Path* path, SerializeUtils::Map* map) {
+std::shared_ptr<Data> PathSerialization::Serialize(const Path* path, SerializeUtils::ComplexObjSerMap* map) {
   DEBUG_ASSERT(path != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -32,7 +32,7 @@ std::shared_ptr<Data> PathSerialization::Serialize(const Path* path, SerializeUt
 }
 
 void PathSerialization::SerializePathImpl(flexbuffers::Builder& fbb, const Path* path,
-                                          SerializeUtils::Map* map) {
+                                          SerializeUtils::ComplexObjSerMap* map) {
   SerializeUtils::SetFlexBufferMap(fbb, "fillType",
                                    SerializeUtils::PathFillTypeToString(path->getFillType()));
   SerializeUtils::SetFlexBufferMap(fbb, "isInverseFillType", path->isInverseFillType());
@@ -43,7 +43,7 @@ void PathSerialization::SerializePathImpl(flexbuffers::Builder& fbb, const Path*
   auto boundsID = SerializeUtils::GetObjID();
   auto bounds = path->getBounds();
   SerializeUtils::SetFlexBufferMap(fbb, "bounds", "", false, true, boundsID);
-  SerializeUtils::FillMap(bounds, boundsID, map);
+  SerializeUtils::FillComplexObjSerMap(bounds, boundsID, map);
 
   SerializeUtils::SetFlexBufferMap(fbb, "isEmpty", path->isEmpty());
   SerializeUtils::SetFlexBufferMap(fbb, "countPoints", path->countPoints());

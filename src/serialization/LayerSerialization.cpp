@@ -15,6 +15,7 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+#include "layers/contents/TextContent.h"
 #ifdef TGFX_USE_INSPECTOR
 
 #include "LayerSerialization.h"
@@ -30,7 +31,8 @@ namespace tgfx {
 extern const std::string HighLightLayerName;
 
 std::shared_ptr<Data> LayerSerialization::SerializeLayer(const Layer* layer,
-                                                         SerializeUtils::Map* map,
+                                                         SerializeUtils::ComplexObjSerMap* map,
+                                                         SerializeUtils::RenderableObjSerMap* rosMap,
                                                          const std::string& typeName) {
   DEBUG_ASSERT(layer != nullptr)
   flexbuffers::Builder fbb;
@@ -40,20 +42,20 @@ std::shared_ptr<Data> LayerSerialization::SerializeLayer(const Layer* layer,
   auto type = layer->type();
   switch (type) {
     case LayerType::Image:
-      SerializeImageLayerImpl(fbb, layer, map);
+      SerializeImageLayerImpl(fbb, layer, map, rosMap);
       break;
     case LayerType::Shape:
-      SerializeShapeLayerImpl(fbb, layer, map);
+      SerializeShapeLayerImpl(fbb, layer, map, rosMap);
       break;
     case LayerType::Text:
-      SerializeTextLayerImpl(fbb, layer, map);
+      SerializeTextLayerImpl(fbb, layer, map, rosMap);
       break;
     case LayerType::Solid:
-      SerializeSolidLayerImpl(fbb, layer, map);
+      SerializeSolidLayerImpl(fbb, layer, map, rosMap);
       break;
     case LayerType::Layer:
     case LayerType::Gradient:
-      SerializeBasicLayerImpl(fbb, layer, map);
+      SerializeBasicLayerImpl(fbb, layer, map, rosMap);
       break;
     default:
       LOGE("Unknown layer type!");
@@ -98,7 +100,7 @@ void LayerSerialization::SerializeTreeNodeImpl(
 }
 
 void LayerSerialization::SerializeBasicLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
-                                                 SerializeUtils::Map* map) {
+                                                 SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap) {
   SerializeUtils::SetFlexBufferMap(fbb, "type", SerializeUtils::LayerTypeToString(layer->type()));
   SerializeUtils::SetFlexBufferMap(fbb, "visible", layer->visible());
   SerializeUtils::SetFlexBufferMap(fbb, "shouldRasterize", layer->shouldRasterize());
@@ -114,12 +116,12 @@ void LayerSerialization::SerializeBasicLayerImpl(flexbuffers::Builder& fbb, cons
   auto matID = SerializeUtils::GetObjID();
   auto matrix = layer->matrix();
   SerializeUtils::SetFlexBufferMap(fbb, "matrix", "", false, true, matID);
-  SerializeUtils::FillMap(matrix, matID, map);
+  SerializeUtils::FillComplexObjSerMap(matrix, matID, map);
 
   auto posID = SerializeUtils::GetObjID();
   auto position = layer->position();
   SerializeUtils::SetFlexBufferMap(fbb, "position", "", false, true, posID);
-  SerializeUtils::FillMap(position, posID, map);
+  SerializeUtils::FillComplexObjSerMap(position, posID, map);
 
   SerializeUtils::SetFlexBufferMap(fbb, "rasterizationScale", layer->rasterizationScale());
 
@@ -127,43 +129,43 @@ void LayerSerialization::SerializeBasicLayerImpl(flexbuffers::Builder& fbb, cons
   auto filterSize = static_cast<unsigned int>(filters.size());
   auto filtersID = SerializeUtils::GetObjID();
   SerializeUtils::SetFlexBufferMap(fbb, "filters", filterSize, false, filterSize, filtersID);
-  SerializeUtils::FillMap(filters, filtersID, map);
+  SerializeUtils::FillComplexObjSerMap(filters, filtersID, map);
 
   auto mask = layer->mask();
   auto maskID = SerializeUtils::GetObjID();
   SerializeUtils::SetFlexBufferMap(fbb, "mask", reinterpret_cast<uint64_t>(mask.get()), true,
                                    mask != nullptr, maskID);
-  SerializeUtils::FillMap(mask, maskID, map);
+  SerializeUtils::FillComplexObjSerMap(mask, maskID, map, rosMap);
 
   auto scrollRectID = SerializeUtils::GetObjID();
   auto scrollRect = layer->scrollRect();
   SerializeUtils::SetFlexBufferMap(fbb, "scrollRect", "", false, true, scrollRectID);
-  SerializeUtils::FillMap(scrollRect, scrollRectID, map);
+  SerializeUtils::FillComplexObjSerMap(scrollRect, scrollRectID, map);
 
   auto rootID = SerializeUtils::GetObjID();
   std::shared_ptr<Layer> root = layer->root() ? layer->root()->weakThis.lock() : nullptr;
   SerializeUtils::SetFlexBufferMap(fbb, "root", reinterpret_cast<uint64_t>(root.get()), true,
                                    root != nullptr, rootID);
-  SerializeUtils::FillMap(root, rootID, map);
+  SerializeUtils::FillComplexObjSerMap(root, rootID, map, rosMap);
 
   auto parentID = SerializeUtils::GetObjID();
   auto parent = layer->parent();
   SerializeUtils::SetFlexBufferMap(fbb, "parent", reinterpret_cast<uint64_t>(parent.get()), true,
                                    parent != nullptr, parentID);
-  SerializeUtils::FillMap(parent, parentID, map);
+  SerializeUtils::FillComplexObjSerMap(parent, parentID, map, rosMap);
 
   auto childrenID = SerializeUtils::GetObjID();
   auto children = layer->children();
   auto childrenSize = static_cast<unsigned int>(children.size());
   SerializeUtils::SetFlexBufferMap(fbb, "children", childrenSize, false, childrenSize, childrenID);
-  SerializeUtils::FillMap(children, childrenID, map);
+  SerializeUtils::FillComplexObjSerMap(children, childrenID, map, rosMap);
 
   auto layerStylesID = SerializeUtils::GetObjID();
   auto layerStyles = layer->layerStyles();
   auto layerStylesSize = static_cast<unsigned int>(layerStyles.size());
   SerializeUtils::SetFlexBufferMap(fbb, "layerStyles", layerStylesSize, false, layerStylesSize,
                                    layerStylesID);
-  SerializeUtils::FillMap(layerStyles, layerStylesID, map);
+  SerializeUtils::FillComplexObjSerMap(layerStyles, layerStylesID, map);
 
   SerializeUtils::SetFlexBufferMap(fbb, "dirtyContent", layer->bitFields.dirtyContent);
   SerializeUtils::SetFlexBufferMap(fbb, "dirtyDescendents", layer->bitFields.dirtyDescendents);
@@ -174,55 +176,57 @@ void LayerSerialization::SerializeBasicLayerImpl(flexbuffers::Builder& fbb, cons
   std::shared_ptr<Layer> maskOwner = layer->maskOwner ? layer->maskOwner->weakThis.lock() : nullptr;
   SerializeUtils::SetFlexBufferMap(fbb, "maskOwner", reinterpret_cast<uint64_t>(maskOwner.get()),
                                    true, maskOwner != nullptr, maskOwnerID);
-  SerializeUtils::FillMap(maskOwner, maskOwnerID, map);
+  SerializeUtils::FillComplexObjSerMap(maskOwner, maskOwnerID, map, rosMap);
 
   auto renderBoundsID = SerializeUtils::GetObjID();
   auto renderBounds = layer->renderBounds;
   SerializeUtils::SetFlexBufferMap(fbb, "renderBounds", "", false, true, renderBoundsID);
-  SerializeUtils::FillMap(renderBounds, renderBoundsID, map);
+  SerializeUtils::FillComplexObjSerMap(renderBounds, renderBoundsID, map);
 }
 
 void LayerSerialization::SerializeImageLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
-                                                 SerializeUtils::Map* map) {
-  SerializeBasicLayerImpl(fbb, layer, map);
+                                                 SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap) {
+  SerializeBasicLayerImpl(fbb, layer, map, rosMap);
   const ImageLayer* imageLayer = static_cast<const ImageLayer*>(layer);
 
   auto samplingID = SerializeUtils::GetObjID();
   auto sampling = imageLayer->sampling();
   SerializeUtils::SetFlexBufferMap(fbb, "sampling", "", false, true, samplingID);
-  SerializeUtils::FillMap(sampling, samplingID, map);
+  SerializeUtils::FillComplexObjSerMap(sampling, samplingID, map);
 
   auto imageID = SerializeUtils::GetObjID();
   auto image = imageLayer->image();
   SerializeUtils::SetFlexBufferMap(fbb, "image", reinterpret_cast<uint64_t>(image.get()), true,
-                                   image != nullptr, imageID);
-  SerializeUtils::FillMap(image, imageID, map);
+                                   image != nullptr, imageID, image != nullptr);
+  SerializeUtils::FillComplexObjSerMap(image, imageID, map);
+    SerializeUtils::FillRenderableObjSerMap(image, imageID, rosMap);
 }
 
 void LayerSerialization::SerializeShapeLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
-                                                 SerializeUtils::Map* map) {
-  SerializeBasicLayerImpl(fbb, layer, map);
+                                                 SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap) {
+  SerializeBasicLayerImpl(fbb, layer, map, rosMap);
   const ShapeLayer* shapeLayer = static_cast<const ShapeLayer*>(layer);
 
   auto shapeID = SerializeUtils::GetObjID();
   auto shape = shapeLayer->shape();
   SerializeUtils::SetFlexBufferMap(fbb, "shape", reinterpret_cast<uint64_t>(shape.get()), true,
-                                   shape != nullptr, shapeID);
-  SerializeUtils::FillMap(shape, shapeID, map);
+                                   shape != nullptr, shapeID, shape != nullptr);
+  SerializeUtils::FillComplexObjSerMap(shape, shapeID, map, rosMap);
+    SerializeUtils::FillRenderableObjSerMap(shape, shapeID, rosMap);
 
   auto fillStylesID = SerializeUtils::GetObjID();
   auto fillStyles = shapeLayer->fillStyles();
   auto fillStylesSize = static_cast<unsigned int>(fillStyles.size());
   SerializeUtils::SetFlexBufferMap(fbb, "fillStyles", fillStylesSize, false, fillStylesSize,
                                    fillStylesID);
-  SerializeUtils::FillMap(fillStyles, fillStylesID, map);
+  SerializeUtils::FillComplexObjSerMap(fillStyles, fillStylesID, map, rosMap);
 
   auto strokeStylesID = SerializeUtils::GetObjID();
   auto strokeStyles = shapeLayer->strokeStyles();
   auto strokeStylesSize = static_cast<unsigned int>(strokeStyles.size());
   SerializeUtils::SetFlexBufferMap(fbb, "strokeStyles", strokeStylesSize, false, strokeStylesSize,
                                    strokeStylesID);
-  SerializeUtils::FillMap(strokeStyles, strokeStylesID, map);
+  SerializeUtils::FillComplexObjSerMap(strokeStyles, strokeStylesID, map, rosMap);
 
   SerializeUtils::SetFlexBufferMap(fbb, "lineCap",
                                    SerializeUtils::LineCapToString(shapeLayer->lineCap()));
@@ -236,7 +240,7 @@ void LayerSerialization::SerializeShapeLayerImpl(flexbuffers::Builder& fbb, cons
   auto lineDashPatternSize = static_cast<unsigned int>(lineDashPattern.size());
   SerializeUtils::SetFlexBufferMap(fbb, "lineDashPattern", lineDashPatternSize, false,
                                    lineDashPatternSize, lineDashPatternID);
-  SerializeUtils::FillMap(lineDashPattern, lineDashPatternID, map);
+  SerializeUtils::FillComplexObjSerMap(lineDashPattern, lineDashPatternID, map);
 
   SerializeUtils::SetFlexBufferMap(fbb, "lineDashPhase", shapeLayer->lineDashPhase());
   SerializeUtils::SetFlexBufferMap(fbb, "strokeStart", shapeLayer->strokeStart());
@@ -248,14 +252,14 @@ void LayerSerialization::SerializeShapeLayerImpl(flexbuffers::Builder& fbb, cons
 }
 
 void LayerSerialization::SerializeSolidLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
-                                                 SerializeUtils::Map* map) {
-  SerializeBasicLayerImpl(fbb, layer, map);
+                                                 SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap) {
+  SerializeBasicLayerImpl(fbb, layer, map, rosMap);
   const SolidLayer* solidLayer = static_cast<const SolidLayer*>(layer);
 
   auto colorID = SerializeUtils::GetObjID();
   auto color = solidLayer->color();
   SerializeUtils::SetFlexBufferMap(fbb, "color", "", false, true, colorID);
-  SerializeUtils::FillMap(color, colorID, map);
+  SerializeUtils::FillComplexObjSerMap(color, colorID, map);
 
   SerializeUtils::SetFlexBufferMap(fbb, "width", solidLayer->width());
   SerializeUtils::SetFlexBufferMap(fbb, "height", solidLayer->height());
@@ -264,26 +268,38 @@ void LayerSerialization::SerializeSolidLayerImpl(flexbuffers::Builder& fbb, cons
 }
 
 void LayerSerialization::SerializeTextLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
-                                                SerializeUtils::Map* map) {
-  SerializeBasicLayerImpl(fbb, layer, map);
+                                                SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap) {
+  SerializeBasicLayerImpl(fbb, layer, map, rosMap);
   const TextLayer* textLayer = static_cast<const TextLayer*>(layer);
   SerializeUtils::SetFlexBufferMap(fbb, "text", textLayer->text());
 
   auto textColorID = SerializeUtils::GetObjID();
   auto textColor = textLayer->textColor();
   SerializeUtils::SetFlexBufferMap(fbb, "textColor", "", false, true, textColorID);
-  SerializeUtils::FillMap(textColor, textColorID, map);
+  SerializeUtils::FillComplexObjSerMap(textColor, textColorID, map);
 
   auto fontID = SerializeUtils::GetObjID();
   auto font = textLayer->font();
   SerializeUtils::SetFlexBufferMap(fbb, "font", "", false, true, fontID);
-  SerializeUtils::FillMap(font, fontID, map);
+  SerializeUtils::FillComplexObjSerMap(font, fontID, map);
 
   SerializeUtils::SetFlexBufferMap(fbb, "width", textLayer->width());
   SerializeUtils::SetFlexBufferMap(fbb, "height", textLayer->height());
   SerializeUtils::SetFlexBufferMap(fbb, "textAlign",
                                    SerializeUtils::TextAlignToString(textLayer->textAlign()));
   SerializeUtils::SetFlexBufferMap(fbb, "autoWrap", textLayer->autoWrap());
+
+    if(textLayer->layerContent != nullptr) {
+        auto textLayerContent = static_cast<TextContent*>(textLayer->layerContent.get());
+        if(textLayerContent != nullptr) {
+            auto textBlob = textLayerContent->textBlob;
+            auto textBlobID = SerializeUtils::GetObjID();
+            SerializeUtils::SetFlexBufferMap(fbb, "textBlob", reinterpret_cast<uint64_t>(textBlob.get()),
+                true, textBlob != nullptr, textBlobID, textBlob != nullptr);
+            SerializeUtils::FillComplexObjSerMap(textBlob, textBlobID, map, rosMap);
+            SerializeUtils::FillRenderableObjSerMap(textBlob, textBlobID, rosMap);
+        }
+    }
 }
 }  // namespace tgfx
 #endif

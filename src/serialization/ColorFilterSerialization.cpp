@@ -28,7 +28,7 @@
 namespace tgfx {
 
 std::shared_ptr<Data> ColorFilterSerialization::Serialize(const ColorFilter* colorFilter,
-                                                          SerializeUtils::Map* map) {
+                                                          SerializeUtils::ComplexObjSerMap* map) {
   DEBUG_ASSERT(colorFilter != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -61,7 +61,7 @@ void ColorFilterSerialization::SerializeColorFilterImpl(flexbuffers::Builder& fb
 
 void ColorFilterSerialization::SerializeComposeColorFilterImpl(flexbuffers::Builder& fbb,
                                                                const ColorFilter* colorFilter,
-                                                               SerializeUtils::Map* map) {
+                                                               SerializeUtils::ComplexObjSerMap* map) {
   SerializeColorFilterImpl(fbb, colorFilter);
   const ComposeColorFilter* composeColorFilter =
       static_cast<const ComposeColorFilter*>(colorFilter);
@@ -70,13 +70,13 @@ void ColorFilterSerialization::SerializeComposeColorFilterImpl(flexbuffers::Buil
   auto inner = composeColorFilter->inner;
   SerializeUtils::SetFlexBufferMap(fbb, "inner", reinterpret_cast<uint64_t>(inner.get()), true,
                                    inner != nullptr, innerID);
-  SerializeUtils::FillMap(inner, innerID, map);
+  SerializeUtils::FillComplexObjSerMap(inner, innerID, map);
 
   auto outerID = SerializeUtils::GetObjID();
   auto outer = composeColorFilter->outer;
   SerializeUtils::SetFlexBufferMap(fbb, "outer", reinterpret_cast<uint64_t>(outer.get()), true,
                                    outer != nullptr, outerID);
-  SerializeUtils::FillMap(outer, outerID, map);
+  SerializeUtils::FillComplexObjSerMap(outer, outerID, map);
 }
 
 void ColorFilterSerialization::SerializeAlphaThreadholdColorFilterImpl(
@@ -89,7 +89,7 @@ void ColorFilterSerialization::SerializeAlphaThreadholdColorFilterImpl(
 
 void ColorFilterSerialization::SerializeMatrixColorFilterImpl(flexbuffers::Builder& fbb,
                                                               const ColorFilter* colorFilter,
-                                                              SerializeUtils::Map* map) {
+                                                              SerializeUtils::ComplexObjSerMap* map) {
   SerializeColorFilterImpl(fbb, colorFilter);
   const MatrixColorFilter* matrixColorFilter = static_cast<const MatrixColorFilter*>(colorFilter);
 
@@ -98,20 +98,20 @@ void ColorFilterSerialization::SerializeMatrixColorFilterImpl(flexbuffers::Build
   auto matrixSize = matrix.size();
   SerializeUtils::SetFlexBufferMap(fbb, "matrix", static_cast<uint32_t>(matrixSize), false, true,
                                    matrixID);
-  SerializeUtils::FillMap(matrix, matrixID, map);
+  SerializeUtils::FillComplexObjSerMap(matrix, matrixID, map);
 
   SerializeUtils::SetFlexBufferMap(fbb, "alphaIsUnchanged", matrixColorFilter->alphaIsUnchanged);
 }
 
 void ColorFilterSerialization::SerializeModeColorFilterImpl(flexbuffers::Builder& fbb,
                                                             const ColorFilter* colorFilter,
-                                                            SerializeUtils::Map* map) {
+                                                            SerializeUtils::ComplexObjSerMap* map) {
   SerializeColorFilterImpl(fbb, colorFilter);
   const ModeColorFilter* modeColorFilter = static_cast<const ModeColorFilter*>(colorFilter);
   auto colorID = SerializeUtils::GetObjID();
   auto color = modeColorFilter->color;
   SerializeUtils::SetFlexBufferMap(fbb, "color", "", false, true, colorID);
-  SerializeUtils::FillMap(color, colorID, map);
+  SerializeUtils::FillComplexObjSerMap(color, colorID, map);
 
   SerializeUtils::SetFlexBufferMap(fbb, "mode",
                                    SerializeUtils::BlendModeToString(modeColorFilter->mode));

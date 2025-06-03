@@ -35,8 +35,16 @@ class LayerItem {
     m_childItems.clear();
   }
 
+  bool eyeButtonState() {
+    return m_EyeButtonState;
+  }
+  void setEyeButtonState(bool state) {
+    m_EyeButtonState = state;
+  }
+
  private:
   std::vector<std::unique_ptr<LayerItem>> m_childItems;
   QVariantList m_itemData;
   LayerItem* m_parentItem;
+  bool m_EyeButtonState = false;
 };

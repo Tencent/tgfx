@@ -28,7 +28,7 @@
 namespace tgfx {
 
 std::shared_ptr<Data> ShaderSerialization::Serialize(const Shader* shader,
-                                                     SerializeUtils::Map* map) {
+                                                     SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap) {
   DEBUG_ASSERT(shader != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -40,16 +40,16 @@ std::shared_ptr<Data> ShaderSerialization::Serialize(const Shader* shader,
       SerializeColorShaderImpl(fbb, shader, map);
       break;
     case Types::ShaderType::ColorFilter:
-      SerializeColorFilterShaderImpl(fbb, shader, map);
+      SerializeColorFilterShaderImpl(fbb, shader, map, rosMap);
       break;
     case Types::ShaderType::Image:
-      SerializeImageShaderImpl(fbb, shader, map);
+      SerializeImageShaderImpl(fbb, shader, map, rosMap);
       break;
     case Types::ShaderType::Blend:
-      SerializeBlendShaderImpl(fbb, shader, map);
+      SerializeBlendShaderImpl(fbb, shader, map, rosMap);
       break;
     case Types::ShaderType::Matrix:
-      SerializeMatrixShaderImpl(fbb, shader, map);
+      SerializeMatrixShaderImpl(fbb, shader, map, rosMap);
     case Types::ShaderType::Gradient:
       SerializeGradientShaderImpl(fbb, shader, map);
   }
@@ -64,19 +64,19 @@ void ShaderSerialization::SerializeBasicShaderImpl(flexbuffers::Builder& fbb,
 }
 
 void ShaderSerialization::SerializeColorShaderImpl(flexbuffers::Builder& fbb, const Shader* shader,
-                                                   SerializeUtils::Map* map) {
+                                                   SerializeUtils::ComplexObjSerMap* map) {
   SerializeBasicShaderImpl(fbb, shader);
   const ColorShader* colorShader = static_cast<const ColorShader*>(shader);
 
   auto colorID = SerializeUtils::GetObjID();
   auto color = colorShader->color;
   SerializeUtils::SetFlexBufferMap(fbb, "color", "", false, true, colorID);
-  SerializeUtils::FillMap(color, colorID, map);
+  SerializeUtils::FillComplexObjSerMap(color, colorID, map);
 }
 
 void ShaderSerialization::SerializeColorFilterShaderImpl(flexbuffers::Builder& fbb,
                                                          const Shader* shader,
-                                                         SerializeUtils::Map* map) {
+                                                         SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap) {
   SerializeBasicShaderImpl(fbb, shader);
   const ColorFilterShader* colorFilterShader = static_cast<const ColorFilterShader*>(shader);
 
@@ -85,7 +85,7 @@ void ShaderSerialization::SerializeColorFilterShaderImpl(flexbuffers::Builder& f
     auto shader = colorFilterShader->shader;
     SerializeUtils::SetFlexBufferMap(fbb, "shader", reinterpret_cast<uint64_t>(shader.get()), true,
                                      shader != nullptr, shaderID);
-    SerializeUtils::FillMap(shader, shaderID, map);
+    SerializeUtils::FillComplexObjSerMap(shader, shaderID, map, rosMap);
   }
 
   auto colorFilterID = SerializeUtils::GetObjID();
@@ -93,20 +93,20 @@ void ShaderSerialization::SerializeColorFilterShaderImpl(flexbuffers::Builder& f
   SerializeUtils::SetFlexBufferMap(fbb, "colorFilter",
                                    reinterpret_cast<uint64_t>(colorFilter.get()), true,
                                    colorFilter != nullptr, colorFilterID);
-  SerializeUtils::FillMap(colorFilter, colorFilterID, map);
+  SerializeUtils::FillComplexObjSerMap(colorFilter, colorFilterID, map);
 }
 
 void ShaderSerialization::SerializeImageShaderImpl(flexbuffers::Builder& fbb, const Shader* shader,
-                                                   SerializeUtils::Map* map) {
+                                                   SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap) {
   SerializeBasicShaderImpl(fbb, shader);
   const ImageShader* imageShader = static_cast<const ImageShader*>(shader);
 
   auto imageID = SerializeUtils::GetObjID();
   auto image = imageShader->image;
   SerializeUtils::SetFlexBufferMap(fbb, "image", reinterpret_cast<uint64_t>(image.get()), true,
-                                   image != nullptr, imageID);
-  SerializeUtils::FillMap(image, imageID, map);
-
+                                   image != nullptr, imageID, image != nullptr);
+  SerializeUtils::FillComplexObjSerMap(image, imageID, map);
+    SerializeUtils::FillRenderableObjSerMap(image, imageID, rosMap);
   SerializeUtils::SetFlexBufferMap(fbb, "tileModeX",
                                    SerializeUtils::TileModeToString(imageShader->tileModeX));
   SerializeUtils::SetFlexBufferMap(fbb, "tileModeY",
@@ -115,11 +115,11 @@ void ShaderSerialization::SerializeImageShaderImpl(flexbuffers::Builder& fbb, co
   auto samplingID = SerializeUtils::GetObjID();
   auto sampling = imageShader->sampling;
   SerializeUtils::SetFlexBufferMap(fbb, "sampling", "", false, true, samplingID);
-  SerializeUtils::FillMap(sampling, samplingID, map);
+  SerializeUtils::FillComplexObjSerMap(sampling, samplingID, map);
 }
 
 void ShaderSerialization::SerializeBlendShaderImpl(flexbuffers::Builder& fbb, const Shader* shader,
-                                                   SerializeUtils::Map* map) {
+                                                   SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap) {
   SerializeBasicShaderImpl(fbb, shader);
   const BlendShader* blendShader = static_cast<const BlendShader*>(shader);
   SerializeUtils::SetFlexBufferMap(fbb, "blendMode",
@@ -129,17 +129,17 @@ void ShaderSerialization::SerializeBlendShaderImpl(flexbuffers::Builder& fbb, co
   auto dst = blendShader->dst;
   SerializeUtils::SetFlexBufferMap(fbb, "dst", reinterpret_cast<uint64_t>(dst.get()), true,
                                    dst != nullptr, dstID);
-  SerializeUtils::FillMap(dst, dstID, map);
+  SerializeUtils::FillComplexObjSerMap(dst, dstID, map, rosMap);
 
   auto srcID = SerializeUtils::GetObjID();
   auto src = blendShader->src;
   SerializeUtils::SetFlexBufferMap(fbb, "src", reinterpret_cast<uint64_t>(src.get()), true,
                                    src != nullptr, srcID);
-  SerializeUtils::FillMap(src, srcID, map);
+  SerializeUtils::FillComplexObjSerMap(src, srcID, map, rosMap);
 }
 
 void ShaderSerialization::SerializeMatrixShaderImpl(flexbuffers::Builder& fbb, const Shader* shader,
-                                                    SerializeUtils::Map* map) {
+                                                    SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap) {
   SerializeBasicShaderImpl(fbb, shader);
   const MatrixShader* matrixShader = static_cast<const MatrixShader*>(shader);
 
@@ -147,17 +147,17 @@ void ShaderSerialization::SerializeMatrixShaderImpl(flexbuffers::Builder& fbb, c
   auto source = matrixShader->source;
   SerializeUtils::SetFlexBufferMap(fbb, "source", reinterpret_cast<uint64_t>(source.get()), true,
                                    source != nullptr, sourceID);
-  SerializeUtils::FillMap(source, sourceID, map);
+  SerializeUtils::FillComplexObjSerMap(source, sourceID, map, rosMap);
 
   auto matrixID = SerializeUtils::GetObjID();
   auto matrix = matrixShader->matrix;
   SerializeUtils::SetFlexBufferMap(fbb, "matrix", "", false, true, matrixID);
-  SerializeUtils::FillMap(matrix, matrixID, map);
+  SerializeUtils::FillComplexObjSerMap(matrix, matrixID, map);
 }
 
 void ShaderSerialization::SerializeGradientShaderImpl(flexbuffers::Builder& fbb,
                                                       const Shader* shader,
-                                                      SerializeUtils::Map* map) {
+                                                      SerializeUtils::ComplexObjSerMap* map) {
   SerializeBasicShaderImpl(fbb, shader);
   const GradientShader* gradientShader = static_cast<const GradientShader*>(shader);
 
@@ -166,19 +166,19 @@ void ShaderSerialization::SerializeGradientShaderImpl(flexbuffers::Builder& fbb,
   auto originalColorsSize = static_cast<unsigned int>(originalColors.size());
   SerializeUtils::SetFlexBufferMap(fbb, "originalColors", originalColorsSize, false,
                                    originalColorsSize, originalColorsID);
-  SerializeUtils::FillMap(originalColors, originalColorsID, map);
+  SerializeUtils::FillComplexObjSerMap(originalColors, originalColorsID, map);
 
   auto originalPositionsID = SerializeUtils::GetObjID();
   auto originalPositions = gradientShader->originalPositions;
   auto originalPositionSize = static_cast<unsigned int>(originalPositions.size());
   SerializeUtils::SetFlexBufferMap(fbb, "orignalPositions", originalPositionSize, false,
                                    originalPositionSize, originalPositionsID);
-  SerializeUtils::FillMap(originalPositions, originalPositionsID, map);
+  SerializeUtils::FillComplexObjSerMap(originalPositions, originalPositionsID, map);
 
   auto pointsToUnit = gradientShader->pointsToUnit;
   auto pointsToUnitID = SerializeUtils::GetObjID();
   SerializeUtils::SetFlexBufferMap(fbb, "pointsToUnit", "", false, true, pointsToUnitID);
-  SerializeUtils::FillMap(pointsToUnit, pointsToUnitID, map);
+  SerializeUtils::FillComplexObjSerMap(pointsToUnit, pointsToUnitID, map);
 
   SerializeUtils::SetFlexBufferMap(fbb, "colorsAreOpaque", gradientShader->colorsAreOpaque);
 }

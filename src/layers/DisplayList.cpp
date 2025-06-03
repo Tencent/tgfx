@@ -84,8 +84,8 @@ void DisplayList::render(Surface* surface, bool autoClear) {
 
 #ifdef TGFX_USE_INSPECTOR
   auto& layerInspector = LayerInspector::GetLayerInspector();
-  //layerInspector.serializingLayerTree();
   layerInspector.setCallBack();
+  layerInspector.RenderImageAndSend(surface->getContext());
 #endif
 }
 

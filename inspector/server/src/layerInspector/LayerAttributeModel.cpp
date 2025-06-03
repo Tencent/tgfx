@@ -20,10 +20,10 @@
 
 template <typename T>
 LayerItem* SetSingleAttribute(LayerItem* parent, const char* key, T value, bool isExpandable,
-                              bool isAddress, uint64_t objID) {
+                              bool isAddress, uint64_t objID, bool isRenderable, bool isImage = false, uint64_t imageID = 0) {
   QVariantList var;
   QVariant ID;
-  var << key << value << isExpandable << isAddress << objID;
+  var << key << value << isExpandable << isAddress << objID << isRenderable << isImage << imageID;
   parent->appendChild(std::make_unique<LayerItem>(var, parent));
   return parent->child(parent->childCount() - 1);
 }
@@ -77,6 +77,18 @@ bool LayerAttributeModel::isExpandable(const QModelIndex& index) {
   return item->data(2).toBool();
 }
 
+bool LayerAttributeModel::isRenderable(const QModelIndex& index) {
+  if (!index.isValid()) return false;
+  const auto* item = static_cast<const LayerItem*>(index.internalPointer());
+  return item->data(5).toBool();
+}
+
+bool LayerAttributeModel::isImage(const QModelIndex& index) {
+  if (!index.isValid()) return false;
+  const auto* item = static_cast<const LayerItem*>(index.internalPointer());
+  return item->data(6).toBool();
+}
+
 void LayerAttributeModel::switchToLayer(uint64_t address) {
   m_CurrentLayerAddress = address;
   beginResetModel();
@@ -92,6 +104,7 @@ void LayerAttributeModel::switchToLayer(uint64_t address) {
         break;
     }
   }
+  emit modelReset();
 }
 
 void LayerAttributeModel::flushTree() {
@@ -119,6 +132,35 @@ void LayerAttributeModel::expandSubAttribute(const QModelIndex& index, int row) 
   addressToLayerData[m_CurrentLayerAddress].rowDatas.push_back({RowOp::Expand, row});
 }
 
+bool LayerAttributeModel::eyeButtonState(const QModelIndex& index) {
+  if (!index.isValid()) return false;
+  auto item = static_cast<LayerItem*>(index.internalPointer());
+  return item->eyeButtonState();
+}
+
+void LayerAttributeModel::setEyeButtonState(bool state, const QModelIndex& index) {
+  if (!index.isValid()) return;
+  auto item = static_cast<LayerItem*>(index.internalPointer());
+  item->setEyeButtonState(state);
+  emit flushImageChild(item->data(4).toULongLong());
+}
+
+uint64_t LayerAttributeModel::imageID(const QModelIndex& index) {
+  if (!index.isValid()) return false;
+  auto item = static_cast<LayerItem*>(index.internalPointer());
+  return item->data(7).toULongLong();
+}
+
+void LayerAttributeModel::DisplayImage(bool isVisible, const QModelIndex& index) {
+  (void)isVisible;
+  if (!index.isValid()) return;
+  auto item = static_cast<LayerItem*>(index.internalPointer());
+  uint64_t objID = item->data(4).toULongLong();
+  beginInsertRows(index, 0, 0);
+  SetSingleAttribute(item, "Image", 0, false, false, 0, false, true, objID);
+  endInsertRows();
+}
+
 void LayerAttributeModel::collapseRow(int row) {
   addressToLayerData[m_CurrentLayerAddress].rowDatas.push_back({RowOp::Collapse, row});
 }
@@ -131,8 +173,9 @@ void LayerAttributeModel::ProcessLayerAttribute(const flexbuffers::Map& contentM
                                                 LayerItem* item) {
   auto keys = contentMap.Keys();
   for (size_t i = 0; i < keys.size(); i++) {
-    std::string key = keys[i].AsString().str();
-    auto valueMap = contentMap[key].AsMap();
+    QString key = keys[i].AsString().str().c_str();
+    QString name = key.split('_').back();
+    auto valueMap = contentMap[key.toStdString()].AsMap();
     bool isExpandable = valueMap["IsExpandable"].AsBool();
     bool isAddress = valueMap["IsAddress"].AsBool();
     uint64_t objID;
@@ -141,29 +184,34 @@ void LayerAttributeModel::ProcessLayerAttribute(const flexbuffers::Map& contentM
     } else {
       objID = valueMap["objID"].AsUInt64();
     }
+    bool isRenderable = valueMap["IsRenderableObj"].AsBool();
+    LayerItem* currentItem = nullptr;
     switch (valueMap["Value"].GetType()) {
       case flexbuffers::FBT_UINT:
-        SetSingleAttribute(item, key.c_str(), valueMap["Value"].AsUInt64(), isExpandable, isAddress,
-                           objID);
+        currentItem = SetSingleAttribute(item, name.toStdString().c_str(), valueMap["Value"].AsUInt64(), isExpandable, isAddress,
+                           objID, isRenderable);
         break;
       case flexbuffers::FBT_INT:
-        SetSingleAttribute(item, key.c_str(), valueMap["Value"].AsInt64(), isExpandable, isAddress,
-                           objID);
+        currentItem = SetSingleAttribute(item, name.toStdString().c_str(), valueMap["Value"].AsInt64(), isExpandable, isAddress,
+                           objID, isRenderable);
         break;
       case flexbuffers::FBT_FLOAT:
-        SetSingleAttribute(item, key.c_str(), valueMap["Value"].AsFloat(), isExpandable, isAddress,
-                           objID);
+        currentItem = SetSingleAttribute(item, name.toStdString().c_str(), valueMap["Value"].AsFloat(), isExpandable, isAddress,
+                           objID, isRenderable);
         break;
       case flexbuffers::FBT_STRING:
-        SetSingleAttribute(item, key.c_str(), valueMap["Value"].AsString().c_str(), isExpandable,
-                           isAddress, objID);
+        currentItem = SetSingleAttribute(item, name.toStdString().c_str(), valueMap["Value"].AsString().c_str(), isExpandable,
+                           isAddress, objID, isRenderable);
         break;
       case flexbuffers::FBT_BOOL:
-        SetSingleAttribute(item, key.c_str(), valueMap["Value"].AsBool(), isExpandable, isAddress,
-                           objID);
+        currentItem = SetSingleAttribute(item, name.toStdString().c_str(), valueMap["Value"].AsBool(), isExpandable, isAddress,
+                           objID, isRenderable);
         break;
       default:
         qDebug() << "Unknown value type!";
+    }
+    if(currentItem && isRenderable) {
+      SetSingleAttribute(currentItem, "Image", 0, false, false, 0, false, true, objID);
     }
   }
 }

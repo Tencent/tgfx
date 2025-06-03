@@ -22,7 +22,7 @@
 namespace tgfx {
 
 std::shared_ptr<Data> ScalerContextSerialization::Serialize(const ScalerContext* scalerContext,
-                                                            SerializeUtils::Map* map) {
+                                                            SerializeUtils::ComplexObjSerMap* map) {
   DEBUG_ASSERT(scalerContext != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -35,19 +35,19 @@ std::shared_ptr<Data> ScalerContextSerialization::Serialize(const ScalerContext*
 
 void ScalerContextSerialization::SerializeScalerContextImpl(flexbuffers::Builder& fbb,
                                                             const ScalerContext* scaler_context,
-                                                            SerializeUtils::Map* map) {
+                                                            SerializeUtils::ComplexObjSerMap* map) {
   auto typeFace = scaler_context->getTypeface();
   auto typeFaceID = SerializeUtils::GetObjID();
   SerializeUtils::SetFlexBufferMap(fbb, "typeFace", reinterpret_cast<uint64_t>(typeFace.get()),
                                    true, typeFace != nullptr, typeFaceID);
-  SerializeUtils::FillMap(typeFace, typeFaceID, map);
+  SerializeUtils::FillComplexObjSerMap(typeFace, typeFaceID, map);
 
   SerializeUtils::SetFlexBufferMap(fbb, "size", scaler_context->getSize());
 
   auto fontMetricsID = SerializeUtils::GetObjID();
   auto fontMetrics = scaler_context->getFontMetrics();
   SerializeUtils::SetFlexBufferMap(fbb, "fontMetrics", "", false, true, fontMetricsID);
-  SerializeUtils::FillMap(fontMetrics, fontMetricsID, map);
+  SerializeUtils::FillComplexObjSerMap(fontMetrics, fontMetricsID, map);
 }
 }  // namespace tgfx
 #endif

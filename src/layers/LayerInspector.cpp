@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <complex>
 #ifdef TGFX_USE_INSPECTOR
 #include "tgfx/layers/LayerInspector.h"
 #include <chrono>
@@ -46,6 +47,17 @@ void LayerInspector::pickedLayer(float x, float y) {
         AddHighLightOverlay(tgfx::Color::FromRGBA(111, 166, 219), layer);
         break;
       }
+    }
+  }
+}
+
+void LayerInspector::RenderImageAndSend(Context *context) {
+  if(!imageIDQueue.empty()) {
+    auto id = imageIDQueue.pop();
+    std::shared_ptr<Data> data = m_LayerRenderableObjMap[m_SelectedAddress][*id](context);
+    if(!data->empty()) {
+      std::vector<uint8_t> blob(data->bytes(), data->bytes() + data->size());
+      LAYER_DATA(blob);
     }
   }
 }
@@ -105,8 +117,9 @@ void LayerInspector::SendFlushAttributeAck(uint64_t address) {
 
 void LayerInspector::serializingLayerAttribute(const std::shared_ptr<tgfx::Layer>& layer) {
   if (!layer) return;
-  auto& pathObjMap = m_LayerComplexObjMap[reinterpret_cast<uint64_t>(layer.get())];
-  auto data = LayerSerialization::SerializeLayer(layer.get(), &pathObjMap, "LayerAttribute");
+  auto& complexObjSerMap = m_LayerComplexObjMap[reinterpret_cast<uint64_t>(layer.get())];
+  auto& renderableObjSerMap = m_LayerRenderableObjMap[reinterpret_cast<uint64_t>(layer.get())];
+  auto data = LayerSerialization::SerializeLayer(layer.get(), &complexObjSerMap, &renderableObjSerMap, "LayerAttribute");
   std::vector<uint8_t> blob(data->bytes(), data->bytes() + data->size());
   LAYER_DATA(blob);
 }
@@ -142,9 +155,15 @@ void LayerInspector::FeedBackDataProcess(const std::vector<uint8_t>& data) {
     if (m_LayerComplexObjMap.find(address) != m_LayerComplexObjMap.end()) {
       m_LayerComplexObjMap.erase(address);
     }
+    if(m_LayerRenderableObjMap.find(address)!=m_LayerRenderableObjMap.end()) {
+      m_LayerRenderableObjMap.erase(address);
+    }
     SendFlushAttributeAck(address);
   } else if (type == "FlushLayerTree") {
     serializingLayerTree();
+  }else if(type == "FlushImage") {
+    uint64_t imageId = map["Value"].AsUInt64();
+    imageIDQueue.push(imageId);
   }
 }
 

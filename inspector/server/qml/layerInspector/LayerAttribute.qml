@@ -41,11 +41,10 @@ Rectangle {
 
             delegate: Item {
                 id: root
+                implicitWidth: column === 0 ? wind.width * 0.6 : wind.width * 0.4
+                implicitHeight: isImage? wind.width * 0.3 : 40
 
-                implicitWidth: padding + label.x + label.implicitWidth + padding
-                //implicitWidth: wind.width * 0.5
-                implicitHeight: 40
-
+                property  bool isImage: treeView.model.isImage(treeView.index(row, column))
                 readonly property real indent: 20
                 readonly property real padding: 10
 
@@ -60,6 +59,22 @@ Rectangle {
                 //包含delegate绘制的model Item的深度。model Item的深度与其在模型中的祖先数量相同
                 required property int depth
 
+                Component.onCompleted:{
+                    _layerAttributeModel.flushImageChild.connect((objID) => {
+                        if(objID === _layerAttributeModel.imageID(treeView.index(row, column))){
+                            image.visible = Qt.binding(function () {
+                                    return _layerAttributeModel.eyeButtonState(_layerAttributeModel.parent(treeView.index(row, column)))
+                            })
+                        }
+                    });
+
+                    imageProvider.imageFlush.connect((id) => {
+                        if(id === _layerAttributeModel.imageID(treeView.index(row, column))) {
+                            let number = _layerAttributeModel.imageID(treeView.index(row, column)).toString()
+                            image.source = "image://RenderableImage/" + number + "-" + Date.now();
+                        }
+                    });
+                }
 
                 Rectangle {
                     id: background1
@@ -83,7 +98,7 @@ Rectangle {
                     id: indicator
                     visible: root.isTreeNode && treeView.model.isExpandable(treeView.index(row, column))
                     x: root.padding + (root.depth * root.indent)
-                    y: label.implicitHeight * 0.2
+                    anchors.verticalCenter : parent.verticalCenter
                     text: root.expanded ? "▼" : "▶"
                     color: "white"
                     font.pointSize: 22
@@ -91,12 +106,16 @@ Rectangle {
                         anchors.fill: parent
                         onClicked: {
                             if (root.hasChildren) {
-                                if (root.expanded) {
-                                    treeView.model.collapseRow(row);
-                                } else {
-                                    treeView.model.expandRow(row);
+                                if(treeView.model.rowCount(treeView.index(row, column)) === 1 && treeView.model.isRenderable(treeView.index(row, column))){
+                                    treeView.model.expandSubAttribute(treeView.index(row, column), row)
+                                }else{
+                                    if (root.expanded) {
+                                        treeView.model.collapseRow(row);
+                                    } else {
+                                        treeView.model.expandRow(row);
+                                    }
+                                    treeView.toggleExpanded(row)
                                 }
-                                treeView.toggleExpanded(row)
                             } else {
                                 treeView.model.expandSubAttribute(treeView.index(row, column), row)
                             }
@@ -106,14 +125,63 @@ Rectangle {
 
                 Text {
                     id: label
-                    //x: root.padding + (root.isTreeNode ? (root.depth + 1) * root.indent : 0)
-                    x: root.padding + (root.depth + 1) * root.indent
-                    y: label.implicitHeight * 0.2
-                    width: root.width - root.padding - x
+                    visible: !treeView.model.isImage(treeView.index(row, column)) || root.isTreeNode
+                    x: root.padding + (root.isTreeNode ? (root.depth + 1) * root.indent : 0)
+                    //x: root.padding + (root.depth + 1) * root.indent
+                    anchors.verticalCenter : parent.verticalCenter
+                    //width: x + label.implicitWidth
                     clip: false
                     text: model.display
                     color: "white"
                     font.pointSize: 22
+                }
+
+                Rectangle{
+                    id: imageArea
+                    visible: treeView.model.isImage(treeView.index(row, column)) && !root.isTreeNode
+                    color: "#383838"
+                    x: root.padding + (root.isTreeNode ? (root.depth + 1) * root.indent : 0)
+                    anchors.verticalCenter : parent.verticalCenter
+                    width: root.implicitWidth - root.padding * 2
+                    height: root.implicitHeight - root.padding * 2
+                    Image{
+                        id: image
+                        visible: _layerAttributeModel.eyeButtonState(_layerAttributeModel.parent(treeView.index(row, column)))
+                        anchors.centerIn : parent
+                        width: parent.width * 0.6
+                        height: width
+                        cache: false
+                        source: "image://RenderableImage/" + _layerAttributeModel.imageID(treeView.index(row, column)).toString()
+                        fillMode: Image.PreserveAspectFit
+                    }
+                }
+
+                Rectangle{
+                    id: renderableSwitch
+                    color: eyeIcon.checked ? "#808080" : "transparent";
+                    width: 25
+                    height: width
+                    visible: !root.isTreeNode && treeView.model.isRenderable(treeView.index(row, column))
+                    x: label.x + label.width + root.padding
+                    anchors.verticalCenter : parent.verticalCenter
+                    Image{
+                        id: eyeIcon
+                        anchors.fill: parent
+                        source: "qrc:/icons/layerInspector/eye.svg"
+                        property bool checked : treeView.model.eyeButtonState(treeView.index(row, column))
+                        MouseArea {
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            onClicked: {
+                                //eyeIcon.checked = !eyeIcon.checked;
+                                treeView.model.setEyeButtonState(!eyeIcon.checked, treeView.index(row, column));
+                                //treeView.model.DisplayImage(eyeIcon.checked, treeView.index(row, column));
+                                eyeIcon.checked = Qt.binding(function (){
+                                    return treeView.model.eyeButtonState(treeView.index(row, column))
+                                })
+                            }
+                        }
+                    }
                 }
             }
         }

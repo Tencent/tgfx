@@ -29,7 +29,7 @@
 namespace tgfx {
 
 std::shared_ptr<Data> LayerFilterSerialization::Serialize(const LayerFilter* layerFilter,
-                                                          SerializeUtils::Map* map) {
+                                                          SerializeUtils::ComplexObjSerMap* map) {
   DEBUG_ASSERT(layerFilter != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -68,13 +68,13 @@ void LayerFilterSerialization::SerializeBasicLayerFilterImpl(flexbuffers::Builde
 
 void LayerFilterSerialization::SerializeBlendFilterImpl(flexbuffers::Builder& fbb,
                                                         const LayerFilter* layerFilter,
-                                                        SerializeUtils::Map* map) {
+                                                        SerializeUtils::ComplexObjSerMap* map) {
   SerializeBasicLayerFilterImpl(fbb, layerFilter);
   const BlendFilter* blendFilter = static_cast<const BlendFilter*>(layerFilter);
   auto colorID = SerializeUtils::GetObjID();
   auto color = blendFilter->color();
   SerializeUtils::SetFlexBufferMap(fbb, "color", "", false, true, colorID);
-  SerializeUtils::FillMap(color, colorID, map);
+  SerializeUtils::FillComplexObjSerMap(color, colorID, map);
   SerializeUtils::SetFlexBufferMap(fbb, "blendMode",
                                    SerializeUtils::BlendModeToString(blendFilter->blendMode()));
 }
@@ -91,19 +91,19 @@ void LayerFilterSerialization::SerializeBlurFilterImpl(flexbuffers::Builder& fbb
 
 void LayerFilterSerialization::SerializeColorMatrixFilterImpl(flexbuffers::Builder& fbb,
                                                               const LayerFilter* layerFilter,
-                                                              SerializeUtils::Map* map) {
+                                                              SerializeUtils::ComplexObjSerMap* map) {
   SerializeBasicLayerFilterImpl(fbb, layerFilter);
   const ColorMatrixFilter* colorMatrixFilter = static_cast<const ColorMatrixFilter*>(layerFilter);
 
   auto matrixID = SerializeUtils::GetObjID();
   auto matrix = colorMatrixFilter->matrix();
   SerializeUtils::SetFlexBufferMap(fbb, "matrix", "", false, true, matrixID);
-  SerializeUtils::FillMap(matrix, matrixID, map);
+  SerializeUtils::FillComplexObjSerMap(matrix, matrixID, map);
 }
 
 void LayerFilterSerialization::SerializeDropShadowFilterImpl(flexbuffers::Builder& fbb,
                                                              const LayerFilter* layerFilter,
-                                                             SerializeUtils::Map* map) {
+                                                             SerializeUtils::ComplexObjSerMap* map) {
   SerializeBasicLayerFilterImpl(fbb, layerFilter);
   const DropShadowFilter* dropShadowFilter = static_cast<const DropShadowFilter*>(layerFilter);
   SerializeUtils::SetFlexBufferMap(fbb, "offsetX", dropShadowFilter->offsetX());
@@ -114,14 +114,14 @@ void LayerFilterSerialization::SerializeDropShadowFilterImpl(flexbuffers::Builde
   auto colorID = SerializeUtils::GetObjID();
   auto color = dropShadowFilter->color();
   SerializeUtils::SetFlexBufferMap(fbb, "color", "", false, true, colorID);
-  SerializeUtils::FillMap(color, colorID, map);
+  SerializeUtils::FillComplexObjSerMap(color, colorID, map);
 
   SerializeUtils::SetFlexBufferMap(fbb, "dropShadowOnly", dropShadowFilter->dropsShadowOnly());
 }
 
 void LayerFilterSerialization::SerializeInnerShadowFilterImpl(flexbuffers::Builder& fbb,
                                                               const LayerFilter* layerFilter,
-                                                              SerializeUtils::Map* map) {
+                                                              SerializeUtils::ComplexObjSerMap* map) {
   SerializeBasicLayerFilterImpl(fbb, layerFilter);
   const InnerShadowFilter* innerShadowFilter = static_cast<const InnerShadowFilter*>(layerFilter);
   SerializeUtils::SetFlexBufferMap(fbb, "offsetX", innerShadowFilter->offsetX());
@@ -132,7 +132,7 @@ void LayerFilterSerialization::SerializeInnerShadowFilterImpl(flexbuffers::Build
   auto colorID = SerializeUtils::GetObjID();
   auto color = innerShadowFilter->color();
   SerializeUtils::SetFlexBufferMap(fbb, "color", "", false, true, colorID);
-  SerializeUtils::FillMap(color, colorID, map);
+  SerializeUtils::FillComplexObjSerMap(color, colorID, map);
 
   SerializeUtils::SetFlexBufferMap(fbb, "innerShadowOnly", innerShadowFilter->innerShadowOnly());
 }

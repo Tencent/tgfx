@@ -81,6 +81,8 @@ void LayerProfiler::SendWork() {
     if (!m_Queue.empty()) {
       auto data = *m_Queue.front();
       m_Queue.pop();
+      int size = (int)data.size();
+      m_Socket->Send(&size, sizeof(int));
       m_Socket->Send(data.data(), data.size());
     }
   }

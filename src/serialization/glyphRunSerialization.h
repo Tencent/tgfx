@@ -24,10 +24,10 @@
 namespace tgfx {
 class glyphRunSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(const GlyphRun* glyphRun, SerializeUtils::Map* map);
+  static std::shared_ptr<Data> Serialize(const GlyphRun* glyphRun, SerializeUtils::ComplexObjSerMap* map);
 
  private:
   static void SerializeGlyphRunImpl(flexbuffers::Builder& fbb, const GlyphRun* glyphRun,
-                                    SerializeUtils::Map* map);
+                                    SerializeUtils::ComplexObjSerMap* map);
 };
 }  // namespace tgfx

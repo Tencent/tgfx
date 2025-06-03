@@ -55,8 +55,14 @@ class LayerAttributeModel : public LayerModel {
   void switchToLayer(uint64_t address);
   void flushTree();
   void clearAttribute();
+  Q_INVOKABLE bool eyeButtonState(const QModelIndex& index);
+  Q_INVOKABLE void setEyeButtonState(bool state, const QModelIndex& index);
+  Q_INVOKABLE uint64_t imageID(const QModelIndex& index);
   Q_INVOKABLE bool isExpandable(const QModelIndex& index);
+  Q_INVOKABLE bool isRenderable(const QModelIndex& index);
+  Q_INVOKABLE bool isImage(const QModelIndex& index);
   Q_INVOKABLE void expandSubAttribute(const QModelIndex& index, int row);
+  Q_INVOKABLE void DisplayImage(bool isVisible, const QModelIndex& index);
   Q_INVOKABLE void collapseRow(int row);
   Q_INVOKABLE void expandRow(int row);
  signals:
@@ -65,7 +71,7 @@ class LayerAttributeModel : public LayerModel {
   void collapseItemRow(int row);
   void flushLayerAttribute(uint64_t address);
   void modelReset();
-
+  void flushImageChild(uint64_t objID);
  private:
   void ProcessLayerAttribute(const flexbuffers::Map& contentMap, LayerItem* item);
 
