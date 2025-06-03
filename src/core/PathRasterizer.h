@@ -36,6 +36,13 @@ class PathRasterizer : public ImageCodec {
   static std::shared_ptr<PathRasterizer> Make(std::shared_ptr<Shape> shape, bool antiAlias,
                                               bool needsGammaCorrection = false);
 
+  /**
+   * Creates a new PathRasterizer instance with the specified width, height. Maybe only part of the
+   * shape can be displayed. The same considerations apply to the other parameters as mentioned above.
+   */
+  static std::shared_ptr<PathRasterizer> Make(int width, int height, std::shared_ptr<Shape> shape,
+                                              bool antiAlias, bool needsGammaCorrection = false);
+
   bool isAlphaOnly() const override {
     return true;
   }

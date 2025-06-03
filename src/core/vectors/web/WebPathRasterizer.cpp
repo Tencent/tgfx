@@ -38,6 +38,18 @@ std::shared_ptr<PathRasterizer> PathRasterizer::Make(std::shared_ptr<Shape> shap
   return std::make_shared<WebPathRasterizer>(width, height, shape, antiAlias, needsGammaCorrection);
 }
 
+std::shared_ptr<PathRasterizer> PathRasterizer::Make(int width, int height,
+                                                     std::shared_ptr<Shape> shape, bool antiAlias,
+                                                     bool needsGammaCorrection) {
+  if (shape == nullptr || width <= 0 || height <= 0) {
+    return nullptr;
+  }
+  if (shape->getBounds().isEmpty()) {
+    return nullptr;
+  }
+  return std::make_shared<WebPathRasterizer>(width, height, shape, antiAlias, needsGammaCorrection);
+}
+
 static void Iterator(PathVerb verb, const Point points[4], void* info) {
   auto path2D = reinterpret_cast<val*>(info);
   switch (verb) {

@@ -117,6 +117,19 @@ std::shared_ptr<PathRasterizer> PathRasterizer::Make(std::shared_ptr<Shape> shap
                                             needsGammaCorrection);
 }
 
+std::shared_ptr<PathRasterizer> PathRasterizer::Make(int width, int height,
+                                                     std::shared_ptr<Shape> shape, bool antiAlias,
+                                                     bool needsGammaCorrection) {
+  if (shape == nullptr || width <= 0 || height <= 0) {
+    return nullptr;
+  }
+  if (shape->getBounds().isEmpty()) {
+    return nullptr;
+  }
+  return std::make_shared<CGPathRasterizer>(width, height, std::move(shape), antiAlias,
+                                            needsGammaCorrection);
+}
+
 bool CGPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (dstPixels == nullptr || dstInfo.isEmpty()) {
     return false;
