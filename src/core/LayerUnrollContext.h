@@ -41,11 +41,12 @@ class LayerUnrollContext : public DrawContext {
   void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) override;
 
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                 const MCState& state, const Fill& fill) override;
+                 const MCState& state, const Fill& fill,
+                 DrawImageStyle imageStyle = DrawImageStyle::Color) override;
 
   void drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
-                     const SamplingOptions& sampling, const MCState& mcState,
-                     const Fill& fill) override;
+                     const SamplingOptions& sampling, const MCState& mcState, const Fill& fill,
+                     DrawImageStyle imageStyle = DrawImageStyle::Color) override;
 
   void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
                         const Fill& fill, const Stroke* stroke) override;

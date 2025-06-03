@@ -20,6 +20,7 @@
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
 #include "core/Rasterizer.h"
+#include "core/utils/MathExtra.h"
 #include "core/utils/Types.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
@@ -47,14 +48,15 @@ OpsCompositor::OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t 
 
 void OpsCompositor::fillImage(std::shared_ptr<Image> image, const Rect& rect,
                               const SamplingOptions& sampling, const MCState& state,
-                              const Fill& fill) {
+                              const Fill& fill, DrawImageStyle imageStyle) {
   DEBUG_ASSERT(image != nullptr);
   DEBUG_ASSERT(!rect.isEmpty());
   if (!canAppend(PendingOpType::Image, state.clip, fill) || pendingImage != image ||
-      pendingSampling != sampling) {
+      pendingSampling != sampling || pendingImageStyle != imageStyle) {
     flushPendingOps(PendingOpType::Image, state.clip, fill);
     pendingImage = std::move(image);
     pendingSampling = sampling;
+    pendingImageStyle = imageStyle;
   }
   auto record = drawingBuffer()->make<RectRecord>(rect, state.matrix, fill.color.premultiply());
   pendingRects.emplace_back(std::move(record));
@@ -145,6 +147,7 @@ void OpsCompositor::discardAll() {
     pendingFill = {};
     pendingImage = nullptr;
     pendingSampling = {};
+    pendingImageStyle = DrawImageStyle::Color;
     pendingRects.clear();
     pendingRRects.clear();
     pendingStrokes.clear();
@@ -277,11 +280,47 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
 
   if (type == PendingOpType::Image) {
     FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty())};
-    auto processor = FragmentProcessor::Make(std::move(pendingImage), args, pendingSampling);
+    auto processor = FragmentProcessor::Make(pendingImage, args, pendingSampling);
     if (processor == nullptr) {
       return;
     }
-    drawOp->addColorFP(std::move(processor));
+
+    switch (pendingImageStyle) {
+      case DrawImageStyle::Color:
+        drawOp->addColorFP(std::move(processor));
+        break;
+      case DrawImageStyle::Coverage: {
+        auto maskProcessor = FragmentProcessor::MulInputByChildAlpha(
+            drawingBuffer(), FragmentProcessor::Make(pendingImage, args, pendingSampling));
+        if (maskProcessor) {
+          drawOp->addCoverageFP(std::move(maskProcessor));
+        }
+        break;
+      }
+      case DrawImageStyle::ColorAndCoverage: {
+        // In color mode, only the RGB data is needed and the alpha is ignored,
+        // so AlphaThreshold(0.0f) is used directly to restore the original data and set the alpha to 1.0f.
+        auto colorFilter = ColorFilter::AlphaThreshold(0.0f);
+
+        if (colorFilter) {
+          auto colorFilterProcessor = colorFilter->asFragmentProcessor(context);
+          if (colorFilterProcessor) {
+            processor = FragmentProcessor::Compose(drawingBuffer(), std::move(processor),
+                                                   std::move(colorFilterProcessor));
+          }
+        }
+        if (processor) {
+          drawOp->addColorFP(std::move(processor));
+        }
+        auto maskProcessor = FragmentProcessor::MulInputByChildAlpha(
+            drawingBuffer(), FragmentProcessor::Make(pendingImage, args, pendingSampling));
+        if (maskProcessor) {
+          drawOp->addCoverageFP(std::move(maskProcessor));
+        }
+        break;
+      }
+    }
+    pendingImage.reset();
   }
   addDrawOp(std::move(drawOp), clip, fill, localBounds, deviceBounds);
 }

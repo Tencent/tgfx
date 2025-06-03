@@ -21,6 +21,7 @@
 #include <stack>
 #include "core/CanvasState.h"
 #include "core/GlyphRunList.h"
+#include "tgfx/core/DrawImageStyle.h"
 #include "tgfx/core/Fill.h"
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/Shape.h"
@@ -62,17 +63,19 @@ class DrawContext {
   virtual void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) = 0;
 
   /**
-   * Draws an Image with the specified SamplingOptions, MCState, and Fill.
+   * Draws an Image with the specified SamplingOptions, MCState, Fill, and DrawImageStyle.
    */
   virtual void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                         const MCState& state, const Fill& fill) = 0;
+                         const MCState& state, const Fill& fill,
+                         DrawImageStyle imageStyle = DrawImageStyle::Color) = 0;
 
   /**
-   * Draws a rectangle filled with the specified Image, SamplingOptions, MCState, and Fill.
+   * Draws a rectangle filled with the specified Image, SamplingOptions, MCState, Fill, and DrawImageStyle.
    */
   virtual void drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                              const SamplingOptions& sampling, const MCState& state,
-                             const Fill& fill) = 0;
+                             const Fill& fill,
+                             DrawImageStyle imageStyle = DrawImageStyle::Color) = 0;
 
   /**
    * Draws a GlyphRunList with the specified MCState, Fill, and optional Stroke.

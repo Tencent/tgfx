@@ -36,11 +36,13 @@
         "YUVImage_RGBAA": "bc64712",
         "altas": "b1cfcd4",
         "blendMode": "c475bfb",
+        "complexEmojiTextBlending": "8c4d3235",
         "drawColor": "b7aefeb",
         "drawImage": "e87e871a",
         "drawPaint": "b7aefeb",
         "drawPaint_shadow": "1ae5042",
         "drawShape": "13657aa4",
+        "emojiTextStrokeBlending": "8c4d3235",
         "filter_mode_linear": "c475bfb",
         "filter_mode_nearest": "d010fb8",
         "hardware_render_target_blend": "0389826",
@@ -59,7 +61,9 @@
         "rasterized_scale_up": "c475bfb",
         "saveLayer": "c475bfb",
         "shape": "66aef718",
-        "text_shape": "50136952",
+        "textEmojiMixedBlendModes1": "8c4d3235",
+        "textEmojiMixedBlendModes2": "8c4d3235",
+        "text_shape": "8c4d3235",
         "tile_mode_normal": "c475bfb",
         "tile_mode_rgbaaa": "8cb853c",
         "tile_mode_subset": "c475bfb"
@@ -71,7 +75,7 @@
         "ImageWithMipmap": "da590da",
         "ImageWithShadow": "50136952",
         "SimpleLayerTreeDrawer": "0224fbeb",
-        "SimpleText": "15e0e39"
+        "SimpleText": "8c4d3235"
     },
     "DstTextureTest": {
         "EmptyLocalBounds": "be94e666",
@@ -99,7 +103,7 @@
     },
     "GlyphFaceTest": {
         "GlyphFaceSimple": "c475bfb",
-        "GlyphFaceWithStyle": "c475bfb",
+        "GlyphFaceWithStyle": "8c4d3235",
         "MakeTextBlobWithGlyphFace": "15e0e39"
     },
     "ImageReaderTest": {
@@ -250,7 +254,7 @@
         "ImageSnapshot_Surface2": "d010fb8"
     },
     "TextAlignTest": {
-        "FontFallbackTest": "50136952",
+        "FontFallbackTest": "8c4d3235",
         "SingleLineTextAlign": "15e0e39",
         "TextAlign": "970e2fb",
         "TextAlignBlankLineTest": "50136952",

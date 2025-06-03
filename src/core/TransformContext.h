@@ -65,14 +65,15 @@ class TransformContext : public DrawContext {
   }
 
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                 const MCState& state, const Fill& fill) override {
-    drawContext->drawImage(std::move(image), sampling, transform(state), fill);
+                 const MCState& state, const Fill& fill, DrawImageStyle imageStyle) override {
+    drawContext->drawImage(std::move(image), sampling, transform(state), fill, imageStyle);
   }
 
   void drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
-                     const SamplingOptions& sampling, const MCState& state,
-                     const Fill& fill) override {
-    drawContext->drawImageRect(std::move(image), rect, sampling, transform(state), fill);
+                     const SamplingOptions& sampling, const MCState& state, const Fill& fill,
+                     DrawImageStyle imageStyle) override {
+    drawContext->drawImageRect(std::move(image), rect, sampling, transform(state), fill,
+                               imageStyle);
   }
 
   void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,

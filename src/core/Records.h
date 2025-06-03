@@ -234,8 +234,9 @@ class DrawShape : public Record {
 
 class DrawImage : public Record {
  public:
-  DrawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling)
-      : image(std::move(image)), sampling(sampling) {
+  DrawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
+            DrawImageStyle imageStyle)
+      : image(std::move(image)), sampling(sampling), imageStyle(imageStyle) {
   }
 
   RecordType type() const override {
@@ -243,17 +244,19 @@ class DrawImage : public Record {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawImage(image, sampling, playback->state, playback->fill);
+    context->drawImage(image, sampling, playback->state, playback->fill, imageStyle);
   }
 
   std::shared_ptr<Image> image;
   SamplingOptions sampling;
+  DrawImageStyle imageStyle;
 };
 
 class DrawImageRect : public DrawImage {
  public:
-  DrawImageRect(std::shared_ptr<Image> image, const Rect& rect, const SamplingOptions& sampling)
-      : DrawImage(std::move(image), sampling), rect(rect) {
+  DrawImageRect(std::shared_ptr<Image> image, const Rect& rect, const SamplingOptions& sampling,
+                DrawImageStyle imageStyle = DrawImageStyle::Color)
+      : DrawImage(std::move(image), sampling, imageStyle), rect(rect) {
   }
 
   RecordType type() const override {

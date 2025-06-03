@@ -21,6 +21,7 @@
 #include "core/MCState.h"
 #include "gpu/ops/RRectDrawOp.h"
 #include "gpu/ops/RectDrawOp.h"
+#include "tgfx/core/DrawImageStyle.h"
 #include "tgfx/core/Fill.h"
 #include "tgfx/core/Shape.h"
 
@@ -48,7 +49,7 @@ class OpsCompositor {
    * Fills the given rect with the image, sampling options, state and fill.
    */
   void fillImage(std::shared_ptr<Image> image, const Rect& rect, const SamplingOptions& sampling,
-                 const MCState& state, const Fill& fill);
+                 const MCState& state, const Fill& fill, DrawImageStyle imageStyle);
 
   /**
    * Fills the given rect with the given state and fill.
@@ -95,6 +96,7 @@ class OpsCompositor {
   Fill pendingFill = {};
   std::shared_ptr<Image> pendingImage = nullptr;
   SamplingOptions pendingSampling = {};
+  DrawImageStyle pendingImageStyle = DrawImageStyle::Color;
   std::vector<PlacementPtr<RectRecord>> pendingRects = {};
   std::vector<PlacementPtr<RRectRecord>> pendingRRects = {};
   std::vector<PlacementPtr<Stroke>> pendingStrokes = {};

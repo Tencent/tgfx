@@ -92,15 +92,15 @@ void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state
 }
 
 void RenderContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                              const MCState& state, const Fill& fill) {
+                              const MCState& state, const Fill& fill, DrawImageStyle imageStyle) {
   DEBUG_ASSERT(image != nullptr);
   auto rect = Rect::MakeWH(image->width(), image->height());
-  return drawImageRect(std::move(image), rect, sampling, state, fill);
+  return drawImageRect(std::move(image), rect, sampling, state, fill, imageStyle);
 }
 
 void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                                   const SamplingOptions& sampling, const MCState& state,
-                                  const Fill& fill) {
+                                  const Fill& fill, DrawImageStyle imageStyle) {
   DEBUG_ASSERT(image != nullptr);
   DEBUG_ASSERT(image->isAlphaOnly() || fill.shader == nullptr);
   auto compositor = getOpsCompositor();
@@ -114,7 +114,7 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect
   }
   auto type = Types::Get(image.get());
   if (type != Types::ImageType::Subset) {
-    compositor->fillImage(std::move(image), rect, samplingOptions, state, fill);
+    compositor->fillImage(std::move(image), rect, samplingOptions, state, fill, imageStyle);
   } else {
     // Unwrap the subset image to maximize the merging of draw calls.
     auto subsetImage = static_cast<const SubsetImage*>(image.get());
@@ -125,7 +125,7 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect
     imageState.matrix.preTranslate(-subset.left, -subset.top);
     auto offsetMatrix = Matrix::MakeTrans(subset.left, subset.top);
     compositor->fillImage(subsetImage->source, imageRect, samplingOptions, imageState,
-                          fill.makeWithMatrix(offsetMatrix));
+                          fill.makeWithMatrix(offsetMatrix), imageStyle);
   }
 }
 
@@ -140,6 +140,7 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   if (FloatNearlyZero(maxScale)) {
     return;
   }
+
   auto bounds = glyphRunList->getBounds(maxScale);
   if (stroke) {
     stroke->applyToBounds(&bounds);
@@ -164,12 +165,46 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   }
   auto newState = state;
   newState.matrix = Matrix::MakeTrans(bounds.x(), bounds.y());
-  drawImage(std::move(image), {}, newState, fill.makeWithMatrix(rasterizeMatrix));
+  drawImage(std::move(image), {}, newState, fill.makeWithMatrix(rasterizeMatrix),
+            DrawImageStyle::Coverage);
 }
 
 void RenderContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
   DEBUG_ASSERT(picture != nullptr);
   picture->playback(this, state);
+}
+
+void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
+                                    const MCState& state, const Fill& fill) {
+  auto viewMatrix = state.matrix;
+  auto scale = viewMatrix.getMaxScale();
+  if (FloatNearlyZero(scale)) {
+    return;
+  }
+  viewMatrix.preScale(1.0f / scale, 1.0f / scale);
+  for (auto& glyphRun : glyphRunList->glyphRuns()) {
+    auto glyphFace = glyphRun.glyphFace;
+    glyphFace = glyphFace->makeScaled(scale);
+    DEBUG_ASSERT(glyphFace != nullptr);
+    auto& glyphIDs = glyphRun.glyphs;
+    auto glyphCount = glyphIDs.size();
+    auto& positions = glyphRun.positions;
+    auto glyphState = state;
+    for (size_t i = 0; i < glyphCount; ++i) {
+      const auto& glyphID = glyphIDs[i];
+      const auto& position = positions[i];
+      auto glyphCodec = glyphFace->getImage(glyphID, nullptr, &glyphState.matrix);
+      auto glyphImage = Image::MakeFrom(glyphCodec);
+      if (glyphImage == nullptr) {
+        continue;
+      }
+      glyphState.matrix.postTranslate(position.x * scale, position.y * scale);
+      glyphState.matrix.postConcat(viewMatrix);
+      auto rect = Rect::MakeWH(glyphImage->width(), glyphImage->height());
+      drawImageRect(std::move(glyphImage), rect, {}, glyphState, fill,
+                    DrawImageStyle::ColorAndCoverage);
+    }
+  }
 }
 
 void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
@@ -220,38 +255,6 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
   drawImage(std::move(image), {}, drawState, fill.makeWithMatrix(viewMatrix));
 }
 
-void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
-                                    const MCState& state, const Fill& fill) {
-  auto viewMatrix = state.matrix;
-  auto scale = viewMatrix.getMaxScale();
-  if (FloatNearlyZero(scale)) {
-    return;
-  }
-  viewMatrix.preScale(1.0f / scale, 1.0f / scale);
-  for (auto& glyphRun : glyphRunList->glyphRuns()) {
-    auto glyphFace = glyphRun.glyphFace;
-    glyphFace = glyphFace->makeScaled(scale);
-    DEBUG_ASSERT(glyphFace != nullptr);
-    auto& glyphIDs = glyphRun.glyphs;
-    auto glyphCount = glyphIDs.size();
-    auto& positions = glyphRun.positions;
-    auto glyphState = state;
-    for (size_t i = 0; i < glyphCount; ++i) {
-      const auto& glyphID = glyphIDs[i];
-      const auto& position = positions[i];
-      auto glyphCodec = glyphFace->getImage(glyphID, nullptr, &glyphState.matrix);
-      auto glyphImage = Image::MakeFrom(glyphCodec);
-      if (glyphImage == nullptr) {
-        continue;
-      }
-      glyphState.matrix.postTranslate(position.x * scale, position.y * scale);
-      glyphState.matrix.postConcat(viewMatrix);
-      auto rect = Rect::MakeWH(glyphImage->width(), glyphImage->height());
-      drawImageRect(std::move(glyphImage), rect, {}, glyphState, fill);
-    }
-  }
-}
-
 bool RenderContext::flush() {
   if (opsCompositor != nullptr) {
     auto closed = opsCompositor->isClosed();
@@ -284,7 +287,8 @@ void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRe
     auto drawingManager = renderTarget->getContext()->drawingManager();
     opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
     Fill fill = {{}, BlendMode::Src, false};
-    opsCompositor->fillImage(std::move(oldContent), renderTarget->bounds(), {}, MCState{}, fill);
+    opsCompositor->fillImage(std::move(oldContent), renderTarget->bounds(), {}, MCState{}, fill,
+                             {});
   }
 }
 

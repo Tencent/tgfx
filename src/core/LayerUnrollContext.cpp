@@ -55,15 +55,16 @@ void LayerUnrollContext::drawShape(std::shared_ptr<Shape> shape, const MCState& 
 }
 
 void LayerUnrollContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                                   const MCState& state, const Fill& fill) {
-  drawContext->drawImage(std::move(image), sampling, state, merge(fill));
+                                   const MCState& state, const Fill& fill,
+                                   DrawImageStyle imageStyle) {
+  drawContext->drawImage(std::move(image), sampling, state, merge(fill), imageStyle);
   unrolled = true;
 }
 
 void LayerUnrollContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                                        const SamplingOptions& sampling, const MCState& state,
-                                       const Fill& fill) {
-  drawContext->drawImageRect(std::move(image), rect, sampling, state, merge(fill));
+                                       const Fill& fill, DrawImageStyle imageStyle) {
+  drawContext->drawImageRect(std::move(image), rect, sampling, state, merge(fill), imageStyle);
   unrolled = true;
 }
 

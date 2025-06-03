@@ -144,15 +144,16 @@ void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& st
 }
 
 void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                                 const MCState& state, const Fill& fill) {
+                                 const MCState& state, const Fill& fill,
+                                 DrawImageStyle imageStyle) {
   DEBUG_ASSERT(image != nullptr);
   auto rect = Rect::MakeWH(image->width(), image->height());
-  return drawImageRect(std::move(image), rect, sampling, state, fill);
+  return drawImageRect(std::move(image), rect, sampling, state, fill, imageStyle);
 }
 
 void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
-                                     const SamplingOptions&, const MCState& state,
-                                     const Fill& fill) {
+                                     const SamplingOptions&, const MCState& state, const Fill& fill,
+                                     DrawImageStyle) {
   DEBUG_ASSERT(image != nullptr);
   Bitmap bitmap = ImageExportToBitmap(context, image);
   if (!bitmap.isEmpty()) {
