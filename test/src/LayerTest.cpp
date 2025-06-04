@@ -1057,8 +1057,9 @@ TGFX_TEST(LayerTest, shapeMask) {
 
   auto vectorShaperLayer = ShapeLayer::Make();
   vectorShaperLayer->setPath(path);
-  vectorShaperLayer->setFillStyle(filleStyle);
-  vectorShaperLayer->setAlpha(1.0f);
+  // make a fill style with alpha
+  auto vectorFillStyle = SolidColor::Make(Color::FromRGBA(0, 0, 255, 128));
+  vectorShaperLayer->setFillStyle(vectorFillStyle);
   layer->addChild(vectorShaperLayer);
   Matrix vectorMaskMatrix =
       Matrix::MakeAll(1.0f, 0, 300, 0, 1.0f, 300 + static_cast<float>(image->height()) * 0.5f);
