@@ -227,7 +227,7 @@ class PlotUseUpdater {
     DEBUG_ASSERT(!find(pageIndex, plotIndex));
     if (pageIndex >= plotAlreadyUpdated.size()) {
       auto count = pageIndex - plotAlreadyUpdated.size() + 1;
-      for (auto i = 0; i < count; ++i) {
+      for (size_t i = 0; i < count; ++i) {
         plotAlreadyUpdated.emplace_back(0);
       }
     }
@@ -239,16 +239,16 @@ class PlotUseUpdater {
 
 class Plot {
  public:
-  Plot(int pageIndex, int plotIndex, AtlasGenerationCounter* generationCounter, int offX, int offY,
-       int width, int height, int bytesPerPixel);
+  Plot(uint32_t pageIndex, uint32_t plotIndex, AtlasGenerationCounter* generationCounter, int offX,
+       int offY, int width, int height, int bytesPerPixel);
 
   ~Plot();
 
-  int pageIndex() const {
+  uint32_t pageIndex() const {
     return _pageIndex;
   }
 
-  int plotIndex() const {
+  uint32_t plotIndex() const {
     return _plotIndex;
   }
 
@@ -295,8 +295,8 @@ class Plot {
   int _flushesSinceLastUsed = 0;
 
   AtlasGenerationCounter* const generationCounter = nullptr;
-  const int _pageIndex;
-  const int _plotIndex;
+  const uint32_t _pageIndex;
+  const uint32_t _plotIndex;
   uint64_t _genID;
   mutable unsigned char* data = nullptr;
   const int width;

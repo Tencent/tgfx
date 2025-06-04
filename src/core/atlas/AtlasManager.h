@@ -33,8 +33,6 @@ class AtlasManager : public AtlasGenerationCounter, public FlushCallbackObject {
 
   const std::vector<std::shared_ptr<TextureProxy>>& getTextureProxies(MaskFormat maskFormat);
 
-  const std::vector<std::shared_ptr<Image>>& getImages(MaskFormat maskFormat);
-
   void releaseAll();
   bool hasGlyph(MaskFormat, const BytesKey& key) const;
 

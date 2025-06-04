@@ -45,7 +45,7 @@ class RectPackSkyline {
   bool addRect(int w, int h, Point& location);
 
   float percentFull() const {
-    return areaSoFar / static_cast<float>(_width * _height);
+    return static_cast<float>(areaSoFar) / static_cast<float>(_width * _height);
   }
 
  private:

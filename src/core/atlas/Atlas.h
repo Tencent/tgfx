@@ -89,7 +89,7 @@ class Atlas {
   void makeMRU(Plot* plot, uint32_t pageIndex);
 
   bool activateNewPage();
-  bool addToPageWithoutFillImage(const Glyph& glyph, int pageIndex, AtlasLocator& atlasLocator);
+  bool addToPageWithoutFillImage(const Glyph& glyph, size_t pageIndex, AtlasLocator& atlasLocator);
 
   void evictionPlot(Plot* plot);
   void deactivateLastPage();

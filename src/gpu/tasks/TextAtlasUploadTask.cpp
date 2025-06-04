@@ -37,12 +37,12 @@ bool TextAtlasUploadTask::execute(Context* context) {
   auto pixelBuffer = source->getData();
   if (pixelBuffer == nullptr) {
     LOGE("TextAtlasUploadTask::execute() pixelBuffer is nullptr!");
-    return nullptr;
+    return false;
   }
   auto texture = textureProxy->getTexture();
   if (texture == nullptr) {
     LOGE("TextureUploadTask::onMakeResource() texture is nullptr!");
-    return nullptr;
+    return false;
   }
   auto gpu = context->gpu();
   auto pixels = pixelBuffer->lockPixels();
@@ -51,8 +51,8 @@ bool TextAtlasUploadTask::execute(Context* context) {
     LOGE("TextAtlasUploadTask::execute() lockPixels is nullptr!");
     return false;
   }
-  auto rect = Rect::MakeXYWH(atlasOffset.x, atlasOffset.y, 1.f * pixelBuffer->width(),
-                             1.f * pixelBuffer->height());
+  auto rect = Rect::MakeXYWH(atlasOffset.x, atlasOffset.y, static_cast<float>(pixelBuffer->width()),
+                             static_cast<float>(pixelBuffer->height()));
   gpu->writePixels(texture->getSampler(), rect, pixels, pixelBuffer->info().rowBytes());
   pixelBuffer->unlockPixels();
   // Free the image source immediately to reduce memory pressure.

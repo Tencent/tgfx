@@ -20,6 +20,7 @@
 #include "core/GlyphRunList.h"
 #include "core/MCState.h"
 #include "core/atlas/AtlasManager.h"
+#include "gpu/OpsCompositor.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {

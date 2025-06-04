@@ -45,14 +45,8 @@ const std::vector<std::shared_ptr<TextureProxy>>& AtlasManager::getTextureProxie
   if (this->initAtlas(maskFormat)) {
     return this->getAtlas(maskFormat)->getTextureProxies();
   }
-  return {};
-}
-
-const std::vector<std::shared_ptr<Image>>& AtlasManager::getImages(MaskFormat maskFormat) {
-  if (this->initAtlas(maskFormat)) {
-    return this->getAtlas(maskFormat)->getImages();
-  }
-  return {};
+  static std::vector<std::shared_ptr<TextureProxy>> kEmpty;
+  return kEmpty;
 }
 
 // bool AtlasManager::hasGlyph(MaskFormat format, Glyph* glyph) {

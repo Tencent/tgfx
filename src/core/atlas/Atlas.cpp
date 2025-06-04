@@ -39,13 +39,12 @@ Atlas::Atlas(ProxyProvider* proxyProvider, PixelFormat pixelFormat, int width, i
              int plotWidth, int plotHeight, AtlasGenerationCounter* generationCounter,
              std::string_view label)
     : proxyProvider(proxyProvider), pixelFormat(pixelFormat), generationCounter(generationCounter),
-      previousFlushToken(AtlasToken::InvalidToken()), flushesSinceLastUse(0),
-      _atlasGeneration(generationCounter->next()),
+      _atlasGeneration(generationCounter->next()), previousFlushToken(AtlasToken::InvalidToken()),
+      flushesSinceLastUse(0),
       bytesPerPixel(static_cast<int>(PixelFormatBytesPerPixel(pixelFormat))), textureWidth(width),
       textureHeight(height), plotWidth(plotWidth), plotHeight(plotHeight), label(label) {
   int numPlotX = width / plotWidth;
   int numPlotY = height / plotHeight;
-  DEBUG_ASSERT(numPlotX * numPlotY <= PlotLocator::kMaxPlots);
   DEBUG_ASSERT(plotWidth * numPlotX == textureWidth);
   DEBUG_ASSERT(plotHeight * numPlotY == textureHeight);
   numPlots = static_cast<uint32_t>(numPlotX * numPlotY);
@@ -53,7 +52,7 @@ Atlas::Atlas(ProxyProvider* proxyProvider, PixelFormat pixelFormat, int width, i
 
 Atlas::ErrorCode Atlas::addToAtlasWithoutFillImage(const Glyph& glyph, AtlasToken nextFlushToken,
                                                    AtlasLocator& atlasLocator) {
-  for (auto pageIndex = 0; pageIndex < pages.size(); ++pageIndex) {
+  for (size_t pageIndex = 0; pageIndex < pages.size(); ++pageIndex) {
     if (addToPageWithoutFillImage(glyph, pageIndex, atlasLocator)) {
       return ErrorCode::Succeeded;
     }
@@ -61,7 +60,7 @@ Atlas::ErrorCode Atlas::addToAtlasWithoutFillImage(const Glyph& glyph, AtlasToke
 
   auto pageCount = pages.size();
   if (pageCount == PlotLocator::kMaxResidentPages) {
-    for (auto pageIndex = 0; pageIndex < pageCount; ++pageIndex) {
+    for (size_t pageIndex = 0; pageIndex < pageCount; ++pageIndex) {
       Plot* plot = pages[pageIndex].plotList.back();
       DEBUG_ASSERT(plot != nullptr);
       if (plot->lastUseToken() < nextFlushToken) {
@@ -77,14 +76,14 @@ Atlas::ErrorCode Atlas::addToAtlasWithoutFillImage(const Glyph& glyph, AtlasToke
 
   activateNewPage();
 
-  if (!addToPageWithoutFillImage(glyph, static_cast<int>(pages.size() - 1), atlasLocator)) {
+  if (!addToPageWithoutFillImage(glyph, pages.size() - 1, atlasLocator)) {
     return ErrorCode::Error;
   }
 
   return ErrorCode::Succeeded;
 }
 
-bool Atlas::addToPageWithoutFillImage(const Glyph& glyph, int pageIndex,
+bool Atlas::addToPageWithoutFillImage(const Glyph& glyph, size_t pageIndex,
                                       AtlasLocator& atlasLocator) {
   auto& page = pages[pageIndex];
   auto& plotList = page.plotList;
@@ -104,13 +103,13 @@ bool Atlas::activateNewPage() {
   page.plotArray =
       std::make_unique<std::unique_ptr<Plot>[]>(static_cast<size_t>(numPlotX * numPlotY));
 
-  auto pageIndex = static_cast<int>(pages.size());
+  auto pageIndex = static_cast<uint32_t>(pages.size());
   auto currentPlot = page.plotArray.get();
   for (int y = numPlotY - 1, r = 0; y >= 0; --y, ++r) {
     for (int x = numPlotX - 1, c = 0; x >= 0; --x, ++c) {
-      int plotIndex = r * numPlotX + c;
-      currentPlot->reset(new Plot(pageIndex, plotIndex, generationCounter, x, y, plotWidth,
-                                  plotHeight, bytesPerPixel));
+      auto plotIndex = static_cast<uint32_t>(r * numPlotX + c);
+      *currentPlot = std::make_unique<Plot>(pageIndex, plotIndex, generationCounter, x, y,
+                                            plotWidth, plotHeight, bytesPerPixel);
       page.plotList.push_front(currentPlot->get());
       ++currentPlot;
     }
@@ -151,7 +150,7 @@ bool Atlas::fillGlyphImage(AtlasLocator& locator, void* image) const {
     return false;
   }
   auto plot = page.plotArray[plotIndex].get();
-  if (plot->plotIndex() == static_cast<int>(plotIndex)) {
+  if (plot->plotIndex() == plotIndex) {
     auto width = static_cast<int>(locator.getLocation().width());
     auto height = static_cast<int>(locator.getLocation().height());
     plot->addSubImage(width, height, image, locator);
@@ -233,7 +232,7 @@ void Atlas::compact(AtlasToken startTokenForNextFlush) {
   if (atlasUsedThisFlush || flushesSinceLastUse > kAtlasRecentlyUsedCount) {
     std::vector<Plot*> availablePlots;
     auto lastPageIndex = pages.size() - 1;
-    for (auto pageIndex = 0; pageIndex < lastPageIndex; ++pageIndex) {
+    for (uint32_t pageIndex = 0; pageIndex < lastPageIndex; ++pageIndex) {
       for (auto& plot : pages[pageIndex].plotList) {
         if (!plot->lastUseToken().isInterval(previousFlushToken, startTokenForNextFlush)) {
           plot->increaseFlushesSinceLastUsed();
@@ -287,7 +286,7 @@ void Atlas::compact(AtlasToken startTokenForNextFlush) {
 }
 
 void Atlas::clearEvictionPlotTexture(Context* context) {
-  if (evictionPlots.empty() || context == nullptr) {
+  if (evictionPlots.empty() || context == nullptr || textureProxies.empty()) {
     return;
   }
 
@@ -296,7 +295,7 @@ void Atlas::clearEvictionPlotTexture(Context* context) {
     return;
   }
 
-  auto size = plotWidth * plotHeight * bytesPerPixel;
+  auto size = static_cast<size_t>(plotWidth * plotHeight * bytesPerPixel);
   auto data = new (std::nothrow) uint8_t[size];
   if (data == nullptr) {
     return;
@@ -317,10 +316,10 @@ void Atlas::clearEvictionPlotTexture(Context* context) {
       if (plot == nullptr) {
         continue;
       }
-      auto& plotLocator = plot->plotLocator();
-      auto rect = Rect::MakeXYWH(plot->pixelOffset().x, plot->pixelOffset().y, 1.f * plotWidth,
-                                 1.f * plotHeight);
-      gpu->writePixels(texture->getSampler(), rect, data, plotWidth * bytesPerPixel);
+      auto rect = Rect::MakeXYWH(plot->pixelOffset().x, plot->pixelOffset().y,
+                                 static_cast<float>(plotWidth), static_cast<float>(plotHeight));
+      gpu->writePixels(texture->getSampler(), rect, data,
+                       static_cast<size_t>(plotWidth * bytesPerPixel));
     }
   }
   delete[] data;

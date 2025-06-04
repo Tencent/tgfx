@@ -18,13 +18,12 @@
 #include "AtlasTypes.h"
 
 namespace tgfx {
-Plot::Plot(int pageIndex, int plotIndex, AtlasGenerationCounter* generationCounter, int offsetX,
-           int offsetY, int width, int height, int bytesPerPixel)
+Plot::Plot(uint32_t pageIndex, uint32_t plotIndex, AtlasGenerationCounter* generationCounter,
+           int offsetX, int offsetY, int width, int height, int bytesPerPixel)
     : generationCounter(generationCounter), _pageIndex(pageIndex), _plotIndex(plotIndex),
       _genID(generationCounter->next()), width(width), height(height),
       _pixelOffset(Point::Make(offsetX * width, offsetY * height)), bytesPerPixel(bytesPerPixel),
-      rectPack(width, height),
-      _plotLocator(static_cast<uint32_t>(pageIndex), static_cast<uint32_t>(plotIndex), _genID) {
+      rectPack(width, height), _plotLocator(pageIndex, plotIndex, _genID) {
   dirtyRect.setEmpty();
   cachedRect.setEmpty();
 }
