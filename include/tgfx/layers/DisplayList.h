@@ -171,7 +171,7 @@ class DisplayList {
    * offset). The default is 0, which means the minimum tile count will be used based on the viewport
    * size and tile size.
    */
-  float maxTileCount() const {
+  int maxTileCount() const {
     return _maxTileCount;
   }
 

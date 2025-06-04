@@ -327,8 +327,8 @@ void DisplayList::checkTileCount(Surface* renderSurface) {
   auto remainingTileCount = totalTileCount % maxTileCountPerAtlas;
   totalTileCount -= remainingTileCount;
   int width = static_cast<int>(sqrtf(static_cast<float>(remainingTileCount)));
-  int height = static_cast<int>(
-      ceilf(static_cast<float>(remainingTileCount) / static_cast<float>(width)));
+  int height =
+      static_cast<int>(ceilf(static_cast<float>(remainingTileCount) / static_cast<float>(width)));
   totalTileCount += width * height;
 }
 
@@ -508,16 +508,13 @@ std::vector<std::shared_ptr<Tile>> DisplayList::createContinuousTiles(const Surf
     return {};
   }
   int countX = static_cast<int>(sqrtf(static_cast<float>(tileCount)));
-  int countY =
-      static_cast<int>(ceilf(static_cast<float>(tileCount) / static_cast<float>(countX)));
+  int countY = static_cast<int>(ceilf(static_cast<float>(tileCount) / static_cast<float>(countX)));
   if (countX < requestCountX) {
     countX = requestCountX;
-    countY =
-        static_cast<int>(ceilf(static_cast<float>(tileCount) / static_cast<float>(countX)));
+    countY = static_cast<int>(ceilf(static_cast<float>(tileCount) / static_cast<float>(countX)));
   } else if (countY < requestCountY) {
     countY = requestCountY;
-    countX =
-        static_cast<int>(ceilf(static_cast<float>(tileCount) / static_cast<float>(countY)));
+    countX = static_cast<int>(ceilf(static_cast<float>(tileCount) / static_cast<float>(countY)));
   }
   auto surface = Surface::Make(context, countX * _tileSize, countY * _tileSize,
                                ColorType::RGBA_8888, 1, false, renderSurface->renderFlags());
@@ -551,8 +548,7 @@ bool DisplayList::createEmptyTiles(const Surface* renderSurface) {
   auto context = renderSurface->getContext();
   auto tileCount = nextSurfaceTileCount(context);
   int countX = static_cast<int>(sqrtf(static_cast<float>(tileCount)));
-  int countY =
-      static_cast<int>(ceilf(static_cast<float>(tileCount) / static_cast<float>(countX)));
+  int countY = static_cast<int>(ceilf(static_cast<float>(tileCount) / static_cast<float>(countX)));
   auto surface = Surface::Make(context, countX * _tileSize, countY * _tileSize,
                                ColorType::RGBA_8888, 1, false, renderSurface->renderFlags());
   if (surface == nullptr) {
