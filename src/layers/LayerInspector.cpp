@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,39 +16,45 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <complex>
-#ifdef TGFX_USE_INSPECTOR
 #include "tgfx/layers/LayerInspector.h"
+#include <string>
+#ifdef TGFX_USE_INSPECTOR
 #include <chrono>
 #include <functional>
 #include "core/utils/Profiling.h"
 #include "serialization/LayerSerialization.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/SolidColor.h"
+#endif
 
 namespace tgfx {
+  extern const std::string HighLightLayerName = "HighLightLayer";
 
-extern const std::string HighLightLayerName = "HighLightLayer";
+  void LayerInspector::pickedLayer(float x, float y) {
+#ifdef TGFX_USE_INSPECTOR
+    if (m_HoverdSwitch) {
+      auto layers = m_DisplayList->root()->getLayersUnderPoint(x, y);
+      for (auto layer : layers) {
+        if (layer->name() != HighLightLayerName) {
+          if (reinterpret_cast<uint64_t>(layer.get()) != m_SelectedAddress) {
+            SendPickedLayerAddress(layer);
+          }
+          AddHighLightOverlay(tgfx::Color::FromRGBA(111, 166, 219), layer);
+          break;
+        }
+      }
+    }
+#else
+    (void)x;
+    (void)y;
+#endif
+  }
 
+#ifdef TGFX_USE_INSPECTOR
 void LayerInspector::setCallBack() {
   [[maybe_unused]] std::function<void(const std::vector<uint8_t>&)> func =
       std::bind(&LayerInspector::FeedBackDataProcess, this, std::placeholders::_1);
   LAYER_CALLBACK(func);
-}
-
-void LayerInspector::pickedLayer(float x, float y) {
-  if (m_HoverdSwitch) {
-    auto layers = m_DisplayList->root()->getLayersUnderPoint(x, y);
-    for (auto layer : layers) {
-      if (layer->name() != HighLightLayerName) {
-        if (reinterpret_cast<uint64_t>(layer.get()) != m_SelectedAddress) {
-          SendPickedLayerAddress(layer);
-        }
-        AddHighLightOverlay(tgfx::Color::FromRGBA(111, 166, 219), layer);
-        break;
-      }
-    }
-  }
 }
 
 void LayerInspector::RenderImageAndSend(Context *context) {
@@ -70,14 +76,7 @@ void LayerInspector::setDisplayList(tgfx::DisplayList* displayList) {
   m_DisplayList = displayList;
 }
 
-// void LayerInspector::setDirty(Layer* root, std::shared_ptr<Layer> child) {
-//   if(root == m_DisplayList->root() && child->name() != "HighLightLayer") {
-//     m_IsDirty = true;
-//   }
-// }
-
 void LayerInspector::serializingLayerTree() {
-  // if (m_IsDirty) {
   m_LayerMap.clear();
 
   std::shared_ptr<Data> data = tgfx::LayerSerialization::SerializeTreeNode(
@@ -85,8 +84,6 @@ void LayerInspector::serializingLayerTree() {
   std::vector<uint8_t> blob(data->bytes(), data->bytes() + data->size());
 
   LAYER_DATA(blob);
-  // m_IsDirty = false;
-  // }
 }
 
 void LayerInspector::SendPickedLayerAddress(const std::shared_ptr<tgfx::Layer>& layer) {
@@ -192,5 +189,5 @@ void LayerInspector::AddHighLightOverlay(Color color, std::shared_ptr<Layer> hov
   m_HoverdLayer->addChild(highlightLayer);
   m_HighLightLayerIndex = m_HoverdLayer->getChildIndex(highlightLayer);
 }
-}  // namespace tgfx
 #endif
+}  // namespace tgfx

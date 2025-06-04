@@ -18,7 +18,6 @@ option(TGFX_USE_QT "Enable building with the Qt framework." OFF)
 option(TGFX_USE_SWIFTSHADER "Enable building with the SwiftShader library" OFF)
 option(TGFX_USE_ANGLE "Enable building with the ANGLE library" OFF)
 option(TGFX_USE_FASTER_BLUR "Enable a faster blur algorithm instead of the standard Gaussian blur" ON)
-option(TGFX_USE_INSPECTOR "Enable Inspector tool" ON)
 
 # When enabled, ImageBuffers created from web native codecs won’t be fully decoded right away.
 # Instead, they will use promise-awaiting calls before generating textures, allowing multiple
