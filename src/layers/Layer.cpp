@@ -663,7 +663,7 @@ std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
 }
 
 LayerContent* Layer::getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix) {
-  if (!bitFields.shouldRasterize || args.context == nullptr) {
+  if (bitFields.shouldRasterize || args.drawMode == DrawMode::Contour || args.context == nullptr) {
     return nullptr;
   }
   auto contextID = args.context->uniqueID();
@@ -897,8 +897,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
                  [&]() { return drawChildren(drawArgs, canvas, 1.0f); });
   };
 
-  // null context prohibits the use of rasterizedCache during the drawing process.
-  DrawArgs drawArgs(nullptr, bitFields.excludeChildEffectsInLayerStyle);
+  DrawArgs drawArgs(args.context, bitFields.excludeChildEffectsInLayerStyle);
   drawArgs.renderRect = args.renderRect;
   auto contentPicture = CreatePicture(drawArgs, contentScale, drawLayerContents);
   Point contentOffset = {};
