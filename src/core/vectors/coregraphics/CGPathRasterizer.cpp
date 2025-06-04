@@ -127,11 +127,12 @@ bool CGPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) con
   auto totalMatrix = Matrix::MakeScale(1, -1);
   totalMatrix.postTranslate(0, static_cast<float>(dstInfo.height()));
   path.transform(totalMatrix);
-  auto bounds = path.getBounds();
-  bounds.roundOut();
+  ClearPixels(dstInfo, dstPixels);
   if (!needsGammaCorrection) {
     DrawPath(path, cgContext, dstInfo, antiAlias);
   }
+  auto bounds = shape->getBounds();
+  bounds.roundOut();
   auto width = static_cast<int>(bounds.width());
   auto height = static_cast<int>(bounds.height());
   auto tempBuffer = PixelBuffer::Make(width, height, true, false);

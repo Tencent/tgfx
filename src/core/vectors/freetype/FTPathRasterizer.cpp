@@ -70,6 +70,9 @@ bool FTPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) con
     maskPath.addRect(Rect::MakeWH(dstInfo.width(), dstInfo.height()));
     path.addPath(maskPath, PathOp::Intersect);
   }
+  auto bounds = shape->getBounds();
+  bounds.roundOut();
+  ClearPixels(dstInfo, dstPixels);
   FTPath ftPath = {};
   path.decompose(Iterator, &ftPath);
   auto fillType = path.getFillType();
