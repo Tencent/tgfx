@@ -1139,17 +1139,9 @@ void Layer::updateBackgroundBounds(const Matrix& renderMatrix) {
     }
   }
   if (backgroundChanged) {
-    auto layer = this;
-    while (layer) {
-      if (layer->bitFields.dirtyDescendents) {
-        break;
-      }
+    rasterizedContent = nullptr;
+    for (auto layer = this; layer && !layer->bitFields.dirtyDescendents && !layer->maskOwner; layer = layer->_parent) {
       layer->rasterizedContent = nullptr;
-      if (!layer->maskOwner) {
-        layer = layer->_parent;
-      } else {
-        layer = layer->maskOwner;
-      }
     }
   }
 }
