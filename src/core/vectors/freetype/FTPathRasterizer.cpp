@@ -30,10 +30,10 @@ void ClearPixels(const ImageInfo& dstInfo, void* dstPixels, const Rect& bounds) 
     return;
   }
   dstBounds.intersect(bounds);
-  auto left = static_cast<int>(dstBounds.left);
-  auto width = static_cast<int>(dstBounds.width());
-  auto top = dstInfo.height() - static_cast<int>(dstBounds.bottom);
-  auto bottom = top + static_cast<int>(dstBounds.height());
+  auto left = static_cast<size_t>(dstBounds.left);
+  auto width = static_cast<size_t>(dstBounds.width());
+  auto top = static_cast<size_t>(dstInfo.height()) - static_cast<size_t>(dstBounds.bottom);
+  auto bottom = top + static_cast<size_t>(dstBounds.height());
 
   for (auto y = top; y < bottom; ++y) {
     auto row =
