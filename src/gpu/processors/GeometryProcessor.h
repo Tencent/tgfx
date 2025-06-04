@@ -121,6 +121,23 @@ class GeometryProcessor : public Processor {
   virtual void setData(UniformBuffer* uniformBuffer,
                        FPCoordTransformIter* coordTransformIter) const = 0;
 
+  size_t numTextureSamplers() const {
+    return textureSamplerCount;
+  }
+
+  const TextureSampler* textureSampler(size_t index) const {
+    return onTextureSampler(index);
+  }
+
+  SamplerState samplerState(size_t index) const {
+    return onSamplerState(index);
+  }
+
+  void setTextureSamplerCount(size_t count) {
+    DEBUG_ASSERT(count > 0);
+    textureSamplerCount = count;
+  }
+
  protected:
   explicit GeometryProcessor(uint32_t classID) : Processor(classID) {
   }
@@ -145,6 +162,15 @@ class GeometryProcessor : public Processor {
   virtual void onComputeProcessorKey(BytesKey*) const {
   }
 
+  virtual const TextureSampler* onTextureSampler(size_t) const {
+    return nullptr;
+  }
+
+  virtual SamplerState onSamplerState(size_t) const {
+    return {};
+  }
+
   std::vector<const Attribute*> attributes = {};
+  size_t textureSamplerCount = 0;
 };
 }  // namespace tgfx

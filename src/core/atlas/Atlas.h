@@ -31,6 +31,7 @@
 namespace tgfx {
 class Atlas {
  public:
+  static constexpr int kMaxCellSize = 256;
   static std::unique_ptr<Atlas> Make(ProxyProvider* proxyProvider, PixelFormat format, int width,
                                      int height, int plotWidth, int plotHeight,
                                      AtlasGenerationCounter* generationCounter,
@@ -43,7 +44,7 @@ class Atlas {
   ErrorCode addToAtlasWithoutFillImage(const Glyph& glyph, AtlasToken nextFlushToken,
                                        AtlasLocator& atlasLocator);
 
-  bool getGlyphLocator(const BytesKey& glyphKey, AtlasLocator& atlasLocator) const;
+  bool getGlyphLocator(const BytesKey& glyphKey, GlyphLocator& glyphLocator) const;
 
   bool fillGlyphImage(AtlasLocator& locator, void* image) const;
 
@@ -117,7 +118,7 @@ class Atlas {
 
   std::vector<PlotEvictionCallback*> evictionCallbacks;
 
-  BytesKeyMap<AtlasLocator> locatorMap;
+  BytesKeyMap<GlyphLocator> glyphLocators;
   std::map<uint32_t, std::set<Plot*>> evictionPlots;
 };
 

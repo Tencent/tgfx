@@ -20,8 +20,8 @@
 
 #include "ResourceTask.h"
 #include "core/ImageSource.h"
-#include "gpu/proxies/TextureProxy.h"
 #include "core/PixelBuffer.h"
+#include "gpu/proxies/TextureProxy.h"
 
 namespace tgfx {
 class TextAtlasUploadTask : public ResourceTask {

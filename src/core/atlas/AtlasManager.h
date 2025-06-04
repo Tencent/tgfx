@@ -38,7 +38,7 @@ class AtlasManager : public AtlasGenerationCounter, public FlushCallbackObject {
   void releaseAll();
   bool hasGlyph(MaskFormat, const BytesKey& key) const;
 
-  bool getGlyphLocator(MaskFormat, const BytesKey& key, AtlasLocator& locator) const;
+  bool getGlyphLocator(MaskFormat, const BytesKey& key, GlyphLocator& locator) const;
 
   Atlas::ErrorCode addGlyphToAtlasWithoutFillImage(const Glyph& glyph, AtlasToken nextFlushToken,
                                                    AtlasLocator&) const;

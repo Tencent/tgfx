@@ -21,13 +21,14 @@
 namespace tgfx {
 
 std::shared_ptr<PixelBuffer> onMakePixelBuffer(const std::shared_ptr<ImageCodec>& imageCodec,
-                                          bool tryHardware) {
+                                               bool tryHardware) {
   auto pixelBuffer = PixelBuffer::Make(imageCodec->width(), imageCodec->height(),
                                        imageCodec->isAlphaOnly(), tryHardware);
   if (pixelBuffer == nullptr) {
     return nullptr;
   }
   auto pixels = pixelBuffer->lockPixels();
+  memset(pixels, 0, pixelBuffer->info().byteSize());
   auto result = imageCodec->readPixels(pixelBuffer->info(), pixels);
   pixelBuffer->unlockPixels();
   return result ? pixelBuffer : nullptr;
@@ -39,7 +40,7 @@ std::unique_ptr<DataSource<PixelBuffer>> GlyphSource::MakeFrom(
     return nullptr;
   }
   if (asyncDecoding && !imageCodec->asyncSupport()) {
-    auto pixelBuffer = onMakePixelBuffer(imageCodec,tryHardware);
+    auto pixelBuffer = onMakePixelBuffer(imageCodec, tryHardware);
     if (pixelBuffer == nullptr) {
       return nullptr;
     }

@@ -25,8 +25,6 @@
 namespace tgfx {
 class Glyph {
  public:
-  ~Glyph();
-
   GlyphID glyphId() const {
     return _glyphId;
   }
@@ -39,53 +37,41 @@ class Glyph {
     return _locator;
   }
 
-  void setImage(void* image) {
-    _image = image;
-  }
-
   void setAtlasLocator(const AtlasLocator& locator) {
     _locator = locator;
-  }
-
-  void* image() const {
-    return _image;
   }
 
   MaskFormat maskFormat() const {
     return _maskFormat;
   }
 
-  Point position() const {
-    return _position;
-  }
-
-  int width() const {
+  uint16_t width() const {
     return _width;
   }
 
-  int height() const {
+  uint16_t height() const {
     return _height;
   }
 
+  const Matrix& matrix() const {
+    return _matrix;
+  }
+
  private:
-  Point _position = Point::Zero();
-  int _width = 0;
-  int _height = 0;
-  GlyphID _glyphId;
-  MaskFormat _maskFormat;
-  void* _image = nullptr;
   BytesKey _key;
+  Matrix _matrix;
   AtlasLocator _locator;
+  MaskFormat _maskFormat = MaskFormat::A8;
+  uint16_t _width = 0;
+  uint16_t _height = 0;
+  GlyphID _glyphId = 0;
 
   friend class AtlasSource;
-  friend class RenderContext;
+  friend class TextRender;
 };
 
-struct DrawGlyph {
-  MaskFormat maskFormat;
-  GlyphID glyphId;
-  std::shared_ptr<GlyphFace> glyphFace;
-  Point position = Point::Zero();
-  AtlasLocator locator;
+struct GlyphLocator {
+  Matrix matrix;
+  AtlasLocator atlasLocator;
 };
 }  //namespace tgfx

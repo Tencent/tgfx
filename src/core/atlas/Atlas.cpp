@@ -67,7 +67,7 @@ Atlas::ErrorCode Atlas::addToAtlasWithoutFillImage(const Glyph& glyph, AtlasToke
       if (plot->lastUseToken() < nextFlushToken) {
         evictionPlot(plot);
         if (plot->addRect(glyph.width(), glyph.height(), atlasLocator)) {
-          locatorMap[glyph.key()] = atlasLocator;
+          glyphLocators[glyph.key()] = {glyph.matrix(), atlasLocator};
           return ErrorCode::Succeeded;
         }
         return ErrorCode::Error;
@@ -90,7 +90,7 @@ bool Atlas::addToPageWithoutFillImage(const Glyph& glyph, int pageIndex,
   auto& plotList = page.plotList;
   for (auto& plot : plotList) {
     if (plot->addRect(glyph.width(), glyph.height(), atlasLocator)) {
-      locatorMap[glyph.key()] = atlasLocator;
+      glyphLocators[glyph.key()] = {glyph.matrix(), atlasLocator};
       return true;
     }
   }
@@ -127,12 +127,12 @@ bool Atlas::activateNewPage() {
   return true;
 }
 
-bool Atlas::getGlyphLocator(const BytesKey& glyphKey, AtlasLocator& atlasLocator) const {
-  auto it = locatorMap.find(glyphKey);
-  if (it == locatorMap.end()) {
+bool Atlas::getGlyphLocator(const BytesKey& glyphKey, GlyphLocator& glyphLocator) const {
+  auto it = glyphLocators.find(glyphKey);
+  if (it == glyphLocators.end()) {
     return false;
   }
-  atlasLocator = it->second;
+  glyphLocator = it->second;
   return true;
 }
 
@@ -189,18 +189,18 @@ void Atlas::deactivateLastPage() {
 }
 
 bool Atlas::hasGlyph(const BytesKey& glyphKey) const {
-  auto iter = locatorMap.find(glyphKey);
-  if (iter == locatorMap.end()) {
+  auto iter = glyphLocators.find(glyphKey);
+  if (iter == glyphLocators.end()) {
     return false;
   }
-  auto& Locator = iter->second;
-  auto pageIndex = iter->second.pageIndex();
-  auto plotIndex = iter->second.plotIndex();
+  auto& locator = iter->second.atlasLocator;
+  auto pageIndex = locator.pageIndex();
+  auto plotIndex = locator.plotIndex();
 
   if (pageIndex >= pages.size() || plotIndex >= numPlots) {
     return false;
   }
-  auto locatorGeneration = iter->second.genID();
+  auto locatorGeneration = locator.genID();
   auto plotGeneration = pages[pageIndex].plotArray[plotIndex]->genID();
   return plotGeneration == locatorGeneration;
 }
@@ -208,7 +208,7 @@ bool Atlas::hasGlyph(const BytesKey& glyphKey) const {
 void Atlas::compact(AtlasToken startTokenForNextFlush) {
   if (pages.empty()) {
     previousFlushToken = startTokenForNextFlush;
-    locatorMap.clear();
+    glyphLocators.clear();
     return;
   }
 

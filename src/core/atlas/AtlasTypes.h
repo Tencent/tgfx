@@ -24,21 +24,16 @@
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
-enum class MaskFormat : int {
-  A8,
-  RGBA,
+enum class MaskFormat : int { A8, RGBA, Last = RGBA };
 
-  Last = RGBA
-};
-
-static const int kMaskFormatCount = static_cast<int>(MaskFormat::Last) + 1;
+static constexpr int kMaskFormatCount = static_cast<int>(MaskFormat::Last) + 1;
 
 /**
  * Keep track of generation number for atlases and Plots.
  */
 class AtlasGenerationCounter {
  public:
-  inline constexpr static uint64_t kInvalidGeneration = 0;
+  constexpr static uint64_t kInvalidGeneration = 0;
   uint64_t next() {
     return generation++;
   }
@@ -52,6 +47,8 @@ class AtlasToken {
   static AtlasToken InvalidToken() {
     return AtlasToken(0);
   }
+
+  AtlasToken() = delete;
 
   bool operator==(const AtlasToken& other) const {
     return sequenceNumber == other.sequenceNumber;
@@ -92,7 +89,6 @@ class AtlasToken {
   }
 
  private:
-  AtlasToken() = delete;
   explicit AtlasToken(uint64_t seqenceNumber) : sequenceNumber(seqenceNumber) {
   }
   uint64_t sequenceNumber;
@@ -116,8 +112,8 @@ class TokenTracker {
 
 class PlotLocator {
  public:
-  inline static constexpr size_t kMaxResidentPages = 4;
-  inline static constexpr uint32_t kMaxPlots = 32;
+  static constexpr size_t kMaxResidentPages = 4;
+  static constexpr uint32_t kMaxPlots = 32;
 
   PlotLocator(uint32_t pageIndex, uint32_t plotIndex, uint64_t generation)
       : _genID(generation), _plotIndex(plotIndex), _pageIndex(pageIndex) {

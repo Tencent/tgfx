@@ -86,6 +86,11 @@ class GlyphFace {
    */
   virtual float getScale() const = 0;
 
+  /**
+   * Returns the unique ID of this GlyphFace.
+   */
+  virtual uint32_t getUniqueID() const = 0;
+
  protected:
   GlyphFace() = default;
 };

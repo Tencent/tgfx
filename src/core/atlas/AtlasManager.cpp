@@ -99,7 +99,7 @@ Atlas::ErrorCode AtlasManager::addGlyphToAtlasWithoutFillImage(const Glyph& glyp
 }
 
 bool AtlasManager::getGlyphLocator(MaskFormat maskFormat, const BytesKey& key,
-                                   AtlasLocator& locator) const {
+                                   GlyphLocator& locator) const {
   return this->getAtlas(maskFormat)->getGlyphLocator(key, locator);
 }
 
