@@ -52,16 +52,6 @@ Rect SVGMask::bounds(const SVGRenderContext& context) const {
   return {};
 }
 
-/** See ITU-R Recommendation BT.709 at http://www.itu.int/rec/R-REC-BT.709/ .*/
-constexpr float LUM_COEFF_R = 0.2126f;
-constexpr float LUM_COEFF_G = 0.7152f;
-constexpr float LUM_COEFF_B = 0.0722f;
-
-constexpr std::array<float, 20> MakeLuminanceToAlpha() {
-  return std::array<float, 20>{0, 0, 0, 0, 0, 0,           0,           0,           0, 0,
-                               0, 0, 0, 0, 0, LUM_COEFF_R, LUM_COEFF_G, LUM_COEFF_B, 0, 0};
-}
-
 void SVGMask::renderMask(const SVGRenderContext& context) const {
   // https://www.w3.org/TR/SVG11/masking.html#Masking
   // Propagate any inherited properties that may impact mask effect behavior (e.g.
@@ -72,7 +62,7 @@ void SVGMask::renderMask(const SVGRenderContext& context) const {
 
   int saveCount = context.canvas()->getSaveCount();
   if (MaskType.type() != SVGMaskType::Type::Alpha) {
-    auto luminanceFilter = ColorFilter::Matrix(MakeLuminanceToAlpha());
+    auto luminanceFilter = ColorFilter::Luma();
     Paint luminancePaint;
     luminancePaint.setColorFilter(luminanceFilter);
     context.canvas()->saveLayer(&luminancePaint);

@@ -21,6 +21,8 @@
 #include "core/LayerUnrollContext.h"
 #include "core/RecordingContext.h"
 #include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
+#include "shapes/MatrixShape.h"
 #include "shapes/PathShape.h"
 #include "shapes/StrokeShape.h"
 #include "tgfx/core/Surface.h"
@@ -178,12 +180,12 @@ void Canvas::clear(const Color& color) {
 }
 
 void Canvas::drawColor(const Color& color, BlendMode blendMode) {
-  drawContext->drawFill(*mcState, {color, blendMode});
+  drawFill(*mcState, {color, blendMode});
 }
 
 void Canvas::drawPaint(const Paint& paint) {
   SaveLayerForImageFilter(paint.getImageFilter());
-  drawContext->drawFill(*mcState, paint.getFill());
+  drawFill(*mcState, paint.getFill());
 }
 
 void Canvas::drawLine(float x0, float y0, float x1, float y1, const Paint& paint) {
@@ -227,13 +229,62 @@ void Canvas::drawRoundRect(const Rect& rect, float radiusX, float radiusY, const
   drawRRect(rRect, paint);
 }
 
+static bool UseDrawPath(const Paint& paint, const Point& radii, const Matrix& viewMatrix) {
+  auto stroke = paint.getStroke();
+  if (!stroke) {
+    return false;
+  }
+  if (!viewMatrix.rectStaysRect()) {
+    return false;
+  }
+  float xRadius = std::fabs(viewMatrix.getScaleX() * radii.x + viewMatrix.getSkewY() * radii.y);
+  float yRadius = std::fabs(viewMatrix.getSkewX() * radii.x + viewMatrix.getScaleY() * radii.y);
+  Point scaledStroke = {};
+  scaledStroke.x = std::fabs(stroke->width * (viewMatrix.getScaleX() + viewMatrix.getSkewY()));
+  scaledStroke.y = std::fabs(stroke->width * (viewMatrix.getSkewX() + viewMatrix.getScaleY()));
+
+  // Half of strokewidth is greater than radius
+  if (scaledStroke.x * 0.5f > xRadius || scaledStroke.y * 0.5f > yRadius) {
+    return true;
+  }
+  // Handle thick strokes for near-circular ellipses
+  if (stroke->width > 1.0f && (radii.x * 0.5f > radii.y || radii.y * 0.5f > radii.x)) {
+    return true;
+  }
+  // The matrix may have a rotation by an odd multiple of 90 degrees.
+  if (viewMatrix.getScaleX() == 0) {
+    std::swap(xRadius, yRadius);
+    std::swap(scaledStroke.x, scaledStroke.y);
+  }
+
+  if (FloatNearlyZero(scaledStroke.length())) {
+    scaledStroke.set(0.5f, 0.5f);
+  } else {
+    scaledStroke *= 0.5f;
+  }
+
+  // Handle thick strokes for near-circular ellipses
+  if (scaledStroke.length() > 0.5f && (0.5f * xRadius > yRadius || 0.5f * yRadius > xRadius)) {
+    return true;
+  }
+
+  // Curvature of the stroke is less than curvature of the ellipse
+  if (scaledStroke.x * radii.y * radii.y < scaledStroke.y * scaledStroke.y * radii.x) {
+    return true;
+  }
+  if (scaledStroke.y * radii.x * radii.x < scaledStroke.x * scaledStroke.x * radii.y) {
+    return true;
+  }
+  return false;
+}
+
 void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
   auto& radii = rRect.radii;
   if (radii.x < 0.5f && radii.y < 0.5f) {
     drawRect(rRect.rect, paint);
     return;
   }
-  if (paint.getStroke()) {
+  if (UseDrawPath(paint, radii, mcState->matrix)) {
     Path path = {};
     path.addRRect(rRect);
     drawPath(path, paint);
@@ -243,19 +294,12 @@ void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
-  drawContext->drawRRect(rRect, *mcState, paint.getFill());
+  drawContext->drawRRect(rRect, *mcState, paint.getFill(), paint.getStroke());
 }
 
 void Canvas::drawPath(const Path& path, const Paint& paint) {
   SaveLayerForImageFilter(paint.getImageFilter());
-  if (drawSimplePath(path, *mcState, paint.getFill(), paint.getStroke())) {
-    return;
-  }
-  auto shape = Shape::MakeFrom(path);
-  shape = Shape::ApplyStroke(std::move(shape), paint.getStroke());
-  if (shape != nullptr) {
-    drawContext->drawShape(std::move(shape), *mcState, paint.getFill());
-  }
+  drawPath(path, *mcState, paint.getFill(), paint.getStroke());
 }
 
 /// Check if the line is axis-aligned and convert it to a rect
@@ -289,44 +333,79 @@ static bool StrokeLineIsRect(const Stroke& stroke, const Point line[2], Rect* re
   return true;
 }
 
-bool Canvas::drawSimplePath(const Path& path, const MCState& state, const Fill& fill,
-                            const Stroke* stroke) const {
+void Canvas::drawPath(const Path& path, const MCState& state, const Fill& fill,
+                      const Stroke* stroke) const {
   if (path.isEmpty()) {
     if (path.isInverseFillType()) {
       // No geometry to draw, so draw the fill instead.
-      drawContext->drawFill(state, fill);
+      drawFill(state, fill);
     }
-    return true;
+    return;
   }
   Rect rect = {};
   Point line[2] = {};
   if (path.isLine(line)) {
     if (!stroke) {
       // a line has no fill to draw.
-      return true;
+      return;
     }
     if (StrokeLineIsRect(*stroke, line, &rect)) {
       drawContext->drawRect(rect, state, fill);
-      return true;
+      return;
     }
   }
   if (stroke == nullptr) {
     if (path.isRect(&rect)) {
       drawContext->drawRect(rect, state, fill);
-      return true;
+      return;
     }
     RRect rRect = {};
     if (path.isOval(&rect)) {
       rRect.setOval(rect);
-      drawContext->drawRRect(rRect, state, fill);
-      return true;
+      drawContext->drawRRect(rRect, state, fill, stroke);
+      return;
     }
     if (path.isRRect(&rRect)) {
-      drawContext->drawRRect(rRect, state, fill);
-      return true;
+      drawContext->drawRRect(rRect, state, fill, stroke);
+      return;
     }
+    drawContext->drawPath(path, state, fill);
+  } else {
+    auto shape = Shape::MakeFrom(path);
+    if (shape == nullptr) {
+      return;
+    }
+    shape = Shape::ApplyStroke(std::move(shape), stroke);
+    if (shape == nullptr) {
+      return;
+    }
+    drawContext->drawShape(shape, state, fill);
   }
-  return false;
+}
+
+Path* Canvas::UnwrapShape(std::shared_ptr<Shape> shape, const Stroke** pathStroke,
+                          Matrix* pathMatrix) {
+  DEBUG_ASSERT(pathMatrix != nullptr);
+  DEBUG_ASSERT(pathStroke != nullptr);
+  if (shape->type() == Shape::Type::Path) {
+    return &std::static_pointer_cast<PathShape>(shape)->path;
+  }
+  if (*pathStroke == nullptr && shape->type() == Shape::Type::Stroke) {
+    auto strokeShape = std::static_pointer_cast<StrokeShape>(shape);
+    if (strokeShape->shape->isSimplePath()) {
+      *pathStroke = &strokeShape->stroke;
+      return &std::static_pointer_cast<PathShape>(strokeShape->shape)->path;
+    }
+  } else if (*pathStroke == nullptr && shape->type() == Shape::Type::Matrix) {
+    auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);
+    Matrix matrix = matrixShape->matrix;
+    auto path = UnwrapShape(matrixShape->shape, pathStroke, &matrix);
+    if (path) {
+      pathMatrix->preConcat(matrix);
+    }
+    return path;
+  }
+  return nullptr;
 }
 
 void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
@@ -334,23 +413,16 @@ void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
-  Path* path = nullptr;
   auto stroke = paint.getStroke();
-  if (shape->type() == Shape::Type::Path) {
-    path = &std::static_pointer_cast<PathShape>(shape)->path;
-  } else if (!stroke && shape->type() == Shape::Type::Stroke) {
-    auto strokeShape = std::static_pointer_cast<StrokeShape>(shape);
-    if (strokeShape->shape->isSimplePath()) {
-      path = &std::static_pointer_cast<PathShape>(strokeShape->shape)->path;
-      stroke = &strokeShape->stroke;
-    }
-  }
-  if (path && drawSimplePath(*path, *mcState, paint.getFill(), stroke)) {
+  auto state = *mcState;
+  auto path = UnwrapShape(shape, &stroke, &state.matrix);
+  if (path) {
+    drawPath(*path, state, paint.getFill(), stroke);
     return;
   }
   shape = Shape::ApplyStroke(std::move(shape), paint.getStroke());
   if (shape != nullptr) {
-    drawContext->drawShape(std::move(shape), *mcState, paint.getFill());
+    drawContext->drawShape(std::move(shape), state, paint.getFill());
   }
 }
 
@@ -532,4 +604,16 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
     }
   }
 }
+
+void Canvas::drawFill(const MCState& state, const Fill& fill) const {
+  if (state.clip.isEmpty()) {
+    if (!state.clip.isInverseFillType()) {
+      return;
+    }
+    drawContext->drawFill(fill.makeWithMatrix(state.matrix));
+  } else {
+    drawPath(state.clip, {}, fill.makeWithMatrix(state.matrix), nullptr);
+  }
+}
+
 }  // namespace tgfx

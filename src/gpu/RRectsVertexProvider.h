@@ -23,6 +23,7 @@
 #include "gpu/VertexProvider.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/RRect.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
 struct RRectRecord {
@@ -45,7 +46,8 @@ class RRectsVertexProvider : public VertexProvider {
    */
   static PlacementPtr<RRectsVertexProvider> MakeFrom(BlockBuffer* blockBuffer,
                                                      std::vector<PlacementPtr<RRectRecord>>&& rects,
-                                                     AAType aaType, bool useScale);
+                                                     AAType aaType, bool useScale,
+                                                     std::vector<PlacementPtr<Stroke>>&& strokes);
 
   /**
    * Returns the number of round rects in the provider.
@@ -72,6 +74,10 @@ class RRectsVertexProvider : public VertexProvider {
     return bitFields.hasColor;
   }
 
+  bool hasStroke() const {
+    return bitFields.hasStroke;
+  }
+
   /**
    * Returns the first color in the provider. If no color record exists, a white color is returned.
    */
@@ -85,14 +91,16 @@ class RRectsVertexProvider : public VertexProvider {
 
  private:
   PlacementArray<RRectRecord> rects = {};
+  PlacementArray<Stroke> strokes = {};
   struct {
     uint8_t aaType : 2;
     bool useScale : 1;
     bool hasColor : 1;
+    bool hasStroke : 1;
   } bitFields = {};
 
   RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool useScale,
-                       bool hasColor);
+                       bool hasColor, PlacementArray<Stroke>&& strokes);
 
   friend class BlockBuffer;
 };

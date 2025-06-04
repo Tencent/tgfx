@@ -51,15 +51,9 @@ Rect RenderContext::getClipBounds(const Path& clip) {
   return bounds;
 }
 
-void RenderContext::drawFill(const MCState& state, const Fill& fill) {
-  auto& clip = state.clip;
-  if (clip.isEmpty() && clip.isInverseFillType()) {
-    if (auto compositor = getOpsCompositor(fill.isOpaque())) {
-      compositor->fillRect(renderTarget->bounds(), {}, fill.makeWithMatrix(state.matrix));
-    }
-  } else {
-    auto shape = Shape::MakeFrom(clip);
-    drawShape(std::move(shape), {}, fill.makeWithMatrix(state.matrix));
+void RenderContext::drawFill(const Fill& fill) {
+  if (auto compositor = getOpsCompositor(fill.isOpaque())) {
+    compositor->fillRect(renderTarget->bounds(), {}, fill);
   }
 }
 
@@ -69,10 +63,16 @@ void RenderContext::drawRect(const Rect& rect, const MCState& state, const Fill&
   }
 }
 
-void RenderContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill) {
+void RenderContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
+                              const Stroke* stroke) {
   if (auto compositor = getOpsCompositor()) {
-    compositor->fillRRect(rRect, state, fill);
+    compositor->drawRRect(rRect, state, fill, stroke);
   }
+}
+
+void RenderContext::drawPath(const Path& path, const MCState& state, const Fill& fill) {
+  // Temporarily use drawShape for rendering, and perform merging in the compositor later.
+  drawShape(Shape::MakeFrom(path), state, fill);
 }
 
 static Rect ToLocalBounds(const Rect& bounds, const Matrix& viewMatrix) {
@@ -280,9 +280,6 @@ OpsCompositor* RenderContext::getOpsCompositor(bool discardContent) {
   if (opsCompositor == nullptr || opsCompositor->isClosed()) {
     auto drawingManager = renderTarget->getContext()->drawingManager();
     opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
-    if (surface) {
-      surface->contentChanged();
-    }
   } else if (discardContent) {
     opsCompositor->discardAll();
   }

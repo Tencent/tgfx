@@ -22,6 +22,7 @@
 #include "gpu/processors/ColorMatrixFragmentProcessor.h"
 
 namespace tgfx {
+
 std::shared_ptr<ColorFilter> ColorFilter::Matrix(const std::array<float, 20>& rowMajor) {
   return std::make_shared<MatrixColorFilter>(rowMajor);
 }

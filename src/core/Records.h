@@ -29,6 +29,8 @@ enum class RecordType {
   DrawFill,
   DrawRect,
   DrawRRect,
+  StrokeRRect,
+  DrawPath,
   DrawShape,
   DrawImage,
   DrawImageRect,
@@ -137,7 +139,7 @@ class DrawFill : public Record {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawFill(playback->state, playback->fill);
+    context->drawFill(playback->fill);
   }
 };
 
@@ -167,10 +169,47 @@ class DrawRRect : public Record {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawRRect(rRect, playback->state, playback->fill);
+    context->drawRRect(rRect, playback->state, playback->fill, nullptr);
   }
 
   RRect rRect;
+};
+
+class StrokeRRect : public Record {
+ public:
+  StrokeRRect(const RRect& rRect, const Stroke& stroke) : rRect(rRect), stroke(stroke) {
+  }
+
+  RecordType type() const override {
+    return RecordType::StrokeRRect;
+  }
+
+  void playback(DrawContext* context, PlaybackContext* playback) const override {
+    context->drawRRect(rRect, playback->state, playback->fill, &stroke);
+  }
+
+  RRect rRect;
+  Stroke stroke;
+};
+
+class DrawPath : public Record {
+ public:
+  explicit DrawPath(Path path) : path(std::move(path)) {
+  }
+
+  RecordType type() const override {
+    return RecordType::DrawPath;
+  }
+
+  bool hasUnboundedFill(bool& hasInverseClip) const override {
+    return hasInverseClip && path.isInverseFillType();
+  }
+
+  void playback(DrawContext* context, PlaybackContext* playback) const override {
+    context->drawPath(path, playback->state, playback->fill);
+  }
+
+  Path path;
 };
 
 class DrawShape : public Record {

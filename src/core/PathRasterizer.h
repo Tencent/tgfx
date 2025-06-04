@@ -29,12 +29,12 @@ namespace tgfx {
 class PathRasterizer : public ImageCodec {
  public:
   /**
-   * Creates a new PathRasterizer instance with the specified shape,anti-aliasing setting,
-   * and gamma correction flag. Anti-aliasing and gamma correction are recommended for glyph path rendering,
-   * while gamma correction is generally unnecessary for regular path rendering.
+   * Creates a new PathRasterizer instance with the specified width, height, shape, anti-aliasing
+   * setting, and gamma correction flag. Anti-aliasing and gamma correction are recommended for glyph
+   * path rendering, while gamma correction is generally unnecessary for regular path rendering.
    */
-  static std::shared_ptr<PathRasterizer> Make(std::shared_ptr<Shape> shape, bool antiAlias,
-                                              bool needsGammaCorrection = false);
+  static std::shared_ptr<PathRasterizer> Make(int width, int height, std::shared_ptr<Shape> shape,
+                                              bool antiAlias, bool needsGammaCorrection = false);
 
   bool isAlphaOnly() const override {
     return true;

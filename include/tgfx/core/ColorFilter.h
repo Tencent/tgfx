@@ -69,12 +69,17 @@ class ColorFilter {
   static std::shared_ptr<ColorFilter> Matrix(const std::array<float, 20>& rowMajor);
 
   /**
-    * Creates a new ColorFilter that makes translucent colors fully opaque or fully transparent
-    * based on a specified alpha threshold. Colors with alpha values below this threshold will
-    * become fully transparent, while colors with alpha values at or above this threshold will
-    * become fully opaque.
-    */
+   * Creates a new ColorFilter that makes translucent colors fully opaque or fully transparent
+   * based on a specified alpha threshold. Colors with alpha values below this threshold will
+   * become fully transparent, while colors with alpha values at or above this threshold will
+   * become fully opaque.
+   */
   static std::shared_ptr<ColorFilter> AlphaThreshold(float threshold);
+
+  /**
+   * Creates a new ColorFilter that transforms the input color into its corresponding brightness.
+   */
+  static std::shared_ptr<ColorFilter> Luma();
 
   virtual ~ColorFilter() = default;
 
@@ -95,7 +100,7 @@ class ColorFilter {
   }
 
  protected:
-  enum class Type { Blend, Matrix, AlphaThreshold, Compose };
+  enum class Type { Blend, Matrix, AlphaThreshold, Compose, Luma };
 
   /**
    * Returns the type of this color filter.

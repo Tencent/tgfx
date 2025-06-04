@@ -69,15 +69,21 @@ void OpsCompositor::fillRect(const Rect& rect, const MCState& state, const Fill&
   pendingRects.emplace_back(std::move(record));
 }
 
-void OpsCompositor::fillRRect(const RRect& rRect, const MCState& state, const Fill& fill) {
+void OpsCompositor::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
+                              const Stroke* stroke) {
   DEBUG_ASSERT(!rRect.rect.isEmpty());
   auto rectFill = fill.makeWithMatrix(state.matrix);
-  if (!canAppend(PendingOpType::RRect, state.clip, rectFill)) {
+  if (!canAppend(PendingOpType::RRect, state.clip, rectFill) ||
+      (pendingStrokes.empty() != (stroke == nullptr))) {
     flushPendingOps(PendingOpType::RRect, state.clip, rectFill);
   }
   auto record =
       drawingBuffer()->make<RRectRecord>(rRect, state.matrix, rectFill.color.premultiply());
   pendingRRects.emplace_back(std::move(record));
+  if (stroke) {
+    auto strokeRecord = drawingBuffer()->make<Stroke>(*stroke);
+    pendingStrokes.emplace_back(std::move(strokeRecord));
+  }
 }
 
 static Rect ToLocalBounds(const Rect& bounds, const Matrix& viewMatrix) {
@@ -141,6 +147,7 @@ void OpsCompositor::discardAll() {
     pendingSampling = {};
     pendingRects.clear();
     pendingRRects.clear();
+    pendingStrokes.clear();
   }
 }
 
@@ -262,8 +269,9 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
           localBounds->setEmpty();
         }
       }
-      auto provider = RRectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRRects),
-                                                     aaType, RRectUseScale(context));
+      auto provider =
+          RRectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRRects), aaType,
+                                         RRectUseScale(context), std::move(pendingStrokes));
       drawOp = RRectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::Atlas: {
@@ -412,7 +420,8 @@ std::pair<std::optional<Rect>, bool> OpsCompositor::getClipRect(const Path& clip
     if (rect != renderTarget->bounds()) {
       return {rect, true};
     }
-    return {{}, false};
+    // Cannot return '{}' as an empty Rect, since it would be interpreted as std::nullopt.
+    return {Rect::MakeEmpty(), false};
   }
   return {rect, false};
 }
@@ -485,7 +494,7 @@ std::pair<PlacementPtr<FragmentProcessor>, bool> OpsCompositor::getClipMaskFP(co
   auto uvMatrix = Matrix::MakeTrans(-clipBounds.left, -clipBounds.top);
   if (renderTarget->origin() == ImageOrigin::BottomLeft) {
     auto flipYMatrix = Matrix::MakeScale(1.0f, -1.0f);
-    flipYMatrix.postTranslate(0, -static_cast<float>(renderTarget->height()));
+    flipYMatrix.postTranslate(0, static_cast<float>(renderTarget->height()));
     uvMatrix.preConcat(flipYMatrix);
   }
   auto processor = DeviceSpaceTextureEffect::Make(buffer, std::move(textureProxy), uvMatrix);

@@ -53,7 +53,7 @@ void Gradient::setColors(std::vector<Color> colors) {
     return;
   }
   _colors = std::move(colors);
-  invalidate();
+  invalidateContent();
 }
 
 void Gradient::setPositions(std::vector<float> positions) {
@@ -62,7 +62,7 @@ void Gradient::setPositions(std::vector<float> positions) {
     return;
   }
   _positions = std::move(positions);
-  invalidate();
+  invalidateContent();
 }
 
 void LinearGradient::setEndPoint(const Point& endPoint) {
@@ -70,7 +70,7 @@ void LinearGradient::setEndPoint(const Point& endPoint) {
     return;
   }
   _endPoint = endPoint;
-  invalidate();
+  invalidateContent();
 }
 
 void LinearGradient::setStartPoint(const Point& startPoint) {
@@ -78,7 +78,7 @@ void LinearGradient::setStartPoint(const Point& startPoint) {
     return;
   }
   _startPoint = startPoint;
-  invalidate();
+  invalidateContent();
 }
 
 std::shared_ptr<Shader> LinearGradient::onGetShader() const {
@@ -90,7 +90,7 @@ void RadialGradient::setCenter(const Point& center) {
     return;
   }
   _center = center;
-  invalidate();
+  invalidateContent();
 }
 
 void RadialGradient::setRadius(float radius) {
@@ -98,7 +98,7 @@ void RadialGradient::setRadius(float radius) {
     return;
   }
   _radius = radius;
-  invalidate();
+  invalidateTransform();
 }
 
 std::shared_ptr<Shader> RadialGradient::onGetShader() const {
@@ -110,7 +110,7 @@ void ConicGradient::setStartAngle(float startAngle) {
     return;
   }
   _startAngle = startAngle;
-  invalidate();
+  invalidateTransform();
 }
 
 void ConicGradient::setCenter(const Point& center) {
@@ -118,7 +118,7 @@ void ConicGradient::setCenter(const Point& center) {
     return;
   }
   _center = center;
-  invalidate();
+  invalidateContent();
 }
 
 void ConicGradient::setEndAngle(float endAngle) {
@@ -126,7 +126,7 @@ void ConicGradient::setEndAngle(float endAngle) {
     return;
   }
   _endAngle = endAngle;
-  invalidate();
+  invalidateContent();
 }
 
 std::shared_ptr<Shader> ConicGradient::onGetShader() const {
@@ -138,7 +138,7 @@ void DiamondGradient::setCenter(const Point& center) {
     return;
   }
   _center = center;
-  invalidate();
+  invalidateContent();
 }
 
 void DiamondGradient::setHalfDiagonal(float halfDiagonal) {
@@ -146,7 +146,7 @@ void DiamondGradient::setHalfDiagonal(float halfDiagonal) {
     return;
   }
   _halfDiagonal = halfDiagonal;
-  invalidate();
+  invalidateContent();
 }
 
 std::shared_ptr<Shader> DiamondGradient::onGetShader() const {

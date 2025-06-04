@@ -164,7 +164,7 @@ void LayerSerialization::SerializeBasicLayerImpl(flexbuffers::Builder& fbb, cons
   SerializeUtils::SetFlexBufferMap(fbb, "dirtyContent", layer->bitFields.dirtyContent);
   SerializeUtils::SetFlexBufferMap(fbb, "dirtyDescendents", layer->bitFields.dirtyDescendents);
   SerializeUtils::SetFlexBufferMap(fbb, "dirtyTransform", layer->bitFields.dirtyTransform);
-  SerializeUtils::SetFlexBufferMap(fbb, "dirtyBackground", layer->bitFields.dirtyBackground);
+  SerializeUtils::SetFlexBufferMap(fbb, "hasBackgroundStyle", layer->bitFields.hasBackgroundStyle);
 
   auto maskOwnerID = SerializeUtils::GetObjID();
   std::shared_ptr<Layer> maskOwner = layer->maskOwner ? layer->maskOwner->weakThis.lock() : nullptr;

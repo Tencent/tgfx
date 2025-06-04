@@ -134,7 +134,6 @@ class GeometryProcessor : public Processor {
   }
 
   void setTextureSamplerCount(size_t count) {
-    DEBUG_ASSERT(count > 0);
     textureSamplerCount = count;
   }
 

@@ -32,7 +32,8 @@ PlacementPtr<RRectDrawOp> RRectDrawOp::Make(Context* context,
     return nullptr;
   }
   auto drawOp = context->drawingBuffer()->make<RRectDrawOp>(provider.get());
-  drawOp->indexBufferProxy = context->resourceProvider()->rRectIndexBuffer();
+  auto type = provider->hasStroke() ? RRectType::StrokeType : RRectType::FillType;
+  drawOp->indexBufferProxy = context->resourceProvider()->rRectIndexBuffer(type);
   if (provider->rectCount() <= 1) {
     // If we only have one rect, it is not worth the async task overhead.
     renderFlags |= RenderFlags::DisableAsyncTask;
@@ -49,6 +50,7 @@ RRectDrawOp::RRectDrawOp(RRectsVertexProvider* provider)
   if (!provider->hasColor()) {
     commonColor = provider->firstColor();
   }
+  hasStroke = provider->hasStroke();
 }
 
 void RRectDrawOp::execute(RenderPass* renderPass) {
@@ -66,12 +68,14 @@ void RRectDrawOp::execute(RenderPass* renderPass) {
   }
   auto renderTarget = renderPass->renderTarget();
   auto drawingBuffer = renderPass->getContext()->drawingBuffer();
-  auto gp = EllipseGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
-                                           renderTarget->height(), false, useScale, commonColor);
+  auto gp =
+      EllipseGeometryProcessor::Make(drawingBuffer, renderTarget->width(), renderTarget->height(),
+                                     hasStroke, useScale, commonColor);
   auto pipeline = createPipeline(renderPass, std::move(gp));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   renderPass->bindBuffers(indexBuffer, vertexBuffer, vertexBufferOffset);
-  auto numIndicesPerRRect = ResourceProvider::NumIndicesPerRRect();
+  auto type = hasStroke ? RRectType::StrokeType : RRectType::FillType;
+  auto numIndicesPerRRect = ResourceProvider::NumIndicesPerRRect(type);
   renderPass->drawIndexed(PrimitiveType::Triangles, 0, rectCount * numIndicesPerRRect);
 }
 }  // namespace tgfx

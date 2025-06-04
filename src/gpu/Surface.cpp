@@ -24,8 +24,6 @@
 #include "gpu/RenderContext.h"
 
 namespace tgfx {
-static constexpr uint32_t InvalidContentVersion = 0;
-
 std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, bool alphaOnly,
                                        int sampleCount, bool mipmapped, uint32_t renderFlags) {
   return Make(context, width, height, alphaOnly ? ColorType::ALPHA_8 : ColorType::RGBA_8888,
@@ -214,11 +212,5 @@ bool Surface::aboutToDraw(bool discardContent) {
   }
   renderContext->replaceRenderTarget(std::move(newRenderTarget), std::move(oldContent));
   return true;
-}
-
-void Surface::contentChanged() {
-  do {
-    _contentVersion++;
-  } while (InvalidContentVersion == _contentVersion);
 }
 }  // namespace tgfx
