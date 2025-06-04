@@ -32,7 +32,7 @@ void PathRasterizer::ClearPixels(const ImageInfo& dstInfo, void* dstPixels) {
     return;
   }
   auto height = static_cast<size_t>(dstInfo.height());
-  for (auto y = 0; y < height; ++y) {
+  for (size_t y = 0; y < height; ++y) {
     auto row = static_cast<uint8_t*>(dstPixels) + y * dstInfo.rowBytes();
     memset(row, 0, dstInfo.rowBytes());
   }
