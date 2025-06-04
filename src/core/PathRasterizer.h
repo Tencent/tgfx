@@ -46,8 +46,7 @@ class PathRasterizer : public ImageCodec {
   explicit PathRasterizer(int width, int height, std::shared_ptr<Shape> shape, bool antiAlias,
                           bool needsGammaCorrection);
 
-  static void ClearPixels(const ImageInfo& dstInfo, void* dstPixels, const Rect& bounds,
-                          bool flipY);
+  static void ClearPixels(const ImageInfo& dstInfo, void* dstPixels);
 
   std::shared_ptr<Shape> shape = nullptr;
   bool antiAlias = false;

@@ -26,28 +26,15 @@ PathRasterizer::PathRasterizer(int width, int height, std::shared_ptr<Shape> sha
       antiAlias(antiAlias), needsGammaCorrection(needsGammaCorrection) {
 }
 
-void PathRasterizer::ClearPixels(const ImageInfo& dstInfo, void* dstPixels, const Rect& bounds,
-                                 bool flipY) {
-  auto dstBounds = Rect::MakeWH(dstInfo.width(), dstInfo.height());
-  if (bounds.contains(dstBounds)) {
+void PathRasterizer::ClearPixels(const ImageInfo& dstInfo, void* dstPixels) {
+  size_t height = static_cast<size_t>(dstInfo.height());
+  if (dstInfo.byteSize() == dstInfo.minRowBytes() * height) {
     memset(dstPixels, 0, dstInfo.byteSize());
     return;
   }
-  dstBounds.intersect(bounds);
-  auto left = static_cast<size_t>(dstBounds.left);
-  auto width = static_cast<size_t>(dstBounds.width());
-  size_t top = 0, bottom = 0;
-  if (flipY) {
-    top = static_cast<size_t>(dstInfo.height()) - static_cast<size_t>(dstBounds.bottom);
-    bottom = top + static_cast<size_t>(dstBounds.height());
-  } else {
-    top = static_cast<size_t>(dstBounds.top);
-    bottom = static_cast<size_t>(dstBounds.bottom);
-  }
-  for (auto y = top; y < bottom; ++y) {
-    auto row =
-        static_cast<uint8_t*>(dstPixels) + y * dstInfo.rowBytes() + left * dstInfo.bytesPerPixel();
-    memset(row, 0, width * dstInfo.bytesPerPixel());
+  for (size_t y = 0; y < height; ++y) {
+    auto row = static_cast<uint8_t*>(dstPixels) + y * dstInfo.rowBytes();
+    memset(row, 0, dstInfo.rowBytes());
   }
 }
 

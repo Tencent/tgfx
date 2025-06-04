@@ -72,7 +72,7 @@ bool FTPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) con
   }
   auto bounds = shape->getBounds();
   bounds.roundOut();
-  ClearPixels(dstInfo, dstPixels, bounds, true);
+  ClearPixels(dstInfo, dstPixels);
   FTPath ftPath = {};
   path.decompose(Iterator, &ftPath);
   auto fillType = path.getFillType();
