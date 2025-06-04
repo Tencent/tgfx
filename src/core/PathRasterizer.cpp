@@ -27,12 +27,12 @@ PathRasterizer::PathRasterizer(int width, int height, std::shared_ptr<Shape> sha
 }
 
 void PathRasterizer::ClearPixels(const ImageInfo& dstInfo, void* dstPixels) {
-  size_t height = static_cast<size_t>(dstInfo.height());
-  if (dstInfo.byteSize() == dstInfo.minRowBytes() * height) {
+  if (dstInfo.rowBytes() == dstInfo.minRowBytes()) {
     memset(dstPixels, 0, dstInfo.byteSize());
     return;
   }
-  for (size_t y = 0; y < height; ++y) {
+  auto height = static_cast<size_t>(dstInfo.height());
+  for (auto y = 0; y < height; ++y) {
     auto row = static_cast<uint8_t*>(dstPixels) + y * dstInfo.rowBytes();
     memset(row, 0, dstInfo.rowBytes());
   }
