@@ -18,6 +18,7 @@
 
 #include "RootLayer.h"
 #include <limits>
+#include "core/utils/DecomposeRects.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
@@ -27,69 +28,6 @@ static float UnionArea(const Rect& rect1, const Rect& rect2) {
   auto top = rect1.top < rect2.top ? rect1.top : rect2.top;
   auto bottom = rect1.bottom > rect2.bottom ? rect1.bottom : rect2.bottom;
   return (right - left) * (bottom - top);
-}
-
-static float RectArea(const Rect& rect) {
-  return (rect.right - rect.left) * (rect.bottom - rect.top);
-}
-
-// Restructure two overlapping rectangles to remove their intersection while still covering the same
-// or a larger area
-static void DecomposeRect(Rect* rectA, Rect* rectB) {
-  // Ensure rectA and rectB overlap
-  DEBUG_ASSERT(rectA->intersects(*rectB));
-
-  // Step 1: Build the 3 rect slabs on the y-axis
-  Rect rects[3];
-  if (rectA->top < rectB->top) {
-    rects[0].top = rectA->top;
-    rects[0].bottom = rectB->top;
-    rects[0].left = rectA->left;
-    rects[0].right = rectA->right;
-  } else {
-    rects[0].top = rectB->top;
-    rects[0].bottom = rectA->top;
-    rects[0].left = rectB->left;
-    rects[0].right = rectB->right;
-  }
-  if (rectA->bottom < rectB->bottom) {
-    rects[2].top = rectA->bottom;
-    rects[2].bottom = rectB->bottom;
-    rects[2].left = rectB->left;
-    rects[2].right = rectB->right;
-  } else {
-    rects[2].top = rectB->bottom;
-    rects[2].bottom = rectA->bottom;
-    rects[2].left = rectA->left;
-    rects[2].right = rectA->right;
-  }
-  rects[1].top = rects[0].bottom;
-  rects[1].bottom = rects[2].top;
-  rects[1].left = std::min(rectA->left, rectB->left);
-  rects[1].right = std::max(rectA->right, rectB->right);
-
-  // Step 2: Compute areas
-  float areas[3];
-  for (int i = 0; i < 3; ++i) {
-    areas[i] = RectArea(rects[i]);
-  }
-
-  // Step 3: Union slabs and compute area deltas
-  Rect u1 = rects[0];
-  u1.join(rects[1]);
-  Rect u2 = rects[1];
-  u2.join(rects[2]);
-  float delta0 = areas[0] + areas[1] - RectArea(u1);
-  float delta1 = areas[1] + areas[2] - RectArea(u2);
-
-  // Step 4: Choose the best decomposition
-  if (delta0 > delta1) {
-    *rectA = u1;
-    *rectB = rects[2];
-  } else {
-    *rectA = rects[0];
-    *rectB = u2;
-  }
 }
 
 std::shared_ptr<RootLayer> RootLayer::Make() {
@@ -110,7 +48,7 @@ void RootLayer::invalidateRect(const Rect& rect) {
   }
   DEBUG_ASSERT(dirtyRects.size() <= MAX_DIRTY_REGIONS);
   dirtyRects.push_back(rect);
-  dirtyAreas.push_back(RectArea(rect));
+  dirtyAreas.push_back(rect.area());
   mergeDirtyList(dirtyRects.size() == MAX_DIRTY_REGIONS + 1);
 }
 
@@ -135,7 +73,7 @@ bool RootLayer::mergeDirtyList(bool forceMerge) {
   }
   if (mergeA != mergeB) {
     dirtyRects[mergeA].join(dirtyRects[mergeB]);
-    dirtyAreas[mergeA] = RectArea(dirtyRects[mergeA]);
+    dirtyAreas[mergeA] = dirtyRects[mergeA].area();
     dirtyRects.erase(dirtyRects.begin() + static_cast<long>(mergeB));
     dirtyAreas.erase(dirtyAreas.begin() + static_cast<long>(mergeB));
     return true;
@@ -171,14 +109,7 @@ std::vector<Rect> RootLayer::updateDirtyRegions() {
   while (mergeDirtyList(false)) {
   }
   dirtyAreas.clear();
-  auto rectSize = dirtyRects.size();
-  for (size_t i = 0; i < rectSize; i++) {
-    for (size_t j = i + 1; j < rectSize; j++) {
-      if (dirtyRects[i].intersects(dirtyRects[j])) {
-        DecomposeRect(&dirtyRects[i], &dirtyRects[j]);
-      }
-    }
-  }
+  DecomposeRects(&dirtyRects[0], dirtyRects.size());
   return std::move(dirtyRects);
 }
 
