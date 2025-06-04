@@ -17,13 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/DisplayList.h"
+#include "core/utils/DecomposeRects.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
 
 namespace tgfx {
-static constexpr size_t MAX_DIRTY_REGION_FRAMES = 5;
+static constexpr size_t MAX_DIRTY_REGION_FRAMES = 4;
+static constexpr float DIRTY_REGION_ANTIALIAS_MARGIN = 0.5f;
 
 DisplayList::DisplayList() : _root(RootLayer::Make()) {
   _root->_root = _root.get();
@@ -113,6 +115,27 @@ void DisplayList::render(Surface* surface, bool autoClear) {
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }
 
+static std::vector<Rect> MapDirtyRegions(const std::vector<Rect>& dirtyRegions,
+                                         const Matrix& viewMatrix, bool decompose = false,
+                                         const Rect* clipRect = nullptr) {
+  std::vector<Rect> dirtyRects = {};
+  dirtyRects.reserve(dirtyRegions.size());
+  for (auto& region : dirtyRegions) {
+    auto dirtyRect = viewMatrix.mapRect(region);
+    // Expand by 0.5 pixels to preserve antialiasing results.
+    dirtyRect.outset(DIRTY_REGION_ANTIALIAS_MARGIN, DIRTY_REGION_ANTIALIAS_MARGIN);
+    // Snap to pixel boundaries to avoid subpixel clipping artifacts.
+    dirtyRect.roundOut();
+    if (!clipRect || dirtyRect.intersect(*clipRect)) {
+      dirtyRects.push_back(dirtyRect);
+    }
+  }
+  if (decompose) {
+    DecomposeRects(&dirtyRects[0], dirtyRects.size());
+  }
+  return dirtyRects;
+}
+
 bool DisplayList::renderPartially(Surface* surface, bool autoClear,
                                   std::vector<Rect> dirtyRegions) {
   auto context = surface->getContext();
@@ -133,14 +156,7 @@ bool DisplayList::renderPartially(Surface* surface, bool autoClear,
     lastZoomScale = _zoomScale;
     lastContentOffset = _contentOffset;
   } else {
-    for (auto& region : dirtyRegions) {
-      viewMatrix.mapRect(&region);  // Map the region to the surface coordinate system.
-      region.outset(0.5f, 0.5f);    // Expand by 0.5 pixels to preserve antialiasing results.
-      region.roundOut();
-      if (!region.intersect(surfaceRect)) {
-        region.setEmpty();
-      }
-    }
+    dirtyRegions = MapDirtyRegions(dirtyRegions, viewMatrix, true, &surfaceRect);
   }
   auto inverse = Matrix::I();
   DEBUG_ASSERT(viewMatrix.invertible());
@@ -185,13 +201,9 @@ void DisplayList::renderDirtyRegions(Canvas* canvas, std::vector<Rect> dirtyRegi
   Paint dirtyPaint = {};
   dirtyPaint.setAntiAlias(false);
   dirtyPaint.setColor(Color::Red());
-  dirtyPaint.setStyle(PaintStyle::Stroke);
+  dirtyPaint.setAlpha(0.15f);
   for (auto& regions : lastDirtyRegions) {
     for (auto& region : regions) {
-      if (region.isEmpty()) {
-        continue;
-      }
-      region.inset(0.25f, 0.25f);
       canvas->drawRect(region, dirtyPaint);
     }
   }
