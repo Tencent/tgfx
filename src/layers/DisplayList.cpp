@@ -226,7 +226,7 @@ static std::vector<Rect> MapDirtyRegions(const std::vector<Rect>& dirtyRegions,
     }
   }
   if (decompose) {
-    DecomposeRects(&dirtyRects[0], dirtyRects.size());
+    DecomposeRects(dirtyRects);
   }
   return dirtyRects;
 }

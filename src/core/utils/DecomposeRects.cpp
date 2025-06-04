@@ -77,7 +77,8 @@ static void DecomposeRect(Rect* rectA, Rect* rectB) {
   }
 }
 
-void DecomposeRects(Rect* rects, size_t count) {
+void DecomposeRects(std::vector<Rect>& rects) {
+  auto count = rects.size();
   for (size_t i = 0; i < count; i++) {
     for (size_t j = i + 1; j < count; j++) {
       if (rects[i].intersects(rects[j])) {

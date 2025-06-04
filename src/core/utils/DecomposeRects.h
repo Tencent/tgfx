@@ -24,8 +24,6 @@ namespace tgfx {
 /**
  * Restructure a list of rectangles to remove their intersections while still covering the same or a
  * larger area. The input rectangles are modified in place.
- * @param rects Array of rectangles to decompose.
- * @param count Number of rectangles in the array.
  */
-void DecomposeRects(Rect* rects, size_t count);
+void DecomposeRects(std::vector<Rect>& rects);
 }  // namespace tgfx
