@@ -15,23 +15,21 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
+#ifdef TGFX_USE_INSPECTOR
 #include "tgfx/layers/LayerInspector.h"
 #include <string>
-#ifdef TGFX_USE_INSPECTOR
 #include <chrono>
 #include <functional>
 #include "core/utils/Profiling.h"
 #include "serialization/LayerSerialization.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/SolidColor.h"
-#endif
+#include "LockFreeQueue.h"
 
 namespace tgfx {
   extern const std::string HighLightLayerName = "HighLightLayer";
-
+  static inspector::LockFreeQueue<uint64_t> imageIDQueue;
   void LayerInspector::pickedLayer(float x, float y) {
-#ifdef TGFX_USE_INSPECTOR
     if (m_HoverdSwitch) {
       auto layers = m_DisplayList->root()->getLayersUnderPoint(x, y);
       for (auto layer : layers) {
@@ -44,13 +42,8 @@ namespace tgfx {
         }
       }
     }
-#else
-    (void)x;
-    (void)y;
-#endif
   }
 
-#ifdef TGFX_USE_INSPECTOR
 void LayerInspector::setCallBack() {
   [[maybe_unused]] std::function<void(const std::vector<uint8_t>&)> func =
       std::bind(&LayerInspector::FeedBackDataProcess, this, std::placeholders::_1);
@@ -189,5 +182,5 @@ void LayerInspector::AddHighLightOverlay(Color color, std::shared_ptr<Layer> hov
   m_HoverdLayer->addChild(highlightLayer);
   m_HighLightLayerIndex = m_HoverdLayer->getChildIndex(highlightLayer);
 }
-#endif
 }  // namespace tgfx
+#endif

@@ -16,14 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma once
-#ifdef TGFX_USE_INSPECTOR
 #include <unordered_map>
 #include <vector>
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Layer.h"
-#include "serialization/SerializationUtils.h"
-#include "LockFreeQueue.h"
-#endif
 
 namespace tgfx {
 
@@ -36,7 +32,6 @@ class LayerInspector {
 
   void pickedLayer(float x, float y);
 
-#ifdef TGFX_USE_INSPECTOR
   void setDisplayList(tgfx::DisplayList* displayList);
   void serializingLayerTree();
   void serializingLayerAttribute(const std::shared_ptr<tgfx::Layer>& layer);
@@ -52,8 +47,8 @@ class LayerInspector {
 
  private:
   std::unordered_map<uint64_t, std::shared_ptr<tgfx::Layer>> m_LayerMap;
-  std::unordered_map<uint64_t, SerializeUtils::ComplexObjSerMap> m_LayerComplexObjMap;
-  std::unordered_map<uint64_t, SerializeUtils::RenderableObjSerMap> m_LayerRenderableObjMap;
+  std::unordered_map<uint64_t, std::unordered_map<uint64_t, std::function<std::shared_ptr<Data>()>>> m_LayerComplexObjMap;
+  std::unordered_map<uint64_t, std::unordered_map<uint64_t, std::function<std::shared_ptr<Data>(Context*)>>> m_LayerRenderableObjMap;
   uint64_t m_HoveredAddress;
   uint64_t m_SelectedAddress;
   uint64_t m_ExpandID;
@@ -61,8 +56,6 @@ class LayerInspector {
   int m_HighLightLayerIndex = 0;
   bool m_HoverdSwitch = false;
   tgfx::DisplayList* m_DisplayList;
- LockFreeQueue<uint64_t> imageIDQueue;
-#endif
 };
 
 }  // namespace tgfx
