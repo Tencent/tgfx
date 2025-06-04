@@ -463,12 +463,11 @@ std::vector<std::shared_ptr<Tile>> DisplayList::getFreeTiles(size_t tileCount,
     }
   }
   if (emptyTiles.size() >= tileCount) {
-    std::move(emptyTiles.end() - static_cast<int>(tileCount), emptyTiles.end(),
-              std::back_inserter(tiles));
+    tiles.insert(tiles.end(), emptyTiles.end() - static_cast<int>(tileCount), emptyTiles.end());
     emptyTiles.resize(emptyTiles.size() - tileCount);
     return tiles;
   }
-  std::move(emptyTiles.begin(), emptyTiles.end(), std::back_inserter(tiles));
+  tiles.insert(tiles.end(), emptyTiles.begin(), emptyTiles.end());
   emptyTiles.clear();
   for (auto& [scale, tileCache] : tileCaches) {
     auto centerX = static_cast<float>(renderSurface->width()) * 0.5f - _contentOffset.x;
