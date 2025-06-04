@@ -149,7 +149,7 @@ class DisplayList {
   /**
    * Returns the tile size used in tiled rendering mode. This setting is ignored in other render
    * modes. It specifies the width and height of each tile when rendering the display list in tiled
-   * mode. The tile size must be between 16 and 4096 pixels and should be a power of two. The
+   * mode. The tile size must be between 16 and 2048 pixels and should be a power of two. The
    * default is 256 pixels.
    */
   int tileSize() const {

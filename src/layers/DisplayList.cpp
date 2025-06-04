@@ -28,7 +28,7 @@ namespace tgfx {
 static constexpr size_t MAX_DIRTY_REGION_FRAMES = 4;
 static constexpr float DIRTY_REGION_ANTIALIAS_MARGIN = 0.5f;
 static constexpr int MIN_TILE_SIZE = 16;
-static constexpr int MAX_TILE_SIZE = 4096;
+static constexpr int MAX_TILE_SIZE = 2048;
 
 struct TileRenderTask {
   TileRenderTask(const Tile* tile, int tileSize, const Rect& drawRect)
@@ -324,6 +324,9 @@ void DisplayList::checkTileCount(Surface* renderSurface) {
   }
   totalTileCount = std::max(minTileCount, _maxTileCount);
   auto maxTileCountPerAtlas = getMaxTileCountPerAtlas(renderSurface->getContext());
+  if (maxTileCountPerAtlas <= 0) {
+    return;
+  }
   auto remainingTileCount = totalTileCount % maxTileCountPerAtlas;
   totalTileCount -= remainingTileCount;
   int width = static_cast<int>(sqrtf(static_cast<float>(remainingTileCount)));
@@ -546,6 +549,9 @@ bool DisplayList::createEmptyTiles(const Surface* renderSurface) {
   DEBUG_ASSERT(renderSurface != nullptr);
   auto context = renderSurface->getContext();
   auto tileCount = nextSurfaceTileCount(context);
+  if (tileCount <= 0) {
+    return false;
+  }
   int countX = static_cast<int>(sqrtf(static_cast<float>(tileCount)));
   int countY = static_cast<int>(ceilf(static_cast<float>(tileCount) / static_cast<float>(countX)));
   auto surface = Surface::Make(context, countX * _tileSize, countY * _tileSize,
