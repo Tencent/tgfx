@@ -19,11 +19,45 @@
 #pragma once
 
 #include <deque>
+#include <unordered_map>
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/Layer.h"
 
 namespace tgfx {
 class RootLayer;
+class Tile;
+class TileCache;
+struct TileRenderTask;
+
+/**
+ * RenderMode defines the different modes of rendering a DisplayList.
+ */
+enum class RenderMode {
+  /**
+   * Direct rendering mode. In this mode, the display list is rendered directly to the target
+   * surface without any caching or optimization.
+   */
+  Direct,
+
+  /**
+   * Partial rendering mode. In this mode, only the dirty regions of the display list are rendered
+   * to the target surface. This can improve performance when only a small part of the display list
+   * changes. However, enabling partial rendering may cause some blending issues, since all layers
+   * are first drawn onto a cached surface before being composited onto the target surface. Partial
+   * rendering also requires extra memory (equal to the size of the target surface) to cache the
+   * previous frame. This is the default rendering mode.
+   */
+  Partial,
+
+  /**
+   * Tiled rendering mode. In this mode, the display list is divided into tiles, and each tile is
+   * rendered separately. This can improve performance by rendering only the parts of the display
+   * list that have changed, and also enables efficient scrolling and zooming (using contentOffset
+   * and zoomScale). However, tiled rendering may use more memory for tile caches than partial
+   * rendering.
+   */
+  Tiled
+};
 
 /**
  * DisplayList represents a collection of layers can be drawn to a Surface. Note: All layers in the
@@ -33,7 +67,7 @@ class DisplayList {
  public:
   DisplayList();
 
-  virtual ~DisplayList() = default;
+  virtual ~DisplayList();
 
   /**
    * Returns the root layer of the display list. Note: The root layer cannot be added to another
@@ -61,6 +95,25 @@ class DisplayList {
   void setZoomScale(float zoomScale);
 
   /**
+   * Returns the integer multiplier used for zoom scale precision. This value determines the smallest
+   * increment by which the zoom scale can change. For example, a precision of 100 means the zoom scale
+   * can be adjusted in steps of 0.01 (1/100). Internally, the zoom scale is first rounded to the nearest
+   * integer and then converted back to a float for rendering. The precision is used to convert the zoom
+   * scale to an integer as follows:
+   * - When zooming in (scale >= 1.0), the scale is multiplied by the precision.
+   * - When zooming out (scale < 1.0), the reciprocal of the scale is multiplied by the precision.
+   * The default precision is 100, allowing zoom scale adjustments in steps of 0.01.
+   */
+  int zoomScalePrecision() const {
+    return _zoomScalePrecision;
+  }
+
+  /**
+   * Sets the integer multiplier used for zoom scale precision.
+   */
+  void setZoomScalePrecision(int precision);
+
+  /**
    * Returns the current content offset of the layer tree after applying the zoomScale. This offset
    * determines how far the origin of the layer tree is shifted relative to the surface's origin.
    * Adjusting the contentOffset to move the layer tree is more efficient than applying a matrix
@@ -80,21 +133,68 @@ class DisplayList {
   void setContentOffset(float offsetX, float offsetY);
 
   /**
-   * Returns true if partial refresh is enabled. When partial refresh is on, only the dirty regions
-   * of the display list are rendered, instead of redrawing the entire list. This can improve
-   * performance when only a small part of the display list changes. However, enabling partial
-   * refresh may cause some blending issues, since all layers are drawn onto a cached surface before
-   * being drawn to the target surface. Partial refresh also requires extra memory to cache the
-   * previous frame. The default is true.
+   * Returns the current render mode of the display list. The render mode determines how the display
+   * list is rendered to the target surface. The default render mode is RenderMode::Partial.
    */
-  bool partialRefreshEnabled() const {
-    return _partialRefreshEnabled;
+  RenderMode renderMode() const {
+    return _renderMode;
   }
 
   /**
-   * Sets whether partial refresh is enabled. The default value is false.
+   * Sets the render mode of the display list. The render mode determines how the display list is
+   * rendered to the target surface. The default render mode is RenderMode::Partial.
    */
-  void setPartialRefreshEnabled(bool partialRefreshEnabled);
+  void setRenderMode(RenderMode renderMode);
+
+  /**
+   * Returns the tile size used in tiled rendering mode. This setting is ignored in other render
+   * modes. It specifies the width and height of each tile when rendering the display list in tiled
+   * mode. The tile size must be between 16 and 4096 pixels and should be a power of two. The
+   * default is 256 pixels.
+   */
+  int tileSize() const {
+    return _tileSize;
+  }
+
+  /**
+   * Sets the size of the tiles used in tiled rendering mode.
+   */
+  void setTileSize(int tileSize);
+
+  /**
+   * Returns the maximum number of tiles that can be created in tiled rendering mode. This setting is
+   * ignored in other render modes. If the specified count is less than the minimum required for tiled
+   * rendering, it will be automatically increased to meet the minimum. The minimum value is calculated
+   * based on the tile size and viewport size, ensuring the visible area is always fully covered, even
+   * if the viewport is offset by half a tile. For example, with a tile size of 256 pixels and a
+   * viewport of 512x512 pixels, the minimum tile count is 9 (2 tiles in each direction plus 1 for
+   * offset). The default is 0, which means the minimum tile count will be used based on the viewport
+   * size and tile size.
+   */
+  float maxTileCount() const {
+    return _maxTileCount;
+  }
+
+  /**
+   * Sets the maximum number of tiles that can be created in tiled rendering mode.
+   */
+  void setMaxTileCount(int count);
+
+  /**
+   * Returns true if zoom blur is allowed in tiled rendering mode. This setting is ignored in other
+   * render modes. When enabled, if the zoomScale changes and cached images at other zoom levels are
+   * available, the display list will first use those caches to render when the frame rate is low.
+   * It will then gradually update to the current zoomScale in later frames. This can improve
+   * zooming performance, but may cause temporary zoom blur artifacts. The default is true.
+   */
+  bool allowZoomBlur() const {
+    return _allowZoomBlur;
+  }
+
+  /**
+   * Sets whether to allow zoom blur in tiled rendering mode.
+   */
+  void setAllowZoomBlur(bool allow);
 
   /**
    * Sets whether to show dirty regions during rendering. When enabled, the dirty regions will be
@@ -119,18 +219,61 @@ class DisplayList {
 
  private:
   std::shared_ptr<RootLayer> _root = nullptr;
-  std::shared_ptr<Surface> frameCache = nullptr;
   float _zoomScale = 1.0f;
+  int _zoomScalePrecision = 100;
   Point _contentOffset = {};
-  bool _partialRefreshEnabled = true;
+  RenderMode _renderMode = RenderMode::Partial;
+  int _tileSize = 256;
+  int _maxTileCount = 0;
+  bool _allowZoomBlur = true;
   bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
   float lastZoomScale = 1.0f;
   Point lastContentOffset = {};
+  int totalTileCount = 0;
+  std::vector<std::shared_ptr<Surface>> surfaceCaches = {};
+  std::unordered_map<float, TileCache*> tileCaches = {};
+  std::vector<std::shared_ptr<Tile>> emptyTiles = {};
   std::deque<std::vector<Rect>> lastDirtyRegions = {};
 
-  bool renderPartially(Surface* surface, bool autoClear, std::vector<Rect> dirtyRegions);
+  std::vector<Rect> renderDirect(Surface* surface, bool autoClear) const;
+
+  std::vector<Rect> renderPartial(Surface* surface, bool autoClear,
+                                  const std::vector<Rect>& dirtyRegions);
+
+  std::vector<Rect> renderTiled(Surface* surface, bool autoClear,
+                                const std::vector<Rect>& dirtyRegions);
+
+  void checkTileCount(Surface* renderSurface);
+
+  std::vector<TileRenderTask> invalidateTileCaches(const std::vector<Rect>& dirtyRegions);
+
+  void invalidateCurrentTileCache(const TileCache* tileCache, const std::vector<Rect>& dirtyRegions,
+                                  std::vector<TileRenderTask>* renderTasks) const;
+
+  std::vector<std::shared_ptr<Tile>> collectRenderTiles(const Surface* surface,
+                                                        std::vector<TileRenderTask>* renderTasks);
+
+  std::vector<std::shared_ptr<Tile>> getFreeTiles(size_t tileCount, const Surface* renderSurface);
+
+  std::vector<std::shared_ptr<Tile>> createContinuousTiles(const Surface* renderSurface,
+                                                           int requestCountX, int requestCountY);
+
+  bool createEmptyTiles(const Surface* renderSurface);
+
+  int nextSurfaceTileCount(Context* context) const;
+
+  int getMaxTileCountPerAtlas(Context* context) const;
+
+  void renderOneTile(const TileRenderTask& task) const;
+
+  void drawTilesToSurface(const std::vector<std::shared_ptr<Tile>>& tiles, Surface* surface,
+                          bool autoClear) const;
+
   void renderDirtyRegions(Canvas* canvas, std::vector<Rect> dirtyRegions);
+
   Matrix getViewMatrix() const;
+
+  void resetCaches();
 };
 }  // namespace tgfx
