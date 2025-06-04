@@ -25,6 +25,7 @@
 
 namespace tgfx {
 static constexpr size_t MAX_DIRTY_REGION_FRAMES = 4;
+static constexpr float DIRTY_REGION_ANTIALIAS_MARGIN = 0.5f;
 
 DisplayList::DisplayList() : _root(RootLayer::Make()) {
   _root->_root = _root.get();
@@ -122,7 +123,7 @@ static std::vector<Rect> MapDirtyRegions(const std::vector<Rect>& dirtyRegions,
   for (auto& region : dirtyRegions) {
     auto dirtyRect = viewMatrix.mapRect(region);
     // Expand by 0.5 pixels to preserve antialiasing results.
-    dirtyRect.outset(0.5f, 0.5f);
+    dirtyRect.outset(DIRTY_REGION_ANTIALIAS_MARGIN, DIRTY_REGION_ANTIALIAS_MARGIN);
     // Snap to pixel boundaries to avoid subpixel clipping artifacts.
     dirtyRect.roundOut();
     if (!clipRect || dirtyRect.intersect(*clipRect)) {

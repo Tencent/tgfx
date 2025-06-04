@@ -69,7 +69,7 @@ struct Rect {
     return {x, y, x + w, y + h};
   }
 
- /**
+  /**
   * Returns a Rect constructed as (x, y, x + w, y + h). Input is not validated; w or h may be
   * negative.
   */
@@ -78,7 +78,7 @@ struct Rect {
             static_cast<float>(y + h)};
   }
 
- /**
+  /**
   * Returns a Rect constructed as (0, 0, size.width, size.height). Input is not validated;
   * size.width or size.height may be negative.
   */
@@ -86,7 +86,7 @@ struct Rect {
     return Rect{0, 0, static_cast<float>(size.width), static_cast<float>(size.height)};
   }
 
- /**
+  /**
   * Returns a Rect constructed as (0, 0, size.width, size.height). Input is not validated;
   * size.width or size.height may be negative.
   */
@@ -154,7 +154,7 @@ struct Rect {
     return left;
   }
 
- /**
+  /**
   * Returns the top edge of the Rect if it is sorted.
   * Use isEmpty() to check if the Rect may be invalid, and sort() to swap top and bottom if needed.
   */
