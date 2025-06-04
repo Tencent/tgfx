@@ -86,7 +86,5 @@ class GlyphRunList {
 
  private:
   std::vector<GlyphRun> _glyphRuns = {};
-
-  friend class RenderContext;
 };
 }  // namespace tgfx

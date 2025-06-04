@@ -116,7 +116,7 @@ void TGFXView::draw() {
   auto numDrawers = drawers::Drawer::Count() - 1;
   auto index = (lastDrawIndex % numDrawers) + 1;
   auto drawer = drawers::Drawer::GetByName("GridBackground");
-  //drawer->draw(canvas, appHost.get());
+  drawer->draw(canvas, appHost.get());
   drawer = drawers::Drawer::GetByIndex(index);
   drawer->draw(canvas, appHost.get());
   canvas->restore();

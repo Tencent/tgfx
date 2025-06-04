@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "../../src/core/utils/UniqueID.h"
 #include "core/utils/MathExtra.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/layers/DisplayList.h"
@@ -101,8 +102,13 @@ class CustomPathGlyphFace : public GlyphFace {
     return _scale;
   }
 
+  uint32_t getUniqueID() const override {
+    return uniqueID;
+  }
+
  private:
   float _scale = 1.0f;
+  uint32_t uniqueID = UniqueID::Next();
 };
 
 class CustomImageGlyphFace : public GlyphFace {
@@ -164,8 +170,13 @@ class CustomImageGlyphFace : public GlyphFace {
     return _scale;
   }
 
+  uint32_t getUniqueID() const override {
+    return uniqueID;
+  }
+
  private:
   float _scale = 1.0f;
+  uint32_t uniqueID = UniqueID::Next();
 };
 
 TGFX_TEST(GlyphFaceTest, GlyphFaceSimple) {
@@ -250,11 +261,16 @@ class CustomPathGlyphFace2 : public GlyphFace, std::enable_shared_from_this<Cust
     return _scale;
   }
 
+  uint32_t getUniqueID() const override {
+    return uniqueID;
+  }
+
  private:
   float _scale = 1.0f;
   Font font20 = {};
   Font font40 = {};
   Font font60 = {};
+  uint32_t uniqueID = UniqueID::Next();
 };
 
 class CustomImageGlyphFace2 : public GlyphFace,
@@ -295,9 +311,14 @@ class CustomImageGlyphFace2 : public GlyphFace,
     return _scale;
   }
 
+  uint32_t getUniqueID() const override {
+    return uniqueID;
+  }
+
  private:
   float _scale = 1.0f;
   Font fontEmoji = {};
+  uint32_t uniqueID = UniqueID::Next();
 };
 
 TGFX_TEST(GlyphFaceTest, GlyphFaceWithStyle) {

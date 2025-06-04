@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextAtlasUploadTask.h"
+#include "gpu/Gpu.h"
 #include "gpu/Texture.h"
 
 namespace tgfx {
@@ -29,7 +30,7 @@ TextAtlasUploadTask::TextAtlasUploadTask(UniqueKey uniqueKey,
       textureProxy(std::move(textureProxy)), atlasOffset(atlasOffset) {
 }
 
-bool TextAtlasUploadTask::execute(Context*) {
+bool TextAtlasUploadTask::execute(Context* context) {
   if (source == nullptr || textureProxy == nullptr) {
     return false;
   }
@@ -38,13 +39,24 @@ bool TextAtlasUploadTask::execute(Context*) {
     LOGE("TextAtlasUploadTask::execute() pixelBuffer is nullptr!");
     return nullptr;
   }
-  auto result = pixelBuffer->onUploadTexture(textureProxy->getTexture(), atlasOffset);
-  if (!result) {
-    LOGE("TextAtlasUploadTask::execute() Failed to upload the texture!");
-  } else {
-    // Free the image source immediately to reduce memory pressure.
-    source = nullptr;
+  auto texture = textureProxy->getTexture();
+  if (texture == nullptr) {
+    LOGE("TextureUploadTask::onMakeResource() texture is nullptr!");
+    return nullptr;
   }
+  auto gpu = context->gpu();
+  auto pixels = pixelBuffer->lockPixels();
+  if (pixels == nullptr) {
+    pixelBuffer->unlockPixels();
+    LOGE("TextAtlasUploadTask::execute() lockPixels is nullptr!");
+    return false;
+  }
+  auto rect = Rect::MakeXYWH(atlasOffset.x, atlasOffset.y, 1.f * pixelBuffer->width(),
+                             1.f * pixelBuffer->height());
+  gpu->writePixels(texture->getSampler(), rect, pixels, pixelBuffer->info().rowBytes());
+  pixelBuffer->unlockPixels();
+  // Free the image source immediately to reduce memory pressure.
+  source = nullptr;
   return true;
 }
 
