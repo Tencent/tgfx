@@ -303,7 +303,7 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
     if (dirtyRect.intersect(surfaceRect)) {
       dirtyRects.emplace_back(dirtyRect);
     }
-    renderOneTile(task);
+    renderTileTask(task);
   }
   drawTilesToSurface(renderTiles, surface, autoClear);
   return dirtyRects;
@@ -588,7 +588,7 @@ int DisplayList::getMaxTileCountPerAtlas(Context* context) const {
   return (maxTextureSize / _tileSize) * (maxTextureSize / _tileSize);
 }
 
-void DisplayList::renderOneTile(const TileRenderTask& task) const {
+void DisplayList::renderTileTask(const TileRenderTask& task) const {
   auto surface = surfaceCaches[task.surfaceIndex].get();
   DEBUG_ASSERT(surface != nullptr);
   auto canvas = surface->getCanvas();

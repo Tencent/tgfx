@@ -265,7 +265,7 @@ class DisplayList {
 
   int getMaxTileCountPerAtlas(Context* context) const;
 
-  void renderOneTile(const TileRenderTask& task) const;
+  void renderTileTask(const TileRenderTask& task) const;
 
   void drawTilesToSurface(const std::vector<std::shared_ptr<Tile>>& tiles, Surface* surface,
                           bool autoClear) const;
