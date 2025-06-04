@@ -750,7 +750,7 @@ Matrix Layer::getRelativeMatrix(const Layer* targetCoordinateSpace) const {
 std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float scale) {
   auto maskArgs = args;
   maskArgs.drawMode = _maskStyle != MaskStyle::Vector ? DrawMode::Normal : DrawMode::Contour;
-  auto maskPicture = CreatePicture(args, scale, [this](const DrawArgs& args, Canvas* canvas) {
+  auto maskPicture = CreatePicture(maskArgs, scale, [this](const DrawArgs& args, Canvas* canvas) {
     _mask->drawLayer(args, canvas, _mask->_alpha, BlendMode::SrcOver);
   });
   if (maskPicture == nullptr) {
