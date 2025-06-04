@@ -25,7 +25,7 @@
 #include "layers/TileCache.h"
 
 namespace tgfx {
-static constexpr size_t MAX_DIRTY_REGION_FRAMES = 4;
+static constexpr size_t MAX_DIRTY_REGION_FRAMES = 5;
 static constexpr float DIRTY_REGION_ANTIALIAS_MARGIN = 0.5f;
 static constexpr int MIN_TILE_SIZE = 16;
 static constexpr int MAX_TILE_SIZE = 2048;
@@ -456,6 +456,14 @@ std::vector<std::shared_ptr<Tile>> DisplayList::collectRenderTiles(
   return renderTiles;
 }
 
+static float ScaleRatio(float scaleA, float zoomScale) {
+  auto ratio = fabsf(scaleA / zoomScale);
+  if (ratio < 1.0f) {
+    ratio = 1.0f / ratio;
+  }
+  return ratio;
+}
+
 std::vector<std::shared_ptr<Tile>> DisplayList::getFreeTiles(size_t tileCount,
                                                              const Surface* renderSurface) {
   std::vector<std::shared_ptr<Tile>> tiles = {};
@@ -472,7 +480,17 @@ std::vector<std::shared_ptr<Tile>> DisplayList::getFreeTiles(size_t tileCount,
   }
   tiles.insert(tiles.end(), emptyTiles.begin(), emptyTiles.end());
   emptyTiles.clear();
+  std::vector<std::pair<float, TileCache*>> sortedTileCaches;
+  sortedTileCaches.reserve(tileCaches.size());
   for (auto& [scale, tileCache] : tileCaches) {
+    sortedTileCaches.emplace_back(scale, tileCache);
+  }
+  std::sort(sortedTileCaches.begin(), sortedTileCaches.end(),
+            [this](const std::pair<float, TileCache*>& a, const std::pair<float, TileCache*>& b) {
+              return ScaleRatio(a.first, _zoomScale) < ScaleRatio(b.first, _zoomScale);
+            });
+
+  for (auto& [scale, tileCache] : sortedTileCaches) {
     auto centerX = static_cast<float>(renderSurface->width()) * 0.5f - _contentOffset.x;
     auto centerY = static_cast<float>(renderSurface->height()) * 0.5f - _contentOffset.y;
     centerX *= scale / _zoomScale;
