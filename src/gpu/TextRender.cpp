@@ -94,6 +94,17 @@ static std::shared_ptr<ImageCodec> getGlyphCodec(std::shared_ptr<GlyphFace> glyp
   return glyphCodec;
 }
 
+static MaskFormat getMaskFormat(GlyphFace* glyphFace) {
+  if (!glyphFace->hasColor()) {
+    return MaskFormat::A8;
+  }
+#ifdef __APPLE__
+  return MaskFormat::BGRA;
+#else
+  return MaskFormat::RGBA;
+#endif
+}
+
 std::unique_ptr<TextRender> TextRender::MakeFrom(Context* context, OpsCompositor* opsCompositor,
                                                  std::shared_ptr<GlyphRunList> glyphRunList,
                                                  const Rect& clipBounds) {
@@ -125,6 +136,11 @@ void TextRender::draw(const MCState& state, const Fill& fill, const Stroke* stro
   sourceGlyphRun.positions.reserve(maxGlyphRunCount);
   rejectedGlyphRun.positions.reserve(maxGlyphRunCount);
 
+  Path path;
+  glyphRunList->getPath(&path, state.matrix.getMaxScale());
+  auto bounds = path.getBounds();
+  state.matrix.mapRect(&bounds);
+
   for (const auto& run : glyphRunList->glyphRuns()) {
     rejectedGlyphRun.glyphFace = run.glyphFace;
     directMaskDrawing(run, state, fill, stroke, rejectedGlyphRun);
@@ -140,12 +156,7 @@ void TextRender::draw(const MCState& state, const Fill& fill, const Stroke* stro
     if (rejectedGlyphRun.glyphs.empty()) {
       continue;
     }
-    std::swap(sourceGlyphRun, rejectedGlyphRun);
-    rejectedGlyphRun.positions.clear();
-    rejectedGlyphRun.glyphs.clear();
-    if (rejectedGlyphRun.glyphs.empty()) {
-      continue;
-    }
+
     transformedMaskDrawing(rejectedGlyphRun, state, fill, stroke);
   }
 }
@@ -188,7 +199,8 @@ void TextRender::directMaskDrawing(const GlyphRun& glyphRun, const MCState& stat
     }
     BytesKey glyphKey;
     computeAtlasKey(scaledGlyphFace.get(), glyphID, stroke, glyphKey);
-    auto maskFormat = scaledGlyphFace->hasColor() ? MaskFormat::RGBA : MaskFormat::A8;
+
+    auto maskFormat = getMaskFormat(scaledGlyphFace.get());
     auto& textureProxies = atlasManager->getTextureProxies(maskFormat);
 
     auto glyphState = state;
@@ -270,6 +282,7 @@ void TextRender::pathDrawing(const GlyphRun& glyphRun, const MCState& state, con
     index++;
   }
   if (totalPath.isEmpty()) {
+    rejectedGlyphRun = glyphRun;
     return;
   }
 
@@ -278,8 +291,11 @@ void TextRender::pathDrawing(const GlyphRun& glyphRun, const MCState& state, con
   auto shape = Shape::MakeFrom(totalPath);
   shape = Shape::ApplyStroke(std::move(shape), stroke);
   shape = Shape::ApplyMatrix(std::move(shape), rasterizeMatrix);
-  auto width = static_cast<int>(ceilf(clipBounds.width()));
-  auto height = static_cast<int>(ceilf(clipBounds.height()));
+  auto bounds = shape->getBounds();
+  bounds.intersect(clipBounds);
+  bounds.roundOut();
+  auto width = static_cast<int>(bounds.width());
+  auto height = static_cast<int>(bounds.height());
 
   auto rasterizer = PathRasterizer::Make(width, height, std::move(shape), true, true);
   auto image = Image::MakeFrom(std::move(rasterizer));
@@ -342,7 +358,7 @@ void TextRender::transformedMaskDrawing(const GlyphRun& glyphRun, const MCState&
 
     BytesKey glyphKey;
     computeAtlasKey(scaledGlyphFace.get(), glyphID, stroke, glyphKey);
-    auto maskFormat = scaledGlyphFace->hasColor() ? MaskFormat::RGBA : MaskFormat::A8;
+    auto maskFormat = getMaskFormat(scaledGlyphFace.get());
     auto& textureProxies = atlasManager->getTextureProxies(maskFormat);
 
     auto glyphState = state;

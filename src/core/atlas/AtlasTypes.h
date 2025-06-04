@@ -24,7 +24,7 @@
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
-enum class MaskFormat : int { A8, RGBA, Last = RGBA };
+enum class MaskFormat : int { A8, RGBA, BGRA, Last = BGRA };
 
 static constexpr int kMaskFormatCount = static_cast<int>(MaskFormat::Last) + 1;
 

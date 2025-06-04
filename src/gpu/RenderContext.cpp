@@ -147,6 +147,7 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
     stroke->applyToBounds(&bounds);
   }
   state.matrix.mapRect(&bounds);  // To device space
+  bounds.roundOut();
   auto clipBounds = getClipBounds(state.clip);
   if (clipBounds.isEmpty()) {
     return;
