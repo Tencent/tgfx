@@ -1147,6 +1147,8 @@ void Layer::updateBackgroundBounds(const Matrix& renderMatrix) {
       layer->rasterizedContent = nullptr;
       if (!layer->maskOwner) {
         layer = layer->_parent;
+      } else {
+        layer = layer->maskOwner;
       }
     }
   }
