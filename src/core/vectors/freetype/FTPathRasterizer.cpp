@@ -23,6 +23,25 @@
 #include "core/utils/GammaCorrection.h"
 
 namespace tgfx {
+void ClearPixels(const ImageInfo& dstInfo, void* dstPixels, const Rect& bounds) {
+  auto dstBounds = Rect::MakeWH(dstInfo.width(), dstInfo.height());
+  if (bounds.contains(dstBounds)) {
+    memset(dstPixels, 0, dstInfo.byteSize());
+    return;
+  }
+  dstBounds.intersect(bounds);
+  auto left = static_cast<int>(dstBounds.left);
+  auto width = static_cast<int>(dstBounds.width());
+  auto top = dstInfo.height() - static_cast<int>(dstBounds.bottom);
+  auto bottom = top + static_cast<int>(dstBounds.height());
+
+  for (auto y = top; y < bottom; ++y) {
+    auto row =
+        static_cast<uint8_t*>(dstPixels) + y * dstInfo.rowBytes() + left * dstInfo.bytesPerPixel();
+    memset(row, 0, width * dstInfo.bytesPerPixel());
+  }
+}
+
 static void Iterator(PathVerb verb, const Point points[4], void* info) {
   auto path = reinterpret_cast<FTPath*>(info);
   switch (verb) {
@@ -70,6 +89,9 @@ bool FTPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) con
     maskPath.addRect(Rect::MakeWH(dstInfo.width(), dstInfo.height()));
     path.addPath(maskPath, PathOp::Intersect);
   }
+  auto bounds = path.getBounds();
+  bounds.roundOut();
+  ClearPixels(dstInfo, dstPixels, bounds);
   FTPath ftPath = {};
   path.decompose(Iterator, &ftPath);
   auto fillType = path.getFillType();

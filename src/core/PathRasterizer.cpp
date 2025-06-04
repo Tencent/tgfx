@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/PathRasterizer.h"
-#include "core/PixelBuffer.h"
 #include "core/ScalerContext.h"
 
 namespace tgfx {
@@ -26,17 +25,4 @@ PathRasterizer::PathRasterizer(int width, int height, std::shared_ptr<Shape> sha
     : ImageCodec(width, height, Orientation::LeftTop), shape(std::move(shape)),
       antiAlias(antiAlias), needsGammaCorrection(needsGammaCorrection) {
 }
-
-std::shared_ptr<ImageBuffer> PathRasterizer::onMakeBuffer(bool tryHardware) const {
-  auto pixelBuffer = PixelBuffer::Make(width(), height(), isAlphaOnly(), tryHardware);
-  if (pixelBuffer == nullptr) {
-    return nullptr;
-  }
-  auto pixels = pixelBuffer->lockPixels();
-  memset(pixels, 0, pixelBuffer->info().byteSize());
-  auto result = readPixels(pixelBuffer->info(), pixels);
-  pixelBuffer->unlockPixels();
-  return result ? pixelBuffer : nullptr;
-}
-
 }  //namespace tgfx
