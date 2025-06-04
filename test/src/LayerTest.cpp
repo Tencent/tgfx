@@ -849,7 +849,7 @@ TGFX_TEST(LayerTest, PassthroughAndNormal) {
 
   root->setMatrix(Matrix::MakeTrans(400, 50));
   root->setShouldRasterize(false);
-  displayList.setPartialRefreshEnabled(false);
+  displayList.setRenderMode(RenderMode::Direct);
   displayList.render(surface.get(), false);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PassThoughAndNormal"));
 }
@@ -2705,6 +2705,7 @@ TGFX_TEST(LayerTest, DirtyRegionTest) {
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest5"));
 
+  displayList->setRenderMode(RenderMode::Tiled);
   displayList->setZoomScale(1.3f);
   displayList->render(surface.get());
   // Clear the previous dirty regions.
