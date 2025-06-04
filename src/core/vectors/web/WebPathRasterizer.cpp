@@ -64,6 +64,9 @@ bool WebPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) co
   if (path.isEmpty()) {
     return false;
   }
+  auto bounds = shape->getBounds();
+  bounds.roundOut();
+  ClearPixels(dstInfo, dstPixels, bounds, false);
   auto path2DClass = val::global("Path2D");
   if (!path2DClass.as<bool>()) {
     return false;
