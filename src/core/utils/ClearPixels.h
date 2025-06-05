@@ -16,13 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/PathRasterizer.h"
-#include "core/ScalerContext.h"
+#pragma once
+
+#include "tgfx/core/ImageInfo.h"
 
 namespace tgfx {
-PathRasterizer::PathRasterizer(int width, int height, std::shared_ptr<Shape> shape, bool antiAlias,
-                               bool needsGammaCorrection)
-    : ImageCodec(width, height, Orientation::LeftTop), shape(std::move(shape)),
-      antiAlias(antiAlias), needsGammaCorrection(needsGammaCorrection) {
-}
-}  //namespace tgfx
+/**
+ * Clears the pixels of a given pixel buffer to transparent black.
+ */
+void ClearPixels(const ImageInfo& dstInfo, void* dstPixels);
+}  // namespace tgfx
