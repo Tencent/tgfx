@@ -37,6 +37,10 @@ class FontGlyphFace final : public GlyphFace {
 
   bool asFont(Font* font) const override;
 
+  float getScale() const override;
+
+  uint32_t getUniqueID() const override;
+
  private:
   explicit FontGlyphFace(Font font) : _font(std::move(font)) {
   }

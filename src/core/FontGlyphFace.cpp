@@ -62,4 +62,13 @@ bool FontGlyphFace::asFont(Font* font) const {
 
   return true;
 }
+
+float FontGlyphFace::getScale() const {
+  return _font.getSize();
+}
+
+uint32_t FontGlyphFace::getUniqueID() const {
+  return _font.getTypeface()->uniqueID();
+}
+
 }  // namespace tgfx
