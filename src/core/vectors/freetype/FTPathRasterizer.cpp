@@ -20,6 +20,7 @@
 #include "FTLibrary.h"
 #include "FTPath.h"
 #include "FTRasterTarget.h"
+#include "core/utils/ClearPixels.h"
 #include "core/utils/GammaCorrection.h"
 
 namespace tgfx {
@@ -70,8 +71,6 @@ bool FTPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) con
     maskPath.addRect(Rect::MakeWH(dstInfo.width(), dstInfo.height()));
     path.addPath(maskPath, PathOp::Intersect);
   }
-  auto bounds = shape->getBounds();
-  bounds.roundOut();
   ClearPixels(dstInfo, dstPixels);
   FTPath ftPath = {};
   path.decompose(Iterator, &ftPath);

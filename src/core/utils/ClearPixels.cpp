@@ -16,13 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/PathRasterizer.h"
-#include "core/ScalerContext.h"
+#include "ClearPixels.h"
 
 namespace tgfx {
-PathRasterizer::PathRasterizer(int width, int height, std::shared_ptr<Shape> shape, bool antiAlias,
-                               bool needsGammaCorrection)
-    : ImageCodec(width, height, Orientation::LeftTop), shape(std::move(shape)),
-      antiAlias(antiAlias), needsGammaCorrection(needsGammaCorrection) {
+void ClearPixels(const ImageInfo& dstInfo, void* dstPixels) {
+  if (dstInfo.rowBytes() == dstInfo.minRowBytes()) {
+    memset(dstPixels, 0, dstInfo.byteSize());
+    return;
+  }
+  auto height = static_cast<size_t>(dstInfo.height());
+  for (size_t y = 0; y < height; ++y) {
+    auto row = static_cast<uint8_t*>(dstPixels) + y * dstInfo.rowBytes();
+    memset(row, 0, dstInfo.rowBytes());
+  }
 }
-}  //namespace tgfx
+}  // namespace tgfx
