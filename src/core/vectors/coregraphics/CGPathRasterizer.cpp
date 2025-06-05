@@ -124,7 +124,7 @@ bool CGPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) con
   if (cgContext == nullptr) {
     return false;
   }
-  CGContextClearRect(cgContext, CGRectMake(0.f, 0.f, info.width(), info.height()));
+  CGContextClearRect(cgContext, CGRectMake(0.f, 0.f, dstInfo.width(), dstInfo.height()));
   auto totalMatrix = Matrix::MakeScale(1, -1);
   totalMatrix.postTranslate(0, static_cast<float>(dstInfo.height()));
   path.transform(totalMatrix);
