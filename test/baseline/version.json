@@ -24,7 +24,7 @@
         "Path_addArc_reversed7": "4802e56",
         "Path_addArc_reversed8": "4802e56",
         "Path_complex": "e031f25",
-        "Picture": "99c36f0c",
+        "Picture": "ced3b513",
         "PictureImage": "c475bfb",
         "PictureImage_Path": "1ae5042",
         "PictureImage_Text": "1ae5042",
@@ -71,7 +71,7 @@
         "ImageWithMipmap": "da590da",
         "ImageWithShadow": "50136952",
         "SimpleLayerTreeDrawer": "0224fbeb",
-        "SimpleText": "15e0e39"
+        "SimpleText": "ced3b513"
     },
     "DstTextureTest": {
         "EmptyLocalBounds": "be94e666",

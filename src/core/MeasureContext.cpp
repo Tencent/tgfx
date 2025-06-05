@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MeasureContext.h"
+#include "core/utils/ApplyStrokeToBound.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
@@ -31,7 +32,7 @@ void MeasureContext::drawRRect(const RRect& rRect, const MCState& state, const F
                                const Stroke* stroke) {
   auto rect = rRect.rect;
   if (stroke) {
-    stroke->applyToBounds(&rect);
+    ApplyStrokeToBounds(*stroke, &rect);
   }
   addLocalBounds(state, fill, rect, false);
 }
@@ -64,7 +65,7 @@ void MeasureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList
                                       const Stroke* stroke) {
   auto localBounds = glyphRunList->getBounds();
   if (stroke) {
-    stroke->applyToBounds(&localBounds);
+    ApplyStrokeToBounds(*stroke, &localBounds);
   }
   addLocalBounds(state, fill, localBounds);
 }
