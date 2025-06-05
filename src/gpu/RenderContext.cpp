@@ -23,6 +23,7 @@
 #include "core/Rasterizer.h"
 #include "core/images/SubsetImage.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/StrokeUtils.h"
 #include "core/utils/Types.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
@@ -142,7 +143,7 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   }
   auto bounds = glyphRunList->getBounds(maxScale);
   if (stroke) {
-    stroke->applyToBounds(&bounds);
+    StrokeApplyToBounds(*stroke, &bounds);
   }
   state.matrix.mapRect(&bounds);  // To device space
   auto clipBounds = getClipBounds(state.clip);

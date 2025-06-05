@@ -119,9 +119,6 @@ std::shared_ptr<ImageCodec> Font::getImage(GlyphID glyphID, const Stroke* stroke
   std::unique_ptr<Stroke> adjustMitterStroke = nullptr;
   if (stroke != nullptr) {
     adjustMitterStroke = std::make_unique<Stroke>(*stroke);
-    // Glyph stroke rarely creates sharp angles, so setting miterLimit = 1.0f
-    // helps produce tighter bounding box.
-    adjustMitterStroke->miterLimit = 1.0f;
   }
   auto bounds =
       scalerContext->getImageTransform(glyphID, fauxBold, adjustMitterStroke.get(), matrix);
