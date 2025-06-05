@@ -50,10 +50,14 @@ class GlyphFace {
   virtual bool hasOutlines() const = 0;
 
   /**
-   * Returns a new GlyphFace with the same attributes as this one, but with the glyph size scaled by
-   * the specified factor. If the scale is less than or equal to 0, returns nullptr.
+   * Returns the point size of this GlyphFace.
    */
-  virtual std::shared_ptr<GlyphFace> makeScaled(float scale) const = 0;
+  virtual float getSize() const = 0;
+
+  /**
+   * Returns a new GlyphFace with the same attributes of this GlyphFace, but with the specified size.
+   */
+  virtual std::shared_ptr<GlyphFace> makeWithSize(float size) const = 0;
 
   /**
    * Creates a path corresponding to glyph outline. If glyph has an outline, copies outline to path
@@ -81,15 +85,10 @@ class GlyphFace {
    */
   virtual bool asFont(Font* font) const = 0;
 
-  /*
-   * Returns the scale of this GlyphFace
-   */
-  virtual float getScale() const = 0;
-
   /**
-   * Returns the unique ID of this GlyphFace.
+   * Returns the unique ID of the Typeface associated with this GlyphFace.
    */
-  virtual uint32_t getUniqueID() const = 0;
+  virtual uint32_t getTypefaceID() const = 0;
 
  protected:
   GlyphFace() = default;

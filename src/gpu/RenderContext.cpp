@@ -230,7 +230,7 @@ void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
   viewMatrix.preScale(1.0f / scale, 1.0f / scale);
   for (auto& glyphRun : glyphRunList->glyphRuns()) {
     auto glyphFace = glyphRun.glyphFace;
-    glyphFace = glyphFace->makeScaled(scale);
+    glyphFace = glyphFace->makeWithSize(scale * glyphFace->getSize());
     DEBUG_ASSERT(glyphFace != nullptr);
     auto& glyphIDs = glyphRun.glyphs;
     auto glyphCount = glyphIDs.size();

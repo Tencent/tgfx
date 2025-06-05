@@ -57,7 +57,7 @@ Rect GlyphRunList::getBounds(float resolutionScale) const {
     auto glyphFace = run.glyphFace;
     if (hasScale) {
       // Scale the glyphs before measuring to prevent precision loss with small font sizes.
-      glyphFace = glyphFace->makeScaled(resolutionScale);
+      glyphFace = glyphFace->makeWithSize(resolutionScale * glyphFace->getSize());
       DEBUG_ASSERT(glyphFace != nullptr);
     }
     size_t index = 0;
@@ -86,7 +86,7 @@ bool GlyphRunList::getPath(Path* path, float resolutionScale) const {
     auto glyphFace = run.glyphFace;
     if (hasScale) {
       // Scale the glyphs before measuring to prevent precision loss with small font sizes.
-      glyphFace = glyphFace->makeScaled(resolutionScale);
+      glyphFace = glyphFace->makeWithSize(resolutionScale * glyphFace->getSize());
       DEBUG_ASSERT(glyphFace != nullptr);
     }
     size_t index = 0;

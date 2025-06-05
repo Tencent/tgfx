@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/utils/MathExtra.h"
-#include "core/utils/UniqueID.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ShapeLayer.h"
@@ -28,7 +27,7 @@
 namespace tgfx {
 class CustomPathGlyphFace : public GlyphFace {
  public:
-  explicit CustomPathGlyphFace(float scale = 1.0f) : _scale(scale) {
+  explicit CustomPathGlyphFace(float size = 1.0f) : _size(size) {
   }
 
   bool hasColor() const override {
@@ -38,35 +37,35 @@ class CustomPathGlyphFace : public GlyphFace {
     return true;
   }
 
-  std::shared_ptr<GlyphFace> makeScaled(float scale) const override {
-    return std::make_shared<CustomPathGlyphFace>(_scale * scale);
+  std::shared_ptr<GlyphFace> makeWithSize(float size) const override {
+    return std::make_shared<CustomPathGlyphFace>(size);
   }
 
   bool getPath(GlyphID glyphID, Path* path) const override {
     switch (glyphID) {
       case 1:
-        path->moveTo(Point::Make(25.0f, 5.0f) * _scale);
-        path->lineTo(Point::Make(45.0f, 45.0f) * _scale);
-        path->lineTo(Point::Make(5.0f, 45.0f) * _scale);
+        path->moveTo(Point::Make(25.0f, 5.0f) * _size);
+        path->lineTo(Point::Make(45.0f, 45.0f) * _size);
+        path->lineTo(Point::Make(5.0f, 45.0f) * _size);
         path->close();
         return true;
       case 2:
-        path->moveTo(Point::Make(5.0f, 5.0f) * _scale);
-        path->lineTo(Point::Make(45.0f, 5.0f) * _scale);
-        path->lineTo(Point::Make(45.0f, 45.0f) * _scale);
-        path->lineTo(Point::Make(5.0f, 45.0f) * _scale);
+        path->moveTo(Point::Make(5.0f, 5.0f) * _size);
+        path->lineTo(Point::Make(45.0f, 5.0f) * _size);
+        path->lineTo(Point::Make(45.0f, 45.0f) * _size);
+        path->lineTo(Point::Make(5.0f, 45.0f) * _size);
         path->close();
         return true;
       case 3: {
         Rect rect = Rect::MakeXYWH(5.0f, 5.0f, 40.0f, 40.0f);
-        rect.scale(_scale, _scale);
+        rect.scale(_size, _size);
         path->addOval(rect);
         path->close();
         return true;
       }
       case 100: {
         Rect rect = Rect::MakeXYWH(0.0f, 0.0f, 100.0f, 100.0f);
-        rect.scale(_scale, _scale);
+        rect.scale(_size, _size);
         path->addRect(rect);
         path->close();
         return true;
@@ -90,7 +89,7 @@ class CustomPathGlyphFace : public GlyphFace {
       return {};
     }
     Rect bounds = Rect::MakeXYWH(50 * (glyphID - 1), 0, 50, 50);
-    bounds.scale(_scale, _scale);
+    bounds.scale(_size, _size);
     return bounds;
   }
 
@@ -98,22 +97,21 @@ class CustomPathGlyphFace : public GlyphFace {
     return false;
   }
 
-  float getScale() const override {
-    return _scale;
+  float getSize() const override {
+    return _size;
   }
 
   uint32_t getUniqueID() const override {
-    return uniqueID;
+    return 0;
   }
 
  private:
-  float _scale = 1.0f;
-  uint32_t uniqueID = UniqueID::Next();
+  float _size = 1.0f;
 };
 
 class CustomImageGlyphFace : public GlyphFace {
  public:
-  explicit CustomImageGlyphFace(float scale = 1.0f) : _scale(scale) {
+  explicit CustomImageGlyphFace(float size = 1.0f) : _size(size) {
   }
 
   bool hasColor() const override {
@@ -124,8 +122,8 @@ class CustomImageGlyphFace : public GlyphFace {
     return false;
   }
 
-  std::shared_ptr<GlyphFace> makeScaled(float scale) const override {
-    return std::make_shared<CustomImageGlyphFace>(_scale * scale);
+  std::shared_ptr<GlyphFace> makeWithSize(float size) const override {
+    return std::make_shared<CustomImageGlyphFace>(size);
   }
 
   bool getPath(GlyphID /*glyphID*/, Path* /*path*/) const override {
@@ -149,7 +147,7 @@ class CustomImageGlyphFace : public GlyphFace {
         return nullptr;
     }
 
-    matrix->setScale(0.25f * _scale, 0.25f * _scale);
+    matrix->setScale(0.25f * _size, 0.25f * _size);
     return ImageCodec::MakeFrom(ProjectPath::Absolute(imagePath));
   }
 
@@ -158,7 +156,7 @@ class CustomImageGlyphFace : public GlyphFace {
       return {};
     }
     Rect bounds = Rect::MakeXYWH(50 * (glyphID - 1), 0, 50, 50);
-    bounds.scale(_scale, _scale);
+    bounds.scale(_size, _size);
     return bounds;
   }
 
@@ -166,17 +164,16 @@ class CustomImageGlyphFace : public GlyphFace {
     return false;
   }
 
-  float getScale() const override {
-    return _scale;
+  float getSize() const override {
+    return _size;
   }
 
-  uint32_t getUniqueID() const override {
-    return uniqueID;
+  uint32_t getTypefaceID() const override {
+    return 1;
   }
 
  private:
-  float _scale = 1.0f;
-  uint32_t uniqueID = UniqueID::Next();
+  float _size = 1.0f;
 };
 
 TGFX_TEST(GlyphFaceTest, GlyphFaceSimple) {
@@ -213,9 +210,9 @@ TGFX_TEST(GlyphFaceTest, GlyphFaceSimple) {
 
 class CustomPathGlyphFace2 : public GlyphFace, std::enable_shared_from_this<CustomPathGlyphFace2> {
  public:
-  CustomPathGlyphFace2(std::shared_ptr<Typeface> typeface, float scale)
-      : _scale(scale), font20(typeface, 20 * scale), font40(typeface, 40 * scale),
-        font60(typeface, 60 * scale) {
+  CustomPathGlyphFace2(std::shared_ptr<Typeface> typeface, float size)
+      : _size(size), font20(typeface, 20 * size), font40(typeface, 40 * size),
+        font60(typeface, 60 * size) {
   }
 
   bool hasColor() const override {
@@ -224,8 +221,8 @@ class CustomPathGlyphFace2 : public GlyphFace, std::enable_shared_from_this<Cust
   bool hasOutlines() const override {
     return true;
   }
-  std::shared_ptr<GlyphFace> makeScaled(float scale) const override {
-    return std::make_shared<CustomPathGlyphFace2>(font20.getTypeface(), _scale * scale);
+  std::shared_ptr<GlyphFace> makeWithSize(float size) const override {
+    return std::make_shared<CustomPathGlyphFace2>(font20.getTypeface(), size);
   }
 
   bool getPath(GlyphID glyphID, Path* path) const override {
@@ -257,27 +254,26 @@ class CustomPathGlyphFace2 : public GlyphFace, std::enable_shared_from_this<Cust
     return false;
   }
 
-  float getScale() const override {
-    return _scale;
+  float getSize() const override {
+    return _size;
   }
 
-  uint32_t getUniqueID() const override {
-    return uniqueID;
+  uint32_t getTypefaceID() const override {
+    return 2;
   }
 
  private:
-  float _scale = 1.0f;
+  float _size = 1.0f;
   Font font20 = {};
   Font font40 = {};
   Font font60 = {};
-  uint32_t uniqueID = UniqueID::Next();
 };
 
 class CustomImageGlyphFace2 : public GlyphFace,
                               std::enable_shared_from_this<CustomImageGlyphFace2> {
  public:
-  CustomImageGlyphFace2(std::shared_ptr<Typeface> typeface, float scale)
-      : _scale(scale), fontEmoji(typeface, 50 * scale) {
+  CustomImageGlyphFace2(std::shared_ptr<Typeface> typeface, float size)
+      : _size(size), fontEmoji(typeface, 50 * _size) {
   }
 
   bool hasColor() const override {
@@ -286,8 +282,8 @@ class CustomImageGlyphFace2 : public GlyphFace,
   bool hasOutlines() const override {
     return false;
   }
-  std::shared_ptr<GlyphFace> makeScaled(float scale) const override {
-    return std::make_shared<CustomImageGlyphFace2>(fontEmoji.getTypeface(), _scale * scale);
+  std::shared_ptr<GlyphFace> makeWithSize(float size) const override {
+    return std::make_shared<CustomImageGlyphFace2>(fontEmoji.getTypeface(), size);
   }
 
   bool getPath(GlyphID /*glyphID*/, Path* /*path*/) const override {
@@ -307,18 +303,17 @@ class CustomImageGlyphFace2 : public GlyphFace,
     return false;
   }
 
-  float getScale() const override {
-    return _scale;
+  float getSize() const override {
+    return _size;
   }
 
-  uint32_t getUniqueID() const override {
-    return uniqueID;
+  uint32_t getTypefaceID() const override {
+    return 3;
   }
 
  private:
-  float _scale = 1.0f;
+  float _size = 1.0f;
   Font fontEmoji = {};
-  uint32_t uniqueID = UniqueID::Next();
 };
 
 TGFX_TEST(GlyphFaceTest, GlyphFaceWithStyle) {

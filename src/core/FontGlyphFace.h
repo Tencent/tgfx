@@ -26,7 +26,9 @@ class FontGlyphFace final : public GlyphFace {
 
   bool hasOutlines() const override;
 
-  std::shared_ptr<GlyphFace> makeScaled(float scale) const override;
+  float getSize() const override;
+
+  std::shared_ptr<GlyphFace> makeWithSize(float size) const override;
 
   bool getPath(GlyphID glyphID, Path* path) const override;
 
@@ -37,9 +39,7 @@ class FontGlyphFace final : public GlyphFace {
 
   bool asFont(Font* font) const override;
 
-  float getScale() const override;
-
-  uint32_t getUniqueID() const override;
+  uint32_t getTypefaceID() const override;
 
  private:
   explicit FontGlyphFace(Font font) : _font(std::move(font)) {
