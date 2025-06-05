@@ -265,7 +265,7 @@ void SVGExportContext::exportGlyphsAsImage(const std::shared_ptr<GlyphRunList>& 
   viewMatrix.preScale(1.0f / scale, 1.0f / scale);
   for (const auto& glyphRun : glyphRunList->glyphRuns()) {
     auto glyphFace = glyphRun.glyphFace;
-    glyphFace = glyphFace->makeScaled(scale);
+    glyphFace = glyphFace->makeWithSize(scale * glyphFace->getSize());
     if (glyphFace == nullptr) {
       continue;
     }

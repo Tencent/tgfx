@@ -34,11 +34,14 @@ bool FontGlyphFace::hasOutlines() const {
   return _font.hasOutlines();
 }
 
-std::shared_ptr<GlyphFace> FontGlyphFace::makeScaled(float scale) const {
-  if (scale <= 0) {
+float FontGlyphFace::getSize() const {
+  return _font.getSize();
+}
+
+std::shared_ptr<GlyphFace> FontGlyphFace::makeWithSize(float size) const {
+  if (size <= 0.f) {
     return nullptr;
   }
-  auto size = _font.getSize() * scale;
   return GlyphFace::Wrap(_font.makeWithSize(size));
 }
 
@@ -62,4 +65,9 @@ bool FontGlyphFace::asFont(Font* font) const {
 
   return true;
 }
+
+uint32_t FontGlyphFace::getTypefaceID() const {
+  return _font.getTypeface()->uniqueID();
+}
+
 }  // namespace tgfx
