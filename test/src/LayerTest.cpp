@@ -849,7 +849,7 @@ TGFX_TEST(LayerTest, PassthroughAndNormal) {
 
   root->setMatrix(Matrix::MakeTrans(400, 50));
   root->setShouldRasterize(false);
-  displayList.setPartialRefreshEnabled(false);
+  displayList.setRenderMode(RenderMode::Direct);
   displayList.render(surface.get(), false);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PassThoughAndNormal"));
 }
@@ -1057,8 +1057,9 @@ TGFX_TEST(LayerTest, shapeMask) {
 
   auto vectorShaperLayer = ShapeLayer::Make();
   vectorShaperLayer->setPath(path);
-  vectorShaperLayer->setFillStyle(filleStyle);
-  vectorShaperLayer->setAlpha(1.0f);
+  // make a fill style with alpha
+  auto vectorFillStyle = SolidColor::Make(Color::FromRGBA(0, 0, 255, 128));
+  vectorShaperLayer->setFillStyle(vectorFillStyle);
   layer->addChild(vectorShaperLayer);
   Matrix vectorMaskMatrix =
       Matrix::MakeAll(1.0f, 0, 300, 0, 1.0f, 300 + static_cast<float>(image->height()) * 0.5f);
@@ -2536,13 +2537,13 @@ TGFX_TEST(LayerTest, BottomLeftSurface) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BottomLeftSurface"));
 }
 
-TGFX_TEST(LayerTest, DecomposeRectTest) {
+TGFX_TEST(LayerTest, DirtyRegionTest) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 1024, 800);
-  auto canvas = surface->getCanvas();
   auto displayList = std::make_unique<DisplayList>();
+  displayList->showDirtyRegions(false);
   auto rootLayer = Layer::Make();
   displayList->root()->addChild(rootLayer);
 
@@ -2645,76 +2646,26 @@ TGFX_TEST(LayerTest, DecomposeRectTest) {
   auto bounds11 = shapeLayer11->getBounds();
   shapeLayer11->getGlobalMatrix().mapRect(&bounds11);
 
-  Paint paint = {};
+  displayList->render(surface.get());
+  displayList->showDirtyRegions(true);
 
-  // Draw the shape layer
-  canvas->clear();
-  paint.setStyle(PaintStyle::Stroke);
-  paint.setStrokeWidth(2.0f);
-  paint.setColor(Color::FromRGBA(100, 200, 50, 255));
-  canvas->drawRect(bounds1, paint);
-  canvas->drawRect(bounds2, paint);
-  canvas->drawRect(bounds3, paint);
-  // Draw the dirty rects
-  paint.setStyle(PaintStyle::Fill);
-  paint.setColor(Color::FromRGBA(255, 0, 255, 255));
-  paint.setBlendMode(BlendMode::DstOver);
   rootLayer->removeChildren();
   rootLayer->addChild(shapeLayer1);
   rootLayer->addChild(shapeLayer2);
   rootLayer->addChild(shapeLayer3);
-  auto dirtyRects = displayList->_root->updateDirtyRegions();
-  canvas->drawRect(dirtyRects[0], paint);
-  canvas->drawRect(dirtyRects[1], paint);
-  // canvas->drawRect(dirtyRects[2], paint);
-  EXPECT_EQ(dirtyRects.size(), 2lu);
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DecomposeRectTest1"));
 
-  // Draw the shape layer
-  canvas->clear();
-  paint.setStyle(PaintStyle::Stroke);
-  paint.setStrokeWidth(2.0f);
-  paint.setColor(Color::FromRGBA(100, 200, 50, 255));
-  canvas->drawRect(bounds1, paint);
-  canvas->drawRect(bounds2, paint);
-  canvas->drawRect(bounds3, paint);
-  canvas->drawRect(bounds4, paint);
-  canvas->drawRect(bounds5, paint);
-  // Draw the dirty rects
-  paint.setStyle(PaintStyle::Fill);
-  paint.setColor(Color::FromRGBA(255, 0, 255, 255));
-  paint.setBlendMode(BlendMode::DstOver);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest1"));
+
   rootLayer->removeChildren();
   rootLayer->addChild(shapeLayer1);
   rootLayer->addChild(shapeLayer2);
   rootLayer->addChild(shapeLayer3);
   rootLayer->addChild(shapeLayer4);
   rootLayer->addChild(shapeLayer5);
-  dirtyRects = displayList->_root->updateDirtyRegions();
-  canvas->drawRect(dirtyRects[0], paint);
-  canvas->drawRect(dirtyRects[1], paint);
-  canvas->drawRect(dirtyRects[2], paint);
-  // canvas->drawRect(dirtyRects[3], paint);
-  // canvas->drawRect(dirtyRects[4], paint);
-  EXPECT_EQ(dirtyRects.size(), 3lu);
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DecomposeRectTest2"));
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest2"));
 
-  // Draw the shape layer
-  canvas->clear();
-  paint.setStyle(PaintStyle::Stroke);
-  paint.setStrokeWidth(2.0f);
-  paint.setColor(Color::FromRGBA(100, 200, 50, 255));
-  canvas->drawRect(bounds1, paint);
-  canvas->drawRect(bounds2, paint);
-  canvas->drawRect(bounds3, paint);
-  canvas->drawRect(bounds4, paint);
-  canvas->drawRect(bounds5, paint);
-  canvas->drawRect(bounds6, paint);
-  canvas->drawRect(bounds7, paint);
-  // Draw the dirty rects
-  paint.setStyle(PaintStyle::Fill);
-  paint.setColor(Color::FromRGBA(255, 0, 255, 255));
-  paint.setBlendMode(BlendMode::DstOver);
   rootLayer->removeChildren();
   rootLayer->addChild(shapeLayer1);
   rootLayer->addChild(shapeLayer2);
@@ -2723,35 +2674,9 @@ TGFX_TEST(LayerTest, DecomposeRectTest) {
   rootLayer->addChild(shapeLayer5);
   rootLayer->addChild(shapeLayer6);
   rootLayer->addChild(shapeLayer7);
-  dirtyRects = displayList->_root->updateDirtyRegions();
-  canvas->drawRect(dirtyRects[0], paint);
-  canvas->drawRect(dirtyRects[1], paint);
-  canvas->drawRect(dirtyRects[2], paint);
-  EXPECT_EQ(dirtyRects.size(), 3lu);
-  // canvas->drawRect(dirtyRects[3], paint);
-  // canvas->drawRect(dirtyRects[4], paint);
-  // canvas->drawRect(dirtyRects[5], paint);
-  // canvas->drawRect(dirtyRects[6], paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DecomposeRectTest3"));
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest3"));
 
-  // Draw the shape layer
-  canvas->clear();
-  paint.setStyle(PaintStyle::Stroke);
-  paint.setStrokeWidth(2.0f);
-  paint.setColor(Color::FromRGBA(100, 200, 50, 255));
-  canvas->drawRect(bounds1, paint);
-  canvas->drawRect(bounds2, paint);
-  canvas->drawRect(bounds3, paint);
-  canvas->drawRect(bounds4, paint);
-  canvas->drawRect(bounds5, paint);
-  canvas->drawRect(bounds6, paint);
-  canvas->drawRect(bounds7, paint);
-  canvas->drawRect(bounds8, paint);
-  canvas->drawRect(bounds9, paint);
-  // Draw the dirty rects
-  paint.setStyle(PaintStyle::Fill);
-  paint.setColor(Color::FromRGBA(255, 0, 255, 255));
-  paint.setBlendMode(BlendMode::DstOver);
   rootLayer->removeChildren();
   rootLayer->addChild(shapeLayer1);
   rootLayer->addChild(shapeLayer2);
@@ -2762,39 +2687,9 @@ TGFX_TEST(LayerTest, DecomposeRectTest) {
   rootLayer->addChild(shapeLayer7);
   rootLayer->addChild(shapeLayer8);
   rootLayer->addChild(shapeLayer9);
-  dirtyRects = displayList->_root->updateDirtyRegions();
-  canvas->drawRect(dirtyRects[0], paint);
-  canvas->drawRect(dirtyRects[1], paint);
-  canvas->drawRect(dirtyRects[2], paint);
-  EXPECT_EQ(dirtyRects.size(), 3lu);
-  // canvas->drawRect(dirtyRects[3], paint);
-  // canvas->drawRect(dirtyRects[4], paint);
-  // canvas->drawRect(dirtyRects[5], paint);
-  // canvas->drawRect(dirtyRects[6], paint);
-  // canvas->drawRect(dirtyRects[7], paint);
-  // canvas->drawRect(dirtyRects[8], paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DecomposeRectTest4"));
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest4"));
 
-  // Draw the shape layer
-  canvas->clear();
-  paint.setStyle(PaintStyle::Stroke);
-  paint.setStrokeWidth(2.0f);
-  paint.setColor(Color::FromRGBA(100, 200, 50, 255));
-  canvas->drawRect(bounds1, paint);
-  canvas->drawRect(bounds2, paint);
-  canvas->drawRect(bounds3, paint);
-  canvas->drawRect(bounds4, paint);
-  canvas->drawRect(bounds5, paint);
-  canvas->drawRect(bounds6, paint);
-  canvas->drawRect(bounds7, paint);
-  canvas->drawRect(bounds8, paint);
-  canvas->drawRect(bounds9, paint);
-  canvas->drawRect(bounds10, paint);
-  canvas->drawRect(bounds11, paint);
-  // Draw the dirty rects
-  paint.setStyle(PaintStyle::Fill);
-  paint.setColor(Color::FromRGBA(255, 0, 255, 255));
-  paint.setBlendMode(BlendMode::DstOver);
   rootLayer->removeChildren();
   rootLayer->addChild(shapeLayer1);
   rootLayer->addChild(shapeLayer2);
@@ -2807,19 +2702,35 @@ TGFX_TEST(LayerTest, DecomposeRectTest) {
   rootLayer->addChild(shapeLayer9);
   rootLayer->addChild(shapeLayer10);
   rootLayer->addChild(shapeLayer11);
-  dirtyRects = displayList->_root->updateDirtyRegions();
-  canvas->drawRect(dirtyRects[0], paint);
-  canvas->drawRect(dirtyRects[1], paint);
-  canvas->drawRect(dirtyRects[2], paint);
-  EXPECT_EQ(dirtyRects.size(), 3lu);
-  // canvas->drawRect(dirtyRects[3], paint);
-  // canvas->drawRect(dirtyRects[4], paint);
-  // canvas->drawRect(dirtyRects[5], paint);
-  // canvas->drawRect(dirtyRects[6], paint);
-  // canvas->drawRect(dirtyRects[7], paint);
-  // canvas->drawRect(dirtyRects[8], paint);
-  // canvas->drawRect(dirtyRects[9], paint);
-  // canvas->drawRect(dirtyRects[10], paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DecomposeRectTest5"));
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest5"));
+
+  displayList->setRenderMode(RenderMode::Tiled);
+  displayList->setZoomScale(1.3f);
+  displayList->render(surface.get());
+  // Clear the previous dirty regions.
+  displayList->showDirtyRegions(false);
+  displayList->showDirtyRegions(true);
+  rootLayer->removeChildren();
+  rootLayer->addChild(shapeLayer1);
+  rootLayer->addChild(shapeLayer2);
+  rootLayer->addChild(shapeLayer3);
+  rootLayer->addChild(shapeLayer4);
+  rootLayer->addChild(shapeLayer5);
+  rootLayer->addChild(shapeLayer6);
+  rootLayer->addChild(shapeLayer7);
+  rootLayer->addChild(shapeLayer8);
+  rootLayer->addChild(shapeLayer9);
+  rootLayer->addChild(shapeLayer10);
+  rootLayer->addChild(shapeLayer11);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest6"));
+
+  // Clear the previous dirty regions.
+  displayList->showDirtyRegions(false);
+  displayList->showDirtyRegions(true);
+  displayList->setContentOffset(-256, -300);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest7"));
 }
 }  // namespace tgfx

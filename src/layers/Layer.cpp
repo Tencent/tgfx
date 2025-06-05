@@ -750,9 +750,10 @@ Matrix Layer::getRelativeMatrix(const Layer* targetCoordinateSpace) const {
 std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float scale) {
   auto maskArgs = args;
   maskArgs.drawMode = _maskStyle != MaskStyle::Vector ? DrawMode::Normal : DrawMode::Contour;
-  auto maskPicture = CreatePicture(args, scale, [this](const DrawArgs& args, Canvas* canvas) {
-    _mask->drawLayer(args, canvas, _mask->_alpha, BlendMode::SrcOver);
-  });
+  auto maskPicture =
+      CreatePicture(maskArgs, scale, [this](const DrawArgs& innerArgs, Canvas* canvas) {
+        _mask->drawLayer(innerArgs, canvas, _mask->_alpha, BlendMode::SrcOver);
+      });
   if (maskPicture == nullptr) {
     return nullptr;
   }
@@ -1139,14 +1140,12 @@ void Layer::updateBackgroundBounds(const Matrix& renderMatrix) {
   }
   if (backgroundChanged) {
     auto layer = this;
-    while (layer) {
-      if (layer->bitFields.dirtyDescendents) {
+    while (layer && !layer->bitFields.dirtyDescendents) {
+      layer->rasterizedContent = nullptr;
+      if (layer->maskOwner) {
         break;
       }
-      layer->rasterizedContent = nullptr;
-      if (!layer->maskOwner) {
-        layer = layer->_parent;
-      }
+      layer = layer->_parent;
     }
   }
 }
