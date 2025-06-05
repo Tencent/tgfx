@@ -292,6 +292,7 @@ void TextRender::pathDrawing(const GlyphRun& glyphRun, const MCState& state, con
   shape = Shape::ApplyStroke(std::move(shape), stroke);
   shape = Shape::ApplyMatrix(std::move(shape), rasterizeMatrix);
   auto bounds = shape->getBounds();
+  bounds.offset(clipBounds.x(), clipBounds.y());
   bounds.intersect(clipBounds);
   bounds.roundOut();
   auto width = static_cast<int>(bounds.width());
