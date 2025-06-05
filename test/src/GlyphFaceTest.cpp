@@ -101,7 +101,7 @@ class CustomPathGlyphFace : public GlyphFace {
     return _size;
   }
 
-  uint32_t getUniqueID() const override {
+  uint32_t getTypefaceID() const override {
     return 0;
   }
 
