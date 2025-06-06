@@ -663,7 +663,8 @@ std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
 }
 
 LayerContent* Layer::getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix) {
-  if (bitFields.shouldRasterize || args.drawMode == DrawMode::Contour || args.context == nullptr) {
+  if (!bitFields.shouldRasterize || args.context == nullptr || ((args.drawMode != DrawMode::Normal ||
+      args.excludeEffects) && bitFields.hasBackgroundStyle)) {
     return nullptr;
   }
   auto contextID = args.context->uniqueID();
@@ -897,8 +898,8 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
                  [&]() { return drawChildren(drawArgs, canvas, 1.0f); });
   };
 
-  DrawArgs drawArgs(args.context, bitFields.excludeChildEffectsInLayerStyle);
-  drawArgs.renderRect = args.renderRect;
+  DrawArgs drawArgs = args;
+  drawArgs.excludeEffects = bitFields.excludeChildEffectsInLayerStyle;
   auto contentPicture = CreatePicture(drawArgs, contentScale, drawLayerContents);
   Point contentOffset = {};
   auto content = CreatePictureImage(std::move(contentPicture), &contentOffset);
