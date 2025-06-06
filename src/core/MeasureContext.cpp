@@ -48,13 +48,6 @@ void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& stat
   addLocalBounds(state, fill, localBounds, shape->isInverseFillType());
 }
 
-void MeasureContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions&,
-                               const MCState& state, const Fill& fill) {
-  DEBUG_ASSERT(image != nullptr);
-  auto rect = Rect::MakeWH(image->width(), image->height());
-  addLocalBounds(state, fill, rect);
-}
-
 void MeasureContext::drawImageRect(std::shared_ptr<Image>, const Rect& rect, const SamplingOptions&,
                                    const MCState& state, const Fill& fill) {
   addLocalBounds(state, fill, rect);

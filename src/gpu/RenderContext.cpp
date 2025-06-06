@@ -91,13 +91,6 @@ void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state
   }
 }
 
-void RenderContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                              const MCState& state, const Fill& fill) {
-  DEBUG_ASSERT(image != nullptr);
-  auto rect = Rect::MakeWH(image->width(), image->height());
-  return drawImageRect(std::move(image), rect, sampling, state, fill);
-}
-
 void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                                   const SamplingOptions& sampling, const MCState& state,
                                   const Fill& fill) {
@@ -150,7 +143,8 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   }
   auto newState = state;
   newState.matrix = Matrix::MakeTrans(bounds.x(), bounds.y());
-  drawImage(std::move(image), {}, newState, fill.makeWithMatrix(rasterizeMatrix));
+  auto imageRect = Rect::MakeWH(image->width(), image->height());
+  drawImageRect(std::move(image), imageRect, {}, newState, fill.makeWithMatrix(rasterizeMatrix));
 }
 
 void RenderContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
@@ -203,7 +197,8 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
     return;
   }
   drawState.matrix.preConcat(invertMatrix);
-  drawImage(std::move(image), {}, drawState, fill.makeWithMatrix(viewMatrix));
+  auto imageRect = Rect::MakeWH(image->width(), image->height());
+  drawImageRect(std::move(image), imageRect, {}, drawState, fill.makeWithMatrix(viewMatrix));
 }
 
 void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,

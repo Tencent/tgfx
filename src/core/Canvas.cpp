@@ -621,7 +621,9 @@ void Canvas::drawLayer(std::shared_ptr<Picture> picture, const MCState& state, c
       auto drawState = state;
       drawState.matrix.preTranslate(offset.x + filterOffset.x, offset.y + filterOffset.y);
       auto fillMatrix = Matrix::MakeTrans(-offset.x - filterOffset.x, -offset.y - +filterOffset.y);
-      drawContext->drawImage(std::move(image), {}, drawState, fill.makeWithMatrix(fillMatrix));
+      auto imageRect = Rect::MakeWH(image->width(), image->height());
+      drawContext->drawImageRect(std::move(image), imageRect, {}, drawState,
+                                 fill.makeWithMatrix(fillMatrix));
       return;
     }
   } else if (picture->drawCount == 1 && fill.maskFilter == nullptr) {
