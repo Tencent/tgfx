@@ -24,9 +24,10 @@ namespace tgfx {
 class RasterizedContent : public LayerContent {
  public:
   RasterizedContent(uint32_t contextID, float contentScale, std::shared_ptr<Image> image,
-                    const Matrix& matrix)
-      : _contextID(contextID), _contentScale(contentScale), image(std::move(image)),
-        matrix(matrix) {
+                    const Matrix& matrix, std::shared_ptr<Image> backgroundImage,
+                    const Point& backgroundOffset)
+      : _contextID(contextID), _contentScale(contentScale), image(std::move(image)), matrix(matrix),
+        backgroundImage(std::move(backgroundImage)), backgroundOffset(backgroundOffset) {
   }
 
   /**
@@ -43,6 +44,8 @@ class RasterizedContent : public LayerContent {
   Rect getBounds() const override;
 
   void draw(Canvas* canvas, const Paint& paint) const override;
+
+  void drawBackground(Canvas* canvas, const Paint& paint) const;
 
   bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
 
@@ -64,5 +67,7 @@ class RasterizedContent : public LayerContent {
   float _contentScale = 0.0f;
   std::shared_ptr<Image> image = nullptr;
   Matrix matrix = {};
+  std::shared_ptr<Image> backgroundImage = nullptr;
+  Point backgroundOffset = Point::Zero();
 };
 }  // namespace tgfx

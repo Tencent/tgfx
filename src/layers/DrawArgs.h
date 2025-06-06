@@ -19,6 +19,7 @@
 #pragma once
 
 #include "tgfx/gpu/Context.h"
+#include "layers/BackgroundContext.h"
 
 namespace tgfx {
 
@@ -43,5 +44,8 @@ class DrawArgs {
   DrawMode drawMode = DrawMode::Normal;
   // The rectangle area to be drawn. This is used for clipping the drawing area.
   Rect* renderRect = nullptr;
+
+  // The background context to be used during the drawing process. Note: this could be nullptr.
+  std::shared_ptr<BackgroundContext> backgroundContext = nullptr;
 };
 }  // namespace tgfx

@@ -526,14 +526,17 @@ class Layer {
    * layer content first, followed by the children. Subclasses can override this method to change
    * the drawing order or the way the layer content is drawn.
    * @param content The layer content to draw. This can be nullptr.
-   * @param canvas The canvas to draw the layer content on.
-   * @param alpha The alpha transparency value used for drawing the layer content.
-   * @param forContour Whether to draw the layer content for the contour.
+   * @param drawContent A callback function that takes a drawer function as its argument.
+   * The drawer function draws the layer content onto a canvas. Param alpha used for drawing the
+   * layer content. Param forContour Whether to draw the layer content for the contour.
    * @param drawChildren A callback function that draws the children of the layer. if the function
    * returns false, the content above children should not be drawn.
    */
-  virtual void drawContents(LayerContent* content, Canvas* canvas, float alpha, bool forContour,
-                            const std::function<bool()>& drawChildren) const;
+  virtual void drawContents(
+      LayerContent* content, bool forContour,
+      const std::function<bool(const std::function<bool(Canvas* canvas, float alpha)>& drawer)>&
+          drawContent,
+      const std::function<bool()>& drawChildren) const;
 
   /**
   * Attachs a property to this layer.
@@ -576,7 +579,8 @@ class Layer {
   LayerContent* getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix);
 
   std::shared_ptr<Image> getRasterizedImage(const DrawArgs& args, float contentScale,
-                                            Matrix* drawingMatrix);
+                                            Matrix* drawingMatrix,
+                                            std::shared_ptr<Image>* backgroundImage, Point* backgroundOffset);
 
   void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
@@ -590,8 +594,11 @@ class Layer {
 
   std::unique_ptr<LayerStyleSource> getLayerStyleSource(const DrawArgs& args, const Matrix& matrix);
 
-  void drawLayerStyles(Canvas* canvas, float alpha, const LayerStyleSource* source,
-                       LayerStylePosition position);
+  std::shared_ptr<Image> getBackgroundImage(const DrawArgs& args, float contentScale,
+                                            Point* offset);
+
+  void drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
+                       const LayerStyleSource* source, LayerStylePosition position);
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 

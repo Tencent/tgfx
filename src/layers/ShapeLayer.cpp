@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/ShapeLayer.h"
+#include "layers/BackgroundContext.h"
 #include "layers/contents/ShapeContent.h"
 #include "tgfx/core/PathEffect.h"
 
@@ -284,12 +285,24 @@ std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
                                         fillPaintCount);
 }
 
-void ShapeLayer::drawContents(LayerContent* content, Canvas* canvas, float alpha, bool forContour,
-                              const std::function<bool()>& drawChildren) const {
+void ShapeLayer::drawContents(
+    LayerContent* content, bool forContour,
+    const std::function<bool(const std::function<bool(Canvas*, float)>&)>& drawContent,
+    const std::function<bool()>& drawChildren) const {
   auto shapeContent = static_cast<ShapeContent*>(content);
-  if (!shapeContent || !shapeContent->drawFills(canvas, getPaint(alpha), forContour)) {
+  auto fillDrawer = [&](Canvas* canvas, float alpha) {
+    return shapeContent->drawFills(canvas, getPaint(alpha), forContour);
+  };
+  auto strokeDrawer = [&](Canvas* canvas, float alpha) {
+    return shapeContent->drawStrokes(canvas, getPaint(alpha), forContour);
+  };
+  if (!shapeContent || !drawContent(fillDrawer)) {
     if (forContour) {
-      canvas->drawShape(_shape, getPaint(alpha));
+      auto shapeDrawer = [&](Canvas* canvas, float alpha) {
+        canvas->drawShape(_shape, getPaint(alpha));
+        return true;
+      };
+      drawContent(shapeDrawer);
     }
   }
   if (shapeBitFields.strokeOnTop) {
@@ -298,7 +311,7 @@ void ShapeLayer::drawContents(LayerContent* content, Canvas* canvas, float alpha
     }
   }
   if (shapeContent) {
-    shapeContent->drawStrokes(canvas, getPaint(alpha), forContour);
+    drawContent(strokeDrawer);
   }
   if (!shapeBitFields.strokeOnTop) {
     drawChildren();

@@ -109,6 +109,10 @@
     },
     "LayerTest": {
         "AdaptiveDashEffect": "330279d",
+        "BackgroundBlurStyleTest1": "b6198a7b",
+        "BackgroundBlurStyleTest2": "b6198a7b",
+        "BackgroundBlurStyleTest3": "b6198a7b",
+        "BackgroundBlurStyleTest4": "b6198a7b",
         "BottomLeftSurface": "239a5d24",
         "ChildMask": "50136952",
         "DirtyRegionTest1": "e1604824",
