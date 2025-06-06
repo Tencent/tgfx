@@ -435,40 +435,6 @@ void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
   }
 }
 
-static SamplingOptions GetDefaultSamplingOptions(Image* image) {
-  if (image == nullptr) {
-    return {};
-  }
-  auto mipmapMode = image->hasMipmaps() ? MipmapMode::Linear : MipmapMode::None;
-  return SamplingOptions(FilterMode::Linear, mipmapMode);
-}
-
-void Canvas::drawImage(std::shared_ptr<Image> image, float left, float top, const Paint* paint) {
-  drawImage(std::move(image), Matrix::MakeTrans(left, top), paint);
-}
-
-void Canvas::drawImage(std::shared_ptr<Image> image, const Matrix& matrix, const Paint* paint) {
-  if (image == nullptr) {
-    return;
-  }
-  SaveLayerForImageFilter(paint ? paint->getImageFilter() : nullptr);
-  auto srcRect = Rect::MakeWH(image->width(), image->height());
-  auto sampling = GetDefaultSamplingOptions(image.get());
-  auto fill = GetFillStyleForImage(paint, image.get());
-  drawImageRect(std::move(image), srcRect, sampling, fill, &matrix);
-}
-
-void Canvas::drawImage(std::shared_ptr<Image> image, const Paint* paint) {
-  if (image == nullptr) {
-    return;
-  }
-  SaveLayerForImageFilter(paint ? paint->getImageFilter() : nullptr);
-  auto srcRect = Rect::MakeWH(image->width(), image->height());
-  auto sampling = GetDefaultSamplingOptions(image.get());
-  auto fill = GetFillStyleForImage(paint, image.get());
-  drawImageRect(std::move(image), srcRect, sampling, fill);
-}
-
 void Canvas::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                        const Paint* paint) {
   if (image == nullptr) {
@@ -478,6 +444,18 @@ void Canvas::drawImage(std::shared_ptr<Image> image, const SamplingOptions& samp
   auto srcRect = Rect::MakeWH(image->width(), image->height());
   auto fill = GetFillStyleForImage(paint, image.get());
   drawImageRect(std::move(image), srcRect, sampling, fill);
+}
+
+void Canvas::drawImage(std::shared_ptr<Image> image, float left, float top,
+                       const SamplingOptions& sampling, const Paint* paint) {
+  if (image == nullptr) {
+    return;
+  }
+  SaveLayerForImageFilter(paint ? paint->getImageFilter() : nullptr);
+  auto srcRect = Rect::MakeWH(image->width(), image->height());
+  auto fill = GetFillStyleForImage(paint, image.get());
+  auto dstMatrix = Matrix::MakeTrans(left, top);
+  drawImageRect(std::move(image), srcRect, sampling, fill, &dstMatrix);
 }
 
 void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& dstRect,
