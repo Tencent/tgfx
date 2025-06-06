@@ -103,21 +103,18 @@ void RecordingContext::drawShape(std::shared_ptr<Shape> shape, const MCState& st
   drawCount++;
 }
 
-void RecordingContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                                 const MCState& state, const Fill& fill) {
-  DEBUG_ASSERT(image != nullptr);
-  recordStateAndFill(state, fill);
-  auto record = blockBuffer.make<DrawImage>(std::move(image), sampling);
-  records.emplace_back(std::move(record));
-  drawCount++;
-}
-
 void RecordingContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                                      const SamplingOptions& sampling, const MCState& state,
                                      const Fill& fill) {
   DEBUG_ASSERT(image != nullptr);
   recordStateAndFill(state, fill);
-  auto record = blockBuffer.make<DrawImageRect>(std::move(image), rect, sampling);
+  auto imageRect = Rect::MakeWH(image->width(), image->height());
+  PlacementPtr<Record> record = nullptr;
+  if (rect == imageRect) {
+    record = blockBuffer.make<DrawImage>(std::move(image), sampling);
+  } else {
+    record = blockBuffer.make<DrawImageRect>(std::move(image), rect, sampling);
+  }
   records.emplace_back(std::move(record));
   drawCount++;
 }

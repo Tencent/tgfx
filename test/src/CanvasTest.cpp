@@ -1035,6 +1035,35 @@ TGFX_TEST(CanvasTest, image) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawImage"));
 }
 
+TGFX_TEST(CanvasTest, drawImageRect) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+
+  int width = 400;
+  int height = 400;
+  auto surface = Surface::Make(context, width, height);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Rect srcRect = Rect::MakeWH(image->width(), image->height());
+  Rect dstRect = Rect::MakeXYWH(0, 0, width / 2, height / 2);
+  canvas->drawImageRect(image, srcRect, dstRect, SamplingOptions(FilterMode::Linear));
+
+  srcRect = Rect::MakeXYWH(20, 20, 60, 60);
+  dstRect = Rect::MakeXYWH(width / 2, 0, width / 2, height / 2);
+  canvas->drawImageRect(image, srcRect, dstRect, SamplingOptions(FilterMode::Nearest));
+
+  srcRect = Rect::MakeXYWH(40, 40, 40, 40);
+  dstRect = Rect::MakeXYWH(0, height / 2, width, height / 2);
+  canvas->drawImageRect(image, srcRect, dstRect, SamplingOptions(FilterMode::Linear));
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawImageRect"));
+}
+
 TGFX_TEST(CanvasTest, atlas) {
   ContextScope scope;
   auto context = scope.getContext();
