@@ -1688,4 +1688,128 @@ TGFX_TEST(CanvasTest, ShadowBoundIntersect) {
   canvas->drawImage(image);
   context->flush();
 }
+
+TGFX_TEST(CanvasTest, SubsetImageSampler) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  int textureWidth = 1563;
+  int textureHeight = 1563;
+  GLTextureInfo textureInfo;
+  CreateGLTexture(context, textureWidth, textureHeight, &textureInfo);
+  auto surface = Surface::MakeFrom(context, {textureInfo, textureWidth, textureHeight}, ImageOrigin::BottomLeft);
+  auto* canvas = surface->getCanvas();
+  canvas->clear();
+  auto image = MakeImage("resources/assets/GenMesh.png");
+  int meshNumH = 3;
+  int meshNumV = 3;
+  int meshWidth = image->width() / meshNumH;
+  int meshHeight = image->height() / meshNumV;
+  float scale = 0.9f;
+  for(int i = 0; i < meshNumH; i++) {
+    for(int j = 0; j < meshNumV; j++) {
+      Rect rect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
+      auto subImage = image->makeSubset(rect);
+      //auto mipmapImage = subImage->makeMipmapped(true);
+      Paint paint;
+      paint.setAntiAlias(false);
+      if(subImage) {
+        auto matrix = Matrix::MakeAll(scale, 0.0f, rect.x() * scale, 0.0f, scale, rect.y() * scale);
+        canvas->drawImage(subImage, matrix, &paint);
+      }
+    }
+  }
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/SubsetImageSampler"));
+  auto gl = GLFunctions::Get(context);
+  gl->deleteTextures(1, &textureInfo.id);
+}
+
+TGFX_TEST(CanvasTest, ImageMeshScale) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  int textureWidth = 1563;
+  int textureHeight = 1563;
+  GLTextureInfo textureInfo;
+  CreateGLTexture(context, textureWidth, textureHeight, &textureInfo);
+  auto surface = Surface::MakeFrom(context, {textureInfo, textureWidth, textureHeight}, ImageOrigin::BottomLeft);
+  auto* canvas = surface->getCanvas();
+  canvas->clear();
+  auto image = MakeImage("resources/assets/GenMesh.png");
+  Paint paint;
+  paint.setAntiAlias(false);
+  float scale = 0.9f;
+  if(image) {
+    auto matrix = Matrix::MakeAll(scale, 0.0f, 0.0f, 0.0f, scale, 0.0f);
+    canvas->drawImage(image, matrix, &paint);
+  }
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ImageMeshScale"));
+  auto gl = GLFunctions::Get(context);
+  gl->deleteTextures(1, &textureInfo.id);
+}
+
+TGFX_TEST(CanvasTest, GenMesh) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  int textureWidth = 1563;
+  int textureHeight = 1563;
+  GLTextureInfo textureInfo;
+  CreateGLTexture(context, textureWidth, textureHeight, &textureInfo);
+  auto surface = Surface::MakeFrom(context, {textureInfo, textureWidth, textureHeight}, ImageOrigin::BottomLeft);
+  auto* canvas = surface->getCanvas();
+  canvas->clear();
+  int meshNumH = 5;
+  int meshNumV = 5;
+  int meshWidth = textureWidth / meshNumH;
+  int meshHeight = textureHeight / meshNumV;
+  Paint paint;
+  paint.setAntiAlias(false);
+  for(int i = 0; i < meshNumH; i++) {
+    for(int j = 0; j < meshNumV; j++) {
+      Rect rect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
+      Path path;
+      path.addRect(rect);
+      paint.setColor((i+j) % 2 == 0 ? Color(1.0f, 0.0f,0.0f, 1.0f) : Color(0.0f, 1.0f,0.0f, 1.0f));
+      canvas->drawPath(path, paint);
+    }
+  }
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/GenMesh"));
+  auto gl = GLFunctions::Get(context);
+  gl->deleteTextures(1, &textureInfo.id);
+}
+
+TGFX_TEST(CanvasTest, SubsetImageScale) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  int textureWidth = 1563;
+  int textureHeight = 1563;
+  GLTextureInfo textureInfo;
+  CreateGLTexture(context, textureWidth, textureHeight, &textureInfo);
+  auto surface = Surface::MakeFrom(context, {textureInfo, textureWidth, textureHeight}, ImageOrigin::BottomLeft);
+  auto* canvas = surface->getCanvas();
+  canvas->clear();
+  auto image = MakeImage("resources/assets/GenMesh.png");
+  float scale = 0.89f;
+  Rect rect1 = Rect::MakeXYWH(624, 624, 312, 312);
+  auto subImage = image->makeSubset(rect1);
+  // Rect rect2 = Rect::MakeXYWH(936, 624, 312, 312);
+  // auto subImage2 = image->makeSubset(rect2);
+  Paint paint;
+  paint.setAntiAlias(false);
+  if(subImage) {
+    auto matrix = Matrix::MakeAll(scale, 0.0f, rect1.x() * scale, 0.0f, scale, rect1.y() * scale);
+    canvas->drawImage(subImage, matrix, &paint);
+  }
+
+  // if(subImage2) {
+  //   auto matrix = Matrix::MakeAll(scale, 0.0f, rect2.x() * scale, 0.0f, scale, rect2.y() * scale);
+  //   canvas->drawImage(subImage2, matrix, &paint);
+  // }
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/SubsetImageScale"));
+  auto gl = GLFunctions::Get(context);
+  gl->deleteTextures(1, &textureInfo.id);
+}
 }  // namespace tgfx

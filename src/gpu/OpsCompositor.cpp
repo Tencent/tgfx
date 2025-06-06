@@ -277,7 +277,11 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
 
   if (type == PendingOpType::Image) {
     FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty())};
-    auto processor = FragmentProcessor::Make(std::move(pendingImage), args, pendingSampling);
+    Matrix matrixUV = Matrix::I();
+    //matrixUV.postTranslate(-args.drawRect.x(), -args.drawRect.y());
+    //matrixUV.postScale((args.drawRect.width() - 1.0f) / args.drawRect.width(), (args.drawRect.height() - 1.0f) / args.drawRect.height());
+    //matrixUV.postTranslate(args.drawRect.x() + 0.5f, args.drawRect.y() + 0.5f);
+    PlacementPtr<FragmentProcessor> processor = FragmentProcessor::Make(std::move(pendingImage), args, pendingSampling, &matrixUV);
     if (processor == nullptr) {
       return;
     }
