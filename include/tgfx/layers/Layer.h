@@ -532,7 +532,7 @@ class Layer {
    * @param drawChildren A callback function that draws the children of the layer. if the function
    * returns false, the content above children should not be drawn.
    */
-  virtual void drawContents(LayerContent* content, Canvas* canvas, float alpha, bool forContour,
+  virtual void drawContents(LayerContent* content, Canvas* canvas, Canvas* backgroundCanvas, float alpha, bool forContour,
                             const std::function<bool()>& drawChildren) const;
 
   /**

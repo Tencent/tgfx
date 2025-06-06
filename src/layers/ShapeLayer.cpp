@@ -284,12 +284,16 @@ std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
                                         fillPaintCount);
 }
 
-void ShapeLayer::drawContents(LayerContent* content, Canvas* canvas, float alpha, bool forContour,
+void ShapeLayer::drawContents(LayerContent* content, Canvas* canvas, Canvas* backgroundCanvas,
+                              float alpha, bool forContour,
                               const std::function<bool()>& drawChildren) const {
   auto shapeContent = static_cast<ShapeContent*>(content);
   if (!shapeContent || !shapeContent->drawFills(canvas, getPaint(alpha), forContour)) {
     if (forContour) {
       canvas->drawShape(_shape, getPaint(alpha));
+      if (backgroundCanvas) {
+        backgroundCanvas->drawShape(_shape, getPaint(alpha));
+      }
     }
   }
   if (shapeBitFields.strokeOnTop) {
@@ -299,6 +303,9 @@ void ShapeLayer::drawContents(LayerContent* content, Canvas* canvas, float alpha
   }
   if (shapeContent) {
     shapeContent->drawStrokes(canvas, getPaint(alpha), forContour);
+    if (backgroundCanvas) {
+      shapeContent->drawStrokes(backgroundCanvas, getPaint(alpha), forContour);
+    }
   }
   if (!shapeBitFields.strokeOnTop) {
     drawChildren();

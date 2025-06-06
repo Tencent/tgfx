@@ -302,7 +302,7 @@ class ShapeLayer : public Layer {
 
   std::unique_ptr<LayerContent> onUpdateContent() override;
 
-  void drawContents(LayerContent* content, Canvas* canvas, float alpha, bool forContour,
+  void drawContents(LayerContent* content, Canvas* canvas, Canvas* backgroundCanvas, float alpha, bool forContour,
                     const std::function<bool()>& drawChildren) const override;
 
  private:

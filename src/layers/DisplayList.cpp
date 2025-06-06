@@ -206,6 +206,8 @@ std::vector<Rect> DisplayList::renderDirect(Surface* surface, bool autoClear) co
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
   auto renderRect = inverse.mapRect(surfaceRect);
   args.renderRect = &renderRect;
+  BackgroundArgs backgroundArgs = {surface->getContext(), renderRect, _zoomScale};
+  args.backgroundArgs = &backgroundArgs;
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
   return {surfaceRect};
 }
@@ -269,6 +271,9 @@ std::vector<Rect> DisplayList::renderPartial(Surface* surface, bool autoClear,
     DrawArgs args(context);
     auto renderRect = inverse.mapRect(drawRect);
     args.renderRect = &renderRect;
+    BackgroundArgs backgroundArgs = {surface->getContext(), renderRect, _zoomScale};
+    args.backgroundArgs = &backgroundArgs;
+
     _root->drawLayer(args, cacheCanvas, 1.0f, BlendMode::SrcOver);
   }
   canvas->resetMatrix();
@@ -631,6 +636,8 @@ void DisplayList::renderTileTask(const TileRenderTask& task) const {
   auto renderRect = drawRect;
   renderRect.scale(1.0f / _zoomScale, 1.0f / _zoomScale);
   renderRect.roundOut();
+  BackgroundArgs backgroundArgs = {surface->getContext(), renderRect, _zoomScale};
+  args.backgroundArgs = &backgroundArgs;
   args.renderRect = &renderRect;
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }

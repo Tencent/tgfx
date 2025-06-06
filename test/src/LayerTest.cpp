@@ -2733,4 +2733,29 @@ TGFX_TEST(LayerTest, DirtyRegionTest) {
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest7"));
 }
+
+TGFX_TEST(LayerTest, BackgroundBlurStyleTest) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 1024, 800);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->showDirtyRegions(false);
+  auto rootLayer = ImageLayer::Make();
+  displayList->root()->addChild(rootLayer);
+  auto shapeLayer1 = ShapeLayer::Make();
+  shapeLayer1->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 0 ,1)));
+  auto path1 = Path();
+  path1.addRect(Rect::MakeXYWH(40.5f, 40.5f, 100.f, 140.f));
+  shapeLayer1->setPath(path1);
+  shapeLayer1->setMatrix(Matrix::MakeTrans(0.5f, 0.5f));
+  shapeLayer1->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  rootLayer->addChild(shapeLayer1);
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  rootLayer->setImage(image);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::FromRGBA(255, 255, 255, 255));
+  displayList->render(surface.get(), false);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurStyleTest1"));
+}
 }  // namespace tgfx
