@@ -46,12 +46,30 @@ static std::unordered_map<std::string, std::weak_ptr<ImageCodec>> imageCodecMap;
 std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const std::string& filePath) {
   std::lock_guard<std::mutex> lock(codecCacheLocker);
 
+  if (filePath.empty()) {
+    return nullptr;
+  }
+
   auto it = imageCodecMap.find(filePath);
   if (it != imageCodecMap.end()) {
-    if (auto cachedCodec = it->second.lock()) {
+    auto& weak = it->second;
+    auto cachedCodec = weak.lock();
+    if (cachedCodec) {
       return cachedCodec;
     }
     imageCodecMap.erase(it);
+
+    if (imageCodecMap.size() > 50) {
+      std::vector<std::string> needRemoveList = {};
+      for (auto& item : imageCodecMap) {
+        if (item.second.expired()) {
+          needRemoveList.push_back(item.first);
+        }
+      }
+      for (const auto& key : needRemoveList) {
+        imageCodecMap.erase(key);
+      }
+    }
   }
 
   std::shared_ptr<ImageCodec> codec = nullptr;
@@ -92,12 +110,12 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const std::string& filePath) {
   }
 
   if (codec) {
-    imageCodecMap[filePath] = std::weak_ptr<ImageCodec>(codec);
+    auto weak = std::weak_ptr<ImageCodec>(codec);
+    imageCodecMap.insert(std::make_pair(filePath, std::move(weak)));
   }
 
   return codec;
 }
-
 
 std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(std::shared_ptr<Data> imageBytes) {
   if (imageBytes == nullptr || imageBytes->size() == 0) {

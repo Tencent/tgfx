@@ -65,13 +65,31 @@ static std::unordered_map<std::string, std::weak_ptr<Image>> imageMap;
 
 std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
   std::lock_guard<std::mutex> lock(cacheLocker);
+
+  if (filePath.empty()) {
+    return nullptr;
+  }
+
   auto it = imageMap.find(filePath);
   if (it != imageMap.end()) {
-    if (auto cachedImage = it->second.lock()) {
+    auto& weak = it->second;
+    auto cachedImage = weak.lock();
+    if (cachedImage) {
       return cachedImage;
     }
-
     imageMap.erase(it);
+
+    if (imageMap.size() > 50) {
+      std::vector<std::string> needRemoveList = {};
+      for (auto& item : imageMap) {
+        if (item.second.expired()) {
+          needRemoveList.push_back(item.first);
+        }
+      }
+      for (const auto& key : needRemoveList) {
+        imageMap.erase(key);
+      }
+    }
   }
 
   auto codec = ImageCodec::MakeFrom(filePath);
@@ -86,7 +104,8 @@ std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
 
   auto orientedImage = image->makeOriented(codec->orientation());
   if (orientedImage) {
-    imageMap[filePath] = std::weak_ptr<Image>(orientedImage);
+    auto weak = std::weak_ptr<Image>(orientedImage);
+    imageMap.insert(std::make_pair(filePath, std::move(weak)));
   }
 
   return orientedImage;
