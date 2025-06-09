@@ -103,12 +103,17 @@ class NonAARectVertexProvider : public RectsVertexProvider {
       auto& rect = record->rect;
       auto quad = Quad::MakeFrom(rect, &viewMatrix);
       auto uvQuad = Quad::MakeFrom(rect);
+      Matrix insetHalfPixel = Matrix::I();
+      insetHalfPixel.postTranslate(-rect.x(), -record->rect.y());
+      insetHalfPixel.postScale((rect.width() - 1.0f) / rect.width(), (rect.height() - 1.0f) / rect.height());
+      insetHalfPixel.postTranslate(rect.x() + 0.5f, rect.y() + 0.5f);
       for (size_t j = 4; j >= 1; --j) {
         vertices[index++] = quad.point(j - 1).x;
         vertices[index++] = quad.point(j - 1).y;
         if (bitFields.hasUVCoord) {
-          vertices[index++] = uvQuad.point(j - 1).x;
-          vertices[index++] = uvQuad.point(j - 1).y;
+          Point uv = insetHalfPixel.mapXY(uvQuad.point(j - 1).x, uvQuad.point(j - 1).y);
+          vertices[index++] = uv.x;
+          vertices[index++] = uv.y;
         }
         if (bitFields.hasColor) {
           WriteUByte4Color(vertices, index, record->color);

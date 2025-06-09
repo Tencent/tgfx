@@ -322,6 +322,8 @@ class Canvas {
    */
   void drawImage(std::shared_ptr<Image> image, const Matrix& matrix, const Paint* paint = nullptr);
 
+  void drawImage(std::shared_ptr<Image> image, const Matrix& matrix, const SamplingOptions& sampling, const Paint* paint = nullptr);
+
   /**
    * Draws an image with its top-left corner at (0, 0), using the current clip, matrix, and optional
    * paint. If image->hasMipmaps() is true, it uses FilterMode::Linear and MipmapMode::Linear for

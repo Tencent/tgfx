@@ -443,6 +443,11 @@ void Canvas::drawImage(std::shared_ptr<Image> image, const Matrix& matrix, const
   drawImage(std::move(image), sampling, paint, &matrix);
 }
 
+void Canvas::drawImage(std::shared_ptr<Image> image, const Matrix& matrix,
+    const SamplingOptions& sampling, const Paint* paint) {
+  drawImage(std::move(image), sampling, paint, &matrix);
+}
+
 void Canvas::drawImage(std::shared_ptr<Image> image, const Paint* paint) {
   auto sampling = GetDefaultSamplingOptions(image.get());
   drawImage(std::move(image), sampling, paint, nullptr);

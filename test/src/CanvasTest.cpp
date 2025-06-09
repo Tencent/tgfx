@@ -1812,4 +1812,177 @@ TGFX_TEST(CanvasTest, SubsetImageScale) {
   auto gl = GLFunctions::Get(context);
   gl->deleteTextures(1, &textureInfo.id);
 }
+
+TGFX_TEST(CanvasTest, ReorderImage) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  int textureWidth = 1563;
+  int textureHeight = 1563;
+  GLTextureInfo textureInfo;
+  CreateGLTexture(context, textureWidth, textureHeight, &textureInfo);
+  auto surface = Surface::MakeFrom(context, {textureInfo, textureWidth, textureHeight}, ImageOrigin::BottomLeft);
+  auto* canvas = surface->getCanvas();
+  canvas->clear();
+  auto image = MakeImage("resources/assets/HappyNewYear.png");
+  float scale = 1.2f;
+  Paint paint;
+  paint.setAntiAlias(false);
+  int meshWidth = image->width() / 4;
+  int meshHeight = image->height() / 4;
+  SamplingOptions options;
+  options.filterMode = FilterMode::Linear;
+  // 1th row
+  {
+    Rect rect = Rect::MakeXYWH(0, 0, meshWidth, meshHeight);
+    auto subImage = image->makeSubset(rect);
+    if(subImage) {
+      auto matrix = Matrix::MakeAll(scale, 0.0f, meshWidth * scale, 0.0f, scale, meshHeight * scale);
+      canvas->drawImage(subImage, matrix, options, &paint);
+    }
+  }
+
+  {
+    Rect rect = Rect::MakeXYWH(meshWidth, 0, meshWidth, meshHeight);
+    auto subImage = image->makeSubset(rect);
+    if(subImage) {
+      auto matrix = Matrix::MakeAll(scale, 0.0f, meshWidth * scale, 0.0f, scale, 0.0f);
+      canvas->drawImage(subImage, matrix, options, &paint);
+    }
+  }
+
+  {
+    Rect rect = Rect::MakeXYWH(meshWidth * 2, 0, meshWidth, meshHeight);
+    auto subImage = image->makeSubset(rect);
+    if(subImage) {
+      auto matrix = Matrix::MakeAll(scale, 0.0f, 0.0f, 0.0f, scale, meshHeight * 2 * scale);
+      canvas->drawImage(subImage, matrix, options, &paint);
+    }
+  }
+
+  {
+    Rect rect = Rect::MakeXYWH(meshWidth * 3, 0, meshWidth, meshHeight);
+    auto subImage = image->makeSubset(rect);
+    if(subImage) {
+      auto matrix = Matrix::MakeAll(scale, 0.0f, meshWidth * 3 * scale, 0.0f, scale, 0.0f);
+      canvas->drawImage(subImage, matrix, options, &paint);
+    }
+  }
+
+  // 2th row
+  {
+    Rect rect = Rect::MakeXYWH(0, meshHeight, meshWidth, meshHeight);
+    auto subImage = image->makeSubset(rect);
+    if(subImage) {
+      auto matrix = Matrix::MakeAll(scale, 0.0f, 0.0f, 0.0f, scale, meshHeight * scale);
+      canvas->drawImage(subImage, matrix, options, &paint);
+    }
+  }
+
+  {
+    Rect rect = Rect::MakeXYWH(meshWidth, meshHeight, meshWidth, meshHeight);
+    auto subImage = image->makeSubset(rect);
+    if(subImage) {
+      auto matrix = Matrix::MakeAll(scale, 0.0f, 0.0f, 0.0f, scale, 0.0f);
+      canvas->drawImage(subImage, matrix, options, &paint);
+    }
+  }
+
+  {
+    Rect rect = Rect::MakeXYWH(meshWidth * 2, meshHeight, meshWidth, meshHeight);
+    auto subImage = image->makeSubset(rect);
+    if(subImage) {
+      auto matrix = Matrix::MakeAll(scale, 0.0f, meshWidth * 2 * scale, 0.0f, scale, meshHeight * 3 * scale);
+      canvas->drawImage(subImage, matrix, options, &paint);
+    }
+  }
+
+  {
+    Rect rect = Rect::MakeXYWH(meshWidth * 3, meshHeight, meshWidth, meshHeight);
+    auto subImage = image->makeSubset(rect);
+    if(subImage) {
+      auto matrix = Matrix::MakeAll(scale, 0.0f, meshWidth * 3 * scale, 0.0f, scale, meshHeight * scale);
+      canvas->drawImage(subImage, matrix, options, &paint);
+    }
+  }
+
+  // 3th row
+  {
+    Rect rect = Rect::MakeXYWH(0, meshHeight * 2, meshWidth, meshHeight);
+    auto subImage = image->makeSubset(rect);
+    if(subImage) {
+      auto matrix = Matrix::MakeAll(scale, 0.0f, 0.0f, 0.0f, scale, meshHeight * 3 * scale);
+      canvas->drawImage(subImage, matrix, options, &paint);
+    }
+  }
+
+  {
+    Rect rect = Rect::MakeXYWH(meshWidth, meshHeight * 2, meshWidth, meshHeight);
+    auto subImage = image->makeSubset(rect);
+    if(subImage) {
+      auto matrix = Matrix::MakeAll(scale, 0.0f, meshWidth * 3 * scale, 0.0f, scale, meshHeight * 2 * scale);
+      canvas->drawImage(subImage, matrix, options, &paint);
+    }
+  }
+
+  {
+    Rect rect = Rect::MakeXYWH(meshWidth * 2, meshHeight * 2, meshWidth, meshHeight);
+    auto subImage = image->makeSubset(rect);
+    if(subImage) {
+      auto matrix = Matrix::MakeAll(scale, 0.0f, meshWidth * 2 * scale, 0.0f, scale, meshHeight * 2 * scale);
+      canvas->drawImage(subImage, matrix, options, &paint);
+    }
+  }
+
+  {
+    Rect rect = Rect::MakeXYWH(meshWidth * 3, meshHeight * 2, meshWidth, meshHeight);
+    auto subImage = image->makeSubset(rect);
+    if(subImage) {
+      auto matrix = Matrix::MakeAll(scale, 0.0f, meshWidth * 2 * scale, 0.0f, scale, 0.0f);
+      canvas->drawImage(subImage, matrix, options, &paint);
+    }
+  }
+
+  // 4th row
+  {
+    Rect rect = Rect::MakeXYWH(0, meshHeight * 3, meshWidth, meshHeight);
+    auto subImage = image->makeSubset(rect);
+    if(subImage) {
+      auto matrix = Matrix::MakeAll(scale, 0.0f, meshWidth * 2 * scale, 0.0f, scale, meshHeight * scale);
+      canvas->drawImage(subImage, matrix, options, &paint);
+    }
+  }
+
+  {
+    Rect rect = Rect::MakeXYWH(meshWidth, meshHeight * 3, meshWidth, meshHeight);
+    auto subImage = image->makeSubset(rect);
+    if(subImage) {
+      auto matrix = Matrix::MakeAll(scale, 0.0f, meshWidth * scale, 0.0f, scale, meshHeight * 3 * scale);
+      canvas->drawImage(subImage, matrix, options, &paint);
+    }
+  }
+
+  {
+    Rect rect = Rect::MakeXYWH(meshWidth * 2, meshHeight * 3, meshWidth, meshHeight);
+    auto subImage = image->makeSubset(rect);
+    if(subImage) {
+      auto matrix = Matrix::MakeAll(scale, 0.0f, meshWidth * scale, 0.0f, scale, meshHeight * 2 * scale);
+      canvas->drawImage(subImage, matrix, options, &paint);
+    }
+  }
+
+  {
+    Rect rect = Rect::MakeXYWH(meshWidth * 3, meshHeight * 3, meshWidth, meshHeight);
+    auto subImage = image->makeSubset(rect);
+    if(subImage) {
+      auto matrix = Matrix::MakeAll(scale, 0.0f, meshWidth * 3 * scale, 0.0f, scale, meshHeight * 3 * scale);
+      canvas->drawImage(subImage, matrix, options, &paint);
+    }
+  }
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ReorderImage"));
+  auto gl = GLFunctions::Get(context);
+  gl->deleteTextures(1, &textureInfo.id);
+}
+
 }  // namespace tgfx
