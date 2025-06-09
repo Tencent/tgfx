@@ -991,15 +991,18 @@ TGFX_TEST(CanvasTest, image) {
   matrix.postTranslate(0, 120);
   rotationImage = rotationImage->makeOriented(Orientation::BottomRight);
   rotationImage = rotationImage->makeOriented(Orientation::BottomRight);
-  canvas->drawImage(rotationImage, matrix);
+  canvas->setMatrix(matrix);
+  canvas->drawImage(rotationImage);
   subset = rotationImage->makeSubset(Rect::MakeXYWH(500, 800, 2000, 2400));
   ASSERT_TRUE(subset != nullptr);
   matrix.postTranslate(160, 30);
-  canvas->drawImage(subset, matrix);
+  canvas->setMatrix(matrix);
+  canvas->drawImage(subset);
   subset = subset->makeSubset(Rect::MakeXYWH(400, 500, 1600, 1900));
   ASSERT_TRUE(subset != nullptr);
   matrix.postTranslate(110, -30);
-  canvas->drawImage(subset, matrix);
+  canvas->setMatrix(matrix);
+  canvas->drawImage(subset);
   subset = subset->makeOriented(Orientation::RightTop);
   textureImage = subset->makeTextureImage(context);
   ASSERT_TRUE(textureImage != nullptr);
@@ -1007,7 +1010,6 @@ TGFX_TEST(CanvasTest, image) {
   SamplingOptions sampling(FilterMode::Linear, MipmapMode::None);
   canvas->setMatrix(matrix);
   canvas->drawImage(textureImage, sampling);
-  canvas->resetMatrix();
   auto rgbAAA = subset->makeRGBAAA(500, 500, 500, 0);
   EXPECT_TRUE(rgbAAA != nullptr);
   image = MakeImage("resources/apitest/rgbaaa.png");
@@ -1019,20 +1021,53 @@ TGFX_TEST(CanvasTest, image) {
   EXPECT_EQ(rgbAAA->height(), 512);
   matrix = Matrix::MakeScale(0.25);
   matrix.postTranslate(0, 330);
-  canvas->drawImage(rgbAAA, matrix);
+  canvas->setMatrix(matrix);
+  canvas->drawImage(rgbAAA);
   subset = rgbAAA->makeSubset(Rect::MakeXYWH(100, 100, 300, 200));
   matrix.postTranslate(140, 5);
-  canvas->drawImage(subset, matrix);
+  canvas->setMatrix(matrix);
+  canvas->drawImage(subset);
   auto originImage = subset->makeOriented(Orientation::BottomLeft);
   EXPECT_TRUE(originImage != nullptr);
   matrix.postTranslate(0, 70);
-  canvas->drawImage(originImage, matrix);
+  canvas->setMatrix(matrix);
+  canvas->drawImage(originImage);
   rgbAAA = image->makeRGBAAA(512, 512, 0, 0);
   EXPECT_EQ(rgbAAA->width(), 512);
   EXPECT_EQ(rgbAAA->height(), 512);
   matrix.postTranslate(110, -75);
-  canvas->drawImage(rgbAAA, matrix);
+  canvas->setMatrix(matrix);
+  canvas->drawImage(rgbAAA);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawImage"));
+}
+
+TGFX_TEST(CanvasTest, drawImageRect) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+
+  int width = 400;
+  int height = 400;
+  auto surface = Surface::Make(context, width, height);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  Rect srcRect = Rect::MakeWH(image->width(), image->height());
+  Rect dstRect = Rect::MakeXYWH(0, 0, width / 2, height / 2);
+  canvas->drawImageRect(image, srcRect, dstRect, SamplingOptions(FilterMode::Linear));
+
+  srcRect = Rect::MakeXYWH(20, 20, 60, 60);
+  dstRect = Rect::MakeXYWH(width / 2, 0, width / 2, height / 2);
+  canvas->drawImageRect(image, srcRect, dstRect, SamplingOptions(FilterMode::Nearest));
+
+  srcRect = Rect::MakeXYWH(40, 40, 40, 40);
+  dstRect = Rect::MakeXYWH(0, height / 2, width, height / 2);
+  canvas->drawImageRect(image, srcRect, dstRect, SamplingOptions(FilterMode::Linear));
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawImageRect"));
 }
 
 TGFX_TEST(CanvasTest, atlas) {
@@ -1360,7 +1395,10 @@ TGFX_TEST(CanvasTest, BlendModeTest) {
     Paint paint;
     paint.setBlendMode(blendMode);
     paint.setAntiAlias(true);
-    canvas->drawImage(image, Matrix::MakeScale(scale), &paint);
+    canvas->save();
+    canvas->concat(Matrix::MakeScale(scale));
+    canvas->drawImage(image, &paint);
+    canvas->restore();
     canvas->concat(Matrix::MakeTrans(offset, 0));
     if (canvas->getMatrix().getTranslateX() + static_cast<float>(image->width()) * scale >
         static_cast<float>(surface->width())) {

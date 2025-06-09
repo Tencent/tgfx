@@ -243,7 +243,8 @@ class DrawImage : public Record {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawImage(image, sampling, playback->state, playback->fill);
+    auto rect = Rect::MakeWH(image->width(), image->height());
+    context->drawImageRect(image, rect, sampling, playback->state, playback->fill);
   }
 
   std::shared_ptr<Image> image;
