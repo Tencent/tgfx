@@ -24,6 +24,7 @@
 #include "core/images/RasterizedImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/images/TextureImage.h"
+#include "core/utils/CacheUtils.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"
@@ -64,32 +65,14 @@ static std::mutex cacheLocker;
 static std::unordered_map<std::string, std::weak_ptr<Image>> imageMap;
 
 std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
-  std::lock_guard<std::mutex> lock(cacheLocker);
-
   if (filePath.empty()) {
     return nullptr;
   }
 
-  auto it = imageMap.find(filePath);
-  if (it != imageMap.end()) {
-    auto& weak = it->second;
-    auto cachedImage = weak.lock();
-    if (cachedImage) {
-      return cachedImage;
-    }
-    imageMap.erase(it);
+  std::lock_guard<std::mutex> lock(cacheLocker);
 
-    if (imageMap.size() > 50) {
-      std::vector<std::string> needRemoveList = {};
-      for (auto& item : imageMap) {
-        if (item.second.expired()) {
-          needRemoveList.push_back(item.first);
-        }
-      }
-      for (const auto& key : needRemoveList) {
-        imageMap.erase(key);
-      }
-    }
+  if (auto cached = FindAndCleanCache(imageMap, filePath, 50)) {
+    return cached;
   }
 
   auto codec = ImageCodec::MakeFrom(filePath);
