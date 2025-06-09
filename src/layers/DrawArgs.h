@@ -28,47 +28,36 @@ enum class DrawMode { Normal, Contour, Background };
 
 class BackgroundArgs {
  public:
-  BackgroundArgs(Context* context, const Rect& renderRect, float scale)
-      : renderRect(renderRect), scale(scale) {
-    this->renderRect.roundOut();
-    init(context);
-  }
-
-  Matrix invertMatrix() const {
-    auto matrix = Matrix::MakeScale( 1 / scale, 1 / scale);
-    matrix.preTranslate(renderRect.x(), renderRect.y());
-    return matrix;
+  BackgroundArgs(Context* context, const Rect& drawRect, const Matrix& matrix) {
+    init(context, drawRect, matrix);
   }
 
   Canvas* canvas() {
     return _canvas;
   }
 
-  std::shared_ptr<Image> getBackgroundImage(const Rect&) const {
-    // auto rect = backgroundRect;
-    // rect.intersect(renderRect);
-    // rect.offset(-renderRect.x(), -renderRect.y());
-    // rect.scale(scale, scale);
-    auto image = surface->makeImageSnapshot();
-    // return image->makeSubset(rect);
-    return image;
+  std::shared_ptr<Image> getBackgroundImage() const {
+    LOGE("BackgroundArgs::getBackgroundImage() surface:%d %d ", surface->width(), surface->height());
+    return surface->makeImageSnapshot();
   }
 
-  void init(Context* context) {
-    auto rect = renderRect;
-    rect.scale(scale, scale);
+  void init(Context* context, const Rect& drawRect, const Matrix& matrix) {
+    auto rect = drawRect;
     rect.roundOut();
+    auto surfaceMatrix = Matrix::MakeTrans(-rect.x(), -rect.y());
+    surfaceMatrix.preConcat(matrix);
+    if (!surfaceMatrix.invert(&invertBackgroundMatrix)) {
+      return;
+    }
     surface =
         Surface::Make(context, static_cast<int>(rect.width()), static_cast<int>(rect.height()));
     _canvas = surface->getCanvas();
     _canvas->clear();
-    _canvas->scale(scale, scale);
-    _canvas->translate(-renderRect.x(), -renderRect.y());
+    _canvas->setMatrix(surfaceMatrix);
   }
   Canvas* _canvas = nullptr;
   std::shared_ptr<Surface> surface;
-  Rect renderRect;
-  float scale = 1.0f;
+  Matrix invertBackgroundMatrix = Matrix::I();
 };
 
 /**

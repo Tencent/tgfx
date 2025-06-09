@@ -2753,9 +2753,13 @@ TGFX_TEST(LayerTest, BackgroundBlurStyleTest) {
   rootLayer->addChild(shapeLayer1);
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   rootLayer->setImage(image);
-  auto canvas = surface->getCanvas();
-  canvas->clear(Color::FromRGBA(255, 255, 255, 255));
-  displayList->render(surface.get(), false);
+  displayList->setZoomScale(2.0f);
+  displayList->setContentOffset(-50, -50);
+  displayList->setRenderMode(RenderMode::Partial);
+  displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurStyleTest1"));
+  shapeLayer1->setAlpha(0.5f);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurStyleTest2"));
 }
 }  // namespace tgfx

@@ -530,6 +530,9 @@ void Layer::invalidateTransform() {
     return;
   }
   bitFields.dirtyTransform = true;
+  if (_root) {
+    _root->invalidateRect(renderBounds);
+  }
   invalidate();
 }
 
@@ -750,6 +753,7 @@ Matrix Layer::getRelativeMatrix(const Layer* targetCoordinateSpace) const {
 std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float scale) {
   auto maskArgs = args;
   maskArgs.drawMode = _maskStyle != MaskStyle::Vector ? DrawMode::Normal : DrawMode::Contour;
+  maskArgs.context = _maskStyle != MaskStyle::Vector ? args.context : nullptr;
   auto maskPicture =
       CreatePicture(maskArgs, scale, [this](const DrawArgs& innerArgs, Canvas* canvas) {
         _mask->drawLayer(innerArgs, canvas, _mask->_alpha, BlendMode::SrcOver);
@@ -967,8 +971,8 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
       }
       canvas->concat(invertMatrix);
       if (args.backgroundArgs) {
-        canvas->concat(args.backgroundArgs->invertMatrix());
-        canvas->drawImage(args.backgroundArgs->getBackgroundImage({}));
+        canvas->concat(args.backgroundArgs->invertBackgroundMatrix);
+        canvas->drawImage(args.backgroundArgs->getBackgroundImage());
       } else {
         drawBackground(args, canvas);
       }
@@ -985,7 +989,7 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
         drawArgs.renderRect = &backgroundRect;
       }
     }
-    auto backgroundPicture = CreatePicture(drawArgs, 1.0f, backgroundDrawer);
+    auto backgroundPicture = CreatePicture(drawArgs, contentScale, backgroundDrawer);
     source->background =
         CreatePictureImage(std::move(backgroundPicture), &source->backgroundOffset);
   }
@@ -997,7 +1001,12 @@ void Layer::drawLayerStyles(Canvas* canvas, float alpha, const LayerStyleSource*
   // if (source->background) {
   //   Paint paint = {};
   //   paint.setAlpha(0.5f);
-  //   canvas->drawImage(source->background, &paint);
+  //   paint.setBlendMode(BlendMode::SrcIn);
+  //   canvas->save();
+  //   canvas->scale(1 / source->contentScale, 1 / source->contentScale);
+  //   canvas->drawImage(source->background, source->backgroundOffset.x, source->backgroundOffset.y,
+  //                     &paint);
+  //   canvas->restore();
   //   return;
   // }
   DEBUG_ASSERT(source != nullptr && !FloatNearlyZero(source->contentScale));
@@ -1125,6 +1134,9 @@ void Layer::updateRenderBounds(const Matrix& renderMatrix,
   }
   for (auto& child : _children) {
     if (!child->bitFields.visible || child->_alpha <= 0) {
+      if (child->bitFields.dirtyTransform) {
+        _root->invalidateRect(child->renderBounds);
+      }
       child->bitFields.dirtyTransform = false;
       continue;
     }
