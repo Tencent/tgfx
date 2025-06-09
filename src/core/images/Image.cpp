@@ -71,7 +71,7 @@ std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
 
   std::lock_guard<std::mutex> lock(cacheLocker);
 
-  if (auto cached = FindAndCleanCache(imageMap, filePath, 50)) {
+  if (auto cached = FindAndCleanCache(imageMap, filePath)) {
     return cached;
   }
 

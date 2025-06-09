@@ -51,7 +51,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const std::string& filePath) {
 
   std::lock_guard<std::mutex> lock(codecCacheLocker);
 
-  if (auto cached = FindAndCleanCache(imageCodecMap, filePath, 50)) {
+  if (auto cached = FindAndCleanCache(imageCodecMap, filePath)) {
     return cached;
   }
 
