@@ -60,13 +60,36 @@ class PixelDataConverter : public ImageGenerator {
   std::shared_ptr<Data> pixels = nullptr;
 };
 
+static std::mutex cacheLocker;
+static std::unordered_map<std::string, std::weak_ptr<Image>> imageMap;
+
 std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
+  std::lock_guard<std::mutex> lock(cacheLocker);
+  auto it = imageMap.find(filePath);
+  if (it != imageMap.end()) {
+    if (auto cachedImage = it->second.lock()) {
+      return cachedImage;
+    }
+
+    imageMap.erase(it);
+  }
+
   auto codec = ImageCodec::MakeFrom(filePath);
-  auto image = CodecImage::MakeFrom(codec);
-  if (image == nullptr) {
+  if (!codec) {
     return nullptr;
   }
-  return image->makeOriented(codec->orientation());
+
+  auto image = CodecImage::MakeFrom(codec);
+  if (!image) {
+    return nullptr;
+  }
+
+  auto orientedImage = image->makeOriented(codec->orientation());
+  if (orientedImage) {
+    imageMap[filePath] = std::weak_ptr<Image>(orientedImage);
+  }
+
+  return orientedImage;
 }
 
 std::shared_ptr<Image> Image::MakeFromEncoded(std::shared_ptr<Data> encodedData) {

@@ -39,41 +39,65 @@
 #endif
 
 namespace tgfx {
+
+static std::mutex codecCacheLocker;
+static std::unordered_map<std::string, std::weak_ptr<ImageCodec>> imageCodecMap;
+
 std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const std::string& filePath) {
-  std::shared_ptr<ImageCodec> codec = nullptr;
-  auto stream = Stream::MakeFromFile(filePath);
-  if (stream && stream->size() > 14) {
-    Buffer buffer(14);
-    if (stream->read(buffer.data(), 14) == 14) {
-      auto data = buffer.release();
-#ifdef TGFX_USE_WEBP_DECODE
-      if (WebpCodec::IsWebp(data)) {
-        codec = WebpCodec::MakeFrom(filePath);
-      }
-#endif
+  std::lock_guard<std::mutex> lock(codecCacheLocker);
 
-#ifdef TGFX_USE_PNG_DECODE
-      if (codec == nullptr && PngCodec::IsPng(data)) {
-        codec = PngCodec::MakeFrom(filePath);
-      }
-#endif
-
-#ifdef TGFX_USE_JPEG_DECODE
-      if (codec == nullptr && JpegCodec::IsJpeg(data)) {
-        codec = JpegCodec::MakeFrom(filePath);
-      }
-#endif
+  auto it = imageCodecMap.find(filePath);
+  if (it != imageCodecMap.end()) {
+    if (auto cachedCodec = it->second.lock()) {
+      return cachedCodec;
     }
+    imageCodecMap.erase(it);
   }
-  if (codec == nullptr) {
+
+  std::shared_ptr<ImageCodec> codec = nullptr;
+
+  auto stream = Stream::MakeFromFile(filePath);
+  if (!stream || stream->size() < 14) {
+    return nullptr;
+  }
+
+  Buffer headerBuffer(14);
+  if (stream->read(headerBuffer.data(), 14) != 14) {
+    return nullptr;
+  }
+  auto headerData = headerBuffer.release();
+
+#ifdef TGFX_USE_WEBP_DECODE
+  if (!codec && WebpCodec::IsWebp(headerData)) {
+    codec = WebpCodec::MakeFrom(filePath);
+  }
+#endif
+#ifdef TGFX_USE_PNG_DECODE
+  if (!codec && PngCodec::IsPng(headerData)) {
+    codec = PngCodec::MakeFrom(filePath);
+  }
+#endif
+#ifdef TGFX_USE_JPEG_DECODE
+  if (!codec && JpegCodec::IsJpeg(headerData)) {
+    codec = JpegCodec::MakeFrom(filePath);
+  }
+#endif
+
+  if (!codec) {
     codec = MakeNativeCodec(filePath);
   }
 
   if (codec && !ImageInfo::IsValidSize(codec->width(), codec->height())) {
     codec = nullptr;
   }
+
+  if (codec) {
+    imageCodecMap[filePath] = std::weak_ptr<ImageCodec>(codec);
+  }
+
   return codec;
 }
+
 
 std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(std::shared_ptr<Data> imageBytes) {
   if (imageBytes == nullptr || imageBytes->size() == 0) {
