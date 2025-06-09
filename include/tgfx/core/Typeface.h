@@ -167,5 +167,7 @@ class Typeface {
   friend class ScalerContext;
   friend class GlyphConverter;
   friend class SVGExportContext;
+  friend class CGMask;
+  friend class WebMask;
 };
 }  // namespace tgfx
