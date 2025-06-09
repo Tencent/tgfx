@@ -19,6 +19,7 @@
 #include "WebMask.h"
 #include "WebTypeface.h"
 #include "core/GlyphRunList.h"
+#include "core/utils/ApplyStrokeToBound.h"
 #include "core/utils/Log.h"
 #include "platform/web/WebImageBuffer.h"
 #include "platform/web/WebImageStream.h"
@@ -118,7 +119,7 @@ bool WebMask::onFillText(const GlyphRunList* glyphRunList, const Stroke* stroke,
   aboutToFill();
   auto bounds = glyphRunList->getBounds(matrix.getMaxScale());
   if (stroke) {
-    stroke->applyToBounds(&bounds);
+    ApplyStrokeToBounds(*stroke, &bounds);
   }
   matrix.mapRect(&bounds);
   if (bounds.isEmpty()) {

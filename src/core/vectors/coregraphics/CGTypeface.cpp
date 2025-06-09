@@ -65,6 +65,9 @@ std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
     CFRelease(cfDesc);
   }
   CFRelease(cfAttributes);
+  if (typeface == nullptr) {
+    typeface->weakThis = typeface;
+  }
   return typeface;
 }
 
@@ -129,6 +132,9 @@ std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
     CFRelease(cfDesc);
   }
   CFRelease(cfAttributes);
+  if (typeface == nullptr) {
+    typeface->weakThis = typeface;
+  }
   return typeface;
 }
 
@@ -148,6 +154,9 @@ std::shared_ptr<Typeface> Typeface::MakeFromPath(const std::string& fontPath, in
     CFRelease(cgFont);
   }
   CGDataProviderRelease(cgDataProvider);
+  if (typeface == nullptr) {
+    typeface->weakThis = typeface;
+  }
   return typeface;
 }
 
@@ -177,6 +186,9 @@ std::shared_ptr<Typeface> Typeface::MakeFromData(std::shared_ptr<Data> data, int
     CFRelease(cfDesc);
   }
   CFRelease(cfData);
+  if (typeface == nullptr) {
+    typeface->weakThis = typeface;
+  }
   return typeface;
 }
 
@@ -386,4 +398,7 @@ std::vector<Unichar> CGTypeface::getGlyphToUnicodeMap() const {
 }
 #endif
 
+std::shared_ptr<ScalerContext> CGTypeface::onCreateScalerContext(float size) const {
+  return std::make_shared<CGScalerContext>(weakThis.lock(), size);
+}
 }  // namespace tgfx

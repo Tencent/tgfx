@@ -31,8 +31,6 @@ class ScalerContext {
  public:
   static std::shared_ptr<ScalerContext> MakeEmpty(float size);
 
-  static std::shared_ptr<ScalerContext> Make(std::shared_ptr<Typeface> typeface, float size);
-
   virtual ~ScalerContext() = default;
 
   std::shared_ptr<Typeface> getTypeface() const {

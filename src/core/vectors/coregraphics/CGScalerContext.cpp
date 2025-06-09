@@ -74,12 +74,6 @@ static CGAffineTransform GetTransform(bool fauxItalic) {
   return fauxItalic ? italicTransform : identityTransform;
 }
 
-std::shared_ptr<ScalerContext> ScalerContext::CreateNew(std::shared_ptr<Typeface> typeface,
-                                                        float size) {
-  DEBUG_ASSERT(typeface != nullptr);
-  return std::make_shared<CGScalerContext>(std::move(typeface), size);
-}
-
 CGScalerContext::CGScalerContext(std::shared_ptr<Typeface> tf, float size)
     : ScalerContext(std::move(tf), size) {
   CTFontRef font = std::static_pointer_cast<CGTypeface>(typeface)->ctFont;

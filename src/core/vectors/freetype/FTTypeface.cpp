@@ -28,28 +28,48 @@
 namespace tgfx {
 std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
                                                  const std::string& fontStyle) {
-  return SystemFont::MakeFromName(fontFamily, fontStyle);
+  auto typeface = SystemFont::MakeFromName(fontFamily, fontStyle);
+  if (typeface != nullptr) {
+    typeface->weakThis = typeface;
+  }
+  return typeface;
 }
 
 std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
                                                  const FontStyle& fontStyle) {
-  return SystemFont::MakeFromName(fontFamily, fontStyle);
+  auto typeface = SystemFont::MakeFromName(fontFamily, fontStyle);
+  if (typeface != nullptr) {
+    typeface->weakThis = typeface;
+  }
+  return typeface;
 }
 
 std::shared_ptr<Typeface> Typeface::MakeFromPath(const std::string& fontPath, int ttcIndex) {
-  return FTTypeface::Make(FTFontData(fontPath, ttcIndex));
+  std::shared_ptr<Typeface> typeface = FTTypeface::Make(FTFontData(fontPath, ttcIndex));
+  if (typeface != nullptr) {
+    typeface->weakThis = typeface;
+  }
+  return typeface;
 }
 
 std::shared_ptr<Typeface> Typeface::MakeFromBytes(const void* bytes, size_t length, int ttcIndex) {
   auto data = Data::MakeWithCopy(bytes, length);
-  return MakeFromData(std::move(data), ttcIndex);
+  auto typeface = MakeFromData(std::move(data), ttcIndex);
+  if (typeface != nullptr) {
+    typeface->weakThis = typeface;
+  }
+  return typeface;
 }
 
 std::shared_ptr<Typeface> Typeface::MakeFromData(std::shared_ptr<Data> data, int ttcIndex) {
   if (data == nullptr || data->empty()) {
     return nullptr;
   }
-  return FTTypeface::Make(FTFontData(std::move(data), ttcIndex));
+  std::shared_ptr<Typeface> typeface = FTTypeface::Make(FTFontData(std::move(data), ttcIndex));
+  if (typeface != nullptr) {
+    typeface->weakThis = typeface;
+  }
+  return typeface;
 }
 
 static std::mutex& FTMutex() {
@@ -188,5 +208,9 @@ std::vector<Unichar> FTTypeface::getGlyphToUnicodeMap() const {
   return returnMap;
 }
 #endif
+
+std::shared_ptr<ScalerContext> FTTypeface::onCreateScalerContext(float size) const {
+  return std::make_shared<FTScalerContext>(weakThis.lock(), size);
+}
 
 }  // namespace tgfx

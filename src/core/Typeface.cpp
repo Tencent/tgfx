@@ -18,6 +18,7 @@
 
 #include "tgfx/core/Typeface.h"
 #include <vector>
+#include "core/ScalerContext.h"
 #include "core/utils/UniqueID.h"
 #include "tgfx/core/UTF.h"
 
@@ -70,11 +71,18 @@ class EmptyTypeface : public Typeface {
   }
 
  private:
+  std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override {
+    return ScalerContext::MakeEmpty(size);
+  }
+
   uint32_t _uniqueID = UniqueID::Next();
 };
 
 std::shared_ptr<Typeface> Typeface::MakeEmpty() {
   static auto emptyTypeface = std::make_shared<EmptyTypeface>();
+  if (emptyTypeface->weakThis.lock()) {
+    emptyTypeface->weakThis = emptyTypeface;
+  }
   return emptyTypeface;
 }
 
@@ -95,4 +103,23 @@ std::vector<Unichar> Typeface::getGlyphToUnicodeMap() const {
   return {};
 };
 
+std::shared_ptr<ScalerContext> Typeface::createScalerContext(float size) {
+  if (weakThis.lock() == nullptr || glyphsCount() <= 0 || size < 0.0f) {
+    return ScalerContext::MakeEmpty(size);
+  }
+  std::lock_guard<std::mutex> autoLock(locker);
+  auto result = scalerContexts.find(size);
+  if (result != scalerContexts.end()) {
+    auto context = result->second.lock();
+    if (context != nullptr) {
+      return context;
+    }
+  }
+  auto context = onCreateScalerContext(size);
+  if (context == nullptr) {
+    return ScalerContext::MakeEmpty(size);
+  }
+  scalerContexts[size] = context;
+  return context;
+}
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,54 +18,55 @@
 
 #pragma once
 
-#include <emscripten/val.h>
-#include <unordered_map>
-#include <vector>
-#include "tgfx/core/Font.h"
+#include "core/utils/UniqueID.h"
+#include "tgfx/core/FontMetrics.h"
+#include "tgfx/core/ImageTypefaceBuilder.h"
 #include "tgfx/core/Typeface.h"
 
 namespace tgfx {
-class WebTypeface : public Typeface {
+class ImageTypeface final : public Typeface {
  public:
-  static std::shared_ptr<WebTypeface> Make(const std::string& name, const std::string& style = "");
+  using ImageRecordType = std::vector<std::shared_ptr<ImageTypefaceBuilder::GlyphRecord>>;
+
+  explicit ImageTypeface(uint32_t uniqueID, const std::string& fontFamily,
+                         const std::string& fontStyle, const FontMetrics& metrics,
+                         const ImageRecordType& glyphRecords);
+
+  uint32_t builderID() const {
+    return _builderID;
+  }
 
   uint32_t uniqueID() const override {
     return _uniqueID;
   }
 
   std::string fontFamily() const override {
-    return name;
+    return _fontFamily;
   }
 
   std::string fontStyle() const override {
-    return style;
+    return _fontStyle;
   }
 
-  size_t glyphsCount() const override {
-    return 1;  // Returns a non-zero value to indicate that we are not empty.
+  const FontMetrics& fontMetrics() const {
+    return _fontMetrics;
   }
 
-  int unitsPerEm() const override {
-    return 0;
-  }
+  size_t glyphsCount() const override;
 
-  bool hasColor() const override {
-    return _hasColor;
-  }
+  int unitsPerEm() const override;
 
-  bool hasOutlines() const override {
-    return false;
-  }
+  bool hasColor() const override;
 
-  std::string getText(GlyphID glyphID) const;
+  bool hasOutlines() const override;
 
   GlyphID getGlyphID(Unichar unichar) const override;
 
   std::shared_ptr<Data> getBytes() const override;
 
-  std::shared_ptr<Data> copyTableData(FontTableTag) const override {
-    return nullptr;
-  }
+  std::shared_ptr<Data> copyTableData(FontTableTag) const override;
+
+  std::shared_ptr<ImageTypefaceBuilder::GlyphRecord> getGlyphRecord(GlyphID glyphID) const;
 
  protected:
 #ifdef TGFX_USE_GLYPH_TO_UNICODE
@@ -73,15 +74,16 @@ class WebTypeface : public Typeface {
 #endif
 
  private:
-  explicit WebTypeface(std::string name, std::string style);
+  void initCharGlyphIDMap();
 
   std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;
 
-  uint32_t _uniqueID;
-  bool _hasColor = false;
-  emscripten::val scalerContextClass = emscripten::val::null();
-  std::string name;
-  std::string style;
-  std::string webFontFamily;
+  uint32_t _builderID = 0;  // Builder ID for tracking the source builder
+  uint32_t _uniqueID = UniqueID::Next();
+  std::string _fontFamily;
+  std::string _fontStyle;
+  FontMetrics _fontMetrics;
+  ImageRecordType glyphRecords;
+  std::unordered_map<Unichar, GlyphID> unicharToGlyphIDMap;  // Maps Unichar to GlyphID
 };
 }  // namespace tgfx

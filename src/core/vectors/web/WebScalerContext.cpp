@@ -19,27 +19,13 @@
 #include "WebScalerContext.h"
 #include "ReadPixelsFromCanvasImage.h"
 #include "WebTypeface.h"
+#include "core/utils/ApplyStrokeToBound.h"
 #include "core/utils/Log.h"
 #include "platform/web/WebImageBuffer.h"
 
 using namespace emscripten;
 
 namespace tgfx {
-
-std::shared_ptr<ScalerContext> ScalerContext::CreateNew(std::shared_ptr<Typeface> typeface,
-                                                        float size) {
-  DEBUG_ASSERT(typeface != nullptr);
-  auto scalerContextClass = val::module_property("ScalerContext");
-  if (!scalerContextClass.as<bool>()) {
-    return nullptr;
-  }
-  auto scalerContext = scalerContextClass.new_(typeface->fontFamily(), typeface->fontStyle(), size);
-  if (!scalerContext.as<bool>()) {
-    return nullptr;
-  }
-  return std::make_shared<WebScalerContext>(std::move(typeface), size, std::move(scalerContext));
-}
-
 WebScalerContext::WebScalerContext(std::shared_ptr<Typeface> typeface, float size,
                                    val scalerContext)
     : ScalerContext(std::move(typeface), size), scalerContext(std::move(scalerContext)) {
@@ -75,7 +61,7 @@ Rect WebScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const S
     return {};
   }
   if (!hasColor() && stroke != nullptr) {
-    stroke->applyToBounds(&bounds);
+    ApplyStrokeToBounds(*stroke, &bounds);
   }
   if (matrix) {
     matrix->setTranslate(bounds.left, bounds.top);
@@ -95,7 +81,7 @@ bool WebScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke* 
   }
   emscripten::val imageData = emscripten::val::null();
   if (!hasColor() && stroke != nullptr) {
-    stroke->applyToBounds(&bounds);
+    ApplyStrokeToBounds(*stroke, &bounds);
     imageData =
         scalerContext.call<val>("readPixels", getText(glyphID), bounds, properFauxBold, *stroke);
   } else {
