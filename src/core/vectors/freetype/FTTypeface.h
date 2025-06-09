@@ -63,7 +63,6 @@ class FTTypeface : public Typeface {
   uint32_t _uniqueID = 0;
   FTFontData data;
   FT_Face face = nullptr;
-  std::weak_ptr<FTTypeface> weakThis;
 
   FTTypeface(FTFontData data, FT_Face face);
 
