@@ -143,13 +143,6 @@ void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& st
   drawPath(shape->getPath(), state, fill);
 }
 
-void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                                 const MCState& state, const Fill& fill) {
-  DEBUG_ASSERT(image != nullptr);
-  auto rect = Rect::MakeWH(image->width(), image->height());
-  return drawImageRect(std::move(image), rect, sampling, state, fill);
-}
-
 void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                                      const SamplingOptions&, const MCState& state,
                                      const Fill& fill) {

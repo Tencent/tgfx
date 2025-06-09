@@ -663,7 +663,9 @@ std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
 }
 
 LayerContent* Layer::getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix) {
-  if (!bitFields.shouldRasterize || args.context == nullptr) {
+  if (!bitFields.shouldRasterize || args.context == nullptr ||
+      (args.drawMode == DrawMode::Background && bitFields.hasBackgroundStyle) ||
+      args.drawMode == DrawMode::Contour || args.excludeEffects) {
     return nullptr;
   }
   auto contextID = args.context->uniqueID();
@@ -897,9 +899,8 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
                  [&]() { return drawChildren(drawArgs, canvas, 1.0f); });
   };
 
-  // null context prohibits the use of rasterizedCache during the drawing process.
-  DrawArgs drawArgs(nullptr, bitFields.excludeChildEffectsInLayerStyle);
-  drawArgs.renderRect = args.renderRect;
+  DrawArgs drawArgs = args;
+  drawArgs.excludeEffects = bitFields.excludeChildEffectsInLayerStyle;
   auto contentPicture = CreatePicture(drawArgs, contentScale, drawLayerContents);
   Point contentOffset = {};
   auto content = CreatePictureImage(std::move(contentPicture), &contentOffset);
@@ -1140,14 +1141,12 @@ void Layer::updateBackgroundBounds(const Matrix& renderMatrix) {
   }
   if (backgroundChanged) {
     auto layer = this;
-    while (layer) {
-      if (layer->bitFields.dirtyDescendents) {
+    while (layer && !layer->bitFields.dirtyDescendents) {
+      layer->rasterizedContent = nullptr;
+      if (layer->maskOwner) {
         break;
       }
-      layer->rasterizedContent = nullptr;
-      if (!layer->maskOwner) {
-        layer = layer->_parent;
-      }
+      layer = layer->_parent;
     }
   }
 }

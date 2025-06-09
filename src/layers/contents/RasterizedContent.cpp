@@ -26,7 +26,10 @@ Rect RasterizedContent::getBounds() const {
 }
 
 void RasterizedContent::draw(Canvas* canvas, const Paint& paint) const {
-  canvas->drawImage(image, matrix, &paint);
+  auto oldMatrix = canvas->getMatrix();
+  canvas->concat(matrix);
+  canvas->drawImage(image, &paint);
+  canvas->setMatrix(oldMatrix);
 }
 
 bool RasterizedContent::hitTestPoint(float localX, float localY, bool) {

@@ -849,7 +849,7 @@ TGFX_TEST(LayerTest, PassthroughAndNormal) {
 
   root->setMatrix(Matrix::MakeTrans(400, 50));
   root->setShouldRasterize(false);
-  displayList.setPartialRefreshEnabled(false);
+  displayList.setRenderMode(RenderMode::Direct);
   displayList.render(surface.get(), false);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PassThoughAndNormal"));
 }
@@ -2336,6 +2336,47 @@ TGFX_TEST(LayerTest, ShapeStyleWithMatrix) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ShapeStyleWithMatrix"));
 }
 
+TGFX_TEST(LayerTest, RasterizedCache) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 350, 350);
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto rootLayer = Layer::Make();
+  rootLayer->setMatrix(Matrix::MakeTrans(30, 30));
+
+  auto imageLayer = ImageLayer::Make();
+  imageLayer->setImage(MakeImage("resources/apitest/imageReplacement.png"));
+  imageLayer->setShouldRasterize(true);
+  rootLayer->addChild(imageLayer);
+
+  auto rectLayer = ShapeLayer::Make();
+  auto style = DropShadowStyle::Make(10, 10, 0, 0, Color::Black(), false);
+  Path rect;
+  rect.addRect(Rect::MakeWH(50, 50));
+  rectLayer->setPath(rect);
+  rectLayer->setFillStyle(SolidColor::Make(Color::Red()));
+  rectLayer->setShouldRasterize(true);
+  rectLayer->setLayerStyles({style});
+  rectLayer->setMatrix(Matrix::MakeTrans(100, 0));
+  imageLayer->addChild(rectLayer);
+
+  auto blurLayer = ShapeLayer::Make();
+  Path childPath;
+  childPath.addRect(Rect::MakeWH(250, 100));
+  blurLayer->setPath(childPath);
+  auto fillStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0, 128));
+  blurLayer->setFillStyle(fillStyle);
+  blurLayer->setShouldRasterize(true);
+  blurLayer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  rootLayer->addChild(blurLayer);
+
+  displayList->root()->addChild(rootLayer);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/RasterizedCache"));
+}
+
 TGFX_TEST(LayerTest, RasterizedBackground) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -2705,6 +2746,7 @@ TGFX_TEST(LayerTest, DirtyRegionTest) {
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest5"));
 
+  displayList->setRenderMode(RenderMode::Tiled);
   displayList->setZoomScale(1.3f);
   displayList->render(surface.get());
   // Clear the previous dirty regions.

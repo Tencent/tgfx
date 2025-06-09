@@ -177,6 +177,7 @@ export class ScalerContext {
         const height = bounds.bottom - bounds.top
         const canvas = getCanvas2D(width, height);
         const context = canvas.getContext('2d',{willReadFrequently: true}) as CanvasRenderingContext2D;
+        context.clearRect(0, 0, width, height);
         context.font = this.fontString(fauxBold, false);
         if (stroke){
             context.lineJoin = ScalerContext.getLineJoin(stroke.join);

@@ -24,6 +24,7 @@
 #include FT_TRUETYPE_TABLES_H
 #include "FTRasterTarget.h"
 #include "FTUtil.h"
+#include "core/utils/ClearPixels.h"
 #include "core/utils/GammaCorrection.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -601,6 +602,7 @@ bool FTScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*,
     if (!loadOutlineGlyph(face, glyphID, fauxBold, false)) {
       return false;
     }
+    ClearPixels(dstInfo, dstPixels);
     RenderOutLineGlyph(face, dstInfo, dstPixels);
     return true;
   }

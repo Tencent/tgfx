@@ -28,7 +28,9 @@ namespace tgfx {
 class GlyphRasterizer : public ImageCodec {
  public:
   GlyphRasterizer(int width, int height, std::shared_ptr<ScalerContext> scalerContext,
-                  GlyphID glyphID, bool fauxBold, std::unique_ptr<Stroke> stroke);
+                  GlyphID glyphID, bool fauxBold, const Stroke* stroke);
+
+  ~GlyphRasterizer() override;
 
   bool isAlphaOnly() const override {
     return !scalerContext->hasColor();
@@ -40,6 +42,6 @@ class GlyphRasterizer : public ImageCodec {
   std::shared_ptr<ScalerContext> scalerContext = nullptr;
   GlyphID glyphID = 0;
   bool fauxBold = false;
-  std::unique_ptr<Stroke> stroke = nullptr;
+  Stroke* stroke = nullptr;
 };
 }  // namespace tgfx
