@@ -664,8 +664,8 @@ std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
 
 LayerContent* Layer::getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix) {
   if (!bitFields.shouldRasterize || args.context == nullptr ||
-  (args.drawMode == DrawMode::Background && bitFields.hasBackgroundStyle) ||
-  args.drawMode == DrawMode::Contour || args.excludeEffects) {
+      (args.drawMode == DrawMode::Background && bitFields.hasBackgroundStyle) ||
+      args.drawMode == DrawMode::Contour || args.excludeEffects) {
     return nullptr;
   }
   auto contextID = args.context->uniqueID();
