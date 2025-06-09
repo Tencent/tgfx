@@ -2755,7 +2755,7 @@ TGFX_TEST(LayerTest, BackgroundBlurStyleTest) {
   rootLayer->setImage(image);
   displayList->setZoomScale(2.0f);
   displayList->setContentOffset(-50, -50);
-  displayList->setRenderMode(RenderMode::Partial);
+  displayList->setRenderMode(RenderMode::Tiled);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurStyleTest1"));
   shapeLayer1->setAlpha(0.5f);

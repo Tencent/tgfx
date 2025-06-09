@@ -532,7 +532,8 @@ class Layer {
    * @param drawChildren A callback function that draws the children of the layer. if the function
    * returns false, the content above children should not be drawn.
    */
-  virtual void drawContents(LayerContent* content, Canvas* canvas, Canvas* backgroundCanvas, float alpha, bool forContour,
+  virtual void drawContents(LayerContent* content, Canvas* canvas, Canvas* backgroundCanvas,
+                            float alpha, bool forContour,
                             const std::function<bool()>& drawChildren) const;
 
   /**
@@ -590,8 +591,11 @@ class Layer {
 
   std::unique_ptr<LayerStyleSource> getLayerStyleSource(const DrawArgs& args, const Matrix& matrix);
 
-  void drawLayerStyles(Canvas* canvas, float alpha, const LayerStyleSource* source,
-                       LayerStylePosition position);
+  std::shared_ptr<Image> getBackgroundImage(const DrawArgs& args, float contentScale,
+                                            Point* offset);
+
+  void drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
+                       const LayerStyleSource* source, LayerStylePosition position);
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 
