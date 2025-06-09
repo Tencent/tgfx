@@ -75,7 +75,6 @@ class CGTypeface : public Typeface {
   bool _hasColor = false;
   bool _hasOutlines = true;
   std::shared_ptr<Data> data;
-  std::weak_ptr<CGTypeface> weakThis;
 
   friend class CGScalerContext;
 };
