@@ -29,35 +29,23 @@ namespace tgfx {
 std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
                                                  const std::string& fontStyle) {
   auto typeface = SystemFont::MakeFromName(fontFamily, fontStyle);
-  if (typeface != nullptr) {
-    typeface->weakThis = typeface;
-  }
   return typeface;
 }
 
 std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
                                                  const FontStyle& fontStyle) {
   auto typeface = SystemFont::MakeFromName(fontFamily, fontStyle);
-  if (typeface != nullptr) {
-    typeface->weakThis = typeface;
-  }
   return typeface;
 }
 
 std::shared_ptr<Typeface> Typeface::MakeFromPath(const std::string& fontPath, int ttcIndex) {
   std::shared_ptr<Typeface> typeface = FTTypeface::Make(FTFontData(fontPath, ttcIndex));
-  if (typeface != nullptr) {
-    typeface->weakThis = typeface;
-  }
   return typeface;
 }
 
 std::shared_ptr<Typeface> Typeface::MakeFromBytes(const void* bytes, size_t length, int ttcIndex) {
   auto data = Data::MakeWithCopy(bytes, length);
   auto typeface = MakeFromData(std::move(data), ttcIndex);
-  if (typeface != nullptr) {
-    typeface->weakThis = typeface;
-  }
   return typeface;
 }
 
