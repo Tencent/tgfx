@@ -18,13 +18,17 @@
 
 #pragma once
 #include <memory>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 template <typename T>
 std::shared_ptr<T> FindAndCleanCache(std::unordered_map<std::string, std::weak_ptr<T>>& cacheMap,
-                                     const std::string& key, size_t cleanThreshold = 50) {
+                                     const std::string& key, std::mutex& cacheMutex,
+                                     size_t cleanThreshold = 50) {
+  std::lock_guard<std::mutex> lock(cacheMutex);
+
   auto it = cacheMap.find(key);
   if (it != cacheMap.end()) {
     auto& weak = it->second;

@@ -49,9 +49,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const std::string& filePath) {
     return nullptr;
   }
 
-  std::lock_guard<std::mutex> lock(codecCacheLocker);
-
-  if (auto cached = FindAndCleanCache(imageCodecMap, filePath)) {
+  if (auto cached = FindAndCleanCache(imageCodecMap, filePath, codecCacheLocker)) {
     return cached;
   }
 
@@ -91,6 +89,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const std::string& filePath) {
 
   if (codec) {
     auto weak = std::weak_ptr<ImageCodec>(codec);
+    std::lock_guard<std::mutex> lock(codecCacheLocker);
     imageCodecMap.insert(std::make_pair(filePath, std::move(weak)));
   }
 

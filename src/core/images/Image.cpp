@@ -69,9 +69,7 @@ std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
     return nullptr;
   }
 
-  std::lock_guard<std::mutex> lock(cacheLocker);
-
-  if (auto cached = FindAndCleanCache(imageMap, filePath)) {
+  if (auto cached = FindAndCleanCache(imageMap, filePath, cacheLocker)) {
     return cached;
   }
 
@@ -85,6 +83,7 @@ std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
   auto orientedImage = image->makeOriented(codec->orientation());
   if (orientedImage) {
     auto weak = std::weak_ptr<Image>(orientedImage);
+    std::lock_guard<std::mutex> lock(cacheLocker);
     imageMap.insert(std::make_pair(filePath, std::move(weak)));
   }
 
