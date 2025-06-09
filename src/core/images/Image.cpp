@@ -76,9 +76,6 @@ std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
   }
 
   auto codec = ImageCodec::MakeFrom(filePath);
-  if (!codec) {
-    return nullptr;
-  }
 
   auto image = CodecImage::MakeFrom(codec);
   if (!image) {
