@@ -17,17 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <unordered_map>
 #include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
-template<typename T>
-std::shared_ptr<T> FindAndCleanCache(
-    std::unordered_map<std::string, std::weak_ptr<T>>& cacheMap,
-    const std::string& key,
-    size_t cleanThreshold = 50)
-{
+template <typename T>
+std::shared_ptr<T> FindAndCleanCache(std::unordered_map<std::string, std::weak_ptr<T>>& cacheMap,
+                                     const std::string& key, size_t cleanThreshold = 50) {
   auto it = cacheMap.find(key);
   if (it != cacheMap.end()) {
     auto& weak = it->second;
