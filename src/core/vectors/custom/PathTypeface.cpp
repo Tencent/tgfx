@@ -69,16 +69,6 @@ std::shared_ptr<Data> PathTypeface::copyTableData(FontTableTag) const {
   return nullptr;
 }
 
-#ifdef TGFX_USE_GLYPH_TO_UNICODE
-std::vector<Unichar> PathTypeface::getGlyphToUnicodeMap() const {
-  std::vector<Unichar> returnMap(glyphRecords.size(), 0);
-  for (size_t i = 0; i < glyphRecords.size(); ++i) {
-    returnMap[i] = glyphRecords[i]->unichar;
-  }
-  return returnMap;
-}
-#endif
-
 std::shared_ptr<ScalerContext> PathTypeface::onCreateScalerContext(float size) const {
   return std::make_shared<PathScalerContext>(weakThis.lock(), size);
 }

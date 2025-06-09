@@ -68,16 +68,6 @@ std::shared_ptr<Data> ImageTypeface::copyTableData(FontTableTag) const {
   return nullptr;
 }
 
-#ifdef TGFX_USE_GLYPH_TO_UNICODE
-std::vector<Unichar> ImageTypeface::getGlyphToUnicodeMap() const {
-  std::vector<Unichar> returnMap(glyphRecords.size(), 0);
-  for (size_t i = 0; i < glyphRecords.size(); ++i) {
-    returnMap[i] = glyphRecords[i]->unichar;
-  }
-  return returnMap;
-}
-#endif
-
 std::shared_ptr<ScalerContext> ImageTypeface::onCreateScalerContext(float size) const {
   return std::make_shared<ImageScalerContext>(weakThis.lock(), size);
 }

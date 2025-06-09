@@ -157,9 +157,15 @@ class Typeface {
  private:
   virtual std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const = 0;
 
+  /**
+   * Returns the active ID for this typeface. for custom typefaces, this is the builderID,or returns uniqueID.
+   */
+  virtual uint32_t getActiveID() const;
+
   std::unordered_map<float, std::weak_ptr<ScalerContext>> scalerContexts = {};
 
   friend class ScalerContext;
   friend class GlyphConverter;
+  friend class SVGExportContext;
 };
 }  // namespace tgfx

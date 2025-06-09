@@ -80,9 +80,6 @@ class EmptyTypeface : public Typeface {
 
 std::shared_ptr<Typeface> Typeface::MakeEmpty() {
   static auto emptyTypeface = std::make_shared<EmptyTypeface>();
-  if (emptyTypeface->weakThis.lock()) {
-    emptyTypeface->weakThis = emptyTypeface;
-  }
   return emptyTypeface;
 }
 
@@ -122,4 +119,9 @@ std::shared_ptr<ScalerContext> Typeface::createScalerContext(float size) {
   scalerContexts[size] = context;
   return context;
 }
+
+uint32_t Typeface::getActiveID() const {
+  return uniqueID();
+}
+
 }  // namespace tgfx

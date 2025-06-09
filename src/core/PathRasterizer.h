@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "tgfx/core/GlyphFace.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Shape.h"
 

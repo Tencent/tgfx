@@ -32,7 +32,7 @@ class PathTypeface final : public Typeface {
                         const std::string& fontStyle, const FontMetrics& metrics,
                         const VectorRecordType& glyphRecords);
 
-  uint32_t builderID() const {
+  uint32_t getActiveID() const override {
     return _builderID;
   }
 
@@ -67,11 +67,6 @@ class PathTypeface final : public Typeface {
   std::shared_ptr<Data> copyTableData(FontTableTag) const override;
 
   std::shared_ptr<PathTypefaceBuilder::GlyphRecord> getGlyphRecord(GlyphID glyphID) const;
-
- protected:
-#ifdef TGFX_USE_GLYPH_TO_UNICODE
-  std::vector<Unichar> getGlyphToUnicodeMap() const override;
-#endif
 
  private:
   void initCharGlyphIDMap();
