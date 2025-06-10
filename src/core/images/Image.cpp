@@ -24,7 +24,7 @@
 #include "core/images/RasterizedImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/images/TextureImage.h"
-#include "core/utils/CacheUtils.h"
+#include "core/utils/WeakMap.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"
@@ -61,32 +61,24 @@ class PixelDataConverter : public ImageGenerator {
   std::shared_ptr<Data> pixels = nullptr;
 };
 
-static std::mutex cacheLocker;
-static std::unordered_map<std::string, std::weak_ptr<Image>> imageMap;
+static WeakMap<std::string, Image> imageMap;
 
 std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
   if (filePath.empty()) {
     return nullptr;
   }
-
-  if (auto cached = FindAndCleanCache(imageMap, filePath, cacheLocker)) {
+  if (auto cached = imageMap.find(filePath)) {
     return cached;
   }
-
   auto codec = ImageCodec::MakeFrom(filePath);
-
   auto image = CodecImage::MakeFrom(codec);
-  if (!image) {
+  if (image == nullptr) {
     return nullptr;
   }
-
   auto orientedImage = image->makeOriented(codec->orientation());
   if (orientedImage) {
-    auto weak = std::weak_ptr<Image>(orientedImage);
-    std::lock_guard<std::mutex> lock(cacheLocker);
-    imageMap.insert(std::make_pair(filePath, std::move(weak)));
+    imageMap.insert(filePath, orientedImage);
   }
-
   return orientedImage;
 }
 

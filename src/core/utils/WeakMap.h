@@ -19,36 +19,42 @@
 #pragma once
 #include <memory>
 #include <mutex>
-#include <string>
 #include <unordered_map>
 #include <vector>
 
-template <typename T>
-std::shared_ptr<T> FindAndCleanCache(std::unordered_map<std::string, std::weak_ptr<T>>& cacheMap,
-                                     const std::string& key, std::mutex& cacheMutex,
-                                     size_t cleanThreshold = 50) {
-  std::lock_guard<std::mutex> lock(cacheMutex);
-
-  auto it = cacheMap.find(key);
-  if (it != cacheMap.end()) {
-    auto& weak = it->second;
-    auto cachedPtr = weak.lock();
-    if (cachedPtr) {
-      return cachedPtr;
-    }
-    cacheMap.erase(it);
-
-    if (cacheMap.size() > cleanThreshold) {
-      std::vector<std::string> needRemoveList;
-      for (const auto& item : cacheMap) {
-        if (item.second.expired()) {
-          needRemoveList.push_back(item.first);
+template <typename Key, typename T>
+class WeakMap {
+ public:
+  std::shared_ptr<T> find(const Key& key, size_t cleanThreshold = 50) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    auto it = cacheMap_.find(key);
+    if (it != cacheMap_.end()) {
+      auto cachedPtr = it->second.lock();
+      if (cachedPtr) {
+        return cachedPtr;
+      }
+      cacheMap_.erase(it);
+      if (cacheMap_.size() > cleanThreshold) {
+        std::vector<Key> expiredKeys;
+        for (const auto& item : cacheMap_) {
+          if (item.second.expired()) {
+            expiredKeys.push_back(item.first);
+          }
+        }
+        for (const auto& k : expiredKeys) {
+          cacheMap_.erase(k);
         }
       }
-      for (const auto& k : needRemoveList) {
-        cacheMap.erase(k);
-      }
     }
+    return nullptr;
   }
-  return nullptr;
-}
+
+  void insert(const Key& key, const std::shared_ptr<T>& ptr) {
+    std::lock_guard<std::mutex> lock(mutex_);
+    cacheMap_[key] = std::weak_ptr<T>(ptr);
+  }
+
+ private:
+  std::unordered_map<Key, std::weak_ptr<T>> cacheMap_;
+  std::mutex mutex_;
+};

@@ -18,8 +18,8 @@
 
 #include "tgfx/core/ImageCodec.h"
 #include "core/PixelBuffer.h"
-#include "core/utils/CacheUtils.h"
 #include "core/utils/USE.h"
+#include "core/utils/WeakMap.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Pixmap.h"
@@ -41,20 +41,16 @@
 
 namespace tgfx {
 
-static std::mutex codecCacheLocker;
-static std::unordered_map<std::string, std::weak_ptr<ImageCodec>> imageCodecMap;
+static WeakMap<std::string, ImageCodec> imageCodecMap;
 
 std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const std::string& filePath) {
   if (filePath.empty()) {
     return nullptr;
   }
-
-  if (auto cached = FindAndCleanCache(imageCodecMap, filePath, codecCacheLocker)) {
+  if (auto cached = imageCodecMap.find(filePath)) {
     return cached;
   }
-
   std::shared_ptr<ImageCodec> codec = nullptr;
-
   auto stream = Stream::MakeFromFile(filePath);
   if (stream && stream->size() > 14) {
     Buffer buffer(14);
@@ -79,20 +75,15 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const std::string& filePath) {
 #endif
     }
   }
-  if (!codec) {
+  if (codec == nullptr) {
     codec = MakeNativeCodec(filePath);
   }
-
   if (codec && !ImageInfo::IsValidSize(codec->width(), codec->height())) {
     codec = nullptr;
   }
-
   if (codec) {
-    auto weak = std::weak_ptr<ImageCodec>(codec);
-    std::lock_guard<std::mutex> lock(codecCacheLocker);
-    imageCodecMap.insert(std::make_pair(filePath, std::move(weak)));
+    imageCodecMap.insert(filePath, codec);
   }
-
   return codec;
 }
 
