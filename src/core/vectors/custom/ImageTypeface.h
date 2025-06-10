@@ -33,10 +33,6 @@ class ImageTypeface final : public Typeface {
                                              const FontMetrics& metrics,
                                              const ImageRecordType& glyphRecords);
 
-  uint32_t getActiveID() const override {
-    return _builderID;
-  }
-
   uint32_t uniqueID() const override {
     return _uniqueID;
   }
@@ -75,6 +71,10 @@ class ImageTypeface final : public Typeface {
                          const ImageRecordType& glyphRecords);
 
   void initCharGlyphIDMap();
+
+  uint32_t getActiveID() const override {
+    return _builderID;
+  }
 
   std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;
 

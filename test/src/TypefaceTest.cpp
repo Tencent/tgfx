@@ -68,11 +68,6 @@ TGFX_TEST(TypefaceTest, CustomPathTypeface) {
   ASSERT_EQ(typeface->getGlyphID(100), static_cast<GlyphID>(4));
   ASSERT_EQ(typeface->getGlyphID(1000), static_cast<GlyphID>(0));
 
-  auto pathTypeface = static_cast<PathTypeface*>(typeface.get());
-  auto activeID = pathTypeface->getActiveID();
-  auto uniqueID = pathTypeface->uniqueID();
-  ASSERT_NE(uniqueID, activeID);
-
   path.reset();
   path.moveTo(Point::Make(25.0f, 5.0f));
   path.lineTo(Point::Make(35.0f, 35.0f));
@@ -82,11 +77,7 @@ TGFX_TEST(TypefaceTest, CustomPathTypeface) {
 
   typeface = builder.detach();
   ASSERT_TRUE(typeface != nullptr);
-  auto newActiveID = static_cast<PathTypeface*>(typeface.get())->getActiveID();
-  ASSERT_EQ(activeID, newActiveID);
   ASSERT_EQ(typeface->glyphsCount(), static_cast<size_t>(5));
-  auto newUniqueID = pathTypeface->uniqueID();
-  ASSERT_NE(uniqueID, newUniqueID);
 
   ContextScope scope;
   auto context = scope.getContext();
@@ -96,7 +87,6 @@ TGFX_TEST(TypefaceTest, CustomPathTypeface) {
 
   auto paint = Paint();
   paint.setColor(Color::Red());
-  //paint.setStyle(PaintStyle::Stroke);
 
   float scaleFactor = 1.0f;
   canvas->scale(scaleFactor, scaleFactor);
@@ -138,22 +128,13 @@ TGFX_TEST(TypefaceTest, CustomImageTypeface) {
   ASSERT_EQ(typeface->getGlyphID(4), static_cast<GlyphID>(1));
   ASSERT_EQ(typeface->getGlyphID(1000), static_cast<GlyphID>(0));
 
-  auto pathTypeface = static_cast<ImageTypeface*>(typeface.get());
-  auto activeID = pathTypeface->getActiveID();
-  auto uniqueID = pathTypeface->uniqueID();
-  ASSERT_NE(uniqueID, activeID);
-
   imagePath = "resources/assets/glyph3.png";
   imageCodec = ImageCodec::MakeFrom(ProjectPath::Absolute(imagePath));
   builder.addGlyph(std::move(imageCodec), Point::Make(0.0f, 5.0f), 6);
 
   typeface = builder.detach();
   ASSERT_TRUE(typeface != nullptr);
-  auto newActiveID = static_cast<ImageTypeface*>(typeface.get())->getActiveID();
-  ASSERT_EQ(activeID, newActiveID);
   ASSERT_EQ(typeface->glyphsCount(), static_cast<size_t>(3));
-  auto newUniqueID = pathTypeface->uniqueID();
-  ASSERT_NE(uniqueID, newUniqueID);
 
   ContextScope scope;
   auto context = scope.getContext();
