@@ -1731,12 +1731,9 @@ TGFX_TEST(CanvasTest, MultiImageRect_SameView) {
   ContextScope scope;
   auto* context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
-  int textureWidth = 1563;
-  int textureHeight = 1563;
-  GLTextureInfo textureInfo;
-  CreateGLTexture(context, textureWidth, textureHeight, &textureInfo);
-  auto surface = Surface::MakeFrom(context, {textureInfo, textureWidth, textureHeight},
-                                   ImageOrigin::BottomLeft);
+  int surfaceWidth = 1563;
+  int surfaceHeight = 1563;
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
   auto* canvas = surface->getCanvas();
   canvas->clear();
   auto image = MakeImage("resources/assets/GenMesh.png");
@@ -1748,7 +1745,7 @@ TGFX_TEST(CanvasTest, MultiImageRect_SameView) {
   Paint paint;
   paint.setAntiAlias(false);
   SamplingOptions options;
-  options.filterMode = FilterMode::Nearest;
+  options.filterMode = FilterMode::Linear;
   for (int i = 0; i < meshNumH; i++) {
     for (int j = 0; j < meshNumV; j++) {
       Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
@@ -1758,20 +1755,15 @@ TGFX_TEST(CanvasTest, MultiImageRect_SameView) {
     }
   }
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect_SameView"));
-  auto gl = GLFunctions::Get(context);
-  gl->deleteTextures(1, &textureInfo.id);
 }
 
 TGFX_TEST(CanvasTest, SingleImageRect) {
   ContextScope scope;
   auto* context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
-  int textureWidth = 1563;
-  int textureHeight = 1563;
-  GLTextureInfo textureInfo;
-  CreateGLTexture(context, textureWidth, textureHeight, &textureInfo);
-  auto surface = Surface::MakeFrom(context, {textureInfo, textureWidth, textureHeight},
-                                   ImageOrigin::BottomLeft);
+  int surfaceWidth = 1563;
+  int surfaceHeight = 1563;
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
   auto* canvas = surface->getCanvas();
   canvas->clear();
   auto image = MakeImage("resources/assets/GenMesh.png");
@@ -1785,8 +1777,6 @@ TGFX_TEST(CanvasTest, SingleImageRect) {
   paint.setAntiAlias(false);
   canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/SingleImageRect"));
-  auto gl = GLFunctions::Get(context);
-  gl->deleteTextures(1, &textureInfo.id);
 }
 
 TGFX_TEST(CanvasTest, MultiImageRect_SCALE_LINEAR) {
