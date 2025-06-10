@@ -110,8 +110,8 @@ void DropShadowStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<Imag
   if (!_showBehindLayer) {
     extraSource = extraSource->makeWithFilter(opaqueFilter);
     auto shader = Shader::MakeImageShader(extraSource, TileMode::Decal, TileMode::Decal);
-    auto matrixShader = shader->makeWithMatrix(
-        Matrix::MakeTrans(extraSourceOffset.x - offset.x, extraSourceOffset.y - offset.y));
+    auto matrixShader =
+        shader->makeWithMatrix(Matrix::MakeTrans(extraSourceOffset.x, extraSourceOffset.y));
     paint.setMaskFilter(MaskFilter::MakeShader(matrixShader, true));
   }
   paint.setBlendMode(blendMode);

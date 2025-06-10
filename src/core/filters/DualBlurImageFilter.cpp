@@ -146,7 +146,10 @@ std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_
   // calculate the uv matrix of the first downsample. Add sampleOffset to get the sample texture.
   uvMatrix.preTranslate(sampleOffset.x * scaleFactor * downScaling,
                         sampleOffset.y * scaleFactor * downScaling);
-  auto sourceProcessor = FragmentProcessor::Make(source, fpArgs, tileMode, tileMode, {}, &uvMatrix);
+  // SamplingOptions sampling(FilterMode::Linear, MipmapMode::None);
+  SamplingOptions sampling(FilterMode::Linear, MipmapMode::None);
+  auto sourceProcessor =
+      FragmentProcessor::Make(source, fpArgs, tileMode, tileMode, sampling, &uvMatrix);
 
   // downsample
   for (int i = 0; i < iteration; ++i) {
@@ -163,8 +166,8 @@ std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_
       uvMatrix = Matrix::MakeScale(textureSize.width / static_cast<float>(downWidth),
                                    textureSize.height / static_cast<float>(downHeight));
 
-      sourceProcessor =
-          TextureEffect::Make(lastRenderTarget->getTextureProxy(), {}, &uvMatrix, isAlphaOnly);
+      sourceProcessor = TextureEffect::Make(lastRenderTarget->getTextureProxy(), sampling,
+                                            &uvMatrix, isAlphaOnly);
     }
     draw(renderTarget, args.renderFlags, std::move(sourceProcessor), downScaling, true);
     textureSize = Size::Make(static_cast<float>(downWidth), static_cast<float>(downHeight));
@@ -190,7 +193,7 @@ std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_
                                    textureSize.height / static_cast<float>(renderTarget->height()));
     }
     sourceProcessor =
-        TextureEffect::Make(lastRenderTarget->getTextureProxy(), {}, &uvMatrix, isAlphaOnly);
+        TextureEffect::Make(lastRenderTarget->getTextureProxy(), sampling, &uvMatrix, isAlphaOnly);
     draw(renderTarget, args.renderFlags, std::move(sourceProcessor), upSampleScale, false);
     lastRenderTarget = renderTarget;
     textureSize = Size::Make(static_cast<float>(renderTarget->width()),

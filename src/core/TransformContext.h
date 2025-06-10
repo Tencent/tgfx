@@ -64,11 +64,6 @@ class TransformContext : public DrawContext {
     drawContext->drawShape(std::move(shape), transform(state), fill);
   }
 
-  void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                 const MCState& state, const Fill& fill) override {
-    drawContext->drawImage(std::move(image), sampling, transform(state), fill);
-  }
-
   void drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                      const SamplingOptions& sampling, const MCState& state,
                      const Fill& fill) override {

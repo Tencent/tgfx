@@ -109,7 +109,7 @@ std::vector<Rect> RootLayer::updateDirtyRegions() {
   while (mergeDirtyList(false)) {
   }
   dirtyAreas.clear();
-  DecomposeRects(dirtyRects);
+  DecomposeRects(dirtyRects.data(), dirtyRects.size());
   return std::move(dirtyRects);
 }
 

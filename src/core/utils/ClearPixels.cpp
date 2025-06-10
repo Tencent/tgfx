@@ -16,23 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GlyphRasterizer.h"
+#include "ClearPixels.h"
 
 namespace tgfx {
-GlyphRasterizer::GlyphRasterizer(int width, int height,
-                                 std::shared_ptr<ScalerContext> scalerContext, GlyphID glyphID,
-                                 bool fauxBold, const Stroke* stroke)
-    : ImageCodec(width, height, Orientation::LeftTop), scalerContext(std::move(scalerContext)),
-      glyphID(glyphID), fauxBold(fauxBold), stroke(stroke ? new Stroke(*stroke) : nullptr) {
-}
-
-GlyphRasterizer::~GlyphRasterizer() {
-  if (stroke) {
-    delete stroke;
+void ClearPixels(const ImageInfo& dstInfo, void* dstPixels) {
+  if (dstInfo.rowBytes() == dstInfo.minRowBytes()) {
+    memset(dstPixels, 0, dstInfo.byteSize());
+    return;
   }
-}
-
-bool GlyphRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
-  return scalerContext->readPixels(glyphID, fauxBold, stroke, dstInfo, dstPixels);
+  auto height = static_cast<size_t>(dstInfo.height());
+  for (size_t y = 0; y < height; ++y) {
+    auto row = static_cast<uint8_t*>(dstPixels) + y * dstInfo.rowBytes();
+    memset(row, 0, dstInfo.rowBytes());
+  }
 }
 }  // namespace tgfx

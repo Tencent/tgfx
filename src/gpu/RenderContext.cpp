@@ -22,8 +22,8 @@
 #include "core/PathTriangulator.h"
 #include "core/Rasterizer.h"
 #include "core/images/SubsetImage.h"
+#include "core/utils/ApplyStrokeToBound.h"
 #include "core/utils/MathExtra.h"
-#include "core/utils/Types.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 
@@ -91,13 +91,6 @@ void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state
   }
 }
 
-void RenderContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                              const MCState& state, const Fill& fill) {
-  DEBUG_ASSERT(image != nullptr);
-  auto rect = Rect::MakeWH(image->width(), image->height());
-  return drawImageRect(std::move(image), rect, sampling, state, fill);
-}
-
 void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                                   const SamplingOptions& sampling, const MCState& state,
                                   const Fill& fill) {
@@ -112,21 +105,7 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect
     // There is no scaling for the source image, so we can disable mipmaps to save memory.
     samplingOptions.mipmapMode = MipmapMode::None;
   }
-  auto type = Types::Get(image.get());
-  if (type != Types::ImageType::Subset) {
-    compositor->fillImage(std::move(image), rect, samplingOptions, state, fill);
-  } else {
-    // Unwrap the subset image to maximize the merging of draw calls.
-    auto subsetImage = static_cast<const SubsetImage*>(image.get());
-    auto imageRect = rect;
-    auto imageState = state;
-    auto& subset = subsetImage->bounds;
-    imageRect.offset(subset.left, subset.top);
-    imageState.matrix.preTranslate(-subset.left, -subset.top);
-    auto offsetMatrix = Matrix::MakeTrans(subset.left, subset.top);
-    compositor->fillImage(subsetImage->source, imageRect, samplingOptions, imageState,
-                          fill.makeWithMatrix(offsetMatrix));
-  }
+  compositor->fillImage(std::move(image), rect, samplingOptions, state, fill);
 }
 
 void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
@@ -142,7 +121,7 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   }
   auto bounds = glyphRunList->getBounds(maxScale);
   if (stroke) {
-    stroke->applyToBounds(&bounds);
+    ApplyStrokeToBounds(*stroke, &bounds);
   }
   state.matrix.mapRect(&bounds);  // To device space
   auto clipBounds = getClipBounds(state.clip);
@@ -164,7 +143,8 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   }
   auto newState = state;
   newState.matrix = Matrix::MakeTrans(bounds.x(), bounds.y());
-  drawImage(std::move(image), {}, newState, fill.makeWithMatrix(rasterizeMatrix));
+  auto imageRect = Rect::MakeWH(image->width(), image->height());
+  drawImageRect(std::move(image), imageRect, {}, newState, fill.makeWithMatrix(rasterizeMatrix));
 }
 
 void RenderContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
@@ -217,7 +197,8 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
     return;
   }
   drawState.matrix.preConcat(invertMatrix);
-  drawImage(std::move(image), {}, drawState, fill.makeWithMatrix(viewMatrix));
+  auto imageRect = Rect::MakeWH(image->width(), image->height());
+  drawImageRect(std::move(image), imageRect, {}, drawState, fill.makeWithMatrix(viewMatrix));
 }
 
 void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,

@@ -116,15 +116,7 @@ std::shared_ptr<ImageCodec> Font::getImage(GlyphID glyphID, const Stroke* stroke
     return nullptr;
   }
 
-  std::unique_ptr<Stroke> adjustMitterStroke = nullptr;
-  if (stroke != nullptr) {
-    adjustMitterStroke = std::make_unique<Stroke>(*stroke);
-    // Glyph stroke rarely creates sharp angles, so setting miterLimit = 1.0f
-    // helps produce tighter bounding box.
-    adjustMitterStroke->miterLimit = 1.0f;
-  }
-  auto bounds =
-      scalerContext->getImageTransform(glyphID, fauxBold, adjustMitterStroke.get(), matrix);
+  auto bounds = scalerContext->getImageTransform(glyphID, fauxBold, stroke, matrix);
   if (bounds.isEmpty()) {
     return nullptr;
   }
@@ -133,8 +125,7 @@ std::shared_ptr<ImageCodec> Font::getImage(GlyphID glyphID, const Stroke* stroke
   }
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
-  return std::make_shared<GlyphRasterizer>(width, height, scalerContext, glyphID, fauxBold,
-                                           std::move(adjustMitterStroke));
+  return std::make_shared<GlyphRasterizer>(width, height, scalerContext, glyphID, fauxBold, stroke);
 }
 
 bool Font::operator==(const Font& font) const {

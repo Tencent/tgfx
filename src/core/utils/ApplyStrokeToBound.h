@@ -16,23 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GlyphRasterizer.h"
+#pragma once
+
+#include "tgfx/core/Rect.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
-GlyphRasterizer::GlyphRasterizer(int width, int height,
-                                 std::shared_ptr<ScalerContext> scalerContext, GlyphID glyphID,
-                                 bool fauxBold, const Stroke* stroke)
-    : ImageCodec(width, height, Orientation::LeftTop), scalerContext(std::move(scalerContext)),
-      glyphID(glyphID), fauxBold(fauxBold), stroke(stroke ? new Stroke(*stroke) : nullptr) {
-}
-
-GlyphRasterizer::~GlyphRasterizer() {
-  if (stroke) {
-    delete stroke;
-  }
-}
-
-bool GlyphRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
-  return scalerContext->readPixels(glyphID, fauxBold, stroke, dstInfo, dstPixels);
-}
+/**
+ * Applies the stroke options to the given bounds.
+ */
+void ApplyStrokeToBounds(const Stroke& stroke, Rect* bounds, bool applyMiterLimit = false);
 }  // namespace tgfx
