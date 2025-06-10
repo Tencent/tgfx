@@ -26,7 +26,7 @@ ImageScalerContext::ImageScalerContext(std::shared_ptr<Typeface> typeface, float
     textScale = 1.0f;
     extraScale.set(0.0f, 0.0f);
   }
-  auto fontMetrics = static_cast<ImageTypeface*>(typeface.get())->fontMetrics();
+  auto fontMetrics = static_cast<ImageTypeface*>(this->typeface.get())->fontMetrics();
   auto xppem = fabs(fontMetrics.bottom - fontMetrics.top);
   auto yppem = fabs(fontMetrics.xMax - fontMetrics.xMin);
   xppem = FloatNearlyZero(xppem) ? 109.f : xppem;
