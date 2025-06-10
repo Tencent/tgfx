@@ -2359,18 +2359,19 @@ TGFX_TEST(LayerTest, RasterizedCache) {
   rectLayer->setFillStyle(SolidColor::Make(Color::Red()));
   rectLayer->setShouldRasterize(true);
   rectLayer->setLayerStyles({style});
-  rectLayer->setMatrix(Matrix::MakeTrans(100, 0));
+  rectLayer->setMatrix(Matrix::MakeTrans(150, 0));
   imageLayer->addChild(rectLayer);
 
   auto blurLayer = ShapeLayer::Make();
   Path childPath;
-  childPath.addRect(Rect::MakeWH(250, 100));
+  childPath.addRect(Rect::MakeWH(100, 100));
   blurLayer->setPath(childPath);
   auto fillStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0, 128));
   blurLayer->setFillStyle(fillStyle);
   blurLayer->setShouldRasterize(true);
+  blurLayer->setMatrix(Matrix::MakeTrans(150, 0));
   blurLayer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
-  rootLayer->addChild(blurLayer);
+  imageLayer->addChild(blurLayer);
 
   displayList->root()->addChild(rootLayer);
   displayList->render(surface.get());
