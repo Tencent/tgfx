@@ -27,15 +27,15 @@ class WeakMap {
  public:
   std::shared_ptr<T> find(const Key& key, size_t cleanThreshold = 50) {
     std::lock_guard<std::mutex> lock(mutex);
-    auto it = cacheMap.find(key);
-    if (it == cacheMap.end()) {
+    auto result = cacheMap.find(key);
+    if (result == cacheMap.end()) {
       return nullptr;
     }
-    auto cachedPointer = it->second.lock();
+    auto cachedPointer = result->second.lock();
     if (cachedPointer) {
       return cachedPointer;
     }
-    cacheMap.erase(it);
+    cacheMap.erase(result);
     if (cacheMap.size() > cleanThreshold) {
       std::vector<Key> expiredKeys = {};
       for (const auto& item : cacheMap) {
@@ -57,5 +57,5 @@ class WeakMap {
 
  private:
   std::unordered_map<Key, std::weak_ptr<T>> cacheMap = {};
-  std::mutex mutex;
+  std::mutex mutex = {};
 };
