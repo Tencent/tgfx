@@ -28,33 +28,34 @@ class WeakMap {
   std::shared_ptr<T> find(const Key& key, size_t cleanThreshold = 50) {
     std::lock_guard<std::mutex> lock(mutex);
     auto it = cacheMap.find(key);
-    if (it != cacheMap.end()) {
-      auto cachedPtr = it->second.lock();
-      if (cachedPtr) {
-        return cachedPtr;
+    if (it == cacheMap.end()) {
+      return nullptr;
+    }
+    auto cachedPointer = it->second.lock();
+    if (cachedPointer) {
+      return cachedPointer;
+    }
+    cacheMap.erase(it);
+    if (cacheMap.size() > cleanThreshold) {
+      std::vector<Key> expiredKeys = {};
+      for (const auto& item : cacheMap) {
+        if (item.second.expired()) {
+          expiredKeys.push_back(item.first);
+        }
       }
-      cacheMap.erase(it);
-      if (cacheMap.size() > cleanThreshold) {
-        std::vector<Key> expiredKeys;
-        for (const auto& item : cacheMap) {
-          if (item.second.expired()) {
-            expiredKeys.push_back(item.first);
-          }
-        }
-        for (const auto& k : expiredKeys) {
-          cacheMap.erase(k);
-        }
+      for (const auto& k : expiredKeys) {
+        cacheMap.erase(k);
       }
     }
     return nullptr;
   }
 
-  void insert(const Key& key, const std::shared_ptr<T>& ptr) {
+  void insert(const Key& key, const std::shared_ptr<T>& pointer) {
     std::lock_guard<std::mutex> lock(mutex);
-    cacheMap[key] = std::weak_ptr<T>(ptr);
+    cacheMap[key] = pointer;
   }
 
  private:
-  std::unordered_map<Key, std::weak_ptr<T>> cacheMap;
+  std::unordered_map<Key, std::weak_ptr<T>> cacheMap = {};
   std::mutex mutex;
 };
