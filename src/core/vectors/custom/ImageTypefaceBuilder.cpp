@@ -45,7 +45,6 @@ std::shared_ptr<Typeface> ImageTypefaceBuilder::detach() const {
   if (glyphRecords.empty()) {
     return nullptr;
   }
-  return std::make_shared<ImageTypeface>(uniqueID, _fontFamily, _fontStyle, _fontMetrics,
-                                         glyphRecords);
+  return ImageTypeface::Make(uniqueID, _fontFamily, _fontStyle, _fontMetrics, glyphRecords);
 }
 }  // namespace tgfx

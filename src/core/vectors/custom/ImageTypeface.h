@@ -28,9 +28,10 @@ class ImageTypeface final : public Typeface {
  public:
   using ImageRecordType = std::vector<std::shared_ptr<ImageTypefaceBuilder::GlyphRecord>>;
 
-  explicit ImageTypeface(uint32_t uniqueID, const std::string& fontFamily,
-                         const std::string& fontStyle, const FontMetrics& metrics,
-                         const ImageRecordType& glyphRecords);
+  static std::shared_ptr<ImageTypeface> Make(uint32_t uniqueID, const std::string& fontFamily,
+                                             const std::string& fontStyle,
+                                             const FontMetrics& metrics,
+                                             const ImageRecordType& glyphRecords);
 
   uint32_t getActiveID() const override {
     return _builderID;
@@ -69,6 +70,10 @@ class ImageTypeface final : public Typeface {
   std::shared_ptr<ImageTypefaceBuilder::GlyphRecord> getGlyphRecord(GlyphID glyphID) const;
 
  private:
+  explicit ImageTypeface(uint32_t uniqueID, const std::string& fontFamily,
+                         const std::string& fontStyle, const FontMetrics& metrics,
+                         const ImageRecordType& glyphRecords);
+
   void initCharGlyphIDMap();
 
   std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;

@@ -20,6 +20,17 @@
 #include "PathScalerContext.h"
 
 namespace tgfx {
+
+std::shared_ptr<PathTypeface> PathTypeface::Make(uint32_t builderID, const std::string& fontFamily,
+                                                 const std::string& fontStyle,
+                                                 const FontMetrics& metrics,
+                                                 const VectorRecordType& glyphRecords) {
+  auto typeface = std::shared_ptr<PathTypeface>(
+      new PathTypeface(builderID, fontFamily, fontStyle, metrics, glyphRecords));
+  typeface->weakThis = typeface;
+  return typeface;
+}
+
 PathTypeface::PathTypeface(uint32_t builderID, const std::string& fontFamily,
                            const std::string& fontStyle, const FontMetrics& metrics,
                            const VectorRecordType& glyphRecords)

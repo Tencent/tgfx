@@ -54,7 +54,6 @@ std::shared_ptr<Typeface> PathTypefaceBuilder::detach() const {
   if (glyphRecords.empty()) {
     return nullptr;
   }
-  return std::make_shared<PathTypeface>(uniqueID, _fontFamily, _fontStyle, _fontMetrics,
-                                        glyphRecords);
+  return PathTypeface::Make(uniqueID, _fontFamily, _fontStyle, _fontMetrics, glyphRecords);
 }
 }  // namespace tgfx

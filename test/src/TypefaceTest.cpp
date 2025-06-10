@@ -144,7 +144,7 @@ TGFX_TEST(TypefaceTest, CustomImageTypeface) {
 
   imagePath = "resources/assets/glyph3.png";
   imageCodec = ImageCodec::MakeFrom(ProjectPath::Absolute(imagePath));
-  builder.addGlyph(std::move(imageCodec), Point::Make(5.0f, 5.0f), 6);
+  builder.addGlyph(std::move(imageCodec), Point::Make(0.0f, 5.0f), 6);
 
   typeface = builder.detach();
   ASSERT_TRUE(typeface != nullptr);
@@ -157,21 +157,21 @@ TGFX_TEST(TypefaceTest, CustomImageTypeface) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 400, 200);
+  auto surface = Surface::Make(context, 600, 250);
   auto canvas = surface->getCanvas();
 
   auto paint = Paint();
   paint.setColor(Color::Red());
 
-  float scaleFactor = 1.0f;
+  float scaleFactor = 0.5f;
   canvas->scale(scaleFactor, scaleFactor);
 
   Font font(std::move(typeface), 12);
-  std::vector<GlyphID> glyphIDs2 = {4, 5, 6};
+  std::vector<GlyphID> glyphIDs2 = {1, 2, 3};
   std::vector<Point> positions2 = {};
-  positions2.push_back(Point::Make(150.0f, 0.0f));
-  positions2.push_back(Point::Make(205.0f, 0.0f));
-  positions2.push_back(Point::Make(260.0f, 0.0f));
+  positions2.push_back(Point::Make(0.0f, 0.0f));
+  positions2.push_back(Point::Make(200.0f, 0.0f));
+  positions2.push_back(Point::Make(400.0f, 0.0f));
   canvas->drawGlyphs(glyphIDs2.data(), positions2.data(), glyphIDs2.size(), font, paint);
 
   EXPECT_TRUE(Baseline::Compare(surface, "TypefaceTest/CustomImageTypeface"));

@@ -20,6 +20,16 @@
 #include "ImageScalerContext.h"
 
 namespace tgfx {
+std::shared_ptr<ImageTypeface> ImageTypeface::Make(uint32_t uniqueID, const std::string& fontFamily,
+                                                   const std::string& fontStyle,
+                                                   const FontMetrics& metrics,
+                                                   const ImageRecordType& glyphRecords) {
+  auto typeface = std::shared_ptr<ImageTypeface>(
+      new ImageTypeface(uniqueID, fontFamily, fontStyle, metrics, glyphRecords));
+  typeface->weakThis = typeface;
+  return typeface;
+}
+
 ImageTypeface::ImageTypeface(uint32_t uniqueID, const std::string& fontFamily,
                              const std::string& fontStyle, const FontMetrics& metrics,
                              const ImageRecordType& glyphRecords)

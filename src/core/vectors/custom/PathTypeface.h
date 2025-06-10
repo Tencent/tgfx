@@ -28,9 +28,10 @@ class PathTypeface final : public Typeface {
  public:
   using VectorRecordType = std::vector<std::shared_ptr<PathTypefaceBuilder::GlyphRecord>>;
 
-  explicit PathTypeface(uint32_t builderID, const std::string& fontFamily,
-                        const std::string& fontStyle, const FontMetrics& metrics,
-                        const VectorRecordType& glyphRecords);
+  static std::shared_ptr<PathTypeface> Make(uint32_t builderID, const std::string& fontFamily,
+                                            const std::string& fontStyle,
+                                            const FontMetrics& metrics,
+                                            const VectorRecordType& glyphRecords);
 
   uint32_t getActiveID() const override {
     return _builderID;
@@ -69,6 +70,10 @@ class PathTypeface final : public Typeface {
   std::shared_ptr<PathTypefaceBuilder::GlyphRecord> getGlyphRecord(GlyphID glyphID) const;
 
  private:
+  explicit PathTypeface(uint32_t builderID, const std::string& fontFamily,
+                        const std::string& fontStyle, const FontMetrics& metrics,
+                        const VectorRecordType& glyphRecords);
+
   void initCharGlyphIDMap();
 
   std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;
