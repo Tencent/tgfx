@@ -1084,6 +1084,9 @@ void Layer::updateRenderBounds(const Matrix& renderMatrix,
   }
   for (auto& child : _children) {
     if (!child->bitFields.visible || child->_alpha <= 0) {
+      if (child->bitFields.dirtyTransform) {
+        _root->invalidateRect(child->renderBounds);
+      }
       child->bitFields.dirtyTransform = false;
       continue;
     }
