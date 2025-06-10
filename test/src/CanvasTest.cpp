@@ -1735,7 +1735,8 @@ TGFX_TEST(CanvasTest, SubsetImageSampler) {
   int textureHeight = 1563;
   GLTextureInfo textureInfo;
   CreateGLTexture(context, textureWidth, textureHeight, &textureInfo);
-  auto surface = Surface::MakeFrom(context, {textureInfo, textureWidth, textureHeight}, ImageOrigin::BottomLeft);
+  auto surface = Surface::MakeFrom(context, {textureInfo, textureWidth, textureHeight},
+                                   ImageOrigin::BottomLeft);
   auto* canvas = surface->getCanvas();
   canvas->clear();
   auto image = MakeImage("resources/assets/GenMesh.png");
@@ -1748,10 +1749,11 @@ TGFX_TEST(CanvasTest, SubsetImageSampler) {
   paint.setAntiAlias(false);
   SamplingOptions options;
   options.filterMode = FilterMode::Nearest;
-  for(int i = 0; i < meshNumH; i++) {
-    for(int j = 0; j < meshNumV; j++) {
+  for (int i = 0; i < meshNumH; i++) {
+    for (int j = 0; j < meshNumV; j++) {
       Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
-      Rect dstRect = Rect::MakeXYWH(i * meshWidth * scale, j * meshHeight * scale, meshWidth * scale, meshHeight * scale);
+      Rect dstRect = Rect::MakeXYWH(i * meshWidth * scale, j * meshHeight * scale,
+                                    meshWidth * scale, meshHeight * scale);
       canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
     }
   }
@@ -1768,13 +1770,15 @@ TGFX_TEST(CanvasTest, SubsetImageScale) {
   int textureHeight = 1563;
   GLTextureInfo textureInfo;
   CreateGLTexture(context, textureWidth, textureHeight, &textureInfo);
-  auto surface = Surface::MakeFrom(context, {textureInfo, textureWidth, textureHeight}, ImageOrigin::BottomLeft);
+  auto surface = Surface::MakeFrom(context, {textureInfo, textureWidth, textureHeight},
+                                   ImageOrigin::BottomLeft);
   auto* canvas = surface->getCanvas();
   canvas->clear();
   auto image = MakeImage("resources/assets/GenMesh.png");
   float scale = 0.89f;
   Rect srcRect = Rect::MakeXYWH(624, 624, 312, 312);
-  Rect dstRect = Rect::MakeXYWH(srcRect.x() * scale, srcRect.y() * scale, srcRect.width() * scale, srcRect.height() * scale);
+  Rect dstRect = Rect::MakeXYWH(srcRect.x() * scale, srcRect.y() * scale, srcRect.width() * scale,
+                                srcRect.height() * scale);
   SamplingOptions options;
   options.filterMode = FilterMode::Linear;
   Paint paint;
@@ -1793,7 +1797,8 @@ TGFX_TEST(CanvasTest, ReorderImage) {
   int textureHeight = 1563;
   GLTextureInfo textureInfo;
   CreateGLTexture(context, textureWidth, textureHeight, &textureInfo);
-  auto surface = Surface::MakeFrom(context, {textureInfo, textureWidth, textureHeight}, ImageOrigin::BottomLeft);
+  auto surface = Surface::MakeFrom(context, {textureInfo, textureWidth, textureHeight},
+                                   ImageOrigin::BottomLeft);
   auto* canvas = surface->getCanvas();
   canvas->clear();
   auto image = MakeImage("resources/assets/HappyNewYear.png");
@@ -1807,7 +1812,8 @@ TGFX_TEST(CanvasTest, ReorderImage) {
   // 1th row
   {
     Rect srcRect = Rect::MakeXYWH(0, 0, meshWidth, meshHeight);
-    Rect dstRect = Rect::MakeXYWH(meshWidth * scale, meshHeight * scale, meshWidth * scale, meshHeight * scale);
+    Rect dstRect = Rect::MakeXYWH(meshWidth * scale, meshHeight * scale, meshWidth * scale,
+                                  meshHeight * scale);
     canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
   }
 
@@ -1819,13 +1825,15 @@ TGFX_TEST(CanvasTest, ReorderImage) {
 
   {
     Rect srcRect = Rect::MakeXYWH(meshWidth * 2, 0, meshWidth, meshHeight);
-    Rect dstRect = Rect::MakeXYWH(0.0f, meshHeight * 2 * scale, meshWidth * scale, meshHeight * scale);
+    Rect dstRect =
+        Rect::MakeXYWH(0.0f, meshHeight * 2 * scale, meshWidth * scale, meshHeight * scale);
     canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
   }
 
   {
     Rect srcRect = Rect::MakeXYWH(meshWidth * 3, 0, meshWidth, meshHeight);
-    Rect dstRect = Rect::MakeXYWH(meshWidth * 3 * scale, 0.0f, meshWidth * scale, meshHeight * scale);
+    Rect dstRect =
+        Rect::MakeXYWH(meshWidth * 3 * scale, 0.0f, meshWidth * scale, meshHeight * scale);
     canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
   }
 
@@ -1844,63 +1852,73 @@ TGFX_TEST(CanvasTest, ReorderImage) {
 
   {
     Rect srcRect = Rect::MakeXYWH(meshWidth * 2, meshHeight, meshWidth, meshHeight);
-    Rect dstRect = Rect::MakeXYWH(meshWidth * 2 * scale, meshHeight * 3 * scale, meshWidth * scale, meshHeight * scale);
+    Rect dstRect = Rect::MakeXYWH(meshWidth * 2 * scale, meshHeight * 3 * scale, meshWidth * scale,
+                                  meshHeight * scale);
     canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
   }
 
   {
     Rect srcRect = Rect::MakeXYWH(meshWidth * 3, meshHeight, meshWidth, meshHeight);
-    Rect dstRect = Rect::MakeXYWH(meshWidth * 3 * scale, meshHeight * scale, meshWidth * scale, meshHeight * scale);
+    Rect dstRect = Rect::MakeXYWH(meshWidth * 3 * scale, meshHeight * scale, meshWidth * scale,
+                                  meshHeight * scale);
     canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
   }
 
   // 3th row
   {
     Rect srcRect = Rect::MakeXYWH(0, meshHeight * 2, meshWidth, meshHeight);
-    Rect dstRect = Rect::MakeXYWH(0.0f, meshHeight * 3 * scale, meshWidth * scale, meshHeight * scale);
+    Rect dstRect =
+        Rect::MakeXYWH(0.0f, meshHeight * 3 * scale, meshWidth * scale, meshHeight * scale);
     canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
   }
 
   {
     Rect srcRect = Rect::MakeXYWH(meshWidth, meshHeight * 2, meshWidth, meshHeight);
-    Rect dstRect = Rect::MakeXYWH(meshWidth * 3 * scale, meshHeight * 2 * scale, meshWidth * scale, meshHeight * scale);
+    Rect dstRect = Rect::MakeXYWH(meshWidth * 3 * scale, meshHeight * 2 * scale, meshWidth * scale,
+                                  meshHeight * scale);
     canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
   }
 
   {
     Rect srcRect = Rect::MakeXYWH(meshWidth * 2, meshHeight * 2, meshWidth, meshHeight);
-    Rect dstRect = Rect::MakeXYWH(meshWidth * 2 * scale, meshHeight * 2 * scale, meshWidth * scale, meshHeight * scale);
+    Rect dstRect = Rect::MakeXYWH(meshWidth * 2 * scale, meshHeight * 2 * scale, meshWidth * scale,
+                                  meshHeight * scale);
     canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
   }
 
   {
     Rect srcRect = Rect::MakeXYWH(meshWidth * 3, meshHeight * 2, meshWidth, meshHeight);
-    Rect dstRect = Rect::MakeXYWH(meshWidth * 2 * scale, 0.0f, meshWidth * scale, meshHeight * scale);
+    Rect dstRect =
+        Rect::MakeXYWH(meshWidth * 2 * scale, 0.0f, meshWidth * scale, meshHeight * scale);
     canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
   }
 
   // 4th row
   {
     Rect srcRect = Rect::MakeXYWH(0, meshHeight * 3, meshWidth, meshHeight);
-    Rect dstRect = Rect::MakeXYWH(meshWidth * 2 * scale, meshHeight * scale, meshWidth * scale, meshHeight * scale);
+    Rect dstRect = Rect::MakeXYWH(meshWidth * 2 * scale, meshHeight * scale, meshWidth * scale,
+                                  meshHeight * scale);
     canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
   }
 
   {
     Rect srcRect = Rect::MakeXYWH(meshWidth, meshHeight * 3, meshWidth, meshHeight);
-    Rect dstRect = Rect::MakeXYWH(meshWidth * scale, meshHeight * 3 * scale, meshWidth * scale, meshHeight * scale);
+    Rect dstRect = Rect::MakeXYWH(meshWidth * scale, meshHeight * 3 * scale, meshWidth * scale,
+                                  meshHeight * scale);
     canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
   }
 
   {
     Rect srcRect = Rect::MakeXYWH(meshWidth * 2, meshHeight * 3, meshWidth, meshHeight);
-    Rect dstRect = Rect::MakeXYWH(meshWidth * scale, meshHeight * 2 * scale, meshWidth * scale, meshHeight * scale);
+    Rect dstRect = Rect::MakeXYWH(meshWidth * scale, meshHeight * 2 * scale, meshWidth * scale,
+                                  meshHeight * scale);
     canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
   }
 
   {
     Rect srcRect = Rect::MakeXYWH(meshWidth * 3, meshHeight * 3, meshWidth, meshHeight);
-    Rect dstRect = Rect::MakeXYWH(meshWidth * 3 * scale, meshHeight * 3 * scale, meshWidth * scale, meshHeight * scale);
+    Rect dstRect = Rect::MakeXYWH(meshWidth * 3 * scale, meshHeight * 3 * scale, meshWidth * scale,
+                                  meshHeight * scale);
     canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
   }
 
