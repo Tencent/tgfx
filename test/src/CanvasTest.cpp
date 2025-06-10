@@ -1727,7 +1727,7 @@ TGFX_TEST(CanvasTest, ShadowBoundIntersect) {
   context->flush();
 }
 
-TGFX_TEST(CanvasTest, SubsetImageSampler) {
+TGFX_TEST(CanvasTest, MultiImageRect_SameView) {
   ContextScope scope;
   auto* context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -1757,12 +1757,12 @@ TGFX_TEST(CanvasTest, SubsetImageSampler) {
       canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
     }
   }
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/SubsetImageSampler"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect_SameView"));
   auto gl = GLFunctions::Get(context);
   gl->deleteTextures(1, &textureInfo.id);
 }
 
-TGFX_TEST(CanvasTest, SubsetImageScale) {
+TGFX_TEST(CanvasTest, SingleImageRect) {
   ContextScope scope;
   auto* context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -1784,12 +1784,12 @@ TGFX_TEST(CanvasTest, SubsetImageScale) {
   Paint paint;
   paint.setAntiAlias(false);
   canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/SubsetImageScale"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/SingleImageRect"));
   auto gl = GLFunctions::Get(context);
   gl->deleteTextures(1, &textureInfo.id);
 }
 
-TGFX_TEST(CanvasTest, ReorderImage) {
+TGFX_TEST(CanvasTest, MultiImageRect) {
   ContextScope scope;
   auto* context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -1922,7 +1922,7 @@ TGFX_TEST(CanvasTest, ReorderImage) {
     canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
   }
 
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ReorderImage"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect"));
   auto gl = GLFunctions::Get(context);
   gl->deleteTextures(1, &textureInfo.id);
 }
