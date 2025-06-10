@@ -2775,13 +2775,12 @@ TGFX_TEST(LayerTest, DirtyRegionTest) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest7"));
 }
 
-TGFX_TEST(LayerTest, LayerDrawBadCase) {
+TGFX_TEST(LayerTest, LayerVisible) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 1024, 800);
+  auto surface = Surface::Make(context, 100, 100);
   auto displayList = std::make_unique<DisplayList>();
-  displayList->showDirtyRegions(false);
   auto rootLayer = Layer::Make();
   displayList->root()->addChild(rootLayer);
   auto layer = ShapeLayer::Make();
@@ -2792,12 +2791,12 @@ TGFX_TEST(LayerTest, LayerDrawBadCase) {
   layer->setVisible(true);
   rootLayer->addChild(layer);
   displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerDrawBadCase"));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerVisible"));
   layer->setVisible(false);
   displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerDrawBadCase1"));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerVisible1"));
   layer->setVisible(true);
   displayList->render(surface.get());
-  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerDrawBadCase"));
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerVisible"));
 }
 }  // namespace tgfx
