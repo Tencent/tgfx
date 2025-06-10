@@ -2359,18 +2359,19 @@ TGFX_TEST(LayerTest, RasterizedCache) {
   rectLayer->setFillStyle(SolidColor::Make(Color::Red()));
   rectLayer->setShouldRasterize(true);
   rectLayer->setLayerStyles({style});
-  rectLayer->setMatrix(Matrix::MakeTrans(100, 0));
+  rectLayer->setMatrix(Matrix::MakeTrans(150, 0));
   imageLayer->addChild(rectLayer);
 
   auto blurLayer = ShapeLayer::Make();
   Path childPath;
-  childPath.addRect(Rect::MakeWH(250, 100));
+  childPath.addRect(Rect::MakeWH(100, 100));
   blurLayer->setPath(childPath);
   auto fillStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0, 128));
   blurLayer->setFillStyle(fillStyle);
   blurLayer->setShouldRasterize(true);
+  blurLayer->setMatrix(Matrix::MakeTrans(150, 0));
   blurLayer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
-  rootLayer->addChild(blurLayer);
+  imageLayer->addChild(blurLayer);
 
   displayList->root()->addChild(rootLayer);
   displayList->render(surface.get());
@@ -2773,5 +2774,30 @@ TGFX_TEST(LayerTest, DirtyRegionTest) {
   displayList->setContentOffset(-256, -300);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest7"));
+}
+
+TGFX_TEST(LayerTest, LayerVisible) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 100, 100);
+  auto displayList = std::make_unique<DisplayList>();
+  auto rootLayer = Layer::Make();
+  displayList->root()->addChild(rootLayer);
+  auto layer = ShapeLayer::Make();
+  auto path = Path();
+  path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
+  layer->setPath(path);
+  layer->setFillStyle(SolidColor::Make(Color::Red()));
+  layer->setVisible(true);
+  rootLayer->addChild(layer);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerVisible"));
+  layer->setVisible(false);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerVisible1"));
+  layer->setVisible(true);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerVisible"));
 }
 }  // namespace tgfx
