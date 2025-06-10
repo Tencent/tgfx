@@ -21,6 +21,10 @@
 #include "gpu/Quad.h"
 
 namespace tgfx {
+
+// Inset texture coordinates by 0.5 pixels inward to avoid drawImageRect sampling outside the Rect.
+static constexpr float offset = 0.5f;
+
 static void WriteUByte4Color(float* vertices, int& index, const Color& color) {
   auto bytes = reinterpret_cast<uint8_t*>(&vertices[index++]);
   bytes[0] = static_cast<uint8_t>(color.red * 255);
@@ -101,7 +105,6 @@ class NonAARectVertexProvider : public RectsVertexProvider {
     for (auto& record : rects) {
       auto& viewMatrix = record->viewMatrix;
       auto& rect = record->rect;
-      float offset = 0.5f;
       auto insetBounds = rect.makeInset(offset, offset);
       auto quad = Quad::MakeFrom(rect, &viewMatrix);
       auto uvQuad = Quad::MakeFrom(insetBounds);

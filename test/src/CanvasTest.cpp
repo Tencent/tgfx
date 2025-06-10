@@ -1789,142 +1789,130 @@ TGFX_TEST(CanvasTest, SingleImageRect) {
   gl->deleteTextures(1, &textureInfo.id);
 }
 
-TGFX_TEST(CanvasTest, MultiImageRect) {
+TGFX_TEST(CanvasTest, MultiImageRect_SCALE_LINEAR) {
   ContextScope scope;
   auto* context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
-  int textureWidth = 1563;
-  int textureHeight = 1563;
-  GLTextureInfo textureInfo;
-  CreateGLTexture(context, textureWidth, textureHeight, &textureInfo);
-  auto surface = Surface::MakeFrom(context, {textureInfo, textureWidth, textureHeight},
-                                   ImageOrigin::BottomLeft);
+  int surfaceWidth = 1563;
+  int surfaceHeight = 1563;
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
   auto* canvas = surface->getCanvas();
   canvas->clear();
   auto image = MakeImage("resources/assets/HappyNewYear.png");
   float scale = 0.9f;
   Paint paint;
   paint.setAntiAlias(false);
-  int meshWidth = image->width() / 4;
-  int meshHeight = image->height() / 4;
+  constexpr int meshNumH = 4;
+  constexpr int meshNumV = 4;
+  float meshWidth = image->width() / meshNumH;
+  float meshHeight = image->height() / meshNumV;
   SamplingOptions options;
   options.filterMode = FilterMode::Linear;
-  // 1th row
-  {
-    Rect srcRect = Rect::MakeXYWH(0, 0, meshWidth, meshHeight);
-    Rect dstRect = Rect::MakeXYWH(meshWidth * scale, meshHeight * scale, meshWidth * scale,
-                                  meshHeight * scale);
-    canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
-  }
+  options.mipmapMode = MipmapMode::None;
+  Point offsets[meshNumV][meshNumH] = {
+      {{meshWidth, meshHeight}, {meshWidth, 0.0f}, {0.0f, meshHeight * 2}, {meshWidth * 3, 0.0f}},
+      {{0.0f, meshHeight},
+       {0.0f, 0.0f},
+       {meshWidth * 2, meshHeight * 3},
+       {meshWidth * 3, meshHeight}},
+      {{0.0f, meshHeight * 3},
+       {meshWidth * 3, meshHeight * 2},
+       {meshWidth * 2, meshHeight * 2},
+       {meshWidth * 2, 0.0f}},
+      {{meshWidth * 2, meshHeight},
+       {meshWidth, meshHeight * 3},
+       {meshWidth, meshHeight * 2},
+       {meshWidth * 3, meshHeight * 3}}};
+  for (int i = 0; i < meshNumH; i++)
+    for (int j = 0; j < meshNumV; j++) {
+      Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
+      Rect dstRect = Rect::MakeXYWH(offsets[j][i].x * scale, offsets[j][i].y * scale,
+                                    meshWidth * scale, meshHeight * scale);
+      canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
+    }
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect_SCALE_LINEAR_NONE"));
+  canvas->clear();
+  options.mipmapMode = MipmapMode::Linear;
+  for (int i = 0; i < meshNumH; i++)
+    for (int j = 0; j < meshNumV; j++) {
+      Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
+      Rect dstRect = Rect::MakeXYWH(offsets[j][i].x * scale, offsets[j][i].y * scale,
+                                    meshWidth * scale, meshHeight * scale);
+      canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
+    }
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect_SCALE_LINEAR_LINEAR"));
+  canvas->clear();
+  options.mipmapMode = MipmapMode::Nearest;
+  for (int i = 0; i < meshNumH; i++)
+    for (int j = 0; j < meshNumV; j++) {
+      Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
+      Rect dstRect = Rect::MakeXYWH(offsets[j][i].x * scale, offsets[j][i].y * scale,
+                                    meshWidth * scale, meshHeight * scale);
+      canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
+    }
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect_SCALE_LINEAR_NEAREST"));
+}
 
-  {
-    Rect srcRect = Rect::MakeXYWH(meshWidth, 0, meshWidth, meshHeight);
-    Rect dstRect = Rect::MakeXYWH(meshWidth * scale, 0.0f, meshWidth * scale, meshHeight * scale);
-    canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
-  }
+TGFX_TEST(CanvasTest, MultiImageRect_NOSCALE_NEAREST) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  int surfaceWidth = 1024;
+  int surfaceHeight = 1024;
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  auto* canvas = surface->getCanvas();
+  canvas->clear();
+  auto image = MakeImage("resources/assets/HappyNewYear.png");
+  Paint paint;
+  paint.setAntiAlias(false);
+  constexpr int meshNumH = 4;
+  constexpr int meshNumV = 4;
+  float meshWidth = image->width() / meshNumH;
+  float meshHeight = image->height() / meshNumV;
+  SamplingOptions options;
+  options.filterMode = FilterMode::Nearest;
+  options.mipmapMode = MipmapMode::None;
+  Point offsets[meshNumV][meshNumH] = {
+      {{meshWidth, meshHeight}, {meshWidth, 0.0f}, {0.0f, meshHeight * 2}, {meshWidth * 3, 0.0f}},
+      {{0.0f, meshHeight},
+       {0.0f, 0.0f},
+       {meshWidth * 2, meshHeight * 3},
+       {meshWidth * 3, meshHeight}},
+      {{0.0f, meshHeight * 3},
+       {meshWidth * 3, meshHeight * 2},
+       {meshWidth * 2, meshHeight * 2},
+       {meshWidth * 2, 0.0f}},
+      {{meshWidth * 2, meshHeight},
+       {meshWidth, meshHeight * 3},
+       {meshWidth, meshHeight * 2},
+       {meshWidth * 3, meshHeight * 3}}};
+  for (int i = 0; i < meshNumH; i++)
+    for (int j = 0; j < meshNumV; j++) {
+      Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
+      Rect dstRect = Rect::MakeXYWH(offsets[j][i].x, offsets[j][i].y, meshWidth, meshHeight);
+      canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
+    }
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect_NOSCALE_NEAREST_NONE"));
 
-  {
-    Rect srcRect = Rect::MakeXYWH(meshWidth * 2, 0, meshWidth, meshHeight);
-    Rect dstRect =
-        Rect::MakeXYWH(0.0f, meshHeight * 2 * scale, meshWidth * scale, meshHeight * scale);
-    canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
-  }
+  canvas->clear();
+  options.mipmapMode = MipmapMode::Linear;
+  for (int i = 0; i < meshNumH; i++)
+    for (int j = 0; j < meshNumV; j++) {
+      Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
+      Rect dstRect = Rect::MakeXYWH(offsets[j][i].x, offsets[j][i].y, meshWidth, meshHeight);
+      canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
+    }
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect_NOSCALE_NEAREST_LINEAR"));
 
-  {
-    Rect srcRect = Rect::MakeXYWH(meshWidth * 3, 0, meshWidth, meshHeight);
-    Rect dstRect =
-        Rect::MakeXYWH(meshWidth * 3 * scale, 0.0f, meshWidth * scale, meshHeight * scale);
-    canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
-  }
-
-  // 2th row
-  {
-    Rect srcRect = Rect::MakeXYWH(0, meshHeight, meshWidth, meshHeight);
-    Rect dstRect = Rect::MakeXYWH(0.0f, meshHeight * scale, meshWidth * scale, meshHeight * scale);
-    canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
-  }
-
-  {
-    Rect srcRect = Rect::MakeXYWH(meshWidth, meshHeight, meshWidth, meshHeight);
-    Rect dstRect = Rect::MakeXYWH(0.0f, 0.0f, meshWidth * scale, meshHeight * scale);
-    canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
-  }
-
-  {
-    Rect srcRect = Rect::MakeXYWH(meshWidth * 2, meshHeight, meshWidth, meshHeight);
-    Rect dstRect = Rect::MakeXYWH(meshWidth * 2 * scale, meshHeight * 3 * scale, meshWidth * scale,
-                                  meshHeight * scale);
-    canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
-  }
-
-  {
-    Rect srcRect = Rect::MakeXYWH(meshWidth * 3, meshHeight, meshWidth, meshHeight);
-    Rect dstRect = Rect::MakeXYWH(meshWidth * 3 * scale, meshHeight * scale, meshWidth * scale,
-                                  meshHeight * scale);
-    canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
-  }
-
-  // 3th row
-  {
-    Rect srcRect = Rect::MakeXYWH(0, meshHeight * 2, meshWidth, meshHeight);
-    Rect dstRect =
-        Rect::MakeXYWH(0.0f, meshHeight * 3 * scale, meshWidth * scale, meshHeight * scale);
-    canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
-  }
-
-  {
-    Rect srcRect = Rect::MakeXYWH(meshWidth, meshHeight * 2, meshWidth, meshHeight);
-    Rect dstRect = Rect::MakeXYWH(meshWidth * 3 * scale, meshHeight * 2 * scale, meshWidth * scale,
-                                  meshHeight * scale);
-    canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
-  }
-
-  {
-    Rect srcRect = Rect::MakeXYWH(meshWidth * 2, meshHeight * 2, meshWidth, meshHeight);
-    Rect dstRect = Rect::MakeXYWH(meshWidth * 2 * scale, meshHeight * 2 * scale, meshWidth * scale,
-                                  meshHeight * scale);
-    canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
-  }
-
-  {
-    Rect srcRect = Rect::MakeXYWH(meshWidth * 3, meshHeight * 2, meshWidth, meshHeight);
-    Rect dstRect =
-        Rect::MakeXYWH(meshWidth * 2 * scale, 0.0f, meshWidth * scale, meshHeight * scale);
-    canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
-  }
-
-  // 4th row
-  {
-    Rect srcRect = Rect::MakeXYWH(0, meshHeight * 3, meshWidth, meshHeight);
-    Rect dstRect = Rect::MakeXYWH(meshWidth * 2 * scale, meshHeight * scale, meshWidth * scale,
-                                  meshHeight * scale);
-    canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
-  }
-
-  {
-    Rect srcRect = Rect::MakeXYWH(meshWidth, meshHeight * 3, meshWidth, meshHeight);
-    Rect dstRect = Rect::MakeXYWH(meshWidth * scale, meshHeight * 3 * scale, meshWidth * scale,
-                                  meshHeight * scale);
-    canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
-  }
-
-  {
-    Rect srcRect = Rect::MakeXYWH(meshWidth * 2, meshHeight * 3, meshWidth, meshHeight);
-    Rect dstRect = Rect::MakeXYWH(meshWidth * scale, meshHeight * 2 * scale, meshWidth * scale,
-                                  meshHeight * scale);
-    canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
-  }
-
-  {
-    Rect srcRect = Rect::MakeXYWH(meshWidth * 3, meshHeight * 3, meshWidth, meshHeight);
-    Rect dstRect = Rect::MakeXYWH(meshWidth * 3 * scale, meshHeight * 3 * scale, meshWidth * scale,
-                                  meshHeight * scale);
-    canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
-  }
-
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect"));
-  auto gl = GLFunctions::Get(context);
-  gl->deleteTextures(1, &textureInfo.id);
+  canvas->clear();
+  options.mipmapMode = MipmapMode::Nearest;
+  for (int i = 0; i < meshNumH; i++)
+    for (int j = 0; j < meshNumV; j++) {
+      Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
+      Rect dstRect = Rect::MakeXYWH(offsets[j][i].x, offsets[j][i].y, meshWidth, meshHeight);
+      canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
+    }
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect_NOSCALE_NEAREST_NEAREST"));
 }
 
 }  // namespace tgfx
