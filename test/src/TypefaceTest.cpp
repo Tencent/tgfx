@@ -47,7 +47,7 @@ TGFX_TEST(TypefaceTest, CustomPathTypeface) {
   Rect rect = Rect::MakeXYWH(5.0f, 5.0f, 40.0f, 40.0f);
   path.addOval(rect);
   path.close();
-  builder.addGlyph(path, 50);
+  builder.addGlyph(path, 3);
 
   path.reset();
   rect = Rect::MakeXYWH(0.0f, 0.0f, 100.0f, 100.0f);
@@ -65,7 +65,7 @@ TGFX_TEST(TypefaceTest, CustomPathTypeface) {
   ASSERT_EQ(typeface->fontFamily(), fontFamily);
   ASSERT_EQ(typeface->fontStyle(), fontStyle);
   ASSERT_EQ(typeface->glyphsCount(), static_cast<size_t>(4));
-  ASSERT_EQ(typeface->getGlyphID(50), static_cast<GlyphID>(3));
+  ASSERT_EQ(typeface->getGlyphID(100), static_cast<GlyphID>(4));
   ASSERT_EQ(typeface->getGlyphID(1000), static_cast<GlyphID>(0));
 
   auto pathTypeface = static_cast<PathTypeface*>(typeface.get());
@@ -91,16 +91,18 @@ TGFX_TEST(TypefaceTest, CustomPathTypeface) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 400, 200);
+  auto surface = Surface::Make(context, 200, 100);
   auto canvas = surface->getCanvas();
 
   auto paint = Paint();
   paint.setColor(Color::Red());
+  //paint.setStyle(PaintStyle::Stroke);
 
   float scaleFactor = 1.0f;
   canvas->scale(scaleFactor, scaleFactor);
 
-  Font font(std::move(typeface), 12);
+  Font font(std::move(typeface), 1.f);
+  font.setFauxItalic(true);
   std::vector<GlyphID> glyphIDs1 = {1, 2, 3};
   std::vector<Point> positions1 = {};
   positions1.push_back(Point::Make(0.0f, 0.0f));
@@ -114,11 +116,6 @@ TGFX_TEST(TypefaceTest, CustomPathTypeface) {
 TGFX_TEST(TypefaceTest, CustomImageTypeface) {
   const std::string fontFamily = "customImage";
   const std::string fontStyle = "customStyle";
-  FontMetrics fontMetrics;
-  fontMetrics.xMax = 200.f;
-  fontMetrics.xMin = 0.f;
-  fontMetrics.top = -180.f;
-  fontMetrics.bottom = 20.f;
   ImageTypefaceBuilder builder(fontFamily, fontStyle, {});
 
   std::string imagePath = "resources/assets/glyph1.png";
@@ -162,21 +159,21 @@ TGFX_TEST(TypefaceTest, CustomImageTypeface) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 600, 250);
+  auto surface = Surface::Make(context, 400, 200);
   auto canvas = surface->getCanvas();
 
   auto paint = Paint();
   paint.setColor(Color::Red());
 
-  float scaleFactor = 0.5f;
+  float scaleFactor = 1.0f;
   canvas->scale(scaleFactor, scaleFactor);
 
-  Font font(std::move(typeface), 12);
+  Font font(std::move(typeface), 60);
   std::vector<GlyphID> glyphIDs2 = {1, 2, 3};
   std::vector<Point> positions2 = {};
-  positions2.push_back(Point::Make(0.0f, 0.0f));
-  positions2.push_back(Point::Make(200.0f, 0.0f));
-  positions2.push_back(Point::Make(400.0f, 0.0f));
+  positions2.push_back(Point::Make(150.0f, 0.0f));
+  positions2.push_back(Point::Make(215.0f, 0.0f));
+  positions2.push_back(Point::Make(280.0f, 0.0f));
   canvas->drawGlyphs(glyphIDs2.data(), positions2.data(), glyphIDs2.size(), font, paint);
 
   EXPECT_TRUE(Baseline::Compare(surface, "TypefaceTest/CustomImageTypeface"));

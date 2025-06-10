@@ -66,9 +66,12 @@ static float FloatInterpFunc(float searchKey, const float keys[], const float va
   return Interpolate(values[right - 1], values[right], t);
 }
 
-static Matrix GetTransform(bool fauxItalic) {
-  static auto italicMatrix = Matrix::MakeSkew(-ITALIC_SKEW, 0.f);
-  return fauxItalic ? italicMatrix : Matrix::I();
+static Matrix GetTransform(bool fauxItalic, float textSize) {
+  auto matrix = Matrix::MakeScale(textSize);
+  if (fauxItalic) {
+    matrix.postSkew(-ITALIC_SKEW, 0.f);
+  }
+  return matrix;
 }
 
 PathScalerContext::PathScalerContext(std::shared_ptr<Typeface> typeface, float size)
@@ -91,7 +94,7 @@ Rect PathScalerContext::getBounds(GlyphID glyphID, bool fauxBold, bool fauxItali
     return {};
   }
 
-  auto matrix = GetTransform(fauxItalic);
+  auto matrix = GetTransform(fauxItalic, textSize);
   bounds = matrix.mapRect(bounds);
 
   if (fauxBold) {
@@ -118,7 +121,7 @@ Point PathScalerContext::getVerticalOffset(GlyphID glyphID) const {
   return {-record->advance * 0.5f, pathTypeFace()->fontMetrics().capHeight};
 }
 
-bool PathScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic,
+bool PathScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool faxuItalic,
                                      Path* path) const {
   if (path == nullptr) {
     return false;
@@ -129,10 +132,9 @@ bool PathScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxIt
   }
 
   *path = record->path;
-  if (fauxItalic) {
-    auto transfrom = GetTransform(fauxItalic);
-    path->transform(transfrom);
-  }
+  auto transform = GetTransform(faxuItalic, textSize);
+  path->transform(transform);
+
   if (fauxBold) {
     auto strokePath = *path;
     Stroke stroke(textSize * fauxBoldScale);
