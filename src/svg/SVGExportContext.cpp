@@ -196,7 +196,7 @@ void SVGExportContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunLi
   if (typeface == nullptr) {
     return;
   }
-  auto customFont = typeface->uniqueID() == typeface->getActiveID();
+  auto customFont = typeface->uniqueID() != typeface->getActiveID();
 
   // If the font needs to be converted to a path but lacks outlines (e.g., emoji font, web font),
   // it cannot be converted.
