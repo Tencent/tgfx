@@ -69,7 +69,7 @@ static float FloatInterpFunc(float searchKey, const float keys[], const float va
 static Matrix GetTransform(bool fauxItalic, float textSize) {
   auto matrix = Matrix::MakeScale(textSize);
   if (fauxItalic) {
-    matrix.postSkew(-ITALIC_SKEW, 0.f);
+    matrix.postSkew(ITALIC_SKEW, 0.f);
   }
   return matrix;
 }
@@ -88,15 +88,12 @@ Rect PathScalerContext::getBounds(GlyphID glyphID, bool fauxBold, bool fauxItali
   if (record == nullptr) {
     return {};
   }
-
   auto bounds = record->path.getBounds();
   if (bounds.isEmpty()) {
     return {};
   }
-
   auto matrix = GetTransform(fauxItalic, textSize);
   bounds = matrix.mapRect(bounds);
-
   if (fauxBold) {
     auto fauxBoldSize = textSize * fauxBoldScale;
     bounds.outset(fauxBoldSize, fauxBoldSize);
@@ -121,7 +118,7 @@ Point PathScalerContext::getVerticalOffset(GlyphID glyphID) const {
   return {-record->advance * 0.5f, pathTypeFace()->fontMetrics().capHeight};
 }
 
-bool PathScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool faxuItalic,
+bool PathScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic,
                                      Path* path) const {
   if (path == nullptr) {
     return false;
@@ -132,7 +129,7 @@ bool PathScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool faxuIt
   }
 
   *path = record->path;
-  auto transform = GetTransform(faxuItalic, textSize);
+  auto transform = GetTransform(fauxItalic, textSize);
   path->transform(transform);
 
   if (fauxBold) {

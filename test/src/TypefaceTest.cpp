@@ -102,12 +102,11 @@ TGFX_TEST(TypefaceTest, CustomPathTypeface) {
   canvas->scale(scaleFactor, scaleFactor);
 
   Font font(std::move(typeface), 1.f);
-  font.setFauxItalic(true);
   std::vector<GlyphID> glyphIDs1 = {1, 2, 3};
   std::vector<Point> positions1 = {};
-  positions1.push_back(Point::Make(0.0f, 0.0f));
-  positions1.push_back(Point::Make(50.0f, 0.0f));
-  positions1.push_back(Point::Make(100.0f, 0.0f));
+  positions1.push_back(Point::Make(10.0f, 0.0f));
+  positions1.push_back(Point::Make(60.0f, 0.0f));
+  positions1.push_back(Point::Make(120.0f, 0.0f));
   canvas->drawGlyphs(glyphIDs1.data(), positions1.data(), glyphIDs1.size(), font, paint);
 
   EXPECT_TRUE(Baseline::Compare(surface, "TypefaceTest/CustomPathTypeface"));
