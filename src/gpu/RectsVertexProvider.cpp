@@ -101,19 +101,16 @@ class NonAARectVertexProvider : public RectsVertexProvider {
     for (auto& record : rects) {
       auto& viewMatrix = record->viewMatrix;
       auto& rect = record->rect;
+      float offset = 0.5f;
+      auto insetBounds = rect.makeInset(offset, offset);
       auto quad = Quad::MakeFrom(rect, &viewMatrix);
-      auto uvQuad = Quad::MakeFrom(rect);
-      Matrix insetHalfPixel = Matrix::I();
-      insetHalfPixel.postTranslate(-rect.x(), -record->rect.y());
-      insetHalfPixel.postScale((rect.width() - 1.0f) / rect.width(), (rect.height() - 1.0f) / rect.height());
-      insetHalfPixel.postTranslate(rect.x() + 0.5f, rect.y() + 0.5f);
+      auto uvQuad = Quad::MakeFrom(insetBounds);
       for (size_t j = 4; j >= 1; --j) {
         vertices[index++] = quad.point(j - 1).x;
         vertices[index++] = quad.point(j - 1).y;
         if (bitFields.hasUVCoord) {
-          Point uv = insetHalfPixel.mapXY(uvQuad.point(j - 1).x, uvQuad.point(j - 1).y);
-          vertices[index++] = uv.x;
-          vertices[index++] = uv.y;
+          vertices[index++] = uvQuad.point(j - 1).x;
+          vertices[index++] = uvQuad.point(j - 1).y;
         }
         if (bitFields.hasColor) {
           WriteUByte4Color(vertices, index, record->color);
@@ -152,16 +149,8 @@ PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
         break;
       }
     }
-    if (needUVCoord) {
-      auto& firstMatrix = rects.front()->viewMatrix;
-      for (auto& record : rects) {
-        if (record->viewMatrix != firstMatrix) {
-          hasUVCoord = true;
-          break;
-        }
-      }
-    }
   }
+  hasUVCoord = needUVCoord;
   auto array = buffer->makeArray(std::move(rects));
   if (aaType == AAType::Coverage) {
     return buffer->make<AARectsVertexProvider>(std::move(array), aaType, hasUVCoord, hasColor);
