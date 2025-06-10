@@ -2775,4 +2775,29 @@ TGFX_TEST(LayerTest, DirtyRegionTest) {
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest7"));
 }
+
+TGFX_TEST(LayerTest, LayerVisible) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 100, 100);
+  auto displayList = std::make_unique<DisplayList>();
+  auto rootLayer = Layer::Make();
+  displayList->root()->addChild(rootLayer);
+  auto layer = ShapeLayer::Make();
+  auto path = Path();
+  path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
+  layer->setPath(path);
+  layer->setFillStyle(SolidColor::Make(Color::Red()));
+  layer->setVisible(true);
+  rootLayer->addChild(layer);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerVisible"));
+  layer->setVisible(false);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerVisible1"));
+  layer->setVisible(true);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerVisible"));
+}
 }  // namespace tgfx
