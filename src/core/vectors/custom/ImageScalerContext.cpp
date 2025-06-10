@@ -17,10 +17,21 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ImageScalerContext.h"
+#include "core/utils/MathExtra.h"
 
 namespace tgfx {
 ImageScalerContext::ImageScalerContext(std::shared_ptr<Typeface> typeface, float size)
-    : ScalerContext(std::move(typeface), size) {
+    : ScalerContext(std::move(typeface), size), textScale(size) {
+  if (FloatNearlyZero(textScale) || !FloatsAreFinite(&textScale, 1)) {
+    textScale = 1.0f;
+    extraScale.set(0.0f, 0.0f);
+  }
+  auto fontMetrics = static_cast<ImageTypeface*>(typeface.get())->fontMetrics();
+  auto xppem = fabs(fontMetrics.bottom - fontMetrics.top);
+  auto yppem = fabs(fontMetrics.xMax - fontMetrics.xMin);
+
+  extraScale.x *= textScale / xppem;
+  extraScale.y *= textScale / yppem;
 }
 
 FontMetrics ImageScalerContext::getFontMetrics() const {
@@ -35,10 +46,11 @@ Rect ImageScalerContext::getBounds(GlyphID glyphID, bool, bool fauxItalic) const
   auto bounds =
       Rect::MakeXYWH(record->offset.x, record->offset.y, static_cast<float>(record->image->width()),
                      static_cast<float>(record->image->height()));
+  auto matrix = Matrix::MakeScale(extraScale.x, extraScale.y);
   if (fauxItalic) {
-    static auto italicMatrix = Matrix::MakeSkew(-ITALIC_SKEW, 0.f);
-    bounds = italicMatrix.mapRect(bounds);
+    matrix.postSkew(-ITALIC_SKEW, 0.f);
   }
+  bounds = matrix.mapRect(bounds);
   return bounds;
 }
 
@@ -61,17 +73,20 @@ bool ImageScalerContext::generatePath(GlyphID, bool, bool, Path*) const {
   return false;
 }
 
-Rect ImageScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke*,
+Rect ImageScalerContext::getImageTransform(GlyphID glyphID, bool, const Stroke*,
                                            Matrix* matrix) const {
   auto record = imageTypeface()->getGlyphRecord(glyphID);
   if (record == nullptr || record->image == nullptr) {
     return {};
   }
-  Rect bounds = getBounds(glyphID, fauxBold, false);
+
   if (matrix) {
-    matrix->setTranslate(bounds.x(), bounds.y());
+    matrix->setTranslate(record->offset.x, record->offset.y);
+    matrix->postScale(extraScale.x, extraScale.y);
   }
-  return bounds;
+  return Rect::MakeXYWH(record->offset.x, record->offset.y,
+                        static_cast<float>(record->image->width()),
+                        static_cast<float>(record->image->height()));
 }
 
 bool ImageScalerContext::readPixels(GlyphID glyphID, bool, const Stroke*, const ImageInfo& dstInfo,

@@ -52,7 +52,7 @@ size_t PathTypeface::glyphsCount() const {
 }
 
 int PathTypeface::unitsPerEm() const {
-  return 2048;
+  return 1;
 }
 
 bool PathTypeface::hasColor() const {

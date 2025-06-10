@@ -114,6 +114,11 @@ TGFX_TEST(TypefaceTest, CustomPathTypeface) {
 TGFX_TEST(TypefaceTest, CustomImageTypeface) {
   const std::string fontFamily = "customImage";
   const std::string fontStyle = "customStyle";
+  FontMetrics fontMetrics;
+  fontMetrics.xMax = 200.f;
+  fontMetrics.xMin = 0.f;
+  fontMetrics.top = -180.f;
+  fontMetrics.bottom = 20.f;
   ImageTypefaceBuilder builder(fontFamily, fontStyle, {});
 
   std::string imagePath = "resources/assets/glyph1.png";
