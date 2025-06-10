@@ -1,0 +1,118 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making tgfx available.
+//
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+//  in compliance with the License. You may obtain a copy of the License at
+//
+//      https://opensource.org/licenses/BSD-3-Clause
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
+
+#include "core/vectors/custom/PathTypeface.h"
+#include "tgfx/core/PathTypefaceBuilder.h"
+#include "tgfx/core/Typeface.h"
+#include "utils/TestUtils.h"
+
+namespace tgfx {
+TGFX_TEST(TypefaceTest, CustomPathTypeface) {
+  const std::string fontFamily = "customPath";
+  const std::string fontStyle = "customStyle";
+  PathTypefaceBuilder builder(fontFamily, fontStyle, {});
+  Path path;
+  path.moveTo(Point::Make(25.0f, 5.0f));
+  path.lineTo(Point::Make(45.0f, 45.0f));
+  path.lineTo(Point::Make(5.0f, 45.0f));
+  path.close();
+  builder.addGlyph(path, 1);
+
+  path.reset();
+  path.moveTo(Point::Make(5.0f, 5.0f));
+  path.lineTo(Point::Make(45.0f, 5.0f));
+  path.lineTo(Point::Make(45.0f, 45.0f));
+  path.lineTo(Point::Make(5.0f, 45.0f));
+  path.close();
+  builder.addGlyph(path, 2);
+
+  path.reset();
+  Rect rect = Rect::MakeXYWH(5.0f, 5.0f, 40.0f, 40.0f);
+  path.addOval(rect);
+  path.close();
+  builder.addGlyph(path, 50);
+
+  path.reset();
+  rect = Rect::MakeXYWH(0.0f, 0.0f, 100.0f, 100.0f);
+  path.addOval(rect);
+  path.close();
+  builder.addGlyph(path, 100);
+
+  auto typeface = builder.detach();
+
+  ASSERT_TRUE(typeface != nullptr);
+  ASSERT_TRUE(typeface->hasOutlines());
+  ASSERT_FALSE(typeface->hasColor());
+  ASSERT_TRUE(typeface->getBytes() == nullptr);
+  ASSERT_TRUE(typeface->copyTableData(0) == nullptr);
+  ASSERT_EQ(typeface->fontFamily(), fontFamily);
+  ASSERT_EQ(typeface->fontStyle(), fontStyle);
+  ASSERT_EQ(typeface->glyphsCount(), static_cast<size_t>(4));
+  ASSERT_EQ(typeface->getGlyphID(50), static_cast<GlyphID>(3));
+  ASSERT_EQ(typeface->getGlyphID(1000), static_cast<GlyphID>(0));
+
+  auto pathTypeface = static_cast<PathTypeface*>(typeface.get());
+  auto activeID = pathTypeface->getActiveID();
+  auto uniqueID = pathTypeface->uniqueID();
+  ASSERT_NE(uniqueID, activeID);
+
+  path.reset();
+  path.moveTo(Point::Make(25.0f, 5.0f));
+  path.lineTo(Point::Make(35.0f, 35.0f));
+  path.lineTo(Point::Make(45.0f, 5.0f));
+  path.close();
+  builder.addGlyph(path, 101);
+
+  typeface = builder.detach();
+  ASSERT_TRUE(typeface != nullptr);
+  auto newActiveID = static_cast<PathTypeface*>(typeface.get())->getActiveID();
+  ASSERT_EQ(activeID, newActiveID);
+  ASSERT_EQ(typeface->glyphsCount(), static_cast<size_t>(5));
+  auto newUniqueID = pathTypeface->uniqueID();
+  ASSERT_NE(uniqueID, newUniqueID);
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 200);
+  auto canvas = surface->getCanvas();
+
+  auto paint = Paint();
+  paint.setColor(Color::Red());
+
+  float scaleFactor = 1.0f;
+  canvas->scale(scaleFactor, scaleFactor);
+
+  Font font(std::move(typeface), 12);
+  std::vector<GlyphID> glyphIDs1 = {1, 2, 3};
+  std::vector<Point> positions1 = {};
+  positions1.push_back(Point::Make(0.0f, 0.0f));
+  positions1.push_back(Point::Make(50.0f, 0.0f));
+  positions1.push_back(Point::Make(100.0f, 0.0f));
+  canvas->drawGlyphs(glyphIDs1.data(), positions1.data(), glyphIDs1.size(), font, paint);
+
+  std::vector<GlyphID> glyphIDs2 = {4, 5, 6};
+  std::vector<Point> positions2 = {};
+  positions2.push_back(Point::Make(150.0f, 0.0f));
+  positions2.push_back(Point::Make(205.0f, 0.0f));
+  positions2.push_back(Point::Make(260.0f, 0.0f));
+  canvas->drawGlyphs(glyphIDs2.data(), positions2.data(), glyphIDs2.size(), font, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "TypefaceTest/CustomPathTypeface"));
+}
+}  // namespace tgfx

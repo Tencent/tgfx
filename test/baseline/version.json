@@ -98,11 +98,6 @@
         "innerShadow": "c475bfb",
         "shaderMaskFilter": "c475bfb"
     },
-    "GlyphFaceTest": {
-        "GlyphFaceSimple": "c475bfb",
-        "GlyphFaceWithStyle": "c475bfb",
-        "MakeTextBlobWithGlyphFace": "15e0e39"
-    },
     "ImageReaderTest": {
         "update_bitmap": "c475bfb",
         "update_mask": "d010fb8"
@@ -262,5 +257,8 @@
         "TextAlignWidth0Height0": "15e0e39",
         "TextAlignWidth1Height10": "15e0e39",
         "TruncateTextLineTest": "15e0e39"
+    },
+    "TypefaceTest": {
+        "CustomPathTypeface": "c275bff"
     }
 }

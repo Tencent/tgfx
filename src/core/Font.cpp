@@ -26,7 +26,7 @@ Font::Font() : scalerContext(ScalerContext::MakeEmpty(0.0f)) {
 }
 
 Font::Font(std::shared_ptr<Typeface> tf, float textSize)
-    : scalerContext(tf->createScalerContext(textSize)) {
+    : scalerContext(tf ? tf->createScalerContext(textSize) : ScalerContext::MakeEmpty(textSize)) {
 }
 
 Font Font::makeWithSize(float newSize) const {
@@ -65,7 +65,12 @@ void Font::setSize(float newSize) {
   if (newSize == scalerContext->getSize()) {
     return;
   }
-  scalerContext = scalerContext->getTypeface()->createScalerContext(newSize);
+  auto typeface = scalerContext->getTypeface();
+  if (typeface == nullptr) {
+    scalerContext = ScalerContext::MakeEmpty(newSize);
+  } else {
+    scalerContext = typeface->createScalerContext(newSize);
+  }
 }
 
 GlyphID Font::getGlyphID(const std::string& name) const {
