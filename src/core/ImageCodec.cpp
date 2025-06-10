@@ -41,9 +41,8 @@
 
 namespace tgfx {
 
-static WeakMap<std::string, ImageCodec> imageCodecMap;
-
 std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const std::string& filePath) {
+  static WeakMap<std::string, ImageCodec> imageCodecMap = {};
   if (filePath.empty()) {
     return nullptr;
   }

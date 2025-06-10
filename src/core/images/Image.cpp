@@ -61,9 +61,8 @@ class PixelDataConverter : public ImageGenerator {
   std::shared_ptr<Data> pixels = nullptr;
 };
 
-static WeakMap<std::string, Image> imageMap;
-
 std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
+  static WeakMap<std::string, Image> imageMap = {};
   if (filePath.empty()) {
     return nullptr;
   }
