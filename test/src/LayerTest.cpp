@@ -2739,6 +2739,7 @@ TGFX_TEST(LayerTest, BackgroundBlurStyleTest) {
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
   auto surface = Surface::Make(context, 1024, 800);
+  Layer::SetDefaultAllowsGroupOpacity(true);
   auto displayList = std::make_unique<DisplayList>();
   displayList->showDirtyRegions(false);
   auto rootLayer = ImageLayer::Make();
@@ -2753,13 +2754,21 @@ TGFX_TEST(LayerTest, BackgroundBlurStyleTest) {
   rootLayer->addChild(shapeLayer1);
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   rootLayer->setImage(image);
+
+  auto layer2 = Layer::Make();
+  layer2->addChild(shapeLayer1);
+  rootLayer->addChild(layer2);
   displayList->setZoomScale(2.0f);
   displayList->setContentOffset(-50, -50);
   displayList->setRenderMode(RenderMode::Tiled);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurStyleTest1"));
   shapeLayer1->setAlpha(0.5f);
+  layer2->setBlendMode(BlendMode::Difference);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurStyleTest2"));
+  surface->getCanvas()->clear();
+  shapeLayer1->draw(surface->getCanvas());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurStyleTest3"));
 }
 }  // namespace tgfx

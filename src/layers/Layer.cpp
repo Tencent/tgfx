@@ -972,7 +972,7 @@ std::shared_ptr<Image> Layer::getBackgroundImage(const DrawArgs& args, float con
         backgroundRect.intersect(*args.renderRect);
         drawArgs.renderRect = &backgroundRect;
       }
-      drawBackground(args, canvas);
+      drawBackground(drawArgs, canvas);
     }
   };
   auto backgroundPicture = CreatePicture(args, contentScale, backgroundDrawer);
@@ -993,8 +993,10 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
     }
     AutoCanvasRestore autoRestore(canvas);
     canvas->concat(matrix);
-    AutoCanvasRestore autoRestoreBackground(backgroundCanvas);
-    backgroundCanvas->concat(matrix);
+    if (backgroundCanvas) {
+      backgroundCanvas->save();
+      backgroundCanvas->concat(matrix);
+    }
     switch (layerStyle->extraSourceType()) {
       case LayerStyleExtraSourceType::None:
         layerStyle->draw(canvas, source->content, source->contentScale, alpha);
@@ -1022,6 +1024,9 @@ void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
                                           contour, contourOffset, alpha);
         }
         break;
+    }
+    if (backgroundCanvas) {
+      backgroundCanvas->restore();
     }
   }
 }
