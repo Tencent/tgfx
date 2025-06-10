@@ -31,12 +31,12 @@ GlyphID ImageTypefaceBuilder::addGlyph(std::shared_ptr<ImageCodec> image, const 
     // Reached the maximum number of glyphs.Return an invalid GlyphID
     return 0;
   }
-  // GlyphID starts from 1
+
+  auto bounds = Rect::MakeXYWH(offset.x, offset.y, static_cast<float>(image->width()),
+                               static_cast<float>(image->height()));
   auto glyphID = static_cast<GlyphID>(glyphRecords.size() + 1);
   glyphRecords.emplace_back(
       std::make_shared<GlyphRecord>(std::move(image), offset, unichar, advance));
-  auto bounds = Rect::MakeXYWH(offset.x, offset.y, static_cast<float>(image->width()),
-                               static_cast<float>(image->height()));
   updateMetricsBounds(bounds, glyphID == 1);
   return glyphID;
 }
