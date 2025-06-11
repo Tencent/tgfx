@@ -16,8 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/CustomTypefaceBuilder.h"
-#include "core/utils/UniqueID.h"
+#include "tgfx/core/CustomTypeface.h"
 
 namespace tgfx {
 void CustomTypefaceBuilder::setFontName(const std::string& fontFamily,

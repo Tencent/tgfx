@@ -25,7 +25,7 @@ ImageUserScalerContext::ImageUserScalerContext(std::shared_ptr<Typeface> typefac
   auto textScale = size;
   if (FloatNearlyZero(textScale) || !FloatsAreFinite(&textScale, 1)) {
     textScale = 1.0f;
-    extraScale.set(1.0f, 1.0f);
+    extraScale.set(0.0f, 0.0f);
   }
   auto imageUserTypeface = static_cast<ImageUserTypeface*>(this->typeface.get());
   auto fontMetrics = imageUserTypeface->fontMetrics();

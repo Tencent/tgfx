@@ -17,8 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/custom/GlyphPathProvider.h"
-#include "tgfx/core/ImageTypefaceBuilder.h"
-#include "tgfx/core/PathTypefaceBuilder.h"
+#include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Typeface.h"
 #include "utils/TestUtils.h"
 

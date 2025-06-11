@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/ImageTypefaceBuilder.h"
 #include "ImageUserTypeface.h"
+#include "tgfx/core/CustomTypeface.h"
 
 namespace tgfx {
 GlyphID ImageTypefaceBuilder::addGlyph(std::shared_ptr<ImageCodec> image, const Point& offset) {

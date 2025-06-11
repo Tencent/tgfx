@@ -126,7 +126,7 @@ bool WebMask::onFillText(const GlyphRunList* glyphRunList, const Stroke* stroke,
     std::vector<std::string> texts = {};
     std::vector<Point> points = {};
     auto typeface = glyphRun.font.getTypeface();
-    if (!typeface || typeface->uniqueID() != typeface->getActiveID()) {
+    if (!typeface || typeface->uniqueID() != typeface->getCacheID()) {
       return false;
     }
     GetTextsAndPositions(&glyphRun, &texts, &points);

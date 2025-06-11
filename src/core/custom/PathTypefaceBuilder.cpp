@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/PathTypefaceBuilder.h"
 #include "GlyphPathProvider.h"
 #include "PathUserTypeface.h"
+#include "tgfx/core/CustomTypeface.h"
 
 namespace tgfx {
 GlyphID PathTypefaceBuilder::addGlyph(const Path& path) {

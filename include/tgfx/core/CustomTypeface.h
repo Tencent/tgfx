@@ -18,11 +18,47 @@
 
 #pragma once
 
-#include "tgfx/core/CustomTypefaceBuilder.h"
-#include "tgfx/core/Path.h"
+#include <memory>
+#include <string>
+#include "tgfx/core/FontMetrics.h"
+#include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/PathProvider.h"
+#include "tgfx/core/Typeface.h"
 
 namespace tgfx {
+/**
+ * CustomTypefaceBuilder is the base class for creating custom typefaces.
+ */
+class CustomTypefaceBuilder {
+ public:
+  virtual ~CustomTypefaceBuilder() = default;
+
+  /**
+   * Sets the font name and style for the typeface.
+   */
+  void setFontName(const std::string& fontFamily, const std::string& fontStyle);
+
+  /**
+   * Sets the font metrics for the typeface.
+   */
+  void setMetrics(const FontMetrics& metrics);
+
+  /**
+   * Detaches the typeface being built. After this call, the builder remains valid and can be used
+   * to add more glyphs, but the returned typeface is no longer linked to this builder. Any later
+   * detached typeface will include glyphs from previous detachments. You can safely release the
+   * previously detached typeface and use the new one for rendering. All glyphs added to the same
+   * typeface builder share internal caches during rendering.
+   */
+  virtual std::shared_ptr<Typeface> detach() const = 0;
+
+ protected:
+  std::string _fontFamily;
+  std::string _fontStyle;
+  FontMetrics _fontMetrics = {};
+  uint32_t uniqueID = 0;
+};
+
 /**
  * PathTypefaceBuilder is a CustomTypefaceBuilder that lets you add glyphs defined by vector paths.
  * Use it to create typefaces from custom vector shapes. The resulting typefaces are render-only and
@@ -57,5 +93,35 @@ class PathTypefaceBuilder : public CustomTypefaceBuilder {
 
  private:
   std::vector<std::shared_ptr<PathProvider>> glyphRecords = {};
+};
+
+/**
+ * ImageTypefaceBuilder is a CustomTypefaceBuilder that lets you add glyphs defined by images.
+ * Use it to create typefaces from custom images. The resulting typefaces are render-only and
+ * contain just the information needed to display glyphs.
+ */
+class ImageTypefaceBuilder : public CustomTypefaceBuilder {
+ public:
+  struct GlyphRecord {  // logical union
+    std::shared_ptr<ImageCodec> image = nullptr;
+    Point offset = {};
+    GlyphRecord(std::shared_ptr<ImageCodec> image, const Point& offset)
+        : image(std::move(image)), offset(offset) {
+    }
+  };
+
+  /**
+   * Adds a glyph to the typeface using an ImageCodec. The ImageCodec is expected to provide the
+   * image for the glyph when requested. It may be called from any thread, so it must be thread-safe
+   * and immutable after creation. Returns the GlyphID of the new glyph, which is a unique
+   * identifier within the typeface, starting from 1. Returns 0 if the glyph cannot be added because
+   * the typeface builder is full.
+   */
+  GlyphID addGlyph(std::shared_ptr<ImageCodec> image, const Point& offset);
+
+  std::shared_ptr<Typeface> detach() const override;
+
+ private:
+  std::vector<std::shared_ptr<GlyphRecord>> glyphRecords = {};
 };
 }  // namespace tgfx

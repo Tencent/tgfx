@@ -19,7 +19,7 @@
 #pragma once
 
 #include "UserTypeface.h"
-#include "tgfx/core/ImageTypefaceBuilder.h"
+#include "tgfx/core/CustomTypeface.h"
 
 namespace tgfx {
 class ImageUserTypeface final : public UserTypeface {
