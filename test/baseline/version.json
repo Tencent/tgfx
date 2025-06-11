@@ -261,7 +261,7 @@
         "TruncateTextLineTest": "15e0e39"
     },
     "TypefaceTest": {
-        "CustomPathTypeface": "c275bff",
-        "CustomImageTypeface": "92f3f139"
+        "CustomImageTypeface": "92f3f139",
+        "CustomPathTypeface": "c275bff"
     }
 }
