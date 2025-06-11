@@ -18,36 +18,18 @@
 
 #pragma once
 
-#include "core/utils/UniqueID.h"
-#include "tgfx/core/FontMetrics.h"
+#include "UserTypeface.h"
 #include "tgfx/core/ImageTypefaceBuilder.h"
-#include "tgfx/core/Typeface.h"
 
 namespace tgfx {
-class ImageTypeface final : public Typeface {
+class ImageUserTypeface final : public UserTypeface {
  public:
   using ImageRecordType = std::vector<std::shared_ptr<ImageTypefaceBuilder::GlyphRecord>>;
 
-  static std::shared_ptr<ImageTypeface> Make(uint32_t builderID, const std::string& fontFamily,
-                                             const std::string& fontStyle,
-                                             const FontMetrics& metrics,
-                                             const ImageRecordType& glyphRecords);
-
-  uint32_t uniqueID() const override {
-    return _uniqueID;
-  }
-
-  std::string fontFamily() const override {
-    return _fontFamily;
-  }
-
-  std::string fontStyle() const override {
-    return _fontStyle;
-  }
-
-  const FontMetrics& fontMetrics() const {
-    return _fontMetrics;
-  }
+  static std::shared_ptr<UserTypeface> Make(uint32_t builderID, const std::string& fontFamily,
+                                            const std::string& fontStyle,
+                                            const FontMetrics& metrics,
+                                            const ImageRecordType& glyphRecords);
 
   size_t glyphsCount() const override;
 
@@ -57,32 +39,15 @@ class ImageTypeface final : public Typeface {
 
   bool hasOutlines() const override;
 
-  GlyphID getGlyphID(Unichar) const override {
-    return 0;
-  }
-
-  std::shared_ptr<Data> getBytes() const override;
-
-  std::shared_ptr<Data> copyTableData(FontTableTag) const override;
-
   std::shared_ptr<ImageTypefaceBuilder::GlyphRecord> getGlyphRecord(GlyphID glyphID) const;
 
  private:
-  explicit ImageTypeface(uint32_t builderID, const std::string& fontFamily,
-                         const std::string& fontStyle, const FontMetrics& metrics,
-                         const ImageRecordType& glyphRecords);
-
-  uint32_t getActiveID() const override {
-    return _builderID;
-  }
+  explicit ImageUserTypeface(uint32_t builderID, const std::string& fontFamily,
+                             const std::string& fontStyle, const FontMetrics& metrics,
+                             const ImageRecordType& glyphRecords);
 
   std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;
 
-  uint32_t _builderID = 0;  // Builder ID for tracking the source builder
-  uint32_t _uniqueID = UniqueID::Next();
-  std::string _fontFamily;
-  std::string _fontStyle;
-  FontMetrics _fontMetrics = {};
   ImageRecordType glyphRecords = {};
 };
 }  // namespace tgfx

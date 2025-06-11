@@ -192,7 +192,7 @@ bool CGMask::onFillText(const GlyphRunList* glyphRunList, const Stroke* stroke,
       return false;
     }
     //Custom typeface
-    if (typeface->uniqueID() != typeface->getActiveID()) {
+    if (typeface->uniqueID() != typeface->getCacheID()) {
       return false;
     }
   }

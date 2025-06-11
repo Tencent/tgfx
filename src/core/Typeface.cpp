@@ -100,8 +100,8 @@ std::vector<Unichar> Typeface::getGlyphToUnicodeMap() const {
   return {};
 };
 
-std::shared_ptr<ScalerContext> Typeface::createScalerContext(float size) {
-  if (weakThis.lock() == nullptr || glyphsCount() <= 0 || size < 0.0f) {
+std::shared_ptr<ScalerContext> Typeface::getScalerContext(float size) {
+  if (size <= 0.0f) {
     return ScalerContext::MakeEmpty(size);
   }
   std::lock_guard<std::mutex> autoLock(locker);
@@ -120,7 +120,7 @@ std::shared_ptr<ScalerContext> Typeface::createScalerContext(float size) {
   return context;
 }
 
-uint32_t Typeface::getActiveID() const {
+uint32_t Typeface::getCacheID() const {
   return uniqueID();
 }
 }  // namespace tgfx

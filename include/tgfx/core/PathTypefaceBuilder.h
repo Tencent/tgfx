@@ -30,12 +30,6 @@ namespace tgfx {
  */
 class PathTypefaceBuilder : public CustomTypefaceBuilder {
  public:
-  struct GlyphRecord {
-    Path path = {};
-    GlyphRecord(const Path& path) : path(path) {
-    }
-  };
-
   /**
    * Adds a glyph to the typeface using a vector path. Returns the GlyphID of the new glyph, which
    * is a unique identifier within the typeface, starting from 1. Returns 0 if the glyph cannot be
@@ -50,7 +44,7 @@ class PathTypefaceBuilder : public CustomTypefaceBuilder {
    * identifier within the typeface, starting from 1. Returns 0 if the glyph cannot be added because
    * the typeface builder is full.Make sure the PathProvider is non-null and valid.
    */
-  GlyphID addGlyph(std::unique_ptr<PathProvider> provider);
+  GlyphID addGlyph(std::shared_ptr<PathProvider> provider);
 
   /**
    * Detaches the typeface being built. After this call, the builder remains valid and can be used
@@ -62,6 +56,6 @@ class PathTypefaceBuilder : public CustomTypefaceBuilder {
   std::shared_ptr<Typeface> detach() const override;
 
  private:
-  std::vector<std::shared_ptr<GlyphRecord>> glyphRecords = {};
+  std::vector<std::shared_ptr<PathProvider>> glyphRecords = {};
 };
 }  // namespace tgfx

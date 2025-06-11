@@ -18,43 +18,59 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
+#include "core/utils/UniqueID.h"
 #include "tgfx/core/FontMetrics.h"
-#include "tgfx/core/Rect.h"
 #include "tgfx/core/Typeface.h"
 
 namespace tgfx {
-/**
- * CustomTypefaceBuilder is the base class for creating custom typefaces.
- */
-class CustomTypefaceBuilder {
+class UserTypeface : public Typeface {
  public:
-  virtual ~CustomTypefaceBuilder() = default;
+  uint32_t getCacheID() const override {
+    return _builderID;
+  }
 
-  /**
-   * Sets the font name and style for the typeface.
-   */
-  void setFontName(const std::string& fontFamily, const std::string& fontStyle);
+  uint32_t uniqueID() const override {
+    return _uniqueID;
+  }
 
-  /**
-   * Sets the font metrics for the typeface.
-   */
-  void setMetrics(const FontMetrics& metrics);
+  std::string fontFamily() const override {
+    return _fontFamily;
+  }
 
-  /**
-   * Detaches the typeface being built. After this call, the builder remains valid and can be used
-   * to add more glyphs, but the returned typeface is no longer linked to this builder. Any later
-   * detached typeface will include glyphs from previous detachments. You can safely release the
-   * previously detached typeface and use the new one for rendering. All glyphs added to the same
-   * typeface builder share internal caches during rendering.
-   */
-  virtual std::shared_ptr<Typeface> detach() const = 0;
+  std::string fontStyle() const override {
+    return _fontStyle;
+  }
+
+  const FontMetrics& fontMetrics() const {
+    return _fontMetrics;
+  }
+
+  GlyphID getGlyphID(Unichar) const override {
+    return 0;
+  }
+
+  std::shared_ptr<Data> getBytes() const override {
+    // UserTypeface does not have byte data.
+    return nullptr;
+  }
+
+  std::shared_ptr<Data> copyTableData(FontTableTag) const override {
+    // UserTypeface does not support font tables.
+    return nullptr;
+  }
 
  protected:
+  explicit UserTypeface(uint32_t builderID, const std::string& fontFamily,
+                        const std::string& fontStyle, const FontMetrics& metrics)
+      : _builderID(builderID), _fontFamily(fontFamily), _fontStyle(fontStyle),
+        _fontMetrics(metrics) {
+  }
+
+ private:
+  uint32_t _builderID = 0;  // Builder ID for tracking the source builder
+  uint32_t _uniqueID = UniqueID::Next();
   std::string _fontFamily;
   std::string _fontStyle;
   FontMetrics _fontMetrics = {};
-  uint32_t uniqueID = 0;
 };
 }  // namespace tgfx

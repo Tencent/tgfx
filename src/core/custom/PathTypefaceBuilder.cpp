@@ -17,7 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/PathTypefaceBuilder.h"
-#include "PathTypeface.h"
+#include "GlyphPathProvider.h"
+#include "PathUserTypeface.h"
 
 namespace tgfx {
 GlyphID PathTypefaceBuilder::addGlyph(const Path& path) {
@@ -27,20 +28,18 @@ GlyphID PathTypefaceBuilder::addGlyph(const Path& path) {
   }
   // GlyphID starts from 1
   auto glyphID = static_cast<GlyphID>(glyphRecords.size() + 1);
-  glyphRecords.emplace_back(std::make_shared<GlyphRecord>(path));
-  updateMetricsBounds(path.getBounds(), glyphID == 1);
+  glyphRecords.emplace_back(GlyphPathProvider::Wrap(path));
   return glyphID;
 }
 
-GlyphID PathTypefaceBuilder::addGlyph(std::unique_ptr<PathProvider> provider) {
+GlyphID PathTypefaceBuilder::addGlyph(std::shared_ptr<PathProvider> provider) {
   if (glyphRecords.size() >= std::numeric_limits<GlyphID>::max()) {
     // Reached the maximum number of glyphs. Return an invalid GlyphID
     return 0;
   }
   // GlyphID starts from 1
   auto glyphID = static_cast<GlyphID>(glyphRecords.size() + 1);
-  glyphRecords.emplace_back(std::make_shared<GlyphRecord>(provider->getPath()));
-  updateMetricsBounds(provider->getPath().getBounds(), glyphID == 1);
+  glyphRecords.emplace_back(std::move(provider));
   return glyphID;
 }
 
@@ -48,6 +47,6 @@ std::shared_ptr<Typeface> PathTypefaceBuilder::detach() const {
   if (glyphRecords.empty()) {
     return nullptr;
   }
-  return PathTypeface::Make(uniqueID, _fontFamily, _fontStyle, _fontMetrics, glyphRecords);
+  return PathUserTypeface::Make(uniqueID, _fontFamily, _fontStyle, _fontMetrics, glyphRecords);
 }
 }  // namespace tgfx

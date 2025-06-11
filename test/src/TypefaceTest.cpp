@@ -16,8 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/vectors/custom/ImageTypeface.h"
-#include "core/vectors/custom/PathTypeface.h"
+#include "core/custom/GlyphPathProvider.h"
 #include "tgfx/core/ImageTypefaceBuilder.h"
 #include "tgfx/core/PathTypefaceBuilder.h"
 #include "tgfx/core/Typeface.h"
@@ -34,7 +33,7 @@ TGFX_TEST(TypefaceTest, CustomPathTypeface) {
   path.lineTo(Point::Make(45.0f, 45.0f));
   path.lineTo(Point::Make(5.0f, 45.0f));
   path.close();
-  builder.addGlyph(path);
+  builder.addGlyph(GlyphPathProvider::Wrap(path));
 
   path.reset();
   path.moveTo(Point::Make(5.0f, 5.0f));
@@ -42,19 +41,19 @@ TGFX_TEST(TypefaceTest, CustomPathTypeface) {
   path.lineTo(Point::Make(45.0f, 45.0f));
   path.lineTo(Point::Make(5.0f, 45.0f));
   path.close();
-  builder.addGlyph(path);
+  builder.addGlyph(GlyphPathProvider::Wrap(path));
 
   path.reset();
   Rect rect = Rect::MakeXYWH(5.0f, 5.0f, 40.0f, 40.0f);
   path.addOval(rect);
   path.close();
-  builder.addGlyph(path);
+  builder.addGlyph(GlyphPathProvider::Wrap(path));
 
   path.reset();
   rect = Rect::MakeXYWH(0.0f, 0.0f, 100.0f, 100.0f);
   path.addOval(rect);
   path.close();
-  builder.addGlyph(path);
+  builder.addGlyph(GlyphPathProvider::Wrap(path));
 
   auto typeface = builder.detach();
 
@@ -72,7 +71,7 @@ TGFX_TEST(TypefaceTest, CustomPathTypeface) {
   path.lineTo(Point::Make(35.0f, 35.0f));
   path.lineTo(Point::Make(45.0f, 5.0f));
   path.close();
-  builder.addGlyph(path);
+  builder.addGlyph(GlyphPathProvider::Wrap(path));
 
   typeface = builder.detach();
   ASSERT_TRUE(typeface != nullptr);

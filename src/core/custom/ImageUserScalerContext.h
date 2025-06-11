@@ -16,31 +16,29 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/CustomTypefaceBuilder.h"
-#include "core/utils/UniqueID.h"
+#pragma once
+
+#include "ImageUserTypeface.h"
+#include "UserScalerContext.h"
 
 namespace tgfx {
-void CustomTypefaceBuilder::setFontName(const std::string& fontFamily,
-                                        const std::string& fontStyle) {
-  _fontFamily = fontFamily;
-  _fontStyle = fontStyle;
-}
+class ImageUserScalerContext final : public UserScalerContext {
+ public:
+  ImageUserScalerContext(std::shared_ptr<Typeface> typeface, float size);
 
-void CustomTypefaceBuilder::setMetrics(const FontMetrics& metrics) {
-  _fontMetrics = metrics;
-}
+  Rect getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic) const override;
 
-void CustomTypefaceBuilder::updateMetricsBounds(const Rect& bounds, bool firstTime) {
-  if (firstTime) {
-    _fontMetrics.top = bounds.top;
-    _fontMetrics.bottom = bounds.bottom;
-    _fontMetrics.xMin = bounds.left;
-    _fontMetrics.xMax = bounds.right;
-  } else {
-    _fontMetrics.top = std::min(_fontMetrics.top, bounds.top);
-    _fontMetrics.bottom = std::max(_fontMetrics.bottom, bounds.bottom);
-    _fontMetrics.xMin = std::min(_fontMetrics.xMin, bounds.left);
-    _fontMetrics.xMax = std::max(_fontMetrics.xMax, bounds.right);
-  }
-}
+  bool generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic, Path* path) const override;
+
+  Rect getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
+                         Matrix* matrix) const override;
+
+  bool readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke, const ImageInfo& dstInfo,
+                  void* dstPixels) const override;
+
+ private:
+  ImageUserTypeface* imageTypeface() const;
+
+  Point extraScale = Point::Make(1.f, 1.f);
+};
 }  // namespace tgfx

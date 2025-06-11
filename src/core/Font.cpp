@@ -26,7 +26,7 @@ Font::Font() : scalerContext(ScalerContext::MakeEmpty(0.0f)) {
 }
 
 Font::Font(std::shared_ptr<Typeface> tf, float textSize)
-    : scalerContext(tf ? tf->createScalerContext(textSize) : ScalerContext::MakeEmpty(textSize)) {
+    : scalerContext(tf ? tf->getScalerContext(textSize) : ScalerContext::MakeEmpty(textSize)) {
 }
 
 Font Font::makeWithSize(float newSize) const {
@@ -51,7 +51,7 @@ void Font::setTypeface(std::shared_ptr<Typeface> newTypeface) {
   if (newTypeface == scalerContext->getTypeface()) {
     return;
   }
-  scalerContext = newTypeface->createScalerContext(scalerContext->getSize());
+  scalerContext = newTypeface->getScalerContext(scalerContext->getSize());
 }
 
 float Font::getSize() const {
@@ -69,7 +69,7 @@ void Font::setSize(float newSize) {
   if (typeface == nullptr) {
     scalerContext = ScalerContext::MakeEmpty(newSize);
   } else {
-    scalerContext = typeface->createScalerContext(newSize);
+    scalerContext = typeface->getScalerContext(newSize);
   }
 }
 

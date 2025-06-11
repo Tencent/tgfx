@@ -18,33 +18,22 @@
 
 #pragma once
 
-#include "PathTypeface.h"
-#include "core/ScalerContext.h"
+#include "tgfx/core/Path.h"
+#include "tgfx/core/PathProvider.h"
 
 namespace tgfx {
-class PathScalerContext final : public ScalerContext {
+class GlyphPathProvider : public PathProvider {
  public:
-  PathScalerContext(std::shared_ptr<Typeface> typeface, float size);
+  static std::shared_ptr<PathProvider> Wrap(const Path& path);
 
-  FontMetrics getFontMetrics() const override;
+  Path getPath() const override;
 
-  Rect getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic) const override;
-
-  float getAdvance(GlyphID glyphID, bool verticalText) const override;
-
-  Point getVerticalOffset(GlyphID glyphID) const override;
-
-  bool generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic, Path* path) const override;
-
-  Rect getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
-                         Matrix* matrix) const override;
-
-  bool readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke, const ImageInfo& dstInfo,
-                  void* dstPixels) const override;
+  Rect getBounds() const override;
 
  private:
-  PathTypeface* pathTypeFace() const;
+  explicit GlyphPathProvider(const Path& path) : _path(path) {
+  }
 
-  float fauxBoldScale = 1.0f;
+  Path _path;
 };
 }  // namespace tgfx

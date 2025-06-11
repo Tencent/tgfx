@@ -138,11 +138,6 @@ class Typeface {
    */
   virtual std::shared_ptr<Data> copyTableData(FontTableTag tag) const = 0;
 
-  /**
-   *  Returns a ScalerContext for the given size.
-   */
-  virtual std::shared_ptr<ScalerContext> createScalerContext(float size);
-
  protected:
   /**
    * Gets the mapping from GlyphID to unicode. The array index is GlyphID, and the array value is
@@ -155,15 +150,22 @@ class Typeface {
   std::weak_ptr<Typeface> weakThis;
 
  private:
+  /**
+  *  Returns a ScalerContext for the given size.
+  */
+  std::shared_ptr<ScalerContext> getScalerContext(float size);
+
   virtual std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const = 0;
 
   /**
-   * Returns the active ID for this typeface. for custom typefaces, this is the builderID, or returns uniqueID.
+   * Returns the cache ID for this typeface. Typically, this is the uniqueID of the typeface;
+   * for custom typefaces, it returns the uniqueID of the associated typeface builder.
    */
-  virtual uint32_t getActiveID() const;
+  virtual uint32_t getCacheID() const;
 
   std::unordered_map<float, std::weak_ptr<ScalerContext>> scalerContexts = {};
 
+  friend class Font;
   friend class ScalerContext;
   friend class GlyphConverter;
   friend class SVGExportContext;

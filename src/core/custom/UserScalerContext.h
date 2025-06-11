@@ -17,34 +17,26 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include "ImageTypeface.h"
+#include "UserTypeface.h"
 #include "core/ScalerContext.h"
 
 namespace tgfx {
-class ImageScalerContext final : public ScalerContext {
+class UserScalerContext : public ScalerContext {
  public:
-  ImageScalerContext(std::shared_ptr<Typeface> typeface, float size);
+  UserScalerContext(std::shared_ptr<Typeface> typeface, float size)
+      : ScalerContext(std::move(typeface), size) {
+  }
 
-  FontMetrics getFontMetrics() const override;
+  FontMetrics getFontMetrics() const override {
+    return static_cast<UserTypeface*>(typeface.get())->fontMetrics();
+  }
 
-  Rect getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic) const override;
+  float getAdvance(GlyphID, bool) const override {
+    return 0.0f;
+  }
 
-  float getAdvance(GlyphID glyphID, bool verticalText) const override;
-
-  Point getVerticalOffset(GlyphID glyphID) const override;
-
-  bool generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic, Path* path) const override;
-
-  Rect getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
-                         Matrix* matrix) const override;
-
-  bool readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke, const ImageInfo& dstInfo,
-                  void* dstPixels) const override;
-
- private:
-  ImageTypeface* imageTypeface() const;
-
-  Point extraScale = Point::Make(1.f, 1.f);
+  Point getVerticalOffset(GlyphID) const override {
+    return {};
+  }
 };
 }  // namespace tgfx
