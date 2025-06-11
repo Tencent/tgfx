@@ -28,7 +28,7 @@ class ImageTypeface final : public Typeface {
  public:
   using ImageRecordType = std::vector<std::shared_ptr<ImageTypefaceBuilder::GlyphRecord>>;
 
-  static std::shared_ptr<ImageTypeface> Make(uint32_t uniqueID, const std::string& fontFamily,
+  static std::shared_ptr<ImageTypeface> Make(uint32_t builderID, const std::string& fontFamily,
                                              const std::string& fontStyle,
                                              const FontMetrics& metrics,
                                              const ImageRecordType& glyphRecords);
@@ -66,7 +66,7 @@ class ImageTypeface final : public Typeface {
   std::shared_ptr<ImageTypefaceBuilder::GlyphRecord> getGlyphRecord(GlyphID glyphID) const;
 
  private:
-  explicit ImageTypeface(uint32_t uniqueID, const std::string& fontFamily,
+  explicit ImageTypeface(uint32_t builderID, const std::string& fontFamily,
                          const std::string& fontStyle, const FontMetrics& metrics,
                          const ImageRecordType& glyphRecords);
 

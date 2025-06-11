@@ -20,20 +20,21 @@
 #include "ImageScalerContext.h"
 
 namespace tgfx {
-std::shared_ptr<ImageTypeface> ImageTypeface::Make(uint32_t uniqueID, const std::string& fontFamily,
+std::shared_ptr<ImageTypeface> ImageTypeface::Make(uint32_t builderID,
+                                                   const std::string& fontFamily,
                                                    const std::string& fontStyle,
                                                    const FontMetrics& metrics,
                                                    const ImageRecordType& glyphRecords) {
   auto typeface = std::shared_ptr<ImageTypeface>(
-      new ImageTypeface(uniqueID, fontFamily, fontStyle, metrics, glyphRecords));
+      new ImageTypeface(builderID, fontFamily, fontStyle, metrics, glyphRecords));
   typeface->weakThis = typeface;
   return typeface;
 }
 
-ImageTypeface::ImageTypeface(uint32_t uniqueID, const std::string& fontFamily,
+ImageTypeface::ImageTypeface(uint32_t builderID, const std::string& fontFamily,
                              const std::string& fontStyle, const FontMetrics& metrics,
                              const ImageRecordType& glyphRecords)
-    : _uniqueID(uniqueID), _fontFamily(fontFamily), _fontStyle(fontStyle), _fontMetrics(metrics),
+    : _builderID(builderID), _fontFamily(fontFamily), _fontStyle(fontStyle), _fontMetrics(metrics),
       glyphRecords(glyphRecords) {
   initCharGlyphIDMap();
 }
