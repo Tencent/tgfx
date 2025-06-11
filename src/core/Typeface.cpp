@@ -123,5 +123,4 @@ std::shared_ptr<ScalerContext> Typeface::createScalerContext(float size) {
 uint32_t Typeface::getActiveID() const {
   return uniqueID();
 }
-
 }  // namespace tgfx
