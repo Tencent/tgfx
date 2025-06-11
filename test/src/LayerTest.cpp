@@ -2748,7 +2748,7 @@ TGFX_TEST(LayerTest, DirtyRegionTest) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest5"));
 
   displayList->setRenderMode(RenderMode::Tiled);
-  displayList->setZoomScale(1.3f);
+  displayList->setMaxTileCount(512);
   displayList->render(surface.get());
   // Clear the previous dirty regions.
   displayList->showDirtyRegions(false);
@@ -2771,9 +2771,40 @@ TGFX_TEST(LayerTest, DirtyRegionTest) {
   // Clear the previous dirty regions.
   displayList->showDirtyRegions(false);
   displayList->showDirtyRegions(true);
-  displayList->setContentOffset(-256, -300);
+  displayList->setContentOffset(-100, -300);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest7"));
+
+  // Clear the previous dirty regions.
+  displayList->showDirtyRegions(false);
+  displayList->showDirtyRegions(true);
+  displayList->setZoomScale(1.3f);
+  displayList->setRenderTimeBudget(0);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest8"));
+
+  // Clear the previous dirty regions.
+  displayList->showDirtyRegions(false);
+  displayList->showDirtyRegions(true);
+  displayList->setRenderTimeBudget(INT64_MAX);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest9"));
+
+  // Clear the previous dirty regions.
+  displayList->showDirtyRegions(false);
+  displayList->showDirtyRegions(true);
+  displayList->setContentOffset(250, 150);
+  displayList->setZoomScale(0.5f);
+  displayList->setRenderTimeBudget(0);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest10"));
+
+  // Clear the previous dirty regions.
+  displayList->showDirtyRegions(false);
+  displayList->showDirtyRegions(true);
+  displayList->setRenderTimeBudget(INT64_MAX);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest11"));
 }
 
 TGFX_TEST(LayerTest, LayerVisible) {

@@ -16,26 +16,39 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <cstddef>
-#include <deque>
+#include "SlidingWindowTracker.h"
 
 namespace tgfx {
-/**
- * A tracker that keeps track of the maximum value of the last N values added.
- */
-class MaxValueTracker {
- public:
-  MaxValueTracker(size_t maxSize);
 
-  void addValue(size_t value);
+SlidingWindowTracker::SlidingWindowTracker(size_t windowSize) : windowSize(windowSize) {
+}
 
-  size_t getMaxValue() const;
+void SlidingWindowTracker::addValue(size_t value) {
+  values.push_back(value);
+  if (values.size() > windowSize) {
+    values.pop_front();
+  }
+}
 
- private:
-  size_t _maxSize;
-  std::deque<size_t> _values;
-};
+size_t SlidingWindowTracker::getMaxValue() const {
+  size_t maxValue = 0;
+  for (auto value : values) {
+    if (value > maxValue) {
+      maxValue = value;
+    }
+  }
+  return maxValue;
+}
+
+size_t SlidingWindowTracker::getAverageValue() const {
+  if (values.empty()) {
+    return 0;
+  }
+  size_t sum = 0;
+  for (auto value : values) {
+    sum += value;
+  }
+  return sum / values.size();
+}
 
 }  // namespace tgfx
