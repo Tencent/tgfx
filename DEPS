@@ -17,7 +17,7 @@
       },
       {
         "url": "${PAG_GROUP}/skcms.git",
-        "commit": "8ca9333954230146f663b8890db634d2e7a30500",
+        "commit": "0084176aa5808a668666846c356ae6503a3b2447",
         "dir": "third_party/skcms"
       },
       {
