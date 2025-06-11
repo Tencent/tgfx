@@ -45,7 +45,6 @@ class ImageScalerContext final : public ScalerContext {
  private:
   ImageTypeface* imageTypeface() const;
 
-  float textScale = 1.0f;
   Point extraScale = Point::Make(1.f, 1.f);
 };
 }  // namespace tgfx

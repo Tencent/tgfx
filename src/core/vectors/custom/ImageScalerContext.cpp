@@ -21,7 +21,8 @@
 
 namespace tgfx {
 ImageScalerContext::ImageScalerContext(std::shared_ptr<Typeface> typeface, float size)
-    : ScalerContext(std::move(typeface), size), textScale(size) {
+    : ScalerContext(std::move(typeface), size) {
+  auto textScale = size;
   if (FloatNearlyZero(textScale) || !FloatsAreFinite(&textScale, 1)) {
     textScale = 1.0f;
     extraScale.set(0.0f, 0.0f);
