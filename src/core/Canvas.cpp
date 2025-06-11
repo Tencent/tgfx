@@ -530,7 +530,7 @@ void Canvas::drawSimpleText(const std::string& text, float x, float y, const Fon
 void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,
                         const Font& font, const Paint& paint) {
 
-  if (glyphCount == 0 || font.getTypeface() == nullptr) {
+  if (glyphCount == 0) {
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());

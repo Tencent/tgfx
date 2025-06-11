@@ -68,9 +68,6 @@ std::shared_ptr<TextBlob> TextBlob::MakeFrom(GlyphRun glyphRun) {
   if (glyphRun.glyphs.empty()) {
     return nullptr;
   }
-  if (glyphRun.font.getTypeface() == nullptr) {
-    return nullptr;
-  }
   auto glyphRunList = std::make_shared<GlyphRunList>(std::move(glyphRun));
   return std::shared_ptr<TextBlob>(new TextBlob({glyphRunList}));
 }
@@ -104,9 +101,6 @@ std::shared_ptr<TextBlob> TextBlob::MakeFrom(std::vector<GlyphRun> glyphRuns) {
   FontType fontType = GetFontType(glyphRuns[0].font);
   for (auto& run : glyphRuns) {
     if (run.glyphs.size() != run.positions.size()) {
-      return nullptr;
-    }
-    if (run.font.getTypeface() == nullptr) {
       return nullptr;
     }
     if (run.glyphs.empty()) {

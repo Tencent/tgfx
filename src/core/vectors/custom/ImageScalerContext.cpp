@@ -29,8 +29,9 @@ ImageScalerContext::ImageScalerContext(std::shared_ptr<Typeface> typeface, float
   auto fontMetrics = static_cast<ImageTypeface*>(this->typeface.get())->fontMetrics();
   auto xppem = fabs(fontMetrics.bottom - fontMetrics.top);
   auto yppem = fabs(fontMetrics.xMax - fontMetrics.xMin);
-  xppem = FloatNearlyZero(xppem) ? 109.f : xppem;
-  yppem = FloatNearlyZero(yppem) ? 109.f : yppem;
+  constexpr float kDefaultPPEM = 109.f;  // Default PPI for many typefaces
+  xppem = FloatNearlyZero(xppem) ? kDefaultPPEM : xppem;
+  yppem = FloatNearlyZero(yppem) ? kDefaultPPEM : yppem;
 
   extraScale.x *= textScale / xppem;
   extraScale.y *= textScale / yppem;
@@ -50,7 +51,7 @@ Rect ImageScalerContext::getBounds(GlyphID glyphID, bool, bool fauxItalic) const
                      static_cast<float>(record->image->height()));
   auto matrix = Matrix::MakeScale(extraScale.x, extraScale.y);
   if (fauxItalic) {
-    matrix.postSkew(-ITALIC_SKEW, 0.f);
+    matrix.postSkew(ITALIC_SKEW, 0.f);
   }
   bounds = matrix.mapRect(bounds);
   return bounds;
@@ -61,7 +62,7 @@ float ImageScalerContext::getAdvance(GlyphID glyphID, bool) const {
   if (record == nullptr) {
     return 0.0f;
   }
-  return record->advance;
+  return record->advance * extraScale.x;
 }
 
 Point ImageScalerContext::getVerticalOffset(GlyphID glyphID) const {
@@ -69,7 +70,7 @@ Point ImageScalerContext::getVerticalOffset(GlyphID glyphID) const {
   if (record == nullptr) {
     return {};
   }
-  return {-record->advance * 0.5f, imageTypeface()->fontMetrics().capHeight};
+  return {-record->advance * 0.5f * extraScale.y, imageTypeface()->fontMetrics().capHeight};
 }
 bool ImageScalerContext::generatePath(GlyphID, bool, bool, Path*) const {
   return false;

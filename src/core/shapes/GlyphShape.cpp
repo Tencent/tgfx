@@ -20,7 +20,7 @@
 
 namespace tgfx {
 std::shared_ptr<Shape> Shape::MakeFrom(Font font, GlyphID glyphID) {
-  if (font.getTypeface() == nullptr || glyphID == 0) {
+  if (glyphID == 0) {
     return nullptr;
   }
   if (!font.hasOutlines()) {

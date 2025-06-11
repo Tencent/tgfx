@@ -38,12 +38,10 @@ GlyphRunList::GlyphRunList(GlyphRun glyphRun) {
 
 GlyphRunList::GlyphRunList(std::vector<GlyphRun> glyphRuns) : _glyphRuns(std::move(glyphRuns)) {
   DEBUG_ASSERT(!_glyphRuns.empty());
-  DEBUG_ASSERT(_glyphRuns[0].font.getTypeface() != nullptr);
   DEBUG_ASSERT(std::all_of(_glyphRuns.begin(), _glyphRuns.end(),
                            [hasColor = _glyphRuns[0].font.hasColor()](const GlyphRun& glyphRun) {
                              return !glyphRun.glyphs.empty() &&
                                     glyphRun.glyphs.size() == glyphRun.positions.size() &&
-                                    glyphRun.font.getTypeface() != nullptr &&
                                     glyphRun.font.hasColor() == hasColor;
                            }));
 }
@@ -59,7 +57,6 @@ Rect GlyphRunList::getBounds(float resolutionScale) const {
     if (hasScale) {
       // Scale the glyphs before measuring to prevent precision loss with small font sizes.
       font = font.makeWithSize(resolutionScale * font.getSize());
-      DEBUG_ASSERT(font.getTypeface() != nullptr);
     }
     size_t index = 0;
     auto& positions = run.positions;
@@ -88,7 +85,6 @@ bool GlyphRunList::getPath(Path* path, float resolutionScale) const {
     if (hasScale) {
       // Scale the glyphs before measuring to prevent precision loss with small font sizes.
       font = font.makeWithSize(resolutionScale * font.getSize());
-      DEBUG_ASSERT(font.getTypeface() != nullptr);
     }
     size_t index = 0;
     auto& positions = run.positions;
