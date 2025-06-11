@@ -27,7 +27,9 @@ namespace tgfx {
 class RootLayer;
 class Tile;
 class TileCache;
-struct TileRenderTask;
+class SlidingWindowTracker;
+struct DrawTask;
+struct FallbackTile;
 
 /**
  * RenderMode defines the different modes of rendering a DisplayList.
@@ -95,14 +97,14 @@ class DisplayList {
   void setZoomScale(float zoomScale);
 
   /**
-   * Returns the integer multiplier used for zoom scale precision. This value determines the smallest
-   * increment by which the zoom scale can change. For example, a precision of 100 means the zoom scale
-   * can be adjusted in steps of 0.01 (1/100). Internally, the zoom scale is first rounded to the nearest
-   * integer and then converted back to a float for rendering. The precision is used to convert the zoom
-   * scale to an integer as follows:
+   * Returns the integer multiplier used for zoom scale precision. This value determines the
+   * smallest increment by which the zoom scale can change. For example, a precision of 100 means
+   * the zoom scale can be adjusted in steps of 0.01 (1/100). Internally, the zoom scale is first
+   * rounded to the nearest integer and then converted back to a float for rendering. The precision
+   * is used to convert the zoom scale to an integer as follows:
    * - When zooming in (scale >= 1.0), the scale is multiplied by the precision.
    * - When zooming out (scale < 1.0), the reciprocal of the scale is multiplied by the precision.
-   * The default precision is 100, allowing zoom scale adjustments in steps of 0.01.
+   * The default precision is 500, allowing zoom scale adjustments in steps of 0.002f.
    */
   int zoomScalePrecision() const {
     return _zoomScalePrecision;
@@ -194,7 +196,28 @@ class DisplayList {
   /**
    * Sets whether to allow zoom blur in tiled rendering mode.
    */
-  void setAllowZoomBlur(bool allow);
+  void setAllowZoomBlur(bool allow) {
+    _allowZoomBlur = allow;
+  }
+
+  /**
+   * Returns the render time budget in microseconds. This value limits how long rendering can take
+   * for each frame, helping the application maintain a consistent frame rate. If rendering goes
+   * over this budget, some parts may be skipped or rendered at lower quality to stay within the
+   * limit. You can adjust this value each frame based on your app’s performance needs. Rendering
+   * may still take longer than the budget, especially if there is no content that can be skipped or
+   * rendered at lower quality. The default is 40,000 microseconds (25 fps).
+   */
+  int64_t renderTimeBudget() const {
+    return _renderTimeBudget;
+  }
+
+  /**
+   * Sets the render time budget in microseconds.
+   */
+  void setRenderTimeBudget(int64_t budget) {
+    _renderTimeBudget = budget;
+  }
 
   /**
    * Sets whether to show dirty regions during rendering. When enabled, the dirty regions will be
@@ -220,12 +243,15 @@ class DisplayList {
  private:
   std::shared_ptr<RootLayer> _root = nullptr;
   float _zoomScale = 1.0f;
-  int _zoomScalePrecision = 100;
+  int _zoomScalePrecision = 500;
   Point _contentOffset = {};
   RenderMode _renderMode = RenderMode::Partial;
   int _tileSize = 256;
   int _maxTileCount = 0;
   bool _allowZoomBlur = true;
+  int64_t _renderTimeBudget = 40000;  // 40 milliseconds (25 fps)
+  SlidingWindowTracker* tileTimeTracker = nullptr;
+  SlidingWindowTracker* screenTimeTracker = nullptr;
   bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
   float lastZoomScale = 1.0f;
@@ -242,19 +268,26 @@ class DisplayList {
                                   const std::vector<Rect>& dirtyRegions);
 
   std::vector<Rect> renderTiled(Surface* surface, bool autoClear,
-                                const std::vector<Rect>& dirtyRegions);
+                                const std::vector<Rect>& dirtyRegions, int64_t renderTimeBudget);
 
   void checkTileCount(Surface* renderSurface);
 
-  std::vector<TileRenderTask> invalidateTileCaches(const std::vector<Rect>& dirtyRegions);
+  std::vector<DrawTask> invalidateTileCaches(const std::vector<Rect>& dirtyRegions);
 
   void invalidateCurrentTileCache(const TileCache* tileCache, const std::vector<Rect>& dirtyRegions,
-                                  std::vector<TileRenderTask>* renderTasks) const;
+                                  std::vector<DrawTask>* tileTasks) const;
 
-  std::vector<std::shared_ptr<Tile>> collectRenderTiles(const Surface* surface,
-                                                        std::vector<TileRenderTask>* renderTasks);
+  std::vector<DrawTask> collectScreenTasks(const Surface* surface, std::vector<DrawTask>* tileTasks,
+                                           std::vector<FallbackTile>* fallbackTiles);
 
-  std::vector<std::shared_ptr<Tile>> getFreeTiles(size_t tileCount, const Surface* renderSurface);
+  std::vector<std::pair<float, TileCache*>> getSortedTileCaches() const;
+
+  std::vector<DrawTask> getFallbackDrawTasks(
+      int tileX, int tileY, const std::vector<std::pair<float, TileCache*>>& sortedCaches) const;
+
+  std::vector<std::shared_ptr<Tile>> getFreeTiles(
+      const Surface* renderSurface, size_t tileCount,
+      const std::vector<std::pair<float, TileCache*>>& sortedCaches);
 
   std::vector<std::shared_ptr<Tile>> createContinuousTiles(const Surface* renderSurface,
                                                            int requestCountX, int requestCountY);
@@ -265,10 +298,13 @@ class DisplayList {
 
   int getMaxTileCountPerAtlas(Context* context) const;
 
-  void renderTileTask(const TileRenderTask& task) const;
+  std::vector<Rect> drawFallbackTiles(const std::vector<FallbackTile>& fallbackTiles,
+                                      std::vector<DrawTask>* screenTasks, int64_t renderTimeBudget);
 
-  void drawTilesToSurface(const std::vector<std::shared_ptr<Tile>>& tiles, Surface* surface,
-                          bool autoClear) const;
+  Rect drawTileTask(const DrawTask& task, bool requireFlush = false) const;
+
+  void drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface, bool autoClear,
+                       bool recordScreenTime) const;
 
   void renderDirtyRegions(Canvas* canvas, std::vector<Rect> dirtyRegions);
 
