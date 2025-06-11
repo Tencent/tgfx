@@ -107,7 +107,7 @@ float PathScalerContext::getAdvance(GlyphID glyphID, bool) const {
   if (record == nullptr) {
     return 0.f;
   }
-  return record->advance;
+  return record->advance * textSize;
 }
 
 Point PathScalerContext::getVerticalOffset(GlyphID glyphID) const {
@@ -115,7 +115,7 @@ Point PathScalerContext::getVerticalOffset(GlyphID glyphID) const {
   if (record == nullptr) {
     return {};
   }
-  return {-record->advance * 0.5f, pathTypeFace()->fontMetrics().capHeight};
+  return {-record->advance * 0.5f * textSize, pathTypeFace()->fontMetrics().capHeight * textSize};
 }
 
 bool PathScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic,

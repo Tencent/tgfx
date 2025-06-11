@@ -71,7 +71,8 @@ Point ImageScalerContext::getVerticalOffset(GlyphID glyphID) const {
   if (record == nullptr) {
     return {};
   }
-  return {-record->advance * 0.5f * extraScale.y, imageTypeface()->fontMetrics().capHeight};
+  return {-record->advance * 0.5f * extraScale.y,
+          imageTypeface()->fontMetrics().capHeight * extraScale.y};
 }
 bool ImageScalerContext::generatePath(GlyphID, bool, bool, Path*) const {
   return false;
