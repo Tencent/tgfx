@@ -58,21 +58,12 @@ Rect ImageScalerContext::getBounds(GlyphID glyphID, bool, bool fauxItalic) const
   return bounds;
 }
 
-float ImageScalerContext::getAdvance(GlyphID glyphID, bool) const {
-  auto record = imageTypeface()->getGlyphRecord(glyphID);
-  if (record == nullptr) {
-    return 0.0f;
-  }
-  return record->advance * extraScale.x;
+float ImageScalerContext::getAdvance(GlyphID, bool) const {
+  return 0.f;
 }
 
-Point ImageScalerContext::getVerticalOffset(GlyphID glyphID) const {
-  auto record = imageTypeface()->getGlyphRecord(glyphID);
-  if (record == nullptr) {
-    return {};
-  }
-  return {-record->advance * 0.5f * extraScale.y,
-          imageTypeface()->fontMetrics().capHeight * extraScale.y};
+Point ImageScalerContext::getVerticalOffset(GlyphID) const {
+  return {};
 }
 bool ImageScalerContext::generatePath(GlyphID, bool, bool, Path*) const {
   return false;

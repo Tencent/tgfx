@@ -36,15 +36,6 @@ ImageTypeface::ImageTypeface(uint32_t builderID, const std::string& fontFamily,
                              const ImageRecordType& glyphRecords)
     : _builderID(builderID), _fontFamily(fontFamily), _fontStyle(fontStyle), _fontMetrics(metrics),
       glyphRecords(glyphRecords) {
-  initCharGlyphIDMap();
-}
-
-void ImageTypeface::initCharGlyphIDMap() {
-  GlyphID glyphID = 0;
-  for (const auto& record : glyphRecords) {
-    ++glyphID;
-    unicharToGlyphIDMap[record->unichar] = glyphID;
-  }
 }
 
 size_t ImageTypeface::glyphsCount() const {
@@ -61,13 +52,6 @@ bool ImageTypeface::hasColor() const {
 
 bool ImageTypeface::hasOutlines() const {
   return false;
-}
-
-GlyphID ImageTypeface::getGlyphID(Unichar unichar) const {
-  if (auto iter = unicharToGlyphIDMap.find(unichar); iter != unicharToGlyphIDMap.end()) {
-    return iter->second;
-  }
-  return 0;
 }
 
 std::shared_ptr<Data> ImageTypeface::getBytes() const {

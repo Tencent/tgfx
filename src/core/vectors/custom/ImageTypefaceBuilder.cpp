@@ -20,13 +20,7 @@
 #include "ImageTypeface.h"
 
 namespace tgfx {
-ImageTypefaceBuilder::ImageTypefaceBuilder(const std::string& fontFamily,
-                                           const std::string& fontStyle, const FontMetrics& metrics)
-    : CustomTypefaceBuilder(fontFamily, fontStyle, metrics) {
-}
-
-GlyphID ImageTypefaceBuilder::addGlyph(std::shared_ptr<ImageCodec> image, const Point& offset,
-                                       Unichar unichar, float advance) {
+GlyphID ImageTypefaceBuilder::addGlyph(std::shared_ptr<ImageCodec> image, const Point& offset) {
   if (glyphRecords.size() >= std::numeric_limits<GlyphID>::max()) {
     // Reached the maximum number of glyphs.Return an invalid GlyphID
     return 0;
@@ -35,8 +29,7 @@ GlyphID ImageTypefaceBuilder::addGlyph(std::shared_ptr<ImageCodec> image, const 
   auto bounds = Rect::MakeXYWH(offset.x, offset.y, static_cast<float>(image->width()),
                                static_cast<float>(image->height()));
   auto glyphID = static_cast<GlyphID>(glyphRecords.size() + 1);
-  glyphRecords.emplace_back(
-      std::make_shared<GlyphRecord>(std::move(image), offset, unichar, advance));
+  glyphRecords.emplace_back(std::make_shared<GlyphRecord>(std::move(image), offset));
   updateMetricsBounds(bounds, glyphID == 1);
   return glyphID;
 }

@@ -103,20 +103,12 @@ Rect PathScalerContext::getBounds(GlyphID glyphID, bool fauxBold, bool fauxItali
   return bounds;
 }
 
-float PathScalerContext::getAdvance(GlyphID glyphID, bool) const {
-  auto record = pathTypeFace()->getGlyphRecord(glyphID);
-  if (record == nullptr) {
-    return 0.f;
-  }
-  return record->advance * textSize;
+float PathScalerContext::getAdvance(GlyphID, bool) const {
+  return 0.0f;
 }
 
-Point PathScalerContext::getVerticalOffset(GlyphID glyphID) const {
-  auto record = pathTypeFace()->getGlyphRecord(glyphID);
-  if (record == nullptr) {
-    return {};
-  }
-  return {-record->advance * 0.5f * textSize, pathTypeFace()->fontMetrics().capHeight * textSize};
+Point PathScalerContext::getVerticalOffset(GlyphID) const {
+  return {};
 }
 
 bool PathScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic,

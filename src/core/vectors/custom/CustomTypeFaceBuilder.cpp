@@ -20,13 +20,6 @@
 #include "core/utils/UniqueID.h"
 
 namespace tgfx {
-CustomTypefaceBuilder::CustomTypefaceBuilder(const std::string& fontFamily,
-                                             const std::string& fontStyle,
-                                             const FontMetrics& fontMetrics)
-    : _fontFamily(fontFamily), _fontStyle(fontStyle), _fontMetrics(fontMetrics),
-      uniqueID(UniqueID::Next()) {
-}
-
 void CustomTypefaceBuilder::setFontName(const std::string& fontFamily,
                                         const std::string& fontStyle) {
   _fontFamily = fontFamily;
@@ -50,5 +43,4 @@ void CustomTypefaceBuilder::updateMetricsBounds(const Rect& bounds, bool firstTi
     _fontMetrics.xMax = std::max(_fontMetrics.xMax, bounds.right);
   }
 }
-
 }  // namespace tgfx

@@ -30,10 +30,6 @@ namespace tgfx {
  */
 class CustomTypefaceBuilder {
  public:
-  explicit CustomTypefaceBuilder(const std::string& fontFamily = "",
-                                 const std::string& fontStyle = "",
-                                 const FontMetrics& metrics = {});
-
   virtual ~CustomTypefaceBuilder() = default;
 
   /**

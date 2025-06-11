@@ -32,22 +32,16 @@ class PathTypefaceBuilder : public CustomTypefaceBuilder {
  public:
   struct GlyphRecord {
     Path path = {};
-    Unichar unichar = 0;
-    float advance = 0;
-    GlyphRecord(const Path& path, Unichar unichar, float advance)
-        : path(path), unichar(unichar), advance(advance) {
+    GlyphRecord(const Path& path) : path(path) {
     }
   };
-
-  explicit PathTypefaceBuilder(const std::string& fontFamily = "",
-                               const std::string& fontStyle = "", const FontMetrics& metrics = {});
 
   /**
    * Adds a glyph to the typeface using a vector path. Returns the GlyphID of the new glyph, which
    * is a unique identifier within the typeface, starting from 1. Returns 0 if the glyph cannot be
    * added because the typeface builder is full.
    */
-  GlyphID addGlyph(const Path& path, Unichar unichar = 0, float advance = 0.f);
+  GlyphID addGlyph(const Path& path);
 
   /**
    * Adds a glyph to the typeface using a PathProvider. The PathProvider is expected to provide the
@@ -56,8 +50,7 @@ class PathTypefaceBuilder : public CustomTypefaceBuilder {
    * identifier within the typeface, starting from 1. Returns 0 if the glyph cannot be added because
    * the typeface builder is full.Make sure the PathProvider is non-null and valid.
    */
-  GlyphID addGlyph(std::unique_ptr<PathProvider> provider, Unichar unichar = 0,
-                   float advance = 0.f);
+  GlyphID addGlyph(std::unique_ptr<PathProvider> provider);
 
   /**
    * Detaches the typeface being built. After this call, the builder remains valid and can be used

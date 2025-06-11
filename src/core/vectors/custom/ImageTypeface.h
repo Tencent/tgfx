@@ -57,7 +57,9 @@ class ImageTypeface final : public Typeface {
 
   bool hasOutlines() const override;
 
-  GlyphID getGlyphID(Unichar unichar) const override;
+  GlyphID getGlyphID(Unichar) const override {
+    return 0;
+  }
 
   std::shared_ptr<Data> getBytes() const override;
 
@@ -69,8 +71,6 @@ class ImageTypeface final : public Typeface {
   explicit ImageTypeface(uint32_t builderID, const std::string& fontFamily,
                          const std::string& fontStyle, const FontMetrics& metrics,
                          const ImageRecordType& glyphRecords);
-
-  void initCharGlyphIDMap();
 
   uint32_t getActiveID() const override {
     return _builderID;
@@ -84,6 +84,5 @@ class ImageTypeface final : public Typeface {
   std::string _fontStyle;
   FontMetrics _fontMetrics;
   ImageRecordType glyphRecords;
-  std::unordered_map<Unichar, GlyphID> unicharToGlyphIDMap;  // Maps Unichar to GlyphID
 };
 }  // namespace tgfx

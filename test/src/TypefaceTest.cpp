@@ -27,13 +27,14 @@ namespace tgfx {
 TGFX_TEST(TypefaceTest, CustomPathTypeface) {
   const std::string fontFamily = "customPath";
   const std::string fontStyle = "customStyle";
-  PathTypefaceBuilder builder(fontFamily, fontStyle, {});
+  PathTypefaceBuilder builder;
+  builder.setFontName(fontFamily, fontStyle);
   Path path;
   path.moveTo(Point::Make(25.0f, 5.0f));
   path.lineTo(Point::Make(45.0f, 45.0f));
   path.lineTo(Point::Make(5.0f, 45.0f));
   path.close();
-  builder.addGlyph(path, 1);
+  builder.addGlyph(path);
 
   path.reset();
   path.moveTo(Point::Make(5.0f, 5.0f));
@@ -41,19 +42,19 @@ TGFX_TEST(TypefaceTest, CustomPathTypeface) {
   path.lineTo(Point::Make(45.0f, 45.0f));
   path.lineTo(Point::Make(5.0f, 45.0f));
   path.close();
-  builder.addGlyph(path, 2);
+  builder.addGlyph(path);
 
   path.reset();
   Rect rect = Rect::MakeXYWH(5.0f, 5.0f, 40.0f, 40.0f);
   path.addOval(rect);
   path.close();
-  builder.addGlyph(path, 3);
+  builder.addGlyph(path);
 
   path.reset();
   rect = Rect::MakeXYWH(0.0f, 0.0f, 100.0f, 100.0f);
   path.addOval(rect);
   path.close();
-  builder.addGlyph(path, 100);
+  builder.addGlyph(path);
 
   auto typeface = builder.detach();
 
@@ -65,15 +66,13 @@ TGFX_TEST(TypefaceTest, CustomPathTypeface) {
   ASSERT_EQ(typeface->fontFamily(), fontFamily);
   ASSERT_EQ(typeface->fontStyle(), fontStyle);
   ASSERT_EQ(typeface->glyphsCount(), static_cast<size_t>(4));
-  ASSERT_EQ(typeface->getGlyphID(100), static_cast<GlyphID>(4));
-  ASSERT_EQ(typeface->getGlyphID(1000), static_cast<GlyphID>(0));
 
   path.reset();
   path.moveTo(Point::Make(25.0f, 5.0f));
   path.lineTo(Point::Make(35.0f, 35.0f));
   path.lineTo(Point::Make(45.0f, 5.0f));
   path.close();
-  builder.addGlyph(path, 101);
+  builder.addGlyph(path);
 
   typeface = builder.detach();
   ASSERT_TRUE(typeface != nullptr);
@@ -105,15 +104,15 @@ TGFX_TEST(TypefaceTest, CustomPathTypeface) {
 TGFX_TEST(TypefaceTest, CustomImageTypeface) {
   const std::string fontFamily = "customImage";
   const std::string fontStyle = "customStyle";
-  ImageTypefaceBuilder builder(fontFamily, fontStyle, {});
-
+  ImageTypefaceBuilder builder;
+  builder.setFontName(fontFamily, fontStyle);
   std::string imagePath = "resources/assets/glyph1.png";
   auto imageCodec = ImageCodec::MakeFrom(ProjectPath::Absolute(imagePath));
-  builder.addGlyph(std::move(imageCodec), Point::Make(0.0f, 0.0f), 4);
+  builder.addGlyph(std::move(imageCodec), Point::Make(0.0f, 0.0f));
 
   imagePath = "resources/assets/glyph2.png";
   imageCodec = ImageCodec::MakeFrom(ProjectPath::Absolute(imagePath));
-  builder.addGlyph(std::move(imageCodec), Point::Make(5.0f, 5.0f), 5);
+  builder.addGlyph(std::move(imageCodec), Point::Make(5.0f, 5.0f));
 
   auto typeface = builder.detach();
 
@@ -125,12 +124,10 @@ TGFX_TEST(TypefaceTest, CustomImageTypeface) {
   ASSERT_EQ(typeface->fontFamily(), fontFamily);
   ASSERT_EQ(typeface->fontStyle(), fontStyle);
   ASSERT_EQ(typeface->glyphsCount(), static_cast<size_t>(2));
-  ASSERT_EQ(typeface->getGlyphID(4), static_cast<GlyphID>(1));
-  ASSERT_EQ(typeface->getGlyphID(1000), static_cast<GlyphID>(0));
 
   imagePath = "resources/assets/glyph3.png";
   imageCodec = ImageCodec::MakeFrom(ProjectPath::Absolute(imagePath));
-  builder.addGlyph(std::move(imageCodec), Point::Make(0.0f, 5.0f), 6);
+  builder.addGlyph(std::move(imageCodec), Point::Make(0.0f, 5.0f));
 
   typeface = builder.detach();
   ASSERT_TRUE(typeface != nullptr);

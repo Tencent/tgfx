@@ -20,32 +20,26 @@
 #include "PathTypeface.h"
 
 namespace tgfx {
-PathTypefaceBuilder::PathTypefaceBuilder(const std::string& fontFamily,
-                                         const std::string& fontStyle, const FontMetrics& metrics)
-    : CustomTypefaceBuilder(fontFamily, fontStyle, metrics) {
-}
-
-GlyphID PathTypefaceBuilder::addGlyph(const Path& path, Unichar unichar, float advance) {
+GlyphID PathTypefaceBuilder::addGlyph(const Path& path) {
   if (glyphRecords.size() >= std::numeric_limits<GlyphID>::max()) {
     // Reached the maximum number of glyphs. Return an invalid GlyphID
     return 0;
   }
   // GlyphID starts from 1
   auto glyphID = static_cast<GlyphID>(glyphRecords.size() + 1);
-  glyphRecords.emplace_back(std::make_shared<GlyphRecord>(path, unichar, advance));
+  glyphRecords.emplace_back(std::make_shared<GlyphRecord>(path));
   updateMetricsBounds(path.getBounds(), glyphID == 1);
   return glyphID;
 }
 
-GlyphID PathTypefaceBuilder::addGlyph(std::unique_ptr<PathProvider> provider, Unichar unichar,
-                                      float advance) {
+GlyphID PathTypefaceBuilder::addGlyph(std::unique_ptr<PathProvider> provider) {
   if (glyphRecords.size() >= std::numeric_limits<GlyphID>::max()) {
     // Reached the maximum number of glyphs. Return an invalid GlyphID
     return 0;
   }
   // GlyphID starts from 1
   auto glyphID = static_cast<GlyphID>(glyphRecords.size() + 1);
-  glyphRecords.emplace_back(std::make_shared<GlyphRecord>(provider->getPath(), unichar, advance));
+  glyphRecords.emplace_back(std::make_shared<GlyphRecord>(provider->getPath()));
   updateMetricsBounds(provider->getPath().getBounds(), glyphID == 1);
   return glyphID;
 }

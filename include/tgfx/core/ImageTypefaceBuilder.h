@@ -32,16 +32,10 @@ class ImageTypefaceBuilder : public CustomTypefaceBuilder {
   struct GlyphRecord {  // logical union
     std::shared_ptr<ImageCodec> image = nullptr;
     Point offset = {};
-    Unichar unichar = 0;
-    float advance = 0;
-    GlyphRecord(std::shared_ptr<ImageCodec> image, const Point& offset, Unichar unichar,
-                float advance)
-        : image(std::move(image)), offset(offset), unichar(unichar), advance(advance) {
+    GlyphRecord(std::shared_ptr<ImageCodec> image, const Point& offset)
+        : image(std::move(image)), offset(offset) {
     }
   };
-
-  explicit ImageTypefaceBuilder(const std::string& fontFamily = "",
-                                const std::string& fontStyle = "", const FontMetrics& metrics = {});
 
   /**
    * Adds a glyph to the typeface using an ImageCodec. The ImageCodec is expected to provide the
@@ -50,8 +44,7 @@ class ImageTypefaceBuilder : public CustomTypefaceBuilder {
    * identifier within the typeface, starting from 1. Returns 0 if the glyph cannot be added because
    * the typeface builder is full.
    */
-  GlyphID addGlyph(std::shared_ptr<ImageCodec> image, const Point& offset, Unichar unichar = 0,
-                   float advance = 0.f);
+  GlyphID addGlyph(std::shared_ptr<ImageCodec> image, const Point& offset);
 
   std::shared_ptr<Typeface> detach() const override;
 

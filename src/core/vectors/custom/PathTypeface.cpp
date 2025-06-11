@@ -36,15 +36,6 @@ PathTypeface::PathTypeface(uint32_t builderID, const std::string& fontFamily,
                            const VectorRecordType& glyphRecords)
     : _builderID(builderID), _fontFamily(fontFamily), _fontStyle(fontStyle), _fontMetrics(metrics),
       glyphRecords(glyphRecords) {
-  initCharGlyphIDMap();
-}
-
-void PathTypeface::initCharGlyphIDMap() {
-  GlyphID glyphID = 0;
-  for (const auto& record : glyphRecords) {
-    ++glyphID;
-    unicharToGlyphIDMap[record->unichar] = glyphID;
-  }
 }
 
 size_t PathTypeface::glyphsCount() const {
@@ -61,13 +52,6 @@ bool PathTypeface::hasColor() const {
 
 bool PathTypeface::hasOutlines() const {
   return true;
-}
-
-GlyphID PathTypeface::getGlyphID(Unichar unichar) const {
-  if (auto iter = unicharToGlyphIDMap.find(unichar); iter != unicharToGlyphIDMap.end()) {
-    return iter->second;
-  }
-  return 0;
 }
 
 std::shared_ptr<Data> PathTypeface::getBytes() const {

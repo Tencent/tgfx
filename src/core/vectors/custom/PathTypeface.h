@@ -57,7 +57,9 @@ class PathTypeface final : public Typeface {
 
   bool hasOutlines() const override;
 
-  GlyphID getGlyphID(Unichar unichar) const override;
+  GlyphID getGlyphID(Unichar) const override {
+    return 0;
+  }
 
   std::shared_ptr<Data> getBytes() const override;
 
@@ -69,8 +71,6 @@ class PathTypeface final : public Typeface {
   explicit PathTypeface(uint32_t builderID, const std::string& fontFamily,
                         const std::string& fontStyle, const FontMetrics& metrics,
                         const VectorRecordType& glyphRecords);
-
-  void initCharGlyphIDMap();
 
   uint32_t getActiveID() const override {
     return _builderID;
@@ -84,6 +84,5 @@ class PathTypeface final : public Typeface {
   std::string _fontStyle;
   FontMetrics _fontMetrics;
   VectorRecordType glyphRecords;
-  std::unordered_map<Unichar, GlyphID> unicharToGlyphIDMap;
 };
 }  // namespace tgfx
