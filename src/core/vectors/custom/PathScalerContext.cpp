@@ -88,12 +88,13 @@ Rect PathScalerContext::getBounds(GlyphID glyphID, bool fauxBold, bool fauxItali
   if (record == nullptr) {
     return {};
   }
-  auto bounds = record->path.getBounds();
+  auto matrix = GetTransform(fauxItalic, textSize);
+  auto path = record->path;
+  path.transform(matrix);
+  auto bounds = path.getBounds();
   if (bounds.isEmpty()) {
     return {};
   }
-  auto matrix = GetTransform(fauxItalic, textSize);
-  bounds = matrix.mapRect(bounds);
   if (fauxBold) {
     auto fauxBoldSize = textSize * fauxBoldScale;
     bounds.outset(fauxBoldSize, fauxBoldSize);
@@ -168,12 +169,13 @@ bool PathScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*
   }
   auto bounds = PathScalerContext::getImageTransform(glyphID, fauxBold, stroke, nullptr);
   bounds.roundOut();
-  auto matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
   auto width = static_cast<int>(bounds.width());
   auto height = static_cast<int>(bounds.height());
   if (width <= 0 || height <= 0) {
     return false;
   }
+  auto matrix = Matrix::MakeScale(textSize);
+  matrix.postTranslate(-bounds.x(), -bounds.y());
   auto shape = Shape::MakeFrom(record->path);
   shape = Shape::ApplyStroke(std::move(shape), stroke);
   shape = Shape::ApplyMatrix(std::move(shape), matrix);
