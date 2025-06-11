@@ -84,9 +84,7 @@ class DisplayList {
    * efficient than applying a matrix directly, as it avoids invalidating the layer tree's internal
    * caches. The default value is 1.0f.
    */
-  float zoomScale() const {
-    return _zoomScale;
-  }
+  float zoomScale() const;
 
   /**
    * Sets the scale factor for the layer tree. This factor determines how much the layer tree is
@@ -98,13 +96,12 @@ class DisplayList {
 
   /**
    * Returns the integer multiplier used for zoom scale precision. This value determines the
-   * smallest increment by which the zoom scale can change. For example, a precision of 100 means
-   * the zoom scale can be adjusted in steps of 0.01 (1/100). Internally, the zoom scale is first
-   * rounded to the nearest integer and then converted back to a float for rendering. The precision
-   * is used to convert the zoom scale to an integer as follows:
+   * smallest step by which the zoom scale can change. For example, a precision of 100 means the
+   * zoom scale can be adjusted in increments of 0.01 (1/100). Internally, the zoom scale is stored
+   * as an integer. The precision is used to convert the zoom scale to an integer as follows:
    * - When zooming in (scale >= 1.0), the scale is multiplied by the precision.
    * - When zooming out (scale < 1.0), the reciprocal of the scale is multiplied by the precision.
-   * The default precision is 500, allowing zoom scale adjustments in steps of 0.002f.
+   * The default precision is 1000, allowing zoom scale adjustments in steps of 0.001f.
    */
   int zoomScalePrecision() const {
     return _zoomScalePrecision;
@@ -242,8 +239,8 @@ class DisplayList {
 
  private:
   std::shared_ptr<RootLayer> _root = nullptr;
-  float _zoomScale = 1.0f;
-  int _zoomScalePrecision = 500;
+  int64_t _zoomScaleInt = 1000;
+  int _zoomScalePrecision = 1000;
   Point _contentOffset = {};
   RenderMode _renderMode = RenderMode::Partial;
   int _tileSize = 256;
@@ -254,11 +251,11 @@ class DisplayList {
   SlidingWindowTracker* screenTimeTracker = nullptr;
   bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
-  float lastZoomScale = 1.0f;
+  int64_t lastZoomScaleInt = 1000;
   Point lastContentOffset = {};
   int totalTileCount = 0;
   std::vector<std::shared_ptr<Surface>> surfaceCaches = {};
-  std::unordered_map<float, TileCache*> tileCaches = {};
+  std::unordered_map<int64_t, TileCache*> tileCaches = {};
   std::vector<std::shared_ptr<Tile>> emptyTiles = {};
   std::deque<std::vector<Rect>> lastDirtyRegions = {};
 
