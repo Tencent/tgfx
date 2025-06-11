@@ -171,7 +171,7 @@ void DisplayList::render(Surface* surface, bool autoClear) {
   if (!surface) {
     return;
   }
-  auto startTime = Clock::Now();
+  Clock clock = {};
   _hasContentChanged = false;
   auto dirtyRegions = _root->updateDirtyRegions();
   if (_zoomScale == 0.0f) {
@@ -181,7 +181,7 @@ void DisplayList::render(Surface* surface, bool autoClear) {
     }
     return;
   }
-  auto renderTimeBudget = _renderTimeBudget - Clock::Now() + startTime;
+  auto renderTimeBudget = _renderTimeBudget - clock.elapsedTime();
   switch (_renderMode) {
     case RenderMode::Direct:
       dirtyRegions = renderDirect(surface, autoClear);
