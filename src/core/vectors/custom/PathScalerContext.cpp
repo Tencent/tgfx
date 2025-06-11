@@ -124,7 +124,7 @@ bool PathScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxIt
     return false;
   }
   auto record = pathTypeFace()->getGlyphRecord(glyphID);
-  if (record == nullptr) {
+  if (record == nullptr || record->path.isEmpty()) {
     return false;
   }
 
@@ -150,7 +150,7 @@ Rect PathScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const 
 
   auto bounds = getBounds(glyphID, fauxBold, false);
   if (stroke != nullptr) {
-    ApplyStrokeToBounds(*stroke, &bounds, true);
+    ApplyStrokeToBounds(*stroke, &bounds);
   }
   if (matrix) {
     matrix->setTranslate(bounds.x(), bounds.y());
@@ -173,6 +173,9 @@ bool PathScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*
   auto matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
   auto width = static_cast<int>(bounds.width());
   auto height = static_cast<int>(bounds.height());
+  if (width <= 0 || height <= 0) {
+    return false;
+  }
 
   auto shape = Shape::MakeFrom(record->path);
   shape = Shape::ApplyStroke(std::move(shape), stroke);
