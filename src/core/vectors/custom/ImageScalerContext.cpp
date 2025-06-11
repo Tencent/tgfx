@@ -101,14 +101,6 @@ bool ImageScalerContext::readPixels(GlyphID glyphID, bool, const Stroke*, const 
   if (record == nullptr || record->image == nullptr) {
     return false;
   }
-
-  auto bounds = getImageTransform(glyphID, false, nullptr, nullptr);
-  bounds.roundOut();
-
-  if (bounds.isEmpty()) {
-    return false;
-  }
-
   return record->image->readPixels(dstInfo, dstPixels);
 }
 
