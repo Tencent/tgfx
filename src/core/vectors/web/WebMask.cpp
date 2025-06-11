@@ -114,13 +114,13 @@ bool WebMask::onFillText(const GlyphRunList* glyphRunList, const Stroke* stroke,
                          const Matrix& matrix, bool) {
   aboutToFill();
   auto bounds = glyphRunList->getBounds(matrix.getMaxScale());
-  if (stroke) {
-    ApplyStrokeToBounds(*stroke, &bounds);
-  }
-  matrix.mapRect(&bounds);
   if (bounds.isEmpty()) {
     return false;
   }
+  if (stroke) {
+    ApplyStrokeToBounds(*stroke, &bounds, true);
+  }
+  matrix.mapRect(&bounds);
   stream->markContentDirty(bounds);
   for (auto& glyphRun : glyphRunList->glyphRuns()) {
     std::vector<std::string> texts = {};

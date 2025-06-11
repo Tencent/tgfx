@@ -158,5 +158,4 @@ TGFX_TEST(TypefaceTest, CustomImageTypeface) {
 
   EXPECT_TRUE(Baseline::Compare(surface, "TypefaceTest/CustomImageTypeface"));
 }
-
 }  // namespace tgfx

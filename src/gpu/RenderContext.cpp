@@ -212,7 +212,6 @@ void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
   for (auto& glyphRun : glyphRunList->glyphRuns()) {
     auto font = glyphRun.font;
     font = font.makeWithSize(scale * font.getSize());
-    DEBUG_ASSERT(font.getTypeface() != nullptr);
     auto& glyphIDs = glyphRun.glyphs;
     auto glyphCount = glyphIDs.size();
     auto& positions = glyphRun.positions;

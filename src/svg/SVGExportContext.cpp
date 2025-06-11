@@ -259,9 +259,6 @@ void SVGExportContext::exportGlyphsAsImage(const std::shared_ptr<GlyphRunList>& 
   viewMatrix.preScale(1.0f / scale, 1.0f / scale);
   for (const auto& glyphRun : glyphRunList->glyphRuns()) {
     auto font = glyphRun.font;
-    if (font.getTypeface() == nullptr) {
-      continue;
-    }
     font = font.makeWithSize(scale * font.getSize());
     const auto& glyphIDs = glyphRun.glyphs;
     auto glyphCount = glyphIDs.size();
