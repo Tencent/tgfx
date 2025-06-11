@@ -22,7 +22,7 @@
 #include "core/ScalerContext.h"
 
 namespace tgfx {
-class PathScalerContext : public ScalerContext {
+class PathScalerContext final : public ScalerContext {
  public:
   PathScalerContext(std::shared_ptr<Typeface> typeface, float size);
 
