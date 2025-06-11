@@ -173,5 +173,9 @@ class ProxyProvider {
   void addResourceProxy(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& uniqueKey);
 
   void uploadSharedVertexBuffer(std::shared_ptr<Data> data);
+
+  std::shared_ptr<TextureProxy> createTextureProxyByImageSource(
+      const UniqueKey& uniqueKey, std::shared_ptr<DataSource<ImageBuffer>> source, int width,
+      int height, bool alphaOnly, bool mipmapped = false, uint32_t renderFlags = 0);
 };
 }  // namespace tgfx
