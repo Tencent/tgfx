@@ -158,7 +158,7 @@ class Typeface {
   virtual std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const = 0;
 
   /**
-   * Returns the active ID for this typeface. for custom typefaces, this is the builderID,or returns uniqueID.
+   * Returns the active ID for this typeface. for custom typefaces, this is the builderID, or returns uniqueID.
    */
   virtual uint32_t getActiveID() const;
 
