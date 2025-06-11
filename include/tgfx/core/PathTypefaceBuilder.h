@@ -62,6 +62,6 @@ class PathTypefaceBuilder : public CustomTypefaceBuilder {
   std::shared_ptr<Typeface> detach() const override;
 
  private:
-  std::vector<std::shared_ptr<GlyphRecord>> glyphRecords;
+  std::vector<std::shared_ptr<GlyphRecord>> glyphRecords = {};
 };
 }  // namespace tgfx

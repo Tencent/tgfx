@@ -82,7 +82,7 @@ class ImageTypeface final : public Typeface {
   uint32_t _uniqueID = UniqueID::Next();
   std::string _fontFamily;
   std::string _fontStyle;
-  FontMetrics _fontMetrics;
-  ImageRecordType glyphRecords;
+  FontMetrics _fontMetrics = {};
+  ImageRecordType glyphRecords = {};
 };
 }  // namespace tgfx
