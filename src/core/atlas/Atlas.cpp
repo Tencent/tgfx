@@ -123,7 +123,16 @@ bool Atlas::getCellLocator(const BytesKey& cellKey, AtlasCellLocator& cellLocato
     return false;
   }
   cellLocator = it->second;
-  return true;
+  const auto& atlasLocator = cellLocator.atlasLocator;
+  auto page = atlasLocator.pageIndex();
+  auto plot = atlasLocator.plotIndex();
+  if (page >= pages.size() || plot >= numPlots) {
+    return false;
+  }
+  auto plotGeneration = pages[page].plotArray[plot]->genID();
+  auto locatorGeneration = atlasLocator.genID();
+  return plotGeneration == locatorGeneration;
+  ;
 }
 
 void Atlas::setLastUseToken(const PlotLocator& plotLocator, AtlasToken token) {
@@ -158,8 +167,16 @@ void Atlas::evictionPlot(Plot* plot) {
 
 void Atlas::deactivateLastPage() {
   DEBUG_ASSERT(!pages.empty());
+  auto pageIndex = pages.size() - 1;
   pages.pop_back();
   textureProxies.pop_back();
+  for (auto it = evictionPlots.begin(); it != evictionPlots.end();) {
+    if (it->first == pageIndex) {
+      it = evictionPlots.erase(it);
+    } else {
+      ++it;
+    }
+  }
 }
 
 void Atlas::compact(AtlasToken startTokenForNextFlush) {
