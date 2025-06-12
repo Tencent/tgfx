@@ -21,6 +21,10 @@
 #include "gpu/Quad.h"
 
 namespace tgfx {
+
+// Inset texture coordinates by 0.5 pixels inward to avoid drawImageRect sampling outside the Rect.
+static constexpr float offset = 0.5f;
+
 static void WriteUByte4Color(float* vertices, int& index, const Color& color) {
   auto bytes = reinterpret_cast<uint8_t*>(&vertices[index++]);
   bytes[0] = static_cast<uint8_t>(color.red * 255);
@@ -101,8 +105,9 @@ class NonAARectVertexProvider : public RectsVertexProvider {
     for (auto& record : rects) {
       auto& viewMatrix = record->viewMatrix;
       auto& rect = record->rect;
+      auto insetBounds = rect.makeInset(offset, offset);
       auto quad = Quad::MakeFrom(rect, &viewMatrix);
-      auto uvQuad = Quad::MakeFrom(rect);
+      auto uvQuad = Quad::MakeFrom(insetBounds);
       for (size_t j = 4; j >= 1; --j) {
         vertices[index++] = quad.point(j - 1).x;
         vertices[index++] = quad.point(j - 1).y;
@@ -147,16 +152,8 @@ PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
         break;
       }
     }
-    if (needUVCoord) {
-      auto& firstMatrix = rects.front()->viewMatrix;
-      for (auto& record : rects) {
-        if (record->viewMatrix != firstMatrix) {
-          hasUVCoord = true;
-          break;
-        }
-      }
-    }
   }
+  hasUVCoord = needUVCoord;
   auto array = buffer->makeArray(std::move(rects));
   if (aaType == AAType::Coverage) {
     return buffer->make<AARectsVertexProvider>(std::move(array), aaType, hasUVCoord, hasColor);
