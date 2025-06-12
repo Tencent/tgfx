@@ -158,21 +158,6 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
     return;
   }
   textRender->draw(state, fill, stroke);
-
-  /*
-  auto rasterizeMatrix = state.matrix;
-  rasterizeMatrix.postTranslate(-bounds.x(), -bounds.y());
-  auto width = static_cast<int>(ceilf(bounds.width()));
-  auto height = static_cast<int>(ceilf(bounds.height()));
-  auto rasterizer = Rasterizer::MakeFrom(width, height, std::move(glyphRunList), fill.antiAlias,
-                                         rasterizeMatrix, stroke);
-  auto image = Image::MakeFrom(std::move(rasterizer));
-  if (image == nullptr) {
-    return;
-  }
-  auto newState = state;
-  newState.matrix = Matrix::MakeTrans(bounds.x(), bounds.y());
-  drawImage(std::move(image), {}, newState, fill.makeWithMatrix(rasterizeMatrix)); */
 }
 
 void RenderContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
