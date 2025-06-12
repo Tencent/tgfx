@@ -227,18 +227,35 @@ std::shared_ptr<GpuShapeProxy> ProxyProvider::createGpuShapeProxy(std::shared_pt
   return std::make_shared<GpuShapeProxy>(drawingMatrix, triangleProxy, textureProxy);
 }
 
+std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxyByImageSource(
+    const UniqueKey& uniqueKey, std::shared_ptr<DataSource<ImageBuffer>> source, int width,
+    int height, bool alphaOnly, bool mipmapped, uint32_t renderFlags) {
+  auto proxyKey = GetProxyKey(uniqueKey, renderFlags);
+  auto task =
+      context->drawingBuffer()->make<TextureUploadTask>(proxyKey, std::move(source), mipmapped);
+  context->drawingManager()->addResourceTask(std::move(task));
+  auto proxy = std::shared_ptr<TextureProxy>(
+      new DefaultTextureProxy(proxyKey, width, height, mipmapped, alphaOnly));
+  addResourceProxy(proxy, uniqueKey);
+  return proxy;
+}
+
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
     const UniqueKey& uniqueKey, std::shared_ptr<ImageBuffer> imageBuffer, bool mipmapped,
     uint32_t renderFlags) {
   if (imageBuffer == nullptr) {
     return nullptr;
   }
+  auto proxy = findOrWrapTextureProxy(uniqueKey);
+  if (proxy != nullptr) {
+    return proxy;
+  }
   auto width = imageBuffer->width();
   auto height = imageBuffer->height();
   auto alphaOnly = imageBuffer->isAlphaOnly();
   auto source = ImageSource::Wrap(std::move(imageBuffer));
-  return createTextureProxy(uniqueKey, std::move(source), width, height, alphaOnly, mipmapped,
-                            renderFlags);
+  return createTextureProxyByImageSource(uniqueKey, std::move(source), width, height, alphaOnly,
+                                         mipmapped, renderFlags);
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
@@ -246,6 +263,10 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
     uint32_t renderFlags) {
   if (generator == nullptr) {
     return nullptr;
+  }
+  auto proxy = findOrWrapTextureProxy(uniqueKey);
+  if (proxy != nullptr) {
+    return proxy;
   }
   auto width = generator->width();
   auto height = generator->height();
@@ -255,9 +276,10 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
 #else
   auto asyncDecoding = false;
 #endif
+  // Ensure the image source is retained so it won't be destroyed prematurely during async decoding.
   auto source = ImageSource::MakeFrom(std::move(generator), !mipmapped, asyncDecoding);
-  return createTextureProxy(uniqueKey, std::move(source), width, height, alphaOnly, mipmapped,
-                            renderFlags);
+  return createTextureProxyByImageSource(uniqueKey, std::move(source), width, height, alphaOnly,
+                                         mipmapped, renderFlags);
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
@@ -267,14 +289,8 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
   if (proxy != nullptr || source == nullptr) {
     return proxy;
   }
-  auto proxyKey = GetProxyKey(uniqueKey, renderFlags);
-  auto task =
-      context->drawingBuffer()->make<TextureUploadTask>(proxyKey, std::move(source), mipmapped);
-  context->drawingManager()->addResourceTask(std::move(task));
-  proxy = std::shared_ptr<TextureProxy>(
-      new DefaultTextureProxy(proxyKey, width, height, mipmapped, alphaOnly));
-  addResourceProxy(proxy, uniqueKey);
-  return proxy;
+  return createTextureProxyByImageSource(uniqueKey, std::move(source), width, height, alphaOnly,
+                                         mipmapped, renderFlags);
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(const UniqueKey& uniqueKey,

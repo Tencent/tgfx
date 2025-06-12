@@ -20,7 +20,7 @@
 #include "core/atlas/AtlasManager.h"
 #include "core/utils/BlockBuffer.h"
 #include "core/utils/Log.h"
-#include "core/utils/MaxValueTracker.h"
+#include "core/utils/SlidingWindowTracker.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProgramCache.h"
 #include "gpu/ProxyProvider.h"
@@ -36,7 +36,7 @@ Context::Context(Device* device) : _device(device) {
   _drawingManager = new DrawingManager(this);
   _resourceProvider = new ResourceProvider(this);
   _proxyProvider = new ProxyProvider(this);
-  _maxValueTracker = new MaxValueTracker(10);
+  _maxValueTracker = new SlidingWindowTracker(10);
   _atlasManager = new AtlasManager(this);
   _drawingManager->addFlushCallbackObject(_atlasManager);
 }

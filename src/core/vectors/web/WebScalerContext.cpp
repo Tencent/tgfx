@@ -19,6 +19,7 @@
 #include "WebScalerContext.h"
 #include "ReadPixelsFromCanvasImage.h"
 #include "WebTypeface.h"
+#include "core/utils/ApplyStrokeToBound.h"
 #include "core/utils/Log.h"
 #include "platform/web/WebImageBuffer.h"
 
@@ -75,7 +76,7 @@ Rect WebScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const S
     return {};
   }
   if (!hasColor() && stroke != nullptr) {
-    stroke->applyToBounds(&bounds);
+    ApplyStrokeToBounds(*stroke, &bounds, true);
   }
   if (matrix) {
     matrix->setTranslate(bounds.left, bounds.top);
@@ -95,7 +96,7 @@ bool WebScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke* 
   }
   emscripten::val imageData = emscripten::val::null();
   if (!hasColor() && stroke != nullptr) {
-    stroke->applyToBounds(&bounds);
+    ApplyStrokeToBounds(*stroke, &bounds, true);
     imageData =
         scalerContext.call<val>("readPixels", getText(glyphID), bounds, properFauxBold, *stroke);
   } else {

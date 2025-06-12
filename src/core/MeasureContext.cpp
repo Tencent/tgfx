@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MeasureContext.h"
+#include "core/utils/ApplyStrokeToBound.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
@@ -31,7 +32,7 @@ void MeasureContext::drawRRect(const RRect& rRect, const MCState& state, const F
                                const Stroke* stroke) {
   auto rect = rRect.rect;
   if (stroke) {
-    stroke->applyToBounds(&rect);
+    ApplyStrokeToBounds(*stroke, &rect);
   }
   addLocalBounds(state, fill, rect, false);
 }
@@ -47,13 +48,6 @@ void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& stat
   addLocalBounds(state, fill, localBounds, shape->isInverseFillType());
 }
 
-void MeasureContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions&,
-                               const MCState& state, const Fill& fill) {
-  DEBUG_ASSERT(image != nullptr);
-  auto rect = Rect::MakeWH(image->width(), image->height());
-  addLocalBounds(state, fill, rect);
-}
-
 void MeasureContext::drawImageRect(std::shared_ptr<Image>, const Rect& rect, const SamplingOptions&,
                                    const MCState& state, const Fill& fill) {
   addLocalBounds(state, fill, rect);
@@ -64,7 +58,7 @@ void MeasureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList
                                       const Stroke* stroke) {
   auto localBounds = glyphRunList->getBounds();
   if (stroke) {
-    stroke->applyToBounds(&localBounds);
+    ApplyStrokeToBounds(*stroke, &localBounds);
   }
   addLocalBounds(state, fill, localBounds);
 }

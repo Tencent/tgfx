@@ -16,28 +16,36 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "MaxValueTracker.h"
+#pragma once
+
+#include <cstddef>
+#include <deque>
 
 namespace tgfx {
+/**
+ * SlidingWindowTracker is a utility class that tracks the maximum and average values of a sliding
+ * window of a specified size. It is useful for monitoring performance metrics over time, such as
+ * memory usage, frame rates, or other resource consumption metrics.
+ */
+class SlidingWindowTracker {
+ public:
+  SlidingWindowTracker(size_t windowSize);
 
-MaxValueTracker::MaxValueTracker(size_t maxSize) : _maxSize(maxSize) {
-}
+  void addValue(size_t value);
 
-void MaxValueTracker::addValue(size_t value) {
-  _values.push_back(value);
-  if (_values.size() > _maxSize) {
-    _values.pop_front();
-  }
-}
+  /**
+   * Returns the maximum value in the sliding window. If the window is empty, returns 0.
+   */
+  size_t getMaxValue() const;
 
-size_t MaxValueTracker::getMaxValue() const {
-  size_t maxValue = 0;
-  for (size_t value : _values) {
-    if (value > maxValue) {
-      maxValue = value;
-    }
-  }
-  return maxValue;
-}
+  /**
+   * Returns the average value in the sliding window. If the window is empty, returns 0.
+   */
+  size_t getAverageValue() const;
+
+ private:
+  size_t windowSize = 0;
+  std::deque<size_t> values = {};
+};
 
 }  // namespace tgfx

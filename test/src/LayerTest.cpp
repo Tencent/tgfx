@@ -2336,6 +2336,48 @@ TGFX_TEST(LayerTest, ShapeStyleWithMatrix) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/ShapeStyleWithMatrix"));
 }
 
+TGFX_TEST(LayerTest, RasterizedCache) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 350, 350);
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto rootLayer = Layer::Make();
+  rootLayer->setMatrix(Matrix::MakeTrans(30, 30));
+
+  auto imageLayer = ImageLayer::Make();
+  imageLayer->setImage(MakeImage("resources/apitest/imageReplacement.png"));
+  imageLayer->setShouldRasterize(true);
+  rootLayer->addChild(imageLayer);
+
+  auto rectLayer = ShapeLayer::Make();
+  auto style = DropShadowStyle::Make(10, 10, 0, 0, Color::Black(), false);
+  Path rect;
+  rect.addRect(Rect::MakeWH(50, 50));
+  rectLayer->setPath(rect);
+  rectLayer->setFillStyle(SolidColor::Make(Color::Red()));
+  rectLayer->setShouldRasterize(true);
+  rectLayer->setLayerStyles({style});
+  rectLayer->setMatrix(Matrix::MakeTrans(150, 0));
+  imageLayer->addChild(rectLayer);
+
+  auto blurLayer = ShapeLayer::Make();
+  Path childPath;
+  childPath.addRect(Rect::MakeWH(100, 100));
+  blurLayer->setPath(childPath);
+  auto fillStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0, 128));
+  blurLayer->setFillStyle(fillStyle);
+  blurLayer->setShouldRasterize(true);
+  blurLayer->setMatrix(Matrix::MakeTrans(150, 0));
+  blurLayer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  imageLayer->addChild(blurLayer);
+
+  displayList->root()->addChild(rootLayer);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/RasterizedCache"));
+}
+
 TGFX_TEST(LayerTest, RasterizedBackground) {
   ContextScope scope;
   auto context = scope.getContext();
@@ -2706,7 +2748,7 @@ TGFX_TEST(LayerTest, DirtyRegionTest) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest5"));
 
   displayList->setRenderMode(RenderMode::Tiled);
-  displayList->setZoomScale(1.3f);
+  displayList->setMaxTileCount(512);
   displayList->render(surface.get());
   // Clear the previous dirty regions.
   displayList->showDirtyRegions(false);
@@ -2729,8 +2771,64 @@ TGFX_TEST(LayerTest, DirtyRegionTest) {
   // Clear the previous dirty regions.
   displayList->showDirtyRegions(false);
   displayList->showDirtyRegions(true);
-  displayList->setContentOffset(-256, -300);
+  displayList->setContentOffset(-100, -300);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest7"));
+
+  // Clear the previous dirty regions.
+  displayList->showDirtyRegions(false);
+  displayList->showDirtyRegions(true);
+  displayList->setZoomScale(1.3f);
+  displayList->setMaxTilesRefinedPerFrame(0);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest8"));
+
+  // Clear the previous dirty regions.
+  displayList->showDirtyRegions(false);
+  displayList->showDirtyRegions(true);
+  displayList->setMaxTilesRefinedPerFrame(INT_MAX);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest9"));
+
+  // Clear the previous dirty regions.
+  displayList->showDirtyRegions(false);
+  displayList->showDirtyRegions(true);
+  displayList->setContentOffset(250, 150);
+  displayList->setZoomScale(0.5f);
+  displayList->setMaxTilesRefinedPerFrame(0);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest10"));
+
+  // Clear the previous dirty regions.
+  displayList->showDirtyRegions(false);
+  displayList->showDirtyRegions(true);
+  displayList->setMaxTilesRefinedPerFrame(INT_MAX);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest11"));
+}
+
+TGFX_TEST(LayerTest, LayerVisible) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 100, 100);
+  auto displayList = std::make_unique<DisplayList>();
+  auto rootLayer = Layer::Make();
+  displayList->root()->addChild(rootLayer);
+  auto layer = ShapeLayer::Make();
+  auto path = Path();
+  path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
+  layer->setPath(path);
+  layer->setFillStyle(SolidColor::Make(Color::Red()));
+  layer->setVisible(true);
+  rootLayer->addChild(layer);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerVisible"));
+  layer->setVisible(false);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerVisible1"));
+  layer->setVisible(true);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerVisible"));
 }
 }  // namespace tgfx

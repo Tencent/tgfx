@@ -164,6 +164,7 @@ TGFX_TEST(FilterTest, Blur) {
   canvas->concat(Matrix::MakeTrans(imageWidth + padding, 0));
   canvas->save();
   canvas->concat(imageMatrix);
+  // The blur filter is applied to the scaled image after it is drawn on the canvas.
   paint.setImageFilter(ImageFilter::Blur(130, 130, TileMode::Decal));
   canvas->drawImage(image, &paint);
   canvas->restore();

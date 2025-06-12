@@ -20,6 +20,7 @@
 #include "core/GlyphSource.h"
 #include "core/PathRasterizer.h"
 #include "core/atlas/AtlasTypes.h"
+#include "core/utils/ApplyStrokeToBound.h"
 #include "core/utils/MathExtra.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/tasks/TextAtlasUploadTask.h"
@@ -60,7 +61,7 @@ static float findMaxGlyphDimension(const GlyphFace* glyphFace, const std::vector
       continue;
     }
     if (stroke != nullptr) {
-      stroke->applyToBounds(&bounds);
+      ApplyStrokeToBounds(*stroke, &bounds, true);
     }
     maxDimension = std::max(maxDimension, std::max(bounds.width(), bounds.height()));
   }
@@ -83,7 +84,7 @@ static std::shared_ptr<ImageCodec> getGlyphCodec(std::shared_ptr<GlyphFace> glyp
     return nullptr;
   }
   if (stroke != nullptr) {
-    stroke->applyToBounds(&bounds);
+    ApplyStrokeToBounds(*stroke, &bounds, true);
     shape = Shape::ApplyStroke(std::move(shape), stroke);
   }
   shape = Shape::ApplyMatrix(std::move(shape), Matrix::MakeTrans(-bounds.x(), -bounds.y()));
@@ -184,7 +185,7 @@ void TextRender::directMaskDrawing(const GlyphRun& glyphRun, const MCState& stat
       continue;
     }
     if (scaledStroke) {
-      scaledStroke->applyToBounds(&bounds);
+      ApplyStrokeToBounds(*scaledStroke, &bounds, true);
     }
     auto maxDimension = static_cast<int>(ceilf(std::max(bounds.width(), bounds.height())));
     if (maxDimension >= Atlas::kMaxCellSize) {
@@ -349,7 +350,7 @@ void TextRender::transformedMaskDrawing(const GlyphRun& glyphRun, const MCState&
       continue;
     }
     if (scaledStroke) {
-      scaledStroke->applyToBounds(&bounds);
+      ApplyStrokeToBounds(*scaledStroke, &bounds, true);
     }
 
     BytesKey glyphKey;

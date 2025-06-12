@@ -110,7 +110,7 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
     return nullptr;
   }
   auto imageRecord = static_cast<const DrawImage*>(record);
-  if (fill.maskFilter || fill.colorFilter) {
+  if (fill.maskFilter || fill.colorFilter || fill.color.alpha != 1.0f) {
     return nullptr;
   }
   auto image = imageRecord->image;

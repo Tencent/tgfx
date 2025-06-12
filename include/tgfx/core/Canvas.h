@@ -301,35 +301,27 @@ class Canvas {
   void drawShape(std::shared_ptr<Shape> shape, const Paint& paint);
 
   /**
-   * Draws an image with its top-left corner at (left, top), using the current clip, matrix, and
-   * optional paint. If image->hasMipmaps() is true, it uses FilterMode::Linear and
-   * MipmapMode::Linear as the sampling options. Otherwise, it uses FilterMode::Linear and
-   * MipmapMode::None.
-   * @param image  the image to draw.
-   * @param left  the x-coordinate of the image's top-left corner.
-   * @param top  the y-coordinate of the image's top-left corner.
-   * @param paint  the paint to apply blending, filtering, etc.; can be nullptr.
+   * Draws an image with its top-left corner at (0, 0) using the current clip and matrix.
+   * Uses the default sampling option: FilterMode::Linear and MipmapMode::Linear.
+   * @param image  The image to draw.
+   * @param paint  Optional paint for blending, filtering, etc.; can be nullptr.
    */
-  void drawImage(std::shared_ptr<Image> image, float left, float top, const Paint* paint = nullptr);
+  void drawImage(std::shared_ptr<Image> image, const Paint* paint = nullptr) {
+    drawImage(std::move(image), {}, paint);
+  }
 
   /**
-   * Draws an image with its top-left corner at (0, 0), using the current clip and matrix combined
-   * with the existing matrix. If `image->hasMipmaps()` is true, it uses FilterMode::Linear and
-   * MipmapMode::Linear for sampling. Otherwise, it uses FilterMode::Linear and MipmapMode::None.
-   * @param image  the image to draw.
-   * @param matrix  the matrix to rotate, scale, translate, etc.; can be nullptr.
-   * @param paint  the paint to apply blending, filtering, etc.; can be nullptr.
+   * Draws an image with its top-left corner at (left, top) using the current clip and matrix.
+   * Uses the default sampling option: FilterMode::Linear and MipmapMode::Linear.
+   * @param image  The image to draw.
+   * @param left  The x-coordinate for the image's top-left corner. This does not affect the paint.
+   * @param top  The y-coordinate for the image's top-left corner. This does not affect the paint.
+   * @param paint  Optional paint for blending, filtering, etc.; can be nullptr.
    */
-  void drawImage(std::shared_ptr<Image> image, const Matrix& matrix, const Paint* paint = nullptr);
-
-  /**
-   * Draws an image with its top-left corner at (0, 0), using the current clip, matrix, and optional
-   * paint. If image->hasMipmaps() is true, it uses FilterMode::Linear and MipmapMode::Linear for
-   * sampling. Otherwise, it uses FilterMode::Linear and MipmapMode::None.
-   * @param image  the image to draw.
-   * @param paint  the paint to apply blending, filtering, etc.; can be nullptr.
-   */
-  void drawImage(std::shared_ptr<Image> image, const Paint* paint = nullptr);
+  void drawImage(std::shared_ptr<Image> image, float left, float top,
+                 const Paint* paint = nullptr) {
+    drawImage(std::move(image), left, top, {}, paint);
+  }
 
   /**
    * Draws an image with its top-left corner at (0, 0), using the current clip, matrix, sampling
@@ -340,6 +332,43 @@ class Canvas {
    */
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                  const Paint* paint = nullptr);
+
+  /**
+   * Draws an image with its top-left corner at (left, top), using the current clip, matrix,
+   * sampling options, and optional paint.
+   * @param image  The image to draw.
+   * @param left The x-coordinate for the image's top-left corner. This does not affect the paint.
+   * @param top The y-coordinate for the image's top-left corner. This does not affect the paint.
+   * @param sampling  the sampling options used to sample the image.
+   * @param paint The paint to apply blending, filtering, etc.; can be nullptr.
+   */
+  void drawImage(std::shared_ptr<Image> image, float left, float top,
+                 const SamplingOptions& sampling, const Paint* paint = nullptr);
+
+  /**
+   * Draws an image into a rectangle defined by the destination rectangle (dst) using the current
+   * clip, matrix, and specified sampling options.
+   * @param image the image to draw.
+   * @param dstRect the destination rectangle where the sampled portion will be drawn.
+   * @param sampling the sampling options used to sample the image. Defaults to
+   * FilterMode::Linear and MipmapMode::Linear.
+   * @param paint the paint to apply blending, filtering, etc.; can be nullptr.
+   */
+  void drawImageRect(std::shared_ptr<Image> image, const Rect& dstRect,
+                     const SamplingOptions& sampling = {}, const Paint* paint = nullptr);
+
+  /**
+   * Draws a portion of an image defined by the source rectangle (src) into a destination rectangle
+   * (dst) using the current clip, matrix, and specified sampling options.
+   * @param image  the image to draw.
+   * @param srcRect  the source rectangle in the image to sample from.
+   * @param dstRect  the destination rectangle where the sampled portion will be drawn.
+   * @param sampling  the sampling options used to sample the image. Defaults to
+   * FilterMode::Linear and MipmapMode::Linear.
+   * @param paint  the paint to apply blending, filtering, etc.; can be nullptr.
+   */
+  void drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
+                     const SamplingOptions& sampling = {}, const Paint* paint = nullptr);
 
   /**
    * Draws text at the specified (x, y) coordinates using the current clip, matrix, font, and paint.
@@ -428,8 +457,9 @@ class Canvas {
   explicit Canvas(DrawContext* drawContext, Surface* surface = nullptr);
   void drawPath(const Path& path, const MCState& state, const Fill& fill,
                 const Stroke* stroke) const;
-  void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling, const Paint* paint,
-                 const Matrix* extraMatrix);
+  void drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
+                     const SamplingOptions& sampling, const Fill& fill,
+                     const Matrix* dstMatrix = nullptr);
   void drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const Fill& fill,
                  std::shared_ptr<ImageFilter> imageFilter = nullptr);
   void drawFill(const MCState& state, const Fill& fill) const;

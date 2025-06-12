@@ -62,12 +62,6 @@ class DrawContext {
   virtual void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) = 0;
 
   /**
-   * Draws an Image with the specified SamplingOptions, MCState, and Fill.
-   */
-  virtual void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                         const MCState& state, const Fill& fill) = 0;
-
-  /**
    * Draws a rectangle filled with the specified Image, SamplingOptions, MCState, and Fill.
    */
   virtual void drawImageRect(std::shared_ptr<Image> image, const Rect& rect,

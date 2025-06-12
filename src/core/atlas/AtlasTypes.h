@@ -148,9 +148,9 @@ class PlotLocator {
   }
 
  private:
-  uint64_t _genID : 48 = 0;
-  uint64_t _plotIndex : 8 = 0;
-  uint64_t _pageIndex : 8 = 0;
+  uint64_t _genID : 48;
+  uint64_t _plotIndex : 8;
+  uint64_t _pageIndex : 8;
 };
 
 /**

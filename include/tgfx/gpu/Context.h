@@ -32,7 +32,7 @@ class Gpu;
 class ResourceProvider;
 class ProxyProvider;
 class BlockBuffer;
-class MaxValueTracker;
+class SlidingWindowTracker;
 class AtlasManager;
 
 /**
@@ -206,11 +206,10 @@ class Context {
   ResourceProvider* _resourceProvider = nullptr;
   ProxyProvider* _proxyProvider = nullptr;
   BlockBuffer* _drawingBuffer = nullptr;
-  MaxValueTracker* _maxValueTracker = nullptr;
+  SlidingWindowTracker* _maxValueTracker = nullptr;
   AtlasManager* _atlasManager = nullptr;
 
   void releaseAll(bool releaseGPU);
-  void clearDrawingBuffer();
 
   friend class Device;
   friend class Resource;
