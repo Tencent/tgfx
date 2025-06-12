@@ -555,10 +555,11 @@ std::vector<std::pair<float, TileCache*>> DisplayList::getSortedTileCaches() con
   }
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
   DEBUG_ASSERT(currentZoomScale != 0.0f);
+  // Closest tile caches first, farthest last.
   std::sort(sortedTileCaches.begin(), sortedTileCaches.end(),
             [currentZoomScale](const std::pair<float, TileCache*>& a,
                                const std::pair<float, TileCache*>& b) {
-              return ScaleRatio(a.first, currentZoomScale) > ScaleRatio(b.first, currentZoomScale);
+              return ScaleRatio(a.first, currentZoomScale) < ScaleRatio(b.first, currentZoomScale);
             });
   return sortedTileCaches;
 }
