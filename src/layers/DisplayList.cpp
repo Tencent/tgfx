@@ -768,7 +768,7 @@ void DisplayList::drawTileTask(const DrawTask& task) const {
   args.renderRect = &renderRect;
   args.backgroundContext =
       _root->bitFields.hasBackgroundStyle
-          ? BackgroundContext::Make(surface->getContext(), drawRect, viewMatrix)
+          ? BackgroundContext::Make(surface->getContext(), tileRect, viewMatrix)
           : nullptr;
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }
