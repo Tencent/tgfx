@@ -267,8 +267,6 @@ class Plot {
   const uint32_t _pageIndex = 0;
   const uint32_t _plotIndex = 0;
   uint64_t _genID = 0;
-  const int width = 512;
-  const int height = 512;
   const Point _pixelOffset = {};
   RectPackSkyline rectPack;
   PlotLocator _plotLocator;

@@ -52,13 +52,12 @@ void PlotUseUpdater::set(uint32_t pageIndex, uint32_t plotIndex) {
 Plot::Plot(uint32_t pageIndex, uint32_t plotIndex, AtlasGenerationCounter* generationCounter,
            int offsetX, int offsetY, int width, int height)
     : generationCounter(generationCounter), _pageIndex(pageIndex), _plotIndex(plotIndex),
-      _genID(generationCounter->next()), width(width), height(height),
+      _genID(generationCounter->next()),
       _pixelOffset(Point::Make(offsetX * width, offsetY * height)), rectPack(width, height),
       _plotLocator(pageIndex, plotIndex, _genID) {
 }
 
 bool Plot::addRect(int imageWidth, int imageHeight, AtlasLocator& atlasLocator) {
-  DEBUG_ASSERT(imageWidth + 2 * padding < width && imageHeight + 2 * padding < height);
   auto widthWithPadding = imageWidth + 2 * padding;
   auto heightWithPadding = imageHeight + 2 * padding;
   Point location;
