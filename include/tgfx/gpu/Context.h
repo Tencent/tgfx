@@ -32,7 +32,7 @@ class Gpu;
 class ResourceProvider;
 class ProxyProvider;
 class BlockBuffer;
-class MaxValueTracker;
+class SlidingWindowTracker;
 
 /**
  * Context is the main interface to the GPU. It is used to create and manage GPU resources, and to
@@ -201,7 +201,7 @@ class Context {
   ResourceProvider* _resourceProvider = nullptr;
   ProxyProvider* _proxyProvider = nullptr;
   BlockBuffer* _drawingBuffer = nullptr;
-  MaxValueTracker* _maxValueTracker = nullptr;
+  SlidingWindowTracker* _maxValueTracker = nullptr;
 
   void releaseAll(bool releaseGPU);
 

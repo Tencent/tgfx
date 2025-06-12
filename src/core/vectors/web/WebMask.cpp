@@ -118,7 +118,7 @@ bool WebMask::onFillText(const GlyphRunList* glyphRunList, const Stroke* stroke,
     return false;
   }
   if (stroke) {
-    ApplyStrokeToBounds(*stroke, &bounds, true);
+    ApplyStrokeToBounds(*stroke, &bounds);
   }
   matrix.mapRect(&bounds);
   stream->markContentDirty(bounds);
