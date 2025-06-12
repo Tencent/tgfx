@@ -109,7 +109,7 @@ class AtlasConfig {
 
  private:
   static constexpr int kMaxTextureSize = 2048;
-  ISize RGBADimensions = {2048, 2048};
-  int maxTextureSize;
+  ISize RGBADimensions = {kMaxTextureSize, kMaxTextureSize};
+  int maxTextureSize = kMaxTextureSize;
 };
 }  //namespace tgfx
