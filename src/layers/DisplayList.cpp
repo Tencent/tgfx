@@ -174,7 +174,7 @@ void DisplayList::showDirtyRegions(bool show) {
 }
 
 bool DisplayList::hasContentChanged() const {
-  if (_hasContentChanged || _root->bitFields.dirtyDescendents) {
+  if (_hasContentChanged || hasZoomBlurTiles || _root->bitFields.dirtyDescendents) {
     return true;
   }
   if (!_showDirtyRegions) {
@@ -416,6 +416,7 @@ void DisplayList::invalidateCurrentTileCache(const TileCache* tileCache,
 
 std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
                                                       std::vector<DrawTask>* tileTasks) {
+  hasZoomBlurTiles = false;
   TileCache* currentTileCache = nullptr;
   auto result = tileCaches.find(_zoomScaleInt);
   if (result != tileCaches.end()) {
@@ -461,28 +462,27 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     return {};
   }
   size_t tileIndex = 0;
-  bool hasFallbackTasks = false;
   auto refinedCount = _maxTilesRefinedPerFrame;
   std::vector<std::shared_ptr<Tile>> taskTiles = {};
   for (auto& grid : dirtyGrids) {
     auto& tile = freeTiles[tileIndex++];
-    tile->tileX = grid.first;
-    tile->tileY = grid.second;
     auto fallbackTasks = getFallbackDrawTasks(grid.first, grid.second, sortedCaches);
     if (!fallbackTasks.empty()) {
       if (refinedCount <= 0) {
         emptyTiles.emplace_back(tile);
         screenTasks.insert(screenTasks.end(), fallbackTasks.begin(), fallbackTasks.end());
-        hasFallbackTasks = true;
+        hasZoomBlurTiles = true;
         continue;
       }
       refinedCount--;
     }
+    tile->tileX = grid.first;
+    tile->tileY = grid.second;
     taskTiles.push_back(tile);
     screenTasks.emplace_back(tile.get(), _tileSize, tile->getTileRect(_tileSize));
     currentTileCache->addTile(tile);
   }
-  if (continuous && !hasFallbackTasks) {
+  if (continuous && !hasZoomBlurTiles) {
     // If we have continuous tiles, we can draw a single rectangle for the entire area.
     auto drawRect = Rect::MakeXYWH(startX * _tileSize, startY * _tileSize,
                                    (endX - startX) * _tileSize, (endY - startY) * _tileSize);

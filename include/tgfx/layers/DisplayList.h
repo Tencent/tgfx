@@ -229,6 +229,7 @@ class DisplayList {
   int _maxTilesRefinedPerFrame = 10;
   bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
+  bool hasZoomBlurTiles = false;
   int64_t lastZoomScaleInt = 1000;
   Point lastContentOffset = {};
   int totalTileCount = 0;
