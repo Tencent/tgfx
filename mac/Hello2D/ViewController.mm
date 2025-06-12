@@ -22,6 +22,8 @@
 @interface ViewController ()
 @property(strong, nonatomic) TGFXView* tgfxView;
 @property(nonatomic) int drawCount;
+@property(nonatomic) float zoomScale;
+@property(nonatomic) CGPoint contentOffset;
 @end
 
 @implementation ViewController
@@ -29,19 +31,43 @@
 - (void)viewDidLoad {
   [super viewDidLoad];
   self.tgfxView = [[TGFXView alloc] initWithFrame:self.view.bounds];
-  [self.tgfxView setAutoresizingMask:kCALayerWidthSizable | kCALayerHeightSizable];
+  [self.tgfxView setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
   [self.view addSubview:self.tgfxView];
-  [self.tgfxView draw:self.drawCount];
+  self.zoomScale = 1.0f;
+  self.contentOffset = CGPointZero;
+  [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
 }
 
 - (void)viewDidLayout {
   [super viewDidLayout];
-  [self.tgfxView draw:self.drawCount];
+  [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
 }
 
 - (void)mouseUp:(NSEvent*)event {
   self.drawCount++;
-  [self.tgfxView draw:self.drawCount];
+  self.zoomScale = 1.0f;
+  self.contentOffset = CGPointZero;
+  [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
+}
+
+- (void)scrollWheel:(NSEvent*)event {
+  self.contentOffset = CGPointMake(self.contentOffset.x + event.scrollingDeltaX,
+                                   self.contentOffset.y + event.scrollingDeltaY);
+  [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
+}
+
+- (void)magnifyWithEvent:(NSEvent*)event {
+  float oldZoom = self.zoomScale;
+  float newZoom = oldZoom * (1.0 + event.magnification);
+  NSPoint mouseInView = [self.tgfxView convertPoint:[event locationInWindow] fromView:nil];
+  mouseInView.y = self.tgfxView.bounds.size.height - mouseInView.y;
+  mouseInView = [self.tgfxView convertPointToBacking:mouseInView];
+  float contentX = (mouseInView.x - self.contentOffset.x) / oldZoom;
+  float contentY = (mouseInView.y - self.contentOffset.y) / oldZoom;
+  self.contentOffset =
+      CGPointMake(mouseInView.x - contentX * newZoom, mouseInView.y - contentY * newZoom);
+  self.zoomScale = newZoom;
+  [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
 }
 
 @end
