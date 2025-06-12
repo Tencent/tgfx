@@ -58,6 +58,15 @@ bool AppHost::updateScreen(int width, int height, float density) {
   return true;
 }
 
+bool AppHost::updateZoomAndOffset(float zoomScale, const tgfx::Point& contentOffset) {
+  if (zoomScale == _zoomScale && contentOffset == _contentOffset) {
+    return false;
+  }
+  _zoomScale = zoomScale;
+  _contentOffset = contentOffset;
+  return true;
+}
+
 void AppHost::addImage(const std::string& name, std::shared_ptr<tgfx::Image> image) {
   if (name.empty()) {
     tgfx::PrintError("AppHost::addImage() name is empty!");
