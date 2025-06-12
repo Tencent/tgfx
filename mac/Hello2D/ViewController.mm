@@ -59,6 +59,12 @@
 - (void)magnifyWithEvent:(NSEvent*)event {
   float oldZoom = self.zoomScale;
   float newZoom = oldZoom * (1.0 + event.magnification);
+  if (self.zoomScale < 0.001f) {
+    self.zoomScale = 0.001f;
+  }
+  if (self.zoomScale > 1000.0f) {
+    self.zoomScale = 1000.0f;
+  }
   NSPoint mouseInView = [self.tgfxView convertPoint:[event locationInWindow] fromView:nil];
   mouseInView.y = self.tgfxView.bounds.size.height - mouseInView.y;
   mouseInView = [self.tgfxView convertPointToBacking:mouseInView];
