@@ -217,7 +217,7 @@ class DisplayList {
    * Otherwise, the display list will be rendered over the existing content.
    */
   void render(Surface* surface, bool autoClear = true);
-  
+
  private:
   std::shared_ptr<RootLayer> _root = nullptr;
   int64_t _zoomScaleInt = 1000;
