@@ -27,7 +27,7 @@ namespace tgfx {
 class RootLayer;
 class Tile;
 class TileCache;
-struct DrawTask;
+class DrawTask;
 
 /**
  * RenderMode defines the different modes of rendering a DisplayList.
