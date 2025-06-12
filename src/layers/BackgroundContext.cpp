@@ -61,7 +61,7 @@ std::shared_ptr<Image> BackgroundContext::getBackgroundImage() const {
   return Image::MakeFrom(std::move(picture), surface->width(), surface->height());
 }
 
-std::shared_ptr<BackgroundContext> BackgroundContext::creatSubContext() const {
+std::shared_ptr<BackgroundContext> BackgroundContext::createSubContext() const {
   if (!surface) {
     return nullptr;
   }

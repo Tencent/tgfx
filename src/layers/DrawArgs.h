@@ -18,8 +18,8 @@
 
 #pragma once
 
-#include "tgfx/gpu/Context.h"
 #include "layers/BackgroundContext.h"
+#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 

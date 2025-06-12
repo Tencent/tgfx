@@ -34,7 +34,7 @@ class BackgroundContext {
     return imageMatrix;
   }
 
-  std::shared_ptr<BackgroundContext> creatSubContext() const;
+  std::shared_ptr<BackgroundContext> createSubContext() const;
 
   void drawToParent(const Matrix& paintMatrix, const Paint& paint);
 

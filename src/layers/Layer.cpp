@@ -844,7 +844,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     paint.setMaskFilter(maskFilter);
   }
   auto subBackgroundContext = bitFields.hasBackgroundStyle && args.backgroundContext
-                                  ? args.backgroundContext->creatSubContext()
+                                  ? args.backgroundContext->createSubContext()
                                   : nullptr;
   auto offscreenArgs = args;
   offscreenArgs.backgroundContext = subBackgroundContext;
