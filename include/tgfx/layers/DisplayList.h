@@ -27,9 +27,7 @@ namespace tgfx {
 class RootLayer;
 class Tile;
 class TileCache;
-class SlidingWindowTracker;
 struct DrawTask;
-struct FallbackTile;
 
 /**
  * RenderMode defines the different modes of rendering a DisplayList.
@@ -161,14 +159,14 @@ class DisplayList {
   void setTileSize(int tileSize);
 
   /**
-   * Returns the maximum number of tiles that can be created in tiled rendering mode. This setting is
-   * ignored in other render modes. If the specified count is less than the minimum required for tiled
-   * rendering, it will be automatically increased to meet the minimum. The minimum value is calculated
-   * based on the tile size and viewport size, ensuring the visible area is always fully covered, even
-   * if the viewport is offset by half a tile. For example, with a tile size of 256 pixels and a
-   * viewport of 512x512 pixels, the minimum tile count is 9 (2 tiles in each direction plus 1 for
-   * offset). The default is 0, which means the minimum tile count will be used based on the viewport
-   * size and tile size.
+   * Returns the maximum number of tiles that can be created in tiled rendering mode. This setting
+   * is ignored in other render modes. If the specified count is less than the minimum required for
+   * tiled rendering, it will be automatically increased to meet the minimum. The minimum value is
+   * calculated based on the tile size and viewport size, ensuring the visible area is always fully
+   * covered, even if the viewport is offset by half a tile. For example, with a tile size of 256
+   * pixels and a viewport of 512x512 pixels, the minimum tile count is 9 (2 tiles in each direction
+   * plus 1 for offset). The default is 0, which means the minimum tile count will be used based on
+   * the viewport size and tile size.
    */
   int maxTileCount() const {
     return _maxTileCount;
@@ -180,40 +178,23 @@ class DisplayList {
   void setMaxTileCount(int count);
 
   /**
-   * Returns true if zoom blur is allowed in tiled rendering mode. This setting is ignored in other
-   * render modes. When enabled, if the zoomScale changes and cached images at other zoom levels are
-   * available, the display list will first use those caches to render when the frame rate is low.
-   * It will then gradually update to the current zoomScale in later frames. This can improve
-   * zooming performance, but may cause temporary zoom blur artifacts. The default is true.
+   * Returns the maximum number of tiles that can be refined (updated to the current zoom scale) per
+   * frame in tiled rendering mode. This setting is ignored in other render modes. When zooming,
+   * cached images from other zoom levels may be used temporarily, resulting in brief blur artifacts.
+   * Increasing this value refines more tiles per frame, reducing blur more quickly but potentially
+   * impacting performance. To eliminate blur entirely, set this value higher than the total number
+   * of visible tiles. The default is 10.
    */
-  bool allowZoomBlur() const {
-    return _allowZoomBlur;
+  int maxTilesRefinedPerFrame() const {
+    return _maxTilesRefinedPerFrame;
   }
 
   /**
-   * Sets whether to allow zoom blur in tiled rendering mode.
+   * Sets the maximum number of tiles that can be refined (updated to the current zoom scale) per
+   * frame in tiled rendering mode.
    */
-  void setAllowZoomBlur(bool allow) {
-    _allowZoomBlur = allow;
-  }
-
-  /**
-   * Returns the render time budget in microseconds. This value limits how long rendering can take
-   * for each frame, helping the application maintain a consistent frame rate. If rendering goes
-   * over this budget, some parts may be skipped or rendered at lower quality to stay within the
-   * limit. You can adjust this value each frame based on your app’s performance needs. Rendering
-   * may still take longer than the budget, especially if there is no content that can be skipped or
-   * rendered at lower quality. The default is 40,000 microseconds (25 fps).
-   */
-  int64_t renderTimeBudget() const {
-    return _renderTimeBudget;
-  }
-
-  /**
-   * Sets the render time budget in microseconds.
-   */
-  void setRenderTimeBudget(int64_t budget) {
-    _renderTimeBudget = budget;
+  void setMaxTilesRefinedPerFrame(int count) {
+    _maxTilesRefinedPerFrame = count;
   }
 
   /**
@@ -245,10 +226,7 @@ class DisplayList {
   RenderMode _renderMode = RenderMode::Partial;
   int _tileSize = 256;
   int _maxTileCount = 0;
-  bool _allowZoomBlur = true;
-  int64_t _renderTimeBudget = 40000;  // 40 milliseconds (25 fps)
-  SlidingWindowTracker* tileTimeTracker = nullptr;
-  SlidingWindowTracker* screenTimeTracker = nullptr;
+  int _maxTilesRefinedPerFrame = 10;
   bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
   int64_t lastZoomScaleInt = 1000;
@@ -265,7 +243,7 @@ class DisplayList {
                                   const std::vector<Rect>& dirtyRegions);
 
   std::vector<Rect> renderTiled(Surface* surface, bool autoClear,
-                                const std::vector<Rect>& dirtyRegions, int64_t renderTimeBudget);
+                                const std::vector<Rect>& dirtyRegions);
 
   void checkTileCount(Surface* renderSurface);
 
@@ -274,8 +252,8 @@ class DisplayList {
   void invalidateCurrentTileCache(const TileCache* tileCache, const std::vector<Rect>& dirtyRegions,
                                   std::vector<DrawTask>* tileTasks) const;
 
-  std::vector<DrawTask> collectScreenTasks(const Surface* surface, std::vector<DrawTask>* tileTasks,
-                                           std::vector<FallbackTile>* fallbackTiles);
+  std::vector<DrawTask> collectScreenTasks(const Surface* surface,
+                                           std::vector<DrawTask>* tileTasks);
 
   std::vector<std::pair<float, TileCache*>> getSortedTileCaches() const;
 
@@ -295,13 +273,9 @@ class DisplayList {
 
   int getMaxTileCountPerAtlas(Context* context) const;
 
-  std::vector<Rect> drawFallbackTiles(const std::vector<FallbackTile>& fallbackTiles,
-                                      std::vector<DrawTask>* screenTasks, int64_t renderTimeBudget);
+  void drawTileTask(const DrawTask& task) const;
 
-  Rect drawTileTask(const DrawTask& task, bool requireFlush = false) const;
-
-  void drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface, bool autoClear,
-                       bool recordScreenTime) const;
+  void drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface, bool autoClear) const;
 
   void renderDirtyRegions(Canvas* canvas, std::vector<Rect> dirtyRegions);
 
