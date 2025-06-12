@@ -102,7 +102,7 @@ class Context {
   size_t cacheLimit() const;
 
   /**
-   * Sets the cache limit of max gpu memory byte size.
+   * Sets the cache limit of max gpu memory byte size. The default value is 96MB.
    */
   void setCacheLimit(size_t bytesLimit);
 
