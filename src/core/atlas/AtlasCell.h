@@ -18,9 +18,9 @@
 
 #pragma once
 
-#include "../FontGlyphFace.h"
 #include "core/atlas/AtlasTypes.h"
 #include "tgfx/core/BytesKey.h"
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
 class AtlasCell {

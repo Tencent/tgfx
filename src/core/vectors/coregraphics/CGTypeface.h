@@ -68,12 +68,13 @@ class CGTypeface : public Typeface {
  private:
   CGTypeface(CTFontRef ctFont, std::shared_ptr<Data> data);
 
+  std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;
+
   uint32_t _uniqueID = 0;
   CTFontRef ctFont = nullptr;
   bool _hasColor = false;
   bool _hasOutlines = true;
   std::shared_ptr<Data> data;
-  std::weak_ptr<CGTypeface> weakThis;
 
   friend class CGScalerContext;
 };

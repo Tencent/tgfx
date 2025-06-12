@@ -16,31 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GlyphShape.h"
+#include "GlyphPathProvider.h"
 
 namespace tgfx {
-std::shared_ptr<Shape> Shape::MakeFrom(Font font, GlyphID glyphID) {
-  if (glyphID == 0) {
-    return nullptr;
-  }
-  if (!font.hasOutlines()) {
-    return nullptr;
-  }
-  return std::make_shared<GlyphShape>(std::move(font), glyphID);
+std::shared_ptr<PathProvider> GlyphPathProvider::Wrap(const Path& path) {
+  return std::shared_ptr<PathProvider>(new GlyphPathProvider(path));
 }
 
-GlyphShape::GlyphShape(Font font, GlyphID glyphID) : font(std::move(font)), glyphID(glyphID) {
+Path GlyphPathProvider::getPath() const {
+  return _path;
 }
 
-Path GlyphShape::getPath() const {
-  Path path = {};
-  if (!font.getPath(glyphID, &path)) {
-    return {};
-  }
-  return path;
-}
-
-Rect GlyphShape::getBounds() const {
-  return font.getBounds(glyphID);
+Rect GlyphPathProvider::getBounds() const {
+  return _path.getBounds();
 }
 }  // namespace tgfx

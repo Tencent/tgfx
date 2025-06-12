@@ -16,31 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GlyphShape.h"
+#include "tgfx/core/CustomTypeface.h"
 
 namespace tgfx {
-std::shared_ptr<Shape> Shape::MakeFrom(Font font, GlyphID glyphID) {
-  if (glyphID == 0) {
-    return nullptr;
-  }
-  if (!font.hasOutlines()) {
-    return nullptr;
-  }
-  return std::make_shared<GlyphShape>(std::move(font), glyphID);
+void CustomTypefaceBuilder::setFontName(const std::string& fontFamily,
+                                        const std::string& fontStyle) {
+  _fontFamily = fontFamily;
+  _fontStyle = fontStyle;
 }
 
-GlyphShape::GlyphShape(Font font, GlyphID glyphID) : font(std::move(font)), glyphID(glyphID) {
-}
-
-Path GlyphShape::getPath() const {
-  Path path = {};
-  if (!font.getPath(glyphID, &path)) {
-    return {};
-  }
-  return path;
-}
-
-Rect GlyphShape::getBounds() const {
-  return font.getBounds(glyphID);
+void CustomTypefaceBuilder::setMetrics(const FontMetrics& metrics) {
+  _fontMetrics = metrics;
 }
 }  // namespace tgfx

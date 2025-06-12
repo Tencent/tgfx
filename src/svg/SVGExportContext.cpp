@@ -192,14 +192,18 @@ void SVGExportContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunLi
                                         const MCState& state, const Fill& fill,
                                         const Stroke* stroke) {
   DEBUG_ASSERT(glyphRunList != nullptr);
-  bool hasFont = glyphRunList->glyphRuns()[0].glyphFace->asFont(nullptr);
+  auto typeface = glyphRunList->glyphRuns()[0].font.getTypeface().get();
+  if (typeface == nullptr) {
+    return;
+  }
+  auto customFont = typeface->uniqueID() != typeface->getCacheID();
 
   // If the font needs to be converted to a path but lacks outlines (e.g., emoji font, web font),
   // it cannot be converted.
   if (!state.clip.contains(glyphRunList->getBounds(state.matrix.getMaxScale()))) {
     applyClipPath(state.clip);
   }
-  if (hasFont) {
+  if (!customFont) {
     if (glyphRunList->hasOutlines() && !glyphRunList->hasColor() &&
         exportFlags & SVGExportFlags::ConvertTextToPaths) {
       exportGlyphsAsPath(glyphRunList, state, fill, stroke);
@@ -236,15 +240,12 @@ void SVGExportContext::exportGlyphsAsText(const std::shared_ptr<GlyphRunList>& g
     ElementWriter textElement("text", context, this, writer.get(), resourceBucket.get(),
                               exportFlags & SVGExportFlags::DisableWarnings, state, fill, stroke);
 
-    Font font;
-    if (glyphRun.glyphFace->asFont(&font)) {
-      textElement.addFontAttributes(font);
+    textElement.addFontAttributes(glyphRun.font);
 
-      auto unicharInfo = textBuilder.glyphToUnicharsInfo(glyphRun);
-      textElement.addAttribute("x", unicharInfo.posX);
-      textElement.addAttribute("y", unicharInfo.posY);
-      textElement.addText(unicharInfo.text);
-    }
+    auto unicharInfo = textBuilder.glyphToUnicharsInfo(glyphRun);
+    textElement.addAttribute("x", unicharInfo.posX);
+    textElement.addAttribute("y", unicharInfo.posY);
+    textElement.addText(unicharInfo.text);
   }
 }
 
@@ -257,11 +258,8 @@ void SVGExportContext::exportGlyphsAsImage(const std::shared_ptr<GlyphRunList>& 
   }
   viewMatrix.preScale(1.0f / scale, 1.0f / scale);
   for (const auto& glyphRun : glyphRunList->glyphRuns()) {
-    auto glyphFace = glyphRun.glyphFace;
-    glyphFace = glyphFace->makeScaled(scale);
-    if (glyphFace == nullptr) {
-      continue;
-    }
+    auto font = glyphRun.font;
+    font = font.makeWithSize(scale * font.getSize());
     const auto& glyphIDs = glyphRun.glyphs;
     auto glyphCount = glyphIDs.size();
     const auto& positions = glyphRun.positions;
@@ -269,7 +267,7 @@ void SVGExportContext::exportGlyphsAsImage(const std::shared_ptr<GlyphRunList>& 
     for (size_t i = 0; i < glyphCount; ++i) {
       const auto& glyphID = glyphIDs[i];
       const auto& position = positions[i];
-      auto glyphCodec = glyphFace->getImage(glyphID, nullptr, &glyphState.matrix);
+      auto glyphCodec = font.getImage(glyphID, nullptr, &glyphState.matrix);
       auto glyphImage = Image::MakeFrom(glyphCodec);
       if (glyphImage == nullptr) {
         continue;

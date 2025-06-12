@@ -26,19 +26,13 @@
 #include "gpu/tasks/TextAtlasUploadTask.h"
 
 namespace tgfx {
-static void computeAtlasKey(const GlyphFace* glyphFace, GlyphID glyphID, const Stroke* stroke,
-                            BytesKey& key) {
-  key.write(glyphFace->getScale());
-  key.write(glyphFace->getUniqueID());
+static void computeAtlasKey(const Font& font, uint32_t typefaceID, GlyphID glyphID,
+                            const Stroke* stroke, BytesKey& key) {
+  key.write(font.getSize());
+  key.write(typefaceID);
   int packedID = glyphID;
-  auto shift = sizeof(glyphID) * 8;
-  Font font;
-  if (glyphFace->asFont(&font)) {
-    auto bold = static_cast<int>(font.isFauxBold());
-    packedID |= (bold << shift);
-  } else {
-    packedID |= (0b1 << (shift + 1));
-  }
+  auto bold = static_cast<int>(font.isFauxBold());
+  packedID |= (bold << (sizeof(glyphID) * 8));
   key.write(packedID);
   if (stroke != nullptr) {
     key.write(stroke->width);
@@ -52,11 +46,11 @@ static void computeAtlasKey(const GlyphFace* glyphFace, GlyphID glyphID, const S
   }
 }
 
-static float findMaxGlyphDimension(const GlyphFace* glyphFace, const std::vector<GlyphID>& glyphIDs,
+static float findMaxGlyphDimension(const Font& font, const std::vector<GlyphID>& glyphIDs,
                                    const Stroke* stroke) {
   float maxDimension = 0.f;
   for (auto& glyphID : glyphIDs) {
-    auto bounds = glyphFace->getBounds(glyphID);
+    auto bounds = font.getBounds(glyphID);
     if (bounds.isEmpty()) {
       continue;
     }
@@ -68,14 +62,13 @@ static float findMaxGlyphDimension(const GlyphFace* glyphFace, const std::vector
   return maxDimension;
 }
 
-static std::shared_ptr<ImageCodec> getGlyphCodec(std::shared_ptr<GlyphFace> glyphFace,
-                                                 GlyphID glyphID, const Stroke* stroke,
-                                                 Matrix* matrix) {
-  auto glyphCodec = glyphFace->getImage(glyphID, stroke, matrix);
+static std::shared_ptr<ImageCodec> getGlyphCodec(const Font& font, GlyphID glyphID,
+                                                 const Stroke* stroke, Matrix* matrix) {
+  auto glyphCodec = font.getImage(glyphID, stroke, matrix);
   if (glyphCodec) {
     return glyphCodec;
   }
-  auto shape = Shape::MakeFrom(std::move(glyphFace), glyphID);
+  auto shape = Shape::MakeFrom(font, glyphID);
   if (shape == nullptr) {
     return nullptr;
   }
@@ -95,8 +88,8 @@ static std::shared_ptr<ImageCodec> getGlyphCodec(std::shared_ptr<GlyphFace> glyp
   return glyphCodec;
 }
 
-static MaskFormat getMaskFormat(GlyphFace* glyphFace) {
-  if (!glyphFace->hasColor()) {
+static MaskFormat getMaskFormat(const Font& font) {
+  if (!font.hasColor()) {
     return MaskFormat::A8;
   }
 #ifdef __APPLE__
@@ -138,7 +131,7 @@ void TextRender::draw(const MCState& state, const Fill& fill, const Stroke* stro
   rejectedGlyphRun.positions.reserve(maxGlyphRunCount);
 
   for (const auto& run : glyphRunList->glyphRuns()) {
-    rejectedGlyphRun.glyphFace = run.glyphFace;
+    rejectedGlyphRun.font = run.font;
     directMaskDrawing(run, state, fill, stroke, rejectedGlyphRun);
     if (rejectedGlyphRun.glyphs.empty()) {
       continue;
@@ -165,13 +158,11 @@ void TextRender::directMaskDrawing(const GlyphRun& glyphRun, const MCState& stat
 
   auto maxScale = state.matrix.getMaxScale();
   auto hasScale = !FloatNearlyEqual(maxScale, 1.0f);
-  auto scaledGlyphFace = glyphRun.glyphFace;
+  auto font = glyphRun.font;
   if (hasScale) {
-    scaledGlyphFace = glyphRun.glyphFace->makeScaled(maxScale);
+    font = font.makeWithSize(font.getSize() * maxScale);
   }
-  if (scaledGlyphFace == nullptr) {
-    return;
-  }
+
   std::unique_ptr<Stroke> scaledStroke;
   if (stroke) {
     scaledStroke =
@@ -180,7 +171,7 @@ void TextRender::directMaskDrawing(const GlyphRun& glyphRun, const MCState& stat
   size_t index = 0;
   for (auto& glyphID : glyphRun.glyphs) {
     auto glyphPosition = glyphRun.positions[index++];
-    auto bounds = scaledGlyphFace->getBounds(glyphID);
+    auto bounds = font.getBounds(glyphID);
     if (bounds.isEmpty()) {
       continue;
     }
@@ -194,9 +185,9 @@ void TextRender::directMaskDrawing(const GlyphRun& glyphRun, const MCState& stat
       continue;
     }
     BytesKey glyphKey;
-    computeAtlasKey(scaledGlyphFace.get(), glyphID, stroke, glyphKey);
+    computeAtlasKey(font, font.getTypeface()->getCacheID(), glyphID, stroke, glyphKey);
 
-    auto maskFormat = getMaskFormat(scaledGlyphFace.get());
+    auto maskFormat = getMaskFormat(font);
     auto& textureProxies = atlasManager->getTextureProxies(maskFormat);
 
     auto glyphState = state;
@@ -205,8 +196,7 @@ void TextRender::directMaskDrawing(const GlyphRun& glyphRun, const MCState& stat
     if (atlasManager->getCellLocator(maskFormat, glyphKey, glyphLocator)) {
       glyphState.matrix = glyphLocator.matrix;
     } else {
-      auto glyphCodec =
-          getGlyphCodec(scaledGlyphFace, glyphID, scaledStroke.get(), &glyphState.matrix);
+      auto glyphCodec = getGlyphCodec(font, glyphID, scaledStroke.get(), &glyphState.matrix);
       if (glyphCodec == nullptr) {
         continue;
       }
@@ -250,23 +240,22 @@ void TextRender::directMaskDrawing(const GlyphRun& glyphRun, const MCState& stat
 
 void TextRender::pathDrawing(const GlyphRun& glyphRun, const MCState& state, const Fill& fill,
                              const Stroke* stroke, GlyphRun& rejectedGlyphRun) const {
-  if (!glyphRun.glyphFace->hasOutlines()) {
+  if (!glyphRun.font.hasOutlines()) {
     rejectedGlyphRun = glyphRun;
   }
 
   auto maxScale = state.matrix.getMaxScale();
   Path totalPath = {};
-  auto glyphFace = glyphRun.glyphFace;
+  auto font = glyphRun.font;
   if (!FloatNearlyEqual(maxScale, 1.0f)) {
-    glyphFace = glyphFace->makeScaled(maxScale);
-    DEBUG_ASSERT(glyphFace != nullptr);
+    font = font.makeWithSize(font.getSize() * maxScale);
   }
   size_t index = 0;
   auto& positions = glyphRun.positions;
   for (auto& glyphID : glyphRun.glyphs) {
     Path glyphPath = {};
     auto& position = positions[index];
-    if (glyphFace->getPath(glyphID, &glyphPath)) {
+    if (font.getPath(glyphID, &glyphPath)) {
       auto glyphMatrix = Matrix::MakeScale(1.0f / maxScale, 1.0f / maxScale);
       glyphMatrix.postTranslate(position.x, position.y);
       glyphPath.transform(glyphMatrix);
@@ -315,9 +304,9 @@ void TextRender::transformedMaskDrawing(const GlyphRun& glyphRun, const MCState&
 
   auto maxScale = state.matrix.getMaxScale();
   auto hasScale = !FloatNearlyEqual(maxScale, 1.0f);
-  auto scaledGlyphFace = glyphRun.glyphFace;
+  auto font = glyphRun.font;
   if (hasScale) {
-    scaledGlyphFace = glyphRun.glyphFace->makeScaled(maxScale);
+    font = font.makeWithSize(font.getSize() * maxScale);
   }
 
   std::unique_ptr<Stroke> scaledStroke = nullptr;
@@ -327,25 +316,23 @@ void TextRender::transformedMaskDrawing(const GlyphRun& glyphRun, const MCState&
   }
   static constexpr float kMaxAtlasDimension = Atlas::kMaxCellSize - 2.f;
   auto cellScale = 1.f;
-  auto maxDimension =
-      findMaxGlyphDimension(scaledGlyphFace.get(), glyphRun.glyphs, scaledStroke.get());
+  auto maxDimension = findMaxGlyphDimension(font, glyphRun.glyphs, scaledStroke.get());
   while (maxDimension > kMaxAtlasDimension) {
     auto reductionFactor = kMaxAtlasDimension / maxDimension;
-    scaledGlyphFace = scaledGlyphFace->makeScaled(reductionFactor);
+    font = font.makeWithSize(font.getSize() * reductionFactor);
 
     if (scaledStroke) {
       scaledStroke->width *= reductionFactor;
       scaledStroke->miterLimit *= reductionFactor;
     }
-    maxDimension =
-        findMaxGlyphDimension(scaledGlyphFace.get(), glyphRun.glyphs, scaledStroke.get());
+    maxDimension = findMaxGlyphDimension(font, glyphRun.glyphs, scaledStroke.get());
     cellScale *= reductionFactor;
   }
 
   size_t index = 0;
   for (auto& glyphID : glyphRun.glyphs) {
     auto glyphPosition = glyphRun.positions[index++];
-    auto bounds = scaledGlyphFace->getBounds(glyphID);
+    auto bounds = font.getBounds(glyphID);
     if (bounds.isEmpty()) {
       continue;
     }
@@ -354,8 +341,8 @@ void TextRender::transformedMaskDrawing(const GlyphRun& glyphRun, const MCState&
     }
 
     BytesKey glyphKey;
-    computeAtlasKey(scaledGlyphFace.get(), glyphID, stroke, glyphKey);
-    auto maskFormat = getMaskFormat(scaledGlyphFace.get());
+    computeAtlasKey(font, font.getTypeface()->getCacheID(), glyphID, stroke, glyphKey);
+    auto maskFormat = getMaskFormat(font);
     auto& textureProxies = atlasManager->getTextureProxies(maskFormat);
 
     auto glyphState = state;
@@ -364,8 +351,7 @@ void TextRender::transformedMaskDrawing(const GlyphRun& glyphRun, const MCState&
     if (atlasManager->getCellLocator(maskFormat, glyphKey, glyphLocator)) {
       glyphState.matrix = glyphLocator.matrix;
     } else {
-      auto glyphCodec =
-          getGlyphCodec(scaledGlyphFace, glyphID, scaledStroke.get(), &glyphState.matrix);
+      auto glyphCodec = getGlyphCodec(font, glyphID, scaledStroke.get(), &glyphState.matrix);
       if (glyphCodec == nullptr) {
         continue;
       }

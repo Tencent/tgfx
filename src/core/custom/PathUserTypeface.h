@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,28 +18,18 @@
 
 #pragma once
 
-#include <mutex>
-#include "ft2build.h"
-#include FT_FREETYPE_H
-#include "FTFontData.h"
-#include "tgfx/core/Font.h"
-#include "tgfx/core/Typeface.h"
+#include "UserTypeface.h"
+#include "tgfx/core/CustomTypeface.h"
 
 namespace tgfx {
-class FTTypeface : public Typeface {
+class PathUserTypeface final : public UserTypeface {
  public:
-  static std::shared_ptr<FTTypeface> Make(FTFontData data);
+  using VectorRecordType = std::vector<std::shared_ptr<PathProvider>>;
 
-  ~FTTypeface() override;
-
-  uint32_t uniqueID() const override {
-    return _uniqueID;
-  }
-
-  std::string fontFamily() const override;
-
-  std::string fontStyle() const override;
-
+  static std::shared_ptr<UserTypeface> Make(uint32_t builderID, const std::string& fontFamily,
+                                            const std::string& fontStyle,
+                                            const FontMetrics& metrics,
+                                            const VectorRecordType& glyphRecords);
   size_t glyphsCount() const override;
 
   int unitsPerEm() const override;
@@ -48,28 +38,15 @@ class FTTypeface : public Typeface {
 
   bool hasOutlines() const override;
 
-  GlyphID getGlyphID(Unichar unichar) const override;
-
-  std::shared_ptr<Data> getBytes() const override;
-
-  std::shared_ptr<Data> copyTableData(FontTableTag tag) const override;
-
- protected:
-#ifdef TGFX_USE_GLYPH_TO_UNICODE
-  std::vector<Unichar> getGlyphToUnicodeMap() const override;
-#endif
+  std::shared_ptr<PathProvider> getGlyphRecord(GlyphID glyphID) const;
 
  private:
-  uint32_t _uniqueID = 0;
-  FTFontData data;
-  FT_Face face = nullptr;
-
-  FTTypeface(FTFontData data, FT_Face face);
-
-  int unitsPerEmInternal() const;
+  explicit PathUserTypeface(uint32_t builderID, const std::string& fontFamily,
+                            const std::string& fontStyle, const FontMetrics& metrics,
+                            const VectorRecordType& glyphRecords);
 
   std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;
 
-  friend class FTScalerContext;
+  VectorRecordType glyphRecords = {};
 };
 }  // namespace tgfx

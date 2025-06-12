@@ -113,8 +113,7 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
                                      const MCState& state, const Fill& fill, const Stroke* stroke) {
   DEBUG_ASSERT(glyphRunList != nullptr);
   auto maxScale = state.matrix.getMaxScale();
-  if (FloatNearlyZero(maxScale) || renderTarget == nullptr ||
-      renderTarget->getContext() == nullptr) {
+  if (FloatNearlyZero(maxScale)) {
     return;
   }
   auto bounds = glyphRunList->getBounds(maxScale);
