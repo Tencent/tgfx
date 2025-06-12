@@ -21,8 +21,8 @@
 #include <map>
 #include <memory>
 #include <set>
+#include "core/atlas/AtlasCell.h"
 #include "core/atlas/AtlasTypes.h"
-#include "core/atlas/Glyph.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "tgfx/core/Image.h"
@@ -32,66 +32,45 @@ namespace tgfx {
 class Atlas {
  public:
   static constexpr int kMaxCellSize = 256;
+
+  enum class ErrorCode { Error, Succeeded };
+
   static std::unique_ptr<Atlas> Make(ProxyProvider* proxyProvider, PixelFormat format, int width,
                                      int height, int plotWidth, int plotHeight,
-                                     AtlasGenerationCounter* generationCounter,
-                                     std::string_view label);
-  enum class ErrorCode { Error, Succeeded, TryAgain };
+                                     AtlasGenerationCounter* generationCounter);
 
-  ErrorCode addToAtlas(ResourceProvider*, int width, int height, const void* image,
-                       AtlasLocator* atlasLocator);
+  ErrorCode addToAtlas(const AtlasCell& cell, AtlasToken nextFlushToken,
+                       AtlasLocator& atlasLocator);
 
-  ErrorCode addToAtlasWithoutFillImage(const Glyph& glyph, AtlasToken nextFlushToken,
-                                       AtlasLocator& atlasLocator);
-
-  bool getGlyphLocator(const BytesKey& glyphKey, GlyphLocator& glyphLocator) const;
-
-  bool fillGlyphImage(AtlasLocator& locator, void* image) const;
+  bool getCellLocator(const BytesKey& cellKey, AtlasCellLocator& cellLocator) const;
 
   const std::vector<std::shared_ptr<TextureProxy>>& getTextureProxies() const {
     return textureProxies;
-  }
-
-  const std::vector<std::shared_ptr<Image>>& getImages() const {
-    return images;
   }
 
   uint64_t atlasGeneration() const {
     return _atlasGeneration;
   }
 
-  bool hasGlyph(const BytesKey& glyphKey) const;
-
   void compact(AtlasToken);
 
-  uint32_t maxPages() const {
-    return static_cast<uint32_t>(pages.size());
-  }
-
-  //To ensure the atlas does not evict a given entry,the client must set the  use token
-  void setLastUseToken(const PlotLocator& plotLocator, AtlasToken token) {
-    auto plotIndex = plotLocator.plotIndex();
-    DEBUG_ASSERT(plotIndex < numPlots);
-    auto pageIndex = plotLocator.pageIndex();
-    DEBUG_ASSERT(pageIndex < pages.size());
-    auto plot = pages[pageIndex].plotArray[plotIndex].get();
-    DEBUG_ASSERT(plot != nullptr);
-    makeMRU(plot, pageIndex);
-    plot->setLastUseToken(token);
-  }
+  //To ensure the atlas does not evict a given entry,the client must set the use token
+  void setLastUseToken(const PlotLocator& plotLocator, AtlasToken token);
 
   void clearEvictionPlotTexture(Context* context);
 
  private:
   Atlas(ProxyProvider* proxyProvider, PixelFormat pixelFormat, int width, int height, int plotWidth,
-        int plotHeight, AtlasGenerationCounter* generationCounter, std::string_view label);
+        int plotHeight, AtlasGenerationCounter* generationCounter);
 
   void makeMRU(Plot* plot, uint32_t pageIndex);
 
   bool activateNewPage();
-  bool addToPageWithoutFillImage(const Glyph& glyph, size_t pageIndex, AtlasLocator& atlasLocator);
+
+  bool addToPage(const AtlasCell& cell, size_t pageIndex, AtlasLocator& atlasLocator);
 
   void evictionPlot(Plot* plot);
+
   void deactivateLastPage();
 
   struct Page {
@@ -103,7 +82,6 @@ class Atlas {
   PixelFormat pixelFormat;
   AtlasGenerationCounter* const generationCounter;
   std::vector<std::shared_ptr<TextureProxy>> textureProxies;
-  std::vector<std::shared_ptr<Image>> images;
   std::vector<Page> pages;
   uint64_t _atlasGeneration;
   AtlasToken previousFlushToken;
@@ -114,11 +92,10 @@ class Atlas {
   int textureHeight;
   int plotWidth;
   int plotHeight;
-  const std::string label;
 
   std::vector<PlotEvictionCallback*> evictionCallbacks;
 
-  BytesKeyMap<GlyphLocator> glyphLocators;
+  BytesKeyMap<AtlasCellLocator> cellLocators;
   std::map<uint32_t, std::set<Plot*>> evictionPlots;
 };
 
@@ -130,11 +107,9 @@ class AtlasConfig {
 
   ISize plotDimensions(MaskFormat maskFormat) const;
 
-  void init(int maxTextureSize);
-
  private:
-  inline static constexpr int kMaxTextureSize = 2048;
-  ISize RGBADimensions = ISize::Make(0, 0);
+  static constexpr int kMaxTextureSize = 2048;
+  ISize RGBADimensions = {2048, 2048};
   int maxTextureSize;
 };
 }  //namespace tgfx

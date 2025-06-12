@@ -24,14 +24,13 @@ bool RectPackSkyline::addRect(int width, int height, Point& location) {
   if (width > _width || height > _height) {
     return false;
   }
-
   auto bestWidth = _width + 1;
   auto bestIndex = -1;
   auto bestX = 0;
   auto bestY = _height + 1;
   for (size_t i = 0; i < skyline.size(); ++i) {
     int y;
-    if (rectangleFits(i, width, height, y)) {
+    if (rectangleFits(static_cast<int>(i), width, height, y)) {
       if (y < bestY || (y == bestY && skyline[i].width < bestWidth)) {
         bestIndex = static_cast<int>(i);
         bestWidth = skyline[i].width;
@@ -40,27 +39,23 @@ bool RectPackSkyline::addRect(int width, int height, Point& location) {
       }
     }
   }
-
   if (bestIndex != -1) {
-    addSkylineLevel(static_cast<size_t>(bestIndex), bestX, bestY, width, height);
+    addSkylineLevel(bestIndex, bestX, bestY, width, height);
     location = Point::Make(bestX, bestY);
     areaSoFar += width * height;
     return true;
   }
-
   location = Point::Zero();
   return false;
 }
 
-bool RectPackSkyline::rectangleFits(size_t skylineIndex, int width, int height,
-                                    int& yPosition) const {
-  int x = skyline[skylineIndex].x;
+bool RectPackSkyline::rectangleFits(int skylineIndex, int width, int height, int& yPosition) const {
+  auto x = skyline[static_cast<size_t>(skylineIndex)].x;
   if (x + width > _width) {
     return false;
   }
-
   auto widthLeft = width;
-  auto i = skylineIndex;
+  auto i = static_cast<size_t>(skylineIndex);
   auto y = skyline[i].y;
   while (widthLeft > 0) {
     y = std::max(y, skyline[i].y);
@@ -75,36 +70,35 @@ bool RectPackSkyline::rectangleFits(size_t skylineIndex, int width, int height,
   return true;
 }
 
-void RectPackSkyline::addSkylineLevel(size_t skylineIndex, int x, int y, int width, int height) {
-  Node newNode;
-  newNode.x = x;
-  newNode.y = y + height;
-  newNode.width = width;
-  skyline.insert(skyline.begin() + static_cast<int>(skylineIndex), newNode);
+void RectPackSkyline::addSkylineLevel(int skylineIndex, int x, int y, int width, int height) {
+  Node newNode = {x, y + height, width};
+  skyline.insert(skyline.begin() + skylineIndex, newNode);
 
-  for (auto i = skylineIndex + 1; i < skyline.size(); ++i) {
-    if (skyline[i].x < skyline[i - 1].x + skyline[i - 1].width) {
-      int shrink = skyline[i - 1].x + skyline[i - 1].width - skyline[i].x;
-      skyline[i].x += shrink;
-      skyline[i].width -= shrink;
-      if (skyline[i].width <= 0) {
-        skyline.erase(skyline.begin() + static_cast<int>(i));
-        --i;
-      } else {
-        break;
-      }
-    } else {
+  // delete width of the new skyline segment from following ones
+  for (auto i = static_cast<size_t>(skylineIndex + 1); i < skyline.size(); ++i) {
+    // Skip if no overlap
+    if (skyline[i].x >= skyline[i - 1].x + skyline[i - 1].width) {
       break;
     }
-  }
-
-  for (size_t i = 0; i < skyline.size() - 1; ++i) {
-    if (skyline[i].y == skyline[i + 1].y) {
-      skyline[i].width += skyline[i + 1].width;
-      skyline.erase(skyline.begin() + static_cast<int>(i) + 1);
-      --i;
+    int shrink = skyline[i - 1].x + skyline[i - 1].width - skyline[i].x;
+    skyline[i].x += shrink;
+    skyline[i].width -= shrink;
+    if (skyline[i].width > 0) {
+      // only partially consumed
+      break;
     }
+    // fully consumed
+    skyline.erase(skyline.begin() + static_cast<int>(i));
+    --i;
+  }
+  // merge skyline
+  for (size_t i = 0; i < skyline.size() - 1; ++i) {
+    if (skyline[i].y != skyline[i + 1].y) {
+      continue;
+    }
+    skyline[i].width += skyline[i + 1].width;
+    skyline.erase(skyline.begin() + static_cast<int>(i) + 1);
+    --i;
   }
 }
-
 }  // namespace tgfx

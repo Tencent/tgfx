@@ -21,23 +21,11 @@
 #include "core/utils/PixelFormatUtil.h"
 
 namespace tgfx {
-
-static int MaskFromatToAtlasIndex(MaskFormat format) {
+static int MaskFormatToAtlasIndex(MaskFormat format) {
   return static_cast<int>(format);
 }
 
 AtlasManager::AtlasManager(Context* context) : context(context) {
-  _glyphCacheBuffer = new BlockBuffer(1 << 14);
-}
-
-AtlasManager::~AtlasManager() {
-  delete _glyphCacheBuffer;
-}
-
-void AtlasManager::releaseAll() {
-  for (int i = 0; i < kMaskFormatCount; i++) {
-    atlases[i] = nullptr;
-  }
 }
 
 const std::vector<std::shared_ptr<TextureProxy>>& AtlasManager::getTextureProxies(
@@ -49,25 +37,16 @@ const std::vector<std::shared_ptr<TextureProxy>>& AtlasManager::getTextureProxie
   return kEmpty;
 }
 
-// bool AtlasManager::hasGlyph(MaskFormat format, Glyph* glyph) {
-//   return this->getAtlas(format)->hasGlyph(glyph);
-// }
-
-// Atlas::ErrorCode AtlasManager::addGlyphToAtlas(const Glyph& glyph, int srcPadding,
-//                                                ResourceProvider) {
-//   return Atlas::ErrorCode::Succeeded;
-// }
-
 bool AtlasManager::initAtlas(MaskFormat maskFormat) {
-  int index = MaskFromatToAtlasIndex(maskFormat);
+  int index = MaskFormatToAtlasIndex(maskFormat);
   AtlasConfig atlasConfig(context->caps()->maxTextureSize);
   if (atlases[index] == nullptr) {
     ISize atlasDimensions = atlasConfig.atlasDimensions(maskFormat);
     ISize plotDimensions = atlasConfig.plotDimensions(maskFormat);
     auto pixelFormat = MaskFormatToPixelFormat(maskFormat);
-    atlases[index] = Atlas::Make(context->proxyProvider(), pixelFormat, atlasDimensions.width,
-                                 atlasDimensions.height, plotDimensions.width,
-                                 plotDimensions.height, this, "TextAtlas");
+    atlases[index] =
+        Atlas::Make(context->proxyProvider(), pixelFormat, atlasDimensions.width,
+                    atlasDimensions.height, plotDimensions.width, plotDimensions.height, this);
     if (atlases[index] == nullptr) {
       return false;
     }
@@ -76,36 +55,49 @@ bool AtlasManager::initAtlas(MaskFormat maskFormat) {
 }
 
 Atlas* AtlasManager::getAtlas(MaskFormat maskFormat) const {
-  auto atlasIndex = MaskFromatToAtlasIndex(maskFormat);
-  DEBUG_ASSERT(atlases[atlasIndex])
+  auto atlasIndex = MaskFormatToAtlasIndex(maskFormat);
+  DEBUG_ASSERT(atlases[atlasIndex] != nullptr)
   return atlases[atlasIndex].get();
 }
 
-bool AtlasManager::hasGlyph(MaskFormat maskFormat, const BytesKey& key) const {
-  return this->getAtlas(maskFormat)->hasGlyph(key);
+Atlas::ErrorCode AtlasManager::addCellToAtlas(const AtlasCell& cell, AtlasToken nextFlushToken,
+                                              AtlasLocator& atlasLocator) const {
+  return getAtlas(cell.maskFormat())->addToAtlas(cell, nextFlushToken, atlasLocator);
 }
 
-Atlas::ErrorCode AtlasManager::addGlyphToAtlasWithoutFillImage(const Glyph& glyph,
-                                                               AtlasToken nextFlushToken,
-                                                               AtlasLocator& atlasLocator) const {
-  return getAtlas(glyph.maskFormat())
-      ->addToAtlasWithoutFillImage(glyph, nextFlushToken, atlasLocator);
-}
-
-bool AtlasManager::getGlyphLocator(MaskFormat maskFormat, const BytesKey& key,
-                                   GlyphLocator& locator) const {
-  return this->getAtlas(maskFormat)->getGlyphLocator(key, locator);
-}
-
-bool AtlasManager::fillGlyphImage(MaskFormat maskFormat, AtlasLocator& locator, void* image) const {
-  return this->getAtlas(maskFormat)->fillGlyphImage(locator, image);
+bool AtlasManager::getCellLocator(MaskFormat maskFormat, const BytesKey& key,
+                                  AtlasCellLocator& locator) const {
+  return this->getAtlas(maskFormat)->getCellLocator(key, locator);
 }
 
 void AtlasManager::setPlotUseToken(PlotUseUpdater& plotUseUpdater, const PlotLocator& plotLocator,
-                                   MaskFormat maskFormat, AtlasToken useToken) {
+                                   MaskFormat maskFormat, AtlasToken useToken) const {
   if (plotUseUpdater.add(plotLocator)) {
     getAtlas(maskFormat)->setLastUseToken(plotLocator, useToken);
   }
 }
 
+void AtlasManager::preFlush() {
+  for (const auto& atlas : atlases) {
+    if (atlas == nullptr) {
+      continue;
+    }
+    atlas->clearEvictionPlotTexture(context);
+  }
+}
+
+void AtlasManager::postFlush(AtlasToken startTokenForNextFlush) {
+  for (const auto& atlas : atlases) {
+    if (atlas == nullptr) {
+      continue;
+    }
+    atlas->compact(startTokenForNextFlush);
+  }
+}
+
+void AtlasManager::releaseAll() {
+  for (auto& atlas : atlases) {
+    atlas = nullptr;
+  }
+}
 }  // namespace tgfx

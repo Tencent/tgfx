@@ -89,9 +89,9 @@ class AtlasToken {
   }
 
  private:
-  explicit AtlasToken(uint64_t seqenceNumber) : sequenceNumber(seqenceNumber) {
+  explicit AtlasToken(uint64_t sequenceNumber) : sequenceNumber(sequenceNumber) {
   }
-  uint64_t sequenceNumber;
+  uint64_t sequenceNumber = 0;
 };
 
 class TokenTracker {
@@ -119,7 +119,7 @@ class PlotLocator {
       : _genID(generation), _plotIndex(plotIndex), _pageIndex(pageIndex) {
     DEBUG_ASSERT(pageIndex < kMaxResidentPages);
     DEBUG_ASSERT(plotIndex < kMaxPlots);
-    DEBUG_ASSERT(generation < ((uint64_t)1 << 48));
+    DEBUG_ASSERT(generation < static_cast<uint64_t>(1) << 48);
   }
 
   PlotLocator() : _genID(AtlasGenerationCounter::kInvalidGeneration), _plotIndex(0), _pageIndex(0) {
@@ -194,55 +194,29 @@ class AtlasLocator {
 
  private:
   PlotLocator _plotLocator;
-  Rect location = Rect::MakeEmpty();
+  Rect location = {};
 };
 
 class PlotUseUpdater {
  public:
-  bool add(const PlotLocator& plotLocator) {
-    auto pageIndex = plotLocator.pageIndex();
-    auto plotIndex = plotLocator.plotIndex();
-
-    if (find(pageIndex, plotIndex)) {
-      return false;
-    }
-    set(pageIndex, plotIndex);
-    return true;
-  }
+  bool add(const PlotLocator& plotLocator);
 
   void reset() {
     plotAlreadyUpdated.clear();
   }
 
  private:
-  bool find(uint32_t pageIndex, uint32_t plotIndex) const {
-    DEBUG_ASSERT(plotIndex < PlotLocator::kMaxPlots);
-    if (pageIndex >= plotAlreadyUpdated.size()) {
-      return false;
-    }
-    return static_cast<bool>((plotAlreadyUpdated[pageIndex] >> plotIndex) & 1);
-  }
+  bool find(uint32_t pageIndex, uint32_t plotIndex) const;
 
-  void set(uint32_t pageIndex, uint32_t plotIndex) {
-    DEBUG_ASSERT(!find(pageIndex, plotIndex));
-    if (pageIndex >= plotAlreadyUpdated.size()) {
-      auto count = pageIndex - plotAlreadyUpdated.size() + 1;
-      for (size_t i = 0; i < count; ++i) {
-        plotAlreadyUpdated.emplace_back(0);
-      }
-    }
-    plotAlreadyUpdated[pageIndex] |= (1 << plotIndex);
-  }
+  void set(uint32_t pageIndex, uint32_t plotIndex);
 
-  std::vector<uint32_t> plotAlreadyUpdated;
+  std::vector<uint32_t> plotAlreadyUpdated = {};
 };
 
 class Plot {
  public:
   Plot(uint32_t pageIndex, uint32_t plotIndex, AtlasGenerationCounter* generationCounter, int offX,
        int offY, int width, int height, int bytesPerPixel);
-
-  ~Plot();
 
   uint32_t pageIndex() const {
     return _pageIndex;
@@ -264,14 +238,9 @@ class Plot {
     return _pixelOffset;
   }
 
-  bool addSubImage(int imageWidth, int imageHeight, const void* image,
-                   AtlasLocator& atlasLocator) const;
-
   bool addRect(int with, int height, AtlasLocator& atlasLocator);
 
   void resetRects();
-
-  std::tuple<const void*, Rect, size_t> prepareForUpload();
 
   AtlasToken lastUseToken() const {
     return _lastUseToken;
@@ -295,21 +264,17 @@ class Plot {
   int _flushesSinceLastUsed = 0;
 
   AtlasGenerationCounter* const generationCounter = nullptr;
-  const uint32_t _pageIndex;
-  const uint32_t _plotIndex;
-  uint64_t _genID;
-  mutable unsigned char* data = nullptr;
-  const int width;
-  const int height;
-  const Point _pixelOffset;
-  const int bytesPerPixel;
+  const uint32_t _pageIndex = 0;
+  const uint32_t _plotIndex = 0;
+  uint64_t _genID = 0;
+  const int width = 512;
+  const int height = 512;
+  const Point _pixelOffset = {};
+  const int bytesPerPixel = 1;
   RectPackSkyline rectPack;
   PlotLocator _plotLocator;
   const int padding = 1;
-  Rect dirtyRect = Rect::MakeEmpty();
-  Rect cachedRect = Rect::MakeEmpty();
 };
 
 using PlotList = std::list<Plot*>;
-
 }  // namespace tgfx

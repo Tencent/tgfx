@@ -18,44 +18,43 @@
 #include "AtlasTypes.h"
 
 namespace tgfx {
+bool PlotUseUpdater::add(const PlotLocator& plotLocator) {
+  auto pageIndex = plotLocator.pageIndex();
+  auto plotIndex = plotLocator.plotIndex();
+  if (find(pageIndex, plotIndex)) {
+    return false;
+  }
+  set(pageIndex, plotIndex);
+  return true;
+}
+
+bool PlotUseUpdater::find(uint32_t pageIndex, uint32_t plotIndex) const {
+  DEBUG_ASSERT(plotIndex < PlotLocator::kMaxPlots);
+  if (pageIndex >= plotAlreadyUpdated.size()) {
+    return false;
+  }
+  return static_cast<bool>((plotAlreadyUpdated[pageIndex] >> plotIndex) & 1);
+}
+
+void PlotUseUpdater::set(uint32_t pageIndex, uint32_t plotIndex) {
+  DEBUG_ASSERT(!find(pageIndex, plotIndex));
+  if (pageIndex >= plotAlreadyUpdated.size()) {
+    auto count = pageIndex - plotAlreadyUpdated.size() + 1;
+    for (size_t i = 0; i < count; ++i) {
+      plotAlreadyUpdated.emplace_back(0);
+    }
+  }
+  plotAlreadyUpdated[pageIndex] |= (1 << plotIndex);
+}
+
+/////////////
+
 Plot::Plot(uint32_t pageIndex, uint32_t plotIndex, AtlasGenerationCounter* generationCounter,
            int offsetX, int offsetY, int width, int height, int bytesPerPixel)
     : generationCounter(generationCounter), _pageIndex(pageIndex), _plotIndex(plotIndex),
       _genID(generationCounter->next()), width(width), height(height),
       _pixelOffset(Point::Make(offsetX * width, offsetY * height)), bytesPerPixel(bytesPerPixel),
       rectPack(width, height), _plotLocator(pageIndex, plotIndex, _genID) {
-  dirtyRect.setEmpty();
-  cachedRect.setEmpty();
-}
-
-Plot::~Plot() {
-  delete[] data;
-}
-
-bool Plot::addSubImage(int imageWidth, int imageHeight, const void* image,
-                       AtlasLocator& atlasLocator) const {
-  if (data == nullptr) {
-    return false;
-  }
-  DEBUG_ASSERT(imageWidth < width && imageHeight < height);
-  Point location = {atlasLocator.getLocation().left, atlasLocator.getLocation().top};
-  auto rect = Rect::MakeXYWH(location.x, location.y, (float)imageWidth, (float)imageHeight);
-
-  auto left = static_cast<int>(rect.left);
-  auto top = static_cast<int>(rect.top);
-  auto rowBytes = static_cast<size_t>(imageWidth * bytesPerPixel);
-  auto imagePtr = static_cast<const uint8_t*>(image);
-  auto dataPtr = data;
-  dataPtr += bytesPerPixel * width * top;
-  dataPtr += bytesPerPixel * left;
-
-  for (auto i = 0; i < imageHeight; ++i) {
-    memcpy(dataPtr, imagePtr, rowBytes);
-    dataPtr += bytesPerPixel * width;
-    imagePtr += rowBytes;
-  }
-
-  return true;
 }
 
 bool Plot::addRect(int imageWidth, int imageHeight, AtlasLocator& atlasLocator) {
@@ -67,22 +66,12 @@ bool Plot::addRect(int imageWidth, int imageHeight, AtlasLocator& atlasLocator) 
     return false;
   }
 
-  if (data == nullptr) {
-    auto size = static_cast<size_t>(this->width * this->height * bytesPerPixel);
-    data = new (std::nothrow) uint8_t[size];
-    if (data == nullptr) {
-      return false;
-    }
-    memset(data, 0, size);
-  }
-
   auto rectX = static_cast<int>(location.x) + padding;
   auto rectY = static_cast<int>(location.y) + padding;
   auto rect = Rect::MakeXYWH(rectX, rectY, imageWidth, imageHeight);
   rect.offset(_pixelOffset.x, _pixelOffset.y);
   atlasLocator.updateRect(rect);
   atlasLocator.setPlotLocator(_plotLocator);
-  dirtyRect.join(rect);
   return true;
 }
 
@@ -92,26 +81,5 @@ void Plot::resetRects() {
   _plotLocator =
       PlotLocator(static_cast<uint32_t>(_pageIndex), static_cast<uint32_t>(_plotIndex), _genID);
   _lastUseToken = AtlasToken::InvalidToken();
-  if (data) {
-    memset(data, 0, static_cast<size_t>(bytesPerPixel * width * height));
-  }
-  dirtyRect.setEmpty();
-  cachedRect.setEmpty();
 }
-
-std::tuple<const void*, Rect, size_t> Plot::prepareForUpload() {
-  if (data == nullptr || dirtyRect.isEmpty()) {
-    return {nullptr, Rect::MakeEmpty(), 0};
-  }
-  auto rect = dirtyRect;
-  dirtyRect.setEmpty();
-  auto rowBytes = static_cast<int>(width * bytesPerPixel);
-  auto dataPtr = data;
-  auto top = static_cast<int>(rect.top);
-  auto left = static_cast<int>(rect.left);
-  dataPtr += rowBytes * top;
-  dataPtr += bytesPerPixel * left;
-  return {dataPtr, rect, rowBytes};
-}
-
 }  // namespace tgfx

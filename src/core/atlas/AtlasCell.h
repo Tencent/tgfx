@@ -23,10 +23,10 @@
 #include "tgfx/core/BytesKey.h"
 
 namespace tgfx {
-class Glyph {
+class AtlasCell {
  public:
-  GlyphID glyphId() const {
-    return _glyphId;
+  uint16_t id() const {
+    return _id;
   }
 
   const BytesKey& key() const {
@@ -64,14 +64,14 @@ class Glyph {
   MaskFormat _maskFormat = MaskFormat::A8;
   uint16_t _width = 0;
   uint16_t _height = 0;
-  GlyphID _glyphId = 0;
+  uint16_t _id = 0;
 
   friend class AtlasSource;
   friend class TextRender;
 };
 
-struct GlyphLocator {
-  Matrix matrix;
+struct AtlasCellLocator {
+  Matrix matrix = {};  // The cell's transformation matrix
   AtlasLocator atlasLocator;
 };
 }  //namespace tgfx

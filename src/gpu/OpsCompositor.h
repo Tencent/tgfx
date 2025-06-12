@@ -19,8 +19,6 @@
 #pragma once
 
 #include "core/MCState.h"
-#include "core/atlas/Atlas.h"
-#include "gpu/ops/AtlasTextOp.h"
 #include "gpu/ops/RRectDrawOp.h"
 #include "gpu/ops/RectDrawOp.h"
 #include "tgfx/core/Fill.h"

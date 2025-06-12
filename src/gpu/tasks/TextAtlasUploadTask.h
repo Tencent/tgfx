@@ -28,6 +28,7 @@ class TextAtlasUploadTask : public ResourceTask {
  public:
   TextAtlasUploadTask(UniqueKey uniqueKey, std::shared_ptr<DataSource<PixelBuffer>> source,
                       std::shared_ptr<TextureProxy> proxy, Point atlasOffset);
+
   bool execute(Context* context) override;
 
  protected:

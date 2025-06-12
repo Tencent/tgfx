@@ -22,62 +22,33 @@
 #include "Atlas.h"
 #include "AtlasTypes.h"
 #include "gpu/FlushCallbackObject.h"
-#include "gpu/ProxyProvider.h"
 
 namespace tgfx {
 class AtlasManager : public AtlasGenerationCounter, public FlushCallbackObject {
  public:
   explicit AtlasManager(Context* context);
 
-  ~AtlasManager();
-
   const std::vector<std::shared_ptr<TextureProxy>>& getTextureProxies(MaskFormat maskFormat);
 
+  bool getCellLocator(MaskFormat, const BytesKey& key, AtlasCellLocator& locator) const;
+
+  Atlas::ErrorCode addCellToAtlas(const AtlasCell& cell, AtlasToken nextFlushToken,
+                                  AtlasLocator&) const;
+
+  void setPlotUseToken(PlotUseUpdater&, const PlotLocator&, MaskFormat, AtlasToken) const;
+
+  void preFlush() override;
+
+  void postFlush(AtlasToken startTokenForNextFlush) override;
+
   void releaseAll();
-  bool hasGlyph(MaskFormat, const BytesKey& key) const;
-
-  bool getGlyphLocator(MaskFormat, const BytesKey& key, GlyphLocator& locator) const;
-
-  Atlas::ErrorCode addGlyphToAtlasWithoutFillImage(const Glyph& glyph, AtlasToken nextFlushToken,
-                                                   AtlasLocator&) const;
-
-  bool fillGlyphImage(MaskFormat, AtlasLocator& locator, void* image) const;
-
-  //Atlas::ErrorCode addGlyphToAtlas(const Glyph& glyph, int srcPadding, ResourceProvider);
-
-  Context* getContext() const {
-    return context;
-  }
-
-  BlockBuffer* glyphCacheBuffer() const {
-    return _glyphCacheBuffer;
-  }
-
-  void setPlotUseToken(PlotUseUpdater&, const PlotLocator&, MaskFormat, AtlasToken);
-
-  void preFlush() override {
-    for (const auto& atlas : atlases) {
-      if (atlas == nullptr) {
-        continue;
-      }
-      atlas->clearEvictionPlotTexture(context);
-    }
-  }
-  void postFlush(AtlasToken startTokenForNextFlush) override {
-    for (const auto& atlas : atlases) {
-      if (atlas == nullptr) {
-        continue;
-      }
-      atlas->compact(startTokenForNextFlush);
-    }
-  }
 
  private:
   bool initAtlas(MaskFormat format);
 
   Atlas* getAtlas(MaskFormat format) const;
+
   Context* context = nullptr;
   std::unique_ptr<Atlas> atlases[kMaskFormatCount];
-  BlockBuffer* _glyphCacheBuffer = nullptr;
 };
 }  // namespace tgfx

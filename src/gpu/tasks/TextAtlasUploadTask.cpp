@@ -47,7 +47,6 @@ bool TextAtlasUploadTask::execute(Context* context) {
   auto gpu = context->gpu();
   auto pixels = pixelBuffer->lockPixels();
   if (pixels == nullptr) {
-    pixelBuffer->unlockPixels();
     LOGE("TextAtlasUploadTask::execute() lockPixels is nullptr!");
     return false;
   }
@@ -59,5 +58,4 @@ bool TextAtlasUploadTask::execute(Context* context) {
   source = nullptr;
   return true;
 }
-
 }  // namespace tgfx

@@ -50,19 +50,19 @@ class RectPackSkyline {
 
  private:
   struct Node {
-    int x;
-    int y;
-    int width;
+    int x = 0;
+    int y = 0;
+    int width = 2;
   };
 
-  bool rectangleFits(size_t skylineIndex, int w, int h, int& y) const;
+  bool rectangleFits(int skylineIndex, int w, int h, int& y) const;
 
-  void addSkylineLevel(size_t skylineIndex, int x, int y, int width, int height);
+  void addSkylineLevel(int skylineIndex, int x, int y, int width, int height);
 
-  int _width;
-  int _height;
-  std::vector<Node> skyline;
-  int32_t areaSoFar;
+  std::vector<Node> skyline = {};
+  int _width = 512;
+  int _height = 512;
+  int areaSoFar = 0;
 };
 
 }  // namespace tgfx
