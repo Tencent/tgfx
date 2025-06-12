@@ -50,11 +50,11 @@ void PlotUseUpdater::set(uint32_t pageIndex, uint32_t plotIndex) {
 /////////////
 
 Plot::Plot(uint32_t pageIndex, uint32_t plotIndex, AtlasGenerationCounter* generationCounter,
-           int offsetX, int offsetY, int width, int height, int bytesPerPixel)
+           int offsetX, int offsetY, int width, int height)
     : generationCounter(generationCounter), _pageIndex(pageIndex), _plotIndex(plotIndex),
       _genID(generationCounter->next()), width(width), height(height),
-      _pixelOffset(Point::Make(offsetX * width, offsetY * height)), bytesPerPixel(bytesPerPixel),
-      rectPack(width, height), _plotLocator(pageIndex, plotIndex, _genID) {
+      _pixelOffset(Point::Make(offsetX * width, offsetY * height)), rectPack(width, height),
+      _plotLocator(pageIndex, plotIndex, _genID) {
 }
 
 bool Plot::addRect(int imageWidth, int imageHeight, AtlasLocator& atlasLocator) {

@@ -216,7 +216,7 @@ class PlotUseUpdater {
 class Plot {
  public:
   Plot(uint32_t pageIndex, uint32_t plotIndex, AtlasGenerationCounter* generationCounter, int offX,
-       int offY, int width, int height, int bytesPerPixel);
+       int offY, int width, int height);
 
   uint32_t pageIndex() const {
     return _pageIndex;
@@ -270,7 +270,6 @@ class Plot {
   const int width = 512;
   const int height = 512;
   const Point _pixelOffset = {};
-  const int bytesPerPixel = 1;
   RectPackSkyline rectPack;
   PlotLocator _plotLocator;
   const int padding = 1;

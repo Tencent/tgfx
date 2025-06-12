@@ -79,21 +79,21 @@ class Atlas {
   };
 
   ProxyProvider* proxyProvider = nullptr;
-  PixelFormat pixelFormat;
+  PixelFormat pixelFormat = PixelFormat::Unknown;
   AtlasGenerationCounter* const generationCounter;
-  std::vector<std::shared_ptr<TextureProxy>> textureProxies;
-  std::vector<Page> pages;
-  uint64_t _atlasGeneration;
-  AtlasToken previousFlushToken;
-  int flushesSinceLastUse;
-  uint32_t numPlots;
-  int bytesPerPixel;
-  int textureWidth;
-  int textureHeight;
-  int plotWidth;
-  int plotHeight;
+  std::vector<std::shared_ptr<TextureProxy>> textureProxies = {};
+  std::vector<Page> pages = {};
+  uint64_t _atlasGeneration = 0;
+  AtlasToken previousFlushToken = AtlasToken::InvalidToken();
+  int flushesSinceLastUse = 0;
+  uint32_t numPlots = 0;
+  int bytesPerPixel = 1;
+  int textureWidth = 2028;
+  int textureHeight = 2048;
+  int plotWidth = 512;
+  int plotHeight = 512;
 
-  std::vector<PlotEvictionCallback*> evictionCallbacks;
+  std::vector<PlotEvictionCallback*> evictionCallbacks = {};
 
   BytesKeyMap<AtlasCellLocator> cellLocators;
   std::map<uint32_t, std::set<Plot*>> evictionPlots;

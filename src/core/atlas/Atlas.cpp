@@ -102,7 +102,7 @@ bool Atlas::activateNewPage() {
     for (int x = numPlotX - 1, c = 0; x >= 0; --x, ++c) {
       auto plotIndex = static_cast<uint32_t>(r * numPlotX + c);
       *currentPlot = std::make_unique<Plot>(pageIndex, plotIndex, generationCounter, x, y,
-                                            plotWidth, plotHeight, bytesPerPixel);
+                                            plotWidth, plotHeight);
       page.plotList.push_front(currentPlot->get());
       ++currentPlot;
     }
@@ -251,7 +251,7 @@ void Atlas::clearEvictionPlotTexture(Context* context) {
     return;
   }
   auto rowBytes = static_cast<size_t>(plotWidth * bytesPerPixel);
-  auto size = static_cast<size_t>(rowBytes * plotHeight);
+  auto size = static_cast<size_t>(plotHeight) * rowBytes;
   auto data = new (std::nothrow) uint8_t[size];
   if (data == nullptr) {
     return;
