@@ -2779,14 +2779,14 @@ TGFX_TEST(LayerTest, DirtyRegionTest) {
   displayList->showDirtyRegions(false);
   displayList->showDirtyRegions(true);
   displayList->setZoomScale(1.3f);
-  displayList->setRenderTimeBudget(0);
+  displayList->setMaxTilesRefinedPerFrame(0);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest8"));
 
   // Clear the previous dirty regions.
   displayList->showDirtyRegions(false);
   displayList->showDirtyRegions(true);
-  displayList->setRenderTimeBudget(INT64_MAX);
+  displayList->setMaxTilesRefinedPerFrame(INT_MAX);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest9"));
 
@@ -2795,14 +2795,14 @@ TGFX_TEST(LayerTest, DirtyRegionTest) {
   displayList->showDirtyRegions(true);
   displayList->setContentOffset(250, 150);
   displayList->setZoomScale(0.5f);
-  displayList->setRenderTimeBudget(0);
+  displayList->setMaxTilesRefinedPerFrame(0);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest10"));
 
   // Clear the previous dirty regions.
   displayList->showDirtyRegions(false);
   displayList->showDirtyRegions(true);
-  displayList->setRenderTimeBudget(INT64_MAX);
+  displayList->setMaxTilesRefinedPerFrame(INT_MAX);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest11"));
 }
