@@ -529,6 +529,7 @@ class Layer {
    * @param content The layer content to draw. This can be nullptr.
    * @param alpha The alpha transparency value used for drawing the layer content.
    * @param forContour Whether to draw the layer content for the contour.
+   * @return true if the content was drawn successfully, false otherwise.
    */
   using ContentDrawer = bool (*)(Canvas* canvas, const Layer* layer, const LayerContent* content,
                                  float alpha, bool forContour);
