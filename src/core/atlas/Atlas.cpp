@@ -143,7 +143,6 @@ bool Atlas::getCellLocator(const BytesKey& cellKey, AtlasCellLocator& cellLocato
   auto plotGeneration = pages[page].plotArray[plot]->genID();
   auto locatorGeneration = atlasLocator.genID();
   return plotGeneration == locatorGeneration;
-  ;
 }
 
 void Atlas::setLastUseToken(const PlotLocator& plotLocator, AtlasToken token) {
@@ -171,6 +170,16 @@ void Atlas::evictionPlot(Plot* plot) {
   for (auto evictor : evictionCallbacks) {
     evictor->evict(plot->plotLocator());
   }
+  auto pageIndex = plot->pageIndex();
+  auto generation = plot->genID();
+  auto plotIndex = plot->plotIndex();
+  for (const auto& [key, cellLocator] : cellLocators) {
+    auto& locator = cellLocator.atlasLocator;
+    if (locator.pageIndex() == pageIndex && locator.plotIndex() == plotIndex &&
+        locator.genID() == generation) {
+      expiredKeys.insert(key);
+    }
+  }
   _atlasGeneration = generationCounter->next();
   plot->resetRects();
   evictionPlots[plot->pageIndex()].insert(plot);
@@ -186,6 +195,11 @@ void Atlas::deactivateLastPage() {
       it = evictionPlots.erase(it);
     } else {
       ++it;
+    }
+  }
+  for (const auto& [key, cellLocator] : cellLocators) {
+    if (cellLocator.atlasLocator.pageIndex() == pageIndex) {
+      expiredKeys.insert(key);
     }
   }
 }
@@ -304,6 +318,22 @@ void Atlas::clearEvictionPlotTexture(Context* context) {
   pixelRef->unlockPixels();
   evictionPlots.clear();
 }
+
+void Atlas::removeExpiredKeys() {
+  constexpr size_t kMaxKeys = 20000;
+  if (cellLocators.size() < kMaxKeys || expiredKeys.empty()) {
+    return;
+  }
+  for (auto it = cellLocators.begin(); it != cellLocators.end();) {
+    if (expiredKeys.find(it->first) != expiredKeys.end()) {
+      it = cellLocators.erase(it);
+    } else {
+      ++it;
+    }
+  }
+  expiredKeys.clear();
+}
+
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 AtlasConfig::AtlasConfig(int maxTextureSize) : maxTextureSize(kMaxTextureSize) {

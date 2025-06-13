@@ -59,6 +59,8 @@ class Atlas {
 
   void clearEvictionPlotTexture(Context* context);
 
+  void removeExpiredKeys();
+
  private:
   Atlas(ProxyProvider* proxyProvider, PixelFormat pixelFormat, int width, int height, int plotWidth,
         int plotHeight, AtlasGenerationCounter* generationCounter);
@@ -97,6 +99,7 @@ class Atlas {
 
   BytesKeyMap<AtlasCellLocator> cellLocators;
   std::map<uint32_t, std::set<Plot*>> evictionPlots;
+  std::set<BytesKey> expiredKeys;
 };
 
 class AtlasConfig {
