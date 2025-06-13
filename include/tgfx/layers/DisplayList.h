@@ -283,5 +283,8 @@ class DisplayList {
   Matrix getViewMatrix() const;
 
   void resetCaches();
+
+  void renderDrawRect(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
+                      bool autoClear) const;
 };
 }  // namespace tgfx

@@ -685,50 +685,28 @@ LayerContent* Layer::getRasterizedCache(const DrawArgs& args, const Matrix& rend
     return content;
   }
   Matrix drawingMatrix = {};
-  std::shared_ptr<Image> backgroundImage = nullptr;
-  Point backgroundOffset = {};
-  auto image =
-      getRasterizedImage(args, contentScale, &drawingMatrix, &backgroundImage, &backgroundOffset);
+  auto image = getRasterizedImage(args, contentScale, &drawingMatrix);
   if (image == nullptr) {
     return nullptr;
   }
   image = image->makeTextureImage(args.context);
-  backgroundImage = backgroundImage ? backgroundImage->makeTextureImage(args.context) : nullptr;
   if (image == nullptr) {
     return nullptr;
   }
-  rasterizedContent = std::make_unique<RasterizedContent>(
-      contextID, contentScale, std::move(image), drawingMatrix, backgroundImage, backgroundOffset);
+  rasterizedContent =
+      std::make_unique<RasterizedContent>(contextID, contentScale, std::move(image), drawingMatrix);
   return rasterizedContent.get();
 }
 
 std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float contentScale,
-                                                 Matrix* drawingMatrix,
-                                                 std::shared_ptr<Image>* backgroundImage,
-                                                 Point* backgroundOffset) {
+                                                 Matrix* drawingMatrix) {
   DEBUG_ASSERT(drawingMatrix != nullptr);
-  DEBUG_ASSERT(backgroundImage != nullptr);
-  DEBUG_ASSERT(backgroundOffset != nullptr);
   if (FloatNearlyZero(contentScale)) {
     return nullptr;
   }
   auto drawArgs = args;
   drawArgs.renderRect = nullptr;
-  auto currentBackground = bitFields.hasBackgroundStyle
-                               ? getBackgroundImage(args, contentScale, backgroundOffset)
-                               : nullptr;
-  if (currentBackground) {
-    auto bounds = getBounds();
-    bounds.scale(contentScale, contentScale);
-    drawArgs.backgroundContext = BackgroundContext::Make(
-        args.context,
-        Rect::MakeXYWH(backgroundOffset->x, backgroundOffset->y, bounds.width(), bounds.height()),
-        Matrix::MakeScale(contentScale, contentScale));
-    auto backgroundCanvas = drawArgs.backgroundContext->backgroundCanvas();
-    AutoCanvasRestore restore(backgroundCanvas);
-    backgroundCanvas->resetMatrix();
-    backgroundCanvas->drawImage(currentBackground);
-  }
+  drawArgs.backgroundContext = nullptr;
   auto picture = CreatePicture(
       drawArgs, contentScale,
       [this](const DrawArgs& args, Canvas* canvas) { drawDirectly(args, canvas, 1.0f); });
@@ -740,22 +718,11 @@ std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float con
   if (image == nullptr) {
     return nullptr;
   }
-  currentBackground =
-      drawArgs.backgroundContext ? drawArgs.backgroundContext->getBackgroundImage() : nullptr;
-  if (currentBackground) {
-    *backgroundOffset -= offset;
-  }
   auto filter = getImageFilter(contentScale);
   if (filter) {
     Point filterOffset = {};
-    if (currentBackground) {
-      currentBackground = currentBackground->makeWithFilter(filter);
-    }
     image = image->makeWithFilter(std::move(filter), &filterOffset);
     offset += filterOffset;
-  }
-  if (currentBackground) {
-    *backgroundImage = currentBackground;
   }
   drawingMatrix->setScale(1.0f / contentScale, 1.0f / contentScale);
   drawingMatrix->preTranslate(offset.x, offset.y);
@@ -770,9 +737,10 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
   if (auto rasterizedCache = getRasterizedCache(args, canvas->getMatrix())) {
     rasterizedCache->draw(canvas, getLayerPaint(alpha, blendMode));
     if (args.backgroundContext) {
-      static_cast<RasterizedContent*>(rasterizedCache)
-          ->drawBackground(args.backgroundContext->backgroundCanvas(),
-                           getLayerPaint(alpha, blendMode));
+      auto backgroundArgs = args;
+      backgroundArgs.drawMode = DrawMode::Background;
+      backgroundArgs.backgroundContext = nullptr;
+      drawOffscreen(backgroundArgs, args.backgroundContext->backgroundCanvas(), alpha, blendMode);
     }
   } else if (blendMode != BlendMode::SrcOver || (alpha < 1.0f && allowsGroupOpacity()) ||
              (!_filters.empty() && !args.excludeEffects) || hasValidMask()) {

@@ -261,25 +261,9 @@ void DisplayList::render(Surface* surface, bool autoClear) {
 }
 
 std::vector<Rect> DisplayList::renderDirect(Surface* surface, bool autoClear) const {
-  auto viewMatrix = getViewMatrix();
-  auto inverse = Matrix::I();
-  DEBUG_ASSERT(viewMatrix.invertible());
-  viewMatrix.invert(&inverse);
-  auto canvas = surface->getCanvas();
-  canvas->setMatrix(viewMatrix);
-  if (autoClear) {
-    canvas->clear();
-  }
-  DrawArgs args(surface->getContext());
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
-  auto renderRect = inverse.mapRect(surfaceRect);
-  args.renderRect = &renderRect;
-  args.backgroundContext =
-      _root->bitFields.hasBackgroundStyle
-          ? BackgroundContext::Make(surface->getContext(), surfaceRect, viewMatrix)
-          : nullptr;
-  _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
-  canvas->resetMatrix();
+  renderDrawRect(surface, surfaceRect, getViewMatrix(), autoClear);
+  surface->getCanvas()->resetMatrix();
   return {surfaceRect};
 }
 
@@ -329,24 +313,9 @@ std::vector<Rect> DisplayList::renderPartial(Surface* surface, bool autoClear,
   } else {
     drawRects = MapDirtyRegions(dirtyRegions, viewMatrix, true, &surfaceRect);
   }
-  auto inverse = Matrix::I();
-  DEBUG_ASSERT(viewMatrix.invertible());
-  viewMatrix.invert(&inverse);
-  auto cacheCanvas = partialCache->getCanvas();
   auto canvas = surface->getCanvas();
   for (auto& drawRect : drawRects) {
-    AutoCanvasRestore autoRestore(cacheCanvas);
-    cacheCanvas->clipRect(drawRect);
-    cacheCanvas->clear();
-    cacheCanvas->setMatrix(viewMatrix);
-    DrawArgs args(context);
-    auto renderRect = inverse.mapRect(drawRect);
-    args.renderRect = &renderRect;
-    args.backgroundContext =
-        _root->bitFields.hasBackgroundStyle
-            ? BackgroundContext::Make(surface->getContext(), drawRect, viewMatrix)
-            : nullptr;
-    _root->drawLayer(args, cacheCanvas, 1.0f, BlendMode::SrcOver);
+    renderDrawRect(partialCache.get(), drawRect, viewMatrix, true);
   }
   canvas->resetMatrix();
   Paint paint = {};
@@ -758,19 +727,7 @@ void DisplayList::drawTileTask(const DrawTask& task) const {
   viewMatrix.postTranslate(offsetX, offsetY);
   auto clipRect = tileRect;
   clipRect.offset(offsetX, offsetY);
-  canvas->clipRect(clipRect);
-  canvas->clear();
-  canvas->setMatrix(viewMatrix);
-  DrawArgs args(surface->getContext());
-  auto renderRect = tileRect;
-  renderRect.scale(1.0f / currentZoomScale, 1.0f / currentZoomScale);
-  renderRect.roundOut();
-  args.renderRect = &renderRect;
-  args.backgroundContext =
-      _root->bitFields.hasBackgroundStyle
-          ? BackgroundContext::Make(surface->getContext(), tileRect, viewMatrix)
-          : nullptr;
-  _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
+  renderDrawRect(surface, clipRect, viewMatrix, true);
 }
 
 void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface,
@@ -828,6 +785,30 @@ void DisplayList::resetCaches() {
   surfaceCaches = {};
   totalTileCount = 0;
   emptyTiles.clear();
+}
+
+void DisplayList::renderDrawRect(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
+                                 bool autoClear) const {
+  DEBUG_ASSERT(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  auto context = surface->getContext();
+  AutoCanvasRestore autoRestore(canvas);
+  canvas->clipRect(drawRect);
+  if (autoClear) {
+    canvas->clear();
+  }
+  canvas->setMatrix(viewMatrix);
+  DrawArgs args(context);
+  DEBUG_ASSERT(viewMatrix.invertible());
+  Matrix inverse = Matrix::I();
+  viewMatrix.invert(&inverse);
+  auto renderRect = inverse.mapRect(drawRect);
+  renderRect.roundOut();
+  args.renderRect = &renderRect;
+  if (_root->bitFields.hasBackgroundStyle) {
+    args.backgroundContext = BackgroundContext::Make(context, drawRect, viewMatrix);
+  }
+  _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }
 
 }  // namespace tgfx

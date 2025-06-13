@@ -32,17 +32,6 @@ void RasterizedContent::draw(Canvas* canvas, const Paint& paint) const {
   canvas->setMatrix(oldMatrix);
 }
 
-void RasterizedContent::drawBackground(Canvas* canvas, const Paint& paint) const {
-  if (!backgroundImage) {
-    draw(canvas, paint);
-    return;
-  }
-  auto oldMatrix = canvas->getMatrix();
-  canvas->concat(matrix);
-  canvas->drawImage(backgroundImage, backgroundOffset.x, backgroundOffset.y, &paint);
-  canvas->setMatrix(oldMatrix);
-}
-
 bool RasterizedContent::hitTestPoint(float localX, float localY, bool) {
   const auto imageBounds = Rect::MakeXYWH(0, 0, image->width(), image->height());
   return imageBounds.contains(localX, localY);

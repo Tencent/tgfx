@@ -580,9 +580,7 @@ class Layer {
   LayerContent* getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix);
 
   std::shared_ptr<Image> getRasterizedImage(const DrawArgs& args, float contentScale,
-                                            Matrix* drawingMatrix,
-                                            std::shared_ptr<Image>* backgroundImage,
-                                            Point* backgroundOffset);
+                                            Matrix* drawingMatrix);
 
   void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
