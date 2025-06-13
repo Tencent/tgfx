@@ -377,8 +377,8 @@ TGFX_TEST(CanvasTest, rasterizedImage) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto defaultCacheLimit = context->cacheLimit();
-  context->setCacheLimit(0);
+  auto defaultExpirationFrames = context->resourceExpirationFrames();
+  context->setResourceExpirationFrames(1);
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   auto rasterImage = image->makeRasterized();
   EXPECT_TRUE(rasterImage == image);
@@ -395,6 +395,7 @@ TGFX_TEST(CanvasTest, rasterizedImage) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized"));
   auto rasterImageUniqueKey = std::static_pointer_cast<ResourceImage>(rasterImage)->uniqueKey;
   auto texture = Resource::Find<Texture>(context, rasterImageUniqueKey);
+  ASSERT_TRUE(texture != nullptr);
   EXPECT_TRUE(texture != nullptr);
   EXPECT_EQ(texture->width(), 454);
   EXPECT_EQ(texture->height(), 605);
@@ -425,7 +426,7 @@ TGFX_TEST(CanvasTest, rasterizedImage) {
   EXPECT_EQ(rasterImage->height(), 1210);
   canvas->drawImage(rasterImage, 100, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized_scale_up"));
-  context->setCacheLimit(defaultCacheLimit);
+  context->setResourceExpirationFrames(defaultExpirationFrames);
 }
 
 TGFX_TEST(CanvasTest, mipmap) {
