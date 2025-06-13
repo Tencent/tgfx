@@ -29,29 +29,19 @@
 #include <tgfx/gpu/opengl/GLTypes.h>
 #include "gpu/Texture.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
+#include "core/utils/WeakMap.h"
 
 namespace tgfx {
-
-static std::mutex cacheLocker;
-static std::unordered_map<AHardwareBuffer*, std::weak_ptr<tgfx::AndroidOESBuffer>> oesBufferMap;
-
+    static WeakMap<AHardwareBuffer*, AndroidOESBuffer> oesBufferMap = {};
     std::shared_ptr<AndroidOESBuffer> AndroidOESBuffer::MakeFrom(AHardwareBuffer* hardwareBuffer, YUVColorSpace colorSpace) {
         if (!hardwareBuffer) {
             return nullptr;
         }
-        // todo 加入缓存清除
-        std::lock_guard<std::mutex> lock(cacheLocker);
-        auto it = oesBufferMap.find(hardwareBuffer);
-        if (it != oesBufferMap.end()) {
-            auto buffer = it->second.lock();
-            if (buffer) {
-                return buffer;
-            }
-            oesBufferMap.erase(it);
+        if(auto cached = oesBufferMap.find(hardwareBuffer)) {
+            return cached;
         }
-
         auto buffer = std::shared_ptr<AndroidOESBuffer>(new AndroidOESBuffer(hardwareBuffer, colorSpace));
-        oesBufferMap[hardwareBuffer] = buffer;
+        oesBufferMap.insert(hardwareBuffer, buffer);
         return buffer;
     }
 
@@ -62,9 +52,8 @@ static std::unordered_map<AHardwareBuffer*, std::weak_ptr<tgfx::AndroidOESBuffer
 
     AndroidOESBuffer::~AndroidOESBuffer() {
         if (hardwareBuffer) {
+            oesBufferMap.remove(hardwareBuffer);
             AHardwareBuffer_release(hardwareBuffer);
-            std::lock_guard<std::mutex> lock(cacheLocker);
-            oesBufferMap.erase(hardwareBuffer);
         }
     }
 
