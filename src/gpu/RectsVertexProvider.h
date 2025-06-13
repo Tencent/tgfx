@@ -18,11 +18,13 @@
 
 #pragma once
 
+#include "Quad.h"
 #include "core/utils/BlockBuffer.h"
 #include "gpu/AAType.h"
 #include "gpu/VertexProvider.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
+#include "tgfx/core/Stroke.h"
 
 namespace tgfx {
 struct RectRecord {
@@ -51,7 +53,8 @@ class RectsVertexProvider : public VertexProvider {
    */
   static PlacementPtr<RectsVertexProvider> MakeFrom(BlockBuffer* buffer,
                                                     std::vector<PlacementPtr<RectRecord>>&& rects,
-                                                    AAType aaType, bool needUVCoord);
+                                                    AAType aaType, bool needUVCoord,
+                                                    std::vector<PlacementPtr<Stroke>>&& strokes);
 
   /**
    * Returns the number of rects in the provider.
@@ -81,6 +84,10 @@ class RectsVertexProvider : public VertexProvider {
     return bitFields.hasColor;
   }
 
+  bool hasStroke() const {
+    return bitFields.hasStroke;
+  }
+
   /**
    * Returns the first rect in the provider.
    */
@@ -105,13 +112,17 @@ class RectsVertexProvider : public VertexProvider {
 
  protected:
   PlacementArray<RectRecord> rects = {};
+  PlacementArray<Stroke> strokes = {};
   struct {
     uint8_t aaType : 2;
     bool hasUVCoord : 1;
     bool hasColor : 1;
+    bool hasStroke : 1;
   } bitFields = {};
 
   RectsVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType, bool hasUVCoord,
-                      bool hasColor);
+                      bool hasColor, PlacementArray<Stroke>&& strokes);
+
+  void writeQuad(float* vertices, int& index, Quad quad, Color color, float coverage = -1.0f) const;
 };
 }  // namespace tgfx

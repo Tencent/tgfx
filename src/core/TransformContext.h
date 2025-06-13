@@ -47,12 +47,13 @@ class TransformContext : public DrawContext {
     }
   }
 
-  void drawRect(const Rect& rect, const MCState& state, const Fill& fill) override {
-    drawContext->drawRect(rect, transform(state), fill);
+  void drawRect(const Rect& rect, const MCState& state, const Fill& fill,
+                const Stroke* stroke) override {
+    drawContext->drawRect(rect, transform(state), fill, stroke);
   }
 
   void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
-                 const Stroke* stroke = nullptr) override {
+                 const Stroke* stroke) override {
     drawContext->drawRRect(rRect, transform(state), fill, stroke);
   }
 

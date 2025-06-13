@@ -504,6 +504,25 @@ TGFX_TEST(LayerTest, getbounds) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/getBounds"));
 }
 
+TGFX_TEST(LayerTest, drawRect) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 1000, 1000);
+  auto canvas = surface->getCanvas();
+
+  auto paint = Paint();
+  paint.setStrokeWidth(10.0f);
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setLineJoin(LineJoin::Miter);
+  paint.setColor(Color::Blue());
+  paint.setAntiAlias(true);
+
+  Rect rect = Rect::MakeLTRB(100.5, 100.5, 600.0, 400.0);
+  canvas->drawRect(rect, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/Layer_drawRect"));
+}
+
 TGFX_TEST(LayerTest, shapeLayer) {
   ContextScope scope;
   auto context = scope.getContext();

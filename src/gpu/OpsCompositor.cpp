@@ -60,13 +60,20 @@ void OpsCompositor::fillImage(std::shared_ptr<Image> image, const Rect& rect,
   pendingRects.emplace_back(std::move(record));
 }
 
-void OpsCompositor::fillRect(const Rect& rect, const MCState& state, const Fill& fill) {
+void OpsCompositor::drawRect(const Rect& rect, const MCState& state, const Fill& fill,
+                             const Stroke* stroke) {
   DEBUG_ASSERT(!rect.isEmpty());
-  if (!canAppend(PendingOpType::Rect, state.clip, fill)) {
+  if (!canAppend(PendingOpType::Rect, state.clip, fill) ||
+      // To do: rect 的处理不同于 rrect
+      (pendingStrokes.empty() != (stroke == nullptr))) {
     flushPendingOps(PendingOpType::Rect, state.clip, fill);
   }
   auto record = drawingBuffer()->make<RectRecord>(rect, state.matrix, fill.color.premultiply());
   pendingRects.emplace_back(std::move(record));
+  if (stroke) {
+    auto strokeRecord = drawingBuffer()->make<Stroke>(*stroke);
+    pendingStrokes.emplace_back(std::move(strokeRecord));
+  }
 }
 
 void OpsCompositor::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
@@ -250,8 +257,9 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
           deviceBounds->join(rect);
         }
       }
-      auto provider = RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects),
-                                                    aaType, needLocalBounds);
+      auto provider =
+          RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects), aaType,
+                                        needLocalBounds, std::move(pendingStrokes));
       drawOp = RectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::RRect: {

@@ -34,8 +34,8 @@ RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t 
   if (clearAll) {
     auto drawingManager = renderTarget->getContext()->drawingManager();
     opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
-    opsCompositor->fillRect(renderTarget->bounds(), MCState{},
-                            {Color::Transparent(), BlendMode::Src});
+    opsCompositor->drawRect(renderTarget->bounds(), MCState{},
+                            {Color::Transparent(), BlendMode::Src}, nullptr);
   }
 }
 
@@ -52,13 +52,14 @@ Rect RenderContext::getClipBounds(const Path& clip) {
 
 void RenderContext::drawFill(const Fill& fill) {
   if (auto compositor = getOpsCompositor(fill.isOpaque())) {
-    compositor->fillRect(renderTarget->bounds(), {}, fill);
+    compositor->drawRect(renderTarget->bounds(), {}, fill, nullptr);
   }
 }
 
-void RenderContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
+void RenderContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill,
+                             const Stroke* stroke) {
   if (auto compositor = getOpsCompositor()) {
-    compositor->fillRect(rect, state, fill);
+    compositor->drawRect(rect, state, fill, stroke);
   }
 }
 

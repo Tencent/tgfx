@@ -21,6 +21,7 @@
 #include "gpu/Texture.h"
 #include "gpu/proxies/GpuBufferProxy.h"
 #include "tgfx/core/Color.h"
+#include "tgfx/core/Stroke.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
@@ -49,6 +50,10 @@ class ResourceProvider {
 
   static uint16_t NumIndicesPerRRect(RRectType type);
 
+  std::shared_ptr<GpuBufferProxy> aaStrokeRectIndexBuffer(LineJoin join);
+
+  static uint16_t NumIndicesStrokeRect(LineJoin join);
+
   void releaseAll();
 
  private:
@@ -58,5 +63,6 @@ class ResourceProvider {
   std::shared_ptr<GpuBufferProxy> _nonAAQuadIndexBuffer = nullptr;
   std::shared_ptr<GpuBufferProxy> _rRectFillIndexBuffer = nullptr;
   std::shared_ptr<GpuBufferProxy> _rRectStrokeIndexBuffer = nullptr;
+  std::shared_ptr<GpuBufferProxy> _rectStrokeIndexBuffer = nullptr;
 };
 }  // namespace tgfx

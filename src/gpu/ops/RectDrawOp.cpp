@@ -20,6 +20,7 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
 #include "gpu/ResourceProvider.h"
+#include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "tgfx/core/RenderFlags.h"
 
@@ -32,6 +33,9 @@ PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
   }
   auto drawOp = context->drawingBuffer()->make<RectDrawOp>(provider.get());
   if (provider->aaType() == AAType::Coverage) {
+    if (provider->hasStroke()) {
+      drawOp->indexBufferProxy = context->resourceProvider()->aaStrokeRectIndexBuffer(LineJoin::Miter);
+    }
     drawOp->indexBufferProxy = context->resourceProvider()->aaQuadIndexBuffer();
   } else if (provider->rectCount() > 1) {
     drawOp->indexBufferProxy = context->resourceProvider()->nonAAQuadIndexBuffer();
@@ -74,15 +78,18 @@ void RectDrawOp::execute(RenderPass* renderPass) {
   }
   auto renderTarget = renderPass->renderTarget();
   auto drawingBuffer = renderPass->getContext()->drawingBuffer();
-  auto gp = QuadPerEdgeAAGeometryProcessor::Make(
-      drawingBuffer, renderTarget->width(), renderTarget->height(), aaType, commonColor, uvMatrix);
+//  auto gp = QuadPerEdgeAAGeometryProcessor::Make(
+//      drawingBuffer, renderTarget->width(), renderTarget->height(), aaType, commonColor, uvMatrix);
+  auto gp = DefaultGeometryProcessor::Make(
+      drawingBuffer,  Color::Red(),renderTarget->width(), renderTarget->height(), aaType, Matrix::I(), Matrix::I());
   auto pipeline = createPipeline(renderPass, std::move(gp));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   renderPass->bindBuffers(indexBuffer, vertexBuffer, vertexBufferOffset);
   if (indexBuffer != nullptr) {
     uint16_t numIndicesPerQuad;
     if (aaType == AAType::Coverage) {
-      numIndicesPerQuad = ResourceProvider::NumIndicesPerAAQuad();
+//      numIndicesPerQuad = ResourceProvider::NumIndicesPerAAQuad();
+        numIndicesPerQuad = ResourceProvider::NumIndicesStrokeRect(LineJoin::Miter);
     } else {
       numIndicesPerQuad = ResourceProvider::NumIndicesPerNonAAQuad();
     }

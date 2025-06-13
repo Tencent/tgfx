@@ -51,9 +51,9 @@ class OpsCompositor {
                  const MCState& state, const Fill& fill);
 
   /**
-   * Fills the given rect with the given state and fill.
+   * Draw the given rect with the given state, fill and optional stroke.
    */
-  void fillRect(const Rect& rect, const MCState& state, const Fill& fill);
+  void drawRect(const Rect& rect, const MCState& state, const Fill& fill, const Stroke* stroke);
 
   /**
    * Draw the given rrect with the given state, fill and optional stroke.

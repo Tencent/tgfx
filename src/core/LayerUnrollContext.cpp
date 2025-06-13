@@ -32,8 +32,9 @@ void LayerUnrollContext::drawFill(const Fill& fill) {
   unrolled = true;
 }
 
-void LayerUnrollContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
-  drawContext->drawRect(rect, state, merge(fill));
+void LayerUnrollContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill,
+                                  const Stroke* stroke) {
+  drawContext->drawRect(rect, state, merge(fill), stroke);
   unrolled = true;
 }
 

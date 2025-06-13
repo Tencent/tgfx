@@ -24,8 +24,13 @@ namespace tgfx {
 void MeasureContext::drawFill(const Fill&) {
 }
 
-void MeasureContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
-  addLocalBounds(state, fill, rect);
+void MeasureContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill,
+                              const Stroke* stroke) {
+  auto localBounds = rect;
+  if (stroke) {
+    ApplyStrokeToBounds(*stroke, &localBounds);
+  }
+  addLocalBounds(state, fill, localBounds);
 }
 
 void MeasureContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,

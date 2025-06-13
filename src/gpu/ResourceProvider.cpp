@@ -215,6 +215,113 @@ uint16_t ResourceProvider::NumIndicesPerRRect(RRectType type) {
   ABORT("Invalid type");
 }
 
+static const int kMiterStrokeRectIndexCnt = 3 * 24;
+static const int kBevelStrokeRectIndexCnt = 48 + 36 + 24;
+// clang-format off
+static const uint16_t gMiterStrokeRectIndices[] = {
+  0 + 0, 1 + 0, 5 + 0, 5 + 0, 4 + 0, 0 + 0,
+  1 + 0, 2 + 0, 6 + 0, 6 + 0, 5 + 0, 1 + 0,
+  2 + 0, 3 + 0, 7 + 0, 7 + 0, 6 + 0, 2 + 0,
+  3 + 0, 0 + 0, 4 + 0, 4 + 0, 7 + 0, 3 + 0,
+
+  0 + 4, 1 + 4, 5 + 4, 5 + 4, 4 + 4, 0 + 4,
+  1 + 4, 2 + 4, 6 + 4, 6 + 4, 5 + 4, 1 + 4,
+  2 + 4, 3 + 4, 7 + 4, 7 + 4, 6 + 4, 2 + 4,
+  3 + 4, 0 + 4, 4 + 4, 4 + 4, 7 + 4, 3 + 4,
+
+  0 + 8, 1 + 8, 5 + 8, 5 + 8, 4 + 8, 0 + 8,
+  1 + 8, 2 + 8, 6 + 8, 6 + 8, 5 + 8, 1 + 8,
+  2 + 8, 3 + 8, 7 + 8, 7 + 8, 6 + 8, 2 + 8,
+  3 + 8, 0 + 8, 4 + 8, 4 + 8, 7 + 8, 3 + 8,
+};
+// clang-format on
+
+/**
+ * As in miter-stroke, index = a + b, and a is the current index, b is the shift
+ * from the first index. The index layout:
+ * outer AA line: 0~3, 4~7
+ * outer edge:    8~11, 12~15
+ * inner edge:    16~19
+ * inner AA line: 20~23
+ * Following comes a bevel-stroke rect and its indices:
+ *
+ *           4                                 7
+ *            *********************************
+ *          *   ______________________________  *
+ *         *  / 12                          15 \  *
+ *        *  /                                  \  *
+ *     0 *  |8     16_____________________19  11 |  * 3
+ *       *  |       |                    |       |  *
+ *       *  |       |  ****************  |       |  *
+ *       *  |       |  * 20        23 *  |       |  *
+ *       *  |       |  *              *  |       |  *
+ *       *  |       |  * 21        22 *  |       |  *
+ *       *  |       |  ****************  |       |  *
+ *       *  |       |____________________|       |  *
+ *     1 *  |9    17                      18   10|  * 2
+ *        *  \                                  /  *
+ *         *  \13 __________________________14/  *
+ *          *                                   *
+ *           **********************************
+ *          5                                  6
+ */
+// clang-format off
+static const uint16_t gBevelStrokeRectIndices[] = {
+  // Draw outer AA, from outer AA line to outer edge, shift is 0.
+  0 + 0, 1 + 0,  9 + 0,  9 + 0,  8 + 0, 0 + 0,
+  1 + 0, 5 + 0, 13 + 0, 13 + 0,  9 + 0, 1 + 0,
+  5 + 0, 6 + 0, 14 + 0, 14 + 0, 13 + 0, 5 + 0,
+  6 + 0, 2 + 0, 10 + 0, 10 + 0, 14 + 0, 6 + 0,
+  2 + 0, 3 + 0, 11 + 0, 11 + 0, 10 + 0, 2 + 0,
+  3 + 0, 7 + 0, 15 + 0, 15 + 0, 11 + 0, 3 + 0,
+  7 + 0, 4 + 0, 12 + 0, 12 + 0, 15 + 0, 7 + 0,
+  4 + 0, 0 + 0,  8 + 0,  8 + 0, 12 + 0, 4 + 0,
+
+  // Draw the stroke, from outer edge to inner edge, shift is 8.
+  0 + 8, 1 + 8, 9 + 8, 9 + 8, 8 + 8, 0 + 8,
+  1 + 8, 5 + 8, 9 + 8,
+  5 + 8, 6 + 8, 10 + 8, 10 + 8, 9 + 8, 5 + 8,
+  6 + 8, 2 + 8, 10 + 8,
+  2 + 8, 3 + 8, 11 + 8, 11 + 8, 10 + 8, 2 + 8,
+  3 + 8, 7 + 8, 11 + 8,
+  7 + 8, 4 + 8, 8 + 8, 8 + 8, 11 + 8, 7 + 8,
+  4 + 8, 0 + 8, 8 + 8,
+
+  // Draw the inner AA, from inner edge to inner AA line, shift is 16.
+  0 + 16, 1 + 16, 5 + 16, 5 + 16, 4 + 16, 0 + 16,
+  1 + 16, 2 + 16, 6 + 16, 6 + 16, 5 + 16, 1 + 16,
+  2 + 16, 3 + 16, 7 + 16, 7 + 16, 6 + 16, 2 + 16,
+  3 + 16, 0 + 16, 4 + 16, 4 + 16, 7 + 16, 3 + 16,
+};
+// clang-format on
+
+std::shared_ptr<GpuBufferProxy> ResourceProvider::aaStrokeRectIndexBuffer(tgfx::LineJoin join) {
+  if (_rectStrokeIndexBuffer == nullptr) {
+    if (join == LineJoin::Round) {
+      return nullptr;  // Round join is not supported for stroke rects.
+    }
+    bool isMiter = (join == LineJoin::Miter);
+    auto provider = std::make_unique<PatternedIndexBufferProvider>(
+        isMiter ? gMiterStrokeRectIndices : gBevelStrokeRectIndices, isMiter ? kMiterStrokeRectIndexCnt : kBevelStrokeRectIndexCnt, RectDrawOp::MaxNumRects,
+        kVerticesPerNonAAQuad);
+    _rectStrokeIndexBuffer =
+        GpuBufferProxy::MakeFrom(context, std::move(provider), BufferType::Index, 0);
+  }
+  return _rectStrokeIndexBuffer;
+}
+
+uint16_t ResourceProvider::NumIndicesStrokeRect(LineJoin join) {
+  switch (join) {
+    case LineJoin::Miter:
+      return kMiterStrokeRectIndexCnt;
+    case LineJoin::Bevel:
+      return kBevelStrokeRectIndexCnt;
+    default:
+      ABORT("Invalid join type");
+      return 0;
+  }
+}
+
 void ResourceProvider::releaseAll() {
   if (_gradientCache) {
     _gradientCache->releaseAll();
