@@ -24,7 +24,7 @@
 
 namespace tgfx {
 std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,
-                                                   YUVColorSpace colorSpace) {
+                                                   YUVColorSpace colorSpace [[maybe_unused]]) {
 #if __ANDROID_API__ >= 26
   return AndroidOESBuffer::MakeFrom(hardwareBuffer, colorSpace);
  #else
