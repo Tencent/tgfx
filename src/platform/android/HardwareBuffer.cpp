@@ -17,19 +17,19 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AHardwareBufferFunctions.h"
+#include "AndroidOESBuffer.h"
 #include "core/PixelBuffer.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "tgfx/platform/android/HardwareBufferJNI.h"
-#include "AndroidOESBuffer.h"
 
 namespace tgfx {
 std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,
                                                    YUVColorSpace colorSpace) {
-//    auto pixelBuffer = PixelBuffer::MakeFrom(hardwareBuffer);
-//    if (pixelBuffer) {
-//        return pixelBuffer;
-//    }
-    return AndroidOESBuffer::MakeFrom(hardwareBuffer, colorSpace);
+#if __ANDROID_API__ >= 26
+  return AndroidOESBuffer::MakeFrom(hardwareBuffer, colorSpace);
+ #else
+  return PixelBuffer::MakeFrom(hardwareBuffer);
+ #endif
 }
 
 bool HardwareBufferCheck(HardwareBufferRef buffer) {

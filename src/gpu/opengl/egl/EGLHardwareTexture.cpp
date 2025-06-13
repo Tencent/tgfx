@@ -90,7 +90,7 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* contex
     width = config.width;
     height = config.height;
     useScratchKey = false;
-#elif defined(__ANDROID__)
+#elif defined(__ANDROID__) && __ANDROID_API__ >= 26
     AHardwareBuffer_Desc des{};
     AHardwareBuffer_describe(hardwareBuffer, &des);
     target = GL_TEXTURE_EXTERNAL_OES;

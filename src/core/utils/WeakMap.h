@@ -56,11 +56,11 @@ class WeakMap {
   }
 
   void remove(const Key& key) {
-      std::lock_guard<std::mutex> lock(mutex);
-      auto result = cacheMap.find(key);
-      if (result != cacheMap.end()) {
-          cacheMap.erase(key);
-      }
+    std::lock_guard<std::mutex> lock(mutex);
+    auto result = cacheMap.find(key);
+    if (result != cacheMap.end()) {
+      cacheMap.erase(key);
+    }
   }
 
  private:

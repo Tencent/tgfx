@@ -19,63 +19,64 @@
 #if __ANDROID_API__ >= 26
 
 #include "AndroidOESBuffer.h"
-#include <android/hardware_buffer.h>
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
+#include <android/hardware_buffer.h>
+#include <tgfx/gpu/opengl/GLTypes.h>
 #include <mutex>
 #include <unordered_map>
-#include <tgfx/gpu/opengl/GLTypes.h>
+#include "core/utils/WeakMap.h"
 #include "gpu/Texture.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
-#include "core/utils/WeakMap.h"
 
 namespace tgfx {
-    static WeakMap<AHardwareBuffer*, AndroidOESBuffer> oesBufferMap = {};
-    std::shared_ptr<AndroidOESBuffer> AndroidOESBuffer::MakeFrom(AHardwareBuffer* hardwareBuffer, YUVColorSpace colorSpace) {
-        if (!hardwareBuffer) {
-            return nullptr;
-        }
-        if(auto cached = oesBufferMap.find(hardwareBuffer)) {
-            return cached;
-        }
-        auto buffer = std::shared_ptr<AndroidOESBuffer>(new AndroidOESBuffer(hardwareBuffer, colorSpace));
-        oesBufferMap.insert(hardwareBuffer, buffer);
-        return buffer;
-    }
+static WeakMap<AHardwareBuffer*, AndroidOESBuffer> oesBufferMap = {};
+std::shared_ptr<AndroidOESBuffer> AndroidOESBuffer::MakeFrom(AHardwareBuffer* hardwareBuffer,
+                                                             YUVColorSpace colorSpace) {
+  if (!hardwareBuffer) {
+    return nullptr;
+  }
+  if (auto cached = oesBufferMap.find(hardwareBuffer)) {
+    return cached;
+  }
+  auto buffer = std::shared_ptr<AndroidOESBuffer>(new AndroidOESBuffer(hardwareBuffer, colorSpace));
+  oesBufferMap.insert(hardwareBuffer, buffer);
+  return buffer;
+}
 
-    AndroidOESBuffer::AndroidOESBuffer(AHardwareBuffer* hardwareBuffer, YUVColorSpace colorSpace)
-            : hardwareBuffer(hardwareBuffer), colorSpace(colorSpace) {
-        AHardwareBuffer_acquire(hardwareBuffer);
-    }
+AndroidOESBuffer::AndroidOESBuffer(AHardwareBuffer* hardwareBuffer, YUVColorSpace colorSpace)
+    : hardwareBuffer(hardwareBuffer), colorSpace(colorSpace) {
+  AHardwareBuffer_acquire(hardwareBuffer);
+}
 
-    AndroidOESBuffer::~AndroidOESBuffer() {
-        if (hardwareBuffer) {
-            oesBufferMap.remove(hardwareBuffer);
-            AHardwareBuffer_release(hardwareBuffer);
-        }
-    }
+AndroidOESBuffer::~AndroidOESBuffer() {
+  if (hardwareBuffer) {
+    oesBufferMap.remove(hardwareBuffer);
+    AHardwareBuffer_release(hardwareBuffer);
+  }
+}
 
-    int AndroidOESBuffer::width() const {
-        if (!hardwareBuffer) return 0;
-        AHardwareBuffer_Desc desc{};
-        AHardwareBuffer_describe(hardwareBuffer, &desc);
-        return static_cast<int>(desc.width);
-    }
+int AndroidOESBuffer::width() const {
+  if (!hardwareBuffer) return 0;
+  AHardwareBuffer_Desc desc{};
+  AHardwareBuffer_describe(hardwareBuffer, &desc);
+  return static_cast<int>(desc.width);
+}
 
-    int AndroidOESBuffer::height() const {
-        if (!hardwareBuffer) return 0;
-        AHardwareBuffer_Desc desc{};
-        AHardwareBuffer_describe(hardwareBuffer, &desc);
-        return static_cast<int>(desc.height);
-    }
+int AndroidOESBuffer::height() const {
+  if (!hardwareBuffer) return 0;
+  AHardwareBuffer_Desc desc{};
+  AHardwareBuffer_describe(hardwareBuffer, &desc);
+  return static_cast<int>(desc.height);
+}
 
-    std::shared_ptr<Texture> AndroidOESBuffer::onMakeTexture(Context* context, bool /*mipmapped*/) const {
+std::shared_ptr<Texture> AndroidOESBuffer::onMakeTexture(Context* context,
+                                                         bool /*mipmapped*/) const {
+  return Texture::MakeFrom(context, hardwareBuffer, colorSpace);
+}
 
-        return Texture::MakeFrom(context, hardwareBuffer, colorSpace);
-    }
-
-} // tgfx
+}  // namespace tgfx
 
 #endif

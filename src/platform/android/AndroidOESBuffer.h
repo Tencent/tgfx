@@ -20,34 +20,35 @@
 
 #pragma once
 
-#include "tgfx/core/ImageBuffer.h"
-#include <media/NdkMediaCodec.h>
 #include <android/hardware_buffer.h>
+#include <media/NdkMediaCodec.h>
+#include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
-    class AndroidOESBuffer  : public ImageBuffer {
-    public:
-        static std::shared_ptr<AndroidOESBuffer> MakeFrom(AHardwareBuffer* hardwareBuffer, YUVColorSpace colorSpace);
+class AndroidOESBuffer : public ImageBuffer {
+ public:
+  static std::shared_ptr<AndroidOESBuffer> MakeFrom(AHardwareBuffer* hardwareBuffer,
+                                                    YUVColorSpace colorSpace);
 
-        ~AndroidOESBuffer() override;
+  ~AndroidOESBuffer() override;
 
-        int width() const override;
+  int width() const override;
 
-        int height() const override;
+  int height() const override;
 
-        bool isAlphaOnly() const final {
-            return false;
-        }
+  bool isAlphaOnly() const final {
+    return false;
+  }
 
-    protected:
-        std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const override;
+ protected:
+  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const override;
 
-    private:
-        AHardwareBuffer* hardwareBuffer = nullptr;
-        YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED;
+ private:
+  AHardwareBuffer* hardwareBuffer = nullptr;
+  YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED;
 
-        AndroidOESBuffer(AHardwareBuffer* hardwareBuffer, YUVColorSpace colorSpace);
-    };
+  AndroidOESBuffer(AHardwareBuffer* hardwareBuffer, YUVColorSpace colorSpace);
+};
 }  // namespace tgfx
 
 #endif
