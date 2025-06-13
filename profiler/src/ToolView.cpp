@@ -127,6 +127,7 @@ void ToolView::initView() {
   layout->addWidget(clientWidget);
 }
 
+//有用
 void ToolView::connectClient(QListWidgetItem* currenItem) {
   auto clientIdIter = itemToClients.find(currenItem);
   if (clientIdIter == itemToClients.end()) {
@@ -142,6 +143,7 @@ void ToolView::connectClient(QListWidgetItem* currenItem) {
   reset();
 }
 
+//有用
 void ToolView::connectAddress() {
   auto addr = textCombobox->currentText();
   auto byteArray = addr.toLatin1();
@@ -178,6 +180,7 @@ void ToolView::openWebsocketServer() {
   mainView->openWebsocketServer();
 }
 
+///有用
 void ToolView::handleClient(uint64_t clientId) {
   auto iter = clientItems.find(clientId);
   if (iter != clientItems.end()) {
@@ -203,6 +206,7 @@ void ToolView::initConnect() {
   connect(clientWidget, &QListWidget::itemClicked, this, &ToolView::connectClient);
 }
 
+//有用
 void ToolView::updateBroadcastClients() {
   const auto time = std::chrono::duration_cast<std::chrono::milliseconds>(
                         std::chrono::system_clock::now().time_since_epoch())

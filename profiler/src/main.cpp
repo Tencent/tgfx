@@ -20,26 +20,79 @@
 #include "ProfilerApplication.h"
 #include "ProfilerWindow.h"
 #include "qwidget.h"
+#include <QQuickStyle>
+
+#include <kddockwidgets/Config.h>
+#include <kddockwidgets/qtquick/views/DockWidget.h>
+#include <kddockwidgets/qtquick/ViewFactory.h>
+
+
+class CustomViewFactory : public KDDockWidgets::QtQuick::ViewFactory
+{
+public:
+  ~CustomViewFactory() override;
+
+  QUrl tabbarFilename() const override
+  {
+    return QUrl("qrc:/qml/TabBar.qml");
+  }
+
+  QUrl separatorFilename() const override
+  {
+    return QUrl("qrc:/qml/Separator2.qml");
+  }
+
+  QUrl titleBarFilename() const override
+  {
+    return QUrl("qrc:/qml/TitleBar.qml");
+  }
+};
+
+CustomViewFactory::~CustomViewFactory() = default;
 
 int main(int argc, char* argv[]) {
-  QApplication::setApplicationName("Profiler");
+  QApplication::setApplicationName("Inspector");
   QApplication::setOrganizationName("org.tgfx");
   QSurfaceFormat defaultFormat = QSurfaceFormat();
   defaultFormat.setRenderableType(QSurfaceFormat::RenderableType::OpenGL);
   defaultFormat.setVersion(3, 2);
   defaultFormat.setProfile(QSurfaceFormat::CoreProfile);
   QSurfaceFormat::setDefaultFormat(defaultFormat);
+  qputenv("QT_LOGGING_RULES", "qt.qpa.*=false");
+  QQuickStyle::setStyle("Basic");
+
+
 #if (QT_VERSION >= QT_VERSION_CHECK(6, 0, 0))
   QQuickWindow::setGraphicsApi(QSGRendererInterface::OpenGL);
+
 #else
   QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
   QApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
 #endif
 
-  QApplication app(argc, argv);
 
-  ProfilerWindow* window = new ProfilerWindow;
-  window->show();
+
+  QApplication app(argc, argv);
+  KDDockWidgets::initFrontend(KDDockWidgets::FrontendType::QtQuick);
+
+  static bool initialized = false;
+  if(!initialized) {
+    initFrontend(KDDockWidgets::FrontendType::QtQuick);
+    initialized = true;
+  }
+
+  auto &config = KDDockWidgets::Config::self();
+  auto flags = config.flags() | KDDockWidgets::Config::Flag_TitleBarIsFocusable
+              | KDDockWidgets::Config::Flag_HideTitleBarWhenTabsVisible;
+
+  config.setFlags(flags);
+  config.setViewFactory(new CustomViewFactory());
+
+  qmlRegisterType<FramesView>("Frames", 1, 0, "FramesView");
+
+  // 创建并显示StartView
+  isp::StartView* startView = new isp::StartView();
+  startView->showStartView();
 
   return app.exec();
 }
