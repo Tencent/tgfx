@@ -18,10 +18,13 @@
 
 #include "Atlas.h"
 #include <algorithm>
+#include "core/PixelRef.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/PixelFormatUtil.h"
+#include "gpu/DrawingManager.h"
 #include "gpu/Gpu.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/tasks/TextureClearTask.h"
 namespace tgfx {
 
 static constexpr auto kPlotRecentlyUsedCount = 32;
@@ -113,6 +116,14 @@ bool Atlas::activateNewPage() {
   if (proxy == nullptr) {
     return false;
   }
+
+  // In OpenGL, calling glTexImage2D with data == nullptr allocates texture memory
+  // for the given width and height, but the contents are undefined.
+  // This means OpenGL does not guarantee the texture will be zero-initialized.
+  auto context = proxy->getContext();
+  auto task =
+      proxy->getContext()->drawingBuffer()->make<TextureClearTask>(UniqueKey::Make(), proxy);
+  context->drawingManager()->addResourceTask(std::move(task));
   textureProxies.push_back(std::move(proxy));
   return true;
 }
@@ -263,38 +274,34 @@ void Atlas::clearEvictionPlotTexture(Context* context) {
   if (evictionPlots.empty() || context == nullptr || textureProxies.empty()) {
     return;
   }
-  auto gpu = context->gpu();
-  if (gpu == nullptr) {
+  auto pixelRef = PixelRef::Make(plotWidth, plotHeight, bytesPerPixel == 1);
+  pixelRef->clear();
+  auto pixels = pixelRef->lockPixels();
+  if (pixels == nullptr) {
     return;
   }
-  auto rowBytes = static_cast<size_t>(plotWidth * bytesPerPixel);
-  auto size = static_cast<size_t>(plotHeight) * rowBytes;
-  auto data = new (std::nothrow) uint8_t[size];
-  if (data == nullptr) {
-    return;
-  }
-  memset(data, 0, size);
   for (auto& [pageIndex, plots] : evictionPlots) {
+    if (pageIndex >= textureProxies.size()) {
+      continue;
+    }
     auto textureProxy = textureProxies[pageIndex];
     if (textureProxy == nullptr) {
       continue;
     }
-
     auto texture = textureProxy->getTexture();
     if (texture == nullptr) {
       continue;
     }
-
     for (auto& plot : plots) {
       if (plot == nullptr) {
         continue;
       }
       auto rect = Rect::MakeXYWH(plot->pixelOffset().x, plot->pixelOffset().y,
                                  static_cast<float>(plotWidth), static_cast<float>(plotHeight));
-      gpu->writePixels(texture->getSampler(), rect, data, rowBytes);
+      context->gpu()->writePixels(texture->getSampler(), rect, pixels, pixelRef->info().rowBytes());
     }
   }
-  delete[] data;
+  pixelRef->unlockPixels();
   evictionPlots.clear();
 }
 /////////////////////////////////////////////////////////////////////////////////////////////////
