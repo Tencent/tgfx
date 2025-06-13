@@ -16,31 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GlyphShape.h"
+#include "ImageUserTypeface.h"
+#include "tgfx/core/CustomTypeface.h"
 
 namespace tgfx {
-std::shared_ptr<Shape> Shape::MakeFrom(Font font, GlyphID glyphID) {
-  if (glyphID == 0) {
+GlyphID ImageTypefaceBuilder::addGlyph(std::shared_ptr<ImageCodec> image, const Point& offset) {
+  if (glyphRecords.size() >= std::numeric_limits<GlyphID>::max()) {
+    // Reached the maximum number of glyphs.Return an invalid GlyphID
+    return 0;
+  }
+  auto glyphID = static_cast<GlyphID>(glyphRecords.size() + 1);
+  glyphRecords.emplace_back(std::make_shared<GlyphRecord>(std::move(image), offset));
+  return glyphID;
+}
+
+std::shared_ptr<Typeface> ImageTypefaceBuilder::detach() const {
+  if (glyphRecords.empty()) {
     return nullptr;
   }
-  if (!font.hasOutlines()) {
-    return nullptr;
-  }
-  return std::make_shared<GlyphShape>(std::move(font), glyphID);
-}
-
-GlyphShape::GlyphShape(Font font, GlyphID glyphID) : font(std::move(font)), glyphID(glyphID) {
-}
-
-Path GlyphShape::getPath() const {
-  Path path = {};
-  if (!font.getPath(glyphID, &path)) {
-    return {};
-  }
-  return path;
-}
-
-Rect GlyphShape::getBounds() const {
-  return font.getBounds(glyphID);
+  return ImageUserTypeface::Make(uniqueID, _fontFamily, _fontStyle, _fontMetrics, glyphRecords);
 }
 }  // namespace tgfx

@@ -72,12 +72,6 @@ static void RenderOutLineGlyph(FT_Face face, const ImageInfo& dstInfo, void* dst
   FT_Outline_Render(face->glyph->library, outline, &params);
 }
 
-std::shared_ptr<ScalerContext> ScalerContext::CreateNew(std::shared_ptr<Typeface> typeface,
-                                                        float size) {
-  DEBUG_ASSERT(typeface != nullptr);
-  return std::make_shared<FTScalerContext>(std::move(typeface), size);
-}
-
 static void ApplyEmbolden(FT_Face face, FT_GlyphSlot glyph, GlyphID glyphId, FT_Int32 glyphFlags) {
   switch (glyph->format) {
     case FT_GLYPH_FORMAT_OUTLINE:
