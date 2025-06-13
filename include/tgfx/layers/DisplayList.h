@@ -284,7 +284,7 @@ class DisplayList {
 
   void resetCaches();
 
-  void renderDrawRect(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
-                      bool autoClear) const;
+  void drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
+                     bool autoClear) const;
 };
 }  // namespace tgfx

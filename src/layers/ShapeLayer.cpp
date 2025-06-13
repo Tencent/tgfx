@@ -285,34 +285,40 @@ std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
                                         fillPaintCount);
 }
 
-void ShapeLayer::drawContents(
-    LayerContent* content, bool forContour,
-    const std::function<bool(const std::function<bool(Canvas*, float)>&)>& drawContent,
-    const std::function<bool()>& drawChildren) const {
-  auto shapeContent = static_cast<ShapeContent*>(content);
-  auto fillDrawer = [&](Canvas* canvas, float alpha) {
-    return shapeContent->drawFills(canvas, getPaint(alpha), forContour);
-  };
-  auto strokeDrawer = [&](Canvas* canvas, float alpha) {
-    return shapeContent->drawStrokes(canvas, getPaint(alpha), forContour);
-  };
-  if (!shapeContent || !drawContent(fillDrawer)) {
+bool ShapeLayer::DrawFills(Canvas* canvas, const Layer* layer, const LayerContent* content,
+                           float alpha, bool forContour) {
+  auto shapeContent = static_cast<const ShapeContent*>(content);
+  auto shapeLayer = static_cast<const ShapeLayer*>(layer);
+  auto paint = shapeLayer->getPaint(alpha);
+  if (!shapeContent || !shapeContent->drawFills(canvas, paint, forContour)) {
     if (forContour) {
-      auto shapeDrawer = [&](Canvas* canvas, float alpha) {
-        canvas->drawShape(_shape, getPaint(alpha));
-        return true;
-      };
-      drawContent(shapeDrawer);
+      canvas->drawShape(shapeLayer->_shape, paint);
     }
+    return false;
   }
+  return true;
+}
+
+bool ShapeLayer::DrawStrokes(Canvas* canvas, const Layer* layer, const LayerContent* content,
+                             float alpha, bool forContour) {
+  auto shapeContent = static_cast<const ShapeContent*>(content);
+  auto shapeLayer = static_cast<const ShapeLayer*>(layer);
+  auto paint = shapeLayer->getPaint(alpha);
+  if (shapeContent == nullptr) {
+    return false;
+  }
+  return shapeContent->drawStrokes(canvas, paint, forContour);
+}
+
+void ShapeLayer::drawContents(const std::function<void(ContentDrawer contentDrawer)>& drawContent,
+                              const std::function<bool()>& drawChildren) const {
+  drawContent(DrawFills);
   if (shapeBitFields.strokeOnTop) {
     if (!drawChildren()) {
       return;
     }
   }
-  if (shapeContent) {
-    drawContent(strokeDrawer);
-  }
+  drawContent(DrawStrokes);
   if (!shapeBitFields.strokeOnTop) {
     drawChildren();
   }

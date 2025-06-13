@@ -262,8 +262,7 @@ void DisplayList::render(Surface* surface, bool autoClear) {
 
 std::vector<Rect> DisplayList::renderDirect(Surface* surface, bool autoClear) const {
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
-  renderDrawRect(surface, surfaceRect, getViewMatrix(), autoClear);
-  surface->getCanvas()->resetMatrix();
+  drawRootLayer(surface, surfaceRect, getViewMatrix(), autoClear);
   return {surfaceRect};
 }
 
@@ -315,8 +314,9 @@ std::vector<Rect> DisplayList::renderPartial(Surface* surface, bool autoClear,
   }
   auto canvas = surface->getCanvas();
   for (auto& drawRect : drawRects) {
-    renderDrawRect(partialCache.get(), drawRect, viewMatrix, true);
+    drawRootLayer(partialCache.get(), drawRect, viewMatrix, true);
   }
+  AutoCanvasRestore restore(canvas);
   canvas->resetMatrix();
   Paint paint = {};
   paint.setAntiAlias(false);
@@ -727,7 +727,7 @@ void DisplayList::drawTileTask(const DrawTask& task) const {
   viewMatrix.postTranslate(offsetX, offsetY);
   auto clipRect = tileRect;
   clipRect.offset(offsetX, offsetY);
-  renderDrawRect(surface, clipRect, viewMatrix, true);
+  drawRootLayer(surface, clipRect, viewMatrix, true);
 }
 
 void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface,
@@ -736,6 +736,7 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* su
   std::sort(screenTasks.begin(), screenTasks.end(),
             [](const DrawTask& a, const DrawTask& b) { return a.sourceIndex() < b.sourceIndex(); });
   auto canvas = surface->getCanvas();
+  AutoCanvasRestore autoRestore(canvas);
   Paint paint = {};
   paint.setAntiAlias(false);
   if (autoClear) {
@@ -749,7 +750,6 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* su
     auto image = surfaceCache->makeImageSnapshot();
     canvas->drawImageRect(image, task.sourceRect(), task.tileRect(), sampling, &paint);
   }
-  canvas->resetMatrix();
 }
 
 void DisplayList::renderDirtyRegions(Canvas* canvas, std::vector<Rect> dirtyRegions) {
@@ -764,6 +764,8 @@ void DisplayList::renderDirtyRegions(Canvas* canvas, std::vector<Rect> dirtyRegi
   dirtyPaint.setAntiAlias(false);
   dirtyPaint.setColor(Color::Red());
   dirtyPaint.setAlpha(0.15f);
+  AutoCanvasRestore autoRestore(canvas);
+  canvas->resetMatrix();
   for (auto& regions : lastDirtyRegions) {
     for (auto& region : regions) {
       canvas->drawRect(region, dirtyPaint);
@@ -787,13 +789,16 @@ void DisplayList::resetCaches() {
   emptyTiles.clear();
 }
 
-void DisplayList::renderDrawRect(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
-                                 bool autoClear) const {
+void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
+                                bool autoClear) const {
   DEBUG_ASSERT(surface != nullptr);
   auto canvas = surface->getCanvas();
   auto context = surface->getContext();
   AutoCanvasRestore autoRestore(canvas);
-  canvas->clipRect(drawRect);
+  auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
+  if (drawRect != surfaceRect) {
+    canvas->clipRect(drawRect);
+  }
   if (autoClear) {
     canvas->clear();
   }

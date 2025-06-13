@@ -54,18 +54,6 @@ static std::shared_ptr<Picture> CreatePicture(
   return recorder.finishRecordingAsPicture();
 }
 
-static bool DrawContent(const DrawArgs& args, Canvas* canvas, float alpha,
-                        const std::function<bool(Canvas*, float alpha)>& drawer) {
-  bool forContour = args.drawMode == DrawMode::Contour;
-  if (drawer(canvas, alpha)) {
-    if (!forContour && args.backgroundContext) {
-      drawer(args.backgroundContext->backgroundCanvas(), alpha);
-    }
-    return true;
-  }
-  return false;
-}
-
 static std::shared_ptr<Image> CreatePictureImage(std::shared_ptr<Picture> picture, Point* offset) {
   if (picture == nullptr) {
     return nullptr;
@@ -79,6 +67,25 @@ static std::shared_ptr<Image> CreatePictureImage(std::shared_ptr<Picture> pictur
     *offset = Point::Make(bounds.x(), bounds.y());
   }
   return image;
+}
+
+void Layer::DrawContents(const DrawArgs& args, Canvas* canvas, Layer* layer, float alpha,
+                         ContentDrawer drawer) {
+  bool forContour = args.drawMode == DrawMode::Contour;
+  auto content = layer->getContent();
+  if (drawer(canvas, layer, content, alpha, forContour)) {
+    if (!forContour && args.backgroundContext) {
+      drawer(args.backgroundContext->backgroundCanvas(), layer, content, alpha, false);
+    }
+  }
+}
+
+bool Layer::DrawContent(Canvas* canvas, const Layer* layer, const LayerContent* content,
+                        float alpha, bool) {
+  if (content) {
+    content->draw(canvas, layer->getLayerPaint(alpha));
+  }
+  return true;
 }
 
 bool Layer::DefaultAllowsEdgeAntialiasing() {
@@ -842,10 +849,7 @@ void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
     drawLayerStyles(args, canvas, alpha, layerStyleSource.get(), LayerStylePosition::Below);
   }
   drawContents(
-      getContent(), args.drawMode == DrawMode::Contour,
-      [&](const std::function<bool(Canvas*, float alpha)>& drawer) {
-        return DrawContent(args, canvas, alpha, drawer);
-      },
+      [&](ContentDrawer drawer) { return DrawContents(args, canvas, this, alpha, drawer); },
       [&]() {
         drawChildren(args, canvas, alpha);
         if (layerStyleSource) {
@@ -855,18 +859,9 @@ void Layer::drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha) {
       });
 }
 
-void Layer::drawContents(
-    LayerContent* content, bool,
-    const std::function<bool(const std::function<bool(Canvas* canvas, float alpha)>& drawer)>&
-        drawContent,
-    const std::function<bool()>& drawChildren) const {
-  auto contentDrawer = [&](Canvas* canvas, float alpha) {
-    content->draw(canvas, getLayerPaint(alpha));
-    return true;
-  };
-  if (content != nullptr) {
-    drawContent(contentDrawer);
-  }
+void Layer::drawContents(const std::function<void(ContentDrawer contentDrawer)>& drawContent,
+                         const std::function<bool()>& drawChildren) const {
+  drawContent(DrawContent);
   drawChildren();
 }
 
@@ -919,9 +914,8 @@ void Layer::drawBackground(const DrawArgs& args, Canvas* canvas, float* contentA
   if (_parent != nullptr) {
     _parent->drawBackground(args, canvas, contentAlpha);
     _parent->drawContents(
-        _parent->getContent(), args.drawMode == DrawMode::Contour,
-        [&](const std::function<bool(Canvas*, float)>& drawer) {
-          return DrawContent(args, canvas, *contentAlpha, drawer);
+        [&](ContentDrawer drawer) {
+          return DrawContents(args, canvas, this, *contentAlpha, drawer);
         },
         [&]() { return _parent->drawChildren(args, canvas, *contentAlpha, this); });
     *contentAlpha = *contentAlpha * _alpha;
@@ -954,9 +948,8 @@ std::unique_ptr<LayerStyleSource> Layer::getLayerStyleSource(const DrawArgs& arg
     // child should not use background context case drawing children twice into background canvas.
     childArgs.backgroundContext = nullptr;
     drawContents(
-        getContent(), drawArgs.drawMode == DrawMode::Contour,
-        [&](const std::function<bool(Canvas*, float alpha)>& drawer) {
-          return drawer(canvas, 1.0f);
+        [&](ContentDrawer drawer) {
+          return drawer(canvas, this, getContent(), 1.0f, drawArgs.drawMode == DrawMode::Contour);
         },
         [&]() { return drawChildren(childArgs, canvas, 1.0f); });
   };
