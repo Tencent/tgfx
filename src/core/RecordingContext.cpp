@@ -105,8 +105,9 @@ void RecordingContext::drawShape(std::shared_ptr<Shape> shape, const MCState& st
 
 void RecordingContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                                      const SamplingOptions& sampling, const MCState& state,
-                                     const Fill& fill) {
+                                     const Fill& fill, SrcRectConstraint constraint) {
   DEBUG_ASSERT(image != nullptr);
+  (void)constraint;
   recordStateAndFill(state, fill);
   auto imageRect = Rect::MakeWH(image->width(), image->height());
   PlacementPtr<Record> record = nullptr;

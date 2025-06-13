@@ -79,10 +79,13 @@ void GeometryProcessor::setTransformDataHelper(const Matrix& uvMatrix, UniformBu
   int i = 0;
   while (const CoordTransform* coordTransform = transformIter->next()) {
     Matrix combined = {};
-    combined.setConcat(coordTransform->getTotalMatrix(), uvMatrix);
+    combined.setConcat(coordTransform->getTotalMatrix(true), uvMatrix);
     std::string uniformName = TRANSFORM_UNIFORM_PREFIX;
     uniformName += std::to_string(i);
     uniformBuffer->setData(uniformName, combined);
+    if(constraint == SrcRectConstraint::Strict_SrcRectConstraint) {
+      uniformBuffer->setData("NormalizeMatrix", coordTransform->getTotalMatrix(false));
+    }
     ++i;
   }
 }

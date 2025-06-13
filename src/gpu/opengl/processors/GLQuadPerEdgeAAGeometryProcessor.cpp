@@ -42,6 +42,14 @@ void GLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
   auto uvCoordsVar = uvCoord.isInitialized() ? uvCoord.asShaderVar() : position.asShaderVar();
   emitTransforms(vertBuilder, varyingHandler, uniformHandler, uvCoordsVar,
                  args.fpCoordTransformHandler);
+  bool subsetIsjInit = subSet.isInitialized();
+  if(subsetIsjInit) {
+    auto varying = varyingHandler->addVarying("vtexsubset", SLType::Float4, true);
+    auto uniName = uniformHandler->addUniform(ShaderFlags::Vertex, SLType::Float3x3, "NormalizeMatrix");
+    vertBuilder->codeAppendf("vec2 leftTop = (%s * vec3(%s.xy, 1)).xy;", uniName.c_str(), subSet.asShaderVar().name().c_str());
+    vertBuilder->codeAppendf("vec2 rightBottom = (%s * vec3(%s.zw, 1)).xy;", uniName.c_str(), subSet.asShaderVar().name().c_str());
+    vertBuilder->codeAppendf("%s = vec4(leftTop, rightBottom);", varying.vsOut().c_str());
+  }
 
   if (aa == AAType::Coverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);

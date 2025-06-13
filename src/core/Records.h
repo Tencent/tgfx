@@ -244,7 +244,7 @@ class DrawImage : public Record {
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
     auto rect = Rect::MakeWH(image->width(), image->height());
-    context->drawImageRect(image, rect, sampling, playback->state, playback->fill);
+    context->drawImageRect(image, rect, sampling, playback->state, playback->fill, SrcRectConstraint::Fast_SrcRectConstraint);
   }
 
   std::shared_ptr<Image> image;
@@ -262,7 +262,7 @@ class DrawImageRect : public DrawImage {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawImageRect(image, rect, sampling, playback->state, playback->fill);
+    context->drawImageRect(image, rect, sampling, playback->state, playback->fill, SrcRectConstraint::Fast_SrcRectConstraint);
   }
 
   Rect rect;

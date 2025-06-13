@@ -21,6 +21,7 @@
 #include "core/utils/BlockBuffer.h"
 #include "gpu/AAType.h"
 #include "gpu/VertexProvider.h"
+#include "serialization/RRectSerialization.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
 
@@ -51,7 +52,7 @@ class RectsVertexProvider : public VertexProvider {
    */
   static PlacementPtr<RectsVertexProvider> MakeFrom(BlockBuffer* buffer,
                                                     std::vector<PlacementPtr<RectRecord>>&& rects,
-                                                    AAType aaType, bool needUVCoord);
+                                                    AAType aaType, bool needUVCoord, SrcRectConstraint constraint, SamplingOptions samplingOpt);
 
   /**
    * Returns the number of rects in the provider.
@@ -103,8 +104,14 @@ class RectsVertexProvider : public VertexProvider {
     return rects.front()->color;
   }
 
+  SrcRectConstraint rectConstraint() const {
+    return srcRectConstraint;
+  }
+
  protected:
   PlacementArray<RectRecord> rects = {};
+  SrcRectConstraint srcRectConstraint;
+  SamplingOptions samplingOptions;
   struct {
     uint8_t aaType : 2;
     bool hasUVCoord : 1;
@@ -112,6 +119,8 @@ class RectsVertexProvider : public VertexProvider {
   } bitFields = {};
 
   RectsVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType, bool hasUVCoord,
-                      bool hasColor);
+                      bool hasColor, SrcRectConstraint constraint, SamplingOptions options);
+
+  bool getInsetRect(const Rect& srcRect, Rect* dstRect) const;
 };
 }  // namespace tgfx

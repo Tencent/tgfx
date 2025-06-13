@@ -56,8 +56,8 @@ void LayerUnrollContext::drawShape(std::shared_ptr<Shape> shape, const MCState& 
 
 void LayerUnrollContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                                        const SamplingOptions& sampling, const MCState& state,
-                                       const Fill& fill) {
-  drawContext->drawImageRect(std::move(image), rect, sampling, state, merge(fill));
+                                       const Fill& fill, SrcRectConstraint constraint) {
+  drawContext->drawImageRect(std::move(image), rect, sampling, state, merge(fill), constraint);
   unrolled = true;
 }
 

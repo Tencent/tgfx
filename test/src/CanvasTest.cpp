@@ -1751,7 +1751,7 @@ TGFX_TEST(CanvasTest, MultiImageRect_SameView) {
       Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
       Rect dstRect = Rect::MakeXYWH(i * meshWidth * scale, j * meshHeight * scale,
                                     meshWidth * scale, meshHeight * scale);
-      canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
+      canvas->drawImageRect(image, srcRect, dstRect, options, &paint, SrcRectConstraint::Fast_SrcRectConstraint);
     }
   }
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect_SameView"));
@@ -1766,17 +1766,26 @@ TGFX_TEST(CanvasTest, SingleImageRect) {
   auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
   auto* canvas = surface->getCanvas();
   canvas->clear();
-  auto image = MakeImage("resources/assets/GenMesh.png");
-  float scale = 0.89f;
-  Rect srcRect = Rect::MakeXYWH(624, 624, 312, 312);
-  Rect dstRect = Rect::MakeXYWH(srcRect.x() * scale, srcRect.y() * scale, srcRect.width() * scale,
+  auto image = MakeImage("resources/assets/HappyNewYear.png");
+  float scale = 5.211f;
+  Rect srcRect = Rect::MakeXYWH(256, 256, 256, 256);
+  Rect dstRect = Rect::MakeXYWH(0.0f, 0.0f, srcRect.width() * scale,
                                 srcRect.height() * scale);
   SamplingOptions options;
   options.filterMode = FilterMode::Linear;
   Paint paint;
   paint.setAntiAlias(false);
-  canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/SingleImageRect"));
+  canvas->drawImageRect(image, srcRect, dstRect, options, &paint, SrcRectConstraint::Strict_SrcRectConstraint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/SingleImageRect1"));
+  canvas->clear();
+  auto mipmapImage = image->makeMipmapped(true);
+  options.filterMode = FilterMode::Linear;
+  options.mipmapMode = MipmapMode::Nearest;
+  scale = 0.3f;
+  dstRect = Rect::MakeXYWH(0.0f, 0.0f, srcRect.width() * scale,
+                                srcRect.height() * scale);
+  canvas->drawImageRect(mipmapImage, srcRect, dstRect, options, &paint, SrcRectConstraint::Strict_SrcRectConstraint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/SingleImageRectWithMipmap"));
 }
 
 TGFX_TEST(CanvasTest, MultiImageRect_SCALE_LINEAR) {
@@ -1789,6 +1798,7 @@ TGFX_TEST(CanvasTest, MultiImageRect_SCALE_LINEAR) {
   auto* canvas = surface->getCanvas();
   canvas->clear();
   auto image = MakeImage("resources/assets/HappyNewYear.png");
+  auto mipmapImage = image->makeMipmapped(true);
   float scale = 0.9f;
   Paint paint;
   paint.setAntiAlias(false);
@@ -1818,9 +1828,9 @@ TGFX_TEST(CanvasTest, MultiImageRect_SCALE_LINEAR) {
       Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
       Rect dstRect = Rect::MakeXYWH(offsets[j][i].x * scale, offsets[j][i].y * scale,
                                     meshWidth * scale, meshHeight * scale);
-      canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
+      canvas->drawImageRect(mipmapImage, srcRect, dstRect, options, &paint, SrcRectConstraint::Strict_SrcRectConstraint);
     }
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect_SCALE_LINEAR_NONE"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect_SCALE_LINEAR_NONE1"));
   canvas->clear();
   options.mipmapMode = MipmapMode::Linear;
   for (int i = 0; i < meshNumH; i++)
@@ -1828,9 +1838,9 @@ TGFX_TEST(CanvasTest, MultiImageRect_SCALE_LINEAR) {
       Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
       Rect dstRect = Rect::MakeXYWH(offsets[j][i].x * scale, offsets[j][i].y * scale,
                                     meshWidth * scale, meshHeight * scale);
-      canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
+      canvas->drawImageRect(mipmapImage, srcRect, dstRect, options, &paint, SrcRectConstraint::Strict_SrcRectConstraint);
     }
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect_SCALE_LINEAR_LINEAR"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect_SCALE_LINEAR_LINEAR1"));
   canvas->clear();
   options.mipmapMode = MipmapMode::Nearest;
   for (int i = 0; i < meshNumH; i++)
@@ -1838,9 +1848,9 @@ TGFX_TEST(CanvasTest, MultiImageRect_SCALE_LINEAR) {
       Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
       Rect dstRect = Rect::MakeXYWH(offsets[j][i].x * scale, offsets[j][i].y * scale,
                                     meshWidth * scale, meshHeight * scale);
-      canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
+      canvas->drawImageRect(mipmapImage, srcRect, dstRect, options, &paint, SrcRectConstraint::Strict_SrcRectConstraint);
     }
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect_SCALE_LINEAR_NEAREST"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect_SCALE_LINEAR_NEAREST1"));
 }
 
 TGFX_TEST(CanvasTest, MultiImageRect_NOSCALE_NEAREST) {
@@ -1853,6 +1863,7 @@ TGFX_TEST(CanvasTest, MultiImageRect_NOSCALE_NEAREST) {
   auto* canvas = surface->getCanvas();
   canvas->clear();
   auto image = MakeImage("resources/assets/HappyNewYear.png");
+  auto mipmapImage = image->makeMipmapped(true);
   Paint paint;
   paint.setAntiAlias(false);
   constexpr int meshNumH = 4;
@@ -1880,7 +1891,7 @@ TGFX_TEST(CanvasTest, MultiImageRect_NOSCALE_NEAREST) {
     for (int j = 0; j < meshNumV; j++) {
       Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
       Rect dstRect = Rect::MakeXYWH(offsets[j][i].x, offsets[j][i].y, meshWidth, meshHeight);
-      canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
+      canvas->drawImageRect(mipmapImage, srcRect, dstRect, options, &paint, SrcRectConstraint::Strict_SrcRectConstraint);
     }
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect_NOSCALE_NEAREST_NONE"));
 
@@ -1890,7 +1901,7 @@ TGFX_TEST(CanvasTest, MultiImageRect_NOSCALE_NEAREST) {
     for (int j = 0; j < meshNumV; j++) {
       Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
       Rect dstRect = Rect::MakeXYWH(offsets[j][i].x, offsets[j][i].y, meshWidth, meshHeight);
-      canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
+      canvas->drawImageRect(mipmapImage, srcRect, dstRect, options, &paint, SrcRectConstraint::Strict_SrcRectConstraint);
     }
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect_NOSCALE_NEAREST_LINEAR"));
 
@@ -1900,7 +1911,7 @@ TGFX_TEST(CanvasTest, MultiImageRect_NOSCALE_NEAREST) {
     for (int j = 0; j < meshNumV; j++) {
       Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
       Rect dstRect = Rect::MakeXYWH(offsets[j][i].x, offsets[j][i].y, meshWidth, meshHeight);
-      canvas->drawImageRect(image, srcRect, dstRect, options, &paint);
+      canvas->drawImageRect(mipmapImage, srcRect, dstRect, options, &paint, SrcRectConstraint::Strict_SrcRectConstraint);
     }
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect_NOSCALE_NEAREST_NEAREST"));
 }

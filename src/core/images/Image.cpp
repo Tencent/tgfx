@@ -174,7 +174,7 @@ std::shared_ptr<Image> Image::makeMipmapped(bool enabled) const {
   return onMakeMipmapped(enabled);
 }
 
-std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {
+std::shared_ptr<Image> Image::makeSubset(const Rect& subset, SrcRectConstraint constraint) const {
   auto rect = subset;
   rect.round();
   if (rect.isEmpty()) {
@@ -187,7 +187,9 @@ std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {
   if (!bounds.contains(rect)) {
     return nullptr;
   }
-  return onMakeSubset(rect);
+  auto subsetImage = onMakeSubset(rect);
+  std::static_pointer_cast<SubsetImage>(subsetImage)->constraint = constraint;
+  return subsetImage;
 }
 
 std::shared_ptr<Image> Image::makeRasterized(float rasterizationScale,

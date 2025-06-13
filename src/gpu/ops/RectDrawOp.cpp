@@ -57,6 +57,7 @@ RectDrawOp::RectDrawOp(RectsVertexProvider* provider)
   if (!provider->hasColor()) {
     commonColor = provider->firstColor();
   }
+  srcRectConstraint = provider->rectConstraint();
 }
 
 void RectDrawOp::execute(RenderPass* renderPass) {
@@ -76,6 +77,8 @@ void RectDrawOp::execute(RenderPass* renderPass) {
   auto drawingBuffer = renderPass->getContext()->drawingBuffer();
   auto gp = QuadPerEdgeAAGeometryProcessor::Make(
       drawingBuffer, renderTarget->width(), renderTarget->height(), aaType, commonColor, uvMatrix);
+  gp->setSrcRectConstraint(srcRectConstraint);
+  gp->fillAttribute();
   auto pipeline = createPipeline(renderPass, std::move(gp));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   renderPass->bindBuffers(indexBuffer, vertexBuffer, vertexBufferOffset);

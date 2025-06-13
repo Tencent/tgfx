@@ -20,7 +20,7 @@
 #include "gpu/TextureSampler.h"
 
 namespace tgfx {
-Matrix CoordTransform::getTotalMatrix() const {
+Matrix CoordTransform::getTotalMatrix(bool isContainOESFix) const {
   if (textureProxy == nullptr || textureProxy->getTexture() == nullptr) {
     return matrix;
   }
@@ -29,24 +29,26 @@ Matrix CoordTransform::getTotalMatrix() const {
   // normalize
   auto scale = texture->getTextureCoord(1, 1);
   combined.postScale(scale.x, scale.y);
-  // If the texture has a crop rectangle, we need to shrink it to prevent bilinear sampling beyond
-  // the edge of the crop rectangle.
-  auto samplerType = texture->getSampler()->type();
-  auto edgePoint = texture->getTextureCoord(static_cast<float>(texture->width()),
-                                            static_cast<float>(texture->height()));
-  static constexpr Point FullEdge = Point::Make(1.0f, 1.0f);
-  if (samplerType != SamplerType::Rectangle && edgePoint != FullEdge && alphaStart.isZero()) {
-    // https://cs.android.com/android/platform/superproject/+/master:frameworks/native/libs/nativedisplay/surfacetexture/SurfaceTexture.cpp;l=275;drc=master;bpv=0;bpt=1
-    // https://stackoverflow.com/questions/6023400/opengl-es-texture-coordinates-slightly-off
-    // Normally this would just need to take 1/2 a texel off each end, but because the chroma
-    // channels of YUV420 images are subsampled we may need to shrink the crop region by a whole
-    // texel on each side.
-    auto shrinkAmount = samplerType == SamplerType::External ? 1.0f : 0.5f;
-    scale = texture->getTextureCoord(static_cast<float>(texture->width()) - (2.0f * shrinkAmount),
-                                     static_cast<float>(texture->height()) - (2.0f * shrinkAmount));
-    combined.postScale(scale.x, scale.y);
-    auto translate = texture->getTextureCoord(shrinkAmount, shrinkAmount);
-    combined.postTranslate(translate.x, translate.y);
+  if(isContainOESFix) {
+    // If the texture has a crop rectangle, we need to shrink it to prevent bilinear sampling beyond
+    // the edge of the crop rectangle.
+    auto samplerType = texture->getSampler()->type();
+    auto edgePoint = texture->getTextureCoord(static_cast<float>(texture->width()),
+                                              static_cast<float>(texture->height()));
+    static constexpr Point FullEdge = Point::Make(1.0f, 1.0f);
+    if (samplerType != SamplerType::Rectangle && edgePoint != FullEdge && alphaStart.isZero()) {
+      // https://cs.android.com/android/platform/superproject/+/master:frameworks/native/libs/nativedisplay/surfacetexture/SurfaceTexture.cpp;l=275;drc=master;bpv=0;bpt=1
+      // https://stackoverflow.com/questions/6023400/opengl-es-texture-coordinates-slightly-off
+      // Normally this would just need to take 1/2 a texel off each end, but because the chroma
+      // channels of YUV420 images are subsampled we may need to shrink the crop region by a whole
+      // texel on each side.
+      auto shrinkAmount = samplerType == SamplerType::External ? 1.0f : 0.5f;
+      scale = texture->getTextureCoord(static_cast<float>(texture->width()) - (2.0f * shrinkAmount),
+                                       static_cast<float>(texture->height()) - (2.0f * shrinkAmount));
+      combined.postScale(scale.x, scale.y);
+      auto translate = texture->getTextureCoord(shrinkAmount, shrinkAmount);
+      combined.postTranslate(translate.x, translate.y);
+    }
   }
   if (texture->origin() == ImageOrigin::BottomLeft) {
     combined.postScale(1, -1);

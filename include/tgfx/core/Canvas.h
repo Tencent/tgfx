@@ -368,7 +368,7 @@ class Canvas {
    * @param paint  the paint to apply blending, filtering, etc.; can be nullptr.
    */
   void drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
-                     const SamplingOptions& sampling = {}, const Paint* paint = nullptr);
+                     const SamplingOptions& sampling = {}, const Paint* paint = nullptr, SrcRectConstraint constraint = SrcRectConstraint::Fast_SrcRectConstraint);
 
   /**
    * Draws text at the specified (x, y) coordinates using the current clip, matrix, font, and paint.
@@ -459,7 +459,7 @@ class Canvas {
                 const Stroke* stroke) const;
   void drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                      const SamplingOptions& sampling, const Fill& fill,
-                     const Matrix* dstMatrix = nullptr);
+                     const Matrix* dstMatrix = nullptr, SrcRectConstraint constraint = SrcRectConstraint::Fast_SrcRectConstraint);
   void drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const Fill& fill,
                  std::shared_ptr<ImageFilter> imageFilter = nullptr);
   void drawFill(const MCState& state, const Fill& fill) const;

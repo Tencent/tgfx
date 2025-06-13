@@ -39,7 +39,7 @@ class SubsetImage : public TransformImage {
   }
 
   Rect bounds = {};
-
+  SrcRectConstraint constraint = SrcRectConstraint::Fast_SrcRectConstraint;
  protected:
   Type type() const override {
     return Type::Subset;

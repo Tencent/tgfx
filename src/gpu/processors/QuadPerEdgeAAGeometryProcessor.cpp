@@ -20,11 +20,8 @@
 #include "gpu/YUVTexture.h"
 
 namespace tgfx {
-QuadPerEdgeAAGeometryProcessor::QuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa,
-                                                               std::optional<Color> commonColor,
-                                                               std::optional<Matrix> uvMatrix)
-    : GeometryProcessor(ClassID()), width(width), height(height), aa(aa), commonColor(commonColor),
-      uvMatrix(uvMatrix) {
+void QuadPerEdgeAAGeometryProcessor::fillAttribute()
+{
   position = {"aPosition", SLType::Float2};
   if (aa == AAType::Coverage) {
     coverage = {"inCoverage", SLType::Float};
@@ -35,7 +32,17 @@ QuadPerEdgeAAGeometryProcessor::QuadPerEdgeAAGeometryProcessor(int width, int he
   if (!commonColor.has_value()) {
     color = {"inColor", SLType::UByte4Color};
   }
-  setVertexAttributes(&position, 4);
+  if(constraint == SrcRectConstraint::Strict_SrcRectConstraint) {
+    subSet = {"texSubset", SLType::Float4};
+  }
+  setVertexAttributes(&position, 5);
+}
+
+QuadPerEdgeAAGeometryProcessor::QuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa,
+                                                               std::optional<Color> commonColor,
+                                                               std::optional<Matrix> uvMatrix)
+    : GeometryProcessor(ClassID()), width(width), height(height), aa(aa), commonColor(commonColor),
+      uvMatrix(uvMatrix){
 }
 
 void QuadPerEdgeAAGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {

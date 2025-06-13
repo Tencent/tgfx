@@ -94,6 +94,9 @@ void GLTextureEffect::emitPlainTextureCode(EmitArgs& args) const {
   if (args.coordFunc) {
     vertexColor = args.coordFunc(vertexColor);
   }
+  if(constraint == SrcRectConstraint::Strict_SrcRectConstraint) {
+    vertexColor = "clamp(" + vertexColor + ", vtexsubset_P0.xy, vtexsubset_P0.zw)";
+  }
   fragBuilder->codeAppend("vec4 color = ");
   fragBuilder->appendTextureLookup(textureSampler, vertexColor);
   fragBuilder->codeAppend(";");

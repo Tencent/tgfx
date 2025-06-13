@@ -66,7 +66,7 @@ class DrawContext {
    */
   virtual void drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                              const SamplingOptions& sampling, const MCState& state,
-                             const Fill& fill) = 0;
+                             const Fill& fill, SrcRectConstraint constraint) = 0;
 
   /**
    * Draws a GlyphRunList with the specified MCState, Fill, and optional Stroke.

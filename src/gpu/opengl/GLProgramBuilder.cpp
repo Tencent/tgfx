@@ -19,6 +19,7 @@
 #include "GLProgramBuilder.h"
 #include "GLContext.h"
 #include "GLUtil.h"
+#include <fstream>
 
 namespace tgfx {
 static std::string TypeModifierString(bool isDesktopGL, ShaderVar::TypeModifier t,
@@ -30,6 +31,8 @@ static std::string TypeModifierString(bool isDesktopGL, ShaderVar::TypeModifier 
       return isDesktopGL ? "in" : "attribute";
     case ShaderVar::TypeModifier::Varying:
       return isDesktopGL ? (flag == ShaderFlags::Vertex ? "out" : "in") : "varying";
+    case ShaderVar::TypeModifier::FlatVarying:
+      return isDesktopGL ? (flag == ShaderFlags::Vertex ? "flat out" : "flat in") : "varying";
     case ShaderVar::TypeModifier::Uniform:
       return "uniform";
     case ShaderVar::TypeModifier::Out:
@@ -93,7 +96,7 @@ std::string GLProgramBuilder::getShaderVarDeclarations(const ShaderVar& var,
     ret += TypeModifierString(isDesktopGL(), var.typeModifier(), flag);
     ret += " ";
     // On Android，fragment shader's varying needs high precision.
-    if (var.typeModifier() == ShaderVar::TypeModifier::Varying && flag == ShaderFlags::Fragment) {
+    if ((var.typeModifier() == ShaderVar::TypeModifier::Varying || var.typeModifier() == ShaderVar::TypeModifier::FlatVarying) && flag == ShaderFlags::Fragment) {
       ret += "highp ";
     }
   }
@@ -111,6 +114,14 @@ std::unique_ptr<GLProgram> GLProgramBuilder::finalize() {
 
   auto vertex = vertexShaderBuilder()->shaderString();
   auto fragment = fragmentShaderBuilder()->shaderString();
+  //test
+  std::ofstream vertexshader("vertex.glsl");
+  vertexshader << vertex;
+  vertexshader.close();
+  std::ofstream fragmentshader("fragment.glsl");
+  fragmentshader << fragment;
+  fragmentshader.close();
+
   auto programID = CreateGLProgram(context, vertex, fragment);
   if (programID == 0) {
     return nullptr;
