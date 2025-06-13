@@ -83,6 +83,7 @@ void AtlasManager::preFlush() {
       continue;
     }
     atlas->clearEvictionPlotTexture(context);
+    atlas->removeExpiredKeys();
   }
 }
 
