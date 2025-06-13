@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.13)
 project(TGFXProfiler)
 
 include(../third_party/vendor_tools/vendor.cmake)
-include(../third_party/KDDockWidgets/src/kdbindings.cmake)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -24,15 +23,6 @@ list(APPEND TGFX_PROFILER_INCLUDE
         ../third_party/tracy/server
         ../third_party/tracy/profiler
         ../third_party/tracy/public/common)
-list(APPEND TGFX_PROFILER_INCLUDE
-        ../third_party/KDDockWidgets/src
-        ../third_party/KDDockWidgets/src/qtquick
-        ../third_party/KDDockWidgets/src/private
-        ../third_party/KDDockWidgets
-        ../third_party)
-add_subdirectory(../third_party/KDDockWidgets kddockwidgets_build)
-set(KDDockWidgets_QTQUICK ON CACHE BOOL "Build with QtQuick support" FORCE)
-set(KDDockWidgets_STATIC ON CACHE BOOL "Build static library" FORCE)
 
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
@@ -110,14 +100,8 @@ file(GLOB TGFX_PROFILER_FILES src/*.*)
 find_vendor_libraries(tgfx-vendor STATIC TGFX_VENDOR_STATIC_LIBRARIES)
 list(APPEND TGFX_PROFILER_STATIC_LIBS ${TGFX_VENDOR_STATIC_LIBRARIES})
 
-add_executable(Profiler ${RC_FILES} ${TGFX_PROFILER_FILES} ${QT_RESOURCES}
-        src/InspectorView.cpp
-        src/InspectorView.h
-        src/TaskTreeModel.cpp
-        src/TaskTreeModel.h
-        src/AtttributeModel.cpp
-        src/AtttributeModel.h)
+add_executable(Profiler ${RC_FILES} ${TGFX_PROFILER_FILES} ${QT_RESOURCES})
 add_dependencies(Profiler tgfx-vendor)
 target_include_directories(Profiler PUBLIC ${TGFX_PROFILER_SRC})
 target_include_directories(Profiler SYSTEM PRIVATE ${TGFX_PROFILER_INCLUDE})
-target_link_libraries(Profiler tgfx ${TGFX_PROFILER_LIBS} kddockwidgets ${APPKIT_LIBRARY} "-framework UniformTypeIdentifiers")
+target_link_libraries(Profiler tgfx ${TGFX_PROFILER_LIBS} ${APPKIT_LIBRARY} "-framework UniformTypeIdentifiers")

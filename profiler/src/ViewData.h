@@ -79,10 +79,3 @@ struct SourceRegex {
   std::string target;
   std::regex regex;
 };
-
-struct FrameData {
-  int64_t start;
-  int64_t end;
-  int64_t drawcall;
-  int64_t triangles;
-};

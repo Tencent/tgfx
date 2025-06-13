@@ -20,6 +20,7 @@
 #include <qevent.h>
 #include <QSGImageNode>
 #include <QToolTip>
+#include "TimelineView.h"
 #include "TracyPrint.hpp"
 #include "tgfx/gpu/opengl/qt/QGLWindow.h"
 

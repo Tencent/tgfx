@@ -20,13 +20,12 @@
 #include <qguiapplication.h>
 #include <qscreen.h>
 #include <QToolBar>
-#include <QQmlContext>
 #include "MainView.h"
 
 ProfilerWindow::ProfilerWindow(QMainWindow* parent) : QMainWindow(parent) {
-  //initWindow();
-  //initConnect();
-  //updateToolBar(ProfilerStatus::None);
+  initWindow();
+  initConnect();
+  updateToolBar(ProfilerStatus::None);
 }
 
 void ProfilerWindow::initToolBar() {
@@ -50,85 +49,62 @@ void ProfilerWindow::initToolBar() {
   topBar->addAction(statisticsAction);
 }
 
-// void ProfilerWindow::updateToolBar(ProfilerStatus status) {
-//   // if (status != ProfilerStatus::Connect) {
-//   //   changePlayAction(false);
-//   // }
-//
-//   quitAction->setEnabled(status == ProfilerStatus::ReadFile);
-//   saveFileAction->setEnabled(status == ProfilerStatus::Connect);
-//   playAction->setEnabled(status == ProfilerStatus::Connect);
-//   discardAction->setEnabled(status == ProfilerStatus::Connect);
-//   statisticsAction->setEnabled(status == ProfilerStatus::Connect ||
-//                                status == ProfilerStatus::ReadFile);
-// }
+void ProfilerWindow::updateToolBar(ProfilerStatus status) {
+  if (status != ProfilerStatus::Connect) {
+    changePlayAction(false);
+  }
 
-// void ProfilerWindow::changeViewMode() {
-//   mainView->changeViewMode(pause);
-// }
+  quitAction->setEnabled(status == ProfilerStatus::ReadFile);
+  saveFileAction->setEnabled(status == ProfilerStatus::Connect);
+  playAction->setEnabled(status == ProfilerStatus::Connect);
+  discardAction->setEnabled(status == ProfilerStatus::Connect);
+  statisticsAction->setEnabled(status == ProfilerStatus::Connect ||
+                               status == ProfilerStatus::ReadFile);
+}
 
-// void ProfilerWindow::reversalPlayAction() {
-//   changePlayAction(!pause);
-// }
-//
-// void ProfilerWindow::changePlayAction(bool pause) {
-//   if (!playAction->isEnabled()) {
-//     return;
-//   }
-//   if (pause) {
-//     playAction->setIcon(QIcon(":/icons/next.png"));
-//     playAction->setToolTip(tr("&start"));
-//   } else {
-//     playAction->setIcon(QIcon(":/icons/pause.png"));
-//     playAction->setToolTip(tr("&pause"));
-//   }
-//   this->pause = pause;
-// }
+void ProfilerWindow::changeViewMode() {
+  mainView->changeViewMode(pause);
+}
 
-// void ProfilerWindow::pushPlayAction() {
-//   reversalPlayAction();
-//   changeViewMode();
-// }
+void ProfilerWindow::reversalPlayAction() {
+  changePlayAction(!pause);
+}
 
-// void ProfilerWindow::initWindow() {
-//
-//
-//   qmlRegisterType<FramesView>("Frames", 1, 0, "FramesView");
-//   QQmlApplicationEngine* engine = new QQmlApplicationEngine(this);
-//   isp::StartView* startView = new isp::StartView(this);
-//   engine->rootContext()->setContextProperty("startViewModel", startView);
-//   engine->load(QUrl(QStringLiteral("qrc:/qml/StartView.qml")));
-//
-//
-//   auto startWindow = static_cast<QQuickWindow*>(engine->rootObjects().first());
-//   startWindow->setFlags(Qt::Window);
-//   startWindow->setTitle("Inspector - Start");
-//   startWindow->resize(1000, 600);
-//   startWindow->show();
-//
-//   // mainView = new MainView(nullptr);
-//   // QWidget* mainWindow = new QWidget();
-//   // mainWindow->setAttribute(Qt::WA_DeleteOnClose);
-//   // QVBoxLayout* layout = new QVBoxLayout(mainWindow);
-//   // layout->setContentsMargins(0, 0 , 0, 0);
-//   // layout->addWidget(mainView);
-//   //
-//   // mainWindow->setWindowTitle("Inspector-Test");
-//   // mainWindow->resize(1200, 800);
-//   // mainWindow->show();
-//
-//
-//
-//   // QScreen* screen = QGuiApplication::primaryScreen();
-//   // QRect rect = screen->availableGeometry();
-//   // resize(rect.size().width(), rect.height());
-// }
+void ProfilerWindow::changePlayAction(bool pause) {
+  if (!playAction->isEnabled()) {
+    return;
+  }
+  if (pause) {
+    playAction->setIcon(QIcon(":/icons/next.png"));
+    playAction->setToolTip(tr("&start"));
+  } else {
+    playAction->setIcon(QIcon(":/icons/pause.png"));
+    playAction->setToolTip(tr("&pause"));
+  }
+  this->pause = pause;
+}
 
-// void ProfilerWindow::initConnect() {
-//   connect(mainView, &MainView::statusChange, this, &ProfilerWindow::updateToolBar);
-//   connect(saveFileAction, &QAction::triggered, mainView, &MainView::saveFile);
-//   connect(quitAction, &QAction::triggered, mainView, &MainView::quitReadFile);
-//   connect(discardAction, &QAction::triggered, mainView, &MainView::discardConnect);
-//   //connect(playAction, &QAction::triggered, this, &ProfilerWindow::pushPlayAction);
-//   connect(statisticsAction, &QAction::triggered, mainView, &MainView::statView);
-// }
+void ProfilerWindow::pushPlayAction() {
+  reversalPlayAction();
+  changeViewMode();
+}
+
+void ProfilerWindow::initWindow() {
+  initToolBar();
+  addToolBar(Qt::TopToolBarArea, topBar);
+  mainView = new MainView;
+  setCentralWidget(mainView);
+
+  QScreen* screen = QGuiApplication::primaryScreen();
+  QRect rect = screen->availableGeometry();
+  resize(rect.size().width(), rect.height());
+}
+
+void ProfilerWindow::initConnect() {
+  connect(mainView, &MainView::statusChange, this, &ProfilerWindow::updateToolBar);
+  connect(saveFileAction, &QAction::triggered, mainView, &MainView::saveFile);
+  connect(quitAction, &QAction::triggered, mainView, &MainView::quitReadFile);
+  connect(discardAction, &QAction::triggered, mainView, &MainView::discardConnect);
+  connect(playAction, &QAction::triggered, this, &ProfilerWindow::pushPlayAction);
+  connect(statisticsAction, &QAction::triggered, mainView, &MainView::statView);
+}
