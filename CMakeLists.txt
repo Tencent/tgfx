@@ -422,6 +422,9 @@ elseif (ANDROID)
     find_library(JNIGRAPHICS_LIB jnigraphics)
     list(APPEND TGFX_SHARED_LIBS ${JNIGRAPHICS_LIB})
 
+    find_library(MEDIANDKLIB mediandk)
+    list(APPEND TGFX_SHARED_LIBS ${MEDIANDKLIB})
+
     file(GLOB_RECURSE PLATFORM_FILES src/platform/android/*.*)
     list(APPEND TGFX_FILES ${PLATFORM_FILES})
 
