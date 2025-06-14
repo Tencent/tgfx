@@ -78,10 +78,12 @@ void RectDrawOp::execute(RenderPass* renderPass) {
   }
   auto renderTarget = renderPass->renderTarget();
   auto drawingBuffer = renderPass->getContext()->drawingBuffer();
-//  auto gp = QuadPerEdgeAAGeometryProcessor::Make(
-//      drawingBuffer, renderTarget->width(), renderTarget->height(), aaType, commonColor, uvMatrix);
-  auto gp = DefaultGeometryProcessor::Make(
-      drawingBuffer,  Color::Red(),renderTarget->width(), renderTarget->height(), aaType, Matrix::I(), Matrix::I());
+  auto gp = QuadPerEdgeAAGeometryProcessor::Make(
+      drawingBuffer, renderTarget->width(), renderTarget->height(), aaType, commonColor, uvMatrix);
+//  Matrix matrix = Matrix::I();
+//  matrix.postTranslate(79.5, 79.5);
+//  auto gp = DefaultGeometryProcessor::Make(
+//      drawingBuffer,  Color::Red(),renderTarget->width(), renderTarget->height(), aaType, matrix, matrix);
   auto pipeline = createPipeline(renderPass, std::move(gp));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   renderPass->bindBuffers(indexBuffer, vertexBuffer, vertexBufferOffset);

@@ -303,7 +303,7 @@ std::shared_ptr<GpuBufferProxy> ResourceProvider::aaStrokeRectIndexBuffer(tgfx::
     bool isMiter = (join == LineJoin::Miter);
     auto provider = std::make_unique<PatternedIndexBufferProvider>(
         isMiter ? gMiterStrokeRectIndices : gBevelStrokeRectIndices, isMiter ? kMiterStrokeRectIndexCnt : kBevelStrokeRectIndexCnt, RectDrawOp::MaxNumRects,
-        kVerticesPerNonAAQuad);
+        16);
     _rectStrokeIndexBuffer =
         GpuBufferProxy::MakeFrom(context, std::move(provider), BufferType::Index, 0);
   }

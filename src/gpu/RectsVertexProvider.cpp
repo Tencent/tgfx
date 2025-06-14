@@ -129,7 +129,7 @@ class NonAARectVertexProvider : public RectsVertexProvider {
     printf("-NonAARectVertexProvider-vertextData--vertexCount: %zu\n", vertextCount);
     for (size_t i = 0; i < vertextCount; ++i) {
       printf("%f, ", vertices[i]);
-      if ((i + 1) % 10 == 0) {
+      if ((i + 1) % 3 == 0) {
         printf("\n");
       }
     }
@@ -147,7 +147,7 @@ class AAStrokeRectsVertexProvider : public RectsVertexProvider {
   }
 
   size_t vertexCount() const override {
-    size_t perVertexCount = 4 + (isMiterStroke ? 4 : 8);  // inner + outer
+    size_t perVertexCount = (4 + (isMiterStroke ? 4 : 8)) * 2;  // inner + outer
     size_t perVertexDataSize = 3;                         // x, y, coverage
     if (bitFields.hasColor) {
       perVertexDataSize += 1;
@@ -263,7 +263,7 @@ class AAStrokeRectsVertexProvider : public RectsVertexProvider {
     printf("--vertextData--vertexCount: %zu\n", vertextCount);
     for (size_t i = 0; i < vertextCount; ++i) {
       printf("%f, ", vertices[i]);
-      if ((i + 1) % 10 == 0) {
+      if ((i + 1) % 3 == 0) {
         printf("\n");
       }
     }
