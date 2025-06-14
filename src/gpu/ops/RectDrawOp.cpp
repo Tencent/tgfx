@@ -35,8 +35,9 @@ PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
   if (provider->aaType() == AAType::Coverage) {
     if (provider->hasStroke()) {
       drawOp->indexBufferProxy = context->resourceProvider()->aaStrokeRectIndexBuffer(LineJoin::Miter);
+    } else {
+      drawOp->indexBufferProxy = context->resourceProvider()->aaQuadIndexBuffer();
     }
-    drawOp->indexBufferProxy = context->resourceProvider()->aaQuadIndexBuffer();
   } else if (provider->rectCount() > 1) {
     drawOp->indexBufferProxy = context->resourceProvider()->nonAAQuadIndexBuffer();
   }

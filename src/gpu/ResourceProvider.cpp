@@ -28,9 +28,9 @@
 namespace tgfx {
 class PatternedIndexBufferProvider : public DataSource<Data> {
  public:
-  PatternedIndexBufferProvider(const uint16_t* pattern, uint16_t patternSize, uint16_t reps,
+  PatternedIndexBufferProvider(const uint16_t* pattern, uint16_t patternSize, uint16_t,
                                uint16_t vertCount)
-      : pattern(pattern), patternSize(patternSize), reps(reps), vertCount(vertCount) {
+      : pattern(pattern), patternSize(patternSize), reps(1), vertCount(vertCount) {
   }
 
   std::shared_ptr<Data> getData() const override {
@@ -39,14 +39,20 @@ class PatternedIndexBufferProvider : public DataSource<Data> {
     if (buffer.isEmpty()) {
       return nullptr;
     }
+    printf("----patterned index buffer size: %zu\n", size);
     auto* data = reinterpret_cast<uint16_t*>(buffer.data());
     for (uint16_t i = 0; i < reps; ++i) {
       uint16_t baseIdx = i * patternSize;
       auto baseVert = static_cast<uint16_t>(i * vertCount);
       for (uint16_t j = 0; j < patternSize; ++j) {
         data[baseIdx + j] = baseVert + pattern[j];
+        printf("%d, ", data[baseIdx + j]);
+        if ((j + 1) % 6 == 0) {
+          printf("\n");
+        }
       }
     }
+    printf("\n----end \n");
     return buffer.release();
   }
 
