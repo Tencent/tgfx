@@ -28,7 +28,7 @@ class RectDrawOp : public DrawOp {
   /**
    * The maximum number of rects that can be drawn in a single draw call.
    */
-  static constexpr uint16_t MaxNumRects = 2048;
+  static constexpr uint16_t MaxNumRects = 512;
 
   /**
    * Create a new RectDrawOp for the specified vertex provider.
@@ -40,6 +40,8 @@ class RectDrawOp : public DrawOp {
 
  private:
   size_t rectCount = 0;
+  bool hasStroke = false;
+  LineJoin strokeLineJoin = LineJoin::Miter;
   std::optional<Color> commonColor = std::nullopt;
   std::optional<Matrix> uvMatrix = std::nullopt;
   std::shared_ptr<GpuBufferProxy> indexBufferProxy = nullptr;

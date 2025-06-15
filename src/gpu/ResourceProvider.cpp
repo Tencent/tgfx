@@ -28,9 +28,10 @@
 namespace tgfx {
 class PatternedIndexBufferProvider : public DataSource<Data> {
  public:
-  PatternedIndexBufferProvider(const uint16_t* pattern, uint16_t patternSize, uint16_t,
+  PatternedIndexBufferProvider(const uint16_t* pattern, uint16_t patternSize, uint16_t reps,
                                uint16_t vertCount)
-      : pattern(pattern), patternSize(patternSize), reps(1), vertCount(vertCount) {
+      : pattern(pattern), patternSize(patternSize), reps(reps), vertCount(vertCount) {
+//    this->reps = 512;
   }
 
   std::shared_ptr<Data> getData() const override {
@@ -221,8 +222,10 @@ uint16_t ResourceProvider::NumIndicesPerRRect(RRectType type) {
   ABORT("Invalid type");
 }
 
-static const int kMiterStrokeRectIndexCnt = 3 * 24;
-static const int kBevelStrokeRectIndexCnt = 48 + 36 + 24;
+static const int kMiterStrokeRectPerIndexCount = 3 * 24;
+static const int kBevelStrokeRectPerIndexCount = 48 + 36 + 24;
+static const int kMiterStrokeRectPerVertexCount = 16;
+static const int kBevelStrokeRectPerVertexCount = 24;
 // clang-format off
 static const uint16_t gMiterStrokeRectIndices[] = {
   0 + 0, 1 + 0, 5 + 0, 5 + 0, 4 + 0, 0 + 0,
@@ -308,8 +311,8 @@ std::shared_ptr<GpuBufferProxy> ResourceProvider::aaStrokeRectIndexBuffer(tgfx::
     }
     bool isMiter = (join == LineJoin::Miter);
     auto provider = std::make_unique<PatternedIndexBufferProvider>(
-        isMiter ? gMiterStrokeRectIndices : gBevelStrokeRectIndices, isMiter ? kMiterStrokeRectIndexCnt : kBevelStrokeRectIndexCnt, RectDrawOp::MaxNumRects,
-        16);
+        isMiter ? gMiterStrokeRectIndices : gBevelStrokeRectIndices, isMiter ? kMiterStrokeRectPerIndexCount : kBevelStrokeRectPerIndexCount, RectDrawOp::MaxNumRects,
+        isMiter ? kMiterStrokeRectPerVertexCount : kBevelStrokeRectPerVertexCount);
     _rectStrokeIndexBuffer =
         GpuBufferProxy::MakeFrom(context, std::move(provider), BufferType::Index, 0);
   }
@@ -319,9 +322,9 @@ std::shared_ptr<GpuBufferProxy> ResourceProvider::aaStrokeRectIndexBuffer(tgfx::
 uint16_t ResourceProvider::NumIndicesStrokeRect(LineJoin join) {
   switch (join) {
     case LineJoin::Miter:
-      return kMiterStrokeRectIndexCnt;
+      return kMiterStrokeRectPerIndexCount;
     case LineJoin::Bevel:
-      return kBevelStrokeRectIndexCnt;
+      return kBevelStrokeRectPerIndexCount;
     default:
       ABORT("Invalid join type");
       return 0;

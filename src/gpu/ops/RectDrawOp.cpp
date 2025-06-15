@@ -34,7 +34,7 @@ PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
   auto drawOp = context->drawingBuffer()->make<RectDrawOp>(provider.get());
   if (provider->aaType() == AAType::Coverage) {
     if (provider->hasStroke()) {
-      drawOp->indexBufferProxy = context->resourceProvider()->aaStrokeRectIndexBuffer(LineJoin::Miter);
+      drawOp->indexBufferProxy = context->resourceProvider()->aaStrokeRectIndexBuffer(provider->lineJoin());
     } else {
       drawOp->indexBufferProxy = context->resourceProvider()->aaQuadIndexBuffer();
     }
@@ -62,6 +62,8 @@ RectDrawOp::RectDrawOp(RectsVertexProvider* provider)
   if (!provider->hasColor()) {
     commonColor = provider->firstColor();
   }
+  hasStroke = provider->hasStroke();
+  strokeLineJoin = provider->lineJoin();
 }
 
 void RectDrawOp::execute(RenderPass* renderPass) {
@@ -91,8 +93,11 @@ void RectDrawOp::execute(RenderPass* renderPass) {
   if (indexBuffer != nullptr) {
     uint16_t numIndicesPerQuad;
     if (aaType == AAType::Coverage) {
-//      numIndicesPerQuad = ResourceProvider::NumIndicesPerAAQuad();
-        numIndicesPerQuad = ResourceProvider::NumIndicesStrokeRect(LineJoin::Miter);
+      if (hasStroke) {
+        numIndicesPerQuad = ResourceProvider::NumIndicesStrokeRect(strokeLineJoin);
+      } else {
+        numIndicesPerQuad = ResourceProvider::NumIndicesPerAAQuad();
+      }
     } else {
       numIndicesPerQuad = ResourceProvider::NumIndicesPerNonAAQuad();
     }

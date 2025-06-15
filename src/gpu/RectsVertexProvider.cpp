@@ -143,11 +143,10 @@ class AAStrokeRectsVertexProvider : public RectsVertexProvider {
   AAStrokeRectsVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType, bool hasUVCoord,
                               bool hasColor, PlacementArray<Stroke>&& strokes)
       : RectsVertexProvider(std::move(rects), aaType, hasUVCoord, hasColor, std::move(strokes)) {
-    isMiterStroke = this->strokes.front().get()->join == LineJoin::Miter;
   }
 
   size_t vertexCount() const override {
-    size_t perVertexCount = (4 + (isMiterStroke ? 4 : 8)) * 2;  // inner + outer
+    size_t perVertexCount = (4 + (lineJoin() == LineJoin::Miter ? 4 : 8)) * 2;  // inner + outer
     size_t perVertexDataSize = 3;                         // x, y, coverage
     if (bitFields.hasColor) {
       perVertexDataSize += 1;
@@ -192,7 +191,7 @@ class AAStrokeRectsVertexProvider : public RectsVertexProvider {
       // For bevel-stroke, use 2 SkRect instances(devOutside and devOutsideAssist)
       // to draw the outside of the octagon. Because there are 8 vertices on the outer
       // edge, while vertex number of inner edge is 4, the same as miter-stroke.
-      if (!isMiterStroke) {
+      if (lineJoin() != LineJoin::Miter) {
         outSide.inset(0, strokeSize.y);
         outSideAssist.outset(0, strokeSize.y);
       }
@@ -216,13 +215,13 @@ class AAStrokeRectsVertexProvider : public RectsVertexProvider {
 
       writeQuad(vertices, index, Quad::MakeFrom(outSide.makeInset(-outset, -outset)), record->color,
                 outerCoverage);
-      if (!isMiterStroke) {
+      if (lineJoin() != LineJoin::Miter) {
         writeQuad(vertices, index, Quad::MakeFrom(outSideAssist.makeInset(-outset, -outset)),
                   record->color, outerCoverage);
       }
       writeQuad(vertices, index, Quad::MakeFrom(outSide.makeInset(inset, inset)), record->color,
                 innerCoverage);
-      if (!isMiterStroke) {
+      if (lineJoin() != LineJoin::Miter) {
         writeQuad(vertices, index, Quad::MakeFrom(outSideAssist.makeInset(inset, inset)),
                   record->color, innerCoverage);
       }
@@ -269,9 +268,6 @@ class AAStrokeRectsVertexProvider : public RectsVertexProvider {
     }
     printf("\n--vertextData-end-\n");
   }
-
- private:
-  bool isMiterStroke = false;
 };
 
 PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(BlockBuffer* buffer,
@@ -319,9 +315,12 @@ PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
   auto array = buffer->makeArray(std::move(rects));
   auto strokeArray = buffer->makeArray(std::move(strokes));
   if (aaType == AAType::Coverage) {
-    return buffer->make<AAStrokeRectsVertexProvider>(std::move(array), aaType, hasUVCoord, hasColor,std::move(strokeArray));
-//    return buffer->make<AARectsVertexProvider>(std::move(array), aaType, hasUVCoord, hasColor,
-//                                               std::move(strokeArray));
+    if (strokeArray.empty()) {
+      return buffer->make<AARectsVertexProvider>(std::move(array), aaType, hasUVCoord, hasColor,
+                                                 std::move(strokeArray));
+    } else {
+      return buffer->make<AAStrokeRectsVertexProvider>(std::move(array), aaType, hasUVCoord, hasColor,std::move(strokeArray));
+    }
   }
   return buffer->make<NonAARectVertexProvider>(std::move(array), aaType, hasUVCoord, hasColor,
                                                std::move(strokeArray));
@@ -336,6 +335,7 @@ RectsVertexProvider::RectsVertexProvider(PlacementArray<RectRecord>&& rects, AAT
   bitFields.hasColor = hasColor;
   if (!this->strokes.empty()) {
     bitFields.hasStroke = true;
+    bitFields.lineJoin = static_cast<uint8_t>(this->strokes.front().get()->join);
   } else {
     bitFields.hasStroke = false;
   }
