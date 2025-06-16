@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,15 +17,32 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#import <Cocoa/Cocoa.h>
-#include "tgfx/core/Canvas.h"
 #include "tgfx/core/Surface.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
-#include "tgfx/gpu/opengl/cgl/CGLWindow.h"
 
-@interface TGFXView : NSView
+namespace tgfx {
 
-- (void)draw:(int)index zoom:(float)zoom offset:(CGPoint)offset;
+class BackgroundContext {
+ public:
+  static std::shared_ptr<BackgroundContext> Make(Context* context, const Rect& drawRect,
+                                                 const Matrix& matrix);
 
-@end
+  Canvas* backgroundCanvas() const;
+
+  std::shared_ptr<Image> getBackgroundImage() const;
+
+  Matrix backgroundMatrix() const {
+    return imageMatrix;
+  }
+
+  std::shared_ptr<BackgroundContext> createSubContext() const;
+
+  void drawToParent(const Matrix& paintMatrix, const Paint& paint);
+
+ private:
+  BackgroundContext() = default;
+  std::shared_ptr<Surface> surface = nullptr;
+  Matrix imageMatrix = Matrix::I();
+  const BackgroundContext* parent = nullptr;
+};
+
+}  // namespace tgfx

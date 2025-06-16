@@ -19,6 +19,7 @@
 #import "TGFXView.h"
 #include <cmath>
 #include "drawers/Drawer.h"
+#include "tgfx/core/Point.h"
 
 @implementation TGFXView {
   std::shared_ptr<tgfx::CGLWindow> window;
@@ -67,7 +68,7 @@
   [self updateSize];
 }
 
-- (void)draw:(int)index {
+- (void)draw:(int)index zoom:(float)zoom offset:(CGPoint)offset {
   if (self.window == nil) {
     return;
   }
@@ -80,6 +81,7 @@
   if (window == nullptr) {
     return;
   }
+  appHost->updateZoomAndOffset(zoom, tgfx::Point(offset.x, offset.y));
   auto device = window->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {

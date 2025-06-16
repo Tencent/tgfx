@@ -2831,4 +2831,61 @@ TGFX_TEST(LayerTest, LayerVisible) {
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/LayerVisible"));
 }
+
+TGFX_TEST(LayerTest, BackgroundBlurStyleTest) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  Layer::SetDefaultAllowsGroupOpacity(true);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->showDirtyRegions(false);
+  auto rootLayer = Layer::Make();
+  displayList->root()->addChild(rootLayer);
+  auto shapeLayer1 = ShapeLayer::Make();
+  shapeLayer1->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 0, 1)));
+  auto path1 = Path();
+  path1.addRect(Rect::MakeXYWH(40.5f, 40.5f, 80.f, 80.f));
+  shapeLayer1->setPath(path1);
+  shapeLayer1->setMatrix(Matrix::MakeTrans(0.5f, 0.5f));
+  shapeLayer1->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  auto imageLayer = ImageLayer::Make();
+  imageLayer->setImage(image);
+  rootLayer->addChildAt(imageLayer, 0);
+
+  auto shapeLayer2 = ShapeLayer::Make();
+  auto path2 = Path();
+  path2.addRect(Rect::MakeXYWH(50, 20, 100, 100));
+  shapeLayer2->setPath(path2);
+  shapeLayer2->setFillStyle(
+      Gradient::MakeLinear({50, 20}, {150, 120}, {{0.f, 0.f, 1.f, 1.f}, {0.f, 1.f, 0.f, 1.f}}));
+  rootLayer->addChildAt(shapeLayer2, 0);
+
+  auto layer2 = Layer::Make();
+  layer2->addChild(shapeLayer1);
+  layer2->setShouldRasterize(true);
+  rootLayer->addChild(layer2);
+  displayList->setZoomScale(2.0f);
+  displayList->setContentOffset(-50, -50);
+  displayList->setRenderMode(RenderMode::Direct);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurStyleTest1"));
+  layer2->setBlendMode(BlendMode::Difference);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurStyleTest2"));
+  surface->getCanvas()->clear();
+  surface->getCanvas()->resetMatrix();
+  layer2->draw(surface->getCanvas());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurStyleTest3"));
+  auto maskLayer = ShapeLayer::Make();
+  auto maskPath = Path();
+  maskPath.addRect(Rect::MakeXYWH(80, 80, 200, 200));
+  maskLayer->setPath(maskPath);
+  maskLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 0, 255)));
+  imageLayer->setMask(maskLayer);
+  rootLayer->addChild(maskLayer);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurStyleTest4"));
+}
 }  // namespace tgfx

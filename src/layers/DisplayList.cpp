@@ -30,18 +30,61 @@ static constexpr float DIRTY_REGION_ANTIALIAS_MARGIN = 0.5f;
 static constexpr int MIN_TILE_SIZE = 16;
 static constexpr int MAX_TILE_SIZE = 2048;
 
-struct DrawTask {
-  DrawTask(const Tile* tile, int tileSize, const Rect& drawRect)
-      : surfaceIndex(tile->sourceIndex), drawRect(drawRect) {
-    surfaceRect = drawRect;
-    auto offsetX = (tile->sourceX - tile->tileX) * tileSize;
-    auto offsetY = (tile->sourceY - tile->tileY) * tileSize;
-    surfaceRect.offset(static_cast<float>(offsetX), static_cast<float>(offsetY));
+class DrawTask {
+ public:
+  DrawTask(std::shared_ptr<Tile> tile, int tileSize, const Rect& drawRect = {}, float scale = 1.0f)
+      : tiles({std::move(tile)}) {
+    calculateRects(tileSize, drawRect, scale);
   }
 
-  size_t surfaceIndex = 0;  // The index of the surface in the surfaceCaches.
-  Rect surfaceRect = {};    // The rectangle on the surface.
-  Rect drawRect = {};       // The rectangle on the zoomed display list.
+  DrawTask(std::vector<std::shared_ptr<Tile>> tiles, int tileSize, const Rect& drawRect)
+      : tiles(std::move(tiles)) {
+    DEBUG_ASSERT(!drawRect.isEmpty());
+    calculateRects(tileSize, drawRect, 1.0f);
+  }
+
+  /**
+   * Returns the index of the atlas in the surface caches.
+   */
+  size_t sourceIndex() const {
+    return tiles.front()->sourceIndex;
+  }
+
+  /**
+   * Returns the source rectangle of the tile in the atlas.
+   */
+  const Rect& sourceRect() const {
+    return _sourceRect;
+  }
+
+  /**
+   * Returns the rectangle of the tile in the zoomed display list grid.
+   */
+  const Rect& tileRect() const {
+    return _tileRect;
+  }
+
+ private:
+  // Hold strong references to tiles to ensure they aren't reused by TileCache.
+  std::vector<std::shared_ptr<Tile>> tiles = {};
+  Rect _sourceRect = {};
+  Rect _tileRect = {};
+
+  void calculateRects(int tileSize, const Rect& drawRect, float scale) {
+    DEBUG_ASSERT(!tiles.empty());
+    DEBUG_ASSERT(std::all_of(tiles.begin(), tiles.end(), [&](const std::shared_ptr<Tile>& t) {
+      return t->sourceIndex == tiles.front()->sourceIndex;
+    }));
+    auto& tile = tiles.front();
+    _tileRect = drawRect.isEmpty() ? tile->getTileRect(tileSize) : drawRect;
+    _sourceRect = _tileRect;
+    auto offsetX = (tile->sourceX - tile->tileX) * tileSize;
+    auto offsetY = (tile->sourceY - tile->tileY) * tileSize;
+    _sourceRect.offset(static_cast<float>(offsetX), static_cast<float>(offsetY));
+    if (fabsf(scale - 1.0f) > std::numeric_limits<float>::epsilon()) {
+      _tileRect.scale(scale, scale);
+    }
+  }
 };
 
 static float ToZoomScaleFloat(int64_t zoomScaleInt, int64_t precision) {
@@ -174,7 +217,7 @@ void DisplayList::showDirtyRegions(bool show) {
 }
 
 bool DisplayList::hasContentChanged() const {
-  if (_hasContentChanged || _root->bitFields.dirtyDescendents) {
+  if (_hasContentChanged || hasZoomBlurTiles || _root->bitFields.dirtyDescendents) {
     return true;
   }
   if (!_showDirtyRegions) {
@@ -218,21 +261,8 @@ void DisplayList::render(Surface* surface, bool autoClear) {
 }
 
 std::vector<Rect> DisplayList::renderDirect(Surface* surface, bool autoClear) const {
-  auto viewMatrix = getViewMatrix();
-  auto inverse = Matrix::I();
-  DEBUG_ASSERT(viewMatrix.invertible());
-  viewMatrix.invert(&inverse);
-  auto canvas = surface->getCanvas();
-  canvas->setMatrix(viewMatrix);
-  if (autoClear) {
-    canvas->clear();
-  }
-  DrawArgs args(surface->getContext());
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
-  auto renderRect = inverse.mapRect(surfaceRect);
-  args.renderRect = &renderRect;
-  _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
-  canvas->resetMatrix();
+  drawRootLayer(surface, surfaceRect, getViewMatrix(), autoClear);
   return {surfaceRect};
 }
 
@@ -282,21 +312,11 @@ std::vector<Rect> DisplayList::renderPartial(Surface* surface, bool autoClear,
   } else {
     drawRects = MapDirtyRegions(dirtyRegions, viewMatrix, true, &surfaceRect);
   }
-  auto inverse = Matrix::I();
-  DEBUG_ASSERT(viewMatrix.invertible());
-  viewMatrix.invert(&inverse);
-  auto cacheCanvas = partialCache->getCanvas();
   auto canvas = surface->getCanvas();
   for (auto& drawRect : drawRects) {
-    AutoCanvasRestore autoRestore(cacheCanvas);
-    cacheCanvas->clipRect(drawRect);
-    cacheCanvas->clear();
-    cacheCanvas->setMatrix(viewMatrix);
-    DrawArgs args(context);
-    auto renderRect = inverse.mapRect(drawRect);
-    args.renderRect = &renderRect;
-    _root->drawLayer(args, cacheCanvas, 1.0f, BlendMode::SrcOver);
+    drawRootLayer(partialCache.get(), drawRect, viewMatrix, true);
   }
+  AutoCanvasRestore restore(canvas);
   canvas->resetMatrix();
   Paint paint = {};
   paint.setAntiAlias(false);
@@ -323,7 +343,7 @@ std::vector<Rect> DisplayList::renderTiled(Surface* surface, bool autoClear,
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
   for (auto& task : tileTasks) {
     drawTileTask(task);
-    auto dirtyRect = task.drawRect;
+    auto dirtyRect = task.tileRect();
     dirtyRect.offset(roundf(_contentOffset.x), roundf(_contentOffset.y));
     if (dirtyRect.intersect(surfaceRect)) {
       dirtyRects.emplace_back(dirtyRect);
@@ -402,12 +422,12 @@ void DisplayList::invalidateCurrentTileCache(const TileCache* tileCache,
     bool continuous = false;
     auto tiles = tileCache->getTilesUnderRect(dirtyRect, false, &continuous);
     if (continuous) {
-      tileTasks->emplace_back(tiles.front().get(), _tileSize, dirtyRect);
+      tileTasks->emplace_back(std::move(tiles), _tileSize, dirtyRect);
     } else {
       for (auto& tile : tiles) {
         auto drawRect = tile->getTileRect(_tileSize);
         if (drawRect.intersect(dirtyRect)) {
-          tileTasks->emplace_back(tile.get(), _tileSize, drawRect);
+          tileTasks->emplace_back(tile, _tileSize, drawRect);
         }
       }
     }
@@ -416,6 +436,7 @@ void DisplayList::invalidateCurrentTileCache(const TileCache* tileCache,
 
 std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
                                                       std::vector<DrawTask>* tileTasks) {
+  hasZoomBlurTiles = false;
   TileCache* currentTileCache = nullptr;
   auto result = tileCaches.find(_zoomScaleInt);
   if (result != tileCaches.end()) {
@@ -439,7 +460,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     for (int tileX = startX; tileX < endX; ++tileX) {
       auto tile = currentTileCache->getTile(tileX, tileY);
       if (tile != nullptr) {
-        screenTasks.emplace_back(tile.get(), _tileSize, tile->getTileRect(_tileSize));
+        screenTasks.emplace_back(tile, _tileSize);
       } else {
         dirtyGrids.emplace_back(tileX, tileY);
       }
@@ -461,35 +482,34 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     return {};
   }
   size_t tileIndex = 0;
-  bool hasFallbackTasks = false;
   auto refinedCount = _maxTilesRefinedPerFrame;
   std::vector<std::shared_ptr<Tile>> taskTiles = {};
   for (auto& grid : dirtyGrids) {
     auto& tile = freeTiles[tileIndex++];
-    tile->tileX = grid.first;
-    tile->tileY = grid.second;
     auto fallbackTasks = getFallbackDrawTasks(grid.first, grid.second, sortedCaches);
     if (!fallbackTasks.empty()) {
       if (refinedCount <= 0) {
         emptyTiles.emplace_back(tile);
         screenTasks.insert(screenTasks.end(), fallbackTasks.begin(), fallbackTasks.end());
-        hasFallbackTasks = true;
+        hasZoomBlurTiles = true;
         continue;
       }
       refinedCount--;
     }
+    tile->tileX = grid.first;
+    tile->tileY = grid.second;
     taskTiles.push_back(tile);
-    screenTasks.emplace_back(tile.get(), _tileSize, tile->getTileRect(_tileSize));
+    screenTasks.emplace_back(tile, _tileSize);
     currentTileCache->addTile(tile);
   }
-  if (continuous && !hasFallbackTasks) {
+  if (continuous && !hasZoomBlurTiles) {
     // If we have continuous tiles, we can draw a single rectangle for the entire area.
     auto drawRect = Rect::MakeXYWH(startX * _tileSize, startY * _tileSize,
                                    (endX - startX) * _tileSize, (endY - startY) * _tileSize);
-    tileTasks->emplace_back(freeTiles.front().get(), _tileSize, drawRect);
+    tileTasks->emplace_back(std::move(freeTiles), _tileSize, drawRect);
   } else {
     for (auto& tile : taskTiles) {
-      tileTasks->emplace_back(tile.get(), _tileSize, tile->getTileRect(_tileSize));
+      tileTasks->emplace_back(tile, _tileSize);
     }
   }
   return screenTasks;
@@ -512,10 +532,11 @@ std::vector<std::pair<float, TileCache*>> DisplayList::getSortedTileCaches() con
   }
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
   DEBUG_ASSERT(currentZoomScale != 0.0f);
+  // Closest tile caches first, farthest last.
   std::sort(sortedTileCaches.begin(), sortedTileCaches.end(),
             [currentZoomScale](const std::pair<float, TileCache*>& a,
                                const std::pair<float, TileCache*>& b) {
-              return ScaleRatio(a.first, currentZoomScale) > ScaleRatio(b.first, currentZoomScale);
+              return ScaleRatio(a.first, currentZoomScale) < ScaleRatio(b.first, currentZoomScale);
             });
   return sortedTileCaches;
 }
@@ -541,9 +562,7 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
     for (auto& tile : tiles) {
       auto drawRect = tile->getTileRect(_tileSize);
       if (drawRect.intersect(zoomedRect)) {
-        DrawTask task(tile.get(), _tileSize, drawRect);
-        task.drawRect.scale(1.0f / scaleRatio, 1.0f / scaleRatio);
-        tasks.push_back(task);
+        tasks.emplace_back(tile, _tileSize, drawRect, 1.0f / scaleRatio);
       }
     }
     return tasks;
@@ -695,50 +714,43 @@ int DisplayList::getMaxTileCountPerAtlas(Context* context) const {
 }
 
 void DisplayList::drawTileTask(const DrawTask& task) const {
-  auto surface = surfaceCaches[task.surfaceIndex].get();
+  auto surface = surfaceCaches[task.sourceIndex()].get();
   DEBUG_ASSERT(surface != nullptr);
   auto canvas = surface->getCanvas();
   AutoCanvasRestore autoRestore(canvas);
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
   DEBUG_ASSERT(currentZoomScale != 0.0f);
   auto viewMatrix = Matrix::MakeScale(currentZoomScale);
-  auto& drawRect = task.drawRect;
-  auto& surfaceRect = task.surfaceRect;
-  auto offsetX = surfaceRect.left - drawRect.left;
-  auto offsetY = surfaceRect.top - drawRect.top;
+  auto& tileRect = task.tileRect();
+  auto& sourceRect = task.sourceRect();
+  auto offsetX = sourceRect.left - tileRect.left;
+  auto offsetY = sourceRect.top - tileRect.top;
   viewMatrix.postTranslate(offsetX, offsetY);
-  auto clipRect = drawRect;
+  auto clipRect = tileRect;
   clipRect.offset(offsetX, offsetY);
-  canvas->clipRect(clipRect);
-  canvas->clear();
-  canvas->setMatrix(viewMatrix);
-  DrawArgs args(surface->getContext());
-  auto renderRect = drawRect;
-  renderRect.scale(1.0f / currentZoomScale, 1.0f / currentZoomScale);
-  renderRect.roundOut();
-  args.renderRect = &renderRect;
-  _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
+  drawRootLayer(surface, clipRect, viewMatrix, true);
 }
 
 void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface,
                                   bool autoClear) const {
   // Sort tasks by surface index to ensure they are drawn in batches.
   std::sort(screenTasks.begin(), screenTasks.end(),
-            [](const DrawTask& a, const DrawTask& b) { return a.surfaceIndex < b.surfaceIndex; });
+            [](const DrawTask& a, const DrawTask& b) { return a.sourceIndex() < b.sourceIndex(); });
   auto canvas = surface->getCanvas();
+  AutoCanvasRestore autoRestore(canvas);
   Paint paint = {};
   paint.setAntiAlias(false);
   if (autoClear) {
     paint.setBlendMode(BlendMode::Src);
   }
+  static SamplingOptions sampling(FilterMode::Nearest, MipmapMode::None);
   canvas->setMatrix(Matrix::MakeTrans(_contentOffset.x, _contentOffset.y));
   for (auto& task : screenTasks) {
-    auto surfaceCache = surfaceCaches[task.surfaceIndex];
+    auto surfaceCache = surfaceCaches[task.sourceIndex()];
     DEBUG_ASSERT(surfaceCache != nullptr);
     auto image = surfaceCache->makeImageSnapshot();
-    canvas->drawImageRect(image, task.surfaceRect, task.drawRect, {}, &paint);
+    canvas->drawImageRect(image, task.sourceRect(), task.tileRect(), sampling, &paint);
   }
-  canvas->resetMatrix();
 }
 
 void DisplayList::renderDirtyRegions(Canvas* canvas, std::vector<Rect> dirtyRegions) {
@@ -753,6 +765,8 @@ void DisplayList::renderDirtyRegions(Canvas* canvas, std::vector<Rect> dirtyRegi
   dirtyPaint.setAntiAlias(false);
   dirtyPaint.setColor(Color::Red());
   dirtyPaint.setAlpha(0.15f);
+  AutoCanvasRestore autoRestore(canvas);
+  canvas->resetMatrix();
   for (auto& regions : lastDirtyRegions) {
     for (auto& region : regions) {
       canvas->drawRect(region, dirtyPaint);
@@ -774,6 +788,33 @@ void DisplayList::resetCaches() {
   surfaceCaches = {};
   totalTileCount = 0;
   emptyTiles.clear();
+}
+
+void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
+                                bool autoClear) const {
+  DEBUG_ASSERT(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  auto context = surface->getContext();
+  AutoCanvasRestore autoRestore(canvas);
+  auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
+  if (drawRect != surfaceRect) {
+    canvas->clipRect(drawRect);
+  }
+  if (autoClear) {
+    canvas->clear();
+  }
+  canvas->setMatrix(viewMatrix);
+  DrawArgs args(context);
+  DEBUG_ASSERT(viewMatrix.invertible());
+  Matrix inverse = Matrix::I();
+  viewMatrix.invert(&inverse);
+  auto renderRect = inverse.mapRect(drawRect);
+  renderRect.roundOut();
+  args.renderRect = &renderRect;
+  if (_root->bitFields.hasBackgroundStyle) {
+    args.backgroundContext = BackgroundContext::Make(context, drawRect, viewMatrix);
+  }
+  _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }
 
 }  // namespace tgfx
