@@ -146,17 +146,18 @@ class Typeface {
    */
   virtual std::vector<Unichar> getGlyphToUnicodeMap() const;
 
-  mutable std::mutex locker = {};
-  std::weak_ptr<Typeface> weakThis;
-
- private:
   /**
-  *  Returns a ScalerContext for the given size.
-  */
+ *  Returns a ScalerContext for the given size.
+ */
   std::shared_ptr<ScalerContext> getScalerContext(float size);
 
   virtual std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const = 0;
 
+  mutable std::mutex locker = {};
+
+  std::weak_ptr<Typeface> weakThis;
+
+ private:
   /**
    * Returns the cache ID for this typeface. Typically, this is the uniqueID of the typeface;
    * for custom typefaces, it returns the uniqueID of the associated typeface builder.
