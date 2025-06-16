@@ -30,7 +30,7 @@ namespace tgfx {
  */
 class PathProvider {
  public:
-  static std::shared_ptr<PathProvider> Wrap(const Path& path);
+  static std::shared_ptr<PathProvider> Wrap(Path path);
 
   virtual ~PathProvider() = default;
 

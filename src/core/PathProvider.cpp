@@ -22,7 +22,7 @@ namespace tgfx {
 
 class PathProviderWrapper final : public PathProvider {
  public:
-  explicit PathProviderWrapper(const Path& path) : _path(path) {
+  explicit PathProviderWrapper(Path path) : _path(std::move(path)) {
   }
 
   Path getPath() const override {
@@ -37,7 +37,7 @@ class PathProviderWrapper final : public PathProvider {
   Path _path;
 };
 
-std::shared_ptr<PathProvider> PathProvider::Wrap(const Path& path) {
-  return std::make_shared<PathProviderWrapper>(path);
+std::shared_ptr<PathProvider> PathProvider::Wrap(Path path) {
+  return std::make_shared<PathProviderWrapper>(std::move(path));
 }
 }  // namespace tgfx

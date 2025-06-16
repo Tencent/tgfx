@@ -26,39 +26,17 @@ class ImageUserScalerContext final : public UserScalerContext {
  public:
   ImageUserScalerContext(std::shared_ptr<Typeface> typeface, float size)
       : UserScalerContext(std::move(typeface), size) {
-    auto textScale = size;
-    if (FloatNearlyZero(textScale) || !FloatsAreFinite(&textScale, 1)) {
-      textScale = 1.0f;
-      extraScale.set(0.0f, 0.0f);
-    }
-    auto imageUserTypeface = static_cast<ImageUserTypeface*>(this->typeface.get());
-    auto fontMetrics = imageUserTypeface->fontMetrics();
-    auto xPpem = fabs(fontMetrics.bottom - fontMetrics.top);
-    auto yPpem = fabs(fontMetrics.xMax - fontMetrics.xMin);
-    if (FloatNearlyZero(xPpem) || FloatNearlyZero(yPpem)) {
-      auto record = imageUserTypeface->getGlyphRecord(1);
-      if (record != nullptr && record->image != nullptr) {
-        xPpem = static_cast<float>(record->image->width());
-        yPpem = static_cast<float>(record->image->height());
-      } else {
-        constexpr float kDefaultPpem = 109.f;
-        xPpem = kDefaultPpem;
-        yPpem = kDefaultPpem;
-      }
-    }
-    extraScale.x *= textScale / xPpem;
-    extraScale.y *= textScale / yPpem;
   }
 
   Rect getBounds(GlyphID glyphID, bool, bool fauxItalic) const override {
     auto record = imageTypeface()->getGlyphRecord(glyphID);
-    if (record == nullptr) {
+    if (record == nullptr || record->image == nullptr) {
       return {};
     }
     auto bounds = Rect::MakeXYWH(record->offset.x, record->offset.y,
                                  static_cast<float>(record->image->width()),
                                  static_cast<float>(record->image->height()));
-    auto matrix = Matrix::MakeScale(extraScale.x, extraScale.y);
+    auto matrix = Matrix::MakeScale(textSize, textSize);
     if (fauxItalic) {
       matrix.postSkew(ITALIC_SKEW, 0.f);
     }
@@ -77,7 +55,7 @@ class ImageUserScalerContext final : public UserScalerContext {
     }
     if (matrix) {
       matrix->setTranslate(record->offset.x, record->offset.y);
-      matrix->postScale(extraScale.x, extraScale.y);
+      matrix->postScale(textSize, textSize);
     }
     return Rect::MakeXYWH(record->offset.x, record->offset.y,
                           static_cast<float>(record->image->width()),
@@ -100,8 +78,6 @@ class ImageUserScalerContext final : public UserScalerContext {
   ImageUserTypeface* imageTypeface() const {
     return static_cast<ImageUserTypeface*>(typeface.get());
   }
-
-  Point extraScale = Point::Make(1.f, 1.f);
 };
 
 //////////////
@@ -125,10 +101,6 @@ ImageUserTypeface::ImageUserTypeface(uint32_t builderID, const std::string& font
 
 size_t ImageUserTypeface::glyphsCount() const {
   return glyphRecords.size();
-}
-
-int ImageUserTypeface::unitsPerEm() const {
-  return 128;
 }
 
 bool ImageUserTypeface::hasColor() const {

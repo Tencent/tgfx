@@ -16,11 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "tgfx/core/CustomTypeface.h"
 #include "ImageUserTypeface.h"
 #include "PathUserTypeface.h"
 #include "tgfx/core/PathProvider.h"
 
 namespace tgfx {
+void CustomTypefaceBuilder::setFontName(const std::string& fontFamily,
+                                        const std::string& fontStyle) {
+  _fontFamily = fontFamily;
+  _fontStyle = fontStyle;
+}
+
+void CustomTypefaceBuilder::setMetrics(const FontMetrics& metrics) {
+  _fontMetrics = metrics;
+}
+
+//////////////
+
 GlyphID PathTypefaceBuilder::addGlyph(const Path& path) {
   if (glyphRecords.size() >= std::numeric_limits<GlyphID>::max()) {
     // Reached the maximum number of glyphs. Return an invalid GlyphID
@@ -68,4 +81,5 @@ std::shared_ptr<Typeface> ImageTypefaceBuilder::detach() const {
   }
   return ImageUserTypeface::Make(uniqueID, _fontFamily, _fontStyle, _fontMetrics, glyphRecords);
 }
+
 }  // namespace tgfx

@@ -24,6 +24,9 @@ namespace tgfx {
 
 class GlyphPathProvider final : public PathProvider {
  public:
+  explicit GlyphPathProvider(int pathIndex) : pathIndex(pathIndex) {
+  }
+
   Path getPath() const override {
     Path path;
     switch (pathIndex) {
@@ -66,9 +69,6 @@ class GlyphPathProvider final : public PathProvider {
         return Rect::MakeXYWH(0.0f, 0.0f, 100.0f, 100.0f);
     }
   }
-  void next() {
-    pathIndex = (pathIndex + 1) % 4;
-  }
 
  private:
   int pathIndex = 0;
@@ -79,13 +79,10 @@ TGFX_TEST(TypefaceTest, CustomPathTypeface) {
   const std::string fontStyle = "customStyle";
   PathTypefaceBuilder builder;
   builder.setFontName(fontFamily, fontStyle);
-  GlyphPathProvider provider;
 
-  builder.addGlyph(provider.getPath());
-  provider.next();
-  builder.addGlyph(provider.getPath());
-  provider.next();
-  builder.addGlyph(provider.getPath());
+  builder.addGlyph(std::make_shared<GlyphPathProvider>(0));
+  builder.addGlyph(std::make_shared<GlyphPathProvider>(1));
+  builder.addGlyph(std::make_shared<GlyphPathProvider>(2));
   auto typeface = builder.detach();
 
   ASSERT_TRUE(typeface != nullptr);
@@ -97,8 +94,7 @@ TGFX_TEST(TypefaceTest, CustomPathTypeface) {
   ASSERT_EQ(typeface->fontStyle(), fontStyle);
   ASSERT_EQ(typeface->glyphsCount(), static_cast<size_t>(3));
 
-  provider.next();
-  builder.addGlyph(provider.getPath());
+  builder.addGlyph(std::make_shared<GlyphPathProvider>(4));
 
   typeface = builder.detach();
   ASSERT_TRUE(typeface != nullptr);
@@ -171,7 +167,7 @@ TGFX_TEST(TypefaceTest, CustomImageTypeface) {
   float scaleFactor = 1.0f;
   canvas->scale(scaleFactor, scaleFactor);
 
-  Font font(std::move(typeface), 60);
+  Font font(std::move(typeface), 0.25);
   std::vector<GlyphID> glyphIDs2 = {1, 2, 3};
   std::vector<Point> positions2 = {};
   positions2.push_back(Point::Make(150.0f, 0.0f));

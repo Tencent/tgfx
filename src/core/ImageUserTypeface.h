@@ -33,8 +33,6 @@ class ImageUserTypeface final : public UserTypeface {
 
   size_t glyphsCount() const override;
 
-  int unitsPerEm() const override;
-
   bool hasColor() const override;
 
   bool hasOutlines() const override;

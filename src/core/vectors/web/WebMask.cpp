@@ -126,16 +126,17 @@ bool WebMask::onFillText(const GlyphRunList* glyphRunList, const Stroke* stroke,
     std::vector<std::string> texts = {};
     std::vector<Point> points = {};
     auto typeface = glyphRun.font.getTypeface();
-    if (!typeface || typeface->uniqueID() != typeface->getCacheID()) {
+    if (!typeface || typeface->isCustom()) {
       return false;
     }
     GetTextsAndPositions(&glyphRun, &texts, &points);
+    auto& font = glyphRun.font;
     auto webFont = val::object();
     webFont.set("name", typeface->fontFamily());
     webFont.set("style", typeface->fontStyle());
-    webFont.set("size", glyphRun.font.getSize());
-    webFont.set("bold", glyphRun.font.isFauxBold());
-    webFont.set("italic", glyphRun.font.isFauxItalic());
+    webFont.set("size", font.getSize());
+    webFont.set("bold", font.isFauxBold());
+    webFont.set("italic", font.isFauxItalic());
     if (stroke) {
       webMask.call<void>("strokeText", webFont, *stroke, texts, points, matrix);
     } else {

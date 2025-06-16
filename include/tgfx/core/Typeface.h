@@ -138,6 +138,8 @@ class Typeface {
    */
   virtual std::shared_ptr<Data> copyTableData(FontTableTag tag) const = 0;
 
+  virtual bool isCustom() const;
+
  protected:
   /**
    * Gets the mapping from GlyphID to unicode. The array index is GlyphID, and the array value is
@@ -145,11 +147,6 @@ class Typeface {
    * This method is only implemented when compiling the SVG or PDF export module.
    */
   virtual std::vector<Unichar> getGlyphToUnicodeMap() const;
-
-  /**
- *  Returns a ScalerContext for the given size.
- */
-  std::shared_ptr<ScalerContext> getScalerContext(float size);
 
   virtual std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const = 0;
 
@@ -159,18 +156,14 @@ class Typeface {
 
  private:
   /**
-   * Returns the cache ID for this typeface. Typically, this is the uniqueID of the typeface;
-   * for custom typefaces, it returns the uniqueID of the associated typeface builder.
+   *  Returns a ScalerContext for the given size.
    */
-  virtual uint32_t getCacheID() const;
+  std::shared_ptr<ScalerContext> getScalerContext(float size);
 
   std::unordered_map<float, std::weak_ptr<ScalerContext>> scalerContexts = {};
 
   friend class Font;
   friend class ScalerContext;
   friend class GlyphConverter;
-  friend class SVGExportContext;
-  friend class CGMask;
-  friend class WebMask;
 };
 }  // namespace tgfx
