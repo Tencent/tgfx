@@ -191,8 +191,7 @@ bool CGMask::onFillText(const GlyphRunList* glyphRunList, const Stroke* stroke,
     if (typeface == nullptr || glyphRun.font.isFauxBold()) {
       return false;
     }
-    //Custom typeface
-    if (typeface->uniqueID() != typeface->getCacheID()) {
+    if (typeface->isCustom()) {
       return false;
     }
   }
