@@ -522,17 +522,28 @@ class Layer {
   virtual std::unique_ptr<LayerContent> onUpdateContent();
 
   /**
+   * The drawer function type used to draw the layer content onto a canvas.
+   * @param content The layer content to draw. This can be nullptr.
+   * @param canvas The canvas to draw the layer content on.
+   * @param layer The layer whose content is being drawn.
+   * @param content The layer content to draw. This can be nullptr.
+   * @param alpha The alpha transparency value used for drawing the layer content.
+   * @param forContour Whether to draw the layer content for the contour.
+   * @return true if the content was drawn successfully, false otherwise.
+   */
+  using ContentDrawer = bool (*)(Canvas* canvas, const Layer* layer, const LayerContent* content,
+                                 float alpha, bool forContour);
+  /**
    * Draws the layer content and its children on the given canvas. By default, this method draws the
    * layer content first, followed by the children. Subclasses can override this method to change
    * the drawing order or the way the layer content is drawn.
-   * @param content The layer content to draw. This can be nullptr.
-   * @param canvas The canvas to draw the layer content on.
-   * @param alpha The alpha transparency value used for drawing the layer content.
-   * @param forContour Whether to draw the layer content for the contour.
+   * @param drawContent A callback function that takes a drawer function as its argument. Calling
+   * this function will call the drawer function with the canvas, layer, content, alpha, and
+   * forContour parameters.
    * @param drawChildren A callback function that draws the children of the layer. if the function
    * returns false, the content above children should not be drawn.
    */
-  virtual void drawContents(LayerContent* content, Canvas* canvas, float alpha, bool forContour,
+  virtual void drawContents(const std::function<void(ContentDrawer contentDrawer)>& drawContent,
                             const std::function<bool()>& drawChildren) const;
 
   /**
@@ -590,8 +601,11 @@ class Layer {
 
   std::unique_ptr<LayerStyleSource> getLayerStyleSource(const DrawArgs& args, const Matrix& matrix);
 
-  void drawLayerStyles(Canvas* canvas, float alpha, const LayerStyleSource* source,
-                       LayerStylePosition position);
+  std::shared_ptr<Image> getBackgroundImage(const DrawArgs& args, float contentScale,
+                                            Point* offset);
+
+  void drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
+                       const LayerStyleSource* source, LayerStylePosition position);
 
   bool getLayersUnderPointInternal(float x, float y, std::vector<std::shared_ptr<Layer>>* results);
 
@@ -610,6 +624,12 @@ class Layer {
   void updateBackgroundBounds(const Matrix& renderMatrix);
 
   void propagateHasBackgroundStyleFlags();
+
+  static void DrawContents(const DrawArgs& args, Canvas* canvas, Layer* layer, float alpha,
+                           ContentDrawer drawer);
+
+  static bool DrawContent(Canvas* canvas, const Layer* layer, const LayerContent* content,
+                          float alpha, bool forContour);
 
   struct {
     bool dirtyContent : 1;        // layer's content needs updating

@@ -19,7 +19,7 @@
 #include "base/Drawers.h"
 
 namespace drawers {
-void ConicGradient::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) {
+void ConicGradient::onDraw(tgfx::Canvas* canvas, const AppHost* host) {
   auto scale = host->density();
   auto width = host->width();
   auto height = host->height();
@@ -36,6 +36,8 @@ void ConicGradient::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) {
   auto rect = tgfx::Rect::MakeXYWH((width - size) / 2, (height - size) / 2, size, size);
   tgfx::Path path = {};
   path.addRoundRect(rect, 20 * scale, 20 * scale);
+  canvas->translate(host->contentOffset().x, host->contentOffset().y);
+  canvas->scale(host->zoomScale(), host->zoomScale());
   canvas->drawPath(path, paint);
 }
 

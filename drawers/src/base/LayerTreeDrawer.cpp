@@ -27,8 +27,14 @@ void LayerTreeDrawer::onDraw(tgfx::Canvas* canvas, const AppHost* host) {
   if (!root) {
     root = buildLayerTree(host);
     displayList.root()->addChild(root);
+    displayList.setRenderMode(tgfx::RenderMode::Tiled);
+    displayList.setMaxTileCount(512);
+    displayList.setMaxTilesRefinedPerFrame(512);
   }
   updateRootMatrix(host);
+  displayList.setZoomScale(host->zoomScale());
+  auto offset = host->contentOffset();
+  displayList.setContentOffset(offset.x, offset.y);
   displayList.render(canvas->getSurface(), false);
 }
 
