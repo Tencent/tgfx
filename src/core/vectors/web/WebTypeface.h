@@ -72,10 +72,10 @@ class WebTypeface : public Typeface {
   std::vector<Unichar> getGlyphToUnicodeMap() const override;
 #endif
 
+  std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;
+
  private:
   explicit WebTypeface(std::string name, std::string style);
-
-  std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;
 
   uint32_t _uniqueID;
   bool _hasColor = false;

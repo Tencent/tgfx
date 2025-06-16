@@ -16,29 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "ImageUserTypeface.h"
-#include "UserScalerContext.h"
+#include "tgfx/core/PathProvider.h"
 
 namespace tgfx {
-class ImageUserScalerContext final : public UserScalerContext {
+
+class PathProviderWrapper final : public PathProvider {
  public:
-  ImageUserScalerContext(std::shared_ptr<Typeface> typeface, float size);
+  explicit PathProviderWrapper(const Path& path) : _path(path) {
+  }
 
-  Rect getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic) const override;
+  Path getPath() const override {
+    return _path;
+  }
 
-  bool generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic, Path* path) const override;
-
-  Rect getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
-                         Matrix* matrix) const override;
-
-  bool readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke, const ImageInfo& dstInfo,
-                  void* dstPixels) const override;
+  Rect getBounds() const override {
+    return _path.getBounds();
+  }
 
  private:
-  ImageUserTypeface* imageTypeface() const;
-
-  Point extraScale = Point::Make(1.f, 1.f);
+  Path _path;
 };
+
+std::shared_ptr<PathProvider> PathProvider::Wrap(const Path& path) {
+  return std::make_shared<PathProviderWrapper>(path);
+}
 }  // namespace tgfx

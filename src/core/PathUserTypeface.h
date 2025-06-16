@@ -22,15 +22,14 @@
 #include "tgfx/core/CustomTypeface.h"
 
 namespace tgfx {
-class ImageUserTypeface final : public UserTypeface {
+class PathUserTypeface final : public UserTypeface {
  public:
-  using ImageRecordType = std::vector<std::shared_ptr<ImageTypefaceBuilder::GlyphRecord>>;
+  using VectorRecordType = std::vector<std::shared_ptr<PathProvider>>;
 
   static std::shared_ptr<UserTypeface> Make(uint32_t builderID, const std::string& fontFamily,
                                             const std::string& fontStyle,
                                             const FontMetrics& metrics,
-                                            const ImageRecordType& glyphRecords);
-
+                                            const VectorRecordType& glyphRecords);
   size_t glyphsCount() const override;
 
   int unitsPerEm() const override;
@@ -39,15 +38,15 @@ class ImageUserTypeface final : public UserTypeface {
 
   bool hasOutlines() const override;
 
-  std::shared_ptr<ImageTypefaceBuilder::GlyphRecord> getGlyphRecord(GlyphID glyphID) const;
-
- private:
-  explicit ImageUserTypeface(uint32_t builderID, const std::string& fontFamily,
-                             const std::string& fontStyle, const FontMetrics& metrics,
-                             const ImageRecordType& glyphRecords);
+  std::shared_ptr<PathProvider> getGlyphRecord(GlyphID glyphID) const;
 
   std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;
 
-  ImageRecordType glyphRecords = {};
+ private:
+  explicit PathUserTypeface(uint32_t builderID, const std::string& fontFamily,
+                            const std::string& fontStyle, const FontMetrics& metrics,
+                            const VectorRecordType& glyphRecords);
+
+  VectorRecordType glyphRecords = {};
 };
 }  // namespace tgfx

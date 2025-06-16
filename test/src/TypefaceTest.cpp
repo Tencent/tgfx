@@ -16,44 +16,76 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/custom/GlyphPathProvider.h"
 #include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Typeface.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
+
+class GlyphPathProvider final : public PathProvider {
+ public:
+  Path getPath() const override {
+    Path path;
+    switch (pathIndex) {
+      case 0:
+        path.moveTo(Point::Make(25.0f, 5.0f));
+        path.lineTo(Point::Make(45.0f, 45.0f));
+        path.lineTo(Point::Make(5.0f, 45.0f));
+        path.close();
+        break;
+      case 1:
+        path.moveTo(Point::Make(5.0f, 5.0f));
+        path.lineTo(Point::Make(45.0f, 5.0f));
+        path.lineTo(Point::Make(45.0f, 45.0f));
+        path.lineTo(Point::Make(5.0f, 45.0f));
+        path.close();
+        break;
+      case 2: {
+        Rect rect = Rect::MakeXYWH(5.0f, 5.0f, 40.0f, 40.0f);
+        path.addOval(rect);
+        path.close();
+        break;
+      }
+      default: {
+        Rect rect = Rect::MakeXYWH(0.0f, 0.0f, 100.0f, 100.0f);
+        path.addOval(rect);
+        path.close();
+        break;
+      }
+    }
+    return path;
+  }
+
+  Rect getBounds() const override {
+    switch (pathIndex) {
+      case 0:
+      case 1:
+      case 2:
+        return Rect::MakeXYWH(5.0f, 5.0f, 40.0f, 40.0f);
+      default:
+        return Rect::MakeXYWH(0.0f, 0.0f, 100.0f, 100.0f);
+    }
+  }
+  void next() {
+    pathIndex = (pathIndex + 1) % 4;
+  }
+
+ private:
+  int pathIndex = 0;
+};
+
 TGFX_TEST(TypefaceTest, CustomPathTypeface) {
   const std::string fontFamily = "customPath";
   const std::string fontStyle = "customStyle";
   PathTypefaceBuilder builder;
   builder.setFontName(fontFamily, fontStyle);
-  Path path;
-  path.moveTo(Point::Make(25.0f, 5.0f));
-  path.lineTo(Point::Make(45.0f, 45.0f));
-  path.lineTo(Point::Make(5.0f, 45.0f));
-  path.close();
-  builder.addGlyph(GlyphPathProvider::Wrap(path));
+  GlyphPathProvider provider;
 
-  path.reset();
-  path.moveTo(Point::Make(5.0f, 5.0f));
-  path.lineTo(Point::Make(45.0f, 5.0f));
-  path.lineTo(Point::Make(45.0f, 45.0f));
-  path.lineTo(Point::Make(5.0f, 45.0f));
-  path.close();
-  builder.addGlyph(GlyphPathProvider::Wrap(path));
-
-  path.reset();
-  Rect rect = Rect::MakeXYWH(5.0f, 5.0f, 40.0f, 40.0f);
-  path.addOval(rect);
-  path.close();
-  builder.addGlyph(GlyphPathProvider::Wrap(path));
-
-  path.reset();
-  rect = Rect::MakeXYWH(0.0f, 0.0f, 100.0f, 100.0f);
-  path.addOval(rect);
-  path.close();
-  builder.addGlyph(GlyphPathProvider::Wrap(path));
-
+  builder.addGlyph(provider.getPath());
+  provider.next();
+  builder.addGlyph(provider.getPath());
+  provider.next();
+  builder.addGlyph(provider.getPath());
   auto typeface = builder.detach();
 
   ASSERT_TRUE(typeface != nullptr);
@@ -63,18 +95,14 @@ TGFX_TEST(TypefaceTest, CustomPathTypeface) {
   ASSERT_TRUE(typeface->copyTableData(0) == nullptr);
   ASSERT_EQ(typeface->fontFamily(), fontFamily);
   ASSERT_EQ(typeface->fontStyle(), fontStyle);
-  ASSERT_EQ(typeface->glyphsCount(), static_cast<size_t>(4));
+  ASSERT_EQ(typeface->glyphsCount(), static_cast<size_t>(3));
 
-  path.reset();
-  path.moveTo(Point::Make(25.0f, 5.0f));
-  path.lineTo(Point::Make(35.0f, 35.0f));
-  path.lineTo(Point::Make(45.0f, 5.0f));
-  path.close();
-  builder.addGlyph(GlyphPathProvider::Wrap(path));
+  provider.next();
+  builder.addGlyph(provider.getPath());
 
   typeface = builder.detach();
   ASSERT_TRUE(typeface != nullptr);
-  ASSERT_EQ(typeface->glyphsCount(), static_cast<size_t>(5));
+  ASSERT_EQ(typeface->glyphsCount(), static_cast<size_t>(4));
 
   ContextScope scope;
   auto context = scope.getContext();

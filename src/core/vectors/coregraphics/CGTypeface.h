@@ -65,10 +65,10 @@ class CGTypeface : public Typeface {
   std::vector<Unichar> getGlyphToUnicodeMap() const override;
 #endif
 
+  std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;
+
  private:
   CGTypeface(CTFontRef ctFont, std::shared_ptr<Data> data);
-
-  std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;
 
   uint32_t _uniqueID = 0;
   CTFontRef ctFont = nullptr;
