@@ -48,6 +48,8 @@ void ImageWithShadow::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host)
                                               tgfx::Color::Black());
   tgfx::Paint paint = {};
   paint.setImageFilter(filter);
+  canvas->translate(host->contentOffset().x, host->contentOffset().y);
+  canvas->scale(host->zoomScale(), host->zoomScale());
   canvas->drawImage(scaledImage, static_cast<float>(width - size) / 2,
                     static_cast<float>(height - size) / 2, &paint);
 }

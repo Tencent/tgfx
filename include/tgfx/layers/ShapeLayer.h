@@ -302,7 +302,7 @@ class ShapeLayer : public Layer {
 
   std::unique_ptr<LayerContent> onUpdateContent() override;
 
-  void drawContents(LayerContent* content, Canvas* canvas, float alpha, bool forContour,
+  void drawContents(const std::function<void(ContentDrawer contentDrawer)>& drawContent,
                     const std::function<bool()>& drawChildren) const override;
 
  private:
@@ -322,5 +322,11 @@ class ShapeLayer : public Layer {
 
   Paint getPaint(float alpha) const;
   std::shared_ptr<Shape> createStrokeShape() const;
+
+  static bool DrawFills(Canvas* canvas, const Layer* layer, const LayerContent* content,
+                        float alpha, bool forContour);
+
+  static bool DrawStrokes(Canvas* canvas, const Layer* layer, const LayerContent* content,
+                          float alpha, bool forContour);
 };
 }  // namespace tgfx

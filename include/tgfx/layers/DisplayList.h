@@ -27,7 +27,7 @@ namespace tgfx {
 class RootLayer;
 class Tile;
 class TileCache;
-struct TileRenderTask;
+class DrawTask;
 
 /**
  * RenderMode defines the different modes of rendering a DisplayList.
@@ -82,9 +82,7 @@ class DisplayList {
    * efficient than applying a matrix directly, as it avoids invalidating the layer tree's internal
    * caches. The default value is 1.0f.
    */
-  float zoomScale() const {
-    return _zoomScale;
-  }
+  float zoomScale() const;
 
   /**
    * Sets the scale factor for the layer tree. This factor determines how much the layer tree is
@@ -95,14 +93,13 @@ class DisplayList {
   void setZoomScale(float zoomScale);
 
   /**
-   * Returns the integer multiplier used for zoom scale precision. This value determines the smallest
-   * increment by which the zoom scale can change. For example, a precision of 100 means the zoom scale
-   * can be adjusted in steps of 0.01 (1/100). Internally, the zoom scale is first rounded to the nearest
-   * integer and then converted back to a float for rendering. The precision is used to convert the zoom
-   * scale to an integer as follows:
+   * Returns the integer multiplier used for zoom scale precision. This value determines the
+   * smallest step by which the zoom scale can change. For example, a precision of 100 means the
+   * zoom scale can be adjusted in increments of 0.01 (1/100). Internally, the zoom scale is stored
+   * as an integer. The precision is used to convert the zoom scale to an integer as follows:
    * - When zooming in (scale >= 1.0), the scale is multiplied by the precision.
    * - When zooming out (scale < 1.0), the reciprocal of the scale is multiplied by the precision.
-   * The default precision is 100, allowing zoom scale adjustments in steps of 0.01.
+   * The default precision is 1000, allowing zoom scale adjustments in steps of 0.001f.
    */
   int zoomScalePrecision() const {
     return _zoomScalePrecision;
@@ -162,14 +159,14 @@ class DisplayList {
   void setTileSize(int tileSize);
 
   /**
-   * Returns the maximum number of tiles that can be created in tiled rendering mode. This setting is
-   * ignored in other render modes. If the specified count is less than the minimum required for tiled
-   * rendering, it will be automatically increased to meet the minimum. The minimum value is calculated
-   * based on the tile size and viewport size, ensuring the visible area is always fully covered, even
-   * if the viewport is offset by half a tile. For example, with a tile size of 256 pixels and a
-   * viewport of 512x512 pixels, the minimum tile count is 9 (2 tiles in each direction plus 1 for
-   * offset). The default is 0, which means the minimum tile count will be used based on the viewport
-   * size and tile size.
+   * Returns the maximum number of tiles that can be created in tiled rendering mode. This setting
+   * is ignored in other render modes. If the specified count is less than the minimum required for
+   * tiled rendering, it will be automatically increased to meet the minimum. The minimum value is
+   * calculated based on the tile size and viewport size, ensuring the visible area is always fully
+   * covered, even if the viewport is offset by half a tile. For example, with a tile size of 256
+   * pixels and a viewport of 512x512 pixels, the minimum tile count is 9 (2 tiles in each direction
+   * plus 1 for offset). The default is 0, which means the minimum tile count will be used based on
+   * the viewport size and tile size.
    */
   int maxTileCount() const {
     return _maxTileCount;
@@ -181,20 +178,24 @@ class DisplayList {
   void setMaxTileCount(int count);
 
   /**
-   * Returns true if zoom blur is allowed in tiled rendering mode. This setting is ignored in other
-   * render modes. When enabled, if the zoomScale changes and cached images at other zoom levels are
-   * available, the display list will first use those caches to render when the frame rate is low.
-   * It will then gradually update to the current zoomScale in later frames. This can improve
-   * zooming performance, but may cause temporary zoom blur artifacts. The default is true.
+   * Returns the maximum number of tiles that can be refined (updated to the current zoom scale) per
+   * frame in tiled rendering mode. This setting is ignored in other render modes. When zooming,
+   * cached images from other zoom levels may be used temporarily, resulting in brief blur artifacts.
+   * Increasing this value refines more tiles per frame, reducing blur more quickly but potentially
+   * impacting performance. To eliminate blur entirely, set this value higher than the total number
+   * of visible tiles. The default is 10.
    */
-  bool allowZoomBlur() const {
-    return _allowZoomBlur;
+  int maxTilesRefinedPerFrame() const {
+    return _maxTilesRefinedPerFrame;
   }
 
   /**
-   * Sets whether to allow zoom blur in tiled rendering mode.
+   * Sets the maximum number of tiles that can be refined (updated to the current zoom scale) per
+   * frame in tiled rendering mode.
    */
-  void setAllowZoomBlur(bool allow);
+  void setMaxTilesRefinedPerFrame(int count) {
+    _maxTilesRefinedPerFrame = count;
+  }
 
   /**
    * Sets whether to show dirty regions during rendering. When enabled, the dirty regions will be
@@ -219,20 +220,21 @@ class DisplayList {
 
  private:
   std::shared_ptr<RootLayer> _root = nullptr;
-  float _zoomScale = 1.0f;
-  int _zoomScalePrecision = 100;
+  int64_t _zoomScaleInt = 1000;
+  int _zoomScalePrecision = 1000;
   Point _contentOffset = {};
   RenderMode _renderMode = RenderMode::Partial;
   int _tileSize = 256;
   int _maxTileCount = 0;
-  bool _allowZoomBlur = true;
+  int _maxTilesRefinedPerFrame = 10;
   bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
-  float lastZoomScale = 1.0f;
+  bool hasZoomBlurTiles = false;
+  int64_t lastZoomScaleInt = 1000;
   Point lastContentOffset = {};
   int totalTileCount = 0;
   std::vector<std::shared_ptr<Surface>> surfaceCaches = {};
-  std::unordered_map<float, TileCache*> tileCaches = {};
+  std::unordered_map<int64_t, TileCache*> tileCaches = {};
   std::vector<std::shared_ptr<Tile>> emptyTiles = {};
   std::deque<std::vector<Rect>> lastDirtyRegions = {};
 
@@ -246,15 +248,22 @@ class DisplayList {
 
   void checkTileCount(Surface* renderSurface);
 
-  std::vector<TileRenderTask> invalidateTileCaches(const std::vector<Rect>& dirtyRegions);
+  std::vector<DrawTask> invalidateTileCaches(const std::vector<Rect>& dirtyRegions);
 
   void invalidateCurrentTileCache(const TileCache* tileCache, const std::vector<Rect>& dirtyRegions,
-                                  std::vector<TileRenderTask>* renderTasks) const;
+                                  std::vector<DrawTask>* tileTasks) const;
 
-  std::vector<std::shared_ptr<Tile>> collectRenderTiles(const Surface* surface,
-                                                        std::vector<TileRenderTask>* renderTasks);
+  std::vector<DrawTask> collectScreenTasks(const Surface* surface,
+                                           std::vector<DrawTask>* tileTasks);
 
-  std::vector<std::shared_ptr<Tile>> getFreeTiles(size_t tileCount, const Surface* renderSurface);
+  std::vector<std::pair<float, TileCache*>> getSortedTileCaches() const;
+
+  std::vector<DrawTask> getFallbackDrawTasks(
+      int tileX, int tileY, const std::vector<std::pair<float, TileCache*>>& sortedCaches) const;
+
+  std::vector<std::shared_ptr<Tile>> getFreeTiles(
+      const Surface* renderSurface, size_t tileCount,
+      const std::vector<std::pair<float, TileCache*>>& sortedCaches);
 
   std::vector<std::shared_ptr<Tile>> createContinuousTiles(const Surface* renderSurface,
                                                            int requestCountX, int requestCountY);
@@ -265,15 +274,17 @@ class DisplayList {
 
   int getMaxTileCountPerAtlas(Context* context) const;
 
-  void renderTileTask(const TileRenderTask& task) const;
+  void drawTileTask(const DrawTask& task) const;
 
-  void drawTilesToSurface(const std::vector<std::shared_ptr<Tile>>& tiles, Surface* surface,
-                          bool autoClear) const;
+  void drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface, bool autoClear) const;
 
   void renderDirtyRegions(Canvas* canvas, std::vector<Rect> dirtyRegions);
 
   Matrix getViewMatrix() const;
 
   void resetCaches();
+
+  void drawRootLayer(Surface* surface, const Rect& drawRect, const Matrix& viewMatrix,
+                     bool autoClear) const;
 };
 }  // namespace tgfx
