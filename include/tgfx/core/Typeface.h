@@ -138,8 +138,6 @@ class Typeface {
    */
   virtual std::shared_ptr<Data> copyTableData(FontTableTag tag) const = 0;
 
-  virtual bool isCustom() const;
-
  protected:
   /**
    * Gets the mapping from GlyphID to unicode. The array index is GlyphID, and the array value is
@@ -160,10 +158,15 @@ class Typeface {
    */
   std::shared_ptr<ScalerContext> getScalerContext(float size);
 
+  virtual bool isCustom() const;
+
   std::unordered_map<float, std::weak_ptr<ScalerContext>> scalerContexts = {};
 
   friend class Font;
   friend class ScalerContext;
   friend class GlyphConverter;
+  friend class CGMask;
+  friend class WebMask;
+  friend class SVGExportContext;
 };
 }  // namespace tgfx
