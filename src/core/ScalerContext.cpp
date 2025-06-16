@@ -64,27 +64,6 @@ std::shared_ptr<ScalerContext> ScalerContext::MakeEmpty(float size) {
   return std::make_shared<EmptyScalerContext>(size);
 }
 
-std::shared_ptr<ScalerContext> ScalerContext::Make(std::shared_ptr<Typeface> typeface, float size) {
-  if (typeface == nullptr || typeface->glyphsCount() <= 0 || size < 0.0f) {
-    return MakeEmpty(size);
-  }
-  std::lock_guard<std::mutex> autoLock(typeface->locker);
-  auto& scalerContexts = typeface->scalerContexts;
-  auto result = scalerContexts.find(size);
-  if (result != scalerContexts.end()) {
-    auto context = result->second.lock();
-    if (context != nullptr) {
-      return context;
-    }
-  }
-  auto context = ScalerContext::CreateNew(std::move(typeface), size);
-  if (context == nullptr) {
-    return MakeEmpty(size);
-  }
-  scalerContexts[size] = context;
-  return context;
-}
-
 ScalerContext::ScalerContext(std::shared_ptr<Typeface> typeface, float size)
     : typeface(std::move(typeface)), textSize(size) {
 }

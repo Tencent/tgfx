@@ -15,27 +15,30 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#ifdef TGFX_USE_INSPECTOR
 
-#include "GlyphFaceSerialization.h"
+#pragma once
+
+#include "ImageUserTypeface.h"
+#include "UserScalerContext.h"
 
 namespace tgfx {
+class ImageUserScalerContext final : public UserScalerContext {
+ public:
+  ImageUserScalerContext(std::shared_ptr<Typeface> typeface, float size);
 
-std::shared_ptr<Data> GlyphFaceSerialization::Serialize(const GlyphFace* glyphFace) {
-  DEBUG_ASSERT(glyphFace != nullptr)
-  flexbuffers::Builder fbb;
-  size_t startMap;
-  size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
-  SerializeGlyphFaceImpl(fbb, glyphFace);
-  SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
-  return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
-}
+  Rect getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic) const override;
 
-void GlyphFaceSerialization::SerializeGlyphFaceImpl(flexbuffers::Builder& fbb,
-                                                    const GlyphFace* glyphFace) {
-  SerializeUtils::SetFlexBufferMap(fbb, "hasColor", glyphFace->hasColor());
-  SerializeUtils::SetFlexBufferMap(fbb, "hasOutlines", glyphFace->hasOutlines());
-}
+  bool generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic, Path* path) const override;
+
+  Rect getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
+                         Matrix* matrix) const override;
+
+  bool readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke, const ImageInfo& dstInfo,
+                  void* dstPixels) const override;
+
+ private:
+  ImageUserTypeface* imageTypeface() const;
+
+  Point extraScale = Point::Make(1.f, 1.f);
+};
 }  // namespace tgfx
-#endif

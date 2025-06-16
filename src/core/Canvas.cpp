@@ -529,16 +529,12 @@ void Canvas::drawSimpleText(const std::string& text, float x, float y, const Fon
 
 void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,
                         const Font& font, const Paint& paint) {
-  drawGlyphs(glyphs, positions, glyphCount, GlyphFace::Wrap(font), paint);
-}
 
-void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,
-                        std::shared_ptr<GlyphFace> glyphFace, const Paint& paint) {
-  if (glyphCount == 0 || glyphFace == nullptr) {
+  if (glyphCount == 0) {
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
-  GlyphRun glyphRun(glyphFace, {glyphs, glyphs + glyphCount}, {positions, positions + glyphCount});
+  GlyphRun glyphRun(font, {glyphs, glyphs + glyphCount}, {positions, positions + glyphCount});
   auto glyphRunList = std::make_shared<GlyphRunList>(std::move(glyphRun));
   drawContext->drawGlyphRunList(std::move(glyphRunList), *mcState, paint.getFill(),
                                 paint.getStroke());

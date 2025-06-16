@@ -18,6 +18,9 @@
 
 #pragma once
 
+#include "tgfx/core/Path.h"
+#include "tgfx/core/Rect.h"
+
 namespace tgfx {
 /**
  * PathProvider defines interfaces for creating a Path object lazily, which is useful when the path

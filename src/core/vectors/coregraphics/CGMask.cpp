@@ -20,9 +20,7 @@
 #include "CGTypeface.h"
 #include "core/GlyphRunList.h"
 #include "core/ScalerContext.h"
-#include "core/utils/Log.h"
 #include "platform/apple/BitmapContextUtil.h"
-#include "tgfx/core/GlyphFace.h"
 #include "tgfx/core/Mask.h"
 #include "tgfx/core/Pixmap.h"
 
@@ -189,9 +187,12 @@ bool CGMask::onFillText(const GlyphRunList* glyphRunList, const Stroke* stroke,
     return false;
   }
   for (auto& glyphRun : glyphRunList->glyphRuns()) {
-    Font font;
-    bool success = glyphRun.glyphFace->asFont(&font);
-    if (!success || font.isFauxBold()) {
+    const auto typeface = glyphRun.font.getTypeface();
+    if (typeface == nullptr || glyphRun.font.isFauxBold()) {
+      return false;
+    }
+    //Custom typeface
+    if (typeface->uniqueID() != typeface->getCacheID()) {
       return false;
     }
   }
@@ -213,13 +214,11 @@ bool CGMask::onFillText(const GlyphRunList* glyphRunList, const Stroke* stroke,
 
   for (auto& glyphRun : glyphRunList->glyphRuns()) {
     CGContextSaveGState(cgContext);
-    Font font;
-    glyphRun.glyphFace->asFont(&font);
-    auto typeface = std::static_pointer_cast<CGTypeface>(font.getTypeface());
+    auto typeface = std::static_pointer_cast<CGTypeface>(glyphRun.font.getTypeface());
     CTFontRef ctFont = typeface->getCTFont();
-    ctFont = CTFontCreateCopyWithAttributes(ctFont, static_cast<CGFloat>(font.getSize()), nullptr,
-                                            nullptr);
-    if (font.isFauxItalic()) {
+    ctFont = CTFontCreateCopyWithAttributes(ctFont, static_cast<CGFloat>(glyphRun.font.getSize()),
+                                            nullptr, nullptr);
+    if (glyphRun.font.isFauxItalic()) {
       CGContextSetTextMatrix(cgContext, CGAffineTransformMake(1, 0, -ITALIC_SKEW, 1, 0, 0));
     }
     CGContextTranslateCTM(cgContext, 0.f, static_cast<CGFloat>(height()));

@@ -29,13 +29,10 @@
 namespace tgfx {
 
 SVGTextBuilder::UnicharsInfo SVGTextBuilder::glyphToUnicharsInfo(const GlyphRun& glyphRun) {
-
-  Font font;
-  if (!glyphRun.glyphFace->asFont(&font)) {
+  auto unicodeChars = converter.glyphsToUnichars(glyphRun.font, glyphRun.glyphs);
+  if (unicodeChars.empty()) {
     return {};
   }
-
-  auto unicodeChars = converter.glyphsToUnichars(font, glyphRun.glyphs);
 
   std::string _text;
   std::string posXString;

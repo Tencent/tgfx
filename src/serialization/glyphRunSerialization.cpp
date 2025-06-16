@@ -37,10 +37,10 @@ void glyphRunSerialization::SerializeGlyphRunImpl(flexbuffers::Builder& fbb,
                                                   const GlyphRun* glyphRun,
                                                   SerializeUtils::Map* map) {
   auto glyphFaceID = SerializeUtils::GetObjID();
-  auto glyphFace = glyphRun->glyphFace;
-  SerializeUtils::SetFlexBufferMap(fbb, "glyphFace", reinterpret_cast<uint64_t>(glyphFace.get()),
-                                   true, glyphFace != nullptr, glyphFaceID);
-  SerializeUtils::FillMap(glyphFace, glyphFaceID, map);
+  const auto& font = glyphRun->font;
+  SerializeUtils::SetFlexBufferMap(fbb, "font", reinterpret_cast<uint64_t>(&font), true,
+                                   font.getTypeface() != nullptr, glyphFaceID);
+  SerializeUtils::FillMap(font, glyphFaceID, map);
 
   auto glyphsID = SerializeUtils::GetObjID();
   auto glyphs = glyphRun->glyphs;

@@ -18,15 +18,8 @@
 
 #pragma once
 
-#include <tgfx/core/Data.h>
-#include "SerializationUtils.h"
-
 namespace tgfx {
-class GlyphFaceSerialization {
- public:
-  static std::shared_ptr<Data> Serialize(const GlyphFace* glyphFace);
 
- private:
-  static void SerializeGlyphFaceImpl(flexbuffers::Builder& fbb, const GlyphFace* glyphFace);
-};
+float FauxBoldScale(float textSize);
+
 }  // namespace tgfx
