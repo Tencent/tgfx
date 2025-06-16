@@ -19,30 +19,31 @@
 #import "TGFXView.h"
 #include <cmath>
 #include "drawers/Drawer.h"
+#include "tgfx/core/Point.h"
 
 @implementation TGFXView {
-  std::shared_ptr<tgfx::EAGLWindow> window;
-  std::unique_ptr<drawers::AppHost> appHost;
+    std::shared_ptr<tgfx::EAGLWindow> window;
+    std::unique_ptr<drawers::AppHost> appHost;
 }
 
 + (Class)layerClass {
-  return [CAEAGLLayer class];
+    return [CAEAGLLayer class];
 }
 
 - (void)setBounds:(CGRect)bounds {
-  CGRect oldBounds = self.bounds;
-  [super setBounds:bounds];
-  if (oldBounds.size.width != bounds.size.width || oldBounds.size.height != bounds.size.height) {
-    [self updateSize];
-  }
+    CGRect oldBounds = self.bounds;
+    [super setBounds:bounds];
+    if (oldBounds.size.width != bounds.size.width || oldBounds.size.height != bounds.size.height) {
+        [self updateSize];
+    }
 }
 
 - (void)setFrame:(CGRect)frame {
-  CGRect oldRect = self.frame;
-  [super setFrame:frame];
-  if (oldRect.size.width != frame.size.width || oldRect.size.height != frame.size.height) {
-    [self updateSize];
-  }
+    CGRect oldRect = self.frame;
+    [super setFrame:frame];
+    if (oldRect.size.width != frame.size.width || oldRect.size.height != frame.size.height) {
+        [self updateSize];
+    }
 }
 
 - (void)setContentScaleFactor:(CGFloat)scaleFactor {
@@ -54,55 +55,59 @@
 }
 
 - (void)updateSize {
-  auto width = static_cast<int>(roundf(self.layer.bounds.size.width * self.layer.contentsScale));
-  auto height = static_cast<int>(roundf(self.layer.bounds.size.height * self.layer.contentsScale));
-  if (appHost == nullptr) {
-    appHost = std::make_unique<drawers::AppHost>();
-    NSString* imagePath = [[NSBundle mainBundle] pathForResource:@"bridge" ofType:@"jpg"];
-    auto image = tgfx::Image::MakeFromFile(imagePath.UTF8String);
-    appHost->addImage("bridge", image);
-    auto typeface = tgfx::Typeface::MakeFromName("PingFang SC", "");
-    appHost->addTypeface("default", typeface);
-    typeface = tgfx::Typeface::MakeFromName("Apple Color Emoji", "");
-    appHost->addTypeface("emoji", typeface);
-  }
-  auto sizeChanged = appHost->updateScreen(width, height, self.layer.contentsScale);
-  if (sizeChanged && window != nullptr) {
-    window->invalidSize();
-  }
+    auto width = static_cast<int>(roundf(self.layer.bounds.size.width * self.layer.contentsScale));
+    auto height = static_cast<int>(roundf(self.layer.bounds.size.height * self.layer.contentsScale));
+    if (appHost == nullptr) {
+        appHost = std::make_unique<drawers::AppHost>();
+        NSString* imagePath = [[NSBundle mainBundle] pathForResource:@"bridge" ofType:@"jpg"];
+        auto image = tgfx::Image::MakeFromFile(imagePath.UTF8String);
+        appHost->addImage("bridge", image);
+        auto typeface = tgfx::Typeface::MakeFromName("PingFang SC", "");
+        appHost->addTypeface("default", typeface);
+        typeface = tgfx::Typeface::MakeFromName("Apple Color Emoji", "");
+        appHost->addTypeface("emoji", typeface);
+    }
+    auto sizeChanged = appHost->updateScreen(width, height, self.layer.contentsScale);
+    if (sizeChanged && window != nullptr) {
+        window->invalidSize();
+    }
 }
 
-- (void)draw:(int)index {
-  if (appHost->width() <= 0 || appHost->height() <= 0) {
-    return;
-  }
-  if (window == nullptr) {
-    window = tgfx::EAGLWindow::MakeFrom((CAEAGLLayer*)[self layer]);
-  }
-  if (window == nullptr) {
-    return;
-  }
-  auto device = window->getDevice();
-  auto context = device->lockContext();
-  if (context == nullptr) {
-    return;
-  }
-  auto surface = window->getSurface(context);
-  if (surface == nullptr) {
+- (void)draw:(int)index zoom:(float)zoom offset:(CGPoint)offset {
+    if (self.window == nil) {
+        return;
+    }
+    if (appHost->width() <= 0 || appHost->height() <= 0) {
+        return;
+    }
+    if (window == nullptr) {
+      window = tgfx::EAGLWindow::MakeFrom((CAEAGLLayer*)[self layer]);
+    }
+    if (window == nullptr) {
+        return;
+    }
+    appHost->updateZoomAndOffset(zoom, tgfx::Point(offset.x, offset.y));
+    auto device = window->getDevice();
+    auto context = device->lockContext();
+    if (context == nullptr) {
+        return;
+    }
+    auto surface = window->getSurface(context);
+    if (surface == nullptr) {
+        device->unlock();
+        return;
+    }
+    auto canvas = surface->getCanvas();
+    canvas->clear();
+    auto numDrawers = drawers::Drawer::Count() - 1;
+    index = (index % numDrawers) + 1;
+    auto drawer = drawers::Drawer::GetByName("GridBackground");
+    drawer->draw(canvas, appHost.get());
+    drawer = drawers::Drawer::GetByIndex(index);
+    drawer->draw(canvas, appHost.get());
+    context->flushAndSubmit();
+    window->present(context);
     device->unlock();
-    return;
-  }
-  auto canvas = surface->getCanvas();
-  canvas->clear();
-  auto numDrawers = drawers::Drawer::Count() - 1;
-  index = (index % numDrawers) + 1;
-  auto drawer = drawers::Drawer::GetByName("GridBackground");
-  drawer->draw(canvas, appHost.get());
-  drawer = drawers::Drawer::GetByIndex(index);
-  drawer->draw(canvas, appHost.get());
-  context->flushAndSubmit();
-  window->present(context);
-  device->unlock();
 }
 
 @end

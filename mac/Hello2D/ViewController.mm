@@ -51,9 +51,32 @@
 }
 
 - (void)scrollWheel:(NSEvent*)event {
-  self.contentOffset = CGPointMake(self.contentOffset.x + event.scrollingDeltaX,
-                                   self.contentOffset.y + event.scrollingDeltaY);
-  [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
+  BOOL isCtrl = (event.modifierFlags & NSEventModifierFlagControl) != 0;
+  BOOL isCmd = (event.modifierFlags & NSEventModifierFlagCommand) != 0;
+  if (isCtrl || isCmd) {
+    float oldZoom = self.zoomScale;
+    float zoomStep = 1.0 + event.scrollingDeltaY * 0.05;
+    float newZoom = oldZoom * zoomStep;
+      if (newZoom < 0.001f) {
+          newZoom = 0.001f;
+      }
+      if (newZoom > 1000.0f) {
+          newZoom = 1000.0f;
+      }
+    NSPoint mouseInView = [self.tgfxView convertPoint:[event locationInWindow] fromView:nil];
+    mouseInView.y = self.tgfxView.bounds.size.height - mouseInView.y;
+    mouseInView = [self.tgfxView convertPointToBacking:mouseInView];
+    float contentX = (mouseInView.x - self.contentOffset.x) / oldZoom;
+    float contentY = (mouseInView.y - self.contentOffset.y) / oldZoom;
+    self.contentOffset =
+        CGPointMake(mouseInView.x - contentX * newZoom, mouseInView.y - contentY * newZoom);
+    self.zoomScale = newZoom;
+    [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
+  } else {
+    self.contentOffset = CGPointMake(self.contentOffset.x + event.scrollingDeltaX,
+                                     self.contentOffset.y + event.scrollingDeltaY);
+    [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
+  }
 }
 
 - (void)magnifyWithEvent:(NSEvent*)event {

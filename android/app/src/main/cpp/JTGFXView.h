@@ -40,7 +40,7 @@ class JTGFXView {
 
   void updateSize();
 
-  void draw(int index);
+  void draw(int index, float zoom, float x, float y);
 
  private:
   ANativeWindow* nativeWindow = nullptr;

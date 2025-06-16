@@ -22,6 +22,8 @@ import android.graphics.SurfaceTexture
 import android.view.Surface
 import android.view.TextureView
 import java.io.ByteArrayOutputStream
+import android.graphics.PointF
+import android.view.MotionEvent
 
 import java.io.InputStream
 
@@ -59,7 +61,7 @@ open class TGFXView : TextureView, TextureView.SurfaceTextureListener {
         val metrics = resources.displayMetrics
         surface = Surface(p0)
         nativePtr = setupFromSurface(surface!!, imageBytes, metrics.density)
-        nativeDraw(drawIndex)
+        nativeDraw(drawIndex, zoomScale, contentOffset.x, contentOffset.y)
     }
 
     override fun onSurfaceTextureSizeChanged(p0: SurfaceTexture, p1: Int, p2: Int) {
@@ -73,6 +75,19 @@ open class TGFXView : TextureView, TextureView.SurfaceTextureListener {
     override fun onSurfaceTextureUpdated(p0: SurfaceTexture) {
     }
 
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        return controller.onTouchEvent(event) || super.onTouchEvent(event)
+    }
+
+    override fun performClick(): Boolean {
+        super.performClick()
+        drawIndex++;
+        zoomScale = 1.0f;
+        contentOffset.set(0f, 0f);
+        draw(drawIndex);
+        return true
+    }
+
     fun release() {
         if (surface != null) {
             surface!!.release()
@@ -83,20 +98,26 @@ open class TGFXView : TextureView, TextureView.SurfaceTextureListener {
 
     fun draw(index: Int) {
         drawIndex = index
-        nativeDraw(drawIndex)
+        nativeDraw(drawIndex, zoomScale, contentOffset.x, contentOffset.y)
     }
 
     private external fun updateSize()
 
     private external fun nativeRelease()
 
-    private external fun nativeDraw(drawIndex: Int)
+    private external fun nativeDraw(drawIndex: Int, zoom: Float, offsetX: Float, offsetY: Float)
 
     private var surface: Surface? = null
 
     private var nativePtr: Long = 0
 
-    private var drawIndex: Int = 0;
+    var drawIndex: Int = 0;
+
+    var zoomScale: Float = 1.0f
+
+    var contentOffset: PointF = PointF(0f, 0f)
+
+    private val controller = ViewController(this)
 
     companion object {
         private external fun nativeInit()
