@@ -35,6 +35,10 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Picture> picture, int wid
   }
   if (picture->drawCount == 1) {
     ISize clipSize = {width, height};
+    // PictureImage is not a ResourceImage because it can be very large, while ResourceImage always
+    // caches the full image by default. With PictureImage, usually only a portion is needed,
+    // especially for image filters. So, we only unwrap the image inside the picture and avoid
+    // creating a ResourceImage for paths or text.
     auto image = picture->asImage(nullptr, matrix, &clipSize);
     if (image) {
       return image;

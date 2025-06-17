@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Picture.h"
+#include "core/FillModifierContext.h"
 #include "core/MeasureContext.h"
 #include "core/Records.h"
 #include "core/TransformContext.h"
@@ -52,16 +53,21 @@ Rect Picture::getBounds(const Matrix* matrix) const {
   return context.getBounds();
 }
 
-void Picture::playback(Canvas* canvas) const {
+void Picture::playback(Canvas* canvas, const FillModifier* fillModifier) const {
   if (canvas != nullptr) {
-    playback(canvas->drawContext, *canvas->mcState);
+    playback(canvas->drawContext, *canvas->mcState, fillModifier);
   }
 }
 
-void Picture::playback(DrawContext* drawContext, const MCState& state) const {
+void Picture::playback(DrawContext* drawContext, const MCState& state,
+                       const FillModifier* fillModifier) const {
   DEBUG_ASSERT(drawContext != nullptr);
   if (state.clip.isEmpty() && !state.clip.isInverseFillType()) {
     return;
+  }
+  FillModifierContext modifierContext(drawContext, fillModifier);
+  if (fillModifier != nullptr) {
+    drawContext = &modifierContext;
   }
   TransformContext transformContext(drawContext, state);
   if (transformContext.type() != TransformContext::Type::None) {
@@ -102,7 +108,7 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
   }
   MCState state = {};
   Fill fill = {};
-  auto record = firstDrawRecord(&state, &fill);
+  auto record = getFirstDrawRecord(&state, &fill);
   if (record == nullptr) {
     return nullptr;
   }
@@ -165,7 +171,7 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
   return image;
 }
 
-const Record* Picture::firstDrawRecord(tgfx::MCState* state, tgfx::Fill* fill) const {
+const Record* Picture::getFirstDrawRecord(MCState* state, Fill* fill) const {
   for (auto& record : records) {
     if (record->type() > RecordType::SetFill) {
       return record.get();

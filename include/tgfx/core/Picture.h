@@ -32,6 +32,20 @@ template <typename T>
 class PlacementPtr;
 
 /**
+ * FillModifier is an interface for modifying the Fill properties of drawing commands. It can be
+ * used to change the color, alpha, or other properties of a Fill before it is applied.
+ */
+class FillModifier {
+ public:
+  virtual ~FillModifier() = default;
+
+  /**
+   * Modifies the given Fill and returns a new Fill with the modifications applied.
+   */
+  virtual Fill modify(const Fill& fill) const = 0;
+};
+
+/**
  * The Picture class captures the drawing commands made on a Canvas, which can be replayed later.
  * The Picture object is thread-safe and immutable once created. Pictures can be created by a
  * Recorder or loaded from serialized data.
@@ -62,8 +76,10 @@ class Picture {
    * Replays the drawing commands on the specified canvas. In the case that the commands are
    * recorded, each command in the Picture is sent separately to canvas. To add a single command to
    * draw the Picture to a canvas, call Canvas::drawPicture() instead.
+   * @param canvas The receiver of drawing commands
+   * @param fillModifier An optional FillModifier to modify the Fill properties of drawing commands.
    */
-  void playback(Canvas* canvas) const;
+  void playback(Canvas* canvas, const FillModifier* fillModifier = nullptr) const;
 
  private:
   std::shared_ptr<BlockData> blockData = nullptr;
@@ -74,17 +90,19 @@ class Picture {
   Picture(std::shared_ptr<BlockData> data, std::vector<PlacementPtr<Record>> records,
           size_t drawCount);
 
-  void playback(DrawContext* drawContext, const MCState& state) const;
+  void playback(DrawContext* drawContext, const MCState& state,
+                const FillModifier* fillModifier = nullptr) const;
 
   std::shared_ptr<Image> asImage(Point* offset, const Matrix* matrix = nullptr,
                                  const ISize* clipSize = nullptr) const;
 
-  const Record* firstDrawRecord(MCState* state = nullptr, Fill* fill = nullptr) const;
+  const Record* getFirstDrawRecord(MCState* state = nullptr, Fill* fill = nullptr) const;
 
   friend class MeasureContext;
   friend class RenderContext;
   friend class RecordingContext;
   friend class SVGExportContext;
+  friend class FillModifierContext;
   friend class Image;
   friend class PictureImage;
   friend class Canvas;

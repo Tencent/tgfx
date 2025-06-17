@@ -20,7 +20,6 @@
 
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/PathProvider.h"
-#include "tgfx/core/RRect.h"
 #include "tgfx/core/TextBlob.h"
 
 namespace tgfx {
