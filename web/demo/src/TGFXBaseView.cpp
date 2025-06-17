@@ -17,6 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TGFXBaseView.h"
+#include <cmath>
+#include "drawers/Drawer.h"
+#include "tgfx/core/Point.h"
 
 using namespace emscripten;
 namespace hello2d {
@@ -44,7 +47,7 @@ void TGFXBaseView::setImagePath(const std::string& imagePath) {
   }
 }
 
-void TGFXBaseView::draw(int drawIndex) {
+void TGFXBaseView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
   if (appHost->width() <= 0 || appHost->height() <= 0) {
     return;
   }
@@ -54,6 +57,7 @@ void TGFXBaseView::draw(int drawIndex) {
   if (window == nullptr) {
     return;
   }
+  appHost->updateZoomAndOffset(zoom, tgfx::Point(offsetX, offsetY));
   auto device = window->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {

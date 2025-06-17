@@ -45,6 +45,47 @@ if (typeof window !== 'undefined') {
             const emojiFontUIntArray = new Uint8Array(emojiFontBuffer);
             tgfxView.registerFonts(fontUIntArray, emojiFontUIntArray);
             updateSize(shareData);
+            const canvas = document.getElementById('hello2d');
+            if (canvas) {
+                let lastMouse = {x: 0, y: 0};
+                canvas.addEventListener('mousedown', (e) => {
+                    lastMouse.x = e.offsetX;
+                    lastMouse.y = e.offsetY;
+                    (canvas as any)._dragging = true;
+                });
+                window.addEventListener('mousemove', (e) => {
+                    if ((canvas as any)._dragging) {
+                        let dx = e.movementX;
+                        let dy = e.movementY;
+                        shareData.offsetX += dx / shareData.zoom;
+                        shareData.offsetY += dy / shareData.zoom;
+                        shareData.tgfxBaseView.draw(shareData.drawIndex, shareData.zoom, shareData.offsetX, shareData.offsetY);
+                    }
+                });
+                window.addEventListener('mouseup', () => {
+                    (canvas as any)._dragging = false;
+                });
+
+                canvas.addEventListener('wheel', (e: WheelEvent) => {
+                    e.preventDefault();
+                    if (e.ctrlKey || e.metaKey) {
+                        const zoomFactor = Math.exp(-e.deltaY * 0.001); // 更自然的缩放
+                        const oldZoom = shareData.zoom;
+                        const newZoom = Math.max(0.01, Math.min(100, oldZoom * zoomFactor));
+                        const rect = canvas.getBoundingClientRect();
+                        const px = (e.clientX - rect.left) * window.devicePixelRatio;
+                        const py = (e.clientY - rect.top) * window.devicePixelRatio;
+                        shareData.offsetX = (shareData.offsetX - px) * (newZoom / oldZoom) + px;
+                        shareData.offsetY = (shareData.offsetY - py) * (newZoom / oldZoom) + py;
+                        shareData.zoom = newZoom;
+                        shareData.tgfxBaseView.draw(shareData.drawIndex, shareData.zoom, shareData.offsetX, shareData.offsetY);
+                    } else {
+                        shareData.offsetX -= e.deltaX / shareData.zoom;
+                        shareData.offsetY -= e.deltaY / shareData.zoom;
+                        shareData.tgfxBaseView.draw(shareData.drawIndex, shareData.zoom, shareData.offsetX, shareData.offsetY);
+                    }
+                }, {passive: false});
+            }
         } catch (error) {
             console.error(error);
             throw new Error("Hello2D init failed. Please check the .wasm file path!.");
