@@ -58,13 +58,10 @@ Context::~Context() {
 }
 
 bool Context::flush(BackendSemaphore* signalSemaphore) {
-  _proxyProvider->purgeExpiredProxies();
   // Clean up all unreferenced resources before flushing, allowing them to be reused. This is
   // particularly crucial for texture resources that are bound to render targets. Only after the
   // cleanup can they be unbound and reused.
   _resourceCache->processUnreferencedResources();
-  // Retain the resources created after this time point until the next flush() for reuse.
-  auto timePoint = std::chrono::steady_clock::now();
   auto flushed = _drawingManager->flush();
   bool semaphoreInserted = false;
   if (signalSemaphore != nullptr) {
@@ -75,9 +72,8 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
     }
   }
   if (flushed) {
-    // Clean up all unreferenced resources after flushing to reduce memory usage.
     _proxyProvider->purgeExpiredProxies();
-    _resourceCache->purgeToCacheLimit(timePoint);
+    _resourceCache->advanceFrameAndPurge();
     _maxValueTracker->addValue(_drawingBuffer->size());
     _drawingBuffer->clear(_maxValueTracker->getMaxValue());
   }
@@ -117,13 +113,20 @@ void Context::setCacheLimit(size_t bytesLimit) {
   _resourceCache->setCacheLimit(bytesLimit);
 }
 
-void Context::purgeResourcesNotUsedSince(std::chrono::steady_clock::time_point purgeTime,
-                                         bool scratchResourcesOnly) {
-  _resourceCache->purgeNotUsedSince(purgeTime, scratchResourcesOnly);
+size_t Context::resourceExpirationFrames() const {
+  return _resourceCache->expirationFrames();
 }
 
-bool Context::purgeResourcesUntilMemoryTo(size_t bytesLimit, bool scratchResourcesOnly) {
-  return _resourceCache->purgeUntilMemoryTo(bytesLimit, scratchResourcesOnly);
+void Context::setResourceExpirationFrames(size_t frames) {
+  _resourceCache->setExpirationFrames(frames);
+}
+
+void Context::purgeResourcesNotUsedSince(std::chrono::steady_clock::time_point purgeTime) {
+  _resourceCache->purgeNotUsedSince(purgeTime);
+}
+
+bool Context::purgeResourcesUntilMemoryTo(size_t bytesLimit) {
+  return _resourceCache->purgeUntilMemoryTo(bytesLimit);
 }
 
 void Context::releaseAll(bool releaseGPU) {

@@ -16,11 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GlyphPathProvider.h"
-#include "PathUserTypeface.h"
 #include "tgfx/core/CustomTypeface.h"
+#include "ImageUserTypeface.h"
+#include "PathUserTypeface.h"
+#include "tgfx/core/PathProvider.h"
 
 namespace tgfx {
+void CustomTypefaceBuilder::setFontName(const std::string& fontFamily,
+                                        const std::string& fontStyle) {
+  _fontFamily = fontFamily;
+  _fontStyle = fontStyle;
+}
+
+void CustomTypefaceBuilder::setMetrics(const FontMetrics& metrics) {
+  _fontMetrics = metrics;
+}
+
+//////////////
+
 GlyphID PathTypefaceBuilder::addGlyph(const Path& path) {
   if (glyphRecords.size() >= std::numeric_limits<GlyphID>::max()) {
     // Reached the maximum number of glyphs. Return an invalid GlyphID
@@ -28,7 +41,7 @@ GlyphID PathTypefaceBuilder::addGlyph(const Path& path) {
   }
   // GlyphID starts from 1
   auto glyphID = static_cast<GlyphID>(glyphRecords.size() + 1);
-  glyphRecords.emplace_back(GlyphPathProvider::Wrap(path));
+  glyphRecords.emplace_back(PathProvider::Wrap(path));
   return glyphID;
 }
 
@@ -49,4 +62,24 @@ std::shared_ptr<Typeface> PathTypefaceBuilder::detach() const {
   }
   return PathUserTypeface::Make(uniqueID, _fontFamily, _fontStyle, _fontMetrics, glyphRecords);
 }
+
+//////////////
+
+GlyphID ImageTypefaceBuilder::addGlyph(std::shared_ptr<ImageCodec> image, const Point& offset) {
+  if (glyphRecords.size() >= std::numeric_limits<GlyphID>::max()) {
+    // Reached the maximum number of glyphs.Return an invalid GlyphID
+    return 0;
+  }
+  auto glyphID = static_cast<GlyphID>(glyphRecords.size() + 1);
+  glyphRecords.emplace_back(std::make_shared<GlyphRecord>(std::move(image), offset));
+  return glyphID;
+}
+
+std::shared_ptr<Typeface> ImageTypefaceBuilder::detach() const {
+  if (glyphRecords.empty()) {
+    return nullptr;
+  }
+  return ImageUserTypeface::Make(uniqueID, _fontFamily, _fontStyle, _fontMetrics, glyphRecords);
+}
+
 }  // namespace tgfx

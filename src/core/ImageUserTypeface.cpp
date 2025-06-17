@@ -17,9 +17,71 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ImageUserTypeface.h"
-#include "ImageUserScalerContext.h"
+#include "UserScalerContext.h"
+#include "core/utils/MathExtra.h"
 
 namespace tgfx {
+
+class ImageUserScalerContext final : public UserScalerContext {
+ public:
+  ImageUserScalerContext(std::shared_ptr<Typeface> typeface, float size)
+      : UserScalerContext(std::move(typeface), size) {
+  }
+
+  Rect getBounds(GlyphID glyphID, bool, bool fauxItalic) const override {
+    auto record = imageTypeface()->getGlyphRecord(glyphID);
+    if (record == nullptr || record->image == nullptr) {
+      return {};
+    }
+    auto bounds = Rect::MakeXYWH(record->offset.x, record->offset.y,
+                                 static_cast<float>(record->image->width()),
+                                 static_cast<float>(record->image->height()));
+    auto matrix = Matrix::MakeScale(textSize, textSize);
+    if (fauxItalic) {
+      matrix.postSkew(ITALIC_SKEW, 0.f);
+    }
+    bounds = matrix.mapRect(bounds);
+    return bounds;
+  }
+
+  bool generatePath(GlyphID, bool, bool, Path*) const override {
+    return false;
+  }
+
+  Rect getImageTransform(GlyphID glyphID, bool, const Stroke*, Matrix* matrix) const override {
+    auto record = imageTypeface()->getGlyphRecord(glyphID);
+    if (record == nullptr || record->image == nullptr) {
+      return {};
+    }
+    if (matrix) {
+      matrix->setTranslate(record->offset.x, record->offset.y);
+      matrix->postScale(textSize, textSize);
+    }
+    return Rect::MakeXYWH(record->offset.x, record->offset.y,
+                          static_cast<float>(record->image->width()),
+                          static_cast<float>(record->image->height()));
+  }
+
+  bool readPixels(GlyphID glyphID, bool, const Stroke*, const ImageInfo& dstInfo,
+                  void* dstPixels) const override {
+    if (dstInfo.isEmpty() || dstPixels == nullptr) {
+      return false;
+    }
+    auto record = imageTypeface()->getGlyphRecord(glyphID);
+    if (record == nullptr || record->image == nullptr) {
+      return false;
+    }
+    return record->image->readPixels(dstInfo, dstPixels);
+  }
+
+ private:
+  ImageUserTypeface* imageTypeface() const {
+    return static_cast<ImageUserTypeface*>(typeface.get());
+  }
+};
+
+//////////////
+
 std::shared_ptr<UserTypeface> ImageUserTypeface::Make(uint32_t builderID,
                                                       const std::string& fontFamily,
                                                       const std::string& fontStyle,
@@ -39,10 +101,6 @@ ImageUserTypeface::ImageUserTypeface(uint32_t builderID, const std::string& font
 
 size_t ImageUserTypeface::glyphsCount() const {
   return glyphRecords.size();
-}
-
-int ImageUserTypeface::unitsPerEm() const {
-  return 128;
 }
 
 bool ImageUserTypeface::hasColor() const {

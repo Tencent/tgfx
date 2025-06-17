@@ -25,7 +25,7 @@
 namespace tgfx {
 class UserTypeface : public Typeface {
  public:
-  uint32_t getCacheID() const override {
+  uint32_t builderID() const {
     return _builderID;
   }
 
@@ -39,6 +39,10 @@ class UserTypeface : public Typeface {
 
   std::string fontStyle() const override {
     return _fontStyle;
+  }
+
+  int unitsPerEm() const override {
+    return 1;
   }
 
   const FontMetrics& fontMetrics() const {
@@ -57,6 +61,10 @@ class UserTypeface : public Typeface {
   std::shared_ptr<Data> copyTableData(FontTableTag) const override {
     // UserTypeface does not support font tables.
     return nullptr;
+  }
+
+  bool isCustom() const override {
+    return true;
   }
 
  protected:

@@ -16,44 +16,73 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/custom/GlyphPathProvider.h"
 #include "tgfx/core/CustomTypeface.h"
 #include "tgfx/core/Typeface.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
+
+class GlyphPathProvider final : public PathProvider {
+ public:
+  explicit GlyphPathProvider(int pathIndex) : pathIndex(pathIndex) {
+  }
+
+  Path getPath() const override {
+    Path path;
+    switch (pathIndex) {
+      case 0:
+        path.moveTo(Point::Make(25.0f, 5.0f));
+        path.lineTo(Point::Make(45.0f, 45.0f));
+        path.lineTo(Point::Make(5.0f, 45.0f));
+        path.close();
+        break;
+      case 1:
+        path.moveTo(Point::Make(5.0f, 5.0f));
+        path.lineTo(Point::Make(45.0f, 5.0f));
+        path.lineTo(Point::Make(45.0f, 45.0f));
+        path.lineTo(Point::Make(5.0f, 45.0f));
+        path.close();
+        break;
+      case 2: {
+        Rect rect = Rect::MakeXYWH(5.0f, 5.0f, 40.0f, 40.0f);
+        path.addOval(rect);
+        path.close();
+        break;
+      }
+      default: {
+        Rect rect = Rect::MakeXYWH(0.0f, 0.0f, 100.0f, 100.0f);
+        path.addOval(rect);
+        path.close();
+        break;
+      }
+    }
+    return path;
+  }
+
+  Rect getBounds() const override {
+    switch (pathIndex) {
+      case 0:
+      case 1:
+      case 2:
+        return Rect::MakeXYWH(5.0f, 5.0f, 40.0f, 40.0f);
+      default:
+        return Rect::MakeXYWH(0.0f, 0.0f, 100.0f, 100.0f);
+    }
+  }
+
+ private:
+  int pathIndex = 0;
+};
+
 TGFX_TEST(TypefaceTest, CustomPathTypeface) {
   const std::string fontFamily = "customPath";
   const std::string fontStyle = "customStyle";
   PathTypefaceBuilder builder;
   builder.setFontName(fontFamily, fontStyle);
-  Path path;
-  path.moveTo(Point::Make(25.0f, 5.0f));
-  path.lineTo(Point::Make(45.0f, 45.0f));
-  path.lineTo(Point::Make(5.0f, 45.0f));
-  path.close();
-  builder.addGlyph(GlyphPathProvider::Wrap(path));
 
-  path.reset();
-  path.moveTo(Point::Make(5.0f, 5.0f));
-  path.lineTo(Point::Make(45.0f, 5.0f));
-  path.lineTo(Point::Make(45.0f, 45.0f));
-  path.lineTo(Point::Make(5.0f, 45.0f));
-  path.close();
-  builder.addGlyph(GlyphPathProvider::Wrap(path));
-
-  path.reset();
-  Rect rect = Rect::MakeXYWH(5.0f, 5.0f, 40.0f, 40.0f);
-  path.addOval(rect);
-  path.close();
-  builder.addGlyph(GlyphPathProvider::Wrap(path));
-
-  path.reset();
-  rect = Rect::MakeXYWH(0.0f, 0.0f, 100.0f, 100.0f);
-  path.addOval(rect);
-  path.close();
-  builder.addGlyph(GlyphPathProvider::Wrap(path));
-
+  builder.addGlyph(std::make_shared<GlyphPathProvider>(0));
+  builder.addGlyph(std::make_shared<GlyphPathProvider>(1));
+  builder.addGlyph(std::make_shared<GlyphPathProvider>(2));
   auto typeface = builder.detach();
 
   ASSERT_TRUE(typeface != nullptr);
@@ -63,18 +92,13 @@ TGFX_TEST(TypefaceTest, CustomPathTypeface) {
   ASSERT_TRUE(typeface->copyTableData(0) == nullptr);
   ASSERT_EQ(typeface->fontFamily(), fontFamily);
   ASSERT_EQ(typeface->fontStyle(), fontStyle);
-  ASSERT_EQ(typeface->glyphsCount(), static_cast<size_t>(4));
+  ASSERT_EQ(typeface->glyphsCount(), static_cast<size_t>(3));
 
-  path.reset();
-  path.moveTo(Point::Make(25.0f, 5.0f));
-  path.lineTo(Point::Make(35.0f, 35.0f));
-  path.lineTo(Point::Make(45.0f, 5.0f));
-  path.close();
-  builder.addGlyph(GlyphPathProvider::Wrap(path));
+  builder.addGlyph(std::make_shared<GlyphPathProvider>(4));
 
   typeface = builder.detach();
   ASSERT_TRUE(typeface != nullptr);
-  ASSERT_EQ(typeface->glyphsCount(), static_cast<size_t>(5));
+  ASSERT_EQ(typeface->glyphsCount(), static_cast<size_t>(4));
 
   ContextScope scope;
   auto context = scope.getContext();
@@ -143,7 +167,7 @@ TGFX_TEST(TypefaceTest, CustomImageTypeface) {
   float scaleFactor = 1.0f;
   canvas->scale(scaleFactor, scaleFactor);
 
-  Font font(std::move(typeface), 60);
+  Font font(std::move(typeface), 0.25);
   std::vector<GlyphID> glyphIDs2 = {1, 2, 3};
   std::vector<Point> positions2 = {};
   positions2.push_back(Point::Make(150.0f, 0.0f));

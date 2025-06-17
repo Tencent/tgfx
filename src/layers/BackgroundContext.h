@@ -17,23 +17,32 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include "tgfx/core/Path.h"
-#include "tgfx/core/PathProvider.h"
+#include "tgfx/core/Surface.h"
 
 namespace tgfx {
-class GlyphPathProvider : public PathProvider {
+
+class BackgroundContext {
  public:
-  static std::shared_ptr<PathProvider> Wrap(const Path& path);
+  static std::shared_ptr<BackgroundContext> Make(Context* context, const Rect& drawRect,
+                                                 const Matrix& matrix);
 
-  Path getPath() const override;
+  Canvas* backgroundCanvas() const;
 
-  Rect getBounds() const override;
+  std::shared_ptr<Image> getBackgroundImage() const;
 
- private:
-  explicit GlyphPathProvider(const Path& path) : _path(path) {
+  Matrix backgroundMatrix() const {
+    return imageMatrix;
   }
 
-  Path _path;
+  std::shared_ptr<BackgroundContext> createSubContext() const;
+
+  void drawToParent(const Matrix& paintMatrix, const Paint& paint);
+
+ private:
+  BackgroundContext() = default;
+  std::shared_ptr<Surface> surface = nullptr;
+  Matrix imageMatrix = Matrix::I();
+  const BackgroundContext* parent = nullptr;
 };
+
 }  // namespace tgfx

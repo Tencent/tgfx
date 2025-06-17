@@ -227,4 +227,5 @@ void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRe
     opsCompositor->fillImage(std::move(oldContent), renderTarget->bounds(), {}, MCState{}, fill);
   }
 }
+
 }  // namespace tgfx

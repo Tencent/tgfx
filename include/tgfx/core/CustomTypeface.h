@@ -78,7 +78,7 @@ class PathTypefaceBuilder : public CustomTypefaceBuilder {
    * path for the glyph when requested. It may be called from any thread, so it must be thread-safe
    * and immutable after creation. Returns the GlyphID of the new glyph, which is a unique
    * identifier within the typeface, starting from 1. Returns 0 if the glyph cannot be added because
-   * the typeface builder is full.Make sure the PathProvider is non-null and valid.
+   * the typeface builder is full.
    */
   GlyphID addGlyph(std::shared_ptr<PathProvider> provider);
 
@@ -102,7 +102,7 @@ class PathTypefaceBuilder : public CustomTypefaceBuilder {
  */
 class ImageTypefaceBuilder : public CustomTypefaceBuilder {
  public:
-  struct GlyphRecord {  // logical union
+  struct GlyphRecord {
     std::shared_ptr<ImageCodec> image = nullptr;
     Point offset = {};
     GlyphRecord(std::shared_ptr<ImageCodec> image, const Point& offset)

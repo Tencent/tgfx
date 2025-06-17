@@ -196,14 +196,12 @@ void SVGExportContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunLi
   if (typeface == nullptr) {
     return;
   }
-  auto customFont = typeface->uniqueID() != typeface->getCacheID();
-
   // If the font needs to be converted to a path but lacks outlines (e.g., emoji font, web font),
   // it cannot be converted.
   if (!state.clip.contains(glyphRunList->getBounds(state.matrix.getMaxScale()))) {
     applyClipPath(state.clip);
   }
-  if (!customFont) {
+  if (!typeface->isCustom()) {
     if (glyphRunList->hasOutlines() && !glyphRunList->hasColor() &&
         exportFlags & SVGExportFlags::ConvertTextToPaths) {
       exportGlyphsAsPath(glyphRunList, state, fill, stroke);

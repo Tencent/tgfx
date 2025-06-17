@@ -96,6 +96,10 @@ GlyphID Typeface::getGlyphID(const std::string& name) const {
   return getGlyphID(unichar);
 }
 
+bool Typeface::isCustom() const {
+  return false;
+}
+
 std::vector<Unichar> Typeface::getGlyphToUnicodeMap() const {
   return {};
 };
@@ -118,9 +122,5 @@ std::shared_ptr<ScalerContext> Typeface::getScalerContext(float size) {
   }
   scalerContexts[size] = context;
   return context;
-}
-
-uint32_t Typeface::getCacheID() const {
-  return uniqueID();
 }
 }  // namespace tgfx

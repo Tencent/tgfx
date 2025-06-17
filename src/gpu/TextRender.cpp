@@ -19,6 +19,7 @@
 #include "TextRender.h"
 #include "core/GlyphSource.h"
 #include "core/PathRasterizer.h"
+#include "core/UserTypeface.h"
 #include "core/atlas/AtlasTypes.h"
 #include "core/utils/ApplyStrokeToBound.h"
 #include "core/utils/MathExtra.h"
@@ -26,6 +27,17 @@
 #include "gpu/tasks/TextAtlasUploadTask.h"
 
 namespace tgfx {
+
+static uint32_t getTypefaceID(const Typeface* typeface, bool isCustom) {
+  uint32_t typefaceID = 0;
+  if (isCustom) {
+    typefaceID = static_cast<const UserTypeface*>(typeface)->builderID();
+  } else {
+    typefaceID = typeface->uniqueID();
+  }
+  return typefaceID;
+}
+
 static void computeAtlasKey(const Font& font, uint32_t typefaceID, GlyphID glyphID,
                             const Stroke* stroke, BytesKey& key) {
   key.write(font.getSize());
@@ -131,6 +143,9 @@ void TextRender::draw(const MCState& state, const Fill& fill, const Stroke* stro
   rejectedGlyphRun.positions.reserve(maxGlyphRunCount);
 
   for (const auto& run : glyphRunList->glyphRuns()) {
+    if (run.font.getTypeface() == nullptr) {
+      continue;
+    }
     rejectedGlyphRun.font = run.font;
     directMaskDrawing(run, state, fill, stroke, rejectedGlyphRun);
     if (rejectedGlyphRun.glyphs.empty()) {
@@ -184,8 +199,11 @@ void TextRender::directMaskDrawing(const GlyphRun& glyphRun, const MCState& stat
       rejectedGlyphRun.positions.push_back(glyphPosition);
       continue;
     }
+
+    auto typeface = font.getTypeface();
     BytesKey glyphKey;
-    computeAtlasKey(font, font.getTypeface()->getCacheID(), glyphID, stroke, glyphKey);
+    computeAtlasKey(font, getTypefaceID(typeface.get(), typeface->isCustom()), glyphID, stroke,
+                    glyphKey);
 
     auto maskFormat = getMaskFormat(font);
     auto& textureProxies = atlasManager->getTextureProxies(maskFormat);
@@ -340,8 +358,9 @@ void TextRender::transformedMaskDrawing(const GlyphRun& glyphRun, const MCState&
       ApplyStrokeToBounds(*scaledStroke, &bounds, true);
     }
 
+    auto typeface = font.getTypeface().get();
     BytesKey glyphKey;
-    computeAtlasKey(font, font.getTypeface()->getCacheID(), glyphID, stroke, glyphKey);
+    computeAtlasKey(font, getTypefaceID(typeface, typeface->isCustom()), glyphID, stroke, glyphKey);
     auto maskFormat = getMaskFormat(font);
     auto& textureProxies = atlasManager->getTextureProxies(maskFormat);
 

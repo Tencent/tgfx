@@ -33,20 +33,18 @@ class ImageUserTypeface final : public UserTypeface {
 
   size_t glyphsCount() const override;
 
-  int unitsPerEm() const override;
-
   bool hasColor() const override;
 
   bool hasOutlines() const override;
 
   std::shared_ptr<ImageTypefaceBuilder::GlyphRecord> getGlyphRecord(GlyphID glyphID) const;
 
+  std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;
+
  private:
   explicit ImageUserTypeface(uint32_t builderID, const std::string& fontFamily,
                              const std::string& fontStyle, const FontMetrics& metrics,
                              const ImageRecordType& glyphRecords);
-
-  std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;
 
   ImageRecordType glyphRecords = {};
 };
