@@ -20,6 +20,7 @@
 #include <qevent.h>
 #include <QSGImageNode>
 #include <QToolTip>
+#include <iostream>
 #include "Draw.h"
 #include "TimePrint.h"
 #include "tgfx/gpu/opengl/qt/QGLWindow.h"
@@ -255,8 +256,7 @@ void FramesDrawer::mouseMoveEvent(QMouseEvent* event) {
     const auto delta = (event->pos().x() - lastRightDragPos.x());
     if (abs(delta) >= frameWidth) {
       const auto d = delta / frameWidth;
-      viewData->frameStart =
-          std::max(static_cast<uint32_t>(0), viewData->frameStart - static_cast<uint32_t>(d));
+      viewData->frameStart = static_cast<uint32_t>(std::max(0, static_cast<int32_t>(viewData->frameStart) - d));
       lastRightDragPos = pos;
       lastRightDragPos.setX(lastRightDragPos.x() + d * frameWidth - delta);
     }
@@ -274,49 +274,49 @@ void FramesDrawer::mouseReleaseEvent(QMouseEvent* event) {
   QQuickItem::mouseReleaseEvent(event);
 }
 
-void FramesDrawer::hoverMoveEvent(QHoverEvent* event) {
-  if (!event || !frames || !worker) {
-    QQuickItem::hoverMoveEvent(event);
-    return;
-  }
-  const auto w = static_cast<float>(width());
-  const auto mouseX = int(event->position().x());
-  if (mouseX < 0 || mouseX > w - placeWidth) {
-    QToolTip::hideText();
-    return;
-  }
-
-  const auto frameWidth = viewData->frameWidth;
-  const auto adjustedX = mouseX - int(viewOffset);
-  const auto offset = static_cast<uint32_t>(adjustedX / frameWidth);
-  const auto total = worker->GetFrameCount();
-  const auto sel = viewData->frameStart + offset;
-
-  if (sel >= 0 && sel < total) {
-    QString text;
-    const auto frameTime = worker->GetFrameTime(*frames, sel);
-    const auto strFrameTime = TimeToString(frameTime);
-    if (sel == 0) {
-      text = QString("Tracy Initialization\nTime:%1\n").arg(strFrameTime);
-    } else if (sel == 1) {
-      text = QString("Missed frames\nTime:%1").arg(TimeToString(worker->GetFrameTime(*frames, 1)));
-    } else {
-      text = QString("Frames:%1\nFrame Time:%2(%3 FPS)\n")
-                 .arg(sel)
-                 .arg(strFrameTime)
-                 .arg(1000000000.0 / frameTime);
-    }
-    text += QString("Time from start of program:%1\nDrawCall:%2\nTrangles:%3")
-                .arg(TimeToStringExact(worker->GetFrameStart(sel)))
-                .arg(worker->GetFrameDrawCall(sel))
-                .arg(worker->GetFrameTriangles(sel));
-
-    QPoint globalPos = QCursor::pos();
-    QToolTip::showText(globalPos, text, nullptr);
-
-  } else {
-    QToolTip::hideText();
-  }
-  QQuickItem::hoverMoveEvent(event);
-}
+// void FramesDrawer::hoverMoveEvent(QHoverEvent* event) {
+//   if (!event || !frames || !worker) {
+//     QQuickItem::hoverMoveEvent(event);
+//     return;
+//   }
+//   const auto w = static_cast<float>(width());
+//   const auto mouseX = int(event->position().x());
+//   if (mouseX < 0 || mouseX > w - placeWidth) {
+//     QToolTip::hideText();
+//     return;
+//   }
+//
+//   const auto frameWidth = viewData->frameWidth;
+//   const auto adjustedX = mouseX - int(viewOffset);
+//   const auto offset = static_cast<uint32_t>(adjustedX / frameWidth);
+//   const auto total = worker->GetFrameCount();
+//   const auto sel = viewData->frameStart + offset;
+//
+//   if (sel >= 0 && sel < total) {
+//     QString text;
+//     const auto frameTime = worker->GetFrameTime(*frames, sel);
+//     const auto strFrameTime = TimeToString(frameTime);
+//     if (sel == 0) {
+//       text = QString("Tracy Initialization\nTime:%1\n").arg(strFrameTime);
+//     } else if (sel == 1) {
+//       text = QString("Missed frames\nTime:%1").arg(TimeToString(worker->GetFrameTime(*frames, 1)));
+//     } else {
+//       text = QString("Frames:%1\nFrame Time:%2(%3 FPS)\n")
+//                  .arg(sel)
+//                  .arg(strFrameTime)
+//                  .arg(1000000000.0 / frameTime);
+//     }
+//     text += QString("Time from start of program:%1\nDrawCall:%2\nTrangles:%3")
+//                 .arg(TimeToStringExact(worker->GetFrameStart(sel)))
+//                 .arg(worker->GetFrameDrawCall(sel))
+//                 .arg(worker->GetFrameTriangles(sel));
+//
+//     QPoint globalPos = QCursor::pos();
+//     QToolTip::showText(globalPos, text, nullptr);
+//
+//   } else {
+//     QToolTip::hideText();
+//   }
+//   QQuickItem::hoverMoveEvent(event);
+// }
 }  // namespace inspector

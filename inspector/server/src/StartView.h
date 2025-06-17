@@ -23,6 +23,7 @@
 #include <QDateTime>
 #include <QLabel>
 #include <QQmlApplicationEngine>
+#include <kddockwidgets/qtquick/Platform.h>
 #include <QTimer>
 #include <QtTest/QTest>
 #include "InspectorView.h"
@@ -34,9 +35,10 @@ namespace inspector {
 
 class ClientData : public QObject {
   Q_OBJECT
+  Q_PROPERTY(bool connected READ getConnected NOTIFY connectStateChange)
+  Q_PROPERTY(uint16_t port READ getPort CONSTANT)
   Q_PROPERTY(QString procName READ getProcName CONSTANT)
   Q_PROPERTY(QString address READ getAddress CONSTANT)
-  Q_PROPERTY(uint16_t port READ getPort CONSTANT)
  public:
   ClientData(int64_t time, uint32_t protoVer, int32_t activeTime, uint16_t port, uint64_t pid,
              std::string procName, std::string address);
@@ -50,7 +52,17 @@ class ClientData : public QObject {
   uint16_t getPort() const {
     return port;
   }
+  bool getConnected() const {
+    return connected;
+  }
+  void setConnected(bool isConnect) {
+    connected = isConnect;
+    Q_EMIT connectStateChange();
+  }
 
+  Q_SIGNAL void connectStateChange();
+
+  bool connected = false;
   int64_t time = 0;
   uint32_t protocolVersion = 0;
   int32_t activeTime = 0;
@@ -124,23 +136,23 @@ class StartView : public QObject {
   Q_INVOKABLE QString getDirectoryFromPath(const QString& fPath) {
     return QFileInfo(fPath).path();
   }
+  ///* client items *///
+  Q_INVOKABLE QVector<QObject*> getClientItems() const;
+  Q_INVOKABLE void connectToClient(QObject* object);
+  Q_INVOKABLE void connectToClientByLayerInspector(QObject* object);
+  Q_INVOKABLE void showStartView();
 
   Q_SIGNAL void recentFilesChanged();
   Q_SIGNAL void fileItemsChanged();
   Q_SIGNAL void lastOpenFileChanged();
   Q_SIGNAL void openStatView(const QString& fPath);
 
-  ///* client items *///
-  Q_INVOKABLE QVector<QObject*> getClientItems() const;
-
-  Q_INVOKABLE void connectToClient(QObject* object);
-  Q_INVOKABLE void connectToClientByLayerInspector(QObject* object);
-
   Q_SIGNAL void clientItemsChanged();
   Q_SIGNAL void openConnectView(const QString& address, uint16_t port);
-  Q_SIGNAL void closeWindow();
+  Q_SIGNAL void quitStartView();
 
-  Q_INVOKABLE void showStartView();
+  Q_SLOT void onCloseView(QObject* view);
+  Q_SLOT void onCloseAllView();
 
  protected:
   void loadRecentFiles();
@@ -149,17 +161,13 @@ class StartView : public QObject {
   void updateBroadcastClients();
 
  private:
-  InspectorView* inspectorView = nullptr;
-  LayerProfilerView* layerProfilerView = nullptr;
-
+  InspectorView* inspectorView;
+  LayerProfilerView* layerProfilerView;
   QLabel* filesPath = nullptr;
   QString lastOpenFile;
   QStringList recentFiles;
   QList<FileItem*> fileItems;
   QQmlApplicationEngine* qmlEngine = nullptr;
-
-  //todo: need to refactor
-  //only for test
   std::mutex resolvLock;
   uint16_t port = 8086;
   ResolvService resolv;

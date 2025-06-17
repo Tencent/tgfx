@@ -18,10 +18,10 @@
 
 #include <kddockwidgets/Config.h>
 #include <kddockwidgets/qtquick/ViewFactory.h>
-#include <kddockwidgets/qtquick/views/DockWidget.h>
 #include <qwidget.h>
-#include "StartView.h"
 #include <QQuickStyle>
+
+#include "StartView.h"
 
 class CustomViewFactory : public KDDockWidgets::QtQuick::ViewFactory {
  public:
@@ -64,7 +64,6 @@ int main(int argc, char* argv[]) {
 #endif
 
   QApplication app(argc, argv);
-  KDDockWidgets::initFrontend(KDDockWidgets::FrontendType::QtQuick);
 
   static bool initialized = false;
   if (!initialized) {
@@ -81,7 +80,7 @@ int main(int argc, char* argv[]) {
   config.setViewFactory(new CustomViewFactory());
 
   // 创建并显示StartView
-  inspector::StartView* startView = new inspector::StartView();
+  auto startView = new inspector::StartView(&app);
   startView->showStartView();
 
   return app.exec();

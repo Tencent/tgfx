@@ -47,8 +47,20 @@ Worker::Worker(std::string& filePath)
 }
 
 Worker::~Worker() {
-  serverQueryQueue.clear();
-  serverQueryQueuePrio.clear();
+  Shutdown();
+
+  if (netThread.joinable()) {
+    netThread.join();
+  }
+  if (workThread.joinable()) {
+    workThread.join();
+  }
+  if (dataBuffer) {
+    delete[] dataBuffer;
+  }
+  if (lz4Stream) {
+    LZ4_freeStreamDecode((LZ4_streamDecode_t*)lz4Stream);
+  }
 }
 
 bool Worker::Open(const std::string& filePath) {
@@ -200,6 +212,7 @@ void Worker::Exec() {
     dataContext.frameData.frames.push_back(FrameEvent{0, -1, 0, 0, -1});
     dataContext.frameData.frames.push_back(FrameEvent{initEnd, -1, 0, 0, -1});
     dataContext.lastTime = initEnd;
+    refTime = welcome.refTime;
   }
   // leave space for terminate request
   serverQuerySpaceLeft = serverQuerySpaceBase =
@@ -402,7 +415,9 @@ void Worker::ProcessOperateBegin(const QueueOperateBegin& ev) {
 
 void Worker::ProcessOperateEnd(const QueueOperateEnd& ev) {
   auto& stack = dataContext.opTaskStack;
-  assert(!stack.empty());
+  if (stack.empty()) {
+    return;
+  }
   auto opTask = stack.back();
   stack.pop_back();
   assert(opTask->end == -1);

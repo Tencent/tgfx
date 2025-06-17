@@ -20,17 +20,10 @@ ApplicationWindow {
     property int selectedFilePathIndex: -1
     property int selectedClientIndex: -1
 
-
     Column {
         anchors.fill: parent
-        spacing: 0
+        spacing: 2
         clip: true
-
-        Item {
-            width: parent.width
-            height: 2
-        }
-
         ///* open file area header*///
         Column {
             spacing: 2
@@ -51,12 +44,6 @@ ApplicationWindow {
                 }
             }
         }
-
-        Item {
-            width: parent.width
-            height: 2
-        }
-
 
         ///* open file and drag open file area *///
         Row {
@@ -226,11 +213,6 @@ ApplicationWindow {
             }
         }
 
-        Item {
-            width: parent.width
-            height: 2
-        }
-
         ///* open client and select launcher header*///
         Column {
             spacing: 2
@@ -250,11 +232,6 @@ ApplicationWindow {
                     font.pixelSize: 14
                 }
             }
-        }
-
-        Item {
-            width: parent.width
-            height: 2
         }
 
         ///* open client and select launcher area *///
@@ -315,7 +292,7 @@ ApplicationWindow {
 
                             Text {
                                 text: modelData.procName
-                                color: "#DDDDDD"
+                                color: modelData.connected ? "#888888" : "#DDDDDD"
                                 font.pixelSize: 12
                                 width: parent.width
                                 elide: Text.ElideMiddle
@@ -323,7 +300,7 @@ ApplicationWindow {
 
                             Text {
                                 text: modelData.address + ":" + modelData.port
-                                color: "#aaaaaa"
+                                color: modelData.connected ? "#777777" : "#AAAAAA"
                                 font.pixelSize: 10
                                 width: parent.width
                                 elide: Text.ElideMiddle
@@ -333,7 +310,7 @@ ApplicationWindow {
                         MouseArea {
                             id: mouseArea
                             anchors.fill: parent
-                            hoverEnabled: true
+                            enabled: !modelData.connected
                             onClicked: {
                                 selectedClientIndex = index
                             }
@@ -434,11 +411,6 @@ ApplicationWindow {
             }
         }
 
-        Item {
-            width: parent.width
-            height: 2
-        }
-
         ///* cancel and launch button *///
         Rectangle {
             width: parent.width
@@ -530,13 +502,6 @@ ApplicationWindow {
                         }
                     }
                 }
-            }
-        }
-
-        Connections {
-            target: startViewModel
-            function onCloseWindow() {
-                startView.close()
             }
         }
     }

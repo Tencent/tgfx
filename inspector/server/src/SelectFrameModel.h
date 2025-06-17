@@ -17,14 +17,38 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <QAbstractItemModel>
 #include <QObject>
+#include "ViewData.h"
+#include "Worker.h"
 
-class ViewData : public QObject {
- public:
-  int frameWidth = 4;
-  uint32_t selectFrame = 0;
-  uint32_t frameStart = 0;
+namespace inspector {
+class SelectFrameModel: public QAbstractItemModel {
+  Q_OBJECT
+public:
+  enum Roles {
+    NameRole = Qt::UserRole + 1,
+    ValueRole,
+  };
 
-  uint32_t opTaskFilterType = std::numeric_limits<uint32_t>::max();
-  std::string opTaskFilterName;
+  explicit SelectFrameModel(Worker* worker, ViewData* viewData, QObject* parent = nullptr);
+
+  Q_SLOT void refreshData();
+
+  int rowCount(const QModelIndex& parent) const override;
+  QVariant data(const QModelIndex& index, int role) const override;
+  QHash<int, QByteArray> roleNames() const override;
+  QModelIndex index(int row, int column, const QModelIndex& parent) const override;
+  QModelIndex parent(const QModelIndex& child) const override;
+  int columnCount(const QModelIndex& parent) const override;
+private:
+  struct Item {
+    QString name;
+    QVariant value;
+  };
+
+  Worker* worker;
+  ViewData* viewData;
+  QList<Item> items;
 };
+}

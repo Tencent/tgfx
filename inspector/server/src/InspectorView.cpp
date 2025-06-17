@@ -32,33 +32,33 @@ InspectorView::InspectorView(std::string filePath, int width, QObject* parent)
   initConnect();
 }
 
-InspectorView::InspectorView(std::string& addr, uint16_t port, int width, QObject* parent)
-    : QObject(parent), width(width), worker(addr.c_str(), port) {
+InspectorView::InspectorView(ClientData* clientData, int width, QObject* parent)
+    : QObject(parent), width(width), clientData(clientData), worker(clientData->address.c_str(), clientData->port) {
+  this->clientData->setConnected(true);
   initView();
   initConnect();
 }
 
 InspectorView::~InspectorView() {
-  if (taskTreeModel) {
-    delete taskTreeModel;
-  }
-  cleanView();
+  clientData->setConnected(false);
 }
 
 void InspectorView::initView() {
-  cleanView();
   qmlRegisterType<FramesDrawer>("FramesDrawer", 1, 0, "FramesDrawer");
   qmlRegisterType<TaskTreeModel>("TaskTreeModel", 1, 0, "TaskTreeModel");
   qmlRegisterType<AtttributeModel>("AtttributeModel", 1, 0, "AtttributeModel");
   qmlRegisterUncreatableType<KDDockWidgets::QtQuick::Group>("com.kdab.dockwidgets", 2, 0,
                                                "GroupView", QStringLiteral("Internal usage only"));
-  taskTreeModel = new TaskTreeModel(&worker, &viewData, this);
-  ispEngine = new QQmlApplicationEngine(this);
+  taskTreeModel = std::make_unique<TaskTreeModel>(&worker, &viewData, this);
+  selectFrameModel = std::make_unique<SelectFrameModel>(&worker, &viewData, this);
+  taskFilterModel = std::make_unique<TaskFilterModel>(&viewData, this);
+  ispEngine = std::make_unique<QQmlApplicationEngine>(this);
   ispEngine->rootContext()->setContextProperty("workerPtr", &worker);
   ispEngine->rootContext()->setContextProperty("viewDataPtr", &viewData);
   ispEngine->rootContext()->setContextProperty("inspectorViewModel", this);
-  ispEngine->rootContext()->setContextProperty("taskTreeModel", taskTreeModel);
-  KDDockWidgets::QtQuick::Platform::instance()->setQmlEngine(ispEngine);
+  ispEngine->rootContext()->setContextProperty("taskTreeModel", taskTreeModel.get());
+  ispEngine->rootContext()->setContextProperty("taskFilterModel", taskFilterModel.get());
+  ispEngine->rootContext()->setContextProperty("selectFrameModel", selectFrameModel.get());
   ispEngine->load((QUrl("qrc:/qml/InspectorView.qml")));
   if (ispEngine->rootObjects().isEmpty()) {
     qWarning() << "Failed to load InspectorView.qml";
@@ -76,27 +76,23 @@ void InspectorView::initConnect() {
   if (!ispEngine) {
     return;
   }
-  auto inspectorWindow = qobject_cast<QWindow*>(ispEngine->rootObjects().first());
+  auto inspectorWindow = qobject_cast<QQuickWindow*>(ispEngine->rootObjects().first());
   if (!inspectorWindow) {
     return;
   }
   auto frameDrawer = inspectorWindow->findChild<FramesDrawer*>("framesDrawer");
-  connect(frameDrawer, &FramesDrawer::selectFrame, taskTreeModel, &TaskTreeModel::refreshData);
-}
-
-void InspectorView::cleanView() {
-  if (ispEngine) {
-    ispEngine->deleteLater();
-    ispEngine = nullptr;
-  }
+  connect(frameDrawer, &FramesDrawer::selectFrame, taskTreeModel.get(), &TaskTreeModel::refreshData);
+  connect(frameDrawer, &FramesDrawer::selectFrame, selectFrameModel.get(), &SelectFrameModel::refreshData);
+  connect(inspectorWindow, &QQuickWindow::closing, this, &InspectorView::onCloseView, Qt::QueuedConnection);
+  connect(taskFilterModel.get(), &TaskFilterModel::filterTypeChange, taskTreeModel.get(), &TaskTreeModel::refreshData);
 }
 
 void InspectorView::openStartView() {
-  cleanView();
-  auto startView = new StartView(this);
+  auto startView = dynamic_cast<StartView*>(parent());
   startView->showStartView();
 }
 
-void InspectorView::openTaskView() {
+void InspectorView::onCloseView(QQuickCloseEvent*) {
+  Q_EMIT closeView(this);
 }
 }  // namespace inspector

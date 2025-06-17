@@ -90,13 +90,8 @@ class TaskTreeModel : public QAbstractItemModel {
  public:
   enum Roles {
     NameRole = Qt::UserRole + 1,
-    StartTimeRole,
-    EndTimeRole,
-    RowCountRole,
-    DurationRole,
-    TypeRole,
-    OpIdRole,
-    TaskIndexRole
+    CostTimeRole,
+    WeightRole,
   };
 
   explicit TaskTreeModel(Worker* worker, ViewData* viewData, QObject* parent = nullptr);
@@ -104,6 +99,7 @@ class TaskTreeModel : public QAbstractItemModel {
 
   ///* TreeModel *///
   QVariant data(const QModelIndex& index, int role) const override;
+  QHash<int, QByteArray> roleNames() const override;
   QModelIndex index(int row, int column, const QModelIndex& parent) const override;
   QModelIndex parent(const QModelIndex& index) const override;
   int rowCount(const QModelIndex& parent) const override;
@@ -121,18 +117,17 @@ class TaskTreeModel : public QAbstractItemModel {
  protected:
   TaskItem* processTaskLevel(int64_t selectFrameTime,
                              const std::vector<std::shared_ptr<OpTaskData>>& opTasks,
-                             const std::unordered_map<uint32_t, std::vector<unsigned int>>& opChilds);
-  bool matchesFilter(const QString& name) const;
+                             const std::unordered_map<uint32_t, std::vector<uint32_t>>& opChilds);
+  bool filterOpTasks(const OpTaskData* opTask,
+                     const std::unordered_map<uint32_t, std::vector<uint32_t>>& opChilds);
+  bool matchesFilter(const std::string& name) const;
+  bool matchesFilter(uint8_t type) const;
 
  private:
   Worker* worker = nullptr;
   ViewData* viewData = nullptr;
   TaskItem* rootItem = nullptr;
   AtttributeModel* atttributeModel = nullptr;
-  QStringList typeFilter;
-  QStringList typeName;
-  QString textFilter;
-  bool filterEnabled = false;
   QMap<uint32_t, TaskItem*> opIdNodeMap;
 };
 

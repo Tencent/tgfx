@@ -3,8 +3,10 @@ import QtQuick.Window 2.13
 import FramesDrawer 1.0
 
 Item {
-    id: wind
+    id: frameView
     visible: true
+    property int fontSize: 14
+    property string fontColor: "#DDDDDD"
 
     Row {
         anchors.fill: parent
@@ -14,61 +16,41 @@ Item {
             id: frameInfoArea
             width: 180
             height: parent.height
-            color: "#535353"
+            color: "#383838"
 
-            Column {
-                anchors.left: parent.left
-                anchors.top: parent.top
-                anchors.leftMargin: 1
-                anchors.topMargin: 1
-                spacing: 10
+            ListView {
+                id: selectFrameDataPreview
+                width: parent.width
+                height: parent.height
+                clip: true
 
-                Row {
-                    spacing: 10
-                    Text {
-                        text: "Frame:"
-                        color: "#DDDDDD"
-                        font.pixelSize: 14
-                        width: 80
-                    }
-                    Text {
-                        id: frameInfo
-                        /* get the data from model */
-                        text: /*model.getFirstFrame()*/ "0"
-                        color: "#DDDDDD"
-                        font.pixelSize: 14
-                    }
-                }
+                model: selectFrameModel
 
-                Row {
-                    spacing: 10
-                    Text {
-                        text: "Time:"
-                        color: "#DDDDDD"
-                        font.pixelSize: 14
-                        width: 80
-                    }
-                    Text {
-                        id: timeInfo
-                        text: "0 ms"
-                        color: "#DDDDDD"
-                        font.pixelSize: 14
-                    }
-                }
+                delegate: Rectangle {
+                    id: selectFrameViewDelegate
+                    implicitHeight: 30
+                    implicitWidth: selectFrameDataPreview.width
+                    color: "#535353"
+                    anchors.topMargin: 10
+                    clip: true
 
-                Row {
-                    spacing: 10
+                    required property string name
+                    required property string value
+
                     Text {
-                        text: "Draw Calls:"
-                        color: "#DDDDDD"
-                        font.pixelSize: 14
-                        width: 80
+                        x: 6
+                        y: 6
+                        font.pixelSize: frameView.fontSize
+                        color: frameView.fontColor
+                        text: selectFrameViewDelegate.name
                     }
+
                     Text {
-                        id: drawCallsInfo
-                        text: "0"
-                        color: "#DDDDDD"
-                        font.pixelSize: 14
+                        x: (selectFrameDataPreview.width / 2) + 6
+                        y: 6
+                        font.pixelSize: frameView.fontSize
+                        color: frameView.fontColor
+                        text: selectFrameViewDelegate.value
                     }
                 }
             }

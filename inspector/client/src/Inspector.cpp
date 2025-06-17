@@ -41,6 +41,7 @@ struct InspectorData {
 
 static std::atomic<int> inspectorDataLock{0};
 static std::atomic<InspectorData*> inspectorData{nullptr};
+static Inspector* s_instance = nullptr;
 
 BroadcastMessage& GetBroadcastMessage(const char* procname, size_t pnsz, size_t& len,
                                       uint16_t port) {
@@ -95,6 +96,7 @@ Inspector::Inspector()
       lz4Buf((char*)inspectorMalloc(LZ4Size + sizeof(lz4sz_t))), shutdown(false), timeBegin(0),
       frameCount(0), isConnect(false), serialQueue(1024 * 1024), serialDequeue(1024 * 1024),
       lz4Stream(LZ4_createStream()) {
+  s_instance = this;
   SpawnWorkerThreads();
 }
 
@@ -152,6 +154,10 @@ bool Inspector::HandleServerQuery() {
   return true;
 }
 
+bool Inspector::ShouldExit() {
+  return s_instance->shutdown.load(std::memory_order_relaxed);
+}
+
 void Inspector::Worker() {
   const char* addr = "255.255.255.255";
   uint16_t dataPort = 8086;
@@ -168,7 +174,23 @@ void Inspector::Worker() {
   MemWrite(&welcome.initEnd, timeBegin.load(std::memory_order_relaxed));
 
   ListenSocket listen;
-  listen.Listen(dataPort, 4);
+  bool isListening = false;
+  for (uint16_t i = 0; i < 20; ++i) {
+    if (listen.Listen(dataPort + i, 4)) {
+      dataPort += i;
+      isListening = true;
+      break;
+    }
+  }
+  if (!isListening) {
+    while(true) {
+      if (ShouldExit()) {
+        shutdown.store(true, std::memory_order_relaxed);
+        return;
+      }
+      std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
+    }
+  }
 
   broadcast = (UdpBroadcast*)inspectorMalloc(sizeof(UdpBroadcast));
   new (broadcast) UdpBroadcast();
@@ -182,6 +204,7 @@ void Inspector::Worker() {
   auto& broadcastMsg = GetBroadcastMessage(procname, pnsz, broadcastLen, dataPort);
   long long lastBroadcast = 0;
   while (true) {
+    MemWrite(&welcome.refTime, refTimeThread);
     while (true) {
       if (ShouldExit()) {
         if (broadcast) {

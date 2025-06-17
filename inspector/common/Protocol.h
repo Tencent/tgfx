@@ -91,4 +91,5 @@ enum OpTaskType : uint8_t {
 struct WelcomeMessage {
   int64_t initBegin;
   int64_t initEnd;
+  int64_t refTime;
 };
