@@ -28,16 +28,67 @@ namespace hello2d {
 TGFXView::TGFXView(QQuickItem* parent) : QQuickItem(parent) {
   setFlag(ItemHasContents, true);
   setAcceptedMouseButtons(Qt::LeftButton);
+  setAcceptHoverEvents(true);
+  setAcceptedMouseButtons(Qt::LeftButton);
+  setAcceptTouchEvents(true);
+  setFocus(true);
   createAppHost();
 }
 
-void TGFXView::mousePressEvent(QMouseEvent* event) {
+void TGFXView::wheelEvent(QWheelEvent* event) {
+  bool isZoom = (event->modifiers() & Qt::ControlModifier) || (event->modifiers() & Qt::MetaModifier);
+  qreal px = event->position().x();
+  qreal py = event->position().y();
+
+  if(isZoom) {
+    float factor = (float)std::exp(-event->angleDelta().y() / 400.0);
+    float oldZoom = zoom;
+    float newZoom = std::max(0.01f, std::min(100.0f, oldZoom * factor));
+    offset.setX((offset.x() - px) * (newZoom / oldZoom) + px);
+    offset.setY((offset.y() - py) * (newZoom / oldZoom) + py);
+    zoom = newZoom;
+  } else {
+    offset.rx() -= event->angleDelta().x();
+    offset.ry() -= event->angleDelta().y();
+  }
+  update();
   event->accept();
 }
 
-void TGFXView::mouseReleaseEvent(QMouseEvent*) {
-  lastDrawIndex++;
-  QMetaObject::invokeMethod(this, "update", Qt::AutoConnection);
+static bool switchFlag = true;
+
+void TGFXView::mousePressEvent(QMouseEvent* event) {
+  if(event->button() == Qt::LeftButton) {
+    dragging = true;
+    lastMousePos = event->pos();
+    setCursor(Qt::ClosedHandCursor);
+    event->accept();
+    switchFlag = true;
+  }
+}
+
+void TGFXView::mouseMoveEvent(QMouseEvent* event) {
+  if(dragging) {
+    QPoint delta = event->pos() - lastMousePos;
+    offset.rx() += delta.x();
+    offset.ry() += delta.y();
+    lastMousePos = event->pos();
+    update();
+    event->accept();
+    switchFlag = false;
+  }
+}
+
+void TGFXView::mouseReleaseEvent(QMouseEvent* event) {
+  if(event->button() == Qt::LeftButton) {
+    dragging = false;
+    unsetCursor();
+    event->accept();
+  }
+  if(switchFlag) {
+    lastDrawIndex++;
+    update();
+  }
 }
 
 QSGNode* TGFXView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
@@ -97,6 +148,7 @@ void TGFXView::createAppHost() {
 }
 
 void TGFXView::draw() {
+  appHost->updateZoomAndOffset(zoom, tgfx::Point((float)offset.x(), (float)offset.y()));
   auto device = tgfxWindow->getDevice();
   if (device == nullptr) {
     return;

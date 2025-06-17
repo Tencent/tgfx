@@ -15,5 +15,6 @@ Window {
         anchors.bottom: parent.bottom
         anchors.right: parent.right
         objectName: "tgfxView"
+        focus: true
     }
 }

@@ -32,6 +32,8 @@ class TGFXView : public QQuickItem {
  protected:
   void mousePressEvent(QMouseEvent* event) override;
   void mouseReleaseEvent(QMouseEvent*) override;
+  void wheelEvent(QWheelEvent* event) override;
+  void mouseMoveEvent(QMouseEvent* event) override;
 
   QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*) override;
 
@@ -39,6 +41,10 @@ class TGFXView : public QQuickItem {
   int lastDrawIndex = 0;
   std::shared_ptr<tgfx::QGLWindow> tgfxWindow = nullptr;
   std::shared_ptr<drawers::AppHost> appHost = nullptr;
+  float zoom = 1.0f;
+  QPointF offset = {0, 0};
+  bool dragging = false;
+  QPoint lastMousePos;
 
   void createAppHost();
   void draw();
