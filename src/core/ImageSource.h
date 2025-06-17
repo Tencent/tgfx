@@ -19,6 +19,7 @@
 #pragma once
 
 #include "core/DataSource.h"
+#include "core/utils/BlockBuffer.h"
 #include "tgfx/core/ImageGenerator.h"
 
 namespace tgfx {
@@ -33,7 +34,8 @@ class ImageSource : public DataSource<ImageBuffer> {
    * image will be decoded synchronously when the getData() method is called.
    */
   static std::unique_ptr<DataSource> MakeFrom(std::shared_ptr<ImageGenerator> generator,
-                                              bool tryHardware = true, bool asyncDecoding = true);
+                                              bool tryHardware = true, bool asyncDecoding = true,
+                                              BlockBuffer* blockBuffer = nullptr);
 
   ImageSource(std::shared_ptr<ImageGenerator> generator, bool tryHardware);
 
@@ -41,8 +43,8 @@ class ImageSource : public DataSource<ImageBuffer> {
     return generator->makeBuffer(tryHardware);
   }
 
- private:
-  std::shared_ptr<ImageGenerator> generator = nullptr;
-  bool tryHardware = true;
+   private:
+    std::shared_ptr<ImageGenerator> generator = nullptr;
+    bool tryHardware = true;
 };
 }  // namespace tgfx

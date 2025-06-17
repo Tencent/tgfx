@@ -44,4 +44,11 @@ std::shared_ptr<Resource> TextureUploadTask::onMakeResource(Context* context) {
   }
   return texture;
 }
+
+void TextureUploadTask::runAsync() {
+  if (source) {
+    source->runAsync();
+  }
+};
+
 }  // namespace tgfx

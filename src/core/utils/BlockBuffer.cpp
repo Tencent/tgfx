@@ -48,6 +48,7 @@ BlockBuffer::BlockBuffer(size_t initBlockSize) : initBlockSize(initBlockSize) {
 }
 
 BlockBuffer::~BlockBuffer() {
+  waitForReferenceEmpty();
   for (auto& block : blocks) {
     free(block.data);
   }
@@ -92,6 +93,7 @@ void BlockBuffer::clear(size_t maxReuseSize) {
   if (blocks.empty()) {
     return;
   }
+  waitForReferenceEmpty();
   currentBlockIndex = 0;
   usedSize = 0;
   size_t totalBlockSize = 0;
@@ -112,6 +114,7 @@ std::shared_ptr<BlockData> BlockBuffer::release() {
   if (usedSize == 0) {
     return nullptr;
   }
+  waitForReferenceEmpty();
   std::vector<uint8_t*> usedBlocks = {};
   usedBlocks.reserve(currentBlockIndex + 1);
   for (auto& block : blocks) {
@@ -147,5 +150,21 @@ bool BlockBuffer::allocateNewBlock(size_t requestSize) {
   currentBlockIndex = blocks.size();
   blocks.emplace_back(data, blockSize);
   return true;
+}
+
+void BlockBuffer::addReference() {
+  referenceCount.fetch_add(1, std::memory_order_relaxed);
+}
+
+void BlockBuffer::removeReference() {
+  if (referenceCount.fetch_sub(1, std::memory_order_acq_rel) == 1) {
+    std::unique_lock<std::mutex> lock(mutex);
+    condition.notify_all();
+  }
+}
+
+void BlockBuffer::waitForReferenceEmpty() {
+  std::unique_lock<std::mutex> lock(mutex);
+  condition.wait(lock, [this]() { return referenceCount.load(std::memory_order_acquire) == 0; });
 }
 }  // namespace tgfx

@@ -18,11 +18,14 @@
 
 #pragma once
 
+#include <atomic>
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <vector>
 #include "core/utils/PlacementArray.h"
 
@@ -149,6 +152,27 @@ class BlockBuffer {
    */
   std::shared_ptr<BlockData> release();
 
+  /**
+   * Increments the reference count of the BlockBuffer. This allows tracking whether the memory
+   * blocks is still in use by other threads. Ensures that memory blocks are not freed while there
+   * are outstanding references.
+   * This method is thread-safe.
+   */
+  void addReference();
+
+  /**
+   * Decrements the reference count of the BlockBuffer. If the reference count reaches zero, it
+   * signals any waiting threads that the memory blocks can be freed.
+   * This method is thread-safe.
+   */
+  void removeReference();
+
+  /**
+   * Waits until the reference count reaches zero, indicating that all threads have finished using
+   * the memory blocks and it is safe to release them.
+   */
+  void waitForReferenceEmpty();
+
  private:
   struct Block {
     Block() = default;
@@ -165,6 +189,10 @@ class BlockBuffer {
   size_t initBlockSize = 0;
   size_t currentBlockIndex = 0;
   size_t usedSize = 0;
+
+  std::atomic<int> referenceCount = 0;
+  std::mutex mutex = {};
+  std::condition_variable condition = {};
 
   Block* findOrAllocateBlock(size_t requestedSize);
   bool allocateNewBlock(size_t requestSize);

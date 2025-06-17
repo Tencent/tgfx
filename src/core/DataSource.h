@@ -18,8 +18,10 @@
 
 #pragma once
 
+#include "core/utils/BlockBuffer.h"
 #include "core/utils/Log.h"
 #include "tgfx/core/Task.h"
+#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 template <typename T>
@@ -48,14 +50,15 @@ class DataSource {
    * Wraps the existing data source into an asynchronous DataSource and starts loading the data
 	 * immediately.
    */
-  static std::unique_ptr<DataSource> Async(std::unique_ptr<DataSource> source) {
+  static std::unique_ptr<DataSource> Async(std::unique_ptr<DataSource> source,
+                                           BlockBuffer* blockBuffer) {
 #ifndef TGFX_USE_THREADS
     return source;
 #endif
     if (source == nullptr) {
       return nullptr;
     }
-    return std::make_unique<AsyncDataSource<T>>(std::move(source));
+    return std::make_unique<AsyncDataSource<T>>(std::move(source), blockBuffer);
   }
 
   virtual ~DataSource() = default;
@@ -65,6 +68,8 @@ class DataSource {
    * generate a new data.
    */
   virtual std::shared_ptr<T> getData() const = 0;
+
+  virtual void runAsync() {};
 };
 
 /**
@@ -90,7 +95,8 @@ class DataWrapper : public DataSource<T> {
 template <typename T>
 class DataTask : public Task {
  public:
-  explicit DataTask(std::unique_ptr<DataSource<T>> source) : source(std::move(source)) {
+  explicit DataTask(std::unique_ptr<DataSource<T>> source, BlockBuffer* blockBuffer)
+      : source(std::move(source)), blockBuffer(blockBuffer) {
   }
 
   std::shared_ptr<T> getData() {
@@ -100,8 +106,16 @@ class DataTask : public Task {
  protected:
   void onExecute() override {
     DEBUG_ASSERT(source != nullptr);
+    // Ensure that the reference count of the shared memory (BlockBuffer) is greater than 1 during
+    // execution, so that the BlockBuffer does not release the memory used by the Task or its owner.
+    if (blockBuffer) {
+      blockBuffer->addReference();
+    }
     data = source->getData();
     source = nullptr;
+    if (blockBuffer) {
+      blockBuffer->removeReference();
+    }
   }
 
   void onCancel() override {
@@ -111,6 +125,7 @@ class DataTask : public Task {
  private:
   std::shared_ptr<T> data = nullptr;
   std::unique_ptr<DataSource<T>> source = nullptr;
+  BlockBuffer* blockBuffer = nullptr;
 };
 
 /**
@@ -120,14 +135,12 @@ class DataTask : public Task {
 template <typename T>
 class AsyncDataSource : public DataSource<T> {
  public:
-  explicit AsyncDataSource(std::unique_ptr<DataSource<T>> source) {
-    task = std::make_shared<DataTask<T>>(std::move(source));
-    Task::Run(task);
+  explicit AsyncDataSource(std::unique_ptr<DataSource<T>> source, BlockBuffer* blockBuffer)
+      : DataSource<T>() {
+    task = std::make_shared<DataTask<T>>(std::move(source), blockBuffer);
   }
 
   ~AsyncDataSource() override {
-    // The data source might have objects created in shared memory (like BlockBuffer), so we
-    // need to wait for the task to finish before destroying it.
     task->cancel();
   }
 
@@ -135,6 +148,12 @@ class AsyncDataSource : public DataSource<T> {
     task->wait();
     return task->getData();
   }
+
+  void runAsync() override {
+    if (task) {
+      Task::Run(task);
+    }
+  };
 
  private:
   std::shared_ptr<DataTask<T>> task = nullptr;

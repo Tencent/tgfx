@@ -20,6 +20,7 @@
 
 #include <vector>
 #include "core/DataSource.h"
+#include "core/utils/BlockBuffer.h"
 #include "core/utils/PlacementPtr.h"
 #include "tgfx/core/Data.h"
 
@@ -44,8 +45,9 @@ class VertexProvider {
 
 class VertexProviderTask : public Task {
  public:
-  VertexProviderTask(PlacementPtr<VertexProvider> provider, float* vertices)
-      : provider(std::move(provider)), vertices(vertices) {
+  VertexProviderTask(PlacementPtr<VertexProvider> provider, float* vertices,
+                     BlockBuffer* blockBuffer)
+      : provider(std::move(provider)), vertices(vertices), blockBuffer(blockBuffer) {
   }
 
  protected:
@@ -56,6 +58,7 @@ class VertexProviderTask : public Task {
  private:
   PlacementPtr<VertexProvider> provider = nullptr;
   float* vertices = nullptr;
+  BlockBuffer* blockBuffer = nullptr;
 };
 
 class AsyncVertexSource : public DataSource<Data> {

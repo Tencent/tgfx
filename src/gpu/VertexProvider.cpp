@@ -22,8 +22,16 @@
 namespace tgfx {
 void VertexProviderTask::onExecute() {
   DEBUG_ASSERT(provider != nullptr);
+  // Ensure that the reference count of the shared memory (BlockBuffer) is greater than 1 during
+  // execution, so that the BlockBuffer does not release the memory used by the Task or its owner.
+  if (blockBuffer) {
+    blockBuffer->addReference();
+  }
   provider->getVertices(vertices);
   provider = nullptr;
+  if (blockBuffer) {
+    blockBuffer->removeReference();
+  }
 }
 
 void VertexProviderTask::onCancel() {
