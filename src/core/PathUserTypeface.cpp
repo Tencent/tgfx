@@ -60,6 +60,9 @@ class PathUserScalerContext final : public UserScalerContext {
   }
 
   bool generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic, Path* path) const override {
+    if (path == nullptr) {
+      return false;
+    }
     auto pathProvider = pathTypeFace()->getPathProvider(glyphID);
     if (pathProvider == nullptr) {
       path->reset();
