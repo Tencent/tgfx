@@ -57,7 +57,8 @@ class RasterPixelBuffer : public PixelBuffer {
 class HardwarePixelBuffer : public PixelBuffer {
  public:
   HardwarePixelBuffer(const ImageInfo& info, HardwareBufferRef hardwareBuffer)
-      : PixelBuffer(info), hardwareBuffer(HardwareBufferRetain(hardwareBuffer)) {
+      : PixelBuffer(info) {
+    this->hardwareBuffer = HardwareBufferRetain(hardwareBuffer);
   }
 
   ~HardwarePixelBuffer() override {
@@ -85,8 +86,6 @@ class HardwarePixelBuffer : public PixelBuffer {
     return Texture::MakeFrom(context, hardwareBuffer);
   }
 
- private:
-  HardwareBufferRef hardwareBuffer;
 };
 
 std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alphaOnly,
@@ -116,7 +115,8 @@ std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alpha
 
 std::shared_ptr<PixelBuffer> PixelBuffer::MakeFrom(HardwareBufferRef hardwareBuffer) {
   auto info = HardwareBufferGetInfo(hardwareBuffer);
-  return info.isEmpty() ? nullptr : std::make_shared<HardwarePixelBuffer>(info, hardwareBuffer);
+  // return info.isEmpty() ? nullptr : std::make_shared<HardwarePixelBuffer>(info, hardwareBuffer);
+  return std::make_shared<HardwarePixelBuffer>(info, hardwareBuffer);
 }
 
 PixelBuffer::PixelBuffer(const ImageInfo& info) : _info(info) {
@@ -137,18 +137,21 @@ void PixelBuffer::unlockPixels() {
 }
 
 std::shared_ptr<Texture> PixelBuffer::onMakeTexture(Context* context, bool mipmapped) const {
-  std::lock_guard<std::mutex> autoLock(locker);
-  if (!mipmapped && isHardwareBacked()) {
-    return onBindToHardwareTexture(context);
+  if(!_info.isEmpty()) {
+    std::lock_guard<std::mutex> autoLock(locker);
+    if (!mipmapped && isHardwareBacked()) {
+      return onBindToHardwareTexture(context);
+    }
+    auto pixels = onLockPixels();
+    if (pixels == nullptr) {
+      return nullptr;
+    }
+    auto format = ColorTypeToPixelFormat(_info.colorType());
+    auto texture =
+        Texture::MakeFormat(context, width(), height(), pixels, _info.rowBytes(), format, mipmapped);
+    onUnlockPixels();
+    return texture;
   }
-  auto pixels = onLockPixels();
-  if (pixels == nullptr) {
-    return nullptr;
-  }
-  auto format = ColorTypeToPixelFormat(_info.colorType());
-  auto texture =
-      Texture::MakeFormat(context, width(), height(), pixels, _info.rowBytes(), format, mipmapped);
-  onUnlockPixels();
-  return texture;
+  return Texture::MakeFrom(context, hardwareBuffer);
 }
 }  // namespace tgfx

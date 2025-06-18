@@ -96,8 +96,11 @@ class PixelBuffer : public ImageBuffer {
   virtual void onUnlockPixels() const = 0;
   virtual std::shared_ptr<Texture> onBindToHardwareTexture(Context* context) const = 0;
 
+  HardwareBufferRef hardwareBuffer = {};
+
  private:
   mutable std::mutex locker = {};
   ImageInfo _info = {};
+
 };
 }  // namespace tgfx
