@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "tgfx/core/FillModifier.h"
 #include "tgfx/core/Matrix.h"
 
 namespace tgfx {
@@ -62,8 +63,10 @@ class Picture {
    * Replays the drawing commands on the specified canvas. In the case that the commands are
    * recorded, each command in the Picture is sent separately to canvas. To add a single command to
    * draw the Picture to a canvas, call Canvas::drawPicture() instead.
+   * @param canvas The receiver of drawing commands
+   * @param fillModifier An optional FillModifier to modify the Fill properties of drawing commands.
    */
-  void playback(Canvas* canvas) const;
+  void playback(Canvas* canvas, const FillModifier* fillModifier = nullptr) const;
 
  private:
   std::shared_ptr<BlockData> blockData = nullptr;
@@ -74,17 +77,20 @@ class Picture {
   Picture(std::shared_ptr<BlockData> data, std::vector<PlacementPtr<Record>> records,
           size_t drawCount);
 
-  void playback(DrawContext* drawContext, const MCState& state) const;
+  void playback(DrawContext* drawContext, const MCState& state,
+                const FillModifier* fillModifier = nullptr) const;
 
   std::shared_ptr<Image> asImage(Point* offset, const Matrix* matrix = nullptr,
                                  const ISize* clipSize = nullptr) const;
 
-  const Record* firstDrawRecord(MCState* state = nullptr, Fill* fill = nullptr) const;
+  const Record* getFirstDrawRecord(MCState* state = nullptr, Fill* fill = nullptr,
+                                   bool* hasStroke = nullptr) const;
 
   friend class MeasureContext;
   friend class RenderContext;
   friend class RecordingContext;
   friend class SVGExportContext;
+  friend class FillModifierContext;
   friend class Image;
   friend class PictureImage;
   friend class Canvas;
