@@ -115,8 +115,6 @@ void DrawingManager::addResourceTask(PlacementPtr<ResourceTask> resourceTask) {
     // Remove the unique key from the old task, so it will be skipped when the task is executed.
     result->second->uniqueKey = {};
   }
-  // If this is an asynchronous task, start executing it here.
-  resourceTask->runAsync();
   resourceTaskMap[resourceTask->uniqueKey] = resourceTask.get();
   resourceTasks.emplace_back(std::move(resourceTask));
 }

@@ -30,6 +30,10 @@
 #include "core/utils/PlacementArray.h"
 
 namespace tgfx {
+
+//use shared_ptr<void> as a reference counter to manage the lifetime of memory blocks
+using ReferenceCounter = std::shared_ptr<void>;
+
 /**
  * BlockData is a helper class that manages the memory blocks released from a BlockBuffer. It is
  * responsible for freeing the memory blocks when they are no longer needed.
@@ -152,20 +156,9 @@ class BlockBuffer {
    */
   std::shared_ptr<BlockData> release();
 
-  /**
-   * Increments the reference count of the BlockBuffer. This allows tracking whether the memory
-   * blocks are still in use by other threads. Ensures that memory blocks are not freed while there
-   * are outstanding references.
-   * This method is thread-safe.
-   */
-  void addReference();
-
-  /**
-   * Decrements the reference count of the BlockBuffer. If the reference count reaches zero, it
-   * signals any waiting threads that the memory blocks can be freed.
-   * This method is thread-safe.
-   */
-  void removeReference();
+  ReferenceCounter referenceCounter() const {
+    return _referenceCounter;
+  }
 
   /**
    * Waits until the reference count reaches zero, indicating that all threads have finished using
@@ -190,9 +183,10 @@ class BlockBuffer {
   size_t currentBlockIndex = 0;
   size_t usedSize = 0;
 
-  std::atomic<int> referenceCount = 0;
   std::mutex mutex = {};
   std::condition_variable condition = {};
+  ReferenceCounter _referenceCounter = nullptr;
+  std::weak_ptr<void> weakReferenceCounter;
 
   Block* findOrAllocateBlock(size_t requestedSize);
   bool allocateNewBlock(size_t requestSize);

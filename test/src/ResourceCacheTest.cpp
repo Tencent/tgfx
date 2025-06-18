@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <thread>
+#include <utility>
 #include <vector>
 #include "core/utils/BlockBuffer.h"
 #include "core/utils/UniqueID.h"
@@ -66,28 +67,23 @@ TGFX_TEST(ResourceCacheTest, multiThreadRecycling) {
 namespace {
 class TestAsyncTask : public Task {
  public:
-  explicit TestAsyncTask(BlockBuffer* blockBuffer) : blockBuffer(blockBuffer) {
+  explicit TestAsyncTask(ReferenceCounter referenceCounter)
+      : referenceCounter(std::move(referenceCounter)) {
   }
 
  protected:
   void onExecute() override {
-    if (blockBuffer) {
-      blockBuffer->addReference();
-    }
-
     // sleep for a while to simulate a long-running task
     std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
-    if (blockBuffer) {
-      blockBuffer->removeReference();
-    }
+    referenceCounter = nullptr;
   }
 
   void onCancel() override {
+    referenceCounter = nullptr;
   }
 
  private:
-  BlockBuffer* blockBuffer = nullptr;
+  ReferenceCounter referenceCounter = nullptr;
 };
 
 class TaskOwner {
@@ -103,7 +99,7 @@ class TaskOwner {
 #ifdef TGFX_USE_THREADS
 TGFX_TEST(ResourceCacheTest, blockBufferRefCount) {
   BlockBuffer blockBuffer;
-  auto task = std::make_shared<TestAsyncTask>(&blockBuffer);
+  auto task = std::make_shared<TestAsyncTask>(blockBuffer.referenceCounter());
   auto taskOwner = blockBuffer.make<TaskOwner>(task);
   Task::Run(task);
 

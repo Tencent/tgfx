@@ -108,8 +108,8 @@ class Task {
   }
 
   /**
-   * Requests the Task to skip executing its Runnable object. Cancellation does not affect the
-   * execution of a Task that has already begun. This method does not block the current thread.
+   * Requests the task to skip executing. Cancellation does not affect the execution of a Task that
+   * has already begun. This method does not block the current thread.
    */
   void cancel();
 

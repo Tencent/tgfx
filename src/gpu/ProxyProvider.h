@@ -176,6 +176,7 @@ class ProxyProvider {
 
   std::shared_ptr<TextureProxy> createTextureProxyByImageSource(
       const UniqueKey& uniqueKey, std::shared_ptr<DataSource<ImageBuffer>> source, int width,
-      int height, bool alphaOnly, bool mipmapped = false, uint32_t renderFlags = 0);
+      int height, bool alphaOnly, bool mipmapped = false, uint32_t renderFlags = 0,
+      bool asyncDecoding = false);
 };
 }  // namespace tgfx

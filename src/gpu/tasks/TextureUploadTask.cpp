@@ -17,13 +17,22 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureUploadTask.h"
+#include <utility>
+#include "core/DataSource.h"
 #include "gpu/Texture.h"
+#include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
 TextureUploadTask::TextureUploadTask(UniqueKey uniqueKey,
-                                     std::shared_ptr<DataSource<ImageBuffer>> source,
-                                     bool mipmapped)
-    : ResourceTask(std::move(uniqueKey)), source(std::move(source)), mipmapped(mipmapped) {
+                                     std::shared_ptr<DataSource<ImageBuffer>> inputSource,
+                                     bool mipmapped, bool asyncDecoding,
+                                     ReferenceCounter referenceCounter)
+    : ResourceTask(std::move(uniqueKey)), mipmapped(mipmapped) {
+  if (asyncDecoding) {
+    source = DataSource<ImageBuffer>::Async(std::move(inputSource), std::move(referenceCounter));
+  } else {
+    source = inputSource;
+  }
 }
 
 std::shared_ptr<Resource> TextureUploadTask::onMakeResource(Context* context) {
@@ -44,11 +53,5 @@ std::shared_ptr<Resource> TextureUploadTask::onMakeResource(Context* context) {
   }
   return texture;
 }
-
-void TextureUploadTask::runAsync() {
-  if (source) {
-    source->runAsync();
-  }
-};
 
 }  // namespace tgfx

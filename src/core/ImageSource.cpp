@@ -17,12 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ImageSource.h"
+#include <memory>
+#include <utility>
 #include "core/utils/BlockBuffer.h"
 
 namespace tgfx {
-std::unique_ptr<DataSource<ImageBuffer>> ImageSource::MakeFrom(
+std::shared_ptr<DataSource<ImageBuffer>> ImageSource::MakeFrom(
     std::shared_ptr<ImageGenerator> generator, bool tryHardware, bool asyncDecoding,
-    BlockBuffer* blockBuffer) {
+    ReferenceCounter referenceCounter) {
   if (generator == nullptr) {
     return nullptr;
   }
@@ -34,7 +36,7 @@ std::unique_ptr<DataSource<ImageBuffer>> ImageSource::MakeFrom(
   }
   auto imageSource = std::make_unique<ImageSource>(std::move(generator), tryHardware);
   if (asyncDecoding) {
-    return Async(std::move(imageSource), blockBuffer);
+    return Async(std::move(imageSource), std::move(referenceCounter));
   }
   return imageSource;
 }

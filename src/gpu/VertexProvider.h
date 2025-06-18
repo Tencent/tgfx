@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <utility>
 #include <vector>
 #include "core/DataSource.h"
 #include "core/utils/BlockBuffer.h"
@@ -46,8 +47,11 @@ class VertexProvider {
 class VertexProviderTask : public Task {
  public:
   VertexProviderTask(PlacementPtr<VertexProvider> provider, float* vertices,
-                     BlockBuffer* blockBuffer)
-      : provider(std::move(provider)), vertices(vertices), blockBuffer(blockBuffer) {
+                     ReferenceCounter referenceCounter)
+      : provider(std::move(provider)), vertices(vertices),
+        referenceCounter(std::move(referenceCounter)) {
+    // Ensure that the reference count of the shared memory (BlockBuffer) is greater than 1 during
+    // execution, so that the BlockBuffer does not release the memory used by the Task or its owner.
   }
 
  protected:
@@ -58,7 +62,7 @@ class VertexProviderTask : public Task {
  private:
   PlacementPtr<VertexProvider> provider = nullptr;
   float* vertices = nullptr;
-  BlockBuffer* blockBuffer = nullptr;
+  ReferenceCounter referenceCounter = nullptr;
 };
 
 class AsyncVertexSource : public DataSource<Data> {

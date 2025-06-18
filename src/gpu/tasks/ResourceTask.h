@@ -41,8 +41,6 @@ class ResourceTask {
 
   virtual std::shared_ptr<Resource> onMakeResource(Context* context) = 0;
 
-  virtual void runAsync(){};
-
   friend class DrawingManager;
 };
 }  // namespace tgfx

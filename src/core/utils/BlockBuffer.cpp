@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BlockBuffer.h"
+#include <memory>
 #include "core/utils/Log.h"
 
 namespace tgfx {
@@ -45,6 +46,13 @@ BlockData::~BlockData() {
 
 BlockBuffer::BlockBuffer(size_t initBlockSize) : initBlockSize(initBlockSize) {
   DEBUG_ASSERT(initBlockSize > 0);
+
+  // Initialize reference count callback to notify when the reference count reaches zero.
+  _referenceCounter = ReferenceCounter(nullptr, [this](void*) {
+    std::unique_lock<std::mutex> lock(mutex);
+    condition.notify_all();
+  });
+  weakReferenceCounter = std::weak_ptr<void>(_referenceCounter);
 }
 
 BlockBuffer::~BlockBuffer() {
@@ -152,19 +160,10 @@ bool BlockBuffer::allocateNewBlock(size_t requestSize) {
   return true;
 }
 
-void BlockBuffer::addReference() {
-  referenceCount.fetch_add(1, std::memory_order_relaxed);
-}
-
-void BlockBuffer::removeReference() {
-  if (referenceCount.fetch_sub(1, std::memory_order_acq_rel) == 1) {
-    std::unique_lock<std::mutex> lock(mutex);
-    condition.notify_all();
-  }
-}
-
 void BlockBuffer::waitForReferenceEmpty() {
+  // If _referenceCounter is not set to nullptr, the reference count will always be at least 1.
+  _referenceCounter = nullptr;
   std::unique_lock<std::mutex> lock(mutex);
-  condition.wait(lock, [this]() { return referenceCount.load(std::memory_order_acquire) == 0; });
+  condition.wait(lock, [this]() { return weakReferenceCounter.expired(); });
 }
 }  // namespace tgfx

@@ -18,19 +18,19 @@
 
 #pragma once
 
+#include <memory>
 #include "ResourceTask.h"
-#include "core/ImageSource.h"
+#include "core/DataSource.h"
+#include "core/utils/BlockBuffer.h"
+#include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
 class TextureUploadTask : public ResourceTask {
  public:
   TextureUploadTask(UniqueKey uniqueKey, std::shared_ptr<DataSource<ImageBuffer>> source,
-                    bool mipmapped);
+                    bool mipmapped, bool asyncDecoding, ReferenceCounter referenceCounter);
 
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
-
- protected:
-  void runAsync() override;
 
  private:
   std::shared_ptr<DataSource<ImageBuffer>> source = nullptr;

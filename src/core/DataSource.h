@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <memory>
+#include <utility>
 #include "core/utils/BlockBuffer.h"
 #include "core/utils/Log.h"
 #include "tgfx/core/Task.h"
@@ -50,15 +52,15 @@ class DataSource {
    * Wraps the existing data source into an asynchronous DataSource and starts loading the data
 	 * immediately.
    */
-  static std::unique_ptr<DataSource> Async(std::unique_ptr<DataSource> source,
-                                           BlockBuffer* blockBuffer) {
+  static std::unique_ptr<DataSource> Async(std::shared_ptr<DataSource> source,
+                                           ReferenceCounter referenceCounter) {
 #ifndef TGFX_USE_THREADS
     return source;
 #endif
     if (source == nullptr) {
       return nullptr;
     }
-    return std::make_unique<AsyncDataSource<T>>(std::move(source), blockBuffer);
+    return std::make_unique<AsyncDataSource<T>>(std::move(source), referenceCounter);
   }
 
   virtual ~DataSource() = default;
@@ -68,8 +70,6 @@ class DataSource {
    * generate a new data.
    */
   virtual std::shared_ptr<T> getData() const = 0;
-
-  virtual void runAsync(){};
 };
 
 /**
@@ -95,8 +95,8 @@ class DataWrapper : public DataSource<T> {
 template <typename T>
 class DataTask : public Task {
  public:
-  explicit DataTask(std::unique_ptr<DataSource<T>> source, BlockBuffer* blockBuffer)
-      : source(std::move(source)), blockBuffer(blockBuffer) {
+  explicit DataTask(std::shared_ptr<DataSource<T>> source, ReferenceCounter referenceCounter)
+      : source(std::move(source)), referenceCounter(std::move(referenceCounter)) {
   }
 
   std::shared_ptr<T> getData() {
@@ -106,26 +106,22 @@ class DataTask : public Task {
  protected:
   void onExecute() override {
     DEBUG_ASSERT(source != nullptr);
-    // Ensure that the reference count of the shared memory (BlockBuffer) is greater than 1 during
-    // execution, so that the BlockBuffer does not release the memory used by the Task or its owner.
-    if (blockBuffer) {
-      blockBuffer->addReference();
-    }
     data = source->getData();
     source = nullptr;
-    if (blockBuffer) {
-      blockBuffer->removeReference();
-    }
+    // Release the reference counter to decrement the BlockBuffer's reference count
+    referenceCounter = nullptr;
   }
 
   void onCancel() override {
     source = nullptr;
+    // Release the reference counter to decrement the BlockBuffer's reference count
+    referenceCounter = nullptr;
   }
 
  private:
   std::shared_ptr<T> data = nullptr;
-  std::unique_ptr<DataSource<T>> source = nullptr;
-  BlockBuffer* blockBuffer = nullptr;
+  std::shared_ptr<DataSource<T>> source = nullptr;
+  ReferenceCounter referenceCounter = nullptr;
 };
 
 /**
@@ -135,8 +131,10 @@ class DataTask : public Task {
 template <typename T>
 class AsyncDataSource : public DataSource<T> {
  public:
-  explicit AsyncDataSource(std::unique_ptr<DataSource<T>> source, BlockBuffer* blockBuffer) {
-    task = std::make_shared<DataTask<T>>(std::move(source), blockBuffer);
+  explicit AsyncDataSource(std::shared_ptr<DataSource<T>> source,
+                           ReferenceCounter referenceCounter) {
+    task = std::make_shared<DataTask<T>>(std::move(source), referenceCounter);
+    Task::Run(task);
   }
 
   ~AsyncDataSource() override {
@@ -147,12 +145,6 @@ class AsyncDataSource : public DataSource<T> {
     task->wait();
     return task->getData();
   }
-
-  void runAsync() override {
-    if (task) {
-      Task::Run(task);
-    }
-  };
 
  private:
   std::shared_ptr<DataTask<T>> task = nullptr;
