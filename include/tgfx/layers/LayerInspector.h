@@ -31,6 +31,7 @@ class LayerInspector {
   }
 
   void pickedLayer(float x, float y);
+  void setLayerInspectorHoveredStateCallBack(std::function<void(bool)> callback);
 
   void setDisplayList(tgfx::DisplayList* displayList);
   void serializingLayerTree();
@@ -56,6 +57,7 @@ class LayerInspector {
   int m_HighLightLayerIndex = 0;
   bool m_HoverdSwitch = false;
   tgfx::DisplayList* m_DisplayList;
+  std::function<void(bool)> hoveredCallBack;
 };
 
 }  // namespace tgfx
