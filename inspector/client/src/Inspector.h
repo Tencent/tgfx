@@ -81,9 +81,7 @@ class Inspector {
     inspector->Worker();
   }
 
-  static bool ShouldExit() {
-    return SingletonInspector::GetInstance()->shutdown.load(std::memory_order_relaxed);
-  }
+  static bool ShouldExit();
 
   void Worker();
   void SpawnWorkerThreads();

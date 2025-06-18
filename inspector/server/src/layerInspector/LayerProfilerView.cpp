@@ -199,7 +199,6 @@ void LayerProfilerView::LayerProlfilerQMLImpl() {
   if (window) {
     window->show();
   }
-
 }
 
 void LayerProfilerView::ProcessMessage(const QByteArray& message) {

@@ -5,7 +5,6 @@ import QtQuick.Layouts 1.15
 import FramesDrawer 1.0
 import com.kdab.dockwidgets 2.0 as KDDW
 
-
 ApplicationWindow {
     id: inspectorView
     visible: true
@@ -76,8 +75,8 @@ ApplicationWindow {
                 text: qsTr("Close")
                 shortcut: StandardKey.Close
                 onTriggered: {
-                    inspectorView.hide()
-                    inspectorViewModel.openStartView()
+                    close()
+                    inspectorViewModel.cleanUp();
                 }
             }
         }
@@ -188,7 +187,6 @@ ApplicationWindow {
         }
     }
 
-
     Rectangle {
         id: mainContainer
         anchors.fill: parent
@@ -199,13 +197,11 @@ ApplicationWindow {
             anchors.margins: 1
             spacing: 0
 
-
             Rectangle {
                 id: framesContainer
                 Layout.fillWidth: true
-                Layout.preferredHeight: 100
+                Layout.preferredHeight: 150
                 color: "#535353"
-
 
                 Loader {
                     id: framesViewLoader
@@ -217,7 +213,6 @@ ApplicationWindow {
                 }
             }
 
-
             Item {
                 width: parent.width
                 height: 2
@@ -228,18 +223,15 @@ ApplicationWindow {
                 Layout.fillWidth: true
                 Layout.preferredHeight: 50
                 color: "#535353"
-
                 Row {
                     id: iconRow
                     anchors.left: parent.left
                     anchors.verticalCenter: parent.verticalCenter
                     anchors.leftMargin: 10
                     spacing: 20
-
                     Item {
                         height: 32
                         width: 32
-
                         Image {
                             id: disconnectIcon
                             source: "qrc:icons/disconnected.png"
@@ -254,7 +246,7 @@ ApplicationWindow {
                             onEntered: parent.scale = 1.1
                             onExited: parent.scale = 1.0
                             onClicked: {
-                                console.log("Disconnect clicked")
+                                close();
                             }
                         }
                     }
@@ -343,7 +335,6 @@ ApplicationWindow {
     KDDW.LayoutSaver {
         id: layoutSaver
     }
-
 }
 
 

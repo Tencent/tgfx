@@ -32,13 +32,29 @@ TaskTreeModel::~TaskTreeModel() {
   deleteTree(rootItem);
 }
 
+QHash<int, QByteArray> TaskTreeModel::roleNames() const {
+  QHash<int, QByteArray> names;
+  names[NameRole] = "name";
+  names[CostTimeRole] = "costTime";
+  names[WeightRole] = "weight";
+  return names;
+}
+
 QVariant TaskTreeModel::data(const QModelIndex& index, int role) const {
-  if (!index.isValid() || rootItem == nullptr || role != Qt::DisplayRole) {
+  if (!index.isValid() || rootItem == nullptr) {
     return {};
   }
 
   auto item = static_cast<TaskItem*>(index.internalPointer());
-  return item->data(index.column());
+  switch (role) {
+    case NameRole:
+    case CostTimeRole:
+    case WeightRole:{
+      return item->data(index.column());
+    }
+    default:
+      return {};
+  }
 }
 
 QModelIndex TaskTreeModel::index(int row, int column, const QModelIndex& parent) const {
@@ -73,13 +89,13 @@ int TaskTreeModel::rowCount(const QModelIndex& parent) const {
   if (parent.column() > 0) {
     return 0;
   }
+
   TaskItem* parentItem;
   if (!parent.isValid()) {
     parentItem = rootItem;
   } else {
     parentItem = static_cast<TaskItem*>(parent.internalPointer());
   }
-
   if (!parentItem) {
     return 0;
   }
@@ -93,17 +109,36 @@ int TaskTreeModel::columnCount(const QModelIndex& parent) const {
   return rootItem ? rootItem->columnCount() : 3;
 }
 
-bool TaskTreeModel::matchesFilter(const QString& name) const {
-  if (!typeFilter.isEmpty() && !typeFilter.contains(name)) {
-    return false;
+bool TaskTreeModel::filterOpTasks(const OpTaskData* opTask,
+                   const std::unordered_map<uint32_t, std::vector<uint32_t>>& opChilds) {
+  const auto& dataContext = worker->GetDataContext();
+  auto& opTaskName = OpTaskName[opTask->type];
+  auto& opTasks = dataContext.opTasks;
+  if (matchesFilter(opTaskName)) {
+    return true;
   }
-
-  if (!textFilter.isEmpty()) {
-    QRegularExpression regex(textFilter, QRegularExpression::CaseInsensitiveOption);
-    return regex.match(name).hasMatch();
+  auto childsIndx = opChilds.find(opTask->id);
+  if (childsIndx != opChilds.end()) {
+    for (auto opTaskIdx: childsIndx->second) {
+      if (filterOpTasks(opTasks.at(opTaskIdx).get(), opChilds)) {
+        return true;
+      }
+    }
   }
+  return false;
+}
 
-  return true;
+bool TaskTreeModel::matchesFilter(const std::string& name) const {
+  auto& filterName = viewData->opTaskFilterName;
+  if (filterName.empty() || filterName == name) {
+    return true;
+  }
+  QRegularExpression regex(filterName.c_str(), QRegularExpression::CaseInsensitiveOption);
+  return regex.match(name.c_str()).hasMatch();
+}
+
+bool TaskTreeModel::matchesFilter(uint8_t type) const {
+  return viewData->opTaskFilterType & 1 << (type - 1);
 }
 
 void TaskTreeModel::deleteTree(TaskItem* root) {
@@ -158,9 +193,8 @@ void TaskTreeModel::refreshData() {
 TaskItem* TaskTreeModel::processTaskLevel(
     int64_t selectFrameTime,
     const std::vector<std::shared_ptr<OpTaskData>>& opTasks,
-    const std::unordered_map<uint32_t, std::vector<unsigned int>>& opChilds) {
+    const std::unordered_map<uint32_t, std::vector<uint32_t>>& opChilds) {
   TaskItem* root = nullptr;
-  // this step is very importent
   QVariantList emptyColumnData {tr("opTaskName"), tr("opTaskTime"), tr("opTaskWeight")};
   if (opTasks.empty()) {
     root = new TaskItem(emptyColumnData, static_cast<uint32_t>(0));
@@ -169,9 +203,13 @@ TaskItem* TaskTreeModel::processTaskLevel(
 
   std::unordered_map<uint32_t, TaskItem*> nodeMap;
   for (auto& opTask: opTasks) {
-    QVariantList columnData;
+    auto opTaskName = OpTaskName[opTask->type];
+    if (!(matchesFilter(opTask->type) && filterOpTasks(opTask.get(), opChilds))) {
+      continue;
+    }
     auto opTaskTime = opTask->end - opTask->start;
-    columnData << OpTaskName[opTask->type];
+    QVariantList columnData;
+    columnData << opTaskName;
     columnData << TimeToString(opTaskTime);
     columnData << opTaskTime / selectFrameTime * 100;
     nodeMap[opTask->id] = new TaskItem(columnData, opTask->id);
@@ -200,9 +238,15 @@ TaskItem* TaskTreeModel::processTaskLevel(
   }
   for (const auto& pair: opChilds) {
     auto parendIndex = pair.first;
+    if (nodeMap.find(parendIndex) == nodeMap.end()) {
+      continue;
+    }
     auto& childIndices = pair.second;
     auto parentNode = nodeMap[parendIndex];
     for (auto childIndex: childIndices) {
+      if (nodeMap.find(childIndex) == nodeMap.end()) {
+        continue;
+      }
       auto childNode = nodeMap[childIndex];
       childNode->setIndex(parentNode->childCount());
       parentNode->appendChild(childNode);
@@ -211,6 +255,9 @@ TaskItem* TaskTreeModel::processTaskLevel(
   }
   if (root->opId == 0) {
     for (const auto& opTask: opTasks) {
+      if (nodeMap.find(opTask->id) == nodeMap.end()) {
+        continue;
+      }
       auto node = nodeMap[opTask->id];
       if (node->getParentItem() == nullptr && node != root) {
         root->appendChild(node);

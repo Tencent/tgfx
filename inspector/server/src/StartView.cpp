@@ -21,6 +21,7 @@
 #include <QQmlContext>
 #include <QQuickWindow>
 #include <QSettings>
+#include "FramesDrawer.h"
 #include "Protocol.h"
 #include "Socket.h"
 
@@ -51,6 +52,7 @@ StartView::~StartView() {
   }
   clients.clear();
   broadcastListen.reset();
+  Q_EMIT quitStartView();
 }
 
 QList<QObject*> StartView::getFileItems() const {
@@ -58,7 +60,6 @@ QList<QObject*> StartView::getFileItems() const {
   for (const auto& fileItem : fileItems) {
     items.append(fileItem);
   }
-
   return items;
 }
 
@@ -74,7 +75,6 @@ void StartView::openFile(const QString& fPath) {
   if (filesPath) {
     filesPath->setText(fPath);
     inspectorView = new InspectorView(fPath.toStdString(), 1920, this);
-    Q_EMIT closeWindow();
   }
 }
 
@@ -124,39 +124,49 @@ void StartView::connectToClient(QObject* object) {
   auto client = dynamic_cast<ClientData*>(object);
   if (client) {
     if (inspectorView) {
-      delete inspectorView;
+      connect(inspectorView, &InspectorView::destroyed, this, [&, client]() {
+        inspectorView = new InspectorView(client, 1920, this);
+      });
+      inspectorView->deleteLater();
+    } else {
+      inspectorView = new InspectorView(client, 1920, this);
     }
-    inspectorView = new InspectorView(client->address, client->port, 1920, this);
-    Q_EMIT closeWindow();
+    connect(inspectorView, &InspectorView::closeView, this, &StartView::onCloseView);
   }
 }
 
 void StartView::connectToClientByLayerInspector(QObject* object) {
   auto client = dynamic_cast<ClientData*>(object);
   if (client) {
-    if (layerProfilerView) {
-      delete layerProfilerView;
-      layerProfilerView = nullptr;
-    }
     layerProfilerView =
         new LayerProfilerView(QString::fromStdString(client->address), 8084);
-    Q_EMIT closeWindow();
   }
 }
 
 void StartView::showStartView() {
-  QQmlApplicationEngine* engine = new QQmlApplicationEngine(this);
-  engine->rootContext()->setContextProperty("startViewModel", this);
-  engine->load(QUrl(QStringLiteral("qrc:/qml/StartView.qml")));
+  if (!qmlEngine) {
+    qmlEngine = new QQmlApplicationEngine(this);
+    qmlEngine->rootContext()->setContextProperty("startViewModel", this);
+    qmlEngine->load(QUrl(QStringLiteral("qrc:/qml/StartView.qml")));
+    KDDockWidgets::QtQuick::Platform::instance()->setQmlEngine(qmlEngine);
 
-  if (!engine->rootObjects().isEmpty()) {
-    auto startWindow = static_cast<QQuickWindow*>(engine->rootObjects().first());
-    startWindow->setFlags(Qt::Window);
-    startWindow->setTitle("Inspector - Start");
-    startWindow->resize(1000, 600);
+    if (!qmlEngine->rootObjects().isEmpty()) {
+      auto startWindow = dynamic_cast<QQuickWindow*>(qmlEngine->rootObjects().first());
+      startWindow->setFlags(Qt::Window);
+      startWindow->setTitle("Inspector - Start");
+      startWindow->resize(1000, 600);
+      startWindow->show();
+
+      connect(startWindow, &QQuickWindow::closing, this, &StartView::onCloseAllView);
+      connect(this, &StartView::quitStartView, QApplication::instance(), &QApplication::quit);
+    } else {
+      qWarning() << "无法加载StartView.qml";
+    }
+  }
+
+  if (!qmlEngine->rootObjects().isEmpty()) {
+    auto startWindow = dynamic_cast<QQuickWindow*>(qmlEngine->rootObjects().first());
     startWindow->show();
-  } else {
-    qWarning() << "无法加载StartView.qml";
   }
 }
 
@@ -256,6 +266,7 @@ void StartView::updateBroadcastClients() {
         }
       } else if (it != clients.end()) {
         clients.erase(it);
+        Q_EMIT clientItemsChanged();
       }
     }
     auto it = clients.begin();
@@ -269,5 +280,25 @@ void StartView::updateBroadcastClients() {
       }
     }
   }
+}
+
+void StartView::onCloseView(QObject* view) {
+  view->deleteLater();
+  if (view == inspectorView) {
+    inspectorView = nullptr;
+  }
+  if (view == layerProfilerView) {
+    layerProfilerView = nullptr;
+  }
+}
+
+void StartView::onCloseAllView() {
+  if (inspectorView) {
+    inspectorView->deleteLater();
+  }
+  if (layerProfilerView) {
+    layerProfilerView->deleteLater();
+  }
+  this->deleteLater();
 }
 }  // namespace inspector

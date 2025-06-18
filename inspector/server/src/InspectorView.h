@@ -19,32 +19,38 @@
 #pragma once
 
 #include <QMainWindow>
+#include <QQuickWindow>
+#include "SelectFrameModel.h"
 #include "StartView.h"
+#include "TaskFilterModel.h"
 #include "TaskTreeModel.h"
 #include "ViewData.h"
 #include "Worker.h"
 
 namespace inspector {
+class ClientData;
 class InspectorView : public QObject {
   Q_OBJECT
 
  public:
   InspectorView(std::string filePath, int width, QObject* parent = nullptr);
-  InspectorView(std::string& addr, uint16_t port, int width, QObject* parent = nullptr);
-  ~InspectorView() override;
+  InspectorView(ClientData* clientData, int width, QObject* parent = nullptr);
+  ~InspectorView();
 
   void initView();
   void initConnect();
-  void cleanView();
   Q_INVOKABLE void openStartView();
-  Q_INVOKABLE void openTaskView();
 
+  Q_SLOT void onCloseView(QQuickCloseEvent*);
+  Q_SIGNAL void closeView(QObject* view);
  private:
   int width;
+  ClientData* clientData = nullptr;
   Worker worker;
   ViewData viewData;
-  bool connected = false;
-  QQmlApplicationEngine* ispEngine = nullptr;
-  TaskTreeModel* taskTreeModel = nullptr;
+  std::unique_ptr<QQmlApplicationEngine> ispEngine = nullptr;
+  std::unique_ptr<TaskTreeModel> taskTreeModel;
+  std::unique_ptr<SelectFrameModel> selectFrameModel;
+  std::unique_ptr<TaskFilterModel> taskFilterModel;
 };
 }  // namespace inspector

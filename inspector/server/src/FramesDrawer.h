@@ -40,7 +40,7 @@ class FramesDrawer : public QQuickItem {
   void mouseMoveEvent(QMouseEvent* event) override;
   void mousePressEvent(QMouseEvent* event) override;
   void mouseReleaseEvent(QMouseEvent* event) override;
-  void hoverMoveEvent(QHoverEvent* event) override;
+  // void hoverMoveEvent(QHoverEvent* event) override;
 
   Worker* getWorker() const {
     return worker;
