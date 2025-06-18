@@ -16,7 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <thread>
 #include <vector>
+#include "core/utils/BlockBuffer.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/Resource.h"
 #include "tgfx/core/Task.h"
@@ -59,5 +61,54 @@ TGFX_TEST(ResourceCacheTest, multiThreadRecycling) {
       });
     }
   });
+};
+
+namespace {
+class TestAsyncTask : public Task {
+ public:
+  explicit TestAsyncTask(BlockBuffer* blockBuffer) : blockBuffer(blockBuffer) {
+  }
+
+ protected:
+  void onExecute() override {
+    if (blockBuffer) {
+      blockBuffer->addReference();
+    }
+
+    // sleep for a while to simulate a long-running task
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+
+    if (blockBuffer) {
+      blockBuffer->removeReference();
+    }
+  }
+
+  void onCancel() override {
+  }
+
+ private:
+  BlockBuffer* blockBuffer = nullptr;
+};
+
+class TaskOwner {
+ public:
+  explicit TaskOwner(std::shared_ptr<Task> task) : task(std::move(task)) {
+  }
+
+ private:
+  std::shared_ptr<Task> task;
+};
+}  // namespace
+
+#ifdef TGFX_USE_THREADS
+TGFX_TEST(ResourceCacheTest, blockBufferRefCount) {
+  BlockBuffer blockBuffer;
+  auto task = std::make_shared<TestAsyncTask>(&blockBuffer);
+  auto taskOwner = blockBuffer.make<TaskOwner>(task);
+  Task::Run(task);
+
+  blockBuffer.clear();
 }
+#endif
+
 }  // namespace tgfx

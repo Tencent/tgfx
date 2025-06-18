@@ -135,8 +135,7 @@ class DataTask : public Task {
 template <typename T>
 class AsyncDataSource : public DataSource<T> {
  public:
-  explicit AsyncDataSource(std::unique_ptr<DataSource<T>> source, BlockBuffer* blockBuffer)
-      : DataSource<T>() {
+  explicit AsyncDataSource(std::unique_ptr<DataSource<T>> source, BlockBuffer* blockBuffer) {
     task = std::make_shared<DataTask<T>>(std::move(source), blockBuffer);
   }
 
