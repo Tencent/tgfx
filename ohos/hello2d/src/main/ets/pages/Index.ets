@@ -31,7 +31,7 @@ struct Index {
       .width('100%')
       .onClick(() => {
         hello2d.draw(this.drawIndex++);
-      })
+      }, 10)
     }
     .height('100%')
   }

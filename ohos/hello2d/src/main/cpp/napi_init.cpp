@@ -1,12 +1,32 @@
 #include "napi/native_api.h"
 #include <ace/xcomponent/native_interface_xcomponent.h>
 #include "tgfx/gpu/opengl/egl/EGLWindow.h"
+#include "tgfx/core/Point.h"
 #include "drawers/AppHost.h"
 #include "drawers/Drawer.h"
+#include <vector>
+#include <cmath>
 
 static float screenDensity = 1.0f;
 static std::shared_ptr<drawers::AppHost> appHost = nullptr;
 static std::shared_ptr<tgfx::Window> window = nullptr;
+static float g_zoom = 1.0f;
+static tgfx::Point g_offset{0, 0};
+static int g_drawIndex = 0;
+
+struct TouchState {
+    bool dragging = false;
+    float lastX = 0, lastY = 0;
+    bool pinching = false;
+    float pinchStartDist = 0.0f;
+    float pinchStartZoom = 1.0f;
+    tgfx::Point pinchStartOffset{0, 0};
+    float pinchCenterX = 0, pinchCenterY = 0;
+    int pointerIdA = -1, pointerIdB = -1;
+    float lastAX = 0, lastAY = 0, lastBX = 0, lastBY = 0;
+    bool needResetPanAfterScale = false;
+};
+static TouchState touchState;
 
 static std::shared_ptr<drawers::AppHost> CreateAppHost();
 
@@ -46,6 +66,7 @@ static void Draw(int index) {
   if (window == nullptr || appHost == nullptr || appHost->width() <= 0 || appHost->height() <= 0) {
     return;
   }
+    appHost->updateZoomAndOffset(g_zoom, g_offset);
   auto device = window->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {
@@ -78,6 +99,10 @@ static napi_value OnDraw(napi_env env, napi_callback_info info) {
   napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
   double value;
   napi_get_value_double(env, args[0], &value);
+    g_drawIndex = static_cast<int>(value);
+    touchState = TouchState();
+    g_zoom = 1.0f;
+    g_offset = {0,0};
   Draw(static_cast<int>(value));
   return nullptr;
 }
@@ -125,7 +150,85 @@ static void OnSurfaceDestroyedCB(OH_NativeXComponent*, void*) {
   window = nullptr;
 }
 
-static void DispatchTouchEventCB(OH_NativeXComponent*, void*) {
+static void DispatchTouchEventCB(OH_NativeXComponent* component, void* windowRaw)
+{
+    OH_NativeXComponent_TouchEvent touchEvent;
+    if (OH_NativeXComponent_GetTouchEvent(component, windowRaw, &touchEvent) != OH_NATIVEXCOMPONENT_RESULT_SUCCESS) {
+        return;
+    }
+    unsigned int pointerCount = touchEvent.numPoints;
+    if (pointerCount == 2) {
+        float x1 = touchEvent.touchPoints[0].x, y1 = touchEvent.touchPoints[0].y;
+        float x2 = touchEvent.touchPoints[1].x, y2 = touchEvent.touchPoints[1].y;
+        float centerX = (x1 + x2) / 2.0f;
+        float centerY = (y1 + y2) / 2.0f;
+        float dist = std::hypot(x2 - x1, y2 - y1);
+        if (!touchState.pinching
+            || touchEvent.type == OH_NativeXComponent_TouchEventType::OH_NATIVEXCOMPONENT_DOWN) {
+            touchState.pinching = true;
+            touchState.pinchStartDist = dist;
+            touchState.pinchStartZoom = g_zoom;
+            touchState.pinchStartOffset = g_offset;
+            touchState.pinchCenterX = centerX;
+            touchState.pinchCenterY = centerY;
+            touchState.pointerIdA = touchEvent.touchPoints[0].id;
+            touchState.pointerIdB = touchEvent.touchPoints[1].id;
+        }
+        else if (touchEvent.type == OH_NativeXComponent_TouchEventType::OH_NATIVEXCOMPONENT_MOVE) {
+            if (touchState.pinching) {
+                float scale = dist / touchState.pinchStartDist;
+                float zoomNew = std::max(0.01f, std::min(100.0f, touchState.pinchStartZoom * scale));
+                float ox = (touchState.pinchStartOffset.x - touchState.pinchCenterX) * (zoomNew / touchState.pinchStartZoom) + touchState.pinchCenterX;
+                float oy = (touchState.pinchStartOffset.y - touchState.pinchCenterY) * (zoomNew / touchState.pinchStartZoom) + touchState.pinchCenterY;
+                g_zoom = zoomNew;
+                g_offset.x = ox;
+                g_offset.y = oy;
+                Draw(g_drawIndex);
+            }
+        }
+        else if (touchEvent.type == OH_NativeXComponent_TouchEventType::OH_NATIVEXCOMPONENT_UP) {
+            touchState.pinching = false;
+            touchState.needResetPanAfterScale = true;
+        }
+        return;
+    }
+    if (pointerCount == 1) {
+        float x = touchEvent.touchPoints[0].x;
+        float y = touchEvent.touchPoints[0].y;
+        if (touchState.pinching) {
+            if (touchEvent.type == OH_NativeXComponent_TouchEventType::OH_NATIVEXCOMPONENT_DOWN) {
+                touchState.pinching = false;
+            } else {
+                return;
+            }
+        }
+        if (touchEvent.type == OH_NativeXComponent_TouchEventType::OH_NATIVEXCOMPONENT_DOWN) {
+            touchState.dragging = true;
+            touchState.lastX = x;
+            touchState.lastY = y;
+            if (touchState.needResetPanAfterScale) {
+                touchState.lastX = x;
+                touchState.lastY = y;
+                touchState.needResetPanAfterScale = false;
+            }
+        } else if (touchEvent.type == OH_NativeXComponent_TouchEventType::OH_NATIVEXCOMPONENT_MOVE) {
+            if (touchState.needResetPanAfterScale) {
+                touchState.lastX = x;
+                touchState.lastY = y;
+                touchState.needResetPanAfterScale = false;
+                return;
+            }
+            if (touchState.dragging) {
+                float dx = x - touchState.lastX;
+                float dy = y - touchState.lastY;
+                g_offset.x += dx;
+                g_offset.y += dy;
+                touchState.lastX = x;
+                touchState.lastY = y;
+                Draw(g_drawIndex);
+            }
+        }
+    }
 }
 
 static void OnSurfaceCreatedCB(OH_NativeXComponent* component, void* nativeWindow) {

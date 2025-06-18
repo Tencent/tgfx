@@ -81,12 +81,11 @@ class ViewController(private val view: TGFXView) {
                 distanceX: Float,
                 distanceY: Float
             ): Boolean {
-                // 防跳动关键：缩放刚结束后首次onScroll直接吞掉
                 if (needResetPanAfterScale) {
                     lastPan.set(e2.x, e2.y)
                     lastOffset.set(view.contentOffset.x, view.contentOffset.y)
                     needResetPanAfterScale = false
-                    return false // 本次不平移，不跳
+                    return false
                 }
                 val dx = e2.x - lastPan.x
                 val dy = e2.y - lastPan.y
@@ -111,7 +110,6 @@ class ViewController(private val view: TGFXView) {
             lastOffset.set(view.contentOffset.x, view.contentOffset.y)
             needResetPanAfterScale = false
         }
-
         var handled = scaleGestureDetector.onTouchEvent(event)
         if (!isScaling) {
             handled = gestureDetector.onTouchEvent(event) || handled
