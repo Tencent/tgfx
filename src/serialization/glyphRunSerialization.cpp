@@ -40,7 +40,7 @@ void glyphRunSerialization::SerializeGlyphRunImpl(flexbuffers::Builder& fbb,
   const auto& font = glyphRun->font;
   SerializeUtils::SetFlexBufferMap(fbb, "font", reinterpret_cast<uint64_t>(&font), true,
                                    font.getTypeface() != nullptr, glyphFaceID);
-  SerializeUtils::FillMap(font, glyphFaceID, map);
+  SerializeUtils::FillComplexObjSerMap(font, glyphFaceID, map);
 
   auto glyphsID = SerializeUtils::GetObjID();
   auto glyphs = glyphRun->glyphs;
