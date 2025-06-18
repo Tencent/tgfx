@@ -171,7 +171,7 @@ const Record* Picture::getFirstDrawRecord(MCState* state, Fill* fill, bool* hasS
   PlaybackContext playback({});
   Record* drawRecord = nullptr;
   for (auto& record : records) {
-    if (record->type() > RecordType::SetHasStroke) {
+    if (record->type() >= RecordType::DrawFill) {
       drawRecord = record.get();
       break;
     }
