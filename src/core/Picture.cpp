@@ -17,14 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Picture.h"
-#include "core/FillModifierContext.h"
 #include "core/MeasureContext.h"
 #include "core/Records.h"
-#include "core/TransformContext.h"
 #include "core/utils/BlockBuffer.h"
 #include "core/utils/Log.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Image.h"
+#include "utils/MathExtra.h"
 
 namespace tgfx {
 Picture::Picture(std::shared_ptr<BlockData> data, std::vector<PlacementPtr<Record>> recordList,
@@ -62,18 +61,14 @@ void Picture::playback(Canvas* canvas, const FillModifier* fillModifier) const {
 void Picture::playback(DrawContext* drawContext, const MCState& state,
                        const FillModifier* fillModifier) const {
   DEBUG_ASSERT(drawContext != nullptr);
+  auto maxScale = state.matrix.getMaxScale();
+  if (FloatNearlyZero(maxScale)) {
+    return;
+  }
   if (state.clip.isEmpty() && !state.clip.isInverseFillType()) {
     return;
   }
-  FillModifierContext modifierContext(drawContext, fillModifier);
-  if (fillModifier != nullptr) {
-    drawContext = &modifierContext;
-  }
-  TransformContext transformContext(drawContext, state);
-  if (transformContext.type() != TransformContext::Type::None) {
-    drawContext = &transformContext;
-  }
-  PlaybackContext playbackContext = {};
+  PlaybackContext playbackContext(state, fillModifier);
   for (auto& record : records) {
     record->playback(drawContext, &playbackContext);
   }

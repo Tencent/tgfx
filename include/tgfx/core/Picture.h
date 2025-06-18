@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "tgfx/core/FillModifier.h"
 #include "tgfx/core/Matrix.h"
 
 namespace tgfx {
@@ -30,20 +31,6 @@ class Fill;
 class BlockData;
 template <typename T>
 class PlacementPtr;
-
-/**
- * FillModifier is an interface for modifying the Fill properties of drawing commands. It can be
- * used to change the color, alpha, or other properties of a Fill before it is applied.
- */
-class FillModifier {
- public:
-  virtual ~FillModifier() = default;
-
-  /**
-   * Modifies the given Fill and returns a new Fill with the modifications applied.
-   */
-  virtual Fill modify(const Fill& fill) const = 0;
-};
 
 /**
  * The Picture class captures the drawing commands made on a Canvas, which can be replayed later.

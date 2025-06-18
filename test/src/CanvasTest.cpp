@@ -1369,7 +1369,7 @@ class ColorModifier : public FillModifier {
   explicit ColorModifier(Color color) : color(color) {
   }
 
-  Fill modify(const Fill& fill) const override {
+  Fill transform(const Fill& fill) const override {
     auto newFill = fill;
     newFill.color = color;
     newFill.color.alpha *= fill.color.alpha;

@@ -19,6 +19,7 @@
 #pragma once
 
 #include "core/DrawContext.h"
+#include "core/PlaybackContext.h"
 
 namespace tgfx {
 enum class RecordType {
@@ -38,12 +39,6 @@ enum class RecordType {
   StrokeGlyphRunList,
   DrawPicture,
   DrawLayer
-};
-
-class PlaybackContext {
- public:
-  MCState state = {};
-  Fill fill = {};
 };
 
 class Record {
@@ -69,7 +64,7 @@ class SetMatrix : public Record {
   }
 
   void playback(DrawContext*, PlaybackContext* playback) const override {
-    playback->state.matrix = matrix;
+    playback->setMatrix(matrix);
   }
 
   Matrix matrix = {};
@@ -90,7 +85,7 @@ class SetClip : public Record {
   }
 
   void playback(DrawContext*, PlaybackContext* playback) const override {
-    playback->state.clip = clip;
+    playback->setClip(clip);
   }
 
   Path clip = {};
@@ -106,7 +101,7 @@ class SetColor : public Record {
   }
 
   void playback(DrawContext*, PlaybackContext* playback) const override {
-    playback->fill.color = color;
+    playback->setColor(color);
   }
 
   Color color = {};
@@ -122,7 +117,7 @@ class SetFill : public Record {
   }
 
   void playback(DrawContext*, PlaybackContext* playback) const override {
-    playback->fill = fill;
+    playback->setFill(fill);
   }
 
   Fill fill = {};
@@ -139,7 +134,7 @@ class DrawFill : public Record {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawFill(playback->fill);
+    playback->drawFill(context);
   }
 };
 
@@ -153,7 +148,7 @@ class DrawRect : public Record {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawRect(rect, playback->state, playback->fill);
+    context->drawRect(rect, playback->state(), playback->fill());
   }
 
   Rect rect;
@@ -169,7 +164,7 @@ class DrawRRect : public Record {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawRRect(rRect, playback->state, playback->fill, nullptr);
+    context->drawRRect(rRect, playback->state(), playback->fill(), nullptr);
   }
 
   RRect rRect;
@@ -185,7 +180,7 @@ class StrokeRRect : public Record {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawRRect(rRect, playback->state, playback->fill, &stroke);
+    context->drawRRect(rRect, playback->state(), playback->fill(), &stroke);
   }
 
   RRect rRect;
@@ -206,7 +201,7 @@ class DrawPath : public Record {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawPath(path, playback->state, playback->fill);
+    context->drawPath(path, playback->state(), playback->fill());
   }
 
   Path path;
@@ -226,7 +221,7 @@ class DrawShape : public Record {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawShape(shape, playback->state, playback->fill);
+    context->drawShape(shape, playback->state(), playback->fill());
   }
 
   std::shared_ptr<Shape> shape;
@@ -244,7 +239,7 @@ class DrawImage : public Record {
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
     auto rect = Rect::MakeWH(image->width(), image->height());
-    context->drawImageRect(image, rect, sampling, playback->state, playback->fill);
+    context->drawImageRect(image, rect, sampling, playback->state(), playback->fill());
   }
 
   std::shared_ptr<Image> image;
@@ -262,7 +257,7 @@ class DrawImageRect : public DrawImage {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawImageRect(image, rect, sampling, playback->state, playback->fill);
+    context->drawImageRect(image, rect, sampling, playback->state(), playback->fill());
   }
 
   Rect rect;
@@ -279,7 +274,7 @@ class DrawGlyphRunList : public Record {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawGlyphRunList(glyphRunList, playback->state, playback->fill, nullptr);
+    context->drawGlyphRunList(glyphRunList, playback->state(), playback->fill(), nullptr);
   }
 
   std::shared_ptr<GlyphRunList> glyphRunList;
@@ -296,7 +291,7 @@ class StrokeGlyphRunList : public DrawGlyphRunList {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawGlyphRunList(glyphRunList, playback->state, playback->fill, &stroke);
+    context->drawGlyphRunList(glyphRunList, playback->state(), playback->fill(), &stroke);
   }
 
   Stroke stroke;
@@ -316,7 +311,7 @@ class DrawPicture : public Record {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawPicture(picture, playback->state);
+    context->drawPicture(picture, playback->state());
   }
 
   std::shared_ptr<Picture> picture;
@@ -337,7 +332,7 @@ class DrawLayer : public Record {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawLayer(picture, filter, playback->state, playback->fill);
+    context->drawLayer(picture, filter, playback->state(), playback->fill());
   }
 
   std::shared_ptr<Picture> picture;

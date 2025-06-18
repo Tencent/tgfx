@@ -161,7 +161,7 @@ void RecordingContext::recordState(const tgfx::MCState& state) {
     records.emplace_back(std::move(record));
     lastState.matrix = state.matrix;
   }
-  if (!lastState.clip.isSame(state.clip)) {
+  if (lastState.clip != state.clip) {
     auto record = blockBuffer.make<SetClip>(state.clip);
     records.emplace_back(std::move(record));
     lastState.clip = state.clip;
