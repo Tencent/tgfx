@@ -18,6 +18,7 @@
 
 #include "TGFXWindow.h"
 #include <filesystem>
+#include <cmath>
 #if WINVER >= 0x0603  // Windows 8.1
 #include <shellscalingapi.h>
 #endif
@@ -48,6 +49,8 @@ bool TGFXWindow::open() {
   }
   SetWindowLongPtr(windowHandle, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
   centerAndShow();
+  ShowWindow(windowHandle, SW_SHOW);
+  UpdateWindow(windowHandle);
   return true;
 }
 
@@ -91,10 +94,45 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       EndPaint(windowHandle, &ps);
       break;
     }
-    case WM_LBUTTONDOWN:
+    case WM_LBUTTONDOWN: {
       lastDrawIndex++;
+      zoomScale = 1.0f;
+      contentOffset.x = 0.0f;
+      contentOffset.y = 0.0f;
       ::InvalidateRect(windowHandle, nullptr, TRUE);
       break;
+    }
+    case WM_MOUSEWHEEL: {
+      POINT pt;
+      pt.x = GET_X_LPARAM(lparam);
+      pt.y = GET_Y_LPARAM(lparam);
+      ScreenToClient(hwnd, &pt);
+      bool isCtrl = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+      bool isShift = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+      float oldZoom = zoomScale;
+      if (isCtrl) {
+        float zDelta = GET_WHEEL_DELTA_WPARAM(wparam) / 120.0f;
+        float zoomStep = 1.0f + zDelta * 0.05f;
+        float newZoom = oldZoom * zoomStep;
+        if (newZoom < 0.001f) newZoom = 0.001f;
+        if (newZoom > 1000.0f) newZoom = 1000.0f;
+        float contentX = (pt.x - contentOffset.x) / oldZoom;
+        float contentY = (pt.y - contentOffset.y) / oldZoom;
+        contentOffset.x = pt.x - contentX * newZoom;
+        contentOffset.y = pt.y - contentY * newZoom;
+        zoomScale = newZoom;
+      } else {
+        if (isShift) {
+          float xDelta = (float)GET_WHEEL_DELTA_WPARAM(wparam);
+          contentOffset.x += xDelta;
+        } else {
+          float yDelta = (float)GET_WHEEL_DELTA_WPARAM(wparam);
+          contentOffset.y -= yDelta;
+        }
+      }
+      ::InvalidateRect(windowHandle, nullptr, TRUE);
+      break;
+    }
     default:
       result = DefWindowProc(windowHandle, message, wparam, lparam);
       break;
@@ -214,6 +252,7 @@ void TGFXWindow::draw() {
   if (sizeChanged) {
     tgfxWindow->invalidSize();
   }
+  appHost->updateZoomAndOffset(zoomScale, tgfx::Point(contentOffset.x, contentOffset.y));
   auto device = tgfxWindow->getDevice();
   if (device == nullptr) {
     return;

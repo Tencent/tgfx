@@ -69,7 +69,7 @@ if (typeof window !== 'undefined') {
                 canvas.addEventListener('wheel', (e: WheelEvent) => {
                     e.preventDefault();
                     if (e.ctrlKey || e.metaKey) {
-                        const zoomFactor = Math.exp(-e.deltaY * 0.001); // 更自然的缩放
+                        const zoomFactor = Math.exp(-e.deltaY * 0.001);
                         const oldZoom = shareData.zoom;
                         const newZoom = Math.max(0.01, Math.min(100, oldZoom * zoomFactor));
                         const rect = canvas.getBoundingClientRect();
