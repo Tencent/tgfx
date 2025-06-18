@@ -19,29 +19,28 @@
 #include "GlyphShape.h"
 
 namespace tgfx {
-std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<GlyphFace> glyphFace, GlyphID glyphID) {
-  if (glyphFace == nullptr || glyphID == 0) {
+std::shared_ptr<Shape> Shape::MakeFrom(Font font, GlyphID glyphID) {
+  if (glyphID == 0) {
     return nullptr;
   }
-  if (!glyphFace->hasOutlines()) {
+  if (!font.hasOutlines()) {
     return nullptr;
   }
-  return std::make_shared<GlyphShape>(std::move(glyphFace), glyphID);
+  return std::make_shared<GlyphShape>(std::move(font), glyphID);
 }
 
-GlyphShape::GlyphShape(std::shared_ptr<GlyphFace> glyphFace, GlyphID glyphID)
-    : glyphFace(std::move(glyphFace)), glyphID(glyphID) {
+GlyphShape::GlyphShape(Font font, GlyphID glyphID) : font(std::move(font)), glyphID(glyphID) {
 }
 
 Path GlyphShape::getPath() const {
   Path path = {};
-  if (!glyphFace->getPath(glyphID, &path)) {
+  if (!font.getPath(glyphID, &path)) {
     return {};
   }
   return path;
 }
 
 Rect GlyphShape::getBounds() const {
-  return glyphFace->getBounds(glyphID);
+  return font.getBounds(glyphID);
 }
 }  // namespace tgfx
