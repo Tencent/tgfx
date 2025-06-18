@@ -46,14 +46,6 @@ class TextBlob {
                                             size_t glyphCount, const Font& font);
 
   /**
-   * Creates a new TextBlob from the given glyphIDs, positions, and glyphFace. Returns nullptr if
-   * the glyphCount is 0 or glyphFace is nullptr.
-   */
-  static std::shared_ptr<TextBlob> MakeFrom(const GlyphID glyphIDs[], const Point positions[],
-                                            size_t glyphCount,
-                                            std::shared_ptr<GlyphFace> glyphFace);
-
-  /**
    * Creates a new TextBlob from a single glyph run. Returns nullptr if the glyph run is empty or
    * has mismatched glyph and position counts.
    */

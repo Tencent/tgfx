@@ -15,27 +15,29 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#ifdef TGFX_USE_INSPECTOR
 
-#include "GlyphFaceSerialization.h"
+#include "tgfx/core/PathProvider.h"
 
 namespace tgfx {
 
-std::shared_ptr<Data> GlyphFaceSerialization::Serialize(const GlyphFace* glyphFace) {
-  DEBUG_ASSERT(glyphFace != nullptr)
-  flexbuffers::Builder fbb;
-  size_t startMap;
-  size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
-  SerializeGlyphFaceImpl(fbb, glyphFace);
-  SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
-  return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
-}
+class PathProviderWrapper final : public PathProvider {
+ public:
+  explicit PathProviderWrapper(Path path) : _path(std::move(path)) {
+  }
 
-void GlyphFaceSerialization::SerializeGlyphFaceImpl(flexbuffers::Builder& fbb,
-                                                    const GlyphFace* glyphFace) {
-  SerializeUtils::SetFlexBufferMap(fbb, "hasColor", glyphFace->hasColor());
-  SerializeUtils::SetFlexBufferMap(fbb, "hasOutlines", glyphFace->hasOutlines());
+  Path getPath() const override {
+    return _path;
+  }
+
+  Rect getBounds() const override {
+    return _path.getBounds();
+  }
+
+ private:
+  Path _path;
+};
+
+std::shared_ptr<PathProvider> PathProvider::Wrap(Path path) {
+  return std::make_shared<PathProviderWrapper>(std::move(path));
 }
 }  // namespace tgfx
-#endif
