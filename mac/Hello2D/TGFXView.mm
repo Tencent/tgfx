@@ -26,6 +26,10 @@
   std::unique_ptr<drawers::AppHost> appHost;
 }
 
+- (BOOL)acceptsFirstResponder {
+  return YES;
+}
+
 - (void)setBounds:(CGRect)bounds {
   CGRect oldBounds = self.bounds;
   [super setBounds:bounds];
@@ -65,6 +69,7 @@
 
 - (void)viewDidMoveToWindow {
   [super viewDidMoveToWindow];
+  [self.window makeFirstResponder:self];
   [self updateSize];
 }
 

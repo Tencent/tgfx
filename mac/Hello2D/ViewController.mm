@@ -73,8 +73,8 @@
     self.zoomScale = newZoom;
     [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
   } else {
-    self.contentOffset = CGPointMake(self.contentOffset.x + event.scrollingDeltaX,
-                                     self.contentOffset.y + event.scrollingDeltaY);
+    self.contentOffset = CGPointMake(self.contentOffset.x - event.scrollingDeltaX,
+                                     self.contentOffset.y - event.scrollingDeltaY);
     [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
   }
 }
