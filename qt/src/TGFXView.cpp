@@ -36,11 +36,12 @@ TGFXView::TGFXView(QQuickItem* parent) : QQuickItem(parent) {
 }
 
 void TGFXView::wheelEvent(QWheelEvent* event) {
-  bool isZoom = (event->modifiers() & Qt::ControlModifier) || (event->modifiers() & Qt::MetaModifier);
+  bool isZoom =
+      (event->modifiers() & Qt::ControlModifier) || (event->modifiers() & Qt::MetaModifier);
   qreal px = event->position().x();
   qreal py = event->position().y();
 
-  if(isZoom) {
+  if (isZoom) {
     float factor = (float)std::exp(-event->angleDelta().y() / 400.0);
     float oldZoom = zoom;
     float newZoom = std::max(0.01f, std::min(100.0f, oldZoom * factor));
@@ -58,7 +59,7 @@ void TGFXView::wheelEvent(QWheelEvent* event) {
 static bool switchFlag = true;
 
 void TGFXView::mousePressEvent(QMouseEvent* event) {
-  if(event->button() == Qt::LeftButton) {
+  if (event->button() == Qt::LeftButton) {
     dragging = true;
     lastMousePos = event->pos();
     setCursor(Qt::ClosedHandCursor);
@@ -68,7 +69,7 @@ void TGFXView::mousePressEvent(QMouseEvent* event) {
 }
 
 void TGFXView::mouseMoveEvent(QMouseEvent* event) {
-  if(dragging) {
+  if (dragging) {
     QPoint delta = event->pos() - lastMousePos;
     offset.rx() += delta.x();
     offset.ry() += delta.y();
@@ -80,12 +81,12 @@ void TGFXView::mouseMoveEvent(QMouseEvent* event) {
 }
 
 void TGFXView::mouseReleaseEvent(QMouseEvent* event) {
-  if(event->button() == Qt::LeftButton) {
+  if (event->button() == Qt::LeftButton) {
     dragging = false;
     unsetCursor();
     event->accept();
   }
-  if(switchFlag) {
+  if (switchFlag) {
     lastDrawIndex++;
     update();
   }

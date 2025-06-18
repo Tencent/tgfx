@@ -28,8 +28,8 @@
 #include <memory>
 #include <string>
 #include "drawers/Drawer.h"
-#include "tgfx/gpu/opengl/wgl/WGLWindow.h"
 #include "tgfx/core/Point.h"
+#include "tgfx/gpu/opengl/wgl/WGLWindow.h"
 
 namespace hello2d {
 class TGFXWindow {

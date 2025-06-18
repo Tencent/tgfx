@@ -57,12 +57,12 @@
     float oldZoom = self.zoomScale;
     float zoomStep = 1.0 + event.scrollingDeltaY * 0.05;
     float newZoom = oldZoom * zoomStep;
-      if (newZoom < 0.001f) {
-          newZoom = 0.001f;
-      }
-      if (newZoom > 1000.0f) {
-          newZoom = 1000.0f;
-      }
+    if (newZoom < 0.001f) {
+      newZoom = 0.001f;
+    }
+    if (newZoom > 1000.0f) {
+      newZoom = 1000.0f;
+    }
     NSPoint mouseInView = [self.tgfxView convertPoint:[event locationInWindow] fromView:nil];
     mouseInView.y = self.tgfxView.bounds.size.height - mouseInView.y;
     mouseInView = [self.tgfxView convertPointToBacking:mouseInView];
