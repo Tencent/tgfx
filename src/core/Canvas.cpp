@@ -18,7 +18,7 @@
 
 #include "tgfx/core/Canvas.h"
 #include "core/DrawContext.h"
-#include "core/LayerUnrollContext.h"
+#include "core/LayerFillModifier.h"
 #include "core/RecordingContext.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -601,11 +601,9 @@ void Canvas::drawLayer(std::shared_ptr<Picture> picture, const MCState& state, c
       return;
     }
   } else if (picture->drawCount == 1 && fill.maskFilter == nullptr) {
-    LayerUnrollContext layerContext(drawContext, fill);
-    picture->playback(&layerContext, state);
-    if (layerContext.hasUnrolled()) {
-      return;
-    }
+    LayerFillModifier layerModifier(fill);
+    picture->playback(drawContext, state, &layerModifier);
+    return;
   }
   drawContext->drawLayer(std::move(picture), std::move(imageFilter), state, fill);
 }

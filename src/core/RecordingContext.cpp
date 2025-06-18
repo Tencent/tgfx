@@ -141,9 +141,9 @@ void RecordingContext::drawPicture(std::shared_ptr<Picture> picture, const MCSta
   DEBUG_ASSERT(picture != nullptr);
   if (picture->drawCount > MaxPictureDrawsToUnrollInsteadOfReference) {
     recordState(state);
+    drawCount += picture->drawCount;
     auto record = blockBuffer.make<DrawPicture>(std::move(picture));
     records.emplace_back(std::move(record));
-    drawCount++;
   } else {
     picture->playback(this, state);
   }

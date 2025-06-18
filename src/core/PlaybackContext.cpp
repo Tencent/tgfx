@@ -21,9 +21,13 @@
 
 namespace tgfx {
 PlaybackContext::PlaybackContext(MCState state, const FillModifier* fillModifier)
-    : initState(state), fillModifier(fillModifier), _state(std::move(state)) {
+    : initState(std::move(state)), fillModifier(fillModifier) {
   hasInitMatrix = !initState.matrix.isIdentity();
   hasInitClip = !initState.clip.isEmpty() || !initState.clip.isInverseFillType();
+  _state = initState;
+  if (fillModifier) {
+    _fill = fillModifier->transform(lastOriginalFill);
+  }
 }
 
 void PlaybackContext::setMatrix(const Matrix& matrix) {
