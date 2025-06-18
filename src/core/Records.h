@@ -27,16 +27,17 @@ enum class RecordType {
   SetClip,
   SetColor,
   SetFill,
+  SetStrokeWidth,
+  SetStroke,
+  SetHasStroke,
   DrawFill,
   DrawRect,
   DrawRRect,
-  StrokeRRect,
   DrawPath,
   DrawShape,
   DrawImage,
   DrawImageRect,
   DrawGlyphRunList,
-  StrokeGlyphRunList,
   DrawPicture,
   DrawLayer
 };
@@ -123,6 +124,54 @@ class SetFill : public Record {
   Fill fill = {};
 };
 
+class SetStrokeWidth : public Record {
+ public:
+  explicit SetStrokeWidth(float width) : width(width) {
+  }
+
+  RecordType type() const override {
+    return RecordType::SetStrokeWidth;
+  }
+
+  void playback(DrawContext*, PlaybackContext* playback) const override {
+    playback->setStrokeWidth(width);
+  }
+
+  float width = 0.0f;
+};
+
+class SetStroke : public Record {
+ public:
+  explicit SetStroke(const Stroke& stroke) : stroke(stroke) {
+  }
+
+  RecordType type() const override {
+    return RecordType::SetStroke;
+  }
+
+  void playback(DrawContext*, PlaybackContext* playback) const override {
+    playback->setStroke(stroke);
+  }
+
+  Stroke stroke = {};
+};
+
+class SetHasStroke : public Record {
+ public:
+  explicit SetHasStroke(bool hasStroke) : hasStroke(hasStroke) {
+  }
+
+  RecordType type() const override {
+    return RecordType::SetHasStroke;
+  }
+
+  void playback(DrawContext*, PlaybackContext* playback) const override {
+    playback->setHasStroke(hasStroke);
+  }
+
+  bool hasStroke = false;
+};
+
 class DrawFill : public Record {
  public:
   RecordType type() const override {
@@ -164,27 +213,10 @@ class DrawRRect : public Record {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawRRect(rRect, playback->state(), playback->fill(), nullptr);
+    context->drawRRect(rRect, playback->state(), playback->fill(), playback->stroke());
   }
 
   RRect rRect;
-};
-
-class StrokeRRect : public Record {
- public:
-  StrokeRRect(const RRect& rRect, const Stroke& stroke) : rRect(rRect), stroke(stroke) {
-  }
-
-  RecordType type() const override {
-    return RecordType::StrokeRRect;
-  }
-
-  void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawRRect(rRect, playback->state(), playback->fill(), &stroke);
-  }
-
-  RRect rRect;
-  Stroke stroke;
 };
 
 class DrawPath : public Record {
@@ -274,27 +306,11 @@ class DrawGlyphRunList : public Record {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawGlyphRunList(glyphRunList, playback->state(), playback->fill(), nullptr);
+    context->drawGlyphRunList(glyphRunList, playback->state(), playback->fill(),
+                              playback->stroke());
   }
 
   std::shared_ptr<GlyphRunList> glyphRunList;
-};
-
-class StrokeGlyphRunList : public DrawGlyphRunList {
- public:
-  StrokeGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const Stroke& stroke)
-      : DrawGlyphRunList(std::move(glyphRunList)), stroke(stroke) {
-  }
-
-  RecordType type() const override {
-    return RecordType::StrokeGlyphRunList;
-  }
-
-  void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawGlyphRunList(glyphRunList, playback->state(), playback->fill(), &stroke);
-  }
-
-  Stroke stroke;
 };
 
 class DrawPicture : public Record {

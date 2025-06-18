@@ -83,7 +83,8 @@ class Picture {
   std::shared_ptr<Image> asImage(Point* offset, const Matrix* matrix = nullptr,
                                  const ISize* clipSize = nullptr) const;
 
-  const Record* getFirstDrawRecord(MCState* state = nullptr, Fill* fill = nullptr) const;
+  const Record* getFirstDrawRecord(MCState* state = nullptr, Fill* fill = nullptr,
+                                   bool* hasStroke = nullptr) const;
 
   friend class MeasureContext;
   friend class RenderContext;

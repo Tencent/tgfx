@@ -35,6 +35,10 @@ class PlaybackContext {
     return _fill;
   }
 
+  const Stroke* stroke() const {
+    return hasStroke ? &_stroke : nullptr;
+  }
+
   void setMatrix(const Matrix& matrix);
 
   void setClip(const Path& clip);
@@ -42,6 +46,12 @@ class PlaybackContext {
   void setColor(const Color& color);
 
   void setFill(const Fill& fill);
+
+  void setStrokeWidth(float width);
+
+  void setStroke(const Stroke& stroke);
+
+  void setHasStroke(bool value);
 
   void drawFill(DrawContext* context);
 
@@ -53,5 +63,7 @@ class PlaybackContext {
   MCState _state = {};
   Fill _fill = {};
   Fill lastOriginalFill = {};
+  Stroke _stroke = {};
+  bool hasStroke = false;
 };
 }  // namespace tgfx

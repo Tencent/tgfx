@@ -61,6 +61,20 @@ void PlaybackContext::setFill(const Fill& fill) {
   }
 }
 
+void PlaybackContext::setStrokeWidth(float width) {
+  _stroke.width = width;
+  hasStroke = true;
+}
+
+void PlaybackContext::setStroke(const Stroke& stroke) {
+  _stroke = stroke;
+  hasStroke = true;
+}
+
+void PlaybackContext::setHasStroke(bool value) {
+  hasStroke = value;
+}
+
 void PlaybackContext::drawFill(DrawContext* context) {
   if (hasInitClip) {
     context->drawPath(initState.clip, {}, _fill.makeWithMatrix(initState.matrix));

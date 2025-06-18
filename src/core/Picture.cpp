@@ -103,8 +103,9 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
   }
   MCState state = {};
   Fill fill = {};
-  auto record = getFirstDrawRecord(&state, &fill);
-  if (record == nullptr) {
+  bool hasStroke = false;
+  auto record = getFirstDrawRecord(&state, &fill, &hasStroke);
+  if (record == nullptr || hasStroke) {
     return nullptr;
   }
   if (record->type() != RecordType::DrawImage && record->type() != RecordType::DrawImageRect) {
@@ -166,37 +167,26 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
   return image;
 }
 
-const Record* Picture::getFirstDrawRecord(MCState* state, Fill* fill) const {
+const Record* Picture::getFirstDrawRecord(MCState* state, Fill* fill, bool* hasStroke) const {
+  PlaybackContext playback({});
+  Record* drawRecord = nullptr;
   for (auto& record : records) {
-    if (record->type() > RecordType::SetFill) {
-      return record.get();
+    if (record->type() > RecordType::SetHasStroke) {
+      drawRecord = record.get();
+      break;
     }
-    switch (record->type()) {
-      case RecordType::SetMatrix:
-        if (state) {
-          state->matrix = static_cast<SetMatrix*>(record.get())->matrix;
-        }
-        break;
-      case RecordType::SetClip:
-        if (state) {
-          state->clip = static_cast<SetClip*>(record.get())->clip;
-        }
-        break;
-      case RecordType::SetColor:
-        if (fill) {
-          fill->color = static_cast<SetColor*>(record.get())->color;
-        }
-        break;
-      case RecordType::SetFill:
-        if (fill) {
-          *fill = static_cast<SetFill*>(record.get())->fill;
-        }
-        break;
-      default:
-        break;
-    }
+    record->playback(nullptr, &playback);
   }
-  return nullptr;
+  if (state) {
+    *state = playback.state();
+  }
+  if (fill) {
+    *fill = playback.fill();
+  }
+  if (hasStroke) {
+    *hasStroke = playback.stroke() != nullptr;
+  }
+  return drawRecord;
 }
 
 }  // namespace tgfx
