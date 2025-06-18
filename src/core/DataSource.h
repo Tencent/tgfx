@@ -54,7 +54,7 @@ class DataSource {
    */
   static std::unique_ptr<DataSource> Async(std::shared_ptr<DataSource> source,
                                            ReferenceCounter referenceCounter) {
-#ifdef TGFX_USE_THREADS
+#ifndef TGFX_USE_THREADS
     // This code path should not be reached in single-threaded execution
     DEBUG_ASSERT(false)
     return nullptr;
