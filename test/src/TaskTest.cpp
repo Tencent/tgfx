@@ -25,11 +25,15 @@ namespace tgfx {
 TGFX_TEST(TaskTest, release) {
   Task::ReleaseThreads();
   auto group = TaskGroup::GetInstance();
-  EXPECT_EQ(group->threads->dequeue(), nullptr);
+  std::thread* thead = nullptr;
+  group->threads->try_dequeue(thead);
+  EXPECT_EQ(thead, nullptr);
   EXPECT_EQ(group->waitingThreads, 0);
   EXPECT_EQ(group->totalThreads, 0);
   for (auto& queue : group->priorityQueues) {
-    EXPECT_EQ(queue->dequeue(), nullptr);
+    std::shared_ptr<Task> task = nullptr;
+    queue->try_dequeue(task);
+    EXPECT_EQ(task, nullptr);
   }
 }
 }  // namespace tgfx

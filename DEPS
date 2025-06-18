@@ -7,7 +7,7 @@
     "common": [
       {
         "url": "${PAG_GROUP}/vendor_tools.git",
-        "commit": "76b266c30e3314678a0d8daeb5b40a9389ea5544",
+        "commit": "f622876bb82fd83e731b8fa4c62c6f4d7d7f3467",
         "dir": "third_party/vendor_tools"
       },
       {
@@ -52,7 +52,7 @@
       },
       {
         "url": "https://github.com/google/googletest.git",
-        "commit": "e2239ee6043f73722e7aa812a459f54a28552929",
+        "commit": "6910c9d9165801d8827d628cb72eb7ea9dd538c5",
         "dir": "third_party/googletest"
       },
       {
@@ -69,6 +69,11 @@
         "url": "https://github.com/google/flatbuffers.git",
         "commit": "1c514626e83c20fffa8557e75641848e1e15cd5e",
         "dir": "third_party/flatbuffers"
+      },
+      {
+         "url": "https://github.com/cameron314/concurrentqueue.git",
+         "commit": "6dd38b8a1dbaa7863aa907045f32308a56a6ff5d",
+         "dir": "third_party/concurrentqueue"
       }
     ]
   },

@@ -24,6 +24,7 @@
 #include FT_TRUETYPE_TABLES_H
 #include "FTRasterTarget.h"
 #include "FTUtil.h"
+#include "core/utils/ClearPixels.h"
 #include "core/utils/GammaCorrection.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -69,12 +70,6 @@ static void RenderOutLineGlyph(FT_Face face, const ImageInfo& dstInfo, void* dst
   bbox.yMin &= ~63;
   FT_Outline_Translate(outline, -bbox.xMin, -bbox.yMin);
   FT_Outline_Render(face->glyph->library, outline, &params);
-}
-
-std::shared_ptr<ScalerContext> ScalerContext::CreateNew(std::shared_ptr<Typeface> typeface,
-                                                        float size) {
-  DEBUG_ASSERT(typeface != nullptr);
-  return std::make_shared<FTScalerContext>(std::move(typeface), size);
 }
 
 static void ApplyEmbolden(FT_Face face, FT_GlyphSlot glyph, GlyphID glyphId, FT_Int32 glyphFlags) {
@@ -601,6 +596,7 @@ bool FTScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*,
     if (!loadOutlineGlyph(face, glyphID, fauxBold, false)) {
       return false;
     }
+    ClearPixels(dstInfo, dstPixels);
     RenderOutLineGlyph(face, dstInfo, dstPixels);
     return true;
   }

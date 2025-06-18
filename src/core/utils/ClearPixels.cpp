@@ -16,26 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <cstddef>
-#include <deque>
+#include "ClearPixels.h"
 
 namespace tgfx {
-/**
- * A tracker that keeps track of the maximum value of the last N values added.
- */
-class MaxValueTracker {
- public:
-  MaxValueTracker(size_t maxSize);
-
-  void addValue(size_t value);
-
-  size_t getMaxValue() const;
-
- private:
-  size_t _maxSize;
-  std::deque<size_t> _values;
-};
-
+void ClearPixels(const ImageInfo& dstInfo, void* dstPixels) {
+  if (dstInfo.rowBytes() == dstInfo.minRowBytes()) {
+    memset(dstPixels, 0, dstInfo.byteSize());
+    return;
+  }
+  auto height = static_cast<size_t>(dstInfo.height());
+  for (size_t y = 0; y < height; ++y) {
+    auto row = static_cast<uint8_t*>(dstPixels) + y * dstInfo.rowBytes();
+    memset(row, 0, dstInfo.rowBytes());
+  }
+}
 }  // namespace tgfx

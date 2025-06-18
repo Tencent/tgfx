@@ -102,17 +102,12 @@ static CGImageRef CreateCGImage(const Path& path, void* pixels, const ImageInfo&
   return image;
 }
 
-std::shared_ptr<PathRasterizer> PathRasterizer::Make(std::shared_ptr<Shape> shape, bool antiAlias,
+std::shared_ptr<PathRasterizer> PathRasterizer::Make(int width, int height,
+                                                     std::shared_ptr<Shape> shape, bool antiAlias,
                                                      bool needsGammaCorrection) {
-  if (shape == nullptr) {
+  if (shape == nullptr || width <= 0 || height <= 0) {
     return nullptr;
   }
-  auto bounds = shape->getBounds();
-  if (bounds.isEmpty()) {
-    return nullptr;
-  }
-  auto width = static_cast<int>(ceilf(bounds.width()));
-  auto height = static_cast<int>(ceilf(bounds.height()));
   return std::make_shared<CGPathRasterizer>(width, height, std::move(shape), antiAlias,
                                             needsGammaCorrection);
 }
@@ -129,14 +124,15 @@ bool CGPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) con
   if (cgContext == nullptr) {
     return false;
   }
+  CGContextClearRect(cgContext, CGRectMake(0.f, 0.f, dstInfo.width(), dstInfo.height()));
   auto totalMatrix = Matrix::MakeScale(1, -1);
   totalMatrix.postTranslate(0, static_cast<float>(dstInfo.height()));
   path.transform(totalMatrix);
-  auto bounds = path.getBounds();
-  bounds.roundOut();
   if (!needsGammaCorrection) {
     DrawPath(path, cgContext, dstInfo, antiAlias);
   }
+  auto bounds = path.getBounds();
+  bounds.roundOut();
   auto width = static_cast<int>(bounds.width());
   auto height = static_cast<int>(bounds.height());
   auto tempBuffer = PixelBuffer::Make(width, height, true, false);

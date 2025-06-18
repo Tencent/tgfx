@@ -19,7 +19,6 @@
 #pragma once
 
 #include "gpu/ResourceKey.h"
-#include "tgfx/core/GlyphFace.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
@@ -28,7 +27,7 @@ namespace tgfx {
  */
 class GlyphShape final : public Shape {
  public:
-  explicit GlyphShape(std::shared_ptr<GlyphFace> glyphFace, GlyphID glyphID);
+  explicit GlyphShape(Font font, GlyphID glyphID);
 
   Rect getBounds() const override;
 
@@ -44,7 +43,7 @@ class GlyphShape final : public Shape {
 
  private:
   LazyUniqueKey uniqueKey = {};
-  std::shared_ptr<GlyphFace> glyphFace = nullptr;
+  Font font;
   GlyphID glyphID = 0;
 };
 }  // namespace tgfx

@@ -20,6 +20,7 @@
 #include "FTLibrary.h"
 #include "FTPath.h"
 #include "FTRasterTarget.h"
+#include "core/utils/ClearPixels.h"
 #include "core/utils/GammaCorrection.h"
 
 namespace tgfx {
@@ -44,17 +45,12 @@ static void Iterator(PathVerb verb, const Point points[4], void* info) {
   }
 }
 
-std::shared_ptr<PathRasterizer> PathRasterizer::Make(std::shared_ptr<Shape> shape, bool antiAlias,
+std::shared_ptr<PathRasterizer> PathRasterizer::Make(int width, int height,
+                                                     std::shared_ptr<Shape> shape, bool antiAlias,
                                                      bool needsGammaCorrection) {
-  if (shape == nullptr) {
+  if (shape == nullptr || width <= 0 || height <= 0) {
     return nullptr;
   }
-  auto bounds = shape->getBounds();
-  if (bounds.isEmpty()) {
-    return nullptr;
-  }
-  auto width = static_cast<int>(ceilf(bounds.width()));
-  auto height = static_cast<int>(ceilf(bounds.height()));
   return std::make_shared<FTPathRasterizer>(width, height, std::move(shape), antiAlias,
                                             needsGammaCorrection);
 }
@@ -75,6 +71,7 @@ bool FTPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) con
     maskPath.addRect(Rect::MakeWH(dstInfo.width(), dstInfo.height()));
     path.addPath(maskPath, PathOp::Intersect);
   }
+  ClearPixels(dstInfo, dstPixels);
   FTPath ftPath = {};
   path.decompose(Iterator, &ftPath);
   auto fillType = path.getFillType();

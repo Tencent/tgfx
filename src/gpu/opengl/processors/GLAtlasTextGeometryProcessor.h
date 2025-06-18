@@ -18,15 +18,21 @@
 
 #pragma once
 
-#include <tgfx/core/Data.h>
-#include "SerializationUtils.h"
+#include <optional>
+#include "gpu/processors/AtlasTextGeometryProcessor.h"
 
 namespace tgfx {
-class GlyphFaceSerialization {
+class GLAtlasTextGeometryProcessor : public AtlasTextGeometryProcessor {
  public:
-  static std::shared_ptr<Data> Serialize(const GlyphFace* glyphFace);
+  GLAtlasTextGeometryProcessor(std::shared_ptr<TextureProxy> textureProxy,
+                               const SamplingOptions& sampling, AAType aa,
+                               std::optional<Color> commonColor, const Matrix& uvMatrix);
+  void emitCode(EmitArgs&) const override;
+
+  void setData(UniformBuffer* uniformBuffer,
+               FPCoordTransformIter* coordTransformIter) const override;
 
  private:
-  static void SerializeGlyphFaceImpl(flexbuffers::Builder& fbb, const GlyphFace* glyphFace);
+  std::string atlasSizeUniformName = "atlasSizeInv";
 };
 }  // namespace tgfx

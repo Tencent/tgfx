@@ -59,11 +59,12 @@ class FTTypeface : public Typeface {
   std::vector<Unichar> getGlyphToUnicodeMap() const override;
 #endif
 
+  std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;
+
  private:
   uint32_t _uniqueID = 0;
   FTFontData data;
   FT_Face face = nullptr;
-  std::weak_ptr<FTTypeface> weakThis;
 
   FTTypeface(FTFontData data, FT_Face face);
 

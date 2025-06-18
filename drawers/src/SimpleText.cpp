@@ -36,6 +36,8 @@ void SimpleText::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) {
   tgfx::Point textStart = {(width - bounds.width()) / 2, height / 2 - bounds.bottom * 1.2f};
   tgfx::Matrix matrix = {};
   matrix.setScale(textScale, textScale, width / 2, height / 2);
+  canvas->translate(host->contentOffset().x, host->contentOffset().y);
+  canvas->scale(host->zoomScale(), host->zoomScale());
   auto oldMatrix = canvas->getMatrix();
   canvas->concat(matrix);
   tgfx::Paint paint = {};

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/ShapeLayer.h"
+#include "layers/BackgroundContext.h"
 #include "layers/contents/ShapeContent.h"
 #include "tgfx/core/PathEffect.h"
 
@@ -284,22 +285,40 @@ std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
                                         fillPaintCount);
 }
 
-void ShapeLayer::drawContents(LayerContent* content, Canvas* canvas, float alpha, bool forContour,
-                              const std::function<bool()>& drawChildren) const {
-  auto shapeContent = static_cast<ShapeContent*>(content);
-  if (!shapeContent || !shapeContent->drawFills(canvas, getPaint(alpha), forContour)) {
+bool ShapeLayer::DrawFills(Canvas* canvas, const Layer* layer, const LayerContent* content,
+                           float alpha, bool forContour) {
+  auto shapeContent = static_cast<const ShapeContent*>(content);
+  auto shapeLayer = static_cast<const ShapeLayer*>(layer);
+  auto paint = shapeLayer->getPaint(alpha);
+  if (!shapeContent || !shapeContent->drawFills(canvas, paint, forContour)) {
     if (forContour) {
-      canvas->drawShape(_shape, getPaint(alpha));
+      canvas->drawShape(shapeLayer->_shape, paint);
     }
+    return false;
   }
+  return true;
+}
+
+bool ShapeLayer::DrawStrokes(Canvas* canvas, const Layer* layer, const LayerContent* content,
+                             float alpha, bool forContour) {
+  auto shapeContent = static_cast<const ShapeContent*>(content);
+  auto shapeLayer = static_cast<const ShapeLayer*>(layer);
+  auto paint = shapeLayer->getPaint(alpha);
+  if (shapeContent == nullptr) {
+    return false;
+  }
+  return shapeContent->drawStrokes(canvas, paint, forContour);
+}
+
+void ShapeLayer::drawContents(const std::function<void(ContentDrawer contentDrawer)>& drawContent,
+                              const std::function<bool()>& drawChildren) const {
+  drawContent(DrawFills);
   if (shapeBitFields.strokeOnTop) {
     if (!drawChildren()) {
       return;
     }
   }
-  if (shapeContent) {
-    shapeContent->drawStrokes(canvas, getPaint(alpha), forContour);
-  }
+  drawContent(DrawStrokes);
   if (!shapeBitFields.strokeOnTop) {
     drawChildren();
   }

@@ -17,32 +17,35 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "MeasureContext.h"
+#include "core/utils/ApplyStrokeToBound.h"
 #include "core/utils/Log.h"
 
 namespace tgfx {
-void MeasureContext::drawFill(const MCState& state, const Fill& fill) {
-  addDeviceBounds(state.clip, fill, {}, true);
+void MeasureContext::drawFill(const Fill&) {
 }
 
 void MeasureContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
   addLocalBounds(state, fill, rect);
 }
 
-void MeasureContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill) {
-  addLocalBounds(state, fill, rRect.rect);
+void MeasureContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
+                               const Stroke* stroke) {
+  auto rect = rRect.rect;
+  if (stroke) {
+    ApplyStrokeToBounds(*stroke, &rect);
+  }
+  addLocalBounds(state, fill, rect, false);
+}
+
+void MeasureContext::drawPath(const Path& path, const MCState& state, const Fill& fill) {
+  auto localBounds = path.getBounds();
+  addLocalBounds(state, fill, localBounds, path.isInverseFillType());
 }
 
 void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                                const Fill& fill) {
   auto localBounds = shape->getBounds();
   addLocalBounds(state, fill, localBounds, shape->isInverseFillType());
-}
-
-void MeasureContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions&,
-                               const MCState& state, const Fill& fill) {
-  DEBUG_ASSERT(image != nullptr);
-  auto rect = Rect::MakeWH(image->width(), image->height());
-  addLocalBounds(state, fill, rect);
 }
 
 void MeasureContext::drawImageRect(std::shared_ptr<Image>, const Rect& rect, const SamplingOptions&,
@@ -55,7 +58,7 @@ void MeasureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList
                                       const Stroke* stroke) {
   auto localBounds = glyphRunList->getBounds();
   if (stroke) {
-    stroke->applyToBounds(&localBounds);
+    ApplyStrokeToBounds(*stroke, &localBounds);
   }
   addLocalBounds(state, fill, localBounds);
 }

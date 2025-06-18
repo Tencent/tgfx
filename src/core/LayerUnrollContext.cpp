@@ -27,8 +27,8 @@ LayerUnrollContext::LayerUnrollContext(DrawContext* drawContext, Fill fill)
     : drawContext(drawContext), layerFill(std::move(fill)) {
 }
 
-void LayerUnrollContext::drawFill(const MCState& state, const Fill& fill) {
-  drawContext->drawFill(state, merge(fill));
+void LayerUnrollContext::drawFill(const Fill& fill) {
+  drawContext->drawFill(merge(fill));
   unrolled = true;
 }
 
@@ -37,23 +37,20 @@ void LayerUnrollContext::drawRect(const Rect& rect, const MCState& state, const 
   unrolled = true;
 }
 
-void LayerUnrollContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill) {
-  drawContext->drawRRect(rRect, state, merge(fill));
+void LayerUnrollContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
+                                   const Stroke* stroke) {
+  drawContext->drawRRect(rRect, state, merge(fill), stroke);
+  unrolled = true;
+}
+
+void LayerUnrollContext::drawPath(const Path& path, const MCState& state, const Fill& fill) {
+  drawContext->drawPath(path, state, merge(fill));
   unrolled = true;
 }
 
 void LayerUnrollContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                                    const Fill& fill) {
-  // The shape might have multiple contours and could overlap, so we can't unroll it directly.
-  if (fill.isOpaque() && layerFill.isOpaque()) {
-    drawContext->drawShape(std::move(shape), state, merge(fill));
-    unrolled = true;
-  }
-}
-
-void LayerUnrollContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                                   const MCState& state, const Fill& fill) {
-  drawContext->drawImage(std::move(image), sampling, state, merge(fill));
+  drawContext->drawShape(std::move(shape), state, merge(fill));
   unrolled = true;
 }
 

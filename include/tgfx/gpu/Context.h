@@ -32,7 +32,7 @@ class Gpu;
 class ResourceProvider;
 class ProxyProvider;
 class BlockBuffer;
-class MaxValueTracker;
+class SlidingWindowTracker;
 
 /**
  * Context is the main interface to the GPU. It is used to create and manage GPU resources, and to
@@ -97,33 +97,45 @@ class Context {
   size_t purgeableBytes() const;
 
   /**
-   * Returns current cache limits of max gpu memory byte size.
+   * Returns the size of the Context's gpu memory cache limit in bytes. The default value is 512MB.
    */
   size_t cacheLimit() const;
 
   /**
-   * Sets the cache limit of max gpu memory byte size.
+   * Sets the size of the Context's gpu memory cache limit in bytes. If the new limit is lower than
+   * the current limit, the cache will try to free resources to get under the new limit.
    */
   void setCacheLimit(size_t bytesLimit);
 
   /**
-   * Purges GPU resources that haven't been used since the passed point in time.
-   * @param purgeTime A time point previously returned by std::chrono::steady_clock::now().
-   * @param scratchResourcesOnly If true, the purgeable resources containing unique keys are spared.
-   * If false, then all purgeable resources will be deleted.
+   * Returns the number of frames (valid flushes) after which unused GPU resources are considered
+   * expired. A 'frame' is defined as a non-empty flush where actual rendering work is performed and
+   * commands are submitted to the GPU. If a GPU resource is not used for more than this number of
+   * frames, it will be automatically purged from the cache. The default value is 10 frames.
    */
-  void purgeResourcesNotUsedSince(std::chrono::steady_clock::time_point purgeTime,
-                                  bool scratchResourcesOnly = false);
+  size_t resourceExpirationFrames() const;
 
   /**
-   * Purge unreferenced resources from the cache until the provided bytesLimit has been reached, or
-   * we have purged all unreferenced resources. Returns true if the total resource bytes is not over
-   * the specified bytesLimit after purging.
-   * @param bytesLimit The desired number of bytes after puring.
-   * @param scratchResourcesOnly If true, the purgeable resources containing unique keys are spared.
-   * If false, then all purgeable resources will be deleted.
+   * Sets the number of frames (valid flushes) after which unused GPU resources are considered
+   * expired. If the new value is lower than the current value, the cache will try to free resources
+   * that haven't been used for more than the new number of frames.
    */
-  bool purgeResourcesUntilMemoryTo(size_t bytesLimit, bool scratchResourcesOnly = false);
+  void setResourceExpirationFrames(size_t frames);
+
+  /**
+   * Purges GPU resources that haven't been used since the passed point in time.
+   * @param purgeTime A time point returned by std::chrono::steady_clock::now() or
+   * std::chrono::steady_clock::now() - std::chrono::milliseconds(msNotUsed).
+   */
+  void purgeResourcesNotUsedSince(std::chrono::steady_clock::time_point purgeTime);
+
+  /**
+   * Purges GPU resources from the cache until the specified bytesLimit is reached, or until all
+   * purgeable resources have been removed. Returns true if the total resource usage does not exceed
+   * bytesLimit after purging.
+   * @param bytesLimit The target maximum number of bytes after purging.
+   */
+  bool purgeResourcesUntilMemoryTo(size_t bytesLimit);
 
   /**
    * Inserts a GPU semaphore that the current GPU-backed API must wait on before executing any more
@@ -201,7 +213,7 @@ class Context {
   ResourceProvider* _resourceProvider = nullptr;
   ProxyProvider* _proxyProvider = nullptr;
   BlockBuffer* _drawingBuffer = nullptr;
-  MaxValueTracker* _maxValueTracker = nullptr;
+  SlidingWindowTracker* _maxValueTracker = nullptr;
 
   void releaseAll(bool releaseGPU);
 

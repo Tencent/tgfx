@@ -38,7 +38,7 @@ class DrawContext {
   /**
    * Fills the entire clip area with the specified Fill.
    */
-  virtual void drawFill(const MCState& state, const Fill& fill) = 0;
+  virtual void drawFill(const Fill& fill) = 0;
 
   /**
    * Draws a rectangle with the specified MCState and Fill.
@@ -48,18 +48,18 @@ class DrawContext {
   /**
    * Draws a rounded rectangle with the specified MCState and Fill.
    */
-  virtual void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill) = 0;
+  virtual void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
+                         const Stroke* stroke) = 0;
+
+  /**
+   * Draws a path with the specified MCState and Fill.
+   */
+  virtual void drawPath(const Path& path, const MCState& state, const Fill& fill) = 0;
 
   /**
    * Draws a complex Shape with the specified MCState and Fill.
    */
   virtual void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) = 0;
-
-  /**
-   * Draws an Image with the specified SamplingOptions, MCState, and Fill.
-   */
-  virtual void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                         const MCState& state, const Fill& fill) = 0;
 
   /**
    * Draws a rectangle filled with the specified Image, SamplingOptions, MCState, and Fill.

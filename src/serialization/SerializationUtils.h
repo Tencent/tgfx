@@ -148,8 +148,6 @@ class SerializeUtils {
 
   static void FillComplexObjSerMap(const std::shared_ptr<Typeface>& typeFace, uint64_t objID, ComplexObjSerMap* map);
 
-  static void FillComplexObjSerMap(const std::shared_ptr<GlyphFace>& glyphFace, uint64_t objID, ComplexObjSerMap* map);
-
   static void FillComplexObjSerMap(const std::shared_ptr<ImageFilter>& imageFilter, uint64_t objID, ComplexObjSerMap* map);
 
   static void FillComplexObjSerMap(const std::shared_ptr<RuntimeEffect>& runtimeEffect, uint64_t objID,

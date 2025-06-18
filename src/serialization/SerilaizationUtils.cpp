@@ -16,13 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TextBlobSerialization.h"
 #ifdef TGFX_USE_INSPECTOR
 #include "ColorFilterSerialization.h"
 #include "ColorSerialization.h"
 #include "FontMetricsSerialization.h"
 #include "FontSerialization.h"
-#include "GlyphFaceSerialization.h"
 #include "ImageFilterSerialization.h"
 #include "ImageSerialization.h"
 #include "LayerFilterSerialization.h"
@@ -39,6 +37,7 @@
 #include "ShapeSerialization.h"
 #include "ShapeStyleSerialization.h"
 #include "TypeFaceSerialization.h"
+#include "TextBlobSerialization.h"
 #include "core/images/FilterImage.h"
 #include "glyphRunSerialization.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
@@ -140,10 +139,11 @@ std::string SerializeUtils::MipmapModeToString(MipmapMode mode) {
 std::string SerializeUtils::ShapeTypeToString(Types::ShapeType type) {
   static std::unordered_map<Types::ShapeType, const char*> m = {
       {Types::ShapeType::Append, "Append"}, {Types::ShapeType::Effect, "Effect"},
-      {Types::ShapeType::Glyph, "Glyph"},   {Types::ShapeType::Inverse, "Inverse"},
+      {Types::ShapeType::Text, "Text"},     {Types::ShapeType::Inverse, "Inverse"},
       {Types::ShapeType::Matrix, "Matrix"}, {Types::ShapeType::Merge, "Merge"},
       {Types::ShapeType::Path, "Path"},     {Types::ShapeType::Provider, "Provider"},
-      {Types::ShapeType::Stroke, "Stroke"}};
+      {Types::ShapeType::Stroke, "Stroke"}, {Types::ShapeType::Glyph, "Glyph"},
+  };
   return m[type];
 }
 
@@ -440,14 +440,6 @@ void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<Typeface>& typeF
     return;
   }
   (*map)[objID] = [typeFace]() { return TypeFaceSerialization::Serialize(typeFace.get()); };
-}
-
-void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<GlyphFace>& glyphFace, uint64_t objID,
-                             ComplexObjSerMap* map) {
-  if (glyphFace == nullptr) {
-    return;
-  }
-  (*map)[objID] = [glyphFace]() { return GlyphFaceSerialization::Serialize(glyphFace.get()); };
 }
 
 void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<ImageFilter>& imageFilter, uint64_t objID,

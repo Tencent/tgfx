@@ -56,9 +56,9 @@ class OpsCompositor {
   void fillRect(const Rect& rect, const MCState& state, const Fill& fill);
 
   /**
-   * Fills the given rrect with the given state and fill.
+   * Draw the given rrect with the given state, fill and optional stroke.
    */
-  void fillRRect(const RRect& rRect, const MCState& state, const Fill& fill);
+  void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill, const Stroke* stroke);
 
   /**
    * Fills the given shape with the given state and fill.
@@ -97,6 +97,7 @@ class OpsCompositor {
   SamplingOptions pendingSampling = {};
   std::vector<PlacementPtr<RectRecord>> pendingRects = {};
   std::vector<PlacementPtr<RRectRecord>> pendingRRects = {};
+  std::vector<PlacementPtr<Stroke>> pendingStrokes = {};
   std::vector<PlacementPtr<Op>> ops = {};
 
   static bool CompareFill(const Fill& a, const Fill& b);

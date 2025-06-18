@@ -15,27 +15,27 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#ifdef TGFX_USE_INSPECTOR
 
-#include "GlyphFaceSerialization.h"
+#pragma once
+#include "core/utils/Types.h"
+#include "tgfx/core/ColorFilter.h"
 
 namespace tgfx {
+/**
+ * LumaFilter cannot be replaced by MatrixFilter because MatrixFilter uses non-premultiplied RGBA,
+ * while LumaFilter uses premultiplied RGBA.
+ */
+class LumaColorFilter : public ColorFilter {
+ protected:
+  Type type() const override {
+    return Type::Luma;
+  }
 
-std::shared_ptr<Data> GlyphFaceSerialization::Serialize(const GlyphFace* glyphFace) {
-  DEBUG_ASSERT(glyphFace != nullptr)
-  flexbuffers::Builder fbb;
-  size_t startMap;
-  size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
-  SerializeGlyphFaceImpl(fbb, glyphFace);
-  SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
-  return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
-}
+  bool isEqual(const ColorFilter* colorFilter) const override {
+    auto type = Types::Get(colorFilter);
+    return type == Type::Luma;
+  }
 
-void GlyphFaceSerialization::SerializeGlyphFaceImpl(flexbuffers::Builder& fbb,
-                                                    const GlyphFace* glyphFace) {
-  SerializeUtils::SetFlexBufferMap(fbb, "hasColor", glyphFace->hasColor());
-  SerializeUtils::SetFlexBufferMap(fbb, "hasOutlines", glyphFace->hasOutlines());
-}
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(Context* context) const override;
+};
 }  // namespace tgfx
-#endif
