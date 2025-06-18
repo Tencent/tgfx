@@ -19,6 +19,7 @@
 #include "WebMask.h"
 #include "WebTypeface.h"
 #include "core/GlyphRunList.h"
+#include "core/utils/ApplyStrokeToBound.h"
 #include "core/utils/Log.h"
 #include "platform/web/WebImageBuffer.h"
 #include "platform/web/WebImageStream.h"
@@ -100,11 +101,7 @@ void WebMask::onFillPath(const Path& path, const Matrix& matrix, bool /*antiAlia
 
 static void GetTextsAndPositions(const GlyphRun* glyphRun, std::vector<std::string>* texts,
                                  std::vector<Point>* points) {
-  Font font = {};
-  if (!glyphRun->glyphFace->asFont(&font)) {
-    return;
-  }
-  auto typeface = std::static_pointer_cast<WebTypeface>(font.getTypeface());
+  auto typeface = std::static_pointer_cast<WebTypeface>(glyphRun->font.getTypeface());
   auto& glyphIDs = glyphRun->glyphs;
   auto& positions = glyphRun->positions;
   for (size_t i = 0; i < glyphIDs.size(); ++i) {
@@ -117,23 +114,23 @@ bool WebMask::onFillText(const GlyphRunList* glyphRunList, const Stroke* stroke,
                          const Matrix& matrix, bool) {
   aboutToFill();
   auto bounds = glyphRunList->getBounds(matrix.getMaxScale());
-  if (stroke) {
-    stroke->applyToBounds(&bounds);
-  }
-  matrix.mapRect(&bounds);
   if (bounds.isEmpty()) {
     return false;
   }
+  if (stroke) {
+    ApplyStrokeToBounds(*stroke, &bounds);
+  }
+  matrix.mapRect(&bounds);
   stream->markContentDirty(bounds);
   for (auto& glyphRun : glyphRunList->glyphRuns()) {
     std::vector<std::string> texts = {};
     std::vector<Point> points = {};
-    GetTextsAndPositions(&glyphRun, &texts, &points);
-    Font font = {};
-    if (!glyphRun.glyphFace->asFont(&font)) {
+    auto typeface = glyphRun.font.getTypeface();
+    if (!typeface || typeface->isCustom()) {
       return false;
     }
-    auto typeface = std::static_pointer_cast<WebTypeface>(font.getTypeface());
+    GetTextsAndPositions(&glyphRun, &texts, &points);
+    auto& font = glyphRun.font;
     auto webFont = val::object();
     webFont.set("name", typeface->fontFamily());
     webFont.set("style", typeface->fontStyle());

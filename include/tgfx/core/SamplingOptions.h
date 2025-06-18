@@ -49,7 +49,7 @@ enum class MipmapMode {
 struct SamplingOptions {
   SamplingOptions() = default;
 
-  explicit SamplingOptions(FilterMode filterMode, MipmapMode mipmapMode = MipmapMode::None)
+  explicit SamplingOptions(FilterMode filterMode, MipmapMode mipmapMode = MipmapMode::Linear)
       : filterMode(filterMode), mipmapMode(mipmapMode) {
   }
 
@@ -62,6 +62,6 @@ struct SamplingOptions {
   }
 
   FilterMode filterMode = FilterMode::Linear;
-  MipmapMode mipmapMode = MipmapMode::None;
+  MipmapMode mipmapMode = MipmapMode::Linear;
 };
 }  // namespace tgfx

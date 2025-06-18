@@ -24,10 +24,10 @@
 namespace tgfx {
 class FontSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(const Font* font, SerializeUtils::Map* map);
+  static std::shared_ptr<Data> Serialize(const Font* font, SerializeUtils::ComplexObjSerMap* map);
 
  private:
   static void SerializeFontImpl(flexbuffers::Builder& fbb, const Font* font,
-                                SerializeUtils::Map* map);
+                                SerializeUtils::ComplexObjSerMap* map);
 };
 }  // namespace tgfx

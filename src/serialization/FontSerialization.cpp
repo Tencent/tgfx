@@ -21,7 +21,7 @@
 
 namespace tgfx {
 
-std::shared_ptr<Data> FontSerialization::Serialize(const Font* font, SerializeUtils::Map* map) {
+std::shared_ptr<Data> FontSerialization::Serialize(const Font* font, SerializeUtils::ComplexObjSerMap* map) {
   DEBUG_ASSERT(font != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -33,12 +33,12 @@ std::shared_ptr<Data> FontSerialization::Serialize(const Font* font, SerializeUt
 }
 
 void FontSerialization::SerializeFontImpl(flexbuffers::Builder& fbb, const Font* font,
-                                          SerializeUtils::Map* map) {
+                                          SerializeUtils::ComplexObjSerMap* map) {
   auto typeFace = font->getTypeface();
   auto typeFaceID = SerializeUtils::GetObjID();
   SerializeUtils::SetFlexBufferMap(fbb, "typeFace", reinterpret_cast<uint64_t>(typeFace.get()),
                                    true, typeFace != nullptr, typeFaceID);
-  SerializeUtils::FillMap(typeFace, typeFaceID, map);
+  SerializeUtils::FillComplexObjSerMap(typeFace, typeFaceID, map);
 
   SerializeUtils::SetFlexBufferMap(fbb, "hasColor", font->hasColor());
   SerializeUtils::SetFlexBufferMap(fbb, "hasOutlines", font->hasOutlines());
@@ -49,7 +49,7 @@ void FontSerialization::SerializeFontImpl(flexbuffers::Builder& fbb, const Font*
   auto metricsID = SerializeUtils::GetObjID();
   auto metrics = font->getMetrics();
   SerializeUtils::SetFlexBufferMap(fbb, "metrics", "", false, true, metricsID);
-  SerializeUtils::FillMap(metrics, metricsID, map);
+  SerializeUtils::FillComplexObjSerMap(metrics, metricsID, map);
 }
 }  // namespace tgfx
 #endif

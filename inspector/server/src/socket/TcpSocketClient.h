@@ -41,4 +41,8 @@ class TcpSocketClient : public QObject {
  private:
   bool m_IsConnection;
   QTcpSocket* m_TcpSocket;
+  QByteArray data;
+  int currentIndex;
+  int size;
+  int Remainder;
 };

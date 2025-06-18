@@ -21,19 +21,19 @@
 
 namespace tgfx {
 
-std::shared_ptr<Data> ShapeSerialization::Serialize(const Shape* shape, SerializeUtils::Map* map) {
+std::shared_ptr<Data> ShapeSerialization::Serialize(const Shape* shape, SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap) {
   DEBUG_ASSERT(shape != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
   SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
-  SerializeShapeImpl(fbb, shape, map);
+  SerializeShapeImpl(fbb, shape, map, rosMap);
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
 
 void ShapeSerialization::SerializeShapeImpl(flexbuffers::Builder& fbb, const Shape* shape,
-                                            SerializeUtils::Map* map) {
+                                            SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap) {
   SerializeUtils::SetFlexBufferMap(fbb, "type",
                                    SerializeUtils::ShapeTypeToString(Types::Get(shape)));
   SerializeUtils::SetFlexBufferMap(fbb, "isSimplePath", shape->isSimplePath());
@@ -42,12 +42,13 @@ void ShapeSerialization::SerializeShapeImpl(flexbuffers::Builder& fbb, const Sha
   auto boundsID = SerializeUtils::GetObjID();
   auto bounds = shape->getBounds();
   SerializeUtils::SetFlexBufferMap(fbb, "bounds", "", false, true, boundsID);
-  SerializeUtils::FillMap(bounds, boundsID, map);
+  SerializeUtils::FillComplexObjSerMap(bounds, boundsID, map);
 
   auto pathID = SerializeUtils::GetObjID();
   auto path = shape->getPath();
-  SerializeUtils::SetFlexBufferMap(fbb, "path", "", false, true, pathID);
-  SerializeUtils::FillMap(path, pathID, map);
+  SerializeUtils::SetFlexBufferMap(fbb, "path", "", false, true, pathID, true);
+  SerializeUtils::FillComplexObjSerMap(path, pathID, map);
+    SerializeUtils::FillRenderableObjSerMap(path, pathID, rosMap);
 }
 }  // namespace tgfx
 #endif

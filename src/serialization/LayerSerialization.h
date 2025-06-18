@@ -34,7 +34,7 @@ class LayerSerialization {
       std::shared_ptr<Layer> layer,
       std::unordered_map<uint64_t, std::shared_ptr<tgfx::Layer>>& layerMap);
 
-  static std::shared_ptr<Data> SerializeLayer(const Layer* layer, SerializeUtils::Map* map,
+  static std::shared_ptr<Data> SerializeLayer(const Layer* layer, SerializeUtils::ComplexObjSerMap* map,SerializeUtils::RenderableObjSerMap* rosMap,
                                               const std::string& typeName = "LayerSubAttribute");
 
  private:
@@ -43,18 +43,18 @@ class LayerSerialization {
       std::unordered_map<uint64_t, std::shared_ptr<tgfx::Layer>>& layerMap);
 
   static void SerializeBasicLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
-                                      SerializeUtils::Map* map);
+                                      SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
 
   static void SerializeImageLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
-                                      SerializeUtils::Map* map);
+                                      SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
 
   static void SerializeShapeLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
-                                      SerializeUtils::Map* map);
+                                      SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
 
   static void SerializeSolidLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
-                                      SerializeUtils::Map* map);
+                                      SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
 
   static void SerializeTextLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
-                                     SerializeUtils::Map* map);
+                                     SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
 };
 }  // namespace tgfx

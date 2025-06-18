@@ -189,4 +189,7 @@ std::vector<Unichar> FTTypeface::getGlyphToUnicodeMap() const {
 }
 #endif
 
+std::shared_ptr<ScalerContext> FTTypeface::onCreateScalerContext(float size) const {
+  return std::make_shared<FTScalerContext>(weakThis.lock(), size);
+}
 }  // namespace tgfx

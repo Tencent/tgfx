@@ -24,6 +24,7 @@
 #include "core/images/RasterizedImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/images/TextureImage.h"
+#include "core/utils/WeakMap.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"
@@ -61,12 +62,23 @@ class PixelDataConverter : public ImageGenerator {
 };
 
 std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
+  static WeakMap<std::string, Image> imageMap = {};
+  if (filePath.empty()) {
+    return nullptr;
+  }
+  if (auto cached = imageMap.find(filePath)) {
+    return cached;
+  }
   auto codec = ImageCodec::MakeFrom(filePath);
   auto image = CodecImage::MakeFrom(codec);
   if (image == nullptr) {
     return nullptr;
   }
-  return image->makeOriented(codec->orientation());
+  auto orientedImage = image->makeOriented(codec->orientation());
+  if (orientedImage) {
+    imageMap.insert(filePath, orientedImage);
+  }
+  return orientedImage;
 }
 
 std::shared_ptr<Image> Image::MakeFromEncoded(std::shared_ptr<Data> encodedData) {
@@ -177,6 +189,9 @@ std::shared_ptr<Image> Image::makeMipmapped(bool enabled) const {
 std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {
   auto rect = subset;
   rect.round();
+  if (rect.isEmpty()) {
+    return nullptr;
+  }
   auto bounds = Rect::MakeWH(width(), height());
   if (bounds == rect) {
     return weakThis.lock();

@@ -22,7 +22,7 @@
 namespace tgfx {
 
 std::shared_ptr<Data> glyphRunSerialization::Serialize(const GlyphRun* glyphRun,
-                                                       SerializeUtils::Map* map) {
+                                                       SerializeUtils::ComplexObjSerMap* map) {
   DEBUG_ASSERT(glyphRun != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -35,25 +35,25 @@ std::shared_ptr<Data> glyphRunSerialization::Serialize(const GlyphRun* glyphRun,
 
 void glyphRunSerialization::SerializeGlyphRunImpl(flexbuffers::Builder& fbb,
                                                   const GlyphRun* glyphRun,
-                                                  SerializeUtils::Map* map) {
+                                                  SerializeUtils::ComplexObjSerMap* map) {
   auto glyphFaceID = SerializeUtils::GetObjID();
-  auto glyphFace = glyphRun->glyphFace;
-  SerializeUtils::SetFlexBufferMap(fbb, "glyphFace", reinterpret_cast<uint64_t>(glyphFace.get()),
-                                   true, glyphFace != nullptr, glyphFaceID);
-  SerializeUtils::FillMap(glyphFace, glyphFaceID, map);
+  const auto& font = glyphRun->font;
+  SerializeUtils::SetFlexBufferMap(fbb, "font", reinterpret_cast<uint64_t>(&font), true,
+                                   font.getTypeface() != nullptr, glyphFaceID);
+  SerializeUtils::FillComplexObjSerMap(font, glyphFaceID, map);
 
   auto glyphsID = SerializeUtils::GetObjID();
   auto glyphs = glyphRun->glyphs;
   auto glyphsSize = static_cast<unsigned int>(glyphs.size());
   SerializeUtils::SetFlexBufferMap(fbb, "glyphs", glyphsSize, false, glyphsSize, glyphsID);
-  SerializeUtils::FillMap(glyphs, glyphsID, map);
+  SerializeUtils::FillComplexObjSerMap(glyphs, glyphsID, map);
 
   auto positionsID = SerializeUtils::GetObjID();
   auto positions = glyphRun->positions;
   auto positionsSize = static_cast<unsigned int>(positions.size());
   SerializeUtils::SetFlexBufferMap(fbb, "positions", positionsSize, false, positionsSize,
                                    positionsID);
-  SerializeUtils::FillMap(positions, positionsID, map);
+  SerializeUtils::FillComplexObjSerMap(positions, positionsID, map);
 }
 }  // namespace tgfx
 #endif

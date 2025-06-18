@@ -25,25 +25,25 @@ namespace tgfx {
 class ShapeStyle;
 class ShapeStyleSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(const ShapeStyle* shapeStyle, SerializeUtils::Map* map);
+  static std::shared_ptr<Data> Serialize(const ShapeStyle* shapeStyle, SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
 
  private:
   static void SerializeShapeStyleImpl(flexbuffers::Builder& fbb, const ShapeStyle* shapeStyle,
-                                      SerializeUtils::Map* map);
+                                      SerializeUtils::ComplexObjSerMap* map);
   static void SerializeImagePatternImpl(flexbuffers::Builder& fbb, const ShapeStyle* shapeStyle,
-                                        SerializeUtils::Map* map);
+                                        SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
   static void SerializeGradientImpl(flexbuffers::Builder& fbb, const ShapeStyle* shapeStyle,
-                                    SerializeUtils::Map* map);
+                                    SerializeUtils::ComplexObjSerMap* map);
   static void SerializeLinearGradientImpl(flexbuffers::Builder& fbb, const ShapeStyle* shapeStyle,
-                                          SerializeUtils::Map* map);
+                                          SerializeUtils::ComplexObjSerMap* map);
   static void SerializeRadialGradientImpl(flexbuffers::Builder& fbb, const ShapeStyle* shapeStyle,
-                                          SerializeUtils::Map* map);
+                                          SerializeUtils::ComplexObjSerMap* map);
   static void SerializeConicGradientImpl(flexbuffers::Builder& fbb, const ShapeStyle* shapeStyle,
-                                         SerializeUtils::Map* map);
+                                         SerializeUtils::ComplexObjSerMap* map);
   static void SerializeDiamondGradientImpl(flexbuffers::Builder& fbb, const ShapeStyle* shapeStyle,
-                                           SerializeUtils::Map* map);
+                                           SerializeUtils::ComplexObjSerMap* map);
   static void SerializeSolidColorImpl(flexbuffers::Builder& fbb, const ShapeStyle* shapeStyle,
-                                      SerializeUtils::Map* map);
+                                      SerializeUtils::ComplexObjSerMap* map);
 };
 
 }  // namespace tgfx

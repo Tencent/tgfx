@@ -16,28 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "MaxValueTracker.h"
+#include "GLLumaFragmentProcessor.h"
 
 namespace tgfx {
 
-MaxValueTracker::MaxValueTracker(size_t maxSize) : _maxSize(maxSize) {
+PlacementPtr<FragmentProcessor> LumaFragmentProcessor::Make(BlockBuffer* buffer) {
+  return buffer->make<GLLumaFragmentProcessor>();
 }
 
-void MaxValueTracker::addValue(size_t value) {
-  _values.push_back(value);
-  if (_values.size() > _maxSize) {
-    _values.pop_front();
-  }
-}
-
-size_t MaxValueTracker::getMaxValue() const {
-  size_t maxValue = 0;
-  for (size_t value : _values) {
-    if (value > maxValue) {
-      maxValue = value;
-    }
-  }
-  return maxValue;
+void GLLumaFragmentProcessor::emitCode(EmitArgs& args) const {
+  /** See ITU-R Recommendation BT.709 at http://www.itu.int/rec/R-REC-BT.709/ .*/
+  args.fragBuilder->codeAppendf("float luma = dot(%s.rgb, vec3(0.2126, 0.7152, 0.0722));\n",
+                                args.inputColor.c_str(), args.inputColor.c_str());
+  args.fragBuilder->codeAppendf("%s = vec4(luma);\n", args.outputColor.c_str());
 }
 
 }  // namespace tgfx

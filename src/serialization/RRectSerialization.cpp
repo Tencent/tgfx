@@ -21,7 +21,7 @@
 
 namespace tgfx {
 
-std::shared_ptr<Data> RRectSerialization::Serialize(const RRect* rrect, SerializeUtils::Map* map) {
+std::shared_ptr<Data> RRectSerialization::Serialize(const RRect* rrect, SerializeUtils::ComplexObjSerMap* map) {
   DEBUG_ASSERT(rrect != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -33,18 +33,18 @@ std::shared_ptr<Data> RRectSerialization::Serialize(const RRect* rrect, Serializ
 }
 
 void RRectSerialization::SerializeRRectImpl(flexbuffers::Builder& fbb, const RRect* rrect,
-                                            SerializeUtils::Map* map) {
+                                            SerializeUtils::ComplexObjSerMap* map) {
   (void)rrect;
 
   auto rectID = SerializeUtils::GetObjID();
   auto rect = rrect->rect;
   SerializeUtils::SetFlexBufferMap(fbb, "rect", "", false, true, rectID);
-  SerializeUtils::FillMap(rect, rectID, map);
+  SerializeUtils::FillComplexObjSerMap(rect, rectID, map);
 
   auto radiiID = SerializeUtils::GetObjID();
   auto radii = rrect->radii;
   SerializeUtils::SetFlexBufferMap(fbb, "radii", "", false, true, radiiID);
-  SerializeUtils::FillMap(radii, radiiID, map);
+  SerializeUtils::FillComplexObjSerMap(radii, radiiID, map);
 }
 
 }  // namespace tgfx

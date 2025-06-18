@@ -386,4 +386,7 @@ std::vector<Unichar> CGTypeface::getGlyphToUnicodeMap() const {
 }
 #endif
 
+std::shared_ptr<ScalerContext> CGTypeface::onCreateScalerContext(float size) const {
+  return std::make_shared<CGScalerContext>(weakThis.lock(), size);
+}
 }  // namespace tgfx

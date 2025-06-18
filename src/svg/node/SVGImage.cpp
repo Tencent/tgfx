@@ -110,7 +110,8 @@ void SVGImage::onRender(const SVGRenderContext& context) const {
                                   viewPort.height() / imgInfo.destinationRect.height());
   matrix.preTranslate(imgInfo.destinationRect.x(), imgInfo.destinationRect.y());
 
-  context.canvas()->drawImage(imgInfo.image, matrix);
+  context.canvas()->concat(matrix);
+  context.canvas()->drawImage(imgInfo.image);
 }
 
 Path SVGImage::onAsPath(const SVGRenderContext&) const {

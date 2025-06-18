@@ -23,7 +23,7 @@
 namespace tgfx {
 
 std::shared_ptr<Data> glyphRunListSerialization::Serialize(const GlyphRunList* glyphRunList,
-                                                           SerializeUtils::Map* map) {
+                                                           SerializeUtils::ComplexObjSerMap* map) {
   DEBUG_ASSERT(glyphRunList != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -36,7 +36,7 @@ std::shared_ptr<Data> glyphRunListSerialization::Serialize(const GlyphRunList* g
 
 void glyphRunListSerialization::SerializeglyphRunListImpl(flexbuffers::Builder& fbb,
                                                           const GlyphRunList* glyphRunList,
-                                                          SerializeUtils::Map* map) {
+                                                          SerializeUtils::ComplexObjSerMap* map) {
   SerializeUtils::SetFlexBufferMap(fbb, "hasColor", glyphRunList->hasColor());
   SerializeUtils::SetFlexBufferMap(fbb, "hasOutlines", glyphRunList->hasOutlines());
 
@@ -45,7 +45,7 @@ void glyphRunListSerialization::SerializeglyphRunListImpl(flexbuffers::Builder& 
   auto glyhRunsSize = static_cast<unsigned int>(glyphRuns.size());
   SerializeUtils::SetFlexBufferMap(fbb, "glyphRuns", glyhRunsSize, false, glyhRunsSize,
                                    glyphRunsID);
-  SerializeUtils::FillMap(glyphRuns, glyphRunsID, map);
+  SerializeUtils::FillComplexObjSerMap(glyphRuns, glyphRunsID, map);
 }
 }  // namespace tgfx
 #endif

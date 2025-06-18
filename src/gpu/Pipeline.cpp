@@ -74,6 +74,11 @@ void Pipeline::getUniforms(UniformBuffer* uniformBuffer) const {
 
 std::vector<SamplerInfo> Pipeline::getSamplers() const {
   std::vector<SamplerInfo> samplers = {};
+  for (size_t i = 0; i < geometryProcessor->numTextureSamplers(); i++) {
+    SamplerInfo sampler = {geometryProcessor->textureSampler(i),
+                           geometryProcessor->samplerState(i)};
+    samplers.push_back(sampler);
+  }
   FragmentProcessor::Iter iter(this);
   const FragmentProcessor* fp = iter.next();
   while (fp) {

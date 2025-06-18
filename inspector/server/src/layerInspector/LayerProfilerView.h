@@ -25,6 +25,7 @@
 #include "flatbuffers/flexbuffers.h"
 #include "socket/TcpSocketClient.h"
 #include "socket/WebSocketServer.h"
+#include "MemoryImageProvider.h"
 
 
 class LayerProfilerView : public QObject {
@@ -60,11 +61,13 @@ class LayerProfilerView : public QObject {
 
   void processSelectedLayer(uint64_t address);
 
+  void processImageFlush(uint64_t imageID);
+
  private:
   WebSocketServer* m_WebSocketServer;
   TcpSocketClient* m_TcpSocketClient;
   QQmlApplicationEngine* m_LayerTreeEngine;
-  QQmlApplicationEngine* m_LayerAttributeEngine;
+  MemoryImageProvider* imageProvider;
   LayerTreeModel* m_LayerTreeModel;
   LayerAttributeModel* m_LayerAttributeModel;
 };

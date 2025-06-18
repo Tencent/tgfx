@@ -26,11 +26,11 @@ namespace tgfx {
 class ScalerContextSerialization {
  public:
   static std::shared_ptr<Data> Serialize(const ScalerContext* scalerContext,
-                                         SerializeUtils::Map* map);
+                                         SerializeUtils::ComplexObjSerMap* map);
 
  private:
   static void SerializeScalerContextImpl(flexbuffers::Builder& fbb,
                                          const ScalerContext* scaler_context,
-                                         SerializeUtils::Map* map);
+                                         SerializeUtils::ComplexObjSerMap* map);
 };
 }  // namespace tgfx

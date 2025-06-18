@@ -28,5 +28,6 @@
         <file>icons/layerInspector/mouse.svg</file>
         <file>icons/layerInspector/tree.png</file>
         <file>icons/layerInspector/close.svg</file>
+        <file>icons/layerInspector/eye.svg</file>
     </qresource>
 </RCC>

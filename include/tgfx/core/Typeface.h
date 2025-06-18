@@ -146,12 +146,27 @@ class Typeface {
    */
   virtual std::vector<Unichar> getGlyphToUnicodeMap() const;
 
+  virtual std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const = 0;
+
   mutable std::mutex locker = {};
 
+  std::weak_ptr<Typeface> weakThis;
+
  private:
+  /**
+   *  Returns a ScalerContext for the given size.
+   */
+  std::shared_ptr<ScalerContext> getScalerContext(float size);
+
+  virtual bool isCustom() const;
+
   std::unordered_map<float, std::weak_ptr<ScalerContext>> scalerContexts = {};
 
+  friend class Font;
   friend class ScalerContext;
   friend class GlyphConverter;
+  friend class CGMask;
+  friend class WebMask;
+  friend class SVGExportContext;
 };
 }  // namespace tgfx

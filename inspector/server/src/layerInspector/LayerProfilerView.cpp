@@ -81,6 +81,10 @@ LayerProfilerView::LayerProfilerView(QString ip, quint16 port)
     auto data = feedBackData("FlushLayerTree", UINT64_MAX);
     m_TcpSocketClient->sendData(data);
   });
+
+  connect(m_LayerAttributeModel, &LayerAttributeModel::flushImageChild, [this](uint64_t imageID) {
+    processImageFlush(imageID);
+  });
 }
 
 LayerProfilerView::LayerProfilerView()
@@ -113,6 +117,10 @@ LayerProfilerView::LayerProfilerView()
   connect(m_LayerTreeModel, &LayerTreeModel::flushLayerTreeSignal, [this]() {
     auto data = feedBackData("FlushLayerTree", UINT64_MAX);
     m_WebSocketServer->SendData(data);
+  });
+
+  connect(m_LayerAttributeModel, &LayerAttributeModel::flushImageChild, [this](uint64_t imageID) {
+    processImageFlush(imageID);
   });
 }
 
@@ -171,12 +179,17 @@ void LayerProfilerView::LayerProlfilerQMLImpl() {
   };
   KDDockWidgets::Config::self().setDropIndicatorAllowedFunc(func);
   m_LayerTreeEngine = new QQmlApplicationEngine();
+  imageProvider = new MemoryImageProvider();
+  m_LayerTreeEngine->addImageProvider(QLatin1String("RenderableImage"), imageProvider);
+
   m_LayerTreeEngine->rootContext()->setContextProperty("_layerAttributeModel",
                                                             m_LayerAttributeModel);
   m_LayerTreeEngine->rootContext()->setContextProperty("_layerTreeModel", m_LayerTreeModel);
   m_LayerTreeEngine->rootContext()->setContextProperty("_layerProfileView", this);
+  m_LayerTreeEngine->rootContext()->setContextProperty("imageProvider", imageProvider);
   KDDockWidgets::QtQuick::Platform::instance()->setQmlEngine(m_LayerTreeEngine);
   m_LayerTreeEngine->load("qrc:/qml/layerInspector/LayerProfilerView.qml");
+
   if (m_LayerTreeEngine->rootObjects().isEmpty()) {
     qWarning() << "Failed to load LayerProfilerView.qml";
     return;
@@ -210,6 +223,12 @@ void LayerProfilerView::ProcessMessage(const QByteArray& message) {
   } else if (type == "FlushAttributeAck") {
     auto address = contentMap["Address"].AsUInt64();
     processSelectedLayer(address);
+  }else if(type == "ImageData") {
+    int width = contentMap["width"].AsInt32();
+    int height = contentMap["height"].AsInt32();
+    auto blob = contentMap["data"].AsBlob();
+    QByteArray data((char*)blob.data(), (qsizetype)blob.size());
+    imageProvider->setImage(imageProvider->ImageID(), width, height, data);
   } else {
     qDebug() << "Unknown message type!";
   }
@@ -246,5 +265,14 @@ void LayerProfilerView::processSelectedLayer(uint64_t address) {
     m_LayerAttributeModel->switchToLayer(address);
   } else {
     sendSerializeAttributeAddress(address);
+  }
+}
+
+void LayerProfilerView::processImageFlush(uint64_t imageID) {
+  if(!imageProvider->isImageExisted(imageID)) {
+    imageProvider->setCurrentImageID(imageID);
+    auto data = feedBackData("FlushImage", imageID);
+    if (m_WebSocketServer) m_WebSocketServer->SendData(data);
+    if (m_TcpSocketClient) m_TcpSocketClient->sendData(data);
   }
 }

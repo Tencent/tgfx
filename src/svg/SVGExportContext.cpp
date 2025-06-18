@@ -71,15 +71,8 @@ SVGExportContext::SVGExportContext(Context* context, const Rect& viewBox,
   }
 }
 
-void SVGExportContext::drawFill(const MCState& state, const Fill& fill) {
-  auto newFill = fill;
-  if (newFill.shader) {
-    newFill.shader = newFill.shader->makeWithMatrix(state.matrix);
-  }
-  if (newFill.maskFilter) {
-    newFill.maskFilter = newFill.maskFilter->makeWithMatrix(state.matrix);
-  }
-  drawRect(viewBox, MCState{state.clip}, newFill);
+void SVGExportContext::drawFill(const Fill& fill) {
+  drawRect(viewBox, {}, fill);
 }
 
 void SVGExportContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
@@ -109,7 +102,8 @@ void SVGExportContext::drawRect(const Rect& rect, const MCState& state, const Fi
   }
 }
 
-void SVGExportContext::drawRRect(const RRect& roundRect, const MCState& state, const Fill& fill) {
+void SVGExportContext::drawRRect(const RRect& roundRect, const MCState& state, const Fill& fill,
+                                 const Stroke*) {
   if (!state.clip.contains(roundRect.rect)) {
     applyClipPath(state.clip);
   }
@@ -131,12 +125,10 @@ void SVGExportContext::drawRRect(const RRect& roundRect, const MCState& state, c
   }
 }
 
-void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
-                                 const Fill& fill) {
-  if (!state.clip.contains(shape->getBounds())) {
+void SVGExportContext::drawPath(const Path& path, const MCState& state, const Fill& fill) {
+  if (!state.clip.contains(path.getBounds())) {
     applyClipPath(state.clip);
   }
-  auto path = shape->getPath();
   ElementWriter pathElement("path", context, this, writer.get(), resourceBucket.get(),
                             exportFlags & SVGExportFlags::DisableWarnings, state, fill);
   pathElement.addPathAttributes(path, tgfx::SVGExportContext::PathEncodingType());
@@ -145,11 +137,10 @@ void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& st
   }
 }
 
-void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
-                                 const MCState& state, const Fill& fill) {
-  DEBUG_ASSERT(image != nullptr);
-  auto rect = Rect::MakeWH(image->width(), image->height());
-  return drawImageRect(std::move(image), rect, sampling, state, fill);
+void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
+                                 const Fill& fill) {
+  DEBUG_ASSERT(shape != nullptr);
+  drawPath(shape->getPath(), state, fill);
 }
 
 void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
@@ -201,14 +192,16 @@ void SVGExportContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunLi
                                         const MCState& state, const Fill& fill,
                                         const Stroke* stroke) {
   DEBUG_ASSERT(glyphRunList != nullptr);
-  bool hasFont = glyphRunList->glyphRuns()[0].glyphFace->asFont(nullptr);
-
+  auto typeface = glyphRunList->glyphRuns()[0].font.getTypeface().get();
+  if (typeface == nullptr) {
+    return;
+  }
   // If the font needs to be converted to a path but lacks outlines (e.g., emoji font, web font),
   // it cannot be converted.
   if (!state.clip.contains(glyphRunList->getBounds(state.matrix.getMaxScale()))) {
     applyClipPath(state.clip);
   }
-  if (hasFont) {
+  if (!typeface->isCustom()) {
     if (glyphRunList->hasOutlines() && !glyphRunList->hasColor() &&
         exportFlags & SVGExportFlags::ConvertTextToPaths) {
       exportGlyphsAsPath(glyphRunList, state, fill, stroke);
@@ -245,15 +238,12 @@ void SVGExportContext::exportGlyphsAsText(const std::shared_ptr<GlyphRunList>& g
     ElementWriter textElement("text", context, this, writer.get(), resourceBucket.get(),
                               exportFlags & SVGExportFlags::DisableWarnings, state, fill, stroke);
 
-    Font font;
-    if (glyphRun.glyphFace->asFont(&font)) {
-      textElement.addFontAttributes(font);
+    textElement.addFontAttributes(glyphRun.font);
 
-      auto unicharInfo = textBuilder.glyphToUnicharsInfo(glyphRun);
-      textElement.addAttribute("x", unicharInfo.posX);
-      textElement.addAttribute("y", unicharInfo.posY);
-      textElement.addText(unicharInfo.text);
-    }
+    auto unicharInfo = textBuilder.glyphToUnicharsInfo(glyphRun);
+    textElement.addAttribute("x", unicharInfo.posX);
+    textElement.addAttribute("y", unicharInfo.posY);
+    textElement.addText(unicharInfo.text);
   }
 }
 
@@ -266,11 +256,8 @@ void SVGExportContext::exportGlyphsAsImage(const std::shared_ptr<GlyphRunList>& 
   }
   viewMatrix.preScale(1.0f / scale, 1.0f / scale);
   for (const auto& glyphRun : glyphRunList->glyphRuns()) {
-    auto glyphFace = glyphRun.glyphFace;
-    glyphFace = glyphFace->makeScaled(scale);
-    if (glyphFace == nullptr) {
-      continue;
-    }
+    auto font = glyphRun.font;
+    font = font.makeWithSize(scale * font.getSize());
     const auto& glyphIDs = glyphRun.glyphs;
     auto glyphCount = glyphIDs.size();
     const auto& positions = glyphRun.positions;
@@ -278,7 +265,7 @@ void SVGExportContext::exportGlyphsAsImage(const std::shared_ptr<GlyphRunList>& 
     for (size_t i = 0; i < glyphCount; ++i) {
       const auto& glyphID = glyphIDs[i];
       const auto& position = positions[i];
-      auto glyphCodec = glyphFace->getImage(glyphID, nullptr, &glyphState.matrix);
+      auto glyphCodec = font.getImage(glyphID, nullptr, &glyphState.matrix);
       auto glyphImage = Image::MakeFrom(glyphCodec);
       if (glyphImage == nullptr) {
         continue;

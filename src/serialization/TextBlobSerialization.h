@@ -24,9 +24,9 @@
 namespace tgfx {
 class TextBlobSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(const TextBlob* textBlob);
+  static std::shared_ptr<Data> Serialize(const TextBlob* textBlob, SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
 
  private:
-  static void SerializeTextBlobImpl(flexbuffers::Builder& fbb, const TextBlob* textBlob);
+  static void SerializeTextBlobImpl(flexbuffers::Builder& fbb, const TextBlob* textBlob, SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
 };
 }  // namespace tgfx

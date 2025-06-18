@@ -19,7 +19,7 @@
 #include "TcpSocketClient.h"
 #include <utility>
 TcpSocketClient::TcpSocketClient(QObject* parent, QString ip, quint16 port)
-    : QObject(parent), m_IsConnection(false) {
+    : QObject(parent), m_IsConnection(false), data(), currentIndex(0), size(0), Remainder(0) {
   m_TcpSocket = new QTcpSocket(this);
 
   connect(m_TcpSocket, &QTcpSocket::connected, this, &TcpSocketClient::onSocketConnected);
@@ -53,8 +53,20 @@ void TcpSocketClient::onSocketDisconnected() {
   m_IsConnection = false;
 }
 void TcpSocketClient::onSocketReadyRead() {
-  QByteArray data = m_TcpSocket->readAll();
-  emit ServerBinaryData(data);
+  if(Remainder == 0) {
+    m_TcpSocket->read((char*)&size, sizeof(int));
+    Remainder = size;
+    data.resize(size);
+  }
+  if(Remainder != 0) {
+    auto readSize = m_TcpSocket->read(data.data() + currentIndex, Remainder);
+    currentIndex += readSize;
+    Remainder -= readSize;
+    if(Remainder == 0) {
+      emit ServerBinaryData(data);
+      currentIndex = 0;
+    }
+  }
 }
 void TcpSocketClient::onSocketErrorOccurred(QAbstractSocket::SocketError error) {
   Q_UNUSED(error);
