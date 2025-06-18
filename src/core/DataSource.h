@@ -48,20 +48,19 @@ class DataSource {
     return std::make_unique<DataWrapper<T>>(std::move(data));
   }
 
+#ifdef TGFX_USE_THREADS
   /**
    * Wraps the existing data source into an asynchronous DataSource and starts loading the data
 	 * immediately.
    */
   static std::unique_ptr<DataSource> Async(std::shared_ptr<DataSource> source,
                                            ReferenceCounter referenceCounter) {
-#ifndef TGFX_USE_THREADS
-    return source;
-#endif
     if (source == nullptr) {
       return nullptr;
     }
     return std::make_unique<AsyncDataSource<T>>(std::move(source), referenceCounter);
   }
+#endif
 
   virtual ~DataSource() = default;
 
