@@ -69,7 +69,7 @@ class DataSource {
    */
   virtual std::shared_ptr<T> getData() const = 0;
 
-  virtual void runAsync() {};
+  virtual void runAsync(){};
 };
 
 /**
