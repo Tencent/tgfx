@@ -43,8 +43,8 @@ class ImageSource : public DataSource<ImageBuffer> {
     return generator->makeBuffer(tryHardware);
   }
 
-   private:
-    std::shared_ptr<ImageGenerator> generator = nullptr;
-    bool tryHardware = true;
+ private:
+  std::shared_ptr<ImageGenerator> generator = nullptr;
+  bool tryHardware = true;
 };
 }  // namespace tgfx
