@@ -154,7 +154,7 @@ class BlockBuffer {
 
   /**
    * Increments the reference count of the BlockBuffer. This allows tracking whether the memory
-   * blocks is still in use by other threads. Ensures that memory blocks are not freed while there
+   * blocks are still in use by other threads. Ensures that memory blocks are not freed while there
    * are outstanding references.
    * This method is thread-safe.
    */
