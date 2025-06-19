@@ -45,7 +45,7 @@ void TGFXView::handlePinch(qreal scaleDelta, QPointF center) {
   update();
 }
 
-void TGFXView::onMouseClicked(qreal, qreal){
+void TGFXView::onMouseClicked(qreal, qreal) {
   lastDrawIndex++;
   offset = {0, 0};
   zoom = 1.0f;
