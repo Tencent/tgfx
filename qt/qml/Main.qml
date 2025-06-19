@@ -8,6 +8,8 @@ Window {
     width: 800
     height: 600
 
+    property point mousePos: Qt.point(width/2, height/2)
+
     PinchArea {
         id: pinchArea
         anchors.fill: parent
@@ -16,7 +18,7 @@ Window {
             lastScale = 1.0
         }
         onPinchUpdated: {
-            tgfxView.handlePinch(pinch.scale / lastScale, pinch.center)
+            tgfxView.handlePinch(pinch.scale / lastScale, wind.mousePos)
             lastScale = pinch.scale
         }
         TGFXView {
@@ -27,6 +29,15 @@ Window {
             anchors.right: parent.right
             objectName: "tgfxView"
             focus: true
+        }
+        MouseArea {
+            id: mouseTracker
+            anchors.fill: parent
+            hoverEnabled: true
+            onPositionChanged: {
+                wind.mousePos = Qt.point(mouse.x, mouse.y)
+            }
+            onClicked: tgfxView.onMouseClicked(mouse.x, mouse.y)
         }
     }
 }

@@ -29,12 +29,10 @@ class TGFXView : public QQuickItem {
  public:
   explicit TGFXView(QQuickItem* parent = nullptr);
   Q_INVOKABLE void handlePinch(qreal scaleDelta, QPointF center);
+  Q_INVOKABLE void onMouseClicked(qreal x, qreal y);
 
  protected:
-  void mousePressEvent(QMouseEvent* event) override;
-  void mouseReleaseEvent(QMouseEvent*) override;
   void wheelEvent(QWheelEvent* event) override;
-  void mouseMoveEvent(QMouseEvent* event) override;
 
   QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*) override;
 
@@ -44,8 +42,6 @@ class TGFXView : public QQuickItem {
   std::shared_ptr<drawers::AppHost> appHost = nullptr;
   float zoom = 1.0f;
   QPointF offset = {0, 0};
-  bool dragging = false;
-  QPoint lastMousePos;
 
   void createAppHost();
   void draw();

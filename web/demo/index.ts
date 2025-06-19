@@ -47,29 +47,16 @@ if (typeof window !== 'undefined') {
             updateSize(shareData);
             const canvas = document.getElementById('hello2d');
             if (canvas) {
-                let lastMouse = {x: 0, y: 0};
-                canvas.addEventListener('mousedown', (e) => {
-                    lastMouse.x = e.offsetX;
-                    lastMouse.y = e.offsetY;
-                    (canvas as any)._dragging = true;
-                });
-                window.addEventListener('mousemove', (e) => {
-                    if ((canvas as any)._dragging) {
-                        let dx = e.movementX;
-                        let dy = e.movementY;
-                        shareData.offsetX += dx / shareData.zoom;
-                        shareData.offsetY += dy / shareData.zoom;
-                        shareData.tgfxBaseView.draw(shareData.drawIndex, shareData.zoom, shareData.offsetX, shareData.offsetY);
-                    }
-                });
                 window.addEventListener('mouseup', () => {
-                    (canvas as any)._dragging = false;
+                    shareData.offsetX = 0;
+                    shareData.offsetY = 0;
+                    shareData.zoom = 1.0;
                 });
 
                 canvas.addEventListener('wheel', (e: WheelEvent) => {
                     e.preventDefault();
                     if (e.ctrlKey || e.metaKey) {
-                        const zoomFactor = Math.exp(-e.deltaY * 0.05);
+                        const zoomFactor = 1.0 + e.deltaY * 0.007;
                         const oldZoom = shareData.zoom;
                         const newZoom = Math.max(0.001, Math.min(1000, oldZoom * zoomFactor));
                         const rect = canvas.getBoundingClientRect();
@@ -80,8 +67,8 @@ if (typeof window !== 'undefined') {
                         shareData.zoom = newZoom;
                         shareData.tgfxBaseView.draw(shareData.drawIndex, shareData.zoom, shareData.offsetX, shareData.offsetY);
                     } else {
-                        shareData.offsetX -= e.deltaX;
-                        shareData.offsetY -= e.deltaY;
+                        shareData.offsetX -= e.deltaX*4;
+                        shareData.offsetY -= e.deltaY*4;
                         shareData.tgfxBaseView.draw(shareData.drawIndex, shareData.zoom, shareData.offsetX, shareData.offsetY);
                     }
                 }, {passive: false});

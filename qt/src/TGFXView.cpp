@@ -45,13 +45,20 @@ void TGFXView::handlePinch(qreal scaleDelta, QPointF center) {
   update();
 }
 
+void TGFXView::onMouseClicked(qreal, qreal){
+  lastDrawIndex++;
+  offset = {0, 0};
+  zoom = 1.0f;
+  update();
+}
+
 void TGFXView::wheelEvent(QWheelEvent* event) {
   bool isZoom =
       (event->modifiers() & Qt::ControlModifier) || (event->modifiers() & Qt::MetaModifier);
   qreal px = event->position().x();
   qreal py = event->position().y();
   if (isZoom) {
-    float factor = (float)std::exp(-event->angleDelta().y() / 300.0);
+    float factor = (float)std::exp(event->angleDelta().y() / 300.0);
     float oldZoom = zoom;
     float newZoom = std::max(0.001f, std::min(1000.0f, oldZoom * factor));
     offset.setX((offset.x() - px) * (newZoom / oldZoom) + px);
@@ -63,44 +70,6 @@ void TGFXView::wheelEvent(QWheelEvent* event) {
   }
   update();
   event->accept();
-}
-
-static bool switchFlag = true;
-
-void TGFXView::mousePressEvent(QMouseEvent* event) {
-  if (event->button() == Qt::LeftButton) {
-    dragging = true;
-    lastMousePos = event->pos();
-    setCursor(Qt::ClosedHandCursor);
-    event->accept();
-    switchFlag = true;
-  }
-}
-
-void TGFXView::mouseMoveEvent(QMouseEvent* event) {
-  if (dragging) {
-    QPoint delta = event->pos() - lastMousePos;
-    offset.rx() += delta.x();
-    offset.ry() += delta.y();
-    lastMousePos = event->pos();
-    update();
-    event->accept();
-    switchFlag = false;
-  }
-}
-
-void TGFXView::mouseReleaseEvent(QMouseEvent* event) {
-  if (event->button() == Qt::LeftButton) {
-    dragging = false;
-    unsetCursor();
-    event->accept();
-  }
-  if (switchFlag) {
-    lastDrawIndex++;
-    offset = {0, 0};
-    zoom = 1.0f;
-    update();
-  }
 }
 
 QSGNode* TGFXView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
