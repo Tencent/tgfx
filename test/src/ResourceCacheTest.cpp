@@ -19,9 +19,13 @@
 #include <thread>
 #include <utility>
 #include <vector>
+#include "core/DataSource.h"
+#include "core/ImageSource.h"
 #include "core/utils/BlockBuffer.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/Resource.h"
+#include "gpu/tasks/TextureUploadTask.h"
+#include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Task.h"
 #include "utils/TestUtils.h"
 
@@ -64,45 +68,17 @@ TGFX_TEST(ResourceCacheTest, multiThreadRecycling) {
   });
 };
 
-namespace {
-class TestAsyncTask : public Task {
- public:
-  explicit TestAsyncTask(ReferenceCounter referenceCounter)
-      : referenceCounter(std::move(referenceCounter)) {
-  }
-
- protected:
-  void onExecute() override {
-    // sleep for a while to simulate a long-running task
-    std::this_thread::sleep_for(std::chrono::milliseconds(100));
-    referenceCounter = nullptr;
-  }
-
-  void onCancel() override {
-    referenceCounter = nullptr;
-  }
-
- private:
-  ReferenceCounter referenceCounter = nullptr;
-};
-
-class TaskOwner {
- public:
-  explicit TaskOwner(std::shared_ptr<Task> task) : task(std::move(task)) {
-  }
-
- private:
-  std::shared_ptr<Task> task;
-};
-}  // namespace
-
 #ifdef TGFX_USE_THREADS
 TGFX_TEST(ResourceCacheTest, blockBufferRefCount) {
   BlockBuffer blockBuffer;
-  auto task = std::make_shared<TestAsyncTask>(blockBuffer.referenceCounter());
-  auto taskOwner = blockBuffer.make<TaskOwner>(task);
-  Task::Run(task);
+  {
+    auto proxyKey = UniqueKey::Make();
 
+    auto image = ImageCodec::MakeFrom(ProjectPath::Absolute("resources/apitest/rotation.jpg"));
+    auto source = ImageSource::MakeFrom(std::move(image), false);
+    auto task = blockBuffer.make<TextureUploadTask>(proxyKey, std::move(source), false, true,
+                                                    blockBuffer.getReferenceCounter());
+  }
   blockBuffer.clear();
 }
 #endif

@@ -31,9 +31,6 @@
 
 namespace tgfx {
 
-//use shared_ptr<void> as a reference counter to manage the lifetime of memory blocks
-using ReferenceCounter = std::shared_ptr<void>;
-
 /**
  * BlockData is a helper class that manages the memory blocks released from a BlockBuffer. It is
  * responsible for freeing the memory blocks when they are no longer needed.
@@ -156,9 +153,12 @@ class BlockBuffer {
    */
   std::shared_ptr<BlockData> release();
 
-  ReferenceCounter referenceCounter() const {
-    return _referenceCounter;
-  }
+  /**
+   * Returns a shared pointer that acts as a reference counter for this BlockBuffer.
+   * Asynchronous objects using the BlockBuffer can hold this shared pointer. When all references
+   * are released, the BlockBuffer will be notified.
+   */
+  std::shared_ptr<BlockBuffer> getReferenceCounter();
 
   /**
    * Waits until the reference count reaches zero, indicating that all threads have finished using
@@ -185,10 +185,15 @@ class BlockBuffer {
 
   std::mutex mutex = {};
   std::condition_variable condition = {};
-  ReferenceCounter _referenceCounter = nullptr;
-  std::weak_ptr<void> weakReferenceCounter;
+  std::weak_ptr<BlockBuffer> referenceCounter;
 
   Block* findOrAllocateBlock(size_t requestedSize);
   bool allocateNewBlock(size_t requestSize);
+
+  /**
+   * Notifies that the reference count has reached zero. As the destructor of the reference counter
+   * shared pointer.
+   */
+  static void NotifyReferenceEmpty(BlockBuffer* blockBuffer);
 };
 }  // namespace tgfx

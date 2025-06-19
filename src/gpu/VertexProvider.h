@@ -46,10 +46,8 @@ class VertexProvider {
 
 class VertexProviderTask : public Task {
  public:
-  VertexProviderTask(PlacementPtr<VertexProvider> provider, float* vertices,
-                     ReferenceCounter referenceCounter)
-      : provider(std::move(provider)), vertices(vertices),
-        referenceCounter(std::move(referenceCounter)) {
+  VertexProviderTask(PlacementPtr<VertexProvider> provider, float* vertices)
+      : provider(std::move(provider)), vertices(vertices) {
     // Ensure that the reference count of the shared memory (BlockBuffer) is greater than 1 during
     // execution, so that the BlockBuffer does not release the memory used by the Task or its owner.
   }
@@ -62,7 +60,6 @@ class VertexProviderTask : public Task {
  private:
   PlacementPtr<VertexProvider> provider = nullptr;
   float* vertices = nullptr;
-  ReferenceCounter referenceCounter = nullptr;
 };
 
 class AsyncVertexSource : public DataSource<Data> {

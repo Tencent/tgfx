@@ -22,7 +22,7 @@
 
 namespace tgfx {
 ShapeBufferUploadTask::ShapeBufferUploadTask(UniqueKey trianglesKey, UniqueKey textureKey,
-                                             std::unique_ptr<DataSource<ShapeBuffer>> source)
+                                             std::shared_ptr<DataSource<ShapeBuffer>> source)
     : ResourceTask(std::move(trianglesKey)), textureKey(std::move(textureKey)),
       source(std::move(source)) {
 }

@@ -19,26 +19,20 @@
 #include "ImageSource.h"
 #include <memory>
 #include <utility>
-#include "core/utils/BlockBuffer.h"
 
 namespace tgfx {
 std::shared_ptr<DataSource<ImageBuffer>> ImageSource::MakeFrom(
-    std::shared_ptr<ImageGenerator> generator, bool tryHardware, bool asyncDecoding,
-    ReferenceCounter referenceCounter) {
+    std::shared_ptr<ImageGenerator> generator, bool tryHardware) {
   if (generator == nullptr) {
     return nullptr;
   }
-  if (asyncDecoding && !generator->asyncSupport()) {
+  if (!generator->asyncSupport()) {
     // The generator may have built-in async decoding support which will not block the main thread.
     // Therefore, we should trigger the decoding ASAP.
     auto buffer = generator->makeBuffer(tryHardware);
     return Wrap(std::move(buffer));
   }
-  auto imageSource = std::make_unique<ImageSource>(std::move(generator), tryHardware);
-  if (asyncDecoding) {
-    return Async(std::move(imageSource), std::move(referenceCounter));
-  }
-  return imageSource;
+  return std::make_unique<ImageSource>(std::move(generator), tryHardware);
 }
 
 ImageSource::ImageSource(std::shared_ptr<ImageGenerator> generator, bool tryHardware)

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <iostream>
 #include <memory>
 #include "ResourceTask.h"
 #include "core/DataSource.h"
@@ -28,7 +29,12 @@ namespace tgfx {
 class TextureUploadTask : public ResourceTask {
  public:
   TextureUploadTask(UniqueKey uniqueKey, std::shared_ptr<DataSource<ImageBuffer>> source,
-                    bool mipmapped, bool asyncDecoding, ReferenceCounter referenceCounter);
+                    bool mipmapped, bool asyncDecoding,
+                    std::shared_ptr<BlockBuffer> referenceCounter);
+
+  ~TextureUploadTask() override {
+    std::cout << "TextureUploadTask destroyed" << std::endl;
+  };
 
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
 

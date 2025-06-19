@@ -24,14 +24,10 @@ void VertexProviderTask::onExecute() {
   DEBUG_ASSERT(provider != nullptr);
   provider->getVertices(vertices);
   provider = nullptr;
-  // Release the reference counter to decrement the BlockBuffer's reference count
-  referenceCounter = nullptr;
 }
 
 void VertexProviderTask::onCancel() {
   provider = nullptr;
-  // Release the reference counter to decrement the BlockBuffer's reference count
-  referenceCounter = nullptr;
 }
 
 AsyncVertexSource::~AsyncVertexSource() {

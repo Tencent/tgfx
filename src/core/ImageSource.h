@@ -35,8 +35,7 @@ class ImageSource : public DataSource<ImageBuffer> {
    * image will be decoded synchronously when the getData() method is called.
    */
   static std::shared_ptr<DataSource> MakeFrom(std::shared_ptr<ImageGenerator> generator,
-                                              bool tryHardware = true, bool asyncDecoding = true,
-                                              ReferenceCounter referenceCounter = nullptr);
+                                              bool tryHardware = true);
 
   ImageSource(std::shared_ptr<ImageGenerator> generator, bool tryHardware);
 

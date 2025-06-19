@@ -21,7 +21,7 @@
 
 namespace tgfx {
 GpuBufferUploadTask::GpuBufferUploadTask(UniqueKey uniqueKey, BufferType bufferType,
-                                         std::unique_ptr<DataSource<Data>> source)
+                                         std::shared_ptr<DataSource<Data>> source)
     : ResourceTask(std::move(uniqueKey)), bufferType(bufferType), source(std::move(source)) {
 }
 

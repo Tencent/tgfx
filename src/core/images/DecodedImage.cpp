@@ -31,7 +31,12 @@ std::shared_ptr<Image> DecodedImage::MakeFrom(UniqueKey uniqueKey,
   auto width = generator->width();
   auto height = generator->height();
   auto alphaOnly = generator->isAlphaOnly();
-  auto source = ImageSource::MakeFrom(std::move(generator), tryHardware, asyncDecoding);
+  auto source = ImageSource::MakeFrom(std::move(generator), tryHardware);
+  if (asyncDecoding) {
+#ifdef TGFX_USE_THREADS
+    source = DataSource<ImageBuffer>::Async(std::move(source), nullptr);
+#endif
+  }
   auto image = std::shared_ptr<DecodedImage>(
       new DecodedImage(std::move(uniqueKey), width, height, alphaOnly, std::move(source)));
   image->weakThis = image;

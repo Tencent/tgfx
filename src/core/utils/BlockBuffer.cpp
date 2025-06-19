@@ -46,13 +46,6 @@ BlockData::~BlockData() {
 
 BlockBuffer::BlockBuffer(size_t initBlockSize) : initBlockSize(initBlockSize) {
   DEBUG_ASSERT(initBlockSize > 0);
-
-  // Initialize reference count callback to notify when the reference count reaches zero.
-  _referenceCounter = ReferenceCounter(nullptr, [this](void*) {
-    std::unique_lock<std::mutex> lock(mutex);
-    condition.notify_all();
-  });
-  weakReferenceCounter = std::weak_ptr<void>(_referenceCounter);
 }
 
 BlockBuffer::~BlockBuffer() {
@@ -160,10 +153,23 @@ bool BlockBuffer::allocateNewBlock(size_t requestSize) {
   return true;
 }
 
-void BlockBuffer::waitForReferenceEmpty() {
-  // If _referenceCounter is not set to nullptr, the reference count will always be at least 1.
-  _referenceCounter = nullptr;
-  std::unique_lock<std::mutex> lock(mutex);
-  condition.wait(lock, [this]() { return weakReferenceCounter.expired(); });
+std::shared_ptr<BlockBuffer> BlockBuffer::getReferenceCounter() {
+  if (referenceCounter.expired()) {
+    auto newCounter = std::shared_ptr<BlockBuffer>(this, NotifyReferenceEmpty);
+    referenceCounter = newCounter;
+    return newCounter;
+  }
+  return referenceCounter.lock();
 }
+
+void BlockBuffer::waitForReferenceEmpty() {
+  std::unique_lock<std::mutex> lock(mutex);
+  condition.wait(lock, [this]() { return referenceCounter.expired(); });
+}
+
+void BlockBuffer::NotifyReferenceEmpty(BlockBuffer* blockBuffer) {
+  std::unique_lock<std::mutex> lock(blockBuffer->mutex);
+  blockBuffer->condition.notify_all();
+}
+
 }  // namespace tgfx
