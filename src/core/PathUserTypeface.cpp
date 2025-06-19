@@ -65,20 +65,19 @@ class PathUserScalerContext final : public UserScalerContext {
     }
     auto pathProvider = pathTypeFace()->getPathProvider(glyphID);
     if (pathProvider == nullptr) {
+      path->reset();
       return false;
     }
-
     *path = pathProvider->getPath();
-    if (path->isEmpty()) {
-      return false;
-    }
-    auto transform = GetTransform(fauxItalic, textSize);
-    path->transform(transform);
-    if (fauxBold) {
-      auto strokePath = *path;
-      Stroke stroke(textSize * fauxBoldScale);
-      stroke.applyToPath(&strokePath);
-      path->addPath(strokePath, PathOp::Union);
+    if (!path->isEmpty()) {
+      auto transform = GetTransform(fauxItalic, textSize);
+      path->transform(transform);
+      if (fauxBold) {
+        auto strokePath = *path;
+        Stroke stroke(textSize * fauxBoldScale);
+        stroke.applyToPath(&strokePath);
+        path->addPath(strokePath, PathOp::Union);
+      }
     }
     return true;
   }

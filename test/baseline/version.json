@@ -6,6 +6,7 @@
         "ClipAll": "d0e35c3",
         "DiscardContent": "4c590832",
         "DrawPathProvider": "0e538a2",
+        "FillModifier": "fa2f12b1",
         "NothingToDraw": "d010fb8",
         "Path_addArc1": "4802e56",
         "Path_addArc2": "4802e56",
@@ -71,7 +72,7 @@
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "da590da",
         "ImageWithShadow": "50136952",
-        "SimpleLayerTreeDrawer": "d067492b",
+        "SimpleLayerTreeDrawer": "89a370d8",
         "SimpleText": "ced3b513"
     },
     "DstTextureTest": {
@@ -241,7 +242,7 @@
         "complex4": "50136952",
         "complex5": "50136952",
         "complex6": "e87e871a",
-        "complex7": "e87e871a",
+        "complex7": "89a370d8",
         "jpg_image": "b1db872",
         "mask": "da364e8",
         "path": "a6ff60e1",
