@@ -77,8 +77,6 @@ class WebTypeface : public Typeface {
  private:
   explicit WebTypeface(std::string name, std::string style);
 
-  std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;
-
   uint32_t _uniqueID;
   bool _hasColor = false;
   emscripten::val scalerContextClass = emscripten::val::null();

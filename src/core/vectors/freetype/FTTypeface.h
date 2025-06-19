@@ -70,8 +70,6 @@ class FTTypeface : public Typeface {
 
   int unitsPerEmInternal() const;
 
-  std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;
-
   friend class FTScalerContext;
 };
 }  // namespace tgfx
