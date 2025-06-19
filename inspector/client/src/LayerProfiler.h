@@ -24,10 +24,15 @@ class LayerProfiler {
 #ifdef __EMSCRIPTEN__
   std::shared_ptr<WebSocketClient> m_WebSocket;
 #else
-  ListenSocket m_ListenSocket;
+  ListenSocket* m_ListenSocket;
   Socket* m_Socket = nullptr;
   std::queue<std::vector<uint8_t>> messages;
+  UdpBroadcast* broadcast;
 #endif
+  bool isUDPOpened = false;
+  const char* addr = "255.255.255.255";
+  uint16_t broadcastPort = 8086;
+  int64_t epoch;
   LockFreeQueue<std::vector<uint8_t>> m_Queue;
   std::shared_ptr<std::thread> m_SendThread;
   std::shared_ptr<std::thread> m_RecvThread;

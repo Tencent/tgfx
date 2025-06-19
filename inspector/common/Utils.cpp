@@ -115,4 +115,18 @@ const char* GetProcessName() {
   return processName;
 }
 
+BroadcastMessage GetBroadcastMessage(const char* procname, size_t pnsz, size_t& len,
+                                      uint16_t port, uint8_t type) {
+  BroadcastMessage msg;
+  msg.type = type;
+  msg.protocolVersion = ProtocolVersion;
+  msg.listenPort = port;
+  msg.pid = GetPid();
+
+  memcpy(msg.programName, procname, pnsz);
+  memset(msg.programName + pnsz, 0, WelcomeMessageProgramNameSize - pnsz);
+  len = offsetof(BroadcastMessage, programName) + pnsz + 1;
+  return msg;
+}
+
 }  // namespace inspector

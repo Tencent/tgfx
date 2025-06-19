@@ -27,9 +27,9 @@
 
 namespace inspector {
 ClientData::ClientData(int64_t time, uint32_t protoVer, int32_t activeTime, uint16_t port,
-                       uint64_t pid, std::string procName, std::string address)
+                       uint64_t pid, std::string procName, std::string address, uint8_t type)
     : time(time), protocolVersion(protoVer), activeTime(activeTime), port(port), pid(pid),
-      procName(std::move(procName)), address(std::move(address)) {
+      procName(std::move(procName)), address(std::move(address)), type(type) {
 }
 
 StartView::StartView(QObject* parent) : QObject(parent), resolv(port) {
@@ -112,10 +112,22 @@ void StartView::clearRecentFiles() {
   saveRecentFiles();
 }
 
-QVector<QObject*> StartView::getClientItems() const {
+QVector<QObject*> StartView::getFrameCaptureClientItems() const {
   QVector<QObject*> clientDatas;
   for (auto& client : clients) {
-    clientDatas.push_back(client.second);
+    if(client.second->type == FrameCapture) {
+      clientDatas.push_back(client.second);
+    }
+  }
+  return clientDatas;
+}
+
+QVector<QObject*> StartView::getLayerTreeClientItems() const {
+  QVector<QObject*> clientDatas;
+  for (auto& client : clients) {
+    if(client.second->type == LayerTree) {
+      clientDatas.push_back(client.second);
+    }
   }
   return clientDatas;
 }
@@ -139,7 +151,7 @@ void StartView::connectToClientByLayerInspector(QObject* object) {
   auto client = dynamic_cast<ClientData*>(object);
   if (client) {
     layerProfilerView =
-        new LayerProfilerView(QString::fromStdString(client->address), 8084);
+        new LayerProfilerView(QString::fromStdString(client->address), client->port);
   }
 }
 
@@ -227,8 +239,7 @@ void StartView::updateBroadcastClients() {
       auto activeTime = bm.activeTime;
       auto listenPort = bm.listenPort;
       auto pid = bm.pid;
-      uint16_t broadcastVersion;
-      memcpy(&broadcastVersion, msg, sizeof(uint16_t));
+      auto type = bm.type;
 
       auto address = addr.GetText();
       const auto ipNumerical = addr.GetNumber();
@@ -250,7 +261,7 @@ void StartView::updateBroadcastClients() {
           }
           resolvLock.unlock();
           auto client =
-              new ClientData{time, protoVer, activeTime, listenPort, pid, procname, std::move(ip)};
+              new ClientData{time, protoVer, activeTime, listenPort, pid, procname, std::move(ip), type};
           clients.emplace(clientId, client);
           Q_EMIT clientItemsChanged();
         } else {
@@ -263,6 +274,7 @@ void StartView::updateBroadcastClients() {
           if (strcmp(client->procName.c_str(), procname) != 0) {
             client->procName = procname;
           }
+          client->type = type;
         }
       } else if (it != clients.end()) {
         clients.erase(it);

@@ -43,19 +43,6 @@ static std::atomic<int> inspectorDataLock{0};
 static std::atomic<InspectorData*> inspectorData{nullptr};
 static Inspector* s_instance = nullptr;
 
-BroadcastMessage& GetBroadcastMessage(const char* procname, size_t pnsz, size_t& len,
-                                      uint16_t port) {
-  static BroadcastMessage msg;
-  msg.protocolVersion = ProtocolVersion;
-  msg.listenPort = port;
-  msg.pid = GetPid();
-
-  memcpy(msg.programName, procname, pnsz);
-  memset(msg.programName + pnsz, 0, WelcomeMessageProgramNameSize - pnsz);
-  len = offsetof(BroadcastMessage, programName) + pnsz + 1;
-  return msg;
-}
-
 static InspectorData& GetInspectorData() {
   auto ptr = inspectorData.load(std::memory_order_acquire);
   if (!ptr) {
@@ -201,7 +188,7 @@ void Inspector::Worker() {
   }
 
   size_t broadcastLen = 0;
-  auto& broadcastMsg = GetBroadcastMessage(procname, pnsz, broadcastLen, dataPort);
+  auto broadcastMsg = GetBroadcastMessage(procname, pnsz, broadcastLen, dataPort, FrameCapture);
   long long lastBroadcast = 0;
   while (true) {
     MemWrite(&welcome.refTime, refTimeThread);
@@ -225,7 +212,7 @@ void Inspector::Worker() {
           programNameLock.lock();
           if (programName) {
             broadcastMsg =
-                GetBroadcastMessage(programName, strlen(programName), broadcastLen, dataPort);
+                GetBroadcastMessage(programName, strlen(programName), broadcastLen, dataPort, FrameCapture);
             programName = nullptr;
           }
           programNameLock.unlock();
