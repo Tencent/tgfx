@@ -97,7 +97,7 @@ void TGFXView::mouseReleaseEvent(QMouseEvent* event) {
   }
   if (switchFlag) {
     lastDrawIndex++;
-    offset = {0,0};
+    offset = {0, 0};
     zoom = 1.0f;
     update();
   }
