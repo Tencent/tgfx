@@ -2,7 +2,9 @@ import QtQuick 2.6
 import QtQuick.Controls 2.12
 import QtQuick.Layouts 1.12
 import QtQuick.Window 2.12
+import QtQuick.Dialogs
 import com.kdab.dockwidgets 2.0 as KDDW
+import Qt5Compat.GraphicalEffects
 
 
 ApplicationWindow {
@@ -20,6 +22,17 @@ ApplicationWindow {
     property int selectedFilePathIndex: -1
     property int selectedClientIndex: -1
 
+    FileDialog {
+        id: openFileDialog
+        title: qsTr("open File")
+        fileMode: FileDialog.OpenFile
+        nameFilters: [ "Inspector files (*.isp)" ]
+        onAccepted: {
+            startViewModel.openFile(openFileDialog.selectedFile)
+            close()
+        }
+    }
+
     Column {
         anchors.fill: parent
         spacing: 2
@@ -34,13 +47,45 @@ ApplicationWindow {
                 height: 30
                 color: "#535353"
 
-                Text {
+                Row {
                     anchors.left: parent.left
                     anchors.leftMargin: 10
-                    anchors.verticalCenter: parent.verticalCenter
-                    text: "Open File"
-                    color: "#DDDDDD"
-                    font.pixelSize: 14
+                    spacing: 10
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        text: "Open File"
+                        color: "#DDDDDD"
+                        font.pixelSize: 14
+                    }
+
+                    Item {
+                        height: 30
+                        width: 30
+                        Image {
+                            id: openFile
+                            source: "qrc:icons/chooseOpenFile.png"
+                            width: 20
+                            height: 20
+                            anchors.centerIn: parent
+
+                            ColorOverlay{
+                                anchors.fill: parent
+                                color: "#DDDDDD"
+                                source: parent
+                            }
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            onEntered: parent.scale = 1.1
+                            onExited: parent.scale = 1.0
+                            onClicked: {
+                                openFileDialog.open();
+                            }
+                        }
+
+                    }
                 }
             }
         }

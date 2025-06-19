@@ -170,12 +170,12 @@ void Inspector::Worker() {
     }
   }
   if (!isListening) {
-    while(true) {
+    while (true) {
       if (ShouldExit()) {
         shutdown.store(true, std::memory_order_relaxed);
         return;
       }
-      std::this_thread::sleep_for( std::chrono::milliseconds( 10 ) );
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
   }
 

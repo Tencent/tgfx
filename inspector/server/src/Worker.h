@@ -49,6 +49,8 @@ class Worker : public QObject {
   int64_t GetFrameDrawCall(uint32_t index) const;
   int64_t GetFrameTriangles(uint32_t index) const;
   size_t GetFrameCount() const;
+  bool hasExpection() const;
+  std::vector<std::string>& getErrorMessage();
 
   FrameData* GetFrameData();
   const DataContext& GetDataContext() const;

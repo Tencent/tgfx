@@ -102,12 +102,12 @@ void FramesDrawer::drawSelectFrame(tgfx::Canvas* canvas, int onScreen, int frame
 }
 
 void FramesDrawer::drawFrames(tgfx::Canvas* canvas) {
+  canvas->translate(viewOffset, 0);
+  drawBackground(canvas);
+
   if (worker->GetFrameCount() == 0) {
     return;
   }
-  canvas->translate(viewOffset, 0);
-
-  drawBackground(canvas);
   const auto w = static_cast<int>(width() - placeWidth);
   const auto frameWidth = 4;
   const auto total = worker->GetFrameCount();
@@ -256,7 +256,8 @@ void FramesDrawer::mouseMoveEvent(QMouseEvent* event) {
     const auto delta = (event->pos().x() - lastRightDragPos.x());
     if (abs(delta) >= frameWidth) {
       const auto d = delta / frameWidth;
-      viewData->frameStart = static_cast<uint32_t>(std::max(0, static_cast<int32_t>(viewData->frameStart) - d));
+      viewData->frameStart =
+          static_cast<uint32_t>(std::max(0, static_cast<int32_t>(viewData->frameStart) - d));
       lastRightDragPos = pos;
       lastRightDragPos.setX(lastRightDragPos.x() + d * frameWidth - delta);
     }

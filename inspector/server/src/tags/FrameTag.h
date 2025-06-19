@@ -22,5 +22,5 @@
 namespace inspector {
 void ReadFrameTag(DecodeStream* stream);
 
-TagType WriteFrameTag(EncodeStream* stream, StringDiscovery<FrameData*>* frames);
+TagType WriteFrameTag(EncodeStream* stream, const FrameData* frames);
 }  // namespace inspector

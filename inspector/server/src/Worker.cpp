@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Worker.h"
+#include <tgfx/core/WriteStream.h>
 #include <cassert>
 #include <iostream>
 #include "DecodeStream.h"
@@ -41,9 +42,8 @@ Worker::Worker(const char* addr, uint16_t port)
 }
 
 Worker::Worker(std::string& filePath)
-    : addr(""), port(0), lz4Stream(nullptr), dataBuffer(nullptr), bufferOffset(0) {
-  if (!Open(filePath)) {
-  }
+    : port(0), lz4Stream(nullptr), dataBuffer(nullptr), bufferOffset(0) {
+  Open(filePath);
 }
 
 Worker::~Worker() {
@@ -78,7 +78,7 @@ bool Worker::Open(const std::string& filePath) {
   return true;
 }
 
-bool Worker::Save(const std::string&) {
+bool Worker::Save(const std::string& filePath) {
   EncodeStream bodyBytes(&dataContext);
   WriteTagsOfFile(&bodyBytes);
 
@@ -90,13 +90,18 @@ bool Worker::Save(const std::string&) {
   fileBytes.writeUint8(ProtocolVersion);
   fileBytes.writeEncodedUint32(bodyBytes.length());
   fileBytes.writeBytes(&bodyBytes);
+  auto data = fileBytes.release();
 
+  auto writeStream = tgfx::WriteStream::MakeFromFile(filePath);
+  if (!writeStream) {
+    return false;
+  }
+  writeStream->write(data->bytes(), data->size());
   return true;
 }
 
 DecodeStream Worker::ReadBodyBytes(DecodeStream* stream) {
   DecodeStream emptyStream(stream->context);
-
   auto T = stream->readInt8();
   auto G = stream->readInt8();
   auto F = stream->readInt8();
@@ -111,7 +116,7 @@ DecodeStream Worker::ReadBodyBytes(DecodeStream* stream) {
     InspectorThrowError(stream->context, "Isp file version is too high");
     return emptyStream;
   }
-  auto bodyLength = stream->readUint32();
+  auto bodyLength = stream->readEncodedUint32();
   bodyLength = std::min(bodyLength, stream->bytesAvailable());
   return stream->readBytes(bodyLength);
 }
@@ -157,6 +162,14 @@ const DataContext& Worker::GetDataContext() const {
 
 size_t Worker::GetFrameCount() const {
   return dataContext.frameData.frames.size();
+}
+
+bool Worker::hasExpection() const {
+  return dataContext.hasException();
+}
+
+std::vector<std::string>& Worker::getErrorMessage() {
+  return dataContext.errorMessages;
 }
 
 void Worker::Shutdown() {
@@ -434,14 +447,6 @@ void Worker::ProcessFrameMark(const QueueFrameMark& ev) {
   fd.frames.push_back(FrameEvent{time, -1, 0, 0, -1});
   if (dataContext.lastTime < time) {
     dataContext.lastTime = time;
-  }
-
-  const auto timespan = GetFrameTime(fd, fd.frames.size() - 1);
-  if (timespan > 0) {
-    fd.min = std::min(fd.min, timespan);
-    fd.max = std::max(fd.max, timespan);
-    fd.total += timespan;
-    fd.sumSq += double(timespan * timespan);
   }
 }
 

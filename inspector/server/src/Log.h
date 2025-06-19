@@ -1,4 +1,4 @@
-/////////////////////////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////////////////////
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
@@ -15,25 +15,32 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
 #pragma once
-#include "InspectorEvent.h"
-#include "StreamContext.h"
+
+#include <cstdlib>
+#include "tgfx/platform/Print.h"
 
 namespace inspector {
-class DataContext : public StreamContext {
- public:
-  std::mutex lock;
-  FrameData frameData;
-  std::vector<std::shared_ptr<OpTaskData>> opTasks;
-  std::vector<std::shared_ptr<OpTaskData>> opTaskStack;
-  std::unordered_map<uint32_t, std::vector<uint32_t>> opChilds;
-  std::unordered_map<uint32_t, std::shared_ptr<PropertyData>> properties;
-  std::unordered_map<uint32_t, std::shared_ptr<TextureData>> textures;
-  std::unordered_map<uint32_t, std::shared_ptr<VertexData>> vertexDatas;
-  FrameData* framebase = nullptr;
-  uint64_t opTaskCount = 0;
-  int64_t baseTime = 0;
-  int64_t lastTime = 0;
-};
+#define ABORT(msg)                                                                \
+  do {                                                                            \
+    ::tgfx::PrintError("%s:%d: fatal error: \"%s\"\n", __FILE__, __LINE__, #msg); \
+    ::abort();                                                                    \
+  } while (false)
+
+#ifdef DEBUG
+
+#define LOGI(...) ::tgfx::PrintLog(__VA_ARGS__)
+#define LOGE(...) ::tgfx::PrintError(__VA_ARGS__)
+#define ASSERT(assertion) \
+if (!(assertion)) {     \
+ABORT(#assertion);    \
+}
+
+#else
+
+#define LOGI(...)
+#define LOGE(...)
+#define ASSERT(assertion)
+
+#endif
 }  // namespace inspector

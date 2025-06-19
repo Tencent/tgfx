@@ -47,10 +47,8 @@ void ReadTagsOfFile(DecodeStream* stream, TagType type) {
 
 void WriteTagsOfFile(EncodeStream* stream) {
   auto context = dynamic_cast<DataContext*>(stream->context);
-  auto& frames = context->frames;
-  if (!frames.Data().empty()) {
-    WriteTag(stream, &frames, WriteFrameTag);
-  }
+  const auto& frames = context->frameData;
+  WriteTag(stream, &frames, WriteFrameTag);
 
   auto& opTasks = context->opTasks;
   auto& opChilds = context->opChilds;

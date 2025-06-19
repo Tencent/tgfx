@@ -68,14 +68,12 @@ void StartView::openFile(const QString& fPath) {
     return;
   }
 
-  lastOpenFile = fPath;
   addRecentFile(fPath);
-  Q_EMIT lastOpenFileChanged();
+  inspectorView = new InspectorView(fPath.toStdString(), 1920, this);
+}
 
-  if (filesPath) {
-    filesPath->setText(fPath);
-    inspectorView = new InspectorView(fPath.toStdString(), 1920, this);
-  }
+void StartView::openFile(const QUrl& filePath) {
+  openFile(filePath.path());
 }
 
 void StartView::addRecentFile(const QString& fPath) {
@@ -97,7 +95,6 @@ void StartView::addRecentFile(const QString& fPath) {
     fileItems.append(new FileItem(file, QFileInfo(file).fileName(), this));
   }
   Q_EMIT fileItemsChanged();
-  Q_EMIT recentFilesChanged();
   saveRecentFiles();
 }
 
@@ -106,7 +103,6 @@ void StartView::clearRecentFiles() {
   qDeleteAll(fileItems);
   fileItems.clear();
 
-  Q_EMIT recentFilesChanged();
   Q_EMIT fileItemsChanged();
 
   saveRecentFiles();
@@ -136,14 +132,12 @@ void StartView::connectToClient(QObject* object) {
   auto client = dynamic_cast<ClientData*>(object);
   if (client) {
     if (inspectorView) {
-      connect(inspectorView, &InspectorView::destroyed, this, [&, client]() {
-        inspectorView = new InspectorView(client, 1920, this);
-      });
+      connect(inspectorView, &InspectorView::destroyed, this,
+              [&, client]() { inspectorView = new InspectorView(client, 1920, this); });
       inspectorView->deleteLater();
     } else {
       inspectorView = new InspectorView(client, 1920, this);
     }
-    connect(inspectorView, &InspectorView::closeView, this, &StartView::onCloseView);
   }
 }
 
@@ -201,7 +195,6 @@ void StartView::loadRecentFiles() {
     fileItems.append(new FileItem(file, QFileInfo(file).fileName(), this));
   }
 
-  Q_EMIT recentFilesChanged();
   Q_EMIT fileItemsChanged();
 }
 

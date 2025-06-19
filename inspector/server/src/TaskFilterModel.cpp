@@ -20,8 +20,8 @@
 #include <iostream>
 
 namespace inspector {
-TaskFilterItem::TaskFilterItem(const char* data, int32_t type, TaskFilterItem* parentItem):
-  type(type), itemData(data), parentItem(parentItem){
+TaskFilterItem::TaskFilterItem(const char* data, int32_t type, TaskFilterItem* parentItem)
+    : type(type), itemData(data), parentItem(parentItem) {
 }
 
 void TaskFilterItem::appendChild(std::unique_ptr<TaskFilterItem>& child) {
@@ -30,8 +30,8 @@ void TaskFilterItem::appendChild(std::unique_ptr<TaskFilterItem>& child) {
 }
 
 TaskFilterItem* TaskFilterItem::child(uint32_t row) {
-
-  return row >= static_cast<uint32_t>(0) && row < childItems.size() ? childItems.at(row).get() : nullptr;
+  return row >= static_cast<uint32_t>(0) && row < childItems.size() ? childItems.at(row).get()
+                                                                    : nullptr;
 }
 
 int TaskFilterItem::childCount() const {
@@ -46,15 +46,14 @@ int TaskFilterItem::row() const {
   if (parentItem == nullptr) {
     return 0;
   }
-  const auto it = std::find_if(parentItem->childItems.cbegin(), parentItem->childItems.cend(),
-                               [this](const std::unique_ptr<TaskFilterItem> &treeItem) {
-                                   return treeItem.get() == this;
-                               });
+  const auto it = std::find_if(
+      parentItem->childItems.cbegin(), parentItem->childItems.cend(),
+      [this](const std::unique_ptr<TaskFilterItem>& treeItem) { return treeItem.get() == this; });
 
   if (it != parentItem->childItems.cend()) {
     return int(std::distance(parentItem->childItems.cbegin(), it));
   }
-  Q_ASSERT(false); // should not happen
+  Q_ASSERT(false);  // should not happen
 }
 
 const std::string& TaskFilterItem::data() const {
@@ -67,7 +66,7 @@ int32_t TaskFilterItem::childFilterType(int depth) const {
   }
   --depth;
   int32_t resultFilterType = 0;
-  for (const auto& item: childItems) {
+  for (const auto& item : childItems) {
     resultFilterType |= item->filterType();
     resultFilterType |= item->childFilterType(depth);
   }
@@ -83,7 +82,8 @@ TaskFilterItem* TaskFilterItem::getParentItem() const {
 }
 
 TaskFilterModel::TaskFilterModel(ViewData* data, QObject* parent)
-  :QAbstractItemModel(parent), viewData(data), rootItem(std::make_unique<TaskFilterItem>("typeName", 0)){
+    : QAbstractItemModel(parent), viewData(data),
+      rootItem(std::make_unique<TaskFilterItem>("typeName", 0)) {
   setUpModelData();
 }
 
@@ -126,8 +126,7 @@ void TaskFilterModel::checkedParentItem(const TaskFilterItem* item, bool checked
   if (!checked && !(broItemType & filterType)) {
     filterType |= parentItemType;
     filterType ^= parentItemType;
-  }
-  else if (checked) {
+  } else if (checked) {
     filterType |= parentItemType;
   }
   checkedParentItem(parentItem, checked);
@@ -143,10 +142,9 @@ void TaskFilterModel::checkedChildrenItem(const TaskFilterItem* item, bool check
 }
 
 QVariant TaskFilterModel::data(const QModelIndex& index, int role) const {
-  if (!index.isValid() || rootItem == nullptr)
-    return {};
+  if (!index.isValid() || rootItem == nullptr) return {};
 
-  const auto *item = static_cast<const TaskFilterItem*>(index.internalPointer());
+  const auto* item = static_cast<const TaskFilterItem*>(index.internalPointer());
   switch (role) {
     case NameRole:
       return item->data().c_str();
@@ -157,7 +155,7 @@ QVariant TaskFilterModel::data(const QModelIndex& index, int role) const {
   }
 }
 
-QHash<int, QByteArray> TaskFilterModel::roleNames() const  {
+QHash<int, QByteArray> TaskFilterModel::roleNames() const {
   QHash<int, QByteArray> names;
   names[NameRole] = "name";
   names[FilterTypeRole] = "filterType";
@@ -165,43 +163,46 @@ QHash<int, QByteArray> TaskFilterModel::roleNames() const  {
 }
 
 QModelIndex TaskFilterModel::index(int row, int column, const QModelIndex& parent) const {
-  if (!hasIndex(row, column, parent))
+  if (!hasIndex(row, column, parent)) {
     return {};
+  }
 
-  auto parentItem = parent.isValid()
-                             ? static_cast<TaskFilterItem*>(parent.internalPointer())
-                             : rootItem.get();
+  auto parentItem =
+      parent.isValid() ? static_cast<TaskFilterItem*>(parent.internalPointer()) : rootItem.get();
 
-  if (auto *childItem = parentItem->child(static_cast<uint32_t>(row)))
+  if (auto* childItem = parentItem->child(static_cast<uint32_t>(row))) {
     return createIndex(row, column, childItem);
+  }
   return {};
 }
 
 QModelIndex TaskFilterModel::parent(const QModelIndex& index) const {
-  if (!index.isValid())
+  if (!index.isValid()) {
     return {};
+  }
 
-  auto *childItem = static_cast<TaskFilterItem*>(index.internalPointer());
-  TaskFilterItem *parentItem = childItem->getParentItem();
+  auto* childItem = static_cast<TaskFilterItem*>(index.internalPointer());
+  TaskFilterItem* parentItem = childItem->getParentItem();
 
-  return parentItem != rootItem.get()
-             ? createIndex(parentItem->row(), 0, parentItem) : QModelIndex{};
+  return parentItem != rootItem.get() ? createIndex(parentItem->row(), 0, parentItem)
+                                      : QModelIndex{};
 }
 
 int TaskFilterModel::rowCount(const QModelIndex& parent) const {
-  if (parent.column() > 0)
+  if (parent.column() > 0) {
     return 0;
+  }
 
-  auto parentItem = parent.isValid()
-                                   ? static_cast<const TaskFilterItem*>(parent.internalPointer())
-                                   : rootItem.get();
+  auto parentItem = parent.isValid() ? static_cast<const TaskFilterItem*>(parent.internalPointer())
+                                     : rootItem.get();
 
   return parentItem->childCount();
 }
 
 int TaskFilterModel::columnCount(const QModelIndex& parent) const {
-  if (parent.isValid())
+  if (parent.isValid()) {
     return static_cast<TaskFilterItem*>(parent.internalPointer())->columnCount();
+  }
   return rootItem->columnCount();
 }
 
@@ -250,4 +251,4 @@ void TaskFilterModel::setUpModelData() {
   rootItem->appendChild(flush);
 }
 
-}
+}  // namespace inspector

@@ -20,6 +20,7 @@
 #include <cstdint>
 #include <string>
 #include <vector>
+#include "Log.h"
 
 namespace inspector {
 static constexpr uint8_t LENGTH_FOR_STORE_NUM_BITS = 5;
@@ -49,7 +50,6 @@ inline size_t BitsToBytes(size_t capacity) {
 
 #define InspectorThrowError(context, message)                                   \
   if ((context)->throwException(message)) {                                     \
-    printf("ISP Decoding Failed \"%s\" at %s:%d", message, __FILE__, __LINE__); \
+    LOGE("ISP Decoding Failed \"%s\" at %s:%d", message, __FILE__, __LINE__);   \
   }
-
 }  // namespace inspector

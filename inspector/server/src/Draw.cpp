@@ -29,7 +29,7 @@ bool isEqual(float num1, float num2) {
 }
 
 tgfx::Color getTgfxColor(uint32_t color) {
-  uint8_t r = (color) & 0xFF;
+  uint8_t r = (color)&0xFF;
   uint8_t g = (color >> 8) & 0xFF;
   uint8_t b = (color >> 16) & 0xFF;
   uint8_t a = (color >> 24) & 0xFF;

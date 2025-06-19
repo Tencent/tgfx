@@ -14,6 +14,7 @@
         <file>icons/InspectorIcon.png</file>
         <file>icons/LayerTreeIcon.png</file>
         <file>icons/openfile.png</file>
+        <file>icons/chooseOpenFile.png</file>
         <file>icons/capture.png</file>
         <file>icons/arrow_icon.png</file>
         <file>icons/savefile.png</file>
@@ -28,6 +29,5 @@
         <file>icons/layerInspector/mouse.svg</file>
         <file>icons/layerInspector/tree.png</file>
         <file>icons/layerInspector/close.svg</file>
-        <file>icons/layerInspector/eye.svg</file>
     </qresource>
 </RCC>

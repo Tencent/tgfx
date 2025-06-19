@@ -23,9 +23,9 @@
 #include "Worker.h"
 
 namespace inspector {
-class SelectFrameModel: public QAbstractItemModel {
+class SelectFrameModel : public QAbstractItemModel {
   Q_OBJECT
-public:
+ public:
   enum Roles {
     NameRole = Qt::UserRole + 1,
     ValueRole,
@@ -41,7 +41,8 @@ public:
   QModelIndex index(int row, int column, const QModelIndex& parent) const override;
   QModelIndex parent(const QModelIndex& child) const override;
   int columnCount(const QModelIndex& parent) const override;
-private:
+
+ private:
   struct Item {
     QString name;
     QVariant value;
@@ -51,4 +52,4 @@ private:
   ViewData* viewData;
   QList<Item> items;
 };
-}
+}  // namespace inspector

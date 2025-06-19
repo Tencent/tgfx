@@ -30,6 +30,17 @@ EncodeStream::~EncodeStream() {
   delete[] bytes;
 }
 
+std::shared_ptr<tgfx::Data> EncodeStream::release() {
+  auto data = tgfx::Data::MakeAdopted(bytes, _length);
+  capacity = 0;
+  _position = 0;
+  _length = 0;
+  _bitPosition = 0;
+  bytes = nullptr;
+  dataView.reset();
+  return data;
+}
+
 void EncodeStream::setPosition(uint32_t value) {
   _position = value;
   positionChanged(0);

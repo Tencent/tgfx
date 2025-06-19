@@ -20,7 +20,6 @@
 #include <kddockwidgets/qtquick/ViewFactory.h>
 #include <qwidget.h>
 #include <QQuickStyle>
-
 #include "StartView.h"
 
 class CustomViewFactory : public KDDockWidgets::QtQuick::ViewFactory {

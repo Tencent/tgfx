@@ -21,7 +21,7 @@
 #include "ViewData.h"
 
 namespace inspector {
-enum class OpTaskFilter: uint32_t {
+enum class OpTaskFilter : uint32_t {
   Flush = 1 << 0,
   ResourceTask = 1 << 1,
   TextureUploadTask = 1 << 2,
@@ -44,7 +44,7 @@ enum class OpTaskFilter: uint32_t {
 };
 
 class TaskFilterItem {
-public:
+ public:
   explicit TaskFilterItem(const char* data, int32_t type, TaskFilterItem* parentItem = nullptr);
 
   void appendChild(std::unique_ptr<TaskFilterItem>& child);
@@ -56,17 +56,18 @@ public:
   int32_t filterType() const;
   TaskFilterItem* getParentItem() const;
   int32_t childFilterType(int depth = -1) const;
-private:
+
+ private:
   int32_t type;
   std::vector<std::unique_ptr<TaskFilterItem>> childItems;
   std::string itemData;
   TaskFilterItem* parentItem;
 };
 
-class TaskFilterModel: public QAbstractItemModel {
+class TaskFilterModel : public QAbstractItemModel {
   Q_OBJECT
   Q_PROPERTY(int filterType READ getFilterType NOTIFY filterTypeChange)
-public:
+ public:
   enum Roles {
     NameRole = Qt::UserRole + 1,
     FilterTypeRole,
@@ -85,12 +86,14 @@ public:
   QModelIndex parent(const QModelIndex& child) const override;
   int rowCount(const QModelIndex& parent) const override;
   int columnCount(const QModelIndex& parent) const override;
-protected:
+
+ protected:
   void checkedParentItem(const TaskFilterItem* item, bool checked);
   void checkedChildrenItem(const TaskFilterItem* item, bool checked);
-private:
+
+ private:
   void setUpModelData();
   ViewData* viewData = nullptr;
   std::unique_ptr<TaskFilterItem> rootItem;
 };
-}
+}  // namespace inspector

@@ -1,5 +1,6 @@
 import QtQuick 2.6
 import QtQuick.Window 2.15
+import QtQuick.Dialogs
 import QtQuick.Controls 2.12
 import QtQuick.Layouts 1.15
 import FramesDrawer 1.0
@@ -12,6 +13,27 @@ ApplicationWindow {
     height: 1080
     title : "TGFX Inspector"
     color: "#2d2d2d"
+
+    FileDialog {
+        id: saveDialog
+        title: qsTr("save File")
+        fileMode: FileDialog.SaveFile
+        nameFilters: [ "Inspector files (*.isp)" ]
+        onAccepted: {
+            inspectorViewModel.saveFileAs(saveDialog.selectedFile)
+            close()
+        }
+    }
+
+    MessageDialog {
+        id: exitMessageDialog
+        buttons: MessageDialog.Ok
+        title: qsTr("Open failed")
+
+        onButtonClicked: {
+            inspectorView.close()
+        }
+    }
 
     menuBar: MenuBar {
         Menu {
@@ -34,49 +56,35 @@ ApplicationWindow {
         Menu {
             title: qsTr("&File")
             Action {
-                text: qsTr("DisConnect")
-                shortcut: "Ctrl+Shift+D"
+                text: !inspectorViewModel.isOpenFile ? qsTr("DisConnect") : qsTr("Close")
+                shortcut: StandardKey.Close
                 onTriggered: {
-                    console.log("DisConnect clicked")
-                    //todo: disconnect the client
+                    close();
                 }
             }
 
             MenuSeparator {}
 
             Action {
-                text: qsTr("Open File")
-                shortcut: StandardKey.Open
-                onTriggered: {
-                    console.log("Open File clicked")
-                    //todo: open file call the openFile()
-                }
-            }
-
-            Action {
                 text: qsTr("Save File")
                 shortcut: StandardKey.Save
+                enabled: !inspectorViewModel.isOpenFile
                 onTriggered: {
-                    console.log("Save File clicked")
-                    //todo: save file call the saveFile()
+                    if (inspectorViewModel.hasSaveFilePath) {
+                        inspectorViewModel.saveFile()
+                    }
+                    else {
+                        saveDialog.open()
+                    }
                 }
             }
 
             Action {
                 text: qsTr("Save As")
                 shortcut: StandardKey.SaveAs
+                enabled: !inspectorViewModel.isOpenFile
                 onTriggered: {
-                    console.log("Save As clicked")
-                    //todo: need a new format file to save
-                }
-            }
-
-            Action {
-                text: qsTr("Close")
-                shortcut: StandardKey.Close
-                onTriggered: {
-                    close()
-                    inspectorViewModel.cleanUp();
+                    saveDialog.open()
                 }
             }
         }
@@ -86,24 +94,19 @@ ApplicationWindow {
             Action {
                 text: qsTr("Next Frame")
                 shortcut: "Ctrl+Right"
-                onTriggered: {
-                    console.log("Next Frame clicked")
-                    //todo: next frame api call in the InspectorView
-                }
+                onTriggered: inspectorViewModel.nextFrame()
             }
 
             Action {
                 text: qsTr("Pre Frame")
                 shortcut: "Ctrl+Left"
-                onTriggered: {
-                    console.log("Pre Frame clicked")
-                    //todo: pre frame api call in the InspectorView
-                }
+                onTriggered: inspectorViewModel.preFrame()
             }
             MenuSeparator {}
 
             Action {
                 text: qsTr("Capture Frame")
+                enabled: !inspectorViewModel.isOpenFile
                 shortcut: "F12"
                 onTriggered: {
                     console.log("Capture Frame clicked")
@@ -113,6 +116,7 @@ ApplicationWindow {
 
             Action {
                 text: qsTr("Capture 3 Frames")
+                enabled: !inspectorViewModel.isOpenFile
                 shortcut: "Shift+F12"
                 onTriggered: {
                     console.log("Capture 3 Frames clicked")
@@ -269,7 +273,7 @@ ApplicationWindow {
                             onEntered: parent.scale = 1.1
                             onExited: parent.scale = 1.0
                             onClicked: {
-                                console.log("saveFile clicked")
+                                saveDialog.open()
                             }
                         }
                     }
@@ -334,6 +338,14 @@ ApplicationWindow {
 
     KDDW.LayoutSaver {
         id: layoutSaver
+    }
+
+    Connections {
+        target: inspectorViewModel
+        function onFailedOpenInspectorView(msg) {
+            exitMessageDialog.text = msg
+            exitMessageDialog.open()
+        }
     }
 }
 

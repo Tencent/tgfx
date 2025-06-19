@@ -19,8 +19,8 @@
 #pragma once
 #include <tgfx/core/Data.h>
 #include <cstdint>
-#include <vector>
 #include <unordered_map>
+#include <vector>
 #include "Protocol.h"
 
 namespace inspector {
@@ -46,11 +46,6 @@ enum { FrameEventSize = sizeof(FrameEvent) };
 struct FrameData {
   std::vector<FrameEvent> frames;
   uint8_t continuous = 1;
-
-  int64_t min = std::numeric_limits<int64_t>::max();
-  int64_t max = std::numeric_limits<int64_t>::min();
-  int64_t total = 0;
-  double sumSq = 0;
 };
 
 struct OpTaskData {
@@ -62,27 +57,27 @@ struct OpTaskData {
 enum { OpTaskDataSize = sizeof(OpTaskData) };
 
 static std::unordered_map<uint8_t, const char*> OpTaskName = {
-  {OpTaskType::Unknown, "Unknown"},
-  {OpTaskType::Flush, "Flush"},
-  {OpTaskType::ResourceTask, "ResourceTask"},
-  {OpTaskType::TextureUploadTask, "TextureUploadTask"},
-  {OpTaskType::ShapeBufferUploadTask, "ShapeBufferUploadTask"},
-  {OpTaskType::GpuUploadTask, "GpuUploadTask"},
-  {OpTaskType::TextureCreateTask, "TextureCreateTask"},
-  {OpTaskType::RenderTargetCreateTask, "RenderTargetCreateTask"},
-  {OpTaskType::TextureFlattenTask, "TextureFlattenTask"},
-  {OpTaskType::RenderTask, "RenderTask"},
-  {OpTaskType::RenderTargetCopyTask, "RenderTargetCopyTask"},
-  {OpTaskType::RuntimeDrawTask, "RuntimeDrawTask"},
-  {OpTaskType::TextureResolveTask, "TextureResolveTask"},
-  {OpTaskType::OpsRenderTask, "OpsRenderTask"},
-  {OpTaskType::ClearOp, "ClearOp"},
-  {OpTaskType::RectDrawOp, "RectDrawOp"},
-  {OpTaskType::RRectDrawOp, "RRectDrawOp"},
-  {OpTaskType::ShapeDrawOp, "ShapeDrawOp"},
-  {OpTaskType::DstTextureCopyOp, "DstTextureCopyOp"},
-  {OpTaskType::ResolveOp, "ResolveOp"},
-  {OpTaskType::OpTaskTypeSize, "OpTaskTypeSize"},
+    {OpTaskType::Unknown, "Unknown"},
+    {OpTaskType::Flush, "Flush"},
+    {OpTaskType::ResourceTask, "ResourceTask"},
+    {OpTaskType::TextureUploadTask, "TextureUploadTask"},
+    {OpTaskType::ShapeBufferUploadTask, "ShapeBufferUploadTask"},
+    {OpTaskType::GpuUploadTask, "GpuUploadTask"},
+    {OpTaskType::TextureCreateTask, "TextureCreateTask"},
+    {OpTaskType::RenderTargetCreateTask, "RenderTargetCreateTask"},
+    {OpTaskType::TextureFlattenTask, "TextureFlattenTask"},
+    {OpTaskType::RenderTask, "RenderTask"},
+    {OpTaskType::RenderTargetCopyTask, "RenderTargetCopyTask"},
+    {OpTaskType::RuntimeDrawTask, "RuntimeDrawTask"},
+    {OpTaskType::TextureResolveTask, "TextureResolveTask"},
+    {OpTaskType::OpsRenderTask, "OpsRenderTask"},
+    {OpTaskType::ClearOp, "ClearOp"},
+    {OpTaskType::RectDrawOp, "RectDrawOp"},
+    {OpTaskType::RRectDrawOp, "RRectDrawOp"},
+    {OpTaskType::ShapeDrawOp, "ShapeDrawOp"},
+    {OpTaskType::DstTextureCopyOp, "DstTextureCopyOp"},
+    {OpTaskType::ResolveOp, "ResolveOp"},
+    {OpTaskType::OpTaskTypeSize, "OpTaskTypeSize"},
 };
 
 enum DataType : uint8_t { Color, Vect, Mat4, Int, Float, String, Count };
