@@ -243,6 +243,11 @@ void DisplayList::render(Surface* surface, bool autoClear) {
   if (!surface) {
     return;
   }
+#ifdef TGFX_USE_INSPECTOR
+  auto& layerInspector = LayerInspector::GetLayerInspector();
+  layerInspector.setCallBack();
+  layerInspector.RenderImageAndSend(surface->getContext());
+#endif
   _hasContentChanged = false;
   auto dirtyRegions = _root->updateDirtyRegions();
   if (_zoomScaleInt == 0) {
@@ -823,12 +828,6 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
     args.backgroundContext = BackgroundContext::Make(context, drawRect, viewMatrix);
   }
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
-
-#ifdef TGFX_USE_INSPECTOR
-  auto& layerInspector = LayerInspector::GetLayerInspector();
-  layerInspector.setCallBack();
-  layerInspector.RenderImageAndSend(surface->getContext());
-#endif
 }
 
 }  // namespace tgfx
