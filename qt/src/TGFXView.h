@@ -28,6 +28,7 @@ class TGFXView : public QQuickItem {
   Q_OBJECT
  public:
   explicit TGFXView(QQuickItem* parent = nullptr);
+  Q_INVOKABLE void handlePinch(qreal scaleDelta, QPointF center);
 
  protected:
   void mousePressEvent(QMouseEvent* event) override;

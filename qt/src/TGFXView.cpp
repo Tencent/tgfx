@@ -29,10 +29,20 @@ TGFXView::TGFXView(QQuickItem* parent) : QQuickItem(parent) {
   setFlag(ItemHasContents, true);
   setAcceptedMouseButtons(Qt::LeftButton);
   setAcceptHoverEvents(true);
-  setAcceptedMouseButtons(Qt::LeftButton);
   setAcceptTouchEvents(true);
   setFocus(true);
   createAppHost();
+}
+
+void TGFXView::handlePinch(qreal scaleDelta, QPointF center) {
+  float oldZoom = zoom;
+  float newZoom = std::max(0.001f, std::min(1000.0f, oldZoom * (float)scaleDelta));
+  float px = (float)center.x();
+  float py = (float)center.y();
+  offset.setX((offset.x() - px) * (newZoom / oldZoom) + px);
+  offset.setY((offset.y() - py) * (newZoom / oldZoom) + py);
+  zoom = newZoom;
+  update();
 }
 
 void TGFXView::wheelEvent(QWheelEvent* event) {
@@ -40,17 +50,16 @@ void TGFXView::wheelEvent(QWheelEvent* event) {
       (event->modifiers() & Qt::ControlModifier) || (event->modifiers() & Qt::MetaModifier);
   qreal px = event->position().x();
   qreal py = event->position().y();
-
   if (isZoom) {
-    float factor = (float)std::exp(-event->angleDelta().y() / 400.0);
+    float factor = (float)std::exp(-event->angleDelta().y() / 300.0);
     float oldZoom = zoom;
-    float newZoom = std::max(0.01f, std::min(100.0f, oldZoom * factor));
+    float newZoom = std::max(0.001f, std::min(1000.0f, oldZoom * factor));
     offset.setX((offset.x() - px) * (newZoom / oldZoom) + px);
     offset.setY((offset.y() - py) * (newZoom / oldZoom) + py);
     zoom = newZoom;
   } else {
-    offset.rx() -= event->angleDelta().x();
-    offset.ry() -= event->angleDelta().y();
+    offset.rx() += event->angleDelta().x();
+    offset.ry() += event->angleDelta().y();
   }
   update();
   event->accept();
@@ -88,6 +97,8 @@ void TGFXView::mouseReleaseEvent(QMouseEvent* event) {
   }
   if (switchFlag) {
     lastDrawIndex++;
+    offset = {0,0};
+    zoom = 1.0f;
     update();
   }
 }

@@ -8,13 +8,25 @@ Window {
     width: 800
     height: 600
 
-    TGFXView {
-        id: tgfxView
-        anchors.left: parent.left
-        anchors.top: parent.top
-        anchors.bottom: parent.bottom
-        anchors.right: parent.right
-        objectName: "tgfxView"
-        focus: true
+    PinchArea {
+        id: pinchArea
+        anchors.fill: parent
+        property real lastScale: 1.0
+        onPinchStarted: {
+            lastScale = 1.0
+        }
+        onPinchUpdated: {
+            tgfxView.handlePinch(pinch.scale / lastScale, pinch.center)
+            lastScale = pinch.scale
+        }
+        TGFXView {
+            id: tgfxView
+            anchors.left: parent.left
+            anchors.top: parent.top
+            anchors.bottom: parent.bottom
+            anchors.right: parent.right
+            objectName: "tgfxView"
+            focus: true
+        }
     }
 }

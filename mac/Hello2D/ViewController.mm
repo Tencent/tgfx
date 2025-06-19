@@ -54,8 +54,8 @@
   BOOL isCtrl = (event.modifierFlags & NSEventModifierFlagControl) != 0;
   BOOL isCmd = (event.modifierFlags & NSEventModifierFlagCommand) != 0;
   if (isCtrl || isCmd) {
-    float oldZoom = self.zoomScale;
-    float zoomStep = 1.0 + event.scrollingDeltaY * 0.05;
+    float oldZoom = self.zoomScale * 0.05;
+    float zoomStep = 1.0 + event.scrollingDeltaY;
     float newZoom = oldZoom * zoomStep;
     if (newZoom < 0.001f) {
       newZoom = 0.001f;
@@ -73,8 +73,8 @@
     self.zoomScale = newZoom;
     [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
   } else {
-    self.contentOffset = CGPointMake(self.contentOffset.x - event.scrollingDeltaX,
-                                     self.contentOffset.y - event.scrollingDeltaY);
+    self.contentOffset = CGPointMake(self.contentOffset.x + event.scrollingDeltaX,
+                                     self.contentOffset.y + event.scrollingDeltaY);
     [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
   }
 }

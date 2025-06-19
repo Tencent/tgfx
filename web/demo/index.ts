@@ -69,9 +69,9 @@ if (typeof window !== 'undefined') {
                 canvas.addEventListener('wheel', (e: WheelEvent) => {
                     e.preventDefault();
                     if (e.ctrlKey || e.metaKey) {
-                        const zoomFactor = Math.exp(-e.deltaY * 0.001);
+                        const zoomFactor = Math.exp(-e.deltaY * 0.05);
                         const oldZoom = shareData.zoom;
-                        const newZoom = Math.max(0.01, Math.min(100, oldZoom * zoomFactor));
+                        const newZoom = Math.max(0.001, Math.min(1000, oldZoom * zoomFactor));
                         const rect = canvas.getBoundingClientRect();
                         const px = (e.clientX - rect.left) * window.devicePixelRatio;
                         const py = (e.clientY - rect.top) * window.devicePixelRatio;
@@ -80,8 +80,8 @@ if (typeof window !== 'undefined') {
                         shareData.zoom = newZoom;
                         shareData.tgfxBaseView.draw(shareData.drawIndex, shareData.zoom, shareData.offsetX, shareData.offsetY);
                     } else {
-                        shareData.offsetX -= e.deltaX / shareData.zoom;
-                        shareData.offsetY -= e.deltaY / shareData.zoom;
+                        shareData.offsetX -= e.deltaX;
+                        shareData.offsetY -= e.deltaY;
                         shareData.tgfxBaseView.draw(shareData.drawIndex, shareData.zoom, shareData.offsetX, shareData.offsetY);
                     }
                 }, {passive: false});
