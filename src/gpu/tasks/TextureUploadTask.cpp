@@ -27,11 +27,10 @@
 namespace tgfx {
 TextureUploadTask::TextureUploadTask(UniqueKey uniqueKey,
                                      std::shared_ptr<DataSource<ImageBuffer>> inputSource,
-                                     bool mipmapped, bool asyncDecoding,
-                                     std::shared_ptr<BlockBuffer> referenceCounter)
+                                     bool mipmapped, bool asyncDecoding)
     : ResourceTask(std::move(uniqueKey)), mipmapped(mipmapped) {
   if (asyncDecoding) {
-    source = DataSource<ImageBuffer>::Async(std::move(inputSource), std::move(referenceCounter));
+    source = DataSource<ImageBuffer>::Async(std::move(inputSource));
   } else {
     source = inputSource;
   }

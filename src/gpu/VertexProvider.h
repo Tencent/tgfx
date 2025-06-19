@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <memory>
 #include <utility>
 #include <vector>
 #include "core/DataSource.h"
@@ -31,6 +32,10 @@ namespace tgfx {
  */
 class VertexProvider {
  public:
+  explicit VertexProvider(std::shared_ptr<BlockBuffer> reference)
+      : reference(std::move(reference)) {
+  }
+
   virtual ~VertexProvider() = default;
 
   /**
@@ -42,14 +47,15 @@ class VertexProvider {
    * Returns the vertices in the provider.
    */
   virtual void getVertices(float* vertices) const = 0;
+
+ private:
+  std::shared_ptr<BlockBuffer> reference = nullptr;
 };
 
 class VertexProviderTask : public Task {
  public:
   VertexProviderTask(PlacementPtr<VertexProvider> provider, float* vertices)
       : provider(std::move(provider)), vertices(vertices) {
-    // Ensure that the reference count of the shared memory (BlockBuffer) is greater than 1 during
-    // execution, so that the BlockBuffer does not release the memory used by the Task or its owner.
   }
 
  protected:

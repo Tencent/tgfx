@@ -26,13 +26,7 @@ std::shared_ptr<DataSource<ImageBuffer>> ImageSource::MakeFrom(
   if (generator == nullptr) {
     return nullptr;
   }
-  if (!generator->asyncSupport()) {
-    // The generator may have built-in async decoding support which will not block the main thread.
-    // Therefore, we should trigger the decoding ASAP.
-    auto buffer = generator->makeBuffer(tryHardware);
-    return Wrap(std::move(buffer));
-  }
-  return std::make_unique<ImageSource>(std::move(generator), tryHardware);
+  return std::make_shared<ImageSource>(std::move(generator), tryHardware);
 }
 
 ImageSource::ImageSource(std::shared_ptr<ImageGenerator> generator, bool tryHardware)

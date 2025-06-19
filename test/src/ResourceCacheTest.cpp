@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <array>
 #include <thread>
 #include <utility>
 #include <vector>
@@ -23,9 +24,11 @@
 #include "core/ImageSource.h"
 #include "core/utils/BlockBuffer.h"
 #include "core/utils/UniqueID.h"
+#include "gpu/RectsVertexProvider.h"
 #include "gpu/Resource.h"
 #include "gpu/tasks/TextureUploadTask.h"
 #include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/Rect.h"
 #include "tgfx/core/Task.h"
 #include "utils/TestUtils.h"
 
@@ -72,12 +75,11 @@ TGFX_TEST(ResourceCacheTest, multiThreadRecycling) {
 TGFX_TEST(ResourceCacheTest, blockBufferRefCount) {
   BlockBuffer blockBuffer;
   {
-    auto proxyKey = UniqueKey::Make();
-
-    auto image = ImageCodec::MakeFrom(ProjectPath::Absolute("resources/apitest/rotation.jpg"));
-    auto source = ImageSource::MakeFrom(std::move(image), false);
-    auto task = blockBuffer.make<TextureUploadTask>(proxyKey, std::move(source), false, true,
-                                                    blockBuffer.getReferenceCounter());
+    auto vertexProvider =
+        RectsVertexProvider::MakeFrom(&blockBuffer, Rect::MakeWH(100, 100), AAType::Coverage);
+    std::array<float, 16> vertices;
+    auto task = std::make_shared<VertexProviderTask>(std::move(vertexProvider), vertices.data());
+    Task::Run(task);
   }
   blockBuffer.clear();
 }

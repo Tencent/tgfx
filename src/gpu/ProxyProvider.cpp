@@ -22,7 +22,6 @@
 #include "core/ImageSource.h"
 #include "core/ShapeRasterizer.h"
 #include "core/shapes/MatrixShape.h"
-#include "core/utils/USE.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/PlainTexture.h"
@@ -33,9 +32,7 @@
 #include "gpu/tasks/RenderTargetCreateTask.h"
 #include "gpu/tasks/ShapeBufferUploadTask.h"
 #include "gpu/tasks/TextureCreateTask.h"
-#include "gpu/tasks/TextureFlattenTask.h"
 #include "gpu/tasks/TextureUploadTask.h"
-#include "tgfx/core/DataView.h"
 #include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/RenderFlags.h"
 #include "tgfx/gpu/Context.h"
@@ -69,8 +66,7 @@ std::shared_ptr<GpuBufferProxy> ProxyProvider::createGpuBufferProxy(
   std::shared_ptr<DataSource<Data>> dataSource = nullptr;
 #ifdef TGFX_USE_THREADS
   if (!(renderFlags & RenderFlags::DisableAsyncTask)) {
-    dataSource =
-        DataSource<Data>::Async(std::move(source), context->drawingBuffer()->getReferenceCounter());
+    dataSource = DataSource<Data>::Async(std::move(source));
   } else {
     dataSource = std::move(source);
   }
@@ -215,8 +211,7 @@ std::shared_ptr<GpuShapeProxy> ProxyProvider::createGpuShapeProxy(std::shared_pt
   std::shared_ptr<DataSource<ShapeBuffer>> dataSource = nullptr;
 #ifdef TGFX_USE_THREADS
   if (!(renderFlags & RenderFlags::DisableAsyncTask) && rasterizer->asyncSupport()) {
-    dataSource = DataSource<ShapeBuffer>::Async(std::move(rasterizer),
-                                                context->drawingBuffer()->getReferenceCounter());
+    dataSource = DataSource<ShapeBuffer>::Async(std::move(rasterizer));
   } else {
     dataSource = std::move(rasterizer);
   }
@@ -241,9 +236,8 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxyByImageSource(
     const UniqueKey& uniqueKey, std::shared_ptr<DataSource<ImageBuffer>> source, int width,
     int height, bool alphaOnly, bool mipmapped, uint32_t renderFlags, bool asyncDecoding) {
   auto proxyKey = GetProxyKey(uniqueKey, renderFlags);
-  auto task = context->drawingBuffer()->make<TextureUploadTask>(
-      proxyKey, std::move(source), mipmapped, asyncDecoding,
-      context->drawingBuffer()->getReferenceCounter());
+  auto task = context->drawingBuffer()->make<TextureUploadTask>(proxyKey, std::move(source),
+                                                                mipmapped, asyncDecoding);
   context->drawingManager()->addResourceTask(std::move(task));
   auto proxy = std::shared_ptr<TextureProxy>(
       new DefaultTextureProxy(proxyKey, width, height, mipmapped, alphaOnly));
@@ -282,10 +276,18 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
   auto width = generator->width();
   auto height = generator->height();
   auto alphaOnly = generator->isAlphaOnly();
-  auto source = ImageSource::MakeFrom(std::move(generator), !mipmapped);
   bool asyncDecoding = false;
+  std::shared_ptr<DataSource<ImageBuffer>> source = nullptr;
 #ifdef TGFX_USE_THREADS
   asyncDecoding = !(renderFlags & RenderFlags::DisableAsyncTask);
+  if (asyncDecoding && !generator->asyncSupport()) {
+    auto buffer = generator->makeBuffer(!mipmapped);
+    source = DataSource<ImageBuffer>::Wrap(std::move(buffer));
+  } else {
+    source = ImageSource::MakeFrom(std::move(generator), !mipmapped);
+  }
+#else
+  source = ImageSource::MakeFrom(std::move(generator), !mipmapped);
 #endif
   return createTextureProxyByImageSource(uniqueKey, std::move(source), width, height, alphaOnly,
                                          mipmapped, renderFlags, asyncDecoding);

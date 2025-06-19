@@ -17,9 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DecodedImage.h"
-#include "BufferImage.h"
+#include <memory>
+#include "core/DataSource.h"
 #include "core/ImageSource.h"
+#include "core/utils/USE.h"
 #include "gpu/ProxyProvider.h"
+#include "tgfx/core/Buffer.h"
+#include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
 std::shared_ptr<Image> DecodedImage::MakeFrom(UniqueKey uniqueKey,
@@ -31,12 +35,23 @@ std::shared_ptr<Image> DecodedImage::MakeFrom(UniqueKey uniqueKey,
   auto width = generator->width();
   auto height = generator->height();
   auto alphaOnly = generator->isAlphaOnly();
-  auto source = ImageSource::MakeFrom(std::move(generator), tryHardware);
-  if (asyncDecoding) {
+  std::shared_ptr<DataSource<ImageBuffer>> source = nullptr;
 #ifdef TGFX_USE_THREADS
-    source = DataSource<ImageBuffer>::Async(std::move(source), nullptr);
-#endif
+  if (asyncDecoding) {
+    if (generator->asyncSupport()) {
+      source = ImageSource::MakeFrom(std::move(generator), tryHardware);
+      source = DataSource<ImageBuffer>::Async(std::move(source));
+    } else {
+      // The generator may have built-in async decoding support which will not block the main thread.
+      // Therefore, we should trigger the decoding ASAP.
+      auto buffer = generator->makeBuffer(tryHardware);
+      source = DataSource<ImageBuffer>::Wrap(std::move(buffer));
+    }
   }
+#else
+  source = ImageSource::MakeFrom(std::move(generator), tryHardware);
+#endif
+
   auto image = std::shared_ptr<DecodedImage>(
       new DecodedImage(std::move(uniqueKey), width, height, alphaOnly, std::move(source)));
   image->weakThis = image;

@@ -158,13 +158,7 @@ class BlockBuffer {
    * Asynchronous objects using the BlockBuffer can hold this shared pointer. When all references
    * are released, the BlockBuffer will be notified.
    */
-  std::shared_ptr<BlockBuffer> getReferenceCounter();
-
-  /**
-   * Waits until the reference count reaches zero, indicating that all threads have finished using
-   * the memory blocks and it is safe to release them.
-   */
-  void waitForReferenceEmpty();
+  std::shared_ptr<BlockBuffer> addReference();
 
  private:
   struct Block {
@@ -185,7 +179,7 @@ class BlockBuffer {
 
   std::mutex mutex = {};
   std::condition_variable condition = {};
-  std::weak_ptr<BlockBuffer> referenceCounter;
+  std::weak_ptr<BlockBuffer> externalReferences;
 
   Block* findOrAllocateBlock(size_t requestedSize);
   bool allocateNewBlock(size_t requestSize);
@@ -194,6 +188,12 @@ class BlockBuffer {
    * Notifies that the reference count has reached zero. As the destructor of the reference counter
    * shared pointer.
    */
-  static void NotifyReferenceEmpty(BlockBuffer* blockBuffer);
+  static void NotifyReferenceReachedZero(BlockBuffer* blockBuffer);
+
+  /**
+   * Waits until the reference count reaches zero, indicating that all threads have finished using
+   * the memory blocks and it is safe to release them.
+   */
+  void waitForReferencesExpired();
 };
 }  // namespace tgfx

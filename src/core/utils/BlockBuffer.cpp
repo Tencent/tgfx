@@ -49,7 +49,7 @@ BlockBuffer::BlockBuffer(size_t initBlockSize) : initBlockSize(initBlockSize) {
 }
 
 BlockBuffer::~BlockBuffer() {
-  waitForReferenceEmpty();
+  waitForReferencesExpired();
   for (auto& block : blocks) {
     free(block.data);
   }
@@ -94,7 +94,7 @@ void BlockBuffer::clear(size_t maxReuseSize) {
   if (blocks.empty()) {
     return;
   }
-  waitForReferenceEmpty();
+  waitForReferencesExpired();
   currentBlockIndex = 0;
   usedSize = 0;
   size_t totalBlockSize = 0;
@@ -115,7 +115,7 @@ std::shared_ptr<BlockData> BlockBuffer::release() {
   if (usedSize == 0) {
     return nullptr;
   }
-  waitForReferenceEmpty();
+  waitForReferencesExpired();
   std::vector<uint8_t*> usedBlocks = {};
   usedBlocks.reserve(currentBlockIndex + 1);
   for (auto& block : blocks) {
@@ -153,21 +153,22 @@ bool BlockBuffer::allocateNewBlock(size_t requestSize) {
   return true;
 }
 
-std::shared_ptr<BlockBuffer> BlockBuffer::getReferenceCounter() {
-  if (referenceCounter.expired()) {
-    auto newCounter = std::shared_ptr<BlockBuffer>(this, NotifyReferenceEmpty);
-    referenceCounter = newCounter;
-    return newCounter;
+std::shared_ptr<BlockBuffer> BlockBuffer::addReference() {
+  auto reference = externalReferences.lock();
+  if (reference) {
+    return reference;
   }
-  return referenceCounter.lock();
+  reference = std::shared_ptr<BlockBuffer>(this, NotifyReferenceReachedZero);
+  externalReferences = reference;
+  return externalReferences.lock();
 }
 
-void BlockBuffer::waitForReferenceEmpty() {
+void BlockBuffer::waitForReferencesExpired() {
   std::unique_lock<std::mutex> lock(mutex);
-  condition.wait(lock, [this]() { return referenceCounter.expired(); });
+  condition.wait(lock, [this]() { return externalReferences.expired(); });
 }
 
-void BlockBuffer::NotifyReferenceEmpty(BlockBuffer* blockBuffer) {
+void BlockBuffer::NotifyReferenceReachedZero(BlockBuffer* blockBuffer) {
   std::unique_lock<std::mutex> lock(blockBuffer->mutex);
   blockBuffer->condition.notify_all();
 }

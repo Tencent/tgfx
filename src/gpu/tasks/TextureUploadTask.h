@@ -22,19 +22,13 @@
 #include <memory>
 #include "ResourceTask.h"
 #include "core/DataSource.h"
-#include "core/utils/BlockBuffer.h"
 #include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
 class TextureUploadTask : public ResourceTask {
  public:
   TextureUploadTask(UniqueKey uniqueKey, std::shared_ptr<DataSource<ImageBuffer>> source,
-                    bool mipmapped, bool asyncDecoding,
-                    std::shared_ptr<BlockBuffer> referenceCounter);
-
-  ~TextureUploadTask() override {
-    std::cout << "TextureUploadTask destroyed" << std::endl;
-  };
+                    bool mipmapped, bool asyncDecoding);
 
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
 

@@ -52,15 +52,14 @@ class DataSource {
    * Wraps the existing data source into an asynchronous DataSource and starts loading the data
 	 * immediately.
    */
-  static std::shared_ptr<DataSource> Async(std::shared_ptr<DataSource> source,
-                                           std::shared_ptr<BlockBuffer> referenceCounter) {
+  static std::shared_ptr<DataSource> Async(std::shared_ptr<DataSource> source) {
 #ifndef TGFX_USE_THREADS
     return source;
 #endif
     if (source == nullptr) {
       return nullptr;
     }
-    return std::make_shared<AsyncDataSource<T>>(std::move(source), referenceCounter);
+    return std::make_shared<AsyncDataSource<T>>(std::move(source));
   }
 
   virtual ~DataSource() = default;
@@ -125,9 +124,7 @@ class DataTask : public Task {
 template <typename T>
 class AsyncDataSource : public DataSource<T> {
  public:
-  AsyncDataSource(std::shared_ptr<DataSource<T>> source,
-                  std::shared_ptr<BlockBuffer> referenceCounter)
-      : referenceCounter(std::move(referenceCounter)) {
+  explicit AsyncDataSource(std::shared_ptr<DataSource<T>> source) {
     task = std::make_shared<DataTask<T>>(std::move(source));
     Task::Run(task);
   }
@@ -143,6 +140,5 @@ class AsyncDataSource : public DataSource<T> {
 
  private:
   std::shared_ptr<DataTask<T>> task = nullptr;
-  std::shared_ptr<BlockBuffer> referenceCounter = nullptr;
 };
 }  // namespace tgfx
