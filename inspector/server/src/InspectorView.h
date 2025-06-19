@@ -31,18 +31,22 @@ namespace inspector {
 class ClientData;
 class InspectorView : public QObject {
   Q_OBJECT
-
  public:
   InspectorView(std::string filePath, int width, QObject* parent = nullptr);
   InspectorView(ClientData* clientData, int width, QObject* parent = nullptr);
-  ~InspectorView();
+  ~InspectorView() override;
 
   void initView();
   void initConnect();
+  void failedCreateWorker();
+
   Q_INVOKABLE void openStartView();
+  Q_INVOKABLE bool saveFile(const QUrl& filePath);
 
   Q_SLOT void onCloseView(QQuickCloseEvent*);
   Q_SIGNAL void closeView(QObject* view);
+  Q_SIGNAL void failedOpenInspectorView(QString errorMsg);
+
  private:
   int width;
   ClientData* clientData = nullptr;

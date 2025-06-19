@@ -24,7 +24,7 @@
 
 namespace inspector {
 TaskTreeModel::TaskTreeModel(Worker* worker, ViewData* viewData, QObject* parent)
-  : QAbstractItemModel(parent), worker(worker), viewData(viewData) {
+    : QAbstractItemModel(parent), worker(worker), viewData(viewData) {
   refreshData();
 }
 
@@ -49,7 +49,7 @@ QVariant TaskTreeModel::data(const QModelIndex& index, int role) const {
   switch (role) {
     case NameRole:
     case CostTimeRole:
-    case WeightRole:{
+    case WeightRole: {
       return item->data(index.column());
     }
     default:
@@ -62,9 +62,8 @@ QModelIndex TaskTreeModel::index(int row, int column, const QModelIndex& parent)
     return {};
   }
 
-  TaskItem* parentItem = parent.isValid()
-                               ? static_cast<TaskItem*>(parent.internalPointer())
-                               : rootItem;
+  TaskItem* parentItem =
+      parent.isValid() ? static_cast<TaskItem*>(parent.internalPointer()) : rootItem;
   if (auto childItem = parentItem->childAt(static_cast<uint32_t>(row))) {
     return createIndex(row, column, childItem);
   }
@@ -109,8 +108,8 @@ int TaskTreeModel::columnCount(const QModelIndex& parent) const {
   return rootItem ? rootItem->columnCount() : 3;
 }
 
-bool TaskTreeModel::filterOpTasks(const OpTaskData* opTask,
-                   const std::unordered_map<uint32_t, std::vector<uint32_t>>& opChilds) {
+bool TaskTreeModel::filterOpTasks(
+    const OpTaskData* opTask, const std::unordered_map<uint32_t, std::vector<uint32_t>>& opChilds) {
   const auto& dataContext = worker->GetDataContext();
   auto& opTaskName = OpTaskName[opTask->type];
   auto& opTasks = dataContext.opTasks;
@@ -119,7 +118,7 @@ bool TaskTreeModel::filterOpTasks(const OpTaskData* opTask,
   }
   auto childsIndx = opChilds.find(opTask->id);
   if (childsIndx != opChilds.end()) {
-    for (auto opTaskIdx: childsIndx->second) {
+    for (auto opTaskIdx : childsIndx->second) {
       if (filterOpTasks(opTasks.at(opTaskIdx).get(), opChilds)) {
         return true;
       }
@@ -146,7 +145,7 @@ void TaskTreeModel::deleteTree(TaskItem* root) {
     return;
   }
 
-  for (auto child: root->childrenItems) {
+  for (auto child : root->childrenItems) {
     deleteTree(child);
   }
   delete root;
@@ -191,18 +190,17 @@ void TaskTreeModel::refreshData() {
 }
 
 TaskItem* TaskTreeModel::processTaskLevel(
-    int64_t selectFrameTime,
-    const std::vector<std::shared_ptr<OpTaskData>>& opTasks,
+    int64_t selectFrameTime, const std::vector<std::shared_ptr<OpTaskData>>& opTasks,
     const std::unordered_map<uint32_t, std::vector<uint32_t>>& opChilds) {
   TaskItem* root = nullptr;
-  QVariantList emptyColumnData {tr("opTaskName"), tr("opTaskTime"), tr("opTaskWeight")};
+  QVariantList emptyColumnData{tr("opTaskName"), tr("opTaskTime"), tr("opTaskWeight")};
   if (opTasks.empty()) {
     root = new TaskItem(emptyColumnData, static_cast<uint32_t>(0));
     return root;
   }
 
   std::unordered_map<uint32_t, TaskItem*> nodeMap;
-  for (auto& opTask: opTasks) {
+  for (auto& opTask : opTasks) {
     auto opTaskName = OpTaskName[opTask->type];
     if (!(matchesFilter(opTask->type) && filterOpTasks(opTask.get(), opChilds))) {
       continue;
@@ -215,8 +213,8 @@ TaskItem* TaskTreeModel::processTaskLevel(
     nodeMap[opTask->id] = new TaskItem(columnData, opTask->id);
   }
   std::unordered_set<uint32_t> childNodes;
-  for (const auto& pair: opChilds) {
-    for (auto childIndex: pair.second) {
+  for (const auto& pair : opChilds) {
+    for (auto childIndex : pair.second) {
       childNodes.insert(childIndex);
     }
   }
@@ -225,8 +223,7 @@ TaskItem* TaskTreeModel::processTaskLevel(
     if (childNodes.find(i) == childNodes.end()) {
       if (root == nullptr) {
         root = nodeMap[i];
-      }
-      else {
+      } else {
         root = new TaskItem(emptyColumnData, static_cast<uint32_t>(0));
         break;
       }
@@ -236,14 +233,14 @@ TaskItem* TaskTreeModel::processTaskLevel(
   if (root == nullptr) {
     root = new TaskItem(emptyColumnData, static_cast<uint32_t>(0));
   }
-  for (const auto& pair: opChilds) {
+  for (const auto& pair : opChilds) {
     auto parendIndex = pair.first;
     if (nodeMap.find(parendIndex) == nodeMap.end()) {
       continue;
     }
     auto& childIndices = pair.second;
     auto parentNode = nodeMap[parendIndex];
-    for (auto childIndex: childIndices) {
+    for (auto childIndex : childIndices) {
       if (nodeMap.find(childIndex) == nodeMap.end()) {
         continue;
       }
@@ -254,7 +251,7 @@ TaskItem* TaskTreeModel::processTaskLevel(
     }
   }
   if (root->opId == 0) {
-    for (const auto& opTask: opTasks) {
+    for (const auto& opTask : opTasks) {
       if (nodeMap.find(opTask->id) == nodeMap.end()) {
         continue;
       }

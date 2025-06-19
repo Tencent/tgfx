@@ -1,5 +1,6 @@
 import QtQuick 2.6
 import QtQuick.Window 2.15
+import QtQuick.Dialogs
 import QtQuick.Controls 2.12
 import QtQuick.Layouts 1.15
 import FramesDrawer 1.0
@@ -12,6 +13,27 @@ ApplicationWindow {
     height: 1080
     title : "TGFX Inspector"
     color: "#2d2d2d"
+
+    FileDialog {
+        id: saveDialog
+        title: qsTr("save File")
+        fileMode: FileDialog.SaveFile
+        nameFilters: [ "Inspector files (*.isp)" ]
+        onAccepted: {
+            inspectorViewModel.saveFile(saveDialog.selectedFile)
+            close()
+        }
+    }
+
+    MessageDialog {
+        id: exitMessageDialog
+        buttons: MessageDialog.Ok
+        title: qsTr("Open failed")
+
+        onButtonClicked: {
+            inspectorView.close()
+        }
+    }
 
     menuBar: MenuBar {
         Menu {
@@ -57,8 +79,7 @@ ApplicationWindow {
                 text: qsTr("Save File")
                 shortcut: StandardKey.Save
                 onTriggered: {
-                    console.log("Save File clicked")
-                    //todo: save file call the saveFile()
+                    saveDialog.open()
                 }
             }
 
@@ -269,7 +290,7 @@ ApplicationWindow {
                             onEntered: parent.scale = 1.1
                             onExited: parent.scale = 1.0
                             onClicked: {
-                                console.log("saveFile clicked")
+                                saveDialog.open()
                             }
                         }
                     }
@@ -334,6 +355,14 @@ ApplicationWindow {
 
     KDDW.LayoutSaver {
         id: layoutSaver
+    }
+
+    Connections {
+        target: inspectorViewModel
+        function onFailedOpenInspectorView(msg) {
+            exitMessageDialog.text = msg
+            exitMessageDialog.open()
+        }
     }
 }
 

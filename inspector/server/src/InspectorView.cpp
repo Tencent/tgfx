@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "InspectorView.h"
-#include <kddockwidgets/qtquick/Platform.h>
 #include <QQmlContext>
 #include "AtttributeModel.h"
 #include "FramesDrawer.h"
@@ -29,26 +28,28 @@ namespace inspector {
 InspectorView::InspectorView(std::string filePath, int width, QObject* parent)
     : QObject(parent), width(width), worker(filePath) {
   initView();
-  initConnect();
+  failedCreateWorker();
 }
 
 InspectorView::InspectorView(ClientData* clientData, int width, QObject* parent)
-    : QObject(parent), width(width), clientData(clientData), worker(clientData->address.c_str(), clientData->port) {
+    : QObject(parent), width(width), clientData(clientData),
+      worker(clientData->address.c_str(), clientData->port) {
   this->clientData->setConnected(true);
   initView();
-  initConnect();
 }
 
 InspectorView::~InspectorView() {
-  clientData->setConnected(false);
+  if (clientData) {
+    clientData->setConnected(false);
+  }
 }
 
 void InspectorView::initView() {
   qmlRegisterType<FramesDrawer>("FramesDrawer", 1, 0, "FramesDrawer");
   qmlRegisterType<TaskTreeModel>("TaskTreeModel", 1, 0, "TaskTreeModel");
   qmlRegisterType<AtttributeModel>("AtttributeModel", 1, 0, "AtttributeModel");
-  qmlRegisterUncreatableType<KDDockWidgets::QtQuick::Group>("com.kdab.dockwidgets", 2, 0,
-                                               "GroupView", QStringLiteral("Internal usage only"));
+  qmlRegisterUncreatableType<KDDockWidgets::QtQuick::Group>(
+      "com.kdab.dockwidgets", 2, 0, "GroupView", QStringLiteral("Internal usage only"));
   taskTreeModel = std::make_unique<TaskTreeModel>(&worker, &viewData, this);
   selectFrameModel = std::make_unique<SelectFrameModel>(&worker, &viewData, this);
   taskFilterModel = std::make_unique<TaskFilterModel>(&viewData, this);
@@ -59,7 +60,7 @@ void InspectorView::initView() {
   ispEngine->rootContext()->setContextProperty("taskTreeModel", taskTreeModel.get());
   ispEngine->rootContext()->setContextProperty("taskFilterModel", taskFilterModel.get());
   ispEngine->rootContext()->setContextProperty("selectFrameModel", selectFrameModel.get());
-  ispEngine->load((QUrl("qrc:/qml/InspectorView.qml")));
+  ispEngine->load(QUrl("qrc:/qml/InspectorView.qml"));
   if (ispEngine->rootObjects().isEmpty()) {
     qWarning() << "Failed to load InspectorView.qml";
     return;
@@ -81,10 +82,16 @@ void InspectorView::initConnect() {
     return;
   }
   auto frameDrawer = inspectorWindow->findChild<FramesDrawer*>("framesDrawer");
-  connect(frameDrawer, &FramesDrawer::selectFrame, taskTreeModel.get(), &TaskTreeModel::refreshData);
-  connect(frameDrawer, &FramesDrawer::selectFrame, selectFrameModel.get(), &SelectFrameModel::refreshData);
-  connect(inspectorWindow, &QQuickWindow::closing, this, &InspectorView::onCloseView, Qt::QueuedConnection);
-  connect(taskFilterModel.get(), &TaskFilterModel::filterTypeChange, taskTreeModel.get(), &TaskTreeModel::refreshData);
+  connect(frameDrawer, &FramesDrawer::selectFrame, taskTreeModel.get(),
+          &TaskTreeModel::refreshData);
+  connect(frameDrawer, &FramesDrawer::selectFrame, selectFrameModel.get(),
+          &SelectFrameModel::refreshData);
+  connect(inspectorWindow, &QQuickWindow::closing, this, &InspectorView::onCloseView,
+          Qt::QueuedConnection);
+  connect(taskFilterModel.get(), &TaskFilterModel::filterTypeChange, taskTreeModel.get(),
+          &TaskTreeModel::refreshData);
+  connect(this, &InspectorView::closeView, dynamic_cast<StartView*>(parent()),
+          &StartView::onCloseView);
 }
 
 void InspectorView::openStartView() {
@@ -92,7 +99,22 @@ void InspectorView::openStartView() {
   startView->showStartView();
 }
 
+bool InspectorView::saveFile(const QUrl& filePath) {
+  return worker.Save(filePath.path().toStdString());
+}
+
 void InspectorView::onCloseView(QQuickCloseEvent*) {
   Q_EMIT closeView(this);
+}
+
+void InspectorView::failedCreateWorker() {
+  if (worker.hasExpection()) {
+    QString errorMessage = "Inspector create failed, because: \n";
+    for (auto& message: worker.getErrorMessage()) {
+      errorMessage += message.c_str();
+      errorMessage += "\n";
+    }
+    Q_EMIT failedOpenInspectorView(errorMessage);
+  }
 }
 }  // namespace inspector

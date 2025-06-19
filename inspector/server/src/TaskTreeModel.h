@@ -29,8 +29,8 @@ namespace inspector {
 class AtttributeModel;
 class TaskItem {
  public:
-  explicit TaskItem(QVariantList data, uint32_t opId)
-      :opId(opId), itemData(std::move(data))  {}
+  explicit TaskItem(QVariantList data, uint32_t opId) : opId(opId), itemData(std::move(data)) {
+  }
 
   void appendChild(TaskItem* child) {
     return childrenItems.push_back(child);
@@ -65,17 +65,15 @@ class TaskItem {
   }
 
   int row() const {
-    if (parentItem == nullptr)
-      return 0;
-    const auto it = std::find_if(parentItem->childrenItems.cbegin(), parentItem->childrenItems.cend(),
-                                 [this](TaskItem* treeItem) {
-                                     return treeItem == this;
-                                 });
+    if (parentItem == nullptr) return 0;
+    const auto it =
+        std::find_if(parentItem->childrenItems.cbegin(), parentItem->childrenItems.cend(),
+                     [this](TaskItem* treeItem) { return treeItem == this; });
 
     if (it != parentItem->childrenItems.cend()) {
       return int(std::distance(parentItem->childrenItems.cbegin(), it));
     }
-    Q_ASSERT(false); // should not happen
+    Q_ASSERT(false);  // should not happen
   }
 
   int index = 0;

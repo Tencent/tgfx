@@ -20,8 +20,8 @@
 #include "TimePrint.h"
 
 namespace inspector {
-SelectFrameModel::SelectFrameModel(Worker* worker, ViewData* viewData, QObject* parent):
-  QAbstractItemModel(parent), worker(worker), viewData(viewData) {
+SelectFrameModel::SelectFrameModel(Worker* worker, ViewData* viewData, QObject* parent)
+    : QAbstractItemModel(parent), worker(worker), viewData(viewData) {
   refreshData();
 }
 
@@ -40,11 +40,11 @@ void SelectFrameModel::refreshData() {
     drawCall = worker->GetFrameDrawCall(selectFrame);
     triangles = worker->GetFrameTriangles(selectFrame);
   }
-  auto frameItem = Item{tr("Frame"),selectFrame };
-  auto timeItem = Item{tr("Time"),TimeToString(selectFrameTime) };
-  auto fpsItem = Item{tr("FPS"),fps };
-  auto drawCallItem = Item{tr("DrawCall"),drawCall };
-  auto trianglesItem = Item{tr("Triangles"),triangles };
+  auto frameItem = Item{tr("Frame"), selectFrame};
+  auto timeItem = Item{tr("Time"), TimeToString(selectFrameTime)};
+  auto fpsItem = Item{tr("FPS"), fps};
+  auto drawCallItem = Item{tr("DrawCall"), drawCall};
+  auto trianglesItem = Item{tr("Triangles"), triangles};
   items.append(frameItem);
   items.append(timeItem);
   items.append(fpsItem);
@@ -87,7 +87,9 @@ QHash<int, QByteArray> SelectFrameModel::roleNames() const {
 }
 
 QModelIndex SelectFrameModel::index(int row, int column, const QModelIndex& parent) const {
-  return !parent.isValid() && row >= 0 && row < items.count() && column >= 0 && column < 2 ? createIndex(row, column) : QModelIndex();
+  return !parent.isValid() && row >= 0 && row < items.count() && column >= 0 && column < 2
+             ? createIndex(row, column)
+             : QModelIndex();
 }
 
 QModelIndex SelectFrameModel::parent(const QModelIndex& child) const {
@@ -98,4 +100,4 @@ QModelIndex SelectFrameModel::parent(const QModelIndex& child) const {
 int SelectFrameModel::columnCount(const QModelIndex& parent) const {
   return !parent.isValid() ? 2 : 0;
 }
-}
+}  // namespace inspector

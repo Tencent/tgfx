@@ -21,8 +21,11 @@
 
 namespace inspector {
 void ReadOpTaskTag(DecodeStream* stream) {
-  auto count = stream->readEncodedUint64();
   auto context = dynamic_cast<DataContext*>(stream->context);
+  context->baseTime = stream->readEncodedInt64();
+  context->lastTime = stream->readEncodedInt64();
+
+  auto count = stream->readEncodedUint64();
   auto& opTasks = context->opTasks;
   opTasks.reserve(count);
   for (uint32_t i = 0; i < count; ++i) {
@@ -31,7 +34,7 @@ void ReadOpTaskTag(DecodeStream* stream) {
     ptr->end = stream->readEncodedInt64();
     ptr->type = stream->readUint8();
     ptr->id = i;
-    opTasks[i] = ptr;
+    opTasks.push_back(ptr);
   }
 
   count = stream->readEncodedUint64();
@@ -44,13 +47,16 @@ void ReadOpTaskTag(DecodeStream* stream) {
     childs.reserve(childCount);
     for (uint32_t j = 0; j < childCount; ++j) {
       auto childIndex = stream->readEncodedUint32();
-      childs[j] = childIndex;
+      childs.push_back(childIndex);
     }
     opChilds[parentIndex] = childs;
   }
 }
 
 TagType WriteOpTaskTag(EncodeStream* stream, DataContext* context) {
+  stream->writeEncodedInt64(context->baseTime);
+  stream->writeEncodedInt64(context->lastTime);
+
   const auto& opTasks = context->opTasks;
   stream->writeEncodedUint64(opTasks.size());
   for (const auto& opTask : opTasks) {
@@ -69,7 +75,7 @@ TagType WriteOpTaskTag(EncodeStream* stream, DataContext* context) {
       stream->writeEncodedUint32(child);
     }
   }
-  return TagType::Property;
+  return TagType::OpTask;
 }
 
 }  // namespace inspector

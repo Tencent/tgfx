@@ -43,6 +43,13 @@ class EncodeStream final {
   }
 
   /**
+ * Call the method to take ownership of the current bytes. Once the release method is called,
+ * the EncodeStream object will be reset to a new one, and the returned bytes will be managed by
+ * the tgfx::Data object.
+ */
+  std::shared_ptr<tgfx::Data> release();
+
+  /**
    * Set this EncodeStream's byte order.
    */
   void setByteOrder(tgfx::ByteOrder order) {

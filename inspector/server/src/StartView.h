@@ -19,11 +19,11 @@
 #pragma once
 
 #include <QtQml/qqmlengine.h>
+#include <kddockwidgets/qtquick/Platform.h>
 #include <qstring.h>
 #include <QDateTime>
 #include <QLabel>
 #include <QQmlApplicationEngine>
-#include <kddockwidgets/qtquick/Platform.h>
 #include <QTimer>
 #include <QtTest/QTest>
 #include "InspectorView.h"
@@ -111,9 +111,6 @@ class StartView : public QObject {
   explicit StartView(QObject* parent = nullptr);
   ~StartView() override;
 
-  void setFilePathLabel(QLabel* label) {
-    filesPath = label;
-  }
   QStringList getRecentFiles() const {
     return recentFiles;
   }
@@ -128,6 +125,7 @@ class StartView : public QObject {
   ///* file items *///
   Q_INVOKABLE QList<QObject*> getFileItems() const;
   Q_INVOKABLE void openFile(const QString& fPath);
+  Q_INVOKABLE void openFile(const QUrl& fPath);
   Q_INVOKABLE void addRecentFile(const QString& fPath);
   Q_INVOKABLE void clearRecentFiles();
   Q_INVOKABLE QString getFileNameFromPath(const QString& fPath) {
@@ -161,19 +159,19 @@ class StartView : public QObject {
   void updateBroadcastClients();
 
  private:
-  InspectorView* inspectorView;
-  LayerProfilerView* layerProfilerView;
-  QLabel* filesPath = nullptr;
   QString lastOpenFile;
   QStringList recentFiles;
   QList<FileItem*> fileItems;
-  QQmlApplicationEngine* qmlEngine = nullptr;
   std::mutex resolvLock;
   uint16_t port = 8086;
   ResolvService resolv;
   std::unique_ptr<UdpListen> broadcastListen;
   std::unordered_map<uint64_t, ClientData*> clients;
   std::unordered_map<std::string, std::string> resolvMap;
+
   QTimer* broadcastTimer = nullptr;
+  QQmlApplicationEngine* qmlEngine = nullptr;
+  InspectorView* inspectorView = nullptr;
+  LayerProfilerView* layerProfilerView = nullptr;
 };
 }  // namespace inspector
