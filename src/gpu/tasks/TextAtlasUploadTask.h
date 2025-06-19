@@ -24,7 +24,7 @@
 #include "gpu/proxies/TextureProxy.h"
 
 namespace tgfx {
-class TextAtlasUploadTask : public ResourceTask {
+class TextAtlasUploadTask final : public ResourceTask {
  public:
   TextAtlasUploadTask(UniqueKey uniqueKey, std::shared_ptr<DataSource<PixelBuffer>> source,
                       std::shared_ptr<TextureProxy> proxy, Point atlasOffset);

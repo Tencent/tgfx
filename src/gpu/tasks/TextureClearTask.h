@@ -22,7 +22,7 @@
 #include "gpu/proxies/TextureProxy.h"
 
 namespace tgfx {
-class TextureClearTask : public ResourceTask {
+class TextureClearTask final : public ResourceTask {
  public:
   TextureClearTask(UniqueKey uniqueKey, std::shared_ptr<TextureProxy> proxy);
 
