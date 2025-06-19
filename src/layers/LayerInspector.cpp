@@ -44,6 +44,10 @@ namespace tgfx {
     }
   }
 
+void LayerInspector::setLayerInspectorHoveredStateCallBack(std::function<void(bool)> callback) {
+    hoveredCallBack = callback;
+  }
+
 void LayerInspector::setCallBack() {
   [[maybe_unused]] std::function<void(const std::vector<uint8_t>&)> func =
       std::bind(&LayerInspector::FeedBackDataProcess, this, std::placeholders::_1);
@@ -125,6 +129,9 @@ void LayerInspector::FeedBackDataProcess(const std::vector<uint8_t>& data) {
     if (!m_HoverdSwitch && m_HoverdLayer) {
       m_HoverdLayer->removeChildren(m_HighLightLayerIndex);
       m_HoverdLayer = nullptr;
+    }
+    if(hoveredCallBack) {
+      hoveredCallBack(m_HoverdSwitch);
     }
   } else if (type == "HoverLayerAddress") {
     if (m_HoverdSwitch) {
