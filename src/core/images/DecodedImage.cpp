@@ -49,7 +49,7 @@ std::shared_ptr<Image> DecodedImage::MakeFrom(UniqueKey uniqueKey,
     }
   }
 #else
-  // USE(asyncDecoding);
+  USE(asyncDecoding);
   source = ImageSource::MakeFrom(std::move(generator), tryHardware);
 #endif
 
