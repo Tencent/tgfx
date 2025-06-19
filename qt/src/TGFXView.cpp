@@ -58,15 +58,15 @@ void TGFXView::wheelEvent(QWheelEvent* event) {
   qreal px = event->position().x();
   qreal py = event->position().y();
   if (isZoom) {
-    float factor = (float)std::exp(event->angleDelta().y() / 300.0);
+    float factor = 1 + event->angleDelta().y() / 120.0f;
     float oldZoom = zoom;
     float newZoom = std::max(0.001f, std::min(1000.0f, oldZoom * factor));
     offset.setX((offset.x() - px) * (newZoom / oldZoom) + px);
     offset.setY((offset.y() - py) * (newZoom / oldZoom) + py);
     zoom = newZoom;
   } else {
-    offset.rx() += event->angleDelta().x();
-    offset.ry() += event->angleDelta().y();
+    offset.rx() += event->angleDelta().x()/120.0f*100.0f;
+    offset.ry() += event->angleDelta().y()/120.0f*100.0f;
   }
   update();
   event->accept();

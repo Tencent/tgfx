@@ -56,7 +56,7 @@ if (typeof window !== 'undefined') {
                 canvas.addEventListener('wheel', (e: WheelEvent) => {
                     e.preventDefault();
                     if (e.ctrlKey || e.metaKey) {
-                        const zoomFactor = 1.0 + e.deltaY * 0.007;
+                        const zoomFactor = 1.0 - e.deltaY / 100.0;
                         const oldZoom = shareData.zoom;
                         const newZoom = Math.max(0.001, Math.min(1000, oldZoom * zoomFactor));
                         const rect = canvas.getBoundingClientRect();
@@ -67,8 +67,9 @@ if (typeof window !== 'undefined') {
                         shareData.zoom = newZoom;
                         shareData.tgfxBaseView.draw(shareData.drawIndex, shareData.zoom, shareData.offsetX, shareData.offsetY);
                     } else {
-                        shareData.offsetX -= e.deltaX*4;
-                        shareData.offsetY -= e.deltaY*4;
+
+                        shareData.offsetX -= e.deltaX*window.devicePixelRatio;
+                        shareData.offsetY -= e.deltaY*window.devicePixelRatio;
                         shareData.tgfxBaseView.draw(shareData.drawIndex, shareData.zoom, shareData.offsetX, shareData.offsetY);
                     }
                 }, {passive: false});
