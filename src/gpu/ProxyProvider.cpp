@@ -22,6 +22,7 @@
 #include "core/ImageSource.h"
 #include "core/ShapeRasterizer.h"
 #include "core/shapes/MatrixShape.h"
+#include "core/utils/USE.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/PlainTexture.h"
