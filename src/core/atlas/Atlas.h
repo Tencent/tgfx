@@ -25,7 +25,6 @@
 #include "core/atlas/AtlasTypes.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/proxies/TextureProxy.h"
-#include "tgfx/core/Image.h"
 #include "tgfx/core/Size.h"
 
 namespace tgfx {
@@ -33,14 +32,11 @@ class Atlas {
  public:
   static constexpr int kMaxCellSize = 256;
 
-  enum class ErrorCode { Error, Succeeded };
-
   static std::unique_ptr<Atlas> Make(ProxyProvider* proxyProvider, PixelFormat format, int width,
                                      int height, int plotWidth, int plotHeight,
                                      AtlasGenerationCounter* generationCounter);
 
-  ErrorCode addToAtlas(const AtlasCell& cell, AtlasToken nextFlushToken,
-                       AtlasLocator& atlasLocator);
+  bool addToAtlas(const AtlasCell& cell, AtlasToken nextFlushToken, AtlasLocator& atlasLocator);
 
   bool getCellLocator(const BytesKey& cellKey, AtlasCellLocator& cellLocator) const;
 
@@ -89,13 +85,10 @@ class Atlas {
   AtlasToken previousFlushToken = AtlasToken::InvalidToken();
   int flushesSinceLastUse = 0;
   uint32_t numPlots = 0;
-  int bytesPerPixel = 1;
   int textureWidth = 2028;
   int textureHeight = 2048;
   int plotWidth = 512;
   int plotHeight = 512;
-
-  std::vector<PlotEvictionCallback*> evictionCallbacks = {};
 
   BytesKeyMap<AtlasCellLocator> cellLocators;
   std::map<uint32_t, std::set<Plot*>> evictionPlots;
@@ -113,6 +106,5 @@ class AtlasConfig {
  private:
   static constexpr int kMaxTextureSize = 2048;
   ISize RGBADimensions = {kMaxTextureSize, kMaxTextureSize};
-  int maxTextureSize = kMaxTextureSize;
 };
 }  //namespace tgfx

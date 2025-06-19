@@ -32,8 +32,7 @@ class AtlasManager : public AtlasGenerationCounter, public FlushCallbackObject {
 
   bool getCellLocator(MaskFormat, const BytesKey& key, AtlasCellLocator& locator) const;
 
-  Atlas::ErrorCode addCellToAtlas(const AtlasCell& cell, AtlasToken nextFlushToken,
-                                  AtlasLocator&) const;
+  bool addCellToAtlas(const AtlasCell& cell, AtlasToken nextFlushToken, AtlasLocator&) const;
 
   void setPlotUseToken(PlotUseUpdater&, const PlotLocator&, MaskFormat, AtlasToken) const;
 

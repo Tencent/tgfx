@@ -34,6 +34,7 @@ static constexpr int kMaskFormatCount = static_cast<int>(MaskFormat::Last) + 1;
 class AtlasGenerationCounter {
  public:
   constexpr static uint64_t kInvalidGeneration = 0;
+
   uint64_t next() {
     return generation++;
   }
@@ -96,9 +97,7 @@ class AtlasToken {
 
 class TokenTracker {
  public:
-  /*
-   * Get the next flush token. in DrawingManger::flush()
-   */
+  // Get the next flush token. in DrawingManger::flush()
   AtlasToken nextFlushToken() const {
     return currentFlushToken.next();
   }
@@ -153,16 +152,6 @@ class PlotLocator {
   uint64_t _pageIndex : 8;
 };
 
-/**
- * An interface for eviction callbacks. Whenever an atlas evicts a specific PlotLocator,
- * it will call all the registered listeners so they can process the eviction.
- */
-class PlotEvictionCallback {
- public:
-  virtual ~PlotEvictionCallback() = default;
-  virtual void evict(const PlotLocator&) = 0;
-};
-
 class AtlasLocator {
  public:
   const Rect& getLocation() const {
@@ -215,8 +204,8 @@ class PlotUseUpdater {
 
 class Plot {
  public:
-  Plot(uint32_t pageIndex, uint32_t plotIndex, AtlasGenerationCounter* generationCounter, int offX,
-       int offY, int width, int height);
+  Plot(uint32_t pageIndex, uint32_t plotIndex, AtlasGenerationCounter* generationCounter,
+       int offsetX, int offsetY, int width, int height);
 
   uint32_t pageIndex() const {
     return _pageIndex;

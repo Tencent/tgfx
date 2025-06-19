@@ -25,20 +25,12 @@
 namespace tgfx {
 class AtlasCell {
  public:
-  uint16_t id() const {
-    return _id;
-  }
-
   const BytesKey& key() const {
     return _key;
   }
 
   const AtlasLocator& locator() const {
     return _locator;
-  }
-
-  void setAtlasLocator(const AtlasLocator& locator) {
-    _locator = locator;
   }
 
   MaskFormat maskFormat() const {
@@ -64,7 +56,6 @@ class AtlasCell {
   MaskFormat _maskFormat = MaskFormat::A8;
   uint16_t _width = 0;
   uint16_t _height = 0;
-  uint16_t _id = 0;
 
   friend class AtlasSource;
   friend class TextRender;

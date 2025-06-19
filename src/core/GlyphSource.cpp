@@ -21,7 +21,7 @@
 namespace tgfx {
 
 static std::shared_ptr<PixelBuffer> onMakePixelBuffer(const std::shared_ptr<ImageCodec>& imageCodec,
-                                               bool tryHardware) {
+                                                      bool tryHardware) {
   auto pixelBuffer = PixelBuffer::Make(imageCodec->width(), imageCodec->height(),
                                        imageCodec->isAlphaOnly(), tryHardware);
   if (pixelBuffer == nullptr) {

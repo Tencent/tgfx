@@ -38,7 +38,7 @@ const std::vector<std::shared_ptr<TextureProxy>>& AtlasManager::getTextureProxie
 }
 
 bool AtlasManager::initAtlas(MaskFormat maskFormat) {
-  int index = MaskFormatToAtlasIndex(maskFormat);
+  auto index = MaskFormatToAtlasIndex(maskFormat);
   AtlasConfig atlasConfig(context->caps()->maxTextureSize);
   if (atlases[index] == nullptr) {
     ISize atlasDimensions = atlasConfig.atlasDimensions(maskFormat);
@@ -60,8 +60,8 @@ Atlas* AtlasManager::getAtlas(MaskFormat maskFormat) const {
   return atlases[atlasIndex].get();
 }
 
-Atlas::ErrorCode AtlasManager::addCellToAtlas(const AtlasCell& cell, AtlasToken nextFlushToken,
-                                              AtlasLocator& atlasLocator) const {
+bool AtlasManager::addCellToAtlas(const AtlasCell& cell, AtlasToken nextFlushToken,
+                                  AtlasLocator& atlasLocator) const {
   return getAtlas(cell.maskFormat())->addToAtlas(cell, nextFlushToken, atlasLocator);
 }
 

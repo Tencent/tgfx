@@ -54,7 +54,6 @@ bool TextAtlasUploadTask::execute(Context* context) {
                              static_cast<float>(pixelBuffer->height()));
   gpu->writePixels(texture->getSampler(), rect, pixels, pixelBuffer->info().rowBytes());
   pixelBuffer->unlockPixels();
-  // Free the image source immediately to reduce memory pressure.
   source = nullptr;
   return true;
 }

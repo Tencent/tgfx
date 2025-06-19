@@ -24,7 +24,9 @@ namespace tgfx {
 class FlushCallbackObject {
  public:
   virtual ~FlushCallbackObject() = default;
+
   virtual void preFlush() = 0;
+
   virtual void postFlush(AtlasToken startTokenForNextFlush) = 0;
 };
 }  // namespace tgfx

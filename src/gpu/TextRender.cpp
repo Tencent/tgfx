@@ -221,7 +221,6 @@ void TextRender::directMaskDrawing(const GlyphRun& glyphRun, const MCState& stat
 
       glyph._key = std::move(glyphKey);
       glyph._maskFormat = maskFormat;
-      glyph._id = glyphID;
       glyph._width = static_cast<uint16_t>(glyphCodec->width());
       glyph._height = static_cast<uint16_t>(glyphCodec->height());
       glyph._matrix = glyphState.matrix;
@@ -377,7 +376,6 @@ void TextRender::transformedMaskDrawing(const GlyphRun& glyphRun, const MCState&
 
       atlasCell._key = std::move(glyphKey);
       atlasCell._maskFormat = maskFormat;
-      atlasCell._id = glyphID;
       atlasCell._width = static_cast<uint16_t>(glyphCodec->width());
       atlasCell._height = static_cast<uint16_t>(glyphCodec->height());
       atlasCell._matrix = glyphState.matrix;
