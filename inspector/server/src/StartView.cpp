@@ -154,7 +154,6 @@ void StartView::showStartView() {
     qmlEngine = new QQmlApplicationEngine(this);
     qmlEngine->rootContext()->setContextProperty("startViewModel", this);
     qmlEngine->load(QUrl(QStringLiteral("qrc:/qml/StartView.qml")));
-    KDDockWidgets::QtQuick::Platform::instance()->setQmlEngine(qmlEngine);
 
     if (!qmlEngine->rootObjects().isEmpty()) {
       auto startWindow = dynamic_cast<QQuickWindow*>(qmlEngine->rootObjects().first());
