@@ -20,7 +20,7 @@ ApplicationWindow {
         fileMode: FileDialog.SaveFile
         nameFilters: [ "Inspector files (*.isp)" ]
         onAccepted: {
-            inspectorViewModel.saveFile(saveDialog.selectedFile)
+            inspectorViewModel.saveFileAs(saveDialog.selectedFile)
             close()
         }
     }
@@ -56,48 +56,35 @@ ApplicationWindow {
         Menu {
             title: qsTr("&File")
             Action {
-                text: qsTr("DisConnect")
-                shortcut: "Ctrl+Shift+D"
+                text: !inspectorViewModel.isOpenFile ? qsTr("DisConnect") : qsTr("Close")
+                shortcut: StandardKey.Close
                 onTriggered: {
-                    console.log("DisConnect clicked")
-                    //todo: disconnect the client
+                    close();
                 }
             }
 
             MenuSeparator {}
 
             Action {
-                text: qsTr("Open File")
-                shortcut: StandardKey.Open
-                onTriggered: {
-                    console.log("Open File clicked")
-                    //todo: open file call the openFile()
-                }
-            }
-
-            Action {
                 text: qsTr("Save File")
                 shortcut: StandardKey.Save
+                enabled: !inspectorViewModel.isOpenFile
                 onTriggered: {
-                    saveDialog.open()
+                    if (inspectorViewModel.hasSaveFilePath) {
+                        inspectorViewModel.saveFile()
+                    }
+                    else {
+                        saveDialog.open()
+                    }
                 }
             }
 
             Action {
                 text: qsTr("Save As")
                 shortcut: StandardKey.SaveAs
+                enabled: !inspectorViewModel.isOpenFile
                 onTriggered: {
-                    console.log("Save As clicked")
-                    //todo: need a new format file to save
-                }
-            }
-
-            Action {
-                text: qsTr("Close")
-                shortcut: StandardKey.Close
-                onTriggered: {
-                    close()
-                    inspectorViewModel.cleanUp();
+                    saveDialog.open()
                 }
             }
         }
@@ -107,24 +94,19 @@ ApplicationWindow {
             Action {
                 text: qsTr("Next Frame")
                 shortcut: "Ctrl+Right"
-                onTriggered: {
-                    console.log("Next Frame clicked")
-                    //todo: next frame api call in the InspectorView
-                }
+                onTriggered: inspectorViewModel.nextFrame()
             }
 
             Action {
                 text: qsTr("Pre Frame")
                 shortcut: "Ctrl+Left"
-                onTriggered: {
-                    console.log("Pre Frame clicked")
-                    //todo: pre frame api call in the InspectorView
-                }
+                onTriggered: inspectorViewModel.preFrame()
             }
             MenuSeparator {}
 
             Action {
                 text: qsTr("Capture Frame")
+                enabled: !inspectorViewModel.isOpenFile
                 shortcut: "F12"
                 onTriggered: {
                     console.log("Capture Frame clicked")
@@ -134,6 +116,7 @@ ApplicationWindow {
 
             Action {
                 text: qsTr("Capture 3 Frames")
+                enabled: !inspectorViewModel.isOpenFile
                 shortcut: "Shift+F12"
                 onTriggered: {
                     console.log("Capture 3 Frames clicked")

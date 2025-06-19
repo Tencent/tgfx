@@ -31,6 +31,8 @@ namespace inspector {
 class ClientData;
 class InspectorView : public QObject {
   Q_OBJECT
+  Q_PROPERTY(bool isOpenFile READ getIsOpenFile CONSTANT)
+  Q_PROPERTY(bool hasSaveFilePath READ getHasSaveFilePath CONSTANT)
  public:
   InspectorView(std::string filePath, int width, QObject* parent = nullptr);
   InspectorView(ClientData* clientData, int width, QObject* parent = nullptr);
@@ -39,9 +41,14 @@ class InspectorView : public QObject {
   void initView();
   void initConnect();
   void failedCreateWorker();
+  bool getIsOpenFile() const;
+  bool getHasSaveFilePath() const;
 
   Q_INVOKABLE void openStartView();
-  Q_INVOKABLE bool saveFile(const QUrl& filePath);
+  Q_INVOKABLE bool saveFileAs(const QUrl& filePath);
+  Q_INVOKABLE bool saveFile();
+  Q_INVOKABLE void nextFrame();
+  Q_INVOKABLE void preFrame();
 
   Q_SLOT void onCloseView(QQuickCloseEvent*);
   Q_SIGNAL void closeView(QObject* view);
@@ -49,9 +56,11 @@ class InspectorView : public QObject {
 
  private:
   int width;
-  ClientData* clientData = nullptr;
+  bool isOpenFile = false;
   Worker worker;
   ViewData viewData;
+  std::string saveFilePath;
+  ClientData* clientData = nullptr;
   std::unique_ptr<QQmlApplicationEngine> ispEngine = nullptr;
   std::unique_ptr<TaskTreeModel> taskTreeModel;
   std::unique_ptr<SelectFrameModel> selectFrameModel;

@@ -118,10 +118,6 @@ class StartView : public QObject {
     return lastOpenFile;
   }
 
-  void setQmlEngine(QQmlApplicationEngine* engine) {
-    qmlEngine = engine;
-  }
-
   ///* file items *///
   Q_INVOKABLE QList<QObject*> getFileItems() const;
   Q_INVOKABLE void openFile(const QString& fPath);

@@ -26,14 +26,14 @@
 namespace inspector {
 
 InspectorView::InspectorView(std::string filePath, int width, QObject* parent)
-    : QObject(parent), width(width), worker(filePath) {
+    : QObject(parent), width(width), isOpenFile(true), worker(filePath) {
   initView();
   failedCreateWorker();
 }
 
 InspectorView::InspectorView(ClientData* clientData, int width, QObject* parent)
-    : QObject(parent), width(width), clientData(clientData),
-      worker(clientData->address.c_str(), clientData->port) {
+    : QObject(parent), width(width), worker(clientData->address.c_str(), clientData->port),
+      clientData(clientData) {
   this->clientData->setConnected(true);
   initView();
 }
@@ -99,8 +99,16 @@ void InspectorView::openStartView() {
   startView->showStartView();
 }
 
-bool InspectorView::saveFile(const QUrl& filePath) {
-  return worker.Save(filePath.path().toStdString());
+bool InspectorView::saveFile() {
+  if (saveFilePath.empty()) {
+    return false;
+  }
+  return worker.Save(saveFilePath);
+}
+
+bool InspectorView::saveFileAs(const QUrl& filePath) {
+  saveFilePath = filePath.path().toStdString();
+  return worker.Save(saveFilePath);
 }
 
 void InspectorView::onCloseView(QQuickCloseEvent*) {
@@ -116,5 +124,39 @@ void InspectorView::failedCreateWorker() {
     }
     Q_EMIT failedOpenInspectorView(errorMessage);
   }
+}
+
+bool InspectorView::getIsOpenFile() const {
+  return isOpenFile;
+}
+
+bool InspectorView::getHasSaveFilePath() const {
+  return !saveFilePath.empty();
+}
+
+void InspectorView::nextFrame() {
+  if (viewData.selectFrame + 1 > worker.GetFrameCount() - 1) {
+    return;
+  }
+  viewData.selectFrame++;
+  auto inspectorWindow = qobject_cast<QQuickWindow*>(ispEngine->rootObjects().first());
+  if (!inspectorWindow) {
+    return;
+  }
+  auto frameDrawer = inspectorWindow->findChild<FramesDrawer*>("framesDrawer");
+  Q_EMIT frameDrawer->selectFrame();
+}
+
+void InspectorView::preFrame() {
+  if (viewData.selectFrame - 1 == uint32_t(-1)) {
+    return;
+  }
+  viewData.selectFrame--;
+  auto inspectorWindow = qobject_cast<QQuickWindow*>(ispEngine->rootObjects().first());
+  if (!inspectorWindow) {
+    return;
+  }
+  auto frameDrawer = inspectorWindow->findChild<FramesDrawer*>("framesDrawer");
+  Q_EMIT frameDrawer->selectFrame();
 }
 }  // namespace inspector
