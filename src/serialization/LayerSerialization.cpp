@@ -137,16 +137,16 @@ void LayerSerialization::SerializeBasicLayerImpl(flexbuffers::Builder& fbb, cons
   SerializeUtils::FillMap(scrollRect, scrollRectID, map);
 
   auto rootID = SerializeUtils::GetObjID();
-  std::shared_ptr<Layer> root = layer->root() ? layer->root()->weakThis.lock() : nullptr;
+  std::shared_ptr<Layer> root = layer->root() ? layer->root()->shared_from_this() : nullptr;
   SerializeUtils::SetFlexBufferMap(fbb, "root", reinterpret_cast<uint64_t>(root.get()), true,
                                    root != nullptr, rootID);
   SerializeUtils::FillMap(root, rootID, map);
 
   auto parentID = SerializeUtils::GetObjID();
   auto parent = layer->parent();
-  SerializeUtils::SetFlexBufferMap(fbb, "parent", reinterpret_cast<uint64_t>(parent.get()), true,
+  SerializeUtils::SetFlexBufferMap(fbb, "parent", reinterpret_cast<uint64_t>(parent), true,
                                    parent != nullptr, parentID);
-  SerializeUtils::FillMap(parent, parentID, map);
+  SerializeUtils::FillMap(parent->shared_from_this(), parentID, map);
 
   auto childrenID = SerializeUtils::GetObjID();
   auto children = layer->children();
@@ -167,7 +167,8 @@ void LayerSerialization::SerializeBasicLayerImpl(flexbuffers::Builder& fbb, cons
   SerializeUtils::SetFlexBufferMap(fbb, "hasBackgroundStyle", layer->bitFields.hasBackgroundStyle);
 
   auto maskOwnerID = SerializeUtils::GetObjID();
-  std::shared_ptr<Layer> maskOwner = layer->maskOwner ? layer->maskOwner->weakThis.lock() : nullptr;
+  std::shared_ptr<Layer> maskOwner =
+      layer->maskOwner ? layer->maskOwner->shared_from_this() : nullptr;
   SerializeUtils::SetFlexBufferMap(fbb, "maskOwner", reinterpret_cast<uint64_t>(maskOwner.get()),
                                    true, maskOwner != nullptr, maskOwnerID);
   SerializeUtils::FillMap(maskOwner, maskOwnerID, map);

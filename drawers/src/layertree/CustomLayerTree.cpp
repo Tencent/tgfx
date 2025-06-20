@@ -24,9 +24,7 @@
 namespace drawers {
 
 std::shared_ptr<CustomLayer> CustomLayer::Make() {
-  auto layer = std::shared_ptr<CustomLayer>(new CustomLayer());
-  layer->weakThis = layer;
-  return layer;
+  return std::shared_ptr<CustomLayer>(new CustomLayer());
 }
 
 std::unique_ptr<tgfx::LayerContent> CustomLayer::onUpdateContent() {
