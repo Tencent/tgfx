@@ -113,7 +113,7 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       float pixelRatio = getPixelRatio();
       if (isCtrl) {
         float zDelta = GET_WHEEL_DELTA_WPARAM(wparam) / 120.0f;
-        float zoomStep = 1.0f + zDelta * 0.05f;
+        float zoomStep = 1.0f + zDelta * 0.1f;
         float newZoom = oldZoom * zoomStep;
         if (newZoom < 0.001f)
         {
@@ -138,6 +138,42 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
         }
       }
       ::InvalidateRect(windowHandle, nullptr, TRUE);
+      break;
+    }
+    case WM_GESTURE: {
+      GESTUREINFO gi;
+      memset(&gi, 0, sizeof(GESTUREINFO));
+      gi.cbSize = sizeof(GESTUREINFO);
+      if (GetGestureInfo((HGESTUREINFO)lparam, &gi)) {
+        if (gi.dwID == GID_ZOOM) {
+          static double lastArgument = 0.0;
+          double argument = gi.ullArguments;
+          double zoomFactor = 1.0;
+          if (lastArgument != 0.0) {
+            zoomFactor = argument / lastArgument;
+          }
+          lastArgument = argument;
+          POINT pt = { gi.ptsLocation.x, gi.ptsLocation.y };
+          ScreenToClient(hwnd, &pt);
+          float pixelRatio = getPixelRatio();
+          float mouseX = pt.x * pixelRatio;
+          float mouseY = pt.y * pixelRatio;
+
+          float oldZoom = zoomScale;
+          float newZoom = std::clamp(oldZoom * (float)zoomFactor, 0.001f, 1000.0f);
+          float contentX = (mouseX - contentOffset.x) / oldZoom;
+          float contentY = (mouseY - contentOffset.y) / oldZoom;
+          contentOffset.x = mouseX - contentX * newZoom;
+          contentOffset.y = mouseY - contentY * newZoom;
+          zoomScale = newZoom;
+
+          ::InvalidateRect(windowHandle, nullptr, TRUE);
+        }
+        if (gi.dwFlags & GF_END) {
+          lastArgument = 0.0;
+        }
+        CloseGestureInfoHandle((HGESTUREINFO)lparam);
+      }
       break;
     }
     default:

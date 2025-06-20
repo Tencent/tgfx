@@ -23,6 +23,7 @@
 #endif
 
 #include <Windows.h>
+#include <Winuser.h>
 #include <Windowsx.h>
 #include <functional>
 #include <memory>
