@@ -17,10 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ProxyProvider.h"
-#include <memory>
-#include <utility>
-#include "core/DataSource.h"
-#include "core/ImageSource.h"
 #include "core/ShapeRasterizer.h"
 #include "core/shapes/MatrixShape.h"
 #include "core/utils/USE.h"
@@ -35,9 +31,7 @@
 #include "gpu/tasks/ShapeBufferUploadTask.h"
 #include "gpu/tasks/TextureCreateTask.h"
 #include "gpu/tasks/TextureUploadTask.h"
-#include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/RenderFlags.h"
-#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 ProxyProvider::ProxyProvider(Context* context) : context(context), blockBuffer(1 << 14) {  // 16KB

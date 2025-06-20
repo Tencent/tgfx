@@ -17,10 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RectsVertexProvider.h"
-#include <utility>
-#include "core/utils/Log.h"
 #include "gpu/Quad.h"
-#include "gpu/VertexProvider.h"
 
 namespace tgfx {
 static void WriteUByte4Color(float* vertices, int& index, const Color& color) {

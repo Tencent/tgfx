@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <memory>
 #include "core/utils/BlockBuffer.h"
 #include "gpu/AAType.h"
 #include "gpu/VertexProvider.h"

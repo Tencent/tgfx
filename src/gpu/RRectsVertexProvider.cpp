@@ -17,9 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RRectsVertexProvider.h"
-#include <utility>
 #include "core/utils/MathExtra.h"
-#include "gpu/VertexProvider.h"
 
 namespace tgfx {
 // We have three possible cases for geometry for a round rect.
