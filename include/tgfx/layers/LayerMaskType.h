@@ -20,9 +20,9 @@
 
 namespace tgfx {
 /**
- * Defines the mask style of layer's mask.
+ * LayerMaskType defines the type of mask to be used for a layer.
  */
-enum class MaskStyle {
+enum class LayerMaskType {
   /**
    * Uses the target layer's transparency as a mask.
    */
@@ -30,7 +30,7 @@ enum class MaskStyle {
   /**
    * Uses the target layer's contour as a mask.
    */
-  Vector,
+  Contour,
   /**
    * Uses the target layer's luminance as a mask.
    */

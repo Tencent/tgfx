@@ -23,8 +23,8 @@
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/layers/LayerContent.h"
+#include "tgfx/layers/LayerMaskType.h"
 #include "tgfx/layers/LayerType.h"
-#include "tgfx/layers/MaskStyle.h"
 #include "tgfx/layers/filters/LayerFilter.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
@@ -286,16 +286,18 @@ class Layer {
   void setMask(std::shared_ptr<Layer> value);
 
   /**
-   * Returns the mask style used by the layer. The default value is MaskStyle::Alpha.
+   * Returns the mask type used by the layer. The mask type affects how the mask is applied to the
+   * layer content, such as whether it uses the alpha channel, luminance, or contour of the
+   * mask layer. The default value is LayerMaskType::Alpha.
    */
-  MaskStyle maskStyle() const {
-    return _maskStyle;
+  LayerMaskType maskType() const {
+    return _maskType;
   }
 
   /**
-   * Sets the mask style used by the layer.
+   * Sets the mask type used by the layer.
    */
-  void setMaskStyle(MaskStyle value);
+  void setMaskType(LayerMaskType value);
 
   /**
    * Returns the scroll rectangle bounds of the layer. The layer is cropped to the size defined by
@@ -648,7 +650,7 @@ class Layer {
   float _alpha = 1.0f;
   Matrix _matrix = {};
   float _rasterizationScale = 0.0f;
-  MaskStyle _maskStyle = MaskStyle::Alpha;
+  LayerMaskType _maskType = LayerMaskType::Alpha;
   std::vector<std::shared_ptr<LayerFilter>> _filters = {};
   std::shared_ptr<Layer> _mask = nullptr;
   Layer* maskOwner = nullptr;
