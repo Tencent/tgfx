@@ -92,7 +92,7 @@ class DataWrapper : public DataSource<T> {
 template <typename T>
 class DataTask : public Task {
  public:
-  explicit DataTask(std::shared_ptr<DataSource<T>> source) : source(std::move(source)) {
+  explicit DataTask(std::unique_ptr<DataSource<T>> source) : source(std::move(source)) {
   }
 
   std::shared_ptr<T> getData() {
@@ -112,7 +112,7 @@ class DataTask : public Task {
 
  private:
   std::shared_ptr<T> data = nullptr;
-  std::shared_ptr<DataSource<T>> source = nullptr;
+  std::unique_ptr<DataSource<T>> source = nullptr;
 };
 
 /**
@@ -122,7 +122,7 @@ class DataTask : public Task {
 template <typename T>
 class AsyncDataSource : public DataSource<T> {
  public:
-  explicit AsyncDataSource(std::shared_ptr<DataSource<T>> source) {
+  explicit AsyncDataSource(std::unique_ptr<DataSource<T>> source) {
     task = std::make_shared<DataTask<T>>(std::move(source));
     Task::Run(task);
   }

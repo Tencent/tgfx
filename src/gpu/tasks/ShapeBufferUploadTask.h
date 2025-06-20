@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <memory>
 #include "ResourceTask.h"
 #include "core/DataSource.h"
 #include "core/ShapeBuffer.h"

@@ -17,13 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DecodedImage.h"
-#include <memory>
-#include "core/DataSource.h"
+#include "BufferImage.h"
 #include "core/ImageSource.h"
-#include "core/utils/USE.h"
 #include "gpu/ProxyProvider.h"
-#include "tgfx/core/Buffer.h"
-#include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
 std::shared_ptr<Image> DecodedImage::MakeFrom(UniqueKey uniqueKey,

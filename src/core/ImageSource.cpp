@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ImageSource.h"
-#include <memory>
-#include <utility>
 
 namespace tgfx {
 std::unique_ptr<DataSource<ImageBuffer>> ImageSource::MakeFrom(
