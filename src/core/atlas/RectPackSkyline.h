@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <cstdint>
+
 #include <vector>
 #include "tgfx/core/Point.h"
 
@@ -42,7 +42,7 @@ class RectPackSkyline {
     return _height;
   }
 
-  bool addRect(int w, int h, Point& location);
+  bool addRect(int width, int height, Point& location);
 
   float percentFull() const {
     return static_cast<float>(areaSoFar) / static_cast<float>(_width * _height);
@@ -55,7 +55,7 @@ class RectPackSkyline {
     int width = 2;
   };
 
-  bool rectangleFits(int skylineIndex, int w, int h, int& y) const;
+  bool rectangleFits(int skylineIndex, int width, int height, int& yPosition) const;
 
   void addSkylineLevel(int skylineIndex, int x, int y, int width, int height);
 
@@ -64,5 +64,4 @@ class RectPackSkyline {
   int _height = 512;
   int areaSoFar = 0;
 };
-
 }  // namespace tgfx
