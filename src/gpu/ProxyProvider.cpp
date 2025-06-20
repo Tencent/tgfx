@@ -18,6 +18,7 @@
 
 #include "ProxyProvider.h"
 #include <memory>
+#include <utility>
 #include "core/DataSource.h"
 #include "core/ImageSource.h"
 #include "core/ShapeRasterizer.h"
@@ -64,16 +65,15 @@ std::shared_ptr<GpuBufferProxy> ProxyProvider::createGpuBufferProxy(
   if (proxy != nullptr) {
     return proxy;
   }
-  std::shared_ptr<DataSource<Data>> dataSource = nullptr;
 #ifdef TGFX_USE_THREADS
   if (!(renderFlags & RenderFlags::DisableAsyncTask)) {
-    dataSource = DataSource<Data>::Async(std::move(source));
-  } else {
-    dataSource = std::move(source);
+    source = DataSource<Data>::Async(std::move(source));
+    asd
   }
 #endif
   auto proxyKey = GetProxyKey(uniqueKey, renderFlags);
-  auto task = context->drawingBuffer()->make<GpuBufferUploadTask>(proxyKey, bufferType, dataSource);
+  auto task =
+      context->drawingBuffer()->make<GpuBufferUploadTask>(proxyKey, bufferType, std::move(source));
   context->drawingManager()->addResourceTask(std::move(task));
   proxy = std::shared_ptr<GpuBufferProxy>(new GpuBufferProxy(proxyKey, bufferType));
   addResourceProxy(proxy, uniqueKey);
@@ -209,7 +209,7 @@ std::shared_ptr<GpuShapeProxy> ProxyProvider::createGpuShapeProxy(std::shared_pt
   auto height = static_cast<int>(ceilf(bounds.height()));
   shape = Shape::ApplyMatrix(std::move(shape), Matrix::MakeTrans(-bounds.x(), -bounds.y()));
   auto rasterizer = std::make_unique<ShapeRasterizer>(width, height, std::move(shape), aaType);
-  std::shared_ptr<DataSource<ShapeBuffer>> dataSource = nullptr;
+  std::unique_ptr<DataSource<ShapeBuffer>> dataSource = nullptr;
 #ifdef TGFX_USE_THREADS
   if (!(renderFlags & RenderFlags::DisableAsyncTask) && rasterizer->asyncSupport()) {
     dataSource = DataSource<ShapeBuffer>::Async(std::move(rasterizer));
@@ -235,10 +235,10 @@ std::shared_ptr<GpuShapeProxy> ProxyProvider::createGpuShapeProxy(std::shared_pt
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxyByImageSource(
     const UniqueKey& uniqueKey, std::shared_ptr<DataSource<ImageBuffer>> source, int width,
-    int height, bool alphaOnly, bool mipmapped, uint32_t renderFlags, bool asyncDecoding) {
+    int height, bool alphaOnly, bool mipmapped, uint32_t renderFlags) {
   auto proxyKey = GetProxyKey(uniqueKey, renderFlags);
-  auto task = context->drawingBuffer()->make<TextureUploadTask>(proxyKey, std::move(source),
-                                                                mipmapped, asyncDecoding);
+  auto task =
+      context->drawingBuffer()->make<TextureUploadTask>(proxyKey, std::move(source), mipmapped);
   context->drawingManager()->addResourceTask(std::move(task));
   auto proxy = std::shared_ptr<TextureProxy>(
       new DefaultTextureProxy(proxyKey, width, height, mipmapped, alphaOnly));
@@ -277,21 +277,15 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
   auto width = generator->width();
   auto height = generator->height();
   auto alphaOnly = generator->isAlphaOnly();
-  bool asyncDecoding = false;
-  std::shared_ptr<DataSource<ImageBuffer>> source = nullptr;
 #ifdef TGFX_USE_THREADS
-  asyncDecoding = !(renderFlags & RenderFlags::DisableAsyncTask);
-  if (asyncDecoding && !generator->asyncSupport()) {
-    auto buffer = generator->makeBuffer(!mipmapped);
-    source = DataSource<ImageBuffer>::Wrap(std::move(buffer));
-  } else {
-    source = ImageSource::MakeFrom(std::move(generator), !mipmapped);
-  }
+  auto asyncDecoding = !(renderFlags & RenderFlags::DisableAsyncTask);
 #else
-  source = ImageSource::MakeFrom(std::move(generator), !mipmapped);
+  auto asyncDecoding = false;
 #endif
+  // Ensure the image source is retained so it won't be destroyed prematurely during async decoding.
+  auto source = ImageSource::MakeFrom(std::move(generator), !mipmapped, asyncDecoding);
   return createTextureProxyByImageSource(uniqueKey, std::move(source), width, height, alphaOnly,
-                                         mipmapped, renderFlags, asyncDecoding);
+                                         mipmapped, renderFlags);
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(

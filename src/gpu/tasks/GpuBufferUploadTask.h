@@ -28,13 +28,13 @@ namespace tgfx {
 class GpuBufferUploadTask : public ResourceTask {
  public:
   GpuBufferUploadTask(UniqueKey uniqueKey, BufferType bufferType,
-                      std::shared_ptr<DataSource<Data>> source);
+                      std::unique_ptr<DataSource<Data>> source);
 
  protected:
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
 
  private:
   BufferType bufferType = BufferType::Vertex;
-  std::shared_ptr<DataSource<Data>> source = nullptr;
+  std::unique_ptr<DataSource<Data>> source = nullptr;
 };
 }  // namespace tgfx

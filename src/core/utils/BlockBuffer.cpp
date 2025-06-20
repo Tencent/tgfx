@@ -160,7 +160,7 @@ std::shared_ptr<BlockBuffer> BlockBuffer::addReference() {
   }
   reference = std::shared_ptr<BlockBuffer>(this, NotifyReferenceReachedZero);
   externalReferences = reference;
-  return externalReferences.lock();
+  return reference;
 }
 
 void BlockBuffer::waitForReferencesExpired() {

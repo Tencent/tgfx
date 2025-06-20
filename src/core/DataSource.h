@@ -20,10 +20,8 @@
 
 #include <memory>
 #include <utility>
-#include "core/utils/BlockBuffer.h"
 #include "core/utils/Log.h"
 #include "tgfx/core/Task.h"
-#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 template <typename T>
@@ -52,14 +50,14 @@ class DataSource {
    * Wraps the existing data source into an asynchronous DataSource and starts loading the data
 	 * immediately.
    */
-  static std::shared_ptr<DataSource> Async(std::shared_ptr<DataSource> source) {
+  static std::unique_ptr<DataSource> Async(std::unique_ptr<DataSource> source) {
 #ifndef TGFX_USE_THREADS
     return source;
 #endif
     if (source == nullptr) {
       return nullptr;
     }
-    return std::make_shared<AsyncDataSource<T>>(std::move(source));
+    return std::make_unique<AsyncDataSource<T>>(std::move(source));
   }
 
   virtual ~DataSource() = default;

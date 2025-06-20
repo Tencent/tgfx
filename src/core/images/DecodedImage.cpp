@@ -35,24 +35,7 @@ std::shared_ptr<Image> DecodedImage::MakeFrom(UniqueKey uniqueKey,
   auto width = generator->width();
   auto height = generator->height();
   auto alphaOnly = generator->isAlphaOnly();
-  std::shared_ptr<DataSource<ImageBuffer>> source = nullptr;
-#ifdef TGFX_USE_THREADS
-  if (asyncDecoding) {
-    if (generator->asyncSupport()) {
-      source = ImageSource::MakeFrom(std::move(generator), tryHardware);
-      source = DataSource<ImageBuffer>::Async(std::move(source));
-    } else {
-      // The generator may have built-in async decoding support which will not block the main thread.
-      // Therefore, we should trigger the decoding ASAP.
-      auto buffer = generator->makeBuffer(tryHardware);
-      source = DataSource<ImageBuffer>::Wrap(std::move(buffer));
-    }
-  }
-#else
-  USE(asyncDecoding);
-  source = ImageSource::MakeFrom(std::move(generator), tryHardware);
-#endif
-
+  auto source = ImageSource::MakeFrom(std::move(generator), tryHardware, asyncDecoding);
   auto image = std::shared_ptr<DecodedImage>(
       new DecodedImage(std::move(uniqueKey), width, height, alphaOnly, std::move(source)));
   image->weakThis = image;
