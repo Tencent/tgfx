@@ -54,40 +54,6 @@ class RasterPixelBuffer : public PixelBuffer {
   uint8_t* _pixels = nullptr;
 };
 
-class HardwarePixelBuffer : public PixelBuffer {
- public:
-  HardwarePixelBuffer(const ImageInfo& info, HardwareBufferRef hardwareBuffer)
-      : PixelBuffer(info) {
-    this->hardwareBuffer = HardwareBufferRetain(hardwareBuffer);
-  }
-
-  ~HardwarePixelBuffer() override {
-    HardwareBufferRelease(hardwareBuffer);
-  }
-
-  bool isHardwareBacked() const override {
-    return HardwareBufferCheck(hardwareBuffer);
-  }
-
-  HardwareBufferRef getHardwareBuffer() const override {
-    return isHardwareBacked() ? hardwareBuffer : nullptr;
-  }
-
- protected:
-  void* onLockPixels() const override {
-    return HardwareBufferLock(hardwareBuffer);
-  }
-
-  void onUnlockPixels() const override {
-    HardwareBufferUnlock(hardwareBuffer);
-  }
-
-  std::shared_ptr<Texture> onBindToHardwareTexture(Context* context) const override {
-    return Texture::MakeFrom(context, hardwareBuffer);
-  }
-
-};
-
 std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alphaOnly,
                                                bool tryHardware) {
   if (width <= 0 || height <= 0) {
@@ -115,8 +81,7 @@ std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alpha
 
 std::shared_ptr<PixelBuffer> PixelBuffer::MakeFrom(HardwareBufferRef hardwareBuffer) {
   auto info = HardwareBufferGetInfo(hardwareBuffer);
-  // return info.isEmpty() ? nullptr : std::make_shared<HardwarePixelBuffer>(info, hardwareBuffer);
-  return std::make_shared<HardwarePixelBuffer>(info, hardwareBuffer);
+  return info.isEmpty() ? nullptr : std::make_shared<HardwarePixelBuffer>(info, hardwareBuffer);
 }
 
 PixelBuffer::PixelBuffer(const ImageInfo& info) : _info(info) {
@@ -137,7 +102,6 @@ void PixelBuffer::unlockPixels() {
 }
 
 std::shared_ptr<Texture> PixelBuffer::onMakeTexture(Context* context, bool mipmapped) const {
-  if(!_info.isEmpty()) {
     std::lock_guard<std::mutex> autoLock(locker);
     if (!mipmapped && isHardwareBacked()) {
       return onBindToHardwareTexture(context);
@@ -151,7 +115,5 @@ std::shared_ptr<Texture> PixelBuffer::onMakeTexture(Context* context, bool mipma
         Texture::MakeFormat(context, width(), height(), pixels, _info.rowBytes(), format, mipmapped);
     onUnlockPixels();
     return texture;
-  }
-  return Texture::MakeFrom(context, hardwareBuffer);
 }
 }  // namespace tgfx

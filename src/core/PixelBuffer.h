@@ -96,11 +96,49 @@ class PixelBuffer : public ImageBuffer {
   virtual void onUnlockPixels() const = 0;
   virtual std::shared_ptr<Texture> onBindToHardwareTexture(Context* context) const = 0;
 
-  HardwareBufferRef hardwareBuffer = {};
-
  private:
   mutable std::mutex locker = {};
   ImageInfo _info = {};
 
 };
+
+class HardwarePixelBuffer : public PixelBuffer {
+public:
+  HardwarePixelBuffer(const ImageInfo& info, HardwareBufferRef hardwareBuffer)
+      : PixelBuffer(info), hardwareBuffer(hardwareBuffer) {
+  }
+
+  explicit HardwarePixelBuffer(HardwareBufferRef hardwareBuffer)
+    : PixelBuffer({}), hardwareBuffer(hardwareBuffer) {
+  }
+
+  ~HardwarePixelBuffer() override {
+    HardwareBufferRelease(hardwareBuffer);
+  }
+
+  bool isHardwareBacked() const override {
+    return HardwareBufferCheck(hardwareBuffer);
+  }
+
+  HardwareBufferRef getHardwareBuffer() const override {
+    return isHardwareBacked() ? hardwareBuffer : nullptr;
+  }
+
+protected:
+  void* onLockPixels() const override {
+    return HardwareBufferLock(hardwareBuffer);
+  }
+
+  void onUnlockPixels() const override {
+    HardwareBufferUnlock(hardwareBuffer);
+  }
+
+  std::shared_ptr<Texture> onBindToHardwareTexture(Context* context) const override {
+    return Texture::MakeFrom(context, hardwareBuffer);
+  }
+
+  HardwareBufferRef hardwareBuffer = {};
+
+};
+
 }  // namespace tgfx
