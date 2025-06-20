@@ -35,10 +35,11 @@ TGFXView::TGFXView(QQuickItem* parent) : QQuickItem(parent) {
 }
 
 void TGFXView::handlePinch(qreal scaleDelta, QPointF center) {
+  qreal ratio = window()->devicePixelRatio();
   float oldZoom = zoom;
   float newZoom = std::max(0.001f, std::min(1000.0f, oldZoom * (float)scaleDelta));
-  float px = (float)center.x();
-  float py = (float)center.y();
+  float px = (float)(center.x()*ratio);
+  float py = (float)(center.y()*ratio);
   offset.setX((offset.x() - px) * (newZoom / oldZoom) + px);
   offset.setY((offset.y() - py) * (newZoom / oldZoom) + py);
   zoom = newZoom;
@@ -53,20 +54,33 @@ void TGFXView::onMouseClicked(qreal, qreal) {
 }
 
 void TGFXView::wheelEvent(QWheelEvent* event) {
+  qreal ratio = window()->devicePixelRatio();
   bool isZoom =
       (event->modifiers() & Qt::ControlModifier) || (event->modifiers() & Qt::MetaModifier);
-  qreal px = event->position().x();
-  qreal py = event->position().y();
+  bool isShift = (event->modifiers() & Qt::ShiftModifier);
+  qreal px = event->position().x()*ratio;
+  qreal py = event->position().y()*ratio;
   if (isZoom) {
-    float factor = 1 + event->angleDelta().y() / 120.0f;
+#ifdef __APPLE__
+    float scaleFactor = 1 + event->angleDelta().y() / 120.0f;
+#else
+    float scaleFactor = (event->angleDelta().y() > 0) ? 1.2f : 0.8f;
+#endif
     float oldZoom = zoom;
-    float newZoom = std::max(0.001f, std::min(1000.0f, oldZoom * factor));
+    float newZoom = oldZoom * scaleFactor;
+    newZoom = std::max(0.001f, std::min(1000.0f, newZoom));
     offset.setX((offset.x() - px) * (newZoom / oldZoom) + px);
     offset.setY((offset.y() - py) * (newZoom / oldZoom) + py);
     zoom = newZoom;
   } else {
-    offset.rx() += event->angleDelta().x()/120.0f*100.0f;
-    offset.ry() += event->angleDelta().y()/120.0f*100.0f;
+    float dx = event->angleDelta().x() / 120.0f * 100.0f;
+    float dy = event->angleDelta().y() / 120.0f * 100.0f;
+    if (isShift && dx == 0 && dy != 0) {
+      dx = dy;
+      dy = 0;
+    }
+    offset.rx() += dx;
+    offset.ry() += dy;
   }
   update();
   event->accept();
@@ -112,7 +126,7 @@ void TGFXView::onSceneGraphInvalidated() {
 void TGFXView::createAppHost() {
   appHost = std::make_unique<drawers::AppHost>();
   auto rootPath = QApplication::applicationDirPath();
-  rootPath = QFileInfo(rootPath + "/../../").absolutePath();
+  rootPath = QFileInfo(rootPath + "/../").absolutePath();
   auto imagePath = rootPath + "/resources/assets/bridge.jpg";
   auto image = tgfx::Image::MakeFromFile(std::string(imagePath.toLocal8Bit()));
   appHost->addImage("bridge", image);

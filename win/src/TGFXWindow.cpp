@@ -110,16 +110,23 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       bool isCtrl = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
       bool isShift = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
       float oldZoom = zoomScale;
+      float pixelRatio = getPixelRatio();
       if (isCtrl) {
         float zDelta = GET_WHEEL_DELTA_WPARAM(wparam) / 120.0f;
         float zoomStep = 1.0f + zDelta * 0.05f;
         float newZoom = oldZoom * zoomStep;
-        if (newZoom < 0.001f) newZoom = 0.001f;
-        if (newZoom > 1000.0f) newZoom = 1000.0f;
-        float contentX = (pt.x - contentOffset.x) / oldZoom;
-        float contentY = (pt.y - contentOffset.y) / oldZoom;
-        contentOffset.x = pt.x - contentX * newZoom;
-        contentOffset.y = pt.y - contentY * newZoom;
+        if (newZoom < 0.001f)
+        {
+          newZoom = 0.001f;
+        }
+        if (newZoom > 1000.0f)
+        {
+        newZoom = 1000.0f;
+        }
+        float contentX = (pt.x*pixelRatio - contentOffset.x) / oldZoom;
+        float contentY = (pt.y*pixelRatio - contentOffset.y) / oldZoom;
+        contentOffset.x = pt.x*pixelRatio - contentX * newZoom;
+        contentOffset.y = pt.y*pixelRatio - contentY * newZoom;
         zoomScale = newZoom;
       } else {
         if (isShift) {

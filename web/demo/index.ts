@@ -67,7 +67,6 @@ if (typeof window !== 'undefined') {
                         shareData.zoom = newZoom;
                         shareData.tgfxBaseView.draw(shareData.drawIndex, shareData.zoom, shareData.offsetX, shareData.offsetY);
                     } else {
-
                         shareData.offsetX -= e.deltaX*window.devicePixelRatio;
                         shareData.offsetY -= e.deltaY*window.devicePixelRatio;
                         shareData.tgfxBaseView.draw(shareData.drawIndex, shareData.zoom, shareData.offsetX, shareData.offsetY);
