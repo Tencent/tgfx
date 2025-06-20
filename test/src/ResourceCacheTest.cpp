@@ -17,17 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <array>
-#include <thread>
 #include <utility>
-#include <vector>
-#include "core/DataSource.h"
-#include "core/ImageSource.h"
 #include "core/utils/BlockBuffer.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/RectsVertexProvider.h"
 #include "gpu/Resource.h"
-#include "gpu/tasks/TextureUploadTask.h"
-#include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Task.h"
 #include "utils/TestUtils.h"
