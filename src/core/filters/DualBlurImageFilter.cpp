@@ -123,7 +123,7 @@ std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_
     return nullptr;
   }
   auto drawRect = Rect::MakeWH(lastRenderTarget->width(), lastRenderTarget->height());
-  FPArgs fpArgs(args.context, args.renderFlags, drawRect);
+  FPArgs fpArgs(args.context, args.renderFlags, drawRect, false);
 
   // Calculate the bounds of the filter after scaling.
   // `boundsWillSample` will determine the size of the texture after the first downsample.

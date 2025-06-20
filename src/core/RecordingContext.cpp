@@ -113,7 +113,7 @@ void RecordingContext::drawImageRect(std::shared_ptr<Image> image, const Rect& r
   if (rect == imageRect) {
     record = blockBuffer.make<DrawImage>(std::move(image), sampling);
   } else {
-    record = blockBuffer.make<DrawImageRect>(std::move(image), rect, sampling,constraint);
+    record = blockBuffer.make<DrawImageRect>(std::move(image), rect, sampling, constraint);
   }
   records.emplace_back(std::move(record));
   drawCount++;
