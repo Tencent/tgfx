@@ -20,7 +20,6 @@
 #include "gpu/Quad.h"
 
 namespace tgfx {
-
 static void WriteUByte4Color(float* vertices, int& index, const Color& color) {
   auto bytes = reinterpret_cast<uint8_t*>(&vertices[index++]);
   bytes[0] = static_cast<uint8_t>(color.red * 255);

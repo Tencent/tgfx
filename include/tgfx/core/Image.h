@@ -295,15 +295,15 @@ class Image {
     Buffer,
     Codec,
     Decoded,
+    Filter,
     Generator,
     Mipmap,
     Orient,
     Picture,
     Rasterized,
-    Texture,
-    Subset,
     RGBAAA,
-    Filter
+    Texture,
+    Subset
   };
 
   virtual Type type() const = 0;

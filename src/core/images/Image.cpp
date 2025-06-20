@@ -199,8 +199,7 @@ std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {
   if (!bounds.contains(rect)) {
     return nullptr;
   }
-  auto subsetImage = onMakeSubset(rect);
-  return subsetImage;
+  return onMakeSubset(rect);
 }
 
 std::shared_ptr<Image> Image::makeRasterized(float rasterizationScale,

@@ -47,8 +47,12 @@ void VaryingHandler::addAttribute(const ShaderVar& var) {
 
 void VaryingHandler::finalize() {
   for (const auto& v : varyings) {
-    vertexOutputs.emplace_back(v._name, v.type(), v._isFlat ? ShaderVar::TypeModifier::FlatVarying : ShaderVar::TypeModifier::Varying);
-    fragInputs.emplace_back(v._name, v.type(), v._isFlat ? ShaderVar::TypeModifier::FlatVarying : ShaderVar::TypeModifier::Varying);
+    vertexOutputs.emplace_back(
+        v._name, v.type(),
+        v._isFlat ? ShaderVar::TypeModifier::FlatVarying : ShaderVar::TypeModifier::Varying);
+    fragInputs.emplace_back(
+        v._name, v.type(),
+        v._isFlat ? ShaderVar::TypeModifier::FlatVarying : ShaderVar::TypeModifier::Varying);
   }
 }
 

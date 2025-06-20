@@ -280,8 +280,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
   if (type == PendingOpType::Image) {
     FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()),
                    pendingConstraint == SrcRectConstraint::Strict};
-    auto processor =
-        FragmentProcessor::Make(std::move(pendingImage), args, pendingSampling, nullptr);
+    auto processor = FragmentProcessor::Make(std::move(pendingImage), args, pendingSampling);
     if (processor == nullptr) {
       return;
     }
