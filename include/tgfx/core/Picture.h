@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <atomic>
 #include "tgfx/core/FillModifier.h"
 #include "tgfx/core/Matrix.h"
 
@@ -71,6 +72,7 @@ class Picture {
  private:
   std::shared_ptr<BlockData> blockData = nullptr;
   std::vector<PlacementPtr<Record>> records;
+  mutable std::atomic<Rect*> bounds = {nullptr};
   size_t drawCount = 0;
   bool _hasUnboundedFill = false;
 
