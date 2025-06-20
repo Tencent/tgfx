@@ -21,9 +21,7 @@
 
 namespace tgfx {
 std::shared_ptr<ImageLayer> ImageLayer::Make() {
-  auto layer = std::shared_ptr<ImageLayer>(new ImageLayer());
-  layer->weakThis = layer;
-  return layer;
+  return std::shared_ptr<ImageLayer>(new ImageLayer());
 }
 
 void ImageLayer::setSampling(const SamplingOptions& value) {

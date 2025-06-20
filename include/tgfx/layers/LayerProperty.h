@@ -44,9 +44,9 @@ class LayerProperty {
   void invalidateTransform();
 
  private:
-  void attachToLayer(const Layer* layer);
+  void attachToLayer(Layer* layer);
 
-  void detachFromLayer(const Layer* layer);
+  void detachFromLayer(Layer* layer);
 
   std::vector<std::weak_ptr<Layer>> owners;
 
