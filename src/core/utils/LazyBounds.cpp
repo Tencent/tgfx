@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,38 +16,20 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "core/utils/LazyBounds.h"
-#include "gpu/ResourceKey.h"
-#include "pathkit.h"
+#include "LazyBounds.h"
 
 namespace tgfx {
-class Path;
-struct Rect;
-
-class PathRef {
- public:
-  static const pk::SkPath& ReadAccess(const Path& path);
-
-  static pk::SkPath& WriteAccess(Path& path);
-
-  static UniqueKey GetUniqueKey(const Path& path);
-
-  PathRef() = default;
-
-  explicit PathRef(const pk::SkPath& path) : path(path) {
+void LazyBounds::update(const Rect& rect) const {
+  auto newBounds = new Rect(rect);
+  Rect* oldBounds = nullptr;
+  if (!bounds.compare_exchange_strong(oldBounds, newBounds, std::memory_order_acq_rel)) {
+    delete newBounds;
   }
+}
 
-  Rect getBounds();
+void LazyBounds::reset() {
+  auto oldBounds = bounds.exchange(nullptr, std::memory_order_acq_rel);
+  delete oldBounds;
+}
 
- private:
-  LazyUniqueKey uniqueKey = {};
-  LazyBounds bounds = {};
-  pk::SkPath path = {};
-
-  friend bool operator==(const Path& a, const Path& b);
-  friend bool operator!=(const Path& a, const Path& b);
-  friend class Path;
-};
 }  // namespace tgfx
