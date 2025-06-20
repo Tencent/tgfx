@@ -37,7 +37,6 @@ class ViewController(private val view: TGFXView) {
                 return true
             }
             override fun onScaleEnd(detector: ScaleGestureDetector) {
-                android.util.Log.d("ViewController", "onScaleEnd")
                 isScaling = false
                 needResetPanAfterScale = true
             }

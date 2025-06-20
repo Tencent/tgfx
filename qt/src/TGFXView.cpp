@@ -19,10 +19,10 @@
 #include "TGFXView.h"
 #include <QApplication>
 #include <QFileInfo>
+#include <QMessageBox>
 #include <QQuickWindow>
 #include <QSGImageNode>
 #include <QThread>
-#include <QMessageBox>
 #include "drawers/Drawer.h"
 
 namespace hello2d {
@@ -39,8 +39,8 @@ void TGFXView::handlePinch(qreal scaleDelta, QPointF center) {
   qreal ratio = window()->devicePixelRatio();
   float oldZoom = zoom;
   float newZoom = std::max(0.001f, std::min(1000.0f, oldZoom * (float)scaleDelta));
-  float px = (float)(center.x()*ratio);
-  float py = (float)(center.y()*ratio);
+  float px = (float)(center.x() * ratio);
+  float py = (float)(center.y() * ratio);
   offset.setX((offset.x() - px) * (newZoom / oldZoom) + px);
   offset.setY((offset.y() - py) * (newZoom / oldZoom) + py);
   zoom = newZoom;
@@ -59,8 +59,8 @@ void TGFXView::wheelEvent(QWheelEvent* event) {
   bool isZoom =
       (event->modifiers() & Qt::ControlModifier) || (event->modifiers() & Qt::MetaModifier);
   bool isShift = (event->modifiers() & Qt::ShiftModifier);
-  qreal px = event->position().x()*ratio;
-  qreal py = event->position().y()*ratio;
+  qreal px = event->position().x() * ratio;
+  qreal py = event->position().y() * ratio;
   if (isZoom) {
 #ifdef __APPLE__
     float scaleFactor = 1 + event->angleDelta().y() / 120.0f;
@@ -132,8 +132,7 @@ void TGFXView::createAppHost() {
   auto image = tgfx::Image::MakeFromFile(std::string(imagePath.toLocal8Bit()));
   if (!image) {
     QMessageBox::critical(
-        nullptr,
-        "加载图片失败",
+        nullptr, "加载图片失败",
         QString("无法加载图片文件:\n%1\n\n请检查文件路径是否正确。").arg(imagePath));
     return;
   }

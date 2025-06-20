@@ -55,7 +55,7 @@
   BOOL isCmd = (event.modifierFlags & NSEventModifierFlagCommand) != 0;
   if (isCtrl || isCmd) {
     float oldZoom = self.zoomScale;
-    float zoomStep = 1+event.scrollingDeltaY / 100.0f;
+    float zoomStep = 1 + event.scrollingDeltaY / 100.0f;
     float newZoom = oldZoom * zoomStep;
     if (newZoom < 0.001f) {
       newZoom = 0.001f;

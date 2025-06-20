@@ -23,8 +23,8 @@
 #endif
 
 #include <Windows.h>
-#include <Winuser.h>
 #include <Windowsx.h>
+#include <Winuser.h>
 #include <functional>
 #include <memory>
 #include <string>

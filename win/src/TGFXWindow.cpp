@@ -116,18 +116,16 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
         float zDelta = GET_WHEEL_DELTA_WPARAM(wparam) / 120.0f;
         float zoomStep = 1.0f + zDelta * 0.1f;
         float newZoom = oldZoom * zoomStep;
-        if (newZoom < 0.001f)
-        {
+        if (newZoom < 0.001f) {
           newZoom = 0.001f;
         }
-        if (newZoom > 1000.0f)
-        {
-        newZoom = 1000.0f;
+        if (newZoom > 1000.0f) {
+          newZoom = 1000.0f;
         }
-        float contentX = (pt.x*pixelRatio - contentOffset.x) / oldZoom;
-        float contentY = (pt.y*pixelRatio - contentOffset.y) / oldZoom;
-        contentOffset.x = pt.x*pixelRatio - contentX * newZoom;
-        contentOffset.y = pt.y*pixelRatio - contentY * newZoom;
+        float contentX = (pt.x * pixelRatio - contentOffset.x) / oldZoom;
+        float contentY = (pt.y * pixelRatio - contentOffset.y) / oldZoom;
+        contentOffset.x = pt.x * pixelRatio - contentX * newZoom;
+        contentOffset.y = pt.y * pixelRatio - contentY * newZoom;
         zoomScale = newZoom;
       } else {
         if (isShift) {
@@ -154,7 +152,7 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
             zoomFactor = argument / lastArgument;
           }
           lastArgument = argument;
-          POINT pt = { gi.ptsLocation.x, gi.ptsLocation.y };
+          POINT pt = {gi.ptsLocation.x, gi.ptsLocation.y};
           ScreenToClient(hwnd, &pt);
           float pixelRatio = getPixelRatio();
           float mouseX = pt.x * pixelRatio;
