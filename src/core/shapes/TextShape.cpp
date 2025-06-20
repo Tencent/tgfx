@@ -41,7 +41,7 @@ std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<TextBlob> textBlob, float
 
 Path TextShape::getPath() const {
   Path path = {};
-  if (!glyphRunList->getPath(&path)) {
+  if (!glyphRunList->getPath(&path, resolutionScale)) {
     LOGE("TextShape::getPath() Failed to get path from GlyphRunList!");
     return {};
   }
