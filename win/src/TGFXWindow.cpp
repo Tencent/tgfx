@@ -47,6 +47,7 @@ bool TGFXWindow::open() {
   if (windowHandle == nullptr) {
     return false;
   }
+  RegisterTouchWindow(windowHandle, 0);
   SetWindowLongPtr(windowHandle, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
   centerAndShow();
   ShowWindow(windowHandle, SW_SHOW);
@@ -145,8 +146,8 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       memset(&gi, 0, sizeof(GESTUREINFO));
       gi.cbSize = sizeof(GESTUREINFO);
       if (GetGestureInfo((HGESTUREINFO)lparam, &gi)) {
+        static double lastArgument = 0.0;
         if (gi.dwID == GID_ZOOM) {
-          static double lastArgument = 0.0;
           double argument = gi.ullArguments;
           double zoomFactor = 1.0;
           if (lastArgument != 0.0) {

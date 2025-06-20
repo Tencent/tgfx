@@ -37,7 +37,6 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 
   hello2d::TGFXWindow tgfxWindow = {};
   tgfxWindow.open();
-  RegisterTouchWindow(windowHandle, 0);
 
   MSG msg = {};
   while (GetMessage(&msg, nullptr, 0, 0) > 0) {

@@ -22,6 +22,7 @@
 #include <QQuickWindow>
 #include <QSGImageNode>
 #include <QThread>
+#include <QMessageBox>
 #include "drawers/Drawer.h"
 
 namespace hello2d {
@@ -126,9 +127,16 @@ void TGFXView::onSceneGraphInvalidated() {
 void TGFXView::createAppHost() {
   appHost = std::make_unique<drawers::AppHost>();
   auto rootPath = QApplication::applicationDirPath();
-  rootPath = QFileInfo(rootPath + "/../").absolutePath();
+  rootPath = QFileInfo(rootPath + "/../../").absolutePath();
   auto imagePath = rootPath + "/resources/assets/bridge.jpg";
   auto image = tgfx::Image::MakeFromFile(std::string(imagePath.toLocal8Bit()));
+  if (!image) {
+    QMessageBox::critical(
+        nullptr,
+        "加载图片失败",
+        QString("无法加载图片文件:\n%1\n\n请检查文件路径是否正确。").arg(imagePath));
+    return;
+  }
   appHost->addImage("bridge", image);
 #ifdef __APPLE__
   auto defaultTypeface = tgfx::Typeface::MakeFromName("PingFang SC", "");
