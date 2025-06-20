@@ -102,18 +102,18 @@ void PixelBuffer::unlockPixels() {
 }
 
 std::shared_ptr<Texture> PixelBuffer::onMakeTexture(Context* context, bool mipmapped) const {
-    std::lock_guard<std::mutex> autoLock(locker);
-    if (!mipmapped && isHardwareBacked()) {
-      return onBindToHardwareTexture(context);
-    }
-    auto pixels = onLockPixels();
-    if (pixels == nullptr) {
-      return nullptr;
-    }
-    auto format = ColorTypeToPixelFormat(_info.colorType());
-    auto texture =
-        Texture::MakeFormat(context, width(), height(), pixels, _info.rowBytes(), format, mipmapped);
-    onUnlockPixels();
-    return texture;
+  std::lock_guard<std::mutex> autoLock(locker);
+  if (!mipmapped && isHardwareBacked()) {
+    return onBindToHardwareTexture(context);
+  }
+  auto pixels = onLockPixels();
+  if (pixels == nullptr) {
+    return nullptr;
+  }
+  auto format = ColorTypeToPixelFormat(_info.colorType());
+  auto texture =
+      Texture::MakeFormat(context, width(), height(), pixels, _info.rowBytes(), format, mipmapped);
+  onUnlockPixels();
+  return texture;
 }
 }  // namespace tgfx

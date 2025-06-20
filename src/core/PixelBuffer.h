@@ -99,17 +99,16 @@ class PixelBuffer : public ImageBuffer {
  private:
   mutable std::mutex locker = {};
   ImageInfo _info = {};
-
 };
 
 class HardwarePixelBuffer : public PixelBuffer {
-public:
+ public:
   HardwarePixelBuffer(const ImageInfo& info, HardwareBufferRef hardwareBuffer)
       : PixelBuffer(info), hardwareBuffer(HardwareBufferRetain(hardwareBuffer)) {
   }
 
   explicit HardwarePixelBuffer(HardwareBufferRef hardwareBuffer)
-    : PixelBuffer({}), hardwareBuffer(HardwareBufferRetain(hardwareBuffer)) {
+      : PixelBuffer({}), hardwareBuffer(HardwareBufferRetain(hardwareBuffer)) {
   }
 
   ~HardwarePixelBuffer() override {
@@ -124,7 +123,7 @@ public:
     return isHardwareBacked() ? hardwareBuffer : nullptr;
   }
 
-protected:
+ protected:
   void* onLockPixels() const override {
     return HardwareBufferLock(hardwareBuffer);
   }
@@ -138,7 +137,6 @@ protected:
   }
 
   HardwareBufferRef hardwareBuffer = {};
-
 };
 
 }  // namespace tgfx

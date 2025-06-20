@@ -25,7 +25,7 @@ namespace tgfx {
 std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,
                                                    YUVColorSpace) {
   auto pixelBuffer = PixelBuffer::MakeFrom(hardwareBuffer);
-  if(pixelBuffer) {
+  if (pixelBuffer) {
     return pixelBuffer;
   }
   return std::make_shared<HardwarePixelBuffer>(hardwareBuffer);

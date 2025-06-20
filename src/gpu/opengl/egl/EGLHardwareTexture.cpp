@@ -91,14 +91,14 @@ std::shared_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* contex
     height = config.height;
     useScratchKey = false;
 #elif defined(__ANDROID__)
-	if(HardwareBufferAvailable()){
-	    AHardwareBuffer_Desc des{};
-    	AHardwareBuffer_describe(hardwareBuffer, &des);
-    	target = GL_TEXTURE_EXTERNAL_OES;
-    	width = static_cast<int>(des.width);
-    	height = static_cast<int>(des.height);
-    	useScratchKey = false;
-	}
+    if (HardwareBufferAvailable()) {
+      AHardwareBuffer_Desc des{};
+      AHardwareBuffer_describe(hardwareBuffer, &des);
+      target = GL_TEXTURE_EXTERNAL_OES;
+      width = static_cast<int>(des.width);
+      height = static_cast<int>(des.height);
+      useScratchKey = false;
+    }
 #else
     return nullptr;
 #endif
