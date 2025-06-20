@@ -23,7 +23,6 @@
 #include "gpu/VertexProvider.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
-#include "tgfx/core/SrcRectConstraint.h"
 
 namespace tgfx {
 struct RectRecord {

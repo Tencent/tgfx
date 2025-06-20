@@ -26,7 +26,6 @@
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/Shape.h"
-#include "tgfx/core/SrcRectConstraint.h"
 #include "tgfx/core/TextBlob.h"
 #include "tgfx/svg/SVGExporter.h"
 
@@ -35,6 +34,16 @@ class Surface;
 class DrawContext;
 class MCState;
 class CanvasState;
+
+/**
+ * SrcRectConstraint controls the behavior at the edge of source SkRect, provided to drawImageRect()
+ * when there is any filtering. If Strict is set, then extra code is used to ensure it never samples
+ * outside of the src-rect. Strict disables the use of mipmaps.
+*/
+enum class SrcRectConstraint {
+  Strict,  //!< sample only inside bounds; slower
+  Fast,    //!< sample outside bounds; faster
+};
 
 /**
  * Canvas provides an interface for drawing, including how the drawing is clipped and transformed.
@@ -367,6 +376,8 @@ class Canvas {
    * @param sampling  the sampling options used to sample the image. Defaults to
    * FilterMode::Linear and MipmapMode::Linear.
    * @param paint  the paint to apply blending, filtering, etc.; can be nullptr.
+   * @param constraint  the constraint for the source rectangle sampling. Defaults to
+   * SrcRectConstraint::Fast.
    */
   void drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
                      const SamplingOptions& sampling = {}, const Paint* paint = nullptr,

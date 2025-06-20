@@ -21,6 +21,7 @@
 #include "core/MCState.h"
 #include "gpu/ops/RRectDrawOp.h"
 #include "gpu/ops/RectDrawOp.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/core/Fill.h"
 #include "tgfx/core/Shape.h"
 

@@ -21,6 +21,7 @@
 #include <stack>
 #include "core/CanvasState.h"
 #include "core/GlyphRunList.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/core/Fill.h"
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/Shape.h"
