@@ -105,11 +105,11 @@ class PixelBuffer : public ImageBuffer {
 class HardwarePixelBuffer : public PixelBuffer {
 public:
   HardwarePixelBuffer(const ImageInfo& info, HardwareBufferRef hardwareBuffer)
-      : PixelBuffer(info), hardwareBuffer(hardwareBuffer) {
+      : PixelBuffer(info), hardwareBuffer(HardwareBufferRetain(hardwareBuffer)) {
   }
 
   explicit HardwarePixelBuffer(HardwareBufferRef hardwareBuffer)
-    : PixelBuffer({}), hardwareBuffer(hardwareBuffer) {
+    : PixelBuffer({}), hardwareBuffer(HardwareBufferRetain(hardwareBuffer)) {
   }
 
   ~HardwarePixelBuffer() override {
