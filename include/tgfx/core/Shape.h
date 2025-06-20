@@ -20,7 +20,6 @@
 
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/PathProvider.h"
-#include "tgfx/core/RRect.h"
 #include "tgfx/core/TextBlob.h"
 
 namespace tgfx {
@@ -57,7 +56,7 @@ class Shape {
    * Creates a new Shape from the glyphFace and glyphID. Returns nullptr if the glyphFace is nullptr
    * or contains a typeface that can't generate a path, such as bitmap typefaces.
    */
-  static std::shared_ptr<Shape> MakeFrom(std::shared_ptr<GlyphFace> glyphFace, GlyphID glyphID);
+  static std::shared_ptr<Shape> MakeFrom(Font font, GlyphID glyphID);
 
   /**
    * Merges two Shapes into a new Shape using the specified path operation. If either Shape is

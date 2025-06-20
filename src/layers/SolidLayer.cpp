@@ -22,9 +22,7 @@
 
 namespace tgfx {
 std::shared_ptr<SolidLayer> SolidLayer::Make() {
-  auto layer = std::shared_ptr<SolidLayer>(new SolidLayer());
-  layer->weakThis = layer;
-  return layer;
+  return std::shared_ptr<SolidLayer>(new SolidLayer());
 }
 
 void SolidLayer::setWidth(float width) {

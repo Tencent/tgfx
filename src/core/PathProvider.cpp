@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,40 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/core/Font.h"
+#include "tgfx/core/PathProvider.h"
 
 namespace tgfx {
-/**
- * GlyphRun represents a sequence of glyphs from a single font, along with their positions.
- */
-struct GlyphRun {
-  /**
-   * Constructs an empty GlyphRun.
-   */
-  GlyphRun() = default;
 
-  /**
-   * Constructs a GlyphRun using a font, a list of glyph IDs, and their positions.
-   */
-  GlyphRun(Font font, std::vector<GlyphID> glyphIDs, std::vector<Point> positions)
-      : font(std::move(font)), glyphs(std::move(glyphIDs)), positions(std::move(positions)) {
+class PathProviderWrapper final : public PathProvider {
+ public:
+  explicit PathProviderWrapper(Path path) : _path(std::move(path)) {
   }
 
-  /**
-   * Returns the Font used to render the glyphs in this run.
-   */
-  Font font = {};
+  Path getPath() const override {
+    return _path;
+  }
 
-  /**
-   * Returns the sequence of glyph IDs in this run.
-   */
-  std::vector<GlyphID> glyphs = {};
+  Rect getBounds() const override {
+    return _path.getBounds();
+  }
 
-  /**
-   * Returns the sequence of positions for each glyph in this run.
-   */
-  std::vector<Point> positions = {};
+ private:
+  Path _path;
 };
+
+std::shared_ptr<PathProvider> PathProvider::Wrap(Path path) {
+  return std::make_shared<PathProviderWrapper>(std::move(path));
+}
 }  // namespace tgfx

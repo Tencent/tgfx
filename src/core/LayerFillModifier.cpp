@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,38 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/LayerProperty.h"
-#include "tgfx/layers/Layer.h"
+#include "LayerFillModifier.h"
 
 namespace tgfx {
-
-void LayerProperty::invalidateContent() {
-  for (auto& owner : owners) {
-    if (auto layer = owner.lock()) {
-      layer->invalidateContent();
-    }
-  }
+LayerFillModifier::LayerFillModifier(Fill layerFill) : layerFill(std::move(layerFill)) {
 }
 
-void LayerProperty::invalidateTransform() {
-  for (auto& owner : owners) {
-    if (auto layer = owner.lock()) {
-      layer->invalidateTransform();
-    }
-  }
+Fill LayerFillModifier::transform(const Fill& fill) const {
+  auto newFill = fill;
+  newFill.color.alpha *= layerFill.color.alpha;
+  newFill.blendMode = layerFill.blendMode;
+  newFill.colorFilter = ColorFilter::Compose(fill.colorFilter, layerFill.colorFilter);
+  return newFill;
 }
-
-void LayerProperty::attachToLayer(Layer* layer) {
-  owners.push_back(layer->weak_from_this());
-}
-
-void LayerProperty::detachFromLayer(Layer* layer) {
-  for (auto owner = owners.begin(); owner != owners.end(); ++owner) {
-    if (owner->lock().get() == layer) {
-      owners.erase(owner);
-      break;
-    }
-  }
-}
-
 }  // namespace tgfx

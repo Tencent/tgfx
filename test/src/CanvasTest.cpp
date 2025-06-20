@@ -1292,7 +1292,7 @@ TGFX_TEST(CanvasTest, Picture) {
   auto imagePicture = recorder.finishRecordingAsPicture();
   ASSERT_TRUE(imagePicture != nullptr);
   ASSERT_TRUE(imagePicture->drawCount == 1);
-  EXPECT_EQ(imagePicture->firstDrawRecord()->type(), RecordType::DrawImage);
+  EXPECT_EQ(imagePicture->getFirstDrawRecord()->type(), RecordType::DrawImage);
 
   surface = Surface::Make(context, image->width() - 200, image->height() - 200);
   canvas = surface->getCanvas();
@@ -1362,6 +1362,46 @@ TGFX_TEST(CanvasTest, Picture) {
   canvas = surface->getCanvas();
   canvas->drawImage(pathImage);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/PictureImage_Path"));
+}
+
+class ColorModifier : public FillModifier {
+ public:
+  explicit ColorModifier(Color color) : color(color) {
+  }
+
+  Fill transform(const Fill& fill) const override {
+    auto newFill = fill;
+    newFill.color = color;
+    newFill.color.alpha *= fill.color.alpha;
+    return newFill;
+  }
+
+ private:
+  Color color = {};
+};
+
+TGFX_TEST(CanvasTest, FillModifier) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  // Record a rectangle with default fill
+  Recorder recorder = {};
+  auto canvas = recorder.beginRecording();
+  Paint paint;
+  paint.setColor(Color::Red());
+  paint.setAlpha(0.5f);
+  canvas->drawRect(Rect::MakeXYWH(10, 10, 100, 100), paint);
+  auto picture = recorder.finishRecordingAsPicture();
+  ASSERT_TRUE(picture != nullptr);
+  auto surface = Surface::Make(context, 120, 120);
+  canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  canvas->scale(0.8f, 0.8f);
+  canvas->translate(15, 15);
+  ColorModifier colorModifier(Color::Green());
+  picture->playback(canvas, &colorModifier);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/FillModifier"));
 }
 
 TGFX_TEST(CanvasTest, BlendModeTest) {

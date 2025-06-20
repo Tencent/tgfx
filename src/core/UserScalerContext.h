@@ -17,16 +17,26 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include <tgfx/core/Data.h>
-#include "SerializationUtils.h"
+#include "UserTypeface.h"
+#include "core/ScalerContext.h"
 
 namespace tgfx {
-class GlyphFaceSerialization {
+class UserScalerContext : public ScalerContext {
  public:
-  static std::shared_ptr<Data> Serialize(const GlyphFace* glyphFace);
+  UserScalerContext(std::shared_ptr<Typeface> typeface, float size)
+      : ScalerContext(std::move(typeface), size) {
+  }
 
- private:
-  static void SerializeGlyphFaceImpl(flexbuffers::Builder& fbb, const GlyphFace* glyphFace);
+  FontMetrics getFontMetrics() const override {
+    return static_cast<UserTypeface*>(typeface.get())->fontMetrics();
+  }
+
+  float getAdvance(GlyphID, bool) const override {
+    return 0.0f;
+  }
+
+  Point getVerticalOffset(GlyphID) const override {
+    return {};
+  }
 };
 }  // namespace tgfx

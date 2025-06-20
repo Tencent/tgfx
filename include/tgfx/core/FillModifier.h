@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,32 +17,22 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include "tgfx/core/GlyphFace.h"
 
 namespace tgfx {
-class FontGlyphFace final : public GlyphFace {
+class Fill;
+
+/**
+ * FillModifier is an interface for modifying the properties of a Fill used in drawing commands. It
+ * allows you to adjust the color, alpha, or other attributes of a Fill before it is applied to a
+ * picture record.
+ */
+class FillModifier {
  public:
-  bool hasColor() const override;
+  virtual ~FillModifier() = default;
 
-  bool hasOutlines() const override;
-
-  std::shared_ptr<GlyphFace> makeScaled(float scale) const override;
-
-  bool getPath(GlyphID glyphID, Path* path) const override;
-
-  std::shared_ptr<ImageCodec> getImage(GlyphID glyphID, const Stroke* stroke,
-                                       Matrix* matrix) const override;
-
-  Rect getBounds(GlyphID glyphID) const override;
-
-  bool asFont(Font* font) const override;
-
- private:
-  explicit FontGlyphFace(Font font) : _font(std::move(font)) {
-  }
-
-  Font _font = {};
-
-  friend class GlyphFace;
+  /**
+   * Transforms the given Fill and returns a new Fill with the modifications applied.
+   */
+  virtual Fill transform(const Fill& fill) const = 0;
 };
 }  // namespace tgfx

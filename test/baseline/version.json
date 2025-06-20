@@ -13,6 +13,7 @@
         "MultiImageRect_SCALE_LINEAR_NEAREST1": "4edccb64",
         "MultiImageRect_SCALE_LINEAR_NONE1": "4edccb64",
         "MultiImageRect_SameView": "4edccb64",
+        "FillModifier": "fa2f12b1",
         "NothingToDraw": "d010fb8",
         "Path_addArc1": "4802e56",
         "Path_addArc2": "4802e56",
@@ -80,7 +81,7 @@
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "da590da",
         "ImageWithShadow": "50136952",
-        "SimpleLayerTreeDrawer": "d067492b",
+        "SimpleLayerTreeDrawer": "89a370d8",
         "SimpleText": "ced3b513"
     },
     "DstTextureTest": {
@@ -106,11 +107,6 @@
         "identityMatrix": "a30de8b",
         "innerShadow": "c475bfb",
         "shaderMaskFilter": "c475bfb"
-    },
-    "GlyphFaceTest": {
-        "GlyphFaceSimple": "c475bfb",
-        "GlyphFaceWithStyle": "c475bfb",
-        "MakeTextBlobWithGlyphFace": "15e0e39"
     },
     "ImageReaderTest": {
         "update_bitmap": "c475bfb",
@@ -255,7 +251,7 @@
         "complex4": "50136952",
         "complex5": "50136952",
         "complex6": "e87e871a",
-        "complex7": "e87e871a",
+        "complex7": "89a370d8",
         "jpg_image": "b1db872",
         "mask": "da364e8",
         "path": "a6ff60e1",
@@ -281,5 +277,9 @@
         "TextAlignWidth0Height0": "15e0e39",
         "TextAlignWidth1Height10": "15e0e39",
         "TruncateTextLineTest": "15e0e39"
+    },
+    "TypefaceTest": {
+        "CustomImageTypeface": "92f3f139",
+        "CustomPathTypeface": "c275bff"
     }
 }

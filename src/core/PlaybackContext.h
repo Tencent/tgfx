@@ -18,32 +18,52 @@
 
 #pragma once
 
-#include "gpu/ResourceKey.h"
-#include "tgfx/core/Shape.h"
+#include "core/MCState.h"
+#include "tgfx/core/FillModifier.h"
 
 namespace tgfx {
-/**
- * Shape that contains a GlyphFace and GlyphID.
- */
-class GlyphShape final : public Shape {
+
+class PlaybackContext {
  public:
-  explicit GlyphShape(Font font, GlyphID glyphID);
+  explicit PlaybackContext(MCState state, const FillModifier* fillModifier = nullptr);
 
-  Rect getBounds() const override;
-
-  Path getPath() const override;
-
- protected:
-  Type type() const override {
-    return Type::Glyph;
+  const MCState& state() const {
+    return _state;
   }
-  UniqueKey getUniqueKey() const override {
-    return uniqueKey.get();
+
+  const Fill& fill() const {
+    return _fill;
   }
+
+  const Stroke* stroke() const {
+    return hasStroke ? &_stroke : nullptr;
+  }
+
+  void setMatrix(const Matrix& matrix);
+
+  void setClip(const Path& clip);
+
+  void setColor(const Color& color);
+
+  void setFill(const Fill& fill);
+
+  void setStrokeWidth(float width);
+
+  void setStroke(const Stroke& stroke);
+
+  void setHasStroke(bool value);
+
+  void drawFill(DrawContext* context);
 
  private:
-  LazyUniqueKey uniqueKey = {};
-  Font font;
-  GlyphID glyphID = 0;
+  MCState initState = {};
+  bool hasInitMatrix = false;
+  bool hasInitClip = false;
+  const FillModifier* fillModifier = nullptr;
+  MCState _state = {};
+  Fill _fill = {};
+  Fill lastOriginalFill = {};
+  Stroke _stroke = {};
+  bool hasStroke = false;
 };
 }  // namespace tgfx
