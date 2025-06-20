@@ -68,7 +68,6 @@ std::shared_ptr<GpuBufferProxy> ProxyProvider::createGpuBufferProxy(
 #ifdef TGFX_USE_THREADS
   if (!(renderFlags & RenderFlags::DisableAsyncTask)) {
     source = DataSource<Data>::Async(std::move(source));
-    asd
   }
 #endif
   auto proxyKey = GetProxyKey(uniqueKey, renderFlags);

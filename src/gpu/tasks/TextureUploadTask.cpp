@@ -17,11 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureUploadTask.h"
-#include <memory>
-#include <utility>
-#include "core/DataSource.h"
 #include "gpu/Texture.h"
-#include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
 TextureUploadTask::TextureUploadTask(UniqueKey uniqueKey,

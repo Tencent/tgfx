@@ -18,8 +18,6 @@
 
 #pragma once
 
-#include <memory>
-#include <utility>
 #include "core/utils/Log.h"
 #include "tgfx/core/Task.h"
 

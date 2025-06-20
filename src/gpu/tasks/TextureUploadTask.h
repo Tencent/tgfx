@@ -18,10 +18,8 @@
 
 #pragma once
 
-#include <memory>
 #include "ResourceTask.h"
-#include "core/DataSource.h"
-#include "tgfx/core/ImageBuffer.h"
+#include "core/ImageSource.h"
 
 namespace tgfx {
 class TextureUploadTask : public ResourceTask {
