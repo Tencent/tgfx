@@ -21,14 +21,16 @@
 namespace tgfx {
 PlacementPtr<QuadPerEdgeAAGeometryProcessor> QuadPerEdgeAAGeometryProcessor::Make(
     BlockBuffer* buffer, int width, int height, AAType aa, std::optional<Color> commonColor,
-    std::optional<Matrix> uvMatrix) {
-  return buffer->make<GLQuadPerEdgeAAGeometryProcessor>(width, height, aa, commonColor, uvMatrix);
+    std::optional<Matrix> uvMatrix, bool extraSubset) {
+  return buffer->make<GLQuadPerEdgeAAGeometryProcessor>(width, height, aa, commonColor, uvMatrix,
+                                                        extraSubset);
 }
 
 GLQuadPerEdgeAAGeometryProcessor::GLQuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa,
                                                                    std::optional<Color> commonColor,
-                                                                   std::optional<Matrix> uvMatrix)
-    : QuadPerEdgeAAGeometryProcessor(width, height, aa, commonColor, uvMatrix) {
+                                                                   std::optional<Matrix> uvMatrix,
+                                                                   bool extraSubset)
+    : QuadPerEdgeAAGeometryProcessor(width, height, aa, commonColor, uvMatrix, extraSubset) {
 }
 
 void GLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -42,12 +44,14 @@ void GLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
   auto uvCoordsVar = uvCoord.isInitialized() ? uvCoord.asShaderVar() : position.asShaderVar();
   emitTransforms(vertBuilder, varyingHandler, uniformHandler, uvCoordsVar,
                  args.fpCoordTransformHandler);
-  bool subsetIsjInit = subSet.isInitialized();
-  if(subsetIsjInit) {
+  if (extraSubset) {
     auto varying = varyingHandler->addVarying("vtexsubset", SLType::Float4, true);
-    auto uniName = uniformHandler->addUniform(ShaderFlags::Vertex, SLType::Float3x3, "NormalizeMatrix");
-    vertBuilder->codeAppendf("vec2 leftTop = (%s * vec3(%s.xy, 1)).xy;", uniName.c_str(), subSet.asShaderVar().name().c_str());
-    vertBuilder->codeAppendf("vec2 rightBottom = (%s * vec3(%s.zw, 1)).xy;", uniName.c_str(), subSet.asShaderVar().name().c_str());
+    auto uniName =
+        uniformHandler->addUniform(ShaderFlags::Vertex, SLType::Float3x3, "NormalizeMatrix");
+    vertBuilder->codeAppendf("vec2 leftTop = (%s * vec3(%s.xy, 1)).xy;", uniName.c_str(),
+                             subset.asShaderVar().name().c_str());
+    vertBuilder->codeAppendf("vec2 rightBottom = (%s * vec3(%s.zw, 1)).xy;", uniName.c_str(),
+                             subset.asShaderVar().name().c_str());
     vertBuilder->codeAppendf("%s = vec4(leftTop, rightBottom);", varying.vsOut().c_str());
   }
 
@@ -81,4 +85,12 @@ void GLQuadPerEdgeAAGeometryProcessor::setData(UniformBuffer* uniformBuffer,
     uniformBuffer->setData("Color", *commonColor);
   }
 }
+
+void GLQuadPerEdgeAAGeometryProcessor::onSolveCoordTransform(
+    const Matrix&, UniformBuffer* uniformBuffer, const CoordTransform* coordTransform) const {
+  if (extraSubset) {
+    uniformBuffer->setData("NormalizeMatrix", coordTransform->getTotalMatrix());
+  }
+}
+
 }  // namespace tgfx

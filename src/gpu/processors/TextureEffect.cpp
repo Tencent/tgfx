@@ -23,12 +23,13 @@
 namespace tgfx {
 PlacementPtr<FragmentProcessor> TextureEffect::Make(std::shared_ptr<TextureProxy> proxy,
                                                     const SamplingOptions& sampling,
-                                                    const Matrix* uvMatrix, bool forceAsMask) {
+                                                    const Matrix* uvMatrix, bool forceAsMask,
+                                                    const Rect* subset, bool extraSubset) {
   if (proxy == nullptr) {
     return nullptr;
   }
   auto isAlphaOnly = proxy->isAlphaOnly();
-  auto processor = MakeRGBAAA(std::move(proxy), {}, sampling, uvMatrix);
+  auto processor = MakeRGBAAA(std::move(proxy), {}, sampling, uvMatrix, subset, extraSubset);
   if (forceAsMask && !isAlphaOnly) {
     auto drawingBuffer = proxy->getContext()->drawingBuffer();
     processor = FragmentProcessor::MulInputByChildAlpha(drawingBuffer, std::move(processor));
@@ -37,9 +38,14 @@ PlacementPtr<FragmentProcessor> TextureEffect::Make(std::shared_ptr<TextureProxy
 }
 
 TextureEffect::TextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplingOptions& sampling,
-                             const Point& alphaStart, const Matrix& uvMatrix)
+                             const Point& alphaStart, const Matrix& uvMatrix, const Rect* subset,
+                             bool extraSubset)
     : FragmentProcessor(ClassID()), textureProxy(std::move(proxy)), samplerState(sampling),
-      alphaStart(alphaStart), coordTransform(uvMatrix, textureProxy.get(), alphaStart) {
+      alphaStart(alphaStart), coordTransform(uvMatrix, textureProxy.get(), alphaStart),
+      extraSubset(extraSubset) {
+  if (subset) {
+    this->subset = *subset;
+  }
   addCoordTransform(&coordTransform);
 }
 
@@ -57,6 +63,8 @@ void TextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
     flags |= yuvTexture->pixelFormat() == YUVPixelFormat::I420 ? 0 : 4;
     flags |= IsLimitedYUVColorRange(yuvTexture->colorSpace()) ? 0 : 8;
   }
+  flags |= needSubset(texture) ? 16 : 0;
+  flags |= extraSubset ? 32 : 0;
   bytesKey->write(flags);
 }
 
@@ -93,4 +101,19 @@ YUVTexture* TextureEffect::getYUVTexture() const {
   }
   return nullptr;
 }
+
+bool TextureEffect::needSubset(Texture* texture) const {
+  DEBUG_ASSERT(texture);
+  if (subset.has_value()) {
+    return true;
+  }
+  // If the texture has a crop rectangle, we need to shrink it to prevent bilinear sampling beyond
+  // the edge of the crop rectangle.
+  auto samplerType = texture->getSampler()->type();
+  auto edgePoint = texture->getTextureCoord(static_cast<float>(texture->width()),
+                                            static_cast<float>(texture->height()));
+  static constexpr Point FullEdge = Point::Make(1.0f, 1.0f);
+  return samplerType != SamplerType::Rectangle && edgePoint != FullEdge && alphaStart.isZero();
+}
+
 }  // namespace tgfx

@@ -468,7 +468,8 @@ void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& dstRect,
 }
 
 void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
-                           const SamplingOptions& sampling, const Paint* paint, SrcRectConstraint constraint) {
+                           const SamplingOptions& sampling, const Paint* paint,
+                           SrcRectConstraint constraint) {
   if (image == nullptr || srcRect.isEmpty() || dstRect.isEmpty()) {
     return;
   }
@@ -494,16 +495,13 @@ void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
   DEBUG_ASSERT(image != nullptr);
   DEBUG_ASSERT(!rect.isEmpty());
   auto type = Types::Get(image.get());
-  if(type >= Types::ImageType::Subset) {
-    constraint = std::static_pointer_cast<SubsetImage>(image)->constraint;
-  }
   if (type != Types::ImageType::Subset && dstMatrix == nullptr) {
     drawContext->drawImageRect(std::move(image), rect, sampling, *mcState, fill, constraint);
     return;
   }
   auto viewMatrix = dstMatrix ? *dstMatrix : Matrix::I();
   auto imageRect = rect;
-  if (type == Types::ImageType::Subset) {
+  if (type == Types::ImageType::Subset && constraint == SrcRectConstraint::Strict) {
     // Unwrap the subset image to maximize the merging of draw calls.
     auto subsetImage = static_cast<const SubsetImage*>(image.get());
     auto& subset = subsetImage->bounds;
@@ -518,7 +516,8 @@ void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
   auto imageState = *mcState;
   imageState.matrix.preConcat(viewMatrix);
   auto imageFill = fill.makeWithMatrix(fillMatrix);
-  drawContext->drawImageRect(std::move(image), imageRect, sampling, imageState, imageFill, constraint);
+  drawContext->drawImageRect(std::move(image), imageRect, sampling, imageState, imageFill,
+                             constraint);
 }
 
 void Canvas::drawSimpleText(const std::string& text, float x, float y, const Font& font,
@@ -604,7 +603,7 @@ void Canvas::drawLayer(std::shared_ptr<Picture> picture, const MCState& state, c
       auto fillMatrix = Matrix::MakeTrans(-offset.x - filterOffset.x, -offset.y - +filterOffset.y);
       auto imageRect = Rect::MakeWH(image->width(), image->height());
       drawContext->drawImageRect(std::move(image), imageRect, {}, drawState,
-                                 fill.makeWithMatrix(fillMatrix), SrcRectConstraint::Fast_SrcRectConstraint);
+                                 fill.makeWithMatrix(fillMatrix), SrcRectConstraint::Fast);
       return;
     }
   } else if (picture->drawCount == 1 && fill.maskFilter == nullptr) {

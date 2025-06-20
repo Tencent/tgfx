@@ -743,14 +743,14 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* su
   if (autoClear) {
     paint.setBlendMode(BlendMode::Src);
   }
-  static SamplingOptions sampling(FilterMode::Linear, MipmapMode::None);
-  canvas->setMatrix(Matrix::MakeTrans(0.5f, 0.5f));
-  // canvas->setMatrix(Matrix::MakeTrans(_contentOffset.x, _contentOffset.y));
+  static SamplingOptions sampling(FilterMode::Nearest, MipmapMode::None);
+  canvas->setMatrix(Matrix::MakeTrans(_contentOffset.x, _contentOffset.y));
   for (auto& task : screenTasks) {
     auto surfaceCache = surfaceCaches[task.sourceIndex()];
     DEBUG_ASSERT(surfaceCache != nullptr);
     auto image = surfaceCache->makeImageSnapshot();
-    canvas->drawImageRect(image, task.sourceRect(), task.tileRect(), sampling, &paint, SrcRectConstraint::Strict_SrcRectConstraint);
+    canvas->drawImageRect(image, task.sourceRect(), task.tileRect(), sampling, &paint,
+                          SrcRectConstraint::Strict);
   }
 }
 

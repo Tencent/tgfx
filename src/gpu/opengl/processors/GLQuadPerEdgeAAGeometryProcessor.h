@@ -25,11 +25,14 @@ namespace tgfx {
 class GLQuadPerEdgeAAGeometryProcessor : public QuadPerEdgeAAGeometryProcessor {
  public:
   GLQuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa,
-                                   std::optional<Color> commonColor,
-                                   std::optional<Matrix> uvMatrix);
+                                   std::optional<Color> commonColor, std::optional<Matrix> uvMatrix,
+                                   bool extraSubset);
 
   void emitCode(EmitArgs& args) const override;
 
   void setData(UniformBuffer* uniformBuffer, FPCoordTransformIter* transformIter) const override;
+
+  void onSolveCoordTransform(const Matrix& uvMatrix, UniformBuffer* uniformBuffer,
+                             const CoordTransform* coordTransform) const override;
 };
 }  // namespace tgfx

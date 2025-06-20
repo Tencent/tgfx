@@ -91,7 +91,7 @@ class OpsCompositor {
   UniqueKey clipKey = {};
   std::shared_ptr<TextureProxy> clipTexture = nullptr;
   PendingOpType pendingType = PendingOpType::Unknown;
-  SrcRectConstraint srcRectConstraint = SrcRectConstraint::Fast_SrcRectConstraint;
+  SrcRectConstraint pendingConstraint = SrcRectConstraint::Fast;
   Path pendingClip = {};
   Fill pendingFill = {};
   std::shared_ptr<Image> pendingImage = nullptr;

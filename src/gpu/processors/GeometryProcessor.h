@@ -136,13 +136,7 @@ class GeometryProcessor : public Processor {
   void setTextureSamplerCount(size_t count) {
     textureSamplerCount = count;
   }
-  void setSrcRectConstraint(SrcRectConstraint constraint) {
-    this->constraint = constraint;
-  }
 
-  SrcRectConstraint srcRectConstraint() const {
-    return constraint;
-  }
  protected:
   explicit GeometryProcessor(uint32_t classID) : Processor(classID) {
   }
@@ -162,7 +156,7 @@ class GeometryProcessor : public Processor {
   void emitTransforms(VertexShaderBuilder* vertexBuilder, VaryingHandler* varyingHandler,
                       UniformHandler* uniformHandler, const ShaderVar& uvCoordsVar,
                       FPCoordTransformHandler* transformHandler) const;
-  SrcRectConstraint constraint = SrcRectConstraint::Fast_SrcRectConstraint;
+
  private:
   virtual void onComputeProcessorKey(BytesKey*) const {
   }
@@ -173,6 +167,9 @@ class GeometryProcessor : public Processor {
 
   virtual SamplerState onSamplerState(size_t) const {
     return {};
+  }
+
+  virtual void onSolveCoordTransform(const Matrix&, UniformBuffer*, const CoordTransform*) const {
   }
 
   std::vector<const Attribute*> attributes = {};

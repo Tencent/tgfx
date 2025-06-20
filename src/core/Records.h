@@ -244,7 +244,8 @@ class DrawImage : public Record {
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
     auto rect = Rect::MakeWH(image->width(), image->height());
-    context->drawImageRect(image, rect, sampling, playback->state, playback->fill, SrcRectConstraint::Fast_SrcRectConstraint);
+    context->drawImageRect(image, rect, sampling, playback->state, playback->fill,
+                           SrcRectConstraint::Fast);
   }
 
   std::shared_ptr<Image> image;
@@ -253,8 +254,9 @@ class DrawImage : public Record {
 
 class DrawImageRect : public DrawImage {
  public:
-  DrawImageRect(std::shared_ptr<Image> image, const Rect& rect, const SamplingOptions& sampling)
-      : DrawImage(std::move(image), sampling), rect(rect) {
+  DrawImageRect(std::shared_ptr<Image> image, const Rect& rect, const SamplingOptions& sampling,
+                SrcRectConstraint constraint)
+      : DrawImage(std::move(image), sampling), rect(rect), constraint(constraint) {
   }
 
   RecordType type() const override {
@@ -262,10 +264,12 @@ class DrawImageRect : public DrawImage {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawImageRect(image, rect, sampling, playback->state, playback->fill, SrcRectConstraint::Fast_SrcRectConstraint);
+    context->drawImageRect(image, rect, sampling, playback->state, playback->fill, constraint);
   }
 
   Rect rect;
+
+  SrcRectConstraint constraint = SrcRectConstraint::Fast;
 };
 
 class DrawGlyphRunList : public Record {

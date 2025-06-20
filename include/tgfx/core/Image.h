@@ -25,6 +25,7 @@
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/SamplingOptions.h"
+#include "tgfx/core/SrcRectConstraint.h"
 #include "tgfx/core/TileMode.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/ImageOrigin.h"
@@ -41,17 +42,6 @@ class ImageFilter;
 class FragmentProcessor;
 class TextureProxy;
 class Paint;
-
-/**
- *SrcRectConstraint controls the behavior at the edge of source Rect,
- *provided to drawImageRect() when there is any filtering. If Strict is set,
- *then extra code is used to ensure it never samples outside of the src-rect.
- *Strict_SrcRectConstraint disables the use of mipmaps and anisotropic filtering.
- */
-enum class SrcRectConstraint {
- Strict_SrcRectConstraint, //!< sample only inside bounds; slower
- Fast_SrcRectConstraint,   //!< sample outside bounds; faster
-};
 
 /**
  * The Image class represents a two-dimensional array of pixels for drawing. These pixels can be
@@ -249,7 +239,7 @@ class Image {
    * Image always shares pixels and caches with the original Image. Returns nullptr if the subset is
    * empty, or the subset is not contained by bounds.
    */
-  std::shared_ptr<Image> makeSubset(const Rect& subset, SrcRectConstraint constraint = SrcRectConstraint::Fast_SrcRectConstraint) const;
+  std::shared_ptr<Image> makeSubset(const Rect& subset) const;
 
   /**
    * Returns an Image with its origin transformed by the given Orientation. The returned Image

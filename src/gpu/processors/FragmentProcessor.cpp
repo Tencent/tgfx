@@ -28,13 +28,10 @@ namespace tgfx {
 PlacementPtr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image> image,
                                                         const FPArgs& args,
                                                         const SamplingOptions& sampling,
-                                                        const Matrix* uvMatrix,
-                                                        SrcRectConstraint constraint) {
+                                                        const Matrix* uvMatrix) {
   DEBUG_ASSERT(image != nullptr);
-  auto fpProcessor = image->asFragmentProcessor(args, TileMode::Clamp, TileMode::Clamp, sampling, uvMatrix);
-  if(fpProcessor) {
-    fpProcessor->setSrcRectConstraint(constraint);
-  }
+  auto fpProcessor =
+      image->asFragmentProcessor(args, TileMode::Clamp, TileMode::Clamp, sampling, uvMatrix);
   return fpProcessor;
 }
 

@@ -27,7 +27,7 @@
 #include "gpu/UniformHandler.h"
 #include "gpu/processors/Processor.h"
 #include "gpu/proxies/TextureProxy.h"
-#include "serialization/RRectSerialization.h"
+#include "tgfx/core/Image.h"
 
 namespace tgfx {
 class Pipeline;
@@ -38,13 +38,15 @@ class FPArgs {
  public:
   FPArgs() = default;
 
-  FPArgs(Context* context, uint32_t renderFlags, const Rect& drawRect)
-      : context(context), renderFlags(renderFlags), drawRect(drawRect) {
+  FPArgs(Context* context, uint32_t renderFlags, const Rect& drawRect, bool extraSubset)
+      : context(context), renderFlags(renderFlags), drawRect(drawRect), extraSubset(extraSubset) {
   }
 
   Context* context = nullptr;
   uint32_t renderFlags = 0;
   Rect drawRect = {};
+  bool extraSubset = false;
+  const Rect* clipRect = nullptr;
 };
 
 class FragmentProcessor : public Processor {
@@ -55,8 +57,7 @@ class FragmentProcessor : public Processor {
    */
   static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<Image> image, const FPArgs& args,
                                               const SamplingOptions& sampling,
-                                              const Matrix* uvMatrix = nullptr,
-                                              SrcRectConstraint constraint = SrcRectConstraint::Fast_SrcRectConstraint);
+                                              const Matrix* uvMatrix = nullptr);
 
   /**
    * Creates a fragment processor that will draw the given image with the given options.
@@ -265,17 +266,8 @@ class FragmentProcessor : public Processor {
    */
   void emitChild(size_t childIndex, const std::string& inputColor, EmitArgs& parentArgs) const;
 
-  void setSrcRectConstraint(SrcRectConstraint constraint) {
-    this->constraint = constraint;
-  }
-
-  SrcRectConstraint srcRectConstraint() const {
-    return constraint;
-  }
-
  protected:
   std::vector<PlacementPtr<FragmentProcessor>> childProcessors = {};
-  SrcRectConstraint constraint = SrcRectConstraint::Fast_SrcRectConstraint;
 
   explicit FragmentProcessor(uint32_t classID) : Processor(classID) {
   }

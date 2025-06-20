@@ -101,13 +101,10 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect
     return;
   }
   auto samplingOptions = sampling;
-  if (constraint == SrcRectConstraint::Strict_SrcRectConstraint || (samplingOptions.mipmapMode != MipmapMode::None && !state.matrix.hasNonIdentityScale())) {
+  if (constraint == SrcRectConstraint::Strict ||
+      (samplingOptions.mipmapMode != MipmapMode::None && !state.matrix.hasNonIdentityScale())) {
     // There is no scaling for the source image, so we can disable mipmaps to save memory.
     samplingOptions.mipmapMode = MipmapMode::None;
-  }
-
-  if(sampling.filterMode == FilterMode::Nearest && !fill.antiAlias) {
-    constraint = SrcRectConstraint::Fast_SrcRectConstraint;
   }
 
   compositor->fillImage(std::move(image), rect, samplingOptions, state, fill, constraint);
@@ -149,7 +146,8 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   auto newState = state;
   newState.matrix = Matrix::MakeTrans(bounds.x(), bounds.y());
   auto imageRect = Rect::MakeWH(image->width(), image->height());
-  drawImageRect(std::move(image), imageRect, {}, newState, fill.makeWithMatrix(rasterizeMatrix), SrcRectConstraint::Fast_SrcRectConstraint);
+  drawImageRect(std::move(image), imageRect, {}, newState, fill.makeWithMatrix(rasterizeMatrix),
+                SrcRectConstraint::Fast);
 }
 
 void RenderContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
@@ -203,7 +201,8 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
   }
   drawState.matrix.preConcat(invertMatrix);
   auto imageRect = Rect::MakeWH(image->width(), image->height());
-  drawImageRect(std::move(image), imageRect, {}, drawState, fill.makeWithMatrix(viewMatrix), SrcRectConstraint::Fast_SrcRectConstraint);
+  drawImageRect(std::move(image), imageRect, {}, drawState, fill.makeWithMatrix(viewMatrix),
+                SrcRectConstraint::Fast);
 }
 
 void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
@@ -233,7 +232,7 @@ void RenderContext::drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList,
       glyphState.matrix.postTranslate(position.x * scale, position.y * scale);
       glyphState.matrix.postConcat(viewMatrix);
       auto rect = Rect::MakeWH(glyphImage->width(), glyphImage->height());
-      drawImageRect(std::move(glyphImage), rect, {}, glyphState, fill, SrcRectConstraint::Fast_SrcRectConstraint);
+      drawImageRect(std::move(glyphImage), rect, {}, glyphState, fill, SrcRectConstraint::Fast);
     }
   }
 }
@@ -270,7 +269,8 @@ void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRe
     auto drawingManager = renderTarget->getContext()->drawingManager();
     opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
     Fill fill = {{}, BlendMode::Src, false};
-    opsCompositor->fillImage(std::move(oldContent), renderTarget->bounds(), {}, MCState{}, fill, SrcRectConstraint::Fast_SrcRectConstraint);
+    opsCompositor->fillImage(std::move(oldContent), renderTarget->bounds(), {}, MCState{}, fill,
+                             SrcRectConstraint::Fast);
   }
 }
 

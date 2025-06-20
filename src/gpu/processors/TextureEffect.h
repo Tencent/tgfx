@@ -29,12 +29,16 @@ class TextureEffect : public FragmentProcessor {
   static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<TextureProxy> proxy,
                                               const SamplingOptions& sampling = {},
                                               const Matrix* uvMatrix = nullptr,
-                                              bool forceAsMask = false);
+                                              bool forceAsMask = false,
+                                              const Rect* subset = nullptr,
+                                              bool extraSubset = false);
 
   static PlacementPtr<FragmentProcessor> MakeRGBAAA(std::shared_ptr<TextureProxy> proxy,
                                                     const Point& alphaStart,
                                                     const SamplingOptions& sampling = {},
-                                                    const Matrix* uvMatrix = nullptr);
+                                                    const Matrix* uvMatrix = nullptr,
+                                                    const Rect* subset = nullptr,
+                                                    bool extraSubset = false);
 
   std::string name() const override {
     return "TextureEffect";
@@ -44,7 +48,8 @@ class TextureEffect : public FragmentProcessor {
   DEFINE_PROCESSOR_CLASS_ID
 
   TextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplingOptions& sampling,
-                const Point& alphaStart, const Matrix& uvMatrix);
+                const Point& alphaStart, const Matrix& uvMatrix, const Rect* subset,
+                bool extraSubset);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
@@ -60,9 +65,13 @@ class TextureEffect : public FragmentProcessor {
 
   YUVTexture* getYUVTexture() const;
 
+  bool needSubset(Texture* texture) const;
+
   std::shared_ptr<TextureProxy> textureProxy;
   SamplerState samplerState;
   Point alphaStart = {};
   CoordTransform coordTransform;
+  bool extraSubset = false;
+  std::optional<Rect> subset = std::nullopt;
 };
 }  // namespace tgfx

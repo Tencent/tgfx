@@ -30,7 +30,7 @@ struct CoordTransform {
       : matrix(matrix), textureProxy(proxy), alphaStart(alphaStart) {
   }
 
-  Matrix getTotalMatrix(bool isContainOESFix = true) const;
+  Matrix getTotalMatrix() const;
 
   Matrix matrix = {};
   const TextureProxy* textureProxy = nullptr;

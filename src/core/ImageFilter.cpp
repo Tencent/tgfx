@@ -46,7 +46,7 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
     return nullptr;
   }
   auto drawRect = Rect::MakeWH(renderTarget->width(), renderTarget->height());
-  FPArgs fpArgs(args.context, args.renderFlags, drawRect);
+  FPArgs fpArgs(args.context, args.renderFlags, drawRect, false);
   auto offsetMatrix = Matrix::MakeTrans(clipBounds.x(), clipBounds.y());
   // There is no scaling for the source image, so we can use the default sampling options.
   auto processor = asFragmentProcessor(std::move(source), fpArgs, {}, &offsetMatrix);
@@ -93,9 +93,10 @@ PlacementPtr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(std::shared_
     fpMatrix.preConcat(*uvMatrix);
   }
   if (dstBounds.contains(clipBounds)) {
-    return TextureEffect::Make(std::move(textureProxy), sampling, &fpMatrix, isAlphaOnly);
+    return TextureEffect::Make(std::move(textureProxy), sampling, &fpMatrix, isAlphaOnly, nullptr,
+                               args.extraSubset);
   }
   return TiledTextureEffect::Make(std::move(textureProxy), TileMode::Decal, TileMode::Decal,
-                                  sampling, &fpMatrix, isAlphaOnly);
+                                  sampling, &fpMatrix, isAlphaOnly, nullptr, args.extraSubset);
 }
 }  // namespace tgfx

@@ -49,8 +49,8 @@ void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& stat
 }
 
 void MeasureContext::drawImageRect(std::shared_ptr<Image>, const Rect& rect, const SamplingOptions&,
-                                   const MCState& state, const Fill& fill, SrcRectConstraint constraint) {
-  (void)constraint;
+                                   const MCState& state, const Fill& fill,
+                                   SrcRectConstraint) {
   addLocalBounds(state, fill, rect);
 }
 

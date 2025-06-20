@@ -54,8 +54,11 @@ PlacementPtr<FragmentProcessor> SubsetImage::asFragmentProcessor(const FPArgs& a
   if (matrix) {
     matrix->mapRect(&drawBounds);
   }
+  FPArgs newArgs = args;
+  newArgs.clipRect = &drawBounds;
   if (bounds.contains(drawBounds)) {
-    return FragmentProcessor::Make(source, args, tileModeX, tileModeY, sampling, AddressOf(matrix));
+    return FragmentProcessor::Make(source, newArgs, tileModeX, tileModeY, sampling,
+                                   AddressOf(matrix));
   }
   auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped);

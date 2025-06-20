@@ -186,7 +186,7 @@ std::shared_ptr<Image> Image::makeMipmapped(bool enabled) const {
   return onMakeMipmapped(enabled);
 }
 
-std::shared_ptr<Image> Image::makeSubset(const Rect& subset, SrcRectConstraint constraint) const {
+std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {
   auto rect = subset;
   rect.round();
   if (rect.isEmpty()) {
@@ -200,7 +200,6 @@ std::shared_ptr<Image> Image::makeSubset(const Rect& subset, SrcRectConstraint c
     return nullptr;
   }
   auto subsetImage = onMakeSubset(rect);
-  std::static_pointer_cast<SubsetImage>(subsetImage)->constraint = constraint;
   return subsetImage;
 }
 
@@ -254,7 +253,7 @@ std::shared_ptr<TextureProxy> Image::lockTextureProxy(const TPArgs& args) const 
     return nullptr;
   }
   auto drawRect = Rect::MakeWH(width(), height());
-  FPArgs fpArgs(args.context, args.renderFlags, drawRect);
+  FPArgs fpArgs(args.context, args.renderFlags, drawRect, false);
   // There is no scaling for the image, so we can use the default sampling options.
   auto processor = asFragmentProcessor(fpArgs, TileMode::Clamp, TileMode::Clamp, {}, nullptr);
   auto drawingManager = args.context->drawingManager();

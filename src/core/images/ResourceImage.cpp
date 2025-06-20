@@ -53,6 +53,6 @@ PlacementPtr<FragmentProcessor> ResourceImage::asFragmentProcessor(const FPArgs&
   TPArgs tpArgs(args.context, args.renderFlags, hasMipmaps());
   auto proxy = onLockTextureProxy(tpArgs, uniqueKey);
   return TiledTextureEffect::Make(std::move(proxy), tileModeX, tileModeY, sampling, uvMatrix,
-                                  isAlphaOnly());
+                                  isAlphaOnly(), args.clipRect, args.extraSubset);
 }
 }  // namespace tgfx

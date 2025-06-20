@@ -107,14 +107,13 @@ void RecordingContext::drawImageRect(std::shared_ptr<Image> image, const Rect& r
                                      const SamplingOptions& sampling, const MCState& state,
                                      const Fill& fill, SrcRectConstraint constraint) {
   DEBUG_ASSERT(image != nullptr);
-  (void)constraint;
   recordStateAndFill(state, fill);
   auto imageRect = Rect::MakeWH(image->width(), image->height());
   PlacementPtr<Record> record = nullptr;
   if (rect == imageRect) {
     record = blockBuffer.make<DrawImage>(std::move(image), sampling);
   } else {
-    record = blockBuffer.make<DrawImageRect>(std::move(image), rect, sampling);
+    record = blockBuffer.make<DrawImageRect>(std::move(image), rect, sampling,constraint);
   }
   records.emplace_back(std::move(record));
   drawCount++;
