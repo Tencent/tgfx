@@ -47,7 +47,7 @@ InnerShadowImageFilter::InnerShadowImageFilter(float dx, float dy, float blurrin
 
 PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    const Matrix* uvMatrix) const {
+    SrcRectConstraint constraint, const Matrix* uvMatrix) const {
   if (color.alpha <= 0) {
     // The filer will not be created if filter is not drop shadow only and alpha < 0.So if color is
     // transparent, the image after applying the filter will be transparent.
@@ -86,10 +86,11 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
   shadowMatrix.preConcat(fpMatrix);
   PlacementPtr<FragmentProcessor> invertShadowMask;
   if (blurFilter != nullptr) {
-    invertShadowMask = blurFilter->asFragmentProcessor(source, args, sampling, &shadowMatrix);
+    invertShadowMask =
+        blurFilter->asFragmentProcessor(source, args, sampling, constraint, &shadowMatrix);
   } else {
     invertShadowMask = FragmentProcessor::Make(source, args, TileMode::Decal, TileMode::Decal,
-                                               sampling, &shadowMatrix);
+                                               sampling, constraint, &shadowMatrix);
   }
   auto buffer = args.context->drawingBuffer();
   auto colorProcessor = ConstColorProcessor::Make(buffer, color.premultiply(), InputMode::Ignore);
@@ -99,7 +100,7 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
       buffer, std::move(colorProcessor), std::move(invertShadowMask), BlendMode::SrcOut);
 
   auto imageProcessor = FragmentProcessor::Make(std::move(source), args, TileMode::Decal,
-                                                TileMode::Decal, sampling, &fpMatrix);
+                                                TileMode::Decal, sampling, constraint, &fpMatrix);
 
   if (shadowOnly) {
     // mask the image with origin image

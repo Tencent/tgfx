@@ -23,6 +23,7 @@
 #include "gpu/VertexProvider.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
+#include "tgfx/core/SamplingOptions.h"
 
 namespace tgfx {
 struct RectRecord {
@@ -51,7 +52,8 @@ class RectsVertexProvider : public VertexProvider {
    */
   static PlacementPtr<RectsVertexProvider> MakeFrom(BlockBuffer* buffer,
                                                     std::vector<PlacementPtr<RectRecord>>&& rects,
-                                                    AAType aaType, bool needUVCoord);
+                                                    AAType aaType, const SamplingOptions& options,
+                                                    bool needUVCoord, bool needSubset);
 
   /**
    * Returns the number of rects in the provider.
@@ -103,15 +105,28 @@ class RectsVertexProvider : public VertexProvider {
     return rects.front()->color;
   }
 
+  /**
+   * Returns true if the provider generates subset rects.
+   */
+  bool hasSubset() const {
+    return bitFields.hasSubset;
+  }
+
  protected:
   PlacementArray<RectRecord> rects = {};
   struct {
     uint8_t aaType : 2;
     bool hasUVCoord : 1;
     bool hasColor : 1;
+    bool hasSubset : 1;
   } bitFields = {};
 
-  RectsVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType, bool hasUVCoord,
-                      bool hasColor, std::shared_ptr<BlockBuffer> reference);
+  SamplingOptions samplingOption = {};
+
+  RectsVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType,
+                      const SamplingOptions& options, bool hasUVCoord, bool hasColor,
+                      bool hasSubset, std::shared_ptr<BlockBuffer> reference);
+
+  Rect getSubsetRect(const Rect& rect) const;
 };
 }  // namespace tgfx

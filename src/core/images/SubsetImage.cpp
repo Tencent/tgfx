@@ -45,26 +45,26 @@ std::shared_ptr<Image> SubsetImage::onMakeSubset(const Rect& subset) const {
 }
 
 PlacementPtr<FragmentProcessor> SubsetImage::asFragmentProcessor(const FPArgs& args,
-                                                                 TileMode tileModeX,
-                                                                 TileMode tileModeY,
-                                                                 const SamplingOptions& sampling,
+                                                                 const FPImageArgs& imageArgs,
                                                                  const Matrix* uvMatrix) const {
   auto matrix = concatUVMatrix(uvMatrix);
   auto drawBounds = args.drawRect;
   if (matrix) {
     matrix->mapRect(&drawBounds);
   }
+  auto newImageArgs = imageArgs;
   if (bounds.contains(drawBounds)) {
-    return FragmentProcessor::Make(source, args, tileModeX, tileModeY, sampling, AddressOf(matrix));
+    newImageArgs.subset = getSubset(drawBounds);
+    return FragmentProcessor::Make(source, args, newImageArgs, AddressOf(matrix));
   }
-  auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
+  auto mipmapped = source->hasMipmaps() && imageArgs.sampling.mipmapMode != MipmapMode::None;
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
   auto textureProxy = lockTextureProxy(tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  return TiledTextureEffect::Make(textureProxy, tileModeX, tileModeY, sampling, uvMatrix,
-                                  source->isAlphaOnly());
+  newImageArgs.subset = std::nullopt;
+  return TiledTextureEffect::Make(textureProxy, newImageArgs, uvMatrix, source->isAlphaOnly());
 }
 
 std::optional<Matrix> SubsetImage::concatUVMatrix(const Matrix* uvMatrix) const {
@@ -81,4 +81,14 @@ std::optional<Matrix> SubsetImage::concatUVMatrix(const Matrix* uvMatrix) const 
   }
   return matrix;
 }
+
+std::optional<Rect> SubsetImage::getSubset(const Rect& drawRect) const {
+  auto saftBounds = bounds;
+  saftBounds.inset(0.5f, 0.5f);
+  if (saftBounds.contains(drawRect)) {
+    return std::nullopt;
+  }
+  return std::optional<Rect>(bounds);
+}
+
 }  // namespace tgfx

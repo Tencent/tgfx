@@ -21,14 +21,16 @@
 namespace tgfx {
 PlacementPtr<QuadPerEdgeAAGeometryProcessor> QuadPerEdgeAAGeometryProcessor::Make(
     BlockBuffer* buffer, int width, int height, AAType aa, std::optional<Color> commonColor,
-    std::optional<Matrix> uvMatrix) {
-  return buffer->make<GLQuadPerEdgeAAGeometryProcessor>(width, height, aa, commonColor, uvMatrix);
+    std::optional<Matrix> uvMatrix, bool hasSubset) {
+  return buffer->make<GLQuadPerEdgeAAGeometryProcessor>(width, height, aa, commonColor, uvMatrix,
+                                                        hasSubset);
 }
 
 GLQuadPerEdgeAAGeometryProcessor::GLQuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa,
                                                                    std::optional<Color> commonColor,
-                                                                   std::optional<Matrix> uvMatrix)
-    : QuadPerEdgeAAGeometryProcessor(width, height, aa, commonColor, uvMatrix) {
+                                                                   std::optional<Matrix> uvMatrix,
+                                                                   bool hasSubset)
+    : QuadPerEdgeAAGeometryProcessor(width, height, aa, commonColor, uvMatrix, hasSubset) {
 }
 
 void GLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -42,6 +44,10 @@ void GLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
   auto uvCoordsVar = uvCoord.isInitialized() ? uvCoord.asShaderVar() : position.asShaderVar();
   emitTransforms(vertBuilder, varyingHandler, uniformHandler, uvCoordsVar,
                  args.fpCoordTransformHandler);
+  if (subset.isInitialized()) {
+    auto varying = varyingHandler->addVarying("vtexsubset", SLType::Float4, true);
+    vertBuilder->codeAppendf("%s = %s;", varying.vsOut().c_str(), subset.name().c_str());
+  }
 
   if (aa == AAType::Coverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);

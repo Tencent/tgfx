@@ -92,14 +92,18 @@ std::shared_ptr<Image> OrientImage::onMakeOriented(Orientation newOrientation) c
 }
 
 PlacementPtr<FragmentProcessor> OrientImage::asFragmentProcessor(const FPArgs& args,
-                                                                 TileMode tileModeX,
-                                                                 TileMode tileModeY,
-                                                                 const SamplingOptions& sampling,
+                                                                 const FPImageArgs& imageArgs,
                                                                  const Matrix* uvMatrix) const {
   std::optional<Matrix> matrix = std::nullopt;
+  FPImageArgs newImageArgs = imageArgs;
   if (orientation != Orientation::TopLeft) {
     matrix = OrientationToMatrix(orientation, source->width(), source->height());
     matrix->invert(AddressOf(matrix));
+    if (imageArgs.subset) {
+      Rect subset = *imageArgs.subset;
+      matrix->mapRect(&subset);
+      newImageArgs.subset = subset;
+    }
   }
   if (uvMatrix) {
     if (matrix) {
@@ -109,9 +113,9 @@ PlacementPtr<FragmentProcessor> OrientImage::asFragmentProcessor(const FPArgs& a
     }
   }
   if (OrientationSwapsWidthHeight(orientation)) {
-    std::swap(tileModeX, tileModeY);
+    std::swap(newImageArgs.tileModeX, newImageArgs.tileModeY);
   }
-  return FragmentProcessor::Make(source, args, tileModeX, tileModeY, sampling, AddressOf(matrix));
+  return FragmentProcessor::Make(source, args, newImageArgs, AddressOf(matrix));
 }
 
 Orientation OrientImage::concatOrientation(Orientation newOrientation) const {
