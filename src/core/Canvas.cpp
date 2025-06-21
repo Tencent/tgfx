@@ -501,13 +501,17 @@ void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
   }
   auto viewMatrix = dstMatrix ? *dstMatrix : Matrix::I();
   auto imageRect = rect;
-  if (type == Types::ImageType::Subset && constraint == SrcRectConstraint::Strict) {
-    // Unwrap the subset image to maximize the merging of draw calls.
-    auto subsetImage = static_cast<const SubsetImage*>(image.get());
-    auto& subset = subsetImage->bounds;
-    imageRect.offset(subset.left, subset.top);
-    viewMatrix.preTranslate(-subset.left, -subset.top);
-    image = subsetImage->source;
+  if (type == Types::ImageType::Subset) {
+    auto safeBounds = Rect::MakeWH(image->width(), image->height());
+    safeBounds.inset(0.5f, 0.5f);
+    if (constraint == SrcRectConstraint::Strict || safeBounds.contains(rect)) {
+      // Unwrap the subset image to maximize the merging of draw calls.
+      auto subsetImage = static_cast<const SubsetImage*>(image.get());
+      auto& subset = subsetImage->bounds;
+      imageRect.offset(subset.left, subset.top);
+      viewMatrix.preTranslate(-subset.left, -subset.top);
+      image = subsetImage->source;
+    }
   }
   Matrix fillMatrix = {};
   if (!viewMatrix.invert(&fillMatrix)) {

@@ -55,7 +55,7 @@ class SubsetImage : public TransformImage {
 
   std::optional<Matrix> concatUVMatrix(const Matrix* uvMatrix) const;
 
-  std::optional<Rect> concatSubset(const std::optional<Rect>& subset) const;
+  std::optional<Rect> getSubset(const Rect& drawRect) const;
 
   SubsetImage(std::shared_ptr<Image> source, const Rect& bounds);
 };

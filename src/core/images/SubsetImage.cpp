@@ -47,7 +47,6 @@ std::shared_ptr<Image> SubsetImage::onMakeSubset(const Rect& subset) const {
 PlacementPtr<FragmentProcessor> SubsetImage::asFragmentProcessor(const FPArgs& args,
                                                                  const FPImageArgs& imageArgs,
                                                                  const Matrix* uvMatrix) const {
-
   auto matrix = concatUVMatrix(uvMatrix);
   auto drawBounds = args.drawRect;
   if (matrix) {
@@ -55,7 +54,7 @@ PlacementPtr<FragmentProcessor> SubsetImage::asFragmentProcessor(const FPArgs& a
   }
   auto newImageArgs = imageArgs;
   if (bounds.contains(drawBounds)) {
-    newImageArgs.subset = concatSubset(imageArgs.subset);
+    newImageArgs.subset = getSubset(drawBounds);
     return FragmentProcessor::Make(source, args, newImageArgs, AddressOf(matrix));
   }
   auto mipmapped = source->hasMipmaps() && imageArgs.sampling.mipmapMode != MipmapMode::None;
@@ -83,15 +82,13 @@ std::optional<Matrix> SubsetImage::concatUVMatrix(const Matrix* uvMatrix) const 
   return matrix;
 }
 
-std::optional<Rect> SubsetImage::concatSubset(const std::optional<Rect>& subset) const {
-  std::optional<Rect> result;
-  if (subset) {
-    auto localMatrix = concatUVMatrix(nullptr).value_or(Matrix::I());
-    result = localMatrix.mapRect(subset.value());
-  } else {
-    result = bounds;
+std::optional<Rect> SubsetImage::getSubset(const Rect& drawRect) const {
+  auto saftBounds = bounds;
+  saftBounds.inset(0.5f, 0.5f);
+  if (saftBounds.contains(drawRect)) {
+    return std::nullopt;
   }
-  return result;
+  return std::optional<Rect>(bounds);
 }
 
 }  // namespace tgfx

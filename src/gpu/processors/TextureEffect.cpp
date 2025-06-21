@@ -100,7 +100,9 @@ YUVTexture* TextureEffect::getYUVTexture() const {
 
 bool TextureEffect::needSubset(Texture* texture) const {
   DEBUG_ASSERT(texture);
-  if (subset.has_value()) {
+  auto bounds = Rect::MakeWH(texture->width(), texture->height());
+  if (subset.has_value() && !subset.value().contains(bounds)) {
+    // if subset equal to bounds, we don't need to use subset.
     return true;
   }
   // If the texture has a crop rectangle, we need to shrink it to prevent bilinear sampling beyond

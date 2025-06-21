@@ -61,7 +61,7 @@ PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs& a
   auto newImageArgs = imageArgs;
   auto mipmapped = source->hasMipmaps() && imageArgs.sampling.mipmapMode != MipmapMode::None;
   if (bounds.contains(drawBounds)) {
-    newImageArgs.subset = concatSubset(imageArgs.subset);
+    newImageArgs.subset = getSubset(drawBounds);
     TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
     auto proxy = source->lockTextureProxy(tpArgs);
     return TextureEffect::MakeRGBAAA(std::move(proxy), newImageArgs, alphaStart, AddressOf(matrix));

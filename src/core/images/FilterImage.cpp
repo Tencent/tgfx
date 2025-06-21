@@ -144,11 +144,6 @@ PlacementPtr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs& a
   if (fpMatrix) {
     matrix.preConcat(*fpMatrix);
   }
-  auto newImageArgs = imageArgs;
-  if (imageArgs.subset) {
-    newImageArgs.subset = concatSubset(imageArgs.subset);
-    newImageArgs.subset->offset(-dstBounds.x(), -dstBounds.y());
-  }
-  return TiledTextureEffect::Make(textureProxy, newImageArgs, &matrix, source->isAlphaOnly());
+  return TiledTextureEffect::Make(textureProxy, imageArgs, &matrix, source->isAlphaOnly());
 }
 }  // namespace tgfx
