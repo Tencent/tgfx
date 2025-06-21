@@ -27,6 +27,7 @@
 #include "gpu/UniformHandler.h"
 #include "gpu/processors/Processor.h"
 #include "gpu/proxies/TextureProxy.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/core/Image.h"
 
 namespace tgfx {
@@ -38,15 +39,29 @@ class FPArgs {
  public:
   FPArgs() = default;
 
-  FPArgs(Context* context, uint32_t renderFlags, const Rect& drawRect, bool extraSubset)
-      : context(context), renderFlags(renderFlags), drawRect(drawRect), extraSubset(extraSubset) {
+  FPArgs(Context* context, uint32_t renderFlags, const Rect& drawRect)
+      : context(context), renderFlags(renderFlags), drawRect(drawRect) {
   }
 
   Context* context = nullptr;
   uint32_t renderFlags = 0;
   Rect drawRect = {};
-  bool extraSubset = false;
-  const Rect* clipRect = nullptr;
+};
+
+class FPImageArgs {
+ public:
+  FPImageArgs() = default;
+
+  FPImageArgs(TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
+              SrcRectConstraint constraint)
+      : tileModeX(tileModeX), tileModeY(tileModeY), sampling(sampling), constraint(constraint) {
+  }
+
+  TileMode tileModeX = TileMode::Clamp;
+  TileMode tileModeY = TileMode::Clamp;
+  SamplingOptions sampling = {};
+  SrcRectConstraint constraint = SrcRectConstraint::Fast;
+  std::optional<Rect> subset = std::nullopt;
 };
 
 class FragmentProcessor : public Processor {
@@ -55,9 +70,9 @@ class FragmentProcessor : public Processor {
    * Creates a fragment processor that will draw the given image with the given options. The both
    * tileModeX and tileModeY are set to TileMode::Clamp.
    */
-  static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<Image> image, const FPArgs& args,
-                                              const SamplingOptions& sampling,
-                                              const Matrix* uvMatrix = nullptr);
+  static PlacementPtr<FragmentProcessor> Make(
+      std::shared_ptr<Image> image, const FPArgs& args, const SamplingOptions& sampling,
+      SrcRectConstraint constraint = SrcRectConstraint::Fast, const Matrix* uvMatrix = nullptr);
 
   /**
    * Creates a fragment processor that will draw the given image with the given options.
@@ -65,6 +80,14 @@ class FragmentProcessor : public Processor {
   static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<Image> image, const FPArgs& args,
                                               TileMode tileModeX, TileMode tileModeY,
                                               const SamplingOptions& sampling,
+                                              SrcRectConstraint constraint,
+                                              const Matrix* uvMatrix = nullptr);
+  /**
+   * Creates a fragment processor that will draw the given image with the given options.
+   * The imageArgs contains additional information about how to sample the image.
+   */
+  static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<Image> image, const FPArgs& args,
+                                              const FPImageArgs& imageArgs,
                                               const Matrix* uvMatrix = nullptr);
 
   /**

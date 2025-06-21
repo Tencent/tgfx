@@ -25,8 +25,8 @@ namespace tgfx {
 class GLTextureEffect : public TextureEffect {
  public:
   GLTextureEffect(std::shared_ptr<TextureProxy> proxy, const Point& alphaStart,
-                  const SamplingOptions& sampling, const Matrix& uvMatrix, const Rect* subset,
-                  bool extraSubset);
+                  const SamplingOptions& sampling, SrcRectConstraint constraint,
+                  const Matrix& uvMatrix, const std::optional<Rect>& subset);
 
   void emitCode(EmitArgs& args) const override;
 
@@ -36,6 +36,6 @@ class GLTextureEffect : public TextureEffect {
   void onSetData(UniformBuffer* uniformBuffer) const override;
   void appendClamp(FragmentShaderBuilder* fragBuilder, const std::string& vertexColor,
                    const std::string& finalCoordName, const std::string& subsetName,
-                   const std::string& dimensionName, float scale = 1.0f) const;
+                   const std::string& dimensionName) const;
 };
 }  // namespace tgfx

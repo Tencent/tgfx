@@ -115,6 +115,7 @@ std::unique_ptr<GLProgram> GLProgramBuilder::finalize() {
 
   auto vertex = vertexShaderBuilder()->shaderString();
   auto fragment = fragmentShaderBuilder()->shaderString();
+  LOGI("%s", vertex.c_str());
 
   auto programID = CreateGLProgram(context, vertex, fragment);
   if (programID == 0) {

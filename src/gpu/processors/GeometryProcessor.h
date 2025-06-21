@@ -169,9 +169,6 @@ class GeometryProcessor : public Processor {
     return {};
   }
 
-  virtual void onSolveCoordTransform(const Matrix&, UniformBuffer*, const CoordTransform*) const {
-  }
-
   std::vector<const Attribute*> attributes = {};
   size_t textureSamplerCount = 0;
 };

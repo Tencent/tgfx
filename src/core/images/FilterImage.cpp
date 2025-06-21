@@ -113,9 +113,7 @@ std::shared_ptr<TextureProxy> FilterImage::lockTextureProxy(const TPArgs& args) 
 }
 
 PlacementPtr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs& args,
-                                                                 TileMode tileModeX,
-                                                                 TileMode tileModeY,
-                                                                 const SamplingOptions& sampling,
+                                                                 const FPImageArgs& imageArgs,
                                                                  const Matrix* uvMatrix) const {
   auto fpMatrix = concatUVMatrix(uvMatrix);
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
@@ -131,8 +129,10 @@ PlacementPtr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs& a
   if (!filter->applyCropRect(inputBounds, &dstBounds, &clipBounds)) {
     return nullptr;
   }
+  auto sampling = imageArgs.sampling;
   if (dstBounds.contains(drawBounds)) {
-    return filter->asFragmentProcessor(source, args, sampling, AddressOf(fpMatrix));
+    return filter->asFragmentProcessor(source, args, sampling, imageArgs.constraint,
+                                       AddressOf(fpMatrix));
   }
   auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
@@ -144,7 +144,11 @@ PlacementPtr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs& a
   if (fpMatrix) {
     matrix.preConcat(*fpMatrix);
   }
-  return TiledTextureEffect::Make(textureProxy, tileModeX, tileModeY, sampling, &matrix,
-                                  source->isAlphaOnly());
+  auto newImageArgs = imageArgs;
+  if (imageArgs.subset) {
+    newImageArgs.subset = concatSubset(imageArgs.subset);
+    newImageArgs.subset->offset(-dstBounds.x(), -dstBounds.y());
+  }
+  return TiledTextureEffect::Make(textureProxy, newImageArgs, &matrix, source->isAlphaOnly());
 }
 }  // namespace tgfx

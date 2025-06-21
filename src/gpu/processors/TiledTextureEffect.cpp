@@ -130,12 +130,13 @@ TiledTextureEffect::Sampling::Sampling(const Texture* texture, SamplerState samp
 }
 
 TiledTextureEffect::TiledTextureEffect(std::shared_ptr<TextureProxy> proxy,
-                                       const SamplerState& samplerState, const Matrix& uvMatrix,
-                                       const Rect* subset, bool extraSubset)
+                                       const SamplerState& samplerState,
+                                       SrcRectConstraint constraint, const Matrix& uvMatrix,
+                                       const std::optional<Rect>& subset)
     : FragmentProcessor(ClassID()), textureProxy(std::move(proxy)), samplerState(samplerState),
       coordTransform(uvMatrix, textureProxy.get()),
-      subset(subset ? *subset : Rect::MakeWH(textureProxy->width(), textureProxy->height())),
-      extraSubset(extraSubset) {
+      subset(subset.value_or(Rect::MakeWH(textureProxy->width(), textureProxy->height()))),
+      constraint(constraint) {
   addCoordTransform(&coordTransform);
 }
 
@@ -150,7 +151,7 @@ void TiledTextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   Sampling sampling(texture, samplerState, subset);
   auto flags = static_cast<uint32_t>(sampling.shaderModeX);
   flags |= static_cast<uint32_t>(sampling.shaderModeY) << 4;
-  flags |= extraSubset ? static_cast<uint32_t>(1) << 8 : 0;
+  flags |= constraint == SrcRectConstraint::Strict ? static_cast<uint32_t>(1) << 8 : 0;
   bytesKey->write(flags);
 }
 

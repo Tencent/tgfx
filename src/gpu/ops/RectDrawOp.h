@@ -42,7 +42,7 @@ class RectDrawOp : public DrawOp {
   size_t rectCount = 0;
   std::optional<Color> commonColor = std::nullopt;
   std::optional<Matrix> uvMatrix = std::nullopt;
-  bool extraSubset = false;
+  bool hasSubset = false;
   std::shared_ptr<GpuBufferProxy> indexBufferProxy = nullptr;
   std::shared_ptr<GpuBufferProxy> vertexBufferProxy = nullptr;
   size_t vertexBufferOffset = 0;

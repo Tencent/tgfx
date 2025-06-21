@@ -50,9 +50,7 @@ std::shared_ptr<Image> RGBAAAImage::onCloneWith(std::shared_ptr<Image> newSource
 }
 
 PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs& args,
-                                                                 TileMode tileModeX,
-                                                                 TileMode tileModeY,
-                                                                 const SamplingOptions& sampling,
+                                                                 const FPImageArgs& imageArgs,
                                                                  const Matrix* uvMatrix) const {
   DEBUG_ASSERT(!source->isAlphaOnly());
   auto matrix = concatUVMatrix(uvMatrix);
@@ -60,18 +58,21 @@ PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs& a
   if (matrix) {
     matrix->mapRect(&drawBounds);
   }
-  auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
+  auto newImageArgs = imageArgs;
+  auto mipmapped = source->hasMipmaps() && imageArgs.sampling.mipmapMode != MipmapMode::None;
   if (bounds.contains(drawBounds)) {
+    newImageArgs.subset = concatSubset(imageArgs.subset);
     TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
     auto proxy = source->lockTextureProxy(tpArgs);
-    return TextureEffect::MakeRGBAAA(std::move(proxy), alphaStart, sampling, AddressOf(matrix));
+    return TextureEffect::MakeRGBAAA(std::move(proxy), newImageArgs, alphaStart, AddressOf(matrix));
   }
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
   auto textureProxy = lockTextureProxy(tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  return TiledTextureEffect::Make(textureProxy, tileModeX, tileModeY, sampling, uvMatrix);
+  newImageArgs.subset = std::nullopt;
+  return TiledTextureEffect::Make(textureProxy, newImageArgs, uvMatrix);
 }
 
 std::shared_ptr<Image> RGBAAAImage::onMakeSubset(const Rect& subset) const {

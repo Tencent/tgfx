@@ -30,7 +30,7 @@ class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
                                                            int height, AAType aa,
                                                            std::optional<Color> commonColor,
                                                            std::optional<Matrix> uvMatrix,
-                                                           bool extraSubset);
+                                                           bool hasSubset);
   std::string name() const override {
     return "QuadPerEdgeAAGeometryProcessor";
   }
@@ -40,7 +40,7 @@ class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
   QuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa, std::optional<Color> commonColor,
-                                 std::optional<Matrix> uvMatrix, bool extraSubset);
+                                 std::optional<Matrix> uvMatrix, bool hasSubset);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
@@ -55,6 +55,6 @@ class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
   AAType aa = AAType::None;
   std::optional<Color> commonColor = std::nullopt;
   std::optional<Matrix> uvMatrix = std::nullopt;
-  bool extraSubset = false;
+  bool hasSubset = false;
 };
 }  // namespace tgfx

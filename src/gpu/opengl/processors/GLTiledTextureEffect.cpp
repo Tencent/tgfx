@@ -22,23 +22,20 @@
 
 namespace tgfx {
 PlacementPtr<FragmentProcessor> TiledTextureEffect::Make(std::shared_ptr<TextureProxy> proxy,
-                                                         TileMode tileModeX, TileMode tileModeY,
-                                                         const SamplingOptions& options,
-                                                         const Matrix* uvMatrix, bool forceAsMask,
-                                                         const Rect* subset, bool extraSubset) {
+                                                         const FPImageArgs& args,
+                                                         const Matrix* uvMatrix, bool forceAsMask) {
   if (proxy == nullptr) {
     return nullptr;
   }
-  if (tileModeX == TileMode::Clamp && tileModeY == TileMode::Clamp) {
-    return TextureEffect::Make(std::move(proxy), options, uvMatrix, forceAsMask, subset,
-                               extraSubset);
+  if (args.tileModeX == TileMode::Clamp && args.tileModeY == TileMode::Clamp) {
+    return TextureEffect::Make(std::move(proxy), args, uvMatrix, forceAsMask);
   }
   auto matrix = uvMatrix ? *uvMatrix : Matrix::I();
-  SamplerState samplerState(tileModeX, tileModeY, options);
+  SamplerState samplerState(args.tileModeX, args.tileModeY, args.sampling);
   auto isAlphaOnly = proxy->isAlphaOnly();
   auto drawingBuffer = proxy->getContext()->drawingBuffer();
   PlacementPtr<FragmentProcessor> processor = drawingBuffer->make<GLTiledTextureEffect>(
-      std::move(proxy), samplerState, matrix, subset, extraSubset);
+      std::move(proxy), samplerState, args.constraint, matrix, args.subset);
   if (forceAsMask && !isAlphaOnly) {
     processor = FragmentProcessor::MulInputByChildAlpha(drawingBuffer, std::move(processor));
   }
@@ -46,9 +43,10 @@ PlacementPtr<FragmentProcessor> TiledTextureEffect::Make(std::shared_ptr<Texture
 }
 
 GLTiledTextureEffect::GLTiledTextureEffect(std::shared_ptr<TextureProxy> proxy,
-                                           const SamplerState& samplerState, const Matrix& uvMatrix,
-                                           const Rect* subset, bool extraSubset)
-    : TiledTextureEffect(std::move(proxy), samplerState, uvMatrix, subset, extraSubset) {
+                                           const SamplerState& samplerState,
+                                           SrcRectConstraint constraint, const Matrix& uvMatrix,
+                                           const std::optional<Rect>& subset)
+    : TiledTextureEffect(std::move(proxy), samplerState, constraint, uvMatrix, subset) {
 }
 
 bool GLTiledTextureEffect::ShaderModeRequiresUnormCoord(TiledTextureEffect::ShaderMode mode) {
@@ -276,7 +274,7 @@ void GLTiledTextureEffect::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppend("vec2 clampedCoord;");
     clampCoord(args, useClamp, names.clampName);
 
-    if (extraSubset) {
+    if (constraint == SrcRectConstraint::Strict) {
       args.fragBuilder->codeAppend(
           "clampedCoord = clamp(clampedCoord, vtexsubset_P0.xy, vtexsubset_P0.zw);");
     }

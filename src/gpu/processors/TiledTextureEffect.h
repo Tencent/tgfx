@@ -25,10 +25,10 @@
 namespace tgfx {
 class TiledTextureEffect : public FragmentProcessor {
  public:
-  static PlacementPtr<FragmentProcessor> Make(
-      std::shared_ptr<TextureProxy> textureProxy, TileMode tileModeX, TileMode tileModeY,
-      const SamplingOptions& sampling = {}, const Matrix* uvMatrix = nullptr,
-      bool forceAsMask = false, const Rect* subset = nullptr, bool extraSubset = false);
+  static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<TextureProxy> textureProxy,
+                                              const FPImageArgs& args,
+                                              const Matrix* uvMatrix = nullptr,
+                                              bool forceAsMask = false);
 
   std::string name() const override {
     return "TiledTextureEffect";
@@ -60,7 +60,8 @@ class TiledTextureEffect : public FragmentProcessor {
   };
 
   TiledTextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplerState& samplerState,
-                     const Matrix& uvMatrix, const Rect* subset, bool extraSubset);
+                     SrcRectConstraint constraint, const Matrix& uvMatrix,
+                     const std::optional<Rect>& subset);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
@@ -78,6 +79,6 @@ class TiledTextureEffect : public FragmentProcessor {
   SamplerState samplerState;
   CoordTransform coordTransform;
   Rect subset = Rect::MakeEmpty();
-  bool extraSubset = false;
+  SrcRectConstraint constraint = SrcRectConstraint::Fast;
 };
 }  // namespace tgfx

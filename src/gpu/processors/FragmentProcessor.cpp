@@ -28,20 +28,27 @@ namespace tgfx {
 PlacementPtr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image> image,
                                                         const FPArgs& args,
                                                         const SamplingOptions& sampling,
+                                                        SrcRectConstraint constraint,
                                                         const Matrix* uvMatrix) {
   DEBUG_ASSERT(image != nullptr);
-  auto fpProcessor =
-      image->asFragmentProcessor(args, TileMode::Clamp, TileMode::Clamp, sampling, uvMatrix);
-  return fpProcessor;
+  FPImageArgs imageArgs = FPImageArgs(TileMode::Clamp, TileMode::Clamp, sampling, constraint);
+  return image->asFragmentProcessor(args, imageArgs, uvMatrix);
+}
+
+PlacementPtr<FragmentProcessor> FragmentProcessor::Make(
+    std::shared_ptr<Image> image, const FPArgs& args, TileMode tileModeX, TileMode tileModeY,
+    const SamplingOptions& sampling, SrcRectConstraint constraint, const Matrix* uvMatrix) {
+  DEBUG_ASSERT(image != nullptr);
+  FPImageArgs imageArgs = FPImageArgs(tileModeX, tileModeY, sampling, constraint);
+  return image->asFragmentProcessor(args, imageArgs, uvMatrix);
 }
 
 PlacementPtr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image> image,
-                                                        const FPArgs& args, TileMode tileModeX,
-                                                        TileMode tileModeY,
-                                                        const SamplingOptions& sampling,
+                                                        const FPArgs& args,
+                                                        const FPImageArgs& imageArgs,
                                                         const Matrix* uvMatrix) {
   DEBUG_ASSERT(image != nullptr);
-  return image->asFragmentProcessor(args, tileModeX, tileModeY, sampling, uvMatrix);
+  return image->asFragmentProcessor(args, imageArgs, uvMatrix);
 }
 
 PlacementPtr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Shader> shader,

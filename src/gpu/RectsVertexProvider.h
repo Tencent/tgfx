@@ -23,6 +23,7 @@
 #include "gpu/VertexProvider.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
+#include "tgfx/core/SamplingOptions.h"
 
 namespace tgfx {
 struct RectRecord {
@@ -51,8 +52,8 @@ class RectsVertexProvider : public VertexProvider {
    */
   static PlacementPtr<RectsVertexProvider> MakeFrom(BlockBuffer* buffer,
                                                     std::vector<PlacementPtr<RectRecord>>&& rects,
-                                                    AAType aaType, bool needUVCoord,
-                                                    bool needSubset);
+                                                    AAType aaType, const SamplingOptions& options,
+                                                    bool needUVCoord, bool needSubset);
 
   /**
    * Returns the number of rects in the provider.
@@ -120,7 +121,12 @@ class RectsVertexProvider : public VertexProvider {
     bool hasSubset : 1;
   } bitFields = {};
 
-  RectsVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType, bool hasUVCoord,
-                      bool hasColor, bool hasSubset);
+  SamplingOptions samplingOption = {};
+
+  RectsVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType,
+                      const SamplingOptions& options, bool hasUVCoord, bool hasColor,
+                      bool hasSubset);
+
+  Rect getSubsetRect(const Rect& rect) const;
 };
 }  // namespace tgfx

@@ -45,9 +45,8 @@ class OrientImage : public TransformImage {
 
   std::shared_ptr<Image> onMakeOriented(Orientation newOrientation) const override;
 
-  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args, TileMode tileModeX,
-                                                      TileMode tileModeY,
-                                                      const SamplingOptions& sampling,
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
+                                                      const FPImageArgs& imageArgs,
                                                       const Matrix* uvMatrix) const override;
 
   Orientation concatOrientation(Orientation newOrientation) const;

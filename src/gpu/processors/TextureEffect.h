@@ -27,18 +27,14 @@ namespace tgfx {
 class TextureEffect : public FragmentProcessor {
  public:
   static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<TextureProxy> proxy,
-                                              const SamplingOptions& sampling = {},
+                                              const FPImageArgs& args = {},
                                               const Matrix* uvMatrix = nullptr,
-                                              bool forceAsMask = false,
-                                              const Rect* subset = nullptr,
-                                              bool extraSubset = false);
+                                              bool forceAsMask = false);
 
   static PlacementPtr<FragmentProcessor> MakeRGBAAA(std::shared_ptr<TextureProxy> proxy,
+                                                    const FPImageArgs& args,
                                                     const Point& alphaStart,
-                                                    const SamplingOptions& sampling = {},
-                                                    const Matrix* uvMatrix = nullptr,
-                                                    const Rect* subset = nullptr,
-                                                    bool extraSubset = false);
+                                                    const Matrix* uvMatrix = nullptr);
 
   std::string name() const override {
     return "TextureEffect";
@@ -48,8 +44,8 @@ class TextureEffect : public FragmentProcessor {
   DEFINE_PROCESSOR_CLASS_ID
 
   TextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplingOptions& sampling,
-                const Point& alphaStart, const Matrix& uvMatrix, const Rect* subset,
-                bool extraSubset);
+                SrcRectConstraint constraint, const Point& alphaStart, const Matrix& uvMatrix,
+                const std::optional<Rect>& subset);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
@@ -69,9 +65,9 @@ class TextureEffect : public FragmentProcessor {
 
   std::shared_ptr<TextureProxy> textureProxy;
   SamplerState samplerState;
+  SrcRectConstraint constraint = SrcRectConstraint::Fast;
   Point alphaStart = {};
   CoordTransform coordTransform;
-  bool extraSubset = false;
   std::optional<Rect> subset = std::nullopt;
 };
 }  // namespace tgfx

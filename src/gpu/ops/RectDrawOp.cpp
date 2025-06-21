@@ -57,7 +57,7 @@ RectDrawOp::RectDrawOp(RectsVertexProvider* provider)
   if (!provider->hasColor()) {
     commonColor = provider->firstColor();
   }
-  extraSubset = provider->hasSubset();
+  hasSubset = provider->hasSubset();
 }
 
 void RectDrawOp::execute(RenderPass* renderPass) {
@@ -77,7 +77,7 @@ void RectDrawOp::execute(RenderPass* renderPass) {
   auto drawingBuffer = renderPass->getContext()->drawingBuffer();
   auto gp = QuadPerEdgeAAGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
                                                  renderTarget->height(), aaType, commonColor,
-                                                 uvMatrix, extraSubset);
+                                                 uvMatrix, hasSubset);
   gp->fillAttribute();
   auto pipeline = createPipeline(renderPass, std::move(gp));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());

@@ -31,7 +31,7 @@ void QuadPerEdgeAAGeometryProcessor::fillAttribute() {
   if (!commonColor.has_value()) {
     color = {"inColor", SLType::UByte4Color};
   }
-  if (extraSubset) {
+  if (hasSubset) {
     subset = {"texSubset", SLType::Float4};
   }
   setVertexAttributes(&position, 5);
@@ -40,16 +40,16 @@ void QuadPerEdgeAAGeometryProcessor::fillAttribute() {
 QuadPerEdgeAAGeometryProcessor::QuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa,
                                                                std::optional<Color> commonColor,
                                                                std::optional<Matrix> uvMatrix,
-                                                               bool extraSubset)
+                                                               bool hasSubset)
     : GeometryProcessor(ClassID()), width(width), height(height), aa(aa), commonColor(commonColor),
-      uvMatrix(uvMatrix), extraSubset(extraSubset) {
+      uvMatrix(uvMatrix), hasSubset(hasSubset) {
 }
 
 void QuadPerEdgeAAGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t flags = aa == AAType::Coverage ? 1 : 0;
   flags |= commonColor.has_value() ? 2 : 0;
   flags |= uvMatrix.has_value() ? 4 : 0;
-  flags |= extraSubset ? 8 : 0;
+  flags |= hasSubset ? 8 : 0;
   bytesKey->write(flags);
 }
 }  // namespace tgfx

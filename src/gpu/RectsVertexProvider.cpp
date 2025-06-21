@@ -30,9 +30,10 @@ static void WriteUByte4Color(float* vertices, int& index, const Color& color) {
 
 class AARectsVertexProvider : public RectsVertexProvider {
  public:
-  AARectsVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType, bool hasUVCoord,
-                        bool hasColor, bool needSubset)
-      : RectsVertexProvider(std::move(rects), aaType, hasUVCoord, hasColor, needSubset) {
+  AARectsVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType,
+                        const SamplingOptions& options, bool hasUVCoord, bool hasColor,
+                        bool needSubset)
+      : RectsVertexProvider(std::move(rects), aaType, options, hasUVCoord, hasColor, needSubset) {
   }
 
   size_t vertexCount() const override {
@@ -61,6 +62,7 @@ class AARectsVertexProvider : public RectsVertexProvider {
       auto outsetQuad = Quad::MakeFrom(outsetBounds, &viewMatrix);
       auto uvInsetQuad = Quad::MakeFrom(insetBounds);
       auto uvOutsetQuad = Quad::MakeFrom(outsetBounds);
+      Rect subset = getSubsetRect(rect);
       for (int j = 0; j < 2; ++j) {
         auto& quad = j == 0 ? insetQuad : outsetQuad;
         auto& uvQuad = j == 0 ? uvInsetQuad : uvOutsetQuad;
@@ -77,7 +79,6 @@ class AARectsVertexProvider : public RectsVertexProvider {
             WriteUByte4Color(vertices, index, record->color);
           }
           if (bitFields.hasSubset) {
-            Rect subset = rect;
             vertices[index++] = subset.left;
             vertices[index++] = subset.top;
             vertices[index++] = subset.right;
@@ -91,9 +92,10 @@ class AARectsVertexProvider : public RectsVertexProvider {
 
 class NonAARectVertexProvider : public RectsVertexProvider {
  public:
-  NonAARectVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType, bool hasUVCoord,
-                          bool hasColor, bool hasSubset)
-      : RectsVertexProvider(std::move(rects), aaType, hasUVCoord, hasColor, hasSubset) {
+  NonAARectVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType,
+                          const SamplingOptions& options, bool hasUVCoord, bool hasColor,
+                          bool hasSubset)
+      : RectsVertexProvider(std::move(rects), aaType, options, hasUVCoord, hasColor, hasSubset) {
   }
 
   size_t vertexCount() const override {
@@ -101,7 +103,7 @@ class NonAARectVertexProvider : public RectsVertexProvider {
     if (bitFields.hasColor) {
       perVertexCount += 1;
     }
-    if (hasSubset()) {
+    if (bitFields.hasSubset) {
       perVertexCount += 4;
     }
     return rects.size() * 4 * perVertexCount;
@@ -109,12 +111,12 @@ class NonAARectVertexProvider : public RectsVertexProvider {
 
   void getVertices(float* vertices) const override {
     auto index = 0;
-    bool needSubset = hasSubset();
     for (auto& record : rects) {
       auto& viewMatrix = record->viewMatrix;
       auto& rect = record->rect;
       auto quad = Quad::MakeFrom(rect, &viewMatrix);
       auto uvQuad = Quad::MakeFrom(rect);
+      auto subset = getSubsetRect(rect);
       for (size_t j = 4; j >= 1; --j) {
         vertices[index++] = quad.point(j - 1).x;
         vertices[index++] = quad.point(j - 1).y;
@@ -125,11 +127,11 @@ class NonAARectVertexProvider : public RectsVertexProvider {
         if (bitFields.hasColor) {
           WriteUByte4Color(vertices, index, record->color);
         }
-        if (needSubset) {
-          vertices[index++] = rect.left;
-          vertices[index++] = rect.top;
-          vertices[index++] = rect.right;
-          vertices[index++] = rect.bottom;
+        if (bitFields.hasSubset) {
+          vertices[index++] = subset.left;
+          vertices[index++] = subset.top;
+          vertices[index++] = subset.right;
+          vertices[index++] = subset.bottom;
         }
       }
     }
@@ -144,14 +146,16 @@ PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(BlockBuffer* buf
   auto record = buffer->make<RectRecord>(rect, Matrix::I());
   auto rects = buffer->makeArray<RectRecord>(&record, 1);
   if (aaType == AAType::Coverage) {
-    return buffer->make<AARectsVertexProvider>(std::move(rects), aaType, false, false, false);
+    return buffer->make<AARectsVertexProvider>(std::move(rects), aaType, SamplingOptions{}, false,
+                                               false, false);
   }
-  return buffer->make<NonAARectVertexProvider>(std::move(rects), aaType, false, false, false);
+  return buffer->make<NonAARectVertexProvider>(std::move(rects), aaType, SamplingOptions{}, false,
+                                               false, false);
 }
 
 PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
     BlockBuffer* buffer, std::vector<PlacementPtr<RectRecord>>&& rects, AAType aaType,
-    bool needUVCoord, bool needSubset) {
+    const SamplingOptions& options, bool needUVCoord, bool needSubset) {
   if (rects.empty()) {
     return nullptr;
   }
@@ -177,20 +181,28 @@ PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
   }
   auto array = buffer->makeArray(std::move(rects));
   if (aaType == AAType::Coverage) {
-    return buffer->make<AARectsVertexProvider>(std::move(array), aaType, hasUVCoord, hasColor,
-                                               needSubset);
+    return buffer->make<AARectsVertexProvider>(std::move(array), aaType, options, hasUVCoord,
+                                               hasColor, needSubset);
   }
-  return buffer->make<NonAARectVertexProvider>(std::move(array), aaType, hasUVCoord, hasColor,
-                                               needSubset);
+  return buffer->make<NonAARectVertexProvider>(std::move(array), aaType, options, hasUVCoord,
+                                               hasColor, needSubset);
 }
 
 RectsVertexProvider::RectsVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType,
-                                         bool hasUVCoord, bool hasColor, bool hasSubset)
-    : rects(std::move(rects)) {
+                                         const SamplingOptions& options, bool hasUVCoord,
+                                         bool hasColor, bool hasSubset)
+    : rects(std::move(rects)), samplingOption(options) {
   bitFields.aaType = static_cast<uint8_t>(aaType);
   bitFields.hasUVCoord = hasUVCoord;
   bitFields.hasColor = hasColor;
   bitFields.hasSubset = hasSubset;
 }
 
+Rect RectsVertexProvider::getSubsetRect(const Rect& rect) const {
+  auto subset = rect;
+  if (samplingOption.filterMode == FilterMode::Nearest) {
+    subset.roundOut();
+  }
+  return subset.makeInset(0.5f, 0.5f);
+}
 }  // namespace tgfx

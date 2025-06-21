@@ -45,29 +45,27 @@ std::shared_ptr<Image> SubsetImage::onMakeSubset(const Rect& subset) const {
 }
 
 PlacementPtr<FragmentProcessor> SubsetImage::asFragmentProcessor(const FPArgs& args,
-                                                                 TileMode tileModeX,
-                                                                 TileMode tileModeY,
-                                                                 const SamplingOptions& sampling,
+                                                                 const FPImageArgs& imageArgs,
                                                                  const Matrix* uvMatrix) const {
+
   auto matrix = concatUVMatrix(uvMatrix);
   auto drawBounds = args.drawRect;
   if (matrix) {
     matrix->mapRect(&drawBounds);
   }
-  FPArgs newArgs = args;
-  newArgs.clipRect = &drawBounds;
+  auto newImageArgs = imageArgs;
   if (bounds.contains(drawBounds)) {
-    return FragmentProcessor::Make(source, newArgs, tileModeX, tileModeY, sampling,
-                                   AddressOf(matrix));
+    newImageArgs.subset = concatSubset(imageArgs.subset);
+    return FragmentProcessor::Make(source, args, newImageArgs, AddressOf(matrix));
   }
-  auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
+  auto mipmapped = source->hasMipmaps() && imageArgs.sampling.mipmapMode != MipmapMode::None;
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
   auto textureProxy = lockTextureProxy(tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  return TiledTextureEffect::Make(textureProxy, tileModeX, tileModeY, sampling, uvMatrix,
-                                  source->isAlphaOnly());
+  newImageArgs.subset = std::nullopt;
+  return TiledTextureEffect::Make(textureProxy, newImageArgs, uvMatrix, source->isAlphaOnly());
 }
 
 std::optional<Matrix> SubsetImage::concatUVMatrix(const Matrix* uvMatrix) const {
@@ -84,4 +82,16 @@ std::optional<Matrix> SubsetImage::concatUVMatrix(const Matrix* uvMatrix) const 
   }
   return matrix;
 }
+
+std::optional<Rect> SubsetImage::concatSubset(const std::optional<Rect>& subset) const {
+  std::optional<Rect> result;
+  if (subset) {
+    auto localMatrix = concatUVMatrix(nullptr).value_or(Matrix::I());
+    result = localMatrix.mapRect(subset.value());
+  } else {
+    result = bounds;
+  }
+  return result;
+}
+
 }  // namespace tgfx

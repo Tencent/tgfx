@@ -252,8 +252,9 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
         }
       }
       auto needSubset = pendingConstraint == SrcRectConstraint::Strict && pendingImage;
-      auto provider = RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects),
-                                                    aaType, needLocalBounds, needSubset);
+      auto provider =
+          RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects), aaType,
+                                        pendingSampling, needLocalBounds, needSubset);
       drawOp = RectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::RRect: {
@@ -278,9 +279,9 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
   }
 
   if (type == PendingOpType::Image) {
-    FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()),
-                   pendingConstraint == SrcRectConstraint::Strict};
-    auto processor = FragmentProcessor::Make(std::move(pendingImage), args, pendingSampling);
+    FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty())};
+    auto processor =
+        FragmentProcessor::Make(std::move(pendingImage), args, pendingSampling, pendingConstraint);
     if (processor == nullptr) {
       return;
     }
@@ -537,7 +538,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
     return;
   }
 
-  FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()), false};
+  FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty())};
   if (fill.shader) {
     if (auto processor = FragmentProcessor::Make(fill.shader, args)) {
       op->addColorFP(std::move(processor));

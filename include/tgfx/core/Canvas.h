@@ -36,13 +36,19 @@ class MCState;
 class CanvasState;
 
 /**
- * SrcRectConstraint controls the behavior at the edge of source SkRect, provided to drawImageRect()
+ * SrcRectConstraint controls the behavior at the edge of source rect, provided to drawImageRect()
  * when there is any filtering. If Strict is set, then extra code is used to ensure it never samples
  * outside of the src-rect. Strict disables the use of mipmaps.
 */
 enum class SrcRectConstraint {
-  Strict,  //!< sample only inside bounds; slower
-  Fast,    //!< sample outside bounds; faster
+  /**
+   * sample only inside bounds; slower
+   */
+  Strict,
+  /**
+   * sample outside bounds; faster
+   */
+  Fast,
 };
 
 /**
