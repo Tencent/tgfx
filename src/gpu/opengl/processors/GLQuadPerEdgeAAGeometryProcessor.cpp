@@ -79,5 +79,4 @@ void GLQuadPerEdgeAAGeometryProcessor::setData(UniformBuffer* uniformBuffer,
     uniformBuffer->setData("Color", *commonColor);
   }
 }
-
 }  // namespace tgfx

@@ -52,7 +52,6 @@ PlacementPtr<FragmentProcessor> TextureEffect::MakeRGBAAA(std::shared_ptr<Textur
                                                           const FPImageArgs& args,
                                                           const Point& alphaStart,
                                                           const Matrix* uvMatrix) {
-
   if (proxy == nullptr) {
     return nullptr;
   }

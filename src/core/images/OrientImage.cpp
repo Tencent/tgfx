@@ -100,7 +100,7 @@ PlacementPtr<FragmentProcessor> OrientImage::asFragmentProcessor(const FPArgs& a
     matrix = OrientationToMatrix(orientation, source->width(), source->height());
     matrix->invert(AddressOf(matrix));
     if (imageArgs.subset) {
-      Rect subset = imageArgs.subset.value();
+      Rect subset = *imageArgs.subset;
       matrix->mapRect(&subset);
       newImageArgs.subset = subset;
     }

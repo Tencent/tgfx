@@ -19,6 +19,7 @@
 #pragma once
 
 #include <functional>
+#include <optional>
 #include "gpu/CoordTransform.h"
 #include "gpu/FragmentShaderBuilder.h"
 #include "gpu/SamplerState.h"

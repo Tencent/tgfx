@@ -101,7 +101,7 @@ YUVTexture* TextureEffect::getYUVTexture() const {
 bool TextureEffect::needSubset(Texture* texture) const {
   DEBUG_ASSERT(texture);
   auto bounds = Rect::MakeWH(texture->width(), texture->height());
-  if (subset.has_value() && !subset.value().contains(bounds)) {
+  if (subset.has_value() && !(*subset).contains(bounds)) {
     // if subset equal to bounds, we don't need to use subset.
     return true;
   }
