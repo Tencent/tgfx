@@ -612,7 +612,8 @@ TGFX_TEST(TextAlignTest, FontFallbackTest) {
   fallbackTypefaces.emplace_back(typeface2);
   TextLayer::SetFallbackTypefaces(fallbackTypefaces);
 
-  const std::string testText = "这是一段测试 emoji🤡👻🐠的文字，🤩😃🤪😅。";
+  const std::string testText =
+      "这是一段测试 emoji🤡👻🐠的文字，🤩😃🤪😅。";
 
   auto textLayer = TextLayer::Make();
   textLayer->setName("text_layer1");
