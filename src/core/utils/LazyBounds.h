@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,38 +18,39 @@
 
 #pragma once
 
-#include "core/GlyphRunList.h"
-#include "gpu/ResourceKey.h"
-#include "tgfx/core/Shape.h"
+#include <atomic>
+#include "tgfx/core/Rect.h"
 
 namespace tgfx {
 /**
- * Shape that contains a GlyphRunList.
+ * LazyBounds is a thread-safe cache for storing bounding box.
  */
-class TextShape : public Shape {
+class LazyBounds {
  public:
-  explicit TextShape(std::shared_ptr<GlyphRunList> glyphRunList, float resolutionScale)
-      : glyphRunList(std::move(glyphRunList)), resolutionScale(resolutionScale) {
+  ~LazyBounds() {
+    reset();
   }
 
-  Rect getBounds() const override {
-    return glyphRunList->getBounds(resolutionScale);
+  /**
+   * Returns the cached bounding box. This method is thread-safe as long as there is no concurrent
+   * reset() call.
+   */
+  const Rect* get() const {
+    return bounds.load(std::memory_order_acquire);
   }
 
-  Path getPath() const override;
+  /**
+   * Sets the bounding box to the cache. This method is thread-safe as long as there is no
+   * concurrent reset() call.
+   */
+  void update(const Rect& rect) const;
 
- protected:
-  Type type() const override {
-    return Type::Text;
-  }
-
-  UniqueKey getUniqueKey() const override {
-    return uniqueKey.get();
-  }
+  /**
+   * Resets the cached bounding box to its empty state. This method is not thread-safe.
+   */
+  void reset();
 
  private:
-  LazyUniqueKey uniqueKey = {};
-  std::shared_ptr<GlyphRunList> glyphRunList = nullptr;
-  float resolutionScale = 1.0f;
+  mutable std::atomic<Rect*> bounds = {nullptr};
 };
 }  // namespace tgfx

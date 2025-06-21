@@ -19,6 +19,7 @@
 #include "MeasureContext.h"
 #include "core/utils/ApplyStrokeToBound.h"
 #include "core/utils/Log.h"
+#include "utils/MathExtra.h"
 
 namespace tgfx {
 void MeasureContext::drawFill(const Fill&) {
@@ -56,7 +57,11 @@ void MeasureContext::drawImageRect(std::shared_ptr<Image>, const Rect& rect, con
 void MeasureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
                                       const MCState& state, const Fill& fill,
                                       const Stroke* stroke) {
-  auto localBounds = glyphRunList->getBounds();
+  auto maxScale = state.matrix.getMaxScale();
+  if (FloatNearlyZero(maxScale)) {
+    return;
+  }
+  auto localBounds = glyphRunList->getBounds(maxScale);
   if (stroke) {
     ApplyStrokeToBounds(*stroke, &localBounds);
   }

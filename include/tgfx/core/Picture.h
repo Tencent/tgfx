@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <atomic>
 #include "tgfx/core/FillModifier.h"
 #include "tgfx/core/Matrix.h"
 
@@ -52,7 +53,7 @@ class Picture {
 
   /**
    * Returns the bounding box of the Picture when drawn with the given Matrix. Since the Picture
-   * may contain shape or glyph drawing commands whose outlines can change with different scale
+   * may contain glyph drawing commands whose outlines can change with different scale
    * factors, it's best to use the final drawing matrix to calculate the bounds for accuracy.
    * Note that the bounds only include the combined geometry of each drawing command, but some
    * commands may draw outside these bounds. Use the hasUnboundedFill() method to check for this.
@@ -71,6 +72,7 @@ class Picture {
  private:
   std::shared_ptr<BlockData> blockData = nullptr;
   std::vector<PlacementPtr<Record>> records;
+  mutable std::atomic<Rect*> bounds = {nullptr};
   size_t drawCount = 0;
   bool _hasUnboundedFill = false;
 

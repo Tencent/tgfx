@@ -125,7 +125,7 @@ class RectsVertexProvider : public VertexProvider {
 
   RectsVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType,
                       const SamplingOptions& options, bool hasUVCoord, bool hasColor,
-                      bool hasSubset);
+                      bool hasSubset, std::shared_ptr<BlockBuffer> reference);
 
   Rect getSubsetRect(const Rect& rect) const;
 };

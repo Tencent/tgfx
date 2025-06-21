@@ -126,8 +126,6 @@ class AsyncDataSource : public DataSource<T> {
   }
 
   ~AsyncDataSource() override {
-    // The data source might have objects created in shared memory (like BlockBuffer), so we
-    // need to wait for the task to finish before destroying it.
     task->cancel();
   }
 

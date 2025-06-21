@@ -32,8 +32,9 @@ class AARectsVertexProvider : public RectsVertexProvider {
  public:
   AARectsVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType,
                         const SamplingOptions& options, bool hasUVCoord, bool hasColor,
-                        bool needSubset)
-      : RectsVertexProvider(std::move(rects), aaType, options, hasUVCoord, hasColor, needSubset) {
+                        bool hasSubset, std::shared_ptr<BlockBuffer> reference)
+      : RectsVertexProvider(std::move(rects), aaType, options, hasUVCoord, hasColor, hasSubset,
+                            std::move(reference)) {
   }
 
   size_t vertexCount() const override {
@@ -94,8 +95,9 @@ class NonAARectVertexProvider : public RectsVertexProvider {
  public:
   NonAARectVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType,
                           const SamplingOptions& options, bool hasUVCoord, bool hasColor,
-                          bool hasSubset)
-      : RectsVertexProvider(std::move(rects), aaType, options, hasUVCoord, hasColor, hasSubset) {
+                          bool hasSubset, std::shared_ptr<BlockBuffer> reference)
+      : RectsVertexProvider(std::move(rects), aaType, options, hasUVCoord, hasColor, hasSubset,
+                            std::move(reference)) {
   }
 
   size_t vertexCount() const override {
@@ -147,10 +149,10 @@ PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(BlockBuffer* buf
   auto rects = buffer->makeArray<RectRecord>(&record, 1);
   if (aaType == AAType::Coverage) {
     return buffer->make<AARectsVertexProvider>(std::move(rects), aaType, SamplingOptions{}, false,
-                                               false, false);
+                                               false, false, buffer->addReference());
   }
   return buffer->make<NonAARectVertexProvider>(std::move(rects), aaType, SamplingOptions{}, false,
-                                               false, false);
+                                               false, false, buffer->addReference());
 }
 
 PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
@@ -182,16 +184,17 @@ PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
   auto array = buffer->makeArray(std::move(rects));
   if (aaType == AAType::Coverage) {
     return buffer->make<AARectsVertexProvider>(std::move(array), aaType, options, hasUVCoord,
-                                               hasColor, needSubset);
+                                               hasColor, needSubset, buffer->addReference());
   }
   return buffer->make<NonAARectVertexProvider>(std::move(array), aaType, options, hasUVCoord,
-                                               hasColor, needSubset);
+                                               hasColor, needSubset, buffer->addReference());
 }
 
 RectsVertexProvider::RectsVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType,
                                          const SamplingOptions& options, bool hasUVCoord,
-                                         bool hasColor, bool hasSubset)
-    : rects(std::move(rects)), samplingOption(options) {
+                                         bool hasColor, bool hasSubset,
+                                         std::shared_ptr<BlockBuffer> reference)
+    : VertexProvider(std::move(reference)), rects(std::move(rects)), samplingOption(options) {
   bitFields.aaType = static_cast<uint8_t>(aaType);
   bitFields.hasUVCoord = hasUVCoord;
   bitFields.hasColor = hasColor;

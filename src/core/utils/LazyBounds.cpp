@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,40 +16,20 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "core/GlyphRunList.h"
-#include "gpu/ResourceKey.h"
-#include "tgfx/core/Shape.h"
+#include "LazyBounds.h"
 
 namespace tgfx {
-/**
- * Shape that contains a GlyphRunList.
- */
-class TextShape : public Shape {
- public:
-  explicit TextShape(std::shared_ptr<GlyphRunList> glyphRunList, float resolutionScale)
-      : glyphRunList(std::move(glyphRunList)), resolutionScale(resolutionScale) {
+void LazyBounds::update(const Rect& rect) const {
+  auto newBounds = new Rect(rect);
+  Rect* oldBounds = nullptr;
+  if (!bounds.compare_exchange_strong(oldBounds, newBounds, std::memory_order_acq_rel)) {
+    delete newBounds;
   }
+}
 
-  Rect getBounds() const override {
-    return glyphRunList->getBounds(resolutionScale);
-  }
+void LazyBounds::reset() {
+  auto oldBounds = bounds.exchange(nullptr, std::memory_order_acq_rel);
+  delete oldBounds;
+}
 
-  Path getPath() const override;
-
- protected:
-  Type type() const override {
-    return Type::Text;
-  }
-
-  UniqueKey getUniqueKey() const override {
-    return uniqueKey.get();
-  }
-
- private:
-  LazyUniqueKey uniqueKey = {};
-  std::shared_ptr<GlyphRunList> glyphRunList = nullptr;
-  float resolutionScale = 1.0f;
-};
 }  // namespace tgfx
