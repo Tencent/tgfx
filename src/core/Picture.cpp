@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Picture.h"
+#include "core/HitTestContext.h"
 #include "core/MeasureContext.h"
 #include "core/Records.h"
 #include "core/utils/BlockBuffer.h"
@@ -47,18 +48,22 @@ Picture::~Picture() {
   delete oldBounds;
 }
 
-Rect Picture::getBounds(const Matrix* matrix) const {
-  if (!matrix) {
+Rect Picture::getBounds(const Matrix* matrix, bool computeTightBounds) const {
+  if (matrix && FloatNearlyZero(matrix->getMaxScale())) {
+    return {};
+  }
+  auto useCachedBounds = !matrix && !computeTightBounds;
+  if (useCachedBounds) {
     auto cachedBounds = bounds.load(std::memory_order_acquire);
     if (cachedBounds) {
       return *cachedBounds;
     }
   }
-  MeasureContext context = {};
+  MeasureContext context(computeTightBounds);
   MCState state(matrix ? *matrix : Matrix::I());
   playback(&context, state);
   auto totalBounds = context.getBounds();
-  if (!matrix) {
+  if (useCachedBounds) {
     auto newBounds = new Rect(totalBounds);
     Rect* oldBounds = nullptr;
     if (!bounds.compare_exchange_strong(oldBounds, newBounds, std::memory_order_acq_rel)) {
@@ -68,22 +73,36 @@ Rect Picture::getBounds(const Matrix* matrix) const {
   return totalBounds;
 }
 
-void Picture::playback(Canvas* canvas, const FillModifier* fillModifier) const {
-  if (canvas != nullptr) {
-    playback(canvas->drawContext, *canvas->mcState, fillModifier);
+bool Picture::hitTestPoint(float localX, float localY, bool shapeHitTest) const {
+  PlaybackContext playbackContext = {};
+  HitTestContext hitTestContext(localX, localY, shapeHitTest);
+  for (auto& record : records) {
+    record->playback(&hitTestContext, &playbackContext);
+    if (hitTestContext.hasHit()) {
+      return true;
+    }
   }
+  return false;
+}
+
+void Picture::playback(Canvas* canvas, const FillModifier* fillModifier) const {
+  if (canvas == nullptr) {
+    return;
+  }
+  auto& state = *canvas->mcState;
+  if (state.clip.isEmpty() && !state.clip.isInverseFillType()) {
+    return;
+  }
+  auto maxScale = state.matrix.getMaxScale();
+  if (FloatNearlyZero(maxScale)) {
+    return;
+  }
+  playback(canvas->drawContext, state, fillModifier);
 }
 
 void Picture::playback(DrawContext* drawContext, const MCState& state,
                        const FillModifier* fillModifier) const {
   DEBUG_ASSERT(drawContext != nullptr);
-  auto maxScale = state.matrix.getMaxScale();
-  if (FloatNearlyZero(maxScale)) {
-    return;
-  }
-  if (state.clip.isEmpty() && !state.clip.isInverseFillType()) {
-    return;
-  }
   PlaybackContext playbackContext(state, fillModifier);
   for (auto& record : records) {
     record->playback(drawContext, &playbackContext);
@@ -184,7 +203,7 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
 }
 
 const Record* Picture::getFirstDrawRecord(MCState* state, Fill* fill, bool* hasStroke) const {
-  PlaybackContext playback({});
+  PlaybackContext playback = {};
   Record* drawRecord = nullptr;
   for (auto& record : records) {
     if (record->type() >= RecordType::DrawFill) {

@@ -30,7 +30,7 @@ void SolidContent::draw(Canvas* canvas, const Paint& paint) const {
   canvas->drawRRect(_rRect, solidPaint);
 }
 
-bool SolidContent::hitTestPoint(float localX, float localY, bool /*pixelHitTest*/) {
+bool SolidContent::hitTestPoint(float localX, float localY, bool /*shapeHitTest*/) {
   return _rRect.rect.contains(localX, localY);
 }
 
