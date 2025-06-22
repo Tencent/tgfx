@@ -109,7 +109,6 @@ class Picture {
   friend class RenderContext;
   friend class RecordingContext;
   friend class SVGExportContext;
-  friend class FillModifierContext;
   friend class Image;
   friend class PictureImage;
   friend class Canvas;

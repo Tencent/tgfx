@@ -177,10 +177,7 @@ bool HitTestContext::checkClipAndFill(const Path& clip, const Fill& fill,
   if (fill.nothingToDraw() || (!clip.isInverseFillType() && clip.isEmpty())) {
     return false;
   }
-  if (clip.isInverseFillType()) {
-    return !clip.contains(local.x, local.y);
-  }
-  if (shapeHitTest) {
+  if (shapeHitTest || clip.isInverseFillType()) {
     return clip.contains(local.x, local.y);
   }
   auto clipBounds = clip.getBounds();
