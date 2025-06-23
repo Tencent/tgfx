@@ -22,14 +22,13 @@
 #include "tgfx/core/UTF.h"
 
 namespace drawers {
-
 std::shared_ptr<CustomLayer> CustomLayer::Make() {
   return std::shared_ptr<CustomLayer>(new CustomLayer());
 }
 
-std::unique_ptr<tgfx::LayerContent> CustomLayer::onUpdateContent() {
+void CustomLayer::onUpdateContent(tgfx::LayerRecorder* recorder) const {
   if (_text.empty()) {
-    return nullptr;
+    return;
   }
   std::vector<tgfx::GlyphID> glyphs = {};
   std::vector<tgfx::Point> positions = {};
@@ -66,10 +65,12 @@ std::unique_ptr<tgfx::LayerContent> CustomLayer::onUpdateContent() {
   }
   tgfx::GlyphRun glyphRun(_font, std::move(glyphs), std::move(positions));
   auto textBlob = tgfx::TextBlob::MakeFrom(std::move(glyphRun));
-  if (textBlob == nullptr) {
-    return nullptr;
+  if (textBlob != nullptr) {
+    tgfx::Paint textPaint = {};
+    textPaint.setColor(tgfx::Color::Black());
+    auto canvas = recorder->getCanvas();
+    canvas->drawTextBlob(std::move(textBlob), 0, 0, textPaint);
   }
-  return std::make_unique<CustomLayerContent>(std::move(textBlob));
 }
 
 std::shared_ptr<tgfx::Layer> CustomLayerTree::buildLayerTree(const AppHost* host) {

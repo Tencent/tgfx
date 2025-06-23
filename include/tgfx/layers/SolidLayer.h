@@ -100,7 +100,7 @@ class SolidLayer : public Layer {
  protected:
   SolidLayer() = default;
 
-  std::unique_ptr<LayerContent> onUpdateContent() override;
+  void onUpdateContent(LayerRecorder* recorder) const override;
 
  private:
   Color _color = {};

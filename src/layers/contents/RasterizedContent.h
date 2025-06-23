@@ -18,10 +18,10 @@
 
 #pragma once
 
-#include "tgfx/layers/LayerContent.h"
+#include "tgfx/core/Canvas.h"
 
 namespace tgfx {
-class RasterizedContent : public LayerContent {
+class RasterizedContent {
  public:
   RasterizedContent(uint32_t contextID, float contentScale, std::shared_ptr<Image> image,
                     const Matrix& matrix)
@@ -40,12 +40,6 @@ class RasterizedContent : public LayerContent {
     return _contentScale;
   }
 
-  Rect getBounds() const override;
-
-  void draw(Canvas* canvas, const Paint& paint) const override;
-
-  bool hitTestPoint(float localX, float localY, bool shapeHitTest) override;
-
   std::shared_ptr<Image> getImage() const {
     return image;
   }
@@ -54,10 +48,8 @@ class RasterizedContent : public LayerContent {
     return matrix;
   }
 
- protected:
-  Type type() const override {
-    return Type::RasterizedContent;
-  }
+  void draw(Canvas* canvas, bool antiAlias, float alpha,
+            BlendMode blendMode = BlendMode::SrcOver) const;
 
  private:
   uint32_t _contextID = 0;
