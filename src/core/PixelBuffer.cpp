@@ -54,41 +54,6 @@ class RasterPixelBuffer : public PixelBuffer {
   uint8_t* _pixels = nullptr;
 };
 
-class HardwarePixelBuffer : public PixelBuffer {
- public:
-  HardwarePixelBuffer(const ImageInfo& info, HardwareBufferRef hardwareBuffer)
-      : PixelBuffer(info), hardwareBuffer(HardwareBufferRetain(hardwareBuffer)) {
-  }
-
-  ~HardwarePixelBuffer() override {
-    HardwareBufferRelease(hardwareBuffer);
-  }
-
-  bool isHardwareBacked() const override {
-    return HardwareBufferCheck(hardwareBuffer);
-  }
-
-  HardwareBufferRef getHardwareBuffer() const override {
-    return isHardwareBacked() ? hardwareBuffer : nullptr;
-  }
-
- protected:
-  void* onLockPixels() const override {
-    return HardwareBufferLock(hardwareBuffer);
-  }
-
-  void onUnlockPixels() const override {
-    HardwareBufferUnlock(hardwareBuffer);
-  }
-
-  std::shared_ptr<Texture> onBindToHardwareTexture(Context* context) const override {
-    return Texture::MakeFrom(context, hardwareBuffer);
-  }
-
- private:
-  HardwareBufferRef hardwareBuffer;
-};
-
 std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alphaOnly,
                                                bool tryHardware) {
   if (width <= 0 || height <= 0) {

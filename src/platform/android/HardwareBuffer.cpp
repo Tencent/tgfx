@@ -19,12 +19,24 @@
 #include "AHardwareBufferFunctions.h"
 #include "core/PixelBuffer.h"
 #include "core/utils/PixelFormatUtil.h"
+#include "core/utils/WeakMap.h"
 #include "tgfx/platform/android/HardwareBufferJNI.h"
 
 namespace tgfx {
 std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuffer,
                                                    YUVColorSpace) {
-  return PixelBuffer::MakeFrom(hardwareBuffer);
+  auto pixelBuffer = PixelBuffer::MakeFrom(hardwareBuffer);
+  if (pixelBuffer) {
+    return pixelBuffer;
+  }
+  static WeakMap<HardwareBufferRef, HardwarePixelBuffer> bufferMap;
+  auto mapCache = bufferMap.find(hardwareBuffer);
+  if (mapCache) {
+    return mapCache;
+  }
+  auto newCache = std::make_shared<HardwarePixelBuffer>(hardwareBuffer);
+  bufferMap.insert(hardwareBuffer, newCache);
+  return newCache;
 }
 
 bool HardwareBufferCheck(HardwareBufferRef buffer) {

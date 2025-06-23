@@ -55,6 +55,14 @@ class WeakMap {
     cacheMap[key] = pointer;
   }
 
+  void remove(const Key& key) {
+    std::lock_guard<std::mutex> lock(mutex);
+    auto result = cacheMap.find(key);
+    if (result != cacheMap.end()) {
+      cacheMap.erase(key);
+    }
+  }
+
  private:
   std::unordered_map<Key, std::weak_ptr<T>> cacheMap = {};
   std::mutex mutex = {};
