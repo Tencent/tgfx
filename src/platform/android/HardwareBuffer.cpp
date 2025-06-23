@@ -31,7 +31,7 @@ std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef hardwareBuf
   }
   static WeakMap<HardwareBufferRef, HardwarePixelBuffer> bufferMap;
   auto mapCache = bufferMap.find(hardwareBuffer);
-  if(mapCache){
+  if (mapCache) {
     return mapCache;
   }
   auto newCache = std::make_shared<HardwarePixelBuffer>(hardwareBuffer);
