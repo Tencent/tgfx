@@ -28,6 +28,10 @@
 
 @implementation ViewController
 
+static const float MinZoom = 0.001f;
+static const float MaxZoom = 1000.0f;
+static const float ScrollWheelZoomSensitivity = 100.0f;
+
 - (void)viewDidLoad {
   [super viewDidLoad];
   self.tgfxView = [[TGFXView alloc] initWithFrame:self.view.bounds];
@@ -49,10 +53,6 @@
   self.contentOffset = CGPointZero;
   [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
 }
-
-static const float MinZoom = 0.001f;
-static const float MaxZoom = 1000.0f;
-static const float ScrollWheelZoomSensitivity = 100.0f;
 
 - (void)scrollWheel:(NSEvent*)event {
   BOOL isCtrl = (event.modifierFlags & NSEventModifierFlagControl) != 0;
