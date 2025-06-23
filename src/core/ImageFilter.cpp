@@ -49,7 +49,8 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
   FPArgs fpArgs(args.context, args.renderFlags, drawRect);
   auto offsetMatrix = Matrix::MakeTrans(clipBounds.x(), clipBounds.y());
   // There is no scaling for the source image, so we can use the default sampling options.
-  auto processor = asFragmentProcessor(std::move(source), fpArgs, {}, &offsetMatrix);
+  auto processor =
+      asFragmentProcessor(std::move(source), fpArgs, {}, SrcRectConstraint::Fast, &offsetMatrix);
   auto drawingManager = args.context->drawingManager();
   if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags)) {
     return nullptr;
@@ -68,10 +69,9 @@ bool ImageFilter::applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* 
   return true;
 }
 
-PlacementPtr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(std::shared_ptr<Image> source,
-                                                                    const FPArgs& args,
-                                                                    const SamplingOptions& sampling,
-                                                                    const Matrix* uvMatrix) const {
+PlacementPtr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(
+    std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
+    const SrcRectConstraint constraint, const Matrix* uvMatrix) const {
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
   auto clipBounds = args.drawRect;
   if (uvMatrix) {
@@ -92,10 +92,10 @@ PlacementPtr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(std::shared_
   if (uvMatrix != nullptr) {
     fpMatrix.preConcat(*uvMatrix);
   }
+  SamplingArgs samplingArgs = {TileMode::Decal, TileMode::Decal, sampling, constraint};
   if (dstBounds.contains(clipBounds)) {
-    return TextureEffect::Make(std::move(textureProxy), sampling, &fpMatrix, isAlphaOnly);
+    return TextureEffect::Make(std::move(textureProxy), samplingArgs, &fpMatrix, isAlphaOnly);
   }
-  return TiledTextureEffect::Make(std::move(textureProxy), TileMode::Decal, TileMode::Decal,
-                                  sampling, &fpMatrix, isAlphaOnly);
+  return TiledTextureEffect::Make(std::move(textureProxy), samplingArgs, &fpMatrix, isAlphaOnly);
 }
 }  // namespace tgfx

@@ -21,6 +21,7 @@
 #include <stack>
 #include "core/CanvasState.h"
 #include "core/GlyphRunList.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/core/Fill.h"
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/Shape.h"
@@ -66,7 +67,7 @@ class DrawContext {
    */
   virtual void drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                              const SamplingOptions& sampling, const MCState& state,
-                             const Fill& fill) = 0;
+                             const Fill& fill, SrcRectConstraint constraint) = 0;
 
   /**
    * Draws a GlyphRunList with the specified MCState, Fill, and optional Stroke.

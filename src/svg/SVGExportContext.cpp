@@ -144,8 +144,8 @@ void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& st
 }
 
 void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
-                                     const SamplingOptions&, const MCState& state,
-                                     const Fill& fill) {
+                                     const SamplingOptions&, const MCState& state, const Fill& fill,
+                                     SrcRectConstraint) {
   DEBUG_ASSERT(image != nullptr);
   Bitmap bitmap = ImageExportToBitmap(context, image);
   if (!bitmap.isEmpty()) {
@@ -273,7 +273,7 @@ void SVGExportContext::exportGlyphsAsImage(const std::shared_ptr<GlyphRunList>& 
       glyphState.matrix.postTranslate(position.x * scale, position.y * scale);
       glyphState.matrix.postConcat(viewMatrix);
       auto rect = Rect::MakeWH(glyphImage->width(), glyphImage->height());
-      drawImageRect(std::move(glyphImage), rect, {}, glyphState, fill);
+      drawImageRect(std::move(glyphImage), rect, {}, glyphState, fill, SrcRectConstraint::Fast);
     }
   }
 }

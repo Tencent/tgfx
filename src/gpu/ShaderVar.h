@@ -37,6 +37,7 @@ class ShaderVar {
     None,
     Attribute,
     Varying,
+    FlatVarying,
     Uniform,
     Out,
   };

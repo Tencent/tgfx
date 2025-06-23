@@ -38,6 +38,7 @@ class GaussianBlurImageFilter : public BlurImageFilter {
   PlacementPtr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
                                                       const FPArgs& args,
                                                       const SamplingOptions& sampling,
+                                                      SrcRectConstraint constraint,
                                                       const Matrix* uvMatrix) const override;
 };
 }  // namespace tgfx
