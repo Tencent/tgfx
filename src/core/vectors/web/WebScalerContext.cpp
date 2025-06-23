@@ -19,7 +19,7 @@
 #include "WebScalerContext.h"
 #include "ReadPixelsFromCanvasImage.h"
 #include "WebTypeface.h"
-#include "core/utils/ApplyStrokeToBound.h"
+#include "core/utils/ApplyStrokeToBounds.h"
 #include "core/utils/Log.h"
 #include "platform/web/WebImageBuffer.h"
 

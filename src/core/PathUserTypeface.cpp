@@ -19,7 +19,7 @@
 #include "PathUserTypeface.h"
 #include "UserScalerContext.h"
 #include "core/PathRasterizer.h"
-#include "core/utils/ApplyStrokeToBound.h"
+#include "core/utils/ApplyStrokeToBounds.h"
 #include "core/utils/FauxBoldScale.h"
 #include "tgfx/core/Shape.h"
 #include "utils/MathExtra.h"

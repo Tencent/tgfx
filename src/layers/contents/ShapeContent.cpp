@@ -90,8 +90,8 @@ bool ShapeContent::drawStrokes(Canvas* canvas, const Paint& paint, bool forConto
   return true;
 }
 
-bool ShapeContent::hitTestPoint(float localX, float localY, bool pixelHitTest) {
-  if (!pixelHitTest) {
+bool ShapeContent::hitTestPoint(float localX, float localY, bool shapeHitTest) {
+  if (!shapeHitTest) {
     return bounds.contains(localX, localY);
   }
   if (fillShape != nullptr) {

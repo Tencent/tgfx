@@ -121,6 +121,7 @@ void RecordingContext::drawImageRect(std::shared_ptr<Image> image, const Rect& r
 void RecordingContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
                                         const MCState& state, const Fill& fill,
                                         const Stroke* stroke) {
+  DEBUG_ASSERT(glyphRunList != nullptr);
   recordAll(state, fill, stroke);
   auto record = blockBuffer.make<DrawGlyphRunList>(std::move(glyphRunList));
   records.emplace_back(std::move(record));

@@ -18,7 +18,6 @@
 
 #include "tgfx/core/Canvas.h"
 #include "core/DrawContext.h"
-#include "core/LayerFillModifier.h"
 #include "core/RecordingContext.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -585,6 +584,23 @@ void Canvas::drawPicture(std::shared_ptr<Picture> picture, const Matrix* matrix,
   }
 }
 
+class LayerUnrollModifier : public FillModifier {
+ public:
+  explicit LayerUnrollModifier(Fill layerFill) : layerFill(std::move(layerFill)) {
+  }
+
+  Fill transform(const Fill& fill) const override {
+    auto newFill = fill;
+    newFill.color.alpha *= layerFill.color.alpha;
+    newFill.blendMode = layerFill.blendMode;
+    newFill.colorFilter = ColorFilter::Compose(fill.colorFilter, layerFill.colorFilter);
+    return newFill;
+  }
+
+ private:
+  Fill layerFill = {};
+};
+
 void Canvas::drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const Fill& fill,
                        std::shared_ptr<ImageFilter> imageFilter) {
   DEBUG_ASSERT(fill.shader == nullptr);
@@ -607,8 +623,8 @@ void Canvas::drawLayer(std::shared_ptr<Picture> picture, const MCState& state, c
       return;
     }
   } else if (picture->drawCount == 1 && fill.maskFilter == nullptr) {
-    LayerFillModifier layerModifier(fill);
-    picture->playback(drawContext, state, &layerModifier);
+    LayerUnrollModifier unrollModifier(fill);
+    picture->playback(drawContext, state, &unrollModifier);
     return;
   }
   drawContext->drawLayer(std::move(picture), std::move(imageFilter), state, fill);

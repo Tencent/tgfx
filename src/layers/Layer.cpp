@@ -492,11 +492,11 @@ Point Layer::localToGlobal(const Point& localPoint) const {
   return globalMatrix.mapXY(localPoint.x, localPoint.y);
 }
 
-bool Layer::hitTestPoint(float x, float y, bool pixelHitTest) {
+bool Layer::hitTestPoint(float x, float y, bool shapeHitTest) {
   auto content = getContent();
   if (nullptr != content) {
     Point localPoint = globalToLocal(Point::Make(x, y));
-    if (content->hitTestPoint(localPoint.x, localPoint.y, pixelHitTest)) {
+    if (content->hitTestPoint(localPoint.x, localPoint.y, shapeHitTest)) {
       return true;
     }
   }
@@ -514,12 +514,12 @@ bool Layer::hitTestPoint(float x, float y, bool pixelHitTest) {
     }
 
     if (nullptr != childLayer->_mask) {
-      if (!childLayer->_mask->hitTestPoint(x, y, pixelHitTest)) {
+      if (!childLayer->_mask->hitTestPoint(x, y, shapeHitTest)) {
         continue;
       }
     }
 
-    if (childLayer->hitTestPoint(x, y, pixelHitTest)) {
+    if (childLayer->hitTestPoint(x, y, shapeHitTest)) {
       return true;
     }
   }
