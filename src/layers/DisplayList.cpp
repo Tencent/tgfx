@@ -743,7 +743,7 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* su
   if (autoClear) {
     paint.setBlendMode(BlendMode::Src);
   }
-  static SamplingOptions sampling(FilterMode::Nearest, MipmapMode::None);
+  static SamplingOptions sampling(FilterMode::Linear, MipmapMode::None);
   canvas->setMatrix(Matrix::MakeTrans(_contentOffset.x, _contentOffset.y));
   for (auto& task : screenTasks) {
     auto surfaceCache = surfaceCaches[task.sourceIndex()];
