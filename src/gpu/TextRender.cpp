@@ -301,7 +301,6 @@ void TextRender::pathDrawing(GlyphRun& sourceGlyphRun, const MCState& state, con
     rejectedGlyphRun = std::move(sourceGlyphRun);
     return;
   }
-
   auto newState = state;
   newState.matrix = Matrix::MakeTrans(clipBounds.x(), clipBounds.y());
   auto rect = Rect::MakeWH(image->width(), image->height());
