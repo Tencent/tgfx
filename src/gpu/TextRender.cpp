@@ -160,7 +160,7 @@ void TextRender::draw(const MCState& state, const Fill& fill, const Stroke* stro
 void TextRender::directMaskDrawing(const GlyphRun& sourceGlyphRun, const MCState& state,
                                    const Fill& fill, const Stroke* stroke,
                                    GlyphRun& rejectedGlyphRun) const {
-  AtlasCell glyph;
+  AtlasCell glyphCell;
   auto nextFlushToken = context->drawingManager()->nextFlushToken();
   PlotUseUpdater plotUseUpdater;
 
@@ -202,10 +202,10 @@ void TextRender::directMaskDrawing(const GlyphRun& sourceGlyphRun, const MCState
     auto& textureProxies = atlasManager->getTextureProxies(maskFormat);
 
     auto glyphState = state;
-    AtlasCellLocator glyphLocator;
-    auto& atlasLocator = glyphLocator.atlasLocator;
-    if (atlasManager->getCellLocator(maskFormat, glyphKey, glyphLocator)) {
-      glyphState.matrix = glyphLocator.matrix;
+    AtlasCellLocator cellLocator;
+    auto& atlasLocator = cellLocator.atlasLocator;
+    if (atlasManager->getCellLocator(maskFormat, glyphKey, cellLocator)) {
+      glyphState.matrix = cellLocator.matrix;
     } else {
       auto glyphCodec = getGlyphCodec(font, glyphID, scaledStroke.get(), &glyphState.matrix);
       if (glyphCodec == nullptr) {
@@ -213,13 +213,13 @@ void TextRender::directMaskDrawing(const GlyphRun& sourceGlyphRun, const MCState
         rejectedGlyphRun.positions.push_back(glyphPosition);
         continue;
       }
-      glyph._key = std::move(glyphKey);
-      glyph._maskFormat = maskFormat;
-      glyph._width = static_cast<uint16_t>(glyphCodec->width());
-      glyph._height = static_cast<uint16_t>(glyphCodec->height());
-      glyph._matrix = glyphState.matrix;
+      glyphCell._key = std::move(glyphKey);
+      glyphCell._maskFormat = maskFormat;
+      glyphCell._width = static_cast<uint16_t>(glyphCodec->width());
+      glyphCell._height = static_cast<uint16_t>(glyphCodec->height());
+      glyphCell._matrix = glyphState.matrix;
 
-      if (atlasManager->addCellToAtlas(glyph, nextFlushToken, atlasLocator)) {
+      if (atlasManager->addCellToAtlas(glyphCell, nextFlushToken, atlasLocator)) {
         auto source = GlyphSource::MakeFrom(glyphCodec);
         auto offset = Point::Make(atlasLocator.getLocation().left, atlasLocator.getLocation().top);
         auto task = context->drawingBuffer()->make<TextAtlasUploadTask>(

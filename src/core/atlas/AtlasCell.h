@@ -29,10 +29,6 @@ class AtlasCell {
     return _key;
   }
 
-  const AtlasLocator& locator() const {
-    return _locator;
-  }
-
   MaskFormat maskFormat() const {
     return _maskFormat;
   }
@@ -52,7 +48,6 @@ class AtlasCell {
  private:
   BytesKey _key;
   Matrix _matrix;
-  AtlasLocator _locator;
   MaskFormat _maskFormat = MaskFormat::A8;
   uint16_t _width = 0;
   uint16_t _height = 0;
