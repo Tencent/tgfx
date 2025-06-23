@@ -18,13 +18,11 @@
 
 #pragma once
 
-#include <optional>
 #include "core/utils/BlockBuffer.h"
 #include "gpu/AAType.h"
 #include "gpu/VertexProvider.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
-#include "tgfx/core/SamplingOptions.h"
 
 namespace tgfx {
 struct RectRecord {
@@ -37,22 +35,12 @@ struct RectRecord {
   Color color;
 };
 
-class SubsetMaker {
- public:
-  explicit SubsetMaker(const SamplingOptions& options) : filterMode(options.filterMode) {
-  }
-
-  Rect getSubset(const Rect& rect) const;
-
- private:
-  FilterMode filterMode = FilterMode::Nearest;
-};
-
 /**
  * RectsVertexProvider is a VertexProvider that provides vertices for drawing rectangles.
  */
 class RectsVertexProvider : public VertexProvider {
  public:
+  enum class RectSubsetMode { None, SubsetOnly, RoundOutAndSubset };
   /**
    * Creates a new RectsVertexProvider from a single rect.
    */
@@ -65,7 +53,7 @@ class RectsVertexProvider : public VertexProvider {
   static PlacementPtr<RectsVertexProvider> MakeFrom(BlockBuffer* buffer,
                                                     std::vector<PlacementPtr<RectRecord>>&& rects,
                                                     AAType aaType, bool needUVCoord,
-                                                    const std::optional<SubsetMaker>& subsetMaker);
+                                                    RectSubsetMode subsetType);
 
   /**
    * Returns the number of rects in the provider.
@@ -121,7 +109,7 @@ class RectsVertexProvider : public VertexProvider {
    * Returns true if the provider generates subset rects.
    */
   bool hasSubset() const {
-    return subsetMaker.has_value();
+    return static_cast<RectSubsetMode>(bitFields.subsetMode) != RectSubsetMode::None;
   }
 
  protected:
@@ -130,12 +118,13 @@ class RectsVertexProvider : public VertexProvider {
     uint8_t aaType : 2;
     bool hasUVCoord : 1;
     bool hasColor : 1;
+    uint8_t subsetMode : 2;
   } bitFields = {};
 
-  std::optional<SubsetMaker> subsetMaker = std::nullopt;
+  Rect getSubset(const Rect& rect) const;
 
   RectsVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType, bool hasUVCoord,
-                      bool hasColor, const std::optional<SubsetMaker>& subsetMaker,
+                      bool hasColor, RectSubsetMode subsetType,
                       std::shared_ptr<BlockBuffer> reference);
 };
 }  // namespace tgfx

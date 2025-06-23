@@ -226,36 +226,34 @@ void GLTextureEffect::onSetData(UniformBuffer* uniformBuffer) const {
     }
   }
   if (needSubset(texture)) {
-    auto pushRect = [&](Rect subset, const std::string& uni) {
-      float rect[4] = {subset.left, subset.top, subset.right, subset.bottom};
-      if (texture->origin() == ImageOrigin::BottomLeft) {
-        auto h = static_cast<float>(texture->height());
-        rect[1] = h - rect[1];
-        rect[3] = h - rect[3];
-        std::swap(rect[1], rect[3]);
-      }
-      auto type = texture->getSampler()->type();
-      if (type != SamplerType::Rectangle) {
-        auto lt =
-            texture->getTextureCoord(static_cast<float>(rect[0]), static_cast<float>(rect[1]));
-        auto rb =
-            texture->getTextureCoord(static_cast<float>(rect[2]), static_cast<float>(rect[3]));
-        rect[0] = lt.x;
-        rect[1] = lt.y;
-        rect[2] = rb.x;
-        rect[3] = rb.y;
-      }
-      uniformBuffer->setData(uni, rect);
-    };
-    auto getClampRect = [&](Rect subset, SamplerState samplerState) {
-      if (samplerState.filterMode == FilterMode::Nearest) {
-        subset.roundOut();
-      }
-      return subset.makeInset(0.5f, 0.5f);
-    };
-
-    auto subsetRect = subset.value_or(Rect::MakeWH(texture->width(), texture->height()));
-    pushRect(getClampRect(subsetRect, samplerState), "Subset");
+    auto subsetRect = subset.value();
+    if (samplerState.filterMode == FilterMode::Nearest) {
+      subsetRect.roundOut();
+    }
+    auto type = texture->getSampler()->type();
+    // https://cs.android.com/android/platform/superproject/+/master:frameworks/native/libs/nativedisplay/surfacetexture/SurfaceTexture.cpp;l=275;drc=master;bpv=0;bpt=1
+    // https://stackoverflow.com/questions/6023400/opengl-es-texture-coordinates-slightly-off
+    // Normally this would just need to take 1/2 a texel off each end, but because the chroma
+    // channels of YUV420 images are subsampled we may need to shrink the crop region by a whole
+    // texel on each side.
+    auto inset = type == SamplerType::External ? 1.0f : 0.5f;
+    subsetRect = subsetRect.makeInset(inset, inset);
+    float rect[4] = {subsetRect.left, subsetRect.top, subsetRect.right, subsetRect.bottom};
+    if (texture->origin() == ImageOrigin::BottomLeft) {
+      auto h = static_cast<float>(texture->height());
+      rect[1] = h - rect[1];
+      rect[3] = h - rect[3];
+      std::swap(rect[1], rect[3]);
+    }
+    if (type != SamplerType::Rectangle) {
+      auto lt = texture->getTextureCoord(rect[0], rect[1]);
+      auto rb = texture->getTextureCoord(rect[2], rect[3]);
+      rect[0] = lt.x;
+      rect[1] = lt.y;
+      rect[2] = rb.x;
+      rect[3] = rb.y;
+    }
+    uniformBuffer->setData("Subset", rect);
   }
 
   if (constraint == SrcRectConstraint::Strict) {
