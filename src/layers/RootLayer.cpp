@@ -31,9 +31,7 @@ static float UnionArea(const Rect& rect1, const Rect& rect2) {
 }
 
 std::shared_ptr<RootLayer> RootLayer::Make() {
-  auto layer = std::shared_ptr<RootLayer>(new RootLayer());
-  layer->weakThis = layer;
-  return layer;
+  return std::shared_ptr<RootLayer>(new RootLayer());
 }
 
 RootLayer::~RootLayer() {

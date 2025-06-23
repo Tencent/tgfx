@@ -16,17 +16,41 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "LayerFillModifier.h"
+#pragma once
+
+#include <atomic>
+#include "tgfx/core/Rect.h"
 
 namespace tgfx {
-LayerFillModifier::LayerFillModifier(Fill layerFill) : layerFill(std::move(layerFill)) {
-}
+/**
+ * LazyBounds is a thread-safe cache for storing bounding box.
+ */
+class LazyBounds {
+ public:
+  ~LazyBounds() {
+    reset();
+  }
 
-Fill LayerFillModifier::transform(const Fill& fill) const {
-  auto newFill = fill;
-  newFill.color.alpha *= layerFill.color.alpha;
-  newFill.blendMode = layerFill.blendMode;
-  newFill.colorFilter = ColorFilter::Compose(fill.colorFilter, layerFill.colorFilter);
-  return newFill;
-}
+  /**
+   * Returns the cached bounding box. This method is thread-safe as long as there is no concurrent
+   * reset() call.
+   */
+  const Rect* get() const {
+    return bounds.load(std::memory_order_acquire);
+  }
+
+  /**
+   * Sets the bounding box to the cache. This method is thread-safe as long as there is no
+   * concurrent reset() call.
+   */
+  void update(const Rect& rect) const;
+
+  /**
+   * Resets the cached bounding box to its empty state. This method is not thread-safe.
+   */
+  void reset();
+
+ private:
+  mutable std::atomic<Rect*> bounds = {nullptr};
+};
 }  // namespace tgfx

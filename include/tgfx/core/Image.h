@@ -36,6 +36,7 @@ template <typename T>
 class PlacementPtr;
 class FPArgs;
 class TPArgs;
+class SamplingArgs;
 class Context;
 class ImageFilter;
 class FragmentProcessor;
@@ -333,15 +334,11 @@ class Image {
   /**
    * Returns a fragment processor for the entire Image.
    * @param args The FPArgs used to create the fragment processor.
-   * @param tileModeX The tile mode applied in the x direction.
-   * @param tileModeY The tile mode applied in the y direction.
-   * @param sampling The sampling options used when sampling the Image.
+   * @param samplingArgs The SamplingArgs used to sample the Image.
    * @param uvMatrix The matrix used to transform the uv coordinates.
    */
   virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                              TileMode tileModeX,
-                                                              TileMode tileModeY,
-                                                              const SamplingOptions& sampling,
+                                                              const SamplingArgs& samplingArgs,
                                                               const Matrix* uvMatrix) const = 0;
 
   friend class FragmentProcessor;

@@ -28,11 +28,13 @@ namespace tgfx {
  */
 class TextShape : public Shape {
  public:
-  explicit TextShape(std::shared_ptr<GlyphRunList> glyphRunList)
-      : glyphRunList(std::move(glyphRunList)) {
+  explicit TextShape(std::shared_ptr<GlyphRunList> glyphRunList, float resolutionScale)
+      : glyphRunList(std::move(glyphRunList)), resolutionScale(resolutionScale) {
   }
 
-  Rect getBounds() const override;
+  Rect getBounds() const override {
+    return glyphRunList->getBounds(resolutionScale);
+  }
 
   Path getPath() const override;
 
@@ -48,5 +50,6 @@ class TextShape : public Shape {
  private:
   LazyUniqueKey uniqueKey = {};
   std::shared_ptr<GlyphRunList> glyphRunList = nullptr;
+  float resolutionScale = 1.0f;
 };
 }  // namespace tgfx

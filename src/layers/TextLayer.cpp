@@ -92,9 +92,7 @@ std::vector<std::shared_ptr<Typeface>> GetFallbackTypefaces() {
 }
 
 std::shared_ptr<TextLayer> TextLayer::Make() {
-  auto layer = std::shared_ptr<TextLayer>(new TextLayer());
-  layer->weakThis = layer;
-  return layer;
+  return std::shared_ptr<TextLayer>(new TextLayer());
 }
 
 void TextLayer::setText(const std::string& text) {

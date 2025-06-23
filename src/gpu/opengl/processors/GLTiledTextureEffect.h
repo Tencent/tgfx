@@ -25,7 +25,8 @@ namespace tgfx {
 class GLTiledTextureEffect : public TiledTextureEffect {
  public:
   GLTiledTextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplerState& samplerState,
-                       const Matrix& uvMatrix);
+                       SrcRectConstraint constraint, const Matrix& uvMatrix,
+                       const std::optional<Rect>& subset);
 
   void emitCode(EmitArgs& args) const override;
 

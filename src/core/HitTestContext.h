@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,19 +18,17 @@
 
 #pragma once
 
-#include <optional>
 #include "core/DrawContext.h"
-#include "gpu/OpsCompositor.h"
-#include "gpu/ops/DrawOp.h"
 
 namespace tgfx {
-class RenderContext : public DrawContext {
+class HitTestContext : public DrawContext {
  public:
-  RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
-                bool clearAll = false, Surface* surface = nullptr);
+  HitTestContext(float testX, float testY, bool shapeHitTest)
+      : testX(testX), testY(testY), shapeHitTest(shapeHitTest) {
+  }
 
-  Context* getContext() const {
-    return renderTarget->getContext();
+  bool hasHit() const {
+    return hit;
   }
 
   void drawFill(const Fill& fill) override;
@@ -56,25 +54,12 @@ class RenderContext : public DrawContext {
   void drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
                  const MCState& state, const Fill& fill) override;
 
-  /**
-   * Flushes the render context, submitting all pending operations to the drawing manager. Returns
-   * true if any operations were submitted.
-   */
-  bool flush();
-
  private:
-  std::shared_ptr<RenderTargetProxy> renderTarget = nullptr;
-  uint32_t renderFlags = 0;
-  Surface* surface = nullptr;
-  std::shared_ptr<OpsCompositor> opsCompositor = nullptr;
+  float testX = 0;
+  float testY = 0;
+  bool shapeHitTest = false;
+  bool hit = false;
 
-  Rect getClipBounds(const Path& clip);
-  void drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
-                       const Fill& fill);
-  OpsCompositor* getOpsCompositor(bool discardContent = false);
-  void replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRenderTarget,
-                           std::shared_ptr<Image> oldContent);
-
-  friend class Surface;
+  bool checkClipAndFill(const Path& clip, const Fill& fill, const Point& local) const;
 };
 }  // namespace tgfx

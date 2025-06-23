@@ -48,6 +48,7 @@ BlockBuffer::BlockBuffer(size_t initBlockSize) : initBlockSize(initBlockSize) {
 }
 
 BlockBuffer::~BlockBuffer() {
+  waitForReferencesExpired();
   for (auto& block : blocks) {
     free(block.data);
   }
@@ -92,6 +93,7 @@ void BlockBuffer::clear(size_t maxReuseSize) {
   if (blocks.empty()) {
     return;
   }
+  waitForReferencesExpired();
   currentBlockIndex = 0;
   usedSize = 0;
   size_t totalBlockSize = 0;
@@ -112,6 +114,7 @@ std::shared_ptr<BlockData> BlockBuffer::release() {
   if (usedSize == 0) {
     return nullptr;
   }
+  waitForReferencesExpired();
   std::vector<uint8_t*> usedBlocks = {};
   usedBlocks.reserve(currentBlockIndex + 1);
   for (auto& block : blocks) {
@@ -148,4 +151,25 @@ bool BlockBuffer::allocateNewBlock(size_t requestSize) {
   blocks.emplace_back(data, blockSize);
   return true;
 }
+
+std::shared_ptr<BlockBuffer> BlockBuffer::addReference() {
+  auto reference = externalReferences.lock();
+  if (reference) {
+    return reference;
+  }
+  reference = std::shared_ptr<BlockBuffer>(this, NotifyReferenceReachedZero);
+  externalReferences = reference;
+  return reference;
+}
+
+void BlockBuffer::waitForReferencesExpired() {
+  std::unique_lock<std::mutex> lock(mutex);
+  condition.wait(lock, [this]() { return externalReferences.expired(); });
+}
+
+void BlockBuffer::NotifyReferenceReachedZero(BlockBuffer* blockBuffer) {
+  std::unique_lock<std::mutex> lock(blockBuffer->mutex);
+  blockBuffer->condition.notify_all();
+}
+
 }  // namespace tgfx

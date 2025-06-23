@@ -43,7 +43,7 @@ struct LayerStyleSource;
  * single thread. Some properties only take effect if the layer has a parent, such as alpha,
  * blendMode, position, matrix, visible, scrollRect, and mask.
  */
-class Layer {
+class Layer : public std::enable_shared_from_this<Layer> {
  public:
   /**
    * Returns the default value for the allowsEdgeAntialiasing property for new Layer instances. The
@@ -331,8 +331,8 @@ class Layer {
   /**
    * Returns the parent layer that contains the calling layer.
    */
-  std::shared_ptr<Layer> parent() const {
-    return _parent ? _parent->weakThis.lock() : nullptr;
+  Layer* parent() const {
+    return _parent;
   }
 
   /**
@@ -481,12 +481,12 @@ class Layer {
    * methods to convert points between these coordinate spaces.
    * @param x The x coordinate to test it against the calling layer.
    * @param y The y coordinate to test it against the calling layer.
-   * @param pixelHitTest Whether to check the actual pixels of the layer (true) or just the bounding
+   * @param shapeHitTest Whether to check the actual shape of the layer (true) or just the bounding
    * box (false). Note that Image layers are always checked against their bounding box. You can draw
    * image layers to a Surface and use the Surface::getColor() method to check the actual pixels.
    * @return true if the layer overlaps or intersects with the specified point, false otherwise.
    */
-  bool hitTestPoint(float x, float y, bool pixelHitTest = false);
+  bool hitTestPoint(float x, float y, bool shapeHitTest = false);
 
   /**
    * Draws the layer and all its children onto the given canvas. You can specify the alpha and blend
@@ -500,15 +500,7 @@ class Layer {
   void draw(Canvas* canvas, float alpha = 1.0f, BlendMode blendMode = BlendMode::SrcOver);
 
  protected:
-  std::weak_ptr<Layer> weakThis;
-
   Layer();
-
-  /**
-   * Marks the layer as needing to be redrawn. Unlike invalidateContent(), this method only marks
-   * the layer as dirty and does not update the layer content.
-   */
-  void invalidateTransform();
 
   /**
    * Marks the layer's content as changed and needing to be redrawn. The updateContent() method will
@@ -551,14 +543,20 @@ class Layer {
   /**
   * Attachs a property to this layer.
   */
-  void attachProperty(LayerProperty* property) const;
+  void attachProperty(LayerProperty* property);
 
   /**
    * Detaches a property from this layer.
    */
-  void detachProperty(LayerProperty* property) const;
+  void detachProperty(LayerProperty* property);
 
  private:
+  /**
+   * Marks the layer as needing to be redrawn. Unlike invalidateContent(), this method only marks
+   * the layer as dirty and does not update the layer content.
+   */
+  void invalidateTransform();
+
   /**
    * Marks the layer's descendents as changed and needing to be redrawn.
    */

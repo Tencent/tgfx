@@ -49,7 +49,7 @@ class ShapeContent : public LayerContent {
 
   bool drawStrokes(Canvas* canvas, const Paint& paint, bool forContour) const;
 
-  bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
+  bool hitTestPoint(float localX, float localY, bool shapeHitTest) override;
 
   Rect bounds = {};
   std::shared_ptr<Shape> fillShape = nullptr;

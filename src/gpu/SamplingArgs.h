@@ -18,17 +18,25 @@
 
 #pragma once
 
-#include "tgfx/core/Fill.h"
-#include "tgfx/core/FillModifier.h"
+#include <optional>
+#include "tgfx/core/Canvas.h"
+#include "tgfx/core/SamplingOptions.h"
+#include "tgfx/core/TileMode.h"
 
 namespace tgfx {
-class LayerFillModifier : public FillModifier {
+class SamplingArgs {
  public:
-  explicit LayerFillModifier(Fill layerFill);
+  SamplingArgs() = default;
 
-  Fill transform(const Fill& fill) const override;
+  SamplingArgs(TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
+               SrcRectConstraint constraint)
+      : tileModeX(tileModeX), tileModeY(tileModeY), sampling(sampling), constraint(constraint) {
+  }
 
- private:
-  Fill layerFill = {};
+  TileMode tileModeX = TileMode::Clamp;
+  TileMode tileModeY = TileMode::Clamp;
+  SamplingOptions sampling = {};
+  SrcRectConstraint constraint = SrcRectConstraint::Fast;
+  std::optional<Rect> sampleArea = std::nullopt;
 };
 }  // namespace tgfx

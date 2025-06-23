@@ -100,7 +100,8 @@ class RRectsVertexProvider : public VertexProvider {
   } bitFields = {};
 
   RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType, bool useScale,
-                       bool hasColor, PlacementArray<Stroke>&& strokes);
+                       bool hasColor, PlacementArray<Stroke>&& strokes,
+                       std::shared_ptr<BlockBuffer> reference);
 
   friend class BlockBuffer;
 };

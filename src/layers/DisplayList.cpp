@@ -749,7 +749,8 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* su
     auto surfaceCache = surfaceCaches[task.sourceIndex()];
     DEBUG_ASSERT(surfaceCache != nullptr);
     auto image = surfaceCache->makeImageSnapshot();
-    canvas->drawImageRect(image, task.sourceRect(), task.tileRect(), sampling, &paint);
+    canvas->drawImageRect(image, task.sourceRect(), task.tileRect(), sampling, &paint,
+                          SrcRectConstraint::Strict);
   }
 }
 

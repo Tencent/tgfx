@@ -23,6 +23,10 @@
 namespace tgfx {
 class MeasureContext : public DrawContext {
  public:
+  explicit MeasureContext(bool computeTightBounds = false)
+      : computeTightBounds(computeTightBounds) {
+  }
+
   Rect getBounds() const {
     return bounds;
   }
@@ -39,8 +43,8 @@ class MeasureContext : public DrawContext {
   void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) override;
 
   void drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
-                     const SamplingOptions& sampling, const MCState& state,
-                     const Fill& fill) override;
+                     const SamplingOptions& sampling, const MCState& state, const Fill& fill,
+                     SrcRectConstraint constraint) override;
 
   void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
                         const Fill& fill, const Stroke* stroke) override;
@@ -51,7 +55,10 @@ class MeasureContext : public DrawContext {
                  const MCState& state, const Fill& fill) override;
 
  private:
+  bool computeTightBounds = false;
   Rect bounds = {};
+
+  void addTightBounds(const Path& path, const MCState& state, const Fill& fill);
 
   void addLocalBounds(const MCState& state, const Fill& fill, const Rect& localBounds,
                       bool unbounded = false);
