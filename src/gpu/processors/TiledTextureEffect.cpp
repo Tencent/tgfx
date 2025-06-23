@@ -110,7 +110,7 @@ TiledTextureEffect::Sampling::Sampling(const Texture* texture, SamplerState samp
       // and GPU-specific snapping at the boundary).
       r.shaderClamp = isubset.makeInset(0.5f);
     } else {
-      r.shaderClamp = subset.makeInset(linerFilterInset);
+      r.shaderClamp = subset.makeInset(linearFilterInset);
     }
     auto mipmapMode = texture->hasMipmaps() ? sampler.mipmapMode : MipmapMode::None;
     r.shaderMode = GetShaderMode(wrap, sampler.filterMode, mipmapMode);
