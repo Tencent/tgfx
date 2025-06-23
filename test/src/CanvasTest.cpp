@@ -1767,4 +1767,94 @@ TGFX_TEST(CanvasTest, ShadowBoundIntersect) {
   canvas->drawImage(image);
   context->flush();
 }
+
+TGFX_TEST(CanvasTest, CornerTest) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 1024, 1024);
+  auto* canvas = surface->getCanvas();
+  canvas->clear();
+  Path rectPath = {};
+  rectPath.addRect(Rect::MakeXYWH(50, 50, 170, 100));
+  auto rectShape = Shape::MakeFrom(rectPath);
+  auto pathEffect = PathEffect::MakeCorner(10);
+  auto cornerRectshape = Shape::ApplyEffect(rectShape, pathEffect);
+
+  Path trianglePath = {};
+  trianglePath.moveTo(500, 500);
+  trianglePath.lineTo(550, 600);
+  trianglePath.lineTo(450, 600);
+  trianglePath.lineTo(500, 500);
+  trianglePath.close();
+  auto triangleShape = Shape::MakeFrom(trianglePath);
+  auto cornerTriShape = Shape::ApplyEffect(triangleShape, pathEffect);
+  Paint paint;
+  paint.setColor(Color(0, 0, 0));
+  canvas->drawShape(cornerRectshape, paint);
+  canvas->drawShape(cornerTriShape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/CornerShape"));
+  canvas->clear();
+  auto doubleCornerRectShape = Shape::ApplyEffect(cornerRectshape, pathEffect);
+  auto doubleCornerTriShape = Shape::ApplyEffect(cornerTriShape, pathEffect);
+  canvas->drawShape(doubleCornerRectShape, paint);
+  canvas->drawShape(doubleCornerTriShape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/CornerShapeDouble"));
+  canvas->clear();
+  auto tripleCornerRectShape = Shape::ApplyEffect(doubleCornerRectShape, pathEffect);
+  auto tripleCornerTriShape = Shape::ApplyEffect(doubleCornerTriShape, pathEffect);
+  canvas->drawShape(tripleCornerRectShape, paint);
+  canvas->drawShape(tripleCornerTriShape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/CornerShapeTriple"));
+
+  canvas->clear();
+  Path openQuadPath = {};
+  openQuadPath.moveTo(50, 50);
+  openQuadPath.lineTo(80, 50);
+  openQuadPath.quadTo(100, 70, 80, 80);
+  openQuadPath.lineTo(80, 100);
+  openQuadPath.lineTo(50, 100);
+  auto openQuadShape = Shape::MakeFrom(openQuadPath);
+  paint.setStyle(PaintStyle::Stroke);
+  canvas->drawShape(openQuadShape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/OpenQuadShape"));
+  canvas->clear();
+  auto cornerOpenQuadShape = Shape::ApplyEffect(openQuadShape, pathEffect);
+  canvas->drawShape(cornerOpenQuadShape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/OpenQuadShapeCorner"));
+
+  canvas->clear();
+  Path openConicPath = {};
+  openConicPath.moveTo(50, 50);
+  openConicPath.lineTo(80, 50);
+  openConicPath.cubicTo(100, 50, 150, 80, 80, 80);
+  openConicPath.lineTo(80, 100);
+  openConicPath.lineTo(50, 100);
+  auto openConicShape = Shape::MakeFrom(openConicPath);
+  paint.setStyle(PaintStyle::Stroke);
+  canvas->drawShape(openConicShape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/OpenConicShape"));
+  canvas->clear();
+  auto cornerOpenConicShape = Shape::ApplyEffect(openConicShape, pathEffect);
+  canvas->drawShape(cornerOpenConicShape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/OpenConicShapeCorner"));
+
+  canvas->clear();
+  Path path = {};
+  path.moveTo(50, 50);
+  path.quadTo(60, 50, 220, 50);
+  path.quadTo(220, 70, 220, 150);
+  path.quadTo(200, 150, 50, 150);
+  path.quadTo(50, 120, 50, 50);
+  path.close();
+  auto quadShape = Shape::MakeFrom(path);
+  canvas->drawShape(quadShape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/QuadRectShape"));
+
+  canvas->clear();
+  auto cornerShape = Shape::ApplyEffect(quadShape, pathEffect);
+  canvas->drawShape(cornerShape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/QuadRectShapeCorner"));
+}
+
 }  // namespace tgfx
