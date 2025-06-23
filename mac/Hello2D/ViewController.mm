@@ -50,20 +50,47 @@
   [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
 }
 
+static const float MinZoom = 0.001f;
+static const float MaxZoom = 1000.0f;
+static const float ScrollWheelZoomSensitivity = 100.0f;
+
 - (void)scrollWheel:(NSEvent*)event {
-  self.contentOffset = CGPointMake(self.contentOffset.x + event.scrollingDeltaX,
-                                   self.contentOffset.y + event.scrollingDeltaY);
-  [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
+  BOOL isCtrl = (event.modifierFlags & NSEventModifierFlagControl) != 0;
+  BOOL isCmd = (event.modifierFlags & NSEventModifierFlagCommand) != 0;
+  if (isCtrl || isCmd) {
+    float oldZoom = self.zoomScale;
+    float zoomStep = 1 + event.scrollingDeltaY / ScrollWheelZoomSensitivity;
+    float newZoom = oldZoom * zoomStep;
+    if (newZoom < MinZoom) {
+      newZoom = MinZoom;
+    }
+    if (newZoom > MaxZoom) {
+      newZoom = MaxZoom;
+    }
+    NSPoint mouseInView = [self.tgfxView convertPoint:[event locationInWindow] fromView:nil];
+    mouseInView.y = self.tgfxView.bounds.size.height - mouseInView.y;
+    mouseInView = [self.tgfxView convertPointToBacking:mouseInView];
+    float contentX = (mouseInView.x - self.contentOffset.x) / oldZoom;
+    float contentY = (mouseInView.y - self.contentOffset.y) / oldZoom;
+    self.contentOffset =
+        CGPointMake(mouseInView.x - contentX * newZoom, mouseInView.y - contentY * newZoom);
+    self.zoomScale = newZoom;
+    [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
+  } else {
+    self.contentOffset = CGPointMake(self.contentOffset.x + event.scrollingDeltaX,
+                                     self.contentOffset.y + event.scrollingDeltaY);
+    [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
+  }
 }
 
 - (void)magnifyWithEvent:(NSEvent*)event {
   float oldZoom = self.zoomScale;
   float newZoom = oldZoom * (1.0 + event.magnification);
-  if (self.zoomScale < 0.001f) {
-    self.zoomScale = 0.001f;
+  if (self.zoomScale < MinZoom) {
+    self.zoomScale = MinZoom;
   }
-  if (self.zoomScale > 1000.0f) {
-    self.zoomScale = 1000.0f;
+  if (self.zoomScale > MaxZoom) {
+    self.zoomScale = MaxZoom;
   }
   NSPoint mouseInView = [self.tgfxView convertPoint:[event locationInWindow] fromView:nil];
   mouseInView.y = self.tgfxView.bounds.size.height - mouseInView.y;
