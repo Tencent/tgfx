@@ -95,18 +95,18 @@ class AtlasToken {
   uint64_t sequenceNumber = 0;
 };
 
-class TokenTracker {
+class FlushTokenTracker {
  public:
   // Get the next flush token. in DrawingManger::flush()
-  AtlasToken nextFlushToken() const {
-    return currentFlushToken.next();
+  AtlasToken nextToken() const {
+    return currentToken.next();
   }
-  void advanceFlushToken() {
-    ++currentFlushToken;
+  void advanceToken() {
+    ++currentToken;
   }
 
  private:
-  AtlasToken currentFlushToken = AtlasToken::InvalidToken();
+  AtlasToken currentToken = AtlasToken::InvalidToken();
 };
 
 class PlotLocator {

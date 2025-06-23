@@ -163,15 +163,15 @@ bool DrawingManager::flush() {
     task->execute(renderPass.get());
   }
   renderTasks.clear();
-  tokenTracker.advanceFlushToken();
+  flushTokenTracker.advanceToken();
   for (auto flushCallbackObject : flushCallbackObjects) {
-    flushCallbackObject->postFlush(tokenTracker.nextFlushToken());
+    flushCallbackObject->postFlush(flushTokenTracker.nextToken());
   }
   return true;
 }
 
 AtlasToken DrawingManager::nextFlushToken() const {
-  return tokenTracker.nextFlushToken();
+  return flushTokenTracker.nextToken();
 }
 
 void DrawingManager::addFlushCallbackObject(FlushCallbackObject* flushCallbackObject) {
