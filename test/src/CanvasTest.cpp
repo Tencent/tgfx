@@ -1961,7 +1961,6 @@ TGFX_TEST(CanvasTest, MultiImageRect_NOSCALE_NEAREST) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect_NOSCALE_NEAREST_NEAREST"));
 }
 
-
 TGFX_TEST(CanvasTest, CornerTest) {
   ContextScope scope;
   auto* context = scope.getContext();
