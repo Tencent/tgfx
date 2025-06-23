@@ -88,7 +88,8 @@ bool RasterizedImage::onDraw(std::shared_ptr<RenderTargetProxy> renderTarget,
   Matrix uvMatrix = Matrix::MakeScale(uvScaleX, uvScaleY);
   auto drawRect = Rect::MakeWH(width(), height());
   FPArgs args(renderTarget->getContext(), renderFlags, drawRect);
-  auto processor = FragmentProcessor::Make(source, args, sampling, &uvMatrix);
+  auto processor =
+      FragmentProcessor::Make(source, args, sampling, SrcRectConstraint::Fast, &uvMatrix);
   auto drawingManager = renderTarget->getContext()->drawingManager();
   return drawingManager->fillRTWithFP(std::move(renderTarget), std::move(processor), renderFlags);
 }

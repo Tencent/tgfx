@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,23 +19,24 @@
 #pragma once
 
 #include <optional>
-#include "gpu/processors/TextureEffect.h"
+#include "tgfx/core/Canvas.h"
+#include "tgfx/core/SamplingOptions.h"
+#include "tgfx/core/TileMode.h"
 
 namespace tgfx {
-class GLTextureEffect : public TextureEffect {
+class SamplingArgs {
  public:
-  GLTextureEffect(std::shared_ptr<TextureProxy> proxy, const Point& alphaStart,
-                  const SamplingOptions& sampling, SrcRectConstraint constraint,
-                  const Matrix& uvMatrix, const std::optional<Rect>& subset);
+  SamplingArgs() = default;
 
-  void emitCode(EmitArgs& args) const override;
+  SamplingArgs(TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
+               SrcRectConstraint constraint)
+      : tileModeX(tileModeX), tileModeY(tileModeY), sampling(sampling), constraint(constraint) {
+  }
 
- private:
-  void emitPlainTextureCode(EmitArgs& args) const;
-  void emitYUVTextureCode(EmitArgs& args) const;
-  void onSetData(UniformBuffer* uniformBuffer) const override;
-  void appendClamp(FragmentShaderBuilder* fragBuilder, const std::string& vertexColor,
-                   const std::string& finalCoordName, const std::string& subsetName,
-                   const std::string& dimensionName) const;
+  TileMode tileModeX = TileMode::Clamp;
+  TileMode tileModeY = TileMode::Clamp;
+  SamplingOptions sampling = {};
+  SrcRectConstraint constraint = SrcRectConstraint::Fast;
+  std::optional<Rect> sampleArea = std::nullopt;
 };
 }  // namespace tgfx
