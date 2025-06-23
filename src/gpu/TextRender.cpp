@@ -256,7 +256,6 @@ void TextRender::pathDrawing(GlyphRun& sourceGlyphRun, const MCState& state, con
   if (!sourceGlyphRun.font.hasOutlines()) {
     rejectedGlyphRun = std::move(sourceGlyphRun);
   }
-
   auto maxScale = state.matrix.getMaxScale();
   Path totalPath = {};
   auto font = sourceGlyphRun.font;
