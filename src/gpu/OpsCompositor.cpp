@@ -251,11 +251,11 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
           deviceBounds->join(rect);
         }
       }
-      auto subsetMode = RectsVertexProvider::RectSubsetMode::None;
+      auto subsetMode = RectsVertexProvider::UVSubsetMode::None;
       if (pendingConstraint == SrcRectConstraint::Strict && pendingImage) {
         subsetMode = pendingSampling.filterMode == FilterMode::Linear
-                         ? RectsVertexProvider::RectSubsetMode::SubsetOnly
-                         : RectsVertexProvider::RectSubsetMode::RoundOutAndSubset;
+                         ? RectsVertexProvider::UVSubsetMode::SubsetOnly
+                         : RectsVertexProvider::UVSubsetMode::RoundOutAndSubset;
       }
       auto provider = RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects),
                                                     aaType, needLocalBounds, subsetMode);

@@ -40,7 +40,7 @@ struct RectRecord {
  */
 class RectsVertexProvider : public VertexProvider {
  public:
-  enum class RectSubsetMode { None, SubsetOnly, RoundOutAndSubset };
+  enum class UVSubsetMode { None, SubsetOnly, RoundOutAndSubset };
   /**
    * Creates a new RectsVertexProvider from a single rect.
    */
@@ -53,7 +53,7 @@ class RectsVertexProvider : public VertexProvider {
   static PlacementPtr<RectsVertexProvider> MakeFrom(BlockBuffer* buffer,
                                                     std::vector<PlacementPtr<RectRecord>>&& rects,
                                                     AAType aaType, bool needUVCoord,
-                                                    RectSubsetMode subsetType);
+                                                    UVSubsetMode subsetMode);
 
   /**
    * Returns the number of rects in the provider.
@@ -109,7 +109,7 @@ class RectsVertexProvider : public VertexProvider {
    * Returns true if the provider generates subset rects.
    */
   bool hasSubset() const {
-    return static_cast<RectSubsetMode>(bitFields.subsetMode) != RectSubsetMode::None;
+    return static_cast<UVSubsetMode>(bitFields.subsetMode) != UVSubsetMode::None;
   }
 
  protected:
@@ -124,7 +124,7 @@ class RectsVertexProvider : public VertexProvider {
   Rect getSubset(const Rect& rect) const;
 
   RectsVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType, bool hasUVCoord,
-                      bool hasColor, RectSubsetMode subsetType,
+                      bool hasColor, UVSubsetMode subsetMode,
                       std::shared_ptr<BlockBuffer> reference);
 };
 }  // namespace tgfx

@@ -226,7 +226,7 @@ void GLTextureEffect::onSetData(UniformBuffer* uniformBuffer) const {
     }
   }
   if (needSubset(texture)) {
-    auto subsetRect = subset.value();
+    auto subsetRect = subset.value_or(Rect::MakeWH(texture->width(), texture->height()));
     if (samplerState.filterMode == FilterMode::Nearest) {
       subsetRect.roundOut();
     }
