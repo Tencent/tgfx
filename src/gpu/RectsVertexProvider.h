@@ -53,7 +53,8 @@ class RectsVertexProvider : public VertexProvider {
   static PlacementPtr<RectsVertexProvider> MakeFrom(BlockBuffer* buffer,
                                                     std::vector<PlacementPtr<RectRecord>>&& rects,
                                                     AAType aaType, bool needUVCoord,
-                                                    UVSubsetMode subsetMode, bool mustUVCoord = false);
+                                                    UVSubsetMode subsetMode,
+                                                    bool mustUVCoord = false);
 
   /**
    * Returns the number of rects in the provider.

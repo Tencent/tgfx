@@ -305,7 +305,7 @@ void TextRender::pathDrawing(GlyphRun& sourceGlyphRun, const MCState& state, con
   newState.matrix = Matrix::MakeTrans(clipBounds.x(), clipBounds.y());
   auto rect = Rect::MakeWH(image->width(), image->height());
   opsCompositor->fillImage(std::move(image), rect, {}, newState,
-                           fill.makeWithMatrix(rasterizeMatrix));
+                           fill.makeWithMatrix(rasterizeMatrix), SrcRectConstraint::Fast);
 }
 
 void TextRender::transformedMaskDrawing(const GlyphRun& sourceGlyphRun, const MCState& state,

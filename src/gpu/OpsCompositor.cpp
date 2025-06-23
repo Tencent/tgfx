@@ -297,7 +297,8 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
         }
       }
       auto provider = RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingAtlasRects),
-                                                    aaType, needLocalBounds, true);
+                                                    aaType, needLocalBounds,
+                                                    RectsVertexProvider::UVSubsetMode::None, true);
       Matrix uvMatrix;
       if (!pendingAtlasMatrix.invert(&uvMatrix)) {
         return;
