@@ -18,11 +18,11 @@
 
 #include "ExternalOESBuffer.h"
 #include <mutex>
+#include "core/utils/WeakMap.h"
 #include "gpu/Texture.h"
 
 namespace tgfx {
-static std::mutex cacheLocker = {};
-static std::unordered_map<OH_NativeBuffer*, std::weak_ptr<ExternalOESBuffer>> oesBufferMap = {};
+static WeakMap<OH_NativeBuffer*, ExternalOESBuffer> oesBufferMap = {};
 
 std::shared_ptr<ExternalOESBuffer> ExternalOESBuffer::MakeFrom(OH_NativeBuffer* hardwareBuffer,
                                                                YUVColorSpace colorSpace) {
@@ -34,19 +34,14 @@ std::shared_ptr<ExternalOESBuffer> ExternalOESBuffer::MakeFrom(OH_NativeBuffer* 
   if (config.format < NATIVEBUFFER_PIXEL_FMT_YUV_422_I ||
       config.format > NATIVEBUFFER_PIXEL_FMT_YCRCB_P010) {
     return nullptr;
+      }
+
+  auto buffer = oesBufferMap.find(hardwareBuffer);
+  if (buffer) {
+    return buffer;
   }
-  std::lock_guard<std::mutex> cacheLock(cacheLocker);
-  auto result = oesBufferMap.find(hardwareBuffer);
-  if (result != oesBufferMap.end()) {
-    auto buffer = result->second.lock();
-    if (buffer) {
-      return buffer;
-    }
-    oesBufferMap.erase(result);
-  }
-  auto buffer =
-      std::shared_ptr<ExternalOESBuffer>(new ExternalOESBuffer(hardwareBuffer, colorSpace));
-  oesBufferMap[hardwareBuffer] = buffer;
+  buffer = std::shared_ptr<ExternalOESBuffer>(new ExternalOESBuffer(hardwareBuffer, colorSpace));
+  oesBufferMap.insert(hardwareBuffer, buffer);
   return buffer;
 }
 
@@ -57,8 +52,7 @@ ExternalOESBuffer::ExternalOESBuffer(OH_NativeBuffer* hardwareBuffer, YUVColorSp
 
 ExternalOESBuffer::~ExternalOESBuffer() {
   OH_NativeBuffer_Unreference(hardwareBuffer);
-  std::lock_guard<std::mutex> cacheLock(cacheLocker);
-  oesBufferMap.erase(hardwareBuffer);
+  oesBufferMap.remove(hardwareBuffer);
 }
 
 int ExternalOESBuffer::width() const {
