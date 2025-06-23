@@ -21,7 +21,7 @@
 #include "core/PathRasterizer.h"
 #include "core/UserTypeface.h"
 #include "core/atlas/AtlasTypes.h"
-#include "core/utils/ApplyStrokeToBound.h"
+#include "core/utils/ApplyStrokeToBounds.h"
 #include "core/utils/MathExtra.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/tasks/TextAtlasUploadTask.h"
