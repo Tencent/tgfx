@@ -95,7 +95,7 @@ TiledTextureEffect::Sampling::Sampling(const Texture* texture, SamplerState samp
     return true;
   };
   auto resolve = [&](int size, Wrap wrap, Span subset, SamplerState samplerState,
-                     float linerFilterInset) {
+                     float linearFilterInset) {
     Result1D r;
     bool canDoModeInHW = canDoWrapInHW(size, wrap);
     if (canDoModeInHW && subset.a <= 0 && subset.b >= static_cast<float>(size)) {
