@@ -32,8 +32,8 @@ void TextContent::draw(Canvas* canvas, const Paint& paint) const {
   canvas->drawTextBlob(textBlob, 0, 0, textPaint);
 }
 
-bool TextContent::hitTestPoint(float localX, float localY, bool pixelHitTest) {
-  if (pixelHitTest) {
+bool TextContent::hitTestPoint(float localX, float localY, bool shapeHitTest) {
+  if (shapeHitTest) {
     const auto glyphRunLists = GlyphRunList::Unwrap(textBlob.get());
 
     if (nullptr == glyphRunLists) {

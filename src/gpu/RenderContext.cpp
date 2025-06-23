@@ -23,7 +23,7 @@
 #include "core/Rasterizer.h"
 #include "core/ScalerContext.h"
 #include "core/images/SubsetImage.h"
-#include "core/utils/ApplyStrokeToBound.h"
+#include "core/utils/ApplyStrokeToBounds.h"
 #include "core/utils/MathExtra.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/TextRender.h"

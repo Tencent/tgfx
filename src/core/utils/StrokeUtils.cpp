@@ -1,5 +1,5 @@
 #include <cmath>
-#include "ApplyStrokeToBound.h"
+#include "ApplyStrokeToBounds.h"
 
 namespace tgfx {
 
