@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/SamplingOptions.h"
 #include "tgfx/core/TileMode.h"
