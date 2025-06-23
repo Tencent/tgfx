@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,40 +17,40 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <memory>
-#include <vector>
+
+#include <atomic>
+#include "tgfx/core/Rect.h"
 
 namespace tgfx {
-class Layer;
-
 /**
- * A property of a layer that may change the content of the layer.
+ * LazyBounds is a thread-safe cache for storing bounding box.
  */
-class LayerProperty {
+class LazyBounds {
  public:
-  virtual ~LayerProperty() = default;
-
- protected:
-  /**
-   *  Called when the property is invalidated. This method will notify the layer that the content
-   *  of the layer should be invalidated.
-   */
-  void invalidateContent();
+  ~LazyBounds() {
+    reset();
+  }
 
   /**
-   *  Called when the property is invalidated. This method will notify the layer that the
-   *  transformation of the layer should be invalidated.
+   * Returns the cached bounding box. This method is thread-safe as long as there is no concurrent
+   * reset() call.
    */
-  void invalidateTransform();
+  const Rect* get() const {
+    return bounds.load(std::memory_order_acquire);
+  }
+
+  /**
+   * Sets the bounding box to the cache. This method is thread-safe as long as there is no
+   * concurrent reset() call.
+   */
+  void update(const Rect& rect) const;
+
+  /**
+   * Resets the cached bounding box to its empty state. This method is not thread-safe.
+   */
+  void reset();
 
  private:
-  void attachToLayer(Layer* layer);
-
-  void detachFromLayer(Layer* layer);
-
-  std::vector<std::weak_ptr<Layer>> owners;
-
-  friend class Layer;
+  mutable std::atomic<Rect*> bounds = {nullptr};
 };
-
 }  // namespace tgfx

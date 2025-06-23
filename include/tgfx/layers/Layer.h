@@ -23,8 +23,8 @@
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/layers/LayerContent.h"
+#include "tgfx/layers/LayerMaskType.h"
 #include "tgfx/layers/LayerType.h"
-#include "tgfx/layers/MaskStyle.h"
 #include "tgfx/layers/filters/LayerFilter.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
@@ -43,7 +43,7 @@ struct LayerStyleSource;
  * single thread. Some properties only take effect if the layer has a parent, such as alpha,
  * blendMode, position, matrix, visible, scrollRect, and mask.
  */
-class Layer {
+class Layer : public std::enable_shared_from_this<Layer> {
  public:
   /**
    * Returns the default value for the allowsEdgeAntialiasing property for new Layer instances. The
@@ -286,16 +286,18 @@ class Layer {
   void setMask(std::shared_ptr<Layer> value);
 
   /**
-   * Returns the mask style used by the layer. The default value is MaskStyle::Alpha.
+   * Returns the mask type used by the layer. The mask type affects how the mask is applied to the
+   * layer content, such as whether it uses the alpha channel, luminance, or contour of the
+   * mask layer. The default value is LayerMaskType::Alpha.
    */
-  MaskStyle maskStyle() const {
-    return _maskStyle;
+  LayerMaskType maskType() const {
+    return _maskType;
   }
 
   /**
-   * Sets the mask style used by the layer.
+   * Sets the mask type used by the layer.
    */
-  void setMaskStyle(MaskStyle value);
+  void setMaskType(LayerMaskType value);
 
   /**
    * Returns the scroll rectangle bounds of the layer. The layer is cropped to the size defined by
@@ -329,8 +331,8 @@ class Layer {
   /**
    * Returns the parent layer that contains the calling layer.
    */
-  std::shared_ptr<Layer> parent() const {
-    return _parent ? _parent->weakThis.lock() : nullptr;
+  Layer* parent() const {
+    return _parent;
   }
 
   /**
@@ -498,15 +500,7 @@ class Layer {
   void draw(Canvas* canvas, float alpha = 1.0f, BlendMode blendMode = BlendMode::SrcOver);
 
  protected:
-  std::weak_ptr<Layer> weakThis;
-
   Layer();
-
-  /**
-   * Marks the layer as needing to be redrawn. Unlike invalidateContent(), this method only marks
-   * the layer as dirty and does not update the layer content.
-   */
-  void invalidateTransform();
 
   /**
    * Marks the layer's content as changed and needing to be redrawn. The updateContent() method will
@@ -549,14 +543,20 @@ class Layer {
   /**
   * Attachs a property to this layer.
   */
-  void attachProperty(LayerProperty* property) const;
+  void attachProperty(LayerProperty* property);
 
   /**
    * Detaches a property from this layer.
    */
-  void detachProperty(LayerProperty* property) const;
+  void detachProperty(LayerProperty* property);
 
  private:
+  /**
+   * Marks the layer as needing to be redrawn. Unlike invalidateContent(), this method only marks
+   * the layer as dirty and does not update the layer content.
+   */
+  void invalidateTransform();
+
   /**
    * Marks the layer's descendents as changed and needing to be redrawn.
    */
@@ -648,7 +648,7 @@ class Layer {
   float _alpha = 1.0f;
   Matrix _matrix = {};
   float _rasterizationScale = 0.0f;
-  MaskStyle _maskStyle = MaskStyle::Alpha;
+  LayerMaskType _maskType = LayerMaskType::Alpha;
   std::vector<std::shared_ptr<LayerFilter>> _filters = {};
   std::shared_ptr<Layer> _mask = nullptr;
   Layer* maskOwner = nullptr;

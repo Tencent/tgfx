@@ -105,9 +105,7 @@ void Layer::SetDefaultAllowsGroupOpacity(bool value) {
 }
 
 std::shared_ptr<Layer> Layer::Make() {
-  auto layer = std::shared_ptr<Layer>(new Layer());
-  layer->weakThis = layer;
-  return layer;
+  return std::shared_ptr<Layer>(new Layer());
 }
 
 Layer::~Layer() {
@@ -239,11 +237,11 @@ void Layer::setMask(std::shared_ptr<Layer> value) {
   invalidateTransform();
 }
 
-void Layer::setMaskStyle(MaskStyle value) {
-  if (_maskStyle == value) {
+void Layer::setMaskType(LayerMaskType value) {
+  if (_maskType == value) {
     return;
   }
-  _maskStyle = value;
+  _maskType = value;
   if (_mask) {
     invalidateTransform();
   }
@@ -294,7 +292,7 @@ bool Layer::addChild(std::shared_ptr<Layer> child) {
     return false;
   }
   auto index = _children.size();
-  if (child->parent().get() == this) {
+  if (child->_parent == this) {
     index--;
   }
   return addChildAt(child, static_cast<int>(index));
@@ -314,7 +312,7 @@ bool Layer::addChildAt(std::shared_ptr<Layer> child, int index) {
     LOGE("A root layer cannot be added as a child to another layer.");
     return false;
   }
-  if (child->parent().get() == this) {
+  if (child->_parent == this) {
     return setChildIndex(child, index);
   }
   child->removeFromParent();
@@ -541,14 +539,6 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   drawLayer(args, canvas, alpha, blendMode);
 }
 
-void Layer::invalidateTransform() {
-  if (bitFields.dirtyTransform) {
-    return;
-  }
-  bitFields.dirtyTransform = true;
-  invalidate();
-}
-
 void Layer::invalidateContent() {
   if (bitFields.dirtyContent) {
     return;
@@ -556,6 +546,14 @@ void Layer::invalidateContent() {
   bitFields.dirtyContent = true;
   bitFields.dirtyContentBounds = true;
   invalidateDescendents();
+}
+
+void Layer::invalidateTransform() {
+  if (bitFields.dirtyTransform) {
+    return;
+  }
+  bitFields.dirtyTransform = true;
+  invalidate();
 }
 
 void Layer::invalidateDescendents() {
@@ -580,13 +578,13 @@ std::unique_ptr<LayerContent> Layer::onUpdateContent() {
   return nullptr;
 }
 
-void Layer::attachProperty(LayerProperty* property) const {
+void Layer::attachProperty(LayerProperty* property) {
   if (property) {
     property->attachToLayer(this);
   }
 }
 
-void Layer::detachProperty(LayerProperty* property) const {
+void Layer::detachProperty(LayerProperty* property) {
   if (property) {
     property->detachFromLayer(this);
   }
@@ -774,7 +772,7 @@ Matrix Layer::getRelativeMatrix(const Layer* targetCoordinateSpace) const {
 
 std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float scale) {
   auto maskArgs = args;
-  maskArgs.drawMode = _maskStyle != MaskStyle::Vector ? DrawMode::Normal : DrawMode::Contour;
+  maskArgs.drawMode = _maskType != LayerMaskType::Contour ? DrawMode::Normal : DrawMode::Contour;
   maskArgs.backgroundContext = nullptr;
   auto maskPicture =
       CreatePicture(maskArgs, scale, [this](const DrawArgs& innerArgs, Canvas* canvas) {
@@ -788,7 +786,7 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
   if (maskContentImage == nullptr) {
     return nullptr;
   }
-  if (_maskStyle == MaskStyle::Luminance) {
+  if (_maskType == LayerMaskType::Luminance) {
     maskContentImage =
         maskContentImage->makeWithFilter(ImageFilter::ColorFilter(ColorFilter::Luma()));
   }
@@ -1095,14 +1093,14 @@ bool Layer::getLayersUnderPointInternal(float x, float y,
   }
 
   if (hasLayerUnderPoint) {
-    results->push_back(weakThis.lock());
+    results->push_back(shared_from_this());
   } else {
     auto content = getContent();
     if (nullptr != content) {
       auto layerBoundsRect = content->getBounds();
       auto localPoint = globalToLocal(Point::Make(x, y));
       if (layerBoundsRect.contains(localPoint.x, localPoint.y)) {
-        results->push_back(weakThis.lock());
+        results->push_back(shared_from_this());
         hasLayerUnderPoint = true;
       }
     }

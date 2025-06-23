@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RectsVertexProvider.h"
-#include "core/utils/Log.h"
 #include "gpu/Quad.h"
 
 namespace tgfx {
@@ -32,8 +31,8 @@ static void WriteUByte4Color(float* vertices, int& index, const Color& color) {
 class AARectsVertexProvider : public RectsVertexProvider {
  public:
   AARectsVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType, bool hasUVCoord,
-                        bool hasColor)
-      : RectsVertexProvider(std::move(rects), aaType, hasUVCoord, hasColor) {
+                        bool hasColor, std::shared_ptr<BlockBuffer> reference)
+      : RectsVertexProvider(std::move(rects), aaType, hasUVCoord, hasColor, std::move(reference)) {
   }
 
   size_t vertexCount() const override {
@@ -84,8 +83,8 @@ class AARectsVertexProvider : public RectsVertexProvider {
 class NonAARectVertexProvider : public RectsVertexProvider {
  public:
   NonAARectVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType, bool hasUVCoord,
-                          bool hasColor)
-      : RectsVertexProvider(std::move(rects), aaType, hasUVCoord, hasColor) {
+                          bool hasColor, std::shared_ptr<BlockBuffer> reference)
+      : RectsVertexProvider(std::move(rects), aaType, hasUVCoord, hasColor, std::move(reference)) {
   }
 
   size_t vertexCount() const override {
@@ -126,9 +125,11 @@ PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(BlockBuffer* buf
   auto record = buffer->make<RectRecord>(rect, Matrix::I());
   auto rects = buffer->makeArray<RectRecord>(&record, 1);
   if (aaType == AAType::Coverage) {
-    return buffer->make<AARectsVertexProvider>(std::move(rects), aaType, false, false);
+    return buffer->make<AARectsVertexProvider>(std::move(rects), aaType, false, false,
+                                               buffer->addReference());
   }
-  return buffer->make<NonAARectVertexProvider>(std::move(rects), aaType, false, false);
+  return buffer->make<NonAARectVertexProvider>(std::move(rects), aaType, false, false,
+                                               buffer->addReference());
 }
 
 PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
@@ -159,14 +160,17 @@ PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
   }
   auto array = buffer->makeArray(std::move(rects));
   if (aaType == AAType::Coverage) {
-    return buffer->make<AARectsVertexProvider>(std::move(array), aaType, hasUVCoord, hasColor);
+    return buffer->make<AARectsVertexProvider>(std::move(array), aaType, hasUVCoord, hasColor,
+                                               buffer->addReference());
   }
-  return buffer->make<NonAARectVertexProvider>(std::move(array), aaType, hasUVCoord, hasColor);
+  return buffer->make<NonAARectVertexProvider>(std::move(array), aaType, hasUVCoord, hasColor,
+                                               buffer->addReference());
 }
 
 RectsVertexProvider::RectsVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType,
-                                         bool hasUVCoord, bool hasColor)
-    : rects(std::move(rects)) {
+                                         bool hasUVCoord, bool hasColor,
+                                         std::shared_ptr<BlockBuffer> reference)
+    : VertexProvider(std::move(reference)), rects(std::move(rects)) {
   bitFields.aaType = static_cast<uint8_t>(aaType);
   bitFields.hasUVCoord = hasUVCoord;
   bitFields.hasColor = hasColor;

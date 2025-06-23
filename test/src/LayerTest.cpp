@@ -54,15 +54,15 @@ TGFX_TEST(LayerTest, LayerTree) {
   // Test adding children
   parent->addChild(child1);
   child1->addChild(child2);
-  EXPECT_EQ(child1->parent(), parent);
-  EXPECT_EQ(child2->parent(), child1);
+  EXPECT_EQ(child1->parent(), parent.get());
+  EXPECT_EQ(child2->parent(), child1.get());
   EXPECT_TRUE(parent->children().size() == 1);
   EXPECT_TRUE(parent->contains(child1));
   EXPECT_TRUE(parent->contains(child2));
   EXPECT_EQ(parent->getChildIndex(child1), 0);
   EXPECT_EQ(parent->getChildIndex(child2), -1);
   parent->addChildAt(child3, 0);
-  EXPECT_EQ(child3->parent(), parent);
+  EXPECT_EQ(child3->parent(), parent.get());
   EXPECT_TRUE(parent->children().size() == 2);
   EXPECT_TRUE(parent->getChildIndex(child3) == 0);
   EXPECT_EQ(parent->getChildIndex(child1), 1);
@@ -93,7 +93,7 @@ TGFX_TEST(LayerTest, LayerTree) {
   EXPECT_EQ(replacedChild2->root(), nullptr);
 
   parent->replaceChild(child1, replacedChild);
-  EXPECT_EQ(replacedChild->parent(), parent);
+  EXPECT_EQ(replacedChild->parent(), parent.get());
   EXPECT_EQ(replacedChild->root(), displayList->root());
   EXPECT_FALSE(parent->contains(child1));
   EXPECT_FALSE(parent->contains(child2));
@@ -101,7 +101,7 @@ TGFX_TEST(LayerTest, LayerTree) {
   EXPECT_TRUE(parent->children().size() == 2);
   EXPECT_EQ(parent->getChildIndex(replacedChild), 1);
   parent->replaceChild(replacedChild, child2);
-  EXPECT_EQ(child2->parent(), parent);
+  EXPECT_EQ(child2->parent(), parent.get());
   EXPECT_EQ(child2->root(), displayList->root());
   EXPECT_FALSE(parent->contains(replacedChild));
   EXPECT_TRUE(parent->contains(child2));
@@ -1043,7 +1043,7 @@ TGFX_TEST(LayerTest, shapeMask) {
       Matrix::MakeAll(1.0f, 0, 300 + static_cast<float>(image->width()) * 0.5f, 0, 1.0f, 300);
   alphaShaperLayer->setMatrix(alphaMaskMatrix);
   imageLayer1->setMask(alphaShaperLayer);
-  imageLayer1->setMaskStyle(MaskStyle::Alpha);
+  imageLayer1->setMaskType(LayerMaskType::Alpha);
 
   // Vector mask effect
   auto imageLayer2 = ImageLayer::Make();
@@ -1053,7 +1053,7 @@ TGFX_TEST(LayerTest, shapeMask) {
       Matrix::MakeAll(0.5f, 0, 0, 0, 0.5f, static_cast<float>(image->height()) * 0.5f);
   imageLayer2->setMatrix(image2Matrix);
   imageLayer2->setAlpha(1.0f);
-  imageLayer2->setMaskStyle(MaskStyle::Vector);
+  imageLayer2->setMaskType(LayerMaskType::Contour);
 
   auto vectorShaperLayer = ShapeLayer::Make();
   vectorShaperLayer->setPath(path);
@@ -1074,7 +1074,7 @@ TGFX_TEST(LayerTest, shapeMask) {
                                       static_cast<float>(image->height()) * 0.5f);
   imageLayer3->setMatrix(image3Matrix);
   imageLayer3->setAlpha(1.0f);
-  imageLayer3->setMaskStyle(MaskStyle::Luminance);
+  imageLayer3->setMaskType(LayerMaskType::Luminance);
 
   auto lumaShaperLayer = ShapeLayer::Make();
   lumaShaperLayer->setPath(path);

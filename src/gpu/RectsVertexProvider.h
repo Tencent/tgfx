@@ -113,6 +113,6 @@ class RectsVertexProvider : public VertexProvider {
   } bitFields = {};
 
   RectsVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType, bool hasUVCoord,
-                      bool hasColor);
+                      bool hasColor, std::shared_ptr<BlockBuffer> reference);
 };
 }  // namespace tgfx

@@ -23,9 +23,7 @@
 
 namespace tgfx {
 std::shared_ptr<ShapeLayer> ShapeLayer::Make() {
-  auto layer = std::shared_ptr<ShapeLayer>(new ShapeLayer());
-  layer->weakThis = layer;
-  return layer;
+  return std::shared_ptr<ShapeLayer>(new ShapeLayer());
 }
 
 Path ShapeLayer::path() const {
@@ -57,11 +55,11 @@ void ShapeLayer::setFillStyles(std::vector<std::shared_ptr<ShapeStyle>> fills) {
       std::equal(_fillStyles.begin(), _fillStyles.end(), fills.begin())) {
     return;
   }
-  for (const auto& style : _fillStyles) {
+  for (auto& style : _fillStyles) {
     detachProperty(style.get());
   }
   _fillStyles = std::move(fills);
-  for (const auto& style : _fillStyles) {
+  for (auto& style : _fillStyles) {
     attachProperty(style.get());
   }
   invalidateContent();
