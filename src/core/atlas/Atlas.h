@@ -44,10 +44,6 @@ class Atlas {
     return textureProxies;
   }
 
-  uint64_t atlasGeneration() const {
-    return _atlasGeneration;
-  }
-
   void compact(AtlasToken);
 
   //To ensure the atlas does not evict a given entry,the client must set the use token
@@ -81,7 +77,6 @@ class Atlas {
   AtlasGenerationCounter* const generationCounter;
   std::vector<std::shared_ptr<TextureProxy>> textureProxies = {};
   std::vector<Page> pages = {};
-  uint64_t _atlasGeneration = 0;
   AtlasToken previousFlushToken = AtlasToken::InvalidToken();
   int flushesSinceLastUse = 0;
   uint32_t numPlots = 0;

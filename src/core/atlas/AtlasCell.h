@@ -47,7 +47,7 @@ class AtlasCell {
 
  private:
   BytesKey _key;
-  Matrix _matrix;
+  Matrix _matrix = {};
   MaskFormat _maskFormat = MaskFormat::A8;
   uint16_t _width = 0;
   uint16_t _height = 0;

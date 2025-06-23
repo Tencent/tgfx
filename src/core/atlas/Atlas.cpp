@@ -40,9 +40,7 @@ std::unique_ptr<Atlas> Atlas::Make(ProxyProvider* proxyProvider, PixelFormat pix
 Atlas::Atlas(ProxyProvider* proxyProvider, PixelFormat pixelFormat, int width, int height,
              int plotWidth, int plotHeight, AtlasGenerationCounter* generationCounter)
     : proxyProvider(proxyProvider), pixelFormat(pixelFormat), generationCounter(generationCounter),
-      _atlasGeneration(generationCounter->next()), previousFlushToken(AtlasToken::InvalidToken()),
-      flushesSinceLastUse(0), textureWidth(width), textureHeight(height), plotWidth(plotWidth),
-      plotHeight(plotHeight) {
+      textureWidth(width), textureHeight(height), plotWidth(plotWidth), plotHeight(plotHeight) {
   int numPlotX = width / plotWidth;
   int numPlotY = height / plotHeight;
   DEBUG_ASSERT(plotWidth * numPlotX == textureWidth);
@@ -97,7 +95,6 @@ bool Atlas::activateNewPage() {
   Page page;
   page.plotArray =
       std::make_unique<std::unique_ptr<Plot>[]>(static_cast<size_t>(numPlotX * numPlotY));
-
   auto pageIndex = static_cast<uint32_t>(pages.size());
   auto currentPlot = page.plotArray.get();
   for (int y = numPlotY - 1, r = 0; y >= 0; --y, ++r) {
@@ -115,7 +112,6 @@ bool Atlas::activateNewPage() {
   if (proxy == nullptr) {
     return false;
   }
-
   // In OpenGL, calling glTexImage2D with data == nullptr allocates texture memory
   // for the given width and height, but the contents are undefined.
   // This means OpenGL does not guarantee the texture will be zero-initialized.
@@ -176,7 +172,6 @@ void Atlas::evictionPlot(Plot* plot) {
       expiredKeys.insert(key);
     }
   }
-  _atlasGeneration = generationCounter->next();
   plot->resetRects();
   evictionPlots[plot->pageIndex()].insert(plot);
 }
@@ -286,8 +281,7 @@ void Atlas::clearEvictionPlotTexture(Context* context) {
   if (evictionPlots.empty() || context == nullptr || textureProxies.empty()) {
     return;
   }
-  auto isAlphaOnly = pixelFormat == PixelFormat::ALPHA_8;
-  auto pixelRef = PixelRef::Make(plotWidth, plotHeight, isAlphaOnly);
+  auto pixelRef = PixelRef::Make(plotWidth, plotHeight, pixelFormat == PixelFormat::ALPHA_8);
   pixelRef->clear();
   auto pixels = pixelRef->lockPixels();
   if (pixels == nullptr) {
