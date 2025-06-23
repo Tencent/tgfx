@@ -54,10 +54,10 @@ class LayerContent {
   /**
     * Checks if the layer content overlaps or intersects with the specified point (localX, localY).
     * The localX and localY coordinates are in the layer's local coordinate space. If the
-    * pixelHitTest flag is true, it checks the actual pixels of the layer content; otherwise, it
+    * shapeHitTest flag is true, it checks the actual shape of the layer content; otherwise, it
     * checks the bounding box.
   */
-  virtual bool hitTestPoint(float localX, float localY, bool pixelHitTest) = 0;
+  virtual bool hitTestPoint(float localX, float localY, bool shapeHitTest) = 0;
 
  protected:
   enum class Type {

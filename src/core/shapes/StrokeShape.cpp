@@ -18,7 +18,7 @@
 
 #include "StrokeShape.h"
 #include "core/shapes/MatrixShape.h"
-#include "core/utils/ApplyStrokeToBound.h"
+#include "core/utils/ApplyStrokeToBounds.h"
 #include "core/utils/Log.h"
 #include "core/utils/UniqueID.h"
 

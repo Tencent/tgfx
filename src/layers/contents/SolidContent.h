@@ -31,7 +31,7 @@ class SolidContent : public LayerContent {
 
   void draw(Canvas* canvas, const Paint& paint) const override;
 
-  bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
+  bool hitTestPoint(float localX, float localY, bool shapeHitTest) override;
 
   RRect _rRect;
   Color _color;
