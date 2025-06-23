@@ -49,7 +49,7 @@ static const float ColorConversionJPEGFullRange[] = {
 };
 
 PlacementPtr<FragmentProcessor> TextureEffect::MakeRGBAAA(std::shared_ptr<TextureProxy> proxy,
-                                                          const FPImageArgs& args,
+                                                          const SamplingArgs& args,
                                                           const Point& alphaStart,
                                                           const Matrix* uvMatrix) {
   if (proxy == nullptr) {
@@ -58,7 +58,7 @@ PlacementPtr<FragmentProcessor> TextureEffect::MakeRGBAAA(std::shared_ptr<Textur
   auto matrix = uvMatrix ? *uvMatrix : Matrix::I();
   auto drawingBuffer = proxy->getContext()->drawingBuffer();
   return drawingBuffer->make<GLTextureEffect>(std::move(proxy), alphaStart, args.sampling,
-                                              args.constraint, matrix, args.subset);
+                                              args.constraint, matrix, args.sampleArea);
 }
 
 GLTextureEffect::GLTextureEffect(std::shared_ptr<TextureProxy> proxy, const Point& alphaStart,

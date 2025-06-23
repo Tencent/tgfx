@@ -47,7 +47,7 @@ bool ImageShader::isEqual(const Shader* shader) const {
 
 PlacementPtr<FragmentProcessor> ImageShader::asFragmentProcessor(const FPArgs& args,
                                                                  const Matrix* uvMatrix) const {
-  FPImageArgs imageArgs = {tileModeX, tileModeY, sampling, SrcRectConstraint::Fast};
-  return image->asFragmentProcessor(args, imageArgs, uvMatrix);
+  SamplingArgs samplingArgs = {tileModeX, tileModeY, sampling, SrcRectConstraint::Fast};
+  return image->asFragmentProcessor(args, samplingArgs, uvMatrix);
 }
 }  // namespace tgfx

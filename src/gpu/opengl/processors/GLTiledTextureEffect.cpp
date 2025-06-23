@@ -22,7 +22,7 @@
 
 namespace tgfx {
 PlacementPtr<FragmentProcessor> TiledTextureEffect::Make(std::shared_ptr<TextureProxy> proxy,
-                                                         const FPImageArgs& args,
+                                                         const SamplingArgs& args,
                                                          const Matrix* uvMatrix, bool forceAsMask) {
   if (proxy == nullptr) {
     return nullptr;
@@ -35,7 +35,7 @@ PlacementPtr<FragmentProcessor> TiledTextureEffect::Make(std::shared_ptr<Texture
   auto isAlphaOnly = proxy->isAlphaOnly();
   auto drawingBuffer = proxy->getContext()->drawingBuffer();
   PlacementPtr<FragmentProcessor> processor = drawingBuffer->make<GLTiledTextureEffect>(
-      std::move(proxy), samplerState, args.constraint, matrix, args.subset);
+      std::move(proxy), samplerState, args.constraint, matrix, args.sampleArea);
   if (forceAsMask && !isAlphaOnly) {
     processor = FragmentProcessor::MulInputByChildAlpha(drawingBuffer, std::move(processor));
   }

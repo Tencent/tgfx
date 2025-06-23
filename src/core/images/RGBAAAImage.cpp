@@ -50,7 +50,7 @@ std::shared_ptr<Image> RGBAAAImage::onCloneWith(std::shared_ptr<Image> newSource
 }
 
 PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs& args,
-                                                                 const FPImageArgs& imageArgs,
+                                                                 const SamplingArgs& samplingArgs,
                                                                  const Matrix* uvMatrix) const {
   DEBUG_ASSERT(!source->isAlphaOnly());
   auto matrix = concatUVMatrix(uvMatrix);
@@ -58,21 +58,24 @@ PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs& a
   if (matrix) {
     matrix->mapRect(&drawBounds);
   }
-  auto newImageArgs = imageArgs;
-  auto mipmapped = source->hasMipmaps() && imageArgs.sampling.mipmapMode != MipmapMode::None;
+  auto newSamplingArgs = samplingArgs;
+  auto mipmapped = source->hasMipmaps() && samplingArgs.sampling.mipmapMode != MipmapMode::None;
   if (bounds.contains(drawBounds)) {
-    newImageArgs.subset = getSubset(drawBounds);
+    if (samplingArgs.constraint != SrcRectConstraint::Strict) {
+      newSamplingArgs.sampleArea = getSubset(drawBounds);
+    }
     TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
     auto proxy = source->lockTextureProxy(tpArgs);
-    return TextureEffect::MakeRGBAAA(std::move(proxy), newImageArgs, alphaStart, AddressOf(matrix));
+    return TextureEffect::MakeRGBAAA(std::move(proxy), newSamplingArgs, alphaStart,
+                                     AddressOf(matrix));
   }
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
   auto textureProxy = lockTextureProxy(tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  newImageArgs.subset = std::nullopt;
-  return TiledTextureEffect::Make(textureProxy, newImageArgs, uvMatrix);
+  newSamplingArgs.sampleArea = std::nullopt;
+  return TiledTextureEffect::Make(textureProxy, newSamplingArgs, uvMatrix);
 }
 
 std::shared_ptr<Image> RGBAAAImage::onMakeSubset(const Rect& subset) const {

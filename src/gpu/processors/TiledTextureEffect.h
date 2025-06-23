@@ -26,7 +26,7 @@ namespace tgfx {
 class TiledTextureEffect : public FragmentProcessor {
  public:
   static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<TextureProxy> textureProxy,
-                                              const FPImageArgs& args,
+                                              const SamplingArgs& args,
                                               const Matrix* uvMatrix = nullptr,
                                               bool forceAsMask = false);
 

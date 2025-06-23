@@ -92,10 +92,10 @@ PlacementPtr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(
   if (uvMatrix != nullptr) {
     fpMatrix.preConcat(*uvMatrix);
   }
-  FPImageArgs imageArgs = {TileMode::Decal, TileMode::Decal, sampling, constraint};
+  SamplingArgs samplingArgs = {TileMode::Decal, TileMode::Decal, sampling, constraint};
   if (dstBounds.contains(clipBounds)) {
-    return TextureEffect::Make(std::move(textureProxy), imageArgs, &fpMatrix, isAlphaOnly);
+    return TextureEffect::Make(std::move(textureProxy), samplingArgs, &fpMatrix, isAlphaOnly);
   }
-  return TiledTextureEffect::Make(std::move(textureProxy), imageArgs, &fpMatrix, isAlphaOnly);
+  return TiledTextureEffect::Make(std::move(textureProxy), samplingArgs, &fpMatrix, isAlphaOnly);
 }
 }  // namespace tgfx

@@ -22,8 +22,8 @@
 
 namespace tgfx {
 PlacementPtr<FragmentProcessor> TextureEffect::Make(std::shared_ptr<TextureProxy> proxy,
-                                                    const FPImageArgs& args, const Matrix* uvMatrix,
-                                                    bool forceAsMask) {
+                                                    const SamplingArgs& args,
+                                                    const Matrix* uvMatrix, bool forceAsMask) {
   if (proxy == nullptr) {
     return nullptr;
   }
@@ -111,7 +111,7 @@ bool TextureEffect::needSubset(Texture* texture) const {
   auto edgePoint = texture->getTextureCoord(static_cast<float>(texture->width()),
                                             static_cast<float>(texture->height()));
   static constexpr Point FullEdge = Point::Make(1.0f, 1.0f);
-  return samplerType != SamplerType::Rectangle && edgePoint != FullEdge && alphaStart.isZero();
+  return samplerType != SamplerType::Rectangle && edgePoint != FullEdge;
 }
 
 }  // namespace tgfx

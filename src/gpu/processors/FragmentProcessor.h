@@ -23,6 +23,7 @@
 #include "gpu/CoordTransform.h"
 #include "gpu/FragmentShaderBuilder.h"
 #include "gpu/SamplerState.h"
+#include "gpu/SamplingArgs.h"
 #include "gpu/Texture.h"
 #include "gpu/UniformBuffer.h"
 #include "gpu/UniformHandler.h"
@@ -49,22 +50,6 @@ class FPArgs {
   Rect drawRect = {};
 };
 
-class FPImageArgs {
- public:
-  FPImageArgs() = default;
-
-  FPImageArgs(TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
-              SrcRectConstraint constraint)
-      : tileModeX(tileModeX), tileModeY(tileModeY), sampling(sampling), constraint(constraint) {
-  }
-
-  TileMode tileModeX = TileMode::Clamp;
-  TileMode tileModeY = TileMode::Clamp;
-  SamplingOptions sampling = {};
-  SrcRectConstraint constraint = SrcRectConstraint::Fast;
-  std::optional<Rect> subset = std::nullopt;
-};
-
 class FragmentProcessor : public Processor {
  public:
   /**
@@ -85,10 +70,10 @@ class FragmentProcessor : public Processor {
                                               const Matrix* uvMatrix = nullptr);
   /**
    * Creates a fragment processor that will draw the given image with the given options.
-   * The imageArgs contains additional information about how to sample the image.
+   * The samplingArgs contains additional information about how to sample the image.
    */
   static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<Image> image, const FPArgs& args,
-                                              const FPImageArgs& imageArgs,
+                                              const SamplingArgs& samplingArgs,
                                               const Matrix* uvMatrix = nullptr);
 
   /**

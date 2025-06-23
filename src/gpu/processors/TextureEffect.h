@@ -19,6 +19,7 @@
 #pragma once
 
 #include "gpu/SamplerState.h"
+#include "gpu/SamplingArgs.h"
 #include "gpu/YUVTexture.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/proxies/TextureProxy.h"
@@ -27,12 +28,12 @@ namespace tgfx {
 class TextureEffect : public FragmentProcessor {
  public:
   static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<TextureProxy> proxy,
-                                              const FPImageArgs& args = {},
+                                              const SamplingArgs& args = {},
                                               const Matrix* uvMatrix = nullptr,
                                               bool forceAsMask = false);
 
   static PlacementPtr<FragmentProcessor> MakeRGBAAA(std::shared_ptr<TextureProxy> proxy,
-                                                    const FPImageArgs& args,
+                                                    const SamplingArgs& args,
                                                     const Point& alphaStart,
                                                     const Matrix* uvMatrix = nullptr);
 

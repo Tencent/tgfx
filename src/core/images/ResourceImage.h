@@ -45,7 +45,7 @@ class ResourceImage : public Image {
                                                            const UniqueKey& key) const = 0;
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                      const FPImageArgs& imageArgs,
+                                                      const SamplingArgs& samplingArgs,
                                                       const Matrix* uvMatrix) const override;
 
   friend class MipmapImage;

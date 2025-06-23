@@ -103,6 +103,9 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect
   auto samplingOptions = sampling;
   if (constraint == SrcRectConstraint::Strict ||
       (samplingOptions.mipmapMode != MipmapMode::None && !state.matrix.hasNonIdentityScale())) {
+    // Mipmaps perform sampling at different scales, which could cause samples to go outside the
+    // strict region. So we disable mipmaps for strict constraints.
+
     // There is no scaling for the source image, so we can disable mipmaps to save memory.
     samplingOptions.mipmapMode = MipmapMode::None;
   }

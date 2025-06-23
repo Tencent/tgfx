@@ -31,24 +31,24 @@ PlacementPtr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image> i
                                                         SrcRectConstraint constraint,
                                                         const Matrix* uvMatrix) {
   DEBUG_ASSERT(image != nullptr);
-  FPImageArgs imageArgs = FPImageArgs(TileMode::Clamp, TileMode::Clamp, sampling, constraint);
-  return image->asFragmentProcessor(args, imageArgs, uvMatrix);
+  SamplingArgs samplingArgs = SamplingArgs(TileMode::Clamp, TileMode::Clamp, sampling, constraint);
+  return image->asFragmentProcessor(args, samplingArgs, uvMatrix);
 }
 
 PlacementPtr<FragmentProcessor> FragmentProcessor::Make(
     std::shared_ptr<Image> image, const FPArgs& args, TileMode tileModeX, TileMode tileModeY,
     const SamplingOptions& sampling, SrcRectConstraint constraint, const Matrix* uvMatrix) {
   DEBUG_ASSERT(image != nullptr);
-  FPImageArgs imageArgs = FPImageArgs(tileModeX, tileModeY, sampling, constraint);
-  return image->asFragmentProcessor(args, imageArgs, uvMatrix);
+  SamplingArgs samplingArgs = SamplingArgs(tileModeX, tileModeY, sampling, constraint);
+  return image->asFragmentProcessor(args, samplingArgs, uvMatrix);
 }
 
 PlacementPtr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image> image,
                                                         const FPArgs& args,
-                                                        const FPImageArgs& imageArgs,
+                                                        const SamplingArgs& samplingArgs,
                                                         const Matrix* uvMatrix) {
   DEBUG_ASSERT(image != nullptr);
-  return image->asFragmentProcessor(args, imageArgs, uvMatrix);
+  return image->asFragmentProcessor(args, samplingArgs, uvMatrix);
 }
 
 PlacementPtr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Shader> shader,

@@ -36,6 +36,17 @@ struct RectRecord {
   Color color;
 };
 
+class SubsetMaker {
+ public:
+  explicit SubsetMaker(const SamplingOptions& options) : filterMode(options.filterMode) {
+  }
+
+  Rect getSubset(const Rect& rect) const;
+
+ private:
+  FilterMode filterMode = FilterMode::Nearest;
+};
+
 /**
  * RectsVertexProvider is a VertexProvider that provides vertices for drawing rectangles.
  */
@@ -52,8 +63,8 @@ class RectsVertexProvider : public VertexProvider {
    */
   static PlacementPtr<RectsVertexProvider> MakeFrom(BlockBuffer* buffer,
                                                     std::vector<PlacementPtr<RectRecord>>&& rects,
-                                                    AAType aaType, const SamplingOptions& options,
-                                                    bool needUVCoord, bool needSubset);
+                                                    AAType aaType, bool needUVCoord,
+                                                    const std::optional<SubsetMaker>& subsetMaker);
 
   /**
    * Returns the number of rects in the provider.
@@ -109,7 +120,7 @@ class RectsVertexProvider : public VertexProvider {
    * Returns true if the provider generates subset rects.
    */
   bool hasSubset() const {
-    return bitFields.hasSubset;
+    return subsetMaker.has_value();
   }
 
  protected:
@@ -118,15 +129,12 @@ class RectsVertexProvider : public VertexProvider {
     uint8_t aaType : 2;
     bool hasUVCoord : 1;
     bool hasColor : 1;
-    bool hasSubset : 1;
   } bitFields = {};
 
-  SamplingOptions samplingOption = {};
+  std::optional<SubsetMaker> subsetMaker = std::nullopt;
 
-  RectsVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType,
-                      const SamplingOptions& options, bool hasUVCoord, bool hasColor,
-                      bool hasSubset, std::shared_ptr<BlockBuffer> reference);
-
-  Rect getSubsetRect(const Rect& rect) const;
+  RectsVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType, bool hasUVCoord,
+                      bool hasColor, const std::optional<SubsetMaker>& subsetMaker,
+                      std::shared_ptr<BlockBuffer> reference);
 };
 }  // namespace tgfx

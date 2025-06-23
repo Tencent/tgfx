@@ -45,26 +45,28 @@ std::shared_ptr<Image> SubsetImage::onMakeSubset(const Rect& subset) const {
 }
 
 PlacementPtr<FragmentProcessor> SubsetImage::asFragmentProcessor(const FPArgs& args,
-                                                                 const FPImageArgs& imageArgs,
+                                                                 const SamplingArgs& samplingArgs,
                                                                  const Matrix* uvMatrix) const {
   auto matrix = concatUVMatrix(uvMatrix);
   auto drawBounds = args.drawRect;
   if (matrix) {
     matrix->mapRect(&drawBounds);
   }
-  auto newImageArgs = imageArgs;
+  auto newSamplingArgs = samplingArgs;
   if (bounds.contains(drawBounds)) {
-    newImageArgs.subset = getSubset(drawBounds);
-    return FragmentProcessor::Make(source, args, newImageArgs, AddressOf(matrix));
+    if (samplingArgs.constraint != SrcRectConstraint::Strict) {
+      newSamplingArgs.sampleArea = getSubset(drawBounds);
+    }
+    return FragmentProcessor::Make(source, args, newSamplingArgs, AddressOf(matrix));
   }
-  auto mipmapped = source->hasMipmaps() && imageArgs.sampling.mipmapMode != MipmapMode::None;
+  auto mipmapped = source->hasMipmaps() && samplingArgs.sampling.mipmapMode != MipmapMode::None;
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
   auto textureProxy = lockTextureProxy(tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  newImageArgs.subset = std::nullopt;
-  return TiledTextureEffect::Make(textureProxy, newImageArgs, uvMatrix, source->isAlphaOnly());
+  newSamplingArgs.sampleArea = std::nullopt;
+  return TiledTextureEffect::Make(textureProxy, newSamplingArgs, uvMatrix, source->isAlphaOnly());
 }
 
 std::optional<Matrix> SubsetImage::concatUVMatrix(const Matrix* uvMatrix) const {
