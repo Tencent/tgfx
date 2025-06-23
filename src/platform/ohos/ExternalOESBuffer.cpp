@@ -34,7 +34,7 @@ std::shared_ptr<ExternalOESBuffer> ExternalOESBuffer::MakeFrom(OH_NativeBuffer* 
   if (config.format < NATIVEBUFFER_PIXEL_FMT_YUV_422_I ||
       config.format > NATIVEBUFFER_PIXEL_FMT_YCRCB_P010) {
     return nullptr;
-      }
+  }
 
   auto buffer = oesBufferMap.find(hardwareBuffer);
   if (buffer) {
