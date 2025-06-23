@@ -17,9 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Atlas.h"
-#include <algorithm>
 #include "core/PixelRef.h"
-#include "core/images/TextureImage.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/Gpu.h"

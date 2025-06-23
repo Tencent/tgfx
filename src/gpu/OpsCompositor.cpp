@@ -289,7 +289,6 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
           deviceBounds->join(rect);
         }
       }
-
       auto provider = RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingAtlasRects),
                                                     aaType, needLocalBounds, true);
       Matrix uvMatrix;

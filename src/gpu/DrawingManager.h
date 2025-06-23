@@ -81,7 +81,7 @@ class DrawingManager {
   std::vector<PlacementPtr<RenderTask>> renderTasks = {};
   std::list<std::shared_ptr<OpsCompositor>> compositors = {};
   ResourceKeyMap<ResourceTask*> resourceTaskMap = {};
-  FlushTokenTracker flushTokenTracker;
+  FlushTokenTracker flushTokenTracker = {};
   std::vector<FlushCallbackObject*> flushCallbackObjects = {};
 
   friend class OpsCompositor;
