@@ -18,8 +18,8 @@
 
 #include "tgfx/layers/Layer.h"
 #include <atomic>
-#include "contents/LayerContent.h"
 #include "contents/RasterizedContent.h"
+#include "contents/RecordedContent.h"
 #include "core/images/PictureImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -415,7 +415,7 @@ Rect Layer::getBounds(const Layer* targetCoordinateSpace, bool computeTightBound
 
 Rect Layer::getBoundsInternal(const Matrix& coordinateMatrix, bool computeTightBounds) {
   Rect bounds = {};
-  if (auto content = getContent()) {
+  if (auto content = getRecordedContent()) {
     if (computeTightBounds) {
       bounds.join(content->getTightBounds(coordinateMatrix));
     } else {
@@ -475,7 +475,7 @@ Point Layer::localToGlobal(const Point& localPoint) const {
 }
 
 bool Layer::hitTestPoint(float x, float y, bool shapeHitTest) {
-  if (auto content = getContent()) {
+  if (auto content = getRecordedContent()) {
     Point localPoint = globalToLocal(Point::Make(x, y));
     if (content->hitTestPoint(localPoint.x, localPoint.y, shapeHitTest)) {
       return true;
@@ -627,14 +627,14 @@ Matrix Layer::getMatrixWithScrollRect() const {
   return matrix;
 }
 
-LayerContent* Layer::getContent() {
+RecordedContent* Layer::getRecordedContent() {
   if (bitFields.dirtyContent) {
     LayerRecorder recorder = {};
     onUpdateContent(&recorder);
-    layerContent = recorder.finishRecording();
+    recordedContent = recorder.finishRecording();
     bitFields.dirtyContent = false;
   }
-  return layerContent.get();
+  return recordedContent.get();
 }
 
 std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
@@ -843,7 +843,7 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
     drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Below);
   }
   LayerFill layerFill(bitFields.allowsEdgeAntialiasing, alpha);
-  auto content = getContent();
+  auto content = getRecordedContent();
   if (content) {
     if (args.drawMode == DrawMode::Contour) {
       content->drawContour(canvas, &layerFill);
@@ -1081,7 +1081,7 @@ bool Layer::getLayersUnderPointInternal(float x, float y,
   if (hasLayerUnderPoint) {
     results->push_back(shared_from_this());
   } else {
-    auto content = getContent();
+    auto content = getRecordedContent();
     if (nullptr != content) {
       auto layerBoundsRect = content->getBounds();
       auto localPoint = globalToLocal(Point::Make(x, y));
@@ -1118,7 +1118,7 @@ void Layer::updateRenderBounds(const Matrix& renderMatrix,
     transformer =
         RegionTransformer::MakeFromStyles(_layerStyles, contentScale, std::move(transformer));
   }
-  auto content = getContent();
+  auto content = getRecordedContent();
   if (bitFields.dirtyContentBounds || (forceDirty && content)) {
     if (contentBounds) {
       _root->invalidateRect(*contentBounds);

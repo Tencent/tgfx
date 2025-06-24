@@ -23,12 +23,13 @@
 
 namespace tgfx {
 /**
- * LayerContent represents the contents of a layer, which may include default content, foreground
- * content, and the layer's contour. LayerContent is immutable and cannot be modified after creation.
+ * RecordedContent represents the recorded contents of a layer, which can include default content,
+ * foreground content, and the layer's contour. RecordedContent is immutable and cannot be changed
+ * after it is created.
  */
-class LayerContent {
+class RecordedContent {
  public:
-  virtual ~LayerContent() = default;
+  virtual ~RecordedContent() = default;
 
   /**
    * Returns the bounds of the content.

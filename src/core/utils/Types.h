@@ -19,7 +19,7 @@
 #pragma once
 
 #include "core/utils/Log.h"
-#include "layers/contents/LayerContent.h"
+#include "layers/contents/RecordedContent.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/MaskFilter.h"
@@ -36,7 +36,7 @@ class Types {
   using ImageType = Image::Type;
   using MaskFilterType = MaskFilter::Type;
   using ShapeType = Shape::Type;
-  using LayerContentType = LayerContent::Type;
+  using RecordedContentType = RecordedContent::Type;
   using ShapeStyleType = ShapeStyle::Type;
   using LayerFilterType = LayerFilter::Type;
 
@@ -70,9 +70,9 @@ class Types {
     return shape->type();
   }
 
-  static LayerContentType Get(const LayerContent* layerContent) {
-    DEBUG_ASSERT(layerContent != nullptr)
-    return layerContent->type();
+  static RecordedContentType Get(const RecordedContent* recordedContent) {
+    DEBUG_ASSERT(recordedContent != nullptr)
+    return recordedContent->type();
   }
 
   static ShapeStyleType Get(const ShapeStyle* shapeStyle) {

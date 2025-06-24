@@ -19,10 +19,10 @@
 #pragma once
 
 #include "core/utils/Log.h"
-#include "layers/contents/LayerContent.h"
+#include "layers/contents/RecordedContent.h"
 
 namespace tgfx {
-class DefaultContent : public LayerContent {
+class DefaultContent : public RecordedContent {
  public:
   explicit DefaultContent(std::shared_ptr<Picture> content) : content(std::move(content)) {
   }

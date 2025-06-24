@@ -19,12 +19,12 @@
 #pragma once
 
 #include "core/utils/Log.h"
-#include "layers/contents/LayerContent.h"
+#include "layers/contents/RecordedContent.h"
 
 namespace tgfx {
-class ContourContent : public LayerContent {
+class ContourContent : public RecordedContent {
  public:
-  ContourContent(std::unique_ptr<LayerContent> content, std::shared_ptr<Picture> contour)
+  ContourContent(std::unique_ptr<RecordedContent> content, std::shared_ptr<Picture> contour)
       : content(std::move(content)), contour(std::move(contour)) {
   }
 
@@ -52,7 +52,7 @@ class ContourContent : public LayerContent {
     contour->playback(canvas, modifier);
   }
 
-  std::unique_ptr<LayerContent> content;
+  std::unique_ptr<RecordedContent> content;
   std::shared_ptr<Picture> contour = nullptr;
 
  protected:

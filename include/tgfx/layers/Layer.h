@@ -29,7 +29,7 @@
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
-class LayerContent;
+class RecordedContent;
 class RasterizedContent;
 class DisplayList;
 class DrawArgs;
@@ -555,7 +555,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   Matrix getMatrixWithScrollRect() const;
 
-  LayerContent* getContent();
+  RecordedContent* getRecordedContent();
 
   std::shared_ptr<ImageFilter> getImageFilter(float contentScale);
 
@@ -632,7 +632,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::vector<std::shared_ptr<LayerStyle>> _layerStyles = {};
   float _rasterizationScale = 0.0f;
   std::unique_ptr<RasterizedContent> rasterizedContent = nullptr;
-  std::unique_ptr<LayerContent> layerContent = nullptr;
+  std::unique_ptr<RecordedContent> recordedContent = nullptr;
   Rect renderBounds = {};         // in global coordinates
   Rect* contentBounds = nullptr;  //  in global coordinates
 
