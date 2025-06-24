@@ -270,6 +270,11 @@ void Layer::setExcludeChildEffectsInLayerStyle(bool value) {
   invalidateTransform();
 }
 
+void Layer::setContent(std::unique_ptr<LayerContent> content) {
+  layerContent = std::move(content);
+  invalidateContent();
+}
+
 bool Layer::addChild(std::shared_ptr<Layer> child) {
   if (!child) {
     return false;
@@ -556,7 +561,11 @@ void Layer::invalidate() {
   }
 }
 
-void Layer::onUpdateContent(LayerRecorder*) {
+void Layer::onUpdateContent(LayerRecorder* recorder) {
+  if (layerContent != nullptr) {
+    layerContent->onDrawContent(recorder);
+    layerContent = nullptr;
+  }
 }
 
 void Layer::attachProperty(LayerProperty* property) {

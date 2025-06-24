@@ -60,7 +60,8 @@ class LayerContent {
    * Draws the contents of the layer. Subclasses should override this method to record the layer’s
    * contents, typically by drawing on a canvas obtained from the provided LayerRecorder. This
    * method is similar to Layer::onUpdateContent(), but may be called on a background thread. Ensure
-   * all operations here are thread-safe and do not depend on main thread state.
+   * all operations here are thread-safe and do not depend on main thread state. The LayerContent
+   * will be released after this method returns.
    * @param recorder The LayerRecorder used to record the layer's contents.
    */
   virtual void onDrawContent(LayerRecorder* recorder) const = 0;
