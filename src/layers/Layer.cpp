@@ -520,8 +520,27 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   }
   auto surface = canvas->getSurface();
   DrawArgs args = {};
-  if (surface && !(surface->renderFlags() & RenderFlags::DisableCache)) {
-    args.context = surface->getContext();
+  Context* context = nullptr;
+  if (surface) {
+    context = surface->getContext();
+    if (!(surface->renderFlags() & RenderFlags::DisableCache)) {
+      args.context = context;
+    }
+  }
+  if (context && hasBackgroundStyleNode()) {
+    auto scale = canvas->getMatrix().getMaxScale();
+    auto bounds = getBounds();
+    bounds.scale(scale, scale);
+    auto backgroundContext = BackgroundContext::Make(context, bounds, Matrix::MakeScale(scale));
+    if (backgroundContext) {
+      auto backgroundCanvas = backgroundContext->getCanvas();
+      Point offset = {};
+      auto image = getBackgroundImage(args, 1.0f, &offset);
+      if (image) {
+        backgroundCanvas->drawImage(image, offset.x, offset.y);
+      }
+    }
+    args.backgroundContext = std::move(backgroundContext);
   }
   drawLayer(args, canvas, alpha, blendMode);
 }
@@ -1231,6 +1250,23 @@ void Layer::propagateHasBackgroundStyleFlags() {
     layer->bitFields.hasBackgroundStyle = true;
     layer = layer->_parent;
   }
+}
+
+bool Layer::hasBackgroundStyleNode() {
+  if (bitFields.hasBackgroundStyle) {
+    return true;
+  }
+  for (auto& style : _layerStyles) {
+    if (style->extraSourceType() == LayerStyleExtraSourceType::Background) {
+      return true;
+    }
+  }
+  for (const auto& child : _children) {
+    if (child->bitFields.hasBackgroundStyle || child->hasBackgroundStyleNode()) {
+      return true;
+    }
+  }
+  return false;
 }
 
 }  // namespace tgfx
