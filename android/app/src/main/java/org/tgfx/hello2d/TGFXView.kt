@@ -18,6 +18,7 @@
 
 package org.tgfx.hello2d
 
+import android.graphics.PointF
 import android.graphics.SurfaceTexture
 import android.view.Surface
 import android.view.TextureView
@@ -59,7 +60,6 @@ open class TGFXView : TextureView, TextureView.SurfaceTextureListener {
         val metrics = resources.displayMetrics
         surface = Surface(p0)
         nativePtr = setupFromSurface(surface!!, imageBytes, metrics.density)
-        nativeDraw(drawIndex)
     }
 
     override fun onSurfaceTextureSizeChanged(p0: SurfaceTexture, p1: Int, p2: Int) {
@@ -81,22 +81,19 @@ open class TGFXView : TextureView, TextureView.SurfaceTextureListener {
         nativeRelease()
     }
 
-    fun draw(index: Int) {
-        drawIndex = index
-        nativeDraw(drawIndex)
+    fun draw(index: Int, zoom: Float, offset: PointF) {
+        nativeDraw(index, zoom, offset.x, offset.y)
     }
 
     private external fun updateSize()
 
     private external fun nativeRelease()
 
-    private external fun nativeDraw(drawIndex: Int)
+    private external fun nativeDraw(drawIndex: Int, zoom: Float, offsetX: Float, offsetY: Float)
 
     private var surface: Surface? = null
 
     private var nativePtr: Long = 0
-
-    private var drawIndex: Int = 0;
 
     companion object {
         private external fun nativeInit()

@@ -31,7 +31,7 @@ void JTGFXView::updateSize() {
   }
 }
 
-void JTGFXView::draw(int index) {
+void JTGFXView::draw(int index, float zoom, float offsetX, float offsetY) {
   if (appHost->width() <= 0 || appHost->height() <= 0) {
     return;
   }
@@ -45,6 +45,7 @@ void JTGFXView::draw(int index) {
     device->unlock();
     return;
   }
+  appHost->updateZoomAndOffset(zoom, tgfx::Point(offsetX, offsetY));
   auto canvas = surface->getCanvas();
   canvas->clear();
   canvas->save();
@@ -127,12 +128,13 @@ JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromS
 }
 
 JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_nativeDraw(JNIEnv* env, jobject thiz,
-                                                                 jint drawIndex) {
+                                                                 jint drawIndex, jfloat zoom,
+                                                                 jfloat offsetX, jfloat offsetY) {
   auto* view = GetJTGFXView(env, thiz);
   if (view == nullptr) {
     return;
   }
-  view->draw(drawIndex);
+  view->draw(drawIndex, zoom, offsetX, offsetY);
 }
 
 JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_updateSize(JNIEnv* env, jobject thiz) {
