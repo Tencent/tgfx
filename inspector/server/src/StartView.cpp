@@ -144,8 +144,14 @@ void StartView::connectToClient(QObject* object) {
 void StartView::connectToClientByLayerInspector(QObject* object) {
   auto client = dynamic_cast<ClientData*>(object);
   if (client) {
-    layerProfilerView =
-        new LayerProfilerView(QString::fromStdString(client->address), client->port);
+    if(layerProfilerView) {
+      connect(layerProfilerView, &LayerProfilerView::destroyed, this,
+        [&, client]{ layerProfilerView = new LayerProfilerView(QString::fromStdString(client->address), client->port);});
+      layerProfilerView->deleteLater();
+    }else {
+      layerProfilerView =
+      new LayerProfilerView(QString::fromStdString(client->address), client->port);
+    }
   }
 }
 

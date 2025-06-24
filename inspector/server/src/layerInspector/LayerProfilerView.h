@@ -20,6 +20,7 @@
 #include <QtGui/qwindow.h>
 #include <QDialog>
 #include <QQmlApplicationEngine>
+#include <kddockwidgets/qtquick/views/DockWidget.h>
 #include "LayerAttributeModel.h"
 #include "LayerTreeModel.h"
 #include "flatbuffers/flexbuffers.h"
@@ -32,7 +33,7 @@ class LayerProfilerView : public QObject {
   Q_OBJECT
  public:
   LayerProfilerView(QString ip, quint16 port);
-  explicit LayerProfilerView();
+  LayerProfilerView();
   ~LayerProfilerView() override;
   bool hasWebSocketConnection() const {
     if (m_WebSocketServer) return m_WebSocketServer->hasClientConnect();
@@ -66,8 +67,10 @@ class LayerProfilerView : public QObject {
  private:
   WebSocketServer* m_WebSocketServer;
   TcpSocketClient* m_TcpSocketClient;
-  QQmlApplicationEngine* m_LayerTreeEngine;
+  std::unique_ptr<QQmlApplicationEngine> m_LayerTreeEngine;
   MemoryImageProvider* imageProvider;
   LayerTreeModel* m_LayerTreeModel;
   LayerAttributeModel* m_LayerAttributeModel;
+  KDDockWidgets::QtQuick::DockWidget* layerTree;
+  KDDockWidgets::QtQuick::DockWidget* layerAttributeTree;
 };

@@ -99,35 +99,41 @@ void LayerProfiler::SendWork() {
   size_t broadcastLen = 0;
   auto broadcastMsg = GetBroadcastMessage(procname, pnsz, broadcastLen, port, LayerTree);
   long long lastBroadcast = 0;
-  while (!m_StopFlag.load(std::memory_order_acquire)) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    if(broadcast) {
-      const auto t = std::chrono::high_resolution_clock::now().time_since_epoch().count();
-      if(t - lastBroadcast > 3000000000) {
-        lastBroadcast = t;
-        const auto ts = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-        broadcastMsg.activeTime = int32_t(ts - epoch);
-        broadcast->Send(broadcastPort, &broadcastMsg, broadcastLen);
+  while(!m_StopFlag.load(std::memory_order_acquire)) {
+    while (!m_StopFlag.load(std::memory_order_acquire)) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      if(broadcast) {
+        const auto t = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+        if(t - lastBroadcast > 3000000000) {
+          lastBroadcast = t;
+          const auto ts = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+          broadcastMsg.activeTime = int32_t(ts - epoch);
+          broadcast->Send(broadcastPort, &broadcastMsg, broadcastLen);
+        }
+      }
+      m_Socket = m_ListenSocket->Accept();
+      if (m_Socket) {
+        printf("tcp already connect!\n");
+        break;
       }
     }
-    m_Socket = m_ListenSocket->Accept();
-    if (m_Socket) {
-      printf("tcp already connect!\n");
-      break;
+
+    while (!m_StopFlag.load(std::memory_order_acquire)) {
+      std::this_thread::sleep_for(std::chrono::milliseconds(10));
+      if(!m_Socket) {
+        break;
+      }
+      if (!m_Queue.empty()) {
+        auto data = *m_Queue.front();
+        m_Queue.pop();
+        int size = (int)data.size();
+        if(m_Socket) {
+          m_Socket->Send(&size, sizeof(int));
+          m_Socket->Send(data.data(), data.size());
+        }
+      }
     }
   }
-
-  while (!m_StopFlag.load(std::memory_order_acquire)) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    if (!m_Queue.empty()) {
-      auto data = *m_Queue.front();
-      m_Queue.pop();
-      int size = (int)data.size();
-      m_Socket->Send(&size, sizeof(int));
-      m_Socket->Send(data.data(), data.size());
-    }
-  }
-
 #endif
 }
 
@@ -149,10 +155,14 @@ void LayerProfiler::recvWork() {
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
     if (m_Socket && m_Socket->HasData()) {
       int size;
-      m_Socket->ReadUpTo(&size, sizeof(int));
+      int flag = m_Socket->ReadUpTo(&size, sizeof(int));
       std::vector<uint8_t> data(static_cast<size_t>(size));
-      m_Socket->ReadUpTo(data.data(), (size_t)size);
+      int flag1 = m_Socket->ReadUpTo(data.data(), (size_t)size);
       messages.push(std::move(data));
+      if(!flag || !flag1) {
+        inspectorFree(m_Socket);
+        m_Socket = nullptr;
+      }
     }
     if (!messages.empty()) {
       if (m_Callback) {

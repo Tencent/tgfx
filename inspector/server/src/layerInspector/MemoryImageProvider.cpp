@@ -24,6 +24,12 @@ MemoryImageProvider::MemoryImageProvider():
   defaultImage->fill(QColor(56, 56, 56));
 }
 
+MemoryImageProvider::~MemoryImageProvider() {
+  if(defaultImage) {
+    delete defaultImage;
+  }
+}
+
 void MemoryImageProvider::setImage(uint64_t id, int width, int height, const QByteArray& rawData) {
     qDebug() << "set id: " << id;
     rwLock.lockForWrite();

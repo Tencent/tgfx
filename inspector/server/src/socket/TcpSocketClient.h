@@ -26,6 +26,7 @@ class TcpSocketClient : public QObject {
   TcpSocketClient(QObject* parent, QString ip, quint16 port);
   ~TcpSocketClient() override;
   void connection(QString ip, quint16 port);
+  void disConnection();
   void sendData(const QByteArray& data);
   bool hasClientConnect() const {
     return m_IsConnection;
