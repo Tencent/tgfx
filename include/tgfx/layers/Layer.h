@@ -642,9 +642,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::vector<std::shared_ptr<LayerFilter>> _filters = {};
   std::vector<std::shared_ptr<LayerStyle>> _layerStyles = {};
   float _rasterizationScale = 0.0f;
-  std::unique_ptr<RasterizedContent> rasterizedContent = nullptr;
-  std::unique_ptr<LayerContent> layerContent = nullptr;
-  std::unique_ptr<RecordedContent> recordedContent = nullptr;
+  std::unique_ptr<RasterizedContent> rasterizedContent;
+  std::unique_ptr<LayerContent> layerContent;
+  std::unique_ptr<RecordedContent> recordedContent;
   Rect renderBounds = {};         // in global coordinates
   Rect* contentBounds = nullptr;  //  in global coordinates
 
