@@ -54,11 +54,12 @@ static std::shared_ptr<Picture> RecordPicture(float contentScale,
   return recorder.finishRecordingAsPicture();
 }
 
-static std::shared_ptr<Image> ToImageWithOffset(std::shared_ptr<Picture> picture, Point* offset) {
+static std::shared_ptr<Image> ToImageWithOffset(std::shared_ptr<Picture> picture, Point* offset,
+                                                Rect* imageBounds = nullptr) {
   if (picture == nullptr) {
     return nullptr;
   }
-  auto bounds = picture->getBounds();
+  auto bounds = imageBounds ? *imageBounds : picture->getBounds();
   bounds.roundOut();
   auto matrix = Matrix::MakeTrans(-bounds.x(), -bounds.y());
   auto image = Image::MakeFrom(std::move(picture), static_cast<int>(bounds.width()),
@@ -909,7 +910,7 @@ float Layer::drawBackgroundLayers(const DrawArgs& args, Canvas* canvas) {
   }
   // parent background -> parent layer styles (below) -> parent content -> sibling layers content
   auto currentAlpha = _parent->drawBackgroundLayers(args, canvas);
-  auto layerStyleSource = getLayerStyleSource(args, canvas->getMatrix());
+  auto layerStyleSource = _parent->getLayerStyleSource(args, canvas->getMatrix());
   _parent->drawContents(args, canvas, currentAlpha, layerStyleSource.get(), this);
   canvas->concat(getMatrixWithScrollRect());
   if (_scrollRect) {
@@ -965,9 +966,10 @@ std::shared_ptr<Image> Layer::getBackgroundImage(const DrawArgs& args, float con
   }
   Recorder recorder = {};
   auto canvas = recorder.beginRecording();
-  canvas->scale(contentScale, contentScale);
   auto bounds = getBounds();
+  bounds.scale(contentScale, contentScale);
   canvas->clipRect(bounds);
+  canvas->scale(contentScale, contentScale);
   auto globalMatrix = getGlobalMatrix();
   Matrix invertMatrix = {};
   if (!globalMatrix.invert(&invertMatrix)) {
@@ -996,7 +998,7 @@ std::shared_ptr<Image> Layer::getBackgroundImage(const DrawArgs& args, float con
     }
   }
   auto backgroundPicture = recorder.finishRecordingAsPicture();
-  return ToImageWithOffset(std::move(backgroundPicture), offset);
+  return ToImageWithOffset(std::move(backgroundPicture), offset, &bounds);
 }
 
 void Layer::drawLayerStyles(const DrawArgs& args, Canvas* canvas, float alpha,
