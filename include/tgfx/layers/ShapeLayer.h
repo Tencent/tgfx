@@ -300,7 +300,7 @@ class ShapeLayer : public Layer {
  protected:
   ShapeLayer();
 
-  void onUpdateContent(LayerRecorder* recorder) const override;
+  void onUpdateContent(LayerRecorder* recorder) override;
 
  private:
   std::shared_ptr<Shape> _shape = nullptr;

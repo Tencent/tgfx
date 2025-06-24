@@ -156,7 +156,7 @@ void TextLayer::setAutoWrap(bool value) {
   invalidateContent();
 }
 
-void TextLayer::onUpdateContent(LayerRecorder* recorder) const {
+void TextLayer::onUpdateContent(LayerRecorder* recorder) {
   if (_text.empty()) {
     return;
   }

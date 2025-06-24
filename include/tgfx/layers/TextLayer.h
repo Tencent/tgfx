@@ -136,7 +136,7 @@ class TextLayer : public Layer {
  protected:
   TextLayer() = default;
 
-  void onUpdateContent(LayerRecorder* recorder) const override;
+  void onUpdateContent(LayerRecorder* recorder) override;
 
  private:
   std::string _text;

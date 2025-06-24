@@ -555,7 +555,7 @@ void Layer::invalidate() {
   }
 }
 
-void Layer::onUpdateContent(LayerRecorder*) const {
+void Layer::onUpdateContent(LayerRecorder*) {
 }
 
 void Layer::attachProperty(LayerProperty* property) {

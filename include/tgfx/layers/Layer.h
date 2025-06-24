@@ -515,7 +515,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * LayerRecorder.
    * @param recorder The LayerRecorder used to record the layer's content.
    */
-  virtual void onUpdateContent(LayerRecorder* recorder) const;
+  virtual void onUpdateContent(LayerRecorder* recorder);
 
   /**
    * Attaches a property to this layer.

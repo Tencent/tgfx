@@ -37,7 +37,7 @@ class CustomLayer : public tgfx::Layer {
  protected:
   CustomLayer() = default;
 
-  void onUpdateContent(tgfx::LayerRecorder* recorder) const override;
+  void onUpdateContent(tgfx::LayerRecorder* recorder) override;
 
  private:
   std::string _text;

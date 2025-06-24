@@ -39,7 +39,7 @@ void ImageLayer::setImage(std::shared_ptr<Image> value) {
   invalidateContent();
 }
 
-void ImageLayer::onUpdateContent(LayerRecorder* recorder) const {
+void ImageLayer::onUpdateContent(LayerRecorder* recorder) {
   auto canvas = recorder->getCanvas();
   canvas->drawImage(_image, _sampling);
 }

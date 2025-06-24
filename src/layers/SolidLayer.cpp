@@ -69,7 +69,7 @@ void SolidLayer::setColor(const Color& color) {
   invalidateContent();
 }
 
-void SolidLayer::onUpdateContent(LayerRecorder* recorder) const {
+void SolidLayer::onUpdateContent(LayerRecorder* recorder) {
   if (_width == 0 || _height == 0) {
     return;
   }

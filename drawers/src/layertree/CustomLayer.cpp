@@ -26,7 +26,7 @@ std::shared_ptr<CustomLayer> CustomLayer::Make() {
   return std::shared_ptr<CustomLayer>(new CustomLayer());
 }
 
-void CustomLayer::onUpdateContent(tgfx::LayerRecorder* recorder) const {
+void CustomLayer::onUpdateContent(tgfx::LayerRecorder* recorder) {
   if (_text.empty()) {
     return;
   }

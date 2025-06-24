@@ -249,7 +249,7 @@ ShapeLayer::~ShapeLayer() {
   }
 }
 
-void ShapeLayer::onUpdateContent(LayerRecorder* recorder) const {
+void ShapeLayer::onUpdateContent(LayerRecorder* recorder) {
   if (_shape == nullptr) {
     return;
   }
