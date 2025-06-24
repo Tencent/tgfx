@@ -17,9 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 import * as types from '../types/types';
-import {TGFXBind} from '../lib/tgfx';
+import { TGFXBind } from '../lib/tgfx';
 import Hello2D from './wasm/hello2d';
-import {ShareData, updateSize, onresizeEvent, onclickEvent, loadImage} from "./common";
+import {
+    ShareData,
+    updateSize,
+    onresizeEvent,
+    onclickEvent,
+    loadImage,
+    setupCommonCanvasEvents
+} from "./common";
 
 let shareData: ShareData = new ShareData();
 
@@ -34,6 +41,8 @@ if (typeof window !== 'undefined') {
             var imagePath = "http://localhost:8081/../../resources/assets/bridge.jpg";
             await tgfxView.setImagePath(imagePath);
             updateSize(shareData);
+            const canvas = document.getElementById('hello2d');
+            setupCommonCanvasEvents(canvas, shareData);
         } catch (error) {
             console.error(error);
             throw new Error("Hello2D init failed. Please check the .wasm file path!.");

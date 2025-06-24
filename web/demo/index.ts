@@ -17,9 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 import * as types from '../types/types';
-import {TGFXBind} from '../lib/tgfx';
+import { TGFXBind } from '../lib/tgfx';
 import Hello2D from './wasm-mt/hello2d';
-import {ShareData, updateSize, onresizeEvent, onclickEvent, loadImage} from "./common";
+import {
+    ShareData,
+    updateSize,
+    onresizeEvent,
+    onclickEvent,
+    loadImage,
+    setupCommonCanvasEvents
+} from "./common";
 
 let shareData: ShareData = new ShareData();
 
@@ -27,7 +34,7 @@ if (typeof window !== 'undefined') {
     window.onload = async () => {
         try {
             shareData.Hello2DModule = await Hello2D({
-                locateFile: (file: string) => './wasm-mt/' + file ,
+                locateFile: (file: string) => './wasm-mt/' + file,
                 mainScriptUrlOrBlob: './wasm-mt/hello2d.js'
             });
             TGFXBind(shareData.Hello2DModule);
@@ -45,6 +52,8 @@ if (typeof window !== 'undefined') {
             const emojiFontUIntArray = new Uint8Array(emojiFontBuffer);
             tgfxView.registerFonts(fontUIntArray, emojiFontUIntArray);
             updateSize(shareData);
+            const canvas = document.getElementById('hello2d');
+            setupCommonCanvasEvents(canvas, shareData);
         } catch (error) {
             console.error(error);
             throw new Error("Hello2D init failed. Please check the .wasm file path!.");

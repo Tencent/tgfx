@@ -30,6 +30,7 @@
 
 static const float MinZoom = 0.001f;
 static const float MaxZoom = 1000.0f;
+// Refs https://github.com/godotengine/godot/blob/master/platform/macos/godot_content_view.mm
 static const float ScrollWheelZoomSensitivity = 100.0f;
 
 - (void)viewDidLoad {
