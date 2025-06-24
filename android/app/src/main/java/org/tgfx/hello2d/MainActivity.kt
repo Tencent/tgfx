@@ -24,7 +24,6 @@ import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
 import androidx.activity.ComponentActivity
-import android.widget.FrameLayout
 
 class MainActivity : ComponentActivity() {
     private lateinit var tgfxView: TGFXView
@@ -33,8 +32,8 @@ class MainActivity : ComponentActivity() {
     private var zoomScale = 1.0f
     private var contentOffset = PointF(0f, 0f)
 
-    private var lastPan = PointF(0f, 0f)
-    private var lastOffset = PointF(0f, 0f)
+    private var currentPan = PointF(0f, 0f)
+    private var currentOffset = PointF(0f, 0f)
     private var isScaling = false
     private var needResetPanAfterScale = false
 
@@ -48,11 +47,11 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        tgfxView = TGFXView(this)
-        setContentView(tgfxView)
+        setContentView(R.layout.activity_main)
+        tgfxView = findViewById<TGFXView>(R.id.tgfx_view)
         setupGesture()
         tgfxView.post {
-            draw()
+            tgfxView.draw(drawIndex, zoomScale, contentOffset)
         }
     }
 
@@ -70,19 +69,15 @@ class MainActivity : ComponentActivity() {
                 }
 
                 override fun onScale(detector: ScaleGestureDetector): Boolean {
-                    val oldZoom = zoomScale
-                    val newZoom = (oldZoom * detector.scaleFactor).coerceIn(MinZoom, MaxZoom)
-                    val focusX = detector.focusX
-                    val focusY = detector.focusY
-                    val contentX = (focusX - contentOffset.x) / oldZoom
-                    val contentY = (focusY - contentOffset.y) / oldZoom
-                    zoomScale = newZoom
+                    val contentX = (detector.focusX - contentOffset.x) / zoomScale
+                    val contentY = (detector.focusY - contentOffset.y) / zoomScale
+                    zoomScale = (zoomScale * detector.scaleFactor).coerceIn(MinZoom, MaxZoom)
                     contentOffset = PointF(
-                        focusX - contentX * newZoom,
-                        focusY - contentY * newZoom
+                        detector.focusX - contentX * zoomScale,
+                        detector.focusY - contentY * zoomScale
                     )
-                    lastOffset.set(contentOffset.x, contentOffset.y)
-                    draw()
+                    currentOffset.set(contentOffset.x, contentOffset.y)
+                    tgfxView.draw(drawIndex, zoomScale, contentOffset)
                     return true
                 }
             })
@@ -90,14 +85,17 @@ class MainActivity : ComponentActivity() {
         gestureDetector = GestureDetector(this,
             object : GestureDetector.SimpleOnGestureListener() {
                 override fun onDown(e: MotionEvent): Boolean {
-                    lastPan.set(e.x, e.y)
-                    lastOffset.set(contentOffset.x, contentOffset.y)
+                    currentPan.set(e.x, e.y)
+                    currentOffset.set(contentOffset.x, contentOffset.y)
                     return true
                 }
 
                 override fun onSingleTapUp(e: MotionEvent): Boolean {
                     if (!isScaling) {
-                        onSingleTap()
+                        drawIndex++
+                        zoomScale = 1.0f
+                        contentOffset.set(0f, 0f)
+                        tgfxView.draw(drawIndex, zoomScale, contentOffset)
                         return true
                     }
                     return false
@@ -110,32 +108,19 @@ class MainActivity : ComponentActivity() {
                     distanceY: Float
                 ): Boolean {
                     if (needResetPanAfterScale) {
-                        lastPan.set(e2.x, e2.y)
-                        lastOffset.set(contentOffset.x, contentOffset.y)
+                        currentPan.set(e2.x, e2.y)
+                        currentOffset.set(contentOffset.x, contentOffset.y)
                         needResetPanAfterScale = false
                         return false
                     }
-                    val dx = e2.x - lastPan.x
-                    val dy = e2.y - lastPan.y
                     contentOffset = PointF(
-                        lastOffset.x + dx,
-                        lastOffset.y + dy
+                        currentOffset.x + e2.x - currentPan.x,
+                        currentOffset.y + e2.y - currentPan.y
                     )
-                    draw()
+                    tgfxView.draw(drawIndex, zoomScale, contentOffset)
                     return true
                 }
             })
-    }
-
-    private fun onSingleTap() {
-        drawIndex++
-        zoomScale = 1.0f
-        contentOffset.set(0f, 0f)
-        draw()
-    }
-
-    private fun draw() {
-        tgfxView.draw(drawIndex, zoomScale, contentOffset)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
@@ -145,8 +130,8 @@ class MainActivity : ComponentActivity() {
             event.pointerCount == 1 &&
             event.actionMasked == MotionEvent.ACTION_MOVE
         ) {
-            lastPan.set(event.x, event.y)
-            lastOffset.set(contentOffset.x, contentOffset.y)
+            currentPan.set(event.x, event.y)
+            currentOffset.set(contentOffset.x, contentOffset.y)
             needResetPanAfterScale = false
         }
         var handled = scaleGestureDetector.onTouchEvent(event)

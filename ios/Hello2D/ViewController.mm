@@ -24,8 +24,8 @@
 @property(nonatomic) int drawCount;
 @property(nonatomic) CGFloat zoomScale;
 @property(nonatomic) CGPoint contentOffset;
-@property(nonatomic) CGFloat beginZoom;
-@property(nonatomic) CGPoint beginOffset;
+@property(nonatomic) CGFloat currentZoom;
+@property(nonatomic) CGPoint currentOffset;
 @property(nonatomic) CGPoint pinchCenter;
 @end
 
@@ -39,8 +39,8 @@ static const float MaxZoom = 1000.0f;
   self.tgfxView.contentScaleFactor = [UIScreen mainScreen].scale;
   self.zoomScale = 1.0f;
   self.contentOffset = CGPointZero;
-  self.beginZoom = 1.0f;
-  self.beginOffset = CGPointZero;
+  self.currentZoom = 1.0f;
+  self.currentOffset = CGPointZero;
   self.pinchCenter = CGPointZero;
 
   UITapGestureRecognizer* tap =
@@ -74,14 +74,13 @@ static const float MaxZoom = 1000.0f;
 }
 
 - (void)handlePan:(UIPanGestureRecognizer*)gesture {
-  static CGPoint lastOffset;
   if (gesture.state == UIGestureRecognizerStateBegan) {
-    lastOffset = self.contentOffset;
+    self.currentOffset = self.contentOffset;
   }
-  CGFloat scale = self.tgfxView.contentScaleFactor;
   CGPoint translation = [gesture translationInView:self.tgfxView];
   self.contentOffset =
-      CGPointMake(lastOffset.x + (translation.x * scale), lastOffset.y + (translation.y * scale));
+      CGPointMake(self.currentOffset.x + (translation.x * self.tgfxView.contentScaleFactor),
+                  self.currentOffset.y + (translation.y * self.tgfxView.contentScaleFactor));
   [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
 }
 
@@ -90,21 +89,19 @@ static const float MaxZoom = 1000.0f;
     return;
   }
   if (gesture.state == UIGestureRecognizerStateBegan) {
-    self.beginZoom = self.zoomScale;
-    self.beginOffset = self.contentOffset;
-    CGPoint loc = [gesture locationInView:self.tgfxView];
-    CGFloat scale = self.tgfxView.contentScaleFactor;
-    self.pinchCenter = CGPointMake(loc.x * scale, loc.y * scale);
+    self.currentZoom = self.zoomScale;
+    self.currentOffset = self.contentOffset;
+    CGPoint location = [gesture locationInView:self.tgfxView];
+    self.pinchCenter = CGPointMake(location.x * self.tgfxView.contentScaleFactor,
+                                   location.y * self.tgfxView.contentScaleFactor);
   }
   if (gesture.state == UIGestureRecognizerStateChanged) {
-    CGFloat zoomNew = self.beginZoom * gesture.scale;
-    zoomNew = MAX(MinZoom, MIN(MaxZoom, zoomNew));
-    CGFloat scaleChange = zoomNew / self.beginZoom;
-    CGPoint offsetNew;
-    offsetNew.x = (self.beginOffset.x - self.pinchCenter.x) * scaleChange + self.pinchCenter.x;
-    offsetNew.y = (self.beginOffset.y - self.pinchCenter.y) * scaleChange + self.pinchCenter.y;
-    self.zoomScale = zoomNew;
-    self.contentOffset = offsetNew;
+    self.zoomScale = MAX(MinZoom, MIN(MaxZoom, self.currentZoom * gesture.scale));
+    self.contentOffset = CGPointMake(
+        (self.currentOffset.x - self.pinchCenter.x) * self.zoomScale / self.currentZoom +
+            self.pinchCenter.x,
+        (self.currentOffset.y - self.pinchCenter.y) * self.zoomScale / self.currentZoom +
+            self.pinchCenter.y);
     [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
   }
 }

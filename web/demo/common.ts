@@ -107,15 +107,12 @@ export function setupCommonCanvasEvents(canvas: HTMLElement, shareData: ShareDat
     canvas.addEventListener('wheel', (e: WheelEvent) => {
         e.preventDefault();
         if (e.ctrlKey || e.metaKey) {
-            const delta = normalizeWheelDeltaY(e);
-            const zoomFactor = Math.pow(ZoomFactorPerNotch, delta);
-            const oldZoom = shareData.zoom;
-            const newZoom = Math.max(MinZoom, Math.min(MaxZoom, oldZoom * zoomFactor));
+            const newZoom = Math.max(MinZoom, Math.min(MaxZoom, shareData.zoom * Math.pow(ZoomFactorPerNotch, normalizeWheelDeltaY(e))));
             const rect = canvas.getBoundingClientRect();
             const px = (e.clientX - rect.left) * window.devicePixelRatio;
             const py = (e.clientY - rect.top) * window.devicePixelRatio;
-            shareData.offsetX = (shareData.offsetX - px) * (newZoom / oldZoom) + px;
-            shareData.offsetY = (shareData.offsetY - py) * (newZoom / oldZoom) + py;
+            shareData.offsetX = (shareData.offsetX - px) * (newZoom / shareData.zoom) + px;
+            shareData.offsetY = (shareData.offsetY - py) * (newZoom / shareData.zoom) + py;
             shareData.zoom = newZoom;
             shareData.tgfxBaseView.draw(shareData.drawIndex, shareData.zoom, shareData.offsetX, shareData.offsetY);
         } else {
