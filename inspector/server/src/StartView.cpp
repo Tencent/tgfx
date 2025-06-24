@@ -214,8 +214,15 @@ void StartView::updateBroadcastClients() {
                         std::chrono::system_clock::now().time_since_epoch())
                         .count();
   if (!broadcastListen) {
+    bool isListen = false;
     broadcastListen = std::make_unique<UdpListen>();
-    if (!broadcastListen->Listen(port)) {
+    for(uint16_t i = 0; i < broadcastNum; i++) {
+      isListen = broadcastListen->Listen(port + i);
+      if(isListen) {
+        break;
+      }
+    }
+    if (!isListen) {
       broadcastListen.reset();
     }
   } else {

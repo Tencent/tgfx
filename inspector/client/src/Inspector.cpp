@@ -99,9 +99,11 @@ Inspector::~Inspector() {
     sock->~Socket();
     inspectorFree(sock);
   }
-  if (broadcast) {
-    broadcast->~UdpBroadcast();
-    inspectorFree(broadcast);
+  for(uint16_t i = 0; i < broadcastNum; i++) {
+    if (broadcast[i]) {
+      broadcast[i]->~UdpBroadcast();
+      inspectorFree(broadcast[i]);
+    }
   }
 }
 
@@ -178,13 +180,14 @@ void Inspector::Worker() {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
   }
-
-  broadcast = (UdpBroadcast*)inspectorMalloc(sizeof(UdpBroadcast));
-  new (broadcast) UdpBroadcast();
-  if (!broadcast->Open(addr, broadcastPort)) {
-    broadcast->~UdpBroadcast();
-    inspectorFree(broadcast);
-    broadcast = nullptr;
+  for(uint16_t i = 0; i < broadcastNum; i++) {
+    broadcast[i] = (UdpBroadcast*)inspectorMalloc(sizeof(UdpBroadcast));
+    new (broadcast[i]) UdpBroadcast();
+    if (!broadcast[i]->Open(addr, broadcastPort + i)) {
+      broadcast[i]->~UdpBroadcast();
+      inspectorFree(broadcast[i]);
+      broadcast[i] = nullptr;
+    }
   }
 
   size_t broadcastLen = 0;
@@ -194,9 +197,11 @@ void Inspector::Worker() {
     MemWrite(&welcome.refTime, refTimeThread);
     while (true) {
       if (ShouldExit()) {
-        if (broadcast) {
-          broadcastMsg.activeTime = -1;
-          broadcast->Send(broadcastPort, &broadcastMsg, broadcastLen);
+        for(uint16_t i = 0; i < broadcastNum; i++) {
+          if (broadcast[i]) {
+            broadcastMsg.activeTime = -1;
+            broadcast[i]->Send(broadcastPort + i, &broadcastMsg, broadcastLen);
+          }
         }
         return;
       }
@@ -204,33 +209,35 @@ void Inspector::Worker() {
       if (sock) {
         break;
       }
+      const auto t = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+      if (t - lastBroadcast > 3000000000) {
+        lastBroadcast = t;
+        for(uint16_t i = 0; i< broadcastNum; i++) {
+          if (broadcast[i]) {
+            programNameLock.lock();
+            if (programName) {
+              broadcastMsg =
+                  GetBroadcastMessage(programName, strlen(programName), broadcastLen, dataPort, FrameCapture);
+              programName = nullptr;
+            }
+            programNameLock.unlock();
 
-      if (broadcast) {
-        const auto t = std::chrono::high_resolution_clock::now().time_since_epoch().count();
-        if (t - lastBroadcast > 3000000000)  // 3s
-        {
-          programNameLock.lock();
-          if (programName) {
-            broadcastMsg =
-                GetBroadcastMessage(programName, strlen(programName), broadcastLen, dataPort, FrameCapture);
-            programName = nullptr;
+            const auto ts = std::chrono::duration_cast<std::chrono::seconds>(
+                                std::chrono::system_clock::now().time_since_epoch())
+                                .count();
+            broadcastMsg.activeTime = int32_t(ts - epoch);
+            assert(broadcastMsg.activeTime >= 0);
+            broadcast[i]->Send(broadcastPort + i, &broadcastMsg, broadcastLen);
           }
-          programNameLock.unlock();
-
-          lastBroadcast = t;
-          const auto ts = std::chrono::duration_cast<std::chrono::seconds>(
-                              std::chrono::system_clock::now().time_since_epoch())
-                              .count();
-          broadcastMsg.activeTime = int32_t(ts - epoch);
-          assert(broadcastMsg.activeTime >= 0);
-          broadcast->Send(broadcastPort, &broadcastMsg, broadcastLen);
         }
       }
     }
-    if (broadcast) {
-      lastBroadcast = 0;
-      broadcastMsg.activeTime = -1;
-      broadcast->Send(broadcastPort, &broadcastMsg, broadcastLen);
+    for(uint16_t i = 0; i< broadcastNum; i++) {
+      if (broadcast[i]) {
+        lastBroadcast = 0;
+        broadcastMsg.activeTime = -1;
+        broadcast[i]->Send(broadcastPort + i, &broadcastMsg, broadcastLen);
+      }
     }
 
     {

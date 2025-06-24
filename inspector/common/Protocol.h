@@ -18,6 +18,8 @@
 
 #pragma once
 
+inline constexpr int broadcastNum = 5;
+
 constexpr unsigned Lz4CompressBound(unsigned isize) {
   return isize + (isize / 255) + 16;
 }

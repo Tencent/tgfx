@@ -16,6 +16,9 @@ namespace inspector {
 static uint16_t port = 8084;
 static LayerProfiler s_layer_profiler;
 
+  static const char* addr = "255.255.255.255";
+  static uint16_t broadcastPort = 8086;
+
 void LayerProfiler::SendLayerData(const std::vector<uint8_t>& data) {
   s_layer_profiler.setData(data);
 }
@@ -28,8 +31,11 @@ LayerProfiler::LayerProfiler() {
   m_WebSocket = nullptr;
 #else
   m_ListenSocket = new ListenSocket();
-  broadcast = new UdpBroadcast();
-  isUDPOpened = broadcast->Open(addr, broadcastPort);
+  for(uint16_t i =0; i < broadcastNum; i++) {
+      broadcast[i] = new UdpBroadcast();
+      isUDPOpened = isUDPOpened && broadcast[i]->Open(addr, broadcastPort + i);
+  }
+
 #endif
   epoch = std::chrono::duration_cast<std::chrono::seconds>(
                 std::chrono::system_clock::now().time_since_epoch())
@@ -49,8 +55,10 @@ LayerProfiler::~LayerProfiler() {
   if(m_ListenSocket) {
     delete m_ListenSocket;
   }
-  if(broadcast) {
-    delete broadcast;
+  for(uint16_t i = 0; i < broadcastNum; i++) {
+    if(broadcast[i]) {
+      delete broadcast[i];
+    }
   }
 #endif
 }
@@ -102,13 +110,15 @@ void LayerProfiler::SendWork() {
   while(!m_StopFlag.load(std::memory_order_acquire)) {
     while (!m_StopFlag.load(std::memory_order_acquire)) {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      if(broadcast) {
-        const auto t = std::chrono::high_resolution_clock::now().time_since_epoch().count();
-        if(t - lastBroadcast > 3000000000) {
-          lastBroadcast = t;
-          const auto ts = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-          broadcastMsg.activeTime = int32_t(ts - epoch);
-          broadcast->Send(broadcastPort, &broadcastMsg, broadcastLen);
+      const auto t = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+      if(t - lastBroadcast > 3000000000) {
+        lastBroadcast = t;
+        for(uint16_t i = 0; i < broadcastNum; i++) {
+          if(broadcast[i]) {
+              const auto ts = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+              broadcastMsg.activeTime = int32_t(ts - epoch);
+              broadcast[i]->Send(broadcastPort + i, &broadcastMsg, broadcastLen);
+          }
         }
       }
       m_Socket = m_ListenSocket->Accept();
