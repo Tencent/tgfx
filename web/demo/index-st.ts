@@ -25,7 +25,7 @@ import {
     onresizeEvent,
     onclickEvent,
     loadImage,
-    setupCommonCanvasEvents
+    bindCanvasZoomAndPanEvents
 } from "./common";
 
 let shareData: ShareData = new ShareData();
@@ -42,7 +42,7 @@ if (typeof window !== 'undefined') {
             await tgfxView.setImagePath(imagePath);
             updateSize(shareData);
             const canvas = document.getElementById('hello2d');
-            setupCommonCanvasEvents(canvas, shareData);
+            bindCanvasZoomAndPanEvents(canvas, shareData);
         } catch (error) {
             console.error(error);
             throw new Error("Hello2D init failed. Please check the .wasm file path!.");

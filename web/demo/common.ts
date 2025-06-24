@@ -96,14 +96,14 @@ export function loadImage(src: string) {
     })
 }
 
-export function setupCommonCanvasEvents(canvas: HTMLElement, shareData: ShareData) {
+export function bindCanvasZoomAndPanEvents(canvas: HTMLElement, shareData: ShareData) {
     if (!canvas) return;
     window.addEventListener('mouseup', () => {
         shareData.offsetX = 0;
         shareData.offsetY = 0;
         shareData.zoom = 1.0;
     });
-
+    
     canvas.addEventListener('wheel', (e: WheelEvent) => {
         e.preventDefault();
         if (e.ctrlKey || e.metaKey) {
