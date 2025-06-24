@@ -249,6 +249,25 @@ ShapeLayer::~ShapeLayer() {
   }
 }
 
+static bool DrawContour(Canvas* canvas, std::shared_ptr<Shape> shape,
+                        const std::vector<Paint>& paints) {
+  if (shape == nullptr || paints.empty()) {
+    return false;
+  }
+  auto hasNonImageShader = std::any_of(paints.begin(), paints.end(), [](const Paint& paint) {
+    auto shader = paint.getShader();
+    return !shader || !shader->isAImage();
+  });
+  if (hasNonImageShader) {
+    canvas->drawShape(shape, {});
+  } else {
+    for (auto& paint : paints) {
+      canvas->drawShape(shape, paint);
+    }
+  }
+  return true;
+}
+
 void ShapeLayer::onUpdateContent(LayerRecorder* recorder) {
   if (_shape == nullptr) {
     return;
@@ -267,20 +286,11 @@ void ShapeLayer::onUpdateContent(LayerRecorder* recorder) {
     canvas->drawShape(strokeShape, paint);
   }
   canvas = recorder->getCanvas(LayerContentType::Contour);
-  auto hasNonImageShader =
-      std::any_of(fillPaints.begin(), fillPaints.end(), [](const Paint& paint) {
-        auto shader = paint.getShader();
-        return !shader || !shader->isAImage();
-      });
-  Paint contourPaint = {};
-  if (hasNonImageShader || fillPaints.empty()) {
-    canvas->drawShape(_shape, contourPaint);
-  } else {
-    for (auto& paint : fillPaints) {
-      canvas->drawShape(_shape, paint);
-    }
+  if (!DrawContour(canvas, _shape, fillPaints)) {
+    // If there is not any fill paints, we still need to draw the shape as contour.
+    canvas->drawShape(_shape, {});
   }
-  canvas->drawShape(strokeShape, contourPaint);
+  DrawContour(canvas, strokeShape, strokePaints);
 }
 
 std::vector<Paint> ShapeLayer::createShapePaints(
