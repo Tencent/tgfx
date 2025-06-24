@@ -18,17 +18,34 @@
 
 #pragma once
 
-#include <tgfx/core/Data.h>
-#include "SerializationUtils.h"
-#include "layers/contents/ShapeContent.h"
+#include <array>
+#include "tgfx/core/Canvas.h"
+#include "tgfx/core/Recorder.h"
+#include "tgfx/layers/LayerContent.h"
 
 namespace tgfx {
-class ShapePaintSerialization {
+class RecordedContent;
+
+/**
+ * LayerRecorder is a utility class that records drawing commands as layer content.
+ */
+class LayerRecorder {
  public:
-  static std::shared_ptr<Data> Serialize(const ShapePaint* shapePaint, SerializeUtils::Map* map);
+  /**
+   * Returns a Canvas for recording drawing commands. The content type determines where the recorded
+   * commands will be stored:
+   * - Default: The commands will be stored in the default content of the layer.
+   * - Foreground: The commands will be stored in the foreground content of the layer.
+   * - Contour: The commands will be stored in the contour content of the layer.
+   * If the content type is not specified, it defaults to ContentType::Default.
+   */
+  Canvas* getCanvas(LayerContentType contentType = LayerContentType::Default);
 
  private:
-  static void SerializeShapePaintImpl(flexbuffers::Builder& fbb, const ShapePaint* shapePaint,
-                                      SerializeUtils::Map* map);
+  std::array<std::unique_ptr<Recorder>, 3> recorders = {};
+
+  std::unique_ptr<RecordedContent> finishRecording();
+
+  friend class Layer;
 };
 }  // namespace tgfx
