@@ -38,6 +38,7 @@ class MemoryImageProvider : public QQuickImageProvider {
   Q_OBJECT
  public:
   MemoryImageProvider();
+  ~MemoryImageProvider() override;
 
   void setImage(uint64_t id, int width, int height, const QByteArray& rawData);
   void clearImageMap();

@@ -302,7 +302,8 @@ ApplicationWindow {
                 }
 
                 ListView {
-                    id: clientsList
+                    id: frameCaptureclientsList
+                    visible: selectedIndex === 0
                     anchors.top: clientsTitle.bottom
                     anchors.left: parent.left
                     anchors.right: parent.right
@@ -310,10 +311,83 @@ ApplicationWindow {
                     anchors.margins: 10
                     spacing: 6
                     clip: true
-                    model: startViewModel ? startViewModel.clientItems : null
+                    model: startViewModel ? startViewModel.frameCaptureClientItems : null
 
                     delegate: Rectangle {
-                        width: clientsList.width
+                        width: frameCaptureclientsList.width
+                        height: 40
+                        color: {
+                            if(mouseArea.containsMouse) {
+                                return "#6b6b6b"
+                            }
+                            else if(index === selectedClientIndex) {
+                                return "#6b6b6b"
+                            }
+                            else {
+                                return "transparent"
+                            }
+                        }
+                        radius: 3
+
+                        Column {
+                            anchors.fill: parent
+                            anchors.leftMargin: 8
+                            anchors.rightMargin: 8
+                            anchors.verticalCenter: parent.verticalCenter
+                            spacing: 2
+
+                            Text {
+                                text: modelData.procName
+                                color: modelData.connected ? "#888888" : "#DDDDDD"
+                                font.pixelSize: 12
+                                width: parent.width
+                                elide: Text.ElideMiddle
+                            }
+
+                            Text {
+                                text: modelData.address + ":" + modelData.port
+                                color: modelData.connected ? "#777777" : "#AAAAAA"
+                                font.pixelSize: 10
+                                width: parent.width
+                                elide: Text.ElideMiddle
+                            }
+                        }
+
+                        MouseArea {
+                            id: mouseArea
+                            anchors.fill: parent
+                            enabled: !modelData.connected
+                            onClicked: {
+                                selectedClientIndex = index
+                            }
+
+                            onDoubleClicked: {
+                                if (startViewModel) {
+                                    if(selectedIndex === 0){
+                                        startViewModel.connectToClient(modelData)
+                                    }else if(selectedIndex === 1){
+                                        startViewModel.connectToClientByLayerInspector(modelData)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                ListView {
+                    id: layerTreeClientsList
+                    visible: selectedIndex === 1
+                    anchors.top: clientsTitle.bottom
+                    anchors.left: parent.left
+                    anchors.right: parent.right
+                    anchors.bottom: parent.bottom
+                    anchors.margins: 10
+                    spacing: 6
+                    clip: true
+                    model: startViewModel ? startViewModel.layerTreeClientItems : null
+
+                    delegate: Rectangle {
+                        width: layerTreeClientsList.width
                         height: 40
                         color: {
                             if(mouseArea.containsMouse) {
@@ -375,7 +449,15 @@ ApplicationWindow {
 
                 Text {
                     anchors.centerIn: parent
-                    text: clientsList.count === 0 ? "Waitting for project start..." : ""
+                    text: {
+                        if(selectedIndex === 0 && frameCaptureclientsList.count === 0){
+                            return "Waitting for project start...";
+                        }else if(selectedIndex === 1 && layerTreeClientsList.count === 0){
+                            return "Waitting for project start...";
+                        }else{
+                            return "";
+                        }
+                    }
                     color: "#44ffffff"
                     font.pixelSize: 14
                 }
@@ -536,10 +618,12 @@ ApplicationWindow {
                                     startViewModel.openFile(selectedFilePath)
                                 }
                                 else if(selectedClientIndex !== -1){
-                                    var selectedClient = startViewModel.clientItems[selectedClientIndex]
+                                    var selectedClient;
                                     if(selectedIndex === 0){
+                                        selectedClient = startViewModel.frameCaptureClientItems[selectedClientIndex]
                                         startViewModel.connectToClient(selectedClient)
                                     } else if(selectedIndex === 1){
+                                        selectedClient = startViewModel.layerTreeClientsList[selectedClientIndex]
                                         startViewModel.connectToClientByLayerInspector(selectedClient)
                                     }
                                 }

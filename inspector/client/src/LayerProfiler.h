@@ -5,6 +5,7 @@
 #include <vector>
 #include "LockFreeQueue.h"
 #include "Socket.h"
+#include "Protocol.h"
 namespace inspector {
 class LayerProfiler {
  public:
@@ -24,10 +25,13 @@ class LayerProfiler {
 #ifdef __EMSCRIPTEN__
   std::shared_ptr<WebSocketClient> m_WebSocket;
 #else
-  ListenSocket m_ListenSocket;
+  ListenSocket* m_ListenSocket;
   Socket* m_Socket = nullptr;
   std::queue<std::vector<uint8_t>> messages;
+  UdpBroadcast* broadcast[broadcastNum];
 #endif
+  bool isUDPOpened = true;
+  int64_t epoch;
   LockFreeQueue<std::vector<uint8_t>> m_Queue;
   std::shared_ptr<std::thread> m_SendThread;
   std::shared_ptr<std::thread> m_RecvThread;

@@ -37,6 +37,13 @@ void TcpSocketClient::connection(QString ip, quint16 port) {
     m_TcpSocket->connectToHost(ip, port);
   }
 }
+
+void TcpSocketClient::disConnection() {
+  if(m_IsConnection) {
+    m_TcpSocket->disconnectFromHost();
+  }
+}
+
 void TcpSocketClient::sendData(const QByteArray& data) {
   if (!m_IsConnection) {
     qDebug() << "Server is not connected!\n";

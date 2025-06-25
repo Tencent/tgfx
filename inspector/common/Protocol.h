@@ -19,6 +19,8 @@
 #pragma once
 namespace inspector {
 
+inline constexpr int broadcastNum = 5;
+
 constexpr unsigned Lz4CompressBound(unsigned isize) {
   return isize + (isize / 255) + 16;
 }
@@ -42,7 +44,13 @@ enum HandshakeStatus : uint8_t {
   HandshakeDropped
 };
 
+enum MsgType : uint8_t {
+  FrameCapture = 0,
+  LayerTree = 1
+};
+
 struct BroadcastMessage {
+  uint8_t type;
   uint16_t listenPort;
   uint32_t protocolVersion;
   uint64_t pid;

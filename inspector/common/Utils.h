@@ -19,6 +19,7 @@
 #pragma once
 #include <cstdint>
 #include <memory>
+#include "Protocol.h"
 
 namespace inspector {
 template <typename T>
@@ -42,4 +43,6 @@ uint32_t GetThreadHandleImpl();
 uint64_t GetPid();
 const char* GetProcessName();
 const char* GetEnvVar(const char* name);
+BroadcastMessage GetBroadcastMessage(const char* procname, size_t pnsz, size_t& len,
+                                      uint16_t port, uint8_t type);
 }  // namespace inspector

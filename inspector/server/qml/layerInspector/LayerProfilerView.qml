@@ -81,31 +81,25 @@ ApplicationWindow {
         anchors.fill: parent
         uniqueName: "LayerProfilerLayout"
 
-        KDDW.DockWidget{
-            id: layerTree
-            uniqueName: "RenderTree" // Each dock widget needs a unique id
-            source: "qrc:/qml/layerInspector/LayerTree.qml"
-
-        }
-
-        KDDW.DockWidget{
-            id: layerAttributeTree
-            uniqueName: "Attribute" // Each dock widget needs a unique id
-            source: "qrc:/qml/layerInspector/LayerAttribute.qml"
-        }
-
-        KDDW.DockWidget{
-            id: renderableImage
-            uniqueName: "Image" // Each dock widget needs a unique id
-            source: "qrc:/qml/layerInspector/Image.qml"
-        }
-
-        Component.onCompleted: {
-            addDockWidget(layerAttributeTree, KDDW.KDDockWidgets.Location_OnRight);
-
-            addDockWidget(layerTree, KDDW.KDDockWidgets.Location_OnLeft);
-
-        }
+        // KDDW.DockWidget{
+        //     id: layerTree
+        //     uniqueName: "RenderTree" // Each dock widget needs a unique id
+        //     source: "qrc:/qml/layerInspector/LayerTree.qml"
+        //
+        // }
+        //
+        // KDDW.DockWidget{
+        //     id: layerAttributeTree
+        //     uniqueName: "Attribute" // Each dock widget needs a unique id
+        //     source: "qrc:/qml/layerInspector/LayerAttribute.qml"
+        // }
+        //
+        // Component.onCompleted: {
+        //     addDockWidget(layerAttributeTree, KDDW.KDDockWidgets.Location_OnRight);
+        //
+        //     addDockWidget(layerTree, KDDW.KDDockWidgets.Location_OnLeft);
+        //
+        // }
     }
 
     KDDW.LayoutSaver {

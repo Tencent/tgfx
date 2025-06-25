@@ -18,12 +18,35 @@
 
 #include "InspectorView.h"
 #include <QQmlContext>
+#include <kddockwidgets/Config.h>
+#include <kddockwidgets/qtquick/ViewFactory.h>
 #include "AttributeModel.h"
 #include "FramesDrawer.h"
 #include "TaskTreeModel.h"
 #include "kddockwidgets/qtquick/views/Group.h"
 
 namespace inspector {
+
+class CustomViewFactory : public KDDockWidgets::QtQuick::ViewFactory {
+public:
+  ~CustomViewFactory() override = default;
+
+  QUrl tabbarFilename() const override {
+    return QUrl("qrc:/qml/TabBar.qml");
+  }
+
+  QUrl separatorFilename() const override {
+    return QUrl("qrc:/qml/Separator2.qml");
+  }
+
+  QUrl titleBarFilename() const override {
+    return QUrl("qrc:/qml/TitleBar.qml");
+  }
+
+  QUrl groupFilename() const override {
+    return QUrl("qrc:/qml/MyGroup.qml");
+  }
+};
 
 InspectorView::InspectorView(std::string filePath, int width, QObject* parent)
     : QObject(parent), width(width), isOpenFile(true), worker(filePath) {
@@ -45,6 +68,7 @@ InspectorView::~InspectorView() {
 }
 
 void InspectorView::initView() {
+  KDDockWidgets::Config::self().setViewFactory(new CustomViewFactory);
   qmlRegisterType<FramesDrawer>("FramesDrawer", 1, 0, "FramesDrawer");
   qmlRegisterType<TaskTreeModel>("TaskTreeModel", 1, 0, "TaskTreeModel");
   qmlRegisterType<AttributeModel>("AttributeModel", 1, 0, "AttributeModel");
@@ -61,7 +85,7 @@ void InspectorView::initView() {
   ispEngine->rootContext()->setContextProperty("taskTreeModel", taskTreeModel.get());
   ispEngine->rootContext()->setContextProperty("taskFilterModel", taskFilterModel.get());
   ispEngine->rootContext()->setContextProperty("selectFrameModel", selectFrameModel.get());
-  ispEngine->rootContext()->setContextProperty("attributeModel", attributeModel.get());
+  KDDockWidgets::QtQuick::Platform::instance()->setQmlEngine(ispEngine.get());
   ispEngine->load(QUrl("qrc:/qml/InspectorView.qml"));
   if (ispEngine->rootObjects().isEmpty()) {
     qWarning() << "Failed to load InspectorView.qml";

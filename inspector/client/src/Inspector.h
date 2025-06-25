@@ -191,7 +191,7 @@ class Inspector {
   std::mutex serialLock;
 
   std::thread* messageThread = nullptr;
-  UdpBroadcast* broadcast = nullptr;
+  UdpBroadcast* broadcast[broadcastNum];
   const char* programName = nullptr;
   std::mutex programNameLock;
 

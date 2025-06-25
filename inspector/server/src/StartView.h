@@ -39,9 +39,10 @@ class ClientData : public QObject {
   Q_PROPERTY(uint16_t port READ getPort CONSTANT)
   Q_PROPERTY(QString procName READ getProcName CONSTANT)
   Q_PROPERTY(QString address READ getAddress CONSTANT)
+  Q_PROPERTY(uint8_t type READ getType CONSTANT)
  public:
   ClientData(int64_t time, uint32_t protoVer, int32_t activeTime, uint16_t port, uint64_t pid,
-             std::string procName, std::string address);
+             std::string procName, std::string address, uint8_t type);
 
   QString getProcName() const {
     return QString::fromStdString(procName);
@@ -54,6 +55,9 @@ class ClientData : public QObject {
   }
   bool getConnected() const {
     return connected;
+  }
+  uint8_t getType() const {
+    return type;
   }
   void setConnected(bool isConnect) {
     connected = isConnect;
@@ -70,6 +74,7 @@ class ClientData : public QObject {
   uint64_t pid = 0;
   std::string procName;
   std::string address;
+  uint8_t type;
 };
 
 class InspectorView;
@@ -104,7 +109,8 @@ class FileItem : public QObject {
 class StartView : public QObject {
   Q_OBJECT
   Q_PROPERTY(QList<QObject*> fileItems READ getFileItems NOTIFY fileItemsChanged)
-  Q_PROPERTY(QVector<QObject*> clientItems READ getClientItems NOTIFY clientItemsChanged)
+  Q_PROPERTY(QVector<QObject*> frameCaptureClientItems READ getFrameCaptureClientItems NOTIFY clientItemsChanged)
+  Q_PROPERTY(QVector<QObject*> layerTreeClientItems READ getLayerTreeClientItems NOTIFY clientItemsChanged)
   Q_PROPERTY(QString lastOpenFile READ getLastOpenFile NOTIFY lastOpenFileChanged)
 
  public:
@@ -131,7 +137,8 @@ class StartView : public QObject {
     return QFileInfo(fPath).path();
   }
   ///* client items *///
-  Q_INVOKABLE QVector<QObject*> getClientItems() const;
+  Q_INVOKABLE QVector<QObject*> getFrameCaptureClientItems() const;
+  Q_INVOKABLE QVector<QObject*> getLayerTreeClientItems() const;
   Q_INVOKABLE void connectToClient(QObject* object);
   Q_INVOKABLE void connectToClientByLayerInspector(QObject* object);
   Q_INVOKABLE void showStartView();

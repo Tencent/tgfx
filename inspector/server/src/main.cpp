@@ -17,31 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <kddockwidgets/Config.h>
-#include <kddockwidgets/qtquick/ViewFactory.h>
 #include <qwidget.h>
 #include <QQuickStyle>
 #include "StartView.h"
-
-class CustomViewFactory : public KDDockWidgets::QtQuick::ViewFactory {
- public:
-  ~CustomViewFactory() override = default;
-
-  QUrl tabbarFilename() const override {
-    return QUrl("qrc:/qml/TabBar.qml");
-  }
-
-  QUrl separatorFilename() const override {
-    return QUrl("qrc:/qml/Separator2.qml");
-  }
-
-  QUrl titleBarFilename() const override {
-    return QUrl("qrc:/qml/TitleBar.qml");
-  }
-
-  QUrl groupFilename() const override {
-    return QUrl("qrc:/qml/MyGroup.qml");
-  }
-};
 
 int main(int argc, char* argv[]) {
   QApplication::setApplicationName("Inspector");
@@ -76,7 +54,6 @@ int main(int argc, char* argv[]) {
                KDDockWidgets::Config::Flag_HideTitleBarWhenTabsVisible;
 
   config.setFlags(flags);
-  config.setViewFactory(new CustomViewFactory());
 
   // 创建并显示StartView
   auto startView = new inspector::StartView(&app);
