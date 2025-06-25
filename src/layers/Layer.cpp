@@ -743,7 +743,7 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
   if (auto rasterizedCache = getRasterizedCache(args, canvas->getMatrix())) {
     rasterizedCache->draw(canvas, bitFields.allowsEdgeAntialiasing, alpha, blendMode);
     if (args.backgroundContext) {
-      if (bitFields.hasBackgroundStyle) {
+      if (hasDescendantBackgroundStyle()) {
         auto backgroundArgs = args;
         backgroundArgs.drawMode = DrawMode::Background;
         backgroundArgs.backgroundContext = nullptr;
@@ -824,10 +824,9 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     }
     paint.setMaskFilter(maskFilter);
   }
-  auto subBackgroundContext =
-      args.backgroundContext && (bitFields.hasBackgroundStyle || hasDescendantBackgroundStyle())
-          ? args.backgroundContext->createSubContext()
-          : nullptr;
+  auto subBackgroundContext = args.backgroundContext && hasDescendantBackgroundStyle()
+                                  ? args.backgroundContext->createSubContext()
+                                  : nullptr;
   auto offscreenArgs = args;
   offscreenArgs.backgroundContext = subBackgroundContext;
   auto picture = RecordPicture(contentScale,
@@ -1258,6 +1257,9 @@ void Layer::propagateHasBackgroundStyleFlags() {
 }
 
 bool Layer::hasDescendantBackgroundStyle() {
+  if (!bitFields.dirtyDescendents && bitFields.hasBackgroundStyle) {
+    return true;
+  }
   for (const auto& style : _layerStyles) {
     if (style->extraSourceType() == LayerStyleExtraSourceType::Background) {
       return true;
