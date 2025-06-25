@@ -21,8 +21,8 @@
 #include <map>
 #include <memory>
 #include <set>
-#include "core/atlas/AtlasCell.h"
-#include "core/atlas/AtlasTypes.h"
+#include "core/AtlasCell.h"
+#include "core/AtlasTypes.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "tgfx/core/Size.h"
@@ -48,8 +48,6 @@ class Atlas {
 
   //To ensure the atlas does not evict a given entry,the client must set the use token
   void setLastUseToken(const PlotLocator& plotLocator, AtlasToken token);
-
-  void clearEvictionPlotTexture(Context* context);
 
   void removeExpiredKeys();
 
@@ -78,7 +76,7 @@ class Atlas {
   std::vector<std::shared_ptr<TextureProxy>> textureProxies = {};
   std::vector<Page> pages = {};
   AtlasToken previousFlushToken = AtlasToken::InvalidToken();
-  int flushesSinceLastUse = 0;
+  uint32_t flushesSinceLastUse = 0;
   uint32_t numPlots = 0;
   int textureWidth = 2028;
   int textureHeight = 2048;
@@ -86,7 +84,6 @@ class Atlas {
   int plotHeight = 512;
 
   BytesKeyMap<AtlasCellLocator> cellLocators;
-  std::map<uint32_t, std::set<Plot*>> evictionPlots;
   std::set<BytesKey> expiredKeys;
 };
 
@@ -99,7 +96,7 @@ class AtlasConfig {
   ISize plotDimensions(MaskFormat maskFormat) const;
 
  private:
-  static constexpr int kMaxTextureSize = 2048;
-  ISize RGBADimensions = {kMaxTextureSize, kMaxTextureSize};
+  static constexpr int MaxTextureSize = 2048;
+  ISize RGBADimensions = {MaxTextureSize, MaxTextureSize};
 };
 }  //namespace tgfx

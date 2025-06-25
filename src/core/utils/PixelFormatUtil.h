@@ -19,7 +19,7 @@
 #pragma once
 
 #include <cstdio>
-#include "core/atlas/AtlasTypes.h"
+#include "core/AtlasTypes.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/gpu/PixelFormat.h"
 

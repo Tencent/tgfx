@@ -20,13 +20,11 @@
 #include "core/PixelRef.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/DrawingManager.h"
-#include "gpu/Gpu.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/tasks/TextureClearTask.h"
 namespace tgfx {
 
-static constexpr auto kPlotRecentlyUsedCount = 32;
-static constexpr auto kAtlasRecentlyUsedCount = 128;
+static constexpr uint32_t PlotRecentlyUsedCount = 32;
+static constexpr uint32_t AtlasRecentlyUsedCount = 128;
 
 std::unique_ptr<Atlas> Atlas::Make(ProxyProvider* proxyProvider, PixelFormat pixelFormat, int width,
                                    int height, int plotWidth, int plotHeight,
@@ -54,7 +52,7 @@ bool Atlas::addToAtlas(const AtlasCell& cell, AtlasToken nextFlushToken,
     }
   }
   auto pageCount = pages.size();
-  if (pageCount == PlotLocator::kMaxResidentPages) {
+  if (pageCount == PlotLocator::MaxResidentPages) {
     for (size_t pageIndex = 0; pageIndex < pageCount; ++pageIndex) {
       Plot* plot = pages[pageIndex].plotList.back();
       DEBUG_ASSERT(plot != nullptr);
@@ -110,13 +108,6 @@ bool Atlas::activateNewPage() {
   if (proxy == nullptr) {
     return false;
   }
-  // In OpenGL, calling glTexImage2D with data == nullptr allocates texture memory
-  // for the given width and height, but the contents are undefined.
-  // This means OpenGL does not guarantee the texture will be zero-initialized.
-  auto context = proxy->getContext();
-  auto task =
-      proxy->getContext()->drawingBuffer()->make<TextureClearTask>(UniqueKey::Make(), proxy);
-  context->drawingManager()->addResourceTask(std::move(task));
   textureProxies.push_back(std::move(proxy));
   return true;
 }
@@ -171,7 +162,6 @@ void Atlas::evictionPlot(Plot* plot) {
     }
   }
   plot->resetRects();
-  evictionPlots[plot->pageIndex()].insert(plot);
 }
 
 void Atlas::deactivateLastPage() {
@@ -179,13 +169,6 @@ void Atlas::deactivateLastPage() {
   auto pageIndex = pages.size() - 1;
   pages.pop_back();
   textureProxies.pop_back();
-  for (auto it = evictionPlots.begin(); it != evictionPlots.end();) {
-    if (it->first == pageIndex) {
-      it = evictionPlots.erase(it);
-    } else {
-      ++it;
-    }
-  }
   for (const auto& [key, cellLocator] : cellLocators) {
     if (cellLocator.atlasLocator.pageIndex() == pageIndex) {
       expiredKeys.insert(key);
@@ -219,7 +202,7 @@ void Atlas::compact(AtlasToken startTokenForNextFlush) {
 
   // Compact if the atlas was used in the recently completed flush or
   // hasn't been used in a long time.
-  if (atlasUsedThisFlush || flushesSinceLastUse > kAtlasRecentlyUsedCount) {
+  if (atlasUsedThisFlush || flushesSinceLastUse > AtlasRecentlyUsedCount) {
     std::vector<Plot*> availablePlots;
     auto lastPageIndex = pages.size() - 1;
     for (uint32_t pageIndex = 0; pageIndex < lastPageIndex; ++pageIndex) {
@@ -227,7 +210,7 @@ void Atlas::compact(AtlasToken startTokenForNextFlush) {
         if (!plot->lastUseToken().isInterval(previousFlushToken, startTokenForNextFlush)) {
           plot->increaseFlushesSinceLastUsed();
         }
-        if (plot->flushesSinceLastUsed() > kPlotRecentlyUsedCount) {
+        if (plot->flushesSinceLastUsed() > PlotRecentlyUsedCount) {
           availablePlots.push_back(plot);
         }
       }
@@ -239,7 +222,7 @@ void Atlas::compact(AtlasToken startTokenForNextFlush) {
       if (!plot->lastUseToken().isInterval(previousFlushToken, startTokenForNextFlush)) {
         plot->increaseFlushesSinceLastUsed();
       }
-      if (plot->flushesSinceLastUsed() <= kPlotRecentlyUsedCount) {
+      if (plot->flushesSinceLastUsed() <= PlotRecentlyUsedCount) {
         ++usedPlots;
       } else if (plot->lastUseToken() != AtlasToken::InvalidToken()) {
         evictionPlot(plot);
@@ -250,7 +233,7 @@ void Atlas::compact(AtlasToken startTokenForNextFlush) {
     // which is equivalent to moving a plot from the last page to a previous page
     if (!availablePlots.empty() && usedPlots > 0 && usedPlots < numPlots / 4) {
       for (auto& plot : pages[lastPageIndex].plotList) {
-        if (plot->flushesSinceLastUsed() > kPlotRecentlyUsedCount) {
+        if (plot->flushesSinceLastUsed() > PlotRecentlyUsedCount) {
           continue;
         }
 
@@ -275,41 +258,6 @@ void Atlas::compact(AtlasToken startTokenForNextFlush) {
   previousFlushToken = startTokenForNextFlush;
 }
 
-void Atlas::clearEvictionPlotTexture(Context* context) {
-  if (evictionPlots.empty() || context == nullptr || textureProxies.empty()) {
-    return;
-  }
-  auto pixelRef = PixelRef::Make(plotWidth, plotHeight, pixelFormat == PixelFormat::ALPHA_8);
-  pixelRef->clear();
-  auto pixels = pixelRef->lockPixels();
-  if (pixels == nullptr) {
-    return;
-  }
-  for (auto& [pageIndex, plots] : evictionPlots) {
-    if (pageIndex >= textureProxies.size()) {
-      continue;
-    }
-    auto textureProxy = textureProxies[pageIndex];
-    if (textureProxy == nullptr) {
-      continue;
-    }
-    auto texture = textureProxy->getTexture();
-    if (texture == nullptr) {
-      continue;
-    }
-    for (auto& plot : plots) {
-      if (plot == nullptr) {
-        continue;
-      }
-      auto rect = Rect::MakeXYWH(plot->pixelOffset().x, plot->pixelOffset().y,
-                                 static_cast<float>(plotWidth), static_cast<float>(plotHeight));
-      context->gpu()->writePixels(texture->getSampler(), rect, pixels, pixelRef->info().rowBytes());
-    }
-  }
-  pixelRef->unlockPixels();
-  evictionPlots.clear();
-}
-
 void Atlas::removeExpiredKeys() {
   constexpr size_t kMaxKeys = 20000;
   if (cellLocators.size() < kMaxKeys || expiredKeys.empty()) {
@@ -325,11 +273,9 @@ void Atlas::removeExpiredKeys() {
   expiredKeys.clear();
 }
 
-//////////////
-
 AtlasConfig::AtlasConfig(int maxTextureSize) {
-  RGBADimensions.set(std::min(kMaxTextureSize, maxTextureSize),
-                     std::min(kMaxTextureSize, maxTextureSize));
+  RGBADimensions.set(std::min(MaxTextureSize, maxTextureSize),
+                     std::min(MaxTextureSize, maxTextureSize));
 }
 
 ISize AtlasConfig::atlasDimensions(MaskFormat maskFormat) const {
@@ -341,8 +287,8 @@ ISize AtlasConfig::atlasDimensions(MaskFormat maskFormat) const {
 
 ISize AtlasConfig::plotDimensions(MaskFormat maskFormat) const {
   auto atlasDimensions = this->atlasDimensions(maskFormat);
-  auto plotWidth = atlasDimensions.width >= kMaxTextureSize ? 512 : 256;
-  auto plotHeight = atlasDimensions.height >= kMaxTextureSize ? 512 : 256;
+  auto plotWidth = atlasDimensions.width >= MaxTextureSize ? 512 : 256;
+  auto plotHeight = atlasDimensions.height >= MaxTextureSize ? 512 : 256;
   return {plotWidth, plotHeight};
 }
 }  // namespace tgfx

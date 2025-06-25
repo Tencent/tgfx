@@ -21,7 +21,7 @@
 #include <unordered_map>
 #include <vector>
 #include "FlushCallbackObject.h"
-#include "core/atlas/AtlasTypes.h"
+#include "core/AtlasTypes.h"
 #include "gpu/OpsCompositor.h"
 #include "gpu/tasks/OpsRenderTask.h"
 #include "gpu/tasks/RenderTask.h"

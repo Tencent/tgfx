@@ -48,6 +48,6 @@ class AtlasManager : public AtlasGenerationCounter, public FlushCallbackObject {
   Atlas* getAtlas(MaskFormat format) const;
 
   Context* context = nullptr;
-  std::unique_ptr<Atlas> atlases[kMaskFormatCount];
+  std::unique_ptr<Atlas> atlases[MaskFormatCount];
 };
 }  // namespace tgfx

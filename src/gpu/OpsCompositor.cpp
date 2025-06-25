@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OpsCompositor.h"
+#include "core/Atlas.h"
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
 #include "core/Rasterizer.h"
-#include "core/atlas/Atlas.h"
 #include "core/utils/Types.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
@@ -41,6 +41,36 @@ namespace tgfx {
  * 0.5 * 1/256 of its intended value, it shouldn't affect the final pixel values.
  */
 static constexpr float BOUNDS_TOLERANCE = 1e-3f;
+
+static bool RectHasColor(const std::vector<PlacementPtr<RectRecord>>& rects) {
+  if (rects.size() <= 1) {
+    return false;
+  }
+  bool hasColor = false;
+  auto& firstColor = rects.front()->color;
+  for (auto& record : rects) {
+    if (record->color != firstColor) {
+      hasColor = true;
+      break;
+    }
+  }
+  return hasColor;
+}
+
+static bool RectHasUVCoord(const std::vector<PlacementPtr<RectRecord>>& rects) {
+  if (rects.size() <= 1) {
+    return false;
+  }
+  bool hasUVCoord = false;
+  auto& firstMatrix = rects.front()->viewMatrix;
+  for (auto& record : rects) {
+    if (record->viewMatrix != firstMatrix) {
+      hasUVCoord = true;
+      break;
+    }
+  }
+  return hasUVCoord;
+}
 
 OpsCompositor::OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags)
     : context(proxy->getContext()), renderTarget(std::move(proxy)), renderFlags(renderFlags) {
@@ -262,8 +292,10 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
                          ? RectsVertexProvider::UVSubsetMode::SubsetOnly
                          : RectsVertexProvider::UVSubsetMode::RoundOutAndSubset;
       }
+      bool hasColor = RectHasColor(pendingRects);
+      bool hasUVCoord = needLocalBounds && RectHasUVCoord(pendingRects);
       auto provider = RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects),
-                                                    aaType, needLocalBounds, subsetMode);
+                                                    aaType, hasColor, hasUVCoord, subsetMode);
       drawOp = RectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::RRect: {
@@ -296,9 +328,10 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
           deviceBounds->join(rect);
         }
       }
-      auto provider = RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingAtlasRects),
-                                                    aaType, needLocalBounds,
-                                                    RectsVertexProvider::UVSubsetMode::None, true);
+      bool hasColor = RectHasColor(pendingAtlasRects);
+      auto provider =
+          RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingAtlasRects), aaType,
+                                        hasColor, true, RectsVertexProvider::UVSubsetMode::None);
       Matrix uvMatrix;
       if (!pendingAtlasMatrix.invert(&uvMatrix)) {
         return;

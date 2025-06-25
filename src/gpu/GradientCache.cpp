@@ -21,8 +21,8 @@
 
 namespace tgfx {
 // Each bitmap will be 256x1.
-static constexpr size_t kMaxNumCachedGradientBitmaps = 32;
-static constexpr int kGradientTextureSize = 256;
+static constexpr size_t MaxNumCachedGradientBitmaps = 32;
+static constexpr int GradientTextureSize = 256;
 
 std::shared_ptr<Texture> GradientCache::find(const BytesKey& bytesKey) {
   auto iter = textures.find(bytesKey);
@@ -37,7 +37,7 @@ std::shared_ptr<Texture> GradientCache::find(const BytesKey& bytesKey) {
 void GradientCache::add(const BytesKey& bytesKey, std::shared_ptr<Texture> texture) {
   textures[bytesKey] = std::move(texture);
   keys.push_front(bytesKey);
-  while (keys.size() > kMaxNumCachedGradientBitmaps) {
+  while (keys.size() > MaxNumCachedGradientBitmaps) {
     auto key = keys.back();
     keys.pop_back();
     textures.erase(key);
@@ -105,7 +105,7 @@ std::shared_ptr<Texture> GradientCache::getGradient(Context* context, const Colo
   if (texture) {
     return texture;
   }
-  auto pixelBuffer = CreateGradient(colors, positions, count, kGradientTextureSize);
+  auto pixelBuffer = CreateGradient(colors, positions, count, GradientTextureSize);
   if (pixelBuffer == nullptr) {
     return nullptr;
   }

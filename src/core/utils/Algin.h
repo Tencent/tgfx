@@ -18,46 +18,36 @@
 
 #pragma once
 
-#include "core/atlas/AtlasTypes.h"
-#include "tgfx/core/BytesKey.h"
-#include "tgfx/core/Matrix.h"
-
 namespace tgfx {
-class AtlasCell {
- public:
-  const BytesKey& key() const {
-    return _key;
-  }
 
-  MaskFormat maskFormat() const {
-    return _maskFormat;
-  }
+template <typename T>
+static constexpr T Align2(T x) {
+  return (x + 1) >> 1 << 1;
+}
 
-  uint16_t width() const {
-    return _width;
-  }
+template <typename T>
+static constexpr T Align4(T x) {
+  return (x + 3) >> 2 << 2;
+}
 
-  uint16_t height() const {
-    return _height;
-  }
+template <typename T>
+static constexpr T Align8(T x) {
+  return (x + 7) >> 3 << 3;
+}
 
-  const Matrix& matrix() const {
-    return _matrix;
-  }
+template <typename T>
+static constexpr bool IsAlign2(T x) {
+  return 0 == (x & 1);
+}
 
- private:
-  BytesKey _key;
-  Matrix _matrix = {};
-  MaskFormat _maskFormat = MaskFormat::A8;
-  uint16_t _width = 0;
-  uint16_t _height = 0;
+template <typename T>
+static constexpr bool IsAlign4(T x) {
+  return 0 == (x & 3);
+}
 
-  friend class AtlasSource;
-  friend class TextRender;
-};
+template <typename T>
+static constexpr bool IsAlign8(T x) {
+  return 0 == (x & 7);
+}
 
-struct AtlasCellLocator {
-  Matrix matrix = {};  // The cell's transformation matrix
-  AtlasLocator atlasLocator;
-};
-}  //namespace tgfx
+}  // namespace tgfx

@@ -61,7 +61,7 @@ static PlacementPtr<FragmentProcessor> MakeColorizer(const Context* context, con
     return SingleIntervalGradientColorizer::Make(drawingBuffer, colors[offset], colors[offset + 1]);
   }
 
-  bool tryAnalyticColorizer = count <= UnrolledBinaryGradientColorizer::kMaxColorCount;
+  bool tryAnalyticColorizer = count <= UnrolledBinaryGradientColorizer::MaxColorCount;
 
   // The remaining analytic colorizes use scale*t+bias, and the scale/bias values can become
   // quite large when thresholds are close (but still outside the hard stop limit). If float isn't

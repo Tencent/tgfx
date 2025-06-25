@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "core/atlas/AtlasTypes.h"
+#include "core/AtlasTypes.h"
 
 namespace tgfx {
 class FlushCallbackObject {

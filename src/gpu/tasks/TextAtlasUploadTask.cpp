@@ -17,10 +17,23 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextAtlasUploadTask.h"
+#include "core/AtlasTypes.h"
+#include "core/utils/AutoMalloc.h"
 #include "gpu/Gpu.h"
 #include "gpu/Texture.h"
 
 namespace tgfx {
+
+static void getPackedGlyphImage(const void* srcPixels, void* dstPixels,
+                                const ImageInfo& srcImageInfo, size_t dstRowBytes) {
+  auto srcHeight = srcImageInfo.height();
+  auto srcRowBytes = srcImageInfo.rowBytes();
+  for (auto y = 0; y < srcHeight; y++) {
+    memcpy(dstPixels, srcPixels, srcRowBytes);
+    srcPixels = static_cast<const char*>(srcPixels) + srcRowBytes;
+    dstPixels = static_cast<char*>(dstPixels) + dstRowBytes;
+  }
+}
 
 TextAtlasUploadTask::TextAtlasUploadTask(UniqueKey uniqueKey,
                                          std::shared_ptr<DataSource<PixelBuffer>> source,
@@ -41,7 +54,7 @@ bool TextAtlasUploadTask::execute(Context* context) {
   }
   auto texture = textureProxy->getTexture();
   if (texture == nullptr) {
-    LOGE("TextureUploadTask::onMakeResource() texture is nullptr!");
+    LOGE("TextAtlasUploadTask::onMakeResource() texture is nullptr!");
     return false;
   }
   auto gpu = context->gpu();
@@ -52,7 +65,16 @@ bool TextAtlasUploadTask::execute(Context* context) {
   }
   auto rect = Rect::MakeXYWH(atlasOffset.x, atlasOffset.y, static_cast<float>(pixelBuffer->width()),
                              static_cast<float>(pixelBuffer->height()));
-  gpu->writePixels(texture->getSampler(), rect, pixels, pixelBuffer->info().rowBytes());
+  auto padding = static_cast<float>(Plot::CellPadding);
+  rect.outset(padding, padding);
+  auto dstRowBytes = static_cast<size_t>(rect.width()) * pixelBuffer->info().bytesPerPixel();
+  auto size = static_cast<size_t>(rect.height()) * dstRowBytes;
+  AutoMalloc<1024> storage(size);
+  void* dstPixels = storage.get();
+  memset(dstPixels, 0, size);
+  dstPixels = static_cast<char*>(dstPixels) + dstRowBytes + pixelBuffer->info().bytesPerPixel();
+  getPackedGlyphImage(pixels, dstPixels, pixelBuffer->info(), dstRowBytes);
+  gpu->writePixels(texture->getSampler(), rect, storage.get(), dstRowBytes);
   pixelBuffer->unlockPixels();
   source = nullptr;
   return true;

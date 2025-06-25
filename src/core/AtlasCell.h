@@ -18,23 +18,46 @@
 
 #pragma once
 
-#include "ResourceTask.h"
-#include "gpu/proxies/TextureProxy.h"
+#include "core/AtlasTypes.h"
+#include "tgfx/core/BytesKey.h"
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
-class TextureClearTask final : public ResourceTask {
+class AtlasCell {
  public:
-  TextureClearTask(UniqueKey uniqueKey, std::shared_ptr<TextureProxy> proxy);
+  const BytesKey& key() const {
+    return _key;
+  }
 
-  bool execute(Context* context) override;
+  MaskFormat maskFormat() const {
+    return _maskFormat;
+  }
 
- protected:
-  std::shared_ptr<Resource> onMakeResource(Context*) override {
-    // The execute() method is already overridden, so this method should never be called.
-    return nullptr;
+  uint16_t width() const {
+    return _width;
+  }
+
+  uint16_t height() const {
+    return _height;
+  }
+
+  const Matrix& matrix() const {
+    return _matrix;
   }
 
  private:
-  std::shared_ptr<TextureProxy> textureProxy = nullptr;
+  BytesKey _key;
+  Matrix _matrix = {};
+  MaskFormat _maskFormat = MaskFormat::A8;
+  uint16_t _width = 0;
+  uint16_t _height = 0;
+
+  friend class AtlasSource;
+  friend class RenderContext;
 };
-}  // namespace tgfx
+
+struct AtlasCellLocator {
+  Matrix matrix = {};  // The cell's transformation matrix
+  AtlasLocator atlasLocator;
+};
+}  //namespace tgfx
