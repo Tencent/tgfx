@@ -21,17 +21,18 @@
 #include <core/utils/Types.h>
 #include <flatbuffers/flexbuffers.h>
 #include <tgfx/core/GradientType.h>
+#include <tgfx/gpu/Context.h>
 #include <tgfx/layers/Layer.h>
 #include <tgfx/layers/ShapeLayer.h>
 #include <tgfx/layers/TextAlign.h>
-#include <tgfx/gpu/Context.h>
 #include <string>
 
 namespace tgfx {
 class SerializeUtils {
  public:
   using ComplexObjSerMap = std::unordered_map<uint64_t, std::function<std::shared_ptr<Data>()>>;
-  using RenderableObjSerMap = std::unordered_map<uint64_t, std::function<std::shared_ptr<Data>(Context*)>>;
+  using RenderableObjSerMap =
+      std::unordered_map<uint64_t, std::function<std::shared_ptr<Data>(Context*)>>;
 
   static std::string LayerTypeToString(LayerType type);
 
@@ -86,35 +87,43 @@ class SerializeUtils {
 
   static void SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key, const char* value,
                                bool isAddress = false, bool isExpandable = false,
-                               std::optional<uint64_t> objID = std::nullopt, bool isRenderableObj = false);
+                               std::optional<uint64_t> objID = std::nullopt,
+                               bool isRenderableObj = false);
 
   static void SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key, std::string value,
                                bool isAddress = false, bool isExpandable = false,
-                               std::optional<uint64_t> objID = std::nullopt, bool isRenderableObj = false);
+                               std::optional<uint64_t> objID = std::nullopt,
+                               bool isRenderableObj = false);
 
   static void SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key, int value,
                                bool isAddress = false, bool isExpandable = false,
-                               std::optional<uint64_t> objID = std::nullopt, bool isRenderableObj = false);
+                               std::optional<uint64_t> objID = std::nullopt,
+                               bool isRenderableObj = false);
 
   static void SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key, unsigned int value,
                                bool isAddress = false, bool isExpandable = false,
-                               std::optional<uint64_t> objID = std::nullopt, bool isRenderableObj = false);
+                               std::optional<uint64_t> objID = std::nullopt,
+                               bool isRenderableObj = false);
 
   static void SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key, uint64_t value,
                                bool isAddress = false, bool isExpandable = false,
-                               std::optional<uint64_t> objID = std::nullopt, bool isRenderableObj = false);
+                               std::optional<uint64_t> objID = std::nullopt,
+                               bool isRenderableObj = false);
 
   static void SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key, float value,
                                bool isAddress = false, bool isExpandable = false,
-                               std::optional<uint64_t> objID = std::nullopt, bool isRenderableObj = false);
+                               std::optional<uint64_t> objID = std::nullopt,
+                               bool isRenderableObj = false);
 
   static void SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key, double value,
                                bool isAddress = false, bool isExpandable = false,
-                               std::optional<uint64_t> objID = std::nullopt, bool isRenderableObj = false);
+                               std::optional<uint64_t> objID = std::nullopt,
+                               bool isRenderableObj = false);
 
   static void SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key, bool value,
                                bool isAddress = false, bool isExpandable = false,
-                               std::optional<uint64_t> objID = std::nullopt, bool isRenderableObj = false);
+                               std::optional<uint64_t> objID = std::nullopt,
+                               bool isRenderableObj = false);
 
   static void FillComplexObjSerMap(const Matrix& matrix, uint64_t objID, ComplexObjSerMap* map);
 
@@ -122,13 +131,15 @@ class SerializeUtils {
 
   static void FillComplexObjSerMap(const Rect& rect, uint64_t objID, ComplexObjSerMap* map);
 
-  static void FillComplexObjSerMap(const SamplingOptions& sampling, uint64_t objID, ComplexObjSerMap* map);
+  static void FillComplexObjSerMap(const SamplingOptions& sampling, uint64_t objID,
+                                   ComplexObjSerMap* map);
 
   static void FillComplexObjSerMap(const Color& color, uint64_t objID, ComplexObjSerMap* map);
 
   static void FillComplexObjSerMap(const Font& font, uint64_t objID, ComplexObjSerMap* map);
 
-  static void FillComplexObjSerMap(const FontMetrics& fontMetrics, uint64_t objID, ComplexObjSerMap* map);
+  static void FillComplexObjSerMap(const FontMetrics& fontMetrics, uint64_t objID,
+                                   ComplexObjSerMap* map);
 
   static void FillComplexObjSerMap(const GlyphRun& glyphRun, uint64_t objID, ComplexObjSerMap* map);
 

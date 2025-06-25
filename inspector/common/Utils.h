@@ -34,6 +34,11 @@ void MemWrite(void* ptr, T val) {
   memcpy(ptr, &val, sizeof(T));
 }
 
+template <typename T>
+void MemWrite(void* ptr, T* val, size_t size) {
+  memcpy(ptr, val, size);
+}
+
 uint32_t GetThreadHandleImpl();
 uint64_t GetPid();
 const char* GetProcessName();

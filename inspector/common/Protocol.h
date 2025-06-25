@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+namespace inspector {
 
 inline constexpr int broadcastNum = 5;
 
@@ -57,10 +58,17 @@ struct BroadcastMessage {
   char programName[WelcomeMessageProgramNameSize];
 };
 
+struct WelcomeMessage {
+  int64_t initBegin;
+  int64_t initEnd;
+  int64_t refTime;
+};
+
 enum ServerQuery : uint8_t {
   ServerQueryTerminate,
   ServerQueryString,
   ServerQueryFrameName,
+  ServerQueryValueName,
   ServerQueryDisconnect,
 };
 
@@ -96,8 +104,8 @@ enum OpTaskType : uint8_t {
   OpTaskTypeSize,
 };
 
-struct WelcomeMessage {
-  int64_t initBegin;
-  int64_t initEnd;
-  int64_t refTime;
+enum TGFXEnum {
+  BufferType,
+  BlendMode,
 };
+}  // namespace inspector

@@ -16,21 +16,31 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ResolveOp.h"
-#include "core/utils/Profiling.h"
-#include "gpu/RenderPass.h"
+#include "InspectorEvent.h"
 
-namespace tgfx {
-PlacementPtr<ResolveOp> ResolveOp::Make(Context* context, const Rect& bounds) {
-  if (bounds.isEmpty()) {
-    return nullptr;
+namespace inspector {
+
+OpOrTask getOpTaskType(OpTaskType type) {
+  switch (type) {
+    case TextureUploadTask:
+    case ShapeBufferUploadTask:
+    case GpuUploadTask:
+    case TextureCreateTask:
+    case RenderTargetCreateTask:
+    case TextureFlattenTask:
+    case RenderTargetCopyTask:
+    case RuntimeDrawTask:
+    case TextureResolveTask:
+      return OpOrTask::Task;
+    case ClearOp:
+    case RectDrawOp:
+    case RRectDrawOp:
+    case ShapeDrawOp:
+    case DstTextureCopyOp:
+    case ResolveOp:
+      return OpOrTask::Op;
+    default:
+      return OpOrTask::NoType;
   }
-  return context->drawingBuffer()->make<ResolveOp>(bounds);
 }
-
-void ResolveOp::execute(RenderPass* renderPass) {
-  OperateMark(inspector::OpTaskType::ResolveOp);
-  renderPass->resolve(bounds);
-}
-
-}  // namespace tgfx
+}  // namespace inspector

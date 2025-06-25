@@ -23,11 +23,10 @@
 #include <kddockwidgets/qtquick/views/DockWidget.h>
 #include "LayerAttributeModel.h"
 #include "LayerTreeModel.h"
+#include "MemoryImageProvider.h"
 #include "flatbuffers/flexbuffers.h"
 #include "socket/TcpSocketClient.h"
 #include "socket/WebSocketServer.h"
-#include "MemoryImageProvider.h"
-
 
 class LayerProfilerView : public QObject {
   Q_OBJECT

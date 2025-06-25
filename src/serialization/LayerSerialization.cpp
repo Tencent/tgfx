@@ -17,22 +17,21 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #ifdef TGFX_USE_INSPECTOR
 
-#include "LayerSerialization.h"
 #include <tgfx/layers/ImageLayer.h>
 #include <tgfx/layers/ShapeLayer.h>
 #include <tgfx/layers/SolidLayer.h>
 #include <tgfx/layers/TextLayer.h>
 #include "LayerFilterSerialization.h"
+#include "LayerSerialization.h"
 #include "core/utils/Log.h"
 #include "tgfx/layers/Layer.h"
 
 namespace tgfx {
 extern const std::string HighLightLayerName;
 
-std::shared_ptr<Data> LayerSerialization::SerializeLayer(const Layer* layer,
-                                                         SerializeUtils::ComplexObjSerMap* map,
-                                                         SerializeUtils::RenderableObjSerMap* rosMap,
-                                                         const std::string& typeName) {
+std::shared_ptr<Data> LayerSerialization::SerializeLayer(
+    const Layer* layer, SerializeUtils::ComplexObjSerMap* map,
+    SerializeUtils::RenderableObjSerMap* rosMap, const std::string& typeName) {
   DEBUG_ASSERT(layer != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -79,7 +78,8 @@ void LayerSerialization::SerializeTreeNodeImpl(
 }
 
 void LayerSerialization::SerializeBasicLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
-                                                 SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap) {
+                                                 SerializeUtils::ComplexObjSerMap* map,
+                                                 SerializeUtils::RenderableObjSerMap* rosMap) {
   SerializeUtils::SetFlexBufferMap(fbb, "type", SerializeUtils::LayerTypeToString(layer->type()));
   SerializeUtils::SetFlexBufferMap(fbb, "visible", layer->visible());
   SerializeUtils::SetFlexBufferMap(fbb, "shouldRasterize", layer->shouldRasterize());

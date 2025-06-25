@@ -121,7 +121,7 @@ void DrawingManager::addResourceTask(PlacementPtr<ResourceTask> resourceTask) {
 }
 
 bool DrawingManager::flush() {
-  TaskMark(OpTaskType::Flush);
+  TaskMark(inspector::OpTaskType::Flush);
   while (!compositors.empty()) {
     auto compositor = compositors.back();
     // The makeClosed() method may add more compositors to the list.
@@ -137,7 +137,7 @@ bool DrawingManager::flush() {
   }
 
   {
-    TaskMark(OpTaskType::ResourceTask);
+    TaskMark(inspector::OpTaskType::ResourceTask);
     for (auto& task : resourceTasks) {
       task->execute(context);
     }
@@ -161,7 +161,7 @@ bool DrawingManager::flush() {
   }
   flattenTasks.clear();
   {
-    TaskMark(OpTaskType::RenderTask);
+    TaskMark(inspector::OpTaskType::RenderTask);
     for (auto& task : renderTasks) {
       task->execute(renderPass.get());
     }

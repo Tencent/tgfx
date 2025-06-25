@@ -20,7 +20,8 @@
 
 namespace tgfx {
 
-std::shared_ptr<Data> PathSerialization::Serialize(const Path* path, SerializeUtils::ComplexObjSerMap* map) {
+std::shared_ptr<Data> PathSerialization::Serialize(const Path* path,
+                                                   SerializeUtils::ComplexObjSerMap* map) {
   DEBUG_ASSERT(path != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;

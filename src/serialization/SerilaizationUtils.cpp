@@ -16,12 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <sys/socket.h>
-
-#include "PictureSerialization.h"
-#include "layers/contents/ContourContent.h"
-#include "layers/contents/DefaultContent.h"
-#include "layers/contents/ForegroundContent.h"
 #ifdef TGFX_USE_INSPECTOR
 #include "ColorFilterSerialization.h"
 #include "ColorSerialization.h"
@@ -47,6 +41,10 @@
 #include "glyphRunSerialization.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 #include "tgfx/core/Surface.h"
+#include "PictureSerialization.h"
+#include "layers/contents/ContourContent.h"
+#include "layers/contents/DefaultContent.h"
+#include "layers/contents/ForegroundContent.h"
 
 namespace tgfx {
 

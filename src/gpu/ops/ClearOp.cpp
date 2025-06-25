@@ -29,7 +29,7 @@ PlacementPtr<ClearOp> ClearOp::Make(Context* context, Color color, const Rect& s
 }
 
 void ClearOp::execute(RenderPass* renderPass) {
-  OperateMark(OpTaskType::ClearOp);
+  OperateMark(inspector::OpTaskType::ClearOp);
   renderPass->clear(scissor, color);
 }
 }  // namespace tgfx

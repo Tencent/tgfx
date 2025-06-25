@@ -388,8 +388,30 @@ void Worker::QueryTerminate() {
   sock.Send(&query, ServerQueryPacketSize);
 }
 
-bool Worker::DispatchProcess(const QueueItem& ev, const char*& test) {
-  test += QueueDataSize[ev.hdr.idx];
+bool Worker::DispatchProcess(const QueueItem& ev, const char*& ptr) {
+  if (ev.hdr.idx >= static_cast<uint8_t>(QueueType::StringData)) {
+    ptr += sizeof(QueueHeader) + sizeof(QueueStringTransfer);
+    uint16_t sz;
+    memcpy(&sz, ptr, sizeof(sz));
+    ptr += sizeof(sz);
+    switch (ev.hdr.type) {
+      case QueueType::StringData: {
+        serverQuerySpaceLeft++;
+        break;
+      }
+      case QueueType::ValueName: {
+        HandleValueName(ev.stringTransfer.ptr, ptr, sz);
+        serverQuerySpaceLeft++;
+        break;
+      }
+      default: {
+        break;
+      }
+    }
+    ptr += sz;
+    return true;
+  }
+  ptr += QueueDataSize[ev.hdr.idx];
   return Process(ev);
 }
 
@@ -401,10 +423,36 @@ bool Worker::Process(const QueueItem& ev) {
     case QueueType::OperateEnd:
       ProcessOperateEnd(ev.operateEnd);
       break;
+    case QueueType::ValueDataUint32:
+      ProcessUint32Value(ev.attributeDataUint32);
+      break;
+    case QueueType::ValueDataFloat4:
+      ProcessFloat4Value(ev.attributeDataFloat4);
+      break;
+    case QueueType::ValueDataMat4:
+      ProcessMat4Value(ev.attributeDataMat4);
+      break;
+    case QueueType::ValueDataInt:
+      ProcessIntValue(ev.attributeDataInt);
+      break;
+    case QueueType::ValueDataColor:
+      ProcessColorValue(ev.attributeDataUint32);
+      break;
+    case QueueType::ValueDataFloat:
+      ProcessFloatValue(ev.attributeDataFloat);
+      break;
+    case QueueType::ValueDataBool:
+      ProcessBoolValue(ev.attributeDataBool);
+      break;
+    case QueueType::ValueDataEnum:
+      ProcessEnumValue(ev.attributeDataEnum);
+      break;
     case QueueType::FrameMarkMsg:
       ProcessFrameMark(ev.frameMark);
       break;
     case QueueType::KeepAlive:
+      break;
+    default:
       break;
   }
   return true;
@@ -440,6 +488,77 @@ void Worker::ProcessOperateEnd(const QueueOperateEnd& ev) {
   assert(timeEnd >= opTask->start);
 }
 
+void Worker::ProcessAttributeImpl(DataHead& head, std::shared_ptr<tgfx::Data> data) {
+  auto& stack = dataContext.opTaskStack;
+  if (stack.empty()) {
+    return;
+  }
+  auto opTask = stack.back();
+  auto& nameMap = dataContext.nameMap;
+  auto propertyIter = dataContext.properties.find(opTask->id);
+  std::shared_ptr<PropertyData> propertyData;
+  if (propertyIter == dataContext.properties.end()) {
+    propertyData = std::make_shared<PropertyData>();
+  } else {
+    propertyData = propertyIter->second;
+  }
+  if (nameMap.find(head.name) == nameMap.end()) {
+    Query(ServerQueryValueName, head.name);
+  }
+  propertyData->summaryName.push_back(head);
+  auto& summaryData = propertyData->summaryData;
+  summaryData.emplace_back(data);
+  dataContext.properties[opTask->id] = propertyData;
+}
+
+void Worker::ProcessFloatValue(const QueueAttributeDataFloat& ev) {
+  auto head = DataHead{DataType::Float, ev.name};
+  auto data = tgfx::Data::MakeWithCopy(&ev.value, sizeof(float));
+  ProcessAttributeImpl(head, std::move(data));
+}
+
+void Worker::ProcessFloat4Value(const QueueAttributeDataFloat4& ev) {
+  auto head = DataHead{DataType::Vec4, ev.name};
+  auto data = tgfx::Data::MakeWithCopy(ev.value, sizeof(float) * 4);
+  ProcessAttributeImpl(head, std::move(data));
+}
+
+void Worker::ProcessIntValue(const QueueAttributeDataInt& ev) {
+  auto head = DataHead{DataType::Int, ev.name};
+  auto data = tgfx::Data::MakeWithCopy(&ev.value, sizeof(int));
+  ProcessAttributeImpl(head, std::move(data));
+}
+
+void Worker::ProcessBoolValue(const QueueAttributeDataBool& ev) {
+  auto head = DataHead{DataType::Bool, ev.name};
+  auto data = tgfx::Data::MakeWithCopy(&ev.value, sizeof(bool));
+  ProcessAttributeImpl(head, std::move(data));
+}
+
+void Worker::ProcessMat4Value(const QueueAttributeDataMat4& ev) {
+  auto head = DataHead{DataType::Mat4, ev.name};
+  auto data = tgfx::Data::MakeWithCopy(ev.value, sizeof(float) * 6);
+  ProcessAttributeImpl(head, std::move(data));
+}
+
+void Worker::ProcessEnumValue(const QueueAttributeDataEnum& ev) {
+  auto head = DataHead{DataType::Enum, ev.name};
+  auto data = tgfx::Data::MakeWithCopy(&ev.value, sizeof(uint16_t));
+  ProcessAttributeImpl(head, std::move(data));
+}
+
+void Worker::ProcessUint32Value(const QueueAttributeDataUInt32& ev) {
+  auto head = DataHead{DataType::Uint32, ev.name};
+  auto data = tgfx::Data::MakeWithCopy(&ev.value, sizeof(uint32_t));
+  ProcessAttributeImpl(head, std::move(data));
+}
+
+void Worker::ProcessColorValue(const QueueAttributeDataUInt32& ev) {
+  auto head = DataHead{DataType::Color, ev.name};
+  auto data = tgfx::Data::MakeWithCopy(&ev.value, sizeof(uint32_t));
+  ProcessAttributeImpl(head, std::move(data));
+}
+
 void Worker::ProcessFrameMark(const QueueFrameMark& ev) {
   auto& fd = dataContext.frameData;
 
@@ -447,6 +566,13 @@ void Worker::ProcessFrameMark(const QueueFrameMark& ev) {
   fd.frames.push_back(FrameEvent{time, -1, 0, 0, -1});
   if (dataContext.lastTime < time) {
     dataContext.lastTime = time;
+  }
+}
+
+void Worker::HandleValueName(uint64_t name, const char* str, size_t sz) {
+  auto& nameMap = dataContext.nameMap;
+  if (nameMap.find(name) == nameMap.end()) {
+    nameMap[name] = std::string(str, sz);
   }
 }
 

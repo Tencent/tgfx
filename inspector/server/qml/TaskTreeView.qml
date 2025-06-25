@@ -389,6 +389,14 @@ Item {
                         implicitWidth: columnLayout.columnWidth[model.column]
                         implicitHeight: szHeight
 
+                        TapHandler {
+                            acceptedButtons: Qt.LeftButton
+                            onTapped: {
+                                var selectedIndex = viewDelegate.treeView.index(row, column)
+                                taskTreeModel.selectedTask(selectedIndex)
+                            }
+                        }
+
                         contentItem: Text {
                             color: "#DDDDDD"
                             clip: true

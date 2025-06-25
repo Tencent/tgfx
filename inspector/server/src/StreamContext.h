@@ -48,8 +48,8 @@ inline size_t BitsToBytes(size_t capacity) {
   return static_cast<size_t>(ceil(capacity * 0.125));
 }
 
-#define InspectorThrowError(context, message)                                   \
-  if ((context)->throwException(message)) {                                     \
-    LOGE("ISP Decoding Failed \"%s\" at %s:%d", message, __FILE__, __LINE__);   \
+#define InspectorThrowError(context, message)                                 \
+  if ((context)->throwException(message)) {                                   \
+    LOGE("ISP Decoding Failed \"%s\" at %s:%d", message, __FILE__, __LINE__); \
   }
 }  // namespace inspector

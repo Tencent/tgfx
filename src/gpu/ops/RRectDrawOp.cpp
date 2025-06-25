@@ -55,7 +55,7 @@ RRectDrawOp::RRectDrawOp(RRectsVertexProvider* provider)
 }
 
 void RRectDrawOp::execute(RenderPass* renderPass) {
-  OperateMark(OpTaskType::RRectDrawOp);
+  OperateMark(inspector::OpTaskType::RRectDrawOp);
   if (indexBufferProxy == nullptr) {
     return;
   }

@@ -25,13 +25,16 @@ namespace tgfx {
 class ShapeStyle;
 class ShapeStyleSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(const ShapeStyle* shapeStyle, SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
+  static std::shared_ptr<Data> Serialize(const ShapeStyle* shapeStyle,
+                                         SerializeUtils::ComplexObjSerMap* map,
+                                         SerializeUtils::RenderableObjSerMap* rosMap);
 
  private:
   static void SerializeShapeStyleImpl(flexbuffers::Builder& fbb, const ShapeStyle* shapeStyle,
                                       SerializeUtils::ComplexObjSerMap* map);
   static void SerializeImagePatternImpl(flexbuffers::Builder& fbb, const ShapeStyle* shapeStyle,
-                                        SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
+                                        SerializeUtils::ComplexObjSerMap* map,
+                                        SerializeUtils::RenderableObjSerMap* rosMap);
   static void SerializeGradientImpl(flexbuffers::Builder& fbb, const ShapeStyle* shapeStyle,
                                     SerializeUtils::ComplexObjSerMap* map);
   static void SerializeLinearGradientImpl(flexbuffers::Builder& fbb, const ShapeStyle* shapeStyle,

@@ -19,7 +19,7 @@
 #include "TaskTreeModel.h"
 #include <QRegularExpression>
 #include <unordered_set>
-#include "AtttributeModel.h"
+#include "AttributeModel.h"
 #include "TimePrint.h"
 #include <iomanip>
 #include <sstream>
@@ -286,16 +286,10 @@ void TaskTreeModel::selectedTask(const QModelIndex& index) {
     return;
   }
 
-  TaskItem* item = static_cast<TaskItem*>(index.internalPointer());
+  auto item = static_cast<TaskItem*>(index.internalPointer());
   if (item) {
-  }
-}
-
-void TaskTreeModel::setAttributeModel(AtttributeModel* model) {
-  if (model && model != atttributeModel) {
-    atttributeModel = model;
-    connect(this, &TaskTreeModel::taskSelected, atttributeModel,
-            &AtttributeModel::updateSelectedTask);
+    viewData->selectOpTask = static_cast<int>(item->opId);
+    Q_EMIT selectTaskOp();
   }
 }
 }  // namespace inspector

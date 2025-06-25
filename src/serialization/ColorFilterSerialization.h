@@ -25,7 +25,8 @@ namespace tgfx {
 
 class ColorFilterSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(const ColorFilter* colorFilter, SerializeUtils::ComplexObjSerMap* map);
+  static std::shared_ptr<Data> Serialize(const ColorFilter* colorFilter,
+                                         SerializeUtils::ComplexObjSerMap* map);
 
  private:
   static void SerializeColorFilterImpl(flexbuffers::Builder& fbb, const ColorFilter* colorFilter);

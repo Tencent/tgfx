@@ -21,7 +21,9 @@
 
 namespace tgfx {
 
-std::shared_ptr<Data> TextBlobSerialization::Serialize(const TextBlob* textBlob, SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap) {
+std::shared_ptr<Data> TextBlobSerialization::Serialize(
+    const TextBlob* textBlob, SerializeUtils::ComplexObjSerMap* map,
+    SerializeUtils::RenderableObjSerMap* rosMap) {
   DEBUG_ASSERT(textBlob != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -33,19 +35,21 @@ std::shared_ptr<Data> TextBlobSerialization::Serialize(const TextBlob* textBlob,
 }
 
 void TextBlobSerialization::SerializeTextBlobImpl(flexbuffers::Builder& fbb,
-                                                  const TextBlob* textBlob, SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap) {
-    auto boundsID = SerializeUtils::GetObjID();
-    auto bounds = textBlob->getBounds();
-    SerializeUtils::SetFlexBufferMap(fbb, "bounds", "", false, true, boundsID);
-    SerializeUtils::FillComplexObjSerMap(bounds, boundsID, map);
+                                                  const TextBlob* textBlob,
+                                                  SerializeUtils::ComplexObjSerMap* map,
+                                                  SerializeUtils::RenderableObjSerMap* rosMap) {
+  auto boundsID = SerializeUtils::GetObjID();
+  auto bounds = textBlob->getBounds();
+  SerializeUtils::SetFlexBufferMap(fbb, "bounds", "", false, true, boundsID);
+  SerializeUtils::FillComplexObjSerMap(bounds, boundsID, map);
 
-    Path path;
-    if(textBlob->getPath(&path)) {
-        auto pathID = SerializeUtils::GetObjID();
-        SerializeUtils::SetFlexBufferMap(fbb, "path", "", false, true, pathID, true);
-        SerializeUtils::FillComplexObjSerMap(path, pathID, map);
-        SerializeUtils::FillRenderableObjSerMap(path, pathID, rosMap);
-    }
+  Path path;
+  if (textBlob->getPath(&path)) {
+    auto pathID = SerializeUtils::GetObjID();
+    SerializeUtils::SetFlexBufferMap(fbb, "path", "", false, true, pathID, true);
+    SerializeUtils::FillComplexObjSerMap(path, pathID, map);
+    SerializeUtils::FillRenderableObjSerMap(path, pathID, rosMap);
+  }
 }
 
 }  // namespace tgfx

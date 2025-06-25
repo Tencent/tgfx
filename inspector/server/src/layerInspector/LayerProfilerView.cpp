@@ -16,7 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "LayerProfilerView.h"
-#include "StartView.h"
+#include <kddockwidgets/Config.h>
+#include <kddockwidgets/core/DockWidget.h>
 #include <kddockwidgets/qtquick/Platform.h>
 #include <kddockwidgets/qtquick/ViewFactory.h>
 #include <kddockwidgets/core/DockWidget.h>
@@ -28,9 +29,10 @@
 #include <QLabel>
 #include <QQmlContext>
 #include <QQuickWindow>
+#include "StartView.h"
 
 class LayerProfilerViewFactory : public KDDockWidgets::QtQuick::ViewFactory {
-public:
+ public:
   ~LayerProfilerViewFactory() override = default;
 
   QUrl tabbarFilename() const override {
@@ -84,9 +86,8 @@ LayerProfilerView::LayerProfilerView(QString ip, quint16 port)
     m_TcpSocketClient->sendData(data);
   });
 
-  connect(m_LayerAttributeModel, &LayerAttributeModel::flushImageChild, [this](uint64_t imageID) {
-    processImageFlush(imageID);
-  });
+  connect(m_LayerAttributeModel, &LayerAttributeModel::flushImageChild,
+          [this](uint64_t imageID) { processImageFlush(imageID); });
 }
 
 LayerProfilerView::LayerProfilerView()
@@ -121,9 +122,8 @@ LayerProfilerView::LayerProfilerView()
     m_WebSocketServer->SendData(data);
   });
 
-  connect(m_LayerAttributeModel, &LayerAttributeModel::flushImageChild, [this](uint64_t imageID) {
-    processImageFlush(imageID);
-  });
+  connect(m_LayerAttributeModel, &LayerAttributeModel::flushImageChild,
+          [this](uint64_t imageID) { processImageFlush(imageID); });
 }
 
 LayerProfilerView::~LayerProfilerView() {
@@ -164,10 +164,10 @@ void LayerProfilerView::openStartView() {
 }
 
 void LayerProfilerView::cleanView() {
-    if (m_LayerTreeEngine) {
-      m_LayerTreeEngine->deleteLater();
-      m_LayerTreeEngine = nullptr;
-    }
+  if (m_LayerTreeEngine) {
+    m_LayerTreeEngine->deleteLater();
+    m_LayerTreeEngine = nullptr;
+  }
 }
 
 void LayerProfilerView::LayerProlfilerQMLImpl() {
@@ -253,7 +253,7 @@ void LayerProfilerView::ProcessMessage(const QByteArray& message) {
   } else if (type == "FlushAttributeAck") {
     auto address = contentMap["Address"].AsUInt64();
     processSelectedLayer(address);
-  }else if(type == "ImageData") {
+  } else if (type == "ImageData") {
     int width = contentMap["width"].AsInt32();
     int height = contentMap["height"].AsInt32();
     auto blob = contentMap["data"].AsBlob();
@@ -299,7 +299,7 @@ void LayerProfilerView::processSelectedLayer(uint64_t address) {
 }
 
 void LayerProfilerView::processImageFlush(uint64_t imageID) {
-  if(!imageProvider->isImageExisted(imageID)) {
+  if (!imageProvider->isImageExisted(imageID)) {
     imageProvider->setCurrentImageID(imageID);
     auto data = feedBackData("FlushImage", imageID);
     if (m_WebSocketServer) m_WebSocketServer->SendData(data);

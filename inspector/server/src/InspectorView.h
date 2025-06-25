@@ -65,5 +65,6 @@ class InspectorView : public QObject {
   std::unique_ptr<TaskTreeModel> taskTreeModel;
   std::unique_ptr<SelectFrameModel> selectFrameModel;
   std::unique_ptr<TaskFilterModel> taskFilterModel;
+  std::unique_ptr<AttributeModel> attributeModel;
 };
 }  // namespace inspector

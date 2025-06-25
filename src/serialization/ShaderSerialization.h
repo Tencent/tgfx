@@ -24,7 +24,9 @@
 namespace tgfx {
 class ShaderSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(const Shader* shader, SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
+  static std::shared_ptr<Data> Serialize(const Shader* shader,
+                                         SerializeUtils::ComplexObjSerMap* map,
+                                         SerializeUtils::RenderableObjSerMap* rosMap);
 
  private:
   static void SerializeBasicShaderImpl(flexbuffers::Builder& fbb, const Shader* shader);
@@ -33,16 +35,20 @@ class ShaderSerialization {
                                        SerializeUtils::ComplexObjSerMap* map);
 
   static void SerializeColorFilterShaderImpl(flexbuffers::Builder& fbb, const Shader* shader,
-                                             SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
+                                             SerializeUtils::ComplexObjSerMap* map,
+                                             SerializeUtils::RenderableObjSerMap* rosMap);
 
   static void SerializeImageShaderImpl(flexbuffers::Builder& fbb, const Shader* shader,
-                                       SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
+                                       SerializeUtils::ComplexObjSerMap* map,
+                                       SerializeUtils::RenderableObjSerMap* rosMap);
 
   static void SerializeBlendShaderImpl(flexbuffers::Builder& fbb, const Shader* shader,
-                                       SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
+                                       SerializeUtils::ComplexObjSerMap* map,
+                                       SerializeUtils::RenderableObjSerMap* rosMap);
 
   static void SerializeMatrixShaderImpl(flexbuffers::Builder& fbb, const Shader* shader,
-                                        SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
+                                        SerializeUtils::ComplexObjSerMap* map,
+                                        SerializeUtils::RenderableObjSerMap* rosMap);
 
   static void SerializeGradientShaderImpl(flexbuffers::Builder& fbb, const Shader* shader,
                                           SerializeUtils::ComplexObjSerMap* map);
