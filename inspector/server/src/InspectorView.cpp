@@ -85,6 +85,7 @@ void InspectorView::initView() {
   ispEngine->rootContext()->setContextProperty("taskTreeModel", taskTreeModel.get());
   ispEngine->rootContext()->setContextProperty("taskFilterModel", taskFilterModel.get());
   ispEngine->rootContext()->setContextProperty("selectFrameModel", selectFrameModel.get());
+  ispEngine->rootContext()->setContextProperty("attributeModel", attributeModel.get());
   KDDockWidgets::QtQuick::Platform::instance()->setQmlEngine(ispEngine.get());
   ispEngine->load(QUrl("qrc:/qml/InspectorView.qml"));
   if (ispEngine->rootObjects().isEmpty()) {
