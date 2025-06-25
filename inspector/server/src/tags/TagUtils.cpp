@@ -36,7 +36,7 @@ void ReadDataHead(std::vector<DataHead>& dataHead, DecodeStream* stream) {
   dataHead.reserve(dataHeadCount);
   for (uint32_t j = 0; j < dataHeadCount; ++j) {
     dataHead[j].type = static_cast<DataType>(stream->readUint8());
-    dataHead[j].size = stream->readUint16();
+    dataHead[j].name = stream->readEncodedUint64();
   }
 }
 
@@ -44,7 +44,7 @@ void WriteDataHead(const std::vector<DataHead>& dataHead, EncodeStream* stream) 
   stream->writeEncodedUint32(static_cast<uint32_t>(dataHead.size()));
   for (const auto& data : dataHead) {
     stream->writeUint8(data.type);
-    stream->writeUint16(data.size);
+    stream->writeEncodedUint64(data.name);
   }
 }
 }  // namespace inspector

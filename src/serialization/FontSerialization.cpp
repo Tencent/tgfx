@@ -21,7 +21,8 @@
 
 namespace tgfx {
 
-std::shared_ptr<Data> FontSerialization::Serialize(const Font* font, SerializeUtils::ComplexObjSerMap* map) {
+std::shared_ptr<Data> FontSerialization::Serialize(const Font* font,
+                                                   SerializeUtils::ComplexObjSerMap* map) {
   DEBUG_ASSERT(font != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;

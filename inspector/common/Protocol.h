@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+namespace inspector {
 
 constexpr unsigned Lz4CompressBound(unsigned isize) {
   return isize + (isize / 255) + 16;
@@ -49,10 +50,17 @@ struct BroadcastMessage {
   char programName[WelcomeMessageProgramNameSize];
 };
 
+struct WelcomeMessage {
+  int64_t initBegin;
+  int64_t initEnd;
+  int64_t refTime;
+};
+
 enum ServerQuery : uint8_t {
   ServerQueryTerminate,
   ServerQueryString,
   ServerQueryFrameName,
+  ServerQueryValueName,
   ServerQueryDisconnect,
 };
 
@@ -88,8 +96,8 @@ enum OpTaskType : uint8_t {
   OpTaskTypeSize,
 };
 
-struct WelcomeMessage {
-  int64_t initBegin;
-  int64_t initEnd;
-  int64_t refTime;
+enum TGFXEnum {
+  BufferType,
+  BlendMode,
 };
+}  // namespace inspector

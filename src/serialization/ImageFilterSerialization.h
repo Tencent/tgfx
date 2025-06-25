@@ -24,7 +24,8 @@
 namespace tgfx {
 class ImageFilterSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(const ImageFilter* imageFilter, SerializeUtils::ComplexObjSerMap* map);
+  static std::shared_ptr<Data> Serialize(const ImageFilter* imageFilter,
+                                         SerializeUtils::ComplexObjSerMap* map);
 
  private:
   static void serializeImageFilterImpl(flexbuffers::Builder& fbb, const ImageFilter* imageFilter);

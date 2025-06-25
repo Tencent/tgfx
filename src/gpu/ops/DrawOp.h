@@ -32,6 +32,10 @@ class DrawOp : public Op {
     return _scissorRect;
   }
 
+  const BlendMode& getBlendMode() const {
+    return blendMode;
+  }
+
   void setScissorRect(Rect scissorRect) {
     _scissorRect = scissorRect;
   }

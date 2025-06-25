@@ -24,10 +24,12 @@
 namespace tgfx {
 class ShapeSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(const Shape* shape, SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
+  static std::shared_ptr<Data> Serialize(const Shape* shape, SerializeUtils::ComplexObjSerMap* map,
+                                         SerializeUtils::RenderableObjSerMap* rosMap);
 
  private:
   static void SerializeShapeImpl(flexbuffers::Builder& fbb, const Shape* shape,
-                                 SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
+                                 SerializeUtils::ComplexObjSerMap* map,
+                                 SerializeUtils::RenderableObjSerMap* rosMap);
 };
 }  // namespace tgfx

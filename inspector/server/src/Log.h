@@ -32,9 +32,9 @@ namespace inspector {
 #define LOGI(...) ::tgfx::PrintLog(__VA_ARGS__)
 #define LOGE(...) ::tgfx::PrintError(__VA_ARGS__)
 #define ASSERT(assertion) \
-if (!(assertion)) {     \
-ABORT(#assertion);    \
-}
+  if (!(assertion)) {     \
+    ABORT(#assertion);    \
+  }
 
 #else
 

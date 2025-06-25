@@ -137,10 +137,13 @@ bool Inspector::HandleServerQuery() {
 
   switch (type) {
     case ServerQueryString: {
-      break;
+      SendString(ptr, (const char*)ptr, QueueType::StringData);
     }
     case ServerQueryFrameName: {
       break;
+    }
+    case ServerQueryValueName: {
+      SendString(ptr, (const char*)ptr, QueueType::ValueName);
     }
     case ServerQueryDisconnect: {
       break;
@@ -156,6 +159,22 @@ bool Inspector::HandleServerQuery() {
 
 bool Inspector::ShouldExit() {
   return s_instance->shutdown.load(std::memory_order_relaxed);
+}
+
+void Inspector::SendString(uint64_t str, const char* ptr, size_t len, QueueType type) {
+  assert(type == QueueType::StringData || type == QueueType::ValueName);
+
+  QueueItem item;
+  MemWrite(&item.hdr.type, type);
+  MemWrite(&item.stringTransfer.ptr, str);
+
+  assert(len <= std::numeric_limits<uint16_t>::max());
+  auto l16 = uint16_t(len);
+  NeetDataSize(QueueDataSize[static_cast<int>(type)] + sizeof(l16) + l16);
+
+  AppendDataUnsafe(&item, QueueDataSize[static_cast<int>(type)]);
+  AppendDataUnsafe(&l16, sizeof(l16));
+  AppendDataUnsafe(ptr, l16);
 }
 
 void Inspector::Worker() {

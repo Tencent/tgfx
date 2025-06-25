@@ -21,7 +21,8 @@
 
 namespace tgfx {
 
-std::shared_ptr<Data> RRectSerialization::Serialize(const RRect* rrect, SerializeUtils::ComplexObjSerMap* map) {
+std::shared_ptr<Data> RRectSerialization::Serialize(const RRect* rrect,
+                                                    SerializeUtils::ComplexObjSerMap* map) {
   DEBUG_ASSERT(rrect != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;

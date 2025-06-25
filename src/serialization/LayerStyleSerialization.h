@@ -25,7 +25,8 @@ namespace tgfx {
 class LayerStyle;
 class LayerStyleSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(const LayerStyle* layerStyle, SerializeUtils::ComplexObjSerMap* map);
+  static std::shared_ptr<Data> Serialize(const LayerStyle* layerStyle,
+                                         SerializeUtils::ComplexObjSerMap* map);
 
  private:
   static void SerializeBasicLayerStyleImpl(flexbuffers::Builder& fbb, const LayerStyle* layerStyle);

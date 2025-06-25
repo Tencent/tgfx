@@ -61,7 +61,12 @@ RectDrawOp::RectDrawOp(RectsVertexProvider* provider)
 }
 
 void RectDrawOp::execute(RenderPass* renderPass) {
-  OperateMark(OpTaskType::RectDrawOp);
+  OperateMark(inspector::OpTaskType::RectDrawOp);
+  AttributeName("rectCount", static_cast<int>(rectCount));
+  AttributeTGFXName("commonColor", commonColor);
+  AttributeTGFXName("uvMatrix", uvMatrix);
+  AttributeTGFXName("scissorRect", scissorRect());
+  AttributeNameEnum("blenderMode", getBlendMode(), inspector::TGFXEnum::BlendMode);
   std::shared_ptr<GpuBuffer> indexBuffer;
   if (indexBufferProxy) {
     indexBuffer = indexBufferProxy->getBuffer();

@@ -16,19 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "LayerProfilerView.h"
-#include "StartView.h"
+#include <kddockwidgets/Config.h>
+#include <kddockwidgets/core/DockWidget.h>
 #include <kddockwidgets/qtquick/Platform.h>
 #include <kddockwidgets/qtquick/ViewFactory.h>
-#include <kddockwidgets/core/DockWidget.h>
-#include <kddockwidgets/Config.h>
 #include <kddockwidgets/qtquick/views/Group.h>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QQmlContext>
 #include <QQuickWindow>
+#include "StartView.h"
 
 class LayerProfilerViewFactory : public KDDockWidgets::QtQuick::ViewFactory {
-public:
+ public:
   ~LayerProfilerViewFactory() override = default;
 
   QUrl tabbarFilename() const override {
@@ -82,9 +82,8 @@ LayerProfilerView::LayerProfilerView(QString ip, quint16 port)
     m_TcpSocketClient->sendData(data);
   });
 
-  connect(m_LayerAttributeModel, &LayerAttributeModel::flushImageChild, [this](uint64_t imageID) {
-    processImageFlush(imageID);
-  });
+  connect(m_LayerAttributeModel, &LayerAttributeModel::flushImageChild,
+          [this](uint64_t imageID) { processImageFlush(imageID); });
 }
 
 LayerProfilerView::LayerProfilerView()
@@ -119,9 +118,8 @@ LayerProfilerView::LayerProfilerView()
     m_WebSocketServer->SendData(data);
   });
 
-  connect(m_LayerAttributeModel, &LayerAttributeModel::flushImageChild, [this](uint64_t imageID) {
-    processImageFlush(imageID);
-  });
+  connect(m_LayerAttributeModel, &LayerAttributeModel::flushImageChild,
+          [this](uint64_t imageID) { processImageFlush(imageID); });
 }
 
 LayerProfilerView::~LayerProfilerView() {
@@ -149,41 +147,38 @@ void LayerProfilerView::openStartView() {
 }
 
 void LayerProfilerView::cleanView() {
-    if (m_LayerTreeEngine) {
-      m_LayerTreeEngine->deleteLater();
-      m_LayerTreeEngine = nullptr;
-    }
+  if (m_LayerTreeEngine) {
+    m_LayerTreeEngine->deleteLater();
+    m_LayerTreeEngine = nullptr;
+  }
 }
 
 void LayerProfilerView::LayerProlfilerQMLImpl() {
-  qmlRegisterUncreatableType<KDDockWidgets::QtQuick::Group>("com.kdab.dockwidgets", 2, 0,
-                                           "GroupView", QStringLiteral("Internal usage only"));
+  qmlRegisterUncreatableType<KDDockWidgets::QtQuick::Group>(
+      "com.kdab.dockwidgets", 2, 0, "GroupView", QStringLiteral("Internal usage only"));
   KDDockWidgets::Config::self().setViewFactory(new LayerProfilerViewFactory);
-  auto func = [](KDDockWidgets::DropLocation loc,
-                const KDDockWidgets::Core::DockWidget::List &source,
-                const KDDockWidgets::Core::DockWidget::List &target,
-                KDDockWidgets::Core::DropArea *) {
-    KDDW_UNUSED(target);
-    bool isDraggingRenderTree =
-      std::find_if(source.cbegin(), source.cend(),
-      [](KDDockWidgets::Core::DockWidget *dw) {
-            return dw->uniqueName() == QLatin1String("RenderTree");
-          })
-      != source.cend();
-    bool isDraggingAttribute = std::find_if(source.cbegin(), source.cend(),
-      [](KDDockWidgets::Core::DockWidget *dw) {
-            return dw->uniqueName() == QLatin1String("Attribute");
-          })
-      != source.cend();
-    return (loc & (KDDockWidgets::DropLocation_Inner | KDDockWidgets::DropLocation_Outter)) || !(isDraggingRenderTree||isDraggingAttribute);
-  };
+  auto func =
+      [](KDDockWidgets::DropLocation loc, const KDDockWidgets::Core::DockWidget::List& source,
+         const KDDockWidgets::Core::DockWidget::List& target, KDDockWidgets::Core::DropArea*) {
+        KDDW_UNUSED(target);
+        bool isDraggingRenderTree =
+            std::find_if(source.cbegin(), source.cend(), [](KDDockWidgets::Core::DockWidget* dw) {
+              return dw->uniqueName() == QLatin1String("RenderTree");
+            }) != source.cend();
+        bool isDraggingAttribute =
+            std::find_if(source.cbegin(), source.cend(), [](KDDockWidgets::Core::DockWidget* dw) {
+              return dw->uniqueName() == QLatin1String("Attribute");
+            }) != source.cend();
+        return (loc & (KDDockWidgets::DropLocation_Inner | KDDockWidgets::DropLocation_Outter)) ||
+               !(isDraggingRenderTree || isDraggingAttribute);
+      };
   KDDockWidgets::Config::self().setDropIndicatorAllowedFunc(func);
   m_LayerTreeEngine = new QQmlApplicationEngine();
   imageProvider = new MemoryImageProvider();
   m_LayerTreeEngine->addImageProvider(QLatin1String("RenderableImage"), imageProvider);
 
   m_LayerTreeEngine->rootContext()->setContextProperty("_layerAttributeModel",
-                                                            m_LayerAttributeModel);
+                                                       m_LayerAttributeModel);
   m_LayerTreeEngine->rootContext()->setContextProperty("_layerTreeModel", m_LayerTreeModel);
   m_LayerTreeEngine->rootContext()->setContextProperty("_layerProfileView", this);
   m_LayerTreeEngine->rootContext()->setContextProperty("imageProvider", imageProvider);
@@ -223,7 +218,7 @@ void LayerProfilerView::ProcessMessage(const QByteArray& message) {
   } else if (type == "FlushAttributeAck") {
     auto address = contentMap["Address"].AsUInt64();
     processSelectedLayer(address);
-  }else if(type == "ImageData") {
+  } else if (type == "ImageData") {
     int width = contentMap["width"].AsInt32();
     int height = contentMap["height"].AsInt32();
     auto blob = contentMap["data"].AsBlob();
@@ -269,7 +264,7 @@ void LayerProfilerView::processSelectedLayer(uint64_t address) {
 }
 
 void LayerProfilerView::processImageFlush(uint64_t imageID) {
-  if(!imageProvider->isImageExisted(imageID)) {
+  if (!imageProvider->isImageExisted(imageID)) {
     imageProvider->setCurrentImageID(imageID);
     auto data = feedBackData("FlushImage", imageID);
     if (m_WebSocketServer) m_WebSocketServer->SendData(data);

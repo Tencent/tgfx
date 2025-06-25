@@ -48,8 +48,11 @@ class LayerInspector {
 
  private:
   std::unordered_map<uint64_t, std::shared_ptr<tgfx::Layer>> m_LayerMap;
-  std::unordered_map<uint64_t, std::unordered_map<uint64_t, std::function<std::shared_ptr<Data>()>>> m_LayerComplexObjMap;
-  std::unordered_map<uint64_t, std::unordered_map<uint64_t, std::function<std::shared_ptr<Data>(Context*)>>> m_LayerRenderableObjMap;
+  std::unordered_map<uint64_t, std::unordered_map<uint64_t, std::function<std::shared_ptr<Data>()>>>
+      m_LayerComplexObjMap;
+  std::unordered_map<uint64_t,
+                     std::unordered_map<uint64_t, std::function<std::shared_ptr<Data>(Context*)>>>
+      m_LayerRenderableObjMap;
   uint64_t m_HoveredAddress;
   uint64_t m_SelectedAddress;
   uint64_t m_ExpandID;

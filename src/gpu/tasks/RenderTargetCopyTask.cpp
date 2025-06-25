@@ -26,7 +26,7 @@ RenderTargetCopyTask::RenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> so
 }
 
 bool RenderTargetCopyTask::execute(RenderPass* renderPass) {
-  TaskMark(OpTaskType::RenderTargetCopyTask);
+  TaskMark(inspector::OpTaskType::RenderTargetCopyTask);
   auto renderTarget = renderTargetProxy->getRenderTarget();
   if (renderTarget == nullptr) {
     LOGE("RenderTargetCopyTask::execute() Failed to get the source render target!");

@@ -36,17 +36,17 @@
 #include "ShaderSerialization.h"
 #include "ShapeSerialization.h"
 #include "ShapeStyleSerialization.h"
-#include "TypeFaceSerialization.h"
 #include "TextBlobSerialization.h"
+#include "TypeFaceSerialization.h"
 #include "core/images/FilterImage.h"
 #include "glyphRunSerialization.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
 #include "tgfx/core/Surface.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace tgfx {
 
 constexpr int padding = 20;
-  static int insertionCounter = 0;
+static int insertionCounter = 0;
 std::string SerializeUtils::LayerTypeToString(LayerType type) {
   static std::unordered_map<LayerType, const char*> m = {
       {LayerType::Layer, "Layer"},      {LayerType::Image, "ImageLayer"},
@@ -270,16 +270,18 @@ uint64_t SerializeUtils::GetObjID() {
   return objID++;
 }
 
-void SerializeUtils::FillComplexObjSerMap(const Matrix& matrix, uint64_t objID, ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(const Matrix& matrix, uint64_t objID,
+                                          ComplexObjSerMap* map) {
   (*map)[objID] = [matrix]() { return MatrixSerialization::Serialize(&matrix); };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const Point& point, uint64_t objID, ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(const Point& point, uint64_t objID,
+                                          ComplexObjSerMap* map) {
   (*map)[objID] = [point]() { return PointSerialization::Serialize(&point); };
 }
 
 void SerializeUtils::FillComplexObjSerMap(const std::vector<std::shared_ptr<LayerFilter>>& filters,
-                             uint64_t objID, ComplexObjSerMap* map) {
+                                          uint64_t objID, ComplexObjSerMap* map) {
   (*map)[objID] = [filters, map]() {
     flexbuffers::Builder fbb;
     size_t startMap;
@@ -300,8 +302,8 @@ void SerializeUtils::FillComplexObjSerMap(const std::vector<std::shared_ptr<Laye
   };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<LayerFilter>& layerFilter, uint64_t objID,
-                             ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<LayerFilter>& layerFilter,
+                                          uint64_t objID, ComplexObjSerMap* map) {
   if (layerFilter == nullptr) {
     return;
   }
@@ -310,19 +312,23 @@ void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<LayerFilter>& la
   };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<Layer>& layer, uint64_t objID, ComplexObjSerMap* map, RenderableObjSerMap* renderMap) {
+void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<Layer>& layer, uint64_t objID,
+                                          ComplexObjSerMap* map, RenderableObjSerMap* renderMap) {
   if (layer == nullptr) {
     return;
   }
-  (*map)[objID] = [layer, map, renderMap]() { return LayerSerialization::SerializeLayer(layer.get(), map, renderMap); };
+  (*map)[objID] = [layer, map, renderMap]() {
+    return LayerSerialization::SerializeLayer(layer.get(), map, renderMap);
+  };
 }
 
 void SerializeUtils::FillComplexObjSerMap(const Rect& rect, uint64_t objID, ComplexObjSerMap* map) {
   (*map)[objID] = [rect]() { return RectSerialization::Serialize(&rect); };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const std::vector<std::shared_ptr<Layer>>& children, uint64_t objID,
-                             ComplexObjSerMap* map, RenderableObjSerMap* renderMap) {
+void SerializeUtils::FillComplexObjSerMap(const std::vector<std::shared_ptr<Layer>>& children,
+                                          uint64_t objID, ComplexObjSerMap* map,
+                                          RenderableObjSerMap* renderMap) {
   (*map)[objID] = [children, map, renderMap]() {
     flexbuffers::Builder fbb;
     size_t startMap;
@@ -343,8 +349,9 @@ void SerializeUtils::FillComplexObjSerMap(const std::vector<std::shared_ptr<Laye
   };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const std::vector<std::shared_ptr<LayerStyle>>& layerStyles,
-                             uint64_t objID, ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(
+    const std::vector<std::shared_ptr<LayerStyle>>& layerStyles, uint64_t objID,
+    ComplexObjSerMap* map) {
   (*map)[objID] = [layerStyles, map]() {
     flexbuffers::Builder fbb;
     size_t startMap;
@@ -365,8 +372,8 @@ void SerializeUtils::FillComplexObjSerMap(const std::vector<std::shared_ptr<Laye
   };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<LayerStyle>& layerStyle, uint64_t objID,
-                             ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<LayerStyle>& layerStyle,
+                                          uint64_t objID, ComplexObjSerMap* map) {
   if (layerStyle == nullptr) {
     return;
   }
@@ -375,26 +382,32 @@ void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<LayerStyle>& lay
   };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const SamplingOptions& sampling, uint64_t objID, ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(const SamplingOptions& sampling, uint64_t objID,
+                                          ComplexObjSerMap* map) {
   (*map)[objID] = [sampling]() { return SamplingOptionsSerialization::Serialize(&sampling); };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<Image>& image, uint64_t objID, ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<Image>& image, uint64_t objID,
+                                          ComplexObjSerMap* map) {
   if (image == nullptr) {
     return;
   }
   (*map)[objID] = [image]() { return ImageSerialization::Serialize(image.get()); };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<Shape>& shape, uint64_t objID, ComplexObjSerMap* map, RenderableObjSerMap* rosMap) {
+void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<Shape>& shape, uint64_t objID,
+                                          ComplexObjSerMap* map, RenderableObjSerMap* rosMap) {
   if (shape == nullptr) {
     return;
   }
-  (*map)[objID] = [shape, map, rosMap]() { return ShapeSerialization::Serialize(shape.get(), map, rosMap); };
+  (*map)[objID] = [shape, map, rosMap]() {
+    return ShapeSerialization::Serialize(shape.get(), map, rosMap);
+  };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const std::vector<std::shared_ptr<ShapeStyle>>& shapeStyles,
-                             uint64_t objID, ComplexObjSerMap* map, RenderableObjSerMap* rosMap) {
+void SerializeUtils::FillComplexObjSerMap(
+    const std::vector<std::shared_ptr<ShapeStyle>>& shapeStyles, uint64_t objID,
+    ComplexObjSerMap* map, RenderableObjSerMap* rosMap) {
   (*map)[objID] = [shapeStyles, map, rosMap]() {
     flexbuffers::Builder fbb;
     size_t startMap;
@@ -415,8 +428,9 @@ void SerializeUtils::FillComplexObjSerMap(const std::vector<std::shared_ptr<Shap
   };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<ShapeStyle>& shapeStyle, uint64_t objID,
-                             ComplexObjSerMap* map, RenderableObjSerMap* rosMap) {
+void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<ShapeStyle>& shapeStyle,
+                                          uint64_t objID, ComplexObjSerMap* map,
+                                          RenderableObjSerMap* rosMap) {
   if (shapeStyle == nullptr) {
     return;
   }
@@ -425,8 +439,8 @@ void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<ShapeStyle>& sha
   };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<ColorFilter>& colorFilter, uint64_t objID,
-                             ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<ColorFilter>& colorFilter,
+                                          uint64_t objID, ComplexObjSerMap* map) {
   if (colorFilter == nullptr) {
     return;
   }
@@ -435,15 +449,16 @@ void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<ColorFilter>& co
   };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<Typeface>& typeFace, uint64_t objID, ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<Typeface>& typeFace, uint64_t objID,
+                                          ComplexObjSerMap* map) {
   if (typeFace == nullptr) {
     return;
   }
   (*map)[objID] = [typeFace]() { return TypeFaceSerialization::Serialize(typeFace.get()); };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<ImageFilter>& imageFilter, uint64_t objID,
-                             ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<ImageFilter>& imageFilter,
+                                          uint64_t objID, ComplexObjSerMap* map) {
   if (imageFilter == nullptr) {
     return;
   }
@@ -452,8 +467,8 @@ void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<ImageFilter>& im
   };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<RuntimeEffect>& runtimeEffect, uint64_t objID,
-                             ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<RuntimeEffect>& runtimeEffect,
+                                          uint64_t objID, ComplexObjSerMap* map) {
   if (runtimeEffect == nullptr) {
     return;
   }
@@ -462,16 +477,19 @@ void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<RuntimeEffect>& 
   };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<Shader>& shader, uint64_t objID, ComplexObjSerMap* map, RenderableObjSerMap* rosMap) {
+void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<Shader>& shader, uint64_t objID,
+                                          ComplexObjSerMap* map, RenderableObjSerMap* rosMap) {
   if (shader == nullptr) {
     return;
   }
-  (*map)[objID] = [shader, map, rosMap]() { return ShaderSerialization::Serialize(shader.get(), map, rosMap); };
+  (*map)[objID] = [shader, map, rosMap]() {
+    return ShaderSerialization::Serialize(shader.get(), map, rosMap);
+  };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<TextBlob> &textBlob, uint64_t objID,
-  ComplexObjSerMap *map, RenderableObjSerMap* rosMap) {
-  if(textBlob == nullptr) {
+void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<TextBlob>& textBlob, uint64_t objID,
+                                          ComplexObjSerMap* map, RenderableObjSerMap* rosMap) {
+  if (textBlob == nullptr) {
     return;
   }
   (*map)[objID] = [textBlob, map, rosMap]() {
@@ -479,7 +497,8 @@ void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<TextBlob> &textB
   };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const std::vector<float>& floatVec, uint64_t objID, ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(const std::vector<float>& floatVec, uint64_t objID,
+                                          ComplexObjSerMap* map) {
   (*map)[objID] = [floatVec]() {
     flexbuffers::Builder fbb;
     size_t startMap;
@@ -496,7 +515,8 @@ void SerializeUtils::FillComplexObjSerMap(const std::vector<float>& floatVec, ui
   };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const std::array<float, 20>& matrix, uint64_t objID, ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(const std::array<float, 20>& matrix, uint64_t objID,
+                                          ComplexObjSerMap* map) {
   (*map)[objID] = [matrix]() {
     flexbuffers::Builder fbb;
     size_t startMap;
@@ -513,7 +533,8 @@ void SerializeUtils::FillComplexObjSerMap(const std::array<float, 20>& matrix, u
   };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const std::vector<GlyphRun>& glyphRuns, uint64_t objID, ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(const std::vector<GlyphRun>& glyphRuns, uint64_t objID,
+                                          ComplexObjSerMap* map) {
   (*map)[objID] = [glyphRuns, map]() {
     flexbuffers::Builder fbb;
     size_t startMap;
@@ -532,7 +553,8 @@ void SerializeUtils::FillComplexObjSerMap(const std::vector<GlyphRun>& glyphRuns
   };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const std::vector<GlyphID>& glyphs, uint64_t objID, ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(const std::vector<GlyphID>& glyphs, uint64_t objID,
+                                          ComplexObjSerMap* map) {
   (*map)[objID] = [glyphs]() {
     flexbuffers::Builder fbb;
     size_t startMap;
@@ -549,7 +571,8 @@ void SerializeUtils::FillComplexObjSerMap(const std::vector<GlyphID>& glyphs, ui
   };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const std::vector<Point>& points, uint64_t objID, ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(const std::vector<Point>& points, uint64_t objID,
+                                          ComplexObjSerMap* map) {
   (*map)[objID] = [points, map]() {
     flexbuffers::Builder fbb;
     size_t startMap;
@@ -568,8 +591,9 @@ void SerializeUtils::FillComplexObjSerMap(const std::vector<Point>& points, uint
   };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const std::vector<std::shared_ptr<ImageFilter>>& imageFilters,
-                             uint64_t objID, ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(
+    const std::vector<std::shared_ptr<ImageFilter>>& imageFilters, uint64_t objID,
+    ComplexObjSerMap* map) {
   (*map)[objID] = [imageFilters, map]() {
     flexbuffers::Builder fbb;
     size_t startMap;
@@ -590,7 +614,8 @@ void SerializeUtils::FillComplexObjSerMap(const std::vector<std::shared_ptr<Imag
   };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const std::vector<Color>& colors, uint64_t objID, ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(const std::vector<Color>& colors, uint64_t objID,
+                                          ComplexObjSerMap* map) {
   (*map)[objID] = [colors, map]() {
     flexbuffers::Builder fbb;
     size_t startMap;
@@ -610,7 +635,7 @@ void SerializeUtils::FillComplexObjSerMap(const std::vector<Color>& colors, uint
 }
 
 bool SerializeUtils::CreateGLTexture(Context* context, int width, int height,
-    GLTextureInfo* texture) {
+                                     GLTextureInfo* texture) {
   texture->target = GL_TEXTURE_2D;
   texture->format = GL_RGBA8;
   auto gl = GLFunctions::Get(context);
@@ -635,10 +660,11 @@ void SerializeUtils::FillRenderableObjSerMap(const std::shared_ptr<Shape>& shape
     auto bounds = shape->getBounds();
     int width = static_cast<int>(bounds.width()) + padding * 2;
     int height = static_cast<int>(bounds.height()) + padding * 2;
-    auto transformShape = Shape::ApplyMatrix(shape, Matrix::MakeTrans(padding-bounds.x(), padding-bounds.y()));
+    auto transformShape =
+        Shape::ApplyMatrix(shape, Matrix::MakeTrans(padding - bounds.x(), padding - bounds.y()));
     CreateGLTexture(context, width, height, &textureInfo);
-    auto surface = Surface::MakeFrom(context, {textureInfo, width,
-      height}, ImageOrigin::BottomLeft);
+    auto surface =
+        Surface::MakeFrom(context, {textureInfo, width, height}, ImageOrigin::BottomLeft);
     auto canvas = surface->getCanvas();
     canvas->clear();
     auto paint = Paint();
@@ -648,7 +674,7 @@ void SerializeUtils::FillRenderableObjSerMap(const std::shared_ptr<Shape>& shape
     bool result = surface->readPixels(info, data.data());
     auto gl = GLFunctions::Get(context);
     gl->deleteTextures(1, &textureInfo.id);
-    if(!result) {
+    if (!result) {
       return Data::MakeEmpty();
     }
     flexbuffers::Builder fbb;
@@ -663,15 +689,15 @@ void SerializeUtils::FillRenderableObjSerMap(const std::shared_ptr<Shape>& shape
   };
 }
 
-void SerializeUtils::FillRenderableObjSerMap(const std::shared_ptr<Image> &image, uint64_t objID,
-  RenderableObjSerMap *map) {
+void SerializeUtils::FillRenderableObjSerMap(const std::shared_ptr<Image>& image, uint64_t objID,
+                                             RenderableObjSerMap* map) {
   (*map)[objID] = [image](Context* context) {
     GLTextureInfo textureInfo;
     int width = image->width() + padding * 2;
     int height = image->height() + padding * 2;
     CreateGLTexture(context, width, height, &textureInfo);
-    auto surface = Surface::MakeFrom(context, {textureInfo, width,
-      height}, ImageOrigin::BottomLeft);
+    auto surface =
+        Surface::MakeFrom(context, {textureInfo, width, height}, ImageOrigin::BottomLeft);
     auto canvas = surface->getCanvas();
     canvas->clear();
     canvas->drawImage(image, padding, padding);
@@ -680,7 +706,7 @@ void SerializeUtils::FillRenderableObjSerMap(const std::shared_ptr<Image> &image
     bool result = surface->readPixels(info, data.data());
     auto gl = GLFunctions::Get(context);
     gl->deleteTextures(1, &textureInfo.id);
-    if(!result) {
+    if (!result) {
       return Data::MakeEmpty();
     }
     flexbuffers::Builder fbb;
@@ -695,61 +721,62 @@ void SerializeUtils::FillRenderableObjSerMap(const std::shared_ptr<Image> &image
   };
 }
 
-void SerializeUtils::FillRenderableObjSerMap(const Path &path, uint64_t objID, RenderableObjSerMap *map) {
-    (*map)[objID] = [path](Context* context) {
-      GLTextureInfo textureInfo;
-      auto bounds = path.getBounds();
-      int width = static_cast<int>(bounds.width()) + padding * 2;
-      int height = static_cast<int>(bounds.height()) + padding * 2;
-      CreateGLTexture(context, width, height, &textureInfo);
-      auto tempPath = path;
-      tempPath.transform(Matrix::MakeTrans(padding-bounds.x(), padding-bounds.y()));
-      auto surface = Surface::MakeFrom(context, {textureInfo, width,
-        height}, ImageOrigin::BottomLeft);
-      auto canvas = surface->getCanvas();
-      canvas->clear();
-      auto paint = Paint();
-      canvas->drawPath(tempPath, paint);
-      ImageInfo info = ImageInfo::Make(width, height, ColorType::RGBA_8888);
-      std::vector<uint8_t> data(static_cast<size_t>(width * height * 4));
-      bool result = surface->readPixels(info, data.data());
-      auto gl = GLFunctions::Get(context);
-      gl->deleteTextures(1, &textureInfo.id);
-      if(!result) {
-        return Data::MakeEmpty();
-      }
-      flexbuffers::Builder fbb;
-      size_t startMap;
-      size_t contentMap;
-      SerializeUtils::SerializeBegin(fbb, "ImageData", startMap, contentMap);
-      fbb.Int("width", width);
-      fbb.Int("height", height);
-      fbb.Blob("data", data.data(), data.size());
-      SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
-      return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
-    };
+void SerializeUtils::FillRenderableObjSerMap(const Path& path, uint64_t objID,
+                                             RenderableObjSerMap* map) {
+  (*map)[objID] = [path](Context* context) {
+    GLTextureInfo textureInfo;
+    auto bounds = path.getBounds();
+    int width = static_cast<int>(bounds.width()) + padding * 2;
+    int height = static_cast<int>(bounds.height()) + padding * 2;
+    CreateGLTexture(context, width, height, &textureInfo);
+    auto tempPath = path;
+    tempPath.transform(Matrix::MakeTrans(padding - bounds.x(), padding - bounds.y()));
+    auto surface =
+        Surface::MakeFrom(context, {textureInfo, width, height}, ImageOrigin::BottomLeft);
+    auto canvas = surface->getCanvas();
+    canvas->clear();
+    auto paint = Paint();
+    canvas->drawPath(tempPath, paint);
+    ImageInfo info = ImageInfo::Make(width, height, ColorType::RGBA_8888);
+    std::vector<uint8_t> data(static_cast<size_t>(width * height * 4));
+    bool result = surface->readPixels(info, data.data());
+    auto gl = GLFunctions::Get(context);
+    gl->deleteTextures(1, &textureInfo.id);
+    if (!result) {
+      return Data::MakeEmpty();
+    }
+    flexbuffers::Builder fbb;
+    size_t startMap;
+    size_t contentMap;
+    SerializeUtils::SerializeBegin(fbb, "ImageData", startMap, contentMap);
+    fbb.Int("width", width);
+    fbb.Int("height", height);
+    fbb.Blob("data", data.data(), data.size());
+    SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
+    return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
+  };
 }
 
-void SerializeUtils::FillRenderableObjSerMap(const std::shared_ptr<TextBlob> &textBlob, uint64_t objID,
-  RenderableObjSerMap *map) {
+void SerializeUtils::FillRenderableObjSerMap(const std::shared_ptr<TextBlob>& textBlob,
+                                             uint64_t objID, RenderableObjSerMap* map) {
   (*map)[objID] = [textBlob](Context* context) {
     GLTextureInfo textureInfo;
     auto bounds = textBlob->getBounds();
     int width = static_cast<int>(bounds.width()) + padding * 2;
     int height = static_cast<int>(bounds.height()) + padding * 2;
     CreateGLTexture(context, width, height, &textureInfo);
-    auto surface = Surface::MakeFrom(context, {textureInfo, width,
-      height}, ImageOrigin::BottomLeft);
+    auto surface =
+        Surface::MakeFrom(context, {textureInfo, width, height}, ImageOrigin::BottomLeft);
     auto canvas = surface->getCanvas();
     canvas->clear();
     auto paint = Paint();
-    canvas->drawTextBlob(textBlob, padding-bounds.x(), padding-bounds.y(), paint);
+    canvas->drawTextBlob(textBlob, padding - bounds.x(), padding - bounds.y(), paint);
     ImageInfo info = ImageInfo::Make(width, height, ColorType::RGBA_8888);
     std::vector<uint8_t> data(static_cast<size_t>(width * height * 4));
     bool result = surface->readPixels(info, data.data());
     auto gl = GLFunctions::Get(context);
     gl->deleteTextures(1, &textureInfo.id);
-    if(!result) {
+    if (!result) {
       return Data::MakeEmpty();
     }
     flexbuffers::Builder fbb;
@@ -764,7 +791,8 @@ void SerializeUtils::FillRenderableObjSerMap(const std::shared_ptr<TextBlob> &te
   };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const Color& color, uint64_t objID, ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(const Color& color, uint64_t objID,
+                                          ComplexObjSerMap* map) {
   (*map)[objID] = [color]() { return ColorSerialization::Serialize(&color); };
 }
 
@@ -772,11 +800,13 @@ void SerializeUtils::FillComplexObjSerMap(const Font& font, uint64_t objID, Comp
   (*map)[objID] = [font, map]() { return FontSerialization::Serialize(&font, map); };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const FontMetrics& fontMetrics, uint64_t objID, ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(const FontMetrics& fontMetrics, uint64_t objID,
+                                          ComplexObjSerMap* map) {
   (*map)[objID] = [fontMetrics]() { return FontMetricsSerialization::Serialize(&fontMetrics); };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const GlyphRun& glyphRun, uint64_t objID, ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(const GlyphRun& glyphRun, uint64_t objID,
+                                          ComplexObjSerMap* map) {
   (*map)[objID] = [glyphRun, map]() { return glyphRunSerialization::Serialize(&glyphRun, map); };
 }
 

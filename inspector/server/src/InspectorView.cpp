@@ -18,7 +18,7 @@
 
 #include "InspectorView.h"
 #include <QQmlContext>
-#include "AtttributeModel.h"
+#include "AttributeModel.h"
 #include "FramesDrawer.h"
 #include "TaskTreeModel.h"
 #include "kddockwidgets/qtquick/views/Group.h"
@@ -47,11 +47,12 @@ InspectorView::~InspectorView() {
 void InspectorView::initView() {
   qmlRegisterType<FramesDrawer>("FramesDrawer", 1, 0, "FramesDrawer");
   qmlRegisterType<TaskTreeModel>("TaskTreeModel", 1, 0, "TaskTreeModel");
-  qmlRegisterType<AtttributeModel>("AtttributeModel", 1, 0, "AtttributeModel");
+  qmlRegisterType<AttributeModel>("AttributeModel", 1, 0, "AttributeModel");
   qmlRegisterUncreatableType<KDDockWidgets::QtQuick::Group>(
       "com.kdab.dockwidgets", 2, 0, "GroupView", QStringLiteral("Internal usage only"));
   taskTreeModel = std::make_unique<TaskTreeModel>(&worker, &viewData, this);
   selectFrameModel = std::make_unique<SelectFrameModel>(&worker, &viewData, this);
+  attributeModel = std::make_unique<AttributeModel>(&worker, &viewData, this);
   taskFilterModel = std::make_unique<TaskFilterModel>(&viewData, this);
   ispEngine = std::make_unique<QQmlApplicationEngine>(this);
   ispEngine->rootContext()->setContextProperty("workerPtr", &worker);
@@ -60,6 +61,7 @@ void InspectorView::initView() {
   ispEngine->rootContext()->setContextProperty("taskTreeModel", taskTreeModel.get());
   ispEngine->rootContext()->setContextProperty("taskFilterModel", taskFilterModel.get());
   ispEngine->rootContext()->setContextProperty("selectFrameModel", selectFrameModel.get());
+  ispEngine->rootContext()->setContextProperty("attributeModel", attributeModel.get());
   ispEngine->load(QUrl("qrc:/qml/InspectorView.qml"));
   if (ispEngine->rootObjects().isEmpty()) {
     qWarning() << "Failed to load InspectorView.qml";
@@ -90,6 +92,8 @@ void InspectorView::initConnect() {
           Qt::QueuedConnection);
   connect(taskFilterModel.get(), &TaskFilterModel::filterTypeChange, taskTreeModel.get(),
           &TaskTreeModel::refreshData);
+  connect(taskTreeModel.get(), &TaskTreeModel::selectTaskOp, attributeModel.get(),
+          &AttributeModel::refreshData);
   connect(this, &InspectorView::closeView, dynamic_cast<StartView*>(parent()),
           &StartView::onCloseView);
 }
@@ -118,7 +122,7 @@ void InspectorView::onCloseView(QQuickCloseEvent*) {
 void InspectorView::failedCreateWorker() {
   if (worker.hasExpection()) {
     QString errorMessage = "Inspector create failed, because: \n";
-    for (auto& message: worker.getErrorMessage()) {
+    for (auto& message : worker.getErrorMessage()) {
       errorMessage += message.c_str();
       errorMessage += "\n";
     }

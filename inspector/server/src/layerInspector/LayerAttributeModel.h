@@ -72,6 +72,7 @@ class LayerAttributeModel : public LayerModel {
   void flushLayerAttribute(uint64_t address);
   void modelReset();
   void flushImageChild(uint64_t objID);
+
  private:
   void ProcessLayerAttribute(const flexbuffers::Map& contentMap, LayerItem* item);
 

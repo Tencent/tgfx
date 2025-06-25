@@ -103,9 +103,9 @@ void ImageFilterSerialization::serializeComposeImageFilter(flexbuffers::Builder&
   SerializeUtils::FillComplexObjSerMap(filters, filtersID, map);
 }
 
-void ImageFilterSerialization::serializeDropShadowImageFilter(flexbuffers::Builder& fbb,
-                                                              const ImageFilter* imageFilter,
-                                                              SerializeUtils::ComplexObjSerMap* map) {
+void ImageFilterSerialization::serializeDropShadowImageFilter(
+    flexbuffers::Builder& fbb, const ImageFilter* imageFilter,
+    SerializeUtils::ComplexObjSerMap* map) {
   serializeImageFilterImpl(fbb, imageFilter);
   const DropShadowImageFilter* dropShadowImageFilter =
       static_cast<const DropShadowImageFilter*>(imageFilter);
@@ -126,9 +126,9 @@ void ImageFilterSerialization::serializeDropShadowImageFilter(flexbuffers::Build
   SerializeUtils::SetFlexBufferMap(fbb, "shadowOnly", dropShadowImageFilter->shadowOnly);
 }
 
-void ImageFilterSerialization::serializeInnerShadowImageFilter(flexbuffers::Builder& fbb,
-                                                               const ImageFilter* imageFilter,
-                                                               SerializeUtils::ComplexObjSerMap* map) {
+void ImageFilterSerialization::serializeInnerShadowImageFilter(
+    flexbuffers::Builder& fbb, const ImageFilter* imageFilter,
+    SerializeUtils::ComplexObjSerMap* map) {
   serializeImageFilterImpl(fbb, imageFilter);
   const InnerShadowImageFilter* innerShadowImageFilter =
       static_cast<const InnerShadowImageFilter*>(imageFilter);

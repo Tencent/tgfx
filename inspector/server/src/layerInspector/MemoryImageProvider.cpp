@@ -18,20 +18,19 @@
 
 #include "MemoryImageProvider.h"
 
-MemoryImageProvider::MemoryImageProvider():
-  QQuickImageProvider(QQuickImageProvider::Image) {
+MemoryImageProvider::MemoryImageProvider() : QQuickImageProvider(QQuickImageProvider::Image) {
   defaultImage = new QImage(200, 200, QImage::Format_RGBA8888);
   defaultImage->fill(QColor(56, 56, 56));
 }
 
 void MemoryImageProvider::setImage(uint64_t id, int width, int height, const QByteArray& rawData) {
-    qDebug() << "set id: " << id;
-    rwLock.lockForWrite();
-    imageMap[id] = {width, height, rawData};
-    rwLock.unlock();
-    //bool result = imageMap[id].save(QString::number(id)+".jpg");
-    //qDebug() << QString::number(id)+".jpg" << " : " << result;
-    emit imageFlush(id);
+  qDebug() << "set id: " << id;
+  rwLock.lockForWrite();
+  imageMap[id] = {width, height, rawData};
+  rwLock.unlock();
+  //bool result = imageMap[id].save(QString::number(id)+".jpg");
+  //qDebug() << QString::number(id)+".jpg" << " : " << result;
+  emit imageFlush(id);
 }
 
 void MemoryImageProvider::clearImageMap() {
@@ -51,20 +50,20 @@ bool MemoryImageProvider::isImageExisted(uint64_t id) {
   return result;
 }
 
-QImage MemoryImageProvider::
-requestImage(const QString& id, QSize* size, const QSize& requestedSize) {
+QImage MemoryImageProvider::requestImage(const QString& id, QSize* size,
+                                         const QSize& requestedSize) {
   Q_UNUSED(requestedSize);
   uint64_t idn = id.split("-")[0].toULongLong();
   rwLock.lockForRead();
-  if(imageMap.find(idn) != imageMap.end()) {
+  if (imageMap.find(idn) != imageMap.end()) {
     rwLock.unlock();
-    if(size) {
+    if (size) {
       *size = QSize(imageMap[idn].width, imageMap[idn].height);
     }
     return imageMap[idn].createImage();
   }
   rwLock.unlock();
-  if(size) {
+  if (size) {
     *size = defaultImage->size();
   }
   return defaultImage->copy();

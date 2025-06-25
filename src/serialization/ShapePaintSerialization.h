@@ -25,10 +25,13 @@
 namespace tgfx {
 class ShapePaintSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(const ShapePaint* shapePaint, SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
+  static std::shared_ptr<Data> Serialize(const ShapePaint* shapePaint,
+                                         SerializeUtils::ComplexObjSerMap* map,
+                                         SerializeUtils::RenderableObjSerMap* rosMap);
 
  private:
   static void SerializeShapePaintImpl(flexbuffers::Builder& fbb, const ShapePaint* shapePaint,
-                                      SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
+                                      SerializeUtils::ComplexObjSerMap* map,
+                                      SerializeUtils::RenderableObjSerMap* rosMap);
 };
 }  // namespace tgfx

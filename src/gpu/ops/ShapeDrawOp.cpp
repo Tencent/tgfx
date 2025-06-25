@@ -42,7 +42,7 @@ ShapeDrawOp::ShapeDrawOp(std::shared_ptr<GpuShapeProxy> shapeProxy, Color color,
 }
 
 void ShapeDrawOp::execute(RenderPass* renderPass) {
-  OperateMark(OpTaskType::ShapeDrawOp);
+  OperateMark(inspector::OpTaskType::ShapeDrawOp);
   if (shapeProxy == nullptr) {
     return;
   }

@@ -27,5 +27,13 @@
 #define OperateMark(type) ScopedMark(type, true)
 #define TaskMark(type) ScopedMark(type, true)
 
+#define AttributeName(name, value) inspector::Inspector::SendAttributeData(name, value)
+#define AttributeNameFloatArray(name, value, size)
+#define AttributeNameEnum(name, value, type) inspector::Inspector::SendAttributeData(name, static_cast<uint8_t>(value), static_cast<uint8_t>(type))
+
+#define AttributeFloat4(value) AttributeNameFloatArray(#value, value, 4)
+#define AttributeFloat6(value) AttributeNameFloatArray(#value, value, 6)
+#define AttributeEnum(value, type) AttributeNameEnum(#value, value, type)
+
 #define LAYER_DATA(data) inspector::LayerProfiler::SendLayerData(data)
 #define LAYER_CALLBACK(func) inspector::LayerProfiler::SetLayerCallBack(func)

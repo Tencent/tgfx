@@ -17,36 +17,36 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #ifdef TGFX_USE_INSPECTOR
 #include "tgfx/layers/LayerInspector.h"
-#include <string>
 #include <chrono>
 #include <functional>
+#include <string>
+#include "LockFreeQueue.h"
 #include "core/utils/Profiling.h"
 #include "serialization/LayerSerialization.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/SolidColor.h"
-#include "LockFreeQueue.h"
 
 namespace tgfx {
-  extern const std::string HighLightLayerName = "HighLightLayer";
-  static inspector::LockFreeQueue<uint64_t> imageIDQueue;
-  void LayerInspector::pickedLayer(float x, float y) {
-    if (m_HoverdSwitch) {
-      auto layers = m_DisplayList->root()->getLayersUnderPoint(x, y);
-      for (auto layer : layers) {
-        if (layer->name() != HighLightLayerName) {
-          if (reinterpret_cast<uint64_t>(layer.get()) != m_SelectedAddress) {
-            SendPickedLayerAddress(layer);
-          }
-          AddHighLightOverlay(tgfx::Color::FromRGBA(111, 166, 219), layer);
-          break;
+extern const std::string HighLightLayerName = "HighLightLayer";
+static inspector::LockFreeQueue<uint64_t> imageIDQueue;
+void LayerInspector::pickedLayer(float x, float y) {
+  if (m_HoverdSwitch) {
+    auto layers = m_DisplayList->root()->getLayersUnderPoint(x, y);
+    for (auto layer : layers) {
+      if (layer->name() != HighLightLayerName) {
+        if (reinterpret_cast<uint64_t>(layer.get()) != m_SelectedAddress) {
+          SendPickedLayerAddress(layer);
         }
+        AddHighLightOverlay(tgfx::Color::FromRGBA(111, 166, 219), layer);
+        break;
       }
     }
   }
+}
 
 void LayerInspector::setLayerInspectorHoveredStateCallBack(std::function<void(bool)> callback) {
-    hoveredCallBack = callback;
-  }
+  hoveredCallBack = callback;
+}
 
 void LayerInspector::setCallBack() {
   [[maybe_unused]] std::function<void(const std::vector<uint8_t>&)> func =
@@ -54,11 +54,11 @@ void LayerInspector::setCallBack() {
   LAYER_CALLBACK(func);
 }
 
-void LayerInspector::RenderImageAndSend(Context *context) {
-  if(!imageIDQueue.empty()) {
+void LayerInspector::RenderImageAndSend(Context* context) {
+  if (!imageIDQueue.empty()) {
     auto id = imageIDQueue.pop();
     std::shared_ptr<Data> data = m_LayerRenderableObjMap[m_SelectedAddress][*id](context);
-    if(!data->empty()) {
+    if (!data->empty()) {
       std::vector<uint8_t> blob(data->bytes(), data->bytes() + data->size());
       LAYER_DATA(blob);
     }
@@ -113,7 +113,8 @@ void LayerInspector::serializingLayerAttribute(const std::shared_ptr<tgfx::Layer
   if (!layer) return;
   auto& complexObjSerMap = m_LayerComplexObjMap[reinterpret_cast<uint64_t>(layer.get())];
   auto& renderableObjSerMap = m_LayerRenderableObjMap[reinterpret_cast<uint64_t>(layer.get())];
-  auto data = LayerSerialization::SerializeLayer(layer.get(), &complexObjSerMap, &renderableObjSerMap, "LayerAttribute");
+  auto data = LayerSerialization::SerializeLayer(layer.get(), &complexObjSerMap,
+                                                 &renderableObjSerMap, "LayerAttribute");
   std::vector<uint8_t> blob(data->bytes(), data->bytes() + data->size());
   LAYER_DATA(blob);
 }
@@ -130,7 +131,7 @@ void LayerInspector::FeedBackDataProcess(const std::vector<uint8_t>& data) {
       m_HoverdLayer->removeChildren(m_HighLightLayerIndex);
       m_HoverdLayer = nullptr;
     }
-    if(hoveredCallBack) {
+    if (hoveredCallBack) {
       hoveredCallBack(m_HoverdSwitch);
     }
   } else if (type == "HoverLayerAddress") {
@@ -152,13 +153,13 @@ void LayerInspector::FeedBackDataProcess(const std::vector<uint8_t>& data) {
     if (m_LayerComplexObjMap.find(address) != m_LayerComplexObjMap.end()) {
       m_LayerComplexObjMap.erase(address);
     }
-    if(m_LayerRenderableObjMap.find(address)!=m_LayerRenderableObjMap.end()) {
+    if (m_LayerRenderableObjMap.find(address) != m_LayerRenderableObjMap.end()) {
       m_LayerRenderableObjMap.erase(address);
     }
     SendFlushAttributeAck(address);
   } else if (type == "FlushLayerTree") {
     serializingLayerTree();
-  }else if(type == "FlushImage") {
+  } else if (type == "FlushImage") {
     uint64_t imageId = map["Value"].AsUInt64();
     imageIDQueue.push(imageId);
   }

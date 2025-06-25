@@ -21,7 +21,9 @@
 
 namespace tgfx {
 
-std::shared_ptr<Data> ShapeSerialization::Serialize(const Shape* shape, SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap) {
+std::shared_ptr<Data> ShapeSerialization::Serialize(const Shape* shape,
+                                                    SerializeUtils::ComplexObjSerMap* map,
+                                                    SerializeUtils::RenderableObjSerMap* rosMap) {
   DEBUG_ASSERT(shape != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -33,7 +35,8 @@ std::shared_ptr<Data> ShapeSerialization::Serialize(const Shape* shape, Serializ
 }
 
 void ShapeSerialization::SerializeShapeImpl(flexbuffers::Builder& fbb, const Shape* shape,
-                                            SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap) {
+                                            SerializeUtils::ComplexObjSerMap* map,
+                                            SerializeUtils::RenderableObjSerMap* rosMap) {
   SerializeUtils::SetFlexBufferMap(fbb, "type",
                                    SerializeUtils::ShapeTypeToString(Types::Get(shape)));
   SerializeUtils::SetFlexBufferMap(fbb, "isSimplePath", shape->isSimplePath());
@@ -48,7 +51,7 @@ void ShapeSerialization::SerializeShapeImpl(flexbuffers::Builder& fbb, const Sha
   auto path = shape->getPath();
   SerializeUtils::SetFlexBufferMap(fbb, "path", "", false, true, pathID, true);
   SerializeUtils::FillComplexObjSerMap(path, pathID, map);
-    SerializeUtils::FillRenderableObjSerMap(path, pathID, rosMap);
+  SerializeUtils::FillRenderableObjSerMap(path, pathID, rosMap);
 }
 }  // namespace tgfx
 #endif

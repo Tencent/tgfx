@@ -77,11 +77,67 @@ class Inspector {
     QueueSerialFinish();
   }
 
+  static void SendAttributeData(const char* name, int val) {
+    QueuePrepare(QueueType::ValueDataInt);
+    MemWrite(&item->attributeDataInt.name, (uint64_t)name);
+    MemWrite(&item->attributeDataInt.value, val);
+    QueueCommit(attributeDataInt);
+  }
+
+  static void SendAttributeData(const char* name, float val) {
+    QueuePrepare(QueueType::ValueDataFloat)
+        MemWrite(&item->attributeDataFloat.name, (uint64_t)name);
+    MemWrite(&item->attributeDataFloat.value, val);
+    QueueCommit(attributeDataFloat);
+  }
+
+  static void SendAttributeData(const char* name, bool val) {
+    QueuePrepare(QueueType::ValueDataBool);
+    MemWrite(&item->attributeDataBool.name, (uint64_t)name);
+    MemWrite(&item->attributeDataBool.value, val);
+    QueueCommit(attributeDataBool);
+  }
+
+  static void SendAttributeData(const char* name, uint8_t val, uint8_t type) {
+    QueuePrepare(QueueType::ValueDataEnum);
+    MemWrite(&item->attributeDataEnum.name, (uint64_t)name);
+    auto value = static_cast<uint16_t>(type << 8 | val);
+    MemWrite(&item->attributeDataEnum.value, value);
+    QueueCommit(attributeDataEnum);
+  }
+
+  static void SendAttributeData(const char* name, uint32_t val,
+                                QueueType type = QueueType::ValueDataUint32) {
+    QueuePrepare(type);
+    MemWrite(&item->attributeDataUint32.name, (uint64_t)name);
+    MemWrite(&item->attributeDataUint32.value, val);
+    QueueCommit(attributeDataUint32);
+  }
+
+  static void SendAttributeData(const char* name, float* val, int size) {
+    if (size == 4) {
+      QueuePrepare(QueueType::ValueDataFloat4);
+      MemWrite(&item->attributeDataFloat4.name, (uint64_t)name);
+      MemWrite(item->attributeDataFloat4.value, val, static_cast<size_t>(size) * sizeof(float));
+      QueueCommit(attributeDataFloat4);
+    } else if (size == 6) {
+      QueuePrepare(QueueType::ValueDataMat4);
+      MemWrite(&item->attributeDataMat4.name, (uint64_t)name);
+      MemWrite(item->attributeDataMat4.value, val, static_cast<size_t>(size) * sizeof(float));
+      QueueCommit(attributeDataMat4);
+    }
+  }
+
   static void LaunchWorker(Inspector* inspector) {
     inspector->Worker();
   }
 
   static bool ShouldExit();
+
+  void SendString(uint64_t str, const char* ptr, QueueType type) {
+    SendString(str, ptr, strlen(ptr), type);
+  }
+  void SendString(uint64_t str, const char* ptr, size_t len, QueueType type);
 
   void Worker();
   void SpawnWorkerThreads();

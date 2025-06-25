@@ -21,8 +21,9 @@
 
 namespace tgfx {
 
-std::shared_ptr<Data> ShapePaintSerialization::Serialize(const ShapePaint* shapePaint,
-                                                         SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap) {
+std::shared_ptr<Data> ShapePaintSerialization::Serialize(
+    const ShapePaint* shapePaint, SerializeUtils::ComplexObjSerMap* map,
+    SerializeUtils::RenderableObjSerMap* rosMap) {
   DEBUG_ASSERT(shapePaint != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -35,7 +36,8 @@ std::shared_ptr<Data> ShapePaintSerialization::Serialize(const ShapePaint* shape
 
 void ShapePaintSerialization::SerializeShapePaintImpl(flexbuffers::Builder& fbb,
                                                       const ShapePaint* shapePaint,
-                                                      SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap) {
+                                                      SerializeUtils::ComplexObjSerMap* map,
+                                                      SerializeUtils::RenderableObjSerMap* rosMap) {
   auto shaderID = SerializeUtils::GetObjID();
   auto shader = shapePaint->shader;
   SerializeUtils::SetFlexBufferMap(fbb, "shader", reinterpret_cast<uint64_t>(shader.get()), true,

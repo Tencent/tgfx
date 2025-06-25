@@ -53,16 +53,16 @@ void TcpSocketClient::onSocketDisconnected() {
   m_IsConnection = false;
 }
 void TcpSocketClient::onSocketReadyRead() {
-  if(Remainder == 0) {
+  if (Remainder == 0) {
     m_TcpSocket->read((char*)&size, sizeof(int));
     Remainder = size;
     data.resize(size);
   }
-  if(Remainder != 0) {
+  if (Remainder != 0) {
     auto readSize = m_TcpSocket->read(data.data() + currentIndex, Remainder);
     currentIndex += readSize;
     Remainder -= readSize;
-    if(Remainder == 0) {
+    if (Remainder == 0) {
       emit ServerBinaryData(data);
       currentIndex = 0;
     }

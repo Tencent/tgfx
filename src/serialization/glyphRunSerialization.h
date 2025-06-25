@@ -24,7 +24,8 @@
 namespace tgfx {
 class glyphRunSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(const GlyphRun* glyphRun, SerializeUtils::ComplexObjSerMap* map);
+  static std::shared_ptr<Data> Serialize(const GlyphRun* glyphRun,
+                                         SerializeUtils::ComplexObjSerMap* map);
 
  private:
   static void SerializeGlyphRunImpl(flexbuffers::Builder& fbb, const GlyphRun* glyphRun,

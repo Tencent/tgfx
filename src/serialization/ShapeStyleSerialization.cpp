@@ -26,8 +26,9 @@
 
 namespace tgfx {
 
-std::shared_ptr<Data> ShapeStyleSerialization::Serialize(const ShapeStyle* shapeStyle,
-                                                         SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap) {
+std::shared_ptr<Data> ShapeStyleSerialization::Serialize(
+    const ShapeStyle* shapeStyle, SerializeUtils::ComplexObjSerMap* map,
+    SerializeUtils::RenderableObjSerMap* rosMap) {
   DEBUG_ASSERT(shapeStyle != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -64,9 +65,9 @@ void ShapeStyleSerialization::SerializeShapeStyleImpl(flexbuffers::Builder& fbb,
   SerializeUtils::FillComplexObjSerMap(matrix, matrixID, map);
 }
 
-void ShapeStyleSerialization::SerializeImagePatternImpl(flexbuffers::Builder& fbb,
-                                                        const ShapeStyle* shapeStyle,
-                                                        SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap) {
+void ShapeStyleSerialization::SerializeImagePatternImpl(
+    flexbuffers::Builder& fbb, const ShapeStyle* shapeStyle, SerializeUtils::ComplexObjSerMap* map,
+    SerializeUtils::RenderableObjSerMap* rosMap) {
   SerializeShapeStyleImpl(fbb, shapeStyle, map);
   const ImagePattern* imagePattern = static_cast<const ImagePattern*>(shapeStyle);
 
