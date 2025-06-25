@@ -1261,7 +1261,7 @@ void Layer::propagateHasBackgroundStyleFlags() {
 }
 
 bool Layer::hasDescendantBackgroundStyle() {
-  for (auto& style : _layerStyles) {
+  for (const auto& style : _layerStyles) {
     if (style->extraSourceType() == LayerStyleExtraSourceType::Background) {
       return true;
     }
