@@ -44,17 +44,5 @@ class LayerSerialization {
 
   static void SerializeBasicLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
                                       SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
-
-  static void SerializeImageLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
-                                      SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
-
-  static void SerializeShapeLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
-                                      SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
-
-  static void SerializeSolidLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
-                                      SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
-
-  static void SerializeTextLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
-                                     SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
 };
 }  // namespace tgfx

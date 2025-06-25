@@ -16,18 +16,22 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <tgfx/core/Data.h>
-#include "SerializationUtils.h"
+#include "PictureSerialization.h"
 
 namespace tgfx {
-class ShapeSerialization {
- public:
-  static std::shared_ptr<Data> Serialize(const Shape* shape, SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
 
- private:
-  static void SerializeShapeImpl(flexbuffers::Builder& fbb, const Shape* shape,
-                                 SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
-};
+std::shared_ptr<Data> PictureSerialization::Serialize(const Picture* pic) {
+  DEBUG_ASSERT(pic != nullptr)
+  flexbuffers::Builder fbb;
+  size_t startMap;
+  size_t contentMap;
+  SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
+  SerializePictureImpl(fbb, pic);
+  SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
+  return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
+}
+
+void PictureSerialization::SerializePictureImpl(flexbuffers::Builder&, const Picture*) {
+  // noop
+}
 }  // namespace tgfx

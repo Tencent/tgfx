@@ -16,6 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <sys/socket.h>
+
+#include "PictureSerialization.h"
+#include "layers/contents/ContourContent.h"
+#include "layers/contents/DefaultContent.h"
+#include "layers/contents/ForegroundContent.h"
 #ifdef TGFX_USE_INSPECTOR
 #include "ColorFilterSerialization.h"
 #include "ColorSerialization.h"
@@ -34,7 +40,6 @@
 #include "SamplingOptionsSerialization.h"
 #include "SerializationUtils.h"
 #include "ShaderSerialization.h"
-#include "ShapeSerialization.h"
 #include "ShapeStyleSerialization.h"
 #include "TypeFaceSerialization.h"
 #include "TextBlobSerialization.h"
@@ -250,6 +255,15 @@ std::string SerializeUtils::PathFillTypeToString(PathFillType type) {
   return m[type];
 }
 
+std::string SerializeUtils::RecordedContentTypeToString(Types::RecordedContentType type) {
+  static std::unordered_map<Types::RecordedContentType, const char*> m = {
+    {Types::RecordedContentType::Default, "Default"},
+    {Types::RecordedContentType::Foreground, "Foreground"},
+      {Types::RecordedContentType::Contour, "Contour"}
+  };
+  return m[type];
+}
+
 void SerializeUtils::SerializeBegin(flexbuffers::Builder& fbb, const std::string& type,
                                     size_t& mapStart, size_t& contentStart) {
   mapStart = fbb.StartMap();
@@ -386,13 +400,6 @@ void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<Image>& image, u
   (*map)[objID] = [image]() { return ImageSerialization::Serialize(image.get()); };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<Shape>& shape, uint64_t objID, ComplexObjSerMap* map, RenderableObjSerMap* rosMap) {
-  if (shape == nullptr) {
-    return;
-  }
-  (*map)[objID] = [shape, map, rosMap]() { return ShapeSerialization::Serialize(shape.get(), map, rosMap); };
-}
-
 void SerializeUtils::FillComplexObjSerMap(const std::vector<std::shared_ptr<ShapeStyle>>& shapeStyles,
                              uint64_t objID, ComplexObjSerMap* map, RenderableObjSerMap* rosMap) {
   (*map)[objID] = [shapeStyles, map, rosMap]() {
@@ -479,6 +486,16 @@ void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<TextBlob> &textB
   };
 }
 
+void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<Picture>& picture, uint64_t objID,
+    ComplexObjSerMap* map) {
+  if(picture == nullptr) {
+    return;
+  }
+  (*map)[objID] = [picture]() {
+    return PictureSerialization::Serialize(picture.get());
+  };
+}
+
 void SerializeUtils::FillComplexObjSerMap(const std::vector<float>& floatVec, uint64_t objID, ComplexObjSerMap* map) {
   (*map)[objID] = [floatVec]() {
     flexbuffers::Builder fbb;
@@ -507,25 +524,6 @@ void SerializeUtils::FillComplexObjSerMap(const std::array<float, 20>& matrix, u
       ss << "[" << i << "]";
       auto value = matrix[i];
       SerializeUtils::SetFlexBufferMap(fbb, ss.str().c_str(), value);
-    }
-    SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
-    return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
-  };
-}
-
-void SerializeUtils::FillComplexObjSerMap(const std::vector<GlyphRun>& glyphRuns, uint64_t objID, ComplexObjSerMap* map) {
-  (*map)[objID] = [glyphRuns, map]() {
-    flexbuffers::Builder fbb;
-    size_t startMap;
-    size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
-    for (size_t i = 0; i < glyphRuns.size(); i++) {
-      std::stringstream ss;
-      ss << "[" << i << "]";
-      const auto& glyphRun = glyphRuns[i];
-      auto glyphRunID = SerializeUtils::GetObjID();
-      SerializeUtils::SetFlexBufferMap(fbb, ss.str().c_str(), "", false, true, glyphRunID);
-      FillComplexObjSerMap(glyphRun, glyphRunID, map);
     }
     SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
     return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
@@ -609,8 +607,59 @@ void SerializeUtils::FillComplexObjSerMap(const std::vector<Color>& colors, uint
   };
 }
 
+void SerializeUtils::FillComplexObjSermap(const std::unique_ptr<RecordedContent>& recordedContent,
+    uint64_t objID, ComplexObjSerMap* map, RenderableObjSerMap* rosMap) {
+  (*map)[objID] = [&recordedContent, map, rosMap]() {
+    auto type = Types::Get(recordedContent.get());
+    flexbuffers::Builder fbb;
+    size_t startMap;
+    size_t contentMap;
+    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
+    SerializeUtils::SetFlexBufferMap(fbb, "type", RecordedContentTypeToString(type));
+    switch (type) {
+      case Types::RecordedContentType::Default: {
+        auto defaultContent = static_cast<DefaultContent*>(recordedContent.get());
+        auto content = defaultContent->content;
+        auto contentID = SerializeUtils::GetObjID();
+        SerializeUtils::SetFlexBufferMap(fbb, "Content", reinterpret_cast<uint64_t>(content.get()), true, content != nullptr, contentID, true);
+        SerializeUtils::FillRenderableObjSerMap(content, contentID, rosMap);
+        SerializeUtils::FillComplexObjSerMap(content, contentID, map);
+        break;
+      }
+      case Types::RecordedContentType::Foreground: {
+        auto foregroundContent = static_cast<ForegroundContent*>(recordedContent.get());
+        auto foreground = foregroundContent->foreground;
+        auto background = foregroundContent->background;
+        auto foregroundID = SerializeUtils::GetObjID();
+        auto backgroundID = SerializeUtils::GetObjID();
+        SerializeUtils::SetFlexBufferMap(fbb, "foreground", reinterpret_cast<uint64_t>(foreground.get()), true, foreground != nullptr, foregroundID, true);
+        SerializeUtils::FillRenderableObjSerMap(foreground, foregroundID, rosMap);
+        SerializeUtils::FillComplexObjSerMap(foreground, foregroundID, map);
+        SerializeUtils::SetFlexBufferMap(fbb, "background", reinterpret_cast<uint64_t>(background.get()), true, background != nullptr, backgroundID, true);
+        SerializeUtils::FillRenderableObjSerMap(background, backgroundID, rosMap);
+        SerializeUtils::FillComplexObjSerMap(background, backgroundID, map);
+        break;
+      }
+      case Types::RecordedContentType::Contour: {
+        auto contourContent = static_cast<ContourContent*>(recordedContent.get());
+        auto contour = contourContent->contour;
+        auto contourID = SerializeUtils::GetObjID();
+        SerializeUtils::SetFlexBufferMap(fbb, "contour", reinterpret_cast<uint64_t>(contour.get()), true, contour != nullptr, contourID, true);
+        SerializeUtils::FillRenderableObjSerMap(contour, contourID, rosMap);
+        SerializeUtils::FillComplexObjSerMap(contour, contourID, map);
+        auto contentID = SerializeUtils::GetObjID();
+        SerializeUtils::SetFlexBufferMap(fbb, "content", "", false, (bool)contourContent->content, contentID);
+        FillComplexObjSermap(contourContent->content, contentID, map, rosMap);
+        break;
+      }
+    }
+    SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
+    return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
+  };
+}
+
 bool SerializeUtils::CreateGLTexture(Context* context, int width, int height,
-    GLTextureInfo* texture) {
+                                     GLTextureInfo* texture) {
   texture->target = GL_TEXTURE_2D;
   texture->format = GL_RGBA8;
   auto gl = GLFunctions::Get(context);
@@ -744,6 +793,40 @@ void SerializeUtils::FillRenderableObjSerMap(const std::shared_ptr<TextBlob> &te
     canvas->clear();
     auto paint = Paint();
     canvas->drawTextBlob(textBlob, padding-bounds.x(), padding-bounds.y(), paint);
+    ImageInfo info = ImageInfo::Make(width, height, ColorType::RGBA_8888);
+    std::vector<uint8_t> data(static_cast<size_t>(width * height * 4));
+    bool result = surface->readPixels(info, data.data());
+    auto gl = GLFunctions::Get(context);
+    gl->deleteTextures(1, &textureInfo.id);
+    if(!result) {
+      return Data::MakeEmpty();
+    }
+    flexbuffers::Builder fbb;
+    size_t startMap;
+    size_t contentMap;
+    SerializeUtils::SerializeBegin(fbb, "ImageData", startMap, contentMap);
+    fbb.Int("width", width);
+    fbb.Int("height", height);
+    fbb.Blob("data", data.data(), data.size());
+    SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
+    return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
+  };
+}
+
+void SerializeUtils::FillRenderableObjSerMap(const std::shared_ptr<Picture>& picture, uint64_t objID, RenderableObjSerMap* map) {
+  (*map)[objID] = [picture](Context* context) {
+    GLTextureInfo textureInfo;
+    auto bounds = picture->getBounds();
+    int width = static_cast<int>(bounds.width()) + padding * 2;
+    int height = static_cast<int>(bounds.height()) + padding * 2;
+    CreateGLTexture(context, width, height, &textureInfo);
+    auto surface = Surface::MakeFrom(context, {textureInfo, width,
+      height}, ImageOrigin::BottomLeft);
+    auto canvas = surface->getCanvas();
+    canvas->clear();
+    auto paint = Paint();
+    auto matrix = Matrix::MakeTrans(padding - bounds.x(), padding - bounds.y());
+    canvas->drawPicture(picture, &matrix, &paint);
     ImageInfo info = ImageInfo::Make(width, height, ColorType::RGBA_8888);
     std::vector<uint8_t> data(static_cast<size_t>(width * height * 4));
     bool result = surface->readPixels(info, data.data());

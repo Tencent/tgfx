@@ -22,13 +22,11 @@
 #include "SerializationUtils.h"
 
 namespace tgfx {
-class glyphRunListSerialization {
- public:
-  static std::shared_ptr<Data> Serialize(const GlyphRunList* glyphRunList,
-                                         SerializeUtils::ComplexObjSerMap* map);
+class PictureSerialization {
+public:
+  static std::shared_ptr<Data> Serialize(const Picture* pic);
 
- private:
-  static void SerializeglyphRunListImpl(flexbuffers::Builder& fbb, const GlyphRunList* glyphRunList,
-                                        SerializeUtils::ComplexObjSerMap* map);
+private:
+  static void SerializePictureImpl(flexbuffers::Builder& fbb, const Picture* pic);
 };
 }  // namespace tgfx

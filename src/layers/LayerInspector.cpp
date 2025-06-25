@@ -77,7 +77,7 @@ void LayerInspector::serializingLayerTree() {
   m_LayerMap.clear();
 
   std::shared_ptr<Data> data = tgfx::LayerSerialization::SerializeTreeNode(
-      m_DisplayList->root()->weakThis.lock(), m_LayerMap);
+      m_DisplayList->root()->shared_from_this(), m_LayerMap);
   std::vector<uint8_t> blob(data->bytes(), data->bytes() + data->size());
 
   LAYER_DATA(blob);

@@ -75,6 +75,8 @@ class SerializeUtils {
 
   static std::string PathFillTypeToString(PathFillType type);
 
+  static std::string RecordedContentTypeToString(Types::RecordedContentType type);
+
   static void SerializeBegin(flexbuffers::Builder& fbb, const std::string& type, size_t& mapStart,
                              size_t& contentStart);
 
@@ -140,8 +142,6 @@ class SerializeUtils {
 
   static void FillComplexObjSerMap(const std::shared_ptr<Image>& image, uint64_t objID, ComplexObjSerMap* map);
 
-  static void FillComplexObjSerMap(const std::shared_ptr<Shape>& shape, uint64_t objID, ComplexObjSerMap* map, RenderableObjSerMap* rosMap);
-
   static void FillComplexObjSerMap(const std::shared_ptr<ShapeStyle>& shapeStyle, uint64_t objID, ComplexObjSerMap* map, RenderableObjSerMap* rosMap);
 
   static void FillComplexObjSerMap(const std::shared_ptr<ColorFilter>& colorFilter, uint64_t objID, ComplexObjSerMap* map);
@@ -155,7 +155,9 @@ class SerializeUtils {
 
   static void FillComplexObjSerMap(const std::shared_ptr<Shader>& shader, uint64_t objID, ComplexObjSerMap* map, RenderableObjSerMap* rosMap);
 
-    static void FillComplexObjSerMap(const std::shared_ptr<TextBlob>& textBlob, uint64_t objID, ComplexObjSerMap* map, RenderableObjSerMap* rosMap);
+  static void FillComplexObjSerMap(const std::shared_ptr<TextBlob>& textBlob, uint64_t objID, ComplexObjSerMap* map, RenderableObjSerMap* rosMap);
+
+  static void FillComplexObjSerMap(const std::shared_ptr<Picture>& picture, uint64_t objID, ComplexObjSerMap* map);
 
   static void FillComplexObjSerMap(const std::vector<std::shared_ptr<LayerFilter>>& filters, uint64_t objID,
                       ComplexObjSerMap* map);
@@ -173,8 +175,6 @@ class SerializeUtils {
 
   static void FillComplexObjSerMap(const std::array<float, 20>& matrix, uint64_t objID, ComplexObjSerMap* map);
 
-  static void FillComplexObjSerMap(const std::vector<GlyphRun>& glyphRuns, uint64_t objID, ComplexObjSerMap* map);
-
   static void FillComplexObjSerMap(const std::vector<GlyphID>& glyphs, uint64_t objID, ComplexObjSerMap* map);
 
   static void FillComplexObjSerMap(const std::vector<Point>& points, uint64_t objID, ComplexObjSerMap* map);
@@ -183,6 +183,8 @@ class SerializeUtils {
                       ComplexObjSerMap* map);
 
   static void FillComplexObjSerMap(const std::vector<Color>& colors, uint64_t objID, ComplexObjSerMap* map);
+
+  static void FillComplexObjSermap(const std::unique_ptr<RecordedContent>& recordedContent, uint64_t objID, ComplexObjSerMap* map, RenderableObjSerMap* rosMap);
 
   static bool CreateGLTexture(Context* context, int width, int height, GLTextureInfo* texture);
 
@@ -193,5 +195,7 @@ class SerializeUtils {
   static void FillRenderableObjSerMap(const Path& path, uint64_t objID, RenderableObjSerMap* map);
 
     static void FillRenderableObjSerMap(const std::shared_ptr<TextBlob>& textBlob, uint64_t objID, RenderableObjSerMap* map);
+
+  static void FillRenderableObjSerMap(const std::shared_ptr<Picture>& picture, uint64_t objID, RenderableObjSerMap* map);
 };
 }  // namespace tgfx
