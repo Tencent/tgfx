@@ -161,8 +161,8 @@ void Layer::setShouldRasterize(bool value) {
 }
 
 void Layer::setRasterizationScale(float value) {
-  if (_rasterizationScale < 0) {
-    _rasterizationScale = 0;
+  if (value < 0) {
+    value = 0;
   }
   _rasterizationScale = value;
 }
@@ -200,7 +200,7 @@ void Layer::setFilters(std::vector<std::shared_ptr<LayerFilter>> value) {
 }
 
 void Layer::setMask(std::shared_ptr<Layer> value) {
-  if (_mask.get() == this) {
+  if (value.get() == this) {
     return;
   }
   if (_mask == value) {
