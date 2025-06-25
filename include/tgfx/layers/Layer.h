@@ -29,7 +29,7 @@
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
-class RecordedContent;
+class LayerContent;
 class RasterizedContent;
 class DisplayList;
 class DrawArgs;
@@ -337,17 +337,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
   }
 
   /**
-   * Sets a custom LayerContent object to provide the contents for this layer. The onDrawContent()
-   * method will be called to record the layer’s contents. The LayerContent object is released after
-   * onDrawContent() is called. Each time you want to update the contents, you must create a new
-   * LayerContent object and set it using this method. Because onDrawContent() may run on a
-   * background thread, the LayerContent object must be immutable, thread-safe, and independent of
-   * main thread state. This method is ignored if the subclass overrides the onUpdateContent()
-   * method.
-   */
-  void setContent(std::unique_ptr<LayerContent> content);
-
-  /**
    * Returns the list of child layers that are direct children of the calling layer. Note: Do not
    * iterate through this list directly with a loop while modifying it, as the loop may skip
    * children. Instead, make a copy of the list and iterate through the copy.
@@ -566,7 +555,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   Matrix getMatrixWithScrollRect() const;
 
-  RecordedContent* getRecordedContent();
+  LayerContent* getContent();
 
   std::shared_ptr<ImageFilter> getImageFilter(float contentScale);
 
@@ -643,8 +632,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::vector<std::shared_ptr<LayerStyle>> _layerStyles = {};
   float _rasterizationScale = 0.0f;
   std::unique_ptr<RasterizedContent> rasterizedContent;
-  std::unique_ptr<LayerContent> layerContent;
-  std::unique_ptr<RecordedContent> recordedContent;
+  std::shared_ptr<LayerContent> layerContent = nullptr;
   Rect renderBounds = {};         // in global coordinates
   Rect* contentBounds = nullptr;  //  in global coordinates
 

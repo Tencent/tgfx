@@ -35,7 +35,7 @@ Rect ForegroundContent::getTightBounds(const Matrix& matrix) const {
   return bounds;
 }
 
-bool ForegroundContent::hitTestPoint(float localX, float localY, bool shapeHitTest) {
+bool ForegroundContent::hitTestPoint(float localX, float localY, bool shapeHitTest) const {
   if (foreground->hitTestPoint(localX, localY, shapeHitTest)) {
     return true;
   }
