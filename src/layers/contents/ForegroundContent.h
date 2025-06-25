@@ -19,10 +19,10 @@
 #pragma once
 
 #include "core/utils/Log.h"
-#include "layers/contents/RecordedContent.h"
+#include "layers/contents/LayerContent.h"
 
 namespace tgfx {
-class ForegroundContent : public RecordedContent {
+class ForegroundContent : public LayerContent {
  public:
   ForegroundContent(std::shared_ptr<Picture> background, std::shared_ptr<Picture> foreground)
       : background(std::move(background)), foreground(std::move(foreground)) {
@@ -32,7 +32,7 @@ class ForegroundContent : public RecordedContent {
 
   Rect getTightBounds(const Matrix& matrix) const override;
 
-  bool hitTestPoint(float localX, float localY, bool shapeHitTest) override;
+  bool hitTestPoint(float localX, float localY, bool shapeHitTest) const override;
 
   void drawDefault(Canvas* canvas, const FillModifier* modifier) const override;
 

@@ -18,13 +18,12 @@
 
 #pragma once
 
-#include "core/utils/Log.h"
-#include "layers/contents/RecordedContent.h"
+#include "layers/contents/LayerContent.h"
 
 namespace tgfx {
-class ContourContent : public RecordedContent {
+class ContourContent : public LayerContent {
  public:
-  ContourContent(std::unique_ptr<RecordedContent> content, std::shared_ptr<Picture> contour)
+  ContourContent(std::unique_ptr<LayerContent> content, std::shared_ptr<Picture> contour)
       : content(std::move(content)), contour(std::move(contour)) {
   }
 
@@ -36,7 +35,7 @@ class ContourContent : public RecordedContent {
     return content->getTightBounds(matrix);
   }
 
-  bool hitTestPoint(float localX, float localY, bool shapeHitTest) override {
+  bool hitTestPoint(float localX, float localY, bool shapeHitTest) const override {
     return content->hitTestPoint(localX, localY, shapeHitTest);
   }
 
@@ -52,7 +51,7 @@ class ContourContent : public RecordedContent {
     contour->playback(canvas, modifier);
   }
 
-  std::unique_ptr<RecordedContent> content;
+  std::unique_ptr<LayerContent> content = nullptr;
   std::shared_ptr<Picture> contour = nullptr;
 
  protected:

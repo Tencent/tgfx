@@ -23,13 +23,13 @@
 
 namespace tgfx {
 /**
- * RecordedContent represents the recorded contents of a layer, which can include default content,
- * foreground content, and the layer's contour. RecordedContent is immutable and cannot be changed
+ * LayerContent represents the recorded contents of a layer, which can include default content,
+ * foreground content, and the layer's contour. LayerContent is immutable and cannot be changed
  * after it is created.
  */
-class RecordedContent {
+class LayerContent {
  public:
-  virtual ~RecordedContent() = default;
+  virtual ~LayerContent() = default;
 
   /**
    * Returns the bounds of the content.
@@ -47,7 +47,7 @@ class RecordedContent {
    * shapeHitTest flag is true, it checks the actual shape of the layer content; otherwise, it
    * checks the bounding box.
    */
-  virtual bool hitTestPoint(float localX, float localY, bool shapeHitTest) = 0;
+  virtual bool hitTestPoint(float localX, float localY, bool shapeHitTest) const = 0;
 
   /**
    * Draws the default content of the layer to the specified canvas using the provided layer fill.

@@ -21,10 +21,34 @@
 #include <array>
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Recorder.h"
-#include "tgfx/layers/LayerContent.h"
 
 namespace tgfx {
-class RecordedContent;
+class LayerContent;
+
+/**
+ * Defines the different types of content that can be recorded in a layer.
+ */
+enum class LayerContentType {
+  /**
+   * The default content of a layer, rendered beneath the layer’s children but above any layerStyles
+   * positioned with LayerStylePosition::Below.
+   */
+  Default,
+
+  /**
+   * The foreground content of a layer, rendered above the layer’s children and all layerStyles.
+   * This content also serves as part of the input source for layer styles. This content type is
+   * optional.
+   */
+  Foreground,
+
+  /**
+   * The contour content of a layer, typically used for LayerMaskType::Contour masks or layerStyles
+   * that require LayerStyleExtraSourceType::Contour. This content type is optional. If not
+   * provided, the default and foreground content will be used as the contour instead.
+   */
+  Contour
+};
 
 /**
  * LayerRecorder is a utility class that records drawing commands as layer content.
@@ -44,7 +68,7 @@ class LayerRecorder {
  private:
   std::array<std::unique_ptr<Recorder>, 3> recorders = {};
 
-  std::unique_ptr<RecordedContent> finishRecording();
+  std::unique_ptr<LayerContent> finishRecording();
 
   friend class Layer;
 };
