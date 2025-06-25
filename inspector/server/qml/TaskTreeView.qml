@@ -360,7 +360,10 @@ Item {
             Rectangle {
                 id: treeView
                 width: parent.width
-                height: taskTreeView.contentHeight
+                height: Math.min(taskTreeView.contentHeight, parent.height)
+                MouseArea {
+                    anchors.fill: parent
+                }
                 TreeView {
                     id: taskTreeView
                     width: parent.width

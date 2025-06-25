@@ -107,5 +107,9 @@ enum OpTaskType : uint8_t {
 enum TGFXEnum {
   BufferType,
   BlendMode,
+  AAType,
+  Sampling,
+  PixelFormat,
+  ImageOrigin,
 };
 }  // namespace inspector
