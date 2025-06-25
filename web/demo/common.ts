@@ -103,7 +103,7 @@ export function bindCanvasZoomAndPanEvents(canvas: HTMLElement, shareData: Share
         shareData.offsetY = 0;
         shareData.zoom = 1.0;
     });
-    
+
     canvas.addEventListener('wheel', (e: WheelEvent) => {
         e.preventDefault();
         if (e.ctrlKey || e.metaKey) {
@@ -116,8 +116,12 @@ export function bindCanvasZoomAndPanEvents(canvas: HTMLElement, shareData: Share
             shareData.zoom = newZoom;
             shareData.tgfxBaseView.draw(shareData.drawIndex, shareData.zoom, shareData.offsetX, shareData.offsetY);
         } else {
-            shareData.offsetX -= e.deltaX * window.devicePixelRatio;
-            shareData.offsetY -= e.deltaY * window.devicePixelRatio;
+            if(e.shiftKey && e.deltaX === 0 && e.deltaY !== 0){
+                shareData.offsetX -= e.deltaY * window.devicePixelRatio;
+            }else{
+                shareData.offsetX -= e.deltaX * window.devicePixelRatio;
+                shareData.offsetY -= e.deltaY * window.devicePixelRatio;
+            }
             shareData.tgfxBaseView.draw(shareData.drawIndex, shareData.zoom, shareData.offsetX, shareData.offsetY);
         }
     }, { passive: false });
