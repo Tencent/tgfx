@@ -2877,6 +2877,7 @@ TGFX_TEST(LayerTest, BackgroundBlurStyleTest) {
   surface->getCanvas()->clear();
   surface->getCanvas()->resetMatrix();
   layer2->draw(surface->getCanvas());
+  layer2->setShouldRasterize(false);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurStyleTest3"));
   auto maskLayer = ShapeLayer::Make();
   auto maskPath = Path();

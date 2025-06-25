@@ -527,21 +527,29 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
       args.context = context;
     }
   }
-  if (context && hasBackgroundStyleNode()) {
+
+  if (context && hasDescendantBackgroundStyle()) {
     auto scale = canvas->getMatrix().getMaxScale();
     auto bounds = getBounds();
     bounds.scale(scale, scale);
-    auto backgroundContext = BackgroundContext::Make(context, bounds, Matrix::MakeScale(scale));
-    if (backgroundContext) {
-      auto backgroundCanvas = backgroundContext->getCanvas();
-      Point offset = {};
-      auto image = getBackgroundImage(args, 1.0f, &offset);
-      if (image) {
-        backgroundCanvas->drawImage(image, offset.x, offset.y);
+    auto globalMatrix = getGlobalMatrix();
+    globalMatrix.preScale(1 / scale, 1 / scale);
+    auto invert = Matrix::I();
+    if (globalMatrix.invert(&invert)) {
+      auto backgroundContext = BackgroundContext::Make(context, bounds, invert);
+      if (backgroundContext) {
+        auto backgroundCanvas = backgroundContext->getCanvas();
+        auto image = getBackgroundImage(args, scale, nullptr);
+        if (image) {
+          AutoCanvasRestore restore(backgroundCanvas);
+          backgroundCanvas->setMatrix(Matrix::I());
+          backgroundCanvas->drawImage(image);
+        }
+        args.backgroundContext = std::move(backgroundContext);
       }
     }
-    args.backgroundContext = std::move(backgroundContext);
   }
+
   drawLayer(args, canvas, alpha, blendMode);
 }
 
@@ -1252,17 +1260,14 @@ void Layer::propagateHasBackgroundStyleFlags() {
   }
 }
 
-bool Layer::hasBackgroundStyleNode() {
-  if (bitFields.hasBackgroundStyle) {
-    return true;
-  }
+bool Layer::hasDescendantBackgroundStyle() {
   for (auto& style : _layerStyles) {
     if (style->extraSourceType() == LayerStyleExtraSourceType::Background) {
       return true;
     }
   }
   for (const auto& child : _children) {
-    if (child->bitFields.hasBackgroundStyle || child->hasBackgroundStyleNode()) {
+    if (child->hasDescendantBackgroundStyle()) {
       return true;
     }
   }
