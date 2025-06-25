@@ -857,9 +857,9 @@ TGFX_TEST(CanvasTest, drawShape) {
   canvas->drawShape(mergeShape2, paint);
 
   transShape = Shape::ApplyMatrix(shape, Matrix::MakeTrans(200, 90));
-  paint.setShader(Shader::MakeLinearGradient(
-      Point{200.f, 90.f}, Point{250, 140},
-      {Color{1.f, 0.f, 0.f, 1.f}, Color{0.f, 1.f, 0.f, 1.f}}, {}));
+  paint.setShader(Shader::MakeLinearGradient(Point{200.f, 90.f}, Point{250, 140},
+                                             {Color{1.f, 0.f, 0.f, 1.f}, Color{0.f, 1.f, 0.f, 1.f}},
+                                             {}));
   canvas->drawShape(transShape, paint);
   paint.setShader(nullptr);
 
