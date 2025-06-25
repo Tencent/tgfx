@@ -54,7 +54,7 @@ class Shape {
   static std::shared_ptr<Shape> MakeFrom(std::shared_ptr<PathProvider> pathProvider);
 
   /**
-   * Creates a new Shape from the glyphFace and glyphID. Returns nullptr if the glyphFace is nullptr
+   * Creates a new Shape from the Font and glyphID. Returns nullptr if the glyphID is 0
    * or contains a typeface that can't generate a path, such as bitmap typefaces.
    */
   static std::shared_ptr<Shape> MakeFrom(Font font, GlyphID glyphID);
