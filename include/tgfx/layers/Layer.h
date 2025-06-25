@@ -605,6 +605,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void propagateHasBackgroundStyleFlags();
 
+  bool hasBackgroundStyle();
+
   struct {
     bool dirtyContent : 1;        // layer's content needs updating
     bool dirtyContentBounds : 1;  // layer's content bounds needs updating

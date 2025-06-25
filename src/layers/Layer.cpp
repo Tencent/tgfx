@@ -515,9 +515,36 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   }
   auto surface = canvas->getSurface();
   DrawArgs args = {};
-  if (surface && !(surface->renderFlags() & RenderFlags::DisableCache)) {
-    args.context = surface->getContext();
+  Context* context = nullptr;
+  if (surface) {
+    context = surface->getContext();
+    if (!(surface->renderFlags() & RenderFlags::DisableCache)) {
+      args.context = context;
+    }
   }
+
+  if (context && hasBackgroundStyle()) {
+    auto scale = canvas->getMatrix().getMaxScale();
+    auto bounds = getBounds();
+    bounds.scale(scale, scale);
+    auto globalMatrix = getGlobalMatrix();
+    globalMatrix.preScale(1 / scale, 1 / scale);
+    auto invert = Matrix::I();
+    if (globalMatrix.invert(&invert)) {
+      auto backgroundContext = BackgroundContext::Make(context, bounds, invert);
+      if (backgroundContext) {
+        auto backgroundCanvas = backgroundContext->getCanvas();
+        auto image = getBackgroundImage(args, scale, nullptr);
+        if (image) {
+          AutoCanvasRestore restore(backgroundCanvas);
+          backgroundCanvas->setMatrix(Matrix::I());
+          backgroundCanvas->drawImage(image);
+        }
+        args.backgroundContext = std::move(backgroundContext);
+      }
+    }
+  }
+
   drawLayer(args, canvas, alpha, blendMode);
 }
 
@@ -653,7 +680,7 @@ std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
 
 RasterizedContent* Layer::getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix) {
   if (!bitFields.shouldRasterize || args.context == nullptr ||
-      (args.drawMode == DrawMode::Background && bitFields.hasBackgroundStyle) ||
+      (args.drawMode == DrawMode::Background && hasBackgroundStyle()) ||
       args.drawMode == DrawMode::Contour || args.excludeEffects) {
     return nullptr;
   }
@@ -716,7 +743,7 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
   if (auto rasterizedCache = getRasterizedCache(args, canvas->getMatrix())) {
     rasterizedCache->draw(canvas, bitFields.allowsEdgeAntialiasing, alpha, blendMode);
     if (args.backgroundContext) {
-      if (bitFields.hasBackgroundStyle) {
+      if (hasBackgroundStyle()) {
         auto backgroundArgs = args;
         backgroundArgs.drawMode = DrawMode::Background;
         backgroundArgs.backgroundContext = nullptr;
@@ -797,7 +824,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     }
     paint.setMaskFilter(maskFilter);
   }
-  auto subBackgroundContext = bitFields.hasBackgroundStyle && args.backgroundContext
+  auto subBackgroundContext = args.backgroundContext && hasBackgroundStyle()
                                   ? args.backgroundContext->createSubContext()
                                   : nullptr;
   auto offscreenArgs = args;
@@ -1227,6 +1254,23 @@ void Layer::propagateHasBackgroundStyleFlags() {
     layer->bitFields.hasBackgroundStyle = true;
     layer = layer->_parent;
   }
+}
+
+bool Layer::hasBackgroundStyle() {
+  if (!bitFields.dirtyDescendents && bitFields.hasBackgroundStyle) {
+    return true;
+  }
+  for (const auto& style : _layerStyles) {
+    if (style->extraSourceType() == LayerStyleExtraSourceType::Background) {
+      return true;
+    }
+  }
+  for (const auto& child : _children) {
+    if (child->hasBackgroundStyle()) {
+      return true;
+    }
+  }
+  return false;
 }
 
 }  // namespace tgfx
