@@ -30,9 +30,18 @@ class AutoMalloc {
  public:
   explicit AutoMalloc() : pointer(storage), size_(SizeAlign4) {
   }
+
   explicit AutoMalloc(size_t size) : pointer(storage), size_(SizeAlign4) {
     reset(size);
   }
+
+  AutoMalloc(const AutoMalloc&) = delete;
+
+  AutoMalloc& operator=(const AutoMalloc&) = delete;
+
+  AutoMalloc(AutoMalloc&&) = default;
+
+  AutoMalloc& operator=(AutoMalloc&&) = default;
 
   ~AutoMalloc() {
     if (pointer != static_cast<void*>(storage)) {
