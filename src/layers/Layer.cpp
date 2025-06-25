@@ -523,7 +523,7 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     }
   }
 
-  if (context && hasDescendantBackgroundStyle()) {
+  if (context && hasBackgroundStyle()) {
     auto scale = canvas->getMatrix().getMaxScale();
     auto bounds = getBounds();
     bounds.scale(scale, scale);
@@ -680,7 +680,7 @@ std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
 
 RasterizedContent* Layer::getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix) {
   if (!bitFields.shouldRasterize || args.context == nullptr ||
-      (args.drawMode == DrawMode::Background && bitFields.hasBackgroundStyle) ||
+      (args.drawMode == DrawMode::Background && hasBackgroundStyle()) ||
       args.drawMode == DrawMode::Contour || args.excludeEffects) {
     return nullptr;
   }
@@ -743,7 +743,7 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
   if (auto rasterizedCache = getRasterizedCache(args, canvas->getMatrix())) {
     rasterizedCache->draw(canvas, bitFields.allowsEdgeAntialiasing, alpha, blendMode);
     if (args.backgroundContext) {
-      if (hasDescendantBackgroundStyle()) {
+      if (hasBackgroundStyle()) {
         auto backgroundArgs = args;
         backgroundArgs.drawMode = DrawMode::Background;
         backgroundArgs.backgroundContext = nullptr;
@@ -824,7 +824,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     }
     paint.setMaskFilter(maskFilter);
   }
-  auto subBackgroundContext = args.backgroundContext && hasDescendantBackgroundStyle()
+  auto subBackgroundContext = args.backgroundContext && hasBackgroundStyle()
                                   ? args.backgroundContext->createSubContext()
                                   : nullptr;
   auto offscreenArgs = args;
@@ -1256,7 +1256,7 @@ void Layer::propagateHasBackgroundStyleFlags() {
   }
 }
 
-bool Layer::hasDescendantBackgroundStyle() {
+bool Layer::hasBackgroundStyle() {
   if (!bitFields.dirtyDescendents && bitFields.hasBackgroundStyle) {
     return true;
   }
@@ -1266,7 +1266,7 @@ bool Layer::hasDescendantBackgroundStyle() {
     }
   }
   for (const auto& child : _children) {
-    if (child->hasDescendantBackgroundStyle()) {
+    if (child->hasBackgroundStyle()) {
       return true;
     }
   }
