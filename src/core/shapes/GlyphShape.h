@@ -18,14 +18,13 @@
 
 #pragma once
 
-#include "gpu/ResourceKey.h"
-#include "tgfx/core/Shape.h"
+#include "core/shapes/UniqueKeyShape.h"
 
 namespace tgfx {
 /**
  * Shape that contains a GlyphFace and GlyphID.
  */
-class GlyphShape final : public Shape {
+class GlyphShape : public UniqueKeyShape {
  public:
   explicit GlyphShape(Font font, GlyphID glyphID);
 
@@ -37,12 +36,8 @@ class GlyphShape final : public Shape {
   Type type() const override {
     return Type::Glyph;
   }
-  UniqueKey getUniqueKey() const override {
-    return uniqueKey.get();
-  }
 
  private:
-  LazyUniqueKey uniqueKey = {};
   Font font;
   GlyphID glyphID = 0;
 };

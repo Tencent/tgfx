@@ -60,7 +60,7 @@
         "drawImageRect": "7d02c515",
         "drawPaint": "b7aefeb",
         "drawPaint_shadow": "1ae5042",
-        "drawShape": "13657aa4",
+        "drawShape": "ea225887",
         "filter_mode_linear": "c475bfb",
         "filter_mode_nearest": "d010fb8",
         "hardware_render_target_blend": "0389826",
@@ -90,7 +90,7 @@
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "da590da",
         "ImageWithShadow": "50136952",
-        "SimpleLayerTreeDrawer": "d59910d8",
+        "SimpleLayerTreeDrawer": "ea225887",
         "SimpleText": "ced3b513"
     },
     "DstTextureTest": {

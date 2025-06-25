@@ -19,13 +19,13 @@
 #include "tgfx/core/Canvas.h"
 #include "core/DrawContext.h"
 #include "core/RecordingContext.h"
+#include "core/shapes/StrokeShape.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/Types.h"
 #include "images/SubsetImage.h"
 #include "shapes/MatrixShape.h"
 #include "shapes/PathShape.h"
-#include "shapes/StrokeShape.h"
 #include "tgfx/core/Surface.h"
 
 namespace tgfx {
@@ -383,7 +383,7 @@ void Canvas::drawPath(const Path& path, const MCState& state, const Fill& fill,
     if (shape == nullptr) {
       return;
     }
-    shape = Shape::ApplyStroke(std::move(shape), stroke);
+    shape = StrokeShape::Apply(std::move(shape), stroke, false);
     if (shape == nullptr) {
       return;
     }
@@ -391,46 +391,35 @@ void Canvas::drawPath(const Path& path, const MCState& state, const Fill& fill,
   }
 }
 
-Path* Canvas::UnwrapShape(std::shared_ptr<Shape> shape, const Stroke** pathStroke,
-                          Matrix* pathMatrix) {
-  DEBUG_ASSERT(pathMatrix != nullptr);
-  DEBUG_ASSERT(pathStroke != nullptr);
-  if (shape->type() == Shape::Type::Path) {
-    return &std::static_pointer_cast<PathShape>(shape)->path;
-  }
-  if (*pathStroke == nullptr && shape->type() == Shape::Type::Stroke) {
-    auto strokeShape = std::static_pointer_cast<StrokeShape>(shape);
-    if (strokeShape->shape->isSimplePath()) {
-      *pathStroke = &strokeShape->stroke;
-      return &std::static_pointer_cast<PathShape>(strokeShape->shape)->path;
-    }
-  } else if (*pathStroke == nullptr && shape->type() == Shape::Type::Matrix) {
-    auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);
-    Matrix matrix = matrixShape->matrix;
-    auto path = UnwrapShape(matrixShape->shape, pathStroke, &matrix);
-    if (path) {
-      pathMatrix->preConcat(matrix);
-    }
-    return path;
-  }
-  return nullptr;
-}
-
 void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
   if (shape == nullptr) {
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
-  auto stroke = paint.getStroke();
+  auto fill = paint.getFill();
   auto state = *mcState;
-  auto path = UnwrapShape(shape, &stroke, &state.matrix);
+  auto stroke = paint.getStroke();
+  Path* path = nullptr;
+  if (shape->type() == Shape::Type::Path) {
+    path = &std::static_pointer_cast<PathShape>(shape)->path;
+  } else if (stroke == nullptr && shape->type() == Shape::Type::Matrix) {
+    auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);
+    if (matrixShape->shape->isSimplePath()) {
+      Matrix inverse = {};
+      if (matrixShape->matrix.invert(&inverse)) {
+        path = &std::static_pointer_cast<PathShape>(matrixShape->shape)->path;
+        state.matrix.preConcat(matrixShape->matrix);
+        fill = fill.makeWithMatrix(inverse);
+      }
+    }
+  }
   if (path) {
-    drawPath(*path, state, paint.getFill(), stroke);
+    drawPath(*path, state, fill, stroke);
     return;
   }
-  shape = Shape::ApplyStroke(std::move(shape), paint.getStroke());
+  shape = StrokeShape::Apply(std::move(shape), stroke, false);
   if (shape != nullptr) {
-    drawContext->drawShape(std::move(shape), state, paint.getFill());
+    drawContext->drawShape(std::move(shape), state, fill);
   }
 }
 

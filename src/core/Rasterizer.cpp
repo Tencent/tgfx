@@ -19,6 +19,7 @@
 #include "Rasterizer.h"
 #include "core/ShapeRasterizer.h"
 #include "core/TextRasterizer.h"
+#include "core/shapes/StrokeShape.h"
 
 namespace tgfx {
 std::shared_ptr<Rasterizer> Rasterizer::MakeFrom(int width, int height,
@@ -38,7 +39,7 @@ std::shared_ptr<Rasterizer> Rasterizer::MakeFrom(int width, int height, Path pat
     return nullptr;
   }
   auto shape = Shape::MakeFrom(std::move(path));
-  shape = Shape::ApplyStroke(std::move(shape), stroke);
+  shape = StrokeShape::Apply(std::move(shape), stroke, false);
   shape = Shape::ApplyMatrix(std::move(shape), matrix);
   if (shape == nullptr) {
     return nullptr;
