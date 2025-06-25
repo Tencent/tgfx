@@ -18,8 +18,8 @@
 
 #include "tgfx/layers/Layer.h"
 #include <atomic>
+#include "contents/LayerContent.h"
 #include "contents/RasterizedContent.h"
-#include "contents/RecordedContent.h"
 #include "core/images/PictureImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -270,11 +270,6 @@ void Layer::setExcludeChildEffectsInLayerStyle(bool value) {
   invalidateTransform();
 }
 
-void Layer::setContent(std::unique_ptr<LayerContent> content) {
-  layerContent = std::move(content);
-  invalidateContent();
-}
-
 bool Layer::addChild(std::shared_ptr<Layer> child) {
   if (!child) {
     return false;
@@ -421,7 +416,7 @@ Rect Layer::getBounds(const Layer* targetCoordinateSpace, bool computeTightBound
 
 Rect Layer::getBoundsInternal(const Matrix& coordinateMatrix, bool computeTightBounds) {
   Rect bounds = {};
-  if (auto content = getRecordedContent()) {
+  if (auto content = getContent()) {
     if (computeTightBounds) {
       bounds.join(content->getTightBounds(coordinateMatrix));
     } else {
@@ -481,7 +476,7 @@ Point Layer::localToGlobal(const Point& localPoint) const {
 }
 
 bool Layer::hitTestPoint(float x, float y, bool shapeHitTest) {
-  if (auto content = getRecordedContent()) {
+  if (auto content = getContent()) {
     Point localPoint = globalToLocal(Point::Make(x, y));
     if (content->hitTestPoint(localPoint.x, localPoint.y, shapeHitTest)) {
       return true;
@@ -588,11 +583,7 @@ void Layer::invalidate() {
   }
 }
 
-void Layer::onUpdateContent(LayerRecorder* recorder) {
-  if (layerContent != nullptr) {
-    layerContent->onDrawContent(recorder);
-    layerContent = nullptr;
-  }
+void Layer::onUpdateContent(LayerRecorder*) {
 }
 
 void Layer::attachProperty(LayerProperty* property) {
@@ -664,14 +655,14 @@ Matrix Layer::getMatrixWithScrollRect() const {
   return matrix;
 }
 
-RecordedContent* Layer::getRecordedContent() {
+LayerContent* Layer::getContent() {
   if (bitFields.dirtyContent) {
     LayerRecorder recorder = {};
     onUpdateContent(&recorder);
-    recordedContent = recorder.finishRecording();
+    layerContent = recorder.finishRecording();
     bitFields.dirtyContent = false;
   }
-  return recordedContent.get();
+  return layerContent.get();
 }
 
 std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
@@ -694,7 +685,7 @@ RasterizedContent* Layer::getRasterizedCache(const DrawArgs& args, const Matrix&
     return nullptr;
   }
   auto contextID = args.context->uniqueID();
-  auto content = static_cast<RasterizedContent*>(rasterizedContent.get());
+  auto content = rasterizedContent.get();
   float contentScale =
       _rasterizationScale == 0.0f ? renderMatrix.getMaxScale() : _rasterizationScale;
   if (content && content->contextID() == contextID && content->contentScale() == contentScale) {
@@ -752,10 +743,15 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
   if (auto rasterizedCache = getRasterizedCache(args, canvas->getMatrix())) {
     rasterizedCache->draw(canvas, bitFields.allowsEdgeAntialiasing, alpha, blendMode);
     if (args.backgroundContext) {
-      auto backgroundArgs = args;
-      backgroundArgs.drawMode = DrawMode::Background;
-      backgroundArgs.backgroundContext = nullptr;
-      drawOffscreen(backgroundArgs, args.backgroundContext->getCanvas(), alpha, blendMode);
+      if (bitFields.hasBackgroundStyle) {
+        auto backgroundArgs = args;
+        backgroundArgs.drawMode = DrawMode::Background;
+        backgroundArgs.backgroundContext = nullptr;
+        drawOffscreen(backgroundArgs, args.backgroundContext->getCanvas(), alpha, blendMode);
+      } else {
+        rasterizedCache->draw(args.backgroundContext->getCanvas(), bitFields.allowsEdgeAntialiasing,
+                              alpha, blendMode);
+      }
     }
   } else if (blendMode != BlendMode::SrcOver || (alpha < 1.0f && allowsGroupOpacity()) ||
              (!_filters.empty() && !args.excludeEffects) || hasValidMask()) {
@@ -881,7 +877,7 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
     drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Below);
   }
   LayerFill layerFill(bitFields.allowsEdgeAntialiasing, alpha);
-  auto content = getRecordedContent();
+  auto content = getContent();
   if (content) {
     if (args.drawMode == DrawMode::Contour) {
       content->drawContour(canvas, &layerFill);
@@ -1120,7 +1116,7 @@ bool Layer::getLayersUnderPointInternal(float x, float y,
   if (hasLayerUnderPoint) {
     results->push_back(shared_from_this());
   } else {
-    auto content = getRecordedContent();
+    auto content = getContent();
     if (nullptr != content) {
       auto layerBoundsRect = content->getBounds();
       auto localPoint = globalToLocal(Point::Make(x, y));
@@ -1157,7 +1153,7 @@ void Layer::updateRenderBounds(const Matrix& renderMatrix,
     transformer =
         RegionTransformer::MakeFromStyles(_layerStyles, contentScale, std::move(transformer));
   }
-  auto content = getRecordedContent();
+  auto content = getContent();
   if (bitFields.dirtyContentBounds || (forceDirty && content)) {
     if (contentBounds) {
       _root->invalidateRect(*contentBounds);

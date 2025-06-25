@@ -34,7 +34,7 @@ Canvas* LayerRecorder::getCanvas(LayerContentType contentType) {
   return canvas;
 }
 
-std::unique_ptr<RecordedContent> LayerRecorder::finishRecording() {
+std::unique_ptr<LayerContent> LayerRecorder::finishRecording() {
   std::shared_ptr<Picture> defaultContent = nullptr;
   if (auto& defaultRecorder = recorders[static_cast<size_t>(LayerContentType::Default)]) {
     defaultContent = defaultRecorder->finishRecordingAsPicture();
@@ -47,7 +47,7 @@ std::unique_ptr<RecordedContent> LayerRecorder::finishRecording() {
   if (auto& contourRecorder = recorders[static_cast<size_t>(LayerContentType::Contour)]) {
     contour = contourRecorder->finishRecordingAsPicture();
   }
-  std::unique_ptr<RecordedContent> layerContent = nullptr;
+  std::unique_ptr<LayerContent> layerContent = nullptr;
   if (foreground) {
     layerContent =
         std::make_unique<ForegroundContent>(std::move(defaultContent), std::move(foreground));
