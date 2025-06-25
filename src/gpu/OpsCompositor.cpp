@@ -47,14 +47,15 @@ OpsCompositor::OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t 
 
 void OpsCompositor::fillImage(std::shared_ptr<Image> image, const Rect& rect,
                               const SamplingOptions& sampling, const MCState& state,
-                              const Fill& fill) {
+                              const Fill& fill, SrcRectConstraint constraint) {
   DEBUG_ASSERT(image != nullptr);
   DEBUG_ASSERT(!rect.isEmpty());
   if (!canAppend(PendingOpType::Image, state.clip, fill) || pendingImage != image ||
-      pendingSampling != sampling) {
+      pendingSampling != sampling || pendingConstraint != constraint) {
     flushPendingOps(PendingOpType::Image, state.clip, fill);
     pendingImage = std::move(image);
     pendingSampling = sampling;
+    pendingConstraint = constraint;
   }
   auto record = drawingBuffer()->make<RectRecord>(rect, state.matrix, fill.color.premultiply());
   pendingRects.emplace_back(std::move(record));
@@ -250,8 +251,14 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
           deviceBounds->join(rect);
         }
       }
+      auto subsetMode = RectsVertexProvider::UVSubsetMode::None;
+      if (pendingConstraint == SrcRectConstraint::Strict && pendingImage) {
+        subsetMode = pendingSampling.filterMode == FilterMode::Linear
+                         ? RectsVertexProvider::UVSubsetMode::SubsetOnly
+                         : RectsVertexProvider::UVSubsetMode::RoundOutAndSubset;
+      }
       auto provider = RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects),
-                                                    aaType, needLocalBounds);
+                                                    aaType, needLocalBounds, subsetMode);
       drawOp = RectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::RRect: {
@@ -277,7 +284,8 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
 
   if (type == PendingOpType::Image) {
     FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty())};
-    auto processor = FragmentProcessor::Make(std::move(pendingImage), args, pendingSampling);
+    auto processor =
+        FragmentProcessor::Make(std::move(pendingImage), args, pendingSampling, pendingConstraint);
     if (processor == nullptr) {
       return;
     }

@@ -18,22 +18,34 @@
 
 #pragma once
 
+#include <array>
+#include "tgfx/core/Canvas.h"
+#include "tgfx/core/Recorder.h"
+#include "tgfx/layers/LayerContent.h"
+
 namespace tgfx {
+class RecordedContent;
+
 /**
- * Defines the mask style of layer's mask.
+ * LayerRecorder is a utility class that records drawing commands as layer content.
  */
-enum class MaskStyle {
+class LayerRecorder {
+ public:
   /**
-   * Uses the target layer's transparency as a mask.
+   * Returns a Canvas for recording drawing commands. The content type determines where the recorded
+   * commands will be stored:
+   * - Default: The commands will be stored in the default content of the layer.
+   * - Foreground: The commands will be stored in the foreground content of the layer.
+   * - Contour: The commands will be stored in the contour content of the layer.
+   * If the content type is not specified, it defaults to ContentType::Default.
    */
-  Alpha,
-  /**
-   * Uses the target layer's contour as a mask.
-   */
-  Vector,
-  /**
-   * Uses the target layer's luminance as a mask.
-   */
-  Luminance
+  Canvas* getCanvas(LayerContentType contentType = LayerContentType::Default);
+
+ private:
+  std::array<std::unique_ptr<Recorder>, 3> recorders = {};
+
+  std::unique_ptr<RecordedContent> finishRecording();
+
+  friend class Layer;
 };
 }  // namespace tgfx

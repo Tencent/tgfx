@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -21,12 +21,14 @@
 #include "core/DrawContext.h"
 
 namespace tgfx {
-class LayerUnrollContext : public DrawContext {
+class HitTestContext : public DrawContext {
  public:
-  LayerUnrollContext(DrawContext* drawContext, Fill fill);
+  HitTestContext(float testX, float testY, bool shapeHitTest)
+      : testX(testX), testY(testY), shapeHitTest(shapeHitTest) {
+  }
 
-  bool hasUnrolled() const {
-    return unrolled;
+  bool hasHit() const {
+    return hit;
   }
 
   void drawFill(const Fill& fill) override;
@@ -41,8 +43,8 @@ class LayerUnrollContext : public DrawContext {
   void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) override;
 
   void drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
-                     const SamplingOptions& sampling, const MCState& mcState,
-                     const Fill& fill) override;
+                     const SamplingOptions& sampling, const MCState& state, const Fill& fill,
+                     SrcRectConstraint constraint) override;
 
   void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
                         const Fill& fill, const Stroke* stroke) override;
@@ -52,12 +54,12 @@ class LayerUnrollContext : public DrawContext {
   void drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<ImageFilter> filter,
                  const MCState& state, const Fill& fill) override;
 
- protected:
-  Fill merge(const Fill& fill);
-
  private:
-  DrawContext* drawContext = nullptr;
-  Fill layerFill = {};
-  bool unrolled = false;
+  float testX = 0;
+  float testY = 0;
+  bool shapeHitTest = false;
+  bool hit = false;
+
+  bool checkClipAndFill(const Path& clip, const Fill& fill, const Point& local) const;
 };
 }  // namespace tgfx

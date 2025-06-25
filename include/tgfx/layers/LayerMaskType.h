@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,20 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ImageContent.h"
+#pragma once
 
 namespace tgfx {
-Rect ImageContent::getBounds() const {
-  return Rect::MakeXYWH(0, 0, image->width(), image->height());
-}
-
-void ImageContent::draw(Canvas* canvas, const Paint& paint) const {
-  canvas->drawImage(image, sampling, &paint);
-}
-
-bool ImageContent::hitTestPoint(float localX, float localY, bool /*pixelHitTest*/) {
-  // The pixelHitTest flag is ignored because we cannot read pixels from images before they are drawn.
-  const auto imageBounds = Rect::MakeXYWH(0, 0, image->width(), image->height());
-  return imageBounds.contains(localX, localY);
-}
+/**
+ * LayerMaskType defines the type of mask to be used for a layer.
+ */
+enum class LayerMaskType {
+  /**
+   * Uses the target layer's transparency as a mask.
+   */
+  Alpha,
+  /**
+   * Uses the target layer's contour as a mask.
+   */
+  Contour,
+  /**
+   * Uses the target layer's luminance as a mask.
+   */
+  Luminance
+};
 }  // namespace tgfx

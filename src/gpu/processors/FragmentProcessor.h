@@ -22,11 +22,14 @@
 #include "gpu/CoordTransform.h"
 #include "gpu/FragmentShaderBuilder.h"
 #include "gpu/SamplerState.h"
+#include "gpu/SamplingArgs.h"
 #include "gpu/Texture.h"
 #include "gpu/UniformBuffer.h"
 #include "gpu/UniformHandler.h"
 #include "gpu/processors/Processor.h"
 #include "gpu/proxies/TextureProxy.h"
+#include "tgfx/core/Canvas.h"
+#include "tgfx/core/Image.h"
 
 namespace tgfx {
 class Pipeline;
@@ -52,9 +55,9 @@ class FragmentProcessor : public Processor {
    * Creates a fragment processor that will draw the given image with the given options. The both
    * tileModeX and tileModeY are set to TileMode::Clamp.
    */
-  static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<Image> image, const FPArgs& args,
-                                              const SamplingOptions& sampling,
-                                              const Matrix* uvMatrix = nullptr);
+  static PlacementPtr<FragmentProcessor> Make(
+      std::shared_ptr<Image> image, const FPArgs& args, const SamplingOptions& sampling,
+      SrcRectConstraint constraint = SrcRectConstraint::Fast, const Matrix* uvMatrix = nullptr);
 
   /**
    * Creates a fragment processor that will draw the given image with the given options.
@@ -62,6 +65,14 @@ class FragmentProcessor : public Processor {
   static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<Image> image, const FPArgs& args,
                                               TileMode tileModeX, TileMode tileModeY,
                                               const SamplingOptions& sampling,
+                                              SrcRectConstraint constraint,
+                                              const Matrix* uvMatrix = nullptr);
+  /**
+   * Creates a fragment processor that will draw the given image with the given options.
+   * The samplingArgs contains additional information about how to sample the image.
+   */
+  static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<Image> image, const FPArgs& args,
+                                              const SamplingArgs& samplingArgs,
                                               const Matrix* uvMatrix = nullptr);
 
   /**

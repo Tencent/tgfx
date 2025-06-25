@@ -20,10 +20,11 @@
 #include "ProgramBuilder.h"
 
 namespace tgfx {
-Varying VaryingHandler::addVarying(const std::string& name, SLType type) {
+Varying VaryingHandler::addVarying(const std::string& name, SLType type, bool isFlat) {
   Varying varying;
   varying._type = type;
   varying._name = programBuilder->nameVariable(name);
+  varying._isFlat = isFlat;
   varyings.push_back(std::move(varying));
   return varyings[varyings.size() - 1];
 }
@@ -46,8 +47,12 @@ void VaryingHandler::addAttribute(const ShaderVar& var) {
 
 void VaryingHandler::finalize() {
   for (const auto& v : varyings) {
-    vertexOutputs.emplace_back(v._name, v.type(), ShaderVar::TypeModifier::Varying);
-    fragInputs.emplace_back(v._name, v.type(), ShaderVar::TypeModifier::Varying);
+    vertexOutputs.emplace_back(
+        v._name, v.type(),
+        v._isFlat ? ShaderVar::TypeModifier::FlatVarying : ShaderVar::TypeModifier::Varying);
+    fragInputs.emplace_back(
+        v._name, v.type(),
+        v._isFlat ? ShaderVar::TypeModifier::FlatVarying : ShaderVar::TypeModifier::Varying);
   }
 }
 

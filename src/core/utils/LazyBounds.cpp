@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,38 +16,20 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/layers/LayerProperty.h"
-#include "tgfx/layers/Layer.h"
+#include "LazyBounds.h"
 
 namespace tgfx {
-
-void LayerProperty::invalidateContent() {
-  for (auto& owner : owners) {
-    if (auto layer = owner.lock()) {
-      layer->invalidateContent();
-    }
+void LazyBounds::update(const Rect& rect) const {
+  auto newBounds = new Rect(rect);
+  Rect* oldBounds = nullptr;
+  if (!bounds.compare_exchange_strong(oldBounds, newBounds, std::memory_order_acq_rel)) {
+    delete newBounds;
   }
 }
 
-void LayerProperty::invalidateTransform() {
-  for (auto& owner : owners) {
-    if (auto layer = owner.lock()) {
-      layer->invalidateTransform();
-    }
-  }
-}
-
-void LayerProperty::attachToLayer(Layer* layer) {
-  owners.push_back(layer->weak_from_this());
-}
-
-void LayerProperty::detachFromLayer(Layer* layer) {
-  for (auto owner = owners.begin(); owner != owners.end(); ++owner) {
-    if (owner->lock().get() == layer) {
-      owners.erase(owner);
-      break;
-    }
-  }
+void LazyBounds::reset() {
+  auto oldBounds = bounds.exchange(nullptr, std::memory_order_acq_rel);
+  delete oldBounds;
 }
 
 }  // namespace tgfx

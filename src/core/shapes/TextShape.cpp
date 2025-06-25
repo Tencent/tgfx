@@ -21,25 +21,27 @@
 #include "core/utils/Log.h"
 
 namespace tgfx {
-std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<TextBlob> textBlob) {
+std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<TextBlob> textBlob, float resolutionScale) {
   auto glyphRunLists = GlyphRunList::Unwrap(textBlob.get());
-  if (glyphRunLists == nullptr || glyphRunLists->size() != 1) {
+  if (glyphRunLists == nullptr) {
     return nullptr;
   }
-  auto glyphRunList = (*glyphRunLists)[0];
-  if (!glyphRunList->hasOutlines()) {
+  std::shared_ptr<GlyphRunList> glyphRunList = nullptr;
+  for (auto& list : *glyphRunLists) {
+    if (list->hasOutlines()) {
+      glyphRunList = list;
+      break;
+    }
+  }
+  if (glyphRunList == nullptr) {
     return nullptr;
   }
-  return std::make_shared<TextShape>(std::move(glyphRunList));
-}
-
-Rect TextShape::getBounds() const {
-  return glyphRunList->getBounds();
+  return std::make_shared<TextShape>(std::move(glyphRunList), resolutionScale);
 }
 
 Path TextShape::getPath() const {
   Path path = {};
-  if (!glyphRunList->getPath(&path)) {
+  if (!glyphRunList->getPath(&path, resolutionScale)) {
     LOGE("TextShape::getPath() Failed to get path from GlyphRunList!");
     return {};
   }

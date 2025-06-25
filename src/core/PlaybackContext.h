@@ -25,6 +25,8 @@ namespace tgfx {
 
 class PlaybackContext {
  public:
+  PlaybackContext() = default;
+
   explicit PlaybackContext(MCState state, const FillModifier* fillModifier = nullptr);
 
   const MCState& state() const {

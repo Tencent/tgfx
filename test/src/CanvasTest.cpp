@@ -1767,4 +1767,287 @@ TGFX_TEST(CanvasTest, ShadowBoundIntersect) {
   canvas->drawImage(image);
   context->flush();
 }
+
+TGFX_TEST(CanvasTest, MultiImageRect_SameView) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  int surfaceWidth = 1563;
+  int surfaceHeight = 1563;
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  auto* canvas = surface->getCanvas();
+  canvas->clear();
+  auto image = MakeImage("resources/assets/GenMesh.png");
+  int meshNumH = 5;
+  int meshNumV = 5;
+  float meshWidth = image->width() / meshNumH;
+  float meshHeight = image->height() / meshNumV;
+  float scale = 0.9f;
+  Paint paint;
+  paint.setAntiAlias(false);
+  SamplingOptions options;
+  options.filterMode = FilterMode::Linear;
+  for (int i = 0; i < meshNumH; i++) {
+    for (int j = 0; j < meshNumV; j++) {
+      Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
+      Rect dstRect = Rect::MakeXYWH(i * meshWidth * scale, j * meshHeight * scale,
+                                    meshWidth * scale, meshHeight * scale);
+      canvas->drawImageRect(image, srcRect, dstRect, options, &paint, SrcRectConstraint::Fast);
+    }
+  }
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect_SameView"));
+}
+
+TGFX_TEST(CanvasTest, SingleImageRect) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  int surfaceWidth = 1563;
+  int surfaceHeight = 1563;
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  auto* canvas = surface->getCanvas();
+  canvas->clear();
+  auto image = MakeImage("resources/assets/HappyNewYear.png");
+  float scale = 5.211f;
+  Rect srcRect = Rect::MakeXYWH(256, 256, 256, 256);
+  Rect dstRect = Rect::MakeXYWH(0.0f, 0.0f, srcRect.width() * scale, srcRect.height() * scale);
+  SamplingOptions options;
+  options.filterMode = FilterMode::Linear;
+  Paint paint;
+  paint.setAntiAlias(false);
+  canvas->drawImageRect(image, srcRect, dstRect, options, &paint, SrcRectConstraint::Strict);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/SingleImageRect1"));
+  canvas->clear();
+  auto mipmapImage = image->makeMipmapped(true);
+  options.filterMode = FilterMode::Linear;
+  options.mipmapMode = MipmapMode::Nearest;
+  scale = 0.3f;
+  dstRect = Rect::MakeXYWH(0.0f, 0.0f, srcRect.width() * scale, srcRect.height() * scale);
+  canvas->drawImageRect(mipmapImage, srcRect, dstRect, options, &paint, SrcRectConstraint::Strict);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/SingleImageRectWithMipmap"));
+}
+
+TGFX_TEST(CanvasTest, MultiImageRect_SCALE_LINEAR) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  int surfaceWidth = 1563;
+  int surfaceHeight = 1563;
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  auto* canvas = surface->getCanvas();
+  canvas->clear();
+  auto image = MakeImage("resources/assets/HappyNewYear.png");
+  auto mipmapImage = image->makeMipmapped(true);
+  float scale = 0.9f;
+  Paint paint;
+  paint.setAntiAlias(false);
+  constexpr int meshNumH = 4;
+  constexpr int meshNumV = 4;
+  float meshWidth = image->width() / meshNumH;
+  float meshHeight = image->height() / meshNumV;
+  SamplingOptions options;
+  options.filterMode = FilterMode::Linear;
+  options.mipmapMode = MipmapMode::None;
+  Point offsets[meshNumV][meshNumH] = {
+      {{meshWidth, meshHeight}, {meshWidth, 0.0f}, {0.0f, meshHeight * 2}, {meshWidth * 3, 0.0f}},
+      {{0.0f, meshHeight},
+       {0.0f, 0.0f},
+       {meshWidth * 2, meshHeight * 3},
+       {meshWidth * 3, meshHeight}},
+      {{0.0f, meshHeight * 3},
+       {meshWidth * 3, meshHeight * 2},
+       {meshWidth * 2, meshHeight * 2},
+       {meshWidth * 2, 0.0f}},
+      {{meshWidth * 2, meshHeight},
+       {meshWidth, meshHeight * 3},
+       {meshWidth, meshHeight * 2},
+       {meshWidth * 3, meshHeight * 3}}};
+  for (int i = 0; i < meshNumH; i++)
+    for (int j = 0; j < meshNumV; j++) {
+      Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
+      Rect dstRect = Rect::MakeXYWH(offsets[j][i].x * scale, offsets[j][i].y * scale,
+                                    meshWidth * scale, meshHeight * scale);
+      canvas->drawImageRect(mipmapImage, srcRect, dstRect, options, &paint,
+                            SrcRectConstraint::Strict);
+    }
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect_SCALE_LINEAR_NONE1"));
+  canvas->clear();
+  options.mipmapMode = MipmapMode::Linear;
+  for (int i = 0; i < meshNumH; i++)
+    for (int j = 0; j < meshNumV; j++) {
+      Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
+      Rect dstRect = Rect::MakeXYWH(offsets[j][i].x * scale, offsets[j][i].y * scale,
+                                    meshWidth * scale, meshHeight * scale);
+      canvas->drawImageRect(mipmapImage, srcRect, dstRect, options, &paint,
+                            SrcRectConstraint::Strict);
+    }
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect_SCALE_LINEAR_LINEAR1"));
+  canvas->clear();
+  options.mipmapMode = MipmapMode::Nearest;
+  for (int i = 0; i < meshNumH; i++)
+    for (int j = 0; j < meshNumV; j++) {
+      Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
+      Rect dstRect = Rect::MakeXYWH(offsets[j][i].x * scale, offsets[j][i].y * scale,
+                                    meshWidth * scale, meshHeight * scale);
+      canvas->drawImageRect(mipmapImage, srcRect, dstRect, options, &paint,
+                            SrcRectConstraint::Strict);
+    }
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect_SCALE_LINEAR_NEAREST1"));
+}
+
+TGFX_TEST(CanvasTest, MultiImageRect_NOSCALE_NEAREST) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  int surfaceWidth = 1024;
+  int surfaceHeight = 1024;
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  auto* canvas = surface->getCanvas();
+  canvas->clear();
+  auto image = MakeImage("resources/assets/HappyNewYear.png");
+  auto mipmapImage = image->makeMipmapped(true);
+  Paint paint;
+  paint.setAntiAlias(false);
+  constexpr int meshNumH = 4;
+  constexpr int meshNumV = 4;
+  float meshWidth = image->width() / meshNumH;
+  float meshHeight = image->height() / meshNumV;
+  SamplingOptions options;
+  options.filterMode = FilterMode::Nearest;
+  options.mipmapMode = MipmapMode::None;
+  Point offsets[meshNumV][meshNumH] = {
+      {{meshWidth, meshHeight}, {meshWidth, 0.0f}, {0.0f, meshHeight * 2}, {meshWidth * 3, 0.0f}},
+      {{0.0f, meshHeight},
+       {0.0f, 0.0f},
+       {meshWidth * 2, meshHeight * 3},
+       {meshWidth * 3, meshHeight}},
+      {{0.0f, meshHeight * 3},
+       {meshWidth * 3, meshHeight * 2},
+       {meshWidth * 2, meshHeight * 2},
+       {meshWidth * 2, 0.0f}},
+      {{meshWidth * 2, meshHeight},
+       {meshWidth, meshHeight * 3},
+       {meshWidth, meshHeight * 2},
+       {meshWidth * 3, meshHeight * 3}}};
+  for (int i = 0; i < meshNumH; i++)
+    for (int j = 0; j < meshNumV; j++) {
+      Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
+      Rect dstRect = Rect::MakeXYWH(offsets[j][i].x, offsets[j][i].y, meshWidth, meshHeight);
+      canvas->drawImageRect(mipmapImage, srcRect, dstRect, options, &paint,
+                            SrcRectConstraint::Strict);
+    }
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect_NOSCALE_NEAREST_NONE"));
+
+  canvas->clear();
+  options.mipmapMode = MipmapMode::Linear;
+  for (int i = 0; i < meshNumH; i++)
+    for (int j = 0; j < meshNumV; j++) {
+      Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
+      Rect dstRect = Rect::MakeXYWH(offsets[j][i].x, offsets[j][i].y, meshWidth, meshHeight);
+      canvas->drawImageRect(mipmapImage, srcRect, dstRect, options, &paint,
+                            SrcRectConstraint::Strict);
+    }
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect_NOSCALE_NEAREST_LINEAR"));
+
+  canvas->clear();
+  options.mipmapMode = MipmapMode::Nearest;
+  for (int i = 0; i < meshNumH; i++)
+    for (int j = 0; j < meshNumV; j++) {
+      Rect srcRect = Rect::MakeXYWH(i * meshWidth, j * meshHeight, meshWidth, meshHeight);
+      Rect dstRect = Rect::MakeXYWH(offsets[j][i].x, offsets[j][i].y, meshWidth, meshHeight);
+      canvas->drawImageRect(mipmapImage, srcRect, dstRect, options, &paint,
+                            SrcRectConstraint::Strict);
+    }
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect_NOSCALE_NEAREST_NEAREST"));
+}
+
+TGFX_TEST(CanvasTest, CornerTest) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 1024, 1024);
+  auto* canvas = surface->getCanvas();
+  canvas->clear();
+  Path rectPath = {};
+  rectPath.addRect(Rect::MakeXYWH(50, 50, 170, 100));
+  auto rectShape = Shape::MakeFrom(rectPath);
+  auto pathEffect = PathEffect::MakeCorner(10);
+  auto cornerRectshape = Shape::ApplyEffect(rectShape, pathEffect);
+
+  Path trianglePath = {};
+  trianglePath.moveTo(500, 500);
+  trianglePath.lineTo(550, 600);
+  trianglePath.lineTo(450, 600);
+  trianglePath.lineTo(500, 500);
+  trianglePath.close();
+  auto triangleShape = Shape::MakeFrom(trianglePath);
+  auto cornerTriShape = Shape::ApplyEffect(triangleShape, pathEffect);
+  Paint paint;
+  paint.setColor(Color(0, 0, 0));
+  canvas->drawShape(cornerRectshape, paint);
+  canvas->drawShape(cornerTriShape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/CornerShape"));
+  canvas->clear();
+  auto doubleCornerRectShape = Shape::ApplyEffect(cornerRectshape, pathEffect);
+  auto doubleCornerTriShape = Shape::ApplyEffect(cornerTriShape, pathEffect);
+  canvas->drawShape(doubleCornerRectShape, paint);
+  canvas->drawShape(doubleCornerTriShape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/CornerShapeDouble"));
+  canvas->clear();
+  auto tripleCornerRectShape = Shape::ApplyEffect(doubleCornerRectShape, pathEffect);
+  auto tripleCornerTriShape = Shape::ApplyEffect(doubleCornerTriShape, pathEffect);
+  canvas->drawShape(tripleCornerRectShape, paint);
+  canvas->drawShape(tripleCornerTriShape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/CornerShapeTriple"));
+
+  canvas->clear();
+  Path openQuadPath = {};
+  openQuadPath.moveTo(50, 50);
+  openQuadPath.lineTo(80, 50);
+  openQuadPath.quadTo(100, 70, 80, 80);
+  openQuadPath.lineTo(80, 100);
+  openQuadPath.lineTo(50, 100);
+  auto openQuadShape = Shape::MakeFrom(openQuadPath);
+  paint.setStyle(PaintStyle::Stroke);
+  canvas->drawShape(openQuadShape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/OpenQuadShape"));
+  canvas->clear();
+  auto cornerOpenQuadShape = Shape::ApplyEffect(openQuadShape, pathEffect);
+  canvas->drawShape(cornerOpenQuadShape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/OpenQuadShapeCorner"));
+
+  canvas->clear();
+  Path openConicPath = {};
+  openConicPath.moveTo(50, 50);
+  openConicPath.lineTo(80, 50);
+  openConicPath.cubicTo(100, 50, 150, 80, 80, 80);
+  openConicPath.lineTo(80, 100);
+  openConicPath.lineTo(50, 100);
+  auto openConicShape = Shape::MakeFrom(openConicPath);
+  paint.setStyle(PaintStyle::Stroke);
+  canvas->drawShape(openConicShape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/OpenConicShape"));
+  canvas->clear();
+  auto cornerOpenConicShape = Shape::ApplyEffect(openConicShape, pathEffect);
+  canvas->drawShape(cornerOpenConicShape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/OpenConicShapeCorner"));
+
+  canvas->clear();
+  Path path = {};
+  path.moveTo(50, 50);
+  path.quadTo(60, 50, 220, 50);
+  path.quadTo(220, 70, 220, 150);
+  path.quadTo(200, 150, 50, 150);
+  path.quadTo(50, 120, 50, 50);
+  path.close();
+  auto quadShape = Shape::MakeFrom(path);
+  canvas->drawShape(quadShape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/QuadRectShape"));
+
+  canvas->clear();
+  auto cornerShape = Shape::ApplyEffect(quadShape, pathEffect);
+  canvas->drawShape(cornerShape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/QuadRectShapeCorner"));
+}
+
 }  // namespace tgfx

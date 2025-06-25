@@ -18,17 +18,39 @@
 
 #pragma once
 
-#include <tgfx/core/Data.h>
-#include "SerializationUtils.h"
-#include "layers/contents/ShapeContent.h"
+#include <atomic>
+#include "tgfx/core/Rect.h"
 
 namespace tgfx {
-class ShapePaintSerialization {
+/**
+ * LazyBounds is a thread-safe cache for storing bounding box.
+ */
+class LazyBounds {
  public:
-  static std::shared_ptr<Data> Serialize(const ShapePaint* shapePaint, SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
+  ~LazyBounds() {
+    reset();
+  }
+
+  /**
+   * Returns the cached bounding box. This method is thread-safe as long as there is no concurrent
+   * reset() call.
+   */
+  const Rect* get() const {
+    return bounds.load(std::memory_order_acquire);
+  }
+
+  /**
+   * Sets the bounding box to the cache. This method is thread-safe as long as there is no
+   * concurrent reset() call.
+   */
+  void update(const Rect& rect) const;
+
+  /**
+   * Resets the cached bounding box to its empty state. This method is not thread-safe.
+   */
+  void reset();
 
  private:
-  static void SerializeShapePaintImpl(flexbuffers::Builder& fbb, const ShapePaint* shapePaint,
-                                      SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
+  mutable std::atomic<Rect*> bounds = {nullptr};
 };
 }  // namespace tgfx

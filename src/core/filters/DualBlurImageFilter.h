@@ -42,6 +42,7 @@ class DualBlurImageFilter : public BlurImageFilter {
   PlacementPtr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
                                                       const FPArgs& args,
                                                       const SamplingOptions& sampling,
+                                                      SrcRectConstraint constraint,
                                                       const Matrix* uvMatrix) const override;
 
   void draw(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags,
