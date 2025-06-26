@@ -38,11 +38,12 @@ bool SVGPath::parseAndSetAttribute(const std::string& n, const std::string& v) {
 
 template <>
 bool SVGAttributeParser::parse<Path>(Path* path) {
-  auto [success, parsePath] = SVGPathParser::FromSVGString(currentPos);
-  if (success) {
+  auto parsePath = SVGPathParser::FromSVGString(currentPos);
+  if (parsePath) {
     *path = *parsePath;
+    return true;
   }
-  return success;
+  return false;
 }
 
 void SVGPath::onDrawFill(Canvas* canvas, const SVGLengthContext&, const Paint& paint,
