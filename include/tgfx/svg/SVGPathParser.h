@@ -26,17 +26,17 @@ namespace tgfx {
 class SVGPathParser {
  public:
   /**
- * Two ways to describe paths in SVG
- */
+   * Two ways to describe paths in SVG
+   */
   enum class PathEncoding {
     /**
-   * Each step's point is an absolute coordinate, and the step letter is uppercase
-   */
+     * Each step's point is an absolute coordinate, and the step letter is uppercase
+     */
     Absolute,
     /**
-   * Each step's point is a relative coordinate to the previous point, and the step letter is
-   *lowercase
-   */
+     * Each step's point is a relative coordinate to the previous point, and the step letter is
+     *lowercase
+     */
     Relative,
   };
 
