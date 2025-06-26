@@ -64,7 +64,11 @@ static const float ScrollWheelZoomSensitivity = 120.0f;
     mouseInView = [self.tgfxView convertPointToBacking:mouseInView];
     float contentX = (mouseInView.x - self.contentOffset.x) / self.zoomScale;
     float contentY = (mouseInView.y - self.contentOffset.y) / self.zoomScale;
-    self.zoomScale = self.zoomScale * (1 + event.scrollingDeltaY / ScrollWheelZoomSensitivity);
+      if(event.hasPreciseScrollingDeltas){
+          self.zoomScale = self.zoomScale * (1 + event.scrollingDeltaY / ScrollWheelZoomSensitivity);
+      }else{
+          self.zoomScale = self.zoomScale * std::pow(1.1, event.scrollingDeltaY);
+      }
     if (self.zoomScale < MinZoom) {
       self.zoomScale = MinZoom;
     }
