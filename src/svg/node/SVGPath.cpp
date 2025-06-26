@@ -24,6 +24,7 @@
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/svg/SVGPathParser.h"
 
 namespace tgfx {
 
@@ -37,7 +38,7 @@ bool SVGPath::parseAndSetAttribute(const std::string& n, const std::string& v) {
 
 template <>
 bool SVGAttributeParser::parse<Path>(Path* path) {
-  auto [success, parsePath] = PathMakeFromSVGString(currentPos);
+  auto [success, parsePath] = SVGPathParser::FromSVGString(currentPos);
   if (success) {
     *path = *parsePath;
   }

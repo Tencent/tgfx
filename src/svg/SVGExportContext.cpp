@@ -43,6 +43,7 @@
 #include "tgfx/core/TileMode.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/svg/SVGExporter.h"
+#include "tgfx/svg/SVGPathParser.h"
 
 namespace tgfx {
 
@@ -319,8 +320,8 @@ bool SVGExportContext::RequiresViewportReset(const Fill& fill) {
   return false;
 }
 
-PathEncoding SVGExportContext::PathEncodingType() {
-  return PathEncoding::Absolute;
+SVGPathParser::PathEncoding SVGExportContext::PathEncodingType() {
+  return SVGPathParser::PathEncoding::Absolute;
 }
 
 void SVGExportContext::applyClipPath(const Path& clipPath) {
