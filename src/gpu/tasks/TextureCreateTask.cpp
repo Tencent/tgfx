@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureCreateTask.h"
-#include <InspectorDefine.h>
+#include "core/utils/Profiling.h"
 #include "gpu/Texture.h"
 
 namespace tgfx {
