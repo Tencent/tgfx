@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureUploadTask.h"
+#include "core/utils/Profiling.h"
 #include "gpu/Texture.h"
 
 namespace tgfx {
@@ -27,6 +28,8 @@ TextureUploadTask::TextureUploadTask(UniqueKey uniqueKey,
 }
 
 std::shared_ptr<Resource> TextureUploadTask::onMakeResource(Context* context) {
+  TaskMark(inspector::OpTaskType::TextureUploadTask);
+  AttributeName("mipmaped", mipmapped);
   if (source == nullptr) {
     return nullptr;
   }

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,26 +16,33 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "OpsRenderTask.h"
-#include "core/utils/Profiling.h"
-#include "gpu/Gpu.h"
-#include "gpu/RenderPass.h"
+#pragma once
+#include <cstdint>
+#include <memory>
+#include "Protocol.h"
 
-namespace tgfx {
-bool OpsRenderTask::execute(RenderPass* renderPass) {
-  TaskMark(inspector::OpTaskType::OpsRenderTask);
-  if (ops.empty() || renderTargetProxy == nullptr) {
-    return false;
-  }
-  if (!renderPass->begin(renderTargetProxy->getRenderTarget(), renderTargetProxy->getTexture())) {
-    LOGE("OpsRenderTask::execute() Failed to initialize the render pass!");
-    return false;
-  }
-  auto tempOps = std::move(ops);
-  for (auto& op : tempOps) {
-    op->execute(renderPass);
-  }
-  renderPass->end();
-  return true;
+namespace inspector {
+template <typename T>
+T MemRead(const void* ptr) {
+  T val;
+  memcpy(&val, ptr, sizeof(T));
+  return val;
 }
-}  // namespace tgfx
+
+template <typename T>
+void MemWrite(void* ptr, T val) {
+  memcpy(ptr, &val, sizeof(T));
+}
+
+template <typename T>
+void MemWrite(void* ptr, T* val, size_t size) {
+  memcpy(ptr, val, size);
+}
+
+uint32_t GetThreadHandleImpl();
+uint64_t GetPid();
+const char* GetProcessName();
+const char* GetEnvVar(const char* name);
+BroadcastMessage GetBroadcastMessage(const char* procname, size_t pnsz, size_t& len, uint16_t port,
+                                     uint8_t type);
+}  // namespace inspector

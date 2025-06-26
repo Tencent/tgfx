@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ClearOp.h"
+#include "core/utils/Profiling.h"
 #include "gpu/RenderPass.h"
 
 namespace tgfx {
@@ -28,6 +29,9 @@ PlacementPtr<ClearOp> ClearOp::Make(Context* context, Color color, const Rect& s
 }
 
 void ClearOp::execute(RenderPass* renderPass) {
+  OperateMark(inspector::OpTaskType::ResolveOp);
+  AttributeTGFXName("bounds", scissor);
+  AttributeTGFXName("color", color);
   renderPass->clear(scissor, color);
 }
 }  // namespace tgfx
