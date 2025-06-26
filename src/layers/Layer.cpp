@@ -1204,10 +1204,8 @@ void Layer::updateRenderBounds(const Matrix& renderMatrix,
       continue;
     }
     auto outset = style->filterBackground(Rect::MakeEmpty(), renderMatrix.getMaxScale());
-    backOutset = std::max(backOutset, abs(outset.left));
-    backOutset = std::max(backOutset, abs(outset.right));
-    backOutset = std::max(backOutset, abs(outset.top));
-    backOutset = std::max(backOutset, abs(outset.bottom));
+    backOutset = std::max(backOutset, outset.right);
+    backOutset = std::max(backOutset, outset.bottom);
   }
   if (backOutset > 0) {
     backgroundOutset = std::max(backOutset, backgroundOutset);
