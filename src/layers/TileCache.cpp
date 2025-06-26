@@ -39,8 +39,8 @@ std::vector<std::shared_ptr<Tile>> TileCache::getTilesUnderRect(const Rect& rect
   int endX = static_cast<int>(std::ceil(rect.right / static_cast<float>(tileSize)));
   int endY = static_cast<int>(std::ceil(rect.bottom / static_cast<float>(tileSize)));
   std::vector<std::shared_ptr<Tile>> tiles = {};
-  auto tileCount = (endX - startX) * (endY - startY);
-  tiles.reserve(static_cast<size_t>(tileCount));
+  // Do not use reserve() here, as the input rect may be very large, and we don't want to
+  // allocate a large vector that may not be fully filled.
   bool allFound = true;
   for (int tileY = startY; tileY < endY; ++tileY) {
     for (int tileX = startX; tileX < endX; ++tileX) {
