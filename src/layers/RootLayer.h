@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "tgfx/layers/Layer.h"
 
 namespace tgfx {
