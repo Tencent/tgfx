@@ -1198,7 +1198,7 @@ void Layer::updateRenderBounds(const Matrix& renderMatrix,
       renderBounds.join(child->renderBounds);
     }
   }
-  auto backOutset = -1.f;
+  auto backOutset = 0.f;
   for (auto& style : _layerStyles) {
     if (style->extraSourceType() != LayerStyleExtraSourceType::Background) {
       continue;
