@@ -440,12 +440,7 @@ static int addrinfo_and_socket_for_family(uint16_t port, int ai_family, struct a
   memset(&hints, 0, sizeof(hints));
   hints.ai_family = ai_family;
   hints.ai_socktype = SOCK_STREAM;
-#ifndef TRACY_ONLY_LOCALHOST
-  const char* onlyLocalhost = GetEnvVar("TRACY_ONLY_LOCALHOST");
-  if (!onlyLocalhost || onlyLocalhost[0] != '1') {
-    hints.ai_flags = AI_PASSIVE;
-  }
-#endif
+  hints.ai_flags = AI_PASSIVE;
   char portbuf[32];
   snprintf(portbuf, 32, "%" PRIu16, port);
   if (getaddrinfo(nullptr, portbuf, &hints, res) != 0) {
@@ -462,13 +457,7 @@ bool ListenSocket::Listen(uint16_t port, int backlog) {
   assert(this->sock == -1);
 
   struct addrinfo* res = nullptr;
-
-#if !defined TRACY_ONLY_IPV4 && !defined TRACY_ONLY_LOCALHOST
-  const char* onlyIPv4 = GetEnvVar("TRACY_ONLY_IPV4");
-  if (!onlyIPv4 || onlyIPv4[0] != '1') {
-    this->sock = addrinfo_and_socket_for_family(port, AF_INET6, &res);
-  }
-#endif
+  this->sock = addrinfo_and_socket_for_family(port, AF_INET6, &res);
   if (this->sock == -1) {
     // IPV6 protocol may not be available/is disabled. Try to create a socket
     // with the IPV4 protocol

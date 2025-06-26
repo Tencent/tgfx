@@ -19,6 +19,7 @@
 #pragma once
 
 #include <assert.h>
+#include <cstring>
 #include <stddef.h>
 #include "Alloc.h"
 

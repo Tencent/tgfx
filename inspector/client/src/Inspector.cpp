@@ -71,10 +71,6 @@ int64_t GetInitTime() {
   return GetInspectorData().initTime;
 }
 
-uint32_t GetThreadHandle() {
-  return GetThreadHandleImpl();
-}
-
 Inspector::Inspector()
     : epoch(std::chrono::duration_cast<std::chrono::seconds>(
                 std::chrono::system_clock::now().time_since_epoch())
