@@ -24,7 +24,6 @@
 #include "FastVector.h"
 #include "Protocol.h"
 #include "Queue.h"
-#include "Singleton.h"
 #include "Socket.h"
 #include "Utils.h"
 
@@ -34,22 +33,6 @@
 #ifdef __APPLE__
 #  include <TargetConditionals.h>
 #  include <mach/mach_time.h>
-#endif
-
-#if ( (defined _WIN32 && !(defined _M_ARM64 || defined _M_ARM)) || ( defined __i386 || defined _M_IX86 || defined __x86_64__ || defined _M_X64 ) || ( defined TARGET_OS_IOS && TARGET_OS_IOS == 1 ) )
-#  define INSPECTOR_HW_TIMER
-#endif
-
-#if defined INSPECTOR_HW_TIMER
-inline bool HardwareSupportsInvariantTSC()
-{
-  return true;  // this is checked at startup
-}
-#else
-bool HardwareSupportsInvariantTSC()
-{
-  return false;
-}
 #endif
 
 namespace inspector {
