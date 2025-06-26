@@ -603,7 +603,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void updateBackgroundBounds(const Matrix& renderMatrix);
 
-  void propagateHasBackgroundStyleOutset();
+  void propagateBackgroundStyleOutset();
 
   bool hasBackgroundStyle();
 

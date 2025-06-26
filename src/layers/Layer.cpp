@@ -1137,7 +1137,7 @@ void Layer::updateRenderBounds(const Matrix& renderMatrix,
                                std::shared_ptr<RegionTransformer> transformer, bool forceDirty) {
   if (!forceDirty && !bitFields.dirtyDescendents) {
     if (backgroundOutset > 0) {
-      propagateHasBackgroundStyleOutset();
+      propagateBackgroundStyleOutset();
       if (_root->hasDirtyRegions()) {
         checkBackgroundStyles(renderMatrix);
       }
@@ -1209,7 +1209,7 @@ void Layer::updateRenderBounds(const Matrix& renderMatrix,
   }
   if (backOutset > 0) {
     backgroundOutset = std::max(backOutset, backgroundOutset);
-    propagateHasBackgroundStyleOutset();
+    propagateBackgroundStyleOutset();
     updateBackgroundBounds(renderMatrix);
   }
   bitFields.dirtyDescendents = false;
@@ -1250,7 +1250,7 @@ void Layer::updateBackgroundBounds(const Matrix& renderMatrix) {
   }
 }
 
-void Layer::propagateHasBackgroundStyleOutset() {
+void Layer::propagateBackgroundStyleOutset() {
   auto layer = _parent;
   while (layer && layer->backgroundOutset < backgroundOutset) {
     layer->backgroundOutset = backgroundOutset;
