@@ -39,7 +39,7 @@ void TcpSocketClient::connection(QString ip, quint16 port) {
 }
 
 void TcpSocketClient::disConnection() {
-  if(m_IsConnection) {
+  if (m_IsConnection) {
     m_TcpSocket->disconnectFromHost();
   }
 }

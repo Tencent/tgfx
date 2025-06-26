@@ -4,8 +4,8 @@
 #include <thread>
 #include <vector>
 #include "LockFreeQueue.h"
-#include "Socket.h"
 #include "Protocol.h"
+#include "Socket.h"
 namespace inspector {
 class LayerProfiler {
  public:

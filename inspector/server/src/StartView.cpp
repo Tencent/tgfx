@@ -111,7 +111,7 @@ void StartView::clearRecentFiles() {
 QVector<QObject*> StartView::getFrameCaptureClientItems() const {
   QVector<QObject*> clientDatas;
   for (auto& client : clients) {
-    if(client.second->type == FrameCapture) {
+    if (client.second->type == FrameCapture) {
       clientDatas.push_back(client.second);
     }
   }
@@ -121,7 +121,7 @@ QVector<QObject*> StartView::getFrameCaptureClientItems() const {
 QVector<QObject*> StartView::getLayerTreeClientItems() const {
   QVector<QObject*> clientDatas;
   for (auto& client : clients) {
-    if(client.second->type == LayerTree) {
+    if (client.second->type == LayerTree) {
       clientDatas.push_back(client.second);
     }
   }
@@ -144,13 +144,15 @@ void StartView::connectToClient(QObject* object) {
 void StartView::connectToClientByLayerInspector(QObject* object) {
   auto client = dynamic_cast<ClientData*>(object);
   if (client) {
-    if(layerProfilerView) {
-      connect(layerProfilerView, &LayerProfilerView::destroyed, this,
-        [&, client]{ layerProfilerView = new LayerProfilerView(QString::fromStdString(client->address), client->port);});
+    if (layerProfilerView) {
+      connect(layerProfilerView, &LayerProfilerView::destroyed, this, [&, client] {
+        layerProfilerView =
+            new LayerProfilerView(QString::fromStdString(client->address), client->port);
+      });
       layerProfilerView->deleteLater();
-    }else {
+    } else {
       layerProfilerView =
-      new LayerProfilerView(QString::fromStdString(client->address), client->port);
+          new LayerProfilerView(QString::fromStdString(client->address), client->port);
     }
   }
 }
@@ -216,9 +218,9 @@ void StartView::updateBroadcastClients() {
   if (!broadcastListen) {
     bool isListen = false;
     broadcastListen = std::make_unique<UdpListen>();
-    for(uint16_t i = 0; i < broadcastNum; i++) {
+    for (uint16_t i = 0; i < broadcastNum; i++) {
       isListen = broadcastListen->Listen(port + i);
-      if(isListen) {
+      if (isListen) {
         break;
       }
     }
@@ -265,8 +267,8 @@ void StartView::updateBroadcastClients() {
             });
           }
           resolvLock.unlock();
-          auto client =
-              new ClientData{time, protoVer, activeTime, listenPort, pid, procname, std::move(ip), type};
+          auto client = new ClientData{time, protoVer, activeTime,    listenPort,
+                                       pid,  procname, std::move(ip), type};
           clients.emplace(clientId, client);
           Q_EMIT clientItemsChanged();
         } else {

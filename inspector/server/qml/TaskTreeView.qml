@@ -335,7 +335,7 @@ Item {
                         color: "#535353"
                         Text {
                             anchors.centerIn: parent
-                            text: "Self"
+                            text: "Weight"
                             color: "#DDDDDD"
                             font.bold: true
                             clip: true
@@ -348,19 +348,23 @@ Item {
                         color: "#535353"
                         Text {
                             anchors.centerIn: parent
-                            text: "Weight"
+                            text: "Self"
                             color: "#DDDDDD"
                             font.bold: true
                             clip: true
                         }
                     }
+
                 }
             }
             ///*main treeview*///
             Rectangle {
                 id: treeView
                 width: parent.width
-                height: taskTreeView.contentHeight
+                height: Math.min(taskTreeView.contentHeight, parent.height)
+                MouseArea {
+                    anchors.fill: parent
+                }
                 TreeView {
                     id: taskTreeView
                     width: parent.width
@@ -417,9 +421,9 @@ Item {
                                     case 0:
                                         return viewDelegate.name
                                     case 1:
-                                        return viewDelegate.costTime
-                                    case 2:
                                         return viewDelegate.weight
+                                    case 2:
+                                        return viewDelegate.costTime
                                     default:
                                         return ""
                                 }

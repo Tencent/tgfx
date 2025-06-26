@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "InspectorView.h"
-#include <QQmlContext>
 #include <kddockwidgets/Config.h>
 #include <kddockwidgets/qtquick/ViewFactory.h>
+#include <QQmlContext>
 #include "AttributeModel.h"
 #include "FramesDrawer.h"
 #include "TaskTreeModel.h"
@@ -28,7 +28,7 @@
 namespace inspector {
 
 class CustomViewFactory : public KDDockWidgets::QtQuick::ViewFactory {
-public:
+ public:
   ~CustomViewFactory() override = default;
 
   QUrl tabbarFilename() const override {

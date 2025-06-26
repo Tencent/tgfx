@@ -38,6 +38,8 @@ DstTextureCopyOp::DstTextureCopyOp(std::shared_ptr<TextureProxy> textureProxy, i
 
 void DstTextureCopyOp::execute(RenderPass* renderPass) {
   OperateMark(inspector::OpTaskType::DstTextureCopyOp);
+  AttributeName("srcX", srcX);
+  AttributeName("srcY", srcY);
   auto texture = textureProxy->getTexture();
   if (texture == nullptr) {
     LOGE("CopyOp::execute() Failed to get the dest texture!");

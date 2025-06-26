@@ -90,6 +90,19 @@ static std::unordered_map<tgfx::PixelFormat, const char*> PixelFormatName = {
 enum DataType : uint8_t { Color, Vec4, Mat4, Int, Uint32, Bool, Float, Enum, String, Count };
 enum OpOrTask : uint8_t { Op, Task, NoType };
 
+static std::unordered_map<TGFXEnum, std::vector<std::string>> TGFXEnumName = {
+    {TGFXEnum::BufferType, {"Index", "Vertex"}},
+    {TGFXEnum::BlendMode,
+     {"Clear",       "Src",       "Dst",        "SrcOver",   "DstOver",    "SrcIn",
+      "DstIn",       "SrcOut",    "DstOut",     "SrcTop",    "DstTop",     "Xor",
+      "PlusLighter", "Modulate",  "Screen",     "OverLay",   "Darken",     "Lighten",
+      "ColorDodge",  "ColorBurn", "HardLight",  "SoftLight", "Difference", "Exclusion",
+      "Multiply",    "Hue",       "Saturation", "Color",     "Luminosity", "PlusDarker"}},
+    {TGFXEnum::AAType, {"None", "Coverage", "MSAA"}},
+    {TGFXEnum::PixelFormat, {"Unknown", "ALPHA_8", "GRAY_8", "RG_88", "RGBA_8888", "BGRA_8888"}},
+    {TGFXEnum::ImageOrigin, {"TopLeft", "BottomLeft"}},
+};
+
 struct DataHead {
   DataType type;
   uint64_t name;

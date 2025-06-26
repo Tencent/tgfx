@@ -2,8 +2,8 @@
 #include <chrono>
 #include <thread>
 #include "Alloc.h"
-#include "Utils.h"
 #include "Protocol.h"
+#include "Utils.h"
 
 #ifdef __EMSCRIPTEN__
 #include <emscripten.h>
@@ -16,8 +16,8 @@ namespace inspector {
 static uint16_t port = 8084;
 static LayerProfiler s_layer_profiler;
 
-  static const char* addr = "255.255.255.255";
-  static uint16_t broadcastPort = 8086;
+static const char* addr = "255.255.255.255";
+static uint16_t broadcastPort = 8086;
 
 void LayerProfiler::SendLayerData(const std::vector<uint8_t>& data) {
   s_layer_profiler.setData(data);
@@ -31,15 +31,15 @@ LayerProfiler::LayerProfiler() {
   m_WebSocket = nullptr;
 #else
   m_ListenSocket = new ListenSocket();
-  for(uint16_t i =0; i < broadcastNum; i++) {
-      broadcast[i] = new UdpBroadcast();
-      isUDPOpened = isUDPOpened && broadcast[i]->Open(addr, broadcastPort + i);
+  for (uint16_t i = 0; i < broadcastNum; i++) {
+    broadcast[i] = new UdpBroadcast();
+    isUDPOpened = isUDPOpened && broadcast[i]->Open(addr, broadcastPort + i);
   }
 
 #endif
   epoch = std::chrono::duration_cast<std::chrono::seconds>(
-                std::chrono::system_clock::now().time_since_epoch())
-                .count();
+              std::chrono::system_clock::now().time_since_epoch())
+              .count();
   spawnWorkTread();
 }
 
@@ -52,11 +52,11 @@ LayerProfiler::~LayerProfiler() {
   if (m_Socket) {
     inspectorFree(m_Socket);
   }
-  if(m_ListenSocket) {
+  if (m_ListenSocket) {
     delete m_ListenSocket;
   }
-  for(uint16_t i = 0; i < broadcastNum; i++) {
-    if(broadcast[i]) {
+  for (uint16_t i = 0; i < broadcastNum; i++) {
+    if (broadcast[i]) {
       delete broadcast[i];
     }
   }
@@ -87,37 +87,39 @@ void LayerProfiler::SendWork() {
     }
   }
 #else
-  if(!isUDPOpened) {
+  if (!isUDPOpened) {
     return;
   }
   const auto procname = GetProcessName();
   const auto pnsz = std::min<size_t>(strlen(procname), WelcomeMessageProgramNameSize - 1);
   bool isListening = false;
-  for(uint16_t i = 0; i < 20; ++i) {
-    if(m_ListenSocket->Listen(port - i, 4)) {
+  for (uint16_t i = 0; i < 20; ++i) {
+    if (m_ListenSocket->Listen(port - i, 4)) {
       port -= i;
       isListening = true;
       break;
     }
   }
-  if(!isListening) {
+  if (!isListening) {
     return;
   }
 
   size_t broadcastLen = 0;
   auto broadcastMsg = GetBroadcastMessage(procname, pnsz, broadcastLen, port, LayerTree);
   long long lastBroadcast = 0;
-  while(!m_StopFlag.load(std::memory_order_acquire)) {
+  while (!m_StopFlag.load(std::memory_order_acquire)) {
     while (!m_StopFlag.load(std::memory_order_acquire)) {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
       const auto t = std::chrono::high_resolution_clock::now().time_since_epoch().count();
-      if(t - lastBroadcast > 3000000000) {
+      if (t - lastBroadcast > 3000000000) {
         lastBroadcast = t;
-        for(uint16_t i = 0; i < broadcastNum; i++) {
-          if(broadcast[i]) {
-              const auto ts = std::chrono::duration_cast<std::chrono::seconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-              broadcastMsg.activeTime = int32_t(ts - epoch);
-              broadcast[i]->Send(broadcastPort + i, &broadcastMsg, broadcastLen);
+        for (uint16_t i = 0; i < broadcastNum; i++) {
+          if (broadcast[i]) {
+            const auto ts = std::chrono::duration_cast<std::chrono::seconds>(
+                                std::chrono::system_clock::now().time_since_epoch())
+                                .count();
+            broadcastMsg.activeTime = int32_t(ts - epoch);
+            broadcast[i]->Send(broadcastPort + i, &broadcastMsg, broadcastLen);
           }
         }
       }
@@ -130,14 +132,14 @@ void LayerProfiler::SendWork() {
 
     while (!m_StopFlag.load(std::memory_order_acquire)) {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      if(!m_Socket) {
+      if (!m_Socket) {
         break;
       }
       if (!m_Queue.empty()) {
         auto data = *m_Queue.front();
         m_Queue.pop();
         int size = (int)data.size();
-        if(m_Socket) {
+        if (m_Socket) {
           m_Socket->Send(&size, sizeof(int));
           m_Socket->Send(data.data(), data.size());
         }
@@ -169,7 +171,7 @@ void LayerProfiler::recvWork() {
       std::vector<uint8_t> data(static_cast<size_t>(size));
       int flag1 = m_Socket->ReadUpTo(data.data(), (size_t)size);
       messages.push(std::move(data));
-      if(!flag || !flag1) {
+      if (!flag || !flag1) {
         inspectorFree(m_Socket);
         m_Socket = nullptr;
       }

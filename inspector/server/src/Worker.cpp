@@ -507,7 +507,7 @@ void Worker::ProcessAttributeImpl(DataHead& head, std::shared_ptr<tgfx::Data> da
   }
   propertyData->summaryName.push_back(head);
   auto& summaryData = propertyData->summaryData;
-  summaryData.emplace_back(data);
+  summaryData.push_back(std::move(data));
   dataContext.properties[opTask->id] = propertyData;
 }
 

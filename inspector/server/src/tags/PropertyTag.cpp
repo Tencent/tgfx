@@ -31,13 +31,18 @@ void ReadPropertyTag(DecodeStream* stream) {
     ReadDataHead(ptr->summaryName, stream);
     ReadDataHead(ptr->processName, stream);
 
-    // auto summaryDataCount = stream->readEncodedUint32();
-    // memcpy(ptr->summaryData.data(), stream->readBytes(summaryDataCount).data(),
-    //        summaryDataCount * sizeof(uint8_t));
-    // auto processDataCount = stream->readEncodedUint32();
-    // memcpy(ptr->processData.data(), stream->readBytes(processDataCount).data(),
-    //        processDataCount * sizeof(uint8_t));
+    auto summaryDataCount = stream->readEncodedUint32();
+    ptr->summaryData.reserve(summaryDataCount);
+    for (uint32_t j = 0; j < summaryDataCount; ++j) {
+      auto data = stream->readData();
+      ptr->summaryData.push_back(data);
+    }
 
+    auto processDataCount = stream->readEncodedUint32();
+    for (uint32_t j = 0; j < processDataCount; ++j) {
+      auto data = stream->readData();
+      ptr->processData.push_back(data);
+    }
     properties[opIndex] = ptr;
   }
 }
@@ -50,15 +55,20 @@ TagType WritePropertyTag(EncodeStream* stream,
     WriteDataHead(property.second->summaryName, stream);
     WriteDataHead(property.second->processName, stream);
 
-    // const auto& summaryData = property.second->summaryData;
-    // const auto summaryDataCount = static_cast<uint32_t>(summaryData.size());
-    // const auto& processData = property.second->processData;
-    // const auto processDataCount = static_cast<uint32_t>(processData.size());
+    const auto& summaryData = property.second->summaryData;
+    const auto summaryDataCount = static_cast<uint32_t>(summaryData.size());
+    const auto& processData = property.second->processData;
+    const auto processDataCount = static_cast<uint32_t>(processData.size());
 
-    // stream->writeEncodedUint32(summaryDataCount);
-    // stream->writeBytes((uint8_t*)summaryData.data(), summaryDataCount);
-    // stream->writeEncodedUint32(processDataCount);
-    // stream->writeBytes((uint8_t*)processData.data(), processDataCount);
+    stream->writeEncodedUint32(summaryDataCount);
+    for (auto& data : summaryData) {
+      stream->writeData(data.get());
+    }
+
+    stream->writeEncodedUint32(processDataCount);
+    for (auto& data : processData) {
+      stream->writeData(data.get());
+    }
   }
   return TagType::Property;
 }

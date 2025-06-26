@@ -22,7 +22,7 @@
 namespace inspector {
 AttributeModel::AttributeModel(Worker* worker, ViewData* viewData, QObject* parent)
     : QObject(parent), worker(worker), viewData(viewData) {
-  refreshData();  // 初始化时加载测试数据
+  refreshData();
 }
 
 AttributeModel::~AttributeModel() {
@@ -159,13 +159,19 @@ QVariant AttributeModel::readData(DataType type, std::shared_ptr<tgfx::Data> dat
     }
     case Float: {
       auto value = dataView.getFloat(0);
-      return QString::number(value, 'f', 2);
+      return getShowFloat(value);
     }
     case Enum: {
-      // auto typeValue = dataView.getUint16(0);
-      // uint8_t enumType = (typeValue >> 8) & 0xFF;
-      // uint8_t enumValue = typeValue & 0xFF;
-      return tr("test");
+      auto typeValue = dataView.getUint16(0);
+      uint8_t enumType = (typeValue >> 8) & 0xFF;
+      uint8_t enumValue = typeValue & 0xFF;
+      auto enumTypeIter = TGFXEnumName.find((TGFXEnum)enumType);
+      if (enumTypeIter == TGFXEnumName.end() || enumValue < 0 ||
+          static_cast<size_t>(enumValue) >= enumTypeIter->second.size()) {
+        return tr("???");
+      }
+      auto enumName = enumTypeIter->second[enumValue];
+      return enumName.c_str();
     }
     default:
       return tr("nullptr(Parsing exception)");

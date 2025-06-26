@@ -81,8 +81,9 @@ Inspector::Inspector()
                 .count()),
       dataBuffer((char*)inspectorMalloc(TargetFrameSize * 3)),
       lz4Buf((char*)inspectorMalloc(LZ4Size + sizeof(lz4sz_t))), shutdown(false), timeBegin(0),
-      frameCount(0), isConnect(false), serialQueue(1024 * 1024), serialDequeue(1024 * 1024),
-      lz4Stream(LZ4_createStream()) {
+      frameCount(0), isConnect(false), refTimeThread(0), serialQueue(1024 * 1024),
+      serialDequeue(1024 * 1024), lz4Stream(LZ4_createStream()), dataBufferOffset(0),
+      dataBufferStart(0) {
   s_instance = this;
   SpawnWorkerThreads();
 }
@@ -99,7 +100,7 @@ Inspector::~Inspector() {
     sock->~Socket();
     inspectorFree(sock);
   }
-  for(uint16_t i = 0; i < broadcastNum; i++) {
+  for (uint16_t i = 0; i < broadcastNum; i++) {
     if (broadcast[i]) {
       broadcast[i]->~UdpBroadcast();
       inspectorFree(broadcast[i]);
@@ -199,7 +200,7 @@ void Inspector::Worker() {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
   }
-  for(uint16_t i = 0; i < broadcastNum; i++) {
+  for (uint16_t i = 0; i < broadcastNum; i++) {
     broadcast[i] = (UdpBroadcast*)inspectorMalloc(sizeof(UdpBroadcast));
     new (broadcast[i]) UdpBroadcast();
     if (!broadcast[i]->Open(addr, broadcastPort + i)) {
@@ -216,7 +217,7 @@ void Inspector::Worker() {
     MemWrite(&welcome.refTime, refTimeThread);
     while (true) {
       if (ShouldExit()) {
-        for(uint16_t i = 0; i < broadcastNum; i++) {
+        for (uint16_t i = 0; i < broadcastNum; i++) {
           if (broadcast[i]) {
             broadcastMsg.activeTime = -1;
             broadcast[i]->Send(broadcastPort + i, &broadcastMsg, broadcastLen);
@@ -231,12 +232,12 @@ void Inspector::Worker() {
       const auto t = std::chrono::high_resolution_clock::now().time_since_epoch().count();
       if (t - lastBroadcast > 3000000000) {
         lastBroadcast = t;
-        for(uint16_t i = 0; i< broadcastNum; i++) {
+        for (uint16_t i = 0; i < broadcastNum; i++) {
           if (broadcast[i]) {
             programNameLock.lock();
             if (programName) {
-              broadcastMsg =
-                  GetBroadcastMessage(programName, strlen(programName), broadcastLen, dataPort, FrameCapture);
+              broadcastMsg = GetBroadcastMessage(programName, strlen(programName), broadcastLen,
+                                                 dataPort, FrameCapture);
               programName = nullptr;
             }
             programNameLock.unlock();
@@ -251,7 +252,7 @@ void Inspector::Worker() {
         }
       }
     }
-    for(uint16_t i = 0; i< broadcastNum; i++) {
+    for (uint16_t i = 0; i < broadcastNum; i++) {
       if (broadcast[i]) {
         lastBroadcast = 0;
         broadcastMsg.activeTime = -1;
@@ -293,8 +294,6 @@ void Inspector::Worker() {
 
     LZ4_resetStream((LZ4_stream_t*)lz4Stream);
     this->sock->Send(&welcome, sizeof(welcome));
-
-    refTimeSerial = 0;
 
     int keepAlive = 0;
     while (true) {
@@ -348,20 +347,6 @@ void Inspector::Worker() {
     this->sock = nullptr;
   }
 }
-
-#define ThreadCtxCheckSerial(_name)                         \
-  uint32_t thread = MemRead<uint32_t>(&item->_name.thread); \
-  switch (ThreadCtxCheck(thread)) {                         \
-    case ThreadCtxStatus::Same:                             \
-      break;                                                \
-    case ThreadCtxStatus::Changed:                          \
-      assert(refTimeThread == 0);                           \
-      refThread = 0;                                        \
-      break;                                                \
-    default:                                                \
-      assert(false);                                        \
-      break;                                                \
-  }
 
 bool Inspector::CommitData() {
   bool ret = SendData(dataBuffer + dataBufferStart, size_t(dataBufferOffset - dataBufferStart));
@@ -428,12 +413,4 @@ Inspector::DequeueStatus Inspector::DequeueSerial() {
   }
   return DequeueStatus::DataDequeued;
 }
-
-Inspector::ThreadCtxStatus Inspector::ThreadCtxCheck(uint32_t threadId) {
-  if (threadCtx == threadId) {
-    return ThreadCtxStatus::Same;
-  }
-  return ThreadCtxStatus::Changed;
-}
-
 }  // namespace inspector

@@ -43,6 +43,10 @@ ShapeDrawOp::ShapeDrawOp(std::shared_ptr<GpuShapeProxy> shapeProxy, Color color,
 
 void ShapeDrawOp::execute(RenderPass* renderPass) {
   OperateMark(inspector::OpTaskType::ShapeDrawOp);
+  AttributeTGFXName("color", color);
+  AttributeTGFXName("uvMatrix", uvMatrix);
+  AttributeNameEnum("blenderMode", getBlendMode(), inspector::TGFXEnum::BlendMode);
+  AttributeNameEnum("aaType", getAAType(), inspector::TGFXEnum::AAType);
   if (shapeProxy == nullptr) {
     return;
   }

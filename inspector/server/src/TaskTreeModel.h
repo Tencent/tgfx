@@ -88,8 +88,8 @@ class TaskTreeModel : public QAbstractItemModel {
  public:
   enum Roles {
     NameRole = Qt::UserRole + 1,
-    CostTimeRole,
     WeightRole,
+    CostTimeRole,
   };
 
   explicit TaskTreeModel(Worker* worker, ViewData* viewData, QObject* parent = nullptr);

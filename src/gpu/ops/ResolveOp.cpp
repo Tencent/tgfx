@@ -30,6 +30,7 @@ PlacementPtr<ResolveOp> ResolveOp::Make(Context* context, const Rect& bounds) {
 
 void ResolveOp::execute(RenderPass* renderPass) {
   OperateMark(inspector::OpTaskType::ResolveOp);
+  AttributeTGFXName("bounds", bounds);
   renderPass->resolve(bounds);
 }
 

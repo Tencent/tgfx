@@ -29,6 +29,11 @@ TextureCreateTask::TextureCreateTask(UniqueKey uniqueKey, int width, int height,
 
 std::shared_ptr<Resource> TextureCreateTask::onMakeResource(Context* context) {
   TaskMark(inspector::OpTaskType::TextureCreateTask);
+  AttributeName("width", width);
+  AttributeName("height", height);
+  AttributeName("mipmaped", mipmapped);
+  AttributeNameEnum("format", format, inspector::TGFXEnum::PixelFormat);
+  AttributeNameEnum("origin", origin, inspector::TGFXEnum::ImageOrigin);
   auto texture = Texture::MakeFormat(context, width, height, format, mipmapped, origin);
   if (texture == nullptr) {
     LOGE("TextureCreateTask::onMakeResource() Failed to create the texture!");
