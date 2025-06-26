@@ -603,7 +603,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void updateBackgroundBounds(const Matrix& renderMatrix);
 
-  void propagateHasBackgroundStyleFlags();
+  void propagateHasBackgroundStyleOutset();
 
   bool hasBackgroundStyle();
 
@@ -612,7 +612,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
     bool dirtyContentBounds : 1;  // layer's content bounds needs updating
     bool dirtyDescendents : 1;    // a descendant layer needs redrawing
     bool dirtyTransform : 1;      // the layer and its children need redrawing
-    bool hasBackgroundStyle : 1;  // the layer or any of its descendants has a background style
     bool visible : 1;
     bool shouldRasterize : 1;
     bool allowsEdgeAntialiasing : 1;
@@ -637,6 +636,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::shared_ptr<LayerContent> layerContent = nullptr;
   Rect renderBounds = {};         // in global coordinates
   Rect* contentBounds = nullptr;  //  in global coordinates
+
+  // if > 0, means the layer or any of its descendants has a background style
+  float backgroundOutset = 0.f;
 
   friend class RootLayer;
   friend class DisplayList;
