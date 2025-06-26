@@ -170,7 +170,6 @@ class Inspector {
   bool CommitData();
   bool SendData(const char* data, size_t len);
   DequeueStatus DequeueSerial();
-  ThreadCtxStatus ThreadCtxCheck(uint32_t threadId);
 
  private:
   int64_t epoch;
@@ -182,8 +181,6 @@ class Inspector {
   std::atomic<bool> isConnect;
   Socket* sock = nullptr;
 
-  uint32_t threadCtx;
-  int64_t refTimeSerial;
   int64_t refTimeThread;
 
   FastVector<QueueItem> serialQueue;
@@ -191,7 +188,7 @@ class Inspector {
   std::mutex serialLock;
 
   std::thread* messageThread = nullptr;
-  UdpBroadcast* broadcast[broadcastNum];
+  UdpBroadcast* broadcast[broadcastNum] = {nullptr};
   const char* programName = nullptr;
   std::mutex programNameLock;
 

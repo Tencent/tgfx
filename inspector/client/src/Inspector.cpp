@@ -81,8 +81,9 @@ Inspector::Inspector()
                 .count()),
       dataBuffer((char*)inspectorMalloc(TargetFrameSize * 3)),
       lz4Buf((char*)inspectorMalloc(LZ4Size + sizeof(lz4sz_t))), shutdown(false), timeBegin(0),
-      frameCount(0), isConnect(false), serialQueue(1024 * 1024), serialDequeue(1024 * 1024),
-      lz4Stream(LZ4_createStream()) {
+      frameCount(0), isConnect(false), refTimeThread(0), serialQueue(1024 * 1024),
+      serialDequeue(1024 * 1024), lz4Stream(LZ4_createStream()), dataBufferOffset(0),
+      dataBufferStart(0) {
   s_instance = this;
   SpawnWorkerThreads();
 }
@@ -294,8 +295,6 @@ void Inspector::Worker() {
     LZ4_resetStream((LZ4_stream_t*)lz4Stream);
     this->sock->Send(&welcome, sizeof(welcome));
 
-    refTimeSerial = 0;
-
     int keepAlive = 0;
     while (true) {
       const auto serialStatus = DequeueSerial();
@@ -348,20 +347,6 @@ void Inspector::Worker() {
     this->sock = nullptr;
   }
 }
-
-#define ThreadCtxCheckSerial(_name)                         \
-  uint32_t thread = MemRead<uint32_t>(&item->_name.thread); \
-  switch (ThreadCtxCheck(thread)) {                         \
-    case ThreadCtxStatus::Same:                             \
-      break;                                                \
-    case ThreadCtxStatus::Changed:                          \
-      assert(refTimeThread == 0);                           \
-      refThread = 0;                                        \
-      break;                                                \
-    default:                                                \
-      assert(false);                                        \
-      break;                                                \
-  }
 
 bool Inspector::CommitData() {
   bool ret = SendData(dataBuffer + dataBufferStart, size_t(dataBufferOffset - dataBufferStart));
@@ -428,12 +413,4 @@ Inspector::DequeueStatus Inspector::DequeueSerial() {
   }
   return DequeueStatus::DataDequeued;
 }
-
-Inspector::ThreadCtxStatus Inspector::ThreadCtxCheck(uint32_t threadId) {
-  if (threadCtx == threadId) {
-    return ThreadCtxStatus::Same;
-  }
-  return ThreadCtxStatus::Changed;
-}
-
 }  // namespace inspector
