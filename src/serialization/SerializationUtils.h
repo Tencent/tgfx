@@ -20,11 +20,8 @@
 
 #include <core/utils/Types.h>
 #include <flatbuffers/flexbuffers.h>
-#include <tgfx/core/GradientType.h>
 #include <tgfx/gpu/Context.h>
 #include <tgfx/layers/Layer.h>
-#include <tgfx/layers/ShapeLayer.h>
-#include <tgfx/layers/TextAlign.h>
 #include <string>
 
 namespace tgfx {
@@ -38,29 +35,7 @@ class SerializeUtils {
 
   static std::string BlendModeToString(BlendMode mode);
 
-  static std::string StrokeAlignToString(StrokeAlign align);
-
-  static std::string TextAlignToString(TextAlign align);
-
   static std::string TileModeToString(TileMode tileMode);
-
-  static std::string ImageTypeToString(Types::ImageType type);
-
-  static std::string FilterModeToString(FilterMode mode);
-
-  static std::string MipmapModeToString(MipmapMode mode);
-
-  static std::string ShapeTypeToString(Types::ShapeType type);
-
-  static std::string ShaderTypeToString(Types::ShaderType type);
-
-  static std::string LineCapToString(LineCap lineCap);
-
-  static std::string LineJoinToString(LineJoin lineJoin);
-
-  static std::string ImageFilterTypeToString(Types::ImageFilterType type);
-
-  static std::string ColorFilterTypeToString(Types::ColorFilterType type);
 
   static std::string LayerFilterTypeToString(Types::LayerFilterType type);
 
@@ -69,12 +44,6 @@ class SerializeUtils {
   static std::string LayerStylePositionToString(LayerStylePosition position);
 
   static std::string LayerStyleExtraSourceTypeToString(LayerStyleExtraSourceType type);
-
-  static std::string ShapeStyleTypeToString(Types::ShapeStyleType type);
-
-  static std::string GradientTypeToString(GradientType type);
-
-  static std::string PathFillTypeToString(PathFillType type);
 
   static std::string RecordedContentTypeToString(Types::RecordedContentType type);
 
@@ -131,42 +100,13 @@ class SerializeUtils {
 
   static void FillComplexObjSerMap(const Rect& rect, uint64_t objID, ComplexObjSerMap* map);
 
-  static void FillComplexObjSerMap(const SamplingOptions& sampling, uint64_t objID,
-                                   ComplexObjSerMap* map);
-
   static void FillComplexObjSerMap(const Color& color, uint64_t objID, ComplexObjSerMap* map);
-
-  static void FillComplexObjSerMap(const Font& font, uint64_t objID, ComplexObjSerMap* map);
-
-  static void FillComplexObjSerMap(const FontMetrics& fontMetrics, uint64_t objID,
-                                   ComplexObjSerMap* map);
-
-  static void FillComplexObjSerMap(const GlyphRun& glyphRun, uint64_t objID, ComplexObjSerMap* map);
-
-  static void FillComplexObjSerMap(const Path& path, uint64_t objID, ComplexObjSerMap* map);
 
   static void FillComplexObjSerMap(const std::shared_ptr<LayerFilter>& layerFilter, uint64_t objID, ComplexObjSerMap* map);
 
   static void FillComplexObjSerMap(const std::shared_ptr<Layer>& layer, uint64_t objID, ComplexObjSerMap* map, RenderableObjSerMap* renderMap);
 
   static void FillComplexObjSerMap(const std::shared_ptr<LayerStyle>& layerStyle, uint64_t objID, ComplexObjSerMap* map);
-
-  static void FillComplexObjSerMap(const std::shared_ptr<Image>& image, uint64_t objID, ComplexObjSerMap* map);
-
-  static void FillComplexObjSerMap(const std::shared_ptr<ShapeStyle>& shapeStyle, uint64_t objID, ComplexObjSerMap* map, RenderableObjSerMap* rosMap);
-
-  static void FillComplexObjSerMap(const std::shared_ptr<ColorFilter>& colorFilter, uint64_t objID, ComplexObjSerMap* map);
-
-  static void FillComplexObjSerMap(const std::shared_ptr<Typeface>& typeFace, uint64_t objID, ComplexObjSerMap* map);
-
-  static void FillComplexObjSerMap(const std::shared_ptr<ImageFilter>& imageFilter, uint64_t objID, ComplexObjSerMap* map);
-
-  static void FillComplexObjSerMap(const std::shared_ptr<RuntimeEffect>& runtimeEffect, uint64_t objID,
-                      ComplexObjSerMap* map);
-
-  static void FillComplexObjSerMap(const std::shared_ptr<Shader>& shader, uint64_t objID, ComplexObjSerMap* map, RenderableObjSerMap* rosMap);
-
-  static void FillComplexObjSerMap(const std::shared_ptr<TextBlob>& textBlob, uint64_t objID, ComplexObjSerMap* map, RenderableObjSerMap* rosMap);
 
   static void FillComplexObjSerMap(const std::shared_ptr<Picture>& picture, uint64_t objID, ComplexObjSerMap* map);
 
@@ -179,33 +119,13 @@ class SerializeUtils {
   static void FillComplexObjSerMap(const std::vector<std::shared_ptr<LayerStyle>>& layerStyles, uint64_t objID,
                       ComplexObjSerMap* map);
 
-  static void FillComplexObjSerMap(const std::vector<std::shared_ptr<ShapeStyle>>& shapeStyles, uint64_t objID,
-                      ComplexObjSerMap* map, RenderableObjSerMap* rosMap);
-
-  static void FillComplexObjSerMap(const std::vector<float>& floatVec, uint64_t objID, ComplexObjSerMap* map);
-
   static void FillComplexObjSerMap(const std::array<float, 20>& matrix, uint64_t objID, ComplexObjSerMap* map);
 
-  static void FillComplexObjSerMap(const std::vector<GlyphID>& glyphs, uint64_t objID, ComplexObjSerMap* map);
-
   static void FillComplexObjSerMap(const std::vector<Point>& points, uint64_t objID, ComplexObjSerMap* map);
-
-  static void FillComplexObjSerMap(const std::vector<std::shared_ptr<ImageFilter>>& imageFilters, uint64_t objID,
-                      ComplexObjSerMap* map);
 
   static void FillComplexObjSerMap(const std::vector<Color>& colors, uint64_t objID, ComplexObjSerMap* map);
 
   static void FillComplexObjSermap(const std::unique_ptr<RecordedContent>& recordedContent, uint64_t objID, ComplexObjSerMap* map, RenderableObjSerMap* rosMap);
-
-  static bool CreateGLTexture(Context* context, int width, int height, GLTextureInfo* texture);
-
-  static void FillRenderableObjSerMap(const std::shared_ptr<Shape>& shape, uint64_t objID, RenderableObjSerMap* map);
-
-  static void FillRenderableObjSerMap(const std::shared_ptr<Image>& image, uint64_t objID, RenderableObjSerMap* map);
-
-  static void FillRenderableObjSerMap(const Path& path, uint64_t objID, RenderableObjSerMap* map);
-
-    static void FillRenderableObjSerMap(const std::shared_ptr<TextBlob>& textBlob, uint64_t objID, RenderableObjSerMap* map);
 
   static void FillRenderableObjSerMap(const std::shared_ptr<Picture>& picture, uint64_t objID, RenderableObjSerMap* map);
 };
