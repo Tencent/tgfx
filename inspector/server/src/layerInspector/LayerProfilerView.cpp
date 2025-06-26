@@ -127,17 +127,15 @@ LayerProfilerView::LayerProfilerView()
 LayerProfilerView::~LayerProfilerView() {
   if (m_WebSocketServer) {
     m_WebSocketServer->close();
-    m_WebSocketServer->deleteLater();
   }
   if (m_TcpSocketClient) {
     m_TcpSocketClient->disConnection();
-    m_TcpSocketClient->deleteLater();
   }
   if (layerTree) {
-    delete layerTree;
+    layerTree->deleteLater();
   }
   if (layerAttributeTree) {
-    delete layerAttributeTree;
+    layerAttributeTree->deleteLater();
   }
 }
 
@@ -196,7 +194,7 @@ void LayerProfilerView::LayerProlfilerQMLImpl() {
                !(isDraggingRenderTree || isDraggingAttribute);
       };
   KDDockWidgets::Config::self().setDropIndicatorAllowedFunc(func);
-  m_LayerTreeEngine = std::make_unique<QQmlApplicationEngine>(this);
+  m_LayerTreeEngine = std::make_unique<QQmlApplicationEngine>();
   imageProvider = new MemoryImageProvider();
   m_LayerTreeEngine->addImageProvider(QLatin1String("RenderableImage"), imageProvider);
 
