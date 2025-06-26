@@ -2895,4 +2895,44 @@ TGFX_TEST(LayerTest, BackgroundBlurStyleTest) {
   layer2->draw(canvas);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurStyleTest5"));
 }
+
+TGFX_TEST(LayerTest, PartialBackgroundBlur) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  auto surface = Surface::Make(context, 300, 300);
+  EXPECT_TRUE(context != nullptr);
+  DisplayList displayList;
+  auto rootLayer = Layer::Make();
+  displayList.root()->addChild(rootLayer);
+  auto background = ShapeLayer::Make();
+  Path backgroundPath;
+  backgroundPath.addRect(Rect::MakeXYWH(0, 0, 300, 300));
+  background->setPath(backgroundPath);
+  background->addFillStyle(Gradient::MakeRadial({150, 150}, 360, {Color::Red(), Color::Blue()}));
+  rootLayer->addChild(background);
+  auto solidLayer = SolidLayer::Make();
+  solidLayer->setColor(Color::FromRGBA(0, 0, 0, 50));
+  solidLayer->setWidth(200);
+  solidLayer->setHeight(200);
+  solidLayer->setMatrix(Matrix::MakeTrans(50, 50));
+  solidLayer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  rootLayer->addChild(solidLayer);
+  auto solidLayer2 = SolidLayer::Make();
+  solidLayer2->setColor(Color::FromRGBA(0, 0, 0, 10));
+  solidLayer2->setWidth(50);
+  solidLayer2->setHeight(50);
+  solidLayer2->setMatrix(Matrix::MakeTrans(100, 100));
+  rootLayer->addChild(solidLayer2);
+  displayList.setRenderMode(RenderMode::Partial);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialBackgroundBlur"));
+  solidLayer2->removeFromParent();
+  rootLayer->addChild(solidLayer2);
+  EXPECT_TRUE(displayList.root()->bitFields.dirtyDescendents);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialBackgroundBlur_partial"));
+  solidLayer2->setMatrix(Matrix::MakeTrans(120, 120));
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialBackgroundBlur_move"));
+}
 }  // namespace tgfx

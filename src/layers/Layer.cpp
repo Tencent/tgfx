@@ -1136,15 +1136,15 @@ bool Layer::hasValidMask() const {
 void Layer::updateRenderBounds(const Matrix& renderMatrix,
                                std::shared_ptr<RegionTransformer> transformer, bool forceDirty) {
   if (!forceDirty && !bitFields.dirtyDescendents) {
-    if (bitFields.hasBackgroundStyle) {
-      propagateHasBackgroundStyleFlags();
+    if (backgroundOutset > 0) {
+      propagateBackgroundStyleOutset();
       if (_root->hasDirtyRegions()) {
         checkBackgroundStyles(renderMatrix);
       }
     }
     return;
   }
-  bitFields.hasBackgroundStyle = false;
+  backgroundOutset = 0;
   if (!_layerStyles.empty() || !_filters.empty()) {
     auto contentScale = renderMatrix.getMaxScale();
     transformer =
@@ -1198,16 +1198,18 @@ void Layer::updateRenderBounds(const Matrix& renderMatrix,
       renderBounds.join(child->renderBounds);
     }
   }
-  auto hasBackgroundStyle = false;
+  auto backOutset = 0.f;
   for (auto& style : _layerStyles) {
-    if (style->extraSourceType() == LayerStyleExtraSourceType::Background) {
-      hasBackgroundStyle = true;
-      break;
+    if (style->extraSourceType() != LayerStyleExtraSourceType::Background) {
+      continue;
     }
+    auto outset = style->filterBackground(Rect::MakeEmpty(), renderMatrix.getMaxScale());
+    backOutset = std::max(backOutset, outset.right);
+    backOutset = std::max(backOutset, outset.bottom);
   }
-  if (hasBackgroundStyle) {
-    bitFields.hasBackgroundStyle = true;
-    propagateHasBackgroundStyleFlags();
+  if (backOutset > 0) {
+    backgroundOutset = std::max(backOutset, backgroundOutset);
+    propagateBackgroundStyleOutset();
     updateBackgroundBounds(renderMatrix);
   }
   bitFields.dirtyDescendents = false;
@@ -1215,7 +1217,7 @@ void Layer::updateRenderBounds(const Matrix& renderMatrix,
 
 void Layer::checkBackgroundStyles(const Matrix& renderMatrix) {
   for (auto& child : _children) {
-    if (!child->bitFields.hasBackgroundStyle || !child->bitFields.visible || child->_alpha <= 0) {
+    if (child->backgroundOutset <= 0 || !child->bitFields.visible || child->_alpha <= 0) {
       continue;
     }
     auto childMatrix = child->getMatrixWithScrollRect();
@@ -1248,16 +1250,16 @@ void Layer::updateBackgroundBounds(const Matrix& renderMatrix) {
   }
 }
 
-void Layer::propagateHasBackgroundStyleFlags() {
+void Layer::propagateBackgroundStyleOutset() {
   auto layer = _parent;
-  while (layer && !layer->bitFields.hasBackgroundStyle) {
-    layer->bitFields.hasBackgroundStyle = true;
+  while (layer && layer->backgroundOutset < backgroundOutset) {
+    layer->backgroundOutset = backgroundOutset;
     layer = layer->_parent;
   }
 }
 
 bool Layer::hasBackgroundStyle() {
-  if (!bitFields.dirtyDescendents && bitFields.hasBackgroundStyle) {
+  if (!bitFields.dirtyDescendents && backgroundOutset > 0) {
     return true;
   }
   for (const auto& style : _layerStyles) {
