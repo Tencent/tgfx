@@ -17,14 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "LayerProfilerView.h"
 #include <kddockwidgets/Config.h>
+#include <kddockwidgets/core/DockRegistry.h>
 #include <kddockwidgets/core/DockWidget.h>
 #include <kddockwidgets/qtquick/Platform.h>
 #include <kddockwidgets/qtquick/ViewFactory.h>
-#include <kddockwidgets/core/DockWidget.h>
-#include <kddockwidgets/core/DockRegistry.h>
-#include <kddockwidgets/qtquick/views/MainWindow.h>
-#include <kddockwidgets/Config.h>
 #include <kddockwidgets/qtquick/views/Group.h>
+#include <kddockwidgets/qtquick/views/MainWindow.h>
 #include <QHBoxLayout>
 #include <QLabel>
 #include <QQmlContext>
@@ -131,14 +129,14 @@ LayerProfilerView::~LayerProfilerView() {
     m_WebSocketServer->close();
     m_WebSocketServer->deleteLater();
   }
-  if(m_TcpSocketClient) {
+  if (m_TcpSocketClient) {
     m_TcpSocketClient->disConnection();
     m_TcpSocketClient->deleteLater();
   }
-  if(layerTree) {
+  if (layerTree) {
     delete layerTree;
   }
-  if(layerAttributeTree) {
+  if (layerAttributeTree) {
     delete layerAttributeTree;
   }
 }
@@ -171,34 +169,31 @@ void LayerProfilerView::cleanView() {
 }
 
 void LayerProfilerView::LayerProlfilerQMLImpl() {
-  qmlRegisterUncreatableType<KDDockWidgets::QtQuick::Group>("com.kdab.dockwidgets", 2, 0,
-                                           "GroupView", QStringLiteral("Internal usage only"));
+  qmlRegisterUncreatableType<KDDockWidgets::QtQuick::Group>(
+      "com.kdab.dockwidgets", 2, 0, "GroupView", QStringLiteral("Internal usage only"));
   KDDockWidgets::Config::self().setViewFactory(new LayerProfilerViewFactory);
-  auto func = [](KDDockWidgets::DropLocation loc,
-               const KDDockWidgets::Core::DockWidget::List &source,
-               const KDDockWidgets::Core::DockWidget::List &target,
-               KDDockWidgets::Core::DropArea *) {
-   KDDW_UNUSED(target);
-   bool isDraggingRenderTree =
-     std::find_if(source.cbegin(), source.cend(),
-     [](KDDockWidgets::Core::DockWidget *dw) {
-           return dw->uniqueName() == QLatin1String("RenderTree");
-         })
-     != source.cend();
-   bool isDraggingAttribute = std::find_if(source.cbegin(), source.cend(),
-     [](KDDockWidgets::Core::DockWidget *dw) {
-           return dw->uniqueName() == QLatin1String("Attribute");
-         })
-     != source.cend();
-   return (loc & (KDDockWidgets::DropLocation_Inner | KDDockWidgets::DropLocation_Outter)) || !(isDraggingRenderTree||isDraggingAttribute);
-  };
+  auto func =
+      [](KDDockWidgets::DropLocation loc, const KDDockWidgets::Core::DockWidget::List& source,
+         const KDDockWidgets::Core::DockWidget::List& target, KDDockWidgets::Core::DropArea*) {
+        KDDW_UNUSED(target);
+        bool isDraggingRenderTree =
+            std::find_if(source.cbegin(), source.cend(), [](KDDockWidgets::Core::DockWidget* dw) {
+              return dw->uniqueName() == QLatin1String("RenderTree");
+            }) != source.cend();
+        bool isDraggingAttribute =
+            std::find_if(source.cbegin(), source.cend(), [](KDDockWidgets::Core::DockWidget* dw) {
+              return dw->uniqueName() == QLatin1String("Attribute");
+            }) != source.cend();
+        return (loc & (KDDockWidgets::DropLocation_Inner | KDDockWidgets::DropLocation_Outter)) ||
+               !(isDraggingRenderTree || isDraggingAttribute);
+      };
   KDDockWidgets::Config::self().setDropIndicatorAllowedFunc(func);
   m_LayerTreeEngine = std::make_unique<QQmlApplicationEngine>(this);
   imageProvider = new MemoryImageProvider();
   m_LayerTreeEngine->addImageProvider(QLatin1String("RenderableImage"), imageProvider);
 
   m_LayerTreeEngine->rootContext()->setContextProperty("_layerAttributeModel",
-                                                            m_LayerAttributeModel);
+                                                       m_LayerAttributeModel);
   m_LayerTreeEngine->rootContext()->setContextProperty("_layerTreeModel", m_LayerTreeModel);
   m_LayerTreeEngine->rootContext()->setContextProperty("_layerProfileView", this);
   m_LayerTreeEngine->rootContext()->setContextProperty("imageProvider", imageProvider);
@@ -214,7 +209,6 @@ void LayerProfilerView::LayerProlfilerQMLImpl() {
   mainArea->addDockWidget(layerTree, KDDockWidgets::Location_OnLeft);
   mainArea->addDockWidget(layerAttributeTree, KDDockWidgets::Location_OnRight);
 
-
   if (m_LayerTreeEngine->rootObjects().isEmpty()) {
     qWarning() << "Failed to load LayerProfilerView.qml";
     return;
@@ -224,7 +218,7 @@ void LayerProfilerView::LayerProlfilerQMLImpl() {
   if (window) {
     window->show();
     connect(window, &QWindow::visibilityChanged, [this](QWindow::Visibility visibility) {
-      if(visibility == QWindow::Visibility::Hidden) {
+      if (visibility == QWindow::Visibility::Hidden) {
         m_TcpSocketClient->disConnection();
       }
     });

@@ -99,7 +99,7 @@ Inspector::~Inspector() {
     sock->~Socket();
     inspectorFree(sock);
   }
-  for(uint16_t i = 0; i < broadcastNum; i++) {
+  for (uint16_t i = 0; i < broadcastNum; i++) {
     if (broadcast[i]) {
       broadcast[i]->~UdpBroadcast();
       inspectorFree(broadcast[i]);
@@ -199,7 +199,7 @@ void Inspector::Worker() {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
   }
-  for(uint16_t i = 0; i < broadcastNum; i++) {
+  for (uint16_t i = 0; i < broadcastNum; i++) {
     broadcast[i] = (UdpBroadcast*)inspectorMalloc(sizeof(UdpBroadcast));
     new (broadcast[i]) UdpBroadcast();
     if (!broadcast[i]->Open(addr, broadcastPort + i)) {
@@ -216,7 +216,7 @@ void Inspector::Worker() {
     MemWrite(&welcome.refTime, refTimeThread);
     while (true) {
       if (ShouldExit()) {
-        for(uint16_t i = 0; i < broadcastNum; i++) {
+        for (uint16_t i = 0; i < broadcastNum; i++) {
           if (broadcast[i]) {
             broadcastMsg.activeTime = -1;
             broadcast[i]->Send(broadcastPort + i, &broadcastMsg, broadcastLen);
@@ -231,12 +231,12 @@ void Inspector::Worker() {
       const auto t = std::chrono::high_resolution_clock::now().time_since_epoch().count();
       if (t - lastBroadcast > 3000000000) {
         lastBroadcast = t;
-        for(uint16_t i = 0; i< broadcastNum; i++) {
+        for (uint16_t i = 0; i < broadcastNum; i++) {
           if (broadcast[i]) {
             programNameLock.lock();
             if (programName) {
-              broadcastMsg =
-                  GetBroadcastMessage(programName, strlen(programName), broadcastLen, dataPort, FrameCapture);
+              broadcastMsg = GetBroadcastMessage(programName, strlen(programName), broadcastLen,
+                                                 dataPort, FrameCapture);
               programName = nullptr;
             }
             programNameLock.unlock();
@@ -251,7 +251,7 @@ void Inspector::Worker() {
         }
       }
     }
-    for(uint16_t i = 0; i< broadcastNum; i++) {
+    for (uint16_t i = 0; i < broadcastNum; i++) {
       if (broadcast[i]) {
         lastBroadcast = 0;
         broadcastMsg.activeTime = -1;

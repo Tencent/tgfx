@@ -115,8 +115,8 @@ const char* GetProcessName() {
   return processName;
 }
 
-BroadcastMessage GetBroadcastMessage(const char* procname, size_t pnsz, size_t& len,
-                                      uint16_t port, uint8_t type) {
+BroadcastMessage GetBroadcastMessage(const char* procname, size_t pnsz, size_t& len, uint16_t port,
+                                     uint8_t type) {
   BroadcastMessage msg;
   msg.type = type;
   msg.protocolVersion = ProtocolVersion;

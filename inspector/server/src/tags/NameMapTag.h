@@ -17,32 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <cstdint>
-#include <memory>
-#include "Protocol.h"
+#include <unordered_map>
+#include "DecodeStream.h"
+#include "EncodeStream.h"
+#include "TagHeader.h"
 
 namespace inspector {
-template <typename T>
-T MemRead(const void* ptr) {
-  T val;
-  memcpy(&val, ptr, sizeof(T));
-  return val;
-}
-
-template <typename T>
-void MemWrite(void* ptr, T val) {
-  memcpy(ptr, &val, sizeof(T));
-}
-
-template <typename T>
-void MemWrite(void* ptr, T* val, size_t size) {
-  memcpy(ptr, val, size);
-}
-
-uint32_t GetThreadHandleImpl();
-uint64_t GetPid();
-const char* GetProcessName();
-const char* GetEnvVar(const char* name);
-BroadcastMessage GetBroadcastMessage(const char* procname, size_t pnsz, size_t& len, uint16_t port,
-                                     uint8_t type);
+void ReadNameMapTag(DecodeStream* stream);
+TagType WriteNameMapTag(EncodeStream* stream,
+                        const std::unordered_map<uint64_t, std::string>* nameMap);
 }  // namespace inspector

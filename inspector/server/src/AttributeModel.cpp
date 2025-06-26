@@ -162,10 +162,16 @@ QVariant AttributeModel::readData(DataType type, std::shared_ptr<tgfx::Data> dat
       return QString::number(value, 'f', 2);
     }
     case Enum: {
-      // auto typeValue = dataView.getUint16(0);
-      // uint8_t enumType = (typeValue >> 8) & 0xFF;
-      // uint8_t enumValue = typeValue & 0xFF;
-      return tr("test");
+      auto typeValue = dataView.getUint16(0);
+      uint8_t enumType = (typeValue >> 8) & 0xFF;
+      uint8_t enumValue = typeValue & 0xFF;
+      auto enumTypeIter = TGFXEnumName.find((TGFXEnum)enumType);
+      if (enumTypeIter == TGFXEnumName.end() || enumValue < 0 ||
+          static_cast<size_t>(enumValue) >= enumTypeIter->second.size()) {
+        return "???";
+      }
+      auto enumName = enumTypeIter->second[enumValue];
+      return enumName.c_str();
     }
     default:
       return tr("nullptr(Parsing exception)");

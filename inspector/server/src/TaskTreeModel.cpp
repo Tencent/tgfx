@@ -18,11 +18,11 @@
 
 #include "TaskTreeModel.h"
 #include <QRegularExpression>
+#include <iomanip>
+#include <sstream>
 #include <unordered_set>
 #include "AttributeModel.h"
 #include "TimePrint.h"
-#include <iomanip>
-#include <sstream>
 namespace inspector {
 TaskTreeModel::TaskTreeModel(Worker* worker, ViewData* viewData, QObject* parent)
     : QAbstractItemModel(parent), worker(worker), viewData(viewData) {
@@ -36,8 +36,8 @@ TaskTreeModel::~TaskTreeModel() {
 QHash<int, QByteArray> TaskTreeModel::roleNames() const {
   QHash<int, QByteArray> names;
   names[NameRole] = "name";
-  names[CostTimeRole] = "costTime";
   names[WeightRole] = "weight";
+  names[CostTimeRole] = "costTime";
   return names;
 }
 
@@ -202,8 +202,7 @@ TaskItem* TaskTreeModel::processTaskLevel(
 
   auto getTaskTimeByIndex = [&](uint32_t index) {
     for (auto& task : opTasks)
-      if (task->id == index)
-        return task->end - task->start;
+      if (task->id == index) return task->end - task->start;
     return (int64_t)0;
   };
   std::unordered_map<uint32_t, TaskItem*> nodeMap;
@@ -213,8 +212,8 @@ TaskItem* TaskTreeModel::processTaskLevel(
       continue;
     }
     long long childTasksTime{0};
-    if (opChilds.find(opTask->id)!=opChilds.end()) {
-      for (auto childTaskId: opChilds.at(opTask->id)) {
+    if (opChilds.find(opTask->id) != opChilds.end()) {
+      for (auto childTaskId : opChilds.at(opTask->id)) {
         childTasksTime += getTaskTimeByIndex(childTaskId);
       }
     }
@@ -224,8 +223,8 @@ TaskItem* TaskTreeModel::processTaskLevel(
     snprintf(weight, sizeof(weight), "%.2f%%", opTaskTime / double(selectFrameTime) * 100.0f);
     QVariantList columnData;
     columnData << opTaskName;
-    columnData << TimeToString(opTaskTime - childTasksTime);
     columnData << TimeToString(opTaskTime) + QString(" ") + QString(weight);
+    columnData << TimeToString(opTaskTime - childTasksTime);
     nodeMap[opTask->id] = new TaskItem(columnData, opTask->id);
   }
   std::unordered_set<uint32_t> childNodes;

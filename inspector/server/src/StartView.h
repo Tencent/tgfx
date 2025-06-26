@@ -109,8 +109,10 @@ class FileItem : public QObject {
 class StartView : public QObject {
   Q_OBJECT
   Q_PROPERTY(QList<QObject*> fileItems READ getFileItems NOTIFY fileItemsChanged)
-  Q_PROPERTY(QVector<QObject*> frameCaptureClientItems READ getFrameCaptureClientItems NOTIFY clientItemsChanged)
-  Q_PROPERTY(QVector<QObject*> layerTreeClientItems READ getLayerTreeClientItems NOTIFY clientItemsChanged)
+  Q_PROPERTY(QVector<QObject*> frameCaptureClientItems READ getFrameCaptureClientItems NOTIFY
+                 clientItemsChanged)
+  Q_PROPERTY(
+      QVector<QObject*> layerTreeClientItems READ getLayerTreeClientItems NOTIFY clientItemsChanged)
   Q_PROPERTY(QString lastOpenFile READ getLastOpenFile NOTIFY lastOpenFileChanged)
 
  public:

@@ -24,7 +24,7 @@ MemoryImageProvider::MemoryImageProvider() : QQuickImageProvider(QQuickImageProv
 }
 
 MemoryImageProvider::~MemoryImageProvider() {
-  if(defaultImage) {
+  if (defaultImage) {
     delete defaultImage;
   }
 }

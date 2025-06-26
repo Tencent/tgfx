@@ -24,6 +24,7 @@
 namespace inspector {
 enum TagType : uint8_t {
   End,
+  NameMap,
   Frame,
   OpTask,
   Property,

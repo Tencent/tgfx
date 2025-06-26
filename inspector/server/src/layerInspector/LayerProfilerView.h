@@ -18,9 +18,9 @@
 #pragma once
 
 #include <QtGui/qwindow.h>
+#include <kddockwidgets/qtquick/views/DockWidget.h>
 #include <QDialog>
 #include <QQmlApplicationEngine>
-#include <kddockwidgets/qtquick/views/DockWidget.h>
 #include "LayerAttributeModel.h"
 #include "LayerTreeModel.h"
 #include "MemoryImageProvider.h"

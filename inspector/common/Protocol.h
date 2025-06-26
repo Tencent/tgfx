@@ -44,10 +44,7 @@ enum HandshakeStatus : uint8_t {
   HandshakeDropped
 };
 
-enum MsgType : uint8_t {
-  FrameCapture = 0,
-  LayerTree = 1
-};
+enum MsgType : uint8_t { FrameCapture = 0, LayerTree = 1 };
 
 struct BroadcastMessage {
   uint8_t type;
@@ -104,11 +101,10 @@ enum OpTaskType : uint8_t {
   OpTaskTypeSize,
 };
 
-enum TGFXEnum {
-  BufferType,
+enum TGFXEnum : uint8_t {
+  BufferType = 0,
   BlendMode,
   AAType,
-  Sampling,
   PixelFormat,
   ImageOrigin,
 };
