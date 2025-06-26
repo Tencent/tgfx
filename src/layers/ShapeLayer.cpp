@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/ShapeLayer.h"
-#include "layers/BackgroundContext.h"
-#include "layers/contents/ShapeContent.h"
 #include "tgfx/core/PathEffect.h"
 
 namespace tgfx {
@@ -251,82 +249,64 @@ ShapeLayer::~ShapeLayer() {
   }
 }
 
-static bool NothingToDraw(ShapeStyle* style) {
-  Fill fill = {};
-  fill.color.alpha = style->alpha();
-  fill.blendMode = style->blendMode();
-  return fill.nothingToDraw();
-}
-
-std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
-  if (_shape == nullptr) {
-    return nullptr;
-  }
-  std::vector<ShapePaint> paintList = {};
-  paintList.reserve(_fillStyles.size() + _strokeStyles.size());
-  for (auto& style : _fillStyles) {
-    if (!NothingToDraw(style.get())) {
-      paintList.emplace_back(style->getShader(), style->alpha(), style->blendMode());
-    }
-  }
-  auto fillPaintCount = paintList.size();
-  if (stroke.width > 0) {
-    for (auto& style : _strokeStyles) {
-      if (!NothingToDraw(style.get())) {
-        paintList.emplace_back(style->getShader(), style->alpha(), style->blendMode());
-      }
-    }
-  }
-  auto fillShape = fillPaintCount > 0 ? _shape : nullptr;
-  auto strokeShape = fillPaintCount < paintList.size() ? createStrokeShape() : nullptr;
-  return std::make_unique<ShapeContent>(fillShape, strokeShape, std::move(paintList),
-                                        fillPaintCount);
-}
-
-bool ShapeLayer::DrawFills(Canvas* canvas, const Layer* layer, const LayerContent* content,
-                           float alpha, bool forContour) {
-  auto shapeContent = static_cast<const ShapeContent*>(content);
-  auto shapeLayer = static_cast<const ShapeLayer*>(layer);
-  auto paint = shapeLayer->getPaint(alpha);
-  if (!shapeContent || !shapeContent->drawFills(canvas, paint, forContour)) {
-    if (forContour) {
-      canvas->drawShape(shapeLayer->_shape, paint);
-    }
+static bool DrawContour(Canvas* canvas, std::shared_ptr<Shape> shape,
+                        const std::vector<Paint>& paints) {
+  if (shape == nullptr || paints.empty()) {
     return false;
+  }
+  auto hasNonImageShader = std::any_of(paints.begin(), paints.end(), [](const Paint& paint) {
+    auto shader = paint.getShader();
+    return !shader || !shader->isAImage();
+  });
+  if (hasNonImageShader) {
+    canvas->drawShape(shape, {});
+  } else {
+    for (auto& paint : paints) {
+      canvas->drawShape(shape, paint);
+    }
   }
   return true;
 }
 
-bool ShapeLayer::DrawStrokes(Canvas* canvas, const Layer* layer, const LayerContent* content,
-                             float alpha, bool forContour) {
-  auto shapeContent = static_cast<const ShapeContent*>(content);
-  auto shapeLayer = static_cast<const ShapeLayer*>(layer);
-  auto paint = shapeLayer->getPaint(alpha);
-  if (shapeContent == nullptr) {
-    return false;
+void ShapeLayer::onUpdateContent(LayerRecorder* recorder) {
+  if (_shape == nullptr) {
+    return;
   }
-  return shapeContent->drawStrokes(canvas, paint, forContour);
+  auto fillPaints = createShapePaints(_fillStyles);
+  auto strokePaints = stroke.width > 0 ? createShapePaints(_strokeStyles) : std::vector<Paint>();
+  auto strokeShape = strokePaints.empty() ? nullptr : createStrokeShape();
+  auto canvas = recorder->getCanvas(LayerContentType::Default);
+  for (auto& paint : fillPaints) {
+    canvas->drawShape(_shape, paint);
+  }
+  if (shapeBitFields.strokeOnTop) {
+    canvas = recorder->getCanvas(LayerContentType::Foreground);
+  }
+  for (auto& paint : strokePaints) {
+    canvas->drawShape(strokeShape, paint);
+  }
+  canvas = recorder->getCanvas(LayerContentType::Contour);
+  if (!DrawContour(canvas, _shape, fillPaints)) {
+    // If there is not any fill paints, we still need to draw the shape as contour.
+    canvas->drawShape(_shape, {});
+  }
+  DrawContour(canvas, strokeShape, strokePaints);
 }
 
-void ShapeLayer::drawContents(const std::function<void(ContentDrawer contentDrawer)>& drawContent,
-                              const std::function<bool()>& drawChildren) const {
-  drawContent(DrawFills);
-  if (shapeBitFields.strokeOnTop) {
-    if (!drawChildren()) {
-      return;
+std::vector<Paint> ShapeLayer::createShapePaints(
+    const std::vector<std::shared_ptr<ShapeStyle>>& styles) const {
+  std::vector<Paint> paintList = {};
+  paintList.reserve(styles.size());
+  for (auto& style : styles) {
+    Paint paint = {};
+    paint.setAlpha(style->alpha());
+    paint.setBlendMode(style->blendMode());
+    paint.setShader(style->getShader());
+    if (!paint.getFill().nothingToDraw()) {
+      paintList.push_back(paint);
     }
   }
-  drawContent(DrawStrokes);
-  if (!shapeBitFields.strokeOnTop) {
-    drawChildren();
-  }
-}
-
-Paint ShapeLayer::getPaint(float alpha) const {
-  Paint paint = {};
-  paint.setAntiAlias(allowsEdgeAntialiasing());
-  paint.setAlpha(alpha);
-  return paint;
+  return paintList;
 }
 
 std::shared_ptr<Shape> ShapeLayer::createStrokeShape() const {

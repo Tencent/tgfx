@@ -49,20 +49,22 @@ static const float ColorConversionJPEGFullRange[] = {
 };
 
 PlacementPtr<FragmentProcessor> TextureEffect::MakeRGBAAA(std::shared_ptr<TextureProxy> proxy,
+                                                          const SamplingArgs& args,
                                                           const Point& alphaStart,
-                                                          const SamplingOptions& sampling,
                                                           const Matrix* uvMatrix) {
   if (proxy == nullptr) {
     return nullptr;
   }
   auto matrix = uvMatrix ? *uvMatrix : Matrix::I();
   auto drawingBuffer = proxy->getContext()->drawingBuffer();
-  return drawingBuffer->make<GLTextureEffect>(std::move(proxy), alphaStart, sampling, matrix);
+  return drawingBuffer->make<GLTextureEffect>(std::move(proxy), alphaStart, args.sampling,
+                                              args.constraint, matrix, args.sampleArea);
 }
 
 GLTextureEffect::GLTextureEffect(std::shared_ptr<TextureProxy> proxy, const Point& alphaStart,
-                                 const SamplingOptions& sampling, const Matrix& uvMatrix)
-    : TextureEffect(std::move(proxy), sampling, alphaStart, uvMatrix) {
+                                 const SamplingOptions& sampling, SrcRectConstraint constraint,
+                                 const Matrix& uvMatrix, const std::optional<Rect>& subset)
+    : TextureEffect(std::move(proxy), sampling, constraint, alphaStart, uvMatrix, subset) {
 }
 
 void GLTextureEffect::emitCode(EmitArgs& args) const {
@@ -86,6 +88,7 @@ void GLTextureEffect::emitCode(EmitArgs& args) const {
                              args.inputColor.c_str());
   }
 }
+
 void GLTextureEffect::emitPlainTextureCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
   auto* uniformHandler = args.uniformHandler;
@@ -94,15 +97,26 @@ void GLTextureEffect::emitPlainTextureCode(EmitArgs& args) const {
   if (args.coordFunc) {
     vertexColor = args.coordFunc(vertexColor);
   }
+  std::string subsetName = "";
+  std::string dimensionsName = "";
+  if (needSubset(getTexture())) {
+    subsetName = uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "Subset");
+  }
+  if (constraint == SrcRectConstraint::Strict) {
+    dimensionsName = uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float2, "Dimension");
+  }
+  std::string finalCoordName = "finalCoord";
+  fragBuilder->codeAppendf("vec2 %s;", finalCoordName.c_str());
+  appendClamp(fragBuilder, vertexColor, finalCoordName, subsetName, dimensionsName);
   fragBuilder->codeAppend("vec4 color = ");
-  fragBuilder->appendTextureLookup(textureSampler, vertexColor);
+  fragBuilder->appendTextureLookup(textureSampler, finalCoordName);
   fragBuilder->codeAppend(";");
   if (alphaStart != Point::Zero()) {
     fragBuilder->codeAppend("color = clamp(color, 0.0, 1.0);");
     auto alphaStartName =
         uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float2, "AlphaStart");
     std::string alphaVertexColor = "alphaVertexColor";
-    fragBuilder->codeAppendf("vec2 %s = %s + %s;", alphaVertexColor.c_str(), vertexColor.c_str(),
+    fragBuilder->codeAppendf("vec2 %s = %s + %s;", alphaVertexColor.c_str(), finalCoordName.c_str(),
                              alphaStartName.c_str());
     fragBuilder->codeAppend("vec4 alpha = ");
     fragBuilder->appendTextureLookup(textureSampler, alphaVertexColor);
@@ -119,20 +133,34 @@ void GLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
   auto yuvTexture = getYUVTexture();
   auto& textureSamplers = *args.textureSamplers;
   auto vertexColor = (*args.transformedCoords)[0].name();
+  std::string subsetName = "";
+  std::string dimensionsName = "";
+  if (needSubset(yuvTexture)) {
+    subsetName = uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "Subset");
+  }
+  if (SrcRectConstraint::Strict == constraint) {
+    dimensionsName = uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float2, "Dimension");
+  }
+  std::string finalCoordName = "finalCoord";
+  fragBuilder->codeAppendf("vec2 %s;", finalCoordName.c_str());
+  appendClamp(fragBuilder, vertexColor, finalCoordName, subsetName, dimensionsName);
   fragBuilder->codeAppend("vec3 yuv;");
   fragBuilder->codeAppend("yuv.x = ");
-  fragBuilder->appendTextureLookup(textureSamplers[0], vertexColor);
+  fragBuilder->appendTextureLookup(textureSamplers[0], finalCoordName);
   fragBuilder->codeAppend(".r;");
   if (yuvTexture->pixelFormat() == YUVPixelFormat::I420) {
+    appendClamp(fragBuilder, vertexColor, finalCoordName, subsetName, dimensionsName);
     fragBuilder->codeAppend("yuv.y = ");
-    fragBuilder->appendTextureLookup(textureSamplers[1], vertexColor);
+    fragBuilder->appendTextureLookup(textureSamplers[1], finalCoordName);
     fragBuilder->codeAppend(".r;");
+    appendClamp(fragBuilder, vertexColor, finalCoordName, subsetName, dimensionsName);
     fragBuilder->codeAppend("yuv.z = ");
-    fragBuilder->appendTextureLookup(textureSamplers[2], vertexColor);
+    fragBuilder->appendTextureLookup(textureSamplers[2], finalCoordName);
     fragBuilder->codeAppend(".r;");
   } else if (yuvTexture->pixelFormat() == YUVPixelFormat::NV12) {
+    appendClamp(fragBuilder, vertexColor, finalCoordName, subsetName, dimensionsName);
     fragBuilder->codeAppend("yuv.yz = ");
-    fragBuilder->appendTextureLookup(textureSamplers[1], vertexColor);
+    fragBuilder->appendTextureLookup(textureSamplers[1], finalCoordName);
     fragBuilder->codeAppend(".ra;");
   }
   if (IsLimitedYUVColorRange(yuvTexture->colorSpace())) {
@@ -148,7 +176,7 @@ void GLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
     auto alphaStartName =
         uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float2, "AlphaStart");
     std::string alphaVertexColor = "alphaVertexColor";
-    fragBuilder->codeAppendf("vec2 %s = %s + %s;", alphaVertexColor.c_str(), vertexColor.c_str(),
+    fragBuilder->codeAppendf("vec2 %s = %s + %s;", alphaVertexColor.c_str(), finalCoordName.c_str(),
                              alphaStartName.c_str());
     fragBuilder->codeAppend("float yuv_a = ");
     fragBuilder->appendTextureLookup(textureSamplers[0], alphaVertexColor);
@@ -196,6 +224,61 @@ void GLTextureEffect::onSetData(UniformBuffer* uniformBuffer) const {
       default:
         break;
     }
+  }
+  if (needSubset(texture)) {
+    auto subsetRect = subset.value_or(Rect::MakeWH(texture->width(), texture->height()));
+    if (samplerState.filterMode == FilterMode::Nearest) {
+      subsetRect.roundOut();
+    }
+    auto type = texture->getSampler()->type();
+    // https://cs.android.com/android/platform/superproject/+/master:frameworks/native/libs/nativedisplay/surfacetexture/SurfaceTexture.cpp;l=275;drc=master;bpv=0;bpt=1
+    // https://stackoverflow.com/questions/6023400/opengl-es-texture-coordinates-slightly-off
+    // Normally this would just need to take 1/2 a texel off each end, but because the chroma
+    // channels of YUV420 images are subsampled we may need to shrink the crop region by a whole
+    // texel on each side.
+    auto inset = type == SamplerType::External ? 1.0f : 0.5f;
+    subsetRect = subsetRect.makeInset(inset, inset);
+    float rect[4] = {subsetRect.left, subsetRect.top, subsetRect.right, subsetRect.bottom};
+    if (texture->origin() == ImageOrigin::BottomLeft) {
+      auto h = static_cast<float>(texture->height());
+      rect[1] = h - rect[1];
+      rect[3] = h - rect[3];
+      std::swap(rect[1], rect[3]);
+    }
+    if (type != SamplerType::Rectangle) {
+      auto lt = texture->getTextureCoord(rect[0], rect[1]);
+      auto rb = texture->getTextureCoord(rect[2], rect[3]);
+      rect[0] = lt.x;
+      rect[1] = lt.y;
+      rect[2] = rb.x;
+      rect[3] = rb.y;
+    }
+    uniformBuffer->setData("Subset", rect);
+  }
+
+  if (constraint == SrcRectConstraint::Strict) {
+    auto dimensions = texture->getTextureCoord(1.f, 1.f);
+    uniformBuffer->setData("Dimension", dimensions);
+  }
+}
+
+void GLTextureEffect::appendClamp(FragmentShaderBuilder* fragBuilder,
+                                  const std::string& vertexColor, const std::string& finalCoordName,
+                                  const std::string& subsetName,
+                                  const std::string& dimensionName) const {
+  fragBuilder->codeAppendf("%s = %s;", finalCoordName.c_str(), vertexColor.c_str());
+  if (!dimensionName.empty()) {
+    fragBuilder->codeAppend("{");
+    fragBuilder->codeAppend("vec4 extraSubset = vtexsubset_P0;");
+    fragBuilder->codeAppendf("extraSubset.xy = extraSubset.xy * %s;", dimensionName.c_str());
+    fragBuilder->codeAppendf("extraSubset.zw = extraSubset.zw * %s;", dimensionName.c_str());
+    fragBuilder->codeAppendf("%s = clamp(%s, extraSubset.xy, extraSubset.zw);",
+                             finalCoordName.c_str(), vertexColor.c_str());
+    fragBuilder->codeAppend("}");
+  }
+  if (!subsetName.empty()) {
+    fragBuilder->codeAppendf("%s = clamp(%s, %s.xy, %s.zw);", finalCoordName.c_str(),
+                             finalCoordName.c_str(), subsetName.c_str(), subsetName.c_str());
   }
 }
 }  // namespace tgfx

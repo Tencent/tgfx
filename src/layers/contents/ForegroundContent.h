@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,28 +18,34 @@
 
 #pragma once
 
-#include "tgfx/layers/LayerContent.h"
+#include "core/utils/Log.h"
+#include "layers/contents/LayerContent.h"
 
 namespace tgfx {
-class ComposeContent : public LayerContent {
+class ForegroundContent : public LayerContent {
  public:
-  explicit ComposeContent(std::vector<std::unique_ptr<LayerContent>> contents)
-      : contents(std::move(contents)) {
+  ForegroundContent(std::shared_ptr<Picture> background, std::shared_ptr<Picture> foreground)
+      : background(std::move(background)), foreground(std::move(foreground)) {
   }
 
   Rect getBounds() const override;
 
   Rect getTightBounds(const Matrix& matrix) const override;
 
-  void draw(Canvas* canvas, const Paint& paint) const override;
+  bool hitTestPoint(float localX, float localY, bool shapeHitTest) const override;
 
-  bool hitTestPoint(float localX, float localY, bool shapeHitTest) override;
+  void drawDefault(Canvas* canvas, const FillModifier* modifier) const override;
 
-  std::vector<std::unique_ptr<LayerContent>> contents = {};
+  void drawForeground(Canvas* canvas, const FillModifier* modifier) const override;
+
+  void drawContour(Canvas*, const FillModifier* modifier) const override;
+
+  std::shared_ptr<Picture> background = nullptr;
+  std::shared_ptr<Picture> foreground = nullptr;
 
  protected:
   Type type() const override {
-    return Type::ComposeContent;
+    return Type::Foreground;
   }
 };
 }  // namespace tgfx

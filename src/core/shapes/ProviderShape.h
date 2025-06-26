@@ -15,16 +15,14 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#include "gpu/ResourceKey.h"
-#include "tgfx/core/Path.h"
-#include "tgfx/core/PathProvider.h"
-#include "tgfx/core/Rect.h"
-#include "tgfx/core/Shape.h"
 
 #pragma once
 
+#include "core/shapes/UniqueKeyShape.h"
+#include "tgfx/core/PathProvider.h"
+
 namespace tgfx {
-class ProviderShape final : public Shape {
+class ProviderShape : public UniqueKeyShape {
  public:
   explicit ProviderShape(std::shared_ptr<PathProvider> pathProvider)
       : provider(std::move(pathProvider)) {
@@ -39,12 +37,7 @@ class ProviderShape final : public Shape {
     return Type::Provider;
   }
 
-  UniqueKey getUniqueKey() const override {
-    return uniqueKey.get();
-  }
-
  private:
   std::shared_ptr<PathProvider> provider = nullptr;
-  LazyUniqueKey uniqueKey = {};
 };
 }  // namespace tgfx

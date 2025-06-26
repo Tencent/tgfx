@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,20 +16,27 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ImageContent.h"
+#pragma once
+
+#include <optional>
+#include "tgfx/core/Canvas.h"
+#include "tgfx/core/SamplingOptions.h"
+#include "tgfx/core/TileMode.h"
 
 namespace tgfx {
-Rect ImageContent::getBounds() const {
-  return Rect::MakeXYWH(0, 0, image->width(), image->height());
-}
+class SamplingArgs {
+ public:
+  SamplingArgs() = default;
 
-void ImageContent::draw(Canvas* canvas, const Paint& paint) const {
-  canvas->drawImage(image, sampling, &paint);
-}
+  SamplingArgs(TileMode tileModeX, TileMode tileModeY, const SamplingOptions& sampling,
+               SrcRectConstraint constraint)
+      : tileModeX(tileModeX), tileModeY(tileModeY), sampling(sampling), constraint(constraint) {
+  }
 
-bool ImageContent::hitTestPoint(float localX, float localY, bool /*shapeHitTest*/) {
-  // Images are always checked against their bounding box.
-  const auto imageBounds = Rect::MakeXYWH(0, 0, image->width(), image->height());
-  return imageBounds.contains(localX, localY);
-}
+  TileMode tileModeX = TileMode::Clamp;
+  TileMode tileModeY = TileMode::Clamp;
+  SamplingOptions sampling = {};
+  SrcRectConstraint constraint = SrcRectConstraint::Fast;
+  std::optional<Rect> sampleArea = std::nullopt;
+};
 }  // namespace tgfx
