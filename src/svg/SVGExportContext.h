@@ -35,6 +35,7 @@
 #include "tgfx/core/Size.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/svg/SVGExporter.h"
+#include "tgfx/svg/SVGPathParser.h"
 
 namespace tgfx {
 
@@ -108,7 +109,7 @@ class SVGExportContext : public DrawContext {
 
   void applyClipPath(const Path& clipPath);
 
-  static PathEncoding PathEncodingType();
+  static SVGPathParser::PathEncoding PathEncodingType();
 
   uint32_t exportFlags = {};
   Context* context = nullptr;
