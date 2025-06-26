@@ -326,7 +326,7 @@ int Socket::Recv(void* _buf, size_t len, int timeout) {
   fd.events = POLLIN;
 
   if (poll(&fd, 1, timeout) > 0) {
-    return recv(sock, buf, len, 0);
+    return static_cast<int>(recv(sock, buf, len, 0));
   } else {
     return -1;
   }

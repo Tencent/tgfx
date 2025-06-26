@@ -20,6 +20,7 @@
 #include <iostream>
 #include <mutex>
 #include <thread>
+#include <chrono>
 #include "FastVector.h"
 #include "Protocol.h"
 #include "Queue.h"
@@ -67,51 +68,9 @@ class Inspector {
   ~Inspector();
 
   static int64_t GetTime() {
-#ifdef INSPECTOR_HW_TIMER
-#  if defined TARGET_OS_IOS && TARGET_OS_IOS == 1
-        if( HardwareSupportsInvariantTSC() ) {
-          return mach_absolute_time();
-        }
-#  elif defined _WIN32
-#    ifdef INSPECTOR_TIMER_QPC
-        return GetTimeQpc();
-#    else
-        if(HardwareSupportsInvariantTSC()) {
-          return int64_t(__rdtsc());
-        }
-#    endif
-#  elif defined __i386 || defined _M_IX86
-        if(HardwareSupportsInvariantTSC())
-        {
-            uint32_t eax, edx;
-            asm volatile ( "rdtsc" : "=a" (eax), "=d" (edx) );
-            return ( uint64_t( edx ) << 32 ) + uint64_t( eax );
-        }
-#  elif defined __x86_64__ || defined _M_X64
-        if( HardwareSupportsInvariantTSC() )
-        {
-            uint64_t rax, rdx;
-            asm volatile ( "rdtsc" : "=a" (rax), "=d" (rdx) );
-            return (int64_t)(( rdx << 32 ) + rax);
-        }
-#  else
-#    error "INSPECTOR_HW_TIMER detection logic needs fixing"
-#  endif
-#endif
-
-#if !defined INSPECTOR_HW_TIMER
-#  if defined __linux__ && defined CLOCK_MONOTONIC_RAW
-        struct timespec ts;
-        clock_gettime( CLOCK_MONOTONIC_RAW, &ts );
-        return int64_t( ts.tv_sec ) * 1000000000ll + int64_t( ts.tv_nsec );
-#  else
-        return std::chrono::duration_cast<std::chrono::nanoseconds>( std::chrono::high_resolution_clock::now().time_since_epoch() ).count();
-#  endif
-#endif
-
-#if !defined INSPECTOR_TIMER_FALLBACK
-        return 0;  // unreachable branch
-#endif
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(
+               std::chrono::high_resolution_clock::now().time_since_epoch())
+        .count();
   }
 
   static QueueItem* QueueSerial() {

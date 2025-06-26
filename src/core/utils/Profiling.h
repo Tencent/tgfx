@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma once
 #ifdef TGFX_USE_INSPECTOR
+#include <optional>
 #include "InspectorDefine.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"

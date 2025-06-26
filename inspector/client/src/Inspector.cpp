@@ -21,6 +21,7 @@
 #include <atomic>
 #include <iostream>
 #include <new>
+#include <chrono>
 #include "Alloc.h"
 #include "LZ4.h"
 #include "Protocol.h"
