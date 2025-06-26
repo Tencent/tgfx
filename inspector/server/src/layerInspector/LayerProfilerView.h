@@ -46,7 +46,11 @@ class LayerProfilerView : public QObject {
   Q_INVOKABLE void flushAttribute();
   Q_INVOKABLE void flushLayerTree();
   Q_INVOKABLE void openStartView();
+  Q_INVOKABLE void showLayerTree();
+  Q_INVOKABLE void showLayerAttributeTree();
   void cleanView();
+signals:
+    void viewHide();
 
  protected:
   void LayerProlfilerQMLImpl();

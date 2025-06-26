@@ -54,6 +54,7 @@ int TaskFilterItem::row() const {
     return int(std::distance(parentItem->childItems.cbegin(), it));
   }
   Q_ASSERT(false);  // should not happen
+  return 0;
 }
 
 const std::string& TaskFilterItem::data() const {

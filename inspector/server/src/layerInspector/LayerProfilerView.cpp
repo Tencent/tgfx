@@ -161,6 +161,14 @@ void LayerProfilerView::openStartView() {
   startView->showStartView();
 }
 
+void LayerProfilerView::showLayerTree() {
+  layerTree->show();
+}
+
+void LayerProfilerView::showLayerAttributeTree() {
+  layerAttributeTree->show();
+}
+
 void LayerProfilerView::cleanView() {
   if (m_LayerTreeEngine) {
     m_LayerTreeEngine->deleteLater();
@@ -220,6 +228,7 @@ void LayerProfilerView::LayerProlfilerQMLImpl() {
     connect(window, &QWindow::visibilityChanged, [this](QWindow::Visibility visibility) {
       if (visibility == QWindow::Visibility::Hidden) {
         m_TcpSocketClient->disConnection();
+        emit viewHide();
       }
     });
   }

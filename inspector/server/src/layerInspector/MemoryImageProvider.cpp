@@ -30,12 +30,9 @@ MemoryImageProvider::~MemoryImageProvider() {
 }
 
 void MemoryImageProvider::setImage(uint64_t id, int width, int height, const QByteArray& rawData) {
-  qDebug() << "set id: " << id;
   rwLock.lockForWrite();
   imageMap[id] = {width, height, rawData};
   rwLock.unlock();
-  //bool result = imageMap[id].save(QString::number(id)+".jpg");
-  //qDebug() << QString::number(id)+".jpg" << " : " << result;
   emit imageFlush(id);
 }
 

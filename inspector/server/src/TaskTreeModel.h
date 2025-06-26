@@ -74,6 +74,7 @@ class TaskItem {
       return int(std::distance(parentItem->childrenItems.cbegin(), it));
     }
     Q_ASSERT(false);  // should not happen
+    return 0;
   }
 
   int index = 0;
