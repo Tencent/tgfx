@@ -26,6 +26,7 @@
 #include "layers/DrawArgs.h"
 #include "layers/RegionTransformer.h"
 #include "layers/RootLayer.h"
+#include "layerstyles/OpaqueThreshold.h"
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/layers/ShapeLayer.h"
@@ -221,10 +222,11 @@ void Layer::setMask(std::shared_ptr<Layer> value) {
 }
 
 void Layer::setMaskType(LayerMaskType value) {
-  if (_maskType == value) {
+  uint8_t uValue = static_cast<uint8_t>(value);
+  if (bitFields.maskType == uValue) {
     return;
   }
-  _maskType = value;
+  bitFields.maskType = uValue;
   if (_mask) {
     invalidateTransform();
   }
@@ -778,7 +780,8 @@ Matrix Layer::getRelativeMatrix(const Layer* targetCoordinateSpace) const {
 
 std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float scale) {
   auto maskArgs = args;
-  maskArgs.drawMode = _maskType != LayerMaskType::Contour ? DrawMode::Normal : DrawMode::Contour;
+  auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
+  maskArgs.drawMode = maskType != LayerMaskType::Contour ? DrawMode::Normal : DrawMode::Contour;
   maskArgs.backgroundContext = nullptr;
   auto maskPicture = RecordPicture(scale, [&](Canvas* canvas) {
     _mask->drawLayer(maskArgs, canvas, _mask->_alpha, BlendMode::SrcOver);
@@ -791,9 +794,12 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
   if (maskContentImage == nullptr) {
     return nullptr;
   }
-  if (_maskType == LayerMaskType::Luminance) {
+  if (maskType == LayerMaskType::Luminance) {
     maskContentImage =
         maskContentImage->makeWithFilter(ImageFilter::ColorFilter(ColorFilter::Luma()));
+  } else if (maskType == LayerMaskType::Contour) {
+    maskContentImage = maskContentImage->makeWithFilter(
+        ImageFilter::ColorFilter(ColorFilter::AlphaThreshold(OPAQUE_THRESHOLD)));
   }
   auto relativeMatrix = _mask->getRelativeMatrix(this);
   relativeMatrix.preScale(1.0f / scale, 1.0f / scale);
