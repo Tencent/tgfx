@@ -2887,5 +2887,12 @@ TGFX_TEST(LayerTest, BackgroundBlurStyleTest) {
   rootLayer->addChild(maskLayer);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurStyleTest4"));
+
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  canvas->setMatrix(Matrix::MakeScale(2.0f, 2.0f));
+  canvas->translate(-50, -50);
+  layer2->draw(canvas);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurStyleTest5"));
 }
 }  // namespace tgfx

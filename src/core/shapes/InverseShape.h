@@ -18,11 +18,10 @@
 
 #pragma once
 
-#include "gpu/ResourceKey.h"
-#include "tgfx/core/Shape.h"
+#include "core/shapes/UniqueKeyShape.h"
 
 namespace tgfx {
-class InverseShape : public Shape {
+class InverseShape : public UniqueKeyShape {
  public:
   explicit InverseShape(std::shared_ptr<Shape> shape) : shape(std::move(shape)) {
   }
@@ -42,12 +41,7 @@ class InverseShape : public Shape {
     return Type::Inverse;
   }
 
-  UniqueKey getUniqueKey() const override {
-    return uniqueKey.get();
-  }
-
  private:
-  LazyUniqueKey uniqueKey = {};
   std::shared_ptr<Shape> shape = nullptr;
 
   friend class Shape;

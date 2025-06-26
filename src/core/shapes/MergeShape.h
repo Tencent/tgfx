@@ -18,14 +18,13 @@
 
 #pragma once
 
-#include "gpu/ResourceKey.h"
-#include "tgfx/core/Shape.h"
+#include "core/shapes/UniqueKeyShape.h"
 
 namespace tgfx {
 /**
  * Shape that merges multiple shapes together.
  */
-class MergeShape : public Shape {
+class MergeShape : public UniqueKeyShape {
  public:
   MergeShape(std::shared_ptr<Shape> first, std::shared_ptr<Shape> second, PathOp pathOp)
       : first(std::move(first)), second(std::move(second)), pathOp(pathOp) {
@@ -42,12 +41,7 @@ class MergeShape : public Shape {
     return Type::Merge;
   }
 
-  UniqueKey getUniqueKey() const override {
-    return uniqueKey.get();
-  }
-
  private:
-  LazyUniqueKey uniqueKey = {};
   std::shared_ptr<Shape> first = nullptr;
   std::shared_ptr<Shape> second = nullptr;
   PathOp pathOp = PathOp::Append;
