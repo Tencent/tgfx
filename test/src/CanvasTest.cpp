@@ -2008,6 +2008,23 @@ TGFX_TEST(CanvasTest, CornerTest) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/CornerShapeTriple"));
 
   canvas->clear();
+  Path closeQuadPath = {};
+  closeQuadPath.moveTo(50, 50);
+  closeQuadPath.lineTo(80, 50);
+  closeQuadPath.quadTo(100, 70, 80, 80);
+  closeQuadPath.lineTo(80, 100);
+  closeQuadPath.lineTo(50, 100);
+  closeQuadPath.lineTo(50, 50);
+  closeQuadPath.close();
+  auto closeQuadShape = Shape::MakeFrom(closeQuadPath);
+  canvas->drawShape(closeQuadShape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/CloseQuadShape"));
+  canvas->clear();
+  auto cornerCloseQuadShape = Shape::ApplyEffect(closeQuadShape, pathEffect);
+  canvas->drawShape(cornerCloseQuadShape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/CloseQuadShapeCorner"));
+
+  canvas->clear();
   Path openQuadPath = {};
   openQuadPath.moveTo(50, 50);
   openQuadPath.lineTo(80, 50);
