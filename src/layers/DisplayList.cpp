@@ -25,7 +25,7 @@
 #include "layers/TileCache.h"
 
 #ifdef TGFX_USE_INSPECTOR
-#include "tgfx/layers/LayerInspector.h"
+#include "layers/LayerInspectorManager.h"
 #endif
 
 namespace tgfx {
@@ -117,8 +117,8 @@ static int64_t ChangeZoomScalePrecision(int64_t zoomScaleInt, int oldPrecision, 
 DisplayList::DisplayList() : _root(RootLayer::Make()) {
   _root->_root = _root.get();
 #ifdef TGFX_USE_INSPECTOR
-  auto& layerInspector = LayerInspector::GetLayerInspector();
-  layerInspector.setDisplayList(this);
+  auto& layerInspectorManager = LayerInspectorManager::GetLayerInspectorManager();
+  layerInspectorManager.setDisplayList(this);
 #endif
 }
 
@@ -244,7 +244,7 @@ void DisplayList::render(Surface* surface, bool autoClear) {
     return;
   }
 #ifdef TGFX_USE_INSPECTOR
-  auto& layerInspector = LayerInspector::GetLayerInspector();
+  auto& layerInspector = LayerInspectorManager::GetLayerInspectorManager();
   layerInspector.setCallBack();
   layerInspector.RenderImageAndSend(surface->getContext());
 #endif
