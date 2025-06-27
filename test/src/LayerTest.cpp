@@ -902,8 +902,6 @@ TGFX_TEST(LayerTest, imageMask) {
   auto alphaMaskImageLayer = ImageLayer::Make();
   alphaLayer->addChild(alphaMaskImageLayer);
   alphaMaskImageLayer->setImage(maskImage);
-  auto alphaFilter = ColorMatrixFilter::Make(alphaColorMatrix);
-  alphaMaskImageLayer->setFilters({alphaFilter});
   imageLayer1->setAlpha(0.5f);
   Matrix alphaMaskMatrix =
       Matrix::MakeAll(1.2f, 0, static_cast<float>(image->width()) * 0.5f, 0, 1.2f, 500);
@@ -923,16 +921,11 @@ TGFX_TEST(LayerTest, imageMask) {
   imageLayer2->setAlpha(1.0f);
   imageLayer2->setScrollRect(scrollRect);
 
-  const std::array<float, 20> vectorColorMatrix = {0, 0, 0, 0, 0,  // red
-                                                   0, 0, 0, 0, 0,  // green
-                                                   0, 0, 0, 0, 0,  // blue
-                                                   0, 0, 0, 0, 1.0f};
   auto vectorMaskImageLayer = ImageLayer::Make();
   layer->addChild(vectorMaskImageLayer);
   vectorMaskImageLayer->setImage(maskImage);
-  auto vectorFilter = ColorMatrixFilter::Make(vectorColorMatrix);
-  vectorMaskImageLayer->setFilters({vectorFilter});
   imageLayer2->setMask(vectorMaskImageLayer);
+  imageLayer2->setMaskType(LayerMaskType::Contour);
   imageLayer2->setAlpha(0.5f);
   Matrix vectorMaskMatrix =
       Matrix::MakeAll(1.2f, 0, 0, 0, 1.2f, 500 + static_cast<float>(image->height()) * 0.5f);
@@ -951,9 +944,8 @@ TGFX_TEST(LayerTest, imageMask) {
   auto lumaMaskImageLayer = ImageLayer::Make();
   layer->addChild(lumaMaskImageLayer);
   lumaMaskImageLayer->setImage(maskImage);
-  auto filter = ColorMatrixFilter::Make(lumaColorMatrix);
-  lumaMaskImageLayer->setFilters({filter});
   imageLayer3->setMask(lumaMaskImageLayer);
+  imageLayer3->setMaskType(LayerMaskType::Luminance);
   imageLayer3->setAlpha(0.5f);
   Matrix lumaMaskMatrix = Matrix::MakeAll(1.2f, 0, static_cast<float>(image->width()) * 0.5f, 0,
                                           1.2f, 500 + static_cast<float>(image->height()) * 0.5f);
