@@ -15,7 +15,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/layerstyles/BackgroundBlurStyle.h"
-#include "OpaqueThreshold.h"
+#include "layers/OpaqueThreshold.h"
 
 namespace tgfx {
 
