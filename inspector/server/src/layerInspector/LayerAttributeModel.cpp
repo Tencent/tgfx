@@ -18,6 +18,7 @@
 
 #include "LayerAttributeModel.h"
 
+namespace inspector {
 template <typename T>
 LayerItem* SetSingleAttribute(LayerItem* parent, const char* key, T value, bool isExpandable,
                               bool isAddress, uint64_t objID, bool isRenderable,
@@ -220,4 +221,5 @@ void LayerAttributeModel::ProcessLayerAttribute(const flexbuffers::Map& contentM
       SetSingleAttribute(currentItem, "Image", 0, false, false, 0, false, true, objID);
     }
   }
+}
 }

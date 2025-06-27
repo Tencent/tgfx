@@ -30,7 +30,7 @@ std::shared_ptr<Data> RecordedContentSerialization::Serialize(const RecordedCont
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
+  SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute, startMap, contentMap);
   auto type = Types::Get(content);
   SerializeUtils::SetFlexBufferMap(fbb, "type", SerializeUtils::RecordedContentTypeToString(type));
   switch (type) {

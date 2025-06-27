@@ -23,6 +23,7 @@
 #include <tgfx/gpu/Context.h>
 #include <tgfx/layers/Layer.h>
 #include <string>
+#include "LayerInspectorProtocol.h"
 
 namespace tgfx {
 class SerializeUtils {
@@ -47,7 +48,7 @@ class SerializeUtils {
 
   static std::string RecordedContentTypeToString(Types::RecordedContentType type);
 
-  static void SerializeBegin(flexbuffers::Builder& fbb, const std::string& type, size_t& mapStart,
+  static void SerializeBegin(flexbuffers::Builder& fbb, inspector::LayerInspectorMsgType type, size_t& mapStart,
                              size_t& contentStart);
 
   static void SerializeEnd(flexbuffers::Builder& fbb, size_t mapStart, size_t contentStart);

@@ -128,11 +128,11 @@ std::string SerializeUtils::RecordedContentTypeToString(Types::RecordedContentTy
   return m[type];
 }
 
-void SerializeUtils::SerializeBegin(flexbuffers::Builder& fbb, const std::string& type,
+void SerializeUtils::SerializeBegin(flexbuffers::Builder& fbb, inspector::LayerInspectorMsgType type,
                                     size_t& mapStart, size_t& contentStart) {
   mapStart = fbb.StartMap();
   fbb.Key("Type");
-  fbb.String(type);
+  fbb.UInt(static_cast<uint8_t>(type));
   fbb.Key("Content");
   contentStart = fbb.StartMap();
 }
@@ -162,7 +162,7 @@ void SerializeUtils::FillComplexObjSerMap(const std::vector<std::shared_ptr<Laye
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
+    SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute, startMap, contentMap);
     for (size_t i = 0; i < filters.size(); i++) {
       std::stringstream ss;
       ss << "[" << i << "]";
@@ -205,7 +205,7 @@ void SerializeUtils::FillComplexObjSerMap(const std::vector<std::shared_ptr<Laye
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
+    SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute, startMap, contentMap);
     for (size_t i = 0; i < children.size(); i++) {
       std::stringstream ss;
       ss << "[" << i << "]";
@@ -227,7 +227,7 @@ void SerializeUtils::FillComplexObjSerMap(const std::vector<std::shared_ptr<Laye
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
+    SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute, startMap, contentMap);
     for (size_t i = 0; i < layerStyles.size(); i++) {
       std::stringstream ss;
       ss << "[" << i << "]";
@@ -268,7 +268,7 @@ void SerializeUtils::FillComplexObjSerMap(const std::array<float, 20>& matrix, u
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
+    SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute, startMap, contentMap);
     for (size_t i = 0; i < 20; i++) {
       std::stringstream ss;
       ss << "[" << i << "]";
@@ -285,7 +285,7 @@ void SerializeUtils::FillComplexObjSerMap(const std::vector<Point>& points, uint
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
+    SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute, startMap, contentMap);
     for (size_t i = 0; i < points.size(); i++) {
       std::stringstream ss;
       ss << "[" << i << "]";
@@ -304,7 +304,7 @@ void SerializeUtils::FillComplexObjSerMap(const std::vector<Color>& colors, uint
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
+    SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute, startMap, contentMap);
     for (size_t i = 0; i < colors.size(); i++) {
       std::stringstream ss;
       ss << "[" << i << "]";
@@ -345,7 +345,7 @@ void SerializeUtils::FillRenderableObjSerMap(const std::shared_ptr<Picture>& pic
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "ImageData", startMap, contentMap);
+    SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::ImageData, startMap, contentMap);
     fbb.Int("width", width);
     fbb.Int("height", height);
     fbb.Blob("data", data.data(), data.size());

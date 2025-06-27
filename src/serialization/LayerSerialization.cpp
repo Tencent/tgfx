@@ -31,12 +31,12 @@ extern const std::string HighLightLayerName;
 
 std::shared_ptr<Data> LayerSerialization::SerializeLayer(
     const Layer* layer, SerializeUtils::ComplexObjSerMap* map,
-    SerializeUtils::RenderableObjSerMap* rosMap, const std::string& typeName) {
+    SerializeUtils::RenderableObjSerMap* rosMap, inspector::LayerInspectorMsgType type) {
   DEBUG_ASSERT(layer != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, typeName, startMap, contentMap);
+  SerializeUtils::SerializeBegin(fbb, type, startMap, contentMap);
   SerializeBasicLayerImpl(fbb, layer, map, rosMap);
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
@@ -48,7 +48,7 @@ std::shared_ptr<Data> LayerSerialization::SerializeTreeNode(
   flexbuffers::Builder fbb;
   size_t startMap = fbb.StartMap();
   fbb.Key("Type");
-  fbb.String("LayerTree");
+  fbb.UInt(static_cast<uint8_t>(inspector::LayerInspectorMsgType::LayerTree));
   fbb.Key("Content");
   SerializeTreeNodeImpl(fbb, layer, layerMap);
   fbb.EndMap(startMap);

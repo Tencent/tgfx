@@ -24,6 +24,7 @@
 #include "SerializationUtils.h"
 #include "flatbuffers/flatbuffers.h"
 #include "flatbuffers/flexbuffers.h"
+#include "LayerInspectorProtocol.h"
 
 namespace tgfx {
 class Layer;
@@ -37,7 +38,7 @@ class LayerSerialization {
   static std::shared_ptr<Data> SerializeLayer(const Layer* layer,
                                               SerializeUtils::ComplexObjSerMap* map,
                                               SerializeUtils::RenderableObjSerMap* rosMap,
-                                              const std::string& typeName = "LayerSubAttribute");
+                                              inspector::LayerInspectorMsgType type = inspector::LayerInspectorMsgType::LayerSubAttribute);
 
  private:
   static void SerializeTreeNodeImpl(

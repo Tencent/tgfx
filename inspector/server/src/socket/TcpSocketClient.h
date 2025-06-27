@@ -20,6 +20,7 @@
 
 #include <QTcpSocket>
 
+namespace inspector {
 class TcpSocketClient : public QObject {
   Q_OBJECT
  public:
@@ -31,15 +32,15 @@ class TcpSocketClient : public QObject {
   bool hasClientConnect() const {
     return m_IsConnection;
   }
- Q_SIGNALS:
-  void ServerBinaryData(const QByteArray& message);
- private slots:
-  void onSocketConnected();
+  Q_SIGNALS:
+   void ServerBinaryData(const QByteArray& message);
+  private slots:
+   void onSocketConnected();
   void onSocketDisconnected();
   void onSocketReadyRead();
   void onSocketErrorOccurred(QAbstractSocket::SocketError error);
 
- private:
+private:
   bool m_IsConnection;
   QTcpSocket* m_TcpSocket;
   QByteArray data;
@@ -47,3 +48,4 @@ class TcpSocketClient : public QObject {
   int size;
   int Remainder;
 };
+}

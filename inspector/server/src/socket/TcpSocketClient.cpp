@@ -18,6 +18,8 @@
 
 #include "TcpSocketClient.h"
 #include <utility>
+
+namespace inspector {
 TcpSocketClient::TcpSocketClient(QObject* parent, QString ip, quint16 port)
     : QObject(parent), m_IsConnection(false), data(), currentIndex(0), size(0), Remainder(0) {
   m_TcpSocket = new QTcpSocket(this);
@@ -78,4 +80,5 @@ void TcpSocketClient::onSocketReadyRead() {
 void TcpSocketClient::onSocketErrorOccurred(QAbstractSocket::SocketError error) {
   Q_UNUSED(error);
   qDebug() << "error: " << m_TcpSocket->errorString();
+}
 }

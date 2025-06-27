@@ -18,6 +18,7 @@
 
 #include "MemoryImageProvider.h"
 
+namespace inspector {
 MemoryImageProvider::MemoryImageProvider() : QQuickImageProvider(QQuickImageProvider::Image) {
   defaultImage = new QImage(200, 200, QImage::Format_RGBA8888);
   defaultImage->fill(QColor(56, 56, 56));
@@ -70,4 +71,5 @@ QImage MemoryImageProvider::requestImage(const QString& id, QSize* size,
     *size = defaultImage->size();
   }
   return defaultImage->copy();
+}
 }
