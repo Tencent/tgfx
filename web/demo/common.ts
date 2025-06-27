@@ -24,7 +24,7 @@ export const ZoomFactorPerNotch = 1.1;
 
 export class TGFXBaseView {
     public updateSize: (devicePixelRatio: number) => void;
-    public draw: (drawIndex: number, zoom: number, offsetX: number, offsetY: number) => void;
+    public draw: (drawIndex: number, zoom: number, offsetX: number, offsetY: number) => boolean;
 }
 
 export class ShareData {
@@ -37,6 +37,29 @@ export class ShareData {
     public offsetY: number = 0;
 }
 
+let canDraw = true;
+
+function isPromise(obj: any): obj is Promise<any> {
+    return !!obj && typeof obj.then === "function";
+}
+function draw(shareData: ShareData) {
+    if (canDraw === true) {
+        canDraw = false;
+        const result = shareData.tgfxBaseView.draw(
+            shareData.drawIndex,
+            shareData.zoom,
+            shareData.offsetX,
+            shareData.offsetY
+        );
+        if (isPromise(result)) {
+            result.then((res: boolean) => {
+                canDraw = res;
+            });
+        } else {
+            canDraw = result;
+        }
+    }
+}
 export function updateSize(shareData: ShareData) {
     if (!shareData.tgfxBaseView) {
         return;
@@ -51,7 +74,7 @@ export function updateSize(shareData: ShareData) {
     canvas.style.width = screenRect.width + "px";
     canvas.style.height = screenRect.height + "px";
     shareData.tgfxBaseView.updateSize(scaleFactor);
-    shareData.tgfxBaseView.draw(shareData.drawIndex, shareData.zoom, shareData.offsetX, shareData.offsetY);
+    draw(shareData);
 }
 
 export function onresizeEvent(shareData: ShareData) {
@@ -66,7 +89,7 @@ export function onclickEvent(shareData: ShareData) {
         return;
     }
     shareData.drawIndex++;
-    shareData.tgfxBaseView.draw(shareData.drawIndex, shareData.zoom, shareData.offsetX, shareData.offsetY);
+    draw(shareData);
 }
 
 export function loadImage(src: string) {
@@ -96,7 +119,6 @@ export function bindCanvasZoomAndPanEvents(canvas: HTMLElement, shareData: Share
             shareData.offsetX = (shareData.offsetX - px) * (newZoom / shareData.zoom) + px;
             shareData.offsetY = (shareData.offsetY - py) * (newZoom / shareData.zoom) + py;
             shareData.zoom = newZoom;
-            shareData.tgfxBaseView.draw(shareData.drawIndex, shareData.zoom, shareData.offsetX, shareData.offsetY);
         } else {
             if(e.shiftKey && e.deltaX === 0 && e.deltaY !== 0){
                 shareData.offsetX -= e.deltaY * window.devicePixelRatio;
@@ -104,8 +126,8 @@ export function bindCanvasZoomAndPanEvents(canvas: HTMLElement, shareData: Share
                 shareData.offsetX -= e.deltaX * window.devicePixelRatio;
                 shareData.offsetY -= e.deltaY * window.devicePixelRatio;
             }
-            shareData.tgfxBaseView.draw(shareData.drawIndex, shareData.zoom, shareData.offsetX, shareData.offsetY);
         }
+        draw(shareData);
     }, { passive: false });
 }
 

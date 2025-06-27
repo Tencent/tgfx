@@ -47,25 +47,25 @@ void TGFXBaseView::setImagePath(const std::string& imagePath) {
   }
 }
 
-void TGFXBaseView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
+bool TGFXBaseView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
   if (appHost->width() <= 0 || appHost->height() <= 0) {
-    return;
+    return true;
   }
   if (window == nullptr) {
     window = tgfx::WebGLWindow::MakeFrom(canvasID);
   }
   if (window == nullptr) {
-    return;
+    return true;
   }
   auto device = window->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {
-    return;
+    return true;
   }
   auto surface = window->getSurface(context);
   if (surface == nullptr) {
     device->unlock();
-    return;
+    return true;
   }
   appHost->updateZoomAndOffset(zoom, tgfx::Point(offsetX, offsetY));
   auto canvas = surface->getCanvas();
@@ -79,6 +79,7 @@ void TGFXBaseView::draw(int drawIndex, float zoom, float offsetX, float offsetY)
   context->flushAndSubmit();
   window->present(context);
   device->unlock();
+  return true;
 }
 }  // namespace hello2d
 
