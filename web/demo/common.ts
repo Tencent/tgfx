@@ -18,6 +18,10 @@
 
 import * as types from '../types/types';
 
+export const MinZoom = 0.001;
+export const MaxZoom = 1000.0;
+export const ZoomFactorPerNotch = 1.1;
+
 export class TGFXBaseView {
     public updateSize: (devicePixelRatio: number) => void;
     public draw: (drawIndex: number, zoom: number, offsetX: number, offsetY: number) => void;
@@ -32,28 +36,6 @@ export class ShareData {
     public offsetX: number = 0;
     public offsetY: number = 0;
 }
-
-// Refs https://github.com/microsoft/vscode/blob/main/src/vs/base/browser/mouseEvent.ts
-export function normalizeWheelDeltaY(e: WheelEvent): number {
-    if (e.type === "wheel") {
-        if (e.deltaMode === WheelEvent.DOM_DELTA_LINE) {
-            const isFirefox = navigator.userAgent.toLowerCase().indexOf('firefox') > -1;
-            const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-            if (isFirefox && !isMac) {
-                return -e.deltaY / 3;
-            } else {
-                return -e.deltaY;
-            }
-        } else {
-            return -e.deltaY / 40;
-        }
-    }
-    return -e.deltaY / 40;
-}
-
-export const MinZoom = 0.001;
-export const MaxZoom = 1000.0;
-export const ZoomFactorPerNotch = 1.1;
 
 export function updateSize(shareData: ShareData) {
     if (!shareData.tgfxBaseView) {
@@ -125,4 +107,62 @@ export function bindCanvasZoomAndPanEvents(canvas: HTMLElement, shareData: Share
             shareData.tgfxBaseView.draw(shareData.drawIndex, shareData.zoom, shareData.offsetX, shareData.offsetY);
         }
     }, { passive: false });
+}
+
+/**
+ * Standardized mouse wheel deltaY to be consistent with VSCode's implementation, compatible with Chrome/Firefox/old API, different platforms and DPIs.
+ * Refs VSCode: https://github.com/microsoft/vscode/blob/main/src/vs/base/browser/mouseEvent.ts
+ */
+export function normalizeWheelDeltaY(e: WheelEvent): number {
+    const ua = navigator.userAgent.toLowerCase();
+    const isFirefox = ua.indexOf('firefox') > -1;
+    const isSafari = /safari/.test(ua) && !/chrome/.test(ua);
+    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+    const isWindows = navigator.platform.toUpperCase().indexOf('WIN') >= 0;
+    let shouldFactorDPR = false;
+    const chromeMatch = navigator.userAgent.match(/Chrome\/(\d+)/);
+    if (chromeMatch) {
+        const chromeVer = parseInt(chromeMatch[1]);
+        shouldFactorDPR = chromeVer <= 122;
+    }
+    const devicePixelRatio = (e.view && (e.view as Window).devicePixelRatio) || 1;
+    if (typeof (e as any).wheelDeltaY !== "undefined") {
+        let deltaY: number;
+        if (shouldFactorDPR) {
+            deltaY = (e as any).wheelDeltaY / (120 * devicePixelRatio);
+        } else {
+            deltaY = (e as any).wheelDeltaY / 120;
+        }
+        if (isSafari && isWindows) {
+            deltaY = -deltaY;
+        }
+        return deltaY;
+    }
+    if (typeof (e as any).axis !== "undefined" && (e as any).axis === (e as any).VERTICAL_AXIS) {
+        return -((e as any).detail) / 3;
+    }
+    if (e.type === "wheel") {
+        if (e.deltaMode === WheelEvent.DOM_DELTA_LINE) {
+            if (isFirefox && !isMac) {
+                return -e.deltaY / 3;
+            } else {
+                return -e.deltaY;
+            }
+        } else {
+            return -e.deltaY / 40;
+        }
+    }
+    if (typeof (e as any).wheelDelta !== "undefined") {
+        let deltaY: number;
+        if (shouldFactorDPR) {
+            deltaY = (e as any).wheelDelta / (120 * devicePixelRatio);
+        } else {
+            deltaY = (e as any).wheelDelta / 120;
+        }
+        if (isSafari && isWindows) {
+            deltaY = -deltaY;
+        }
+        return deltaY;
+    }
+    return -e.deltaY / 40;
 }
