@@ -295,7 +295,6 @@ class DrawImageRect : public DrawImage {
   }
 
   Rect rect;
-
   SrcRectConstraint constraint = SrcRectConstraint::Fast;
 };
 

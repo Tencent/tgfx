@@ -27,7 +27,7 @@
 #include "utils/MathExtra.h"
 
 namespace tgfx {
-Picture::Picture(std::shared_ptr<BlockData> data, std::vector<PlacementPtr<Record>> recordList,
+Picture::Picture(std::unique_ptr<BlockData> data, std::vector<PlacementPtr<Record>> recordList,
                  size_t drawCount)
     : blockData(std::move(data)), records(std::move(recordList)), drawCount(drawCount) {
   DEBUG_ASSERT(blockData != nullptr);
@@ -49,9 +49,6 @@ Picture::~Picture() {
 }
 
 Rect Picture::getBounds(const Matrix* matrix, bool computeTightBounds) const {
-  if (matrix && FloatNearlyZero(matrix->getMaxScale())) {
-    return {};
-  }
   auto useCachedBounds = !matrix && !computeTightBounds;
   if (useCachedBounds) {
     auto cachedBounds = bounds.load(std::memory_order_acquire);
@@ -89,15 +86,7 @@ void Picture::playback(Canvas* canvas, const FillModifier* fillModifier) const {
   if (canvas == nullptr) {
     return;
   }
-  auto& state = *canvas->mcState;
-  if (state.clip.isEmpty() && !state.clip.isInverseFillType()) {
-    return;
-  }
-  auto maxScale = state.matrix.getMaxScale();
-  if (FloatNearlyZero(maxScale)) {
-    return;
-  }
-  playback(canvas->drawContext, state, fillModifier);
+  playback(canvas->drawContext, *canvas->mcState, fillModifier);
 }
 
 void Picture::playback(DrawContext* drawContext, const MCState& state,

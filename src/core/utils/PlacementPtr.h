@@ -166,6 +166,14 @@ class PlacementPtr {
     return temp;
   }
 
+  void remap(const void* oldBlock, const void* newBlock) {
+    if (pointer) {
+      auto oldPointer = reinterpret_cast<uint8_t*>(pointer);
+      pointer = reinterpret_cast<T*>(reinterpret_cast<uint8_t*>(const_cast<void*>(newBlock)) +
+                                     (oldPointer - reinterpret_cast<const uint8_t*>(oldBlock)));
+    }
+  }
+
   T& operator*() const {
     return *pointer;
   }

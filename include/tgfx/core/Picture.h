@@ -86,13 +86,13 @@ class Picture {
   void playback(Canvas* canvas, const FillModifier* fillModifier = nullptr) const;
 
  private:
-  std::shared_ptr<BlockData> blockData = nullptr;
+  std::unique_ptr<BlockData> blockData;
   std::vector<PlacementPtr<Record>> records;
   mutable std::atomic<Rect*> bounds = {nullptr};
   size_t drawCount = 0;
   bool _hasUnboundedFill = false;
 
-  Picture(std::shared_ptr<BlockData> data, std::vector<PlacementPtr<Record>> records,
+  Picture(std::unique_ptr<BlockData> data, std::vector<PlacementPtr<Record>> records,
           size_t drawCount);
 
   void playback(DrawContext* drawContext, const MCState& state,
