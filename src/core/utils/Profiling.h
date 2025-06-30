@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma once
 #ifdef TGFX_USE_INSPECTOR
+#include <optional>
 #include "InspectorDefine.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
@@ -30,7 +31,7 @@ class TGFXTypeToInspector {
     inspector::Inspector::SendAttributeData(name, value, 4);
   }
 
-  static void SendAttributeData(const char* name, std::optional<tgfx::Matrix>& matrix) {
+  static void SendAttributeData(const char* name, const std::optional<tgfx::Matrix>& matrix) {
     auto value = Matrix::MakeAll(1, 0, 0, 0, 1, 0);
     if (matrix.has_value()) {
       value = matrix.value();
@@ -38,7 +39,7 @@ class TGFXTypeToInspector {
     SendAttributeData(name, value);
   }
 
-  static void SendAttributeData(const char* name, tgfx::Matrix& matrix) {
+  static void SendAttributeData(const char* name, const tgfx::Matrix& matrix) {
     float value[6] = {1, 0, 0, 0, 1, 0};
     value[0] = matrix.getScaleX();
     value[1] = matrix.getSkewX();
@@ -49,7 +50,7 @@ class TGFXTypeToInspector {
     inspector::Inspector::SendAttributeData(name, value, 6);
   }
 
-  static void SendAttributeData(const char* name, std::optional<tgfx::Color>& color) {
+  static void SendAttributeData(const char* name, const std::optional<tgfx::Color>& color) {
     auto value = Color::FromRGBA(255, 255, 255, 255);
     if (color.has_value()) {
       value = color.value();
@@ -57,7 +58,7 @@ class TGFXTypeToInspector {
     SendAttributeData(name, value);
   }
 
-  static void SendAttributeData(const char* name, tgfx::Color& color) {
+  static void SendAttributeData(const char* name, const tgfx::Color& color) {
     auto r = static_cast<uint8_t>(color.red * 255.f);
     auto g = static_cast<uint8_t>(color.green * 255.f);
     auto b = static_cast<uint8_t>(color.blue * 255.f);

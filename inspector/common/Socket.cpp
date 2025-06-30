@@ -49,6 +49,10 @@
 #include "Socket.h"
 #include "Utils.h"
 
+#ifndef MSG_NOSIGNAL
+#  define MSG_NOSIGNAL 0
+#endif
+
 namespace inspector {
 #ifdef _WIN32
 typedef SOCKET socket_t;
@@ -283,12 +287,12 @@ int Socket::GetSendBufSize() {
   return bufSize;
 }
 
-ssize_t Socket::RecvBuffered(void* buf, size_t len, int timeout) {
-  if (static_cast<ssize_t>(len) <= bufLeft) {
+int Socket::RecvBuffered(void* buf, size_t len, int timeout) {
+  if (static_cast<int>(len) <= bufLeft) {
     memcpy(buf, bufPtr, len);
     bufPtr += len;
     bufLeft -= len;
-    return static_cast<ssize_t>(len);
+    return static_cast<int>(len);
   }
 
   if (bufLeft > 0) {
@@ -306,14 +310,14 @@ ssize_t Socket::RecvBuffered(void* buf, size_t len, int timeout) {
   if (bufLeft <= 0) {
     return bufLeft;
   }
-  const auto sz = static_cast<ssize_t>(len) < bufLeft ? len : static_cast<size_t>(bufLeft);
+  const auto sz = static_cast<int>(len) < bufLeft ? len : static_cast<size_t>(bufLeft);
   memcpy(buf, this->buf, sz);
   bufPtr = this->buf + sz;
-  bufLeft -= static_cast<ssize_t>(sz);
-  return static_cast<ssize_t>(sz);
+  bufLeft -= static_cast<int>(sz);
+  return static_cast<int>(sz);
 }
 
-ssize_t Socket::Recv(void* _buf, size_t len, int timeout) {
+int Socket::Recv(void* _buf, size_t len, int timeout) {
   const auto sock = this->sock.load(std::memory_order_relaxed);
   auto buf = (char*)_buf;
 
@@ -322,7 +326,7 @@ ssize_t Socket::Recv(void* _buf, size_t len, int timeout) {
   fd.events = POLLIN;
 
   if (poll(&fd, 1, timeout) > 0) {
-    return recv(sock, buf, len, 0);
+    return static_cast<int>(recv(sock, buf, len, 0));
   } else {
     return -1;
   }
@@ -421,7 +425,7 @@ bool Socket::IsValid() const {
 
 ListenSocket::ListenSocket() : sock(-1) {
 #ifdef _WIN32
-  InitWinSock();
+  // InitWinSock();
 #endif
 }
 
@@ -436,12 +440,7 @@ static int addrinfo_and_socket_for_family(uint16_t port, int ai_family, struct a
   memset(&hints, 0, sizeof(hints));
   hints.ai_family = ai_family;
   hints.ai_socktype = SOCK_STREAM;
-#ifndef TRACY_ONLY_LOCALHOST
-  const char* onlyLocalhost = GetEnvVar("TRACY_ONLY_LOCALHOST");
-  if (!onlyLocalhost || onlyLocalhost[0] != '1') {
-    hints.ai_flags = AI_PASSIVE;
-  }
-#endif
+  hints.ai_flags = AI_PASSIVE;
   char portbuf[32];
   snprintf(portbuf, 32, "%" PRIu16, port);
   if (getaddrinfo(nullptr, portbuf, &hints, res) != 0) {
@@ -458,13 +457,7 @@ bool ListenSocket::Listen(uint16_t port, int backlog) {
   assert(this->sock == -1);
 
   struct addrinfo* res = nullptr;
-
-#if !defined TRACY_ONLY_IPV4 && !defined TRACY_ONLY_LOCALHOST
-  const char* onlyIPv4 = GetEnvVar("TRACY_ONLY_IPV4");
-  if (!onlyIPv4 || onlyIPv4[0] != '1') {
-    this->sock = addrinfo_and_socket_for_family(port, AF_INET6, &res);
-  }
-#endif
+  this->sock = addrinfo_and_socket_for_family(port, AF_INET6, &res);
   if (this->sock == -1) {
     // IPV6 protocol may not be available/is disabled. Try to create a socket
     // with the IPV4 protocol
@@ -540,7 +533,7 @@ void ListenSocket::Close() {
 
 UdpBroadcast::UdpBroadcast() : sock(-1) {
 #ifdef _WIN32
-  InitWinSock();
+  // InitWinSock();
 #endif
 }
 
@@ -613,7 +606,7 @@ void UdpBroadcast::Close() {
   this->sock = -1;
 }
 
-ssize_t UdpBroadcast::Send(uint16_t port, const void* data, size_t len) {
+int UdpBroadcast::Send(uint16_t port, const void* data, size_t len) {
   char strAddr[17];
   inet_ntop(AF_INET, &this->addr, strAddr, 17);
   assert(this->sock != -1);
@@ -621,15 +614,14 @@ ssize_t UdpBroadcast::Send(uint16_t port, const void* data, size_t len) {
   addr.sin_family = AF_INET;
   addr.sin_port = htons(port);
   addr.sin_addr.s_addr = this->addr;
-  return sendto(this->sock, (const char*)data, len, MSG_NOSIGNAL, (sockaddr*)&addr, sizeof(addr));
+  return (int)sendto(this->sock, (const char*)data, len, MSG_NOSIGNAL, (sockaddr*)&addr, sizeof(addr));
 }
 
 IpAddress::IpAddress() : number(0) {
   *text = '\0';
 }
 
-IpAddress::~IpAddress() {
-}
+IpAddress::~IpAddress() = default;
 
 void IpAddress::Set(const struct sockaddr& addr) {
 #if defined _WIN32 && (!defined NTDDI_WIN10 || NTDDI_VERSION < NTDDI_WIN10)
@@ -645,7 +637,7 @@ void IpAddress::Set(const struct sockaddr& addr) {
 
 UdpListen::UdpListen() : sock(-1) {
 #ifdef _WIN32
-  InitWinSock();
+  // InitWinSock();
 #endif
 }
 

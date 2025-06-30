@@ -20,20 +20,22 @@
 #include <iostream>
 #include <mutex>
 #include <thread>
+#include <chrono>
 #include "FastVector.h"
 #include "Protocol.h"
 #include "Queue.h"
-#include "Singleton.h"
 #include "Socket.h"
 #include "Utils.h"
 
+#if defined _WIN32
+#  include <intrin.h>
+#endif
+#ifdef __APPLE__
+#  include <TargetConditionals.h>
+#  include <mach/mach_time.h>
+#endif
+
 namespace inspector {
-
-struct SourceData {
-  const char* name;
-  const char* function;
-};
-
 #define QueuePrepare(_type)             \
   auto item = Inspector::QueueSerial(); \
   MemWrite(&item->hdr.type, _type);
@@ -43,7 +45,6 @@ class Inspector;
 Inspector& GetInspector();
 uint32_t GetThreadHandle();
 
-typedef Singleton<Inspector> SingletonInspector;
 class Inspector {
  public:
   Inspector();
@@ -192,7 +193,7 @@ class Inspector {
   const char* programName = nullptr;
   std::mutex programNameLock;
 
-  void* lz4Stream = nullptr;  // LZ4_stream_t*
+  void* lz4Stream = nullptr;
   int dataBufferOffset;
   int dataBufferStart;
 };
