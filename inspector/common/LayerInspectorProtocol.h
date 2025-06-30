@@ -17,16 +17,22 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include <tgfx/core/Data.h>
-#include "SerializationUtils.h"
-
-namespace tgfx {
-class FontMetricsSerialization {
- public:
-  static std::shared_ptr<Data> Serialize(const FontMetrics* fontMerics);
-
- private:
-  static void SerializeScalerContextImpl(flexbuffers::Builder& fbb, const FontMetrics* fontMetrics);
-};
+#include <cstdint>
+namespace inspector {
+  enum class LayerInspectorMsgType : uint8_t {
+    EnableLayerInspector,
+    HoverLayerAddress,
+    SelectedLayerAddress,
+    SerializeAttribute,
+    SerializeSubAttribute,
+    FlushAttribute,
+    FlushLayerTree,
+    FlushImage,
+    PickedLayerAddress,
+    FlushAttributeAck,
+    LayerTree,
+    LayerAttribute,
+    LayerSubAttribute,
+    ImageData
+  };
 }  // namespace tgfx

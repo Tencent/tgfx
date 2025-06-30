@@ -15,19 +15,9 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
 #pragma once
 
-#include <tgfx/core/Data.h>
-#include "SerializationUtils.h"
+#include "LayerProfiler.h"
 
-namespace tgfx {
-class glyphRunSerialization {
- public:
-  static std::shared_ptr<Data> Serialize(const GlyphRun* glyphRun, SerializeUtils::Map* map);
-
- private:
-  static void SerializeGlyphRunImpl(flexbuffers::Builder& fbb, const GlyphRun* glyphRun,
-                                    SerializeUtils::Map* map);
-};
-}  // namespace tgfx
+#define LAYER_DATA(data) inspector::LayerProfiler::SendLayerData(data)
+#define LAYER_CALLBACK(func) inspector::LayerProfiler::SetLayerCallBack(func)

@@ -18,15 +18,14 @@
 
 #pragma once
 
-#include <tgfx/core/Data.h>
-#include "SerializationUtils.h"
+#include <cstdlib>
 
-namespace tgfx {
-class ImageSerialization {
- public:
-  static std::shared_ptr<Data> Serialize(const Image* image);
+namespace inspector {
+static inline void* inspectorMalloc(size_t size) {
+  return malloc(size);
+}
 
- private:
-  static void SerializeImageImpl(flexbuffers::Builder& fbb, const Image* image);
-};
-}  // namespace tgfx
+static inline void inspectorFree(void* ptr) {
+  free(ptr);
+}
+}  // namespace inspector
