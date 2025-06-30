@@ -20,11 +20,8 @@
 
 #include <tgfx/core/Data.h>
 #include <functional>
-#include <variant>
 #include "LayerInspectorProtocol.h"
 #include "SerializationUtils.h"
-#include "flatbuffers/flatbuffers.h"
-#include "flatbuffers/flexbuffers.h"
 
 namespace tgfx {
 class Layer;

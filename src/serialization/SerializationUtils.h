@@ -19,6 +19,9 @@
 #pragma once
 
 #include <core/utils/Types.h>
+#ifdef __EMSCRIPTEN__
+#define FLATBUFFERS_LOCALE_INDEPENDENT 0
+#endif
 #include <flatbuffers/flexbuffers.h>
 #include <tgfx/gpu/Context.h>
 #include <tgfx/layers/Layer.h>

@@ -109,13 +109,14 @@ void LayerProfiler::sendWork() {
       if (!socket) {
         break;
       }
-      if (!queue.empty()) {
-        auto data = *queue.front();
-        queue.pop();
-        int size = (int)data.size();
-        if (socket) {
-          socket->Send(&size, sizeof(int));
-          socket->Send(data.data(), data.size());
+      if (queue.size_approx() != 0) {
+        std::vector<uint8_t> data;
+        if(queue.try_dequeue(data)) {
+          int size = (int)data.size();
+          if (socket) {
+            socket->Send(&size, sizeof(int));
+            socket->Send(data.data(), data.size());
+          }
         }
       }
     }
@@ -156,7 +157,7 @@ void LayerProfiler::spawnWorkTread() {
 }
 
 void LayerProfiler::setData(const std::vector<uint8_t>& data) {
-  queue.push(data);
+  queue.enqueue(data);
 }
 void LayerProfiler::setCallBack(std::function<void(const std::vector<uint8_t>&)> callback) {
   if (!this->callback) {

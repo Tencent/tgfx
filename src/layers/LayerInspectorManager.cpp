@@ -20,15 +20,16 @@
 #include <functional>
 #include <string>
 #include "LayerInspectorProtocol.h"
-#include "LockFreeQueue.h"
+#include "concurrentqueue.h"
 #include "core/utils/Profiling.h"
 #include "serialization/LayerSerialization.h"
+#include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/SolidColor.h"
 
 namespace tgfx {
 extern const std::string HighLightLayerName = "HighLightLayer";
-static inspector::LockFreeQueue<uint64_t> imageIDQueue;
+static moodycamel::ConcurrentQueue<uint64_t> imageIDQueue;
 void LayerInspectorManager::pickedLayer(float x, float y) {
   if (hoverdSwitch) {
     auto layers = displayList->root()->getLayersUnderPoint(x, y);
@@ -56,12 +57,14 @@ void LayerInspectorManager::setCallBack() {
 }
 
 void LayerInspectorManager::RenderImageAndSend(Context* context) {
-  if (!imageIDQueue.empty()) {
-    auto id = imageIDQueue.pop();
-    std::shared_ptr<Data> data = layerRenderableObjMap[selectedAddress][*id](context);
-    if (!data->empty()) {
-      std::vector<uint8_t> blob(data->bytes(), data->bytes() + data->size());
-      LAYER_DATA(blob);
+  if (imageIDQueue.size_approx() != 0) {
+    uint64_t id;
+    if (imageIDQueue.try_dequeue(id)) {
+      std::shared_ptr<Data> data = layerRenderableObjMap[selectedAddress][id](context);
+      if (!data->empty()) {
+        std::vector<uint8_t> blob(data->bytes(), data->bytes() + data->size());
+        LAYER_DATA(blob);
+      }
     }
   }
 }
@@ -178,7 +181,7 @@ void LayerInspectorManager::FeedBackDataProcess(const std::vector<uint8_t>& data
     }
     case inspector::LayerInspectorMsgType::FlushImage: {
       uint64_t imageId = map["Value"].AsUInt64();
-      imageIDQueue.push(imageId);
+      imageIDQueue.enqueue(imageId);
       break;
     }
     default: {

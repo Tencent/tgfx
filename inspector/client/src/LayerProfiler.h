@@ -3,7 +3,7 @@
 #include <queue>
 #include <thread>
 #include <vector>
-#include "LockFreeQueue.h"
+#include "concurrentqueue.h"
 #include "Protocol.h"
 #include "Socket.h"
 namespace inspector {
@@ -31,7 +31,7 @@ class LayerProfiler {
   bool isUDPOpened = true;
 #endif
   int64_t epoch;
-  LockFreeQueue<std::vector<uint8_t>> queue;
+  moodycamel::ConcurrentQueue<std::vector<uint8_t>> queue;
   std::shared_ptr<std::thread> sendThread;
   std::shared_ptr<std::thread> recvThread;
   std::function<void(const std::vector<uint8_t>&)> callback;

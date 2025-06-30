@@ -18,7 +18,6 @@
 #pragma once
 #include <unordered_map>
 #include <vector>
-#include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Layer.h"
 
 namespace tgfx {
