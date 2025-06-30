@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,26 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "OpsRenderTask.h"
-#include "core/utils/Profiling.h"
-#include "gpu/Gpu.h"
-#include "gpu/RenderPass.h"
+#if defined __SSE2__ || defined _M_AMD64 || (defined _M_IX86_FP && _M_IX86_FP == 2)
+#include <emmintrin.h>
+#else
+#include <thread>
+#endif
 
-namespace tgfx {
-bool OpsRenderTask::execute(RenderPass* renderPass) {
-  TaskMark(inspector::OpTaskType::OpsRenderTask);
-  if (ops.empty() || renderTargetProxy == nullptr) {
-    return false;
-  }
-  if (!renderPass->begin(renderTargetProxy->getRenderTarget(), renderTargetProxy->getTexture())) {
-    LOGE("OpsRenderTask::execute() Failed to initialize the render pass!");
-    return false;
-  }
-  auto tempOps = std::move(ops);
-  for (auto& op : tempOps) {
-    op->execute(renderPass);
-  }
-  renderPass->end();
-  return true;
+#pragma once
+
+namespace inspector {
+
+static void YieldThread() {
+#if defined __SSE2__ || defined _M_AMD64 || (defined _M_IX86_FP && _M_IX86_FP == 2)
+  _mm_pause();
+#elif defined __aarch64__
+  asm volatile("isb" : :);
+#else
+  std::this_thread::yield();
+#endif
 }
-}  // namespace tgfx
+}  // namespace inspector

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -15,27 +15,19 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+#pragma once
 
-#include "OpsRenderTask.h"
-#include "core/utils/Profiling.h"
-#include "gpu/Gpu.h"
-#include "gpu/RenderPass.h"
+#include "Inspector.h"
+#include "Scoped.h"
 
-namespace tgfx {
-bool OpsRenderTask::execute(RenderPass* renderPass) {
-  TaskMark(inspector::OpTaskType::OpsRenderTask);
-  if (ops.empty() || renderTargetProxy == nullptr) {
-    return false;
-  }
-  if (!renderPass->begin(renderTargetProxy->getRenderTarget(), renderTargetProxy->getTexture())) {
-    LOGE("OpsRenderTask::execute() Failed to initialize the render pass!");
-    return false;
-  }
-  auto tempOps = std::move(ops);
-  for (auto& op : tempOps) {
-    op->execute(renderPass);
-  }
-  renderPass->end();
-  return true;
-}
-}  // namespace tgfx
+#define FrameMark inspector::Inspector::SendFrameMark(nullptr)
+
+#define ScopedMark(type, active) inspector::Scoped scoped(type, active)
+#define OperateMark(type) ScopedMark(type, true)
+#define TaskMark(type) ScopedMark(type, true)
+
+#define AttributeName(name, value) inspector::Inspector::SendAttributeData(name, value)
+#define AttributeNameFloatArray(name, value, size)
+#define AttributeNameEnum(name, value, type) inspector::Inspector::SendAttributeData(name, static_cast<uint8_t>(value), static_cast<uint8_t>(type))
+
+#define AttributeEnum(value, type) AttributeNameEnum(#value, value, type)

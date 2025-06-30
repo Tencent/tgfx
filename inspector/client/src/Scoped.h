@@ -16,22 +16,40 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ResolveOp.h"
-#include "core/utils/Profiling.h"
-#include "gpu/RenderPass.h"
+#pragma once
+#include "Inspector.h"
 
-namespace tgfx {
-PlacementPtr<ResolveOp> ResolveOp::Make(Context* context, const Rect& bounds) {
-  if (bounds.isEmpty()) {
-    return nullptr;
+namespace inspector {
+class Scoped {
+
+ public:
+  Scoped(const Scoped&) = delete;
+  Scoped(Scoped&&) = delete;
+  Scoped& operator=(const Scoped&) = delete;
+  Scoped& operator=(Scoped&&) = delete;
+
+  Scoped(uint8_t type, bool isActive) : active(isActive), type(type) {
+    if (!active) {
+      return;
+    }
+    QueuePrepare(QueueType::OperateBegin);
+    MemWrite(&item->operateBegin.time, Inspector::GetTime());
+    MemWrite(&item->operateBegin.type, type);
+    QueueCommit(operateBegin);
   }
-  return context->drawingBuffer()->make<ResolveOp>(bounds);
-}
 
-void ResolveOp::execute(RenderPass* renderPass) {
-  OperateMark(inspector::OpTaskType::ResolveOp);
-  AttributeTGFXName("bounds", bounds);
-  renderPass->resolve(bounds);
-}
+  ~Scoped() {
+    if (!active) {
+      return;
+    }
+    QueuePrepare(QueueType::OperateEnd);
+    MemWrite(&item->operateEnd.time, Inspector::GetTime());
+    MemWrite(&item->operateEnd.type, type);
+    QueueCommit(operateEnd);
+  }
 
-}  // namespace tgfx
+ private:
+  bool active;
+  uint8_t type;
+};
+}  // namespace inspector

@@ -18,6 +18,7 @@
 
 #include "RRectDrawOp.h"
 #include "core/DataSource.h"
+#include "core/utils/Profiling.h"
 #include "gpu/GpuBuffer.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ResourceProvider.h"
@@ -54,6 +55,13 @@ RRectDrawOp::RRectDrawOp(RRectsVertexProvider* provider)
 }
 
 void RRectDrawOp::execute(RenderPass* renderPass) {
+  OperateMark(inspector::OpTaskType::RRectDrawOp);
+  AttributeName("rectCount", static_cast<uint32_t>(rectCount));
+  AttributeName("useScale", useScale);
+  AttributeName("hasStroke", hasStroke);
+  AttributeTGFXName("commonColor", commonColor);
+  AttributeNameEnum("blenderMode", getBlendMode(), inspector::TGFXEnum::BlendMode);
+  AttributeNameEnum("aaType", getAAType(), inspector::TGFXEnum::AAType);
   if (indexBufferProxy == nullptr) {
     return;
   }
