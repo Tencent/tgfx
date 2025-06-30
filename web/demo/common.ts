@@ -112,7 +112,7 @@ export function bindCanvasZoomAndPanEvents(canvas: HTMLElement, shareData: Share
     canvas.addEventListener('wheel', (e: WheelEvent) => {
         e.preventDefault();
         if (e.ctrlKey || e.metaKey) {
-            const newZoom = Math.max(MinZoom, Math.min(MaxZoom, shareData.zoom * Math.pow(ZoomFactorPerNotch, normalizeWheelDeltaY(e))));
+            const newZoom = Math.max(MinZoom, Math.min(MaxZoom, shareData.zoom * normalizeZoom(e)));
             const rect = canvas.getBoundingClientRect();
             const px = (e.clientX - rect.left) * window.devicePixelRatio;
             const py = (e.clientY - rect.top) * window.devicePixelRatio;
@@ -135,7 +135,7 @@ export function bindCanvasZoomAndPanEvents(canvas: HTMLElement, shareData: Share
  * Standardized mouse wheel deltaY to be consistent with VSCode's implementation, compatible with Chrome/Firefox/old API, different platforms and DPIs.
  * Refs VSCode: https://github.com/microsoft/vscode/blob/main/src/vs/base/browser/mouseEvent.ts
  */
-export function normalizeWheelDeltaY(e: WheelEvent): number {
+export function normalizeZoom(e: WheelEvent): number {
     const ua = navigator.userAgent.toLowerCase();
     const isFirefox = ua.indexOf('firefox') > -1;
     const isSafari = /safari/.test(ua) && !/chrome/.test(ua);
@@ -148,43 +148,42 @@ export function normalizeWheelDeltaY(e: WheelEvent): number {
         shouldFactorDPR = chromeVer <= 122;
     }
     const devicePixelRatio = (e.view && (e.view as Window).devicePixelRatio) || 1;
-    if (typeof (e as any).wheelDeltaY !== "undefined") {
+    if (typeof (e as any).wheelDeltaY !== "undefined" && Math.abs((e as any).wheelDeltaY) >= 120) {
         let deltaY: number;
         if (shouldFactorDPR) {
             deltaY = (e as any).wheelDeltaY / (120 * devicePixelRatio);
         } else {
-            deltaY = (e as any).wheelDeltaY / 120;
+            // Differentiate between a normal scroll wheel and a touchpad
+            if(Math.abs(e.deltaY) > 4){
+                deltaY = (e as any).wheelDeltaY / 120;
+            }else{
+                deltaY = -e.deltaY / 120;
+            }
         }
         if (isSafari && isWindows) {
             deltaY = -deltaY;
         }
-        return deltaY;
+        if(Math.abs(e.deltaY) < 4){
+            return 1 + deltaY;
+        }
+        return Math.pow(ZoomFactorPerNotch, deltaY);
     }
     if (typeof (e as any).axis !== "undefined" && (e as any).axis === (e as any).VERTICAL_AXIS) {
-        return -((e as any).detail) / 3;
+        return 1-((e as any).detail) / 3;
     }
     if (e.type === "wheel") {
         if (e.deltaMode === WheelEvent.DOM_DELTA_LINE) {
             if (isFirefox && !isMac) {
-                return -e.deltaY / 3;
+                return 1-e.deltaY / 3;
             } else {
-                return -e.deltaY;
+                return 1-e.deltaY;
             }
-        } else {
-            return -e.deltaY / 40;
+        }else if(e.deltaMode === WheelEvent.DOM_DELTA_PIXEL){
+            return 1-e.deltaY / 120;
+        }
+        else {
+            return 1-e.deltaY / 40;
         }
     }
-    if (typeof (e as any).wheelDelta !== "undefined") {
-        let deltaY: number;
-        if (shouldFactorDPR) {
-            deltaY = (e as any).wheelDelta / (120 * devicePixelRatio);
-        } else {
-            deltaY = (e as any).wheelDelta / 120;
-        }
-        if (isSafari && isWindows) {
-            deltaY = -deltaY;
-        }
-        return deltaY;
-    }
-    return -e.deltaY / 40;
+    return 1-e.deltaY / 40;
 }
