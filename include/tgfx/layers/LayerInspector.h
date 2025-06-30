@@ -15,18 +15,16 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
 #pragma once
 
-#include <tgfx/core/Data.h>
-#include "SerializationUtils.h"
+#include <functional>
 
 namespace tgfx {
-class FontMetricsSerialization {
- public:
-  static std::shared_ptr<Data> Serialize(const FontMetrics* fontMerics);
 
- private:
-  static void SerializeScalerContextImpl(flexbuffers::Builder& fbb, const FontMetrics* fontMetrics);
+class LayerInspector {
+ public:
+  static void pickedLayer(float x, float y);
+  static void setLayerInspectorHoveredStateCallBack(std::function<void(bool)> callback);
 };
+
 }  // namespace tgfx

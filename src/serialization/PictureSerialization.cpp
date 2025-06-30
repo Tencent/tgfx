@@ -15,37 +15,23 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#ifdef TGFX_USE_INSPECTOR
 
-#include "RRectSerialization.h"
+#include "PictureSerialization.h"
 
 namespace tgfx {
 
-std::shared_ptr<Data> RRectSerialization::Serialize(const RRect* rrect, SerializeUtils::Map* map) {
-  DEBUG_ASSERT(rrect != nullptr)
+std::shared_ptr<Data> PictureSerialization::Serialize(const Picture* pic) {
+  DEBUG_ASSERT(pic != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
-  SerializeRRectImpl(fbb, rrect, map);
+  SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute, startMap, contentMap);
+  SerializePictureImpl(fbb, pic);
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
 
-void RRectSerialization::SerializeRRectImpl(flexbuffers::Builder& fbb, const RRect* rrect,
-                                            SerializeUtils::Map* map) {
-  (void)rrect;
-
-  auto rectID = SerializeUtils::GetObjID();
-  auto rect = rrect->rect;
-  SerializeUtils::SetFlexBufferMap(fbb, "rect", "", false, true, rectID);
-  SerializeUtils::FillMap(rect, rectID, map);
-
-  auto radiiID = SerializeUtils::GetObjID();
-  auto radii = rrect->radii;
-  SerializeUtils::SetFlexBufferMap(fbb, "radii", "", false, true, radiiID);
-  SerializeUtils::FillMap(radii, radiiID, map);
+void PictureSerialization::SerializePictureImpl(flexbuffers::Builder&, const Picture*) {
+  // noop
 }
-
 }  // namespace tgfx
-#endif

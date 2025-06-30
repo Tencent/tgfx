@@ -15,18 +15,24 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+#include "tgfx/layers/LayerInspector.h"
+#ifdef TGFX_USE_INSPECTOR
+#include "layers/LayerInspectorManager.h"
+#endif
 
-#pragma once
+void tgfx::LayerInspector::pickedLayer(float x, float y) {
+#ifdef TGFX_USE_INSPECTOR
+    LayerInspectorManager::GetLayerInspectorManager().pickedLayer(x, y);
+#else
+    (void)x;
+    (void)y;
+#endif
+}
 
-#include <tgfx/core/Data.h>
-#include "SerializationUtils.h"
-
-namespace tgfx {
-class TextBlobSerialization {
- public:
-  static std::shared_ptr<Data> Serialize(const TextBlob* textBlob);
-
- private:
-  static void SerializeTextBlobImpl(flexbuffers::Builder& fbb, const TextBlob* textBlob);
-};
-}  // namespace tgfx
+void tgfx::LayerInspector::setLayerInspectorHoveredStateCallBack(std::function<void(bool)> callback) {
+#ifdef TGFX_USE_INSPECTOR
+    LayerInspectorManager::GetLayerInspectorManager().setLayerInspectorHoveredStateCallBack(callback);
+#else
+    (void)callback;
+#endif
+}

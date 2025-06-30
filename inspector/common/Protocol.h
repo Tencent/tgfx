@@ -17,17 +17,23 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+namespace inspector {
 
-#include <tgfx/core/Data.h>
-#include "SerializationUtils.h"
+inline constexpr int broadcastNum = 5;
 
-namespace tgfx {
-class ShapeSerialization {
- public:
-  static std::shared_ptr<Data> Serialize(const Shape* shape, SerializeUtils::Map* map);
+enum { WelcomeMessageProgramNameSize = 64 };
+enum : uint8_t { ProtocolVersion = 1 };
+enum : uint16_t { BroadcastVersion = 3 };
 
- private:
-  static void SerializeShapeImpl(flexbuffers::Builder& fbb, const Shape* shape,
-                                 SerializeUtils::Map* map);
+enum MsgType : uint8_t { FrameCapture = 0, LayerTree = 1 };
+
+struct BroadcastMessage {
+  uint8_t type;
+  uint16_t listenPort;
+  uint32_t protocolVersion;
+  uint64_t pid;
+  int32_t activeTime;  // in seconds
+  char programName[WelcomeMessageProgramNameSize];
 };
-}  // namespace tgfx
+
+}  // namespace inspector

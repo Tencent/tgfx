@@ -28,12 +28,12 @@
 namespace tgfx {
 
 std::shared_ptr<Data> LayerStyleSerialization::Serialize(const LayerStyle* layerStyle,
-                                                         SerializeUtils::Map* map) {
+                                                         SerializeUtils::ComplexObjSerMap* map) {
   DEBUG_ASSERT(layerStyle != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+  SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute, startMap, contentMap);
   auto type = layerStyle->Type();
   switch (type) {
     case LayerStyleType::LayerStyle:
@@ -79,7 +79,7 @@ void LayerStyleSerialization::SerializeBackGroundBlurStyleImpl(flexbuffers::Buil
 
 void LayerStyleSerialization::SerializeDropShadowStyleImpl(flexbuffers::Builder& fbb,
                                                            const LayerStyle* layerStyle,
-                                                           SerializeUtils::Map* map) {
+                                                           SerializeUtils::ComplexObjSerMap* map) {
   SerializeBasicLayerStyleImpl(fbb, layerStyle);
   const DropShadowStyle* dropShadowStyle = static_cast<const DropShadowStyle*>(layerStyle);
   SerializeUtils::SetFlexBufferMap(fbb, "offsetX", dropShadowStyle->offsetX());
@@ -90,13 +90,13 @@ void LayerStyleSerialization::SerializeDropShadowStyleImpl(flexbuffers::Builder&
   auto colorID = SerializeUtils::GetObjID();
   auto color = dropShadowStyle->color();
   SerializeUtils::SetFlexBufferMap(fbb, "color", "", false, true, colorID);
-  SerializeUtils::FillMap(color, colorID, map);
+  SerializeUtils::FillComplexObjSerMap(color, colorID, map);
   SerializeUtils::SetFlexBufferMap(fbb, "showBehindLayer", dropShadowStyle->showBehindLayer());
 }
 
 void LayerStyleSerialization::SerializeInnerShadowStyleImpl(flexbuffers::Builder& fbb,
                                                             const LayerStyle* layerStyle,
-                                                            SerializeUtils::Map* map) {
+                                                            SerializeUtils::ComplexObjSerMap* map) {
   SerializeBasicLayerStyleImpl(fbb, layerStyle);
   const InnerShadowStyle* innerShadowStyle = static_cast<const InnerShadowStyle*>(layerStyle);
   SerializeUtils::SetFlexBufferMap(fbb, "offsetX", innerShadowStyle->offsetX());
@@ -107,7 +107,7 @@ void LayerStyleSerialization::SerializeInnerShadowStyleImpl(flexbuffers::Builder
   auto colorID = SerializeUtils::GetObjID();
   auto color = innerShadowStyle->color();
   SerializeUtils::SetFlexBufferMap(fbb, "color", "", false, true, colorID);
-  SerializeUtils::FillMap(color, colorID, map);
+  SerializeUtils::FillComplexObjSerMap(color, colorID, map);
 }
 }  // namespace tgfx
 #endif

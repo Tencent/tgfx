@@ -22,12 +22,11 @@
 #include "SerializationUtils.h"
 
 namespace tgfx {
-class PathSerialization {
- public:
-  static std::shared_ptr<Data> Serialize(const Path* path, SerializeUtils::Map* map);
+class PictureSerialization {
+public:
+  static std::shared_ptr<Data> Serialize(const Picture* pic);
 
- private:
-  static void SerializePathImpl(flexbuffers::Builder& fbb, const Path* path,
-                                SerializeUtils::Map* map);
+private:
+  static void SerializePictureImpl(flexbuffers::Builder& fbb, const Picture* pic);
 };
 }  // namespace tgfx

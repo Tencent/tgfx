@@ -15,18 +15,9 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
 #pragma once
 
-#include <tgfx/core/Data.h>
-#include "SerializationUtils.h"
+#include "LayerProfiler.h"
 
-namespace tgfx {
-class StrokeSerialization {
- public:
-  static std::shared_ptr<Data> Serialize(const Stroke* stroke);
-
- private:
-  static void SerializeStrokeImpl(flexbuffers::Builder& fbb, const Stroke* stroke);
-};
-}  // namespace tgfx
+#define LAYER_DATA(data) inspector::LayerProfiler::SendLayerData(data)
+#define LAYER_CALLBACK(func) inspector::LayerProfiler::SetLayerCallBack(func)
