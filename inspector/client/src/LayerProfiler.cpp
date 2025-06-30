@@ -7,11 +7,13 @@
 
 namespace inspector {
 
-static uint16_t port = 8084;
 static LayerProfiler s_layer_profiler;
 
+#ifndef __EMSCRIPTEN__
+static uint16_t port = 8084;
 static const char* addr = "255.255.255.255";
 static uint16_t broadcastPort = 8086;
+#endif
 
 void LayerProfiler::SendLayerData(const std::vector<uint8_t>& data) {
   s_layer_profiler.setData(data);

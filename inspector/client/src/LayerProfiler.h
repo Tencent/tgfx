@@ -28,8 +28,8 @@ class LayerProfiler {
   Socket* socket = nullptr;
   std::queue<std::vector<uint8_t>> messages;
   UdpBroadcast* broadcast[broadcastNum];
-#endif
   bool isUDPOpened = true;
+#endif
   int64_t epoch;
   LockFreeQueue<std::vector<uint8_t>> queue;
   std::shared_ptr<std::thread> sendThread;
