@@ -88,15 +88,12 @@
     },
     "DrawersTest": {
         "ConicGradient": "69683f78",
-        "CustomLayerTreeDrawer": "52e11af8",
-        "CustomLayerTreeDrawer": "ded7faef",
+        "CustomLayerTreeDrawer": "04f35f60",
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "da590da",
         "ImageWithShadow": "50136952",
-        "SimpleLayerTreeDrawer": "52e11af8",
-        "SimpleText": "52e11af8"
-        "SimpleLayerTreeDrawer": "ea225887",
-        "SimpleText": "ced3b513"
+        "SimpleLayerTreeDrawer": "04f35f60",
+        "SimpleText": "04f35f60"
     },
     "DstTextureTest": {
         "EmptyLocalBounds": "be94e666",
@@ -190,10 +187,8 @@
         "imageLayer": "e5103ae6",
         "imageMask": "a217af17",
         "innerShadow": "2cb2474",
-        "shapeMask": "842c5443",
-        "textMask": "52e11af8"
         "shapeMask": "a217af17",
-        "textMask": "acee6b52"
+        "textMask": "04f35f60"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",
