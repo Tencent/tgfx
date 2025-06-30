@@ -181,6 +181,9 @@ void OpsCompositor::discardAll() {
     pendingRects.clear();
     pendingRRects.clear();
     pendingStrokes.clear();
+    pendingAtlasMatrix = {};
+    pendingAtlasRects.clear();
+    pendingTextureProxy = nullptr;
   }
 }
 
