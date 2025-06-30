@@ -20,18 +20,9 @@
 #include "core/utils/Log.h"
 
 namespace tgfx {
-// The maximum size of a memory block that can be allocated. Allocating a block that's too large can
-// cause memory fragmentation and slow down the allocation process. It might also increase the host
-// application's memory usage due to pre-allocation optimizations on some platforms.
-static constexpr size_t MAX_BLOCK_SIZE = 1 << 21;  // 2MB
-
 // The alignment of memory blocks. Set to 64 bytes to ensure that the memory blocks are aligned to
 // cache lines.
 static constexpr size_t BLOCK_ALIGNMENT = 64;
-
-static size_t NextBlockSize(size_t currentSize) {
-  return std::min(currentSize * 2, MAX_BLOCK_SIZE);
-}
 
 BlockData::BlockData(std::vector<uint8_t*> blocks) : blocks(std::move(blocks)) {
   DEBUG_ASSERT(!this->blocks.empty());
@@ -43,7 +34,16 @@ BlockData::~BlockData() {
   }
 }
 
-BlockBuffer::BlockBuffer(size_t initBlockSize) : initBlockSize(initBlockSize) {
+void* BlockData::shrinkLastBlockTo(size_t newSize) {
+  auto& lastBlock = blocks.back();
+  if (auto resizedBlock = static_cast<uint8_t*>(realloc(lastBlock, newSize))) {
+    lastBlock = resizedBlock;
+  }
+  return lastBlock;
+}
+
+BlockBuffer::BlockBuffer(size_t initBlockSize, size_t maxBlockSize)
+    : initBlockSize(initBlockSize), maxBlockSize(maxBlockSize) {
   DEBUG_ASSERT(initBlockSize > 0);
 }
 
@@ -110,7 +110,7 @@ void BlockBuffer::clear(size_t maxReuseSize) {
   blocks.resize(reusedBlockCount);
 }
 
-std::shared_ptr<BlockData> BlockBuffer::release() {
+std::unique_ptr<BlockData> BlockBuffer::release() {
   if (usedSize == 0) {
     return nullptr;
   }
@@ -127,15 +127,15 @@ std::shared_ptr<BlockData> BlockBuffer::release() {
   blocks.clear();
   currentBlockIndex = 0;
   usedSize = 0;
-  return std::make_shared<BlockData>(std::move(usedBlocks));
+  return std::make_unique<BlockData>(std::move(usedBlocks));
 }
 
 bool BlockBuffer::allocateNewBlock(size_t requestSize) {
   size_t blockSize;
-  if (requestSize <= MAX_BLOCK_SIZE) {
-    blockSize = blocks.empty() ? initBlockSize : NextBlockSize(blocks.back().size);
+  if (requestSize <= maxBlockSize) {
+    blockSize = blocks.empty() ? initBlockSize : nextBlockSize(blocks.back().size);
     while (blockSize < requestSize) {
-      blockSize = NextBlockSize(blockSize);
+      blockSize = nextBlockSize(blockSize);
     }
   } else {
     // Allow allocating a block larger than MAX_BLOCK_SIZE if requested.

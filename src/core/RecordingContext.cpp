@@ -43,12 +43,33 @@ void RecordingContext::clear() {
   drawCount = 0;
 }
 
-std::shared_ptr<Picture> RecordingContext::finishRecordingAsPicture() {
+std::shared_ptr<Picture> RecordingContext::finishRecordingAsPicture(bool shrinkToFit) {
   if (records.empty()) {
     return nullptr;
   }
-  auto picture =
-      std::shared_ptr<Picture>(new Picture(blockBuffer.release(), std::move(records), drawCount));
+  auto lastBlock = blockBuffer.currentBlock();
+  auto blockData = blockBuffer.release();
+  if (blockData == nullptr) {
+    return nullptr;
+  }
+  if (shrinkToFit) {
+    records.shrink_to_fit();
+    auto oldBlockStart = reinterpret_cast<const uint8_t*>(lastBlock.first);
+    auto oldBlockEnd = oldBlockStart + lastBlock.second;
+    auto newBlock = blockData->shrinkLastBlockTo(lastBlock.second);
+    if (newBlock != oldBlockStart) {
+      for (auto it = records.rbegin(); it != records.rend(); ++it) {
+        auto pointer = reinterpret_cast<const uint8_t*>(it->get());
+        if (pointer >= oldBlockStart && pointer < oldBlockEnd) {
+          it->remap(oldBlockStart, newBlock);
+        } else {
+          break;
+        }
+      }
+    }
+  }
+  std::shared_ptr<Picture> picture =
+      std::shared_ptr<Picture>(new Picture(std::move(blockData), std::move(records), drawCount));
   lastState = {};
   lastFill = {};
   lastStroke = {};
