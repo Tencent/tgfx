@@ -99,7 +99,6 @@ void LayerProfiler::sendWork() {
       }
       socket = listenSocket->Accept();
       if (socket) {
-        printf("tcp already connect!\n");
         break;
       }
     }
