@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "core/utils/LazyBounds.h"
 #include "tgfx/core/GlyphRun.h"
 #include "tgfx/core/Stroke.h"
 
@@ -86,5 +87,6 @@ class GlyphRunList {
 
  private:
   std::vector<GlyphRun> _glyphRuns = {};
+  LazyBounds bounds = {};
 };
 }  // namespace tgfx

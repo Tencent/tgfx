@@ -18,6 +18,7 @@
 
 #include "WebSocketServer.h"
 
+namespace inspector {
 WebSocketServer::WebSocketServer(quint16 port, QObject* parent) : QObject(parent), m_port(port) {
   // 创建 WebSocket 服务器
   m_server = new QWebSocketServer("My WebSocket Server", QWebSocketServer::NonSecureMode, this);
@@ -94,4 +95,5 @@ void WebSocketServer::onClientDisconnected() {
     clientSocket->deleteLater();
     emit ClientDisconnected();
   }
+}
 }

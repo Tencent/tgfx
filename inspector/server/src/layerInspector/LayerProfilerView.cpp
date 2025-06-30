@@ -29,6 +29,7 @@
 #include <QQuickWindow>
 #include "StartView.h"
 
+namespace inspector {
 class LayerProfilerViewFactory : public KDDockWidgets::QtQuick::ViewFactory {
  public:
   ~LayerProfilerViewFactory() override = default;
@@ -63,24 +64,24 @@ LayerProfilerView::LayerProfilerView(QString ip, quint16 port)
           [this](uint64_t address) { processSelectedLayer(address); });
 
   connect(m_LayerTreeModel, &LayerTreeModel::hoveredAddress, [this](uint64_t address) {
-    auto data = feedBackData("HoverLayerAddress", address);
+    auto data = feedBackData(LayerInspectorMsgType::HoverLayerAddress, address);
     m_TcpSocketClient->sendData(data);
   });
 
   connect(m_LayerAttributeModel, &LayerAttributeModel::expandSubAttributeSignal,
           [this](uint64_t id) {
-            auto data = feedBackData("SerializeSubAttribute", id);
+            auto data = feedBackData(LayerInspectorMsgType::SerializeSubAttribute, id);
             m_TcpSocketClient->sendData(data);
           });
 
   connect(m_LayerAttributeModel, &LayerAttributeModel::flushLayerAttribute,
           [this](uint64_t address) {
-            auto data = feedBackData("FlushAttribute", address);
+            auto data = feedBackData(LayerInspectorMsgType::FlushAttribute, address);
             m_TcpSocketClient->sendData(data);
           });
 
   connect(m_LayerTreeModel, &LayerTreeModel::flushLayerTreeSignal, [this]() {
-    auto data = feedBackData("FlushLayerTree", UINT64_MAX);
+    auto data = feedBackData(LayerInspectorMsgType::FlushLayerTree, UINT64_MAX);
     m_TcpSocketClient->sendData(data);
   });
 
@@ -99,24 +100,24 @@ LayerProfilerView::LayerProfilerView()
           [this](uint64_t address) { processSelectedLayer(address); });
 
   connect(m_LayerTreeModel, &LayerTreeModel::hoveredAddress, [this](uint64_t address) {
-    auto data = feedBackData("HoverLayerAddress", address);
+    auto data = feedBackData(LayerInspectorMsgType::HoverLayerAddress, address);
     m_WebSocketServer->SendData(data);
   });
 
   connect(m_LayerAttributeModel, &LayerAttributeModel::expandSubAttributeSignal,
           [this](uint64_t id) {
-            auto data = feedBackData("SerializeSubAttribute", id);
+            auto data = feedBackData(LayerInspectorMsgType::SerializeSubAttribute, id);
             m_WebSocketServer->SendData(data);
           });
 
   connect(m_LayerAttributeModel, &LayerAttributeModel::flushLayerAttribute,
           [this](uint64_t address) {
-            auto data = feedBackData("FlushAttribute", address);
+            auto data = feedBackData(LayerInspectorMsgType::FlushAttribute, address);
             m_WebSocketServer->SendData(data);
           });
 
   connect(m_LayerTreeModel, &LayerTreeModel::flushLayerTreeSignal, [this]() {
-    auto data = feedBackData("FlushLayerTree", UINT64_MAX);
+    auto data = feedBackData(LayerInspectorMsgType::FlushLayerTree, UINT64_MAX);
     m_WebSocketServer->SendData(data);
   });
 
@@ -127,22 +128,20 @@ LayerProfilerView::LayerProfilerView()
 LayerProfilerView::~LayerProfilerView() {
   if (m_WebSocketServer) {
     m_WebSocketServer->close();
-    m_WebSocketServer->deleteLater();
   }
   if (m_TcpSocketClient) {
     m_TcpSocketClient->disConnection();
-    m_TcpSocketClient->deleteLater();
   }
   if (layerTree) {
-    delete layerTree;
+    layerTree->deleteLater();
   }
   if (layerAttributeTree) {
-    delete layerAttributeTree;
+    layerAttributeTree->deleteLater();
   }
 }
 
 void LayerProfilerView::SetHoveredSwitchState(bool state) {
-  auto data = feedBackData("EnalbeLayerInspect", state);
+  auto data = feedBackData(LayerInspectorMsgType::EnableLayerInspector, state);
   if (m_WebSocketServer) m_WebSocketServer->SendData(data);
   if (m_TcpSocketClient) m_TcpSocketClient->sendData(data);
 }
@@ -159,6 +158,14 @@ void LayerProfilerView::openStartView() {
   cleanView();
   auto startView = new inspector::StartView(this);
   startView->showStartView();
+}
+
+void LayerProfilerView::showLayerTree() {
+  layerTree->show();
+}
+
+void LayerProfilerView::showLayerAttributeTree() {
+  layerAttributeTree->show();
 }
 
 void LayerProfilerView::cleanView() {
@@ -188,7 +195,7 @@ void LayerProfilerView::LayerProlfilerQMLImpl() {
                !(isDraggingRenderTree || isDraggingAttribute);
       };
   KDDockWidgets::Config::self().setDropIndicatorAllowedFunc(func);
-  m_LayerTreeEngine = std::make_unique<QQmlApplicationEngine>(this);
+  m_LayerTreeEngine = std::make_unique<QQmlApplicationEngine>();
   imageProvider = new MemoryImageProvider();
   m_LayerTreeEngine->addImageProvider(QLatin1String("RenderableImage"), imageProvider);
 
@@ -220,6 +227,7 @@ void LayerProfilerView::LayerProlfilerQMLImpl() {
     connect(window, &QWindow::visibilityChanged, [this](QWindow::Visibility visibility) {
       if (visibility == QWindow::Visibility::Hidden) {
         m_TcpSocketClient->disConnection();
+        emit viewHide();
       }
     });
   }
@@ -228,41 +236,55 @@ void LayerProfilerView::LayerProlfilerQMLImpl() {
 void LayerProfilerView::ProcessMessage(const QByteArray& message) {
   auto ptr = message.data();
   auto map = flexbuffers::GetRoot((const uint8_t*)ptr, (size_t)message.size()).AsMap();
-  std::string type = map["Type"].AsString().str();
+  auto type = static_cast<LayerInspectorMsgType>(map["Type"].AsUInt8());
   auto contentMap = map["Content"].AsMap();
-  if (type == "LayerTree") {
-    m_LayerTreeModel->setLayerTreeData(contentMap);
-    auto currentAddress = m_LayerAttributeModel->GetCurrentAddress();
-    if (!m_LayerTreeModel->selectLayer(currentAddress)) {
-      m_LayerAttributeModel->clearAttribute();
+  switch (type) {
+    case LayerInspectorMsgType::LayerTree: {
+      m_LayerTreeModel->setLayerTreeData(contentMap);
+      auto currentAddress = m_LayerAttributeModel->GetCurrentAddress();
+      if (!m_LayerTreeModel->selectLayer(currentAddress)) {
+        m_LayerAttributeModel->clearAttribute();
+      }
+      break;
     }
-  } else if (type == "LayerAttribute") {
-    m_LayerAttributeModel->setLayerAttribute(contentMap);
-  } else if (type == "LayerSubAttribute") {
-    m_LayerAttributeModel->setLayerSubAttribute(contentMap);
-  } else if (type == "PickedLayerAddress") {
-    auto address = contentMap["Address"].AsUInt64();
-    processSelectedLayer(address);
-    m_LayerTreeModel->selectLayer(address);
-  } else if (type == "FlushAttributeAck") {
-    auto address = contentMap["Address"].AsUInt64();
-    processSelectedLayer(address);
-  } else if (type == "ImageData") {
-    int width = contentMap["width"].AsInt32();
-    int height = contentMap["height"].AsInt32();
-    auto blob = contentMap["data"].AsBlob();
-    QByteArray data((char*)blob.data(), (qsizetype)blob.size());
-    imageProvider->setImage(imageProvider->ImageID(), width, height, data);
-  } else {
-    qDebug() << "Unknown message type!";
+    case LayerInspectorMsgType::LayerAttribute: {
+      m_LayerAttributeModel->setLayerAttribute(contentMap);
+      break;
+    }
+    case LayerInspectorMsgType::LayerSubAttribute: {
+      m_LayerAttributeModel->setLayerSubAttribute(contentMap);
+      break;
+    }
+    case LayerInspectorMsgType::PickedLayerAddress: {
+      auto address = contentMap["Address"].AsUInt64();
+      processSelectedLayer(address);
+      m_LayerTreeModel->selectLayer(address);
+      break;
+    }
+    case LayerInspectorMsgType::FlushAttributeAck: {
+      auto address = contentMap["Address"].AsUInt64();
+      processSelectedLayer(address);
+      break;
+    }
+    case LayerInspectorMsgType::ImageData: {
+      int width = contentMap["width"].AsInt32();
+      int height = contentMap["height"].AsInt32();
+      auto blob = contentMap["data"].AsBlob();
+      QByteArray data((char*)blob.data(), (qsizetype)blob.size());
+      imageProvider->setImage(imageProvider->ImageID(), width, height, data);
+      break;
+    }
+    default: {
+      qDebug() << "Unknown message type!";
+    }
   }
 }
 
-QByteArray LayerProfilerView::feedBackData(const std::string& type, uint64_t value) {
+QByteArray LayerProfilerView::feedBackData(LayerInspectorMsgType type, uint64_t value) {
   flexbuffers::Builder fbb;
   auto mapStart = fbb.StartMap();
   fbb.Key("Type");
-  fbb.String(type);
+  fbb.UInt(static_cast<uint8_t>(type));
   fbb.Key("Value");
   fbb.UInt(value);
   fbb.EndMap(mapStart);
@@ -271,13 +293,13 @@ QByteArray LayerProfilerView::feedBackData(const std::string& type, uint64_t val
 }
 
 void LayerProfilerView::sendSelectedAddress(uint64_t address) {
-  auto data = feedBackData("SelectedLayerAddress", address);
+  auto data = feedBackData(LayerInspectorMsgType::SelectedLayerAddress, address);
   if (m_WebSocketServer) m_WebSocketServer->SendData(data);
   if (m_TcpSocketClient) m_TcpSocketClient->sendData(data);
 }
 
 void LayerProfilerView::sendSerializeAttributeAddress(uint64_t address) {
-  auto data = feedBackData("SerializeAttribute", address);
+  auto data = feedBackData(LayerInspectorMsgType::SerializeAttribute, address);
   if (m_WebSocketServer) m_WebSocketServer->SendData(data);
   if (m_TcpSocketClient) m_TcpSocketClient->sendData(data);
 }
@@ -295,8 +317,10 @@ void LayerProfilerView::processSelectedLayer(uint64_t address) {
 void LayerProfilerView::processImageFlush(uint64_t imageID) {
   if (!imageProvider->isImageExisted(imageID)) {
     imageProvider->setCurrentImageID(imageID);
-    auto data = feedBackData("FlushImage", imageID);
+    auto data = feedBackData(LayerInspectorMsgType::FlushImage, imageID);
     if (m_WebSocketServer) m_WebSocketServer->SendData(data);
     if (m_TcpSocketClient) m_TcpSocketClient->sendData(data);
   }
+}
+
 }

@@ -18,6 +18,7 @@
 
 #include "LayerTreeModel.h"
 
+namespace inspector {
 LayerTreeModel::LayerTreeModel(QObject* parent) : LayerModel(parent) {
 }
 
@@ -92,4 +93,5 @@ void LayerTreeModel::setupModelData(const flexbuffers::Map& contentMap, LayerIte
     auto childMap = children[i].AsMap();
     setupModelData(childMap, parent->child(parent->childCount() - 1));
   }
+}
 }

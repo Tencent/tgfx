@@ -17,36 +17,23 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #ifdef TGFX_USE_INSPECTOR
-#include "ColorFilterSerialization.h"
 #include "ColorSerialization.h"
-#include "FontMetricsSerialization.h"
-#include "FontSerialization.h"
-#include "ImageFilterSerialization.h"
-#include "ImageSerialization.h"
 #include "LayerFilterSerialization.h"
 #include "LayerSerialization.h"
 #include "LayerStyleSerialization.h"
 #include "MatrixSerialization.h"
-#include "PathSerialization.h"
 #include "PointSerialization.h"
 #include "RectSerialization.h"
-#include "RuntimeEffectSerialization.h"
-#include "SamplingOptionsSerialization.h"
 #include "SerializationUtils.h"
-#include "ShaderSerialization.h"
-#include "ShapeSerialization.h"
-#include "ShapeStyleSerialization.h"
-#include "TextBlobSerialization.h"
-#include "TypeFaceSerialization.h"
 #include "core/images/FilterImage.h"
-#include "glyphRunSerialization.h"
 #include "tgfx/core/Surface.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
+#include "PictureSerialization.h"
+#include "RecordedContentSerialization.h"
 
 namespace tgfx {
 
 constexpr int padding = 20;
-static int insertionCounter = 0;
+  static int insertionCounter = 0;
 std::string SerializeUtils::LayerTypeToString(LayerType type) {
   static std::unordered_map<LayerType, const char*> m = {
       {LayerType::Layer, "Layer"},      {LayerType::Image, "ImageLayer"},
@@ -89,104 +76,12 @@ std::string SerializeUtils::BlendModeToString(BlendMode mode) {
   return m[mode];
 }
 
-std::string SerializeUtils::StrokeAlignToString(StrokeAlign align) {
-  static std::unordered_map<StrokeAlign, const char*> m = {{StrokeAlign::Center, "Center"},
-                                                           {StrokeAlign::Inside, "Inside"},
-                                                           {StrokeAlign::Outside, "Outside"}};
-  return m[align];
-}
-
-std::string SerializeUtils::TextAlignToString(TextAlign align) {
-  static std::unordered_map<TextAlign, const char*> m = {{TextAlign::Left, "Left"},
-                                                         {TextAlign::Right, "Right"},
-                                                         {TextAlign::Center, "Center"},
-                                                         {TextAlign::Justify, "Justify"}};
-  return m[align];
-}
-
 std::string SerializeUtils::TileModeToString(TileMode tileMode) {
   static std::unordered_map<TileMode, const char*> m = {{TileMode::Clamp, "Clamp"},
                                                         {TileMode::Repeat, "Repeat"},
                                                         {TileMode::Mirror, "Mirror"},
                                                         {TileMode::Decal, "Decal"}};
   return m[tileMode];
-}
-
-std::string SerializeUtils::ImageTypeToString(Types::ImageType type) {
-  static std::unordered_map<Types::ImageType, const char*> m = {
-      {Types::ImageType::Buffer, "Buffer"},         {Types::ImageType::Codec, "Codec"},
-      {Types::ImageType::Decoded, "Decoded"},       {Types::ImageType::Filter, "Filter"},
-      {Types::ImageType::Generator, "Generator"},   {Types::ImageType::Mipmap, "Mipmap"},
-      {Types::ImageType::Orient, "Orient"},         {Types::ImageType::Picture, "Picture"},
-      {Types::ImageType::Rasterized, "Rasterized"}, {Types::ImageType::RGBAAA, "RGBAA"},
-      {Types::ImageType::Texture, "Texture"},       {Types::ImageType::Subset, "Subset"}};
-  return m[type];
-}
-
-std::string SerializeUtils::FilterModeToString(FilterMode mode) {
-  static std::unordered_map<FilterMode, const char*> m = {{FilterMode::Linear, "Linear"},
-                                                          {FilterMode::Nearest, "Nearest"}};
-  return m[mode];
-}
-
-std::string SerializeUtils::MipmapModeToString(MipmapMode mode) {
-  static std::unordered_map<MipmapMode, const char*> m = {{MipmapMode::Linear, "Linear"},
-                                                          {MipmapMode::Nearest, "Nearest"},
-                                                          {MipmapMode::None, "None"}};
-  return m[mode];
-}
-
-std::string SerializeUtils::ShapeTypeToString(Types::ShapeType type) {
-  static std::unordered_map<Types::ShapeType, const char*> m = {
-      {Types::ShapeType::Append, "Append"}, {Types::ShapeType::Effect, "Effect"},
-      {Types::ShapeType::Text, "Text"},     {Types::ShapeType::Inverse, "Inverse"},
-      {Types::ShapeType::Matrix, "Matrix"}, {Types::ShapeType::Merge, "Merge"},
-      {Types::ShapeType::Path, "Path"},     {Types::ShapeType::Provider, "Provider"},
-      {Types::ShapeType::Stroke, "Stroke"}, {Types::ShapeType::Glyph, "Glyph"},
-  };
-  return m[type];
-}
-
-std::string SerializeUtils::ShaderTypeToString(Types::ShaderType type) {
-  static std::unordered_map<Types::ShaderType, const char*> m = {
-      {Types::ShaderType::Color, "Color"},   {Types::ShaderType::ColorFilter, "ColorFilter"},
-      {Types::ShaderType::Image, "Image"},   {Types::ShaderType::Blend, "Blend"},
-      {Types::ShaderType::Matrix, "Matrix"}, {Types::ShaderType::Gradient, "Gradient"}};
-  return m[type];
-}
-
-std::string SerializeUtils::LineCapToString(LineCap lineCap) {
-  static std::unordered_map<LineCap, const char*> m = {{LineCap::Butt, "Butt"},
-                                                       {LineCap::Round, "Round"},
-                                                       {LineCap::Square, "Square"}};
-  return m[lineCap];
-}
-
-std::string SerializeUtils::LineJoinToString(LineJoin lineJoin) {
-  static std::unordered_map<LineJoin, const char*> m = {{LineJoin::Miter, "Miter"},
-                                                        {LineJoin::Round, "Round"},
-                                                        {LineJoin::Bevel, "Bevel"}};
-  return m[lineJoin];
-}
-
-std::string SerializeUtils::ImageFilterTypeToString(Types::ImageFilterType type) {
-  static std::unordered_map<Types::ImageFilterType, const char*> m = {
-      {Types::ImageFilterType::Blur, "Blur"},
-      {Types::ImageFilterType::Color, "Color"},
-      {Types::ImageFilterType::Compose, "Compose"},
-      {Types::ImageFilterType::Runtime, "Runtime"},
-      {Types::ImageFilterType::DropShadow, "DropShadow"},
-      {Types::ImageFilterType::InnerShadow, "InnerShadow"}};
-  return m[type];
-}
-
-std::string SerializeUtils::ColorFilterTypeToString(Types::ColorFilterType type) {
-  static std::unordered_map<Types::ColorFilterType, const char*> m = {
-      {Types::ColorFilterType::Blend, "Blend"},
-      {Types::ColorFilterType::Matrix, "Matrix"},
-      {Types::ColorFilterType::AlphaThreshold, "AlphaThreshold"},
-      {Types::ColorFilterType::Compose, "Compose"}};
-  return m[type];
 }
 
 std::string SerializeUtils::LayerFilterTypeToString(Types::LayerFilterType type) {
@@ -218,43 +113,26 @@ std::string SerializeUtils::LayerStylePositionToString(LayerStylePosition positi
 
 std::string SerializeUtils::LayerStyleExtraSourceTypeToString(LayerStyleExtraSourceType type) {
   static std::unordered_map<LayerStyleExtraSourceType, const char*> m = {
-      {LayerStyleExtraSourceType::None, "None"},
-      {LayerStyleExtraSourceType::Background, "Background"},
-      {LayerStyleExtraSourceType::Contour, "Contour"}};
+    {LayerStyleExtraSourceType::None, "None"},
+    {LayerStyleExtraSourceType::Background, "Background"},
+    {LayerStyleExtraSourceType::Contour, "Contour"}};
   return m[type];
 }
 
-std::string SerializeUtils::ShapeStyleTypeToString(Types::ShapeStyleType type) {
-  static std::unordered_map<Types::ShapeStyleType, const char*> m = {
-      {Types::ShapeStyleType::Gradient, "Gradient"},
-      {Types::ShapeStyleType::ImagePattern, "ImagePattern"},
-      {Types::ShapeStyleType::SolidColor, "SolidColor"}};
+std::string SerializeUtils::RecordedContentTypeToString(Types::RecordedContentType type) {
+  static std::unordered_map<Types::RecordedContentType, const char*> m = {
+    {Types::RecordedContentType::Default, "Default"},
+    {Types::RecordedContentType::Foreground, "Foreground"},
+      {Types::RecordedContentType::Contour, "Contour"}
+  };
   return m[type];
 }
 
-std::string SerializeUtils::GradientTypeToString(GradientType type) {
-  static std::unordered_map<GradientType, const char*> m = {{GradientType::Conic, "Conic"},
-                                                            {GradientType::Diamond, "Diamond"},
-                                                            {GradientType::Linear, "Linear"},
-                                                            {GradientType::None, "None"},
-                                                            {GradientType::Radial, "Radial"}};
-  return m[type];
-}
-
-std::string SerializeUtils::PathFillTypeToString(PathFillType type) {
-  static std::unordered_map<PathFillType, const char*> m = {
-      {PathFillType::Winding, "Winding"},
-      {PathFillType::EvenOdd, "EvenOdd"},
-      {PathFillType::InverseWinding, "InverseWinding"},
-      {PathFillType::InverseEvenOdd, "InverseEvenOdd"}};
-  return m[type];
-}
-
-void SerializeUtils::SerializeBegin(flexbuffers::Builder& fbb, const std::string& type,
+void SerializeUtils::SerializeBegin(flexbuffers::Builder& fbb, inspector::LayerInspectorMsgType type,
                                     size_t& mapStart, size_t& contentStart) {
   mapStart = fbb.StartMap();
   fbb.Key("Type");
-  fbb.String(type);
+  fbb.UInt(static_cast<uint8_t>(type));
   fbb.Key("Content");
   contentStart = fbb.StartMap();
 }
@@ -270,23 +148,21 @@ uint64_t SerializeUtils::GetObjID() {
   return objID++;
 }
 
-void SerializeUtils::FillComplexObjSerMap(const Matrix& matrix, uint64_t objID,
-                                          ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(const Matrix& matrix, uint64_t objID, ComplexObjSerMap* map) {
   (*map)[objID] = [matrix]() { return MatrixSerialization::Serialize(&matrix); };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const Point& point, uint64_t objID,
-                                          ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(const Point& point, uint64_t objID, ComplexObjSerMap* map) {
   (*map)[objID] = [point]() { return PointSerialization::Serialize(&point); };
 }
 
 void SerializeUtils::FillComplexObjSerMap(const std::vector<std::shared_ptr<LayerFilter>>& filters,
-                                          uint64_t objID, ComplexObjSerMap* map) {
+                             uint64_t objID, ComplexObjSerMap* map) {
   (*map)[objID] = [filters, map]() {
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
+    SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute, startMap, contentMap);
     for (size_t i = 0; i < filters.size(); i++) {
       std::stringstream ss;
       ss << "[" << i << "]";
@@ -302,8 +178,8 @@ void SerializeUtils::FillComplexObjSerMap(const std::vector<std::shared_ptr<Laye
   };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<LayerFilter>& layerFilter,
-                                          uint64_t objID, ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<LayerFilter>& layerFilter, uint64_t objID,
+                             ComplexObjSerMap* map) {
   if (layerFilter == nullptr) {
     return;
   }
@@ -312,28 +188,24 @@ void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<LayerFilter>& la
   };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<Layer>& layer, uint64_t objID,
-                                          ComplexObjSerMap* map, RenderableObjSerMap* renderMap) {
+void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<Layer>& layer, uint64_t objID, ComplexObjSerMap* map, RenderableObjSerMap* renderMap) {
   if (layer == nullptr) {
     return;
   }
-  (*map)[objID] = [layer, map, renderMap]() {
-    return LayerSerialization::SerializeLayer(layer.get(), map, renderMap);
-  };
+  (*map)[objID] = [layer, map, renderMap]() { return LayerSerialization::SerializeLayer(layer.get(), map, renderMap); };
 }
 
 void SerializeUtils::FillComplexObjSerMap(const Rect& rect, uint64_t objID, ComplexObjSerMap* map) {
   (*map)[objID] = [rect]() { return RectSerialization::Serialize(&rect); };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const std::vector<std::shared_ptr<Layer>>& children,
-                                          uint64_t objID, ComplexObjSerMap* map,
-                                          RenderableObjSerMap* renderMap) {
+void SerializeUtils::FillComplexObjSerMap(const std::vector<std::shared_ptr<Layer>>& children, uint64_t objID,
+                             ComplexObjSerMap* map, RenderableObjSerMap* renderMap) {
   (*map)[objID] = [children, map, renderMap]() {
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
+    SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute, startMap, contentMap);
     for (size_t i = 0; i < children.size(); i++) {
       std::stringstream ss;
       ss << "[" << i << "]";
@@ -349,14 +221,13 @@ void SerializeUtils::FillComplexObjSerMap(const std::vector<std::shared_ptr<Laye
   };
 }
 
-void SerializeUtils::FillComplexObjSerMap(
-    const std::vector<std::shared_ptr<LayerStyle>>& layerStyles, uint64_t objID,
-    ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(const std::vector<std::shared_ptr<LayerStyle>>& layerStyles,
+                             uint64_t objID, ComplexObjSerMap* map) {
   (*map)[objID] = [layerStyles, map]() {
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
+    SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute, startMap, contentMap);
     for (size_t i = 0; i < layerStyles.size(); i++) {
       std::stringstream ss;
       ss << "[" << i << "]";
@@ -372,8 +243,8 @@ void SerializeUtils::FillComplexObjSerMap(
   };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<LayerStyle>& layerStyle,
-                                          uint64_t objID, ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<LayerStyle>& layerStyle, uint64_t objID,
+                             ComplexObjSerMap* map) {
   if (layerStyle == nullptr) {
     return;
   }
@@ -382,146 +253,22 @@ void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<LayerStyle>& lay
   };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const SamplingOptions& sampling, uint64_t objID,
-                                          ComplexObjSerMap* map) {
-  (*map)[objID] = [sampling]() { return SamplingOptionsSerialization::Serialize(&sampling); };
-}
-
-void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<Image>& image, uint64_t objID,
-                                          ComplexObjSerMap* map) {
-  if (image == nullptr) {
+void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<Picture>& picture, uint64_t objID,
+    ComplexObjSerMap* map) {
+  if(picture == nullptr) {
     return;
   }
-  (*map)[objID] = [image]() { return ImageSerialization::Serialize(image.get()); };
-}
-
-void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<Shape>& shape, uint64_t objID,
-                                          ComplexObjSerMap* map, RenderableObjSerMap* rosMap) {
-  if (shape == nullptr) {
-    return;
-  }
-  (*map)[objID] = [shape, map, rosMap]() {
-    return ShapeSerialization::Serialize(shape.get(), map, rosMap);
+  (*map)[objID] = [picture]() {
+    return PictureSerialization::Serialize(picture.get());
   };
 }
 
-void SerializeUtils::FillComplexObjSerMap(
-    const std::vector<std::shared_ptr<ShapeStyle>>& shapeStyles, uint64_t objID,
-    ComplexObjSerMap* map, RenderableObjSerMap* rosMap) {
-  (*map)[objID] = [shapeStyles, map, rosMap]() {
-    flexbuffers::Builder fbb;
-    size_t startMap;
-    size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
-    for (size_t i = 0; i < shapeStyles.size(); i++) {
-      std::stringstream ss;
-      ss << "[" << i << "]";
-      const auto& shapeStyle = shapeStyles[i];
-      auto shapeStyleID = SerializeUtils::GetObjID();
-      SerializeUtils::SetFlexBufferMap(fbb, ss.str().c_str(),
-                                       reinterpret_cast<uint64_t>(shapeStyle.get()), true,
-                                       shapeStyle != nullptr, shapeStyleID);
-      FillComplexObjSerMap(shapeStyle, shapeStyleID, map, rosMap);
-    }
-    SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
-    return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
-  };
-}
-
-void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<ShapeStyle>& shapeStyle,
-                                          uint64_t objID, ComplexObjSerMap* map,
-                                          RenderableObjSerMap* rosMap) {
-  if (shapeStyle == nullptr) {
-    return;
-  }
-  (*map)[objID] = [shapeStyle, map, rosMap]() {
-    return ShapeStyleSerialization::Serialize(shapeStyle.get(), map, rosMap);
-  };
-}
-
-void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<ColorFilter>& colorFilter,
-                                          uint64_t objID, ComplexObjSerMap* map) {
-  if (colorFilter == nullptr) {
-    return;
-  }
-  (*map)[objID] = [colorFilter, map]() {
-    return ColorFilterSerialization::Serialize(colorFilter.get(), map);
-  };
-}
-
-void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<Typeface>& typeFace, uint64_t objID,
-                                          ComplexObjSerMap* map) {
-  if (typeFace == nullptr) {
-    return;
-  }
-  (*map)[objID] = [typeFace]() { return TypeFaceSerialization::Serialize(typeFace.get()); };
-}
-
-void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<ImageFilter>& imageFilter,
-                                          uint64_t objID, ComplexObjSerMap* map) {
-  if (imageFilter == nullptr) {
-    return;
-  }
-  (*map)[objID] = [imageFilter, map]() {
-    return ImageFilterSerialization::Serialize(imageFilter.get(), map);
-  };
-}
-
-void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<RuntimeEffect>& runtimeEffect,
-                                          uint64_t objID, ComplexObjSerMap* map) {
-  if (runtimeEffect == nullptr) {
-    return;
-  }
-  (*map)[objID] = [runtimeEffect]() {
-    return RuntimeEffectSerialization::Serialize(runtimeEffect.get());
-  };
-}
-
-void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<Shader>& shader, uint64_t objID,
-                                          ComplexObjSerMap* map, RenderableObjSerMap* rosMap) {
-  if (shader == nullptr) {
-    return;
-  }
-  (*map)[objID] = [shader, map, rosMap]() {
-    return ShaderSerialization::Serialize(shader.get(), map, rosMap);
-  };
-}
-
-void SerializeUtils::FillComplexObjSerMap(const std::shared_ptr<TextBlob>& textBlob, uint64_t objID,
-                                          ComplexObjSerMap* map, RenderableObjSerMap* rosMap) {
-  if (textBlob == nullptr) {
-    return;
-  }
-  (*map)[objID] = [textBlob, map, rosMap]() {
-    return TextBlobSerialization::Serialize(textBlob.get(), map, rosMap);
-  };
-}
-
-void SerializeUtils::FillComplexObjSerMap(const std::vector<float>& floatVec, uint64_t objID,
-                                          ComplexObjSerMap* map) {
-  (*map)[objID] = [floatVec]() {
-    flexbuffers::Builder fbb;
-    size_t startMap;
-    size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
-    for (size_t i = 0; i < floatVec.size(); i++) {
-      std::stringstream ss;
-      ss << "[" << i << "]";
-      auto value = floatVec[i];
-      SerializeUtils::SetFlexBufferMap(fbb, ss.str().c_str(), value);
-    }
-    SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
-    return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
-  };
-}
-
-void SerializeUtils::FillComplexObjSerMap(const std::array<float, 20>& matrix, uint64_t objID,
-                                          ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(const std::array<float, 20>& matrix, uint64_t objID, ComplexObjSerMap* map) {
   (*map)[objID] = [matrix]() {
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
+    SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute, startMap, contentMap);
     for (size_t i = 0; i < 20; i++) {
       std::stringstream ss;
       ss << "[" << i << "]";
@@ -533,51 +280,12 @@ void SerializeUtils::FillComplexObjSerMap(const std::array<float, 20>& matrix, u
   };
 }
 
-void SerializeUtils::FillComplexObjSerMap(const std::vector<GlyphRun>& glyphRuns, uint64_t objID,
-                                          ComplexObjSerMap* map) {
-  (*map)[objID] = [glyphRuns, map]() {
-    flexbuffers::Builder fbb;
-    size_t startMap;
-    size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
-    for (size_t i = 0; i < glyphRuns.size(); i++) {
-      std::stringstream ss;
-      ss << "[" << i << "]";
-      const auto& glyphRun = glyphRuns[i];
-      auto glyphRunID = SerializeUtils::GetObjID();
-      SerializeUtils::SetFlexBufferMap(fbb, ss.str().c_str(), "", false, true, glyphRunID);
-      FillComplexObjSerMap(glyphRun, glyphRunID, map);
-    }
-    SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
-    return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
-  };
-}
-
-void SerializeUtils::FillComplexObjSerMap(const std::vector<GlyphID>& glyphs, uint64_t objID,
-                                          ComplexObjSerMap* map) {
-  (*map)[objID] = [glyphs]() {
-    flexbuffers::Builder fbb;
-    size_t startMap;
-    size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
-    for (size_t i = 0; i < glyphs.size(); i++) {
-      std::stringstream ss;
-      ss << "[" << i << "]";
-      auto value = glyphs[i];
-      SerializeUtils::SetFlexBufferMap(fbb, ss.str().c_str(), static_cast<uint32_t>(value));
-    }
-    SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
-    return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
-  };
-}
-
-void SerializeUtils::FillComplexObjSerMap(const std::vector<Point>& points, uint64_t objID,
-                                          ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(const std::vector<Point>& points, uint64_t objID, ComplexObjSerMap* map) {
   (*map)[objID] = [points, map]() {
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
+    SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute, startMap, contentMap);
     for (size_t i = 0; i < points.size(); i++) {
       std::stringstream ss;
       ss << "[" << i << "]";
@@ -591,36 +299,12 @@ void SerializeUtils::FillComplexObjSerMap(const std::vector<Point>& points, uint
   };
 }
 
-void SerializeUtils::FillComplexObjSerMap(
-    const std::vector<std::shared_ptr<ImageFilter>>& imageFilters, uint64_t objID,
-    ComplexObjSerMap* map) {
-  (*map)[objID] = [imageFilters, map]() {
-    flexbuffers::Builder fbb;
-    size_t startMap;
-    size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
-    for (size_t i = 0; i < imageFilters.size(); i++) {
-      std::stringstream ss;
-      ss << "[" << i << "]";
-      const auto& imageFilter = imageFilters[i];
-      auto imageFilterID = SerializeUtils::GetObjID();
-      SerializeUtils::SetFlexBufferMap(fbb, ss.str().c_str(),
-                                       reinterpret_cast<uint64_t>(imageFilter.get()), true,
-                                       imageFilter != nullptr, imageFilterID);
-      FillComplexObjSerMap(imageFilter, imageFilterID, map);
-    }
-    SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
-    return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
-  };
-}
-
-void SerializeUtils::FillComplexObjSerMap(const std::vector<Color>& colors, uint64_t objID,
-                                          ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(const std::vector<Color>& colors, uint64_t objID, ComplexObjSerMap* map) {
   (*map)[objID] = [colors, map]() {
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
+    SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute, startMap, contentMap);
     for (size_t i = 0; i < colors.size(); i++) {
       std::stringstream ss;
       ss << "[" << i << "]";
@@ -634,53 +318,34 @@ void SerializeUtils::FillComplexObjSerMap(const std::vector<Color>& colors, uint
   };
 }
 
-bool SerializeUtils::CreateGLTexture(Context* context, int width, int height,
-                                     GLTextureInfo* texture) {
-  texture->target = GL_TEXTURE_2D;
-  texture->format = GL_RGBA8;
-  auto gl = GLFunctions::Get(context);
-  gl->genTextures(1, &texture->id);
-  if (texture->id <= 0) {
-    return false;
-  }
-  gl->bindTexture(texture->target, texture->id);
-  gl->texParameteri(texture->target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  gl->texParameteri(texture->target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  gl->texParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  gl->texParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-  gl->texImage2D(texture->target, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
-  gl->bindTexture(texture->target, 0);
-  return true;
+void SerializeUtils::FillComplexObjSermap(const std::unique_ptr<RecordedContent>& recordedContent,
+    uint64_t objID, ComplexObjSerMap* map, RenderableObjSerMap* rosMap) {
+  (*map)[objID] = [&recordedContent, map, rosMap]() {
+    return RecordedContentSerialization::Serialize(recordedContent.get(), map, rosMap);
+  };
 }
 
-void SerializeUtils::FillRenderableObjSerMap(const std::shared_ptr<Shape>& shape, uint64_t objID,
-                                             RenderableObjSerMap* map) {
-  (*map)[objID] = [shape](Context* context) {
-    GLTextureInfo textureInfo;
-    auto bounds = shape->getBounds();
+void SerializeUtils::FillRenderableObjSerMap(const std::shared_ptr<Picture>& picture, uint64_t objID, RenderableObjSerMap* map) {
+  (*map)[objID] = [picture](Context* context) {
+    auto bounds = picture->getBounds();
     int width = static_cast<int>(bounds.width()) + padding * 2;
     int height = static_cast<int>(bounds.height()) + padding * 2;
-    auto transformShape =
-        Shape::ApplyMatrix(shape, Matrix::MakeTrans(padding - bounds.x(), padding - bounds.y()));
-    CreateGLTexture(context, width, height, &textureInfo);
-    auto surface =
-        Surface::MakeFrom(context, {textureInfo, width, height}, ImageOrigin::BottomLeft);
+    auto surface = Surface::Make(context, width, height);
     auto canvas = surface->getCanvas();
     canvas->clear();
     auto paint = Paint();
-    canvas->drawShape(transformShape, paint);
+    auto matrix = Matrix::MakeTrans(padding - bounds.x(), padding - bounds.y());
+    canvas->drawPicture(picture, &matrix, &paint);
     ImageInfo info = ImageInfo::Make(width, height, ColorType::RGBA_8888);
     std::vector<uint8_t> data(static_cast<size_t>(width * height * 4));
     bool result = surface->readPixels(info, data.data());
-    auto gl = GLFunctions::Get(context);
-    gl->deleteTextures(1, &textureInfo.id);
-    if (!result) {
+    if(!result) {
       return Data::MakeEmpty();
     }
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "ImageData", startMap, contentMap);
+    SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::ImageData, startMap, contentMap);
     fbb.Int("width", width);
     fbb.Int("height", height);
     fbb.Blob("data", data.data(), data.size());
@@ -689,129 +354,8 @@ void SerializeUtils::FillRenderableObjSerMap(const std::shared_ptr<Shape>& shape
   };
 }
 
-void SerializeUtils::FillRenderableObjSerMap(const std::shared_ptr<Image>& image, uint64_t objID,
-                                             RenderableObjSerMap* map) {
-  (*map)[objID] = [image](Context* context) {
-    GLTextureInfo textureInfo;
-    int width = image->width() + padding * 2;
-    int height = image->height() + padding * 2;
-    CreateGLTexture(context, width, height, &textureInfo);
-    auto surface =
-        Surface::MakeFrom(context, {textureInfo, width, height}, ImageOrigin::BottomLeft);
-    auto canvas = surface->getCanvas();
-    canvas->clear();
-    canvas->drawImage(image, padding, padding);
-    ImageInfo info = ImageInfo::Make(width, height, ColorType::RGBA_8888);
-    std::vector<uint8_t> data(static_cast<size_t>(width * height * 4));
-    bool result = surface->readPixels(info, data.data());
-    auto gl = GLFunctions::Get(context);
-    gl->deleteTextures(1, &textureInfo.id);
-    if (!result) {
-      return Data::MakeEmpty();
-    }
-    flexbuffers::Builder fbb;
-    size_t startMap;
-    size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "ImageData", startMap, contentMap);
-    fbb.Int("width", width);
-    fbb.Int("height", height);
-    fbb.Blob("data", data.data(), data.size());
-    SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
-    return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
-  };
-}
-
-void SerializeUtils::FillRenderableObjSerMap(const Path& path, uint64_t objID,
-                                             RenderableObjSerMap* map) {
-  (*map)[objID] = [path](Context* context) {
-    GLTextureInfo textureInfo;
-    auto bounds = path.getBounds();
-    int width = static_cast<int>(bounds.width()) + padding * 2;
-    int height = static_cast<int>(bounds.height()) + padding * 2;
-    CreateGLTexture(context, width, height, &textureInfo);
-    auto tempPath = path;
-    tempPath.transform(Matrix::MakeTrans(padding - bounds.x(), padding - bounds.y()));
-    auto surface =
-        Surface::MakeFrom(context, {textureInfo, width, height}, ImageOrigin::BottomLeft);
-    auto canvas = surface->getCanvas();
-    canvas->clear();
-    auto paint = Paint();
-    canvas->drawPath(tempPath, paint);
-    ImageInfo info = ImageInfo::Make(width, height, ColorType::RGBA_8888);
-    std::vector<uint8_t> data(static_cast<size_t>(width * height * 4));
-    bool result = surface->readPixels(info, data.data());
-    auto gl = GLFunctions::Get(context);
-    gl->deleteTextures(1, &textureInfo.id);
-    if (!result) {
-      return Data::MakeEmpty();
-    }
-    flexbuffers::Builder fbb;
-    size_t startMap;
-    size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "ImageData", startMap, contentMap);
-    fbb.Int("width", width);
-    fbb.Int("height", height);
-    fbb.Blob("data", data.data(), data.size());
-    SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
-    return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
-  };
-}
-
-void SerializeUtils::FillRenderableObjSerMap(const std::shared_ptr<TextBlob>& textBlob,
-                                             uint64_t objID, RenderableObjSerMap* map) {
-  (*map)[objID] = [textBlob](Context* context) {
-    GLTextureInfo textureInfo;
-    auto bounds = textBlob->getBounds();
-    int width = static_cast<int>(bounds.width()) + padding * 2;
-    int height = static_cast<int>(bounds.height()) + padding * 2;
-    CreateGLTexture(context, width, height, &textureInfo);
-    auto surface =
-        Surface::MakeFrom(context, {textureInfo, width, height}, ImageOrigin::BottomLeft);
-    auto canvas = surface->getCanvas();
-    canvas->clear();
-    auto paint = Paint();
-    canvas->drawTextBlob(textBlob, padding - bounds.x(), padding - bounds.y(), paint);
-    ImageInfo info = ImageInfo::Make(width, height, ColorType::RGBA_8888);
-    std::vector<uint8_t> data(static_cast<size_t>(width * height * 4));
-    bool result = surface->readPixels(info, data.data());
-    auto gl = GLFunctions::Get(context);
-    gl->deleteTextures(1, &textureInfo.id);
-    if (!result) {
-      return Data::MakeEmpty();
-    }
-    flexbuffers::Builder fbb;
-    size_t startMap;
-    size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, "ImageData", startMap, contentMap);
-    fbb.Int("width", width);
-    fbb.Int("height", height);
-    fbb.Blob("data", data.data(), data.size());
-    SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
-    return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
-  };
-}
-
-void SerializeUtils::FillComplexObjSerMap(const Color& color, uint64_t objID,
-                                          ComplexObjSerMap* map) {
+void SerializeUtils::FillComplexObjSerMap(const Color& color, uint64_t objID, ComplexObjSerMap* map) {
   (*map)[objID] = [color]() { return ColorSerialization::Serialize(&color); };
-}
-
-void SerializeUtils::FillComplexObjSerMap(const Font& font, uint64_t objID, ComplexObjSerMap* map) {
-  (*map)[objID] = [font, map]() { return FontSerialization::Serialize(&font, map); };
-}
-
-void SerializeUtils::FillComplexObjSerMap(const FontMetrics& fontMetrics, uint64_t objID,
-                                          ComplexObjSerMap* map) {
-  (*map)[objID] = [fontMetrics]() { return FontMetricsSerialization::Serialize(&fontMetrics); };
-}
-
-void SerializeUtils::FillComplexObjSerMap(const GlyphRun& glyphRun, uint64_t objID,
-                                          ComplexObjSerMap* map) {
-  (*map)[objID] = [glyphRun, map]() { return glyphRunSerialization::Serialize(&glyphRun, map); };
-}
-
-void SerializeUtils::FillComplexObjSerMap(const Path& path, uint64_t objID, ComplexObjSerMap* map) {
-  (*map)[objID] = [path, map]() { return PathSerialization::Serialize(&path, map); };
 }
 
 void SerializeUtils::SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key, const char* value,

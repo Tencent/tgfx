@@ -16,51 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma once
-#include <unordered_map>
-#include <vector>
-#include "tgfx/layers/DisplayList.h"
-#include "tgfx/layers/Layer.h"
+
+#include <functional>
 
 namespace tgfx {
 
 class LayerInspector {
  public:
-  static LayerInspector& GetLayerInspector() {
-    static LayerInspector instance;
-    return instance;
-  }
-
-  void pickedLayer(float x, float y);
-  void setLayerInspectorHoveredStateCallBack(std::function<void(bool)> callback);
-
-  void setDisplayList(tgfx::DisplayList* displayList);
-  void serializingLayerTree();
-  void serializingLayerAttribute(const std::shared_ptr<tgfx::Layer>& layer);
-  void FeedBackDataProcess(const std::vector<uint8_t>& data);
-  void setCallBack();
-  void RenderImageAndSend(Context* context);
-
- private:
-  void AddHighLightOverlay(Color color, std::shared_ptr<Layer> hovedLayer);
-  void SendPickedLayerAddress(const std::shared_ptr<tgfx::Layer>& layer);
-  void SendFlushAttributeAck(uint64_t address);
-  LayerInspector();
-
- private:
-  std::unordered_map<uint64_t, std::shared_ptr<tgfx::Layer>> m_LayerMap;
-  std::unordered_map<uint64_t, std::unordered_map<uint64_t, std::function<std::shared_ptr<Data>()>>>
-      m_LayerComplexObjMap;
-  std::unordered_map<uint64_t,
-                     std::unordered_map<uint64_t, std::function<std::shared_ptr<Data>(Context*)>>>
-      m_LayerRenderableObjMap;
-  uint64_t m_HoveredAddress;
-  uint64_t m_SelectedAddress;
-  uint64_t m_ExpandID;
-  std::shared_ptr<tgfx::Layer> m_HoverdLayer;
-  int m_HighLightLayerIndex = 0;
-  bool m_HoverdSwitch = false;
-  tgfx::DisplayList* m_DisplayList;
-  std::function<void(bool)> hoveredCallBack;
+  static void pickedLayer(float x, float y);
+  static void setLayerInspectorHoveredStateCallBack(std::function<void(bool)> callback);
 };
 
 }  // namespace tgfx

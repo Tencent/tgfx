@@ -18,6 +18,7 @@
 
 #include "LayerItem.h"
 
+namespace inspector {
 LayerItem::LayerItem(QVariantList data, LayerItem* parentItem)
     : m_itemData(std::move(data)), m_parentItem(parentItem) {
 }
@@ -56,4 +57,5 @@ int LayerItem::row() const {
 
 LayerItem* LayerItem::parentItem() {
   return m_parentItem;
+}
 }

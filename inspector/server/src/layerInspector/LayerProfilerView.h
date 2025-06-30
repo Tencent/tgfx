@@ -27,7 +27,9 @@
 #include "flatbuffers/flexbuffers.h"
 #include "socket/TcpSocketClient.h"
 #include "socket/WebSocketServer.h"
+#include "LayerInspectorProtocol.h"
 
+namespace inspector {
 class LayerProfilerView : public QObject {
   Q_OBJECT
  public:
@@ -46,14 +48,18 @@ class LayerProfilerView : public QObject {
   Q_INVOKABLE void flushAttribute();
   Q_INVOKABLE void flushLayerTree();
   Q_INVOKABLE void openStartView();
+  Q_INVOKABLE void showLayerTree();
+  Q_INVOKABLE void showLayerAttributeTree();
   void cleanView();
+  signals:
+      void viewHide();
 
- protected:
+protected:
   void LayerProlfilerQMLImpl();
   void ProcessMessage(const QByteArray& message);
 
- private:
-  QByteArray feedBackData(const std::string& type, uint64_t value);
+private:
+  QByteArray feedBackData(LayerInspectorMsgType type, uint64_t value);
 
   void sendSelectedAddress(uint64_t address);
 
@@ -63,7 +69,7 @@ class LayerProfilerView : public QObject {
 
   void processImageFlush(uint64_t imageID);
 
- private:
+private:
   WebSocketServer* m_WebSocketServer;
   TcpSocketClient* m_TcpSocketClient;
   std::unique_ptr<QQmlApplicationEngine> m_LayerTreeEngine;
@@ -73,3 +79,4 @@ class LayerProfilerView : public QObject {
   KDDockWidgets::QtQuick::DockWidget* layerTree;
   KDDockWidgets::QtQuick::DockWidget* layerAttributeTree;
 };
+}

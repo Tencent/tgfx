@@ -96,6 +96,11 @@ void InspectorView::initView() {
   if (ispWindow) {
     ispWindow->setTitle("Inspector");
     ispWindow->show();
+    connect(ispWindow, &QWindow::visibilityChanged, [this](QWindow::Visibility visibility) {
+      if (visibility == QWindow::Visibility::Hidden) {
+        emit viewHide();
+      }
+    });
   }
   initConnect();
 }

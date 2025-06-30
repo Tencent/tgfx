@@ -22,6 +22,7 @@
 #include <QModelIndex>
 #include "LayerItem.h"
 
+namespace inspector {
 class LayerModel : public QAbstractItemModel {
   Q_OBJECT
   QML_NAMED_ELEMENT(LayerModel)
@@ -37,6 +38,7 @@ class LayerModel : public QAbstractItemModel {
   Qt::ItemFlags flags(const QModelIndex& index) const override;
   QVariant headerData(int section, Qt::Orientation orientation, int role) const override;
 
- protected:
+protected:
   std::shared_ptr<LayerItem> rootItem;
 };
+}

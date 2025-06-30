@@ -28,26 +28,17 @@ ApplicationWindow {
             }
         }
 
-        Menu {
-            title: qsTr("&File")
-            Action {
-                text: qsTr("DisConnect")
-                shortcut: "Ctrl+Shift+D"
-                onTriggered: {
-                    console.log("DisConnect clicked")
-                    //todo: disconnect the client
-                }
-            }
-            MenuSeparator {}
-            Action {
-                text: qsTr("Close")
-                shortcut: StandardKey.Close
-                onTriggered: {
-                    layerProfilerView.hide()
-                    _layerProfileView.openStartView()
-                }
-            }
-        }
+        // Menu {
+        //     title: qsTr("&File")
+        //     Action {
+        //         text: qsTr("Close")
+        //         shortcut: StandardKey.Close
+        //         onTriggered: {
+        //             layerProfilerView.hide()
+        //             //_layerProfileView.openStartView()
+        //         }
+        //     }
+        // }
 
         Menu{
             title: "Window"
@@ -68,10 +59,23 @@ ApplicationWindow {
                 }
             }
 
-            Action {
-                text: qsTr("Close All")
-                onTriggered: {
-                    _kddwDockRegistry.clear();
+            // Action {
+            //     text: qsTr("Close All")
+            //     onTriggered: {
+            //         _kddwDockRegistry.clear();
+            //     }
+            // }
+            Action{
+                text: qsTr("RenderTree")
+                onTriggered:{
+                    _layerProfileView.showLayerTree()
+                }
+            }
+
+            Action{
+                text: qsTr("Attribute")
+                onTriggered:{
+                    _layerProfileView.showLayerAttributeTree()
                 }
             }
         }

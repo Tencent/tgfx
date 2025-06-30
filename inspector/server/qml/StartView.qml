@@ -369,6 +369,7 @@ ApplicationWindow {
                                         startViewModel.connectToClientByLayerInspector(modelData)
                                     }
                                 }
+                                startView.hide()
                             }
                         }
                     }
@@ -442,6 +443,7 @@ ApplicationWindow {
                                         startViewModel.connectToClientByLayerInspector(modelData)
                                     }
                                 }
+                                startView.hide()
                             }
                         }
                     }
@@ -612,22 +614,21 @@ ApplicationWindow {
                         hoverEnabled: true
                         enabled: launchBtn.canLaunch
                         onClicked: {
-                            if(launchBtn.canLaunch){
-                                if(selectedIndex === 0 && selectedFilePathIndex !== -1){
-                                    var selectedFilePath = startViewModel.fileItems[selectedFilePathIndex].filesPath
-                                    startViewModel.openFile(selectedFilePath)
-                                }
-                                else if(selectedClientIndex !== -1){
-                                    var selectedClient;
-                                    if(selectedIndex === 0){
-                                        selectedClient = startViewModel.frameCaptureClientItems[selectedClientIndex]
-                                        startViewModel.connectToClient(selectedClient)
-                                    } else if(selectedIndex === 1){
-                                        selectedClient = startViewModel.layerTreeClientsList[selectedClientIndex]
-                                        startViewModel.connectToClientByLayerInspector(selectedClient)
-                                    }
+                            if(selectedIndex === 0 && selectedFilePathIndex !== -1){
+                                var selectedFilePath = startViewModel.fileItems[selectedFilePathIndex].filesPath
+                                startViewModel.openFile(selectedFilePath)
+                            }
+                            else if(selectedClientIndex !== -1){
+                                var selectedClient;
+                                if(selectedIndex === 0){
+                                    selectedClient = startViewModel.frameCaptureClientItems[selectedClientIndex]
+                                    startViewModel.connectToClient(selectedClient)
+                                } else if(selectedIndex === 1){
+                                    selectedClient = startViewModel.layerTreeClientsList[selectedClientIndex]
+                                    startViewModel.connectToClientByLayerInspector(selectedClient)
                                 }
                             }
+                            startView.hide();
                         }
                     }
                 }

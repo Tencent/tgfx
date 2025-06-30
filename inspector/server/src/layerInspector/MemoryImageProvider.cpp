@@ -18,6 +18,7 @@
 
 #include "MemoryImageProvider.h"
 
+namespace inspector {
 MemoryImageProvider::MemoryImageProvider() : QQuickImageProvider(QQuickImageProvider::Image) {
   defaultImage = new QImage(200, 200, QImage::Format_RGBA8888);
   defaultImage->fill(QColor(56, 56, 56));
@@ -30,12 +31,9 @@ MemoryImageProvider::~MemoryImageProvider() {
 }
 
 void MemoryImageProvider::setImage(uint64_t id, int width, int height, const QByteArray& rawData) {
-  qDebug() << "set id: " << id;
   rwLock.lockForWrite();
   imageMap[id] = {width, height, rawData};
   rwLock.unlock();
-  //bool result = imageMap[id].save(QString::number(id)+".jpg");
-  //qDebug() << QString::number(id)+".jpg" << " : " << result;
   emit imageFlush(id);
 }
 
@@ -73,4 +71,5 @@ QImage MemoryImageProvider::requestImage(const QString& id, QSize* size,
     *size = defaultImage->size();
   }
   return defaultImage->copy();
+}
 }
