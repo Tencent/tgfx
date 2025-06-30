@@ -77,12 +77,16 @@ static const float ScrollWheelZoomSensitivity = 120.0f;
     }
     self.contentOffset = CGPointMake(mouseInView.x - contentX * self.zoomScale,
                                      mouseInView.y - contentY * self.zoomScale);
-    [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
   } else {
-    self.contentOffset = CGPointMake(self.contentOffset.x + event.scrollingDeltaX,
-                                     self.contentOffset.y + event.scrollingDeltaY);
-    [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
+    if (event.hasPreciseScrollingDeltas) {
+      self.contentOffset = CGPointMake(self.contentOffset.x + event.scrollingDeltaX,
+                                       self.contentOffset.y + event.scrollingDeltaY);
+    } else {
+      self.contentOffset = CGPointMake(self.contentOffset.x + event.scrollingDeltaX * 5,
+                                       self.contentOffset.y + event.scrollingDeltaY * 5);
+    }
   }
+  [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
 }
 
 - (void)magnifyWithEvent:(NSEvent*)event {
