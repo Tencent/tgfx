@@ -856,6 +856,13 @@ TGFX_TEST(CanvasTest, drawShape) {
   mergeShape2 = Shape::ApplyMatrix(mergeShape2, Matrix::MakeTrans(170, 10));
   canvas->drawShape(mergeShape2, paint);
 
+  transShape = Shape::ApplyMatrix(shape, Matrix::MakeTrans(200, 90));
+  paint.setShader(Shader::MakeLinearGradient(Point{200.f, 90.f}, Point{250, 140},
+                                             {Color{1.f, 0.f, 0.f, 1.f}, Color{0.f, 1.f, 0.f, 1.f}},
+                                             {}));
+  canvas->drawShape(transShape, paint);
+  paint.setShader(nullptr);
+
   paint.setStyle(PaintStyle::Stroke);
   auto typeface =
       Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
@@ -1999,6 +2006,23 @@ TGFX_TEST(CanvasTest, CornerTest) {
   canvas->drawShape(tripleCornerRectShape, paint);
   canvas->drawShape(tripleCornerTriShape, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/CornerShapeTriple"));
+
+  canvas->clear();
+  Path closeQuadPath = {};
+  closeQuadPath.moveTo(50, 50);
+  closeQuadPath.lineTo(80, 50);
+  closeQuadPath.quadTo(100, 70, 80, 80);
+  closeQuadPath.lineTo(80, 100);
+  closeQuadPath.lineTo(50, 100);
+  closeQuadPath.lineTo(50, 50);
+  closeQuadPath.close();
+  auto closeQuadShape = Shape::MakeFrom(closeQuadPath);
+  canvas->drawShape(closeQuadShape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/CloseQuadShape"));
+  canvas->clear();
+  auto cornerCloseQuadShape = Shape::ApplyEffect(closeQuadShape, pathEffect);
+  canvas->drawShape(cornerCloseQuadShape, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/CloseQuadShapeCorner"));
 
   canvas->clear();
   Path openQuadPath = {};

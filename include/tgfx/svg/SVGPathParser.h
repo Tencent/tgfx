@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,32 +18,38 @@
 
 #pragma once
 
-#include "core/shapes/UniqueKeyShape.h"
+#include <string>
+#include "tgfx/core/Path.h"
 
 namespace tgfx {
-/**
- * Shape that merges multiple shapes together.
- */
-class MergeShape : public UniqueKeyShape {
+
+class SVGPathParser {
  public:
-  MergeShape(std::shared_ptr<Shape> first, std::shared_ptr<Shape> second, PathOp pathOp)
-      : first(std::move(first)), second(std::move(second)), pathOp(pathOp) {
-  }
+  /**
+   * Two ways to describe paths in SVG
+   */
+  enum class PathEncoding {
+    /**
+     * Each step's point is an absolute coordinate, and the step letter is uppercase
+     */
+    Absolute,
+    /**
+     * Each step's point is a relative coordinate to the previous point, and the step letter is
+     *lowercase
+     */
+    Relative,
+  };
 
-  bool isInverseFillType() const override;
+  /**
+   *  Parses a Path object to an SVG path string.
+   */
+  static std::string ToSVGString(const Path& path, PathEncoding = PathEncoding::Absolute);
 
-  Rect getBounds() const override;
-
-  Path getPath() const override;
-
- protected:
-  Type type() const override {
-    return Type::Merge;
-  }
-
- private:
-  std::shared_ptr<Shape> first = nullptr;
-  std::shared_ptr<Shape> second = nullptr;
-  PathOp pathOp = PathOp::Append;
+  /**
+   * Parses an SVG path string to a Path object.
+   * Returns nullptr if the parsing fails.
+   */
+  static std::shared_ptr<Path> FromSVGString(const std::string& pathString);
 };
+
 }  // namespace tgfx

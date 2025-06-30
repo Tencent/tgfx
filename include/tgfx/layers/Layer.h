@@ -29,7 +29,7 @@
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
-class RecordedContent;
+class LayerContent;
 class RasterizedContent;
 class DisplayList;
 class DrawArgs;
@@ -292,7 +292,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * mask layer. The default value is LayerMaskType::Alpha.
    */
   LayerMaskType maskType() const {
-    return _maskType;
+    return static_cast<LayerMaskType>(bitFields.maskType);
   }
 
   /**
@@ -335,17 +335,6 @@ class Layer : public std::enable_shared_from_this<Layer> {
   Layer* parent() const {
     return _parent;
   }
-
-  /**
-   * Sets a custom LayerContent object to provide the contents for this layer. The onDrawContent()
-   * method will be called to record the layer’s contents. The LayerContent object is released after
-   * onDrawContent() is called. Each time you want to update the contents, you must create a new
-   * LayerContent object and set it using this method. Because onDrawContent() may run on a
-   * background thread, the LayerContent object must be immutable, thread-safe, and independent of
-   * main thread state. This method is ignored if the subclass overrides the onUpdateContent()
-   * method.
-   */
-  void setContent(std::unique_ptr<LayerContent> content);
 
   /**
    * Returns the list of child layers that are direct children of the calling layer. Note: Do not
@@ -566,7 +555,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   Matrix getMatrixWithScrollRect() const;
 
-  RecordedContent* getRecordedContent();
+  LayerContent* getContent();
 
   std::shared_ptr<ImageFilter> getImageFilter(float contentScale);
 
@@ -614,25 +603,26 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   void updateBackgroundBounds(const Matrix& renderMatrix);
 
-  void propagateHasBackgroundStyleFlags();
+  void propagateBackgroundStyleOutset();
+
+  bool hasBackgroundStyle();
 
   struct {
     bool dirtyContent : 1;        // layer's content needs updating
     bool dirtyContentBounds : 1;  // layer's content bounds needs updating
     bool dirtyDescendents : 1;    // a descendant layer needs redrawing
     bool dirtyTransform : 1;      // the layer and its children need redrawing
-    bool hasBackgroundStyle : 1;  // the layer or any of its descendants has a background style
     bool visible : 1;
     bool shouldRasterize : 1;
     bool allowsEdgeAntialiasing : 1;
     bool allowsGroupOpacity : 1;
     bool excludeChildEffectsInLayerStyle : 1;
     uint8_t blendMode : 5;
+    uint8_t maskType : 3;
   } bitFields = {};
   std::string _name;
   float _alpha = 1.0f;
   Matrix _matrix = {};
-  LayerMaskType _maskType = LayerMaskType::Alpha;
   std::shared_ptr<Layer> _mask = nullptr;
   Layer* maskOwner = nullptr;
   std::unique_ptr<Rect> _scrollRect = nullptr;
@@ -643,10 +633,12 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::vector<std::shared_ptr<LayerStyle>> _layerStyles = {};
   float _rasterizationScale = 0.0f;
   std::unique_ptr<RasterizedContent> rasterizedContent;
-  std::unique_ptr<LayerContent> layerContent;
-  std::unique_ptr<RecordedContent> recordedContent;
+  std::shared_ptr<LayerContent> layerContent = nullptr;
   Rect renderBounds = {};         // in global coordinates
   Rect* contentBounds = nullptr;  //  in global coordinates
+
+  // if > 0, means the layer or any of its descendants has a background style
+  float backgroundOutset = 0.f;
 
   friend class RootLayer;
   friend class DisplayList;

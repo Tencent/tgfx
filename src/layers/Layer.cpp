@@ -18,12 +18,13 @@
 
 #include "tgfx/layers/Layer.h"
 #include <atomic>
+#include "contents/LayerContent.h"
 #include "contents/RasterizedContent.h"
-#include "contents/RecordedContent.h"
 #include "core/images/PictureImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "layers/DrawArgs.h"
+#include "layers/OpaqueThreshold.h"
 #include "layers/RegionTransformer.h"
 #include "layers/RootLayer.h"
 #include "tgfx/core/Recorder.h"
@@ -161,8 +162,8 @@ void Layer::setShouldRasterize(bool value) {
 }
 
 void Layer::setRasterizationScale(float value) {
-  if (_rasterizationScale < 0) {
-    _rasterizationScale = 0;
+  if (value < 0) {
+    value = 0;
   }
   _rasterizationScale = value;
 }
@@ -200,7 +201,7 @@ void Layer::setFilters(std::vector<std::shared_ptr<LayerFilter>> value) {
 }
 
 void Layer::setMask(std::shared_ptr<Layer> value) {
-  if (_mask.get() == this) {
+  if (value.get() == this) {
     return;
   }
   if (_mask == value) {
@@ -221,10 +222,11 @@ void Layer::setMask(std::shared_ptr<Layer> value) {
 }
 
 void Layer::setMaskType(LayerMaskType value) {
-  if (_maskType == value) {
+  uint8_t uValue = static_cast<uint8_t>(value);
+  if (bitFields.maskType == uValue) {
     return;
   }
-  _maskType = value;
+  bitFields.maskType = uValue;
   if (_mask) {
     invalidateTransform();
   }
@@ -268,11 +270,6 @@ void Layer::setExcludeChildEffectsInLayerStyle(bool value) {
   }
   bitFields.excludeChildEffectsInLayerStyle = value;
   invalidateTransform();
-}
-
-void Layer::setContent(std::unique_ptr<LayerContent> content) {
-  layerContent = std::move(content);
-  invalidateContent();
 }
 
 bool Layer::addChild(std::shared_ptr<Layer> child) {
@@ -421,7 +418,7 @@ Rect Layer::getBounds(const Layer* targetCoordinateSpace, bool computeTightBound
 
 Rect Layer::getBoundsInternal(const Matrix& coordinateMatrix, bool computeTightBounds) {
   Rect bounds = {};
-  if (auto content = getRecordedContent()) {
+  if (auto content = getContent()) {
     if (computeTightBounds) {
       bounds.join(content->getTightBounds(coordinateMatrix));
     } else {
@@ -481,7 +478,7 @@ Point Layer::localToGlobal(const Point& localPoint) const {
 }
 
 bool Layer::hitTestPoint(float x, float y, bool shapeHitTest) {
-  if (auto content = getRecordedContent()) {
+  if (auto content = getContent()) {
     Point localPoint = globalToLocal(Point::Make(x, y));
     if (content->hitTestPoint(localPoint.x, localPoint.y, shapeHitTest)) {
       return true;
@@ -520,9 +517,36 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   }
   auto surface = canvas->getSurface();
   DrawArgs args = {};
-  if (surface && !(surface->renderFlags() & RenderFlags::DisableCache)) {
-    args.context = surface->getContext();
+  Context* context = nullptr;
+  if (surface) {
+    context = surface->getContext();
+    if (!(surface->renderFlags() & RenderFlags::DisableCache)) {
+      args.context = context;
+    }
   }
+
+  if (context && hasBackgroundStyle()) {
+    auto scale = canvas->getMatrix().getMaxScale();
+    auto bounds = getBounds();
+    bounds.scale(scale, scale);
+    auto globalMatrix = getGlobalMatrix();
+    globalMatrix.preScale(1 / scale, 1 / scale);
+    auto invert = Matrix::I();
+    if (globalMatrix.invert(&invert)) {
+      auto backgroundContext = BackgroundContext::Make(context, bounds, invert);
+      if (backgroundContext) {
+        auto backgroundCanvas = backgroundContext->getCanvas();
+        auto image = getBackgroundImage(args, scale, nullptr);
+        if (image) {
+          AutoCanvasRestore restore(backgroundCanvas);
+          backgroundCanvas->setMatrix(Matrix::I());
+          backgroundCanvas->drawImage(image);
+        }
+        args.backgroundContext = std::move(backgroundContext);
+      }
+    }
+  }
+
   drawLayer(args, canvas, alpha, blendMode);
 }
 
@@ -561,11 +585,7 @@ void Layer::invalidate() {
   }
 }
 
-void Layer::onUpdateContent(LayerRecorder* recorder) {
-  if (layerContent != nullptr) {
-    layerContent->onDrawContent(recorder);
-    layerContent = nullptr;
-  }
+void Layer::onUpdateContent(LayerRecorder*) {
 }
 
 void Layer::attachProperty(LayerProperty* property) {
@@ -637,14 +657,14 @@ Matrix Layer::getMatrixWithScrollRect() const {
   return matrix;
 }
 
-RecordedContent* Layer::getRecordedContent() {
+LayerContent* Layer::getContent() {
   if (bitFields.dirtyContent) {
     LayerRecorder recorder = {};
     onUpdateContent(&recorder);
-    recordedContent = recorder.finishRecording();
+    layerContent = recorder.finishRecording();
     bitFields.dirtyContent = false;
   }
-  return recordedContent.get();
+  return layerContent.get();
 }
 
 std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
@@ -662,12 +682,12 @@ std::shared_ptr<ImageFilter> Layer::getImageFilter(float contentScale) {
 
 RasterizedContent* Layer::getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix) {
   if (!bitFields.shouldRasterize || args.context == nullptr ||
-      (args.drawMode == DrawMode::Background && bitFields.hasBackgroundStyle) ||
+      (args.drawMode == DrawMode::Background && hasBackgroundStyle()) ||
       args.drawMode == DrawMode::Contour || args.excludeEffects) {
     return nullptr;
   }
   auto contextID = args.context->uniqueID();
-  auto content = static_cast<RasterizedContent*>(rasterizedContent.get());
+  auto content = rasterizedContent.get();
   float contentScale =
       _rasterizationScale == 0.0f ? renderMatrix.getMaxScale() : _rasterizationScale;
   if (content && content->contextID() == contextID && content->contentScale() == contentScale) {
@@ -725,10 +745,15 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
   if (auto rasterizedCache = getRasterizedCache(args, canvas->getMatrix())) {
     rasterizedCache->draw(canvas, bitFields.allowsEdgeAntialiasing, alpha, blendMode);
     if (args.backgroundContext) {
-      auto backgroundArgs = args;
-      backgroundArgs.drawMode = DrawMode::Background;
-      backgroundArgs.backgroundContext = nullptr;
-      drawOffscreen(backgroundArgs, args.backgroundContext->getCanvas(), alpha, blendMode);
+      if (hasBackgroundStyle()) {
+        auto backgroundArgs = args;
+        backgroundArgs.drawMode = DrawMode::Background;
+        backgroundArgs.backgroundContext = nullptr;
+        drawOffscreen(backgroundArgs, args.backgroundContext->getCanvas(), alpha, blendMode);
+      } else {
+        rasterizedCache->draw(args.backgroundContext->getCanvas(), bitFields.allowsEdgeAntialiasing,
+                              alpha, blendMode);
+      }
     }
   } else if (blendMode != BlendMode::SrcOver || (alpha < 1.0f && allowsGroupOpacity()) ||
              (!_filters.empty() && !args.excludeEffects) || hasValidMask()) {
@@ -755,7 +780,8 @@ Matrix Layer::getRelativeMatrix(const Layer* targetCoordinateSpace) const {
 
 std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float scale) {
   auto maskArgs = args;
-  maskArgs.drawMode = _maskType != LayerMaskType::Contour ? DrawMode::Normal : DrawMode::Contour;
+  auto maskType = static_cast<LayerMaskType>(bitFields.maskType);
+  maskArgs.drawMode = maskType != LayerMaskType::Contour ? DrawMode::Normal : DrawMode::Contour;
   maskArgs.backgroundContext = nullptr;
   auto maskPicture = RecordPicture(scale, [&](Canvas* canvas) {
     _mask->drawLayer(maskArgs, canvas, _mask->_alpha, BlendMode::SrcOver);
@@ -768,9 +794,12 @@ std::shared_ptr<MaskFilter> Layer::getMaskFilter(const DrawArgs& args, float sca
   if (maskContentImage == nullptr) {
     return nullptr;
   }
-  if (_maskType == LayerMaskType::Luminance) {
+  if (maskType == LayerMaskType::Luminance) {
     maskContentImage =
         maskContentImage->makeWithFilter(ImageFilter::ColorFilter(ColorFilter::Luma()));
+  } else if (maskType == LayerMaskType::Contour) {
+    maskContentImage = maskContentImage->makeWithFilter(
+        ImageFilter::ColorFilter(ColorFilter::AlphaThreshold(OPAQUE_THRESHOLD)));
   }
   auto relativeMatrix = _mask->getRelativeMatrix(this);
   relativeMatrix.preScale(1.0f / scale, 1.0f / scale);
@@ -801,7 +830,7 @@ void Layer::drawOffscreen(const DrawArgs& args, Canvas* canvas, float alpha, Ble
     }
     paint.setMaskFilter(maskFilter);
   }
-  auto subBackgroundContext = bitFields.hasBackgroundStyle && args.backgroundContext
+  auto subBackgroundContext = args.backgroundContext && hasBackgroundStyle()
                                   ? args.backgroundContext->createSubContext()
                                   : nullptr;
   auto offscreenArgs = args;
@@ -853,7 +882,7 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
     drawLayerStyles(args, canvas, alpha, layerStyleSource, LayerStylePosition::Below);
   }
   LayerFill layerFill(bitFields.allowsEdgeAntialiasing, alpha);
-  auto content = getRecordedContent();
+  auto content = getContent();
   if (content) {
     if (args.drawMode == DrawMode::Contour) {
       content->drawContour(canvas, &layerFill);
@@ -1092,7 +1121,7 @@ bool Layer::getLayersUnderPointInternal(float x, float y,
   if (hasLayerUnderPoint) {
     results->push_back(shared_from_this());
   } else {
-    auto content = getRecordedContent();
+    auto content = getContent();
     if (nullptr != content) {
       auto layerBoundsRect = content->getBounds();
       auto localPoint = globalToLocal(Point::Make(x, y));
@@ -1113,15 +1142,15 @@ bool Layer::hasValidMask() const {
 void Layer::updateRenderBounds(const Matrix& renderMatrix,
                                std::shared_ptr<RegionTransformer> transformer, bool forceDirty) {
   if (!forceDirty && !bitFields.dirtyDescendents) {
-    if (bitFields.hasBackgroundStyle) {
-      propagateHasBackgroundStyleFlags();
+    if (backgroundOutset > 0) {
+      propagateBackgroundStyleOutset();
       if (_root->hasDirtyRegions()) {
         checkBackgroundStyles(renderMatrix);
       }
     }
     return;
   }
-  bitFields.hasBackgroundStyle = false;
+  backgroundOutset = 0;
   if (!_layerStyles.empty() || !_filters.empty()) {
     auto contentScale = renderMatrix.getMaxScale();
     transformer =
@@ -1129,7 +1158,7 @@ void Layer::updateRenderBounds(const Matrix& renderMatrix,
     transformer =
         RegionTransformer::MakeFromStyles(_layerStyles, contentScale, std::move(transformer));
   }
-  auto content = getRecordedContent();
+  auto content = getContent();
   if (bitFields.dirtyContentBounds || (forceDirty && content)) {
     if (contentBounds) {
       _root->invalidateRect(*contentBounds);
@@ -1175,16 +1204,18 @@ void Layer::updateRenderBounds(const Matrix& renderMatrix,
       renderBounds.join(child->renderBounds);
     }
   }
-  auto hasBackgroundStyle = false;
+  auto backOutset = 0.f;
   for (auto& style : _layerStyles) {
-    if (style->extraSourceType() == LayerStyleExtraSourceType::Background) {
-      hasBackgroundStyle = true;
-      break;
+    if (style->extraSourceType() != LayerStyleExtraSourceType::Background) {
+      continue;
     }
+    auto outset = style->filterBackground(Rect::MakeEmpty(), renderMatrix.getMaxScale());
+    backOutset = std::max(backOutset, outset.right);
+    backOutset = std::max(backOutset, outset.bottom);
   }
-  if (hasBackgroundStyle) {
-    bitFields.hasBackgroundStyle = true;
-    propagateHasBackgroundStyleFlags();
+  if (backOutset > 0) {
+    backgroundOutset = std::max(backOutset, backgroundOutset);
+    propagateBackgroundStyleOutset();
     updateBackgroundBounds(renderMatrix);
   }
   bitFields.dirtyDescendents = false;
@@ -1192,7 +1223,7 @@ void Layer::updateRenderBounds(const Matrix& renderMatrix,
 
 void Layer::checkBackgroundStyles(const Matrix& renderMatrix) {
   for (auto& child : _children) {
-    if (!child->bitFields.hasBackgroundStyle || !child->bitFields.visible || child->_alpha <= 0) {
+    if (child->backgroundOutset <= 0 || !child->bitFields.visible || child->_alpha <= 0) {
       continue;
     }
     auto childMatrix = child->getMatrixWithScrollRect();
@@ -1225,12 +1256,29 @@ void Layer::updateBackgroundBounds(const Matrix& renderMatrix) {
   }
 }
 
-void Layer::propagateHasBackgroundStyleFlags() {
+void Layer::propagateBackgroundStyleOutset() {
   auto layer = _parent;
-  while (layer && !layer->bitFields.hasBackgroundStyle) {
-    layer->bitFields.hasBackgroundStyle = true;
+  while (layer && layer->backgroundOutset < backgroundOutset) {
+    layer->backgroundOutset = backgroundOutset;
     layer = layer->_parent;
   }
+}
+
+bool Layer::hasBackgroundStyle() {
+  if (!bitFields.dirtyDescendents && backgroundOutset > 0) {
+    return true;
+  }
+  for (const auto& style : _layerStyles) {
+    if (style->extraSourceType() == LayerStyleExtraSourceType::Background) {
+      return true;
+    }
+  }
+  for (const auto& child : _children) {
+    if (child->hasBackgroundStyle()) {
+      return true;
+    }
+  }
+  return false;
 }
 
 }  // namespace tgfx

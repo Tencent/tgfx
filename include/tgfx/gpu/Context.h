@@ -111,7 +111,7 @@ class Context {
    * Returns the number of frames (valid flushes) after which unused GPU resources are considered
    * expired. A 'frame' is defined as a non-empty flush where actual rendering work is performed and
    * commands are submitted to the GPU. If a GPU resource is not used for more than this number of
-   * frames, it will be automatically purged from the cache. The default value is 10 frames.
+   * frames, it will be automatically purged from the cache. The default value is 60 frames.
    */
   size_t resourceExpirationFrames() const;
 

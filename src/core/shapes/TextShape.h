@@ -19,14 +19,13 @@
 #pragma once
 
 #include "core/GlyphRunList.h"
-#include "gpu/ResourceKey.h"
-#include "tgfx/core/Shape.h"
+#include "core/shapes/UniqueKeyShape.h"
 
 namespace tgfx {
 /**
  * Shape that contains a GlyphRunList.
  */
-class TextShape : public Shape {
+class TextShape : public UniqueKeyShape {
  public:
   explicit TextShape(std::shared_ptr<GlyphRunList> glyphRunList, float resolutionScale)
       : glyphRunList(std::move(glyphRunList)), resolutionScale(resolutionScale) {
@@ -43,12 +42,7 @@ class TextShape : public Shape {
     return Type::Text;
   }
 
-  UniqueKey getUniqueKey() const override {
-    return uniqueKey.get();
-  }
-
  private:
-  LazyUniqueKey uniqueKey = {};
   std::shared_ptr<GlyphRunList> glyphRunList = nullptr;
   float resolutionScale = 1.0f;
 };

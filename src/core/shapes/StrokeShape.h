@@ -28,9 +28,8 @@ namespace tgfx {
  */
 class StrokeShape : public Shape {
  public:
-  StrokeShape(std::shared_ptr<Shape> shape, const Stroke& stroke)
-      : shape(std::move(shape)), stroke(stroke) {
-  }
+  static std::shared_ptr<Shape> Apply(std::shared_ptr<Shape> shape, const Stroke* stroke,
+                                      bool useOwnUniqueKey);
 
   bool isInverseFillType() const override {
     return shape->isInverseFillType();
@@ -40,14 +39,23 @@ class StrokeShape : public Shape {
 
   Path getPath() const override;
 
-  std::shared_ptr<Shape> shape = nullptr;
-  Stroke stroke = {};
-
  protected:
   Type type() const override {
     return Type::Stroke;
   }
 
   UniqueKey getUniqueKey() const override;
+
+ private:
+  LazyUniqueKey uniqueKey = {};
+  std::shared_ptr<Shape> shape = nullptr;
+  Stroke stroke = {};
+  bool useOwnUniqueKey = true;
+
+  StrokeShape(std::shared_ptr<Shape> shape, const Stroke& stroke, bool useOwnUniqueKey)
+      : shape(std::move(shape)), stroke(stroke), useOwnUniqueKey(useOwnUniqueKey) {
+  }
+
+  friend class Shape;
 };
 }  // namespace tgfx

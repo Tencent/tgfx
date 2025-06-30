@@ -19,10 +19,10 @@
 #pragma once
 
 #include "core/utils/Log.h"
-#include "layers/contents/RecordedContent.h"
+#include "layers/contents/LayerContent.h"
 
 namespace tgfx {
-class DefaultContent : public RecordedContent {
+class DefaultContent : public LayerContent {
  public:
   explicit DefaultContent(std::shared_ptr<Picture> content) : content(std::move(content)) {
   }
@@ -35,7 +35,7 @@ class DefaultContent : public RecordedContent {
     return content->getBounds(&matrix, true);
   }
 
-  bool hitTestPoint(float localX, float localY, bool shapeHitTest) override {
+  bool hitTestPoint(float localX, float localY, bool shapeHitTest) const override {
     return content->hitTestPoint(localX, localY, shapeHitTest);
   }
 
