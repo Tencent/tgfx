@@ -54,7 +54,7 @@ bool TextAtlasUploadTask::execute(Context* context) {
   }
   auto texture = textureProxy->getTexture();
   if (texture == nullptr) {
-    LOGE("TextAtlasUploadTask::onMakeResource() texture is nullptr!");
+    LOGE("TextAtlasUploadTask::execute() texture is nullptr!");
     return false;
   }
   auto gpu = context->gpu();
