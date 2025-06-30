@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,62 +18,53 @@
 
 #pragma once
 
-#include "tgfx/core/Canvas.h"
-
 namespace tgfx {
+class LayerRecorder;
+
 /**
- * LayerContent represents the content of a layer, such as a shape, image, or text. LayerContent is
- * immutable and cannot be changed after it is created.
+ * Defines the different types of content that can be recorded in a layer.
+ */
+enum class LayerContentType {
+  /**
+   * The default content of a layer, rendered beneath the layer’s children but above any layerStyles
+   * positioned with LayerStylePosition::Below.
+   */
+  Default,
+
+  /**
+   * The foreground content of a layer, rendered above the layer’s children and all layerStyles.
+   * This content also serves as part of the input source for layer styles. This content type is
+   * optional.
+   */
+  Foreground,
+
+  /**
+   * The contour content of a layer, typically used for LayerMaskType::Contour masks or layerStyles
+   * that require LayerStyleExtraSourceType::Contour. This content type is optional. If not
+   * provided, the default and foreground content will be used as the contour instead.
+   */
+  Contour
+};
+
+/**
+ * LayerContent represents the deferred contents of a layer, which may include default content,
+ * foreground content, and the layer's contour. It delays computing the layer's contents until they
+ * are actually needed. LayerContent must be immutable and cannot be modified after creation to
+ * ensure thread safety.
  */
 class LayerContent {
  public:
-  /**
-   * Composes the given contents into a single content.
-   */
-  static std::unique_ptr<LayerContent> Compose(std::vector<std::unique_ptr<LayerContent>> contents);
-
   virtual ~LayerContent() = default;
 
   /**
-   * Returns the bounds of the content.
+   * Draws the contents of the layer. Subclasses should override this method to record the layer’s
+   * contents, typically by drawing on a canvas obtained from the provided LayerRecorder. This
+   * method is similar to Layer::onUpdateContent(), but may be called on a background thread. Ensure
+   * all operations here are thread-safe and do not depend on main thread state. The LayerContent
+   * will be released after this method returns.
+   * @param recorder The LayerRecorder used to record the layer's contents.
    */
-  virtual Rect getBounds() const = 0;
-
-  /**
-   * Returns the tight bounds of the content mapped by Matrix.
-   */
-  virtual Rect getTightBounds(const Matrix& matrix) const {
-    return matrix.mapRect(getBounds());
-  }
-
-  /**
-   * Draws the content to the given canvas with the given paint.
-   */
-  virtual void draw(Canvas* canvas, const Paint& paint) const = 0;
-
-  /**
-    * Checks if the layer content overlaps or intersects with the specified point (localX, localY).
-    * The localX and localY coordinates are in the layer's local coordinate space. If the
-    * pixelHitTest flag is true, it checks the actual pixels of the layer content; otherwise, it
-    * checks the bounding box.
-  */
-  virtual bool hitTestPoint(float localX, float localY, bool pixelHitTest) = 0;
-
- protected:
-  enum class Type {
-    LayerContent,
-    ComposeContent,
-    ImageContent,
-    RasterizedContent,
-    ShapeContent,
-    SolidContent,
-    TextContent
-  };
-
-  virtual Type type() const {
-    return Type::LayerContent;
-  }
-
-  friend class Types;
+  virtual void onDrawContent(LayerRecorder* recorder) const = 0;
 };
+
 }  // namespace tgfx

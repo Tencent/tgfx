@@ -18,6 +18,7 @@
 
 #include "LayerModel.h"
 
+namespace inspector {
 LayerModel::LayerModel(QObject* parent)
     : QAbstractItemModel(parent),
       rootItem(std::make_shared<LayerItem>(QVariantList{"LayerName", "LayerAddress"})) {
@@ -70,4 +71,5 @@ Qt::ItemFlags LayerModel::flags(const QModelIndex& index) const {
 QVariant LayerModel::headerData(int section, Qt::Orientation orientation, int role) const {
   return orientation == Qt::Horizontal && role == Qt::DisplayRole ? rootItem->data(section)
                                                                   : QVariant{};
+}
 }

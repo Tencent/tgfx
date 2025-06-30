@@ -46,13 +46,11 @@ std::shared_ptr<Image> ResourceImage::onMakeMipmapped(bool enabled) const {
 }
 
 PlacementPtr<FragmentProcessor> ResourceImage::asFragmentProcessor(const FPArgs& args,
-                                                                   TileMode tileModeX,
-                                                                   TileMode tileModeY,
-                                                                   const SamplingOptions& sampling,
+                                                                   const SamplingArgs& samplingArgs,
                                                                    const Matrix* uvMatrix) const {
+
   TPArgs tpArgs(args.context, args.renderFlags, hasMipmaps());
   auto proxy = onLockTextureProxy(tpArgs, uniqueKey);
-  return TiledTextureEffect::Make(std::move(proxy), tileModeX, tileModeY, sampling, uvMatrix,
-                                  isAlphaOnly());
+  return TiledTextureEffect::Make(std::move(proxy), samplingArgs, uvMatrix, isAlphaOnly());
 }
 }  // namespace tgfx

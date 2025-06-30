@@ -18,12 +18,13 @@
 
 #pragma once
 
-#include <QQuickImageProvider>
-#include <QImage>
 #include <QByteArray>
-#include <unordered_map>
+#include <QImage>
+#include <QQuickImageProvider>
 #include <QReadWriteLock>
+#include <unordered_map>
 
+namespace inspector {
 struct ImageData {
   int width;
   int height;
@@ -36,10 +37,11 @@ struct ImageData {
 
 class MemoryImageProvider : public QQuickImageProvider {
   Q_OBJECT
-public:
+ public:
   MemoryImageProvider();
+  ~MemoryImageProvider() override;
 
-  void setImage(uint64_t id, int width, int height, const QByteArray & rawData);
+  void setImage(uint64_t id, int width, int height, const QByteArray& rawData);
   void clearImageMap();
   void setCurrentImageID(uint64_t id);
   uint64_t ImageID() const {
@@ -47,12 +49,14 @@ public:
   }
   bool isImageExisted(uint64_t id);
   // Implement the requestImage method
-  QImage requestImage(const QString &id, QSize *size, const QSize &requestedSize) override;
-signals:
-  void imageFlush(uint64_t imgID);
+  QImage requestImage(const QString& id, QSize* size, const QSize& requestedSize) override;
+  signals:
+   void imageFlush(uint64_t imgID);
+
 private:
   std::unordered_map<uint64_t, ImageData> imageMap;
   uint64_t currentImageID;
   QReadWriteLock rwLock;
   QImage* defaultImage;
 };
+}

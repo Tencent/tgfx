@@ -51,6 +51,12 @@ Rect GlyphRunList::getBounds(float resolutionScale) const {
     return {};
   }
   auto hasScale = !FloatNearlyEqual(resolutionScale, 1.0f);
+  if (!hasScale) {
+    auto cachedBounds = bounds.get();
+    if (cachedBounds) {
+      return *cachedBounds;
+    }
+  }
   Rect totalBounds = {};
   for (auto& run : _glyphRuns) {
     auto font = run.font;
@@ -70,6 +76,8 @@ Rect GlyphRunList::getBounds(float resolutionScale) const {
   }
   if (hasScale) {
     totalBounds.scale(1.0f / resolutionScale, 1.0f / resolutionScale);
+  } else {
+    bounds.update(totalBounds);
   }
   return totalBounds;
 }

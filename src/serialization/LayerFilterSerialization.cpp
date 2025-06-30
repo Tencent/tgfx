@@ -34,7 +34,7 @@ std::shared_ptr<Data> LayerFilterSerialization::Serialize(const LayerFilter* lay
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, "LayerSubAttribute", startMap, contentMap);
+  SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute, startMap, contentMap);
   auto type = Types::Get(layerFilter);
   switch (type) {
     case Types::LayerFilterType::LayerFilter:
@@ -89,9 +89,9 @@ void LayerFilterSerialization::SerializeBlurFilterImpl(flexbuffers::Builder& fbb
                                    SerializeUtils::TileModeToString(blurFilter->tileMode()));
 }
 
-void LayerFilterSerialization::SerializeColorMatrixFilterImpl(flexbuffers::Builder& fbb,
-                                                              const LayerFilter* layerFilter,
-                                                              SerializeUtils::ComplexObjSerMap* map) {
+void LayerFilterSerialization::SerializeColorMatrixFilterImpl(
+    flexbuffers::Builder& fbb, const LayerFilter* layerFilter,
+    SerializeUtils::ComplexObjSerMap* map) {
   SerializeBasicLayerFilterImpl(fbb, layerFilter);
   const ColorMatrixFilter* colorMatrixFilter = static_cast<const ColorMatrixFilter*>(layerFilter);
 
@@ -101,9 +101,9 @@ void LayerFilterSerialization::SerializeColorMatrixFilterImpl(flexbuffers::Build
   SerializeUtils::FillComplexObjSerMap(matrix, matrixID, map);
 }
 
-void LayerFilterSerialization::SerializeDropShadowFilterImpl(flexbuffers::Builder& fbb,
-                                                             const LayerFilter* layerFilter,
-                                                             SerializeUtils::ComplexObjSerMap* map) {
+void LayerFilterSerialization::SerializeDropShadowFilterImpl(
+    flexbuffers::Builder& fbb, const LayerFilter* layerFilter,
+    SerializeUtils::ComplexObjSerMap* map) {
   SerializeBasicLayerFilterImpl(fbb, layerFilter);
   const DropShadowFilter* dropShadowFilter = static_cast<const DropShadowFilter*>(layerFilter);
   SerializeUtils::SetFlexBufferMap(fbb, "offsetX", dropShadowFilter->offsetX());
@@ -119,9 +119,9 @@ void LayerFilterSerialization::SerializeDropShadowFilterImpl(flexbuffers::Builde
   SerializeUtils::SetFlexBufferMap(fbb, "dropShadowOnly", dropShadowFilter->dropsShadowOnly());
 }
 
-void LayerFilterSerialization::SerializeInnerShadowFilterImpl(flexbuffers::Builder& fbb,
-                                                              const LayerFilter* layerFilter,
-                                                              SerializeUtils::ComplexObjSerMap* map) {
+void LayerFilterSerialization::SerializeInnerShadowFilterImpl(
+    flexbuffers::Builder& fbb, const LayerFilter* layerFilter,
+    SerializeUtils::ComplexObjSerMap* map) {
   SerializeBasicLayerFilterImpl(fbb, layerFilter);
   const InnerShadowFilter* innerShadowFilter = static_cast<const InnerShadowFilter*>(layerFilter);
   SerializeUtils::SetFlexBufferMap(fbb, "offsetX", innerShadowFilter->offsetX());

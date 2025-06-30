@@ -32,12 +32,17 @@ void ReadPropertyTag(DecodeStream* stream) {
     ReadDataHead(ptr->processName, stream);
 
     auto summaryDataCount = stream->readEncodedUint32();
-    memcpy(ptr->summaryData.data(), stream->readBytes(summaryDataCount).data(),
-           summaryDataCount * sizeof(uint8_t));
-    auto processDataCount = stream->readEncodedUint32();
-    memcpy(ptr->processData.data(), stream->readBytes(processDataCount).data(),
-           processDataCount * sizeof(uint8_t));
+    ptr->summaryData.reserve(summaryDataCount);
+    for (uint32_t j = 0; j < summaryDataCount; ++j) {
+      auto data = stream->readData();
+      ptr->summaryData.push_back(data);
+    }
 
+    auto processDataCount = stream->readEncodedUint32();
+    for (uint32_t j = 0; j < processDataCount; ++j) {
+      auto data = stream->readData();
+      ptr->processData.push_back(data);
+    }
     properties[opIndex] = ptr;
   }
 }
@@ -56,9 +61,14 @@ TagType WritePropertyTag(EncodeStream* stream,
     const auto processDataCount = static_cast<uint32_t>(processData.size());
 
     stream->writeEncodedUint32(summaryDataCount);
-    stream->writeBytes((uint8_t*)summaryData.data(), summaryDataCount);
+    for (auto& data : summaryData) {
+      stream->writeData(data.get());
+    }
+
     stream->writeEncodedUint32(processDataCount);
-    stream->writeBytes((uint8_t*)processData.data(), processDataCount);
+    for (auto& data : processData) {
+      stream->writeData(data.get());
+    }
   }
   return TagType::Property;
 }

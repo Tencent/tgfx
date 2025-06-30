@@ -23,7 +23,7 @@
 
 namespace tgfx {
 bool OpsRenderTask::execute(RenderPass* renderPass) {
-  TaskMark(OpTaskType::OpsRenderTask);
+  TaskMark(inspector::OpTaskType::OpsRenderTask);
   if (ops.empty() || renderTargetProxy == nullptr) {
     return false;
   }

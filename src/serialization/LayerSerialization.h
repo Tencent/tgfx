@@ -24,6 +24,7 @@
 #include "SerializationUtils.h"
 #include "flatbuffers/flatbuffers.h"
 #include "flatbuffers/flexbuffers.h"
+#include "LayerInspectorProtocol.h"
 
 namespace tgfx {
 class Layer;
@@ -34,8 +35,10 @@ class LayerSerialization {
       std::shared_ptr<Layer> layer,
       std::unordered_map<uint64_t, std::shared_ptr<tgfx::Layer>>& layerMap);
 
-  static std::shared_ptr<Data> SerializeLayer(const Layer* layer, SerializeUtils::ComplexObjSerMap* map,SerializeUtils::RenderableObjSerMap* rosMap,
-                                              const std::string& typeName = "LayerSubAttribute");
+  static std::shared_ptr<Data> SerializeLayer(const Layer* layer,
+                                              SerializeUtils::ComplexObjSerMap* map,
+                                              SerializeUtils::RenderableObjSerMap* rosMap,
+                                              inspector::LayerInspectorMsgType type = inspector::LayerInspectorMsgType::LayerSubAttribute);
 
  private:
   static void SerializeTreeNodeImpl(
@@ -44,17 +47,5 @@ class LayerSerialization {
 
   static void SerializeBasicLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
                                       SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
-
-  static void SerializeImageLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
-                                      SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
-
-  static void SerializeShapeLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
-                                      SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
-
-  static void SerializeSolidLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
-                                      SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
-
-  static void SerializeTextLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
-                                     SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
 };
 }  // namespace tgfx

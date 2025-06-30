@@ -108,8 +108,8 @@ class Task {
   }
 
   /**
-   * Cancels the Task if it is still in the queue, otherwise blocks the calling thread for the Task
-   * to finish its execution. Returns immediately if the Task is finished or canceled.
+   * Requests the task to skip executing. Cancellation does not affect the execution of a Task that
+   * has already begun. This method does not block the current thread.
    */
   void cancel();
 

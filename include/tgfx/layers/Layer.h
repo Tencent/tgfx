@@ -22,14 +22,15 @@
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Matrix.h"
-#include "tgfx/layers/LayerContent.h"
+#include "tgfx/layers/LayerMaskType.h"
+#include "tgfx/layers/LayerRecorder.h"
 #include "tgfx/layers/LayerType.h"
-#include "tgfx/layers/MaskStyle.h"
 #include "tgfx/layers/filters/LayerFilter.h"
 #include "tgfx/layers/layerstyles/LayerStyle.h"
 
 namespace tgfx {
-
+class RecordedContent;
+class RasterizedContent;
 class DisplayList;
 class DrawArgs;
 class RegionTransformer;
@@ -43,7 +44,7 @@ struct LayerStyleSource;
  * single thread. Some properties only take effect if the layer has a parent, such as alpha,
  * blendMode, position, matrix, visible, scrollRect, and mask.
  */
-class Layer {
+class Layer : public std::enable_shared_from_this<Layer> {
  public:
   /**
    * Returns the default value for the allowsEdgeAntialiasing property for new Layer instances. The
@@ -286,16 +287,18 @@ class Layer {
   void setMask(std::shared_ptr<Layer> value);
 
   /**
-   * Returns the mask style used by the layer. The default value is MaskStyle::Alpha.
+   * Returns the mask type used by the layer. The mask type affects how the mask is applied to the
+   * layer content, such as whether it uses the alpha channel, luminance, or contour of the
+   * mask layer. The default value is LayerMaskType::Alpha.
    */
-  MaskStyle maskStyle() const {
-    return _maskStyle;
+  LayerMaskType maskType() const {
+    return _maskType;
   }
 
   /**
-   * Sets the mask style used by the layer.
+   * Sets the mask type used by the layer.
    */
-  void setMaskStyle(MaskStyle value);
+  void setMaskType(LayerMaskType value);
 
   /**
    * Returns the scroll rectangle bounds of the layer. The layer is cropped to the size defined by
@@ -329,9 +332,20 @@ class Layer {
   /**
    * Returns the parent layer that contains the calling layer.
    */
-  std::shared_ptr<Layer> parent() const {
-    return _parent ? _parent->weakThis.lock() : nullptr;
+  Layer* parent() const {
+    return _parent;
   }
+
+  /**
+   * Sets a custom LayerContent object to provide the contents for this layer. The onDrawContent()
+   * method will be called to record the layer’s contents. The LayerContent object is released after
+   * onDrawContent() is called. Each time you want to update the contents, you must create a new
+   * LayerContent object and set it using this method. Because onDrawContent() may run on a
+   * background thread, the LayerContent object must be immutable, thread-safe, and independent of
+   * main thread state. This method is ignored if the subclass overrides the onUpdateContent()
+   * method.
+   */
+  void setContent(std::unique_ptr<LayerContent> content);
 
   /**
    * Returns the list of child layers that are direct children of the calling layer. Note: Do not
@@ -479,12 +493,12 @@ class Layer {
    * methods to convert points between these coordinate spaces.
    * @param x The x coordinate to test it against the calling layer.
    * @param y The y coordinate to test it against the calling layer.
-   * @param pixelHitTest Whether to check the actual pixels of the layer (true) or just the bounding
+   * @param shapeHitTest Whether to check the actual shape of the layer (true) or just the bounding
    * box (false). Note that Image layers are always checked against their bounding box. You can draw
    * image layers to a Surface and use the Surface::getColor() method to check the actual pixels.
    * @return true if the layer overlaps or intersects with the specified point, false otherwise.
    */
-  bool hitTestPoint(float x, float y, bool pixelHitTest = false);
+  bool hitTestPoint(float x, float y, bool shapeHitTest = false);
 
   /**
    * Draws the layer and all its children onto the given canvas. You can specify the alpha and blend
@@ -498,65 +512,39 @@ class Layer {
   void draw(Canvas* canvas, float alpha = 1.0f, BlendMode blendMode = BlendMode::SrcOver);
 
  protected:
-  std::weak_ptr<Layer> weakThis;
-
   Layer();
 
+  /**
+   * Marks the layer's contents as changed and in need of an update. This will trigger a call to
+   * onUpdateContent() to update the layer's contents.
+   */
+  void invalidateContent();
+
+  /**
+   * Called when the layer’s contents needs to be updated. Subclasses should override this method to
+   * update the layer’s contents, typically by drawing on a canvas obtained from the given
+   * LayerRecorder.
+   * @param recorder The LayerRecorder used to record the layer's contents.
+   */
+  virtual void onUpdateContent(LayerRecorder* recorder);
+
+  /**
+   * Attaches a property to this layer.
+   */
+  void attachProperty(LayerProperty* property);
+
+  /**
+   * Detaches a property from this layer.
+   */
+  void detachProperty(LayerProperty* property);
+
+ private:
   /**
    * Marks the layer as needing to be redrawn. Unlike invalidateContent(), this method only marks
    * the layer as dirty and does not update the layer content.
    */
   void invalidateTransform();
 
-  /**
-   * Marks the layer's content as changed and needing to be redrawn. The updateContent() method will
-   * be called to create the new layer content.
-   */
-  void invalidateContent();
-
-  /**
-   * Called when the layer's content needs to be updated. Subclasses should override this method to
-   * create the layer content used for measuring the bounding box and drawing the layer itself
-   * (children not included).
-   */
-  virtual std::unique_ptr<LayerContent> onUpdateContent();
-
-  /**
-   * The drawer function type used to draw the layer content onto a canvas.
-   * @param content The layer content to draw. This can be nullptr.
-   * @param canvas The canvas to draw the layer content on.
-   * @param layer The layer whose content is being drawn.
-   * @param content The layer content to draw. This can be nullptr.
-   * @param alpha The alpha transparency value used for drawing the layer content.
-   * @param forContour Whether to draw the layer content for the contour.
-   * @return true if the content was drawn successfully, false otherwise.
-   */
-  using ContentDrawer = bool (*)(Canvas* canvas, const Layer* layer, const LayerContent* content,
-                                 float alpha, bool forContour);
-  /**
-   * Draws the layer content and its children on the given canvas. By default, this method draws the
-   * layer content first, followed by the children. Subclasses can override this method to change
-   * the drawing order or the way the layer content is drawn.
-   * @param drawContent A callback function that takes a drawer function as its argument. Calling
-   * this function will call the drawer function with the canvas, layer, content, alpha, and
-   * forContour parameters.
-   * @param drawChildren A callback function that draws the children of the layer. if the function
-   * returns false, the content above children should not be drawn.
-   */
-  virtual void drawContents(const std::function<void(ContentDrawer contentDrawer)>& drawContent,
-                            const std::function<bool()>& drawChildren) const;
-
-  /**
-  * Attachs a property to this layer.
-  */
-  void attachProperty(LayerProperty* property) const;
-
-  /**
-   * Detaches a property from this layer.
-   */
-  void detachProperty(LayerProperty* property) const;
-
- private:
   /**
    * Marks the layer's descendents as changed and needing to be redrawn.
    */
@@ -578,13 +566,11 @@ class Layer {
 
   Matrix getMatrixWithScrollRect() const;
 
-  LayerContent* getContent();
-
-  Paint getLayerPaint(float alpha, BlendMode blendMode = BlendMode::SrcOver) const;
+  RecordedContent* getRecordedContent();
 
   std::shared_ptr<ImageFilter> getImageFilter(float contentScale);
 
-  LayerContent* getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix);
+  RasterizedContent* getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix);
 
   std::shared_ptr<Image> getRasterizedImage(const DrawArgs& args, float contentScale,
                                             Matrix* drawingMatrix);
@@ -595,9 +581,14 @@ class Layer {
 
   void drawDirectly(const DrawArgs& args, Canvas* canvas, float alpha);
 
-  bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha, Layer* stopChild = nullptr);
+  void drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
+                    const LayerStyleSource* layerStyleSource = nullptr,
+                    const Layer* stopChild = nullptr);
 
-  void drawBackground(const DrawArgs& args, Canvas* canvas, float* contentAlpha = nullptr);
+  bool drawChildren(const DrawArgs& args, Canvas* canvas, float alpha,
+                    const Layer* stopChild = nullptr);
+
+  float drawBackgroundLayers(const DrawArgs& args, Canvas* canvas);
 
   std::unique_ptr<LayerStyleSource> getLayerStyleSource(const DrawArgs& args, const Matrix& matrix);
 
@@ -625,12 +616,6 @@ class Layer {
 
   void propagateHasBackgroundStyleFlags();
 
-  static void DrawContents(const DrawArgs& args, Canvas* canvas, Layer* layer, float alpha,
-                           ContentDrawer drawer);
-
-  static bool DrawContent(Canvas* canvas, const Layer* layer, const LayerContent* content,
-                          float alpha, bool forContour);
-
   struct {
     bool dirtyContent : 1;        // layer's content needs updating
     bool dirtyContentBounds : 1;  // layer's content bounds needs updating
@@ -647,18 +632,19 @@ class Layer {
   std::string _name;
   float _alpha = 1.0f;
   Matrix _matrix = {};
-  float _rasterizationScale = 0.0f;
-  MaskStyle _maskStyle = MaskStyle::Alpha;
-  std::vector<std::shared_ptr<LayerFilter>> _filters = {};
+  LayerMaskType _maskType = LayerMaskType::Alpha;
   std::shared_ptr<Layer> _mask = nullptr;
   Layer* maskOwner = nullptr;
   std::unique_ptr<Rect> _scrollRect = nullptr;
   RootLayer* _root = nullptr;
   Layer* _parent = nullptr;
-  std::unique_ptr<LayerContent> layerContent = nullptr;
-  std::unique_ptr<LayerContent> rasterizedContent = nullptr;
   std::vector<std::shared_ptr<Layer>> _children = {};
+  std::vector<std::shared_ptr<LayerFilter>> _filters = {};
   std::vector<std::shared_ptr<LayerStyle>> _layerStyles = {};
+  float _rasterizationScale = 0.0f;
+  std::unique_ptr<RasterizedContent> rasterizedContent;
+  std::unique_ptr<LayerContent> layerContent;
+  std::unique_ptr<RecordedContent> recordedContent;
   Rect renderBounds = {};         // in global coordinates
   Rect* contentBounds = nullptr;  //  in global coordinates
 

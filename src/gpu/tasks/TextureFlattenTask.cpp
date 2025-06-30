@@ -58,7 +58,7 @@ bool TextureFlattenTask::prepare(Context* context) {
 }
 
 bool TextureFlattenTask::execute(RenderPass* renderPass) {
-  TaskMark(OpTaskType::TextureFlattenTask);
+  TaskMark(inspector::OpTaskType::TextureFlattenTask);
   if (renderTarget == nullptr) {
     return false;
   }

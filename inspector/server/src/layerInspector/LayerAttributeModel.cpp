@@ -18,9 +18,11 @@
 
 #include "LayerAttributeModel.h"
 
+namespace inspector {
 template <typename T>
 LayerItem* SetSingleAttribute(LayerItem* parent, const char* key, T value, bool isExpandable,
-                              bool isAddress, uint64_t objID, bool isRenderable, bool isImage = false, uint64_t imageID = 0) {
+                              bool isAddress, uint64_t objID, bool isRenderable,
+                              bool isImage = false, uint64_t imageID = 0) {
   QVariantList var;
   QVariant ID;
   var << key << value << isExpandable << isAddress << objID << isRenderable << isImage << imageID;
@@ -188,30 +190,36 @@ void LayerAttributeModel::ProcessLayerAttribute(const flexbuffers::Map& contentM
     LayerItem* currentItem = nullptr;
     switch (valueMap["Value"].GetType()) {
       case flexbuffers::FBT_UINT:
-        currentItem = SetSingleAttribute(item, name.toStdString().c_str(), valueMap["Value"].AsUInt64(), isExpandable, isAddress,
-                           objID, isRenderable);
+        currentItem =
+            SetSingleAttribute(item, name.toStdString().c_str(), valueMap["Value"].AsUInt64(),
+                               isExpandable, isAddress, objID, isRenderable);
         break;
       case flexbuffers::FBT_INT:
-        currentItem = SetSingleAttribute(item, name.toStdString().c_str(), valueMap["Value"].AsInt64(), isExpandable, isAddress,
-                           objID, isRenderable);
+        currentItem =
+            SetSingleAttribute(item, name.toStdString().c_str(), valueMap["Value"].AsInt64(),
+                               isExpandable, isAddress, objID, isRenderable);
         break;
       case flexbuffers::FBT_FLOAT:
-        currentItem = SetSingleAttribute(item, name.toStdString().c_str(), valueMap["Value"].AsFloat(), isExpandable, isAddress,
-                           objID, isRenderable);
+        currentItem =
+            SetSingleAttribute(item, name.toStdString().c_str(), valueMap["Value"].AsFloat(),
+                               isExpandable, isAddress, objID, isRenderable);
         break;
       case flexbuffers::FBT_STRING:
-        currentItem = SetSingleAttribute(item, name.toStdString().c_str(), valueMap["Value"].AsString().c_str(), isExpandable,
-                           isAddress, objID, isRenderable);
+        currentItem = SetSingleAttribute(item, name.toStdString().c_str(),
+                                         valueMap["Value"].AsString().c_str(), isExpandable,
+                                         isAddress, objID, isRenderable);
         break;
       case flexbuffers::FBT_BOOL:
-        currentItem = SetSingleAttribute(item, name.toStdString().c_str(), valueMap["Value"].AsBool(), isExpandable, isAddress,
-                           objID, isRenderable);
+        currentItem =
+            SetSingleAttribute(item, name.toStdString().c_str(), valueMap["Value"].AsBool(),
+                               isExpandable, isAddress, objID, isRenderable);
         break;
       default:
         qDebug() << "Unknown value type!";
     }
-    if(currentItem && isRenderable) {
+    if (currentItem && isRenderable) {
       SetSingleAttribute(currentItem, "Image", 0, false, false, 0, false, true, objID);
     }
   }
+}
 }

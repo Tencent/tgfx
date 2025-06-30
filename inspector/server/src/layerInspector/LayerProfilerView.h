@@ -18,21 +18,23 @@
 #pragma once
 
 #include <QtGui/qwindow.h>
+#include <kddockwidgets/qtquick/views/DockWidget.h>
 #include <QDialog>
 #include <QQmlApplicationEngine>
 #include "LayerAttributeModel.h"
 #include "LayerTreeModel.h"
+#include "MemoryImageProvider.h"
 #include "flatbuffers/flexbuffers.h"
 #include "socket/TcpSocketClient.h"
 #include "socket/WebSocketServer.h"
-#include "MemoryImageProvider.h"
+#include "LayerInspectorProtocol.h"
 
-
+namespace inspector {
 class LayerProfilerView : public QObject {
   Q_OBJECT
  public:
   LayerProfilerView(QString ip, quint16 port);
-  explicit LayerProfilerView();
+  LayerProfilerView();
   ~LayerProfilerView() override;
   bool hasWebSocketConnection() const {
     if (m_WebSocketServer) return m_WebSocketServer->hasClientConnect();
@@ -46,14 +48,18 @@ class LayerProfilerView : public QObject {
   Q_INVOKABLE void flushAttribute();
   Q_INVOKABLE void flushLayerTree();
   Q_INVOKABLE void openStartView();
+  Q_INVOKABLE void showLayerTree();
+  Q_INVOKABLE void showLayerAttributeTree();
   void cleanView();
+  signals:
+      void viewHide();
 
- protected:
+protected:
   void LayerProlfilerQMLImpl();
   void ProcessMessage(const QByteArray& message);
 
- private:
-  QByteArray feedBackData(const std::string& type, uint64_t value);
+private:
+  QByteArray feedBackData(LayerInspectorMsgType type, uint64_t value);
 
   void sendSelectedAddress(uint64_t address);
 
@@ -63,11 +69,14 @@ class LayerProfilerView : public QObject {
 
   void processImageFlush(uint64_t imageID);
 
- private:
+private:
   WebSocketServer* m_WebSocketServer;
   TcpSocketClient* m_TcpSocketClient;
-  QQmlApplicationEngine* m_LayerTreeEngine;
+  std::unique_ptr<QQmlApplicationEngine> m_LayerTreeEngine;
   MemoryImageProvider* imageProvider;
   LayerTreeModel* m_LayerTreeModel;
   LayerAttributeModel* m_LayerAttributeModel;
+  KDDockWidgets::QtQuick::DockWidget* layerTree;
+  KDDockWidgets::QtQuick::DockWidget* layerAttributeTree;
 };
+}

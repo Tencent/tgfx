@@ -27,7 +27,6 @@
 #endif
 #include <malloc.h>
 #include <windows.h>
-#include "TracyUwp.hpp"
 #else
 #include <pthread.h>
 #include <unistd.h>
@@ -41,53 +40,6 @@
 #include "Utils.h"
 
 namespace inspector {
-
-uint32_t GetThreadHandleImpl() {
-
-#if defined _WIN32
-  static_assert(sizeof(decltype(GetCurrentThreadId())) <= sizeof(uint32_t),
-                "Thread handle too big to fit in protocol");
-  return uint32_t(GetCurrentThreadId());
-#elif defined __APPLE__
-  uint64_t id;
-  pthread_threadid_np(pthread_self(), &id);
-  return uint32_t(id);
-#elif defined __EMSCRIPTEN__
-  return pthread_self();
-#else
-  // To add support for a platform, retrieve and return the kernel thread identifier here.
-  //
-  // Note that pthread_t (as for example returned by pthread_self()) is *not* a kernel
-  // thread identifier. It is a pointer to a library-allocated data structure instead.
-  // Such pointers will be reused heavily, making the pthread_t non-unique. Additionally
-  // a 64-bit pointer cannot be reliably truncated to 32 bits.
-#error "Unsupported platform!"
-#endif
-}
-
-const char* GetEnvVar(const char* name) {
-#if defined _WIN32
-  static char buffer[1024];
-  DWORD const kBufferSize = DWORD(sizeof(buffer) / sizeof(buffer[0]));
-  DWORD count = GetEnvironmentVariableA(name, buffer, kBufferSize);
-
-  if (count == 0) {
-    return nullptr;
-  }
-
-  if (count >= kBufferSize) {
-    char* buf = reinterpret_cast<char*>(_alloca(count + 1));
-    count = GetEnvironmentVariableA(name, buf, count + 1);
-    memcpy(buffer, buf, kBufferSize);
-    buffer[kBufferSize - 1] = 0;
-  }
-
-  return buffer;
-#else
-  return getenv(name);
-#endif
-}
-
 uint64_t GetPid() {
 #if defined _WIN32
   return uint64_t(GetCurrentProcessId());
@@ -115,8 +67,8 @@ const char* GetProcessName() {
   return processName;
 }
 
-BroadcastMessage GetBroadcastMessage(const char* procname, size_t pnsz, size_t& len,
-                                      uint16_t port, uint8_t type) {
+BroadcastMessage GetBroadcastMessage(const char* procname, size_t pnsz, size_t& len, uint16_t port,
+                                     uint8_t type) {
   BroadcastMessage msg;
   msg.type = type;
   msg.protocolVersion = ProtocolVersion;

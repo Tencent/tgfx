@@ -22,6 +22,7 @@
 #include "DataContext.h"
 #include "EnumClassHash.h"
 #include "FrameTag.h"
+#include "NameMapTag.h"
 #include "OpTaskTag.h"
 #include "PropertyTag.h"
 #include "TextureTag.h"
@@ -31,11 +32,9 @@ namespace inspector {
 using ReadTagHandler = void(DecodeStream* stream);
 static const std::unordered_map<TagType, std::function<ReadTagHandler>, EnumClassHash> readHanders =
     {
-        {TagType::Frame, ReadFrameTag},
-        {TagType::OpTask, ReadOpTaskTag},
-        {TagType::Property, ReadPropertyTag},
-        {TagType::Texture, ReadTextureTag},
-        {TagType::VertexBuffer, ReadVertexBufferTag},
+        {TagType::NameMap, ReadNameMapTag}, {TagType::Frame, ReadFrameTag},
+        {TagType::OpTask, ReadOpTaskTag},   {TagType::Property, ReadPropertyTag},
+        {TagType::Texture, ReadTextureTag}, {TagType::VertexBuffer, ReadVertexBufferTag},
 };
 
 void ReadTagsOfFile(DecodeStream* stream, TagType type) {
@@ -47,6 +46,12 @@ void ReadTagsOfFile(DecodeStream* stream, TagType type) {
 
 void WriteTagsOfFile(EncodeStream* stream) {
   auto context = dynamic_cast<DataContext*>(stream->context);
+
+  const auto& nameMap = context->nameMap;
+  if (!nameMap.empty()) {
+    WriteTag(stream, &nameMap, WriteNameMapTag);
+  }
+
   const auto& frames = context->frameData;
   WriteTag(stream, &frames, WriteFrameTag);
 

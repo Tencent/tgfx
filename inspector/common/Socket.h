@@ -64,15 +64,15 @@ class Socket {
   Socket& operator=(Socket&&) = delete;
 
  private:
-  ssize_t RecvBuffered(void* buf, size_t len, int timeout);
-  ssize_t Recv(void* buf, size_t len, int timeout);
+  int RecvBuffered(void* buf, size_t len, int timeout);
+  int Recv(void* buf, size_t len, int timeout);
 
   bool ReadImpl(char*& buf, size_t& len, int timeout);
 
   char* buf;
   char* bufPtr;
   std::atomic<int> sock;
-  ssize_t bufLeft;
+  int bufLeft;
 
   struct addrinfo* res;
   struct addrinfo* ptr;
@@ -105,7 +105,7 @@ class UdpBroadcast {
   bool Open(const char* addr, uint16_t port);
   void Close();
 
-  ssize_t Send(uint16_t port, const void* data, size_t len);
+  int Send(uint16_t port, const void* data, size_t len);
 
   UdpBroadcast(const UdpBroadcast&) = delete;
   UdpBroadcast(UdpBroadcast&&) = delete;

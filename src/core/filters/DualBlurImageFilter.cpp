@@ -148,9 +148,9 @@ std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_
                         sampleOffset.y * scaleFactor * downScaling);
   // SamplingOptions sampling(FilterMode::Linear, MipmapMode::None);
   SamplingOptions sampling(FilterMode::Linear, MipmapMode::None);
-  auto sourceProcessor =
-      FragmentProcessor::Make(source, fpArgs, tileMode, tileMode, sampling, &uvMatrix);
-
+  auto sourceProcessor = FragmentProcessor::Make(source, fpArgs, tileMode, tileMode, sampling,
+                                                 SrcRectConstraint::Fast, &uvMatrix);
+  SamplingArgs samplingArgs = {TileMode::Clamp, TileMode::Clamp, sampling, SrcRectConstraint::Fast};
   // downsample
   for (int i = 0; i < iteration; ++i) {
     renderTargets.push_back(lastRenderTarget);
@@ -166,7 +166,7 @@ std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_
       uvMatrix = Matrix::MakeScale(textureSize.width / static_cast<float>(downWidth),
                                    textureSize.height / static_cast<float>(downHeight));
 
-      sourceProcessor = TextureEffect::Make(lastRenderTarget->getTextureProxy(), sampling,
+      sourceProcessor = TextureEffect::Make(lastRenderTarget->getTextureProxy(), samplingArgs,
                                             &uvMatrix, isAlphaOnly);
     }
     draw(renderTarget, args.renderFlags, std::move(sourceProcessor), downScaling, true);
@@ -192,8 +192,8 @@ std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_
       uvMatrix = Matrix::MakeScale(textureSize.width / static_cast<float>(renderTarget->width()),
                                    textureSize.height / static_cast<float>(renderTarget->height()));
     }
-    sourceProcessor =
-        TextureEffect::Make(lastRenderTarget->getTextureProxy(), sampling, &uvMatrix, isAlphaOnly);
+    sourceProcessor = TextureEffect::Make(lastRenderTarget->getTextureProxy(), samplingArgs,
+                                          &uvMatrix, isAlphaOnly);
     draw(renderTarget, args.renderFlags, std::move(sourceProcessor), upSampleScale, false);
     lastRenderTarget = renderTarget;
     textureSize = Size::Make(static_cast<float>(renderTarget->width()),
@@ -204,7 +204,7 @@ std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_
 
 PlacementPtr<FragmentProcessor> DualBlurImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    const Matrix* uvMatrix) const {
-  return makeFPFromTextureProxy(source, args, sampling, uvMatrix);
+    SrcRectConstraint constraint, const Matrix* uvMatrix) const {
+  return makeFPFromTextureProxy(source, args, sampling, constraint, uvMatrix);
 }
 }  // namespace tgfx

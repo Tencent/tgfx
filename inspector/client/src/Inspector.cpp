@@ -21,6 +21,7 @@
 #include <atomic>
 #include <iostream>
 #include <new>
+#include <chrono>
 #include "Alloc.h"
 #include "LZ4.h"
 #include "Protocol.h"
@@ -71,18 +72,15 @@ int64_t GetInitTime() {
   return GetInspectorData().initTime;
 }
 
-uint32_t GetThreadHandle() {
-  return GetThreadHandleImpl();
-}
-
 Inspector::Inspector()
     : epoch(std::chrono::duration_cast<std::chrono::seconds>(
                 std::chrono::system_clock::now().time_since_epoch())
                 .count()),
       dataBuffer((char*)inspectorMalloc(TargetFrameSize * 3)),
       lz4Buf((char*)inspectorMalloc(LZ4Size + sizeof(lz4sz_t))), shutdown(false), timeBegin(0),
-      frameCount(0), isConnect(false), serialQueue(1024 * 1024), serialDequeue(1024 * 1024),
-      lz4Stream(LZ4_createStream()) {
+      frameCount(0), isConnect(false), refTimeThread(0), serialQueue(1024 * 1024),
+      serialDequeue(1024 * 1024), lz4Stream(LZ4_createStream()), dataBufferOffset(0),
+      dataBufferStart(0) {
   s_instance = this;
   SpawnWorkerThreads();
 }
@@ -99,9 +97,11 @@ Inspector::~Inspector() {
     sock->~Socket();
     inspectorFree(sock);
   }
-  if (broadcast) {
-    broadcast->~UdpBroadcast();
-    inspectorFree(broadcast);
+  for (uint16_t i = 0; i < broadcastNum; i++) {
+    if (broadcast[i]) {
+      broadcast[i]->~UdpBroadcast();
+      inspectorFree(broadcast[i]);
+    }
   }
 }
 
@@ -124,10 +124,13 @@ bool Inspector::HandleServerQuery() {
 
   switch (type) {
     case ServerQueryString: {
-      break;
+      SendString(ptr, (const char*)ptr, QueueType::StringData);
     }
     case ServerQueryFrameName: {
       break;
+    }
+    case ServerQueryValueName: {
+      SendString(ptr, (const char*)ptr, QueueType::ValueName);
     }
     case ServerQueryDisconnect: {
       break;
@@ -143,6 +146,22 @@ bool Inspector::HandleServerQuery() {
 
 bool Inspector::ShouldExit() {
   return s_instance->shutdown.load(std::memory_order_relaxed);
+}
+
+void Inspector::SendString(uint64_t str, const char* ptr, size_t len, QueueType type) {
+  assert(type == QueueType::StringData || type == QueueType::ValueName);
+
+  QueueItem item;
+  MemWrite(&item.hdr.type, type);
+  MemWrite(&item.stringTransfer.ptr, str);
+
+  assert(len <= std::numeric_limits<uint16_t>::max());
+  auto l16 = uint16_t(len);
+  NeetDataSize(QueueDataSize[static_cast<int>(type)] + sizeof(l16) + l16);
+
+  AppendDataUnsafe(&item, QueueDataSize[static_cast<int>(type)]);
+  AppendDataUnsafe(&l16, sizeof(l16));
+  AppendDataUnsafe(ptr, l16);
 }
 
 void Inspector::Worker() {
@@ -178,13 +197,14 @@ void Inspector::Worker() {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
   }
-
-  broadcast = (UdpBroadcast*)inspectorMalloc(sizeof(UdpBroadcast));
-  new (broadcast) UdpBroadcast();
-  if (!broadcast->Open(addr, broadcastPort)) {
-    broadcast->~UdpBroadcast();
-    inspectorFree(broadcast);
-    broadcast = nullptr;
+  for (uint16_t i = 0; i < broadcastNum; i++) {
+    broadcast[i] = (UdpBroadcast*)inspectorMalloc(sizeof(UdpBroadcast));
+    new (broadcast[i]) UdpBroadcast();
+    if (!broadcast[i]->Open(addr, broadcastPort + i)) {
+      broadcast[i]->~UdpBroadcast();
+      inspectorFree(broadcast[i]);
+      broadcast[i] = nullptr;
+    }
   }
 
   size_t broadcastLen = 0;
@@ -194,9 +214,11 @@ void Inspector::Worker() {
     MemWrite(&welcome.refTime, refTimeThread);
     while (true) {
       if (ShouldExit()) {
-        if (broadcast) {
-          broadcastMsg.activeTime = -1;
-          broadcast->Send(broadcastPort, &broadcastMsg, broadcastLen);
+        for (uint16_t i = 0; i < broadcastNum; i++) {
+          if (broadcast[i]) {
+            broadcastMsg.activeTime = -1;
+            broadcast[i]->Send(broadcastPort + i, &broadcastMsg, broadcastLen);
+          }
         }
         return;
       }
@@ -204,33 +226,35 @@ void Inspector::Worker() {
       if (sock) {
         break;
       }
+      const auto t = std::chrono::high_resolution_clock::now().time_since_epoch().count();
+      if (t - lastBroadcast > 3000000000) {
+        lastBroadcast = t;
+        for (uint16_t i = 0; i < broadcastNum; i++) {
+          if (broadcast[i]) {
+            programNameLock.lock();
+            if (programName) {
+              broadcastMsg = GetBroadcastMessage(programName, strlen(programName), broadcastLen,
+                                                 dataPort, FrameCapture);
+              programName = nullptr;
+            }
+            programNameLock.unlock();
 
-      if (broadcast) {
-        const auto t = std::chrono::high_resolution_clock::now().time_since_epoch().count();
-        if (t - lastBroadcast > 3000000000)  // 3s
-        {
-          programNameLock.lock();
-          if (programName) {
-            broadcastMsg =
-                GetBroadcastMessage(programName, strlen(programName), broadcastLen, dataPort, FrameCapture);
-            programName = nullptr;
+            const auto ts = std::chrono::duration_cast<std::chrono::seconds>(
+                                std::chrono::system_clock::now().time_since_epoch())
+                                .count();
+            broadcastMsg.activeTime = int32_t(ts - epoch);
+            assert(broadcastMsg.activeTime >= 0);
+            broadcast[i]->Send(broadcastPort + i, &broadcastMsg, broadcastLen);
           }
-          programNameLock.unlock();
-
-          lastBroadcast = t;
-          const auto ts = std::chrono::duration_cast<std::chrono::seconds>(
-                              std::chrono::system_clock::now().time_since_epoch())
-                              .count();
-          broadcastMsg.activeTime = int32_t(ts - epoch);
-          assert(broadcastMsg.activeTime >= 0);
-          broadcast->Send(broadcastPort, &broadcastMsg, broadcastLen);
         }
       }
     }
-    if (broadcast) {
-      lastBroadcast = 0;
-      broadcastMsg.activeTime = -1;
-      broadcast->Send(broadcastPort, &broadcastMsg, broadcastLen);
+    for (uint16_t i = 0; i < broadcastNum; i++) {
+      if (broadcast[i]) {
+        lastBroadcast = 0;
+        broadcastMsg.activeTime = -1;
+        broadcast[i]->Send(broadcastPort + i, &broadcastMsg, broadcastLen);
+      }
     }
 
     {
@@ -267,8 +291,6 @@ void Inspector::Worker() {
 
     LZ4_resetStream((LZ4_stream_t*)lz4Stream);
     this->sock->Send(&welcome, sizeof(welcome));
-
-    refTimeSerial = 0;
 
     int keepAlive = 0;
     while (true) {
@@ -323,20 +345,6 @@ void Inspector::Worker() {
   }
 }
 
-#define ThreadCtxCheckSerial(_name)                         \
-  uint32_t thread = MemRead<uint32_t>(&item->_name.thread); \
-  switch (ThreadCtxCheck(thread)) {                         \
-    case ThreadCtxStatus::Same:                             \
-      break;                                                \
-    case ThreadCtxStatus::Changed:                          \
-      assert(refTimeThread == 0);                           \
-      refThread = 0;                                        \
-      break;                                                \
-    default:                                                \
-      assert(false);                                        \
-      break;                                                \
-  }
-
 bool Inspector::CommitData() {
   bool ret = SendData(dataBuffer + dataBufferStart, size_t(dataBufferOffset - dataBufferStart));
   if (dataBufferOffset > TargetFrameSize * 2) {
@@ -347,7 +355,7 @@ bool Inspector::CommitData() {
 }
 
 bool Inspector::SendData(const char* data, size_t len) {
-  const lz4sz_t lz4sz = LZ4_compress_fast_continue((LZ4_stream_t*)lz4Stream, data,
+  const auto lz4sz = LZ4_compress_fast_continue((LZ4_stream_t*)lz4Stream, data,
                                                    lz4Buf + sizeof(lz4sz_t), (int)len, LZ4Size, 1);
   memcpy(lz4Buf, &lz4sz, sizeof(lz4sz));
   return sock->Send(lz4Buf, size_t(lz4sz) + sizeof(lz4sz_t)) != -1;
@@ -363,16 +371,13 @@ Inspector::DequeueStatus Inspector::DequeueSerial() {
 
   const auto queueSize = serialDequeue.size();
   if (queueSize > 0) {
-    // auto refSerial = refTimeSerial;
     auto refThread = refTimeThread;
     auto item = serialDequeue.data();
     auto end = item + queueSize;
     while (item != end) {
-      // uint64_t ptr;
       auto idx = MemRead<uint8_t>(&item->hdr.idx);
       switch ((QueueType)idx) {
         case QueueType::OperateBegin: {
-          // ThreadCtxCheckSerial(operateBeginThread);
           auto t = MemRead<int64_t>(&item->operateBegin.time);
           auto dt = t - refThread;
           refThread = t;
@@ -380,7 +385,6 @@ Inspector::DequeueStatus Inspector::DequeueSerial() {
           break;
         }
         case QueueType::OperateEnd: {
-          // ThreadCtxCheckSerial(operateEndThread);
           auto t = MemRead<int64_t>(&item->operateEnd.time);
           auto dt = t - refThread;
           refThread = t;
@@ -402,12 +406,4 @@ Inspector::DequeueStatus Inspector::DequeueSerial() {
   }
   return DequeueStatus::DataDequeued;
 }
-
-Inspector::ThreadCtxStatus Inspector::ThreadCtxCheck(uint32_t threadId) {
-  if (threadCtx == threadId) {
-    return ThreadCtxStatus::Same;
-  }
-  return ThreadCtxStatus::Changed;
-}
-
 }  // namespace inspector

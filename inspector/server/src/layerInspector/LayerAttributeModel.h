@@ -21,6 +21,7 @@
 #include <flatbuffers/flexbuffers.h>
 #include "LayerModel.h"
 
+namespace inspector {
 enum class RowOp { Expand, Collapse };
 
 struct RowData {
@@ -72,6 +73,7 @@ class LayerAttributeModel : public LayerModel {
   void flushLayerAttribute(uint64_t address);
   void modelReset();
   void flushImageChild(uint64_t objID);
+
  private:
   void ProcessLayerAttribute(const flexbuffers::Map& contentMap, LayerItem* item);
 
@@ -82,3 +84,4 @@ class LayerAttributeModel : public LayerModel {
   int currentRow;
   std::unordered_map<uint64_t, LayerData> addressToLayerData;
 };
+}

@@ -22,6 +22,7 @@
 class ViewData : public QObject {
  public:
   int frameWidth = 4;
+  int selectOpTask = -1;
   uint32_t selectFrame = 0;
   uint32_t frameStart = 0;
 

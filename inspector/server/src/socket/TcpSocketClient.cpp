@@ -18,6 +18,8 @@
 
 #include "TcpSocketClient.h"
 #include <utility>
+
+namespace inspector {
 TcpSocketClient::TcpSocketClient(QObject* parent, QString ip, quint16 port)
     : QObject(parent), m_IsConnection(false), data(), currentIndex(0), size(0), Remainder(0) {
   m_TcpSocket = new QTcpSocket(this);
@@ -37,6 +39,13 @@ void TcpSocketClient::connection(QString ip, quint16 port) {
     m_TcpSocket->connectToHost(ip, port);
   }
 }
+
+void TcpSocketClient::disConnection() {
+  if (m_IsConnection) {
+    m_TcpSocket->disconnectFromHost();
+  }
+}
+
 void TcpSocketClient::sendData(const QByteArray& data) {
   if (!m_IsConnection) {
     qDebug() << "Server is not connected!\n";
@@ -53,16 +62,16 @@ void TcpSocketClient::onSocketDisconnected() {
   m_IsConnection = false;
 }
 void TcpSocketClient::onSocketReadyRead() {
-  if(Remainder == 0) {
+  if (Remainder == 0) {
     m_TcpSocket->read((char*)&size, sizeof(int));
     Remainder = size;
     data.resize(size);
   }
-  if(Remainder != 0) {
+  if (Remainder != 0) {
     auto readSize = m_TcpSocket->read(data.data() + currentIndex, Remainder);
     currentIndex += readSize;
     Remainder -= readSize;
-    if(Remainder == 0) {
+    if (Remainder == 0) {
       emit ServerBinaryData(data);
       currentIndex = 0;
     }
@@ -71,4 +80,5 @@ void TcpSocketClient::onSocketReadyRead() {
 void TcpSocketClient::onSocketErrorOccurred(QAbstractSocket::SocketError error) {
   Q_UNUSED(error);
   qDebug() << "error: " << m_TcpSocket->errorString();
+}
 }

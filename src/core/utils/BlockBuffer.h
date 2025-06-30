@@ -18,15 +18,18 @@
 
 #pragma once
 
+#include <condition_variable>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
 #include <limits>
 #include <memory>
+#include <mutex>
 #include <vector>
 #include "core/utils/PlacementArray.h"
 
 namespace tgfx {
+
 /**
  * BlockData is a helper class that manages the memory blocks released from a BlockBuffer. It is
  * responsible for freeing the memory blocks when they are no longer needed.
@@ -149,6 +152,13 @@ class BlockBuffer {
    */
   std::shared_ptr<BlockData> release();
 
+  /**
+   * Returns a shared pointer that acts as a reference counter for this BlockBuffer.
+   * Asynchronous objects using the BlockBuffer can hold this shared pointer. When all references
+   * are released, the BlockBuffer will be notified.
+   */
+  std::shared_ptr<BlockBuffer> addReference();
+
  private:
   struct Block {
     Block() = default;
@@ -166,7 +176,23 @@ class BlockBuffer {
   size_t currentBlockIndex = 0;
   size_t usedSize = 0;
 
+  std::mutex mutex = {};
+  std::condition_variable condition = {};
+  std::weak_ptr<BlockBuffer> externalReferences;
+
   Block* findOrAllocateBlock(size_t requestedSize);
   bool allocateNewBlock(size_t requestSize);
+
+  /**
+   * Notifies that the reference count has reached zero. As the destructor of the reference counter
+   * shared pointer.
+   */
+  static void NotifyReferenceReachedZero(BlockBuffer* blockBuffer);
+
+  /**
+   * Waits until the reference count reaches zero, indicating that all threads have finished using
+   * the memory blocks and it is safe to release them.
+   */
+  void waitForReferencesExpired();
 };
 }  // namespace tgfx

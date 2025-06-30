@@ -557,8 +557,9 @@ PathRef* Path::writableRef() {
   if (pathRef.use_count() != 1) {
     pathRef = std::make_shared<PathRef>(pathRef->path);
   } else {
+    // There only one reference to this PathRef, so we can safely reset the uniqueKey and bounds.
     pathRef->uniqueKey.reset();
-    pathRef->resetBounds();
+    pathRef->bounds.reset();
   }
   return pathRef.get();
 }

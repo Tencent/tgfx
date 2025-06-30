@@ -29,7 +29,7 @@ RuntimeDrawTask::RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
 }
 
 bool RuntimeDrawTask::execute(RenderPass* renderPass) {
-  TaskMark(OpTaskType::RuntimeDrawTask);
+  TaskMark(inspector::OpTaskType::RuntimeDrawTask);
   std::vector<BackendTexture> inputTextures;
   inputTextures.reserve(inputs.size());
   for (size_t i = 0; i < inputs.size(); i++) {

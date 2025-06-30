@@ -10,6 +10,7 @@
         <file>qml/FramesView.qml</file>
         <file>qml/MyGroup.qml</file>
         <file>qml/AttributeView.qml</file>
+        <file>qml/IndicatorText.qml</file>
         <file>icons/InspectorIcon.png</file>
         <file>icons/LayerTreeIcon.png</file>
         <file>icons/openfile.png</file>

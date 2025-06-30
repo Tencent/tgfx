@@ -17,11 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <tgfx/core/Data.h>
 #include <cstdint>
 #include <unordered_map>
 #include <vector>
 #include "Protocol.h"
+#include "tgfx/core/Data.h"
+#include "tgfx/gpu/PixelFormat.h"
 
 namespace inspector {
 
@@ -80,18 +81,38 @@ static std::unordered_map<uint8_t, const char*> OpTaskName = {
     {OpTaskType::OpTaskTypeSize, "OpTaskTypeSize"},
 };
 
-enum DataType : uint8_t { Color, Vect, Mat4, Int, Float, String, Count };
+static std::unordered_map<tgfx::PixelFormat, const char*> PixelFormatName = {
+    {tgfx::PixelFormat::Unknown, "Unknown"},     {tgfx::PixelFormat::ALPHA_8, "ALPHA_8"},
+    {tgfx::PixelFormat::GRAY_8, "GRAY_8"},       {tgfx::PixelFormat::RG_88, "RG_88"},
+    {tgfx::PixelFormat::RGBA_8888, "RGBA_8888"}, {tgfx::PixelFormat::BGRA_8888, "BGRA_8888"},
+};
+
+enum DataType : uint8_t { Color, Vec4, Mat4, Int, Uint32, Bool, Float, Enum, String, Count };
+enum OpOrTask : uint8_t { Op, Task, NoType };
+
+static std::unordered_map<TGFXEnum, std::vector<std::string>> TGFXEnumName = {
+    {TGFXEnum::BufferType, {"Index", "Vertex"}},
+    {TGFXEnum::BlendMode,
+     {"Clear",       "Src",       "Dst",        "SrcOver",   "DstOver",    "SrcIn",
+      "DstIn",       "SrcOut",    "DstOut",     "SrcTop",    "DstTop",     "Xor",
+      "PlusLighter", "Modulate",  "Screen",     "OverLay",   "Darken",     "Lighten",
+      "ColorDodge",  "ColorBurn", "HardLight",  "SoftLight", "Difference", "Exclusion",
+      "Multiply",    "Hue",       "Saturation", "Color",     "Luminosity", "PlusDarker"}},
+    {TGFXEnum::AAType, {"None", "Coverage", "MSAA"}},
+    {TGFXEnum::PixelFormat, {"Unknown", "ALPHA_8", "GRAY_8", "RG_88", "RGBA_8888", "BGRA_8888"}},
+    {TGFXEnum::ImageOrigin, {"TopLeft", "BottomLeft"}},
+};
 
 struct DataHead {
   DataType type;
-  uint16_t size;
+  uint64_t name;
 };
 
 struct PropertyData {
   std::vector<DataHead> summaryName;
   std::vector<DataHead> processName;
-  std::vector<uint8_t> summaryData;
-  std::vector<uint8_t> processData;
+  std::vector<std::shared_ptr<tgfx::Data>> summaryData;
+  std::vector<std::shared_ptr<tgfx::Data>> processData;
 };
 
 struct TextureData {
@@ -104,4 +125,6 @@ struct VertexData {
   bool hasUV;
   bool hasColor;
 };
+
+OpOrTask getOpTaskType(OpTaskType type);
 }  // namespace inspector

@@ -26,7 +26,7 @@
 
 namespace inspector {
 
-class AtttributeModel;
+class AttributeModel;
 class TaskItem {
  public:
   explicit TaskItem(QVariantList data, uint32_t opId) : opId(opId), itemData(std::move(data)) {
@@ -74,6 +74,7 @@ class TaskItem {
       return int(std::distance(parentItem->childrenItems.cbegin(), it));
     }
     Q_ASSERT(false);  // should not happen
+    return 0;
   }
 
   int index = 0;
@@ -88,8 +89,8 @@ class TaskTreeModel : public QAbstractItemModel {
  public:
   enum Roles {
     NameRole = Qt::UserRole + 1,
-    CostTimeRole,
     WeightRole,
+    CostTimeRole,
   };
 
   explicit TaskTreeModel(Worker* worker, ViewData* viewData, QObject* parent = nullptr);
@@ -105,12 +106,12 @@ class TaskTreeModel : public QAbstractItemModel {
 
   Q_INVOKABLE void deleteTree(TaskItem* root);
   Q_INVOKABLE void selectedTask(const QModelIndex& index);
-  Q_INVOKABLE void setAttributeModel(AtttributeModel* model);
 
   Q_SLOT void refreshData();
 
   Q_SIGNAL void taskSelected(const OpTaskData& opData, const QString& name, uint32_t opId);
   Q_SIGNAL void filterChanged();
+  Q_SIGNAL void selectTaskOp();
 
  protected:
   TaskItem* processTaskLevel(int64_t selectFrameTime,
@@ -125,7 +126,6 @@ class TaskTreeModel : public QAbstractItemModel {
   Worker* worker = nullptr;
   ViewData* viewData = nullptr;
   TaskItem* rootItem = nullptr;
-  AtttributeModel* atttributeModel = nullptr;
   QMap<uint32_t, TaskItem*> opIdNodeMap;
 };
 

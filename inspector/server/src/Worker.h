@@ -69,7 +69,18 @@ class Worker : public QObject {
   bool Process(const QueueItem& ev);
   void ProcessOperateBegin(const QueueOperateBegin& ev);
   void ProcessOperateEnd(const QueueOperateEnd& ev);
+  void ProcessAttributeImpl(DataHead& head, std::shared_ptr<tgfx::Data> data);
+  void ProcessFloatValue(const QueueAttributeDataFloat& ev);
+  void ProcessFloat4Value(const QueueAttributeDataFloat4& ev);
+  void ProcessIntValue(const QueueAttributeDataInt& ev);
+  void ProcessBoolValue(const QueueAttributeDataBool& ev);
+  void ProcessMat4Value(const QueueAttributeDataMat4& ev);
+  void ProcessEnumValue(const QueueAttributeDataEnum& ev);
+  void ProcessUint32Value(const QueueAttributeDataUInt32& ev);
+  void ProcessColorValue(const QueueAttributeDataUInt32& ev);
   void ProcessFrameMark(const QueueFrameMark& ev);
+
+  void HandleValueName(uint64_t name, const char* str, size_t sz);
 
   int64_t TscTime(int64_t tsc) {
     return int64_t(tsc - dataContext.baseTime);

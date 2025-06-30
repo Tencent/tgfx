@@ -58,10 +58,17 @@ RectDrawOp::RectDrawOp(RectsVertexProvider* provider)
   if (!provider->hasColor()) {
     commonColor = provider->firstColor();
   }
+  hasSubset = provider->hasSubset();
 }
 
 void RectDrawOp::execute(RenderPass* renderPass) {
-  OperateMark(OpTaskType::RectDrawOp);
+  OperateMark(inspector::OpTaskType::RectDrawOp);
+  AttributeName("rectCount", static_cast<int>(rectCount));
+  AttributeTGFXName("commonColor", commonColor);
+  AttributeTGFXName("uvMatrix", uvMatrix);
+  AttributeTGFXName("scissorRect", scissorRect());
+  AttributeNameEnum("blenderMode", getBlendMode(), inspector::TGFXEnum::BlendMode);
+  AttributeNameEnum("aaType", getAAType(), inspector::TGFXEnum::AAType);
   std::shared_ptr<GpuBuffer> indexBuffer;
   if (indexBufferProxy) {
     indexBuffer = indexBufferProxy->getBuffer();
@@ -76,8 +83,10 @@ void RectDrawOp::execute(RenderPass* renderPass) {
   }
   auto renderTarget = renderPass->renderTarget();
   auto drawingBuffer = renderPass->getContext()->drawingBuffer();
-  auto gp = QuadPerEdgeAAGeometryProcessor::Make(
-      drawingBuffer, renderTarget->width(), renderTarget->height(), aaType, commonColor, uvMatrix);
+  auto gp = QuadPerEdgeAAGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
+                                                 renderTarget->height(), aaType, commonColor,
+                                                 uvMatrix, hasSubset);
+  gp->fillAttribute();
   auto pipeline = createPipeline(renderPass, std::move(gp));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   renderPass->bindBuffers(indexBuffer, vertexBuffer, vertexBufferOffset);

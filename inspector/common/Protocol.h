@@ -17,6 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+namespace inspector {
+
+inline constexpr int broadcastNum = 5;
 
 constexpr unsigned Lz4CompressBound(unsigned isize) {
   return isize + (isize / 255) + 16;
@@ -41,10 +44,7 @@ enum HandshakeStatus : uint8_t {
   HandshakeDropped
 };
 
-enum MsgType : uint8_t {
-  FrameCapture = 0,
-  LayerTree = 1
-};
+enum MsgType : uint8_t { FrameCapture = 0, LayerTree = 1 };
 
 struct BroadcastMessage {
   uint8_t type;
@@ -55,10 +55,17 @@ struct BroadcastMessage {
   char programName[WelcomeMessageProgramNameSize];
 };
 
+struct WelcomeMessage {
+  int64_t initBegin;
+  int64_t initEnd;
+  int64_t refTime;
+};
+
 enum ServerQuery : uint8_t {
   ServerQueryTerminate,
   ServerQueryString,
   ServerQueryFrameName,
+  ServerQueryValueName,
   ServerQueryDisconnect,
 };
 
@@ -94,8 +101,11 @@ enum OpTaskType : uint8_t {
   OpTaskTypeSize,
 };
 
-struct WelcomeMessage {
-  int64_t initBegin;
-  int64_t initEnd;
-  int64_t refTime;
+enum TGFXEnum : uint8_t {
+  BufferType = 0,
+  BlendMode,
+  AAType,
+  PixelFormat,
+  ImageOrigin,
 };
+}  // namespace inspector

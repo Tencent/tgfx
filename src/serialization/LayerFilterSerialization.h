@@ -23,7 +23,8 @@ namespace tgfx {
 class LayerFilter;
 class LayerFilterSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(const LayerFilter* layerFilter, SerializeUtils::ComplexObjSerMap* map);
+  static std::shared_ptr<Data> Serialize(const LayerFilter* layerFilter,
+                                         SerializeUtils::ComplexObjSerMap* map);
 
  private:
   static void SerializeBasicLayerFilterImpl(flexbuffers::Builder& fbb,

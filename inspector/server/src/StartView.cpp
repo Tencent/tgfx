@@ -111,7 +111,7 @@ void StartView::clearRecentFiles() {
 QVector<QObject*> StartView::getFrameCaptureClientItems() const {
   QVector<QObject*> clientDatas;
   for (auto& client : clients) {
-    if(client.second->type == FrameCapture) {
+    if (client.second->type == FrameCapture) {
       clientDatas.push_back(client.second);
     }
   }
@@ -121,7 +121,7 @@ QVector<QObject*> StartView::getFrameCaptureClientItems() const {
 QVector<QObject*> StartView::getLayerTreeClientItems() const {
   QVector<QObject*> clientDatas;
   for (auto& client : clients) {
-    if(client.second->type == LayerTree) {
+    if (client.second->type == LayerTree) {
       clientDatas.push_back(client.second);
     }
   }
@@ -133,10 +133,18 @@ void StartView::connectToClient(QObject* object) {
   if (client) {
     if (inspectorView) {
       connect(inspectorView, &InspectorView::destroyed, this,
-              [&, client]() { inspectorView = new InspectorView(client, 1920, this); });
+              [&, client]() {
+                inspectorView = new InspectorView(client, 1920, this);
+                connect(inspectorView, &InspectorView::viewHide, [this]() {
+                  showStartView();
+                });
+              });
       inspectorView->deleteLater();
     } else {
       inspectorView = new InspectorView(client, 1920, this);
+      connect(inspectorView, &InspectorView::viewHide, [this]() {
+        showStartView();
+      });
     }
   }
 }
@@ -144,8 +152,22 @@ void StartView::connectToClient(QObject* object) {
 void StartView::connectToClientByLayerInspector(QObject* object) {
   auto client = dynamic_cast<ClientData*>(object);
   if (client) {
-    layerProfilerView =
-        new LayerProfilerView(QString::fromStdString(client->address), client->port);
+    if (layerProfilerView) {
+      connect(layerProfilerView, &LayerProfilerView::destroyed, this, [&, client] {
+        layerProfilerView =
+            new LayerProfilerView(QString::fromStdString(client->address), client->port);
+        connect(layerProfilerView, &LayerProfilerView::viewHide, [this]() {
+          showStartView();
+        });
+      });
+      layerProfilerView->deleteLater();
+    } else {
+      layerProfilerView =
+          new LayerProfilerView(QString::fromStdString(client->address), client->port);
+      connect(layerProfilerView, &LayerProfilerView::viewHide, [this]() {
+          showStartView();
+      });
+    }
   }
 }
 
@@ -208,8 +230,15 @@ void StartView::updateBroadcastClients() {
                         std::chrono::system_clock::now().time_since_epoch())
                         .count();
   if (!broadcastListen) {
+    bool isListen = false;
     broadcastListen = std::make_unique<UdpListen>();
-    if (!broadcastListen->Listen(port)) {
+    for (uint16_t i = 0; i < broadcastNum; i++) {
+      isListen = broadcastListen->Listen(port + i);
+      if (isListen) {
+        break;
+      }
+    }
+    if (!isListen) {
       broadcastListen.reset();
     }
   } else {
@@ -252,8 +281,8 @@ void StartView::updateBroadcastClients() {
             });
           }
           resolvLock.unlock();
-          auto client =
-              new ClientData{time, protoVer, activeTime, listenPort, pid, procname, std::move(ip), type};
+          auto client = new ClientData{time, protoVer, activeTime,    listenPort,
+                                       pid,  procname, std::move(ip), type};
           clients.emplace(clientId, client);
           Q_EMIT clientItemsChanged();
         } else {

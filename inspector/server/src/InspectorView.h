@@ -53,6 +53,7 @@ class InspectorView : public QObject {
   Q_SLOT void onCloseView(QQuickCloseEvent*);
   Q_SIGNAL void closeView(QObject* view);
   Q_SIGNAL void failedOpenInspectorView(QString errorMsg);
+    Q_SIGNAL void viewHide();
 
  private:
   int width;
@@ -65,5 +66,6 @@ class InspectorView : public QObject {
   std::unique_ptr<TaskTreeModel> taskTreeModel;
   std::unique_ptr<SelectFrameModel> selectFrameModel;
   std::unique_ptr<TaskFilterModel> taskFilterModel;
+  std::unique_ptr<AttributeModel> attributeModel;
 };
 }  // namespace inspector
