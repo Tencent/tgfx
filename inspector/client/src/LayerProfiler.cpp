@@ -5,12 +5,6 @@
 #include "Protocol.h"
 #include "Utils.h"
 
-#ifdef __EMSCRIPTEN__
-#include <emscripten.h>
-#include <emscripten/threading.h>
-#include <emscripten/websocket.h>
-#endif
-
 namespace inspector {
 
 static uint16_t port = 8084;
@@ -28,7 +22,6 @@ void LayerProfiler::SetLayerCallBack(std::function<void(const std::vector<uint8_
 
 LayerProfiler::LayerProfiler() {
 #ifdef __EMSCRIPTEN__
-  m_WebSocket = nullptr;
 #else
   listenSocket = new ListenSocket();
   for (uint16_t i = 0; i < broadcastNum; i++) {
@@ -65,27 +58,6 @@ LayerProfiler::~LayerProfiler() {
 
 void LayerProfiler::sendWork() {
 #ifdef __EMSCRIPTEN__
-  // create websocket
-  while (!m_StopFlag.load(std::memory_order_acquire)) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    m_WebSocket = std::make_shared<WebSocketClient>("ws://localhost:8085");
-    if (m_WebSocket->isConnect) {
-      printf("web socket create success!\n");
-      break;
-    }
-    printf("web socket create failure!\n");
-    m_WebSocket.reset();
-  }
-
-  while (!m_StopFlag.load(std::memory_order_acquire)) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    if (!m_WebSocket->isConnect) break;
-    if (!m_Queue.empty()) {
-      auto data = *m_Queue.front();
-      m_Queue.pop();
-      m_WebSocket->sendMessage((char*)data.data(), data.size());
-    }
-  }
 #else
   if (!isUDPOpened) {
     return;
@@ -151,17 +123,6 @@ void LayerProfiler::sendWork() {
 
 void LayerProfiler::recvWork() {
 #ifdef __EMSCRIPTEN__
-  while (!m_StopFlag.load(std::memory_order_acquire)) {
-    std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    WebSocketClient::Message message;
-    if (m_WebSocket->recvMssageImmdiately(message)) {
-      printf("recive message type: %d \n", message.type);
-      if ((message.type == WebSocketClient::Binary) && m_Callback) {
-        std::vector<uint8_t> data(message.data.data(), message.data.data() + message.data.size());
-        m_Callback(data);
-      }
-    }
-  }
 #else
   while (!stopFlag.load(std::memory_order_acquire)) {
     std::this_thread::sleep_for(std::chrono::milliseconds(10));

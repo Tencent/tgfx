@@ -23,7 +23,6 @@ class LayerProfiler {
 
  private:
 #ifdef __EMSCRIPTEN__
-  std::shared_ptr<WebSocketClient> m_WebSocket;
 #else
   ListenSocket* listenSocket;
   Socket* socket = nullptr;
