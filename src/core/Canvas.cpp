@@ -68,8 +68,8 @@ static Fill GetFillStyleForImage(const Paint* paint, const Image* image) {
   return fill;
 }
 
-Canvas::Canvas(DrawContext* drawContext, Surface* surface)
-    : drawContext(drawContext), surface(surface) {
+Canvas::Canvas(DrawContext* drawContext, Surface* surface, bool optimizeMemoryForLayer)
+    : drawContext(drawContext), surface(surface), optimizeMemoryForLayer(optimizeMemoryForLayer) {
   mcState = std::make_unique<MCState>();
 }
 
@@ -102,7 +102,7 @@ void Canvas::restore() {
   if (layer != nullptr) {
     drawContext = layer->drawContext;
     auto layerContext = reinterpret_cast<RecordingContext*>(layer->layerContext.get());
-    auto picture = layerContext->finishRecordingAsPicture();
+    auto picture = layerContext->finishRecordingAsPicture(optimizeMemoryForLayer);
     if (picture != nullptr) {
       drawLayer(std::move(picture), {}, layer->layerPaint.getFill(),
                 layer->layerPaint.getImageFilter());

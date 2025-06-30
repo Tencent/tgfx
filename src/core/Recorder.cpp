@@ -28,7 +28,7 @@ Recorder::~Recorder() {
 Canvas* Recorder::beginRecording() {
   if (canvas == nullptr) {
     recordingContext = new RecordingContext();
-    canvas = new Canvas(recordingContext);
+    canvas = new Canvas(recordingContext, nullptr, optimizeMemory);
   } else {
     canvas->resetStateStack();
     recordingContext->clear();
@@ -46,6 +46,6 @@ std::shared_ptr<Picture> Recorder::finishRecordingAsPicture() {
     return nullptr;
   }
   activelyRecording = false;
-  return recordingContext->finishRecordingAsPicture();
+  return recordingContext->finishRecordingAsPicture(optimizeMemory);
 }
 }  // namespace tgfx
