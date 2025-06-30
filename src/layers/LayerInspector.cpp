@@ -22,17 +22,18 @@
 
 void tgfx::LayerInspector::pickedLayer(float x, float y) {
 #ifdef TGFX_USE_INSPECTOR
-    LayerInspectorManager::GetLayerInspectorManager().pickedLayer(x, y);
+  LayerInspectorManager::GetLayerInspectorManager().pickedLayer(x, y);
 #else
-    (void)x;
-    (void)y;
+  (void)x;
+  (void)y;
 #endif
 }
 
-void tgfx::LayerInspector::setLayerInspectorHoveredStateCallBack(std::function<void(bool)> callback) {
+void tgfx::LayerInspector::setLayerInspectorHoveredStateCallBack(
+    std::function<void(bool)> callback) {
 #ifdef TGFX_USE_INSPECTOR
-    LayerInspectorManager::GetLayerInspectorManager().setLayerInspectorHoveredStateCallBack(callback);
+  LayerInspectorManager::GetLayerInspectorManager().setLayerInspectorHoveredStateCallBack(callback);
 #else
-    (void)callback;
+  (void)callback;
 #endif
 }

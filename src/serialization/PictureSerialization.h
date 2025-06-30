@@ -23,10 +23,10 @@
 
 namespace tgfx {
 class PictureSerialization {
-public:
+ public:
   static std::shared_ptr<Data> Serialize(const Picture* pic);
 
-private:
+ private:
   static void SerializePictureImpl(flexbuffers::Builder& fbb, const Picture* pic);
 };
 }  // namespace tgfx
