@@ -120,6 +120,11 @@ void DrawingManager::addResourceTask(PlacementPtr<ResourceTask> resourceTask) {
 }
 
 bool DrawingManager::flush() {
+  // Prepare any onFlush op lists (e.g. atlases).
+  for (auto flushCallbackObject : flushCallbackObjects) {
+    flushCallbackObject->preFlush();
+  }
+
   while (!compositors.empty()) {
     auto compositor = compositors.back();
     // The makeClosed() method may add more compositors to the list.
@@ -158,7 +163,19 @@ bool DrawingManager::flush() {
     task->execute(renderPass.get());
   }
   renderTasks.clear();
+  flushTokenTracker.advanceToken();
+  for (auto flushCallbackObject : flushCallbackObjects) {
+    flushCallbackObject->postFlush(flushTokenTracker.nextToken());
+  }
   return true;
+}
+
+AtlasToken DrawingManager::nextFlushToken() const {
+  return flushTokenTracker.nextToken();
+}
+
+void DrawingManager::addFlushCallbackObject(FlushCallbackObject* flushCallbackObject) {
+  flushCallbackObjects.push_back(flushCallbackObject);
 }
 
 void DrawingManager::releaseAll() {

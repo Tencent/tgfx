@@ -32,6 +32,7 @@ enum class PendingOpType {
   Rect,
   RRect,
   Shape,
+  Atlas,
 };
 
 /**
@@ -67,6 +68,13 @@ class OpsCompositor {
   void fillShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill);
 
   /**
+   * Fills the given rect with the given fill, using the provided texture proxy and sampling options.
+   */
+  void fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,
+                     const SamplingOptions& sampling, const MCState& state, const Fill& fill,
+                     const Matrix& textViewMatrix);
+
+  /**
    * Discard all pending operations.
    */
   void discardAll();
@@ -96,11 +104,14 @@ class OpsCompositor {
   Path pendingClip = {};
   Fill pendingFill = {};
   std::shared_ptr<Image> pendingImage = nullptr;
+  std::shared_ptr<TextureProxy> pendingTextureProxy = nullptr;
   SamplingOptions pendingSampling = {};
   std::vector<PlacementPtr<RectRecord>> pendingRects = {};
+  std::vector<PlacementPtr<RectRecord>> pendingAtlasRects = {};
   std::vector<PlacementPtr<RRectRecord>> pendingRRects = {};
   std::vector<PlacementPtr<Stroke>> pendingStrokes = {};
   std::vector<PlacementPtr<Op>> ops = {};
+  Matrix pendingAtlasMatrix = {};
 
   static bool CompareFill(const Fill& a, const Fill& b);
 
@@ -113,7 +124,8 @@ class OpsCompositor {
   }
 
   bool drawAsClear(const Rect& rect, const MCState& state, const Fill& fill);
-  bool canAppend(PendingOpType type, const Path& clip, const Fill& fill) const;
+  bool canAppend(PendingOpType type, const Path& clip, const Fill& fill,
+                 const Matrix& matrix = {}) const;
   void flushPendingOps(PendingOpType type = PendingOpType::Unknown, Path clip = {}, Fill fill = {});
   AAType getAAType(const Fill& fill) const;
   std::pair<bool, bool> needComputeBounds(const Fill& fill, bool hasCoverage,

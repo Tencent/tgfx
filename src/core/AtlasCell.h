@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,18 +18,46 @@
 
 #pragma once
 
-#include <cstdio>
 #include "core/AtlasTypes.h"
-#include "tgfx/core/ImageInfo.h"
-#include "tgfx/gpu/PixelFormat.h"
+#include "tgfx/core/BytesKey.h"
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
-PixelFormat ColorTypeToPixelFormat(ColorType type);
+class AtlasCell {
+ public:
+  const BytesKey& key() const {
+    return _key;
+  }
 
-ColorType PixelFormatToColorType(PixelFormat format);
+  MaskFormat maskFormat() const {
+    return _maskFormat;
+  }
 
-size_t PixelFormatBytesPerPixel(PixelFormat format);
+  uint16_t width() const {
+    return _width;
+  }
 
-PixelFormat MaskFormatToPixelFormat(MaskFormat format);
+  uint16_t height() const {
+    return _height;
+  }
 
-}  // namespace tgfx
+  const Matrix& matrix() const {
+    return _matrix;
+  }
+
+ private:
+  BytesKey _key;
+  Matrix _matrix = {};
+  MaskFormat _maskFormat = MaskFormat::A8;
+  uint16_t _width = 0;
+  uint16_t _height = 0;
+
+  friend class AtlasSource;
+  friend class RenderContext;
+};
+
+struct AtlasCellLocator {
+  Matrix matrix = {};  // The cell's transformation matrix
+  AtlasLocator atlasLocator;
+};
+}  //namespace tgfx

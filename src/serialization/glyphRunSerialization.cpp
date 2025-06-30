@@ -36,11 +36,11 @@ std::shared_ptr<Data> glyphRunSerialization::Serialize(const GlyphRun* glyphRun,
 void glyphRunSerialization::SerializeGlyphRunImpl(flexbuffers::Builder& fbb,
                                                   const GlyphRun* glyphRun,
                                                   SerializeUtils::Map* map) {
-  auto glyphFaceID = SerializeUtils::GetObjID();
+  auto fontID = SerializeUtils::GetObjID();
   const auto& font = glyphRun->font;
   SerializeUtils::SetFlexBufferMap(fbb, "font", reinterpret_cast<uint64_t>(&font), true,
-                                   font.getTypeface() != nullptr, glyphFaceID);
-  SerializeUtils::FillMap(font, glyphFaceID, map);
+                                   font.getTypeface() != nullptr, fontID);
+  SerializeUtils::FillMap(font, fontID, map);
 
   auto glyphsID = SerializeUtils::GetObjID();
   auto glyphs = glyphRun->glyphs;

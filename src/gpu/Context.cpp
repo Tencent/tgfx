@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Context.h"
+#include "core/AtlasManager.h"
 #include "core/utils/BlockBuffer.h"
 #include "core/utils/Log.h"
 #include "core/utils/SlidingWindowTracker.h"
@@ -39,6 +40,8 @@ Context::Context(Device* device) : _device(device) {
   _resourceProvider = new ResourceProvider(this);
   _proxyProvider = new ProxyProvider(this);
   _maxValueTracker = new SlidingWindowTracker(10);
+  _atlasManager = new AtlasManager(this);
+  _drawingManager->addFlushCallbackObject(_atlasManager);
 }
 
 Context::~Context() {
@@ -53,6 +56,7 @@ Context::~Context() {
   delete _resourceProvider;
   delete _proxyProvider;
   delete _drawingBuffer;
+  delete _atlasManager;
   delete _maxValueTracker;
 }
 
@@ -133,5 +137,6 @@ void Context::releaseAll(bool releaseGPU) {
   _resourceProvider->releaseAll();
   _programCache->releaseAll(releaseGPU);
   _resourceCache->releaseAll(releaseGPU);
+  _atlasManager->releaseAll();
 }
 }  // namespace tgfx

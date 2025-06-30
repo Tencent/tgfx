@@ -18,27 +18,50 @@
 
 #pragma once
 
-#include "core/shapes/UniqueKeyShape.h"
+#include <vector>
+#include "tgfx/core/Point.h"
 
 namespace tgfx {
-/**
- * Shape that contains a Font and GlyphID.
- */
-class GlyphShape : public UniqueKeyShape {
+class RectPackSkyline {
  public:
-  explicit GlyphShape(Font font, GlyphID glyphID);
+  RectPackSkyline(int width, int height) : _width(width), _height(height) {
+    reset();
+  }
 
-  Rect getBounds() const override;
+  void reset() {
+    areaSoFar = 0;
+    skyline.clear();
+    skyline.push_back({0, 0, _width});
+  }
 
-  Path getPath() const override;
+  int width() const {
+    return _width;
+  }
 
- protected:
-  Type type() const override {
-    return Type::Glyph;
+  int height() const {
+    return _height;
+  }
+
+  bool addRect(int width, int height, Point& location);
+
+  float percentFull() const {
+    return static_cast<float>(areaSoFar) / static_cast<float>(_width * _height);
   }
 
  private:
-  Font font;
-  GlyphID glyphID = 0;
+  struct Node {
+    int x = 0;
+    int y = 0;
+    int width = 2;
+  };
+
+  bool rectangleFits(int skylineIndex, int width, int height, int& yPosition) const;
+
+  void addSkylineLevel(int skylineIndex, int x, int y, int width, int height);
+
+  std::vector<Node> skyline = {};
+  int _width = 512;
+  int _height = 512;
+  int areaSoFar = 0;
 };
 }  // namespace tgfx

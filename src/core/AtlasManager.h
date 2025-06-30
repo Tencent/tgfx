@@ -18,27 +18,36 @@
 
 #pragma once
 
-#include "core/shapes/UniqueKeyShape.h"
+#include <memory>
+#include "Atlas.h"
+#include "AtlasTypes.h"
+#include "gpu/FlushCallbackObject.h"
 
 namespace tgfx {
-/**
- * Shape that contains a Font and GlyphID.
- */
-class GlyphShape : public UniqueKeyShape {
+class AtlasManager : public AtlasGenerationCounter, public FlushCallbackObject {
  public:
-  explicit GlyphShape(Font font, GlyphID glyphID);
+  explicit AtlasManager(Context* context);
 
-  Rect getBounds() const override;
+  const std::vector<std::shared_ptr<TextureProxy>>& getTextureProxies(MaskFormat maskFormat);
 
-  Path getPath() const override;
+  bool getCellLocator(MaskFormat, const BytesKey& key, AtlasCellLocator& locator) const;
 
- protected:
-  Type type() const override {
-    return Type::Glyph;
-  }
+  bool addCellToAtlas(const AtlasCell& cell, AtlasToken nextFlushToken, AtlasLocator&) const;
+
+  void setPlotUseToken(PlotUseUpdater&, const PlotLocator&, MaskFormat, AtlasToken) const;
+
+  void preFlush() override;
+
+  void postFlush(AtlasToken startTokenForNextFlush) override;
+
+  void releaseAll();
 
  private:
-  Font font;
-  GlyphID glyphID = 0;
+  bool initAtlas(MaskFormat format);
+
+  Atlas* getAtlas(MaskFormat format) const;
+
+  Context* context = nullptr;
+  std::unique_ptr<Atlas> atlases[MaskFormatCount];
 };
 }  // namespace tgfx

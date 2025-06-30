@@ -168,5 +168,6 @@ class Typeface {
   friend class CGMask;
   friend class WebMask;
   friend class SVGExportContext;
+  friend class RenderContext;
 };
 }  // namespace tgfx

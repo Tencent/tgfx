@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,18 +18,22 @@
 
 #pragma once
 
-#include <cstdio>
-#include "core/AtlasTypes.h"
-#include "tgfx/core/ImageInfo.h"
-#include "tgfx/gpu/PixelFormat.h"
+#include "core/DataSource.h"
+#include "core/PixelBuffer.h"
+#include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
-PixelFormat ColorTypeToPixelFormat(ColorType type);
+class GlyphSource : public DataSource<PixelBuffer> {
+ public:
+  static std::unique_ptr<DataSource> MakeFrom(std::shared_ptr<ImageCodec> imageCodec,
+                                              bool tryHardware = true, bool asyncDecoding = true);
 
-ColorType PixelFormatToColorType(PixelFormat format);
+  std::shared_ptr<PixelBuffer> getData() const override;
 
-size_t PixelFormatBytesPerPixel(PixelFormat format);
+  GlyphSource(std::shared_ptr<ImageCodec> imageCodec, bool tryHardware = true);
 
-PixelFormat MaskFormatToPixelFormat(MaskFormat format);
-
+ private:
+  std::shared_ptr<ImageCodec> imageCodec = nullptr;
+  bool tryHardware = true;
+};
 }  // namespace tgfx

@@ -17,12 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OpsCompositor.h"
+#include "core/Atlas.h"
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
 #include "core/Rasterizer.h"
 #include "core/utils/Types.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/ops/AtlasTextOp.h"
 #include "gpu/ops/ClearOp.h"
 #include "gpu/ops/DstTextureCopyOp.h"
 #include "gpu/ops/ResolveOp.h"
@@ -39,6 +41,36 @@ namespace tgfx {
  * 0.5 * 1/256 of its intended value, it shouldn't affect the final pixel values.
  */
 static constexpr float BOUNDS_TOLERANCE = 1e-3f;
+
+static bool RectHasColor(const std::vector<PlacementPtr<RectRecord>>& rects) {
+  if (rects.size() <= 1) {
+    return false;
+  }
+  bool hasColor = false;
+  auto& firstColor = rects.front()->color;
+  for (auto& record : rects) {
+    if (record->color != firstColor) {
+      hasColor = true;
+      break;
+    }
+  }
+  return hasColor;
+}
+
+static bool RectHasUVCoord(const std::vector<PlacementPtr<RectRecord>>& rects) {
+  if (rects.size() <= 1) {
+    return false;
+  }
+  bool hasUVCoord = false;
+  auto& firstMatrix = rects.front()->viewMatrix;
+  for (auto& record : rects) {
+    if (record->viewMatrix != firstMatrix) {
+      hasUVCoord = true;
+      break;
+    }
+  }
+  return hasUVCoord;
+}
 
 OpsCompositor::OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags)
     : context(proxy->getContext()), renderTarget(std::move(proxy)), renderFlags(renderFlags) {
@@ -149,6 +181,9 @@ void OpsCompositor::discardAll() {
     pendingRects.clear();
     pendingRRects.clear();
     pendingStrokes.clear();
+    pendingAtlasMatrix = {};
+    pendingAtlasRects.clear();
+    pendingTextureProxy = nullptr;
   }
 }
 
@@ -175,7 +210,8 @@ bool OpsCompositor::CompareFill(const Fill& a, const Fill& b) {
   return true;
 }
 
-bool OpsCompositor::canAppend(PendingOpType type, const Path& clip, const Fill& fill) const {
+bool OpsCompositor::canAppend(PendingOpType type, const Path& clip, const Fill& fill,
+                              const Matrix& matrix) const {
   if (pendingType != type || !pendingClip.isSame(clip) || !CompareFill(pendingFill, fill)) {
     return false;
   }
@@ -184,6 +220,8 @@ bool OpsCompositor::canAppend(PendingOpType type, const Path& clip, const Fill& 
       return pendingRects.size() < RectDrawOp::MaxNumRects;
     case PendingOpType::RRect:
       return pendingRRects.size() < RRectDrawOp::MaxNumRRects;
+    case PendingOpType::Atlas:
+      return pendingAtlasRects.empty() || !fill.shader || pendingAtlasMatrix == matrix;
     default:
       break;
   }
@@ -220,8 +258,8 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
   bool hasCoverage = fill.maskFilter != nullptr || !clip.isEmpty() || clip.isInverseFillType();
-  auto [needLocalBounds, needDeviceBounds] =
-      needComputeBounds(fill, hasCoverage, type == PendingOpType::Image);
+  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(
+      fill, hasCoverage, type == PendingOpType::Image || type == PendingOpType::Atlas);
   auto aaType = getAAType(fill);
   Rect clipBounds = {};
   if (needLocalBounds) {
@@ -257,8 +295,10 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
                          ? RectsVertexProvider::UVSubsetMode::SubsetOnly
                          : RectsVertexProvider::UVSubsetMode::RoundOutAndSubset;
       }
+      bool hasColor = RectHasColor(pendingRects);
+      bool hasUVCoord = needLocalBounds && RectHasUVCoord(pendingRects);
       auto provider = RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects),
-                                                    aaType, needLocalBounds, subsetMode);
+                                                    aaType, hasColor, hasUVCoord, subsetMode);
       drawOp = RectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::RRect: {
@@ -278,10 +318,33 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
                                          RRectUseScale(context), std::move(pendingStrokes));
       drawOp = RRectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
+    case PendingOpType::Atlas: {
+      if (needLocalBounds) {
+        for (auto& rect : pendingAtlasRects) {
+          localBounds->join(ClipLocalBounds(rect->rect, rect->viewMatrix, clipBounds));
+        }
+      }
+      if (needDeviceBounds) {
+        deviceBounds = Rect::MakeEmpty();
+        for (auto& record : pendingAtlasRects) {
+          auto rect = record->viewMatrix.mapRect(record->rect);
+          deviceBounds->join(rect);
+        }
+      }
+      bool hasColor = RectHasColor(pendingAtlasRects);
+      auto provider =
+          RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingAtlasRects), aaType,
+                                        hasColor, true, RectsVertexProvider::UVSubsetMode::None);
+      Matrix uvMatrix;
+      if (!pendingAtlasMatrix.invert(&uvMatrix)) {
+        return;
+      }
+      drawOp = AtlasTextOp::Make(context, std::move(provider), renderFlags,
+                                 std::move(pendingTextureProxy), pendingSampling, uvMatrix);
+    } break;
     default:
       break;
   }
-
   if (type == PendingOpType::Image) {
     FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty())};
     auto processor =
@@ -587,4 +650,23 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
   }
   ops.emplace_back(std::move(op));
 }
+
+void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,
+                                  const SamplingOptions& sampling, const MCState& state,
+                                  const Fill& fill, const Matrix& textViewMatrix) {
+  DEBUG_ASSERT(textureProxy != nullptr);
+  DEBUG_ASSERT(!rect.isEmpty());
+  if (!canAppend(PendingOpType::Atlas, state.clip, fill, textViewMatrix) ||
+      pendingTextureProxy != textureProxy || pendingSampling != sampling) {
+    flushPendingOps(PendingOpType::Atlas, state.clip, fill);
+    pendingTextureProxy = std::move(textureProxy);
+    pendingSampling = sampling;
+  }
+  if (pendingAtlasRects.empty()) {
+    pendingAtlasMatrix = textViewMatrix;
+  }
+  auto record = drawingBuffer()->make<RectRecord>(rect, state.matrix, fill.color.premultiply());
+  pendingAtlasRects.emplace_back(std::move(record));
+}
+
 }  // namespace tgfx
