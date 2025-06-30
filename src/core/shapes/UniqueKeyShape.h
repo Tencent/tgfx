@@ -18,17 +18,17 @@
 
 #pragma once
 
-#include <tgfx/core/Data.h>
-#include "SerializationUtils.h"
-#include "layers/contents/ShapeContent.h"
+#include "gpu/ResourceKey.h"
+#include "tgfx/core/Shape.h"
 
 namespace tgfx {
-class ShapePaintSerialization {
- public:
-  static std::shared_ptr<Data> Serialize(const ShapePaint* shapePaint, SerializeUtils::Map* map);
+class UniqueKeyShape : public Shape {
+ protected:
+  UniqueKey getUniqueKey() const override {
+    return uniqueKey.get();
+  }
 
  private:
-  static void SerializeShapePaintImpl(flexbuffers::Builder& fbb, const ShapePaint* shapePaint,
-                                      SerializeUtils::Map* map);
+  LazyUniqueKey uniqueKey = {};
 };
 }  // namespace tgfx

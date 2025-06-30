@@ -798,7 +798,8 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   auto context = surface->getContext();
   AutoCanvasRestore autoRestore(canvas);
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
-  if (drawRect != surfaceRect) {
+  bool fullScreen = drawRect == surfaceRect;
+  if (!fullScreen) {
     canvas->clipRect(drawRect);
   }
   if (autoClear) {
@@ -812,8 +813,9 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   auto renderRect = inverse.mapRect(drawRect);
   renderRect.roundOut();
   args.renderRect = &renderRect;
-  if (_root->bitFields.hasBackgroundStyle) {
-    args.backgroundContext = BackgroundContext::Make(context, drawRect, viewMatrix);
+  auto backgroundRect = _root->getBackgroundRect(drawRect, viewMatrix.getMaxScale());
+  if (backgroundRect) {
+    args.backgroundContext = BackgroundContext::Make(context, *backgroundRect, viewMatrix);
   }
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }

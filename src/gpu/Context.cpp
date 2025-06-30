@@ -30,7 +30,10 @@
 
 namespace tgfx {
 Context::Context(Device* device) : _device(device) {
-  _drawingBuffer = new BlockBuffer(1 << 14);  // 16kb
+  // We set the maxBlockSize to 2MB because allocating blocks that are too large can cause memory
+  // fragmentation and slow down allocation. It may also increase the application's memory usage due
+  // to pre-allocation optimizations on some platforms.
+  _drawingBuffer = new BlockBuffer(1 << 14, 1 << 21);  // 16kb, 2MB
   _programCache = new ProgramCache(this);
   _resourceCache = new ResourceCache(this);
   _drawingManager = new DrawingManager(this);

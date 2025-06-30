@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,20 +16,40 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ImageContent.h"
+#pragma once
+
+#include <string>
+#include "tgfx/core/Path.h"
 
 namespace tgfx {
-Rect ImageContent::getBounds() const {
-  return Rect::MakeXYWH(0, 0, image->width(), image->height());
-}
 
-void ImageContent::draw(Canvas* canvas, const Paint& paint) const {
-  canvas->drawImage(image, sampling, &paint);
-}
+class SVGPathParser {
+ public:
+  /**
+   * Two ways to describe paths in SVG
+   */
+  enum class PathEncoding {
+    /**
+     * Each step's point is an absolute coordinate, and the step letter is uppercase
+     */
+    Absolute,
+    /**
+     * Each step's point is a relative coordinate to the previous point, and the step letter is
+     *lowercase
+     */
+    Relative,
+  };
 
-bool ImageContent::hitTestPoint(float localX, float localY, bool /*shapeHitTest*/) {
-  // Images are always checked against their bounding box.
-  const auto imageBounds = Rect::MakeXYWH(0, 0, image->width(), image->height());
-  return imageBounds.contains(localX, localY);
-}
+  /**
+   *  Parses a Path object to an SVG path string.
+   */
+  static std::string ToSVGString(const Path& path, PathEncoding = PathEncoding::Absolute);
+
+  /**
+   * Parses an SVG path string to a Path object.
+   * Returns nullptr if the parsing fails.
+   */
+  static std::shared_ptr<Path> FromSVGString(const std::string& pathString);
+};
+
 }  // namespace tgfx

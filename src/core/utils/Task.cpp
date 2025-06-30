@@ -62,7 +62,6 @@ void Task::cancel() {
     if (_status.compare_exchange_weak(currentStatus, TaskStatus::Canceled,
                                       std::memory_order_acq_rel, std::memory_order_relaxed)) {
       onCancel();
-      return;
     }
   }
 }

@@ -458,10 +458,12 @@ class Canvas {
  private:
   DrawContext* drawContext = nullptr;
   Surface* surface = nullptr;
+  bool optimizeMemoryForLayer = false;
   std::unique_ptr<MCState> mcState;
   std::stack<std::unique_ptr<CanvasState>> stateStack;
 
-  explicit Canvas(DrawContext* drawContext, Surface* surface = nullptr);
+  explicit Canvas(DrawContext* drawContext, Surface* surface = nullptr,
+                  bool optimizeMemoryForLayer = false);
   void drawPath(const Path& path, const MCState& state, const Fill& fill,
                 const Stroke* stroke) const;
   void drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
@@ -472,9 +474,6 @@ class Canvas {
                  std::shared_ptr<ImageFilter> imageFilter = nullptr);
   void drawFill(const MCState& state, const Fill& fill) const;
   void resetStateStack();
-
-  static Path* UnwrapShape(std::shared_ptr<Shape> shape, const Stroke** pathStroke,
-                           Matrix* pathMatrix);
 
   friend class Surface;
   friend class Picture;
