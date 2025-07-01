@@ -179,7 +179,7 @@ void TaskTreeModel::refreshData() {
     if (iter->start > selectFrameData.start) {
       selectFrameOpTasks.push_back(iter);
       auto opIter = opChilds.find(iter->id);
-      if (opIter != opChilds.end() ) {
+      if (opIter != opChilds.end()) {
         auto& tmp = opIter->second;
         selectChilds[iter->id] = tmp;
       }

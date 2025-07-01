@@ -84,4 +84,4 @@ class LayerAttributeModel : public LayerModel {
   int currentRow;
   std::unordered_map<uint64_t, LayerData> addressToLayerData;
 };
-}
+}  // namespace inspector

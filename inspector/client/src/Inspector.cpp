@@ -19,9 +19,9 @@
 
 #include "Inspector.h"
 #include <atomic>
+#include <chrono>
 #include <iostream>
 #include <new>
-#include <chrono>
 #include "Alloc.h"
 #include "LZ4.h"
 #include "Protocol.h"
@@ -356,7 +356,7 @@ bool Inspector::CommitData() {
 
 bool Inspector::SendData(const char* data, size_t len) {
   const auto lz4sz = LZ4_compress_fast_continue((LZ4_stream_t*)lz4Stream, data,
-                                                   lz4Buf + sizeof(lz4sz_t), (int)len, LZ4Size, 1);
+                                                lz4Buf + sizeof(lz4sz_t), (int)len, LZ4Size, 1);
   memcpy(lz4Buf, &lz4sz, sizeof(lz4sz));
   return sock->Send(lz4Buf, size_t(lz4sz) + sizeof(lz4sz_t)) != -1;
 }

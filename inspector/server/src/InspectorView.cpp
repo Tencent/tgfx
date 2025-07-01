@@ -23,9 +23,9 @@
 #include "AttributeModel.h"
 #include "FramesDrawer.h"
 #include "TaskTreeModel.h"
-#include "kddockwidgets/qtquick/views/Group.h"
 #include "TextureDrawer.h"
 #include "TextureListDrawer.h"
+#include "kddockwidgets/qtquick/views/Group.h"
 namespace inspector {
 
 class CustomViewFactory : public KDDockWidgets::QtQuick::ViewFactory {

@@ -72,4 +72,4 @@ QImage MemoryImageProvider::requestImage(const QString& id, QSize* size,
   }
   return defaultImage->copy();
 }
-}
+}  // namespace inspector

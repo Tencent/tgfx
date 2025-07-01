@@ -35,17 +35,17 @@ class LayerTreeModel : public LayerModel {
   void flushLayerTree();
   Q_INVOKABLE void MouseSelectedIndex(QModelIndex index);
   Q_INVOKABLE void MouseHoveredIndex(QModelIndex index);
-  signals:
-   void selectIndex(QModelIndex index);
+ signals:
+  void selectIndex(QModelIndex index);
   void expandAllTree();
   void selectAddress(uint64_t address);
   void hoveredAddress(uint64_t address);
   void flushLayerTreeSignal();
 
-private:
+ private:
   QModelIndex indexFromAddress(uint64_t address) const;
   void setupModelData(const flexbuffers::Map& contentMap, LayerItem* parent);
   QHash<uint64_t, LayerItem*> m_AddressToItem;
 };
 
-}
+}  // namespace inspector

@@ -31,21 +31,21 @@ class WebSocketServer : public QObject {
   void close();
   void listen();
   void SendData(const QByteArray& data);
-  Q_SIGNALS:
-   void ClientConnected();
+ Q_SIGNALS:
+  void ClientConnected();
   void ClientBinaryData(const QByteArray& message);
   void ClientTextData(const QString& message);
   void ClientDisconnected();
-  private slots:
-   void onNewConnection();
+ private slots:
+  void onNewConnection();
   void onTextMessageReceived(const QString& message);
   void onBinaryMessageReceived(const QByteArray& message);
   void onClientDisconnected();
 
-private:
+ private:
   QWebSocketServer* m_server;
   QWebSocket* m_ClientSocket;
   quint16 m_port;
   bool m_HasClientConnect = false;
 };
-}
+}  // namespace inspector

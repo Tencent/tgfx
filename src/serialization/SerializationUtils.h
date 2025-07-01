@@ -48,8 +48,8 @@ class SerializeUtils {
 
   static std::string RecordedContentTypeToString(Types::RecordedContentType type);
 
-  static void SerializeBegin(flexbuffers::Builder& fbb, inspector::LayerInspectorMsgType type, size_t& mapStart,
-                             size_t& contentStart);
+  static void SerializeBegin(flexbuffers::Builder& fbb, inspector::LayerInspectorMsgType type,
+                             size_t& mapStart, size_t& contentStart);
 
   static void SerializeEnd(flexbuffers::Builder& fbb, size_t mapStart, size_t contentStart);
 
@@ -103,31 +103,42 @@ class SerializeUtils {
 
   static void FillComplexObjSerMap(const Color& color, uint64_t objID, ComplexObjSerMap* map);
 
-  static void FillComplexObjSerMap(const std::shared_ptr<LayerFilter>& layerFilter, uint64_t objID, ComplexObjSerMap* map);
+  static void FillComplexObjSerMap(const std::shared_ptr<LayerFilter>& layerFilter, uint64_t objID,
+                                   ComplexObjSerMap* map);
 
-  static void FillComplexObjSerMap(const std::shared_ptr<Layer>& layer, uint64_t objID, ComplexObjSerMap* map, RenderableObjSerMap* renderMap);
+  static void FillComplexObjSerMap(const std::shared_ptr<Layer>& layer, uint64_t objID,
+                                   ComplexObjSerMap* map, RenderableObjSerMap* renderMap);
 
-  static void FillComplexObjSerMap(const std::shared_ptr<LayerStyle>& layerStyle, uint64_t objID, ComplexObjSerMap* map);
+  static void FillComplexObjSerMap(const std::shared_ptr<LayerStyle>& layerStyle, uint64_t objID,
+                                   ComplexObjSerMap* map);
 
-  static void FillComplexObjSerMap(const std::shared_ptr<Picture>& picture, uint64_t objID, ComplexObjSerMap* map);
+  static void FillComplexObjSerMap(const std::shared_ptr<Picture>& picture, uint64_t objID,
+                                   ComplexObjSerMap* map);
 
-  static void FillComplexObjSerMap(const std::vector<std::shared_ptr<LayerFilter>>& filters, uint64_t objID,
-                      ComplexObjSerMap* map);
+  static void FillComplexObjSerMap(const std::vector<std::shared_ptr<LayerFilter>>& filters,
+                                   uint64_t objID, ComplexObjSerMap* map);
 
-  static void FillComplexObjSerMap(const std::vector<std::shared_ptr<Layer>>& children, uint64_t objID,
-                      ComplexObjSerMap* map, RenderableObjSerMap* renderMap);
+  static void FillComplexObjSerMap(const std::vector<std::shared_ptr<Layer>>& children,
+                                   uint64_t objID, ComplexObjSerMap* map,
+                                   RenderableObjSerMap* renderMap);
 
-  static void FillComplexObjSerMap(const std::vector<std::shared_ptr<LayerStyle>>& layerStyles, uint64_t objID,
-                      ComplexObjSerMap* map);
+  static void FillComplexObjSerMap(const std::vector<std::shared_ptr<LayerStyle>>& layerStyles,
+                                   uint64_t objID, ComplexObjSerMap* map);
 
-  static void FillComplexObjSerMap(const std::array<float, 20>& matrix, uint64_t objID, ComplexObjSerMap* map);
+  static void FillComplexObjSerMap(const std::array<float, 20>& matrix, uint64_t objID,
+                                   ComplexObjSerMap* map);
 
-  static void FillComplexObjSerMap(const std::vector<Point>& points, uint64_t objID, ComplexObjSerMap* map);
+  static void FillComplexObjSerMap(const std::vector<Point>& points, uint64_t objID,
+                                   ComplexObjSerMap* map);
 
-  static void FillComplexObjSerMap(const std::vector<Color>& colors, uint64_t objID, ComplexObjSerMap* map);
+  static void FillComplexObjSerMap(const std::vector<Color>& colors, uint64_t objID,
+                                   ComplexObjSerMap* map);
 
-  static void FillComplexObjSermap(const std::unique_ptr<RecordedContent>& recordedContent, uint64_t objID, ComplexObjSerMap* map, RenderableObjSerMap* rosMap);
+  static void FillComplexObjSermap(const std::unique_ptr<RecordedContent>& recordedContent,
+                                   uint64_t objID, ComplexObjSerMap* map,
+                                   RenderableObjSerMap* rosMap);
 
-  static void FillRenderableObjSerMap(const std::shared_ptr<Picture>& picture, uint64_t objID, RenderableObjSerMap* map);
+  static void FillRenderableObjSerMap(const std::shared_ptr<Picture>& picture, uint64_t objID,
+                                      RenderableObjSerMap* map);
 };
 }  // namespace tgfx

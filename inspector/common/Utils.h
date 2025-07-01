@@ -18,8 +18,8 @@
 
 #pragma once
 #include <cstdint>
-#include <memory>
 #include <cstring>
+#include <memory>
 #include "Protocol.h"
 
 namespace inspector {

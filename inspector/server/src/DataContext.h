@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <mutex>
 #include "InspectorEvent.h"
 #include "StreamContext.h"
-#include <mutex>
 
 namespace inspector {
 class DataContext : public StreamContext {

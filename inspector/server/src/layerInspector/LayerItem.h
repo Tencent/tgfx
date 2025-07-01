@@ -21,7 +21,7 @@
 
 namespace inspector {
 class LayerItem {
-public:
+ public:
   explicit LayerItem(QVariantList data, LayerItem* parentItem = nullptr);
 
   void appendChild(std::unique_ptr<LayerItem>&& child);
@@ -43,10 +43,10 @@ public:
     m_EyeButtonState = state;
   }
 
-private:
+ private:
   std::vector<std::unique_ptr<LayerItem>> m_childItems;
   QVariantList m_itemData;
   LayerItem* m_parentItem;
   bool m_EyeButtonState = false;
 };
-}
+}  // namespace inspector

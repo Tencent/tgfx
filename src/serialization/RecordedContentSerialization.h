@@ -24,11 +24,20 @@
 namespace tgfx {
 class RecordedContentSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(const RecordedContent* content, SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
+  static std::shared_ptr<Data> Serialize(const RecordedContent* content,
+                                         SerializeUtils::ComplexObjSerMap* map,
+                                         SerializeUtils::RenderableObjSerMap* rosMap);
 
  private:
-  static void SerializeDefaultContentImpl(flexbuffers::Builder& fbb, const RecordedContent* content, SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
-  static void SerializeForegroundContentImpl(flexbuffers::Builder& fbb, const RecordedContent* content, SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
-  static void SerializeContourContentImpl(flexbuffers::Builder& fbb, const RecordedContent* content, SerializeUtils::ComplexObjSerMap* map, SerializeUtils::RenderableObjSerMap* rosMap);
+  static void SerializeDefaultContentImpl(flexbuffers::Builder& fbb, const RecordedContent* content,
+                                          SerializeUtils::ComplexObjSerMap* map,
+                                          SerializeUtils::RenderableObjSerMap* rosMap);
+  static void SerializeForegroundContentImpl(flexbuffers::Builder& fbb,
+                                             const RecordedContent* content,
+                                             SerializeUtils::ComplexObjSerMap* map,
+                                             SerializeUtils::RenderableObjSerMap* rosMap);
+  static void SerializeContourContentImpl(flexbuffers::Builder& fbb, const RecordedContent* content,
+                                          SerializeUtils::ComplexObjSerMap* map,
+                                          SerializeUtils::RenderableObjSerMap* rosMap);
 };
 }  // namespace tgfx

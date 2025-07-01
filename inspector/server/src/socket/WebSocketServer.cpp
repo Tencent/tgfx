@@ -96,4 +96,4 @@ void WebSocketServer::onClientDisconnected() {
     emit ClientDisconnected();
   }
 }
-}
+}  // namespace inspector

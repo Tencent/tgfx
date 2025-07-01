@@ -17,23 +17,24 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include "tgfx/gpu/opengl/qt/QGLWindow.h"
 #include "AppHost.h"
+#include "tgfx/gpu/opengl/qt/QGLWindow.h"
 namespace inspector {
-    class TextureDrawer : public QQuickItem {
-        Q_OBJECT
-    public:
-        TextureDrawer(QQuickItem* parent = nullptr);
-        ~TextureDrawer() = default;
+class TextureDrawer : public QQuickItem {
+  Q_OBJECT
+ public:
+  TextureDrawer(QQuickItem* parent = nullptr);
+  ~TextureDrawer() = default;
 
-        Q_SLOT void onSelectedImage(std::shared_ptr<tgfx::Image> image);
-    protected:
-        void draw();
-        QSGNode* updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) override;
+  Q_SLOT void onSelectedImage(std::shared_ptr<tgfx::Image> image);
 
-    private:
-        std::shared_ptr<tgfx::QGLWindow> tgfxWindow = nullptr;
-        std::shared_ptr<AppHost> appHost = nullptr;
-        std::shared_ptr<tgfx::Image> image;
-    };
+ protected:
+  void draw();
+  QSGNode* updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) override;
+
+ private:
+  std::shared_ptr<tgfx::QGLWindow> tgfxWindow = nullptr;
+  std::shared_ptr<AppHost> appHost = nullptr;
+  std::shared_ptr<tgfx::Image> image;
+};
 }  // namespace inspector

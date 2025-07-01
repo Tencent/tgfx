@@ -50,7 +50,7 @@
 #include "Utils.h"
 
 #ifndef MSG_NOSIGNAL
-#  define MSG_NOSIGNAL 0
+#define MSG_NOSIGNAL 0
 #endif
 
 namespace inspector {
@@ -425,7 +425,7 @@ bool Socket::IsValid() const {
 
 ListenSocket::ListenSocket() : sock(-1) {
 #ifdef _WIN32
-  // InitWinSock();
+// InitWinSock();
 #endif
 }
 
@@ -533,7 +533,7 @@ void ListenSocket::Close() {
 
 UdpBroadcast::UdpBroadcast() : sock(-1) {
 #ifdef _WIN32
-  // InitWinSock();
+// InitWinSock();
 #endif
 }
 
@@ -614,7 +614,8 @@ int UdpBroadcast::Send(uint16_t port, const void* data, size_t len) {
   addr.sin_family = AF_INET;
   addr.sin_port = htons(port);
   addr.sin_addr.s_addr = this->addr;
-  return (int)sendto(this->sock, (const char*)data, len, MSG_NOSIGNAL, (sockaddr*)&addr, sizeof(addr));
+  return (int)sendto(this->sock, (const char*)data, len, MSG_NOSIGNAL, (sockaddr*)&addr,
+                     sizeof(addr));
 }
 
 IpAddress::IpAddress() : number(0) {
@@ -637,7 +638,7 @@ void IpAddress::Set(const struct sockaddr& addr) {
 
 UdpListen::UdpListen() : sock(-1) {
 #ifdef _WIN32
-  // InitWinSock();
+// InitWinSock();
 #endif
 }
 

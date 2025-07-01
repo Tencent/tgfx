@@ -19,12 +19,12 @@
 #include "LayerInspectorManager.h"
 #include <functional>
 #include <string>
+#include "LayerInspectorProtocol.h"
 #include "LockFreeQueue.h"
 #include "core/utils/Profiling.h"
 #include "serialization/LayerSerialization.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/SolidColor.h"
-#include "LayerInspectorProtocol.h"
 
 namespace tgfx {
 extern const std::string HighLightLayerName = "HighLightLayer";
@@ -44,7 +44,8 @@ void LayerInspectorManager::pickedLayer(float x, float y) {
   }
 }
 
-void LayerInspectorManager::setLayerInspectorHoveredStateCallBack(std::function<void(bool)> callback) {
+void LayerInspectorManager::setLayerInspectorHoveredStateCallBack(
+    std::function<void(bool)> callback) {
   hoveredCallBack = callback;
 }
 
@@ -113,8 +114,9 @@ void LayerInspectorManager::serializingLayerAttribute(const std::shared_ptr<tgfx
   if (!layer) return;
   auto& complexObjSerMap = layerComplexObjMap[reinterpret_cast<uint64_t>(layer.get())];
   auto& renderableObjSerMap = layerRenderableObjMap[reinterpret_cast<uint64_t>(layer.get())];
-  auto data = LayerSerialization::SerializeLayer(layer.get(), &complexObjSerMap,
-                                                 &renderableObjSerMap, inspector::LayerInspectorMsgType::LayerAttribute);
+  auto data =
+      LayerSerialization::SerializeLayer(layer.get(), &complexObjSerMap, &renderableObjSerMap,
+                                         inspector::LayerInspectorMsgType::LayerAttribute);
   std::vector<uint8_t> blob(data->bytes(), data->bytes() + data->size());
   LAYER_DATA(blob);
 }
