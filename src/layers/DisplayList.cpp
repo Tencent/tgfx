@@ -486,15 +486,17 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   std::vector<std::shared_ptr<Tile>> taskTiles = {};
   for (auto& grid : dirtyGrids) {
     auto& tile = freeTiles[tileIndex++];
-    auto fallbackTasks = getFallbackDrawTasks(grid.first, grid.second, sortedCaches);
-    if (!fallbackTasks.empty()) {
-      if (refinedCount <= 0) {
-        emptyTiles.emplace_back(tile);
-        screenTasks.insert(screenTasks.end(), fallbackTasks.begin(), fallbackTasks.end());
-        hasZoomBlurTiles = true;
-        continue;
+    if (_allowZoomBlur) {
+      auto fallbackTasks = getFallbackDrawTasks(grid.first, grid.second, sortedCaches);
+      if (!fallbackTasks.empty()) {
+        if (refinedCount <= 0) {
+          emptyTiles.emplace_back(tile);
+          screenTasks.insert(screenTasks.end(), fallbackTasks.begin(), fallbackTasks.end());
+          hasZoomBlurTiles = true;
+          continue;
+        }
+        refinedCount--;
       }
-      refinedCount--;
     }
     tile->tileX = grid.first;
     tile->tileY = grid.second;

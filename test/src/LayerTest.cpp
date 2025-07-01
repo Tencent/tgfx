@@ -2740,6 +2740,7 @@ TGFX_TEST(LayerTest, DirtyRegionTest) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest5"));
 
   displayList->setRenderMode(RenderMode::Tiled);
+  displayList->setAllowZoomBlur(true);
   displayList->setMaxTileCount(512);
   displayList->render(surface.get());
   // Clear the previous dirty regions.
