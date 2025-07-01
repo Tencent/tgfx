@@ -115,9 +115,6 @@ bool RootLayer::invalidateBackground(const Rect& drawRect, LayerStyle* layerStyl
 }
 
 std::vector<Rect> RootLayer::updateDirtyRegions() {
-  if (_graphicsLoader) {
-    _graphicsLoader->updateCompleteTasks();
-  }
   updateRenderBounds();
   while (mergeDirtyList(false)) {
   }

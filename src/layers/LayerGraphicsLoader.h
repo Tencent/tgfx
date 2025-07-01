@@ -45,14 +45,17 @@ class LayerGraphicsLoader : public GraphicsLoader {
     _maxAsyncGraphicsPerFrame = count;
   }
 
-  void updateCompleteTasks();
-
   void updateLayerContent(Layer* layer, LayerContent* content);
 
   std::shared_ptr<ImageBuffer> loadImage(std::shared_ptr<ImageGenerator> generator,
                                          bool tryHardware) override;
 
   Path loadShape(std::shared_ptr<Shape> shape) override;
+
+ protected:
+  void onAttached() override;
+
+  void onDetached() override;
 
  private:
   size_t _maxAsyncGraphicsPerFrame = 0;

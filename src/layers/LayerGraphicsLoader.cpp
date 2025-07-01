@@ -104,30 +104,6 @@ LayerGraphicsLoader::~LayerGraphicsLoader() {
   }
 }
 
-void LayerGraphicsLoader::updateCompleteTasks() {
-  std::unordered_set<Layer*> invalidLayers = {};
-  for (auto it = pendingTasks.begin(); it != pendingTasks.end();) {
-    auto& task = it->second;
-    if (task->status() == TaskStatus::Finished) {
-      auto& layers = graphicToLayers[it->first];
-      for (auto& layer : layers) {
-        invalidLayers.insert(layer);
-      }
-      completeTasks[it->first] = task;
-      it = pendingTasks.erase(it);
-    } else {
-      ++it;
-    }
-  }
-  for (auto& layer : invalidLayers) {
-    DEBUG_ASSERT(layer->_root != nullptr);
-    if (layer->contentBounds != nullptr) {
-      layer->_root->invalidateRect(*layer->contentBounds);
-      layer->invalidateDescendents();
-    }
-  }
-}
-
 void LayerGraphicsLoader::updateLayerContent(Layer* layer, LayerContent* content) {
   auto result = layerToGraphics.find(layer);
   if (result != layerToGraphics.end()) {
@@ -171,9 +147,7 @@ std::shared_ptr<ImageBuffer> LayerGraphicsLoader::loadImage(
     std::shared_ptr<ImageGenerator> generator, bool tryHardware) {
   auto result = completeTasks.find(generator.get());
   if (result != completeTasks.end()) {
-    auto imageBuffer = result->second->getBuffer();
-    completeTasks.erase(result);
-    return imageBuffer;
+    return result->second->getBuffer();
   }
   if (pendingTasks.size() < _maxAsyncGraphicsPerFrame &&
       pendingTasks.find(generator.get()) == pendingTasks.end()) {
@@ -187,9 +161,7 @@ std::shared_ptr<ImageBuffer> LayerGraphicsLoader::loadImage(
 Path LayerGraphicsLoader::loadShape(std::shared_ptr<Shape> shape) {
   auto result = completeTasks.find(shape.get());
   if (result != completeTasks.end()) {
-    auto path = result->second->getPath();
-    completeTasks.erase(result);
-    return path;
+    return result->second->getPath();
   }
   if (pendingTasks.size() < _maxAsyncGraphicsPerFrame &&
       pendingTasks.find(shape.get()) == pendingTasks.end()) {
@@ -198,6 +170,34 @@ Path LayerGraphicsLoader::loadShape(std::shared_ptr<Shape> shape) {
     Task::Run(std::move(task), TaskPriority::Low);
   }
   return {};
+}
+
+void LayerGraphicsLoader::onAttached() {
+  std::unordered_set<Layer*> invalidLayers = {};
+  for (auto it = pendingTasks.begin(); it != pendingTasks.end();) {
+    auto& task = it->second;
+    if (task->status() == TaskStatus::Finished) {
+      auto& layers = graphicToLayers[it->first];
+      for (auto& layer : layers) {
+        invalidLayers.insert(layer);
+      }
+      completeTasks[it->first] = task;
+      it = pendingTasks.erase(it);
+    } else {
+      ++it;
+    }
+  }
+  for (auto& layer : invalidLayers) {
+    DEBUG_ASSERT(layer->_root != nullptr);
+    if (layer->contentBounds != nullptr) {
+      layer->_root->invalidateRect(*layer->contentBounds);
+      layer->invalidateDescendents();
+    }
+  }
+}
+
+void LayerGraphicsLoader::onDetached() {
+  completeTasks.clear();
 }
 
 }  // namespace tgfx

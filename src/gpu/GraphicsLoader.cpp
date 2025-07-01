@@ -25,11 +25,13 @@ AutoGraphicsLoaderRestore::AutoGraphicsLoaderRestore(Context* context, GraphicsL
   if (context != nullptr && loader != nullptr) {
     oldLoader = context->proxyProvider()->graphicsLoader;
     context->proxyProvider()->graphicsLoader = loader;
+    loader->onAttached();
   }
 }
 
 AutoGraphicsLoaderRestore::~AutoGraphicsLoaderRestore() {
   if (oldLoader != nullptr) {
+    context->proxyProvider()->graphicsLoader->onDetached();
     context->proxyProvider()->graphicsLoader = oldLoader;
   }
 }

@@ -244,6 +244,8 @@ void DisplayList::render(Surface* surface, bool autoClear) {
     return;
   }
   _hasContentChanged = false;
+  // Call before updateDirtyRegions() since graphicsLoader->onAttached() may modify dirty regions.
+  AutoGraphicsLoaderRestore autoGraphicsLoader(surface->getContext(), _root->graphicsLoader());
   auto dirtyRegions = _root->updateDirtyRegions();
   if (_zoomScaleInt == 0) {
     if (autoClear) {
@@ -252,7 +254,6 @@ void DisplayList::render(Surface* surface, bool autoClear) {
     }
     return;
   }
-  AutoGraphicsLoaderRestore autoGraphicsLoader(surface->getContext(), _root->graphicsLoader());
   switch (_renderMode) {
     case RenderMode::Direct:
       dirtyRegions = renderDirect(surface, autoClear);

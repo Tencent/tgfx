@@ -41,6 +41,21 @@ class GraphicsLoader {
    * Loads a Path from the given Shape.
    */
   virtual Path loadShape(std::shared_ptr<Shape> shape) = 0;
+
+ protected:
+  /**
+   * Called when the GraphicsLoader is attached to the Context. Subclasses can override this
+   * method to perform initialization or setup operations.
+   */
+  virtual void onAttached() = 0;
+
+  /**
+   * Called when the GraphicsLoader is detached from the Context. Subclasses can override this
+   * method to perform cleanup or reset operations.
+   */
+  virtual void onDetached() = 0;
+
+  friend class AutoGraphicsLoaderRestore;
 };
 
 /**
