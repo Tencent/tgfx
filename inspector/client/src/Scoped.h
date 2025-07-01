@@ -28,14 +28,14 @@ class Scoped {
   Scoped& operator=(const Scoped&) = delete;
   Scoped& operator=(Scoped&&) = delete;
 
-  Scoped(uint8_t type, bool isActive) : active(isActive), type(type) {
+  Scoped(OpTaskType type, bool isActive) : active(isActive), type(type) {
     if (!active) {
       return;
     }
     QueuePrepare(QueueType::OperateBegin);
-    MemWrite(&item->operateBegin.time, Inspector::GetTime());
-    MemWrite(&item->operateBegin.type, type);
-    QueueCommit(operateBegin);
+    MemWrite(&item.operateBegin.time, Inspector::GetTime());
+    MemWrite(&item.operateBegin.type, type);
+    QueueCommit();
   }
 
   ~Scoped() {
@@ -43,13 +43,13 @@ class Scoped {
       return;
     }
     QueuePrepare(QueueType::OperateEnd);
-    MemWrite(&item->operateEnd.time, Inspector::GetTime());
-    MemWrite(&item->operateEnd.type, type);
-    QueueCommit(operateEnd);
+    MemWrite(&item.operateEnd.time, Inspector::GetTime());
+    MemWrite(&item.operateEnd.type, type);
+    QueueCommit();
   }
 
  private:
   bool active;
-  uint8_t type;
+  OpTaskType type;
 };
 }  // namespace inspector

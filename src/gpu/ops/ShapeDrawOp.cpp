@@ -45,8 +45,8 @@ void ShapeDrawOp::execute(RenderPass* renderPass) {
   OperateMark(inspector::OpTaskType::ShapeDrawOp);
   AttributeTGFXName("color", color);
   AttributeTGFXName("uvMatrix", uvMatrix);
-  AttributeNameEnum("blenderMode", getBlendMode(), inspector::TGFXEnum::BlendMode);
-  AttributeNameEnum("aaType", getAAType(), inspector::TGFXEnum::AAType);
+  AttributeNameEnum("blenderMode", getBlendMode(), inspector::CustomEnumType::BlendMode);
+  AttributeNameEnum("aaType", getAAType(), inspector::CustomEnumType::AAType);
   if (shapeProxy == nullptr) {
     return;
   }

@@ -33,7 +33,7 @@ RenderTargetCreateTask::RenderTargetCreateTask(UniqueKey uniqueKey,
 std::shared_ptr<Resource> RenderTargetCreateTask::onMakeResource(Context*) {
   TaskMark(inspector::OpTaskType::RenderTargetCreateTask);
   AttributeName("sampleCount", sampleCount);
-  AttributeNameEnum("pixelFormat", pixelFormat, inspector::TGFXEnum::PixelFormat);
+  AttributeNameEnum("pixelFormat", pixelFormat, inspector::CustomEnumType::PixelFormat);
   auto texture = textureProxy->getTexture();
   if (texture == nullptr) {
     LOGE("RenderTargetCreateTask::onMakeResource() Failed to get the associated texture!");

@@ -19,24 +19,21 @@
 #pragma once
 namespace inspector {
 
-inline constexpr int broadcastNum = 5;
-
-constexpr unsigned Lz4CompressBound(unsigned isize) {
-  return isize + (isize / 255) + 16;
-}
 using lz4sz_t = int;
+static constexpr int Lz4CompressBound(int size) {
+  return size + (size / 255) + 16;
+}
+static constexpr int TargetFrameSize = 256 * 1024;
+static constexpr int LZ4Size = Lz4CompressBound(TargetFrameSize);
+static constexpr int HandshakeShibbolethSize = 4;
+static constexpr char HandshakeShibboleth[HandshakeShibbolethSize] = {'T', 'G', 'F', 'X'};
 
-enum { TargetFrameSize = 256 * 1024 };
-enum { LZ4Size = Lz4CompressBound(TargetFrameSize) };
-enum { HandshakeShibbolethSize = 4 };
-static const char HandshakeShibboleth[HandshakeShibbolethSize] = {'T', 'G', 'F', 'X'};
+static constexpr int WelcomeMessageProgramNameSize = 64;
+static constexpr int WelcomeMessageHostInfoSize = 1024;
+static constexpr uint8_t ProtocolVersion = 1;
+static constexpr uint16_t BroadcastVersion = 3;
 
-enum { WelcomeMessageProgramNameSize = 64 };
-enum { WelcomeMessageHostInfoSize = 1024 };
-enum : uint8_t { ProtocolVersion = 1 };
-enum : uint16_t { BroadcastVersion = 3 };
-
-enum HandshakeStatus : uint8_t {
+enum class HandshakeStatus : uint8_t {
   HandshakePending,
   HandshakeWelcome,
   HandshakeProtocolMismatch,
@@ -44,7 +41,7 @@ enum HandshakeStatus : uint8_t {
   HandshakeDropped
 };
 
-enum MsgType : uint8_t { FrameCapture = 0, LayerTree = 1 };
+enum class MsgType : uint8_t { FrameCapture = 0, LayerTree = 1 };
 
 struct BroadcastMessage {
   uint8_t type;
@@ -61,7 +58,7 @@ struct WelcomeMessage {
   int64_t refTime;
 };
 
-enum ServerQuery : uint8_t {
+enum class ServerQuery : uint8_t {
   ServerQueryTerminate,
   ServerQueryString,
   ServerQueryFrameName,
@@ -75,9 +72,7 @@ struct ServerQueryPacket {
   uint32_t extra;
 };
 
-enum { ServerQueryPacketSize = sizeof(ServerQueryPacket) };
-
-enum OpTaskType : uint8_t {
+enum class OpTaskType : uint8_t {
   Unknown = 0,
   Flush,
   ResourceTask,
@@ -101,7 +96,7 @@ enum OpTaskType : uint8_t {
   OpTaskTypeSize,
 };
 
-enum TGFXEnum : uint8_t {
+enum class CustomEnumType : uint8_t {
   BufferType = 0,
   BlendMode,
   AAType,

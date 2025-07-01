@@ -28,7 +28,7 @@ GpuBufferUploadTask::GpuBufferUploadTask(UniqueKey uniqueKey, BufferType bufferT
 
 std::shared_ptr<Resource> GpuBufferUploadTask::onMakeResource(Context* context) {
   TaskMark(inspector::OpTaskType::GpuUploadTask);
-  AttributeEnum(bufferType, inspector::TGFXEnum::BufferType);
+  AttributeEnum(bufferType, inspector::CustomEnumType::BufferType);
   if (source == nullptr) {
     return nullptr;
   }

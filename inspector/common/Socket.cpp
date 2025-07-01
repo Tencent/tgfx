@@ -32,7 +32,6 @@
 #endif
 #else
 #include <arpa/inet.h>
-#include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -40,17 +39,18 @@
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <cerrno>
 #endif
 
 #include <cassert>
 #include <cinttypes>
 #include <cstdio>
 #include "Alloc.h"
+#include "ProcessUtils.h"
 #include "Socket.h"
-#include "Utils.h"
 
 #ifndef MSG_NOSIGNAL
-#  define MSG_NOSIGNAL 0
+#define MSG_NOSIGNAL 0
 #endif
 
 namespace inspector {
@@ -62,18 +62,14 @@ typedef int socket_t;
 
 enum { BufSize = 128 * 1024 };
 
-Socket::Socket()
-    : buf((char*)inspectorMalloc(BufSize)), bufPtr(nullptr), sock(-1), bufLeft(0), res(nullptr),
-      ptr(nullptr), connSock(0) {
+Socket::Socket() : buf((char*)malloc(BufSize)), sock(-1) {
 }
 
-Socket::Socket(int sock)
-    : buf((char*)inspectorMalloc(BufSize)), bufPtr(nullptr), sock(sock), bufLeft(0), res(nullptr),
-      ptr(nullptr), connSock(0) {
+Socket::Socket(int sock) : buf((char*)malloc(BufSize)), sock(sock) {
 }
 
 Socket::~Socket() {
-  inspectorFree(buf);
+  free(buf);
   if (sock.load(std::memory_order_relaxed) != -1) {
     Close();
   }
@@ -131,8 +127,9 @@ bool Socket::Connect(const char* addr, uint16_t port) {
     return true;
   }
 
-  struct addrinfo hints;
-  struct addrinfo *res, *ptr;
+  struct addrinfo hints = {};
+  struct addrinfo* res = nullptr;
+  struct addrinfo* ptr = nullptr;
 
   memset(&hints, 0, sizeof(hints));
   hints.ai_family = AF_UNSPEC;
@@ -202,8 +199,9 @@ bool Socket::ConnectBlocking(const char* addr, uint16_t port) {
   assert(!IsValid());
   assert(!ptr);
 
-  struct addrinfo hints;
-  struct addrinfo *res, *ptr;
+  struct addrinfo hints = {};
+  struct addrinfo* res = nullptr;
+  struct addrinfo* ptr = nullptr;
 
   memset(&hints, 0, sizeof(hints));
   hints.ai_family = AF_UNSPEC;
@@ -334,7 +332,7 @@ int Socket::Recv(void* _buf, size_t len, int timeout) {
 
 int Socket::ReadUpTo(void* _buf, size_t len) {
   const auto sock = this->sock.load(std::memory_order_relaxed);
-  auto buf = (char*)_buf;
+  auto buf = static_cast<char*>(_buf);
 
   int rd = 0;
   while (len > 0) {
@@ -412,7 +410,7 @@ bool Socket::HasData() {
     return true;
   }
 
-  struct pollfd fd;
+  struct pollfd fd = {};
   fd.fd = (socket_t)sock;
   fd.events = POLLIN;
 
@@ -425,7 +423,7 @@ bool Socket::IsValid() const {
 
 ListenSocket::ListenSocket() : sock(-1) {
 #ifdef _WIN32
-  // InitWinSock();
+// InitWinSock();
 #endif
 }
 
@@ -436,7 +434,7 @@ ListenSocket::~ListenSocket() {
 }
 
 static int addrinfo_and_socket_for_family(uint16_t port, int ai_family, struct addrinfo** res) {
-  struct addrinfo hints;
+  struct addrinfo hints = {};
   memset(&hints, 0, sizeof(hints));
   hints.ai_family = ai_family;
   hints.ai_socktype = SOCK_STREAM;
@@ -494,11 +492,11 @@ bool ListenSocket::Listen(uint16_t port, int backlog) {
   return true;
 }
 
-Socket* ListenSocket::Accept() {
-  struct sockaddr_storage remote;
+std::shared_ptr<Socket> ListenSocket::Accept() {
+  struct sockaddr_storage remote = {};
   socklen_t sz = sizeof(remote);
 
-  struct pollfd fd;
+  struct pollfd fd = {};
   fd.fd = (socket_t)this->sock;
   fd.events = POLLIN;
 
@@ -512,10 +510,7 @@ Socket* ListenSocket::Accept() {
     int val = 1;
     setsockopt(sock, SOL_SOCKET, SO_NOSIGPIPE, &val, sizeof(val));
 #endif
-
-    auto ptr = (Socket*)inspectorMalloc(sizeof(Socket));
-    new (ptr) Socket(sock);
-    return ptr;
+    return std::make_shared<Socket>(sock);
   } else {
     return nullptr;
   }
@@ -533,7 +528,7 @@ void ListenSocket::Close() {
 
 UdpBroadcast::UdpBroadcast() : sock(-1) {
 #ifdef _WIN32
-  // InitWinSock();
+// InitWinSock();
 #endif
 }
 
@@ -546,8 +541,9 @@ UdpBroadcast::~UdpBroadcast() {
 bool UdpBroadcast::Open(const char* addr, uint16_t port) {
   assert(this->sock == -1);
 
-  struct addrinfo hints;
-  struct addrinfo *res, *ptr;
+  struct addrinfo hints = {};
+  struct addrinfo* res = nullptr;
+  struct addrinfo* ptr = nullptr;
 
   memset(&hints, 0, sizeof(hints));
   hints.ai_family = AF_INET;
@@ -610,11 +606,12 @@ int UdpBroadcast::Send(uint16_t port, const void* data, size_t len) {
   char strAddr[17];
   inet_ntop(AF_INET, &this->addr, strAddr, 17);
   assert(this->sock != -1);
-  struct sockaddr_in addr;
+  struct sockaddr_in addr = {};
   addr.sin_family = AF_INET;
   addr.sin_port = htons(port);
   addr.sin_addr.s_addr = this->addr;
-  return (int)sendto(this->sock, (const char*)data, len, MSG_NOSIGNAL, (sockaddr*)&addr, sizeof(addr));
+  return (int)sendto(this->sock, (const char*)data, len, MSG_NOSIGNAL, (sockaddr*)&addr,
+                     sizeof(addr));
 }
 
 IpAddress::IpAddress() : number(0) {
@@ -637,7 +634,7 @@ void IpAddress::Set(const struct sockaddr& addr) {
 
 UdpListen::UdpListen() : sock(-1) {
 #ifdef _WIN32
-  // InitWinSock();
+// InitWinSock();
 #endif
 }
 
@@ -682,7 +679,7 @@ bool UdpListen::Listen(uint16_t port) {
     return false;
   }
 
-  struct sockaddr_in addr;
+  struct sockaddr_in addr = {};
   addr.sin_family = AF_INET;
   addr.sin_port = htons(port);
   addr.sin_addr.s_addr = INADDR_ANY;
@@ -713,14 +710,14 @@ void UdpListen::Close() {
 const char* UdpListen::Read(size_t& len, IpAddress& addr, int timeout) {
   static char buf[2048];
 
-  struct pollfd fd;
+  struct pollfd fd = {};
   fd.fd = (socket_t)this->sock;
   fd.events = POLLIN;
   if (poll(&fd, 1, timeout) <= 0) {
     return nullptr;
   }
 
-  sockaddr sa;
+  sockaddr sa = {};
   socklen_t salen = sizeof(struct sockaddr);
   len = (size_t)recvfrom(this->sock, buf, 2048, 0, &sa, &salen);
   addr.Set(sa);

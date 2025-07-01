@@ -69,14 +69,14 @@ class Socket {
 
   bool ReadImpl(char*& buf, size_t& len, int timeout);
 
-  char* buf;
-  char* bufPtr;
-  std::atomic<int> sock;
-  int bufLeft;
+  char* buf = nullptr;
+  char* bufPtr = nullptr;
+  std::atomic<int> sock = 0;
+  int bufLeft = 0;
 
-  struct addrinfo* res;
-  struct addrinfo* ptr;
-  int connSock;
+  struct addrinfo* res = nullptr;
+  struct addrinfo* ptr = nullptr;
+  int connSock = 0;
 };
 
 class ListenSocket {
@@ -85,7 +85,7 @@ class ListenSocket {
   ~ListenSocket();
 
   bool Listen(uint16_t port, int backlog);
-  Socket* Accept();
+  std::shared_ptr<Socket> Accept();
   void Close();
 
   ListenSocket(const ListenSocket&) = delete;
@@ -94,7 +94,7 @@ class ListenSocket {
   ListenSocket& operator=(ListenSocket&&) = delete;
 
  private:
-  int sock;
+  int sock = 0;
 };
 
 class UdpBroadcast {
@@ -113,8 +113,8 @@ class UdpBroadcast {
   UdpBroadcast& operator=(UdpBroadcast&&) = delete;
 
  private:
-  int sock;
-  uint32_t addr;
+  int sock = 0;
+  uint32_t addr = 0;
 };
 
 class IpAddress {
@@ -137,8 +137,8 @@ class IpAddress {
   IpAddress& operator=(IpAddress&&) = delete;
 
  private:
-  uint32_t number;
-  char text[17];
+  uint32_t number = 0;
+  char text[17] = "";
 };
 
 class UdpListen {
@@ -157,7 +157,7 @@ class UdpListen {
   UdpListen& operator=(UdpListen&&) = delete;
 
  private:
-  int sock;
+  int sock = 0;
 };
 
 }  // namespace inspector

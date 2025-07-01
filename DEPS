@@ -74,6 +74,11 @@
          "url": "https://github.com/cameron314/concurrentqueue.git",
          "commit": "6dd38b8a1dbaa7863aa907045f32308a56a6ff5d",
          "dir": "third_party/concurrentqueue"
+      },
+      {
+         "url": "https://github.com/lz4/lz4",
+         "commit": "cacca37747572717ceb1f156eb9840644205ca4f",
+         "dir": "third_party/lz4"
       }
     ]
   },

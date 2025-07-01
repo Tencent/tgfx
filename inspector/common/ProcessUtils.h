@@ -18,30 +18,11 @@
 
 #pragma once
 #include <cstdint>
-#include <memory>
-#include <cstring>
 #include "Protocol.h"
 
 namespace inspector {
-template <typename T>
-T MemRead(const void* ptr) {
-  T val;
-  memcpy(&val, ptr, sizeof(T));
-  return val;
-}
-
-template <typename T>
-void MemWrite(void* ptr, T val) {
-  memcpy(ptr, &val, sizeof(T));
-}
-
-template <typename T>
-void MemWrite(void* ptr, T* val, size_t size) {
-  memcpy(ptr, val, size);
-}
-
 uint64_t GetPid();
 const char* GetProcessName();
 BroadcastMessage GetBroadcastMessage(const char* procname, size_t pnsz, size_t& len, uint16_t port,
-                                     uint8_t type);
+                                     MsgType type);
 }  // namespace inspector

@@ -16,23 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#if defined __SSE2__ || defined _M_AMD64 || (defined _M_IX86_FP && _M_IX86_FP == 2)
-#include <emmintrin.h>
-#else
-#include <thread>
-#endif
-
 #pragma once
+#include <cstring>
 
 namespace inspector {
+template <typename T>
+T MemRead(const void* ptr) {
+  T val;
+  memcpy(&val, ptr, sizeof(T));
+  return val;
+}
 
-static void YieldThread() {
-#if defined __SSE2__ || defined _M_AMD64 || (defined _M_IX86_FP && _M_IX86_FP == 2)
-  _mm_pause();
-#elif defined __aarch64__
-  asm volatile("isb" : :);
-#else
-  std::this_thread::yield();
-#endif
+template <typename T>
+void MemWrite(void* ptr, T val) {
+  memcpy(ptr, &val, sizeof(T));
+}
+
+template <typename T>
+void MemWrite(void* ptr, T* val, size_t size) {
+  memcpy(ptr, val, size);
 }
 }  // namespace inspector

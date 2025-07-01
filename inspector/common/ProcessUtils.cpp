@@ -37,7 +37,7 @@
 #endif
 
 #include <cinttypes>
-#include "Utils.h"
+#include "ProcessUtils.h"
 
 namespace inspector {
 uint64_t GetPid() {
@@ -68,9 +68,9 @@ const char* GetProcessName() {
 }
 
 BroadcastMessage GetBroadcastMessage(const char* procname, size_t pnsz, size_t& len, uint16_t port,
-                                     uint8_t type) {
-  BroadcastMessage msg;
-  msg.type = type;
+                                     MsgType type) {
+  BroadcastMessage msg = {};
+  msg.type = static_cast<uint8_t>(type);
   msg.protocolVersion = ProtocolVersion;
   msg.listenPort = port;
   msg.pid = GetPid();

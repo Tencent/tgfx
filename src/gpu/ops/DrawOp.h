@@ -32,7 +32,7 @@ class DrawOp : public Op {
     return _scissorRect;
   }
 
-  const BlendMode& getBlendMode() const {
+  BlendMode getBlendMode() const {
     return blendMode;
   }
 

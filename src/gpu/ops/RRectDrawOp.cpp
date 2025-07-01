@@ -60,8 +60,8 @@ void RRectDrawOp::execute(RenderPass* renderPass) {
   AttributeName("useScale", useScale);
   AttributeName("hasStroke", hasStroke);
   AttributeTGFXName("commonColor", commonColor);
-  AttributeNameEnum("blenderMode", getBlendMode(), inspector::TGFXEnum::BlendMode);
-  AttributeNameEnum("aaType", getAAType(), inspector::TGFXEnum::AAType);
+  AttributeNameEnum("blenderMode", getBlendMode(), inspector::CustomEnumType::BlendMode);
+  AttributeNameEnum("aaType", getAAType(), inspector::CustomEnumType::AAType);
   if (indexBufferProxy == nullptr) {
     return;
   }

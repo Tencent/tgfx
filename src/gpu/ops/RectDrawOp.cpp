@@ -67,8 +67,8 @@ void RectDrawOp::execute(RenderPass* renderPass) {
   AttributeTGFXName("commonColor", commonColor);
   AttributeTGFXName("uvMatrix", uvMatrix);
   AttributeTGFXName("scissorRect", scissorRect());
-  AttributeNameEnum("blenderMode", getBlendMode(), inspector::TGFXEnum::BlendMode);
-  AttributeNameEnum("aaType", getAAType(), inspector::TGFXEnum::AAType);
+  AttributeNameEnum("blenderMode", getBlendMode(), inspector::CustomEnumType::BlendMode);
+  AttributeNameEnum("aaType", getAAType(), inspector::CustomEnumType::AAType);
   std::shared_ptr<GpuBuffer> indexBuffer;
   if (indexBufferProxy) {
     indexBuffer = indexBufferProxy->getBuffer();

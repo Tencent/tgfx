@@ -27,7 +27,7 @@
 #define TaskMark(type) ScopedMark(type, true)
 
 #define AttributeName(name, value) inspector::Inspector::SendAttributeData(name, value)
-#define AttributeNameFloatArray(name, value, size)
-#define AttributeNameEnum(name, value, type) inspector::Inspector::SendAttributeData(name, static_cast<uint8_t>(value), static_cast<uint8_t>(type))
-
+#define AttributeNameEnum(name, value, type)                                 \
+  inspector::Inspector::SendAttributeData(name, static_cast<uint8_t>(value), \
+                                          static_cast<uint8_t>(type))
 #define AttributeEnum(value, type) AttributeNameEnum(#value, value, type)

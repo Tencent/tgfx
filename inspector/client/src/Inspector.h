@@ -17,34 +17,32 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <iostream>
-#include <mutex>
 #include <thread>
-#include <chrono>
-#include "FastVector.h"
+#include "MemoryUtils.h"
 #include "Protocol.h"
 #include "Queue.h"
+#include "Singleton.h"
 #include "Socket.h"
-#include "Utils.h"
 
 #if defined _WIN32
-#  include <intrin.h>
+#include <intrin.h>
 #endif
 #ifdef __APPLE__
-#  include <TargetConditionals.h>
-#  include <mach/mach_time.h>
+#include <TargetConditionals.h>
+#include <mach/mach_time.h>
 #endif
 
 namespace inspector {
-#define QueuePrepare(_type)             \
-  auto item = Inspector::QueueSerial(); \
-  MemWrite(&item->hdr.type, _type);
-#define QueueCommit(name) Inspector::QueueSerialFinish();
+#define QueuePrepare(_type) \
+  auto item = QueueItem();  \
+  MemWrite(&item.hdr.type, _type);
+#define QueueCommit() Inspector::QueueSerialFinish(item);
 
 class Inspector;
 Inspector& GetInspector();
 uint32_t GetThreadHandle();
 
+typedef Singleton<Inspector> InspectorSingleton;
 class Inspector {
  public:
   Inspector();
@@ -56,76 +54,70 @@ class Inspector {
         .count();
   }
 
-  static QueueItem* QueueSerial() {
-    auto& inspector = GetInspector();
-    inspector.serialLock.lock();
-    return inspector.serialQueue.prepare_next();
-  }
-
-  static void QueueSerialFinish() {
-    auto& inspector = GetInspector();
-    inspector.serialQueue.commit_next();
-    inspector.serialLock.unlock();
+  static void QueueSerialFinish(QueueItem item) {
+    auto inspector = InspectorSingleton::GetInstance();
+    inspector->serialLock.lock();
+    inspector->serialQueue.push_back(item);
+    inspector->serialLock.unlock();
   }
 
   static void SendFrameMark(const char* name) {
     if (!name) {
-      GetInspector().frameCount.fetch_add(1, std::memory_order_relaxed);
+      InspectorSingleton::GetInstance()->frameCount.fetch_add(1, std::memory_order_relaxed);
     }
-    auto item = QueueSerial();
-    MemWrite(&item->hdr.type, QueueType::FrameMarkMsg);
-    MemWrite(&item->frameMark.time, GetTime());
-    QueueSerialFinish();
+    auto item = QueueItem();
+    MemWrite(&item.hdr.type, QueueType::FrameMarkMsg);
+    MemWrite(&item.frameMark.time, GetTime());
+    QueueSerialFinish(item);
   }
 
   static void SendAttributeData(const char* name, int val) {
     QueuePrepare(QueueType::ValueDataInt);
-    MemWrite(&item->attributeDataInt.name, (uint64_t)name);
-    MemWrite(&item->attributeDataInt.value, val);
-    QueueCommit(attributeDataInt);
+    MemWrite(&item.attributeDataInt.name, (uint64_t)name);
+    MemWrite(&item.attributeDataInt.value, val);
+    QueueCommit();
   }
 
   static void SendAttributeData(const char* name, float val) {
-    QueuePrepare(QueueType::ValueDataFloat)
-        MemWrite(&item->attributeDataFloat.name, (uint64_t)name);
-    MemWrite(&item->attributeDataFloat.value, val);
-    QueueCommit(attributeDataFloat);
+    QueuePrepare(QueueType::ValueDataFloat) MemWrite(&item.attributeDataFloat.name, (uint64_t)name);
+    MemWrite(&item.attributeDataFloat.value, val);
+    QueueCommit();
   }
 
   static void SendAttributeData(const char* name, bool val) {
     QueuePrepare(QueueType::ValueDataBool);
-    MemWrite(&item->attributeDataBool.name, (uint64_t)name);
-    MemWrite(&item->attributeDataBool.value, val);
-    QueueCommit(attributeDataBool);
+    MemWrite(&item.attributeDataBool.name, (uint64_t)name);
+    MemWrite(&item.attributeDataBool.value, val);
+    QueueCommit();
   }
 
   static void SendAttributeData(const char* name, uint8_t val, uint8_t type) {
     QueuePrepare(QueueType::ValueDataEnum);
-    MemWrite(&item->attributeDataEnum.name, (uint64_t)name);
+    MemWrite(&item.attributeDataEnum.name, (uint64_t)name);
     auto value = static_cast<uint16_t>(type << 8 | val);
-    MemWrite(&item->attributeDataEnum.value, value);
-    QueueCommit(attributeDataEnum);
+    MemWrite(&item.attributeDataEnum.value, value);
+    QueueCommit();
   }
 
   static void SendAttributeData(const char* name, uint32_t val,
                                 QueueType type = QueueType::ValueDataUint32) {
     QueuePrepare(type);
-    MemWrite(&item->attributeDataUint32.name, (uint64_t)name);
-    MemWrite(&item->attributeDataUint32.value, val);
-    QueueCommit(attributeDataUint32);
+    MemWrite(&item.attributeDataUint32.name, (uint64_t)name);
+    MemWrite(&item.attributeDataUint32.value, val);
+    QueueCommit();
   }
 
   static void SendAttributeData(const char* name, float* val, int size) {
     if (size == 4) {
       QueuePrepare(QueueType::ValueDataFloat4);
-      MemWrite(&item->attributeDataFloat4.name, (uint64_t)name);
-      MemWrite(item->attributeDataFloat4.value, val, static_cast<size_t>(size) * sizeof(float));
-      QueueCommit(attributeDataFloat4);
+      MemWrite(&item.attributeDataFloat4.name, (uint64_t)name);
+      MemWrite(item.attributeDataFloat4.value, val, static_cast<size_t>(size) * sizeof(float));
+      QueueCommit();
     } else if (size == 6) {
       QueuePrepare(QueueType::ValueDataMat4);
-      MemWrite(&item->attributeDataMat4.name, (uint64_t)name);
-      MemWrite(item->attributeDataMat4.value, val, static_cast<size_t>(size) * sizeof(float));
-      QueueCommit(attributeDataMat4);
+      MemWrite(&item.attributeDataMat4.name, (uint64_t)name);
+      MemWrite(item.attributeDataMat4.value, val, static_cast<size_t>(size) * sizeof(float));
+      QueueCommit();
     }
   }
 
@@ -155,7 +147,6 @@ class Inspector {
   }
 
   bool NeetDataSize(size_t len) {
-    assert(len <= TargetFrameSize);
     bool ret = true;
     if (size_t(dataBufferOffset - dataBufferStart) + len > TargetFrameSize) {
       ret = CommitData();
@@ -173,28 +164,31 @@ class Inspector {
   DequeueStatus DequeueSerial();
 
  private:
-  int64_t epoch;
+  static constexpr int BROAD_CAST_NUIM = 5;
+
+  int64_t epoch = 0;
+  int64_t initTime = GetTime();
   char* dataBuffer = nullptr;
   char* lz4Buf = nullptr;
-  std::atomic<bool> shutdown;
-  std::atomic<int64_t> timeBegin;
-  std::atomic<uint64_t> frameCount;
-  std::atomic<bool> isConnect;
-  Socket* sock = nullptr;
+  void* lz4Stream = nullptr;
+  std::atomic<bool> shutdown = false;
+  std::atomic<int64_t> timeBegin = 0;
+  std::atomic<uint64_t> frameCount = 0;
+  std::atomic<bool> isConnect = false;
+  std::shared_ptr<Socket> sock = nullptr;
 
-  int64_t refTimeThread;
+  int64_t refTimeThread = 0;
 
-  FastVector<QueueItem> serialQueue;
-  FastVector<QueueItem> serialDequeue;
+  std::vector<QueueItem> serialQueue;
+  std::vector<QueueItem> serialDequeue;
   std::mutex serialLock;
 
-  std::thread* messageThread = nullptr;
-  UdpBroadcast* broadcast[broadcastNum] = {nullptr};
+  std::unique_ptr<std::thread> messageThread = nullptr;
+  std::vector<std::shared_ptr<UdpBroadcast>> broadcast;
   const char* programName = nullptr;
   std::mutex programNameLock;
 
-  void* lz4Stream = nullptr;
-  int dataBufferOffset;
-  int dataBufferStart;
+  int dataBufferOffset = 0;
+  int dataBufferStart = 0;
 };
 }  // namespace inspector

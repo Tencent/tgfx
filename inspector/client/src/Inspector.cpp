@@ -19,124 +19,75 @@
 
 #include "Inspector.h"
 #include <atomic>
-#include <iostream>
-#include <new>
 #include <chrono>
-#include "Alloc.h"
-#include "LZ4.h"
+#include <iostream>
+#include "ProcessUtils.h"
 #include "Protocol.h"
 #include "Socket.h"
-#include "Yield.h"
+#include "lz4.h"
 
 namespace inspector {
-
-struct SourceLocationData {
-  const char* name;
-  const char* function;
-};
-
-struct InspectorData {
-  int64_t initTime = Inspector::GetTime();
-  Inspector inspector;
-};
-
-static std::atomic<int> inspectorDataLock{0};
-static std::atomic<InspectorData*> inspectorData{nullptr};
-static Inspector* s_instance = nullptr;
-
-static InspectorData& GetInspectorData() {
-  auto ptr = inspectorData.load(std::memory_order_acquire);
-  if (!ptr) {
-    int expected = 0;
-    while (!inspectorDataLock.compare_exchange_weak(expected, 1, std::memory_order_release,
-                                                    std::memory_order_relaxed)) {
-      expected = 0;
-      YieldThread();
-    }
-    ptr = inspectorData.load(std::memory_order_acquire);
-    if (!ptr) {
-      ptr = (InspectorData*)inspectorMalloc(sizeof(InspectorData));
-      new (ptr) InspectorData();
-      inspectorData.store(ptr, std::memory_order_release);
-    }
-    inspectorDataLock.store(0, std::memory_order_release);
-  }
-  return *ptr;
-}
-
-Inspector& GetInspector() {
-  return GetInspectorData().inspector;
-}
-
-int64_t GetInitTime() {
-  return GetInspectorData().initTime;
-}
-
 Inspector::Inspector()
     : epoch(std::chrono::duration_cast<std::chrono::seconds>(
                 std::chrono::system_clock::now().time_since_epoch())
                 .count()),
-      dataBuffer((char*)inspectorMalloc(TargetFrameSize * 3)),
-      lz4Buf((char*)inspectorMalloc(LZ4Size + sizeof(lz4sz_t))), shutdown(false), timeBegin(0),
-      frameCount(0), isConnect(false), refTimeThread(0), serialQueue(1024 * 1024),
-      serialDequeue(1024 * 1024), lz4Stream(LZ4_createStream()), dataBufferOffset(0),
-      dataBufferStart(0) {
-  s_instance = this;
+      dataBuffer(static_cast<char*>(malloc(TargetFrameSize * 3))),
+      lz4Buf(static_cast<char*>(malloc(LZ4Size + sizeof(lz4sz_t)))), lz4Stream(LZ4_createStream()),
+      broadcast(BROAD_CAST_NUIM) {
+  serialDequeue.reserve(1024 * 1024);
+  serialQueue.reserve(1024 * 1024);
   SpawnWorkerThreads();
 }
 
 Inspector::~Inspector() {
   shutdown.store(true, std::memory_order_relaxed);
-  messageThread->join();
-  inspectorFree(messageThread);
-  inspectorFree(lz4Buf);
-  inspectorFree(dataBuffer);
-  LZ4_freeStream((LZ4_stream_t*)lz4Stream);
-
-  if (sock) {
-    sock->~Socket();
-    inspectorFree(sock);
+  if (messageThread) {
+    messageThread->join();
+    messageThread.reset();
   }
-  for (uint16_t i = 0; i < broadcastNum; i++) {
-    if (broadcast[i]) {
-      broadcast[i]->~UdpBroadcast();
-      inspectorFree(broadcast[i]);
-    }
+  broadcast.clear();
+  if (lz4Buf) {
+    free(lz4Buf);
+    lz4Buf = nullptr;
+  }
+  if (dataBuffer) {
+    free(dataBuffer);
+    dataBuffer = nullptr;
+  }
+  if (lz4Stream) {
+    LZ4_freeStream((LZ4_stream_t*)lz4Stream);
+    lz4Stream = nullptr;
   }
 }
-
 void Inspector::SpawnWorkerThreads() {
-  messageThread = (std::thread*)inspectorMalloc(sizeof(std::thread));
-  new (messageThread) std::thread(LaunchWorker, this);
-
+  messageThread = std::make_unique<std::thread>(LaunchWorker, this);
   timeBegin.store(GetTime(), std::memory_order_relaxed);
 }
 
 bool Inspector::HandleServerQuery() {
-  ServerQueryPacket payload;
-  if (!this->sock->Read(&payload, sizeof(payload), 10)) {
+  ServerQueryPacket payload = {};
+  if (!sock->Read(&payload, sizeof(payload), 10)) {
     return false;
   }
-  uint8_t type;
+  ServerQuery type;
   uint64_t ptr;
   memcpy(&type, &payload.type, sizeof(payload.type));
   memcpy(&ptr, &payload.ptr, sizeof(payload.ptr));
 
   switch (type) {
-    case ServerQueryString: {
+    case ServerQuery::ServerQueryString: {
       SendString(ptr, (const char*)ptr, QueueType::StringData);
     }
-    case ServerQueryFrameName: {
+    case ServerQuery::ServerQueryFrameName: {
       break;
     }
-    case ServerQueryValueName: {
+    case ServerQuery::ServerQueryValueName: {
       SendString(ptr, (const char*)ptr, QueueType::ValueName);
     }
-    case ServerQueryDisconnect: {
+    case ServerQuery::ServerQueryDisconnect: {
       break;
     }
     default: {
-      assert(false);
       break;
     }
   }
@@ -145,17 +96,14 @@ bool Inspector::HandleServerQuery() {
 }
 
 bool Inspector::ShouldExit() {
-  return s_instance->shutdown.load(std::memory_order_relaxed);
+  return InspectorSingleton::GetInstance()->shutdown.load(std::memory_order_relaxed);
 }
 
 void Inspector::SendString(uint64_t str, const char* ptr, size_t len, QueueType type) {
-  assert(type == QueueType::StringData || type == QueueType::ValueName);
-
-  QueueItem item;
+  QueueItem item = {};
   MemWrite(&item.hdr.type, type);
   MemWrite(&item.stringTransfer.ptr, str);
 
-  assert(len <= std::numeric_limits<uint16_t>::max());
   auto l16 = uint16_t(len);
   NeetDataSize(QueueDataSize[static_cast<int>(type)] + sizeof(l16) + l16);
 
@@ -165,7 +113,7 @@ void Inspector::SendString(uint64_t str, const char* ptr, size_t len, QueueType 
 }
 
 void Inspector::Worker() {
-  const char* addr = "255.255.255.255";
+  std::string addr = "255.255.255.255";
   uint16_t dataPort = 8086;
   const auto broadcastPort = 8086;
   const auto procname = GetProcessName();
@@ -175,11 +123,11 @@ void Inspector::Worker() {
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
 
-  WelcomeMessage welcome;
-  MemWrite(&welcome.initBegin, GetInitTime());
+  auto welcome = WelcomeMessage{};
+  MemWrite(&welcome.initBegin, InspectorSingleton::GetInstance()->initTime);
   MemWrite(&welcome.initEnd, timeBegin.load(std::memory_order_relaxed));
 
-  ListenSocket listen;
+  auto listen = ListenSocket{};
   bool isListening = false;
   for (uint16_t i = 0; i < 20; ++i) {
     if (listen.Listen(dataPort + i, 4)) {
@@ -197,24 +145,22 @@ void Inspector::Worker() {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
   }
-  for (uint16_t i = 0; i < broadcastNum; i++) {
-    broadcast[i] = (UdpBroadcast*)inspectorMalloc(sizeof(UdpBroadcast));
-    new (broadcast[i]) UdpBroadcast();
-    if (!broadcast[i]->Open(addr, broadcastPort + i)) {
-      broadcast[i]->~UdpBroadcast();
-      inspectorFree(broadcast[i]);
-      broadcast[i] = nullptr;
+  for (uint16_t i = 0; i < BROAD_CAST_NUIM; i++) {
+    broadcast[i] = std::make_shared<UdpBroadcast>();
+    if (!broadcast[i]->Open(addr.c_str(), broadcastPort + i)) {
+      broadcast[i].reset();
     }
   }
 
   size_t broadcastLen = 0;
-  auto broadcastMsg = GetBroadcastMessage(procname, pnsz, broadcastLen, dataPort, FrameCapture);
+  auto broadcastMsg =
+      GetBroadcastMessage(procname, pnsz, broadcastLen, dataPort, MsgType::FrameCapture);
   long long lastBroadcast = 0;
   while (true) {
     MemWrite(&welcome.refTime, refTimeThread);
     while (true) {
       if (ShouldExit()) {
-        for (uint16_t i = 0; i < broadcastNum; i++) {
+        for (uint16_t i = 0; i < BROAD_CAST_NUIM; i++) {
           if (broadcast[i]) {
             broadcastMsg.activeTime = -1;
             broadcast[i]->Send(broadcastPort + i, &broadcastMsg, broadcastLen);
@@ -229,12 +175,12 @@ void Inspector::Worker() {
       const auto t = std::chrono::high_resolution_clock::now().time_since_epoch().count();
       if (t - lastBroadcast > 3000000000) {
         lastBroadcast = t;
-        for (uint16_t i = 0; i < broadcastNum; i++) {
+        for (uint16_t i = 0; i < BROAD_CAST_NUIM; i++) {
           if (broadcast[i]) {
             programNameLock.lock();
             if (programName) {
               broadcastMsg = GetBroadcastMessage(programName, strlen(programName), broadcastLen,
-                                                 dataPort, FrameCapture);
+                                                 dataPort, MsgType::FrameCapture);
               programName = nullptr;
             }
             programNameLock.unlock();
@@ -243,13 +189,12 @@ void Inspector::Worker() {
                                 std::chrono::system_clock::now().time_since_epoch())
                                 .count();
             broadcastMsg.activeTime = int32_t(ts - epoch);
-            assert(broadcastMsg.activeTime >= 0);
             broadcast[i]->Send(broadcastPort + i, &broadcastMsg, broadcastLen);
           }
         }
       }
     }
-    for (uint16_t i = 0; i < broadcastNum; i++) {
+    for (uint16_t i = 0; i < BROAD_CAST_NUIM; i++) {
       if (broadcast[i]) {
         lastBroadcast = 0;
         broadcastMsg.activeTime = -1;
@@ -261,38 +206,32 @@ void Inspector::Worker() {
       char shibboleth[HandshakeShibbolethSize];
       auto res = this->sock->ReadRaw(shibboleth, HandshakeShibbolethSize, 2000);
       if (!res || memcmp(shibboleth, HandshakeShibboleth, HandshakeShibbolethSize) != 0) {
-        this->sock->~Socket();
-        inspectorFree(this->sock);
-        this->sock = nullptr;
+        sock.reset();
         continue;
       }
 
       uint32_t protocolVersion;
       res = this->sock->ReadRaw(&protocolVersion, sizeof(protocolVersion), 2000);
       if (!res) {
-        this->sock->~Socket();
-        inspectorFree(this->sock);
-        this->sock = nullptr;
+        sock.reset();
         continue;
       }
 
       if (protocolVersion != ProtocolVersion) {
-        HandshakeStatus status = HandshakeProtocolMismatch;
+        auto status = HandshakeStatus::HandshakeProtocolMismatch;
         this->sock->Send(&status, sizeof(status));
-        this->sock->~Socket();
-        inspectorFree(this->sock);
-        this->sock = nullptr;
+        sock.reset();
         continue;
       }
     }
     isConnect.store(true, std::memory_order_release);
-    HandshakeStatus handshake = HandshakeWelcome;
+    auto handshake = HandshakeStatus::HandshakeWelcome;
     sock->Send(&handshake, sizeof(handshake));
 
     LZ4_resetStream((LZ4_stream_t*)lz4Stream);
     this->sock->Send(&welcome, sizeof(welcome));
 
-    int keepAlive = 0;
+    auto keepAlive = 0;
     while (true) {
       const auto serialStatus = DequeueSerial();
       if (serialStatus == DequeueStatus::ConnectionLost) {
@@ -339,9 +278,7 @@ void Inspector::Worker() {
     }
 
     isConnect.store(false, std::memory_order_release);
-    this->sock->~Socket();
-    inspectorFree(this->sock);
-    this->sock = nullptr;
+    sock.reset();
   }
 }
 
@@ -356,7 +293,7 @@ bool Inspector::CommitData() {
 
 bool Inspector::SendData(const char* data, size_t len) {
   const auto lz4sz = LZ4_compress_fast_continue((LZ4_stream_t*)lz4Stream, data,
-                                                   lz4Buf + sizeof(lz4sz_t), (int)len, LZ4Size, 1);
+                                                lz4Buf + sizeof(lz4sz_t), (int)len, LZ4Size, 1);
   memcpy(lz4Buf, &lz4sz, sizeof(lz4sz));
   return sock->Send(lz4Buf, size_t(lz4sz) + sizeof(lz4sz_t)) != -1;
 }

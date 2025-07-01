@@ -8,15 +8,21 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 set(INSPECTOR_COMMON_DIR common)
 set(INSPECTOR_CLIENT_DIR client/src)
+set(LZ4_DIR ../third_party/lz4/lib)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     list(APPEND INSPECTOR_COMPILE_OPTIONS -Werror -Wall -Wextra -Weffc++ -Wconversion -pedantic -Werror=return-type -Wno-unused-command-line-argument)
 endif ()
 
+list(APPEND LZ4File
+        ${LZ4_DIR}/lz4.h
+        ${LZ4_DIR}/lz4.c)
 list(APPEND INSPECTOR_CLIENT_SRC
+        ${LZ4_DIR}
         ${INSPECTOR_COMMON_DIR}
         ${INSPECTOR_CLIENT_DIR})
 file(GLOB INSPECTOR_CLIENT_FILES
+        ${LZ4File}
         ${INSPECTOR_COMMON_DIR}/*.*
         ${INSPECTOR_CLIENT_DIR}/*.*)
 
