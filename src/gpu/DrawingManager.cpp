@@ -27,7 +27,7 @@
 #include "gpu/tasks/TextureResolveTask.h"
 
 namespace tgfx {
-static ColorType getColorType(bool isAplhaOnly) {
+static ColorType GetColorType(bool isAplhaOnly) {
   if (isAplhaOnly) {
     return ColorType::ALPHA_8;
   }
@@ -176,13 +176,7 @@ bool DrawingManager::flush() {
     task->execute(renderPass.get());
   }
   renderTasks.clear();
-  atlasTokenTracker.advanceToken();
-  context->atlasManager()->postFlush(atlasTokenTracker.nextToken());
   return true;
-}
-
-AtlasToken DrawingManager::nextFlushToken() const {
-  return atlasTokenTracker.nextToken();
 }
 
 void DrawingManager::releaseAll() {
@@ -201,9 +195,8 @@ void DrawingManager::addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& 
   if (textureProxy == nullptr || codec == nullptr) {
     return;
   }
-
   auto padding = Plot::CellPadding;
-  auto colorType = getColorType(codec->isAlphaOnly());
+  auto colorType = GetColorType(codec->isAlphaOnly());
   auto dstInfo =
       ImageInfo::Make(codec->width() + 2 * padding, codec->height() + 2 * padding, colorType);
   auto length = dstInfo.byteSize();

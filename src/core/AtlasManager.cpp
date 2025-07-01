@@ -86,12 +86,13 @@ void AtlasManager::preFlush() {
   }
 }
 
-void AtlasManager::postFlush(AtlasToken startTokenForNextFlush) {
+void AtlasManager::postFlush() {
+  atlasTokenTracker.advanceToken();
   for (const auto& atlas : atlases) {
     if (atlas == nullptr) {
       continue;
     }
-    atlas->compact(startTokenForNextFlush);
+    atlas->compact(atlasTokenTracker.nextToken());
   }
 }
 
@@ -99,5 +100,8 @@ void AtlasManager::releaseAll() {
   for (auto& atlas : atlases) {
     atlas = nullptr;
   }
+}
+AtlasToken AtlasManager::nextFlushToken() const {
+  return atlasTokenTracker.nextToken();
 }
 }  // namespace tgfx

@@ -64,7 +64,9 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
   // particularly crucial for texture resources that are bound to render targets. Only after the
   // cleanup can they be unbound and reused.
   _resourceCache->processUnreferencedResources();
+  _atlasManager->preFlush();
   auto flushed = _drawingManager->flush();
+  _atlasManager->postFlush();
   bool semaphoreInserted = false;
   if (signalSemaphore != nullptr) {
     auto semaphore = Semaphore::Wrap(signalSemaphore);

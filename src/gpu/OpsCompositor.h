@@ -71,8 +71,7 @@ class OpsCompositor {
    * Fills the given rect with the given fill, using the provided texture proxy and sampling options.
    */
   void fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,
-                     const SamplingOptions& sampling, const MCState& state, const Fill& fill,
-                     const Matrix& textViewMatrix);
+                     const SamplingOptions& sampling, const MCState& state, const Fill& fill);
 
   /**
    * Discard all pending operations.
@@ -107,11 +106,9 @@ class OpsCompositor {
   std::shared_ptr<TextureProxy> pendingAtlasTexture = nullptr;
   SamplingOptions pendingSampling = {};
   std::vector<PlacementPtr<RectRecord>> pendingRects = {};
-  std::vector<PlacementPtr<RectRecord>> pendingAtlasRects = {};
   std::vector<PlacementPtr<RRectRecord>> pendingRRects = {};
   std::vector<PlacementPtr<Stroke>> pendingStrokes = {};
   std::vector<PlacementPtr<Op>> ops = {};
-  Matrix pendingAtlasMatrix = {};
 
   static bool CompareFill(const Fill& a, const Fill& b);
 
@@ -124,8 +121,7 @@ class OpsCompositor {
   }
 
   bool drawAsClear(const Rect& rect, const MCState& state, const Fill& fill);
-  bool canAppend(PendingOpType type, const Path& clip, const Fill& fill,
-                 const Matrix& matrix = {}) const;
+  bool canAppend(PendingOpType type, const Path& clip, const Fill& fill) const;
   void flushPendingOps(PendingOpType type = PendingOpType::Unknown, Path clip = {}, Fill fill = {});
   AAType getAAType(const Fill& fill) const;
   std::pair<bool, bool> needComputeBounds(const Fill& fill, bool hasCoverage,

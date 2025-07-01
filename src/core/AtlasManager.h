@@ -37,9 +37,11 @@ class AtlasManager : public AtlasGenerationCounter {
 
   void preFlush();
 
-  void postFlush(AtlasToken startTokenForNextFlush);
+  void postFlush();
 
   void releaseAll();
+
+  AtlasToken nextFlushToken() const;
 
  private:
   bool initAtlas(MaskFormat format);
@@ -48,5 +50,6 @@ class AtlasManager : public AtlasGenerationCounter {
 
   Context* context = nullptr;
   std::unique_ptr<Atlas> atlases[MaskFormatCount];
+  AtlasTokenTracker atlasTokenTracker = {};
 };
 }  // namespace tgfx

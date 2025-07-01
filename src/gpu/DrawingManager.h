@@ -72,8 +72,6 @@ class DrawingManager {
    */
   bool flush();
 
-  AtlasToken nextFlushToken() const;
-
   /**
    * Releases all tasks associated with the drawing manager.
    */
@@ -93,7 +91,6 @@ class DrawingManager {
   std::vector<PlacementPtr<RenderTask>> renderTasks = {};
   std::list<std::shared_ptr<OpsCompositor>> compositors = {};
   ResourceKeyMap<ResourceTask*> resourceTaskMap = {};
-  AtlasTokenTracker atlasTokenTracker = {};
   std::vector<std::shared_ptr<Task>> atlasCellCodecTasks = {};
   std::map<std::shared_ptr<TextureProxy>, std::vector<AtlasCellData>> atlasCellDatas = {};
 
