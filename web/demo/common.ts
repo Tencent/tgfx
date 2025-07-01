@@ -147,6 +147,10 @@ export function normalizeZoom(e: WheelEvent): number {
         const chromeVer = parseInt(chromeMatch[1]);
         shouldFactorDPR = chromeVer <= 122;
     }
+    if (isFirefox) {
+        // Firefox: Force access to deltaY once to avoid abnormal behavior of properties wheelDeltaY
+        e.deltaY
+    }
     const devicePixelRatio = (e.view && (e.view as Window).devicePixelRatio) || 1;
     if (typeof (e as any).wheelDeltaY !== "undefined" && Math.abs((e as any).wheelDeltaY) >= 120) {
         let deltaY: number;
