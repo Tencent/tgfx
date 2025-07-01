@@ -47,8 +47,6 @@ void PlotUseUpdater::set(uint32_t pageIndex, uint32_t plotIndex) {
   plotAlreadyUpdated[pageIndex] |= (1 << plotIndex);
 }
 
-/////////////
-
 Plot::Plot(uint32_t pageIndex, uint32_t plotIndex, AtlasGenerationCounter* generationCounter,
            int offsetX, int offsetY, int width, int height)
     : generationCounter(generationCounter), _pageIndex(pageIndex), _plotIndex(plotIndex),

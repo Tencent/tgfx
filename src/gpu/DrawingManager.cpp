@@ -203,25 +203,20 @@ void DrawingManager::addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& 
   }
 
   auto padding = Plot::CellPadding;
-  auto floatPadding = static_cast<float>(padding);
   auto colorType = getColorType(codec->isAlphaOnly());
-  auto clearInfo =
+  auto dstInfo =
       ImageInfo::Make(codec->width() + 2 * padding, codec->height() + 2 * padding, colorType);
-  auto dstInfo = clearInfo.makeIntersect(0, 0, codec->width(), codec->height());
-  auto length = clearInfo.byteSize();
+  auto length = dstInfo.byteSize();
   auto buffer = new (std::nothrow) uint8_t[length];
   if (buffer == nullptr) {
     return;
   }
   auto data = Data::MakeAdopted(buffer, length, Data::DeleteProc);
-  auto clearPixels = buffer;
-  auto dstPixels =
-      buffer + (clearInfo.rowBytes() + clearInfo.bytesPerPixel()) * static_cast<size_t>(padding);
-  auto clearOffset = atlasOffset;
-  clearOffset.offset(-floatPadding, -floatPadding);
-  atlasCellDatas[textureProxy].emplace_back(std::move(data), clearInfo, clearOffset);
-  auto task = std::make_shared<AtlasCellCodecTask>(std::move(codec), dstPixels, dstInfo,
-                                                   clearPixels, clearInfo);
+  auto uploadOffset = atlasOffset;
+  auto floatPadding = static_cast<float>(padding);
+  uploadOffset.offset(-floatPadding, -floatPadding);
+  atlasCellDatas[textureProxy].emplace_back(std::move(data), dstInfo, uploadOffset);
+  auto task = std::make_shared<AtlasCellCodecTask>(std::move(codec), buffer, dstInfo, padding);
   atlasCellCodecTasks.emplace_back(std::move(task));
 }
 

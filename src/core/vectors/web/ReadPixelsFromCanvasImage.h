@@ -26,6 +26,6 @@ namespace tgfx {
  * Reads pixel data from an image and writes it to the destination buffer.The canvasImageData
  * is in the RGBA_8888 format obtained from CanvasRenderingContext2D.getImageData()
  */
-bool ReadPixelsFromCanvasImage(emscripten::val canvasImageData, const ImageInfo& srcinfo,
-                               const ImageInfo& dstInfo, void* dstPixels);
+bool ReadPixelsFromCanvasImage(emscripten::val canvasImageData, const ImageInfo& dstInfo,
+                               void* dstPixels);
 }  // namespace tgfx

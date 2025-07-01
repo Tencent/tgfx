@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <map>
 #include <memory>
 #include <set>
 #include "core/AtlasCell.h"
@@ -46,7 +45,7 @@ class Atlas {
 
   void compact(AtlasToken);
 
-  //To ensure the atlas does not evict a given entry,the client must set the use token
+  //To ensure the atlas does not evict a given entry, the client must set the use token
   void setLastUseToken(const PlotLocator& plotLocator, AtlasToken token);
 
   void removeExpiredKeys();

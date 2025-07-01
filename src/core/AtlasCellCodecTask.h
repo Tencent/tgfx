@@ -25,9 +25,9 @@ namespace tgfx {
 class AtlasCellCodecTask final : public Task {
  public:
   AtlasCellCodecTask(std::shared_ptr<ImageCodec> imageCodec, void* dstPixels,
-                     const ImageInfo& dstInfo, void* clearPixels, const ImageInfo& clearInfo)
+                     const ImageInfo& dstInfo, int padding)
       : imageCodec(std::move(imageCodec)), dstPixels(dstPixels), dstInfo(dstInfo),
-        clearPixels(clearPixels), clearInfo(clearInfo) {
+        padding(padding) {
   }
 
  protected:
@@ -39,7 +39,6 @@ class AtlasCellCodecTask final : public Task {
   std::shared_ptr<ImageCodec> imageCodec = nullptr;
   void* dstPixels = nullptr;
   ImageInfo dstInfo = {};
-  void* clearPixels = nullptr;
-  ImageInfo clearInfo = {};
+  int padding = 0;
 };
 }  // namespace tgfx
