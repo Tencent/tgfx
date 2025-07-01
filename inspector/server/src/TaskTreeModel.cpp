@@ -169,7 +169,7 @@ void TaskTreeModel::refreshData() {
   const auto& dataContext = worker->GetDataContext();
   auto selectFrameTime = worker->GetFrameTime(dataContext.frameData, selectFrame);
   auto& opTasks = dataContext.opTasks;
-  auto opChilds = dataContext.opChilds;
+  auto& opChilds = dataContext.opChilds;
   std::unordered_map<uint32_t, std::vector<uint32_t>> selectChilds;
   std::vector<std::shared_ptr<OpTaskData>> selectFrameOpTasks;
   for (const auto& iter : opTasks) {
@@ -178,8 +178,9 @@ void TaskTreeModel::refreshData() {
     }
     if (iter->start > selectFrameData.start) {
       selectFrameOpTasks.push_back(iter);
-      if (opChilds.find(iter->id) != opChilds.end()) {
-        auto& tmp = opChilds[iter->id];
+      auto opIter = opChilds.find(iter->id);
+      if (opIter != opChilds.end() ) {
+        auto& tmp = opIter->second;
         selectChilds[iter->id] = tmp;
       }
     }
