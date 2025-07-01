@@ -26,24 +26,3 @@ file(GLOB INSPECTOR_CLIENT_FILES
 add_library(inspector STATIC ${INSPECTOR_CLIENT_FILES})
 target_include_directories(inspector PUBLIC ${INSPECTOR_CLIENT_SRC})
 target_compile_options(inspector PUBLIC ${INSPECTOR_COMPILE_OPTIONS})
-
-set(CommonIncludes
-    ${INSPECTOR_COMMON_DIR}/Alloc.h
-    ${INSPECTOR_COMMON_DIR}/Protocol.h
-    ${INSPECTOR_COMMON_DIR}/Queue.h
-    ${INSPECTOR_COMMON_DIR}/Singleton.h
-    ${INSPECTOR_COMMON_DIR}/Socket.h
-    ${INSPECTOR_COMMON_DIR}/Utils.h
-    ${INSPECTOR_COMMON_DIR}/Yield.h)
-
-install(FILES ${CommonIncludes}
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/inspector/common)
-
-set(ClientIncludes
-    ${INSPECTOR_CLIENT_DIR}/FastVector.h
-    ${INSPECTOR_CLIENT_DIR}/Inspector.h
-    ${INSPECTOR_CLIENT_DIR}/Scoped.h
-    ${INSPECTOR_CLIENT_DIR}/Thread.h)
-
-install(FILES ${ClientIncludes}
-        DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/inspector/client/src)
