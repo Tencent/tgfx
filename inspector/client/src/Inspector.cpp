@@ -21,6 +21,7 @@
 #include <atomic>
 #include <iostream>
 #include <new>
+#include <chrono>
 #include "Alloc.h"
 #include "LZ4.h"
 #include "Protocol.h"
@@ -69,10 +70,6 @@ Inspector& GetInspector() {
 
 int64_t GetInitTime() {
   return GetInspectorData().initTime;
-}
-
-uint32_t GetThreadHandle() {
-  return GetThreadHandleImpl();
 }
 
 Inspector::Inspector()
@@ -374,16 +371,13 @@ Inspector::DequeueStatus Inspector::DequeueSerial() {
 
   const auto queueSize = serialDequeue.size();
   if (queueSize > 0) {
-    // auto refSerial = refTimeSerial;
     auto refThread = refTimeThread;
     auto item = serialDequeue.data();
     auto end = item + queueSize;
     while (item != end) {
-      // uint64_t ptr;
       auto idx = MemRead<uint8_t>(&item->hdr.idx);
       switch ((QueueType)idx) {
         case QueueType::OperateBegin: {
-          // ThreadCtxCheckSerial(operateBeginThread);
           auto t = MemRead<int64_t>(&item->operateBegin.time);
           auto dt = t - refThread;
           refThread = t;
@@ -391,7 +385,6 @@ Inspector::DequeueStatus Inspector::DequeueSerial() {
           break;
         }
         case QueueType::OperateEnd: {
-          // ThreadCtxCheckSerial(operateEndThread);
           auto t = MemRead<int64_t>(&item->operateEnd.time);
           auto dt = t - refThread;
           refThread = t;

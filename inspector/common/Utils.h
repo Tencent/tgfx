@@ -19,6 +19,7 @@
 #pragma once
 #include <cstdint>
 #include <memory>
+#include <cstring>
 #include "Protocol.h"
 
 namespace inspector {
@@ -39,10 +40,8 @@ void MemWrite(void* ptr, T* val, size_t size) {
   memcpy(ptr, val, size);
 }
 
-uint32_t GetThreadHandleImpl();
 uint64_t GetPid();
 const char* GetProcessName();
-const char* GetEnvVar(const char* name);
 BroadcastMessage GetBroadcastMessage(const char* procname, size_t pnsz, size_t& len, uint16_t port,
                                      uint8_t type);
 }  // namespace inspector

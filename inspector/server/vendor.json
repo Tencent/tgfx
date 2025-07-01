@@ -15,6 +15,18 @@
           "-DCMAKE_PREFIX_PATH=\"/Users/lifengdy/Qt/6.8.1/macos/lib/cmake\""
         ]
       }
+    },
+    {
+      "name": "flatbuffers",
+      "cmake": {
+        "targets": [
+          "flatbuffers"
+        ],
+        "arguments": [
+          "-DFLATBUFFERS_BUILD_FLATLIB=ON",
+          "-DFLATBUFFERS_BUILD_CPP17=ON"
+        ]
+      }
     }
   ]
 }
