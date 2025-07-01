@@ -29,7 +29,6 @@ namespace inspector {
         Q_SLOT void onSelectedImage(std::shared_ptr<tgfx::Image> image);
     protected:
         void draw();
-        tgfx::Rect calcInerRect(const tgfx::Rect& rect);
         QSGNode* updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) override;
 
     private:

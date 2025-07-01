@@ -6,13 +6,32 @@
 #include "Draw.h"
 #include <QSGImageNode>
 namespace inspector {
+    static tgfx::Rect calcInerRect(const tgfx::Rect &rect, float aspectRatio) {
+        float w = rect.width();
+        float h = rect.height();
+        const float paddingRatio = 0.05f;
+        const float innerScaleRatio = 1-2*paddingRatio;
+        if (w<=h*aspectRatio) {//外部矩形更扁
+            float innerWidth = w * innerScaleRatio;
+            float innerHeight = innerWidth / aspectRatio;
+            float x = paddingRatio * w;
+            float y = (h - innerHeight) / 2;
+            return tgfx::Rect::MakeXYWH(x+rect.x(), y+rect.y(), innerWidth, innerHeight);
+        } else {//外部矩形更瘦
+            float innerHeight = h * innerScaleRatio;
+            float innerWidth = innerHeight * aspectRatio;
+            float x = (w - innerWidth) / 2;
+            float y = paddingRatio * h;
+            return tgfx::Rect::MakeXYWH(x+rect.x(), y+rect.y(), innerWidth, innerHeight);
+        }
+    }
+
     TextureListDrawer::TextureListDrawer(QQuickItem *parent)
         : QQuickItem(parent), m_appHost(AppHostSingleton::GetInstance())
     {
         setFlag(ItemHasContents, true);
         setAcceptHoverEvents(true);
         setAcceptedMouseButtons(Qt::AllButtons);
-        updateImageData();
     }
 
     void TextureListDrawer::geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry)
@@ -82,27 +101,19 @@ namespace inspector {
         canvas->setMatrix(tgfx::Matrix::MakeScale(m_appHost->density(), m_appHost->density()));
         canvas->translate(0, -static_cast<float>(m_scrollOffset*width())/200.f);
         for (int i = 0; i < m_squareRects.size(); ++i) {
-            drawRect(canvas,m_squareRects[i], 0xFF2E2E2E);
-            // 绘制内部图片
+            drawRect(canvas,m_squareRects[i], 0xFF535353);
             if (!m_images[i])return;
-            canvas->drawImageRect(m_images[i],m_squareRects[i],tgfx::SamplingOptions(tgfx::FilterMode::Linear, tgfx::MipmapMode::Linear));
+            auto imageRect = calcInerRect(m_squareRects[i],m_images[i]->width() / static_cast<float>(m_images[i]->height()));
+            canvas->drawImageRect(m_images[i],imageRect,tgfx::SamplingOptions(tgfx::FilterMode::Linear, tgfx::MipmapMode::Linear));
         }
     }
 
-    void TextureListDrawer::updateImageData() {
+    void TextureListDrawer::updateImageData(QStringList testImageSources) {
 
         QString rootPath = QCoreApplication::applicationDirPath();
-        // 获取项目根目录（假设resources在项目根目录下）
         while (!rootPath.isEmpty() && !QDir(rootPath + "/resources").exists()) {
             rootPath = rootPath.left(rootPath.lastIndexOf('/'));
         }
-        QStringList testImageSources = {
-                rootPath + "/resources/assets/bridge.jpg",
-                rootPath + "/resources/assets/glyph1.png",
-                rootPath + "/resources/assets/glyph2.png",
-                rootPath + "/resources/assets/glyph3.png",
-                rootPath + "/resources/apitest/rotation.jpg",
-                rootPath + "/resources/apitest/rgbaaa.png"};
 
         m_images.clear();
         for (int i = 0; i < testImageSources.size(); ++i) {
@@ -114,6 +125,30 @@ namespace inspector {
         m_layoutDirty = true;
         update();
         emit selectedImage(nullptr);
+    }
+
+    void TextureListDrawer::setImageLabel(const QString &label) {
+        QString rootPath = QCoreApplication::applicationDirPath();
+        while (!rootPath.isEmpty() && !QDir(rootPath + "/resources").exists()) {
+            rootPath = rootPath.left(rootPath.lastIndexOf('/'));
+        }
+        if (label=="Input") {
+            QStringList testImageSources = {
+                rootPath + "/resources/assets/bridge.jpg",
+                rootPath + "/resources/apitest/rotation.jpg",
+                rootPath + "/resources/apitest/rgbaaa.png"};
+
+            updateImageData(testImageSources);
+        }
+        else if (label=="Output") {
+            QStringList testImageSources = {
+                rootPath + "/resources/assets/glyph1.png",
+                rootPath + "/resources/assets/glyph2.png",
+                rootPath + "/resources/assets/glyph3.png",};
+
+            updateImageData(testImageSources);
+        }
+
     }
 
     QSGNode *TextureListDrawer::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *)

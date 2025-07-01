@@ -10,14 +10,16 @@ namespace inspector {
     class TextureListDrawer : public QQuickItem
     {
         Q_OBJECT
-
+        Q_PROPERTY(QString imageLabel  WRITE setImageLabel)
     public:
         explicit TextureListDrawer(QQuickItem *parent = nullptr);
         ~TextureListDrawer() = default;
 
         Q_SIGNAL void selectedImage(std::shared_ptr<tgfx::Image> image);
 
-        void updateImageData();
+        void updateImageData(QStringList testImageSources);
+        void setImageLabel(const QString &label);
+
     protected:
         QSGNode *updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *) override;
         void mousePressEvent(QMouseEvent *event) override;
@@ -36,7 +38,6 @@ namespace inspector {
 
         std::shared_ptr<tgfx::QGLWindow> m_tgfxWindow = nullptr;
         std::shared_ptr<AppHost> m_appHost = nullptr;
-
     };
 }
 

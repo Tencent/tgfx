@@ -6,6 +6,25 @@
 
 Q_DECLARE_METATYPE(std::shared_ptr<tgfx::Image>)
 namespace inspector {
+    static tgfx::Rect calcInerRect(const tgfx::Rect &rect, float aspectRatio) {
+        float w = rect.width();
+        float h = rect.height();
+        const float paddingRatio = 0.05f;
+        const float innerScaleRatio = 1-2*paddingRatio;
+        if (w<=h*aspectRatio) {//外部矩形更扁
+            float innerWidth = w * innerScaleRatio;
+            float innerHeight = innerWidth / aspectRatio;
+            float x = paddingRatio * w;
+            float y = (h - innerHeight) / 2;
+            return tgfx::Rect::MakeXYWH(x+rect.x(), y+rect.y(), innerWidth, innerHeight);
+        } else {//外部矩形更瘦
+            float innerHeight = h * innerScaleRatio;
+            float innerWidth = innerHeight * aspectRatio;
+            float x = (w - innerWidth) / 2;
+            float y = paddingRatio * h;
+            return tgfx::Rect::MakeXYWH(x+rect.x(), y+rect.y(), innerWidth, innerHeight);
+        }
+    }
     TextureDrawer::TextureDrawer(QQuickItem *parent):
     QQuickItem(parent),appHost(AppHostSingleton::GetInstance())
     {
@@ -38,33 +57,13 @@ namespace inspector {
         auto rect = tgfx::Rect::MakeXYWH(0.f,0.f,static_cast<float>(width()), static_cast<float>(height()));
 
         if (image)
-            canvas->drawImageRect(image, calcInerRect(rect), tgfx::SamplingOptions(tgfx::FilterMode::Linear, tgfx::MipmapMode::Linear));
+            canvas->drawImageRect(image, calcInerRect(rect,image->width() / static_cast<float>(image->height())), tgfx::SamplingOptions(tgfx::FilterMode::Linear, tgfx::MipmapMode::Linear));
 
         context->flushAndSubmit();
         tgfxWindow->present(context);
         device->unlock();
     }
 
-    tgfx::Rect TextureDrawer::calcInerRect(const tgfx::Rect &rect) {
-        auto aspectRatio = image->width() / static_cast<float>(image->height());
-        float w = rect.width();
-        float h = rect.height();
-        const float paddingRatio = 0.05f;
-        const float innerScaleRatio = 1-2*paddingRatio;
-        if (w<=h*aspectRatio) {//外部矩形更扁
-            float innerWidth = w * innerScaleRatio;
-            float innerHeight = innerWidth / aspectRatio;
-            float x = paddingRatio * w;
-            float y = (h - innerHeight) / 2;
-            return tgfx::Rect::MakeXYWH(x, y, innerWidth, innerHeight);
-        } else {//外部矩形更瘦
-            float innerHeight = h * innerScaleRatio;
-            float innerWidth = innerHeight * aspectRatio;
-            float x = (w - innerWidth) / 2;
-            float y = paddingRatio * h;
-            return tgfx::Rect::MakeXYWH(x, y, innerWidth, innerHeight);
-        }
-    }
 
     QSGNode * TextureDrawer::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *) {
         auto node = static_cast<QSGImageNode*>(oldNode);

@@ -73,6 +73,8 @@ void InspectorView::initView() {
   qmlRegisterType<FramesDrawer>("FramesDrawer", 1, 0, "FramesDrawer");
   qmlRegisterType<TaskTreeModel>("TaskTreeModel", 1, 0, "TaskTreeModel");
   qmlRegisterType<AttributeModel>("AttributeModel", 1, 0, "AttributeModel");
+  qmlRegisterType<TextureDrawer>("TextureDrawer", 1, 0, "TextureDrawer");
+  qmlRegisterType<TextureListDrawer>("TextureListDrawer", 1, 0, "TextureListDrawer");
   qmlRegisterUncreatableType<KDDockWidgets::QtQuick::Group>(
       "com.kdab.dockwidgets", 2, 0, "GroupView", QStringLiteral("Internal usage only"));
   taskTreeModel = std::make_unique<TaskTreeModel>(&worker, &viewData, this);
