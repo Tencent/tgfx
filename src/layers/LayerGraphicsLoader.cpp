@@ -197,7 +197,7 @@ void LayerGraphicsLoader::onAttached() {
 }
 
 void LayerGraphicsLoader::onDetached() {
-  completeTasks.clear();
+  // completeTasks.clear();
 }
 
 }  // namespace tgfx
