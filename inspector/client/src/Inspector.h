@@ -18,6 +18,9 @@
 
 #pragma once
 #include <thread>
+#include <mutex>
+#include <chrono>
+#include <vector>
 #include "MemoryUtils.h"
 #include "Protocol.h"
 #include "Queue.h"
