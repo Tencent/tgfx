@@ -21,10 +21,9 @@
 #include <memory>
 #include "Atlas.h"
 #include "AtlasTypes.h"
-#include "gpu/FlushCallbackObject.h"
 
 namespace tgfx {
-class AtlasManager : public AtlasGenerationCounter, public FlushCallbackObject {
+class AtlasManager : public AtlasGenerationCounter {
  public:
   explicit AtlasManager(Context* context);
 
@@ -36,9 +35,9 @@ class AtlasManager : public AtlasGenerationCounter, public FlushCallbackObject {
 
   void setPlotUseToken(PlotUseUpdater&, const PlotLocator&, MaskFormat, AtlasToken) const;
 
-  void preFlush() override;
+  void preFlush();
 
-  void postFlush(AtlasToken startTokenForNextFlush) override;
+  void postFlush(AtlasToken startTokenForNextFlush);
 
   void releaseAll();
 

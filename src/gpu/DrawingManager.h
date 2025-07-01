@@ -18,9 +18,9 @@
 
 #pragma once
 
+#include <map>
 #include <unordered_map>
 #include <vector>
-#include "FlushCallbackObject.h"
 #include "core/AtlasTypes.h"
 #include "gpu/OpsCompositor.h"
 #include "gpu/tasks/OpsRenderTask.h"
@@ -29,6 +29,15 @@
 #include "gpu/tasks/TextureFlattenTask.h"
 
 namespace tgfx {
+struct AtlasCellData {
+  std::shared_ptr<Data> pixels = nullptr;
+  ImageInfo pixelsInfo = {};
+  Point atlasOffset = {};
+  AtlasCellData(std::shared_ptr<Data> data, const ImageInfo& info, const Point& offset)
+      : pixels(std::move(data)), pixelsInfo(info), atlasOffset(offset) {
+  }
+};
+
 class DrawingManager {
  public:
   explicit DrawingManager(Context* context);
@@ -65,12 +74,15 @@ class DrawingManager {
 
   AtlasToken nextFlushToken() const;
 
-  void addFlushCallbackObject(FlushCallbackObject*);
-
   /**
    * Releases all tasks associated with the drawing manager.
    */
   void releaseAll();
+
+  void addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& textureProxy,
+                             const Point& atlasOffset, std::shared_ptr<ImageCodec> codec);
+
+  void uploadAtlasToGPU();
 
  private:
   Context* context = nullptr;
@@ -81,8 +93,11 @@ class DrawingManager {
   std::vector<PlacementPtr<RenderTask>> renderTasks = {};
   std::list<std::shared_ptr<OpsCompositor>> compositors = {};
   ResourceKeyMap<ResourceTask*> resourceTaskMap = {};
-  FlushTokenTracker flushTokenTracker = {};
-  std::vector<FlushCallbackObject*> flushCallbackObjects = {};
+  AtlasTokenTracker atlasTokenTracker = {};
+  std::vector<std::shared_ptr<Task>> atlasCellCodecTasks = {};
+  std::map<std::shared_ptr<TextureProxy>, std::vector<AtlasCellData>> atlasCellDatas = {};
+
+  void clearAtlasCellCodecTasks();
 
   friend class OpsCompositor;
 };

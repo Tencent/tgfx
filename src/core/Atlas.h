@@ -30,7 +30,7 @@
 namespace tgfx {
 class Atlas {
  public:
-  static constexpr int kMaxCellSize = 256;
+  static constexpr int MaxCellSize = 256;
 
   static std::unique_ptr<Atlas> Make(ProxyProvider* proxyProvider, PixelFormat format, int width,
                                      int height, int plotWidth, int plotHeight,

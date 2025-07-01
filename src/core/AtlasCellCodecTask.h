@@ -18,22 +18,28 @@
 
 #pragma once
 
-#include "core/DataSource.h"
-#include "core/PixelBuffer.h"
 #include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/Task.h"
 
 namespace tgfx {
-class GlyphSource : public DataSource<PixelBuffer> {
+class AtlasCellCodecTask final : public Task {
  public:
-  static std::unique_ptr<DataSource> MakeFrom(std::shared_ptr<ImageCodec> imageCodec,
-                                              bool tryHardware = true, bool asyncDecoding = true);
+  AtlasCellCodecTask(std::shared_ptr<ImageCodec> imageCodec, void* dstPixels,
+                     const ImageInfo& dstInfo, void* clearPixels, const ImageInfo& clearInfo)
+      : imageCodec(std::move(imageCodec)), dstPixels(dstPixels), dstInfo(dstInfo),
+        clearPixels(clearPixels), clearInfo(clearInfo) {
+  }
 
-  std::shared_ptr<PixelBuffer> getData() const override;
+ protected:
+  void onExecute() override;
 
-  GlyphSource(std::shared_ptr<ImageCodec> imageCodec, bool tryHardware = true);
+  void onCancel() override;
 
  private:
   std::shared_ptr<ImageCodec> imageCodec = nullptr;
-  bool tryHardware = true;
+  void* dstPixels = nullptr;
+  ImageInfo dstInfo = {};
+  void* clearPixels = nullptr;
+  ImageInfo clearInfo = {};
 };
 }  // namespace tgfx

@@ -90,8 +90,7 @@ void GLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
 
 void GLAtlasTextGeometryProcessor::setData(UniformBuffer* uniformBuffer,
                                            FPCoordTransformIter* transformIter) const {
-  float atlasSizeInv[2] = {1.f / static_cast<float>(textureProxy->width()),
-                           1.f / static_cast<float>(textureProxy->height())};
+  auto atlasSizeInv = textureProxy->getTexture()->getTextureCoord(1.f, 1.f);
   uniformBuffer->setData(atlasSizeUniformName, atlasSizeInv);
   setTransformDataHelper(uvMatrix, uniformBuffer, transformIter);
   if (commonColor.has_value()) {

@@ -23,7 +23,7 @@
 
 namespace tgfx {
 // number of bytes (on the stack) to receive the printf result
-static constexpr size_t BufferSize = 1024;
+static constexpr size_t ShaderBufferSize = 1024;
 
 static bool NeedsAppendEnter(const std::string& code) {
   if (code.empty()) {
@@ -51,10 +51,10 @@ void ShaderBuilder::setPrecisionQualifier(const std::string& precision) {
 }
 
 void ShaderBuilder::codeAppendf(const char* format, ...) {
-  char buffer[BufferSize];
+  char buffer[ShaderBufferSize];
   va_list args;
   va_start(args, format);
-  auto length = vsnprintf(buffer, BufferSize, format, args);
+  auto length = vsnprintf(buffer, ShaderBufferSize, format, args);
   va_end(args);
   codeAppend(std::string(buffer, static_cast<size_t>(length)));
 }
@@ -97,8 +97,9 @@ void ShaderBuilder::addFeature(PrivateFeature featureBit, const std::string& ext
   if ((featureBit & featuresAddedMask) == featureBit) {
     return;
   }
-  char buffer[BufferSize];
-  auto length = snprintf(buffer, BufferSize, "#extension %s: require\n", extensionName.c_str());
+  char buffer[ShaderBufferSize];
+  auto length =
+      snprintf(buffer, ShaderBufferSize, "#extension %s: require\n", extensionName.c_str());
   shaderStrings[Type::Extensions].append(buffer, static_cast<size_t>(length));
   featuresAddedMask |= featureBit;
 }

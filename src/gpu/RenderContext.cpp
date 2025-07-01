@@ -21,7 +21,6 @@
 #include "core/Atlas.h"
 #include "core/AtlasCell.h"
 #include "core/AtlasManager.h"
-#include "core/GlyphSource.h"
 #include "core/PathRasterizer.h"
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
@@ -32,7 +31,6 @@
 #include "core/utils/ApplyStrokeToBounds.h"
 #include "core/utils/MathExtra.h"
 #include "gpu/DrawingManager.h"
-#include "gpu/tasks/TextAtlasUploadTask.h"
 
 namespace tgfx {
 static uint32_t getTypefaceID(const Typeface* typeface, bool isCustom) {
@@ -236,7 +234,7 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
       continue;
     }
     rejectedGlyphRun.font = run.font;
-    directMaskDrawing(run, state, fill, stroke, rejectedGlyphRun);
+    drawGlyphAsDirectMask(run, state, fill, stroke, rejectedGlyphRun);
     if (rejectedGlyphRun.glyphs.empty()) {
       continue;
     }
@@ -245,12 +243,12 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
     rejectedGlyphRun.positions.clear();
     rejectedGlyphRun.glyphs.clear();
 
-    pathDrawing(sourceGlyphRun, state, fill, stroke, clipBounds, rejectedGlyphRun);
+    drawGlyphsAsPath(sourceGlyphRun, state, fill, stroke, clipBounds, rejectedGlyphRun);
     if (rejectedGlyphRun.glyphs.empty()) {
       continue;
     }
 
-    transformedMaskDrawing(rejectedGlyphRun, state, fill, stroke);
+    drawGlyphsAsTransformedMask(rejectedGlyphRun, state, fill, stroke);
   }
 }
 
@@ -346,9 +344,9 @@ void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRe
   }
 }
 
-void RenderContext::directMaskDrawing(const GlyphRun& sourceGlyphRun, const MCState& state,
-                                      const Fill& fill, const Stroke* stroke,
-                                      GlyphRun& rejectedGlyphRun) const {
+void RenderContext::drawGlyphAsDirectMask(const GlyphRun& sourceGlyphRun, const MCState& state,
+                                          const Fill& fill, const Stroke* stroke,
+                                          GlyphRun& rejectedGlyphRun) const {
   AtlasCell glyphCell;
   auto nextFlushToken = getContext()->drawingManager()->nextFlushToken();
   PlotUseUpdater plotUseUpdater;
@@ -377,7 +375,7 @@ void RenderContext::directMaskDrawing(const GlyphRun& sourceGlyphRun, const MCSt
       ApplyStrokeToBounds(*scaledStroke, &bounds, true);
     }
     auto maxDimension = static_cast<int>(ceilf(std::max(bounds.width(), bounds.height())));
-    if (maxDimension >= Atlas::kMaxCellSize) {
+    if (maxDimension >= Atlas::MaxCellSize) {
       rejectedGlyphRun.glyphs.push_back(glyphID);
       rejectedGlyphRun.positions.push_back(glyphPosition);
       continue;
@@ -410,11 +408,10 @@ void RenderContext::directMaskDrawing(const GlyphRun& sourceGlyphRun, const MCSt
       glyphCell._matrix = glyphState.matrix;
 
       if (atlasManager->addCellToAtlas(glyphCell, nextFlushToken, atlasLocator)) {
-        auto source = GlyphSource::MakeFrom(glyphCodec);
+        auto pageIndex = atlasLocator.pageIndex();
         auto offset = Point::Make(atlasLocator.getLocation().left, atlasLocator.getLocation().top);
-        auto task = getContext()->drawingBuffer()->make<TextAtlasUploadTask>(
-            UniqueKey::Make(), std::move(source), textureProxies[atlasLocator.pageIndex()], offset);
-        getContext()->drawingManager()->addResourceTask(std::move(task));
+        getContext()->drawingManager()->addAtlasCellCodecTask(textureProxies[pageIndex], offset,
+                                                              std::move(glyphCodec));
       } else {
         rejectedGlyphRun.glyphs.push_back(glyphID);
         rejectedGlyphRun.positions.push_back(glyphPosition);
@@ -440,9 +437,9 @@ void RenderContext::directMaskDrawing(const GlyphRun& sourceGlyphRun, const MCSt
     drawGlyphAtlas(std::move(textureProxy), rect, {}, glyphState, newFill, state.matrix);
   }
 }
-void RenderContext::pathDrawing(GlyphRun& sourceGlyphRun, const MCState& state, const Fill& fill,
-                                const Stroke* stroke, const Rect& clipBounds,
-                                GlyphRun& rejectedGlyphRun) const {
+void RenderContext::drawGlyphsAsPath(GlyphRun& sourceGlyphRun, const MCState& state,
+                                     const Fill& fill, const Stroke* stroke, const Rect& clipBounds,
+                                     GlyphRun& rejectedGlyphRun) const {
   if (!sourceGlyphRun.font.hasOutlines()) {
     rejectedGlyphRun = std::move(sourceGlyphRun);
   }
@@ -504,8 +501,9 @@ void RenderContext::pathDrawing(GlyphRun& sourceGlyphRun, const MCState& state, 
                            fill.makeWithMatrix(rasterizeMatrix), SrcRectConstraint::Fast);
 }
 
-void RenderContext::transformedMaskDrawing(const GlyphRun& sourceGlyphRun, const MCState& state,
-                                           const Fill& fill, const Stroke* stroke) const {
+void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
+                                                const MCState& state, const Fill& fill,
+                                                const Stroke* stroke) const {
   AtlasCell atlasCell;
   auto nextFlushToken = getContext()->drawingManager()->nextFlushToken();
   PlotUseUpdater plotUseUpdater;
@@ -522,11 +520,11 @@ void RenderContext::transformedMaskDrawing(const GlyphRun& sourceGlyphRun, const
     scaledStroke =
         std::make_unique<Stroke>(stroke->width * maxScale, stroke->cap, stroke->join, maxScale);
   }
-  static constexpr float kMaxAtlasDimension = Atlas::kMaxCellSize - 2.f;
+  static constexpr float MaxAtlasDimension = Atlas::MaxCellSize - 2.f;
   auto cellScale = 1.f;
   auto maxDimension = findMaxGlyphDimension(font, sourceGlyphRun.glyphs, scaledStroke.get());
-  while (maxDimension > kMaxAtlasDimension) {
-    auto reductionFactor = kMaxAtlasDimension / maxDimension;
+  while (maxDimension > MaxAtlasDimension) {
+    auto reductionFactor = MaxAtlasDimension / maxDimension;
     font = font.makeWithSize(font.getSize() * reductionFactor);
 
     if (scaledStroke) {
@@ -574,11 +572,11 @@ void RenderContext::transformedMaskDrawing(const GlyphRun& sourceGlyphRun, const
       if (!atlasManager->addCellToAtlas(atlasCell, nextFlushToken, atlasLocator)) {
         continue;
       }
-      auto source = GlyphSource::MakeFrom(glyphCodec);
+
+      auto pageIndex = atlasLocator.pageIndex();
       auto offset = Point::Make(atlasLocator.getLocation().left, atlasLocator.getLocation().top);
-      auto task = getContext()->drawingBuffer()->make<TextAtlasUploadTask>(
-          UniqueKey::Make(), std::move(source), textureProxies[atlasLocator.pageIndex()], offset);
-      getContext()->drawingManager()->addResourceTask(std::move(task));
+      getContext()->drawingManager()->addAtlasCellCodecTask(textureProxies[pageIndex], offset,
+                                                            std::move(glyphCodec));
     }
 
     atlasManager->setPlotUseToken(plotUseUpdater, atlasLocator.plotLocator(), maskFormat,

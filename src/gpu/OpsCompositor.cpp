@@ -183,7 +183,7 @@ void OpsCompositor::discardAll() {
     pendingStrokes.clear();
     pendingAtlasMatrix = {};
     pendingAtlasRects.clear();
-    pendingTextureProxy = nullptr;
+    pendingAtlasTexture = nullptr;
   }
 }
 
@@ -340,7 +340,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
         return;
       }
       drawOp = AtlasTextOp::Make(context, std::move(provider), renderFlags,
-                                 std::move(pendingTextureProxy), pendingSampling, uvMatrix);
+                                 std::move(pendingAtlasTexture), pendingSampling, uvMatrix);
     } break;
     default:
       break;
@@ -657,9 +657,9 @@ void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, co
   DEBUG_ASSERT(textureProxy != nullptr);
   DEBUG_ASSERT(!rect.isEmpty());
   if (!canAppend(PendingOpType::Atlas, state.clip, fill, textViewMatrix) ||
-      pendingTextureProxy != textureProxy || pendingSampling != sampling) {
+      pendingAtlasTexture != textureProxy || pendingSampling != sampling) {
     flushPendingOps(PendingOpType::Atlas, state.clip, fill);
-    pendingTextureProxy = std::move(textureProxy);
+    pendingAtlasTexture = std::move(textureProxy);
     pendingSampling = sampling;
   }
   if (pendingAtlasRects.empty()) {

@@ -23,7 +23,7 @@ class AdaptiveDashEffect : public PathEffect {
  public:
   // Maximum number of dashes allowed in the intervals array.
   // Reference Skia's implementation to prevent excessive memory usage when dashing very long paths.
-  const float kMaxDashCount = 1000000;
+  const float MaxDashCount = 1000000;
 
   AdaptiveDashEffect(const float intervals[], int count, float phase);
 

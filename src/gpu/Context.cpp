@@ -41,7 +41,6 @@ Context::Context(Device* device) : _device(device) {
   _proxyProvider = new ProxyProvider(this);
   _maxValueTracker = new SlidingWindowTracker(10);
   _atlasManager = new AtlasManager(this);
-  _drawingManager->addFlushCallbackObject(_atlasManager);
 }
 
 Context::~Context() {

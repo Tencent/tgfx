@@ -104,7 +104,7 @@ class OpsCompositor {
   Path pendingClip = {};
   Fill pendingFill = {};
   std::shared_ptr<Image> pendingImage = nullptr;
-  std::shared_ptr<TextureProxy> pendingTextureProxy = nullptr;
+  std::shared_ptr<TextureProxy> pendingAtlasTexture = nullptr;
   SamplingOptions pendingSampling = {};
   std::vector<PlacementPtr<RectRecord>> pendingRects = {};
   std::vector<PlacementPtr<RectRecord>> pendingAtlasRects = {};

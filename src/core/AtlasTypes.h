@@ -95,7 +95,7 @@ class AtlasToken {
   uint64_t sequenceNumber = 0;
 };
 
-class FlushTokenTracker {
+class AtlasTokenTracker {
  public:
   // Get the next flush token. in DrawingManger::flush()
   AtlasToken nextToken() const {
