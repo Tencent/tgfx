@@ -45,8 +45,6 @@
 #include <cassert>
 #include <cinttypes>
 #include <cstdio>
-#include "Alloc.h"
-#include "ProcessUtils.h"
 #include "Socket.h"
 
 #ifndef MSG_NOSIGNAL
@@ -60,7 +58,7 @@ typedef SOCKET socket_t;
 typedef int socket_t;
 #endif
 
-enum { BufSize = 128 * 1024 };
+static constexpr size_t BufSize = 128 * 1024;
 
 Socket::Socket() : buf((char*)malloc(BufSize)), sock(-1) {
 }

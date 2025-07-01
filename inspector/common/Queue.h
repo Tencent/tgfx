@@ -115,8 +115,6 @@ struct QueueItem {
 };
 
 #pragma pack(pop)
-
-enum { QueueItemSize = sizeof(QueueItem) };
 static constexpr size_t QueueDataSize[] = {
     sizeof(QueueHeader) + sizeof(QueueOperateBegin),
     sizeof(QueueHeader) + sizeof(QueueOperateEnd),
