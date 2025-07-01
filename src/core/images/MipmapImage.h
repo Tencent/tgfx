@@ -60,5 +60,9 @@ class MipmapImage : public ResourceImage {
   std::shared_ptr<ResourceImage> source = nullptr;
 
   MipmapImage(UniqueKey uniqueKey, std::shared_ptr<ResourceImage> source);
+
+  void getDeferredGraphics(DeferredGraphics* graphics) const override {
+    source->getDeferredGraphics(graphics);
+  }
 };
 }  // namespace tgfx

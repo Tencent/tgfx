@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,33 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/core/Shader.h"
+#include "GraphicsLoader.h"
+#include "gpu/ProxyProvider.h"
 
 namespace tgfx {
-class BlendShader : public Shader {
- public:
-  BlendShader(BlendMode mode, std::shared_ptr<Shader> dst, std::shared_ptr<Shader> src)
-      : mode(mode), dst(std::move(dst)), src(std::move(src)) {
+AutoGraphicsLoaderRestore::AutoGraphicsLoaderRestore(Context* context, GraphicsLoader* loader)
+    : context(context) {
+  if (context != nullptr && loader != nullptr) {
+    oldLoader = context->proxyProvider()->graphicsLoader;
+    context->proxyProvider()->graphicsLoader = loader;
   }
+}
 
-  std::shared_ptr<Shader> makeWithMatrix(const Matrix& viewMatrix) const override;
-
-  BlendMode mode;
-  std::shared_ptr<Shader> dst;
-  std::shared_ptr<Shader> src;
-
- protected:
-  Type type() const override {
-    return Type::Blend;
+AutoGraphicsLoaderRestore::~AutoGraphicsLoaderRestore() {
+  if (oldLoader != nullptr) {
+    context->proxyProvider()->graphicsLoader = oldLoader;
   }
-
-  bool isEqual(const Shader* shader) const override;
-
-  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                      const Matrix* uvMatrix) const override;
-
-  void getDeferredGraphics(DeferredGraphics* graphics) const override;
-};
+}
 }  // namespace tgfx

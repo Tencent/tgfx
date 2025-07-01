@@ -49,6 +49,10 @@ class ShaderMaskFilter : public MaskFilter {
   PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                       const Matrix* uvMatrix) const override;
 
+  void getDeferredGraphics(DeferredGraphics* graphics) const override {
+    return shader->getDeferredGraphics(graphics);
+  }
+
  private:
   std::shared_ptr<Shader> shader;
   bool inverted;

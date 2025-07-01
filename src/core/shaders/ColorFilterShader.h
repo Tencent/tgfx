@@ -49,5 +49,9 @@ class ColorFilterShader : public Shader {
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                       const Matrix* uvMatrix) const override;
+
+  void getDeferredGraphics(DeferredGraphics* graphics) const override {
+    shader->getDeferredGraphics(graphics);
+  }
 };
 }  // namespace tgfx

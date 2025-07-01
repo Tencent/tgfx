@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Picture.h"
+#include "core/DeferredGraphics.h"
 #include "core/HitTestContext.h"
 #include "core/MeasureContext.h"
 #include "core/Records.h"
@@ -211,6 +212,39 @@ const Record* Picture::getFirstDrawRecord(MCState* state, Fill* fill, bool* hasS
     *hasStroke = playback.stroke() != nullptr;
   }
   return drawRecord;
+}
+
+void Picture::getDeferredGraphics(DeferredGraphics* graphics) const {
+  for (auto& record : records) {
+    switch (record->type()) {
+      case RecordType::SetFill: {
+        auto& fill = static_cast<SetFill*>(record.get())->fill;
+        if (fill.shader) {
+          fill.shader->getDeferredGraphics(graphics);
+        }
+        if (fill.maskFilter) {
+          fill.maskFilter->getDeferredGraphics(graphics);
+        }
+      } break;
+      case RecordType::DrawImage: {
+        static_cast<DrawImage*>(record.get())->image->getDeferredGraphics(graphics);
+      } break;
+      case RecordType::DrawImageRect: {
+        static_cast<DrawImageRect*>(record.get())->image->getDeferredGraphics(graphics);
+      } break;
+      case RecordType::DrawShape: {
+        graphics->shapes.insert(static_cast<DrawShape*>(record.get())->shape);
+      } break;
+      case RecordType::DrawPicture: {
+        static_cast<DrawPicture*>(record.get())->picture->getDeferredGraphics(graphics);
+      } break;
+      case RecordType::DrawLayer: {
+        static_cast<DrawLayer*>(record.get())->picture->getDeferredGraphics(graphics);
+      }
+      default:
+        break;
+    }
+  }
 }
 
 }  // namespace tgfx

@@ -61,4 +61,12 @@ void ForegroundContent::drawContour(Canvas* canvas, const FillModifier* modifier
   }
   foreground->playback(canvas, modifier);
 }
+
+void ForegroundContent::getDeferredGraphics(DeferredGraphics* graphics) const {
+  if (background) {
+    FindDeferredGraphics(background.get(), graphics);
+  }
+  FindDeferredGraphics(foreground.get(), graphics);
+}
+
 }  // namespace tgfx

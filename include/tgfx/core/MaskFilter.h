@@ -61,7 +61,10 @@ class MaskFilter {
   virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                               const Matrix* uvMatrix) const = 0;
 
+  virtual void getDeferredGraphics(DeferredGraphics* graphics) const = 0;
+
   friend class OpsCompositor;
+  friend class Picture;
   friend class Types;
 };
 }  // namespace tgfx

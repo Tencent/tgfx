@@ -51,6 +51,11 @@ class ContourContent : public LayerContent {
     contour->playback(canvas, modifier);
   }
 
+  void getDeferredGraphics(DeferredGraphics* graphics) const override {
+    content->getDeferredGraphics(graphics);
+    FindDeferredGraphics(contour.get(), graphics);
+  }
+
   std::unique_ptr<LayerContent> content = nullptr;
   std::shared_ptr<Picture> contour = nullptr;
 

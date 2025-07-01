@@ -35,9 +35,21 @@ std::shared_ptr<RootLayer> RootLayer::Make() {
 }
 
 RootLayer::~RootLayer() {
+  _graphicsLoader = nullptr;
   // Immediately trigger onDetachFromRoot() for all children to prevent them from calling
   // root->invalidateRect() after this object has been destroyed.
   removeChildren();
+}
+
+void RootLayer::setMaxAsyncGraphicsPerFrame(size_t count) {
+  if (count == 0) {
+    _graphicsLoader = nullptr;
+  } else {
+    if (!_graphicsLoader) {
+      _graphicsLoader = std::make_unique<LayerGraphicsLoader>(this);
+    }
+    _graphicsLoader->setMaxAsyncGraphicsPerFrame(count);
+  }
 }
 
 void RootLayer::invalidateRect(const Rect& rect) {
@@ -103,6 +115,9 @@ bool RootLayer::invalidateBackground(const Rect& drawRect, LayerStyle* layerStyl
 }
 
 std::vector<Rect> RootLayer::updateDirtyRegions() {
+  if (_graphicsLoader) {
+    _graphicsLoader->updateCompleteTasks();
+  }
   updateRenderBounds();
   while (mergeDirtyList(false)) {
   }

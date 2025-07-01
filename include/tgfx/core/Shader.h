@@ -30,6 +30,7 @@
 
 namespace tgfx {
 class FragmentProcessor;
+struct DeferredGraphics;
 
 /**
  * Shaders specify the source color(s) for what is being drawn. If a paint has no shader, then the
@@ -174,12 +175,17 @@ class Shader {
 
   virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                               const Matrix* uvMatrix) const = 0;
+
+  virtual void getDeferredGraphics(DeferredGraphics* /*graphics*/) const {
+  }
+
   friend class OpsCompositor;
   friend class ShaderMaskFilter;
   friend class ColorFilterShader;
   friend class BlendShader;
   friend class MatrixShader;
   friend class FragmentProcessor;
+  friend class Picture;
   friend class Types;
 };
 }  // namespace tgfx

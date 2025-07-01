@@ -290,10 +290,12 @@ bool Layer::addChildAt(std::shared_ptr<Layer> child, int index) {
   if (child.get() == this) {
     LOGE("addChildAt() The child is the same as the parent.");
     return false;
-  } else if (child->doContains(this)) {
+  }
+  if (child->doContains(this)) {
     LOGE("addChildAt() The child is already a parent of the parent.");
     return false;
-  } else if (child->_root == child.get()) {
+  }
+  if (child->_root == child.get()) {
     LOGE("A root layer cannot be added as a child to another layer.");
     return false;
   }
@@ -303,7 +305,9 @@ bool Layer::addChildAt(std::shared_ptr<Layer> child, int index) {
   child->removeFromParent();
   _children.insert(_children.begin() + index, child);
   child->_parent = this;
-  child->onAttachToRoot(_root);
+  if (_root) {
+    child->onAttachToRoot(_root);
+  }
   child->invalidateTransform();
   invalidateDescendents();
   return true;
@@ -346,7 +350,9 @@ std::shared_ptr<Layer> Layer::removeChildAt(int index) {
   }
   auto child = _children[static_cast<size_t>(index)];
   child->_parent = nullptr;
-  child->onDetachFromRoot();
+  if (child->_root) {
+    child->onDetachFromRoot();
+  }
   _children.erase(_children.begin() + index);
   if (_root) {
     _root->invalidateRect(child->renderBounds);
@@ -602,12 +608,18 @@ void Layer::detachProperty(LayerProperty* property) {
 
 void Layer::onAttachToRoot(RootLayer* rootLayer) {
   _root = rootLayer;
+  if (layerContent) {
+    _root->updateLayerContent(this, layerContent.get());
+  }
   for (auto& child : _children) {
     child->onAttachToRoot(rootLayer);
   }
 }
 
 void Layer::onDetachFromRoot() {
+  if (layerContent) {
+    _root->updateLayerContent(this, nullptr);
+  }
   _root = nullptr;
   for (auto& child : _children) {
     child->onDetachFromRoot();
@@ -662,6 +674,9 @@ LayerContent* Layer::getContent() {
     LayerRecorder recorder = {};
     onUpdateContent(&recorder);
     layerContent = recorder.finishRecording();
+    if (_root) {
+      _root->updateLayerContent(this, layerContent.get());
+    }
     bitFields.dirtyContent = false;
   }
   return layerContent.get();

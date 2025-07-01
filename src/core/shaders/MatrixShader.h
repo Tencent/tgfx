@@ -53,6 +53,10 @@ class MatrixShader final : public Shader {
   PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                       const Matrix* uvMatrix) const override;
 
+  void getDeferredGraphics(DeferredGraphics* graphics) const override {
+    source->getDeferredGraphics(graphics);
+  }
+
   MatrixShader(std::shared_ptr<Shader> source, const Matrix& matrix);
 };
 }  // namespace tgfx

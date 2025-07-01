@@ -54,6 +54,10 @@ class RasterizedImage : public OffscreenImage {
 
   std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
 
+  void getDeferredGraphics(DeferredGraphics* graphics) const override {
+    source->getDeferredGraphics(graphics);
+  }
+
   bool onDraw(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags) const override;
 
  private:

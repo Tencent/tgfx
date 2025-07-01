@@ -643,6 +643,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   friend class RootLayer;
   friend class DisplayList;
   friend class LayerProperty;
+  friend class LayerGraphicsLoader;
   friend class LayerSerialization;
 };
 }  // namespace tgfx

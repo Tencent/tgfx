@@ -21,6 +21,7 @@
 #include "core/utils/BlockBuffer.h"
 #include "core/utils/SlidingWindowTracker.h"
 #include "gpu/AAType.h"
+#include "gpu/GraphicsLoader.h"
 #include "gpu/VertexProvider.h"
 #include "gpu/proxies/GpuBufferProxy.h"
 #include "gpu/proxies/GpuShapeProxy.h"
@@ -165,6 +166,7 @@ class ProxyProvider {
   std::vector<std::shared_ptr<Task>> sharedVertexBufferTasks = {};
   BlockBuffer blockBuffer = {};
   SlidingWindowTracker maxValueTracker = {10};
+  GraphicsLoader* graphicsLoader = nullptr;
 
   static UniqueKey GetProxyKey(const UniqueKey& uniqueKey, uint32_t renderFlags);
 
@@ -177,5 +179,7 @@ class ProxyProvider {
   std::shared_ptr<TextureProxy> createTextureProxyByImageSource(
       const UniqueKey& uniqueKey, std::shared_ptr<DataSource<ImageBuffer>> source, int width,
       int height, bool alphaOnly, bool mipmapped = false, uint32_t renderFlags = 0);
+
+  friend class AutoGraphicsLoaderRestore;
 };
 }  // namespace tgfx

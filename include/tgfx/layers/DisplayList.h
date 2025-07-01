@@ -189,7 +189,8 @@ class DisplayList {
    * available, the display list will use those caches to render first, then gradually update to the
    * current zoomScale in later frames. Use setMaxTilesRefinedPerFrame() to control how many tiles
    * are updated per frame. This can improve zooming performance, but may cause temporary zoom blur
-   * artifacts. The default is false.
+   * artifacts. The hasContentChanged() method will return true if there are any pending zoom blur
+   * tiles that still need to be updated. The default is false.
    */
   bool allowZoomBlur() const {
     return _allowZoomBlur;
@@ -209,7 +210,7 @@ class DisplayList {
    * temporarily, resulting in brief blur artifacts. Increasing this value refines more tiles per
    * frame, reducing blur more quickly but potentially impacting performance. The default is 5.
    */
-  int maxTilesRefinedPerFrame() const {
+  size_t maxTilesRefinedPerFrame() const {
     return _maxTilesRefinedPerFrame;
   }
 
@@ -217,9 +218,26 @@ class DisplayList {
    * Sets the maximum number of tiles that can be refined (updated to the current zoom scale) per
    * frame in tiled rendering mode.
    */
-  void setMaxTilesRefinedPerFrame(int count) {
+  void setMaxTilesRefinedPerFrame(size_t count) {
     _maxTilesRefinedPerFrame = count;
   }
+
+  /**
+   * Returns the maximum number of asynchronous tasks allowed per frame for processing deferred
+   * graphics, such as image decoding or shape computation. If set to 0, all deferred graphics are
+   * processed synchronously in the current frame, which may block the rendering thread. If greater
+   * than 0, up to that number of async tasks will be started per frame to process deferred graphics
+   * in the background, allowing rendering to continue without blocking. Deferred graphics may take
+   * several frames to finish processing and will not appear until complete. The hasContentChanged()
+   * method will return true if there are any pending deferred graphics that still need to be
+   * processed. The default is 0.
+   */
+  size_t maxAsyncGraphicsPerFrame() const;
+
+  /**
+   * Sets the maximum number of asynchronous tasks allowed per frame to process deferred graphics.
+   */
+  void setMaxAsyncGraphicsPerFrame(size_t count);
 
   /**
    * Sets whether to show dirty regions during rendering. When enabled, the dirty regions will be
@@ -251,7 +269,7 @@ class DisplayList {
   int _tileSize = 256;
   int _maxTileCount = 0;
   bool _allowZoomBlur = false;
-  int _maxTilesRefinedPerFrame = 5;
+  size_t _maxTilesRefinedPerFrame = 5;
   bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
   bool hasZoomBlurTiles = false;

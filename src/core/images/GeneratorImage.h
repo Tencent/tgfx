@@ -19,6 +19,7 @@
 #pragma once
 
 #include "ResourceImage.h"
+#include "core/DeferredGraphics.h"
 
 namespace tgfx {
 /**
@@ -53,6 +54,12 @@ class GeneratorImage : public ResourceImage {
 
   std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
                                                    const UniqueKey& key) const override;
+
+  void getDeferredGraphics(DeferredGraphics* graphics) const override {
+    if (generator->asyncSupport()) {
+      graphics->images.insert(generator);
+    }
+  }
 
   std::shared_ptr<ImageGenerator> generator = nullptr;
 };

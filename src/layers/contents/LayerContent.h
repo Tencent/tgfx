@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "core/DeferredGraphics.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/FillModifier.h"
 
@@ -64,10 +65,19 @@ class LayerContent {
     */
   virtual void drawContour(Canvas* canvas, const FillModifier* modifier) const = 0;
 
+  /**
+   * Collects deferred graphics from the layer content.
+   */
+  virtual void getDeferredGraphics(DeferredGraphics* graphics) const = 0;
+
  protected:
   enum class Type { Default, Foreground, Contour };
 
   virtual Type type() const = 0;
+
+  static void FindDeferredGraphics(const Picture* picture, DeferredGraphics* graphics) {
+    picture->getDeferredGraphics(graphics);
+  }
 
   friend class Types;
 };
