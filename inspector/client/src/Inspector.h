@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <thread>
-#include <mutex>
 #include <chrono>
+#include <mutex>
+#include <thread>
 #include <vector>
 #include "MemoryUtils.h"
 #include "Protocol.h"

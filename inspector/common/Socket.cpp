@@ -45,6 +45,8 @@
 #include <cassert>
 #include <cinttypes>
 #include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include "Socket.h"
 
 #ifndef MSG_NOSIGNAL
