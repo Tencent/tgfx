@@ -131,8 +131,21 @@ export function bindCanvasZoomAndPanEvents(canvas: HTMLElement, shareData: Share
     }, { passive: false });
 }
 
+interface IWebKitMouseWheelEvent {
+    wheelDeltaY: number;
+    wheelDeltaX: number;
+}
+
+interface IGeckoMouseWheelEvent {
+    HORIZONTAL_AXIS: number;
+    VERTICAL_AXIS: number;
+    axis: number;
+    detail: number;
+}
+
 /**
- * Standardized mouse wheel deltaY to be consistent with VSCode's implementation, compatible with Chrome/Firefox/old API, different platforms and DPIs.
+ * Standardized mouse wheel deltaY to be consistent with VSCode's implementation,
+ * compatible with Chrome/Firefox/old API, different platforms and DPIs.
  * Refs VSCode: https://github.com/microsoft/vscode/blob/main/src/vs/base/browser/mouseEvent.ts
  */
 export function normalizeZoom(e: WheelEvent): number {
@@ -147,47 +160,46 @@ export function normalizeZoom(e: WheelEvent): number {
         const chromeVer = parseInt(chromeMatch[1]);
         shouldFactorDPR = chromeVer <= 122;
     }
-    if (isFirefox) {
-        // Firefox: Force access to deltaY once to avoid abnormal behavior of properties wheelDeltaY
-        e.deltaY
-    }
-    const devicePixelRatio = (e.view && (e.view as Window).devicePixelRatio) || 1;
-    if (typeof (e as any).wheelDeltaY !== "undefined" && Math.abs((e as any).wheelDeltaY) >= 120) {
-        let deltaY: number;
-        if (shouldFactorDPR) {
-            deltaY = (e as any).wheelDeltaY / (120 * devicePixelRatio);
-        } else {
-            // Differentiate between a normal scroll wheel and a touchpad
-            if(Math.abs(e.deltaY) > 4){
-                deltaY = (e as any).wheelDeltaY / 120;
-            }else{
-                deltaY = -e.deltaY / 120;
-            }
-        }
-        if (isSafari && isWindows) {
-            deltaY = -deltaY;
-        }
-        if(Math.abs(e.deltaY) < 4){
-            return 1 + deltaY;
-        }
-        return Math.pow(ZoomFactorPerNotch, deltaY);
-    }
-    if (typeof (e as any).axis !== "undefined" && (e as any).axis === (e as any).VERTICAL_AXIS) {
-        return 1-((e as any).detail) / 3;
-    }
-    if (e.type === "wheel") {
-        if (e.deltaMode === WheelEvent.DOM_DELTA_LINE) {
-            if (isFirefox && !isMac) {
-                return 1-e.deltaY / 3;
+    let deltaY: number;
+    if (e) {
+        const e1 = <IWebKitMouseWheelEvent><any>e;
+        const e2 = <IGeckoMouseWheelEvent><any>e;
+        const devicePixelRatio = e.view?.devicePixelRatio || 1;
+        if (typeof e1.wheelDeltaY !== 'undefined') {
+            if (shouldFactorDPR) {
+                // Refs https://github.com/microsoft/vscode/issues/146403#issuecomment-1854538928
+                deltaY = e1.wheelDeltaY / (120 * devicePixelRatio);
             } else {
-                return 1-e.deltaY;
+                deltaY = e1.wheelDeltaY / 120;
             }
-        }else if(e.deltaMode === WheelEvent.DOM_DELTA_PIXEL){
-            return 1-e.deltaY / 120;
+        } else if (typeof e2.VERTICAL_AXIS !== 'undefined' && e2.axis === e2.VERTICAL_AXIS) {
+            deltaY = -e2.detail / 3;
+        } else if (e.type === 'wheel') {
+            // Modern wheel event
+            // https://developer.mozilla.org/en-US/docs/Web/API/WheelEvent
+            const ev = <WheelEvent><unknown>e;
+            if (ev.deltaMode === ev.DOM_DELTA_LINE) {
+                // the deltas are expressed in lines
+                if (isFirefox && !isMac) {
+                    deltaY = -e.deltaY / 3;
+                } else {
+                    deltaY = -e.deltaY;
+                }
+            } else {
+                deltaY = -e.deltaY / 40;
+            }
         }
-        else {
-            return 1-e.deltaY / 40;
+        if(1 + deltaY * 0.25 <= 0){
+            return 1;
         }
+        //Special processing of chrome
+        if(chromeMatch && isMac && Math.abs(e1.wheelDeltaY) % 120 === 0){
+            if(Math.abs(e1.wheelDeltaY) === 120){
+                return 1 + deltaY * 0.04;
+            }
+            return Math.pow(1.1, deltaY);
+        }
+        return 1 + deltaY * 0.25;
     }
-    return 1-e.deltaY / 40;
 }
+
