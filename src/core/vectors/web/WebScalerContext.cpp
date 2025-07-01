@@ -90,7 +90,10 @@ bool WebScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke* 
   if (!imageData.as<bool>()) {
     return false;
   }
-  return ReadPixelsFromCanvasImage(imageData, dstInfo, dstPixels);
+  auto srcInfo =
+      ImageInfo::Make(static_cast<int>(bounds.width()), static_cast<int>(bounds.height()),
+                      ColorType::RGBA_8888, AlphaType::Premultiplied);
+  return ReadPixelsFromCanvasImage(imageData, srcInfo, dstInfo, dstPixels);
 }
 
 std::string WebScalerContext::getText(GlyphID glyphID) const {

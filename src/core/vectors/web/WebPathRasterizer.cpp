@@ -68,8 +68,7 @@ bool WebPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) co
   if (!path2DClass.as<bool>()) {
     return false;
   }
-  auto canvas =
-      val::module_property("tgfx").call<val>("createCanvas2D", dstInfo.width(), dstInfo.height());
+  auto canvas = val::module_property("tgfx").call<val>("createCanvas2D", width(), height());
   if (!canvas.as<bool>()) {
     return false;
   }
@@ -88,6 +87,7 @@ bool WebPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) co
   if (!imageData.as<bool>()) {
     return false;
   }
-  return ReadPixelsFromCanvasImage(imageData, dstInfo, dstPixels);
+  auto srcInfo = ImageInfo::Make(width(), height(), ColorType::RGBA_8888, AlphaType::Premultiplied);
+  return ReadPixelsFromCanvasImage(imageData, srcInfo, dstInfo, dstPixels);
 }
 }  // namespace tgfx

@@ -442,6 +442,7 @@ void RenderContext::drawGlyphsAsPath(GlyphRun& sourceGlyphRun, const MCState& st
                                      GlyphRun& rejectedGlyphRun) const {
   if (!sourceGlyphRun.font.hasOutlines()) {
     rejectedGlyphRun = std::move(sourceGlyphRun);
+    return;
   }
   auto maxScale = state.matrix.getMaxScale();
   Path totalPath = {};
