@@ -42,7 +42,7 @@ class Socket {
 
   template <typename ShouldExit>
   bool Read(void* buf, size_t len, int timeout, ShouldExit exitCb) {
-    auto cbuf = (char*)buf;
+    auto cbuf = static_cast<char*>(buf);
     while (len > 0) {
       if (exitCb()) {
         return false;

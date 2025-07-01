@@ -62,10 +62,10 @@ typedef int socket_t;
 
 static constexpr size_t BufSize = 128 * 1024;
 
-Socket::Socket() : buf((char*)malloc(BufSize)), sock(-1) {
+Socket::Socket() : buf(static_cast<char*>(malloc(BufSize))), sock(-1) {
 }
 
-Socket::Socket(int sock) : buf((char*)malloc(BufSize)), sock(sock) {
+Socket::Socket(int sock) : buf(static_cast<char*>(malloc(BufSize))), sock(sock) {
 }
 
 Socket::~Socket() {
@@ -254,7 +254,7 @@ void Socket::Close() {
 
 int Socket::Send(const void* _buf, size_t len) {
   const auto sock = this->sock.load(std::memory_order_relaxed);
-  auto buf = (const char*)_buf;
+  auto buf = static_cast<const char*>(_buf);
   assert(sock != -1);
   auto start = buf;
   while (len > 0) {
@@ -277,7 +277,7 @@ int Socket::GetSendBufSize() {
   int bufSize;
 #if defined _WIN32
   int sz = sizeof(bufSize);
-  getsockopt(sock, SOL_SOCKET, SO_SNDBUF, (char*)&bufSize, &sz);
+  getsockopt(sock, SOL_SOCKET, SO_SNDBUF, static_cast<char*>(&bufSize), &sz);
 #else
   socklen_t sz = sizeof(bufSize);
   getsockopt(sock, SOL_SOCKET, SO_SNDBUF, &bufSize, &sz);
@@ -317,7 +317,7 @@ int Socket::RecvBuffered(void* buf, size_t len, int timeout) {
 
 int Socket::Recv(void* _buf, size_t len, int timeout) {
   const auto sock = this->sock.load(std::memory_order_relaxed);
-  auto buf = (char*)_buf;
+  auto buf = static_cast<char*>(_buf);
 
   struct pollfd fd;
   fd.fd = (socket_t)sock;
@@ -351,7 +351,7 @@ int Socket::ReadUpTo(void* _buf, size_t len) {
 }
 
 bool Socket::Read(void* buf, size_t len, int timeout) {
-  auto cbuf = (char*)buf;
+  auto cbuf = static_cast<char*>(buf);
   while (len > 0) {
     if (!ReadImpl(cbuf, len, timeout)) {
       return false;
@@ -361,7 +361,7 @@ bool Socket::Read(void* buf, size_t len, int timeout) {
 }
 
 bool Socket::ReadMax(void* buf, size_t& maxLen, int timeout) {
-  auto cbuf = (char*)buf;
+  auto cbuf = static_cast<char*>(buf);
   if (!ReadImpl(cbuf, maxLen, timeout)) {
     return false;
   }
@@ -392,7 +392,7 @@ bool Socket::ReadImpl(char*& buf, size_t& len, int timeout) {
 }
 
 bool Socket::ReadRaw(void* _buf, size_t len, int timeout) {
-  auto buf = (char*)_buf;
+  auto buf = static_cast<char*>(_buf);
   while (len > 0) {
     const auto sz = Recv(buf, len, timeout);
     if (sz <= 0) {
