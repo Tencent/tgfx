@@ -277,7 +277,7 @@ int Socket::GetSendBufSize() {
   int bufSize;
 #if defined _WIN32
   int sz = sizeof(bufSize);
-  getsockopt(sock, SOL_SOCKET, SO_SNDBUF, static_cast<char*>(&bufSize), &sz);
+  getsockopt(sock, SOL_SOCKET, SO_SNDBUF, (char*)&bufSize, &sz);
 #else
   socklen_t sz = sizeof(bufSize);
   getsockopt(sock, SOL_SOCKET, SO_SNDBUF, &bufSize, &sz);
