@@ -17,7 +17,7 @@ namespace inspector {
 
         Q_SIGNAL void selectedImage(std::shared_ptr<tgfx::Image> image);
 
-        void updateImageData(QStringList testImageSources);
+        void updateImageData(std::initializer_list<std::string>& testImageSources);
         void setImageLabel(const QString &label);
 
     protected:
@@ -28,16 +28,16 @@ namespace inspector {
 
     private:
         void updateLayout();
-        void drawContent(tgfx::Canvas* canvas);
-        int itemAtPosition(qreal y) const;
+        void draw();
+        int itemAtPosition(float y) const;
 
-        QVector<tgfx::Rect> m_squareRects;
-        QVector<std::shared_ptr<tgfx::Image>> m_images;
-        bool m_layoutDirty = true;
-        qreal m_scrollOffset;
+        std::vector<tgfx::Rect> squareRects;
+        std::vector<std::shared_ptr<tgfx::Image>> images;
+        bool layoutDirty = true;
+        float scrollOffset;
 
-        std::shared_ptr<tgfx::QGLWindow> m_tgfxWindow = nullptr;
-        std::shared_ptr<AppHost> m_appHost = nullptr;
+        std::shared_ptr<tgfx::QGLWindow> tgfxWindow = nullptr;
+        std::shared_ptr<AppHost> appHost = nullptr;
     };
 }
 

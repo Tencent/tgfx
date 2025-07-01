@@ -7,27 +7,27 @@
 #include <QSGImageNode>
 namespace inspector {
     static tgfx::Rect calcInerRect(const tgfx::Rect &rect, float aspectRatio) {
-        float w = rect.width();
-        float h = rect.height();
-        const float paddingRatio = 0.05f;
-        const float innerScaleRatio = 1-2*paddingRatio;
+        auto w = rect.width();
+        auto h = rect.height();
+        const auto paddingRatio = 0.05f;
+        const auto innerScaleRatio = 1-2*paddingRatio;
         if (w<=h*aspectRatio) {//外部矩形更扁
-            float innerWidth = w * innerScaleRatio;
-            float innerHeight = innerWidth / aspectRatio;
-            float x = paddingRatio * w;
-            float y = (h - innerHeight) / 2;
+            auto innerWidth = w * innerScaleRatio;
+            auto innerHeight = innerWidth / aspectRatio;
+            auto x = paddingRatio * w;
+            auto y = (h - innerHeight) / 2;
             return tgfx::Rect::MakeXYWH(x+rect.x(), y+rect.y(), innerWidth, innerHeight);
         } else {//外部矩形更瘦
-            float innerHeight = h * innerScaleRatio;
-            float innerWidth = innerHeight * aspectRatio;
-            float x = (w - innerWidth) / 2;
-            float y = paddingRatio * h;
+            auto innerHeight = h * innerScaleRatio;
+            auto innerWidth = innerHeight * aspectRatio;
+            auto x = (w - innerWidth) / 2;
+            auto y = paddingRatio * h;
             return tgfx::Rect::MakeXYWH(x+rect.x(), y+rect.y(), innerWidth, innerHeight);
         }
     }
 
     TextureListDrawer::TextureListDrawer(QQuickItem *parent)
-        : QQuickItem(parent), m_appHost(AppHostSingleton::GetInstance())
+        : QQuickItem(parent), appHost(AppHostSingleton::GetInstance())
     {
         setFlag(ItemHasContents, true);
         setAcceptHoverEvents(true);
@@ -37,31 +37,36 @@ namespace inspector {
     void TextureListDrawer::geometryChange(const QRectF &newGeometry, const QRectF &oldGeometry)
     {
         QQuickItem::geometryChange(newGeometry, oldGeometry);
-        m_layoutDirty = true;
+        layoutDirty = true;
         update();
+        if (tgfxWindow) {
+            tgfxWindow->invalidSize();
+        }
     }
 
     void TextureListDrawer::updateLayout()
     {
-        if (!m_layoutDirty) return;
-
-        m_squareRects.clear();
-        float y = 0;
-        const float squareSize = static_cast<float>(width());
-        for (int i=0;i<m_images.size();i++) {
-            m_squareRects.append(tgfx::Rect::MakeXYWH(0.f, y, squareSize, squareSize));
+        if (!layoutDirty) {
+            return;
+        }
+        squareRects.clear();
+        auto y = 0.f;
+        const auto squareSize = static_cast<float>(width());
+        for (size_t i=0;i<images.size();i++) {
+            squareRects.push_back(tgfx::Rect::MakeXYWH(0.f, y, squareSize, squareSize));
             y += squareSize;
         }
 
         setImplicitHeight(y);
-        m_layoutDirty = false;
+        layoutDirty = false;
     }
 
-    int TextureListDrawer::itemAtPosition(qreal y) const
+    int TextureListDrawer::itemAtPosition(float y) const
     {
-        for (int i = 0; i < m_squareRects.size(); ++i) {
-            if (m_squareRects[i].contains(0.f, static_cast<float>(y))) {
-                return i;
+        y += scrollOffset*static_cast<float>(width())/200.f;
+        for (size_t i = 0; i < squareRects.size(); ++i) {
+            if (squareRects[i].contains(0.f, y)) {
+                return static_cast<int>(i);
             }
         }
         return -1;
@@ -71,69 +76,84 @@ namespace inspector {
     {
         QQuickItem::mousePressEvent(event);
 
-        int index = itemAtPosition(event->position().y()+ m_scrollOffset*width()/200.f);
-        if (index >= 0 && index < m_images.size()) {
-            emit selectedImage(m_images[index]);
+        auto index = itemAtPosition(static_cast<float>(event->position().y()));
+        if (index >= 0 && index < static_cast<int>(images.size())) {
+            emit selectedImage(images[static_cast<size_t>(index)]);
         }
     }
 
     void TextureListDrawer::wheelEvent(QWheelEvent *event)
     {
-        const qreal maxScroll = implicitHeight() - height();
-        if (maxScroll <= 0) {
-            m_scrollOffset = 0;
+        const auto maxScroll = static_cast<float>(implicitHeight() - height());
+        if (maxScroll <= 0.f) {
+            scrollOffset = 0;
             return;
         }
-        const qreal delta = event->angleDelta().y() / 120.0;
-        const qreal step = 20.0;
+        const auto delta = event->angleDelta().y() / 120.f;
+        const auto step = 20.f;
 
-        m_scrollOffset -= delta * step;
-        m_scrollOffset = qBound(0.0, m_scrollOffset, maxScroll/width()*200.f);
+        scrollOffset -= delta * step;
+        scrollOffset = qBound(0.f, scrollOffset, maxScroll/static_cast<float>(width())*200.f);
 
         update();
         event->accept();
     }
 
-    void TextureListDrawer::drawContent(tgfx::Canvas* canvas)
+    void TextureListDrawer::draw()
     {
-        if (!canvas) return;
-        canvas->clear();
-        canvas->setMatrix(tgfx::Matrix::MakeScale(m_appHost->density(), m_appHost->density()));
-        canvas->translate(0, -static_cast<float>(m_scrollOffset*width())/200.f);
-        for (int i = 0; i < m_squareRects.size(); ++i) {
-            drawRect(canvas,m_squareRects[i], 0xFF535353);
-            if (!m_images[i])return;
-            auto imageRect = calcInerRect(m_squareRects[i],m_images[i]->width() / static_cast<float>(m_images[i]->height()));
-            canvas->drawImageRect(m_images[i],imageRect,tgfx::SamplingOptions(tgfx::FilterMode::Linear, tgfx::MipmapMode::Linear));
+        auto device = tgfxWindow->getDevice();
+        if (device == nullptr) {
+            return;
         }
+        auto context = device->lockContext();
+        if (context == nullptr) {
+            return;
+        }
+        auto surface = tgfxWindow->getSurface(context);
+        if (surface == nullptr) {
+            device->unlock();
+            return;
+        }
+        auto canvas = surface->getCanvas();
+        canvas->clear();
+
+        canvas->setMatrix(tgfx::Matrix::MakeScale(appHost->density(), appHost->density()));
+        canvas->translate(0, -static_cast<float>(scrollOffset*width())/200.f);
+        for (size_t i = 0; i < squareRects.size(); ++i) {
+            drawRect(canvas,squareRects[i], 0xFF535353);
+            if (!images[i]) {
+                return;
+            }
+            auto imageRect = calcInerRect(squareRects[i],images[i]->width() / static_cast<float>(images[i]->height()));
+            canvas->drawImageRect(images[i],imageRect,tgfx::SamplingOptions(tgfx::FilterMode::Linear, tgfx::MipmapMode::Linear));
+        }
+
+        context->flushAndSubmit();
+        tgfxWindow->present(context);
+        device->unlock();
     }
 
-    void TextureListDrawer::updateImageData(QStringList testImageSources) {
+    void TextureListDrawer::updateImageData(std::initializer_list<std::string>& testImageSources) {
 
-        QString rootPath = QCoreApplication::applicationDirPath();
-        while (!rootPath.isEmpty() && !QDir(rootPath + "/resources").exists()) {
-            rootPath = rootPath.left(rootPath.lastIndexOf('/'));
-        }
-
-        m_images.clear();
-        for (int i = 0; i < testImageSources.size(); ++i) {
-            auto Image = tgfx::Image::MakeFromFile(testImageSources[i].toStdString());
+        images.clear();
+        for (auto&imageSource: testImageSources) {
+            auto Image = tgfx::Image::MakeFromFile(imageSource);
             Image = Image->makeMipmapped(true);
-            m_images.push_back(Image);
+            images.push_back(Image);
         }
 
-        m_layoutDirty = true;
+        layoutDirty = true;
         update();
         emit selectedImage(nullptr);
     }
 
     void TextureListDrawer::setImageLabel(const QString &label) {
-        QString rootPath = QCoreApplication::applicationDirPath();
-        while (!rootPath.isEmpty() && !QDir(rootPath + "/resources").exists()) {
-            rootPath = rootPath.left(rootPath.lastIndexOf('/'));
+        std::string rootPath = QCoreApplication::applicationDirPath().toStdString();
+        while (!rootPath.empty() && !std::filesystem::exists(rootPath + "/resources")) {
+            rootPath = rootPath.substr(0, rootPath.find_last_of('/'));
         }
-        if (label=="Input") {
-            QStringList testImageSources = {
+        if(label=="Input") {
+            auto testImageSources = {
                 rootPath + "/resources/assets/bridge.jpg",
                 rootPath + "/resources/apitest/rotation.jpg",
                 rootPath + "/resources/apitest/rgbaaa.png"};
@@ -141,7 +161,7 @@ namespace inspector {
             updateImageData(testImageSources);
         }
         else if (label=="Output") {
-            QStringList testImageSources = {
+            auto testImageSources = {
                 rootPath + "/resources/assets/glyph1.png",
                 rootPath + "/resources/assets/glyph2.png",
                 rootPath + "/resources/assets/glyph3.png",};
@@ -154,38 +174,21 @@ namespace inspector {
     QSGNode *TextureListDrawer::updatePaintNode(QSGNode *oldNode, UpdatePaintNodeData *)
     {
         updateLayout();
-
-        if (!m_tgfxWindow)
-            m_tgfxWindow = tgfx::QGLWindow::MakeFrom(this, true);
-
-        auto pixelRatio = window() ? window()->devicePixelRatio() : 1.0;
+        if (!tgfxWindow) {
+            tgfxWindow = tgfx::QGLWindow::MakeFrom(this, true);
+        }
+        auto pixelRatio = window() ? static_cast<float>(window()->devicePixelRatio()) : 1.f;
         auto screenWidth = static_cast<int>(ceil(width() * pixelRatio));
         auto screenHeight = static_cast<int>(ceil(height() * pixelRatio));
-
-        bool sizeChanged = m_appHost->updateScreen(screenWidth, screenHeight, static_cast<float>(pixelRatio));
+        auto sizeChanged = appHost->updateScreen(screenWidth, screenHeight, pixelRatio);
         if (sizeChanged) {
-            m_tgfxWindow->invalidSize();
+            tgfxWindow->invalidSize();
         }
 
-        // 绘制内容
-        auto device = m_tgfxWindow->getDevice();
-        if (device) {
-            auto context = device->lockContext();
-            if (context) {
-                auto surface = m_tgfxWindow->getSurface(context);
-                if (surface) {
-                    auto canvas = surface->getCanvas();
-                    drawContent(canvas);
-                    context->flushAndSubmit();
-                    m_tgfxWindow->present(context);
-                }
-                device->unlock();
-            }
-        }
+        draw();
 
-        // 更新场景图节点
         auto node = static_cast<QSGImageNode*>(oldNode);
-        auto texture = m_tgfxWindow->getQSGTexture();
+        auto texture = tgfxWindow->getQSGTexture();
         if (texture) {
             if (!node) {
                 node = window()->createImageNode();
@@ -195,7 +198,6 @@ namespace inspector {
             node->setRect(boundingRect());
             node->markDirty(QSGNode::DirtyMaterial | QSGNode::DirtyGeometry);
         }
-
         return node;
     }
 }
