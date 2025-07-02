@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include "core/images/OffscreenImage.h"
+#include "core/images/ResourceImage.h"
 
 namespace tgfx {
 /**
  * RasterizedImage is an image that rasterizes another image with a scale and sampling options.
  */
-class RasterizedImage : public OffscreenImage {
+class RasterizedImage : public ResourceImage {
  public:
   /**
    * Note that this method always returns a non-mipmapped image.
@@ -54,7 +54,8 @@ class RasterizedImage : public OffscreenImage {
 
   std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
 
-  bool onDraw(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags) const override;
+  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
+                                                   const UniqueKey& key) const final;
 
  private:
   std::shared_ptr<Image> source = nullptr;

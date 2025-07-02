@@ -19,6 +19,7 @@
 #include "RasterizedImage.h"
 #include "core/images/SubsetImage.h"
 #include "gpu/DrawingManager.h"
+#include "gpu/ProxyProvider.h"
 #include "gpu/ops/DrawOp.h"
 
 namespace tgfx {
@@ -47,7 +48,7 @@ std::shared_ptr<Image> RasterizedImage::MakeFrom(std::shared_ptr<Image> source,
 
 RasterizedImage::RasterizedImage(UniqueKey uniqueKey, std::shared_ptr<Image> source,
                                  float rasterizationScale, const SamplingOptions& sampling)
-    : OffscreenImage(std::move(uniqueKey)), source(std::move(source)),
+    : ResourceImage(std::move(uniqueKey)), source(std::move(source)),
       rasterizationScale(rasterizationScale), sampling(sampling) {
 }
 
@@ -77,8 +78,22 @@ std::shared_ptr<Image> RasterizedImage::onMakeDecoded(Context* context, bool) co
   return newImage;
 }
 
-bool RasterizedImage::onDraw(std::shared_ptr<RenderTargetProxy> renderTarget,
-                             uint32_t renderFlags) const {
+std::shared_ptr<TextureProxy> RasterizedImage::onLockTextureProxy(const TPArgs& args,
+                                                                  const UniqueKey& key) const {
+  auto proxyProvider = args.context->proxyProvider();
+  auto textureProxy = proxyProvider->findOrWrapTextureProxy(key);
+  if (textureProxy != nullptr) {
+    return textureProxy;
+  }
+  auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
+  auto format = isAlphaOnly() && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
+  textureProxy = proxyProvider->createTextureProxy(key, width(), height(), format, args.mipmapped,
+                                                   ImageOrigin::TopLeft, args.renderFlags);
+  auto renderTarget = proxyProvider->createRenderTargetProxy(textureProxy, format);
+  if (renderTarget == nullptr) {
+    return nullptr;
+  }
+
   auto sourceWidth = source->width();
   auto sourceHeight = source->height();
   auto scaledWidth = GetSize(sourceWidth, rasterizationScale);
@@ -87,10 +102,14 @@ bool RasterizedImage::onDraw(std::shared_ptr<RenderTargetProxy> renderTarget,
   auto uvScaleY = static_cast<float>(sourceHeight) / static_cast<float>(scaledHeight);
   Matrix uvMatrix = Matrix::MakeScale(uvScaleX, uvScaleY);
   auto drawRect = Rect::MakeWH(width(), height());
-  FPArgs args(renderTarget->getContext(), renderFlags, drawRect);
+  FPArgs fpArgs(args.context, args.renderFlags, drawRect);
   auto processor =
-      FragmentProcessor::Make(source, args, sampling, SrcRectConstraint::Fast, &uvMatrix);
+      FragmentProcessor::Make(source, fpArgs, sampling, SrcRectConstraint::Fast, &uvMatrix);
+  if (processor == nullptr) {
+    return nullptr;
+  }
   auto drawingManager = renderTarget->getContext()->drawingManager();
-  return drawingManager->fillRTWithFP(std::move(renderTarget), std::move(processor), renderFlags);
+  drawingManager->fillRTWithFP(std::move(renderTarget), std::move(processor), args.renderFlags);
+  return textureProxy;
 }
 }  // namespace tgfx
