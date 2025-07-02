@@ -73,6 +73,16 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
   if (!clipBounds.intersect(sourceRect)) {
     return nullptr;
   }
+  if (dx > 0) {
+    clipBounds.left = 0;
+  } else if (dx < 0) {
+    clipBounds.right = sourceRect.width();
+  }
+  if (dy > 0) {
+    clipBounds.top = 0;
+  } else if (dy < 0) {
+    clipBounds.bottom = sourceRect.height();
+  }
   source = source->makeSubset(clipBounds);
   if (!source) {
     return nullptr;
