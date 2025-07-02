@@ -42,7 +42,7 @@ namespace tgfx {
  */
 static constexpr float BOUNDS_TOLERANCE = 1e-3f;
 
-static bool RectHasColor(const std::vector<PlacementPtr<RectRecord>>& rects) {
+static bool AnyRectHasUniqueColor(const std::vector<PlacementPtr<RectRecord>>& rects) {
   if (rects.size() <= 1) {
     return false;
   }
@@ -57,7 +57,7 @@ static bool RectHasColor(const std::vector<PlacementPtr<RectRecord>>& rects) {
   return hasColor;
 }
 
-static bool RectHasUVCoord(const std::vector<PlacementPtr<RectRecord>>& rects) {
+static bool AnyRectHasUniqueMatrix(const std::vector<PlacementPtr<RectRecord>>& rects) {
   if (rects.size() <= 1) {
     return false;
   }
@@ -255,13 +255,18 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
   bool hasCoverage = fill.maskFilter != nullptr || !clip.isEmpty() || clip.isInverseFillType();
-  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(
-      fill, hasCoverage, type == PendingOpType::Image || type == PendingOpType::Atlas);
+  bool hasImageFill = type == PendingOpType::Image || type == PendingOpType::Atlas;
+  auto [needLocalBounds, needDeviceBounds] = needComputeBounds(fill, hasCoverage, hasImageFill);
   auto aaType = getAAType(fill);
   Rect clipBounds = {};
   if (needLocalBounds) {
     clipBounds = getClipBounds(clip);
     localBounds = Rect::MakeEmpty();
+  }
+  if (hasImageFill) {
+    computeRectsBounds(needLocalBounds, needDeviceBounds, clipBounds, localBounds, deviceBounds);
+  } else if (type == PendingOpType::RRect && (needLocalBounds || needDeviceBounds)) {
+    computeRRectsBounds(clipBounds, localBounds, deviceBounds);
   }
   switch (type) {
     case PendingOpType::Rect:
@@ -274,61 +279,26 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
       }
     // fallthrough
     case PendingOpType::Image: {
-      if (needLocalBounds) {
-        for (auto& rect : pendingRects) {
-          localBounds->join(ClipLocalBounds(rect->rect, rect->viewMatrix, clipBounds));
-        }
-      }
-      if (needDeviceBounds) {
-        deviceBounds = Rect::MakeEmpty();
-        for (auto& record : pendingRects) {
-          auto rect = record->viewMatrix.mapRect(record->rect);
-          deviceBounds->join(rect);
-        }
-      }
       auto subsetMode = RectsVertexProvider::UVSubsetMode::None;
       if (pendingConstraint == SrcRectConstraint::Strict && pendingImage) {
         subsetMode = pendingSampling.filterMode == FilterMode::Linear
                          ? RectsVertexProvider::UVSubsetMode::SubsetOnly
                          : RectsVertexProvider::UVSubsetMode::RoundOutAndSubset;
       }
-      bool hasColor = RectHasColor(pendingRects);
-      bool hasUVCoord = needLocalBounds && RectHasUVCoord(pendingRects);
+      bool hasColor = AnyRectHasUniqueColor(pendingRects);
+      bool hasUVCoord = needLocalBounds && AnyRectHasUniqueMatrix(pendingRects);
       auto provider = RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects),
                                                     aaType, hasColor, hasUVCoord, subsetMode);
       drawOp = RectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::RRect: {
-      if (needLocalBounds || needDeviceBounds) {
-        deviceBounds = Rect::MakeEmpty();
-        for (auto& record : pendingRRects) {
-          auto rect = record->viewMatrix.mapRect(record->rRect.rect);
-          deviceBounds->join(rect);
-        }
-        localBounds = deviceBounds;
-        if (!localBounds->intersect(clipBounds)) {
-          localBounds->setEmpty();
-        }
-      }
       auto provider =
           RRectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRRects), aaType,
                                          RRectUseScale(context), std::move(pendingStrokes));
       drawOp = RRectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::Atlas: {
-      if (needLocalBounds) {
-        for (auto& rect : pendingRects) {
-          localBounds->join(ClipLocalBounds(rect->rect, rect->viewMatrix, clipBounds));
-        }
-      }
-      if (needDeviceBounds) {
-        deviceBounds = Rect::MakeEmpty();
-        for (auto& record : pendingRects) {
-          auto rect = record->viewMatrix.mapRect(record->rect);
-          deviceBounds->join(rect);
-        }
-      }
-      bool hasColor = RectHasColor(pendingRects);
+      bool hasColor = AnyRectHasUniqueColor(pendingRects);
       auto provider =
           RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects), aaType, hasColor,
                                         true, RectsVertexProvider::UVSubsetMode::None);
@@ -657,6 +627,37 @@ void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, co
   }
   auto record = drawingBuffer()->make<RectRecord>(rect, state.matrix, fill.color.premultiply());
   pendingRects.emplace_back(std::move(record));
+}
+
+void OpsCompositor::computeRectsBounds(bool needLocalBounds, bool needDeviceBounds,
+                                       const Rect& clipBounds, std::optional<Rect>& localBounds,
+                                       std::optional<Rect>& deviceBounds) const {
+  if (needLocalBounds) {
+    for (auto& rect : pendingRects) {
+      localBounds->join(ClipLocalBounds(rect->rect, rect->viewMatrix, clipBounds));
+    }
+  }
+  if (!needDeviceBounds) {
+    return;
+  }
+  deviceBounds = Rect::MakeEmpty();
+  for (auto& record : pendingRects) {
+    auto rect = record->viewMatrix.mapRect(record->rect);
+    deviceBounds->join(rect);
+  }
+}
+
+void OpsCompositor::computeRRectsBounds(const Rect& clipBounds, std::optional<Rect>& localBounds,
+                                        std::optional<Rect>& deviceBounds) const {
+  deviceBounds = Rect::MakeEmpty();
+  for (auto& record : pendingRRects) {
+    auto rect = record->viewMatrix.mapRect(record->rRect.rect);
+    deviceBounds->join(rect);
+  }
+  localBounds = deviceBounds;
+  if (!localBounds->intersect(clipBounds)) {
+    localBounds->setEmpty();
+  }
 }
 
 }  // namespace tgfx

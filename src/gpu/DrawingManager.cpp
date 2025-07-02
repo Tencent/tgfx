@@ -18,7 +18,7 @@
 
 #include "DrawingManager.h"
 #include "ProxyProvider.h"
-#include "core/AtlasCellCodecTask.h"
+#include "core/AtlasCellDecodeTask.h"
 #include "core/AtlasManager.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
@@ -133,9 +133,6 @@ void DrawingManager::addResourceTask(PlacementPtr<ResourceTask> resourceTask) {
 }
 
 bool DrawingManager::flush() {
-  // Prepare any onFlush op lists (e.g. atlases).
-  context->atlasManager()->preFlush();
-
   while (!compositors.empty()) {
     auto compositor = compositors.back();
     // The makeClosed() method may add more compositors to the list.
@@ -209,7 +206,7 @@ void DrawingManager::addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& 
   auto floatPadding = static_cast<float>(padding);
   uploadOffset.offset(-floatPadding, -floatPadding);
   atlasCellDatas[textureProxy].emplace_back(std::move(data), dstInfo, uploadOffset);
-  auto task = std::make_shared<AtlasCellCodecTask>(std::move(codec), buffer, dstInfo, padding);
+  auto task = std::make_shared<AtlasCellDecodeTask>(std::move(codec), buffer, dstInfo, padding);
   atlasCellCodecTasks.emplace_back(std::move(task));
 }
 

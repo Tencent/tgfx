@@ -16,23 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "AtlasCellCodecTask.h"
+#include "AtlasCellDecodeTask.h"
 #include "core/utils/ClearPixels.h"
+#include "utils/Log.h"
 
 namespace tgfx {
-
-void AtlasCellCodecTask::onExecute() {
-  if (imageCodec == nullptr) {
-    return;
-  }
+void AtlasCellDecodeTask::onExecute() {
+  DEBUG_ASSERT(imageCodec != nullptr)
   ClearPixels(dstInfo, dstPixels);
-  auto targetPixels = static_cast<uint8_t*>(dstPixels) +
-                      (dstInfo.rowBytes() + dstInfo.bytesPerPixel()) * static_cast<size_t>(padding);
   auto targetInfo = dstInfo.makeIntersect(0, 0, imageCodec->width(), imageCodec->height());
+  auto targetPixels = dstInfo.computeOffset(dstPixels, padding, padding);
   imageCodec->readPixels(targetInfo, targetPixels);
+  imageCodec = nullptr;
 }
 
-void AtlasCellCodecTask::onCancel() {
+void AtlasCellDecodeTask::onCancel() {
   imageCodec = nullptr;
 }
 }  // namespace tgfx

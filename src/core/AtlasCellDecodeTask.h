@@ -22,10 +22,10 @@
 #include "tgfx/core/Task.h"
 
 namespace tgfx {
-class AtlasCellCodecTask final : public Task {
+class AtlasCellDecodeTask final : public Task {
  public:
-  AtlasCellCodecTask(std::shared_ptr<ImageCodec> imageCodec, void* dstPixels,
-                     const ImageInfo& dstInfo, int padding)
+  AtlasCellDecodeTask(std::shared_ptr<ImageCodec> imageCodec, void* dstPixels,
+                      const ImageInfo& dstInfo, int padding)
       : imageCodec(std::move(imageCodec)), dstPixels(dstPixels), dstInfo(dstInfo),
         padding(padding) {
   }
