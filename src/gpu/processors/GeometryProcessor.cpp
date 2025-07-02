@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GeometryProcessor.h"
+#include "core/utils/Algin.h"
 
 namespace tgfx {
 static constexpr char TRANSFORM_UNIFORM_PREFIX[] = "CoordTransformMatrix_";
@@ -47,11 +48,6 @@ static constexpr size_t VertexAttribTypeSize(SLType type) {
     default:
       return 0;
   }
-}
-
-template <typename T>
-static constexpr T Align4(T x) {
-  return (x + 3) >> 2 << 2;
 }
 
 size_t GeometryProcessor::Attribute::sizeAlign4() const {

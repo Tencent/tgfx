@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,18 +18,36 @@
 
 #pragma once
 
-#include <cstdio>
-#include "core/AtlasTypes.h"
-#include "tgfx/core/ImageInfo.h"
-#include "tgfx/gpu/PixelFormat.h"
-
 namespace tgfx {
-PixelFormat ColorTypeToPixelFormat(ColorType type);
 
-ColorType PixelFormatToColorType(PixelFormat format);
+template <typename T>
+static constexpr T Align2(T x) {
+  return (x + 1) >> 1 << 1;
+}
 
-size_t PixelFormatBytesPerPixel(PixelFormat format);
+template <typename T>
+static constexpr T Align4(T x) {
+  return (x + 3) >> 2 << 2;
+}
 
-PixelFormat MaskFormatToPixelFormat(MaskFormat format);
+template <typename T>
+static constexpr T Align8(T x) {
+  return (x + 7) >> 3 << 3;
+}
+
+template <typename T>
+static constexpr bool IsAlign2(T x) {
+  return 0 == (x & 1);
+}
+
+template <typename T>
+static constexpr bool IsAlign4(T x) {
+  return 0 == (x & 3);
+}
+
+template <typename T>
+static constexpr bool IsAlign8(T x) {
+  return 0 == (x & 7);
+}
 
 }  // namespace tgfx

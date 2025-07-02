@@ -63,15 +63,16 @@ bool FTPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) con
   if (path.isEmpty()) {
     return false;
   }
+  auto targetInfo = dstInfo.makeIntersect(0, 0, width(), height());
   auto totalMatrix = Matrix::MakeScale(1, -1);
-  totalMatrix.postTranslate(0, static_cast<float>(dstInfo.height()));
+  totalMatrix.postTranslate(0, static_cast<float>(targetInfo.height()));
   path.transform(totalMatrix);
   if (path.isInverseFillType()) {
     Path maskPath = {};
-    maskPath.addRect(Rect::MakeWH(dstInfo.width(), dstInfo.height()));
+    maskPath.addRect(Rect::MakeWH(targetInfo.width(), targetInfo.height()));
     path.addPath(maskPath, PathOp::Intersect);
   }
-  ClearPixels(dstInfo, dstPixels);
+  ClearPixels(targetInfo, dstPixels);
   FTPath ftPath = {};
   path.decompose(Iterator, &ftPath);
   auto fillType = path.getFillType();
@@ -80,9 +81,9 @@ bool FTPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) con
   auto ftLibrary = FTLibrary::Get();
   if (!needsGammaCorrection) {
     FT_Bitmap bitmap;
-    bitmap.width = static_cast<unsigned>(dstInfo.width());
-    bitmap.rows = static_cast<unsigned>(dstInfo.height());
-    bitmap.pitch = static_cast<int>(dstInfo.rowBytes());
+    bitmap.width = static_cast<unsigned>(targetInfo.width());
+    bitmap.rows = static_cast<unsigned>(targetInfo.height());
+    bitmap.pitch = static_cast<int>(targetInfo.rowBytes());
     bitmap.buffer = static_cast<unsigned char*>(dstPixels);
     bitmap.pixel_mode = FT_PIXEL_MODE_GRAY;
     bitmap.num_grays = 256;
@@ -92,18 +93,18 @@ bool FTPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) con
     return true;
   }
   auto buffer = static_cast<unsigned char*>(dstPixels);
-  auto rows = dstInfo.height();
+  auto rows = targetInfo.height();
   // Anti-aliasing is always enabled because FreeType generates only 1-bit masks when it's off,
   // and we haven't implemented conversion from 1-bit to 8-bit masks yet.
-  auto pitch = static_cast<int>(dstInfo.rowBytes());
+  auto pitch = static_cast<int>(targetInfo.rowBytes());
   FTRasterTarget target = {buffer + (rows - 1) * pitch, pitch,
                            GammaCorrection::GammaTable().data()};
   FT_Raster_Params params;
   params.flags = FT_RASTER_FLAG_DIRECT | FT_RASTER_FLAG_CLIP | FT_RASTER_FLAG_AA;
   params.gray_spans = GraySpanFunc;
   params.user = &target;
-  params.clip_box = {0, 0, static_cast<FT_Pos>(dstInfo.width()),
-                     static_cast<FT_Pos>(dstInfo.height())};
+  params.clip_box = {0, 0, static_cast<FT_Pos>(targetInfo.width()),
+                     static_cast<FT_Pos>(targetInfo.height())};
   for (const auto& outline : outlines) {
     FT_Outline_Render(ftLibrary, &(outline->outline), &params);
   }

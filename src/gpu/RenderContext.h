@@ -63,14 +63,27 @@ class RenderContext : public DrawContext {
   bool flush();
 
  private:
+  void drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const MCState& state,
+                              const Fill& fill, const Stroke* stroke,
+                              GlyphRun& rejectedGlyphRun) const;
+
+  void drawGlyphsAsPath(GlyphRun& sourceGlyphRun, const MCState& state, const Fill& fill,
+                        const Stroke* stroke, const Rect& clipBounds,
+                        GlyphRun& rejectedGlyphRun) const;
+
+  void drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun, const MCState& state,
+                                   const Fill& fill, const Stroke* stroke) const;
+
+  void drawGlyphAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,
+                      const SamplingOptions& sampling, const MCState& state,
+                      const Fill& fill) const;
+
   std::shared_ptr<RenderTargetProxy> renderTarget = nullptr;
   uint32_t renderFlags = 0;
   Surface* surface = nullptr;
   std::shared_ptr<OpsCompositor> opsCompositor = nullptr;
 
   Rect getClipBounds(const Path& clip);
-  void drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
-                       const Fill& fill);
   OpsCompositor* getOpsCompositor(bool discardContent = false);
   void replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRenderTarget,
                            std::shared_ptr<Image> oldContent);

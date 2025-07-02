@@ -33,6 +33,7 @@ class ResourceProvider;
 class ProxyProvider;
 class BlockBuffer;
 class SlidingWindowTracker;
+class AtlasManager;
 
 /**
  * Context is the main interface to the GPU. It is used to create and manage GPU resources, and to
@@ -84,6 +85,10 @@ class Context {
 
   ProxyProvider* proxyProvider() const {
     return _proxyProvider;
+  }
+
+  AtlasManager* atlasManager() const {
+    return _atlasManager;
   }
 
   /**
@@ -214,6 +219,7 @@ class Context {
   ProxyProvider* _proxyProvider = nullptr;
   BlockBuffer* _drawingBuffer = nullptr;
   SlidingWindowTracker* _maxValueTracker = nullptr;
+  AtlasManager* _atlasManager = nullptr;
 
   void releaseAll(bool releaseGPU);
 
