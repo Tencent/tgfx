@@ -133,9 +133,12 @@ bool CGPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) con
     DrawPath(path, cgContext, targetInfo, antiAlias);
   }
   auto bounds = path.getBounds();
-  bounds.roundOut();
-  auto width = static_cast<int>(bounds.width());
-  auto height = static_cast<int>(bounds.height());
+  auto clipBounds = Rect::MakeWH(targetInfo.width(), targetInfo.height());
+  if (!bounds.intersect(clipBounds)) {
+    return false;
+  }
+  auto width = static_cast<int>(ceilf(bounds.width()));
+  auto height = static_cast<int>(ceilf(bounds.height()));
   auto tempBuffer = PixelBuffer::Make(width, height, true, false);
   if (tempBuffer == nullptr) {
     CGContextRelease(cgContext);
