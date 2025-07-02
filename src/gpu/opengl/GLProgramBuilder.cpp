@@ -58,6 +58,39 @@ static constexpr std::pair<SLType, const char*> SLTypes[] = {
     {SLType::Texture2DSampler, "sampler2D"},
 };
 
+static std::string SLTypePrecision(SLType t) {
+  switch (t) {
+    case SLType::Float:
+    case SLType::Float2:
+    case SLType::Float3:
+    case SLType::Float4:
+    case SLType::Float2x2:
+    case SLType::Float3x3:
+    case SLType::Float4x4:
+    case SLType::Int:
+    case SLType::Int2:
+    case SLType::Int3:
+    case SLType::Int4:
+    case SLType::UByte4Color:
+      return "highp";
+    case SLType::Half:
+    case SLType::Half2:
+    case SLType::Half3:
+    case SLType::Half4:
+    case SLType::Short:
+    case SLType::Short2:
+    case SLType::Short3:
+    case SLType::Short4:
+    case SLType::UShort:
+    case SLType::UShort2:
+    case SLType::UShort3:
+    case SLType::UShort4:
+      return "mediump";
+    default:
+      return "";
+  }
+}
+
 static std::string SLTypeString(SLType t) {
   for (const auto& pair : SLTypes) {
     if (pair.first == t) {
@@ -95,6 +128,12 @@ std::string GLProgramBuilder::getShaderVarDeclarations(const ShaderVar& var,
     ret += TypeModifierString(isDesktopGL(), var.typeModifier(), flag);
     ret += " ";
   }
+
+  if (!isDesktopGL()) {
+    ret += SLTypePrecision(var.type());
+    ret += " ";
+  }
+
   ret += SLTypeString(var.type());
   ret += " ";
   ret += var.name();

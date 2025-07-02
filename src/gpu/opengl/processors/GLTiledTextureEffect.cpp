@@ -265,19 +265,19 @@ void GLTiledTextureEffect::emitCode(EmitArgs& args) const {
       repeatCoordWeightY = "repeatCoordWeightY";
     }
 
-    fragBuilder->codeAppend("vec2 subsetCoord;");
+    fragBuilder->codeAppend("highp vec2 subsetCoord;");
     subsetCoord(args, sampling.shaderModeX, names.subsetName, "x", "x", "z", extraRepeatCoordX,
                 repeatCoordWeightX);
     subsetCoord(args, sampling.shaderModeY, names.subsetName, "y", "y", "w", extraRepeatCoordY,
                 repeatCoordWeightY);
 
-    fragBuilder->codeAppend("vec2 clampedCoord;");
+    fragBuilder->codeAppend("highp vec2 clampedCoord;");
     clampCoord(args, useClamp, names.clampName);
 
     if (constraint == SrcRectConstraint::Strict) {
       std::string subsetName = *args.inputSubset;
       if (!names.dimensionsName.empty()) {
-        fragBuilder->codeAppendf("vec4 extraSubset = %s;", subsetName.c_str());
+        fragBuilder->codeAppendf("highp vec4 extraSubset = %s;", subsetName.c_str());
         subsetName = "extraSubset";
         fragBuilder->codeAppendf("extraSubset.xy /= %s;", names.dimensionsName.c_str());
         fragBuilder->codeAppendf("extraSubset.zw /= %s;", names.dimensionsName.c_str());

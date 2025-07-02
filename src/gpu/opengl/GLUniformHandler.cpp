@@ -130,6 +130,42 @@ std::unique_ptr<GLUniformBuffer> GLUniformHandler::makeUniformBuffer() const {
       case SLType::UByte4Color:
         type = Uniform::Type::Float4;
         break;
+      case SLType::Half:
+        type = Uniform::Type::Half;
+        break;
+      case SLType::Half2:
+        type = Uniform::Type::Half2;
+        break;
+      case SLType::Half3:
+        type = Uniform::Type::Half3;
+        break;
+      case SLType::Half4:
+        type = Uniform::Type::Half4;
+        break;
+      case SLType::Short:
+        type = Uniform::Type::Short;
+        break;
+      case SLType::Short2:
+        type = Uniform::Type::Short2;
+        break;
+      case SLType::Short3:
+        type = Uniform::Type::Short3;
+        break;
+      case SLType::Short4:
+        type = Uniform::Type::Short4;
+        break;
+      case SLType::UShort:
+        type = Uniform::Type::UShort;
+        break;
+      case SLType::UShort2:
+        type = Uniform::Type::UShort2;
+        break;
+      case SLType::UShort3:
+        type = Uniform::Type::UShort3;
+        break;
+      case SLType::UShort4:
+        type = Uniform::Type::UShort4;
+        break;
       default:
         type = std::nullopt;
         break;

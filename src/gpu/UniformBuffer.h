@@ -39,10 +39,22 @@ struct Uniform {
     Float2x2,
     Float3x3,
     Float4x4,
+    Half,
+    Half2,
+    Half3,
+    Half4,
     Int,
     Int2,
     Int3,
     Int4,
+    Short,
+    Short2,
+    Short3,
+    Short4,
+    UShort,
+    UShort2,
+    UShort3,
+    UShort4,
   };
 
   std::string name;
