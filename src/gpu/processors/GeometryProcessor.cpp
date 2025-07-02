@@ -83,6 +83,7 @@ void GeometryProcessor::setTransformDataHelper(const Matrix& uvMatrix, UniformBu
     std::string uniformName = TRANSFORM_UNIFORM_PREFIX;
     uniformName += std::to_string(i);
     uniformBuffer->setData(uniformName, combined);
+    onSetTransformData(uniformBuffer, coordTransform, i);
     ++i;
   }
 }

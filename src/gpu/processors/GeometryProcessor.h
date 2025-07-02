@@ -169,6 +169,9 @@ class GeometryProcessor : public Processor {
     return {};
   }
 
+  virtual void onSetTransformData(UniformBuffer*, const CoordTransform*, int) const {
+  }
+
   std::vector<const Attribute*> attributes = {};
   size_t textureSamplerCount = 0;
 };

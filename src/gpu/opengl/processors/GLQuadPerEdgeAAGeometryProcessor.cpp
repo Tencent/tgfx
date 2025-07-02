@@ -45,10 +45,17 @@ void GLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
   emitTransforms(vertBuilder, varyingHandler, uniformHandler, uvCoordsVar,
                  args.fpCoordTransformHandler);
   if (subset.isInitialized()) {
-    auto varying = varyingHandler->addVarying("vtexsubset", SLType::Float4, true);
-    vertBuilder->codeAppendf("%s = %s;", varying.vsOut().c_str(), subset.name().c_str());
+    auto varying = varyingHandler->addVarying("vTexSubset", SLType::Float4, true);
+    std::string subsetMatrixName = "CoordTransformMatrix_0_P0";
+    if (!uvCoord.isInitialized()) {
+      subsetMatrixName =
+          uniformHandler->addUniform(ShaderFlags::Vertex, SLType::Float3x3, "texSubsetMatrix");
+    }
+    vertBuilder->codeAppendf("%s.xy = (vec3(%s.xy, 1) * %s).xy;", varying.vsOut().c_str(),
+                             subset.name().c_str(), subsetMatrixName.c_str());
+    vertBuilder->codeAppendf("%s.zw = (vec3(%s.zw, 1) * %s).xy;", varying.vsOut().c_str(),
+                             subset.name().c_str(), subsetMatrixName.c_str());
   }
-
   if (aa == AAType::Coverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
     vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(), coverage.name().c_str());
@@ -77,6 +84,15 @@ void GLQuadPerEdgeAAGeometryProcessor::setData(UniformBuffer* uniformBuffer,
   setTransformDataHelper(uvMatrix.value_or(Matrix::I()), uniformBuffer, transformIter);
   if (commonColor.has_value()) {
     uniformBuffer->setData("Color", *commonColor);
+  }
+}
+
+void GLQuadPerEdgeAAGeometryProcessor::onSetTransformData(UniformBuffer* uniformBuffer,
+                                                          const CoordTransform* coordTransform,
+                                                          int index) const {
+  if (index == 0 && subset.isInitialized() && !uvCoord.isInitialized()) {
+    // Subset only applies to the first image in pipeline.
+    uniformBuffer->setData("texSubsetMatrix", coordTransform->getTotalMatrix());
   }
 }
 }  // namespace tgfx

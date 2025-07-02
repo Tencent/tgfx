@@ -18,6 +18,7 @@
 
 #include "GLTextureEffect.h"
 #include <unordered_map>
+#include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 
 namespace tgfx {
 static const float ColorConversion601LimitRange[] = {
@@ -98,16 +99,13 @@ void GLTextureEffect::emitPlainTextureCode(EmitArgs& args) const {
     vertexColor = args.coordFunc(vertexColor);
   }
   std::string subsetName = "";
-  std::string dimensionsName = "";
   if (needSubset(getTexture())) {
     subsetName = uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "Subset");
   }
-  if (constraint == SrcRectConstraint::Strict) {
-    dimensionsName = uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float2, "Dimension");
-  }
   std::string finalCoordName = "finalCoord";
-  fragBuilder->codeAppendf("vec2 %s;", finalCoordName.c_str());
-  appendClamp(fragBuilder, vertexColor, finalCoordName, subsetName, dimensionsName);
+  fragBuilder->codeAppendf("highp vec2 %s;", finalCoordName.c_str());
+  appendClamp(fragBuilder, vertexColor, finalCoordName, subsetName,
+              constraint == SrcRectConstraint::Strict);
   fragBuilder->codeAppend("vec4 color = ");
   fragBuilder->appendTextureLookup(textureSampler, finalCoordName);
   fragBuilder->codeAppend(";");
@@ -134,31 +132,28 @@ void GLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
   auto& textureSamplers = *args.textureSamplers;
   auto vertexColor = (*args.transformedCoords)[0].name();
   std::string subsetName = "";
-  std::string dimensionsName = "";
   if (needSubset(yuvTexture)) {
     subsetName = uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "Subset");
   }
-  if (SrcRectConstraint::Strict == constraint) {
-    dimensionsName = uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float2, "Dimension");
-  }
+  bool extraSubset = SrcRectConstraint::Strict == constraint;
   std::string finalCoordName = "finalCoord";
   fragBuilder->codeAppendf("vec2 %s;", finalCoordName.c_str());
-  appendClamp(fragBuilder, vertexColor, finalCoordName, subsetName, dimensionsName);
+  appendClamp(fragBuilder, vertexColor, finalCoordName, subsetName, extraSubset);
   fragBuilder->codeAppend("vec3 yuv;");
   fragBuilder->codeAppend("yuv.x = ");
   fragBuilder->appendTextureLookup(textureSamplers[0], finalCoordName);
   fragBuilder->codeAppend(".r;");
   if (yuvTexture->pixelFormat() == YUVPixelFormat::I420) {
-    appendClamp(fragBuilder, vertexColor, finalCoordName, subsetName, dimensionsName);
+    appendClamp(fragBuilder, vertexColor, finalCoordName, subsetName, extraSubset);
     fragBuilder->codeAppend("yuv.y = ");
     fragBuilder->appendTextureLookup(textureSamplers[1], finalCoordName);
     fragBuilder->codeAppend(".r;");
-    appendClamp(fragBuilder, vertexColor, finalCoordName, subsetName, dimensionsName);
+    appendClamp(fragBuilder, vertexColor, finalCoordName, subsetName, extraSubset);
     fragBuilder->codeAppend("yuv.z = ");
     fragBuilder->appendTextureLookup(textureSamplers[2], finalCoordName);
     fragBuilder->codeAppend(".r;");
   } else if (yuvTexture->pixelFormat() == YUVPixelFormat::NV12) {
-    appendClamp(fragBuilder, vertexColor, finalCoordName, subsetName, dimensionsName);
+    appendClamp(fragBuilder, vertexColor, finalCoordName, subsetName, extraSubset);
     fragBuilder->codeAppend("yuv.yz = ");
     fragBuilder->appendTextureLookup(textureSamplers[1], finalCoordName);
     fragBuilder->codeAppend(".ra;");
@@ -255,24 +250,15 @@ void GLTextureEffect::onSetData(UniformBuffer* uniformBuffer) const {
     }
     uniformBuffer->setData("Subset", rect);
   }
-
-  if (constraint == SrcRectConstraint::Strict) {
-    auto dimensions = texture->getTextureCoord(1.f, 1.f);
-    uniformBuffer->setData("Dimension", dimensions);
-  }
 }
 
 void GLTextureEffect::appendClamp(FragmentShaderBuilder* fragBuilder,
                                   const std::string& vertexColor, const std::string& finalCoordName,
-                                  const std::string& subsetName,
-                                  const std::string& dimensionName) const {
+                                  const std::string& subsetName, bool extraSubset) const {
   fragBuilder->codeAppendf("%s = %s;", finalCoordName.c_str(), vertexColor.c_str());
-  if (!dimensionName.empty()) {
+  if (extraSubset) {
     fragBuilder->codeAppend("{");
-    fragBuilder->codeAppend("vec4 extraSubset = vtexsubset_P0;");
-    fragBuilder->codeAppendf("extraSubset.xy = extraSubset.xy * %s;", dimensionName.c_str());
-    fragBuilder->codeAppendf("extraSubset.zw = extraSubset.zw * %s;", dimensionName.c_str());
-    fragBuilder->codeAppendf("%s = clamp(%s, extraSubset.xy, extraSubset.zw);",
+    fragBuilder->codeAppendf("%s = clamp(%s, vTexSubset_P0.xy, vTexSubset_P0.zw);",
                              finalCoordName.c_str(), vertexColor.c_str());
     fragBuilder->codeAppend("}");
   }

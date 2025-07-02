@@ -94,10 +94,15 @@ std::string GLProgramBuilder::getShaderVarDeclarations(const ShaderVar& var,
   if (var.typeModifier() != ShaderVar::TypeModifier::None) {
     ret += TypeModifierString(isDesktopGL(), var.typeModifier(), flag);
     ret += " ";
-    // On Android，fragment shader's varying needs high precision.
-    if ((var.typeModifier() == ShaderVar::TypeModifier::Varying ||
-         var.typeModifier() == ShaderVar::TypeModifier::FlatVarying) &&
-        flag == ShaderFlags::Fragment) {
+    // On OpenGLES，shader's varying needs high precision use to make subset.
+    if (var.typeModifier() == ShaderVar::TypeModifier::Varying ||
+        var.typeModifier() == ShaderVar::TypeModifier::FlatVarying) {
+      ret += "highp ";
+    }
+    // On OpenGLES，Vertex shader's attribute and uniform needs high precision use to make subset.
+    if ((var.typeModifier() == ShaderVar::TypeModifier::Attribute ||
+         var.typeModifier() == ShaderVar::TypeModifier::Uniform) &&
+        flag == ShaderFlags::Vertex) {
       ret += "highp ";
     }
   }

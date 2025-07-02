@@ -711,7 +711,7 @@ int DisplayList::nextSurfaceTileCount(Context* context) const {
 }
 
 int DisplayList::getMaxTileCountPerAtlas(Context* context) const {
-  auto maxTextureSize = context->caps()->maxTextureSize;
+  auto maxTextureSize = context->caps()->maxAtlasSize;
   return (maxTextureSize / _tileSize) * (maxTextureSize / _tileSize);
 }
 

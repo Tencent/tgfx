@@ -40,6 +40,7 @@ class Caps {
 
   bool floatIs32Bits = true;
   int maxTextureSize = 0;
+  int maxAtlasSize = 0;
   bool semaphoreSupport = false;
   bool multisampleDisableSupport = false;
   /**
