@@ -205,13 +205,13 @@ class FragmentProcessor : public Processor {
 
   struct EmitArgs {
     EmitArgs(FragmentShaderBuilder* fragBuilder, UniformHandler* uniformHandler,
-             std::string outputColor, std::string inputColor,
+             std::string outputColor, std::string inputColor, std::string inputSubset,
              const TransformedCoordVars* transformedCoords, const TextureSamplers* textureSamplers,
              std::function<std::string(std::string_view)> coordFunc = {})
         : fragBuilder(fragBuilder), uniformHandler(uniformHandler),
           outputColor(std::move(outputColor)), inputColor(std::move(inputColor)),
           transformedCoords(transformedCoords), textureSamplers(textureSamplers),
-          coordFunc(std::move(coordFunc)) {
+          coordFunc(std::move(coordFunc)), inputSubset(std::move(inputSubset)) {
     }
 
     /**
@@ -238,6 +238,7 @@ class FragmentProcessor : public Processor {
      */
     const TextureSamplers* textureSamplers;
     const std::function<std::string(std::string_view)> coordFunc;
+    const std::string inputSubset;
   };
 
   /**

@@ -29,6 +29,7 @@ static constexpr size_t MAX_DIRTY_REGION_FRAMES = 5;
 static constexpr float DIRTY_REGION_ANTIALIAS_MARGIN = 0.5f;
 static constexpr int MIN_TILE_SIZE = 16;
 static constexpr int MAX_TILE_SIZE = 2048;
+static constexpr int MAX_ATLAS_SIZE = 8192;
 
 class DrawTask {
  public:
@@ -714,7 +715,7 @@ int DisplayList::nextSurfaceTileCount(Context* context) const {
 }
 
 int DisplayList::getMaxTileCountPerAtlas(Context* context) const {
-  auto maxTextureSize = context->caps()->maxTextureSize;
+  auto maxTextureSize = std::min(context->caps()->maxTextureSize, MAX_ATLAS_SIZE);
   return (maxTextureSize / _tileSize) * (maxTextureSize / _tileSize);
 }
 

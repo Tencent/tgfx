@@ -17,11 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLVertexShaderBuilder.h"
+#include "GLProgramBuilder.h"
 
 namespace tgfx {
 GLVertexShaderBuilder::GLVertexShaderBuilder(ProgramBuilder* program)
     : VertexShaderBuilder(program) {
-  setPrecisionQualifier("precision mediump float;");
+  auto glProgram = static_cast<GLProgramBuilder*>(program);
+  if (glProgram->getContext()->caps()->usesPrecisionModifiers) {
+    setPrecisionQualifier("precision mediump float;");
+  }
 }
 
 void GLVertexShaderBuilder::emitNormalizedPosition(const std::string& devPos) {

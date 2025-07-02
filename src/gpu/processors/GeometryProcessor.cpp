@@ -79,18 +79,20 @@ void GeometryProcessor::setTransformDataHelper(const Matrix& uvMatrix, UniformBu
     std::string uniformName = TRANSFORM_UNIFORM_PREFIX;
     uniformName += std::to_string(i);
     uniformBuffer->setData(uniformName, combined);
+    onSetTransformData(uniformBuffer, coordTransform, i);
     ++i;
   }
 }
 
-void GeometryProcessor::emitTransforms(VertexShaderBuilder* vertexBuilder,
+void GeometryProcessor::emitTransforms(EmitArgs& args, VertexShaderBuilder* vertexBuilder,
                                        VaryingHandler* varyingHandler,
-                                       UniformHandler* uniformHandler, const ShaderVar& uvCoordsVar,
-                                       FPCoordTransformHandler* transformHandler) const {
+                                       UniformHandler* uniformHandler,
+                                       const ShaderVar& uvCoordsVar) const {
   std::string uvCoords = "vec3(";
   uvCoords += uvCoordsVar.name();
   uvCoords += ", 1)";
   int i = 0;
+  auto transformHandler = args.fpCoordTransformHandler;
   while (transformHandler->nextCoordTransform() != nullptr) {
     std::string strUniName = TRANSFORM_UNIFORM_PREFIX;
     strUniName += std::to_string(i);
@@ -104,6 +106,8 @@ void GeometryProcessor::emitTransforms(VertexShaderBuilder* vertexBuilder,
 
     vertexBuilder->codeAppendf("%s = (%s * %s).xy;", varying.vsOut().c_str(), uniName.c_str(),
                                uvCoords.c_str());
+
+    onEmitTransform(args, vertexBuilder, varyingHandler, uniformHandler, uniName, i);
     ++i;
   }
 }

@@ -25,7 +25,10 @@ static constexpr char DstColorName[] = "_dstColor";
 
 GLFragmentShaderBuilder::GLFragmentShaderBuilder(ProgramBuilder* program)
     : FragmentShaderBuilder(program) {
-  setPrecisionQualifier("precision mediump float;");
+  auto glProgram = static_cast<GLProgramBuilder*>(program);
+  if (glProgram->getContext()->caps()->usesPrecisionModifiers) {
+    setPrecisionQualifier("precision mediump float;");
+  }
 }
 
 std::string GLFragmentShaderBuilder::dstColor() {

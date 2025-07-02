@@ -31,5 +31,15 @@ class GLQuadPerEdgeAAGeometryProcessor : public QuadPerEdgeAAGeometryProcessor {
   void emitCode(EmitArgs& args) const override;
 
   void setData(UniformBuffer* uniformBuffer, FPCoordTransformIter* transformIter) const override;
+
+  void onSetTransformData(UniformBuffer* uniformBuffer, const CoordTransform* coordTransform,
+                          int index) const override;
+
+  void onEmitTransform(EmitArgs& args, VertexShaderBuilder* vertexBuilder,
+                       VaryingHandler* varyingHandler, UniformHandler* uniformHandler,
+                       const std::string& transformUniformName, int index) const override;
+
+ private:
+  std::optional<std::string> subsetVaryingName = std::nullopt;
 };
 }  // namespace tgfx
