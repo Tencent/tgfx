@@ -33,7 +33,9 @@ std::shared_ptr<Tile> TileCache::getTile(int tileX, int tileY) const {
 std::vector<std::shared_ptr<Tile>> TileCache::getTilesUnderRect(const Rect& rect,
                                                                 bool requireFullCoverage,
                                                                 bool* continuous) const {
-  DEBUG_ASSERT(!rect.isEmpty());
+  if (rect.isEmpty()) {
+    return {};
+  }
   int startTileX = static_cast<int>(std::floor(rect.left / static_cast<float>(tileSize)));
   int startTileY = static_cast<int>(std::floor(rect.top / static_cast<float>(tileSize)));
   int endTileX = static_cast<int>(std::ceil(rect.right / static_cast<float>(tileSize)));
@@ -67,19 +69,15 @@ std::vector<std::shared_ptr<Tile>> TileCache::getTilesUnderRect(const Rect& rect
   if (requireFullCoverage && !allFound) {
     tiles.clear();
   }
-  if (continuous != nullptr) {
-    if (allFound && !tiles.empty()) {
-      auto firstTile = tiles.front();
-      *continuous = true;
-      for (auto& tile : tiles) {
-        if (tile->tileX - firstTile->tileX != tile->sourceX - firstTile->sourceX ||
-            tile->tileY - firstTile->tileY != tile->sourceY - firstTile->sourceY) {
-          *continuous = false;
-          break;
-        }
+  if (continuous != nullptr && allFound) {
+    auto firstTile = tiles.front();
+    *continuous = true;
+    for (auto& tile : tiles) {
+      if (tile->tileX - firstTile->tileX != tile->sourceX - firstTile->sourceX ||
+          tile->tileY - firstTile->tileY != tile->sourceY - firstTile->sourceY) {
+        *continuous = false;
+        break;
       }
-    } else {
-      *continuous = false;
     }
   }
   return tiles;
