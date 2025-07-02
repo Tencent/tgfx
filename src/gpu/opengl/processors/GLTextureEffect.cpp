@@ -18,7 +18,6 @@
 
 #include "GLTextureEffect.h"
 #include <unordered_map>
-#include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 
 namespace tgfx {
 static const float ColorConversion601LimitRange[] = {

@@ -18,7 +18,6 @@
 
 #include "GLVertexShaderBuilder.h"
 #include "GLProgramBuilder.h"
-#include "gpu/ProgramBuilder.h"
 
 namespace tgfx {
 GLVertexShaderBuilder::GLVertexShaderBuilder(ProgramBuilder* program)
