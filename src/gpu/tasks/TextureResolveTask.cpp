@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureResolveTask.h"
+#include "core/utils/Profiling.h"
 #include "gpu/Gpu.h"
 
 namespace tgfx {
@@ -25,6 +26,7 @@ TextureResolveTask::TextureResolveTask(std::shared_ptr<RenderTargetProxy> render
 }
 
 bool TextureResolveTask::execute(RenderPass* renderPass) {
+  TaskMark(inspector::OpTaskType::TextureResolveTask);
   auto renderTarget = renderTargetProxy->getRenderTarget();
   if (renderTarget == nullptr) {
     LOGE("TextureResolveTask::execute() Failed to get render target!");

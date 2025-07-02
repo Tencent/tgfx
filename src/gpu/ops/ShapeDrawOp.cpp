@@ -19,6 +19,7 @@
 #include "ShapeDrawOp.h"
 #include "core/PathTriangulator.h"
 #include "core/utils/Log.h"
+#include "core/utils/Profiling.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
@@ -41,6 +42,11 @@ ShapeDrawOp::ShapeDrawOp(std::shared_ptr<GpuShapeProxy> shapeProxy, Color color,
 }
 
 void ShapeDrawOp::execute(RenderPass* renderPass) {
+  OperateMark(inspector::OpTaskType::ShapeDrawOp);
+  AttributeTGFXName("color", color);
+  AttributeTGFXName("uvMatrix", uvMatrix);
+  AttributeNameEnum("blenderMode", getBlendMode(), inspector::CustomEnumType::BlendMode);
+  AttributeNameEnum("aaType", getAAType(), inspector::CustomEnumType::AAType);
   if (shapeProxy == nullptr) {
     return;
   }

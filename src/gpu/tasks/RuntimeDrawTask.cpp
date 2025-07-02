@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RuntimeDrawTask.h"
+#include "core/utils/Profiling.h"
 #include "gpu/RuntimeResource.h"
 
 namespace tgfx {
@@ -28,6 +29,7 @@ RuntimeDrawTask::RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
 }
 
 bool RuntimeDrawTask::execute(RenderPass* renderPass) {
+  TaskMark(inspector::OpTaskType::RuntimeDrawTask);
   std::vector<BackendTexture> inputTextures;
   inputTextures.reserve(inputs.size());
   for (size_t i = 0; i < inputs.size(); i++) {
