@@ -277,6 +277,7 @@ void GLTiledTextureEffect::emitCode(EmitArgs& args) const {
     if (constraint == SrcRectConstraint::Strict) {
       std::string subsetName = "vTexSubset_P0";
       if (!names.dimensionsName.empty()) {
+        subsetName = "extraSubset";
         fragBuilder->codeAppendf("highp vec4 extraSubset = vTexSubset_P0;");
         fragBuilder->codeAppendf("extraSubset.xy /= %s;", names.dimensionsName.c_str());
         fragBuilder->codeAppendf("extraSubset.zw /= %s;", names.dimensionsName.c_str());
