@@ -42,10 +42,8 @@ namespace inspector {
 #define QueueCommit() Inspector::QueueSerialFinish(item);
 
 class Inspector;
-Inspector& GetInspector();
-uint32_t GetThreadHandle();
-
 typedef Singleton<Inspector> InspectorSingleton;
+
 class Inspector {
  public:
   Inspector();
@@ -125,46 +123,46 @@ class Inspector {
   }
 
   static void LaunchWorker(Inspector* inspector) {
-    inspector->Worker();
+    inspector->worker();
   }
 
   static bool ShouldExit();
 
-  void SendString(uint64_t str, const char* ptr, QueueType type) {
-    SendString(str, ptr, strlen(ptr), type);
+  void sendString(uint64_t str, const char* ptr, QueueType type) {
+    sendString(str, ptr, strlen(ptr), type);
   }
-  void SendString(uint64_t str, const char* ptr, size_t len, QueueType type);
+  void sendString(uint64_t str, const char* ptr, size_t len, QueueType type);
 
-  void Worker();
-  void SpawnWorkerThreads();
-  bool HandleServerQuery();
+  void worker();
+  void spawnWorkerThreads();
+  bool handleServerQuery();
 
  private:
   enum class DequeueStatus { DataDequeued, ConnectionLost, QueueEmpty };
   enum class ThreadCtxStatus { Same, Changed };
 
-  bool AppendData(const void* data, size_t len) {
-    const auto ret = NeetDataSize(len);
-    AppendDataUnsafe(data, len);
+  bool appendData(const void* data, size_t len) {
+    const auto ret = needDataSize(len);
+    appendDataUnsafe(data, len);
     return ret;
   }
 
-  bool NeetDataSize(size_t len) {
+  bool needDataSize(size_t len) {
     bool ret = true;
     if (size_t(dataBufferOffset - dataBufferStart) + len > TargetFrameSize) {
-      ret = CommitData();
+      ret = commitData();
     }
     return ret;
   }
 
-  void AppendDataUnsafe(const void* data, size_t len) {
+  void appendDataUnsafe(const void* data, size_t len) {
     memcpy(dataBuffer + dataBufferOffset, data, len);
     dataBufferOffset += int(len);
   }
 
-  bool CommitData();
-  bool SendData(const char* data, size_t len);
-  DequeueStatus DequeueSerial();
+  bool commitData();
+  bool sendData(const char* data, size_t len);
+  DequeueStatus dequeueSerial();
 
  private:
   static constexpr int BROAD_CAST_NUIM = 5;

@@ -36,7 +36,7 @@ Inspector::Inspector()
       broadcast(BROAD_CAST_NUIM) {
   serialDequeue.reserve(1024 * 1024);
   serialQueue.reserve(1024 * 1024);
-  SpawnWorkerThreads();
+  spawnWorkerThreads();
 }
 
 Inspector::~Inspector() {
@@ -59,14 +59,14 @@ Inspector::~Inspector() {
     lz4Stream = nullptr;
   }
 }
-void Inspector::SpawnWorkerThreads() {
+void Inspector::spawnWorkerThreads() {
   messageThread = std::make_unique<std::thread>(LaunchWorker, this);
   timeBegin.store(GetTime(), std::memory_order_relaxed);
 }
 
-bool Inspector::HandleServerQuery() {
+bool Inspector::handleServerQuery() {
   ServerQueryPacket payload = {};
-  if (!sock->Read(&payload, sizeof(payload), 10)) {
+  if (!sock->readData(&payload, sizeof(payload), 10)) {
     return false;
   }
   ServerQuery type;
@@ -76,13 +76,13 @@ bool Inspector::HandleServerQuery() {
 
   switch (type) {
     case ServerQuery::ServerQueryString: {
-      SendString(ptr, (const char*)ptr, QueueType::StringData);
+      sendString(ptr, (const char*)ptr, QueueType::StringData);
     }
     case ServerQuery::ServerQueryFrameName: {
       break;
     }
     case ServerQuery::ServerQueryValueName: {
-      SendString(ptr, (const char*)ptr, QueueType::ValueName);
+      sendString(ptr, (const char*)ptr, QueueType::ValueName);
     }
     case ServerQuery::ServerQueryDisconnect: {
       break;
@@ -99,20 +99,20 @@ bool Inspector::ShouldExit() {
   return InspectorSingleton::GetInstance()->shutdown.load(std::memory_order_relaxed);
 }
 
-void Inspector::SendString(uint64_t str, const char* ptr, size_t len, QueueType type) {
+void Inspector::sendString(uint64_t str, const char* ptr, size_t len, QueueType type) {
   QueueItem item = {};
   MemWrite(&item.hdr.type, type);
   MemWrite(&item.stringTransfer.ptr, str);
 
   auto l16 = uint16_t(len);
-  NeetDataSize(QueueDataSize[static_cast<int>(type)] + sizeof(l16) + l16);
+  needDataSize(QueueDataSize[static_cast<int>(type)] + sizeof(l16) + l16);
 
-  AppendDataUnsafe(&item, QueueDataSize[static_cast<int>(type)]);
-  AppendDataUnsafe(&l16, sizeof(l16));
-  AppendDataUnsafe(ptr, l16);
+  appendDataUnsafe(&item, QueueDataSize[static_cast<int>(type)]);
+  appendDataUnsafe(&l16, sizeof(l16));
+  appendDataUnsafe(ptr, l16);
 }
 
-void Inspector::Worker() {
+void Inspector::worker() {
   std::string addr = "255.255.255.255";
   uint16_t dataPort = 8086;
   const auto broadcastPort = 8086;
@@ -130,7 +130,7 @@ void Inspector::Worker() {
   auto listen = ListenSocket{};
   bool isListening = false;
   for (uint16_t i = 0; i < 20; ++i) {
-    if (listen.Listen(dataPort + i, 4)) {
+    if (listen.listenSock(dataPort + i, 4)) {
       dataPort += i;
       isListening = true;
       break;
@@ -147,7 +147,7 @@ void Inspector::Worker() {
   }
   for (uint16_t i = 0; i < BROAD_CAST_NUIM; i++) {
     broadcast[i] = std::make_shared<UdpBroadcast>();
-    if (!broadcast[i]->Open(addr.c_str(), broadcastPort + i)) {
+    if (!broadcast[i]->openConnect(addr.c_str(), broadcastPort + i)) {
       broadcast[i].reset();
     }
   }
@@ -163,12 +163,12 @@ void Inspector::Worker() {
         for (uint16_t i = 0; i < BROAD_CAST_NUIM; i++) {
           if (broadcast[i]) {
             broadcastMsg.activeTime = -1;
-            broadcast[i]->Send(broadcastPort + i, &broadcastMsg, broadcastLen);
+            broadcast[i]->sendData(broadcastPort + i, &broadcastMsg, broadcastLen);
           }
         }
         return;
       }
-      this->sock = listen.Accept();
+      this->sock = listen.acceptSock();
       if (sock) {
         break;
       }
@@ -189,7 +189,7 @@ void Inspector::Worker() {
                                 std::chrono::system_clock::now().time_since_epoch())
                                 .count();
             broadcastMsg.activeTime = int32_t(ts - epoch);
-            broadcast[i]->Send(broadcastPort + i, &broadcastMsg, broadcastLen);
+            broadcast[i]->sendData(broadcastPort + i, &broadcastMsg, broadcastLen);
           }
         }
       }
@@ -198,20 +198,20 @@ void Inspector::Worker() {
       if (broadcast[i]) {
         lastBroadcast = 0;
         broadcastMsg.activeTime = -1;
-        broadcast[i]->Send(broadcastPort + i, &broadcastMsg, broadcastLen);
+        broadcast[i]->sendData(broadcastPort + i, &broadcastMsg, broadcastLen);
       }
     }
 
     {
       char shibboleth[HandshakeShibbolethSize];
-      auto res = this->sock->ReadRaw(shibboleth, HandshakeShibbolethSize, 2000);
+      auto res = this->sock->readRaw(shibboleth, HandshakeShibbolethSize, 2000);
       if (!res || memcmp(shibboleth, HandshakeShibboleth, HandshakeShibbolethSize) != 0) {
         sock.reset();
         continue;
       }
 
       uint32_t protocolVersion;
-      res = this->sock->ReadRaw(&protocolVersion, sizeof(protocolVersion), 2000);
+      res = this->sock->readRaw(&protocolVersion, sizeof(protocolVersion), 2000);
       if (!res) {
         sock.reset();
         continue;
@@ -219,21 +219,21 @@ void Inspector::Worker() {
 
       if (protocolVersion != ProtocolVersion) {
         auto status = HandshakeStatus::HandshakeProtocolMismatch;
-        this->sock->Send(&status, sizeof(status));
+        this->sock->sendData(&status, sizeof(status));
         sock.reset();
         continue;
       }
     }
     isConnect.store(true, std::memory_order_release);
     auto handshake = HandshakeStatus::HandshakeWelcome;
-    sock->Send(&handshake, sizeof(handshake));
+    sock->sendData(&handshake, sizeof(handshake));
 
     LZ4_resetStream((LZ4_stream_t*)lz4Stream);
-    this->sock->Send(&welcome, sizeof(welcome));
+    this->sock->sendData(&welcome, sizeof(welcome));
 
     auto keepAlive = 0;
     while (true) {
-      const auto serialStatus = DequeueSerial();
+      const auto serialStatus = dequeueSerial();
       if (serialStatus == DequeueStatus::ConnectionLost) {
         break;
       } else if (serialStatus == DequeueStatus::QueueEmpty) {
@@ -241,19 +241,19 @@ void Inspector::Worker() {
           break;
         }
         if (dataBufferOffset != dataBufferStart) {
-          if (!CommitData()) {
+          if (!commitData()) {
             break;
           }
           if (keepAlive == 500) {
             QueueItem ka;
             ka.hdr.type = QueueType::KeepAlive;
-            AppendData(&ka, QueueDataSize[ka.hdr.idx]);
-            if (!CommitData()) {
+            appendData(&ka, QueueDataSize[ka.hdr.idx]);
+            if (!commitData()) {
               break;
             }
 
             keepAlive = 0;
-          } else if (!this->sock->HasData()) {
+          } else if (!this->sock->hasData()) {
             ++keepAlive;
             std::this_thread::sleep_for(std::chrono::microseconds(10));
           }
@@ -262,8 +262,8 @@ void Inspector::Worker() {
         }
 
         bool connActive = true;
-        while (this->sock->HasData()) {
-          connActive = HandleServerQuery();
+        while (this->sock->hasData()) {
+          connActive = handleServerQuery();
           if (!connActive) {
             break;
           }
@@ -282,8 +282,8 @@ void Inspector::Worker() {
   }
 }
 
-bool Inspector::CommitData() {
-  bool ret = SendData(dataBuffer + dataBufferStart, size_t(dataBufferOffset - dataBufferStart));
+bool Inspector::commitData() {
+  bool ret = sendData(dataBuffer + dataBufferStart, size_t(dataBufferOffset - dataBufferStart));
   if (dataBufferOffset > TargetFrameSize * 2) {
     dataBufferOffset = 0;
   }
@@ -291,14 +291,14 @@ bool Inspector::CommitData() {
   return ret;
 }
 
-bool Inspector::SendData(const char* data, size_t len) {
+bool Inspector::sendData(const char* data, size_t len) {
   const auto lz4sz = LZ4_compress_fast_continue((LZ4_stream_t*)lz4Stream, data,
                                                 lz4Buf + sizeof(lz4sz_t), (int)len, LZ4Size, 1);
   memcpy(lz4Buf, &lz4sz, sizeof(lz4sz));
-  return sock->Send(lz4Buf, size_t(lz4sz) + sizeof(lz4sz_t)) != -1;
+  return sock->sendData(lz4Buf, size_t(lz4sz) + sizeof(lz4sz_t)) != -1;
 }
 
-Inspector::DequeueStatus Inspector::DequeueSerial() {
+Inspector::DequeueStatus Inspector::dequeueSerial() {
   {
     std::lock_guard<std::mutex> lockGuard(serialLock);
     if (!serialQueue.empty()) {
@@ -331,7 +331,7 @@ Inspector::DequeueStatus Inspector::DequeueSerial() {
         default:
           break;
       }
-      if (!AppendData(item, QueueDataSize[idx])) {
+      if (!appendData(item, QueueDataSize[idx])) {
         return DequeueStatus::ConnectionLost;
       }
       ++item;

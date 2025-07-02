@@ -49,7 +49,7 @@ class Scoped {
   }
 
  private:
-  bool active;
-  OpTaskType type;
+  bool active = false;
+  OpTaskType type = OpTaskType::Unknown;
 };
 }  // namespace inspector
