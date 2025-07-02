@@ -18,13 +18,9 @@
 
 import * as types from '../types/types';
 
-export const MinZoom = 0.001;
-export const MaxZoom = 1000.0;
-export const ZoomFactorPerNotch = 1.1;
-
 export class TGFXBaseView {
     public updateSize: (devicePixelRatio: number) => void;
-    public draw: (drawIndex: number, zoom: number, offsetX: number, offsetY: number) => boolean;
+    public draw: (drawIndex: number) => void;
 }
 
 export class ShareData {
@@ -32,42 +28,8 @@ export class ShareData {
     public tgfxBaseView: TGFXBaseView = null;
     public drawIndex: number = 0;
     public resized: boolean = false;
-    public zoom: number = 1.0;
-    public offsetX: number = 0;
-    public offsetY: number = 0;
 }
 
-let canDraw = true;
-
-function isPromise(obj: any): obj is Promise<any> {
-    return !!obj && typeof obj.then === "function";
-}
-function draw(shareData: ShareData) {
-    if(shareData.drawIndex % 6 !== 4){
-        shareData.tgfxBaseView.draw(
-            shareData.drawIndex,
-            shareData.zoom,
-            shareData.offsetX,
-            shareData.offsetY
-        );
-        canDraw = true;
-    }else if (canDraw === true) {
-        canDraw = false;
-        const result = shareData.tgfxBaseView.draw(
-            shareData.drawIndex,
-            shareData.zoom,
-            shareData.offsetX,
-            shareData.offsetY
-        );
-        if (isPromise(result)) {
-            result.then((res: boolean) => {
-                canDraw = res;
-            });
-        } else {
-            canDraw = result;
-        }
-    }
-}
 export function updateSize(shareData: ShareData) {
     if (!shareData.tgfxBaseView) {
         return;
@@ -82,7 +44,7 @@ export function updateSize(shareData: ShareData) {
     canvas.style.width = screenRect.width + "px";
     canvas.style.height = screenRect.height + "px";
     shareData.tgfxBaseView.updateSize(scaleFactor);
-    draw(shareData);
+    shareData.tgfxBaseView.draw(shareData.drawIndex);
 }
 
 export function onresizeEvent(shareData: ShareData) {
@@ -97,7 +59,7 @@ export function onclickEvent(shareData: ShareData) {
         return;
     }
     shareData.drawIndex++;
-    draw(shareData);
+    shareData.tgfxBaseView.draw(shareData.drawIndex);
 }
 
 export function loadImage(src: string) {
@@ -108,122 +70,3 @@ export function loadImage(src: string) {
         img.src = src;
     })
 }
-
-export function bindCanvasZoomAndPanEvents(canvas: HTMLElement, shareData: ShareData) {
-    if (!canvas) return;
-    window.addEventListener('mouseup', () => {
-        shareData.offsetX = 0;
-        shareData.offsetY = 0;
-        shareData.zoom = 1.0;
-    });
-
-    canvas.addEventListener('wheel', (e: WheelEvent) => {
-        e.preventDefault();
-        if (e.ctrlKey || e.metaKey) {
-            const newZoom = Math.max(MinZoom, Math.min(MaxZoom, shareData.zoom * normalizeZoom(e)));
-            const rect = canvas.getBoundingClientRect();
-            const px = (e.clientX - rect.left) * window.devicePixelRatio;
-            const py = (e.clientY - rect.top) * window.devicePixelRatio;
-            shareData.offsetX = (shareData.offsetX - px) * (newZoom / shareData.zoom) + px;
-            shareData.offsetY = (shareData.offsetY - py) * (newZoom / shareData.zoom) + py;
-            shareData.zoom = newZoom;
-        } else {
-            if(e.shiftKey && e.deltaX === 0 && e.deltaY !== 0){
-                shareData.offsetX -= e.deltaY * window.devicePixelRatio;
-            }else{
-                shareData.offsetX -= e.deltaX * window.devicePixelRatio;
-                shareData.offsetY -= e.deltaY * window.devicePixelRatio;
-            }
-        }
-        draw(shareData);
-    }, { passive: false });
-}
-
-interface IWebKitMouseWheelEvent {
-    wheelDeltaY: number;
-    wheelDeltaX: number;
-}
-
-interface IGeckoMouseWheelEvent {
-    HORIZONTAL_AXIS: number;
-    VERTICAL_AXIS: number;
-    axis: number;
-    detail: number;
-}
-
-/**
- * Standardized mouse wheel deltaY to be consistent with VSCode's implementation,
- * compatible with Chrome/Firefox/old API, different platforms and DPIs.
- * Refs VSCode: https://github.com/microsoft/vscode/blob/main/src/vs/base/browser/mouseEvent.ts
- */
-export function normalizeZoom(e: WheelEvent): number {
-    const ua = navigator.userAgent.toLowerCase();
-    const isFirefox = ua.indexOf('firefox') > -1;
-    const isSafari = /safari/.test(ua) && !/chrome/.test(ua);
-    const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
-    const isWindows = navigator.platform.toUpperCase().indexOf('WIN') >= 0;
-    let shouldFactorDPR = false;
-    const chromeMatch = navigator.userAgent.match(/Chrome\/(\d+)/);
-    if (chromeMatch) {
-        const chromeVer = parseInt(chromeMatch[1]);
-        shouldFactorDPR = chromeVer <= 122;
-    }
-    let deltaY: number;
-    if (e) {
-        const e1 = <IWebKitMouseWheelEvent><any>e;
-        const e2 = <IGeckoMouseWheelEvent><any>e;
-        const devicePixelRatio = e.view?.devicePixelRatio || 1;
-        if (typeof e1.wheelDeltaY !== 'undefined') {
-            if (shouldFactorDPR) {
-                // Refs https://github.com/microsoft/vscode/issues/146403#issuecomment-1854538928
-                deltaY = e1.wheelDeltaY / (120 * devicePixelRatio);
-            } else {
-                deltaY = e1.wheelDeltaY / 120;
-            }
-        } else if (typeof e2.VERTICAL_AXIS !== 'undefined' && e2.axis === e2.VERTICAL_AXIS) {
-            deltaY = -e2.detail / 3;
-        } else if (e.type === 'wheel') {
-            // Modern wheel event
-            // https://developer.mozilla.org/en-US/docs/Web/API/WheelEvent
-            const ev = <WheelEvent><unknown>e;
-            if (ev.deltaMode === ev.DOM_DELTA_LINE) {
-                // the deltas are expressed in lines
-                if (isFirefox && !isMac) {
-                    deltaY = -e.deltaY / 3;
-                } else {
-                    deltaY = -e.deltaY;
-                }
-            } else {
-                deltaY = -e.deltaY / 40;
-            }
-        }
-        // Special processing of chrome
-        if (chromeMatch && isMac && Math.abs(e1.wheelDeltaY) % 120 === 0){
-            if (Math.abs(e1.wheelDeltaY) === 120){
-                /**
-                 * Adjustment coefficient of the touchpad zoom sensitivity.
-                 * The wheelDeltaY generated by the touchpad scrolling is usually ±120, with a high event frequency and
-                 * a small single increment, so it is necessary to reduce the zoom step by multiplying by 0.08.
-                 */
-                return 1 + deltaY * 0.08;
-            }
-            /**
-             * It's mainly used to adapt to ordinary mouse wheel zooming.
-             * When ordinary wheels are scrolled, wheelDeltaY is often an integer multiple of 120, and the zoom range
-             * is large per step. Exponential scaling makes the zooming more linear and natural.
-             */
-            return Math.pow(ZoomFactorPerNotch, deltaY);
-        }
-        /**
-         * It's a general zoom sensitivity adjustment for other devices or browsers.
-         * Since the distribution and amplitude of deltaY on different devices and browsers vary greatly, 0.25 is used
-         * as the zoom factor to effectively balance the zoom speed in different scenarios.
-         */
-        let result = 1 + deltaY * 0.25;
-        if (result <= 0){
-            return 0.9;
-        }
-        return result;
-    }
-}
-

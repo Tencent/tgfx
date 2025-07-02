@@ -32,7 +32,7 @@ class TGFXBaseView {
 
   void updateSize(float devicePixelRatio);
 
-  bool draw(int drawIndex, float zoom, float offsetX, float offsetY);
+  void draw(int drawIndex);
 
  protected:
   std::shared_ptr<drawers::AppHost> appHost;
