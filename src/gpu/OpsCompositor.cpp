@@ -264,11 +264,33 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     localBounds = Rect::MakeEmpty();
   }
 
-  if (type == PendingOpType::RRect) {
-    computeRRectsBounds(needLocalBounds || needDeviceBounds, clipBounds, localBounds, deviceBounds);
-  } else {
-    computeRectsBounds(needLocalBounds, needDeviceBounds, clipBounds, localBounds, deviceBounds);
+  if (needLocalBounds || needDeviceBounds) {
+    if (type == PendingOpType::RRect) {
+      deviceBounds = Rect::MakeEmpty();
+      for (auto& record : pendingRRects) {
+        auto rect = record->viewMatrix.mapRect(record->rRect.rect);
+        deviceBounds->join(rect);
+      }
+      localBounds = deviceBounds;
+      if (!localBounds->intersect(clipBounds)) {
+        localBounds->setEmpty();
+      }
+    } else {
+      if (needLocalBounds) {
+        for (auto& rect : pendingRects) {
+          localBounds->join(ClipLocalBounds(rect->rect, rect->viewMatrix, clipBounds));
+        }
+      }
+      if (needDeviceBounds) {
+        deviceBounds = Rect::MakeEmpty();
+        for (auto& record : pendingRects) {
+          auto rect = record->viewMatrix.mapRect(record->rect);
+          deviceBounds->join(rect);
+        }
+      }
+    }
   }
+
   switch (type) {
     case PendingOpType::Rect:
       if (pendingRects.size() == 1) {
@@ -629,40 +651,4 @@ void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, co
   auto record = drawingBuffer()->make<RectRecord>(rect, state.matrix, fill.color.premultiply());
   pendingRects.emplace_back(std::move(record));
 }
-
-void OpsCompositor::computeRectsBounds(bool needLocalBounds, bool needDeviceBounds,
-                                       const Rect& clipBounds, std::optional<Rect>& localBounds,
-                                       std::optional<Rect>& deviceBounds) const {
-  if (needLocalBounds) {
-    for (auto& rect : pendingRects) {
-      localBounds->join(ClipLocalBounds(rect->rect, rect->viewMatrix, clipBounds));
-    }
-  }
-  if (!needDeviceBounds) {
-    return;
-  }
-  deviceBounds = Rect::MakeEmpty();
-  for (auto& record : pendingRects) {
-    auto rect = record->viewMatrix.mapRect(record->rect);
-    deviceBounds->join(rect);
-  }
-}
-
-void OpsCompositor::computeRRectsBounds(bool needBounds, const Rect& clipBounds,
-                                        std::optional<Rect>& localBounds,
-                                        std::optional<Rect>& deviceBounds) const {
-  if (!needBounds) {
-    return;
-  }
-  deviceBounds = Rect::MakeEmpty();
-  for (auto& record : pendingRRects) {
-    auto rect = record->viewMatrix.mapRect(record->rRect.rect);
-    deviceBounds->join(rect);
-  }
-  localBounds = deviceBounds;
-  if (!localBounds->intersect(clipBounds)) {
-    localBounds->setEmpty();
-  }
-}
-
 }  // namespace tgfx

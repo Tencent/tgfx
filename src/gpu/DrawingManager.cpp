@@ -27,7 +27,7 @@
 #include "gpu/tasks/TextureResolveTask.h"
 
 namespace tgfx {
-static ColorType GetColorType(bool isAplhaOnly) {
+static ColorType GetAtlasColorType(bool isAplhaOnly) {
   if (isAplhaOnly) {
     return ColorType::ALPHA_8;
   }
@@ -193,7 +193,7 @@ void DrawingManager::addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& 
     return;
   }
   auto padding = Plot::CellPadding;
-  auto colorType = GetColorType(codec->isAlphaOnly());
+  auto colorType = GetAtlasColorType(codec->isAlphaOnly());
   auto dstInfo =
       ImageInfo::Make(codec->width() + 2 * padding, codec->height() + 2 * padding, colorType);
   auto length = dstInfo.byteSize();

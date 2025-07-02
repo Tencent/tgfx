@@ -134,12 +134,7 @@ class OpsCompositor {
   DstTextureInfo makeDstTextureInfo(const Rect& deviceBounds, AAType aaType);
   void addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const Fill& fill,
                  const std::optional<Rect>& localBounds, const std::optional<Rect>& deviceBounds);
-  void computeRectsBounds(bool needLocalBounds, bool needDeviceBounds, const Rect& clipBounds,
-                          std::optional<Rect>& localBounds,
-                          std::optional<Rect>& deviceBounds) const;
-  void computeRRectsBounds(bool needBounds, const Rect& clipBounds,
-                           std::optional<Rect>& localBounds,
-                           std::optional<Rect>& deviceBounds) const;
+
   friend class DrawingManager;
 };
 }  // namespace tgfx
