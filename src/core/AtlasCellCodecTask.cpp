@@ -26,10 +26,10 @@ void AtlasCellCodecTask::onExecute() {
     return;
   }
   ClearPixels(dstInfo, dstPixels);
-  auto offsetPixels = static_cast<uint8_t*>(dstPixels) +
+  auto targetPixels = static_cast<uint8_t*>(dstPixels) +
                       (dstInfo.rowBytes() + dstInfo.bytesPerPixel()) * static_cast<size_t>(padding);
-  auto info = dstInfo.makeIntersect(0, 0, imageCodec->width(), imageCodec->height());
-  imageCodec->readPixels(info, offsetPixels);
+  auto targetInfo = dstInfo.makeIntersect(0, 0, imageCodec->width(), imageCodec->height());
+  imageCodec->readPixels(targetInfo, targetPixels);
 }
 
 void AtlasCellCodecTask::onCancel() {
