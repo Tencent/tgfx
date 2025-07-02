@@ -44,7 +44,9 @@
 
 #include <cassert>
 #include <cinttypes>
+#include <cstring>
 #include <cstdio>
+#include <cstdlib>
 #include "ProcessUtils.h"
 #include "Socket.h"
 

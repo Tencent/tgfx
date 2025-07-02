@@ -41,29 +41,29 @@ class LayerViewerManager final {
   void serializingLayerTree();
   void serializingLayerAttribute(const std::shared_ptr<tgfx::Layer>& layer);
   void FeedBackDataProcess(const std::vector<uint8_t>& data);
-  void setCallBack();
   void RenderImageAndSend(Context* context);
 
  private:
+  void setCallBack();
   void AddHighLightOverlay(Color color, std::shared_ptr<Layer> hovedLayer);
   void SendPickedLayerAddress(const std::shared_ptr<tgfx::Layer>& layer);
   void SendFlushAttributeAck(uint64_t address);
   LayerViewerManager();
 
  private:
-  std::unordered_map<uint64_t, std::shared_ptr<tgfx::Layer>> layerMap;
+  std::unordered_map<uint64_t, std::shared_ptr<tgfx::Layer>> layerMap = {};
   std::unordered_map<uint64_t, std::unordered_map<uint64_t, std::function<std::shared_ptr<Data>()>>>
-      layerComplexObjMap;
+      layerComplexObjMap = {};
   std::unordered_map<uint64_t,
                      std::unordered_map<uint64_t, std::function<std::shared_ptr<Data>(Context*)>>>
-      layerRenderableObjMap;
-  uint64_t hoveredAddress;
-  uint64_t selectedAddress;
-  uint64_t expandID;
-  std::shared_ptr<tgfx::Layer> hoverdLayer;
+      layerRenderableObjMap = {};
+  uint64_t hoveredAddress = 0;
+  uint64_t selectedAddress = 0;
+  uint64_t expandID = 0;
+  std::shared_ptr<tgfx::Layer> hoverdLayer = nullptr;
   int highLightLayerIndex = 0;
   bool hoverdSwitch = false;
-  tgfx::DisplayList* displayList;
+  tgfx::DisplayList* displayList = nullptr;
 };
 
 }  // namespace tgfx

@@ -46,7 +46,7 @@ class LayerProfiler {
   std::shared_ptr<ListenSocket> listenSocket = nullptr;
   std::shared_ptr<Socket> socket = nullptr;
   std::queue<std::vector<uint8_t>> messages;
-  std::array<std::shared_ptr<UdpBroadcast>, broadcastNum> broadcasts;
+  std::array<std::shared_ptr<UdpBroadcast>, broadcastNum> broadcasts = {};
   bool isUDPOpened = true;
   std::shared_ptr<TCPPortProvider> portProvider = nullptr;
 #endif

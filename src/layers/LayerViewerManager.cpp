@@ -73,9 +73,7 @@ void LayerViewerManager::RenderImageAndSend(Context* context) {
   }
 }
 
-LayerViewerManager::LayerViewerManager()
-    : hoveredAddress(0), selectedAddress(0), expandID(0), hoverdLayer(nullptr),
-      displayList(nullptr) {
+LayerViewerManager::LayerViewerManager() {
   inspector::LayerProfiler::InitLayerProfiler();
   setCallBack();
 }
@@ -165,9 +163,13 @@ void LayerViewerManager::FeedBackDataProcess(const std::vector<uint8_t>& data) {
     }
     case inspector::LayerInspectorMsgType::SerializeSubAttribute: {
       expandID = map["Value"].AsUInt64();
-      std::shared_ptr<Data> data = layerComplexObjMap[selectedAddress][expandID]();
-      std::vector<uint8_t> blob(data->bytes(), data->bytes() + data->size());
-      SEND_LAYER_DATA(blob);
+      if (layerComplexObjMap.find(selectedAddress) != layerComplexObjMap.end() &&
+          layerComplexObjMap[selectedAddress].find(expandID) !=
+              layerComplexObjMap[selectedAddress].end()) {
+        std::shared_ptr<Data> data = layerComplexObjMap[selectedAddress][expandID]();
+        std::vector<uint8_t> blob(data->bytes(), data->bytes() + data->size());
+        SEND_LAYER_DATA(blob);
+      }
       break;
     }
     case inspector::LayerInspectorMsgType::FlushAttribute: {
