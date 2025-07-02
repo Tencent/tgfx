@@ -33,38 +33,52 @@ std::shared_ptr<Tile> TileCache::getTile(int tileX, int tileY) const {
 std::vector<std::shared_ptr<Tile>> TileCache::getTilesUnderRect(const Rect& rect,
                                                                 bool requireFullCoverage,
                                                                 bool* continuous) const {
-  DEBUG_ASSERT(!rect.isEmpty());
-  int startX = static_cast<int>(std::floor(rect.left / static_cast<float>(tileSize)));
-  int startY = static_cast<int>(std::floor(rect.top / static_cast<float>(tileSize)));
-  int endX = static_cast<int>(std::ceil(rect.right / static_cast<float>(tileSize)));
-  int endY = static_cast<int>(std::ceil(rect.bottom / static_cast<float>(tileSize)));
+  if (rect.isEmpty()) {
+    if (continuous) {
+      *continuous = false;
+    }
+    return {};
+  }
+  int startTileX = static_cast<int>(std::floor(rect.left / static_cast<float>(tileSize)));
+  int startTileY = static_cast<int>(std::floor(rect.top / static_cast<float>(tileSize)));
+  int endTileX = static_cast<int>(std::ceil(rect.right / static_cast<float>(tileSize)));
+  int endTileY = static_cast<int>(std::ceil(rect.bottom / static_cast<float>(tileSize)));
   std::vector<std::shared_ptr<Tile>> tiles = {};
-  // Do not use reserve() here, as the input rect may be very large, and we don't want to
-  // allocate a large vector that may not be fully filled.
-  bool allFound = true;
-  for (int tileY = startY; tileY < endY; ++tileY) {
-    for (int tileX = startX; tileX < endX; ++tileX) {
-      auto key = TileKey(tileX, tileY);
-      auto result = tileMap.find(key);
-      if (result != tileMap.end()) {
-        tiles.push_back(result->second);
-      } else {
-        allFound = false;
+  auto requestTileCount =
+      static_cast<size_t>(endTileX - startTileX) * static_cast<size_t>(endTileY - startTileY);
+  if (requestTileCount < tileMap.size()) {
+    tiles.reserve(requestTileCount);
+    for (int tileY = startTileY; tileY < endTileY; ++tileY) {
+      for (int tileX = startTileX; tileX < endTileX; ++tileX) {
+        auto key = TileKey(tileX, tileY);
+        auto result = tileMap.find(key);
+        if (result != tileMap.end()) {
+          tiles.push_back(result->second);
+        }
+      }
+    }
+  } else {
+    tiles.reserve(tileMap.size());
+    for (auto& item : tileMap) {
+      auto& tile = item.second;
+      if (tile->tileX >= startTileX && tile->tileX < endTileX && tile->tileY >= startTileY &&
+          tile->tileY < endTileY) {
+        tiles.push_back(tile);
       }
     }
   }
+
+  auto allFound = tiles.size() == requestTileCount;
   if (requireFullCoverage && !allFound) {
     tiles.clear();
   }
   if (continuous != nullptr) {
     if (allFound && !tiles.empty()) {
       auto firstTile = tiles.front();
-      auto sourceStartX = firstTile->sourceX;
-      auto sourceStartY = firstTile->sourceY;
       *continuous = true;
       for (auto& tile : tiles) {
-        if (tile->tileX - startX != tile->sourceX - sourceStartX ||
-            tile->tileY - startY != tile->sourceY - sourceStartY) {
+        if (tile->tileX - firstTile->tileX != tile->sourceX - firstTile->sourceX ||
+            tile->tileY - firstTile->tileY != tile->sourceY - firstTile->sourceY) {
           *continuous = false;
           break;
         }

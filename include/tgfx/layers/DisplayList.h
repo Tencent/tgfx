@@ -184,12 +184,30 @@ class DisplayList {
   void setMaxTileCount(int count);
 
   /**
+   * Returns true if zoom blur is allowed in tiled rendering mode. This setting is ignored in other
+   * render modes. When enabled, if the zoomScale changes and cached images at other zoom levels are
+   * available, the display list will use those caches to render first, then gradually update to the
+   * current zoomScale in later frames. Use setMaxTilesRefinedPerFrame() to control how many tiles
+   * are updated per frame. This can improve zooming performance, but may cause temporary zoom blur
+   * artifacts. The default is false.
+   */
+  bool allowZoomBlur() const {
+    return _allowZoomBlur;
+  }
+
+  /**
+   * Sets whether to allow zoom blur in tiled rendering mode.
+   */
+  void setAllowZoomBlur(bool allow) {
+    _allowZoomBlur = allow;
+  }
+
+  /**
    * Returns the maximum number of tiles that can be refined (updated to the current zoom scale) per
-   * frame in tiled rendering mode. This setting is ignored in other render modes. When zooming,
-   * cached images from other zoom levels may be used temporarily, resulting in brief blur artifacts.
-   * Increasing this value refines more tiles per frame, reducing blur more quickly but potentially
-   * impacting performance. To eliminate blur entirely, set this value higher than the total number
-   * of visible tiles. The default is 10.
+   * frame in tiled rendering mode. This setting is ignored in other render modes or if
+   * allowZoomBlur is false. When zooming, cached images from other zoom levels may be used
+   * temporarily, resulting in brief blur artifacts. Increasing this value refines more tiles per
+   * frame, reducing blur more quickly but potentially impacting performance. The default is 5.
    */
   int maxTilesRefinedPerFrame() const {
     return _maxTilesRefinedPerFrame;
@@ -232,7 +250,8 @@ class DisplayList {
   RenderMode _renderMode = RenderMode::Partial;
   int _tileSize = 256;
   int _maxTileCount = 0;
-  int _maxTilesRefinedPerFrame = 10;
+  bool _allowZoomBlur = false;
+  int _maxTilesRefinedPerFrame = 5;
   bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
   bool hasZoomBlurTiles = false;

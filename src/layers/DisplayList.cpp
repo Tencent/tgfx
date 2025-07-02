@@ -273,6 +273,9 @@ static std::vector<Rect> MapDirtyRegions(const std::vector<Rect>& dirtyRegions,
   dirtyRects.reserve(dirtyRegions.size());
   for (auto& region : dirtyRegions) {
     auto dirtyRect = viewMatrix.mapRect(region);
+    if (dirtyRect.isEmpty()) {
+      continue;
+    }
     // Expand by 0.5 pixels to preserve antialiasing results.
     dirtyRect.outset(DIRTY_REGION_ANTIALIAS_MARGIN, DIRTY_REGION_ANTIALIAS_MARGIN);
     // Snap to pixel boundaries to avoid subpixel clipping artifacts.
@@ -486,15 +489,17 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   std::vector<std::shared_ptr<Tile>> taskTiles = {};
   for (auto& grid : dirtyGrids) {
     auto& tile = freeTiles[tileIndex++];
-    auto fallbackTasks = getFallbackDrawTasks(grid.first, grid.second, sortedCaches);
-    if (!fallbackTasks.empty()) {
-      if (refinedCount <= 0) {
-        emptyTiles.emplace_back(tile);
-        screenTasks.insert(screenTasks.end(), fallbackTasks.begin(), fallbackTasks.end());
-        hasZoomBlurTiles = true;
-        continue;
+    if (_allowZoomBlur) {
+      auto fallbackTasks = getFallbackDrawTasks(grid.first, grid.second, sortedCaches);
+      if (!fallbackTasks.empty()) {
+        if (refinedCount <= 0) {
+          emptyTiles.emplace_back(tile);
+          screenTasks.insert(screenTasks.end(), fallbackTasks.begin(), fallbackTasks.end());
+          hasZoomBlurTiles = true;
+          continue;
+        }
+        refinedCount--;
       }
-      refinedCount--;
     }
     tile->tileX = grid.first;
     tile->tileY = grid.second;
