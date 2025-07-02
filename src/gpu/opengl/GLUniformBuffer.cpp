@@ -93,9 +93,6 @@ void GLUniformBuffer::uploadToGPU(Context* context) {
       case Uniform::Type::Int4:
         gl->uniform4iv(location, 1, reinterpret_cast<int*>(buffer + offset));
         break;
-      default:
-        LOGE("Unsupported uniform type: %d", static_cast<int>(uniform.type));
-        break;
     }
     index++;
   }

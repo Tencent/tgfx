@@ -98,7 +98,7 @@ void GLQuadPerEdgeAAGeometryProcessor::onEmitTransform(
                                subset.name().c_str(), subsetMatrixName.c_str());
     vertexBuilder->codeAppendf("%s.zw = (vec3(%s.zw, 1) * %s).xy;", varying.vsOut().c_str(),
                                subset.name().c_str(), subsetMatrixName.c_str());
-    args.outputSubset = varying.fsIn();
+    *args.outputSubset = varying.fsIn();
   }
 }
 

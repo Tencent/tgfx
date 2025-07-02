@@ -73,19 +73,19 @@ static std::string SLTypePrecision(SLType t) {
     case SLType::Int4:
     case SLType::UByte4Color:
       return "highp";
-    case SLType::Half:
-    case SLType::Half2:
-    case SLType::Half3:
-    case SLType::Half4:
-    case SLType::Short:
-    case SLType::Short2:
-    case SLType::Short3:
-    case SLType::Short4:
-    case SLType::UShort:
-    case SLType::UShort2:
-    case SLType::UShort3:
-    case SLType::UShort4:
-      return "mediump";
+    // case SLType::Half:
+    // case SLType::Half2:
+    // case SLType::Half3:
+    // case SLType::Half4:
+    // case SLType::Short:
+    // case SLType::Short2:
+    // case SLType::Short3:
+    // case SLType::Short4:
+    // case SLType::UShort:
+    // case SLType::UShort2:
+    // case SLType::UShort3:
+    // case SLType::UShort4:
+    //   return "mediump";
     default:
       return "";
   }

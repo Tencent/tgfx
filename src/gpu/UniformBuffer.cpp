@@ -39,22 +39,6 @@ size_t Uniform::size() const {
       return 36;
     case Uniform::Type::Float4x4:
       return 64;
-    case Uniform::Type::Half:
-    case Uniform::Type::Short:
-    case Uniform::Type::UShort:
-      return 2;
-    case Uniform::Type::Half2:
-    case Uniform::Type::Short2:
-    case Uniform::Type::UShort2:
-      return 4;
-    case Uniform::Type::Half3:
-    case Uniform::Type::Short3:
-    case Uniform::Type::UShort3:
-      return 6;
-    case Uniform::Type::Half4:
-    case Uniform::Type::Short4:
-    case Uniform::Type::UShort4:
-      return 8;
   }
   return 0;
 }

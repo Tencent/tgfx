@@ -275,7 +275,7 @@ void GLTiledTextureEffect::emitCode(EmitArgs& args) const {
     clampCoord(args, useClamp, names.clampName);
 
     if (constraint == SrcRectConstraint::Strict) {
-      std::string subsetName = *args.inputSubset;
+      std::string subsetName = args.inputSubset;
       if (!names.dimensionsName.empty()) {
         fragBuilder->codeAppendf("highp vec4 extraSubset = %s;", subsetName.c_str());
         subsetName = "extraSubset";

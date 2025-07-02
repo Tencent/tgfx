@@ -90,21 +90,19 @@ class ProgramBuilder {
  private:
   std::vector<const Processor*> currentProcessors = {};
   std::vector<ShaderVar> transformedCoordVars = {};
+  std::string subsetVarName = {};
 
   /**
    * Generates a possibly mangled name for a stage variable and writes it to the fragment shader.
    */
   void nameExpression(std::string* output, const std::string& baseName);
 
-  void emitAndInstallGeoProc(std::string* outputColor, std::string* outputCoverage,
-                             std::optional<std::string>* outputSubset);
+  void emitAndInstallGeoProc(std::string* outputColor, std::string* outputCoverage);
 
-  void emitAndInstallFragProcessors(const std::optional<std::string>& subset, std::string* color,
-                                    std::string* coverage);
+  void emitAndInstallFragProcessors(std::string* color, std::string* coverage);
 
   std::string emitAndInstallFragProc(const FragmentProcessor* processor,
-                                     size_t transformedCoordVarsIdx, const std::string& input,
-                                     const std::optional<std::string>& subset);
+                                     size_t transformedCoordVarsIdx, const std::string& input);
 
   void emitAndInstallXferProc(const std::string& colorIn, const std::string& coverageIn);
 

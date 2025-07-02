@@ -106,7 +106,7 @@ void GLTextureEffect::emitPlainTextureCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("highp vec2 %s;", finalCoordName.c_str());
   std::string extraSubsetName = "";
   if (SrcRectConstraint::Strict == constraint) {
-    extraSubsetName = *args.inputSubset;
+    extraSubsetName = args.inputSubset;
   }
   appendClamp(fragBuilder, vertexColor, finalCoordName, subsetName, extraSubsetName);
   fragBuilder->codeAppend("vec4 color = ");
@@ -140,7 +140,7 @@ void GLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
   }
   std::string extraSubsetName = "";
   if (SrcRectConstraint::Strict == constraint) {
-    extraSubsetName = *args.inputSubset;
+    extraSubsetName = args.inputSubset;
   }
   std::string finalCoordName = "finalCoord";
   fragBuilder->codeAppendf("highp vec2 %s;", finalCoordName.c_str());

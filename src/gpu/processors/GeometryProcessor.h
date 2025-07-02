@@ -101,10 +101,11 @@ class GeometryProcessor : public Processor {
     EmitArgs(VertexShaderBuilder* vertBuilder, FragmentShaderBuilder* fragBuilder,
              VaryingHandler* varyingHandler, UniformHandler* uniformHandler, const Caps* caps,
              std::string outputColor, std::string outputCoverage,
-             FPCoordTransformHandler* transformHandler)
+             FPCoordTransformHandler* transformHandler, std::string* outputSubset)
         : vertBuilder(vertBuilder), fragBuilder(fragBuilder), varyingHandler(varyingHandler),
           uniformHandler(uniformHandler), caps(caps), outputColor(std::move(outputColor)),
-          outputCoverage(std::move(outputCoverage)), fpCoordTransformHandler(transformHandler) {
+          outputCoverage(std::move(outputCoverage)), fpCoordTransformHandler(transformHandler),
+          outputSubset(outputSubset) {
     }
     VertexShaderBuilder* vertBuilder;
     FragmentShaderBuilder* fragBuilder;
@@ -113,8 +114,8 @@ class GeometryProcessor : public Processor {
     const Caps* caps;
     const std::string outputColor;
     const std::string outputCoverage;
-    std::optional<std::string> outputSubset;
     FPCoordTransformHandler* fpCoordTransformHandler;
+    std::string* outputSubset = nullptr;
   };
 
   virtual void emitCode(EmitArgs&) const = 0;
