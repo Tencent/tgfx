@@ -134,7 +134,9 @@ bool CGPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) con
   }
   auto bounds = path.getBounds();
   auto clipBounds = Rect::MakeWH(targetInfo.width(), targetInfo.height());
-  bounds.intersect(clipBounds);
+  if (!bounds.intersect(clipBounds)) {
+    return false;
+  }
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
   auto tempBuffer = PixelBuffer::Make(width, height, true, false);
