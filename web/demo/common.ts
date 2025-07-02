@@ -43,7 +43,15 @@ function isPromise(obj: any): obj is Promise<any> {
     return !!obj && typeof obj.then === "function";
 }
 function draw(shareData: ShareData) {
-    if (canDraw === true) {
+    if(shareData.drawIndex % 6 !== 4){
+        shareData.tgfxBaseView.draw(
+            shareData.drawIndex,
+            shareData.zoom,
+            shareData.offsetX,
+            shareData.offsetY
+        );
+        canDraw = true;
+    }else if (canDraw === true) {
         canDraw = false;
         const result = shareData.tgfxBaseView.draw(
             shareData.drawIndex,
@@ -195,7 +203,7 @@ export function normalizeZoom(e: WheelEvent): number {
         //Special processing of chrome
         if(chromeMatch && isMac && Math.abs(e1.wheelDeltaY) % 120 === 0){
             if(Math.abs(e1.wheelDeltaY) === 120){
-                return 1 + deltaY * 0.04;
+                return 1 + deltaY * 0.05;
             }
             return Math.pow(1.1, deltaY);
         }
