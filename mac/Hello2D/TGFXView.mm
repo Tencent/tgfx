@@ -22,8 +22,12 @@
 #include "tgfx/core/Point.h"
 
 @implementation TGFXView {
-  std::shared_ptr<tgfx::CGLWindow> window;
+  std::shared_ptr<tgfx::CGLWindow> tgfxWindow;
   std::unique_ptr<drawers::AppHost> appHost;
+}
+
+- (BOOL)acceptsFirstResponder {
+  return YES;
 }
 
 - (void)setBounds:(CGRect)bounds {
@@ -58,13 +62,14 @@
   }
   auto contentScale = size.height / self.bounds.size.height;
   auto sizeChanged = appHost->updateScreen(width, height, contentScale);
-  if (sizeChanged && window != nullptr) {
-    window->invalidSize();
+  if (sizeChanged && tgfxWindow != nullptr) {
+    tgfxWindow->invalidSize();
   }
 }
 
 - (void)viewDidMoveToWindow {
   [super viewDidMoveToWindow];
+  [self.window makeFirstResponder:self];
   [self updateSize];
 }
 
@@ -75,23 +80,23 @@
   if (appHost->width() <= 0 || appHost->height() <= 0) {
     return;
   }
-  if (window == nullptr) {
-    window = tgfx::CGLWindow::MakeFrom(self);
+  if (tgfxWindow == nullptr) {
+    tgfxWindow = tgfx::CGLWindow::MakeFrom(self);
   }
-  if (window == nullptr) {
+  if (tgfxWindow == nullptr) {
     return;
   }
-  appHost->updateZoomAndOffset(zoom, tgfx::Point(offset.x, offset.y));
-  auto device = window->getDevice();
+  auto device = tgfxWindow->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {
     return;
   }
-  auto surface = window->getSurface(context);
+  auto surface = tgfxWindow->getSurface(context);
   if (surface == nullptr) {
     device->unlock();
     return;
   }
+  appHost->updateZoomAndOffset(zoom, tgfx::Point(offset.x, offset.y));
   auto canvas = surface->getCanvas();
   canvas->clear();
   auto numDrawers = drawers::Drawer::Count() - 1;
@@ -101,7 +106,7 @@
   drawer = drawers::Drawer::GetByIndex(index);
   drawer->draw(canvas, appHost.get());
   context->flushAndSubmit();
-  window->present(context);
+  tgfxWindow->present(context);
   device->unlock();
 }
 

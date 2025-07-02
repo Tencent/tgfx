@@ -21,7 +21,7 @@
 #include "drawers/Drawer.h"
 
 @implementation TGFXView {
-  std::shared_ptr<tgfx::EAGLWindow> window;
+  std::shared_ptr<tgfx::EAGLWindow> tgfxWindow;
   std::unique_ptr<drawers::AppHost> appHost;
 }
 
@@ -67,31 +67,35 @@
     appHost->addTypeface("emoji", typeface);
   }
   auto sizeChanged = appHost->updateScreen(width, height, self.layer.contentsScale);
-  if (sizeChanged && window != nullptr) {
-    window->invalidSize();
+  if (sizeChanged && tgfxWindow != nullptr) {
+    tgfxWindow->invalidSize();
   }
 }
 
-- (void)draw:(int)index {
+- (void)draw:(int)index zoom:(float)zoom offset:(CGPoint)offset {
+  if (self.window == nil) {
+    return;
+  }
   if (appHost->width() <= 0 || appHost->height() <= 0) {
     return;
   }
-  if (window == nullptr) {
-    window = tgfx::EAGLWindow::MakeFrom((CAEAGLLayer*)[self layer]);
+  if (tgfxWindow == nullptr) {
+    tgfxWindow = tgfx::EAGLWindow::MakeFrom((CAEAGLLayer*)[self layer]);
   }
-  if (window == nullptr) {
+  if (tgfxWindow == nullptr) {
     return;
   }
-  auto device = window->getDevice();
+  auto device = tgfxWindow->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {
     return;
   }
-  auto surface = window->getSurface(context);
+  auto surface = tgfxWindow->getSurface(context);
   if (surface == nullptr) {
     device->unlock();
     return;
   }
+  appHost->updateZoomAndOffset(zoom, tgfx::Point(offset.x, offset.y));
   auto canvas = surface->getCanvas();
   canvas->clear();
   auto numDrawers = drawers::Drawer::Count() - 1;
@@ -101,7 +105,7 @@
   drawer = drawers::Drawer::GetByIndex(index);
   drawer->draw(canvas, appHost.get());
   context->flushAndSubmit();
-  window->present(context);
+  tgfxWindow->present(context);
   device->unlock();
 }
 

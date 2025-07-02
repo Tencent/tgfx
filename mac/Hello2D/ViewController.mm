@@ -28,6 +28,11 @@
 
 @implementation ViewController
 
+static const float MinZoom = 0.001f;
+static const float MaxZoom = 1000.0f;
+// Refs https://github.com/microsoft/vscode/blob/main/src/vs/base/browser/mouseEvent.ts
+static const float ScrollWheelZoomSensitivity = 120.0f;
+
 - (void)viewDidLoad {
   [super viewDidLoad];
   self.tgfxView = [[TGFXView alloc] initWithFrame:self.view.bounds];
@@ -51,28 +56,54 @@
 }
 
 - (void)scrollWheel:(NSEvent*)event {
-  self.contentOffset = CGPointMake(self.contentOffset.x + event.scrollingDeltaX,
-                                   self.contentOffset.y + event.scrollingDeltaY);
+  BOOL isCtrl = (event.modifierFlags & NSEventModifierFlagControl) != 0;
+  BOOL isCmd = (event.modifierFlags & NSEventModifierFlagCommand) != 0;
+  if (isCtrl || isCmd) {
+    NSPoint mouseInView = [self.tgfxView convertPoint:[event locationInWindow] fromView:nil];
+    mouseInView.y = self.tgfxView.bounds.size.height - mouseInView.y;
+    mouseInView = [self.tgfxView convertPointToBacking:mouseInView];
+    float contentX = (mouseInView.x - self.contentOffset.x) / self.zoomScale;
+    float contentY = (mouseInView.y - self.contentOffset.y) / self.zoomScale;
+    if (event.hasPreciseScrollingDeltas) {
+      self.zoomScale = self.zoomScale * (1 + event.scrollingDeltaY / ScrollWheelZoomSensitivity);
+    } else {
+      self.zoomScale = self.zoomScale * std::pow(1.1, event.scrollingDeltaY);
+    }
+    if (self.zoomScale < MinZoom) {
+      self.zoomScale = MinZoom;
+    }
+    if (self.zoomScale > MaxZoom) {
+      self.zoomScale = MaxZoom;
+    }
+    self.contentOffset = CGPointMake(mouseInView.x - contentX * self.zoomScale,
+                                     mouseInView.y - contentY * self.zoomScale);
+  } else {
+    if (event.hasPreciseScrollingDeltas) {
+      self.contentOffset = CGPointMake(self.contentOffset.x + event.scrollingDeltaX,
+                                       self.contentOffset.y + event.scrollingDeltaY);
+    } else {
+      self.contentOffset = CGPointMake(self.contentOffset.x + event.scrollingDeltaX * 5,
+                                       self.contentOffset.y + event.scrollingDeltaY * 5);
+    }
+  }
   [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
 }
 
 - (void)magnifyWithEvent:(NSEvent*)event {
-  float oldZoom = self.zoomScale;
-  float newZoom = oldZoom * (1.0 + event.magnification);
-  if (self.zoomScale < 0.001f) {
-    self.zoomScale = 0.001f;
-  }
-  if (self.zoomScale > 1000.0f) {
-    self.zoomScale = 1000.0f;
-  }
   NSPoint mouseInView = [self.tgfxView convertPoint:[event locationInWindow] fromView:nil];
   mouseInView.y = self.tgfxView.bounds.size.height - mouseInView.y;
   mouseInView = [self.tgfxView convertPointToBacking:mouseInView];
-  float contentX = (mouseInView.x - self.contentOffset.x) / oldZoom;
-  float contentY = (mouseInView.y - self.contentOffset.y) / oldZoom;
-  self.contentOffset =
-      CGPointMake(mouseInView.x - contentX * newZoom, mouseInView.y - contentY * newZoom);
-  self.zoomScale = newZoom;
+  float contentX = (mouseInView.x - self.contentOffset.x) / self.zoomScale;
+  float contentY = (mouseInView.y - self.contentOffset.y) / self.zoomScale;
+  self.zoomScale = self.zoomScale * (1.0 + event.magnification);
+  if (self.zoomScale < MinZoom) {
+    self.zoomScale = MinZoom;
+  }
+  if (self.zoomScale > MaxZoom) {
+    self.zoomScale = MaxZoom;
+  }
+  self.contentOffset = CGPointMake(mouseInView.x - contentX * self.zoomScale,
+                                   mouseInView.y - contentY * self.zoomScale);
   [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
 }
 
