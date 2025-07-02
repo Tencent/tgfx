@@ -18,6 +18,7 @@
 #include "LayerProfiler.h"
 #include <chrono>
 #include <thread>
+#include <cstring>
 #include "ProcessUtils.h"
 #include "Protocol.h"
 
