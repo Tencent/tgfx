@@ -15,19 +15,26 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
 #pragma once
 
-#include <tgfx/core/Data.h>
-#include "SerializationUtils.h"
+#include <functional>
 
 namespace tgfx {
-class glyphRunSerialization {
- public:
-  static std::shared_ptr<Data> Serialize(const GlyphRun* glyphRun, SerializeUtils::Map* map);
 
- private:
-  static void SerializeGlyphRunImpl(flexbuffers::Builder& fbb, const GlyphRun* glyphRun,
-                                    SerializeUtils::Map* map);
+class LayerViewer {
+ public:
+  /**
+   * Return the Hovered toggle state of layerViewer. When the return value is true, it indicates
+   * that the toggle is switched on. The business logic should replace the original left mouse
+   * button selection handling with a call to the PickLayer function when the left mouse button
+   * is clicked, passing the current mouse coordinates as an argument.
+   */
+  static bool GetLayerViewerHoveredState();
+
+  /**
+   * Set the mouse coordinates to pick the corresponding topmost layer.
+   */
+  static void PickLayer(float x, float y);
 };
+
 }  // namespace tgfx

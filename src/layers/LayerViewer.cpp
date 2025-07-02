@@ -15,19 +15,24 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+#include "tgfx/layers/LayerViewer.h"
+#ifdef TGFX_USE_INSPECTOR
+#include "layers/LayerViewerManager.h"
+#endif
 
-#pragma once
+void tgfx::LayerViewer::PickLayer(float x, float y) {
+#ifdef TGFX_USE_INSPECTOR
+  LayerViewerManager::GetLayerInspectorManager().pickLayer(x, y);
+#else
+  (void)x;
+  (void)y;
+#endif
+}
 
-#include <tgfx/core/Data.h>
-#include "SerializationUtils.h"
-
-namespace tgfx {
-class ShapeSerialization {
- public:
-  static std::shared_ptr<Data> Serialize(const Shape* shape, SerializeUtils::Map* map);
-
- private:
-  static void SerializeShapeImpl(flexbuffers::Builder& fbb, const Shape* shape,
-                                 SerializeUtils::Map* map);
-};
-}  // namespace tgfx
+bool tgfx::LayerViewer::GetLayerViewerHoveredState() {
+#ifdef TGFX_USE_INSPECTOR
+  return LayerViewerManager::GetLayerInspectorManager().getLayerViewerHoveredState();
+#else
+  return false;
+#endif
+}

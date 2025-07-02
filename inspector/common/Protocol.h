@@ -17,16 +17,23 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+namespace inspector {
 
-#include <tgfx/core/Data.h>
-#include "SerializationUtils.h"
+inline constexpr int broadcastNum = 5;
 
-namespace tgfx {
-class TextBlobSerialization {
- public:
-  static std::shared_ptr<Data> Serialize(const TextBlob* textBlob);
+inline constexpr uint64_t WelcomeMessageProgramNameSize = 64;
+inline constexpr uint8_t ProtocolVersion = 1;
+inline constexpr uint16_t BroadcastVersion = 1;
 
- private:
-  static void SerializeTextBlobImpl(flexbuffers::Builder& fbb, const TextBlob* textBlob);
+enum class MsgType : uint8_t { FrameCapture = 0, LayerTree = 1 };
+
+struct BroadcastMessage {
+  uint8_t type;
+  uint16_t listenPort;
+  uint32_t protocolVersion;
+  uint64_t pid;
+  int32_t activeTime;  // in seconds
+  char programName[WelcomeMessageProgramNameSize];
 };
-}  // namespace tgfx
+
+}  // namespace inspector

@@ -15,18 +15,16 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
 #pragma once
-
-#include <tgfx/core/Data.h>
-#include "SerializationUtils.h"
-
-namespace tgfx {
-class StrokeSerialization {
- public:
-  static std::shared_ptr<Data> Serialize(const Stroke* stroke);
-
- private:
-  static void SerializeStrokeImpl(flexbuffers::Builder& fbb, const Stroke* stroke);
+#include <cstdint>
+#include <set>
+namespace inspector {
+class TCPPortProvider {
+public:
+  TCPPortProvider() = default;
+  uint16_t getValidPort();
+private:
+  std::set<uint16_t> usedPortSet = {};
 };
-}  // namespace tgfx
+}
+
