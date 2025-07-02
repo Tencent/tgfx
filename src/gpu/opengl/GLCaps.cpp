@@ -19,8 +19,6 @@
 #include "GLCaps.h"
 #include "GLUtil.h"
 
-#define MAX_ATLAS_SIZE 8192
-
 namespace tgfx {
 static GLStandard GetGLStandard(const char* versionString) {
   if (versionString == nullptr) {
@@ -183,7 +181,6 @@ GLCaps::GLCaps(const GLInfo& info) {
   }
   info.getIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
   info.getIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &maxFragmentSamplers);
-  maxAtlasSize = std::min(maxTextureSize, MAX_ATLAS_SIZE);
   initMSAASupport(info);
   initFormatMap(info);
 }
