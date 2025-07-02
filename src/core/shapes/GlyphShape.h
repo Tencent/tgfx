@@ -22,7 +22,7 @@
 
 namespace tgfx {
 /**
- * Shape that contains a GlyphFace and GlyphID.
+ * Shape that contains a Font and GlyphID.
  */
 class GlyphShape : public UniqueKeyShape {
  public:

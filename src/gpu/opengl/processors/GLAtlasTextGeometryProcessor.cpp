@@ -22,16 +22,15 @@
 namespace tgfx {
 PlacementPtr<AtlasTextGeometryProcessor> AtlasTextGeometryProcessor::Make(
     BlockBuffer* buffer, std::shared_ptr<TextureProxy> textureProxy,
-    const SamplingOptions& sampling, AAType aa, std::optional<Color> commonColor,
-    const Matrix& uvMatrix) {
+    const SamplingOptions& sampling, AAType aa, std::optional<Color> commonColor) {
   return buffer->make<GLAtlasTextGeometryProcessor>(std::move(textureProxy), sampling, aa,
-                                                    commonColor, uvMatrix);
+                                                    commonColor);
 }
 
 GLAtlasTextGeometryProcessor::GLAtlasTextGeometryProcessor(
     std::shared_ptr<TextureProxy> textureProxy, const SamplingOptions& sampling, AAType aa,
-    std::optional<Color> commonColor, const Matrix& uvMatrix)
-    : AtlasTextGeometryProcessor(std::move(textureProxy), sampling, aa, commonColor, uvMatrix) {
+    std::optional<Color> commonColor)
+    : AtlasTextGeometryProcessor(std::move(textureProxy), sampling, aa, commonColor) {
 }
 
 void GLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -48,7 +47,7 @@ void GLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
   auto samplerVarying = varyingHandler->addVarying("textureCoords", SLType::Float2);
   emitTransforms(vertBuilder, varyingHandler, uniformHandler, position.asShaderVar(),
                  args.fpCoordTransformHandler);
-  auto uvName = uvCoord.asShaderVar().name();
+  auto uvName = maskCoord.asShaderVar().name();
   vertBuilder->codeAppendf("%s = %s * %s;", samplerVarying.vsOut().c_str(), uvName.c_str(),
                            atlasName.c_str());
 
@@ -90,10 +89,9 @@ void GLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
 
 void GLAtlasTextGeometryProcessor::setData(UniformBuffer* uniformBuffer,
                                            FPCoordTransformIter* transformIter) const {
-  float atlasSizeInv[2] = {1.f / static_cast<float>(textureProxy->width()),
-                           1.f / static_cast<float>(textureProxy->height())};
+  auto atlasSizeInv = textureProxy->getTexture()->getTextureCoord(1.f, 1.f);
   uniformBuffer->setData(atlasSizeUniformName, atlasSizeInv);
-  setTransformDataHelper(uvMatrix, uniformBuffer, transformIter);
+  setTransformDataHelper(Matrix::I(), uniformBuffer, transformIter);
   if (commonColor.has_value()) {
     uniformBuffer->setData("Color", *commonColor);
   }

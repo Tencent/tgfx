@@ -21,15 +21,14 @@
 namespace tgfx {
 AtlasTextGeometryProcessor::AtlasTextGeometryProcessor(std::shared_ptr<TextureProxy> textureProxy,
                                                        const SamplingOptions& sampling, AAType aa,
-                                                       std::optional<Color> commonColor,
-                                                       const Matrix& uvMatrix)
+                                                       std::optional<Color> commonColor)
     : GeometryProcessor(ClassID()), textureProxy(std::move(textureProxy)), samplerState(sampling),
-      commonColor(commonColor), uvMatrix(uvMatrix) {
+      commonColor(commonColor) {
   position = {"aPosition", SLType::Float2};
   if (aa == AAType::Coverage) {
     coverage = {"inCoverage", SLType::Float};
   }
-  uvCoord = {"uvCoord", SLType::Float2};
+  maskCoord = {"maskCoord", SLType::Float2};
   if (!commonColor.has_value()) {
     color = {"inColor", SLType::UByte4Color};
   }
