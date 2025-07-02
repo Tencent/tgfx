@@ -480,7 +480,7 @@ void RenderContext::drawGlyphsAsPath(GlyphRun& sourceGlyphRun, const MCState& st
     ApplyStrokeToBounds(*stroke, &bounds);
   }
   state.matrix.mapRect(&bounds);
-  if (!bounds.intersects(clipBounds)) {
+  if (!bounds.intersect(clipBounds)) {
     return;
   }
   auto rasterizeMatrix = state.matrix;
