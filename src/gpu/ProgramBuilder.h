@@ -96,12 +96,15 @@ class ProgramBuilder {
    */
   void nameExpression(std::string* output, const std::string& baseName);
 
-  void emitAndInstallGeoProc(std::string* outputColor, std::string* outputCoverage);
+  void emitAndInstallGeoProc(std::string* outputColor, std::string* outputCoverage,
+                             std::optional<std::string>* outputSubset);
 
-  void emitAndInstallFragProcessors(std::string* color, std::string* coverage);
+  void emitAndInstallFragProcessors(const std::optional<std::string>& subset, std::string* color,
+                                    std::string* coverage);
 
   std::string emitAndInstallFragProc(const FragmentProcessor* processor,
-                                     size_t transformedCoordVarsIdx, const std::string& input);
+                                     size_t transformedCoordVarsIdx, const std::string& input,
+                                     const std::optional<std::string>& subset);
 
   void emitAndInstallXferProc(const std::string& colorIn, const std::string& coverageIn);
 

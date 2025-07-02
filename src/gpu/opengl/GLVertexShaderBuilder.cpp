@@ -17,11 +17,18 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLVertexShaderBuilder.h"
+#include "GLProgramBuilder.h"
+#include "gpu/ProgramBuilder.h"
 
 namespace tgfx {
 GLVertexShaderBuilder::GLVertexShaderBuilder(ProgramBuilder* program)
     : VertexShaderBuilder(program) {
-  setPrecisionQualifier("precision mediump float;");
+  auto glProgram = static_cast<GLProgramBuilder*>(program);
+  // Skia determines type precision by both data type and platform. Since TGFX currently doesn't
+  // utilize low-precision types, the precision is configured directly based on the platform.
+  if (glProgram->isDesktopGL()) {
+    setPrecisionQualifier("precision highp float;");
+  }
 }
 
 void GLVertexShaderBuilder::emitNormalizedPosition(const std::string& devPos) {

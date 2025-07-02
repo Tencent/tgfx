@@ -206,12 +206,13 @@ class FragmentProcessor : public Processor {
   struct EmitArgs {
     EmitArgs(FragmentShaderBuilder* fragBuilder, UniformHandler* uniformHandler,
              std::string outputColor, std::string inputColor,
-             const TransformedCoordVars* transformedCoords, const TextureSamplers* textureSamplers,
+             std::optional<std::string> inputSubset, const TransformedCoordVars* transformedCoords,
+             const TextureSamplers* textureSamplers,
              std::function<std::string(std::string_view)> coordFunc = {})
         : fragBuilder(fragBuilder), uniformHandler(uniformHandler),
           outputColor(std::move(outputColor)), inputColor(std::move(inputColor)),
           transformedCoords(transformedCoords), textureSamplers(textureSamplers),
-          coordFunc(std::move(coordFunc)) {
+          coordFunc(std::move(coordFunc)), inputSubset(std::move(inputSubset)) {
     }
 
     /**
@@ -238,6 +239,10 @@ class FragmentProcessor : public Processor {
      */
     const TextureSamplers* textureSamplers;
     const std::function<std::string(std::string_view)> coordFunc;
+    /**
+     * Optional input subset name, if the stage needs to use a subset of the input texture.
+     */
+    const std::optional<std::string> inputSubset;
   };
 
   /**

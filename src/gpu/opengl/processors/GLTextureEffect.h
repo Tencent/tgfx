@@ -36,6 +36,6 @@ class GLTextureEffect : public TextureEffect {
   void onSetData(UniformBuffer* uniformBuffer) const override;
   void appendClamp(FragmentShaderBuilder* fragBuilder, const std::string& vertexColor,
                    const std::string& finalCoordName, const std::string& subsetName,
-                   bool extraSubset) const;
+                   const std::string& extraSubsetName) const;
 };
 }  // namespace tgfx

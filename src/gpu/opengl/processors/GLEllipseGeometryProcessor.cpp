@@ -62,8 +62,7 @@ void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   // Setup position
   args.vertBuilder->emitNormalizedPosition(inPosition.name());
   // emit transforms
-  emitTransforms(vertBuilder, varyingHandler, uniformHandler, inPosition.asShaderVar(),
-                 args.fpCoordTransformHandler);
+  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, inPosition.asShaderVar());
   // For stroked ellipses, we use the full ellipse equation (x^2/a^2 + y^2/b^2 = 1)
   // to compute both the edges because we need two separate test equations for
   // the single offset.

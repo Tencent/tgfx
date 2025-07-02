@@ -42,20 +42,8 @@ void GLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
   varyingHandler->emitAttributes(*this);
 
   auto uvCoordsVar = uvCoord.isInitialized() ? uvCoord.asShaderVar() : position.asShaderVar();
-  emitTransforms(vertBuilder, varyingHandler, uniformHandler, uvCoordsVar,
-                 args.fpCoordTransformHandler);
-  if (subset.isInitialized()) {
-    auto varying = varyingHandler->addVarying("vTexSubset", SLType::Float4, true);
-    std::string subsetMatrixName = "CoordTransformMatrix_0_P0";
-    if (!uvCoord.isInitialized()) {
-      subsetMatrixName =
-          uniformHandler->addUniform(ShaderFlags::Vertex, SLType::Float3x3, "texSubsetMatrix");
-    }
-    vertBuilder->codeAppendf("%s.xy = (vec3(%s.xy, 1) * %s).xy;", varying.vsOut().c_str(),
-                             subset.name().c_str(), subsetMatrixName.c_str());
-    vertBuilder->codeAppendf("%s.zw = (vec3(%s.zw, 1) * %s).xy;", varying.vsOut().c_str(),
-                             subset.name().c_str(), subsetMatrixName.c_str());
-  }
+  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, uvCoordsVar);
+
   if (aa == AAType::Coverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
     vertBuilder->codeAppendf("%s = %s;", coverageVar.vsOut().c_str(), coverage.name().c_str());
@@ -95,4 +83,23 @@ void GLQuadPerEdgeAAGeometryProcessor::onSetTransformData(UniformBuffer* uniform
     uniformBuffer->setData("texSubsetMatrix", coordTransform->getTotalMatrix());
   }
 }
+
+void GLQuadPerEdgeAAGeometryProcessor::onEmitTransform(
+    EmitArgs& args, VertexShaderBuilder* vertexBuilder, VaryingHandler* varyingHandler,
+    UniformHandler* uniformHandler, const std::string& transformUniformName, int index) const {
+  if (index == 0 && subset.isInitialized()) {
+    auto varying = varyingHandler->addVarying("vTexSubset", SLType::Float4, true);
+    std::string subsetMatrixName = transformUniformName;
+    if (!uvCoord.isInitialized()) {
+      subsetMatrixName =
+          uniformHandler->addUniform(ShaderFlags::Vertex, SLType::Float3x3, "texSubsetMatrix");
+    }
+    vertexBuilder->codeAppendf("%s.xy = (vec3(%s.xy, 1) * %s).xy;", varying.vsOut().c_str(),
+                               subset.name().c_str(), subsetMatrixName.c_str());
+    vertexBuilder->codeAppendf("%s.zw = (vec3(%s.zw, 1) * %s).xy;", varying.vsOut().c_str(),
+                               subset.name().c_str(), subsetMatrixName.c_str());
+    args.outputSubset = varying.fsIn();
+  }
+}
+
 }  // namespace tgfx

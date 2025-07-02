@@ -41,15 +41,17 @@ ProgramBuilder::ProgramBuilder(Context* context, const Pipeline* pipeline)
 bool ProgramBuilder::emitAndInstallProcessors() {
   std::string inputColor;
   std::string inputCoverage;
-  emitAndInstallGeoProc(&inputColor, &inputCoverage);
-  emitAndInstallFragProcessors(&inputColor, &inputCoverage);
+  std::optional<std::string> inputSubset;
+  emitAndInstallGeoProc(&inputColor, &inputCoverage, &inputSubset);
+  emitAndInstallFragProcessors(inputSubset, &inputColor, &inputCoverage);
   emitAndInstallXferProc(inputColor, inputCoverage);
   emitFSOutputSwizzle();
 
   return checkSamplerCounts();
 }
 
-void ProgramBuilder::emitAndInstallGeoProc(std::string* outputColor, std::string* outputCoverage) {
+void ProgramBuilder::emitAndInstallGeoProc(std::string* outputColor, std::string* outputCoverage,
+                                           std::optional<std::string>* outputSubset) {
   // We don't want the RTAdjustName to be mangled, so we add it to the uniform handler before the
   // processor guard.
   uniformHandler()->addUniform(ShaderFlags::Vertex, SLType::Float4, RTAdjustName);
@@ -72,9 +74,11 @@ void ProgramBuilder::emitAndInstallGeoProc(std::string* outputColor, std::string
                                    *outputCoverage, &transformHandler);
   geometryProcessor->emitCode(args);
   fragmentShaderBuilder()->codeAppend("}");
+  *outputSubset = args.outputSubset;
 }
 
-void ProgramBuilder::emitAndInstallFragProcessors(std::string* color, std::string* coverage) {
+void ProgramBuilder::emitAndInstallFragProcessors(const std::optional<std::string>& inputSubset,
+                                                  std::string* color, std::string* coverage) {
   size_t transformedCoordVarsIdx = 0;
   std::string** inOut = &color;
   for (size_t i = 0; i < pipeline->numFragmentProcessors(); ++i) {
@@ -82,7 +86,7 @@ void ProgramBuilder::emitAndInstallFragProcessors(std::string* color, std::strin
       inOut = &coverage;
     }
     const auto* fp = pipeline->getFragmentProcessor(i);
-    auto output = emitAndInstallFragProc(fp, transformedCoordVarsIdx, **inOut);
+    auto output = emitAndInstallFragProc(fp, transformedCoordVarsIdx, **inOut, inputSubset);
     FragmentProcessor::Iter iter(fp);
     while (const FragmentProcessor* tempFP = iter.next()) {
       transformedCoordVarsIdx += tempFP->numCoordTransforms();
@@ -101,7 +105,8 @@ static const T* GetPointer(const std::vector<T>& vector, size_t atIndex) {
 
 std::string ProgramBuilder::emitAndInstallFragProc(const FragmentProcessor* processor,
                                                    size_t transformedCoordVarsIdx,
-                                                   const std::string& input) {
+                                                   const std::string& input,
+                                                   const std::optional<std::string>& subset) {
   ProcessorGuard processorGuard(this, processor);
   std::string output;
   nameExpression(&output, "output");
@@ -124,7 +129,7 @@ std::string ProgramBuilder::emitAndInstallFragProc(const FragmentProcessor* proc
   FragmentProcessor::TransformedCoordVars coords(
       processor, GetPointer(transformedCoordVars, transformedCoordVarsIdx));
   FragmentProcessor::TextureSamplers textureSamplers(processor, GetPointer(texSamplers, 0));
-  FragmentProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), output, input,
+  FragmentProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), output, input, subset,
                                    &coords, &textureSamplers);
 
   processor->emitCode(args);
