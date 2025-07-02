@@ -16,22 +16,40 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/PathEffect.h"
+#pragma once
+
+#include <memory>
+#include "Atlas.h"
+#include "AtlasTypes.h"
 
 namespace tgfx {
-class AdaptiveDashEffect : public PathEffect {
+class AtlasManager : public AtlasGenerationCounter {
  public:
-  // Maximum number of dashes allowed in the intervals array.
-  // Reference Skia's implementation to prevent excessive memory usage when dashing very long paths.
-  static constexpr float MaxDashCount = 1000000;
+  explicit AtlasManager(Context* context);
 
-  AdaptiveDashEffect(const float intervals[], int count, float phase);
+  const std::vector<std::shared_ptr<TextureProxy>>& getTextureProxies(MaskFormat maskFormat);
 
-  bool filterPath(Path* path) const override;
+  bool getCellLocator(MaskFormat, const BytesKey& key, AtlasCellLocator& locator) const;
+
+  bool addCellToAtlas(const AtlasCell& cell, AtlasToken nextFlushToken, AtlasLocator&) const;
+
+  void setPlotUseToken(PlotUseUpdater&, const PlotLocator&, MaskFormat, AtlasToken) const;
+
+  void preFlush();
+
+  void postFlush();
+
+  void releaseAll();
+
+  AtlasToken nextFlushToken() const;
 
  private:
-  std::vector<float> _intervals;
-  float _phase = 0;
-  float intervalLength = 0;
+  bool initAtlas(MaskFormat format);
+
+  Atlas* getAtlas(MaskFormat format) const;
+
+  Context* context = nullptr;
+  std::unique_ptr<Atlas> atlases[MaskFormatCount];
+  AtlasTokenTracker atlasTokenTracker = {};
 };
 }  // namespace tgfx

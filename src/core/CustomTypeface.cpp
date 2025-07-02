@@ -32,8 +32,6 @@ void CustomTypefaceBuilder::setMetrics(const FontMetrics& metrics) {
   _fontMetrics = metrics;
 }
 
-//////////////
-
 GlyphID PathTypefaceBuilder::addGlyph(const Path& path) {
   if (glyphRecords.size() >= std::numeric_limits<GlyphID>::max()) {
     // Reached the maximum number of glyphs. Return an invalid GlyphID
@@ -62,8 +60,6 @@ std::shared_ptr<Typeface> PathTypefaceBuilder::detach() const {
   }
   return PathUserTypeface::Make(uniqueID, _fontFamily, _fontStyle, _fontMetrics, glyphRecords);
 }
-
-//////////////
 
 GlyphID ImageTypefaceBuilder::addGlyph(std::shared_ptr<ImageCodec> image, const Point& offset) {
   if (glyphRecords.size() >= std::numeric_limits<GlyphID>::max()) {

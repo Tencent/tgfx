@@ -274,6 +274,9 @@ static std::vector<Rect> MapDirtyRegions(const std::vector<Rect>& dirtyRegions,
   dirtyRects.reserve(dirtyRegions.size());
   for (auto& region : dirtyRegions) {
     auto dirtyRect = viewMatrix.mapRect(region);
+    if (dirtyRect.isEmpty()) {
+      continue;
+    }
     // Expand by 0.5 pixels to preserve antialiasing results.
     dirtyRect.outset(DIRTY_REGION_ANTIALIAS_MARGIN, DIRTY_REGION_ANTIALIAS_MARGIN);
     // Snap to pixel boundaries to avoid subpixel clipping artifacts.

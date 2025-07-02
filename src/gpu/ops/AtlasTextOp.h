@@ -31,7 +31,7 @@ class AtlasTextOp final : public DrawOp {
                                         PlacementPtr<RectsVertexProvider> provider,
                                         uint32_t renderFlags,
                                         std::shared_ptr<TextureProxy> textureProxy,
-                                        const SamplingOptions& sampling, const Matrix& uvMatrix);
+                                        const SamplingOptions& sampling);
   void execute(RenderPass* renderPass) override;
 
  private:
@@ -42,10 +42,9 @@ class AtlasTextOp final : public DrawOp {
   size_t vertexBufferOffset = 0;
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
   SamplingOptions sampling;
-  Matrix uvMatrix = {};
 
   explicit AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureProxy> textureProxy,
-                       const SamplingOptions& sampling, const Matrix& uvMatrix);
+                       const SamplingOptions& sampling);
 
   friend class BlockBuffer;
 };

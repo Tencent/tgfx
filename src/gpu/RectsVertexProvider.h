@@ -52,7 +52,7 @@ class RectsVertexProvider : public VertexProvider {
    */
   static PlacementPtr<RectsVertexProvider> MakeFrom(BlockBuffer* buffer,
                                                     std::vector<PlacementPtr<RectRecord>>&& rects,
-                                                    AAType aaType, bool needUVCoord,
+                                                    AAType aaType, bool hasColor, bool hasUVCoord,
                                                     UVSubsetMode subsetMode);
 
   /**

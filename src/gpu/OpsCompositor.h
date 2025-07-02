@@ -32,6 +32,7 @@ enum class PendingOpType {
   Rect,
   RRect,
   Shape,
+  Atlas,
 };
 
 /**
@@ -67,6 +68,12 @@ class OpsCompositor {
   void fillShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill);
 
   /**
+   * Fills the given rect with the given fill, using the provided texture proxy and sampling options.
+   */
+  void fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,
+                     const SamplingOptions& sampling, const MCState& state, const Fill& fill);
+
+  /**
    * Discard all pending operations.
    */
   void discardAll();
@@ -96,6 +103,7 @@ class OpsCompositor {
   Path pendingClip = {};
   Fill pendingFill = {};
   std::shared_ptr<Image> pendingImage = nullptr;
+  std::shared_ptr<TextureProxy> pendingAtlasTexture = nullptr;
   SamplingOptions pendingSampling = {};
   std::vector<PlacementPtr<RectRecord>> pendingRects = {};
   std::vector<PlacementPtr<RRectRecord>> pendingRRects = {};

@@ -21,7 +21,7 @@
 #include "GLProgramBuilder.h"
 
 namespace tgfx {
-static constexpr char kDstColorName[] = "_dstColor";
+static constexpr char DstColorName[] = "_dstColor";
 
 GLFragmentShaderBuilder::GLFragmentShaderBuilder(ProgramBuilder* program)
     : FragmentShaderBuilder(program) {
@@ -37,7 +37,7 @@ std::string GLFragmentShaderBuilder::dstColor() {
     addFeature(PrivateFeature::FramebufferFetch, caps->frameBufferFetchExtensionString);
     return caps->frameBufferFetchColorName;
   }
-  return kDstColorName;
+  return DstColorName;
 }
 
 std::string GLFragmentShaderBuilder::colorOutputName() {

@@ -159,29 +159,9 @@ PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(BlockBuffer* buf
 
 PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
     BlockBuffer* buffer, std::vector<PlacementPtr<RectRecord>>&& rects, AAType aaType,
-    bool needUVCoord, UVSubsetMode subsetMode) {
+    bool hasColor, bool hasUVCoord, UVSubsetMode subsetMode) {
   if (rects.empty()) {
     return nullptr;
-  }
-  auto hasColor = false;
-  auto hasUVCoord = false;
-  if (rects.size() > 1) {
-    auto& firstColor = rects.front()->color;
-    for (auto& record : rects) {
-      if (record->color != firstColor) {
-        hasColor = true;
-        break;
-      }
-    }
-    if (needUVCoord) {
-      auto& firstMatrix = rects.front()->viewMatrix;
-      for (auto& record : rects) {
-        if (record->viewMatrix != firstMatrix) {
-          hasUVCoord = true;
-          break;
-        }
-      }
-    }
   }
   auto array = buffer->makeArray(std::move(rects));
   if (aaType == AAType::Coverage) {

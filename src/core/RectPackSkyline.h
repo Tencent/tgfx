@@ -16,22 +16,52 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/PathEffect.h"
+#pragma once
+
+#include <vector>
+#include "tgfx/core/Point.h"
 
 namespace tgfx {
-class AdaptiveDashEffect : public PathEffect {
+class RectPackSkyline {
  public:
-  // Maximum number of dashes allowed in the intervals array.
-  // Reference Skia's implementation to prevent excessive memory usage when dashing very long paths.
-  static constexpr float MaxDashCount = 1000000;
+  RectPackSkyline(int width, int height) : _width(width), _height(height) {
+    reset();
+  }
 
-  AdaptiveDashEffect(const float intervals[], int count, float phase);
+  void reset() {
+    areaSoFar = 0;
+    skyline.clear();
+    skyline.push_back({0, 0, _width});
+  }
 
-  bool filterPath(Path* path) const override;
+  int width() const {
+    return _width;
+  }
+
+  int height() const {
+    return _height;
+  }
+
+  bool addRect(int width, int height, Point& location);
+
+  float percentFull() const {
+    return static_cast<float>(areaSoFar) / static_cast<float>(_width * _height);
+  }
 
  private:
-  std::vector<float> _intervals;
-  float _phase = 0;
-  float intervalLength = 0;
+  struct Node {
+    int x = 0;
+    int y = 0;
+    int width = 2;
+  };
+
+  bool rectangleFits(int skylineIndex, int width, int height, int& yPosition) const;
+
+  void addSkylineLevel(int skylineIndex, int x, int y, int width, int height);
+
+  std::vector<Node> skyline = {};
+  int _width = 512;
+  int _height = 512;
+  int areaSoFar = 0;
 };
 }  // namespace tgfx
