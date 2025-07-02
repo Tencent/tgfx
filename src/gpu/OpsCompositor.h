@@ -137,7 +137,8 @@ class OpsCompositor {
   void computeRectsBounds(bool needLocalBounds, bool needDeviceBounds, const Rect& clipBounds,
                           std::optional<Rect>& localBounds,
                           std::optional<Rect>& deviceBounds) const;
-  void computeRRectsBounds(const Rect& clipBounds, std::optional<Rect>& localBounds,
+  void computeRRectsBounds(bool needBounds, const Rect& clipBounds,
+                           std::optional<Rect>& localBounds,
                            std::optional<Rect>& deviceBounds) const;
   friend class DrawingManager;
 };

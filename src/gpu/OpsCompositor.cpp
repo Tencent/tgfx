@@ -263,10 +263,11 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     clipBounds = getClipBounds(clip);
     localBounds = Rect::MakeEmpty();
   }
-  if (hasImageFill) {
+
+  if (type == PendingOpType::RRect) {
+    computeRRectsBounds(needLocalBounds || needDeviceBounds, clipBounds, localBounds, deviceBounds);
+  } else {
     computeRectsBounds(needLocalBounds, needDeviceBounds, clipBounds, localBounds, deviceBounds);
-  } else if (type == PendingOpType::RRect && (needLocalBounds || needDeviceBounds)) {
-    computeRRectsBounds(clipBounds, localBounds, deviceBounds);
   }
   switch (type) {
     case PendingOpType::Rect:
@@ -647,8 +648,12 @@ void OpsCompositor::computeRectsBounds(bool needLocalBounds, bool needDeviceBoun
   }
 }
 
-void OpsCompositor::computeRRectsBounds(const Rect& clipBounds, std::optional<Rect>& localBounds,
+void OpsCompositor::computeRRectsBounds(bool needBounds, const Rect& clipBounds,
+                                        std::optional<Rect>& localBounds,
                                         std::optional<Rect>& deviceBounds) const {
+  if (!needBounds) {
+    return;
+  }
   deviceBounds = Rect::MakeEmpty();
   for (auto& record : pendingRRects) {
     auto rect = record->viewMatrix.mapRect(record->rRect.rect);
