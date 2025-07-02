@@ -22,15 +22,20 @@
 
 namespace tgfx {
 
-class LayerInspectorManager {
+class LayerViewerManager final {
  public:
-  static LayerInspectorManager& GetLayerInspectorManager() {
-    static LayerInspectorManager instance;
+  static LayerViewerManager& GetLayerInspectorManager() {
+    static LayerViewerManager instance;
     return instance;
   }
 
-  void pickedLayer(float x, float y);
-  void setLayerInspectorHoveredStateCallBack(std::function<void(bool)> callback);
+  LayerViewerManager(const LayerViewerManager&) = delete;
+  LayerViewerManager(LayerViewerManager&&) = delete;
+  LayerViewerManager& operator=(const LayerViewerManager&) = delete;
+  LayerViewerManager& operator=(LayerViewerManager&&) = delete;
+
+  void pickLayer(float x, float y);
+  bool getLayerViewerHoveredState();
 
   void setDisplayList(tgfx::DisplayList* displayList);
   void serializingLayerTree();
@@ -43,7 +48,7 @@ class LayerInspectorManager {
   void AddHighLightOverlay(Color color, std::shared_ptr<Layer> hovedLayer);
   void SendPickedLayerAddress(const std::shared_ptr<tgfx::Layer>& layer);
   void SendFlushAttributeAck(uint64_t address);
-  LayerInspectorManager();
+  LayerViewerManager();
 
  private:
   std::unordered_map<uint64_t, std::shared_ptr<tgfx::Layer>> layerMap;
@@ -59,7 +64,6 @@ class LayerInspectorManager {
   int highLightLayerIndex = 0;
   bool hoverdSwitch = false;
   tgfx::DisplayList* displayList;
-  std::function<void(bool)> hoveredCallBack;
 };
 
 }  // namespace tgfx

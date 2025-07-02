@@ -27,7 +27,6 @@
 #include "tgfx/layers/Layer.h"
 
 namespace tgfx {
-extern const std::string HighLightLayerName;
 
 std::shared_ptr<Data> LayerSerialization::SerializeLayer(
     const Layer* layer, SerializeUtils::ComplexObjSerMap* map,

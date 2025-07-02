@@ -1,61 +1,68 @@
+/////////////////////////////////////////////////////////////////////////////////////////////////
+//
+//  Tencent is pleased to support the open source community by making tgfx available.
+//
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//
+//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
+//  in compliance with the License. You may obtain a copy of the License at
+//
+//      https://opensource.org/licenses/BSD-3-Clause
+//
+//  unless required by applicable law or agreed to in writing, software distributed under the
+//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
+//  either express or implied. see the license for the specific language governing permissions
+//  and limitations under the license.
+//
+/////////////////////////////////////////////////////////////////////////////////////////////////
 #include "LayerProfiler.h"
 #include <chrono>
 #include <thread>
-#include "Alloc.h"
+#include "ProcessUtils.h"
 #include "Protocol.h"
-#include "Utils.h"
 
 namespace inspector {
 
-static LayerProfiler s_layer_profiler;
+static std::shared_ptr<LayerProfiler> LayerProfilerInstance = nullptr;
 
 #ifndef __EMSCRIPTEN__
-static uint16_t port = 8084;
 static const char* addr = "255.255.255.255";
 static uint16_t broadcastPort = 8086;
 #endif
 
+void LayerProfiler::InitLayerProfiler() {
+  LayerProfilerInstance = std::make_shared<LayerProfiler>();
+}
 void LayerProfiler::SendLayerData(const std::vector<uint8_t>& data) {
-  s_layer_profiler.setData(data);
+  LayerProfilerInstance->setData(data);
 }
 void LayerProfiler::SetLayerCallBack(std::function<void(const std::vector<uint8_t>&)> callback) {
-  s_layer_profiler.setCallBack(callback);
+  LayerProfilerInstance->setCallBack(callback);
 }
 
-LayerProfiler::LayerProfiler() {
+LayerProfiler::LayerProfiler(){
 #ifdef __EMSCRIPTEN__
 #else
-  listenSocket = new ListenSocket();
+  listenSocket = std::make_shared<ListenSocket>();
+  portProvider = std::make_shared<TCPPortProvider>();
   for (uint16_t i = 0; i < broadcastNum; i++) {
-    broadcast[i] = new UdpBroadcast();
-    isUDPOpened = isUDPOpened && broadcast[i]->Open(addr, broadcastPort + i);
+    broadcasts[i] = std::make_shared<UdpBroadcast>();
+    isUDPOpened = isUDPOpened && broadcasts[i]->Open(addr, broadcastPort + i);
   }
 
 #endif
-  epoch = std::chrono::duration_cast<std::chrono::seconds>(
-              std::chrono::system_clock::now().time_since_epoch())
-              .count();
+  epoch = GetCurrentTimeInSeconds();
   spawnWorkTread();
 }
 
 LayerProfiler::~LayerProfiler() {
   stopFlag.store(true, std::memory_order_release);
-  sendThread->join();
-  recvThread->join();
-#ifdef __EMSCRIPTEN__
-#else
-  if (socket) {
-    inspectorFree(socket);
+  if(sendThread && sendThread->joinable()) {
+    sendThread->join();
   }
-  if (listenSocket) {
-    delete listenSocket;
+  if(recvThread && recvThread->joinable()) {
+    recvThread->join();
   }
-  for (uint16_t i = 0; i < broadcastNum; i++) {
-    if (broadcast[i]) {
-      delete broadcast[i];
-    }
-  }
-#endif
 }
 
 void LayerProfiler::sendWork() {
@@ -66,20 +73,12 @@ void LayerProfiler::sendWork() {
   }
   const auto procname = GetProcessName();
   const auto pnsz = std::min<size_t>(strlen(procname), WelcomeMessageProgramNameSize - 1);
-  bool isListening = false;
-  for (uint16_t i = 0; i < 20; ++i) {
-    if (listenSocket->Listen(port - i, 4)) {
-      port -= i;
-      isListening = true;
-      break;
-    }
-  }
-  if (!isListening) {
+  uint16_t port = portProvider->getValidPort();
+  if (!listenSocket->Listen(port, 4)) {
     return;
   }
-
   size_t broadcastLen = 0;
-  auto broadcastMsg = GetBroadcastMessage(procname, pnsz, broadcastLen, port, LayerTree);
+  auto broadcastMsg = GetBroadcastMessage(procname, pnsz, broadcastLen, port, static_cast<uint8_t>(MsgType::LayerTree));
   long long lastBroadcast = 0;
   while (!stopFlag.load(std::memory_order_acquire)) {
     while (!stopFlag.load(std::memory_order_acquire)) {
@@ -88,12 +87,10 @@ void LayerProfiler::sendWork() {
       if (t - lastBroadcast > 3000000000) {
         lastBroadcast = t;
         for (uint16_t i = 0; i < broadcastNum; i++) {
-          if (broadcast[i]) {
-            const auto ts = std::chrono::duration_cast<std::chrono::seconds>(
-                                std::chrono::system_clock::now().time_since_epoch())
-                                .count();
-            broadcastMsg.activeTime = int32_t(ts - epoch);
-            broadcast[i]->Send(broadcastPort + i, &broadcastMsg, broadcastLen);
+          if (broadcasts[i]) {
+            const auto ts = GetCurrentTimeInSeconds();
+            broadcastMsg.activeTime = static_cast<int32_t>(ts - epoch);
+            broadcasts[i]->Send(broadcastPort + i, &broadcastMsg, broadcastLen);
           }
         }
       }
@@ -112,10 +109,8 @@ void LayerProfiler::sendWork() {
         std::vector<uint8_t> data;
         if(queue.try_dequeue(data)) {
           int size = (int)data.size();
-          if (socket) {
-            socket->Send(&size, sizeof(int));
-            socket->Send(data.data(), data.size());
-          }
+          socket->Send(&size, sizeof(int));
+          socket->Send(data.data(), data.size());
         }
       }
     }
@@ -135,8 +130,7 @@ void LayerProfiler::recvWork() {
       int flag1 = socket->ReadUpTo(data.data(), (size_t)size);
       messages.push(std::move(data));
       if (!flag || !flag1) {
-        inspectorFree(socket);
-        socket = nullptr;
+        socket.reset();
       }
     }
     if (!messages.empty()) {
@@ -159,8 +153,6 @@ void LayerProfiler::setData(const std::vector<uint8_t>& data) {
   queue.enqueue(data);
 }
 void LayerProfiler::setCallBack(std::function<void(const std::vector<uint8_t>&)> callback) {
-  if (!this->callback) {
-    this->callback = callback;
-  }
+    this->callback = std::move(callback);
 }
 }  // namespace inspector

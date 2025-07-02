@@ -46,6 +46,8 @@ std::shared_ptr<Data> RecordedContentSerialization::Serialize(
     case Types::LayerContentType::Contour:
       SerializeContourContentImpl(fbb, content, map, rosMap);
       break;
+    default:
+      DEBUG_ASSERT(false);
   }
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());

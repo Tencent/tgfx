@@ -45,9 +45,8 @@
 #include <cassert>
 #include <cinttypes>
 #include <cstdio>
-#include "Alloc.h"
+#include "ProcessUtils.h"
 #include "Socket.h"
-#include "Utils.h"
 
 #ifndef MSG_NOSIGNAL
 #  define MSG_NOSIGNAL 0
@@ -63,17 +62,17 @@ typedef int socket_t;
 enum { BufSize = 128 * 1024 };
 
 Socket::Socket()
-    : buf((char*)inspectorMalloc(BufSize)), bufPtr(nullptr), sock(-1), bufLeft(0), res(nullptr),
+    : buf((char*)malloc(BufSize)), bufPtr(nullptr), sock(-1), bufLeft(0), res(nullptr),
       ptr(nullptr), connSock(0) {
 }
 
 Socket::Socket(int sock)
-    : buf((char*)inspectorMalloc(BufSize)), bufPtr(nullptr), sock(sock), bufLeft(0), res(nullptr),
+    : buf((char*)malloc(BufSize)), bufPtr(nullptr), sock(sock), bufLeft(0), res(nullptr),
       ptr(nullptr), connSock(0) {
 }
 
 Socket::~Socket() {
-  inspectorFree(buf);
+  free(buf);
   if (sock.load(std::memory_order_relaxed) != -1) {
     Close();
   }
@@ -435,7 +434,7 @@ ListenSocket::~ListenSocket() {
   }
 }
 
-static int addrinfo_and_socket_for_family(uint16_t port, int ai_family, struct addrinfo** res) {
+static int AddrinfoAndSocketForFamily(uint16_t port, int ai_family, struct addrinfo** res) {
   struct addrinfo hints;
   memset(&hints, 0, sizeof(hints));
   hints.ai_family = ai_family;
@@ -457,11 +456,11 @@ bool ListenSocket::Listen(uint16_t port, int backlog) {
   assert(this->sock == -1);
 
   struct addrinfo* res = nullptr;
-  this->sock = addrinfo_and_socket_for_family(port, AF_INET6, &res);
+  this->sock = AddrinfoAndSocketForFamily(port, AF_INET6, &res);
   if (this->sock == -1) {
     // IPV6 protocol may not be available/is disabled. Try to create a socket
     // with the IPV4 protocol
-    this->sock = addrinfo_and_socket_for_family(port, AF_INET, &res);
+    this->sock = AddrinfoAndSocketForFamily(port, AF_INET, &res);
     if (this->sock == -1) {
       return false;
     }
@@ -494,7 +493,7 @@ bool ListenSocket::Listen(uint16_t port, int backlog) {
   return true;
 }
 
-Socket* ListenSocket::Accept() {
+std::shared_ptr<Socket> ListenSocket::Accept() {
   struct sockaddr_storage remote;
   socklen_t sz = sizeof(remote);
 
@@ -513,8 +512,8 @@ Socket* ListenSocket::Accept() {
     setsockopt(sock, SOL_SOCKET, SO_NOSIGPIPE, &val, sizeof(val));
 #endif
 
-    auto ptr = (Socket*)inspectorMalloc(sizeof(Socket));
-    new (ptr) Socket(sock);
+    auto ptr = std::make_shared<Socket>(sock);
+
     return ptr;
   } else {
     return nullptr;
@@ -607,7 +606,7 @@ void UdpBroadcast::Close() {
 }
 
 int UdpBroadcast::Send(uint16_t port, const void* data, size_t len) {
-  char strAddr[17];
+  char strAddr[17] = {};
   inet_ntop(AF_INET, &this->addr, strAddr, 17);
   assert(this->sock != -1);
   struct sockaddr_in addr;

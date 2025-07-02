@@ -24,8 +24,8 @@
 #include "SerializationUtils.h"
 
 namespace tgfx {
+static const std::string HighLightLayerName = "HighLightLayer";
 class Layer;
-
 class LayerSerialization {
  public:
   static std::shared_ptr<Data> SerializeTreeNode(

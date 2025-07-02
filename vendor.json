@@ -249,6 +249,15 @@
           "-DFLATBUFFERS_BUILD_CPP17=ON"
         ]
       }
+    },
+    {
+      "name": "inspector",
+      "dir": "../inspector",
+      "cmake": {
+        "targets": [
+          "inspector"
+        ]
+      }
     }
   ]
 }

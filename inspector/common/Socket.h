@@ -85,7 +85,7 @@ class ListenSocket {
   ~ListenSocket();
 
   bool Listen(uint16_t port, int backlog);
-  Socket* Accept();
+  std::shared_ptr<Socket> Accept();
   void Close();
 
   ListenSocket(const ListenSocket&) = delete;

@@ -21,10 +21,20 @@
 
 namespace tgfx {
 
-class LayerInspector {
+class LayerViewer {
  public:
-  static void pickedLayer(float x, float y);
-  static void setLayerInspectorHoveredStateCallBack(std::function<void(bool)> callback);
+  /**
+   * Return the Hovered toggle state of layerViewer. When the return value is true, it indicates
+   * that the toggle is switched on. The business logic should replace the original left mouse
+   * button selection handling with a call to the PickLayer function when the left mouse button
+   * is clicked, passing the current mouse coordinates as an argument.
+   */
+  static bool GetLayerViewerHoveredState();
+
+  /**
+   * Set the mouse coordinates to pick the corresponding topmost layer.
+   */
+  static void PickLayer(float x, float y);
 };
 
 }  // namespace tgfx

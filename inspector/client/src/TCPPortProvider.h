@@ -15,25 +15,16 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#include "tgfx/layers/LayerInspector.h"
-#ifdef TGFX_USE_INSPECTOR
-#include "layers/LayerInspectorManager.h"
-#endif
-
-void tgfx::LayerInspector::pickedLayer(float x, float y) {
-#ifdef TGFX_USE_INSPECTOR
-  LayerInspectorManager::GetLayerInspectorManager().pickedLayer(x, y);
-#else
-  (void)x;
-  (void)y;
-#endif
+#pragma once
+#include <cstdint>
+#include <set>
+namespace inspector {
+class TCPPortProvider {
+public:
+  TCPPortProvider() = default;
+  uint16_t getValidPort();
+private:
+  std::set<uint16_t> usedPortSet = {};
+};
 }
 
-void tgfx::LayerInspector::setLayerInspectorHoveredStateCallBack(
-    std::function<void(bool)> callback) {
-#ifdef TGFX_USE_INSPECTOR
-  LayerInspectorManager::GetLayerInspectorManager().setLayerInspectorHoveredStateCallBack(callback);
-#else
-  (void)callback;
-#endif
-}

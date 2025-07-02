@@ -37,7 +37,8 @@
 #endif
 
 #include <cinttypes>
-#include "Utils.h"
+#include <chrono>
+#include "ProcessUtils.h"
 
 namespace inspector {
 uint64_t GetPid() {
@@ -79,6 +80,12 @@ BroadcastMessage GetBroadcastMessage(const char* procname, size_t pnsz, size_t& 
   memset(msg.programName + pnsz, 0, WelcomeMessageProgramNameSize - pnsz);
   len = offsetof(BroadcastMessage, programName) + pnsz + 1;
   return msg;
+}
+
+int64_t GetCurrentTimeInSeconds() {
+  return std::chrono::duration_cast<std::chrono::seconds>(
+                                std::chrono::system_clock::now().time_since_epoch())
+                                .count();
 }
 
 }  // namespace inspector

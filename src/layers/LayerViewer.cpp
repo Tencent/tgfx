@@ -15,25 +15,24 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+#include "tgfx/layers/LayerViewer.h"
+#ifdef TGFX_USE_INSPECTOR
+#include "layers/LayerViewerManager.h"
+#endif
 
-#pragma once
-namespace inspector {
+void tgfx::LayerViewer::PickLayer(float x, float y) {
+#ifdef TGFX_USE_INSPECTOR
+  LayerViewerManager::GetLayerInspectorManager().pickLayer(x, y);
+#else
+  (void)x;
+  (void)y;
+#endif
+}
 
-inline constexpr int broadcastNum = 5;
-
-inline constexpr uint64_t WelcomeMessageProgramNameSize = 64;
-inline constexpr uint8_t ProtocolVersion = 1;
-inline constexpr uint16_t BroadcastVersion = 1;
-
-enum class MsgType : uint8_t { FrameCapture = 0, LayerTree = 1 };
-
-struct BroadcastMessage {
-  uint8_t type;
-  uint16_t listenPort;
-  uint32_t protocolVersion;
-  uint64_t pid;
-  int32_t activeTime;  // in seconds
-  char programName[WelcomeMessageProgramNameSize];
-};
-
-}  // namespace inspector
+bool tgfx::LayerViewer::GetLayerViewerHoveredState() {
+#ifdef TGFX_USE_INSPECTOR
+  return LayerViewerManager::GetLayerInspectorManager().getLayerViewerHoveredState();
+#else
+  return false;
+#endif
+}
