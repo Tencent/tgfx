@@ -238,9 +238,6 @@ class FragmentProcessor : public Processor {
      */
     const TextureSamplers* textureSamplers;
     const std::function<std::string(std::string_view)> coordFunc;
-    /**
-     * Optional input subset name, if the stage needs to use a subset of the input texture.
-     */
     const std::string inputSubset;
   };
 

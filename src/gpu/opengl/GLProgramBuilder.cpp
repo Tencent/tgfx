@@ -129,7 +129,7 @@ std::string GLProgramBuilder::getShaderVarDeclarations(const ShaderVar& var,
     ret += " ";
   }
 
-  if (!isDesktopGL()) {
+  if (context->caps()->usesPrecisionModifiers) {
     ret += SLTypePrecision(var.type());
     ret += " ";
   }

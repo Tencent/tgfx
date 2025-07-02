@@ -51,5 +51,6 @@ class Caps {
   bool mipmapSupport = true;
   bool textureBarrierSupport = false;
   bool frameBufferFetchSupport = false;
+  bool usesPrecisionModifiers = false;
 };
 }  // namespace tgfx

@@ -45,10 +45,8 @@ void GLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
       uniformHandler->addUniform(ShaderFlags::Vertex, SLType::Float2, atlasSizeUniformName);
 
   auto samplerVarying = varyingHandler->addVarying("textureCoords", SLType::Float2);
-
   emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, position.asShaderVar());
   auto uvName = maskCoord.asShaderVar().name();
-
   vertBuilder->codeAppendf("%s = %s * %s;", samplerVarying.vsOut().c_str(), uvName.c_str(),
                            atlasName.c_str());
 

@@ -291,6 +291,7 @@ void GLCaps::initGLESSupport(const GLInfo& info) {
   }
   npotTextureTileSupport = version >= GL_VER(3, 0) || info.hasExtension("GL_OES_texture_npot");
   mipmapSupport = npotTextureTileSupport || info.hasExtension("GL_IMG_texture_npot");
+  usesPrecisionModifiers = true;
 }
 
 void GLCaps::initWebGLSupport(const GLInfo& info) {
@@ -307,6 +308,7 @@ void GLCaps::initWebGLSupport(const GLInfo& info) {
   clampToBorderSupport = false;
   npotTextureTileSupport = version >= GL_VER(2, 0);
   mipmapSupport = npotTextureTileSupport;
+  usesPrecisionModifiers = true;
 }
 
 void GLCaps::initFormatMap(const GLInfo& info) {

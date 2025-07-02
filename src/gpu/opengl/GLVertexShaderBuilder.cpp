@@ -24,7 +24,7 @@ namespace tgfx {
 GLVertexShaderBuilder::GLVertexShaderBuilder(ProgramBuilder* program)
     : VertexShaderBuilder(program) {
   auto glProgram = static_cast<GLProgramBuilder*>(program);
-  if (!glProgram->isDesktopGL()) {
+  if (glProgram->getContext()->caps()->usesPrecisionModifiers) {
     setPrecisionQualifier("precision mediump float;");
   }
 }
