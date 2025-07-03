@@ -16,9 +16,13 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <vector>
+#include <array>
+#include <utility>
+#include "core/utils/BlockBuffer.h"
 #include "core/utils/UniqueID.h"
+#include "gpu/RectsVertexProvider.h"
 #include "gpu/Resource.h"
+#include "tgfx/core/Rect.h"
 #include "tgfx/core/Task.h"
 #include "utils/TestUtils.h"
 
@@ -59,5 +63,20 @@ TGFX_TEST(ResourceCacheTest, multiThreadRecycling) {
       });
     }
   });
+};
+
+#ifdef TGFX_USE_THREADS
+TGFX_TEST(ResourceCacheTest, blockBufferRefCount) {
+  BlockBuffer blockBuffer;
+  {
+    auto vertexProvider =
+        RectsVertexProvider::MakeFrom(&blockBuffer, Rect::MakeWH(100, 100), AAType::Coverage);
+    std::array<float, 16> vertices;
+    auto task = std::make_shared<VertexProviderTask>(std::move(vertexProvider), vertices.data());
+    Task::Run(task);
+  }
+  blockBuffer.clear();
 }
+#endif
+
 }  // namespace tgfx

@@ -26,7 +26,7 @@ class GLAtlasTextGeometryProcessor : public AtlasTextGeometryProcessor {
  public:
   GLAtlasTextGeometryProcessor(std::shared_ptr<TextureProxy> textureProxy,
                                const SamplingOptions& sampling, AAType aa,
-                               std::optional<Color> commonColor, const Matrix& uvMatrix);
+                               std::optional<Color> commonColor);
   void emitCode(EmitArgs&) const override;
 
   void setData(UniformBuffer* uniformBuffer,

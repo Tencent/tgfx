@@ -36,6 +36,7 @@ template <typename T>
 class PlacementPtr;
 class FPArgs;
 class TPArgs;
+class SamplingArgs;
 class Context;
 class ImageFilter;
 class FragmentProcessor;
@@ -106,11 +107,14 @@ class Image {
                                          YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED);
 
   /**
-   * Creates an Image from the given picture with the specified width, height, and matrix.
-   * The picture will be drawn onto the Image using the provided matrix. The returned Image holds a
-   * reference to the picture and replays the drawing commands until it is actually required.
-   * Note: This method may return a different type of Image other than PictureImage if the picture
-   * is simple enough.
+   * Creates an Image from the given picture with the specified width, height, and matrix. The
+   * picture will be drawn onto the Image using the provided matrix. The returned Image keeps a
+   * reference to the picture and replays its drawing commands only when needed. A PictureImage is
+   * not rasterized and does not cache its content, so it can render just the required portions of
+   * the picture to a temporary offscreen image. To cache the entire content at full size, use the
+   * makeRasterized() method on the PictureImage. Note: This method may return a different type of
+   * Image instead of PictureImage if the picture is simple enough to be treated directly as an
+   * Image.
    * @param picture A stream of drawing commands.
    * @param width The width of the Image.
    * @param height The height of the Image.
@@ -330,15 +334,11 @@ class Image {
   /**
    * Returns a fragment processor for the entire Image.
    * @param args The FPArgs used to create the fragment processor.
-   * @param tileModeX The tile mode applied in the x direction.
-   * @param tileModeY The tile mode applied in the y direction.
-   * @param sampling The sampling options used when sampling the Image.
+   * @param samplingArgs The SamplingArgs used to sample the Image.
    * @param uvMatrix The matrix used to transform the uv coordinates.
    */
   virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                              TileMode tileModeX,
-                                                              TileMode tileModeY,
-                                                              const SamplingOptions& sampling,
+                                                              const SamplingArgs& samplingArgs,
                                                               const Matrix* uvMatrix) const = 0;
 
   friend class FragmentProcessor;

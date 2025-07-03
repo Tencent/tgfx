@@ -71,7 +71,7 @@ class ResourceCache {
    * Returns the number of frames (valid flushes) after which unused GPU resources are considered
    * expired. A 'frame' is defined as a non-empty flush where actual rendering work is performed and
    * commands are submitted to the GPU. If a GPU resource is not used for more than this number of
-   * frames, it will be automatically purged from the cache. The default value is 10 frames.
+   * frames, it will be automatically purged from the cache. The default value is 60 frames.
    */
   size_t expirationFrames() const {
     return _expirationFrames;
@@ -122,7 +122,7 @@ class ResourceCache {
   size_t maxBytes = 512 * (1 << 20);  // 512MB
   size_t totalBytes = 0;
   size_t purgeableBytes = 0;
-  size_t _expirationFrames = 10;
+  size_t _expirationFrames = 60;
   std::chrono::steady_clock::time_point currentFrameTime = {};
   std::deque<std::chrono::steady_clock::time_point> frameTimes = {};
   std::list<Resource*> nonpurgeableResources = {};

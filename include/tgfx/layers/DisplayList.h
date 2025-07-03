@@ -50,11 +50,14 @@ enum class RenderMode {
   Partial,
 
   /**
-   * Tiled rendering mode. In this mode, the display list is divided into tiles, and each tile is
-   * rendered separately. This can improve performance by rendering only the parts of the display
-   * list that have changed, and also enables efficient scrolling and zooming (using contentOffset
-   * and zoomScale). However, tiled rendering may use more memory for tile caches than partial
-   * rendering.
+   * Tiled rendering mode. In this mode, the display list is split into tiles, and each tile is
+   * cached separately. This improves performance by redrawing only the parts of the display list
+   * that have changed, and also enables efficient scrolling and zooming using contentOffset and
+   * zoomScale. Only the portions of tiles that overlap dirty regions are redrawn, not the entire
+   * tile. Whenever possible, adjacent tiles are combined into a single draw call to reduce the
+   * total number of draw calls. Performance is similar to partial rendering when the viewport isn’t
+   * zoomed or scrolled, though tiled rendering uses a bit more memory. However, for zooming and
+   * scrolling, tiled rendering is much more efficient than partial rendering.
    */
   Tiled
 };
@@ -160,13 +163,16 @@ class DisplayList {
 
   /**
    * Returns the maximum number of tiles that can be created in tiled rendering mode. This setting
-   * is ignored in other render modes. If the specified count is less than the minimum required for
-   * tiled rendering, it will be automatically increased to meet the minimum. The minimum value is
-   * calculated based on the tile size and viewport size, ensuring the visible area is always fully
-   * covered, even if the viewport is offset by half a tile. For example, with a tile size of 256
-   * pixels and a viewport of 512x512 pixels, the minimum tile count is 9 (2 tiles in each direction
-   * plus 1 for offset). The default is 0, which means the minimum tile count will be used based on
-   * the viewport size and tile size.
+   * is ignored in other render modes. Allowing more tiles can improve performance, especially when
+   * zooming. If the specified count is less than the minimum required for tiled rendering, it will
+   * be automatically increased to meet the minimum. The minimum value is calculated based on the
+   * tile size and viewport size, ensuring the visible area is always fully covered, even if the
+   * viewport is offset by half a tile. For example, with a tile size of 256 pixels and a viewport
+   * of 512x512 pixels, the minimum tile count is 9 (2 tiles in each direction plus 1 for offset).
+   * The minimum tile count is sufficient for scrolling without zooming. If you plan to zoom
+   * frequently, you should set a higher maximum tile count to avoid performance issues. The default
+   * value is 0, which means the minimum tile count will be used based on the viewport size and tile
+   * size.
    */
   int maxTileCount() const {
     return _maxTileCount;
@@ -178,12 +184,30 @@ class DisplayList {
   void setMaxTileCount(int count);
 
   /**
+   * Returns true if zoom blur is allowed in tiled rendering mode. This setting is ignored in other
+   * render modes. When enabled, if the zoomScale changes and cached images at other zoom levels are
+   * available, the display list will use those caches to render first, then gradually update to the
+   * current zoomScale in later frames. Use setMaxTilesRefinedPerFrame() to control how many tiles
+   * are updated per frame. This can improve zooming performance, but may cause temporary zoom blur
+   * artifacts. The default is false.
+   */
+  bool allowZoomBlur() const {
+    return _allowZoomBlur;
+  }
+
+  /**
+   * Sets whether to allow zoom blur in tiled rendering mode.
+   */
+  void setAllowZoomBlur(bool allow) {
+    _allowZoomBlur = allow;
+  }
+
+  /**
    * Returns the maximum number of tiles that can be refined (updated to the current zoom scale) per
-   * frame in tiled rendering mode. This setting is ignored in other render modes. When zooming,
-   * cached images from other zoom levels may be used temporarily, resulting in brief blur artifacts.
-   * Increasing this value refines more tiles per frame, reducing blur more quickly but potentially
-   * impacting performance. To eliminate blur entirely, set this value higher than the total number
-   * of visible tiles. The default is 10.
+   * frame in tiled rendering mode. This setting is ignored in other render modes or if
+   * allowZoomBlur is false. When zooming, cached images from other zoom levels may be used
+   * temporarily, resulting in brief blur artifacts. Increasing this value refines more tiles per
+   * frame, reducing blur more quickly but potentially impacting performance. The default is 5.
    */
   int maxTilesRefinedPerFrame() const {
     return _maxTilesRefinedPerFrame;
@@ -226,7 +250,8 @@ class DisplayList {
   RenderMode _renderMode = RenderMode::Partial;
   int _tileSize = 256;
   int _maxTileCount = 0;
-  int _maxTilesRefinedPerFrame = 10;
+  bool _allowZoomBlur = false;
+  int _maxTilesRefinedPerFrame = 5;
   bool _showDirtyRegions = false;
   bool _hasContentChanged = false;
   bool hasZoomBlurTiles = false;

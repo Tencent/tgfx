@@ -38,14 +38,10 @@ std::shared_ptr<BackgroundContext> BackgroundContext::Make(Context* context, con
   if (!backgroundContext->surface) {
     return nullptr;
   }
-  auto canvas = backgroundContext->backgroundCanvas();
+  auto canvas = backgroundContext->getCanvas();
   canvas->clear();
   canvas->setMatrix(surfaceMatrix);
   return backgroundContext;
-}
-
-Canvas* BackgroundContext::backgroundCanvas() const {
-  return surface->getCanvas();
 }
 
 std::shared_ptr<Image> BackgroundContext::getBackgroundImage() const {
@@ -70,9 +66,9 @@ std::shared_ptr<BackgroundContext> BackgroundContext::createSubContext() const {
   if (!child) {
     return nullptr;
   }
-  auto childCanvas = child->backgroundCanvas();
-  childCanvas->clipPath(backgroundCanvas()->getTotalClip());
-  childCanvas->setMatrix(backgroundCanvas()->getMatrix());
+  auto childCanvas = child->getCanvas();
+  childCanvas->clipPath(getCanvas()->getTotalClip());
+  childCanvas->setMatrix(getCanvas()->getMatrix());
   child->parent = this;
   child->imageMatrix = imageMatrix;
   return child;
@@ -82,7 +78,7 @@ void BackgroundContext::drawToParent(const Matrix& paintMatrix, const Paint& pai
   if (!parent) {
     return;
   }
-  auto parentCanvas = parent->backgroundCanvas();
+  auto parentCanvas = parent->getCanvas();
   AutoCanvasRestore autoRestore(parentCanvas);
   auto matrix = parentCanvas->getMatrix();
   auto inverseMatrix = Matrix::I();

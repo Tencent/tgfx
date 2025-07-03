@@ -59,7 +59,7 @@ Rect DropShadowImageFilter::onFilterBounds(const Rect& srcRect) const {
 
 PlacementPtr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    const Matrix* uvMatrix) const {
+    SrcRectConstraint constraint, const Matrix* uvMatrix) const {
   if (color.alpha <= 0) {
     // The filer will not be created if filter is not drop shadow only and alpha < 0.So if color is
     // transparent, the image after applying the filter will be transparent.
@@ -101,10 +101,11 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
   shadowMatrix.preConcat(fpMatrix);
 
   if (blurFilter != nullptr) {
-    shadowProcessor = blurFilter->asFragmentProcessor(source, args, sampling, &shadowMatrix);
+    shadowProcessor =
+        blurFilter->asFragmentProcessor(source, args, sampling, constraint, &shadowMatrix);
   } else {
     shadowProcessor = FragmentProcessor::Make(source, args, TileMode::Decal, TileMode::Decal,
-                                              sampling, &shadowMatrix);
+                                              sampling, constraint, &shadowMatrix);
   }
   if (shadowProcessor == nullptr) {
     return nullptr;
@@ -117,7 +118,7 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
     return colorShadowProcessor;
   }
   auto imageProcessor = FragmentProcessor::Make(std::move(source), args, TileMode::Decal,
-                                                TileMode::Decal, sampling, &fpMatrix);
+                                                TileMode::Decal, sampling, constraint, &fpMatrix);
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(
       buffer, std::move(imageProcessor), std::move(colorShadowProcessor), BlendMode::SrcOver);
 }

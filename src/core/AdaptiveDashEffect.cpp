@@ -195,7 +195,7 @@ bool AdaptiveDashEffect::filterPath(Path* path) const {
 
       // Check dash count limit
       totalDashCount += patternRatio * static_cast<float>(patternCount >> 1);
-      if (totalDashCount > kMaxDashCount) {
+      if (totalDashCount > MaxDashCount) {
         return false;
       }
 

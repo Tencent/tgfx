@@ -98,7 +98,7 @@ void RadialGradient::setRadius(float radius) {
     return;
   }
   _radius = radius;
-  invalidateTransform();
+  invalidateContent();
 }
 
 std::shared_ptr<Shader> RadialGradient::onGetShader() const {
@@ -110,7 +110,7 @@ void ConicGradient::setStartAngle(float startAngle) {
     return;
   }
   _startAngle = startAngle;
-  invalidateTransform();
+  invalidateContent();
 }
 
 void ConicGradient::setCenter(const Point& center) {

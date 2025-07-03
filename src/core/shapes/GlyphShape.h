@@ -18,17 +18,15 @@
 
 #pragma once
 
-#include "gpu/ResourceKey.h"
-#include "tgfx/core/GlyphFace.h"
-#include "tgfx/core/Shape.h"
+#include "core/shapes/UniqueKeyShape.h"
 
 namespace tgfx {
 /**
- * Shape that contains a GlyphFace and GlyphID.
+ * Shape that contains a Font and GlyphID.
  */
-class GlyphShape final : public Shape {
+class GlyphShape : public UniqueKeyShape {
  public:
-  explicit GlyphShape(std::shared_ptr<GlyphFace> glyphFace, GlyphID glyphID);
+  explicit GlyphShape(Font font, GlyphID glyphID);
 
   Rect getBounds() const override;
 
@@ -38,13 +36,9 @@ class GlyphShape final : public Shape {
   Type type() const override {
     return Type::Glyph;
   }
-  UniqueKey getUniqueKey() const override {
-    return uniqueKey.get();
-  }
 
  private:
-  LazyUniqueKey uniqueKey = {};
-  std::shared_ptr<GlyphFace> glyphFace = nullptr;
+  Font font;
   GlyphID glyphID = 0;
 };
 }  // namespace tgfx

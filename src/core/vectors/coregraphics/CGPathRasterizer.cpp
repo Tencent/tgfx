@@ -120,21 +120,25 @@ bool CGPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) con
   if (path.isEmpty()) {
     return false;
   }
-  auto cgContext = CreateBitmapContext(dstInfo, dstPixels);
+  auto targetInfo = dstInfo.makeIntersect(0, 0, width(), height());
+  auto cgContext = CreateBitmapContext(targetInfo, dstPixels);
   if (cgContext == nullptr) {
     return false;
   }
-  CGContextClearRect(cgContext, CGRectMake(0.f, 0.f, dstInfo.width(), dstInfo.height()));
+  CGContextClearRect(cgContext, CGRectMake(0.f, 0.f, targetInfo.width(), targetInfo.height()));
   auto totalMatrix = Matrix::MakeScale(1, -1);
-  totalMatrix.postTranslate(0, static_cast<float>(dstInfo.height()));
+  totalMatrix.postTranslate(0, static_cast<float>(targetInfo.height()));
   path.transform(totalMatrix);
   if (!needsGammaCorrection) {
-    DrawPath(path, cgContext, dstInfo, antiAlias);
+    DrawPath(path, cgContext, targetInfo, antiAlias);
   }
   auto bounds = path.getBounds();
-  bounds.roundOut();
-  auto width = static_cast<int>(bounds.width());
-  auto height = static_cast<int>(bounds.height());
+  auto clipBounds = Rect::MakeWH(targetInfo.width(), targetInfo.height());
+  if (!bounds.intersect(clipBounds)) {
+    return false;
+  }
+  auto width = static_cast<int>(ceilf(bounds.width()));
+  auto height = static_cast<int>(ceilf(bounds.height()));
   auto tempBuffer = PixelBuffer::Make(width, height, true, false);
   if (tempBuffer == nullptr) {
     CGContextRelease(cgContext);

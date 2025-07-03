@@ -27,6 +27,7 @@
 
 namespace tgfx {
 class TextureProxy;
+enum class SrcRectConstraint;
 
 /**
  * ImageFilter is the base class for all image filters. If one is installed in the Paint, then all
@@ -156,6 +157,7 @@ class ImageFilter {
   virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
                                                               const FPArgs& args,
                                                               const SamplingOptions& sampling,
+                                                              SrcRectConstraint constraint,
                                                               const Matrix* uvMatrix) const = 0;
 
   bool applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipBounds = nullptr) const;
@@ -163,6 +165,7 @@ class ImageFilter {
   PlacementPtr<FragmentProcessor> makeFPFromTextureProxy(std::shared_ptr<Image> source,
                                                          const FPArgs& args,
                                                          const SamplingOptions& sampling,
+                                                         SrcRectConstraint constraint,
                                                          const Matrix* uvMatrix) const;
 
   friend class DropShadowImageFilter;

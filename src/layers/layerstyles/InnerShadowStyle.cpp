@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
-#include "OpaqueThreshold.h"
+#include "layers/OpaqueThreshold.h"
 
 namespace tgfx {
 

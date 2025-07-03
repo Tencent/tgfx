@@ -19,21 +19,15 @@
 #include "RasterizedContent.h"
 
 namespace tgfx {
-Rect RasterizedContent::getBounds() const {
-  auto bounds = Rect::MakeWH(image->width(), image->height());
-  matrix.mapRect(&bounds);
-  return bounds;
-}
-
-void RasterizedContent::draw(Canvas* canvas, const Paint& paint) const {
+void RasterizedContent::draw(Canvas* canvas, bool antiAlias, float alpha,
+                             BlendMode blendMode) const {
   auto oldMatrix = canvas->getMatrix();
   canvas->concat(matrix);
+  Paint paint = {};
+  paint.setAntiAlias(antiAlias);
+  paint.setAlpha(alpha);
+  paint.setBlendMode(blendMode);
   canvas->drawImage(image, &paint);
   canvas->setMatrix(oldMatrix);
-}
-
-bool RasterizedContent::hitTestPoint(float localX, float localY, bool) {
-  const auto imageBounds = Rect::MakeXYWH(0, 0, image->width(), image->height());
-  return imageBounds.contains(localX, localY);
 }
 }  // namespace tgfx

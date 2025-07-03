@@ -35,7 +35,8 @@
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
-ProxyProvider::ProxyProvider(Context* context) : context(context), blockBuffer(1 << 14) {  // 16KB
+ProxyProvider::ProxyProvider(Context* context)
+    : context(context), blockBuffer(1 << 14, 1 << 21) {  // 16kb, 2MB
 }
 
 std::shared_ptr<GpuBufferProxy> ProxyProvider::createGpuBufferProxy(const UniqueKey& uniqueKey,

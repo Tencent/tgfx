@@ -49,12 +49,13 @@ class SubsetImage : public TransformImage {
 
   std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override;
 
-  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args, TileMode tileModeX,
-                                                      TileMode tileModeY,
-                                                      const SamplingOptions& sampling,
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
+                                                      const SamplingArgs& samplingArgs,
                                                       const Matrix* uvMatrix) const override;
 
   std::optional<Matrix> concatUVMatrix(const Matrix* uvMatrix) const;
+
+  std::optional<Rect> getSubset(const Rect& drawRect) const;
 
   SubsetImage(std::shared_ptr<Image> source, const Rect& bounds);
 };

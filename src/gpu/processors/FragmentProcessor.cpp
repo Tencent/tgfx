@@ -28,18 +28,27 @@ namespace tgfx {
 PlacementPtr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image> image,
                                                         const FPArgs& args,
                                                         const SamplingOptions& sampling,
+                                                        SrcRectConstraint constraint,
                                                         const Matrix* uvMatrix) {
   DEBUG_ASSERT(image != nullptr);
-  return image->asFragmentProcessor(args, TileMode::Clamp, TileMode::Clamp, sampling, uvMatrix);
+  SamplingArgs samplingArgs = SamplingArgs(TileMode::Clamp, TileMode::Clamp, sampling, constraint);
+  return image->asFragmentProcessor(args, samplingArgs, uvMatrix);
+}
+
+PlacementPtr<FragmentProcessor> FragmentProcessor::Make(
+    std::shared_ptr<Image> image, const FPArgs& args, TileMode tileModeX, TileMode tileModeY,
+    const SamplingOptions& sampling, SrcRectConstraint constraint, const Matrix* uvMatrix) {
+  DEBUG_ASSERT(image != nullptr);
+  SamplingArgs samplingArgs = SamplingArgs(tileModeX, tileModeY, sampling, constraint);
+  return image->asFragmentProcessor(args, samplingArgs, uvMatrix);
 }
 
 PlacementPtr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Image> image,
-                                                        const FPArgs& args, TileMode tileModeX,
-                                                        TileMode tileModeY,
-                                                        const SamplingOptions& sampling,
+                                                        const FPArgs& args,
+                                                        const SamplingArgs& samplingArgs,
                                                         const Matrix* uvMatrix) {
   DEBUG_ASSERT(image != nullptr);
-  return image->asFragmentProcessor(args, tileModeX, tileModeY, sampling, uvMatrix);
+  return image->asFragmentProcessor(args, samplingArgs, uvMatrix);
 }
 
 PlacementPtr<FragmentProcessor> FragmentProcessor::Make(std::shared_ptr<Shader> shader,
@@ -174,8 +183,8 @@ void FragmentProcessor::internalEmitChild(
   TextureSamplers textureSamplers = args.textureSamplers->childInputs(childIndex);
 
   EmitArgs childArgs(fragBuilder, args.uniformHandler, outputColor,
-                     inputName.empty() ? "vec4(1.0)" : inputName, &coordVars, &textureSamplers,
-                     std::move(coordFunc));
+                     inputName.empty() ? "vec4(1.0)" : inputName, args.inputSubset, &coordVars,
+                     &textureSamplers, std::move(coordFunc));
   childProcessor(childIndex)->emitCode(childArgs);
   fragBuilder->codeAppend("}\n");
 

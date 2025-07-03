@@ -41,7 +41,7 @@ struct UnrolledBinaryUniformName {
   std::string thresholds9_13;
 };
 
-static constexpr int kMaxIntervals = 8;
+static constexpr int MaxIntervals = 8;
 
 PlacementPtr<UnrolledBinaryGradientColorizer> UnrolledBinaryGradientColorizer::Make(
     BlockBuffer* buffer, const Color* colors, const float* positions, int count) {
@@ -51,22 +51,22 @@ PlacementPtr<UnrolledBinaryGradientColorizer> UnrolledBinaryGradientColorizer::M
   // two intervals. At the most extreme end, an 8 interval gradient made entirely of hard
   // stops has 16 colors.
 
-  if (count > kMaxColorCount) {
+  if (count > MaxColorCount) {
     // Definitely cannot represent this gradient configuration
     return nullptr;
   }
 
   // The raster implementation also uses scales and biases, but since they must be calculated
   // after the dst color space is applied, it limits our ability to cache their values.
-  Color scales[kMaxIntervals];
-  Color biases[kMaxIntervals];
-  float thresholds[kMaxIntervals];
+  Color scales[MaxIntervals];
+  Color biases[MaxIntervals];
+  float thresholds[MaxIntervals];
 
   int intervalCount = 0;
 
   for (int i = 0; i < count - 1; i++) {
-    if (intervalCount >= kMaxIntervals) {
-      // Already reached kMaxIntervals, and haven't run out of color stops so this
+    if (intervalCount >= MaxIntervals) {
+      // Already reached MaxIntervals, and haven't run out of color stops so this
       // gradient cannot be represented by this shader.
       return nullptr;
     }
@@ -94,7 +94,7 @@ PlacementPtr<UnrolledBinaryGradientColorizer> UnrolledBinaryGradientColorizer::M
   }
 
   // set the unused values to something consistent
-  for (int i = intervalCount; i < kMaxIntervals; i++) {
+  for (int i = intervalCount; i < MaxIntervals; i++) {
     scales[i] = Color::Transparent();
     biases[i] = Color::Transparent();
     thresholds[i] = 0.0;

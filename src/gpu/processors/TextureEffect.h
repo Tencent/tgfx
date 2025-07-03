@@ -19,6 +19,7 @@
 #pragma once
 
 #include "gpu/SamplerState.h"
+#include "gpu/SamplingArgs.h"
 #include "gpu/YUVTexture.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/proxies/TextureProxy.h"
@@ -27,13 +28,13 @@ namespace tgfx {
 class TextureEffect : public FragmentProcessor {
  public:
   static PlacementPtr<FragmentProcessor> Make(std::shared_ptr<TextureProxy> proxy,
-                                              const SamplingOptions& sampling = {},
+                                              const SamplingArgs& args = {},
                                               const Matrix* uvMatrix = nullptr,
                                               bool forceAsMask = false);
 
   static PlacementPtr<FragmentProcessor> MakeRGBAAA(std::shared_ptr<TextureProxy> proxy,
+                                                    const SamplingArgs& args,
                                                     const Point& alphaStart,
-                                                    const SamplingOptions& sampling = {},
                                                     const Matrix* uvMatrix = nullptr);
 
   std::string name() const override {
@@ -44,7 +45,8 @@ class TextureEffect : public FragmentProcessor {
   DEFINE_PROCESSOR_CLASS_ID
 
   TextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplingOptions& sampling,
-                const Point& alphaStart, const Matrix& uvMatrix);
+                SrcRectConstraint constraint, const Point& alphaStart, const Matrix& uvMatrix,
+                const std::optional<Rect>& subset);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
@@ -60,9 +62,13 @@ class TextureEffect : public FragmentProcessor {
 
   YUVTexture* getYUVTexture() const;
 
+  bool needSubset(Texture* texture) const;
+
   std::shared_ptr<TextureProxy> textureProxy;
   SamplerState samplerState;
+  SrcRectConstraint constraint = SrcRectConstraint::Fast;
   Point alphaStart = {};
   CoordTransform coordTransform;
+  std::optional<Rect> subset = std::nullopt;
 };
 }  // namespace tgfx

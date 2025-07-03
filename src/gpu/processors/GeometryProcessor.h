@@ -101,10 +101,11 @@ class GeometryProcessor : public Processor {
     EmitArgs(VertexShaderBuilder* vertBuilder, FragmentShaderBuilder* fragBuilder,
              VaryingHandler* varyingHandler, UniformHandler* uniformHandler, const Caps* caps,
              std::string outputColor, std::string outputCoverage,
-             FPCoordTransformHandler* transformHandler)
+             FPCoordTransformHandler* transformHandler, std::string* outputSubset)
         : vertBuilder(vertBuilder), fragBuilder(fragBuilder), varyingHandler(varyingHandler),
           uniformHandler(uniformHandler), caps(caps), outputColor(std::move(outputColor)),
-          outputCoverage(std::move(outputCoverage)), fpCoordTransformHandler(transformHandler) {
+          outputCoverage(std::move(outputCoverage)), fpCoordTransformHandler(transformHandler),
+          outputSubset(outputSubset) {
     }
     VertexShaderBuilder* vertBuilder;
     FragmentShaderBuilder* fragBuilder;
@@ -114,6 +115,7 @@ class GeometryProcessor : public Processor {
     const std::string outputColor;
     const std::string outputCoverage;
     FPCoordTransformHandler* fpCoordTransformHandler;
+    std::string* outputSubset = nullptr;
   };
 
   virtual void emitCode(EmitArgs&) const = 0;
@@ -153,9 +155,9 @@ class GeometryProcessor : public Processor {
    * Emit transformed uv coords from the vertex shader as a uniform matrix and varying per
    * coord-transform. uvCoordsVar must be a 2-component vector.
    */
-  void emitTransforms(VertexShaderBuilder* vertexBuilder, VaryingHandler* varyingHandler,
-                      UniformHandler* uniformHandler, const ShaderVar& uvCoordsVar,
-                      FPCoordTransformHandler* transformHandler) const;
+  void emitTransforms(EmitArgs& args, VertexShaderBuilder* vertexBuilder,
+                      VaryingHandler* varyingHandler, UniformHandler* uniformHandler,
+                      const ShaderVar& uvCoordsVar) const;
 
  private:
   virtual void onComputeProcessorKey(BytesKey*) const {
@@ -167,6 +169,13 @@ class GeometryProcessor : public Processor {
 
   virtual SamplerState onSamplerState(size_t) const {
     return {};
+  }
+
+  virtual void onEmitTransform(EmitArgs&, VertexShaderBuilder*, VaryingHandler*, UniformHandler*,
+                               const std::string&, int) const {
+  }
+
+  virtual void onSetTransformData(UniformBuffer*, const CoordTransform*, int) const {
   }
 
   std::vector<const Attribute*> attributes = {};

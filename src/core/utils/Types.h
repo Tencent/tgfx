@@ -18,14 +18,14 @@
 
 #pragma once
 
-#include <tgfx/layers/LayerContent.h>
-#include <tgfx/layers/ShapeStyle.h>
-#include <tgfx/layers/filters/LayerFilter.h>
 #include "core/utils/Log.h"
+#include "layers/contents/LayerContent.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/core/MaskFilter.h"
 #include "tgfx/core/Shader.h"
+#include "tgfx/layers/ShapeStyle.h"
+#include "tgfx/layers/filters/LayerFilter.h"
 
 namespace tgfx {
 class Types {

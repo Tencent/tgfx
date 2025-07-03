@@ -46,6 +46,7 @@ void JTGFXView::draw(int index, float zoom, float offsetX, float offsetY) {
     device->unlock();
     return;
   }
+  appHost->updateZoomAndOffset(zoom, tgfx::Point(offsetX, offsetY));
   auto canvas = surface->getCanvas();
   canvas->clear();
   canvas->save();

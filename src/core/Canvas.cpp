@@ -18,15 +18,14 @@
 
 #include "tgfx/core/Canvas.h"
 #include "core/DrawContext.h"
-#include "core/LayerUnrollContext.h"
 #include "core/RecordingContext.h"
+#include "core/shapes/StrokeShape.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/Types.h"
 #include "images/SubsetImage.h"
 #include "shapes/MatrixShape.h"
 #include "shapes/PathShape.h"
-#include "shapes/StrokeShape.h"
 #include "tgfx/core/Surface.h"
 
 namespace tgfx {
@@ -69,8 +68,8 @@ static Fill GetFillStyleForImage(const Paint* paint, const Image* image) {
   return fill;
 }
 
-Canvas::Canvas(DrawContext* drawContext, Surface* surface)
-    : drawContext(drawContext), surface(surface) {
+Canvas::Canvas(DrawContext* drawContext, Surface* surface, bool optimizeMemoryForLayer)
+    : drawContext(drawContext), surface(surface), optimizeMemoryForLayer(optimizeMemoryForLayer) {
   mcState = std::make_unique<MCState>();
 }
 
@@ -103,7 +102,7 @@ void Canvas::restore() {
   if (layer != nullptr) {
     drawContext = layer->drawContext;
     auto layerContext = reinterpret_cast<RecordingContext*>(layer->layerContext.get());
-    auto picture = layerContext->finishRecordingAsPicture();
+    auto picture = layerContext->finishRecordingAsPicture(optimizeMemoryForLayer);
     if (picture != nullptr) {
       drawLayer(std::move(picture), {}, layer->layerPaint.getFill(),
                 layer->layerPaint.getImageFilter());
@@ -384,7 +383,7 @@ void Canvas::drawPath(const Path& path, const MCState& state, const Fill& fill,
     if (shape == nullptr) {
       return;
     }
-    shape = Shape::ApplyStroke(std::move(shape), stroke);
+    shape = StrokeShape::Apply(std::move(shape), stroke, false);
     if (shape == nullptr) {
       return;
     }
@@ -392,46 +391,35 @@ void Canvas::drawPath(const Path& path, const MCState& state, const Fill& fill,
   }
 }
 
-Path* Canvas::UnwrapShape(std::shared_ptr<Shape> shape, const Stroke** pathStroke,
-                          Matrix* pathMatrix) {
-  DEBUG_ASSERT(pathMatrix != nullptr);
-  DEBUG_ASSERT(pathStroke != nullptr);
-  if (shape->type() == Shape::Type::Path) {
-    return &std::static_pointer_cast<PathShape>(shape)->path;
-  }
-  if (*pathStroke == nullptr && shape->type() == Shape::Type::Stroke) {
-    auto strokeShape = std::static_pointer_cast<StrokeShape>(shape);
-    if (strokeShape->shape->isSimplePath()) {
-      *pathStroke = &strokeShape->stroke;
-      return &std::static_pointer_cast<PathShape>(strokeShape->shape)->path;
-    }
-  } else if (*pathStroke == nullptr && shape->type() == Shape::Type::Matrix) {
-    auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);
-    Matrix matrix = matrixShape->matrix;
-    auto path = UnwrapShape(matrixShape->shape, pathStroke, &matrix);
-    if (path) {
-      pathMatrix->preConcat(matrix);
-    }
-    return path;
-  }
-  return nullptr;
-}
-
 void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
   if (shape == nullptr) {
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
-  auto stroke = paint.getStroke();
+  auto fill = paint.getFill();
   auto state = *mcState;
-  auto path = UnwrapShape(shape, &stroke, &state.matrix);
+  auto stroke = paint.getStroke();
+  Path* path = nullptr;
+  if (shape->type() == Shape::Type::Path) {
+    path = &std::static_pointer_cast<PathShape>(shape)->path;
+  } else if (stroke == nullptr && shape->type() == Shape::Type::Matrix) {
+    auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);
+    if (matrixShape->shape->isSimplePath()) {
+      Matrix inverse = {};
+      if (matrixShape->matrix.invert(&inverse)) {
+        path = &std::static_pointer_cast<PathShape>(matrixShape->shape)->path;
+        state.matrix.preConcat(matrixShape->matrix);
+        fill = fill.makeWithMatrix(inverse);
+      }
+    }
+  }
   if (path) {
-    drawPath(*path, state, paint.getFill(), stroke);
+    drawPath(*path, state, fill, stroke);
     return;
   }
-  shape = Shape::ApplyStroke(std::move(shape), paint.getStroke());
+  shape = StrokeShape::Apply(std::move(shape), stroke, false);
   if (shape != nullptr) {
-    drawContext->drawShape(std::move(shape), state, paint.getFill());
+    drawContext->drawShape(std::move(shape), state, fill);
   }
 }
 
@@ -468,14 +456,15 @@ void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& dstRect,
 }
 
 void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
-                           const SamplingOptions& sampling, const Paint* paint) {
+                           const SamplingOptions& sampling, const Paint* paint,
+                           SrcRectConstraint constraint) {
   if (image == nullptr || srcRect.isEmpty() || dstRect.isEmpty()) {
     return;
   }
   SaveLayerForImageFilter(paint ? paint->getImageFilter() : nullptr);
   auto fill = GetFillStyleForImage(paint, image.get());
   if (srcRect == dstRect) {
-    drawImageRect(std::move(image), srcRect, sampling, fill);
+    drawImageRect(std::move(image), srcRect, sampling, fill, nullptr, constraint);
     return;
   }
   auto dstMatrix = Matrix::MakeTrans(-srcRect.left, -srcRect.top);
@@ -483,30 +472,34 @@ void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, co
   auto scaleY = dstRect.height() / srcRect.height();
   dstMatrix.postScale(scaleX, scaleY);
   dstMatrix.postTranslate(dstRect.left, dstRect.top);
-  drawImageRect(std::move(image), srcRect, sampling, fill, &dstMatrix);
+  drawImageRect(std::move(image), srcRect, sampling, fill, &dstMatrix, constraint);
 }
 
 // Fills a rectangle with the given Image. The image is sampled from the area defined by rect,
 // and rendered into the same area, transformed by extraMatrix and the current matrix.
 void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                            const SamplingOptions& sampling, const Fill& fill,
-                           const Matrix* dstMatrix) {
+                           const Matrix* dstMatrix, SrcRectConstraint constraint) {
   DEBUG_ASSERT(image != nullptr);
   DEBUG_ASSERT(!rect.isEmpty());
   auto type = Types::Get(image.get());
   if (type != Types::ImageType::Subset && dstMatrix == nullptr) {
-    drawContext->drawImageRect(std::move(image), rect, sampling, *mcState, fill);
+    drawContext->drawImageRect(std::move(image), rect, sampling, *mcState, fill, constraint);
     return;
   }
   auto viewMatrix = dstMatrix ? *dstMatrix : Matrix::I();
   auto imageRect = rect;
   if (type == Types::ImageType::Subset) {
-    // Unwrap the subset image to maximize the merging of draw calls.
-    auto subsetImage = static_cast<const SubsetImage*>(image.get());
-    auto& subset = subsetImage->bounds;
-    imageRect.offset(subset.left, subset.top);
-    viewMatrix.preTranslate(-subset.left, -subset.top);
-    image = subsetImage->source;
+    auto safeBounds = Rect::MakeWH(image->width(), image->height());
+    safeBounds.inset(0.5f, 0.5f);
+    if (constraint == SrcRectConstraint::Strict || safeBounds.contains(rect)) {
+      // Unwrap the subset image to maximize the merging of draw calls.
+      auto subsetImage = static_cast<const SubsetImage*>(image.get());
+      auto& subset = subsetImage->bounds;
+      imageRect.offset(subset.left, subset.top);
+      viewMatrix.preTranslate(-subset.left, -subset.top);
+      image = subsetImage->source;
+    }
   }
   Matrix fillMatrix = {};
   if (!viewMatrix.invert(&fillMatrix)) {
@@ -515,7 +508,8 @@ void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
   auto imageState = *mcState;
   imageState.matrix.preConcat(viewMatrix);
   auto imageFill = fill.makeWithMatrix(fillMatrix);
-  drawContext->drawImageRect(std::move(image), imageRect, sampling, imageState, imageFill);
+  drawContext->drawImageRect(std::move(image), imageRect, sampling, imageState, imageFill,
+                             constraint);
 }
 
 void Canvas::drawSimpleText(const std::string& text, float x, float y, const Font& font,
@@ -529,16 +523,12 @@ void Canvas::drawSimpleText(const std::string& text, float x, float y, const Fon
 
 void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,
                         const Font& font, const Paint& paint) {
-  drawGlyphs(glyphs, positions, glyphCount, GlyphFace::Wrap(font), paint);
-}
 
-void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,
-                        std::shared_ptr<GlyphFace> glyphFace, const Paint& paint) {
-  if (glyphCount == 0 || glyphFace == nullptr) {
+  if (glyphCount == 0) {
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
-  GlyphRun glyphRun(glyphFace, {glyphs, glyphs + glyphCount}, {positions, positions + glyphCount});
+  GlyphRun glyphRun(font, {glyphs, glyphs + glyphCount}, {positions, positions + glyphCount});
   auto glyphRunList = std::make_shared<GlyphRunList>(std::move(glyphRun));
   drawContext->drawGlyphRunList(std::move(glyphRunList), *mcState, paint.getFill(),
                                 paint.getStroke());
@@ -583,6 +573,23 @@ void Canvas::drawPicture(std::shared_ptr<Picture> picture, const Matrix* matrix,
   }
 }
 
+class LayerUnrollModifier : public FillModifier {
+ public:
+  explicit LayerUnrollModifier(Fill layerFill) : layerFill(std::move(layerFill)) {
+  }
+
+  Fill transform(const Fill& fill) const override {
+    auto newFill = fill;
+    newFill.color.alpha *= layerFill.color.alpha;
+    newFill.blendMode = layerFill.blendMode;
+    newFill.colorFilter = ColorFilter::Compose(fill.colorFilter, layerFill.colorFilter);
+    return newFill;
+  }
+
+ private:
+  Fill layerFill = {};
+};
+
 void Canvas::drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const Fill& fill,
                        std::shared_ptr<ImageFilter> imageFilter) {
   DEBUG_ASSERT(fill.shader == nullptr);
@@ -601,15 +608,13 @@ void Canvas::drawLayer(std::shared_ptr<Picture> picture, const MCState& state, c
       auto fillMatrix = Matrix::MakeTrans(-offset.x - filterOffset.x, -offset.y - +filterOffset.y);
       auto imageRect = Rect::MakeWH(image->width(), image->height());
       drawContext->drawImageRect(std::move(image), imageRect, {}, drawState,
-                                 fill.makeWithMatrix(fillMatrix));
+                                 fill.makeWithMatrix(fillMatrix), SrcRectConstraint::Fast);
       return;
     }
   } else if (picture->drawCount == 1 && fill.maskFilter == nullptr) {
-    LayerUnrollContext layerContext(drawContext, fill);
-    picture->playback(&layerContext, state);
-    if (layerContext.hasUnrolled()) {
-      return;
-    }
+    LayerUnrollModifier unrollModifier(fill);
+    picture->playback(drawContext, state, &unrollModifier);
+    return;
   }
   drawContext->drawLayer(std::move(picture), std::move(imageFilter), state, fill);
 }

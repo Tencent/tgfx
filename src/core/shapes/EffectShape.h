@@ -18,14 +18,13 @@
 
 #pragma once
 
-#include "gpu/ResourceKey.h"
-#include "tgfx/core/Shape.h"
+#include "core/shapes/UniqueKeyShape.h"
 
 namespace tgfx {
 /**
  * Shape that applies a PathEffect to another Shape.
  */
-class EffectShape : public Shape {
+class EffectShape : public UniqueKeyShape {
  public:
   EffectShape(std::shared_ptr<Shape> shape, std::shared_ptr<PathEffect> effect)
       : shape(std::move(shape)), effect(std::move(effect)) {
@@ -40,12 +39,7 @@ class EffectShape : public Shape {
     return Type::Effect;
   }
 
-  UniqueKey getUniqueKey() const override {
-    return uniqueKey.get();
-  }
-
  private:
-  LazyUniqueKey uniqueKey = {};
   std::shared_ptr<Shape> shape = nullptr;
   std::shared_ptr<PathEffect> effect = nullptr;
 };

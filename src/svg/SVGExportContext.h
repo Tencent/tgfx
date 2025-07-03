@@ -35,6 +35,7 @@
 #include "tgfx/core/Size.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/svg/SVGExporter.h"
+#include "tgfx/svg/SVGPathParser.h"
 
 namespace tgfx {
 
@@ -63,8 +64,8 @@ class SVGExportContext : public DrawContext {
   void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) override;
 
   void drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
-                     const SamplingOptions& sampling, const MCState& state,
-                     const Fill& fill) override;
+                     const SamplingOptions& sampling, const MCState& state, const Fill& fill,
+                     SrcRectConstraint constraint) override;
 
   void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
                         const Fill& fill, const Stroke* stroke) override;
@@ -108,7 +109,7 @@ class SVGExportContext : public DrawContext {
 
   void applyClipPath(const Path& clipPath);
 
-  static PathEncoding PathEncodingType();
+  static SVGPathParser::PathEncoding PathEncodingType();
 
   uint32_t exportFlags = {};
   Context* context = nullptr;

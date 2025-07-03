@@ -21,11 +21,14 @@
 #include "GLProgramBuilder.h"
 
 namespace tgfx {
-static constexpr char kDstColorName[] = "_dstColor";
+static constexpr char DstColorName[] = "_dstColor";
 
 GLFragmentShaderBuilder::GLFragmentShaderBuilder(ProgramBuilder* program)
     : FragmentShaderBuilder(program) {
-  setPrecisionQualifier("precision mediump float;");
+  auto glProgram = static_cast<GLProgramBuilder*>(program);
+  if (glProgram->getContext()->caps()->usesPrecisionModifiers) {
+    setPrecisionQualifier("precision mediump float;");
+  }
 }
 
 std::string GLFragmentShaderBuilder::dstColor() {
@@ -34,7 +37,7 @@ std::string GLFragmentShaderBuilder::dstColor() {
     addFeature(PrivateFeature::FramebufferFetch, caps->frameBufferFetchExtensionString);
     return caps->frameBufferFetchColorName;
   }
-  return kDstColorName;
+  return DstColorName;
 }
 
 std::string GLFragmentShaderBuilder::colorOutputName() {

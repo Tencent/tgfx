@@ -54,15 +54,15 @@ TGFX_TEST(LayerTest, LayerTree) {
   // Test adding children
   parent->addChild(child1);
   child1->addChild(child2);
-  EXPECT_EQ(child1->parent(), parent);
-  EXPECT_EQ(child2->parent(), child1);
+  EXPECT_EQ(child1->parent(), parent.get());
+  EXPECT_EQ(child2->parent(), child1.get());
   EXPECT_TRUE(parent->children().size() == 1);
   EXPECT_TRUE(parent->contains(child1));
   EXPECT_TRUE(parent->contains(child2));
   EXPECT_EQ(parent->getChildIndex(child1), 0);
   EXPECT_EQ(parent->getChildIndex(child2), -1);
   parent->addChildAt(child3, 0);
-  EXPECT_EQ(child3->parent(), parent);
+  EXPECT_EQ(child3->parent(), parent.get());
   EXPECT_TRUE(parent->children().size() == 2);
   EXPECT_TRUE(parent->getChildIndex(child3) == 0);
   EXPECT_EQ(parent->getChildIndex(child1), 1);
@@ -93,7 +93,7 @@ TGFX_TEST(LayerTest, LayerTree) {
   EXPECT_EQ(replacedChild2->root(), nullptr);
 
   parent->replaceChild(child1, replacedChild);
-  EXPECT_EQ(replacedChild->parent(), parent);
+  EXPECT_EQ(replacedChild->parent(), parent.get());
   EXPECT_EQ(replacedChild->root(), displayList->root());
   EXPECT_FALSE(parent->contains(child1));
   EXPECT_FALSE(parent->contains(child2));
@@ -101,7 +101,7 @@ TGFX_TEST(LayerTest, LayerTree) {
   EXPECT_TRUE(parent->children().size() == 2);
   EXPECT_EQ(parent->getChildIndex(replacedChild), 1);
   parent->replaceChild(replacedChild, child2);
-  EXPECT_EQ(child2->parent(), parent);
+  EXPECT_EQ(child2->parent(), parent.get());
   EXPECT_EQ(child2->root(), displayList->root());
   EXPECT_FALSE(parent->contains(replacedChild));
   EXPECT_TRUE(parent->contains(child2));
@@ -902,8 +902,6 @@ TGFX_TEST(LayerTest, imageMask) {
   auto alphaMaskImageLayer = ImageLayer::Make();
   alphaLayer->addChild(alphaMaskImageLayer);
   alphaMaskImageLayer->setImage(maskImage);
-  auto alphaFilter = ColorMatrixFilter::Make(alphaColorMatrix);
-  alphaMaskImageLayer->setFilters({alphaFilter});
   imageLayer1->setAlpha(0.5f);
   Matrix alphaMaskMatrix =
       Matrix::MakeAll(1.2f, 0, static_cast<float>(image->width()) * 0.5f, 0, 1.2f, 500);
@@ -923,16 +921,11 @@ TGFX_TEST(LayerTest, imageMask) {
   imageLayer2->setAlpha(1.0f);
   imageLayer2->setScrollRect(scrollRect);
 
-  const std::array<float, 20> vectorColorMatrix = {0, 0, 0, 0, 0,  // red
-                                                   0, 0, 0, 0, 0,  // green
-                                                   0, 0, 0, 0, 0,  // blue
-                                                   0, 0, 0, 0, 1.0f};
   auto vectorMaskImageLayer = ImageLayer::Make();
   layer->addChild(vectorMaskImageLayer);
   vectorMaskImageLayer->setImage(maskImage);
-  auto vectorFilter = ColorMatrixFilter::Make(vectorColorMatrix);
-  vectorMaskImageLayer->setFilters({vectorFilter});
   imageLayer2->setMask(vectorMaskImageLayer);
+  imageLayer2->setMaskType(LayerMaskType::Contour);
   imageLayer2->setAlpha(0.5f);
   Matrix vectorMaskMatrix =
       Matrix::MakeAll(1.2f, 0, 0, 0, 1.2f, 500 + static_cast<float>(image->height()) * 0.5f);
@@ -951,9 +944,8 @@ TGFX_TEST(LayerTest, imageMask) {
   auto lumaMaskImageLayer = ImageLayer::Make();
   layer->addChild(lumaMaskImageLayer);
   lumaMaskImageLayer->setImage(maskImage);
-  auto filter = ColorMatrixFilter::Make(lumaColorMatrix);
-  lumaMaskImageLayer->setFilters({filter});
   imageLayer3->setMask(lumaMaskImageLayer);
+  imageLayer3->setMaskType(LayerMaskType::Luminance);
   imageLayer3->setAlpha(0.5f);
   Matrix lumaMaskMatrix = Matrix::MakeAll(1.2f, 0, static_cast<float>(image->width()) * 0.5f, 0,
                                           1.2f, 500 + static_cast<float>(image->height()) * 0.5f);
@@ -1043,7 +1035,7 @@ TGFX_TEST(LayerTest, shapeMask) {
       Matrix::MakeAll(1.0f, 0, 300 + static_cast<float>(image->width()) * 0.5f, 0, 1.0f, 300);
   alphaShaperLayer->setMatrix(alphaMaskMatrix);
   imageLayer1->setMask(alphaShaperLayer);
-  imageLayer1->setMaskStyle(MaskStyle::Alpha);
+  imageLayer1->setMaskType(LayerMaskType::Alpha);
 
   // Vector mask effect
   auto imageLayer2 = ImageLayer::Make();
@@ -1053,7 +1045,7 @@ TGFX_TEST(LayerTest, shapeMask) {
       Matrix::MakeAll(0.5f, 0, 0, 0, 0.5f, static_cast<float>(image->height()) * 0.5f);
   imageLayer2->setMatrix(image2Matrix);
   imageLayer2->setAlpha(1.0f);
-  imageLayer2->setMaskStyle(MaskStyle::Vector);
+  imageLayer2->setMaskType(LayerMaskType::Contour);
 
   auto vectorShaperLayer = ShapeLayer::Make();
   vectorShaperLayer->setPath(path);
@@ -1074,7 +1066,7 @@ TGFX_TEST(LayerTest, shapeMask) {
                                       static_cast<float>(image->height()) * 0.5f);
   imageLayer3->setMatrix(image3Matrix);
   imageLayer3->setAlpha(1.0f);
-  imageLayer3->setMaskStyle(MaskStyle::Luminance);
+  imageLayer3->setMaskType(LayerMaskType::Luminance);
 
   auto lumaShaperLayer = ShapeLayer::Make();
   lumaShaperLayer->setPath(path);
@@ -2748,6 +2740,7 @@ TGFX_TEST(LayerTest, DirtyRegionTest) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest5"));
 
   displayList->setRenderMode(RenderMode::Tiled);
+  displayList->setAllowZoomBlur(true);
   displayList->setMaxTileCount(512);
   displayList->render(surface.get());
   // Clear the previous dirty regions.
@@ -2887,5 +2880,52 @@ TGFX_TEST(LayerTest, BackgroundBlurStyleTest) {
   rootLayer->addChild(maskLayer);
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurStyleTest4"));
+
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  canvas->setMatrix(Matrix::MakeScale(2.0f, 2.0f));
+  canvas->translate(-50, -50);
+  layer2->draw(canvas);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurStyleTest5"));
+}
+
+TGFX_TEST(LayerTest, PartialBackgroundBlur) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  auto surface = Surface::Make(context, 300, 300);
+  EXPECT_TRUE(context != nullptr);
+  DisplayList displayList;
+  auto rootLayer = Layer::Make();
+  displayList.root()->addChild(rootLayer);
+  auto background = ShapeLayer::Make();
+  Path backgroundPath;
+  backgroundPath.addRect(Rect::MakeXYWH(0, 0, 300, 300));
+  background->setPath(backgroundPath);
+  background->addFillStyle(Gradient::MakeRadial({150, 150}, 360, {Color::Red(), Color::Blue()}));
+  rootLayer->addChild(background);
+  auto solidLayer = SolidLayer::Make();
+  solidLayer->setColor(Color::FromRGBA(0, 0, 0, 50));
+  solidLayer->setWidth(200);
+  solidLayer->setHeight(200);
+  solidLayer->setMatrix(Matrix::MakeTrans(50, 50));
+  solidLayer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  rootLayer->addChild(solidLayer);
+  auto solidLayer2 = SolidLayer::Make();
+  solidLayer2->setColor(Color::FromRGBA(0, 0, 0, 10));
+  solidLayer2->setWidth(50);
+  solidLayer2->setHeight(50);
+  solidLayer2->setMatrix(Matrix::MakeTrans(100, 100));
+  rootLayer->addChild(solidLayer2);
+  displayList.setRenderMode(RenderMode::Partial);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialBackgroundBlur"));
+  solidLayer2->removeFromParent();
+  rootLayer->addChild(solidLayer2);
+  EXPECT_TRUE(displayList.root()->bitFields.dirtyDescendents);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialBackgroundBlur_partial"));
+  solidLayer2->setMatrix(Matrix::MakeTrans(120, 120));
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialBackgroundBlur_move"));
 }
 }  // namespace tgfx

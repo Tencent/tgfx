@@ -43,6 +43,7 @@ class Varying {
  private:
   SLType _type = SLType::Void;
   std::string _name;
+  bool _isFlat = false;
 
   friend class VaryingHandler;
 };
@@ -54,7 +55,7 @@ class VaryingHandler {
 
   virtual ~VaryingHandler() = default;
 
-  Varying addVarying(const std::string& name, SLType type);
+  Varying addVarying(const std::string& name, SLType type, bool isFlat = false);
 
   void emitAttributes(const GeometryProcessor& processor);
 

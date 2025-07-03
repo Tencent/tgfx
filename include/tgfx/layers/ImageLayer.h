@@ -65,7 +65,7 @@ class ImageLayer : public Layer {
   ImageLayer() : _sampling(FilterMode::Linear, MipmapMode::Linear) {
   }
 
-  std::unique_ptr<LayerContent> onUpdateContent() override;
+  void onUpdateContent(LayerRecorder* recorder) override;
 
  private:
   SamplingOptions _sampling;

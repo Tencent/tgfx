@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Context.h"
+#include "core/AtlasManager.h"
 #include "core/utils/BlockBuffer.h"
 #include "core/utils/Log.h"
 #include "core/utils/SlidingWindowTracker.h"
@@ -29,13 +30,17 @@
 
 namespace tgfx {
 Context::Context(Device* device) : _device(device) {
-  _drawingBuffer = new BlockBuffer(1 << 14);  // 16kb
+  // We set the maxBlockSize to 2MB because allocating blocks that are too large can cause memory
+  // fragmentation and slow down allocation. It may also increase the application's memory usage due
+  // to pre-allocation optimizations on some platforms.
+  _drawingBuffer = new BlockBuffer(1 << 14, 1 << 21);  // 16kb, 2MB
   _programCache = new ProgramCache(this);
   _resourceCache = new ResourceCache(this);
   _drawingManager = new DrawingManager(this);
   _resourceProvider = new ResourceProvider(this);
   _proxyProvider = new ProxyProvider(this);
   _maxValueTracker = new SlidingWindowTracker(10);
+  _atlasManager = new AtlasManager(this);
 }
 
 Context::~Context() {
@@ -50,6 +55,7 @@ Context::~Context() {
   delete _resourceProvider;
   delete _proxyProvider;
   delete _drawingBuffer;
+  delete _atlasManager;
   delete _maxValueTracker;
 }
 
@@ -58,7 +64,9 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
   // particularly crucial for texture resources that are bound to render targets. Only after the
   // cleanup can they be unbound and reused.
   _resourceCache->processUnreferencedResources();
+  _atlasManager->preFlush();
   auto flushed = _drawingManager->flush();
+  _atlasManager->postFlush();
   bool semaphoreInserted = false;
   if (signalSemaphore != nullptr) {
     auto semaphore = Semaphore::Wrap(signalSemaphore);
@@ -130,5 +138,6 @@ void Context::releaseAll(bool releaseGPU) {
   _resourceProvider->releaseAll();
   _programCache->releaseAll(releaseGPU);
   _resourceCache->releaseAll(releaseGPU);
+  _atlasManager->releaseAll();
 }
 }  // namespace tgfx

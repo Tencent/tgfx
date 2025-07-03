@@ -20,6 +20,7 @@
 
 #include <vector>
 #include "core/DataSource.h"
+#include "core/utils/BlockBuffer.h"
 #include "core/utils/PlacementPtr.h"
 #include "tgfx/core/Data.h"
 
@@ -29,6 +30,10 @@ namespace tgfx {
  */
 class VertexProvider {
  public:
+  explicit VertexProvider(std::shared_ptr<BlockBuffer> reference)
+      : reference(std::move(reference)) {
+  }
+
   virtual ~VertexProvider() = default;
 
   /**
@@ -40,6 +45,9 @@ class VertexProvider {
    * Returns the vertices in the provider.
    */
   virtual void getVertices(float* vertices) const = 0;
+
+ private:
+  std::shared_ptr<BlockBuffer> reference = nullptr;
 };
 
 class VertexProviderTask : public Task {

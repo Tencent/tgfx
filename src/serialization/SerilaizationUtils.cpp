@@ -21,7 +21,6 @@
 #include "ColorSerialization.h"
 #include "FontMetricsSerialization.h"
 #include "FontSerialization.h"
-#include "GlyphFaceSerialization.h"
 #include "ImageFilterSerialization.h"
 #include "ImageSerialization.h"
 #include "LayerFilterSerialization.h"
@@ -436,14 +435,6 @@ void SerializeUtils::FillMap(const std::shared_ptr<Typeface>& typeFace, uint64_t
     return;
   }
   (*map)[objID] = [typeFace]() { return TypeFaceSerialization::Serialize(typeFace.get()); };
-}
-
-void SerializeUtils::FillMap(const std::shared_ptr<GlyphFace>& glyphFace, uint64_t objID,
-                             Map* map) {
-  if (glyphFace == nullptr) {
-    return;
-  }
-  (*map)[objID] = [glyphFace]() { return GlyphFaceSerialization::Serialize(glyphFace.get()); };
 }
 
 void SerializeUtils::FillMap(const std::shared_ptr<ImageFilter>& imageFilter, uint64_t objID,

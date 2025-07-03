@@ -33,6 +33,7 @@ class ResourceProvider;
 class ProxyProvider;
 class BlockBuffer;
 class SlidingWindowTracker;
+class AtlasManager;
 
 /**
  * Context is the main interface to the GPU. It is used to create and manage GPU resources, and to
@@ -86,6 +87,10 @@ class Context {
     return _proxyProvider;
   }
 
+  AtlasManager* atlasManager() const {
+    return _atlasManager;
+  }
+
   /**
    * Returns the number of bytes consumed by internal gpu caches.
    */
@@ -111,7 +116,7 @@ class Context {
    * Returns the number of frames (valid flushes) after which unused GPU resources are considered
    * expired. A 'frame' is defined as a non-empty flush where actual rendering work is performed and
    * commands are submitted to the GPU. If a GPU resource is not used for more than this number of
-   * frames, it will be automatically purged from the cache. The default value is 10 frames.
+   * frames, it will be automatically purged from the cache. The default value is 60 frames.
    */
   size_t resourceExpirationFrames() const;
 
@@ -214,6 +219,7 @@ class Context {
   ProxyProvider* _proxyProvider = nullptr;
   BlockBuffer* _drawingBuffer = nullptr;
   SlidingWindowTracker* _maxValueTracker = nullptr;
+  AtlasManager* _atlasManager = nullptr;
 
   void releaseAll(bool releaseGPU);
 

@@ -26,7 +26,9 @@ class BackgroundContext {
   static std::shared_ptr<BackgroundContext> Make(Context* context, const Rect& drawRect,
                                                  const Matrix& matrix);
 
-  Canvas* backgroundCanvas() const;
+  Canvas* getCanvas() const {
+    return surface->getCanvas();
+  }
 
   std::shared_ptr<Image> getBackgroundImage() const;
 

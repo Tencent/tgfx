@@ -17,13 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/ImageLayer.h"
-#include "layers/contents/ImageContent.h"
 
 namespace tgfx {
 std::shared_ptr<ImageLayer> ImageLayer::Make() {
-  auto layer = std::shared_ptr<ImageLayer>(new ImageLayer());
-  layer->weakThis = layer;
-  return layer;
+  return std::shared_ptr<ImageLayer>(new ImageLayer());
 }
 
 void ImageLayer::setSampling(const SamplingOptions& value) {
@@ -38,14 +35,12 @@ void ImageLayer::setImage(std::shared_ptr<Image> value) {
   if (_image == value) {
     return;
   }
-  _image = value;
+  _image = std::move(value);
   invalidateContent();
 }
 
-std::unique_ptr<LayerContent> ImageLayer::onUpdateContent() {
-  if (!_image) {
-    return nullptr;
-  }
-  return std::make_unique<ImageContent>(_image, _sampling);
+void ImageLayer::onUpdateContent(LayerRecorder* recorder) {
+  auto canvas = recorder->getCanvas();
+  canvas->drawImage(_image, _sampling);
 }
 }  // namespace tgfx

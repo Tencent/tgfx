@@ -36,6 +36,22 @@ class MCState;
 class CanvasState;
 
 /**
+ * SrcRectConstraint controls the behavior at the edge of source rect, provided to drawImageRect()
+ * when there is any filtering. If Strict is set, then extra code is used to ensure it never samples
+ * outside of the src-rect. Strict disables the use of mipmaps.
+*/
+enum class SrcRectConstraint {
+  /**
+   * sample only inside bounds; slower
+   */
+  Strict,
+  /**
+   * sample outside bounds; faster
+   */
+  Fast,
+};
+
+/**
  * Canvas provides an interface for drawing, including how the drawing is clipped and transformed.
  * It maintains a stack of matrix and clip values. Each draw call on the Canvas transforms the
  * geometry of the object by combining all the matrix values in the stack. The transformed geometry
@@ -366,9 +382,12 @@ class Canvas {
    * @param sampling  the sampling options used to sample the image. Defaults to
    * FilterMode::Linear and MipmapMode::Linear.
    * @param paint  the paint to apply blending, filtering, etc.; can be nullptr.
+   * @param constraint  the constraint for the source rectangle sampling. Defaults to
+   * SrcRectConstraint::Fast.
    */
   void drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
-                     const SamplingOptions& sampling = {}, const Paint* paint = nullptr);
+                     const SamplingOptions& sampling = {}, const Paint* paint = nullptr,
+                     SrcRectConstraint constraint = SrcRectConstraint::Fast);
 
   /**
    * Draws text at the specified (x, y) coordinates using the current clip, matrix, font, and paint.
@@ -394,18 +413,6 @@ class Canvas {
    */
   void drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,
                   const Font& font, const Paint& paint);
-
-  /**
-   * Draws an array of glyphs at specified positions using the current clip, matrix, glyphFace, and
-   * paint.
-   * @param glyphs The array of GlyphIDs to draw.
-   * @param positions The positions to draw each glyph.
-   * @param glyphCount The number of glyphs to draw.
-   * @param glyphFace The custom GlyphFace used for rendering glyphs.
-   * @param paint The paint used for blending, coloring, etc.
-   */
-  void drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t glyphCount,
-                  std::shared_ptr<GlyphFace> glyphFace, const Paint& paint);
 
   /**
    * Draws a TextBlob at the specified (x, y) coordinates using the current clip, matrix, and paint.
@@ -451,22 +458,22 @@ class Canvas {
  private:
   DrawContext* drawContext = nullptr;
   Surface* surface = nullptr;
+  bool optimizeMemoryForLayer = false;
   std::unique_ptr<MCState> mcState;
   std::stack<std::unique_ptr<CanvasState>> stateStack;
 
-  explicit Canvas(DrawContext* drawContext, Surface* surface = nullptr);
+  explicit Canvas(DrawContext* drawContext, Surface* surface = nullptr,
+                  bool optimizeMemoryForLayer = false);
   void drawPath(const Path& path, const MCState& state, const Fill& fill,
                 const Stroke* stroke) const;
   void drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
                      const SamplingOptions& sampling, const Fill& fill,
-                     const Matrix* dstMatrix = nullptr);
+                     const Matrix* dstMatrix = nullptr,
+                     SrcRectConstraint constraint = SrcRectConstraint::Fast);
   void drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const Fill& fill,
                  std::shared_ptr<ImageFilter> imageFilter = nullptr);
   void drawFill(const MCState& state, const Fill& fill) const;
   void resetStateStack();
-
-  static Path* UnwrapShape(std::shared_ptr<Shape> shape, const Stroke** pathStroke,
-                           Matrix* pathMatrix);
 
   friend class Surface;
   friend class Picture;

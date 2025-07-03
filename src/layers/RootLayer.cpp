@@ -31,9 +31,7 @@ static float UnionArea(const Rect& rect1, const Rect& rect2) {
 }
 
 std::shared_ptr<RootLayer> RootLayer::Make() {
-  auto layer = std::shared_ptr<RootLayer>(new RootLayer());
-  layer->weakThis = layer;
-  return layer;
+  return std::shared_ptr<RootLayer>(new RootLayer());
 }
 
 RootLayer::~RootLayer() {
@@ -113,4 +111,10 @@ std::vector<Rect> RootLayer::updateDirtyRegions() {
   return std::move(dirtyRects);
 }
 
+std::optional<Rect> RootLayer::getBackgroundRect(const Rect& drawRect, float contentScale) const {
+  if (backgroundOutset <= 0.f) {
+    return std::nullopt;
+  }
+  return drawRect.makeOutset(backgroundOutset * contentScale, backgroundOutset * contentScale);
+}
 }  // namespace tgfx

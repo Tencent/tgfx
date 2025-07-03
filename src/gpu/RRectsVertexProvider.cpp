@@ -70,7 +70,7 @@ PlacementPtr<RRectsVertexProvider> RRectsVertexProvider::MakeFrom(
   auto array = buffer->makeArray(std::move(rects));
   auto strokeArray = buffer->makeArray(std::move(strokes));
   return buffer->make<RRectsVertexProvider>(std::move(array), aaType, useScale, hasColor,
-                                            std::move(strokeArray));
+                                            std::move(strokeArray), buffer->addReference());
 }
 
 static void WriteUByte4Color(float* vertices, int& index, const Color& color) {
@@ -87,8 +87,9 @@ static float FloatInvert(float value) {
 
 RRectsVertexProvider::RRectsVertexProvider(PlacementArray<RRectRecord>&& rects, AAType aaType,
                                            bool useScale, bool hasColor,
-                                           PlacementArray<Stroke>&& strokes)
-    : rects(std::move(rects)), strokes(std::move(strokes)) {
+                                           PlacementArray<Stroke>&& strokes,
+                                           std::shared_ptr<BlockBuffer> reference)
+    : VertexProvider(std::move(reference)), rects(std::move(rects)), strokes(std::move(strokes)) {
   bitFields.aaType = static_cast<uint8_t>(aaType);
   bitFields.useScale = useScale;
   bitFields.hasColor = hasColor;

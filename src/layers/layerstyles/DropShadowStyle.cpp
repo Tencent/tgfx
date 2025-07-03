@@ -17,8 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
-#include <utility>
-#include "OpaqueThreshold.h"
+#include "layers/OpaqueThreshold.h"
 
 namespace tgfx {
 

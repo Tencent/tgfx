@@ -29,14 +29,13 @@ PlacementPtr<AtlasTextOp> AtlasTextOp::Make(Context* context,
                                             PlacementPtr<RectsVertexProvider> provider,
                                             uint32_t renderFlags,
                                             std::shared_ptr<TextureProxy> textureProxy,
-                                            const SamplingOptions& sampling,
-                                            const Matrix& uvMatrix) {
+                                            const SamplingOptions& sampling) {
   if (provider == nullptr || textureProxy == nullptr || textureProxy->width() <= 0 ||
       textureProxy->height() <= 0) {
     return nullptr;
   }
-  auto atlasTextOp = context->drawingBuffer()->make<AtlasTextOp>(
-      provider.get(), std::move(textureProxy), sampling, uvMatrix);
+  auto atlasTextOp = context->drawingBuffer()->make<AtlasTextOp>(provider.get(),
+                                                                 std::move(textureProxy), sampling);
   if (provider->aaType() == AAType::Coverage) {
     atlasTextOp->indexBufferProxy = context->resourceProvider()->aaQuadIndexBuffer();
   } else if (provider->rectCount() > 1) {
@@ -54,9 +53,9 @@ PlacementPtr<AtlasTextOp> AtlasTextOp::Make(Context* context,
 }
 
 AtlasTextOp::AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureProxy> textureProxy,
-                         const SamplingOptions& sampling, const Matrix& uvMatrix)
+                         const SamplingOptions& sampling)
     : DrawOp(provider->aaType()), rectCount(provider->rectCount()),
-      textureProxy(std::move(textureProxy)), sampling(sampling), uvMatrix(uvMatrix) {
+      textureProxy(std::move(textureProxy)), sampling(sampling) {
   if (!provider->hasColor()) {
     commonColor = provider->firstColor();
   }
@@ -77,8 +76,8 @@ void AtlasTextOp::execute(RenderPass* renderPass) {
   }
 
   auto drawingBuffer = renderPass->getContext()->drawingBuffer();
-  auto atlasGeometryProcessor = AtlasTextGeometryProcessor::Make(
-      drawingBuffer, textureProxy, sampling, aaType, commonColor, uvMatrix);
+  auto atlasGeometryProcessor =
+      AtlasTextGeometryProcessor::Make(drawingBuffer, textureProxy, sampling, aaType, commonColor);
   auto pipeline = createPipeline(renderPass, std::move(atlasGeometryProcessor));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   renderPass->bindBuffers(indexBuffer, vertexBuffer, vertexBufferOffset);

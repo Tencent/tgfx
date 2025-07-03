@@ -27,7 +27,12 @@ bool ReadPixelsFromCanvasImage(emscripten::val canvasImageData, const ImageInfo&
   }
   auto length = canvasImageData["length"].as<size_t>();
   auto memory = emscripten::val::module_property("HEAPU8")["buffer"];
-  if (dstInfo.colorType() != ColorType::RGBA_8888) {
+  if (dstInfo.colorType() == ColorType::RGBA_8888 && dstInfo.rowBytes() == dstInfo.minRowBytes()) {
+    auto memoryView = emscripten::val::global("Uint8Array")
+                          .new_(memory, reinterpret_cast<uintptr_t>(dstPixels), length);
+    memoryView.call<void>("set", canvasImageData);
+
+  } else {
     if (length == 0 || length % 4 != 0) {
       return false;
     }
@@ -38,15 +43,11 @@ bool ReadPixelsFromCanvasImage(emscripten::val canvasImageData, const ImageInfo&
     auto memoryView = emscripten::val::global("Uint8Array")
                           .new_(memory, reinterpret_cast<uintptr_t>(buffer), length);
     memoryView.call<void>("set", canvasImageData);
-    auto RGBAInfo = ImageInfo::Make(dstInfo.width(), dstInfo.height(), ColorType::RGBA_8888,
-                                    AlphaType::Premultiplied);
-    Pixmap RGBAMap(RGBAInfo, buffer);
+    auto srcInfo = ImageInfo::Make(dstInfo.width(), dstInfo.height(), ColorType::RGBA_8888,
+                                   AlphaType::Premultiplied);
+    Pixmap RGBAMap(srcInfo, buffer);
     RGBAMap.readPixels(dstInfo, dstPixels);
     delete[] buffer;
-  } else {
-    auto memoryView = emscripten::val::global("Uint8Array")
-                          .new_(memory, reinterpret_cast<uintptr_t>(dstPixels), length);
-    memoryView.call<void>("set", canvasImageData);
   }
   return true;
 }

@@ -24,7 +24,7 @@ void Paint::setShader(std::shared_ptr<Shader> newShader) {
   if (fill.shader) {
     Color color = {};
     if (fill.shader->asColor(&color)) {
-      color.alpha *= getAlpha();
+      color.alpha *= fill.color.alpha;
       fill.color = color;
       fill.shader = nullptr;
     }

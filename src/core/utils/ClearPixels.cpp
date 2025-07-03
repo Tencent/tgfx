@@ -27,7 +27,7 @@ void ClearPixels(const ImageInfo& dstInfo, void* dstPixels) {
   auto height = static_cast<size_t>(dstInfo.height());
   for (size_t y = 0; y < height; ++y) {
     auto row = static_cast<uint8_t*>(dstPixels) + y * dstInfo.rowBytes();
-    memset(row, 0, dstInfo.rowBytes());
+    memset(row, 0, dstInfo.minRowBytes());
   }
 }
 }  // namespace tgfx

@@ -69,7 +69,7 @@ void ProgramBuilder::emitAndInstallGeoProc(std::string* outputColor, std::string
   GeometryProcessor::FPCoordTransformHandler transformHandler(pipeline, &transformedCoordVars);
   GeometryProcessor::EmitArgs args(vertexShaderBuilder(), fragmentShaderBuilder(), varyingHandler(),
                                    uniformHandler(), getContext()->caps(), *outputColor,
-                                   *outputCoverage, &transformHandler);
+                                   *outputCoverage, &transformHandler, &subsetVarName);
   geometryProcessor->emitCode(args);
   fragmentShaderBuilder()->codeAppend("}");
 }
@@ -125,7 +125,7 @@ std::string ProgramBuilder::emitAndInstallFragProc(const FragmentProcessor* proc
       processor, GetPointer(transformedCoordVars, transformedCoordVarsIdx));
   FragmentProcessor::TextureSamplers textureSamplers(processor, GetPointer(texSamplers, 0));
   FragmentProcessor::EmitArgs args(fragmentShaderBuilder(), uniformHandler(), output, input,
-                                   &coords, &textureSamplers);
+                                   subsetVarName, &coords, &textureSamplers);
 
   processor->emitCode(args);
   fragmentShaderBuilder()->codeAppend("}");

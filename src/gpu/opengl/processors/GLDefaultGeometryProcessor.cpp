@@ -47,8 +47,7 @@ void GLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
   vertBuilder->codeAppendf("vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
                            matrixName.c_str(), position.name().c_str());
 
-  emitTransforms(vertBuilder, varyingHandler, uniformHandler, position.asShaderVar(),
-                 args.fpCoordTransformHandler);
+  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, position.asShaderVar());
 
   if (aa == AAType::Coverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);

@@ -35,6 +35,10 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Picture> picture, int wid
   }
   if (picture->drawCount == 1) {
     ISize clipSize = {width, height};
+    // PictureImage is not a ResourceImage because it can be very large, while ResourceImage always
+    // caches the full image by default. With PictureImage, usually only a portion is needed,
+    // especially for image filters. So, we only unwrap the image inside the picture and avoid
+    // creating a ResourceImage for paths or text.
     auto image = picture->asImage(nullptr, matrix, &clipSize);
     if (image) {
       return image;
@@ -62,9 +66,7 @@ std::shared_ptr<Image> PictureImage::onMakeMipmapped(bool enabled) const {
 }
 
 PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& args,
-                                                                  TileMode tileModeX,
-                                                                  TileMode tileModeY,
-                                                                  const SamplingOptions& sampling,
+                                                                  const SamplingArgs& samplingArgs,
                                                                   const Matrix* uvMatrix) const {
 
   auto drawBounds = args.drawRect;
@@ -76,7 +78,7 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
     return nullptr;
   }
   rect.roundOut();
-  auto mipmapped = sampling.mipmapMode != MipmapMode::None && hasMipmaps();
+  auto mipmapped = samplingArgs.sampling.mipmapMode != MipmapMode::None && hasMipmaps();
   auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(rect.width()), static_cast<int>(rect.height()),
@@ -93,8 +95,12 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (uvMatrix) {
     finalUVMatrix.preConcat(*uvMatrix);
   }
-  return TiledTextureEffect::Make(renderTarget->getTextureProxy(), tileModeX, tileModeY, sampling,
-                                  &finalUVMatrix, isAlphaOnly());
+  auto newSamplingArgs = samplingArgs;
+  if (samplingArgs.sampleArea) {
+    newSamplingArgs.sampleArea->offset(-rect.left, -rect.top);
+  }
+  return TiledTextureEffect::Make(renderTarget->getTextureProxy(), newSamplingArgs, &finalUVMatrix,
+                                  isAlphaOnly());
 }
 
 std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args) const {

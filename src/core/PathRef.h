@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "core/utils/LazyBounds.h"
 #include "gpu/ResourceKey.h"
 #include "pathkit.h"
 
@@ -38,16 +39,12 @@ class PathRef {
   explicit PathRef(const pk::SkPath& path) : path(path) {
   }
 
-  ~PathRef();
-
   Rect getBounds();
 
  private:
   LazyUniqueKey uniqueKey = {};
-  std::atomic<Rect*> bounds = {nullptr};
+  LazyBounds bounds = {};
   pk::SkPath path = {};
-
-  void resetBounds();
 
   friend bool operator==(const Path& a, const Path& b);
   friend bool operator!=(const Path& a, const Path& b);

@@ -34,33 +34,21 @@ UniqueKey PathRef::GetUniqueKey(const Path& path) {
   return path.pathRef->uniqueKey.get();
 }
 
-PathRef::~PathRef() {
-  resetBounds();
-}
-
 Rect PathRef::getBounds() {
-  auto cacheBounds = bounds.load(std::memory_order_acquire);
-  if (cacheBounds == nullptr) {
-    // Internally, SkPath lazily computes bounds. Use this function instead of path.getBounds()
-    // for thread safety.
-    auto count = path.countPoints();
-    auto points = new SkPoint[static_cast<size_t>(count)];
-    path.getPoints(points, count);
-    auto rect = SkRect::MakeEmpty();
-    rect.setBounds(points, count);
-    delete[] points;
-    auto newBounds = new Rect{rect.fLeft, rect.fTop, rect.fRight, rect.fBottom};
-    if (bounds.compare_exchange_strong(cacheBounds, newBounds, std::memory_order_acq_rel)) {
-      cacheBounds = newBounds;
-    } else {
-      delete newBounds;
-    }
+  auto cachedBounds = bounds.get();
+  if (cachedBounds) {
+    return *cachedBounds;
   }
-  return *cacheBounds;
-}
-
-void PathRef::resetBounds() {
-  auto oldBounds = bounds.exchange(nullptr, std::memory_order_acq_rel);
-  delete oldBounds;
+  // Internally, SkPath lazily computes bounds. Use this function instead of path.getBounds()
+  // for thread safety.
+  auto count = path.countPoints();
+  auto points = new SkPoint[static_cast<size_t>(count)];
+  path.getPoints(points, count);
+  auto rect = SkRect::MakeEmpty();
+  rect.setBounds(points, count);
+  delete[] points;
+  Rect newBounds(rect.fLeft, rect.fTop, rect.fRight, rect.fBottom);
+  bounds.update(newBounds);
+  return newBounds;
 }
 }  // namespace tgfx

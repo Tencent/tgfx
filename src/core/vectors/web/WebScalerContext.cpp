@@ -19,28 +19,13 @@
 #include "WebScalerContext.h"
 #include "ReadPixelsFromCanvasImage.h"
 #include "WebTypeface.h"
-#include "core/utils/ApplyStrokeToBound.h"
+#include "core/utils/ApplyStrokeToBounds.h"
 #include "core/utils/Log.h"
 #include "platform/web/WebImageBuffer.h"
 
 using namespace emscripten;
 
 namespace tgfx {
-
-std::shared_ptr<ScalerContext> ScalerContext::CreateNew(std::shared_ptr<Typeface> typeface,
-                                                        float size) {
-  DEBUG_ASSERT(typeface != nullptr);
-  auto scalerContextClass = val::module_property("ScalerContext");
-  if (!scalerContextClass.as<bool>()) {
-    return nullptr;
-  }
-  auto scalerContext = scalerContextClass.new_(typeface->fontFamily(), typeface->fontStyle(), size);
-  if (!scalerContext.as<bool>()) {
-    return nullptr;
-  }
-  return std::make_shared<WebScalerContext>(std::move(typeface), size, std::move(scalerContext));
-}
-
 WebScalerContext::WebScalerContext(std::shared_ptr<Typeface> typeface, float size,
                                    val scalerContext)
     : ScalerContext(std::move(typeface), size), scalerContext(std::move(scalerContext)) {

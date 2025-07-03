@@ -33,25 +33,6 @@
 
 namespace tgfx {
 
-/**
- * Two ways to describe paths in SVG
- */
-enum class PathEncoding {
-  /**
-   * Each step's point is an absolute coordinate, and the step letter is uppercase
-   */
-  Absolute,
-  /**
-   * Each step's point is a relative coordinate to the previous point, and the step letter is
-   *lowercase
-   */
-  Relative,
-};
-
-std::string ToSVGPath(const Path& path, PathEncoding = PathEncoding::Absolute);
-
-std::tuple<bool, std::shared_ptr<Path>> PathMakeFromSVGString(const std::string& pathString);
-
 std::string ToSVGTransform(const Matrix& matrix);
 
 /**

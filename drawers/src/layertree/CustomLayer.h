@@ -18,34 +18,9 @@
 
 #pragma once
 
-#include <utility>
 #include "tgfx/layers/Layer.h"
 
 namespace drawers {
-
-class CustomLayerContent : public tgfx::LayerContent {
- public:
-  explicit CustomLayerContent(std::shared_ptr<tgfx::TextBlob> textBlob)
-      : _textBlob(std::move(textBlob)){};
-
-  tgfx::Rect getBounds() const override {
-    return _textBlob->getBounds();
-  }
-
-  void draw(tgfx::Canvas* canvas, const tgfx::Paint& paint) const override {
-    auto textPaint = paint;
-    textPaint.setColor(tgfx::Color::Black());
-    canvas->drawTextBlob(_textBlob, 0, 0, textPaint);
-  }
-
-  bool hitTestPoint(float localX, float localY, bool) override {
-    return _textBlob->getBounds().contains(localX, localY);
-  }
-
- private:
-  std::shared_ptr<tgfx::TextBlob> _textBlob;
-};
-
 class CustomLayer : public tgfx::Layer {
  public:
   static std::shared_ptr<CustomLayer> Make();
@@ -59,10 +34,10 @@ class CustomLayer : public tgfx::Layer {
     invalidateContent();
   }
 
-  std::unique_ptr<tgfx::LayerContent> onUpdateContent() override;
-
  protected:
   CustomLayer() = default;
+
+  void onUpdateContent(tgfx::LayerRecorder* recorder) override;
 
  private:
   std::string _text;

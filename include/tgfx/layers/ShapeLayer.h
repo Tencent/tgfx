@@ -300,10 +300,7 @@ class ShapeLayer : public Layer {
  protected:
   ShapeLayer();
 
-  std::unique_ptr<LayerContent> onUpdateContent() override;
-
-  void drawContents(const std::function<void(ContentDrawer contentDrawer)>& drawContent,
-                    const std::function<bool()>& drawChildren) const override;
+  void onUpdateContent(LayerRecorder* recorder) override;
 
  private:
   std::shared_ptr<Shape> _shape = nullptr;
@@ -320,13 +317,9 @@ class ShapeLayer : public Layer {
     uint8_t strokeAlign : 2;
   } shapeBitFields = {};
 
-  Paint getPaint(float alpha) const;
+  std::vector<Paint> createShapePaints(
+      const std::vector<std::shared_ptr<ShapeStyle>>& styles) const;
+
   std::shared_ptr<Shape> createStrokeShape() const;
-
-  static bool DrawFills(Canvas* canvas, const Layer* layer, const LayerContent* content,
-                        float alpha, bool forContour);
-
-  static bool DrawStrokes(Canvas* canvas, const Layer* layer, const LayerContent* content,
-                          float alpha, bool forContour);
 };
 }  // namespace tgfx

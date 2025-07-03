@@ -114,7 +114,8 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
   FPArgs fpArgs(args.context, args.renderFlags,
                 Rect::MakeWH(scaledBounds.width(), scaledBounds.height()));
 
-  auto sourceProcessor = FragmentProcessor::Make(source, fpArgs, tileMode, tileMode, {}, &uvMatrix);
+  auto sourceProcessor = FragmentProcessor::Make(source, fpArgs, tileMode, tileMode, {},
+                                                 SrcRectConstraint::Fast, &uvMatrix);
 
   if (blur2D) {
     Blur1D(std::move(sourceProcessor), renderTarget, blurrinessX * scaleFactor,
@@ -126,8 +127,9 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     uvMatrix.preTranslate(clipBounds.left - boundsWillSample.left,
                           clipBounds.top - boundsWillSample.top);
 
-    sourceProcessor = TiledTextureEffect::Make(renderTarget->getTextureProxy(), tileMode, tileMode,
-                                               {}, &uvMatrix);
+    SamplingArgs samplingArgs = {tileMode, tileMode, {}, SrcRectConstraint::Fast};
+    sourceProcessor =
+        TiledTextureEffect::Make(renderTarget->getTextureProxy(), samplingArgs, &uvMatrix);
 
     renderTarget = RenderTargetProxy::MakeFallback(
         args.context, static_cast<int>(clipBounds.width()), static_cast<int>(clipBounds.height()),
@@ -165,8 +167,8 @@ Rect GaussianBlurImageFilter::onFilterBounds(const Rect& srcRect) const {
 
 PlacementPtr<FragmentProcessor> GaussianBlurImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    const Matrix* uvMatrix) const {
-  return makeFPFromTextureProxy(source, args, sampling, uvMatrix);
+    SrcRectConstraint constraint, const Matrix* uvMatrix) const {
+  return makeFPFromTextureProxy(source, args, sampling, constraint, uvMatrix);
 }
 
 }  // namespace tgfx

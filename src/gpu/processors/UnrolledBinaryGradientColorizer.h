@@ -24,7 +24,7 @@
 namespace tgfx {
 class UnrolledBinaryGradientColorizer : public FragmentProcessor {
  public:
-  static constexpr int kMaxColorCount = 16;
+  static constexpr int MaxColorCount = 16;
 
   static PlacementPtr<UnrolledBinaryGradientColorizer> Make(BlockBuffer* buffer,
                                                             const Color* colors,

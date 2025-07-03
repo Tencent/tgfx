@@ -21,6 +21,7 @@
 #include "core/MCState.h"
 #include "gpu/ops/RRectDrawOp.h"
 #include "gpu/ops/RectDrawOp.h"
+#include "tgfx/core/Canvas.h"
 #include "tgfx/core/Fill.h"
 #include "tgfx/core/Shape.h"
 
@@ -31,6 +32,7 @@ enum class PendingOpType {
   Rect,
   RRect,
   Shape,
+  Atlas,
 };
 
 /**
@@ -48,7 +50,7 @@ class OpsCompositor {
    * Fills the given rect with the image, sampling options, state and fill.
    */
   void fillImage(std::shared_ptr<Image> image, const Rect& rect, const SamplingOptions& sampling,
-                 const MCState& state, const Fill& fill);
+                 const MCState& state, const Fill& fill, SrcRectConstraint constraint);
 
   /**
    * Fills the given rect with the given state and fill.
@@ -64,6 +66,12 @@ class OpsCompositor {
    * Fills the given shape with the given state and fill.
    */
   void fillShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill);
+
+  /**
+   * Fills the given rect with the given fill, using the provided texture proxy and sampling options.
+   */
+  void fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,
+                     const SamplingOptions& sampling, const MCState& state, const Fill& fill);
 
   /**
    * Discard all pending operations.
@@ -91,9 +99,11 @@ class OpsCompositor {
   UniqueKey clipKey = {};
   std::shared_ptr<TextureProxy> clipTexture = nullptr;
   PendingOpType pendingType = PendingOpType::Unknown;
+  SrcRectConstraint pendingConstraint = SrcRectConstraint::Fast;
   Path pendingClip = {};
   Fill pendingFill = {};
   std::shared_ptr<Image> pendingImage = nullptr;
+  std::shared_ptr<TextureProxy> pendingAtlasTexture = nullptr;
   SamplingOptions pendingSampling = {};
   std::vector<PlacementPtr<RectRecord>> pendingRects = {};
   std::vector<PlacementPtr<RRectRecord>> pendingRRects = {};

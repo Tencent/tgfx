@@ -18,14 +18,13 @@
 
 #pragma once
 
-#include "gpu/ResourceKey.h"
-#include "tgfx/core/Shape.h"
+#include "core/shapes/UniqueKeyShape.h"
 
 namespace tgfx {
 /**
  * Shape that appends multiple shapes together.
  */
-class AppendShape : public Shape {
+class AppendShape : public UniqueKeyShape {
  public:
   static std::shared_ptr<Shape> MakeFrom(std::shared_ptr<Shape> first,
                                          std::shared_ptr<Shape> second);
@@ -41,12 +40,7 @@ class AppendShape : public Shape {
     return Type::Append;
   }
 
-  UniqueKey getUniqueKey() const override {
-    return uniqueKey.get();
-  }
-
  private:
-  LazyUniqueKey uniqueKey = {};
   std::vector<std::shared_ptr<Shape>> shapes = {};
 
   static void Append(std::vector<std::shared_ptr<Shape>>* shapes, std::shared_ptr<Shape> shape);
