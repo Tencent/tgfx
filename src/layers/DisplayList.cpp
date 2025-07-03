@@ -82,8 +82,9 @@ class DrawTask {
     auto offsetX = (tile->sourceX - tile->tileX) * tileSize;
     auto offsetY = (tile->sourceY - tile->tileY) * tileSize;
     _sourceRect.offset(static_cast<float>(offsetX), static_cast<float>(offsetY));
-    if (fabsf(scale - 1.0f) > std::numeric_limits<float>::epsilon()) {
+    if (!FloatNearlyEqual(scale, 1.0f)) {
       _tileRect.scale(scale, scale);
+      _tileRect.round();
     }
   }
 };
@@ -749,7 +750,7 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* su
   if (autoClear) {
     paint.setBlendMode(BlendMode::Src);
   }
-  static SamplingOptions sampling(FilterMode::Linear, MipmapMode::None);
+  static SamplingOptions sampling(FilterMode::Nearest, MipmapMode::None);
   canvas->setMatrix(Matrix::MakeTrans(_contentOffset.x, _contentOffset.y));
   for (auto& task : screenTasks) {
     auto surfaceCache = surfaceCaches[task.sourceIndex()];
