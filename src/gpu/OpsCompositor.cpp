@@ -217,8 +217,6 @@ bool OpsCompositor::canAppend(PendingOpType type, const Path& clip, const Fill& 
       return pendingRects.size() < RectDrawOp::MaxNumRects;
     case PendingOpType::RRect:
       return pendingRRects.size() < RRectDrawOp::MaxNumRRects;
-    case PendingOpType::Atlas:
-      return pendingRects.empty() || !fill.shader;
     default:
       break;
   }

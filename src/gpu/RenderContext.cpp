@@ -198,7 +198,9 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect
 void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
                                      const MCState& state, const Fill& fill, const Stroke* stroke) {
   DEBUG_ASSERT(glyphRunList != nullptr);
-  if (getContext() == nullptr || getContext()->atlasManager() == nullptr) {
+  DEBUG_ASSERT(getContext() != nullptr);
+  DEBUG_ASSERT(getContext()->atlasManager() != nullptr);
+  if (getOpsCompositor() == nullptr) {
     return;
   }
   auto maxScale = state.matrix.getMaxScale();
@@ -433,9 +435,9 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
     glyphState.matrix.postConcat(state.matrix);
     glyphState.matrix.preTranslate(-rect.x(), -rect.y());
 
-    auto newFill = fill.makeWithMatrix(state.matrix);
-    newFill.antiAlias = false;
-    drawGlyphAtlas(std::move(textureProxy), rect, {}, glyphState, newFill);
+    auto glyphFill = fill.makeWithMatrix(state.matrix);
+    glyphFill.antiAlias = false;
+    drawGlyphAtlas(std::move(textureProxy), rect, {}, glyphState, glyphFill);
   }
 }
 void RenderContext::drawGlyphsAsPath(GlyphRun& sourceGlyphRun, const MCState& state,
@@ -485,22 +487,12 @@ void RenderContext::drawGlyphsAsPath(GlyphRun& sourceGlyphRun, const MCState& st
   }
   auto rasterizeMatrix = state.matrix;
   rasterizeMatrix.postTranslate(-bounds.x(), -bounds.y());
-  auto shape = Shape::MakeFrom(totalPath);
+  auto shape = Shape::MakeFrom(std::move(totalPath));
   shape = Shape::ApplyStroke(std::move(shape), stroke);
   shape = Shape::ApplyMatrix(std::move(shape), rasterizeMatrix);
-  auto width = static_cast<int>(ceilf(bounds.width()));
-  auto height = static_cast<int>(ceilf(bounds.height()));
-  auto rasterizer = PathRasterizer::Make(width, height, std::move(shape), true, true);
-  auto image = Image::MakeFrom(std::move(rasterizer));
-  if (image == nullptr) {
-    rejectedGlyphRun = std::move(sourceGlyphRun);
-    return;
-  }
-  auto newState = state;
-  newState.matrix = Matrix::MakeTrans(bounds.x(), bounds.y());
-  auto rect = Rect::MakeWH(image->width(), image->height());
-  opsCompositor->fillImage(std::move(image), rect, {}, newState,
-                           fill.makeWithMatrix(rasterizeMatrix), SrcRectConstraint::Fast);
+  auto shapeState = state;
+  shapeState.matrix = Matrix::MakeTrans(bounds.x(), bounds.y());
+  opsCompositor->fillShape(std::move(shape), shapeState, fill.makeWithMatrix(rasterizeMatrix));
 }
 
 void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
@@ -593,9 +585,9 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
     glyphState.matrix.postConcat(state.matrix);
     glyphState.matrix.preTranslate(-rect.x(), -rect.y());
 
-    auto newFill = fill.makeWithMatrix(state.matrix);
-    newFill.antiAlias = false;
-    drawGlyphAtlas(std::move(textureProxy), rect, {}, glyphState, newFill);
+    auto glyphFill = fill.makeWithMatrix(state.matrix);
+    glyphFill.antiAlias = false;
+    drawGlyphAtlas(std::move(textureProxy), rect, {}, glyphState, glyphFill);
   }
 }
 

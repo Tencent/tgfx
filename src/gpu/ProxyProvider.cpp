@@ -173,11 +173,8 @@ std::shared_ptr<GpuShapeProxy> ProxyProvider::createGpuShapeProxy(std::shared_pt
     }
   }
   auto shapeBounds = shape->getBounds();
-  auto uniqueKey = shape->getUniqueKey();
-  if (isInverseFillType) {
-    uniqueKey =
-        AppendClipBoundsKey(uniqueKey, clipBounds.makeOffset(-shapeBounds.left, -shapeBounds.top));
-  }
+  auto uniqueKey = AppendClipBoundsKey(shape->getUniqueKey(),
+                                       clipBounds.makeOffset(-shapeBounds.left, -shapeBounds.top));
   if (aaType != AAType::None) {
     // Add a 1-pixel outset to preserve anti-aliasing results.
     shapeBounds.outset(1.0f, 1.0f);
@@ -185,7 +182,10 @@ std::shared_ptr<GpuShapeProxy> ProxyProvider::createGpuShapeProxy(std::shared_pt
     static const auto NonAntialiasShapeType = UniqueID::Next();
     uniqueKey = UniqueKey::Append(uniqueKey, &NonAntialiasShapeType, 1);
   }
-  auto bounds = isInverseFillType ? clipBounds : shapeBounds;
+  auto bounds = shapeBounds;
+  if (!bounds.intersect(clipBounds)) {
+    return nullptr;
+  }
   drawingMatrix.preTranslate(bounds.x(), bounds.y());
   static const auto TriangleShapeType = UniqueID::Next();
   static const auto TextureShapeType = UniqueID::Next();
