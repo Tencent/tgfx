@@ -213,14 +213,14 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
     return;
   }
 
-  std::vector<GlyphRun> rejectedGlyphRuns;
+  std::vector<GlyphRun> rejectedGlyphRuns = {};
   const auto& glyphRuns = glyphRunList->glyphRuns();
   for (size_t i = 0; i < glyphRuns.size(); ++i) {
     auto& run = glyphRuns[i];
     if (run.font.getTypeface() == nullptr) {
       continue;
     }
-    GlyphRun rejectedGlyphRun;
+    GlyphRun rejectedGlyphRun = {};
     drawGlyphsAsDirectMask(run, state, fill, stroke, &rejectedGlyphRun);
     if (rejectedGlyphRun.glyphs.empty()) {
       continue;
