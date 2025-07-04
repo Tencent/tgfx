@@ -214,31 +214,26 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   }
 
   std::vector<GlyphRun> rejectedGlyphRuns;
-  for (const auto& run : glyphRunList->glyphRuns()) {
-    GlyphRun glyphRun;
-    glyphRun.font = run.font;
-    glyphRun.glyphs.reserve(run.glyphs.size());
-    glyphRun.positions.reserve(run.glyphs.size());
-    rejectedGlyphRuns.emplace_back(std::move(glyphRun));
-  }
-
   const auto& glyphRuns = glyphRunList->glyphRuns();
   for (size_t i = 0; i < glyphRuns.size(); ++i) {
     auto& run = glyphRuns[i];
     if (run.font.getTypeface() == nullptr) {
       continue;
     }
-    drawGlyphsAsDirectMask(run, state, fill, stroke, &rejectedGlyphRuns[i]);
+    GlyphRun rejectedGlyphRun;
+    drawGlyphsAsDirectMask(run, state, fill, stroke, &rejectedGlyphRun);
+    if (rejectedGlyphRun.glyphs.empty()) {
+      continue;
+    }
+    rejectedGlyphRun.font = run.font;
+    rejectedGlyphRuns.emplace_back(std::move(rejectedGlyphRun));
   }
 
-  auto iter = std::remove_if(rejectedGlyphRuns.begin(), rejectedGlyphRuns.end(),
-                             [](const auto& run) { return run.glyphs.empty(); });
-  rejectedGlyphRuns.erase(iter, rejectedGlyphRuns.end());
   if (rejectedGlyphRuns.empty()) {
     return;
   }
 
-  if (!glyphRunList->hasColor()) {
+  if (!glyphRunList->hasColor() && glyphRunList->hasOutlines()) {
     auto rejectedGlyphRunList = std::make_shared<GlyphRunList>(std::move(rejectedGlyphRuns));
     drawGlyphsAsPath(std::move(rejectedGlyphRunList), state, fill, stroke, clipBounds);
     return;
