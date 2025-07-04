@@ -548,14 +548,4 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
     }
   }
 }
-
-void RenderContext::drawGlyphAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,
-                                   const SamplingOptions& sampling, const MCState& state,
-                                   const Fill& fill) {
-  DEBUG_ASSERT(textureProxy != nullptr);
-  DEBUG_ASSERT(textureProxy->isAlphaOnly() || fill.shader == nullptr);
-  if (auto compositor = getOpsCompositor()) {
-    compositor->fillTextAtlas(std::move(textureProxy), rect, sampling, state, fill);
-  }
-}
 }  // namespace tgfx

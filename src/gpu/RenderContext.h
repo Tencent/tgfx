@@ -72,9 +72,6 @@ class RenderContext : public DrawContext {
   void drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun, const MCState& state,
                                    const Fill& fill, const Stroke* stroke);
 
-  void drawGlyphAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,
-                      const SamplingOptions& sampling, const MCState& state, const Fill& fill);
-
   std::shared_ptr<RenderTargetProxy> renderTarget = nullptr;
   uint32_t renderFlags = 0;
   Surface* surface = nullptr;
