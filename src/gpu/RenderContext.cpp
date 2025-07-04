@@ -352,13 +352,6 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
         std::make_unique<Stroke>(stroke->width * maxScale, stroke->cap, stroke->join, maxScale);
   }
 
-  auto appendToRejectedGlyphRun = [rejectedGlyphRun](GlyphID glyphID, const Point& position) {
-    if (rejectedGlyphRun != nullptr) {
-      rejectedGlyphRun->glyphs.push_back(glyphID);
-      rejectedGlyphRun->positions.push_back(position);
-    }
-  };
-
   AtlasCell atlasCell;
   size_t index = 0;
   PlotUseUpdater plotUseUpdater;
@@ -376,7 +369,8 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
     }
     auto maxDimension = static_cast<int>(ceilf(std::max(bounds.width(), bounds.height())));
     if (maxDimension >= Atlas::MaxCellSize) {
-      appendToRejectedGlyphRun(glyphID, glyphPosition);
+      rejectedGlyphRun->glyphs.push_back(glyphID);
+      rejectedGlyphRun->positions.push_back(glyphPosition);
       continue;
     }
 
@@ -396,7 +390,8 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
     } else {
       auto glyphCodec = GetGlyphCodec(font, glyphID, scaledStroke.get(), &glyphState.matrix);
       if (glyphCodec == nullptr) {
-        appendToRejectedGlyphRun(glyphID, glyphPosition);
+        rejectedGlyphRun->glyphs.push_back(glyphID);
+        rejectedGlyphRun->positions.push_back(glyphPosition);
         continue;
       }
       atlasCell._key = std::move(glyphKey);
@@ -411,7 +406,8 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
         drawingManager->addAtlasCellCodecTask(textureProxies[pageIndex], offset,
                                               std::move(glyphCodec));
       } else {
-        appendToRejectedGlyphRun(glyphID, glyphPosition);
+        rejectedGlyphRun->glyphs.push_back(glyphID);
+        rejectedGlyphRun->positions.push_back(glyphPosition);
         continue;
       }
     }
@@ -419,7 +415,8 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
                                   nextFlushToken);
     auto textureProxy = textureProxies[atlasLocator.pageIndex()];
     if (textureProxy == nullptr) {
-      appendToRejectedGlyphRun(glyphID, glyphPosition);
+      rejectedGlyphRun->glyphs.push_back(glyphID);
+      rejectedGlyphRun->positions.push_back(glyphPosition);
       continue;
     }
     auto rect = atlasLocator.getLocation();
@@ -430,7 +427,9 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
 
     auto glyphFill = fill.makeWithMatrix(state.matrix);
     glyphFill.antiAlias = false;
-    drawGlyphAtlas(std::move(textureProxy), rect, {}, glyphState, glyphFill);
+    if (auto compositor = getOpsCompositor()) {
+      compositor->fillTextAtlas(std::move(textureProxy), rect, {}, glyphState, glyphFill);
+    }
   }
 }
 void RenderContext::drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList,
@@ -544,7 +543,9 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
 
     auto glyphFill = fill.makeWithMatrix(state.matrix);
     glyphFill.antiAlias = false;
-    drawGlyphAtlas(std::move(textureProxy), rect, {}, glyphState, glyphFill);
+    if (auto compositor = getOpsCompositor()) {
+      compositor->fillTextAtlas(std::move(textureProxy), rect, {}, glyphState, glyphFill);
+    }
   }
 }
 
