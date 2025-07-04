@@ -20,9 +20,8 @@
 
 namespace tgfx {
 AtlasTextGeometryProcessor::AtlasTextGeometryProcessor(std::shared_ptr<TextureProxy> textureProxy,
-                                                       const SamplingOptions& sampling, AAType aa,
-                                                       std::optional<Color> commonColor)
-    : GeometryProcessor(ClassID()), textureProxy(std::move(textureProxy)), samplerState(sampling),
+                                                       AAType aa, std::optional<Color> commonColor)
+    : GeometryProcessor(ClassID()), textureProxy(std::move(textureProxy)),
       commonColor(commonColor) {
   position = {"aPosition", SLType::Float2};
   if (aa == AAType::Coverage) {
