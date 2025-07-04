@@ -81,18 +81,18 @@
         "rasterized_scale_up": "c475bfb",
         "saveLayer": "52e11af8",
         "shape": "66aef718",
-        "text_shape": "52e11af8",
+        "text_shape": "84ef0cb4",
         "tile_mode_normal": "bfd0ea17",
         "tile_mode_rgbaaa": "8cb853c",
         "tile_mode_subset": "bfd0ea17"
     },
     "DrawersTest": {
         "ConicGradient": "69683f78",
-        "CustomLayerTreeDrawer": "772f574e",
+        "CustomLayerTreeDrawer": "84ef0cb4",
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "da590da",
         "ImageWithShadow": "50136952",
-        "SimpleLayerTreeDrawer": "772f574e",
+        "SimpleLayerTreeDrawer": "84ef0cb4",
         "SimpleText": "04f35f60"
     },
     "DstTextureTest": {
@@ -159,7 +159,7 @@
         "LayerVisible1": "4edccb64",
         "Layer_drawRRect": "66aef718",
         "Layer_hitTestPoint": "99c36f0c",
-        "Layer_hitTestPointNested": "52e11af8",
+        "Layer_hitTestPointNested": "84ef0cb4",
         "MaskAlpha": "3dbeed5",
         "ModeColorFilter": "c475bfb",
         "PartialBackgroundBlur": "68b18279",
@@ -175,13 +175,13 @@
         "backgroundLayerBlur": "60f56478",
         "draw_shape": "50136952",
         "draw_solid": "b4a1231",
-        "draw_text": "52e11af8",
+        "draw_text": "84ef0cb4",
         "dropShadow": "6f3f57e",
         "filterClip": "c475bfb",
         "filterTest": "c475bfb",
         "filters": "c475bfb",
-        "getBounds": "52e11af8",
-        "getLayersUnderPoint": "52e11af8",
+        "getBounds": "84ef0cb4",
+        "getLayersUnderPoint": "84ef0cb4",
         "getTightBounds": "ae4290b3",
         "greyColorMatrix": "a1605b2",
         "identityMatrix": "a1605b2",
@@ -189,7 +189,7 @@
         "imageMask": "a217af17",
         "innerShadow": "2cb2474",
         "shapeMask": "a217af17",
-        "textMask": "04f35f60"
+        "textMask": "84ef0cb4"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",
@@ -264,7 +264,7 @@
         "complex1": "ba1c7c2",
         "complex2": "50136952",
         "complex3": "a6ff60e1",
-        "complex4": "599cc434",
+        "complex4": "84ef0cb4",
         "complex5": "50136952",
         "complex6": "e87e871a",
         "complex7": "89a370d8",
@@ -274,9 +274,9 @@
         "png_image": "b1db872",
         "radialGradient": "b1db872",
         "referenceStyle": "8769f398",
-        "text": "52e11af8",
-        "textEmoji": "52e11af8",
-        "textFont": "52e11af8"
+        "text": "84ef0cb4",
+        "textEmoji": "84ef0cb4",
+        "textFont": "84ef0cb4"
     },
     "SurfaceTest": {
         "ImageSnapshot1": "d010fb8",
@@ -285,17 +285,17 @@
         "ImageSnapshot_Surface2": "d010fb8"
     },
     "TextAlignTest": {
-        "FontFallbackTest": "599cc434",
-        "SingleLineTextAlign": "599cc434",
-        "TextAlign": "599cc434",
-        "TextAlignBlankLineTest": "52e11af8",
-        "TextAlignSimulateVerticalTextLayout": "599cc434",
-        "TextAlignWidth0Height0": "599cc434",
-        "TextAlignWidth1Height10": "599cc434",
-        "TruncateTextLineTest": "599cc434"
+        "FontFallbackTest": "84ef0cb4",
+        "SingleLineTextAlign": "84ef0cb4",
+        "TextAlign": "84ef0cb4",
+        "TextAlignBlankLineTest": "84ef0cb4",
+        "TextAlignSimulateVerticalTextLayout": "84ef0cb4",
+        "TextAlignWidth0Height0": "84ef0cb4",
+        "TextAlignWidth1Height10": "84ef0cb4",
+        "TruncateTextLineTest": "84ef0cb4"
     },
     "TypefaceTest": {
-        "CustomImageTypeface": "52e11af8",
+        "CustomImageTypeface": "84ef0cb4",
         "CustomPathTypeface": "52e11af8"
     }
 }
