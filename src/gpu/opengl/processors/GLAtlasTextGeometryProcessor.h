@@ -24,8 +24,7 @@
 namespace tgfx {
 class GLAtlasTextGeometryProcessor : public AtlasTextGeometryProcessor {
  public:
-  GLAtlasTextGeometryProcessor(std::shared_ptr<TextureProxy> textureProxy,
-                               const SamplingOptions& sampling, AAType aa,
+  GLAtlasTextGeometryProcessor(std::shared_ptr<TextureProxy> textureProxy, AAType aa,
                                std::optional<Color> commonColor);
   void emitCode(EmitArgs&) const override;
 

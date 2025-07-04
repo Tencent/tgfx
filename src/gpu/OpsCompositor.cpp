@@ -326,7 +326,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
           RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects), aaType, hasColor,
                                         true, RectsVertexProvider::UVSubsetMode::None);
       drawOp = AtlasTextOp::Make(context, std::move(provider), renderFlags,
-                                 std::move(pendingAtlasTexture), pendingSampling);
+                                 std::move(pendingAtlasTexture));
     } break;
     default:
       break;
