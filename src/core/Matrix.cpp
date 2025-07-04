@@ -18,9 +18,12 @@
 
 #include "tgfx/core/Matrix.h"
 #include <cfloat>
+#include "Vec.h"
 #include "core/utils/MathExtra.h"
 
 namespace tgfx {
+
+static bool use_simd = false;
 
 void Matrix::reset() {
   values[SCALE_X] = values[SCALE_Y] = 1;
@@ -223,25 +226,42 @@ void Matrix::postSkew(float kx, float ky) {
 }
 
 void Matrix::setConcat(const Matrix& first, const Matrix& second) {
-  auto& matrixA = first.values;
-  auto& matrixB = second.values;
-  auto sx = matrixB[SCALE_X] * matrixA[SCALE_X];
-  auto kx = 0.0f;
-  auto ky = 0.0f;
-  auto sy = matrixB[SCALE_Y] * matrixA[SCALE_Y];
-  auto tx = matrixB[TRANS_X] * matrixA[SCALE_X] + matrixA[TRANS_X];
-  auto ty = matrixB[TRANS_Y] * matrixA[SCALE_Y] + matrixA[TRANS_Y];
+  if(!use_simd) {
+    auto& matrixA = first.values;
+    auto& matrixB = second.values;
+    auto sx = matrixB[SCALE_X] * matrixA[SCALE_X];
+    auto kx = 0.0f;
+    auto ky = 0.0f;
+    auto sy = matrixB[SCALE_Y] * matrixA[SCALE_Y];
+    auto tx = matrixB[TRANS_X] * matrixA[SCALE_X] + matrixA[TRANS_X];
+    auto ty = matrixB[TRANS_Y] * matrixA[SCALE_Y] + matrixA[TRANS_Y];
 
-  if (matrixB[SKEW_Y] != 0.0 || matrixB[SKEW_X] != 0.0 || matrixA[SKEW_Y] != 0.0 ||
-      matrixA[SKEW_X] != 0.0) {
-    sx += matrixB[SKEW_Y] * matrixA[SKEW_X];
-    sy += matrixB[SKEW_X] * matrixA[SKEW_Y];
-    ky += matrixB[SCALE_X] * matrixA[SKEW_Y] + matrixB[SKEW_Y] * matrixA[SCALE_Y];
-    kx += matrixB[SKEW_X] * matrixA[SCALE_X] + matrixB[SCALE_Y] * matrixA[SKEW_X];
-    tx += matrixB[TRANS_Y] * matrixA[SKEW_X];
-    ty += matrixB[TRANS_X] * matrixA[SKEW_Y];
+    if (matrixB[SKEW_Y] != 0.0 || matrixB[SKEW_X] != 0.0 || matrixA[SKEW_Y] != 0.0 ||
+        matrixA[SKEW_X] != 0.0) {
+      sx += matrixB[SKEW_Y] * matrixA[SKEW_X];
+      sy += matrixB[SKEW_X] * matrixA[SKEW_Y];
+      ky += matrixB[SCALE_X] * matrixA[SKEW_Y] + matrixB[SKEW_Y] * matrixA[SCALE_Y];
+      kx += matrixB[SKEW_X] * matrixA[SCALE_X] + matrixB[SCALE_Y] * matrixA[SKEW_X];
+      tx += matrixB[TRANS_Y] * matrixA[SKEW_X];
+      ty += matrixB[TRANS_X] * matrixA[SKEW_Y];
+        }
+    setAll(sx, kx, tx, ky, sy, ty);
+  }else {
+    auto& matrixA = first.values;
+    auto& matrixB = second.values;
+    //(sx, sy, tx, ty) =  (scxa, scya, scxa, scya) * (scxb, scyb, trxb, tryb) + (0, 0, trxa, trya)
+    //(kx, ky) = (0, 0)
+    float4 sxsytxty = float4(matrixA[SCALE_X], matrixA[SCALE_Y], matrixA[SCALE_X], matrixA[SCALE_Y]) * float4(matrixB[SCALE_X], matrixB[SCALE_Y], matrixB[TRANS_X], matrixB[TRANS_Y]) + float4(0.0f, 0.0f, matrixA[TRANS_X], matrixA[TRANS_Y]);
+    float2 kxky = {0.0f, 0.0f};
+    if (matrixB[SKEW_Y] != 0.0 || matrixB[SKEW_X] != 0.0 || matrixA[SKEW_Y] != 0.0 ||
+        matrixA[SKEW_X] != 0.0) {
+      //(sx, sy, tx, ty) += (skxa, skya, skxa, skya) * (skyb, skxb, tryb, trxb);
+      //(kx, ky) = (scxa, skya) * (skxb, scxb) + (skxa, scya) * (scyb, skyb);
+      sxsytxty += float4(matrixA[SKEW_X], matrixA[SKEW_Y], matrixA[SKEW_X], matrixA[SKEW_Y]) * float4(matrixB[SKEW_Y], matrixB[SKEW_X], matrixB[TRANS_Y], matrixB[TRANS_X]);
+      kxky = float2(matrixA[SCALE_X], matrixA[SKEW_Y]) * float2(matrixB[SKEW_X], matrixB[SCALE_X]) + float2(matrixA[SKEW_X], matrixA[SCALE_Y]) * float2(matrixB[SCALE_Y], matrixB[SKEW_Y]);
+        }
+    setAll(sxsytxty.x(), kxky.x(), sxsytxty.z(), kxky.y(), sxsytxty.y(), sxsytxty.w());
   }
-  setAll(sx, kx, tx, ky, sy, ty);
 }
 
 void Matrix::preConcat(const Matrix& matrix) {
