@@ -453,6 +453,10 @@ void RenderContext::drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList,
 void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
                                                 const MCState& state, const Fill& fill,
                                                 const Stroke* stroke) {
+  auto compositor = getOpsCompositor();
+  if (compositor == nullptr) {
+    return;
+  }
   auto maxScale = state.matrix.getMaxScale();
   auto hasScale = !FloatNearlyEqual(maxScale, 1.0f);
   auto font = sourceGlyphRun.font;
@@ -539,10 +543,8 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
     glyphState.matrix.postTranslate(glyphPosition.x, glyphPosition.y);
     glyphState.matrix.postConcat(state.matrix);
     glyphState.matrix.preTranslate(-rect.x(), -rect.y());
-    if (auto compositor = getOpsCompositor()) {
-      compositor->fillTextAtlas(std::move(textureProxy), rect, glyphState,
-                                fill.makeWithMatrix(state.matrix));
-    }
+    compositor->fillTextAtlas(std::move(textureProxy), rect, glyphState,
+                              fill.makeWithMatrix(state.matrix));
   }
 }
 }  // namespace tgfx
