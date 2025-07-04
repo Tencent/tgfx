@@ -214,6 +214,8 @@ bool OpsCompositor::canAppend(PendingOpType type, const Path& clip, const Fill& 
   }
   switch (pendingType) {
     case PendingOpType::Rect:
+    case PendingOpType::Image:
+    case PendingOpType::Atlas:
       return pendingRects.size() < RectDrawOp::MaxNumRects;
     case PendingOpType::RRect:
       return pendingRRects.size() < RRectDrawOp::MaxNumRRects;
