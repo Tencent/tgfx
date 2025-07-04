@@ -443,55 +443,65 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
 void RenderContext::drawGlyphsAsPath(GlyphRun& sourceGlyphRun, const MCState& state,
                                      const Fill& fill, const Stroke* stroke, const Rect& clipBounds,
                                      GlyphRun& rejectedGlyphRun) const {
-  if (!sourceGlyphRun.font.hasOutlines()) {
+  if (sourceGlyphRun.font.hasColor()) {
     rejectedGlyphRun = std::move(sourceGlyphRun);
     return;
   }
+  Matrix inverseMatrix = {};
+  if (!state.matrix.invert(&inverseMatrix)) {
+    return;
+  }
   auto maxScale = state.matrix.getMaxScale();
-  Path totalPath = {};
+  auto localClipBounds = inverseMatrix.mapRect(clipBounds);
+  localClipBounds.scale(maxScale, maxScale);
   auto font = sourceGlyphRun.font;
   if (!FloatNearlyEqual(maxScale, 1.0f)) {
     font = font.makeWithSize(font.getSize() * maxScale);
   }
-  size_t index = 0;
-  Rect bounds = {};
-  auto& positions = sourceGlyphRun.positions;
-  for (auto& glyphID : sourceGlyphRun.glyphs) {
-    Path glyphPath = {};
+  Path totalPath = {};
+  Rect totalBounds = {};
+  const auto& positions = sourceGlyphRun.positions;
+  const auto& glyphIDs = sourceGlyphRun.glyphs;
+  for (size_t index = 0; index < positions.size(); ++index) {
+    auto glyphID = glyphIDs[index];
     auto& position = positions[index];
+    Path glyphPath = {};
     if (font.getPath(glyphID, &glyphPath)) {
+      auto glyphBounds = font.getBounds(glyphID);
+      glyphBounds.offset(position.x * maxScale, position.y * maxScale);
+      if (stroke) {
+        auto scaleStroke = *stroke;
+        scaleStroke.miterLimit = maxScale;
+        ApplyStrokeToBounds(*stroke, &glyphBounds, true);
+      }
+      if (!glyphBounds.intersects(localClipBounds)) {
+        continue;
+      }
       auto glyphMatrix = Matrix::MakeScale(1.0f / maxScale, 1.0f / maxScale);
       glyphMatrix.postTranslate(position.x, position.y);
       glyphPath.transform(glyphMatrix);
       totalPath.addPath(glyphPath);
-      auto glyphBounds = font.getBounds(glyphID);
-      glyphBounds.offset(position.x * maxScale, position.y * maxScale);
-      bounds.join(glyphBounds);
+      totalBounds.join(glyphBounds);
     } else {
       rejectedGlyphRun.glyphs.push_back(glyphID);
       rejectedGlyphRun.positions.push_back(position);
     }
-    index++;
   }
-  bounds.scale(1.0f / maxScale, 1.0f / maxScale);
-  if (totalPath.isEmpty()) {
-    rejectedGlyphRun = std::move(sourceGlyphRun);
+  if (totalBounds.isEmpty()) {
     return;
   }
-  if (stroke) {
-    ApplyStrokeToBounds(*stroke, &bounds);
-  }
-  state.matrix.mapRect(&bounds);
-  if (!bounds.intersect(clipBounds)) {
+  totalBounds.scale(1.0f / maxScale, 1.0f / maxScale);
+  state.matrix.mapRect(&totalBounds);
+  if (!totalBounds.intersect(clipBounds)) {
     return;
   }
   auto rasterizeMatrix = state.matrix;
-  rasterizeMatrix.postTranslate(-bounds.x(), -bounds.y());
+  rasterizeMatrix.postTranslate(-totalBounds.x(), -totalBounds.y());
   auto shape = Shape::MakeFrom(std::move(totalPath));
   shape = Shape::ApplyStroke(std::move(shape), stroke);
   shape = Shape::ApplyMatrix(std::move(shape), rasterizeMatrix);
   auto shapeState = state;
-  shapeState.matrix = Matrix::MakeTrans(bounds.x(), bounds.y());
+  shapeState.matrix = Matrix::MakeTrans(totalBounds.x(), totalBounds.y());
   opsCompositor->fillShape(std::move(shape), shapeState, fill.makeWithMatrix(rasterizeMatrix));
 }
 
