@@ -424,11 +424,9 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
     glyphState.matrix.postTranslate(glyphPosition.x, glyphPosition.y);
     glyphState.matrix.postConcat(state.matrix);
     glyphState.matrix.preTranslate(-rect.x(), -rect.y());
-
-    auto glyphFill = fill.makeWithMatrix(state.matrix);
-    glyphFill.antiAlias = false;
     if (auto compositor = getOpsCompositor()) {
-      compositor->fillTextAtlas(std::move(textureProxy), rect, {}, glyphState, glyphFill);
+      compositor->fillTextAtlas(std::move(textureProxy), rect, glyphState,
+                                fill.makeWithMatrix(state.matrix));
     }
   }
 }
@@ -540,11 +538,9 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
     glyphState.matrix.postTranslate(glyphPosition.x, glyphPosition.y);
     glyphState.matrix.postConcat(state.matrix);
     glyphState.matrix.preTranslate(-rect.x(), -rect.y());
-
-    auto glyphFill = fill.makeWithMatrix(state.matrix);
-    glyphFill.antiAlias = false;
     if (auto compositor = getOpsCompositor()) {
-      compositor->fillTextAtlas(std::move(textureProxy), rect, {}, glyphState, glyphFill);
+      compositor->fillTextAtlas(std::move(textureProxy), rect, glyphState,
+                                fill.makeWithMatrix(state.matrix));
     }
   }
 }

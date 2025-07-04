@@ -638,15 +638,12 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
 }
 
 void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,
-                                  const SamplingOptions& sampling, const MCState& state,
-                                  const Fill& fill) {
+                                  const MCState& state, const Fill& fill) {
   DEBUG_ASSERT(textureProxy != nullptr);
   DEBUG_ASSERT(!rect.isEmpty());
-  if (!canAppend(PendingOpType::Atlas, state.clip, fill) || pendingAtlasTexture != textureProxy ||
-      pendingSampling != sampling) {
+  if (!canAppend(PendingOpType::Atlas, state.clip, fill) || pendingAtlasTexture != textureProxy) {
     flushPendingOps(PendingOpType::Atlas, state.clip, fill);
     pendingAtlasTexture = std::move(textureProxy);
-    pendingSampling = sampling;
   }
   auto record = drawingBuffer()->make<RectRecord>(rect, state.matrix, fill.color.premultiply());
   pendingRects.emplace_back(std::move(record));
