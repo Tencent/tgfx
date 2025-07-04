@@ -339,6 +339,10 @@ void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRe
 void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const MCState& state,
                                            const Fill& fill, const Stroke* stroke,
                                            GlyphRun* rejectedGlyphRun) {
+  auto compositor = getOpsCompositor();
+  if (compositor == nullptr) {
+    return;
+  }
   auto maxScale = state.matrix.getMaxScale();
   auto hasScale = !FloatNearlyEqual(maxScale, 1.0f);
   auto font = sourceGlyphRun.font;
@@ -351,7 +355,6 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
     scaledStroke =
         std::make_unique<Stroke>(stroke->width * maxScale, stroke->cap, stroke->join, maxScale);
   }
-
   AtlasCell atlasCell;
   size_t index = 0;
   PlotUseUpdater plotUseUpdater;
@@ -424,10 +427,8 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
     glyphState.matrix.postTranslate(glyphPosition.x, glyphPosition.y);
     glyphState.matrix.postConcat(state.matrix);
     glyphState.matrix.preTranslate(-rect.x(), -rect.y());
-    if (auto compositor = getOpsCompositor()) {
-      compositor->fillTextAtlas(std::move(textureProxy), rect, glyphState,
-                                fill.makeWithMatrix(state.matrix));
-    }
+    compositor->fillTextAtlas(std::move(textureProxy), rect, glyphState,
+                              fill.makeWithMatrix(state.matrix));
   }
 }
 void RenderContext::drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList,
