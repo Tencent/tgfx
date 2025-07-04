@@ -45,10 +45,6 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
     return textureSamplers[index];
   }
 
-  SamplerState onSamplerState(size_t) const override {
-    return {};
-  }
-
   Attribute position;  // May contain coverage as last channel
   Attribute coverage;
   Attribute maskCoord;
