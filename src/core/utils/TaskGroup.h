@@ -31,6 +31,8 @@ namespace tgfx {
 class TaskGroup {
  private:
   std::mutex locker = {};
+  int maxThreads = 32;
+  int lowPriorityThreads = 2;
   std::condition_variable condition = {};
   std::atomic_int totalThreads = 0;
   std::atomic_bool exited = false;
