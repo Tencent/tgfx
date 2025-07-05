@@ -27,10 +27,12 @@
 
 namespace tgfx {
 static constexpr auto THREAD_TIMEOUT = std::chrono::seconds(10);
-static constexpr uint32_t THREAD_POOL_SIZE = 32;
-static constexpr int TASK_PRIORITY_SIZE = 3;
+static constexpr int MAX_THREADS_SIZE = 32;
+static constexpr size_t TASK_PRIORITY_SIZE = 3;
+// 70% of max threads can run low priority tasks
+static constexpr float LOW_PRIORITY_THREAD_RATIO = 0.7f;
 
-int GetCPUCores() {
+static int GetMaxThreads() {
   int cpuCores = 0;
 #ifdef __APPLE__
   size_t len = sizeof(cpuCores);
@@ -41,6 +43,9 @@ int GetCPUCores() {
 #endif
   if (cpuCores <= 0) {
     cpuCores = 8;
+  }
+  if (cpuCores > MAX_THREADS_SIZE) {
+    cpuCores = MAX_THREADS_SIZE;
   }
   return cpuCores;
 }
@@ -69,10 +74,15 @@ void OnAppExit() {
   TaskGroup::GetInstance()->exit();
 }
 
-TaskGroup::TaskGroup() {
-  threads = new moodycamel::ConcurrentQueue<std::thread*>(THREAD_POOL_SIZE);
+TaskGroup::TaskGroup() : maxThreads(GetMaxThreads()) {
+  lowPriorityThreads =
+      static_cast<int>(roundf(static_cast<float>(maxThreads) * LOW_PRIORITY_THREAD_RATIO));
+  if (lowPriorityThreads < 1) {
+    lowPriorityThreads = 1;
+  }
+  threads = new moodycamel::ConcurrentQueue<std::thread*>(static_cast<size_t>(maxThreads));
   priorityQueues.reserve(TASK_PRIORITY_SIZE);
-  for (int i = 0; i < TASK_PRIORITY_SIZE; i++) {
+  for (size_t i = 0; i < TASK_PRIORITY_SIZE; i++) {
     auto queue = new moodycamel::ConcurrentQueue<std::shared_ptr<Task>>();
     priorityQueues.push_back(queue);
   }
@@ -80,9 +90,7 @@ TaskGroup::TaskGroup() {
 }
 
 bool TaskGroup::checkThreads() {
-  static const int CPUCores = GetCPUCores();
-  static const int MaxThreads = CPUCores > 16 ? 16 : CPUCores;
-  if (waitingThreads == 0 && totalThreads < MaxThreads) {
+  if (waitingThreads == 0 && totalThreads < maxThreads) {
     auto thread = new (std::nothrow) std::thread(TaskGroup::RunLoop, this);
     if (thread) {
       if (threads->enqueue(thread)) {
@@ -119,7 +127,13 @@ std::shared_ptr<Task> TaskGroup::popTask() {
   std::unique_lock<std::mutex> autoLock(locker);
   while (!exited) {
     std::shared_ptr<Task> task = nullptr;
-    for (auto& queue : priorityQueues) {
+    for (size_t i = 0; i < static_cast<size_t>(TaskPriority::Low); i++) {
+      if (priorityQueues[i]->try_dequeue(task)) {
+        return task;
+      }
+    }
+    if (totalThreads - waitingThreads < lowPriorityThreads) {
+      auto& queue = priorityQueues[static_cast<size_t>(TaskPriority::Low)];
       if (queue->try_dequeue(task)) {
         return task;
       }
