@@ -269,6 +269,16 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
   if (proxy != nullptr) {
     return proxy;
   }
+  if (graphicsLoader != nullptr) {
+    if (auto imageBuffer = graphicsLoader->loadImage(generator, !mipmapped)) {
+      auto width = imageBuffer->width();
+      auto height = imageBuffer->height();
+      auto alphaOnly = imageBuffer->isAlphaOnly();
+      auto source = ImageSource::Wrap(std::move(imageBuffer));
+      return createTextureProxyByImageSource(uniqueKey, std::move(source), width, height, alphaOnly,
+                                             mipmapped, renderFlags);
+    }
+  }
   auto width = generator->width();
   auto height = generator->height();
   auto alphaOnly = generator->isAlphaOnly();

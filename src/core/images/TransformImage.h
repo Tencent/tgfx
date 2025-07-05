@@ -48,5 +48,9 @@ class TransformImage : public Image {
   std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
 
   virtual std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const = 0;
+
+  bool collectDeferredGraphics(GraphicsLoader* loader, Context* context) const override {
+    return source->collectDeferredGraphics(loader, context);
+  }
 };
 }  // namespace tgfx

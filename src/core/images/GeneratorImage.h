@@ -19,6 +19,7 @@
 #pragma once
 
 #include "ResourceImage.h"
+#include "gpu/GraphicsLoader.h"
 
 namespace tgfx {
 /**
@@ -53,6 +54,9 @@ class GeneratorImage : public ResourceImage {
 
   std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
                                                    const UniqueKey& key) const override;
+
+  bool onCollectDeferredGraphics(GraphicsLoader* loader, Context* context,
+                                 bool tryHardware) const override;
 
   std::shared_ptr<ImageGenerator> generator = nullptr;
 };

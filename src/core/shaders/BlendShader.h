@@ -42,5 +42,7 @@ class BlendShader : public Shader {
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                       const Matrix* uvMatrix) const override;
+
+  bool collectDeferredGraphics(GraphicsLoader* loader, Context* context) const override;
 };
 }  // namespace tgfx

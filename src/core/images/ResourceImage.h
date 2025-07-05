@@ -48,6 +48,13 @@ class ResourceImage : public Image {
                                                       const SamplingArgs& samplingArgs,
                                                       const Matrix* uvMatrix) const override;
 
+  bool collectDeferredGraphics(GraphicsLoader* loader, Context* context) const final;
+
+  virtual bool onCollectDeferredGraphics(GraphicsLoader* /*loader*/, Context* /*context*/,
+                                         bool /*tryHardware*/) const {
+    return false;
+  }
+
   friend class MipmapImage;
 };
 }  // namespace tgfx

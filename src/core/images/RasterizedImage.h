@@ -55,7 +55,10 @@ class RasterizedImage : public ResourceImage {
   std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
 
   std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
-                                                   const UniqueKey& key) const final;
+                                                   const UniqueKey& key) const override;
+
+  bool onCollectDeferredGraphics(GraphicsLoader* loader, Context* context,
+                                 bool tryHardware) const override;
 
  private:
   std::shared_ptr<Image> source = nullptr;

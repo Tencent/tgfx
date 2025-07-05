@@ -112,4 +112,9 @@ std::shared_ptr<TextureProxy> RasterizedImage::onLockTextureProxy(const TPArgs& 
   drawingManager->fillRTWithFP(std::move(renderTarget), std::move(processor), args.renderFlags);
   return textureProxy;
 }
+
+bool RasterizedImage::onCollectDeferredGraphics(GraphicsLoader* loader, Context* context,
+                                                bool) const {
+  return source->collectDeferredGraphics(loader, context);
+}
 }  // namespace tgfx

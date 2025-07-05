@@ -24,9 +24,9 @@ namespace tgfx {
 class RasterizedContent {
  public:
   RasterizedContent(uint32_t contextID, float contentScale, std::shared_ptr<Image> image,
-                    const Matrix& matrix)
-      : _contextID(contextID), _contentScale(contentScale), image(std::move(image)),
-        matrix(matrix) {
+                    const Matrix& matrix, bool didSkipPendingContent)
+      : _contextID(contextID), _contentScale(contentScale), image(std::move(image)), matrix(matrix),
+        _hasSkippedPendingContent(didSkipPendingContent) {
   }
 
   /**
@@ -48,6 +48,10 @@ class RasterizedContent {
     return matrix;
   }
 
+  bool didSkipPendingContent() const {
+    return _hasSkippedPendingContent;
+  }
+
   void draw(Canvas* canvas, bool antiAlias, float alpha,
             BlendMode blendMode = BlendMode::SrcOver) const;
 
@@ -56,5 +60,6 @@ class RasterizedContent {
   float _contentScale = 0.0f;
   std::shared_ptr<Image> image = nullptr;
   Matrix matrix = {};
+  bool _hasSkippedPendingContent = false;
 };
 }  // namespace tgfx

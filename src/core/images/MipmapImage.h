@@ -60,5 +60,9 @@ class MipmapImage : public ResourceImage {
   std::shared_ptr<ResourceImage> source = nullptr;
 
   MipmapImage(UniqueKey uniqueKey, std::shared_ptr<ResourceImage> source);
+
+  bool onCollectDeferredGraphics(GraphicsLoader* loader, Context* context, bool) const override {
+    return source->onCollectDeferredGraphics(loader, context, false);
+  }
 };
 }  // namespace tgfx

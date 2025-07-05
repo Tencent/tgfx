@@ -52,4 +52,13 @@ std::shared_ptr<TextureProxy> GeneratorImage::onLockTextureProxy(const TPArgs& a
   return args.context->proxyProvider()->createTextureProxy(key, generator, args.mipmapped,
                                                            args.renderFlags);
 }
+
+bool GeneratorImage::onCollectDeferredGraphics(GraphicsLoader* loader, Context*,
+                                               bool tryHardware) const {
+  if (generator->asyncSupport()) {
+    return !loader->loadImage(generator, tryHardware);
+  }
+  return false;
+}
+
 }  // namespace tgfx

@@ -161,7 +161,10 @@ void LayerSerialization::SerializeBasicLayerImpl(flexbuffers::Builder& fbb, cons
                                    layerStylesID);
   SerializeUtils::FillMap(layerStyles, layerStylesID, map);
 
-  SerializeUtils::SetFlexBufferMap(fbb, "dirtyContent", layer->bitFields.dirtyContent);
+  SerializeUtils::SetFlexBufferMap(fbb, "dirtyPendingContent",
+                                   layer->bitFields.dirtyPendingContent);
+  SerializeUtils::SetFlexBufferMap(fbb, "dirtyRenderContent", layer->bitFields.dirtyRenderContent);
+  SerializeUtils::SetFlexBufferMap(fbb, "dirtyAsyncContent", layer->bitFields.dirtyAsyncContent);
   SerializeUtils::SetFlexBufferMap(fbb, "dirtyDescendents", layer->bitFields.dirtyDescendents);
   SerializeUtils::SetFlexBufferMap(fbb, "dirtyTransform", layer->bitFields.dirtyTransform);
   SerializeUtils::SetFlexBufferMap(fbb, "backgroundOutset", layer->backgroundOutset);
@@ -173,10 +176,10 @@ void LayerSerialization::SerializeBasicLayerImpl(flexbuffers::Builder& fbb, cons
                                    true, maskOwner != nullptr, maskOwnerID);
   SerializeUtils::FillMap(maskOwner, maskOwnerID, map);
 
-  auto renderBoundsID = SerializeUtils::GetObjID();
-  auto renderBounds = layer->renderBounds;
-  SerializeUtils::SetFlexBufferMap(fbb, "renderBounds", "", false, true, renderBoundsID);
-  SerializeUtils::FillMap(renderBounds, renderBoundsID, map);
+  auto layerBoundsID = SerializeUtils::GetObjID();
+  auto renderBounds = layer->layerBounds;
+  SerializeUtils::SetFlexBufferMap(fbb, "layerBounds", "", false, true, layerBoundsID);
+  SerializeUtils::FillMap(renderBounds, layerBoundsID, map);
 }
 
 void LayerSerialization::SerializeImageLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,

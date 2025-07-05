@@ -22,6 +22,7 @@
 #include "core/Records.h"
 #include "core/utils/BlockBuffer.h"
 #include "core/utils/Log.h"
+#include "gpu/GraphicsLoader.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Image.h"
 #include "utils/MathExtra.h"
@@ -211,6 +212,59 @@ const Record* Picture::getFirstDrawRecord(MCState* state, Fill* fill, bool* hasS
     *hasStroke = playback.stroke() != nullptr;
   }
   return drawRecord;
+}
+
+bool Picture::collectDeferredGraphics(GraphicsLoader* loader, Context* context) const {
+  bool hasDeferredGraphics = false;
+  for (auto& record : records) {
+    switch (record->type()) {
+      case RecordType::SetFill: {
+        auto& fill = static_cast<SetFill*>(record.get())->fill;
+        if (fill.shader) {
+          if (fill.shader->collectDeferredGraphics(loader, context)) {
+            hasDeferredGraphics = true;
+          }
+        }
+        if (fill.maskFilter) {
+          if (fill.maskFilter->collectDeferredGraphics(loader, context)) {
+            hasDeferredGraphics = true;
+          }
+        }
+      } break;
+      case RecordType::DrawImage: {
+        if (static_cast<DrawImage*>(record.get())
+                ->image->collectDeferredGraphics(loader, context)) {
+          hasDeferredGraphics = true;
+        }
+      } break;
+      case RecordType::DrawImageRect: {
+        if (static_cast<DrawImageRect*>(record.get())
+                ->image->collectDeferredGraphics(loader, context)) {
+          hasDeferredGraphics = true;
+        }
+      } break;
+      // case RecordType::DrawShape: {
+      //   if (!loader->loadShape(static_cast<DrawShape*>(record.get())->shape, nullptr)) {
+      //     hasDeferredGraphics = true;
+      //   }
+      // } break;
+      case RecordType::DrawPicture: {
+        if (static_cast<DrawPicture*>(record.get())
+                ->picture->collectDeferredGraphics(loader, context)) {
+          hasDeferredGraphics = true;
+        }
+      } break;
+      case RecordType::DrawLayer: {
+        if (static_cast<DrawLayer*>(record.get())
+                ->picture->collectDeferredGraphics(loader, context)) {
+          hasDeferredGraphics = true;
+        }
+      }
+      default:
+        break;
+    }
+  }
+  return hasDeferredGraphics;
 }
 
 }  // namespace tgfx

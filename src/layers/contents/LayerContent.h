@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "gpu/GraphicsLoader.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/FillModifier.h"
 
@@ -64,10 +65,22 @@ class LayerContent {
     */
   virtual void drawContour(Canvas* canvas, const FillModifier* modifier) const = 0;
 
+  /**
+   * Collects all deferred graphics objects (such as uncached ImageGenerators or Shapes that support
+   * asynchronous loading) within the content. Returns true if any deferred graphics are found and
+   * collected; otherwise, returns false.
+   */
+  virtual bool collectDeferredGraphics(GraphicsLoader* loader, Context* context) const = 0;
+
  protected:
   enum class Type { Default, Foreground, Contour };
 
   virtual Type type() const = 0;
+
+  static bool CollectDeferredGraphics(const Picture* picture, GraphicsLoader* loader,
+                                      Context* context) {
+    return picture->collectDeferredGraphics(loader, context);
+  }
 
   friend class Types;
 };

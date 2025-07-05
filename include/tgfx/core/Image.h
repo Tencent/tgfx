@@ -25,7 +25,6 @@
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/SamplingOptions.h"
-#include "tgfx/core/TileMode.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/ImageOrigin.h"
 #include "tgfx/platform/HardwareBuffer.h"
@@ -341,12 +340,17 @@ class Image {
                                                               const SamplingArgs& samplingArgs,
                                                               const Matrix* uvMatrix) const = 0;
 
+  virtual bool collectDeferredGraphics(GraphicsLoader* /*loader*/, Context* /*context*/) const {
+    return false;
+  }
+
   friend class FragmentProcessor;
   friend class RuntimeImageFilter;
   friend class TransformImage;
   friend class RGBAAAImage;
   friend class RasterizedImage;
   friend class ImageShader;
+  friend class Picture;
   friend class Types;
 };
 }  // namespace tgfx

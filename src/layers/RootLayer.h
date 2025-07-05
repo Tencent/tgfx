@@ -19,6 +19,7 @@
 #pragma once
 
 #include <optional>
+#include "layers/LayerGraphicsLoader.h"
 #include "tgfx/layers/Layer.h"
 
 namespace tgfx {
@@ -41,6 +42,25 @@ class RootLayer : public Layer {
   ~RootLayer() override;
 
   /**
+   * Returns the LayerGraphicsLoader used by the root layer.
+   */
+  LayerGraphicsLoader* graphicsLoader() const {
+    return _graphicsLoader.get();
+  }
+
+  /**
+   * Returns the maximum number of asynchronous graphics that can be loaded per frame.
+   */
+  size_t maxAsyncGraphicsPerFrame() const {
+    return _graphicsLoader ? _graphicsLoader->maxAsyncGraphicsPerFrame() : 0;
+  }
+
+  /**
+   * Sets the maximum number of asynchronous graphics that can be loaded per frame.
+   */
+  void setMaxAsyncGraphicsPerFrame(size_t count);
+
+  /**
    * Invalidates a specific rectangle in the root layer. This method is used to mark a portion of
    * the layer tree as needing to be redrawn.
    */
@@ -51,6 +71,14 @@ class RootLayer : public Layer {
    * LayerStyle, and applies LayerStyle::filterBackground() to the dirty rectangles.
    */
   bool invalidateBackground(const Rect& drawRect, LayerStyle* layerStyle, float contentScale);
+
+  /**
+   * Returns true if the root layer has any dirty content that needs to be redrawn.
+   */
+  bool hasContentChanged() const {
+    return bitFields.dirtyDescendents ||
+           (_graphicsLoader && !_graphicsLoader->loadingTasks.empty());
+  }
 
   /**
    * Returns true if there are any dirty rectangles in the root layer.
@@ -71,13 +99,12 @@ class RootLayer : public Layer {
   std::optional<Rect> getBackgroundRect(const Rect& drawRect, float contentScale) const;
 
  private:
+  std::unique_ptr<LayerGraphicsLoader> _graphicsLoader = nullptr;
   std::vector<Rect> dirtyRects = {};
   std::vector<float> dirtyAreas = {};
 
   RootLayer() = default;
 
   bool mergeDirtyList(bool forceMerge);
-
-  friend class DisplayList;
 };
 }  // namespace tgfx

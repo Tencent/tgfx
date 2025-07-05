@@ -70,4 +70,13 @@ PlacementPtr<FragmentProcessor> BlendShader::asFragmentProcessor(const FPArgs& a
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(args.context->drawingBuffer(),
                                                           std::move(fpB), std::move(fpA), mode);
 }
+
+bool BlendShader::collectDeferredGraphics(GraphicsLoader* loader, Context* context) const {
+  auto hasDeferredGraphics = src->collectDeferredGraphics(loader, context);
+  if (dst->collectDeferredGraphics(loader, context)) {
+    hasDeferredGraphics = true;
+  }
+  return hasDeferredGraphics;
+}
+
 }  // namespace tgfx

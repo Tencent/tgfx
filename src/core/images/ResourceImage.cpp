@@ -53,4 +53,11 @@ PlacementPtr<FragmentProcessor> ResourceImage::asFragmentProcessor(const FPArgs&
   auto proxy = onLockTextureProxy(tpArgs, uniqueKey);
   return TiledTextureEffect::Make(std::move(proxy), samplingArgs, uvMatrix, isAlphaOnly());
 }
+
+bool ResourceImage::collectDeferredGraphics(GraphicsLoader* loader, Context* context) const {
+  if (context && context->resourceCache()->hasUniqueResource(uniqueKey)) {
+    return false;
+  }
+  return onCollectDeferredGraphics(loader, context, !hasMipmaps());
+}
 }  // namespace tgfx

@@ -50,6 +50,10 @@ class DefaultContent : public LayerContent {
     content->playback(canvas, modifier);
   }
 
+  bool collectDeferredGraphics(GraphicsLoader* loader, Context* context) const override {
+    return CollectDeferredGraphics(content.get(), loader, context);
+  }
+
   std::shared_ptr<Picture> content = nullptr;
 
  protected:

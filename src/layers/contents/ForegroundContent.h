@@ -40,6 +40,8 @@ class ForegroundContent : public LayerContent {
 
   void drawContour(Canvas*, const FillModifier* modifier) const override;
 
+  bool collectDeferredGraphics(GraphicsLoader* loader, Context* context) const override;
+
   std::shared_ptr<Picture> background = nullptr;
   std::shared_ptr<Picture> foreground = nullptr;
 

@@ -64,6 +64,10 @@ class PictureImage : public Image {
 
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
+  bool collectDeferredGraphics(GraphicsLoader* loader, Context* context) const override {
+    return picture->collectDeferredGraphics(loader, context);
+  }
+
   bool drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags,
                    const Point* offset) const;
 

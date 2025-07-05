@@ -174,12 +174,18 @@ class Shader {
 
   virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                               const Matrix* uvMatrix) const = 0;
+
+  virtual bool collectDeferredGraphics(GraphicsLoader* /*loader*/, Context* /*context*/) const {
+    return false;
+  }
+
   friend class OpsCompositor;
   friend class ShaderMaskFilter;
   friend class ColorFilterShader;
   friend class BlendShader;
   friend class MatrixShader;
   friend class FragmentProcessor;
+  friend class Picture;
   friend class Types;
 };
 }  // namespace tgfx

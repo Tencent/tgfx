@@ -115,7 +115,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
    * is BlendMode::SrcOver.
    */
   BlendMode blendMode() const {
-    return static_cast<BlendMode>(bitFields.blendMode);
+    return _blendMode;
   }
 
   /**
@@ -539,6 +539,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
    */
   void invalidateDescendents();
 
+  void invalidateAsyncContent();
+
   void invalidate();
 
   Rect getBoundsInternal(const Matrix& coordinateMatrix, bool computeTightBounds);
@@ -555,14 +557,19 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   Matrix getMatrixWithScrollRect() const;
 
-  LayerContent* getContent();
+  LayerContent* getLayerContent(bool skipPendingContent = false,
+                                bool* didSkipPendingContent = nullptr);
+
+  void updatePendingContent();
+
+  bool updateRenderContent();
 
   std::shared_ptr<ImageFilter> getImageFilter(float contentScale);
 
   RasterizedContent* getRasterizedCache(const DrawArgs& args, const Matrix& renderMatrix);
 
   std::shared_ptr<Image> getRasterizedImage(const DrawArgs& args, float contentScale,
-                                            Matrix* drawingMatrix);
+                                            Matrix* drawingMatrix, bool* didSkipPendingContent);
 
   void drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode);
 
@@ -608,8 +615,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
   bool hasBackgroundStyle();
 
   struct {
-    bool dirtyContent : 1;        // layer's content needs updating
-    bool dirtyContentBounds : 1;  // layer's content bounds needs updating
+    bool dirtyPendingContent : 1;  // layer's content needs updating
+    bool dirtyAsyncContent : 1;   // renderContent needs updating because async tasks have completed
+    bool dirtyRenderContent : 1;  // renderContent needs updating because pendingContent changed
     bool dirtyDescendents : 1;    // a descendant layer needs redrawing
     bool dirtyTransform : 1;      // the layer and its children need redrawing
     bool visible : 1;
@@ -617,11 +625,11 @@ class Layer : public std::enable_shared_from_this<Layer> {
     bool allowsEdgeAntialiasing : 1;
     bool allowsGroupOpacity : 1;
     bool excludeChildEffectsInLayerStyle : 1;
-    uint8_t blendMode : 5;
-    uint8_t maskType : 3;
+    uint8_t maskType : 2;
   } bitFields = {};
   std::string _name;
   float _alpha = 1.0f;
+  BlendMode _blendMode = BlendMode::SrcOver;
   Matrix _matrix = {};
   std::shared_ptr<Layer> _mask = nullptr;
   Layer* maskOwner = nullptr;
@@ -633,8 +641,9 @@ class Layer : public std::enable_shared_from_this<Layer> {
   std::vector<std::shared_ptr<LayerStyle>> _layerStyles = {};
   float _rasterizationScale = 0.0f;
   std::unique_ptr<RasterizedContent> rasterizedContent;
-  std::shared_ptr<LayerContent> layerContent = nullptr;
-  Rect renderBounds = {};         // in global coordinates
+  std::unique_ptr<LayerContent> pendingContent;
+  std::unique_ptr<LayerContent> renderContent;
+  Rect layerBounds = {};          // in global coordinates
   Rect* contentBounds = nullptr;  //  in global coordinates
 
   // if > 0, means the layer or any of its descendants has a background style
@@ -643,6 +652,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
   friend class RootLayer;
   friend class DisplayList;
   friend class LayerProperty;
+  friend class LayerGraphicsLoader;
   friend class LayerSerialization;
 };
 }  // namespace tgfx

@@ -30,6 +30,8 @@ class MCState;
 class Image;
 class Fill;
 class BlockData;
+class GraphicsLoader;
+class Context;
 template <typename T>
 class PlacementPtr;
 
@@ -104,6 +106,8 @@ class Picture {
   const Record* getFirstDrawRecord(MCState* state = nullptr, Fill* fill = nullptr,
                                    bool* hasStroke = nullptr) const;
 
+  bool collectDeferredGraphics(GraphicsLoader* loader, Context* context) const;
+
   friend class MeasureContext;
   friend class HitTestContext;
   friend class RenderContext;
@@ -112,5 +116,6 @@ class Picture {
   friend class Image;
   friend class PictureImage;
   friend class Canvas;
+  friend class LayerContent;
 };
 }  // namespace tgfx

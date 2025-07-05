@@ -35,9 +35,23 @@ std::shared_ptr<RootLayer> RootLayer::Make() {
 }
 
 RootLayer::~RootLayer() {
+  _graphicsLoader = nullptr;
   // Immediately trigger onDetachFromRoot() for all children to prevent them from calling
   // root->invalidateRect() after this object has been destroyed.
   removeChildren();
+}
+
+void RootLayer::setMaxAsyncGraphicsPerFrame(size_t count) {
+  if (count == 0) {
+    _graphicsLoader = nullptr;
+  } else {
+#ifdef TGFX_USE_THREADS
+    if (!_graphicsLoader) {
+      _graphicsLoader = std::make_unique<LayerGraphicsLoader>();
+    }
+    _graphicsLoader->setMaxAsyncGraphicsPerFrame(count);
+#endif
+  }
 }
 
 void RootLayer::invalidateRect(const Rect& rect) {

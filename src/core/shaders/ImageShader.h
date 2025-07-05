@@ -50,6 +50,10 @@ class ImageShader : public Shader {
       : image(std::move(image)), tileModeX(tileModeX), tileModeY(tileModeY), sampling(sampling) {
   }
 
+  bool collectDeferredGraphics(GraphicsLoader* loader, Context* context) const override {
+    return image->collectDeferredGraphics(loader, context);
+  }
+
   friend class Shader;
 };
 }  // namespace tgfx

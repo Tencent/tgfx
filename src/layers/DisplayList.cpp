@@ -208,6 +208,14 @@ void DisplayList::setMaxTileCount(int count) {
   resetCaches();
 }
 
+size_t DisplayList::maxAsyncGraphicsPerFrame() const {
+  return _root->maxAsyncGraphicsPerFrame();
+}
+
+void DisplayList::setMaxAsyncGraphicsPerFrame(size_t count) {
+  _root->setMaxAsyncGraphicsPerFrame(count);
+}
+
 void DisplayList::showDirtyRegions(bool show) {
   if (_showDirtyRegions == show) {
     return;
@@ -219,7 +227,7 @@ void DisplayList::showDirtyRegions(bool show) {
 }
 
 bool DisplayList::hasContentChanged() const {
-  if (_hasContentChanged || hasZoomBlurTiles || _root->bitFields.dirtyDescendents) {
+  if (_hasContentChanged || hasZoomBlurTiles || _root->hasContentChanged()) {
     return true;
   }
   if (!_showDirtyRegions) {
@@ -238,6 +246,8 @@ void DisplayList::render(Surface* surface, bool autoClear) {
     return;
   }
   _hasContentChanged = false;
+  // Call before updateDirtyRegions() since graphicsLoader->onAttached() may modify dirty regions.
+  AutoGraphicsLoaderRestore autoGraphicsLoader(surface->getContext(), _root->graphicsLoader());
   auto dirtyRegions = _root->updateDirtyRegions();
   if (_zoomScaleInt == 0) {
     if (autoClear) {
@@ -824,6 +834,7 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   if (backgroundRect) {
     args.backgroundContext = BackgroundContext::Make(context, *backgroundRect, viewMatrix);
   }
+  args.skipPendingContent = _root->graphicsLoader() != nullptr;
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }
 

@@ -44,6 +44,10 @@ class DrawArgs {
   DrawMode drawMode = DrawMode::Normal;
   // The rectangle area to be drawn. This is used for clipping the drawing area.
   Rect* renderRect = nullptr;
+  // Whether to skip pending content during the drawing process.
+  bool skipPendingContent = false;
+  // Whether any pending content did not get drawn in the current frame.
+  std::shared_ptr<bool> didSkipPendingContent = std::make_shared<bool>(false);
 
   // The background context to be used during the drawing process. Note: this could be nullptr.
   std::shared_ptr<BackgroundContext> backgroundContext = nullptr;
