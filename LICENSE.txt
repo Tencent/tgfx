@@ -1,6 +1,6 @@
 Tencent is pleased to support the open source community by making tgfx available.
 
-Copyright (C) 2025 THL A29 Limited, a Tencent company.  All rights reserved. The below software in this distribution may have been modified by THL A29 Limited ("Tencent Modifications"). All Tencent Modifications are Copyright (C) THL A29 Limited.
+Copyright (C) 2025 Tencent.  All rights reserved. The below software in this distribution may have been modified by Tencent ("Tencent Modifications"). All Tencent Modifications are Copyright (C) Tencent.
 
 tgfx is licensed under the BSD 3-Clause License except for the third-party components listed below.
 
@@ -305,7 +305,7 @@ September 28, 2017
 
 
 Open Source Software Licensed under the BSD 3-Clause License:
-The below software in this distribution may have been modified by THL A29 Limited ("Tencent Modifications"). All Tencent Modifications are Copyright (C) 2025 THL A29 Limited.
+The below software in this distribution may have been modified by Tencent ("Tencent Modifications"). All Tencent Modifications are Copyright (C) 2025 Tencent.
 --------------------------------------------------------------------
 1. libwebp
 Copyright (c) 2010, Google Inc. All rights reserved.
