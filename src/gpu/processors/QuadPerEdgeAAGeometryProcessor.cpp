@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "QuadPerEdgeAAGeometryProcessor.h"
-#include "gpu/YUVTexture.h"
 
 namespace tgfx {
 void QuadPerEdgeAAGeometryProcessor::fillAttribute() {
@@ -50,6 +49,8 @@ void QuadPerEdgeAAGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) c
   flags |= commonColor.has_value() ? 2 : 0;
   flags |= uvMatrix.has_value() ? 4 : 0;
   flags |= hasSubset ? 8 : 0;
+  bool hasSubsetMatrix = hasSubset && uvMatrix.has_value();
+  flags |= hasSubsetMatrix ? 16 : 0;
   bytesKey->write(flags);
 }
 }  // namespace tgfx

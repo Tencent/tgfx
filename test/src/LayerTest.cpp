@@ -2928,4 +2928,31 @@ TGFX_TEST(LayerTest, PartialBackgroundBlur) {
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialBackgroundBlur_move"));
 }
+
+TGFX_TEST(LayerTest, PartialInnerShadow) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  DisplayList displayList;
+  auto surface = Surface::Make(context, 100, 100);
+  auto rootLayer = Layer::Make();
+  displayList.root()->addChild(rootLayer);
+  auto shapeLayer = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
+  shapeLayer->setPath(path);
+  shapeLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 255, 255, 255)));
+  shapeLayer->setLineWidth(1.0f);
+  rootLayer->addChild(shapeLayer);
+
+  auto innerShadowStyle = InnerShadowStyle::Make(10, 10, 0, 0, Color::Black());
+  displayList.setContentOffset(-5, -5);
+  displayList.setRenderMode(RenderMode::Tiled);
+  displayList.render(surface.get());
+
+  shapeLayer->setLayerStyles({});
+  shapeLayer->setLayerStyles({innerShadowStyle});
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialInnerShadow"));
+}
 }  // namespace tgfx

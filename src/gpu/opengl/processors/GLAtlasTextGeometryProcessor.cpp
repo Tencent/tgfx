@@ -21,16 +21,14 @@
 
 namespace tgfx {
 PlacementPtr<AtlasTextGeometryProcessor> AtlasTextGeometryProcessor::Make(
-    BlockBuffer* buffer, std::shared_ptr<TextureProxy> textureProxy,
-    const SamplingOptions& sampling, AAType aa, std::optional<Color> commonColor) {
-  return buffer->make<GLAtlasTextGeometryProcessor>(std::move(textureProxy), sampling, aa,
-                                                    commonColor);
+    BlockBuffer* buffer, std::shared_ptr<TextureProxy> textureProxy, AAType aa,
+    std::optional<Color> commonColor) {
+  return buffer->make<GLAtlasTextGeometryProcessor>(std::move(textureProxy), aa, commonColor);
 }
 
 GLAtlasTextGeometryProcessor::GLAtlasTextGeometryProcessor(
-    std::shared_ptr<TextureProxy> textureProxy, const SamplingOptions& sampling, AAType aa,
-    std::optional<Color> commonColor)
-    : AtlasTextGeometryProcessor(std::move(textureProxy), sampling, aa, commonColor) {
+    std::shared_ptr<TextureProxy> textureProxy, AAType aa, std::optional<Color> commonColor)
+    : AtlasTextGeometryProcessor(std::move(textureProxy), aa, commonColor) {
 }
 
 void GLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -45,8 +43,7 @@ void GLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
       uniformHandler->addUniform(ShaderFlags::Vertex, SLType::Float2, atlasSizeUniformName);
 
   auto samplerVarying = varyingHandler->addVarying("textureCoords", SLType::Float2);
-  emitTransforms(vertBuilder, varyingHandler, uniformHandler, position.asShaderVar(),
-                 args.fpCoordTransformHandler);
+  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, position.asShaderVar());
   auto uvName = maskCoord.asShaderVar().name();
   vertBuilder->codeAppendf("%s = %s * %s;", samplerVarying.vsOut().c_str(), uvName.c_str(),
                            atlasName.c_str());

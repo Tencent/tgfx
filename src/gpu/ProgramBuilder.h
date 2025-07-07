@@ -90,6 +90,7 @@ class ProgramBuilder {
  private:
   std::vector<const Processor*> currentProcessors = {};
   std::vector<ShaderVar> transformedCoordVars = {};
+  std::string subsetVarName = {};
 
   /**
    * Generates a possibly mangled name for a stage variable and writes it to the fragment shader.

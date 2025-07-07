@@ -214,11 +214,11 @@ bool OpsCompositor::canAppend(PendingOpType type, const Path& clip, const Fill& 
   }
   switch (pendingType) {
     case PendingOpType::Rect:
+    case PendingOpType::Image:
+    case PendingOpType::Atlas:
       return pendingRects.size() < RectDrawOp::MaxNumRects;
     case PendingOpType::RRect:
       return pendingRRects.size() < RRectDrawOp::MaxNumRRects;
-    case PendingOpType::Atlas:
-      return pendingRects.empty() || !fill.shader;
     default:
       break;
   }
@@ -326,7 +326,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
           RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects), aaType, hasColor,
                                         true, RectsVertexProvider::UVSubsetMode::None);
       drawOp = AtlasTextOp::Make(context, std::move(provider), renderFlags,
-                                 std::move(pendingAtlasTexture), pendingSampling);
+                                 std::move(pendingAtlasTexture));
     } break;
     default:
       break;
@@ -638,15 +638,12 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
 }
 
 void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,
-                                  const SamplingOptions& sampling, const MCState& state,
-                                  const Fill& fill) {
+                                  const MCState& state, const Fill& fill) {
   DEBUG_ASSERT(textureProxy != nullptr);
   DEBUG_ASSERT(!rect.isEmpty());
-  if (!canAppend(PendingOpType::Atlas, state.clip, fill) || pendingAtlasTexture != textureProxy ||
-      pendingSampling != sampling) {
+  if (!canAppend(PendingOpType::Atlas, state.clip, fill) || pendingAtlasTexture != textureProxy) {
     flushPendingOps(PendingOpType::Atlas, state.clip, fill);
     pendingAtlasTexture = std::move(textureProxy);
-    pendingSampling = sampling;
   }
   auto record = drawingBuffer()->make<RectRecord>(rect, state.matrix, fill.color.premultiply());
   pendingRects.emplace_back(std::move(record));

@@ -71,7 +71,7 @@ class OpsCompositor {
    * Fills the given rect with the given fill, using the provided texture proxy and sampling options.
    */
   void fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,
-                     const SamplingOptions& sampling, const MCState& state, const Fill& fill);
+                     const MCState& state, const Fill& fill);
 
   /**
    * Discard all pending operations.

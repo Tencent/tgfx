@@ -30,8 +30,7 @@ class AtlasTextOp final : public DrawOp {
   static PlacementPtr<AtlasTextOp> Make(Context* context,
                                         PlacementPtr<RectsVertexProvider> provider,
                                         uint32_t renderFlags,
-                                        std::shared_ptr<TextureProxy> textureProxy,
-                                        const SamplingOptions& sampling);
+                                        std::shared_ptr<TextureProxy> textureProxy);
   void execute(RenderPass* renderPass) override;
 
  private:
@@ -41,10 +40,8 @@ class AtlasTextOp final : public DrawOp {
   std::shared_ptr<GpuBufferProxy> vertexBufferProxy = nullptr;
   size_t vertexBufferOffset = 0;
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
-  SamplingOptions sampling;
 
-  explicit AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureProxy> textureProxy,
-                       const SamplingOptions& sampling);
+  explicit AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureProxy> textureProxy);
 
   friend class BlockBuffer;
 };

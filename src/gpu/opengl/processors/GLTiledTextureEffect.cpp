@@ -271,12 +271,19 @@ void GLTiledTextureEffect::emitCode(EmitArgs& args) const {
     subsetCoord(args, sampling.shaderModeY, names.subsetName, "y", "y", "w", extraRepeatCoordY,
                 repeatCoordWeightY);
 
-    fragBuilder->codeAppend("vec2 clampedCoord;");
+    fragBuilder->codeAppend("highp vec2 clampedCoord;");
     clampCoord(args, useClamp, names.clampName);
 
     if (constraint == SrcRectConstraint::Strict) {
-      args.fragBuilder->codeAppend(
-          "clampedCoord = clamp(clampedCoord, vtexsubset_P0.xy, vtexsubset_P0.zw);");
+      std::string subsetName = args.inputSubset;
+      if (!names.dimensionsName.empty()) {
+        fragBuilder->codeAppendf("highp vec4 extraSubset = %s;", subsetName.c_str());
+        subsetName = "extraSubset";
+        fragBuilder->codeAppendf("extraSubset.xy /= %s;", names.dimensionsName.c_str());
+        fragBuilder->codeAppendf("extraSubset.zw /= %s;", names.dimensionsName.c_str());
+      }
+      args.fragBuilder->codeAppendf("clampedCoord = clamp(clampedCoord, %s.xy, %s.zw);",
+                                    subsetName.c_str(), subsetName.c_str());
     }
 
     if (mipmapRepeatX && mipmapRepeatY) {

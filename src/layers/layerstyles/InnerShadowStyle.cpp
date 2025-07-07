@@ -93,8 +93,8 @@ void InnerShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, fl
   if (!filter) {
     return;
   }
+  opaqueImage = opaqueImage->makeWithFilter(filter);
   Paint paint = {};
-  paint.setImageFilter(filter);
   paint.setBlendMode(blendMode);
   paint.setAlpha(alpha);
   canvas->drawImage(opaqueImage, &paint);
