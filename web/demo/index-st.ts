@@ -22,8 +22,8 @@ import Hello2D from './wasm/hello2d';
 import {
     ShareData,
     updateSize,
-    onresizeEvent,
-    onclickEvent,
+    onResizeEvent,
+    onClickEvent,
     loadImage,
     bindCanvasZoomAndPanEvents
 } from "./common";
@@ -50,12 +50,12 @@ if (typeof window !== 'undefined') {
     };
 
     window.onresize = () => {
-        onresizeEvent(shareData);
+        onResizeEvent(shareData);
         window.setTimeout(() => updateSize(shareData), 300);
     };
 
     window.onclick = () => {
-        onclickEvent(shareData);
+        onClickEvent(shareData);
     };
 }
 

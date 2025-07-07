@@ -18,8 +18,8 @@
 
 import * as types from '../types/types';
 
-export const MinZoom = 0.001;
-export const MaxZoom = 1000.0;
+export const MIN_ZOOM = 0.001;
+export const MAX_ZOOM = 1000.0;
 
 export class TGFXBaseView {
     public updateSize: (devicePixelRatio: number) => void;
@@ -37,25 +37,25 @@ export class ShareData {
 }
 
 enum ScaleGestureState {
-    kGestureStart = 0,
-    kGestureChange = 1,
-    kGestureEnd = 2,
+    SCALE_START = 0,
+    SCALE_CHANGE = 1,
+    SCALE_END = 2,
 }
 
 enum ScrollGestureState {
-    kScrollStart = 0,
-    kScrollChange = 1,
-    kScrollEnd = 2,
+    SCROLL_START = 0,
+    SCROLL_CHANGE = 1,
+    SCROLL_END = 2,
 }
 
 // 触控笔暂时未用到，只有鼠标和触摸板，默认是鼠标
 enum DeviceKind {
     /// 手指
-    kTouch = 0,
+    TOUCH = 0,
     /// 鼠标
-    kMouse = 1,
+    MOUSE = 1,
     /// 触控笔
-    kStylus = 2,
+    STYLUS = 2,
 }
 
 class GestureManager {
@@ -63,7 +63,7 @@ class GestureManager {
     private scaleY = 1.0;
     private pinchTimeout = 150;
     private timer: number | undefined; // 使用定时器模拟手势结束
-    private scale_start_zoom = 1.0;
+    private scaleStartZoom = 1.0;
 
     // 用于判断触摸板和鼠标的滚动事件
     // 这里使用静态变量来存储上次事件的时间和增量
@@ -78,31 +78,37 @@ class GestureManager {
         event: WheelEvent,
         state: ScrollGestureState,
         shareData: ShareData,
-        deviceKind: DeviceKind = DeviceKind.kMouse,
+        deviceKind: DeviceKind = DeviceKind.MOUSE,
     ) {
-        if(state === ScrollGestureState.kScrollStart) {
+        if (state === ScrollGestureState.SCROLL_START) {
             return;
         }
-        if(event.shiftKey && event.deltaX === 0 && event.deltaY !== 0){
+        if (event.shiftKey && event.deltaX === 0 && event.deltaY !== 0) {
             shareData.offsetX -= event.deltaY * window.devicePixelRatio;
-        }else {
+        } else {
             shareData.offsetX -= event.deltaX * window.devicePixelRatio;
             shareData.offsetY -= event.deltaY * window.devicePixelRatio;
         }
         draw(shareData);
     }
 
-    private handleScaleEvent(event: WheelEvent, state: ScaleGestureState, canvas: HTMLElement, shareData: ShareData, deviceKind: DeviceKind = DeviceKind.kMouse) {
-        if (state === ScaleGestureState.kGestureStart) {
-            this.scale_start_zoom = shareData.zoom;
+    private handleScaleEvent(
+        event: WheelEvent,
+        state: ScaleGestureState,
+        canvas: HTMLElement,
+        shareData: ShareData,
+        deviceKind: DeviceKind = DeviceKind.MOUSE
+    ) {
+        if (state === ScaleGestureState.SCALE_START) {
+            this.scaleStartZoom = shareData.zoom;
         }
-        if (state === ScaleGestureState.kGestureChange) {
+        if (state === ScaleGestureState.SCALE_CHANGE) {
             const rect = canvas.getBoundingClientRect();
-            const px = (event.clientX - rect.left) * window.devicePixelRatio;
-            const py = (event.clientY - rect.top) * window.devicePixelRatio;
-            const newZoom = Math.max(MinZoom, Math.min(MaxZoom, this.scale_start_zoom * this.scaleY));
-            shareData.offsetX = (shareData.offsetX - px) * (newZoom / shareData.zoom) + px;
-            shareData.offsetY = (shareData.offsetY - py) * (newZoom / shareData.zoom) + py;
+            const pixelX = (event.clientX - rect.left) * window.devicePixelRatio;
+            const pixelY = (event.clientY - rect.top) * window.devicePixelRatio;
+            const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, this.scaleStartZoom * this.scaleY));
+            shareData.offsetX = (shareData.offsetX - pixelX) * (newZoom / shareData.zoom) + pixelX;
+            shareData.offsetY = (shareData.offsetY - pixelY) * (newZoom / shareData.zoom) + pixelY;
             shareData.zoom = newZoom;
             draw(shareData);
         }
@@ -115,23 +121,30 @@ class GestureManager {
     }
 
     // 滑轮事件的超时处理
-    private reserveScrollTimeout(event: WheelEvent, shareData: ShareData, deviceKind: DeviceKind = DeviceKind.kMouse) {
+    private reserveScrollTimeout(
+        event: WheelEvent,
+        shareData: ShareData,
+        deviceKind: DeviceKind = DeviceKind.MOUSE
+    ) {
         clearTimeout(this.timer);
-        // @ts-ignore
-        this.timer = setTimeout(() => {
+        this.timer = window.setTimeout(() => {
             this.timer = undefined;
-            this.handleScrollEvent(event, ScrollGestureState.kScrollEnd, shareData, deviceKind);
+            this.handleScrollEvent(event, ScrollGestureState.SCROLL_END, shareData, deviceKind);
             this.clearState();
         }, this.pinchTimeout);
     }
 
     // 缩放事件的超时处理
-    private reserveScaleTimeout(event: WheelEvent, canvas: HTMLElement, shareData: ShareData, deviceKind: DeviceKind = DeviceKind.kMouse) {
+    private reserveScaleTimeout(
+        event: WheelEvent,
+        canvas: HTMLElement,
+        shareData: ShareData,
+        deviceKind: DeviceKind = DeviceKind.MOUSE
+    ) {
         clearTimeout(this.timer);
-        // @ts-ignore
-        this.timer = setTimeout(() => {
+        this.timer = window.setTimeout(() => {
             this.timer = undefined;
-            this.handleScaleEvent(event, ScaleGestureState.kGestureEnd, canvas, shareData, deviceKind);
+            this.handleScaleEvent(event, ScaleGestureState.SCALE_END, canvas, shareData, deviceKind);
             this.clearState();
         }, this.pinchTimeout);
     }
@@ -162,15 +175,15 @@ class GestureManager {
 
     public onWheel(event: WheelEvent, canvas: HTMLElement, shareData: ShareData) {
         const isTouchpad = this.checkScaleType(event);
-        const deviceKind = isTouchpad ? DeviceKind.kTouch : DeviceKind.kMouse;
+        const deviceKind = isTouchpad ? DeviceKind.TOUCH : DeviceKind.MOUSE;
         let wheelRatio = this.touchWheelRatio;
-        if (deviceKind === DeviceKind.kMouse) {
+        if (deviceKind === DeviceKind.MOUSE) {
             wheelRatio = this.mouseWheelRatio;
         }
 
         if (!event.deltaY || (!event.ctrlKey && !event.metaKey)) {
             this.reserveScrollTimeout(event, shareData, deviceKind);
-            this.handleScrollEvent(event, ScrollGestureState.kScrollChange, shareData, deviceKind);
+            this.handleScrollEvent(event, ScrollGestureState.SCROLL_CHANGE, shareData, deviceKind);
             return;
         }
 
@@ -179,22 +192,24 @@ class GestureManager {
 
         if (!this.timer) {
             this.reserveScaleTimeout(event, canvas, shareData, deviceKind);
-            this.handleScaleEvent(event, ScaleGestureState.kGestureStart, canvas, shareData, deviceKind);
+            this.handleScaleEvent(event, ScaleGestureState.SCALE_START, canvas, shareData, deviceKind);
         } else {
             this.reserveScaleTimeout(event, canvas, shareData, deviceKind);
-            this.handleScaleEvent(event, ScaleGestureState.kGestureChange, canvas, shareData, deviceKind);
+            this.handleScaleEvent(event, ScaleGestureState.SCALE_CHANGE, canvas, shareData, deviceKind);
         }
     }
 }
 
 let canDraw = true;
-let gestureManager: GestureManager = new GestureManager();
+const gestureManager: GestureManager = new GestureManager();
 
 function isPromise(obj: any): obj is Promise<any> {
     return !!obj && typeof obj.then === "function";
 }
+
 function draw(shareData: ShareData) {
-    if(shareData.drawIndex % 6 !== 4){
+    // 特殊处理：对6个示例中的第4个示例进行异步等待处理，其它示例直接绘制
+    if (shareData.drawIndex % 6 !== 4) {
         shareData.tgfxBaseView.draw(
             shareData.drawIndex,
             shareData.zoom,
@@ -202,7 +217,7 @@ function draw(shareData: ShareData) {
             shareData.offsetY
         );
         canDraw = true;
-    }else if (canDraw === true) {
+    } else if (canDraw === true) {
         canDraw = false;
         const result = shareData.tgfxBaseView.draw(
             shareData.drawIndex,
@@ -219,15 +234,16 @@ function draw(shareData: ShareData) {
         }
     }
 }
+
 export function updateSize(shareData: ShareData) {
     if (!shareData.tgfxBaseView) {
         return;
     }
     shareData.resized = false;
-    let canvas = document.getElementById('hello2d') as HTMLCanvasElement;
-    let container = document.getElementById('container') as HTMLDivElement;
-    let screenRect = container.getBoundingClientRect();
-    let scaleFactor = window.devicePixelRatio;
+    const canvas = document.getElementById('hello2d') as HTMLCanvasElement;
+    const container = document.getElementById('container') as HTMLDivElement;
+    const screenRect = container.getBoundingClientRect();
+    const scaleFactor = window.devicePixelRatio;
     canvas.width = screenRect.width * scaleFactor;
     canvas.height = screenRect.height * scaleFactor;
     canvas.style.width = screenRect.width + "px";
@@ -236,13 +252,14 @@ export function updateSize(shareData: ShareData) {
     draw(shareData);
 }
 
-export function onresizeEvent(shareData: ShareData) {
+export function onResizeEvent(shareData: ShareData) {
     if (!shareData.tgfxBaseView) {
         return;
     }
     shareData.resized = true;
 }
-export function onclickEvent(shareData: ShareData) {
+
+export function onClickEvent(shareData: ShareData) {
     if (!shareData.tgfxBaseView) {
         return;
     }
@@ -254,13 +271,13 @@ export function onclickEvent(shareData: ShareData) {
     draw(shareData);
 }
 
-export function loadImage(src: string) {
+export function loadImage(src: string): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
-        let img = new Image();
+        const img = new Image();
         img.onload = () => resolve(img);
         img.onerror = reject;
         img.src = src;
-    })
+    });
 }
 
 export function bindCanvasZoomAndPanEvents(canvas: HTMLElement, shareData: ShareData) {
@@ -271,5 +288,3 @@ export function bindCanvasZoomAndPanEvents(canvas: HTMLElement, shareData: Share
         gestureManager.onWheel(e, canvas, shareData);
     }, { passive: false });
 }
-
-
