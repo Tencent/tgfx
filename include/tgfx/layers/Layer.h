@@ -618,7 +618,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
     bool allowsGroupOpacity : 1;
     bool excludeChildEffectsInLayerStyle : 1;
     uint8_t blendMode : 5;
-    uint8_t maskType : 3;
+    uint8_t maskType : 2;
   } bitFields = {};
   std::string _name;
   float _alpha = 1.0f;

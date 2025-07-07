@@ -755,8 +755,9 @@ void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMo
                               alpha, blendMode);
       }
     }
-  } else if (blendMode != BlendMode::SrcOver || (alpha < 1.0f && allowsGroupOpacity()) ||
-             (!_filters.empty() && !args.excludeEffects) || hasValidMask()) {
+  } else if (blendMode != BlendMode::SrcOver || (alpha < 1.0f && bitFields.allowsGroupOpacity) ||
+             bitFields.shouldRasterize || (!_filters.empty() && !args.excludeEffects) ||
+             hasValidMask()) {
     drawOffscreen(args, canvas, alpha, blendMode);
   } else {
     // draw directly
