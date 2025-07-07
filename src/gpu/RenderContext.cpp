@@ -28,6 +28,7 @@
 #include "core/ScalerContext.h"
 #include "core/UserTypeface.h"
 #include "core/images/SubsetImage.h"
+#include "core/shapes/TextShape.h"
 #include "core/utils/ApplyStrokeToBounds.h"
 #include "core/utils/MathExtra.h"
 #include "gpu/DrawingManager.h"
@@ -198,9 +199,6 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect
 void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
                                      const MCState& state, const Fill& fill, const Stroke* stroke) {
   DEBUG_ASSERT(glyphRunList != nullptr);
-  if (getContext() == nullptr || getContext()->atlasManager() == nullptr) {
-    return;
-  }
   auto maxScale = state.matrix.getMaxScale();
   if (FloatNearlyZero(maxScale)) {
     return;
@@ -211,44 +209,38 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   }
   state.matrix.mapRect(&bounds);  // To device space
   auto clipBounds = getClipBounds(state.clip);
-  if (clipBounds.isEmpty()) {
-    return;
-  }
-  if (!clipBounds.intersect(bounds)) {
+  if (clipBounds.isEmpty() || !clipBounds.intersect(bounds)) {
     return;
   }
 
-  size_t maxGlyphRunCount = 0;
-  for (const auto& run : glyphRunList->glyphRuns()) {
-    maxGlyphRunCount = std::max(maxGlyphRunCount, run.glyphs.size());
-  }
-
-  GlyphRun sourceGlyphRun, rejectedGlyphRun;
-  sourceGlyphRun.glyphs.reserve(maxGlyphRunCount);
-  rejectedGlyphRun.glyphs.reserve(maxGlyphRunCount);
-  sourceGlyphRun.positions.reserve(maxGlyphRunCount);
-  rejectedGlyphRun.positions.reserve(maxGlyphRunCount);
-
-  for (const auto& run : glyphRunList->glyphRuns()) {
+  std::vector<GlyphRun> rejectedGlyphRuns = {};
+  const auto& glyphRuns = glyphRunList->glyphRuns();
+  for (size_t i = 0; i < glyphRuns.size(); ++i) {
+    auto& run = glyphRuns[i];
     if (run.font.getTypeface() == nullptr) {
       continue;
     }
+    GlyphRun rejectedGlyphRun = {};
+    drawGlyphsAsDirectMask(run, state, fill, stroke, &rejectedGlyphRun);
+    if (rejectedGlyphRun.glyphs.empty()) {
+      continue;
+    }
     rejectedGlyphRun.font = run.font;
-    drawGlyphsAsDirectMask(run, state, fill, stroke, rejectedGlyphRun);
-    if (rejectedGlyphRun.glyphs.empty()) {
-      continue;
-    }
+    rejectedGlyphRuns.emplace_back(std::move(rejectedGlyphRun));
+  }
 
-    std::swap(sourceGlyphRun, rejectedGlyphRun);
-    rejectedGlyphRun.positions.clear();
-    rejectedGlyphRun.glyphs.clear();
+  if (rejectedGlyphRuns.empty()) {
+    return;
+  }
 
-    drawGlyphsAsPath(sourceGlyphRun, state, fill, stroke, clipBounds, rejectedGlyphRun);
-    if (rejectedGlyphRun.glyphs.empty()) {
-      continue;
-    }
+  if (!glyphRunList->hasColor() && glyphRunList->hasOutlines()) {
+    auto rejectedGlyphRunList = std::make_shared<GlyphRunList>(std::move(rejectedGlyphRuns));
+    drawGlyphsAsPath(std::move(rejectedGlyphRunList), state, fill, stroke, clipBounds);
+    return;
+  }
 
-    drawGlyphsAsTransformedMask(rejectedGlyphRun, state, fill, stroke);
+  for (const auto& run : rejectedGlyphRuns) {
+    drawGlyphsAsTransformedMask(run, state, fill, stroke);
   }
 }
 
@@ -346,7 +338,11 @@ void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRe
 
 void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const MCState& state,
                                            const Fill& fill, const Stroke* stroke,
-                                           GlyphRun& rejectedGlyphRun) const {
+                                           GlyphRun* rejectedGlyphRun) {
+  auto compositor = getOpsCompositor();
+  if (compositor == nullptr) {
+    return;
+  }
   auto maxScale = state.matrix.getMaxScale();
   auto hasScale = !FloatNearlyEqual(maxScale, 1.0f);
   auto font = sourceGlyphRun.font;
@@ -359,7 +355,6 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
     scaledStroke =
         std::make_unique<Stroke>(stroke->width * maxScale, stroke->cap, stroke->join, maxScale);
   }
-
   AtlasCell atlasCell;
   size_t index = 0;
   PlotUseUpdater plotUseUpdater;
@@ -377,8 +372,8 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
     }
     auto maxDimension = static_cast<int>(ceilf(std::max(bounds.width(), bounds.height())));
     if (maxDimension >= Atlas::MaxCellSize) {
-      rejectedGlyphRun.glyphs.push_back(glyphID);
-      rejectedGlyphRun.positions.push_back(glyphPosition);
+      rejectedGlyphRun->glyphs.push_back(glyphID);
+      rejectedGlyphRun->positions.push_back(glyphPosition);
       continue;
     }
 
@@ -398,8 +393,8 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
     } else {
       auto glyphCodec = GetGlyphCodec(font, glyphID, scaledStroke.get(), &glyphState.matrix);
       if (glyphCodec == nullptr) {
-        rejectedGlyphRun.glyphs.push_back(glyphID);
-        rejectedGlyphRun.positions.push_back(glyphPosition);
+        rejectedGlyphRun->glyphs.push_back(glyphID);
+        rejectedGlyphRun->positions.push_back(glyphPosition);
         continue;
       }
       atlasCell._key = std::move(glyphKey);
@@ -414,8 +409,8 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
         drawingManager->addAtlasCellCodecTask(textureProxies[pageIndex], offset,
                                               std::move(glyphCodec));
       } else {
-        rejectedGlyphRun.glyphs.push_back(glyphID);
-        rejectedGlyphRun.positions.push_back(glyphPosition);
+        rejectedGlyphRun->glyphs.push_back(glyphID);
+        rejectedGlyphRun->positions.push_back(glyphPosition);
         continue;
       }
     }
@@ -423,8 +418,8 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
                                   nextFlushToken);
     auto textureProxy = textureProxies[atlasLocator.pageIndex()];
     if (textureProxy == nullptr) {
-      rejectedGlyphRun.glyphs.push_back(glyphID);
-      rejectedGlyphRun.positions.push_back(glyphPosition);
+      rejectedGlyphRun->glyphs.push_back(glyphID);
+      rejectedGlyphRun->positions.push_back(glyphPosition);
       continue;
     }
     auto rect = atlasLocator.getLocation();
@@ -432,80 +427,36 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
     glyphState.matrix.postTranslate(glyphPosition.x, glyphPosition.y);
     glyphState.matrix.postConcat(state.matrix);
     glyphState.matrix.preTranslate(-rect.x(), -rect.y());
-
-    auto newFill = fill.makeWithMatrix(state.matrix);
-    newFill.antiAlias = false;
-    drawGlyphAtlas(std::move(textureProxy), rect, {}, glyphState, newFill);
+    compositor->fillTextAtlas(std::move(textureProxy), rect, glyphState,
+                              fill.makeWithMatrix(state.matrix));
   }
 }
-void RenderContext::drawGlyphsAsPath(GlyphRun& sourceGlyphRun, const MCState& state,
-                                     const Fill& fill, const Stroke* stroke, const Rect& clipBounds,
-                                     GlyphRun& rejectedGlyphRun) const {
-  if (!sourceGlyphRun.font.hasOutlines()) {
-    rejectedGlyphRun = std::move(sourceGlyphRun);
+void RenderContext::drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList,
+                                     const MCState& state, const Fill& fill, const Stroke* stroke,
+                                     const Rect& clipBounds) {
+  Matrix inverseMatrix = {};
+  if (!state.matrix.invert(&inverseMatrix)) {
     return;
   }
-  auto maxScale = state.matrix.getMaxScale();
-  Path totalPath = {};
-  auto font = sourceGlyphRun.font;
-  if (!FloatNearlyEqual(maxScale, 1.0f)) {
-    font = font.makeWithSize(font.getSize() * maxScale);
-  }
-  size_t index = 0;
-  Rect bounds = {};
-  auto& positions = sourceGlyphRun.positions;
-  for (auto& glyphID : sourceGlyphRun.glyphs) {
-    Path glyphPath = {};
-    auto& position = positions[index];
-    if (font.getPath(glyphID, &glyphPath)) {
-      auto glyphMatrix = Matrix::MakeScale(1.0f / maxScale, 1.0f / maxScale);
-      glyphMatrix.postTranslate(position.x, position.y);
-      glyphPath.transform(glyphMatrix);
-      totalPath.addPath(glyphPath);
-      auto glyphBounds = font.getBounds(glyphID);
-      glyphBounds.offset(position.x * maxScale, position.y * maxScale);
-      bounds.join(glyphBounds);
-    } else {
-      rejectedGlyphRun.glyphs.push_back(glyphID);
-      rejectedGlyphRun.positions.push_back(position);
-    }
-    index++;
-  }
-  bounds.scale(1.0f / maxScale, 1.0f / maxScale);
-  if (totalPath.isEmpty()) {
-    rejectedGlyphRun = std::move(sourceGlyphRun);
-    return;
-  }
-  if (stroke) {
-    ApplyStrokeToBounds(*stroke, &bounds);
-  }
-  state.matrix.mapRect(&bounds);
-  if (!bounds.intersect(clipBounds)) {
-    return;
-  }
-  auto rasterizeMatrix = state.matrix;
-  rasterizeMatrix.postTranslate(-bounds.x(), -bounds.y());
-  auto shape = Shape::MakeFrom(totalPath);
+  Path clipPath = {};
+  auto localClipBounds = inverseMatrix.mapRect(clipBounds);
+  clipPath.addRect(localClipBounds);
+  std::shared_ptr<Shape> shape =
+      std::make_shared<TextShape>(std::move(glyphRunList), state.matrix.getMaxScale());
   shape = Shape::ApplyStroke(std::move(shape), stroke);
-  shape = Shape::ApplyMatrix(std::move(shape), rasterizeMatrix);
-  auto width = static_cast<int>(ceilf(bounds.width()));
-  auto height = static_cast<int>(ceilf(bounds.height()));
-  auto rasterizer = PathRasterizer::Make(width, height, std::move(shape), true, true);
-  auto image = Image::MakeFrom(std::move(rasterizer));
-  if (image == nullptr) {
-    rejectedGlyphRun = std::move(sourceGlyphRun);
-    return;
+  shape = Shape::Merge(std::move(shape), Shape::MakeFrom(std::move(clipPath)), PathOp::Intersect);
+  if (auto compositor = getOpsCompositor()) {
+    compositor->fillShape(std::move(shape), state, fill);
   }
-  auto newState = state;
-  newState.matrix = Matrix::MakeTrans(bounds.x(), bounds.y());
-  auto rect = Rect::MakeWH(image->width(), image->height());
-  opsCompositor->fillImage(std::move(image), rect, {}, newState,
-                           fill.makeWithMatrix(rasterizeMatrix), SrcRectConstraint::Fast);
 }
 
 void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
                                                 const MCState& state, const Fill& fill,
-                                                const Stroke* stroke) const {
+                                                const Stroke* stroke) {
+  auto compositor = getOpsCompositor();
+  if (compositor == nullptr) {
+    return;
+  }
   auto maxScale = state.matrix.getMaxScale();
   auto hasScale = !FloatNearlyEqual(maxScale, 1.0f);
   auto font = sourceGlyphRun.font;
@@ -592,18 +543,8 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
     glyphState.matrix.postTranslate(glyphPosition.x, glyphPosition.y);
     glyphState.matrix.postConcat(state.matrix);
     glyphState.matrix.preTranslate(-rect.x(), -rect.y());
-
-    auto newFill = fill.makeWithMatrix(state.matrix);
-    newFill.antiAlias = false;
-    drawGlyphAtlas(std::move(textureProxy), rect, {}, glyphState, newFill);
+    compositor->fillTextAtlas(std::move(textureProxy), rect, glyphState,
+                              fill.makeWithMatrix(state.matrix));
   }
-}
-
-void RenderContext::drawGlyphAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,
-                                   const SamplingOptions& sampling, const MCState& state,
-                                   const Fill& fill) const {
-  DEBUG_ASSERT(textureProxy != nullptr);
-  DEBUG_ASSERT(textureProxy->isAlphaOnly() || fill.shader == nullptr);
-  opsCompositor->fillTextAtlas(std::move(textureProxy), rect, sampling, state, fill);
 }
 }  // namespace tgfx
