@@ -439,6 +439,9 @@ void RenderContext::drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList,
   }
   Path clipPath = {};
   auto localClipBounds = inverseMatrix.mapRect(clipBounds);
+  if (fill.antiAlias) {
+    localClipBounds.outset(1.0f, 1.0f);
+  }
   clipPath.addRect(localClipBounds);
   std::shared_ptr<Shape> shape =
       std::make_shared<TextShape>(std::move(glyphRunList), state.matrix.getMaxScale());
