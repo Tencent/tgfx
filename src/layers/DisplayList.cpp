@@ -82,10 +82,8 @@ class DrawTask {
     auto offsetX = (tile->sourceX - tile->tileX) * tileSize;
     auto offsetY = (tile->sourceY - tile->tileY) * tileSize;
     _sourceRect.offset(static_cast<float>(offsetX), static_cast<float>(offsetY));
-    if (!FloatNearlyEqual(scale, 1.0f)) {
-      _tileRect.scale(scale, scale);
-      _tileRect.round();
-    }
+    _tileRect.scale(scale, scale);
+    _tileRect.round();
   }
 };
 

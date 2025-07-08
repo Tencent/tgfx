@@ -696,6 +696,5 @@ TGFX_TEST(SVGExportTest, DrawImageRect) {
   Buffer buffer(readStream->size());
   readStream->read(buffer.data(), buffer.size());
   EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), SVGString);
-
 }
 }  // namespace tgfx
