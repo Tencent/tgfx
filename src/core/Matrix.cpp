@@ -368,7 +368,6 @@ void Matrix::TransPts(const Matrix& m, Point dst[], const Point src[], int count
   if (count > 0) {
     float tx = m.getTranslateX();
     float ty = m.getTranslateY();
-    ;
     if (count & 1) {
       dst->x = src->x + tx;
       dst->y = src->y + ty;
@@ -531,6 +530,7 @@ void Matrix::mapRect(Rect* dst, const Rect& src) const {
     float ty = values[TRANS_Y];
     float4 trans(tx, ty, tx, ty);
     SortAsRect(float4::Load(&src.left) + trans).store(&dst->left);
+    return;
   }
   if(this->isScaleTranslate()) {
     float sx = values[SCALE_X];
@@ -644,6 +644,5 @@ const Matrix::MapPtsProc Matrix::MapPtsProcs[] = {
   Matrix::ScalePts, Matrix::ScalePts,
   Matrix::AfflinePts, Matrix::AfflinePts,
   Matrix::AfflinePts, Matrix::AfflinePts
-
 };
 }  // namespace tgfx
