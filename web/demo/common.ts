@@ -48,31 +48,24 @@ enum ScrollGestureState {
     SCROLL_END = 2,
 }
 
-// 触控笔暂时未用到，只有鼠标和触摸板，默认是鼠标
 enum DeviceKind {
-    /// 手指
     TOUCH = 0,
-    /// 鼠标
     MOUSE = 1,
-    /// 触控笔
-    STYLUS = 2,
 }
 
 class GestureManager {
-    private scaleX = 1.0;
     private scaleY = 1.0;
     private pinchTimeout = 150;
-    private timer: number | undefined; // 使用定时器模拟手势结束
+    private timer: number | undefined;
     private scaleStartZoom = 1.0;
 
-    // 用于判断触摸板和鼠标的滚动事件
-    // 这里使用静态变量来存储上次事件的时间和增量
     private lastEventTime = 0;
-    private lastDeltaY = 0; // 上一次的 deltaY，用于分析增量
-    private timeThreshold = 100; // 时间差阈值，单位为毫秒
-    private deltaYThreshold = 50; // deltaY 的阈值，控制增量大小
-    private mouseWheelRatio = 800; // 鼠标滚轮的比例
-    private touchWheelRatio = 100; // 触摸板滚轮的比例
+    private lastDeltaY = 0;
+    private timeThreshold = 50;
+    private deltaYThreshold = 50;
+    private deltaYChangeThreshold = 10;
+    private mouseWheelRatio = 800;
+    private touchWheelRatio = 100;
 
     private handleScrollEvent(
         event: WheelEvent,
@@ -80,16 +73,17 @@ class GestureManager {
         shareData: ShareData,
         deviceKind: DeviceKind = DeviceKind.MOUSE,
     ) {
-        if (state === ScrollGestureState.SCROLL_START) {
-            return;
+        if (state === ScrollGestureState.SCROLL_CHANGE){
+            this.scaleStartZoom = shareData.zoom;
+            this.scaleY = 1.0;
+            if (event.shiftKey && event.deltaX === 0 && event.deltaY !== 0) {
+                shareData.offsetX -= event.deltaY * window.devicePixelRatio;
+            } else {
+                shareData.offsetX -= event.deltaX * window.devicePixelRatio;
+                shareData.offsetY -= event.deltaY * window.devicePixelRatio;
+            }
+            draw(shareData);
         }
-        if (event.shiftKey && event.deltaX === 0 && event.deltaY !== 0) {
-            shareData.offsetX -= event.deltaY * window.devicePixelRatio;
-        } else {
-            shareData.offsetX -= event.deltaX * window.devicePixelRatio;
-            shareData.offsetY -= event.deltaY * window.devicePixelRatio;
-        }
-        draw(shareData);
     }
 
     private handleScaleEvent(
@@ -100,6 +94,7 @@ class GestureManager {
         deviceKind: DeviceKind = DeviceKind.MOUSE
     ) {
         if (state === ScaleGestureState.SCALE_START) {
+            this.scaleY = 1.0;
             this.scaleStartZoom = shareData.zoom;
         }
         if (state === ScaleGestureState.SCALE_CHANGE) {
@@ -112,15 +107,17 @@ class GestureManager {
             shareData.zoom = newZoom;
             draw(shareData);
         }
+        if (state === ScaleGestureState.SCALE_END){
+            this.scaleY = 1.0;
+            this.scaleStartZoom = shareData.zoom;
+        }
     }
 
     public clearState() {
-        this.scaleX = 1.0;
         this.scaleY = 1.0;
         this.timer = undefined;
     }
 
-    // 滑轮事件的超时处理
     private reserveScrollTimeout(
         event: WheelEvent,
         shareData: ShareData,
@@ -134,7 +131,6 @@ class GestureManager {
         }, this.pinchTimeout);
     }
 
-    // 缩放事件的超时处理
     private reserveScaleTimeout(
         event: WheelEvent,
         canvas: HTMLElement,
@@ -149,47 +145,33 @@ class GestureManager {
         }, this.pinchTimeout);
     }
 
-    // 检查滚动事件来自触摸板还是鼠标
-    // 触摸板的滚动事件通常是平滑的，增量较小，而鼠标的滚动事件通常是跳跃式的，增量较大
-    // 这里使用时间差和增量的变化来判断
-    private checkScaleType(event: WheelEvent): boolean {
+    private getDeviceKind(event: WheelEvent): DeviceKind {
         const now = Date.now();
-        const timeDifference = now - this.lastEventTime; // 获取与上次事件的时间差
-        const deltaYChange = Math.abs(event.deltaY - this.lastDeltaY); // deltaY 的变化量
-
+        const timeDifference = now - this.lastEventTime;
+        const deltaYChange = Math.abs(event.deltaY - this.lastDeltaY);
         let isTouchpad = false;
-
-        // 检查是否符合触摸板的典型滚动模式
-        if (event.deltaMode === 0 && timeDifference < this.timeThreshold) {
-            // 如果 deltaY 很小，且时间差短，可能是触摸板滚动
-            if (Math.abs(event.deltaY) < this.deltaYThreshold && deltaYChange < 10) {
+        if (event.deltaMode === event.DOM_DELTA_PIXEL && timeDifference < this.timeThreshold) {
+            if (Math.abs(event.deltaY) < this.deltaYThreshold && deltaYChange < this.deltaYChangeThreshold) {
                 isTouchpad = true;
             }
         }
-        // 更新上次事件的时间和增量
         this.lastEventTime = now;
         this.lastDeltaY = event.deltaY;
-
-        return isTouchpad;
+        return isTouchpad ? DeviceKind.TOUCH : DeviceKind.MOUSE;
     }
 
     public onWheel(event: WheelEvent, canvas: HTMLElement, shareData: ShareData) {
-        const isTouchpad = this.checkScaleType(event);
-        const deviceKind = isTouchpad ? DeviceKind.TOUCH : DeviceKind.MOUSE;
+        const deviceKind = this.getDeviceKind(event);
         let wheelRatio = this.touchWheelRatio;
         if (deviceKind === DeviceKind.MOUSE) {
             wheelRatio = this.mouseWheelRatio;
         }
-
         if (!event.deltaY || (!event.ctrlKey && !event.metaKey)) {
             this.reserveScrollTimeout(event, shareData, deviceKind);
             this.handleScrollEvent(event, ScrollGestureState.SCROLL_CHANGE, shareData, deviceKind);
             return;
         }
-
-        this.scaleX *= Math.exp(-event.deltaX / wheelRatio);
-        this.scaleY *= Math.exp(-event.deltaY / wheelRatio);
-
+        this.scaleY *= Math.exp(-(event.deltaY) / wheelRatio);
         if (!this.timer) {
             this.reserveScaleTimeout(event, canvas, shareData, deviceKind);
             this.handleScaleEvent(event, ScaleGestureState.SCALE_START, canvas, shareData, deviceKind);
@@ -208,16 +190,7 @@ function isPromise(obj: any): obj is Promise<any> {
 }
 
 function draw(shareData: ShareData) {
-    // 特殊处理：对6个示例中的第4个示例进行异步等待处理，其它示例直接绘制
-    if (shareData.drawIndex % 6 !== 4) {
-        shareData.tgfxBaseView.draw(
-            shareData.drawIndex,
-            shareData.zoom,
-            shareData.offsetX,
-            shareData.offsetY
-        );
-        canDraw = true;
-    } else if (canDraw === true) {
+    if (canDraw === true) {
         canDraw = false;
         const result = shareData.tgfxBaseView.draw(
             shareData.drawIndex,

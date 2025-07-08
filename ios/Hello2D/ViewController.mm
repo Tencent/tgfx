@@ -25,7 +25,6 @@
 @property(nonatomic) CGFloat zoomScale;
 @property(nonatomic) CGPoint contentOffset;
 
-// 手势交互状态缓存
 @property(nonatomic) CGFloat lastZoom;
 @property(nonatomic) CGPoint lastPanOffset;
 @property(nonatomic) CGPoint lastPinchOffset;
