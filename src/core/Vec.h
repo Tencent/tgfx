@@ -339,7 +339,7 @@ SINT Vec<2*N,T> Join(const Vec<N,T>& lo, const Vec<N,T>& hi) {
     #endif
 
     SINT VExt<N,T> ToVext(const Vec<N,T>& v) { return BitCast<VExt<N,T>>(v); }
-    SINT Vec <N,T> ToVec(const VExt<N,T>& v) { return BitCast<Vec <N,T>>(v); }
+    SINT Vec <N,T> ToVec(const VExt<N,T>& v) { return BitCast<Vec<N,T>>(v); }
 
     SINT Vec<N,T> operator+(const Vec<N,T>& x, const Vec<N,T>& y) {
         return ToVec<N,T>(ToVext(x) + ToVext(y));
