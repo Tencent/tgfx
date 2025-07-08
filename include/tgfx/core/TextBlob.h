@@ -60,14 +60,18 @@ class TextBlob {
   virtual ~TextBlob() = default;
 
   /**
-   * Returns the bounding box of the TextBlob. Since text outlines can change with different scale
-   * factors, it's best to use the final drawing scale factor in the resolutionScale for accurate
-   * bounds calculation. Note that the resolutionScale is not applied to the returned bounds; it
-   * only affects the precision of the bounds.
-   * @param resolutionScale The intended resolution for the TextBlob. The default value is 1.0.
-   * @return The bounding box of the TextBlob.
+   * Returns the quick, conservative bounding box of the TextBlob. Returned bounds may be larger
+   * than the bounds of all glyphs in TextBlob
+   * @return A bounding box that's guaranteed to contain all text.
    */
-  Rect getBounds(float resolutionScale = 1.0f) const;
+  Rect getBounds() const;
+
+  /**
+   * Returns the tight bounding box of TextBlob. If a matrix is provided, the bounds will be
+   * transformed accordingly. Compared to getBounds, this method is more accurate but also more
+   * computationally expensive.
+   */
+  Rect getTightBounds(const Matrix* matrix = nullptr) const;
 
   /**
    * Creates a Path for the glyphs in the text blob. Since text outlines can change with different

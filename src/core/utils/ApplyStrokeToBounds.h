@@ -26,4 +26,11 @@ namespace tgfx {
  * Applies the stroke options to the given bounds.
  */
 void ApplyStrokeToBounds(const Stroke& stroke, Rect* bounds, bool applyMiterLimit = false);
+
+/**
+ * Applies stroke options to the given bounds (if resolutionScale is non-zero). The bounds are first
+ * zoomed out for stroke application, then the final result is zoomed back in  .
+ */
+void ApplyStrokeToScaledBounds(const Stroke& stroke, Rect* bounds, float resolutionScale,
+                               bool applyMiterLimit = false);
 }  // namespace tgfx

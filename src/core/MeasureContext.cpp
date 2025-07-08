@@ -71,19 +71,18 @@ void MeasureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList
   if (FloatNearlyZero(maxScale)) {
     return;
   }
+  Rect localBounds = {};
   if (computeTightBounds) {
-    Path glyphPath = {};
-    if (glyphRunList->getPath(&glyphPath, maxScale)) {
-      if (stroke) {
-        stroke->applyToPath(&glyphPath);
-      }
-      addTightBounds(glyphPath, state, fill);
-      return;
+    auto scale = Matrix::MakeScale(maxScale, maxScale);
+    localBounds = glyphRunList->getTightBounds(&scale);
+    if (stroke) {
+      ApplyStrokeToScaledBounds(*stroke, &bounds, maxScale);
     }
-  }
-  auto localBounds = glyphRunList->getBounds(maxScale);
-  if (stroke) {
-    ApplyStrokeToBounds(*stroke, &localBounds);
+  } else {
+    localBounds = glyphRunList->getBounds();
+    if (stroke) {
+      ApplyStrokeToBounds(*stroke, &localBounds);
+    }
   }
   addLocalBounds(state, fill, localBounds);
 }

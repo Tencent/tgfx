@@ -126,7 +126,7 @@ void HitTestContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList
       return;
     }
   } else {
-    auto localBounds = glyphRunList->getBounds(maxScale);
+    auto localBounds = glyphRunList->getBounds();
     if (stroke) {
       ApplyStrokeToBounds(*stroke, &localBounds);
     }
