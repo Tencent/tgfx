@@ -123,17 +123,17 @@ void RecordingContext::drawShape(std::shared_ptr<Shape> shape, const MCState& st
   drawCount++;
 }
 
-void RecordingContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
+void RecordingContext::drawImageRect(std::shared_ptr<Image> image, const Rect& src, const Rect& dst,
                                      const SamplingOptions& sampling, const MCState& state,
                                      const Fill& fill, SrcRectConstraint constraint) {
   DEBUG_ASSERT(image != nullptr);
   recordAll(state, fill);
   auto imageRect = Rect::MakeWH(image->width(), image->height());
   PlacementPtr<Record> record = nullptr;
-  if (rect == imageRect) {
+  if (src == imageRect && src == dst) {
     record = blockBuffer.make<DrawImage>(std::move(image), sampling);
   } else {
-    record = blockBuffer.make<DrawImageRect>(std::move(image), rect, sampling, constraint);
+    record = blockBuffer.make<DrawImageRect>(std::move(image), src, dst, sampling, constraint);
   }
   records.emplace_back(std::move(record));
   drawCount++;

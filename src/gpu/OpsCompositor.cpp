@@ -58,13 +58,16 @@ static bool AnyRectHasUniqueColor(const std::vector<PlacementPtr<RectRecord>>& r
 }
 
 static bool AnyRectHasUniqueMatrix(const std::vector<PlacementPtr<RectRecord>>& rects) {
-  if (rects.size() <= 1) {
+  if (rects.empty()) {
     return false;
+  }
+  if (rects.size() == 1) {
+    return rects.front()->src != rects.front()->dst;
   }
   bool hasUVCoord = false;
   auto& firstMatrix = rects.front()->viewMatrix;
   for (auto& record : rects) {
-    if (record->viewMatrix != firstMatrix) {
+    if (record->viewMatrix != firstMatrix || record->dst != record->src) {
       hasUVCoord = true;
       break;
     }
@@ -77,19 +80,22 @@ OpsCompositor::OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t 
   DEBUG_ASSERT(renderTarget != nullptr);
 }
 
-void OpsCompositor::fillImage(std::shared_ptr<Image> image, const Rect& rect,
+void OpsCompositor::fillImage(std::shared_ptr<Image> image, const Rect& src, const Rect& dst,
                               const SamplingOptions& sampling, const MCState& state,
                               const Fill& fill, SrcRectConstraint constraint) {
   DEBUG_ASSERT(image != nullptr);
-  DEBUG_ASSERT(!rect.isEmpty());
-  if (!canAppend(PendingOpType::Image, state.clip, fill) || pendingImage != image ||
+  DEBUG_ASSERT(!src.isEmpty());
+  DEBUG_ASSERT(!dst.isEmpty());
+  Fill finalFill = fill.makeWithMatrix(Matrix::MakeRectToRect(dst, src, Matrix::ScaleToFit::Fill));
+  if (!canAppend(PendingOpType::Image, state.clip, finalFill) || pendingImage != image ||
       pendingSampling != sampling || pendingConstraint != constraint) {
-    flushPendingOps(PendingOpType::Image, state.clip, fill);
+    flushPendingOps(PendingOpType::Image, state.clip, finalFill);
     pendingImage = std::move(image);
     pendingSampling = sampling;
     pendingConstraint = constraint;
   }
-  auto record = drawingBuffer()->make<RectRecord>(rect, state.matrix, fill.color.premultiply());
+  auto record =
+      drawingBuffer()->make<RectRecord>(src, state.matrix, finalFill.color.premultiply(), &dst);
   pendingRects.emplace_back(std::move(record));
 }
 
@@ -278,13 +284,16 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     } else {
       if (needLocalBounds) {
         for (auto& rect : pendingRects) {
-          localBounds->join(ClipLocalBounds(rect->rect, rect->viewMatrix, clipBounds));
+          auto viewMatrix = rect->viewMatrix;
+          viewMatrix.preConcat(
+              Matrix::MakeRectToRect(rect->src, rect->dst, Matrix::ScaleToFit::Fill));
+          localBounds->join(ClipLocalBounds(rect->src, viewMatrix, clipBounds));
         }
       }
       if (needDeviceBounds) {
         deviceBounds = Rect::MakeEmpty();
         for (auto& record : pendingRects) {
-          auto rect = record->viewMatrix.mapRect(record->rect);
+          auto rect = record->viewMatrix.mapRect(record->dst);
           deviceBounds->join(rect);
         }
       }
@@ -295,7 +304,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     case PendingOpType::Rect:
       if (pendingRects.size() == 1) {
         auto& paint = pendingRects.front();
-        if (drawAsClear(paint->rect, {paint->viewMatrix, clip}, fill)) {
+        if (drawAsClear(paint->dst, {paint->viewMatrix, clip}, fill)) {
           pendingRects.clear();
           return;
         }

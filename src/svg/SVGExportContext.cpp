@@ -144,24 +144,27 @@ void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& st
   drawPath(shape->getPath(), state, fill);
 }
 
-void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
+void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& src, const Rect& dst,
                                      const SamplingOptions&, const MCState& state, const Fill& fill,
                                      SrcRectConstraint) {
   DEBUG_ASSERT(image != nullptr);
-  Bitmap bitmap = ImageExportToBitmap(context, image);
+  auto subsetImage = image->makeSubset(src);
+  if (subsetImage == nullptr) {
+    return;
+  }
+  Bitmap bitmap = ImageExportToBitmap(context, subsetImage);
   if (!bitmap.isEmpty()) {
-    Rect srcRect = Rect::MakeWH(image->width(), image->height());
-    float scaleX = rect.width() / srcRect.width();
-    float scaleY = rect.height() / srcRect.height();
-    float transX = rect.left - srcRect.left * scaleX;
-    float transY = rect.top - srcRect.top * scaleY;
+    auto viewMatrix = Matrix::MakeRectToRect(Rect::MakeWH(src.width(), src.height()), dst,
+                                             Matrix::ScaleToFit::Fill);
 
     MCState newState;
     newState.matrix = state.matrix;
-    newState.matrix.postScale(scaleX, scaleY);
-    newState.matrix.postTranslate(transX, transY);
+    newState.matrix.preConcat(viewMatrix);
 
-    exportPixmap(Pixmap(bitmap), newState, fill);
+    auto fillMatrix = Matrix::I();
+    viewMatrix.invert(&fillMatrix);
+
+    exportPixmap(Pixmap(bitmap), newState, fill.makeWithMatrix(fillMatrix));
   }
 }
 
@@ -274,7 +277,8 @@ void SVGExportContext::exportGlyphsAsImage(const std::shared_ptr<GlyphRunList>& 
       glyphState.matrix.postTranslate(position.x * scale, position.y * scale);
       glyphState.matrix.postConcat(viewMatrix);
       auto rect = Rect::MakeWH(glyphImage->width(), glyphImage->height());
-      drawImageRect(std::move(glyphImage), rect, {}, glyphState, fill, SrcRectConstraint::Fast);
+      drawImageRect(std::move(glyphImage), rect, rect, {}, glyphState, fill,
+                    SrcRectConstraint::Fast);
     }
   }
 }

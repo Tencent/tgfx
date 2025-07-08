@@ -429,9 +429,9 @@ void Canvas::drawImage(std::shared_ptr<Image> image, const SamplingOptions& samp
     return;
   }
   SaveLayerForImageFilter(paint ? paint->getImageFilter() : nullptr);
-  auto srcRect = Rect::MakeWH(image->width(), image->height());
+  auto rect = Rect::MakeWH(image->width(), image->height());
   auto fill = GetFillStyleForImage(paint, image.get());
-  drawImageRect(std::move(image), srcRect, sampling, fill);
+  drawImageRect(std::move(image), rect, rect, sampling, fill);
 }
 
 void Canvas::drawImage(std::shared_ptr<Image> image, float left, float top,
@@ -440,10 +440,10 @@ void Canvas::drawImage(std::shared_ptr<Image> image, float left, float top,
     return;
   }
   SaveLayerForImageFilter(paint ? paint->getImageFilter() : nullptr);
-  auto srcRect = Rect::MakeWH(image->width(), image->height());
+  auto src = Rect::MakeWH(image->width(), image->height());
   auto fill = GetFillStyleForImage(paint, image.get());
-  auto dstMatrix = Matrix::MakeTrans(left, top);
-  drawImageRect(std::move(image), srcRect, sampling, fill, &dstMatrix);
+  auto dst = Rect::MakeXYWH(left, top, src.width(), src.height());
+  drawImageRect(std::move(image), src, dst, sampling, fill);
 }
 
 void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& dstRect,
@@ -463,43 +463,33 @@ void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, co
   }
   SaveLayerForImageFilter(paint ? paint->getImageFilter() : nullptr);
   auto fill = GetFillStyleForImage(paint, image.get());
-  if (srcRect == dstRect) {
-    drawImageRect(std::move(image), srcRect, sampling, fill, nullptr, constraint);
-    return;
-  }
-  auto dstMatrix = Matrix::MakeTrans(-srcRect.left, -srcRect.top);
-  auto scaleX = dstRect.width() / srcRect.width();
-  auto scaleY = dstRect.height() / srcRect.height();
-  dstMatrix.postScale(scaleX, scaleY);
-  dstMatrix.postTranslate(dstRect.left, dstRect.top);
-  drawImageRect(std::move(image), srcRect, sampling, fill, &dstMatrix, constraint);
+  drawImageRect(std::move(image), srcRect, dstRect, sampling, fill, constraint);
 }
 
 // Fills a rectangle with the given Image. The image is sampled from the area defined by rect,
 // and rendered into the same area, transformed by extraMatrix and the current matrix.
-void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
+void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& src, const Rect& dst,
                            const SamplingOptions& sampling, const Fill& fill,
-                           const Matrix* dstMatrix, SrcRectConstraint constraint) {
+                           SrcRectConstraint constraint) {
   DEBUG_ASSERT(image != nullptr);
-  DEBUG_ASSERT(!rect.isEmpty());
+  DEBUG_ASSERT(!src.isEmpty());
+  DEBUG_ASSERT(!dst.isEmpty());
   auto type = Types::Get(image.get());
-  if (type != Types::ImageType::Subset && dstMatrix == nullptr) {
-    drawContext->drawImageRect(std::move(image), rect, sampling, *mcState, fill, constraint);
+  if (type != Types::ImageType::Subset) {
+    drawContext->drawImageRect(std::move(image), src, dst, sampling, *mcState, fill, constraint);
     return;
   }
-  auto viewMatrix = dstMatrix ? *dstMatrix : Matrix::I();
-  auto imageRect = rect;
-  if (type == Types::ImageType::Subset) {
-    auto safeBounds = Rect::MakeWH(image->width(), image->height());
-    safeBounds.inset(0.5f, 0.5f);
-    if (constraint == SrcRectConstraint::Strict || safeBounds.contains(rect)) {
-      // Unwrap the subset image to maximize the merging of draw calls.
-      auto subsetImage = static_cast<const SubsetImage*>(image.get());
-      auto& subset = subsetImage->bounds;
-      imageRect.offset(subset.left, subset.top);
-      viewMatrix.preTranslate(-subset.left, -subset.top);
-      image = subsetImage->source;
-    }
+  auto viewMatrix = Matrix::I();
+  auto imageRect = src;
+  auto safeBounds = Rect::MakeWH(image->width(), image->height());
+  safeBounds.inset(0.5f, 0.5f);
+  if (constraint == SrcRectConstraint::Strict || safeBounds.contains(src)) {
+    // Unwrap the subset image to maximize the merging of draw calls.
+    auto subsetImage = static_cast<const SubsetImage*>(image.get());
+    auto& subset = subsetImage->bounds;
+    imageRect.offset(subset.left, subset.top);
+    viewMatrix.preTranslate(-subset.left, -subset.top);
+    image = subsetImage->source;
   }
   Matrix fillMatrix = {};
   if (!viewMatrix.invert(&fillMatrix)) {
@@ -508,7 +498,7 @@ void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
   auto imageState = *mcState;
   imageState.matrix.preConcat(viewMatrix);
   auto imageFill = fill.makeWithMatrix(fillMatrix);
-  drawContext->drawImageRect(std::move(image), imageRect, sampling, imageState, imageFill,
+  drawContext->drawImageRect(std::move(image), src, dst, sampling, imageState, imageFill,
                              constraint);
 }
 
@@ -607,7 +597,7 @@ void Canvas::drawLayer(std::shared_ptr<Picture> picture, const MCState& state, c
       drawState.matrix.preTranslate(offset.x + filterOffset.x, offset.y + filterOffset.y);
       auto fillMatrix = Matrix::MakeTrans(-offset.x - filterOffset.x, -offset.y - +filterOffset.y);
       auto imageRect = Rect::MakeWH(image->width(), image->height());
-      drawContext->drawImageRect(std::move(image), imageRect, {}, drawState,
+      drawContext->drawImageRect(std::move(image), imageRect, imageRect, {}, drawState,
                                  fill.makeWithMatrix(fillMatrix), SrcRectConstraint::Fast);
       return;
     }
@@ -640,7 +630,9 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
     if (colors) {
       glyphFill.color = colors[i];
     }
-    drawImageRect(atlas, rect, sampling, glyphFill, &dstMatrix);
+    auto dstRect = rect;
+    dstMatrix.mapRect(&dstRect);
+    drawImageRect(atlas, rect, dstRect, sampling, glyphFill);
   }
 }
 

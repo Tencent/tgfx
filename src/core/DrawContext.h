@@ -65,7 +65,7 @@ class DrawContext {
   /**
    * Draws a rectangle filled with the specified Image, SamplingOptions, MCState, and Fill.
    */
-  virtual void drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
+  virtual void drawImageRect(std::shared_ptr<Image> image, const Rect& src, const Rect& dst,
                              const SamplingOptions& sampling, const MCState& state,
                              const Fill& fill, SrcRectConstraint constraint) = 0;
 

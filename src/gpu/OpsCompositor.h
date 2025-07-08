@@ -49,8 +49,9 @@ class OpsCompositor {
   /**
    * Fills the given rect with the image, sampling options, state and fill.
    */
-  void fillImage(std::shared_ptr<Image> image, const Rect& rect, const SamplingOptions& sampling,
-                 const MCState& state, const Fill& fill, SrcRectConstraint constraint);
+  void fillImage(std::shared_ptr<Image> image, const Rect& src, const Rect& dst,
+                 const SamplingOptions& sampling, const MCState& state, const Fill& fill,
+                 SrcRectConstraint constraint);
 
   /**
    * Fills the given rect with the given state and fill.

@@ -174,7 +174,7 @@ void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state
   }
 }
 
-void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
+void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& src, const Rect& dst,
                                   const SamplingOptions& sampling, const MCState& state,
                                   const Fill& fill, SrcRectConstraint constraint) {
   DEBUG_ASSERT(image != nullptr);
@@ -192,8 +192,7 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect
     // There is no scaling for the source image, so we can disable mipmaps to save memory.
     samplingOptions.mipmapMode = MipmapMode::None;
   }
-
-  compositor->fillImage(std::move(image), rect, samplingOptions, state, fill, constraint);
+  compositor->fillImage(std::move(image), src, dst, samplingOptions, state, fill, constraint);
 }
 
 void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
@@ -295,8 +294,8 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
   }
   drawState.matrix.preConcat(invertMatrix);
   auto imageRect = Rect::MakeWH(image->width(), image->height());
-  drawImageRect(std::move(image), imageRect, {}, drawState, fill.makeWithMatrix(viewMatrix),
-                SrcRectConstraint::Fast);
+  drawImageRect(std::move(image), imageRect, imageRect, {}, drawState,
+                fill.makeWithMatrix(viewMatrix), SrcRectConstraint::Fast);
 }
 
 bool RenderContext::flush() {
@@ -331,8 +330,8 @@ void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRe
     auto drawingManager = renderTarget->getContext()->drawingManager();
     opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
     Fill fill = {{}, BlendMode::Src, false};
-    opsCompositor->fillImage(std::move(oldContent), renderTarget->bounds(), {}, MCState{}, fill,
-                             SrcRectConstraint::Fast);
+    opsCompositor->fillImage(std::move(oldContent), renderTarget->bounds(), renderTarget->bounds(),
+                             {}, MCState{}, fill, SrcRectConstraint::Fast);
   }
 }
 

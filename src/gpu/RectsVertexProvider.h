@@ -26,11 +26,18 @@
 
 namespace tgfx {
 struct RectRecord {
-  RectRecord(const Rect& rect, const Matrix& viewMatrix, const Color& color = {})
-      : rect(rect), viewMatrix(viewMatrix), color(color) {
+  RectRecord(const Rect& src, const Matrix& viewMatrix, const Color& color = {},
+             const Rect* dstRect = nullptr)
+      : src(src), viewMatrix(viewMatrix), color(color) {
+    if (dstRect) {
+      dst = *dstRect;
+    } else {
+      dst = src;
+    }
   }
 
-  Rect rect;
+  Rect src;
+  Rect dst;
   Matrix viewMatrix;
   Color color;
 };
@@ -87,7 +94,7 @@ class RectsVertexProvider : public VertexProvider {
    * Returns the first rect in the provider.
    */
   const Rect& firstRect() const {
-    return rects.front()->rect;
+    return rects.front()->src;
   }
 
   /**
