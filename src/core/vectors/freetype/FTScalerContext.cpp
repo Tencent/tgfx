@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -36,6 +36,15 @@ namespace tgfx {
 //  This value was chosen by eyeballing the result in Firefox and trying to match it.
 static constexpr FT_Pos BITMAP_EMBOLDEN_STRENGTH = 1 << 6;
 static constexpr int OUTLINE_EMBOLDEN_DIVISOR = 24;
+
+static constexpr FT_UInt DefaultResolutionInDPI = 72;
+
+// When FT_Set_Char_Size is called, the ppem value is recalculated using the formula:
+// ppem = textSize * DPI / 72.
+// In FreeType, ppem is stored as an unsigned short, so if textSize exceeds 65535, ppem will overflow.
+// To prevent this, we cap textSize at 65535. For the ppem limit in the source code, check here:
+// https://github.com/freetype/freetype/blob/VER-2-13-3/src/base/ftobjs.c/#L3359
+static constexpr float MaxTextSize = 65535.f * 72.f / static_cast<float>(DefaultResolutionInDPI);
 
 static float FTFixedToFloat(FT_Fixed x) {
   return static_cast<float>(x) * 1.52587890625e-5f;
@@ -149,7 +158,13 @@ FTScalerContext::FTScalerContext(std::shared_ptr<Typeface> tf, float size)
   }
   auto textScaleDot6 = FloatToFDot6(textScale);
   if (FT_IS_SCALABLE(face)) {
-    err = FT_Set_Char_Size(face, textScaleDot6, textScaleDot6, 72, 72);
+    bool exceedScaleLimit = false;
+    if (textScale > MaxTextSize) {
+      textScaleDot6 = FloatToFDot6(MaxTextSize);
+      exceedScaleLimit = true;
+    }
+    err = FT_Set_Char_Size(face, textScaleDot6, textScaleDot6, DefaultResolutionInDPI,
+                           DefaultResolutionInDPI);
     if (err != FT_Err_Ok) {
       LOGE("FT_Set_CharSize(%s, %f, %f) failed.", face->family_name, textScaleDot6, textScaleDot6);
       return;
@@ -164,6 +179,8 @@ FTScalerContext::FTScalerContext(std::shared_ptr<Typeface> tf, float size)
       auto yPpem = unitsPerEm * FTFixedToFloat(metrics.y_scale) / 64.0f;
       extraScale.x *= textScale / xPpem;
       extraScale.y *= textScale / yPpem;
+    } else if (exceedScaleLimit) {
+      extraScale *= textScale / MaxTextSize;
     }
   } else if (FT_HAS_FIXED_SIZES(face)) {
     strikeIndex = ChooseBitmapStrike(face, textScaleDot6);

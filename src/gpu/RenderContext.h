@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -64,19 +64,13 @@ class RenderContext : public DrawContext {
 
  private:
   void drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const MCState& state,
-                              const Fill& fill, const Stroke* stroke,
-                              GlyphRun& rejectedGlyphRun) const;
+                              const Fill& fill, const Stroke* stroke, GlyphRun* rejectedGlyphRun);
 
-  void drawGlyphsAsPath(GlyphRun& sourceGlyphRun, const MCState& state, const Fill& fill,
-                        const Stroke* stroke, const Rect& clipBounds,
-                        GlyphRun& rejectedGlyphRun) const;
+  void drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
+                        const Fill& fill, const Stroke* stroke, const Rect& clipBounds);
 
   void drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun, const MCState& state,
-                                   const Fill& fill, const Stroke* stroke) const;
-
-  void drawGlyphAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,
-                      const SamplingOptions& sampling, const MCState& state,
-                      const Fill& fill) const;
+                                   const Fill& fill, const Stroke* stroke);
 
   std::shared_ptr<RenderTargetProxy> renderTarget = nullptr;
   uint32_t renderFlags = 0;
