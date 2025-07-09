@@ -72,7 +72,7 @@ std::shared_ptr<EAGLNV12Texture> EAGLNV12Texture::MakeFrom(Context* context,
 
 EAGLNV12Texture::EAGLNV12Texture(CVPixelBufferRef pixelBuffer, YUVColorSpace colorSpace)
     : YUVTexture(static_cast<int>(CVPixelBufferGetWidth(pixelBuffer)),
-                 static_cast<int>(CVPixelBufferGetHeight(pixelBuffer)), YUVPixelFormat::NV12,
+                 static_cast<int>(CVPixelBufferGetHeight(pixelBuffer)), YUVFormat::NV12,
                  colorSpace),
       pixelBuffer(pixelBuffer) {
   CFRetain(pixelBuffer);
