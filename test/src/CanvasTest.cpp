@@ -2074,4 +2074,532 @@ TGFX_TEST(CanvasTest, CornerTest) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/QuadRectShapeCorner"));
 }
 
+TGFX_TEST(CanvasTest, textEmojiMixedBlendModes1) {
+  auto serifTypeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  ASSERT_TRUE(serifTypeface != nullptr);
+
+  std::string mixedText = "Hello TGFX! 🎨🎉😊🌟✨🚀💻❤️";
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  int surfaceWidth = 1200;
+  int surfaceHeight = 800;
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+
+  // Create gradient background
+  canvas->clear(Color::White());
+  auto backgroundPaint = Paint();
+  auto colors = {Color::FromRGBA(255, 200, 200, 255), Color::FromRGBA(200, 200, 255, 255)};
+  auto positions = {0.0f, 1.0f};
+  auto shader = Shader::MakeLinearGradient(
+      Point::Make(0, 0), Point::Make(surfaceWidth, surfaceHeight), colors, positions);
+  backgroundPaint.setShader(shader);
+  canvas->drawRect(Rect::MakeWH(surfaceWidth, surfaceHeight), backgroundPaint);
+
+  float fontSize = 32.f;
+  float lineHeight = fontSize * 1.5f;
+  float startY = 60.f;
+
+  // Test different blend modes
+  std::vector<BlendMode> blendModes = {
+      BlendMode::SrcOver,   BlendMode::SrcIn,     BlendMode::Src,        BlendMode::Overlay,
+      BlendMode::Darken,    BlendMode::Lighten,   BlendMode::ColorDodge, BlendMode::ColorBurn,
+      BlendMode::HardLight, BlendMode::SoftLight, BlendMode::Difference, BlendMode::Exclusion};
+
+  std::vector<std::string> blendModeNames = {"SrcOver",   "Multiply",  "Screen",     "Overlay",
+                                             "Darken",    "Lighten",   "ColorDodge", "ColorBurn",
+                                             "HardLight", "SoftLight", "Difference", "Exclusion"};
+
+  for (size_t modeIndex = 0; modeIndex < blendModes.size(); ++modeIndex) {
+    auto blendMode = blendModes[modeIndex];
+    auto modeName = blendModeNames[modeIndex];
+
+    float y = startY + modeIndex * lineHeight;
+    float x = 20.f;
+
+    // Draw blend mode label
+    Paint labelPaint;
+    labelPaint.setColor(Color::Black());
+    auto labelFont = Font(serifTypeface, 16.f);
+    canvas->drawSimpleText(modeName, x, y - 8, labelFont, labelPaint);
+
+    // Process text using TextShaper for proper emoji handling
+    auto positionedGlyphs = TextShaper::Shape(mixedText, serifTypeface);
+
+    struct TextRun {
+      std::vector<GlyphID> ids;
+      std::vector<Point> positions;
+      Font font;
+    };
+    std::vector<TextRun> textRuns;
+    TextRun* run = nullptr;
+    auto count = positionedGlyphs.glyphCount();
+    float textX = x + 120;
+
+    for (size_t i = 0; i < count; ++i) {
+      auto typeface = positionedGlyphs.getTypeface(i);
+      if (run == nullptr || run->font.getTypeface() != typeface) {
+        textRuns.emplace_back();
+        run = &textRuns.back();
+        run->font = Font(typeface, fontSize);
+      }
+      auto glyphID = positionedGlyphs.getGlyphID(i);
+      run->ids.emplace_back(glyphID);
+      run->positions.push_back(Point{textX, y});
+      textX += run->font.getAdvance(glyphID);
+    }
+
+    // Draw mixed text with current blend mode using proper glyph rendering
+    Paint textPaint;
+    textPaint.setColor(Color::FromRGBA(255, 100, 50, 200));
+    textPaint.setBlendMode(blendMode);
+
+    for (const auto& textRun : textRuns) {
+      canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
+                         textRun.font, textPaint);
+    }
+  }
+
+  context->flush();
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/textEmojiMixedBlendModes"));
+}
+
+TGFX_TEST(CanvasTest, textEmojiMixedBlendModes2) {
+  auto serifTypeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  ASSERT_TRUE(serifTypeface != nullptr);
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  int surfaceWidth = 600;
+  int surfaceHeight = 400;
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+
+  // Create colorful background with circles
+  canvas->clear(Color::FromRGBA(240, 240, 255, 255));
+
+  // Test emoji and text with different blend modes in layers
+  std::vector<std::pair<std::string, BlendMode>> textBlendPairs = {{"🎨Art", BlendMode::SrcOver},
+                                                                   {"🎨Art", BlendMode::SrcIn},
+                                                                   {"🎭Mix", BlendMode::Src},
+                                                                   {"🚀Fast", BlendMode::SrcATop},
+                                                                   {"🎪Fun", BlendMode::SrcOut}};
+
+  float fontSize = 36.f;
+
+  for (size_t i = 0; i < textBlendPairs.size(); ++i) {
+    auto& pair = textBlendPairs[i];
+    auto& text = pair.first;
+    auto blendMode = pair.second;
+
+    float x = 50 + (i % 3) * 180;
+    float y = 120 + (i / 3) * 120;
+
+    // Process text using TextShaper for proper emoji handling
+    auto positionedGlyphs = TextShaper::Shape(text, serifTypeface);
+
+    struct TextRun {
+      std::vector<GlyphID> ids;
+      std::vector<Point> positions;
+      Font font;
+    };
+    std::vector<TextRun> textRuns;
+    TextRun* run = nullptr;
+    auto count = positionedGlyphs.glyphCount();
+    float textX = x;
+
+    for (size_t j = 0; j < count; ++j) {
+      auto typeface = positionedGlyphs.getTypeface(j);
+      if (run == nullptr || run->font.getTypeface() != typeface) {
+        textRuns.emplace_back();
+        run = &textRuns.back();
+        run->font = Font(typeface, fontSize);
+      }
+      auto glyphID = positionedGlyphs.getGlyphID(j);
+      run->ids.emplace_back(glyphID);
+      run->positions.push_back(Point{textX, y});
+      textX += run->font.getAdvance(glyphID);
+    }
+
+    Paint textPaint;
+    textPaint.setColor(Color::FromRGBA(255, 50, 100, 220));
+    textPaint.setBlendMode(blendMode);
+
+    for (const auto& textRun : textRuns) {
+      canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
+                         textRun.font, textPaint);
+    }
+  }
+
+  context->flush();
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/textEmojiMixedBlendModes"));
+}
+
+TGFX_TEST(CanvasTest, complexEmojiTextBlending) {
+  auto serifTypeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  ASSERT_TRUE(serifTypeface != nullptr);
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  int surfaceWidth = 800;
+  int surfaceHeight = 600;
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+
+  // Create complex background pattern
+  canvas->clear(Color::White());
+
+  // Draw gradient rectangles as background
+  for (int i = 0; i < 8; ++i) {
+    for (int j = 0; j < 6; ++j) {
+      Paint rectPaint;
+      auto hue = (i * 45 + j * 30) % 360;
+      // Convert HSL to RGB approximation
+      auto r = static_cast<uint8_t>(128 + 100 * sin(hue * 3.14159f / 180.0f));
+      auto g = static_cast<uint8_t>(128 + 100 * sin((hue + 120) * 3.14159f / 180.0f));
+      auto b = static_cast<uint8_t>(128 + 100 * sin((hue + 240) * 3.14159f / 180.0f));
+      auto color = Color::FromRGBA(r, g, b, 77);  // 0.3f * 255
+      rectPaint.setColor(color);
+      canvas->drawRect(Rect::MakeXYWH(i * 100, j * 100, 100, 100), rectPaint);
+    }
+  }
+
+  // Complex text with various emoji sequences
+  std::vector<std::string> complexTexts = {"👨‍👩‍👧‍👦Family测试",
+                                           "🏳️‍🌈Flag🇨🇳China",
+                                           "👨🏼‍🦱Hair👩🏾‍💻Code",
+                                           "🤡🎭🎪🎨艺术Art",
+                                           "🌍🌎🌏World世界",
+                                           "🎵🎶🎼音乐Music"};
+
+  std::vector<BlendMode> complexBlendModes = {BlendMode::Multiply,   BlendMode::Screen,
+                                              BlendMode::Overlay,    BlendMode::SoftLight,
+                                              BlendMode::Difference, BlendMode::ColorBurn};
+
+  float fontSize = 28.f;
+
+  for (size_t i = 0; i < complexTexts.size(); ++i) {
+    auto& text = complexTexts[i];
+    auto blendMode = complexBlendModes[i];
+
+    float x = 20 + (i % 2) * 380;
+    float y = 80 + (i / 2) * 100;
+
+    // Process text using TextShaper for proper emoji handling
+    auto positionedGlyphs = TextShaper::Shape(text, serifTypeface);
+
+    struct TextRun {
+      std::vector<GlyphID> ids;
+      std::vector<Point> positions;
+      Font font;
+    };
+    std::vector<TextRun> textRuns;
+    TextRun* run = nullptr;
+    auto count = positionedGlyphs.glyphCount();
+    float textX = x;
+
+    for (size_t j = 0; j < count; ++j) {
+      auto typeface = positionedGlyphs.getTypeface(j);
+      if (run == nullptr || run->font.getTypeface() != typeface) {
+        textRuns.emplace_back();
+        run = &textRuns.back();
+        run->font = Font(typeface, fontSize);
+      }
+      auto glyphID = positionedGlyphs.getGlyphID(j);
+      run->ids.emplace_back(glyphID);
+      run->positions.push_back(Point{textX, y});
+      textX += run->font.getAdvance(glyphID);
+    }
+
+    // Draw text with blend mode
+    Paint textPaint;
+    textPaint.setColor(Color::FromRGBA(40, 80, 160, 255));
+    textPaint.setBlendMode(blendMode);
+
+    for (const auto& textRun : textRuns) {
+      canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
+                         textRun.font, textPaint);
+    }
+
+    // Draw blend mode label
+    Paint labelPaint;
+    labelPaint.setColor(Color::Black());
+    auto labelFont = Font(serifTypeface, 12.f);
+    std::string label = "BlendMode: " + std::to_string(static_cast<int>(blendMode));
+    canvas->drawSimpleText(label, x, y + 15, labelFont, labelPaint);
+  }
+
+  context->flush();
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/complexEmojiTextBlending"));
+}
+
+TGFX_TEST(CanvasTest, emojiTextStrokeBlending) {
+  auto serifTypeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  ASSERT_TRUE(serifTypeface != nullptr);
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  int surfaceWidth = 700;
+  int surfaceHeight = 500;
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+
+  // Rainbow gradient background
+  canvas->clear(Color::Black());
+  auto colors = {Color::FromRGBA(255, 0, 0, 255),   Color::FromRGBA(255, 127, 0, 255),
+                 Color::FromRGBA(255, 255, 0, 255), Color::FromRGBA(0, 255, 0, 255),
+                 Color::FromRGBA(0, 0, 255, 255),   Color::FromRGBA(75, 0, 130, 255),
+                 Color::FromRGBA(148, 0, 211, 255)};
+  auto positions = {0.0f, 0.16f, 0.33f, 0.5f, 0.66f, 0.83f, 1.0f};
+  auto shader = Shader::MakeLinearGradient(Point::Make(0, 0), Point::Make(0, surfaceHeight), colors,
+                                           positions);
+  Paint bgPaint;
+  bgPaint.setShader(shader);
+  canvas->drawRect(Rect::MakeWH(surfaceWidth, surfaceHeight), bgPaint);
+
+  // Test stroke and fill with different blend modes
+  std::string emojiText = "🎨🌈🎭🎪🚀";
+  std::string normalText = "ArtRainbowMask";
+
+  float fontSize = 48.f;
+
+  std::vector<BlendMode> strokeBlendModes = {BlendMode::SrcOver, BlendMode::Multiply,
+                                             BlendMode::Screen, BlendMode::Overlay,
+                                             BlendMode::Difference};
+
+  for (size_t i = 0; i < strokeBlendModes.size(); ++i) {
+    auto blendMode = strokeBlendModes[i];
+    float y = 80 + i * 80;
+
+    // Process emoji text using TextShaper
+    auto emojiPositionedGlyphs = TextShaper::Shape(emojiText, serifTypeface);
+    struct TextRun {
+      std::vector<GlyphID> ids;
+      std::vector<Point> positions;
+      Font font;
+    };
+    std::vector<TextRun> emojiTextRuns;
+    TextRun* emojiRun = nullptr;
+    auto emojiCount = emojiPositionedGlyphs.glyphCount();
+    float emojiX = 50;
+
+    for (size_t j = 0; j < emojiCount; ++j) {
+      auto typeface = emojiPositionedGlyphs.getTypeface(j);
+      if (emojiRun == nullptr || emojiRun->font.getTypeface() != typeface) {
+        emojiTextRuns.emplace_back();
+        emojiRun = &emojiTextRuns.back();
+        emojiRun->font = Font(typeface, fontSize);
+      }
+      auto glyphID = emojiPositionedGlyphs.getGlyphID(j);
+      emojiRun->ids.emplace_back(glyphID);
+      emojiRun->positions.push_back(Point{emojiX, y});
+      emojiX += emojiRun->font.getAdvance(glyphID);
+    }
+
+    // Draw emoji with stroke and fill
+    Paint emojiStrokePaint;
+    emojiStrokePaint.setColor(Color::White());
+    emojiStrokePaint.setStyle(PaintStyle::Stroke);
+    emojiStrokePaint.setStrokeWidth(3.0f);
+    emojiStrokePaint.setBlendMode(blendMode);
+
+    Paint emojiFillPaint;
+    emojiFillPaint.setColor(Color::FromRGBA(255, 200, 100, 200));
+    emojiFillPaint.setBlendMode(blendMode);
+
+    for (const auto& textRun : emojiTextRuns) {
+      canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
+                         textRun.font, emojiStrokePaint);
+      canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
+                         textRun.font, emojiFillPaint);
+    }
+
+    // Process normal text using TextShaper
+    auto normalPositionedGlyphs = TextShaper::Shape(normalText, serifTypeface);
+    std::vector<TextRun> normalTextRuns;
+    TextRun* normalRun = nullptr;
+    auto normalCount = normalPositionedGlyphs.glyphCount();
+    float normalX = 350;
+
+    for (size_t j = 0; j < normalCount; ++j) {
+      auto typeface = normalPositionedGlyphs.getTypeface(j);
+      if (normalRun == nullptr || normalRun->font.getTypeface() != typeface) {
+        normalTextRuns.emplace_back();
+        normalRun = &normalTextRuns.back();
+        normalRun->font = Font(typeface, fontSize);
+      }
+      auto glyphID = normalPositionedGlyphs.getGlyphID(j);
+      normalRun->ids.emplace_back(glyphID);
+      normalRun->positions.push_back(Point{normalX, y});
+      normalX += normalRun->font.getAdvance(glyphID);
+    }
+
+    // Draw normal text for comparison
+    Paint textStrokePaint;
+    textStrokePaint.setColor(Color::Green());
+    textStrokePaint.setStyle(PaintStyle::Stroke);
+    textStrokePaint.setStrokeWidth(2.0f);
+    textStrokePaint.setBlendMode(blendMode);
+
+    Paint textFillPaint;
+    textFillPaint.setColor(Color::FromRGBA(100, 150, 255, 200));
+    textFillPaint.setBlendMode(blendMode);
+
+    for (const auto& textRun : normalTextRuns) {
+      canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
+                         textRun.font, textStrokePaint);
+      canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
+                         textRun.font, textFillPaint);
+    }
+  }
+
+  context->flush();
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/emojiTextStrokeBlending"));
+}
+
+TGFX_TEST(CanvasTest, textEmojiOverlayBlendModes) {
+  auto serifTypeface =
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSerifSC-Regular.otf"));
+  ASSERT_TRUE(serifTypeface != nullptr);
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  int surfaceWidth = 1200;
+  int surfaceHeight = 900;
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+
+  // Create striped background
+  canvas->clear(Color::FromRGBA(230, 230, 250, 255));
+  Paint stripePaint;
+  stripePaint.setColor(Color::FromRGBA(200, 220, 240, 255));
+  for (int i = 0; i < surfaceHeight; i += 20) {
+    if ((i / 20) % 2 == 0) {
+      canvas->drawRect(Rect::MakeXYWH(0, i, surfaceWidth, 20), stripePaint);
+    }
+  }
+
+  float fontSize = 36.f;
+  float lineHeight = 80.f;
+  float startY = 60.f;
+
+  // Test different blend modes for emoji overlays on text
+  std::vector<BlendMode> blendModes = {
+      BlendMode::SrcOver,   BlendMode::SrcIn,     BlendMode::SrcOut,     BlendMode::SrcATop,
+      BlendMode::DstOver,   BlendMode::DstIn,     BlendMode::DstOut,     BlendMode::DstATop,
+      BlendMode::Xor,       BlendMode::Multiply,  BlendMode::Screen,     BlendMode::Overlay,
+      BlendMode::Darken,    BlendMode::Lighten,   BlendMode::ColorDodge, BlendMode::ColorBurn,
+      BlendMode::HardLight, BlendMode::SoftLight, BlendMode::Difference, BlendMode::Exclusion};
+
+  std::vector<std::string> blendModeNames = {
+      "SrcOver", "SrcIn",      "SrcOut",    "SrcATop",   "DstOver",   "DstIn",      "DstOut",
+      "DstATop", "Xor",        "Plus",      "Multiply",  "Screen",    "Overlay",    "Darken",
+      "Lighten", "ColorDodge", "ColorBurn", "HardLight", "SoftLight", "Difference", "Exclusion"};
+
+  std::string baseText = "Hello 世界";
+  std::string emojiText = "🎨🎉🌟";
+
+  for (size_t modeIndex = 0; modeIndex < blendModes.size(); ++modeIndex) {
+    auto blendMode = blendModes[modeIndex];
+    auto modeName = blendModeNames[modeIndex];
+
+    float y = startY + (modeIndex / 3) * lineHeight;
+    float x = 50.f + (modeIndex % 3) * 380.f;
+
+    // Draw blend mode label
+    Paint labelPaint;
+    labelPaint.setColor(Color::Black());
+    auto labelFont = Font(serifTypeface, 14.f);
+    canvas->drawSimpleText(modeName, x, y - 20, labelFont, labelPaint);
+
+    // First draw base text layer
+    auto basePositionedGlyphs = TextShaper::Shape(baseText, serifTypeface);
+
+    struct TextRun {
+      std::vector<GlyphID> ids;
+      std::vector<Point> positions;
+      Font font;
+    };
+    std::vector<TextRun> baseTextRuns;
+    TextRun* baseRun = nullptr;
+    auto baseCount = basePositionedGlyphs.glyphCount();
+    float baseX = x;
+
+    for (size_t i = 0; i < baseCount; ++i) {
+      auto typeface = basePositionedGlyphs.getTypeface(i);
+      if (baseRun == nullptr || baseRun->font.getTypeface() != typeface) {
+        baseTextRuns.emplace_back();
+        baseRun = &baseTextRuns.back();
+        baseRun->font = Font(typeface, fontSize);
+      }
+      auto glyphID = basePositionedGlyphs.getGlyphID(i);
+      baseRun->ids.emplace_back(glyphID);
+      baseRun->positions.push_back(Point{baseX, y});
+      baseX += baseRun->font.getAdvance(glyphID);
+    }
+
+    // Draw base text with semi-transparent blue
+    Paint baseTextPaint;
+    baseTextPaint.setColor(Color::FromRGBA(50, 100, 200, 180));
+    baseTextPaint.setBlendMode(BlendMode::SrcOver);
+
+    for (const auto& textRun : baseTextRuns) {
+      canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
+                         textRun.font, baseTextPaint);
+    }
+
+    // Then overlay emoji with different blend modes
+    auto emojiPositionedGlyphs = TextShaper::Shape(emojiText, serifTypeface);
+    std::vector<TextRun> emojiTextRuns;
+    TextRun* emojiRun = nullptr;
+    auto emojiCount = emojiPositionedGlyphs.glyphCount();
+    float emojiX = x + 20;
+
+    for (size_t i = 0; i < emojiCount; ++i) {
+      auto typeface = emojiPositionedGlyphs.getTypeface(i);
+      if (emojiRun == nullptr || emojiRun->font.getTypeface() != typeface) {
+        emojiTextRuns.emplace_back();
+        emojiRun = &emojiTextRuns.back();
+        emojiRun->font = Font(typeface, fontSize);
+      }
+      auto glyphID = emojiPositionedGlyphs.getGlyphID(i);
+      emojiRun->ids.emplace_back(glyphID);
+      emojiRun->positions.push_back(Point{emojiX, y + 5});
+      emojiX += emojiRun->font.getAdvance(glyphID);
+    }
+
+    // Draw overlaid emoji with the current blend mode
+    Paint emojiPaint;
+    emojiPaint.setColor(Color::FromRGBA(255, 150, 50, 200));
+    emojiPaint.setBlendMode(blendMode);
+
+    for (const auto& textRun : emojiTextRuns) {
+      canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
+                         textRun.font, emojiPaint);
+    }
+  }
+
+  context->flush();
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/textEmojiOverlayBlendModes"));
+}
 }  // namespace tgfx
