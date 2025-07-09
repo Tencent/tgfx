@@ -167,6 +167,13 @@ static Rect ToLocalBounds(const Rect& bounds, const Matrix& viewMatrix) {
   return localBounds;
 }
 
+void RenderContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
+                              const MCState& state, const Fill& fill) {
+  if (auto compositor = getOpsCompositor()) {
+    compositor->fillImage(std::move(image), sampling, state, fill);
+  }
+}
+
 void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                               const Fill& fill) {
   if (auto compositor = getOpsCompositor()) {
@@ -193,8 +200,8 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcR
     // There is no scaling for the source image, so we can disable mipmaps to save memory.
     samplingOptions.mipmapMode = MipmapMode::None;
   }
-  compositor->fillImage(std::move(image), srcRect, dstRect, samplingOptions, state, fill,
-                        constraint);
+  compositor->fillImageRect(std::move(image), srcRect, dstRect, samplingOptions, state, fill,
+                            constraint);
 }
 
 void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
@@ -332,8 +339,9 @@ void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRe
     auto drawingManager = renderTarget->getContext()->drawingManager();
     opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
     Fill fill = {{}, BlendMode::Src, false};
-    opsCompositor->fillImage(std::move(oldContent), renderTarget->bounds(), renderTarget->bounds(),
-                             {}, MCState{}, fill, SrcRectConstraint::Fast);
+    opsCompositor->fillImageRect(std::move(oldContent), renderTarget->bounds(),
+                                 renderTarget->bounds(), {}, MCState{}, fill,
+                                 SrcRectConstraint::Fast);
   }
 }
 

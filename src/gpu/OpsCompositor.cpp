@@ -81,10 +81,26 @@ OpsCompositor::OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t 
   DEBUG_ASSERT(renderTarget != nullptr);
 }
 
-void OpsCompositor::fillImage(std::shared_ptr<Image> image, const Rect& srcRect,
-                              const Rect& dstRect, const SamplingOptions& sampling,
-                              const MCState& state, const Fill& fill,
-                              SrcRectConstraint constraint) {
+void OpsCompositor::fillImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
+                              const MCState& state, const Fill& fill) {
+  DEBUG_ASSERT(image != nullptr);
+  auto imageRect = Rect::MakeWH(image->width(), image->height());
+  if (!canAppend(PendingOpType::Image, state.clip, fill) || pendingImage != image ||
+      pendingSampling != sampling || pendingConstraint != SrcRectConstraint::Fast) {
+    flushPendingOps(PendingOpType::Image, state.clip, fill);
+    pendingImage = std::move(image);
+    pendingSampling = sampling;
+    pendingConstraint = SrcRectConstraint::Fast;
+  }
+  auto record =
+      drawingBuffer()->make<RectRecord>(imageRect, state.matrix, fill.color.premultiply());
+  pendingRects.emplace_back(std::move(record));
+}
+
+void OpsCompositor::fillImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
+                                  const Rect& dstRect, const SamplingOptions& sampling,
+                                  const MCState& state, const Fill& fill,
+                                  SrcRectConstraint constraint) {
   DEBUG_ASSERT(image != nullptr);
   DEBUG_ASSERT(!srcRect.isEmpty());
   DEBUG_ASSERT(!dstRect.isEmpty());

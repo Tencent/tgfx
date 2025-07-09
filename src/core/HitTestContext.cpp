@@ -98,6 +98,16 @@ void HitTestContext::drawShape(std::shared_ptr<Shape> shape, const MCState& stat
   }
 }
 
+void HitTestContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions&,
+                               const MCState& state, const Fill& fill) {
+  // Images are always checked against their bounding box.
+  auto local = state.matrix.mapXY(testX, testY);
+  auto imageBounds = Rect::MakeWH(image->width(), image->height());
+  if (imageBounds.contains(local.x, local.y) && checkClipAndFill(state.clip, fill, local)) {
+    hit = true;
+  }
+}
+
 void HitTestContext::drawImageRect(std::shared_ptr<Image>, const Rect&, const Rect& dstRect,
                                    const SamplingOptions&, const MCState& state, const Fill& fill,
                                    SrcRectConstraint) {

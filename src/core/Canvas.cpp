@@ -429,9 +429,8 @@ void Canvas::drawImage(std::shared_ptr<Image> image, const SamplingOptions& samp
     return;
   }
   SaveLayerForImageFilter(paint ? paint->getImageFilter() : nullptr);
-  auto rect = Rect::MakeWH(image->width(), image->height());
   auto fill = GetFillStyleForImage(paint, image.get());
-  drawImageRect(std::move(image), rect, rect, sampling, fill);
+  drawContext->drawImage(std::move(image), sampling, *mcState, fill);
 }
 
 void Canvas::drawImage(std::shared_ptr<Image> image, float left, float top,
@@ -440,10 +439,11 @@ void Canvas::drawImage(std::shared_ptr<Image> image, float left, float top,
     return;
   }
   SaveLayerForImageFilter(paint ? paint->getImageFilter() : nullptr);
-  auto src = Rect::MakeWH(image->width(), image->height());
   auto fill = GetFillStyleForImage(paint, image.get());
-  auto dst = Rect::MakeXYWH(left, top, src.width(), src.height());
-  drawImageRect(std::move(image), src, dst, sampling, fill);
+  auto state = *mcState;
+  state.matrix.preTranslate(left, top);
+  drawContext->drawImage(std::move(image), sampling, state,
+                         fill.makeWithMatrix(Matrix::MakeTrans(-left, -top)));
 }
 
 void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& dstRect,
