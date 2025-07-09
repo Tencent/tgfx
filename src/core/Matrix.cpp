@@ -75,10 +75,10 @@ inline float sdot(float a, float b, float c, float d) {
 
 void Matrix::preTranslate(float tx, float ty) {
   const unsigned mask = this->getType();
-  if(mask <= TranslateMask) {
+  if (mask <= TranslateMask) {
     values[TRANS_X] += tx;
     values[TRANS_Y] += ty;
-  }else {
+  } else {
     values[TRANS_X] += sdot(values[SCALE_X], tx, values[SKEW_X], ty);
     values[TRANS_Y] += sdot(values[SKEW_Y], tx, values[SCALE_Y], ty);
   }
@@ -128,11 +128,11 @@ void Matrix::preScale(float sx, float sy) {
   values[SKEW_Y] *= sx;
   values[SKEW_X] *= sy;
   values[SCALE_Y] *= sy;
-  if(values[SCALE_X] == 1 && values[SCALE_Y] == 1 && !(typeMask & AffineMask)) {
+  if (values[SCALE_X] == 1 && values[SCALE_Y] == 1 && !(typeMask & AffineMask)) {
     this->clearTypeMask(ScaleMask);
-  }else {
+  } else {
     this->orTypeMask(ScaleMask);
-    if(sx == 0 || sy == 0) {
+    if (sx == 0 || sy == 0) {
       this->clearTypeMask(RectStayRectMask);
     }
   }
@@ -270,13 +270,13 @@ void Matrix::setConcat(const Matrix& first, const Matrix& second) {
   auto sy = matrixB[SCALE_Y] * matrixA[SCALE_Y];
   auto tx = matrixB[TRANS_X] * matrixA[SCALE_X] + matrixA[TRANS_X];
   auto ty = matrixB[TRANS_Y] * matrixA[SCALE_Y] + matrixA[TRANS_Y];
-  if(first.isTriviallyIdentity()) {
+  if (first.isTriviallyIdentity()) {
     *this = second;
-  }else if(second.isTriviallyIdentity()) {
+  } else if (second.isTriviallyIdentity()) {
     *this = first;
-  }else if(OnlyScaleAndTranslate(aType | bType)) {
+  } else if (OnlyScaleAndTranslate(aType | bType)) {
     this->setScaleTranslate(sx, sy, tx, ty);
-  }else {
+  } else {
     sx += matrixB[SKEW_Y] * matrixA[SKEW_X];
     sy += matrixB[SKEW_X] * matrixA[SKEW_Y];
     ky += matrixB[SCALE_X] * matrixA[SKEW_Y] + matrixB[SKEW_Y] * matrixA[SCALE_Y];
@@ -308,12 +308,7 @@ bool Matrix::invertible() const {
   return !(FloatNearlyZero(determinant, FLOAT_NEARLY_ZERO * FLOAT_NEARLY_ZERO * FLOAT_NEARLY_ZERO));
 }
 
-enum {
-  TranslateShift,
-  ScaleShift,
-  AffineShift,
-  RectStaysRectShift = 4
-};
+enum { TranslateShift, ScaleShift, AffineShift, RectStaysRectShift = 4 };
 
 static const int32_t Scalar1Int = 0x3f800000;
 
@@ -428,7 +423,7 @@ void Matrix::ScalePts(const Matrix& m, Point dst[], const Point src[], int count
 }
 
 void Matrix::AfflinePts(const Matrix& m, Point dst[], const Point src[], int count) {
-  if(count > 0) {
+  if (count > 0) {
     float tx = m.getTranslateX();
     float ty = m.getTranslateY();
     float sx = m.getScaleX();
@@ -441,18 +436,18 @@ void Matrix::AfflinePts(const Matrix& m, Point dst[], const Point src[], int cou
     bool trailingElement = (count & 1);
     count >>= 1;
     float4 src4;
-    for(int i = 0; i < count; i++) {
+    for (int i = 0; i < count; i++) {
       src4 = float4::Load(src);
-      float4 swz4 = Shuffle<1, 0, 3, 2>(src4); // y0, x0, y1, x1
+      float4 swz4 = Shuffle<1, 0, 3, 2>(src4);  // y0, x0, y1, x1
       (src4 * scale4 + swz4 * skew4 + trans4).store(dst);
       src += 2;
       dst += 2;
     }
-    if(trailingElement) {
+    if (trailingElement) {
       // We use the same logic here to ensure that the math stays consistent throughout, even
       // though the high float2 is ignored.
       src4.lo = float2::Load(src);
-      float4 swz4 = Shuffle<1,0,3,2>(src4);
+      float4 swz4 = Shuffle<1, 0, 3, 2>(src4);
       (src4 * scale4 + swz4 * skew4 + trans4).lo.store(dst);
     }
   }
@@ -470,7 +465,7 @@ bool Matrix::invertNonIdentity(Matrix* inverse) const {
       float invSY = 1 / values[SCALE_Y];
       float invTX = -values[TRANS_X] * invSX;
       float invTY = -values[TRANS_Y] * invSY;
-      if(inverse) {
+      if (inverse) {
         inverse->values[SKEW_X] = inverse->values[SKEW_Y] = 0;
         inverse->values[SCALE_X] = invSX;
         inverse->values[SCALE_Y] = invSY;
@@ -480,7 +475,7 @@ bool Matrix::invertNonIdentity(Matrix* inverse) const {
       }
       return true;
     }
-    if(inverse) {
+    if (inverse) {
       inverse->setTranslate(-values[TRANS_X], -values[TRANS_Y]);
     }
     return true;
@@ -496,7 +491,7 @@ bool Matrix::invertNonIdentity(Matrix* inverse) const {
   auto sy = values[SCALE_X] * determinant;
   auto tx = -(sx * values[TRANS_X] + kx * values[TRANS_Y]);
   auto ty = -(ky * values[TRANS_X] + sy * values[TRANS_Y]);
-  if(inverse) {
+  if (inverse) {
     inverse->setAll(sx, kx, tx, ky, sy, ty);
     inverse->setTypeMask(typeMask);
   }
@@ -513,7 +508,7 @@ void Matrix::mapXY(float x, float y, Point* result) const {
 }
 
 bool Matrix::rectStaysRect() const {
-  if(typeMask & UnknownMask) {
+  if (typeMask & UnknownMask) {
     typeMask = this->computeTypeMask();
   }
   return (typeMask & RectStayRectMask) != 0;
@@ -529,14 +524,14 @@ static float4 SortAsRect(const float4& ltrb) {
 }
 
 void Matrix::mapRect(Rect* dst, const Rect& src) const {
-  if(this->getType() <= TranslateMask) {
+  if (this->getType() <= TranslateMask) {
     float tx = values[TRANS_X];
     float ty = values[TRANS_Y];
     float4 trans(tx, ty, tx, ty);
     SortAsRect(float4::Load(&src.left) + trans).store(&dst->left);
     return;
   }
-  if(this->isScaleTranslate()) {
+  if (this->isScaleTranslate()) {
     float sx = values[SCALE_X];
     float sy = values[SCALE_Y];
     float tx = values[TRANS_X];
@@ -544,7 +539,7 @@ void Matrix::mapRect(Rect* dst, const Rect& src) const {
     float4 scale(sx, sy, sx, sy);
     float4 trans(tx, ty, tx, ty);
     SortAsRect(float4::Load(&src.left) * scale + trans).store(&dst->left);
-  }else {
+  } else {
     Point quad[4];
     quad[0].set(src.left, src.top);
     quad[1].set(src.right, src.top);
@@ -644,9 +639,6 @@ const Matrix& Matrix::I() {
 }
 
 const Matrix::MapPtsProc Matrix::MapPtsProcs[] = {
-  Matrix::IdentityPts, Matrix::TransPts,
-  Matrix::ScalePts, Matrix::ScalePts,
-  Matrix::AfflinePts, Matrix::AfflinePts,
-  Matrix::AfflinePts, Matrix::AfflinePts
-};
+    Matrix::IdentityPts, Matrix::TransPts,   Matrix::ScalePts,   Matrix::ScalePts,
+    Matrix::AfflinePts,  Matrix::AfflinePts, Matrix::AfflinePts, Matrix::AfflinePts};
 }  // namespace tgfx

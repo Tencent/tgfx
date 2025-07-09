@@ -43,9 +43,9 @@ class Matrix {
    *  @return    Matrix with scale factors.
    */
   static Matrix MakeScale(float sx, float sy) {
-   Matrix m;
-   m.setScale(sx, sy);
-   return m;
+    Matrix m;
+    m.setScale(sx, sy);
+    return m;
   }
 
   /**
@@ -60,8 +60,8 @@ class Matrix {
    */
   static Matrix MakeScale(float scale) {
     Matrix m;
-   m.setScale(scale, scale);
-   return m;
+    m.setScale(scale, scale);
+    return m;
   }
 
   /**
@@ -76,9 +76,9 @@ class Matrix {
    * @return    Matrix with translation
    */
   static Matrix MakeTrans(float tx, float ty) {
-   Matrix m;
-   m.setTranslate(tx, ty);
-   return m;
+    Matrix m;
+    m.setTranslate(tx, ty);
+    return m;
   }
 
   /**
@@ -88,9 +88,9 @@ class Matrix {
    * @return    Matrix with skew
    */
   static Matrix MakeSkew(float kx, float ky) {
-   Matrix m;
-   m.setSkew(kx, ky);
-   return m;
+    Matrix m;
+    m.setSkew(kx, ky);
+    return m;
   }
 
   /**
@@ -157,24 +157,19 @@ class Matrix {
   constexpr Matrix() : Matrix(1, 0, 0, 0, 1, 0, IdentityMask | RectStayRectMask) {
   }
 
- /** \enum Matrix::TypeMask
+  /** \enum Matrix::TypeMask
    Enum of bit fields for mask returned by getType().
    Used to identify the complexity of Matrix, to optimize performance.
 */
- enum TypeMask {
-   IdentityMask = 0,
-   TranslateMask = 0x01,
-   ScaleMask = 0x02,
-   AffineMask = 0x04
-  };
+  enum TypeMask { IdentityMask = 0, TranslateMask = 0x01, ScaleMask = 0x02, AffineMask = 0x04 };
 
- TypeMask getType() const {
-  if (typeMask & UnknownMask) {
-   typeMask = this->computeTypeMask();
+  TypeMask getType() const {
+    if (typeMask & UnknownMask) {
+      typeMask = this->computeTypeMask();
+    }
+    // only return the public masks
+    return (TypeMask)(typeMask & 0xF);
   }
-  // only return the public masks
-  return (TypeMask)(typeMask & 0xF);
- }
 
   /**
    * Returns true if Matrix is identity. The identity matrix is:
@@ -189,7 +184,7 @@ class Matrix {
     return this->getType() == 0;
   }
 
- /** Returns true if Matrix at most scales and translates. Matrix may be identity,
+  /** Returns true if Matrix at most scales and translates. Matrix may be identity,
     contain only scale elements, only translate elements, or both. SkMatrix form is:
 
         | scale-x    0    translate-x |
@@ -198,11 +193,11 @@ class Matrix {
 
     @return  true if SkMatrix is identity; or scales, translates, or both
 */
- bool isScaleTranslate() const {
-   return !(this->getType() & ~(ScaleMask | TranslateMask));
+  bool isScaleTranslate() const {
+    return !(this->getType() & ~(ScaleMask | TranslateMask));
   }
 
- /** Returns true if SkMatrix is identity, or translates. SkMatrix form is:
+  /** Returns true if SkMatrix is identity, or translates. SkMatrix form is:
 
         | 1 0 translate-x |
         | 0 1 translate-y |
@@ -210,7 +205,9 @@ class Matrix {
 
     @return  true if SkMatrix is identity, or translates
 */
- bool isTranslate() const { return !(this->getType() & ~(TranslateMask)); }
+  bool isTranslate() const {
+    return !(this->getType() & ~(TranslateMask));
+  }
 
   /**
    * Returns one matrix value.
@@ -223,7 +220,7 @@ class Matrix {
    * Returns writable Matrix value.
    */
   float& operator[](int index) {
-   this->setTypeMask(UnknownMask);
+    this->setTypeMask(UnknownMask);
     return values[index];
   }
 
@@ -239,7 +236,7 @@ class Matrix {
    */
   void set(int index, float value) {
     values[index] = value;
-  this->setTypeMask(UnknownMask);
+    this->setTypeMask(UnknownMask);
   }
 
   /**
@@ -263,7 +260,7 @@ class Matrix {
    */
   void set6(const float buffer[6]) {
     memcpy(values, buffer, 6 * sizeof(float));
-   this->setTypeMask(UnknownMask);
+    this->setTypeMask(UnknownMask);
   }
 
   /**
@@ -319,42 +316,42 @@ class Matrix {
    * Sets the horizontal scale factor.
    */
   void setScaleX(float v) {
-   this->set(SCALE_X, v);
+    this->set(SCALE_X, v);
   }
 
   /**
    * Sets the vertical scale factor.
    */
   void setScaleY(float v) {
-   this->set(SCALE_Y, v);
+    this->set(SCALE_Y, v);
   }
 
   /**
    * Sets the vertical skew factor.
    */
   void setSkewY(float v) {
-   this->set(SKEW_Y, v);
+    this->set(SKEW_Y, v);
   }
 
   /**
    * Sets the horizontal skew factor.
    */
   void setSkewX(float v) {
-   this->set(SKEW_X, v);
+    this->set(SKEW_X, v);
   }
 
   /**
    * Sets the horizontal translation.
    */
   void setTranslateX(float v) {
-   this->set(TRANS_X, v);
+    this->set(TRANS_X, v);
   }
 
   /**
    * Sets the vertical translation.
    */
   void setTranslateY(float v) {
-   this->set(TRANS_Y, v);
+    this->set(TRANS_Y, v);
   }
 
   /**
@@ -421,7 +418,7 @@ class Matrix {
    */
   void setScale(float sx, float sy);
 
- /** Initializes SkMatrix with scale and translate elements.
+  /** Initializes SkMatrix with scale and translate elements.
 
         | sx  0 tx |
         |  0 sy ty |
@@ -432,28 +429,27 @@ class Matrix {
     @param tx  horizontal translation to store
     @param ty  vertical translation to store
 */
- void setScaleTranslate(float sx, float sy, float tx, float ty) {
-  values[SCALE_X] = sx;
-  values[SKEW_X]  = 0;
-  values[TRANS_X] = tx;
+  void setScaleTranslate(float sx, float sy, float tx, float ty) {
+    values[SCALE_X] = sx;
+    values[SKEW_X] = 0;
+    values[TRANS_X] = tx;
 
-  values[SKEW_Y]  = 0;
-  values[SCALE_Y] = sy;
-  values[TRANS_Y] = ty;
+    values[SKEW_Y] = 0;
+    values[SCALE_Y] = sy;
+    values[TRANS_Y] = ty;
 
-
-  int mask = 0;
-  if (sx != 1 || sy != 1) {
-   mask |= ScaleMask;
+    int mask = 0;
+    if (sx != 1 || sy != 1) {
+      mask |= ScaleMask;
+    }
+    if (tx != 0.0f || ty != 0.0f) {
+      mask |= TranslateMask;
+    }
+    if (sx != 0 && sy != 0) {
+      mask |= RectStayRectMask;
+    }
+    this->setTypeMask(mask);
   }
-  if (tx != 0.0f || ty != 0.0f) {
-   mask |= TranslateMask;
-  }
-  if(sx != 0 && sy != 0) {
-   mask |= RectStayRectMask;
-  }
-  this->setTypeMask(mask);
- }
 
   /**
    * Sets Matrix to rotate by degrees about a pivot point at (px, py). The pivot point is
@@ -814,9 +810,9 @@ class Matrix {
   bool isFinite() const;
 
  private:
- static constexpr int RectStayRectMask = 0x10;
- static constexpr int UnknownMask = 0x80;
- static constexpr int AllMasks = TranslateMask | ScaleMask | AffineMask;
+  static constexpr int RectStayRectMask = 0x10;
+  static constexpr int UnknownMask = 0x80;
+  static constexpr int AllMasks = TranslateMask | ScaleMask | AffineMask;
   float values[6];
   mutable int32_t typeMask;
   /**
@@ -829,49 +825,50 @@ class Matrix {
   static constexpr int SCALE_Y = 4;  //!< vertical scale factor
   static constexpr int TRANS_Y = 5;  //!< vertical translation
 
-  constexpr Matrix(float scaleX, float skewX, float transX, float skewY, float scaleY, float transY, int typeMask)
+  constexpr Matrix(float scaleX, float skewX, float transX, float skewY, float scaleY, float transY,
+                   int typeMask)
       : values{scaleX, skewX, transX, skewY, scaleY, transY}, typeMask(typeMask) {
   }
   uint8_t computeTypeMask() const;
- void setTypeMask(int mask) {
-  // allow kUnknown or a valid mask
-  typeMask = mask;
- }
- void orTypeMask(int mask) {
-  typeMask |= mask;
- }
- void clearTypeMask(int mask) {
-  typeMask &= ~mask;
- }
+  void setTypeMask(int mask) {
+    // allow kUnknown or a valid mask
+    typeMask = mask;
+  }
+  void orTypeMask(int mask) {
+    typeMask |= mask;
+  }
+  void clearTypeMask(int mask) {
+    typeMask &= ~mask;
+  }
 
- /** Returns true if we already know that the matrix is identity;
+  /** Returns true if we already know that the matrix is identity;
     false otherwise.
 */
- bool isTriviallyIdentity() const {
-  if (typeMask & UnknownMask) {
-   return false;
+  bool isTriviallyIdentity() const {
+    if (typeMask & UnknownMask) {
+      return false;
+    }
+    return ((typeMask & 0xF) == 0);
   }
-  return ((typeMask & 0xF) == 0);
- }
- inline void updateTranslateMask() {
-  if ((values[TRANS_X] != 0) | (values[TRANS_Y] != 0)) {
-   typeMask |= TranslateMask;
-  } else {
-   typeMask &= ~TranslateMask;
+  inline void updateTranslateMask() {
+    if ((values[TRANS_X] != 0) | (values[TRANS_Y] != 0)) {
+      typeMask |= TranslateMask;
+    } else {
+      typeMask &= ~TranslateMask;
+    }
   }
- }
- using MapPtsProc = void (*)(const Matrix& mat, Point dst[], const Point src[], int count);
- static MapPtsProc GetMapPtsProc(TypeMask mask) {
-  return MapPtsProcs[mask & AllMasks];
- }
- MapPtsProc getMapPtsProc() const {
-  return GetMapPtsProc(this->getType());
- }
- static const MapPtsProc MapPtsProcs[];
- static void IdentityPts(const Matrix& m, Point dst[], const Point src[], int count);
- static void TransPts(const Matrix& m, Point dst[], const Point src[], int count);
- static void ScalePts(const Matrix& m, Point dst[], const Point src[], int count);
- static void AfflinePts(const Matrix& m, Point dst[], const Point src[], int count);
+  using MapPtsProc = void (*)(const Matrix& mat, Point dst[], const Point src[], int count);
+  static MapPtsProc GetMapPtsProc(TypeMask mask) {
+    return MapPtsProcs[mask & AllMasks];
+  }
+  MapPtsProc getMapPtsProc() const {
+    return GetMapPtsProc(this->getType());
+  }
+  static const MapPtsProc MapPtsProcs[];
+  static void IdentityPts(const Matrix& m, Point dst[], const Point src[], int count);
+  static void TransPts(const Matrix& m, Point dst[], const Point src[], int count);
+  static void ScalePts(const Matrix& m, Point dst[], const Point src[], int count);
+  static void AfflinePts(const Matrix& m, Point dst[], const Point src[], int count);
   bool invertNonIdentity(Matrix* inverse) const;
   bool getMinMaxScaleFactors(float results[2]) const;
 };

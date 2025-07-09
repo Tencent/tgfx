@@ -84,7 +84,7 @@ inline int32_t FloatAs2sCompliment(float x) {
   return SignBitTo2sCompliment((int32_t)Float2Bits(x));
 }
 
-#define ScalarAs2sCompliment(x)    FloatAs2sCompliment(x)
+#define ScalarAs2sCompliment(x) FloatAs2sCompliment(x)
 
 // from http://randomascii.wordpress.com/2012/02/25/comparing-floating-point-numbers-2012-edition/
 /*
