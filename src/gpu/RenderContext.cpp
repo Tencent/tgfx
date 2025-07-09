@@ -100,7 +100,7 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(const Font& font, GlyphID glyph
     return nullptr;
   }
   if (stroke != nullptr) {
-    ApplyStrokeToBounds(*stroke, &bounds, true);
+    ApplyStrokeToBounds(*stroke, &bounds);
     shape = Shape::ApplyStroke(std::move(shape), stroke);
   }
   shape = Shape::ApplyMatrix(std::move(shape), Matrix::MakeTrans(-bounds.x(), -bounds.y()));
@@ -368,7 +368,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
       continue;
     }
     if (scaledStroke) {
-      ApplyStrokeToBounds(*scaledStroke, &bounds, true);
+      ApplyStrokeToBounds(*scaledStroke, &bounds);
     }
     auto maxDimension = static_cast<int>(ceilf(std::max(bounds.width(), bounds.height())));
     if (maxDimension >= Atlas::MaxCellSize) {
@@ -497,7 +497,7 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
       continue;
     }
     if (scaledStroke) {
-      ApplyStrokeToBounds(*scaledStroke, &bounds, true);
+      ApplyStrokeToBounds(*scaledStroke, &bounds);
     }
 
     auto typeface = font.getTypeface().get();

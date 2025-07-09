@@ -74,13 +74,11 @@ class TextBlob {
   Rect getTightBounds(const Matrix* matrix = nullptr) const;
 
   /**
-   * Creates a Path for the glyphs in the text blob. Since text outlines can change with different
-   * scale factors, it's best to use the final drawing scale factor in the resolutionScale for
-   * accuracy. Note that the resolutionScale is not applied to the returned Path; it only affects
-   * the precision of the Path. Returns true if the path was successfully created. Otherwise,
+   * Creates a Path for the glyphs in the text blob. If a matrix is provided, the path will be
+   * transformed accordingly. Returns true if the path was successfully created. Otherwise,
    * returns false and leaves the path unchanged.
    */
-  bool getPath(Path* path, float resolutionScale = 1.0f) const;
+  bool getPath(Path* path, const Matrix* matrix) const;
 
  private:
   std::vector<std::shared_ptr<GlyphRunList>> glyphRunLists = {};

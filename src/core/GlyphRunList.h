@@ -80,18 +80,18 @@ class GlyphRunList {
   }
 
   /**
-   * Creates a Path for the glyphs in this run. If a matrix is provided, the path will be transformed
-   * accordingly. Returns true if the path was successfully created. Otherwise,
-   * returns false and leaves the path unchanged.
-   */
-  bool getPath(Path* path, float resolutionScale = 1.0f) const;
-
-  /**
    * Returns the tight bounding box of the glyphs in this run. If a matrix is provided, the bounds
    * will be transformed accordingly. Compared to getBounds, this method is more accurate but also
    * more computationally expensive.
    */
   Rect getTightBounds(const Matrix* matrix = nullptr) const;
+
+  /**
+   * Creates a Path for the glyphs in this run. If a matrix is provided, the path will be transformed
+   * accordingly. Returns true if the path was successfully created. Otherwise,
+   * returns false and leaves the path unchanged.
+   */
+  bool getPath(Path* path, const Matrix* matrix = nullptr) const;
 
  private:
   std::vector<GlyphRun> _glyphRuns = {};

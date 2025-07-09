@@ -120,8 +120,12 @@ Rect GlyphRunList::conservativeBounds() const {
   return getTightBounds();
 }
 
-bool GlyphRunList::getPath(Path* path, float resolutionScale) const {
-  if (FloatNearlyZero(resolutionScale) || !hasOutlines()) {
+bool GlyphRunList::getPath(Path* path, const Matrix* matrix) const {
+  if (!hasOutlines()) {
+    return false;
+  }
+  auto resolutionScale = matrix ? matrix->getMaxScale() : 1.0f;
+  if (FloatNearlyZero(resolutionScale)) {
     return false;
   }
   auto hasScale = !FloatNearlyEqual(resolutionScale, 1.0f);
@@ -147,6 +151,9 @@ bool GlyphRunList::getPath(Path* path, float resolutionScale) const {
       }
       index++;
     }
+  }
+  if (matrix) {
+    totalPath.transform(*matrix);
   }
   *path = std::move(totalPath);
   return true;

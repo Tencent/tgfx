@@ -81,7 +81,7 @@ bool WebScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke* 
   }
   emscripten::val imageData = emscripten::val::null();
   if (!hasColor() && stroke != nullptr) {
-    ApplyStrokeToBounds(*stroke, &bounds, true);
+    ApplyStrokeToBounds(*stroke, &bounds);
     imageData =
         scalerContext.call<val>("readPixels", getText(glyphID), bounds, properFauxBold, *stroke);
   } else {

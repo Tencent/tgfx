@@ -138,12 +138,12 @@ Rect TextBlob::getTightBounds(const Matrix* matrix) const {
   return bounds;
 }
 
-bool TextBlob::getPath(Path* path, float resolutionScale) const {
+bool TextBlob::getPath(Path* path, const Matrix* matrix) const {
   if (glyphRunLists.size() != 1) {
     // If there are multiple glyph run lists, meaning the text blob has multiple font types,
     // only one font type can be used to create a path.
     return false;
   }
-  return glyphRunLists.front()->getPath(path, resolutionScale);
+  return glyphRunLists.front()->getPath(path, matrix);
 }
 }  // namespace tgfx

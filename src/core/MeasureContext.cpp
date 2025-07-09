@@ -76,7 +76,7 @@ void MeasureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList
     auto scale = Matrix::MakeScale(maxScale, maxScale);
     localBounds = glyphRunList->getTightBounds(&scale);
     if (stroke) {
-      ApplyStrokeToScaledBounds(*stroke, &bounds, maxScale);
+      ApplyStrokeToScaledBounds(*stroke, &localBounds, maxScale);
     }
   } else {
     localBounds = glyphRunList->getBounds();
