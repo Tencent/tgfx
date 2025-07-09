@@ -88,6 +88,15 @@ void HardwareBufferUnlock(HardwareBufferRef buffer) {
   CVPixelBufferUnlockBaseAddress(buffer, 0);
 }
 
+ISize HardwareBufferGetSize(HardwareBufferRef buffer) {
+  if (buffer == nil) {
+    return {};
+  }
+  auto width = CVPixelBufferGetWidth(buffer);
+  auto height = CVPixelBufferGetHeight(buffer);
+  return {static_cast<int>(width), static_cast<int>(height)};
+}
+
 ImageInfo HardwareBufferGetInfo(HardwareBufferRef buffer) {
   if (buffer == nil) {
     return {};

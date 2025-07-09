@@ -2166,7 +2166,7 @@ TGFX_TEST(CanvasTest, textEmojiMixedBlendModes1) {
   }
 
   context->flush();
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/textEmojiMixedBlendModes1"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/textEmojiMixedBlendModes"));
 }
 
 TGFX_TEST(CanvasTest, textEmojiMixedBlendModes2) {

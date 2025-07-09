@@ -83,6 +83,15 @@ void HardwareBufferUnlock(HardwareBufferRef buffer) {
   }
 }
 
+ISize HardwareBufferGetSize(HardwareBufferRef buffer) {
+  if (!HardwareBufferAvailable() || buffer == nullptr) {
+    return {};
+  }
+  OH_NativeBuffer_Config config;
+  OH_NativeBuffer_GetConfig(buffer, &config);
+  return {config.width, config.height};
+}
+
 ImageInfo HardwareBufferGetInfo(HardwareBufferRef buffer) {
   if (!HardwareBufferAvailable() || buffer == nullptr) {
     return {};

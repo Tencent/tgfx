@@ -46,6 +46,10 @@ void* HardwareBufferLock(HardwareBufferRef) {
 void HardwareBufferUnlock(HardwareBufferRef) {
 }
 
+ISize HardwareBufferGetSize(HardwareBufferRef) {
+  return {};
+}
+
 ImageInfo HardwareBufferGetInfo(HardwareBufferRef) {
   return {};
 }
