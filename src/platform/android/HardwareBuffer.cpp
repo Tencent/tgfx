@@ -86,6 +86,16 @@ void HardwareBufferUnlock(HardwareBufferRef buffer) {
   }
 }
 
+ISize HardwareBufferGetSize(HardwareBufferRef buffer) {
+  static const auto describe = AHardwareBufferFunctions::Get()->describe;
+  if (!HardwareBufferAvailable() || buffer == nullptr) {
+    return {};
+  }
+  AHardwareBuffer_Desc desc;
+  describe(buffer, &desc);
+  return {static_cast<int>(desc.width), static_cast<int>(desc.height)};
+}
+
 ImageInfo HardwareBufferGetInfo(HardwareBufferRef buffer) {
   static const auto describe = AHardwareBufferFunctions::Get()->describe;
   if (!HardwareBufferAvailable() || buffer == nullptr) {

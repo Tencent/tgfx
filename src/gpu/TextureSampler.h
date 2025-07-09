@@ -38,12 +38,11 @@ enum class SamplerType { None, TwoD, Rectangle, External };
 class TextureSampler {
  public:
   /**
-   * Retrieves the pixel formats of texture samplers created from the specified hardware buffer. If
-   * yuvFormat is not nullptr and the hardware buffer uses a YUV format, it will be set to that
-   * format; otherwise, it will be set to YUVFormat::Unknown.
+   * Returns the PixelFormat of the texture sampler created from the given hardware buffer. If the
+   * hardwareBuffer is invalid or uses a format that cannot create a single-plane texture sampler
+   * (such as YUV formats), PixelFormat::Unknown is returned.
    */
-  static std::vector<PixelFormat> GetFormats(HardwareBufferRef hardwareBuffer,
-                                             YUVFormat* yuvFormat = nullptr);
+  static PixelFormat GetPixelFormat(HardwareBufferRef hardwareBuffer);
 
   /**
    * Creates a new TextureSampler which wraps the specified backend texture. The caller is
