@@ -48,20 +48,20 @@ enum ScrollGestureState {
     SCROLL_END = 2,
 }
 
-enum DeviceKind {
+enum DeviceType {
     TOUCH = 0,
     MOUSE = 1,
 }
 
 class GestureManager {
     private scaleY = 1.0;
-    private pinchTimeout = 150;
+    private pinchTimeout = 150; // ms
     private timer: number | undefined;
     private scaleStartZoom = 1.0;
 
     private lastEventTime = 0;
     private lastDeltaY = 0;
-    private timeThreshold = 50;
+    private timeThreshold = 50; // ms
     private deltaYThreshold = 50;
     private deltaYChangeThreshold = 10;
     private mouseWheelRatio = 800;
@@ -71,7 +71,7 @@ class GestureManager {
         event: WheelEvent,
         state: ScrollGestureState,
         shareData: ShareData,
-        deviceKind: DeviceKind = DeviceKind.MOUSE,
+        deviceKind: DeviceType = DeviceType.MOUSE,
     ) {
         if (state === ScrollGestureState.SCROLL_CHANGE){
             this.scaleStartZoom = shareData.zoom;
@@ -91,7 +91,7 @@ class GestureManager {
         state: ScaleGestureState,
         canvas: HTMLElement,
         shareData: ShareData,
-        deviceKind: DeviceKind = DeviceKind.MOUSE
+        deviceKind: DeviceType = DeviceType.MOUSE
     ) {
         if (state === ScaleGestureState.SCALE_START) {
             this.scaleY = 1.0;
@@ -118,10 +118,10 @@ class GestureManager {
         this.timer = undefined;
     }
 
-    private reserveScrollTimeout(
+    private resetScrollTimeout(
         event: WheelEvent,
         shareData: ShareData,
-        deviceKind: DeviceKind = DeviceKind.MOUSE
+        deviceKind: DeviceType = DeviceType.MOUSE
     ) {
         clearTimeout(this.timer);
         this.timer = window.setTimeout(() => {
@@ -131,11 +131,11 @@ class GestureManager {
         }, this.pinchTimeout);
     }
 
-    private reserveScaleTimeout(
+    private resetScaleTimeout(
         event: WheelEvent,
         canvas: HTMLElement,
         shareData: ShareData,
-        deviceKind: DeviceKind = DeviceKind.MOUSE
+        deviceKind: DeviceType = DeviceType.MOUSE
     ) {
         clearTimeout(this.timer);
         this.timer = window.setTimeout(() => {
@@ -145,7 +145,7 @@ class GestureManager {
         }, this.pinchTimeout);
     }
 
-    private getDeviceKind(event: WheelEvent): DeviceKind {
+    private getDeviceKind(event: WheelEvent): DeviceType {
         const now = Date.now();
         const timeDifference = now - this.lastEventTime;
         const deltaYChange = Math.abs(event.deltaY - this.lastDeltaY);
@@ -157,26 +157,23 @@ class GestureManager {
         }
         this.lastEventTime = now;
         this.lastDeltaY = event.deltaY;
-        return isTouchpad ? DeviceKind.TOUCH : DeviceKind.MOUSE;
+        return isTouchpad ? DeviceType.TOUCH : DeviceType.MOUSE;
     }
 
     public onWheel(event: WheelEvent, canvas: HTMLElement, shareData: ShareData) {
         const deviceKind = this.getDeviceKind(event);
-        let wheelRatio = this.touchWheelRatio;
-        if (deviceKind === DeviceKind.MOUSE) {
-            wheelRatio = this.mouseWheelRatio;
-        }
+        let wheelRatio = (deviceKind === DeviceType.MOUSE ? this.mouseWheelRatio : this.touchWheelRatio);
         if (!event.deltaY || (!event.ctrlKey && !event.metaKey)) {
-            this.reserveScrollTimeout(event, shareData, deviceKind);
+            this.resetScrollTimeout(event, shareData, deviceKind);
             this.handleScrollEvent(event, ScrollGestureState.SCROLL_CHANGE, shareData, deviceKind);
             return;
         }
         this.scaleY *= Math.exp(-(event.deltaY) / wheelRatio);
         if (!this.timer) {
-            this.reserveScaleTimeout(event, canvas, shareData, deviceKind);
+            this.resetScaleTimeout(event, canvas, shareData, deviceKind);
             this.handleScaleEvent(event, ScaleGestureState.SCALE_START, canvas, shareData, deviceKind);
         } else {
-            this.reserveScaleTimeout(event, canvas, shareData, deviceKind);
+            this.resetScaleTimeout(event, canvas, shareData, deviceKind);
             this.handleScaleEvent(event, ScaleGestureState.SCALE_CHANGE, canvas, shareData, deviceKind);
         }
     }
@@ -254,7 +251,9 @@ export function loadImage(src: string): Promise<HTMLImageElement> {
 }
 
 export function bindCanvasZoomAndPanEvents(canvas: HTMLElement, shareData: ShareData) {
-    if (!canvas) return;
+    if (!canvas) {
+        return;
+    }
 
     canvas.addEventListener('wheel', (e: WheelEvent) => {
         e.preventDefault();

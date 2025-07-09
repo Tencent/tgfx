@@ -56,7 +56,6 @@ bool TGFXBaseView::draw(int drawIndex, float zoom, float offsetX, float offsetY)
   }
   if (window == nullptr) {
     return true;
-    ;
   }
   auto device = window->getDevice();
   auto context = device->lockContext();
