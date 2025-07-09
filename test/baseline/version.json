@@ -80,10 +80,11 @@
         "path": "f37b222",
         "rasterized": "606f8195",
         "rasterized_mipmap": "606f8195",
-        "rasterized_scale_up": "c475bfb",
+        "rasterized_scale_up": "6e76b812",
         "saveLayer": "52e11af8",
         "shape": "66aef718",
-        "textEmojiMixedBlendModes": "c0a01ecb",
+        "textEmojiMixedBlendModes1": "0b965b3d",
+        "textEmojiMixedBlendModes2": "0b965b3d",
         "textEmojiOverlayBlendModes": "c0a01ecb",
         "text_shape": "52e11af8",
         "tile_mode_normal": "bfd0ea17",
@@ -121,7 +122,7 @@
         "greyColorMatrix": "a30de8b",
         "identityMatrix": "a30de8b",
         "innerShadow": "c475bfb",
-        "shaderMaskFilter": "c475bfb"
+        "shaderMaskFilter": "6e76b812"
     },
     "ImageReaderTest": {
         "update_bitmap": "c475bfb",
