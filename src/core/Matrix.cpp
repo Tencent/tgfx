@@ -18,7 +18,7 @@
 
 #include "tgfx/core/Matrix.h"
 #include <cfloat>
-#include "Vec.h"
+#include "SIMDVec.h"
 #include "core/utils/MathExtra.h"
 
 namespace tgfx {

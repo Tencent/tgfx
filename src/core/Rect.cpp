@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Rect.h"
-#include "Vec.h"
+#include "SIMDVec.h"
 
 namespace tgfx {
 void Rect::scale(float scaleX, float scaleY) {
