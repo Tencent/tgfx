@@ -96,10 +96,11 @@ static const float MaxZoom = 1000.0f;
     self.isTapEnabled = true;
     return;
   }
-  self.contentOffset = CGPointMake(self.contentOffset.x + (translation.x - self.currentPanOffset.x) *
-                                                              self.tgfxView.contentScaleFactor,
-                                   self.contentOffset.y + (translation.y - self.currentPanOffset.y) *
-                                                              self.tgfxView.contentScaleFactor);
+  self.contentOffset =
+      CGPointMake(self.contentOffset.x +
+                      (translation.x - self.currentPanOffset.x) * self.tgfxView.contentScaleFactor,
+                  self.contentOffset.y +
+                      (translation.y - self.currentPanOffset.y) * self.tgfxView.contentScaleFactor);
   self.currentPanOffset = translation;
   if (gesture.numberOfTouches == 1) {
     [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
