@@ -468,37 +468,29 @@ void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, co
 
 // Fills a rectangle with the given Image. The image is sampled from the area defined by rect,
 // and rendered into the same area, transformed by extraMatrix and the current matrix.
-void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& src, const Rect& dst,
+void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
                            const SamplingOptions& sampling, const Fill& fill,
                            SrcRectConstraint constraint) {
   DEBUG_ASSERT(image != nullptr);
-  DEBUG_ASSERT(!src.isEmpty());
-  DEBUG_ASSERT(!dst.isEmpty());
+  DEBUG_ASSERT(!srcRect.isEmpty());
+  DEBUG_ASSERT(!dstRect.isEmpty());
   auto type = Types::Get(image.get());
   if (type != Types::ImageType::Subset) {
-    drawContext->drawImageRect(std::move(image), src, dst, sampling, *mcState, fill, constraint);
+    drawContext->drawImageRect(std::move(image), srcRect, dstRect, sampling, *mcState, fill,
+                               constraint);
     return;
   }
-  auto viewMatrix = Matrix::I();
-  auto imageRect = src;
+  auto imageRect = srcRect;
   auto safeBounds = Rect::MakeWH(image->width(), image->height());
   safeBounds.inset(0.5f, 0.5f);
-  if (constraint == SrcRectConstraint::Strict || safeBounds.contains(src)) {
+  if (constraint == SrcRectConstraint::Strict || safeBounds.contains(srcRect)) {
     // Unwrap the subset image to maximize the merging of draw calls.
     auto subsetImage = static_cast<const SubsetImage*>(image.get());
     auto& subset = subsetImage->bounds;
     imageRect.offset(subset.left, subset.top);
-    viewMatrix.preTranslate(-subset.left, -subset.top);
     image = subsetImage->source;
   }
-  Matrix fillMatrix = {};
-  if (!viewMatrix.invert(&fillMatrix)) {
-    return;
-  }
-  auto imageState = *mcState;
-  imageState.matrix.preConcat(viewMatrix);
-  auto imageFill = fill.makeWithMatrix(fillMatrix);
-  drawContext->drawImageRect(std::move(image), src, dst, sampling, imageState, imageFill,
+  drawContext->drawImageRect(std::move(image), imageRect, dstRect, sampling, *mcState, fill,
                              constraint);
 }
 
@@ -630,8 +622,7 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
     if (colors) {
       glyphFill.color = colors[i];
     }
-    auto dstRect = rect;
-    dstMatrix.mapRect(&dstRect);
+    auto dstRect = dstMatrix.mapRect(rect);
     drawImageRect(atlas, rect, dstRect, sampling, glyphFill);
   }
 }

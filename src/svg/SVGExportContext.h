@@ -63,7 +63,7 @@ class SVGExportContext : public DrawContext {
 
   void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) override;
 
-  void drawImageRect(std::shared_ptr<Image> image, const Rect& src, const Rect& dst,
+  void drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
                      const SamplingOptions& sampling, const MCState& state, const Fill& fill,
                      SrcRectConstraint constraint) override;
 

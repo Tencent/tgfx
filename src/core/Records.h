@@ -37,6 +37,7 @@ enum class RecordType {
   DrawShape,
   DrawImage,
   DrawImageRect,
+  DrawImageRectToRect,
   DrawGlyphRunList,
   DrawPicture,
   DrawLayer
@@ -281,27 +282,41 @@ class DrawImage : public Record {
 
 class DrawImageRect : public DrawImage {
  public:
-  DrawImageRect(std::shared_ptr<Image> image, const Rect& src, const Rect& dst,
-                const SamplingOptions& sampling, SrcRectConstraint constraint)
-      : DrawImage(std::move(image), sampling), src(src), dst(dst), constraint(constraint) {
+  DrawImageRect(std::shared_ptr<Image> image, const Rect& rect, const SamplingOptions& sampling,
+                SrcRectConstraint constraint)
+      : DrawImage(std::move(image), sampling), rect(rect), constraint(constraint) {
   }
 
   RecordType type() const override {
     return RecordType::DrawImageRect;
   }
 
-  bool hasScale() const {
-    return src.width() != dst.width() || src.height() != dst.height();
-  }
-
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawImageRect(image, src, dst, sampling, playback->state(), playback->fill(),
+    context->drawImageRect(image, rect, rect, sampling, playback->state(), playback->fill(),
                            constraint);
   }
 
-  Rect src;
-  Rect dst;
+  Rect rect;
   SrcRectConstraint constraint = SrcRectConstraint::Fast;
+};
+
+class DrawImageRectToRect : public DrawImageRect {
+ public:
+  DrawImageRectToRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
+                      const SamplingOptions& sampling, SrcRectConstraint constraint)
+      : DrawImageRect(std::move(image), srcRect, sampling, constraint), dstRect(dstRect) {
+  }
+
+  RecordType type() const override {
+    return RecordType::DrawImageRectToRect;
+  }
+
+  void playback(DrawContext* context, PlaybackContext* playback) const override {
+    context->drawImageRect(image, rect, dstRect, sampling, playback->state(), playback->fill(),
+                           constraint);
+  }
+
+  Rect dstRect;
 };
 
 class DrawGlyphRunList : public Record {

@@ -260,52 +260,6 @@ void Matrix::postConcat(const Matrix& matrix) {
   }
 }
 
-bool Matrix::setRectToRect(const Rect& src, const Rect& dst, ScaleToFit stf) {
-  if (src.isEmpty()) {
-    reset();
-    return false;
-  }
-  if (dst.isEmpty()) {
-    memset(values, 0, 6 * sizeof(float));
-    return true;
-  }
-  float sx = dst.width() / src.width();
-  float sy = dst.height() / src.height();
-  bool xLarger = false;
-  if (stf != ScaleToFit::Fill) {
-    if (sx > sy) {
-      xLarger = true;
-      sx = sy;
-    } else {
-      sy = sx;
-    }
-  }
-  float tx = dst.left - src.left * sx;
-  float ty = dst.top - src.top * sy;
-  if (stf == ScaleToFit::Center || stf == ScaleToFit::End) {
-    float diff;
-    if (xLarger) {
-      diff = dst.width() - src.width() * sy;
-    } else {
-      diff = dst.height() - src.height() * sy;
-    }
-    if (stf == ScaleToFit::Center) {
-      diff = diff / 2;
-    }
-    if (xLarger) {
-      tx += diff;
-    } else {
-      ty += diff;
-    }
-  }
-  values[SCALE_X] = sx;
-  values[SCALE_Y] = sy;
-  values[TRANS_X] = tx;
-  values[TRANS_Y] = ty;
-  values[SKEW_X] = values[SKEW_Y] = 0;
-  return true;
-}
-
 bool Matrix::invertible() const {
   float determinant = values[SCALE_X] * values[SCALE_Y] - values[SKEW_Y] * values[SKEW_X];
   return !(FloatNearlyZero(determinant, FLOAT_NEARLY_ZERO * FLOAT_NEARLY_ZERO * FLOAT_NEARLY_ZERO));

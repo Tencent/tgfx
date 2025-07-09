@@ -18,6 +18,7 @@
 
 #include "core/RecordingContext.h"
 #include "utils/Log.h"
+#include "utils/RectToRectMatrix.h"
 
 namespace tgfx {
 /**
@@ -123,17 +124,32 @@ void RecordingContext::drawShape(std::shared_ptr<Shape> shape, const MCState& st
   drawCount++;
 }
 
-void RecordingContext::drawImageRect(std::shared_ptr<Image> image, const Rect& src, const Rect& dst,
-                                     const SamplingOptions& sampling, const MCState& state,
-                                     const Fill& fill, SrcRectConstraint constraint) {
+void RecordingContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
+                                     const Rect& dstRect, const SamplingOptions& sampling,
+                                     const MCState& state, const Fill& fill,
+                                     SrcRectConstraint constraint) {
   DEBUG_ASSERT(image != nullptr);
-  recordAll(state, fill);
+  auto newState = state;
+  auto newFill = fill;
+  bool needDstRect = true;
+  if (srcRect.width() == dstRect.width() && srcRect.height() == dstRect.height()) {
+    auto viewMatrix = MakeRectToRectMatrix(srcRect, dstRect);
+    newState.matrix.preConcat(viewMatrix);
+    Matrix fillMatrix = Matrix::I();
+    viewMatrix.invert(&fillMatrix);
+    newFill = newFill.makeWithMatrix(fillMatrix);
+    needDstRect = false;
+  }
+  recordAll(newState, newFill);
   auto imageRect = Rect::MakeWH(image->width(), image->height());
   PlacementPtr<Record> record = nullptr;
-  if (src == imageRect && src == dst) {
+  if (srcRect == imageRect && !needDstRect) {
     record = blockBuffer.make<DrawImage>(std::move(image), sampling);
+  } else if (!needDstRect) {
+    record = blockBuffer.make<DrawImageRect>(std::move(image), srcRect, sampling, constraint);
   } else {
-    record = blockBuffer.make<DrawImageRect>(std::move(image), src, dst, sampling, constraint);
+    record = blockBuffer.make<DrawImageRectToRect>(std::move(image), srcRect, dstRect, sampling,
+                                                   constraint);
   }
   records.emplace_back(std::move(record));
   drawCount++;

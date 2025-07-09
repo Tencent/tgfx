@@ -53,7 +53,7 @@ class AARectsVertexProvider : public RectsVertexProvider {
     bool needSubset = static_cast<UVSubsetMode>(bitFields.subsetMode) != UVSubsetMode::None;
     for (auto& record : rects) {
       auto& viewMatrix = record->viewMatrix;
-      auto& rect = record->dst;
+      auto& rect = record->rect;
       auto scale = sqrtf(viewMatrix.getScaleX() * viewMatrix.getScaleX() +
                          viewMatrix.getSkewY() * viewMatrix.getSkewY());
       // we want the new edge to be .5px away from the old line.
@@ -63,11 +63,11 @@ class AARectsVertexProvider : public RectsVertexProvider {
       auto outsetBounds = rect.makeOutset(padding, padding);
       auto outsetQuad = Quad::MakeFrom(outsetBounds, &viewMatrix);
 
-      auto insetUV = record->src.makeInset(padding, padding);
-      auto outsetUV = record->src.makeOutset(padding, padding);
+      auto insetUV = record->uvRect.makeInset(padding, padding);
+      auto outsetUV = record->uvRect.makeOutset(padding, padding);
       auto uvInsetQuad = Quad::MakeFrom(insetUV);
       auto uvOutsetQuad = Quad::MakeFrom(outsetUV);
-      const Rect& subset = needSubset ? getSubset(record->src) : record->src;
+      const Rect& subset = needSubset ? getSubset(record->uvRect) : record->uvRect;
       for (int j = 0; j < 2; ++j) {
         auto& quad = j == 0 ? insetQuad : outsetQuad;
         auto& uvQuad = j == 0 ? uvInsetQuad : uvOutsetQuad;
@@ -120,10 +120,10 @@ class NonAARectVertexProvider : public RectsVertexProvider {
     bool needSubset = static_cast<UVSubsetMode>(bitFields.subsetMode) != UVSubsetMode::None;
     for (auto& record : rects) {
       auto& viewMatrix = record->viewMatrix;
-      auto& rect = record->dst;
+      auto& rect = record->rect;
       auto quad = Quad::MakeFrom(rect, &viewMatrix);
-      auto uvQuad = Quad::MakeFrom(record->src);
-      const auto& subset = needSubset ? getSubset(record->src) : record->src;
+      auto uvQuad = Quad::MakeFrom(record->uvRect);
+      const auto& subset = needSubset ? getSubset(record->uvRect) : record->uvRect;
       for (size_t j = 4; j >= 1; --j) {
         vertices[index++] = quad.point(j - 1).x;
         vertices[index++] = quad.point(j - 1).y;

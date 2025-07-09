@@ -26,6 +26,7 @@
 #include "core/images/CodecImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/RectToRectMatrix.h"
 #include "core/utils/Types.h"
 #include "svg/SVGTextBuilder.h"
 #include "tgfx/core/Bitmap.h"
@@ -144,18 +145,18 @@ void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& st
   drawPath(shape->getPath(), state, fill);
 }
 
-void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& src, const Rect& dst,
-                                     const SamplingOptions&, const MCState& state, const Fill& fill,
-                                     SrcRectConstraint) {
+void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
+                                     const Rect& dstRect, const SamplingOptions&,
+                                     const MCState& state, const Fill& fill, SrcRectConstraint) {
   DEBUG_ASSERT(image != nullptr);
-  auto subsetImage = image->makeSubset(src);
+  auto subsetImage = image->makeSubset(srcRect);
   if (subsetImage == nullptr) {
     return;
   }
   Bitmap bitmap = ImageExportToBitmap(context, subsetImage);
   if (!bitmap.isEmpty()) {
-    auto viewMatrix = Matrix::MakeRectToRect(Rect::MakeWH(src.width(), src.height()), dst,
-                                             Matrix::ScaleToFit::Fill);
+    auto viewMatrix =
+        MakeRectToRectMatrix(Rect::MakeWH(srcRect.width(), srcRect.height()), dstRect);
 
     MCState newState;
     newState.matrix = state.matrix;

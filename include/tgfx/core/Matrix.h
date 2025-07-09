@@ -31,22 +31,6 @@ namespace tgfx {
  */
 class Matrix {
  public:
-  /** \enum Matrix::ScaleToFit
-        ScaleToFit describes how matrix is constructed to map one rect to another.
-        ScaleToFit may allow matrix to have unequal horizontal and vertical scaling,
-        or may restrict matrix to square scaling. If restricted, ScaleToFit specifies
-        how matrix maps to the side or center of the destination rect.
-    */
-  enum class ScaleToFit {
-    // scales in x and y to fill destination rect
-    Fill,
-    // scales and aligns to left and top
-    Start,
-    // scales and aligns to center
-    Center,
-    //scales and aligns to right and bottom
-    End,
-  };
   /**
    * Sets Matrix to scale by (sx, sy). Returned matrix is:
    *
@@ -532,32 +516,6 @@ class Matrix {
    * Postconcats the matrix with the specified matrix. M' = other * M
    */
   void postConcat(const Matrix& other);
-
-  /**
-   * Sets Matrix to scale and translate src rect to dst rect. stf selects whether mapping completely
-   * fills dst or preserves the aspect ratio, and how to align src within dst.
-   * Returns false if src is empty, and sets matrix to identity.
-   * Returns true if dst is empty, and sets matrix to:
-   *         | 0 0 0 |
-   *         | 0 0 0 |
-   *         | 0 0 1 |
-   */
-  bool setRectToRect(const Rect& src, const Rect& dst, ScaleToFit stf);
-
-  /**
-   * Sets Matrix to scale and translate src rect to dst rect. stf selects whether mapping completely
-   * fills dst or preserves the aspect ratio, and how to align src within dst.
-   * Returns the identity matrix if src is empty.
-   * If dst is empty, returns matrix set to:
-   *         | 0 0 0 |
-   *         | 0 0 0 |
-   *         | 0 0 1 |
-   */
-  static Matrix MakeRectToRect(const Rect& src, const Rect& dst, ScaleToFit stf) {
-    Matrix m;
-    m.setRectToRect(src, dst, stf);
-    return m;
-  }
 
   /**
    * If this matrix can be inverted, return true and if the inverse is not null, set inverse to be

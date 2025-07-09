@@ -466,7 +466,7 @@ class Canvas {
                   bool optimizeMemoryForLayer = false);
   void drawPath(const Path& path, const MCState& state, const Fill& fill,
                 const Stroke* stroke) const;
-  void drawImageRect(std::shared_ptr<Image> image, const Rect& src, const Rect& dst,
+  void drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
                      const SamplingOptions& sampling, const Fill& fill,
                      SrcRectConstraint constraint = SrcRectConstraint::Fast);
   void drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const Fill& fill,

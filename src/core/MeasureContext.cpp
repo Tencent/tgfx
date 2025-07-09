@@ -58,10 +58,10 @@ void MeasureContext::drawShape(std::shared_ptr<Shape> shape, const MCState& stat
   addLocalBounds(state, fill, localBounds, shape->isInverseFillType());
 }
 
-void MeasureContext::drawImageRect(std::shared_ptr<Image>, const Rect&, const Rect& dst,
+void MeasureContext::drawImageRect(std::shared_ptr<Image>, const Rect&, const Rect& dstRect,
                                    const SamplingOptions&, const MCState& state, const Fill& fill,
                                    SrcRectConstraint) {
-  addLocalBounds(state, fill, dst);
+  addLocalBounds(state, fill, dstRect);
 }
 
 void MeasureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,

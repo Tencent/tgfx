@@ -174,9 +174,10 @@ void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state
   }
 }
 
-void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& src, const Rect& dst,
-                                  const SamplingOptions& sampling, const MCState& state,
-                                  const Fill& fill, SrcRectConstraint constraint) {
+void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
+                                  const Rect& dstRect, const SamplingOptions& sampling,
+                                  const MCState& state, const Fill& fill,
+                                  SrcRectConstraint constraint) {
   DEBUG_ASSERT(image != nullptr);
   DEBUG_ASSERT(image->isAlphaOnly() || fill.shader == nullptr);
   auto compositor = getOpsCompositor();
@@ -192,7 +193,7 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& src,
     // There is no scaling for the source image, so we can disable mipmaps to save memory.
     samplingOptions.mipmapMode = MipmapMode::None;
   }
-  compositor->fillImage(std::move(image), src, dst, samplingOptions, state, fill, constraint);
+  compositor->fillImage(std::move(image), srcRect, dstRect, samplingOptions, state, fill, constraint);
 }
 
 void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,

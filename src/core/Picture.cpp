@@ -166,13 +166,7 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
     subset = clipRect;
   }
   if (record->type() == RecordType::DrawImageRect) {
-    auto imageRectRecord = static_cast<const DrawImageRect*>(record);
-    if (imageRectRecord->hasScale()) {
-      return nullptr;
-    }
-    image = image->makeSubset(static_cast<const DrawImageRect*>(record)->src);
-    imageMatrix.preTranslate(imageRectRecord->dst.left - imageRectRecord->src.left,
-                             imageRectRecord->dst.top - imageRectRecord->src.top);
+    image = image->makeSubset(static_cast<const DrawImageRect*>(record)->rect);
     DEBUG_ASSERT(image != nullptr);
   }
   auto offsetX = imageMatrix.getTranslateX();
