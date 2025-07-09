@@ -430,7 +430,7 @@ void Canvas::drawImage(std::shared_ptr<Image> image, const SamplingOptions& samp
   }
   SaveLayerForImageFilter(paint ? paint->getImageFilter() : nullptr);
   auto fill = GetFillStyleForImage(paint, image.get());
-  drawContext->drawImage(std::move(image), sampling, *mcState, fill);
+  drawImage(std::move(image), fill, sampling, nullptr);
 }
 
 void Canvas::drawImage(std::shared_ptr<Image> image, float left, float top,
@@ -440,10 +440,8 @@ void Canvas::drawImage(std::shared_ptr<Image> image, float left, float top,
   }
   SaveLayerForImageFilter(paint ? paint->getImageFilter() : nullptr);
   auto fill = GetFillStyleForImage(paint, image.get());
-  auto state = *mcState;
-  state.matrix.preTranslate(left, top);
-  drawContext->drawImage(std::move(image), sampling, state,
-                         fill.makeWithMatrix(Matrix::MakeTrans(-left, -top)));
+  auto dstMatrix = Matrix::MakeTrans(left, top);
+  drawImage(std::move(image), fill, sampling, &dstMatrix);
 }
 
 void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& dstRect,
@@ -466,6 +464,31 @@ void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, co
   drawImageRect(std::move(image), srcRect, dstRect, sampling, fill, constraint);
 }
 
+void Canvas::drawImage(std::shared_ptr<Image> image, const Fill& fill,
+                       const SamplingOptions& sampling, const Matrix* dstMatrix) {
+  DEBUG_ASSERT(image != nullptr);
+  auto type = Types::Get(image.get());
+  auto state = *mcState;
+  auto newFill = fill;
+  if (dstMatrix) {
+    state.matrix.preConcat(*dstMatrix);
+    auto fillMatrix = Matrix::I();
+    if (!dstMatrix->invert(&fillMatrix)) {
+      return;
+    }
+    newFill = fill.makeWithMatrix(fillMatrix);
+  }
+  if (type != Types::ImageType::Subset || image->hasMipmaps()) {
+    drawContext->drawImage(std::move(image), sampling, state, newFill);
+    return;
+  }
+  auto subsetImage = static_cast<const SubsetImage*>(image.get());
+  auto& subset = subsetImage->bounds;
+  drawContext->drawImageRect(subsetImage->source, subset,
+                             Rect::MakeWH(image->width(), image->height()), sampling, state,
+                             newFill, SrcRectConstraint::Strict);
+}
+
 // Fills a rectangle with the given Image. The image is sampled from the area defined by rect,
 // and rendered into the same area, transformed by extraMatrix and the current matrix.
 void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
@@ -475,7 +498,7 @@ void Canvas::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, co
   DEBUG_ASSERT(!srcRect.isEmpty());
   DEBUG_ASSERT(!dstRect.isEmpty());
   auto type = Types::Get(image.get());
-  if (type != Types::ImageType::Subset) {
+  if (type != Types::ImageType::Subset || image->hasMipmaps()) {
     drawContext->drawImageRect(std::move(image), srcRect, dstRect, sampling, *mcState, fill,
                                constraint);
     return;

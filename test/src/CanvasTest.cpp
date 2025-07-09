@@ -2602,4 +2602,25 @@ TGFX_TEST(CanvasTest, textEmojiOverlayBlendModes) {
   context->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/textEmojiOverlayBlendModes"));
 }
+
+TGFX_TEST(CanvasTest, RotateImageRect) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  int surfaceWidth = 100;
+  int surfaceHeight = 100;
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  image = image->makeOriented(Orientation::RightBottom);
+  ASSERT_TRUE(image != nullptr);
+
+  auto srcRect = Rect::MakeXYWH(20, 20, 40, 40);
+  auto dstRect = Rect::MakeXYWH(0, 0, 100, 100);
+  canvas->drawImageRect(image, srcRect, dstRect, {}, nullptr, SrcRectConstraint::Strict);
+  context->flush();
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/RotateImageRect"));
+}
 }  // namespace tgfx
