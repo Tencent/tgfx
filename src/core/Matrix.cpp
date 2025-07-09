@@ -63,7 +63,7 @@ void Matrix::setTranslate(float tx, float ty) {
 
     values[SCALE_X] = values[SCALE_Y] = 1;
     values[SKEW_X] = values[SKEW_Y] = 0;
-    this->setTypeMask(TranslateMask);
+    this->setTypeMask(TranslateMask | RectStayRectMask);
   } else {
     this->reset();
   }
@@ -103,10 +103,11 @@ void Matrix::setScale(float sx, float sy) {
   if (1 == sx && 1 == sy) {
     this->reset();
   } else {
+    auto rectMask = (sx != 0 && sy != 0) ? RectStayRectMask : 0;
     values[SCALE_X] = sx;
     values[SCALE_Y] = sy;
     values[TRANS_X] = values[TRANS_Y] = values[SKEW_X] = values[SKEW_Y] = 0;
-    this->setTypeMask(ScaleMask);
+    this->setTypeMask(ScaleMask | rectMask);
   }
 }
 
@@ -131,6 +132,9 @@ void Matrix::preScale(float sx, float sy) {
     this->clearTypeMask(ScaleMask);
   }else {
     this->orTypeMask(ScaleMask);
+    if(sx == 0 || sy == 0) {
+      this->clearTypeMask(RectStayRectMask);
+    }
   }
 }
 
@@ -472,7 +476,7 @@ bool Matrix::invertNonIdentity(Matrix* inverse) const {
         inverse->values[SCALE_Y] = invSY;
         inverse->values[TRANS_X] = invTX;
         inverse->values[TRANS_Y] = invTY;
-        inverse->setTypeMask(mask);
+        inverse->setTypeMask(mask | RectStayRectMask);
       }
       return true;
     }

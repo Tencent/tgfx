@@ -146,7 +146,7 @@ class Matrix {
    *    | 0 1 0 |
    *    | 0 0 1 |
    */
-  constexpr Matrix() : Matrix(1, 0, 0, 0, 1, 0, IdentityMask) {
+  constexpr Matrix() : Matrix(1, 0, 0, 0, 1, 0, IdentityMask | RectStayRectMask) {
   }
 
  /** \enum Matrix::TypeMask
@@ -440,6 +440,9 @@ class Matrix {
   }
   if (tx != 0.0f || ty != 0.0f) {
    mask |= TranslateMask;
+  }
+  if(sx != 0 && sy != 0) {
+   mask |= RectStayRectMask;
   }
   this->setTypeMask(mask);
  }
