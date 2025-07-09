@@ -56,7 +56,7 @@ void TextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   flags |= textureProxy->isAlphaOnly() ? 2 : 0;
   auto yuvTexture = getYUVTexture();
   if (yuvTexture) {
-    flags |= yuvTexture->pixelFormat() == YUVPixelFormat::I420 ? 0 : 4;
+    flags |= yuvTexture->yuvFormat() == YUVFormat::I420 ? 0 : 4;
     flags |= IsLimitedYUVColorRange(yuvTexture->colorSpace()) ? 0 : 8;
   }
   flags |= needSubset(texture) ? 16 : 0;

@@ -114,14 +114,6 @@ ImageInfo HardwareBufferGetInfo(HardwareBufferRef buffer) {
                          alphaType, desc.stride * bytesPerPixel);
 }
 
-PixelFormat HardwareBufferGetPixelFormat(HardwareBufferRef buffer) {
-  auto info = HardwareBufferGetInfo(buffer);
-  if (info.isEmpty()) {
-    return PixelFormat::Unknown;
-  }
-  return ColorTypeToPixelFormat(info.colorType());
-}
-
 HardwareBufferRef HardwareBufferFromJavaObject(JNIEnv* env, jobject hardwareBufferObject) {
   static const auto fromHardwareBuffer = AHardwareBufferFunctions::Get()->fromHardwareBuffer;
   if (fromHardwareBuffer == nullptr || hardwareBufferObject == nullptr) {

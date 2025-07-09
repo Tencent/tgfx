@@ -24,6 +24,13 @@ bool HardwareBufferAvailable() {
   return false;
 }
 
+std::vector<PixelFormat> TextureSampler::GetFormats(HardwareBufferRef, YUVFormat* yuvFormat) {
+  if (yuvFormat != nullptr) {
+    *yuvFormat = YUVFormat::Unknown;
+  }
+  return {};
+}
+
 std::shared_ptr<Texture> Texture::MakeFrom(Context*, HardwareBufferRef, YUVColorSpace) {
   return nullptr;
 }
