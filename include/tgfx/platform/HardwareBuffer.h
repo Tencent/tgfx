@@ -19,7 +19,6 @@
 #pragma once
 
 #include "tgfx/core/ImageInfo.h"
-#include "tgfx/gpu/PixelFormat.h"
 
 #if defined(__ANDROID__) || defined(ANDROID)
 struct AHardwareBuffer;
@@ -89,11 +88,5 @@ void HardwareBufferUnlock(HardwareBufferRef buffer);
  * recognized.
  */
 ImageInfo HardwareBufferGetInfo(HardwareBufferRef buffer);
-
-/**
- * Returns the pixel format of the texture generated from the given hardware buffer object. Returns
- * PixelFormat::Unknown if the buffer is nullptr or not recognized.
- */
-PixelFormat HardwareBufferGetPixelFormat(HardwareBufferRef buffer);
 
 }  // namespace tgfx

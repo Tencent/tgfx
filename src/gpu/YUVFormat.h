@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,37 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/platform/HardwareBuffer.h"
-#include "tgfx/core/ImageBuffer.h"
+#pragma once
 
 namespace tgfx {
-std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(HardwareBufferRef, YUVColorSpace) {
-  return nullptr;
-}
-
-bool HardwareBufferCheck(HardwareBufferRef) {
-  return false;
-}
-
-HardwareBufferRef HardwareBufferAllocate(int, int, bool) {
-  return nullptr;
-}
-
-HardwareBufferRef HardwareBufferRetain(HardwareBufferRef buffer) {
-  return buffer;
-}
-
-void HardwareBufferRelease(HardwareBufferRef) {
-}
-
-void* HardwareBufferLock(HardwareBufferRef) {
-  return nullptr;
-}
-
-void HardwareBufferUnlock(HardwareBufferRef) {
-}
-
-ImageInfo HardwareBufferGetInfo(HardwareBufferRef) {
-  return {};
-}
+/**
+ * Defines pixel formats for YUV textures.
+ */
+enum class YUVFormat {
+  /**
+   * uninitialized.
+   */
+  Unknown,
+  /**
+   * 8-bit Y plane followed by 8 bit 2x2 subsampled U and V planes.
+   */
+  I420,
+  /**
+   * 8-bit Y plane followed by an interleaved U/V plane with 2x2 subsampling.
+   */
+  NV12
+};
 }  // namespace tgfx

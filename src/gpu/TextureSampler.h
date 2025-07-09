@@ -18,9 +18,11 @@
 
 #pragma once
 
+#include "gpu/YUVFormat.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/PixelFormat.h"
+#include "tgfx/platform/HardwareBuffer.h"
 
 namespace tgfx {
 /**
@@ -35,6 +37,14 @@ enum class SamplerType { None, TwoD, Rectangle, External };
  */
 class TextureSampler {
  public:
+  /**
+   * Retrieves the pixel formats of texture samplers created from the specified hardware buffer. If
+   * yuvFormat is not nullptr and the hardware buffer uses a YUV format, it will be set to that
+   * format; otherwise, it will be set to YUVFormat::Unknown.
+   */
+  static std::vector<PixelFormat> GetFormats(HardwareBufferRef hardwareBuffer,
+                                             YUVFormat* yuvFormat = nullptr);
+
   /**
    * Creates a new TextureSampler which wraps the specified backend texture. The caller is
    * responsible for managing the lifetime of the backendTexture.

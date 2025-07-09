@@ -30,6 +30,28 @@ bool HardwareBufferAvailable() {
   return true;
 }
 
+std::vector<PixelFormat> TextureSampler::GetFormats(HardwareBufferRef hardwareBuffer,
+                                                    YUVFormat* yuvFormat) {
+  std::vector<PixelFormat> formats = {};
+  if (HardwareBufferCheck(hardwareBuffer)) {
+    auto pixelFormat = CVPixelBufferGetPixelFormatType(hardwareBuffer);
+    switch (pixelFormat) {
+      case kCVPixelFormatType_OneComponent8:
+        formats.push_back(PixelFormat::ALPHA_8);
+        break;
+      case kCVPixelFormatType_32BGRA:
+        formats.push_back(PixelFormat::RGBA_8888);
+        break;
+      default:
+        break;
+    }
+  }
+  if (yuvFormat != nullptr) {
+    *yuvFormat = YUVFormat::Unknown;
+  }
+  return formats;
+}
+
 std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
                                            YUVColorSpace) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
@@ -47,6 +69,13 @@ std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef h
 
 bool HardwareBufferAvailable() {
   return false;
+}
+
+std::vector<PixelFormat> TextureSampler::GetFormats(HardwareBufferRef, YUVFormat* yuvFormat) {
+  if (yuvFormat != nullptr) {
+    *yuvFormat = YUVFormat::Unknown;
+  }
+  return {};
 }
 
 std::shared_ptr<Texture> Texture::MakeFrom(Context*, HardwareBufferRef, YUVColorSpace) {
