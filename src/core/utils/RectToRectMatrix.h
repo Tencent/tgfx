@@ -27,4 +27,4 @@ namespace tgfx {
  */
 Matrix MakeRectToRectMatrix(const Rect& srcRect, const Rect& dstRect);
 
-}
+}  // namespace tgfx

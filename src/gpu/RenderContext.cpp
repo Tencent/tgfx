@@ -193,7 +193,8 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcR
     // There is no scaling for the source image, so we can disable mipmaps to save memory.
     samplingOptions.mipmapMode = MipmapMode::None;
   }
-  compositor->fillImage(std::move(image), srcRect, dstRect, samplingOptions, state, fill, constraint);
+  compositor->fillImage(std::move(image), srcRect, dstRect, samplingOptions, state, fill,
+                        constraint);
 }
 
 void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
