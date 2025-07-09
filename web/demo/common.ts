@@ -71,7 +71,7 @@ class GestureManager {
         event: WheelEvent,
         state: ScrollGestureState,
         shareData: ShareData,
-        deviceKind: DeviceType = DeviceType.MOUSE,
+        deviceType: DeviceType = DeviceType.MOUSE,
     ) {
         if (state === ScrollGestureState.SCROLL_CHANGE){
             this.scaleStartZoom = shareData.zoom;
@@ -91,7 +91,7 @@ class GestureManager {
         state: ScaleGestureState,
         canvas: HTMLElement,
         shareData: ShareData,
-        deviceKind: DeviceType = DeviceType.MOUSE
+        deviceType: DeviceType = DeviceType.MOUSE
     ) {
         if (state === ScaleGestureState.SCALE_START) {
             this.scaleY = 1.0;
@@ -121,12 +121,12 @@ class GestureManager {
     private resetScrollTimeout(
         event: WheelEvent,
         shareData: ShareData,
-        deviceKind: DeviceType = DeviceType.MOUSE
+        deviceType: DeviceType = DeviceType.MOUSE
     ) {
         clearTimeout(this.timer);
         this.timer = window.setTimeout(() => {
             this.timer = undefined;
-            this.handleScrollEvent(event, ScrollGestureState.SCROLL_END, shareData, deviceKind);
+            this.handleScrollEvent(event, ScrollGestureState.SCROLL_END, shareData, deviceType);
             this.clearState();
         }, this.pinchTimeout);
     }
@@ -135,17 +135,17 @@ class GestureManager {
         event: WheelEvent,
         canvas: HTMLElement,
         shareData: ShareData,
-        deviceKind: DeviceType = DeviceType.MOUSE
+        deviceType: DeviceType = DeviceType.MOUSE
     ) {
         clearTimeout(this.timer);
         this.timer = window.setTimeout(() => {
             this.timer = undefined;
-            this.handleScaleEvent(event, ScaleGestureState.SCALE_END, canvas, shareData, deviceKind);
+            this.handleScaleEvent(event, ScaleGestureState.SCALE_END, canvas, shareData, deviceType);
             this.clearState();
         }, this.pinchTimeout);
     }
 
-    private getDeviceKind(event: WheelEvent): DeviceType {
+    private getDeviceType(event: WheelEvent): DeviceType {
         const now = Date.now();
         const timeDifference = now - this.lastEventTime;
         const deltaYChange = Math.abs(event.deltaY - this.lastDeltaY);
@@ -161,20 +161,20 @@ class GestureManager {
     }
 
     public onWheel(event: WheelEvent, canvas: HTMLElement, shareData: ShareData) {
-        const deviceKind = this.getDeviceKind(event);
-        let wheelRatio = (deviceKind === DeviceType.MOUSE ? this.mouseWheelRatio : this.touchWheelRatio);
+        const deviceType = this.getDeviceType(event);
+        let wheelRatio = (deviceType === DeviceType.MOUSE ? this.mouseWheelRatio : this.touchWheelRatio);
         if (!event.deltaY || (!event.ctrlKey && !event.metaKey)) {
-            this.resetScrollTimeout(event, shareData, deviceKind);
-            this.handleScrollEvent(event, ScrollGestureState.SCROLL_CHANGE, shareData, deviceKind);
+            this.resetScrollTimeout(event, shareData, deviceType);
+            this.handleScrollEvent(event, ScrollGestureState.SCROLL_CHANGE, shareData, deviceType);
             return;
         }
         this.scaleY *= Math.exp(-(event.deltaY) / wheelRatio);
         if (!this.timer) {
-            this.resetScaleTimeout(event, canvas, shareData, deviceKind);
-            this.handleScaleEvent(event, ScaleGestureState.SCALE_START, canvas, shareData, deviceKind);
+            this.resetScaleTimeout(event, canvas, shareData, deviceType);
+            this.handleScaleEvent(event, ScaleGestureState.SCALE_START, canvas, shareData, deviceType);
         } else {
-            this.resetScaleTimeout(event, canvas, shareData, deviceKind);
-            this.handleScaleEvent(event, ScaleGestureState.SCALE_CHANGE, canvas, shareData, deviceKind);
+            this.resetScaleTimeout(event, canvas, shareData, deviceType);
+            this.handleScaleEvent(event, ScaleGestureState.SCALE_CHANGE, canvas, shareData, deviceType);
         }
     }
 }
