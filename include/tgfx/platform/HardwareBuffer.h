@@ -19,6 +19,7 @@
 #pragma once
 
 #include "tgfx/core/ImageInfo.h"
+#include "tgfx/core/Size.h"
 
 #if defined(__ANDROID__) || defined(ANDROID)
 struct AHardwareBuffer;
@@ -81,6 +82,12 @@ void* HardwareBufferLock(HardwareBufferRef buffer);
  * HardwareBufferLock().
  */
 void HardwareBufferUnlock(HardwareBufferRef buffer);
+
+/**
+ * Returns the size of the hardware buffer in pixels as an ISize object. Returns an empty ISize if
+ * the buffer is nullptr or not recognized.
+ */
+ISize HardwareBufferGetSize(HardwareBufferRef buffer);
 
 /**
  * Returns an ImageInfo describing the width, height, color type, alpha type, and row bytes of the
