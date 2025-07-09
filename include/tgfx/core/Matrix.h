@@ -43,7 +43,9 @@ class Matrix {
    *  @return    Matrix with scale factors.
    */
   static Matrix MakeScale(float sx, float sy) {
-    return {sx, 0, 0, 0, sy, 0, (sx == 1 && sy == 1) ? IdentityMask : ScaleMask};
+   Matrix m;
+   m.setScale(sx, sy);
+   return m;
   }
 
   /**
@@ -57,7 +59,9 @@ class Matrix {
    * @return       Matrix with scale factors.
    */
   static Matrix MakeScale(float scale) {
-    return {scale, 0, 0, 0, scale, 0, (scale == 1) ? IdentityMask : ScaleMask};
+    Matrix m;
+   m.setScale(scale, scale);
+   return m;
   }
 
   /**
@@ -72,7 +76,9 @@ class Matrix {
    * @return    Matrix with translation
    */
   static Matrix MakeTrans(float tx, float ty) {
-    return {1, 0, tx, 0, 1, ty, (tx !=0 || ty != 0) ? TranslateMask : IdentityMask};
+   Matrix m;
+   m.setTranslate(tx, ty);
+   return m;
   }
 
   /**
@@ -82,7 +88,9 @@ class Matrix {
    * @return    Matrix with skew
    */
   static Matrix MakeSkew(float kx, float ky) {
-    return {1, kx, 0, ky, 1, 0, UnknownMask};
+   Matrix m;
+   m.setSkew(kx, ky);
+   return m;
   }
 
   /**
