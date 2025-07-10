@@ -819,7 +819,7 @@ SINT bool Any(const Vec<N, T>& x) {
     // On SSE, movemaTGFX checks only the MSB in each lane, which is fine if the lanes were set
     // directly from a comparison op (which sets all bits to 1 when true), but TGFX::Vec<>
     // treats any non-zero value as true, so we have to compare 'x' to 0 before calling movemaTGFX
-    return _mm_movemaTGFX_ps(_mm_cmpneq_ps(BitCast<__m128>(x), _mm_set1_ps(0))) != 0b0000;
+    return _mm_movemask_ps(_mm_cmpneq_ps(BitCast<__m128>(x), _mm_set1_ps(0))) != 0b0000;
   }
 #endif
 #if TGFX_USE_SIMD && defined(__aarch64__)
@@ -863,7 +863,7 @@ SINT bool All(const Vec<N, T>& x) {
   // Unfortunately, the _mm_testc intrinsics don't let us avoid the comparison to 0 for all()'s
   // correctness, so always just use the plain SSE version.
   if constexpr (N == 4 && sizeof(T) == 4) {
-    return _mm_movemaTGFX_ps(_mm_cmpneq_ps(BitCast<__m128>(x), _mm_set1_ps(0))) == 0b1111;
+    return _mm_movemask_ps(_mm_cmpneq_ps(BitCast<__m128>(x), _mm_set1_ps(0))) == 0b1111;
   }
 #endif
 #if TGFX_USE_SIMD && defined(__aarch64__)

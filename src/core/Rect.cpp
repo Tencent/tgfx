@@ -42,7 +42,7 @@ bool Rect::setBounds(const Point pts[], int count) {
     pts += 2;
     count -= 2;
   }
-  float4 accum = min * 0;
+  float4 accum = min * 0.0f;
   while (count) {
     float4 xy = float4::Load(pts);
     accum = accum * xy;
@@ -51,7 +51,7 @@ bool Rect::setBounds(const Point pts[], int count) {
     pts += 2;
     count -= 2;
   }
-  const bool allFinite = All(accum * 0 == 0);
+  const bool allFinite = All(accum * 0.0f == 0.0f);
   if (allFinite) {
     this->setLTRB(std::min(min[0], min[2]), std::min(min[1], min[3]), std::max(max[0], max[2]),
                   std::max(max[1], max[3]));
