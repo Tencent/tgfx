@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,34 +18,26 @@
 
 #pragma once
 
-#include "gpu/Texture.h"
-#include "gpu/TextureSampler.h"
+#include "gpu/DefaultTexture.h"
 
 namespace tgfx {
-class GLExternalOESTexture : public Texture {
+class ExtendedTexture : public DefaultTexture {
  public:
-  static std::shared_ptr<GLExternalOESTexture> Make(Context* context, int width, int height);
+  ExtendedTexture(std::unique_ptr<TextureSampler> sampler, int width, int height, int extendedWidth,
+                  int extendedHeight, ImageOrigin origin = ImageOrigin::TopLeft);
 
   size_t memoryUsage() const override;
 
-  const TextureSampler* getSampler() const override {
-    return sampler.get();
+  Point getTextureCoord(float x, float y) const override {
+    return {x / static_cast<float>(extendedWidth), y / static_cast<float>(extendedHeight)};
   }
 
-  Point getTextureCoord(float x, float y) const override;
-
-  BackendTexture getBackendTexture() const override;
-
-  void updateTextureSize(int width, int height);
-
- protected:
-  void onReleaseGPU() override;
+  BackendTexture getBackendTexture() const override {
+    return getSampler()->getBackendTexture(extendedWidth, extendedHeight);
+  }
 
  private:
-  std::unique_ptr<TextureSampler> sampler = {};
-  int textureWidth = 0;
-  int textureHeight = 0;
-
-  GLExternalOESTexture(std::unique_ptr<TextureSampler> sampler, int width, int height);
+  int extendedWidth = 0;
+  int extendedHeight = 0;
 };
 }  // namespace tgfx
