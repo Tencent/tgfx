@@ -40,9 +40,9 @@ void LayerTreeDrawer::onDraw(tgfx::Canvas* canvas, const AppHost* host) {
   displayList.render(canvas->getSurface(), false);
 }
 
-void LayerTreeDrawer::updateRootMatrix(const AppHost* host) {
+void LayerTreeDrawer::updateRootMatrix(const AppHost* host) const {
   auto padding = 30.0;
-  auto bounds = root->getBounds(nullptr, true);
+  auto bounds = root->getTightBounds();
   auto totalScale = std::min(host->width() / (padding * 2 + bounds.width()),
                              host->height() / (padding * 2 + bounds.height()));
 

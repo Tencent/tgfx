@@ -73,10 +73,17 @@ void MeasureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList
   }
   Rect localBounds = {};
   if (computeTightBounds) {
-    auto scale = Matrix::MakeScale(maxScale, maxScale);
-    localBounds = glyphRunList->getTightBounds(&scale);
-    if (stroke) {
-      ApplyStrokeToScaledBounds(*stroke, &localBounds, maxScale);
+    Path glyphPath = {};
+    if (glyphRunList->getPath(&glyphPath, &state.matrix)) {
+      if (stroke) {
+        Stroke scaledStroke(stroke->width * maxScale, stroke->cap, stroke->join,
+                            stroke->miterLimit * maxScale);
+        scaledStroke.applyToPath(&glyphPath);
+      }
+      //TODO glyphPath.computeTightBounds();
+      auto deviceBounds = glyphPath.getBounds();
+      addDeviceBounds(state.clip, fill, deviceBounds, glyphPath.isInverseFillType());
+      return;
     }
   } else {
     localBounds = glyphRunList->getBounds();
@@ -92,11 +99,17 @@ void MeasureContext::drawLayer(std::shared_ptr<Picture> picture,
                                const Fill& fill) {
   DEBUG_ASSERT(picture != nullptr);
   if (imageFilter) {
-    auto localBounds = picture->getBounds(nullptr, computeTightBounds);
+    auto localBounds = computeTightBounds ? picture->getTightBounds(nullptr) : picture->getBounds();
     localBounds = imageFilter->filterBounds(localBounds);
     addLocalBounds(state, fill, localBounds);
   } else {
-    auto deviceBounds = picture->getBounds(&state.matrix, computeTightBounds);
+    Rect deviceBounds = {};
+    if (computeTightBounds) {
+      deviceBounds = picture->getTightBounds(&state.matrix);
+    } else {
+      deviceBounds = picture->getBounds();
+      state.matrix.mapRect(&deviceBounds);
+    }
     addDeviceBounds(state.clip, fill, deviceBounds, picture->hasUnboundedFill());
   }
 }
@@ -109,6 +122,7 @@ void MeasureContext::drawPicture(std::shared_ptr<Picture> picture, const MCState
 void MeasureContext::addTightBounds(const Path& path, const MCState& state, const Fill& fill) {
   auto tempPath = path;
   tempPath.transform(state.matrix);
+  // TODO: tempPath.computeTightBounds()
   auto deviceBounds = tempPath.getBounds();
   addDeviceBounds(state.clip, fill, deviceBounds, path.isInverseFillType());
 }

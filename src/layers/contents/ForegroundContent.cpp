@@ -28,9 +28,9 @@ Rect ForegroundContent::getBounds() const {
 }
 
 Rect ForegroundContent::getTightBounds(const Matrix& matrix) const {
-  auto bounds = foreground->getBounds(&matrix, true);
+  auto bounds = foreground->getTightBounds(&matrix);
   if (background) {
-    bounds.join(background->getBounds(&matrix, true));
+    bounds.join(background->getTightBounds(&matrix));
   }
   return bounds;
 }

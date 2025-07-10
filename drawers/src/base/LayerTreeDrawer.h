@@ -35,7 +35,7 @@ class LayerTreeDrawer : public Drawer {
   void onDraw(tgfx::Canvas* canvas, const AppHost* host) override;
 
  private:
-  void updateRootMatrix(const AppHost* host);
+  void updateRootMatrix(const AppHost* host) const;
 
   // used to update matrix
   std::shared_ptr<tgfx::Layer> root = nullptr;

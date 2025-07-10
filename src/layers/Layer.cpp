@@ -411,9 +411,14 @@ bool Layer::replaceChild(std::shared_ptr<Layer> oldChild, std::shared_ptr<Layer>
   return true;
 }
 
-Rect Layer::getBounds(const Layer* targetCoordinateSpace, bool computeTightBounds) {
+Rect Layer::getBounds(const Layer* targetCoordinateSpace) {
   auto matrix = getRelativeMatrix(targetCoordinateSpace);
-  return getBoundsInternal(matrix, computeTightBounds);
+  return getBoundsInternal(matrix, false);
+}
+
+Rect Layer::getTightBounds(const Layer* targetCoordinateSpace) {
+  auto matrix = getRelativeMatrix(targetCoordinateSpace);
+  return getBoundsInternal(matrix, true);
 }
 
 Rect Layer::getBoundsInternal(const Matrix& coordinateMatrix, bool computeTightBounds) {

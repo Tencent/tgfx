@@ -32,7 +32,7 @@ class DefaultContent : public LayerContent {
   }
 
   Rect getTightBounds(const Matrix& matrix) const override {
-    return content->getBounds(&matrix, true);
+    return content->getTightBounds(&matrix);
   }
 
   bool hitTestPoint(float localX, float localY, bool shapeHitTest) const override {
