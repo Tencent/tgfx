@@ -25,6 +25,9 @@
 
 namespace hello2d {
 static constexpr LPCWSTR ClassName = L"TGFXWindow";
+static constexpr float MAX_ZOOM = 1000.0f;
+static constexpr float MIN_ZOOM = 0.001f;
+static constexpr float WHEEL_RATIO = 400.0f;
 
 TGFXWindow::TGFXWindow() {
   createAppHost();
@@ -37,7 +40,7 @@ TGFXWindow::~TGFXWindow() {
 bool TGFXWindow::open() {
   destroy();
   WNDCLASS windowClass = RegisterWindowClass();
-  auto pixelRatio = getPixelRatio();
+  float pixelRatio = getPixelRatio();
   int initWidth = static_cast<int>(pixelRatio * 800);
   int initHeight = static_cast<int>(pixelRatio * 600);
   windowHandle =
@@ -82,7 +85,6 @@ LRESULT CALLBACK TGFXWindow::WndProc(HWND window, UINT message, WPARAM wparam,
 }
 
 LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) noexcept {
-  LRESULT result = 0;
   switch (message) {
     case WM_DESTROY:
       destroy();
@@ -96,90 +98,75 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       break;
     }
     case WM_LBUTTONDOWN: {
-      lastDrawIndex++;
+      currentDrawerIndex++;
       zoomScale = 1.0f;
-      contentOffset.x = 0.0f;
-      contentOffset.y = 0.0f;
+      contentOffset = {0.0f, 0.0f};
       ::InvalidateRect(windowHandle, nullptr, TRUE);
       break;
     }
     case WM_MOUSEWHEEL: {
-      POINT pt;
-      pt.x = GET_X_LPARAM(lparam);
-      pt.y = GET_Y_LPARAM(lparam);
-      ScreenToClient(hwnd, &pt);
-      bool isCtrl = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
-      bool isShift = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
-      float oldZoom = zoomScale;
+      POINT mousePoint = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+      ScreenToClient(hwnd, &mousePoint);
+      bool isCtrlPressed = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+      bool isShiftPressed = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
       float pixelRatio = getPixelRatio();
-      if (isCtrl) {
-        float zDelta = GET_WHEEL_DELTA_WPARAM(wparam) / 120.0f;
-        float zoomStep = 1.0f + zDelta * 0.1f;
-        float newZoom = oldZoom * zoomStep;
-        if (newZoom < 0.001f) {
-          newZoom = 0.001f;
-        }
-        if (newZoom > 1000.0f) {
-          newZoom = 1000.0f;
-        }
-        float contentX = (pt.x * pixelRatio - contentOffset.x) / oldZoom;
-        float contentY = (pt.y * pixelRatio - contentOffset.y) / oldZoom;
-        contentOffset.x = pt.x * pixelRatio - contentX * newZoom;
-        contentOffset.y = pt.y * pixelRatio - contentY * newZoom;
+      float mouseX = mousePoint.x * pixelRatio;
+      float mouseY = mousePoint.y * pixelRatio;
+      if (isCtrlPressed) {
+        float zoomStep = std::exp(GET_WHEEL_DELTA_WPARAM(wparam) / WHEEL_RATIO);
+        float newZoom = std::clamp(zoomScale * zoomStep, MIN_ZOOM, MAX_ZOOM);
+        float contentX = (mouseX - contentOffset.x) / zoomScale;
+        float contentY = (mouseY - contentOffset.y) / zoomScale;
+        contentOffset.x = mouseX - contentX * newZoom;
+        contentOffset.y = mouseY - contentY * newZoom;
         zoomScale = newZoom;
       } else {
-        if (isShift) {
-          float xDelta = (float)GET_WHEEL_DELTA_WPARAM(wparam);
-          contentOffset.x += xDelta;
+        float wheelDelta = static_cast<float>(GET_WHEEL_DELTA_WPARAM(wparam));
+        if (isShiftPressed) {
+          contentOffset.x += wheelDelta;
         } else {
-          float yDelta = (float)GET_WHEEL_DELTA_WPARAM(wparam);
-          contentOffset.y -= yDelta;
+          contentOffset.y -= wheelDelta;
         }
       }
       ::InvalidateRect(windowHandle, nullptr, TRUE);
       break;
     }
     case WM_GESTURE: {
-      GESTUREINFO gi;
-      memset(&gi, 0, sizeof(GESTUREINFO));
-      gi.cbSize = sizeof(GESTUREINFO);
-      if (GetGestureInfo((HGESTUREINFO)lparam, &gi)) {
-        static double lastArgument = 0.0;
-        if (gi.dwID == GID_ZOOM) {
-          double argument = gi.ullArguments;
-          double zoomFactor = 1.0;
-          if (lastArgument != 0.0) {
-            zoomFactor = argument / lastArgument;
+      GESTUREINFO gestureInfo{};
+      gestureInfo.cbSize = sizeof(GESTUREINFO);
+      if (GetGestureInfo(reinterpret_cast<HGESTUREINFO>(lparam), &gestureInfo)) {
+        static double lastZoomArgument = 0.0;
+        if (gestureInfo.dwID == GID_ZOOM) {
+          double currentArgument = gestureInfo.ullArguments;
+          if (lastZoomArgument != 0.0) {
+            double zoomFactor = currentArgument / lastZoomArgument;
+            POINT gesturePoint = {gestureInfo.ptsLocation.x, gestureInfo.ptsLocation.y};
+            ScreenToClient(hwnd, &gesturePoint);
+            float pixelRatio = getPixelRatio();
+            float mouseX = gesturePoint.x * pixelRatio;
+            float mouseY = gesturePoint.y * pixelRatio;
+            float newZoom =
+                std::clamp(zoomScale * static_cast<float>(zoomFactor), MIN_ZOOM, MAX_ZOOM);
+            float contentX = (mouseX - contentOffset.x) / zoomScale;
+            float contentY = (mouseY - contentOffset.y) / zoomScale;
+            contentOffset.x = mouseX - contentX * newZoom;
+            contentOffset.y = mouseY - contentY * newZoom;
+            zoomScale = newZoom;
+            ::InvalidateRect(windowHandle, nullptr, TRUE);
           }
-          lastArgument = argument;
-          POINT pt = {gi.ptsLocation.x, gi.ptsLocation.y};
-          ScreenToClient(hwnd, &pt);
-          float pixelRatio = getPixelRatio();
-          float mouseX = pt.x * pixelRatio;
-          float mouseY = pt.y * pixelRatio;
-
-          float oldZoom = zoomScale;
-          float newZoom = std::clamp(oldZoom * (float)zoomFactor, 0.001f, 1000.0f);
-          float contentX = (mouseX - contentOffset.x) / oldZoom;
-          float contentY = (mouseY - contentOffset.y) / oldZoom;
-          contentOffset.x = mouseX - contentX * newZoom;
-          contentOffset.y = mouseY - contentY * newZoom;
-          zoomScale = newZoom;
-
-          ::InvalidateRect(windowHandle, nullptr, TRUE);
+          lastZoomArgument = currentArgument;
         }
-        if (gi.dwFlags & GF_END) {
-          lastArgument = 0.0;
+        if (gestureInfo.dwFlags & GF_END) {
+          lastZoomArgument = 0.0;
         }
-        CloseGestureInfoHandle((HGESTUREINFO)lparam);
+        CloseGestureInfoHandle(reinterpret_cast<HGESTUREINFO>(lparam));
       }
       break;
     }
     default:
-      result = DefWindowProc(windowHandle, message, wparam, lparam);
-      break;
+      return DefWindowProc(windowHandle, message, wparam, lparam);
   }
-  return result;
+  return 0;
 }
 
 void TGFXWindow::destroy() {
@@ -194,67 +181,40 @@ void TGFXWindow::centerAndShow() {
   if ((GetWindowStyle(windowHandle) & WS_CHILD) != 0) {
     return;
   }
-  RECT rcDlg = {0};
-  ::GetWindowRect(windowHandle, &rcDlg);
-  RECT rcArea = {0};
-  RECT rcCenter = {0};
-  HWND hWnd = windowHandle;
-  HWND hWndCenter = ::GetWindowOwner(windowHandle);
-  if (hWndCenter != nullptr) {
-    hWnd = hWndCenter;
-  }
 
-  MONITORINFO oMonitor = {};
-  oMonitor.cbSize = sizeof(oMonitor);
-  ::GetMonitorInfo(::MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST), &oMonitor);
-  rcArea = oMonitor.rcWork;
+  RECT windowRect;
+  ::GetWindowRect(windowHandle, &windowRect);
+  int windowWidth = windowRect.right - windowRect.left;
+  int windowHeight = windowRect.bottom - windowRect.top;
 
-  if (hWndCenter == nullptr) {
-    rcCenter = rcArea;
+  HWND centerWindow = ::GetWindowOwner(windowHandle);
+  RECT centerRect;
+
+  MONITORINFO monitorInfo{};
+  monitorInfo.cbSize = sizeof(monitorInfo);
+  ::GetMonitorInfo(
+      ::MonitorFromWindow(centerWindow ? centerWindow : windowHandle, MONITOR_DEFAULTTONEAREST),
+      &monitorInfo);
+  RECT workArea = monitorInfo.rcWork;
+
+  if (centerWindow == nullptr) {
+    centerRect = workArea;
   } else {
-    ::GetWindowRect(hWndCenter, &rcCenter);
+    ::GetWindowRect(centerWindow, &centerRect);
   }
+  int xPos = (centerRect.left + centerRect.right - windowWidth) / 2;
+  int yPos = (centerRect.top + centerRect.bottom - windowHeight) / 2;
+  xPos = std::clamp(xPos, workArea.left, workArea.right - windowWidth);
+  yPos = std::clamp(yPos, workArea.top, workArea.bottom - windowHeight);
 
-  int DlgWidth = rcDlg.right - rcDlg.left;
-  int DlgHeight = rcDlg.bottom - rcDlg.top;
-
-  // Find dialog's upper left based on rcCenter
-  int xLeft = (rcCenter.left + rcCenter.right) / 2 - DlgWidth / 2;
-  int yTop = (rcCenter.top + rcCenter.bottom) / 2 - DlgHeight / 2;
-
-  // The dialog is outside the screen, move it inside
-  if (xLeft < rcArea.left) {
-    if (xLeft < 0) {
-      xLeft = GetSystemMetrics(SM_CXSCREEN) / 2 - DlgWidth / 2;
-    } else {
-      xLeft = rcArea.left;
-    }
-  } else if (xLeft + DlgWidth > rcArea.right) {
-    xLeft = rcArea.right - DlgWidth;
-  }
-
-  if (yTop < rcArea.top) {
-    if (yTop < 0) {
-      yTop = GetSystemMetrics(SM_CYSCREEN) / 2 - DlgHeight / 2;
-    } else {
-      yTop = rcArea.top;
-    }
-
-  } else if (yTop + DlgHeight > rcArea.bottom) {
-    yTop = rcArea.bottom - DlgHeight;
-  }
-  ::SetWindowPos(windowHandle, nullptr, xLeft, yTop, -1, -1,
+  ::SetWindowPos(windowHandle, nullptr, xPos, yPos, -1, -1,
                  SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
 }
 
 float TGFXWindow::getPixelRatio() {
 #if WINVER >= 0x0603  // Windows 8.1
-  HMONITOR monitor = nullptr;
-  if (windowHandle != nullptr) {
-    monitor = ::MonitorFromWindow(windowHandle, MONITOR_DEFAULTTONEAREST);
-  } else {
-    monitor = ::MonitorFromPoint(POINT{0, 0}, MONITOR_DEFAULTTOPRIMARY);
-  }
+  HMONITOR monitor = windowHandle ? ::MonitorFromWindow(windowHandle, MONITOR_DEFAULTTONEAREST)
+                                  : ::MonitorFromPoint({0, 0}, MONITOR_DEFAULTTOPRIMARY);
   UINT dpiX = 96;
   UINT dpiY = 96;
   GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &dpiX, &dpiY);
@@ -266,16 +226,16 @@ float TGFXWindow::getPixelRatio() {
 
 void TGFXWindow::createAppHost() {
   appHost = std::make_unique<drawers::AppHost>();
-  std::filesystem::path filePath = __FILE__;
-  auto rootPath = filePath.parent_path().parent_path().parent_path().string();
-  auto imagePath = rootPath + R"(\resources\assets\bridge.jpg)";
+  std::filesystem::path currentFile = __FILE__;
+  std::string rootPath = currentFile.parent_path().parent_path().parent_path().string();
+  std::string imagePath = rootPath + R"(\resources\assets\bridge.jpg)";
   auto image = tgfx::Image::MakeFromFile(imagePath);
   appHost->addImage("bridge", image);
-  auto typeface = tgfx::Typeface::MakeFromName("Microsoft YaHei", "");
-  appHost->addTypeface("default", typeface);
-  auto emojiPath = rootPath + R"(\resources\font\NotoColorEmoji.ttf)";
-  typeface = tgfx::Typeface::MakeFromPath(emojiPath);
-  appHost->addTypeface("emoji", typeface);
+  auto defaultTypeface = tgfx::Typeface::MakeFromName("Microsoft YaHei", "");
+  appHost->addTypeface("default", defaultTypeface);
+  std::string emojiPath = rootPath + R"(\resources\font\NotoColorEmoji.ttf)";
+  auto emojiTypeface = tgfx::Typeface::MakeFromPath(emojiPath);
+  appHost->addTypeface("emoji", emojiTypeface);
 }
 
 void TGFXWindow::draw() {
@@ -285,12 +245,13 @@ void TGFXWindow::draw() {
   if (tgfxWindow == nullptr) {
     return;
   }
-  RECT rect;
-  GetClientRect(windowHandle, &rect);
-  auto width = static_cast<int>(rect.right - rect.left);
-  auto height = static_cast<int>(rect.bottom - rect.top);
-  auto pixelRatio = getPixelRatio();
-  auto sizeChanged = appHost->updateScreen(width, height, pixelRatio);
+
+  RECT clientRect;
+  GetClientRect(windowHandle, &clientRect);
+  int width = clientRect.right - clientRect.left;
+  int height = clientRect.bottom - clientRect.top;
+  float pixelRatio = getPixelRatio();
+  bool sizeChanged = appHost->updateScreen(width, height, pixelRatio);
   if (sizeChanged) {
     tgfxWindow->invalidSize();
   }
@@ -307,16 +268,16 @@ void TGFXWindow::draw() {
     device->unlock();
     return;
   }
-  appHost->updateZoomAndOffset(zoomScale, tgfx::Point(contentOffset.x, contentOffset.y));
+  appHost->updateZoomAndOffset(zoomScale, contentOffset);
   auto canvas = surface->getCanvas();
   canvas->clear();
   canvas->save();
-  auto numDrawers = drawers::Drawer::Count() - 1;
-  auto index = (lastDrawIndex % numDrawers) + 1;
-  auto drawer = drawers::Drawer::GetByName("GridBackground");
-  drawer->draw(canvas, appHost.get());
-  drawer = drawers::Drawer::GetByIndex(index);
-  drawer->draw(canvas, appHost.get());
+  int numDrawers = drawers::Drawer::Count() - 1;
+  int drawerIndex = (currentDrawerIndex % numDrawers) + 1;
+  auto backgroundDrawer = drawers::Drawer::GetByName("GridBackground");
+  backgroundDrawer->draw(canvas, appHost.get());
+  auto currentDrawer = drawers::Drawer::GetByIndex(drawerIndex);
+  currentDrawer->draw(canvas, appHost.get());
   canvas->restore();
   context->flushAndSubmit();
   tgfxWindow->present(context);

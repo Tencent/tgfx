@@ -42,7 +42,7 @@ class TGFXWindow {
 
  private:
   HWND windowHandle = nullptr;
-  int lastDrawIndex = 0;
+  int currentDrawerIndex = 0;
   float zoomScale = 1.0f;
   tgfx::Point contentOffset = {0.0f, 0.0f};
   std::shared_ptr<tgfx::WGLWindow> tgfxWindow = nullptr;
