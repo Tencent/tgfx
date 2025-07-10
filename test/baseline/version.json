@@ -99,7 +99,7 @@
         "ImageWithMipmap": "da590da",
         "ImageWithShadow": "50136952",
         "SimpleLayerTreeDrawer": "d5164a4e",
-        "SimpleText": "d5164a4e"
+        "SimpleText": "3977d8ca"
     },
     "DstTextureTest": {
         "EmptyLocalBounds": "be94e666",
@@ -281,7 +281,7 @@
         "radialGradient": "b1db872",
         "referenceStyle": "8769f398",
         "text": "84ef0cb4",
-        "textEmoji": "84ef0cb4",
+        "textEmoji": "3977d8ca",
         "textFont": "84ef0cb4"
     },
     "SurfaceTest": {
