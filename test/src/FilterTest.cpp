@@ -701,6 +701,7 @@ TGFX_TEST(FilterTest, ClipInnerShadowImageFilter) {
   auto shadowFilter = ImageFilter::InnerShadow(0, -10.5, 10, 10, Color::FromRGBA(0, 0, 0, 128));
   image = image->makeWithFilter(shadowFilter);
   auto canvas = surface->getCanvas();
+  canvas->scale(0.8571f, 0.8571f);
   {
     AutoCanvasRestore restore(canvas);
     canvas->clipRect(Rect::MakeWH(100.f, 30.f));
