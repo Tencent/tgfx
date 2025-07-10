@@ -937,10 +937,10 @@ SINT T Max(const Vec<N, T>& x) {
 }
 
 SINT Vec<N, T> Min(const Vec<N, T>& x, const Vec<N, T>& y) {
-  return NaiveIfThenElse(y < x, y, x);
+  return IfThenElse(y < x, y, x);
 }
 SINT Vec<N, T> Max(const Vec<N, T>& x, const Vec<N, T>& y) {
-  return NaiveIfThenElse(x < y, y, x);
+  return IfThenElse(x < y, y, x);
 }
 
 SINTU Vec<N, T> Min(const Vec<N, T>& x, U y) {
