@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TGFXWindow.h"
+#include <cmath>
 #include <filesystem>
 #if WINVER >= 0x0603  // Windows 8.1
 #include <shellscalingapi.h>
@@ -46,8 +47,11 @@ bool TGFXWindow::open() {
   if (windowHandle == nullptr) {
     return false;
   }
+  RegisterTouchWindow(windowHandle, 0);
   SetWindowLongPtr(windowHandle, GWLP_USERDATA, reinterpret_cast<LONG_PTR>(this));
   centerAndShow();
+  ShowWindow(windowHandle, SW_SHOW);
+  UpdateWindow(windowHandle);
   return true;
 }
 
@@ -91,10 +95,86 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       EndPaint(windowHandle, &ps);
       break;
     }
-    case WM_LBUTTONDOWN:
+    case WM_LBUTTONDOWN: {
       lastDrawIndex++;
+      zoomScale = 1.0f;
+      contentOffset.x = 0.0f;
+      contentOffset.y = 0.0f;
       ::InvalidateRect(windowHandle, nullptr, TRUE);
       break;
+    }
+    case WM_MOUSEWHEEL: {
+      POINT pt;
+      pt.x = GET_X_LPARAM(lparam);
+      pt.y = GET_Y_LPARAM(lparam);
+      ScreenToClient(hwnd, &pt);
+      bool isCtrl = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
+      bool isShift = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
+      float oldZoom = zoomScale;
+      float pixelRatio = getPixelRatio();
+      if (isCtrl) {
+        float zDelta = GET_WHEEL_DELTA_WPARAM(wparam) / 120.0f;
+        float zoomStep = 1.0f + zDelta * 0.1f;
+        float newZoom = oldZoom * zoomStep;
+        if (newZoom < 0.001f) {
+          newZoom = 0.001f;
+        }
+        if (newZoom > 1000.0f) {
+          newZoom = 1000.0f;
+        }
+        float contentX = (pt.x * pixelRatio - contentOffset.x) / oldZoom;
+        float contentY = (pt.y * pixelRatio - contentOffset.y) / oldZoom;
+        contentOffset.x = pt.x * pixelRatio - contentX * newZoom;
+        contentOffset.y = pt.y * pixelRatio - contentY * newZoom;
+        zoomScale = newZoom;
+      } else {
+        if (isShift) {
+          float xDelta = (float)GET_WHEEL_DELTA_WPARAM(wparam);
+          contentOffset.x += xDelta;
+        } else {
+          float yDelta = (float)GET_WHEEL_DELTA_WPARAM(wparam);
+          contentOffset.y -= yDelta;
+        }
+      }
+      ::InvalidateRect(windowHandle, nullptr, TRUE);
+      break;
+    }
+    case WM_GESTURE: {
+      GESTUREINFO gi;
+      memset(&gi, 0, sizeof(GESTUREINFO));
+      gi.cbSize = sizeof(GESTUREINFO);
+      if (GetGestureInfo((HGESTUREINFO)lparam, &gi)) {
+        static double lastArgument = 0.0;
+        if (gi.dwID == GID_ZOOM) {
+          double argument = gi.ullArguments;
+          double zoomFactor = 1.0;
+          if (lastArgument != 0.0) {
+            zoomFactor = argument / lastArgument;
+          }
+          lastArgument = argument;
+          POINT pt = {gi.ptsLocation.x, gi.ptsLocation.y};
+          ScreenToClient(hwnd, &pt);
+          float pixelRatio = getPixelRatio();
+          float mouseX = pt.x * pixelRatio;
+          float mouseY = pt.y * pixelRatio;
+
+          float oldZoom = zoomScale;
+          float newZoom = std::clamp(oldZoom * (float)zoomFactor, 0.001f, 1000.0f);
+          float contentX = (mouseX - contentOffset.x) / oldZoom;
+          float contentY = (mouseY - contentOffset.y) / oldZoom;
+          contentOffset.x = mouseX - contentX * newZoom;
+          contentOffset.y = mouseY - contentY * newZoom;
+          zoomScale = newZoom;
+
+          ::InvalidateRect(windowHandle, nullptr, TRUE);
+        }
+        if (gi.dwFlags & GF_END) {
+          lastArgument = 0.0;
+        }
+        CloseGestureInfoHandle((HGESTUREINFO)lparam);
+      }
+      break;
+    }
     default:
       result = DefWindowProc(windowHandle, message, wparam, lparam);
       break;
@@ -227,6 +307,7 @@ void TGFXWindow::draw() {
     device->unlock();
     return;
   }
+  appHost->updateZoomAndOffset(zoomScale, tgfx::Point(contentOffset.x, contentOffset.y));
   auto canvas = surface->getCanvas();
   canvas->clear();
   canvas->save();
