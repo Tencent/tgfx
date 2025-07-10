@@ -52,7 +52,7 @@ std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFrom(Context* context,
   if (context == nullptr) {
     return nullptr;
   }
-  auto format = HardwareBufferGetPixelFormat(hardwareBuffer);
+  auto format = TextureSampler::GetPixelFormat(hardwareBuffer);
   if (format == PixelFormat::Unknown) {
     return nullptr;
   }

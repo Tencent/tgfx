@@ -16,20 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/Texture.h"
-#include "tgfx/platform/HardwareBuffer.h"
-
+#include "core/utils/RectToRectMatrix.h"
 namespace tgfx {
-bool HardwareBufferAvailable() {
-  return false;
+Matrix MakeRectToRectMatrix(const Rect& srcRect, const Rect& dstRect) {
+  if (srcRect.isEmpty()) {
+    return Matrix::I();
+  }
+  if (dstRect.isEmpty()) {
+    return Matrix::MakeAll(0, 0, 0, 0, 0, 0);
+  }
+  float sx = dstRect.width() / srcRect.width();
+  float sy = dstRect.height() / srcRect.height();
+  float tx = dstRect.left - srcRect.left * sx;
+  float ty = dstRect.top - srcRect.top * sy;
+  return Matrix::MakeAll(sx, 0, tx, 0, sy, ty);
 }
-
-PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef) {
-  return PixelFormat::Unknown;
-}
-
-std::shared_ptr<Texture> Texture::MakeFrom(Context*, HardwareBufferRef, YUVColorSpace) {
-  return nullptr;
-}
-
 }  // namespace tgfx

@@ -86,6 +86,16 @@ void HardwareBufferUnlock(HardwareBufferRef buffer) {
   }
 }
 
+ISize HardwareBufferGetSize(HardwareBufferRef buffer) {
+  static const auto describe = AHardwareBufferFunctions::Get()->describe;
+  if (!HardwareBufferAvailable() || buffer == nullptr) {
+    return {};
+  }
+  AHardwareBuffer_Desc desc;
+  describe(buffer, &desc);
+  return {static_cast<int>(desc.width), static_cast<int>(desc.height)};
+}
+
 ImageInfo HardwareBufferGetInfo(HardwareBufferRef buffer) {
   static const auto describe = AHardwareBufferFunctions::Get()->describe;
   if (!HardwareBufferAvailable() || buffer == nullptr) {
@@ -112,14 +122,6 @@ ImageInfo HardwareBufferGetInfo(HardwareBufferRef buffer) {
   auto bytesPerPixel = ImageInfo::GetBytesPerPixel(colorType);
   return ImageInfo::Make(static_cast<int>(desc.width), static_cast<int>(desc.height), colorType,
                          alphaType, desc.stride * bytesPerPixel);
-}
-
-PixelFormat HardwareBufferGetPixelFormat(HardwareBufferRef buffer) {
-  auto info = HardwareBufferGetInfo(buffer);
-  if (info.isEmpty()) {
-    return PixelFormat::Unknown;
-  }
-  return ColorTypeToPixelFormat(info.colorType());
 }
 
 HardwareBufferRef HardwareBufferFromJavaObject(JNIEnv* env, jobject hardwareBufferObject) {
