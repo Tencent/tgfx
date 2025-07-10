@@ -69,6 +69,23 @@ Rect MergeShape::getBounds() const {
   }
 }
 
+Rect MergeShape::getTightBounds() const {
+  auto firstBounds = first->getTightBounds();
+  auto secondBounds = second->getTightBounds();
+  switch (pathOp) {
+    case PathOp::Difference:
+      return second->isInverseFillType() ? secondBounds : firstBounds;
+    case PathOp::Intersect:
+      if (first->isInverseFillType() == second->isInverseFillType()) {
+        return firstBounds.intersects(secondBounds) ? firstBounds : Rect::MakeEmpty();
+      }
+      return first->isInverseFillType() ? secondBounds : firstBounds;
+    default:
+      firstBounds.join(secondBounds);
+      return firstBounds;
+  }
+}
+
 Path MergeShape::getPath() const {
   auto path = first->getPath();
   auto secondPath = second->getPath();

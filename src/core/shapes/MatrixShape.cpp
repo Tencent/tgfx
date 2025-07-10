@@ -47,6 +47,12 @@ Rect MatrixShape::getBounds() const {
   return bounds;
 }
 
+Rect MatrixShape::getTightBounds() const {
+  auto bounds = shape->getTightBounds();
+  matrix.mapRect(&bounds);
+  return bounds;
+}
+
 Path MatrixShape::getPath() const {
   auto path = shape->getPath();
   path.transform(matrix);

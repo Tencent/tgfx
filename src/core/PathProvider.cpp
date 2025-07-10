@@ -33,6 +33,11 @@ class PathProviderWrapper final : public PathProvider {
     return _path.getBounds();
   }
 
+  Rect getTightBounds() const override {
+    //TODO _path.computeTightBounds()
+    return _path.getBounds();
+  }
+
  private:
   Path _path;
 };

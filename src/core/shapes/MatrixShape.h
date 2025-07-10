@@ -37,6 +37,8 @@ class MatrixShape : public Shape {
 
   Rect getBounds() const override;
 
+  Rect getTightBounds() const override;
+
   Path getPath() const override;
 
   std::shared_ptr<Shape> shape = nullptr;

@@ -34,6 +34,8 @@ class MergeShape : public UniqueKeyShape {
 
   Rect getBounds() const override;
 
+  Rect getTightBounds() const override;
+
   Path getPath() const override;
 
  protected:

@@ -43,4 +43,8 @@ Path GlyphShape::getPath() const {
 Rect GlyphShape::getBounds() const {
   return font.getBounds(glyphID);
 }
+
+Rect GlyphShape::getTightBounds() const {
+  return getBounds();
+}
 }  // namespace tgfx

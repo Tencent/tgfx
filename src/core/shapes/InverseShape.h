@@ -34,6 +34,10 @@ class InverseShape : public UniqueKeyShape {
     return shape->getBounds();
   }
 
+  Rect getTightBounds() const override {
+    return shape->getTightBounds();
+  }
+
   Path getPath() const override;
 
  protected:

@@ -68,6 +68,14 @@ Rect AppendShape::getBounds() const {
   return bounds;
 }
 
+Rect AppendShape::getTightBounds() const {
+  Rect bounds = {};
+  for (const auto& shape : shapes) {
+    bounds.join(shape->getTightBounds());
+  }
+  return bounds;
+}
+
 Path AppendShape::getPath() const {
   auto firstShape = shapes.front();
   // the first path determines the fill type

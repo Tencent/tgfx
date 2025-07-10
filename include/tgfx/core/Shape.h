@@ -121,6 +121,12 @@ class Shape {
   virtual Rect getBounds() const = 0;
 
   /**
+   * Returns the tight bounding box of the Shape. In general, this method is more precise than
+   * getBounds, but it is also more computationally expensive.
+   */
+  virtual Rect getTightBounds() const = 0;
+
+  /**
    * Returns the Shape's computed path.  Note: The path is recalculated each time this method is
    * called, as it is not cached.
    */

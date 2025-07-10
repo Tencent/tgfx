@@ -36,6 +36,11 @@ Rect EffectShape::getBounds() const {
   return effect->filterBounds(bounds);
 }
 
+Rect EffectShape::getTightBounds() const {
+  auto bounds = shape->getTightBounds();
+  return effect->filterBounds(bounds);
+}
+
 Path EffectShape::getPath() const {
   auto path = shape->getPath();
   effect->filterPath(&path);

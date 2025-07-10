@@ -20,6 +20,7 @@
 
 #include "core/GlyphRunList.h"
 #include "core/shapes/UniqueKeyShape.h"
+#include "core/utils/MathExtra.h"
 
 namespace tgfx {
 /**
@@ -33,6 +34,16 @@ class TextShape : public UniqueKeyShape {
 
   Rect getBounds() const override {
     return glyphRunList->getBounds();
+  }
+
+  Rect getTightBounds() const override {
+    if (FloatNearlyZero(resolutionScale)) {
+      return glyphRunList->getBounds();
+    }
+    auto matrix = Matrix::MakeScale(resolutionScale, resolutionScale);
+    auto bounds = glyphRunList->getTightBounds(&matrix);
+    bounds.scale(1.0f / resolutionScale, 1.0f / resolutionScale);
+    return bounds;
   }
 
   Path getPath() const override;

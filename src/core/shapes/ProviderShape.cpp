@@ -30,6 +30,10 @@ Rect ProviderShape::getBounds() const {
   return provider->getBounds();
 }
 
+Rect ProviderShape::getTightBounds() const {
+  return provider->getTightBounds();
+}
+
 Path ProviderShape::getPath() const {
   return provider->getPath();
 }

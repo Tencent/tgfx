@@ -45,5 +45,11 @@ class PathProvider {
    * the exact bounds can't be determined until the path is computed.
    */
   virtual Rect getBounds() const = 0;
+
+  /**
+   * Returns the bounding box of the path. In general, this method is more precise than
+   * getBounds, but it is also more computationally expensive.
+   */
+  virtual Rect getTightBounds() const = 0;
 };
 }  // namespace tgfx

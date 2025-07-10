@@ -41,6 +41,11 @@ class PathShape : public Shape {
     return path.getBounds();
   }
 
+  Rect getTightBounds() const override {
+    //TODO path.computeTightBounds
+    return path.getBounds();
+  }
+
   Path getPath() const override {
     return path;
   }

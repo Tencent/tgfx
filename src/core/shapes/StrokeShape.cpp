@@ -65,6 +65,12 @@ Rect StrokeShape::getBounds() const {
   return bounds;
 }
 
+Rect StrokeShape::getTightBounds() const {
+  auto bounds = shape->getTightBounds();
+  ApplyStrokeToBounds(stroke, &bounds, true);
+  return bounds;
+}
+
 Path StrokeShape::getPath() const {
   auto path = shape->getPath();
   stroke.applyToPath(&path);
