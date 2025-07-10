@@ -18,11 +18,12 @@
 
 #include "platform/android/SurfaceTexture.h"
 #include <chrono>
-#include "GLExternalOESTexture.h"
 #include "HandlerThread.h"
 #include "JNIUtil.h"
 #include "core/utils/Log.h"
-#include "gpu/opengl/GLSampler.h"
+#include "gpu/ExtendedTexture.h"
+#include "gpu/opengl/GLTextureSampler.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace tgfx {
 static Global<jclass> SurfaceTextureClass;
@@ -194,64 +195,76 @@ static ISize ComputeTextureSize(float matrix[16], int width, int height) {
 }
 
 std::shared_ptr<Texture> SurfaceTexture::onMakeTexture(Context* context, bool) {
-  auto texture = makeTexture(context);
-  if (texture != nullptr) {
-    onUpdateTexture(texture, Rect::MakeWH(_width, _height));
+  auto sampler = makeTextureSampler(context);
+  if (sampler == nullptr) {
+    return nullptr;
   }
-  return texture;
+  auto textureSize = updateTexImage();
+  if (textureSize.isEmpty()) {
+    sampler->releaseGPU(context);
+    return nullptr;
+  }
+  return Resource::AddToCache(context, new ExtendedTexture(std::move(sampler), _width, _height,
+                                                           textureSize.width, textureSize.height));
 }
 
-bool SurfaceTexture::onUpdateTexture(std::shared_ptr<Texture> texture, const Rect&) {
-  std::unique_lock<std::mutex> autoLock(locker);
-  if (!frameAvailable) {
-    static const auto TIMEOUT = std::chrono::seconds(1);
-    auto status = condition.wait_for(autoLock, TIMEOUT);
-    if (status == std::cv_status::timeout) {
-      LOGE("NativeImageReader::onUpdateTexture(): timeout when waiting for the frame available!");
-      return false;
-    }
-  }
-  JNIEnvironment environment;
-  auto env = environment.current();
-  if (env == nullptr) {
-    return false;
-  }
-  frameAvailable = false;
-  env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_updateTexImage);
-  if (env->ExceptionCheck()) {
-    env->ExceptionClear();
-    LOGE("NativeImageReader::onUpdateTexture(): failed to updateTexImage!");
-    return false;
-  }
-  auto floatArray = env->NewFloatArray(16);
-  env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_getTransformMatrix, floatArray);
-  auto matrix = env->GetFloatArrayElements(floatArray, nullptr);
-  auto textureSize = ComputeTextureSize(matrix, width(), height());
-  env->ReleaseFloatArrayElements(floatArray, matrix, 0);
-  std::static_pointer_cast<GLExternalOESTexture>(texture)->updateTextureSize(textureSize.width,
-                                                                             textureSize.height);
-  return true;
+bool SurfaceTexture::onUpdateTexture(std::shared_ptr<Texture>, const Rect&) {
+  auto size = updateTexImage();
+  return !size.isEmpty();
 }
 
-std::shared_ptr<Texture> SurfaceTexture::makeTexture(Context* context) {
+std::unique_ptr<TextureSampler> SurfaceTexture::makeTextureSampler(Context* context) {
   std::lock_guard<std::mutex> autoLock(locker);
   JNIEnvironment environment;
   auto env = environment.current();
   if (env == nullptr) {
     return nullptr;
   }
-  auto texture = GLExternalOESTexture::Make(context, width(), height());
-  if (texture == nullptr) {
+  auto gl = GLFunctions::Get(context);
+  unsigned samplerID = 0;
+  gl->genTextures(1, &samplerID);
+  if (samplerID == 0) {
     return nullptr;
   }
-  auto sampler = static_cast<const GLSampler*>(texture->getSampler());
-  env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_attachToGLContext, sampler->id);
+  env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_attachToGLContext, samplerID);
   if (env->ExceptionCheck()) {
     env->ExceptionClear();
-    texture = nullptr;
+    gl->deleteTextures(1, &samplerID);
     LOGE("NativeImageReader::makeTexture(): failed to attached to a SurfaceTexture!");
     return nullptr;
   }
-  return texture;
+  return std::make_unique<GLTextureSampler>(samplerID, GL_TEXTURE_EXTERNAL_OES,
+                                            PixelFormat::RGBA_8888);
 }
+
+ISize SurfaceTexture::updateTexImage() {
+  std::unique_lock<std::mutex> autoLock(locker);
+  if (!frameAvailable) {
+    static const auto TIMEOUT = std::chrono::seconds(1);
+    auto status = condition.wait_for(autoLock, TIMEOUT);
+    if (status == std::cv_status::timeout) {
+      LOGE("NativeImageReader::onUpdateTexture(): timeout when waiting for the frame available!");
+      return {};
+    }
+  }
+  JNIEnvironment environment;
+  auto env = environment.current();
+  if (env == nullptr) {
+    return {};
+  }
+  frameAvailable = false;
+  env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_updateTexImage);
+  if (env->ExceptionCheck()) {
+    env->ExceptionClear();
+    LOGE("NativeImageReader::onUpdateTexture(): failed to updateTexImage!");
+    return {};
+  }
+  auto floatArray = env->NewFloatArray(16);
+  env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_getTransformMatrix, floatArray);
+  auto matrix = env->GetFloatArrayElements(floatArray, nullptr);
+  auto textureSize = ComputeTextureSize(matrix, width(), height());
+  env->ReleaseFloatArrayElements(floatArray, matrix, 0);
+  return textureSize;
+}
+
 }  // namespace tgfx

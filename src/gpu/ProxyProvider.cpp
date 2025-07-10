@@ -22,7 +22,6 @@
 #include "core/utils/USE.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/DrawingManager.h"
-#include "gpu/PlainTexture.h"
 #include "gpu/proxies/DefaultTextureProxy.h"
 #include "gpu/proxies/FlattenTextureProxy.h"
 #include "gpu/proxies/TextureRenderTargetProxy.h"
@@ -303,7 +302,7 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(const UniqueKey&
   if (proxy != nullptr) {
     return proxy;
   }
-  if (!PlainTexture::CheckSizeAndFormat(context, width, height, format)) {
+  if (!Texture::CheckSizeAndFormat(context, width, height, format)) {
     return nullptr;
   }
   auto proxyKey = GetProxyKey(uniqueKey, renderFlags);
@@ -331,12 +330,7 @@ std::shared_ptr<TextureProxy> ProxyProvider::flattenTextureProxy(
 
 std::shared_ptr<TextureProxy> ProxyProvider::wrapBackendTexture(
     const BackendTexture& backendTexture, ImageOrigin origin, bool adopted) {
-  std::shared_ptr<Texture> texture = nullptr;
-  if (adopted) {
-    texture = Texture::MakeAdopted(context, backendTexture, origin);
-  } else {
-    texture = Texture::MakeFrom(context, backendTexture, origin);
-  }
+  auto texture = Texture::MakeFrom(context, backendTexture, origin, adopted);
   if (texture == nullptr) {
     return nullptr;
   }

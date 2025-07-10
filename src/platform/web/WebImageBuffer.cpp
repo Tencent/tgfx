@@ -18,7 +18,7 @@
 
 #include "WebImageBuffer.h"
 #include "gpu/Texture.h"
-#include "gpu/opengl/GLSampler.h"
+#include "gpu/opengl/GLTextureSampler.h"
 #include "tgfx/core/ImageCodec.h"
 
 using namespace emscripten;
@@ -60,9 +60,9 @@ std::shared_ptr<Texture> WebImageBuffer::onMakeTexture(Context* context, bool) c
   if (texture == nullptr) {
     return nullptr;
   }
-  auto glInfo = static_cast<const GLSampler*>(texture->getSampler());
+  auto glInfo = static_cast<const GLTextureSampler*>(texture->getSampler());
   val::module_property("tgfx").call<void>("uploadToTexture", emscripten::val::module_property("GL"),
-                                          getImage(), glInfo->id, false);
+                                          getImage(), glInfo->id(), false);
   return texture;
 }
 

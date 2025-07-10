@@ -20,7 +20,7 @@
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/TextureSampler.h"
 #include "gpu/opengl/GLContext.h"
-#include "gpu/opengl/GLSampler.h"
+#include "gpu/opengl/GLTextureSampler.h"
 #include "gpu/opengl/GLUtil.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Pixmap.h"
@@ -120,7 +120,7 @@ static bool CreateRenderBuffer(const Texture* texture, unsigned& frameBufferID,
     return false;
   }
   gl->bindRenderbuffer(GL_RENDERBUFFER, renderBufferID);
-  if (!RenderbufferStorageMSAA(texture->getContext(), sampleCount, texture->getSampler()->format,
+  if (!RenderbufferStorageMSAA(texture->getContext(), sampleCount, texture->getSampler()->format(),
                                texture->width(), texture->height())) {
     return false;
   }
@@ -140,8 +140,8 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(const Texture* texture, int
   }
   auto context = texture->getContext();
   auto caps = GLCaps::Get(context);
-  auto glSampler = static_cast<const GLSampler*>(texture->getSampler());
-  if (!caps->isFormatRenderable(glSampler->format)) {
+  auto glSampler = static_cast<const GLTextureSampler*>(texture->getSampler());
+  if (!caps->isFormatRenderable(glSampler->format())) {
     return nullptr;
   }
   auto gl = GLFunctions::Get(context);
@@ -161,7 +161,7 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(const Texture* texture, int
     frameBufferDraw = frameBufferRead;
   }
   gl->bindFramebuffer(GL_FRAMEBUFFER, frameBufferRead);
-  FrameBufferTexture2D(context, glSampler->target, glSampler->id, sampleCount);
+  FrameBufferTexture2D(context, glSampler->target(), glSampler->id(), sampleCount);
 #ifndef TGFX_BUILD_FOR_WEB
   if (gl->checkFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
     ReleaseResource(context, frameBufferRead, frameBufferDraw, renderBufferId);
@@ -169,7 +169,7 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(const Texture* texture, int
   }
 #endif
   auto rt = new GLRenderTarget(texture->width(), texture->height(), texture->origin(), sampleCount,
-                               glSampler->format, glSampler->target);
+                               glSampler->format(), glSampler->target());
   rt->frameBufferRead = frameBufferRead;
   rt->frameBufferDraw = frameBufferDraw;
   rt->renderBufferID = renderBufferId;

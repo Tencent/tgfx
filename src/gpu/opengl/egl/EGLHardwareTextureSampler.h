@@ -22,38 +22,27 @@
 
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
-#include "gpu/Texture.h"
-#include "tgfx/platform/HardwareBuffer.h"
+#include "gpu/opengl/GLTextureSampler.h"
 
 namespace tgfx {
-class EGLHardwareTexture : public Texture {
+class EGLHardwareTextureSampler : public GLTextureSampler {
  public:
-  static std::shared_ptr<EGLHardwareTexture> MakeFrom(Context* context,
-                                                      HardwareBufferRef hardwareBuffer);
-
-  size_t memoryUsage() const override;
-
-  const TextureSampler* getSampler() const override {
-    return sampler.get();
-  }
+  static std::unique_ptr<EGLHardwareTextureSampler> MakeFrom(Context* context,
+                                                             HardwareBufferRef hardwareBuffer);
+  ~EGLHardwareTextureSampler() override;
 
   HardwareBufferRef getHardwareBuffer() const override {
     return hardwareBuffer;
   }
 
- protected:
-  void onReleaseGPU() override;
+  void releaseGPU(Context* context) override;
 
  private:
-  std::unique_ptr<TextureSampler> sampler = {};
   HardwareBufferRef hardwareBuffer = nullptr;
   EGLImageKHR eglImage = EGL_NO_IMAGE_KHR;
 
-  static ScratchKey ComputeScratchKey(void* hardwareBuffer);
-
-  EGLHardwareTexture(HardwareBufferRef hardwareBuffer, EGLImageKHR eglImage, int width, int height);
-
-  ~EGLHardwareTexture() override;
+  EGLHardwareTextureSampler(HardwareBufferRef hardwareBuffer, EGLImageKHR eglImage, unsigned id,
+                            unsigned target, PixelFormat format);
 };
 }  // namespace tgfx
 
