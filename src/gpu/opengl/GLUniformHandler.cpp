@@ -35,10 +35,10 @@ SamplerHandle GLUniformHandler::internalAddSampler(const TextureSampler* sampler
                                                    const std::string& name) {
   auto mangledName = programBuilder->nameVariable(name);
   auto caps = GLCaps::Get(programBuilder->getContext());
-  const auto& swizzle = caps->getReadSwizzle(sampler->format);
+  const auto& swizzle = caps->getReadSwizzle(sampler->format());
 
   SLType type;
-  switch (static_cast<const GLSampler*>(sampler)->target) {
+  switch (static_cast<const GLTextureSampler*>(sampler)->target()) {
     case GL_TEXTURE_EXTERNAL_OES:
       programBuilder->fragmentShaderBuilder()->addFeature(PrivateFeature::OESTexture,
                                                           "GL_OES_EGL_image_external");

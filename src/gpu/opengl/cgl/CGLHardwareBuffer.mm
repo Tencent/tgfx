@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "CGLHardwareTexture.h"
+#include "CGLHardwareTextureSampler.h"
 #include "tgfx/gpu/opengl/cgl/CGLDevice.h"
 
 namespace tgfx {
@@ -24,7 +24,7 @@ bool HardwareBufferAvailable() {
   return true;
 }
 
-PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
+PixelFormat TextureSampler::GetRenderableFormat(HardwareBufferRef hardwareBuffer) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return PixelFormat::Unknown;
   }
@@ -39,16 +39,21 @@ PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
   }
 }
 
-std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
-                                           YUVColorSpace) {
+std::vector<std::unique_ptr<TextureSampler>> TextureSampler::MakeFrom(
+    Context* context, HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
-    return nullptr;
+    return {};
   }
-  auto cglDevice = static_cast<CGLDevice*>(context->device());
-  if (cglDevice == nullptr) {
-    return nullptr;
+  auto textureCache = static_cast<CGLDevice*>(context->device())->getTextureCache();
+  auto sampler = CGLHardwareTextureSampler::MakeFrom(hardwareBuffer, textureCache);
+  if (sampler == nullptr) {
+    return {};
   }
-  auto textureCache = cglDevice->getTextureCache();
-  return CGLHardwareTexture::MakeFrom(context, hardwareBuffer, textureCache);
+  if (yuvFormat != nullptr) {
+    *yuvFormat = YUVFormat::Unknown;
+  }
+  std::vector<std::unique_ptr<TextureSampler>> samplers = {};
+  samplers.push_back(std::move(sampler));
+  return samplers;
 }
 }  // namespace tgfx

@@ -18,12 +18,8 @@
 
 #pragma once
 
-#include <array>
 #include <string>
 #include "gpu/opengl/GLContext.h"
-#include "gpu/opengl/GLSampler.h"
-#include "tgfx/core/Matrix.h"
-#include "tgfx/gpu/ImageOrigin.h"
 
 namespace tgfx {
 struct GLVersion {

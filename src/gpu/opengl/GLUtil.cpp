@@ -36,6 +36,8 @@ PixelFormat GLSizeFormatToPixelFormat(unsigned sizeFormat) {
     case GL_RG8:
     case GL_RG:
       return PixelFormat::RG_88;
+    default:
+      break;
   }
   return PixelFormat::RGBA_8888;
 }

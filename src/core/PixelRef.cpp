@@ -71,14 +71,16 @@ std::shared_ptr<Texture> PixelRef::onMakeTexture(Context* context, bool mipmappe
 }
 
 bool PixelRef::onUpdateTexture(std::shared_ptr<Texture> texture, const Rect& bounds) {
-  auto gpu = texture->getContext()->gpu();
   auto pixels = lockPixels();
   if (pixels == nullptr) {
     return false;
   }
   pixels =
       info().computeOffset(pixels, static_cast<int>(bounds.left), static_cast<int>(bounds.top));
-  gpu->writePixels(texture->getSampler(), bounds, pixels, info().rowBytes());
+  auto context = texture->getContext();
+  auto sampler = texture->getSampler();
+  sampler->writePixels(context, bounds, pixels, info().rowBytes());
+  sampler->regenerateMipmapLevels(context);
   unlockPixels();
   return true;
 }

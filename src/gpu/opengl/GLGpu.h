@@ -26,22 +26,12 @@ class GLGpu : public Gpu {
  public:
   static std::unique_ptr<Gpu> Make(Context* context);
 
-  std::unique_ptr<TextureSampler> createSampler(int width, int height, PixelFormat format,
-                                                int mipLevelCount) override;
-
-  void deleteSampler(TextureSampler* sampler) override;
-
-  void writePixels(const TextureSampler* sampler, Rect rect, const void* pixels,
-                   size_t rowBytes) override;
-
   void bindTexture(int unitIndex, const TextureSampler* sampler, SamplerState samplerState = {});
 
   void copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture* texture, int srcX,
                                  int srcY) override;
 
   void resolveRenderTarget(RenderTarget* renderTarget, const Rect& bounds) override;
-
-  void regenerateMipmapLevels(const TextureSampler* sampler) override;
 
   bool insertSemaphore(Semaphore* semaphore) override;
 

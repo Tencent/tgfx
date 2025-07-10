@@ -18,38 +18,28 @@
 
 #pragma once
 
-#import <UIKit/UIKit.h>
-#include "gpu/Texture.h"
-#include "gpu/TextureSampler.h"
+#include <CoreVideo/CoreVideo.h>
+#include "gpu/opengl/GLTextureSampler.h"
 
 namespace tgfx {
-class EAGLHardwareTexture : public Texture {
+class EAGLHardwareTextureSampler : public GLTextureSampler {
  public:
-  static std::shared_ptr<EAGLHardwareTexture> MakeFrom(Context* context,
-                                                       CVPixelBufferRef pixelBuffer);
+  static std::vector<std::unique_ptr<TextureSampler>> MakeFrom(Context* context,
+                                                               CVPixelBufferRef pixelBuffer);
 
-  explicit EAGLHardwareTexture(CVPixelBufferRef pixelBuffer);
+  explicit EAGLHardwareTextureSampler(CVPixelBufferRef pixelBuffer, CVOpenGLESTextureRef texture,
+                                      unsigned id, unsigned target, PixelFormat format);
 
-  ~EAGLHardwareTexture() override;
-
-  size_t memoryUsage() const override;
-
-  const TextureSampler* getSampler() const override {
-    return sampler.get();
-  }
+  ~EAGLHardwareTextureSampler() override;
 
   HardwareBufferRef getHardwareBuffer() const override {
     return pixelBuffer;
   }
 
- protected:
-  void onReleaseGPU() override;
+  void releaseGPU(Context* context) override;
 
  private:
-  std::unique_ptr<TextureSampler> sampler = {};
   CVPixelBufferRef pixelBuffer = nullptr;
   CVOpenGLESTextureRef texture = nil;
-
-  static ScratchKey ComputeScratchKey(CVPixelBufferRef pixelBuffer);
 };
 }  // namespace tgfx
