@@ -16,20 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/Texture.h"
-#include "tgfx/platform/HardwareBuffer.h"
+#pragma once
 
 namespace tgfx {
-bool HardwareBufferAvailable() {
-  return false;
-}
-
-PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef) {
-  return PixelFormat::Unknown;
-}
-
-std::shared_ptr<Texture> Texture::MakeFrom(Context*, HardwareBufferRef, YUVColorSpace) {
-  return nullptr;
-}
-
+/**
+ * Defines pixel formats for YUV textures.
+ */
+enum class YUVFormat {
+  /**
+   * uninitialized.
+   */
+  Unknown,
+  /**
+   * 8-bit Y plane followed by 8 bit 2x2 subsampled U and V planes.
+   */
+  I420,
+  /**
+   * 8-bit Y plane followed by an interleaved U/V plane with 2x2 subsampling.
+   */
+  NV12
+};
 }  // namespace tgfx

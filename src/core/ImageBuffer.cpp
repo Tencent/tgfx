@@ -69,7 +69,7 @@ class PixelData : public ImageBuffer {
  */
 class YUVBuffer : public ImageBuffer {
  public:
-  YUVBuffer(std::shared_ptr<YUVData> data, YUVPixelFormat format, YUVColorSpace colorSpace)
+  YUVBuffer(std::shared_ptr<YUVData> data, YUVFormat format, YUVColorSpace colorSpace)
       : data(std::move(data)), colorSpace(colorSpace), format(format) {
   }
 
@@ -87,7 +87,7 @@ class YUVBuffer : public ImageBuffer {
 
  protected:
   std::shared_ptr<Texture> onMakeTexture(Context* context, bool) const override {
-    if (format == YUVPixelFormat::NV12) {
+    if (format == YUVFormat::NV12) {
       return YUVTexture::MakeNV12(context, data.get(), colorSpace);
     }
     return YUVTexture::MakeI420(context, data.get(), colorSpace);
@@ -96,7 +96,7 @@ class YUVBuffer : public ImageBuffer {
  private:
   std::shared_ptr<YUVData> data = nullptr;
   YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED;
-  YUVPixelFormat format = YUVPixelFormat::I420;
+  YUVFormat format = YUVFormat::Unknown;
 };
 
 std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(const ImageInfo& info,
@@ -120,7 +120,7 @@ std::shared_ptr<ImageBuffer> ImageBuffer::MakeI420(std::shared_ptr<YUVData> yuvD
   if (yuvData == nullptr || yuvData->planeCount() != YUVData::I420_PLANE_COUNT) {
     return nullptr;
   }
-  return std::make_shared<YUVBuffer>(std::move(yuvData), YUVPixelFormat::I420, colorSpace);
+  return std::make_shared<YUVBuffer>(std::move(yuvData), YUVFormat::I420, colorSpace);
 }
 
 std::shared_ptr<ImageBuffer> ImageBuffer::MakeNV12(std::shared_ptr<YUVData> yuvData,
@@ -128,6 +128,6 @@ std::shared_ptr<ImageBuffer> ImageBuffer::MakeNV12(std::shared_ptr<YUVData> yuvD
   if (yuvData == nullptr || yuvData->planeCount() != YUVData::NV12_PLANE_COUNT) {
     return nullptr;
   }
-  return std::make_shared<YUVBuffer>(std::move(yuvData), YUVPixelFormat::NV12, colorSpace);
+  return std::make_shared<YUVBuffer>(std::move(yuvData), YUVFormat::NV12, colorSpace);
 }
 }  // namespace tgfx

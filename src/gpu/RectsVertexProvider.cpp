@@ -62,9 +62,12 @@ class AARectsVertexProvider : public RectsVertexProvider {
       auto insetQuad = Quad::MakeFrom(insetBounds, &viewMatrix);
       auto outsetBounds = rect.makeOutset(padding, padding);
       auto outsetQuad = Quad::MakeFrom(outsetBounds, &viewMatrix);
-      auto uvInsetQuad = Quad::MakeFrom(insetBounds);
-      auto uvOutsetQuad = Quad::MakeFrom(outsetBounds);
-      const Rect& subset = needSubset ? getSubset(rect) : rect;
+
+      auto insetUV = record->uvRect.makeInset(padding, padding);
+      auto outsetUV = record->uvRect.makeOutset(padding, padding);
+      auto uvInsetQuad = Quad::MakeFrom(insetUV);
+      auto uvOutsetQuad = Quad::MakeFrom(outsetUV);
+      const Rect& subset = needSubset ? getSubset(record->uvRect) : record->uvRect;
       for (int j = 0; j < 2; ++j) {
         auto& quad = j == 0 ? insetQuad : outsetQuad;
         auto& uvQuad = j == 0 ? uvInsetQuad : uvOutsetQuad;
@@ -119,8 +122,8 @@ class NonAARectVertexProvider : public RectsVertexProvider {
       auto& viewMatrix = record->viewMatrix;
       auto& rect = record->rect;
       auto quad = Quad::MakeFrom(rect, &viewMatrix);
-      auto uvQuad = Quad::MakeFrom(rect);
-      const auto& subset = needSubset ? getSubset(rect) : rect;
+      auto uvQuad = Quad::MakeFrom(record->uvRect);
+      const auto& subset = needSubset ? getSubset(record->uvRect) : record->uvRect;
       for (size_t j = 4; j >= 1; --j) {
         vertices[index++] = quad.point(j - 1).x;
         vertices[index++] = quad.point(j - 1).y;

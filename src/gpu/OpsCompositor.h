@@ -47,10 +47,17 @@ class OpsCompositor {
   OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags);
 
   /**
-   * Fills the given rect with the image, sampling options, state and fill.
+   * Fills the given image with the given sampling options, state and fill.
    */
-  void fillImage(std::shared_ptr<Image> image, const Rect& rect, const SamplingOptions& sampling,
-                 const MCState& state, const Fill& fill, SrcRectConstraint constraint);
+  void fillImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
+                 const MCState& state, const Fill& fill);
+  /**
+   * Fills the given rect with the image, using the given source rect, destination rect, sampling
+   * options, state and fill.
+   */
+  void fillImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
+                     const SamplingOptions& sampling, const MCState& state, const Fill& fill,
+                     SrcRectConstraint constraint);
 
   /**
    * Fills the given rect with the given state and fill.

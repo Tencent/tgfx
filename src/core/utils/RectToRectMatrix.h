@@ -16,20 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/Texture.h"
-#include "tgfx/platform/HardwareBuffer.h"
+#pragma once
+
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
-bool HardwareBufferAvailable() {
-  return false;
-}
 
-PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef) {
-  return PixelFormat::Unknown;
-}
-
-std::shared_ptr<Texture> Texture::MakeFrom(Context*, HardwareBufferRef, YUVColorSpace) {
-  return nullptr;
-}
+/**
+ * Creates a 3x2 matrix that maps the source rectangle to the destination rectangle.
+ */
+Matrix MakeRectToRectMatrix(const Rect& srcRect, const Rect& dstRect);
 
 }  // namespace tgfx

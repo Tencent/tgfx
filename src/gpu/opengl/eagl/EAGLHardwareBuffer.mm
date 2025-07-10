@@ -31,6 +31,21 @@ bool HardwareBufferAvailable() {
 #endif
 }
 
+PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
+  if (!HardwareBufferCheck(hardwareBuffer)) {
+    return PixelFormat::Unknown;
+  }
+  auto pixelFormat = CVPixelBufferGetPixelFormatType(hardwareBuffer);
+  switch (pixelFormat) {
+    case kCVPixelFormatType_OneComponent8:
+      return PixelFormat::ALPHA_8;
+    case kCVPixelFormatType_32BGRA:
+      return PixelFormat::BGRA_8888;
+    default:
+      return PixelFormat::Unknown;
+  }
+}
+
 std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
                                            YUVColorSpace colorSpace) {
   if (!HardwareBufferCheck(hardwareBuffer)) {

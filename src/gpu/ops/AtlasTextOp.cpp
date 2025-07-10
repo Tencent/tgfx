@@ -25,6 +25,7 @@
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
+
 PlacementPtr<AtlasTextOp> AtlasTextOp::Make(Context* context,
                                             PlacementPtr<RectsVertexProvider> provider,
                                             uint32_t renderFlags,
@@ -90,5 +91,9 @@ void AtlasTextOp::execute(RenderPass* renderPass) {
   } else {
     renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
   }
+}
+
+bool AtlasTextOp::hasCoverage() const {
+  return true;
 }
 }  // namespace tgfx

@@ -46,11 +46,11 @@ void* HardwareBufferLock(HardwareBufferRef) {
 void HardwareBufferUnlock(HardwareBufferRef) {
 }
 
-ImageInfo HardwareBufferGetInfo(HardwareBufferRef) {
+ISize HardwareBufferGetSize(HardwareBufferRef) {
   return {};
 }
 
-PixelFormat HardwareBufferGetPixelFormat(HardwareBufferRef) {
-  return PixelFormat::Unknown;
+ImageInfo HardwareBufferGetInfo(HardwareBufferRef) {
+  return {};
 }
 }  // namespace tgfx

@@ -94,10 +94,22 @@ void GLQuadPerEdgeAAGeometryProcessor::onEmitTransform(
       subsetMatrixName =
           uniformHandler->addUniform(ShaderFlags::Vertex, SLType::Float3x3, "texSubsetMatrix");
     }
-    vertexBuilder->codeAppendf("%s.xy = (vec3(%s.xy, 1) * %s).xy;", varying.vsOut().c_str(),
-                               subset.name().c_str(), subsetMatrixName.c_str());
-    vertexBuilder->codeAppendf("%s.zw = (vec3(%s.zw, 1) * %s).xy;", varying.vsOut().c_str(),
-                               subset.name().c_str(), subsetMatrixName.c_str());
+    vertexBuilder->codeAppend("highp vec4 subset;");
+    vertexBuilder->codeAppendf("subset.xy = (%s * vec3(%s.xy, 1)).xy;", subsetMatrixName.c_str(),
+                               subset.name().c_str());
+    vertexBuilder->codeAppendf("subset.zw = (%s * vec3(%s.zw, 1)).xy;", subsetMatrixName.c_str(),
+                               subset.name().c_str());
+    vertexBuilder->codeAppendf("if (subset.x > subset.z) {");
+    vertexBuilder->codeAppendf("  highp float tmp = subset.x;");
+    vertexBuilder->codeAppendf("  subset.x = subset.z;");
+    vertexBuilder->codeAppendf("  subset.z = tmp;");
+    vertexBuilder->codeAppendf("}");
+    vertexBuilder->codeAppendf("if (subset.y > subset.w) {");
+    vertexBuilder->codeAppendf("  highp float tmp = subset.y;");
+    vertexBuilder->codeAppendf("  subset.y = subset.w;");
+    vertexBuilder->codeAppendf("  subset.w = tmp;");
+    vertexBuilder->codeAppendf("}");
+    vertexBuilder->codeAppendf("%s = subset;", varying.vsOut().c_str());
     *args.outputSubset = varying.fsIn();
   }
 }

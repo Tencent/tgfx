@@ -69,7 +69,7 @@ std::shared_ptr<Texture> Texture::MakeI420(Context* context, const YUVData* yuvD
     return nullptr;
   }
   auto yuvTexture =
-      new YUVTexture(yuvData->width(), yuvData->height(), YUVPixelFormat::I420, colorSpace);
+      new YUVTexture(yuvData->width(), yuvData->height(), YUVFormat::I420, colorSpace);
   yuvTexture->samplers = std::move(texturePlanes);
   auto texture = std::static_pointer_cast<YUVTexture>(Resource::AddToCache(context, yuvTexture));
   SubmitYUVTexture(context, yuvData, &texture->samplers);
@@ -88,16 +88,15 @@ std::shared_ptr<Texture> Texture::MakeNV12(Context* context, const YUVData* yuvD
     return nullptr;
   }
   auto yuvTexture =
-      new YUVTexture(yuvData->width(), yuvData->height(), YUVPixelFormat::NV12, colorSpace);
+      new YUVTexture(yuvData->width(), yuvData->height(), YUVFormat::NV12, colorSpace);
   yuvTexture->samplers = std::move(texturePlanes);
   auto texture = std::static_pointer_cast<YUVTexture>(Resource::AddToCache(context, yuvTexture));
   SubmitYUVTexture(context, yuvData, &texture->samplers);
   return texture;
 }
 
-YUVTexture::YUVTexture(int width, int height, YUVPixelFormat pixelFormat, YUVColorSpace colorSpace)
-    : Texture(width, height, ImageOrigin::TopLeft), _pixelFormat(pixelFormat),
-      _colorSpace(colorSpace) {
+YUVTexture::YUVTexture(int width, int height, YUVFormat yuvFormat, YUVColorSpace colorSpace)
+    : Texture(width, height, ImageOrigin::TopLeft), _yuvFormat(yuvFormat), _colorSpace(colorSpace) {
 }
 
 Point YUVTexture::getTextureCoord(float x, float y) const {

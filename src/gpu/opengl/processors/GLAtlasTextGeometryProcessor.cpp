@@ -74,10 +74,11 @@ void GLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->appendTextureLookup(samplerHandle, samplerVarying.vsOut());
   fragBuilder->codeAppend(";");
   if (texture->isAlphaOnly()) {
-    fragBuilder->codeAppendf("%s = color.a * %s;", args.outputColor.c_str(),
-                             args.outputColor.c_str());
+    fragBuilder->codeAppendf("%s = vec4(color.a);", args.outputCoverage.c_str());
   } else {
-    fragBuilder->codeAppendf("%s = color;", args.outputColor.c_str());
+    fragBuilder->codeAppendf("%s = clamp(vec4(color.rgb/color.a, 1.0), 0.0, 1.0);",
+                             args.outputColor.c_str());
+    fragBuilder->codeAppendf("%s = vec4(color.a);", args.outputCoverage.c_str());
   }
 
   // Emit the vertex position to the hardware in the normalized window coordinates it expects.
