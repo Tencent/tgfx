@@ -32,7 +32,7 @@ TGFXView::TGFXView(QQuickItem* parent) : QQuickItem(parent) {
   setAcceptHoverEvents(true);
   setAcceptTouchEvents(true);
   setFocus(true);
-  initializeAppHost();
+  createAppHost();
 }
 
 void TGFXView::updateTransform(qreal zoomLevel, QPointF panOffset) {
@@ -69,7 +69,7 @@ QSGNode* TGFXView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
   if (sizeChanged) {
     tgfxWindow->invalidSize();
   }
-  renderFrame();
+  draw();
   auto node = static_cast<QSGImageNode*>(oldNode);
   auto texture = tgfxWindow->getQSGTexture();
   if (texture) {
@@ -90,7 +90,7 @@ void TGFXView::onSceneGraphInvalidated() {
   tgfxWindow = nullptr;
 }
 
-void TGFXView::initializeAppHost() {
+void TGFXView::createAppHost() {
   appHost = std::make_unique<drawers::AppHost>();
   auto rootPath = QApplication::applicationDirPath();
   rootPath = QFileInfo(rootPath + "/../../").absolutePath();
@@ -116,7 +116,7 @@ void TGFXView::initializeAppHost() {
   appHost->addTypeface("emoji", emojiTypeface);
 }
 
-void TGFXView::renderFrame() {
+void TGFXView::draw() {
   auto device = tgfxWindow->getDevice();
   if (device == nullptr) {
     return;

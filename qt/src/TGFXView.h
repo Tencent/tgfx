@@ -44,8 +44,8 @@ class TGFXView : public QQuickItem {
   float zoom = 1.0f;
   QPointF offset = {0, 0};
 
-  void initializeAppHost();
-  void renderFrame();
+  void createAppHost();
+  void draw();
 
  private Q_SLOTS:
   void onSceneGraphInvalidated();
