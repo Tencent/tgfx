@@ -1207,8 +1207,9 @@ SINT std::enable_if_t<std::is_unsigned_v<T>, Vec<N, T>> SaturatedAdd(const Vec<N
 class ScaledDividerU32 {
  public:
   explicit ScaledDividerU32(uint32_t divisor)
-      : fDivisorFactor{(uint32_t)(std::round((1.0 / divisor) * (1ull << 32)))},
-        fHalf{(divisor + 1) >> 1} {
+      : fDivisorFactor{(uint32_t)(std::round((1.0 / divisor) * (1ull << 32)))}, fHalf{
+                                                                                    (divisor + 1) >>
+                                                                                    1} {
     assert(divisor > 1);
   }
 
