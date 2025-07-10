@@ -95,6 +95,7 @@ class ListenSocket {
 
  private:
   int sock;
+  uint16_t listenPort;
 };
 
 class UdpBroadcast {

@@ -20,6 +20,7 @@
 #include <thread>
 #include <cstring>
 #include "ProcessUtils.h"
+#include "TimeUtils.h"
 #include "Protocol.h"
 
 namespace inspector {
@@ -31,8 +32,8 @@ static const char* addr = "255.255.255.255";
 static uint16_t broadcastPort = 8086;
 #endif
 
-void LayerProfiler::InitLayerProfiler() {
-  LayerProfilerInstance = std::make_shared<LayerProfiler>();
+void LayerProfiler::Make() {
+  LayerProfilerInstance = std::shared_ptr<LayerProfiler>(new LayerProfiler());
 }
 void LayerProfiler::SendLayerData(const std::vector<uint8_t>& data) {
   LayerProfilerInstance->setData(data);
@@ -42,17 +43,15 @@ void LayerProfiler::SetLayerCallBack(std::function<void(const std::vector<uint8_
 }
 
 LayerProfiler::LayerProfiler(){
-#ifdef __EMSCRIPTEN__
-#else
+#ifndef __EMSCRIPTEN__
   listenSocket = std::make_shared<ListenSocket>();
-  portProvider = std::make_shared<TCPPortProvider>();
   for (uint16_t i = 0; i < broadcastNum; i++) {
     broadcasts[i] = std::make_shared<UdpBroadcast>();
     isUDPOpened = isUDPOpened && broadcasts[i]->Open(addr, broadcastPort + i);
   }
 
 #endif
-  epoch = GetCurrentTimeInSeconds();
+  epoch = GetCurrentTime<std::chrono::seconds>();
   spawnWorkTread();
 }
 
@@ -67,14 +66,13 @@ LayerProfiler::~LayerProfiler() {
 }
 
 void LayerProfiler::sendWork() {
-#ifdef __EMSCRIPTEN__
-#else
+#ifndef __EMSCRIPTEN__
   if (!isUDPOpened) {
     return;
   }
   const auto procname = GetProcessName();
   const auto pnsz = std::min<size_t>(strlen(procname), WelcomeMessageProgramNameSize - 1);
-  uint16_t port = portProvider->getValidPort();
+  uint16_t port = TCPPortProvider::GetTCPPortProvider().getValidPort();
   if (!listenSocket->Listen(port, 4)) {
     return;
   }
@@ -89,7 +87,7 @@ void LayerProfiler::sendWork() {
         lastBroadcast = t;
         for (uint16_t i = 0; i < broadcastNum; i++) {
           if (broadcasts[i]) {
-            const auto ts = GetCurrentTimeInSeconds();
+            const auto ts = GetCurrentTime<std::chrono::seconds>();
             broadcastMsg.activeTime = static_cast<int32_t>(ts - epoch);
             broadcasts[i]->Send(broadcastPort + i, &broadcastMsg, broadcastLen);
           }
@@ -120,8 +118,7 @@ void LayerProfiler::sendWork() {
 }
 
 void LayerProfiler::recvWork() {
-#ifdef __EMSCRIPTEN__
-#else
+#ifndef __EMSCRIPTEN__
   while (!stopFlag.load(std::memory_order_acquire)) {
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
     if (socket && socket->HasData()) {

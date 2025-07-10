@@ -83,10 +83,4 @@ BroadcastMessage GetBroadcastMessage(const char* procname, size_t pnsz, size_t& 
   return msg;
 }
 
-int64_t GetCurrentTimeInSeconds() {
-  return std::chrono::duration_cast<std::chrono::seconds>(
-                                std::chrono::system_clock::now().time_since_epoch())
-                                .count();
-}
-
 }  // namespace inspector

@@ -44,11 +44,12 @@
 
 #include <cassert>
 #include <cinttypes>
-#include <cstring>
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 #include "ProcessUtils.h"
 #include "Socket.h"
+#include "TCPPortProvider.h"
 
 #ifndef MSG_NOSIGNAL
 #  define MSG_NOSIGNAL 0
@@ -424,7 +425,7 @@ bool Socket::IsValid() const {
   return this->sock.load(std::memory_order_relaxed) >= 0;
 }
 
-ListenSocket::ListenSocket() : sock(-1) {
+ListenSocket::ListenSocket() : sock(-1), listenPort(0) {
 #ifdef _WIN32
   // InitWinSock();
 #endif
@@ -434,6 +435,7 @@ ListenSocket::~ListenSocket() {
   if (this->sock != -1) {
     Close();
   }
+  TCPPortProvider::GetTCPPortProvider().clearUsedPort(listenPort);
 }
 
 static int AddrinfoAndSocketForFamily(uint16_t port, int ai_family, struct addrinfo** res) {
@@ -456,7 +458,7 @@ static int AddrinfoAndSocketForFamily(uint16_t port, int ai_family, struct addri
 
 bool ListenSocket::Listen(uint16_t port, int backlog) {
   assert(this->sock == -1);
-
+  listenPort = port;
   struct addrinfo* res = nullptr;
   this->sock = AddrinfoAndSocketForFamily(port, AF_INET6, &res);
   if (this->sock == -1) {

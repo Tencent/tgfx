@@ -27,28 +27,26 @@
 namespace inspector {
 class LayerProfiler {
  public:
-  static void InitLayerProfiler();
+  static void Make();
   static void SendLayerData(const std::vector<uint8_t>& data);
   static void SetLayerCallBack(std::function<void(const std::vector<uint8_t>&)> callback);
-  LayerProfiler();
   ~LayerProfiler();
   void setData(const std::vector<uint8_t>& data);
   void setCallBack(std::function<void(const std::vector<uint8_t>&)> callback);
 
  private:
+  LayerProfiler();
   void sendWork();
   void recvWork();
   void spawnWorkTread();
 
  private:
-#ifdef __EMSCRIPTEN__
-#else
+#ifndef __EMSCRIPTEN__
   std::shared_ptr<ListenSocket> listenSocket = nullptr;
   std::shared_ptr<Socket> socket = nullptr;
   std::queue<std::vector<uint8_t>> messages;
   std::array<std::shared_ptr<UdpBroadcast>, broadcastNum> broadcasts = {};
   bool isUDPOpened = true;
-  std::shared_ptr<TCPPortProvider> portProvider = nullptr;
 #endif
   int64_t epoch = 0;
   moodycamel::ConcurrentQueue<std::vector<uint8_t>> queue;

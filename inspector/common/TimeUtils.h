@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -15,25 +15,15 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+
 #pragma once
 #include <cstdint>
-#include <set>
+#include <chrono>
 namespace inspector {
-class TCPPortProvider {
-public:
-  static TCPPortProvider& GetTCPPortProvider() {
-    static TCPPortProvider instance;
-    return instance;
-  }
-  TCPPortProvider(const TCPPortProvider& provider) = delete;
-  TCPPortProvider(TCPPortProvider&& provider) = delete;
-  TCPPortProvider& operator=(const TCPPortProvider& provider) = delete;
-  TCPPortProvider& operator=(TCPPortProvider&& provider) = delete;
-  uint16_t getValidPort();
-  bool clearUsedPort(uint16_t port);
-private:
-  TCPPortProvider() = default;
-  std::set<uint16_t> usedPortSet = {};
-};
+template<typename T>
+int64_t GetCurrentTime() {
+  return std::chrono::duration_cast<T>(
+                              std::chrono::system_clock::now().time_since_epoch())
+                              .count();
 }
-
+}  // namespace tgfx

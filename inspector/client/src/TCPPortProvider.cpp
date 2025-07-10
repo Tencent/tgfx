@@ -28,18 +28,26 @@ constexpr uint16_t MinPort = 49152;
 
 uint16_t TCPPortProvider::getValidPort() {
   uint32_t rangeSize = MaxPort - MinPort + 1;
-  if(rangeSize == usedPortSet.size()) {
-      usedPortSet.clear();
+  if (rangeSize == usedPortSet.size()) {
+    usedPortSet.clear();
   }
   std::random_device rd;
   std::mt19937 gen(rd());
   std::uniform_int_distribution<uint16_t> dis(MinPort, MaxPort);
   uint16_t randomPort = dis(gen);
   std::unique_ptr<ListenSocket> listenSocket = std::make_unique<ListenSocket>();
-  while (usedPortSet.find(randomPort) != usedPortSet.end() || !listenSocket->Listen(randomPort, 4)) {
+  while (usedPortSet.find(randomPort) != usedPortSet.end() ||
+         !listenSocket->Listen(randomPort, 4)) {
     randomPort = dis(gen);
   }
   usedPortSet.insert(randomPort);
   return randomPort;
+}
+bool TCPPortProvider::clearUsedPort(uint16_t port) {
+  if(usedPortSet.find(port) != usedPortSet.end()) {
+    usedPortSet.erase(port);
+    return true;
+  }
+  return false;
 }
 }  // namespace inspector
