@@ -70,6 +70,7 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
     clipBounds = blurFilter->filterBounds(clipBounds);
   }
 
+  clipBounds.roundOut();
   if (!clipBounds.intersect(sourceRect)) {
     return nullptr;
   }
@@ -85,14 +86,25 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
   auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);
   shadowMatrix.preConcat(fpMatrix);
   PlacementPtr<FragmentProcessor> invertShadowMask;
-  if (blurFilter != nullptr) {
+
+  auto buffer = args.context->drawingBuffer();
+  if (clipBounds.width() <= fabsf(dx) || clipBounds.height() <= fabsf(dy)) {
+    // If the clip bounds's width or height is less than offset, that means the mask will be
+    // transparent.
+    invertShadowMask =
+        ConstColorProcessor::Make(buffer, Color::Transparent().premultiply(), InputMode::Ignore);
+  } else if (blurFilter != nullptr) {
     invertShadowMask =
         blurFilter->asFragmentProcessor(source, args, sampling, constraint, &shadowMatrix);
   } else {
     invertShadowMask = FragmentProcessor::Make(source, args, TileMode::Decal, TileMode::Decal,
                                                sampling, constraint, &shadowMatrix);
   }
-  auto buffer = args.context->drawingBuffer();
+
+  if (invertShadowMask == nullptr) {
+    invertShadowMask =
+        ConstColorProcessor::Make(buffer, Color::Transparent().premultiply(), InputMode::Ignore);
+  }
   auto colorProcessor = ConstColorProcessor::Make(buffer, color.premultiply(), InputMode::Ignore);
 
   // get shadow mask and fill it with color
