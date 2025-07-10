@@ -158,9 +158,9 @@ class Matrix {
   }
 
   /** \enum Matrix::TypeMask
-   Enum of bit fields for mask returned by getType().
-   Used to identify the complexity of Matrix, to optimize performance.
-*/
+   * Enum of bit fields for mask returned by getType().
+   * Used to identify the complexity of Matrix, to optimize performance.
+   */
   enum TypeMask { IdentityMask = 0, TranslateMask = 0x01, ScaleMask = 0x02, AffineMask = 0x04 };
 
   TypeMask getType() const {
@@ -419,16 +419,16 @@ class Matrix {
   void setScale(float sx, float sy);
 
   /** Initializes SkMatrix with scale and translate elements.
-
-        | sx  0 tx |
-        |  0 sy ty |
-        |  0  0  1 |
-
-    @param sx  horizontal scale factor to store
-    @param sy  vertical scale factor to store
-    @param tx  horizontal translation to store
-    @param ty  vertical translation to store
-*/
+   *
+   *      | sx  0 tx |
+   *      |  0 sy ty |
+   *      |  0  0  1 |
+   *
+   * @param sx  horizontal scale factor to store
+   * @param sy  vertical scale factor to store
+   * @param tx  horizontal translation to store
+   * @param ty  vertical translation to store
+   */
   void setScaleTranslate(float sx, float sy, float tx, float ty) {
     values[SCALE_X] = sx;
     values[SKEW_X] = 0;
@@ -829,14 +829,18 @@ class Matrix {
                    int typeMask)
       : values{scaleX, skewX, transX, skewY, scaleY, transY}, typeMask(typeMask) {
   }
+
   uint8_t computeTypeMask() const;
+
   void setTypeMask(int mask) {
     // allow kUnknown or a valid mask
     typeMask = mask;
   }
+
   void orTypeMask(int mask) {
     typeMask |= mask;
   }
+
   void clearTypeMask(int mask) {
     typeMask &= ~mask;
   }
@@ -850,6 +854,7 @@ class Matrix {
     }
     return ((typeMask & 0xF) == 0);
   }
+
   inline void updateTranslateMask() {
     if ((values[TRANS_X] != 0) | (values[TRANS_Y] != 0)) {
       typeMask |= TranslateMask;
@@ -857,19 +862,29 @@ class Matrix {
       typeMask &= ~TranslateMask;
     }
   }
+
   using MapPtsProc = void (*)(const Matrix& mat, Point dst[], const Point src[], int count);
+
   static MapPtsProc GetMapPtsProc(TypeMask mask) {
     return MapPtsProcs[mask & AllMasks];
   }
+
   MapPtsProc getMapPtsProc() const {
     return GetMapPtsProc(this->getType());
   }
+
   static const MapPtsProc MapPtsProcs[];
+
   static void IdentityPts(const Matrix& m, Point dst[], const Point src[], int count);
+
   static void TransPts(const Matrix& m, Point dst[], const Point src[], int count);
+
   static void ScalePts(const Matrix& m, Point dst[], const Point src[], int count);
+
   static void AfflinePts(const Matrix& m, Point dst[], const Point src[], int count);
+
   bool invertNonIdentity(Matrix* inverse) const;
+
   bool getMinMaxScaleFactors(float results[2]) const;
 };
 }  // namespace tgfx
