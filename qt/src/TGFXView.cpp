@@ -19,6 +19,7 @@
 #include "TGFXView.h"
 #include <QApplication>
 #include <QFileInfo>
+#include <QMessageBox>
 #include <QQuickWindow>
 #include <QSGImageNode>
 #include <QThread>
@@ -28,16 +29,28 @@ namespace hello2d {
 TGFXView::TGFXView(QQuickItem* parent) : QQuickItem(parent) {
   setFlag(ItemHasContents, true);
   setAcceptedMouseButtons(Qt::LeftButton);
-  createAppHost();
+  setAcceptHoverEvents(true);
+  setAcceptTouchEvents(true);
+  setFocus(true);
+  initializeAppHost();
 }
 
-void TGFXView::mousePressEvent(QMouseEvent* event) {
-  event->accept();
+void TGFXView::updateTransform(qreal zoomLevel, QPointF panOffset) {
+  float clampedZoom = std::max(0.001f, std::min(1000.0f, static_cast<float>(zoomLevel)));
+  zoom = clampedZoom;
+  offset = panOffset;
+  update();
 }
 
-void TGFXView::mouseReleaseEvent(QMouseEvent*) {
-  lastDrawIndex++;
-  QMetaObject::invokeMethod(this, "update", Qt::AutoConnection);
+void TGFXView::resetView() {
+  zoom = 1.0f;
+  offset = QPointF(0, 0);
+  update();
+}
+
+void TGFXView::nextDrawer() {
+  currentDrawerIndex++;
+  resetView();
 }
 
 QSGNode* TGFXView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
@@ -56,7 +69,7 @@ QSGNode* TGFXView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
   if (sizeChanged) {
     tgfxWindow->invalidSize();
   }
-  draw();
+  renderFrame();
   auto node = static_cast<QSGImageNode*>(oldNode);
   auto texture = tgfxWindow->getQSGTexture();
   if (texture) {
@@ -72,17 +85,24 @@ QSGNode* TGFXView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
 
 void TGFXView::onSceneGraphInvalidated() {
   disconnect(window(), SIGNAL(sceneGraphInvalidated()), this, SLOT(onSceneGraphInvalidated()));
-  // Release the tgfxWindow on the QSG render thread or call tgfxWindow->moveToThread() to move it. Otherwise,
-  // destroying the tgfxWindow in the main thread will cause an error.
+  // Release the tgfxWindow on the QSG render thread or call tgfxWindow->moveToThread() to move
+  // it. Otherwise, destroying the tgfxWindow in the main thread will cause an error.
   tgfxWindow = nullptr;
 }
 
-void TGFXView::createAppHost() {
+void TGFXView::initializeAppHost() {
   appHost = std::make_unique<drawers::AppHost>();
   auto rootPath = QApplication::applicationDirPath();
   rootPath = QFileInfo(rootPath + "/../../").absolutePath();
   auto imagePath = rootPath + "/resources/assets/bridge.jpg";
   auto image = tgfx::Image::MakeFromFile(std::string(imagePath.toLocal8Bit()));
+  if (!image) {
+    QMessageBox::critical(nullptr, "Image Loading Failed",
+                          QString("Failed to load image file:\n%1\n\nPlease check if the file "
+                                  "path is correct.")
+                              .arg(imagePath));
+    return;
+  }
   appHost->addImage("bridge", image);
 #ifdef __APPLE__
   auto defaultTypeface = tgfx::Typeface::MakeFromName("PingFang SC", "");
@@ -96,7 +116,7 @@ void TGFXView::createAppHost() {
   appHost->addTypeface("emoji", emojiTypeface);
 }
 
-void TGFXView::draw() {
+void TGFXView::renderFrame() {
   auto device = tgfxWindow->getDevice();
   if (device == nullptr) {
     return;
@@ -110,11 +130,13 @@ void TGFXView::draw() {
     device->unlock();
     return;
   }
+  appHost->updateZoomAndOffset(
+      zoom, tgfx::Point(static_cast<float>(offset.x()), static_cast<float>(offset.y())));
   auto canvas = surface->getCanvas();
   canvas->clear();
   canvas->save();
   auto numDrawers = drawers::Drawer::Count() - 1;
-  auto index = (lastDrawIndex % numDrawers) + 1;
+  auto index = (currentDrawerIndex % numDrawers) + 1;
   auto drawer = drawers::Drawer::GetByName("GridBackground");
   drawer->draw(canvas, appHost.get());
   drawer = drawers::Drawer::GetByIndex(index);
