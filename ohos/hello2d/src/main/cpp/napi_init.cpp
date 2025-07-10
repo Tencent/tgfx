@@ -78,13 +78,13 @@ static napi_value OnDraw(napi_env env, napi_callback_info info) {
   napi_value args[4] = {nullptr};
   napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
   double drawIndex = 0;
-    double zoomScale = 1;
-    double contentOffsetX = 0;
-    double contentOffsetY = 0;
+  double zoomScale = 1;
+  double contentOffsetX = 0;
+  double contentOffsetY = 0;
   napi_get_value_double(env, args[0], &drawIndex);
-    napi_get_value_double(env, args[1], &zoomScale);
-    napi_get_value_double(env, args[2], &contentOffsetX);
-    napi_get_value_double(env, args[3], &contentOffsetY);
+  napi_get_value_double(env, args[1], &zoomScale);
+  napi_get_value_double(env, args[2], &contentOffsetX);
+  napi_get_value_double(env, args[3], &contentOffsetY);
   Draw(static_cast<int>(drawIndex), static_cast<float>(zoomScale), static_cast<float>(contentOffsetX), static_cast<float>(contentOffsetY));
   return nullptr;
 }
