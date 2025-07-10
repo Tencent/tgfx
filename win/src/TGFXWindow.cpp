@@ -204,8 +204,10 @@ void TGFXWindow::centerAndShow() {
   }
   int xPos = (centerRect.left + centerRect.right - windowWidth) / 2;
   int yPos = (centerRect.top + centerRect.bottom - windowHeight) / 2;
-  xPos = std::clamp(xPos, workArea.left, workArea.right - windowWidth);
-  yPos = std::clamp(yPos, workArea.top, workArea.bottom - windowHeight);
+  xPos = std::clamp(xPos, static_cast<int>(workArea.left),
+                    static_cast<int>(workArea.right - windowWidth));
+  yPos = std::clamp(yPos, static_cast<int>(workArea.top),
+                    static_cast<int>(workArea.bottom - windowHeight));
 
   ::SetWindowPos(windowHandle, nullptr, xPos, yPos, -1, -1,
                  SWP_NOSIZE | SWP_NOZORDER | SWP_NOACTIVATE | SWP_SHOWWINDOW);
