@@ -70,13 +70,11 @@ struct Index {
                 }
                 this.lastEventScale = eventScale;
                 const zoomNew = Math.max(0.001, Math.min(1000, this.pinchStartZoom * eventScale));
-                const currentPinchCenterX = (event.fingerList[0].displayX + event.fingerList[1].displayX) / 2.0;
-                const currentPinchCenterY = (event.fingerList[0].displayY + event.fingerList[1].displayY) / 2.0;
                 this.offsetX = (this.offsetX - vp2px(this.lastPinchCenterX)) * (zoomNew / this.zoom) + vp2px(this.lastPinchCenterX);
                 this.offsetY = (this.offsetY - vp2px(this.lastPinchCenterY)) * (zoomNew / this.zoom) + vp2px(this.lastPinchCenterY);
                 this.zoom = zoomNew;
-                this.lastPinchCenterX = currentPinchCenterX;
-                this.lastPinchCenterY = currentPinchCenterY;
+                this.lastPinchCenterX = (event.fingerList[0].displayX + event.fingerList[1].displayX) / 2.0;
+                this.lastPinchCenterY = (event.fingerList[0].displayY + event.fingerList[1].displayY) / 2.0;
                 hello2d.draw(this.drawIndex, this.zoom, this.offsetX, this.offsetY);
               }
             })
