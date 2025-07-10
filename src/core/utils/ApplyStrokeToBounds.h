@@ -29,7 +29,7 @@ void ApplyStrokeToBounds(const Stroke& stroke, Rect* bounds, bool applyMiterLimi
 
 /**
  * Applies stroke options to the given bounds. Note that the bounds have been scaled
- * by resolutionScale.
+ * by resolutionScale. So the expand factor is also scaled accordingly.
  */
 void ApplyStrokeToScaledBounds(const Stroke& stroke, Rect* bounds, float resolutionScale,
                                bool applyMiterLimit = false);
