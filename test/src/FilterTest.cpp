@@ -685,7 +685,6 @@ TGFX_TEST(FilterTest, InnerShadowBadCase) {
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/InnerShadowBadCase"));
 }
 
-
 TGFX_TEST(FilterTest, ClipInnerShadowImageFilter) {
   ContextScope scope;
   auto context = scope.getContext();
