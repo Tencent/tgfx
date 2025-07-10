@@ -18,6 +18,7 @@
 
 #include "EGLHardwareTextureSampler.h"
 #include "core/utils/PixelFormatUtil.h"
+#include "gpu/TextureSampler.h"
 #include "tgfx/platform/HardwareBuffer.h"
 
 #if defined(__ANDROID__) || defined(ANDROID)

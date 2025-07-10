@@ -63,7 +63,7 @@ std::shared_ptr<Texture> VideoElement::onMakeTexture(Context* context, bool mipm
     }
   }
   std::shared_ptr<Texture> texture = nullptr;
-  if (textureHeight != width() || textureHeight != height()) {
+  if (textureWidth != width() || textureHeight != height()) {
     auto sampler =
         TextureSampler::Make(context, width(), height(), PixelFormat::RGBA_8888, mipmapped);
     if (sampler != nullptr) {
