@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -68,8 +68,9 @@ bool WebPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) co
   if (!path2DClass.as<bool>()) {
     return false;
   }
-  auto canvas =
-      val::module_property("tgfx").call<val>("createCanvas2D", dstInfo.width(), dstInfo.height());
+  auto targetInfo = dstInfo.makeIntersect(0, 0, width(), height());
+  auto canvas = val::module_property("tgfx").call<val>("createCanvas2D", targetInfo.width(),
+                                                       targetInfo.height());
   if (!canvas.as<bool>()) {
     return false;
   }
@@ -88,6 +89,6 @@ bool WebPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) co
   if (!imageData.as<bool>()) {
     return false;
   }
-  return ReadPixelsFromCanvasImage(imageData, dstInfo, dstPixels);
+  return ReadPixelsFromCanvasImage(imageData, targetInfo, dstPixels);
 }
 }  // namespace tgfx

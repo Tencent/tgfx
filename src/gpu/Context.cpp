@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Context.h"
+#include "core/AtlasManager.h"
 #include "core/utils/BlockBuffer.h"
 #include "core/utils/Log.h"
 #include "core/utils/SlidingWindowTracker.h"
@@ -39,6 +40,7 @@ Context::Context(Device* device) : _device(device) {
   _resourceProvider = new ResourceProvider(this);
   _proxyProvider = new ProxyProvider(this);
   _maxValueTracker = new SlidingWindowTracker(10);
+  _atlasManager = new AtlasManager(this);
 }
 
 Context::~Context() {
@@ -53,6 +55,7 @@ Context::~Context() {
   delete _resourceProvider;
   delete _proxyProvider;
   delete _drawingBuffer;
+  delete _atlasManager;
   delete _maxValueTracker;
 }
 
@@ -61,7 +64,9 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
   // particularly crucial for texture resources that are bound to render targets. Only after the
   // cleanup can they be unbound and reused.
   _resourceCache->processUnreferencedResources();
+  _atlasManager->preFlush();
   auto flushed = _drawingManager->flush();
+  _atlasManager->postFlush();
   bool semaphoreInserted = false;
   if (signalSemaphore != nullptr) {
     auto semaphore = Semaphore::Wrap(signalSemaphore);
@@ -133,5 +138,6 @@ void Context::releaseAll(bool releaseGPU) {
   _resourceProvider->releaseAll();
   _programCache->releaseAll(releaseGPU);
   _resourceCache->releaseAll(releaseGPU);
+  _atlasManager->releaseAll();
 }
 }  // namespace tgfx

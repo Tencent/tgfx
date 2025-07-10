@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "EGLHardwareTexture.h"
+#include "core/utils/PixelFormatUtil.h"
 #include "core/utils/USE.h"
 #include "gpu/Texture.h"
 #include "tgfx/platform/HardwareBuffer.h"
@@ -42,6 +43,14 @@ bool HardwareBufferAvailable() {
   return available;
 }
 
+PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
+  auto info = HardwareBufferGetInfo(hardwareBuffer);
+  if (info.isEmpty()) {
+    return PixelFormat::Unknown;
+  }
+  return ColorTypeToPixelFormat(info.colorType());
+}
+
 std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
                                            YUVColorSpace) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
@@ -54,6 +63,14 @@ std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef h
 
 bool HardwareBufferAvailable() {
   return true;
+}
+
+PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
+  auto info = HardwareBufferGetInfo(hardwareBuffer);
+  if (info.isEmpty()) {
+    return PixelFormat::Unknown;
+  }
+  return ColorTypeToPixelFormat(info.colorType());
 }
 
 std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
@@ -94,6 +111,10 @@ std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef h
 
 bool HardwareBufferAvailable() {
   return false;
+}
+
+PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef) {
+  return PixelFormat::Unknown;
 }
 
 std::shared_ptr<Texture> Texture::MakeFrom(Context*, HardwareBufferRef, YUVColorSpace) {

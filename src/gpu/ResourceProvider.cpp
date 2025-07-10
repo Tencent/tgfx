@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -74,11 +74,11 @@ std::shared_ptr<Texture> ResourceProvider::getGradient(const Color* colors, cons
   return _gradientCache->getGradient(context, colors, positions, count);
 }
 
-static constexpr uint16_t kVerticesPerNonAAQuad = 4;
-static constexpr uint16_t kIndicesPerNonAAQuad = 6;
+static constexpr uint16_t VerticesPerNonAAQuad = 4;
+static constexpr uint16_t IndicesPerNonAAQuad = 6;
 
 // clang-format off
-static constexpr uint16_t kNonAAQuadIndexPattern[] = {
+static constexpr uint16_t NonAAQuadIndexPattern[] = {
   0, 1, 2, 2, 1, 3
 };
 // clang-format on
@@ -86,8 +86,7 @@ static constexpr uint16_t kNonAAQuadIndexPattern[] = {
 std::shared_ptr<GpuBufferProxy> ResourceProvider::nonAAQuadIndexBuffer() {
   if (_nonAAQuadIndexBuffer == nullptr) {
     auto provider = std::make_unique<PatternedIndexBufferProvider>(
-        kNonAAQuadIndexPattern, kIndicesPerNonAAQuad, RectDrawOp::MaxNumRects,
-        kVerticesPerNonAAQuad);
+        NonAAQuadIndexPattern, IndicesPerNonAAQuad, RectDrawOp::MaxNumRects, VerticesPerNonAAQuad);
     _nonAAQuadIndexBuffer =
         GpuBufferProxy::MakeFrom(context, std::move(provider), BufferType::Index, 0);
   }
@@ -95,14 +94,14 @@ std::shared_ptr<GpuBufferProxy> ResourceProvider::nonAAQuadIndexBuffer() {
 }
 
 uint16_t ResourceProvider::NumIndicesPerNonAAQuad() {
-  return kIndicesPerNonAAQuad;
+  return IndicesPerNonAAQuad;
 }
 
-static constexpr uint16_t kVerticesPerAAQuad = 8;
-static constexpr uint16_t kIndicesPerAAQuad = 30;
+static constexpr uint16_t VerticesPerAAQuad = 8;
+static constexpr uint16_t IndicesPerAAQuad = 30;
 
 // clang-format off
-static constexpr uint16_t kAAQuadIndexPattern[] = {
+static constexpr uint16_t AAQuadIndexPattern[] = {
   0, 1, 2, 1, 3, 2,
   0, 4, 1, 4, 5, 1,
   0, 6, 4, 0, 2, 6,
@@ -114,7 +113,7 @@ static constexpr uint16_t kAAQuadIndexPattern[] = {
 std::shared_ptr<GpuBufferProxy> ResourceProvider::aaQuadIndexBuffer() {
   if (_aaQuadIndexBuffer == nullptr) {
     auto provider = std::make_unique<PatternedIndexBufferProvider>(
-        kAAQuadIndexPattern, kIndicesPerAAQuad, RectDrawOp::MaxNumRects, kVerticesPerAAQuad);
+        AAQuadIndexPattern, IndicesPerAAQuad, RectDrawOp::MaxNumRects, VerticesPerAAQuad);
     _aaQuadIndexBuffer =
         GpuBufferProxy::MakeFrom(context, std::move(provider), BufferType::Index, 0);
   }
@@ -122,7 +121,7 @@ std::shared_ptr<GpuBufferProxy> ResourceProvider::aaQuadIndexBuffer() {
 }
 
 uint16_t ResourceProvider::NumIndicesPerAAQuad() {
-  return kIndicesPerAAQuad;
+  return IndicesPerAAQuad;
 }
 
 // clang-format off
@@ -152,22 +151,22 @@ static const uint16_t gOverstrokeRRectIndices[] = {
 };
 // clang-format on
 
-static constexpr int kOverstrokeIndicesCount = 6 * 4;
-static constexpr int kCornerIndicesCount = 6 * 4;
-static constexpr int kEdgeIndicesCount = 6 * 4;
-static constexpr int kCenterIndicesCount = 6;
+static constexpr int OverstrokeIndicesCount = 6 * 4;
+static constexpr int CornerIndicesCount = 6 * 4;
+static constexpr int EdgeIndicesCount = 6 * 4;
+static constexpr int CenterIndicesCount = 6;
 
 // fill and standard stroke indices skip the overstroke "ring"
-static const uint16_t* gStandardRRectIndices = gOverstrokeRRectIndices + kOverstrokeIndicesCount;
+static const uint16_t* gStandardRRectIndices = gOverstrokeRRectIndices + OverstrokeIndicesCount;
 
 // overstroke count is arraysize minus the center indices
-// static constexpr int kIndicesPerOverstrokeRRect =
-//    kOverstrokeIndicesCount + kCornerIndicesCount + kEdgeIndicesCount;
+// static constexpr int IndicesPerOverstrokeRRect =
+//    OverstrokeIndicesCount + CornerIndicesCount + EdgeIndicesCount;
 // fill count skips overstroke indices and includes center
 static constexpr size_t kIndicesPerFillRRect =
-    kCornerIndicesCount + kEdgeIndicesCount + kCenterIndicesCount;
+    CornerIndicesCount + EdgeIndicesCount + CenterIndicesCount;
 // stroke count is fill count minus center indices
-static constexpr int kIndicesPerStrokeRRect = kCornerIndicesCount + kEdgeIndicesCount;
+static constexpr int kIndicesPerStrokeRRect = CornerIndicesCount + EdgeIndicesCount;
 
 class RRectIndicesProvider : public DataSource<Data> {
  public:

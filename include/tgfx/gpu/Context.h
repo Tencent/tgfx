@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -33,6 +33,7 @@ class ResourceProvider;
 class ProxyProvider;
 class BlockBuffer;
 class SlidingWindowTracker;
+class AtlasManager;
 
 /**
  * Context is the main interface to the GPU. It is used to create and manage GPU resources, and to
@@ -84,6 +85,10 @@ class Context {
 
   ProxyProvider* proxyProvider() const {
     return _proxyProvider;
+  }
+
+  AtlasManager* atlasManager() const {
+    return _atlasManager;
   }
 
   /**
@@ -214,6 +219,7 @@ class Context {
   ProxyProvider* _proxyProvider = nullptr;
   BlockBuffer* _drawingBuffer = nullptr;
   SlidingWindowTracker* _maxValueTracker = nullptr;
+  AtlasManager* _atlasManager = nullptr;
 
   void releaseAll(bool releaseGPU);
 

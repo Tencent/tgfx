@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License") {} you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,6 +18,7 @@
 
 #include "core/RecordingContext.h"
 #include "utils/Log.h"
+#include "utils/RectToRectMatrix.h"
 
 namespace tgfx {
 /**
@@ -123,17 +124,42 @@ void RecordingContext::drawShape(std::shared_ptr<Shape> shape, const MCState& st
   drawCount++;
 }
 
-void RecordingContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
-                                     const SamplingOptions& sampling, const MCState& state,
-                                     const Fill& fill, SrcRectConstraint constraint) {
+void RecordingContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
+                                 const MCState& state, const Fill& fill) {
   DEBUG_ASSERT(image != nullptr);
   recordAll(state, fill);
+  PlacementPtr<Record> record = nullptr;
+  record = blockBuffer.make<DrawImage>(std::move(image), sampling);
+  records.emplace_back(std::move(record));
+  drawCount++;
+}
+
+void RecordingContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
+                                     const Rect& dstRect, const SamplingOptions& sampling,
+                                     const MCState& state, const Fill& fill,
+                                     SrcRectConstraint constraint) {
+  DEBUG_ASSERT(image != nullptr);
+  auto newState = state;
+  auto newFill = fill;
+  bool needDstRect = true;
+  if (srcRect.width() == dstRect.width() && srcRect.height() == dstRect.height()) {
+    auto viewMatrix = MakeRectToRectMatrix(srcRect, dstRect);
+    newState.matrix.preConcat(viewMatrix);
+    Matrix fillMatrix = Matrix::I();
+    viewMatrix.invert(&fillMatrix);
+    newFill = newFill.makeWithMatrix(fillMatrix);
+    needDstRect = false;
+  }
+  recordAll(newState, newFill);
   auto imageRect = Rect::MakeWH(image->width(), image->height());
   PlacementPtr<Record> record = nullptr;
-  if (rect == imageRect) {
+  if (srcRect == imageRect && !needDstRect) {
     record = blockBuffer.make<DrawImage>(std::move(image), sampling);
+  } else if (!needDstRect) {
+    record = blockBuffer.make<DrawImageRect>(std::move(image), srcRect, sampling, constraint);
   } else {
-    record = blockBuffer.make<DrawImageRect>(std::move(image), rect, sampling, constraint);
+    record = blockBuffer.make<DrawImageRectToRect>(std::move(image), srcRect, dstRect, sampling,
+                                                   constraint);
   }
   records.emplace_back(std::move(record));
   drawCount++;

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -54,7 +54,7 @@ class Shape {
   static std::shared_ptr<Shape> MakeFrom(std::shared_ptr<PathProvider> pathProvider);
 
   /**
-   * Creates a new Shape from the glyphFace and glyphID. Returns nullptr if the glyphFace is nullptr
+   * Creates a new Shape from the Font and glyphID. Returns nullptr if the glyphID is 0
    * or contains a typeface that can't generate a path, such as bitmap typefaces.
    */
   static std::shared_ptr<Shape> MakeFrom(Font font, GlyphID glyphID);

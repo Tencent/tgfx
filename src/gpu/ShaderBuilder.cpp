@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -23,7 +23,7 @@
 
 namespace tgfx {
 // number of bytes (on the stack) to receive the printf result
-static constexpr size_t kBufferSize = 1024;
+static constexpr size_t ShaderBufferSize = 1024;
 
 static bool NeedsAppendEnter(const std::string& code) {
   if (code.empty()) {
@@ -51,10 +51,10 @@ void ShaderBuilder::setPrecisionQualifier(const std::string& precision) {
 }
 
 void ShaderBuilder::codeAppendf(const char* format, ...) {
-  char buffer[kBufferSize];
+  char buffer[ShaderBufferSize];
   va_list args;
   va_start(args, format);
-  auto length = vsnprintf(buffer, kBufferSize, format, args);
+  auto length = vsnprintf(buffer, ShaderBufferSize, format, args);
   va_end(args);
   codeAppend(std::string(buffer, static_cast<size_t>(length)));
 }
@@ -97,8 +97,9 @@ void ShaderBuilder::addFeature(PrivateFeature featureBit, const std::string& ext
   if ((featureBit & featuresAddedMask) == featureBit) {
     return;
   }
-  char buffer[kBufferSize];
-  auto length = snprintf(buffer, kBufferSize, "#extension %s: require\n", extensionName.c_str());
+  char buffer[ShaderBufferSize];
+  auto length =
+      snprintf(buffer, ShaderBufferSize, "#extension %s: require\n", extensionName.c_str());
   shaderStrings[Type::Extensions].append(buffer, static_cast<size_t>(length));
   featuresAddedMask |= featureBit;
 }

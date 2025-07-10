@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -22,8 +22,8 @@
 namespace tgfx {
 static void HardLight(FragmentShaderBuilder* fsBuilder, const char* final, const char* src,
                       const char* dst) {
-  static constexpr char kComponents[] = {'r', 'g', 'b'};
-  for (auto& component : kComponents) {
+  static constexpr char Components[] = {'r', 'g', 'b'};
+  for (auto& component : Components) {
     fsBuilder->codeAppendf("if (2.0 * %s.%c < %s.a) {", src, component, src);
     fsBuilder->codeAppendf("%s.%c = 2.0 * %s.%c * %s.%c;", final, component, src, component, dst,
                            component);
@@ -323,7 +323,7 @@ static void BlendHandler_PlusDarker(FragmentShaderBuilder* fsBuilder, const char
 using BlendHandler = void (*)(FragmentShaderBuilder* fsBuilder, const char* srcColor,
                               const char* dstColor, const char* outputColor);
 
-static constexpr std::pair<BlendMode, BlendHandler> kBlendHandlers[] = {
+static constexpr std::pair<BlendMode, BlendHandler> BlendHandlers[] = {
     {BlendMode::Overlay, BlendHandler_Overlay},
     {BlendMode::Darken, BlendHandler_Darken},
     {BlendMode::Lighten, BlendHandler_Lighten},
@@ -346,7 +346,7 @@ static void HandleBlendModes(FragmentShaderBuilder* fsBuilder, const std::string
   // These all perform src-over on the alpha channel.
   fsBuilder->codeAppendf("%s.a = %s.a + (1.0 - %s.a) * %s.a;", outputColor.c_str(),
                          srcColor.c_str(), srcColor.c_str(), dstColor.c_str());
-  for (const auto& pair : kBlendHandlers) {
+  for (const auto& pair : BlendHandlers) {
     if (pair.first == blendMode) {
       pair.second(fsBuilder, srcColor.c_str(), dstColor.c_str(), outputColor.c_str());
       break;

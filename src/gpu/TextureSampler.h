@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,9 +18,11 @@
 
 #pragma once
 
+#include "gpu/YUVFormat.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/PixelFormat.h"
+#include "tgfx/platform/HardwareBuffer.h"
 
 namespace tgfx {
 /**
@@ -35,6 +37,13 @@ enum class SamplerType { None, TwoD, Rectangle, External };
  */
 class TextureSampler {
  public:
+  /**
+   * Returns the PixelFormat of the texture sampler created from the given hardware buffer. If the
+   * hardwareBuffer is invalid or uses a format that cannot create a single-plane texture sampler
+   * (such as YUV formats), PixelFormat::Unknown is returned.
+   */
+  static PixelFormat GetPixelFormat(HardwareBufferRef hardwareBuffer);
+
   /**
    * Creates a new TextureSampler which wraps the specified backend texture. The caller is
    * responsible for managing the lifetime of the backendTexture.

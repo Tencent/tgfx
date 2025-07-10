@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -120,21 +120,25 @@ bool CGPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) con
   if (path.isEmpty()) {
     return false;
   }
-  auto cgContext = CreateBitmapContext(dstInfo, dstPixels);
+  auto targetInfo = dstInfo.makeIntersect(0, 0, width(), height());
+  auto cgContext = CreateBitmapContext(targetInfo, dstPixels);
   if (cgContext == nullptr) {
     return false;
   }
-  CGContextClearRect(cgContext, CGRectMake(0.f, 0.f, dstInfo.width(), dstInfo.height()));
+  CGContextClearRect(cgContext, CGRectMake(0.f, 0.f, targetInfo.width(), targetInfo.height()));
   auto totalMatrix = Matrix::MakeScale(1, -1);
-  totalMatrix.postTranslate(0, static_cast<float>(dstInfo.height()));
+  totalMatrix.postTranslate(0, static_cast<float>(targetInfo.height()));
   path.transform(totalMatrix);
   if (!needsGammaCorrection) {
-    DrawPath(path, cgContext, dstInfo, antiAlias);
+    DrawPath(path, cgContext, targetInfo, antiAlias);
   }
   auto bounds = path.getBounds();
-  bounds.roundOut();
-  auto width = static_cast<int>(bounds.width());
-  auto height = static_cast<int>(bounds.height());
+  auto clipBounds = Rect::MakeWH(targetInfo.width(), targetInfo.height());
+  if (!bounds.intersect(clipBounds)) {
+    return false;
+  }
+  auto width = static_cast<int>(ceilf(bounds.width()));
+  auto height = static_cast<int>(ceilf(bounds.height()));
   auto tempBuffer = PixelBuffer::Make(width, height, true, false);
   if (tempBuffer == nullptr) {
     CGContextRelease(cgContext);

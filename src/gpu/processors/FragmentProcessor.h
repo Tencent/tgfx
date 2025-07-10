@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -205,13 +205,13 @@ class FragmentProcessor : public Processor {
 
   struct EmitArgs {
     EmitArgs(FragmentShaderBuilder* fragBuilder, UniformHandler* uniformHandler,
-             std::string outputColor, std::string inputColor,
+             std::string outputColor, std::string inputColor, std::string inputSubset,
              const TransformedCoordVars* transformedCoords, const TextureSamplers* textureSamplers,
              std::function<std::string(std::string_view)> coordFunc = {})
         : fragBuilder(fragBuilder), uniformHandler(uniformHandler),
           outputColor(std::move(outputColor)), inputColor(std::move(inputColor)),
           transformedCoords(transformedCoords), textureSamplers(textureSamplers),
-          coordFunc(std::move(coordFunc)) {
+          coordFunc(std::move(coordFunc)), inputSubset(std::move(inputSubset)) {
     }
 
     /**
@@ -238,6 +238,7 @@ class FragmentProcessor : public Processor {
      */
     const TextureSamplers* textureSamplers;
     const std::function<std::string(std::string_view)> coordFunc;
+    const std::string inputSubset;
   };
 
   /**

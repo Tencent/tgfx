@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -98,11 +98,22 @@ void HitTestContext::drawShape(std::shared_ptr<Shape> shape, const MCState& stat
   }
 }
 
-void HitTestContext::drawImageRect(std::shared_ptr<Image>, const Rect& rect, const SamplingOptions&,
-                                   const MCState& state, const Fill& fill, SrcRectConstraint) {
+void HitTestContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions&,
+                               const MCState& state, const Fill& fill) {
   // Images are always checked against their bounding box.
   auto local = state.matrix.mapXY(testX, testY);
-  if (rect.contains(local.x, local.y) && checkClipAndFill(state.clip, fill, local)) {
+  auto imageBounds = Rect::MakeWH(image->width(), image->height());
+  if (imageBounds.contains(local.x, local.y) && checkClipAndFill(state.clip, fill, local)) {
+    hit = true;
+  }
+}
+
+void HitTestContext::drawImageRect(std::shared_ptr<Image>, const Rect&, const Rect& dstRect,
+                                   const SamplingOptions&, const MCState& state, const Fill& fill,
+                                   SrcRectConstraint) {
+  // Images are always checked against their bounding box.
+  auto local = state.matrix.mapXY(testX, testY);
+  if (dstRect.contains(local.x, local.y) && checkClipAndFill(state.clip, fill, local)) {
     hit = true;
   }
 }

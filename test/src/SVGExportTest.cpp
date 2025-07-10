@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -654,6 +654,43 @@ TGFX_TEST(SVGExportTest, InvertPictureImageMask) {
   auto SVGString = SVGStream->readString();
 
   auto path = ProjectPath::Absolute("resources/apitest/mask_invert_picture_image.svg");
+  auto readStream = Stream::MakeFromFile(path);
+  EXPECT_TRUE(readStream != nullptr);
+  Buffer buffer(readStream->size());
+  readStream->read(buffer.data(), buffer.size());
+  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), SVGString);
+}
+
+TGFX_TEST(SVGExportTest, DrawImageRect) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+
+  int width = 400;
+  int height = 400;
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(width, height));
+  auto* canvas = exporter->getCanvas();
+
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  ASSERT_TRUE(image != nullptr);
+
+  Rect srcRect = Rect::MakeWH(image->width(), image->height());
+  Rect dstRect = Rect::MakeXYWH(0, 0, width / 2, height / 2);
+  canvas->drawImageRect(image, srcRect, dstRect, SamplingOptions(FilterMode::Linear));
+
+  srcRect = Rect::MakeXYWH(20, 20, 60, 60);
+  dstRect = Rect::MakeXYWH(width / 2, 0, width / 2, height / 2);
+  canvas->drawImageRect(image, srcRect, dstRect, SamplingOptions(FilterMode::Nearest));
+
+  srcRect = Rect::MakeXYWH(40, 40, 40, 40);
+  dstRect = Rect::MakeXYWH(0, height / 2, width, height / 2);
+  canvas->drawImageRect(image, srcRect, dstRect, SamplingOptions(FilterMode::Linear));
+
+  exporter->close();
+  auto SVGString = SVGStream->readString();
+  auto path = ProjectPath::Absolute("resources/apitest/SVG/drawImageRect.svg");
   auto readStream = Stream::MakeFromFile(path);
   EXPECT_TRUE(readStream != nullptr);
   Buffer buffer(readStream->size());

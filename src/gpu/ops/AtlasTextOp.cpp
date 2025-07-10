@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -25,18 +25,17 @@
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
+
 PlacementPtr<AtlasTextOp> AtlasTextOp::Make(Context* context,
                                             PlacementPtr<RectsVertexProvider> provider,
                                             uint32_t renderFlags,
-                                            std::shared_ptr<TextureProxy> textureProxy,
-                                            const SamplingOptions& sampling,
-                                            const Matrix& uvMatrix) {
+                                            std::shared_ptr<TextureProxy> textureProxy) {
   if (provider == nullptr || textureProxy == nullptr || textureProxy->width() <= 0 ||
       textureProxy->height() <= 0) {
     return nullptr;
   }
-  auto atlasTextOp = context->drawingBuffer()->make<AtlasTextOp>(
-      provider.get(), std::move(textureProxy), sampling, uvMatrix);
+  auto atlasTextOp =
+      context->drawingBuffer()->make<AtlasTextOp>(provider.get(), std::move(textureProxy));
   if (provider->aaType() == AAType::Coverage) {
     atlasTextOp->indexBufferProxy = context->resourceProvider()->aaQuadIndexBuffer();
   } else if (provider->rectCount() > 1) {
@@ -53,10 +52,9 @@ PlacementPtr<AtlasTextOp> AtlasTextOp::Make(Context* context,
   return atlasTextOp;
 }
 
-AtlasTextOp::AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureProxy> textureProxy,
-                         const SamplingOptions& sampling, const Matrix& uvMatrix)
+AtlasTextOp::AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureProxy> textureProxy)
     : DrawOp(provider->aaType()), rectCount(provider->rectCount()),
-      textureProxy(std::move(textureProxy)), sampling(sampling), uvMatrix(uvMatrix) {
+      textureProxy(std::move(textureProxy)) {
   if (!provider->hasColor()) {
     commonColor = provider->firstColor();
   }
@@ -77,8 +75,8 @@ void AtlasTextOp::execute(RenderPass* renderPass) {
   }
 
   auto drawingBuffer = renderPass->getContext()->drawingBuffer();
-  auto atlasGeometryProcessor = AtlasTextGeometryProcessor::Make(
-      drawingBuffer, textureProxy, sampling, aaType, commonColor, uvMatrix);
+  auto atlasGeometryProcessor =
+      AtlasTextGeometryProcessor::Make(drawingBuffer, textureProxy, aaType, commonColor);
   auto pipeline = createPipeline(renderPass, std::move(atlasGeometryProcessor));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   renderPass->bindBuffers(indexBuffer, vertexBuffer, vertexBufferOffset);
@@ -93,5 +91,9 @@ void AtlasTextOp::execute(RenderPass* renderPass) {
   } else {
     renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
   }
+}
+
+bool AtlasTextOp::hasCoverage() const {
+  return true;
 }
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -22,6 +22,21 @@
 namespace tgfx {
 bool HardwareBufferAvailable() {
   return true;
+}
+
+PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
+  if (!HardwareBufferCheck(hardwareBuffer)) {
+    return PixelFormat::Unknown;
+  }
+  auto pixelFormat = CVPixelBufferGetPixelFormatType(hardwareBuffer);
+  switch (pixelFormat) {
+    case kCVPixelFormatType_OneComponent8:
+      return PixelFormat::ALPHA_8;
+    case kCVPixelFormatType_32BGRA:
+      return PixelFormat::RGBA_8888;
+    default:
+      return PixelFormat::Unknown;
+  }
 }
 
 std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,

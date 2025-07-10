@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,6 +18,8 @@
 
 #include "DrawingManager.h"
 #include "ProxyProvider.h"
+#include "core/AtlasCellDecodeTask.h"
+#include "core/AtlasManager.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/tasks/RenderTargetCopyTask.h"
@@ -25,6 +27,17 @@
 #include "gpu/tasks/TextureResolveTask.h"
 
 namespace tgfx {
+static ColorType GetAtlasColorType(bool isAplhaOnly) {
+  if (isAplhaOnly) {
+    return ColorType::ALPHA_8;
+  }
+#ifdef __APPLE__
+  return ColorType::BGRA_8888;
+#else
+  return ColorType::RGBA_8888;
+#endif
+}
+
 DrawingManager::DrawingManager(Context* context)
     : context(context), drawingBuffer(context->drawingBuffer()) {
 }
@@ -131,11 +144,13 @@ bool DrawingManager::flush() {
 
   if (resourceTasks.empty() && renderTasks.empty()) {
     proxyProvider->clearSharedVertexBuffer();
+    clearAtlasCellCodecTasks();
     return false;
   }
   for (auto& task : resourceTasks) {
     task->execute(context);
   }
+  uploadAtlasToGPU();
   resourceTasks.clear();
   resourceTaskMap = {};
   proxyProvider->clearSharedVertexBuffer();
@@ -167,6 +182,62 @@ void DrawingManager::releaseAll() {
   resourceTaskMap = {};
   flattenTasks.clear();
   renderTasks.clear();
+  atlasCellCodecTasks.clear();
+  atlasCellDatas.clear();
+}
+
+void DrawingManager::addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& textureProxy,
+                                           const Point& atlasOffset,
+                                           std::shared_ptr<ImageCodec> codec) {
+  if (textureProxy == nullptr || codec == nullptr) {
+    return;
+  }
+  auto padding = Plot::CellPadding;
+  auto colorType = GetAtlasColorType(codec->isAlphaOnly());
+  auto dstInfo =
+      ImageInfo::Make(codec->width() + 2 * padding, codec->height() + 2 * padding, colorType);
+  auto length = dstInfo.byteSize();
+  auto buffer = new (std::nothrow) uint8_t[length];
+  if (buffer == nullptr) {
+    return;
+  }
+  auto data = Data::MakeAdopted(buffer, length, Data::DeleteProc);
+  auto uploadOffset = atlasOffset;
+  auto floatPadding = static_cast<float>(padding);
+  uploadOffset.offset(-floatPadding, -floatPadding);
+  atlasCellDatas[textureProxy].emplace_back(std::move(data), dstInfo, uploadOffset);
+  auto task = std::make_shared<AtlasCellDecodeTask>(std::move(codec), buffer, dstInfo, padding);
+  atlasCellCodecTasks.emplace_back(std::move(task));
+}
+
+void DrawingManager::clearAtlasCellCodecTasks() {
+  atlasCellCodecTasks.clear();
+  atlasCellDatas.clear();
+}
+
+void DrawingManager::uploadAtlasToGPU() {
+  for (auto& task : atlasCellCodecTasks) {
+    task->wait();
+  }
+  for (auto& [textureProxy, cellDatas] : atlasCellDatas) {
+    if (textureProxy == nullptr || cellDatas.empty()) {
+      continue;
+    }
+    auto texture = textureProxy->getTexture();
+    if (texture == nullptr) {
+      continue;
+    }
+    auto gpu = context->gpu();
+    for (auto& [data, info, atlasOffset] : cellDatas) {
+      if (data == nullptr) {
+        continue;
+      }
+      auto rect = Rect::MakeXYWH(atlasOffset.x, atlasOffset.y, static_cast<float>(info.width()),
+                                 static_cast<float>(info.height()));
+      gpu->writePixels(texture->getSampler(), rect, data->data(), info.rowBytes());
+    }
+  }
+  clearAtlasCellCodecTasks();
 }
 
 }  // namespace tgfx

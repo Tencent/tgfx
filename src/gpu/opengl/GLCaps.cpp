@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -291,6 +291,7 @@ void GLCaps::initGLESSupport(const GLInfo& info) {
   }
   npotTextureTileSupport = version >= GL_VER(3, 0) || info.hasExtension("GL_OES_texture_npot");
   mipmapSupport = npotTextureTileSupport || info.hasExtension("GL_IMG_texture_npot");
+  usesPrecisionModifiers = true;
 }
 
 void GLCaps::initWebGLSupport(const GLInfo& info) {
@@ -307,6 +308,7 @@ void GLCaps::initWebGLSupport(const GLInfo& info) {
   clampToBorderSupport = false;
   npotTextureTileSupport = version >= GL_VER(2, 0);
   mipmapSupport = npotTextureTileSupport;
+  usesPrecisionModifiers = true;
 }
 
 void GLCaps::initFormatMap(const GLInfo& info) {

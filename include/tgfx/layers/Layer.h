@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -618,7 +618,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
     bool allowsGroupOpacity : 1;
     bool excludeChildEffectsInLayerStyle : 1;
     uint8_t blendMode : 5;
-    uint8_t maskType : 3;
+    uint8_t maskType : 2;
   } bitFields = {};
   std::string _name;
   float _alpha = 1.0f;
