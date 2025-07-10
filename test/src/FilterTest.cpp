@@ -684,4 +684,44 @@ TGFX_TEST(FilterTest, InnerShadowBadCase) {
   canvas->drawPath(path, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/InnerShadowBadCase"));
 }
+
+
+TGFX_TEST(FilterTest, ClipInnerShadowImageFilter) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  int surfaceWidth = 100;
+  int surfaceHeight = 100;
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  ASSERT_TRUE(surface != nullptr);
+
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  ASSERT_TRUE(image != nullptr);
+  auto shadowFilter = ImageFilter::InnerShadow(0, -10.5, 10, 10, Color::FromRGBA(0, 0, 0, 128));
+  image = image->makeWithFilter(shadowFilter);
+  auto canvas = surface->getCanvas();
+  {
+    AutoCanvasRestore restore(canvas);
+    canvas->clipRect(Rect::MakeWH(100.f, 30.f));
+    canvas->drawImage(image);
+  }
+  {
+    AutoCanvasRestore restore(canvas);
+    canvas->clipRect(Rect::MakeXYWH(0.f, 30.f, 100.f, 30.f));
+    canvas->drawImage(image);
+  }
+  {
+    AutoCanvasRestore restore(canvas);
+    canvas->clipRect(Rect::MakeXYWH(0, 60, 100, 30));
+    canvas->drawImage(image);
+  }
+  {
+    AutoCanvasRestore restore(canvas);
+    canvas->clipRect(Rect::MakeXYWH(0, 90, 100, 10));
+    canvas->drawImage(image);
+  }
+  context->flush();
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ClipInnerShadowImageFilter"));
+}
 }  // namespace tgfx
