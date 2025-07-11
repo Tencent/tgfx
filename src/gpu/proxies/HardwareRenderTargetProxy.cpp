@@ -23,7 +23,7 @@ HardwareRenderTargetProxy::HardwareRenderTargetProxy(HardwareBufferRef hardwareB
                                                      int height, PixelFormat format,
                                                      int sampleCount)
     : TextureRenderTargetProxy(width, height, format, sampleCount, false, ImageOrigin::TopLeft,
-                               true),
+                               false,true),
       hardwareBuffer(hardwareBuffer) {
   HardwareBufferRetain(hardwareBuffer);
 }

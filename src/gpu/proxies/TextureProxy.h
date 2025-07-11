@@ -41,6 +41,18 @@ class TextureProxy : public ResourceProxy {
   virtual int height() const = 0;
 
   /**
+   * Returns the width of the backing store, which may differ from the texture width if the texture
+   * is approximate size.
+   */
+  virtual int backingStoreWidth() const = 0;
+
+  /**
+   * Returns the height of the backing store, which may differ from the texture height if the
+   * texture is approximate size.
+   */
+  virtual int backingStoreHeight() const = 0;
+
+  /**
    * Returns the origin of the texture, either ImageOrigin::TopLeft or ImageOrigin::BottomLeft.
    */
   virtual ImageOrigin origin() const = 0;

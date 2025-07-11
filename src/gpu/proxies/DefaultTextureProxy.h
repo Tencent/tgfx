@@ -31,6 +31,14 @@ class DefaultTextureProxy : public TextureProxy {
     return _height;
   }
 
+  int backingStoreWidth() const override {
+    return _backingStoreWidth;
+  }
+
+  int backingStoreHeight() const override {
+    return _backingStoreHeight;
+  }
+
   bool isAlphaOnly() const override {
     return _format == PixelFormat::ALPHA_8;
   }
@@ -49,15 +57,15 @@ class DefaultTextureProxy : public TextureProxy {
   PixelFormat _format = PixelFormat::RGBA_8888;
   bool _mipmapped = false;
   ImageOrigin _origin = ImageOrigin::TopLeft;
+  int _backingStoreWidth = 0;
+  int _backingStoreHeight = 0;
 
   DefaultTextureProxy(int width, int height, PixelFormat pixelFormat, bool mipmapped = false,
-                      ImageOrigin origin = ImageOrigin::TopLeft)
-      : _width(width), _height(height), _format(pixelFormat), _mipmapped(mipmapped),
-        _origin(origin) {
-  }
+                      ImageOrigin origin = ImageOrigin::TopLeft, bool approximateSize = false);
 
   std::shared_ptr<Texture> onMakeTexture(Context* context) const override {
-    return Texture::MakeFormat(context, _width, _height, _format, _mipmapped, _origin);
+    return Texture::MakeFormat(context, _backingStoreWidth, _backingStoreHeight, _format,
+                               _mipmapped, _origin);
   }
 
   friend class ProxyProvider;

@@ -374,9 +374,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
 
 static void FlipYIfNeeded(Rect* rect, std::shared_ptr<RenderTargetProxy> renderTarget) {
   if (renderTarget->origin() == ImageOrigin::BottomLeft) {
-    auto height = rect->height();
-    rect->top = static_cast<float>(renderTarget->height()) - rect->bottom;
-    rect->bottom = rect->top + height;
+    renderTarget->getOriginTransform().mapRect(rect);
   }
 }
 
@@ -510,7 +508,8 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
     auto shapeProxy = proxyProvider()->createGpuShapeProxy(shape, aaType, clipBounds, renderFlags);
     auto uvMatrix = Matrix::MakeTrans(bounds.left, bounds.top);
     auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), {}, uvMatrix, aaType);
-    auto clipRenderTarget = RenderTargetProxy::MakeFallback(context, width, height, true);
+    auto clipRenderTarget = RenderTargetProxy::MakeFallback(context, width, height, true, 1, false,
+                                                            renderTarget->origin(), true);
     if (clipRenderTarget == nullptr) {
       return nullptr;
     }
@@ -554,9 +553,7 @@ std::pair<PlacementPtr<FragmentProcessor>, bool> OpsCompositor::getClipMaskFP(co
   auto textureProxy = getClipTexture(clip, aaType);
   auto uvMatrix = Matrix::MakeTrans(-clipBounds.left, -clipBounds.top);
   if (renderTarget->origin() == ImageOrigin::BottomLeft) {
-    auto flipYMatrix = Matrix::MakeScale(1.0f, -1.0f);
-    flipYMatrix.postTranslate(0, static_cast<float>(renderTarget->height()));
-    uvMatrix.preConcat(flipYMatrix);
+    uvMatrix.preConcat(renderTarget->getOriginTransform());
   }
   auto processor = DeviceSpaceTextureEffect::Make(buffer, std::move(textureProxy), uvMatrix);
   return {FragmentProcessor::MulInputByChildAlpha(buffer, std::move(processor)), true};
@@ -598,7 +595,7 @@ DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AATyp
   dstTextureInfo.offset = {bounds.x(), bounds.y()};
   textureProxy = proxyProvider()->createTextureProxy(
       {}, static_cast<int>(bounds.width()), static_cast<int>(bounds.height()),
-      renderTarget->format(), false, renderTarget->origin());
+      renderTarget->format(), false, renderTarget->origin(), true);
   auto dstTextureCopyOp = DstTextureCopyOp::Make(textureProxy, static_cast<int>(bounds.x()),
                                                  static_cast<int>(bounds.y()));
   if (dstTextureCopyOp == nullptr) {
