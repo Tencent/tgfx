@@ -99,7 +99,7 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (samplingArgs.sampleArea) {
     newSamplingArgs.sampleArea->offset(-rect.left, -rect.top);
   }
-  return TiledTextureEffect::Make(renderTarget->getTextureProxy(), newSamplingArgs, &finalUVMatrix,
+  return TiledTextureEffect::Make(renderTarget->asTextureProxy(), newSamplingArgs, &finalUVMatrix,
                                   isAlphaOnly());
 }
 
@@ -114,7 +114,7 @@ std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args)
   if (!drawPicture(renderTarget, args.renderFlags, nullptr)) {
     return nullptr;
   }
-  return renderTarget->getTextureProxy();
+  return renderTarget->asTextureProxy();
 }
 
 bool PictureImage::drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget,

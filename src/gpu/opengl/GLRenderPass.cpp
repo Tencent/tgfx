@@ -118,7 +118,7 @@ static void UpdateBlend(Context* context, const BlendFormula* blendFactors) {
 void GLRenderPass::onBindRenderTarget() {
   auto gl = GLFunctions::Get(context);
   auto glRT = static_cast<GLRenderTarget*>(_renderTarget.get());
-  gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->getFrameBufferID());
+  gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->drawFrameBufferID());
   gl->viewport(0, 0, glRT->width(), glRT->height());
   if (vertexArray) {
     gl->bindVertexArray(vertexArray->id());
@@ -217,7 +217,7 @@ void GLRenderPass::onCopyToTexture(Texture* texture, int srcX, int srcY) {
   // Reset the render target after the copy operation.
   auto gl = GLFunctions::Get(context);
   gl->bindFramebuffer(GL_FRAMEBUFFER,
-                      static_cast<GLRenderTarget*>(_renderTarget.get())->getFrameBufferID());
+                      static_cast<GLRenderTarget*>(_renderTarget.get())->drawFrameBufferID());
 }
 
 bool GLRenderPass::copyAsBlit(Texture* texture, int srcX, int srcY) {
@@ -244,7 +244,7 @@ bool GLRenderPass::copyAsBlit(Texture* texture, int srcX, int srcY) {
 
   gl->bindFramebuffer(GL_FRAMEBUFFER, frameBuffer->id());
   gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, target, glSampler->id(), 0);
-  auto sourceFrameBufferID = static_cast<GLRenderTarget*>(_renderTarget.get())->getFrameBufferID();
+  auto sourceFrameBufferID = static_cast<GLRenderTarget*>(_renderTarget.get())->drawFrameBufferID();
 #ifndef TGFX_BUILD_FOR_WEB
   if (gl->checkFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
     gl->bindFramebuffer(GL_FRAMEBUFFER, sourceFrameBufferID);

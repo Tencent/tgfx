@@ -51,11 +51,7 @@ class RenderPass {
     return _renderTarget;
   }
 
-  std::shared_ptr<Texture> renderTargetTexture() {
-    return _renderTargetTexture;
-  }
-
-  bool begin(std::shared_ptr<RenderTarget> renderTarget, std::shared_ptr<Texture> renderTexture);
+  bool begin(std::shared_ptr<RenderTarget> renderTarget);
   void end();
   void bindProgramAndScissorClip(const ProgramInfo* programInfo, const Rect& scissorRect);
   void bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer, std::shared_ptr<GpuBuffer> vertexBuffer,
@@ -85,7 +81,6 @@ class RenderPass {
 
   Context* context = nullptr;
   std::shared_ptr<RenderTarget> _renderTarget = nullptr;
-  std::shared_ptr<Texture> _renderTargetTexture = nullptr;
   Program* _program = nullptr;
 
  private:

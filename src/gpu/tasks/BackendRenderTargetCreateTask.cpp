@@ -16,31 +16,22 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/DefaultTexture.h"
+#include "BackendRenderTargetCreateTask.h"
 
 namespace tgfx {
-/**
- * ExtendedTexture enhances DefaultTexture by allowing you to specify an extended width and height.
- */
-class ExtendedTexture : public DefaultTexture {
- public:
-  ExtendedTexture(std::unique_ptr<TextureSampler> sampler, int width, int height, int extendedWidth,
-                  int extendedHeight, ImageOrigin origin = ImageOrigin::TopLeft);
+BackendRenderTargetCreateTask::BackendRenderTargetCreateTask(UniqueKey uniqueKey,
+                                                             const BackendTexture& backendTexture,
+                                                             int sampleCount, ImageOrigin origin,
+                                                             bool adopted)
+    : ResourceTask(std::move(uniqueKey)), backendTexture(backendTexture), sampleCount(sampleCount),
+      origin(origin), adopted(adopted) {
+}
 
-  size_t memoryUsage() const override;
-
-  Point getTextureCoord(float x, float y) const override {
-    return {x / static_cast<float>(extendedWidth), y / static_cast<float>(extendedHeight)};
+std::shared_ptr<Resource> BackendRenderTargetCreateTask::onMakeResource(Context* context) {
+  auto renderTarget = RenderTarget::MakeFrom(context, backendTexture, sampleCount, origin, adopted);
+  if (renderTarget == nullptr) {
+    LOGE("BackendTextureRTCreateTask::onMakeResource() Failed to create the render target!");
   }
-
-  BackendTexture getBackendTexture() const override {
-    return getSampler()->getBackendTexture(extendedWidth, extendedHeight);
-  }
-
- private:
-  int extendedWidth = 0;
-  int extendedHeight = 0;
-};
+  return renderTarget->asTexture();
+}
 }  // namespace tgfx

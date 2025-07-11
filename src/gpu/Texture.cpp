@@ -40,7 +40,8 @@ bool Texture::CheckSizeAndFormat(Context* context, int width, int height, PixelF
   return width <= maxTextureSize && height <= maxTextureSize;
 }
 
-static ScratchKey ComputeScratchKey(int width, int height, PixelFormat format, bool mipmapped) {
+static ScratchKey ComputeTextureScratchKey(int width, int height, PixelFormat format,
+                                           bool mipmapped) {
   static const uint32_t DefaultTextureType = UniqueID::Next();
   BytesKey bytesKey(4);
   bytesKey.write(DefaultTextureType);
@@ -60,7 +61,7 @@ std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int he
     return nullptr;
   }
   auto hasMipmaps = context->caps()->mipmapSupport ? mipmapped : false;
-  auto scratchKey = ComputeScratchKey(width, height, pixelFormat, hasMipmaps);
+  auto scratchKey = ComputeTextureScratchKey(width, height, pixelFormat, hasMipmaps);
   auto texture = Resource::Find<Texture>(context, scratchKey);
   if (texture) {
     texture->_origin = origin;
@@ -89,9 +90,14 @@ std::shared_ptr<Texture> Texture::MakeFrom(Context* context, const BackendTextur
   if (sampler == nullptr) {
     return nullptr;
   }
+  ScratchKey scratchKey = {};
+  if (adopted) {
+    scratchKey = ComputeTextureScratchKey(backendTexture.width(), backendTexture.height(),
+                                          sampler->format(), sampler->hasMipmaps());
+  }
   auto texture = new DefaultTexture(std::move(sampler), backendTexture.width(),
                                     backendTexture.height(), origin);
-  return Resource::AddToCache(context, texture);
+  return Resource::AddToCache(context, texture, scratchKey);
 }
 
 std::shared_ptr<Texture> Texture::MakeFrom(Context* context,
@@ -113,27 +119,32 @@ std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef h
 #if defined(__OHOS__)
   // On the HarmonyOS platform, video-decoded HardwareBuffers may not have the correct color space
   // set, so we need to set it manually before creating the texture.
-  switch (colorSpace) {
-    case YUVColorSpace::BT601_LIMITED:
-      OH_NativeBuffer_SetColorSpace(hardwareBuffer, OH_COLORSPACE_BT601_SMPTE_C_LIMIT);
-      break;
-    case YUVColorSpace::BT601_FULL:
-      OH_NativeBuffer_SetColorSpace(hardwareBuffer, OH_COLORSPACE_BT601_SMPTE_C_FULL);
-      break;
-    case YUVColorSpace::BT709_LIMITED:
-      OH_NativeBuffer_SetColorSpace(hardwareBuffer, OH_COLORSPACE_BT709_LIMIT);
-      break;
-    case YUVColorSpace::BT709_FULL:
-      OH_NativeBuffer_SetColorSpace(hardwareBuffer, OH_COLORSPACE_BT709_FULL);
-      break;
-    case YUVColorSpace::BT2020_LIMITED:
-      OH_NativeBuffer_SetColorSpace(hardwareBuffer, OH_COLORSPACE_BT2020_PQ_LIMIT);
-      break;
-    case YUVColorSpace::BT2020_FULL:
-      OH_NativeBuffer_SetColorSpace(hardwareBuffer, OH_COLORSPACE_BT2020_PQ_FULL);
-      break;
-    default:
-      break;
+  OH_NativeBuffer_Config config;
+  OH_NativeBuffer_GetConfig(hardwareBuffer, &config);
+  if (config.format >= NATIVEBUFFER_PIXEL_FMT_YUV_422_I &&
+      config.format <= NATIVEBUFFER_PIXEL_FMT_YCRCB_P010) {
+    switch (colorSpace) {
+      case YUVColorSpace::BT601_LIMITED:
+        OH_NativeBuffer_SetColorSpace(hardwareBuffer, OH_COLORSPACE_BT601_SMPTE_C_LIMIT);
+        break;
+      case YUVColorSpace::BT601_FULL:
+        OH_NativeBuffer_SetColorSpace(hardwareBuffer, OH_COLORSPACE_BT601_SMPTE_C_FULL);
+        break;
+      case YUVColorSpace::BT709_LIMITED:
+        OH_NativeBuffer_SetColorSpace(hardwareBuffer, OH_COLORSPACE_BT709_LIMIT);
+        break;
+      case YUVColorSpace::BT709_FULL:
+        OH_NativeBuffer_SetColorSpace(hardwareBuffer, OH_COLORSPACE_BT709_FULL);
+        break;
+      case YUVColorSpace::BT2020_LIMITED:
+        OH_NativeBuffer_SetColorSpace(hardwareBuffer, OH_COLORSPACE_BT2020_PQ_LIMIT);
+        break;
+      case YUVColorSpace::BT2020_FULL:
+        OH_NativeBuffer_SetColorSpace(hardwareBuffer, OH_COLORSPACE_BT2020_PQ_FULL);
+        break;
+      default:
+        break;
+    }
   }
 #endif
 

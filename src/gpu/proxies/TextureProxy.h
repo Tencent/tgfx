@@ -20,7 +20,6 @@
 
 #include "ResourceProxy.h"
 #include "gpu/Texture.h"
-#include "gpu/TextureSampler.h"
 
 namespace tgfx {
 /**
@@ -52,11 +51,6 @@ class TextureProxy : public ResourceProxy {
    * Returns true if the texture represents transparency only.
    */
   virtual bool isAlphaOnly() const = 0;
-
-  /**
-   * Returns true if the backend texture is externally owned.
-   */
-  virtual bool externallyOwned() const = 0;
 
   /**
    * Returns true if it is a flatten texture proxy.

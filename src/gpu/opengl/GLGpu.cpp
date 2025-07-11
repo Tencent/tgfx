@@ -101,7 +101,7 @@ void GLGpu::copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture*
   DEBUG_ASSERT(srcY >= 0 && srcY + texture->height() <= renderTarget->height());
   auto gl = GLFunctions::Get(context);
   auto glRenderTarget = static_cast<const GLRenderTarget*>(renderTarget);
-  gl->bindFramebuffer(GL_FRAMEBUFFER, glRenderTarget->getFrameBufferID(false));
+  gl->bindFramebuffer(GL_FRAMEBUFFER, glRenderTarget->readFrameBufferID());
   auto glSampler = static_cast<const GLTextureSampler*>(texture->getSampler());
   auto target = glSampler->target();
   gl->bindTexture(target, glSampler->id());
@@ -125,8 +125,8 @@ void GLGpu::resolveRenderTarget(RenderTarget* renderTarget, const Rect& bounds) 
                bounds.right == static_cast<float>(right) &&
                bounds.bottom == static_cast<float>(bottom));
   auto glRT = static_cast<GLRenderTarget*>(renderTarget);
-  gl->bindFramebuffer(GL_READ_FRAMEBUFFER, glRT->getFrameBufferID(true));
-  gl->bindFramebuffer(GL_DRAW_FRAMEBUFFER, glRT->getFrameBufferID(false));
+  gl->bindFramebuffer(GL_READ_FRAMEBUFFER, glRT->drawFrameBufferID());
+  gl->bindFramebuffer(GL_DRAW_FRAMEBUFFER, glRT->readFrameBufferID());
   if (caps->msFBOType == MSFBOType::ES_Apple) {
     // Apple's extension uses the scissor as the blit bounds.
     gl->enable(GL_SCISSOR_TEST);

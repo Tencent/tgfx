@@ -448,7 +448,7 @@ std::pair<bool, bool> OpsCompositor::needComputeBounds(const Fill& fill, bool ha
   if (BlendModeNeedDstTexture(fill.blendMode, hasCoverage)) {
     auto caps = context->caps();
     if (!caps->frameBufferFetchSupport &&
-        (!caps->textureBarrierSupport || renderTarget->getTextureProxy() == nullptr ||
+        (!caps->textureBarrierSupport || renderTarget->asTextureProxy() == nullptr ||
          renderTarget->sampleCount() > 1)) {
       needDeviceBounds = true;
     }
@@ -511,7 +511,7 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
     if (clipRenderTarget == nullptr) {
       return nullptr;
     }
-    clipTexture = clipRenderTarget->getTextureProxy();
+    clipTexture = clipRenderTarget->asTextureProxy();
     auto clearOp = ClearOp::Make(context, Color::Transparent(), clipRenderTarget->bounds());
     auto opList = drawingBuffer()->makeArray<Op>(2);
     opList[0] = std::move(clearOp);
@@ -565,7 +565,7 @@ DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AATyp
     return {};
   }
   Rect bounds = {};
-  auto textureProxy = caps->textureBarrierSupport ? renderTarget->getTextureProxy() : nullptr;
+  auto textureProxy = caps->textureBarrierSupport ? renderTarget->asTextureProxy() : nullptr;
   if (textureProxy == nullptr || renderTarget->sampleCount() > 1) {
     if (deviceBounds.isEmpty()) {
       return {};

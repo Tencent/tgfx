@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,45 +16,20 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/proxies/TextureProxy.h"
+#include "HardwareRenderTargetCreateTask.h"
 
 namespace tgfx {
+HardwareRenderTargetCreateTask::HardwareRenderTargetCreateTask(UniqueKey uniqueKey,
+                                                               HardwareBufferRef hardwareBuffer,
+                                                               int sampleCount)
+    : ResourceTask(std::move(uniqueKey)), hardwareBuffer(hardwareBuffer), sampleCount(sampleCount) {
+}
 
-class FlattenTextureProxy : public TextureProxy {
- public:
-  int width() const override {
-    return source->width();
+std::shared_ptr<Resource> HardwareRenderTargetCreateTask::onMakeResource(Context* context) {
+  auto renderTarget = RenderTarget::MakeFrom(context, hardwareBuffer, sampleCount);
+  if (renderTarget == nullptr) {
+    LOGE("HardwareBufferRTCreateTask::onMakeResource() Failed to create the render target!");
   }
-
-  int height() const override {
-    return source->height();
-  }
-
-  ImageOrigin origin() const override {
-    return ImageOrigin::TopLeft;
-  }
-
-  bool hasMipmaps() const override {
-    return source->hasMipmaps();
-  }
-
-  bool isAlphaOnly() const override {
-    return source->isAlphaOnly();
-  }
-
-  bool isFlatten() const override {
-    return true;
-  }
-
-  std::shared_ptr<Texture> getTexture() const override;
-
- private:
-  std::shared_ptr<TextureProxy> source = nullptr;
-
-  FlattenTextureProxy(UniqueKey uniqueKey, std::shared_ptr<TextureProxy> source);
-
-  friend class ProxyProvider;
-};
+  return renderTarget->asTexture();
+}
 }  // namespace tgfx

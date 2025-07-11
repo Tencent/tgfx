@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,20 +19,22 @@
 #pragma once
 
 #include "ResourceTask.h"
-#include "gpu/proxies/TextureProxy.h"
+#include "gpu/RenderTarget.h"
 
 namespace tgfx {
-class RenderTargetCreateTask : public ResourceTask {
+class TextureRenderTargetCreateTask : public ResourceTask {
  public:
-  RenderTargetCreateTask(UniqueKey uniqueKey, std::shared_ptr<TextureProxy> textureProxy,
-                         PixelFormat pixelFormat, int sampleCount);
+  TextureRenderTargetCreateTask(UniqueKey uniqueKey, int width, int height, PixelFormat format,
+                                int sampleCount, bool mipmapped, ImageOrigin origin);
 
- protected:
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
 
  private:
-  std::shared_ptr<TextureProxy> textureProxy = nullptr;
-  PixelFormat pixelFormat = PixelFormat::RGBA_8888;
+  int width = 0;
+  int height = 0;
+  PixelFormat format = PixelFormat::Unknown;
   int sampleCount = 1;
+  bool mipmapped = false;
+  ImageOrigin origin = ImageOrigin::TopLeft;
 };
 }  // namespace tgfx

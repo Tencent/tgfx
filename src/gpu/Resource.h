@@ -84,6 +84,7 @@ class Resource {
 
  protected:
   Context* context = nullptr;
+  std::shared_ptr<Resource> reference = nullptr;
 
   /**
    * Overridden to free GPU resources in the backend API.
@@ -91,7 +92,6 @@ class Resource {
   virtual void onReleaseGPU() = 0;
 
  private:
-  std::shared_ptr<Resource> reference;
   ScratchKey scratchKey = {};
   UniqueKey uniqueKey = {};
   std::list<Resource*>* cachedList = nullptr;

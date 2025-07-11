@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,45 +16,25 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/proxies/TextureProxy.h"
+#include "GLBackendRenderTarget.h"
+#include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
-
-class FlattenTextureProxy : public TextureProxy {
- public:
-  int width() const override {
-    return source->width();
+std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
+                                                     const BackendRenderTarget& renderTarget,
+                                                     ImageOrigin origin) {
+  if (context == nullptr || !renderTarget.isValid()) {
+    return nullptr;
   }
-
-  int height() const override {
-    return source->height();
+  GLFrameBufferInfo frameBufferInfo = {};
+  if (!renderTarget.getGLFramebufferInfo(&frameBufferInfo)) {
+    return nullptr;
   }
-
-  ImageOrigin origin() const override {
-    return ImageOrigin::TopLeft;
+  auto format = GLSizeFormatToPixelFormat(frameBufferInfo.format);
+  if (!context->caps()->isFormatRenderable(format)) {
+    return nullptr;
   }
-
-  bool hasMipmaps() const override {
-    return source->hasMipmaps();
-  }
-
-  bool isAlphaOnly() const override {
-    return source->isAlphaOnly();
-  }
-
-  bool isFlatten() const override {
-    return true;
-  }
-
-  std::shared_ptr<Texture> getTexture() const override;
-
- private:
-  std::shared_ptr<TextureProxy> source = nullptr;
-
-  FlattenTextureProxy(UniqueKey uniqueKey, std::shared_ptr<TextureProxy> source);
-
-  friend class ProxyProvider;
-};
+  return std::make_shared<GLBackendRenderTarget>(
+      context, renderTarget.width(), renderTarget.height(), origin, format, frameBufferInfo.id);
+}
 }  // namespace tgfx
