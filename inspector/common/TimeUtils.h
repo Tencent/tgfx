@@ -17,18 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include <tgfx/core/Data.h>
-#include "SerializationUtils.h"
-
-namespace tgfx {
-class glyphRunListSerialization {
- public:
-  static std::shared_ptr<Data> Serialize(const GlyphRunList* glyphRunList,
-                                         SerializeUtils::Map* map);
-
- private:
-  static void SerializeglyphRunListImpl(flexbuffers::Builder& fbb, const GlyphRunList* glyphRunList,
-                                        SerializeUtils::Map* map);
-};
+#include <cstdint>
+#include <chrono>
+namespace inspector {
+template<typename T>
+int64_t GetCurrentTime() {
+  return std::chrono::duration_cast<T>(
+                              std::chrono::system_clock::now().time_since_epoch())
+                              .count();
+}
 }  // namespace tgfx

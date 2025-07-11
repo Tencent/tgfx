@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -15,18 +15,25 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
 #pragma once
-
-#include <tgfx/core/Data.h>
-#include "SerializationUtils.h"
-
-namespace tgfx {
-class TypeFaceSerialization {
- public:
-  static std::shared_ptr<Data> Serialize(const Typeface* typeface);
-
- private:
-  static void SerializeTypeFaceImpl(flexbuffers::Builder& fbb, const Typeface* typeface);
+#include <cstdint>
+#include <set>
+namespace inspector {
+class TCPPortProvider {
+public:
+  static TCPPortProvider& GetTCPPortProvider() {
+    static TCPPortProvider instance;
+    return instance;
+  }
+  TCPPortProvider(const TCPPortProvider& provider) = delete;
+  TCPPortProvider(TCPPortProvider&& provider) = delete;
+  TCPPortProvider& operator=(const TCPPortProvider& provider) = delete;
+  TCPPortProvider& operator=(TCPPortProvider&& provider) = delete;
+  uint16_t getValidPort();
+  bool clearUsedPort(uint16_t port);
+private:
+  TCPPortProvider() = default;
+  std::set<uint16_t> usedPortSet = {};
 };
-}  // namespace tgfx
+}
+

@@ -15,18 +15,9 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
 #pragma once
 
-#include <tgfx/core/Data.h>
-#include "SerializationUtils.h"
+#include "LayerProfiler.h"
 
-namespace tgfx {
-class ImageSerialization {
- public:
-  static std::shared_ptr<Data> Serialize(const Image* image);
-
- private:
-  static void SerializeImageImpl(flexbuffers::Builder& fbb, const Image* image);
-};
-}  // namespace tgfx
+#define SEND_LAYER_DATA(data) inspector::LayerProfiler::SendLayerData(data)
+#define LAYER_CALLBACK(func) inspector::LayerProfiler::SetLayerCallBack(func)

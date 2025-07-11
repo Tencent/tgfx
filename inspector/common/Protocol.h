@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,16 +17,23 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+namespace inspector {
 
-#include <tgfx/core/Data.h>
-#include "SerializationUtils.h"
+inline constexpr int broadcastNum = 5;
 
-namespace tgfx {
-class FontMetricsSerialization {
- public:
-  static std::shared_ptr<Data> Serialize(const FontMetrics* fontMerics);
+inline constexpr uint64_t WelcomeMessageProgramNameSize = 64;
+inline constexpr uint8_t ProtocolVersion = 1;
+inline constexpr uint16_t BroadcastVersion = 1;
 
- private:
-  static void SerializeScalerContextImpl(flexbuffers::Builder& fbb, const FontMetrics* fontMetrics);
+enum class MsgType : uint8_t { FrameCapture = 0, LayerTree = 1 };
+
+struct BroadcastMessage {
+  uint8_t type;
+  uint16_t listenPort;
+  uint32_t protocolVersion;
+  uint64_t pid;
+  int32_t activeTime;  // in seconds
+  char programName[WelcomeMessageProgramNameSize];
 };
-}  // namespace tgfx
+
+}  // namespace inspector

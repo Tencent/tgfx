@@ -25,7 +25,8 @@ namespace tgfx {
 class LayerStyle;
 class LayerStyleSerialization {
  public:
-  static std::shared_ptr<Data> Serialize(const LayerStyle* layerStyle, SerializeUtils::Map* map);
+  static std::shared_ptr<Data> Serialize(const LayerStyle* layerStyle,
+                                         SerializeUtils::ComplexObjSerMap* map);
 
  private:
   static void SerializeBasicLayerStyleImpl(flexbuffers::Builder& fbb, const LayerStyle* layerStyle);
@@ -34,9 +35,9 @@ class LayerStyleSerialization {
                                                const LayerStyle* layerStyle);
 
   static void SerializeDropShadowStyleImpl(flexbuffers::Builder& fbb, const LayerStyle* layerStyle,
-                                           SerializeUtils::Map* map);
+                                           SerializeUtils::ComplexObjSerMap* map);
 
   static void SerializeInnerShadowStyleImpl(flexbuffers::Builder& fbb, const LayerStyle* layerStyle,
-                                            SerializeUtils::Map* map);
+                                            SerializeUtils::ComplexObjSerMap* map);
 };
 }  // namespace tgfx

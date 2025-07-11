@@ -15,19 +15,17 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
 #pragma once
-
-#include <tgfx/core/Data.h>
-#include "SerializationUtils.h"
+#include "Layer.h"
 
 namespace tgfx {
-class RRectSerialization {
- public:
-  static std::shared_ptr<Data> Serialize(const RRect* rrect, SerializeUtils::Map* map);
 
- private:
-  static void SerializeRRectImpl(flexbuffers::Builder& fbb, const RRect* rrect,
-                                 SerializeUtils::Map* map);
+class LayerViewer {
+ public:
+  /**
+   * Pick the layer to inspect it
+   */
+  static void PickLayer(std::shared_ptr<Layer> layer);
 };
+
 }  // namespace tgfx

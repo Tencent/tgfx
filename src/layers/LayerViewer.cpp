@@ -15,22 +15,15 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+#include "tgfx/layers/LayerViewer.h"
+#ifdef TGFX_USE_INSPECTOR
+#include "layers/LayerViewerManager.h"
+#endif
 
-#pragma once
-
-#include <tgfx/core/Data.h>
-#include "SerializationUtils.h"
-#include "core/ScalerContext.h"
-
-namespace tgfx {
-class ScalerContextSerialization {
- public:
-  static std::shared_ptr<Data> Serialize(const ScalerContext* scalerContext,
-                                         SerializeUtils::Map* map);
-
- private:
-  static void SerializeScalerContextImpl(flexbuffers::Builder& fbb,
-                                         const ScalerContext* scaler_context,
-                                         SerializeUtils::Map* map);
-};
-}  // namespace tgfx
+void tgfx::LayerViewer::PickLayer(std::shared_ptr<Layer> layer) {
+#ifdef TGFX_USE_INSPECTOR
+  LayerViewerManager::GetLayerInspectorManager().pickLayer(layer);
+#else
+  (void)layer;
+#endif
+}

@@ -17,17 +17,22 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include <tgfx/core/Data.h>
-#include "SerializationUtils.h"
-
-namespace tgfx {
-class SamplingOptionsSerialization {
- public:
-  static std::shared_ptr<Data> Serialize(const SamplingOptions* samplingOptions);
-
- private:
-  static void SerializeSamplingOptionsImpl(flexbuffers::Builder& fbb,
-                                           const SamplingOptions* samplingOptions);
-};
+#include <cstdint>
+namespace inspector {
+  enum class LayerInspectorMsgType : uint8_t {
+    EnableLayerInspector,
+    HoverLayerAddress,
+    SelectedLayerAddress,
+    SerializeAttribute,
+    SerializeSubAttribute,
+    FlushAttribute,
+    FlushLayerTree,
+    FlushImage,
+    PickedLayerAddress,
+    FlushAttributeAck,
+    LayerTree,
+    LayerAttribute,
+    LayerSubAttribute,
+    ImageData
+  };
 }  // namespace tgfx
