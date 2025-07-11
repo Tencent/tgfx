@@ -48,6 +48,10 @@ class GLTextureRenderTarget : public DefaultTexture, public GLRenderTarget {
     return _sampler->format();
   }
 
+  bool externallyOwned() const override {
+    return _externallyOwned;
+  }
+
   std::shared_ptr<Texture> asTexture() const override {
     return std::static_pointer_cast<Texture>(reference);
   }
@@ -69,6 +73,7 @@ class GLTextureRenderTarget : public DefaultTexture, public GLRenderTarget {
 
  private:
   int _sampleCount = 1;
+  bool _externallyOwned = false;
   unsigned _readFrameBufferID = 0;
   unsigned _drawFrameBufferID = 0;
   unsigned renderBufferID = 0;
@@ -77,11 +82,13 @@ class GLTextureRenderTarget : public DefaultTexture, public GLRenderTarget {
                                                 std::unique_ptr<TextureSampler> sampler, int width,
                                                 int height, int sampleCount,
                                                 ImageOrigin origin = ImageOrigin::TopLeft,
+                                                bool externallyOwned = false,
                                                 const ScratchKey& scratchKey = {});
 
   GLTextureRenderTarget(std::unique_ptr<TextureSampler> sampler, int width, int height,
-                        ImageOrigin origin, int sampleCount)
-      : DefaultTexture(std::move(sampler), width, height, origin), _sampleCount(sampleCount) {
+                        ImageOrigin origin, int sampleCount, bool externallyOwned)
+      : DefaultTexture(std::move(sampler), width, height, origin), _sampleCount(sampleCount),
+        _externallyOwned(externallyOwned) {
   }
 
   friend class RenderTarget;

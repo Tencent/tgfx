@@ -22,6 +22,8 @@
 #include "gpu/Texture.h"
 
 namespace tgfx {
+class RenderTargetProxy;
+
 /**
  * This class defers the acquisition of textures until they are actually required.
  */
@@ -63,6 +65,14 @@ class TextureProxy : public ResourceProxy {
    * Returns the associated Texture instance.
    */
   virtual std::shared_ptr<Texture> getTexture() const = 0;
+
+  /**
+   * Returns the underlying RenderTargetProxy if this TextureProxy is alos a render target proxy;
+   * otherwise, returns nullptr.
+   */
+  virtual std::shared_ptr<RenderTargetProxy> asRenderTargetProxy() const {
+    return nullptr;
+  }
 
  protected:
   explicit TextureProxy(UniqueKey uniqueKey) : ResourceProxy(std::move(uniqueKey)) {
