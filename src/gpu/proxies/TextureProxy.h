@@ -67,7 +67,7 @@ class TextureProxy : public ResourceProxy {
   virtual std::shared_ptr<Texture> getTexture() const = 0;
 
   /**
-   * Returns the underlying RenderTargetProxy if this TextureProxy is alos a render target proxy;
+   * Returns the underlying RenderTargetProxy if this TextureProxy is also a render target proxy;
    * otherwise, returns nullptr.
    */
   virtual std::shared_ptr<RenderTargetProxy> asRenderTargetProxy() const {
