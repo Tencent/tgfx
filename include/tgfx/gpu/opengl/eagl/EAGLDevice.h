@@ -35,10 +35,6 @@ class EAGLDevice : public GLDevice {
 
   EAGLContext* eaglContext() const;
 
-  CVOpenGLESTextureCacheRef getTextureCache();
-
-  void releaseTexture(CVOpenGLESTextureRef texture);
-
  protected:
   bool onMakeCurrent() override;
   void onClearCurrent() override;
@@ -56,9 +52,11 @@ class EAGLDevice : public GLDevice {
   bool makeCurrent(bool force = false);
   void clearCurrent();
   void finish();
+  CVOpenGLESTextureCacheRef getTextureCache();
 
   friend class GLDevice;
   friend class EAGLWindow;
+  friend class EAGLHardwareTextureSampler;
 
   friend void ApplicationWillResignActive();
   friend void ApplicationDidBecomeActive();

@@ -206,12 +206,14 @@ void GLRenderPass::onCopyToTexture(Texture* texture, int srcX, int srcY) {
   auto gpu = context->gpu();
   if (_renderTarget->sampleCount() > 1) {
     if (copyAsBlit(texture, srcX, srcY)) {
+      texture->getSampler()->regenerateMipmapLevels(context);
       return;
     }
     auto bounds = Rect::MakeXYWH(srcX, srcY, texture->width(), texture->height());
     gpu->resolveRenderTarget(_renderTarget.get(), bounds);
   }
   gpu->copyRenderTargetToTexture(_renderTarget.get(), texture, srcX, srcY);
+  texture->getSampler()->regenerateMipmapLevels(context);
   // Reset the render target after the copy operation.
   auto gl = GLFunctions::Get(context);
   gl->bindFramebuffer(GL_FRAMEBUFFER,
@@ -226,8 +228,9 @@ bool GLRenderPass::copyAsBlit(Texture* texture, int srcX, int srcY) {
   if (caps->blitRectsMustMatchForMSAASrc && (srcX != 0 || srcY != 0)) {
     return false;
   }
-  auto glSampler = static_cast<const GLSampler*>(texture->getSampler());
-  if (glSampler->format != _renderTarget->format()) {
+  auto glSampler = static_cast<const GLTextureSampler*>(texture->getSampler());
+  auto target = glSampler->target();
+  if (glSampler->format() != _renderTarget->format()) {
     return false;
   }
   if (frameBuffer == nullptr) {
@@ -238,9 +241,9 @@ bool GLRenderPass::copyAsBlit(Texture* texture, int srcX, int srcY) {
   }
   ClearGLError(context);
   auto gl = GLFunctions::Get(context);
+
   gl->bindFramebuffer(GL_FRAMEBUFFER, frameBuffer->id());
-  gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, glSampler->target, glSampler->id,
-                           0);
+  gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, target, glSampler->id(), 0);
   auto sourceFrameBufferID = static_cast<GLRenderTarget*>(_renderTarget.get())->getFrameBufferID();
 #ifndef TGFX_BUILD_FOR_WEB
   if (gl->checkFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
@@ -260,11 +263,7 @@ bool GLRenderPass::copyAsBlit(Texture* texture, int srcX, int srcY) {
     return false;
   }
   gl->bindFramebuffer(GL_FRAMEBUFFER, frameBuffer->id());
-  gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, glSampler->target, 0, 0);
-  if (glSampler->hasMipmaps() && glSampler->target == GL_TEXTURE_2D) {
-    gl->bindTexture(glSampler->target, glSampler->id);
-    gl->generateMipmap(glSampler->target);
-  }
+  gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, target, 0, 0);
   gl->bindFramebuffer(GL_FRAMEBUFFER, sourceFrameBufferID);
   return true;
 }

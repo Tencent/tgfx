@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <array>
 #include "gpu/Texture.h"
 #include "gpu/TextureSampler.h"
 #include "gpu/YUVFormat.h"
@@ -43,21 +44,27 @@ class YUVTexture : public Texture {
     return _colorSpace;
   }
 
+  TextureSampler* getSampler() const override {
+    return samplers.front().get();
+  }
+
   /**
    * Returns the number of the samplers in the texture.
    */
-  size_t samplerCount() const {
-    return samplers.size();
-  }
-
-  const TextureSampler* getSampler() const override {
-    return samplers[0].get();
-  }
+  size_t samplerCount() const;
 
   /**
    * Returns a texture sampler at the specified index.
    */
-  const TextureSampler* getSamplerAt(size_t index) const;
+  TextureSampler* getSamplerAt(size_t index) const;
+
+  bool isAlphaOnly() const override {
+    return false;
+  }
+
+  bool hasMipmaps() const override {
+    return false;  // YUV textures do not support mipmaps.
+  }
 
   bool isYUV() const final {
     return true;
@@ -67,16 +74,18 @@ class YUVTexture : public Texture {
 
   Point getTextureCoord(float x, float y) const override;
 
-  BackendTexture getBackendTexture() const override;
+  BackendTexture getBackendTexture() const override {
+    return {};
+  }
 
  protected:
-  std::vector<std::unique_ptr<TextureSampler>> samplers = {};
-
-  YUVTexture(int width, int height, YUVFormat yuvFormat, YUVColorSpace colorSpace);
+  YUVTexture(std::vector<std::unique_ptr<TextureSampler>> yuvSamplers, int width, int height,
+             YUVFormat yuvFormat, YUVColorSpace colorSpace);
 
   void onReleaseGPU() override;
 
  private:
+  std::array<std::unique_ptr<TextureSampler>, 3> samplers = {};
   YUVFormat _yuvFormat = YUVFormat::Unknown;
   YUVColorSpace _colorSpace = YUVColorSpace::BT601_LIMITED;
 

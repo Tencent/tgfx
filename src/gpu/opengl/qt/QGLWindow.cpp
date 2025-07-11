@@ -22,7 +22,7 @@
 #include <QThread>
 #include "gpu/Texture.h"
 #include "gpu/opengl/GLRenderTarget.h"
-#include "gpu/opengl/GLSampler.h"
+#include "gpu/opengl/GLTextureSampler.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace tgfx {

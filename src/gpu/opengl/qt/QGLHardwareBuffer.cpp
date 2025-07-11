@@ -19,7 +19,7 @@
 #include "gpu/Texture.h"
 #include "tgfx/gpu/opengl/qt/QGLDevice.h"
 #ifdef __APPLE__
-#include "gpu/opengl/cgl/CGLHardwareTexture.h"
+#include "gpu/opengl/cgl/CGLHardwareTextureSampler.h"
 #endif
 #include "tgfx/platform/HardwareBuffer.h"
 
@@ -30,7 +30,7 @@ bool HardwareBufferAvailable() {
   return true;
 }
 
-PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
+PixelFormat TextureSampler::GetRenderableFormat(HardwareBufferRef hardwareBuffer) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return PixelFormat::Unknown;
   }
@@ -45,17 +45,22 @@ PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
   }
 }
 
-std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
-                                           YUVColorSpace) {
+std::vector<std::unique_ptr<TextureSampler>> TextureSampler::MakeFrom(
+    Context* context, HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
-    return nullptr;
+    return {};
   }
-  auto qglDevice = static_cast<QGLDevice*>(context->device());
-  if (qglDevice == nullptr) {
-    return nullptr;
+  auto textureCache = static_cast<QGLDevice*>(context->device())->getTextureCache();
+  auto sampler = CGLHardwareTextureSampler::MakeFrom(hardwareBuffer, textureCache);
+  if (sampler == nullptr) {
+    return {};
   }
-  auto textureCache = qglDevice->getTextureCache();
-  return CGLHardwareTexture::MakeFrom(context, hardwareBuffer, textureCache);
+  if (yuvFormat != nullptr) {
+    *yuvFormat = YUVFormat::Unknown;
+  }
+  std::vector<std::unique_ptr<TextureSampler>> samplers = {};
+  samplers.push_back(std::move(sampler));
+  return samplers;
 }
 
 #else
@@ -64,12 +69,13 @@ bool HardwareBufferAvailable() {
   return false;
 }
 
-PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef) {
+PixelFormat TextureSampler::GetRenderableFormat(HardwareBufferRef) {
   return PixelFormat::Unknown;
 }
 
-std::shared_ptr<Texture> Texture::MakeFrom(Context*, HardwareBufferRef, YUVColorSpace) {
-  return nullptr;
+std::vector<std::unique_ptr<TextureSampler>> TextureSampler::MakeFrom(Context*, HardwareBufferRef,
+                                                                      YUVFormat*) {
+  return {};
 }
 
 #endif

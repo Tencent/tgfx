@@ -129,7 +129,7 @@ HardwareBufferRef Surface::getHardwareBuffer() {
   if (texture == nullptr) {
     return nullptr;
   }
-  return texture->getHardwareBuffer();
+  return texture->getSampler()->getHardwareBuffer();
 }
 
 Canvas* Surface::getCanvas() {
@@ -172,7 +172,7 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
   auto context = renderTargetProxy->getContext();
   context->flush();
   auto texture = renderTargetProxy->getTexture();
-  auto hardwareBuffer = texture ? texture->getHardwareBuffer() : nullptr;
+  auto hardwareBuffer = texture ? texture->getSampler()->getHardwareBuffer() : nullptr;
   if (hardwareBuffer != nullptr) {
     context->submit(true);
     auto pixels = HardwareBufferLock(hardwareBuffer);

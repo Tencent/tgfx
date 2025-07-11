@@ -108,6 +108,7 @@
     "FilterTest": {
         "AlphaThreshold": "5012d73",
         "AlphaThreshold_empty": "500c87a",
+        "ClipInnerShadowImageFilter": "98fb8f08",
         "ComposeColorFilter": "c475bfb",
         "ComposeImageFilter": "4f910ac1",
         "ComposeImageFilter2": "4f910ac1",

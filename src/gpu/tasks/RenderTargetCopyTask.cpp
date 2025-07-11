@@ -37,8 +37,9 @@ bool RenderTargetCopyTask::execute(RenderPass* renderPass) {
   }
   DEBUG_ASSERT(renderTarget->width() == texture->width() &&
                renderTarget->height() == texture->height());
-  auto gpu = renderPass->getContext()->gpu();
-  gpu->copyRenderTargetToTexture(renderTarget.get(), texture.get(), 0, 0);
+  auto context = renderPass->getContext();
+  context->gpu()->copyRenderTargetToTexture(renderTarget.get(), texture.get(), 0, 0);
+  texture->getSampler()->regenerateMipmapLevels(context);
   return true;
 }
 

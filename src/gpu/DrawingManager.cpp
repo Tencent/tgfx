@@ -227,14 +227,14 @@ void DrawingManager::uploadAtlasToGPU() {
     if (texture == nullptr) {
       continue;
     }
-    auto gpu = context->gpu();
     for (auto& [data, info, atlasOffset] : cellDatas) {
       if (data == nullptr) {
         continue;
       }
       auto rect = Rect::MakeXYWH(atlasOffset.x, atlasOffset.y, static_cast<float>(info.width()),
                                  static_cast<float>(info.height()));
-      gpu->writePixels(texture->getSampler(), rect, data->data(), info.rowBytes());
+      texture->getSampler()->writePixels(context, rect, data->data(), info.rowBytes());
+      // Text atlas has no mipmaps, so we don't need to regenerate mipmaps.
     }
   }
   clearAtlasCellCodecTasks();

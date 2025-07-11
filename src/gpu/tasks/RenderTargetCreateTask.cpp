@@ -35,7 +35,7 @@ std::shared_ptr<Resource> RenderTargetCreateTask::onMakeResource(Context*) {
     LOGE("RenderTargetCreateTask::onMakeResource() Failed to get the associated texture!");
     return nullptr;
   }
-  if (texture->getSampler()->format != pixelFormat) {
+  if (texture->getSampler()->format() != pixelFormat) {
     LOGE("RenderTargetCreateTask::onMakeResource() the texture format mismatch!");
     return nullptr;
   }

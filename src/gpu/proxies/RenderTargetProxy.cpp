@@ -41,9 +41,9 @@ std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFrom(Context* context,
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  auto textureSampler = TextureSampler::MakeFrom(context, backendTexture);
+  auto sampler = TextureSampler::MakeFrom(context, backendTexture);
   return context->proxyProvider()->createRenderTargetProxy(std::move(textureProxy),
-                                                           textureSampler->format, sampleCount);
+                                                           sampler->format(), sampleCount);
 }
 
 std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFrom(Context* context,
@@ -52,7 +52,7 @@ std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFrom(Context* context,
   if (context == nullptr) {
     return nullptr;
   }
-  auto format = TextureSampler::GetPixelFormat(hardwareBuffer);
+  auto format = TextureSampler::GetRenderableFormat(hardwareBuffer);
   if (format == PixelFormat::Unknown) {
     return nullptr;
   }

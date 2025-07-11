@@ -78,7 +78,7 @@ void GLTextureEffect::emitCode(EmitArgs& args) const {
   if (texture->isYUV()) {
     emitYUVTextureCode(args);
   } else {
-    emitPlainTextureCode(args);
+    emitDefaultTextureCode(args);
   }
   if (textureProxy->isAlphaOnly()) {
     fragBuilder->codeAppendf("%s = %s.a * %s;", args.outputColor.c_str(), args.outputColor.c_str(),
@@ -89,7 +89,7 @@ void GLTextureEffect::emitCode(EmitArgs& args) const {
   }
 }
 
-void GLTextureEffect::emitPlainTextureCode(EmitArgs& args) const {
+void GLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
   auto* uniformHandler = args.uniformHandler;
   auto& textureSampler = (*args.textureSamplers)[0];
