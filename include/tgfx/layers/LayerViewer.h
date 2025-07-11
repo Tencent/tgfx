@@ -22,7 +22,6 @@ namespace tgfx {
 
 class LayerViewer {
  public:
-
   /**
    * Pick the layer to inspect it
    */

@@ -24,7 +24,6 @@ void tgfx::LayerViewer::PickLayer(std::shared_ptr<Layer> layer) {
 #ifdef TGFX_USE_INSPECTOR
   LayerViewerManager::GetLayerInspectorManager().pickLayer(layer);
 #else
-  (void)x;
-  (void)y;
+  (void)layer;
 #endif
 }
