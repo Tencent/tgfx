@@ -322,17 +322,14 @@ uint8_t Matrix::computeTypeMask() const {
   int m10 = ScalarAs2sCompliment(values[SKEW_Y]);
   int m11 = ScalarAs2sCompliment(values[SCALE_Y]);
   if (m01 | m10) {
-    // The skew components may be scale-inducing, unless we are dealing
-    // with a pure rotation.  Testing for a pure rotation is expensive,
-    // so we opt for being conservative by always setting the scale bit.
-    // along with affine.
-    // By doing this, we are also ensuring that matrices have the same
-    // type masks as their inverses.
+    // The skew components may be scale-inducing, unless we are dealing with a pure rotation.
+    // Testing for a pure rotation is expensive, so we opt for being conservative by always setting
+    // the scale bit. along with affine.
+    // By doing this, we are also ensuring that matrices have the same type masks as their inverses.
     mask |= AffineMask | ScaleMask;
 
-    // For rectStaysRect, in the affine case, we only need check that
-    // the primary diagonal is all zeros and that the secondary diagonal
-    // is all non-zero.
+    // For rectStaysRect, in the affine case, we only need check that the primary diagonal is all
+    // zeros and that the secondary diagonal is all non-zero.
 
     // map non-zero to 1
     m01 = m01 != 0;
@@ -345,9 +342,8 @@ uint8_t Matrix::computeTypeMask() const {
       mask |= ScaleMask;
     }
 
-    // Not affine, therefore we already know secondary diagonal is
-    // all zeros, so we just need to check that primary diagonal is
-    // all non-zero.
+    // Not affine, therefore we already know secondary diagonal is all zeros, so we just need to
+    // check that primary diagonal is all non-zero.
 
     // map non-zero to 1
     m00 = m00 != 0;
@@ -438,7 +434,8 @@ void Matrix::AfflinePts(const Matrix& m, Point dst[], const Point src[], int cou
     float4 src4;
     for (int i = 0; i < count; i++) {
       src4 = float4::Load(src);
-      float4 swz4 = Shuffle<1, 0, 3, 2>(src4);  // y0, x0, y1, x1
+      // y0, x0, y1, x1
+      float4 swz4 = Shuffle<1, 0, 3, 2>(src4);
       (src4 * scale4 + swz4 * skew4 + trans4).store(dst);
       src += 2;
       dst += 2;
@@ -518,8 +515,8 @@ static float4 SortAsRect(const float4& ltrb) {
   float4 rblt(ltrb[2], ltrb[3], ltrb[0], ltrb[1]);
   auto min = Min(ltrb, rblt);
   auto max = Max(ltrb, rblt);
-  // We can extract either pair [0,1] or [2,3] from min and max and be correct, but on
-  // ARM this sequence generates the fastest (a single instruction).
+  // We can extract either pair [0,1] or [2,3] from min and max and be correct, but on ARM this
+  // sequence generates the fastest (a single instruction).
   return float4(min[2], min[3], max[0], max[1]);
 }
 

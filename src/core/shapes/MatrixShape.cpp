@@ -57,7 +57,7 @@ UniqueKey MatrixShape::getUniqueKey() const {
   static const auto SingleScaleMatrixShapeType = UniqueID::Next();
   static const auto BothScalesShapeType = UniqueID::Next();
   static const auto RSXformShapeType = UniqueID::Next();
-  auto hasRSXform = matrix.getSkewX() != 0 || matrix.getSkewY() != 0;
+  auto hasRSXform = !matrix.isScaleTranslate();
   auto hasBothScales = hasRSXform || matrix.getScaleX() != matrix.getScaleY();
   if (!hasBothScales && matrix.getScaleX() == 1.0f) {
     // The matrix has translation only.

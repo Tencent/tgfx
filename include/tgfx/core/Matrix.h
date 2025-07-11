@@ -157,7 +157,8 @@ class Matrix {
   constexpr Matrix() : Matrix(1, 0, 0, 0, 1, 0, IdentityMask | RectStayRectMask) {
   }
 
-  /** \enum Matrix::TypeMask
+  /**
+   * enum Matrix::TypeMask
    * Enum of bit fields for mask returned by getType().
    * Used to identify the complexity of Matrix, to optimize performance.
    */
@@ -184,27 +185,25 @@ class Matrix {
     return this->getType() == 0;
   }
 
-  /** Returns true if Matrix at most scales and translates. Matrix may be identity,
-    contain only scale elements, only translate elements, or both. SkMatrix form is:
-
-        | scale-x    0    translate-x |
-        |    0    scale-y translate-y |
-        |    0       0         1      |
-
-    @return  true if SkMatrix is identity; or scales, translates, or both
-*/
+  /**
+   * Returns true if Matrix at most scales and translates. Matrix may be identity,
+   * contain only scale elements, only translate elements, or both. Matrix form is:
+   *        | scale-x    0    translate-x |
+   *        |    0    scale-y translate-y |
+   *        |    0       0         1      |
+   * @return  true if Matrix is identity; or scales, translates, or both
+   */
   bool isScaleTranslate() const {
     return !(this->getType() & ~(ScaleMask | TranslateMask));
   }
 
-  /** Returns true if SkMatrix is identity, or translates. SkMatrix form is:
-
-        | 1 0 translate-x |
-        | 0 1 translate-y |
-        | 0 0      1      |
-
-    @return  true if SkMatrix is identity, or translates
-*/
+  /**
+   * Returns true if Matrix is identity, or translates. Matrix form is:
+   *        | 1 0 translate-x |
+   *        | 0 1 translate-y |
+   *        | 0 0      1      |
+   * @return  true if Matrix is identity, or translates
+   */
   bool isTranslate() const {
     return !(this->getType() & ~(TranslateMask));
   }
@@ -418,7 +417,8 @@ class Matrix {
    */
   void setScale(float sx, float sy);
 
-  /** Initializes SkMatrix with scale and translate elements.
+  /**
+   * Initializes Matrix with scale and translate elements.
    *
    *      | sx  0 tx |
    *      |  0 sy ty |
@@ -749,7 +749,7 @@ class Matrix {
     mapRect(rect, *rect);
   }
 
-  /**1995
+  /**
    * Returns bounds of src corners mapped by Matrix.
    */
   Rect mapRect(const Rect& src) const {
@@ -758,7 +758,8 @@ class Matrix {
     return dst;
   }
 
-  /** Compares a and b; returns true if a and b are numerically equal. Returns true even if sign
+  /**
+   * Compares a and b; returns true if a and b are numerically equal. Returns true even if sign
    * of zero values are different. Returns false if either Matrix contains NaN, even if the other
    * Matrix also contains NaN.
    */
@@ -833,7 +834,7 @@ class Matrix {
   uint8_t computeTypeMask() const;
 
   void setTypeMask(int mask) {
-    // allow kUnknown or a valid mask
+    // allow UnknownMask or a valid mask
     typeMask = mask;
   }
 
@@ -845,9 +846,10 @@ class Matrix {
     typeMask &= ~mask;
   }
 
-  /** Returns true if we already know that the matrix is identity;
-    false otherwise.
-*/
+  /**
+   * Returns true if we already know that the matrix is identity;
+   * false otherwise.
+   */
   bool isTriviallyIdentity() const {
     if (typeMask & UnknownMask) {
       return false;

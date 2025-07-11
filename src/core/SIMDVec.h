@@ -18,25 +18,25 @@
 
 #pragma once
 
-//Vec<N,T> are SIMD vectors of N T's.
-//
-// we're leaning a bit less on platform-specific intrinsics and a bit
-// more on Clang/GCC vector extensions, but still keeping the option open to
-// drop in platform-specific intrinsics.
-
-#include <algorithm>         // std::min, std::max
-#include <cassert>           // assert()
-#include <cmath>             // ceilf, floorf, truncf, roundf, sqrtf, etc.
-#include <cstdint>           // intXX_t
-#include <cstring>           // memcpy()
-#include <initializer_list>  // std::initializer_list
+/**
+  * Vec<N,T> are SIMD vectors of N T's. we're leaning a bit less on platform-specific intrinsics and
+  * a bit more on Clang/GCC vector extensions, but still keeping the option open to drop in
+  * platform-specific intrinsics.
+  */
+#include <algorithm>
+#include <cassert>
+#include <cmath>
+#include <cstdint>
+#include <cstring>
+#include <initializer_list>
 #include <type_traits>
-#include <utility>  // std::index_sequence
-#include "Feature.h"
+#include <utility>
+#include "SIMDFeature.h"
 
-// Users may disable SIMD with TGFX_NO_SIMD, which may be set via compiler flags.
-// Use TGFX_USE_SIMD internally to avoid confusing double negation.
-// Do not use 'defined' in a macro expansion.
+/**
+  * Users may disable SIMD with TGFX_NO_SIMD, which may be set via compiler flags. Use TGFX_USE_SIMD
+  * internally to avoid confusing double negation. Do not use 'defined' in a macro expansion.
+  */
 #if !defined(TGFX_NO_SIMD)
 #define TGFX_USE_SIMD 1
 #else
@@ -70,22 +70,24 @@
 #define TGFX_ALWAYS_INLINE __attribute__((always_inline))
 #endif
 
-// If T is an 8-byte GCC or Clang vector extension type, it would naturally pass or return in the
-// MMX mm0 register on 32-bit x86 builds.  This has the fun side effect of clobbering any state in
-// the x87 st0 register.  (There is no ABI governing who should preserve mm?/st? registers, so no
-// one does!)
-//
-// We force-inline TGFX_unaligned_load() and TGFX_unaligned_store() to avoid that, making them safe to
-// use for all types on all platforms, thus solving the problem once and for all!
-
-// A separate problem exists with 32-bit x86. The default calling convention returns values in
-// ST0 (the x87 FPU). Unfortunately, doing so can mutate some bit patterns (signaling NaNs
-// become quiet). If you're using these functions to pass data around as floats, but it's actually
-// integers, that can be bad -- raster pipeline does this.
-//
-// With GCC and Clang, the always_inline attribute ensures we don't have a problem. MSVC, though,
-// ignores __forceinline in debug builds, so the return-via-ST0 is always present. Switching to
-// __vectorcall changes the functions to return in xmm0.
+/**
+ * If T is an 8-byte GCC or Clang vector extension type, it would naturally pass or return in the
+ * MMX mm0 register on 32-bit x86 builds.  This has the fun side effect of clobbering any state in
+ * the x87 st0 register.  (There is no ABI governing who should preserve mm?/st? registers, so no
+ * one does!)
+ *
+ * We force-inline UnalignedLoad() and UnalignedStore() to avoid that, making them safe to
+ * use for all types on all platforms, thus solving the problem once and for all!
+ *
+ * A separate problem exists with 32-bit x86. The default calling convention returns values in
+ * ST0 (the x87 FPU). Unfortunately, doing so can mutate some bit patterns (signaling NaNs
+ * become quiet). If you're using these functions to pass data around as floats, but it's actually
+ * integers, that can be bad -- raster pipeline does this.
+ *
+ * With GCC and Clang, the always_inline attribute ensures we don't have a problem. MSVC, though,
+ * ignores __forceinline in debug builds, so the return-via-ST0 is always present. Switching to
+ * __vectorcall changes the functions to return in xmm0.
+ */
 #if defined(_MSC_VER) && defined(_M_IX86)
 #define TGFX_FP_SAFE_ABI __vectorcall
 #else
@@ -99,10 +101,9 @@ static TGFX_ALWAYS_INLINE T TGFX_FP_SAFE_ABI UnalignedLoad(const P* ptr) {
   T val;
   // gcc's class-memaccess sometimes triggers when:
   // - `T` is trivially copyable but
-  // - `T` is non-trivial (e.g. at least one eligible default constructor is
-  //    non-trivial).
-  // Use `reinterpret_Cast<const void*>` to explicit suppress this warning; a
-  // trivially copyable type is safe to memcpy from/to.
+  // - `T` is non-trivial (e.g. at least one eligible default constructor is non-trivial).
+  // Use `reinterpret_Cast<const void*>` to explicit suppress this warning; a trivially copyable
+  // type is safe to memcpy from/to.
   memcpy(&val, static_cast<const void*>(ptr), sizeof(val));
   return val;
 }
@@ -124,7 +125,7 @@ static TGFX_ALWAYS_INLINE Dst TGFX_FP_SAFE_ABI BitCast(const Src& src) {
 
 #undef TGFX_FP_SAFE_ABI
 
-// ... and all standalone functions must be static.  Please use these helpers:
+// all standalone functions must be static. Please use these helpers:
 #define SI static inline
 #define SIT             \
   template <typename T> \
@@ -185,7 +186,7 @@ struct alignas(N * sizeof(T)) Vec {
     return UnalignedLoad<Vec>(ptr);
   }
   TGFX_ALWAYS_INLINE void store(void* ptr) const {
-    // Note: Calling TGFX_unaligned_store produces slightly worse code here, for some reason
+    // Note: Calling UnalignedStore produces slightly worse code here, for some reason
     memcpy(ptr, this, sizeof(Vec));
   }
 
@@ -371,21 +372,21 @@ struct Vec<1, T> {
   }
 };
 
-// Translate from a value type T to its corresponding MaTGFX, the result of a comparison.
+// Translate from a value type T to its corresponding Mask, the result of a comparison.
 template <typename T>
-struct MaTGFX {
+struct Mask {
   using type = T;
 };
 template <>
-struct MaTGFX<float> {
+struct Mask<float> {
   using type = int32_t;
 };
 template <>
-struct MaTGFX<double> {
+struct Mask<double> {
   using type = int64_t;
 };
 template <typename T>
-using M = typename MaTGFX<T>::type;
+using M = typename Mask<T>::type;
 
 // Join two Vec<N,T> into one Vec<2N,T>.
 SINT Vec<2 * N, T> Join(const Vec<N, T>& lo, const Vec<N, T>& hi) {
@@ -395,12 +396,14 @@ SINT Vec<2 * N, T> Join(const Vec<N, T>& lo, const Vec<N, T>& hi) {
   return v;
 }
 
-// We have three strategies for implementing Vec operations:
-//    1) lean on Clang/GCC vector extensions when available;
-//    2) use map() to apply a scalar function lane-wise;
-//    3) recurse on lo/hi to scalar portable implementations.
-// We can slot in platform-specific implementations as overloads for particular Vec<N,T>,
-// or often integrate them directly into the recursion of style 3), allowing fine control.
+/**
+ * We have three strategies for implementing Vec operations:
+ *  1) lean on Clang/GCC vector extensions when available;
+ *  2) use map() to apply a scalar function lane-wise;
+ *  3) recurse on lo/hi to scalar portable implementations.
+ * We can slot in platform-specific implementations as overloads for particular Vec<N,T>,
+ * or often integrate them directly into the recursion of style 3), allowing fine control.
+ */
 
 #if TGFX_USE_SIMD && (defined(__clang__) || defined(__GNUC__))
 
@@ -751,9 +754,9 @@ SINT Vec<N, T>& operator>>=(Vec<N, T>& x, int bits) {
 
 // Some operations we want are not expressible with Clang/GCC vector extensions.
 
-// Clang can reason about NaiveIfThenElse() and optimize through it better
-// than IfThenElse(), so it's sometimes useful to call it directly when we
-// think an entire expression should optimize away, e.g. min()/max().
+// Clang can reason about NaiveIfThenElse() and optimize through it better than IfThenElse(), so
+// it's sometimes useful to call it directly when we think an entire expression should optimize
+// away, e.g. min()/max().
 SINT Vec<N, T> NaiveIfThenElse(const Vec<N, M<T>>& cond, const Vec<N, T>& t, const Vec<N, T>& e) {
   return BitCast<Vec<N, T>>((cond & BitCast<Vec<N, M<T>>>(t)) | (~cond & BitCast<Vec<N, M<T>>>(e)));
 }
@@ -803,7 +806,7 @@ SIT bool Any(const Vec<1, T>& x) {
 }
 SINT bool Any(const Vec<N, T>& x) {
   // For Any(), the _mm_testz intrinsics are correct and don't require comparing 'x' to 0, so it's
-  // lower latency compared to _mm_movemaTGFX + _mm_compneq on plain SSE.
+  // lower latency compared to _mm_movemask + _mm_compneq on plain SSE.
 #if TGFX_USE_SIMD && TGFX_CPU_SSE_LEVEL >= TGFX_CPU_SSE_LEVEL_AVX2
   if constexpr (N * sizeof(T) == 32) {
     return !_mm256_testz_si256(BitCast<__m256i>(x), _mm256_set1_epi32(-1));
@@ -818,7 +821,7 @@ SINT bool Any(const Vec<N, T>& x) {
   if constexpr (N * sizeof(T) == 16) {
     // On SSE, movemaTGFX checks only the MSB in each lane, which is fine if the lanes were set
     // directly from a comparison op (which sets all bits to 1 when true), but TGFX::Vec<>
-    // treats any non-zero value as true, so we have to compare 'x' to 0 before calling movemaTGFX
+    // treats any non-zero value as true, so we have to compare 'x' to 0 before calling movemask
     return _mm_movemask_ps(_mm_cmpneq_ps(BitCast<__m128>(x), _mm_set1_ps(0))) != 0b0000;
   }
 #endif
@@ -857,8 +860,8 @@ SIT bool All(const Vec<1, T>& x) {
   return x.val != 0;
 }
 SINT bool All(const Vec<N, T>& x) {
-// Unlike Any(), we have to respect the lane layout, or we'll miss cases where a
-// true lane has a mix of 0 and 1 bits.
+// Unlike Any(), we have to respect the lane layout, or we'll miss cases where a true lane has a
+// mix of 0 and 1 bits.
 #if TGFX_USE_SIMD && TGFX_CPU_SSE_LEVEL >= TGFX_CPU_SSE_LEVEL_SSE1
   // Unfortunately, the _mm_testc intrinsics don't let us avoid the comparison to 0 for all()'s
   // correctness, so always just use the plain SSE version.
@@ -956,8 +959,8 @@ SINTU Vec<N, T> Max(U x, const Vec<N, T>& y) {
   return Max(Vec<N, T>(x), y);
 }
 
-// Pin matches the logic of TGFXTPin, which is important when NaN is involved. It always returns
-// values in the range lo..hi, and if x is NaN, it returns lo.
+// Pin is important when NaN is involved. It always returns values in the range lo..hi, and if x is
+// NaN, it returns lo.
 SINT Vec<N, T> Pin(const Vec<N, T>& x, const Vec<N, T>& lo, const Vec<N, T>& hi) {
   return Max(lo, Min(x, hi));
 }
@@ -1015,11 +1018,10 @@ template <typename Fn, typename... Args, size_t... I>
 SI auto Map(std::index_sequence<I...>, Fn&& fn, const Args&... args)
     -> Vec<sizeof...(I), decltype(fn(args[0]...))> {
   auto lane = [&](size_t i)
-      // CFI, specifically -fsanitize=cfi-icall, seems to give a false positive here,
-      // with errors like "control flow integrity check for type 'float (float)
-      // noexcept' failed during indirect function call... note: sqrtf.cfi_jt defined
-      // here".  But we can be quite sure fn is the right type: it's all inferred!
-      // So, stifle CFI in this function.
+      // CFI, specifically -fsanitize=cfi-icall, seems to give a false positive here, with errors
+      // like "control flow integrity check for type 'float (float) noexcept' failed during indirect
+      // function call... note: sqrtf.cfi_jt defined here".  But we can be quite sure fn is the
+      // right type: it's all inferred! So, stifle CFI in this function.
       TGFX_NO_SANITIZE_CFI { return fn(args[static_cast<int>(i)]...); };
 
   return {lane(I)...};
@@ -1090,8 +1092,8 @@ SIN Vec<N, uint16_t> ToHalf(const Vec<N, float>& x) {
   assert(All(x == x));  // No NaNs should reach this function
 
   // Intrinsics for float->half tend to operate on 4 lanes, and the default implementation has
-  // enough instructions that it's better to split and Join on 128 bits groups vs.
-  // recursing for each min/max/shift/etc.
+  // enough instructions that it's better to split and Join on 128 bits groups vs. recursing for
+  // each min/max/shift/etc.
   if constexpr (N > 4) {
     return Join(ToHalf(x.lo), ToHalf(x.hi));
   }
@@ -1105,16 +1107,11 @@ SIN Vec<N, uint16_t> ToHalf(const Vec<N, float>& x) {
 #define I(x) BitCast<Vec<N, int32_t>>(x)
 #define F(x) BitCast<Vec<N, float>>(x)
   Vec<N, int32_t> sem = I(x), s = sem & 0x8000'0000,
-                  em = Min(sem ^ s, 0x4780'0000),  // |x| clamped to f16 infinity
-      // F(em)*8192 increases the exponent by 13, which when added back to em will shift
-      // the mantissa bits 13 to the right. We clamp to 1/2 for subnormal values, which
-      // automatically shifts the mantissa to match 2^-14 expected for a subnorm f16.
+                  em = Min(sem ^ s, 0x4780'0000),
       magic = I(Max(F(em) * 8192.f, 0.5f)) & (255 << 23),
-                  rounded = I((F(em) + F(magic))),  // shift mantissa with automatic round-to-even
-      // Subtract 127 for f32 bias, subtract 13 to undo the *8192, subtract 1 to remove
-      // the implicit leading 1., and add 15 to get the f16 biased exponent.
-      exp = ((magic >> 13) - ((127 - 15 + 13 + 1) << 10)),  // shift and re-bias exponent
-      f16 = rounded + exp;  // use + if 'rounded' rolled over into first exponent bit
+                  rounded = I((F(em) + F(magic))),
+      exp = ((magic >> 13) - ((127 - 15 + 13 + 1) << 10)),
+      f16 = rounded + exp;
   return Cast<uint16_t>((s >> 16) | f16);
 #undef I
 #undef F
@@ -1133,16 +1130,12 @@ SIN Vec<N, float> FromHalf(const Vec<N, uint16_t>& x) {
 #endif
 
   Vec<N, int32_t> wide = Cast<int32_t>(x), s = wide & 0x8000, em = wide ^ s,
-                  inf_or_nan = (em >= (31 << 10)) & (255 << 23),  // Expands exponent to fill 8 bits
+                  inf_or_nan = (em >= (31 << 10)) & (255 << 23),
       is_norm = em > 0x3ff,
-                  // subnormal f16's are 2^-14*0.[m0:9] == 2^-24*[m0:9].0
       sub = BitCast<Vec<N, int32_t>>((Cast<float>(em) * (1.f / (1 << 24)))),
                   norm =
-                      ((em << 13) + ((127 - 15) << 23)),  // Shifts mantissa, shifts + re-biases exp
+                      ((em << 13) + ((127 - 15) << 23)),
       finite = (is_norm & norm) | (~is_norm & sub);
-  // If 'x' is f16 +/- infinity, inf_or_nan will be the filled 8-bit exponent but 'norm' will be
-  // all 0s since 'x's mantissa is 0. Thus norm | inf_or_nan becomes f32 infinity. However, if
-  // 'x' is an f16 NaN, some bits of 'norm' will be non-zero, so it stays an f32 NaN after the OR.
   return BitCast<Vec<N, float>>((s << 16) | finite | inf_or_nan);
 }
 
@@ -1151,11 +1144,11 @@ SIN Vec<N, uint8_t> Div255(const Vec<N, uint16_t>& x) {
   return Cast<uint8_t>((x + 127) / 255);
 }
 
-// ApproxScale(x,y) approximates Div255(Cast<uint16_t>(x)*Cast<uint16_t>(y)) within a bit,
-// and is always perfect when x or y is 0 or 255.
+// ApproxScale(x,y) approximates Div255(Cast<uint16_t>(x)*Cast<uint16_t>(y)) within a bit, and is
+// always perfect when x or y is 0 or 255.
 SIN Vec<N, uint8_t> ApproxScale(const Vec<N, uint8_t>& x, const Vec<N, uint8_t>& y) {
-  // All of (x*y+x)/256, (x*y+y)/256, and (x*y+255)/256 meet the criteria above.
-  // We happen to have historically picked (x*y+x)/256.
+  // All of (x*y+x)/256, (x*y+y)/256, and (x*y+255)/256 meet the criteria above. We happen to have
+  // historically picked (x*y+x)/256.
   auto X = Cast<uint16_t>(x), Y = Cast<uint16_t>(y);
   return Cast<uint8_t>((X * Y + X) / 256);
 }
@@ -1186,24 +1179,26 @@ SINT std::enable_if_t<std::is_unsigned_v<T>, Vec<N, T>> SaturatedAdd(const Vec<N
   return IfThenElse(sum < x, Vec<N, T>(std::numeric_limits<T>::max()), sum);
 }
 
-// The ScaledDividerU32 takes a divisor > 1, and creates a function divide(numerator) that
-// calculates a numerator / denominator. For this to be rounded properly, numerator should have
-// half added in:
-// divide(numerator + half) == floor(numerator/denominator + 1/2).
-//
-// This gives an answer within +/- 1 from the true value.
-//
-// Derivation of half:
-//    numerator/denominator + 1/2 = (numerator + half) / d
-//    numerator + denominator / 2 = numerator + half
-//    half = denominator / 2.
-//
-// Because half is divided by 2, that division must also be rounded.
-//    half == denominator / 2 = (denominator + 1) / 2.
-//
-// The divisorFactor is just a scaled value:
-//    divisorFactor = (1 / divisor) * 2 ^ 32.
-// The maximum that can be divided and rounded is UINT_MAX - half.
+/**
+  * The ScaledDividerU32 takes a divisor > 1, and creates a function divide(numerator) that
+  * calculates a numerator / denominator. For this to be rounded properly, numerator should have
+  * half added in:
+  *   divide(numerator + half) == floor(numerator/denominator + 1/2).
+  *
+  *   This gives an answer within +/- 1 from the true value.
+  *
+  *   Derivation of half:
+  *     numerator/denominator + 1/2 = (numerator + half) / d
+  *     numerator + denominator / 2 = numerator + half
+  *     half = denominator / 2.
+  *
+  *    Because half is divided by 2, that division must also be rounded.
+  *    half == denominator / 2 = (denominator + 1) / 2.
+  *
+  *    The divisorFactor is just a scaled value:
+  *     divisorFactor = (1 / divisor) * 2 ^ 32.
+  *    The maximum that can be divided and rounded is UINT_MAX - half.
+  */
 class ScaledDividerU32 {
  public:
   explicit ScaledDividerU32(uint32_t divisor)
@@ -1290,9 +1285,9 @@ SIN Vec<N, uint16_t> Mulhi(const Vec<N, uint16_t>& x, const Vec<N, uint16_t>& y)
 }
 
 SINT T Dot(const Vec<N, T>& a, const Vec<N, T>& b) {
-  // While Dot is a "horizontal" operation like any or all, it needs to remain
-  // in floating point and there aren't really any good SIMD instructions that make it faster.
-  // The constexpr cases remove the for loop in the only cases we realistically call.
+  // While Dot is a "horizontal" operation like any or all, it needs to remain in floating point and
+  // there aren't really any good SIMD instructions that make it faster. The constexpr cases remove
+  // the for loop in the only cases we realistically call.
   auto ab = a * b;
   if constexpr (N == 2) {
     return ab[0] + ab[1];
@@ -1352,8 +1347,8 @@ static inline bool IsFinite(const T array[], int count) {
 }
 
 SINT bool Isfinite(const Vec<N, T>& v) {
-  // Multiply all values together with 0. If they were all finite, the output is
-  // 0 (also finite). If any were not, we'll get nan.
+  // Multiply all values together with 0. If they were all finite, the output is 0 (also finite). If
+  // any were not, we'll get nan.
   return IsFinite(Dot(v, Vec<N, T>(0)));
 }
 
