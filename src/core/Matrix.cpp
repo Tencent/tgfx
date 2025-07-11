@@ -20,7 +20,9 @@
 #include <cfloat>
 #include "SIMDVec.h"
 #include "core/utils/MathExtra.h"
-
+#define XSIMD
+//#define skiaVx
+#include "xsimd/xsimd.hpp"
 namespace tgfx {
 
 void Matrix::reset() {
@@ -360,6 +362,7 @@ void Matrix::IdentityPts(const Matrix&, Point dst[], const Point src[], int coun
 }
 
 void Matrix::TransPts(const Matrix& m, Point dst[], const Point src[], int count) {
+#ifdef skiaVx
   if (count > 0) {
     float tx = m.getTranslateX();
     float ty = m.getTranslateY();
@@ -384,9 +387,35 @@ void Matrix::TransPts(const Matrix& m, Point dst[], const Point src[], int count
       dst += 4;
     }
   }
+#elif defined(XSIMD)
+  if(count > 0) {
+    auto* fdst = reinterpret_cast<float*>(&dst[0]);
+    const auto* fsrc = reinterpret_cast<const float*>(&src[0]);
+    using simdType = xsimd::batch<float>;
+    float tx = m.getTranslateX();
+    float ty = m.getTranslateY();
+    std::size_t inc = simdType::size;
+    std::vector<float, xsimd::default_allocator<float>> tranVec(inc);
+    for(size_t i = 0; i < inc; i++) {
+      tranVec[i] = (i % 2 == 0 ? tx : ty);
+    }
+    simdType transSimd = simdType::load_aligned(tranVec.data());
+    std::size_t size = static_cast<size_t>(count * 2);
+    std::size_t vecSize = size - size % inc;
+    for(std::size_t i = 0; i < vecSize; i += inc) {
+      simdType srcSimd = simdType::load_unaligned(&fsrc[i]);
+      simdType res = srcSimd + transSimd;
+      res.store_unaligned(&fdst[i]);
+    }
+    for(std::size_t i = vecSize; i < size; i++) {
+      fdst[i] = fsrc[i] + (i % 2 == 0 ? tx : ty);
+    }
+  }
+#endif
 }
 
 void Matrix::ScalePts(const Matrix& m, Point dst[], const Point src[], int count) {
+#ifdef skiaVx
   if (count > 0) {
     float tx = m.getTranslateX();
     float ty = m.getTranslateY();
@@ -416,9 +445,40 @@ void Matrix::ScalePts(const Matrix& m, Point dst[], const Point src[], int count
       dst += 4;
     }
   }
+#elif defined(XSIMD)
+  if(count > 0) {
+    auto* fdst = reinterpret_cast<float*>(&dst[0]);
+    const auto* fsrc = reinterpret_cast<const float*>(&src[0]);
+    using simdType = xsimd::batch<float>;
+    float tx = m.getTranslateX();
+    float ty = m.getTranslateY();
+    float sx = m.getScaleX();
+    float sy = m.getScaleY();
+    std::size_t inc = simdType::size;
+    std::vector<float, xsimd::default_allocator<float>> tranVec(inc);
+    std::vector<float, xsimd::default_allocator<float>> scaleVec(inc);
+    for(size_t i = 0; i < inc; i++) {
+      tranVec[i] = (i % 2 == 0 ? tx : ty);
+      scaleVec[i] = (i % 2 == 0 ? sx : sy);
+    }
+    simdType transSimd = simdType::load_aligned(tranVec.data());
+    simdType scaleSimd = simdType::load_aligned(scaleVec.data());
+    std::size_t size = static_cast<size_t>(count * 2);
+    std::size_t vecSize = size - size % inc;
+    for(std::size_t i = 0; i < vecSize; i += inc) {
+      simdType srcSimd = simdType::load_unaligned(&fsrc[i]);
+      simdType res = srcSimd * scaleSimd + transSimd;
+      res.store_unaligned(&fdst[i]);
+    }
+    for(std::size_t i = vecSize; i < size; i++) {
+      fdst[i] = fsrc[i] * (i % 2 == 0 ? sx : sy) + (i % 2 == 0 ? tx : ty);
+    }
+  }
+#endif
 }
 
 void Matrix::AfflinePts(const Matrix& m, Point dst[], const Point src[], int count) {
+#ifdef skiaVx
   if (count > 0) {
     float tx = m.getTranslateX();
     float ty = m.getTranslateY();
@@ -448,6 +508,61 @@ void Matrix::AfflinePts(const Matrix& m, Point dst[], const Point src[], int cou
       (src4 * scale4 + swz4 * skew4 + trans4).lo.store(dst);
     }
   }
+#elif defined(XSIMD)
+  if(count > 0) {
+    auto* fdst = reinterpret_cast<float*>(&dst[0]);
+    const auto* fsrc = reinterpret_cast<const float*>(&src[0]);
+    using simdType = xsimd::batch<float>;
+    float tx = m.getTranslateX();
+    float ty = m.getTranslateY();
+    float sx = m.getScaleX();
+    float sy = m.getScaleY();
+    float kx = m.getSkewX();
+    float ky = m.getSkewY();
+    std::size_t inc = simdType::size;
+    std::vector<float> tranVec(inc);
+    std::vector<float> scaleVec(inc);
+    std::vector<float> skewVec(inc);
+    std::vector<int> mask(inc);
+    for(size_t i = 0; i < inc; i++) {
+      if(i % 2 == 0) {
+        tranVec[i] = tx;
+        scaleVec[i] = sx;
+        skewVec[i] = kx;
+        mask[i] = static_cast<int>(i + 1);
+      }else {
+        tranVec[i] = ty;
+        scaleVec[i] = sy;
+        skewVec[i] = ky;
+        mask[i] = static_cast<int>(i - 1);
+      }
+    }
+    simdType transSimd = simdType::load_unaligned(tranVec.data());
+    simdType scaleSimd = simdType::load_unaligned(scaleVec.data());
+    simdType skewSimd = simdType::load_unaligned(skewVec.data());
+    xsimd::batch<int> maskSimd = xsimd::batch<int>::load_unaligned(mask.data());
+    std::size_t size = static_cast<size_t>(count * 2);
+    std::size_t vecSize = size - size % inc;
+    for(std::size_t i = 0; i < vecSize; i += inc) {
+      simdType srcSimd = simdType::load_unaligned(&fsrc[i]);
+      simdType swzSimd = xsimd::swizzle(srcSimd, maskSimd);
+      simdType res = srcSimd * scaleSimd + swzSimd * skewSimd + transSimd;
+      res.store_unaligned(&fdst[i]);
+    }
+    float temp = 0.0f;
+    for(std::size_t i = vecSize; i < size; i++) {
+      float swz = 0.0f;
+      size_t swzindex = (i % 2 == 0 ? i + 1 : i - 1);
+      if(fdst == fsrc) {
+        temp = fsrc[i];
+        swz = swzindex > i ? fsrc[swzindex] : temp;
+      }else {
+        swz = fsrc[swzindex];
+      }
+      fdst[i] = fsrc[i] * (i % 2 == 0 ? sx : sy) + (i % 2 == 0 ? tx : ty) + swz * (i % 2 == 0 ? kx : ky);
+    }
+  }
+#endif
 }
 
 bool Matrix::invertNonIdentity(Matrix* inverse) const {
@@ -511,7 +626,7 @@ bool Matrix::rectStaysRect() const {
   return (typeMask & RectStayRectMask) != 0;
 }
 
-static float4 SortAsRect(const float4& ltrb) {
+[[maybe_unused]] static float4 SortAsRect(const float4& ltrb) {
   float4 rblt(ltrb[2], ltrb[3], ltrb[0], ltrb[1]);
   auto min = Min(ltrb, rblt);
   auto max = Max(ltrb, rblt);
@@ -520,7 +635,15 @@ static float4 SortAsRect(const float4& ltrb) {
   return float4(min[2], min[3], max[0], max[1]);
 }
 
+[[maybe_unused]] static xsimd::batch<float> SortAsRect(const xsimd::batch<float>& ltrb) {
+  xsimd::batch<float> rblt(ltrb.get(2), ltrb.get(3), ltrb.get(0), ltrb.get(1));
+  auto min = xsimd::min(ltrb, rblt);
+  auto max = xsimd::max(ltrb, rblt);
+  return xsimd::batch<float>(min.get(2), min.get(3), max.get(0), max.get(1));
+}
+
 void Matrix::mapRect(Rect* dst, const Rect& src) const {
+#ifdef skiaVx
   if (this->getType() <= TranslateMask) {
     float tx = values[TRANS_X];
     float ty = values[TRANS_Y];
@@ -545,6 +668,41 @@ void Matrix::mapRect(Rect* dst, const Rect& src) const {
     mapPoints(quad, quad, 4);
     dst->setBounds(quad, 4);
   }
+#elif defined(XSIMD)
+  using simdType = xsimd::batch<float>;
+  if (this->getType() <= TranslateMask) {
+    float tx = values[TRANS_X];
+    float ty = values[TRANS_Y];
+    simdType trans(tx, ty, tx, ty);
+    auto res = SortAsRect(simdType::load_unaligned(&src.left) + trans);
+    dst->left = res.get(0);
+    dst->top = res.get(1);
+    dst->right = res.get(2);
+    dst->bottom = res.get(3);
+    return;
+  }
+  if (this->isScaleTranslate()) {
+    float sx = values[SCALE_X];
+    float sy = values[SCALE_Y];
+    float tx = values[TRANS_X];
+    float ty = values[TRANS_Y];
+    simdType scale(sx, sy, sx, sy);
+    simdType trans(tx, ty, tx, ty);
+    auto res = SortAsRect(simdType::load_unaligned(&src.left) * scale + trans);
+    dst->left = res.get(0);
+    dst->top = res.get(1);
+    dst->right = res.get(2);
+    dst->bottom = res.get(3);
+  } else {
+    Point quad[4];
+    quad[0].set(src.left, src.top);
+    quad[1].set(src.right, src.top);
+    quad[2].set(src.right, src.bottom);
+    quad[3].set(src.left, src.bottom);
+    mapPoints(quad, quad, 4);
+    dst->setBounds(quad, 4);
+  }
+#endif
 }
 
 float Matrix::getMinScale() const {

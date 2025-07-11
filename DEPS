@@ -74,6 +74,11 @@
          "url": "https://github.com/cameron314/concurrentqueue.git",
          "commit": "6dd38b8a1dbaa7863aa907045f32308a56a6ff5d",
          "dir": "third_party/concurrentqueue"
+      },
+      {
+        "url": "https://github.com/xtensor-stack/xsimd.git",
+        "commit": "1f8dd9c8e162968d9b4ff0251c56d431b8777f36",
+        "dir": "third_party/xsimd"
       }
     ]
   },

@@ -2623,4 +2623,41 @@ TGFX_TEST(CanvasTest, RotateImageRect) {
   context->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/RotateImageRect"));
 }
+
+TGFX_TEST(CanvasTest, SIMDTEST) {
+  Clock clock;
+  Matrix m;
+  m.setAll(1.2f, 1.2f, 1.2f, 0.8f, 1.2f, 1.5f);
+  constexpr int pointNum = 100000;
+  Point src[pointNum];
+  Point dst[pointNum];
+  for(int i= 0; i < pointNum; i++) {
+    src[i].x = i * 0.123f;
+    src[i].y = i * -0.256f;
+  }
+  clock.mark("mapPointsStart");
+  m.mapPoints(dst, src, 100000);
+  clock.mark("mapPointsEnd");
+  Rect srcRect = {100, 100, 500, 500};
+  Rect dstRect;
+  clock.mark("mapRectStart");
+  for(int i= 0; i < 100000; i++) {
+    srcRect.left += i;
+    srcRect.top += i;
+    srcRect.right += i;
+    srcRect.bottom += i;
+    m.mapRect(&dstRect, srcRect);
+  }
+  clock.mark("mapRectEnd");
+  printf("mapPoints: \n");
+  printf("num: %d \n", pointNum);
+  printf("time: %lld \n", clock.measure("mapPointsStart", "mapPointsEnd"));
+  printf("mapRectTime: %lld \n", clock.measure("mapRectStart", "mapRectEnd"));
+
+  Rect rect;
+  clock.mark("setBounds");
+  rect.setBounds(dst, 65536);
+  clock.mark("setboundend");
+  printf("setBounds: %lld \n", clock.measure("setBounds", "setboundend"));
+}
 }  // namespace tgfx

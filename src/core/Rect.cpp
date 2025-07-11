@@ -17,8 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Rect.h"
+#include <xsimd/xsimd.hpp>
 #include "SIMDVec.h"
-
+#define XSIMD
+//#define skiaVx
 namespace tgfx {
 void Rect::scale(float scaleX, float scaleY) {
   left *= scaleX;
@@ -28,6 +30,7 @@ void Rect::scale(float scaleX, float scaleY) {
 }
 
 bool Rect::setBounds(const Point pts[], int count) {
+#ifdef skiaVx
   if (count <= 0) {
     this->setEmpty();
     return false;
@@ -60,6 +63,42 @@ bool Rect::setBounds(const Point pts[], int count) {
     this->setEmpty();
     return false;
   }
+#elif defined(XSIMD)
+  using simdType = xsimd::batch<float>;
+  if (count <= 0) {
+    this->setEmpty();
+    return false;
+  }
+  simdType min, max;
+  if(count & 1) {
+    min = max = simdType(pts[0].x, pts[0].y, pts[0].x, pts[0].y);
+    pts += 1;
+    count -= 1;
+  }else {
+    min = max = simdType(pts[0].x, pts[0].y, pts[1].x, pts[1].y);
+    pts += 2;
+    count -= 2;
+  }
+  simdType accum = min * simdType(0.0f);
+  while(count) {
+    simdType xy = simdType(pts[0].x, pts[0].y, pts[1].x, pts[1].y);
+    accum = accum * xy;
+    min = xsimd::min(min, xy);
+    max = xsimd::max(max, xy);
+    pts += 2;
+    count -= 2;
+  }
+  const bool allFinite = xsimd::all(accum * simdType(0) == simdType(0));
+  if(allFinite) {
+    this->setLTRB(std::min(min.get(0), min.get(2)), std::min(min.get(1), min.get(3)), std::max(max.get(0), max.get(2)),
+      std::max(max.get(1),max.get(3)));
+    return true;
+  }else {
+    this->setEmpty();
+    return false;
+  }
+
+#endif
 }
 
 #define CHECK_INTERSECT(al, at, ar, ab, bl, bt, br, bb) \
