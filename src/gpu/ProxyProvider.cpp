@@ -397,6 +397,10 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
 std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
     const UniqueKey& uniqueKey, int width, int height, PixelFormat format, int sampleCount,
     bool mipmapped, ImageOrigin origin, uint32_t renderFlags) {
+  auto textureProxy = findOrWrapTextureProxy(uniqueKey);
+  if (textureProxy != nullptr) {
+    return textureProxy->asRenderTargetProxy();
+  }
   if (!Texture::CheckSizeAndFormat(context, width, height, format)) {
     return nullptr;
   }
@@ -461,9 +465,16 @@ std::shared_ptr<TextureProxy> ProxyProvider::findOrWrapTextureProxy(const Unique
   if (texture == nullptr) {
     return nullptr;
   }
-  proxy = std::shared_ptr<TextureProxy>(
-      new DefaultTextureProxy(uniqueKey, texture->width(), texture->height(), texture->hasMipmaps(),
-                              texture->isAlphaOnly(), texture->origin()));
+  if (auto renderTarget = texture->asRenderTarget()) {
+    proxy = std::shared_ptr<TextureProxy>(new TextureRenderTargetProxy(
+        uniqueKey, texture->width(), texture->height(), renderTarget->format(),
+        renderTarget->sampleCount(), texture->hasMipmaps(), texture->origin(),
+        renderTarget->externallyOwned()));
+  } else {
+    proxy = std::shared_ptr<TextureProxy>(
+        new DefaultTextureProxy(uniqueKey, texture->width(), texture->height(),
+                                texture->hasMipmaps(), texture->isAlphaOnly(), texture->origin()));
+  }
   addResourceProxy(proxy, uniqueKey);
   return proxy;
 }

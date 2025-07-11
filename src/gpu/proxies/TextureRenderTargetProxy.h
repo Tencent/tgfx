@@ -58,6 +58,10 @@ class TextureRenderTargetProxy : public DefaultTextureProxy,
     return std::const_pointer_cast<TextureRenderTargetProxy>(shared_from_this());
   }
 
+  std::shared_ptr<RenderTargetProxy> asRenderTargetProxy() const override {
+    return std::const_pointer_cast<TextureRenderTargetProxy>(shared_from_this());
+  }
+
   std::shared_ptr<RenderTarget> getRenderTarget() const override {
     return Resource::Find<Texture>(context, handle.key())->asRenderTarget();
   }

@@ -53,6 +53,10 @@ class GLBackendRenderTarget : public GLRenderTarget {
     return _format;
   }
 
+  bool externallyOwned() const override {
+    return true;
+  }
+
   unsigned readFrameBufferID() const override {
     return frameBufferID;
   }

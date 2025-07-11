@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "ResourceProxy.h"
 #include "TextureProxy.h"
 #include "gpu/RenderTarget.h"
 
