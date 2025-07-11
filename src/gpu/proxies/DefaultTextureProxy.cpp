@@ -17,15 +17,52 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DefaultTextureProxy.h"
+#include "core/utils/MathExtra.h"
 
 namespace tgfx {
+
+int GetApproximateLength(int length) {
+  // Map 'value' to a larger multiple of 2. Values <= 'kMagicTol' will pop up to
+  // the next power of 2. Those above 'kMagicTol' will only go up half the floor power of 2.
+
+  constexpr int kMinApproxSize = 16;
+  constexpr int kMagicTol = 1024;
+
+  length = std::max(kMinApproxSize, length);
+
+  if (IsPow2(length)) {
+    return length;
+  }
+
+  int ceilPow2 = NextPow2(length);
+  if (length <= kMagicTol) {
+    return ceilPow2;
+  }
+
+  int floorPow2 = ceilPow2 >> 1;
+  int mid = floorPow2 + (floorPow2 >> 1);
+
+  if (length <= mid) {
+    return mid;
+  }
+  return ceilPow2;
+}
+
 DefaultTextureProxy::DefaultTextureProxy(UniqueKey uniqueKey, int width, int height, bool mipmapped,
-                                         bool isAlphaOnly, ImageOrigin origin, bool externallyOwned)
+                                         bool isAlphaOnly, bool approximateSize, ImageOrigin origin,
+                                         bool externallyOwned)
     : TextureProxy(std::move(uniqueKey)), _width(width), _height(height) {
   bitFields.origin = origin;
   bitFields.mipmapped = mipmapped;
   bitFields.isAlphaOnly = isAlphaOnly;
   bitFields.externallyOwned = externallyOwned;
+  if (approximateSize) {
+    _backingStoreWidth = GetApproximateLength(width);
+    _backingStoreHeight = GetApproximateLength(height);
+  } else {
+    _backingStoreWidth = width;
+    _backingStoreHeight = height;
+  }
 }
 
 std::shared_ptr<Texture> DefaultTextureProxy::getTexture() const {

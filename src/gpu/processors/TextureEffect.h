@@ -62,7 +62,7 @@ class TextureEffect : public FragmentProcessor {
 
   YUVTexture* getYUVTexture() const;
 
-  bool needSubset(Texture* texture) const;
+  bool needSubset() const;
 
   std::shared_ptr<TextureProxy> textureProxy;
   SamplerState samplerState;

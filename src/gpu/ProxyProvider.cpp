@@ -223,7 +223,7 @@ std::shared_ptr<GpuShapeProxy> ProxyProvider::createGpuShapeProxy(std::shared_pt
       std::shared_ptr<GpuBufferProxy>(new GpuBufferProxy(triangleProxyKey, BufferType::Vertex));
   addResourceProxy(triangleProxy, triangleKey);
   textureProxy = std::shared_ptr<TextureProxy>(
-      new DefaultTextureProxy(textureProxyKey, width, height, false, true));
+      new DefaultTextureProxy(textureProxyKey, width, height, false, true, false));
   addResourceProxy(textureProxy, textureKey);
   return std::make_shared<GpuShapeProxy>(drawingMatrix, triangleProxy, textureProxy);
 }
@@ -236,7 +236,7 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxyByImageSource(
       context->drawingBuffer()->make<TextureUploadTask>(proxyKey, std::move(source), mipmapped);
   context->drawingManager()->addResourceTask(std::move(task));
   auto proxy = std::shared_ptr<TextureProxy>(
-      new DefaultTextureProxy(proxyKey, width, height, mipmapped, alphaOnly));
+      new DefaultTextureProxy(proxyKey, width, height, mipmapped, alphaOnly, false));
   addResourceProxy(proxy, uniqueKey);
   return proxy;
 }
@@ -294,11 +294,9 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
                                          mipmapped, renderFlags);
 }
 
-std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(const UniqueKey& uniqueKey,
-                                                                int width, int height,
-                                                                PixelFormat format, bool mipmapped,
-                                                                ImageOrigin origin,
-                                                                uint32_t renderFlags) {
+std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
+    const UniqueKey& uniqueKey, int width, int height, PixelFormat format, bool approxmateSize,
+    bool mipmapped, ImageOrigin origin, uint32_t renderFlags) {
   auto proxy = findOrWrapTextureProxy(uniqueKey);
   if (proxy != nullptr) {
     return proxy;
@@ -307,12 +305,13 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(const UniqueKey&
     return nullptr;
   }
   auto proxyKey = GetProxyKey(uniqueKey, renderFlags);
-  auto task = context->drawingBuffer()->make<TextureCreateTask>(proxyKey, width, height, format,
-                                                                mipmapped, origin);
-  context->drawingManager()->addResourceTask(std::move(task));
+
   auto isAlphaOnly = format == PixelFormat::ALPHA_8;
-  proxy = std::shared_ptr<TextureProxy>(
-      new DefaultTextureProxy(proxyKey, width, height, mipmapped, isAlphaOnly, origin));
+  proxy = std::shared_ptr<TextureProxy>(new DefaultTextureProxy(
+      proxyKey, width, height, mipmapped, isAlphaOnly, approxmateSize, origin));
+  auto task = context->drawingBuffer()->make<TextureCreateTask>(
+      proxyKey, proxy->backingStoreWidth(), proxy->backingStoreHeight(), format, mipmapped, origin);
+  context->drawingManager()->addResourceTask(std::move(task));
   addResourceProxy(proxy, uniqueKey);
   return proxy;
 }
@@ -344,7 +343,7 @@ std::shared_ptr<TextureProxy> ProxyProvider::wrapBackendTexture(
   texture->assignUniqueKey(uniqueKey);
   auto proxy = std::shared_ptr<TextureProxy>(
       new DefaultTextureProxy(uniqueKey, texture->width(), texture->height(), texture->hasMipmaps(),
-                              texture->isAlphaOnly(), texture->origin(), !adopted));
+                              texture->isAlphaOnly(), false, texture->origin(), !adopted));
   addResourceProxy(proxy, uniqueKey);
   return proxy;
 }
@@ -431,7 +430,7 @@ std::shared_ptr<TextureProxy> ProxyProvider::findOrWrapTextureProxy(const Unique
   }
   proxy = std::shared_ptr<TextureProxy>(
       new DefaultTextureProxy(uniqueKey, texture->width(), texture->height(), texture->hasMipmaps(),
-                              texture->isAlphaOnly(), texture->origin()));
+                              texture->isAlphaOnly(), false, texture->origin()));
   addResourceProxy(proxy, uniqueKey);
   return proxy;
 }

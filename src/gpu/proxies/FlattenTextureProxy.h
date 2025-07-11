@@ -32,6 +32,14 @@ class FlattenTextureProxy : public TextureProxy {
     return source->height();
   }
 
+  int backingStoreWidth() const override {
+    return source->backingStoreWidth();
+  }
+
+  int backingStoreHeight() const override {
+    return source->backingStoreHeight();
+  }
+
   ImageOrigin origin() const override {
     return ImageOrigin::TopLeft;
   }

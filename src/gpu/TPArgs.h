@@ -28,8 +28,8 @@ class TPArgs {
  public:
   TPArgs() = default;
 
-  TPArgs(Context* context, uint32_t renderFlags, bool mipmapped)
-      : context(context), renderFlags(renderFlags), mipmapped(mipmapped) {
+  TPArgs(Context* context, uint32_t renderFlags, bool mipmapped, bool approxmateSize = true)
+      : context(context), renderFlags(renderFlags), mipmapped(mipmapped), approxmateSize(approxmateSize) {
   }
 
   /**
@@ -47,5 +47,10 @@ class TPArgs {
    * image already has preset mipmaps.
    */
   bool mipmapped = false;
+
+  /**
+   * Specifies whether the texture proxy should approximate the size of the texture.
+   */
+  bool approxmateSize = true;
 };
 }  // namespace tgfx

@@ -113,7 +113,7 @@ class ProxyProvider {
    */
   std::shared_ptr<TextureProxy> createTextureProxy(const UniqueKey& uniqueKey, int width,
                                                    int height, PixelFormat format,
-                                                   bool mipmapped = false,
+                                                   bool approxmateSize, bool mipmapped = false,
                                                    ImageOrigin origin = ImageOrigin::TopLeft,
                                                    uint32_t renderFlags = 0);
 

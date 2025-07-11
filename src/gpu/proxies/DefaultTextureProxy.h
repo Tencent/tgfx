@@ -31,6 +31,14 @@ class DefaultTextureProxy : public TextureProxy {
     return _height;
   }
 
+  int backingStoreWidth() const override {
+    return _backingStoreWidth;
+  }
+
+  int backingStoreHeight() const override {
+    return _backingStoreHeight;
+  }
+
   ImageOrigin origin() const override {
     return bitFields.origin;
   }
@@ -52,6 +60,8 @@ class DefaultTextureProxy : public TextureProxy {
  private:
   int _width = 0;
   int _height = 0;
+  int _backingStoreWidth = 0;
+  int _backingStoreHeight = 0;
 
   struct {
     ImageOrigin origin : 2;
@@ -61,7 +71,8 @@ class DefaultTextureProxy : public TextureProxy {
   } bitFields = {};
 
   DefaultTextureProxy(UniqueKey uniqueKey, int width, int height, bool mipmapped, bool isAlphaOnly,
-                      ImageOrigin origin = ImageOrigin::TopLeft, bool externallyOwned = false);
+                      bool approximateSize, ImageOrigin origin = ImageOrigin::TopLeft,
+                      bool externallyOwned = false);
 
   friend class ProxyProvider;
 };

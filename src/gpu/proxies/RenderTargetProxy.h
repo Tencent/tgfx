@@ -58,7 +58,8 @@ class RenderTargetProxy : public ResourceProxy {
    */
   static std::shared_ptr<RenderTargetProxy> Make(Context* context, int width, int height,
                                                  PixelFormat format = PixelFormat::RGBA_8888,
-                                                 int sampleCount = 1, bool mipmapped = false,
+                                                 int sampleCount = 1, bool approxmateSize = false,
+                                                 bool mipmapped = false,
                                                  ImageOrigin origin = ImageOrigin::TopLeft);
 
   /**
@@ -69,6 +70,7 @@ class RenderTargetProxy : public ResourceProxy {
    */
   static std::shared_ptr<RenderTargetProxy> MakeFallback(Context* context, int width, int height,
                                                          bool isAlphaOnly, int sampleCount = 1,
+                                                         bool approxmateSize = false,
                                                          bool mipmapped = false,
                                                          ImageOrigin origin = ImageOrigin::TopLeft);
 
@@ -166,6 +168,8 @@ class RenderTargetProxy : public ResourceProxy {
    */
   std::shared_ptr<RenderTargetProxy> makeRenderTargetProxy(int width, int height) const;
 
+  Matrix getTransform() const;
+
  protected:
   RenderTargetProxy(UniqueKey uniqueKey, int width, int height, PixelFormat format, int sampleCount,
                     ImageOrigin origin);
@@ -179,7 +183,8 @@ class RenderTargetProxy : public ResourceProxy {
 
   static std::shared_ptr<RenderTargetProxy> Create(Context* context, int width, int height,
                                                    PixelFormat format, int sampleCount,
-                                                   bool mipmapped, ImageOrigin origin);
+                                                   bool approxmateSize, bool mipmapped,
+                                                   ImageOrigin origin);
 
   friend class ProxyProvider;
 };

@@ -2539,7 +2539,7 @@ TGFX_TEST(LayerTest, BottomLeftSurface) {
   ContextScope scope;
   auto context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
-  auto proxy = tgfx::RenderTargetProxy::MakeFallback(context, 200, 200, false, 1, false,
+  auto proxy = tgfx::RenderTargetProxy::MakeFallback(context, 200, 200, false, 1, false, false,
                                                      ImageOrigin::BottomLeft);
   auto surface = Surface::MakeFrom(std::move(proxy), 0, true);
 

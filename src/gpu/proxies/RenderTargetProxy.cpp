@@ -71,35 +71,36 @@ std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFrom(Context* context,
 
 std::shared_ptr<RenderTargetProxy> RenderTargetProxy::Make(Context* context, int width, int height,
                                                            PixelFormat format, int sampleCount,
-                                                           bool mipmapped, ImageOrigin origin) {
+                                                           bool approxmateSize, bool mipmapped,
+                                                           ImageOrigin origin) {
+
   if (context == nullptr) {
     return nullptr;
   }
   if (!context->caps()->isFormatRenderable(format)) {
     return nullptr;
   }
-  return Create(context, width, height, format, sampleCount, mipmapped, origin);
+  return Create(context, width, height, format, sampleCount, approxmateSize, mipmapped, origin);
 }
 
-std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFallback(Context* context, int width,
-                                                                   int height, bool isAlphaOnly,
-                                                                   int sampleCount, bool mipmapped,
-                                                                   ImageOrigin origin) {
+std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFallback(
+    Context* context, int width, int height, bool isAlphaOnly, int sampleCount, bool approxmateSize,
+    bool mipmapped, ImageOrigin origin) {
   if (context == nullptr) {
     return nullptr;
   }
   auto alphaRenderable = context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
   auto format = isAlphaOnly && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
-  return Create(context, width, height, format, sampleCount, mipmapped, origin);
+  return Create(context, width, height, format, sampleCount, approxmateSize, mipmapped, origin);
 }
 
 std::shared_ptr<RenderTargetProxy> RenderTargetProxy::Create(Context* context, int width,
                                                              int height, PixelFormat format,
-                                                             int sampleCount, bool mipmapped,
-                                                             ImageOrigin origin) {
+                                                             int sampleCount, bool approxmateSize,
+                                                             bool mipmapped, ImageOrigin origin) {
   auto proxyProvider = context->proxyProvider();
-  auto textureProxy =
-      proxyProvider->createTextureProxy({}, width, height, format, mipmapped, origin);
+  auto textureProxy = proxyProvider->createTextureProxy({}, width, height, format, approxmateSize,
+                                                        mipmapped, origin);
   if (textureProxy == nullptr) {
     return nullptr;
   }
@@ -129,8 +130,8 @@ std::shared_ptr<TextureProxy> RenderTargetProxy::makeTextureProxy(int width, int
   auto context = getContext();
   auto textureProxy = getTextureProxy();
   auto hasMipmaps = textureProxy && textureProxy->hasMipmaps();
-  return context->proxyProvider()->createTextureProxy({}, width, height, format(), hasMipmaps,
-                                                      origin());
+  return context->proxyProvider()->createTextureProxy({}, width, height, format(), false,
+                                                      hasMipmaps, origin());
 }
 
 std::shared_ptr<RenderTargetProxy> RenderTargetProxy::makeRenderTargetProxy(int width,
@@ -142,4 +143,16 @@ std::shared_ptr<RenderTargetProxy> RenderTargetProxy::makeRenderTargetProxy(int 
   return context->proxyProvider()->createRenderTargetProxy(std::move(textureProxy), format(),
                                                            sampleCount());
 }
+
+Matrix RenderTargetProxy::getTransform() const {
+  if (_origin == ImageOrigin::TopLeft) {
+    return Matrix::I();
+  }
+  auto textureProxy = getTextureProxy();
+  auto height = textureProxy ? textureProxy->backingStoreHeight() : _height;
+  auto result = Matrix::MakeScale(1.0f, -1.0f);
+  result.postTranslate(0.0f, static_cast<float>(height));
+  return result;
+}
+
 }  // namespace tgfx
