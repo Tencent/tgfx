@@ -24,8 +24,9 @@
 namespace tgfx {
 class BackendRenderTargetCreateTask : public ResourceTask {
  public:
-  BackendRenderTargetCreateTask(UniqueKey uniqueKey, const BackendTexture& backendTexture,
-                                int sampleCount, ImageOrigin origin, bool adopted);
+  BackendRenderTargetCreateTask(std::shared_ptr<ResourceProxy> proxy,
+                                const BackendTexture& backendTexture, int sampleCount,
+                                ImageOrigin origin, bool adopted);
 
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
 

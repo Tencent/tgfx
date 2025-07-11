@@ -43,10 +43,12 @@ class DefaultTextureProxy : public TextureProxy {
     return bitFields.isAlphaOnly;
   }
 
-  std::shared_ptr<Texture> getTexture() const override;
+  std::shared_ptr<Texture> getTexture() const override {
+    return std::static_pointer_cast<Texture>(resource);
+  }
 
  protected:
-  DefaultTextureProxy(UniqueKey uniqueKey, int width, int height, bool mipmapped, bool isAlphaOnly,
+  DefaultTextureProxy(int width, int height, bool mipmapped, bool isAlphaOnly,
                       ImageOrigin origin = ImageOrigin::TopLeft);
 
  private:

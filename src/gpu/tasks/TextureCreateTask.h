@@ -24,8 +24,8 @@
 namespace tgfx {
 class TextureCreateTask : public ResourceTask {
  public:
-  TextureCreateTask(UniqueKey uniqueKey, int width, int height, PixelFormat format, bool mipmapped,
-                    ImageOrigin origin);
+  TextureCreateTask(std::shared_ptr<ResourceProxy> proxy, int width, int height, PixelFormat format,
+                    bool mipmapped, ImageOrigin origin);
 
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
 

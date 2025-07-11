@@ -73,12 +73,5 @@ class TextureProxy : public ResourceProxy {
   virtual std::shared_ptr<RenderTargetProxy> asRenderTargetProxy() const {
     return nullptr;
   }
-
- protected:
-  explicit TextureProxy(UniqueKey uniqueKey) : ResourceProxy(std::move(uniqueKey)) {
-  }
-
- private:
-  friend class ProxyProvider;
 };
 }  // namespace tgfx

@@ -19,15 +19,11 @@
 #include "DefaultTextureProxy.h"
 
 namespace tgfx {
-DefaultTextureProxy::DefaultTextureProxy(UniqueKey uniqueKey, int width, int height, bool mipmapped,
-                                         bool isAlphaOnly, ImageOrigin origin)
-    : TextureProxy(std::move(uniqueKey)), _width(width), _height(height) {
+DefaultTextureProxy::DefaultTextureProxy(int width, int height, bool mipmapped, bool isAlphaOnly,
+                                         ImageOrigin origin)
+    : _width(width), _height(height) {
   bitFields.origin = origin;
   bitFields.mipmapped = mipmapped;
   bitFields.isAlphaOnly = isAlphaOnly;
-}
-
-std::shared_ptr<Texture> DefaultTextureProxy::getTexture() const {
-  return Resource::Find<Texture>(context, handle.key());
 }
 }  // namespace tgfx

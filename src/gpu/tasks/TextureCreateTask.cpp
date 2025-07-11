@@ -20,9 +20,9 @@
 #include "gpu/Texture.h"
 
 namespace tgfx {
-TextureCreateTask::TextureCreateTask(UniqueKey uniqueKey, int width, int height, PixelFormat format,
-                                     bool mipmapped, ImageOrigin origin)
-    : ResourceTask(std::move(uniqueKey)), width(width), height(height), format(format),
+TextureCreateTask::TextureCreateTask(std::shared_ptr<ResourceProxy> proxy, int width, int height,
+                                     PixelFormat format, bool mipmapped, ImageOrigin origin)
+    : ResourceTask(std::move(proxy)), width(width), height(height), format(format),
       mipmapped(mipmapped), origin(origin) {
 }
 

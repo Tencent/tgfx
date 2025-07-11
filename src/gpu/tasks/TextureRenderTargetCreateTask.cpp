@@ -19,11 +19,11 @@
 #include "TextureRenderTargetCreateTask.h"
 
 namespace tgfx {
-TextureRenderTargetCreateTask::TextureRenderTargetCreateTask(UniqueKey uniqueKey, int width,
-                                                             int height, PixelFormat format,
-                                                             int sampleCount, bool mipmapped,
-                                                             ImageOrigin origin)
-    : ResourceTask(std::move(uniqueKey)), width(width), height(height), format(format),
+TextureRenderTargetCreateTask::TextureRenderTargetCreateTask(std::shared_ptr<ResourceProxy> proxy,
+                                                             int width, int height,
+                                                             PixelFormat format, int sampleCount,
+                                                             bool mipmapped, ImageOrigin origin)
+    : ResourceTask(std::move(proxy)), width(width), height(height), format(format),
       sampleCount(sampleCount), mipmapped(mipmapped), origin(origin) {
 }
 

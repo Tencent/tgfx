@@ -63,7 +63,7 @@ class TextureRenderTargetProxy : public DefaultTextureProxy,
   }
 
   std::shared_ptr<RenderTarget> getRenderTarget() const override {
-    return Resource::Find<Texture>(context, handle.key())->asRenderTarget();
+    return std::static_pointer_cast<Texture>(resource)->asRenderTarget();
   }
 
  private:
@@ -71,11 +71,10 @@ class TextureRenderTargetProxy : public DefaultTextureProxy,
   int _sampleCount = 1;
   bool _externallyOwned = false;
 
-  TextureRenderTargetProxy(UniqueKey uniqueKey, int width, int height, PixelFormat format,
-                           int sampleCount, bool mipmapped = false,
-                           ImageOrigin origin = ImageOrigin::TopLeft, bool externallyOwned = false)
-      : DefaultTextureProxy(std::move(uniqueKey), width, height, mipmapped,
-                            format == PixelFormat::ALPHA_8, origin),
+  TextureRenderTargetProxy(int width, int height, PixelFormat format, int sampleCount,
+                           bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft,
+                           bool externallyOwned = false)
+      : DefaultTextureProxy(width, height, mipmapped, format == PixelFormat::ALPHA_8, origin),
         _format(format), _sampleCount(sampleCount), _externallyOwned(externallyOwned) {
   }
 

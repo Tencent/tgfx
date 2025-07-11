@@ -24,8 +24,8 @@
 namespace tgfx {
 class HardwareRenderTargetCreateTask : public ResourceTask {
  public:
-  HardwareRenderTargetCreateTask(UniqueKey uniqueKey, HardwareBufferRef hardwareBuffer,
-                                 int sampleCount);
+  HardwareRenderTargetCreateTask(std::shared_ptr<ResourceProxy> proxy,
+                                 HardwareBufferRef hardwareBuffer, int sampleCount);
 
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
 

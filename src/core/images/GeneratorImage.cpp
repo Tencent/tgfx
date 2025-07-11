@@ -37,7 +37,7 @@ GeneratorImage::GeneratorImage(UniqueKey uniqueKey, std::shared_ptr<ImageGenerat
 std::shared_ptr<Image> GeneratorImage::onMakeDecoded(Context* context, bool tryHardware) const {
   if (context != nullptr) {
     auto proxy = context->proxyProvider()->findProxy(uniqueKey);
-    if (proxy != nullptr && proxy->getUniqueKey() == uniqueKey) {
+    if (proxy != nullptr) {
       return nullptr;
     }
     if (context->resourceCache()->hasUniqueResource(uniqueKey)) {

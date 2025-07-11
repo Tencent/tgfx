@@ -19,10 +19,10 @@
 #include "HardwareRenderTargetCreateTask.h"
 
 namespace tgfx {
-HardwareRenderTargetCreateTask::HardwareRenderTargetCreateTask(UniqueKey uniqueKey,
+HardwareRenderTargetCreateTask::HardwareRenderTargetCreateTask(std::shared_ptr<ResourceProxy> proxy,
                                                                HardwareBufferRef hardwareBuffer,
                                                                int sampleCount)
-    : ResourceTask(std::move(uniqueKey)), hardwareBuffer(hardwareBuffer), sampleCount(sampleCount) {
+    : ResourceTask(std::move(proxy)), hardwareBuffer(hardwareBuffer), sampleCount(sampleCount) {
 }
 
 std::shared_ptr<Resource> HardwareRenderTargetCreateTask::onMakeResource(Context* context) {

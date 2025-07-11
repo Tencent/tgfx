@@ -19,11 +19,11 @@
 #include "BackendRenderTargetCreateTask.h"
 
 namespace tgfx {
-BackendRenderTargetCreateTask::BackendRenderTargetCreateTask(UniqueKey uniqueKey,
+BackendRenderTargetCreateTask::BackendRenderTargetCreateTask(std::shared_ptr<ResourceProxy> proxy,
                                                              const BackendTexture& backendTexture,
                                                              int sampleCount, ImageOrigin origin,
                                                              bool adopted)
-    : ResourceTask(std::move(uniqueKey)), backendTexture(backendTexture), sampleCount(sampleCount),
+    : ResourceTask(std::move(proxy)), backendTexture(backendTexture), sampleCount(sampleCount),
       origin(origin), adopted(adopted) {
 }
 
