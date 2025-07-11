@@ -1106,12 +1106,10 @@ SIN Vec<N, uint16_t> ToHalf(const Vec<N, float>& x) {
 
 #define I(x) BitCast<Vec<N, int32_t>>(x)
 #define F(x) BitCast<Vec<N, float>>(x)
-  Vec<N, int32_t> sem = I(x), s = sem & 0x8000'0000,
-                  em = Min(sem ^ s, 0x4780'0000),
-      magic = I(Max(F(em) * 8192.f, 0.5f)) & (255 << 23),
+  Vec<N, int32_t> sem = I(x), s = sem & 0x8000'0000, em = Min(sem ^ s, 0x4780'0000),
+                  magic = I(Max(F(em) * 8192.f, 0.5f)) & (255 << 23),
                   rounded = I((F(em) + F(magic))),
-      exp = ((magic >> 13) - ((127 - 15 + 13 + 1) << 10)),
-      f16 = rounded + exp;
+                  exp = ((magic >> 13) - ((127 - 15 + 13 + 1) << 10)), f16 = rounded + exp;
   return Cast<uint16_t>((s >> 16) | f16);
 #undef I
 #undef F
@@ -1130,12 +1128,10 @@ SIN Vec<N, float> FromHalf(const Vec<N, uint16_t>& x) {
 #endif
 
   Vec<N, int32_t> wide = Cast<int32_t>(x), s = wide & 0x8000, em = wide ^ s,
-                  inf_or_nan = (em >= (31 << 10)) & (255 << 23),
-      is_norm = em > 0x3ff,
-      sub = BitCast<Vec<N, int32_t>>((Cast<float>(em) * (1.f / (1 << 24)))),
-                  norm =
-                      ((em << 13) + ((127 - 15) << 23)),
-      finite = (is_norm & norm) | (~is_norm & sub);
+                  inf_or_nan = (em >= (31 << 10)) & (255 << 23), is_norm = em > 0x3ff,
+                  sub = BitCast<Vec<N, int32_t>>((Cast<float>(em) * (1.f / (1 << 24)))),
+                  norm = ((em << 13) + ((127 - 15) << 23)),
+                  finite = (is_norm & norm) | (~is_norm & sub);
   return BitCast<Vec<N, float>>((s << 16) | finite | inf_or_nan);
 }
 
