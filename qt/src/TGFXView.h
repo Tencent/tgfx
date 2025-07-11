@@ -31,8 +31,7 @@ class TGFXView : public QQuickItem {
   explicit TGFXView(QQuickItem* parent = nullptr);
 
   Q_INVOKABLE void updateTransform(qreal zoomLevel, QPointF panOffset);
-  Q_INVOKABLE void resetView();
-  Q_INVOKABLE void nextDrawer();
+  Q_INVOKABLE void onClicked();
 
  protected:
   QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*) override;

@@ -16,30 +16,15 @@ Window {
     readonly property real maxZoom: 1000.0
     readonly property real mouseScaleRatio: 300.0
     readonly property real mouseScrollRatio: 0.8
+    readonly property real devicePixelRatio: mainWindow.Screen.devicePixelRatio || 1.0
 
-    function calculateZoomWithCenter(oldZoom, scaleFactor, centerX, centerY) {
-        var ratio = mainWindow.Screen.devicePixelRatio || 1.0
-        var newZoom = Math.max(minZoom, Math.min(maxZoom, oldZoom * scaleFactor))
-        var px = centerX * ratio
-        var py = centerY * ratio
-
-        var newOffsetX = (currentOffset.x - px) * (newZoom / oldZoom) + px
-        var newOffsetY = (currentOffset.y - py) * (newZoom / oldZoom) + py
-
-        return {
-            zoom: newZoom,
-            offset: Qt.point(newOffsetX, newOffsetY)
-        }
-    }
-
-    function resetTransform() {
-        currentZoom = 1.0
-        currentOffset = Qt.point(0, 0)
-        tgfxView.resetView()
-    }
-
-    function updateViewTransform() {
-        tgfxView.updateTransform(currentZoom, currentOffset)
+    function calculateTransform(scaleFactor) {
+        var newZoom = Math.max(minZoom, Math.min(maxZoom, currentZoom * scaleFactor))
+        var px = mousePosition.x * devicePixelRatio
+        var py = mousePosition.y * devicePixelRatio
+        currentOffset.x = (currentOffset.x - px) * (newZoom / currentZoom) + px
+        currentOffset.y = (currentOffset.y - py) * (newZoom / currentZoom) + py
+        currentZoom = newZoom
     }
 
     PinchArea {
@@ -54,12 +39,8 @@ Window {
 
         onPinchUpdated: function(pinch) {
             var scaleDelta = pinch.scale / lastScale
-            var result = calculateZoomWithCenter(currentZoom, scaleDelta, mousePosition.x, mousePosition.y)
-
-            currentZoom = result.zoom
-            currentOffset = result.offset
-            updateViewTransform()
-
+            calculateTransform(scaleDelta)
+            tgfxView.updateTransform(currentZoom, currentOffset)
             lastScale = pinch.scale
         }
 
@@ -75,34 +56,32 @@ Window {
             hoverEnabled: true
             acceptedButtons: Qt.LeftButton
 
+            onPositionChanged: function(mouse) {
+                mousePosition = Qt.point(mouse.x, mouse.y)
+            }
+
             onClicked: function(mouse) {
-                tgfxView.nextDrawer()
-                resetTransform()
+                tgfxView.onClicked()
+                currentZoom = 1.0
+                currentOffset = Qt.point(0, 0)
             }
 
             onWheel: function(wheel) {
-                var ratio = mainWindow.Screen.devicePixelRatio || 1.0
                 var isZoomMode = (wheel.modifiers & Qt.ControlModifier) || (wheel.modifiers & Qt.MetaModifier)
                 var isShiftPressed = wheel.modifiers & Qt.ShiftModifier
-
                 if (isZoomMode) {
                     var scaleFactor = Math.exp(wheel.angleDelta.y / mouseScaleRatio)
-                    var result = calculateZoomWithCenter(currentZoom, scaleFactor, wheel.x, wheel.y)
-                    currentZoom = result.zoom
-                    currentOffset = result.offset
-                    updateViewTransform()
+                    calculateTransform(scaleFactor)
                 } else {
-                    var deltaX = wheel.angleDelta.x * ratio * mouseScrollRatio
-                    var deltaY = wheel.angleDelta.y * ratio * mouseScrollRatio
-
+                    var deltaX = wheel.angleDelta.x * devicePixelRatio * mouseScrollRatio
+                    var deltaY = wheel.angleDelta.y * devicePixelRatio * mouseScrollRatio
                     if (isShiftPressed && deltaX === 0 && deltaY !== 0) {
                         deltaX = deltaY
                         deltaY = 0
                     }
-
                     currentOffset = Qt.point(currentOffset.x + deltaX, currentOffset.y + deltaY)
-                    updateViewTransform()
                 }
+                tgfxView.updateTransform(currentZoom, currentOffset)
                 wheel.accepted = true
             }
         }

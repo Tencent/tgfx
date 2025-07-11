@@ -19,7 +19,6 @@
 #include "TGFXView.h"
 #include <QApplication>
 #include <QFileInfo>
-#include <QMessageBox>
 #include <QQuickWindow>
 #include <QSGImageNode>
 #include <QThread>
@@ -42,15 +41,11 @@ void TGFXView::updateTransform(qreal zoomLevel, QPointF panOffset) {
   update();
 }
 
-void TGFXView::resetView() {
+void TGFXView::onClicked() {
+  currentDrawerIndex++;
   zoom = 1.0f;
   offset = QPointF(0, 0);
   update();
-}
-
-void TGFXView::nextDrawer() {
-  currentDrawerIndex++;
-  resetView();
 }
 
 QSGNode* TGFXView::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*) {
@@ -96,13 +91,6 @@ void TGFXView::createAppHost() {
   rootPath = QFileInfo(rootPath + "/../../").absolutePath();
   auto imagePath = rootPath + "/resources/assets/bridge.jpg";
   auto image = tgfx::Image::MakeFromFile(std::string(imagePath.toLocal8Bit()));
-  if (!image) {
-    QMessageBox::critical(nullptr, "Image Loading Failed",
-                          QString("Failed to load image file:\n%1\n\nPlease check if the file "
-                                  "path is correct.")
-                              .arg(imagePath));
-    return;
-  }
   appHost->addImage("bridge", image);
 #ifdef __APPLE__
   auto defaultTypeface = tgfx::Typeface::MakeFromName("PingFang SC", "");
