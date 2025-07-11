@@ -29,6 +29,7 @@
 
 namespace tgfx {
 class BackendTexture;
+class RenderTarget;
 
 /**
  * Texture describes a two-dimensional array of pixels in the GPU backend for drawing.
@@ -149,21 +150,21 @@ class Texture : public Resource {
   /**
    * Returns the display width of this texture.
    */
-  int width() const {
+  virtual int width() const {
     return _width;
   }
 
   /**
    * Returns the display height of this texture.
    */
-  int height() const {
+  virtual int height() const {
     return _height;
   }
 
   /**
    * Returns the origin of the texture, either ImageOrigin::TopLeft or ImageOrigin::BottomLeft.
    */
-  ImageOrigin origin() const {
+  virtual ImageOrigin origin() const {
     return _origin;
   }
 
@@ -204,6 +205,13 @@ class Texture : public Resource {
    */
   virtual BackendTexture getBackendTexture() const {
     return getSampler()->getBackendTexture(_width, _height);
+  }
+
+  /**
+   * Returns the underlying render target if this texture is also a render target; otherwise, returns nullptr.
+   */
+  virtual std::shared_ptr<RenderTarget> asRenderTarget() const {
+    return nullptr;
   }
 
  protected:

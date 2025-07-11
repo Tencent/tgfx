@@ -42,7 +42,7 @@ bool HardwareBufferAvailable() {
   return available;
 }
 
-PixelFormat TextureSampler::GetRenderableFormat(HardwareBufferRef hardwareBuffer) {
+PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
   auto info = HardwareBufferGetInfo(hardwareBuffer);
   if (info.isEmpty()) {
     return PixelFormat::Unknown;
@@ -73,7 +73,7 @@ bool HardwareBufferAvailable() {
   return true;
 }
 
-PixelFormat TextureSampler::GetRenderableFormat(HardwareBufferRef hardwareBuffer) {
+PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
   auto info = HardwareBufferGetInfo(hardwareBuffer);
   if (info.isEmpty()) {
     return PixelFormat::Unknown;
@@ -104,7 +104,7 @@ bool HardwareBufferAvailable() {
   return false;
 }
 
-PixelFormat TextureSampler::GetRenderableFormat(HardwareBufferRef) {
+PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef) {
   return PixelFormat::Unknown;
 }
 

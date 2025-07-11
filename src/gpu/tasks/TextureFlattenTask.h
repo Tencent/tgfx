@@ -38,7 +38,6 @@ class TextureFlattenTask {
  private:
   UniqueKey uniqueKey = {};
   std::shared_ptr<TextureProxy> sourceTextureProxy = nullptr;
-  std::shared_ptr<Texture> flatTexture = nullptr;
   std::shared_ptr<RenderTarget> renderTarget = nullptr;
 };
 }  // namespace tgfx

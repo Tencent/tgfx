@@ -43,11 +43,11 @@ class DefaultTextureProxy : public TextureProxy {
     return bitFields.isAlphaOnly;
   }
 
-  bool externallyOwned() const override {
-    return bitFields.externallyOwned;
-  }
-
   std::shared_ptr<Texture> getTexture() const override;
+
+ protected:
+  DefaultTextureProxy(UniqueKey uniqueKey, int width, int height, bool mipmapped, bool isAlphaOnly,
+                      ImageOrigin origin = ImageOrigin::TopLeft);
 
  private:
   int _width = 0;
@@ -57,11 +57,7 @@ class DefaultTextureProxy : public TextureProxy {
     ImageOrigin origin : 2;
     bool mipmapped : 1;
     bool isAlphaOnly : 1;
-    bool externallyOwned : 1;
   } bitFields = {};
-
-  DefaultTextureProxy(UniqueKey uniqueKey, int width, int height, bool mipmapped, bool isAlphaOnly,
-                      ImageOrigin origin = ImageOrigin::TopLeft, bool externallyOwned = false);
 
   friend class ProxyProvider;
 };

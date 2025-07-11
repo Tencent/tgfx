@@ -90,12 +90,13 @@ void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> rende
   addTextureResolveTask(std::move(renderTarget));
 }
 
-void DrawingManager::addTextureResolveTask(std::shared_ptr<RenderTargetProxy> target) {
-  auto textureProxy = target->getTextureProxy();
-  if (textureProxy == nullptr || (target->sampleCount() <= 1 && !textureProxy->hasMipmaps())) {
+void DrawingManager::addTextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTarget) {
+  auto textureProxy = renderTarget->asTextureProxy();
+  if (textureProxy == nullptr ||
+      (renderTarget->sampleCount() <= 1 && !textureProxy->hasMipmaps())) {
     return;
   }
-  auto task = drawingBuffer->make<TextureResolveTask>(std::move(target));
+  auto task = drawingBuffer->make<TextureResolveTask>(std::move(renderTarget));
   renderTasks.emplace_back(std::move(task));
 }
 

@@ -21,6 +21,9 @@
 #include "gpu/Texture.h"
 
 namespace tgfx {
+/**
+ * DefaultTexture is a simple texture implementation that stores pixel data using a single sampler.
+ */
 class DefaultTexture : public Texture {
  public:
   DefaultTexture(std::unique_ptr<TextureSampler> sampler, int width, int height,
