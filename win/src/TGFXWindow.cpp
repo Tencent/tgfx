@@ -85,7 +85,6 @@ LRESULT CALLBACK TGFXWindow::WndProc(HWND window, UINT message, WPARAM wparam,
 }
 
 LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) noexcept {
-  float pixelRatio = getPixelRatio();
   switch (message) {
     case WM_DESTROY:
       destroy();
@@ -110,13 +109,11 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       ScreenToClient(hwnd, &mousePoint);
       bool isCtrlPressed = (GetKeyState(VK_CONTROL) & 0x8000) != 0;
       bool isShiftPressed = (GetKeyState(VK_SHIFT) & 0x8000) != 0;
-      float mouseX = mousePoint.x * pixelRatio;
-      float mouseY = mousePoint.y * pixelRatio;
       if (isCtrlPressed) {
         float zoomStep = std::exp(GET_WHEEL_DELTA_WPARAM(wparam) / WHEEL_RATIO);
         float newZoom = std::clamp(zoomScale * zoomStep, MIN_ZOOM, MAX_ZOOM);
-        contentOffset.x = mouseX - ((mouseX - contentOffset.x) / zoomScale) * newZoom;
-        contentOffset.y = mouseY - ((mouseY - contentOffset.y) / zoomScale) * newZoom;
+        contentOffset.x = mousePoint.x - ((mousePoint.x - contentOffset.x) / zoomScale) * newZoom;
+        contentOffset.y = mousePoint.y - ((mousePoint.y - contentOffset.y) / zoomScale) * newZoom;
         zoomScale = newZoom;
       } else {
         float wheelDelta = static_cast<float>(GET_WHEEL_DELTA_WPARAM(wparam));
@@ -138,14 +135,12 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
           double currentArgument = gestureInfo.ullArguments;
           if (lastZoomArgument != 0.0) {
             double zoomFactor = currentArgument / lastZoomArgument;
-            POINT gesturePoint = {gestureInfo.ptsLocation.x, gestureInfo.ptsLocation.y};
-            ScreenToClient(hwnd, &gesturePoint);
-            float mouseX = gesturePoint.x * pixelRatio;
-            float mouseY = gesturePoint.y * pixelRatio;
+            POINT mousePoint = {GET_X_LPARAM(lparam), GET_Y_LPARAM(lparam)};
+            ScreenToClient(hwnd, &mousePoint);
             float newZoom =
                 std::clamp(zoomScale * static_cast<float>(zoomFactor), MIN_ZOOM, MAX_ZOOM);
-            contentOffset.x = mouseX - ((mouseX - contentOffset.x) / zoomScale) * newZoom;
-            contentOffset.y = mouseY - ((mouseY - contentOffset.y) / zoomScale) * newZoom;
+            contentOffset.x = mousePoint.x - ((mousePoint.x - contentOffset.x) / zoomScale) * newZoom;
+            contentOffset.y = mousePoint.y - ((mousePoint.y - contentOffset.y) / zoomScale) * newZoom;
             zoomScale = newZoom;
             ::InvalidateRect(windowHandle, nullptr, TRUE);
           }
