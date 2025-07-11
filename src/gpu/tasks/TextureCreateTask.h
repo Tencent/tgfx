@@ -29,6 +29,10 @@ class TextureCreateTask : public ResourceTask {
 
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
 
+  bool needExecute() const override {
+    return false;
+  }
+
  private:
   int width = 0;
   int height = 0;

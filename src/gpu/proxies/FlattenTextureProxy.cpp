@@ -26,6 +26,10 @@ FlattenTextureProxy::FlattenTextureProxy(UniqueKey uniqueKey, std::shared_ptr<Te
 
 std::shared_ptr<Texture> FlattenTextureProxy::getTexture() const {
   auto texture = Resource::Find<Texture>(context, handle.key());
+  if (texture == nullptr) {
+    task->execute(context);
+    texture = Resource::Find<Texture>(context, handle.key());
+  }
   return texture ? texture : source->getTexture();
 }
 }  // namespace tgfx

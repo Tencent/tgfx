@@ -148,11 +148,11 @@ bool DrawingManager::flush() {
     return false;
   }
   for (auto& task : resourceTasks) {
-    task->execute(context);
+    if (task->needExecute()) {
+      task->execute(context);
+    }
   }
   uploadAtlasToGPU();
-  resourceTasks.clear();
-  resourceTaskMap = {};
   proxyProvider->clearSharedVertexBuffer();
 
   if (renderPass == nullptr) {
@@ -173,6 +173,8 @@ bool DrawingManager::flush() {
     task->execute(renderPass.get());
   }
   renderTasks.clear();
+  resourceTasks.clear();
+  resourceTaskMap = {};
   return true;
 }
 

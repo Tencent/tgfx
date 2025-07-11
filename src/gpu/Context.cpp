@@ -64,9 +64,16 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
   // particularly crucial for texture resources that are bound to render targets. Only after the
   // cleanup can they be unbound and reused.
   _resourceCache->processUnreferencedResources();
+  tgfx::Clock clock = {};
   _atlasManager->preFlush();
+  clock.mark("preFlush");
   auto flushed = _drawingManager->flush();
+  clock.mark("flush");
   _atlasManager->postFlush();
+  clock.mark("postFlush");
+  LOGI("Context::flush: preFlush:%ld flush:%ld postFlush:%ld", clock.measure("", "preFlush"),
+       clock.measure("preFlush", "flush"), clock.measure("flush", "postFlush"));
+
   bool semaphoreInserted = false;
   if (signalSemaphore != nullptr) {
     auto semaphore = Semaphore::Wrap(signalSemaphore);

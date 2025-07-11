@@ -19,8 +19,10 @@
 #pragma once
 
 #include "ResourceProxy.h"
+#include "core/utils/PlacementPtr.h"
 #include "gpu/Texture.h"
 #include "gpu/TextureSampler.h"
+#include "gpu/tasks/ResourceTask.h"
 
 namespace tgfx {
 /**
@@ -70,9 +72,15 @@ class TextureProxy : public ResourceProxy {
    */
   virtual std::shared_ptr<Texture> getTexture() const = 0;
 
+  void addResourceTask(ResourceTask* resourceTask) {
+    task = resourceTask;
+  }
+
  protected:
   explicit TextureProxy(UniqueKey uniqueKey) : ResourceProxy(std::move(uniqueKey)) {
   }
+
+  ResourceTask* task = nullptr;
 
  private:
   friend class ProxyProvider;

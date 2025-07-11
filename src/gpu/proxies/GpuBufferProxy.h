@@ -21,6 +21,7 @@
 #include "ResourceProxy.h"
 #include "core/DataSource.h"
 #include "gpu/GpuBuffer.h"
+#include "gpu/tasks/ResourceTask.h"
 #include "tgfx/core/Data.h"
 
 namespace tgfx {

@@ -20,7 +20,8 @@
 
 namespace tgfx {
 DefaultTextureProxy::DefaultTextureProxy(UniqueKey uniqueKey, int width, int height, bool mipmapped,
-                                         bool isAlphaOnly, ImageOrigin origin, bool externallyOwned)
+                                         bool isAlphaOnly, ImageOrigin origin,
+                                         bool externallyOwned)
     : TextureProxy(std::move(uniqueKey)), _width(width), _height(height) {
   bitFields.origin = origin;
   bitFields.mipmapped = mipmapped;
@@ -29,6 +30,11 @@ DefaultTextureProxy::DefaultTextureProxy(UniqueKey uniqueKey, int width, int hei
 }
 
 std::shared_ptr<Texture> DefaultTextureProxy::getTexture() const {
-  return Resource::Find<Texture>(context, handle.key());
+  auto texture = Resource::Find<Texture>(context, handle.key());
+  if (texture == nullptr && task) {
+    task->execute(context);
+    texture = Resource::Find<Texture>(context, handle.key());
+  }
+  return texture;
 }
 }  // namespace tgfx

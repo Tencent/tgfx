@@ -36,6 +36,10 @@ class ResourceTask {
    */
   virtual bool execute(Context* context);
 
+  virtual bool needExecute() const {
+    return true;
+  }
+
  protected:
   UniqueKey uniqueKey = {};
 
