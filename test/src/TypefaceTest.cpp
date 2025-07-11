@@ -70,6 +70,10 @@ class GlyphPathProvider final : public PathProvider {
     }
   }
 
+  Rect getTightBounds() const override {
+    return getBounds();
+  }
+
  private:
   int pathIndex = 0;
 };

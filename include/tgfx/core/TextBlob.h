@@ -78,7 +78,7 @@ class TextBlob {
    * transformed accordingly. Returns true if the path was successfully created. Otherwise,
    * returns false and leaves the path unchanged.
    */
-  bool getPath(Path* path, const Matrix* matrix) const;
+  bool getPath(Path* path, const Matrix* matrix = nullptr) const;
 
  private:
   std::vector<std::shared_ptr<GlyphRunList>> glyphRunLists = {};

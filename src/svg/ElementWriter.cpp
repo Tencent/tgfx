@@ -771,7 +771,10 @@ void ElementWriter::addPictureImageMaskResources(const PictureImage* pictureImag
                                                  const std::string& filterID,
                                                  SVGExportContext* svgContext) {
   auto picture = pictureImage->picture;
-  auto pictureBound = picture->getBounds(pictureImage->matrix);
+  auto pictureBound = picture->getBounds();
+  if (pictureImage->matrix) {
+    pictureImage->matrix->mapRect(&pictureBound);
+  }
   auto imageBound = Rect::MakeWH(pictureImage->width(), pictureImage->height());
   std::string clipID;
   if (!imageBound.contains(pictureBound)) {

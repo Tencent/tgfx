@@ -208,7 +208,7 @@ TGFX_TEST(SVGRenderTest, TextSVG) {
 
   std::vector<std::shared_ptr<Typeface>> fallbackTypefaceList;
   fallbackTypefaceList.push_back(
-      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf")));
+      Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/msyh.ttf")));
 
   auto SVGDom = SVGDOM::Make(*stream, TextShaper::Make(fallbackTypefaceList));
   auto rootNode = SVGDom->getRoot();

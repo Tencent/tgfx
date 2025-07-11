@@ -134,7 +134,7 @@ void SVGText::onRender(const SVGRenderContext& context) const {
       return;
     }
 
-    auto bound = textBlob->getBounds();
+    auto bound = textBlob->getTightBounds();
     float x =
         context.presentationContext()._inherited.TextAnchor->getAlignmentFactor() * bound.width();
     float y = 0;
