@@ -30,23 +30,15 @@
 
 namespace tgfx {
 static moodycamel::ConcurrentQueue<uint64_t> imageIDQueue;
-void LayerViewerManager::pickLayer(float x, float y) {
-  if (hoverdSwitch) {
-    auto layers = displayList->root()->getLayersUnderPoint(x, y);
-    for (auto layer : layers) {
-      if (layer->name() != HighLightLayerName) {
-        if (reinterpret_cast<uint64_t>(layer.get()) != selectedAddress) {
-          SendPickedLayerAddress(layer);
-        }
+void LayerViewerManager::pickLayer(std::shared_ptr<Layer> layer) {
+    if (layer->name() != HighLightLayerName) {
+      if (reinterpret_cast<uint64_t>(layer.get()) != selectedAddress) {
+        SendPickedLayerAddress(layer);
+      }
+      if(hoverdSwitch) {
         AddHighLightOverlay(tgfx::Color::FromRGBA(111, 166, 219), std::move(layer));
-        break;
       }
     }
-  }
-}
-
-bool LayerViewerManager::getLayerViewerHoveredState() {
-  return hoverdSwitch;
 }
 
 void LayerViewerManager::setCallBack() {

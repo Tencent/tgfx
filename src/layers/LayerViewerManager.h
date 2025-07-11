@@ -34,8 +34,7 @@ class LayerViewerManager final {
   LayerViewerManager& operator=(const LayerViewerManager&) = delete;
   LayerViewerManager& operator=(LayerViewerManager&&) = delete;
 
-  void pickLayer(float x, float y);
-  bool getLayerViewerHoveredState();
+  void pickLayer(std::shared_ptr<Layer> layer);
 
   void setDisplayList(tgfx::DisplayList* displayList);
   void serializingLayerTree();

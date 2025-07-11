@@ -16,25 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma once
-
-#include <functional>
+#include "Layer.h"
 
 namespace tgfx {
 
 class LayerViewer {
  public:
-  /**
-   * Return the Hovered toggle state of layerViewer. When the return value is true, it indicates
-   * that the toggle is switched on. The business logic should replace the original left mouse
-   * button selection handling with a call to the PickLayer function when the left mouse button
-   * is clicked, passing the current mouse coordinates as an argument.
-   */
-  static bool GetLayerViewerHoveredState();
 
   /**
-   * Set the mouse coordinates to pick the corresponding topmost layer.
+   * Pick the layer to inspect it
    */
-  static void PickLayer(float x, float y);
+  static void PickLayer(std::shared_ptr<Layer> layer);
 };
 
 }  // namespace tgfx
