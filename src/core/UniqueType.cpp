@@ -74,15 +74,15 @@ UniqueType& UniqueType::operator=(UniqueType&& type) noexcept {
   return *this;
 }
 
-void UniqueType::addStrong() {
+void UniqueType::addReference() {
   if (domain != nullptr) {
-    domain->addStrong();
+    domain->addReference();
   }
 }
 
-void UniqueType::releaseStrong() {
+void UniqueType::releaseReference() {
   if (domain != nullptr) {
-    domain->releaseStrong();
+    domain->releaseReference();
   }
 }
 }  // namespace tgfx

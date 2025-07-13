@@ -59,9 +59,9 @@ class UniqueType {
 
   explicit UniqueType(UniqueDomain* domain);
 
-  void addStrong();
+  void addReference();
 
-  void releaseStrong();
+  void releaseReference();
 
   friend class RuntimeEffect;
   friend class UniqueKey;
