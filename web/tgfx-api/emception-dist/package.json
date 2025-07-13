@@ -1,0 +1,22 @@
+{
+    "name": "emception",
+    "version": "1.0.15",
+    "main": "emception.js",
+    "repository": "https://github.com/InfiniBrains/emception",
+    "scripts": {
+        "build": "webpack --mode=production --stats-children",
+        "postbuild_": "cp index.html package.json ../README.md dist",
+        "dev_": "webpack serve --mode=development --stats-children"
+    },
+    "dependencies": {
+        "compression-webpack-plugin": "^10.0.0",
+        "copy-webpack-plugin": "^11.0.0",
+        "local-echo": "^0.2.0",
+        "webpack": "^5.89.0",
+        "webpack-cli": "^5.1.4",
+        "webpack-dev-server": "^4.15.1",
+        "webpack-mode": "^1.1.0",
+        "worker-loader": "^3.0.8",
+        "html-webpack-plugin": "^5.5.3"
+    }
+}

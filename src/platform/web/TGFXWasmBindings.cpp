@@ -27,6 +27,10 @@ using namespace emscripten;
 
 namespace tgfx {
 bool TGFXBindInit() {
+#ifdef TGFX_DISABLE_MAIN_BINDINGS
+  // 主绑定被禁用，直接返回
+  return true;
+#endif
   class_<Matrix>("TGFXMatrix").function("_get", &Matrix::get).function("_set", &Matrix::set);
 
   value_object<Point>("TGFXPoint").field("x", &Point::x).field("y", &Point::y);
