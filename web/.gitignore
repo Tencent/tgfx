@@ -10,4 +10,6 @@ demo/.hello2d.wasm.md5
 demo/.hello2d.wasm-mt.md5
 src/wasm
 emsdk/
+web-code-editor/cmake-build-*
+web-code-editor/wasm-assets
 

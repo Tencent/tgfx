@@ -1,0 +1,566 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>TGFX 在线代码编辑器</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 2em;
+        }
+        .content {
+            display: flex;
+            height: 70vh;
+        }
+        .editor-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #ddd;
+        }
+        .editor-header {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-bottom: 1px solid #ddd;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .editor-title {
+            font-weight: bold;
+            color: #333;
+        }
+        .run-button {
+            background: #28a745;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: background 0.3s;
+        }
+        .run-button:hover {
+            background: #218838;
+        }
+        .run-button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .editor {
+            flex: 1;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            padding: 15px;
+            border: none;
+            outline: none;
+            resize: none;
+            background: #fafafa;
+            line-height: 1.5;
+        }
+        .output-panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+        .canvas-container {
+            flex: 1;
+            padding: 20px;
+            background: #f8f9fa;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        canvas {
+            border: 2px solid #ddd;
+            background: white;
+            border-radius: 4px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .console {
+            height: 150px;
+            border-top: 1px solid #ddd;
+            padding: 10px;
+            background: #2d3748;
+            color: #e2e8f0;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        .console .info { color: #63b3ed; }
+        .console .success { color: #68d391; }
+        .console .error { color: #fc8181; }
+        .console .warning { color: #fbd38d; }
+        .examples {
+            background: #f8f9fa;
+            padding: 10px 15px;
+            border-bottom: 1px solid #ddd;
+        }
+        .example-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 5px 10px;
+            margin: 0 5px 5px 0;
+            border-radius: 3px;
+            cursor: pointer;
+            font-size: 12px;
+        }
+        .example-btn:hover {
+            background: #0056b3;
+        }
+
+        /* 编译模式选择器样式 */
+        .compile-mode-selector {
+            margin: 10px 0;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
+            border: 1px solid #e9ecef;
+        }
+
+        .mode-option {
+            margin: 5px 10px 5px 0;
+        }
+
+        .mode-option input {
+            margin-right: 5px;
+        }
+
+        .mode-description {
+            font-size: 12px;
+            color: #6c757d;
+            margin-left: 20px;
+        }
+
+        /* 编译状态显示 */
+        .compile-status {
+            margin: 10px 0;
+            padding: 8px;
+            border-radius: 4px;
+            font-size: 14px;
+            display: none;
+        }
+
+        .compile-status.compiling {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            display: block;
+        }
+
+        .compile-status.success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+            display: block;
+        }
+
+        .compile-status.error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+            display: block;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #e9ecef;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: #007bff;
+            border-radius: 2px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>TGFX Playground</h1>
+        </div>
+
+        <div class="content">
+            <div class="editor-panel">
+                <div class="examples">
+                    <button class="example-btn" data-example="rect">绘制矩形</button>
+                    <button class="example-btn" data-example="circle">绘制圆形</button>
+                    <button class="example-btn" data-example="webgl_basic">WebGL 基础</button>
+                    <button class="example-btn" data-example="webgl_blend">WebGL 叠加混合</button>
+                    <button class="example-btn" data-example="webgl_multi">WebGL 多图形</button>
+                </div>
+
+                <!-- 仅保留 Emception 模式，移除模式选择器 -->
+
+                <!-- 编译状态显示 -->
+                <div id="compileStatus" class="compile-status">
+                    <div id="statusMessage">准备就绪</div>
+                    <div class="progress-bar">
+                        <div id="progressFill" class="progress-fill"></div>
+                    </div>
+                </div>
+                <div class="editor-header">
+                    <span class="editor-title">C++ 代码编辑器</span>
+                    <button id="runBtn" class="run-button" data-action="execute">
+                        ▶️ 运行代码
+                    </button>
+                </div>
+                <textarea id="codeEditor" class="editor" placeholder="在这里编写您的C++代码...">
+#include <tgfx/core/Color.h>
+#include <tgfx/core/Paint.h>
+#include <tgfx/core/Rect.h>
+#include <tgfx/core/Point.h>
+#include <tgfx/core/Canvas.h>
+#include <tgfx/gpu/opengl/webgl/WebGLWindow.h>
+
+int main() {
+    auto window = tgfx::WebGLWindow::MakeFrom("#renderCanvas");
+    if (!window) return 1;
+    auto device = window->getDevice();
+    if (!device) return 2;
+    auto context = device->lockContext();
+    if (!context) return 3;
+    auto surface = window->getSurface(context);
+    if (!surface) return 4;
+    auto canvas = surface->getCanvas();
+
+    canvas->clear(tgfx::Color::White());
+
+    tgfx::Paint paint;
+    paint.setColor(tgfx::Color::FromRGBA(255, 0, 0, 255));
+    canvas->drawRect(tgfx::Rect::MakeLTRB(50, 50, 200, 150), paint);
+
+    paint.setColor(tgfx::Color::FromRGBA(0, 0, 255, 179));
+    canvas->drawCircle(tgfx::Point::Make(300, 100), 40, paint);
+
+    window->present(context);
+    return 0;
+}
+                </textarea>
+            </div>
+
+            <div class="output-panel">
+                <div class="canvas-container">
+                    <canvas id="renderCanvas" width="400" height="300"></canvas>
+                </div>
+                <div id="console" class="console"></div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // 示例代码
+        const examples = {
+            rect: `#include <tgfx/core/Color.h>\n#include <tgfx/core/Paint.h>\n#include <tgfx/core/Rect.h>\n\nextern "C" int user_main(){\n  tgfx::Paint p; p.setColor(tgfx::Color::FromRGBA(255,0,0,255));\n  auto rc = tgfx::Rect::MakeLTRB(50,50,200,150); (void)rc;\n  return 0;\n}`,
+            circle: `#include <tgfx/core/Color.h>\n#include <tgfx/core/Paint.h>\n#include <tgfx/core/Point.h>\n\nextern "C" int user_main(){\n  tgfx::Paint fill; fill.setColor(tgfx::Color::FromRGBA(0,0,255,255));\n  auto c = tgfx::Point::Make(200,150); (void)c;\n  return 0;\n}`,
+            simple: `#include <tgfx/core/Color.h>\n#include <tgfx/core/Paint.h>\n#include <tgfx/core/Rect.h>\n\nextern "C" int user_main(){\n  tgfx::Paint p; p.setColor(tgfx::Color::FromRGBA(128,0,128,255));\n  auto rc = tgfx::Rect::MakeLTRB(100,100,300,200); (void)rc;\n  return 0;\n}`,
+            improved: `#include <tgfx/core/Color.h>\n#include <tgfx/core/Paint.h>\n\nextern "C" int user_main(){\n  tgfx::Paint p1; p1.setColor(tgfx::Color::FromRGBA(255,51,51,204));\n  tgfx::Paint p2; p2.setColor(tgfx::Color::FromRGBA(51,255,51,204));\n  tgfx::Paint p3; p3.setColor(tgfx::Color::FromRGBA(51,51,255,204));\n  return 0;\n}`,
+            memory: `#include <tgfx/core/Color.h>\n#include <tgfx/core/Paint.h>\n\nextern "C" int user_main(){\n  tgfx::Paint r; r.setColor(tgfx::Color::FromRGBA(255,0,0,179));\n  tgfx::Paint g; g.setColor(tgfx::Color::FromRGBA(0,255,0,179));\n  tgfx::Paint b; b.setColor(tgfx::Color::FromRGBA(0,0,255,179));\n  return 0;\n}`,
+            webgl_basic: `#include <tgfx/core/Color.h>\n#include <tgfx/core/Paint.h>\n#include <tgfx/core/Rect.h>\n#include <tgfx/core/Point.h>\n#include <tgfx/core/Canvas.h>\n#include <tgfx/gpu/opengl/webgl/WebGLWindow.h>\n\nextern "C" int user_main(){\n  auto window = tgfx::WebGLWindow::MakeFrom("#renderCanvas");\n  if(!window) return 1; auto device = window->getDevice(); if(!device) return 2; auto context = device->lockContext(); if(!context) return 3; auto surface = window->getSurface(context); if(!surface) return 4; auto canvas = surface->getCanvas();\n  canvas->clear(tgfx::Color::White());\n  tgfx::Paint p; p.setColor(tgfx::Color::FromRGBA(255,0,0,255));\n  canvas->drawRect(tgfx::Rect::MakeLTRB(50,50,200,150), p);\n  p.setColor(tgfx::Color::FromRGBA(0,0,255,179));\n  canvas->drawCircle(tgfx::Point::Make(300,100), 40, p);\n  window->present(context);\n  return 0;\n}`,
+            webgl_blend: `#include <tgfx/core/Color.h>\n#include <tgfx/core/Paint.h>\n#include <tgfx/core/Point.h>\n#include <tgfx/core/Canvas.h>\n#include <tgfx/gpu/opengl/webgl/WebGLWindow.h>\n\nextern "C" int user_main(){\n  auto window = tgfx::WebGLWindow::MakeFrom("#renderCanvas");\n  if(!window) return 1; auto device = window->getDevice(); if(!device) return 2; auto context = device->lockContext(); if(!context) return 3; auto surface = window->getSurface(context); if(!surface) return 4; auto canvas = surface->getCanvas();\n  canvas->clear(tgfx::Color::White());\n  tgfx::Paint p; p.setColor(tgfx::Color::FromRGBA(255,0,0,128)); canvas->drawCircle(tgfx::Point::Make(140,120), 60, p);\n  p.setColor(tgfx::Color::FromRGBA(0,255,0,128)); canvas->drawCircle(tgfx::Point::Make(200,120), 60, p);\n  p.setColor(tgfx::Color::FromRGBA(0,0,255,128)); canvas->drawCircle(tgfx::Point::Make(170,180), 60, p);\n  window->present(context);\n  return 0;\n}`,
+            webgl_multi: `#include <tgfx/core/Color.h>\n#include <tgfx/core/Paint.h>\n#include <tgfx/core/Rect.h>\n#include <tgfx/core/Canvas.h>\n#include <tgfx/gpu/opengl/webgl/WebGLWindow.h>\n\nextern "C" int user_main(){\n  auto window = tgfx::WebGLWindow::MakeFrom("#renderCanvas");\n  if(!window) return 1; auto device = window->getDevice(); if(!device) return 2; auto context = device->lockContext(); if(!context) return 3; auto surface = window->getSurface(context); if(!surface) return 4; auto canvas = surface->getCanvas();\n  canvas->clear(tgfx::Color::White());\n  tgfx::Paint p;\n  p.setColor(tgfx::Color::FromRGBA(255,128,0,255)); canvas->drawRect(tgfx::Rect::MakeLTRB(20,20,120,80), p);\n  p.setColor(tgfx::Color::FromRGBA(0,128,255,200)); canvas->drawRect(tgfx::Rect::MakeLTRB(140,40,260,140), p);\n  p.setColor(tgfx::Color::FromRGBA(128,0,255,160)); canvas->drawRect(tgfx::Rect::MakeLTRB(280,60,380,160), p);\n  window->present(context);\n  return 0;\n}`
+        };
+
+        let compilationManager = null;
+
+        // 控制台输出
+        function addConsoleOutput(message, type = 'info') {
+            const consoleElement = document.getElementById('console');
+            if (!consoleElement) return;
+            const span = document.createElement('span');
+            span.className = type;
+            span.textContent = `[${new Date().toLocaleTimeString()}] ${message}\n`;
+            consoleElement.appendChild(span);
+            consoleElement.scrollTop = consoleElement.scrollHeight;
+        }
+
+        window.addConsoleOutput = addConsoleOutput;
+
+        // Emception 与头文件加载缓存
+        // 1) Emception 动态导入单例缓存
+            const EmceptionLoader = (() => {
+                let emceptionPromise = null;
+                let packsPromise = null;
+                const base = new URL('./emception/', window.location.href).toString();
+                return {
+                    load() {
+                        if (!emceptionPromise) {
+                            emceptionPromise = import(new URL('./emception/emception.js', window.location.href).toString());
+                        }
+                        return emceptionPromise;
+                    },
+                    loadPacks() {
+                        if (!packsPromise) {
+                            packsPromise = import(new URL('./emception/packs.mjs', window.location.href).toString());
+                        }
+                        return packsPromise;
+                    },
+                    base
+                };
+            })();
+        window.EmceptionLoader = EmceptionLoader;
+
+        // 2) 头文件与静态资源 fetch 内存缓存（同源 GET + 白名单路径）
+        (function installFetchCacheOnce() {
+            if (window.__tgfxFetchCacheInstalled) return;
+            window.__tgfxFetchCacheInstalled = true;
+
+            const origin = window.location.origin;
+            const cache = new Map(); // key -> { body:ArrayBuffer|Text, type:string, isBinary:boolean }
+            const allowPatterns = [
+                /\/web-code-editor\/emception\//, // emception.js/wasm/packs.mjs 及其资源
+                /\/emception\//,           // 本目录 emception 资源
+                /\/include\//,                  // 头文件常见路径
+                /\/headers?\//,                 // headers 或 header
+                /\/tgfx\/include\//,            // 项目内 include 别名
+                /\/wasm-assets\//               // 头文件清单与静态库
+            ];
+
+            function shouldCache(url) {
+                try {
+                    const u = new URL(url, window.location.href);
+                    if (u.origin !== origin) return false;
+                    if (u.search) return false; // 带查询参数常用于变体/不缓存
+                    return allowPatterns.some(re => re.test(u.pathname));
+                } catch { return false; }
+            }
+
+            const originalFetch = window.fetch.bind(window);
+            window.fetch = async function cachedFetch(input, init) {
+                const req = typeof input === 'string' ? input : input.url;
+                const method = (init && init.method) ? init.method.toUpperCase() : 'GET';
+
+                if (method !== 'GET' || !shouldCache(req)) {
+                    return originalFetch(input, init);
+                }
+
+                const key = req;
+                const hit = cache.get(key);
+                if (hit) {
+                    const body = hit.isBinary ? hit.body.slice(0) : hit.body; // 复制二进制缓冲
+                    return new Response(body, { headers: { 'content-type': hit.type || 'application/octet-stream' } });
+                }
+
+                const resp = await originalFetch(input, init);
+                if (!resp.ok) return resp;
+
+                const ctype = resp.headers.get('content-type') || '';
+                const isText = ctype.includes('text') || ctype.includes('json') || ctype.includes('javascript');
+                if (isText) {
+                    const text = await resp.clone().text();
+                    cache.set(key, { body: text, type: ctype, isBinary: false });
+                    return new Response(text, { headers: { 'content-type': ctype } });
+                } else {
+                    const buf = await resp.clone().arrayBuffer();
+                    cache.set(key, { body: buf, type: ctype, isBinary: true });
+                    return new Response(buf.slice(0), { headers: { 'content-type': ctype } });
+                }
+            };
+        })();
+
+        // 模块加载
+        (async function initializeModules() {
+            try {
+                const compilationManagerModule = await import('./compilation-manager.js');
+                const CompilationManager = compilationManagerModule.default;
+
+                window.CompilationManager = CompilationManager;
+                window.dispatchEvent(new CustomEvent('modulesLoaded', { detail: { success: true } }));
+                // 预加载 Emception 相关模块（命中 ESModule 缓存）
+                try {
+                    EmceptionLoader.load().catch(()=>{});
+                    EmceptionLoader.loadPacks().catch(()=>{});
+                } catch {}
+            } catch (error) {
+                console.error('模块导入失败:', error);
+                window.CompilationManager = null;
+                window.dispatchEvent(new CustomEvent('modulesLoaded', { detail: { success: false, error } }));
+            }
+        })();
+
+        // 不再加载精简宿主模块，直接使用浏览器端编译与单WASM执行
+
+        // 初始化编译管理器
+        async function initializeCompilationManager() {
+            try {
+                const CompilationManagerClass = window.CompilationManager;
+                if (!CompilationManagerClass) {
+                    addConsoleOutput('编译器模块不可用', 'warning');
+                    return;
+                }
+
+                if (compilationManager) {
+                    addConsoleOutput('编译管理器已就绪（缓存）', 'success');
+                    return;
+                }
+                // 如编译器内部可利用全局缓存，可将 loader 提供给其使用
+                // 例如 CompilationManager 可选择读取 window.EmceptionLoader
+                compilationManager = new CompilationManagerClass();
+                addConsoleOutput('编译管理器已准备就绪', 'success');
+
+            } catch (error) {
+                addConsoleOutput(`编译管理器初始化失败: ${error.message}`, 'error');
+            }
+        }
+
+
+        // 仅保留 Emception 模式
+
+        // 加载示例
+        function loadExample(type) {
+            if (examples[type]) {
+                const editor = document.getElementById('codeEditor');
+                if (editor) {
+                    editor.value = examples[type];
+                    addConsoleOutput(`已加载${type}示例代码`, 'info');
+                }
+            }
+        }
+
+        // 执行代码
+        async function executeCode() {
+            const runBtn = document.getElementById('runBtn');
+            const code = document.getElementById('codeEditor').value;
+
+            runBtn.disabled = true;
+            runBtn.textContent = '执行中...';
+
+            try {
+                await initializeCompilationManager();
+                addConsoleOutput(`开始执行用户代码...`, 'info');
+                await executeWithEmception(code);
+
+                addConsoleOutput('代码执行完成!', 'success');
+
+            } catch (e) {
+                addConsoleOutput(`执行错误: ${e.message}`, 'error');
+            } finally {
+                runBtn.disabled = false;
+                runBtn.textContent = '▶️ 运行代码';
+            }
+        }
+
+        // 编译并执行代码
+        async function executeWithEmception(code) {
+            if (!compilationManager) {
+                throw new Error('编译管理器未初始化');
+            }
+
+            try {
+                if (!compilationManager.isInitialized) {
+                    await compilationManager.initialize();
+                }
+
+                const result = await compilationManager.compileAndExecute(code);
+                //addConsoleOutput(`编译成功! 会话ID: ${result.sessionId}`, 'success');
+
+                // 如果是单文件 em++ 模块，读取帧缓冲贴到 canvas
+                try {
+                    const mod = compilationManager.wasmExecutor?.wasmModule;
+                    if (mod && typeof mod.cwrap === 'function' && mod.HEAPU8) {
+                        const getPtr = mod.cwrap('tgfx_get_framebuffer_ptr','number',[]);
+                        const getW = mod.cwrap('tgfx_get_width','number',[]);
+                        const getH = mod.cwrap('tgfx_get_height','number',[]);
+                        // 若示例未调用初始化/渲染，可补一次
+                        const init = mod.cwrap('tgfx_init','number',['number','number']);
+                        const render = mod.cwrap('tgfx_render','void',[]);
+                        const present = mod.cwrap('tgfx_present','void',[]);
+
+                        const canvas = document.getElementById('renderCanvas');
+                        const ctx = canvas?.getContext('2d');
+                        if (ctx) {
+                            if (getW() === 0 || getH() === 0) {
+                                init(canvas.width, canvas.height);
+                                render();
+                                present();
+                            }
+                            const w = getW();
+                            const h = getH();
+                            if (w > 0 && h > 0) {
+                                if (canvas.width !== w || canvas.height !== h) {
+                                    canvas.width = w; canvas.height = h;
+                                }
+                                const ptr = getPtr();
+                                const view = new Uint8ClampedArray(mod.HEAPU8.buffer, ptr, w*h*4);
+                                const img = new ImageData(view, w, h);
+                                ctx.putImageData(img, 0, 0);
+                                addConsoleOutput(`已渲染到画布 (${w}x${h})`, 'success');
+                            }
+                        }
+                    }
+                } catch (postErr) {
+                    addConsoleOutput(` 贴图阶段警告: ${postErr.message}`, 'warning');
+                }
+
+            } catch (error) {
+                addConsoleOutput('Emception编译失败:', 'error');
+                addConsoleOutput(`   错误详情: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+
+        // DSL 模式与 wrapcode 功能已移除
+
+        // 页面初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            // 绑定示例按钮
+            const exampleButtons = document.querySelectorAll('.example-btn[data-example]');
+            exampleButtons.forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const exampleType = e.target.getAttribute('data-example');
+                    loadExample(exampleType);
+                });
+            });
+
+            // 绑定运行按钮
+            const runButton = document.getElementById('runBtn');
+            if (runButton) {
+                runButton.addEventListener('click', executeCode);
+            }
+
+            addConsoleOutput('欢迎使用 TGFX 在线代码编辑器!', 'info');
+            addConsoleOutput('点击示例按钮加载代码，然后点击运行按钮执行', 'info');
+        });
+
+        // 监听模块加载完成事件
+        window.addEventListener('modulesLoaded', (event) => {
+            if (event.detail.success) {
+                addConsoleOutput('编译器模块已就绪', 'success');
+                // 再次尝试静默预热 emception（若首次失败）
+                EmceptionLoader.load().catch(()=>{});
+                EmceptionLoader.loadPacks().catch(()=>{});
+            } else {
+                addConsoleOutput('编译器模块加载失败', 'error');
+            }
+        });
+    </script>
+</body>
+</html>
