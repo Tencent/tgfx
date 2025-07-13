@@ -19,6 +19,7 @@
 #pragma once
 
 #include "ResourceProxy.h"
+#include "core/utils/Log.h"
 #include "gpu/Texture.h"
 
 namespace tgfx {
@@ -62,16 +63,27 @@ class TextureProxy : public ResourceProxy {
   }
 
   /**
-   * Returns the associated Texture instance.
-   */
-  virtual std::shared_ptr<Texture> getTexture() const = 0;
-
-  /**
    * Returns the underlying RenderTargetProxy if this TextureProxy is also a render target proxy;
    * otherwise, returns nullptr.
    */
   virtual std::shared_ptr<RenderTargetProxy> asRenderTargetProxy() const {
     return nullptr;
   }
+
+  /**
+   * Returns the associated Texture instance.
+   */
+  std::shared_ptr<Texture> getTexture() const;
+
+ protected:
+  /**
+   * Subclass should override this method to create the actual Texture instance.
+   */
+  virtual std::shared_ptr<Texture> onMakeTexture(Context* context) const = 0;
+
+ private:
+  UniqueKey uniqueKey = {};
+
+  friend class ProxyProvider;
 };
 }  // namespace tgfx

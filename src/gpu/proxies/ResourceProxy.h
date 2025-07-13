@@ -32,13 +32,13 @@ class ResourceProxy {
   /**
    * Retrieves the context associated with this ResourceProxy.
    */
-  Context* getContext() const {
+  virtual Context* getContext() const {
     return context;
   }
 
  protected:
   Context* context = nullptr;
-  std::shared_ptr<Resource> resource = nullptr;
+  mutable std::shared_ptr<Resource> resource = nullptr;
 
   explicit ResourceProxy(std::shared_ptr<Resource> resource) : resource(std::move(resource)) {
   }

@@ -16,24 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "ResourceTask.h"
-#include "gpu/RenderTarget.h"
-
+#include "TextureProxy.h"
 namespace tgfx {
-class BackendRenderTargetCreateTask : public ResourceTask {
- public:
-  BackendRenderTargetCreateTask(std::shared_ptr<ResourceProxy> proxy,
-                                const BackendTexture& backendTexture, int sampleCount,
-                                ImageOrigin origin, bool adopted);
+std::shared_ptr<Texture> TextureProxy::getTexture() const {
+  if (resource == nullptr) {
+    resource = onMakeTexture(context);
+    if (resource != nullptr && !uniqueKey.empty()) {
+      resource->assignUniqueKey(uniqueKey);
+    }
+  }
+  return std::static_pointer_cast<Texture>(resource);
+}
 
-  std::shared_ptr<Resource> onMakeResource(Context* context) override;
-
- private:
-  BackendTexture backendTexture = {};
-  int sampleCount = 0;
-  ImageOrigin origin = ImageOrigin::TopLeft;
-  bool adopted = false;
-};
 }  // namespace tgfx

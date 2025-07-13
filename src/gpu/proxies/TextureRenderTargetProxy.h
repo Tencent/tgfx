@@ -62,21 +62,21 @@ class TextureRenderTargetProxy : public DefaultTextureProxy,
     return std::const_pointer_cast<TextureRenderTargetProxy>(shared_from_this());
   }
 
-  std::shared_ptr<RenderTarget> getRenderTarget() const override {
-    return std::static_pointer_cast<Texture>(resource)->asRenderTarget();
+  std::shared_ptr<Texture> getTexture() const override {
+    return TextureProxy::getTexture();
   }
 
- private:
-  PixelFormat _format = PixelFormat::RGBA_8888;
+  std::shared_ptr<RenderTarget> getRenderTarget() const override;
+
+ protected:
   int _sampleCount = 1;
   bool _externallyOwned = false;
 
   TextureRenderTargetProxy(int width, int height, PixelFormat format, int sampleCount,
                            bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft,
-                           bool externallyOwned = false)
-      : DefaultTextureProxy(width, height, mipmapped, format == PixelFormat::ALPHA_8, origin),
-        _format(format), _sampleCount(sampleCount), _externallyOwned(externallyOwned) {
-  }
+                           bool externallyOwned = false);
+
+  std::shared_ptr<Texture> onMakeTexture(Context* context) const override;
 
   friend class ProxyProvider;
 };

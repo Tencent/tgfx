@@ -16,21 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "BackendRenderTargetCreateTask.h"
+#include "BackendTextureRenderTargetProxy.h"
 
 namespace tgfx {
-BackendRenderTargetCreateTask::BackendRenderTargetCreateTask(std::shared_ptr<ResourceProxy> proxy,
-                                                             const BackendTexture& backendTexture,
-                                                             int sampleCount, ImageOrigin origin,
-                                                             bool adopted)
-    : ResourceTask(std::move(proxy)), backendTexture(backendTexture), sampleCount(sampleCount),
-      origin(origin), adopted(adopted) {
+BackendTextureRenderTargetProxy::BackendTextureRenderTargetProxy(
+    const BackendTexture& backendTexture, PixelFormat format, int sampleCount, ImageOrigin origin,
+    bool adopted)
+    : TextureRenderTargetProxy(backendTexture.width(), backendTexture.height(), format, sampleCount,
+                               false, origin, !adopted),
+      backendTexture(backendTexture) {
 }
 
-std::shared_ptr<Resource> BackendRenderTargetCreateTask::onMakeResource(Context* context) {
-  auto renderTarget = RenderTarget::MakeFrom(context, backendTexture, sampleCount, origin, adopted);
+std::shared_ptr<Texture> BackendTextureRenderTargetProxy::onMakeTexture(Context* context) const {
+  auto renderTarget =
+      RenderTarget::MakeFrom(context, backendTexture, _sampleCount, _origin, !externallyOwned());
   if (renderTarget == nullptr) {
-    LOGE("BackendTextureRTCreateTask::onMakeResource() Failed to create the render target!");
+    LOGE("BackendTextureRenderTargetProxy::onMakeTexture() Failed to create the render target!");
+    return nullptr;
   }
   return renderTarget->asTexture();
 }

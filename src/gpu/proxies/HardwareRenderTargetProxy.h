@@ -18,19 +18,22 @@
 
 #pragma once
 
-#include "ResourceTask.h"
-#include "gpu/RenderTarget.h"
+#include "TextureRenderTargetProxy.h"
 
 namespace tgfx {
-class HardwareRenderTargetCreateTask : public ResourceTask {
+class HardwareRenderTargetProxy : public TextureRenderTargetProxy {
  public:
-  HardwareRenderTargetCreateTask(std::shared_ptr<ResourceProxy> proxy,
-                                 HardwareBufferRef hardwareBuffer, int sampleCount);
+  ~HardwareRenderTargetProxy() override;
 
-  std::shared_ptr<Resource> onMakeResource(Context* context) override;
+ protected:
+  std::shared_ptr<Texture> onMakeTexture(Context* context) const override;
 
  private:
-  HardwareBufferRef hardwareBuffer;
-  int sampleCount = 0;
+  HardwareBufferRef hardwareBuffer = nullptr;
+
+  HardwareRenderTargetProxy(HardwareBufferRef hardwareBuffer, int width, int height,
+                            PixelFormat format, int sampleCount);
+
+  friend class ProxyProvider;
 };
 }  // namespace tgfx

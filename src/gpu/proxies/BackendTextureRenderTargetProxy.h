@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,14 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DefaultTextureProxy.h"
+#pragma once
+
+#include "gpu/proxies/TextureRenderTargetProxy.h"
 
 namespace tgfx {
-DefaultTextureProxy::DefaultTextureProxy(int width, int height, bool mipmapped, bool isAlphaOnly,
-                                         ImageOrigin origin)
-    : _width(width), _height(height) {
-  bitFields.origin = origin;
-  bitFields.mipmapped = mipmapped;
-  bitFields.isAlphaOnly = isAlphaOnly;
-}
+class BackendTextureRenderTargetProxy : public TextureRenderTargetProxy {
+ protected:
+  std::shared_ptr<Texture> onMakeTexture(Context* context) const override;
+
+ private:
+  BackendTexture backendTexture = {};
+
+  BackendTextureRenderTargetProxy(const BackendTexture& backendTexture, PixelFormat format,
+                                  int sampleCount, ImageOrigin origin = ImageOrigin::TopLeft,
+                                  bool adopted = false);
+  friend class ProxyProvider;
+};
 }  // namespace tgfx

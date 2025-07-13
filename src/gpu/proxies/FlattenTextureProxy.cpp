@@ -25,7 +25,7 @@ FlattenTextureProxy::FlattenTextureProxy(UniqueKey flattenTextureKey,
     : flattenTextureKey(std::move(flattenTextureKey)), source(std::move(source)) {
 }
 
-std::shared_ptr<Texture> FlattenTextureProxy::getTexture() const {
+std::shared_ptr<Texture> FlattenTextureProxy::onMakeTexture(Context* context) const {
   auto texture = Resource::Find<Texture>(context, flattenTextureKey);
   return texture ? texture : source->getTexture();
 }

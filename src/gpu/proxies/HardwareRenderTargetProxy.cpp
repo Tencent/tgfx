@@ -16,20 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "HardwareRenderTargetCreateTask.h"
+#include "HardwareRenderTargetProxy.h"
 
 namespace tgfx {
-HardwareRenderTargetCreateTask::HardwareRenderTargetCreateTask(std::shared_ptr<ResourceProxy> proxy,
-                                                               HardwareBufferRef hardwareBuffer,
-                                                               int sampleCount)
-    : ResourceTask(std::move(proxy)), hardwareBuffer(hardwareBuffer), sampleCount(sampleCount) {
+HardwareRenderTargetProxy::HardwareRenderTargetProxy(HardwareBufferRef hardwareBuffer, int width,
+                                                     int height, PixelFormat format,
+                                                     int sampleCount)
+    : TextureRenderTargetProxy(width, height, format, sampleCount, false, ImageOrigin::TopLeft,
+                               true),
+      hardwareBuffer(hardwareBuffer) {
+  HardwareBufferRetain(hardwareBuffer);
 }
 
-std::shared_ptr<Resource> HardwareRenderTargetCreateTask::onMakeResource(Context* context) {
-  auto renderTarget = RenderTarget::MakeFrom(context, hardwareBuffer, sampleCount);
+HardwareRenderTargetProxy::~HardwareRenderTargetProxy() {
+  HardwareBufferRelease(hardwareBuffer);
+}
+
+std::shared_ptr<Texture> HardwareRenderTargetProxy::onMakeTexture(Context* context) const {
+  auto renderTarget = RenderTarget::MakeFrom(context, hardwareBuffer, _sampleCount);
   if (renderTarget == nullptr) {
-    LOGE("HardwareBufferRTCreateTask::onMakeResource() Failed to create the render target!");
+    LOGE("HardwareRenderTargetProxy::onMakeTexture() Failed to create the render target!");
   }
   return renderTarget->asTexture();
 }
+
 }  // namespace tgfx
