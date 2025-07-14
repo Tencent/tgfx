@@ -16,22 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TextureRenderTargetCreateTask.h"
+#include "TextureRenderTargetProxy.h"
 
 namespace tgfx {
-TextureRenderTargetCreateTask::TextureRenderTargetCreateTask(UniqueKey uniqueKey, int width,
-                                                             int height, PixelFormat format,
-                                                             int sampleCount, bool mipmapped,
-                                                             ImageOrigin origin)
-    : ResourceTask(std::move(uniqueKey)), width(width), height(height), format(format),
-      sampleCount(sampleCount), mipmapped(mipmapped), origin(origin) {
+TextureRenderTargetProxy::TextureRenderTargetProxy(int width, int height, PixelFormat format,
+                                                   int sampleCount, bool mipmapped,
+                                                   ImageOrigin origin, bool externallyOwned)
+    : DefaultTextureProxy(width, height, format, mipmapped, origin), _sampleCount(sampleCount),
+      _externallyOwned(externallyOwned) {
 }
 
-std::shared_ptr<Resource> TextureRenderTargetCreateTask::onMakeResource(Context* context) {
+std::shared_ptr<RenderTarget> TextureRenderTargetProxy::getRenderTarget() const {
+  auto texture = TextureProxy::getTexture();
+  return texture ? texture->asRenderTarget() : nullptr;
+}
+
+std::shared_ptr<Texture> TextureRenderTargetProxy::onMakeTexture(Context* context) const {
+  if (_externallyOwned) {
+    return nullptr;
+  }
   auto renderTarget =
-      RenderTarget::Make(context, width, height, format, sampleCount, mipmapped, origin);
+      RenderTarget::Make(context, _width, _height, _format, _sampleCount, _mipmapped, _origin);
   if (renderTarget == nullptr) {
-    LOGE("TextureRTCreateTask::onMakeResource() Failed to create the render target!");
+    LOGE("TextureRenderTargetProxy::onMakeTexture() Failed to create the render target!");
+    return nullptr;
   }
   return renderTarget->asTexture();
 }

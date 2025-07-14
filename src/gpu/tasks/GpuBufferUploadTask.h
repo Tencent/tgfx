@@ -26,7 +26,7 @@
 namespace tgfx {
 class GpuBufferUploadTask : public ResourceTask {
  public:
-  GpuBufferUploadTask(UniqueKey uniqueKey, BufferType bufferType,
+  GpuBufferUploadTask(std::shared_ptr<ResourceProxy> proxy, BufferType bufferType,
                       std::unique_ptr<DataSource<Data>> source);
 
  protected:

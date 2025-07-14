@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,22 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TextureCreateTask.h"
-#include "gpu/Texture.h"
+#pragma once
+
+#include "gpu/proxies/TextureRenderTargetProxy.h"
 
 namespace tgfx {
-TextureCreateTask::TextureCreateTask(UniqueKey uniqueKey, int width, int height, PixelFormat format,
-                                     bool mipmapped, ImageOrigin origin)
-    : ResourceTask(std::move(uniqueKey)), width(width), height(height), format(format),
-      mipmapped(mipmapped), origin(origin) {
-}
+class BackendTextureRenderTargetProxy : public TextureRenderTargetProxy {
+ protected:
+  std::shared_ptr<Texture> onMakeTexture(Context* context) const override;
 
-std::shared_ptr<Resource> TextureCreateTask::onMakeResource(Context* context) {
-  auto texture = Texture::MakeFormat(context, width, height, format, mipmapped, origin);
-  if (texture == nullptr) {
-    LOGE("TextureCreateTask::onMakeResource() Failed to create the texture!");
-  }
-  return texture;
-}
+ private:
+  BackendTexture backendTexture = {};
 
+  BackendTextureRenderTargetProxy(const BackendTexture& backendTexture, PixelFormat format,
+                                  int sampleCount, ImageOrigin origin = ImageOrigin::TopLeft,
+                                  bool adopted = false);
+  friend class ProxyProvider;
+};
 }  // namespace tgfx

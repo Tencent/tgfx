@@ -65,7 +65,8 @@ class DrawingManager {
   void addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
                                std::shared_ptr<TextureProxy> dest);
 
-  void addResourceTask(PlacementPtr<ResourceTask> resourceTask);
+  void addResourceTask(PlacementPtr<ResourceTask> resourceTask, const UniqueKey& uniqueKey = {},
+                       uint32_t renderFlags = 0);
 
   /**
    * Returns true if any render tasks were executed.
@@ -90,7 +91,6 @@ class DrawingManager {
   std::vector<PlacementPtr<TextureFlattenTask>> flattenTasks = {};
   std::vector<PlacementPtr<RenderTask>> renderTasks = {};
   std::list<std::shared_ptr<OpsCompositor>> compositors = {};
-  ResourceKeyMap<ResourceTask*> resourceTaskMap = {};
   std::vector<std::shared_ptr<Task>> atlasCellCodecTasks = {};
   std::map<std::shared_ptr<TextureProxy>, std::vector<AtlasCellData>> atlasCellDatas = {};
 

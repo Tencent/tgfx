@@ -48,12 +48,14 @@ class FlattenTextureProxy : public TextureProxy {
     return true;
   }
 
-  std::shared_ptr<Texture> getTexture() const override;
+ protected:
+  std::shared_ptr<Texture> onMakeTexture(Context* context) const override;
 
  private:
+  UniqueKey flattenTextureKey = {};
   std::shared_ptr<TextureProxy> source = nullptr;
 
-  FlattenTextureProxy(UniqueKey uniqueKey, std::shared_ptr<TextureProxy> source);
+  FlattenTextureProxy(UniqueKey flattenTextureKey, std::shared_ptr<TextureProxy> source);
 
   friend class ProxyProvider;
 };

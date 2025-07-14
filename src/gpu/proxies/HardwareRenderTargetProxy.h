@@ -16,22 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "BackendRenderTargetCreateTask.h"
+#pragma once
+
+#include "TextureRenderTargetProxy.h"
 
 namespace tgfx {
-BackendRenderTargetCreateTask::BackendRenderTargetCreateTask(UniqueKey uniqueKey,
-                                                             const BackendTexture& backendTexture,
-                                                             int sampleCount, ImageOrigin origin,
-                                                             bool adopted)
-    : ResourceTask(std::move(uniqueKey)), backendTexture(backendTexture), sampleCount(sampleCount),
-      origin(origin), adopted(adopted) {
-}
+class HardwareRenderTargetProxy : public TextureRenderTargetProxy {
+ public:
+  ~HardwareRenderTargetProxy() override;
 
-std::shared_ptr<Resource> BackendRenderTargetCreateTask::onMakeResource(Context* context) {
-  auto renderTarget = RenderTarget::MakeFrom(context, backendTexture, sampleCount, origin, adopted);
-  if (renderTarget == nullptr) {
-    LOGE("BackendTextureRTCreateTask::onMakeResource() Failed to create the render target!");
-  }
-  return renderTarget->asTexture();
-}
+ protected:
+  std::shared_ptr<Texture> onMakeTexture(Context* context) const override;
+
+ private:
+  HardwareBufferRef hardwareBuffer = nullptr;
+
+  HardwareRenderTargetProxy(HardwareBufferRef hardwareBuffer, int width, int height,
+                            PixelFormat format, int sampleCount);
+
+  friend class ProxyProvider;
+};
 }  // namespace tgfx
