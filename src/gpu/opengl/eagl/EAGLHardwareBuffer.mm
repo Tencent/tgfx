@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,8 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import <TargetConditionals.h>
-#include "EAGLHardwareTexture.h"
-#include "EAGLNV12Texture.h"
+#include "EAGLHardwareTextureSampler.h"
 #include "core/PixelBuffer.h"
 #include "platform/apple/NV12HardwareBuffer.h"
 
@@ -31,15 +30,30 @@ bool HardwareBufferAvailable() {
 #endif
 }
 
-std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
-                                           YUVColorSpace colorSpace) {
+PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
-    return nullptr;
+    return PixelFormat::Unknown;
   }
-  auto planeCount = CVPixelBufferGetPlaneCount(hardwareBuffer);
-  if (planeCount > 1) {
-    return EAGLNV12Texture::MakeFrom(context, hardwareBuffer, colorSpace);
+  auto pixelFormat = CVPixelBufferGetPixelFormatType(hardwareBuffer);
+  switch (pixelFormat) {
+    case kCVPixelFormatType_OneComponent8:
+      return PixelFormat::ALPHA_8;
+    case kCVPixelFormatType_32BGRA:
+      return PixelFormat::BGRA_8888;
+    default:
+      return PixelFormat::Unknown;
   }
-  return EAGLHardwareTexture::MakeFrom(context, hardwareBuffer);
+}
+
+std::vector<std::unique_ptr<TextureSampler>> TextureSampler::MakeFrom(
+    Context* context, HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) {
+  if (!HardwareBufferCheck(hardwareBuffer)) {
+    return {};
+  }
+  auto samplers = EAGLHardwareTextureSampler::MakeFrom(context, hardwareBuffer);
+  if (yuvFormat != nullptr && !samplers.empty()) {
+    *yuvFormat = samplers.size() == 2 ? YUVFormat::NV12 : YUVFormat::Unknown;
+  }
+  return samplers;
 }
 }  // namespace tgfx

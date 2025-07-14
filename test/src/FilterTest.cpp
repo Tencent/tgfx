@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -683,5 +683,45 @@ TGFX_TEST(FilterTest, InnerShadowBadCase) {
   path.addOval(rect);
   canvas->drawPath(path, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/InnerShadowBadCase"));
+}
+
+TGFX_TEST(FilterTest, ClipInnerShadowImageFilter) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  int surfaceWidth = 100;
+  int surfaceHeight = 100;
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  ASSERT_TRUE(surface != nullptr);
+
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  ASSERT_TRUE(image != nullptr);
+  auto shadowFilter = ImageFilter::InnerShadow(0, -10.5, 10, 10, Color::FromRGBA(0, 0, 0, 128));
+  image = image->makeWithFilter(shadowFilter);
+  auto canvas = surface->getCanvas();
+  canvas->scale(0.8571f, 0.8571f);
+  {
+    AutoCanvasRestore restore(canvas);
+    canvas->clipRect(Rect::MakeWH(100.f, 30.f));
+    canvas->drawImage(image);
+  }
+  {
+    AutoCanvasRestore restore(canvas);
+    canvas->clipRect(Rect::MakeXYWH(0.f, 30.f, 100.f, 30.f));
+    canvas->drawImage(image);
+  }
+  {
+    AutoCanvasRestore restore(canvas);
+    canvas->clipRect(Rect::MakeXYWH(0, 60, 100, 30));
+    canvas->drawImage(image);
+  }
+  {
+    AutoCanvasRestore restore(canvas);
+    canvas->clipRect(Rect::MakeXYWH(0, 90, 100, 10));
+    canvas->drawImage(image);
+  }
+  context->flush();
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ClipInnerShadowImageFilter"));
 }
 }  // namespace tgfx

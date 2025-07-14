@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -48,26 +48,27 @@ Picture::~Picture() {
   delete oldBounds;
 }
 
-Rect Picture::getBounds(const Matrix* matrix, bool computeTightBounds) const {
-  auto useCachedBounds = !matrix && !computeTightBounds;
-  if (useCachedBounds) {
-    auto cachedBounds = bounds.load(std::memory_order_acquire);
-    if (cachedBounds) {
-      return *cachedBounds;
-    }
+Rect Picture::getBounds() const {
+  if (auto cachedBounds = bounds.load(std::memory_order_acquire)) {
+    return *cachedBounds;
   }
-  MeasureContext context(computeTightBounds);
-  MCState state(matrix ? *matrix : Matrix::I());
+  MeasureContext context(false);
+  MCState state(Matrix::I());
   playback(&context, state);
   auto totalBounds = context.getBounds();
-  if (useCachedBounds) {
-    auto newBounds = new Rect(totalBounds);
-    Rect* oldBounds = nullptr;
-    if (!bounds.compare_exchange_strong(oldBounds, newBounds, std::memory_order_acq_rel)) {
-      delete newBounds;
-    }
+  auto newBounds = new Rect(totalBounds);
+  Rect* oldBounds = nullptr;
+  if (!bounds.compare_exchange_strong(oldBounds, newBounds, std::memory_order_acq_rel)) {
+    delete newBounds;
   }
   return totalBounds;
+}
+
+Rect Picture::getTightBounds(const Matrix* matrix) const {
+  MeasureContext context(true);
+  MCState state(matrix ? *matrix : Matrix::I());
+  playback(&context, state);
+  return context.getBounds();
 }
 
 bool Picture::hitTestPoint(float localX, float localY, bool shapeHitTest) const {

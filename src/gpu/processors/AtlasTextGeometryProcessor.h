@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -27,8 +27,7 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
  public:
   static PlacementPtr<AtlasTextGeometryProcessor> Make(BlockBuffer* buffer,
                                                        std::shared_ptr<TextureProxy> textureProxy,
-                                                       const SamplingOptions& sampling, AAType aa,
-                                                       std::optional<Color> commonColor);
+                                                       AAType aa, std::optional<Color> commonColor);
   std::string name() const override {
     return "AtlasTextGeometryProcessor";
   }
@@ -36,8 +35,7 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  AtlasTextGeometryProcessor(std::shared_ptr<TextureProxy> textureProxy,
-                             const SamplingOptions& sampling, AAType aa,
+  AtlasTextGeometryProcessor(std::shared_ptr<TextureProxy> textureProxy, AAType aa,
                              std::optional<Color> commonColor);
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
@@ -47,17 +45,12 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
     return textureSamplers[index];
   }
 
-  SamplerState onSamplerState(size_t) const override {
-    return samplerState;
-  }
-
   Attribute position;  // May contain coverage as last channel
   Attribute coverage;
   Attribute maskCoord;
   Attribute color;
 
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
-  SamplerState samplerState;
   AAType aa = AAType::None;
   std::optional<Color> commonColor = std::nullopt;
   std::vector<const TextureSampler*> textureSamplers;

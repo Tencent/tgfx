@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -83,6 +83,15 @@ void HardwareBufferUnlock(HardwareBufferRef buffer) {
   }
 }
 
+ISize HardwareBufferGetSize(HardwareBufferRef buffer) {
+  if (!HardwareBufferAvailable() || buffer == nullptr) {
+    return {};
+  }
+  OH_NativeBuffer_Config config;
+  OH_NativeBuffer_GetConfig(buffer, &config);
+  return {config.width, config.height};
+}
+
 ImageInfo HardwareBufferGetInfo(HardwareBufferRef buffer) {
   if (!HardwareBufferAvailable() || buffer == nullptr) {
     return {};
@@ -104,13 +113,5 @@ ImageInfo HardwareBufferGetInfo(HardwareBufferRef buffer) {
   }
   return ImageInfo::Make(config.width, config.height, colorType, alphaType,
                          static_cast<size_t>(config.stride));
-}
-
-PixelFormat HardwareBufferGetPixelFormat(HardwareBufferRef buffer) {
-  auto info = HardwareBufferGetInfo(buffer);
-  if (info.isEmpty()) {
-    return PixelFormat::Unknown;
-  }
-  return ColorTypeToPixelFormat(info.colorType());
 }
 }  // namespace tgfx

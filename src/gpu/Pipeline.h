@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -21,17 +21,22 @@
 #include <unordered_map>
 #include "Swizzle.h"
 #include "gpu/Blend.h"
-#include "gpu/ProgramInfo.h"
+#include "gpu/ProgramCreator.h"
 #include "gpu/processors/EmptyXferProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/GeometryProcessor.h"
 
 namespace tgfx {
+struct SamplerInfo {
+  const TextureSampler* sampler;
+  SamplerState state;
+};
+
 /**
  * Pipeline is a ProgramInfo that uses a list of Processors to assemble a shader program and set API
  * state for a draw.
  */
-class Pipeline : public ProgramInfo {
+class Pipeline : public ProgramCreator {
  public:
   Pipeline(PlacementPtr<GeometryProcessor> geometryProcessor,
            std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors,
@@ -60,17 +65,17 @@ class Pipeline : public ProgramInfo {
     return _outputSwizzle;
   }
 
-  bool requiresBarrier() const override {
+  bool requiresBarrier() const {
     return xferProcessor != nullptr && xferProcessor->requiresBarrier();
   }
 
-  const BlendFormula* blendFormula() const override {
+  const BlendFormula* blendFormula() const {
     return xferProcessor == nullptr ? &_blendFormula : nullptr;
   }
 
-  void getUniforms(UniformBuffer* uniformBuffer) const override;
+  void getUniforms(UniformBuffer* uniformBuffer) const;
 
-  std::vector<SamplerInfo> getSamplers() const override;
+  std::vector<SamplerInfo> getSamplers() const;
 
   void computeProgramKey(Context* context, BytesKey* programKey) const override;
 

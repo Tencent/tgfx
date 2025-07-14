@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -28,16 +28,16 @@ bool ProgramCache::empty() const {
   return programMap.empty();
 }
 
-Program* ProgramCache::getProgram(const ProgramInfo* programInfo) {
+Program* ProgramCache::getProgram(const ProgramCreator* programCreator) {
   BytesKey programKey = {};
-  programInfo->computeProgramKey(context, &programKey);
+  programCreator->computeProgramKey(context, &programKey);
   auto result = programMap.find(programKey);
   if (result != programMap.end()) {
     programLRU.remove(result->second);
     programLRU.push_front(result->second);
     return result->second;
   }
-  auto program = programInfo->createProgram(context).release();
+  auto program = programCreator->createProgram(context).release();
   if (program == nullptr) {
     return nullptr;
   }

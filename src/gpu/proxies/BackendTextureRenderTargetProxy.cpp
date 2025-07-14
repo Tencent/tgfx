@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,23 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "RuntimeResource.h"
+#include "BackendTextureRenderTargetProxy.h"
 
 namespace tgfx {
-
-std::shared_ptr<RuntimeResource> RuntimeResource::Wrap(const UniqueKey& uniqueKey,
-                                                       std::unique_ptr<RuntimeProgram> program) {
-  if (program == nullptr) {
-    return nullptr;
-  }
-  auto context = program->getContext();
-  auto resource = Resource::AddToCache(context, new RuntimeResource(std::move(program)));
-  resource->assignUniqueKey(uniqueKey);
-  return std::static_pointer_cast<RuntimeResource>(resource);
+BackendTextureRenderTargetProxy::BackendTextureRenderTargetProxy(
+    const BackendTexture& backendTexture, PixelFormat format, int sampleCount, ImageOrigin origin,
+    bool adopted)
+    : TextureRenderTargetProxy(backendTexture.width(), backendTexture.height(), format, sampleCount,
+                               false, origin, !adopted),
+      backendTexture(backendTexture) {
 }
 
-void RuntimeResource::onReleaseGPU() {
-  program->onReleaseGPU();
-  program->context = nullptr;
+std::shared_ptr<Texture> BackendTextureRenderTargetProxy::onMakeTexture(Context* context) const {
+  auto renderTarget =
+      RenderTarget::MakeFrom(context, backendTexture, _sampleCount, _origin, !externallyOwned());
+  if (renderTarget == nullptr) {
+    LOGE("BackendTextureRenderTargetProxy::onMakeTexture() Failed to create the render target!");
+    return nullptr;
+  }
+  return renderTarget->asTexture();
 }
 }  // namespace tgfx

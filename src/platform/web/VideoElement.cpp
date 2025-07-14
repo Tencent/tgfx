@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,10 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "platform/web/VideoElement.h"
-#include "GLVideoTexture.h"
+#include "gpu/ExtendedTexture.h"
 
 namespace tgfx {
 using namespace emscripten;
+
+static constexpr int ANDROID_MINIPROGRAM_ALIGNMENT = 16;
 
 std::shared_ptr<VideoElement> VideoElement::MakeFrom(val video, int width, int height) {
   if (video == val::null() || width < 1 || height < 1) {
@@ -44,7 +46,35 @@ void VideoElement::markFrameChanged(emscripten::val promise) {
 }
 
 std::shared_ptr<Texture> VideoElement::onMakeTexture(Context* context, bool mipmapped) {
-  auto texture = GLVideoTexture::Make(context, width(), height(), mipmapped);
+  static auto isAndroidMiniprogram =
+      val::module_property("tgfx").call<bool>("isAndroidMiniprogram");
+  auto textureWidth = width();
+  auto textureHeight = height();
+  if (isAndroidMiniprogram) {
+    // https://stackoverflow.com/questions/28291204/something-about-stagefright-codec-input-format-in-android
+    // Video decoder will align to multiples of 16 on the Android WeChat mini-program.
+    if (textureWidth % ANDROID_MINIPROGRAM_ALIGNMENT != 0) {
+      textureWidth +=
+          ANDROID_MINIPROGRAM_ALIGNMENT - (textureWidth % ANDROID_MINIPROGRAM_ALIGNMENT);
+    }
+    if (textureHeight % ANDROID_MINIPROGRAM_ALIGNMENT != 0) {
+      textureHeight +=
+          ANDROID_MINIPROGRAM_ALIGNMENT - (textureHeight % ANDROID_MINIPROGRAM_ALIGNMENT);
+    }
+  }
+  std::shared_ptr<Texture> texture = nullptr;
+  if (textureWidth != width() || textureHeight != height()) {
+    auto sampler =
+        TextureSampler::Make(context, width(), height(), PixelFormat::RGBA_8888, mipmapped);
+    if (sampler != nullptr) {
+      texture = Resource::AddToCache(
+          context,
+          new ExtendedTexture(std::move(sampler), width(), height(), textureWidth, textureHeight));
+    }
+  } else {
+    texture = Texture::MakeFormat(context, textureWidth, textureHeight, PixelFormat::RGBA_8888,
+                                  mipmapped);
+  }
   if (texture != nullptr) {
     onUpdateTexture(texture, Rect::MakeWH(width(), height()));
   }

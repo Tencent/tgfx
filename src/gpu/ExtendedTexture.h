@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,29 +18,29 @@
 
 #pragma once
 
-#import <CoreVideo/CoreVideo.h>
-#include "gpu/YUVTexture.h"
+#include "gpu/DefaultTexture.h"
 
 namespace tgfx {
-class EAGLNV12Texture : public YUVTexture {
+/**
+ * ExtendedTexture enhances DefaultTexture by allowing you to specify an extended width and height.
+ */
+class ExtendedTexture : public DefaultTexture {
  public:
-  static std::shared_ptr<EAGLNV12Texture> MakeFrom(Context* context, CVPixelBufferRef pixelBuffer,
-                                                   YUVColorSpace colorSpace);
+  ExtendedTexture(std::unique_ptr<TextureSampler> sampler, int width, int height, int extendedWidth,
+                  int extendedHeight, ImageOrigin origin = ImageOrigin::TopLeft);
 
-  EAGLNV12Texture(CVPixelBufferRef pixelBuffer, YUVColorSpace colorSpace);
+  size_t memoryUsage() const override;
 
-  ~EAGLNV12Texture() override;
-
-  HardwareBufferRef getHardwareBuffer() const override {
-    return pixelBuffer;
+  Point getTextureCoord(float x, float y) const override {
+    return {x / static_cast<float>(extendedWidth), y / static_cast<float>(extendedHeight)};
   }
 
- protected:
-  void onReleaseGPU() override;
+  BackendTexture getBackendTexture() const override {
+    return getSampler()->getBackendTexture(extendedWidth, extendedHeight);
+  }
 
  private:
-  CVPixelBufferRef pixelBuffer = nullptr;
-  CVOpenGLESTextureRef lumaTexture = nullptr;
-  CVOpenGLESTextureRef chromaTexture = nullptr;
+  int extendedWidth = 0;
+  int extendedHeight = 0;
 };
 }  // namespace tgfx

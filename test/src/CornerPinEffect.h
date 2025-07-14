@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -22,6 +22,17 @@
 #include "utils/FilterProgram.h"
 
 namespace tgfx {
+static constexpr uint32_t InvalidUniqueID = 0;
+
+static uint32_t NextProgramID() {
+  static std::atomic<uint32_t> nextID{1};
+  uint32_t id;
+  do {
+    id = nextID.fetch_add(1, std::memory_order_relaxed);
+  } while (id == InvalidUniqueID);
+  return id;
+}
+
 class CornerPinUniforms : public Uniforms {
  public:
   int positionHandle = -1;
@@ -30,10 +41,13 @@ class CornerPinUniforms : public Uniforms {
 
 class CornerPinEffect : public RuntimeEffect {
  public:
-  DEFINE_RUNTIME_EFFECT_TYPE
-
   static std::shared_ptr<CornerPinEffect> Make(const Point& upperLeft, const Point& upperRight,
                                                const Point& lowerRight, const Point& lowerLeft);
+
+  uint32_t programID() const override {
+    static auto CornerPinEffectID = NextProgramID();
+    return CornerPinEffectID;
+  }
 
   int sampleCount() const override {
     return 4;

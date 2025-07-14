@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -44,12 +44,8 @@ bool TextureFlattenTask::prepare(Context* context) {
   auto alphaRenderable = context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
   auto format =
       texture->isAlphaOnly() && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
-  flatTexture = Texture::MakeFormat(context, texture->width(), texture->height(), format,
+  renderTarget = RenderTarget::Make(context, texture->width(), texture->height(), format, 1,
                                     texture->hasMipmaps(), ImageOrigin::TopLeft);
-  if (flatTexture == nullptr) {
-    LOGE("TextureFlattenTask::prepare() Failed to create the flat texture!");
-  }
-  renderTarget = RenderTarget::MakeFrom(flatTexture.get());
   if (renderTarget == nullptr) {
     LOGE("TextureFlattenTask::prepare() Failed to create the render target!");
   }
@@ -60,7 +56,7 @@ bool TextureFlattenTask::execute(RenderPass* renderPass) {
   if (renderTarget == nullptr) {
     return false;
   }
-  if (!renderPass->begin(renderTarget, flatTexture)) {
+  if (!renderPass->begin(renderTarget)) {
     LOGE("TextureFlattenTask::execute() Failed to initialize the render pass!");
     return false;
   }
@@ -87,7 +83,7 @@ bool TextureFlattenTask::execute(RenderPass* renderPass) {
   renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
   renderPass->end();
   // Assign the unique key to the flat texture after the render pass is done.
-  flatTexture->assignUniqueKey(uniqueKey);
+  renderTarget->asTexture()->assignUniqueKey(uniqueKey);
   return true;
 }
 

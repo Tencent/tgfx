@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -71,14 +71,16 @@ std::shared_ptr<Texture> PixelRef::onMakeTexture(Context* context, bool mipmappe
 }
 
 bool PixelRef::onUpdateTexture(std::shared_ptr<Texture> texture, const Rect& bounds) {
-  auto gpu = texture->getContext()->gpu();
   auto pixels = lockPixels();
   if (pixels == nullptr) {
     return false;
   }
   pixels =
       info().computeOffset(pixels, static_cast<int>(bounds.left), static_cast<int>(bounds.top));
-  gpu->writePixels(texture->getSampler(), bounds, pixels, info().rowBytes());
+  auto context = texture->getContext();
+  auto sampler = texture->getSampler();
+  sampler->writePixels(context, bounds, pixels, info().rowBytes());
+  sampler->regenerateMipmapLevels(context);
   unlockPixels();
   return true;
 }

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -28,9 +28,9 @@ Rect ForegroundContent::getBounds() const {
 }
 
 Rect ForegroundContent::getTightBounds(const Matrix& matrix) const {
-  auto bounds = foreground->getBounds(&matrix, true);
+  auto bounds = foreground->getTightBounds(&matrix);
   if (background) {
-    bounds.join(background->getBounds(&matrix, true));
+    bounds.join(background->getTightBounds(&matrix));
   }
   return bounds;
 }

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -99,7 +99,7 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (samplingArgs.sampleArea) {
     newSamplingArgs.sampleArea->offset(-rect.left, -rect.top);
   }
-  return TiledTextureEffect::Make(renderTarget->getTextureProxy(), newSamplingArgs, &finalUVMatrix,
+  return TiledTextureEffect::Make(renderTarget->asTextureProxy(), newSamplingArgs, &finalUVMatrix,
                                   isAlphaOnly());
 }
 
@@ -114,7 +114,7 @@ std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args)
   if (!drawPicture(renderTarget, args.renderFlags, nullptr)) {
     return nullptr;
   }
-  return renderTarget->getTextureProxy();
+  return renderTarget->asTextureProxy();
 }
 
 bool PictureImage::drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget,

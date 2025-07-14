@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -21,16 +21,14 @@
 
 namespace tgfx {
 PlacementPtr<AtlasTextGeometryProcessor> AtlasTextGeometryProcessor::Make(
-    BlockBuffer* buffer, std::shared_ptr<TextureProxy> textureProxy,
-    const SamplingOptions& sampling, AAType aa, std::optional<Color> commonColor) {
-  return buffer->make<GLAtlasTextGeometryProcessor>(std::move(textureProxy), sampling, aa,
-                                                    commonColor);
+    BlockBuffer* buffer, std::shared_ptr<TextureProxy> textureProxy, AAType aa,
+    std::optional<Color> commonColor) {
+  return buffer->make<GLAtlasTextGeometryProcessor>(std::move(textureProxy), aa, commonColor);
 }
 
 GLAtlasTextGeometryProcessor::GLAtlasTextGeometryProcessor(
-    std::shared_ptr<TextureProxy> textureProxy, const SamplingOptions& sampling, AAType aa,
-    std::optional<Color> commonColor)
-    : AtlasTextGeometryProcessor(std::move(textureProxy), sampling, aa, commonColor) {
+    std::shared_ptr<TextureProxy> textureProxy, AAType aa, std::optional<Color> commonColor)
+    : AtlasTextGeometryProcessor(std::move(textureProxy), aa, commonColor) {
 }
 
 void GLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
@@ -45,8 +43,7 @@ void GLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
       uniformHandler->addUniform(ShaderFlags::Vertex, SLType::Float2, atlasSizeUniformName);
 
   auto samplerVarying = varyingHandler->addVarying("textureCoords", SLType::Float2);
-  emitTransforms(vertBuilder, varyingHandler, uniformHandler, position.asShaderVar(),
-                 args.fpCoordTransformHandler);
+  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, position.asShaderVar());
   auto uvName = maskCoord.asShaderVar().name();
   vertBuilder->codeAppendf("%s = %s * %s;", samplerVarying.vsOut().c_str(), uvName.c_str(),
                            atlasName.c_str());
@@ -77,10 +74,11 @@ void GLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->appendTextureLookup(samplerHandle, samplerVarying.vsOut());
   fragBuilder->codeAppend(";");
   if (texture->isAlphaOnly()) {
-    fragBuilder->codeAppendf("%s = color.a * %s;", args.outputColor.c_str(),
-                             args.outputColor.c_str());
+    fragBuilder->codeAppendf("%s = vec4(color.a);", args.outputCoverage.c_str());
   } else {
-    fragBuilder->codeAppendf("%s = color;", args.outputColor.c_str());
+    fragBuilder->codeAppendf("%s = clamp(vec4(color.rgb/color.a, 1.0), 0.0, 1.0);",
+                             args.outputColor.c_str());
+    fragBuilder->codeAppendf("%s = vec4(color.a);", args.outputCoverage.c_str());
   }
 
   // Emit the vertex position to the hardware in the normalized window coordinates it expects.

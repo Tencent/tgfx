@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -36,6 +36,8 @@ static constexpr int AA_TESSELLATOR_MAX_VERB_COUNT = 100;
 // Buffer.size() / Path.countPoints() from 4300+ tessellated path data.
 static constexpr int AA_TESSELLATOR_BUFFER_SIZE_FACTOR = 170;
 
+static constexpr int MaxRasterizedTextureSize = 4096;
+
 bool PathTriangulator::ShouldTriangulatePath(const Path& path) {
   if (path.countVerbs() <= AA_TESSELLATOR_MAX_VERB_COUNT) {
     return true;
@@ -43,6 +45,9 @@ bool PathTriangulator::ShouldTriangulatePath(const Path& path) {
   auto bounds = path.getBounds();
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
+  if (std::max(width, height) > MaxRasterizedTextureSize) {
+    return true;
+  }
   return path.countPoints() * AA_TESSELLATOR_BUFFER_SIZE_FACTOR <= width * height;
 }
 

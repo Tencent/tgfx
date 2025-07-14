@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -20,9 +20,10 @@
 #include "tgfx/core/Task.h"
 
 namespace tgfx {
-GpuBufferUploadTask::GpuBufferUploadTask(UniqueKey uniqueKey, BufferType bufferType,
+GpuBufferUploadTask::GpuBufferUploadTask(std::shared_ptr<ResourceProxy> proxy,
+                                         BufferType bufferType,
                                          std::unique_ptr<DataSource<Data>> source)
-    : ResourceTask(std::move(uniqueKey)), bufferType(bufferType), source(std::move(source)) {
+    : ResourceTask(std::move(proxy)), bufferType(bufferType), source(std::move(source)) {
 }
 
 std::shared_ptr<Resource> GpuBufferUploadTask::onMakeResource(Context* context) {

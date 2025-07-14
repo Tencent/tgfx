@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -2927,5 +2927,32 @@ TGFX_TEST(LayerTest, PartialBackgroundBlur) {
   solidLayer2->setMatrix(Matrix::MakeTrans(120, 120));
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialBackgroundBlur_move"));
+}
+
+TGFX_TEST(LayerTest, PartialInnerShadow) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  DisplayList displayList;
+  auto surface = Surface::Make(context, 100, 100);
+  auto rootLayer = Layer::Make();
+  displayList.root()->addChild(rootLayer);
+  auto shapeLayer = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
+  shapeLayer->setPath(path);
+  shapeLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 255, 255, 255)));
+  shapeLayer->setLineWidth(1.0f);
+  rootLayer->addChild(shapeLayer);
+
+  auto innerShadowStyle = InnerShadowStyle::Make(10, 10, 0, 0, Color::Black());
+  displayList.setContentOffset(-5, -5);
+  displayList.setRenderMode(RenderMode::Tiled);
+  displayList.render(surface.get());
+
+  shapeLayer->setLayerStyles({});
+  shapeLayer->setLayerStyles({innerShadowStyle});
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialInnerShadow"));
 }
 }  // namespace tgfx

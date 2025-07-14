@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,31 +18,21 @@
 
 #pragma once
 
-#include "gpu/Texture.h"
+#include "gpu/ProgramCreator.h"
+#include "tgfx/gpu/RuntimeEffect.h"
 
 namespace tgfx {
-/**
- * Texture created externally to TGFX
- */
-class ExternalTexture : public Texture {
+class RuntimeProgramCreator : public ProgramCreator {
  public:
-  static std::shared_ptr<Texture> MakeFrom(Context* context, const BackendTexture& backendTexture,
-                                           ImageOrigin origin, bool adopted);
-
-  size_t memoryUsage() const override;
-
-  const TextureSampler* getSampler() const override {
-    return sampler.get();
+  explicit RuntimeProgramCreator(std::shared_ptr<RuntimeEffect> effect)
+      : effect(std::move(effect)) {
   }
 
- protected:
-  void onReleaseGPU() override;
+  void computeProgramKey(Context* context, BytesKey* programKey) const override;
+
+  std::unique_ptr<Program> createProgram(Context* context) const override;
 
  private:
-  std::unique_ptr<TextureSampler> sampler = {};
-  bool adopted = false;
-
-  ExternalTexture(std::unique_ptr<TextureSampler> sampler, int width, int height,
-                  ImageOrigin origin, bool adopted);
+  std::shared_ptr<RuntimeEffect> effect = nullptr;
 };
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -40,8 +40,7 @@ TGFX_TEST(DstTextureTest, EmptyLocalBounds) {
   ASSERT_TRUE(context != nullptr);
   auto width = 800;
   auto height = 600;
-  auto texture = Texture::MakeRGBA(context, width, height);
-  auto renderTarget = RenderTarget::MakeFrom(texture.get());
+  auto renderTarget = RenderTarget::Make(context, width, height);
   auto backendRenderTarget = renderTarget->getBackendRenderTarget();
 
   auto surface = Surface::MakeFrom(context, backendRenderTarget, ImageOrigin::BottomLeft);
@@ -72,8 +71,7 @@ TGFX_TEST(DstTextureTest, OutOfRenderTarget) {
   ASSERT_TRUE(context != nullptr);
   auto width = 800;
   auto height = 600;
-  auto texture = Texture::MakeRGBA(context, width, height);
-  auto renderTarget = RenderTarget::MakeFrom(texture.get());
+  auto renderTarget = RenderTarget::Make(context, width, height);
   auto backendRenderTarget = renderTarget->getBackendRenderTarget();
 
   auto surface = Surface::MakeFrom(context, backendRenderTarget, ImageOrigin::BottomLeft);

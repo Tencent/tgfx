@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,40 +16,34 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#if defined(__ANDROID__) || defined(ANDROID) || defined(__OHOS__)
+
 #pragma once
 
-#import <UIKit/UIKit.h>
-#include "gpu/Texture.h"
-#include "gpu/TextureSampler.h"
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+#include "gpu/opengl/GLTextureSampler.h"
 
 namespace tgfx {
-class EAGLHardwareTexture : public Texture {
+class EGLHardwareTextureSampler : public GLTextureSampler {
  public:
-  static std::shared_ptr<EAGLHardwareTexture> MakeFrom(Context* context,
-                                                       CVPixelBufferRef pixelBuffer);
-
-  explicit EAGLHardwareTexture(CVPixelBufferRef pixelBuffer);
-
-  ~EAGLHardwareTexture() override;
-
-  size_t memoryUsage() const override;
-
-  const TextureSampler* getSampler() const override {
-    return sampler.get();
-  }
+  static std::unique_ptr<EGLHardwareTextureSampler> MakeFrom(Context* context,
+                                                             HardwareBufferRef hardwareBuffer);
+  ~EGLHardwareTextureSampler() override;
 
   HardwareBufferRef getHardwareBuffer() const override {
-    return pixelBuffer;
+    return hardwareBuffer;
   }
 
- protected:
-  void onReleaseGPU() override;
+  void releaseGPU(Context* context) override;
 
  private:
-  std::unique_ptr<TextureSampler> sampler = {};
-  CVPixelBufferRef pixelBuffer = nullptr;
-  CVOpenGLESTextureRef texture = nil;
+  HardwareBufferRef hardwareBuffer = nullptr;
+  EGLImageKHR eglImage = EGL_NO_IMAGE_KHR;
 
-  static ScratchKey ComputeScratchKey(CVPixelBufferRef pixelBuffer);
+  EGLHardwareTextureSampler(HardwareBufferRef hardwareBuffer, EGLImageKHR eglImage, unsigned id,
+                            unsigned target, PixelFormat format);
 };
 }  // namespace tgfx
+
+#endif

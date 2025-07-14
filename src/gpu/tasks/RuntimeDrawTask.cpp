@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RuntimeDrawTask.h"
-#include "gpu/RuntimeResource.h"
+#include "gpu/ProgramCache.h"
+#include "gpu/RuntimeProgramCreator.h"
+#include "gpu/RuntimeProgramWrapper.h"
 
 namespace tgfx {
 RuntimeDrawTask::RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
@@ -48,16 +50,13 @@ bool RuntimeDrawTask::execute(RenderPass* renderPass) {
     return false;
   }
   auto context = renderPass->getContext();
-  UniqueKey uniqueKey(effect->type());
-  auto program = Resource::Find<RuntimeResource>(context, uniqueKey);
+  RuntimeProgramCreator programCreator(effect);
+  auto program = context->programCache()->getProgram(&programCreator);
   if (program == nullptr) {
-    program = RuntimeResource::Wrap(uniqueKey, effect->onCreateProgram(context));
-    if (program == nullptr) {
-      LOGE("RuntimeDrawTask::execute() Failed to create the runtime program!");
-      return false;
-    }
+    LOGE("RuntimeDrawTask::execute() Failed to create the runtime program!");
+    return false;
   }
-  return effect->onDraw(program->getProgram(), inputTextures,
+  return effect->onDraw(RuntimeProgramWrapper::Unwrap(program), inputTextures,
                         renderTarget->getBackendRenderTarget(), offset);
 }
 }  // namespace tgfx

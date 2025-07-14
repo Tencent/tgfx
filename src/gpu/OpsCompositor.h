@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -47,10 +47,17 @@ class OpsCompositor {
   OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags);
 
   /**
-   * Fills the given rect with the image, sampling options, state and fill.
+   * Fills the given image with the given sampling options, state and fill.
    */
-  void fillImage(std::shared_ptr<Image> image, const Rect& rect, const SamplingOptions& sampling,
-                 const MCState& state, const Fill& fill, SrcRectConstraint constraint);
+  void fillImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
+                 const MCState& state, const Fill& fill);
+  /**
+   * Fills the given rect with the image, using the given source rect, destination rect, sampling
+   * options, state and fill.
+   */
+  void fillImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
+                     const SamplingOptions& sampling, const MCState& state, const Fill& fill,
+                     SrcRectConstraint constraint);
 
   /**
    * Fills the given rect with the given state and fill.
@@ -71,7 +78,7 @@ class OpsCompositor {
    * Fills the given rect with the given fill, using the provided texture proxy and sampling options.
    */
   void fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,
-                     const SamplingOptions& sampling, const MCState& state, const Fill& fill);
+                     const MCState& state, const Fill& fill);
 
   /**
    * Discard all pending operations.

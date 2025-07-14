@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -37,8 +37,9 @@ bool RenderTargetCopyTask::execute(RenderPass* renderPass) {
   }
   DEBUG_ASSERT(renderTarget->width() == texture->width() &&
                renderTarget->height() == texture->height());
-  auto gpu = renderPass->getContext()->gpu();
-  gpu->copyRenderTargetToTexture(renderTarget.get(), texture.get(), 0, 0);
+  auto context = renderPass->getContext();
+  context->gpu()->copyRenderTargetToTexture(renderTarget.get(), texture.get(), 0, 0);
+  texture->getSampler()->regenerateMipmapLevels(context);
   return true;
 }
 

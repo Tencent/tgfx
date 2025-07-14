@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,30 +18,29 @@
 
 #pragma once
 
+#include "gpu/Blend.h"
+#include "gpu/Program.h"
+#include "gpu/SamplerState.h"
 #include "gpu/TextureSampler.h"
-#include "tgfx/gpu/opengl/GLDefines.h"
+#include "gpu/UniformBuffer.h"
 
 namespace tgfx {
 /**
- * Defines the sampling parameters for an OpenGL texture uint.
+ * ProgramCreator is an interface for creating GPU programs. It provides methods to compute the
+ * key for the program and to create a Program instance.
  */
-class GLSampler : public TextureSampler {
+class ProgramCreator {
  public:
-  /**
-   * The OpenGL texture id of the sampler.
-   */
-  unsigned id = 0;
+  virtual ~ProgramCreator() = default;
 
   /**
-   * The OpenGL texture target of the sampler.
+   * Computes the key for the program, which is used to cache the program in the ProgramCache.
    */
-  unsigned target = GL_TEXTURE_2D;
+  virtual void computeProgramKey(Context* context, BytesKey* programKey) const = 0;
 
-  SamplerType type() const override;
-
-  BackendTexture getBackendTexture(int width, int height) const override;
-
- protected:
-  void computeKey(Context* context, BytesKey* bytesKey) const override;
+  /**
+   * Creates a Program instance based on the current state of the ProgramCreator.
+   */
+  virtual std::unique_ptr<Program> createProgram(Context* context) const = 0;
 };
 }  // namespace tgfx

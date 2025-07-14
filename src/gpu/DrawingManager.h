@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -65,7 +65,8 @@ class DrawingManager {
   void addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
                                std::shared_ptr<TextureProxy> dest);
 
-  void addResourceTask(PlacementPtr<ResourceTask> resourceTask);
+  void addResourceTask(PlacementPtr<ResourceTask> resourceTask, const UniqueKey& uniqueKey = {},
+                       uint32_t renderFlags = 0);
 
   /**
    * Returns true if any render tasks were executed.
@@ -90,7 +91,6 @@ class DrawingManager {
   std::vector<PlacementPtr<TextureFlattenTask>> flattenTasks = {};
   std::vector<PlacementPtr<RenderTask>> renderTasks = {};
   std::list<std::shared_ptr<OpsCompositor>> compositors = {};
-  ResourceKeyMap<ResourceTask*> resourceTaskMap = {};
   std::vector<std::shared_ptr<Task>> atlasCellCodecTasks = {};
   std::map<std::shared_ptr<TextureProxy>, std::vector<AtlasCellData>> atlasCellDatas = {};
 

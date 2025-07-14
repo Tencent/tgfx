@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -35,20 +35,10 @@ class Gpu {
     return context;
   }
 
-  virtual std::unique_ptr<TextureSampler> createSampler(int width, int height, PixelFormat format,
-                                                        int mipLevelCount) = 0;
-
-  virtual void deleteSampler(TextureSampler* sampler) = 0;
-
-  virtual void writePixels(const TextureSampler* sampler, Rect rect, const void* pixels,
-                           size_t rowBytes) = 0;
-
   virtual void copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture* texture,
                                          int srcX, int srcY) = 0;
 
   virtual void resolveRenderTarget(RenderTarget* renderTarget, const Rect& bounds) = 0;
-
-  virtual void regenerateMipmapLevels(const TextureSampler* sampler) = 0;
 
   virtual bool insertSemaphore(Semaphore* semaphore) = 0;
 

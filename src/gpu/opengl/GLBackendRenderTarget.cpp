@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,22 +16,25 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TextureCreateTask.h"
-#include "gpu/Texture.h"
+#include "GLBackendRenderTarget.h"
+#include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
-TextureCreateTask::TextureCreateTask(UniqueKey uniqueKey, int width, int height, PixelFormat format,
-                                     bool mipmapped, ImageOrigin origin)
-    : ResourceTask(std::move(uniqueKey)), width(width), height(height), format(format),
-      mipmapped(mipmapped), origin(origin) {
-}
-
-std::shared_ptr<Resource> TextureCreateTask::onMakeResource(Context* context) {
-  auto texture = Texture::MakeFormat(context, width, height, format, mipmapped, origin);
-  if (texture == nullptr) {
-    LOGE("TextureCreateTask::onMakeResource() Failed to create the texture!");
+std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
+                                                     const BackendRenderTarget& renderTarget,
+                                                     ImageOrigin origin) {
+  if (context == nullptr || !renderTarget.isValid()) {
+    return nullptr;
   }
-  return texture;
+  GLFrameBufferInfo frameBufferInfo = {};
+  if (!renderTarget.getGLFramebufferInfo(&frameBufferInfo)) {
+    return nullptr;
+  }
+  auto format = GLSizeFormatToPixelFormat(frameBufferInfo.format);
+  if (!context->caps()->isFormatRenderable(format)) {
+    return nullptr;
+  }
+  return std::make_shared<GLBackendRenderTarget>(
+      context, renderTarget.width(), renderTarget.height(), origin, format, frameBufferInfo.id);
 }
-
 }  // namespace tgfx

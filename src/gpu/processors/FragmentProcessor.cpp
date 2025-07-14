@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -87,7 +87,7 @@ void FragmentProcessor::computeProcessorKey(Context* context, BytesKey* bytesKey
   onComputeProcessorKey(bytesKey);
   auto textureSamplerCount = onCountTextureSamplers();
   for (size_t i = 0; i < textureSamplerCount; ++i) {
-    textureSampler(i)->computeKey(context, bytesKey);
+    textureSampler(i)->computeSamplerKey(context, bytesKey);
   }
   for (const auto& childProcessor : childProcessors) {
     childProcessor->computeProcessorKey(context, bytesKey);
@@ -183,8 +183,8 @@ void FragmentProcessor::internalEmitChild(
   TextureSamplers textureSamplers = args.textureSamplers->childInputs(childIndex);
 
   EmitArgs childArgs(fragBuilder, args.uniformHandler, outputColor,
-                     inputName.empty() ? "vec4(1.0)" : inputName, &coordVars, &textureSamplers,
-                     std::move(coordFunc));
+                     inputName.empty() ? "vec4(1.0)" : inputName, args.inputSubset, &coordVars,
+                     &textureSamplers, std::move(coordFunc));
   childProcessor(childIndex)->emitCode(childArgs);
   fragBuilder->codeAppend("}\n");
 

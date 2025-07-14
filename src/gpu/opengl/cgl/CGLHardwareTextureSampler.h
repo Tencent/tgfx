@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,19 +16,31 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DefaultTextureProxy.h"
+#pragma once
+
+#include <CoreVideo/CoreVideo.h>
+#include "gpu/opengl/GLTextureSampler.h"
 
 namespace tgfx {
-DefaultTextureProxy::DefaultTextureProxy(UniqueKey uniqueKey, int width, int height, bool mipmapped,
-                                         bool isAlphaOnly, ImageOrigin origin, bool externallyOwned)
-    : TextureProxy(std::move(uniqueKey)), _width(width), _height(height) {
-  bitFields.origin = origin;
-  bitFields.mipmapped = mipmapped;
-  bitFields.isAlphaOnly = isAlphaOnly;
-  bitFields.externallyOwned = externallyOwned;
-}
+class CGLHardwareTextureSampler : public GLTextureSampler {
+ public:
+  static std::unique_ptr<CGLHardwareTextureSampler> MakeFrom(CVPixelBufferRef pixelBuffer,
+                                                             CVOpenGLTextureCacheRef textureCache);
 
-std::shared_ptr<Texture> DefaultTextureProxy::getTexture() const {
-  return Resource::Find<Texture>(context, handle.key());
-}
+  ~CGLHardwareTextureSampler() override;
+
+  HardwareBufferRef getHardwareBuffer() const override {
+    return pixelBuffer;
+  }
+
+  void releaseGPU(Context*) override;
+
+ private:
+  CVPixelBufferRef pixelBuffer = nullptr;
+  CVOpenGLTextureRef texture = nil;
+  CVOpenGLTextureCacheRef textureCache = nil;
+
+  CGLHardwareTextureSampler(CVPixelBufferRef pixelBuffer, CVOpenGLTextureCacheRef textureCache,
+                            unsigned id, unsigned target, PixelFormat format);
+};
 }  // namespace tgfx

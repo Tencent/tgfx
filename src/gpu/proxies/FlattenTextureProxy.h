@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -44,20 +44,18 @@ class FlattenTextureProxy : public TextureProxy {
     return source->isAlphaOnly();
   }
 
-  bool externallyOwned() const override {
-    return source->externallyOwned();
-  }
-
   bool isFlatten() const override {
     return true;
   }
 
-  std::shared_ptr<Texture> getTexture() const override;
+ protected:
+  std::shared_ptr<Texture> onMakeTexture(Context* context) const override;
 
  private:
+  UniqueKey flattenTextureKey = {};
   std::shared_ptr<TextureProxy> source = nullptr;
 
-  FlattenTextureProxy(UniqueKey uniqueKey, std::shared_ptr<TextureProxy> source);
+  FlattenTextureProxy(UniqueKey flattenTextureKey, std::shared_ptr<TextureProxy> source);
 
   friend class ProxyProvider;
 };

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -25,6 +25,7 @@
 #include "gpu/tasks/RenderTargetCopyTask.h"
 #include "gpu/tasks/RuntimeDrawTask.h"
 #include "gpu/tasks/TextureResolveTask.h"
+#include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
 static ColorType GetAtlasColorType(bool isAplhaOnly) {
@@ -90,12 +91,13 @@ void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> rende
   addTextureResolveTask(std::move(renderTarget));
 }
 
-void DrawingManager::addTextureResolveTask(std::shared_ptr<RenderTargetProxy> target) {
-  auto textureProxy = target->getTextureProxy();
-  if (textureProxy == nullptr || (target->sampleCount() <= 1 && !textureProxy->hasMipmaps())) {
+void DrawingManager::addTextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTarget) {
+  auto textureProxy = renderTarget->asTextureProxy();
+  if (textureProxy == nullptr ||
+      (renderTarget->sampleCount() <= 1 && !textureProxy->hasMipmaps())) {
     return;
   }
-  auto task = drawingBuffer->make<TextureResolveTask>(std::move(target));
+  auto task = drawingBuffer->make<TextureResolveTask>(std::move(renderTarget));
   renderTasks.emplace_back(std::move(task));
 }
 
@@ -119,16 +121,14 @@ void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> 
   renderTasks.emplace_back(std::move(task));
 }
 
-void DrawingManager::addResourceTask(PlacementPtr<ResourceTask> resourceTask) {
+void DrawingManager::addResourceTask(PlacementPtr<ResourceTask> resourceTask,
+                                     const UniqueKey& uniqueKey, uint32_t renderFlags) {
   if (resourceTask == nullptr) {
     return;
   }
-  auto result = resourceTaskMap.find(resourceTask->uniqueKey);
-  if (result != resourceTaskMap.end()) {
-    // Remove the unique key from the old task, so it will be skipped when the task is executed.
-    result->second->uniqueKey = {};
+  if (!uniqueKey.empty() && !(renderFlags & RenderFlags::DisableCache)) {
+    resourceTask->uniqueKey = uniqueKey;
   }
-  resourceTaskMap[resourceTask->uniqueKey] = resourceTask.get();
   resourceTasks.emplace_back(std::move(resourceTask));
 }
 
@@ -152,7 +152,6 @@ bool DrawingManager::flush() {
   }
   uploadAtlasToGPU();
   resourceTasks.clear();
-  resourceTaskMap = {};
   proxyProvider->clearSharedVertexBuffer();
 
   if (renderPass == nullptr) {
@@ -179,7 +178,6 @@ bool DrawingManager::flush() {
 void DrawingManager::releaseAll() {
   compositors.clear();
   resourceTasks.clear();
-  resourceTaskMap = {};
   flattenTasks.clear();
   renderTasks.clear();
   atlasCellCodecTasks.clear();
@@ -227,14 +225,14 @@ void DrawingManager::uploadAtlasToGPU() {
     if (texture == nullptr) {
       continue;
     }
-    auto gpu = context->gpu();
     for (auto& [data, info, atlasOffset] : cellDatas) {
       if (data == nullptr) {
         continue;
       }
       auto rect = Rect::MakeXYWH(atlasOffset.x, atlasOffset.y, static_cast<float>(info.width()),
                                  static_cast<float>(info.height()));
-      gpu->writePixels(texture->getSampler(), rect, data->data(), info.rowBytes());
+      texture->getSampler()->writePixels(context, rect, data->data(), info.rowBytes());
+      // Text atlas has no mipmaps, so we don't need to regenerate mipmaps.
     }
   }
   clearAtlasCellCodecTasks();

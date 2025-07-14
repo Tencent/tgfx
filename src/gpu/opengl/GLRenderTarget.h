@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -28,34 +28,19 @@ class GLInterface;
  */
 class GLRenderTarget : public RenderTarget {
  public:
-  PixelFormat format() const override {
-    return pixelFormat;
-  }
+  /**
+   * Returns the frame buffer ID used for reading pixels.
+   */
+  virtual unsigned readFrameBufferID() const = 0;
 
   /**
-   * Returns the frame buffer id associated with this render target.
+   * Returns the frame buffer ID used for drawing pixels.
    */
-  unsigned getFrameBufferID(bool forDraw = true) const;
+  virtual unsigned drawFrameBufferID() const = 0;
 
   BackendRenderTarget getBackendRenderTarget() const override;
 
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0,
                   int srcY = 0) const override;
-
- protected:
-  void onReleaseGPU() override;
-
- private:
-  PixelFormat pixelFormat = PixelFormat::RGBA_8888;
-  unsigned frameBufferRead = 0;
-  unsigned frameBufferDraw = 0;
-  unsigned renderBufferID = 0;
-  unsigned textureTarget = 0;
-  bool externalResource = false;
-
-  GLRenderTarget(int width, int height, ImageOrigin origin, int sampleCount, PixelFormat format,
-                 unsigned textureTarget = 0);
-
-  friend class RenderTarget;
 };
 }  // namespace tgfx

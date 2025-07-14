@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -21,6 +21,7 @@
 #include "core/images/TextureImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/PixelFormatUtil.h"
+#include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"
 
 namespace tgfx {
@@ -32,15 +33,21 @@ std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, 
 
 std::shared_ptr<Surface> Surface::Make(Context* context, int width, int height, ColorType colorType,
                                        int sampleCount, bool mipmapped, uint32_t renderFlags) {
+  if (context == nullptr) {
+    return nullptr;
+  }
   auto pixelFormat = ColorTypeToPixelFormat(colorType);
-  auto proxy = RenderTargetProxy::Make(context, width, height, pixelFormat, sampleCount, mipmapped,
-                                       ImageOrigin::TopLeft);
+  auto proxy = context->proxyProvider()->createRenderTargetProxy({}, width, height, pixelFormat,
+                                                                 sampleCount, mipmapped);
   return MakeFrom(std::move(proxy), renderFlags, true);
 }
 
 std::shared_ptr<Surface> Surface::MakeFrom(Context* context,
                                            const BackendRenderTarget& renderTarget,
                                            ImageOrigin origin, uint32_t renderFlags) {
+  if (context == nullptr) {
+    return nullptr;
+  }
   auto proxy = RenderTargetProxy::MakeFrom(context, renderTarget, origin);
   return MakeFrom(std::move(proxy), renderFlags);
 }
@@ -48,13 +55,20 @@ std::shared_ptr<Surface> Surface::MakeFrom(Context* context,
 std::shared_ptr<Surface> Surface::MakeFrom(Context* context, const BackendTexture& backendTexture,
                                            ImageOrigin origin, int sampleCount,
                                            uint32_t renderFlags) {
-  auto proxy = RenderTargetProxy::MakeFrom(context, backendTexture, sampleCount, origin);
+  if (context == nullptr) {
+    return nullptr;
+  }
+  auto proxy =
+      context->proxyProvider()->createRenderTargetProxy(backendTexture, sampleCount, origin);
   return MakeFrom(std::move(proxy), renderFlags);
 }
 
 std::shared_ptr<Surface> Surface::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
                                            int sampleCount, uint32_t renderFlags) {
-  auto proxy = RenderTargetProxy::MakeFrom(context, hardwareBuffer, sampleCount);
+  if (context == nullptr) {
+    return nullptr;
+  }
+  auto proxy = context->proxyProvider()->createRenderTargetProxy(hardwareBuffer, sampleCount);
   return MakeFrom(std::move(proxy), renderFlags);
 }
 
@@ -107,12 +121,12 @@ BackendRenderTarget Surface::getBackendRenderTarget() {
 }
 
 BackendTexture Surface::getBackendTexture() {
-  auto renderTarget = renderContext->renderTarget;
-  if (!renderTarget->isTextureBacked()) {
+  auto textureProxy = renderContext->renderTarget->asTextureProxy();
+  if (textureProxy == nullptr) {
     return {};
   }
   getContext()->flush();
-  auto texture = renderTarget->getTexture();
+  auto texture = textureProxy->getTexture();
   if (texture == nullptr) {
     return {};
   }
@@ -120,16 +134,16 @@ BackendTexture Surface::getBackendTexture() {
 }
 
 HardwareBufferRef Surface::getHardwareBuffer() {
-  auto renderTarget = renderContext->renderTarget;
-  if (!renderTarget->isTextureBacked()) {
-    return nullptr;
+  auto textureProxy = renderContext->renderTarget->asTextureProxy();
+  if (textureProxy == nullptr) {
+    return {};
   }
   getContext()->flushAndSubmit(true);
-  auto texture = renderTarget->getTexture();
+  auto texture = textureProxy->getTexture();
   if (texture == nullptr) {
     return nullptr;
   }
-  return texture->getHardwareBuffer();
+  return texture->getSampler()->getHardwareBuffer();
 }
 
 Canvas* Surface::getCanvas() {
@@ -146,8 +160,8 @@ std::shared_ptr<Image> Surface::makeImageSnapshot() {
   auto renderTarget = renderContext->renderTarget;
   auto drawingManager = getContext()->drawingManager();
   renderContext->flush();
-  auto textureProxy = renderTarget->getTextureProxy();
-  if (textureProxy == nullptr || textureProxy->externallyOwned()) {
+  auto textureProxy = renderTarget->asTextureProxy();
+  if (textureProxy == nullptr || renderTarget->externallyOwned()) {
     textureProxy = renderTarget->makeTextureProxy();
     drawingManager->addRenderTargetCopyTask(renderTarget, textureProxy);
   }
@@ -172,7 +186,7 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
   auto context = renderTargetProxy->getContext();
   context->flush();
   auto texture = renderTargetProxy->getTexture();
-  auto hardwareBuffer = texture ? texture->getHardwareBuffer() : nullptr;
+  auto hardwareBuffer = texture ? texture->getSampler()->getHardwareBuffer() : nullptr;
   if (hardwareBuffer != nullptr) {
     context->submit(true);
     auto pixels = HardwareBufferLock(hardwareBuffer);
@@ -201,8 +215,7 @@ bool Surface::aboutToDraw(bool discardContent) {
     return true;
   }
   auto renderTarget = renderContext->renderTarget;
-  auto textureProxy = renderTarget->getTextureProxy();
-  if (textureProxy == nullptr || textureProxy->externallyOwned()) {
+  if (renderTarget->externallyOwned()) {
     return true;
   }
   auto newRenderTarget = renderTarget->makeRenderTargetProxy();
