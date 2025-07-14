@@ -2836,7 +2836,7 @@ TGFX_TEST(LayerTest, BackgroundBlurStyleTest) {
   auto rootLayer = Layer::Make();
   displayList->root()->addChild(rootLayer);
   auto shapeLayer1 = ShapeLayer::Make();
-  shapeLayer1->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 0, 1)));
+  shapeLayer1->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 0, 2)));
   auto path1 = Path();
   path1.addRect(Rect::MakeXYWH(40.5f, 40.5f, 80.f, 80.f));
   shapeLayer1->setPath(path1);

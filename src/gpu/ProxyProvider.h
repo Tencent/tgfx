@@ -115,6 +115,7 @@ class ProxyProvider {
                                                    int height, PixelFormat format,
                                                    bool mipmapped = false,
                                                    ImageOrigin origin = ImageOrigin::TopLeft,
+                                                   BackingFit backingFit = BackingFit::Exact,
                                                    uint32_t renderFlags = 0);
 
   /**
@@ -151,7 +152,8 @@ class ProxyProvider {
    */
   std::shared_ptr<RenderTargetProxy> createRenderTargetProxy(
       const UniqueKey& uniqueKey, int width, int height, PixelFormat format, int sampleCount = 1,
-      bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft, uint32_t renderFlags = 0);
+      bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft,
+      BackingFit backingFit = BackingFit::Exact, uint32_t renderFlags = 0);
 
   /*
    * Purges all unreferenced proxies.

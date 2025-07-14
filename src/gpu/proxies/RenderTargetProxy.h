@@ -44,7 +44,8 @@ class RenderTargetProxy {
   static std::shared_ptr<RenderTargetProxy> MakeFallback(Context* context, int width, int height,
                                                          bool isAlphaOnly, int sampleCount = 1,
                                                          bool mipmapped = false,
-                                                         ImageOrigin origin = ImageOrigin::TopLeft);
+                                                         ImageOrigin origin = ImageOrigin::TopLeft,
+                                                         BackingFit backingFit = BackingFit::Exact);
 
   virtual ~RenderTargetProxy() = default;
 
@@ -136,5 +137,12 @@ class RenderTargetProxy {
    * properties of this one.
    */
   std::shared_ptr<RenderTargetProxy> makeRenderTargetProxy(int width, int height) const;
+
+  /**
+   * Returns a transformation matrix that maps the render target's coordinate system to the
+   * destination coordinate system. The matrix is identity for ImageOrigin::TopLeft, and flips the
+   * Y-axis for ImageOrigin::BottomLeft.
+   */
+  Matrix getOriginTransform() const;
 };
 }  // namespace tgfx

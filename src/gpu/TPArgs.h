@@ -28,8 +28,9 @@ class TPArgs {
  public:
   TPArgs() = default;
 
-  TPArgs(Context* context, uint32_t renderFlags, bool mipmapped)
-      : context(context), renderFlags(renderFlags), mipmapped(mipmapped) {
+  TPArgs(Context* context, uint32_t renderFlags, bool mipmapped,
+         BackingFit backingFit = BackingFit::Approx)
+      : context(context), renderFlags(renderFlags), mipmapped(mipmapped), backingFit(backingFit) {
   }
 
   /**
@@ -47,5 +48,10 @@ class TPArgs {
    * image already has preset mipmaps.
    */
   bool mipmapped = false;
+
+  /**
+   * Specifies whether the texture size should be approximated based on the width and height.
+   */
+  BackingFit backingFit = BackingFit::Approx;
 };
 }  // namespace tgfx
