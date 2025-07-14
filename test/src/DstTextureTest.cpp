@@ -40,8 +40,7 @@ TGFX_TEST(DstTextureTest, EmptyLocalBounds) {
   ASSERT_TRUE(context != nullptr);
   auto width = 800;
   auto height = 600;
-  auto texture = Texture::MakeRGBA(context, width, height);
-  auto renderTarget = RenderTarget::MakeFrom(texture.get());
+  auto renderTarget = RenderTarget::Make(context, width, height);
   auto backendRenderTarget = renderTarget->getBackendRenderTarget();
 
   auto surface = Surface::MakeFrom(context, backendRenderTarget, ImageOrigin::BottomLeft);
@@ -72,8 +71,7 @@ TGFX_TEST(DstTextureTest, OutOfRenderTarget) {
   ASSERT_TRUE(context != nullptr);
   auto width = 800;
   auto height = 600;
-  auto texture = Texture::MakeRGBA(context, width, height);
-  auto renderTarget = RenderTarget::MakeFrom(texture.get());
+  auto renderTarget = RenderTarget::Make(context, width, height);
   auto backendRenderTarget = renderTarget->getBackendRenderTarget();
 
   auto surface = Surface::MakeFrom(context, backendRenderTarget, ImageOrigin::BottomLeft);

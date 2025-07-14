@@ -17,9 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/platform/web/VideoElementReader.h"
-#include "GLVideoTexture.h"
-#include "core/utils/Log.h"
-#include "gpu/opengl/GLSampler.h"
 #include "platform/web/VideoElement.h"
 
 namespace tgfx {

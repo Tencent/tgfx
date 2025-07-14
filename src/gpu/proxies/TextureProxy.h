@@ -20,9 +20,10 @@
 
 #include "ResourceProxy.h"
 #include "gpu/Texture.h"
-#include "gpu/TextureSampler.h"
 
 namespace tgfx {
+class RenderTargetProxy;
+
 /**
  * This class defers the acquisition of textures until they are actually required.
  */
@@ -54,11 +55,6 @@ class TextureProxy : public ResourceProxy {
   virtual bool isAlphaOnly() const = 0;
 
   /**
-   * Returns true if the backend texture is externally owned.
-   */
-  virtual bool externallyOwned() const = 0;
-
-  /**
    * Returns true if it is a flatten texture proxy.
    */
   virtual bool isFlatten() const {
@@ -69,6 +65,14 @@ class TextureProxy : public ResourceProxy {
    * Returns the associated Texture instance.
    */
   virtual std::shared_ptr<Texture> getTexture() const = 0;
+
+  /**
+   * Returns the underlying RenderTargetProxy if this TextureProxy is also a render target proxy;
+   * otherwise, returns nullptr.
+   */
+  virtual std::shared_ptr<RenderTargetProxy> asRenderTargetProxy() const {
+    return nullptr;
+  }
 
  protected:
   explicit TextureProxy(UniqueKey uniqueKey) : ResourceProxy(std::move(uniqueKey)) {

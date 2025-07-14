@@ -30,13 +30,13 @@ bool TextureResolveTask::execute(RenderPass* renderPass) {
     LOGE("TextureResolveTask::execute() Failed to get render target!");
     return false;
   }
-  auto gpu = renderPass->getContext()->gpu();
+  auto context = renderPass->getContext();
   if (renderTarget->sampleCount() > 1) {
-    gpu->resolveRenderTarget(renderTarget.get(), renderTargetProxy->bounds());
+    context->gpu()->resolveRenderTarget(renderTarget.get(), renderTargetProxy->bounds());
   }
   auto texture = renderTargetProxy->getTexture();
-  if (texture != nullptr && texture->hasMipmaps()) {
-    gpu->regenerateMipmapLevels(texture->getSampler());
+  if (texture != nullptr) {
+    texture->getSampler()->regenerateMipmapLevels(context);
   }
   return true;
 }

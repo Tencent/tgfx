@@ -18,23 +18,65 @@
 
 #pragma once
 
+#include "DefaultTextureProxy.h"
 #include "RenderTargetProxy.h"
 
 namespace tgfx {
-class TextureRenderTargetProxy : public RenderTargetProxy {
+class TextureRenderTargetProxy : public DefaultTextureProxy,
+                                 public RenderTargetProxy,
+                                 public std::enable_shared_from_this<TextureRenderTargetProxy> {
  public:
-  std::shared_ptr<TextureProxy> getTextureProxy() const override {
-    return textureProxy;
+  Context* getContext() const override {
+    return context;
+  }
+
+  int width() const override {
+    return DefaultTextureProxy::width();
+  }
+
+  int height() const override {
+    return DefaultTextureProxy::height();
+  }
+
+  PixelFormat format() const override {
+    return _format;
+  }
+
+  int sampleCount() const override {
+    return _sampleCount;
+  }
+
+  ImageOrigin origin() const override {
+    return DefaultTextureProxy::origin();
+  }
+
+  bool externallyOwned() const override {
+    return _externallyOwned;
+  }
+
+  std::shared_ptr<TextureProxy> asTextureProxy() const override {
+    return std::const_pointer_cast<TextureRenderTargetProxy>(shared_from_this());
+  }
+
+  std::shared_ptr<RenderTargetProxy> asRenderTargetProxy() const override {
+    return std::const_pointer_cast<TextureRenderTargetProxy>(shared_from_this());
+  }
+
+  std::shared_ptr<RenderTarget> getRenderTarget() const override {
+    return Resource::Find<Texture>(context, handle.key())->asRenderTarget();
   }
 
  private:
-  std::shared_ptr<TextureProxy> textureProxy = nullptr;
+  PixelFormat _format = PixelFormat::RGBA_8888;
+  int _sampleCount = 1;
+  bool _externallyOwned = false;
 
-  TextureRenderTargetProxy(UniqueKey uniqueKey, std::shared_ptr<TextureProxy> textureProxy,
-                           PixelFormat format, int sampleCount)
-      : RenderTargetProxy(std::move(uniqueKey), textureProxy->width(), textureProxy->height(),
-                          format, sampleCount, textureProxy->origin()),
-        textureProxy(std::move(textureProxy)) {
+  TextureRenderTargetProxy(UniqueKey uniqueKey, int width, int height, PixelFormat format,
+                           int sampleCount, bool mipmapped = false,
+                           ImageOrigin origin = ImageOrigin::TopLeft, bool externallyOwned = false)
+      : DefaultTextureProxy(std::move(uniqueKey), width, height, mipmapped,
+                            format == PixelFormat::ALPHA_8, origin),
+        _format(format), _sampleCount(sampleCount), _externallyOwned(externallyOwned) {
   }
 
   friend class ProxyProvider;

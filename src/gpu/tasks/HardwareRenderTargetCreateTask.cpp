@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,34 +16,20 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/Texture.h"
+#include "HardwareRenderTargetCreateTask.h"
 
 namespace tgfx {
-class GLVideoTexture : public Texture {
- public:
-  static std::shared_ptr<GLVideoTexture> Make(Context* context, int width, int height,
-                                              bool mipmapped = false);
+HardwareRenderTargetCreateTask::HardwareRenderTargetCreateTask(UniqueKey uniqueKey,
+                                                               HardwareBufferRef hardwareBuffer,
+                                                               int sampleCount)
+    : ResourceTask(std::move(uniqueKey)), hardwareBuffer(hardwareBuffer), sampleCount(sampleCount) {
+}
 
-  size_t memoryUsage() const override;
-
-  const TextureSampler* getSampler() const override {
-    return sampler.get();
+std::shared_ptr<Resource> HardwareRenderTargetCreateTask::onMakeResource(Context* context) {
+  auto renderTarget = RenderTarget::MakeFrom(context, hardwareBuffer, sampleCount);
+  if (renderTarget == nullptr) {
+    LOGE("HardwareBufferRTCreateTask::onMakeResource() Failed to create the render target!");
   }
-
-  Point getTextureCoord(float x, float y) const override;
-
-  BackendTexture getBackendTexture() const override;
-
- protected:
-  void onReleaseGPU() override;
-
- private:
-  std::unique_ptr<TextureSampler> sampler = {};
-  int textureWidth = 0;
-  int textureHeight = 0;
-
-  GLVideoTexture(std::unique_ptr<TextureSampler> sampler, int width, int height);
-};
+  return renderTarget->asTexture();
+}
 }  // namespace tgfx

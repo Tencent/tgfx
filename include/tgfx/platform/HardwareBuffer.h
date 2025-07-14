@@ -19,7 +19,7 @@
 #pragma once
 
 #include "tgfx/core/ImageInfo.h"
-#include "tgfx/gpu/PixelFormat.h"
+#include "tgfx/core/Size.h"
 
 #if defined(__ANDROID__) || defined(ANDROID)
 struct AHardwareBuffer;
@@ -84,16 +84,16 @@ void* HardwareBufferLock(HardwareBufferRef buffer);
 void HardwareBufferUnlock(HardwareBufferRef buffer);
 
 /**
+ * Returns the size of the hardware buffer in pixels as an ISize object. Returns an empty ISize if
+ * the buffer is nullptr or not recognized.
+ */
+ISize HardwareBufferGetSize(HardwareBufferRef buffer);
+
+/**
  * Returns an ImageInfo describing the width, height, color type, alpha type, and row bytes of the
  * given hardware buffer object. Returns an empty ImageInfo if the buffer is nullptr or not
  * recognized.
  */
 ImageInfo HardwareBufferGetInfo(HardwareBufferRef buffer);
-
-/**
- * Returns the pixel format of the texture generated from the given hardware buffer object. Returns
- * PixelFormat::Unknown if the buffer is nullptr or not recognized.
- */
-PixelFormat HardwareBufferGetPixelFormat(HardwareBufferRef buffer);
 
 }  // namespace tgfx

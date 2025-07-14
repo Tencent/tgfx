@@ -88,6 +88,15 @@ void HardwareBufferUnlock(HardwareBufferRef buffer) {
   CVPixelBufferUnlockBaseAddress(buffer, 0);
 }
 
+ISize HardwareBufferGetSize(HardwareBufferRef buffer) {
+  if (buffer == nil) {
+    return {};
+  }
+  auto width = CVPixelBufferGetWidth(buffer);
+  auto height = CVPixelBufferGetHeight(buffer);
+  return {static_cast<int>(width), static_cast<int>(height)};
+}
+
 ImageInfo HardwareBufferGetInfo(HardwareBufferRef buffer) {
   if (buffer == nil) {
     return {};
@@ -112,24 +121,5 @@ ImageInfo HardwareBufferGetInfo(HardwareBufferRef buffer) {
   }
   auto rowBytes = CVPixelBufferGetBytesPerRow(buffer);
   return ImageInfo::Make(width, height, colorType, AlphaType::Premultiplied, rowBytes);
-}
-
-PixelFormat HardwareBufferGetPixelFormat(HardwareBufferRef buffer) {
-  if (buffer == nil) {
-    return PixelFormat::Unknown;
-  }
-  auto pixelFormat = CVPixelBufferGetPixelFormatType(buffer);
-  switch (pixelFormat) {
-    case kCVPixelFormatType_OneComponent8:
-      return PixelFormat::ALPHA_8;
-    case kCVPixelFormatType_32BGRA:
-#if TARGET_OS_IPHONE == 0 && TARGET_OS_MAC == 1
-      return PixelFormat::RGBA_8888;
-#else
-      return PixelFormat::BGRA_8888;
-#endif
-    default:
-      return PixelFormat::Unknown;
-  }
 }
 }  // namespace tgfx

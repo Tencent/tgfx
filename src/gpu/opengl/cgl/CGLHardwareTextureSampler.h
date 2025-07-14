@@ -18,31 +18,29 @@
 
 #pragma once
 
-#include "gpu/Texture.h"
+#include <CoreVideo/CoreVideo.h>
+#include "gpu/opengl/GLTextureSampler.h"
 
 namespace tgfx {
-/**
- * Texture created externally to TGFX
- */
-class ExternalTexture : public Texture {
+class CGLHardwareTextureSampler : public GLTextureSampler {
  public:
-  static std::shared_ptr<Texture> MakeFrom(Context* context, const BackendTexture& backendTexture,
-                                           ImageOrigin origin, bool adopted);
+  static std::unique_ptr<CGLHardwareTextureSampler> MakeFrom(CVPixelBufferRef pixelBuffer,
+                                                             CVOpenGLTextureCacheRef textureCache);
 
-  size_t memoryUsage() const override;
+  ~CGLHardwareTextureSampler() override;
 
-  const TextureSampler* getSampler() const override {
-    return sampler.get();
+  HardwareBufferRef getHardwareBuffer() const override {
+    return pixelBuffer;
   }
 
- protected:
-  void onReleaseGPU() override;
+  void releaseGPU(Context*) override;
 
  private:
-  std::unique_ptr<TextureSampler> sampler = {};
-  bool adopted = false;
+  CVPixelBufferRef pixelBuffer = nullptr;
+  CVOpenGLTextureRef texture = nil;
+  CVOpenGLTextureCacheRef textureCache = nil;
 
-  ExternalTexture(std::unique_ptr<TextureSampler> sampler, int width, int height,
-                  ImageOrigin origin, bool adopted);
+  CGLHardwareTextureSampler(CVPixelBufferRef pixelBuffer, CVOpenGLTextureCacheRef textureCache,
+                            unsigned id, unsigned target, PixelFormat format);
 };
 }  // namespace tgfx

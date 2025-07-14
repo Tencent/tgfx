@@ -18,26 +18,13 @@
 
 #pragma once
 
+#include <array>
 #include "gpu/Texture.h"
 #include "gpu/TextureSampler.h"
+#include "gpu/YUVFormat.h"
 #include "tgfx/core/YUVColorSpace.h"
-#include "tgfx/core/YUVData.h"
 
 namespace tgfx {
-/**
- * Defines pixel formats for YUV textures.
- */
-enum class YUVPixelFormat {
-  /**
-   * 8-bit Y plane followed by 8 bit 2x2 subsampled U and V planes.
-   */
-  I420,
-  /**
-   * 8-bit Y plane followed by an interleaved U/V plane with 2x2 subsampling.
-   */
-  NV12
-};
-
 /**
  * YUVTexture wraps separate texture samplers in the GPU backend for Y, U, and V planes.
  */
@@ -46,8 +33,8 @@ class YUVTexture : public Texture {
   /**
    * The pixel format of this yuv texture.
    */
-  YUVPixelFormat pixelFormat() const {
-    return _pixelFormat;
+  YUVFormat yuvFormat() const {
+    return _yuvFormat;
   }
 
   /**
@@ -57,21 +44,27 @@ class YUVTexture : public Texture {
     return _colorSpace;
   }
 
+  TextureSampler* getSampler() const override {
+    return samplers.front().get();
+  }
+
   /**
    * Returns the number of the samplers in the texture.
    */
-  size_t samplerCount() const {
-    return samplers.size();
-  }
-
-  const TextureSampler* getSampler() const override {
-    return samplers[0].get();
-  }
+  size_t samplerCount() const;
 
   /**
    * Returns a texture sampler at the specified index.
    */
-  const TextureSampler* getSamplerAt(size_t index) const;
+  TextureSampler* getSamplerAt(size_t index) const;
+
+  bool isAlphaOnly() const override {
+    return false;
+  }
+
+  bool hasMipmaps() const override {
+    return false;  // YUV textures do not support mipmaps.
+  }
 
   bool isYUV() const final {
     return true;
@@ -81,17 +74,19 @@ class YUVTexture : public Texture {
 
   Point getTextureCoord(float x, float y) const override;
 
-  BackendTexture getBackendTexture() const override;
+  BackendTexture getBackendTexture() const override {
+    return {};
+  }
 
  protected:
-  std::vector<std::unique_ptr<TextureSampler>> samplers = {};
-
-  YUVTexture(int width, int height, YUVPixelFormat pixelFormat, YUVColorSpace colorSpace);
+  YUVTexture(std::vector<std::unique_ptr<TextureSampler>> yuvSamplers, int width, int height,
+             YUVFormat yuvFormat, YUVColorSpace colorSpace);
 
   void onReleaseGPU() override;
 
  private:
-  YUVPixelFormat _pixelFormat = YUVPixelFormat::I420;
+  std::array<std::unique_ptr<TextureSampler>, 3> samplers = {};
+  YUVFormat _yuvFormat = YUVFormat::Unknown;
   YUVColorSpace _colorSpace = YUVColorSpace::BT601_LIMITED;
 
   friend class Texture;

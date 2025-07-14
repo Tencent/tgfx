@@ -87,13 +87,11 @@ std::shared_ptr<TextureProxy> RasterizedImage::onLockTextureProxy(const TPArgs& 
   }
   auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
   auto format = isAlphaOnly() && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
-  textureProxy = proxyProvider->createTextureProxy(key, width(), height(), format, args.mipmapped,
-                                                   ImageOrigin::TopLeft, args.renderFlags);
-  auto renderTarget = proxyProvider->createRenderTargetProxy(textureProxy, format);
+  auto renderTarget = proxyProvider->createRenderTargetProxy(
+      key, width(), height(), format, 1, args.mipmapped, ImageOrigin::TopLeft, args.renderFlags);
   if (renderTarget == nullptr) {
     return nullptr;
   }
-
   auto sourceWidth = source->width();
   auto sourceHeight = source->height();
   auto scaledWidth = GetSize(sourceWidth, rasterizationScale);
@@ -109,7 +107,7 @@ std::shared_ptr<TextureProxy> RasterizedImage::onLockTextureProxy(const TPArgs& 
     return nullptr;
   }
   auto drawingManager = renderTarget->getContext()->drawingManager();
-  drawingManager->fillRTWithFP(std::move(renderTarget), std::move(processor), args.renderFlags);
-  return textureProxy;
+  drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags);
+  return renderTarget->asTextureProxy();
 }
 }  // namespace tgfx

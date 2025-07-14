@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,30 +18,23 @@
 
 #pragma once
 
-#include "gpu/TextureSampler.h"
-#include "tgfx/gpu/opengl/GLDefines.h"
+#include "ResourceTask.h"
+#include "gpu/RenderTarget.h"
 
 namespace tgfx {
-/**
- * Defines the sampling parameters for an OpenGL texture uint.
- */
-class GLSampler : public TextureSampler {
+class TextureRenderTargetCreateTask : public ResourceTask {
  public:
-  /**
-   * The OpenGL texture id of the sampler.
-   */
-  unsigned id = 0;
+  TextureRenderTargetCreateTask(UniqueKey uniqueKey, int width, int height, PixelFormat format,
+                                int sampleCount, bool mipmapped, ImageOrigin origin);
 
-  /**
-   * The OpenGL texture target of the sampler.
-   */
-  unsigned target = GL_TEXTURE_2D;
+  std::shared_ptr<Resource> onMakeResource(Context* context) override;
 
-  SamplerType type() const override;
-
-  BackendTexture getBackendTexture(int width, int height) const override;
-
- protected:
-  void computeKey(Context* context, BytesKey* bytesKey) const override;
+ private:
+  int width = 0;
+  int height = 0;
+  PixelFormat format = PixelFormat::Unknown;
+  int sampleCount = 1;
+  bool mipmapped = false;
+  ImageOrigin origin = ImageOrigin::TopLeft;
 };
 }  // namespace tgfx

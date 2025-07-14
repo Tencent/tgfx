@@ -18,9 +18,12 @@
 
 import * as types from '../types/types';
 
+export const MIN_ZOOM = 0.001;
+export const MAX_ZOOM = 1000.0;
+
 export class TGFXBaseView {
     public updateSize: (devicePixelRatio: number) => void;
-    public draw: (drawIndex: number) => Promise<void>;
+    public draw: (drawIndex: number, zoom: number, offsetX: number, offsetY: number) => boolean;
 }
 
 export class ShareData {
@@ -28,7 +31,179 @@ export class ShareData {
     public tgfxBaseView: TGFXBaseView = null;
     public drawIndex: number = 0;
     public resized: boolean = false;
+    public zoom: number = 1.0;
+    public offsetX: number = 0;
+    public offsetY: number = 0;
     public resizeTimer: number | null = null;
+}
+
+enum ScaleGestureState {
+    SCALE_START = 0,
+    SCALE_CHANGE = 1,
+    SCALE_END = 2,
+}
+
+enum ScrollGestureState {
+    SCROLL_START = 0,
+    SCROLL_CHANGE = 1,
+    SCROLL_END = 2,
+}
+
+enum DeviceType {
+    TOUCH = 0,
+    MOUSE = 1,
+}
+
+class GestureManager {
+    private scaleY = 1.0;
+    private pinchTimeout = 150; // ms
+    private timer: number | undefined;
+    private scaleStartZoom = 1.0;
+
+    private lastEventTime = 0;
+    private lastDeltaY = 0;
+    private timeThreshold = 50; // ms
+    private deltaYThreshold = 50;
+    private deltaYChangeThreshold = 10;
+    private mouseWheelRatio = 800;
+    private touchWheelRatio = 100;
+
+    private handleScrollEvent(
+        event: WheelEvent,
+        state: ScrollGestureState,
+        shareData: ShareData,
+        deviceType: DeviceType = DeviceType.MOUSE,
+    ) {
+        if (state === ScrollGestureState.SCROLL_CHANGE){
+            this.scaleStartZoom = shareData.zoom;
+            this.scaleY = 1.0;
+            if (event.shiftKey && event.deltaX === 0 && event.deltaY !== 0) {
+                shareData.offsetX -= event.deltaY * window.devicePixelRatio;
+            } else {
+                shareData.offsetX -= event.deltaX * window.devicePixelRatio;
+                shareData.offsetY -= event.deltaY * window.devicePixelRatio;
+            }
+            draw(shareData);
+        }
+    }
+
+    private handleScaleEvent(
+        event: WheelEvent,
+        state: ScaleGestureState,
+        canvas: HTMLElement,
+        shareData: ShareData,
+        deviceType: DeviceType = DeviceType.MOUSE
+    ) {
+        if (state === ScaleGestureState.SCALE_START) {
+            this.scaleY = 1.0;
+            this.scaleStartZoom = shareData.zoom;
+        }
+        if (state === ScaleGestureState.SCALE_CHANGE) {
+            const rect = canvas.getBoundingClientRect();
+            const pixelX = (event.clientX - rect.left) * window.devicePixelRatio;
+            const pixelY = (event.clientY - rect.top) * window.devicePixelRatio;
+            const newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, this.scaleStartZoom * this.scaleY));
+            shareData.offsetX = (shareData.offsetX - pixelX) * (newZoom / shareData.zoom) + pixelX;
+            shareData.offsetY = (shareData.offsetY - pixelY) * (newZoom / shareData.zoom) + pixelY;
+            shareData.zoom = newZoom;
+            draw(shareData);
+        }
+        if (state === ScaleGestureState.SCALE_END){
+            this.scaleY = 1.0;
+            this.scaleStartZoom = shareData.zoom;
+        }
+    }
+
+    public clearState() {
+        this.scaleY = 1.0;
+        this.timer = undefined;
+    }
+
+    private resetScrollTimeout(
+        event: WheelEvent,
+        shareData: ShareData,
+        deviceType: DeviceType = DeviceType.MOUSE
+    ) {
+        clearTimeout(this.timer);
+        this.timer = window.setTimeout(() => {
+            this.timer = undefined;
+            this.handleScrollEvent(event, ScrollGestureState.SCROLL_END, shareData, deviceType);
+            this.clearState();
+        }, this.pinchTimeout);
+    }
+
+    private resetScaleTimeout(
+        event: WheelEvent,
+        canvas: HTMLElement,
+        shareData: ShareData,
+        deviceType: DeviceType = DeviceType.MOUSE
+    ) {
+        clearTimeout(this.timer);
+        this.timer = window.setTimeout(() => {
+            this.timer = undefined;
+            this.handleScaleEvent(event, ScaleGestureState.SCALE_END, canvas, shareData, deviceType);
+            this.clearState();
+        }, this.pinchTimeout);
+    }
+
+    private getDeviceType(event: WheelEvent): DeviceType {
+        const now = Date.now();
+        const timeDifference = now - this.lastEventTime;
+        const deltaYChange = Math.abs(event.deltaY - this.lastDeltaY);
+        let isTouchpad = false;
+        if (event.deltaMode === event.DOM_DELTA_PIXEL && timeDifference < this.timeThreshold) {
+            if (Math.abs(event.deltaY) < this.deltaYThreshold && deltaYChange < this.deltaYChangeThreshold) {
+                isTouchpad = true;
+            }
+        }
+        this.lastEventTime = now;
+        this.lastDeltaY = event.deltaY;
+        return isTouchpad ? DeviceType.TOUCH : DeviceType.MOUSE;
+    }
+
+    public onWheel(event: WheelEvent, canvas: HTMLElement, shareData: ShareData) {
+        const deviceType = this.getDeviceType(event);
+        let wheelRatio = (deviceType === DeviceType.MOUSE ? this.mouseWheelRatio : this.touchWheelRatio);
+        if (!event.deltaY || (!event.ctrlKey && !event.metaKey)) {
+            this.resetScrollTimeout(event, shareData, deviceType);
+            this.handleScrollEvent(event, ScrollGestureState.SCROLL_CHANGE, shareData, deviceType);
+            return;
+        }
+        this.scaleY *= Math.exp(-(event.deltaY) / wheelRatio);
+        if (!this.timer) {
+            this.resetScaleTimeout(event, canvas, shareData, deviceType);
+            this.handleScaleEvent(event, ScaleGestureState.SCALE_START, canvas, shareData, deviceType);
+        } else {
+            this.resetScaleTimeout(event, canvas, shareData, deviceType);
+            this.handleScaleEvent(event, ScaleGestureState.SCALE_CHANGE, canvas, shareData, deviceType);
+        }
+    }
+}
+
+let canDraw = true;
+const gestureManager: GestureManager = new GestureManager();
+
+function isPromise(obj: any): obj is Promise<any> {
+    return !!obj && typeof obj.then === "function";
+}
+
+function draw(shareData: ShareData) {
+    if (canDraw === true) {
+        canDraw = false;
+        const result = shareData.tgfxBaseView.draw(
+            shareData.drawIndex,
+            shareData.zoom,
+            shareData.offsetX,
+            shareData.offsetY
+        );
+        if (isPromise(result)) {
+            result.then((res: boolean) => {
+                canDraw = res;
+            });
+        } else {
+            canDraw = result;
+        }
+    }
 }
 
 export function updateSize(shareData: ShareData) {
@@ -36,10 +211,10 @@ export function updateSize(shareData: ShareData) {
         return;
     }
     shareData.resized = false;
-    let canvas = document.getElementById('hello2d') as HTMLCanvasElement;
-    let container = document.getElementById('container') as HTMLDivElement;
-    let screenRect = container.getBoundingClientRect();
-    let scaleFactor = window.devicePixelRatio;
+    const canvas = document.getElementById('hello2d') as HTMLCanvasElement;
+    const container = document.getElementById('container') as HTMLDivElement;
+    const screenRect = container.getBoundingClientRect();
+    const scaleFactor = window.devicePixelRatio;
     canvas.width = screenRect.width * scaleFactor;
     canvas.height = screenRect.height * scaleFactor;
     canvas.style.width = screenRect.width + "px";
@@ -47,12 +222,11 @@ export function updateSize(shareData: ShareData) {
     shareData.tgfxBaseView.updateSize(scaleFactor);
 }
 
-export function onresizeEvent(shareData: ShareData) {
+export function onResizeEvent(shareData: ShareData) {
     if (!shareData.tgfxBaseView) {
         return;
     }
     shareData.resized = true;
-
     if (shareData.resizeTimer) {
         clearTimeout(shareData.resizeTimer);
     }
@@ -75,18 +249,34 @@ export function animationLoop(shareData: ShareData) {
     requestAnimationFrame(frame);
 }
 
-export function onclickEvent(shareData: ShareData) {
+export function onClickEvent(shareData: ShareData) {
     if (!shareData.tgfxBaseView) {
         return;
     }
     shareData.drawIndex++;
+    shareData.offsetX = 0;
+    shareData.offsetY = 0;
+    shareData.zoom = 1.0;
+    gestureManager.clearState();
+    draw(shareData);
 }
 
-export function loadImage(src: string) {
+export function loadImage(src: string): Promise<HTMLImageElement> {
     return new Promise((resolve, reject) => {
-        let img = new Image();
+        const img = new Image();
         img.onload = () => resolve(img);
         img.onerror = reject;
         img.src = src;
-    })
+    });
+}
+
+export function bindCanvasZoomAndPanEvents(canvas: HTMLElement, shareData: ShareData) {
+    if (!canvas) {
+        return;
+    }
+
+    canvas.addEventListener('wheel', (e: WheelEvent) => {
+        e.preventDefault();
+        gestureManager.onWheel(e, canvas, shareData);
+    }, { passive: false });
 }

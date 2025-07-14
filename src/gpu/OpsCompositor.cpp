@@ -21,6 +21,7 @@
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
 #include "core/Rasterizer.h"
+#include "core/utils/RectToRectMatrix.h"
 #include "core/utils/Types.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
@@ -58,13 +59,16 @@ static bool AnyRectHasUniqueColor(const std::vector<PlacementPtr<RectRecord>>& r
 }
 
 static bool AnyRectHasUniqueMatrix(const std::vector<PlacementPtr<RectRecord>>& rects) {
-  if (rects.size() <= 1) {
+  if (rects.empty()) {
     return false;
+  }
+  if (rects.size() == 1) {
+    return rects.front()->rect != rects.front()->uvRect;
   }
   bool hasUVCoord = false;
   auto& firstMatrix = rects.front()->viewMatrix;
   for (auto& record : rects) {
-    if (record->viewMatrix != firstMatrix) {
+    if (record->viewMatrix != firstMatrix || record->rect != record->uvRect) {
       hasUVCoord = true;
       break;
     }
@@ -77,19 +81,39 @@ OpsCompositor::OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t 
   DEBUG_ASSERT(renderTarget != nullptr);
 }
 
-void OpsCompositor::fillImage(std::shared_ptr<Image> image, const Rect& rect,
-                              const SamplingOptions& sampling, const MCState& state,
-                              const Fill& fill, SrcRectConstraint constraint) {
+void OpsCompositor::fillImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
+                              const MCState& state, const Fill& fill) {
   DEBUG_ASSERT(image != nullptr);
-  DEBUG_ASSERT(!rect.isEmpty());
+  auto imageRect = Rect::MakeWH(image->width(), image->height());
   if (!canAppend(PendingOpType::Image, state.clip, fill) || pendingImage != image ||
-      pendingSampling != sampling || pendingConstraint != constraint) {
+      pendingSampling != sampling || pendingConstraint != SrcRectConstraint::Fast) {
     flushPendingOps(PendingOpType::Image, state.clip, fill);
+    pendingImage = std::move(image);
+    pendingSampling = sampling;
+    pendingConstraint = SrcRectConstraint::Fast;
+  }
+  auto record =
+      drawingBuffer()->make<RectRecord>(imageRect, state.matrix, fill.color.premultiply());
+  pendingRects.emplace_back(std::move(record));
+}
+
+void OpsCompositor::fillImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
+                                  const Rect& dstRect, const SamplingOptions& sampling,
+                                  const MCState& state, const Fill& fill,
+                                  SrcRectConstraint constraint) {
+  DEBUG_ASSERT(image != nullptr);
+  DEBUG_ASSERT(!srcRect.isEmpty());
+  DEBUG_ASSERT(!dstRect.isEmpty());
+  auto fillInLocal = fill.makeWithMatrix(MakeRectToRectMatrix(dstRect, srcRect));
+  if (!canAppend(PendingOpType::Image, state.clip, fillInLocal) || pendingImage != image ||
+      pendingSampling != sampling || pendingConstraint != constraint) {
+    flushPendingOps(PendingOpType::Image, state.clip, fillInLocal);
     pendingImage = std::move(image);
     pendingSampling = sampling;
     pendingConstraint = constraint;
   }
-  auto record = drawingBuffer()->make<RectRecord>(rect, state.matrix, fill.color.premultiply());
+  auto record = drawingBuffer()->make<RectRecord>(dstRect, state.matrix,
+                                                  fillInLocal.color.premultiply(), &srcRect);
   pendingRects.emplace_back(std::move(record));
 }
 
@@ -278,7 +302,9 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     } else {
       if (needLocalBounds) {
         for (auto& rect : pendingRects) {
-          localBounds->join(ClipLocalBounds(rect->rect, rect->viewMatrix, clipBounds));
+          auto localViewMatrix = rect->viewMatrix;
+          localViewMatrix.preConcat(MakeRectToRectMatrix(rect->uvRect, rect->rect));
+          localBounds->join(ClipLocalBounds(rect->uvRect, localViewMatrix, clipBounds));
         }
       }
       if (needDeviceBounds) {
@@ -309,7 +335,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
                          : RectsVertexProvider::UVSubsetMode::RoundOutAndSubset;
       }
       bool hasColor = AnyRectHasUniqueColor(pendingRects);
-      bool hasUVCoord = needLocalBounds && AnyRectHasUniqueMatrix(pendingRects);
+      bool hasUVCoord = AnyRectHasUniqueMatrix(pendingRects);
       auto provider = RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects),
                                                     aaType, hasColor, hasUVCoord, subsetMode);
       drawOp = RectDrawOp::Make(context, std::move(provider), renderFlags);
@@ -422,7 +448,7 @@ std::pair<bool, bool> OpsCompositor::needComputeBounds(const Fill& fill, bool ha
   if (BlendModeNeedDstTexture(fill.blendMode, hasCoverage)) {
     auto caps = context->caps();
     if (!caps->frameBufferFetchSupport &&
-        (!caps->textureBarrierSupport || renderTarget->getTextureProxy() == nullptr ||
+        (!caps->textureBarrierSupport || renderTarget->asTextureProxy() == nullptr ||
          renderTarget->sampleCount() > 1)) {
       needDeviceBounds = true;
     }
@@ -485,7 +511,7 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
     if (clipRenderTarget == nullptr) {
       return nullptr;
     }
-    clipTexture = clipRenderTarget->getTextureProxy();
+    clipTexture = clipRenderTarget->asTextureProxy();
     auto clearOp = ClearOp::Make(context, Color::Transparent(), clipRenderTarget->bounds());
     auto opList = drawingBuffer()->makeArray<Op>(2);
     opList[0] = std::move(clearOp);
@@ -539,7 +565,7 @@ DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AATyp
     return {};
   }
   Rect bounds = {};
-  auto textureProxy = caps->textureBarrierSupport ? renderTarget->getTextureProxy() : nullptr;
+  auto textureProxy = caps->textureBarrierSupport ? renderTarget->asTextureProxy() : nullptr;
   if (textureProxy == nullptr || renderTarget->sampleCount() > 1) {
     if (deviceBounds.isEmpty()) {
       return {};

@@ -26,11 +26,18 @@
 
 namespace tgfx {
 struct RectRecord {
-  RectRecord(const Rect& rect, const Matrix& viewMatrix, const Color& color = {})
+  RectRecord(const Rect& rect, const Matrix& viewMatrix, const Color& color = {},
+             const Rect* uv = nullptr)
       : rect(rect), viewMatrix(viewMatrix), color(color) {
+    if (uv) {
+      uvRect = *uv;
+    } else {
+      uvRect = rect;
+    }
   }
 
   Rect rect;
+  Rect uvRect;
   Matrix viewMatrix;
   Color color;
 };

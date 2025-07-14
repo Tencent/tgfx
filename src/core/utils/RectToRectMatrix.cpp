@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,35 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/Texture.h"
-
+#include "core/utils/RectToRectMatrix.h"
 namespace tgfx {
-/**
- * Texture that has a single 2D texture sampler.
- */
-class PlainTexture : public Texture {
- public:
-  /**
-   * Returns true if the specified texture size and format can be created by the GPU backend.
-   */
-  static bool CheckSizeAndFormat(Context* context, int width, int height, PixelFormat format);
-
-  PlainTexture(std::unique_ptr<TextureSampler> sampler, int width, int height, ImageOrigin origin);
-
-  size_t memoryUsage() const override;
-
-  const TextureSampler* getSampler() const override {
-    return sampler.get();
+Matrix MakeRectToRectMatrix(const Rect& srcRect, const Rect& dstRect) {
+  if (srcRect.isEmpty()) {
+    return Matrix::I();
   }
-
- protected:
-  void onReleaseGPU() override;
-
- private:
-  std::unique_ptr<TextureSampler> sampler = {};
-
-  friend class Texture;
-};
+  if (dstRect.isEmpty()) {
+    return Matrix::MakeAll(0, 0, 0, 0, 0, 0);
+  }
+  float sx = dstRect.width() / srcRect.width();
+  float sy = dstRect.height() / srcRect.height();
+  float tx = dstRect.left - srcRect.left * sx;
+  float ty = dstRect.top - srcRect.top * sy;
+  return Matrix::MakeAll(sx, 0, tx, 0, sy, ty);
+}
 }  // namespace tgfx

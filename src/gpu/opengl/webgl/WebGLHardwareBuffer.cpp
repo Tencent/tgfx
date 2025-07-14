@@ -24,7 +24,12 @@ bool HardwareBufferAvailable() {
   return false;
 }
 
-std::shared_ptr<Texture> Texture::MakeFrom(Context*, HardwareBufferRef, YUVColorSpace) {
-  return nullptr;
+PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef) {
+  return PixelFormat::Unknown;
+}
+
+std::vector<std::unique_ptr<TextureSampler>> TextureSampler::MakeFrom(Context*, HardwareBufferRef,
+                                                                      YUVFormat*) {
+  return {};
 }
 }  // namespace tgfx

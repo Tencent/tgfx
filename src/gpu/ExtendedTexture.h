@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,21 +18,29 @@
 
 #pragma once
 
-#include "ResourceTask.h"
-#include "gpu/proxies/TextureProxy.h"
+#include "gpu/DefaultTexture.h"
 
 namespace tgfx {
-class RenderTargetCreateTask : public ResourceTask {
+/**
+ * ExtendedTexture enhances DefaultTexture by allowing you to specify an extended width and height.
+ */
+class ExtendedTexture : public DefaultTexture {
  public:
-  RenderTargetCreateTask(UniqueKey uniqueKey, std::shared_ptr<TextureProxy> textureProxy,
-                         PixelFormat pixelFormat, int sampleCount);
+  ExtendedTexture(std::unique_ptr<TextureSampler> sampler, int width, int height, int extendedWidth,
+                  int extendedHeight, ImageOrigin origin = ImageOrigin::TopLeft);
 
- protected:
-  std::shared_ptr<Resource> onMakeResource(Context* context) override;
+  size_t memoryUsage() const override;
+
+  Point getTextureCoord(float x, float y) const override {
+    return {x / static_cast<float>(extendedWidth), y / static_cast<float>(extendedHeight)};
+  }
+
+  BackendTexture getBackendTexture() const override {
+    return getSampler()->getBackendTexture(extendedWidth, extendedHeight);
+  }
 
  private:
-  std::shared_ptr<TextureProxy> textureProxy = nullptr;
-  PixelFormat pixelFormat = PixelFormat::RGBA_8888;
-  int sampleCount = 1;
+  int extendedWidth = 0;
+  int extendedHeight = 0;
 };
 }  // namespace tgfx

@@ -260,6 +260,6 @@ std::shared_ptr<TextureProxy> Image::lockTextureProxy(const TPArgs& args) const 
   if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags)) {
     return nullptr;
   }
-  return renderTarget->getTextureProxy();
+  return renderTarget->asTextureProxy();
 }
 }  // namespace tgfx

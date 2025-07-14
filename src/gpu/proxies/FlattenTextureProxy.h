@@ -44,10 +44,6 @@ class FlattenTextureProxy : public TextureProxy {
     return source->isAlphaOnly();
   }
 
-  bool externallyOwned() const override {
-    return source->externallyOwned();
-  }
-
   bool isFlatten() const override {
     return true;
   }
