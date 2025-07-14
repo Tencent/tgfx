@@ -156,9 +156,8 @@ std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_
     renderTargets.push_back(lastRenderTarget);
     auto downWidth = static_cast<int>(roundf(textureSize.width * downScaling));
     auto downHeight = static_cast<int>(roundf(textureSize.height * downScaling));
-    auto renderTarget =
-        RenderTargetProxy::MakeFallback(args.context, downWidth, downHeight, isAlphaOnly, 1,
-                                        args.mipmapped, ImageOrigin::TopLeft, true);
+    auto renderTarget = RenderTargetProxy::MakeFallback(
+        args.context, downWidth, downHeight, isAlphaOnly, 1, false, ImageOrigin::TopLeft, true);
     if (renderTarget == nullptr) {
       break;
     }

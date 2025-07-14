@@ -166,11 +166,11 @@ static inline int CLZ(uint32_t mask) {
 /**
  *  Returns the log2 of the specified value, were that value to be rounded up
  *  to the next power of 2. It is undefined to pass 0. Examples:
- *  SkNextLog2(1) -> 0
- *  SkNextLog2(2) -> 1
- *  SkNextLog2(3) -> 2
- *  SkNextLog2(4) -> 2
- *  SkNextLog2(5) -> 3
+ *  NextLog2(1) -> 0
+ *  NextLog2(2) -> 1
+ *  NextLog2(3) -> 2
+ *  NextLog2(4) -> 2
+ *  NextLog2(5) -> 3
  */
 static inline int NextLog2(uint32_t value) {
   DEBUG_ASSERT(value != 0);

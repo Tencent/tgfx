@@ -104,7 +104,7 @@ bool Atlas::activateNewPage() {
   }
   pages.push_back(std::move(page));
   auto proxy = proxyProvider->createTextureProxy(UniqueKey::Make(), textureWidth, textureHeight,
-                                                 pixelFormat, false);
+                                                 pixelFormat);
   if (proxy == nullptr) {
     return false;
   }

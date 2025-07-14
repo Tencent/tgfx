@@ -509,7 +509,7 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
     auto uvMatrix = Matrix::MakeTrans(bounds.left, bounds.top);
     auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), {}, uvMatrix, aaType);
     auto clipRenderTarget = RenderTargetProxy::MakeFallback(context, width, height, true, 1, false,
-                                                            renderTarget->origin(), true);
+                                                            ImageOrigin::TopLeft, true);
     if (clipRenderTarget == nullptr) {
       return nullptr;
     }

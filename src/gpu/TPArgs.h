@@ -29,7 +29,8 @@ class TPArgs {
   TPArgs() = default;
 
   TPArgs(Context* context, uint32_t renderFlags, bool mipmapped, bool approxmateSize = true)
-      : context(context), renderFlags(renderFlags), mipmapped(mipmapped), approxmateSize(approxmateSize) {
+      : context(context), renderFlags(renderFlags), mipmapped(mipmapped),
+        approxmateSize(approxmateSize) {
   }
 
   /**
