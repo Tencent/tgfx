@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RuntimeDrawTask.h"
-#include "gpu/RuntimeResource.h"
+#include "gpu/ProgramCache.h"
+#include "gpu/RuntimeProgramCreator.h"
+#include "gpu/RuntimeProgramWrapper.h"
 
 namespace tgfx {
 RuntimeDrawTask::RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
@@ -48,16 +50,13 @@ bool RuntimeDrawTask::execute(RenderPass* renderPass) {
     return false;
   }
   auto context = renderPass->getContext();
-  UniqueKey uniqueKey(effect->type());
-  auto program = Resource::Find<RuntimeResource>(context, uniqueKey);
+  RuntimeProgramCreator programCreator(effect);
+  auto program = context->programCache()->getProgram(&programCreator);
   if (program == nullptr) {
-    program = RuntimeResource::Wrap(uniqueKey, effect->onCreateProgram(context));
-    if (program == nullptr) {
-      LOGE("RuntimeDrawTask::execute() Failed to create the runtime program!");
-      return false;
-    }
+    LOGE("RuntimeDrawTask::execute() Failed to create the runtime program!");
+    return false;
   }
-  return effect->onDraw(program->getProgram(), inputTextures,
+  return effect->onDraw(RuntimeProgramWrapper::Unwrap(program), inputTextures,
                         renderTarget->getBackendRenderTarget(), offset);
 }
 }  // namespace tgfx

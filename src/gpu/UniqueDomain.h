@@ -39,11 +39,6 @@ class UniqueDomain {
   long useCount() const;
 
   /**
-   * Returns the number of times the UniqueDomain has been referenced strongly.
-   */
-  long strongCount() const;
-
-  /**
    * Increments the number of times the UniqueDomain has been referenced.
    */
   void addReference();
@@ -53,19 +48,8 @@ class UniqueDomain {
    */
   void releaseReference();
 
-  /**
-   * Increments the number of times the UniqueDomain has been referenced strongly.
-   */
-  void addStrong();
-
-  /**
-   * Decrements the number of times the UniqueDomain has been referenced strongly.
-   */
-  void releaseStrong();
-
  private:
   uint32_t _uniqueID = 0;
   std::atomic<long> _useCount = {1};
-  std::atomic<long> _strongCount = {0};
 };
 }  // namespace tgfx

@@ -36,9 +36,8 @@ void RenderPass::end() {
   _program = nullptr;
 }
 
-void RenderPass::bindProgramAndScissorClip(const ProgramInfo* programInfo,
-                                           const Rect& scissorRect) {
-  if (!onBindProgramAndScissorClip(programInfo, scissorRect)) {
+void RenderPass::bindProgramAndScissorClip(const Pipeline* pipeline, const Rect& scissorRect) {
+  if (!onBindProgramAndScissorClip(pipeline, scissorRect)) {
     drawPipelineStatus = DrawPipelineStatus::FailedToBind;
     return;
   }

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,23 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "RuntimeResource.h"
+#pragma once
+
+#include "gpu/ProgramCreator.h"
+#include "tgfx/gpu/RuntimeEffect.h"
 
 namespace tgfx {
-
-std::shared_ptr<RuntimeResource> RuntimeResource::Wrap(const UniqueKey& uniqueKey,
-                                                       std::unique_ptr<RuntimeProgram> program) {
-  if (program == nullptr) {
-    return nullptr;
+class RuntimeProgramCreator : public ProgramCreator {
+ public:
+  explicit RuntimeProgramCreator(std::shared_ptr<RuntimeEffect> effect)
+      : effect(std::move(effect)) {
   }
-  auto context = program->getContext();
-  auto resource = Resource::AddToCache(context, new RuntimeResource(std::move(program)));
-  resource->assignUniqueKey(uniqueKey);
-  return std::static_pointer_cast<RuntimeResource>(resource);
-}
 
-void RuntimeResource::onReleaseGPU() {
-  program->onReleaseGPU();
-  program->context = nullptr;
-}
+  void computeProgramKey(Context* context, BytesKey* programKey) const override;
+
+  std::unique_ptr<Program> createProgram(Context* context) const override;
+
+ private:
+  std::shared_ptr<RuntimeEffect> effect = nullptr;
+};
 }  // namespace tgfx
