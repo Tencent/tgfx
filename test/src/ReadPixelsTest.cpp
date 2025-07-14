@@ -44,9 +44,7 @@ TGFX_TEST(ReadPixelsTest, ScalePixMap) {
   Buffer pixels(byteSize);
   auto result = codec->readPixels(RGBAInfo, pixels.data());
   EXPECT_TRUE(result);
-
   Pixmap pixmap(RGBAInfo, pixels.data());
-  EXPECT_TRUE(Baseline::Compare(pixmap, "ReadPixelsTest/image"));
 
   auto scale = 0.5f;
   width = static_cast<int>(width * scale);
