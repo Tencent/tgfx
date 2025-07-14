@@ -18,23 +18,9 @@
 
 #include "RuntimeProgramCreator.h"
 #include "core/utils/UniqueID.h"
+#include "gpu/RuntimeProgramWrapper.h"
 
 namespace tgfx {
-class RuntimeProgramWrapper : public Program {
- public:
-  explicit RuntimeProgramWrapper(std::unique_ptr<RuntimeProgram> program)
-      : Program(program->getContext()), runtimeProgram(std::move(program)) {
-  }
-
-  void onReleaseGPU() override {
-    runtimeProgram->onReleaseGPU();
-    runtimeProgram->context = nullptr;
-  }
-
- private:
-  std::unique_ptr<RuntimeProgram> runtimeProgram = nullptr;
-};
-
 void RuntimeProgramCreator::computeProgramKey(Context*, BytesKey* programKey) const {
   static auto RuntimeProgramType = UniqueID::Next();
   programKey->write(RuntimeProgramType);
