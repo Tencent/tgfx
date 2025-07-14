@@ -174,11 +174,6 @@ class UniqueKey : public ResourceKey {
    */
   long useCount() const;
 
-  /**
-   * Returns the number of times the domain has been strongly referenced.
-   */
-  long strongCount() const;
-
   UniqueKey& operator=(const UniqueKey& key);
 
   UniqueKey& operator=(UniqueKey&& key) noexcept;
@@ -197,10 +192,6 @@ class UniqueKey : public ResourceKey {
   explicit UniqueKey(UniqueDomain* domain);
 
   UniqueKey(uint32_t* data, size_t count, UniqueDomain* domain);
-
-  void addStrong();
-
-  void releaseStrong();
 
   friend class ResourceHandle;
   friend class LazyUniqueKey;

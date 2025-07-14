@@ -151,10 +151,6 @@ long UniqueKey::useCount() const {
   return uniqueDomain != nullptr ? uniqueDomain->useCount() : 0;
 }
 
-long UniqueKey::strongCount() const {
-  return uniqueDomain != nullptr ? uniqueDomain->strongCount() : 0;
-}
-
 UniqueKey& UniqueKey::operator=(const UniqueKey& key) {
   if (this == &key) {
     return *this;
@@ -185,18 +181,6 @@ UniqueKey& UniqueKey::operator=(UniqueKey&& key) noexcept {
   key.data = nullptr;
   key.count = 0;
   return *this;
-}
-
-void UniqueKey::addStrong() {
-  if (uniqueDomain != nullptr) {
-    uniqueDomain->addStrong();
-  }
-}
-
-void UniqueKey::releaseStrong() {
-  if (uniqueDomain != nullptr) {
-    uniqueDomain->releaseStrong();
-  }
 }
 
 LazyUniqueKey::~LazyUniqueKey() {
