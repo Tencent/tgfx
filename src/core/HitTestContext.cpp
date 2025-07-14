@@ -156,7 +156,7 @@ void HitTestContext::drawLayer(std::shared_ptr<Picture> picture,
   DEBUG_ASSERT(picture != nullptr);
   auto local = state.matrix.mapXY(testX, testY);
   if (imageFilter) {
-    auto localBounds = picture->getBounds(nullptr, shapeHitTest);
+    auto localBounds = shapeHitTest ? picture->getTightBounds(nullptr) : picture->getBounds();
     localBounds = imageFilter->filterBounds(localBounds);
     if (!localBounds.contains(local.x, local.y)) {
       return;

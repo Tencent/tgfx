@@ -44,30 +44,20 @@ Picture::Picture(std::unique_ptr<BlockData> data, std::vector<PlacementPtr<Recor
 Picture::~Picture() {
   // Make sure the records are cleared before the block data is destroyed.
   records.clear();
-  auto oldBounds = bounds.exchange(nullptr, std::memory_order_acq_rel);
-  delete oldBounds;
 }
 
-Rect Picture::getBounds(const Matrix* matrix, bool computeTightBounds) const {
-  auto useCachedBounds = !matrix && !computeTightBounds;
-  if (useCachedBounds) {
-    auto cachedBounds = bounds.load(std::memory_order_acquire);
-    if (cachedBounds) {
-      return *cachedBounds;
-    }
-  }
-  MeasureContext context(computeTightBounds);
+Rect Picture::getBounds() const {
+  MeasureContext context(false);
+  MCState state(Matrix::I());
+  playback(&context, state);
+  return context.getBounds();
+}
+
+Rect Picture::getTightBounds(const Matrix* matrix) const {
+  MeasureContext context(true);
   MCState state(matrix ? *matrix : Matrix::I());
   playback(&context, state);
-  auto totalBounds = context.getBounds();
-  if (useCachedBounds) {
-    auto newBounds = new Rect(totalBounds);
-    Rect* oldBounds = nullptr;
-    if (!bounds.compare_exchange_strong(oldBounds, newBounds, std::memory_order_acq_rel)) {
-      delete newBounds;
-    }
-  }
-  return totalBounds;
+  return context.getBounds();
 }
 
 bool Picture::hitTestPoint(float localX, float localY, bool shapeHitTest) const {
