@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,29 +18,21 @@
 
 #pragma once
 
-#include "gpu/Resource.h"
+#include "gpu/Program.h"
 #include "tgfx/gpu/RuntimeProgram.h"
 
 namespace tgfx {
-class RuntimeResource : public Resource {
+class RuntimeProgramWrapper : public Program {
  public:
-  static std::shared_ptr<RuntimeResource> Wrap(const UniqueKey& uniqueKey,
-                                               std::unique_ptr<RuntimeProgram> program);
+  static const RuntimeProgram* Unwrap(const Program* program);
 
-  size_t memoryUsage() const override {
-    return 0;
-  }
-
-  RuntimeProgram* getProgram() const {
-    return program.get();
-  }
-
- private:
-  std::unique_ptr<RuntimeProgram> program = nullptr;
-
-  explicit RuntimeResource(std::unique_ptr<RuntimeProgram> program) : program(std::move(program)) {
+  explicit RuntimeProgramWrapper(std::unique_ptr<RuntimeProgram> program)
+      : Program(program->getContext()), runtimeProgram(std::move(program)) {
   }
 
   void onReleaseGPU() override;
+
+ private:
+  std::unique_ptr<RuntimeProgram> runtimeProgram = nullptr;
 };
 }  // namespace tgfx

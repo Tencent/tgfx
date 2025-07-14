@@ -25,46 +25,21 @@
 #include "gpu/UniformBuffer.h"
 
 namespace tgfx {
-struct SamplerInfo {
-  const TextureSampler* sampler;
-  SamplerState state;
-};
 /**
- * This immutable object contains information needed to build a shader program and set API state for
- * a draw.
+ * ProgramCreator is an interface for creating GPU programs. It provides methods to compute the
+ * key for the program and to create a Program instance.
  */
-class ProgramInfo {
+class ProgramCreator {
  public:
-  virtual ~ProgramInfo() = default;
+  virtual ~ProgramCreator() = default;
 
   /**
-   * Returns the blend info for the draw. A nullptr is returned if the draw does not require
-   * blending.
-   */
-  virtual const BlendFormula* blendFormula() const = 0;
-
-  /**
-   * Returns true if the draw requires a texture barrier.
-   */
-  virtual bool requiresBarrier() const = 0;
-
-  /**
-   * Collects uniform data for the draw.
-   */
-  virtual void getUniforms(UniformBuffer* uniformBuffer) const = 0;
-
-  /**
-   * Collects texture samplers for the draw.
-   */
-  virtual std::vector<SamplerInfo> getSamplers() const = 0;
-
-  /**
-   * Computes a unique key for the program.
+   * Computes the key for the program, which is used to cache the program in the ProgramCache.
    */
   virtual void computeProgramKey(Context* context, BytesKey* programKey) const = 0;
 
   /**
-   * Creates a new program.
+   * Creates a Program instance based on the current state of the ProgramCreator.
    */
   virtual std::unique_ptr<Program> createProgram(Context* context) const = 0;
 };

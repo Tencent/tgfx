@@ -21,7 +21,7 @@
 #include <list>
 #include <unordered_map>
 #include "Program.h"
-#include "ProgramInfo.h"
+#include "ProgramCreator.h"
 
 namespace tgfx {
 /**
@@ -41,7 +41,7 @@ class ProgramCache {
    * a new program will be created by programMaker. Returns null if the programMaker fails to make a
    * new program.
    */
-  Program* getProgram(const ProgramInfo* programInfo);
+  Program* getProgram(const ProgramCreator* programCreator);
 
  private:
   Context* context = nullptr;

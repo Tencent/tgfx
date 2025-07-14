@@ -21,17 +21,22 @@
 #include <unordered_map>
 #include "Swizzle.h"
 #include "gpu/Blend.h"
-#include "gpu/ProgramInfo.h"
+#include "gpu/ProgramCreator.h"
 #include "gpu/processors/EmptyXferProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/GeometryProcessor.h"
 
 namespace tgfx {
+struct SamplerInfo {
+  const TextureSampler* sampler;
+  SamplerState state;
+};
+
 /**
  * Pipeline is a ProgramInfo that uses a list of Processors to assemble a shader program and set API
  * state for a draw.
  */
-class Pipeline : public ProgramInfo {
+class Pipeline : public ProgramCreator {
  public:
   Pipeline(PlacementPtr<GeometryProcessor> geometryProcessor,
            std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors,
@@ -60,17 +65,17 @@ class Pipeline : public ProgramInfo {
     return _outputSwizzle;
   }
 
-  bool requiresBarrier() const override {
+  bool requiresBarrier() const {
     return xferProcessor != nullptr && xferProcessor->requiresBarrier();
   }
 
-  const BlendFormula* blendFormula() const override {
+  const BlendFormula* blendFormula() const {
     return xferProcessor == nullptr ? &_blendFormula : nullptr;
   }
 
-  void getUniforms(UniformBuffer* uniformBuffer) const override;
+  void getUniforms(UniformBuffer* uniformBuffer) const;
 
-  std::vector<SamplerInfo> getSamplers() const override;
+  std::vector<SamplerInfo> getSamplers() const;
 
   void computeProgramKey(Context* context, BytesKey* programKey) const override;
 
