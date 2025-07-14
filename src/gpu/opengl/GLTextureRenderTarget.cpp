@@ -55,7 +55,8 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
                                       sampler->format(), sampleCount, sampler->hasMipmaps());
   }
   return GLTextureRenderTarget::MakeFrom(context, std::move(sampler), backendTexture.width(),
-                                         backendTexture.height(), sampleCount, origin, scratchKey);
+                                         backendTexture.height(), sampleCount, origin, !adopted,
+                                         scratchKey);
 }
 
 std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
@@ -75,7 +76,7 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
   }
   sampleCount = context->caps()->getSampleCount(sampleCount, format);
   return GLTextureRenderTarget::MakeFrom(context, std::move(samplers.front()), size.width,
-                                         size.height, sampleCount);
+                                         size.height, sampleCount, ImageOrigin::TopLeft, true);
 }
 
 std::shared_ptr<RenderTarget> RenderTarget::Make(Context* context, int width, int height,
@@ -100,7 +101,7 @@ std::shared_ptr<RenderTarget> RenderTarget::Make(Context* context, int width, in
     return nullptr;
   }
   return GLTextureRenderTarget::MakeFrom(context, std::move(sampler), width, height, sampleCount,
-                                         origin, scratchKey);
+                                         origin, false, scratchKey);
 }
 
 static bool RenderbufferStorageMSAA(Context* context, int sampleCount, PixelFormat pixelFormat,
@@ -191,7 +192,7 @@ static bool CreateRenderBuffer(Context* context, TextureSampler* sampler, int wi
 
 std::shared_ptr<RenderTarget> GLTextureRenderTarget::MakeFrom(
     Context* context, std::unique_ptr<TextureSampler> sampler, int width, int height,
-    int sampleCount, ImageOrigin origin, const ScratchKey& scratchKey) {
+    int sampleCount, ImageOrigin origin, bool externallyOwned, const ScratchKey& scratchKey) {
   DEBUG_ASSERT(context != nullptr);
   DEBUG_ASSERT(sampler != nullptr);
   auto caps = GLCaps::Get(context);
@@ -228,8 +229,8 @@ std::shared_ptr<RenderTarget> GLTextureRenderTarget::MakeFrom(
     return nullptr;
   }
 #endif
-  auto renderTarget =
-      new GLTextureRenderTarget(std::move(sampler), width, height, origin, sampleCount);
+  auto renderTarget = new GLTextureRenderTarget(std::move(sampler), width, height, origin,
+                                                sampleCount, externallyOwned);
   renderTarget->_readFrameBufferID = frameBufferRead;
   renderTarget->_drawFrameBufferID = frameBufferDraw;
   renderTarget->renderBufferID = renderBufferId;

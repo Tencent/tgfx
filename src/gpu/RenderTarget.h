@@ -93,6 +93,11 @@ class RenderTarget {
   virtual PixelFormat format() const = 0;
 
   /**
+   * Returns true if the render target is externally owned.
+   */
+  virtual bool externallyOwned() const = 0;
+
+  /**
    * Returns a reference to the underlying texture representation of this render target, may be
    * nullptr.
    */
