@@ -130,7 +130,6 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       GESTUREINFO gestureInfo{};
       gestureInfo.cbSize = sizeof(GESTUREINFO);
       if (GetGestureInfo(reinterpret_cast<HGESTUREINFO>(lparam), &gestureInfo)) {
-        static double lastZoomArgument = 0.0;
         if (gestureInfo.dwID == GID_ZOOM) {
           double currentArgument = gestureInfo.ullArguments;
           if (lastZoomArgument != 0.0) {
@@ -139,8 +138,10 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
             ScreenToClient(hwnd, &mousePoint);
             float newZoom =
                 std::clamp(zoomScale * static_cast<float>(zoomFactor), MIN_ZOOM, MAX_ZOOM);
-            contentOffset.x = mousePoint.x - ((mousePoint.x - contentOffset.x) / zoomScale) * newZoom;
-            contentOffset.y = mousePoint.y - ((mousePoint.y - contentOffset.y) / zoomScale) * newZoom;
+            contentOffset.x =
+                mousePoint.x - ((mousePoint.x - contentOffset.x) / zoomScale) * newZoom;
+            contentOffset.y =
+                mousePoint.y - ((mousePoint.y - contentOffset.y) / zoomScale) * newZoom;
             zoomScale = newZoom;
             ::InvalidateRect(windowHandle, nullptr, TRUE);
           }
@@ -180,15 +181,18 @@ void TGFXWindow::centerAndShow() {
   if (hWndCenter != nullptr) {
     hWnd = hWndCenter;
   }
+
   MONITORINFO oMonitor = {};
   oMonitor.cbSize = sizeof(oMonitor);
   ::GetMonitorInfo(::MonitorFromWindow(hWnd, MONITOR_DEFAULTTONEAREST), &oMonitor);
   rcArea = oMonitor.rcWork;
+
   if (hWndCenter == nullptr) {
     rcCenter = rcArea;
   } else {
     ::GetWindowRect(hWndCenter, &rcCenter);
   }
+
   int DlgWidth = rcDlg.right - rcDlg.left;
   int DlgHeight = rcDlg.bottom - rcDlg.top;
 
@@ -206,12 +210,14 @@ void TGFXWindow::centerAndShow() {
   } else if (xLeft + DlgWidth > rcArea.right) {
     xLeft = rcArea.right - DlgWidth;
   }
+
   if (yTop < rcArea.top) {
     if (yTop < 0) {
       yTop = GetSystemMetrics(SM_CYSCREEN) / 2 - DlgHeight / 2;
     } else {
       yTop = rcArea.top;
     }
+
   } else if (yTop + DlgHeight > rcArea.bottom) {
     yTop = rcArea.bottom - DlgHeight;
   }

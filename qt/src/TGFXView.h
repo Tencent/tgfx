@@ -26,7 +26,6 @@
 namespace hello2d {
 class TGFXView : public QQuickItem {
   Q_OBJECT
-
  public:
   explicit TGFXView(QQuickItem* parent = nullptr);
 

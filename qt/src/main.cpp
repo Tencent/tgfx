@@ -28,6 +28,7 @@
 #include "qobject.h"
 
 int main(int argc, char* argv[]) {
+
   QApplication::setApplicationName("Hello2D");
   QApplication::setOrganizationName("org.tgfx");
   QSurfaceFormat defaultFormat = QSurfaceFormat();
@@ -41,6 +42,7 @@ int main(int argc, char* argv[]) {
   QApplication::setAttribute(Qt::AA_EnableHighDpiScaling);
   QApplication::setAttribute(Qt::AA_UseHighDpiPixmaps);
 #endif
+
   QApplication app(argc, argv);
   QApplication::setWindowIcon(QIcon(":/images/tgfx.png"));
   qmlRegisterType<hello2d::TGFXView>("TGFX", 1, 0, "TGFXView");
