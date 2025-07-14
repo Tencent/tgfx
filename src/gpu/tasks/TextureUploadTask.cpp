@@ -20,10 +20,10 @@
 #include "gpu/Texture.h"
 
 namespace tgfx {
-TextureUploadTask::TextureUploadTask(UniqueKey uniqueKey,
+TextureUploadTask::TextureUploadTask(std::shared_ptr<ResourceProxy> proxy,
                                      std::shared_ptr<DataSource<ImageBuffer>> source,
                                      bool mipmapped)
-    : ResourceTask(std::move(uniqueKey)), source(std::move(source)), mipmapped(mipmapped) {
+    : ResourceTask(std::move(proxy)), source(std::move(source)), mipmapped(mipmapped) {
 }
 
 std::shared_ptr<Resource> TextureUploadTask::onMakeResource(Context* context) {

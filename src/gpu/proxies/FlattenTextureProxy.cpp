@@ -20,12 +20,13 @@
 #include "gpu/ProxyProvider.h"
 
 namespace tgfx {
-FlattenTextureProxy::FlattenTextureProxy(UniqueKey uniqueKey, std::shared_ptr<TextureProxy> source)
-    : TextureProxy(std::move(uniqueKey)), source(std::move(source)) {
+FlattenTextureProxy::FlattenTextureProxy(UniqueKey flattenTextureKey,
+                                         std::shared_ptr<TextureProxy> source)
+    : flattenTextureKey(std::move(flattenTextureKey)), source(std::move(source)) {
 }
 
-std::shared_ptr<Texture> FlattenTextureProxy::getTexture() const {
-  auto texture = Resource::Find<Texture>(context, handle.key());
+std::shared_ptr<Texture> FlattenTextureProxy::onMakeTexture(Context* context) const {
+  auto texture = Resource::Find<Texture>(context, flattenTextureKey);
   return texture ? texture : source->getTexture();
 }
 }  // namespace tgfx

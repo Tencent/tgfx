@@ -42,11 +42,6 @@ std::shared_ptr<GpuBufferProxy> GpuBufferProxy::MakeFrom(Context* context,
                                                         renderFlags);
 }
 
-GpuBufferProxy::GpuBufferProxy(UniqueKey uniqueKey, BufferType bufferType)
-    : ResourceProxy(std::move(uniqueKey)), _bufferType(bufferType) {
-}
-
-std::shared_ptr<GpuBuffer> GpuBufferProxy::getBuffer() const {
-  return Resource::Find<GpuBuffer>(context, handle.key());
+GpuBufferProxy::GpuBufferProxy(BufferType bufferType) : _bufferType(bufferType) {
 }
 }  // namespace tgfx

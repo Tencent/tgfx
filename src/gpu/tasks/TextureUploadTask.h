@@ -24,8 +24,8 @@
 namespace tgfx {
 class TextureUploadTask : public ResourceTask {
  public:
-  TextureUploadTask(UniqueKey uniqueKey, std::shared_ptr<DataSource<ImageBuffer>> source,
-                    bool mipmapped);
+  TextureUploadTask(std::shared_ptr<ResourceProxy> proxy,
+                    std::shared_ptr<DataSource<ImageBuffer>> source, bool mipmapped);
 
   std::shared_ptr<Resource> onMakeResource(Context* context) override;
 

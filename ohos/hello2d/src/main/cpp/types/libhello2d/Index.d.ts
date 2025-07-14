@@ -1,4 +1,4 @@
-export const draw: (index: number) => void;
+export const draw: (index: number, zoom: number, offsetX: number, offsetY: number) => void;
 
 export const updateDensity: (density: number) => void;
 

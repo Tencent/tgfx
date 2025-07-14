@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,18 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DefaultTextureProxy.h"
-
+#include "TextureProxy.h"
 namespace tgfx {
-DefaultTextureProxy::DefaultTextureProxy(UniqueKey uniqueKey, int width, int height, bool mipmapped,
-                                         bool isAlphaOnly, ImageOrigin origin)
-    : TextureProxy(std::move(uniqueKey)), _width(width), _height(height) {
-  bitFields.origin = origin;
-  bitFields.mipmapped = mipmapped;
-  bitFields.isAlphaOnly = isAlphaOnly;
+std::shared_ptr<Texture> TextureProxy::getTexture() const {
+  if (resource == nullptr) {
+    resource = onMakeTexture(context);
+    if (resource != nullptr && !uniqueKey.empty()) {
+      resource->assignUniqueKey(uniqueKey);
+    }
+  }
+  return std::static_pointer_cast<Texture>(resource);
 }
 
-std::shared_ptr<Texture> DefaultTextureProxy::getTexture() const {
-  return Resource::Find<Texture>(context, handle.key());
-}
 }  // namespace tgfx

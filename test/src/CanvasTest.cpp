@@ -961,7 +961,7 @@ TGFX_TEST(CanvasTest, image) {
   EXPECT_TRUE(decodedImage == image);
   textureImage = nullptr;
   decodedImage = image->makeDecoded(context);
-  EXPECT_FALSE(decodedImage == image);
+  EXPECT_TRUE(decodedImage == image);
   context->flush();
   decodedImage = image->makeDecoded(context);
   EXPECT_FALSE(decodedImage == image);
