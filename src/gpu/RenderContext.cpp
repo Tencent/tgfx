@@ -211,7 +211,7 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   if (FloatNearlyZero(maxScale)) {
     return;
   }
-  auto bounds = glyphRunList->getBounds(maxScale);
+  auto bounds = glyphRunList->getBounds();
   if (stroke) {
     ApplyStrokeToBounds(*stroke, &bounds);
   }

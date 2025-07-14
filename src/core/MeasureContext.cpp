@@ -78,16 +78,14 @@ void MeasureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList
     return;
   }
   if (computeTightBounds) {
-    Path glyphPath = {};
-    if (glyphRunList->getPath(&glyphPath, maxScale)) {
-      if (stroke) {
-        stroke->applyToPath(&glyphPath);
-      }
-      addTightBounds(glyphPath, state, fill);
-      return;
+    auto deviceBounds = glyphRunList->getTightBounds(&state.matrix);
+    if (stroke) {
+      ApplyStrokeToScaledBounds(*stroke, &deviceBounds, maxScale);
     }
+    addDeviceBounds(state.clip, fill, deviceBounds);
+    return;
   }
-  auto localBounds = glyphRunList->getBounds(maxScale);
+  auto localBounds = glyphRunList->getBounds();
   if (stroke) {
     ApplyStrokeToBounds(*stroke, &localBounds);
   }

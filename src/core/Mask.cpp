@@ -57,11 +57,14 @@ bool Mask::fillText(const GlyphRunList* glyphRunList, const Stroke* stroke) {
     return true;
   }
   Path path = {};
-  if (!glyphRunList->getPath(&path, matrix.getMaxScale())) {
+  if (!glyphRunList->getPath(&path, &matrix)) {
     return false;
   }
   if (stroke) {
-    stroke->applyToPath(&path);
+    auto scale = matrix.getMaxScale();
+    Stroke scaledStroke(stroke->width * scale, stroke->cap, stroke->join,
+                        stroke->miterLimit * scale);
+    scaledStroke.applyToPath(&path);
   }
   path.transform(matrix);
   onFillPath(path, {}, antiAlias, true);

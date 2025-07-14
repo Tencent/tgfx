@@ -436,16 +436,25 @@ class Layer : public std::enable_shared_from_this<Layer> {
   bool replaceChild(std::shared_ptr<Layer> oldChild, std::shared_ptr<Layer> newChild);
 
   /**
-   * Returns a rectangle that defines the area of the layer relative to the coordinates of the
-   * targetCoordinateSpace layer. If the targetCoordinateSpace is nullptr, this method returns a
-   * rectangle that defines the area of the layer relative to its own coordinates.
+   * Returns a conservative bounding box that defines the area of the layer relative to the
+   * coordinates of the targetCoordinateSpace layer. If the targetCoordinateSpace is nullptr,
+   * the bounding box is returned in the layer’s own coordinate space. It may be larger than
+   * actual bounds but is faster to compute.
    * @param targetCoordinateSpace The layer that defines the coordinate system to use.
-   * @param computeTightBounds Determines whether to calculate the exact tight bounding box (true)
-   * or a general bounding box that may be larger but is faster to compute (false).
-   * @return The rectangle that defines the area of the layer relative to the targetCoordinateSpace
-   * layer's coordinate system.
+   * @return The conservative bounding box that defines the area of the layer relative to the
+   * targetCoordinateSpace layer's coordinate system.
    */
-  Rect getBounds(const Layer* targetCoordinateSpace = nullptr, bool computeTightBounds = false);
+  Rect getBounds(const Layer* targetCoordinateSpace = nullptr);
+
+  /**
+   * Returns a tight bounding box that defines the area of the layer relative to the coordinates
+   * of the targetCoordinateSpace layer. If the targetCoordinateSpace is nullptr, the bounding box
+   * is returned in the layer’s own coordinate space.
+   * @param targetCoordinateSpace The layer that defines the coordinate system to use.
+   * @return The tight bounding box that defines the area of the layer relative to the
+   * targetCoordinateSpace layer's coordinate system.
+   */
+  Rect getTightBounds(const Layer* targetCoordinateSpace = nullptr);
 
   /**
    * Converts the point from the root's (global) coordinates to the layer's (local) coordinates.
