@@ -41,10 +41,13 @@ std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<TextBlob> textBlob, float
 
 Path TextShape::getPath() const {
   Path path = {};
-  if (!glyphRunList->getPath(&path, resolutionScale)) {
+  auto matrix = Matrix::MakeScale(resolutionScale, resolutionScale);
+  if (!glyphRunList->getPath(&path, &matrix)) {
     LOGE("TextShape::getPath() Failed to get path from GlyphRunList!");
     return {};
   }
+  matrix.setScale(1.0f / resolutionScale, 1.0f / resolutionScale);
+  path.transform(matrix);
   return path;
 }
 }  // namespace tgfx
