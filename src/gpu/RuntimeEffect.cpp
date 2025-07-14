@@ -23,10 +23,10 @@ namespace tgfx {
 RuntimeEffect::RuntimeEffect(UniqueType type,
                              const std::vector<std::shared_ptr<Image>>& extraInputs)
     : uniqueType(std::move(type)), extraInputs(extraInputs) {
-  uniqueType.addReference();
+  uniqueType.addStrong();
 }
 
 RuntimeEffect::~RuntimeEffect() {
-  uniqueType.releaseReference();
+  uniqueType.releaseStrong();
 }
 }  // namespace tgfx

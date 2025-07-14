@@ -37,6 +37,10 @@ long UniqueDomain::useCount() const {
   return _useCount.load(std::memory_order_relaxed);
 }
 
+long UniqueDomain::strongCount() const {
+  return _strongCount.load(std::memory_order_relaxed);
+}
+
 void UniqueDomain::addReference() {
   _useCount.fetch_add(1, std::memory_order_relaxed);
 }
@@ -45,5 +49,13 @@ void UniqueDomain::releaseReference() {
   if (_useCount.fetch_add(-1, std::memory_order_acq_rel) <= 1) {
     delete this;
   }
+}
+
+void UniqueDomain::addStrong() {
+  _strongCount.fetch_add(1, std::memory_order_relaxed);
+}
+
+void UniqueDomain::releaseStrong() {
+  _strongCount.fetch_add(-1, std::memory_order_acq_rel);
 }
 }  // namespace tgfx

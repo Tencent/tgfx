@@ -99,7 +99,7 @@ class Resource {
   std::chrono::steady_clock::time_point lastUsedTime = {};
 
   bool isPurgeable() const {
-    return reference.use_count() <= 1;
+    return reference.use_count() <= 1 && uniqueKey.strongCount() == 0;
   }
 
   bool hasExternalReferences() const {
