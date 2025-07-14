@@ -87,9 +87,9 @@ std::shared_ptr<TextureProxy> RasterizedImage::onLockTextureProxy(const TPArgs& 
   }
   auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
   auto format = isAlphaOnly() && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
-  auto renderTarget = proxyProvider->createRenderTargetProxy(
-      key, width(), height(), format, 1, args.mipmapped, ImageOrigin::TopLeft,
-      TextureSizePolicy::Exact, args.renderFlags);
+  auto renderTarget = proxyProvider->createRenderTargetProxy(key, width(), height(), format, 1,
+                                                             args.mipmapped, ImageOrigin::TopLeft,
+                                                             BackingFit::Exact, args.renderFlags);
   if (renderTarget == nullptr) {
     return nullptr;
   }

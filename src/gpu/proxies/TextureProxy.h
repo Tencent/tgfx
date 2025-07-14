@@ -26,11 +26,10 @@ namespace tgfx {
 class RenderTargetProxy;
 
 /**
- * Specifies how the texture size is determined when creating.
- * - Exact: The texture size is exactly the specified width and height.
- * - Approximate: The texture size is approximated based on the texture's width and height.
- */
-enum class TextureSizePolicy {
+ * Indicates whether a backing store needs to be an exact match or can be larger than is strictly
+ * necessary.
+*/
+enum class BackingFit {
   Exact = 0,
   Approximate = 1,
 };

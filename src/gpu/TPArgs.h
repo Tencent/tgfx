@@ -29,8 +29,8 @@ class TPArgs {
   TPArgs() = default;
 
   TPArgs(Context* context, uint32_t renderFlags, bool mipmapped,
-         TextureSizePolicy sizePolicy = TextureSizePolicy::Approximate)
-      : context(context), renderFlags(renderFlags), mipmapped(mipmapped), sizePolicy(sizePolicy) {
+         BackingFit backingFit = BackingFit::Approximate)
+      : context(context), renderFlags(renderFlags), mipmapped(mipmapped), backingFit(backingFit) {
   }
 
   /**
@@ -52,6 +52,6 @@ class TPArgs {
   /**
    * Specifies whether the texture size should be approximated based on the width and height.
    */
-  TextureSizePolicy sizePolicy = TextureSizePolicy::Approximate;
+  BackingFit backingFit = BackingFit::Approximate;
 };
 }  // namespace tgfx

@@ -152,7 +152,7 @@ std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {
   if (context == nullptr) {
     return nullptr;
   }
-  TPArgs args(context, 0, hasMipmaps(), TextureSizePolicy::Exact);
+  TPArgs args(context, 0, hasMipmaps(), BackingFit::Exact);
   auto textureProxy = lockTextureProxy(args);
   if (textureProxy == nullptr) {
     return nullptr;
@@ -248,7 +248,7 @@ std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, in
 std::shared_ptr<TextureProxy> Image::lockTextureProxy(const TPArgs& args) const {
   auto renderTarget =
       RenderTargetProxy::MakeFallback(args.context, width(), height(), isAlphaOnly(), 1,
-                                      args.mipmapped, ImageOrigin::TopLeft, args.sizePolicy);
+                                      args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
   if (renderTarget == nullptr) {
     return nullptr;
   }

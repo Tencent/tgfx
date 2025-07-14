@@ -64,7 +64,7 @@ static std::shared_ptr<TextureProxy> ScaleTexture(const TPArgs& args,
                                                   int targetWidth, int targetHeight) {
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, targetWidth, targetHeight, texture->isAlphaOnly(), 1, args.mipmapped,
-      ImageOrigin::TopLeft, TextureSizePolicy::Approximate);
+      ImageOrigin::TopLeft, BackingFit::Approximate);
   if (!renderTarget) {
     return nullptr;
   }
@@ -105,7 +105,7 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
   auto mipmapped = args.mipmapped && !blur2D && maxSigma <= MAX_BLUR_SIGMA;
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(scaledBounds.width()), static_cast<int>(scaledBounds.height()),
-      isAlphaOnly, 1, mipmapped, ImageOrigin::TopLeft, TextureSizePolicy::Approximate);
+      isAlphaOnly, 1, mipmapped, ImageOrigin::TopLeft, BackingFit::Approximate);
   if (!renderTarget) {
     return nullptr;
   }
@@ -135,7 +135,7 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
 
     renderTarget = RenderTargetProxy::MakeFallback(
         args.context, static_cast<int>(clipBounds.width()), static_cast<int>(clipBounds.height()),
-        isAlphaOnly, 1, args.mipmapped, ImageOrigin::TopLeft, TextureSizePolicy::Approximate);
+        isAlphaOnly, 1, args.mipmapped, ImageOrigin::TopLeft, BackingFit::Approximate);
 
     if (!renderTarget) {
       return nullptr;
