@@ -130,7 +130,6 @@ class MainActivity : ComponentActivity() {
                         }
                         contentOffset.x += MotionEventCompat.getX(event, pointerIndex) - currentTouchX
                         contentOffset.y += MotionEventCompat.getY(event, pointerIndex) - currentTouchY
-                        tgfxView.draw(drawIndex, zoomScale, contentOffset)
                         currentTouchX = MotionEventCompat.getX(event, pointerIndex)
                         currentTouchY = MotionEventCompat.getY(event, pointerIndex)
                     }

@@ -30,11 +30,9 @@ export class ShareData {
     public Hello2DModule: types.TGFX = null;
     public tgfxBaseView: TGFXBaseView = null;
     public drawIndex: number = 0;
-    public resized: boolean = false;
     public zoom: number = 1.0;
     public offsetX: number = 0;
     public offsetY: number = 0;
-    public resizeTimer: number | null = null;
 }
 
 enum ScaleGestureState {
@@ -83,7 +81,6 @@ class GestureManager {
                 shareData.offsetX -= event.deltaX * window.devicePixelRatio;
                 shareData.offsetY -= event.deltaY * window.devicePixelRatio;
             }
-            draw(shareData);
         }
     }
 
@@ -106,7 +103,6 @@ class GestureManager {
             shareData.offsetX = (shareData.offsetX - pixelX) * (newZoom / shareData.zoom) + pixelX;
             shareData.offsetY = (shareData.offsetY - pixelY) * (newZoom / shareData.zoom) + pixelY;
             shareData.zoom = newZoom;
-            draw(shareData);
         }
         if (state === ScaleGestureState.SCALE_END){
             this.scaleY = 1.0;
@@ -210,7 +206,6 @@ export function updateSize(shareData: ShareData) {
     if (!shareData.tgfxBaseView) {
         return;
     }
-    shareData.resized = false;
     const canvas = document.getElementById('hello2d') as HTMLCanvasElement;
     const container = document.getElementById('container') as HTMLDivElement;
     const screenRect = container.getBoundingClientRect();
@@ -226,23 +221,13 @@ export function onResizeEvent(shareData: ShareData) {
     if (!shareData.tgfxBaseView) {
         return;
     }
-    shareData.resized = true;
-    if (shareData.resizeTimer) {
-        clearTimeout(shareData.resizeTimer);
-    }
-
-    shareData.resizeTimer = window.setTimeout(() => {
-        if (shareData.resized) {
-            updateSize(shareData);
-        }
-        shareData.resizeTimer = null;
-    }, 300);
+    updateSize(shareData);
 }
 
 export function animationLoop(shareData: ShareData) {
     const frame = async (timestamp: number) => {
         if (shareData.tgfxBaseView ) {
-            await shareData.tgfxBaseView.draw(shareData.drawIndex);
+            await draw(shareData);
         }
         requestAnimationFrame(frame);
     };
@@ -258,7 +243,6 @@ export function onClickEvent(shareData: ShareData) {
     shareData.offsetY = 0;
     shareData.zoom = 1.0;
     gestureManager.clearState();
-    draw(shareData);
 }
 
 export function loadImage(src: string): Promise<HTMLImageElement> {

@@ -31,7 +31,6 @@
 @property(nonatomic) CGPoint pinchCenter;
 @property(nonatomic) BOOL isTapEnabled;
 @property(nonatomic, strong) CADisplayLink *displayLink;
-- (void)viewWillDisappear:(BOOL)animated;
 @end
 
 @implementation ViewController
@@ -64,10 +63,6 @@ static const float MaxZoom = 1000.0f;
   pinch.delegate = self;
   [self.tgfxView addGestureRecognizer:pinch];
 
-  dispatch_after(
-      dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-        [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
-      });
   self.displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(update:)];
   [self.displayLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
 }
@@ -104,9 +99,6 @@ static const float MaxZoom = 1000.0f;
                   self.contentOffset.y +
                       (translation.y - self.currentPanOffset.y) * self.tgfxView.contentScaleFactor);
   self.currentPanOffset = translation;
-  if (gesture.numberOfTouches == 1) {
-    [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
-  }
 }
 - (void)update:(CADisplayLink *)displayLink {
     [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
@@ -136,7 +128,6 @@ static const float MaxZoom = 1000.0f;
   offset.y = (self.currentPinchOffset.y - self.pinchCenter.y) * scale / self.currentZoom + center.y;
   self.zoomScale = scale;
   self.contentOffset = offset;
-  [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
 }
 
 - (BOOL)gestureRecognizer:(UIGestureRecognizer*)gestureRecognizer
