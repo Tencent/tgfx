@@ -94,6 +94,7 @@ class Picture {
  private:
   std::unique_ptr<BlockData> blockData;
   std::vector<PlacementPtr<Record>> records;
+  mutable std::atomic<Rect*> bounds = {nullptr};
   size_t drawCount = 0;
   bool _hasUnboundedFill = false;
 

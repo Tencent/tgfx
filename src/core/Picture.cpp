@@ -44,13 +44,24 @@ Picture::Picture(std::unique_ptr<BlockData> data, std::vector<PlacementPtr<Recor
 Picture::~Picture() {
   // Make sure the records are cleared before the block data is destroyed.
   records.clear();
+  auto oldBounds = bounds.exchange(nullptr, std::memory_order_acq_rel);
+  delete oldBounds;
 }
 
 Rect Picture::getBounds() const {
+  if (auto cachedBounds = bounds.load(std::memory_order_acquire)) {
+    return *cachedBounds;
+  }
   MeasureContext context(false);
   MCState state(Matrix::I());
   playback(&context, state);
-  return context.getBounds();
+  auto totalBounds = context.getBounds();
+  auto newBounds = new Rect(totalBounds);
+  Rect* oldBounds = nullptr;
+  if (!bounds.compare_exchange_strong(oldBounds, newBounds, std::memory_order_acq_rel)) {
+    delete newBounds;
+  }
+  return totalBounds;
 }
 
 Rect Picture::getTightBounds(const Matrix* matrix) const {
