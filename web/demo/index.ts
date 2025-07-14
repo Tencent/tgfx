@@ -19,7 +19,7 @@
 import * as types from '../types/types';
 import {TGFXBind} from '../lib/tgfx';
 import Hello2D from './wasm-mt/hello2d';
-import {ShareData, updateSize, onresizeEvent, onclickEvent, loadImage} from "./common";
+import {ShareData, updateSize, onresizeEvent, onclickEvent,animationLoop, loadImage} from "./common";
 
 let shareData: ShareData = new ShareData();
 
@@ -45,6 +45,7 @@ if (typeof window !== 'undefined') {
             const emojiFontUIntArray = new Uint8Array(emojiFontBuffer);
             tgfxView.registerFonts(fontUIntArray, emojiFontUIntArray);
             updateSize(shareData);
+            animationLoop(shareData);
         } catch (error) {
             console.error(error);
             throw new Error("Hello2D init failed. Please check the .wasm file path!.");
@@ -53,7 +54,6 @@ if (typeof window !== 'undefined') {
 
     window.onresize = () => {
         onresizeEvent(shareData);
-        window.setTimeout(() => updateSize(shareData), 300);
     };
 
     window.onclick = () => {

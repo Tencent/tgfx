@@ -19,7 +19,7 @@
 import * as types from '../types/types';
 import {TGFXBind} from '../lib/tgfx';
 import Hello2D from './wasm/hello2d';
-import {ShareData, updateSize, onresizeEvent, onclickEvent, loadImage} from "./common";
+import {ShareData, updateSize, onresizeEvent, onclickEvent,animationLoop, loadImage} from "./common";
 
 let shareData: ShareData = new ShareData();
 
@@ -34,6 +34,7 @@ if (typeof window !== 'undefined') {
             var imagePath = "http://localhost:8081/../../resources/assets/bridge.jpg";
             await tgfxView.setImagePath(imagePath);
             updateSize(shareData);
+            animationLoop(shareData);
         } catch (error) {
             console.error(error);
             throw new Error("Hello2D init failed. Please check the .wasm file path!.");
@@ -42,7 +43,6 @@ if (typeof window !== 'undefined') {
 
     window.onresize = () => {
         onresizeEvent(shareData);
-        window.setTimeout(() => updateSize(shareData), 300);
     };
 
     window.onclick = () => {

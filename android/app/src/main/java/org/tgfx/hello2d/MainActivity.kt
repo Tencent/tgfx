@@ -18,6 +18,7 @@
 
 package org.tgfx.hello2d
 
+import android.animation.ValueAnimator
 import android.graphics.PointF
 import android.os.Bundle
 import android.view.GestureDetector
@@ -40,6 +41,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var scaleGestureDetector: ScaleGestureDetector
     private lateinit var gestureDetector: GestureDetector
 
+    private var animator: ValueAnimator? = null
+
     companion object {
         private const val MaxZoom = 1000.0f
         private const val MinZoom = 0.001f
@@ -50,9 +53,19 @@ class MainActivity : ComponentActivity() {
         setContentView(R.layout.activity_main)
         tgfxView = findViewById<TGFXView>(R.id.tgfx_view)
         setupGesture()
-        tgfxView.post {
-            tgfxView.draw(drawIndex, zoomScale, contentOffset)
+
+        animator = ValueAnimator.ofFloat(0f, 1f).apply {
+            repeatCount = ValueAnimator.INFINITE
+            addUpdateListener { animation ->
+                tgfxView.draw(drawIndex, zoomScale, contentOffset)
+            }
+            start()
         }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        animator?.cancel()
     }
 
     private fun setupGesture() {
@@ -77,7 +90,6 @@ class MainActivity : ComponentActivity() {
                         detector.focusY - contentY * zoomScale
                     )
                     currentOffset.set(contentOffset.x, contentOffset.y)
-                    tgfxView.draw(drawIndex, zoomScale, contentOffset)
                     return true
                 }
             })
@@ -95,7 +107,6 @@ class MainActivity : ComponentActivity() {
                         drawIndex++
                         zoomScale = 1.0f
                         contentOffset.set(0f, 0f)
-                        tgfxView.draw(drawIndex, zoomScale, contentOffset)
                         return true
                     }
                     return false
@@ -117,7 +128,6 @@ class MainActivity : ComponentActivity() {
                         currentOffset.x + e2.x - currentPan.x,
                         currentOffset.y + e2.y - currentPan.y
                     )
-                    tgfxView.draw(drawIndex, zoomScale, contentOffset)
                     return true
                 }
             })

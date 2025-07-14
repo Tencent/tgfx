@@ -16,7 +16,8 @@ struct Index {
       }
       const buffer = value.buffer.slice(0);
       hello2d.addImageFromEncoded("bridge", buffer);
-    })
+    });
+    hello2d.startDrawLoop();
   }
 
   build() {
@@ -30,7 +31,7 @@ struct Index {
       }
       .width('100%')
       .onClick(() => {
-        hello2d.draw(this.drawIndex++);
+        hello2d.updateDrawIndex(this.drawIndex++);
       })
     }
     .height('100%')

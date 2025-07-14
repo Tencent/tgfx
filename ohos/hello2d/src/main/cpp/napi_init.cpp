@@ -3,10 +3,12 @@
 #include "tgfx/gpu/opengl/egl/EGLWindow.h"
 #include "drawers/AppHost.h"
 #include "drawers/Drawer.h"
+#include "DisplayLink.h"
 
 static float screenDensity = 1.0f;
 static std::shared_ptr<drawers::AppHost> appHost = nullptr;
 static std::shared_ptr<tgfx::Window> window = nullptr;
+static int currentDrawIndex = 0;
 
 static std::shared_ptr<drawers::AppHost> CreateAppHost();
 
@@ -72,13 +74,21 @@ static void Draw(int index) {
   device->unlock();
 }
 
-static napi_value OnDraw(napi_env env, napi_callback_info info) {
-  size_t argc = 1;
-  napi_value args[1] = {nullptr};
-  napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
-  double value;
-  napi_get_value_double(env, args[0], &value);
-  Draw(static_cast<int>(value));
+static napi_value UpdateDrawIndex(napi_env env, napi_callback_info info) {
+    size_t argc = 1;
+    napi_value args[1] = {nullptr};
+    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+    double value;
+    napi_get_value_double(env, args[0], &value);
+    currentDrawIndex = static_cast<int>(value);
+    return nullptr;
+}
+
+static napi_value StartDrawLoop(napi_env , napi_callback_info ) {
+  auto displayLink = new DisplayLink([]() {
+    Draw(currentDrawIndex);
+  });
+  displayLink->start();
   return nullptr;
 }
 
@@ -161,7 +171,8 @@ static void RegisterCallback(napi_env env, napi_value exports) {
 EXTERN_C_START
 static napi_value Init(napi_env env, napi_value exports) {
   napi_property_descriptor desc[] = {
-      {"draw", nullptr, OnDraw, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"startDrawLoop", nullptr, StartDrawLoop, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"updateDrawIndex", nullptr, UpdateDrawIndex, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"updateDensity", nullptr, OnUpdateDensity, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"addImageFromEncoded", nullptr, AddImageFromEncoded, nullptr, nullptr, nullptr, napi_default,
        nullptr}};

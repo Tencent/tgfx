@@ -27,6 +27,8 @@
 @property(nonatomic) CGFloat currentZoom;
 @property(nonatomic) CGPoint currentOffset;
 @property(nonatomic) CGPoint pinchCenter;
+@property(nonatomic, strong) CADisplayLink *displayLink;
+- (void)viewWillDisappear:(BOOL)animated;
 @end
 
 @implementation ViewController
@@ -59,18 +61,18 @@ static const float MaxZoom = 1000.0f;
       dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.3 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
       });
+  self.displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(update:)];
+  [self.displayLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
 }
 
 - (void)viewDidLayoutSubviews {
   [super viewDidLayoutSubviews];
-  [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
 }
 
 - (void)tgfxViewClicked {
   self.drawCount++;
   self.zoomScale = 1.0f;
   self.contentOffset = CGPointZero;
-  [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
 }
 
 - (void)handlePan:(UIPanGestureRecognizer*)gesture {
@@ -81,9 +83,16 @@ static const float MaxZoom = 1000.0f;
   self.contentOffset =
       CGPointMake(self.currentOffset.x + (translation.x * self.tgfxView.contentScaleFactor),
                   self.currentOffset.y + (translation.y * self.tgfxView.contentScaleFactor));
-  [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
 }
 
+- (void)update:(CADisplayLink *)displayLink {
+    [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
+}
+- (void)viewWillDisappear:(BOOL)animated {
+    [super viewWillDisappear:animated];
+    [self.displayLink invalidate];
+    self.displayLink = nil;
+}
 - (void)handlePinch:(UIPinchGestureRecognizer*)gesture {
   if (gesture.numberOfTouches < 2) {
     return;
@@ -102,7 +111,6 @@ static const float MaxZoom = 1000.0f;
             self.pinchCenter.x,
         (self.currentOffset.y - self.pinchCenter.y) * self.zoomScale / self.currentZoom +
             self.pinchCenter.y);
-    [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
   }
 }
 

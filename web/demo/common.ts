@@ -20,7 +20,7 @@ import * as types from '../types/types';
 
 export class TGFXBaseView {
     public updateSize: (devicePixelRatio: number) => void;
-    public draw: (drawIndex: number) => void;
+    public draw: (drawIndex: number) => Promise<void>;
 }
 
 export class ShareData {
@@ -28,6 +28,7 @@ export class ShareData {
     public tgfxBaseView: TGFXBaseView = null;
     public drawIndex: number = 0;
     public resized: boolean = false;
+    public resizeTimer: number | null = null;
 }
 
 export function updateSize(shareData: ShareData) {
@@ -44,7 +45,6 @@ export function updateSize(shareData: ShareData) {
     canvas.style.width = screenRect.width + "px";
     canvas.style.height = screenRect.height + "px";
     shareData.tgfxBaseView.updateSize(scaleFactor);
-    shareData.tgfxBaseView.draw(shareData.drawIndex);
 }
 
 export function onresizeEvent(shareData: ShareData) {
@@ -52,6 +52,27 @@ export function onresizeEvent(shareData: ShareData) {
         return;
     }
     shareData.resized = true;
+
+    if (shareData.resizeTimer) {
+        clearTimeout(shareData.resizeTimer);
+    }
+
+    shareData.resizeTimer = window.setTimeout(() => {
+        if (shareData.resized) {
+            updateSize(shareData);
+        }
+        shareData.resizeTimer = null;
+    }, 300);
+}
+
+export function animationLoop(shareData: ShareData) {
+    const frame = async (timestamp: number) => {
+        if (shareData.tgfxBaseView ) {
+            await shareData.tgfxBaseView.draw(shareData.drawIndex);
+        }
+        requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
 }
 
 export function onclickEvent(shareData: ShareData) {
@@ -59,7 +80,6 @@ export function onclickEvent(shareData: ShareData) {
         return;
     }
     shareData.drawIndex++;
-    shareData.tgfxBaseView.draw(shareData.drawIndex);
 }
 
 export function loadImage(src: string) {
