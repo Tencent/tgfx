@@ -44,6 +44,11 @@ class OHOSImageInfo {
   static AlphaType ToTGFXAlphaType(int ohAlphaType);
 
   /**
+   * Convert the alphaType attribute returned from TGFX to the alphaType attribute of Openharmony.
+   */
+  static int ToOHAlphaType(AlphaType alphaType);
+
+  /**
    * Convert the pixelFormat attribute returned from TGFX to the colorType attribute of Openharmony. If the corresponding
    * attribute is not defined in HarmonyOS, it will return PIXEL_FORMAT_UNKNOWN.
    * */

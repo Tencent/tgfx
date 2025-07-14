@@ -19,7 +19,7 @@
 #include "BitmapContextUtil.h"
 
 namespace tgfx {
-static uint32_t GetBitmapInfo(AlphaType alphaType, ColorType colorType) {
+uint32_t GetBitmapInfo(AlphaType alphaType, ColorType colorType) {
   CGBitmapInfo bitmapInfo = 0;
   auto premultiplied = alphaType == AlphaType::Premultiplied;
   CGImageAlphaInfo alphaInfo = kCGImageAlphaNone;
