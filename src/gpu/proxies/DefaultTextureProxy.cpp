@@ -21,20 +21,20 @@
 
 namespace tgfx {
 int GetApproximateLength(int length) {
-  // Map 'value' to a larger multiple of 2. Values <= 'kMagicTol' will pop up to
-  // the next power of 2. Those above 'kMagicTol' will only go up half the floor power of 2.
+  // Map 'value' to a larger multiple of 2. Values <= 'MagicTol' will pop up to
+  // the next power of 2. Those above 'MagicTol' will only go up half the floor power of 2.
 
-  constexpr int kMinApproxSize = 16;
-  constexpr int kMagicTol = 1024;
+  constexpr int MinApproxSize = 16;
+  constexpr int MagicTol = 1024;
 
-  length = std::max(kMinApproxSize, length);
+  length = std::max(MinApproxSize, length);
 
   if (IsPow2(length)) {
     return length;
   }
 
   int ceilPow2 = NextPow2(length);
-  if (length <= kMagicTol) {
+  if (length <= MagicTol) {
     return ceilPow2;
   }
 
@@ -50,7 +50,7 @@ int GetApproximateLength(int length) {
 DefaultTextureProxy::DefaultTextureProxy(int width, int height, PixelFormat pixelFormat,
                                          bool mipmapped, ImageOrigin origin, BackingFit backingFit)
     : _width(width), _height(height), _format(pixelFormat), _mipmapped(mipmapped), _origin(origin) {
-  if (backingFit == BackingFit::Approximate) {
+  if (backingFit == BackingFit::Approx) {
     _backingStoreWidth = GetApproximateLength(width);
     _backingStoreHeight = GetApproximateLength(height);
   } else {

@@ -82,8 +82,7 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(rect.width()), static_cast<int>(rect.height()),
-      isAlphaOnly() && alphaRenderable, 1, mipmapped, ImageOrigin::TopLeft,
-      BackingFit::Approximate);
+      isAlphaOnly() && alphaRenderable, 1, mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
 
   if (renderTarget == nullptr) {
     return nullptr;
@@ -108,7 +107,7 @@ std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args)
   auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, width(), height(), isAlphaOnly() && alphaRenderable, 1,
-      hasMipmaps() && args.mipmapped, ImageOrigin::TopLeft, BackingFit::Approximate);
+      hasMipmaps() && args.mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
   if (renderTarget == nullptr) {
     return nullptr;
   }

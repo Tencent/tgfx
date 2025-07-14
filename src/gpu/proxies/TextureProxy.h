@@ -31,7 +31,7 @@ class RenderTargetProxy;
 */
 enum class BackingFit {
   Exact = 0,
-  Approximate = 1,
+  Approx = 1,
 };
 
 /**

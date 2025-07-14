@@ -107,7 +107,7 @@ bool TextureEffect::needSubset() const {
   auto texture = getTexture();
   if (textureProxy->width() != texture->width() || textureProxy->height() != texture->height()) {
     // If the texture size is different from the proxy size, we need to use subset.
-    return texture->getSampler()->type() != SamplerType::Rectangle;
+    return true;
   }
   return false;
 }

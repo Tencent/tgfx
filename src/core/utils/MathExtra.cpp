@@ -75,7 +75,7 @@ static inline int CLZ(uint32_t mask) {
     return 32;
   }
 }
-#elif defined(SK_CPU_ARM32) || defined(__GNUC__) || defined(__clang__)
+#elif defined(__GNUC__) || defined(__clang__)
 static inline int CLZ(uint32_t mask) {
   // __builtin_clz(0) is undefined, so we have to detect that case.
   return mask ? __builtin_clz(mask) : 32;
