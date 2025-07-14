@@ -83,7 +83,8 @@ bool ImageResamper::Scale(const ImageInfo& srcInfo, const void* srcData, const I
     srcPixels = srcTempBuffer.data();
   }
   if (srcInfo.colorType() != dstInfo.colorType() ||
-      srcInfo.colorType() == ColorType::RGBA_1010102) {
+      srcInfo.colorType() == ColorType::RGBA_1010102 ||
+      srcInfo.colorType() == ColorType::RGBA_F16) {
     dstImageInfo = srcImageInfo.makeWH(dstInfo.width(), dstInfo.height());
     dstTempBuffer.alloc(dstImageInfo.byteSize());
     pixels = dstTempBuffer.data();
