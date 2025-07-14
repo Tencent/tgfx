@@ -19,8 +19,8 @@
 #pragma once
 
 #include <cmath>
+#include <cstdint>
 #include <cstring>
-#include "core/utils/Log.h"
 
 namespace tgfx {
 static constexpr float M_PI_F = static_cast<float>(M_PI);
