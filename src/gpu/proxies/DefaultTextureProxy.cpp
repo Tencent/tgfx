@@ -48,9 +48,10 @@ int GetApproximateLength(int length) {
 }
 
 DefaultTextureProxy::DefaultTextureProxy(int width, int height, PixelFormat pixelFormat,
-                                         bool mipmapped, ImageOrigin origin, bool approximateSize)
+                                         bool mipmapped, ImageOrigin origin,
+                                         TextureSizePolicy sizePolicy)
     : _width(width), _height(height), _format(pixelFormat), _mipmapped(mipmapped), _origin(origin) {
-  if (approximateSize) {
+  if (sizePolicy == TextureSizePolicy::Approximate) {
     _backingStoreWidth = GetApproximateLength(width);
     _backingStoreHeight = GetApproximateLength(height);
   } else {

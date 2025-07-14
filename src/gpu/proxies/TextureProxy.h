@@ -26,6 +26,16 @@ namespace tgfx {
 class RenderTargetProxy;
 
 /**
+ * Specifies how the texture size is determined when creating.
+ * - Exact: The texture size is exactly the specified width and height.
+ * - Approximate: The texture size is approximated based on the texture's width and height.
+ */
+enum class TextureSizePolicy {
+  Exact = 0,
+  Approximate = 1,
+};
+
+/**
  * This class defers the acquisition of textures until they are actually required.
  */
 class TextureProxy : public ResourceProxy {

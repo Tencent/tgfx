@@ -98,71 +98,6 @@ constexpr inline bool IsPow2(T value) {
   return (value & (value - 1)) == 0;
 }
 
-//! Returns the number of leading zero bits (0...32)
-// From Hacker's Delight 2nd Edition
-constexpr int CLZ_portable(uint32_t x) {
-  int n = 32;
-  uint32_t y = x >> 16;
-  if (y != 0) {
-    n -= 16;
-    x = y;
-  }
-  y = x >> 8;
-  if (y != 0) {
-    n -= 8;
-    x = y;
-  }
-  y = x >> 4;
-  if (y != 0) {
-    n -= 4;
-    x = y;
-  }
-  y = x >> 2;
-  if (y != 0) {
-    n -= 2;
-    x = y;
-  }
-  y = x >> 1;
-  if (y != 0) {
-    return n - 2;
-  }
-  return n - static_cast<int>(x);
-}
-
-//! Returns the number of trailing zero bits (0...32)
-// From Hacker's Delight 2nd Edition
-constexpr int CTZ_portable(uint32_t x) {
-  return 32 - CLZ_portable(~x & (x - 1));
-}
-
-#if defined(_MSC_VER)
-#include <intrin.h>
-
-static inline int CLZ(uint32_t mask) {
-  if (mask) {
-    unsigned long index = 0;
-    _BitScanReverse(&index, mask);
-    // Suppress this bogus /analyze warning. The check for non-zero
-    // guarantees that _BitScanReverse will succeed.
-#pragma warning(push)
-#pragma warning(suppress : 6102)  // Using 'index' from failed function call
-    return static_cast<int>(index ^ 0x1F);
-#pragma warning(pop)
-  } else {
-    return 32;
-  }
-}
-#elif defined(SK_CPU_ARM32) || defined(__GNUC__) || defined(__clang__)
-static inline int CLZ(uint32_t mask) {
-  // __builtin_clz(0) is undefined, so we have to detect that case.
-  return mask ? __builtin_clz(mask) : 32;
-}
-#else
-static inline int CLZ(uint32_t mask) {
-  return CLZ_portable(mask);
-}
-#endif
-
 /**
  *  Returns the log2 of the specified value, were that value to be rounded up
  *  to the next power of 2. It is undefined to pass 0. Examples:
@@ -172,18 +107,13 @@ static inline int CLZ(uint32_t mask) {
  *  NextLog2(4) -> 2
  *  NextLog2(5) -> 3
  */
-static inline int NextLog2(uint32_t value) {
-  DEBUG_ASSERT(value != 0);
-  return 32 - CLZ(value - 1);
-}
+int NextLog2(uint32_t value);
 
 /**
  *  Returns the smallest power-of-2 that is >= the specified value. If value
  *  is already a power of 2, then it is returned unchanged. It is undefined
  *  if value is <= 0.
  */
-static inline int NextPow2(int value) {
-  DEBUG_ASSERT(value > 0);
-  return 1 << NextLog2(static_cast<uint32_t>(value));
-}
+int NextPow2(int value);
+
 }  // namespace tgfx

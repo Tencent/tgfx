@@ -61,7 +61,8 @@ class DefaultTextureProxy : public TextureProxy {
   int _backingStoreHeight = 0;
 
   DefaultTextureProxy(int width, int height, PixelFormat pixelFormat, bool mipmapped = false,
-                      ImageOrigin origin = ImageOrigin::TopLeft, bool approximateSize = false);
+                      ImageOrigin origin = ImageOrigin::TopLeft,
+                      TextureSizePolicy sizePolicy = TextureSizePolicy::Exact);
 
   std::shared_ptr<Texture> onMakeTexture(Context* context) const override {
     return Texture::MakeFormat(context, _backingStoreWidth, _backingStoreHeight, _format,

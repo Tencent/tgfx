@@ -21,9 +21,9 @@
 namespace tgfx {
 TextureRenderTargetProxy::TextureRenderTargetProxy(int width, int height, PixelFormat format,
                                                    int sampleCount, bool mipmapped,
-                                                   ImageOrigin origin, bool approxmateSize,
+                                                   ImageOrigin origin, TextureSizePolicy sizePolicy,
                                                    bool externallyOwned)
-    : DefaultTextureProxy(width, height, format, mipmapped, origin, approxmateSize),
+    : DefaultTextureProxy(width, height, format, mipmapped, origin, sizePolicy),
       _sampleCount(sampleCount), _externallyOwned(externallyOwned) {
 }
 

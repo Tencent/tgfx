@@ -97,15 +97,15 @@ void GLGpu::bindTexture(int unitIndex, const TextureSampler* sampler, SamplerSta
 
 void GLGpu::copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture* texture, int srcX,
                                       int srcY) {
-  DEBUG_ASSERT(srcX >= 0 && srcX + texture->width() <= renderTarget->width());
-  DEBUG_ASSERT(srcY >= 0 && srcY + texture->height() <= renderTarget->height());
+  auto width = std::min(texture->width(), renderTarget->width() - srcX);
+  auto height = std::min(texture->height(), renderTarget->height() - srcY);
   auto gl = GLFunctions::Get(context);
   auto glRenderTarget = static_cast<const GLRenderTarget*>(renderTarget);
   gl->bindFramebuffer(GL_FRAMEBUFFER, glRenderTarget->readFrameBufferID());
   auto glSampler = static_cast<const GLTextureSampler*>(texture->getSampler());
   auto target = glSampler->target();
   gl->bindTexture(target, glSampler->id());
-  gl->copyTexSubImage2D(target, 0, 0, 0, srcX, srcY, texture->width(), texture->height());
+  gl->copyTexSubImage2D(target, 0, 0, 0, srcX, srcY, width, height);
 }
 
 void GLGpu::resolveRenderTarget(RenderTarget* renderTarget, const Rect& bounds) {

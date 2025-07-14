@@ -111,12 +111,10 @@ class ProxyProvider {
   /**
    * Creates an empty TextureProxy with specified width, height, format, mipmap state and origin.
    */
-  std::shared_ptr<TextureProxy> createTextureProxy(const UniqueKey& uniqueKey, int width,
-                                                   int height, PixelFormat format,
-                                                   bool mipmapped = false,
-                                                   ImageOrigin origin = ImageOrigin::TopLeft,
-                                                   bool approxmateSize = false,
-                                                   uint32_t renderFlags = 0);
+  std::shared_ptr<TextureProxy> createTextureProxy(
+      const UniqueKey& uniqueKey, int width, int height, PixelFormat format, bool mipmapped = false,
+      ImageOrigin origin = ImageOrigin::TopLeft,
+      TextureSizePolicy sizePolicy = TextureSizePolicy::Exact, uint32_t renderFlags = 0);
 
   /**
    * Creates a flattened TextureProxy for the given TextureProxy.
@@ -153,7 +151,7 @@ class ProxyProvider {
   std::shared_ptr<RenderTargetProxy> createRenderTargetProxy(
       const UniqueKey& uniqueKey, int width, int height, PixelFormat format, int sampleCount = 1,
       bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft,
-      bool approxmateSize = false, uint32_t renderFlags = 0);
+      TextureSizePolicy sizePolicy = TextureSizePolicy::Exact, uint32_t renderFlags = 0);
 
   /*
    * Purges all unreferenced proxies.

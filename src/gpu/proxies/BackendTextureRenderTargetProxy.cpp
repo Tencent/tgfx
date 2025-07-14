@@ -23,7 +23,7 @@ BackendTextureRenderTargetProxy::BackendTextureRenderTargetProxy(
     const BackendTexture& backendTexture, PixelFormat format, int sampleCount, ImageOrigin origin,
     bool adopted)
     : TextureRenderTargetProxy(backendTexture.width(), backendTexture.height(), format, sampleCount,
-                               false, origin, false, !adopted),
+                               false, origin, TextureSizePolicy::Exact, !adopted),
       backendTexture(backendTexture) {
 }
 

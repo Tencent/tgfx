@@ -28,9 +28,9 @@ class TPArgs {
  public:
   TPArgs() = default;
 
-  TPArgs(Context* context, uint32_t renderFlags, bool mipmapped, bool approxmateSize = true)
-      : context(context), renderFlags(renderFlags), mipmapped(mipmapped),
-        approxmateSize(approxmateSize) {
+  TPArgs(Context* context, uint32_t renderFlags, bool mipmapped,
+         TextureSizePolicy sizePolicy = TextureSizePolicy::Approximate)
+      : context(context), renderFlags(renderFlags), mipmapped(mipmapped), sizePolicy(sizePolicy) {
   }
 
   /**
@@ -50,8 +50,8 @@ class TPArgs {
   bool mipmapped = false;
 
   /**
-   * Specifies whether the texture proxy should approximate the size of the texture.
+   * Specifies whether the texture size should be approximated based on the width and height.
    */
-  bool approxmateSize = true;
+  TextureSizePolicy sizePolicy = TextureSizePolicy::Approximate;
 };
 }  // namespace tgfx

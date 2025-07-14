@@ -41,11 +41,10 @@ class RenderTargetProxy {
    * format and fall back to RGBA_8888 if not supported. Otherwise, it will use the RGBA_8888
    * format.
    */
-  static std::shared_ptr<RenderTargetProxy> MakeFallback(Context* context, int width, int height,
-                                                         bool isAlphaOnly, int sampleCount = 1,
-                                                         bool mipmapped = false,
-                                                         ImageOrigin origin = ImageOrigin::TopLeft,
-                                                         bool approxmateSize = false);
+  static std::shared_ptr<RenderTargetProxy> MakeFallback(
+      Context* context, int width, int height, bool isAlphaOnly, int sampleCount = 1,
+      bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft,
+      TextureSizePolicy sizePolicy = TextureSizePolicy::Exact);
 
   virtual ~RenderTargetProxy() = default;
 
