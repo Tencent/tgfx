@@ -40,8 +40,7 @@ static OH_PixelmapNative_AntiAliasingLevel ToOHAntiAliasingLevel(FilterQuality q
 
 bool ImageResamper::Scale(const ImageInfo& srcInfo, const void* srcData, const ImageInfo& dstInfo,
                           void* dstData, FilterQuality quality) {
-
-  if (!srcData) {
+  if (srcInfo.isEmpty() || srcData == nullptr || dstInfo.isEmpty() || dstData == nullptr) {
     return false;
   }
   OH_Pixelmap_InitializationOptions* options = nullptr;

@@ -66,6 +66,9 @@ static void ToStbDataTypeAndChannel(ColorType colorType, stbir_datatype* dataTyp
 
 bool ImageResamper::Scale(const ImageInfo& srcInfo, const void* srcData, const ImageInfo& dstInfo,
                           void* dstData, FilterQuality quality) {
+  if (srcInfo.isEmpty() || srcData == nullptr || dstInfo.isEmpty() || dstData == nullptr) {
+    return false;
+  }
   auto dataType = STBIR_TYPE_UINT8;
   auto channel = STBIR_RGBA;
   ToStbDataTypeAndChannel(srcInfo.colorType(), &dataType, &channel);
