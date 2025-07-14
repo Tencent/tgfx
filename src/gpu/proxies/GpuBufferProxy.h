@@ -48,12 +48,14 @@ class GpuBufferProxy : public ResourceProxy {
   /**
    * Returns the associated GpuBuffer instance.
    */
-  std::shared_ptr<GpuBuffer> getBuffer() const;
+  std::shared_ptr<GpuBuffer> getBuffer() const {
+    return std::static_pointer_cast<GpuBuffer>(resource);
+  }
 
  private:
   BufferType _bufferType = BufferType::Vertex;
 
-  GpuBufferProxy(UniqueKey uniqueKey, BufferType bufferType);
+  explicit GpuBufferProxy(BufferType bufferType);
 
   friend class ProxyProvider;
 };

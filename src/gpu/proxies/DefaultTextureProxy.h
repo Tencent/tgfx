@@ -31,33 +31,34 @@ class DefaultTextureProxy : public TextureProxy {
     return _height;
   }
 
-  ImageOrigin origin() const override {
-    return bitFields.origin;
+  bool isAlphaOnly() const override {
+    return _format == PixelFormat::ALPHA_8;
   }
 
   bool hasMipmaps() const override {
-    return bitFields.mipmapped;
+    return _mipmapped;
   }
 
-  bool isAlphaOnly() const override {
-    return bitFields.isAlphaOnly;
+  ImageOrigin origin() const override {
+    return _origin;
   }
-
-  std::shared_ptr<Texture> getTexture() const override;
 
  protected:
-  DefaultTextureProxy(UniqueKey uniqueKey, int width, int height, bool mipmapped, bool isAlphaOnly,
-                      ImageOrigin origin = ImageOrigin::TopLeft);
-
- private:
   int _width = 0;
   int _height = 0;
+  PixelFormat _format = PixelFormat::RGBA_8888;
+  bool _mipmapped = false;
+  ImageOrigin _origin = ImageOrigin::TopLeft;
 
-  struct {
-    ImageOrigin origin : 2;
-    bool mipmapped : 1;
-    bool isAlphaOnly : 1;
-  } bitFields = {};
+  DefaultTextureProxy(int width, int height, PixelFormat pixelFormat, bool mipmapped = false,
+                      ImageOrigin origin = ImageOrigin::TopLeft)
+      : _width(width), _height(height), _format(pixelFormat), _mipmapped(mipmapped),
+        _origin(origin) {
+  }
+
+  std::shared_ptr<Texture> onMakeTexture(Context* context) const override {
+    return Texture::MakeFormat(context, _width, _height, _format, _mipmapped, _origin);
+  }
 
   friend class ProxyProvider;
 };

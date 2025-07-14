@@ -56,6 +56,10 @@ class BackendRenderTargetWrapper : public RenderTargetProxy {
     return true;
   }
 
+  std::shared_ptr<Texture> getTexture() const override {
+    return nullptr;
+  }
+
   std::shared_ptr<RenderTarget> getRenderTarget() const override {
     return renderTarget;
   }
@@ -84,14 +88,6 @@ std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFallback(Context* cont
   auto format = isAlphaOnly && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
   return context->proxyProvider()->createRenderTargetProxy({}, width, height, format, sampleCount,
                                                            mipmapped, origin);
-}
-
-std::shared_ptr<Texture> RenderTargetProxy::getTexture() const {
-  auto textureProxy = asTextureProxy();
-  if (textureProxy == nullptr) {
-    return nullptr;
-  }
-  return textureProxy->getTexture();
 }
 
 std::shared_ptr<TextureProxy> RenderTargetProxy::makeTextureProxy(int width, int height) const {

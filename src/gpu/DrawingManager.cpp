@@ -25,6 +25,7 @@
 #include "gpu/tasks/RenderTargetCopyTask.h"
 #include "gpu/tasks/RuntimeDrawTask.h"
 #include "gpu/tasks/TextureResolveTask.h"
+#include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
 static ColorType GetAtlasColorType(bool isAplhaOnly) {
@@ -120,16 +121,14 @@ void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> 
   renderTasks.emplace_back(std::move(task));
 }
 
-void DrawingManager::addResourceTask(PlacementPtr<ResourceTask> resourceTask) {
+void DrawingManager::addResourceTask(PlacementPtr<ResourceTask> resourceTask,
+                                     const UniqueKey& uniqueKey, uint32_t renderFlags) {
   if (resourceTask == nullptr) {
     return;
   }
-  auto result = resourceTaskMap.find(resourceTask->uniqueKey);
-  if (result != resourceTaskMap.end()) {
-    // Remove the unique key from the old task, so it will be skipped when the task is executed.
-    result->second->uniqueKey = {};
+  if (!uniqueKey.empty() && !(renderFlags & RenderFlags::DisableCache)) {
+    resourceTask->uniqueKey = uniqueKey;
   }
-  resourceTaskMap[resourceTask->uniqueKey] = resourceTask.get();
   resourceTasks.emplace_back(std::move(resourceTask));
 }
 
@@ -153,7 +152,6 @@ bool DrawingManager::flush() {
   }
   uploadAtlasToGPU();
   resourceTasks.clear();
-  resourceTaskMap = {};
   proxyProvider->clearSharedVertexBuffer();
 
   if (renderPass == nullptr) {
@@ -180,7 +178,6 @@ bool DrawingManager::flush() {
 void DrawingManager::releaseAll() {
   compositors.clear();
   resourceTasks.clear();
-  resourceTaskMap = {};
   flattenTasks.clear();
   renderTasks.clear();
   atlasCellCodecTasks.clear();

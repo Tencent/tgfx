@@ -48,26 +48,27 @@ Picture::~Picture() {
   delete oldBounds;
 }
 
-Rect Picture::getBounds(const Matrix* matrix, bool computeTightBounds) const {
-  auto useCachedBounds = !matrix && !computeTightBounds;
-  if (useCachedBounds) {
-    auto cachedBounds = bounds.load(std::memory_order_acquire);
-    if (cachedBounds) {
-      return *cachedBounds;
-    }
+Rect Picture::getBounds() const {
+  if (auto cachedBounds = bounds.load(std::memory_order_acquire)) {
+    return *cachedBounds;
   }
-  MeasureContext context(computeTightBounds);
-  MCState state(matrix ? *matrix : Matrix::I());
+  MeasureContext context(false);
+  MCState state(Matrix::I());
   playback(&context, state);
   auto totalBounds = context.getBounds();
-  if (useCachedBounds) {
-    auto newBounds = new Rect(totalBounds);
-    Rect* oldBounds = nullptr;
-    if (!bounds.compare_exchange_strong(oldBounds, newBounds, std::memory_order_acq_rel)) {
-      delete newBounds;
-    }
+  auto newBounds = new Rect(totalBounds);
+  Rect* oldBounds = nullptr;
+  if (!bounds.compare_exchange_strong(oldBounds, newBounds, std::memory_order_acq_rel)) {
+    delete newBounds;
   }
   return totalBounds;
+}
+
+Rect Picture::getTightBounds(const Matrix* matrix) const {
+  MeasureContext context(true);
+  MCState state(matrix ? *matrix : Matrix::I());
+  playback(&context, state);
+  return context.getBounds();
 }
 
 bool Picture::hitTestPoint(float localX, float localY, bool shapeHitTest) const {

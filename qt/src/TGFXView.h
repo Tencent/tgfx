@@ -29,21 +29,23 @@ class TGFXView : public QQuickItem {
  public:
   explicit TGFXView(QQuickItem* parent = nullptr);
 
- protected:
-  void mousePressEvent(QMouseEvent* event) override;
-  void mouseReleaseEvent(QMouseEvent*) override;
+  Q_INVOKABLE void updateTransform(qreal zoomLevel, QPointF panOffset);
+  Q_INVOKABLE void onClicked();
 
+ protected:
   QSGNode* updatePaintNode(QSGNode*, UpdatePaintNodeData*) override;
 
  private:
-  int lastDrawIndex = 0;
+  int currentDrawerIndex = 0;
   std::shared_ptr<tgfx::QGLWindow> tgfxWindow = nullptr;
   std::shared_ptr<drawers::AppHost> appHost = nullptr;
+  float zoom = 1.0f;
+  QPointF offset = {0, 0};
 
   void createAppHost();
   void draw();
 
-  Q_SLOT
+ private Q_SLOTS:
   void onSceneGraphInvalidated();
 };
 }  // namespace hello2d

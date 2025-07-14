@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureImage.h"
+#include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
 std::shared_ptr<Image> TextureImage::Wrap(std::shared_ptr<TextureProxy> textureProxy) {
@@ -31,8 +32,7 @@ std::shared_ptr<Image> TextureImage::Wrap(std::shared_ptr<TextureProxy> textureP
 }
 
 TextureImage::TextureImage(std::shared_ptr<TextureProxy> textureProxy, uint32_t contextID)
-    : ResourceImage(textureProxy->getUniqueKey()), textureProxy(std::move(textureProxy)),
-      contextID(contextID) {
+    : textureProxy(std::move(textureProxy)), contextID(contextID) {
 }
 
 BackendTexture TextureImage::getBackendTexture(Context* context, ImageOrigin* origin) const {
@@ -57,11 +57,27 @@ std::shared_ptr<Image> TextureImage::makeTextureImage(Context* context) const {
   return std::static_pointer_cast<Image>(weakThis.lock());
 }
 
-std::shared_ptr<TextureProxy> TextureImage::onLockTextureProxy(const TPArgs& args,
-                                                               const UniqueKey&) const {
+std::shared_ptr<Image> TextureImage::makeRasterized(float rasterizationScale,
+                                                    const SamplingOptions& sampling) const {
+  if (rasterizationScale == 1.0f) {
+    return weakThis.lock();
+  }
+  return Image::makeRasterized(rasterizationScale, sampling);
+}
+
+std::shared_ptr<TextureProxy> TextureImage::lockTextureProxy(const TPArgs& args) const {
   if (args.context == nullptr || args.context->uniqueID() != contextID) {
     return nullptr;
   }
   return textureProxy;
+}
+
+PlacementPtr<FragmentProcessor> TextureImage::asFragmentProcessor(const FPArgs& args,
+                                                                  const SamplingArgs& samplingArgs,
+                                                                  const Matrix* uvMatrix) const {
+  if (args.context == nullptr || args.context->uniqueID() != contextID) {
+    return nullptr;
+  }
+  return TiledTextureEffect::Make(textureProxy, samplingArgs, uvMatrix, isAlphaOnly());
 }
 }  // namespace tgfx

@@ -99,11 +99,17 @@ void MeasureContext::drawLayer(std::shared_ptr<Picture> picture,
                                const Fill& fill) {
   DEBUG_ASSERT(picture != nullptr);
   if (imageFilter) {
-    auto localBounds = picture->getBounds(nullptr, computeTightBounds);
+    auto localBounds = computeTightBounds ? picture->getTightBounds(nullptr) : picture->getBounds();
     localBounds = imageFilter->filterBounds(localBounds);
     addLocalBounds(state, fill, localBounds);
   } else {
-    auto deviceBounds = picture->getBounds(&state.matrix, computeTightBounds);
+    Rect deviceBounds = {};
+    if (computeTightBounds) {
+      deviceBounds = picture->getTightBounds(&state.matrix);
+    } else {
+      deviceBounds = picture->getBounds();
+      state.matrix.mapRect(&deviceBounds);
+    }
     addDeviceBounds(state.clip, fill, deviceBounds, picture->hasUnboundedFill());
   }
 }

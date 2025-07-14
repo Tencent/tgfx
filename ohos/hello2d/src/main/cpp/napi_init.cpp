@@ -8,7 +8,10 @@
 static float screenDensity = 1.0f;
 static std::shared_ptr<drawers::AppHost> appHost = nullptr;
 static std::shared_ptr<tgfx::Window> window = nullptr;
-static int currentDrawIndex = 0;
+static double drawIndex = 0;
+static double zoomScale = 1;
+static double contentOffsetX = 0;
+static double contentOffsetY = 0;
 
 static std::shared_ptr<drawers::AppHost> CreateAppHost();
 
@@ -44,7 +47,7 @@ static napi_value AddImageFromEncoded(napi_env env, napi_callback_info info) {
   return nullptr;
 }
 
-static void Draw(int index) {
+static void Draw(int index, float zoom = 1.0f, float offsetX = 0.0f, float offsetY = 0.0f) {
   if (window == nullptr || appHost == nullptr || appHost->width() <= 0 || appHost->height() <= 0) {
     return;
   }
@@ -59,6 +62,7 @@ static void Draw(int index) {
     device->unlock();
     return;
   }
+  appHost->updateZoomAndOffset(zoom, tgfx::Point(offsetX, offsetY));
   auto canvas = surface->getCanvas();
   canvas->clear();
   canvas->save();
@@ -74,22 +78,23 @@ static void Draw(int index) {
   device->unlock();
 }
 
-static napi_value UpdateDrawIndex(napi_env env, napi_callback_info info) {
-    size_t argc = 1;
-    napi_value args[1] = {nullptr};
-    napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
-    double value;
-    napi_get_value_double(env, args[0], &value);
-    currentDrawIndex = static_cast<int>(value);
-    return nullptr;
+static napi_value UpdateDrawParams(napi_env env, napi_callback_info info) {
+  size_t argc = 4;
+  napi_value args[4] = {nullptr};
+  napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
+  napi_get_value_double(env, args[0], &drawIndex);
+  napi_get_value_double(env, args[1], &zoomScale);
+  napi_get_value_double(env, args[2], &contentOffsetX);
+  napi_get_value_double(env, args[3], &contentOffsetY);
+  return nullptr;
 }
 
 static napi_value StartDrawLoop(napi_env , napi_callback_info ) {
-  auto displayLink = new DisplayLink([]() {
-    Draw(currentDrawIndex);
+    auto displayLink = new DisplayLink([]() {
+      Draw(static_cast<int>(drawIndex), static_cast<float>(zoomScale), static_cast<float>(contentOffsetX), static_cast<float>(contentOffsetY));
   });
-  displayLink->start();
-  return nullptr;
+    displayLink->start();
+    return nullptr;
 }
 
 static std::shared_ptr<drawers::AppHost> CreateAppHost() {
@@ -172,7 +177,7 @@ EXTERN_C_START
 static napi_value Init(napi_env env, napi_value exports) {
   napi_property_descriptor desc[] = {
       {"startDrawLoop", nullptr, StartDrawLoop, nullptr, nullptr, nullptr, napi_default, nullptr},
-      {"updateDrawIndex", nullptr, UpdateDrawIndex, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"updateDrawParams", nullptr, UpdateDrawParams, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"updateDensity", nullptr, OnUpdateDensity, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"addImageFromEncoded", nullptr, AddImageFromEncoded, nullptr, nullptr, nullptr, napi_default,
        nullptr}};

@@ -177,11 +177,9 @@ class ProxyProvider {
   BlockBuffer blockBuffer = {};
   SlidingWindowTracker maxValueTracker = {10};
 
-  static UniqueKey GetProxyKey(const UniqueKey& uniqueKey, uint32_t renderFlags);
-
   std::shared_ptr<GpuBufferProxy> findOrWrapGpuBufferProxy(const UniqueKey& uniqueKey);
 
-  void addResourceProxy(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& uniqueKey);
+  void addResourceProxy(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& uniqueKey = {});
 
   void uploadSharedVertexBuffer(std::shared_ptr<Data> data);
 

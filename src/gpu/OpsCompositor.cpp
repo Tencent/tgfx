@@ -315,6 +315,9 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
         }
       }
     }
+    if (localBounds.has_value() && localBounds->isEmpty()) {
+      return;
+    }
   }
 
   switch (type) {
@@ -357,7 +360,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     default:
       break;
   }
-  if (type == PendingOpType::Image) {
+  if (drawOp != nullptr && type == PendingOpType::Image) {
     FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty())};
     auto processor =
         FragmentProcessor::Make(std::move(pendingImage), args, pendingSampling, pendingConstraint);

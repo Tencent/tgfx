@@ -20,9 +20,10 @@
 #include "tgfx/core/Task.h"
 
 namespace tgfx {
-GpuBufferUploadTask::GpuBufferUploadTask(UniqueKey uniqueKey, BufferType bufferType,
+GpuBufferUploadTask::GpuBufferUploadTask(std::shared_ptr<ResourceProxy> proxy,
+                                         BufferType bufferType,
                                          std::unique_ptr<DataSource<Data>> source)
-    : ResourceTask(std::move(uniqueKey)), bufferType(bufferType), source(std::move(source)) {
+    : ResourceTask(std::move(proxy)), bufferType(bufferType), source(std::move(source)) {
 }
 
 std::shared_ptr<Resource> GpuBufferUploadTask::onMakeResource(Context* context) {

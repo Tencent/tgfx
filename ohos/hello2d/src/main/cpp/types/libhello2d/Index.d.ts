@@ -1,4 +1,4 @@
-export const updateDrawIndex: (index: number) => void;
+export const updateDrawParams: (index: number, zoom: number, offsetX: number, offsetY: number) => void;
 
 export const updateDensity: (density: number) => void;
 
