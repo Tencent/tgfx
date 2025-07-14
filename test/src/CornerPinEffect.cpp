@@ -49,8 +49,7 @@ std::shared_ptr<CornerPinEffect> CornerPinEffect::Make(const Point& upperLeft,
 }
 
 CornerPinEffect::CornerPinEffect(const Point& upperLeft, const Point& upperRight,
-                                 const Point& lowerRight, const Point& lowerLeft)
-    : RuntimeEffect(Type()) {
+                                 const Point& lowerRight, const Point& lowerLeft) {
   cornerPoints[0] = lowerLeft;
   cornerPoints[1] = lowerRight;
   cornerPoints[2] = upperLeft;

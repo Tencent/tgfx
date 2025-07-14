@@ -48,11 +48,11 @@ void GLProgram::onReleaseGPU() {
 }
 
 void GLProgram::updateUniformsAndTextureBindings(const RenderTarget* renderTarget,
-                                                 const ProgramInfo* programInfo) {
+                                                 const Pipeline* pipeline) {
   setRenderTargetState(renderTarget);
-  programInfo->getUniforms(uniformBuffer.get());
+  pipeline->getUniforms(uniformBuffer.get());
   uniformBuffer->uploadToGPU(context);
-  auto samplers = programInfo->getSamplers();
+  auto samplers = pipeline->getSamplers();
   int textureUnit = 0;
   auto gpu = static_cast<GLGpu*>(context->gpu());
   for (auto& info : samplers) {

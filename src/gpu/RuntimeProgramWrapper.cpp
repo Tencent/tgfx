@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,17 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/gpu/RuntimeEffect.h"
-#include "gpu/ResourceKey.h"
+#include "RuntimeProgramWrapper.h"
 
 namespace tgfx {
-RuntimeEffect::RuntimeEffect(UniqueType type,
-                             const std::vector<std::shared_ptr<Image>>& extraInputs)
-    : uniqueType(std::move(type)), extraInputs(extraInputs) {
-  uniqueType.addStrong();
+const RuntimeProgram* RuntimeProgramWrapper::Unwrap(const Program* program) {
+  return static_cast<const RuntimeProgramWrapper*>(program)->runtimeProgram.get();
 }
 
-RuntimeEffect::~RuntimeEffect() {
-  uniqueType.releaseStrong();
+void RuntimeProgramWrapper::onReleaseGPU() {
+  runtimeProgram->onReleaseGPU();
+  runtimeProgram->context = nullptr;
 }
 }  // namespace tgfx
