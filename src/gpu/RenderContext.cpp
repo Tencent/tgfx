@@ -271,7 +271,8 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
   } else {
     bounds = getClipBounds(state.clip);
     if (!picture->hasUnboundedFill()) {
-      auto deviceBounds = picture->getBounds(&state.matrix);
+      auto deviceBounds = picture->getBounds();
+      state.matrix.mapRect(&deviceBounds);
       if (!bounds.intersect(deviceBounds)) {
         return;
       }
