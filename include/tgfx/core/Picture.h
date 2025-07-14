@@ -52,7 +52,7 @@ class Picture {
   }
 
   /**
-   * Returns the conservative bounding box of the Picture. Compared to getTightBounds, It may be
+   * Returns the conservative bounding box of the Picture. Compared to getTightBounds, it may be
    * larger than actual bounds but is faster to compute. Note that the bounds only include the
    * combined geometry of each drawing command, but some commands may draw outside these bounds.
    * Use the hasUnboundedFill() method to check for this.
