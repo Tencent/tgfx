@@ -54,7 +54,7 @@ TGFX_TEST(ReadPixelsTest, ScalePixMap) {
   Buffer scalePixels(byteSize);
   auto scalePixmap = Pixmap(scaleRGBAInfo, scalePixels.data());
   pixmap.scalePixels(scalePixmap.info(), scalePixmap.writablePixels(), FilterQuality::Medium);
-  EXPECT_TRUE(Baseline::Compare(scalePixmap, "ReadPixelsTest/scale_RGBA_1010102_image"));
+  EXPECT_TRUE(Baseline::Compare(scalePixmap, "ReadPixelsTest/scale_RGBA_8888_To_RGB_565_image"));
 }
 
 TGFX_TEST(ReadPixelsTest, PixelMap) {
