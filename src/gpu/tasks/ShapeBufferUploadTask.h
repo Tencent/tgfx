@@ -20,7 +20,7 @@
 
 #include "ResourceTask.h"
 #include "core/DataSource.h"
-#include "core/ShapeBuffer.h"
+#include "core/ShapeRasterizer.h"
 
 namespace tgfx {
 class ShapeBufferUploadTask : public ResourceTask {

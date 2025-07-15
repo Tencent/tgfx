@@ -173,7 +173,7 @@ std::shared_ptr<GpuShapeProxy> ProxyProvider::createGpuShapeProxy(std::shared_pt
         AppendClipBoundsKey(uniqueKey, clipBounds.makeOffset(-shapeBounds.left, -shapeBounds.top));
   }
   if (aaType != AAType::None) {
-    // Add a 1-pixel outset to preserve anti-aliasing results.
+    // Add a 1-pixel outset to preserve antialiasing results.
     shapeBounds.outset(1.0f, 1.0f);
   } else {
     static const auto NonAntialiasShapeType = UniqueID::Next();
