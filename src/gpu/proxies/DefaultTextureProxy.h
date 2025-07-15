@@ -18,19 +18,12 @@
 
 #pragma once
 
+#include "gpu/BackingFit.h"
 #include "gpu/proxies/TextureProxy.h"
 
 namespace tgfx {
 class DefaultTextureProxy : public TextureProxy {
  public:
-  int width() const override {
-    return _width;
-  }
-
-  int height() const override {
-    return _height;
-  }
-
   int backingStoreWidth() const override {
     return _backingStoreWidth;
   }
@@ -39,24 +32,9 @@ class DefaultTextureProxy : public TextureProxy {
     return _backingStoreHeight;
   }
 
-  bool isAlphaOnly() const override {
-    return _format == PixelFormat::ALPHA_8;
-  }
-
-  bool hasMipmaps() const override {
-    return _mipmapped;
-  }
-
-  ImageOrigin origin() const override {
-    return _origin;
-  }
+  std::shared_ptr<Texture> getTexture() const override;
 
  protected:
-  int _width = 0;
-  int _height = 0;
-  PixelFormat _format = PixelFormat::RGBA_8888;
-  bool _mipmapped = false;
-  ImageOrigin _origin = ImageOrigin::TopLeft;
   int _backingStoreWidth = 0;
   int _backingStoreHeight = 0;
 
@@ -64,10 +42,10 @@ class DefaultTextureProxy : public TextureProxy {
                       ImageOrigin origin = ImageOrigin::TopLeft,
                       BackingFit backingFit = BackingFit::Exact);
 
-  std::shared_ptr<Texture> onMakeTexture(Context* context) const override {
-    return Texture::MakeFormat(context, _backingStoreWidth, _backingStoreHeight, _format,
-                               _mipmapped, _origin);
-  }
+  virtual std::shared_ptr<Texture> onMakeTexture(Context* context) const;
+
+ private:
+  UniqueKey uniqueKey = {};
 
   friend class ProxyProvider;
 };

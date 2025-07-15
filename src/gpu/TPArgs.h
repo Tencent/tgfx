@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "gpu/BackingFit.h"
 #include "gpu/proxies/TextureProxy.h"
 
 namespace tgfx {

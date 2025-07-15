@@ -19,6 +19,7 @@
 #pragma once
 
 #include "TextureProxy.h"
+#include "gpu/BackingFit.h"
 #include "gpu/RenderTarget.h"
 
 namespace tgfx {
@@ -42,7 +43,7 @@ class RenderTargetProxy {
    * format.
    */
   static std::shared_ptr<RenderTargetProxy> MakeFallback(Context* context, int width, int height,
-                                                         bool isAlphaOnly, int sampleCount = 1,
+                                                         bool alphaOnly, int sampleCount = 1,
                                                          bool mipmapped = false,
                                                          ImageOrigin origin = ImageOrigin::TopLeft,
                                                          BackingFit backingFit = BackingFit::Exact);
