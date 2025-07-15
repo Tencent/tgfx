@@ -264,7 +264,8 @@
         "WebpCodec_Encode_Alpha8": "d010fb8",
         "WebpCodec_Encode_Gray8": "b74f86c1",
         "WebpCodec_Encode_RGB565": "d010fb8",
-        "WebpCodec_Encode_RGBA": "d010fb8"
+        "WebpCodec_Encode_RGBA": "d010fb8",
+        "scale_RGBA_8888_To_RGB_565_image": "5e07f214"
     },
     "SVGTest": {
         "blur": "b1db872",

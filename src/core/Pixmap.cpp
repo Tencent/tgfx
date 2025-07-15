@@ -19,6 +19,7 @@
 #include "tgfx/core/Pixmap.h"
 #include <unordered_map>
 #include "core/PixelRef.h"
+#include "platform/ImageResampler.h"
 #include "skcms.h"
 
 namespace tgfx {
@@ -215,6 +216,10 @@ bool Pixmap::writePixels(const ImageInfo& srcInfo, const void* srcPixels, int ds
   auto dstInfo = _info.makeWH(imageInfo.width(), imageInfo.height());
   ConvertPixels(imageInfo, srcPixels, dstInfo, dstPixels);
   return true;
+}
+
+bool Pixmap::scalePixels(const ImageInfo& dstInfo, void* dstPixels, FilterQuality quality) const {
+  return ImageResamper::Scale(_info, _pixels, dstInfo, dstPixels, quality);
 }
 
 bool Pixmap::clear() {
