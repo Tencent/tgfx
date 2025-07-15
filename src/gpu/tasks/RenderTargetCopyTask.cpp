@@ -28,12 +28,12 @@ bool RenderTargetCopyTask::onExecute(RenderPass* renderPass,
                                      std::shared_ptr<RenderTargetProxy> renderTargetProxy) {
   auto renderTarget = renderTargetProxy->getRenderTarget();
   if (renderTarget == nullptr) {
-    LOGE("RenderTargetCopyTask::execute() Failed to get the source render target!");
+    LOGE("RenderTargetCopyTask::onExecute() Failed to get the source render target!");
     return false;
   }
   auto texture = dest->getTexture();
   if (texture == nullptr) {
-    LOGE("RenderTargetCopyTask::execute() Failed to get the dest texture!");
+    LOGE("RenderTargetCopyTask::onExecute() Failed to get the dest texture!");
     return false;
   }
   DEBUG_ASSERT(renderTarget->width() == texture->width() &&

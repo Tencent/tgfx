@@ -27,7 +27,7 @@ bool OpsRenderTask::onExecute(RenderPass* renderPass,
     return false;
   }
   if (!renderPass->begin(renderTargetProxy->getRenderTarget())) {
-    LOGE("OpsRenderTask::execute() Failed to initialize the render pass!");
+    LOGE("OpsRenderTask::onExecute() Failed to initialize the render pass!");
     return false;
   }
   auto tempOps = std::move(ops);
