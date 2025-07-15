@@ -95,7 +95,7 @@ bool FTPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) con
   }
   auto buffer = static_cast<unsigned char*>(dstPixels);
   auto rows = targetInfo.height();
-  // Anti-aliasing is always enabled because FreeType generates only 1-bit masks when it's off,
+  // Antialiasing is always enabled because FreeType generates only 1-bit masks when it's off,
   // and we haven't implemented conversion from 1-bit to 8-bit masks yet.
   auto pitch = static_cast<int>(targetInfo.rowBytes());
   FTRasterTarget target = {buffer + (rows - 1) * pitch, pitch,
