@@ -108,7 +108,7 @@ namespace HWY_NAMESPACE {
       std::size_t vecSize = size - size % hn::Lanes(d);
       for(int i = 0; i < vecSize; i += hn::Lanes(d)) {
         auto srcSimd = hn::LoadU(d, &fsrc[i]);
-        auto swzSimd = hn::SwapAdjacentBlocks(srcSimd);
+        auto swzSimd = hn::Reverse2(d, srcSimd);
         auto res = hn::MulAdd(srcSimd, scaleSimd, hn::MulAdd(swzSimd, skewSimd, transSimd));
         hn::StoreU(res, d, &fdst[i]);
       }
@@ -125,6 +125,73 @@ namespace HWY_NAMESPACE {
         fdst[i] = fsrc[i] * (i % 2 == 0 ? sx : sy) + (i % 2 == 0 ? tx : ty) + swz * (i % 2 == 0 ? kx : ky);
       }
     }
+  }
+
+  void MapRectDynamicImpl(const Matrix& m, Rect* dst, const Rect& src) {
+    if(m.getType() <= Matrix::TranslateMask) {
+      float tx = m.getTranslateX();
+      float ty = m.getTranslateY();
+      const hn::Full128<float> d;
+      auto trans = hn::Dup128VecFromValues(d, tx, ty, tx, ty);
+      auto ltrb = hn::Add(hn::LoadU(d, &src.left), trans);
+      auto rblt = hn::Reverse2(d, hn::Reverse(d, ltrb));
+      auto min = hn::Min(ltrb, rblt);
+      auto max = hn::Max(ltrb, rblt);
+      auto res = hn::ConcatUpperLower(d, min, max);
+      hn::StoreU(res, d, &dst->left);
+      return;
+    }
+    if(m.isScaleTranslate()) {
+      float sx = m.getScaleX();
+      float sy = m.getScaleY();
+      float tx = m.getTranslateX();
+      float ty = m.getTranslateY();
+      const hn::Full128<float> d;
+      auto scale = hn::Dup128VecFromValues(d, sx, sy, sx, sy);
+      auto trans = hn::Dup128VecFromValues(d, tx, ty, tx, ty);
+      auto ltrb = hn::MulAdd(hn::LoadU(d, &src.left), scale, trans);
+      auto rblt = hn::Reverse2(d, hn::Reverse(d, ltrb));
+      auto min = hn::Min(ltrb, rblt);
+      auto max = hn::Max(ltrb, rblt);
+      auto res = hn::ConcatUpperLower(d, min, max);
+      hn::StoreU(res, d, &dst->left);
+    }else {
+      Point quad[4];
+      quad[0].set(src.left, src.top);
+      quad[1].set(src.right, src.top);
+      quad[2].set(src.right, src.bottom);
+      quad[3].set(src.left, src.bottom);
+      m.mapPoints(quad, quad, 4);
+      dst->setBounds(quad, 4);
+    }
+  }
+  bool SetBoundsDynamicImpl(Rect* rect, const Point pts[], int count) {
+    if(count <= 0) {
+      rect->setEmpty();
+      return false;
+    }
+    const hn::Full128<float> d;
+    hn::Vec<hn::Full128<float>> min, max;
+    if(count & 1) {
+      min = max = hn::Dup128VecFromValues(d, pts[0].x, pts[0].y, pts[0].x, pts[0].y);
+      pts += 1;
+      count -= 1;
+    }else {
+      min = max = hn::Dup128VecFromValues(d, pts[0].x, pts[0].y, pts[1].x, pts[1].y);
+      pts += 2;
+      count -= 2;
+    }
+    auto accum = hn::Mul(min, hn::Set(d, 0.0f));
+    while(count) {
+      auto xy = hn::Dup128VecFromValues(d, pts[0].x, pts[0].y, pts[1].x, pts[1].y);
+      accum = hn::Mul(accum, xy);
+      min = hn::Min(min, xy);
+      max = hn::Max(max, xy);
+      pts += 2;
+      count -= 2;
+    }
+    auto mask = hn::Eq(hn::Mul(accum, hn::Set(d, 0.0f)), Set(d, 0.0f));
+    const bool allFinite = hn::AllTrue(hn::DFromM<decltype(mask)>, mask);
   }
 }
 }
@@ -143,6 +210,14 @@ void ScalePtsDynamic(const Matrix& m, Point dst[], const Point src[], int count)
 
 void AfflinePtsDynamic(const Matrix& m, Point dst[], const Point src[], int count) {
   return HWY_DYNAMIC_DISPATCH(AfflinePtsDynamicImpl)(m, dst, src, count);
+}
+
+void MapRectDynamic(const Matrix& m, Rect* dst, const Rect& src) {
+  return HWY_DYNAMIC_DISPATCH(MapRectDynamicImpl)(m, dst, src);
+}
+
+bool SetBoundsDynamic(Rect* rect, const Point pts[], int count) {
+
 }
 }  // namespace tgfx
 #endif

@@ -751,6 +751,9 @@ void Matrix::mapRect(Rect* dst, const Rect& src) const {
     dst->setBounds(quad, 4);
   }
 #endif
+#ifdef HIGHWAY
+  MapRectDynamic(*this, dst, src);
+#endif
 }
 
 float Matrix::getMinScale() const {

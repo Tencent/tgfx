@@ -23,4 +23,6 @@ namespace tgfx {
   void TransPtsDynamic(const Matrix& m, Point dst[], const Point src[], int count);
   void ScalePtsDynamic(const Matrix& m, Point dst[], const Point src[], int count);
   void AfflinePtsDynamic(const Matrix& m, Point dst[], const Point src[], int count);
+  void MapRectDynamic(const Matrix& m, Rect* dst, const Rect& src);
+  bool SetBoundsDynamic(Rect* rect, const Point pts[], int count);
 }  // namespace tgfx

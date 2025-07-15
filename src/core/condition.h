@@ -19,6 +19,6 @@
 #pragma once
 
 //#define NSIMD
-#define XSIMD
-//#define HIGHWAY
+//#define XSIMD
+#define HIGHWAY
 //#define SKSIMD
