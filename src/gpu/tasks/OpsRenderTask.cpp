@@ -21,7 +21,8 @@
 #include "gpu/RenderPass.h"
 
 namespace tgfx {
-bool OpsRenderTask::execute(RenderPass* renderPass) {
+bool OpsRenderTask::onExecute(RenderPass* renderPass,
+                              std::shared_ptr<RenderTargetProxy> renderTargetProxy) {
   if (ops.empty() || renderTargetProxy == nullptr) {
     return false;
   }

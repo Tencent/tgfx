@@ -24,7 +24,8 @@ TextureResolveTask::TextureResolveTask(std::shared_ptr<RenderTargetProxy> render
     : RenderTask(std::move(renderTargetProxy)) {
 }
 
-bool TextureResolveTask::execute(RenderPass* renderPass) {
+bool TextureResolveTask::onExecute(RenderPass* renderPass,
+                                   std::shared_ptr<RenderTargetProxy> renderTargetProxy) {
   auto renderTarget = renderTargetProxy->getRenderTarget();
   if (renderTarget == nullptr) {
     LOGE("TextureResolveTask::execute() Failed to get render target!");

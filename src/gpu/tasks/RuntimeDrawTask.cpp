@@ -29,7 +29,8 @@ RuntimeDrawTask::RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
       offset(offset) {
 }
 
-bool RuntimeDrawTask::execute(RenderPass* renderPass) {
+bool RuntimeDrawTask::onExecute(RenderPass* renderPass,
+                                std::shared_ptr<RenderTargetProxy> renderTargetProxy) {
   std::vector<BackendTexture> inputTextures;
   inputTextures.reserve(inputs.size());
   for (size_t i = 0; i < inputs.size(); i++) {
