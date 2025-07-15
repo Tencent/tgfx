@@ -28,6 +28,13 @@ static constexpr float M_PI_2_F = static_cast<float>(M_PI_2);
 static constexpr float FLOAT_NEARLY_ZERO = 1.0f / (1 << 12);
 static constexpr float FLOAT_SQRT2 = 1.41421356f;
 
+// Helper to see a float as its bit pattern (w/o aliasing warnings)
+inline uint32_t Float2Bits(float value) {
+  uint32_t bits;
+  memcpy(&bits, &value, sizeof(uint32_t));
+  return bits;
+}
+
 inline float DegreesToRadians(float degrees) {
   return degrees * (static_cast<float>(M_PI) / 180.0f);
 }
@@ -73,6 +80,12 @@ inline int32_t SignBitTo2sCompliment(int32_t x) {
   }
   return x;
 }
+
+inline int32_t FloatAs2sCompliment(float x) {
+  return SignBitTo2sCompliment((int32_t)Float2Bits(x));
+}
+
+#define ScalarAs2sCompliment(x) FloatAs2sCompliment(x)
 
 // from http://randomascii.wordpress.com/2012/02/25/comparing-floating-point-numbers-2012-edition/
 /*
