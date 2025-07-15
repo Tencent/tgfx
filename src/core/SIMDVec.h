@@ -76,12 +76,12 @@
  * the x87 st0 register.  (There is no ABI governing who should preserve mm?/st? registers, so no
  * one does!)
  *
- * We force-inline UnalignedLoad() and UnalignedStore() to avoid that, making them safe to
- * use for all types on all platforms, thus solving the problem once and for all!
+ * We force-inline UnalignedLoad() and UnalignedStore() to avoid that, making them safe to use for
+ * all types on all platforms, thus solving the problem once and for all!
  *
- * A separate problem exists with 32-bit x86. The default calling convention returns values in
- * ST0 (the x87 FPU). Unfortunately, doing so can mutate some bit patterns (signaling NaNs
- * become quiet). If you're using these functions to pass data around as floats, but it's actually
+ * A separate problem exists with 32-bit x86. The default calling convention returns values in ST0
+ * (the x87 FPU). Unfortunately, doing so can mutate some bit patterns (signaling NaNs become
+ * quiet). If you're using these functions to pass data around as floats, but it's actually
  * integers, that can be bad -- raster pipeline does this.
  *
  * With GCC and Clang, the always_inline attribute ensures we don't have a problem. MSVC, though,
@@ -401,8 +401,8 @@ SINT Vec<2 * N, T> Join(const Vec<N, T>& lo, const Vec<N, T>& hi) {
  *  1) lean on Clang/GCC vector extensions when available;
  *  2) use map() to apply a scalar function lane-wise;
  *  3) recurse on lo/hi to scalar portable implementations.
- * We can slot in platform-specific implementations as overloads for particular Vec<N,T>,
- * or often integrate them directly into the recursion of style 3), allowing fine control.
+ * We can slot in platform-specific implementations as overloads for particular Vec<N,T>, or often
+ * integrate them directly into the recursion of style 3), allowing fine control.
  */
 
 #if TGFX_USE_SIMD && (defined(__clang__) || defined(__GNUC__))
@@ -421,8 +421,8 @@ struct VExtHelper {
 template <int N, typename T>
 using VExt = typename VExtHelper<N, T>::type;
 
-// For some reason some (new!) versions of GCC cannot seem to deduce N in the generic
-// ToVec<N,T>() below for N=4 and T=float.  This workaround seems to help...
+// For some reason some (new!) versions of GCC cannot seem to deduce N in the generic ToVec<N,T>()
+// below for N=4 and T=float.  This workaround seems to help...
 SI Vec<4, float> ToVec(VExt<4, float> v) {
   return BitCast<Vec<4, float>>(v);
 }
@@ -496,8 +496,8 @@ SINT Vec<N, M<T>> operator>(const Vec<N, T>& x, const Vec<N, T>& y) {
 
 #else
 
-// Either TGFX_NO_SIMD is defined, or Clang/GCC vector extensions are not available.
-// We'll implement things portably with N==1 scalar implementations and recursion onto them.
+// Either TGFX_NO_SIMD is defined, or Clang/GCC vector extensions are not available. We'll implement
+// things portably with N==1 scalar implementations and recursion onto them.
 
 // N == 1 scalar implementations.
 SIT Vec<1, T> operator+(const Vec<1, T>& x, const Vec<1, T>& y) {
@@ -820,15 +820,15 @@ SINT bool Any(const Vec<N, T>& x) {
 #if TGFX_USE_SIMD && TGFX_CPU_SSE_LEVEL >= TGFX_CPU_SSE_LEVEL_SSE1
   if constexpr (N * sizeof(T) == 16) {
     // On SSE, movemaTGFX checks only the MSB in each lane, which is fine if the lanes were set
-    // directly from a comparison op (which sets all bits to 1 when true), but TGFX::Vec<>
-    // treats any non-zero value as true, so we have to compare 'x' to 0 before calling movemask
+    // directly from a comparison op (which sets all bits to 1 when true), but TGFX::Vec<> treats
+    // any non-zero value as true, so we have to compare 'x' to 0 before calling movemask
     return _mm_movemask_ps(_mm_cmpneq_ps(BitCast<__m128>(x), _mm_set1_ps(0))) != 0b0000;
   }
 #endif
 #if TGFX_USE_SIMD && defined(__aarch64__)
-  // On 64-bit NEON, take the max aCross lanes, which will be non-zero if any lane was true.
-  // The specific lane-size doesn't really matter in this case since it's really any set bit
-  // that we're looking for.
+  // On 64-bit NEON, take the max aCross lanes, which will be non-zero if any lane was true. The
+  // specific lane-size doesn't really matter in this case since it's really any set bit that we're
+  // looking for.
   if constexpr (N * sizeof(T) == 8) {
     return vmaxv_u8(BitCast<uint8x8_t>(x)) > 0;
   }
@@ -860,8 +860,8 @@ SIT bool All(const Vec<1, T>& x) {
   return x.val != 0;
 }
 SINT bool All(const Vec<N, T>& x) {
-// Unlike Any(), we have to respect the lane layout, or we'll miss cases where a true lane has a
-// mix of 0 and 1 bits.
+// Unlike Any(), we have to respect the lane layout, or we'll miss cases where a true lane has a mix
+// of 0 and 1 bits.
 #if TGFX_USE_SIMD && TGFX_CPU_SSE_LEVEL >= TGFX_CPU_SSE_LEVEL_SSE1
   // Unfortunately, the _mm_testc intrinsics don't let us avoid the comparison to 0 for all()'s
   // correctness, so always just use the plain SSE version.
@@ -981,8 +981,8 @@ SI Vec<sizeof...(Ix), T> Shuffle(const Vec<N, T>& x) {
 #endif
 }
 
-// Call Map(fn, x) for a vector with fn() applied to each lane of x, { fn(x[0]), fn(x[1]), ... },
-// or Map(fn, x,y) for a vector of fn(x[i], y[i]), etc.
+// Call Map(fn, x) for a vector with fn() applied to each lane of x, { fn(x[0]), fn(x[1]), ... }, or
+// Map(fn, x,y) for a vector of fn(x[i], y[i]), etc.
 
 /**
  * Used to ignore sanitizer warnings.
@@ -1154,8 +1154,8 @@ SINT std::enable_if_t<std::is_unsigned_v<T>, Vec<N, T>> SaturatedAdd(const Vec<N
                                                                      const Vec<N, T>& y) {
 #if TGFX_USE_SIMD && (TGFX_CPU_SSE_LEVEL >= TGFX_CPU_SSE_LEVEL_SSE1 || \
                       defined(TGFX_ARM_HAS_NEON) || TGFX_CPU_LSX_LEVEL >= TGFX_CPU_LSX_LEVEL_LSX)
-  // Both SSE and ARM have 16-lane saturated adds, so use intrinsics for those and recurse down
-  // or Join up to take advantage.
+  // Both SSE and ARM have 16-lane saturated adds, so use intrinsics for those and recurse down or
+  // Join up to take advantage.
   if constexpr (N == 16 && sizeof(T) == 1) {
 #if TGFX_CPU_SSE_LEVEL >= TGFX_CPU_SSE_LEVEL_SSE1
     return BitCast<Vec<N, T>>(_mm_adds_epu8(BitCast<__m128i>(x), BitCast<__m128i>(y)));
@@ -1320,8 +1320,8 @@ SIN Vec<N, double> Normalize(const Vec<N, double>& v) {
 }
 
 // Subtracting a value from itself will result in zero, except for NAN or ±Inf, which make NAN.
-// Multiplying a group of values against zero will result in zero for each product, except for
-// NAN or ±Inf, which will result in NAN and continue resulting in NAN for the rest of the elements.
+// Multiplying a group of values against zero will result in zero for each product, except for NAN
+// or ±Inf, which will result in NAN and continue resulting in NAN for the rest of the elements.
 // This generates better code than `std::isfinite` when building with clang-cl.
 template <typename T, typename... Pack, std::enable_if_t<std::is_floating_point_v<T>, bool> = true>
 static inline bool IsFinite(T x, Pack... values) {

@@ -158,9 +158,8 @@ class Matrix {
   }
 
   /**
-   * enum Matrix::TypeMask
-   * Enum of bit fields for mask returned by getType().
-   * Used to identify the complexity of Matrix, to optimize performance.
+   * Enum of bit fields for mask returned by getType(). Used to identify the complexity of Matrix,
+   * to optimize performance.
    */
   enum TypeMask { IdentityMask = 0, TranslateMask = 0x01, ScaleMask = 0x02, AffineMask = 0x04 };
 
@@ -186,12 +185,14 @@ class Matrix {
   }
 
   /**
-   * Returns true if Matrix at most scales and translates. Matrix may be identity,
-   * contain only scale elements, only translate elements, or both. Matrix form is:
+   * Returns true if the Matrix only performs scaling and translation, or is the identity. The
+   * Matrix may be an identity matrix, contain only scale elements, only translation elements, or
+   * both.
+   * Matrix form:
    *        | scale-x    0    translate-x |
    *        |    0    scale-y translate-y |
    *        |    0       0         1      |
-   * @return  true if Matrix is identity; or scales, translates, or both
+   * @return  true if Matrix is identity; or scales, translates, or both.
    */
   bool isScaleTranslate() const {
     return !(this->getType() & ~(ScaleMask | TranslateMask));
@@ -452,8 +453,8 @@ class Matrix {
   }
 
   /**
-   * Sets Matrix to rotate by degrees about a pivot point at (px, py). The pivot point is
-   * unchanged when mapped with Matrix. Positive degrees rotates clockwise.
+   * Sets Matrix to rotate by degrees about a pivot point at (px, py). The pivot point is unchanged
+   * when mapped with Matrix. Positive degrees rotates clockwise.
    *  @param degrees  angle of axes relative to upright axes
    *  @param px       pivot on x-axis
    *  @param py       pivot on y-axis
@@ -468,10 +469,9 @@ class Matrix {
   void setRotate(float degrees);
 
   /**
-   * Sets Matrix to rotate by sinValue and cosValue, about a pivot point at (px, py).
-   * The pivot point is unchanged when mapped with Matrix.
-   * Vector (sinValue, cosValue) describes the angle of rotation relative to (0, 1).
-   * Vector length specifies the scale factor.
+   * Sets Matrix to rotate by sinValue and cosValue, about a pivot point at (px, py). The pivot
+   * point is unchanged when mapped with Matrix. Vector (sinValue, cosValue) describes the angle of
+   * rotation relative to (0, 1). Vector length specifies the scale factor.
    */
   void setSinCos(float sinV, float cosV, float px, float py);
 
@@ -483,8 +483,8 @@ class Matrix {
   void setSinCos(float sinV, float cosV);
 
   /**
-   * Sets Matrix to skew by kx and ky, about a pivot point at (px, py). The pivot point is
-   * unchanged when mapped with Matrix.
+   * Sets Matrix to skew by kx and ky, about a pivot point at (px, py). The pivot point is unchanged
+   * when mapped with Matrix.
    * @param kx  horizontal skew factor
    * @param ky  vertical skew factor
    * @param px  pivot on x-axis
@@ -759,16 +759,16 @@ class Matrix {
   }
 
   /**
-   * Compares a and b; returns true if a and b are numerically equal. Returns true even if sign
-   * of zero values are different. Returns false if either Matrix contains NaN, even if the other
+   * Compares a and b; returns true if a and b are numerically equal. Returns true even if sign of
+   * zero values are different. Returns false if either Matrix contains NaN, even if the other
    * Matrix also contains NaN.
    */
   friend bool operator==(const Matrix& a, const Matrix& b);
 
   /**
-   * Compares a and b; returns true if a and b are not numerically equal. Returns false even if
-   * sign of zero values are different. Returns true if either Matrix contains NaN, even if the
-   * other Matrix also contains NaN.
+   * Compares a and b; returns true if a and b are not numerically equal. Returns false even if sign
+   * of zero values are different. Returns true if either Matrix contains NaN, even if the other
+   * Matrix also contains NaN.
    */
   friend bool operator!=(const Matrix& a, const Matrix& b) {
     return !(a == b);
@@ -794,8 +794,8 @@ class Matrix {
   float getMaxScale() const;
 
   /**
-   * Returns the scale components of the Matrix along the x and y axes. Both components are
-   * absolute values.
+   * Returns the scale components of the Matrix along the x and y axes. Both components are absolute
+   * values.
    */
   Point getAxisScales() const;
 
@@ -847,8 +847,7 @@ class Matrix {
   }
 
   /**
-   * Returns true if we already know that the matrix is identity;
-   * false otherwise.
+   * Returns true if we already know that the matrix is identity; false otherwise.
    */
   bool isTriviallyIdentity() const {
     if (typeMask & UnknownMask) {
@@ -877,13 +876,13 @@ class Matrix {
 
   static const MapPtsProc MapPtsProcs[];
 
-  static void IdentityPts(const Matrix& m, Point dst[], const Point src[], int count);
+  static void IdentityPoints(const Matrix& m, Point dst[], const Point src[], int count);
 
-  static void TransPts(const Matrix& m, Point dst[], const Point src[], int count);
+  static void TransPoints(const Matrix& m, Point dst[], const Point src[], int count);
 
-  static void ScalePts(const Matrix& m, Point dst[], const Point src[], int count);
+  static void ScalePoints(const Matrix& m, Point dst[], const Point src[], int count);
 
-  static void AfflinePts(const Matrix& m, Point dst[], const Point src[], int count);
+  static void AfflinePoints(const Matrix& m, Point dst[], const Point src[], int count);
 
   bool invertNonIdentity(Matrix* inverse) const;
 

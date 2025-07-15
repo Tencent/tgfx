@@ -288,16 +288,16 @@ void Matrix::setConcat(const Matrix& first, const Matrix& second) {
 }
 
 void Matrix::preConcat(const Matrix& matrix) {
-  // check for identity first, so we don't do a needless copy of ourselves
-  // to ourselves inside setConcat()
+  // check for identity first, so we don't do a needless copy of ourselves to ourselves inside
+  // setConcat()
   if (!matrix.isIdentity()) {
     this->setConcat(*this, matrix);
   }
 }
 
 void Matrix::postConcat(const Matrix& matrix) {
-  // check for identity first, so we don't do a needless copy of ourselves
-  // to ourselves inside setConcat()
+  // check for identity first, so we don't do a needless copy of ourselves to ourselves inside
+  // setConcat()
   if (!matrix.isIdentity()) {
     this->setConcat(matrix, *this);
   }
@@ -324,8 +324,8 @@ uint8_t Matrix::computeTypeMask() const {
   if (m01 | m10) {
     // The skew components may be scale-inducing, unless we are dealing with a pure rotation.
     // Testing for a pure rotation is expensive, so we opt for being conservative by always setting
-    // the scale bit. along with affine.
-    // By doing this, we are also ensuring that matrices have the same type masks as their inverses.
+    // the scale bit. along with affine. By doing this, we are also ensuring that matrices have the
+    // same type masks as their inverses.
     mask |= AffineMask | ScaleMask;
 
     // For rectStaysRect, in the affine case, we only need check that the primary diagonal is all
@@ -353,13 +353,13 @@ uint8_t Matrix::computeTypeMask() const {
   return static_cast<uint8_t>(mask);
 }
 
-void Matrix::IdentityPts(const Matrix&, Point dst[], const Point src[], int count) {
+void Matrix::IdentityPoints(const Matrix&, Point dst[], const Point src[], int count) {
   if (dst != src && count > 0) {
     memcpy(dst, src, sizeof(Point) * static_cast<size_t>(count));
   }
 }
 
-void Matrix::TransPts(const Matrix& m, Point dst[], const Point src[], int count) {
+void Matrix::TransPoints(const Matrix& m, Point dst[], const Point src[], int count) {
   if (count > 0) {
     float tx = m.getTranslateX();
     float ty = m.getTranslateY();
@@ -386,7 +386,7 @@ void Matrix::TransPts(const Matrix& m, Point dst[], const Point src[], int count
   }
 }
 
-void Matrix::ScalePts(const Matrix& m, Point dst[], const Point src[], int count) {
+void Matrix::ScalePoints(const Matrix& m, Point dst[], const Point src[], int count) {
   if (count > 0) {
     float tx = m.getTranslateX();
     float ty = m.getTranslateY();
@@ -418,7 +418,7 @@ void Matrix::ScalePts(const Matrix& m, Point dst[], const Point src[], int count
   }
 }
 
-void Matrix::AfflinePts(const Matrix& m, Point dst[], const Point src[], int count) {
+void Matrix::AfflinePoints(const Matrix& m, Point dst[], const Point src[], int count) {
   if (count > 0) {
     float tx = m.getTranslateX();
     float ty = m.getTranslateY();
@@ -636,6 +636,6 @@ const Matrix& Matrix::I() {
 }
 
 const Matrix::MapPtsProc Matrix::MapPtsProcs[] = {
-    Matrix::IdentityPts, Matrix::TransPts,   Matrix::ScalePts,   Matrix::ScalePts,
-    Matrix::AfflinePts,  Matrix::AfflinePts, Matrix::AfflinePts, Matrix::AfflinePts};
+    Matrix::IdentityPoints, Matrix::TransPoints,   Matrix::ScalePoints,   Matrix::ScalePoints,
+    Matrix::AfflinePoints,  Matrix::AfflinePoints, Matrix::AfflinePoints, Matrix::AfflinePoints};
 }  // namespace tgfx

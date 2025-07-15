@@ -43,8 +43,8 @@
 /**
  *  TGFX_CPU_SSE_LEVEL
  *
- *  If defined, TGFX_CPU_SSE_LEVEL should be set to the highest supported level.
- *  On non-intel CPU this should be undefined.
+ *  If defined, TGFX_CPU_SSE_LEVEL should be set to the highest supported level. On non-intel CPU
+ *  this should be undefined.
  */
 #define TGFX_CPU_SSE_LEVEL_SSE1 10
 #define TGFX_CPU_SSE_LEVEL_SSE2 20
@@ -59,16 +59,15 @@
 /**
  *  TGFX_CPU_LSX_LEVEL
  *
- *  If defined, TGFX_CPU_LSX_LEVEL should be set to the highest supported level.
- *  On non-loongarch CPU this should be undefined.
+ *  If defined, TGFX_CPU_LSX_LEVEL should be set to the highest supported level. On non-loongarch
+ *  CPU this should be undefined.
  */
 #define TGFX_CPU_LSX_LEVEL_LSX 70
 #define TGFX_CPU_LSX_LEVEL_LASX 80
 
 // Are we in GCC/Clang?
 #ifndef TGFX_CPU_SSE_LEVEL
-// These checks must be done in descending order to ensure we set the highest
-// available SSE level.
+// These checks must be done in descending order to ensure we set the highest available SSE level.
 #if defined(__AVX512F__) && defined(__AVX512DQ__) && defined(__AVX512CD__) && \
     defined(__AVX512BW__) && defined(__AVX512VL__)
 #define TGFX_CPU_SSE_LEVEL TGFX_CPU_SSE_LEVEL_TGFXX
@@ -99,8 +98,8 @@
 
 // Are we in VisualStudio?
 #ifndef TGFX_CPU_SSE_LEVEL
-// These checks must be done in descending order to ensure we set the highest
-// available SSE level. 64-bit intel guarantees at least SSE2 support.
+// These checks must be done in descending order to ensure we set the highest available SSE level.
+// 64-bit intel guarantees at least SSE2 support.
 #if defined(__AVX512F__) && defined(__AVX512DQ__) && defined(__AVX512CD__) && \
     defined(__AVX512BW__) && defined(__AVX512VL__)
 #define TGFX_CPU_SSE_LEVEL TGFX_CPU_SSE_LEVEL_TGFXX
