@@ -22,6 +22,8 @@
 #include "tgfx/platform/android/Global.h"
 
 namespace tgfx {
+class TextureSampler;
+
 /**
  * The SurfaceTexture class allows direct access to image data rendered into the Java Surface object
  * on the android platform. It is typically used with the ImageReader class.
@@ -87,7 +89,9 @@ class SurfaceTexture : public ImageStream {
 
   SurfaceTexture(int width, int height, JNIEnv* env, jobject surfaceTexture);
 
-  std::shared_ptr<Texture> makeTexture(Context* context);
+  std::unique_ptr<TextureSampler> makeTextureSampler(Context* context);
+
+  ISize updateTexImage();
 
   friend class JNIInit;
 };

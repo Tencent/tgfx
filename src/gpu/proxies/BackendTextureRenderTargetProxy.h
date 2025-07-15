@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,34 +18,19 @@
 
 #pragma once
 
-#include "gpu/Texture.h"
-#include "gpu/TextureSampler.h"
+#include "gpu/proxies/TextureRenderTargetProxy.h"
 
 namespace tgfx {
-class GLExternalOESTexture : public Texture {
- public:
-  static std::shared_ptr<GLExternalOESTexture> Make(Context* context, int width, int height);
-
-  size_t memoryUsage() const override;
-
-  const TextureSampler* getSampler() const override {
-    return sampler.get();
-  }
-
-  Point getTextureCoord(float x, float y) const override;
-
-  BackendTexture getBackendTexture() const override;
-
-  void updateTextureSize(int width, int height);
-
+class BackendTextureRenderTargetProxy : public TextureRenderTargetProxy {
  protected:
-  void onReleaseGPU() override;
+  std::shared_ptr<Texture> onMakeTexture(Context* context) const override;
 
  private:
-  std::unique_ptr<TextureSampler> sampler = {};
-  int textureWidth = 0;
-  int textureHeight = 0;
+  BackendTexture backendTexture = {};
 
-  GLExternalOESTexture(std::unique_ptr<TextureSampler> sampler, int width, int height);
+  BackendTextureRenderTargetProxy(const BackendTexture& backendTexture, PixelFormat format,
+                                  int sampleCount, ImageOrigin origin = ImageOrigin::TopLeft,
+                                  bool adopted = false);
+  friend class ProxyProvider;
 };
 }  // namespace tgfx

@@ -28,16 +28,16 @@ bool ProgramCache::empty() const {
   return programMap.empty();
 }
 
-Program* ProgramCache::getProgram(const ProgramInfo* programInfo) {
+Program* ProgramCache::getProgram(const ProgramCreator* programCreator) {
   BytesKey programKey = {};
-  programInfo->computeProgramKey(context, &programKey);
+  programCreator->computeProgramKey(context, &programKey);
   auto result = programMap.find(programKey);
   if (result != programMap.end()) {
     programLRU.remove(result->second);
     programLRU.push_front(result->second);
     return result->second;
   }
-  auto program = programInfo->createProgram(context).release();
+  auto program = programCreator->createProgram(context).release();
   if (program == nullptr) {
     return nullptr;
   }

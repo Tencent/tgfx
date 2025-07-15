@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,31 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#import <CoreVideo/CoreVideo.h>
-#include "gpu/YUVTexture.h"
+#include "RuntimeProgramWrapper.h"
 
 namespace tgfx {
-class EAGLNV12Texture : public YUVTexture {
- public:
-  static std::shared_ptr<EAGLNV12Texture> MakeFrom(Context* context, CVPixelBufferRef pixelBuffer,
-                                                   YUVColorSpace colorSpace);
+const RuntimeProgram* RuntimeProgramWrapper::Unwrap(const Program* program) {
+  return static_cast<const RuntimeProgramWrapper*>(program)->runtimeProgram.get();
+}
 
-  EAGLNV12Texture(CVPixelBufferRef pixelBuffer, YUVColorSpace colorSpace);
-
-  ~EAGLNV12Texture() override;
-
-  HardwareBufferRef getHardwareBuffer() const override {
-    return pixelBuffer;
-  }
-
- protected:
-  void onReleaseGPU() override;
-
- private:
-  CVPixelBufferRef pixelBuffer = nullptr;
-  CVOpenGLESTextureRef lumaTexture = nullptr;
-  CVOpenGLESTextureRef chromaTexture = nullptr;
-};
+void RuntimeProgramWrapper::onReleaseGPU() {
+  runtimeProgram->onReleaseGPU();
+  runtimeProgram->context = nullptr;
+}
 }  // namespace tgfx

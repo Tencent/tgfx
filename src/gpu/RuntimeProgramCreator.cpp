@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,25 +16,22 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "ResourceTask.h"
-#include "tgfx/gpu/ImageOrigin.h"
+#include "RuntimeProgramCreator.h"
+#include "core/utils/UniqueID.h"
+#include "gpu/RuntimeProgramWrapper.h"
 
 namespace tgfx {
-class TextureCreateTask : public ResourceTask {
- public:
-  TextureCreateTask(UniqueKey uniqueKey, int width, int height, PixelFormat format, bool mipmapped,
-                    ImageOrigin origin);
+void RuntimeProgramCreator::computeProgramKey(Context*, BytesKey* programKey) const {
+  static auto RuntimeProgramType = UniqueID::Next();
+  programKey->write(RuntimeProgramType);
+  programKey->write(effect->programID());
+}
 
-  std::shared_ptr<Resource> onMakeResource(Context* context) override;
-
- private:
-  int width = 0;
-  int height = 0;
-  PixelFormat format = PixelFormat::RGBA_8888;
-  bool mipmapped = false;
-  ImageOrigin origin = ImageOrigin::TopLeft;
-};
-
+std::unique_ptr<Program> RuntimeProgramCreator::createProgram(Context* context) const {
+  auto program = effect->onCreateProgram(context);
+  if (program == nullptr) {
+    return nullptr;
+  }
+  return std::make_unique<RuntimeProgramWrapper>(std::move(program));
+}
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,17 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#pragma once
+
+#include "gpu/ProgramCreator.h"
 #include "tgfx/gpu/RuntimeEffect.h"
-#include "gpu/ResourceKey.h"
 
 namespace tgfx {
-RuntimeEffect::RuntimeEffect(UniqueType type,
-                             const std::vector<std::shared_ptr<Image>>& extraInputs)
-    : uniqueType(std::move(type)), extraInputs(extraInputs) {
-  uniqueType.addStrong();
-}
+class RuntimeProgramCreator : public ProgramCreator {
+ public:
+  explicit RuntimeProgramCreator(std::shared_ptr<RuntimeEffect> effect)
+      : effect(std::move(effect)) {
+  }
 
-RuntimeEffect::~RuntimeEffect() {
-  uniqueType.releaseStrong();
-}
+  void computeProgramKey(Context* context, BytesKey* programKey) const override;
+
+  std::unique_ptr<Program> createProgram(Context* context) const override;
+
+ private:
+  std::shared_ptr<RuntimeEffect> effect = nullptr;
+};
 }  // namespace tgfx

@@ -19,7 +19,6 @@
 #pragma once
 
 #include "gpu/Resource.h"
-#include "gpu/ResourceHandle.h"
 
 namespace tgfx {
 /**
@@ -33,24 +32,21 @@ class ResourceProxy {
   /**
    * Retrieves the context associated with this ResourceProxy.
    */
-  Context* getContext() const {
+  virtual Context* getContext() const {
     return context;
-  }
-
-  /**
-   * Returns the UniqueKey associated with this ResourceProxy.
-   */
-  const UniqueKey& getUniqueKey() const {
-    return handle.key();
   }
 
  protected:
   Context* context = nullptr;
-  ResourceHandle handle = {};
+  mutable std::shared_ptr<Resource> resource = nullptr;
 
-  explicit ResourceProxy(UniqueKey uniqueKey) : handle(std::move(uniqueKey)) {
+  explicit ResourceProxy(std::shared_ptr<Resource> resource) : resource(std::move(resource)) {
   }
 
+  ResourceProxy() = default;
+
+  friend class ResourceTask;
+  friend class ShapeBufferUploadTask;
   friend class ProxyProvider;
 };
 }  // namespace tgfx

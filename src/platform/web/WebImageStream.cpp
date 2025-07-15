@@ -19,7 +19,7 @@
 #include "platform/web/WebImageStream.h"
 #include "gpu/Gpu.h"
 #include "gpu/Texture.h"
-#include "gpu/opengl/GLSampler.h"
+#include "gpu/opengl/GLTextureSampler.h"
 
 namespace tgfx {
 using namespace emscripten;
@@ -50,13 +50,10 @@ std::shared_ptr<Texture> WebImageStream::onMakeTexture(Context* context, bool mi
 }
 
 bool WebImageStream::onUpdateTexture(std::shared_ptr<Texture> texture, const Rect&) {
-  auto glSampler = static_cast<const GLSampler*>(texture->getSampler());
+  auto sampler = static_cast<GLTextureSampler*>(texture->getSampler());
   val::module_property("tgfx").call<void>("uploadToTexture", emscripten::val::module_property("GL"),
-                                          source, glSampler->id, alphaOnly);
-  if (glSampler->hasMipmaps()) {
-    auto gpu = texture->getContext()->gpu();
-    gpu->regenerateMipmapLevels(glSampler);
-  }
+                                          source, sampler->id(), alphaOnly);
+  sampler->regenerateMipmapLevels(texture->getContext());
   return true;
 }
 

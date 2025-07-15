@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cmath>
+#include <cstdint>
 #include <cstring>
 
 namespace tgfx {
@@ -109,4 +110,23 @@ template <typename T>
 constexpr inline bool IsPow2(T value) {
   return (value & (value - 1)) == 0;
 }
+
+/**
+ *  Returns the log2 of the specified value, were that value to be rounded up
+ *  to the next power of 2. It is undefined to pass 0. Examples:
+ *  NextLog2(1) -> 0
+ *  NextLog2(2) -> 1
+ *  NextLog2(3) -> 2
+ *  NextLog2(4) -> 2
+ *  NextLog2(5) -> 3
+ */
+int NextLog2(uint32_t value);
+
+/**
+ *  Returns the smallest power-of-2 that is >= the specified value. If value
+ *  is already a power of 2, then it is returned unchanged. It is undefined
+ *  if value is <= 0.
+ */
+int NextPow2(int value);
+
 }  // namespace tgfx

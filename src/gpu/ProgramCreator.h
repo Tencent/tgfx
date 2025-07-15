@@ -18,40 +18,29 @@
 
 #pragma once
 
-#include <CoreVideo/CoreVideo.h>
-#include "gpu/Texture.h"
+#include "gpu/Blend.h"
+#include "gpu/Program.h"
+#include "gpu/SamplerState.h"
 #include "gpu/TextureSampler.h"
+#include "gpu/UniformBuffer.h"
 
 namespace tgfx {
-class CGLHardwareTexture : public Texture {
+/**
+ * ProgramCreator is an interface for creating GPU programs. It provides methods to compute the
+ * key for the program and to create a Program instance.
+ */
+class ProgramCreator {
  public:
-  static std::shared_ptr<CGLHardwareTexture> MakeFrom(Context* context,
-                                                      CVPixelBufferRef pixelBuffer,
-                                                      CVOpenGLTextureCacheRef textureCache);
+  virtual ~ProgramCreator() = default;
 
-  explicit CGLHardwareTexture(CVPixelBufferRef pixelBuffer);
+  /**
+   * Computes the key for the program, which is used to cache the program in the ProgramCache.
+   */
+  virtual void computeProgramKey(Context* context, BytesKey* programKey) const = 0;
 
-  ~CGLHardwareTexture() override;
-
-  size_t memoryUsage() const override;
-
-  const TextureSampler* getSampler() const override {
-    return sampler.get();
-  }
-
-  HardwareBufferRef getHardwareBuffer() const override {
-    return pixelBuffer;
-  }
-
- protected:
-  void onReleaseGPU() override;
-
- private:
-  std::unique_ptr<TextureSampler> sampler = {};
-  CVPixelBufferRef pixelBuffer = nullptr;
-  CVOpenGLTextureRef texture = nil;
-  CVOpenGLTextureCacheRef textureCache = nil;
-
-  static ScratchKey ComputeScratchKey(CVPixelBufferRef pixelBuffer);
+  /**
+   * Creates a Program instance based on the current state of the ProgramCreator.
+   */
+  virtual std::unique_ptr<Program> createProgram(Context* context) const = 0;
 };
 }  // namespace tgfx

@@ -29,12 +29,18 @@
 
 namespace tgfx {
 class BackendTexture;
+class RenderTarget;
 
 /**
  * Texture describes a two-dimensional array of pixels in the GPU backend for drawing.
  */
 class Texture : public Resource {
  public:
+  /**
+   * Returns true if the specified texture size and format can be created by the GPU backend.
+   */
+  static bool CheckSizeAndFormat(Context* context, int width, int height, PixelFormat format);
+
   /**
    * Creates a new texture from the specified pixel data with each pixel stored as 32-bit RGBA
    * data. Returns nullptr if any of the parameters is invalid.
@@ -106,15 +112,8 @@ class Texture : public Resource {
    * backend texture is valid for the lifetime of returned Texture.
    */
   static std::shared_ptr<Texture> MakeFrom(Context* context, const BackendTexture& backendTexture,
-                                           ImageOrigin origin = ImageOrigin::TopLeft);
-
-  /**
-   * Creates a new Texture which wraps the specified backend texture. The returned Texture takes
-   * ownership of the specified backend texture.
-   */
-  static std::shared_ptr<Texture> MakeAdopted(Context* context,
-                                              const BackendTexture& backendTexture,
-                                              ImageOrigin origin = ImageOrigin::TopLeft);
+                                           ImageOrigin origin = ImageOrigin::TopLeft,
+                                           bool adopted = false);
 
   /**
    * Creates a Texture from the specified ImageBuffer. Returns nullptr if the context is nullptr or
@@ -127,7 +126,7 @@ class Texture : public Resource {
   /**
    * Creates a Texture from the platform-specific hardware buffer. For example, the hardware
    * buffer could be an AHardwareBuffer on the android platform or a CVPixelBufferRef on the
-   * apple platform. The returned Image takes a reference to the hardwareBuffer. The colorSpace
+   * apple platform. The returned Texture takes a reference to the hardwareBuffer. The colorSpace
    * is ignored if the hardwareBuffer contains only one plane, indicating that it is not in the YUV
    * format. Returns nullptr if the context is nullptr or the hardwareBuffer is nullptr.
    */
@@ -151,33 +150,37 @@ class Texture : public Resource {
   /**
    * Returns the display width of this texture.
    */
-  int width() const {
+  virtual int width() const {
     return _width;
   }
 
   /**
    * Returns the display height of this texture.
    */
-  int height() const {
+  virtual int height() const {
     return _height;
   }
 
   /**
    * Returns the origin of the texture, either ImageOrigin::TopLeft or ImageOrigin::BottomLeft.
    */
-  ImageOrigin origin() const {
+  virtual ImageOrigin origin() const {
     return _origin;
   }
 
   /**
    * Returns true if pixels represent transparency only.
    */
-  bool isAlphaOnly() const;
+  virtual bool isAlphaOnly() const {
+    return getSampler()->format() == PixelFormat::ALPHA_8;
+  }
 
   /**
    * Returns true if the texture has mipmap levels.
    */
-  bool hasMipmaps() const;
+  virtual bool hasMipmaps() const {
+    return getSampler()->hasMipmaps();
+  }
 
   /**
    * Returns true if this is a YUVTexture.
@@ -189,7 +192,7 @@ class Texture : public Resource {
   /**
    * Returns the default texture sampler.
    */
-  virtual const TextureSampler* getSampler() const = 0;
+  virtual TextureSampler* getSampler() const = 0;
 
   /**
    * Returns the texture coordinates in backend units corresponding to specified position in pixels.
@@ -200,21 +203,24 @@ class Texture : public Resource {
    * Retrieves the backend texture. Returns an invalid BackendTexture if the texture is a
    * YUVTexture.
    */
-  virtual BackendTexture getBackendTexture() const;
+  virtual BackendTexture getBackendTexture() const {
+    return getSampler()->getBackendTexture(_width, _height);
+  }
 
   /**
-   * Retrieves the backing hardware buffer. This method does not acquire any additional reference to
-   * the returned hardware buffer. Returns nullptr if the texture is not created from a hardware
-   * buffer.
+   * Returns the underlying render target if this texture is also a render target; otherwise, returns nullptr.
    */
-  virtual HardwareBufferRef getHardwareBuffer() const;
+  virtual std::shared_ptr<RenderTarget> asRenderTarget() const {
+    return nullptr;
+  }
 
  protected:
-  Texture(int width, int height, ImageOrigin origin);
-
- private:
   int _width = 0;
   int _height = 0;
   ImageOrigin _origin = ImageOrigin::TopLeft;
+
+  Texture(int width, int height, ImageOrigin origin)
+      : _width(width), _height(height), _origin(origin) {
+  }
 };
 }  // namespace tgfx

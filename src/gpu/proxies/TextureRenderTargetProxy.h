@@ -18,24 +18,65 @@
 
 #pragma once
 
+#include "DefaultTextureProxy.h"
 #include "RenderTargetProxy.h"
 
 namespace tgfx {
-class TextureRenderTargetProxy : public RenderTargetProxy {
+class TextureRenderTargetProxy : public DefaultTextureProxy,
+                                 public RenderTargetProxy,
+                                 public std::enable_shared_from_this<TextureRenderTargetProxy> {
  public:
-  std::shared_ptr<TextureProxy> getTextureProxy() const override {
-    return textureProxy;
+  Context* getContext() const override {
+    return context;
   }
 
- private:
-  std::shared_ptr<TextureProxy> textureProxy = nullptr;
-
-  TextureRenderTargetProxy(UniqueKey uniqueKey, std::shared_ptr<TextureProxy> textureProxy,
-                           PixelFormat format, int sampleCount)
-      : RenderTargetProxy(std::move(uniqueKey), textureProxy->width(), textureProxy->height(),
-                          format, sampleCount, textureProxy->origin()),
-        textureProxy(std::move(textureProxy)) {
+  int width() const override {
+    return _width;
   }
+
+  int height() const override {
+    return _height;
+  }
+
+  PixelFormat format() const override {
+    return _format;
+  }
+
+  int sampleCount() const override {
+    return _sampleCount;
+  }
+
+  ImageOrigin origin() const override {
+    return _origin;
+  }
+
+  bool externallyOwned() const override {
+    return _externallyOwned;
+  }
+
+  std::shared_ptr<TextureProxy> asTextureProxy() const override {
+    return std::const_pointer_cast<TextureRenderTargetProxy>(shared_from_this());
+  }
+
+  std::shared_ptr<RenderTargetProxy> asRenderTargetProxy() const override {
+    return std::const_pointer_cast<TextureRenderTargetProxy>(shared_from_this());
+  }
+
+  std::shared_ptr<Texture> getTexture() const override {
+    return DefaultTextureProxy::getTexture();
+  }
+
+  std::shared_ptr<RenderTarget> getRenderTarget() const override;
+
+ protected:
+  int _sampleCount = 1;
+  bool _externallyOwned = false;
+
+  TextureRenderTargetProxy(int width, int height, PixelFormat format, int sampleCount,
+                           bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft,
+                           BackingFit backingFit = BackingFit::Exact, bool externallyOwned = false);
+
+  std::shared_ptr<Texture> onMakeTexture(Context* context) const override;
 
   friend class ProxyProvider;
 };

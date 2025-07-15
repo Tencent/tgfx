@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,33 +18,22 @@
 
 #pragma once
 
-#include "gpu/Texture.h"
+#include "TextureRenderTargetProxy.h"
 
 namespace tgfx {
-/**
- * Texture that has a single 2D texture sampler.
- */
-class PlainTexture : public Texture {
+class HardwareRenderTargetProxy : public TextureRenderTargetProxy {
  public:
-  /**
-   * Returns true if the specified texture size and format can be created by the GPU backend.
-   */
-  static bool CheckSizeAndFormat(Context* context, int width, int height, PixelFormat format);
-
-  PlainTexture(std::unique_ptr<TextureSampler> sampler, int width, int height, ImageOrigin origin);
-
-  size_t memoryUsage() const override;
-
-  const TextureSampler* getSampler() const override {
-    return sampler.get();
-  }
+  ~HardwareRenderTargetProxy() override;
 
  protected:
-  void onReleaseGPU() override;
+  std::shared_ptr<Texture> onMakeTexture(Context* context) const override;
 
  private:
-  std::unique_ptr<TextureSampler> sampler = {};
+  HardwareBufferRef hardwareBuffer = nullptr;
 
-  friend class Texture;
+  HardwareRenderTargetProxy(HardwareBufferRef hardwareBuffer, int width, int height,
+                            PixelFormat format, int sampleCount);
+
+  friend class ProxyProvider;
 };
 }  // namespace tgfx

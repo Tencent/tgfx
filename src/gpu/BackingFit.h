@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,29 +18,20 @@
 
 #pragma once
 
-#include "gpu/Resource.h"
-#include "tgfx/gpu/RuntimeProgram.h"
-
 namespace tgfx {
-class RuntimeResource : public Resource {
- public:
-  static std::shared_ptr<RuntimeResource> Wrap(const UniqueKey& uniqueKey,
-                                               std::unique_ptr<RuntimeProgram> program);
+/**
+ * Indicates whether a backing store needs to be an exact match or can be larger than is strictly
+ * necessary.
+*/
+enum class BackingFit {
+  /**
+   * The backing store must be an exact match for the requested size.
+   */
+  Exact = 0,
 
-  size_t memoryUsage() const override {
-    return 0;
-  }
-
-  RuntimeProgram* getProgram() const {
-    return program.get();
-  }
-
- private:
-  std::unique_ptr<RuntimeProgram> program = nullptr;
-
-  explicit RuntimeResource(std::unique_ptr<RuntimeProgram> program) : program(std::move(program)) {
-  }
-
-  void onReleaseGPU() override;
+  /**
+   * The backing store can be larger than the requested size, but should not be smaller.
+   */
+  Approx = 1,
 };
 }  // namespace tgfx

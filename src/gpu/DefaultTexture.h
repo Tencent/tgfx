@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,30 +18,28 @@
 
 #pragma once
 
-#include "gpu/TextureSampler.h"
-#include "tgfx/gpu/opengl/GLDefines.h"
+#include "gpu/Texture.h"
 
 namespace tgfx {
 /**
- * Defines the sampling parameters for an OpenGL texture uint.
+ * DefaultTexture is a simple texture implementation that stores pixel data using a single sampler.
  */
-class GLSampler : public TextureSampler {
+class DefaultTexture : public Texture {
  public:
-  /**
-   * The OpenGL texture id of the sampler.
-   */
-  unsigned id = 0;
+  DefaultTexture(std::unique_ptr<TextureSampler> sampler, int width, int height,
+                 ImageOrigin origin = ImageOrigin::TopLeft);
 
-  /**
-   * The OpenGL texture target of the sampler.
-   */
-  unsigned target = GL_TEXTURE_2D;
+  size_t memoryUsage() const override;
 
-  SamplerType type() const override;
-
-  BackendTexture getBackendTexture(int width, int height) const override;
+  TextureSampler* getSampler() const override {
+    return _sampler.get();
+  }
 
  protected:
-  void computeKey(Context* context, BytesKey* bytesKey) const override;
+  std::unique_ptr<TextureSampler> _sampler = {};
+
+  void onReleaseGPU() override {
+    _sampler->releaseGPU(context);
+  }
 };
 }  // namespace tgfx

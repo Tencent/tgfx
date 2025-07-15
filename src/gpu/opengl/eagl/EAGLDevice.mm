@@ -175,14 +175,6 @@ CVOpenGLESTextureCacheRef EAGLDevice::getTextureCache() {
   return textureCache;
 }
 
-void EAGLDevice::releaseTexture(CVOpenGLESTextureRef texture) {
-  if (texture == nil || textureCache == nil) {
-    return;
-  }
-  CFRelease(texture);
-  CVOpenGLESTextureCacheFlush(textureCache, 0);
-}
-
 bool EAGLDevice::onMakeCurrent() {
   return makeCurrent();
 }

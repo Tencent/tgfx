@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,47 +18,59 @@
 
 #pragma once
 
-#include "gpu/proxies/TextureProxy.h"
+#include "gpu/opengl/GLRenderTarget.h"
 
 namespace tgfx {
-
-class FlattenTextureProxy : public TextureProxy {
+class GLBackendRenderTarget : public GLRenderTarget {
  public:
+  GLBackendRenderTarget(Context* context, int width, int height, ImageOrigin origin,
+                        PixelFormat format, unsigned frameBufferID)
+      : context(context), _width(width), _height(height), _origin(origin), _format(format),
+        frameBufferID(frameBufferID) {
+  }
+
+  Context* getContext() const override {
+    return context;
+  }
+
   int width() const override {
-    return source->width();
+    return _width;
   }
 
   int height() const override {
-    return source->height();
+    return _height;
   }
 
   ImageOrigin origin() const override {
-    return ImageOrigin::TopLeft;
+    return _origin;
   }
 
-  bool hasMipmaps() const override {
-    return source->hasMipmaps();
+  int sampleCount() const override {
+    return 1;
   }
 
-  bool isAlphaOnly() const override {
-    return source->isAlphaOnly();
+  PixelFormat format() const override {
+    return _format;
   }
 
   bool externallyOwned() const override {
-    return source->externallyOwned();
-  }
-
-  bool isFlatten() const override {
     return true;
   }
 
-  std::shared_ptr<Texture> getTexture() const override;
+  unsigned readFrameBufferID() const override {
+    return frameBufferID;
+  }
+
+  unsigned drawFrameBufferID() const override {
+    return frameBufferID;
+  }
 
  private:
-  std::shared_ptr<TextureProxy> source = nullptr;
-
-  FlattenTextureProxy(UniqueKey uniqueKey, std::shared_ptr<TextureProxy> source);
-
-  friend class ProxyProvider;
+  Context* context = nullptr;
+  int _width = 0;
+  int _height = 0;
+  ImageOrigin _origin = ImageOrigin::TopLeft;
+  PixelFormat _format = PixelFormat::RGBA_8888;
+  unsigned frameBufferID = 0;
 };
 }  // namespace tgfx

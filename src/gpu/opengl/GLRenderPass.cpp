@@ -21,6 +21,7 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/ProgramCache.h"
 #include "gpu/opengl/GLProgram.h"
+#include "gpu/opengl/GLRenderTarget.h"
 
 namespace tgfx {
 struct AttribLayout {
@@ -118,7 +119,7 @@ static void UpdateBlend(Context* context, const BlendFormula* blendFactors) {
 void GLRenderPass::onBindRenderTarget() {
   auto gl = GLFunctions::Get(context);
   auto glRT = static_cast<GLRenderTarget*>(_renderTarget.get());
-  gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->getFrameBufferID());
+  gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->drawFrameBufferID());
   gl->viewport(0, 0, glRT->width(), glRT->height());
   if (vertexArray) {
     gl->bindVertexArray(vertexArray->id());
@@ -133,9 +134,8 @@ void GLRenderPass::onUnbindRenderTarget() {
   gl->bindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-bool GLRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
-                                               const Rect& scissorRect) {
-  _program = static_cast<GLProgram*>(context->programCache()->getProgram(programInfo));
+bool GLRenderPass::onBindProgramAndScissorClip(const Pipeline* pipeline, const Rect& scissorRect) {
+  _program = static_cast<GLProgram*>(context->programCache()->getProgram(pipeline));
   if (_program == nullptr) {
     return false;
   }
@@ -144,11 +144,11 @@ bool GLRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
   auto* program = static_cast<GLProgram*>(_program);
   gl->useProgram(program->programID());
   UpdateScissor(context, scissorRect);
-  UpdateBlend(context, programInfo->blendFormula());
-  if (programInfo->requiresBarrier()) {
+  UpdateBlend(context, pipeline->blendFormula());
+  if (pipeline->requiresBarrier()) {
     gl->textureBarrier();
   }
-  program->updateUniformsAndTextureBindings(_renderTarget.get(), programInfo);
+  program->updateUniformsAndTextureBindings(_renderTarget.get(), pipeline);
   return true;
 }
 
@@ -206,16 +206,18 @@ void GLRenderPass::onCopyToTexture(Texture* texture, int srcX, int srcY) {
   auto gpu = context->gpu();
   if (_renderTarget->sampleCount() > 1) {
     if (copyAsBlit(texture, srcX, srcY)) {
+      texture->getSampler()->regenerateMipmapLevels(context);
       return;
     }
     auto bounds = Rect::MakeXYWH(srcX, srcY, texture->width(), texture->height());
     gpu->resolveRenderTarget(_renderTarget.get(), bounds);
   }
   gpu->copyRenderTargetToTexture(_renderTarget.get(), texture, srcX, srcY);
+  texture->getSampler()->regenerateMipmapLevels(context);
   // Reset the render target after the copy operation.
   auto gl = GLFunctions::Get(context);
   gl->bindFramebuffer(GL_FRAMEBUFFER,
-                      static_cast<GLRenderTarget*>(_renderTarget.get())->getFrameBufferID());
+                      static_cast<GLRenderTarget*>(_renderTarget.get())->drawFrameBufferID());
 }
 
 bool GLRenderPass::copyAsBlit(Texture* texture, int srcX, int srcY) {
@@ -226,8 +228,9 @@ bool GLRenderPass::copyAsBlit(Texture* texture, int srcX, int srcY) {
   if (caps->blitRectsMustMatchForMSAASrc && (srcX != 0 || srcY != 0)) {
     return false;
   }
-  auto glSampler = static_cast<const GLSampler*>(texture->getSampler());
-  if (glSampler->format != _renderTarget->format()) {
+  auto glSampler = static_cast<const GLTextureSampler*>(texture->getSampler());
+  auto target = glSampler->target();
+  if (glSampler->format() != _renderTarget->format()) {
     return false;
   }
   if (frameBuffer == nullptr) {
@@ -238,10 +241,10 @@ bool GLRenderPass::copyAsBlit(Texture* texture, int srcX, int srcY) {
   }
   ClearGLError(context);
   auto gl = GLFunctions::Get(context);
+
   gl->bindFramebuffer(GL_FRAMEBUFFER, frameBuffer->id());
-  gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, glSampler->target, glSampler->id,
-                           0);
-  auto sourceFrameBufferID = static_cast<GLRenderTarget*>(_renderTarget.get())->getFrameBufferID();
+  gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, target, glSampler->id(), 0);
+  auto sourceFrameBufferID = static_cast<GLRenderTarget*>(_renderTarget.get())->drawFrameBufferID();
 #ifndef TGFX_BUILD_FOR_WEB
   if (gl->checkFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
     gl->bindFramebuffer(GL_FRAMEBUFFER, sourceFrameBufferID);
@@ -260,11 +263,7 @@ bool GLRenderPass::copyAsBlit(Texture* texture, int srcX, int srcY) {
     return false;
   }
   gl->bindFramebuffer(GL_FRAMEBUFFER, frameBuffer->id());
-  gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, glSampler->target, 0, 0);
-  if (glSampler->hasMipmaps() && glSampler->target == GL_TEXTURE_2D) {
-    gl->bindTexture(glSampler->target, glSampler->id);
-    gl->generateMipmap(glSampler->target);
-  }
+  gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, target, 0, 0);
   gl->bindFramebuffer(GL_FRAMEBUFFER, sourceFrameBufferID);
   return true;
 }
