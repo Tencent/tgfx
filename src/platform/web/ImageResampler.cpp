@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #ifndef TGFX_USE_THREADS
 #include "platform/ImageResampler.h"
-#include "tgfx/core/Buffer.h"
 #include "CopyDataFromUint8Array.h"
+#include "tgfx/core/Buffer.h"
 
 using namespace emscripten;
 
