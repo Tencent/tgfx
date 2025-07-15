@@ -33,6 +33,8 @@ export class ShareData {
     public zoom: number = 1.0;
     public offsetX: number = 0;
     public offsetY: number = 0;
+    public animationFrameId: number | null = null;
+    public isPageVisible: boolean = true;
 }
 
 enum ScaleGestureState {
@@ -224,14 +226,35 @@ export function onResizeEvent(shareData: ShareData) {
     updateSize(shareData);
 }
 
+function handleVisibilityChange(shareData: ShareData) {
+    shareData.isPageVisible = !document.hidden;
+    if (shareData.isPageVisible && shareData.animationFrameId === null) {
+        animationLoop(shareData);
+    }
+}
+
 export function animationLoop(shareData: ShareData) {
     const frame = async (timestamp: number) => {
-        if (shareData.tgfxBaseView ) {
+        if (shareData.tgfxBaseView && shareData.isPageVisible) {
             await draw(shareData);
+            shareData.animationFrameId = requestAnimationFrame(frame);
+        } else {
+            shareData.animationFrameId = null;
         }
-        requestAnimationFrame(frame);
     };
-    requestAnimationFrame(frame);
+    shareData.animationFrameId = requestAnimationFrame(frame);
+}
+
+export function setupVisibilityListeners(shareData: ShareData) {
+    if (typeof window !== 'undefined') {
+        document.addEventListener('visibilitychange', () => handleVisibilityChange(shareData));
+        window.addEventListener('beforeunload', () => {
+            if (shareData.animationFrameId !== null) {
+                cancelAnimationFrame(shareData.animationFrameId);
+                shareData.animationFrameId = null;
+            }
+        });
+    }
 }
 
 export function onClickEvent(shareData: ShareData) {

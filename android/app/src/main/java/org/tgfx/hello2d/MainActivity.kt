@@ -68,6 +68,22 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    override fun onStop() {
+        super.onStop()
+        animator?.pause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        animator?.resume()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        animator?.cancel()
+        animator = null
+    }
+
     private fun setupGesture() {
         scaleGestureDetector = ScaleGestureDetector(this,
             object : ScaleGestureDetector.SimpleOnScaleGestureListener() {

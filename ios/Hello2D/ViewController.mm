@@ -65,6 +65,27 @@ static const float MaxZoom = 1000.0f;
 
   self.displayLink = [CADisplayLink displayLinkWithTarget:self selector:@selector(update:)];
   [self.displayLink addToRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(appDidEnterBackground:)
+                                               name:UIApplicationDidEnterBackgroundNotification
+                                             object:nil];
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(appWillEnterForeground:)
+                                               name:UIApplicationWillEnterForegroundNotification
+                                             object:nil];
+}
+
+- (void)appDidEnterBackground:(NSNotification*)notification {
+  [self.displayLink setPaused:YES];
+}
+
+- (void)appWillEnterForeground:(NSNotification*)notification {
+  [self.displayLink setPaused:NO];
+}
+
+- (void)dealloc {
+  [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
 - (void)viewDidLayoutSubviews {

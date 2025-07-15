@@ -58,6 +58,27 @@ static const float ScrollWheelZoomSensitivity = 120.0f;
   self.zoomScale = 1.0f;
   self.contentOffset = CGPointZero;
   [self setupDisplayLink];
+
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(appDidEnterBackground:)
+                                               name:NSApplicationDidResignActiveNotification
+                                             object:nil];
+  [[NSNotificationCenter defaultCenter] addObserver:self
+                                           selector:@selector(appWillEnterForeground:)
+                                               name:NSApplicationWillBecomeActiveNotification
+                                             object:nil];
+}
+
+- (void)appDidEnterBackground:(NSNotification*)notification {
+  if (_displayLink) {
+    CVDisplayLinkStop(_displayLink);
+  }
+}
+
+- (void)appWillEnterForeground:(NSNotification*)notification {
+  if (_displayLink) {
+    CVDisplayLinkStart(_displayLink);
+  }
 }
 
 - (void)updateContentView {
@@ -65,10 +86,11 @@ static const float ScrollWheelZoomSensitivity = 120.0f;
 }
 
 - (void)dealloc {
+  [[NSNotificationCenter defaultCenter] removeObserver:self];
   if (_displayLink) {
     CVDisplayLinkStop(_displayLink);
     CVDisplayLinkRelease(_displayLink);
-    _displayLink = NULL;
+    _displayLink = nullptr;
   }
 }
 

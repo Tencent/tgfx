@@ -7,9 +7,11 @@ public:
     explicit DisplayLink(std::function<void()> callback);
     ~DisplayLink();
     void start();
+    void pause();
 
 private:
     static void VSyncCallback(long long, void* data);
     OH_NativeVSync* vSync = nullptr;
-    std::function<void()> callback;
+    std::function<void()> callback = nullptr;
+    bool isPaused = false;
 };

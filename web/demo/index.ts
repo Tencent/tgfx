@@ -25,6 +25,7 @@ import {
     onResizeEvent,
     onClickEvent,
     animationLoop,
+    setupVisibilityListeners,
     loadImage,
     bindCanvasZoomAndPanEvents
 } from "./common";
@@ -55,6 +56,7 @@ if (typeof window !== 'undefined') {
             const canvas = document.getElementById('hello2d');
             bindCanvasZoomAndPanEvents(canvas, shareData);
             animationLoop(shareData);
+            setupVisibilityListeners(shareData);
         } catch (error) {
             console.error(error);
             throw new Error("Hello2D init failed. Please check the .wasm file path!.");

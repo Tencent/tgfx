@@ -31,6 +31,14 @@ struct Index {
     hello2d.startDrawLoop();
   }
 
+  onPageHide(): void {
+    hello2d.pauseDrawLoop();
+  }
+
+  onPageShow(): void {
+    hello2d.startDrawLoop();
+  }
+
   build() {
     Row() {
       Column() {

@@ -6,12 +6,13 @@
 #include "DisplayLink.h"
 
 static float screenDensity = 1.0f;
-static std::shared_ptr<drawers::AppHost> appHost = nullptr;
-static std::shared_ptr<tgfx::Window> window = nullptr;
 static double drawIndex = 0;
 static double zoomScale = 1;
 static double contentOffsetX = 0;
 static double contentOffsetY = 0;
+static std::shared_ptr<drawers::AppHost> appHost = nullptr;
+static std::shared_ptr<tgfx::Window> window = nullptr;
+static std::shared_ptr<DisplayLink> displayLink = nullptr;
 
 static std::shared_ptr<drawers::AppHost> CreateAppHost();
 
@@ -89,11 +90,21 @@ static napi_value UpdateDrawParams(napi_env env, napi_callback_info info) {
   return nullptr;
 }
 
-static napi_value StartDrawLoop(napi_env , napi_callback_info ) {
-    auto displayLink = new DisplayLink([]() {
-      Draw(static_cast<int>(drawIndex), static_cast<float>(zoomScale), static_cast<float>(contentOffsetX), static_cast<float>(contentOffsetY));
-  });
+static napi_value StartDrawLoop(napi_env, napi_callback_info) {
+    if (displayLink == nullptr) {
+        displayLink = std::make_shared<DisplayLink>([&]() {
+            Draw(static_cast<int>(drawIndex), static_cast<float>(zoomScale),
+                 static_cast<float>(contentOffsetX), static_cast<float>(contentOffsetY));
+        });
+    }
     displayLink->start();
+    return nullptr;
+}
+
+static napi_value PauseDrawLoop(napi_env, napi_callback_info) {
+    if (displayLink != nullptr) {
+        displayLink->pause();
+    }
     return nullptr;
 }
 
@@ -138,6 +149,7 @@ static void OnSurfaceChangedCB(OH_NativeXComponent* component, void* nativeWindo
 
 static void OnSurfaceDestroyedCB(OH_NativeXComponent*, void*) {
   window = nullptr;
+  displayLink = nullptr;
 }
 
 static void DispatchTouchEventCB(OH_NativeXComponent*, void*) {
@@ -178,9 +190,10 @@ static napi_value Init(napi_env env, napi_value exports) {
   napi_property_descriptor desc[] = {
       {"startDrawLoop", nullptr, StartDrawLoop, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"updateDrawParams", nullptr, UpdateDrawParams, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"pauseDrawLoop", nullptr, PauseDrawLoop, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"updateDensity", nullptr, OnUpdateDensity, nullptr, nullptr, nullptr, napi_default, nullptr},
-      {"addImageFromEncoded", nullptr, AddImageFromEncoded, nullptr, nullptr, nullptr, napi_default,
-       nullptr}};
+      {"addImageFromEncoded", nullptr, AddImageFromEncoded, nullptr, nullptr, nullptr, napi_default, nullptr},
+  };
   napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
   RegisterCallback(env, exports);
   return exports;
