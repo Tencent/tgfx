@@ -399,23 +399,6 @@ struct Rect {
   bool intersect(const Rect& a, const Rect& b);
 
   /**
-   * Constructs Rect to intersect from (left, top, right, bottom). Does not sort construction.
-   * Returns true if Rect intersects construction.
-   * Returns false if either construction or Rect is empty, or do not intersect.
-   */
-  bool intersects(float l, float t, float r, float b) const {
-    return Intersects(left, top, right, bottom, l, t, r, b);
-  }
-
-  /**
-   * Returns true if Rect intersects r. Returns false if either r or Rect is empty, or do not
-   * intersect.
-   */
-  bool intersects(const Rect& r) const {
-    return Intersects(left, top, right, bottom, r.left, r.top, r.right, r.bottom);
-  }
-
-  /**
    * Returns true if a intersects b. Returns false if either a or b is empty, or do not intersect.
    */
   static bool Intersects(const Rect& a, const Rect& b) {
