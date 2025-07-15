@@ -18,9 +18,9 @@
 
 #include "OpsCompositor.h"
 #include "core/Atlas.h"
+#include "core/PathRasterizer.h"
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
-#include "core/Rasterizer.h"
 #include "core/utils/RectToRectMatrix.h"
 #include "core/utils/Types.h"
 #include "gpu/DrawingManager.h"
@@ -542,7 +542,7 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
     context->drawingManager()->addOpsRenderTask(std::move(clipRenderTarget), std::move(opList));
   } else {
     auto rasterizer =
-        Rasterizer::MakeFrom(width, height, clip, aaType != AAType::None, rasterizeMatrix);
+        PathRasterizer::MakeFrom(width, height, clip, aaType != AAType::None, &rasterizeMatrix);
     clipTexture = proxyProvider()->createTextureProxy({}, rasterizer, false, renderFlags);
   }
   clipKey = uniqueKey;
