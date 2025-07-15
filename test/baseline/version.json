@@ -98,7 +98,7 @@
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "da590da",
         "ImageWithShadow": "67961560",
-        "SimpleLayerTreeDrawer": "67961560",
+        "SimpleLayerTreeDrawer": "9b1a0dfc",
         "SimpleText": "d7f154de"
     },
     "DstTextureTest": {
@@ -182,7 +182,7 @@
         "backgroundLayerBlur": "67961560",
         "draw_shape": "67961560",
         "draw_solid": "b4a1231",
-        "draw_text": "d5164a4e",
+        "draw_text": "9b1a0dfc",
         "dropShadow": "67961560",
         "filterClip": "c475bfb",
         "filterTest": "67961560",
