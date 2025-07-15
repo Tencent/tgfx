@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <vector>
+#include "core/GlyphRunList.h"
 #include "core/images/BufferImage.h"
 #include "core/vectors/freetype/FTMask.h"
 #include "tgfx/core/Mask.h"
@@ -76,5 +77,17 @@ TGFX_TEST(MaskTest, Rasterize) {
   canvas = surface->getCanvas();
   canvas->drawImage(glyphImage);
   EXPECT_TRUE(Baseline::Compare(surface, "MaskTest/rasterize_emoji"));
+
+  mask = Mask::Make(200, 100);
+  matrix = Matrix::MakeTrans(25, 60);
+  mask->setMatrix(matrix);
+  typeface = Typeface::MakeFromPath(ProjectPath::Absolute("resources/font/NotoSansSC-Regular.otf"));
+  std::string text = "HelloTGFX";
+  font = Font(typeface, 30);
+  Stroke stroke(1.f);
+  auto textBlob = TextBlob::MakeFrom(text, font);
+  mask->fillText(textBlob.get(), &stroke);
+  maskBuffer = std::static_pointer_cast<PixelBuffer>(mask->makeBuffer());
+  EXPECT_TRUE(Baseline::Compare(maskBuffer, "MaskTest/rasterize_text"));
 }
 }  // namespace tgfx

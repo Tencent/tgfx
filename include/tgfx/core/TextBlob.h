@@ -60,23 +60,24 @@ class TextBlob {
   virtual ~TextBlob() = default;
 
   /**
-   * Returns the quick, conservative bounding box of the TextBlob. Returned bounds may be larger
-   * than the bounds of all glyphs in TextBlob
-   * @return A bounding box that's guaranteed to contain all text.
+   * Returns a conservative bounding box for the TextBlob that is guaranteed to contain all glyphs.
+   * It may be larger than the actual bounds, but it is faster to compute.
    */
   Rect getBounds() const;
 
   /**
-   * Returns the tight bounding box of TextBlob. If a matrix is provided, the bounds will be
-   * transformed accordingly. Compared to getBounds, this method is more accurate but also more
-   * computationally expensive.
+   * Returns the tight bounding box of the TextBlob when drawn with the given Matrix. Because text
+   * outlines can vary with different scale factors, it's best to use the final drawing matrix for
+   * accurate bounds. This method is more accurate than getBounds, but also more computationally
+   * expensive.
    */
   Rect getTightBounds(const Matrix* matrix = nullptr) const;
 
   /**
-   * Creates a Path for the glyphs in the text blob. If a matrix is provided, the path will be
-   * transformed accordingly. Returns true if the path was successfully created. Otherwise,
-   * returns false and leaves the path unchanged.
+   * Creates a Path for the glyphs in the text blob. Since text outlines can change with different
+   * scale factors, it's best to use the final drawing matrix to compute an accurate Path.
+   * Returns true if the path was created successfully; otherwise, returns false and leaves the
+   * path unchanged.
    */
   bool getPath(Path* path, const Matrix* matrix = nullptr) const;
 

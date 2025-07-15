@@ -21,7 +21,6 @@
 #include "core/utils/FauxBoldScale.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
-#include "tgfx/core/PathEffect.h"
 #include "tgfx/core/TextBlob.h"
 
 namespace tgfx {
@@ -36,7 +35,6 @@ GlyphRunList::GlyphRunList(GlyphRun glyphRun) {
   DEBUG_ASSERT(!glyphRun.glyphs.empty());
   DEBUG_ASSERT(glyphRun.glyphs.size() == glyphRun.positions.size());
   _glyphRuns.push_back(std::move(glyphRun));
-  _bounds = conservativeBounds();
 }
 
 GlyphRunList::GlyphRunList(std::vector<GlyphRun> glyphRuns) : _glyphRuns(std::move(glyphRuns)) {
@@ -47,7 +45,15 @@ GlyphRunList::GlyphRunList(std::vector<GlyphRun> glyphRuns) : _glyphRuns(std::mo
                                     glyphRun.glyphs.size() == glyphRun.positions.size() &&
                                     glyphRun.font.hasColor() == hasColor;
                            }));
-  _bounds = conservativeBounds();
+}
+
+Rect GlyphRunList::getBounds() const {
+  if (auto cachedBounds = bounds.get()) {
+    return *cachedBounds;
+  }
+  Rect totalBounds = computeConservativeBounds();
+  bounds.update(totalBounds);
+  return totalBounds;
 }
 
 Rect GlyphRunList::getTightBounds(const Matrix* matrix) const {
@@ -82,10 +88,9 @@ Rect GlyphRunList::getTightBounds(const Matrix* matrix) const {
   return totalBounds;
 }
 
-Rect GlyphRunList::conservativeBounds() const {
+Rect GlyphRunList::computeConservativeBounds() const {
   Rect finalBounds = {};
   Matrix transformMat = {};
-  constexpr float TextSize = 2048.f;
   for (auto& run : _glyphRuns) {
     auto& font = run.font;
     transformMat.reset();
@@ -93,14 +98,12 @@ Rect GlyphRunList::conservativeBounds() const {
     if (font.isFauxItalic()) {
       transformMat.postSkew(ITALIC_SKEW, 0.0f);
     }
-    auto size2048Font = font.makeWithSize(TextSize);
-    auto metrics = size2048Font.getMetrics();
-    auto fontBounds = Rect::MakeLTRB(metrics.xMin, metrics.top, metrics.xMax, metrics.bottom);
-    if (fontBounds.isEmpty()) {
+    auto typeface = font.getTypeface();
+    if (typeface == nullptr || typeface->getBounds().isEmpty()) {
       finalBounds.setEmpty();
       break;
     }
-    fontBounds.scale(1.0f / TextSize, 1.0f / TextSize);
+    auto fontBounds = typeface->getBounds();
     if (font.isFauxBold()) {
       auto fauxBoldScale = FauxBoldScale(font.getSize());
       fontBounds.outset(fauxBoldScale, fauxBoldScale);
@@ -144,6 +147,9 @@ bool GlyphRunList::getPath(Path* path, const Matrix* matrix) const {
         auto& position = positions[index];
         auto glyphMatrix = Matrix::MakeScale(1.0f / resolutionScale, 1.0f / resolutionScale);
         glyphMatrix.postTranslate(position.x, position.y);
+        if (matrix) {
+          glyphMatrix.postConcat(*matrix);
+        }
         glyphPath.transform(glyphMatrix);
         totalPath.addPath(glyphPath);
       } else {
@@ -151,9 +157,6 @@ bool GlyphRunList::getPath(Path* path, const Matrix* matrix) const {
       }
       index++;
     }
-  }
-  if (matrix) {
-    totalPath.transform(*matrix);
   }
   *path = std::move(totalPath);
   return true;

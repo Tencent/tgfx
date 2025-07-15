@@ -70,14 +70,9 @@ class GlyphRunList {
   }
 
   /**
-   * Returns conservative bounding box of the glyphs in this run. Uses Font associated with each glyph
-   * position to determine glyph bounds, and unions all bounds. Returned bounds may be larger than the
-   * bounds of all glyphs in runs.
-   * @return conservative bounding box
+   * Computes glyph bounds using the font bounds and each glyph's position
    */
-  const Rect& getBounds() const {
-    return _bounds;
-  }
+  Rect getBounds() const;
 
   /**
    * Returns the tight bounding box of the glyphs in this run. If a matrix is provided, the bounds
@@ -95,8 +90,8 @@ class GlyphRunList {
 
  private:
   std::vector<GlyphRun> _glyphRuns = {};
-  Rect _bounds = {};
+  LazyBounds bounds = {};
 
-  Rect conservativeBounds() const;
+  Rect computeConservativeBounds() const;
 };
 }  // namespace tgfx

@@ -4,7 +4,8 @@
 
 namespace tgfx {
 
-void ApplyStrokeToBounds(const Stroke& stroke, Rect* bounds, bool applyMiterLimit) {
+void ApplyStrokeToBounds(const Stroke& stroke, Rect* bounds, float scaleFactor,
+                         bool applyMiterLimit) {
   if (bounds == nullptr) {
     return;
   }
@@ -12,19 +13,7 @@ void ApplyStrokeToBounds(const Stroke& stroke, Rect* bounds, bool applyMiterLimi
   if (applyMiterLimit && stroke.join == LineJoin::Miter) {
     expand *= stroke.miterLimit;
   }
-  expand = ceilf(expand);
-  bounds->outset(expand, expand);
-}
-void ApplyStrokeToScaledBounds(const Stroke& stroke, Rect* bounds, float resolutionScale,
-                               bool applyMiterLimit) {
-  if (bounds == nullptr || FloatNearlyZero(resolutionScale)) {
-    return;
-  }
-  auto expand = stroke.width * 0.5f;
-  if (applyMiterLimit && stroke.join == LineJoin::Miter) {
-    expand *= stroke.miterLimit;
-  }
-  expand = ceilf(expand) * resolutionScale;
+  expand = ceilf(expand) * scaleFactor;
   bounds->outset(expand, expand);
 }
 

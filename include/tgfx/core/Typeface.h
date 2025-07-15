@@ -23,6 +23,7 @@
 #include <vector>
 #include "tgfx/core/Data.h"
 #include "tgfx/core/FontStyle.h"
+#include "tgfx/core/Rect.h"
 
 namespace tgfx {
 /**
@@ -138,6 +139,13 @@ class Typeface {
    */
   virtual std::shared_ptr<Data> copyTableData(FontTableTag tag) const = 0;
 
+  /**
+   * Returns a rectangle that represents the union of the bounds of all the glyphs, but each one
+   * positioned at (0,0). This may be conservatively large, and will not take into account any
+   * hitting or other size-specific adjustments.
+   */
+  Rect getBounds() const;
+
  protected:
   /**
    * Gets the mapping from GlyphID to unicode. The array index is GlyphID, and the array value is
@@ -160,7 +168,11 @@ class Typeface {
 
   virtual bool isCustom() const;
 
+  bool computeBounds(Rect* bounds) const;
+
   std::unordered_map<float, std::weak_ptr<ScalerContext>> scalerContexts = {};
+
+  mutable Rect bounds = {};
 
   friend class Font;
   friend class ScalerContext;

@@ -20,6 +20,7 @@
 #include <vector>
 #include "core/ScalerContext.h"
 #include "core/utils/UniqueID.h"
+#include "tgfx/core/Font.h"
 #include "tgfx/core/UTF.h"
 
 namespace tgfx {
@@ -122,5 +123,32 @@ std::shared_ptr<ScalerContext> Typeface::getScalerContext(float size) {
   }
   scalerContexts[size] = context;
   return context;
+}
+
+Rect Typeface::getBounds() const {
+  std::once_flag onceFlag;
+  std::call_once(onceFlag, [this] {
+    if (!computeBounds(&bounds)) {
+      bounds.setEmpty();
+    }
+  });
+  return bounds;
+}
+
+bool Typeface::computeBounds(Rect* bounds) const {
+  constexpr float TextSize = 2048.f;
+  constexpr float InvTextSize = 1.0f / TextSize;
+  auto scaleContext = onCreateScalerContext(TextSize);
+  if (scaleContext == nullptr) {
+    return false;
+  }
+  auto metrics = scaleContext->getFontMetrics();
+  //Check if the bounds is empty
+  if (metrics.xMin >= metrics.xMax || metrics.top >= metrics.bottom) {
+    return false;
+  }
+  bounds->setLTRB(metrics.xMin * InvTextSize, metrics.top * InvTextSize, metrics.xMax * InvTextSize,
+                  metrics.bottom * InvTextSize);
+  return true;
 }
 }  // namespace tgfx

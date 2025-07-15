@@ -23,14 +23,9 @@
 
 namespace tgfx {
 /**
- * Applies the stroke options to the given bounds.
+ * Applies the stroke options to the given bounds. Note that if scaleFactor != 1.0 means the bounds
+ * have been scaled by scaleFactor. So the stroke expand factor is also scaled accordingly.
  */
-void ApplyStrokeToBounds(const Stroke& stroke, Rect* bounds, bool applyMiterLimit = false);
-
-/**
- * Applies stroke options to the given bounds. Note that the bounds have been scaled
- * by resolutionScale. So the stroke expand factor is also scaled accordingly.
- */
-void ApplyStrokeToScaledBounds(const Stroke& stroke, Rect* bounds, float resolutionScale,
-                               bool applyMiterLimit = false);
+void ApplyStrokeToBounds(const Stroke& stroke, Rect* bounds, float scaleFactor = 1.0f,
+                         bool applyMiterLimit = false);
 }  // namespace tgfx
