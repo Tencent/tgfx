@@ -83,10 +83,11 @@ std::shared_ptr<Texture> RuntimeDrawTask::GetFlatTexture(
   auto renderTargetProxy = RenderTargetProxy::MakeFallback(
       context, texture->width(), texture->height(), texture->isAlphaOnly(), 1,
       texture->hasMipmaps(), ImageOrigin::TopLeft, BackingFit::Exact);
-  auto renderTarget = renderTargetProxy->getRenderTarget();
-  if (renderTarget == nullptr) {
+  if (renderTargetProxy == nullptr) {
     LOGE("RuntimeDrawTask::getFlatTexture() Failed to create the render target!");
+    return nullptr;
   }
+  auto renderTarget = renderTargetProxy->getRenderTarget();
   if (!renderPass->begin(renderTarget)) {
     LOGE("RuntimeDrawTask::getFlatTexture() Failed to initialize the render pass!");
     return nullptr;
