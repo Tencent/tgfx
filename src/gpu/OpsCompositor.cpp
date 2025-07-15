@@ -290,7 +290,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     if (type != PendingOpType::Unknown) {
       pendingType = type;
       pendingClip = std::move(clip);
-      pendingFill = fill;
+      pendingFill = std::move(fill);
     }
     return;
   }
