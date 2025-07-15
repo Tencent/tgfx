@@ -24,9 +24,10 @@
 using namespace emscripten;
 
 namespace tgfx {
-std::shared_ptr<PathRasterizer> PathRasterizer::Make(int width, int height,
-                                                     std::shared_ptr<Shape> shape, bool antiAlias,
-                                                     bool needsGammaCorrection) {
+std::shared_ptr<PathRasterizer> PathRasterizer::MakeFrom(int width, int height,
+                                                         std::shared_ptr<Shape> shape,
+                                                         bool antiAlias,
+                                                         bool needsGammaCorrection) {
   if (shape == nullptr || width <= 0 || height <= 0) {
     return nullptr;
   }

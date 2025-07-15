@@ -82,7 +82,7 @@ static void Iterator(PathVerb verb, const Point points[4], void* info) {
 }
 
 void WebMask::onFillPath(const Path& path, const Matrix& matrix, bool /*antiAlias*/, bool) {
-  // The antiAlias parameter is ignored because the canvas2d API does not support anti-aliasing.
+  // The antiAlias parameter is ignored because the canvas-2d API does not support antialiasing.
   if (path.isEmpty()) {
     return;
   }

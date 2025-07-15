@@ -41,18 +41,17 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_p
                                                                    const TPArgs& args) const {
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(clipBounds.width()), static_cast<int>(clipBounds.height()),
-      source->isAlphaOnly(), effect->sampleCount(), args.mipmapped);
+      source->isAlphaOnly(), effect->sampleCount(), args.mipmapped, ImageOrigin::TopLeft,
+      BackingFit::Approx);
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto proxyProvider = args.context->proxyProvider();
-  std::vector<std::shared_ptr<TextureProxy>> textureProxies;
+  std::vector<std::shared_ptr<TextureProxy>> textureProxies = {};
   textureProxies.reserve(1 + effect->extraInputs.size());
   // Request a texture proxy from the source image without mipmaps to save memory.
   // It may be ignored if the source image has preset mipmaps.
-  TPArgs tpArgs(args.context, args.renderFlags, false);
+  TPArgs tpArgs(args.context, args.renderFlags, false, BackingFit::Exact);
   auto textureProxy = source->lockTextureProxy(tpArgs);
-  textureProxy = proxyProvider->flattenTextureProxy(std::move(textureProxy));
   if (textureProxy == nullptr) {
     return nullptr;
   }
@@ -64,7 +63,6 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_p
       return nullptr;
     }
     textureProxy = input->lockTextureProxy(tpArgs);
-    textureProxy = proxyProvider->flattenTextureProxy(std::move(textureProxy));
     if (textureProxy == nullptr) {
       return nullptr;
     }

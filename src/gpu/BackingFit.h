@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,26 +18,20 @@
 
 #pragma once
 
-#include "core/Rasterizer.h"
-
 namespace tgfx {
 /**
- * A Rasterizer that rasterizes a set of glyphs.
- */
-class TextRasterizer : public Rasterizer {
- public:
-  TextRasterizer(int width, int height, std::shared_ptr<GlyphRunList> glyphRunList, bool antiAlias,
-                 const Matrix& matrix, const Stroke* stroke);
+ * Indicates whether a backing store needs to be an exact match or can be larger than is strictly
+ * necessary.
+*/
+enum class BackingFit {
+  /**
+   * The backing store must be an exact match for the requested size.
+   */
+  Exact = 0,
 
-  ~TextRasterizer() override;
-
- protected:
-  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
-
- private:
-  std::shared_ptr<GlyphRunList> glyphRunList = nullptr;
-  bool antiAlias = true;
-  Matrix matrix = {};
-  Stroke* stroke = nullptr;
+  /**
+   * The backing store can be larger than the requested size, but should not be smaller.
+   */
+  Approx = 1,
 };
 }  // namespace tgfx

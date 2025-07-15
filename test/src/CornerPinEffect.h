@@ -22,17 +22,6 @@
 #include "utils/FilterProgram.h"
 
 namespace tgfx {
-static constexpr uint32_t InvalidUniqueID = 0;
-
-static uint32_t NextProgramID() {
-  static std::atomic<uint32_t> nextID{1};
-  uint32_t id;
-  do {
-    id = nextID.fetch_add(1, std::memory_order_relaxed);
-  } while (id == InvalidUniqueID);
-  return id;
-}
-
 class CornerPinUniforms : public Uniforms {
  public:
   int positionHandle = -1;
@@ -44,10 +33,7 @@ class CornerPinEffect : public RuntimeEffect {
   static std::shared_ptr<CornerPinEffect> Make(const Point& upperLeft, const Point& upperRight,
                                                const Point& lowerRight, const Point& lowerLeft);
 
-  uint32_t programID() const override {
-    static auto CornerPinEffectID = NextProgramID();
-    return CornerPinEffectID;
-  }
+  uint32_t programID() const override;
 
   int sampleCount() const override {
     return 4;

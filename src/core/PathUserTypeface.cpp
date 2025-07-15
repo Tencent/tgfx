@@ -121,7 +121,7 @@ class PathUserScalerContext final : public UserScalerContext {
     auto shape = Shape::MakeFrom(pathProvider);
     shape = Shape::ApplyStroke(std::move(shape), stroke);
     shape = Shape::ApplyMatrix(std::move(shape), matrix);
-    auto rasterizer = PathRasterizer::Make(width, height, std::move(shape), true, true);
+    auto rasterizer = PathRasterizer::MakeFrom(width, height, std::move(shape), true, true);
     if (rasterizer == nullptr) {
       return false;
     }

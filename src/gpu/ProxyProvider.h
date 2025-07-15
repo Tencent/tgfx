@@ -21,6 +21,7 @@
 #include "core/utils/BlockBuffer.h"
 #include "core/utils/SlidingWindowTracker.h"
 #include "gpu/AAType.h"
+#include "gpu/BackingFit.h"
 #include "gpu/VertexProvider.h"
 #include "gpu/proxies/GpuBufferProxy.h"
 #include "gpu/proxies/GpuShapeProxy.h"
@@ -115,12 +116,8 @@ class ProxyProvider {
                                                    int height, PixelFormat format,
                                                    bool mipmapped = false,
                                                    ImageOrigin origin = ImageOrigin::TopLeft,
+                                                   BackingFit backingFit = BackingFit::Exact,
                                                    uint32_t renderFlags = 0);
-
-  /**
-   * Creates a flattened TextureProxy for the given TextureProxy.
-   */
-  std::shared_ptr<TextureProxy> flattenTextureProxy(std::shared_ptr<TextureProxy> source);
 
   /**
    * Creates a TextureProxy for the provided BackendTexture. If adopted is true, the backend
@@ -151,7 +148,8 @@ class ProxyProvider {
    */
   std::shared_ptr<RenderTargetProxy> createRenderTargetProxy(
       const UniqueKey& uniqueKey, int width, int height, PixelFormat format, int sampleCount = 1,
-      bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft, uint32_t renderFlags = 0);
+      bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft,
+      BackingFit backingFit = BackingFit::Exact, uint32_t renderFlags = 0);
 
   /*
    * Purges all unreferenced proxies.

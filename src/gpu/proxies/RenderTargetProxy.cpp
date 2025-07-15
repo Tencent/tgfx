@@ -78,16 +78,17 @@ std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFrom(
 }
 
 std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFallback(Context* context, int width,
-                                                                   int height, bool isAlphaOnly,
+                                                                   int height, bool alphaOnly,
                                                                    int sampleCount, bool mipmapped,
-                                                                   ImageOrigin origin) {
+                                                                   ImageOrigin origin,
+                                                                   BackingFit backingFit) {
   if (context == nullptr) {
     return nullptr;
   }
   auto alphaRenderable = context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
-  auto format = isAlphaOnly && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
+  auto format = alphaOnly && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
   return context->proxyProvider()->createRenderTargetProxy({}, width, height, format, sampleCount,
-                                                           mipmapped, origin);
+                                                           mipmapped, origin, backingFit);
 }
 
 std::shared_ptr<TextureProxy> RenderTargetProxy::makeTextureProxy(int width, int height) const {
@@ -102,4 +103,16 @@ std::shared_ptr<RenderTargetProxy> RenderTargetProxy::makeRenderTargetProxy(int 
   return getContext()->proxyProvider()->createRenderTargetProxy({}, width, height, format(),
                                                                 sampleCount());
 }
+
+Matrix RenderTargetProxy::getOriginTransform() const {
+  if (origin() == ImageOrigin::TopLeft) {
+    return Matrix::I();
+  }
+  auto textureProxy = asTextureProxy();
+  auto offset = textureProxy ? textureProxy->backingStoreHeight() : height();
+  auto result = Matrix::MakeScale(1.0f, -1.0f);
+  result.postTranslate(0.0f, static_cast<float>(offset));
+  return result;
+}
+
 }  // namespace tgfx
