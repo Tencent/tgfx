@@ -78,7 +78,7 @@ std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFrom(
 }
 
 std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFallback(Context* context, int width,
-                                                                   int height, bool isAlphaOnly,
+                                                                   int height, bool alphaOnly,
                                                                    int sampleCount, bool mipmapped,
                                                                    ImageOrigin origin,
                                                                    BackingFit backingFit) {
@@ -86,7 +86,7 @@ std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFallback(Context* cont
     return nullptr;
   }
   auto alphaRenderable = context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
-  auto format = isAlphaOnly && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
+  auto format = alphaOnly && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
   return context->proxyProvider()->createRenderTargetProxy({}, width, height, format, sampleCount,
                                                            mipmapped, origin, backingFit);
 }

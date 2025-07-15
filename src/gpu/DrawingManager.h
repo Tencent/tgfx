@@ -19,14 +19,11 @@
 #pragma once
 
 #include <map>
-#include <unordered_map>
 #include <vector>
-#include "core/AtlasTypes.h"
 #include "gpu/OpsCompositor.h"
 #include "gpu/tasks/OpsRenderTask.h"
 #include "gpu/tasks/RenderTask.h"
 #include "gpu/tasks/ResourceTask.h"
-#include "gpu/tasks/TextureFlattenTask.h"
 
 namespace tgfx {
 struct AtlasCellData {
@@ -60,8 +57,6 @@ class DrawingManager {
 
   void addTextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTarget);
 
-  void addTextureFlattenTask(UniqueKey uniqueKey, std::shared_ptr<TextureProxy> textureProxy);
-
   void addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
                                std::shared_ptr<TextureProxy> dest);
 
@@ -88,7 +83,6 @@ class DrawingManager {
   BlockBuffer* drawingBuffer = nullptr;
   std::unique_ptr<RenderPass> renderPass = nullptr;
   std::vector<PlacementPtr<ResourceTask>> resourceTasks = {};
-  std::vector<PlacementPtr<TextureFlattenTask>> flattenTasks = {};
   std::vector<PlacementPtr<RenderTask>> renderTasks = {};
   std::list<std::shared_ptr<OpsCompositor>> compositors = {};
   std::vector<std::shared_ptr<Task>> atlasCellCodecTasks = {};
