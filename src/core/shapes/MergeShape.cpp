@@ -60,7 +60,7 @@ Rect MergeShape::getBounds() const {
       return second->isInverseFillType() ? secondBounds : firstBounds;
     case PathOp::Intersect:
       if (first->isInverseFillType() == second->isInverseFillType()) {
-        return firstBounds.intersects(secondBounds) ? firstBounds : Rect::MakeEmpty();
+        return firstBounds.intersect(secondBounds) ? firstBounds : Rect::MakeEmpty();
       }
       return first->isInverseFillType() ? secondBounds : firstBounds;
     default:

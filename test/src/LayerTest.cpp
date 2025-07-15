@@ -564,7 +564,7 @@ TGFX_TEST(LayerTest, shapeLayer) {
         EXPECT_EQ(shapeLayerRect, Rect::MakeLTRB(-10, -10, 170, 110));
         break;
       case 1:
-        EXPECT_EQ(shapeLayerRect, Rect::MakeLTRB(-30, 70, 190, 230));
+        EXPECT_EQ(shapeLayerRect, Rect::MakeLTRB(10, 110, 150, 190));
         break;
       case 2:
         EXPECT_EQ(shapeLayerRect, Rect::MakeLTRB(-30, 170, 190, 330));
