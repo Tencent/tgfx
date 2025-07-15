@@ -79,6 +79,11 @@
         "url": "https://github.com/xtensor-stack/xsimd.git",
         "commit": "1f8dd9c8e162968d9b4ff0251c56d431b8777f36",
         "dir": "third_party/xsimd"
+      },
+      {
+        "url": "https://github.com/google/highway.git",
+        "commit": "a523516d35e22a4ba8e2e70a319062cb87352de6",
+        "dir": "third_party/highway"
       }
     ]
   },

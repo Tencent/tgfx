@@ -17,10 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Rect.h"
+#include "condition.h"
 #include <xsimd/xsimd.hpp>
 #include "SIMDVec.h"
-#define XSIMD
-//#define skiaVx
 namespace tgfx {
 void Rect::scale(float scaleX, float scaleY) {
   left *= scaleX;
@@ -30,7 +29,41 @@ void Rect::scale(float scaleX, float scaleY) {
 }
 
 bool Rect::setBounds(const Point pts[], int count) {
-#ifdef skiaVx
+#ifdef NSIMD
+  if (count <= 0) {
+    this->setEmpty();
+    return true;
+  }
+  float minX, maxX;
+  float minY, maxY;
+  minX = maxX = pts[0].x;
+  minY = maxY = pts[0].y;
+
+  for (int i = 1; i < count; i++) {
+    auto x = pts[i].x;
+    auto y = pts[i].y;
+    auto isFinite = ((x + y) * 0 == 0);
+    if (!isFinite) {
+      setEmpty();
+      return false;
+    }
+    if (x < minX) {
+      minX = x;
+    }
+    if (x > maxX) {
+      maxX = x;
+    }
+    if (y < minY) {
+      minY = y;
+    }
+    if (y > maxY) {
+      maxY = y;
+    }
+  }
+  setLTRB(minX, minY, maxX, maxY);
+  return true;
+#endif
+#ifdef SKSIMD
   if (count <= 0) {
     this->setEmpty();
     return false;
@@ -63,7 +96,8 @@ bool Rect::setBounds(const Point pts[], int count) {
     this->setEmpty();
     return false;
   }
-#elif defined(XSIMD)
+#endif
+#ifdef XSIMD
   using simdType = xsimd::batch<float>;
   if (count <= 0) {
     this->setEmpty();

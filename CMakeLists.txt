@@ -338,6 +338,8 @@ if (TGFX_BUILD_SVG)
     list(APPEND TGFX_INCLUDES third_party/expat)
 endif ()
 
+list(APPEND TGFX_STATIC_VENDORS highway)
+list(APPEND TGFX_INCLUDES third_party/highway)
 if (WEB)
     file(GLOB_RECURSE PLATFORM_FILES src/platform/web/*.*)
     list(APPEND TGFX_FILES ${PLATFORM_FILES})

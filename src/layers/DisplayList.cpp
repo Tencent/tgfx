@@ -113,40 +113,40 @@ static int64_t ChangeZoomScalePrecision(int64_t zoomScaleInt, int oldPrecision, 
 
 DisplayList::DisplayList() : _root(RootLayer::Make()) {
   _root->_root = _root.get();
-  Clock clock;
-  Matrix m;
-  m.setAll(1.2f, 1.2f, 1.2f, 0.8f, 1.2f, 1.5f);
-  constexpr int pointNum = 3000;
-  Point src[pointNum];
-  Point dst[pointNum];
-  for(int i= 0; i < pointNum; i++) {
-    src[i].x = (float)i * 0.123f;
-    src[i].y = (float)i * -0.256f;
-  }
-  clock.mark("mapPointsStart");
-  m.mapPoints(dst, src, pointNum);
-  clock.mark("mapPointsEnd");
-  Rect srcRect = {100, 100, 500, 500};
-  Rect dstRect;
-  clock.mark("mapRectStart");
-  for(int i= 0; i < pointNum; i++) {
-    srcRect.left += (float)i;
-    srcRect.top += (float)i;
-    srcRect.right += (float)i;
-    srcRect.bottom += (float)i;
-    m.mapRect(&dstRect, srcRect);
-  }
-  clock.mark("mapRectEnd");
-  printf("mapPoints: \n");
-  printf("num: %d \n", pointNum);
-  printf("time: %lld \n", clock.measure("mapPointsStart", "mapPointsEnd"));
-  printf("mapRectTime: %lld \n", clock.measure("mapRectStart", "mapRectEnd"));
-
-  Rect rect;
-  clock.mark("setBounds");
-  rect.setBounds(dst, pointNum);
-  clock.mark("setboundend");
-  printf("setBounds: %lld \n", clock.measure("setBounds", "setboundend"));
+  // Clock clock;
+  // Matrix m;
+  // m.setAll(1.2f, 1.2f, 1.2f, 0.8f, 1.2f, 1.5f);
+  // constexpr int pointNum = 3000;
+  // Point src[pointNum];
+  // Point dst[pointNum];
+  // for(int i= 0; i < pointNum; i++) {
+  //   src[i].x = (float)i * 0.123f;
+  //   src[i].y = (float)i * -0.256f;
+  // }
+  // clock.mark("mapPointsStart");
+  // m.mapPoints(dst, src, pointNum);
+  // clock.mark("mapPointsEnd");
+  // Rect srcRect = {100, 100, 500, 500};
+  // Rect dstRect;
+  // clock.mark("mapRectStart");
+  // for(int i= 0; i < pointNum; i++) {
+  //   srcRect.left += (float)i;
+  //   srcRect.top += (float)i;
+  //   srcRect.right += (float)i;
+  //   srcRect.bottom += (float)i;
+  //   m.mapRect(&dstRect, srcRect);
+  // }
+  // clock.mark("mapRectEnd");
+  // printf("mapPoints: \n");
+  // printf("num: %d \n", pointNum);
+  // printf("time: %lld \n", clock.measure("mapPointsStart", "mapPointsEnd"));
+  // printf("mapRectTime: %lld \n", clock.measure("mapRectStart", "mapRectEnd"));
+  //
+  // Rect rect;
+  // clock.mark("setBounds");
+  // rect.setBounds(dst, pointNum);
+  // clock.mark("setboundend");
+  // printf("setBounds: %lld \n", clock.measure("setBounds", "setboundend"));
 }
 
 DisplayList::~DisplayList() {

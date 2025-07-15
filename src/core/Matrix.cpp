@@ -20,9 +20,9 @@
 #include <cfloat>
 #include "SIMDVec.h"
 #include "core/utils/MathExtra.h"
-#define XSIMD
-//#define skiaVx
+#include "condition.h"
 #include "xsimd/xsimd.hpp"
+#include "MathDynamic.h"
 namespace tgfx {
 
 void Matrix::reset() {
@@ -362,7 +362,11 @@ void Matrix::IdentityPts(const Matrix&, Point dst[], const Point src[], int coun
 }
 
 void Matrix::TransPts(const Matrix& m, Point dst[], const Point src[], int count) {
-#ifdef skiaVx
+  (void)m;
+  (void)dst;
+  (void)src;
+  (void)count;
+#ifdef SKSIMD
   if (count > 0) {
     float tx = m.getTranslateX();
     float ty = m.getTranslateY();
@@ -387,7 +391,8 @@ void Matrix::TransPts(const Matrix& m, Point dst[], const Point src[], int count
       dst += 4;
     }
   }
-#elif defined(XSIMD)
+#endif
+#ifdef XSIMD
   if(count > 0) {
     auto* fdst = reinterpret_cast<float*>(&dst[0]);
     const auto* fsrc = reinterpret_cast<const float*>(&src[0]);
@@ -412,10 +417,17 @@ void Matrix::TransPts(const Matrix& m, Point dst[], const Point src[], int count
     }
   }
 #endif
+#ifdef HIGHWAY
+  TransPtsDynamic(m, dst, src, count);
+#endif
 }
 
 void Matrix::ScalePts(const Matrix& m, Point dst[], const Point src[], int count) {
-#ifdef skiaVx
+  (void)m;
+  (void)dst;
+  (void)src;
+  (void)count;
+#ifdef SKSIMD
   if (count > 0) {
     float tx = m.getTranslateX();
     float ty = m.getTranslateY();
@@ -445,7 +457,8 @@ void Matrix::ScalePts(const Matrix& m, Point dst[], const Point src[], int count
       dst += 4;
     }
   }
-#elif defined(XSIMD)
+#endif
+#ifdef XSIMD
   if(count > 0) {
     auto* fdst = reinterpret_cast<float*>(&dst[0]);
     const auto* fsrc = reinterpret_cast<const float*>(&src[0]);
@@ -475,10 +488,17 @@ void Matrix::ScalePts(const Matrix& m, Point dst[], const Point src[], int count
     }
   }
 #endif
+#ifdef HIGHWAY
+  ScalePtsDynamic(m, dst, src, count);
+#endif
 }
 
 void Matrix::AfflinePts(const Matrix& m, Point dst[], const Point src[], int count) {
-#ifdef skiaVx
+  (void)m;
+  (void)dst;
+  (void)src;
+  (void)count;
+#ifdef SKSIMD
   if (count > 0) {
     float tx = m.getTranslateX();
     float ty = m.getTranslateY();
@@ -508,7 +528,8 @@ void Matrix::AfflinePts(const Matrix& m, Point dst[], const Point src[], int cou
       (src4 * scale4 + swz4 * skew4 + trans4).lo.store(dst);
     }
   }
-#elif defined(XSIMD)
+#endif
+#ifdef XSIMD
   if(count > 0) {
     auto* fdst = reinterpret_cast<float*>(&dst[0]);
     const auto* fsrc = reinterpret_cast<const float*>(&src[0]);
@@ -563,6 +584,9 @@ void Matrix::AfflinePts(const Matrix& m, Point dst[], const Point src[], int cou
     }
   }
 #endif
+#ifdef HIGHWAY
+  AfflinePtsDynamic(m, dst, src, count);
+#endif
 }
 
 bool Matrix::invertNonIdentity(Matrix* inverse) const {
@@ -611,7 +635,21 @@ bool Matrix::invertNonIdentity(Matrix* inverse) const {
 }
 
 void Matrix::mapPoints(Point dst[], const Point src[], int count) const {
+#ifdef NSIMD
+  auto tx = values[TRANS_X];
+  auto ty = values[TRANS_Y];
+  auto sx = values[SCALE_X];
+  auto sy = values[SCALE_Y];
+  auto kx = values[SKEW_X];
+  auto ky = values[SKEW_Y];
+  for (int i = 0; i < count; i++) {
+    auto x = src[i].x * sx + src[i].y * kx + tx;
+    auto y = src[i].x * ky + src[i].y * sy + ty;
+    dst[i].set(x, y);
+  }
+#else
   this->getMapPtsProc()(*this, dst, src, count);
+#endif
 }
 
 void Matrix::mapXY(float x, float y, Point* result) const {
@@ -643,7 +681,16 @@ bool Matrix::rectStaysRect() const {
 }
 
 void Matrix::mapRect(Rect* dst, const Rect& src) const {
-#ifdef skiaVx
+#ifdef NSIMD
+  Point quad[4];
+  quad[0].set(src.left, src.top);
+  quad[1].set(src.right, src.top);
+  quad[2].set(src.right, src.bottom);
+  quad[3].set(src.left, src.bottom);
+  mapPoints(quad, quad, 4);
+  dst->setBounds(quad, 4);
+#endif
+#ifdef SKSIMD
   if (this->getType() <= TranslateMask) {
     float tx = values[TRANS_X];
     float ty = values[TRANS_Y];
@@ -668,7 +715,8 @@ void Matrix::mapRect(Rect* dst, const Rect& src) const {
     mapPoints(quad, quad, 4);
     dst->setBounds(quad, 4);
   }
-#elif defined(XSIMD)
+#endif
+#ifdef XSIMD
   using simdType = xsimd::batch<float>;
   if (this->getType() <= TranslateMask) {
     float tx = values[TRANS_X];
