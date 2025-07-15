@@ -33,7 +33,8 @@ RuntimeDrawTask::RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
       offset(offset) {
 }
 
-bool RuntimeDrawTask::execute(RenderPass* renderPass) {
+bool RuntimeDrawTask::onExecute(RenderPass* renderPass,
+                                std::shared_ptr<RenderTargetProxy> renderTargetProxy) {
   std::vector<std::shared_ptr<Texture>> inputTextures = {};
   inputTextures.reserve(inputs.size());
   for (size_t i = 0; i < inputs.size(); i++) {
@@ -42,7 +43,7 @@ bool RuntimeDrawTask::execute(RenderPass* renderPass) {
       texture = GetFlatTexture(renderPass, inputs[i]);
     }
     if (texture == nullptr) {
-      LOGE("RuntimeDrawTask::execute() Failed to get the input %d texture!", i);
+      LOGE("RuntimeDrawTask::onExecute() Failed to get the input %d texture!", i);
       return false;
     }
     inputTextures.push_back(texture);
@@ -50,14 +51,14 @@ bool RuntimeDrawTask::execute(RenderPass* renderPass) {
 
   auto renderTarget = renderTargetProxy->getRenderTarget();
   if (renderTarget == nullptr) {
-    LOGE("RuntimeDrawTask::execute() Failed to get the render target!");
+    LOGE("RuntimeDrawTask::onExecute() Failed to get the render target!");
     return false;
   }
   auto context = renderPass->getContext();
   RuntimeProgramCreator programCreator(effect);
   auto program = context->programCache()->getProgram(&programCreator);
   if (program == nullptr) {
-    LOGE("RuntimeDrawTask::execute() Failed to create the runtime program!");
+    LOGE("RuntimeDrawTask::onExecute() Failed to create the runtime program!");
     return false;
   }
   std::vector<BackendTexture> backendTextures = {};
