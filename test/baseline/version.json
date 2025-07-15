@@ -64,7 +64,7 @@
         "drawImageRect": "606f8195",
         "drawPaint": "b7aefeb",
         "drawPaint_shadow": "67961560",
-        "drawShape": "ea225887",
+        "drawShape": "d7f154de",
         "emojiTextStrokeBlending": "67961560",
         "filter_mode_linear": "c475bfb",
         "filter_mode_nearest": "d010fb8",
@@ -94,12 +94,12 @@
     },
     "DrawersTest": {
         "ConicGradient": "69683f78",
-        "CustomLayerTreeDrawer": "d5164a4e",
+        "CustomLayerTreeDrawer": "d7f154de",
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "da590da",
         "ImageWithShadow": "67961560",
         "SimpleLayerTreeDrawer": "67961560",
-        "SimpleText": "d5164a4e"
+        "SimpleText": "d7f154de"
     },
     "DstTextureTest": {
         "EmptyLocalBounds": "be94e666",
@@ -166,7 +166,7 @@
         "LayerVisible1": "4edccb64",
         "Layer_drawRRect": "66aef718",
         "Layer_hitTestPoint": "99c36f0c",
-        "Layer_hitTestPointNested": "d5164a4e",
+        "Layer_hitTestPointNested": "d7f154de",
         "MaskAlpha": "3dbeed5",
         "ModeColorFilter": "67961560",
         "PartialBackgroundBlur": "67961560",
@@ -188,7 +188,7 @@
         "filterTest": "67961560",
         "filters": "67961560",
         "getBounds": "67961560",
-        "getLayersUnderPoint": "84ef0cb4",
+        "getLayersUnderPoint": "d7f154de",
         "getTightBounds": "ae4290b3",
         "greyColorMatrix": "a1605b2",
         "identityMatrix": "a1605b2",
