@@ -38,9 +38,9 @@ static OH_PixelmapNative_AntiAliasingLevel ToOHAntiAliasingLevel(FilterQuality q
   }
 }
 
-bool ImageResamper::Scale(const ImageInfo& srcInfo, const void* srcData, const ImageInfo& dstInfo,
-                          void* dstData, FilterQuality quality) {
-  if (srcInfo.isEmpty() || srcData == nullptr || dstInfo.isEmpty() || dstData == nullptr) {
+bool ImageResamper::Scale(const ImageInfo& srcInfo, const void* srcPixels, const ImageInfo& dstInfo,
+                          void* dstPixels, FilterQuality quality) {
+  if (srcInfo.isEmpty() || srcPixels == nullptr || dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }
   OH_Pixelmap_InitializationOptions* options = nullptr;
@@ -51,25 +51,35 @@ bool ImageResamper::Scale(const ImageInfo& srcInfo, const void* srcData, const I
   }
   Buffer srcTempBuffer = {};
   auto srcImageInfo = srcInfo;
-  auto srcPixels = srcData;
+  auto srcData = srcPixels;
   if (srcInfo.colorType() == ColorType::RGBA_1010102 ||
       srcInfo.colorType() == ColorType::RGBA_F16) {
     srcImageInfo = srcInfo.makeColorType(ColorType::RGBA_8888);
     srcTempBuffer.alloc(srcImageInfo.byteSize());
-    Pixmap(srcInfo, srcData).readPixels(srcImageInfo, srcTempBuffer.bytes());
-    srcPixels = srcTempBuffer.data();
+    Pixmap(srcInfo, srcPixels).readPixels(srcImageInfo, srcTempBuffer.bytes());
+    srcData = srcTempBuffer.data();
+  }
+
+  tgfx::Buffer dstTempBuffer = {};
+  auto dstImageInfo = dstInfo;
+  auto dstData = dstPixels;
+  if (dstInfo.colorType() == ColorType::RGBA_1010102 ||
+      dstInfo.colorType() == ColorType::RGBA_F16) {
+    dstImageInfo = dstInfo.makeColorType(srcInfo.colorType());
+    dstTempBuffer.alloc(dstImageInfo.byteSize());
+    dstData = dstTempBuffer.data();
   }
   OH_PixelmapInitializationOptions_SetWidth(options, static_cast<uint32_t>(srcImageInfo.width()));
   OH_PixelmapInitializationOptions_SetHeight(options, static_cast<uint32_t>(srcImageInfo.height()));
   OH_PixelmapInitializationOptions_SetAlphaType(
       options, OHOSImageInfo::ToOHAlphaType(srcImageInfo.alphaType()));
   OH_PixelmapInitializationOptions_SetPixelFormat(
-      options, OHOSImageInfo::ToOHPixelFormat(srcImageInfo.colorType()));
+      options, OHOSImageInfo::ToOHPixelFormat(dstImageInfo.colorType()));
   OH_PixelmapInitializationOptions_SetSrcPixelFormat(
       options, OHOSImageInfo::ToOHPixelFormat(srcImageInfo.colorType()));
   OH_PixelmapNative* pixelMap = nullptr;
-  errorCode = OH_PixelmapNative_CreatePixelmap((uint8_t*)srcPixels, srcImageInfo.byteSize(),
-                                               options, &pixelMap);
+  errorCode = OH_PixelmapNative_CreatePixelmap((uint8_t*)srcData, srcImageInfo.byteSize(), options,
+                                               &pixelMap);
   if (errorCode != Image_ErrorCode::IMAGE_SUCCESS) {
     LOGE("ImageResamper::Scale() Failed to Create PixmapNative");
     return false;
@@ -84,18 +94,10 @@ bool ImageResamper::Scale(const ImageInfo& srcInfo, const void* srcData, const I
     OH_PixelmapInitializationOptions_Release(options);
     return false;
   }
-  tgfx::Buffer dstTempBuffer = {};
-  auto dstImageInfo = dstInfo;
-  auto pixels = dstData;
-  if (srcInfo.colorType() != dstInfo.colorType()) {
-    dstImageInfo = srcImageInfo.makeWH(dstInfo.width(), dstInfo.height());
-    dstTempBuffer.alloc(dstImageInfo.byteSize());
-    pixels = dstTempBuffer.data();
-  }
   auto result = false;
   auto info = NativeCodec::GetPixelmapInfo(pixelMap);
   auto bufferSize = info.byteSize();
-  errorCode = OH_PixelmapNative_ReadPixels(pixelMap, static_cast<uint8_t*>(pixels), &bufferSize);
+  errorCode = OH_PixelmapNative_ReadPixels(pixelMap, static_cast<uint8_t*>(dstData), &bufferSize);
   if (errorCode != Image_ErrorCode::IMAGE_SUCCESS) {
     LOGE("ImageResamper::Scale() PixelmapNative Failed to ReadPixels");
   } else {
@@ -104,7 +106,7 @@ bool ImageResamper::Scale(const ImageInfo& srcInfo, const void* srcData, const I
   OH_PixelmapNative_Release(pixelMap);
   OH_PixelmapInitializationOptions_Release(options);
   if (!dstTempBuffer.isEmpty()) {
-    Pixmap(dstImageInfo, pixels).readPixels(dstInfo, dstData);
+    Pixmap(dstImageInfo, dstData).readPixels(dstInfo, dstPixels);
   }
   return result;
 }

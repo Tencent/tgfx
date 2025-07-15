@@ -38,23 +38,23 @@ static CGInterpolationQuality GetInterpolationQuality(FilterQuality quality) {
   }
 }
 
-bool ImageResamper::Scale(const ImageInfo& srcInfo, const void* srcData, const ImageInfo& dstInfo,
-                          void* dstData, FilterQuality quality) {
-  if (!srcData || srcInfo.width() == 0 || srcInfo.height() == 0) {
+bool ImageResamper::Scale(const ImageInfo& srcInfo, const void* srcPixels, const ImageInfo& dstInfo,
+                          void* dstPixels, FilterQuality quality) {
+  if (srcInfo.isEmpty() || srcPixels == nullptr || dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }
   Buffer srcTempBuffer = {};
-  auto srcPixels = srcData;
+  auto srcData = srcPixels;
   auto colorType = srcInfo.colorType();
   auto info = srcInfo;
   if (colorType != ColorType::RGBA_8888 && colorType != ColorType::BGRA_8888 &&
       colorType != ColorType::ALPHA_8) {
     info = srcInfo.makeColorType(ColorType::RGBA_8888);
     srcTempBuffer.alloc(info.byteSize());
-    Pixmap(srcInfo, srcData).readPixels(info, srcTempBuffer.bytes());
-    srcPixels = srcTempBuffer.data();
+    Pixmap(srcInfo, srcPixels).readPixels(info, srcTempBuffer.bytes());
+    srcData = srcTempBuffer.data();
   }
-  auto dataProvider = CGDataProviderCreateWithData(nullptr, srcPixels, info.byteSize(), nullptr);
+  auto dataProvider = CGDataProviderCreateWithData(nullptr, srcData, info.byteSize(), nullptr);
   if (!dataProvider) {
     return false;
   }
@@ -70,13 +70,14 @@ bool ImageResamper::Scale(const ImageInfo& srcInfo, const void* srcData, const I
   }
   Buffer dstTempBuffer = {};
   auto dstImageInfo = dstInfo;
-  auto pixels = dstData;
-  if (info.colorType() != dstInfo.colorType()) {
+  auto dstData = dstPixels;
+  if (dstInfo.colorType() != ColorType::RGBA_8888 && dstInfo.colorType() != ColorType::BGRA_8888 &&
+      dstInfo.colorType() != ColorType::ALPHA_8) {
     dstImageInfo = info.makeWH(dstInfo.width(), dstInfo.height());
     dstTempBuffer.alloc(dstImageInfo.byteSize());
-    pixels = dstTempBuffer.data();
+    dstData = dstTempBuffer.data();
   }
-  auto context = CreateBitmapContext(dstImageInfo, pixels);
+  auto context = CreateBitmapContext(dstImageInfo, dstData);
   auto result = context != nullptr;
   if (result) {
     auto interpolationQuality = GetInterpolationQuality(quality);
@@ -90,7 +91,7 @@ bool ImageResamper::Scale(const ImageInfo& srcInfo, const void* srcData, const I
     CGContextRelease(context);
   }
   if (!dstTempBuffer.isEmpty()) {
-    Pixmap(dstImageInfo, pixels).readPixels(dstInfo, dstData);
+    Pixmap(dstImageInfo, dstData).readPixels(dstInfo, dstPixels);
   }
   return true;
 }

@@ -15,10 +15,10 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
+#ifdef TGFX_USE_STB_IMAGE
 #include "platform/ImageResampler.h"
+#include "tgfx/core/Buffer.h"
 #define STB_IMAGE_RESIZE_IMPLEMENTATION
-#include <tgfx/core/Buffer.h>
 #include "stb_image_resize2.h"
 
 namespace tgfx {
@@ -64,9 +64,9 @@ static void ToStbDataTypeAndChannel(ColorType colorType, stbir_datatype* dataTyp
   }
 }
 
-bool ImageResamper::Scale(const ImageInfo& srcInfo, const void* srcData, const ImageInfo& dstInfo,
-                          void* dstData, FilterQuality quality) {
-  if (srcInfo.isEmpty() || srcData == nullptr || dstInfo.isEmpty() || dstData == nullptr) {
+bool ImageResamper::Scale(const ImageInfo& srcInfo, const void* srcPixels, const ImageInfo& dstInfo,
+                          void* dstPixles, FilterQuality quality) {
+  if (srcInfo.isEmpty() || srcPixels == nullptr || dstInfo.isEmpty() || dstPixles == nullptr) {
     return false;
   }
   auto dataType = STBIR_TYPE_UINT8;
@@ -76,31 +76,30 @@ bool ImageResamper::Scale(const ImageInfo& srcInfo, const void* srcData, const I
   Buffer srcTempBuffer = {};
   auto dstImageInfo = dstInfo;
   auto srcImageInfo = srcInfo;
-  auto srcPixels = srcData;
-  auto pixels = dstData;
+  auto srcData = srcPixels;
+  auto dstData = dstPixles;
   if (srcInfo.colorType() == ColorType::RGBA_1010102 ||
       srcInfo.colorType() == ColorType::RGBA_F16) {
     srcImageInfo = srcInfo.makeColorType(ColorType::RGBA_8888);
     srcTempBuffer.alloc(srcImageInfo.byteSize());
-    Pixmap(srcInfo, srcData).readPixels(srcImageInfo, srcTempBuffer.bytes());
-    srcPixels = srcTempBuffer.data();
+    Pixmap(srcInfo, srcPixels).readPixels(srcImageInfo, srcTempBuffer.bytes());
+    srcData = srcTempBuffer.data();
   }
-  if (srcInfo.colorType() != dstInfo.colorType() ||
-      srcInfo.colorType() == ColorType::RGBA_1010102 ||
-      srcInfo.colorType() == ColorType::RGBA_F16) {
-    dstImageInfo = srcImageInfo.makeWH(dstInfo.width(), dstInfo.height());
+  if (srcImageInfo.colorType() != dstInfo.colorType()) {
+    dstImageInfo = dstInfo.makeColorType(srcImageInfo.colorType());
     dstTempBuffer.alloc(dstImageInfo.byteSize());
-    pixels = dstTempBuffer.data();
+    dstData = dstTempBuffer.data();
   }
 
-  stbir_resize(srcPixels, srcImageInfo.width(), srcImageInfo.height(), 0, pixels,
+  stbir_resize(srcData, srcImageInfo.width(), srcImageInfo.height(), 0, dstData,
                dstImageInfo.width(), dstImageInfo.height(), 0, channel, dataType, STBIR_EDGE_CLAMP,
                ToStbFilterType(quality));
 
   if (!dstTempBuffer.isEmpty()) {
-    Pixmap(dstImageInfo, pixels).readPixels(dstInfo, dstData);
+    Pixmap(dstImageInfo, dstData).readPixels(dstInfo, dstPixles);
   }
   return true;
 }
 
 }  // namespace tgfx
+#endif

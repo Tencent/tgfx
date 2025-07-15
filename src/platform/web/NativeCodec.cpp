@@ -18,7 +18,7 @@
 
 #include "NativeCodec.h"
 #include <atomic>
-#include "CopyDataUtils.h"
+#include "CopyDataFromUint8Array.h"
 #include "WebImageBuffer.h"
 #include "WebImageInfo.h"
 #include "tgfx/core/Buffer.h"

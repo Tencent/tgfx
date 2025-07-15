@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "CopyDataUtils.h"
-#include <tgfx/core/Buffer.h>
+#include "CopyDataFromUint8Array.h"
+#include "tgfx/core/Buffer.h"
 
 namespace tgfx {
 std::shared_ptr<Data> CopyDataFromUint8Array(const val& emscriptenData) {

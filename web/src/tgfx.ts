@@ -68,7 +68,7 @@ export const setImageInterpolationQuality = (ctx: CanvasRenderingContext2D | Off
 
 export const scaleImage = (module: TGFX, bytes: Uint8Array, srcWidth: number, srcHeight: number, width: number, height: number, quality: number) => {
     const imageCanvas = getCanvas2D(srcWidth, srcHeight);
-    const imageCtx = imageCanvas.getContext('2d',{willReadFrequently: true}) as CanvasRenderingContext2D;
+    const imageCtx = imageCanvas.getContext('2d', {willReadFrequently: true}) as CanvasRenderingContext2D;
     const imageData = new ImageData(new Uint8ClampedArray(bytes), srcWidth, srcHeight)
     imageCtx.putImageData(imageData, 0, 0);
 

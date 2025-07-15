@@ -30,22 +30,19 @@ namespace tgfx {
 */
 enum class FilterQuality {
   /**
-   * Fastest possible filtering, albeit also the lowest quality Typically this implies
-   * nearest-neighbour filtering.
+   * Fastest but lowest quality, typically nearest-neighbor
    */
   None = 0,
   /**
-   * Use low quality, Better quality than None, faster than Medium, bilinear interpolation on
-   * most platforms.
+   * Better quality than None, faster than Medium, typically bilerp
    */
   Low,
   /**
-   * Use high quality, Better quality than Low, faster than High, Lanczos2 on most platforms.
+   * Better quality than Low, faster than High, typically bilerp + mipmaps for down-scaling
    */
   Medium,
   /**
-   * Use high quality, Best possible quality filtering, albeit also the slowest, Lanczos3 on
-   * most platforms.
+   * Slowest but highest quality, typically bicubic or better
    */
   High,
 };
@@ -233,8 +230,10 @@ class Pixmap {
   bool writePixels(const ImageInfo& srcInfo, const void* srcPixels, int dstX = 0, int dstY = 0);
 
   /**
-   * Scales the pixmap to dstPixels with specified ImageInfo using the given FilterQuality, performs
-   * high-quality image resizing while preserving image details.
+   * Copy the pixels from this pixmap into the dst pixmap, converting as needed into dst's
+   * colortype/alphatype. If the conversion cannot be performed, false is returned.
+   * If dst's dimensions differ from the src dimension, the image will be scaled, applying the specified
+   * filter-quality.
    */
   bool scalePixels(const ImageInfo& dstInfo, void* dstPixels, FilterQuality quality) const;
 

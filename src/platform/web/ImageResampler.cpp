@@ -15,20 +15,20 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
+#ifndef TGFX_USE_THREADS
 #include "platform/ImageResampler.h"
-#include <tgfx/core/Buffer.h>
-#include "CopyDataUtils.h"
+#include "tgfx/core/Buffer.h"
+#include "CopyDataFromUint8Array.h"
 
 using namespace emscripten;
 
 namespace tgfx {
-bool ImageResamper::Scale(const ImageInfo& srcInfo, const void* srcData, const ImageInfo& dstInfo,
-                          void* dstData, FilterQuality quality) {
-  if (srcInfo.isEmpty() || srcData == nullptr || dstInfo.isEmpty() || dstData == nullptr) {
+bool ImageResamper::Scale(const ImageInfo& srcInfo, const void* srcPixels, const ImageInfo& dstInfo,
+                          void* dstPixels, FilterQuality quality) {
+  if (srcInfo.isEmpty() || srcPixels == nullptr || dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }
-  auto bytes = val(typed_memory_view(srcInfo.byteSize(), static_cast<const uint8_t*>(srcData)));
+  auto bytes = val(typed_memory_view(srcInfo.byteSize(), static_cast<const uint8_t*>(srcPixels)));
   auto data = val::module_property("tgfx").call<val>(
       "scaleImage", val::module_property("module"), bytes, srcInfo.width(), srcInfo.height(),
       dstInfo.width(), dstInfo.height(), static_cast<int>(quality));
@@ -36,6 +36,11 @@ bool ImageResamper::Scale(const ImageInfo& srcInfo, const void* srcData, const I
   if (imageData == nullptr) {
     return false;
   }
-  return Pixmap(srcInfo, imageData->data()).readPixels(dstInfo, dstData);
+  auto scaleInfo = dstInfo;
+  if (dstInfo.colorType() != srcInfo.colorType()) {
+    scaleInfo = dstInfo.makeColorType(srcInfo.colorType());
+  }
+  return Pixmap(scaleInfo, imageData->data()).readPixels(dstInfo, dstPixels);
 }
 }  // namespace tgfx
+#endif

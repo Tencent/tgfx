@@ -52,9 +52,6 @@ elseif (NOT ANDROID AND NOT OHOS)
     option(TGFX_USE_WEBP_ENCODE "Enable embedded WEBP encoding support" ON)
 endif ()
 
-if (WIN32 OR ANDROID OR (WEB AND EMSCRIPTEN_PTHREADS) OR CMAKE_HOST_SYSTEM_NAME MATCHES "Linux")
-    option(TGFX_USE_STB "Enable building with the STB library" ON)
-endif()
 
 
 if ($ENV{CLION_IDE})
@@ -108,7 +105,6 @@ message("TGFX_USE_WEBP_ENCODE: ${TGFX_USE_WEBP_ENCODE}")
 message("TGFX_BUILD_TESTS: ${TGFX_BUILD_TESTS}")
 message("TGFX_USE_ASYNC_PROMISE: ${TGFX_USE_ASYNC_PROMISE}")
 message("TGFX_USE_INSPECTOR: ${TGFX_USE_INSPECTOR}")
-message("TGFX_USE_STB: ${TGFX_USE_STB}")
 
 if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
     if (DEPLOYMENT_TARGET)
@@ -332,10 +328,10 @@ if (TGFX_USE_INSPECTOR)
     list(APPEND TGFX_FILES ${SERIALIZATION_FILE})
 endif ()
 
-if (TGFX_USE_STB)
+if (NOT ANDROID AND NOT OHOS AND (NOT WEB OR EMSCRIPTEN_PTHREADS))
     list(APPEND TGFX_INCLUDES third_party/stb)
-    list(APPEND TGFX_FILES src/platform/mock/ImageResampler.cpp)
-endif ()
+    list(APPEND TGFX_DEFINES TGFX_USE_STB_IMAGE)
+endif()
 
 list(APPEND TGFX_STATIC_VENDORS pathkit)
 list(APPEND TGFX_INCLUDES third_party/pathkit)
