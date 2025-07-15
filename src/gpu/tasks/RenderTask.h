@@ -28,7 +28,12 @@ class RenderTask {
   virtual ~RenderTask() = default;
 
   bool execute(RenderPass* renderPass) {
-    DEBUG_ASSERT(renderTargetProxy != nullptr && renderTargetProxy.use_count() > 1);
+    DEBUG_ASSERT(renderTargetProxy != nullptr);
+    if (renderTargetProxy.use_count() < 2) {
+      // If the render target proxy is not shared with other tasks, we can skip the execution.
+      renderTargetProxy = nullptr;
+      return true;
+    }
     return onExecute(renderPass, std::move(renderTargetProxy));
   }
 
