@@ -30,7 +30,7 @@
 @property(nonatomic) CGPoint currentPinchOffset;
 @property(nonatomic) CGPoint pinchCenter;
 @property(nonatomic) BOOL isTapEnabled;
-@property(nonatomic, strong) CADisplayLink *displayLink;
+@property(nonatomic, strong) CADisplayLink* displayLink;
 @end
 
 @implementation ViewController
@@ -81,7 +81,7 @@ static const float MaxZoom = 1000.0f;
   self.currentZoom = 1.0f;
   self.currentPanOffset = CGPointZero;
   self.currentPinchOffset = CGPointZero;
-  }
+}
 
 - (void)handlePan:(UIPanGestureRecognizer*)gesture {
   CGPoint translation = [gesture translationInView:self.tgfxView];
@@ -100,8 +100,8 @@ static const float MaxZoom = 1000.0f;
                       (translation.y - self.currentPanOffset.y) * self.tgfxView.contentScaleFactor);
   self.currentPanOffset = translation;
 }
-- (void)update:(CADisplayLink *)displayLink {
-    [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
+- (void)update:(CADisplayLink*)displayLink {
+  [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
 }
 - (void)handlePinch:(UIPinchGestureRecognizer*)gesture {
   self.isTapEnabled = false;

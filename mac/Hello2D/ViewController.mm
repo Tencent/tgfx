@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "ViewController.h"
-#import "TGFXView.h"
 #import <CoreVideo/CoreVideo.h>
+#import "TGFXView.h"
 @interface ViewController ()
 @property(nonatomic) CVDisplayLinkRef displayLink;
 @property(strong, nonatomic) TGFXView* tgfxView;
@@ -29,8 +29,8 @@
 @end
 
 static CVReturn OnAnimationCallback(CVDisplayLinkRef displayLink, const CVTimeStamp* now,
-                                      const CVTimeStamp* outputTime, CVOptionFlags flagsIn,
-                                      CVOptionFlags* flagsOut, void* displayLinkContext) {
+                                    const CVTimeStamp* outputTime, CVOptionFlags flagsIn,
+                                    CVOptionFlags* flagsOut, void* displayLinkContext) {
   ViewController* controller = (__bridge ViewController*)displayLinkContext;
   [controller performSelectorOnMainThread:@selector(updateContentView)
                                withObject:nil
