@@ -82,7 +82,7 @@
         "rasterized": "606f8195",
         "rasterized_mipmap": "606f8195",
         "rasterized_scale_up": "6e76b812",
-        "saveLayer": "67961560",
+        "saveLayer": "0d4ef3f9",
         "shape": "66aef718",
         "textEmojiMixedBlendModes": "67961560",
         "textEmojiMixedBlendModes2": "67961560",
@@ -187,7 +187,7 @@
         "filterClip": "c475bfb",
         "filterTest": "67961560",
         "filters": "67961560",
-        "getBounds": "67961560",
+        "getBounds": "0d4ef3f9",
         "getLayersUnderPoint": "d7f154de",
         "getTightBounds": "ae4290b3",
         "greyColorMatrix": "a1605b2",
@@ -196,7 +196,7 @@
         "imageMask": "67961560",
         "innerShadow": "67961560",
         "shapeMask": "67961560",
-        "textMask": "67961560"
+        "textMask": "0d4ef3f9"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",
@@ -272,7 +272,7 @@
         "complex1": "ba1c7c2",
         "complex2": "67961560",
         "complex3": "a6ff60e1",
-        "complex4": "67961560",
+        "complex4": "0d4ef3f9",
         "complex5": "50136952",
         "complex6": "67961560",
         "complex7": "67961560",
