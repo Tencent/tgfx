@@ -564,7 +564,7 @@ TGFX_TEST(LayerTest, shapeLayer) {
         EXPECT_EQ(shapeLayerRect, Rect::MakeLTRB(-10, -10, 170, 110));
         break;
       case 1:
-        EXPECT_EQ(shapeLayerRect, Rect::MakeLTRB(-30, 70, 190, 230));
+        EXPECT_EQ(shapeLayerRect, Rect::MakeLTRB(10, 110, 150, 190));
         break;
       case 2:
         EXPECT_EQ(shapeLayerRect, Rect::MakeLTRB(-30, 170, 190, 330));
@@ -2836,7 +2836,7 @@ TGFX_TEST(LayerTest, BackgroundBlurStyleTest) {
   auto rootLayer = Layer::Make();
   displayList->root()->addChild(rootLayer);
   auto shapeLayer1 = ShapeLayer::Make();
-  shapeLayer1->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 0, 1)));
+  shapeLayer1->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 0, 2)));
   auto path1 = Path();
   path1.addRect(Rect::MakeXYWH(40.5f, 40.5f, 80.f, 80.f));
   shapeLayer1->setPath(path1);

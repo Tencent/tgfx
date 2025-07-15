@@ -21,12 +21,13 @@
 #include "gpu/RenderPass.h"
 
 namespace tgfx {
-bool OpsRenderTask::execute(RenderPass* renderPass) {
+bool OpsRenderTask::onExecute(RenderPass* renderPass,
+                              std::shared_ptr<RenderTargetProxy> renderTargetProxy) {
   if (ops.empty() || renderTargetProxy == nullptr) {
     return false;
   }
   if (!renderPass->begin(renderTargetProxy->getRenderTarget())) {
-    LOGE("OpsRenderTask::execute() Failed to initialize the render pass!");
+    LOGE("OpsRenderTask::onExecute() Failed to initialize the render pass!");
     return false;
   }
   auto tempOps = std::move(ops);

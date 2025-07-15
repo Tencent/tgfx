@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,29 +18,29 @@
 
 #pragma once
 
-#include "gpu/DefaultTexture.h"
+#include "gpu/Blend.h"
+#include "gpu/Program.h"
+#include "gpu/SamplerState.h"
+#include "gpu/TextureSampler.h"
+#include "gpu/UniformBuffer.h"
 
 namespace tgfx {
 /**
- * ExtendedTexture enhances DefaultTexture by allowing you to specify an extended width and height.
+ * ProgramCreator is an interface for creating GPU programs. It provides methods to compute the
+ * key for the program and to create a Program instance.
  */
-class ExtendedTexture : public DefaultTexture {
+class ProgramCreator {
  public:
-  ExtendedTexture(std::unique_ptr<TextureSampler> sampler, int width, int height, int extendedWidth,
-                  int extendedHeight, ImageOrigin origin = ImageOrigin::TopLeft);
+  virtual ~ProgramCreator() = default;
 
-  size_t memoryUsage() const override;
+  /**
+   * Computes the key for the program, which is used to cache the program in the ProgramCache.
+   */
+  virtual void computeProgramKey(Context* context, BytesKey* programKey) const = 0;
 
-  Point getTextureCoord(float x, float y) const override {
-    return {x / static_cast<float>(extendedWidth), y / static_cast<float>(extendedHeight)};
-  }
-
-  BackendTexture getBackendTexture() const override {
-    return getSampler()->getBackendTexture(extendedWidth, extendedHeight);
-  }
-
- private:
-  int extendedWidth = 0;
-  int extendedHeight = 0;
+  /**
+   * Creates a Program instance based on the current state of the ProgramCreator.
+   */
+  virtual std::unique_ptr<Program> createProgram(Context* context) const = 0;
 };
 }  // namespace tgfx

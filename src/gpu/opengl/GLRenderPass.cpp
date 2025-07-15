@@ -21,6 +21,7 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/ProgramCache.h"
 #include "gpu/opengl/GLProgram.h"
+#include "gpu/opengl/GLRenderTarget.h"
 
 namespace tgfx {
 struct AttribLayout {
@@ -133,9 +134,8 @@ void GLRenderPass::onUnbindRenderTarget() {
   gl->bindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-bool GLRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
-                                               const Rect& scissorRect) {
-  _program = static_cast<GLProgram*>(context->programCache()->getProgram(programInfo));
+bool GLRenderPass::onBindProgramAndScissorClip(const Pipeline* pipeline, const Rect& scissorRect) {
+  _program = static_cast<GLProgram*>(context->programCache()->getProgram(pipeline));
   if (_program == nullptr) {
     return false;
   }
@@ -144,11 +144,11 @@ bool GLRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
   auto* program = static_cast<GLProgram*>(_program);
   gl->useProgram(program->programID());
   UpdateScissor(context, scissorRect);
-  UpdateBlend(context, programInfo->blendFormula());
-  if (programInfo->requiresBarrier()) {
+  UpdateBlend(context, pipeline->blendFormula());
+  if (pipeline->requiresBarrier()) {
     gl->textureBarrier();
   }
-  program->updateUniformsAndTextureBindings(_renderTarget.get(), programInfo);
+  program->updateUniformsAndTextureBindings(_renderTarget.get(), pipeline);
   return true;
 }
 

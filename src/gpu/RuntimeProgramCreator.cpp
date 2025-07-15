@@ -16,16 +16,22 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "TextureProxy.h"
+#include "RuntimeProgramCreator.h"
+#include "core/utils/UniqueID.h"
+#include "gpu/RuntimeProgramWrapper.h"
+
 namespace tgfx {
-std::shared_ptr<Texture> TextureProxy::getTexture() const {
-  if (resource == nullptr) {
-    resource = onMakeTexture(context);
-    if (resource != nullptr && !uniqueKey.empty()) {
-      resource->assignUniqueKey(uniqueKey);
-    }
-  }
-  return std::static_pointer_cast<Texture>(resource);
+void RuntimeProgramCreator::computeProgramKey(Context*, BytesKey* programKey) const {
+  static auto RuntimeProgramType = UniqueID::Next();
+  programKey->write(RuntimeProgramType);
+  programKey->write(effect->programID());
 }
 
+std::unique_ptr<Program> RuntimeProgramCreator::createProgram(Context* context) const {
+  auto program = effect->onCreateProgram(context);
+  if (program == nullptr) {
+    return nullptr;
+  }
+  return std::make_unique<RuntimeProgramWrapper>(std::move(program));
+}
 }  // namespace tgfx

@@ -21,7 +21,7 @@
 #include "HandlerThread.h"
 #include "JNIUtil.h"
 #include "core/utils/Log.h"
-#include "gpu/ExtendedTexture.h"
+#include "gpu/DefaultTexture.h"
 #include "gpu/opengl/GLTextureSampler.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 
@@ -204,8 +204,8 @@ std::shared_ptr<Texture> SurfaceTexture::onMakeTexture(Context* context, bool) {
     sampler->releaseGPU(context);
     return nullptr;
   }
-  return Resource::AddToCache(context, new ExtendedTexture(std::move(sampler), _width, _height,
-                                                           textureSize.width, textureSize.height));
+  return Resource::AddToCache(
+      context, new DefaultTexture(std::move(sampler), textureSize.width, textureSize.height));
 }
 
 bool SurfaceTexture::onUpdateTexture(std::shared_ptr<Texture>, const Rect&) {

@@ -30,10 +30,10 @@ class CornerPinUniforms : public Uniforms {
 
 class CornerPinEffect : public RuntimeEffect {
  public:
-  DEFINE_RUNTIME_EFFECT_TYPE
-
   static std::shared_ptr<CornerPinEffect> Make(const Point& upperLeft, const Point& upperRight,
                                                const Point& lowerRight, const Point& lowerLeft);
+
+  uint32_t programID() const override;
 
   int sampleCount() const override {
     return 4;

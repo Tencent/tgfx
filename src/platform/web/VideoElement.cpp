@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "platform/web/VideoElement.h"
-#include "gpu/ExtendedTexture.h"
+#include "gpu/DefaultTexture.h"
 
 namespace tgfx {
 using namespace emscripten;
@@ -62,19 +62,8 @@ std::shared_ptr<Texture> VideoElement::onMakeTexture(Context* context, bool mipm
           ANDROID_MINIPROGRAM_ALIGNMENT - (textureHeight % ANDROID_MINIPROGRAM_ALIGNMENT);
     }
   }
-  std::shared_ptr<Texture> texture = nullptr;
-  if (textureWidth != width() || textureHeight != height()) {
-    auto sampler =
-        TextureSampler::Make(context, width(), height(), PixelFormat::RGBA_8888, mipmapped);
-    if (sampler != nullptr) {
-      texture = Resource::AddToCache(
-          context,
-          new ExtendedTexture(std::move(sampler), width(), height(), textureWidth, textureHeight));
-    }
-  } else {
-    texture = Texture::MakeFormat(context, textureWidth, textureHeight, PixelFormat::RGBA_8888,
-                                  mipmapped);
-  }
+  auto texture =
+      Texture::MakeFormat(context, textureWidth, textureHeight, PixelFormat::RGBA_8888, mipmapped);
   if (texture != nullptr) {
     onUpdateTexture(texture, Rect::MakeWH(width(), height()));
   }

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,26 +18,21 @@
 
 #pragma once
 
-#include "core/Rasterizer.h"
+#include "gpu/Program.h"
+#include "tgfx/gpu/RuntimeProgram.h"
 
 namespace tgfx {
-/**
- * A Rasterizer that rasterizes a set of glyphs.
- */
-class TextRasterizer : public Rasterizer {
+class RuntimeProgramWrapper : public Program {
  public:
-  TextRasterizer(int width, int height, std::shared_ptr<GlyphRunList> glyphRunList, bool antiAlias,
-                 const Matrix& matrix, const Stroke* stroke);
+  static const RuntimeProgram* Unwrap(const Program* program);
 
-  ~TextRasterizer() override;
+  explicit RuntimeProgramWrapper(std::unique_ptr<RuntimeProgram> program)
+      : Program(program->getContext()), runtimeProgram(std::move(program)) {
+  }
 
- protected:
-  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
+  void onReleaseGPU() override;
 
  private:
-  std::shared_ptr<GlyphRunList> glyphRunList = nullptr;
-  bool antiAlias = true;
-  Matrix matrix = {};
-  Stroke* stroke = nullptr;
+  std::unique_ptr<RuntimeProgram> runtimeProgram = nullptr;
 };
 }  // namespace tgfx

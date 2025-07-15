@@ -20,7 +20,7 @@
 
 #include "Program.h"
 #include "gpu/Gpu.h"
-#include "gpu/ProgramInfo.h"
+#include "gpu/ProgramCreator.h"
 #include "gpu/RenderTarget.h"
 #include "gpu/processors/GeometryProcessor.h"
 #include "gpu/proxies/GpuBufferProxy.h"
@@ -53,7 +53,7 @@ class RenderPass {
 
   bool begin(std::shared_ptr<RenderTarget> renderTarget);
   void end();
-  void bindProgramAndScissorClip(const ProgramInfo* programInfo, const Rect& scissorRect);
+  void bindProgramAndScissorClip(const Pipeline* pipeline, const Rect& scissorRect);
   void bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer, std::shared_ptr<GpuBuffer> vertexBuffer,
                    size_t vertexOffset = 0);
   void bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer, std::shared_ptr<Data> vertexData);
@@ -69,8 +69,7 @@ class RenderPass {
 
   virtual void onBindRenderTarget() = 0;
   virtual void onUnbindRenderTarget() = 0;
-  virtual bool onBindProgramAndScissorClip(const ProgramInfo* programInfo,
-                                           const Rect& drawBounds) = 0;
+  virtual bool onBindProgramAndScissorClip(const Pipeline* pipeline, const Rect& drawBounds) = 0;
   virtual bool onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
                              std::shared_ptr<GpuBuffer> vertexBuffer, size_t vertexOffset,
                              std::shared_ptr<Data> vertexData) = 0;

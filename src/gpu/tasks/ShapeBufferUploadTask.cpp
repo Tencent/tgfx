@@ -38,15 +38,14 @@ std::shared_ptr<Resource> ShapeBufferUploadTask::onMakeResource(Context* context
     return nullptr;
   }
   std::shared_ptr<GpuBuffer> gpuBuffer = nullptr;
-  if (auto triangles = shapeBuffer->triangles()) {
+  if (auto triangles = shapeBuffer->triangles) {
     gpuBuffer = GpuBuffer::Make(context, BufferType::Vertex, triangles->data(), triangles->size());
     if (!gpuBuffer) {
       LOGE("ShapeBufferUploadTask::execute() Failed to create the GpuBuffer!");
       return nullptr;
     }
   } else {
-    auto imageBuffer = shapeBuffer->imageBuffer();
-    auto texture = Texture::MakeFrom(context, std::move(imageBuffer));
+    auto texture = Texture::MakeFrom(context, std::move(shapeBuffer->imageBuffer));
     if (!texture) {
       LOGE("ShapeBufferUploadTask::execute() Failed to create the texture!");
       return nullptr;

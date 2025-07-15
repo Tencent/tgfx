@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,20 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ShapeBuffer.h"
+#pragma once
+
+#include "gpu/ProgramCreator.h"
+#include "tgfx/gpu/RuntimeEffect.h"
 
 namespace tgfx {
-std::shared_ptr<ShapeBuffer> ShapeBuffer::MakeFrom(std::shared_ptr<Data> triangles) {
-  if (triangles == nullptr || triangles->empty()) {
-    return nullptr;
+class RuntimeProgramCreator : public ProgramCreator {
+ public:
+  explicit RuntimeProgramCreator(std::shared_ptr<RuntimeEffect> effect)
+      : effect(std::move(effect)) {
   }
-  return std::shared_ptr<ShapeBuffer>(new ShapeBuffer(std::move(triangles)));
-}
 
-std::shared_ptr<ShapeBuffer> ShapeBuffer::MakeFrom(std::shared_ptr<ImageBuffer> imageBuffer) {
-  if (imageBuffer == nullptr) {
-    return nullptr;
-  }
-  return std::shared_ptr<ShapeBuffer>(new ShapeBuffer(std::move(imageBuffer)));
-}
+  void computeProgramKey(Context* context, BytesKey* programKey) const override;
+
+  std::unique_ptr<Program> createProgram(Context* context) const override;
+
+ private:
+  std::shared_ptr<RuntimeEffect> effect = nullptr;
+};
 }  // namespace tgfx

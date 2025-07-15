@@ -31,11 +31,11 @@ class TextureRenderTargetProxy : public DefaultTextureProxy,
   }
 
   int width() const override {
-    return DefaultTextureProxy::width();
+    return _width;
   }
 
   int height() const override {
-    return DefaultTextureProxy::height();
+    return _height;
   }
 
   PixelFormat format() const override {
@@ -47,7 +47,7 @@ class TextureRenderTargetProxy : public DefaultTextureProxy,
   }
 
   ImageOrigin origin() const override {
-    return DefaultTextureProxy::origin();
+    return _origin;
   }
 
   bool externallyOwned() const override {
@@ -63,7 +63,7 @@ class TextureRenderTargetProxy : public DefaultTextureProxy,
   }
 
   std::shared_ptr<Texture> getTexture() const override {
-    return TextureProxy::getTexture();
+    return DefaultTextureProxy::getTexture();
   }
 
   std::shared_ptr<RenderTarget> getRenderTarget() const override;
@@ -74,7 +74,7 @@ class TextureRenderTargetProxy : public DefaultTextureProxy,
 
   TextureRenderTargetProxy(int width, int height, PixelFormat format, int sampleCount,
                            bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft,
-                           bool externallyOwned = false);
+                           BackingFit backingFit = BackingFit::Exact, bool externallyOwned = false);
 
   std::shared_ptr<Texture> onMakeTexture(Context* context) const override;
 
