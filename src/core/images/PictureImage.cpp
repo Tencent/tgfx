@@ -79,10 +79,9 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   }
   rect.roundOut();
   auto mipmapped = samplingArgs.sampling.mipmapMode != MipmapMode::None && hasMipmaps();
-  auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
   auto renderTarget = RenderTargetProxy::MakeFallback(
-      args.context, static_cast<int>(rect.width()), static_cast<int>(rect.height()),
-      isAlphaOnly() && alphaRenderable, 1, mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
+      args.context, static_cast<int>(rect.width()), static_cast<int>(rect.height()), isAlphaOnly(),
+      1, mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
 
   if (renderTarget == nullptr) {
     return nullptr;
@@ -104,10 +103,9 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
 }
 
 std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args) const {
-  auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
   auto renderTarget = RenderTargetProxy::MakeFallback(
-      args.context, width(), height(), isAlphaOnly() && alphaRenderable, 1,
-      hasMipmaps() && args.mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
+      args.context, width(), height(), isAlphaOnly(), 1, hasMipmaps() && args.mipmapped,
+      ImageOrigin::TopLeft, BackingFit::Approx);
   if (renderTarget == nullptr) {
     return nullptr;
   }
@@ -122,7 +120,7 @@ bool PictureImage::drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget,
   if (renderTarget == nullptr) {
     return false;
   }
-  RenderContext renderContext(renderTarget, renderFlags, true);
+  RenderContext renderContext(std::move(renderTarget), renderFlags, true);
   Matrix totalMatrix = {};
   if (offset) {
     totalMatrix.preTranslate(offset->x, offset->y);

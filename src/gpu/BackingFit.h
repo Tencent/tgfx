@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,26 +18,20 @@
 
 #pragma once
 
-#include "gpu/RenderPass.h"
-#include "gpu/proxies/RenderTargetProxy.h"
-
 namespace tgfx {
-class TextureFlattenTask {
- public:
-  TextureFlattenTask(UniqueKey uniqueKey, std::shared_ptr<TextureProxy> textureProxy);
+/**
+ * Indicates whether a backing store needs to be an exact match or can be larger than is strictly
+ * necessary.
+*/
+enum class BackingFit {
   /**
-   * Prepares the task for execution. Returns false if the task can be skipped.
+   * The backing store must be an exact match for the requested size.
    */
-  bool prepare(Context* context);
+  Exact = 0,
 
   /**
-   * Executes the task to flatten the texture.
+   * The backing store can be larger than the requested size, but should not be smaller.
    */
-  bool execute(RenderPass* renderPass);
-
- private:
-  UniqueKey uniqueKey = {};
-  std::shared_ptr<TextureProxy> sourceTextureProxy = nullptr;
-  std::shared_ptr<RenderTarget> renderTarget = nullptr;
+  Approx = 1,
 };
 }  // namespace tgfx

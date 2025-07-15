@@ -34,5 +34,8 @@ class RuntimeDrawTask : public RenderTask {
   std::vector<std::shared_ptr<TextureProxy>> inputs;
   std::shared_ptr<RuntimeEffect> effect = nullptr;
   Point offset = {};
+
+  static std::shared_ptr<Texture> GetFlatTexture(RenderPass* renderPass,
+                                                 std::shared_ptr<TextureProxy> textureProxy);
 };
 }  // namespace tgfx

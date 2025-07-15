@@ -49,7 +49,7 @@ int GetApproximateLength(int length) {
 
 DefaultTextureProxy::DefaultTextureProxy(int width, int height, PixelFormat pixelFormat,
                                          bool mipmapped, ImageOrigin origin, BackingFit backingFit)
-    : _width(width), _height(height), _format(pixelFormat), _mipmapped(mipmapped), _origin(origin) {
+    : TextureProxy(width, height, pixelFormat, mipmapped, origin) {
   if (backingFit == BackingFit::Approx) {
     _backingStoreWidth = GetApproximateLength(width);
     _backingStoreHeight = GetApproximateLength(height);
@@ -57,6 +57,21 @@ DefaultTextureProxy::DefaultTextureProxy(int width, int height, PixelFormat pixe
     _backingStoreWidth = width;
     _backingStoreHeight = height;
   }
+}
+
+std::shared_ptr<Texture> DefaultTextureProxy::getTexture() const {
+  if (resource == nullptr) {
+    resource = onMakeTexture(context);
+    if (resource != nullptr && !uniqueKey.empty()) {
+      resource->assignUniqueKey(uniqueKey);
+    }
+  }
+  return std::static_pointer_cast<Texture>(resource);
+}
+
+std::shared_ptr<Texture> DefaultTextureProxy::onMakeTexture(Context* context) const {
+  return Texture::MakeFormat(context, _backingStoreWidth, _backingStoreHeight, _format, _mipmapped,
+                             _origin);
 }
 
 }  // namespace tgfx

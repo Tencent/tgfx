@@ -101,16 +101,6 @@ void DrawingManager::addTextureResolveTask(std::shared_ptr<RenderTargetProxy> re
   renderTasks.emplace_back(std::move(task));
 }
 
-void DrawingManager::addTextureFlattenTask(UniqueKey uniqueKey,
-                                           std::shared_ptr<TextureProxy> textureProxy) {
-  if (textureProxy == nullptr) {
-    return;
-  }
-  auto task =
-      drawingBuffer->make<TextureFlattenTask>(std::move(uniqueKey), std::move(textureProxy));
-  flattenTasks.emplace_back(std::move(task));
-}
-
 void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
                                              std::shared_ptr<TextureProxy> dest) {
   if (source == nullptr || dest == nullptr) {
@@ -157,17 +147,6 @@ bool DrawingManager::flush() {
   if (renderPass == nullptr) {
     renderPass = RenderPass::Make(context);
   }
-  std::vector<TextureFlattenTask*> validFlattenTasks = {};
-  validFlattenTasks.reserve(flattenTasks.size());
-  for (auto& task : flattenTasks) {
-    if (task->prepare(context)) {
-      validFlattenTasks.push_back(task.get());
-    }
-  }
-  for (auto& task : validFlattenTasks) {
-    task->execute(renderPass.get());
-  }
-  flattenTasks.clear();
   for (auto& task : renderTasks) {
     task->execute(renderPass.get());
   }
@@ -178,7 +157,6 @@ bool DrawingManager::flush() {
 void DrawingManager::releaseAll() {
   compositors.clear();
   resourceTasks.clear();
-  flattenTasks.clear();
   renderTasks.clear();
   atlasCellCodecTasks.clear();
   atlasCellDatas.clear();
