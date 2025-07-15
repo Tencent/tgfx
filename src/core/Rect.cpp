@@ -17,9 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Rect.h"
-#include "condition.h"
 #include <xsimd/xsimd.hpp>
+#include "MathDynamic.h"
 #include "SIMDVec.h"
+#include "condition.h"
 namespace tgfx {
 void Rect::scale(float scaleX, float scaleY) {
   left *= scaleX;
@@ -132,6 +133,9 @@ bool Rect::setBounds(const Point pts[], int count) {
     return false;
   }
 
+#endif
+#ifdef HIGHWAY
+  return SetBoundsDynamic(this, pts, count);
 #endif
 }
 

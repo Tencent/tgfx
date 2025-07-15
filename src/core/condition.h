@@ -20,5 +20,5 @@
 
 //#define NSIMD
 //#define XSIMD
-#define HIGHWAY
-//#define SKSIMD
+//#define HIGHWAY
+#define SKSIMD

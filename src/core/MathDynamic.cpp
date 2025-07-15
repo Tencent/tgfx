@@ -106,7 +106,7 @@ namespace HWY_NAMESPACE {
       auto skewSimd = hn::InterleaveLower(kxVec, kyVec);
       std::size_t size = static_cast<size_t>(count * 2);
       std::size_t vecSize = size - size % hn::Lanes(d);
-      for(int i = 0; i < vecSize; i += hn::Lanes(d)) {
+      for(std::size_t i = 0; i < vecSize; i += hn::Lanes(d)) {
         auto srcSimd = hn::LoadU(d, &fsrc[i]);
         auto swzSimd = hn::Reverse2(d, srcSimd);
         auto res = hn::MulAdd(srcSimd, scaleSimd, hn::MulAdd(swzSimd, skewSimd, transSimd));
@@ -137,7 +137,7 @@ namespace HWY_NAMESPACE {
       auto rblt = hn::Reverse2(d, hn::Reverse(d, ltrb));
       auto min = hn::Min(ltrb, rblt);
       auto max = hn::Max(ltrb, rblt);
-      auto res = hn::ConcatUpperLower(d, min, max);
+      auto res = hn::ConcatUpperLower(d, max, min);
       hn::StoreU(res, d, &dst->left);
       return;
     }
@@ -153,7 +153,7 @@ namespace HWY_NAMESPACE {
       auto rblt = hn::Reverse2(d, hn::Reverse(d, ltrb));
       auto min = hn::Min(ltrb, rblt);
       auto max = hn::Max(ltrb, rblt);
-      auto res = hn::ConcatUpperLower(d, min, max);
+      auto res = hn::ConcatUpperLower(d, max, min);
       hn::StoreU(res, d, &dst->left);
     }else {
       Point quad[4];
@@ -165,7 +165,8 @@ namespace HWY_NAMESPACE {
       dst->setBounds(quad, 4);
     }
   }
-  bool SetBoundsDynamicImpl(Rect* rect, const Point pts[], int count) {
+
+  bool SetBoundsDynamicImpl(Rect* rect, const Point* pts, int count) {
     if(count <= 0) {
       rect->setEmpty();
       return false;
@@ -191,7 +192,20 @@ namespace HWY_NAMESPACE {
       count -= 2;
     }
     auto mask = hn::Eq(hn::Mul(accum, hn::Set(d, 0.0f)), Set(d, 0.0f));
-    const bool allFinite = hn::AllTrue(hn::DFromM<decltype(mask)>, mask);
+    hn::DFromM<decltype(mask)> md;
+    const bool allFinite = hn::AllTrue(md, mask);
+    if(allFinite) {
+      float minArray[4] = {};
+      float maxArray[4] = {};
+      hn::Store(min, d, minArray);
+      hn::Store(max, d, maxArray);
+      rect->setLTRB(std::min(minArray[0], minArray[2]), std::min(minArray[1], minArray[3]),
+        std::max(maxArray[0], maxArray[2]), std::max(maxArray[1], maxArray[3]));
+      return true;
+    }else {
+      rect->setEmpty();
+      return false;
+    }
   }
 }
 }
@@ -200,6 +214,10 @@ HWY_AFTER_NAMESPACE();
 #if HWY_ONCE
 namespace tgfx {
 HWY_EXPORT(TransPtsDynamicImpl);
+HWY_EXPORT(ScalePtsDynamicImpl);
+HWY_EXPORT(AfflinePtsDynamicImpl);
+HWY_EXPORT(MapRectDynamicImpl);
+HWY_EXPORT(SetBoundsDynamicImpl);
 void TransPtsDynamic(const Matrix& m, Point* dst, const Point* src, int count) {
   return HWY_DYNAMIC_DISPATCH(TransPtsDynamicImpl)(m, dst, src, count);
 }
@@ -217,7 +235,7 @@ void MapRectDynamic(const Matrix& m, Rect* dst, const Rect& src) {
 }
 
 bool SetBoundsDynamic(Rect* rect, const Point pts[], int count) {
-
+  return HWY_DYNAMIC_DISPATCH(SetBoundsDynamicImpl)(rect, pts, count);
 }
 }  // namespace tgfx
 #endif

@@ -97,9 +97,9 @@
         "CustomLayerTreeDrawer": "d5164a4e",
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "da590da",
-        "ImageWithShadow": "50136952",
-        "SimpleLayerTreeDrawer": "d5164a4e",
-        "SimpleText": "3977d8ca"
+        "ImageWithShadow": "67961560",
+        "SimpleLayerTreeDrawer": "67961560",
+        "SimpleText": "d5164a4e"
     },
     "DstTextureTest": {
         "EmptyLocalBounds": "be94e666",
