@@ -27,16 +27,7 @@ struct Index {
       }
       const buffer = value.buffer.slice(0);
       hello2d.addImageFromEncoded("bridge", buffer);
-    });
-    hello2d.startDrawLoop();
-  }
-
-  onPageHide(): void {
-    hello2d.stopDrawLoop();
-  }
-
-  onPageShow(): void {
-    hello2d.startDrawLoop();
+    })
   }
 
   build() {
@@ -54,7 +45,7 @@ struct Index {
         this.offsetY = 0;
         this.zoom = 1;
         this.drawIndex += 1;
-        hello2d.updateDrawParams(this.drawIndex, this.zoom, this.offsetX, this.offsetY);
+        hello2d.draw(this.drawIndex, this.zoom, this.offsetX, this.offsetY);
       }, 5)
       .gesture(
         GestureGroup(GestureMode.Parallel,
@@ -84,7 +75,7 @@ struct Index {
                 this.zoom = zoomNew;
                 this.lastPinchCenterX = (event.fingerList[0].displayX + event.fingerList[1].displayX) / 2.0;
                 this.lastPinchCenterY = (event.fingerList[0].displayY + event.fingerList[1].displayY) / 2.0;
-                hello2d.updateDrawParams(this.drawIndex, this.zoom, this.offsetX, this.offsetY);
+                hello2d.draw(this.drawIndex, this.zoom, this.offsetX, this.offsetY);
               }
             })
             .onActionEnd((event: GestureEvent | undefined) => {
@@ -104,7 +95,7 @@ struct Index {
                 this.offsetY += vp2px(event.offsetY - this.lastPanY);
                 this.lastPanX = event.offsetX;
                 this.lastPanY = event.offsetY;
-                hello2d.updateDrawParams(this.drawIndex, this.zoom, this.offsetX, this.offsetY);
+                hello2d.draw(this.drawIndex, this.zoom, this.offsetX, this.offsetY);
               }
             })
             .onActionEnd((event: GestureEvent | undefined) => {

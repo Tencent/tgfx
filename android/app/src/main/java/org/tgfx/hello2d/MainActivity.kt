@@ -18,7 +18,6 @@
 
 package org.tgfx.hello2d
 
-import android.animation.ValueAnimator
 import android.graphics.PointF
 import android.os.Bundle
 import android.view.GestureDetector
@@ -45,8 +44,6 @@ class MainActivity : ComponentActivity() {
     private lateinit var scaleGestureDetector: ScaleGestureDetector
     private lateinit var gestureDetector: GestureDetector
 
-    private var animator: ValueAnimator? = null
-
     companion object {
         private const val MAX_ZOOM = 1000.0f
         private const val MIN_ZOOM = 0.001f
@@ -58,30 +55,9 @@ class MainActivity : ComponentActivity() {
         setContentView(R.layout.activity_main)
         tgfxView = findViewById<TGFXView>(R.id.tgfx_view)
         setupGesture()
-
-        animator = ValueAnimator.ofFloat(0f, 1f).apply {
-            repeatCount = ValueAnimator.INFINITE
-            addUpdateListener { animation ->
-                tgfxView.draw(drawIndex, zoomScale, contentOffset)
-            }
-            start()
+        tgfxView.post {
+            tgfxView.draw(drawIndex, zoomScale, contentOffset)
         }
-    }
-
-    override fun onPause() {
-        super.onPause()
-        animator?.pause()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        animator?.resume()
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        animator?.cancel()
-        animator = null
     }
 
     private fun setupGesture() {
@@ -106,6 +82,7 @@ class MainActivity : ComponentActivity() {
                     contentOffset.y = detector.focusY - (detector.focusY - contentOffset.y) * zoomScale / oldZoom + detector.focusY - currentFocusY
                     currentFocusX = detector.focusX
                     currentFocusY = detector.focusY
+                    tgfxView.draw(drawIndex, zoomScale, contentOffset)
                     return true
                 }
             })
@@ -117,6 +94,7 @@ class MainActivity : ComponentActivity() {
                         drawIndex++
                         zoomScale = 1.0f
                         contentOffset.set(0f, 0f)
+                        tgfxView.draw(drawIndex, zoomScale, contentOffset)
                         return true
                     }
                     return false
@@ -134,7 +112,7 @@ class MainActivity : ComponentActivity() {
                 activePointerId = MotionEventCompat.getPointerId(event, 0)
                 needUpdatePanAnchor = false
             }
-
+            
             MotionEvent.ACTION_MOVE -> {
                 if (!isScaling && activePointerId != INVALID_POINTER_ID) {
                     MotionEventCompat.findPointerIndex(event, activePointerId).takeIf { it >= 0 }?.let { pointerIndex ->
@@ -146,17 +124,18 @@ class MainActivity : ComponentActivity() {
                         }
                         contentOffset.x += MotionEventCompat.getX(event, pointerIndex) - currentTouchX
                         contentOffset.y += MotionEventCompat.getY(event, pointerIndex) - currentTouchY
+                        tgfxView.draw(drawIndex, zoomScale, contentOffset)
                         currentTouchX = MotionEventCompat.getX(event, pointerIndex)
                         currentTouchY = MotionEventCompat.getY(event, pointerIndex)
                     }
                 }
             }
-
+            
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 activePointerId = INVALID_POINTER_ID
                 needUpdatePanAnchor = false
             }
-
+            
             MotionEvent.ACTION_POINTER_UP -> {
                 if (MotionEventCompat.getPointerId(event, MotionEventCompat.getActionIndex(event)) == activePointerId) {
                     (if (MotionEventCompat.getActionIndex(event) == 0) 1 else 0).takeIf { it < event.pointerCount }?.let { newPointerIndex ->
@@ -174,7 +153,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
             }
-
+            
             MotionEvent.ACTION_POINTER_DOWN -> {
                 if (activePointerId == INVALID_POINTER_ID) {
                     MotionEventCompat.getActionIndex(event).let { pointerIndex ->
