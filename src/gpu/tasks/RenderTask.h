@@ -27,25 +27,13 @@ class RenderTask {
  public:
   virtual ~RenderTask() = default;
 
-  bool execute(RenderPass* renderPass) {
-    DEBUG_ASSERT(renderTargetProxy != nullptr);
-    if (renderTargetProxy.use_count() < 2) {
-      // If the render target proxy is not shared with other tasks, we can skip the execution.
-      renderTargetProxy = nullptr;
-      return true;
-    }
-    return onExecute(renderPass, std::move(renderTargetProxy));
-  }
+  virtual bool execute(RenderPass* renderPass) = 0;
 
  protected:
   explicit RenderTask(std::shared_ptr<RenderTargetProxy> proxy)
       : renderTargetProxy(std::move(proxy)) {
   }
 
-  virtual bool onExecute(RenderPass* renderPass,
-                         std::shared_ptr<RenderTargetProxy> renderTargetProxy) = 0;
-
- private:
   std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
 };
 }  // namespace tgfx

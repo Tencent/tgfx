@@ -27,8 +27,7 @@ class RenderTargetCopyTask : public RenderTask {
                        std::shared_ptr<TextureProxy> dest);
 
  protected:
-  bool onExecute(RenderPass* renderPass,
-                 std::shared_ptr<RenderTargetProxy> renderTargetProxy) override;
+  bool execute(RenderPass* renderPass) override;
 
  private:
   std::shared_ptr<TextureProxy> dest = nullptr;

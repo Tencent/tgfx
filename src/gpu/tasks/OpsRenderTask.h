@@ -29,9 +29,7 @@ class OpsRenderTask : public RenderTask {
       : RenderTask(std::move(renderTargetProxy)), ops(std::move(ops)) {
   }
 
- protected:
-  bool onExecute(RenderPass* renderPass,
-                 std::shared_ptr<RenderTargetProxy> renderTargetProxy) override;
+  bool execute(RenderPass* renderPass) override;
 
  private:
   PlacementArray<Op> ops = {};

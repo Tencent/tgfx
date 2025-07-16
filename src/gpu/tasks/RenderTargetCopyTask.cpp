@@ -24,16 +24,15 @@ RenderTargetCopyTask::RenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> so
     : RenderTask(std::move(source)), dest(std::move(dest)) {
 }
 
-bool RenderTargetCopyTask::onExecute(RenderPass* renderPass,
-                                     std::shared_ptr<RenderTargetProxy> renderTargetProxy) {
+bool RenderTargetCopyTask::execute(RenderPass* renderPass) {
   auto renderTarget = renderTargetProxy->getRenderTarget();
   if (renderTarget == nullptr) {
-    LOGE("RenderTargetCopyTask::onExecute() Failed to get the source render target!");
+    LOGE("RenderTargetCopyTask::execute() Failed to get the source render target!");
     return false;
   }
   auto texture = dest->getTexture();
   if (texture == nullptr) {
-    LOGE("RenderTargetCopyTask::onExecute() Failed to get the dest texture!");
+    LOGE("RenderTargetCopyTask::execute() Failed to get the dest texture!");
     return false;
   }
   DEBUG_ASSERT(renderTarget->width() == texture->width() &&

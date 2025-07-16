@@ -25,8 +25,6 @@ class TextureResolveTask : public RenderTask {
  public:
   explicit TextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy);
 
- protected:
-  bool onExecute(RenderPass* renderPass,
-                 std::shared_ptr<RenderTargetProxy> renderTargetProxy) override;
+  bool execute(RenderPass* renderPass) override;
 };
 }  // namespace tgfx
