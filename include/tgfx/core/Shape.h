@@ -41,8 +41,8 @@ class Shape {
   static std::shared_ptr<Shape> MakeFrom(Path path);
 
   /**
-   * Creates a new Shape from the given text blob. The Shape uses the specified scale to
-   * extract paths from the text blob. Returns nullptr if the text blob is nullptr or if none of the
+   * Creates a new Shape from the given text blob. The specified scale is applied to the text blob
+   * before extracting its paths. Returns nullptr if the text blob is nullptr or if none of the
    * glyphs in the blob can generate a path, such as when using bitmap typefaces.
    */
   static std::shared_ptr<Shape> MakeFrom(std::shared_ptr<TextBlob> textBlob, float scale = 1.0f);
