@@ -30,10 +30,11 @@ export class ShareData {
     public Hello2DModule: types.TGFX = null;
     public tgfxBaseView: TGFXBaseView = null;
     public drawIndex: number = 0;
-    public resized: boolean = false;
     public zoom: number = 1.0;
     public offsetX: number = 0;
     public offsetY: number = 0;
+    public animationFrameId: number | null = null;
+    public isPageVisible: boolean = true;
 }
 
 enum ScaleGestureState {
@@ -82,7 +83,6 @@ class GestureManager {
                 shareData.offsetX -= event.deltaX * window.devicePixelRatio;
                 shareData.offsetY -= event.deltaY * window.devicePixelRatio;
             }
-            draw(shareData);
         }
     }
 
@@ -105,7 +105,6 @@ class GestureManager {
             shareData.offsetX = (shareData.offsetX - pixelX) * (newZoom / shareData.zoom) + pixelX;
             shareData.offsetY = (shareData.offsetY - pixelY) * (newZoom / shareData.zoom) + pixelY;
             shareData.zoom = newZoom;
-            draw(shareData);
         }
         if (state === ScaleGestureState.SCALE_END){
             this.scaleY = 1.0;
@@ -209,7 +208,6 @@ export function updateSize(shareData: ShareData) {
     if (!shareData.tgfxBaseView) {
         return;
     }
-    shareData.resized = false;
     const canvas = document.getElementById('hello2d') as HTMLCanvasElement;
     const container = document.getElementById('container') as HTMLDivElement;
     const screenRect = container.getBoundingClientRect();
@@ -219,14 +217,44 @@ export function updateSize(shareData: ShareData) {
     canvas.style.width = screenRect.width + "px";
     canvas.style.height = screenRect.height + "px";
     shareData.tgfxBaseView.updateSize(scaleFactor);
-    draw(shareData);
 }
 
 export function onResizeEvent(shareData: ShareData) {
     if (!shareData.tgfxBaseView) {
         return;
     }
-    shareData.resized = true;
+    updateSize(shareData);
+}
+
+function handleVisibilityChange(shareData: ShareData) {
+    shareData.isPageVisible = !document.hidden;
+    if (shareData.isPageVisible && shareData.animationFrameId === null) {
+        animationLoop(shareData);
+    }
+}
+
+export function animationLoop(shareData: ShareData) {
+    const frame = async (timestamp: number) => {
+        if (shareData.tgfxBaseView && shareData.isPageVisible) {
+            await draw(shareData);
+            shareData.animationFrameId = requestAnimationFrame(frame);
+        } else {
+            shareData.animationFrameId = null;
+        }
+    };
+    shareData.animationFrameId = requestAnimationFrame(frame);
+}
+
+export function setupVisibilityListeners(shareData: ShareData) {
+    if (typeof window !== 'undefined') {
+        document.addEventListener('visibilitychange', () => handleVisibilityChange(shareData));
+        window.addEventListener('beforeunload', () => {
+            if (shareData.animationFrameId !== null) {
+                cancelAnimationFrame(shareData.animationFrameId);
+                shareData.animationFrameId = null;
+            }
+        });
+    }
 }
 
 export function onClickEvent(shareData: ShareData) {
@@ -238,7 +266,6 @@ export function onClickEvent(shareData: ShareData) {
     shareData.offsetY = 0;
     shareData.zoom = 1.0;
     gestureManager.clearState();
-    draw(shareData);
 }
 
 export function loadImage(src: string): Promise<HTMLImageElement> {
