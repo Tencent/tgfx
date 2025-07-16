@@ -59,10 +59,6 @@ std::shared_ptr<ImageReader> ImageReader::MakeFrom(const Bitmap& bitmap) {
   return ImageReader::MakeFrom(bitmap.pixelRef);
 }
 
-std::shared_ptr<ImageReader> ImageReader::MakeFrom(std::shared_ptr<Mask> mask) {
-  return ImageReader::MakeFrom(mask->getImageStream());
-}
-
 std::shared_ptr<ImageReader> ImageReader::MakeFrom(std::shared_ptr<ImageStream> imageStream) {
   if (imageStream == nullptr) {
     return nullptr;

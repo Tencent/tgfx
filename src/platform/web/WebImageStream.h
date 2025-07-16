@@ -63,7 +63,5 @@ class WebImageStream : public ImageStream {
   int _width = 0;
   int _height = 0;
   bool alphaOnly = false;
-
-  friend class WebMask;
 };
 }  // namespace tgfx

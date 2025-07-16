@@ -18,11 +18,9 @@
 
 #pragma once
 
-#include <atomic>
 #include <mutex>
 #include "tgfx/core/Bitmap.h"
 #include "tgfx/core/ImageBuffer.h"
-#include "tgfx/core/Mask.h"
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
@@ -54,11 +52,6 @@ class ImageReader {
    * Creates a new ImageReader from the specified Bitmap. Returns nullptr if the bitmap is empty.
    */
   static std::shared_ptr<ImageReader> MakeFrom(const Bitmap& bitmap);
-
-  /**
-   * Creates a new ImageReader from the specified Mask. Returns nullptr if the mask is nullptr.
-   */
-  static std::shared_ptr<ImageReader> MakeFrom(std::shared_ptr<Mask> mask);
 
   virtual ~ImageReader();
 
