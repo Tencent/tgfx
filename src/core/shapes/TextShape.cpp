@@ -39,6 +39,12 @@ std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<TextBlob> textBlob, float
   return std::make_shared<TextShape>(std::move(glyphRunList), scale);
 }
 
+Rect TextShape::getBounds() const {
+  auto bounds = glyphRunList->getBounds();
+  bounds.scale(scale, scale);
+  return bounds;
+}
+
 Path TextShape::getPath() const {
   Path path = {};
   auto matrix = Matrix::MakeScale(scale, scale);

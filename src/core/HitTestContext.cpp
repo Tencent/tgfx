@@ -155,10 +155,12 @@ void HitTestContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList
   }
   if (shapeHitTest && glyphRunList->hasOutlines()) {
     Path glyphPath = {};
-    glyphRunList->getPath(&glyphPath, &state.matrix);
     if (stroke) {
-      Stroke scaledStroke(stroke->width * maxScale, stroke->cap, stroke->join, stroke->miterLimit);
-      scaledStroke.applyToPath(&glyphPath);
+      glyphRunList->getPath(&glyphPath);
+      stroke->applyToPath(&glyphPath);
+      glyphPath.transform(state.matrix);
+    } else {
+      glyphRunList->getPath(&glyphPath, &state.matrix);
     }
     if (!glyphPath.contains(deviceX, deviceY)) {
       return;

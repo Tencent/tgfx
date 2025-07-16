@@ -31,11 +31,7 @@ class TextShape : public UniqueKeyShape {
       : glyphRunList(std::move(glyphRunList)), scale(scale) {
   }
 
-  Rect getBounds() const override {
-    auto bounds = glyphRunList->getBounds();
-    bounds.scale(scale, scale);
-    return bounds;
-  }
+  Rect getBounds() const override;
 
   Path getPath() const override;
 
