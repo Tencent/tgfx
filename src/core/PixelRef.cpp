@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PixelRef.h"
-#include "gpu/Gpu.h"
 
 namespace tgfx {
 std::shared_ptr<PixelRef> PixelRef::Make(int width, int height, bool alphaOnly, bool tryHardware) {
@@ -60,28 +59,8 @@ void* PixelRef::lockWritablePixels() {
 void PixelRef::clear() {
   auto pixels = lockWritablePixels();
   if (pixels != nullptr) {
-    markContentDirty(Rect::MakeWH(width(), height()));
     memset(pixels, 0, info().byteSize());
   }
   unlockPixels();
-}
-
-std::shared_ptr<Texture> PixelRef::onMakeTexture(Context* context, bool mipmapped) {
-  return Texture::MakeFrom(context, pixelBuffer, mipmapped);
-}
-
-bool PixelRef::onUpdateTexture(std::shared_ptr<Texture> texture, const Rect& bounds) {
-  auto pixels = lockPixels();
-  if (pixels == nullptr) {
-    return false;
-  }
-  pixels =
-      info().computeOffset(pixels, static_cast<int>(bounds.left), static_cast<int>(bounds.top));
-  auto context = texture->getContext();
-  auto sampler = texture->getSampler();
-  sampler->writePixels(context, bounds, pixels, info().rowBytes());
-  sampler->regenerateMipmapLevels(context);
-  unlockPixels();
-  return true;
 }
 }  // namespace tgfx

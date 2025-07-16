@@ -40,33 +40,21 @@ class ImageStream {
   /**
    * Returns the width of the ImageStream.
    */
-  virtual int width() const = 0;
+  int width() const {
+    return _width;
+  }
 
   /**
    * Returns the height of the ImageStream.
    */
-  virtual int height() const = 0;
-
-  /**
-   * Returns true if pixels represent transparency only. If true, each pixel is packed in 8 bits as
-   * defined by ColorType::ALPHA_8.
-   */
-  virtual bool isAlphaOnly() const = 0;
-
-  /**
-   * Returns true if the ImageStream is backed by a platform-specified hardware buffer. Hardware
-   * buffers allow sharing memory across CPU and GPU, which can be used to speed up the texture
-   * uploading.
-   */
-  virtual bool isHardwareBacked() const = 0;
-
-  /**
-   * Marks the specified bounds as dirty. The next time the texture is updated, the pixels in
-   * the specified bounds will be uploaded to the texture.
-   */
-  void markContentDirty(const Rect& bounds);
+  int height() const {
+    return _height;
+  }
 
  protected:
+  ImageStream(int width, int height) : _width(width), _height(height) {
+  }
+
   /**
    * Creates a new Texture capturing the pixels in the TextureBuffer. The mipmapped parameter
    * specifies whether created texture must allocate mip map levels.
@@ -76,15 +64,11 @@ class ImageStream {
   /**
    * Updates the specified bounds of the texture with the pixels in the TextureBuffer.
    */
-  virtual bool onUpdateTexture(std::shared_ptr<Texture> texture, const Rect& bounds) = 0;
+  virtual bool onUpdateTexture(std::shared_ptr<Texture> texture) = 0;
 
  private:
-  std::mutex locker = {};
-  std::vector<ImageReader*> readers = {};
-
-  void attachToStream(ImageReader* imageReader);
-
-  void detachFromStream(ImageReader* imageReader);
+  int _width = 0;
+  int _height = 0;
 
   friend class ImageReader;
 };
