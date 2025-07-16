@@ -59,5 +59,12 @@ class TGFXWindow {
   float getPixelRatio();
   void createAppHost();
   void draw();
+
+  static constexpr UINT_PTR kRenderTimerId = 1;
+  bool isTimerRunning = false;
+
+  void startTimer();
+  void stopTimer();
+  void onTimer();
 };
 }  // namespace hello2d

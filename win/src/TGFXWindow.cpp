@@ -55,6 +55,7 @@ bool TGFXWindow::open() {
   centerAndShow();
   ShowWindow(windowHandle, SW_SHOW);
   UpdateWindow(windowHandle);
+  startTimer();
   return true;
 }
 
@@ -86,6 +87,18 @@ LRESULT CALLBACK TGFXWindow::WndProc(HWND window, UINT message, WPARAM wparam,
 
 LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) noexcept {
   switch (message) {
+    case WM_TIMER:
+      if (wparam == kRenderTimerId) {
+        onTimer();
+      }
+      break;
+    case WM_ACTIVATE:
+      if (LOWORD(wparam) == WA_INACTIVE) {
+        stopTimer();
+      } else {
+        startTimer();
+      }
+      break;
     case WM_DESTROY:
       destroy();
       PostQuitMessage(0);
@@ -158,6 +171,26 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       return DefWindowProc(windowHandle, message, wparam, lparam);
   }
   return 0;
+}
+
+void TGFXWindow::startTimer() {
+  if (!isTimerRunning) {
+    SetTimer(windowHandle, kRenderTimerId, 20, nullptr);
+    isTimerRunning = true;
+  }
+}
+
+void TGFXWindow::stopTimer() {
+  if (isTimerRunning) {
+    KillTimer(windowHandle, kRenderTimerId);
+    isTimerRunning = false;
+  }
+}
+
+void TGFXWindow::onTimer() {
+  RECT clientRect = {0};
+  ::GetClientRect(windowHandle, &clientRect);
+  ::InvalidateRect(windowHandle, &clientRect, TRUE);
 }
 
 void TGFXWindow::destroy() {
