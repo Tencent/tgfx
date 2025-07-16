@@ -113,6 +113,7 @@
         "ComposeImageFilter": "67961560",
         "ComposeImageFilter2": "67961560",
         "EmptyShadowTest": "b9a42bf",
+        "GaussianBlurImageFilter": "9275e450",
         "ImageFilterShader": "67961560",
         "InnerShadowBadCase": "67961560",
         "ModeColorFilter": "c475bfb",

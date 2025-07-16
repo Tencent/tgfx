@@ -21,6 +21,7 @@
 #include "CornerPinEffect.h"
 #include "core/filters/ColorImageFilter.h"
 #include "core/filters/DropShadowImageFilter.h"
+#include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
 #include "core/shaders/GradientShader.h"
 #include "core/shaders/ImageShader.h"
@@ -717,5 +718,22 @@ TGFX_TEST(FilterTest, ClipInnerShadowImageFilter) {
   }
   context->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ClipInnerShadowImageFilter"));
+}
+
+TGFX_TEST(FilterTest, GaussianBlurImageFilter) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  ASSERT_TRUE(image != nullptr);
+  auto surface = Surface::Make(context, image->width(), image->height());
+  ASSERT_TRUE(surface != nullptr);
+  auto gaussianBlurFilter = std::make_shared<GaussianBlurImageFilter>(3, 3, TileMode::Decal);
+  auto offset = Point::Make(0, 0);
+  image = image->makeWithFilter(gaussianBlurFilter, &offset);
+  auto canvas = surface->getCanvas();
+  canvas->drawImage(image, offset.x, offset.y);
+  context->flush();
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/GaussianBlurImageFilter"));
 }
 }  // namespace tgfx
