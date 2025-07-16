@@ -206,8 +206,7 @@ void RenderContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcR
 void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
                                      const MCState& state, const Fill& fill, const Stroke* stroke) {
   DEBUG_ASSERT(glyphRunList != nullptr);
-  auto maxScale = state.matrix.getMaxScale();
-  if (FloatNearlyZero(maxScale)) {
+  if (FloatNearlyZero(state.matrix.getMaxScale())) {
     return;
   }
   auto bounds = glyphRunList->getBounds();
@@ -228,7 +227,7 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
       continue;
     }
     GlyphRun rejectedGlyphRun = {};
-    drawGlyphsAsDirectMask(run, state, fill, stroke, maxScale, &rejectedGlyphRun);
+    drawGlyphsAsDirectMask(run, state, fill, stroke, &rejectedGlyphRun);
     if (rejectedGlyphRun.glyphs.empty()) {
       continue;
     }
@@ -242,12 +241,12 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
 
   if (!glyphRunList->hasColor() && glyphRunList->hasOutlines()) {
     auto rejectedGlyphRunList = std::make_shared<GlyphRunList>(std::move(rejectedGlyphRuns));
-    drawGlyphsAsPath(std::move(rejectedGlyphRunList), state, fill, stroke, clipBounds, maxScale);
+    drawGlyphsAsPath(std::move(rejectedGlyphRunList), state, fill, stroke, clipBounds);
     return;
   }
 
   for (const auto& run : rejectedGlyphRuns) {
-    drawGlyphsAsTransformedMask(run, state, fill, stroke, maxScale);
+    drawGlyphsAsTransformedMask(run, state, fill, stroke);
   }
 }
 
@@ -347,21 +346,22 @@ void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRe
 
 void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const MCState& state,
                                            const Fill& fill, const Stroke* stroke,
-                                           float stateMaxScale, GlyphRun* rejectedGlyphRun) {
+                                           GlyphRun* rejectedGlyphRun) {
   auto compositor = getOpsCompositor();
   if (compositor == nullptr) {
     return;
   }
-  auto hasScale = !FloatNearlyEqual(stateMaxScale, 1.0f);
+  auto maxScale = state.matrix.getMaxScale();
+  auto hasScale = !FloatNearlyEqual(maxScale, 1.0f);
   auto font = sourceGlyphRun.font;
   if (hasScale) {
-    font = font.makeWithSize(font.getSize() * stateMaxScale);
+    font = font.makeWithSize(font.getSize() * maxScale);
   }
 
   std::unique_ptr<Stroke> scaledStroke;
   if (stroke) {
-    scaledStroke = std::make_unique<Stroke>(stroke->width * stateMaxScale, stroke->cap,
-                                            stroke->join, stateMaxScale);
+    scaledStroke =
+        std::make_unique<Stroke>(stroke->width * maxScale, stroke->cap, stroke->join, maxScale);
   }
   AtlasCell atlasCell;
   size_t index = 0;
@@ -431,7 +431,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
       continue;
     }
     auto rect = atlasLocator.getLocation();
-    glyphState.matrix.postScale(1.f / stateMaxScale, 1.f / stateMaxScale);
+    glyphState.matrix.postScale(1.f / maxScale, 1.f / maxScale);
     glyphState.matrix.postTranslate(glyphPosition.x, glyphPosition.y);
     glyphState.matrix.postConcat(state.matrix);
     glyphState.matrix.preTranslate(-rect.x(), -rect.y());
@@ -441,21 +441,20 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
 }
 void RenderContext::drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList,
                                      const MCState& state, const Fill& fill, const Stroke* stroke,
-                                     const Rect& clipBounds, float stateMaxScale) {
+                                     const Rect& clipBounds) {
   Matrix inverseMatrix = {};
   if (!state.matrix.invert(&inverseMatrix)) {
     return;
   }
+  auto maxScale = state.matrix.getMaxScale();
   Path clipPath = {};
   auto localClipBounds = inverseMatrix.mapRect(clipBounds);
   if (fill.antiAlias) {
     localClipBounds.outset(1.0f, 1.0f);
   }
   clipPath.addRect(localClipBounds);
-  std::shared_ptr<Shape> shape =
-      std::make_shared<TextShape>(std::move(glyphRunList), stateMaxScale);
-  shape = Shape::ApplyMatrix(std::move(shape),
-                             Matrix::MakeScale(1.0f / stateMaxScale, 1.0f / stateMaxScale));
+  std::shared_ptr<Shape> shape = std::make_shared<TextShape>(std::move(glyphRunList), maxScale);
+  shape = Shape::ApplyMatrix(std::move(shape), Matrix::MakeScale(1.0f / maxScale, 1.0f / maxScale));
   shape = Shape::ApplyStroke(std::move(shape), stroke);
   shape = Shape::Merge(std::move(shape), Shape::MakeFrom(std::move(clipPath)), PathOp::Intersect);
   if (auto compositor = getOpsCompositor()) {
@@ -465,21 +464,22 @@ void RenderContext::drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList,
 
 void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
                                                 const MCState& state, const Fill& fill,
-                                                const Stroke* stroke, float stateMaxScale) {
+                                                const Stroke* stroke) {
   auto compositor = getOpsCompositor();
   if (compositor == nullptr) {
     return;
   }
-  auto hasScale = !FloatNearlyEqual(stateMaxScale, 1.0f);
+  auto maxScale = state.matrix.getMaxScale();
+  auto hasScale = !FloatNearlyEqual(maxScale, 1.0f);
   auto font = sourceGlyphRun.font;
   if (hasScale) {
-    font = font.makeWithSize(font.getSize() * stateMaxScale);
+    font = font.makeWithSize(font.getSize() * maxScale);
   }
 
   std::unique_ptr<Stroke> scaledStroke = nullptr;
   if (stroke) {
-    scaledStroke = std::make_unique<Stroke>(stroke->width * stateMaxScale, stroke->cap,
-                                            stroke->join, stateMaxScale);
+    scaledStroke =
+        std::make_unique<Stroke>(stroke->width * maxScale, stroke->cap, stroke->join, maxScale);
   }
   static constexpr float MaxAtlasDimension = Atlas::MaxCellSize - 2.f;
   auto cellScale = 1.f;
@@ -551,8 +551,7 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
       continue;
     }
     auto rect = atlasLocator.getLocation();
-    glyphState.matrix.postScale(1.f / (stateMaxScale * cellScale),
-                                1.f / (stateMaxScale * cellScale));
+    glyphState.matrix.postScale(1.f / (maxScale * cellScale), 1.f / (maxScale * cellScale));
     glyphState.matrix.postTranslate(glyphPosition.x, glyphPosition.y);
     glyphState.matrix.postConcat(state.matrix);
     glyphState.matrix.preTranslate(-rect.x(), -rect.y());
