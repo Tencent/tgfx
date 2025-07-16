@@ -126,10 +126,6 @@
         "innerShadow": "67961560",
         "shaderMaskFilter": "6e76b812"
     },
-    "ImageReaderTest": {
-        "update_bitmap": "c475bfb",
-        "update_mask": "d010fb8"
-    },
     "LayerTest": {
         "AdaptiveDashEffect": "330279d",
         "BackgroundBlurStyleTest1": "67961560",
