@@ -21,10 +21,6 @@
 #include "SIMDVec.h"
 #include "core/utils/MathExtra.h"
 
-#ifdef _MSC_VER
-#include "SIMDHIghwayInterface.h"
-#endif
-
 namespace tgfx {
 
 void Matrix::reset() {
@@ -363,10 +359,8 @@ void Matrix::IdentityPoints(const Matrix&, Point dst[], const Point src[], int c
   }
 }
 
+#ifndef _MSC_VER
 void Matrix::TransPoints(const Matrix& m, Point dst[], const Point src[], int count) {
-#ifdef _MSC_VER
-  TransPointsHWY(m, dst, src, count);
-#else
   if (count > 0) {
     float tx = m.getTranslateX();
     float ty = m.getTranslateY();
@@ -391,13 +385,9 @@ void Matrix::TransPoints(const Matrix& m, Point dst[], const Point src[], int co
       dst += 4;
     }
   }
-#endif
 }
 
 void Matrix::ScalePoints(const Matrix& m, Point dst[], const Point src[], int count) {
-#ifdef _MSC_VER
-  ScalePointsHWY(m, dst, src, count);
-#else
   if (count > 0) {
     float tx = m.getTranslateX();
     float ty = m.getTranslateY();
@@ -427,13 +417,9 @@ void Matrix::ScalePoints(const Matrix& m, Point dst[], const Point src[], int co
       dst += 4;
     }
   }
-#endif
 }
 
 void Matrix::AfflinePoints(const Matrix& m, Point dst[], const Point src[], int count) {
-#ifdef _MSC_VER
-  AffinePointsHWY(m, dst, src, count);
-#else
   if (count > 0) {
     float tx = m.getTranslateX();
     float ty = m.getTranslateY();
@@ -463,8 +449,8 @@ void Matrix::AfflinePoints(const Matrix& m, Point dst[], const Point src[], int 
       (src4 * scale4 + swz4 * skew4 + trans4).lo.store(dst);
     }
   }
-#endif
 }
+#endif
 
 bool Matrix::invertNonIdentity(Matrix* inverse) const {
   TypeMask mask = this->getType();
@@ -536,10 +522,8 @@ static float4 SortAsRect(const float4& ltrb) {
   return float4(min[2], min[3], max[0], max[1]);
 }
 
+#ifndef _MSC_VER
 void Matrix::mapRect(Rect* dst, const Rect& src) const {
-#ifdef _MSC_VER
-  MapRectHWY(*this, dst, src);
-#else
   if (this->getType() <= TranslateMask) {
     float tx = values[TRANS_X];
     float ty = values[TRANS_Y];
@@ -564,8 +548,8 @@ void Matrix::mapRect(Rect* dst, const Rect& src) const {
     mapPoints(quad, quad, 4);
     dst->setBounds(quad, 4);
   }
-#endif
 }
+#endif
 
 float Matrix::getMinScale() const {
   float results[2];

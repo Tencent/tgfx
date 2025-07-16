@@ -884,6 +884,7 @@ class Matrix {
 
   static void AfflinePoints(const Matrix& m, Point dst[], const Point src[], int count);
 
+
   bool invertNonIdentity(Matrix* inverse) const;
 
   bool getMinMaxScaleFactors(float results[2]) const;

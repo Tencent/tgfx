@@ -18,9 +18,6 @@
 
 #include "tgfx/core/Rect.h"
 #include "SIMDVec.h"
-#ifdef _MSC_VER
-#include "SIMDHIghwayInterface.h"
-#endif
 
 namespace tgfx {
 void Rect::scale(float scaleX, float scaleY) {
@@ -30,10 +27,8 @@ void Rect::scale(float scaleX, float scaleY) {
   bottom *= scaleY;
 }
 
+#ifndef _MSC_VER
 bool Rect::setBounds(const Point pts[], int count) {
-#ifdef _MSC_VER
-  return SetBoundsHWY(this, pts, count);
-#else
   if (count <= 0) {
     this->setEmpty();
     return false;
@@ -66,8 +61,8 @@ bool Rect::setBounds(const Point pts[], int count) {
     this->setEmpty();
     return false;
   }
-#endif
 }
+#endif
 
 #define CHECK_INTERSECT(al, at, ar, ab, bl, bt, br, bb) \
   float L = al > bl ? al : bl;                          \
