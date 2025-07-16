@@ -19,9 +19,9 @@
 #pragma once
 #include "tgfx/core/Matrix.h"
 namespace tgfx {
-  void TransPointsHWY(const Matrix& m, Point dst[], const Point src[], int count);
-  void ScalePointsHWY(const Matrix& m, Point dst[], const Point src[], int count);
-  void AffinePointsHWY(const Matrix& m, Point dst[], const Point src[], int count);
-  void MapRectHWY(const Matrix& m, Rect* dst, const Rect& src);
-  bool SetBoundsHWY(Rect* rect, const Point pts[], int count);
+void TransPointsHWY(const Matrix& m, Point dst[], const Point src[], int count);
+void ScalePointsHWY(const Matrix& m, Point dst[], const Point src[], int count);
+void AffinePointsHWY(const Matrix& m, Point dst[], const Point src[], int count);
+void MapRectHWY(const Matrix& m, Rect* dst, const Rect& src);
+bool SetBoundsHWY(Rect* rect, const Point pts[], int count);
 }  // namespace tgfx

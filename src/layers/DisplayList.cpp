@@ -23,9 +23,6 @@
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
 #include "layers/TileCache.h"
-#include "tgfx/core/Clock.h"
-#include <sstream>
-#include <fstream>
 
 namespace tgfx {
 static constexpr size_t MAX_DIRTY_REGION_FRAMES = 5;
@@ -115,60 +112,6 @@ static int64_t ChangeZoomScalePrecision(int64_t zoomScaleInt, int oldPrecision, 
 
 DisplayList::DisplayList() : _root(RootLayer::Make()) {
   _root->_root = _root.get();
-  std::ofstream file("test.txt");
-  Clock clock;
-  Matrix m[3];
-  m[0].setAll(1.0f, 0.0f, 1.5f, 0.0f, 1.0f, 1.8f);
-  m[1].setAll(1.9f, 0.0f, 1.8f, 0.0f, 1.3f, 2.5f);
-  m[2].setAll(1.9f, 0.8f, 1.8f, 1.5f, 1.3f, 2.5f);
-  const char* prefix[3] = {"transMatrix", "ScaleMatrix", "AfflineMatrix"};
-  constexpr int loopNum = 100000;
-  constexpr int pointNum = 3000;
-  Point src[pointNum];
-  Point dst[pointNum];
-  for(int i= 0; i < pointNum; i++) {
-    src[i].x = (float)i * 0.123f + 1.3f;
-    src[i].y = (float)i * -0.256f + 1.6f;
-  }
-  for(int j = 0; j < 3; j++) {
-    std::stringstream ss;
-    ss << "mapPointsStart" << j;
-    std::string mapPointsStart = ss.str();
-    ss.clear();
-    ss << "mapPointsEnd" << j;
-    std::string mapPointsEnd = ss.str();
-    ss.clear();
-    ss << "mapRectStart" << j;
-    std::string mapRectStart = ss.str();
-    ss.clear();
-    ss << "mapRectEnd" << j;
-    std::string mapRectEnd = ss.str();
-
-    clock.mark(mapPointsStart);
-    for(int i = 0; i < loopNum; i++) {
-      m[j].mapPoints(dst, src, pointNum);
-    }
-    clock.mark(mapPointsEnd);
-    Rect srcRect = {100, 100, 500, 500};
-    Rect dstRect;
-    clock.mark(mapRectStart);
-    for(int i= 0; i < loopNum * 1000; i++) {
-      m[j].mapRect(&dstRect, srcRect);
-    }
-    clock.mark(mapRectEnd);
-    printf("mapPoinTime_%s: %fms \n", prefix[j], (double)clock.measure(mapPointsStart, mapPointsEnd)/1000.0);
-    printf("mapRectTime_%s: %fms \n", prefix[j], (double)clock.measure(mapRectStart, mapRectEnd)/1000.0);
-    file << "mapPoinTime_" << prefix[j] << ": " << (double)clock.measure(mapPointsStart, mapPointsEnd)/1000.0 << "ms" << std::endl;
-    file << "mapRectTime_" << prefix[j] << ": " << (double)clock.measure(mapRectStart, mapRectEnd)/1000.0 << "ms" << std::endl;
-  }
-  Rect rect;
-  clock.mark("setBounds");
-  for(int i= 0; i < loopNum; i++) {
-    rect.setBounds(dst, pointNum);
-  }
-  clock.mark("setboundend");
-  printf("setBounds: %fms \n", (double)clock.measure("setBounds", "setboundend")/1000.0);
-  file << "setBounds: "<< (double)clock.measure("setBounds", "setboundend")/1000.0 << "ms" << std::endl;
 }
 
 DisplayList::~DisplayList() {
