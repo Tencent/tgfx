@@ -33,6 +33,7 @@ namespace tgfx {
 // Therefore, 10 is chosen as the MAX_BLUR_SIGMA.
 #define MAX_BLUR_SIGMA 10.f
 
+#ifndef TGFX_USE_FASTER_BLUR
 std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrinessY,
                                                TileMode tileMode) {
   if (blurrinessX < 0 || blurrinessY < 0 || (blurrinessX == 0 && blurrinessY == 0)) {
@@ -40,6 +41,7 @@ std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrine
   }
   return std::make_shared<GaussianBlurImageFilter>(blurrinessX, blurrinessY, tileMode);
 }
+#endif
 
 GaussianBlurImageFilter::GaussianBlurImageFilter(float blurrinessX, float blurrinessY,
                                                  TileMode tileMode)
