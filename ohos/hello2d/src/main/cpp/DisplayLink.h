@@ -13,5 +13,5 @@ private:
     static void VSyncCallback(long long, void* data);
     OH_NativeVSync* vSync = nullptr;
     std::function<void()> callback = nullptr;
-    bool isStopped = false;
+    std::atomic<bool> playing = false;
 };

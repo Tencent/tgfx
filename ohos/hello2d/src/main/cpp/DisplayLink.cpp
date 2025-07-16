@@ -6,27 +6,23 @@ DisplayLink::DisplayLink(std::function<void()> callback) : callback(callback) {
 }
 
 DisplayLink::~DisplayLink() {
-    if (vSync != nullptr) {
-        OH_NativeVSync_Destroy(vSync);
-    }
+    OH_NativeVSync_Destroy(vSync);
 }
 
 void DisplayLink::start() {
-    if (vSync != nullptr) {
+    if (playing == false) {
         OH_NativeVSync_RequestFrame(vSync, &DisplayLink::VSyncCallback, this);
-        isStopped = false;
+        playing = true;
     }
 }
 
 void DisplayLink::stop() {
-    if (vSync != nullptr && !isStopped) {
-        isStopped = true;
-    }
+    playing = false;
 }
 
 void DisplayLink::VSyncCallback(long long, void* data) {
     auto* displayLink = static_cast<DisplayLink*>(data);
-    if (!displayLink->isStopped) {
+    if (displayLink->playing) {
         displayLink->callback();
         OH_NativeVSync_RequestFrame(displayLink->vSync, &DisplayLink::VSyncCallback, displayLink);
     }
