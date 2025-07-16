@@ -67,13 +67,15 @@ class RenderContext : public DrawContext {
 
  private:
   void drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const MCState& state,
-                              const Fill& fill, const Stroke* stroke, GlyphRun* rejectedGlyphRun);
+                              const Fill& fill, const Stroke* stroke, float stateMaxScale,
+                              GlyphRun* rejectedGlyphRun);
 
   void drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
-                        const Fill& fill, const Stroke* stroke, const Rect& clipBounds);
+                        const Fill& fill, const Stroke* stroke, const Rect& clipBounds,
+                        float stateMaxScale);
 
   void drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun, const MCState& state,
-                                   const Fill& fill, const Stroke* stroke);
+                                   const Fill& fill, const Stroke* stroke, float stateMaxScale);
 
   std::shared_ptr<RenderTargetProxy> renderTarget = nullptr;
   uint32_t renderFlags = 0;
