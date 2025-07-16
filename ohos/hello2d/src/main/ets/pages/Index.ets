@@ -32,7 +32,7 @@ struct Index {
   }
 
   onPageHide(): void {
-    hello2d.pauseDrawLoop();
+    hello2d.stopDrawLoop();
   }
 
   onPageShow(): void {

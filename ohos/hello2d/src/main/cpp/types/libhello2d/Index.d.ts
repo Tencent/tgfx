@@ -6,4 +6,4 @@ export const addImageFromEncoded: (name: string, data: ArrayBuffer) => void;
 
 export const startDrawLoop: () => void;
 
-export const pauseDrawLoop: () => void;
+export const stopDrawLoop: () => void;

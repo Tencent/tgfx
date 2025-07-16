@@ -101,9 +101,9 @@ static napi_value StartDrawLoop(napi_env, napi_callback_info) {
     return nullptr;
 }
 
-static napi_value PauseDrawLoop(napi_env, napi_callback_info) {
+static napi_value StopDrawLoop(napi_env, napi_callback_info) {
     if (displayLink != nullptr) {
-        displayLink->pause();
+        displayLink->stop();
     }
     return nullptr;
 }
@@ -190,7 +190,7 @@ static napi_value Init(napi_env env, napi_value exports) {
   napi_property_descriptor desc[] = {
       {"startDrawLoop", nullptr, StartDrawLoop, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"updateDrawParams", nullptr, UpdateDrawParams, nullptr, nullptr, nullptr, napi_default, nullptr},
-      {"pauseDrawLoop", nullptr, PauseDrawLoop, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"stopDrawLoop", nullptr, StopDrawLoop, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"updateDensity", nullptr, OnUpdateDensity, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"addImageFromEncoded", nullptr, AddImageFromEncoded, nullptr, nullptr, nullptr, napi_default, nullptr},
   };
