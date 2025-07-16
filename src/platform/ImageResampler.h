@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,45 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include <array>
-#include "core/PixelRef.h"
-#include "tgfx/core/Mask.h"
+#include "tgfx/core/ImageInfo.h"
+#include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
-class PixelRefMask : public Mask {
+class ImageResamper {
  public:
-  explicit PixelRefMask(std::shared_ptr<PixelRef> pixelRef);
-
-  int width() const override {
-    return pixelRef->width();
-  }
-
-  int height() const override {
-    return pixelRef->height();
-  }
-
-  bool isHardwareBacked() const override {
-    return pixelRef->isHardwareBacked();
-  }
-
-  void clear() override {
-    return pixelRef->clear();
-  }
-
-  std::shared_ptr<ImageBuffer> makeBuffer() const override {
-    return pixelRef->makeBuffer();
-  }
-
- protected:
-  std::shared_ptr<PixelRef> pixelRef = nullptr;
-
-  void markContentDirty(const Rect& bounds, bool flipY);
-
-  static const std::array<uint8_t, 256>& GammaTable();
-
-  std::shared_ptr<ImageStream> getImageStream() const override {
-    return pixelRef;
-  }
+  static bool Scale(const ImageInfo& srcInfo, const void* srcData, const ImageInfo& dstInfo,
+                    void* dstData, FilterQuality quality);
 };
 }  // namespace tgfx

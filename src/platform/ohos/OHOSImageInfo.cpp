@@ -19,6 +19,7 @@
 #include "OHOSImageInfo.h"
 #include <multimedia/image_framework/image/pixelmap_native.h>
 #include <multimedia/image_framework/image_pixel_map_mdk.h>
+#include "tgfx/core/AlphaType.h"
 
 namespace tgfx {
 
@@ -63,6 +64,20 @@ AlphaType OHOSImageInfo::ToTGFXAlphaType(int ohAlphaType) {
       return AlphaType::Unknown;
   }
   return AlphaType::Unknown;
+}
+
+int OHOSImageInfo::ToOHAlphaType(AlphaType alphaType) {
+  switch (alphaType) {
+    default:
+    case tgfx::AlphaType::Unknown:
+      return OHOS_PIXEL_MAP_ALPHA_TYPE_UNKNOWN;
+    case tgfx::AlphaType::Opaque:
+      return OHOS_PIXEL_MAP_ALPHA_TYPE_OPAQUE;
+    case tgfx::AlphaType::Premultiplied:
+      return OHOS_PIXEL_MAP_ALPHA_TYPE_PREMUL;
+    case tgfx::AlphaType::Unpremultiplied:
+      return OHOS_PIXEL_MAP_ALPHA_TYPE_UNPREMUL;
+  }
 }
 
 int OHOSImageInfo::ToOHPixelFormat(ColorType colorType) {

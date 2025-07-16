@@ -19,6 +19,7 @@
 #include "ProxyProvider.h"
 #include "core/ShapeRasterizer.h"
 #include "core/shapes/MatrixShape.h"
+#include "core/utils/MathExtra.h"
 #include "core/utils/USE.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/DrawingManager.h"
@@ -287,18 +288,48 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
                                          mipmapped, renderFlags);
 }
 
+static constexpr int MinApproxSize = 16;
+static constexpr int MagicTol = 1024;
+
+/**
+ * Map 'value' to a larger multiple of 2. Values <= 'MagicTol' will pop up to the next power of 2.
+ * Those above 'MagicTol' will only go up half the floor power of 2.
+ */
+int GetApproxSize(int value) {
+  value = std::max(MinApproxSize, value);
+  if (IsPow2(value)) {
+    return value;
+  }
+  int ceilPow2 = NextPow2(value);
+  if (value <= MagicTol) {
+    return ceilPow2;
+  }
+  int floorPow2 = ceilPow2 >> 1;
+  int mid = floorPow2 + (floorPow2 >> 1);
+  if (value <= mid) {
+    return mid;
+  }
+  return ceilPow2;
+}
+
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
     const UniqueKey& uniqueKey, int width, int height, PixelFormat format, bool mipmapped,
     ImageOrigin origin, BackingFit backingFit, uint32_t renderFlags) {
-  if (auto proxy = findOrWrapTextureProxy(uniqueKey)) {
-    return proxy;
-  }
   if (!Texture::CheckSizeAndFormat(context, width, height, format)) {
     return nullptr;
   }
+  if (auto proxy = findOrWrapTextureProxy(uniqueKey)) {
+    proxy->_width = width;
+    proxy->_height = height;
+    return proxy;
+  }
   auto hasMipmaps = context->caps()->mipmapSupport ? mipmapped : false;
   auto textureProxy = std::shared_ptr<DefaultTextureProxy>(
-      new DefaultTextureProxy(width, height, format, hasMipmaps, origin, backingFit));
+      new DefaultTextureProxy(width, height, format, hasMipmaps, origin));
+  if (backingFit == BackingFit::Approx) {
+    textureProxy->_backingStoreWidth = GetApproxSize(width);
+    textureProxy->_backingStoreHeight = GetApproxSize(height);
+  }
   if (!(renderFlags & RenderFlags::DisableCache)) {
     textureProxy->uniqueKey = uniqueKey;
   }
@@ -361,12 +392,13 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
 std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
     const UniqueKey& uniqueKey, int width, int height, PixelFormat format, int sampleCount,
     bool mipmapped, ImageOrigin origin, BackingFit backingFit, uint32_t renderFlags) {
-  auto textureProxy = findOrWrapTextureProxy(uniqueKey);
-  if (textureProxy != nullptr) {
-    return textureProxy->asRenderTargetProxy();
-  }
   if (!Texture::CheckSizeAndFormat(context, width, height, format)) {
     return nullptr;
+  }
+  if (auto proxy = findOrWrapTextureProxy(uniqueKey)) {
+    proxy->_width = width;
+    proxy->_height = height;
+    return proxy->asRenderTargetProxy();
   }
   auto caps = context->caps();
   if (!caps->isFormatRenderable(format)) {
@@ -374,8 +406,12 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
   }
   sampleCount = caps->getSampleCount(sampleCount, format);
   auto hasMipmaps = caps->mipmapSupport ? mipmapped : false;
-  auto proxy = std::shared_ptr<TextureRenderTargetProxy>(new TextureRenderTargetProxy(
-      width, height, format, sampleCount, hasMipmaps, origin, backingFit));
+  auto proxy = std::shared_ptr<TextureRenderTargetProxy>(
+      new TextureRenderTargetProxy(width, height, format, sampleCount, hasMipmaps, origin));
+  if (backingFit == BackingFit::Approx) {
+    proxy->_backingStoreWidth = GetApproxSize(width);
+    proxy->_backingStoreHeight = GetApproxSize(height);
+  }
   if (!(renderFlags & RenderFlags::DisableCache)) {
     proxy->uniqueKey = uniqueKey;
   }
@@ -423,8 +459,7 @@ std::shared_ptr<TextureProxy> ProxyProvider::findOrWrapTextureProxy(const Unique
   if (auto renderTarget = texture->asRenderTarget()) {
     proxy = std::shared_ptr<TextureProxy>(new TextureRenderTargetProxy(
         texture->width(), texture->height(), renderTarget->format(), renderTarget->sampleCount(),
-        texture->hasMipmaps(), texture->origin(), BackingFit::Exact,
-        renderTarget->externallyOwned()));
+        texture->hasMipmaps(), texture->origin(), renderTarget->externallyOwned()));
   } else {
     auto format = texture->isYUV() ? PixelFormat::Unknown : texture->getSampler()->format();
     proxy = std::shared_ptr<TextureProxy>(new TextureProxy(

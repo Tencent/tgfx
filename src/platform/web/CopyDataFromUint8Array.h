@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,20 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <emscripten/val.h>
+#include "tgfx/core/Data.h"
 
-#include "core/PixelRefMask.h"
-
+using namespace emscripten;
 namespace tgfx {
-class CGMask : public PixelRefMask {
- public:
-  explicit CGMask(std::shared_ptr<PixelRef> pixelRef) : PixelRefMask(std::move(pixelRef)) {
-  }
-
- protected:
-  void onFillPath(const Path& path, const Matrix& matrix, bool antiAlias,
-                  bool needsGammaCorrection) override;
-
-  bool onFillText(const GlyphRunList* glyphRunList, const Stroke* stroke, const Matrix& matrix,
-                  bool antiAlias) override;
-};
-}  // namespace tgfx
+std::shared_ptr<Data> CopyDataFromUint8Array(const val& emscriptenData);
+}

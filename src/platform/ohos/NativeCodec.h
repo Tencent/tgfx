@@ -28,13 +28,13 @@ class NativeCodec : public ImageCodec {
  public:
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 
+  static ImageInfo GetPixelmapInfo(OH_PixelmapNative* pixelmap);
+
  private:
   std::string imagePath;
   std::shared_ptr<Data> imageBytes;
 
   static std::shared_ptr<NativeCodec> Make(OH_ImageSourceNative* imageSource);
-
-  static ImageInfo GetPixelmapInfo(OH_PixelmapNative* pixelmap);
 
   OH_ImageSourceNative* CreateImageSource() const;
 

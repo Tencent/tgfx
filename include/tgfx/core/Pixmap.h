@@ -22,6 +22,31 @@
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
+
+/**
+* Filter quality levels for image scaling operations.
+* This enum controls the trade-off between rendering quality and performance when scaling pixmaps.
+* Higher quality levels use more computationally expensive filters but produce smoother results.
+*/
+enum class FilterQuality {
+  /**
+   * Fastest but lowest quality, typically nearest-neighbor
+   */
+  None = 0,
+  /**
+   * Better quality than None, faster than Medium, typically bilerp
+   */
+  Low,
+  /**
+   * Better quality than Low, faster than High, typically bilerp + mipmaps for down-scaling
+   */
+  Medium,
+  /**
+   * Slowest but highest quality, typically bicubic or better
+   */
+  High,
+};
+
 /**
  * Pixmap provides a utility to pair ImageInfo width pixels. Pixmap is a low-level class that
  * provides convenience functions to access raster destinations, which can convert the format of
@@ -203,6 +228,14 @@ class Pixmap {
    * Pixmap is constructed from writable pixels. Returns true if src pixels are copied to Pixmap.
    */
   bool writePixels(const ImageInfo& srcInfo, const void* srcPixels, int dstX = 0, int dstY = 0);
+
+  /**
+   * Copy the pixels from this pixmap into the dst pixmap, converting as needed into dst's
+   * colortype/alphatype. If the conversion cannot be performed, false is returned.
+   * If dst's dimensions differ from the src dimension, the image will be scaled, applying the specified
+   * filter-quality.
+   */
+  bool scalePixels(const ImageInfo& dstInfo, void* dstPixels, FilterQuality quality) const;
 
   /**
    * Replaces all pixel values with transparent colors. Returns false if the Pixmap is constructed
