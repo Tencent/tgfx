@@ -139,6 +139,7 @@ bool DrawingManager::flush() {
   }
   for (auto& task : resourceTasks) {
     task->execute(context);
+    task = nullptr;
   }
   uploadAtlasToGPU();
   resourceTasks.clear();
@@ -149,6 +150,7 @@ bool DrawingManager::flush() {
   }
   for (auto& task : renderTasks) {
     task->execute(renderPass.get());
+    task = nullptr;
   }
   renderTasks.clear();
   return true;

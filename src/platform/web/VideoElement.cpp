@@ -18,6 +18,7 @@
 
 #include "platform/web/VideoElement.h"
 #include "gpu/DefaultTexture.h"
+#include "gpu/opengl/GLTextureSampler.h"
 
 namespace tgfx {
 using namespace emscripten;
@@ -32,12 +33,11 @@ std::shared_ptr<VideoElement> VideoElement::MakeFrom(val video, int width, int h
 }
 
 VideoElement::VideoElement(emscripten::val video, int width, int height)
-    : WebImageStream(video, width, height, false) {
+    : ImageStream(width, height), source(video) {
 }
 
 void VideoElement::markFrameChanged(emscripten::val promise) {
   currentPromise = promise;
-  markContentDirty(Rect::MakeWH(width(), height()));
 #ifndef TGFX_USE_ASYNC_PROMISE
   if (currentPromise != val::null()) {
     currentPromise.await();
@@ -65,18 +65,21 @@ std::shared_ptr<Texture> VideoElement::onMakeTexture(Context* context, bool mipm
   auto texture =
       Texture::MakeFormat(context, textureWidth, textureHeight, PixelFormat::RGBA_8888, mipmapped);
   if (texture != nullptr) {
-    onUpdateTexture(texture, Rect::MakeWH(width(), height()));
+    onUpdateTexture(texture);
   }
   return texture;
 }
 
-bool VideoElement::onUpdateTexture(std::shared_ptr<Texture> texture, const Rect& bounds) {
+bool VideoElement::onUpdateTexture(std::shared_ptr<Texture> texture) {
 #ifdef TGFX_USE_ASYNC_PROMISE
   if (currentPromise != val::null()) {
     currentPromise.await();
   }
 #endif
-  return WebImageStream::onUpdateTexture(texture, bounds);
+  auto sampler = static_cast<GLTextureSampler*>(texture->getSampler());
+  val::module_property("tgfx").call<void>("uploadToTexture", emscripten::val::module_property("GL"),
+                                          source, sampler->id(), false);
+  sampler->regenerateMipmapLevels(texture->getContext());
+  return true;
 }
-
 }  // namespace tgfx
