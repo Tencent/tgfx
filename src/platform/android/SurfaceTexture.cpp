@@ -154,7 +154,7 @@ std::shared_ptr<SurfaceTexture> SurfaceTexture::Make(int width, int height, jobj
 }
 
 SurfaceTexture::SurfaceTexture(int width, int height, JNIEnv* env, jobject st)
-    : _width(width), _height(height) {
+    : ImageStream(width, height) {
   surfaceTexture = st;
   surface = env->NewObject(SurfaceClass.get(), Surface_Constructor, st);
 }
@@ -208,7 +208,7 @@ std::shared_ptr<Texture> SurfaceTexture::onMakeTexture(Context* context, bool) {
       context, new DefaultTexture(std::move(sampler), textureSize.width, textureSize.height));
 }
 
-bool SurfaceTexture::onUpdateTexture(std::shared_ptr<Texture>, const Rect&) {
+bool SurfaceTexture::onUpdateTexture(std::shared_ptr<Texture>) {
   auto size = updateTexImage();
   return !size.isEmpty();
 }

@@ -16,11 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/ImageReader.h"
-#include "core/ImageStream.h"
+#include "tgfx/platform/ImageReader.h"
 #include "core/PixelRef.h"
 #include "core/utils/Log.h"
 #include "gpu/Texture.h"
+#include "platform/ImageStream.h"
 
 namespace tgfx {
 class ImageReaderBuffer : public ImageBuffer {
@@ -38,7 +38,7 @@ class ImageReaderBuffer : public ImageBuffer {
   }
 
   bool isAlphaOnly() const override {
-    return imageReader->stream->isAlphaOnly();
+    return false;
   }
 
   bool expired() const override {
@@ -55,10 +55,6 @@ class ImageReaderBuffer : public ImageBuffer {
   uint64_t contentVersion = 0;
 };
 
-std::shared_ptr<ImageReader> ImageReader::MakeFrom(const Bitmap& bitmap) {
-  return ImageReader::MakeFrom(bitmap.pixelRef);
-}
-
 std::shared_ptr<ImageReader> ImageReader::MakeFrom(std::shared_ptr<ImageStream> imageStream) {
   if (imageStream == nullptr) {
     return nullptr;
@@ -70,12 +66,6 @@ std::shared_ptr<ImageReader> ImageReader::MakeFrom(std::shared_ptr<ImageStream> 
 
 ImageReader::ImageReader(std::shared_ptr<ImageStream> imageStream)
     : stream(std::move(imageStream)) {
-  stream->attachToStream(this);
-  dirtyBounds = Rect::MakeWH(stream->width(), stream->height());
-}
-
-ImageReader::~ImageReader() {
-  stream->detachFromStream(this);
 }
 
 int ImageReader::width() const {
@@ -89,10 +79,6 @@ int ImageReader::height() const {
 std::shared_ptr<ImageBuffer> ImageReader::acquireNextBuffer() {
   std::lock_guard<std::mutex> autoLock(locker);
   DEBUG_ASSERT(!weakThis.expired());
-  if (!hasPendingChanges) {
-    return nullptr;
-  }
-  hasPendingChanges = false;
   bufferVersion++;
   return std::make_shared<ImageReaderBuffer>(weakThis.lock(), bufferVersion);
 }
@@ -118,25 +104,13 @@ std::shared_ptr<Texture> ImageReader::readTexture(uint64_t contentVersion, Conte
   if (texture == nullptr) {
     texture = stream->onMakeTexture(context, mipmapped);
     success = texture != nullptr;
-  } else if (!stream->isHardwareBacked()) {
-    success = stream->onUpdateTexture(texture, dirtyBounds);
+  } else {
+    success = stream->onUpdateTexture(texture);
   }
   if (success) {
-    dirtyBounds.setEmpty();
     texture->removeUniqueKey();
     textureVersion = contentVersion;
   }
   return texture;
-}
-
-void ImageReader::onContentDirty(const Rect& bounds) {
-  std::lock_guard<std::mutex> autoLock(locker);
-  hasPendingChanges = true;
-  dirtyBounds.join(bounds);
-  if (stream->isHardwareBacked() && texture != nullptr) {
-    texture->removeUniqueKey();
-    textureVersion = 0;
-    bufferVersion++;
-  }
 }
 }  // namespace tgfx
