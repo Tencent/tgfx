@@ -126,7 +126,6 @@ std::shared_ptr<ScalerContext> Typeface::getScalerContext(float size) {
 }
 
 Rect Typeface::getBounds() const {
-  std::once_flag onceFlag;
   std::call_once(onceFlag, [this] {
     if (!computeBounds(&bounds)) {
       bounds.setEmpty();

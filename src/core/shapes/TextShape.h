@@ -32,7 +32,9 @@ class TextShape : public UniqueKeyShape {
   }
 
   Rect getBounds() const override {
-    return glyphRunList->getBounds();
+    auto bounds = glyphRunList->getBounds();
+    bounds.scale(scale, scale);
+    return bounds;
   }
 
   Path getPath() const override;

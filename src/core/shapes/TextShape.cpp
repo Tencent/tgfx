@@ -21,7 +21,7 @@
 #include "core/utils/Log.h"
 
 namespace tgfx {
-std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<TextBlob> textBlob, float resolutionScale) {
+std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<TextBlob> textBlob, float scale) {
   auto glyphRunLists = GlyphRunList::Unwrap(textBlob.get());
   if (glyphRunLists == nullptr) {
     return nullptr;
@@ -36,18 +36,15 @@ std::shared_ptr<Shape> Shape::MakeFrom(std::shared_ptr<TextBlob> textBlob, float
   if (glyphRunList == nullptr) {
     return nullptr;
   }
-  return std::make_shared<TextShape>(std::move(glyphRunList), resolutionScale);
+  return std::make_shared<TextShape>(std::move(glyphRunList), scale);
 }
 
 Path TextShape::getPath() const {
   Path path = {};
-  auto matrix = Matrix::MakeScale(scale, scale);
-  if (!glyphRunList->getPath(&path, &matrix)) {
+  if (!glyphRunList->getPath(&path)) {
     LOGE("TextShape::getPath() Failed to get path from GlyphRunList!");
     return {};
   }
-  matrix.setScale(1.0f / scale, 1.0f / scale);
-  path.transform(matrix);
   return path;
 }
 }  // namespace tgfx

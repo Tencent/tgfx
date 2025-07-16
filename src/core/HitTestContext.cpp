@@ -122,26 +122,27 @@ void HitTestContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList
                                       const MCState& state, const Fill& fill,
                                       const Stroke* stroke) {
   DEBUG_ASSERT(glyphRunList != nullptr);
+  auto maxScale = state.matrix.getMaxScale();
+  if (FloatNearlyZero(maxScale)) {
+    return;
+  }
   auto local = state.matrix.mapXY(testX, testY);
-  Matrix invScaleMatrix;
-  state.matrix.invert(&invScaleMatrix);
   if (shapeHitTest && glyphRunList->hasOutlines()) {
     Path glyphPath = {};
     glyphRunList->getPath(&glyphPath, &state.matrix);
-    glyphPath.transform(invScaleMatrix);
     if (stroke) {
-      stroke->applyToPath(&glyphPath);
+      Stroke scaledStroke(stroke->width * maxScale, stroke->cap, stroke->join, stroke->miterLimit);
+      scaledStroke.applyToPath(&glyphPath);
     }
     if (!glyphPath.contains(local.x, local.y)) {
       return;
     }
   } else {
-    auto localBounds = glyphRunList->getTightBounds(&state.matrix);
-    invScaleMatrix.mapRect(&localBounds);
+    auto deviceBounds = glyphRunList->getTightBounds(&state.matrix);
     if (stroke) {
-      ApplyStrokeToBounds(*stroke, &localBounds);
+      ApplyStrokeToBounds(*stroke, &deviceBounds, maxScale);
     }
-    if (!localBounds.contains(local.x, local.y)) {
+    if (!deviceBounds.contains(local.x, local.y)) {
       return;
     }
   }

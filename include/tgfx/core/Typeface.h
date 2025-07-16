@@ -171,8 +171,8 @@ class Typeface {
   bool computeBounds(Rect* bounds) const;
 
   std::unordered_map<float, std::weak_ptr<ScalerContext>> scalerContexts = {};
-
   mutable Rect bounds = {};
+  mutable std::once_flag onceFlag = {};
 
   friend class Font;
   friend class ScalerContext;
