@@ -48,16 +48,16 @@ class TextureProxy : public ResourceProxy {
    * Returns the width of the backing store, which may differ from the texture width if the texture
    * is approximate size.
    */
-  virtual int backingStoreWidth() const {
-    return _width;
+  int backingStoreWidth() const {
+    return _backingStoreWidth;
   }
 
   /**
    * Returns the height of the backing store, which may differ from the texture height if the
    * texture is approximate size.
    */
-  virtual int backingStoreHeight() const {
-    return _height;
+  int backingStoreHeight() const {
+    return _backingStoreHeight;
   }
 
   /**
@@ -99,14 +99,16 @@ class TextureProxy : public ResourceProxy {
  protected:
   int _width = 0;
   int _height = 0;
+  int _backingStoreWidth = 0;
+  int _backingStoreHeight = 0;
   PixelFormat _format = PixelFormat::RGBA_8888;
   bool _mipmapped = false;
   ImageOrigin _origin = ImageOrigin::TopLeft;
 
   TextureProxy(int width, int height, PixelFormat pixelFormat, bool mipmapped = false,
                ImageOrigin origin = ImageOrigin::TopLeft)
-      : _width(width), _height(height), _format(pixelFormat), _mipmapped(mipmapped),
-        _origin(origin) {
+      : _width(width), _height(height), _backingStoreWidth(width), _backingStoreHeight(height),
+        _format(pixelFormat), _mipmapped(mipmapped), _origin(origin) {
   }
 
   friend class ProxyProvider;
