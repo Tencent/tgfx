@@ -69,9 +69,9 @@ bool FTPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) con
   totalMatrix.postTranslate(0, static_cast<float>(targetInfo.height()));
   path.transform(totalMatrix);
   if (path.isInverseFillType()) {
-    Path maskPath = {};
-    maskPath.addRect(Rect::MakeWH(targetInfo.width(), targetInfo.height()));
-    path.addPath(maskPath, PathOp::Intersect);
+    Path clipPath = {};
+    clipPath.addRect(Rect::MakeWH(targetInfo.width(), targetInfo.height()));
+    path.addPath(clipPath, PathOp::Intersect);
   }
   ClearPixels(targetInfo, dstPixels);
   FTPath ftPath = {};

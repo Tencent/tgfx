@@ -17,46 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DefaultTextureProxy.h"
-#include "core/utils/MathExtra.h"
 
 namespace tgfx {
-int GetApproximateLength(int length) {
-  // Map 'value' to a larger multiple of 2. Values <= 'MagicTol' will pop up to
-  // the next power of 2. Those above 'MagicTol' will only go up half the floor power of 2.
-
-  constexpr int MinApproxSize = 16;
-  constexpr int MagicTol = 1024;
-
-  length = std::max(MinApproxSize, length);
-
-  if (IsPow2(length)) {
-    return length;
-  }
-
-  int ceilPow2 = NextPow2(length);
-  if (length <= MagicTol) {
-    return ceilPow2;
-  }
-
-  int floorPow2 = ceilPow2 >> 1;
-  int mid = floorPow2 + (floorPow2 >> 1);
-
-  if (length <= mid) {
-    return mid;
-  }
-  return ceilPow2;
-}
-
 DefaultTextureProxy::DefaultTextureProxy(int width, int height, PixelFormat pixelFormat,
-                                         bool mipmapped, ImageOrigin origin, BackingFit backingFit)
+                                         bool mipmapped, ImageOrigin origin)
     : TextureProxy(width, height, pixelFormat, mipmapped, origin) {
-  if (backingFit == BackingFit::Approx) {
-    _backingStoreWidth = GetApproximateLength(width);
-    _backingStoreHeight = GetApproximateLength(height);
-  } else {
-    _backingStoreWidth = width;
-    _backingStoreHeight = height;
-  }
 }
 
 std::shared_ptr<Texture> DefaultTextureProxy::getTexture() const {

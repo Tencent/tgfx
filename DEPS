@@ -74,6 +74,11 @@
          "url": "https://github.com/cameron314/concurrentqueue.git",
          "commit": "6dd38b8a1dbaa7863aa907045f32308a56a6ff5d",
          "dir": "third_party/concurrentqueue"
+      },
+      {
+         "url": "https://github.com/nothings/stb.git",
+         "commit": "f58f558c120e9b32c217290b80bad1a0729fbb2c",
+         "dir": "third_party/stb"
       }
     ]
   },
