@@ -18,29 +18,16 @@
 
 #pragma once
 
-#include "gpu/BackingFit.h"
 #include "gpu/proxies/TextureProxy.h"
 
 namespace tgfx {
 class DefaultTextureProxy : public TextureProxy {
  public:
-  int backingStoreWidth() const override {
-    return _backingStoreWidth;
-  }
-
-  int backingStoreHeight() const override {
-    return _backingStoreHeight;
-  }
-
   std::shared_ptr<Texture> getTexture() const override;
 
  protected:
-  int _backingStoreWidth = 0;
-  int _backingStoreHeight = 0;
-
   DefaultTextureProxy(int width, int height, PixelFormat pixelFormat, bool mipmapped = false,
-                      ImageOrigin origin = ImageOrigin::TopLeft,
-                      BackingFit backingFit = BackingFit::Exact);
+                      ImageOrigin origin = ImageOrigin::TopLeft);
 
   virtual std::shared_ptr<Texture> onMakeTexture(Context* context) const;
 

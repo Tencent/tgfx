@@ -74,7 +74,7 @@ class TextureRenderTargetProxy : public DefaultTextureProxy,
 
   TextureRenderTargetProxy(int width, int height, PixelFormat format, int sampleCount,
                            bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft,
-                           BackingFit backingFit = BackingFit::Exact, bool externallyOwned = false);
+                           bool externallyOwned = false);
 
   std::shared_ptr<Texture> onMakeTexture(Context* context) const override;
 
