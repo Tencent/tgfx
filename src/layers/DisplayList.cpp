@@ -440,9 +440,11 @@ void DisplayList::invalidateCurrentTileCache(const TileCache* tileCache,
 std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
                                                       std::vector<DrawTask>* tileTasks) {
   auto maxRefinedCount = _maxTilesRefinedPerFrame;
-  if (lastZoomScaleInt != _zoomScaleInt) {
+  if (lastContentOffset != _contentOffset || lastZoomScaleInt != _zoomScaleInt) {
+    lastContentOffset = _contentOffset;
     lastZoomScaleInt = _zoomScaleInt;
-    // When the zoom scale is changing, we skip refinement to keep user interactions smooth.
+    // To ensure smooth user interactions, we skip refinement when the offset or zoom scale is
+    // changing.
     maxRefinedCount = 0;
   }
   hasZoomBlurTiles = false;
