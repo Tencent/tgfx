@@ -160,6 +160,8 @@ if (MSVC)
     list(APPEND TGFX_COMPILE_OPTIONS /w44251 /w44275)
     list(APPEND TGFX_COMPILE_OPTIONS /W4)
     list(APPEND TGFX_DEFINES NOMINMAX _USE_MATH_DEFINES)
+    list(APPEND TGFX_STATIC_VENDORS highway)
+    list(APPEND TGFX_INCLUDES third_party/highway)
 endif (MSVC)
 
 # Sets flags

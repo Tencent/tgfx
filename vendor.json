@@ -237,6 +237,14 @@
           "-DCMAKE_C_FLAGS=\"-w\""
         ]
       }
+    },
+    {
+      "name": "highway",
+      "cmake": {
+        "targets": [
+          "hwy"
+        ]
+      }
     }
   ]
 }
