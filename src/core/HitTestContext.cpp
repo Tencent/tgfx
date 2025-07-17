@@ -166,7 +166,7 @@ void HitTestContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList
       return;
     }
   } else {
-    auto localBounds = shapeHitTest ? glyphRunList->getTightBounds() : glyphRunList->getBounds();
+    auto localBounds = glyphRunList->getBounds();
     if (stroke) {
       ApplyStrokeToBounds(*stroke, &localBounds);
     }
