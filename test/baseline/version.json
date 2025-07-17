@@ -41,7 +41,7 @@
         "Path_addArc_reversed7": "4802e56",
         "Path_addArc_reversed8": "4802e56",
         "Path_complex": "e031f25",
-        "Picture": "67961560",
+        "Picture": "caf1ce70",
         "PictureImage": "67961560",
         "PictureImage_Path": "1ae5042",
         "PictureImage_Text": "67961560",
@@ -64,8 +64,8 @@
         "drawImageRect": "606f8195",
         "drawPaint": "b7aefeb",
         "drawPaint_shadow": "67961560",
-        "drawShape": "d7f154de",
-        "emojiTextStrokeBlending": "67961560",
+        "drawShape": "caf1ce70",
+        "emojiTextStrokeBlending": "caf1ce70",
         "filter_mode_linear": "c475bfb",
         "filter_mode_nearest": "d010fb8",
         "hardware_render_target_blend": "67961560",
@@ -99,7 +99,7 @@
         "ImageWithMipmap": "da590da",
         "ImageWithShadow": "67961560",
         "SimpleLayerTreeDrawer": "9b1a0dfc",
-        "SimpleText": "d7f154de"
+        "SimpleText": "caf1ce70"
     },
     "DstTextureTest": {
         "EmptyLocalBounds": "be94e666",
