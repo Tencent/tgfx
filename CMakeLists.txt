@@ -160,6 +160,8 @@ if (MSVC)
     list(APPEND TGFX_COMPILE_OPTIONS /w44251 /w44275)
     list(APPEND TGFX_COMPILE_OPTIONS /W4)
     list(APPEND TGFX_DEFINES NOMINMAX _USE_MATH_DEFINES)
+    list(APPEND TGFX_STATIC_VENDORS highway)
+    list(APPEND TGFX_INCLUDES third_party/highway)
 endif (MSVC)
 
 # Sets flags
@@ -332,6 +334,11 @@ elseif (TGFX_USE_ANGLE)
 else ()
     set(TGFX_USE_NATIVE_GL ON)
 endif ()
+
+if (NOT APPLE AND NOT OHOS AND (NOT WEB OR EMSCRIPTEN_PTHREADS))
+    list(APPEND TGFX_INCLUDES third_party/stb)
+    list(APPEND TGFX_DEFINES TGFX_USE_STB_IMAGE)
+endif()
 
 list(APPEND TGFX_STATIC_VENDORS pathkit)
 list(APPEND TGFX_INCLUDES third_party/pathkit)
@@ -573,6 +580,12 @@ if (TGFX_BUILD_TESTS)
 
     if (TGFX_TEST_EXCLUDE_FILES)
         list(REMOVE_ITEM TGFX_TEST_FILES ${TGFX_TEST_EXCLUDE_FILES})
+    endif ()
+
+    if (TGFX_USE_FASTER_BLUR)
+        file(GLOB_RECURSE GAUSSIAN_BLUR_TEST_FILES src/gpu/processors/*GaussianBlur* src/core/filters/*GaussianBlur*)
+        list(APPEND TGFX_TEST_FILES ${GAUSSIAN_BLUR_TEST_FILES})
+        add_definitions(-DTGFX_USE_FASTER_BLUR)
     endif ()
 
     list(APPEND TGFX_BASELINE_DEFINES ${TGFX_TEST_DEFINES} UPDATE_BASELINE)

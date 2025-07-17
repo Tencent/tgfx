@@ -74,6 +74,16 @@
          "url": "https://github.com/cameron314/concurrentqueue.git",
          "commit": "6dd38b8a1dbaa7863aa907045f32308a56a6ff5d",
          "dir": "third_party/concurrentqueue"
+      },
+      {
+         "url": "https://github.com/nothings/stb.git",
+         "commit": "f58f558c120e9b32c217290b80bad1a0729fbb2c",
+         "dir": "third_party/stb"
+      },
+      {
+         "url": "https://github.com/google/highway.git",
+         "commit": "a523516d35e22a4ba8e2e70a319062cb87352de6",
+         "dir": "third_party/highway"
       }
     ]
   },

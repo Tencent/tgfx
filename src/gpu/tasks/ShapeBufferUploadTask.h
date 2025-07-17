@@ -20,24 +20,23 @@
 
 #include "ResourceTask.h"
 #include "core/DataSource.h"
-#include "core/ShapeBuffer.h"
+#include "core/ShapeRasterizer.h"
 
 namespace tgfx {
 class ShapeBufferUploadTask : public ResourceTask {
  public:
-  ShapeBufferUploadTask(UniqueKey trianglesKey, UniqueKey textureKey,
+  ShapeBufferUploadTask(std::shared_ptr<ResourceProxy> trianglesProxy,
+                        std::shared_ptr<ResourceProxy> textureProxy,
                         std::unique_ptr<DataSource<ShapeBuffer>> source);
 
-  bool execute(Context* context) override;
-
  protected:
-  std::shared_ptr<Resource> onMakeResource(Context*) override {
-    // The execute() method is already overridden, so this method should never be called.
-    return nullptr;
-  }
+  std::shared_ptr<Resource> onMakeResource(Context*) override;
 
  private:
+  std::shared_ptr<ResourceProxy> textureProxy = nullptr;
   UniqueKey textureKey = {};
   std::unique_ptr<DataSource<ShapeBuffer>> source = nullptr;
+
+  friend class ProxyProvider;
 };
 }  // namespace tgfx

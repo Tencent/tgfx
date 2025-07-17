@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cmath>
+#include <cstdint>
 #include <cstring>
 
 namespace tgfx {
@@ -26,6 +27,13 @@ static constexpr float M_PI_F = static_cast<float>(M_PI);
 static constexpr float M_PI_2_F = static_cast<float>(M_PI_2);
 static constexpr float FLOAT_NEARLY_ZERO = 1.0f / (1 << 12);
 static constexpr float FLOAT_SQRT2 = 1.41421356f;
+
+// Helper to see a float as its bit pattern (w/o aliasing warnings)
+inline uint32_t Float2Bits(float value) {
+  uint32_t bits;
+  memcpy(&bits, &value, sizeof(uint32_t));
+  return bits;
+}
 
 inline float DegreesToRadians(float degrees) {
   return degrees * (static_cast<float>(M_PI) / 180.0f);
@@ -73,6 +81,12 @@ inline int32_t SignBitTo2sCompliment(int32_t x) {
   return x;
 }
 
+inline int32_t FloatAs2sCompliment(float x) {
+  return SignBitTo2sCompliment((int32_t)Float2Bits(x));
+}
+
+#define ScalarAs2sCompliment(x) FloatAs2sCompliment(x)
+
 // from http://randomascii.wordpress.com/2012/02/25/comparing-floating-point-numbers-2012-edition/
 /*
  * This function is used to compare two floating point numbers for equality
@@ -96,4 +110,23 @@ template <typename T>
 constexpr inline bool IsPow2(T value) {
   return (value & (value - 1)) == 0;
 }
+
+/**
+ *  Returns the log2 of the specified value, were that value to be rounded up
+ *  to the next power of 2. It is undefined to pass 0. Examples:
+ *  NextLog2(1) -> 0
+ *  NextLog2(2) -> 1
+ *  NextLog2(3) -> 2
+ *  NextLog2(4) -> 2
+ *  NextLog2(5) -> 3
+ */
+int NextLog2(uint32_t value);
+
+/**
+ *  Returns the smallest power-of-2 that is >= the specified value. If value
+ *  is already a power of 2, then it is returned unchanged. It is undefined
+ *  if value is <= 0.
+ */
+int NextPow2(int value);
+
 }  // namespace tgfx

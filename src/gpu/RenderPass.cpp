@@ -20,13 +20,11 @@
 #include "gpu/Gpu.h"
 
 namespace tgfx {
-bool RenderPass::begin(std::shared_ptr<RenderTarget> renderTarget,
-                       std::shared_ptr<Texture> renderTexture) {
+bool RenderPass::begin(std::shared_ptr<RenderTarget> renderTarget) {
   if (renderTarget == nullptr) {
     return false;
   }
   _renderTarget = std::move(renderTarget);
-  _renderTargetTexture = std::move(renderTexture);
   drawPipelineStatus = DrawPipelineStatus::NotConfigured;
   onBindRenderTarget();
   return true;
@@ -35,13 +33,11 @@ bool RenderPass::begin(std::shared_ptr<RenderTarget> renderTarget,
 void RenderPass::end() {
   onUnbindRenderTarget();
   _renderTarget = nullptr;
-  _renderTargetTexture = nullptr;
   _program = nullptr;
 }
 
-void RenderPass::bindProgramAndScissorClip(const ProgramInfo* programInfo,
-                                           const Rect& scissorRect) {
-  if (!onBindProgramAndScissorClip(programInfo, scissorRect)) {
+void RenderPass::bindProgramAndScissorClip(const Pipeline* pipeline, const Rect& scissorRect) {
+  if (!onBindProgramAndScissorClip(pipeline, scissorRect)) {
     drawPipelineStatus = DrawPipelineStatus::FailedToBind;
     return;
   }

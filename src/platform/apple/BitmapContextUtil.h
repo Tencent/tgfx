@@ -22,5 +22,7 @@
 #include "tgfx/core/ImageInfo.h"
 
 namespace tgfx {
+uint32_t GetBitmapInfo(AlphaType alphaType, ColorType colorType);
+
 CGContextRef CreateBitmapContext(const ImageInfo& info, void* pixels);
 }  // namespace tgfx

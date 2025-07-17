@@ -27,9 +27,9 @@
 #include "gpu/opengl/GLCaps.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Canvas.h"
-#include "tgfx/core/ImageReader.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
+#include "tgfx/platform/ImageReader.h"
 #include "utils/TestUtils.h"
 #include "utils/common.h"
 
@@ -40,8 +40,7 @@ TGFX_TEST(DstTextureTest, EmptyLocalBounds) {
   ASSERT_TRUE(context != nullptr);
   auto width = 800;
   auto height = 600;
-  auto texture = Texture::MakeRGBA(context, width, height);
-  auto renderTarget = RenderTarget::MakeFrom(texture.get());
+  auto renderTarget = RenderTarget::Make(context, width, height);
   auto backendRenderTarget = renderTarget->getBackendRenderTarget();
 
   auto surface = Surface::MakeFrom(context, backendRenderTarget, ImageOrigin::BottomLeft);
@@ -72,8 +71,7 @@ TGFX_TEST(DstTextureTest, OutOfRenderTarget) {
   ASSERT_TRUE(context != nullptr);
   auto width = 800;
   auto height = 600;
-  auto texture = Texture::MakeRGBA(context, width, height);
-  auto renderTarget = RenderTarget::MakeFrom(texture.get());
+  auto renderTarget = RenderTarget::Make(context, width, height);
   auto backendRenderTarget = renderTarget->getBackendRenderTarget();
 
   auto surface = Surface::MakeFrom(context, backendRenderTarget, ImageOrigin::BottomLeft);

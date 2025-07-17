@@ -258,6 +258,14 @@
           "inspector"
         ]
       }
+    },
+    {
+      "name": "highway",
+      "cmake": {
+        "targets": [
+          "hwy"
+        ]
+      }
     }
   ]
 }

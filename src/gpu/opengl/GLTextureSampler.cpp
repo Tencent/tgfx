@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "gpu/opengl/GLTextureSampler.h"
+#include <memory>
 #include "GLCaps.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/opengl/GLUtil.h"
@@ -33,17 +34,25 @@ class GLExternalTextureSampler : public GLTextureSampler {
   }
 };
 
+PixelFormat TextureSampler::GetPixelFormat(const BackendTexture& backendTexture) {
+  GLTextureInfo textureInfo = {};
+  if (!backendTexture.isValid() || !backendTexture.getGLTextureInfo(&textureInfo)) {
+    return PixelFormat::Unknown;
+  }
+  return GLSizeFormatToPixelFormat(textureInfo.format);
+}
+
 std::unique_ptr<TextureSampler> TextureSampler::MakeFrom(Context* context,
                                                          const BackendTexture& backendTexture,
                                                          bool adopted) {
   GLTextureInfo textureInfo = {};
-  if (context == nullptr || !backendTexture.getGLTextureInfo(&textureInfo)) {
+  if (context == nullptr || !backendTexture.isValid() ||
+      !backendTexture.getGLTextureInfo(&textureInfo)) {
     return nullptr;
   }
   auto format = GLSizeFormatToPixelFormat(textureInfo.format);
   if (adopted) {
-    return std::unique_ptr<GLTextureSampler>(
-        new GLTextureSampler(textureInfo.id, textureInfo.target, format));
+    return std::make_unique<GLTextureSampler>(textureInfo.id, textureInfo.target, format);
   }
   return std::make_unique<GLExternalTextureSampler>(textureInfo.id, textureInfo.target, format);
 }

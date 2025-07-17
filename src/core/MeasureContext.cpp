@@ -73,21 +73,15 @@ void MeasureContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList
                                       const MCState& state, const Fill& fill,
                                       const Stroke* stroke) {
   DEBUG_ASSERT(glyphRunList != nullptr);
-  auto maxScale = state.matrix.getMaxScale();
-  if (FloatNearlyZero(maxScale)) {
+  if (computeTightBounds) {
+    auto deviceBounds = glyphRunList->getTightBounds(&state.matrix);
+    if (stroke) {
+      ApplyStrokeToBounds(*stroke, &deviceBounds, state.matrix.getMaxScale());
+    }
+    addDeviceBounds(state.clip, fill, deviceBounds);
     return;
   }
-  if (computeTightBounds) {
-    Path glyphPath = {};
-    if (glyphRunList->getPath(&glyphPath, maxScale)) {
-      if (stroke) {
-        stroke->applyToPath(&glyphPath);
-      }
-      addTightBounds(glyphPath, state, fill);
-      return;
-    }
-  }
-  auto localBounds = glyphRunList->getBounds(maxScale);
+  auto localBounds = glyphRunList->getBounds();
   if (stroke) {
     ApplyStrokeToBounds(*stroke, &localBounds);
   }
@@ -99,11 +93,17 @@ void MeasureContext::drawLayer(std::shared_ptr<Picture> picture,
                                const Fill& fill) {
   DEBUG_ASSERT(picture != nullptr);
   if (imageFilter) {
-    auto localBounds = picture->getBounds(nullptr, computeTightBounds);
+    auto localBounds = computeTightBounds ? picture->getTightBounds(nullptr) : picture->getBounds();
     localBounds = imageFilter->filterBounds(localBounds);
     addLocalBounds(state, fill, localBounds);
   } else {
-    auto deviceBounds = picture->getBounds(&state.matrix, computeTightBounds);
+    Rect deviceBounds = {};
+    if (computeTightBounds) {
+      deviceBounds = picture->getTightBounds(&state.matrix);
+    } else {
+      deviceBounds = picture->getBounds();
+      state.matrix.mapRect(&deviceBounds);
+    }
     addDeviceBounds(state.clip, fill, deviceBounds, picture->hasUnboundedFill());
   }
 }

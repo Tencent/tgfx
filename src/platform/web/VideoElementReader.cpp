@@ -40,11 +40,6 @@ VideoElementReader::VideoElementReader(std::shared_ptr<ImageStream> stream)
     : ImageReader(std::move(stream)) {
 }
 
-std::shared_ptr<ImageBuffer> VideoElementReader::acquireNextBuffer() {
-  stream->markContentDirty(Rect::MakeWH(stream->width(), stream->height()));
-  return ImageReader::acquireNextBuffer();
-}
-
 std::shared_ptr<ImageBuffer> VideoElementReader::acquireNextBuffer(val promise) {
   std::static_pointer_cast<VideoElement>(stream)->markFrameChanged(promise);
   return ImageReader::acquireNextBuffer();

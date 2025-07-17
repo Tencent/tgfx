@@ -24,7 +24,7 @@ bool HardwareBufferAvailable() {
   return false;
 }
 
-PixelFormat TextureSampler::GetRenderableFormat(HardwareBufferRef) {
+PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef) {
   return PixelFormat::Unknown;
 }
 

@@ -21,6 +21,7 @@
 #include "core/utils/BlockBuffer.h"
 #include "core/utils/SlidingWindowTracker.h"
 #include "gpu/AAType.h"
+#include "gpu/BackingFit.h"
 #include "gpu/VertexProvider.h"
 #include "gpu/proxies/GpuBufferProxy.h"
 #include "gpu/proxies/GpuShapeProxy.h"
@@ -115,12 +116,8 @@ class ProxyProvider {
                                                    int height, PixelFormat format,
                                                    bool mipmapped = false,
                                                    ImageOrigin origin = ImageOrigin::TopLeft,
+                                                   BackingFit backingFit = BackingFit::Exact,
                                                    uint32_t renderFlags = 0);
-
-  /**
-   * Creates a flattened TextureProxy for the given TextureProxy.
-   */
-  std::shared_ptr<TextureProxy> flattenTextureProxy(std::shared_ptr<TextureProxy> source);
 
   /**
    * Creates a TextureProxy for the provided BackendTexture. If adopted is true, the backend
@@ -129,18 +126,30 @@ class ProxyProvider {
   std::shared_ptr<TextureProxy> wrapBackendTexture(const BackendTexture& backendTexture,
                                                    ImageOrigin origin = ImageOrigin::TopLeft,
                                                    bool adopted = false);
-  /**
-   * Creates an empty RenderTargetProxy with specified width, height, format, sample count,
-   * mipmap state and origin.
-   */
-  std::shared_ptr<RenderTargetProxy> createRenderTargetProxy(
-      std::shared_ptr<TextureProxy> textureProxy, PixelFormat format, int sampleCount = 1);
 
   /**
-   * Creates a render target proxy for the given BackendRenderTarget.
+   * Creates a RenderTargetProxy for the specified BackendTexture, sample count, origin, and
+   * adopted state. Returns nullptr if the backend texture is not renderable.
    */
-  std::shared_ptr<RenderTargetProxy> wrapBackendRenderTarget(
-      const BackendRenderTarget& backendRenderTarget, ImageOrigin origin = ImageOrigin::TopLeft);
+  std::shared_ptr<RenderTargetProxy> createRenderTargetProxy(
+      const BackendTexture& backendTexture, int sampleCount = 1,
+      ImageOrigin origin = ImageOrigin::TopLeft, bool adopted = false);
+
+  /**
+   * Creates a RenderTargetProxy for the specified HardwareBuffer and sample count. Returns nullptr
+   * if the hardware buffer is not renderable.
+   */
+  std::shared_ptr<RenderTargetProxy> createRenderTargetProxy(HardwareBufferRef hardwareBuffer,
+                                                             int sampleCount = 1);
+
+  /**
+   * Creates a RenderTargetProxy with specified width, height, format, sample count, mipmap state
+   * and origin. Returns nullptr if the format is not renderable.
+   */
+  std::shared_ptr<RenderTargetProxy> createRenderTargetProxy(
+      const UniqueKey& uniqueKey, int width, int height, PixelFormat format, int sampleCount = 1,
+      bool mipmapped = false, ImageOrigin origin = ImageOrigin::TopLeft,
+      BackingFit backingFit = BackingFit::Exact, uint32_t renderFlags = 0);
 
   /*
    * Purges all unreferenced proxies.
@@ -166,11 +175,9 @@ class ProxyProvider {
   BlockBuffer blockBuffer = {};
   SlidingWindowTracker maxValueTracker = {10};
 
-  static UniqueKey GetProxyKey(const UniqueKey& uniqueKey, uint32_t renderFlags);
-
   std::shared_ptr<GpuBufferProxy> findOrWrapGpuBufferProxy(const UniqueKey& uniqueKey);
 
-  void addResourceProxy(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& uniqueKey);
+  void addResourceProxy(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& uniqueKey = {});
 
   void uploadSharedVertexBuffer(std::shared_ptr<Data> data);
 
