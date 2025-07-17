@@ -17,8 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #ifdef _MSC_VER
-#include "tgfx/core/Matrix.h"
-#include "tgfx/core/Rect.h"
+#include "SIMDHIghwayInterface.h"
 
 // First undef to prevent error when re-included.
 #undef HWY_TARGET_INCLUDE
@@ -221,24 +220,24 @@ HWY_EXPORT(ScalePointsHWYImpl);
 HWY_EXPORT(AffinePointsHWYImpl);
 HWY_EXPORT(MapRectHWYImpl);
 HWY_EXPORT(SetBoundsHWYImpl);
-void Matrix::TransPoints(const Matrix& m, Point* dst[], const Point* src[], int count) {
+void TransPointsHWY(const Matrix& m, Point* dst, const Point* src, int count) {
   return HWY_DYNAMIC_DISPATCH(TransPointsHWYImpl)(m, dst, src, count);
 }
 
-void Matrix::ScalePoints(const Matrix& m, Point dst[], const Point src[], int count) {
+void ScalePointsHWY(const Matrix& m, Point dst[], const Point src[], int count) {
   return HWY_DYNAMIC_DISPATCH(ScalePointsHWYImpl)(m, dst, src, count);
 }
 
-void Matrix::AfflinePoints(const Matrix& m, Point dst[], const Point src[], int count) {
+void AffinePointsHWY(const Matrix& m, Point dst[], const Point src[], int count) {
   return HWY_DYNAMIC_DISPATCH(AffinePointsHWYImpl)(m, dst, src, count);
 }
 
-void Matrix::MapRect(Rect* dst, const Rect& src) {
-  return HWY_DYNAMIC_DISPATCH(MapRectHWYImpl)(*this, dst, src);
+void MapRectHWY(const Matrix& m, Rect* dst, const Rect& src) {
+  return HWY_DYNAMIC_DISPATCH(MapRectHWYImpl)(m, dst, src);
 }
 
-bool Rect::setBounds(const Point pts[], int count) {
-  return HWY_DYNAMIC_DISPATCH(SetBoundsHWYImpl)(this, pts, count);
+bool SetBoundsHWY(Rect* rect, const Point pts[], int count) {
+  return HWY_DYNAMIC_DISPATCH(SetBoundsHWYImpl)(rect, pts, count);
 }
 }  // namespace tgfx
 #endif
