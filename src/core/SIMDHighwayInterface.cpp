@@ -221,7 +221,7 @@ HWY_EXPORT(ScalePointsHWYImpl);
 HWY_EXPORT(AffinePointsHWYImpl);
 HWY_EXPORT(MapRectHWYImpl);
 HWY_EXPORT(SetBoundsHWYImpl);
-void Matrix::TransPoints(const Matrix& m, Point dst[], const Point src[], int count) {
+void Matrix::TransPoints(const Matrix& m, Point* dst[], const Point* src[], int count) {
   return HWY_DYNAMIC_DISPATCH(TransPointsHWYImpl)(m, dst, src, count);
 }
 
@@ -233,7 +233,7 @@ void Matrix::AfflinePoints(const Matrix& m, Point dst[], const Point src[], int 
   return HWY_DYNAMIC_DISPATCH(AffinePointsHWYImpl)(m, dst, src, count);
 }
 
-void Matrix::MapRect(Rect* dst, const Rect& src) const {
+void Matrix::MapRect(Rect* dst, const Rect& src) {
   return HWY_DYNAMIC_DISPATCH(MapRectHWYImpl)(*this, dst, src);
 }
 
