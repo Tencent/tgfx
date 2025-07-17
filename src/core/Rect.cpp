@@ -19,7 +19,7 @@
 #include "tgfx/core/Rect.h"
 #include "SIMDVec.h"
 #ifdef _MSC_VER
-#include "SIMDHIghwayInterface.h"
+#include "SIMDHighwayInterface.h"
 #endif
 
 namespace tgfx {
@@ -33,6 +33,39 @@ void Rect::scale(float scaleX, float scaleY) {
 bool Rect::setBounds(const Point pts[], int count) {
 #ifdef _MSC_VER
   return SetBoundsHWY(this, pts, count);
+#elif defined(__OHOS__)
+  if (count <= 0) {
+    this->setEmpty();
+    return false;
+  }
+  float minX, maxX;
+  float minY, maxY;
+  minX = maxX = pts[0].x;
+  minY = maxY = pts[0].y;
+
+  for (int i = 1; i < count; i++) {
+    auto x = pts[i].x;
+    auto y = pts[i].y;
+    auto isFinite = ((x + y) * 0 == 0);
+    if (!isFinite) {
+      setEmpty();
+      return false;
+    }
+    if (x < minX) {
+      minX = x;
+    }
+    if (x > maxX) {
+      maxX = x;
+    }
+    if (y < minY) {
+      minY = y;
+    }
+    if (y > maxY) {
+      maxY = y;
+    }
+  }
+  setLTRB(minX, minY, maxX, maxY);
+  return true;
 #else
   if (count <= 0) {
     this->setEmpty();

@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #ifdef _MSC_VER
-#include "SIMDHIghwayInterface.h"
+#include "SIMDHighwayInterface.h"
 
 // First undef to prevent error when re-included.
 #undef HWY_TARGET_INCLUDE

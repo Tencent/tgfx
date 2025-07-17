@@ -22,7 +22,7 @@
 #include "core/utils/MathExtra.h"
 
 #ifdef _MSC_VER
-#include "SIMDHIghwayInterface.h"
+#include "SIMDHighwayInterface.h"
 #endif
 
 namespace tgfx {
@@ -512,7 +512,21 @@ bool Matrix::invertNonIdentity(Matrix* inverse) const {
 }
 
 void Matrix::mapPoints(Point dst[], const Point src[], int count) const {
+#ifdef __OHOS__
+  auto tx = values[TRANS_X];
+  auto ty = values[TRANS_Y];
+  auto sx = values[SCALE_X];
+  auto sy = values[SCALE_Y];
+  auto kx = values[SKEW_X];
+  auto ky = values[SKEW_Y];
+  for (int i = 0; i < count; i++) {
+    auto x = src[i].x * sx + src[i].y * kx + tx;
+    auto y = src[i].x * ky + src[i].y * sy + ty;
+    dst[i].set(x, y);
+  }
+#else
   this->getMapPtsProc()(*this, dst, src, count);
+#endif
 }
 
 void Matrix::mapXY(float x, float y, Point* result) const {
@@ -539,6 +553,14 @@ static float4 SortAsRect(const float4& ltrb) {
 void Matrix::mapRect(Rect* dst, const Rect& src) const {
 #ifdef _MSC_VER
   MapRectHWY(*this, dst, src);
+#elif defined(__OHOS__)
+  Point quad[4];
+  quad[0].set(src.left, src.top);
+  quad[1].set(src.right, src.top);
+  quad[2].set(src.right, src.bottom);
+  quad[3].set(src.left, src.bottom);
+  mapPoints(quad, quad, 4);
+  dst->setBounds(quad, 4);
 #else
   if (this->getType() <= TranslateMask) {
     float tx = values[TRANS_X];
