@@ -20,18 +20,9 @@
 #import <CoreVideo/CoreVideo.h>
 #import "TGFXView.h"
 @interface ViewController ()
-@property(nonatomic) CVDisplayLinkRef displayLink;
 @property(strong, nonatomic) TGFXView* tgfxView;
 - (void)updateContentView;
 @end
-
-static CVReturn OnAnimationCallback(CVDisplayLinkRef displayLink, const CVTimeStamp* now,
-                                    const CVTimeStamp* outputTime, CVOptionFlags flagsIn,
-                                    CVOptionFlags* flagsOut, void* displayLinkContext) {
-  ViewController* controller = (__bridge ViewController*)displayLinkContext;
-  [controller updateContentView];
-  return kCVReturnSuccess;
-}
 
 @implementation ViewController
 
@@ -39,11 +30,6 @@ static const float MinZoom = 0.001f;
 static const float MaxZoom = 1000.0f;
 // Refs https://github.com/microsoft/vscode/blob/main/src/vs/base/browser/mouseEvent.ts
 static const float ScrollWheelZoomSensitivity = 120.0f;
-- (void)setupDisplayLink {
-  CVDisplayLinkCreateWithActiveCGDisplays(&_displayLink);
-  CVDisplayLinkSetOutputCallback(_displayLink, &OnAnimationCallback, (__bridge void*)self);
-  CVDisplayLinkStart(_displayLink);
-}
 
 - (void)viewDidLoad {
   [super viewDidLoad];
@@ -63,18 +49,14 @@ static const float ScrollWheelZoomSensitivity = 120.0f;
 - (void)viewDidAppear {
   [super viewDidAppear];
   [self updateContentView];
-  [self setupDisplayLink];
+  [self.tgfxView startDisplayLink];
 }
 - (void)appDidEnterBackground:(NSNotification*)notification {
-  if (_displayLink) {
-    CVDisplayLinkStop(_displayLink);
-  }
+  [self.tgfxView stopDisplayLink];
 }
 
 - (void)appWillEnterForeground:(NSNotification*)notification {
-  if (_displayLink) {
-    CVDisplayLinkStart(_displayLink);
-  }
+  [self.tgfxView startDisplayLink];
 }
 
 - (void)updateContentView {
@@ -83,15 +65,10 @@ static const float ScrollWheelZoomSensitivity = 120.0f;
 
 - (void)dealloc {
   [[NSNotificationCenter defaultCenter] removeObserver:self];
-  if (_displayLink) {
-    CVDisplayLinkStop(_displayLink);
-    CVDisplayLinkRelease(_displayLink);
-    _displayLink = nullptr;
-  }
 }
 
 - (void)mouseUp:(NSEvent*)event {
-  self.tgfxView.drawCount++;
+  self.tgfxView.drawIndex++;
   self.tgfxView.zoomScale = 1.0f;
   self.tgfxView.contentOffset = CGPointZero;
 }
