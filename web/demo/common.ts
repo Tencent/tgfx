@@ -217,22 +217,13 @@ export function updateSize(shareData: ShareData) {
     canvas.style.width = screenRect.width + "px";
     canvas.style.height = screenRect.height + "px";
     shareData.tgfxBaseView.updateSize(scaleFactor);
-    draw(shareData);
 }
-
-let resizeTimer: number | null = null;
 
 export function onResizeEvent(shareData: ShareData) {
     if (!shareData.tgfxBaseView) {
         return;
     }
-    if (resizeTimer) {
-        clearTimeout(resizeTimer);
-    }
-    resizeTimer = window.setTimeout(() => {
-        updateSize(shareData);
-        resizeTimer = null;
-    }, 300);
+    updateSize(shareData);
 }
 
 function handleVisibilityChange(shareData: ShareData) {
