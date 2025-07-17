@@ -212,7 +212,8 @@ void SVGExportContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunLi
   }
   // If the font needs to be converted to a path but lacks outlines (e.g., emoji font, web font),
   // it cannot be converted.
-  if (!state.clip.contains(glyphRunList->getBounds(state.matrix.getMaxScale()))) {
+  auto deviceBounds = state.matrix.mapRect(glyphRunList->getBounds());
+  if (!state.clip.contains(deviceBounds)) {
     applyClipPath(state.clip);
   }
   if (!typeface->isCustom()) {
