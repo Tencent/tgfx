@@ -233,7 +233,7 @@ void Matrix::AfflinePoints(const Matrix& m, Point dst[], const Point src[], int 
   return HWY_DYNAMIC_DISPATCH(AffinePointsHWYImpl)(m, dst, src, count);
 }
 
-void Matrix::mapRect(Rect* dst, const Rect& src) const {
+void Matrix::MapRect(Rect* dst, const Rect& src) const {
   return HWY_DYNAMIC_DISPATCH(MapRectHWYImpl)(*this, dst, src);
 }
 
