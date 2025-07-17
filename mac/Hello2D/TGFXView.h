@@ -26,9 +26,9 @@
 
 @interface TGFXView : NSView
 
-@property (nonatomic) int drawCount;
-@property (nonatomic) float zoomScale;
-@property (nonatomic) CGPoint contentOffset;
+@property(nonatomic) int drawCount;
+@property(nonatomic) float zoomScale;
+@property(nonatomic) CGPoint contentOffset;
 
 - (void)draw;
 

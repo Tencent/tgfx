@@ -106,25 +106,28 @@ static const float ScrollWheelZoomSensitivity = 120.0f;
     float contentX = (mouseInView.x - self.tgfxView.contentOffset.x) / self.tgfxView.zoomScale;
     float contentY = (mouseInView.y - self.tgfxView.contentOffset.y) / self.tgfxView.zoomScale;
     if (event.hasPreciseScrollingDeltas) {
-        self.tgfxView.zoomScale = self.tgfxView.zoomScale * (1 + event.scrollingDeltaY / ScrollWheelZoomSensitivity);
+      self.tgfxView.zoomScale =
+          self.tgfxView.zoomScale * (1 + event.scrollingDeltaY / ScrollWheelZoomSensitivity);
     } else {
-        self.tgfxView.zoomScale = self.tgfxView.zoomScale * std::pow(1.1, event.scrollingDeltaY);
+      self.tgfxView.zoomScale = self.tgfxView.zoomScale * std::pow(1.1, event.scrollingDeltaY);
     }
     if (self.tgfxView.zoomScale < MinZoom) {
-        self.tgfxView.zoomScale = MinZoom;
+      self.tgfxView.zoomScale = MinZoom;
     }
     if (self.tgfxView.zoomScale > MaxZoom) {
-        self.tgfxView.zoomScale = MaxZoom;
+      self.tgfxView.zoomScale = MaxZoom;
     }
-      self.tgfxView.contentOffset = CGPointMake(mouseInView.x - contentX * self.tgfxView.zoomScale,
-                                     mouseInView.y - contentY * self.tgfxView.zoomScale);
+    self.tgfxView.contentOffset = CGPointMake(mouseInView.x - contentX * self.tgfxView.zoomScale,
+                                              mouseInView.y - contentY * self.tgfxView.zoomScale);
   } else {
     if (event.hasPreciseScrollingDeltas) {
-        self.tgfxView.contentOffset = CGPointMake(self.tgfxView.contentOffset.x + event.scrollingDeltaX,
-                                                  self.tgfxView.contentOffset.y + event.scrollingDeltaY);
+      self.tgfxView.contentOffset =
+          CGPointMake(self.tgfxView.contentOffset.x + event.scrollingDeltaX,
+                      self.tgfxView.contentOffset.y + event.scrollingDeltaY);
     } else {
-        self.tgfxView.contentOffset = CGPointMake(self.tgfxView.contentOffset.x + event.scrollingDeltaX * 5,
-                                                  self.tgfxView.contentOffset.y + event.scrollingDeltaY * 5);
+      self.tgfxView.contentOffset =
+          CGPointMake(self.tgfxView.contentOffset.x + event.scrollingDeltaX * 5,
+                      self.tgfxView.contentOffset.y + event.scrollingDeltaY * 5);
     }
   }
 }
@@ -135,15 +138,15 @@ static const float ScrollWheelZoomSensitivity = 120.0f;
   mouseInView = [self.tgfxView convertPointToBacking:mouseInView];
   float contentX = (mouseInView.x - self.tgfxView.contentOffset.x) / self.tgfxView.zoomScale;
   float contentY = (mouseInView.y - self.tgfxView.contentOffset.y) / self.tgfxView.zoomScale;
-    self.tgfxView.zoomScale = self.tgfxView.zoomScale * (1.0 + event.magnification);
+  self.tgfxView.zoomScale = self.tgfxView.zoomScale * (1.0 + event.magnification);
   if (self.tgfxView.zoomScale < MinZoom) {
-      self.tgfxView.zoomScale = MinZoom;
+    self.tgfxView.zoomScale = MinZoom;
   }
   if (self.tgfxView.zoomScale > MaxZoom) {
-      self.tgfxView.zoomScale = MaxZoom;
+    self.tgfxView.zoomScale = MaxZoom;
   }
-    self.tgfxView.contentOffset = CGPointMake(mouseInView.x - contentX * self.tgfxView.zoomScale,
-                                   mouseInView.y - contentY * self.tgfxView.zoomScale);
+  self.tgfxView.contentOffset = CGPointMake(mouseInView.x - contentX * self.tgfxView.zoomScale,
+                                            mouseInView.y - contentY * self.tgfxView.zoomScale);
 }
 
 @end

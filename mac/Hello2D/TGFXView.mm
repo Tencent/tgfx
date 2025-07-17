@@ -100,7 +100,8 @@
     device->unlock();
     return;
   }
-  appHost->updateZoomAndOffset(self.zoomScale, tgfx::Point(self.contentOffset.x, self.contentOffset.y));
+  appHost->updateZoomAndOffset(self.zoomScale,
+                               tgfx::Point(self.contentOffset.x, self.contentOffset.y));
   auto canvas = surface->getCanvas();
   canvas->clear();
   auto numDrawers = drawers::Drawer::Count() - 1;
