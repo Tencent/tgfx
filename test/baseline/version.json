@@ -64,7 +64,7 @@
         "drawImageRect": "606f8195",
         "drawPaint": "b7aefeb",
         "drawPaint_shadow": "67961560",
-        "drawShape": "ea225887",
+        "drawShape": "d7f154de",
         "emojiTextStrokeBlending": "67961560",
         "filter_mode_linear": "c475bfb",
         "filter_mode_nearest": "d010fb8",
@@ -82,7 +82,7 @@
         "rasterized": "606f8195",
         "rasterized_mipmap": "606f8195",
         "rasterized_scale_up": "6e76b812",
-        "saveLayer": "67961560",
+        "saveLayer": "0d4ef3f9",
         "shape": "66aef718",
         "textEmojiMixedBlendModes": "67961560",
         "textEmojiMixedBlendModes2": "67961560",
@@ -94,12 +94,12 @@
     },
     "DrawersTest": {
         "ConicGradient": "69683f78",
-        "CustomLayerTreeDrawer": "d5164a4e",
+        "CustomLayerTreeDrawer": "d7f154de",
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "da590da",
         "ImageWithShadow": "67961560",
-        "SimpleLayerTreeDrawer": "67961560",
-        "SimpleText": "d5164a4e"
+        "SimpleLayerTreeDrawer": "9b1a0dfc",
+        "SimpleText": "d7f154de"
     },
     "DstTextureTest": {
         "EmptyLocalBounds": "be94e666",
@@ -163,7 +163,7 @@
         "LayerVisible1": "4edccb64",
         "Layer_drawRRect": "66aef718",
         "Layer_hitTestPoint": "99c36f0c",
-        "Layer_hitTestPointNested": "d5164a4e",
+        "Layer_hitTestPointNested": "d7f154de",
         "MaskAlpha": "3dbeed5",
         "ModeColorFilter": "67961560",
         "PartialBackgroundBlur": "67961560",
@@ -179,13 +179,13 @@
         "backgroundLayerBlur": "67961560",
         "draw_shape": "67961560",
         "draw_solid": "b4a1231",
-        "draw_text": "d5164a4e",
+        "draw_text": "9b1a0dfc",
         "dropShadow": "67961560",
         "filterClip": "c475bfb",
         "filterTest": "67961560",
         "filters": "67961560",
-        "getBounds": "67961560",
-        "getLayersUnderPoint": "84ef0cb4",
+        "getBounds": "0d4ef3f9",
+        "getLayersUnderPoint": "d7f154de",
         "getTightBounds": "ae4290b3",
         "greyColorMatrix": "a1605b2",
         "identityMatrix": "a1605b2",
@@ -193,12 +193,13 @@
         "imageMask": "67961560",
         "innerShadow": "67961560",
         "shapeMask": "67961560",
-        "textMask": "67961560"
+        "textMask": "0d4ef3f9"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",
         "rasterize_path": "b062b9a",
-        "rasterize_path_texture": "c475bfb"
+        "rasterize_path_texture": "c475bfb",
+        "rasterize_text": "e9b9b9f4"
     },
     "ReadPixelsTest": {
         "JpegCodec_Decode_Alpha8": "afd80b4",
@@ -269,7 +270,7 @@
         "complex1": "ba1c7c2",
         "complex2": "67961560",
         "complex3": "a6ff60e1",
-        "complex4": "67961560",
+        "complex4": "0d4ef3f9",
         "complex5": "50136952",
         "complex6": "67961560",
         "complex7": "67961560",

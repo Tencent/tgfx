@@ -17,15 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include "tgfx/core/Rect.h"
-#include "tgfx/core/Stroke.h"
-
+#include "tgfx/core/Matrix.h"
 namespace tgfx {
-/**
- * Applies the stroke options to the given bounds. Note that if scaleFactor != 1.0 means the bounds
- * have been scaled by scaleFactor. So the stroke expand factor is also scaled accordingly.
- */
-void ApplyStrokeToBounds(const Stroke& stroke, Rect* bounds, float scaleFactor = 1.0f,
-                         bool applyMiterLimit = false);
+void TransPointsHWY(const Matrix& m, Point dst[], const Point src[], int count);
+void ScalePointsHWY(const Matrix& m, Point dst[], const Point src[], int count);
+void AffinePointsHWY(const Matrix& m, Point dst[], const Point src[], int count);
+void MapRectHWY(const Matrix& m, Rect* dst, const Rect& src);
+bool SetBoundsHWY(Rect* rect, const Point pts[], int count);
 }  // namespace tgfx
