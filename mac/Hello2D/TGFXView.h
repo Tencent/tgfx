@@ -26,6 +26,10 @@
 
 @interface TGFXView : NSView
 
-- (void)draw:(int)index zoom:(float)zoom offset:(CGPoint)offset;
+@property (nonatomic) int drawCount;
+@property (nonatomic) float zoomScale;
+@property (nonatomic) CGPoint contentOffset;
+
+- (void)draw;
 
 @end

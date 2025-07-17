@@ -64,16 +64,20 @@
   auto sizeChanged = appHost->updateScreen(width, height, contentScale);
   if (sizeChanged && tgfxWindow != nullptr) {
     tgfxWindow->invalidSize();
+    [self draw];
   }
 }
 
 - (void)viewDidMoveToWindow {
   [super viewDidMoveToWindow];
+  self.drawCount = 0;
+  self.zoomScale = 1.0f;
+  self.contentOffset = CGPointZero;
   [self.window makeFirstResponder:self];
   [self updateSize];
 }
 
-- (void)draw:(int)index zoom:(float)zoom offset:(CGPoint)offset {
+- (void)draw {
   if (self.window == nil) {
     return;
   }
@@ -96,11 +100,11 @@
     device->unlock();
     return;
   }
-  appHost->updateZoomAndOffset(zoom, tgfx::Point(offset.x, offset.y));
+  appHost->updateZoomAndOffset(self.zoomScale, tgfx::Point(self.contentOffset.x, self.contentOffset.y));
   auto canvas = surface->getCanvas();
   canvas->clear();
   auto numDrawers = drawers::Drawer::Count() - 1;
-  index = (index % numDrawers) + 1;
+  int index = (self.drawCount % numDrawers) + 1;
   auto drawer = drawers::Drawer::GetByName("GridBackground");
   drawer->draw(canvas, appHost.get());
   drawer = drawers::Drawer::GetByIndex(index);
