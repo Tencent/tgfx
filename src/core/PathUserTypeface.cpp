@@ -92,7 +92,7 @@ class PathUserScalerContext final : public UserScalerContext {
       return {};
     }
     if (stroke != nullptr) {
-      ApplyStrokeToBounds(*stroke, &bounds, 1.0f, true);
+      ApplyStrokeToBounds(*stroke, &bounds, true);
     }
     if (matrix) {
       matrix->setTranslate(bounds.x(), bounds.y());

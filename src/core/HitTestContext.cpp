@@ -166,9 +166,18 @@ void HitTestContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList
       return;
     }
   } else {
-    auto deviceBounds = glyphRunList->getTightBounds(&state.matrix);
-    if (stroke) {
-      ApplyStrokeToBounds(*stroke, &deviceBounds, maxScale);
+    Rect deviceBounds = {};
+    if (stroke && !FloatNearlyEqual(state.matrix.getScaleX(), state.matrix.getScaleY())) {
+      auto localBounds = glyphRunList->getTightBounds();
+      ApplyStrokeToBounds(*stroke, &localBounds);
+      deviceBounds = state.matrix.mapRect(localBounds);
+    } else {
+      deviceBounds = glyphRunList->getTightBounds(&state.matrix);
+      if (stroke) {
+        auto scaledStroke = *stroke;
+        scaledStroke.width *= maxScale;
+        ApplyStrokeToBounds(*stroke, &deviceBounds);
+      }
     }
     if (!deviceBounds.contains(deviceX, deviceY)) {
       return;

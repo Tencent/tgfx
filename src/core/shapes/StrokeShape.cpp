@@ -61,7 +61,8 @@ std::shared_ptr<Shape> StrokeShape::Apply(std::shared_ptr<Shape> shape, const St
 
 Rect StrokeShape::getBounds() const {
   auto bounds = shape->getBounds();
-  ApplyStrokeToBounds(stroke, &bounds, 1.0f, true);
+  auto applyMiterLimit = shape->type() != Type::Glyph && shape->type() != Type::Text;
+  ApplyStrokeToBounds(stroke, &bounds, applyMiterLimit);
   return bounds;
 }
 
