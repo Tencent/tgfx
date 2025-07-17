@@ -66,7 +66,6 @@ void LayerViewerManager::RenderImageAndSend(Context* context) {
 }
 
 LayerViewerManager::LayerViewerManager() {
-  inspector::LayerProfiler::Make();
   setCallBack();
 }
 

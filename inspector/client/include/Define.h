@@ -19,5 +19,5 @@
 
 #include "LayerProfiler.h"
 
-#define SEND_LAYER_DATA(data) inspector::LayerProfiler::SendLayerData(data)
-#define LAYER_CALLBACK(func) inspector::LayerProfiler::SetLayerCallBack(func)
+#define SEND_LAYER_DATA(data) inspector::LayerProfiler::GetLayerProfiler().setData(data)
+#define LAYER_CALLBACK(func) inspector::LayerProfiler::GetLayerProfiler().setCallBack(func)

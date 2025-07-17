@@ -138,8 +138,8 @@ class IpAddress {
   IpAddress& operator=(IpAddress&&) = delete;
 
  private:
-  uint32_t number;
-  char text[17];
+  uint32_t number = 0;
+  char text[17] = {0};
 };
 
 class UdpListen {

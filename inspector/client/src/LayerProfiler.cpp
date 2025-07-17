@@ -25,22 +25,10 @@
 
 namespace inspector {
 
-static std::shared_ptr<LayerProfiler> LayerProfilerInstance = nullptr;
-
 #ifndef __EMSCRIPTEN__
 static const char* addr = "255.255.255.255";
 static uint16_t broadcastPort = 8086;
 #endif
-
-void LayerProfiler::Make() {
-  LayerProfilerInstance = std::shared_ptr<LayerProfiler>(new LayerProfiler());
-}
-void LayerProfiler::SendLayerData(const std::vector<uint8_t>& data) {
-  LayerProfilerInstance->setData(data);
-}
-void LayerProfiler::SetLayerCallBack(std::function<void(const std::vector<uint8_t>&)> callback) {
-  LayerProfilerInstance->setCallBack(callback);
-}
 
 LayerProfiler::LayerProfiler(){
 #ifndef __EMSCRIPTEN__

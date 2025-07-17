@@ -27,9 +27,14 @@
 namespace inspector {
 class LayerProfiler {
  public:
-  static void Make();
-  static void SendLayerData(const std::vector<uint8_t>& data);
-  static void SetLayerCallBack(std::function<void(const std::vector<uint8_t>&)> callback);
+  static LayerProfiler& GetLayerProfiler() {
+      static LayerProfiler instance;
+      return instance;
+  }
+    LayerProfiler(const LayerProfiler&) = delete;
+    LayerProfiler(LayerProfiler&&) = delete;
+    LayerProfiler& operator=(const LayerProfiler&) = delete;
+    LayerProfiler& operator=(LayerProfiler&&) = delete;
   ~LayerProfiler();
   void setData(const std::vector<uint8_t>& data);
   void setCallBack(std::function<void(const std::vector<uint8_t>&)> callback);
