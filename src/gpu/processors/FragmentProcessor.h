@@ -40,13 +40,14 @@ class FPArgs {
  public:
   FPArgs() = default;
 
-  FPArgs(Context* context, uint32_t renderFlags, const Rect& drawRect)
-      : context(context), renderFlags(renderFlags), drawRect(drawRect) {
+  FPArgs(Context* context, uint32_t renderFlags, const Rect& drawRect, const Matrix& viewMatrix)
+      : context(context), renderFlags(renderFlags), drawRect(drawRect), viewMatrix(viewMatrix) {
   }
 
   Context* context = nullptr;
   uint32_t renderFlags = 0;
   Rect drawRect = {};
+  Matrix viewMatrix = Matrix::I();
 };
 
 class FragmentProcessor : public Processor {

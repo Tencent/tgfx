@@ -77,6 +77,8 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (!rect.intersect(drawBounds)) {
     return nullptr;
   }
+  auto scales = args.viewMatrix.getAxisScales();
+  rect.scale(scales.x, scales.y);
   rect.roundOut();
   auto mipmapped = samplingArgs.sampling.mipmapMode != MipmapMode::None && hasMipmaps();
   auto renderTarget = RenderTargetProxy::MakeFallback(
@@ -86,17 +88,18 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  Point offset = Point::Make(-rect.left, -rect.top);
-  if (!drawPicture(renderTarget, args.renderFlags, &offset)) {
+  auto viewMatrix = Matrix::MakeScale(scales.x, scales.y);
+  viewMatrix.postTranslate(-rect.left, -rect.top);
+  if (!drawPicture(renderTarget, args.renderFlags, &viewMatrix)) {
     return nullptr;
   }
-  auto finalUVMatrix = Matrix::MakeTrans(offset.x, offset.y);
+  auto finalUVMatrix = viewMatrix;
   if (uvMatrix) {
     finalUVMatrix.preConcat(*uvMatrix);
   }
   auto newSamplingArgs = samplingArgs;
   if (samplingArgs.sampleArea) {
-    newSamplingArgs.sampleArea->offset(-rect.left, -rect.top);
+    newSamplingArgs.sampleArea = viewMatrix.mapRect(*samplingArgs.sampleArea);
   }
   return TiledTextureEffect::Make(renderTarget->asTextureProxy(), newSamplingArgs, &finalUVMatrix,
                                   isAlphaOnly());
@@ -116,14 +119,14 @@ std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args)
 }
 
 bool PictureImage::drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget,
-                               uint32_t renderFlags, const Point* offset) const {
+                               uint32_t renderFlags, const Matrix* viewMatrix) const {
   if (renderTarget == nullptr) {
     return false;
   }
   RenderContext renderContext(std::move(renderTarget), renderFlags, true);
   Matrix totalMatrix = {};
-  if (offset) {
-    totalMatrix.preTranslate(offset->x, offset->y);
+  if (viewMatrix) {
+    totalMatrix = *viewMatrix;
   }
   if (matrix) {
     totalMatrix.preConcat(*matrix);

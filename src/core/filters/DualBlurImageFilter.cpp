@@ -123,7 +123,6 @@ std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_
     return nullptr;
   }
   auto drawRect = Rect::MakeWH(lastRenderTarget->width(), lastRenderTarget->height());
-  FPArgs fpArgs(args.context, args.renderFlags, drawRect);
 
   // Calculate the bounds of the filter after scaling.
   // `boundsWillSample` will determine the size of the texture after the first downsample.
@@ -148,6 +147,9 @@ std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_
                         sampleOffset.y * scaleFactor * downScaling);
   // SamplingOptions sampling(FilterMode::Linear, MipmapMode::None);
   SamplingOptions sampling(FilterMode::Linear, MipmapMode::None);
+  auto viewMatrix = Matrix::I();
+  uvMatrix.invert(&viewMatrix);
+  FPArgs fpArgs(args.context, args.renderFlags, drawRect, viewMatrix);
   auto sourceProcessor = FragmentProcessor::Make(source, fpArgs, tileMode, tileMode, sampling,
                                                  SrcRectConstraint::Fast, &uvMatrix);
   SamplingArgs samplingArgs = {TileMode::Clamp, TileMode::Clamp, sampling, SrcRectConstraint::Fast};
