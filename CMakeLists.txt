@@ -292,7 +292,6 @@ file(GLOB_RECURSE EGL_PLATFORM_FILES src/gpu/opengl/egl/*.*)
 if (TGFX_USE_INSPECTOR)
     set(INSPECTOR_DIR ${CMAKE_CURRENT_LIST_DIR}/inspector)
     list(APPEND TGFX_INCLUDES ${INSPECTOR_DIR}/client/include ${INSPECTOR_DIR}/client/src ${INSPECTOR_DIR}/common)
-#    list(APPEND TGFX_INCLUDES ${INSPECTOR_DIR}/client/include)
     list(APPEND TGFX_STATIC_VENDORS inspector)
 
     list(APPEND TGFX_DEFINES TGFX_USE_INSPECTOR)
