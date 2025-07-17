@@ -22,6 +22,7 @@
 #include "core/utils/MathExtra.h"
 
 namespace tgfx {
+
 void Matrix::reset() {
   *this = Matrix();
 }
@@ -352,13 +353,14 @@ uint8_t Matrix::computeTypeMask() const {
   return static_cast<uint8_t>(mask);
 }
 
-void Matrix::IdentityPoints(const Matrix&, Point* dst, const Point* src, int count) {
+void Matrix::IdentityPoints(const Matrix&, Point dst[], const Point src[], int count) {
   if (dst != src && count > 0) {
     memcpy(dst, src, sizeof(Point) * static_cast<size_t>(count));
   }
 }
 
-void Matrix::TransPoints(const Matrix& m, Point* dst, const Point* src, int count) {
+#ifndef _MSC_VER
+void Matrix::TransPoints(const Matrix& m, Point dst[], const Point src[], int count) {
   if (count > 0) {
     float tx = m.getTranslateX();
     float ty = m.getTranslateY();
@@ -385,7 +387,7 @@ void Matrix::TransPoints(const Matrix& m, Point* dst, const Point* src, int coun
   }
 }
 
-void Matrix::ScalePoints(const Matrix& m, Point* dst, const Point* src, int count) {
+void Matrix::ScalePoints(const Matrix& m, Point dst[], const Point src[], int count) {
   if (count > 0) {
     float tx = m.getTranslateX();
     float ty = m.getTranslateY();
@@ -417,7 +419,7 @@ void Matrix::ScalePoints(const Matrix& m, Point* dst, const Point* src, int coun
   }
 }
 
-void Matrix::AfflinePoints(const Matrix& m, Point* dst, const Point* src, int count) {
+void Matrix::AfflinePoints(const Matrix& m, Point dst[], const Point src[], int count) {
   if (count > 0) {
     float tx = m.getTranslateX();
     float ty = m.getTranslateY();
@@ -448,6 +450,7 @@ void Matrix::AfflinePoints(const Matrix& m, Point* dst, const Point* src, int co
     }
   }
 }
+#endif
 
 bool Matrix::invertNonIdentity(Matrix* inverse) const {
   TypeMask mask = this->getType();
@@ -636,11 +639,7 @@ const Matrix& Matrix::I() {
   return identity;
 }
 
-#ifndef _MSC_VER
 const Matrix::MapPtsProc Matrix::MapPtsProcs[] = {
-  Matrix::IdentityPoints, Matrix::TransPoints,   Matrix::ScalePoints,   Matrix::ScalePoints,
-  Matrix::AfflinePoints,  Matrix::AfflinePoints, Matrix::AfflinePoints, Matrix::AfflinePoints
-};
-#endif
-
-}
+    Matrix::IdentityPoints, Matrix::TransPoints,   Matrix::ScalePoints,   Matrix::ScalePoints,
+    Matrix::AfflinePoints,  Matrix::AfflinePoints, Matrix::AfflinePoints, Matrix::AfflinePoints};
+}  // namespace tgfx

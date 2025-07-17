@@ -864,7 +864,7 @@ class Matrix {
     }
   }
 
-  using MapPtsProc = void (*)(const Matrix& mat, Point* dst, const Point* src, int count);
+  using MapPtsProc = void (*)(const Matrix& mat, Point dst[], const Point src[], int count);
 
   static MapPtsProc GetMapPtsProc(TypeMask mask) {
     return MapPtsProcs[mask & AllMasks];
@@ -876,13 +876,13 @@ class Matrix {
 
   static const MapPtsProc MapPtsProcs[];
 
-  static void IdentityPoints(const Matrix& m, Point* dst, const Point* src, int count);
+  static void IdentityPoints(const Matrix& m, Point dst[], const Point src[], int count);
 
-  static void TransPoints(const Matrix& m, Point* dst, const Point* src, int count);
+  static void TransPoints(const Matrix& m, Point dst[], const Point src[], int count);
 
-  static void ScalePoints(const Matrix& m, Point* dst, const Point* src, int count);
+  static void ScalePoints(const Matrix& m, Point dst[], const Point src[], int count);
 
-  static void AfflinePoints(const Matrix& m, Point* dst, const Point* src, int count);
+  static void AfflinePoints(const Matrix& m, Point dst[], const Point src[], int count);
 
   bool invertNonIdentity(Matrix* inverse) const;
 
