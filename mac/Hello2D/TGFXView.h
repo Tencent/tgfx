@@ -26,6 +26,14 @@
 
 @interface TGFXView : NSView
 
-- (void)draw:(int)index zoom:(float)zoom offset:(CGPoint)offset;
+@property(nonatomic) int drawIndex;
+@property(nonatomic) float zoomScale;
+@property(nonatomic) CGPoint contentOffset;
+@property(nonatomic) CVDisplayLinkRef cvDisplayLink;
+@property(nonatomic, strong) CADisplayLink* caDisplayLink;
+
+- (void)draw;
+- (void)startDisplayLink;
+- (void)stopDisplayLink;
 
 @end
