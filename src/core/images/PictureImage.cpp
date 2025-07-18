@@ -77,7 +77,8 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (!rect.intersect(drawBounds)) {
     return nullptr;
   }
-  args.viewMatrix.mapRect(&rect);
+  auto scales = args.viewMatrix.getAxisScales();
+  rect.scale(scales.x, scales.y);
   rect.roundOut();
   auto mipmapped = samplingArgs.sampling.mipmapMode != MipmapMode::None && hasMipmaps();
   auto renderTarget = RenderTargetProxy::MakeFallback(
@@ -87,7 +88,7 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto viewMatrix = args.viewMatrix;
+  auto viewMatrix = Matrix::MakeScale(scales.x, scales.y);
   viewMatrix.preTranslate(-rect.left, -rect.top);
   if (!drawPicture(renderTarget, args.renderFlags, &viewMatrix)) {
     return nullptr;
@@ -99,7 +100,6 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   auto newSamplingArgs = samplingArgs;
   if (samplingArgs.sampleArea) {
     newSamplingArgs.sampleArea = viewMatrix.mapRect(*samplingArgs.sampleArea);
-    // newSamplingArgs.sampleArea->offset(-rect.left, -rect.top);
   }
   return TiledTextureEffect::Make(renderTarget->asTextureProxy(), newSamplingArgs, &finalUVMatrix,
                                   isAlphaOnly());

@@ -60,22 +60,13 @@ Rect DropShadowImageFilter::onFilterBounds(const Rect& srcRect) const {
 PlacementPtr<FragmentProcessor> DropShadowImageFilter::getImageFragment(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     SrcRectConstraint constraint, const Matrix* uvMatrix) const {
-  auto drawBounds = args.drawRect;
-  auto fpMatrix = Matrix::I();
-  if (uvMatrix != nullptr) {
-    drawBounds = uvMatrix->mapRect(drawBounds);
-    fpMatrix = *uvMatrix;
-  }
-  auto buffer = args.context->drawingBuffer();
-  if (!drawBounds.intersect(0, 0, source->width(), source->height())) {
-    return ConstColorProcessor::Make(buffer, Color::Transparent(), InputMode::Ignore);
-  }
   auto result = FragmentProcessor::Make(std::move(source), args, TileMode::Decal, TileMode::Decal,
-                                        sampling, constraint, &fpMatrix);
+                                        sampling, constraint, uvMatrix);
   if (result) {
     return result;
   }
-  return ConstColorProcessor::Make(buffer, Color::Transparent(), InputMode::Ignore);
+  return ConstColorProcessor::Make(args.context->drawingBuffer(), Color::Transparent(),
+                                   InputMode::Ignore);
 }
 
 PlacementPtr<FragmentProcessor> DropShadowImageFilter::getShadowFragment(
