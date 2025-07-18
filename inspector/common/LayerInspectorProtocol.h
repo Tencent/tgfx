@@ -15,27 +15,24 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#ifdef TGFX_USE_INSPECTOR
 
-#include "PointSerialization.h"
-
-namespace tgfx {
-
-static void SerializePointImpl(flexbuffers::Builder& fbb, const Point* point) {
-  SerializeUtils::SetFlexBufferMap(fbb, "x", point->x);
-  SerializeUtils::SetFlexBufferMap(fbb, "y", point->y);
-}
-
-std::shared_ptr<Data> PointSerialization::Serialize(const Point* point) {
-  DEBUG_ASSERT(point != nullptr)
-  flexbuffers::Builder fbb;
-  size_t startMap;
-  size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute, startMap,
-                                 contentMap);
-  SerializePointImpl(fbb, point);
-  SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
-  return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
-}
+#pragma once
+#include <cstdint>
+namespace inspector {
+  enum class LayerInspectorMsgType : uint8_t {
+    EnableLayerInspector,
+    HoverLayerAddress,
+    SelectedLayerAddress,
+    SerializeAttribute,
+    SerializeSubAttribute,
+    FlushAttribute,
+    FlushLayerTree,
+    FlushImage,
+    PickedLayerAddress,
+    FlushAttributeAck,
+    LayerTree,
+    LayerAttribute,
+    LayerSubAttribute,
+    ImageData
+  };
 }  // namespace tgfx
-#endif

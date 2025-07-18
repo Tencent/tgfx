@@ -15,27 +15,15 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+#include "tgfx/debug/LayerViewer.h"
 #ifdef TGFX_USE_INSPECTOR
-
-#include "PointSerialization.h"
-
-namespace tgfx {
-
-static void SerializePointImpl(flexbuffers::Builder& fbb, const Point* point) {
-  SerializeUtils::SetFlexBufferMap(fbb, "x", point->x);
-  SerializeUtils::SetFlexBufferMap(fbb, "y", point->y);
-}
-
-std::shared_ptr<Data> PointSerialization::Serialize(const Point* point) {
-  DEBUG_ASSERT(point != nullptr)
-  flexbuffers::Builder fbb;
-  size_t startMap;
-  size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute, startMap,
-                                 contentMap);
-  SerializePointImpl(fbb, point);
-  SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
-  return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
-}
-}  // namespace tgfx
+#include "layers/LayerViewerManager.h"
 #endif
+
+void tgfx::SetSelectedLayer(std::shared_ptr<Layer> layer) {
+#ifdef TGFX_USE_INSPECTOR
+  LayerViewerManager::Get().pickLayer(layer);
+#else
+  (void)layer;
+#endif
+}

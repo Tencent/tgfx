@@ -22,11 +22,7 @@
 #include "SerializationUtils.h"
 
 namespace tgfx {
-class ColorSerialization {
- public:
-  static std::shared_ptr<Data> Serialize(const Color* color);
-
- private:
-  static void SerializeColorImpl(flexbuffers::Builder& fbb, const Color* color);
+namespace ColorSerialization {
+std::shared_ptr<Data> Serialize(const Color* color);
 };
 }  // namespace tgfx
