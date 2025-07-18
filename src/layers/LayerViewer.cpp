@@ -15,12 +15,12 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#include "tgfx/layers/LayerViewer.h"
+#include "tgfx/debug/LayerViewer.h"
 #ifdef TGFX_USE_INSPECTOR
 #include "layers/LayerViewerManager.h"
 #endif
 
-void tgfx::PickLayer(std::shared_ptr<Layer> layer) {
+void tgfx::SetSelectedLayer(std::shared_ptr<Layer> layer) {
 #ifdef TGFX_USE_INSPECTOR
   LayerViewerManager::Get().pickLayer(layer);
 #else

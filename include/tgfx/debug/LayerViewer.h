@@ -16,12 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma once
-#include "Layer.h"
+#include "tgfx/layers/Layer.h"
 
 namespace tgfx {
 
 /**
-   * Pick the layer to inspect it
-   */
-void PickLayer(std::shared_ptr<Layer> layer);
+  * Set the slelected layer to inspect it
+  */
+void SetSelectedLayer(std::shared_ptr<Layer> layer);
 }  // namespace tgfx
