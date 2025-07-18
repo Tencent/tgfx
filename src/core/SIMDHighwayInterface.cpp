@@ -209,6 +209,64 @@ bool SetBoundsHWYImpl(Rect* rect, const Point* pts, int count) {
     return false;
   }
 }
+
+void Float4AdditionAssignmentImpl(float* a, float* b) {
+  const hn::Full128<float> d;
+  auto aVec = hn::LoadU(d, a);
+  auto bVec = hn::LoadU(d, b);
+  aVec = hn::Add(aVec, bVec);
+  hn::StoreU(aVec, d, a);
+}
+
+std::shared_ptr<ImageBuffer> CreateGradientImpl(const Color* colors, const float* positions,
+                                                int count, int resolution) {
+  Bitmap bitmap(resolution, 1, false, false);
+  Pixmap pixmap(bitmap);
+  if (pixmap.isEmpty()) {
+    return nullptr;
+  }
+  pixmap.clear();
+  auto pixels = reinterpret_cast<uint8_t*>(pixmap.writablePixels());
+  int prevIndex = 0;
+  const hn::Full128<float> df;
+  const hn::Full128<uint32_t> du;
+  const hn::Full32<uint8_t> du8;
+  for (int i = 1; i < count; ++i) {
+    int nextIndex =
+        std::min(static_cast<int>(positions[i] * static_cast<float>(resolution)), resolution - 1);
+
+    if (nextIndex > prevIndex) {
+      auto color0 = hn::LoadU(df, &colors[i - 1].red);
+      auto color1 = hn::LoadU(df, &colors[i].red);
+
+      auto step = 1.0f / static_cast<float>(nextIndex - prevIndex);
+      auto delta = hn::Mul(hn::Sub(color1, color0), hn::Set(df, step));
+
+      for (int curIndex = prevIndex; curIndex <= nextIndex; ++curIndex) {
+        auto res = hn::U8FromU32(hn::ConvertTo(du, hn::Mul(color0, hn::Set(df, 255.0f))));
+        hn::StoreU(res, du8, &pixels[curIndex * 4]);
+        color0 = hn::Add(color0, delta);
+      }
+    }
+    prevIndex = nextIndex;
+  }
+  return bitmap.makeBuffer();
+}
+bool TileSortCompImpl(float centerX, float centerY, float tileSize, const std::shared_ptr<Tile>& a,
+                      const std::shared_ptr<Tile>& b) {
+  const hn::Full128<int32_t> di;
+  const hn::Full128<float> df;
+  auto res = hn::Add(
+      hn::ConvertTo(df, hn::Dup128VecFromValues(di, a->tileX, a->tileY, b->tileX, b->tileY)),
+      hn::Set(df, 0.5f));
+  res = hn::MulSub(res, hn::Set(df, tileSize),
+                   hn::Dup128VecFromValues(df, centerX, centerY, centerX, centerY));
+  res = hn::Mul(res, res);
+  res = hn::Add(hn::Reverse2(df, res), res);
+  float resVec[4] = {0.0f};
+  hn::Store(res, df, resVec);
+  return resVec[0] < resVec[2];
+}
 }  // namespace HWY_NAMESPACE
 }  // namespace tgfx
 HWY_AFTER_NAMESPACE();
@@ -220,6 +278,9 @@ HWY_EXPORT(ScalePointsHWYImpl);
 HWY_EXPORT(AffinePointsHWYImpl);
 HWY_EXPORT(MapRectHWYImpl);
 HWY_EXPORT(SetBoundsHWYImpl);
+HWY_EXPORT(Float4AdditionAssignmentImpl);
+HWY_EXPORT(CreateGradientImpl);
+HWY_EXPORT(TileSortCompImpl);
 void TransPointsHWY(const Matrix& m, Point* dst, const Point* src, int count) {
   return HWY_DYNAMIC_DISPATCH(TransPointsHWYImpl)(m, dst, src, count);
 }
@@ -238,6 +299,20 @@ void MapRectHWY(const Matrix& m, Rect* dst, const Rect& src) {
 
 bool SetBoundsHWY(Rect* rect, const Point pts[], int count) {
   return HWY_DYNAMIC_DISPATCH(SetBoundsHWYImpl)(rect, pts, count);
+}
+
+void Float4AdditionAssignmentHWY(float* a, float* b) {
+  return HWY_DYNAMIC_DISPATCH(Float4AdditionAssignmentImpl)(a, b);
+}
+
+std::shared_ptr<ImageBuffer> CreateGradientHWY(const Color* colors, const float* positions,
+                                               int count, int resolution) {
+  return HWY_DYNAMIC_DISPATCH(CreateGradientImpl)(colors, positions, count, resolution);
+}
+
+bool TileSortCompHWY(float centerX, float centerY, float tileSize, const std::shared_ptr<Tile>& a,
+                     const std::shared_ptr<Tile>& b) {
+  return HWY_DYNAMIC_DISPATCH(TileSortCompImpl)(centerX, centerY, tileSize, a, b);
 }
 }  // namespace tgfx
 #endif

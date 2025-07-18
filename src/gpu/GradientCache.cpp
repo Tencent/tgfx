@@ -17,7 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GradientCache.h"
+#include "core/SIMDVec.h"
 #include "tgfx/core/Pixmap.h"
+#ifdef _MSC_VER
+#include "core/SIMDHighwayInterface.h"
+#endif
 
 namespace tgfx {
 // Each bitmap will be 256x1.
@@ -46,6 +50,9 @@ void GradientCache::add(const BytesKey& bytesKey, std::shared_ptr<Texture> textu
 
 std::shared_ptr<ImageBuffer> CreateGradient(const Color* colors, const float* positions, int count,
                                             int resolution) {
+#ifdef _MSC_VER
+  return CreateGradientHWY(colors, positions, count, resolution);
+#else
   Bitmap bitmap(resolution, 1, false, false);
   Pixmap pixmap(bitmap);
   if (pixmap.isEmpty()) {
@@ -59,35 +66,22 @@ std::shared_ptr<ImageBuffer> CreateGradient(const Color* colors, const float* po
         std::min(static_cast<int>(positions[i] * static_cast<float>(resolution)), resolution - 1);
 
     if (nextIndex > prevIndex) {
-      auto r0 = colors[i - 1].red;
-      auto g0 = colors[i - 1].green;
-      auto b0 = colors[i - 1].blue;
-      auto a0 = colors[i - 1].alpha;
-      auto r1 = colors[i].red;
-      auto g1 = colors[i].green;
-      auto b1 = colors[i].blue;
-      auto a1 = colors[i].alpha;
+      float4 color0 = float4::Load(&colors[i - 1].red);
+      float4 color1 = float4::Load(&colors[i].red);
 
       auto step = 1.0f / static_cast<float>(nextIndex - prevIndex);
-      auto deltaR = (r1 - r0) * step;
-      auto deltaG = (g1 - g0) * step;
-      auto deltaB = (b1 - b0) * step;
-      auto deltaA = (a1 - a0) * step;
+      float4 delta = (color1 - color0) * step;
 
       for (int curIndex = prevIndex; curIndex <= nextIndex; ++curIndex) {
-        pixels[curIndex * 4] = static_cast<uint8_t>(r0 * 255.0f);
-        pixels[curIndex * 4 + 1] = static_cast<uint8_t>(g0 * 255.0f);
-        pixels[curIndex * 4 + 2] = static_cast<uint8_t>(b0 * 255.0f);
-        pixels[curIndex * 4 + 3] = static_cast<uint8_t>(a0 * 255.0f);
-        r0 += deltaR;
-        g0 += deltaG;
-        b0 += deltaB;
-        a0 += deltaA;
+        byte4 res = Cast<uint8_t, 4, float>(color0 * 255.0f);
+        res.store(&pixels[curIndex * 4]);
+        color0 += delta;
       }
     }
     prevIndex = nextIndex;
   }
   return bitmap.makeBuffer();
+#endif
 }
 
 std::shared_ptr<Texture> GradientCache::getGradient(Context* context, const Color* colors,

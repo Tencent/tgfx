@@ -374,19 +374,19 @@ struct Vec<1, T> {
 
 // Translate from a value type T to its corresponding Mask, the result of a comparison.
 template <typename T>
-struct Mask {
+struct SIMDMask {
   using type = T;
 };
 template <>
-struct Mask<float> {
+struct SIMDMask<float> {
   using type = int32_t;
 };
 template <>
-struct Mask<double> {
+struct SIMDMask<double> {
   using type = int64_t;
 };
 template <typename T>
-using M = typename Mask<T>::type;
+using M = typename SIMDMask<T>::type;
 
 // Join two Vec<N,T> into one Vec<2N,T>.
 SINT Vec<2 * N, T> Join(const Vec<N, T>& lo, const Vec<N, T>& hi) {
