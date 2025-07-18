@@ -122,8 +122,8 @@ class ResourceCache {
   size_t maxBytes = 512 * (1 << 20);  // 512MB
   size_t totalBytes = 0;
   size_t purgeableBytes = 0;
-  // 120 is chosen because a 4K screen can be split into 120 grids of 256x256 pixels. If each grid
-  // is rendered per frame, the cache should cover this use case.
+  // 120 is chosen because a 4K screen can be divided into roughly 120 grids of 256x256 pixels.
+  // If each grid is rendered per frame, the cache should cover this use case.
   size_t _expirationFrames = 120;
   std::chrono::steady_clock::time_point currentFrameTime = {};
   std::deque<std::chrono::steady_clock::time_point> frameTimes = {};
