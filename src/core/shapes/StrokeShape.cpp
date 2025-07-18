@@ -61,7 +61,7 @@ std::shared_ptr<Shape> StrokeShape::Apply(std::shared_ptr<Shape> shape, const St
 
 Rect StrokeShape::getBounds() const {
   auto bounds = shape->getBounds();
-  ApplyStrokeToBounds(stroke, &bounds, 1.0f, true);
+  ApplyStrokeToBounds(stroke, &bounds, true);
   return bounds;
 }
 

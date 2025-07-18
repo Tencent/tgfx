@@ -77,7 +77,7 @@ static float FindMaxGlyphDimension(const Font& font, const std::vector<GlyphID>&
       continue;
     }
     if (stroke != nullptr) {
-      ApplyStrokeToBounds(*stroke, &bounds, 1.0f, true);
+      ApplyStrokeToBounds(*stroke, &bounds);
     }
     maxDimension = std::max(maxDimension, std::max(bounds.width(), bounds.height()));
   }
@@ -99,7 +99,7 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(const Font& font, GlyphID glyph
     return nullptr;
   }
   if (stroke != nullptr) {
-    ApplyStrokeToBounds(*stroke, &bounds, 1.0f, true);
+    ApplyStrokeToBounds(*stroke, &bounds);
     shape = Shape::ApplyStroke(std::move(shape), stroke);
   }
   shape = Shape::ApplyMatrix(std::move(shape), Matrix::MakeTrans(-bounds.x(), -bounds.y()));
@@ -360,8 +360,8 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
 
   std::unique_ptr<Stroke> scaledStroke;
   if (stroke) {
-    scaledStroke =
-        std::make_unique<Stroke>(stroke->width * maxScale, stroke->cap, stroke->join, maxScale);
+    scaledStroke = std::make_unique<Stroke>(*stroke);
+    scaledStroke->width *= maxScale;
   }
   AtlasCell atlasCell;
   size_t index = 0;
@@ -376,7 +376,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
       continue;
     }
     if (scaledStroke) {
-      ApplyStrokeToBounds(*scaledStroke, &bounds, 1.0f, true);
+      ApplyStrokeToBounds(*scaledStroke, &bounds);
     }
     auto maxDimension = static_cast<int>(ceilf(std::max(bounds.width(), bounds.height())));
     if (maxDimension >= Atlas::MaxCellSize) {
@@ -478,8 +478,8 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
 
   std::unique_ptr<Stroke> scaledStroke = nullptr;
   if (stroke) {
-    scaledStroke =
-        std::make_unique<Stroke>(stroke->width * maxScale, stroke->cap, stroke->join, maxScale);
+    scaledStroke = std::make_unique<Stroke>(*stroke);
+    scaledStroke->width *= maxScale;
   }
   static constexpr float MaxAtlasDimension = Atlas::MaxCellSize - 2.f;
   auto cellScale = 1.f;
@@ -490,7 +490,6 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
 
     if (scaledStroke) {
       scaledStroke->width *= reductionFactor;
-      scaledStroke->miterLimit *= reductionFactor;
     }
     maxDimension = FindMaxGlyphDimension(font, sourceGlyphRun.glyphs, scaledStroke.get());
     cellScale *= reductionFactor;
@@ -509,7 +508,7 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
       continue;
     }
     if (scaledStroke) {
-      ApplyStrokeToBounds(*scaledStroke, &bounds, 1.0f, true);
+      ApplyStrokeToBounds(*scaledStroke, &bounds);
     }
 
     auto typeface = font.getTypeface().get();
