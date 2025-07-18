@@ -17,11 +17,21 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include "layers/TileCache.h"
+#include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Color.h"
+#include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/Matrix.h"
+#include "tgfx/core/Pixmap.h"
 namespace tgfx {
 void TransPointsHWY(const Matrix& m, Point dst[], const Point src[], int count);
 void ScalePointsHWY(const Matrix& m, Point dst[], const Point src[], int count);
 void AffinePointsHWY(const Matrix& m, Point dst[], const Point src[], int count);
 void MapRectHWY(const Matrix& m, Rect* dst, const Rect& src);
 bool SetBoundsHWY(Rect* rect, const Point pts[], int count);
+void Float4AdditionAssignmentHWY(float* a, float* b);
+std::shared_ptr<ImageBuffer> CreateGradientHWY(const Color* colors, const float* positions,
+                                               int count, int resolution);
+bool TileSortCompHWY(float centerX, float centerY, float tileSize, const std::shared_ptr<Tile>& a,
+                     const std::shared_ptr<Tile>& b);
 }  // namespace tgfx
