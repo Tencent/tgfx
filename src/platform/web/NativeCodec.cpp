@@ -18,7 +18,6 @@
 
 #include "NativeCodec.h"
 #include <atomic>
-#include "CopyDataFromUint8Array.h"
 #include "WebImageBuffer.h"
 #include "WebImageInfo.h"
 #include "tgfx/core/Buffer.h"
@@ -27,6 +26,25 @@
 using namespace emscripten;
 
 namespace tgfx {
+
+std::shared_ptr<Data> CopyDataFromUint8Array(const val& emscriptenData) {
+  if (!emscriptenData.as<bool>()) {
+    return nullptr;
+  }
+  auto length = emscriptenData["length"].as<size_t>();
+  if (length == 0) {
+    return nullptr;
+  }
+  Buffer imageBuffer(length);
+  if (imageBuffer.isEmpty()) {
+    return nullptr;
+  }
+  auto memory = val::module_property("HEAPU8")["buffer"];
+  auto memoryView = val::global("Uint8Array")
+                        .new_(memory, reinterpret_cast<uintptr_t>(imageBuffer.data()), length);
+  memoryView.call<void>("set", emscriptenData);
+  return imageBuffer.release();
+}
 
 std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& filePath) {
   if (filePath.find("http://") == 0 || filePath.find("https://") == 0) {
