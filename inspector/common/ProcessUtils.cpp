@@ -51,14 +51,23 @@ uint64_t GetPid() {
 }
 
 const char* GetProcessName() {
-  const char* processName = "unknown";
+  static std::string processName = "unknown";
+  if(processName != "unknown") {
+    return processName.c_str();
+  }
 #ifdef _WIN32
-  static char buf[_MAX_PATH];
+  char buf[_MAX_PATH] = {0};
   GetModuleFileNameA(nullptr, buf, _MAX_PATH);
   const char* ptr = buf;
-  while (*ptr != '\0') ptr++;
-  while (ptr > buf && *ptr != '\\' && *ptr != '/') ptr--;
-  if (ptr > buf) ptr++;
+  while (*ptr != '\0') {
+    ptr++;
+  }
+  while (ptr > buf && *ptr != '\\' && *ptr != '/'){
+    ptr--;
+  }
+  if (ptr > buf){
+    ptr++;
+  }
   processName = ptr;
 #elif defined __APPLE__ || defined BSD
   auto buf = getprogname();
@@ -66,7 +75,7 @@ const char* GetProcessName() {
     processName = buf;
   }
 #endif
-  return processName;
+  return processName.c_str();
 }
 
 BroadcastMessage GetBroadcastMessage(const char* procname, size_t pnsz, size_t& len, uint16_t port,

@@ -24,7 +24,7 @@ namespace tgfx {
 
 class LayerViewerManager final {
  public:
-  static LayerViewerManager& GetLayerInspectorManager() {
+  static LayerViewerManager& Get() {
     static LayerViewerManager instance;
     return instance;
   }

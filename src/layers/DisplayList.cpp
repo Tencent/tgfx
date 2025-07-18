@@ -117,7 +117,7 @@ static int64_t ChangeZoomScalePrecision(int64_t zoomScaleInt, int oldPrecision, 
 DisplayList::DisplayList() : _root(RootLayer::Make()) {
   _root->_root = _root.get();
 #ifdef TGFX_USE_INSPECTOR
-  auto& layerInspectorManager = LayerViewerManager::GetLayerInspectorManager();
+  auto& layerInspectorManager = LayerViewerManager::Get();
   layerInspectorManager.setDisplayList(this);
 #endif
 }
@@ -244,7 +244,7 @@ void DisplayList::render(Surface* surface, bool autoClear) {
     return;
   }
 #ifdef TGFX_USE_INSPECTOR
-  auto& layerInspector = LayerViewerManager::GetLayerInspectorManager();
+  auto& layerInspector = LayerViewerManager::Get();
   //layerInspector.setCallBack();
   layerInspector.RenderImageAndSend(surface->getContext());
 #endif

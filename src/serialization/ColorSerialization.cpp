@@ -21,6 +21,12 @@
 #include "ColorSerialization.h"
 
 namespace tgfx {
+static void SerializeColorImpl(flexbuffers::Builder& fbb, const Color* color) {
+  SerializeUtils::SetFlexBufferMap(fbb, "red", color->red);
+  SerializeUtils::SetFlexBufferMap(fbb, "green", color->green);
+  SerializeUtils::SetFlexBufferMap(fbb, "blue", color->blue);
+  SerializeUtils::SetFlexBufferMap(fbb, "alpha", color->alpha);
+}
 
 std::shared_ptr<Data> ColorSerialization::Serialize(const Color* color) {
   DEBUG_ASSERT(color != nullptr)
@@ -32,13 +38,6 @@ std::shared_ptr<Data> ColorSerialization::Serialize(const Color* color) {
   SerializeColorImpl(fbb, color);
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
-}
-
-void ColorSerialization::SerializeColorImpl(flexbuffers::Builder& fbb, const Color* color) {
-  SerializeUtils::SetFlexBufferMap(fbb, "red", color->red);
-  SerializeUtils::SetFlexBufferMap(fbb, "green", color->green);
-  SerializeUtils::SetFlexBufferMap(fbb, "blue", color->blue);
-  SerializeUtils::SetFlexBufferMap(fbb, "alpha", color->alpha);
 }
 }  // namespace tgfx
 #endif

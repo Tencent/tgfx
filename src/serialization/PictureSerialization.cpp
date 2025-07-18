@@ -20,6 +20,10 @@
 
 namespace tgfx {
 
+static void SerializePictureImpl(flexbuffers::Builder&, const Picture*) {
+  // doNothing
+}
+
 std::shared_ptr<Data> PictureSerialization::Serialize(const Picture* pic) {
   DEBUG_ASSERT(pic != nullptr)
   flexbuffers::Builder fbb;
@@ -30,9 +34,5 @@ std::shared_ptr<Data> PictureSerialization::Serialize(const Picture* pic) {
   SerializePictureImpl(fbb, pic);
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
-}
-
-void PictureSerialization::SerializePictureImpl(flexbuffers::Builder&, const Picture*) {
-  // noop
 }
 }  // namespace tgfx

@@ -20,9 +20,9 @@
 #include "layers/LayerViewerManager.h"
 #endif
 
-void tgfx::LayerViewer::PickLayer(std::shared_ptr<Layer> layer) {
+void tgfx::PickLayer(std::shared_ptr<Layer> layer) {
 #ifdef TGFX_USE_INSPECTOR
-  LayerViewerManager::GetLayerInspectorManager().pickLayer(layer);
+  LayerViewerManager::Get().pickLayer(layer);
 #else
   (void)layer;
 #endif

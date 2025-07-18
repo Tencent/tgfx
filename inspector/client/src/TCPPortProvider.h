@@ -21,7 +21,7 @@
 namespace inspector {
 class TCPPortProvider {
 public:
-  static TCPPortProvider& GetTCPPortProvider() {
+  static TCPPortProvider& Get() {
     static TCPPortProvider instance;
     return instance;
   }

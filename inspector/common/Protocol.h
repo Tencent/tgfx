@@ -21,7 +21,7 @@ namespace inspector {
 
 inline constexpr int broadcastNum = 5;
 
-inline constexpr uint64_t WelcomeMessageProgramNameSize = 64;
+inline constexpr uint8_t WelcomeMessageProgramNameSize = 64;
 inline constexpr uint8_t ProtocolVersion = 1;
 inline constexpr uint16_t BroadcastVersion = 1;
 

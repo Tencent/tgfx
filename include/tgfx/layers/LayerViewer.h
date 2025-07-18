@@ -20,12 +20,8 @@
 
 namespace tgfx {
 
-class LayerViewer {
- public:
-  /**
+/**
    * Pick the layer to inspect it
    */
-  static void PickLayer(std::shared_ptr<Layer> layer);
-};
-
+void PickLayer(std::shared_ptr<Layer> layer);
 }  // namespace tgfx

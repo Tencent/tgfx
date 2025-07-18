@@ -62,7 +62,7 @@ typedef SOCKET socket_t;
 typedef int socket_t;
 #endif
 
-enum { BufSize = 128 * 1024 };
+constexpr uint32_t BufSize = 128 * 1024;
 
 Socket::Socket()
     : buf((char*)malloc(BufSize)), bufPtr(nullptr), sock(-1), bufLeft(0), res(nullptr),
@@ -426,16 +426,13 @@ bool Socket::IsValid() const {
 }
 
 ListenSocket::ListenSocket() : sock(-1), listenPort(0) {
-#ifdef _WIN32
-  // InitWinSock();
-#endif
 }
 
 ListenSocket::~ListenSocket() {
   if (this->sock != -1) {
     Close();
   }
-  TCPPortProvider::GetTCPPortProvider().clearUsedPort(listenPort);
+  TCPPortProvider::Get().clearUsedPort(listenPort);
 }
 
 static int AddrinfoAndSocketForFamily(uint16_t port, int ai_family, struct addrinfo** res) {

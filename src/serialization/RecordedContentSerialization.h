@@ -22,21 +22,8 @@
 #include "SerializationUtils.h"
 
 namespace tgfx {
-class RecordedContentSerialization {
- public:
-  static std::shared_ptr<Data> Serialize(const LayerContent* content,
-                                         SerializeUtils::ComplexObjSerMap* map,
-                                         SerializeUtils::RenderableObjSerMap* rosMap);
-
- private:
-  static void SerializeDefaultContentImpl(flexbuffers::Builder& fbb, const LayerContent* content,
-                                          SerializeUtils::ComplexObjSerMap* map,
-                                          SerializeUtils::RenderableObjSerMap* rosMap);
-  static void SerializeForegroundContentImpl(flexbuffers::Builder& fbb, const LayerContent* content,
-                                             SerializeUtils::ComplexObjSerMap* map,
-                                             SerializeUtils::RenderableObjSerMap* rosMap);
-  static void SerializeContourContentImpl(flexbuffers::Builder& fbb, const LayerContent* content,
-                                          SerializeUtils::ComplexObjSerMap* map,
-                                          SerializeUtils::RenderableObjSerMap* rosMap);
+namespace RecordedContentSerialization {
+std::shared_ptr<Data> Serialize(const LayerContent* content, SerializeUtils::ComplexObjSerMap* map,
+                                SerializeUtils::RenderableObjSerMap* rosMap);
 };
 }  // namespace tgfx
