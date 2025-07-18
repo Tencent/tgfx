@@ -334,11 +334,6 @@ else ()
     set(TGFX_USE_NATIVE_GL ON)
 endif ()
 
-if (NOT APPLE AND NOT OHOS AND (NOT WEB OR EMSCRIPTEN_PTHREADS))
-    list(APPEND TGFX_INCLUDES third_party/stb)
-    list(APPEND TGFX_DEFINES TGFX_USE_STB_IMAGE)
-endif()
-
 list(APPEND TGFX_STATIC_VENDORS pathkit)
 list(APPEND TGFX_INCLUDES third_party/pathkit)
 list(APPEND TGFX_STATIC_VENDORS skcms)

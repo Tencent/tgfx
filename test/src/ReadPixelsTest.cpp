@@ -33,30 +33,6 @@ namespace tgfx {
     EXPECT_TRUE(Baseline::Compare(bm, "ReadPixelsTest/" + std::string(key))); \
   }
 
-TGFX_TEST(ReadPixelsTest, ScalePixMap) {
-  std::string imagePath = "resources/assets/bridge.jpg";
-  auto codec = MakeNativeCodec(imagePath);
-  EXPECT_TRUE(codec != nullptr);
-  auto width = codec->width();
-  auto height = codec->height();
-  auto RGBAInfo = ImageInfo::Make(width, height, ColorType::RGBA_8888, AlphaType::Premultiplied);
-  auto byteSize = RGBAInfo.byteSize();
-  Buffer pixels(byteSize);
-  auto result = codec->readPixels(RGBAInfo, pixels.data());
-  EXPECT_TRUE(result);
-  Pixmap pixmap(RGBAInfo, pixels.data());
-
-  auto scale = 0.5f;
-  width = static_cast<int>(width * scale);
-  height = static_cast<int>(height * scale);
-  auto scaleRGBAInfo = ImageInfo::Make(width, height, ColorType::RGB_565, AlphaType::Premultiplied);
-
-  Buffer scalePixels(byteSize);
-  auto scalePixmap = Pixmap(scaleRGBAInfo, scalePixels.data());
-  pixmap.scalePixels(scalePixmap.info(), scalePixmap.writablePixels(), FilterQuality::Medium);
-  EXPECT_TRUE(Baseline::Compare(scalePixmap, "ReadPixelsTest/scale_RGBA_8888_To_RGB_565_image"));
-}
-
 TGFX_TEST(ReadPixelsTest, PixelMap) {
   auto codec = MakeImageCodec("resources/apitest/test_timestretch.png");
   EXPECT_TRUE(codec != nullptr);

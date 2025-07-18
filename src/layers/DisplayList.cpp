@@ -452,6 +452,14 @@ void DisplayList::invalidateCurrentTileCache(const TileCache* tileCache,
 
 std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
                                                       std::vector<DrawTask>* tileTasks) {
+  auto maxRefinedCount = _maxTilesRefinedPerFrame;
+  if (lastContentOffset != _contentOffset || lastZoomScaleInt != _zoomScaleInt) {
+    lastContentOffset = _contentOffset;
+    lastZoomScaleInt = _zoomScaleInt;
+    // To ensure smooth user interactions, we skip refinement when the offset or zoom scale is
+    // changing.
+    maxRefinedCount = 0;
+  }
   hasZoomBlurTiles = false;
   TileCache* currentTileCache = nullptr;
   auto result = tileCaches.find(_zoomScaleInt);
@@ -498,20 +506,19 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     return {};
   }
   size_t tileIndex = 0;
-  auto refinedCount = _maxTilesRefinedPerFrame;
   std::vector<std::shared_ptr<Tile>> taskTiles = {};
   for (auto& grid : dirtyGrids) {
     auto& tile = freeTiles[tileIndex++];
     if (_allowZoomBlur) {
       auto fallbackTasks = getFallbackDrawTasks(grid.first, grid.second, sortedCaches);
       if (!fallbackTasks.empty()) {
-        if (refinedCount <= 0) {
+        if (maxRefinedCount <= 0) {
           emptyTiles.emplace_back(tile);
           screenTasks.insert(screenTasks.end(), fallbackTasks.begin(), fallbackTasks.end());
           hasZoomBlurTiles = true;
           continue;
         }
-        refinedCount--;
+        maxRefinedCount--;
       }
     }
     tile->tileX = grid.first;
