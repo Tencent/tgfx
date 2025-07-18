@@ -95,39 +95,13 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     boundsWillSample.roundOut();
   }
 
-  auto sourceClipBounds = boundsWillSample;
-  if (!sourceClipBounds.intersect(0, 0, source->width(), source->height())) {
-    return nullptr;
-  }
-
-  sourceClipBounds.roundOut();
-  source = source->makeSubset(sourceClipBounds);
-  if (!source) {
-    return nullptr;
-  }
+  Rect scaledBounds = boundsWillSample;
   if (maxSigma > MAX_BLUR_SIGMA) {
     scaleFactor = MAX_BLUR_SIGMA / maxSigma;
-    source = source->makeRasterized(scaleFactor);
+    Matrix matrix = Matrix::MakeScale(scaleFactor);
+    matrix.mapRect(&scaledBounds);
   }
-
-  if (!source) {
-    return nullptr;
-  }
-
-  Rect scaledBounds = boundsWillSample;
-  scaledBounds.scale(source->width() / sourceClipBounds.width(),
-                     source->height() / sourceClipBounds.height());
   scaledBounds.roundOut();
-
-  Matrix uvMatrix = Matrix::MakeTrans(
-      scaledBounds.left - sourceClipBounds.left * source->width() / sourceClipBounds.width(),
-      scaledBounds.top - sourceClipBounds.top * source->height() / sourceClipBounds.height());
-
-  FPArgs fpArgs(args.context, args.renderFlags,
-                Rect::MakeWH(scaledBounds.width(), scaledBounds.height()));
-
-  auto sourceProcessor = FragmentProcessor::Make(source, fpArgs, tileMode, tileMode, {},
-                                                 SrcRectConstraint::Fast, &uvMatrix);
 
   const auto isAlphaOnly = source->isAlphaOnly();
   auto mipmapped = args.mipmapped && !blur2D && maxSigma <= MAX_BLUR_SIGMA;
@@ -137,6 +111,17 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
   if (!renderTarget) {
     return nullptr;
   }
+
+  Matrix uvMatrix = Matrix::MakeTrans(boundsWillSample.left, boundsWillSample.top);
+  uvMatrix.preScale(boundsWillSample.width() / scaledBounds.width(),
+                    boundsWillSample.height() / scaledBounds.height());
+  auto viewMatrix = Matrix::I();
+  uvMatrix.invert(&viewMatrix);
+  FPArgs fpArgs(args.context, args.renderFlags,
+                Rect::MakeWH(scaledBounds.width(), scaledBounds.height()), viewMatrix);
+
+  auto sourceProcessor = FragmentProcessor::Make(source, fpArgs, tileMode, tileMode, {},
+                                                 SrcRectConstraint::Fast, &uvMatrix);
 
   if (blur2D) {
     Blur1D(std::move(sourceProcessor), renderTarget, blurrinessX * scaleFactor,

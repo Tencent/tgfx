@@ -101,7 +101,9 @@ std::shared_ptr<TextureProxy> RasterizedImage::onLockTextureProxy(const TPArgs& 
   auto uvScaleY = static_cast<float>(sourceHeight) / static_cast<float>(scaledHeight);
   Matrix uvMatrix = Matrix::MakeScale(uvScaleX, uvScaleY);
   auto drawRect = Rect::MakeWH(width(), height());
-  FPArgs fpArgs(args.context, args.renderFlags, drawRect);
+  auto viewMatrix = Matrix::I();
+  uvMatrix.invert(&viewMatrix);
+  FPArgs fpArgs(args.context, args.renderFlags, drawRect, viewMatrix);
   auto processor =
       FragmentProcessor::Make(source, fpArgs, sampling, SrcRectConstraint::Fast, &uvMatrix);
   if (processor == nullptr) {
