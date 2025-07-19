@@ -48,6 +48,14 @@ class ImageCodec : public ImageGenerator {
   static std::shared_ptr<ImageCodec> MakeFrom(std::shared_ptr<Data> imageBytes);
 
   /**
+   * Creates a new ImageCodec using the provided ImageInfo and pixel data from an immutable Data
+   * object. The returned ImageCodec holds a reference to the pixel data, so the caller must ensure
+   * the pixels remain unchanged for the lifetime of the ImageCodec. Returns nullptr if ImageInfo is
+   * empty or pixels is nullptr.
+   */
+  static std::shared_ptr<ImageCodec> MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels);
+
+  /**
    * Creates a new ImageCodec object from a platform-specific NativeImage. For example, the
    * NativeImage could be a jobject that represents a java Bitmap on the android platform or a
    * CGImageRef on the apple platform. The returned ImageCodec object takes a reference to the
@@ -85,7 +93,7 @@ class ImageCodec : public ImageGenerator {
   virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const = 0;
 
  protected:
-  ImageCodec(int width, int height, Orientation orientation)
+  ImageCodec(int width, int height, Orientation orientation = Orientation::TopLeft)
       : ImageGenerator(width, height), _orientation(orientation) {
   }
 
