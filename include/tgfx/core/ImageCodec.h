@@ -31,7 +31,7 @@ namespace tgfx {
 class ImageBuffer;
 
 /**
- * ImageCodec is an abstract class that defines the interface for decoding and encoding images.
+ * ImageCodec is an abstract class that defines the interface for decoding images.
  */
 class ImageCodec : public ImageGenerator {
  public:
