@@ -27,19 +27,14 @@ namespace tgfx {
 
 class CodecImage : public GeneratorImage {
  public:
-  static std::shared_ptr<Image> MakeFrom(const std::shared_ptr<ImageCodec>& codec);
+  explicit CodecImage(std::shared_ptr<ImageCodec> codec);
 
-  ~CodecImage() override = default;
-
-  std::shared_ptr<ImageCodec> codec() const;
+  std::shared_ptr<ImageCodec> getCodec() const;
 
  protected:
   Type type() const override {
     return Type::Codec;
   }
-
- private:
-  explicit CodecImage(const std::shared_ptr<ImageCodec>& codec);
 };
 
 }  // namespace tgfx

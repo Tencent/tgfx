@@ -31,7 +31,9 @@ class AtlasTextOp final : public DrawOp {
                                         PlacementPtr<RectsVertexProvider> provider,
                                         uint32_t renderFlags,
                                         std::shared_ptr<TextureProxy> textureProxy);
+
   void execute(RenderPass* renderPass) override;
+
   bool hasCoverage() const override;
 
  private:

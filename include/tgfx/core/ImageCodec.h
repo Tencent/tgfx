@@ -31,7 +31,7 @@ namespace tgfx {
 class ImageBuffer;
 
 /**
- * Abstraction layer directly on top of an image codec.
+ * ImageCodec is an abstract class that defines the interface for decoding and encoding images.
  */
 class ImageCodec : public ImageGenerator {
  public:
@@ -70,6 +70,10 @@ class ImageCodec : public ImageGenerator {
 
   bool isAlphaOnly() const override {
     return false;
+  }
+
+  bool isImageCodec() const final {
+    return true;
   }
 
   /**

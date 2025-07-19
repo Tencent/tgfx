@@ -70,7 +70,7 @@ std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
     return cached;
   }
   auto codec = ImageCodec::MakeFrom(filePath);
-  auto image = CodecImage::MakeFrom(codec);
+  auto image = MakeFrom(codec);
   if (image == nullptr) {
     return nullptr;
   }
@@ -83,7 +83,7 @@ std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
 
 std::shared_ptr<Image> Image::MakeFromEncoded(std::shared_ptr<Data> encodedData) {
   auto codec = ImageCodec::MakeFrom(std::move(encodedData));
-  auto image = CodecImage::MakeFrom(codec);
+  auto image = MakeFrom(codec);
   if (image == nullptr) {
     return nullptr;
   }
@@ -92,11 +92,27 @@ std::shared_ptr<Image> Image::MakeFromEncoded(std::shared_ptr<Data> encodedData)
 
 std::shared_ptr<Image> Image::MakeFrom(NativeImageRef nativeImage) {
   auto codec = ImageCodec::MakeFrom(nativeImage);
-  auto image = CodecImage::MakeFrom(codec);
+  auto image = MakeFrom(codec);
   if (image == nullptr) {
     return nullptr;
   }
   return image->makeOriented(codec->orientation());
+}
+
+std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageGenerator> generator) {
+  if (generator == nullptr) {
+    return nullptr;
+  }
+  std::shared_ptr<Image> image = nullptr;
+  if (generator->isImageCodec()) {
+    auto codec = std::static_pointer_cast<ImageCodec>(generator);
+    image = std::make_shared<CodecImage>(std::move(codec));
+
+  } else {
+    image = std::make_shared<GeneratorImage>(UniqueKey::Make(), std::move(generator));
+  }
+  image->weakThis = image;
+  return image;
 }
 
 std::shared_ptr<Image> Image::MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels) {
