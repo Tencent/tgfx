@@ -22,49 +22,6 @@
 
 namespace tgfx {
 /**
- * PixelData represents a pixel array described in a single plane.
- */
-class PixelData : public ImageBuffer {
- public:
-  PixelData(const ImageInfo& info, std::shared_ptr<Data> pixels)
-      : info(info), pixels(std::move(pixels)) {
-  }
-
-  int width() const override {
-    return info.width();
-  }
-
-  int height() const override {
-    return info.height();
-  }
-
-  bool isAlphaOnly() const override {
-    return info.isAlphaOnly();
-  }
-
- protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const override {
-    switch (info.colorType()) {
-      case ColorType::ALPHA_8:
-        return Texture::MakeAlpha(context, info.width(), info.height(), pixels->data(),
-                                  info.rowBytes(), mipmapped);
-      case ColorType::BGRA_8888:
-        return Texture::MakeFormat(context, info.width(), info.height(), pixels->data(),
-                                   info.rowBytes(), PixelFormat::BGRA_8888, mipmapped);
-      case ColorType::RGBA_8888:
-        return Texture::MakeRGBA(context, info.width(), info.height(), pixels->data(),
-                                 info.rowBytes(), mipmapped);
-      default:
-        return nullptr;
-    }
-  }
-
- private:
-  ImageInfo info = {};
-  std::shared_ptr<Data> pixels = nullptr;
-};
-
-/**
  * YUVBuffer represents a pixel array described in the YUV format with multiple planes.
  */
 class YUVBuffer : public ImageBuffer {
@@ -98,22 +55,6 @@ class YUVBuffer : public ImageBuffer {
   YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED;
   YUVFormat format = YUVFormat::Unknown;
 };
-
-std::shared_ptr<ImageBuffer> ImageBuffer::MakeFrom(const ImageInfo& info,
-                                                   std::shared_ptr<Data> pixels) {
-  if (info.isEmpty() || pixels == nullptr || info.byteSize() > pixels->size() ||
-      info.alphaType() == AlphaType::Unpremultiplied) {
-    return nullptr;
-  }
-  switch (info.colorType()) {
-    case ColorType::ALPHA_8:
-    case ColorType::RGBA_8888:
-    case ColorType::BGRA_8888:
-      return std::make_shared<PixelData>(info, std::move(pixels));
-    default:
-      return nullptr;
-  }
-}
 
 std::shared_ptr<ImageBuffer> ImageBuffer::MakeI420(std::shared_ptr<YUVData> yuvData,
                                                    YUVColorSpace colorSpace) {

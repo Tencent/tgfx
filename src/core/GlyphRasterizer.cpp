@@ -22,8 +22,8 @@ namespace tgfx {
 GlyphRasterizer::GlyphRasterizer(int width, int height,
                                  std::shared_ptr<ScalerContext> scalerContext, GlyphID glyphID,
                                  bool fauxBold, const Stroke* stroke)
-    : ImageCodec(width, height, Orientation::LeftTop), scalerContext(std::move(scalerContext)),
-      glyphID(glyphID), fauxBold(fauxBold), stroke(stroke ? new Stroke(*stroke) : nullptr) {
+    : ImageCodec(width, height), scalerContext(std::move(scalerContext)), glyphID(glyphID),
+      fauxBold(fauxBold), stroke(stroke ? new Stroke(*stroke) : nullptr) {
 }
 
 GlyphRasterizer::~GlyphRasterizer() {

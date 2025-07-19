@@ -407,7 +407,7 @@ std::shared_ptr<Data> SVGExportContext::ImageToEncodedData(const std::shared_ptr
   Types::ImageType type = Types::Get(image.get());
   if (type != Types::ImageType::Codec) return nullptr;
   auto codecImage = static_cast<const CodecImage*>(image.get());
-  auto imageCodec = codecImage->codec();
+  auto imageCodec = codecImage->getCodec();
   return imageCodec->getEncodedData();
 }
 
