@@ -28,8 +28,8 @@ namespace tgfx {
  */
 class VertexBufferProxy {
  public:
-  VertexBufferProxy(std::shared_ptr<GpuBufferProxy> bufferProxy, size_t offset)
-      : proxy(std::move(bufferProxy)), _offset(offset) {
+  VertexBufferProxy(std::shared_ptr<GpuBufferProxy> bufferProxy, size_t offset, size_t size)
+      : proxy(std::move(bufferProxy)), _offset(offset), _size(size) {
     DEBUG_ASSERT(proxy != nullptr);
   }
 

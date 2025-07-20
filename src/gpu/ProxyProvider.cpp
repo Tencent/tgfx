@@ -109,7 +109,7 @@ std::shared_ptr<VertexBufferProxy> ProxyProvider::createVertexBuffer(
     sharedVertexBuffer = std::shared_ptr<GpuBufferProxy>(new GpuBufferProxy(BufferType::Vertex));
     addResourceProxy(sharedVertexBuffer);
   }
-  return std::make_shared<VertexBufferProxy>(sharedVertexBuffer, offset);
+  return std::make_shared<VertexBufferProxy>(sharedVertexBuffer, offset, byteSize);
 }
 
 void ProxyProvider::flushSharedVertexBuffer() {
