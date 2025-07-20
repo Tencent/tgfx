@@ -89,7 +89,7 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
     return nullptr;
   }
   auto viewMatrix = Matrix::MakeScale(scales.x, scales.y);
-  viewMatrix.preTranslate(-rect.left, -rect.top);
+  viewMatrix.postTranslate(-rect.left, -rect.top);
   if (!drawPicture(renderTarget, args.renderFlags, &viewMatrix)) {
     return nullptr;
   }
