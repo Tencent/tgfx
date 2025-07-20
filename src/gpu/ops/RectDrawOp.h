@@ -21,6 +21,7 @@
 #include <optional>
 #include "gpu/RectsVertexProvider.h"
 #include "gpu/ops/DrawOp.h"
+#include "gpu/proxies/VertexBufferProxy.h"
 
 namespace tgfx {
 class RectDrawOp : public DrawOp {
@@ -44,8 +45,7 @@ class RectDrawOp : public DrawOp {
   std::optional<Matrix> uvMatrix = std::nullopt;
   bool hasSubset = false;
   std::shared_ptr<GpuBufferProxy> indexBufferProxy = nullptr;
-  std::shared_ptr<GpuBufferProxy> vertexBufferProxy = nullptr;
-  size_t vertexBufferOffset = 0;
+  std::shared_ptr<VertexBufferProxy> vertexBufferProxy = nullptr;
 
   explicit RectDrawOp(RectsVertexProvider* provider);
 

@@ -60,9 +60,6 @@ GLRenderPass::GLRenderPass(Context* context) : RenderPass(context) {
     vertexArray = GLVertexArray::Make(context);
     DEBUG_ASSERT(vertexArray != nullptr);
   }
-  sharedVertexBuffer =
-      std::static_pointer_cast<GLBuffer>(GpuBuffer::Make(context, BufferType::Vertex));
-  DEBUG_ASSERT(sharedVertexBuffer != nullptr);
 }
 
 static void UpdateScissor(Context* context, const Rect& scissorRect) {
@@ -153,15 +150,10 @@ bool GLRenderPass::onBindProgramAndScissorClip(const Pipeline* pipeline, const R
 }
 
 bool GLRenderPass::onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
-                                 std::shared_ptr<GpuBuffer> vertexBuffer, size_t vertexOffset,
-                                 std::shared_ptr<Data> vertexData) {
+                                 std::shared_ptr<GpuBuffer> vertexBuffer, size_t vertexOffset) {
   auto gl = GLFunctions::Get(context);
   if (vertexBuffer) {
     gl->bindBuffer(GL_ARRAY_BUFFER, std::static_pointer_cast<GLBuffer>(vertexBuffer)->bufferID());
-  } else if (vertexData) {
-    gl->bindBuffer(GL_ARRAY_BUFFER, sharedVertexBuffer->bufferID());
-    gl->bufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(vertexData->size()), vertexData->data(),
-                   GL_STATIC_DRAW);
   } else {
     return false;
   }

@@ -20,7 +20,7 @@
 
 #include "DrawOp.h"
 #include "gpu/proxies/GpuShapeProxy.h"
-#include "tgfx/core/Shape.h"
+#include "gpu/proxies/VertexBufferProxy.h"
 
 namespace tgfx {
 class ShapeDrawOp : public DrawOp {
@@ -34,11 +34,11 @@ class ShapeDrawOp : public DrawOp {
 
  private:
   std::shared_ptr<GpuShapeProxy> shapeProxy = nullptr;
+  std::shared_ptr<VertexBufferProxy> maskBufferProxy = {};
   Color color = Color::Transparent();
   Matrix uvMatrix = {};
-  std::vector<float> maskVertices = {};
 
-  ShapeDrawOp(std::shared_ptr<GpuShapeProxy> shapeProxy, Color color, const Matrix& uvMatrix,
+  ShapeDrawOp(std::shared_ptr<GpuShapeProxy> proxy, Color color, const Matrix& uvMatrix,
               AAType aaType);
 
   friend class BlockBuffer;
