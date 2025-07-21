@@ -23,5 +23,5 @@
 namespace tgfx {
 void GetPixelFormatsToTry(HDC deviceContext, int formatsToTry[2]);
 
-HGLRC CreateGLContext(HDC deviceContext, HGLRC sharedContext);
+HGLRC CreateGLContext(HDC deviceContext, HGLRC sharedContext, bool vSyncEnabled);
 }  // namespace tgfx

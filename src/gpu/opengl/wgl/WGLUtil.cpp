@@ -50,7 +50,7 @@ void GetPixelFormatsToTry(HDC deviceContext, int formatsToTry[2]) {
                                      format, &numFormats);
 }
 
-HGLRC CreateGLContext(HDC deviceContext, HGLRC sharedContext) {
+HGLRC CreateGLContext(HDC deviceContext, HGLRC sharedContext, bool vSyncEnabled) {
   auto oldDeviceContext = wglGetCurrentDC();
   auto oldGLContext = wglGetCurrentContext();
 
@@ -84,7 +84,7 @@ HGLRC CreateGLContext(HDC deviceContext, HGLRC sharedContext) {
   }
 
   if (wglMakeCurrent(deviceContext, glContext) && wglInterface->swapIntervalSupport) {
-    wglInterface->wglSwapInterval(1);
+    wglInterface->wglSwapInterval(vSyncEnabled ? 1 : 0);
   }
 
   wglMakeCurrent(oldDeviceContext, oldGLContext);

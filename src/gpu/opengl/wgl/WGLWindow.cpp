@@ -21,12 +21,13 @@
 #include "core/utils/Log.h"
 
 namespace tgfx {
-std::shared_ptr<WGLWindow> WGLWindow::MakeFrom(HWND nativeWindow, HGLRC sharedContext) {
+std::shared_ptr<WGLWindow> WGLWindow::MakeFrom(HWND nativeWindow, HGLRC sharedContext,
+                                               bool vSyncEnabled) {
   if (nativeWindow == nullptr) {
     return nullptr;
   }
 
-  auto device = WGLDevice::MakeFrom(nativeWindow, sharedContext);
+  auto device = WGLDevice::MakeFrom(nativeWindow, sharedContext, vSyncEnabled);
   if (device == nullptr) {
     return nullptr;
   }

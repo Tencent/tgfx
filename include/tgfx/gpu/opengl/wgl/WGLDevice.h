@@ -27,7 +27,8 @@ class WGLDevice : public GLDevice {
   /**
    * Creates a WGLDevice with the existing HWND and HGLRC
    */
-  static std::shared_ptr<WGLDevice> MakeFrom(HWND nativeWindow, HGLRC sharedContext);
+  static std::shared_ptr<WGLDevice> MakeFrom(HWND nativeWindow, HGLRC sharedContext,
+                                             bool vSyncEnabled);
 
   bool sharableWith(void* nativeConext) const override;
 

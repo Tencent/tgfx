@@ -78,7 +78,7 @@ bool CreatePbufferContext(HDC parentDeviceContext, HGLRC sharedContext, HPBUFFER
   if (pBuffer != nullptr) {
     deviceContext = wglInterface->wglGetPbufferDC(pBuffer);
     if (deviceContext != nullptr) {
-      glContext = CreateGLContext(deviceContext, sharedContext);
+      glContext = CreateGLContext(deviceContext, sharedContext, true);
       if (glContext != nullptr) {
         return true;
       }

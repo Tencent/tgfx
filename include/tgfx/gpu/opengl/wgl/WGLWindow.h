@@ -27,7 +27,8 @@ class WGLWindow : public Window {
   /**
    * Creates a new window from a HWND with specialed shared context.
    */
-  static std::shared_ptr<WGLWindow> MakeFrom(HWND nativeWindow, HGLRC sharedContext = nullptr);
+  static std::shared_ptr<WGLWindow> MakeFrom(HWND nativeWindow, HGLRC sharedContext = nullptr,
+                                             bool vSyncEnabled = true);
 
  protected:
   std::shared_ptr<Surface> onCreateSurface(Context* context) override;

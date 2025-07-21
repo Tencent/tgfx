@@ -21,7 +21,7 @@
 #include "WGLUtil.h"
 
 namespace tgfx {
-static HGLRC CreateWGLContext(HDC deviceContext, HGLRC sharedContext) {
+static HGLRC CreateWGLContext(HDC deviceContext, HGLRC sharedContext, bool vSyncEnabled) {
   auto set = false;
   int pixelFormatsToTry[2] = {-1, -1};
   GetPixelFormatsToTry(deviceContext, pixelFormatsToTry);
@@ -34,15 +34,16 @@ static HGLRC CreateWGLContext(HDC deviceContext, HGLRC sharedContext) {
   if (!set) {
     return nullptr;
   }
-  return CreateGLContext(deviceContext, sharedContext);
+  return CreateGLContext(deviceContext, sharedContext, vSyncEnabled);
 }
 
-std::shared_ptr<WGLDevice> WGLDevice::MakeFrom(HWND nativeWindow, HGLRC sharedContext) {
+std::shared_ptr<WGLDevice> WGLDevice::MakeFrom(HWND nativeWindow, HGLRC sharedContext,
+                                               bool vSyncEnabled) {
   if (nativeWindow == nullptr) {
     return nullptr;
   }
   auto deviceContext = GetDC(nativeWindow);
-  auto glContext = CreateWGLContext(deviceContext, sharedContext);
+  auto glContext = CreateWGLContext(deviceContext, sharedContext, vSyncEnabled);
   auto device = WGLDevice::Wrap(nativeWindow, deviceContext, glContext, sharedContext, false);
   if (device == nullptr) {
     ReleaseDC(nativeWindow, deviceContext);
