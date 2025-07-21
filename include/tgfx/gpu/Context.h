@@ -25,7 +25,7 @@
 #include "tgfx/gpu/Device.h"
 
 namespace tgfx {
-class ProgramCache;
+class GlobalCache;
 class ResourceCache;
 class DrawingManager;
 class Gpu;
@@ -58,10 +58,10 @@ class Context {
   }
 
   /**
-   * Returns the associated cache that manages the lifetime of all Program instances.
+   * Returns the cache for GPU resources that need to stay alive for the lifetime of the Context.
    */
-  ProgramCache* programCache() const {
-    return _programCache;
+  GlobalCache* globalCache() const {
+    return _globalCache;
   }
 
   /**
@@ -77,10 +77,6 @@ class Context {
 
   BlockBuffer* drawingBuffer() const {
     return _drawingBuffer;
-  }
-
-  ResourceProvider* resourceProvider() const {
-    return _resourceProvider;
   }
 
   ProxyProvider* proxyProvider() const {
@@ -212,10 +208,9 @@ class Context {
 
  private:
   Device* _device = nullptr;
-  ProgramCache* _programCache = nullptr;
+  GlobalCache* _globalCache = nullptr;
   ResourceCache* _resourceCache = nullptr;
   DrawingManager* _drawingManager = nullptr;
-  ResourceProvider* _resourceProvider = nullptr;
   ProxyProvider* _proxyProvider = nullptr;
   BlockBuffer* _drawingBuffer = nullptr;
   SlidingWindowTracker* _maxValueTracker = nullptr;

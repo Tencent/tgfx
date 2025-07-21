@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,28 +18,25 @@
 
 #pragma once
 
-#include <list>
-#include <unordered_map>
-#include "core/PixelBuffer.h"
-#include "tgfx/core/BytesKey.h"
+#include <vector>
 #include "tgfx/core/Color.h"
+#include "tgfx/core/ImageGenerator.h"
 
 namespace tgfx {
-class GradientCache {
+
+class GradientGenerator : public ImageGenerator {
  public:
-  std::shared_ptr<Texture> getGradient(Context* context, const Color* colors,
-                                       const float* positions, int count);
+  GradientGenerator(const Color* colors, const float* positions, int count);
 
-  void releaseAll();
+  bool isAlphaOnly() const override {
+    return false;
+  }
 
-  bool empty() const;
+ protected:
+  std::shared_ptr<ImageBuffer> onMakeBuffer(bool) const override;
 
  private:
-  std::shared_ptr<Texture> find(const BytesKey& bytesKey);
-
-  void add(const BytesKey& bytesKey, std::shared_ptr<Texture> texture);
-
-  std::list<BytesKey> keys = {};
-  BytesKeyMap<std::shared_ptr<Texture>> textures = {};
+  std::vector<Color> colors = {};
+  std::vector<float> positions = {};
 };
 }  // namespace tgfx

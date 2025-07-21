@@ -32,6 +32,16 @@ class RRectDrawOp : public DrawOp {
   static constexpr uint16_t MaxNumRRects = 1024;
 
   /**
+   * The maximum number of vertices per fill round rect.
+   */
+  static constexpr uint16_t IndicesPerFillRRect = 54;
+
+  /**
+   * The maximum number of vertices per stroke round rect.
+   */
+  static constexpr uint16_t IndicesPerStrokeRRect = 48;
+
+  /**
    * Create a new RRectDrawOp for a list of RRect records. Note that the returned RRectDrawOp is in
    * the device space.
    */

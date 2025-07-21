@@ -33,7 +33,7 @@ bool RenderPass::begin(std::shared_ptr<RenderTarget> renderTarget) {
 void RenderPass::end() {
   onUnbindRenderTarget();
   _renderTarget = nullptr;
-  _program = nullptr;
+  program = nullptr;
 }
 
 void RenderPass::bindProgramAndScissorClip(const Pipeline* pipeline, const Rect& scissorRect) {

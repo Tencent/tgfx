@@ -18,13 +18,9 @@
 
 #pragma once
 
-#include "Program.h"
-#include "gpu/Gpu.h"
-#include "gpu/ProgramCreator.h"
+#include "gpu/GpuBuffer.h"
+#include "gpu/Pipeline.h"
 #include "gpu/RenderTarget.h"
-#include "gpu/processors/GeometryProcessor.h"
-#include "gpu/proxies/GpuBufferProxy.h"
-#include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/gpu/Context.h"
 
@@ -78,7 +74,7 @@ class RenderPass {
 
   Context* context = nullptr;
   std::shared_ptr<RenderTarget> _renderTarget = nullptr;
-  Program* _program = nullptr;
+  std::shared_ptr<Program> program = nullptr;
 
  private:
   enum class DrawPipelineStatus { Ok = 0, NotConfigured, FailedToBind };

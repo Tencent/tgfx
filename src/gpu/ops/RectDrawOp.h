@@ -32,6 +32,16 @@ class RectDrawOp : public DrawOp {
   static constexpr uint16_t MaxNumRects = 2048;
 
   /**
+   * The maximum number of vertices per non-AA quad.
+   */
+  static constexpr uint16_t IndicesPerNonAAQuad = 6;
+
+  /**
+   * The maximum number of vertices per AA quad.
+   */
+  static constexpr uint16_t IndicesPerAAQuad = 30;
+
+  /**
    * Create a new RectDrawOp for the specified vertex provider.
    */
   static PlacementPtr<RectDrawOp> Make(Context* context, PlacementPtr<RectsVertexProvider> provider,

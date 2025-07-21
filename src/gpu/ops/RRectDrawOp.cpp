@@ -17,10 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RRectDrawOp.h"
-#include "core/DataSource.h"
+#include "gpu/GlobalCache.h"
 #include "gpu/GpuBuffer.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/ResourceProvider.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"
 #include "tgfx/core/RenderFlags.h"
 
@@ -32,8 +31,7 @@ PlacementPtr<RRectDrawOp> RRectDrawOp::Make(Context* context,
     return nullptr;
   }
   auto drawOp = context->drawingBuffer()->make<RRectDrawOp>(provider.get());
-  auto type = provider->hasStroke() ? RRectType::StrokeType : RRectType::FillType;
-  drawOp->indexBufferProxy = context->resourceProvider()->rRectIndexBuffer(type);
+  drawOp->indexBufferProxy = context->globalCache()->getRRectIndexBuffer(provider->hasStroke());
   if (provider->rectCount() <= 1) {
     // If we only have one rect, it is not worth the async task overhead.
     renderFlags |= RenderFlags::DisableAsyncTask;
@@ -71,8 +69,7 @@ void RRectDrawOp::execute(RenderPass* renderPass) {
   auto pipeline = createPipeline(renderPass, std::move(gp));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   renderPass->bindBuffers(indexBuffer, vertexBuffer, vertexBufferProxy->offset());
-  auto type = hasStroke ? RRectType::StrokeType : RRectType::FillType;
-  auto numIndicesPerRRect = ResourceProvider::NumIndicesPerRRect(type);
+  auto numIndicesPerRRect = hasStroke ? IndicesPerStrokeRRect : IndicesPerFillRRect;
   renderPass->drawIndexed(PrimitiveType::Triangles, 0, rectCount * numIndicesPerRRect);
 }
 }  // namespace tgfx
