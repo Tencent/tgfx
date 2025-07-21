@@ -27,6 +27,7 @@
 #include "gpu/proxies/GpuShapeProxy.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
+#include "gpu/proxies/VertexBufferProxy.h"
 #include "tgfx/core/ImageGenerator.h"
 #include "tgfx/core/Shape.h"
 
@@ -59,7 +60,7 @@ class ProxyProvider {
                                                        uint32_t renderFlags = 0);
 
   /**
-   * Creates a GpuBufferProxy for the given DataProvider. The provider will be released after being
+   * Creates a GpuBufferProxy for the given DataProvider. The source will be released after being
    * uploaded to the GPU.
    */
   std::shared_ptr<GpuBufferProxy> createGpuBufferProxy(const UniqueKey& uniqueKey,
@@ -68,12 +69,11 @@ class ProxyProvider {
                                                        uint32_t renderFlags = 0);
 
   /**
-   * Creates a shared vertex buffer from the given VertexProvider. The source will be released after
-   * being uploaded to the GPU. Returns the shared buffer and the byte offset within the shared
-   * buffer where the vertices are stored.
+   * Creates a VertexBufferProxy from the given VertexProvider. The provider will be released after
+   * being uploaded to the GPU.
    */
-  std::pair<std::shared_ptr<GpuBufferProxy>, size_t> createSharedVertexBuffer(
-      PlacementPtr<VertexProvider> provider, uint32_t renderFlags = 0);
+  std::shared_ptr<VertexBufferProxy> createVertexBuffer(PlacementPtr<VertexProvider> provider,
+                                                        uint32_t renderFlags = 0);
 
   /**
    * Creates a GpuShapeProxy for the given Shape. The shape will be released after being uploaded to
@@ -172,7 +172,7 @@ class ProxyProvider {
   bool sharedVertexBufferFlushed = false;
   std::shared_ptr<GpuBufferProxy> sharedVertexBuffer = nullptr;
   std::vector<std::shared_ptr<Task>> sharedVertexBufferTasks = {};
-  BlockBuffer blockBuffer = {};
+  BlockBuffer vertexBlockBuffer = {};
   SlidingWindowTracker maxValueTracker = {10};
 
   std::shared_ptr<GpuBufferProxy> findOrWrapGpuBufferProxy(const UniqueKey& uniqueKey);

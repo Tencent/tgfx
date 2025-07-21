@@ -34,8 +34,7 @@ class GLRenderPass : public RenderPass {
   void onUnbindRenderTarget() override;
   bool onBindProgramAndScissorClip(const Pipeline* pipeline, const Rect& scissorRect) override;
   bool onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
-                     std::shared_ptr<GpuBuffer> vertexBuffer, size_t vertexOffset,
-                     std::shared_ptr<Data> vertexData) override;
+                     std::shared_ptr<GpuBuffer> vertexBuffer, size_t vertexOffset) override;
   void onDraw(PrimitiveType primitiveType, size_t baseVertex, size_t count,
               bool drawIndexed) override;
   void onClear(const Rect& scissor, Color color) override;
@@ -44,7 +43,6 @@ class GLRenderPass : public RenderPass {
  private:
   std::shared_ptr<GLVertexArray> vertexArray = nullptr;
   std::shared_ptr<GLFrameBuffer> frameBuffer = nullptr;
-  std::shared_ptr<GLBuffer> sharedVertexBuffer = nullptr;
 
   bool copyAsBlit(Texture* texture, int srcX, int srcY);
 };
