@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,24 +18,28 @@
 
 #pragma once
 
-#include "core/utils/Log.h"
-#include "tgfx/core/Data.h"
-#include "tgfx/core/Matrix.h"
-#include "tgfx/core/Rect.h"
+#include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
-class Quad {
+class RawPixelCodec : public ImageCodec {
  public:
-  static Quad MakeFrom(const Rect& rect, const Matrix* matrix = nullptr);
-
-  const Point& point(size_t i) const {
-    DEBUG_ASSERT(i < 4);
-    return points[i];
+  RawPixelCodec(const ImageInfo& info, std::shared_ptr<Data> pixels)
+      : ImageCodec(info.width(), info.height()), info(info), pixels(std::move(pixels)) {
   }
 
- private:
-  explicit Quad(const Rect& rect, const Matrix* matrix = nullptr);
+  bool isAlphaOnly() const override {
+    return info.isAlphaOnly();
+  }
 
-  Point points[4] = {};
+  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override {
+    return Pixmap(info, pixels->data()).readPixels(dstInfo, dstPixels);
+  }
+
+ protected:
+  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
+
+ private:
+  ImageInfo info = {};
+  std::shared_ptr<Data> pixels = nullptr;
 };
 }  // namespace tgfx

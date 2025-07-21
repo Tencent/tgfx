@@ -33,34 +33,6 @@
 #include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
-class PixelDataConverter : public ImageGenerator {
- public:
-  PixelDataConverter(const ImageInfo& info, std::shared_ptr<Data> pixels)
-      : ImageGenerator(info.width(), info.height()), info(info), pixels(std::move(pixels)) {
-  }
-
-  bool isAlphaOnly() const override {
-    return info.isAlphaOnly();
-  }
-
- protected:
-  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override {
-    Bitmap bitmap(width(), height(), isAlphaOnly(), tryHardware);
-    if (bitmap.isEmpty()) {
-      return nullptr;
-    }
-    auto success = bitmap.writePixels(info, pixels->data());
-    if (!success) {
-      return nullptr;
-    }
-    return bitmap.makeBuffer();
-  }
-
- private:
-  ImageInfo info = {};
-  std::shared_ptr<Data> pixels = nullptr;
-};
-
 std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
   static WeakMap<std::string, Image> imageMap = {};
   if (filePath.empty()) {
@@ -70,45 +42,44 @@ std::shared_ptr<Image> Image::MakeFromFile(const std::string& filePath) {
     return cached;
   }
   auto codec = ImageCodec::MakeFrom(filePath);
-  auto image = CodecImage::MakeFrom(codec);
-  if (image == nullptr) {
-    return nullptr;
+  auto image = MakeFrom(codec);
+  if (image != nullptr) {
+    imageMap.insert(filePath, image);
   }
-  auto orientedImage = image->makeOriented(codec->orientation());
-  if (orientedImage) {
-    imageMap.insert(filePath, orientedImage);
-  }
-  return orientedImage;
+  return image;
 }
 
 std::shared_ptr<Image> Image::MakeFromEncoded(std::shared_ptr<Data> encodedData) {
   auto codec = ImageCodec::MakeFrom(std::move(encodedData));
-  auto image = CodecImage::MakeFrom(codec);
-  if (image == nullptr) {
-    return nullptr;
-  }
-  return image->makeOriented(codec->orientation());
+  return MakeFrom(std::move(codec));
 }
 
 std::shared_ptr<Image> Image::MakeFrom(NativeImageRef nativeImage) {
   auto codec = ImageCodec::MakeFrom(nativeImage);
-  auto image = CodecImage::MakeFrom(codec);
-  if (image == nullptr) {
+  return MakeFrom(std::move(codec));
+}
+
+std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageGenerator> generator) {
+  if (generator == nullptr) {
     return nullptr;
   }
-  return image->makeOriented(codec->orientation());
+  std::shared_ptr<Image> image = nullptr;
+  if (generator->isImageCodec()) {
+    auto codec = std::static_pointer_cast<ImageCodec>(generator);
+    auto orientation = codec->orientation();
+    image = std::make_shared<CodecImage>(UniqueKey::Make(), std::move(codec));
+    image->weakThis = image;
+    image = image->makeOriented(orientation);
+  } else {
+    image = std::make_shared<GeneratorImage>(UniqueKey::Make(), std::move(generator));
+    image->weakThis = image;
+  }
+  return image;
 }
 
 std::shared_ptr<Image> Image::MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels) {
-  if (info.isEmpty() || pixels == nullptr || info.byteSize() > pixels->size()) {
-    return nullptr;
-  }
-  auto imageBuffer = ImageBuffer::MakeFrom(info, pixels);
-  if (imageBuffer != nullptr) {
-    return MakeFrom(std::move(imageBuffer));
-  }
-  auto converter = std::make_shared<PixelDataConverter>(info, std::move(pixels));
-  return MakeFrom(std::move(converter));
+  auto codec = ImageCodec::MakeFrom(info, std::move(pixels));
+  return MakeFrom(std::move(codec));
 }
 
 std::shared_ptr<Image> Image::MakeFrom(const Bitmap& bitmap) {
