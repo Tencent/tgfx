@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RuntimeDrawTask.h"
+#include "gpu/GlobalCache.h"
 #include "gpu/Pipeline.h"
-#include "gpu/ProgramCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
 #include "gpu/RectsVertexProvider.h"
@@ -72,7 +72,7 @@ bool RuntimeDrawTask::execute(RenderPass* renderPass) {
   }
   auto context = renderPass->getContext();
   RuntimeProgramCreator programCreator(effect);
-  auto program = context->programCache()->getProgram(&programCreator);
+  auto program = context->globalCache()->getProgram(&programCreator);
   if (program == nullptr) {
     LOGE("RuntimeDrawTask::execute() Failed to create the runtime program!");
     return false;
@@ -82,7 +82,7 @@ bool RuntimeDrawTask::execute(RenderPass* renderPass) {
   for (auto& texture : textures) {
     backendTextures.push_back(texture->getBackendTexture());
   }
-  return effect->onDraw(RuntimeProgramWrapper::Unwrap(program), backendTextures,
+  return effect->onDraw(RuntimeProgramWrapper::Unwrap(program.get()), backendTextures,
                         renderTarget->getBackendRenderTarget(), offset);
 }
 

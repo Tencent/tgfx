@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "AtlasTextOp.h"
+#include "RectDrawOp.h"
+#include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/Quad.h"
 #include "gpu/RenderPass.h"
-#include "gpu/ResourceProvider.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "tgfx/core/RenderFlags.h"
 
@@ -36,10 +36,9 @@ PlacementPtr<AtlasTextOp> AtlasTextOp::Make(Context* context,
   }
   auto atlasTextOp =
       context->drawingBuffer()->make<AtlasTextOp>(provider.get(), std::move(textureProxy));
-  if (provider->aaType() == AAType::Coverage) {
-    atlasTextOp->indexBufferProxy = context->resourceProvider()->aaQuadIndexBuffer();
-  } else if (provider->rectCount() > 1) {
-    atlasTextOp->indexBufferProxy = context->resourceProvider()->nonAAQuadIndexBuffer();
+  if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1) {
+    atlasTextOp->indexBufferProxy =
+        context->globalCache()->getRectIndexBuffer(provider->aaType() == AAType::Coverage);
   }
   if (provider->rectCount() <= 1) {
     // If we only have one rect, it is not worth the async task overhead.
@@ -80,9 +79,9 @@ void AtlasTextOp::execute(RenderPass* renderPass) {
   if (indexBuffer != nullptr) {
     uint16_t numIndicesPerQuad;
     if (aaType == AAType::Coverage) {
-      numIndicesPerQuad = ResourceProvider::NumIndicesPerAAQuad();
+      numIndicesPerQuad = RectDrawOp::IndicesPerAAQuad;
     } else {
-      numIndicesPerQuad = ResourceProvider::NumIndicesPerNonAAQuad();
+      numIndicesPerQuad = RectDrawOp::IndicesPerNonAAQuad;
     }
     renderPass->drawIndexed(PrimitiveType::Triangles, 0, rectCount * numIndicesPerQuad);
   } else {
