@@ -23,59 +23,19 @@
 #include "gpu/ops/DrawOp.h"
 
 namespace tgfx {
-static int GetSize(int size, float scale) {
-  return static_cast<int>(roundf(static_cast<float>(size) * scale));
-}
 
-std::shared_ptr<Image> RasterizedImage::MakeFrom(std::shared_ptr<Image> source,
-                                                 float rasterizationScale,
-                                                 const SamplingOptions& sampling) {
-  if (source == nullptr || rasterizationScale <= 0) {
+std::shared_ptr<Image> RasterizedImage::MakeFrom(std::shared_ptr<Image> source) {
+  if (source == nullptr) {
     return nullptr;
   }
-  auto sourceWidth = source->width();
-  auto sourceHeight = source->height();
-  auto width = GetSize(sourceWidth, rasterizationScale);
-  auto height = GetSize(sourceHeight, rasterizationScale);
-  if (width <= 0 || height <= 0) {
-    return nullptr;
-  }
-  auto result = std::shared_ptr<RasterizedImage>(
-      new RasterizedImage(UniqueKey::Make(), std::move(source), rasterizationScale, sampling));
+  auto result =
+      std::shared_ptr<RasterizedImage>(new RasterizedImage(UniqueKey::Make(), std::move(source)));
   result->weakThis = result;
   return result;
 }
 
-RasterizedImage::RasterizedImage(UniqueKey uniqueKey, std::shared_ptr<Image> source,
-                                 float rasterizationScale, const SamplingOptions& sampling)
-    : ResourceImage(std::move(uniqueKey)), source(std::move(source)),
-      rasterizationScale(rasterizationScale), sampling(sampling) {
-}
-
-int RasterizedImage::width() const {
-  return GetSize(source->width(), rasterizationScale);
-}
-
-int RasterizedImage::height() const {
-  return GetSize(source->height(), rasterizationScale);
-}
-
-std::shared_ptr<Image> RasterizedImage::makeRasterized(float newScale,
-                                                       const SamplingOptions& sampling) const {
-  return MakeFrom(source, rasterizationScale * newScale, sampling);
-}
-
-std::shared_ptr<Image> RasterizedImage::onMakeDecoded(Context* context, bool) const {
-  // There is no need to pass tryHardware (disabled) to the source image, as our texture proxy is
-  // not locked from the source image.
-  auto newSource = source->onMakeDecoded(context);
-  if (newSource == nullptr) {
-    return nullptr;
-  }
-  auto newImage = std::shared_ptr<RasterizedImage>(
-      new RasterizedImage(uniqueKey, std::move(newSource), rasterizationScale, sampling));
-  newImage->weakThis = newImage;
-  return newImage;
+RasterizedImage::RasterizedImage(UniqueKey uniqueKey, std::shared_ptr<Image> source)
+    : ResourceImage(std::move(uniqueKey)), source(std::move(source)) {
 }
 
 std::shared_ptr<TextureProxy> RasterizedImage::onLockTextureProxy(const TPArgs& args,
@@ -93,17 +53,9 @@ std::shared_ptr<TextureProxy> RasterizedImage::onLockTextureProxy(const TPArgs& 
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto sourceWidth = source->width();
-  auto sourceHeight = source->height();
-  auto scaledWidth = GetSize(sourceWidth, rasterizationScale);
-  auto scaledHeight = GetSize(sourceHeight, rasterizationScale);
-  auto uvScaleX = static_cast<float>(sourceWidth) / static_cast<float>(scaledWidth);
-  auto uvScaleY = static_cast<float>(sourceHeight) / static_cast<float>(scaledHeight);
-  Matrix uvMatrix = Matrix::MakeScale(uvScaleX, uvScaleY);
   auto drawRect = Rect::MakeWH(width(), height());
   FPArgs fpArgs(args.context, args.renderFlags, drawRect);
-  auto processor =
-      FragmentProcessor::Make(source, fpArgs, sampling, SrcRectConstraint::Fast, &uvMatrix);
+  auto processor = FragmentProcessor::Make(source, fpArgs, {}, SrcRectConstraint::Fast);
   if (processor == nullptr) {
     return nullptr;
   }

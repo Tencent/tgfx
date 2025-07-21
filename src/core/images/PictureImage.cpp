@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PictureImage.h"
+#include "ScaleImage.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/OpsCompositor.h"
 #include "gpu/ProxyProvider.h"
@@ -50,8 +51,9 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Picture> picture, int wid
 }
 
 PictureImage::PictureImage(std::shared_ptr<Picture> picture, int width, int height,
-                           const Matrix* matrix, bool mipmapped)
-    : picture(std::move(picture)), _width(width), _height(height), mipmapped(mipmapped) {
+                           const Matrix* matrix, bool mipmapped, float scale)
+    : picture(std::move(picture)), _width(width), _height(height), mipmapped(mipmapped),
+      _scale(scale) {
   if (matrix && !matrix->isIdentity()) {
     this->matrix = new Matrix(*matrix);
   }
@@ -61,19 +63,44 @@ PictureImage::~PictureImage() {
   delete matrix;
 }
 
+int PictureImage::width() const {
+  return ScaleImage::GetScaledSize(_width, _scale);
+}
+
+int PictureImage::height() const {
+  return ScaleImage::GetScaledSize(_height, _scale);
+}
+
 std::shared_ptr<Image> PictureImage::onMakeMipmapped(bool enabled) const {
-  return std::make_shared<PictureImage>(picture, _width, _height, matrix, enabled);
+  if (enabled == mipmapped) {
+    return weakThis.lock();
+  }
+  auto newImage = std::make_shared<PictureImage>(picture, _width, _height, matrix, enabled, _scale);
+  newImage->weakThis = newImage;
+  return newImage;
+}
+
+std::shared_ptr<Image> PictureImage::makeScaled(float scale, const SamplingOptions&) const {
+  if (scale == 1.0f) {
+    return weakThis.lock();
+  }
+  if (scale <= 0) {
+    return nullptr;
+  }
+  auto newImage =
+      std::make_shared<PictureImage>(picture, _width, _height, matrix, mipmapped, scale * _scale);
+  newImage->weakThis = newImage;
+  return newImage;
 }
 
 PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& args,
                                                                   const SamplingArgs& samplingArgs,
                                                                   const Matrix* uvMatrix) const {
-
   auto drawBounds = args.drawRect;
   if (uvMatrix) {
     drawBounds = uvMatrix->mapRect(drawBounds);
   }
-  auto rect = Rect::MakeWH(_width, _height);
+  auto rect = Rect::MakeWH(width(), height());
   if (!rect.intersect(drawBounds)) {
     return nullptr;
   }
@@ -90,13 +117,13 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (!drawPicture(renderTarget, args.renderFlags, &offset)) {
     return nullptr;
   }
-  auto finalUVMatrix = Matrix::MakeTrans(offset.x, offset.y);
+  auto finalUVMatrix = Matrix::MakeTrans(-rect.left, -rect.top);
   if (uvMatrix) {
     finalUVMatrix.preConcat(*uvMatrix);
   }
   auto newSamplingArgs = samplingArgs;
   if (samplingArgs.sampleArea) {
-    newSamplingArgs.sampleArea->offset(-rect.left, -rect.top);
+    newSamplingArgs.sampleArea = samplingArgs.sampleArea->makeOffset(-rect.left, -rect.top);
   }
   return TiledTextureEffect::Make(renderTarget->asTextureProxy(), newSamplingArgs, &finalUVMatrix,
                                   isAlphaOnly());
@@ -109,6 +136,7 @@ std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args)
   if (renderTarget == nullptr) {
     return nullptr;
   }
+
   if (!drawPicture(renderTarget, args.renderFlags, nullptr)) {
     return nullptr;
   }
@@ -117,13 +145,16 @@ std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args)
 
 bool PictureImage::drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget,
                                uint32_t renderFlags, const Point* offset) const {
+
   if (renderTarget == nullptr) {
     return false;
   }
   RenderContext renderContext(std::move(renderTarget), renderFlags, true);
-  Matrix totalMatrix = {};
+  Matrix totalMatrix =
+      Matrix::MakeScale(static_cast<float>(width()) / static_cast<float>(_width),
+                        static_cast<float>(height()) / static_cast<float>(_height));
   if (offset) {
-    totalMatrix.preTranslate(offset->x, offset->y);
+    totalMatrix.postTranslate(offset->x, offset->y);
   }
   if (matrix) {
     totalMatrix.preConcat(*matrix);

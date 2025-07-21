@@ -383,7 +383,8 @@ TGFX_TEST(CanvasTest, rasterizedImage) {
   auto rasterImage = image->makeRasterized();
   EXPECT_TRUE(rasterImage == image);
   image = MakeImage("resources/apitest/rotation.jpg");
-  rasterImage = image->makeRasterized(0.15f);
+  rasterImage = image->makeScaled(0.15f);
+  rasterImage = rasterImage->makeRasterized();
   EXPECT_FALSE(rasterImage->hasMipmaps());
   EXPECT_FALSE(rasterImage == image);
   EXPECT_EQ(rasterImage->width(), 454);
@@ -407,7 +408,7 @@ TGFX_TEST(CanvasTest, rasterizedImage) {
   image = image->makeMipmapped(true);
   EXPECT_TRUE(image->hasMipmaps());
   SamplingOptions sampling(FilterMode::Linear, MipmapMode::Linear);
-  rasterImage = image->makeRasterized(0.15f, sampling);
+  rasterImage = image->makeScaled(0.15f, sampling)->makeRasterized();
   EXPECT_TRUE(rasterImage->hasMipmaps());
   canvas->drawImage(rasterImage, 100, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized_mipmap"));
@@ -419,7 +420,7 @@ TGFX_TEST(CanvasTest, rasterizedImage) {
   canvas->clear();
   rasterImage = rasterImage->makeMipmapped(false);
   EXPECT_FALSE(rasterImage->hasMipmaps());
-  rasterImage = rasterImage->makeRasterized(2.0f, sampling);
+  rasterImage = rasterImage->makeScaled(2.0f, sampling)->makeRasterized();
   EXPECT_FALSE(rasterImage->hasMipmaps());
   rasterImage = rasterImage->makeMipmapped(true);
   EXPECT_EQ(rasterImage->width(), 907);

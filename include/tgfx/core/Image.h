@@ -249,24 +249,26 @@ class Image {
   std::shared_ptr<Image> makeOriented(Orientation orientation) const;
 
   /**
-   * Returns a rasterized Image scaled by the specified rasterizationScale. A rasterized Image can
-   * be cached as an independent GPU resource for repeated drawing. By default, an Image directly
-   * backed by an ImageBuffer, an ImageGenerator, or a GPU texture is rasterized. Other image aren’t
-   * rasterized unless implicitly created by this method. For example, if you create a subset Image
-   * from a rasterized Image, the subset Image doesn’t create its own GPU cache but uses the full
-   * resolution cache created by the original Image. If you want the subset Image to create its own
-   * GPU cache, call makeRasterized() on the subset Image. The returned Image always has the same
-   * mipmap state as the original Image.
-   * @param rasterizationScale The factor to scale the Image by when rasterizing. The default value
-   * is 1.0, indicating that the Image should be rasterized at its current size. If the value is
-   * greater than 1.0, it may result in blurring.
-   * @param sampling The sampling options to apply when rasterizing the Image if the
-   * rasterizationScale is not 1.0.
-   * @return If the Image is already rasterized and the rasterizationScale is 1.0, the original
-   * Image is returned. If the rasterizationScale is less than zero, nullptr is returned.
+   * Returns a scaled Image with the specified scale factor.
+   * @param scale The factor to scale the source.
+   * @param sampling The sampling options to apply.
+   * @return If the scale is 1.0, the original Image is returned. If the scale is less than or equal
+   * to zero, nullptr is returned.
    */
-  virtual std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f,
-                                                const SamplingOptions& sampling = {}) const;
+  virtual std::shared_ptr<Image> makeScaled(float scale,
+                                            const SamplingOptions& sampling = {}) const;
+
+  /**
+   * Returns a rasterized Image can be cached as an independent GPU resource for repeated drawing.
+   * By default, an Image directly backed by an ImageBuffer, an ImageGenerator, or a GPU texture is
+   * rasterized. Other image aren’t rasterized unless implicitly created by this method.
+   * For example, if you create a subset Image from a rasterized Image, the subset Image doesn’t
+   * create its own GPU cache but uses the full resolution cache created by the original Image.
+   * If you want the subset Image to create its own GPU cache, call makeRasterized() on the subset
+   * Image. The returned Image always has the same mipmap state as the original Image.
+   * @return If the Image is already rasterized the original Image is returned.
+   */
+  virtual std::shared_ptr<Image> makeRasterized() const;
 
   /**
    * Returns a filtered Image with the specified filter. The filter has the potential to alter the
@@ -304,7 +306,8 @@ class Image {
     Rasterized,
     RGBAAA,
     Texture,
-    Subset
+    Subset,
+    Scale
   };
 
   virtual Type type() const = 0;
@@ -343,6 +346,7 @@ class Image {
   friend class TransformImage;
   friend class RGBAAAImage;
   friend class RasterizedImage;
+  friend class ScaleImage;
   friend class ImageShader;
   friend class Types;
 };

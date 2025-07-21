@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,64 +18,56 @@
 
 #pragma once
 
-#include "core/images/ResourceImage.h"
+#include "tgfx/core/Image.h"
 
 namespace tgfx {
-/**
- * TextureImage wraps an existing texture proxy.
- */
-class TextureImage : public Image {
+class ScaleImage : public Image {
  public:
-  /**
-   * Creates an Image wraps the existing TextureProxy, returns nullptr if textureProxy is nullptr.
-   */
-  static std::shared_ptr<Image> Wrap(std::shared_ptr<TextureProxy> textureProxy);
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> image, float scale,
+                                         const SamplingOptions& sampling, bool mipmapped = false);
 
-  int width() const override {
-    return textureProxy->width();
-  }
+  static int GetScaledSize(int size, float scale);
 
-  int height() const override {
-    return textureProxy->height();
-  }
+  ScaleImage(std::shared_ptr<Image> image, float scale, const SamplingOptions& sampling,
+             bool mipmapped);
+
+  ~ScaleImage() override = default;
+
+  int width() const override;
+
+  int height() const override;
 
   bool isAlphaOnly() const override {
-    return textureProxy->isAlphaOnly();
+    return false;
   }
 
   bool hasMipmaps() const override {
-    return textureProxy->hasMipmaps();
+    return mipmapped;
   }
 
-  bool isTextureBacked() const override {
-    return true;
+  bool isFullyDecoded() const override {
+    return source->isFullyDecoded();
   }
 
-  BackendTexture getBackendTexture(Context* context, ImageOrigin* origin = nullptr) const override;
+  std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
 
-  std::shared_ptr<Image> makeTextureImage(Context* context) const override;
-
-  std::shared_ptr<Image> makeRasterized() const override;
+  std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
 
  protected:
   Type type() const override {
-    return Type::Texture;
+    return Type::Scale;
   }
-
-  std::shared_ptr<Image> onMakeMipmapped(bool) const override {
-    return nullptr;
-  }
-
-  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                       const SamplingArgs& samplingArgs,
                                                       const Matrix* uvMatrix) const override;
 
- private:
-  std::shared_ptr<TextureProxy> textureProxy = nullptr;
-  uint32_t contextID = 0;
+  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
-  TextureImage(std::shared_ptr<TextureProxy> textureProxy, uint32_t contextID);
+ private:
+  std::shared_ptr<Image> source = nullptr;
+  float scale = 1.0f;
+  SamplingOptions sampling = {};
+  bool mipmapped = false;
 };
 }  // namespace tgfx

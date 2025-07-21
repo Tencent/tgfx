@@ -62,6 +62,10 @@ FilterImage::FilterImage(std::shared_ptr<Image> source, const Rect& bounds,
     : SubsetImage(std::move(source), bounds), filter(std::move(filter)) {
 }
 
+std::shared_ptr<Image> FilterImage::makeScaled(float scale, const SamplingOptions& sampling) const {
+  return Image::makeScaled(scale, sampling);
+}
+
 std::shared_ptr<Image> FilterImage::onCloneWith(std::shared_ptr<Image> newSource) const {
   return FilterImage::Wrap(std::move(newSource), bounds, filter);
 }

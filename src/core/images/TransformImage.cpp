@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TransformImage.h"
+#include "core/utils/MathExtra.h"
 
 namespace tgfx {
 TransformImage::TransformImage(std::shared_ptr<Image> source) : source(std::move(source)) {
@@ -37,4 +38,18 @@ std::shared_ptr<Image> TransformImage::onMakeMipmapped(bool enabled) const {
   }
   return onCloneWith(std::move(newSource));
 }
+
+std::shared_ptr<Image> TransformImage::makeScaled(float scale,
+                                                  const SamplingOptions& sampling) const {
+  if (IsInteger(scale * static_cast<float>(source->width())) &&
+      IsInteger(scale * static_cast<float>(source->height()))) {
+    auto newSource = source->makeScaled(scale, sampling);
+    if (newSource == nullptr) {
+      return nullptr;
+    }
+    return onCloneWith(std::move(newSource));
+  }
+  return Image::makeScaled(scale, sampling);
+}
+
 }  // namespace tgfx

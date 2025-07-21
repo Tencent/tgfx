@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Image.h"
+#include "ScaleImage.h"
 #include "core/images/CodecImage.h"
 #include "core/images/FilterImage.h"
 #include "core/images/OrientImage.h"
@@ -173,9 +174,15 @@ std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {
   return onMakeSubset(rect);
 }
 
-std::shared_ptr<Image> Image::makeRasterized(float rasterizationScale,
-                                             const SamplingOptions& sampling) const {
-  auto rasterImage = RasterizedImage::MakeFrom(weakThis.lock(), rasterizationScale, sampling);
+std::shared_ptr<Image> Image::makeScaled(float scale, const SamplingOptions& sampling) const {
+  if (scale == 1.0f) {
+    return weakThis.lock();
+  }
+  return ScaleImage::MakeFrom(weakThis.lock(), scale, sampling, hasMipmaps());
+}
+
+std::shared_ptr<Image> Image::makeRasterized() const {
+  auto rasterImage = RasterizedImage::MakeFrom(weakThis.lock());
   if (rasterImage != nullptr && hasMipmaps()) {
     return rasterImage->makeMipmapped(true);
   }

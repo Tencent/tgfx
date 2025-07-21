@@ -43,6 +43,8 @@ class FilterImage : public SubsetImage {
     return static_cast<int>(bounds.height());
   }
 
+  std::shared_ptr<Image> makeScaled(float scale, const SamplingOptions& sampling) const override;
+
  protected:
   Type type() const override {
     return Type::Filter;
