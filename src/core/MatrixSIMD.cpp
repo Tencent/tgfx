@@ -16,14 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#ifdef _MSC_VER
-#include "SIMDHighwayInterface.h"
-
+#include "tgfx/core/Matrix.h"
 // First undef to prevent error when re-included.
 #undef HWY_TARGET_INCLUDE
 // For dynamic dispatch, specify the name of the current file (unfortunately
 // __FILE__ is not reliable) so that foreach_target.h can re-include it.
-#define HWY_TARGET_INCLUDE "core/SIMDHighwayInterface.cpp"
+#define HWY_TARGET_INCLUDE "core/MatrixSIMD.cpp"
 // Generates code for each enabled target by re-including this source file.
 #include "hwy/foreach_target.h"  // IWYU pragma: keep
 
@@ -167,106 +165,6 @@ void MapRectHWYImpl(const Matrix& m, Rect* dst, const Rect& src) {
     dst->setBounds(quad, 4);
   }
 }
-
-bool SetBoundsHWYImpl(Rect* rect, const Point* pts, int count) {
-  if (count <= 0) {
-    rect->setEmpty();
-    return false;
-  }
-  const hn::Full128<float> d;
-  hn::Vec<hn::Full128<float>> min, max;
-  if (count & 1) {
-    min = max = hn::Dup128VecFromValues(d, pts[0].x, pts[0].y, pts[0].x, pts[0].y);
-    pts += 1;
-    count -= 1;
-  } else {
-    min = max = hn::Dup128VecFromValues(d, pts[0].x, pts[0].y, pts[1].x, pts[1].y);
-    pts += 2;
-    count -= 2;
-  }
-  auto accum = hn::Mul(min, hn::Set(d, 0.0f));
-  while (count) {
-    auto xy = hn::Dup128VecFromValues(d, pts[0].x, pts[0].y, pts[1].x, pts[1].y);
-    accum = hn::Mul(accum, xy);
-    min = hn::Min(min, xy);
-    max = hn::Max(max, xy);
-    pts += 2;
-    count -= 2;
-  }
-  auto mask = hn::Eq(hn::Mul(accum, hn::Set(d, 0.0f)), Set(d, 0.0f));
-  hn::DFromM<decltype(mask)> md;
-  const bool allFinite = hn::AllTrue(md, mask);
-  if (allFinite) {
-    float minArray[4] = {};
-    float maxArray[4] = {};
-    hn::Store(min, d, minArray);
-    hn::Store(max, d, maxArray);
-    rect->setLTRB(std::min(minArray[0], minArray[2]), std::min(minArray[1], minArray[3]),
-                  std::max(maxArray[0], maxArray[2]), std::max(maxArray[1], maxArray[3]));
-    return true;
-  } else {
-    rect->setEmpty();
-    return false;
-  }
-}
-
-void Float4AdditionAssignmentImpl(float* a, float* b) {
-  const hn::Full128<float> d;
-  auto aVec = hn::LoadU(d, a);
-  auto bVec = hn::LoadU(d, b);
-  aVec = hn::Add(aVec, bVec);
-  hn::StoreU(aVec, d, a);
-}
-
-std::shared_ptr<ImageBuffer> CreateGradientImpl(const Color* colors, const float* positions,
-                                                int count, int resolution) {
-  Bitmap bitmap(resolution, 1, false, false);
-  Pixmap pixmap(bitmap);
-  if (pixmap.isEmpty()) {
-    return nullptr;
-  }
-  pixmap.clear();
-  auto pixels = reinterpret_cast<uint8_t*>(pixmap.writablePixels());
-  int prevIndex = 0;
-  const hn::Full128<float> df;
-  const hn::Full128<uint32_t> du;
-  const hn::Full32<uint8_t> du8;
-  for (int i = 1; i < count; ++i) {
-    int nextIndex =
-        std::min(static_cast<int>(positions[i] * static_cast<float>(resolution)), resolution - 1);
-
-    if (nextIndex > prevIndex) {
-      auto color0 = hn::LoadU(df, &colors[i - 1].red);
-      auto color1 = hn::LoadU(df, &colors[i].red);
-
-      auto step = 1.0f / static_cast<float>(nextIndex - prevIndex);
-      auto delta = hn::Mul(hn::Sub(color1, color0), hn::Set(df, step));
-
-      for (int curIndex = prevIndex; curIndex <= nextIndex; ++curIndex) {
-        auto res = hn::U8FromU32(hn::ConvertTo(du, hn::Mul(color0, hn::Set(df, 255.0f))));
-        hn::StoreU(res, du8, &pixels[curIndex * 4]);
-        color0 = hn::Add(color0, delta);
-      }
-    }
-    prevIndex = nextIndex;
-  }
-  return bitmap.makeBuffer();
-}
-bool TileSortCompImpl(float centerX, float centerY, float tileSize, const std::shared_ptr<Tile>& a,
-                      const std::shared_ptr<Tile>& b) {
-  const hn::Full128<int32_t> di;
-  const hn::Full128<float> df;
-  auto res = hn::Add(
-      hn::ConvertTo(df, hn::Dup128VecFromValues(di, a->tileX, a->tileY, b->tileX, b->tileY)),
-      hn::Set(df, 0.5f));
-  res = hn::MulSub(res, hn::Set(df, tileSize),
-                   hn::Dup128VecFromValues(df, centerX, centerY, centerX, centerY));
-  res = hn::Mul(res, res);
-  res = hn::Add(hn::Reverse2(df, res), res);
-  float resVec[4] = {0.0f};
-  hn::Store(res, df, resVec);
-  return resVec[0] < resVec[2];
-}
 }  // namespace HWY_NAMESPACE
 }  // namespace tgfx
 HWY_AFTER_NAMESPACE();
@@ -277,44 +175,20 @@ HWY_EXPORT(TransPointsHWYImpl);
 HWY_EXPORT(ScalePointsHWYImpl);
 HWY_EXPORT(AffinePointsHWYImpl);
 HWY_EXPORT(MapRectHWYImpl);
-HWY_EXPORT(SetBoundsHWYImpl);
-HWY_EXPORT(Float4AdditionAssignmentImpl);
-HWY_EXPORT(CreateGradientImpl);
-HWY_EXPORT(TileSortCompImpl);
-void TransPointsHWY(const Matrix& m, Point* dst, const Point* src, int count) {
+void Matrix::TransPoints(const Matrix& m, Point* dst, const Point* src, int count) {
   return HWY_DYNAMIC_DISPATCH(TransPointsHWYImpl)(m, dst, src, count);
 }
 
-void ScalePointsHWY(const Matrix& m, Point dst[], const Point src[], int count) {
+void Matrix::ScalePoints(const Matrix& m, Point dst[], const Point src[], int count) {
   return HWY_DYNAMIC_DISPATCH(ScalePointsHWYImpl)(m, dst, src, count);
 }
 
-void AffinePointsHWY(const Matrix& m, Point dst[], const Point src[], int count) {
+void Matrix::AffinePoints(const Matrix& m, Point dst[], const Point src[], int count) {
   return HWY_DYNAMIC_DISPATCH(AffinePointsHWYImpl)(m, dst, src, count);
 }
 
-void MapRectHWY(const Matrix& m, Rect* dst, const Rect& src) {
-  return HWY_DYNAMIC_DISPATCH(MapRectHWYImpl)(m, dst, src);
-}
-
-bool SetBoundsHWY(Rect* rect, const Point pts[], int count) {
-  return HWY_DYNAMIC_DISPATCH(SetBoundsHWYImpl)(rect, pts, count);
-}
-
-void Float4AdditionAssignmentHWY(float* a, float* b) {
-  return HWY_DYNAMIC_DISPATCH(Float4AdditionAssignmentImpl)(a, b);
-}
-
-std::shared_ptr<ImageBuffer> CreateGradientHWY(const Color* colors, const float* positions,
-                                               int count, int resolution) {
-  return HWY_DYNAMIC_DISPATCH(CreateGradientImpl)(colors, positions, count, resolution);
-}
-
-bool TileSortCompHWY(float centerX, float centerY, float tileSize, const std::shared_ptr<Tile>& a,
-                     const std::shared_ptr<Tile>& b) {
-  return HWY_DYNAMIC_DISPATCH(TileSortCompImpl)(centerX, centerY, tileSize, a, b);
+void Matrix::mapRect(Rect* dst, const Rect& src) const {
+  return HWY_DYNAMIC_DISPATCH(MapRectHWYImpl)(*this, dst, src);
 }
 }  // namespace tgfx
-#endif
-
 #endif

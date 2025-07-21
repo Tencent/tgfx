@@ -17,11 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GradientCache.h"
-#include "core/SIMDVec.h"
 #include "tgfx/core/Pixmap.h"
-#ifdef _MSC_VER
-#include "core/SIMDHighwayInterface.h"
-#endif
 
 namespace tgfx {
 // Each bitmap will be 256x1.
@@ -47,43 +43,8 @@ void GradientCache::add(const BytesKey& bytesKey, std::shared_ptr<Texture> textu
     textures.erase(key);
   }
 }
-
-std::shared_ptr<ImageBuffer> CreateGradient(const Color* colors, const float* positions, int count,
-                                            int resolution) {
-#ifdef _MSC_VER
-  return CreateGradientHWY(colors, positions, count, resolution);
-#else
-  Bitmap bitmap(resolution, 1, false, false);
-  Pixmap pixmap(bitmap);
-  if (pixmap.isEmpty()) {
-    return nullptr;
-  }
-  pixmap.clear();
-  auto pixels = reinterpret_cast<uint8_t*>(pixmap.writablePixels());
-  int prevIndex = 0;
-  for (int i = 1; i < count; ++i) {
-    int nextIndex =
-        std::min(static_cast<int>(positions[i] * static_cast<float>(resolution)), resolution - 1);
-
-    if (nextIndex > prevIndex) {
-      float4 color0 = float4::Load(&colors[i - 1].red);
-      float4 color1 = float4::Load(&colors[i].red);
-
-      auto step = 1.0f / static_cast<float>(nextIndex - prevIndex);
-      float4 delta = (color1 - color0) * step;
-
-      for (int curIndex = prevIndex; curIndex <= nextIndex; ++curIndex) {
-        byte4 res = Cast<uint8_t, 4, float>(color0 * 255.0f);
-        res.store(&pixels[curIndex * 4]);
-        color0 += delta;
-      }
-    }
-    prevIndex = nextIndex;
-  }
-  return bitmap.makeBuffer();
-#endif
-}
-
+extern std::shared_ptr<ImageBuffer> CreateGradient(const Color* colors, const float* positions,
+                                               int count, int resolution);
 std::shared_ptr<Texture> GradientCache::getGradient(Context* context, const Color* colors,
                                                     const float* positions, int count) {
   BytesKey bytesKey = {};

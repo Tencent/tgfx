@@ -18,14 +18,10 @@
 
 #include "GlyphRunList.h"
 #include "ScalerContext.h"
-#include "core/SIMDVec.h"
 #include "core/utils/FauxBoldScale.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "tgfx/core/TextBlob.h"
-#ifdef _MSC_VER
-#include "core/SIMDHighwayInterface.h"
-#endif
 
 namespace tgfx {
 const std::vector<std::shared_ptr<GlyphRunList>>* GlyphRunList::Unwrap(const TextBlob* textBlob) {
@@ -115,14 +111,10 @@ Rect GlyphRunList::computeConservativeBounds() const {
     transformMat.mapRect(&fontBounds);
     Rect runBounds = {};
     runBounds.setBounds(run.positions.data(), static_cast<int>(run.positions.size()));
-#ifdef _MSC_VER
-    Float4AdditionAssignmentHWY(&runBounds.left, &fontBounds.left);
-#else
-    float4 runBoundsSimd = float4::Load(&runBounds.left);
-    float4 fontBoundsSimd = float4::Load(&fontBounds.left);
-    runBoundsSimd += fontBoundsSimd;
-    runBoundsSimd.store(&runBounds.left);
-#endif
+    runBounds.left += fontBounds.left;
+    runBounds.top += fontBounds.top;
+    runBounds.right += fontBounds.right;
+    runBounds.bottom += fontBounds.bottom;
     finalBounds.join(runBounds);
   }
   if (!finalBounds.isEmpty()) {

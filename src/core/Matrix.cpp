@@ -18,12 +18,7 @@
 
 #include "tgfx/core/Matrix.h"
 #include <cfloat>
-#include "SIMDVec.h"
 #include "core/utils/MathExtra.h"
-
-#ifdef _MSC_VER
-#include "SIMDHighwayInterface.h"
-#endif
 
 namespace tgfx {
 
@@ -363,109 +358,6 @@ void Matrix::IdentityPoints(const Matrix&, Point dst[], const Point src[], int c
   }
 }
 
-void Matrix::TransPoints(const Matrix& m, Point dst[], const Point src[], int count) {
-#ifdef _MSC_VER
-  TransPointsHWY(m, dst, src, count);
-#else
-  if (count > 0) {
-    float tx = m.getTranslateX();
-    float ty = m.getTranslateY();
-    if (count & 1) {
-      dst->x = src->x + tx;
-      dst->y = src->y + ty;
-      dst += 1;
-      src += 1;
-    }
-    float4 trans4(tx, ty, tx, ty);
-    count >>= 1;
-    if (count & 1) {
-      (float4::Load(src) + trans4).store(dst);
-      src += 2;
-      dst += 2;
-    }
-    count >>= 1;
-    for (int i = 0; i < count; i++) {
-      (float4::Load(src) + trans4).store(dst);
-      (float4::Load(src + 2) + trans4).store(dst + 2);
-      src += 4;
-      dst += 4;
-    }
-  }
-#endif
-}
-
-void Matrix::ScalePoints(const Matrix& m, Point dst[], const Point src[], int count) {
-#ifdef _MSC_VER
-  ScalePointsHWY(m, dst, src, count);
-#else
-  if (count > 0) {
-    float tx = m.getTranslateX();
-    float ty = m.getTranslateY();
-    float sx = m.getScaleX();
-    float sy = m.getScaleY();
-    float4 trans4(tx, ty, tx, ty);
-    float4 scale4(sx, sy, sx, sy);
-    if (count & 1) {
-      float4 p(src->x, src->y, 0, 0);
-      p = p * scale4 + trans4;
-      dst->x = p[0];
-      dst->y = p[1];
-      src += 1;
-      dst += 1;
-    }
-    count >>= 1;
-    if (count & 1) {
-      (float4::Load(src) * scale4 + trans4).store(dst);
-      src += 2;
-      dst += 2;
-    }
-    count >>= 1;
-    for (int i = 0; i < count; i++) {
-      (float4::Load(src) * scale4 + trans4).store(dst);
-      (float4::Load(src + 2) * scale4 + trans4).store(dst + 2);
-      src += 4;
-      dst += 4;
-    }
-  }
-#endif
-}
-
-void Matrix::AfflinePoints(const Matrix& m, Point dst[], const Point src[], int count) {
-#ifdef _MSC_VER
-  AffinePointsHWY(m, dst, src, count);
-#else
-  if (count > 0) {
-    float tx = m.getTranslateX();
-    float ty = m.getTranslateY();
-    float sx = m.getScaleX();
-    float sy = m.getScaleY();
-    float kx = m.getSkewX();
-    float ky = m.getSkewY();
-    float4 trans4(tx, ty, tx, ty);
-    float4 scale4(sx, sy, sx, sy);
-    float4 skew4(kx, ky, kx, ky);
-    bool trailingElement = (count & 1);
-    count >>= 1;
-    float4 src4;
-    for (int i = 0; i < count; i++) {
-      src4 = float4::Load(src);
-      // y0, x0, y1, x1
-      float4 swz4 = Shuffle<1, 0, 3, 2>(src4);
-      (src4 * scale4 + swz4 * skew4 + trans4).store(dst);
-      src += 2;
-      dst += 2;
-    }
-    if (trailingElement) {
-      // We use the same logic here to ensure that the math stays consistent throughout, even
-      // though the high float2 is ignored.
-      src4.lo = float2::Load(src);
-      float4 swz4 = Shuffle<1, 0, 3, 2>(src4);
-      (src4 * scale4 + swz4 * skew4 + trans4).lo.store(dst);
-    }
-  }
-#endif
-}
-
 bool Matrix::invertNonIdentity(Matrix* inverse) const {
   TypeMask mask = this->getType();
   // Optimized invert for only scale and/or translation matrices.
@@ -525,46 +417,6 @@ bool Matrix::rectStaysRect() const {
     typeMask = this->computeTypeMask();
   }
   return (typeMask & RectStayRectMask) != 0;
-}
-
-static float4 SortAsRect(const float4& ltrb) {
-  float4 rblt(ltrb[2], ltrb[3], ltrb[0], ltrb[1]);
-  auto min = Min(ltrb, rblt);
-  auto max = Max(ltrb, rblt);
-  // We can extract either pair [0,1] or [2,3] from min and max and be correct, but on ARM this
-  // sequence generates the fastest (a single instruction).
-  return float4(min[2], min[3], max[0], max[1]);
-}
-
-void Matrix::mapRect(Rect* dst, const Rect& src) const {
-#ifdef _MSC_VER
-  MapRectHWY(*this, dst, src);
-#else
-  if (this->getType() <= TranslateMask) {
-    float tx = values[TRANS_X];
-    float ty = values[TRANS_Y];
-    float4 trans(tx, ty, tx, ty);
-    SortAsRect(float4::Load(&src.left) + trans).store(&dst->left);
-    return;
-  }
-  if (this->isScaleTranslate()) {
-    float sx = values[SCALE_X];
-    float sy = values[SCALE_Y];
-    float tx = values[TRANS_X];
-    float ty = values[TRANS_Y];
-    float4 scale(sx, sy, sx, sy);
-    float4 trans(tx, ty, tx, ty);
-    SortAsRect(float4::Load(&src.left) * scale + trans).store(&dst->left);
-  } else {
-    Point quad[4];
-    quad[0].set(src.left, src.top);
-    quad[1].set(src.right, src.top);
-    quad[2].set(src.right, src.bottom);
-    quad[3].set(src.left, src.bottom);
-    mapPoints(quad, quad, 4);
-    dst->setBounds(quad, 4);
-  }
-#endif
 }
 
 float Matrix::getMinScale() const {
@@ -657,5 +509,5 @@ const Matrix& Matrix::I() {
 
 const Matrix::MapPtsProc Matrix::MapPtsProcs[] = {
     Matrix::IdentityPoints, Matrix::TransPoints,   Matrix::ScalePoints,   Matrix::ScalePoints,
-    Matrix::AfflinePoints,  Matrix::AfflinePoints, Matrix::AfflinePoints, Matrix::AfflinePoints};
+    Matrix::AffinePoints,  Matrix::AffinePoints, Matrix::AffinePoints, Matrix::AffinePoints};
 }  // namespace tgfx

@@ -111,7 +111,7 @@
         "ClipInnerShadowImageFilter": "67961560",
         "ComposeColorFilter": "c475bfb",
         "ComposeImageFilter": "67961560",
-        "ComposeImageFilter2": "67961560",
+        "ComposeImageFilter2": "97727f06",
         "EmptyShadowTest": "b9a42bf",
         "GaussianBlurImageFilter": "9275e450",
         "ImageFilterShader": "67961560",
@@ -198,8 +198,7 @@
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",
         "rasterize_path": "b062b9a",
-        "rasterize_path_texture": "c475bfb",
-        "rasterize_text": "e9b9b9f4"
+        "rasterize_path_texture": "c475bfb"
     },
     "ReadPixelsTest": {
         "JpegCodec_Decode_Alpha8": "afd80b4",

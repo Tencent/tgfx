@@ -17,12 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TileCache.h"
-#include "core/SIMDVec.h"
 #include "core/utils/Log.h"
-
-#ifdef _MSC_VER
-#include "core/SIMDHighwayInterface.h"
-#endif
 
 namespace tgfx {
 constexpr int64_t TileKey(int tileX, int tileY) {
@@ -104,28 +99,5 @@ void TileCache::addTile(std::shared_ptr<Tile> tile) {
 bool TileCache::removeTile(int tileX, int tileY) {
   auto key = TileKey(tileX, tileY);
   return tileMap.erase(key) > 0;
-}
-
-std::vector<std::shared_ptr<Tile>> TileCache::getReusableTiles(float centerX, float centerY) {
-  std::vector<std::shared_ptr<Tile>> tiles = {};
-  for (auto& item : tileMap) {
-    if (item.second.use_count() == 1) {
-      tiles.push_back(item.second);
-    }
-  }
-  std::sort(tiles.begin(), tiles.end(),
-            [centerX, centerY, tileSize = static_cast<float>(tileSize)](
-                const std::shared_ptr<Tile>& a, const std::shared_ptr<Tile>& b) {
-#ifdef _MSC_VER
-              return TileSortCompHWY(centerX, centerY, tileSize, a, b);
-#else
-              float4 dab = (Cast<float, 4, int32_t>(int4(a->tileX, a->tileY, b->tileX,
-                b->tileY)) + 0.5f) * tileSize - float2(centerX, centerY).xyxy();
-              float4 dabSquare = dab * dab;
-              float4 res = dabSquare.yxwz() + dabSquare;
-              return res[0] < res[2];
-#endif
-            });
-  return tiles;
 }
 }  // namespace tgfx
