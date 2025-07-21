@@ -40,10 +40,8 @@ PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
     // If we only have one rect, it is not worth the async task overhead.
     renderFlags |= RenderFlags::DisableAsyncTask;
   }
-  auto sharedVertexBuffer =
-      context->proxyProvider()->createSharedVertexBuffer(std::move(provider), renderFlags);
-  drawOp->vertexBufferProxy = sharedVertexBuffer.first;
-  drawOp->vertexBufferOffset = sharedVertexBuffer.second;
+  drawOp->vertexBufferProxy =
+      context->proxyProvider()->createVertexBuffer(std::move(provider), renderFlags);
   return drawOp;
 }
 
@@ -78,10 +76,9 @@ void RectDrawOp::execute(RenderPass* renderPass) {
   auto gp = QuadPerEdgeAAGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
                                                  renderTarget->height(), aaType, commonColor,
                                                  uvMatrix, hasSubset);
-  gp->fillAttribute();
   auto pipeline = createPipeline(renderPass, std::move(gp));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
-  renderPass->bindBuffers(indexBuffer, vertexBuffer, vertexBufferOffset);
+  renderPass->bindBuffers(indexBuffer, vertexBuffer, vertexBufferProxy->offset());
   if (indexBuffer != nullptr) {
     uint16_t numIndicesPerQuad;
     if (aaType == AAType::Coverage) {

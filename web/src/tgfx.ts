@@ -45,49 +45,6 @@ export const createImageFromBytes = (bytes: ArrayBuffer) => {
     return createImage(URL.createObjectURL(blob));
 };
 
-export const setImageInterpolationQuality = (ctx: CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D, quality: number) => {
-    switch (quality) {
-        default:
-        case 0:
-            ctx.imageSmoothingEnabled = false;
-            break;
-        case 1:
-            ctx.imageSmoothingEnabled = true
-            ctx.imageSmoothingQuality = "low"
-            break;
-        case 2:
-            ctx.imageSmoothingEnabled = true
-            ctx.imageSmoothingQuality = "medium"
-            break;
-        case 3:
-            ctx.imageSmoothingEnabled = true
-            ctx.imageSmoothingQuality = "high"
-            break;
-    }
-}
-
-export const scaleImage = (module: TGFX, bytes: Uint8Array, srcWidth: number, srcHeight: number, width: number, height: number, quality: number) => {
-    const imageCanvas = getCanvas2D(srcWidth, srcHeight);
-    const imageCtx = imageCanvas.getContext('2d', {willReadFrequently: true}) as CanvasRenderingContext2D;
-    const imageData = new ImageData(new Uint8ClampedArray(bytes), srcWidth, srcHeight)
-    imageCtx.putImageData(imageData, 0, 0);
-
-    const canvas = getCanvas2D(width, height);
-    const ctx = canvas.getContext('2d', {willReadFrequently: true}) as CanvasRenderingContext2D | OffscreenCanvasRenderingContext2D | null;
-    if (!ctx) {
-        return null;
-    }
-    setImageInterpolationQuality(ctx, quality);
-    ctx.drawImage(imageCanvas, 0, 0, width, height);
-    const {data} = ctx.getImageData(0, 0, width, height);
-    releaseCanvas2D(imageCanvas);
-    releaseCanvas2D(canvas);
-    if (data.length == 0) {
-        return null;
-    }
-    return new Uint8Array(data);
-}
-
 export const readImagePixels = (module: TGFX, image: CanvasImageSource, width: number, height: number) => {
     if (!image) {
         return null;

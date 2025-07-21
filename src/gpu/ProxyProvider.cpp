@@ -34,7 +34,7 @@
 
 namespace tgfx {
 ProxyProvider::ProxyProvider(Context* context)
-    : context(context), blockBuffer(1 << 14, 1 << 21) {  // 16kb, 2MB
+    : context(context), vertexBlockBuffer(1 << 14, 1 << 21) {  // 16kb, 2MB
 }
 
 std::shared_ptr<GpuBufferProxy> ProxyProvider::createGpuBufferProxy(const UniqueKey& uniqueKey,
@@ -72,21 +72,21 @@ std::shared_ptr<GpuBufferProxy> ProxyProvider::createGpuBufferProxy(
   return proxy;
 }
 
-std::pair<std::shared_ptr<GpuBufferProxy>, size_t> ProxyProvider::createSharedVertexBuffer(
+std::shared_ptr<VertexBufferProxy> ProxyProvider::createVertexBuffer(
     PlacementPtr<VertexProvider> provider, uint32_t renderFlags) {
   if (provider == nullptr) {
-    return {nullptr, 0};
+    return nullptr;
   }
   DEBUG_ASSERT(!sharedVertexBufferFlushed);
   auto byteSize = provider->vertexCount() * sizeof(float);
-  auto lastBlock = blockBuffer.currentBlock();
-  auto vertices = reinterpret_cast<float*>(blockBuffer.allocate(byteSize));
+  auto lastBlock = vertexBlockBuffer.currentBlock();
+  auto vertices = reinterpret_cast<float*>(vertexBlockBuffer.allocate(byteSize));
   if (vertices == nullptr) {
-    LOGE("ProxyProvider::createSharedVertexBuffer() Failed to allocate memory!");
-    return {nullptr, 0};
+    LOGE("ProxyProvider::createVertexBuffer() Failed to allocate memory!");
+    return nullptr;
   }
   auto offset = lastBlock.second;
-  auto currentBlock = blockBuffer.currentBlock();
+  auto currentBlock = vertexBlockBuffer.currentBlock();
   if (lastBlock.first != nullptr && lastBlock.first != currentBlock.first) {
     DEBUG_ASSERT(sharedVertexBuffer != nullptr);
     auto data = Data::MakeWithoutCopy(lastBlock.first, lastBlock.second);
@@ -109,12 +109,12 @@ std::pair<std::shared_ptr<GpuBufferProxy>, size_t> ProxyProvider::createSharedVe
     sharedVertexBuffer = std::shared_ptr<GpuBufferProxy>(new GpuBufferProxy(BufferType::Vertex));
     addResourceProxy(sharedVertexBuffer);
   }
-  return {sharedVertexBuffer, offset};
+  return std::make_shared<VertexBufferProxy>(sharedVertexBuffer, offset, byteSize);
 }
 
 void ProxyProvider::flushSharedVertexBuffer() {
   if (sharedVertexBuffer != nullptr) {
-    auto lastBlock = blockBuffer.currentBlock();
+    auto lastBlock = vertexBlockBuffer.currentBlock();
     auto data = Data::MakeWithoutCopy(lastBlock.first, lastBlock.second);
     uploadSharedVertexBuffer(std::move(data));
   }
@@ -122,8 +122,8 @@ void ProxyProvider::flushSharedVertexBuffer() {
 }
 
 void ProxyProvider::clearSharedVertexBuffer() {
-  maxValueTracker.addValue(blockBuffer.size());
-  blockBuffer.clear(maxValueTracker.getMaxValue());
+  maxValueTracker.addValue(vertexBlockBuffer.size());
+  vertexBlockBuffer.clear(maxValueTracker.getMaxValue());
   sharedVertexBufferFlushed = false;
 }
 

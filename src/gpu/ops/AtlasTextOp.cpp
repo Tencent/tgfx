@@ -45,10 +45,8 @@ PlacementPtr<AtlasTextOp> AtlasTextOp::Make(Context* context,
     // If we only have one rect, it is not worth the async task overhead.
     renderFlags |= RenderFlags::DisableAsyncTask;
   }
-  auto sharedVertexBuffer =
-      context->proxyProvider()->createSharedVertexBuffer(std::move(provider), renderFlags);
-  atlasTextOp->vertexBufferProxy = sharedVertexBuffer.first;
-  atlasTextOp->vertexBufferOffset = sharedVertexBuffer.second;
+  atlasTextOp->vertexBufferProxy =
+      context->proxyProvider()->createVertexBuffer(std::move(provider), renderFlags);
   return atlasTextOp;
 }
 
@@ -68,8 +66,7 @@ void AtlasTextOp::execute(RenderPass* renderPass) {
       return;
     }
   }
-  std::shared_ptr<GpuBuffer> vertexBuffer =
-      vertexBufferProxy ? vertexBufferProxy->getBuffer() : nullptr;
+  auto vertexBuffer = vertexBufferProxy ? vertexBufferProxy->getBuffer() : nullptr;
   if (vertexBuffer == nullptr) {
     return;
   }
@@ -79,7 +76,7 @@ void AtlasTextOp::execute(RenderPass* renderPass) {
       AtlasTextGeometryProcessor::Make(drawingBuffer, textureProxy, aaType, commonColor);
   auto pipeline = createPipeline(renderPass, std::move(atlasGeometryProcessor));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
-  renderPass->bindBuffers(indexBuffer, vertexBuffer, vertexBufferOffset);
+  renderPass->bindBuffers(indexBuffer, vertexBuffer, vertexBufferProxy->offset());
   if (indexBuffer != nullptr) {
     uint16_t numIndicesPerQuad;
     if (aaType == AAType::Coverage) {
