@@ -508,6 +508,6 @@ const Matrix& Matrix::I() {
 }
 
 const Matrix::MapPtsProc Matrix::MapPtsProcs[] = {
-    Matrix::IdentityPoints, Matrix::TransPoints,   Matrix::ScalePoints,   Matrix::ScalePoints,
-    Matrix::AffinePoints,  Matrix::AffinePoints, Matrix::AffinePoints, Matrix::AffinePoints};
+    Matrix::IdentityPoints, Matrix::TransPoints,  Matrix::ScalePoints,  Matrix::ScalePoints,
+    Matrix::AffinePoints,   Matrix::AffinePoints, Matrix::AffinePoints, Matrix::AffinePoints};
 }  // namespace tgfx

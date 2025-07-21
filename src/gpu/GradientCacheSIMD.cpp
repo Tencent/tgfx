@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/ImageBuffer.h"
-#include "tgfx/core/Color.h"
 #include "tgfx/core/Bitmap.h"
+#include "tgfx/core/Color.h"
+#include "tgfx/core/ImageBuffer.h"
 #include "tgfx/core/Pixmap.h"
 // First undef to prevent error when re-included.
 #undef HWY_TARGET_INCLUDE
@@ -78,8 +78,8 @@ HWY_AFTER_NAMESPACE();
 namespace tgfx {
 HWY_EXPORT(CreateGradientImpl);
 
-std::shared_ptr<ImageBuffer> CreateGradient(const Color* colors, const float* positions,
-                                               int count, int resolution) {
+std::shared_ptr<ImageBuffer> CreateGradient(const Color* colors, const float* positions, int count,
+                                            int resolution) {
   return HWY_DYNAMIC_DISPATCH(CreateGradientImpl)(colors, positions, count, resolution);
 }
 }  // namespace tgfx

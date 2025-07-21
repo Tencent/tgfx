@@ -44,7 +44,7 @@ void GradientCache::add(const BytesKey& bytesKey, std::shared_ptr<Texture> textu
   }
 }
 extern std::shared_ptr<ImageBuffer> CreateGradient(const Color* colors, const float* positions,
-                                               int count, int resolution);
+                                                   int count, int resolution);
 std::shared_ptr<Texture> GradientCache::getGradient(Context* context, const Color* colors,
                                                     const float* positions, int count) {
   BytesKey bytesKey = {};

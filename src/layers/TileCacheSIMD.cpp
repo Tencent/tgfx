@@ -65,7 +65,7 @@ std::vector<std::shared_ptr<Tile>> TileCache::getReusableTiles(float centerX, fl
   std::sort(tiles.begin(), tiles.end(),
             [centerX, centerY, tileSize = static_cast<float>(tileSize)](
                 const std::shared_ptr<Tile>& a, const std::shared_ptr<Tile>& b) {
-                  return HWY_DYNAMIC_DISPATCH(TileSortCompImpl)(centerX, centerY, tileSize, a, b);
+              return HWY_DYNAMIC_DISPATCH(TileSortCompImpl)(centerX, centerY, tileSize, a, b);
             });
   return tiles;
 }
