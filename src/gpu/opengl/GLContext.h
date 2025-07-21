@@ -20,7 +20,7 @@
 
 #include "GLInterface.h"
 #include "gpu/SamplerState.h"
-#include "gpu/opengl/GLSampler.h"
+#include "gpu/opengl/GLTextureSampler.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {

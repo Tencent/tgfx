@@ -19,6 +19,7 @@
 #pragma once
 
 #include "RenderTask.h"
+#include "gpu/proxies/VertexBufferProxy.h"
 #include "tgfx/gpu/RuntimeEffect.h"
 
 namespace tgfx {
@@ -31,8 +32,13 @@ class RuntimeDrawTask : public RenderTask {
   bool execute(RenderPass* renderPass) override;
 
  private:
-  std::vector<std::shared_ptr<TextureProxy>> inputs;
+  std::vector<std::shared_ptr<TextureProxy>> inputTextures = {};
+  std::vector<std::shared_ptr<VertexBufferProxy>> inputVertexBuffers = {};
   std::shared_ptr<RuntimeEffect> effect = nullptr;
   Point offset = {};
+
+  static std::shared_ptr<Texture> GetFlatTexture(RenderPass* renderPass,
+                                                 std::shared_ptr<TextureProxy> textureProxy,
+                                                 std::shared_ptr<VertexBufferProxy> vertexProxy);
 };
 }  // namespace tgfx

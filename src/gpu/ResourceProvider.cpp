@@ -194,7 +194,10 @@ class RRectIndicesProvider : public DataSource<Data> {
 };
 
 std::shared_ptr<GpuBufferProxy> ResourceProvider::rRectIndexBuffer(RRectType type) {
-  auto indexBuffer = type == RRectType::FillType ? _rRectFillIndexBuffer : _rRectStrokeIndexBuffer;
+  // Use `auto&` to bind `indexBuffer` to the appropriate member buffer
+  // (`_rRectFillIndexBuffer` or `_rRectStrokeIndexBuffer`) so that it gets
+  // updated and cached directly.
+  auto& indexBuffer = type == RRectType::FillType ? _rRectFillIndexBuffer : _rRectStrokeIndexBuffer;
   if (indexBuffer == nullptr) {
     auto provider = std::make_unique<RRectIndicesProvider>(RRectDrawOp::MaxNumRRects, type);
     indexBuffer = GpuBufferProxy::MakeFrom(context, std::move(provider), BufferType::Index, 0);

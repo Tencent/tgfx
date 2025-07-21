@@ -61,7 +61,7 @@ Rect WebScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const S
     return {};
   }
   if (!hasColor() && stroke != nullptr) {
-    ApplyStrokeToBounds(*stroke, &bounds, true);
+    ApplyStrokeToBounds(*stroke, &bounds, 1.0f, true);
   }
   if (matrix) {
     matrix->setTranslate(bounds.left, bounds.top);
@@ -81,7 +81,7 @@ bool WebScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke* 
   }
   emscripten::val imageData = emscripten::val::null();
   if (!hasColor() && stroke != nullptr) {
-    ApplyStrokeToBounds(*stroke, &bounds, true);
+    ApplyStrokeToBounds(*stroke, &bounds, 1.0f, true);
     imageData =
         scalerContext.call<val>("readPixels", getText(glyphID), bounds, properFauxBold, *stroke);
   } else {

@@ -17,6 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Rect.h"
+#include "SIMDVec.h"
+#ifdef _MSC_VER
+#include "SIMDHighwayInterface.h"
+#endif
 
 namespace tgfx {
 void Rect::scale(float scaleX, float scaleY) {
@@ -27,38 +31,42 @@ void Rect::scale(float scaleX, float scaleY) {
 }
 
 bool Rect::setBounds(const Point pts[], int count) {
+#ifdef _MSC_VER
+  return SetBoundsHWY(this, pts, count);
+#else
   if (count <= 0) {
     this->setEmpty();
+    return false;
+  }
+  float4 min, max;
+  if (count & 1) {
+    min = max = float2::Load(pts).xyxy();
+    pts += 1;
+    count -= 1;
+  } else {
+    min = max = float4::Load(pts);
+    pts += 2;
+    count -= 2;
+  }
+  float4 accum = min * 0.0f;
+  while (count) {
+    float4 xy = float4::Load(pts);
+    accum = accum * xy;
+    min = Min(min, xy);
+    max = Max(max, xy);
+    pts += 2;
+    count -= 2;
+  }
+  const bool allFinite = All(accum * 0.0f == 0.0f);
+  if (allFinite) {
+    this->setLTRB(std::min(min[0], min[2]), std::min(min[1], min[3]), std::max(max[0], max[2]),
+                  std::max(max[1], max[3]));
     return true;
+  } else {
+    this->setEmpty();
+    return false;
   }
-  float minX, maxX;
-  float minY, maxY;
-  minX = maxX = pts[0].x;
-  minY = maxY = pts[0].y;
-
-  for (int i = 1; i < count; i++) {
-    auto x = pts[i].x;
-    auto y = pts[i].y;
-    auto isFinite = ((x + y) * 0 == 0);
-    if (!isFinite) {
-      setEmpty();
-      return false;
-    }
-    if (x < minX) {
-      minX = x;
-    }
-    if (x > maxX) {
-      maxX = x;
-    }
-    if (y < minY) {
-      minY = y;
-    }
-    if (y > maxY) {
-      maxY = y;
-    }
-  }
-  setLTRB(minX, minY, maxX, maxY);
-  return true;
+#endif
 }
 
 #define CHECK_INTERSECT(al, at, ar, ab, bl, bt, br, bb) \

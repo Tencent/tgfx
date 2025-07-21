@@ -20,9 +20,30 @@
 #include "core/ScalerContext.h"
 
 namespace tgfx {
+std::shared_ptr<PathRasterizer> PathRasterizer::MakeFrom(int width, int height, Path path,
+                                                         bool antiAlias, const Matrix* matrix,
+                                                         bool needsGammaCorrection) {
+  auto shape = Shape::MakeFrom(std::move(path));
+  if (matrix != nullptr) {
+    shape = Shape::ApplyMatrix(std::move(shape), *matrix);
+  }
+  if (shape == nullptr) {
+    return nullptr;
+  }
+  return MakeFrom(width, height, std::move(shape), antiAlias, needsGammaCorrection);
+}
+
 PathRasterizer::PathRasterizer(int width, int height, std::shared_ptr<Shape> shape, bool antiAlias,
                                bool needsGammaCorrection)
-    : ImageCodec(width, height, Orientation::LeftTop), shape(std::move(shape)),
-      antiAlias(antiAlias), needsGammaCorrection(needsGammaCorrection) {
+    : ImageCodec(width, height), shape(std::move(shape)), antiAlias(antiAlias),
+      needsGammaCorrection(needsGammaCorrection) {
+}
+
+bool PathRasterizer::asyncSupport() const {
+#if defined(TGFX_BUILD_FOR_WEB) && !defined(TGFX_USE_FREETYPE)
+  return false;
+#else
+  return true;
+#endif
 }
 }  //namespace tgfx

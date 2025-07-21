@@ -20,6 +20,7 @@
 
 #include "core/utils/Log.h"
 #include "gpu/Resource.h"
+#include "gpu/proxies/ResourceProxy.h"
 
 namespace tgfx {
 /**
@@ -27,7 +28,7 @@ namespace tgfx {
  */
 class ResourceTask {
  public:
-  explicit ResourceTask(UniqueKey uniqueKey);
+  explicit ResourceTask(std::shared_ptr<ResourceProxy> proxy);
 
   virtual ~ResourceTask() = default;
 
@@ -37,9 +38,11 @@ class ResourceTask {
   virtual bool execute(Context* context);
 
  protected:
-  UniqueKey uniqueKey = {};
-
   virtual std::shared_ptr<Resource> onMakeResource(Context* context) = 0;
+
+ private:
+  std::shared_ptr<ResourceProxy> proxy = nullptr;
+  UniqueKey uniqueKey = {};
 
   friend class DrawingManager;
 };

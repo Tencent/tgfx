@@ -25,13 +25,14 @@ bool OpsRenderTask::execute(RenderPass* renderPass) {
   if (ops.empty() || renderTargetProxy == nullptr) {
     return false;
   }
-  if (!renderPass->begin(renderTargetProxy->getRenderTarget(), renderTargetProxy->getTexture())) {
+  if (!renderPass->begin(renderTargetProxy->getRenderTarget())) {
     LOGE("OpsRenderTask::execute() Failed to initialize the render pass!");
     return false;
   }
   auto tempOps = std::move(ops);
   for (auto& op : tempOps) {
     op->execute(renderPass);
+    op = nullptr;
   }
   renderPass->end();
   return true;

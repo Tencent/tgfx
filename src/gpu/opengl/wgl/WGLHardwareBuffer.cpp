@@ -28,8 +28,9 @@ PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef) {
   return PixelFormat::Unknown;
 }
 
-std::shared_ptr<Texture> Texture::MakeFrom(Context*, HardwareBufferRef, YUVColorSpace) {
-  return nullptr;
+std::vector<std::unique_ptr<TextureSampler>> TextureSampler::MakeFrom(Context*, HardwareBufferRef,
+                                                                      YUVFormat*) {
+  return {};
 }
 
 }  // namespace tgfx

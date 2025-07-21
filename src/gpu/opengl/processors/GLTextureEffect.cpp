@@ -78,7 +78,7 @@ void GLTextureEffect::emitCode(EmitArgs& args) const {
   if (texture->isYUV()) {
     emitYUVTextureCode(args);
   } else {
-    emitPlainTextureCode(args);
+    emitDefaultTextureCode(args);
   }
   if (textureProxy->isAlphaOnly()) {
     fragBuilder->codeAppendf("%s = %s.a * %s;", args.outputColor.c_str(), args.outputColor.c_str(),
@@ -89,7 +89,7 @@ void GLTextureEffect::emitCode(EmitArgs& args) const {
   }
 }
 
-void GLTextureEffect::emitPlainTextureCode(EmitArgs& args) const {
+void GLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
   auto* uniformHandler = args.uniformHandler;
   auto& textureSampler = (*args.textureSamplers)[0];
@@ -98,7 +98,7 @@ void GLTextureEffect::emitPlainTextureCode(EmitArgs& args) const {
     vertexColor = args.coordFunc(vertexColor);
   }
   std::string subsetName = "";
-  if (needSubset(getTexture())) {
+  if (needSubset()) {
     subsetName = uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "Subset");
   }
   std::string finalCoordName = "finalCoord";
@@ -134,7 +134,7 @@ void GLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
   auto& textureSamplers = *args.textureSamplers;
   auto vertexColor = (*args.transformedCoords)[0].name();
   std::string subsetName = "";
-  if (needSubset(yuvTexture)) {
+  if (needSubset()) {
     subsetName = uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "Subset");
   }
   std::string extraSubsetName = "";
@@ -225,8 +225,8 @@ void GLTextureEffect::onSetData(UniformBuffer* uniformBuffer) const {
         break;
     }
   }
-  if (needSubset(texture)) {
-    auto subsetRect = subset.value_or(Rect::MakeWH(texture->width(), texture->height()));
+  if (needSubset()) {
+    auto subsetRect = subset.value_or(Rect::MakeWH(textureProxy->width(), textureProxy->height()));
     if (samplerState.filterMode == FilterMode::Nearest) {
       subsetRect.roundOut();
     }

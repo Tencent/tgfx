@@ -17,9 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/platform/web/VideoElementReader.h"
-#include "GLVideoTexture.h"
-#include "core/utils/Log.h"
-#include "gpu/opengl/GLSampler.h"
 #include "platform/web/VideoElement.h"
 
 namespace tgfx {
@@ -41,11 +38,6 @@ std::shared_ptr<VideoElementReader> VideoElementReader::MakeFrom(val video, int 
 
 VideoElementReader::VideoElementReader(std::shared_ptr<ImageStream> stream)
     : ImageReader(std::move(stream)) {
-}
-
-std::shared_ptr<ImageBuffer> VideoElementReader::acquireNextBuffer() {
-  stream->markContentDirty(Rect::MakeWH(stream->width(), stream->height()));
-  return ImageReader::acquireNextBuffer();
 }
 
 std::shared_ptr<ImageBuffer> VideoElementReader::acquireNextBuffer(val promise) {

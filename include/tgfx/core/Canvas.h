@@ -38,7 +38,7 @@ class CanvasState;
 /**
  * SrcRectConstraint controls the behavior at the edge of source rect, provided to drawImageRect()
  * when there is any filtering. If Strict is set, then extra code is used to ensure it never samples
- * outside of the src-rect. Strict disables the use of mipmaps.
+ * outside the src-rect. Strict disables the use of mipmaps.
 */
 enum class SrcRectConstraint {
   /**

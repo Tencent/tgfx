@@ -17,8 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import <TargetConditionals.h>
-#include "EAGLHardwareTexture.h"
-#include "EAGLNV12Texture.h"
+#include "EAGLHardwareTextureSampler.h"
 #include "core/PixelBuffer.h"
 #include "platform/apple/NV12HardwareBuffer.h"
 
@@ -46,15 +45,15 @@ PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
   }
 }
 
-std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
-                                           YUVColorSpace colorSpace) {
+std::vector<std::unique_ptr<TextureSampler>> TextureSampler::MakeFrom(
+    Context* context, HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
-    return nullptr;
+    return {};
   }
-  auto planeCount = CVPixelBufferGetPlaneCount(hardwareBuffer);
-  if (planeCount > 1) {
-    return EAGLNV12Texture::MakeFrom(context, hardwareBuffer, colorSpace);
+  auto samplers = EAGLHardwareTextureSampler::MakeFrom(context, hardwareBuffer);
+  if (yuvFormat != nullptr && !samplers.empty()) {
+    *yuvFormat = samplers.size() == 2 ? YUVFormat::NV12 : YUVFormat::Unknown;
   }
-  return EAGLHardwareTexture::MakeFrom(context, hardwareBuffer);
+  return samplers;
 }
 }  // namespace tgfx

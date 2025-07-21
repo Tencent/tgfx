@@ -19,65 +19,90 @@
 #pragma once
 
 #include "gpu/Texture.h"
-#include "tgfx/core/ImageInfo.h"
 
 namespace tgfx {
 /**
  * RenderTarget represents a 2D buffer of pixels that can be rendered to.
  */
-class RenderTarget : public Resource {
+class RenderTarget {
  public:
+  virtual ~RenderTarget() = default;
   /**
    * Wraps a backend renderTarget into RenderTarget. The caller must ensure the backend renderTarget
    * is valid for the lifetime of the returned RenderTarget. Returns nullptr if the context is
    * nullptr or the backend renderTarget is invalid.
    */
   static std::shared_ptr<RenderTarget> MakeFrom(Context* context,
-                                                const BackendRenderTarget& renderTarget,
-                                                ImageOrigin origin);
+                                                const BackendRenderTarget& backendRenderTarget,
+                                                ImageOrigin origin = ImageOrigin::TopLeft);
 
   /**
-   * Creates a new RenderTarget which uses specified Texture as pixel storage. The caller must
-   * ensure the texture is valid for the lifetime of the returned RenderTarget.
+   * Creates a new RenderTarget with an existing backend texture. If adopted is true, the
+   * backend texture will be destroyed at a later point after the proxy is released.
    */
-  static std::shared_ptr<RenderTarget> MakeFrom(const Texture* texture, int sampleCount = 1);
+  static std::shared_ptr<RenderTarget> MakeFrom(Context* context,
+                                                const BackendTexture& backendTexture,
+                                                int sampleCount = 1,
+                                                ImageOrigin origin = ImageOrigin::TopLeft,
+                                                bool adopted = false);
 
   /**
-   * Returns the display width of the render target.
+   * Creates a new RenderTarget with an existing HardwareBuffer and sample count.
    */
-  int width() const {
-    return _width;
-  }
+  static std::shared_ptr<RenderTarget> MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
+                                                int sampleCount = 1);
 
   /**
-   * Returns the display height of the render target.
+   * Creates a new RenderTarget instance with specified context, with, height, format, sample count,
+   * mipmap state and origin.
    */
-  int height() const {
-    return _height;
-  }
+  static std::shared_ptr<RenderTarget> Make(Context* context, int width, int height,
+                                            PixelFormat format = PixelFormat::RGBA_8888,
+                                            int sampleCount = 1, bool mipmapped = false,
+                                            ImageOrigin origin = ImageOrigin::TopLeft);
+
+  /**
+   * Returns the context associated with the RenderTarget.
+   */
+  virtual Context* getContext() const = 0;
+
+  /**
+   * Returns the width of the render target.
+   */
+  virtual int width() const = 0;
+
+  /**
+   * Returns the height of the render target.
+   */
+  virtual int height() const = 0;
 
   /**
    * Returns the origin of the render target, either ImageOrigin::TopLeft or
    * ImageOrigin::BottomLeft.
    */
-  ImageOrigin origin() const {
-    return _origin;
-  }
+  virtual ImageOrigin origin() const = 0;
 
   /**
    * Returns the sample count of the render target.
    */
-  int sampleCount() const {
-    return _sampleCount;
-  }
+  virtual int sampleCount() const = 0;
 
   /**
    * Returns the pixel format of the render target.
    */
   virtual PixelFormat format() const = 0;
 
-  size_t memoryUsage() const override {
-    return 0;
+  /**
+   * Returns true if the render target is externally owned.
+   */
+  virtual bool externallyOwned() const = 0;
+
+  /**
+   * Returns a reference to the underlying texture representation of this render target, may be
+   * nullptr.
+   */
+  virtual std::shared_ptr<Texture> asTexture() const {
+    return nullptr;
   }
 
   /**
@@ -92,16 +117,5 @@ class RenderTarget : public Resource {
    */
   virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0,
                           int srcY = 0) const = 0;
-
- protected:
-  RenderTarget(int width, int height, ImageOrigin origin, int sampleCount = 1)
-      : _width(width), _height(height), _origin(origin), _sampleCount(sampleCount) {
-  }
-
- private:
-  int _width = 0;
-  int _height = 0;
-  ImageOrigin _origin = ImageOrigin::TopLeft;
-  int _sampleCount = 1;
 };
 }  // namespace tgfx
