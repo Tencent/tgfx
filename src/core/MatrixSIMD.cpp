@@ -104,6 +104,7 @@ void AffinePointsHWYImpl(const Matrix& m, Point* dst, const Point* src, int coun
     auto scaleSimd = hn::InterleaveLower(sxVec, syVec);
     auto skewSimd = hn::InterleaveLower(kxVec, kyVec);
     std::size_t size = static_cast<size_t>(count * 2);
+    printf("lanes: %lu \n", hn::Lanes(d));
     std::size_t vecSize = size - size % hn::Lanes(d);
     for (std::size_t i = 0; i < vecSize; i += hn::Lanes(d)) {
       auto srcSimd = hn::LoadU(d, &fsrc[i]);
