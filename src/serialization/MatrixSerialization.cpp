@@ -24,8 +24,9 @@ namespace tgfx {
 static void SerializeMatrixImpl(flexbuffers::Builder& fbb, const Matrix* matrix) {
   float buffer[6];
   matrix->get6(buffer);
+  std::string key = "";
   for (int i = 0; i < 6; i++) {
-    std::string key = "[" + std::to_string(i) + "]";
+    key = "[" + std::to_string(i) + "]";
     SerializeUtils::SetFlexBufferMap(fbb, key.c_str(), buffer[i]);
   }
 }
