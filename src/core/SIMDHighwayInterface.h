@@ -17,10 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <emscripten/val.h>
-#include "tgfx/core/Data.h"
-
-using namespace emscripten;
+#include "tgfx/core/Matrix.h"
 namespace tgfx {
-std::shared_ptr<Data> CopyDataFromUint8Array(const val& emscriptenData);
-}
+void TransPointsHWY(const Matrix& m, Point dst[], const Point src[], int count);
+void ScalePointsHWY(const Matrix& m, Point dst[], const Point src[], int count);
+void AffinePointsHWY(const Matrix& m, Point dst[], const Point src[], int count);
+void MapRectHWY(const Matrix& m, Rect* dst, const Rect& src);
+bool SetBoundsHWY(Rect* rect, const Point pts[], int count);
+}  // namespace tgfx

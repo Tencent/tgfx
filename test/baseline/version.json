@@ -41,7 +41,7 @@
         "Path_addArc_reversed7": "4802e56",
         "Path_addArc_reversed8": "4802e56",
         "Path_complex": "e031f25",
-        "Picture": "caf1ce70",
+        "Picture": "67961560",
         "PictureImage": "67961560",
         "PictureImage_Path": "1ae5042",
         "PictureImage_Text": "67961560",
@@ -64,13 +64,13 @@
         "drawImageRect": "606f8195",
         "drawPaint": "b7aefeb",
         "drawPaint_shadow": "67961560",
-        "drawShape": "caf1ce70",
-        "emojiTextStrokeBlending": "caf1ce70",
+        "drawShape": "b2073fc2",
+        "emojiTextStrokeBlending": "67961560",
         "filter_mode_linear": "c475bfb",
         "filter_mode_nearest": "d010fb8",
         "hardware_render_target_blend": "67961560",
         "inversePath_rect": "67961560",
-        "inversePath_text": "67961560",
+        "inversePath_text": "b2073fc2",
         "merge_draw_call_rect": "d010fb8",
         "merge_draw_call_rrect": "d010fb8",
         "mipmap_linear": "50136952",
@@ -99,7 +99,7 @@
         "ImageWithMipmap": "da590da",
         "ImageWithShadow": "67961560",
         "SimpleLayerTreeDrawer": "9b1a0dfc",
-        "SimpleText": "caf1ce70"
+        "SimpleText": "d7f154de"
     },
     "DstTextureTest": {
         "EmptyLocalBounds": "be94e666",
@@ -163,7 +163,7 @@
         "LayerVisible1": "4edccb64",
         "Layer_drawRRect": "66aef718",
         "Layer_hitTestPoint": "99c36f0c",
-        "Layer_hitTestPointNested": "caf1ce70",
+        "Layer_hitTestPointNested": "d7f154de",
         "MaskAlpha": "3dbeed5",
         "ModeColorFilter": "67961560",
         "PartialBackgroundBlur": "67961560",
@@ -177,7 +177,7 @@
         "StrokeOnTop_On": "55c619d",
         "ZoomAndOffset": "cc234d6f",
         "backgroundLayerBlur": "67961560",
-        "draw_shape": "67961560",
+        "draw_shape": "b2073fc2",
         "draw_solid": "b4a1231",
         "draw_text": "9b1a0dfc",
         "dropShadow": "67961560",
@@ -185,7 +185,7 @@
         "filterTest": "67961560",
         "filters": "67961560",
         "getBounds": "0d4ef3f9",
-        "getLayersUnderPoint": "caf1ce70",
+        "getLayersUnderPoint": "d7f154de",
         "getTightBounds": "ae4290b3",
         "greyColorMatrix": "a1605b2",
         "identityMatrix": "a1605b2",
@@ -198,8 +198,7 @@
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",
         "rasterize_path": "b062b9a",
-        "rasterize_path_texture": "c475bfb",
-        "rasterize_text": "e9b9b9f4"
+        "rasterize_path_texture": "c475bfb"
     },
     "ReadPixelsTest": {
         "JpegCodec_Decode_Alpha8": "afd80b4",
@@ -262,8 +261,7 @@
         "WebpCodec_Encode_Alpha8": "d010fb8",
         "WebpCodec_Encode_Gray8": "b74f86c1",
         "WebpCodec_Encode_RGB565": "d010fb8",
-        "WebpCodec_Encode_RGBA": "d010fb8",
-        "scale_RGBA_8888_To_RGB_565_image": "5e07f214"
+        "WebpCodec_Encode_RGBA": "d010fb8"
     },
     "SVGTest": {
         "blur": "b1db872",
@@ -271,15 +269,15 @@
         "complex2": "67961560",
         "complex3": "a6ff60e1",
         "complex4": "0d4ef3f9",
-        "complex5": "50136952",
+        "complex5": "b2073fc2",
         "complex6": "67961560",
-        "complex7": "67961560",
+        "complex7": "b2073fc2",
         "jpg_image": "b1db872",
         "mask": "da364e8",
         "path": "a6ff60e1",
         "png_image": "b1db872",
         "radialGradient": "b1db872",
-        "referenceStyle": "8769f398",
+        "referenceStyle": "b2073fc2",
         "text": "84ef0cb4",
         "textEmoji": "3977d8ca",
         "textFont": "84ef0cb4"
