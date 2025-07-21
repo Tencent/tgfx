@@ -260,8 +260,8 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
   DEBUG_ASSERT(fill.shader == nullptr);
   Matrix viewMatrix = {};
   Rect bounds = {};
-  // we can not apply the clip and view matrix to the picture directly, because it may cause the
-  // picture much bigger;
+  // We cannot directly apply the clip and view matrix to the picture, as this may result in
+  // creating unnecessarily large images when used in masks or color filters.
   if (picture->hasUnboundedFill()) {
     bounds = ToLocalBounds(getClipBounds(state.clip), state.matrix);
   } else {
