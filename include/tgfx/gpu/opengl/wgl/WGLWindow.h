@@ -25,7 +25,7 @@ namespace tgfx {
 class WGLWindow : public Window {
  public:
   /**
-   * Creates a new window from a HWND with specialed shared context.
+   * Creates a new window from a HWND with specified shared context and VSync.
    */
   static std::shared_ptr<WGLWindow> MakeFrom(HWND nativeWindow, HGLRC sharedContext = nullptr,
                                              bool vSyncEnabled = true);
