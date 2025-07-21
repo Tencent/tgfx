@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -40,10 +40,8 @@ PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
     // If we only have one rect, it is not worth the async task overhead.
     renderFlags |= RenderFlags::DisableAsyncTask;
   }
-  auto sharedVertexBuffer =
-      context->proxyProvider()->createSharedVertexBuffer(std::move(provider), renderFlags);
-  drawOp->vertexBufferProxy = sharedVertexBuffer.first;
-  drawOp->vertexBufferOffset = sharedVertexBuffer.second;
+  drawOp->vertexBufferProxy =
+      context->proxyProvider()->createVertexBuffer(std::move(provider), renderFlags);
   return drawOp;
 }
 
@@ -57,6 +55,7 @@ RectDrawOp::RectDrawOp(RectsVertexProvider* provider)
   if (!provider->hasColor()) {
     commonColor = provider->firstColor();
   }
+  hasSubset = provider->hasSubset();
 }
 
 void RectDrawOp::execute(RenderPass* renderPass) {
@@ -74,11 +73,12 @@ void RectDrawOp::execute(RenderPass* renderPass) {
   }
   auto renderTarget = renderPass->renderTarget();
   auto drawingBuffer = renderPass->getContext()->drawingBuffer();
-  auto gp = QuadPerEdgeAAGeometryProcessor::Make(
-      drawingBuffer, renderTarget->width(), renderTarget->height(), aaType, commonColor, uvMatrix);
+  auto gp = QuadPerEdgeAAGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
+                                                 renderTarget->height(), aaType, commonColor,
+                                                 uvMatrix, hasSubset);
   auto pipeline = createPipeline(renderPass, std::move(gp));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
-  renderPass->bindBuffers(indexBuffer, vertexBuffer, vertexBufferOffset);
+  renderPass->bindBuffers(indexBuffer, vertexBuffer, vertexBufferProxy->offset());
   if (indexBuffer != nullptr) {
     uint16_t numIndicesPerQuad;
     if (aaType == AAType::Coverage) {

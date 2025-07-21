@@ -7,12 +7,12 @@
     "common": [
       {
         "url": "${PAG_GROUP}/vendor_tools.git",
-        "commit": "76b266c30e3314678a0d8daeb5b40a9389ea5544",
+        "commit": "3b4a23cd26db01b995d1a849b426523860588d7b",
         "dir": "third_party/vendor_tools"
       },
       {
         "url": "${PAG_GROUP}/pathkit.git",
-        "commit": "ad22a7e8c5708f1f12c1653b98ea7a554218af65",
+        "commit": "1971e6f031aaa4b962dda553cf087cb4e3816921",
         "dir": "third_party/pathkit"
       },
       {
@@ -52,7 +52,7 @@
       },
       {
         "url": "https://github.com/google/googletest.git",
-        "commit": "e2239ee6043f73722e7aa812a459f54a28552929",
+        "commit": "6910c9d9165801d8827d628cb72eb7ea9dd538c5",
         "dir": "third_party/googletest"
       },
       {
@@ -64,6 +64,21 @@
         "url": "https://github.com/libexpat/libexpat.git",
         "commit": "88b3ed553d8ad335559254863a33360d55b9f1d6",
         "dir": "third_party/expat"
+      },
+      {
+        "url": "https://github.com/google/flatbuffers.git",
+        "commit": "1c514626e83c20fffa8557e75641848e1e15cd5e",
+        "dir": "third_party/flatbuffers"
+      },
+      {
+         "url": "https://github.com/cameron314/concurrentqueue.git",
+         "commit": "6dd38b8a1dbaa7863aa907045f32308a56a6ff5d",
+         "dir": "third_party/concurrentqueue"
+      },
+      {
+        "url": "https://github.com/google/highway.git",
+        "commit": "a523516d35e22a4ba8e2e70a319062cb87352de6",
+        "dir": "third_party/highway"
       }
     ]
   },

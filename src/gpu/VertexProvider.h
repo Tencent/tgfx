@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -20,6 +20,7 @@
 
 #include <vector>
 #include "core/DataSource.h"
+#include "core/utils/BlockBuffer.h"
 #include "core/utils/PlacementPtr.h"
 #include "tgfx/core/Data.h"
 
@@ -29,6 +30,10 @@ namespace tgfx {
  */
 class VertexProvider {
  public:
+  explicit VertexProvider(std::shared_ptr<BlockBuffer> reference)
+      : reference(std::move(reference)) {
+  }
+
   virtual ~VertexProvider() = default;
 
   /**
@@ -40,6 +45,9 @@ class VertexProvider {
    * Returns the vertices in the provider.
    */
   virtual void getVertices(float* vertices) const = 0;
+
+ private:
+  std::shared_ptr<BlockBuffer> reference = nullptr;
 };
 
 class VertexProviderTask : public Task {

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -25,6 +25,7 @@
 #include <vector>
 #include "tgfx/core/Data.h"
 #include "tgfx/core/FontStyle.h"
+#include "tgfx/core/Rect.h"
 
 namespace tgfx {
 /**
@@ -145,6 +146,13 @@ class Typeface {
    */
   virtual std::shared_ptr<Data> copyTableData(FontTableTag tag) const = 0;
 
+  /**
+   * Returns a rectangle that represents the union of the bounds of all the glyphs, but each one
+   * positioned at (0,0). This may be conservatively large, and will not take into account any
+   * hitting or other size-specific adjustments.
+   */
+  Rect getBounds() const;
+
   size_t getTableSize(FontTableTag tag) const;
 
  protected:
@@ -155,16 +163,36 @@ class Typeface {
    */
   virtual std::vector<Unichar> getGlyphToUnicodeMap() const;
 
+  virtual std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const = 0;
+
   virtual std::shared_ptr<Data> openData() const = 0;
 
   mutable std::mutex locker = {};
 
- private:
-  std::unordered_map<float, std::weak_ptr<ScalerContext>> scalerContexts = {};
+  std::weak_ptr<Typeface> weakThis;
 
+ private:
+  /**
+   *  Returns a ScalerContext for the given size.
+   */
+  std::shared_ptr<ScalerContext> getScalerContext(float size);
+
+  virtual bool isCustom() const;
+
+  bool computeBounds(Rect* bounds) const;
+
+  std::unordered_map<float, std::weak_ptr<ScalerContext>> scalerContexts = {};
+  mutable Rect bounds = {};
+  mutable std::once_flag onceFlag = {};
+
+  friend class Font;
   friend class ScalerContext;
   friend class FTScalerContext;
   friend class GlyphConverter;
+  friend class CGMask;
+  friend class WebMask;
+  friend class SVGExportContext;
+  friend class RenderContext;
   friend class PDFFont;
 };
 }  // namespace tgfx

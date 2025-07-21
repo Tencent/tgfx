@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -21,7 +21,7 @@
 
 namespace tgfx {
 
-void LayerProperty::invalidate() {
+void LayerProperty::invalidateContent() {
   for (auto& owner : owners) {
     if (auto layer = owner.lock()) {
       layer->invalidateContent();
@@ -29,11 +29,19 @@ void LayerProperty::invalidate() {
   }
 }
 
-void LayerProperty::attachToLayer(const Layer* layer) {
-  owners.push_back(layer->weakThis);
+void LayerProperty::invalidateTransform() {
+  for (auto& owner : owners) {
+    if (auto layer = owner.lock()) {
+      layer->invalidateTransform();
+    }
+  }
 }
 
-void LayerProperty::detachFromLayer(const Layer* layer) {
+void LayerProperty::attachToLayer(Layer* layer) {
+  owners.push_back(layer->weak_from_this());
+}
+
+void LayerProperty::detachFromLayer(Layer* layer) {
   for (auto owner = owners.begin(); owner != owners.end(); ++owner) {
     if (owner->lock().get() == layer) {
       owners.erase(owner);

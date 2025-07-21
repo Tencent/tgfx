@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -20,7 +20,7 @@
 
 #include "GLInterface.h"
 #include "gpu/SamplerState.h"
-#include "gpu/opengl/GLSampler.h"
+#include "gpu/opengl/GLTextureSampler.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {

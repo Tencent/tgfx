@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -20,10 +20,11 @@
 #include "ProgramBuilder.h"
 
 namespace tgfx {
-Varying VaryingHandler::addVarying(const std::string& name, SLType type) {
+Varying VaryingHandler::addVarying(const std::string& name, SLType type, bool isFlat) {
   Varying varying;
   varying._type = type;
   varying._name = programBuilder->nameVariable(name);
+  varying._isFlat = isFlat;
   varyings.push_back(std::move(varying));
   return varyings[varyings.size() - 1];
 }
@@ -46,8 +47,12 @@ void VaryingHandler::addAttribute(const ShaderVar& var) {
 
 void VaryingHandler::finalize() {
   for (const auto& v : varyings) {
-    vertexOutputs.emplace_back(v._name, v.type(), ShaderVar::TypeModifier::Varying);
-    fragInputs.emplace_back(v._name, v.type(), ShaderVar::TypeModifier::Varying);
+    vertexOutputs.emplace_back(
+        v._name, v.type(),
+        v._isFlat ? ShaderVar::TypeModifier::FlatVarying : ShaderVar::TypeModifier::Varying);
+    fragInputs.emplace_back(
+        v._name, v.type(),
+        v._isFlat ? ShaderVar::TypeModifier::FlatVarying : ShaderVar::TypeModifier::Varying);
   }
 }
 

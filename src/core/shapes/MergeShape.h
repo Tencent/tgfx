@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,14 +18,13 @@
 
 #pragma once
 
-#include "gpu/ResourceKey.h"
-#include "tgfx/core/Shape.h"
+#include "core/shapes/UniqueKeyShape.h"
 
 namespace tgfx {
 /**
  * Shape that merges multiple shapes together.
  */
-class MergeShape : public Shape {
+class MergeShape : public UniqueKeyShape {
  public:
   MergeShape(std::shared_ptr<Shape> first, std::shared_ptr<Shape> second, PathOp pathOp)
       : first(std::move(first)), second(std::move(second)), pathOp(pathOp) {
@@ -42,12 +41,7 @@ class MergeShape : public Shape {
     return Type::Merge;
   }
 
-  UniqueKey getUniqueKey() const override {
-    return uniqueKey.get();
-  }
-
  private:
-  LazyUniqueKey uniqueKey = {};
   std::shared_ptr<Shape> first = nullptr;
   std::shared_ptr<Shape> second = nullptr;
   PathOp pathOp = PathOp::Append;

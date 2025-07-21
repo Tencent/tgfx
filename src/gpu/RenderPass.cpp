@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -20,13 +20,11 @@
 #include "gpu/Gpu.h"
 
 namespace tgfx {
-bool RenderPass::begin(std::shared_ptr<RenderTarget> renderTarget,
-                       std::shared_ptr<Texture> renderTexture) {
+bool RenderPass::begin(std::shared_ptr<RenderTarget> renderTarget) {
   if (renderTarget == nullptr) {
     return false;
   }
   _renderTarget = std::move(renderTarget);
-  _renderTargetTexture = std::move(renderTexture);
   drawPipelineStatus = DrawPipelineStatus::NotConfigured;
   onBindRenderTarget();
   return true;
@@ -35,13 +33,11 @@ bool RenderPass::begin(std::shared_ptr<RenderTarget> renderTarget,
 void RenderPass::end() {
   onUnbindRenderTarget();
   _renderTarget = nullptr;
-  _renderTargetTexture = nullptr;
   _program = nullptr;
 }
 
-void RenderPass::bindProgramAndScissorClip(const ProgramInfo* programInfo,
-                                           const Rect& scissorRect) {
-  if (!onBindProgramAndScissorClip(programInfo, scissorRect)) {
+void RenderPass::bindProgramAndScissorClip(const Pipeline* pipeline, const Rect& scissorRect) {
+  if (!onBindProgramAndScissorClip(pipeline, scissorRect)) {
     drawPipelineStatus = DrawPipelineStatus::FailedToBind;
     return;
   }
@@ -53,17 +49,7 @@ void RenderPass::bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
   if (drawPipelineStatus != DrawPipelineStatus::Ok) {
     return;
   }
-  if (!onBindBuffers(std::move(indexBuffer), std::move(vertexBuffer), vertexOffset, nullptr)) {
-    drawPipelineStatus = DrawPipelineStatus::FailedToBind;
-  }
-}
-
-void RenderPass::bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
-                             std::shared_ptr<Data> vertexData) {
-  if (drawPipelineStatus != DrawPipelineStatus::Ok) {
-    return;
-  }
-  if (!onBindBuffers(std::move(indexBuffer), nullptr, 0, std::move(vertexData))) {
+  if (!onBindBuffers(std::move(indexBuffer), std::move(vertexBuffer), vertexOffset)) {
     drawPipelineStatus = DrawPipelineStatus::FailedToBind;
   }
 }

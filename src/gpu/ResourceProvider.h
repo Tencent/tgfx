@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -26,6 +26,8 @@
 namespace tgfx {
 class GradientCache;
 
+enum RRectType { FillType, StrokeType };
+
 class ResourceProvider {
  public:
   explicit ResourceProvider(Context* context) : context(context) {
@@ -43,9 +45,9 @@ class ResourceProvider {
 
   static uint16_t NumIndicesPerAAQuad();
 
-  std::shared_ptr<GpuBufferProxy> rRectIndexBuffer();
+  std::shared_ptr<GpuBufferProxy> rRectIndexBuffer(RRectType type);
 
-  static uint16_t NumIndicesPerRRect();
+  static uint16_t NumIndicesPerRRect(RRectType type);
 
   void releaseAll();
 
@@ -54,6 +56,7 @@ class ResourceProvider {
   GradientCache* _gradientCache = nullptr;
   std::shared_ptr<GpuBufferProxy> _aaQuadIndexBuffer = nullptr;
   std::shared_ptr<GpuBufferProxy> _nonAAQuadIndexBuffer = nullptr;
-  std::shared_ptr<GpuBufferProxy> _rRectIndexBuffer = nullptr;
+  std::shared_ptr<GpuBufferProxy> _rRectFillIndexBuffer = nullptr;
+  std::shared_ptr<GpuBufferProxy> _rRectStrokeIndexBuffer = nullptr;
 };
 }  // namespace tgfx

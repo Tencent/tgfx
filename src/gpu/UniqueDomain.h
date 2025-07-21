@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -39,11 +39,6 @@ class UniqueDomain {
   long useCount() const;
 
   /**
-   * Returns the number of times the UniqueDomain has been referenced strongly.
-   */
-  long strongCount() const;
-
-  /**
    * Increments the number of times the UniqueDomain has been referenced.
    */
   void addReference();
@@ -53,19 +48,8 @@ class UniqueDomain {
    */
   void releaseReference();
 
-  /**
-   * Increments the number of times the UniqueDomain has been referenced strongly.
-   */
-  void addStrong();
-
-  /**
-   * Decrements the number of times the UniqueDomain has been referenced strongly.
-   */
-  void releaseStrong();
-
  private:
   uint32_t _uniqueID = 0;
   std::atomic<long> _useCount = {1};
-  std::atomic<long> _strongCount = {0};
 };
 }  // namespace tgfx

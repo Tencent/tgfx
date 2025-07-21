@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -137,18 +137,6 @@ UniqueKey::UniqueKey(UniqueKey&& key) noexcept
   key.uniqueDomain = nullptr;
 }
 
-UniqueKey::UniqueKey(const UniqueType& type)
-    : ResourceKey(MakeDomainData(type.domain), 1), uniqueDomain(type.domain) {
-  if (uniqueDomain != nullptr) {
-    uniqueDomain->addReference();
-  }
-}
-
-UniqueKey::UniqueKey(UniqueType&& type) noexcept
-    : ResourceKey(MakeDomainData(type.domain), 1), uniqueDomain(type.domain) {
-  type.domain = nullptr;
-}
-
 UniqueKey::~UniqueKey() {
   if (uniqueDomain != nullptr) {
     uniqueDomain->releaseReference();
@@ -161,10 +149,6 @@ uint32_t UniqueKey::domainID() const {
 
 long UniqueKey::useCount() const {
   return uniqueDomain != nullptr ? uniqueDomain->useCount() : 0;
-}
-
-long UniqueKey::strongCount() const {
-  return uniqueDomain != nullptr ? uniqueDomain->strongCount() : 0;
 }
 
 UniqueKey& UniqueKey::operator=(const UniqueKey& key) {
@@ -197,18 +181,6 @@ UniqueKey& UniqueKey::operator=(UniqueKey&& key) noexcept {
   key.data = nullptr;
   key.count = 0;
   return *this;
-}
-
-void UniqueKey::addStrong() {
-  if (uniqueDomain != nullptr) {
-    uniqueDomain->addStrong();
-  }
-}
-
-void UniqueKey::releaseStrong() {
-  if (uniqueDomain != nullptr) {
-    uniqueDomain->releaseStrong();
-  }
 }
 
 LazyUniqueKey::~LazyUniqueKey() {

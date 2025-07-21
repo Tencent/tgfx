@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -42,9 +42,11 @@ class FTScalerContext : public ScalerContext {
 
   bool generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic, Path* path) const override;
 
-  Rect getImageTransform(GlyphID glyphID, Matrix* matrix) const override;
+  Rect getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
+                         Matrix* matrix) const override;
 
-  bool readPixels(GlyphID glyphID, const ImageInfo& dstInfo, void* dstPixels) const override;
+  bool readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke, const ImageInfo& dstInfo,
+                  void* dstPixels) const override;
 
  private:
   int setupSize(bool fauxItalic) const;
@@ -62,6 +64,8 @@ class FTScalerContext : public ScalerContext {
   Matrix getExtraMatrix(bool fauxItalic) const;
 
   FTTypeface* ftTypeface() const;
+
+  bool loadOutlineGlyph(FT_Face face, GlyphID glyphID, bool fauxBold, bool fauxItalic) const;
 
   bool isOpentypeFontDataStandardFormat() const;
 

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -27,9 +27,10 @@
 #include "core/codecs/png/PngCodec.h"
 #include "core/filters/BlurImageFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
-#include "core/utils/Caster.h"
+#include "core/shaders/MatrixShader.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/Types.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/GradientType.h"
 #include "tgfx/core/Matrix.h"
@@ -39,6 +40,7 @@
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Context.h"
+#include "tgfx/svg/SVGPathParser.h"
 
 namespace tgfx {
 
@@ -218,8 +220,8 @@ void ElementWriter::addEllipseAttributes(const Rect& bound) {
   addAttribute("ry", bound.height() * 0.5f);
 }
 
-void ElementWriter::addPathAttributes(const Path& path, PathEncoding encoding) {
-  addAttribute("d", ToSVGPath(path, encoding));
+void ElementWriter::addPathAttributes(const Path& path, SVGPathParser::PathEncoding encoding) {
+  addAttribute("d", SVGPathParser::ToSVGString(path, encoding));
 }
 
 Resources ElementWriter::addImageFilterResource(const std::shared_ptr<ImageFilter>& imageFilter,
@@ -228,35 +230,45 @@ Resources ElementWriter::addImageFilterResource(const std::shared_ptr<ImageFilte
   {
     ElementWriter filterElement("filter", writer);
     filterElement.addAttribute("id", filterID);
-    if (const auto* blurFilter = Caster::AsBlurImageFilter(imageFilter.get())) {
-      bound = blurFilter->filterBounds(bound);
-      filterElement.addAttribute("x", bound.x());
-      filterElement.addAttribute("y", bound.y());
-      filterElement.addAttribute("width", bound.width());
-      filterElement.addAttribute("height", bound.height());
-      filterElement.addAttribute("filterUnits", "userSpaceOnUse");
-      addBlurImageFilter(blurFilter);
-    } else if (const auto* dropShadowFilter = Caster::AsDropShadowImageFilter(imageFilter.get())) {
-      bound = blurFilter->filterBounds(bound);
-      filterElement.addAttribute("x", bound.x());
-      filterElement.addAttribute("y", bound.y());
-      filterElement.addAttribute("width", bound.width());
-      filterElement.addAttribute("height", bound.height());
-      filterElement.addAttribute("filterUnits", "userSpaceOnUse");
-      addDropShadowImageFilter(dropShadowFilter);
-    } else if (const auto* innerShadowFilter =
-                   Caster::AsInnerShadowImageFilter(imageFilter.get())) {
-      bound = blurFilter->filterBounds(bound);
-      filterElement.addAttribute("x", bound.x());
-      filterElement.addAttribute("y", bound.y());
-      filterElement.addAttribute("width", bound.width() + innerShadowFilter->dx);
-      filterElement.addAttribute("height", bound.height() + innerShadowFilter->dy);
-      filterElement.addAttribute("filterUnits", "userSpaceOnUse");
-      addInnerShadowImageFilter(innerShadowFilter);
-    } else {
-      // TODO (YGaurora): The compose filter can be expanded into multiple filters for export. This
-      // can be implemented.
-      reportUnsupportedElement("Unsupported image filter");
+    auto type = Types::Get(imageFilter.get());
+    switch (type) {
+      case Types::ImageFilterType::Blur: {
+        auto blurFilter = static_cast<const BlurImageFilter*>(imageFilter.get());
+        bound = blurFilter->filterBounds(bound);
+        filterElement.addAttribute("x", bound.x());
+        filterElement.addAttribute("y", bound.y());
+        filterElement.addAttribute("width", bound.width());
+        filterElement.addAttribute("height", bound.height());
+        filterElement.addAttribute("filterUnits", "userSpaceOnUse");
+        addBlurImageFilter(blurFilter);
+        break;
+      }
+      case Types::ImageFilterType::DropShadow: {
+        auto dropShadowFilter = static_cast<const DropShadowImageFilter*>(imageFilter.get());
+        bound = dropShadowFilter->filterBounds(bound);
+        filterElement.addAttribute("x", bound.x());
+        filterElement.addAttribute("y", bound.y());
+        filterElement.addAttribute("width", bound.width());
+        filterElement.addAttribute("height", bound.height());
+        filterElement.addAttribute("filterUnits", "userSpaceOnUse");
+        addDropShadowImageFilter(dropShadowFilter);
+        break;
+      }
+      case Types::ImageFilterType::InnerShadow: {
+        auto innerShadowFilter = static_cast<const InnerShadowImageFilter*>(imageFilter.get());
+        bound = innerShadowFilter->filterBounds(bound);
+        filterElement.addAttribute("x", bound.x());
+        filterElement.addAttribute("y", bound.y());
+        filterElement.addAttribute("width", bound.width() + innerShadowFilter->dx);
+        filterElement.addAttribute("height", bound.height() + innerShadowFilter->dy);
+        filterElement.addAttribute("filterUnits", "userSpaceOnUse");
+        addInnerShadowImageFilter(innerShadowFilter);
+        break;
+      }
+      default:
+        // TODO (YGaurora): The compose filter can be expanded into multiple filters for export. This
+        // can be implemented.
+        reportUnsupportedElement("Unsupported image filter");
     }
   }
   Resources resources;
@@ -282,7 +294,8 @@ void ElementWriter::addDropShadowImageFilter(const DropShadowImageFilter* filter
   }
   {
     ElementWriter blurElement("feGaussianBlur", writer);
-    if (const auto* blurFilter = Caster::AsBlurImageFilter(filter->blurFilter.get())) {
+    if (Types::Get(filter->blurFilter.get()) == Types::ImageFilterType::Blur) {
+      auto blurFilter = static_cast<const BlurImageFilter*>(filter->blurFilter.get());
       blurElement.addAttribute("stdDeviation",
                                std::max(blurFilter->blurrinessX, blurFilter->blurrinessY) / 2.f);
       blurElement.addAttribute("result", "blur");
@@ -335,7 +348,8 @@ void ElementWriter::addInnerShadowImageFilter(const InnerShadowImageFilter* filt
   }
   {
     ElementWriter blurElement("feGaussianBlur", writer);
-    if (const auto* blurFilter = Caster::AsBlurImageFilter(filter->blurFilter.get())) {
+    if (Types::Get(filter->blurFilter.get()) == Types::ImageFilterType::Blur) {
+      auto blurFilter = static_cast<const BlurImageFilter*>(filter->blurFilter.get());
       blurElement.addAttribute("stdDeviation",
                                std::max(blurFilter->blurrinessX, blurFilter->blurrinessY) / 2.f);
     }
@@ -373,12 +387,19 @@ Resources ElementWriter::addResources(const Fill& fill, Context* context,
   }
 
   if (auto colorFilter = fill.colorFilter) {
-    if (const auto* blendFilter = Caster::AsModeColorFilter(colorFilter.get())) {
-      addBlendColorFilterResources(blendFilter, &resources);
-    } else if (const auto* matrixFilter = Caster::AsMatrixColorFilter(colorFilter.get())) {
-      addMatrixColorFilterResources(matrixFilter, &resources);
-    } else {
-      reportUnsupportedElement("Unsupported color filter");
+    auto type = Types::Get(colorFilter.get());
+    switch (type) {
+      case Types::ColorFilterType::Blend:
+        addBlendColorFilterResources(static_cast<const ModeColorFilter*>(colorFilter.get()),
+                                     &resources);
+        break;
+      case Types::ColorFilterType::Matrix: {
+        addMatrixColorFilterResources(static_cast<const MatrixColorFilter*>(colorFilter.get()),
+                                      &resources);
+        break;
+      }
+      default:
+        reportUnsupportedElement("Unsupported color filter");
     }
   }
 
@@ -396,7 +417,8 @@ void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader, Co
     Matrix matrix = {};
     const Shader* tempShader = decomposedShader.get();
 
-    while (const auto* matrixShader = Caster::AsMatrixShader(tempShader)) {
+    while (Types::Get(tempShader) == Types::ShaderType::Matrix) {
+      auto matrixShader = static_cast<const MatrixShader*>(tempShader);
       matrix = matrix * matrixShader->matrix;
       tempShader = matrixShader->source.get();
     };
@@ -404,17 +426,24 @@ void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader, Co
   };
   auto [decomposedShader, matrix] = shaderDecomposer(shader);
 
-  if (const auto* colorShader = Caster::AsColorShader(decomposedShader)) {
-    addColorShaderResources(colorShader, resources);
-  } else if (const auto* gradientShader = Caster::AsGradientShader(decomposedShader)) {
-    addGradientShaderResources(gradientShader, matrix, resources);
-  } else if (const auto* imageShader = Caster::AsImageShader(decomposedShader)) {
-    addImageShaderResources(imageShader, matrix, context, resources);
-  } else {
-    // TODO(YGaurora):
-    // Export color filter shaders as color filters.
-    // Export blend shaders as a combination of a shader and blend mode.
-    reportUnsupportedElement("Unsupported shader");
+  auto type = Types::Get(decomposedShader);
+  switch (type) {
+    case Types::ShaderType::Color:
+      addColorShaderResources(static_cast<const ColorShader*>(decomposedShader), resources);
+      break;
+    case Types::ShaderType::Gradient:
+      addGradientShaderResources(static_cast<const GradientShader*>(decomposedShader), matrix,
+                                 resources);
+      break;
+    case Types::ShaderType::Image:
+      addImageShaderResources(static_cast<const ImageShader*>(decomposedShader), matrix, context,
+                              resources);
+      break;
+    default:
+      // TODO(YGaurora):
+      // Export color filter shaders as color filters.
+      // Export blend shaders as a combination of a shader and blend mode.
+      reportUnsupportedElement("Unsupported shader");
   }
 }
 
@@ -661,11 +690,11 @@ void ElementWriter::addMatrixColorFilterResources(const MatrixColorFilter* matri
 void ElementWriter::addMaskResources(const std::shared_ptr<MaskFilter>& maskFilter,
                                      Resources* resources, Context* context,
                                      SVGExportContext* svgContext) {
-
-  const auto* maskShaderFilter = Caster::AsShaderMaskFilter(maskFilter.get());
-  if (!maskShaderFilter) {
+  if (Types::Get(maskFilter.get()) != Types::MaskFilterType::Shader) {
     return;
   }
+
+  auto maskShaderFilter = static_cast<const ShaderMaskFilter*>(maskFilter.get());
 
   bool inverse = maskShaderFilter->isInverted();
   std::string filterID;
@@ -684,37 +713,44 @@ void ElementWriter::addMaskResources(const std::shared_ptr<MaskFilter>& maskFilt
   }
 
   auto maskShader = maskShaderFilter->getShader();
-  if (const auto* imageShader = Caster::AsImageShader(maskShader.get())) {
-    auto image = imageShader->image;
+  auto type = Types::Get(maskShader.get());
+  switch (type) {
+    case Types::ShaderType::Image: {
+      auto imageShader = static_cast<const ImageShader*>(maskShader.get());
+      auto image = imageShader->image;
 
-    ElementWriter maskElement("mask", writer);
-    auto maskID = resourceStore->addMask();
-    maskElement.addAttribute("id", maskID);
-    maskElement.addAttribute("style", "mask-type:alpha");
-    maskElement.addAttribute("maskUnits", "userSpaceOnUse");
-    maskElement.addAttribute("width", "100%");
-    maskElement.addAttribute("height", "100%");
+      ElementWriter maskElement("mask", writer);
+      auto maskID = resourceStore->addMask();
+      maskElement.addAttribute("id", maskID);
+      maskElement.addAttribute("style", "mask-type:alpha");
+      maskElement.addAttribute("maskUnits", "userSpaceOnUse");
+      maskElement.addAttribute("width", "100%");
+      maskElement.addAttribute("height", "100%");
 
-    addImageMaskResources(imageShader, filterID, context, svgContext);
+      addImageMaskResources(imageShader, filterID, context, svgContext);
 
-    resources->mask = "url(#" + maskID + ")";
-  } else if (Caster::AsColorShader(maskShader.get()) ||
-             Caster::AsGradientShader(maskShader.get())) {
-    ElementWriter maskElement("mask", writer);
-    auto maskID = resourceStore->addMask();
-    maskElement.addAttribute("id", maskID);
-    maskElement.addAttribute("style", "mask-type:alpha");
-    maskElement.addAttribute("maskUnits", "userSpaceOnUse");
-    maskElement.addAttribute("width", "100%");
-    maskElement.addAttribute("height", "100%");
+      resources->mask = "url(#" + maskID + ")";
+      break;
+    }
+    case Types::ShaderType::Color:
+    case Types::ShaderType::Gradient: {
+      ElementWriter maskElement("mask", writer);
+      auto maskID = resourceStore->addMask();
+      maskElement.addAttribute("id", maskID);
+      maskElement.addAttribute("style", "mask-type:alpha");
+      maskElement.addAttribute("maskUnits", "userSpaceOnUse");
+      maskElement.addAttribute("width", "100%");
+      maskElement.addAttribute("height", "100%");
 
-    addShaderMaskResources(maskShader, filterID, context);
+      addShaderMaskResources(maskShader, filterID, context);
 
-    resources->mask = "url(#" + maskID + ")";
-  } else {
-    // TODO (YGaurora): The mask filter can be expanded to support shaders. Once shaders are
-    // supported, the corresponding mask filter will also be supported.
-    reportUnsupportedElement("unsupported mask filter");
+      resources->mask = "url(#" + maskID + ")";
+      break;
+    }
+    default:
+      // TODO (YGaurora): The mask filter can be expanded to support shaders. Once shaders are
+      // supported, the corresponding mask filter will also be supported.
+      reportUnsupportedElement("unsupported mask filter");
   }
 }
 
@@ -722,8 +758,10 @@ void ElementWriter::addImageMaskResources(const ImageShader* imageShader,
                                           const std::string& filterID, Context* context,
                                           SVGExportContext* svgContext) {
   auto image = imageShader->image;
-  if (const auto* pictureImage = Caster::AsPictureImage(image.get())) {
-    addPictureImageMaskResources(pictureImage, filterID, svgContext);
+  Types::ImageType type = Types::Get(image.get());
+  if (type == Types::ImageType::Picture) {
+    addPictureImageMaskResources(static_cast<const PictureImage*>(image.get()), filterID,
+                                 svgContext);
   } else {
     addRenderImageMaskResources(imageShader, filterID, context);
   }
@@ -733,7 +771,10 @@ void ElementWriter::addPictureImageMaskResources(const PictureImage* pictureImag
                                                  const std::string& filterID,
                                                  SVGExportContext* svgContext) {
   auto picture = pictureImage->picture;
-  auto pictureBound = picture->getBounds(pictureImage->matrix);
+  auto pictureBound = picture->getBounds();
+  if (pictureImage->matrix) {
+    pictureImage->matrix->mapRect(&pictureBound);
+  }
   auto imageBound = Rect::MakeWH(pictureImage->width(), pictureImage->height());
   std::string clipID;
   if (!imageBound.contains(pictureBound)) {

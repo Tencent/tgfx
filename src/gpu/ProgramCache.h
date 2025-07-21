@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -21,7 +21,7 @@
 #include <list>
 #include <unordered_map>
 #include "Program.h"
-#include "ProgramInfo.h"
+#include "ProgramCreator.h"
 
 namespace tgfx {
 /**
@@ -41,7 +41,7 @@ class ProgramCache {
    * a new program will be created by programMaker. Returns null if the programMaker fails to make a
    * new program.
    */
-  Program* getProgram(const ProgramInfo* programInfo);
+  Program* getProgram(const ProgramCreator* programCreator);
 
  private:
   Context* context = nullptr;

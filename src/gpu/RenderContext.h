@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -33,20 +33,23 @@ class RenderContext : public DrawContext {
     return renderTarget->getContext();
   }
 
-  void drawFill(const MCState& state, const Fill& fill) override;
+  void drawFill(const Fill& fill) override;
 
   void drawRect(const Rect& rect, const MCState& state, const Fill& fill) override;
 
-  void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill) override;
+  void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
+                 const Stroke* stroke) override;
+
+  void drawPath(const Path& path, const MCState& state, const Fill& fill) override;
 
   void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) override;
 
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                  const MCState& state, const Fill& fill) override;
 
-  void drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
-                     const SamplingOptions& sampling, const MCState& state,
-                     const Fill& fill) override;
+  void drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
+                     const SamplingOptions& sampling, const MCState& state, const Fill& fill,
+                     SrcRectConstraint constraint) override;
 
   void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
                         const Fill& fill, const Stroke* stroke) override;
@@ -63,14 +66,21 @@ class RenderContext : public DrawContext {
   bool flush();
 
  private:
+  void drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const MCState& state,
+                              const Fill& fill, const Stroke* stroke, GlyphRun* rejectedGlyphRun);
+
+  void drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
+                        const Fill& fill, const Stroke* stroke, const Rect& clipBounds);
+
+  void drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun, const MCState& state,
+                                   const Fill& fill, const Stroke* stroke);
+
   std::shared_ptr<RenderTargetProxy> renderTarget = nullptr;
   uint32_t renderFlags = 0;
   Surface* surface = nullptr;
   std::shared_ptr<OpsCompositor> opsCompositor = nullptr;
 
   Rect getClipBounds(const Path& clip);
-  void drawColorGlyphs(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
-                       const Fill& fill);
   OpsCompositor* getOpsCompositor(bool discardContent = false);
   void replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRenderTarget,
                            std::shared_ptr<Image> oldContent);

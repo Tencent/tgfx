@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -50,16 +50,6 @@ class ImageBuffer {
       HardwareBufferRef hardwareBuffer, YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED);
 
   /**
-   * Creates an ImageBuffer from the ImageInfo and shares pixels from the immutable Data object. The
-   * caller must ensure the pixel data stay unchanged for the lifetime of the returned ImageBuffer.
-   * Returns nullptr if the pixels are nullptr or the ImageInfo is not suitable for direct texture
-   * uploading. ImageInfo parameters suitable for direct texture uploading include:
-   * The alpha type is either AlphaType::Premultiplied or AlphaType::Opaque;
-   * The color type is one of ColorType::ALPHA_8, ColorType::RGBA_8888, and ColorType::BGRA_8888.
-   */
-  static std::shared_ptr<ImageBuffer> MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels);
-
-  /**
    * Creates an ImageBuffer in the I420 format with the specified YUVData and YUVColorSpace. The
    * caller must ensure the yuvData stays unchanged for the lifetime of the returned ImageBuffer.
    * Returns nullptr if the yuvData is invalid.
@@ -102,6 +92,13 @@ class ImageBuffer {
 
  protected:
   ImageBuffer() = default;
+
+  /**
+   * Returns true if the ImageBuffer is backed by a PixelBuffer, allowing pixel locking.
+   */
+  virtual bool isPixelBuffer() const {
+    return false;
+  }
 
   /**
    * Creates a new Texture capturing the pixels of the ImageBuffer. The mipmapped parameter

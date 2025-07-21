@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -69,6 +69,8 @@ class CGTypeface : public Typeface {
 
   std::shared_ptr<Data> openData() const override;
 
+  std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;
+
  private:
   CGTypeface(CTFontRef ctFont, std::shared_ptr<Data> data);
 
@@ -77,7 +79,6 @@ class CGTypeface : public Typeface {
   bool _hasColor = false;
   bool _hasOutlines = true;
   std::shared_ptr<Data> data;
-  std::weak_ptr<CGTypeface> weakThis;
 
   friend class CGScalerContext;
 };

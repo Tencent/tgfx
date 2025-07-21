@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -22,7 +22,6 @@
 #include <cstring>
 #include <memory>
 #include "tgfx/core/BytesKey.h"
-#include "tgfx/gpu/UniqueType.h"
 
 namespace tgfx {
 /**
@@ -163,10 +162,6 @@ class UniqueKey : public ResourceKey {
 
   UniqueKey(UniqueKey&& key) noexcept;
 
-  UniqueKey(const UniqueType& type);
-
-  UniqueKey(UniqueType&& type) noexcept;
-
   virtual ~UniqueKey();
 
   /**
@@ -178,11 +173,6 @@ class UniqueKey : public ResourceKey {
    * Returns the total number of times the domain has been referenced.
    */
   long useCount() const;
-
-  /**
-   * Returns the number of times the domain has been strongly referenced.
-   */
-  long strongCount() const;
 
   UniqueKey& operator=(const UniqueKey& key);
 
@@ -202,10 +192,6 @@ class UniqueKey : public ResourceKey {
   explicit UniqueKey(UniqueDomain* domain);
 
   UniqueKey(uint32_t* data, size_t count, UniqueDomain* domain);
-
-  void addStrong();
-
-  void releaseStrong();
 
   friend class ResourceHandle;
   friend class LazyUniqueKey;

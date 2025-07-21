@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,14 +18,13 @@
 
 #pragma once
 
-#include "gpu/ResourceKey.h"
-#include "tgfx/core/Shape.h"
+#include "core/shapes/UniqueKeyShape.h"
 
 namespace tgfx {
 /**
  * Shape that appends multiple shapes together.
  */
-class AppendShape : public Shape {
+class AppendShape : public UniqueKeyShape {
  public:
   static std::shared_ptr<Shape> MakeFrom(std::shared_ptr<Shape> first,
                                          std::shared_ptr<Shape> second);
@@ -41,12 +40,7 @@ class AppendShape : public Shape {
     return Type::Append;
   }
 
-  UniqueKey getUniqueKey() const override {
-    return uniqueKey.get();
-  }
-
  private:
-  LazyUniqueKey uniqueKey = {};
   std::vector<std::shared_ptr<Shape>> shapes = {};
 
   static void Append(std::vector<std::shared_ptr<Shape>>* shapes, std::shared_ptr<Shape> shape);

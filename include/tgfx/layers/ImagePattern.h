@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -41,14 +41,34 @@ class ImagePattern : public ShapeStyle {
                                             TileMode tileModeY = TileMode::Clamp,
                                             const SamplingOptions& sampling = {});
 
+  std::shared_ptr<Image> image() const {
+    return _image;
+  }
+
+  TileMode tileModeX() const {
+    return _tileModeX;
+  }
+
+  TileMode tileModeY() const {
+    return _tileModeY;
+  }
+
+  SamplingOptions samplingOptions() const {
+    return _sampling;
+  }
+
  protected:
+  Type getType() const override {
+    return Type::ImagePattern;
+  }
+
   std::shared_ptr<Shader> onGetShader() const override;
 
  private:
-  std::shared_ptr<Image> image = nullptr;
-  TileMode tileModeX = TileMode::Clamp;
-  TileMode tileModeY = TileMode::Clamp;
-  SamplingOptions sampling = {};
+  std::shared_ptr<Image> _image = nullptr;
+  TileMode _tileModeX = TileMode::Clamp;
+  TileMode _tileModeY = TileMode::Clamp;
+  SamplingOptions _sampling = {};
 
   ImagePattern(std::shared_ptr<Image> image, TileMode tileModeX, TileMode tileModeY,
                const SamplingOptions& sampling);

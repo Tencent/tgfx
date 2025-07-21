@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -48,6 +48,8 @@ void ImageWithShadow::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host)
                                               tgfx::Color::Black());
   tgfx::Paint paint = {};
   paint.setImageFilter(filter);
+  canvas->translate(host->contentOffset().x, host->contentOffset().y);
+  canvas->scale(host->zoomScale(), host->zoomScale());
   canvas->drawImage(scaledImage, static_cast<float>(width - size) / 2,
                     static_cast<float>(height - size) / 2, &paint);
 }

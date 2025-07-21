@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -25,7 +25,6 @@
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/SamplingOptions.h"
-#include "tgfx/core/TileMode.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/ImageOrigin.h"
 #include "tgfx/platform/HardwareBuffer.h"
@@ -36,6 +35,7 @@ template <typename T>
 class PlacementPtr;
 class FPArgs;
 class TPArgs;
+class SamplingArgs;
 class Context;
 class ImageFilter;
 class FragmentProcessor;
@@ -78,12 +78,10 @@ class Image {
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageGenerator> generator);
 
   /**
-   * Creates an Image from the ImageInfo and shares pixels from the immutable Data object. The
-   * returned Image takes a reference to the pixels. The caller must ensure the pixels are always
-   * the same for the lifetime of the returned Image. If the ImageInfo is unsuitable for direct
-   * texture uploading, the Image will internally create an ImageGenerator for pixel format
-   * conventing instead of an ImageBuffer. Returns nullptr if the ImageInfo is empty or the pixels
-   * are nullptr.
+   * Creates an Image using the provided ImageInfo and pixel data from an immutable Data object. The
+   * returned Image holds a reference to the pixel data. The caller must ensure the pixel data
+   * remains unchanged for the lifetime of the Image. Returns nullptr if the ImageInfo is empty or
+   * the pixel data is nullptr.
    */
   static std::shared_ptr<Image> MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels);
 
@@ -106,11 +104,14 @@ class Image {
                                          YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED);
 
   /**
-   * Creates an Image from the given picture with the specified width, height, and matrix.
-   * The picture will be drawn onto the Image using the provided matrix. The returned Image holds a
-   * reference to the picture and replays the drawing commands until it is actually required.
-   * Note: This method may return a different type of Image other than PictureImage if the picture
-   * is simple enough.
+   * Creates an Image from the given picture with the specified width, height, and matrix. The
+   * picture will be drawn onto the Image using the provided matrix. The returned Image keeps a
+   * reference to the picture and replays its drawing commands only when needed. A PictureImage is
+   * not rasterized and does not cache its content, so it can render just the required portions of
+   * the picture to a temporary offscreen image. To cache the entire content at full size, use the
+   * makeRasterized() method on the PictureImage. Note: This method may return a different type of
+   * Image instead of PictureImage if the picture is simple enough to be treated directly as an
+   * Image.
    * @param picture A stream of drawing commands.
    * @param width The width of the Image.
    * @param height The height of the Image.
@@ -330,15 +331,11 @@ class Image {
   /**
    * Returns a fragment processor for the entire Image.
    * @param args The FPArgs used to create the fragment processor.
-   * @param tileModeX The tile mode applied in the x direction.
-   * @param tileModeY The tile mode applied in the y direction.
-   * @param sampling The sampling options used when sampling the Image.
+   * @param samplingArgs The SamplingArgs used to sample the Image.
    * @param uvMatrix The matrix used to transform the uv coordinates.
    */
   virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
-                                                              TileMode tileModeX,
-                                                              TileMode tileModeY,
-                                                              const SamplingOptions& sampling,
+                                                              const SamplingArgs& samplingArgs,
                                                               const Matrix* uvMatrix) const = 0;
 
   friend class FragmentProcessor;
@@ -347,6 +344,6 @@ class Image {
   friend class RGBAAAImage;
   friend class RasterizedImage;
   friend class ImageShader;
-  friend class Caster;
+  friend class Types;
 };
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -24,7 +24,7 @@ void ShapeStyle::setAlpha(float value) {
     return;
   }
   _alpha = value;
-  invalidate();
+  invalidateContent();
 }
 
 void ShapeStyle::setBlendMode(BlendMode value) {
@@ -32,7 +32,7 @@ void ShapeStyle::setBlendMode(BlendMode value) {
     return;
   }
   _blendMode = value;
-  invalidate();
+  invalidateContent();
 }
 
 void ShapeStyle::setMatrix(const Matrix& value) {
@@ -40,7 +40,7 @@ void ShapeStyle::setMatrix(const Matrix& value) {
     return;
   }
   _matrix = value;
-  invalidate();
+  invalidateContent();
 }
 
 std::shared_ptr<Shader> ShapeStyle::getShader() const {

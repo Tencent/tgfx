@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,7 +18,6 @@
 
 #include "FTScalerContext.h"
 #include <freetype/ftfntfmt.h>
-#include <cmath>
 #include <memory>
 #include "ft2build.h"
 #include "tgfx/core/FontMetrics.h"
@@ -29,7 +28,10 @@
 #include FT_SIZES_H
 #include FT_TRUETYPE_TABLES_H
 #include <array>
+#include "FTRasterTarget.h"
 #include "FTUtil.h"
+#include "core/utils/ClearPixels.h"
+#include "core/utils/GammaCorrection.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "skcms.h"
@@ -41,14 +43,16 @@ namespace tgfx {
 static constexpr FT_Pos BITMAP_EMBOLDEN_STRENGTH = 1 << 6;
 static constexpr int OUTLINE_EMBOLDEN_DIVISOR = 24;
 
-std::shared_ptr<ScalerContext> ScalerContext::CreateNew(std::shared_ptr<Typeface> typeface,
-                                                        float size) {
-  DEBUG_ASSERT(typeface != nullptr);
-  return std::make_shared<FTScalerContext>(std::move(typeface), size);
-}
+static constexpr FT_UInt DefaultResolutionInDPI = 72;
 
-namespace {
-float FTFixedToFloat(FT_Fixed x) {
+// When FT_Set_Char_Size is called, the ppem value is recalculated using the formula:
+// ppem = textSize * DPI / 72.
+// In FreeType, ppem is stored as an unsigned short, so if textSize exceeds 65535, ppem will overflow.
+// To prevent this, we cap textSize at 65535. For the ppem limit in the source code, check here:
+// https://github.com/freetype/freetype/blob/VER-2-13-3/src/base/ftobjs.c/#L3359
+static constexpr float MaxTextSize = 65535.f * 72.f / static_cast<float>(DefaultResolutionInDPI);
+
+static float FTFixedToFloat(FT_Fixed x) {
   return static_cast<float>(x) * 1.52587890625e-5f;
 }
 
@@ -60,7 +64,30 @@ static FT_Fixed FloatToFTFixed(float x) {
   return static_cast<FT_Fixed>(x * (1 << 16));
 }
 
-void ApplyEmbolden(FT_Face face, FT_GlyphSlot glyph, GlyphID glyphId, FT_Int32 glyphFlags) {
+static void RenderOutLineGlyph(FT_Face face, const ImageInfo& dstInfo, void* dstPixels) {
+  auto buffer = static_cast<unsigned char*>(dstPixels);
+  int rows = dstInfo.height();
+  int pitch = static_cast<int>(dstInfo.rowBytes());
+
+  FTRasterTarget target = {buffer + (rows - 1) * pitch, pitch,
+                           GammaCorrection::GammaTable().data()};
+  FT_Raster_Params params;
+  params.flags = FT_RASTER_FLAG_DIRECT | FT_RASTER_FLAG_CLIP | FT_RASTER_FLAG_AA;
+  params.gray_spans = GraySpanFunc;
+  params.user = &target;
+  params.clip_box = {0, 0, static_cast<FT_Pos>(dstInfo.width()),
+                     static_cast<FT_Pos>(dstInfo.height())};
+  auto outline = &face->glyph->outline;
+  FT_BBox bbox;
+  FT_Outline_Get_CBox(outline, &bbox);
+  // outset the box to integral boundaries
+  bbox.xMin &= ~63;
+  bbox.yMin &= ~63;
+  FT_Outline_Translate(outline, -bbox.xMin, -bbox.yMin);
+  FT_Outline_Render(face->glyph->library, outline, &params);
+}
+
+static void ApplyEmbolden(FT_Face face, FT_GlyphSlot glyph, GlyphID glyphId, FT_Int32 glyphFlags) {
   switch (glyph->format) {
     case FT_GLYPH_FORMAT_OUTLINE:
       FT_Pos strength;
@@ -170,7 +197,13 @@ FTScalerContext::FTScalerContext(std::shared_ptr<Typeface> tf, float size)
   }
   auto textScaleDot6 = FloatToFDot6(textScale);
   if (FT_IS_SCALABLE(face)) {
-    err = FT_Set_Char_Size(face, textScaleDot6, textScaleDot6, 72, 72);
+    bool exceedScaleLimit = false;
+    if (textScale > MaxTextSize) {
+      textScaleDot6 = FloatToFDot6(MaxTextSize);
+      exceedScaleLimit = true;
+    }
+    err = FT_Set_Char_Size(face, textScaleDot6, textScaleDot6, DefaultResolutionInDPI,
+                           DefaultResolutionInDPI);
     if (err != FT_Err_Ok) {
       LOGE("FT_Set_CharSize(%s, %f, %f) failed.", face->family_name, textScaleDot6, textScaleDot6);
       return;
@@ -185,6 +218,8 @@ FTScalerContext::FTScalerContext(std::shared_ptr<Typeface> tf, float size)
       auto yPpem = unitsPerEm * FTFixedToFloat(metrics.y_scale) / 64.0f;
       extraScale.x *= textScale / xPpem;
       extraScale.y *= textScale / yPpem;
+    } else if (exceedScaleLimit) {
+      extraScale *= textScale / MaxTextSize;
     }
   } else if (FT_HAS_FIXED_SIZES(face)) {
     strikeIndex = ChooseBitmapStrike(face, textScaleDot6);
@@ -515,22 +550,9 @@ bool FTScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItal
                                    Path* path) const {
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   auto face = ftTypeface()->face;
-  // FT_IS_SCALABLE is documented to mean the face contains outline glyphs.
-  if (!FT_IS_SCALABLE(face) || setupSize(fauxItalic)) {
+  if (!loadOutlineGlyph(face, glyphID, fauxBold, fauxItalic)) {
     path->reset();
     return false;
-  }
-  auto flags = loadGlyphFlags;
-  flags |= FT_LOAD_NO_BITMAP;  // ignore embedded bitmaps so we're sure to get the outline
-  flags &= ~FT_LOAD_RENDER;    // don't scan convert (we just want the outline)
-
-  auto err = FT_Load_Glyph(face, glyphID, flags);
-  if (err != FT_Err_Ok || face->glyph->format != FT_GLYPH_FORMAT_OUTLINE) {
-    path->reset();
-    return false;
-  }
-  if (fauxBold) {
-    ApplyEmbolden(face, face->glyph, glyphID, loadGlyphFlags);
   }
   if (!GenerateGlyphPath(face, path)) {
     path->reset();
@@ -644,7 +666,19 @@ static gfx::skcms_PixelFormat ToPixelFormat(ColorType colorType) {
   }
 }
 
-Rect FTScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
+Rect FTScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
+                                        Matrix* matrix) const {
+  if (!hasColor() && stroke != nullptr) {
+    return {};
+  }
+  if (!hasColor()) {
+    const auto bounds = getBounds(glyphID, fauxBold, false);
+    if (matrix) {
+      matrix->setTranslate(bounds.x(), bounds.y());
+    }
+    return bounds;
+  }
+
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
   auto glyphFlags = loadGlyphFlags | static_cast<FT_Int32>(FT_LOAD_BITMAP_METRICS_ONLY);
   glyphFlags &= ~FT_LOAD_NO_BITMAP;
@@ -662,8 +696,24 @@ Rect FTScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
       static_cast<float>(face->glyph->bitmap.width), static_cast<float>(face->glyph->bitmap.rows));
 }
 
-bool FTScalerContext::readPixels(GlyphID glyphID, const ImageInfo& dstInfo, void* dstPixels) const {
+bool FTScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*,
+                                 const ImageInfo& dstInfo, void* dstPixels) const {
+  if (dstInfo.isEmpty() || dstPixels == nullptr) {
+    return false;
+  }
+  // Note: In the hasColor() function, freeType has an internal lock. Placing this method later
+  // would cause repeated locking and lead to a deadlock.
+  bool colorFont = hasColor();
   std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
+  if (!colorFont) {
+    auto face = ftTypeface()->face;
+    if (!loadOutlineGlyph(face, glyphID, fauxBold, false)) {
+      return false;
+    }
+    ClearPixels(dstInfo, dstPixels);
+    RenderOutLineGlyph(face, dstInfo, dstPixels);
+    return true;
+  }
   auto glyphFlags = loadGlyphFlags;
   glyphFlags |= FT_LOAD_RENDER;
   glyphFlags &= ~FT_LOAD_NO_BITMAP;
@@ -714,5 +764,24 @@ Matrix FTScalerContext::getExtraMatrix(bool fauxItalic) const {
 
 FTTypeface* FTScalerContext::ftTypeface() const {
   return static_cast<FTTypeface*>(typeface.get());
+}
+
+bool FTScalerContext::loadOutlineGlyph(FT_Face face, GlyphID glyphID, bool fauxBold,
+                                       bool fauxItalic) const {
+  // FT_IS_SCALABLE is documented to mean the face contains outline glyphs.
+  if (!FT_IS_SCALABLE(face) || setupSize(fauxItalic)) {
+    return false;
+  }
+  auto flags = loadGlyphFlags;
+  flags |= FT_LOAD_NO_BITMAP;  // ignore embedded bitmaps so we're sure to get the outline
+  flags &= ~FT_LOAD_RENDER;    // don't scan convert (we just want the outline)
+  auto err = FT_Load_Glyph(face, glyphID, flags);
+  if (err != FT_Err_Ok || face->glyph->format != FT_GLYPH_FORMAT_OUTLINE) {
+    return false;
+  }
+  if (fauxBold) {
+    ApplyEmbolden(face, face->glyph, glyphID, flags);
+  }
+  return true;
 }
 }  // namespace tgfx

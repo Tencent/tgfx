@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,7 +19,6 @@
 #include "Pipeline.h"
 #include "gpu/ProgramBuilder.h"
 #include "gpu/TextureSampler.h"
-#include "gpu/processors/PorterDuffXferProcessor.h"
 
 namespace tgfx {
 Pipeline::Pipeline(PlacementPtr<GeometryProcessor> geometryProcessor,
@@ -29,8 +28,8 @@ Pipeline::Pipeline(PlacementPtr<GeometryProcessor> geometryProcessor,
     : geometryProcessor(std::move(geometryProcessor)),
       fragmentProcessors(std::move(fragmentProcessors)), numColorProcessors(numColorProcessors),
       xferProcessor(std::move(xferProcessor)), _outputSwizzle(outputSwizzle) {
-  BlendModeAsCoeff(blendMode, &_blendInfo);
   updateProcessorIndices();
+  BlendModeAsCoeff(blendMode, numColorProcessors < this->fragmentProcessors.size(), &_blendFormula);
 }
 
 void Pipeline::updateProcessorIndices() {
@@ -75,6 +74,11 @@ void Pipeline::getUniforms(UniformBuffer* uniformBuffer) const {
 
 std::vector<SamplerInfo> Pipeline::getSamplers() const {
   std::vector<SamplerInfo> samplers = {};
+  for (size_t i = 0; i < geometryProcessor->numTextureSamplers(); i++) {
+    SamplerInfo sampler = {geometryProcessor->textureSampler(i),
+                           geometryProcessor->samplerState(i)};
+    samplers.push_back(sampler);
+  }
   FragmentProcessor::Iter iter(this);
   const FragmentProcessor* fp = iter.next();
   while (fp) {
@@ -99,7 +103,7 @@ void Pipeline::computeProgramKey(Context* context, BytesKey* programKey) const {
   }
   auto dstTexture = xferProcessor != nullptr ? xferProcessor->dstTexture() : nullptr;
   if (dstTexture != nullptr) {
-    dstTexture->getSampler()->computeKey(context, programKey);
+    dstTexture->getSampler()->computeSamplerKey(context, programKey);
   }
   getXferProcessor()->computeProcessorKey(context, programKey);
   programKey->write(static_cast<uint32_t>(_outputSwizzle->asKey()));

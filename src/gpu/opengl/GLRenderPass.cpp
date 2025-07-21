@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -21,6 +21,7 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/ProgramCache.h"
 #include "gpu/opengl/GLProgram.h"
+#include "gpu/opengl/GLRenderTarget.h"
 
 namespace tgfx {
 struct AttribLayout {
@@ -59,9 +60,6 @@ GLRenderPass::GLRenderPass(Context* context) : RenderPass(context) {
     vertexArray = GLVertexArray::Make(context);
     DEBUG_ASSERT(vertexArray != nullptr);
   }
-  sharedVertexBuffer =
-      std::static_pointer_cast<GLBuffer>(GpuBuffer::Make(context, BufferType::Vertex));
-  DEBUG_ASSERT(sharedVertexBuffer != nullptr);
 }
 
 static void UpdateScissor(Context* context, const Rect& scissorRect) {
@@ -76,14 +74,22 @@ static void UpdateScissor(Context* context, const Rect& scissorRect) {
 }
 
 static const unsigned gXfermodeCoeff2Blend[] = {
-    GL_ZERO,      GL_ONE,
-    GL_SRC_COLOR, GL_ONE_MINUS_SRC_COLOR,
-    GL_DST_COLOR, GL_ONE_MINUS_DST_COLOR,
-    GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA,
-    GL_DST_ALPHA, GL_ONE_MINUS_DST_ALPHA,
+    GL_ZERO,       GL_ONE,
+    GL_SRC_COLOR,  GL_ONE_MINUS_SRC_COLOR,
+    GL_DST_COLOR,  GL_ONE_MINUS_DST_COLOR,
+    GL_SRC_ALPHA,  GL_ONE_MINUS_SRC_ALPHA,
+    GL_DST_ALPHA,  GL_ONE_MINUS_DST_ALPHA,
+    GL_SRC1_COLOR, GL_ONE_MINUS_SRC1_COLOR,
+    GL_SRC1_ALPHA, GL_ONE_MINUS_SRC1_ALPHA,
 };
 
-static void UpdateBlend(Context* context, const BlendInfo* blendFactors) {
+static const unsigned gXfermodeEquation2Blend[] = {
+    GL_FUNC_ADD,
+    GL_FUNC_SUBTRACT,
+    GL_FUNC_REVERSE_SUBTRACT,
+};
+
+static void UpdateBlend(Context* context, const BlendFormula* blendFactors) {
   auto gl = GLFunctions::Get(context);
   auto caps = GLCaps::Get(context);
   if (caps->frameBufferFetchSupport && caps->frameBufferFetchRequiresEnablePerSample) {
@@ -93,22 +99,24 @@ static void UpdateBlend(Context* context, const BlendInfo* blendFactors) {
       gl->disable(GL_FETCH_PER_SAMPLE_ARM);
     }
   }
-  if (blendFactors == nullptr || (blendFactors->srcBlend == BlendModeCoeff::One &&
-                                  blendFactors->dstBlend == BlendModeCoeff::Zero)) {
+  if (blendFactors == nullptr || (blendFactors->srcCoeff() == BlendModeCoeff::One &&
+                                  blendFactors->dstCoeff() == BlendModeCoeff::Zero &&
+                                  (blendFactors->equation() == BlendEquation::Add ||
+                                   blendFactors->equation() == BlendEquation::Subtract))) {
     // There is no need to enable blending if the blend mode is src.
     gl->disable(GL_BLEND);
   } else {
     gl->enable(GL_BLEND);
-    gl->blendFunc(gXfermodeCoeff2Blend[static_cast<int>(blendFactors->srcBlend)],
-                  gXfermodeCoeff2Blend[static_cast<int>(blendFactors->dstBlend)]);
-    gl->blendEquation(GL_FUNC_ADD);
+    gl->blendFunc(gXfermodeCoeff2Blend[static_cast<int>(blendFactors->srcCoeff())],
+                  gXfermodeCoeff2Blend[static_cast<int>(blendFactors->dstCoeff())]);
+    gl->blendEquation(gXfermodeEquation2Blend[static_cast<int>(blendFactors->equation())]);
   }
 }
 
 void GLRenderPass::onBindRenderTarget() {
   auto gl = GLFunctions::Get(context);
   auto glRT = static_cast<GLRenderTarget*>(_renderTarget.get());
-  gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->getFrameBufferID());
+  gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->drawFrameBufferID());
   gl->viewport(0, 0, glRT->width(), glRT->height());
   if (vertexArray) {
     gl->bindVertexArray(vertexArray->id());
@@ -123,9 +131,8 @@ void GLRenderPass::onUnbindRenderTarget() {
   gl->bindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-bool GLRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
-                                               const Rect& scissorRect) {
-  _program = static_cast<GLProgram*>(context->programCache()->getProgram(programInfo));
+bool GLRenderPass::onBindProgramAndScissorClip(const Pipeline* pipeline, const Rect& scissorRect) {
+  _program = static_cast<GLProgram*>(context->programCache()->getProgram(pipeline));
   if (_program == nullptr) {
     return false;
   }
@@ -134,24 +141,19 @@ bool GLRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
   auto* program = static_cast<GLProgram*>(_program);
   gl->useProgram(program->programID());
   UpdateScissor(context, scissorRect);
-  UpdateBlend(context, programInfo->blendInfo());
-  if (programInfo->requiresBarrier()) {
+  UpdateBlend(context, pipeline->blendFormula());
+  if (pipeline->requiresBarrier()) {
     gl->textureBarrier();
   }
-  program->updateUniformsAndTextureBindings(_renderTarget.get(), programInfo);
+  program->updateUniformsAndTextureBindings(_renderTarget.get(), pipeline);
   return true;
 }
 
 bool GLRenderPass::onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
-                                 std::shared_ptr<GpuBuffer> vertexBuffer, size_t vertexOffset,
-                                 std::shared_ptr<Data> vertexData) {
+                                 std::shared_ptr<GpuBuffer> vertexBuffer, size_t vertexOffset) {
   auto gl = GLFunctions::Get(context);
   if (vertexBuffer) {
     gl->bindBuffer(GL_ARRAY_BUFFER, std::static_pointer_cast<GLBuffer>(vertexBuffer)->bufferID());
-  } else if (vertexData) {
-    gl->bindBuffer(GL_ARRAY_BUFFER, sharedVertexBuffer->bufferID());
-    gl->bufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(vertexData->size()), vertexData->data(),
-                   GL_STATIC_DRAW);
   } else {
     return false;
   }
@@ -196,16 +198,18 @@ void GLRenderPass::onCopyToTexture(Texture* texture, int srcX, int srcY) {
   auto gpu = context->gpu();
   if (_renderTarget->sampleCount() > 1) {
     if (copyAsBlit(texture, srcX, srcY)) {
+      texture->getSampler()->regenerateMipmapLevels(context);
       return;
     }
     auto bounds = Rect::MakeXYWH(srcX, srcY, texture->width(), texture->height());
     gpu->resolveRenderTarget(_renderTarget.get(), bounds);
   }
   gpu->copyRenderTargetToTexture(_renderTarget.get(), texture, srcX, srcY);
+  texture->getSampler()->regenerateMipmapLevels(context);
   // Reset the render target after the copy operation.
   auto gl = GLFunctions::Get(context);
   gl->bindFramebuffer(GL_FRAMEBUFFER,
-                      static_cast<GLRenderTarget*>(_renderTarget.get())->getFrameBufferID());
+                      static_cast<GLRenderTarget*>(_renderTarget.get())->drawFrameBufferID());
 }
 
 bool GLRenderPass::copyAsBlit(Texture* texture, int srcX, int srcY) {
@@ -216,8 +220,9 @@ bool GLRenderPass::copyAsBlit(Texture* texture, int srcX, int srcY) {
   if (caps->blitRectsMustMatchForMSAASrc && (srcX != 0 || srcY != 0)) {
     return false;
   }
-  auto glSampler = static_cast<const GLSampler*>(texture->getSampler());
-  if (glSampler->format != _renderTarget->format()) {
+  auto glSampler = static_cast<const GLTextureSampler*>(texture->getSampler());
+  auto target = glSampler->target();
+  if (glSampler->format() != _renderTarget->format()) {
     return false;
   }
   if (frameBuffer == nullptr) {
@@ -228,10 +233,10 @@ bool GLRenderPass::copyAsBlit(Texture* texture, int srcX, int srcY) {
   }
   ClearGLError(context);
   auto gl = GLFunctions::Get(context);
+
   gl->bindFramebuffer(GL_FRAMEBUFFER, frameBuffer->id());
-  gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, glSampler->target, glSampler->id,
-                           0);
-  auto sourceFrameBufferID = static_cast<GLRenderTarget*>(_renderTarget.get())->getFrameBufferID();
+  gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, target, glSampler->id(), 0);
+  auto sourceFrameBufferID = static_cast<GLRenderTarget*>(_renderTarget.get())->drawFrameBufferID();
 #ifndef TGFX_BUILD_FOR_WEB
   if (gl->checkFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
     gl->bindFramebuffer(GL_FRAMEBUFFER, sourceFrameBufferID);
@@ -250,11 +255,7 @@ bool GLRenderPass::copyAsBlit(Texture* texture, int srcX, int srcY) {
     return false;
   }
   gl->bindFramebuffer(GL_FRAMEBUFFER, frameBuffer->id());
-  gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, glSampler->target, 0, 0);
-  if (glSampler->hasMipmaps() && glSampler->target == GL_TEXTURE_2D) {
-    gl->bindTexture(glSampler->target, glSampler->id);
-    gl->generateMipmap(glSampler->target);
-  }
+  gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, target, 0, 0);
   gl->bindFramebuffer(GL_FRAMEBUFFER, sourceFrameBufferID);
   return true;
 }

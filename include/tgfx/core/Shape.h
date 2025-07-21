@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -20,7 +20,6 @@
 
 #include "tgfx/core/PathEffect.h"
 #include "tgfx/core/PathProvider.h"
-#include "tgfx/core/RRect.h"
 #include "tgfx/core/TextBlob.h"
 
 namespace tgfx {
@@ -42,16 +41,22 @@ class Shape {
   static std::shared_ptr<Shape> MakeFrom(Path path);
 
   /**
-   * Creates a new Shape from the given text blob. The Shape uses a resolution scale of 1.0 to get
-   * the path from the text blob. Returns nullptr if the text blob is nullptr or contains a typeface
-   * that can't generate a path, such as bitmap typefaces.
+   * Creates a new Shape from the given text blob. The specified scale is applied to the text blob
+   * before extracting its paths. Returns nullptr if the text blob is nullptr or if none of the
+   * glyphs in the blob can generate a path, such as when using bitmap typefaces.
    */
-  static std::shared_ptr<Shape> MakeFrom(std::shared_ptr<TextBlob> textBlob);
+  static std::shared_ptr<Shape> MakeFrom(std::shared_ptr<TextBlob> textBlob, float scale = 1.0f);
 
   /**
    * Creates a new Shape from the given PathProvider. Returns nullptr if pathProvider is nullptr.
    */
   static std::shared_ptr<Shape> MakeFrom(std::shared_ptr<PathProvider> pathProvider);
+
+  /**
+   * Creates a new Shape from the Font and glyphID. Returns nullptr if the glyphID is 0
+   * or contains a typeface that can't generate a path, such as bitmap typefaces.
+   */
+  static std::shared_ptr<Shape> MakeFrom(Font font, GlyphID glyphID);
 
   /**
    * Merges two Shapes into a new Shape using the specified path operation. If either Shape is
@@ -121,7 +126,7 @@ class Shape {
   virtual Path getPath() const = 0;
 
  protected:
-  enum class Type { Append, Effect, Glyph, Inverse, Matrix, Merge, Path, Stroke, Provider };
+  enum class Type { Append, Effect, Text, Inverse, Matrix, Merge, Path, Stroke, Provider, Glyph };
 
   /**
    * Returns the type of the Shape.
@@ -140,5 +145,6 @@ class Shape {
   friend class ShapeDrawOp;
   friend class ProxyProvider;
   friend class Canvas;
+  friend class Types;
 };
 }  // namespace tgfx

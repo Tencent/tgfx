@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -22,21 +22,20 @@
 
 namespace tgfx {
 PlacementPtr<FragmentProcessor> TiledTextureEffect::Make(std::shared_ptr<TextureProxy> proxy,
-                                                         TileMode tileModeX, TileMode tileModeY,
-                                                         const SamplingOptions& options,
+                                                         const SamplingArgs& args,
                                                          const Matrix* uvMatrix, bool forceAsMask) {
   if (proxy == nullptr) {
     return nullptr;
   }
-  if (tileModeX == TileMode::Clamp && tileModeY == TileMode::Clamp) {
-    return TextureEffect::Make(std::move(proxy), options, uvMatrix, forceAsMask);
+  if (args.tileModeX == TileMode::Clamp && args.tileModeY == TileMode::Clamp) {
+    return TextureEffect::Make(std::move(proxy), args, uvMatrix, forceAsMask);
   }
   auto matrix = uvMatrix ? *uvMatrix : Matrix::I();
-  SamplerState samplerState(tileModeX, tileModeY, options);
+  SamplerState samplerState(args.tileModeX, args.tileModeY, args.sampling);
   auto isAlphaOnly = proxy->isAlphaOnly();
   auto drawingBuffer = proxy->getContext()->drawingBuffer();
-  PlacementPtr<FragmentProcessor> processor =
-      drawingBuffer->make<GLTiledTextureEffect>(std::move(proxy), samplerState, matrix);
+  PlacementPtr<FragmentProcessor> processor = drawingBuffer->make<GLTiledTextureEffect>(
+      std::move(proxy), samplerState, args.constraint, matrix, args.sampleArea);
   if (forceAsMask && !isAlphaOnly) {
     processor = FragmentProcessor::MulInputByChildAlpha(drawingBuffer, std::move(processor));
   }
@@ -44,8 +43,10 @@ PlacementPtr<FragmentProcessor> TiledTextureEffect::Make(std::shared_ptr<Texture
 }
 
 GLTiledTextureEffect::GLTiledTextureEffect(std::shared_ptr<TextureProxy> proxy,
-                                           const SamplerState& samplerState, const Matrix& uvMatrix)
-    : TiledTextureEffect(std::move(proxy), samplerState, uvMatrix) {
+                                           const SamplerState& samplerState,
+                                           SrcRectConstraint constraint, const Matrix& uvMatrix,
+                                           const std::optional<Rect>& subset)
+    : TiledTextureEffect(std::move(proxy), samplerState, constraint, uvMatrix, subset) {
 }
 
 bool GLTiledTextureEffect::ShaderModeRequiresUnormCoord(TiledTextureEffect::ShaderMode mode) {
@@ -223,7 +224,6 @@ void GLTiledTextureEffect::emitCode(EmitArgs& args) const {
   if (args.coordFunc) {
     vertexColor = args.coordFunc(vertexColor);
   }
-  auto subset = Rect::MakeWH(texture->width(), texture->height());
   Sampling sampling(texture, samplerState, subset);
   if (sampling.shaderModeX == TiledTextureEffect::ShaderMode::None &&
       sampling.shaderModeY == TiledTextureEffect::ShaderMode::None) {
@@ -271,8 +271,20 @@ void GLTiledTextureEffect::emitCode(EmitArgs& args) const {
     subsetCoord(args, sampling.shaderModeY, names.subsetName, "y", "y", "w", extraRepeatCoordY,
                 repeatCoordWeightY);
 
-    fragBuilder->codeAppend("vec2 clampedCoord;");
+    fragBuilder->codeAppend("highp vec2 clampedCoord;");
     clampCoord(args, useClamp, names.clampName);
+
+    if (constraint == SrcRectConstraint::Strict) {
+      std::string subsetName = args.inputSubset;
+      if (!names.dimensionsName.empty()) {
+        fragBuilder->codeAppendf("highp vec4 extraSubset = %s;", subsetName.c_str());
+        subsetName = "extraSubset";
+        fragBuilder->codeAppendf("extraSubset.xy /= %s;", names.dimensionsName.c_str());
+        fragBuilder->codeAppendf("extraSubset.zw /= %s;", names.dimensionsName.c_str());
+      }
+      args.fragBuilder->codeAppendf("clampedCoord = clamp(clampedCoord, %s.xy, %s.zw);",
+                                    subsetName.c_str(), subsetName.c_str());
+    }
 
     if (mipmapRepeatX && mipmapRepeatY) {
       fragBuilder->codeAppendf("extraRepeatCoord = clamp(extraRepeatCoord, %s.xy, %s.zw);",
@@ -405,7 +417,6 @@ void GLTiledTextureEffect::onSetData(UniformBuffer* uniformBuffer) const {
   if (texture == nullptr) {
     return;
   }
-  auto subset = Rect::MakeWH(texture->width(), texture->height());
   Sampling sampling(texture, samplerState, subset);
   auto hasDimensionUniform = (ShaderModeRequiresUnormCoord(sampling.shaderModeX) ||
                               ShaderModeRequiresUnormCoord(sampling.shaderModeY)) &&

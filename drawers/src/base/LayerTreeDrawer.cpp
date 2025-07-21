@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -20,7 +20,6 @@
 #include "tgfx/layers/DisplayList.h"
 
 namespace drawers {
-
 LayerTreeDrawer::LayerTreeDrawer(const std::string& name) : Drawer(name + "Drawer") {
 }
 
@@ -28,8 +27,16 @@ void LayerTreeDrawer::onDraw(tgfx::Canvas* canvas, const AppHost* host) {
   if (!root) {
     root = buildLayerTree(host);
     displayList.root()->addChild(root);
+    displayList.setRenderMode(tgfx::RenderMode::Tiled);
+    // Zoom blur is currently disabled because the Hello2D demo doesn't yet support animation frame
+    // rendering with displayList:
+    // displayList.setAllowZoomBlur(true);
+    displayList.setMaxTileCount(512);
   }
   updateRootMatrix(host);
+  displayList.setZoomScale(host->zoomScale());
+  auto offset = host->contentOffset();
+  displayList.setContentOffset(offset.x, offset.y);
   displayList.render(canvas->getSurface(), false);
 }
 

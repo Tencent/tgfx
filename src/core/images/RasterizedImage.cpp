@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,6 +19,7 @@
 #include "RasterizedImage.h"
 #include "core/images/SubsetImage.h"
 #include "gpu/DrawingManager.h"
+#include "gpu/ProxyProvider.h"
 #include "gpu/ops/DrawOp.h"
 
 namespace tgfx {
@@ -39,14 +40,6 @@ std::shared_ptr<Image> RasterizedImage::MakeFrom(std::shared_ptr<Image> source,
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
-  if (rasterizationScale != 1.0f && sampling.mipmapMode != MipmapMode::None &&
-      !source->hasMipmaps()) {
-    // Generate mipmaps for the source image if required by the sampling options.
-    auto newSource = source->makeMipmapped(true);
-    if (newSource != nullptr) {
-      source = std::move(newSource);
-    }
-  }
   auto result = std::shared_ptr<RasterizedImage>(
       new RasterizedImage(UniqueKey::Make(), std::move(source), rasterizationScale, sampling));
   result->weakThis = result;
@@ -55,7 +48,7 @@ std::shared_ptr<Image> RasterizedImage::MakeFrom(std::shared_ptr<Image> source,
 
 RasterizedImage::RasterizedImage(UniqueKey uniqueKey, std::shared_ptr<Image> source,
                                  float rasterizationScale, const SamplingOptions& sampling)
-    : OffscreenImage(std::move(uniqueKey)), source(std::move(source)),
+    : ResourceImage(std::move(uniqueKey)), source(std::move(source)),
       rasterizationScale(rasterizationScale), sampling(sampling) {
 }
 
@@ -85,8 +78,21 @@ std::shared_ptr<Image> RasterizedImage::onMakeDecoded(Context* context, bool) co
   return newImage;
 }
 
-bool RasterizedImage::onDraw(std::shared_ptr<RenderTargetProxy> renderTarget,
-                             uint32_t renderFlags) const {
+std::shared_ptr<TextureProxy> RasterizedImage::onLockTextureProxy(const TPArgs& args,
+                                                                  const UniqueKey& key) const {
+  auto proxyProvider = args.context->proxyProvider();
+  auto textureProxy = proxyProvider->findOrWrapTextureProxy(key);
+  if (textureProxy != nullptr) {
+    return textureProxy;
+  }
+  auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
+  auto format = isAlphaOnly() && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
+  auto renderTarget = proxyProvider->createRenderTargetProxy(key, width(), height(), format, 1,
+                                                             args.mipmapped, ImageOrigin::TopLeft,
+                                                             BackingFit::Exact, args.renderFlags);
+  if (renderTarget == nullptr) {
+    return nullptr;
+  }
   auto sourceWidth = source->width();
   auto sourceHeight = source->height();
   auto scaledWidth = GetSize(sourceWidth, rasterizationScale);
@@ -95,9 +101,14 @@ bool RasterizedImage::onDraw(std::shared_ptr<RenderTargetProxy> renderTarget,
   auto uvScaleY = static_cast<float>(sourceHeight) / static_cast<float>(scaledHeight);
   Matrix uvMatrix = Matrix::MakeScale(uvScaleX, uvScaleY);
   auto drawRect = Rect::MakeWH(width(), height());
-  FPArgs args(renderTarget->getContext(), renderFlags, drawRect);
-  auto processor = FragmentProcessor::Make(source, args, sampling, &uvMatrix);
+  FPArgs fpArgs(args.context, args.renderFlags, drawRect);
+  auto processor =
+      FragmentProcessor::Make(source, fpArgs, sampling, SrcRectConstraint::Fast, &uvMatrix);
+  if (processor == nullptr) {
+    return nullptr;
+  }
   auto drawingManager = renderTarget->getContext()->drawingManager();
-  return drawingManager->fillRTWithFP(std::move(renderTarget), std::move(processor), renderFlags);
+  drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags);
+  return renderTarget->asTextureProxy();
 }
 }  // namespace tgfx

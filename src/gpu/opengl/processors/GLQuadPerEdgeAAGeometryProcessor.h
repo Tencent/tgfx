@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -25,11 +25,21 @@ namespace tgfx {
 class GLQuadPerEdgeAAGeometryProcessor : public QuadPerEdgeAAGeometryProcessor {
  public:
   GLQuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa,
-                                   std::optional<Color> commonColor,
-                                   std::optional<Matrix> uvMatrix);
+                                   std::optional<Color> commonColor, std::optional<Matrix> uvMatrix,
+                                   bool hasSubset);
 
   void emitCode(EmitArgs& args) const override;
 
   void setData(UniformBuffer* uniformBuffer, FPCoordTransformIter* transformIter) const override;
+
+  void onSetTransformData(UniformBuffer* uniformBuffer, const CoordTransform* coordTransform,
+                          int index) const override;
+
+  void onEmitTransform(EmitArgs& args, VertexShaderBuilder* vertexBuilder,
+                       VaryingHandler* varyingHandler, UniformHandler* uniformHandler,
+                       const std::string& transformUniformName, int index) const override;
+
+ private:
+  std::optional<std::string> subsetVaryingName = std::nullopt;
 };
 }  // namespace tgfx

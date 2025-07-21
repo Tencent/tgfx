@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -84,6 +84,7 @@ class Resource {
 
  protected:
   Context* context = nullptr;
+  std::shared_ptr<Resource> reference = nullptr;
 
   /**
    * Overridden to free GPU resources in the backend API.
@@ -91,7 +92,6 @@ class Resource {
   virtual void onReleaseGPU() = 0;
 
  private:
-  std::shared_ptr<Resource> reference;
   ScratchKey scratchKey = {};
   UniqueKey uniqueKey = {};
   std::list<Resource*>* cachedList = nullptr;
@@ -99,7 +99,7 @@ class Resource {
   std::chrono::steady_clock::time_point lastUsedTime = {};
 
   bool isPurgeable() const {
-    return reference.use_count() <= 1 && uniqueKey.strongCount() == 0;
+    return reference.use_count() <= 1;
   }
 
   bool hasExternalReferences() const {

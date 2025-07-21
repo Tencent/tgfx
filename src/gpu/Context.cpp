@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,9 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Context.h"
+#include "core/AtlasManager.h"
 #include "core/utils/BlockBuffer.h"
 #include "core/utils/Log.h"
-#include "core/utils/MaxValueTracker.h"
+#include "core/utils/SlidingWindowTracker.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProgramCache.h"
 #include "gpu/ProxyProvider.h"
@@ -29,13 +30,17 @@
 
 namespace tgfx {
 Context::Context(Device* device) : _device(device) {
-  _drawingBuffer = new BlockBuffer(1 << 14);  // 16kb
+  // We set the maxBlockSize to 2MB because allocating blocks that are too large can cause memory
+  // fragmentation and slow down allocation. It may also increase the application's memory usage due
+  // to pre-allocation optimizations on some platforms.
+  _drawingBuffer = new BlockBuffer(1 << 14, 1 << 21);  // 16kb, 2MB
   _programCache = new ProgramCache(this);
   _resourceCache = new ResourceCache(this);
   _drawingManager = new DrawingManager(this);
   _resourceProvider = new ResourceProvider(this);
   _proxyProvider = new ProxyProvider(this);
-  _maxValueTracker = new MaxValueTracker(10);
+  _maxValueTracker = new SlidingWindowTracker(10);
+  _atlasManager = new AtlasManager(this);
 }
 
 Context::~Context() {
@@ -50,18 +55,18 @@ Context::~Context() {
   delete _resourceProvider;
   delete _proxyProvider;
   delete _drawingBuffer;
+  delete _atlasManager;
   delete _maxValueTracker;
 }
 
 bool Context::flush(BackendSemaphore* signalSemaphore) {
-  _proxyProvider->purgeExpiredProxies();
   // Clean up all unreferenced resources before flushing, allowing them to be reused. This is
   // particularly crucial for texture resources that are bound to render targets. Only after the
   // cleanup can they be unbound and reused.
   _resourceCache->processUnreferencedResources();
-  // Retain the resources created after this time point until the next flush() for reuse.
-  auto timePoint = std::chrono::steady_clock::now();
+  _atlasManager->preFlush();
   auto flushed = _drawingManager->flush();
+  _atlasManager->postFlush();
   bool semaphoreInserted = false;
   if (signalSemaphore != nullptr) {
     auto semaphore = Semaphore::Wrap(signalSemaphore);
@@ -71,9 +76,8 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
     }
   }
   if (flushed) {
-    // Clean up all unreferenced resources after flushing to reduce memory usage.
     _proxyProvider->purgeExpiredProxies();
-    _resourceCache->purgeToCacheLimit(timePoint);
+    _resourceCache->advanceFrameAndPurge();
     _maxValueTracker->addValue(_drawingBuffer->size());
     _drawingBuffer->clear(_maxValueTracker->getMaxValue());
   }
@@ -113,13 +117,20 @@ void Context::setCacheLimit(size_t bytesLimit) {
   _resourceCache->setCacheLimit(bytesLimit);
 }
 
-void Context::purgeResourcesNotUsedSince(std::chrono::steady_clock::time_point purgeTime,
-                                         bool scratchResourcesOnly) {
-  _resourceCache->purgeNotUsedSince(purgeTime, scratchResourcesOnly);
+size_t Context::resourceExpirationFrames() const {
+  return _resourceCache->expirationFrames();
 }
 
-bool Context::purgeResourcesUntilMemoryTo(size_t bytesLimit, bool scratchResourcesOnly) {
-  return _resourceCache->purgeUntilMemoryTo(bytesLimit, scratchResourcesOnly);
+void Context::setResourceExpirationFrames(size_t frames) {
+  _resourceCache->setExpirationFrames(frames);
+}
+
+void Context::purgeResourcesNotUsedSince(std::chrono::steady_clock::time_point purgeTime) {
+  _resourceCache->purgeNotUsedSince(purgeTime);
+}
+
+bool Context::purgeResourcesUntilMemoryTo(size_t bytesLimit) {
+  return _resourceCache->purgeUntilMemoryTo(bytesLimit);
 }
 
 void Context::releaseAll(bool releaseGPU) {
@@ -127,5 +138,6 @@ void Context::releaseAll(bool releaseGPU) {
   _resourceProvider->releaseAll();
   _programCache->releaseAll(releaseGPU);
   _resourceCache->releaseAll(releaseGPU);
+  _atlasManager->releaseAll();
 }
 }  // namespace tgfx

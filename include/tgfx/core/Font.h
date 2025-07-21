@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -21,6 +21,7 @@
 #include "tgfx/core/FontMetrics.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/Stroke.h"
 #include "tgfx/core/Typeface.h"
 
 namespace tgfx {
@@ -148,10 +149,10 @@ class Font {
 
   /**
    * Creates an Image capturing the content of the specified glyph. The returned matrix should apply
-   * to the glyph image when drawing. Please note that the fauxBold is not supported for this
-   * method.
+   * to the glyph image when drawing. Returns nullptr if the glyph is not part of this Font,
+   * cannot be rendered as an image, or if the stroke is unsupported.
    */
-  std::shared_ptr<ImageCodec> getImage(GlyphID glyphID, Matrix* matrix) const;
+  std::shared_ptr<ImageCodec> getImage(GlyphID glyphID, const Stroke* stroke, Matrix* matrix) const;
 
   /**
    * Compares two fonts for equality.

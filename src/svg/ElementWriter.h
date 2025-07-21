@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -37,6 +37,7 @@
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/gpu/Context.h"
+#include "tgfx/svg/SVGPathParser.h"
 #include "xml/XMLWriter.h"
 
 namespace tgfx {
@@ -62,7 +63,7 @@ class ElementWriter {
   void addRoundRectAttributes(const RRect& roundRect);
   void addCircleAttributes(const Rect& bound);
   void addEllipseAttributes(const Rect& bound);
-  void addPathAttributes(const Path& path, PathEncoding encoding);
+  void addPathAttributes(const Path& path, SVGPathParser::PathEncoding encoding);
 
   Resources addImageFilterResource(const std::shared_ptr<ImageFilter>& imageFilter, Rect bound);
 

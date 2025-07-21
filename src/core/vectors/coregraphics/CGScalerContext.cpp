@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,6 +18,7 @@
 
 #include "core/vectors/coregraphics/CGScalerContext.h"
 #include "core/ScalerContext.h"
+#include "core/utils/FauxBoldScale.h"
 #include "core/utils/Log.h"
 #include "platform/apple/BitmapContextUtil.h"
 #include "tgfx/core/FontMetrics.h"
@@ -25,49 +26,6 @@
 #include "tgfx/core/Typeface.h"
 
 namespace tgfx {
-static constexpr float StdFakeBoldInterpKeys[] = {
-    9.f,
-    36.f,
-};
-static constexpr float StdFakeBoldInterpValues[] = {
-    1.f / 24.f,
-    1.f / 32.f,
-};
-
-inline float Interpolate(const float& a, const float& b, const float& t) {
-  return a + (b - a) * t;
-}
-
-/**
- * Interpolate along the function described by (keys[length], values[length])
- * for the passed searchKey. SearchKeys outside the range keys[0]-keys[Length]
- * clamp to the min or max value. This function assumes the number of pairs
- * (length) will be small and a linear search is used.
- *
- * Repeated keys are allowed for discontinuous functions (so long as keys is
- * monotonically increasing). If key is the value of a repeated scalar in
- * keys the first one will be used.
- */
-static float FloatInterpFunc(float searchKey, const float keys[], const float values[],
-                             int length) {
-  int right = 0;
-  while (right < length && keys[right] < searchKey) {
-    ++right;
-  }
-  // Could use sentinel values to eliminate conditionals, but since the
-  // tables are taken as input, a simpler format is better.
-  if (right == length) {
-    return values[length - 1];
-  }
-  if (right == 0) {
-    return values[0];
-  }
-  // Otherwise, interpolate between right - 1 and right.
-  float leftKey = keys[right - 1];
-  float rightKey = keys[right];
-  float t = (searchKey - leftKey) / (rightKey - leftKey);
-  return Interpolate(values[right - 1], values[right], t);
-}
 
 static CGAffineTransform GetTransform(bool fauxItalic) {
   static auto italicTransform =
@@ -76,16 +34,10 @@ static CGAffineTransform GetTransform(bool fauxItalic) {
   return fauxItalic ? italicTransform : identityTransform;
 }
 
-std::shared_ptr<ScalerContext> ScalerContext::CreateNew(std::shared_ptr<Typeface> typeface,
-                                                        float size) {
-  DEBUG_ASSERT(typeface != nullptr);
-  return std::make_shared<CGScalerContext>(std::move(typeface), size);
-}
-
 CGScalerContext::CGScalerContext(std::shared_ptr<Typeface> tf, float size)
     : ScalerContext(std::move(tf), size) {
   CTFontRef font = std::static_pointer_cast<CGTypeface>(typeface)->ctFont;
-  fauxBoldScale = FloatInterpFunc(textSize, StdFakeBoldInterpKeys, StdFakeBoldInterpValues, 2);
+  fauxBoldScale = FauxBoldScale(textSize);
   ctFont = CTFontCreateCopyWithAttributes(font, static_cast<CGFloat>(textSize), nullptr, nullptr);
 }
 
@@ -175,6 +127,10 @@ Rect CGScalerContext::getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic)
     bounds.outset(fauxBoldSize, fauxBoldSize);
   }
   bounds.roundOut();
+  // Expand the bounds by 1 pixel, to give CG room for antialiasing.
+  // Note that this outset is to allow room for LCD smoothed glyphs. However, the correct outset
+  // is not currently known, as CG dilates the outlines by some percentage.
+  // Note that if this context is A8 and not back-forming from LCD, there is no need to outset.
   bounds.outset(1.f, 1.f);
   return bounds;
 }
@@ -299,7 +255,12 @@ bool CGScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItal
   return true;
 }
 
-Rect CGScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
+Rect CGScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
+                                        Matrix* matrix) const {
+  if (!hasColor() && (stroke != nullptr || fauxBold)) {
+    return {};
+  }
+
   CGRect cgBounds;
   CTFontGetBoundingRectsForGlyphs(ctFont, kCTFontOrientationHorizontal, &glyphID, &cgBounds, 1);
   if (CGRectIsEmpty(cgBounds)) {
@@ -317,12 +278,12 @@ Rect CGScalerContext::getImageTransform(GlyphID glyphID, Matrix* matrix) const {
   return bounds;
 }
 
-bool CGScalerContext::readPixels(GlyphID glyphID, const ImageInfo& dstInfo, void* dstPixels) const {
+bool CGScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
+                                 const ImageInfo& dstInfo, void* dstPixels) const {
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }
-
-  auto bounds = getImageTransform(glyphID, nullptr);
+  auto bounds = getImageTransform(glyphID, fauxBold, stroke, nullptr);
   auto width = static_cast<int>(bounds.width());
   auto height = static_cast<int>(bounds.height());
   if (width <= 0 || height <= 0) {

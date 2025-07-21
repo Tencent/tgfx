@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <deque>
 #include <functional>
 #include <list>
 #include <unordered_map>
@@ -54,16 +55,52 @@ class ResourceCache {
   }
 
   /**
-   * Returns current cache limits of max gpu memory byte size.
+   * Returns the size of the Context's gpu memory cache limit in bytes. The default value is 512MB.
    */
   size_t cacheLimit() const {
     return maxBytes;
   }
 
   /**
-   * Sets the cache limits of max gpu memory byte size.
+   * Sets the size of the Context's gpu memory cache limit in bytes. If the new limit is lower than
+   * the current limit, the cache will try to free resources to get under the new limit.
    */
   void setCacheLimit(size_t bytesLimit);
+
+  /**
+   * Returns the number of frames (valid flushes) after which unused GPU resources are considered
+   * expired. A 'frame' is defined as a non-empty flush where actual rendering work is performed and
+   * commands are submitted to the GPU. If a GPU resource is not used for more than this number of
+   * frames, it will be automatically purged from the cache. The default value is 120 frames.
+   */
+  size_t expirationFrames() const {
+    return _expirationFrames;
+  }
+
+  /**
+   * Sets the number of frames (flushes) after which unused GPU resources are considered expired.
+   */
+  void setExpirationFrames(size_t frames);
+
+  /**
+   * Purges GPU resources that haven't been used since the passed point in time.
+   * @param purgeTime A time point returned by std::chrono::steady_clock::now() or
+   * std::chrono::steady_clock::now() - std::chrono::milliseconds(msNotUsed).
+   */
+  void purgeNotUsedSince(std::chrono::steady_clock::time_point purgeTime);
+
+  /**
+   * Purges GPU resources from the cache until the specified bytesLimit is reached, or until all
+   * purgeable resources have been removed. Returns true if the total resource usage does not exceed
+   * bytesLimit after purging.
+   * @param bytesLimit The target maximum number of bytes after purging.
+   */
+  bool purgeUntilMemoryTo(size_t bytesLimit);
+
+  /**
+   * Advances the frame counter and purges resources that have expired or exceed the cache limit.
+   */
+  void advanceFrameAndPurge();
 
   /**
    * Returns a scratch resource in the cache by the specified ScratchKey.
@@ -80,36 +117,16 @@ class ResourceCache {
    */
   bool hasUniqueResource(const UniqueKey& uniqueKey);
 
-  /**
-   * Purges GPU resources that haven't been used since the passed point in time.
-   * @param purgeTime A time point previously returned by std::chrono::steady_clock::now().
-   * @param scratchResourcesOnly If true, the purgeable resources containing unique keys are spared.
-   * If false, then all purgeable resources will be deleted.
-   */
-  void purgeNotUsedSince(std::chrono::steady_clock::time_point purgeTime,
-                         bool scratchResourcesOnly = false);
-
-  /**
-   * Purge unreferenced resources from the cache until the provided bytesLimit has been reached,
-   * or we have purged all unreferenced resources. Returns true if the total resource bytes is not
-   * over the specified bytesLimit after purging.
-   * @param bytesLimit The desired number of bytes after puring.
-   * @param scratchResourcesOnly If true, the purgeable resources containing unique keys are spared.
-   * If false, then all purgeable resources will be deleted.
-   */
-  bool purgeUntilMemoryTo(size_t bytesLimit, bool scratchResourcesOnly = false);
-
-  /**
-   * Purge unreferenced resources not used since the specific time point until the default
-   * cacheLimit is reached.
-   */
-  bool purgeToCacheLimit(std::chrono::steady_clock::time_point notUsedSinceTime);
-
  private:
   Context* context = nullptr;
-  size_t maxBytes = 0;
+  size_t maxBytes = 512 * (1 << 20);  // 512MB
   size_t totalBytes = 0;
   size_t purgeableBytes = 0;
+  // 120 is chosen because a 4K screen can be divided into roughly 120 grids of 256x256 pixels.
+  // If each grid is rendered per frame, the cache should cover this use case.
+  size_t _expirationFrames = 120;
+  std::chrono::steady_clock::time_point currentFrameTime = {};
+  std::deque<std::chrono::steady_clock::time_point> frameTimes = {};
   std::list<Resource*> nonpurgeableResources = {};
   std::list<Resource*> purgeableResources = {};
   ResourceKeyMap<std::vector<Resource*>> scratchKeyMap = {};
@@ -120,6 +137,7 @@ class ResourceCache {
   static bool InList(const std::list<Resource*>& list, Resource* resource);
 
   void releaseAll(bool releaseGPU);
+  void purgeAsNeeded();
   void processUnreferencedResources();
   std::shared_ptr<Resource> addResource(Resource* resource, const ScratchKey& scratchKey);
   std::shared_ptr<Resource> refResource(Resource* resource);

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -41,18 +41,17 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_p
                                                                    const TPArgs& args) const {
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(clipBounds.width()), static_cast<int>(clipBounds.height()),
-      source->isAlphaOnly(), effect->sampleCount(), args.mipmapped);
+      source->isAlphaOnly(), effect->sampleCount(), args.mipmapped, ImageOrigin::TopLeft,
+      BackingFit::Approx);
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto proxyProvider = args.context->proxyProvider();
-  std::vector<std::shared_ptr<TextureProxy>> textureProxies;
+  std::vector<std::shared_ptr<TextureProxy>> textureProxies = {};
   textureProxies.reserve(1 + effect->extraInputs.size());
   // Request a texture proxy from the source image without mipmaps to save memory.
   // It may be ignored if the source image has preset mipmaps.
-  TPArgs tpArgs(args.context, args.renderFlags, false);
+  TPArgs tpArgs(args.context, args.renderFlags, false, BackingFit::Exact);
   auto textureProxy = source->lockTextureProxy(tpArgs);
-  textureProxy = proxyProvider->flattenTextureProxy(std::move(textureProxy));
   if (textureProxy == nullptr) {
     return nullptr;
   }
@@ -64,7 +63,6 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_p
       return nullptr;
     }
     textureProxy = input->lockTextureProxy(tpArgs);
-    textureProxy = proxyProvider->flattenTextureProxy(std::move(textureProxy));
     if (textureProxy == nullptr) {
       return nullptr;
     }
@@ -73,12 +71,12 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_p
   auto offset = Point::Make(-clipBounds.x(), -clipBounds.y());
   auto drawingManager = args.context->drawingManager();
   drawingManager->addRuntimeDrawTask(renderTarget, std::move(textureProxies), effect, offset);
-  return renderTarget->getTextureProxy();
+  return renderTarget->asTextureProxy();
 }
 
 PlacementPtr<FragmentProcessor> RuntimeImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
-    const Matrix* uvMatrix) const {
-  return makeFPFromTextureProxy(source, args, sampling, uvMatrix);
+    SrcRectConstraint constraint, const Matrix* uvMatrix) const {
+  return makeFPFromTextureProxy(source, args, sampling, constraint, uvMatrix);
 }
 }  // namespace tgfx

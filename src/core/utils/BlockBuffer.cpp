@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -20,18 +20,9 @@
 #include "core/utils/Log.h"
 
 namespace tgfx {
-// The maximum size of a memory block that can be allocated. Allocating a block that's too large can
-// cause memory fragmentation and slow down the allocation process. It might also increase the host
-// application's memory usage due to pre-allocation optimizations on some platforms.
-static constexpr size_t MAX_BLOCK_SIZE = 1 << 21;  // 2MB
-
 // The alignment of memory blocks. Set to 64 bytes to ensure that the memory blocks are aligned to
 // cache lines.
 static constexpr size_t BLOCK_ALIGNMENT = 64;
-
-static size_t NextBlockSize(size_t currentSize) {
-  return std::min(currentSize * 2, MAX_BLOCK_SIZE);
-}
 
 BlockData::BlockData(std::vector<uint8_t*> blocks) : blocks(std::move(blocks)) {
   DEBUG_ASSERT(!this->blocks.empty());
@@ -43,11 +34,21 @@ BlockData::~BlockData() {
   }
 }
 
-BlockBuffer::BlockBuffer(size_t initBlockSize) : initBlockSize(initBlockSize) {
+void* BlockData::shrinkLastBlockTo(size_t newSize) {
+  auto& lastBlock = blocks.back();
+  if (auto resizedBlock = static_cast<uint8_t*>(realloc(lastBlock, newSize))) {
+    lastBlock = resizedBlock;
+  }
+  return lastBlock;
+}
+
+BlockBuffer::BlockBuffer(size_t initBlockSize, size_t maxBlockSize)
+    : initBlockSize(initBlockSize), maxBlockSize(maxBlockSize) {
   DEBUG_ASSERT(initBlockSize > 0);
 }
 
 BlockBuffer::~BlockBuffer() {
+  waitForReferencesExpired();
   for (auto& block : blocks) {
     free(block.data);
   }
@@ -92,6 +93,7 @@ void BlockBuffer::clear(size_t maxReuseSize) {
   if (blocks.empty()) {
     return;
   }
+  waitForReferencesExpired();
   currentBlockIndex = 0;
   usedSize = 0;
   size_t totalBlockSize = 0;
@@ -108,10 +110,11 @@ void BlockBuffer::clear(size_t maxReuseSize) {
   blocks.resize(reusedBlockCount);
 }
 
-std::shared_ptr<BlockData> BlockBuffer::release() {
+std::unique_ptr<BlockData> BlockBuffer::release() {
   if (usedSize == 0) {
     return nullptr;
   }
+  waitForReferencesExpired();
   std::vector<uint8_t*> usedBlocks = {};
   usedBlocks.reserve(currentBlockIndex + 1);
   for (auto& block : blocks) {
@@ -124,15 +127,15 @@ std::shared_ptr<BlockData> BlockBuffer::release() {
   blocks.clear();
   currentBlockIndex = 0;
   usedSize = 0;
-  return std::make_shared<BlockData>(std::move(usedBlocks));
+  return std::make_unique<BlockData>(std::move(usedBlocks));
 }
 
 bool BlockBuffer::allocateNewBlock(size_t requestSize) {
   size_t blockSize;
-  if (requestSize <= MAX_BLOCK_SIZE) {
-    blockSize = blocks.empty() ? initBlockSize : NextBlockSize(blocks.back().size);
+  if (requestSize <= maxBlockSize) {
+    blockSize = blocks.empty() ? initBlockSize : nextBlockSize(blocks.back().size);
     while (blockSize < requestSize) {
-      blockSize = NextBlockSize(blockSize);
+      blockSize = nextBlockSize(blockSize);
     }
   } else {
     // Allow allocating a block larger than MAX_BLOCK_SIZE if requested.
@@ -148,4 +151,25 @@ bool BlockBuffer::allocateNewBlock(size_t requestSize) {
   blocks.emplace_back(data, blockSize);
   return true;
 }
+
+std::shared_ptr<BlockBuffer> BlockBuffer::addReference() {
+  auto reference = externalReferences.lock();
+  if (reference) {
+    return reference;
+  }
+  reference = std::shared_ptr<BlockBuffer>(this, NotifyReferenceReachedZero);
+  externalReferences = reference;
+  return reference;
+}
+
+void BlockBuffer::waitForReferencesExpired() {
+  std::unique_lock<std::mutex> lock(mutex);
+  condition.wait(lock, [this]() { return externalReferences.expired(); });
+}
+
+void BlockBuffer::NotifyReferenceReachedZero(BlockBuffer* blockBuffer) {
+  std::unique_lock<std::mutex> lock(blockBuffer->mutex);
+  blockBuffer->condition.notify_all();
+}
+
 }  // namespace tgfx

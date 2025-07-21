@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,6 +19,7 @@
 #pragma once
 
 #include "core/DrawContext.h"
+#include "core/PlaybackContext.h"
 
 namespace tgfx {
 enum class RecordType {
@@ -26,22 +27,20 @@ enum class RecordType {
   SetClip,
   SetColor,
   SetFill,
+  SetStrokeWidth,
+  SetStroke,
+  SetHasStroke,
   DrawFill,
   DrawRect,
   DrawRRect,
+  DrawPath,
   DrawShape,
   DrawImage,
   DrawImageRect,
+  DrawImageRectToRect,
   DrawGlyphRunList,
-  StrokeGlyphRunList,
   DrawPicture,
   DrawLayer
-};
-
-class PlaybackContext {
- public:
-  MCState state = {};
-  Fill fill = {};
 };
 
 class Record {
@@ -67,7 +66,7 @@ class SetMatrix : public Record {
   }
 
   void playback(DrawContext*, PlaybackContext* playback) const override {
-    playback->state.matrix = matrix;
+    playback->setMatrix(matrix);
   }
 
   Matrix matrix = {};
@@ -88,7 +87,7 @@ class SetClip : public Record {
   }
 
   void playback(DrawContext*, PlaybackContext* playback) const override {
-    playback->state.clip = clip;
+    playback->setClip(clip);
   }
 
   Path clip = {};
@@ -104,7 +103,7 @@ class SetColor : public Record {
   }
 
   void playback(DrawContext*, PlaybackContext* playback) const override {
-    playback->fill.color = color;
+    playback->setColor(color);
   }
 
   Color color = {};
@@ -120,10 +119,58 @@ class SetFill : public Record {
   }
 
   void playback(DrawContext*, PlaybackContext* playback) const override {
-    playback->fill = fill;
+    playback->setFill(fill);
   }
 
   Fill fill = {};
+};
+
+class SetStrokeWidth : public Record {
+ public:
+  explicit SetStrokeWidth(float width) : width(width) {
+  }
+
+  RecordType type() const override {
+    return RecordType::SetStrokeWidth;
+  }
+
+  void playback(DrawContext*, PlaybackContext* playback) const override {
+    playback->setStrokeWidth(width);
+  }
+
+  float width = 0.0f;
+};
+
+class SetStroke : public Record {
+ public:
+  explicit SetStroke(const Stroke& stroke) : stroke(stroke) {
+  }
+
+  RecordType type() const override {
+    return RecordType::SetStroke;
+  }
+
+  void playback(DrawContext*, PlaybackContext* playback) const override {
+    playback->setStroke(stroke);
+  }
+
+  Stroke stroke = {};
+};
+
+class SetHasStroke : public Record {
+ public:
+  explicit SetHasStroke(bool hasStroke) : hasStroke(hasStroke) {
+  }
+
+  RecordType type() const override {
+    return RecordType::SetHasStroke;
+  }
+
+  void playback(DrawContext*, PlaybackContext* playback) const override {
+    playback->setHasStroke(hasStroke);
+  }
+
+  bool hasStroke = false;
 };
 
 class DrawFill : public Record {
@@ -137,7 +184,7 @@ class DrawFill : public Record {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawFill(playback->state, playback->fill);
+    playback->drawFill(context);
   }
 };
 
@@ -151,7 +198,7 @@ class DrawRect : public Record {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawRect(rect, playback->state, playback->fill);
+    context->drawRect(rect, playback->state(), playback->fill());
   }
 
   Rect rect;
@@ -167,10 +214,30 @@ class DrawRRect : public Record {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawRRect(rRect, playback->state, playback->fill);
+    context->drawRRect(rRect, playback->state(), playback->fill(), playback->stroke());
   }
 
   RRect rRect;
+};
+
+class DrawPath : public Record {
+ public:
+  explicit DrawPath(Path path) : path(std::move(path)) {
+  }
+
+  RecordType type() const override {
+    return RecordType::DrawPath;
+  }
+
+  bool hasUnboundedFill(bool& hasInverseClip) const override {
+    return hasInverseClip && path.isInverseFillType();
+  }
+
+  void playback(DrawContext* context, PlaybackContext* playback) const override {
+    context->drawPath(path, playback->state(), playback->fill());
+  }
+
+  Path path;
 };
 
 class DrawShape : public Record {
@@ -187,7 +254,7 @@ class DrawShape : public Record {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawShape(shape, playback->state, playback->fill);
+    context->drawShape(shape, playback->state(), playback->fill());
   }
 
   std::shared_ptr<Shape> shape;
@@ -204,7 +271,9 @@ class DrawImage : public Record {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawImage(image, sampling, playback->state, playback->fill);
+    auto rect = Rect::MakeWH(image->width(), image->height());
+    context->drawImageRect(image, rect, rect, sampling, playback->state(), playback->fill(),
+                           SrcRectConstraint::Fast);
   }
 
   std::shared_ptr<Image> image;
@@ -213,8 +282,9 @@ class DrawImage : public Record {
 
 class DrawImageRect : public DrawImage {
  public:
-  DrawImageRect(std::shared_ptr<Image> image, const Rect& rect, const SamplingOptions& sampling)
-      : DrawImage(std::move(image), sampling), rect(rect) {
+  DrawImageRect(std::shared_ptr<Image> image, const Rect& rect, const SamplingOptions& sampling,
+                SrcRectConstraint constraint)
+      : DrawImage(std::move(image), sampling), rect(rect), constraint(constraint) {
   }
 
   RecordType type() const override {
@@ -222,10 +292,31 @@ class DrawImageRect : public DrawImage {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawImageRect(image, rect, sampling, playback->state, playback->fill);
+    context->drawImageRect(image, rect, rect, sampling, playback->state(), playback->fill(),
+                           constraint);
   }
 
   Rect rect;
+  SrcRectConstraint constraint = SrcRectConstraint::Fast;
+};
+
+class DrawImageRectToRect : public DrawImageRect {
+ public:
+  DrawImageRectToRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
+                      const SamplingOptions& sampling, SrcRectConstraint constraint)
+      : DrawImageRect(std::move(image), srcRect, sampling, constraint), dstRect(dstRect) {
+  }
+
+  RecordType type() const override {
+    return RecordType::DrawImageRectToRect;
+  }
+
+  void playback(DrawContext* context, PlaybackContext* playback) const override {
+    context->drawImageRect(image, rect, dstRect, sampling, playback->state(), playback->fill(),
+                           constraint);
+  }
+
+  Rect dstRect;
 };
 
 class DrawGlyphRunList : public Record {
@@ -239,27 +330,11 @@ class DrawGlyphRunList : public Record {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawGlyphRunList(glyphRunList, playback->state, playback->fill, nullptr);
+    context->drawGlyphRunList(glyphRunList, playback->state(), playback->fill(),
+                              playback->stroke());
   }
 
   std::shared_ptr<GlyphRunList> glyphRunList;
-};
-
-class StrokeGlyphRunList : public DrawGlyphRunList {
- public:
-  StrokeGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const Stroke& stroke)
-      : DrawGlyphRunList(std::move(glyphRunList)), stroke(stroke) {
-  }
-
-  RecordType type() const override {
-    return RecordType::StrokeGlyphRunList;
-  }
-
-  void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawGlyphRunList(glyphRunList, playback->state, playback->fill, &stroke);
-  }
-
-  Stroke stroke;
 };
 
 class DrawPicture : public Record {
@@ -276,7 +351,7 @@ class DrawPicture : public Record {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawPicture(picture, playback->state);
+    context->drawPicture(picture, playback->state());
   }
 
   std::shared_ptr<Picture> picture;
@@ -297,7 +372,7 @@ class DrawLayer : public Record {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawLayer(picture, filter, playback->state, playback->fill);
+    context->drawLayer(picture, filter, playback->state(), playback->fill());
   }
 
   std::shared_ptr<Picture> picture;

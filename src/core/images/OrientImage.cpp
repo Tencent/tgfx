@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -92,14 +92,18 @@ std::shared_ptr<Image> OrientImage::onMakeOriented(Orientation newOrientation) c
 }
 
 PlacementPtr<FragmentProcessor> OrientImage::asFragmentProcessor(const FPArgs& args,
-                                                                 TileMode tileModeX,
-                                                                 TileMode tileModeY,
-                                                                 const SamplingOptions& sampling,
+                                                                 const SamplingArgs& samplingArgs,
                                                                  const Matrix* uvMatrix) const {
   std::optional<Matrix> matrix = std::nullopt;
+  SamplingArgs newSamplingArgs = samplingArgs;
   if (orientation != Orientation::TopLeft) {
     matrix = OrientationToMatrix(orientation, source->width(), source->height());
     matrix->invert(AddressOf(matrix));
+    if (samplingArgs.sampleArea) {
+      Rect subset = *samplingArgs.sampleArea;
+      matrix->mapRect(&subset);
+      newSamplingArgs.sampleArea = subset;
+    }
   }
   if (uvMatrix) {
     if (matrix) {
@@ -109,9 +113,9 @@ PlacementPtr<FragmentProcessor> OrientImage::asFragmentProcessor(const FPArgs& a
     }
   }
   if (OrientationSwapsWidthHeight(orientation)) {
-    std::swap(tileModeX, tileModeY);
+    std::swap(newSamplingArgs.tileModeX, newSamplingArgs.tileModeY);
   }
-  return FragmentProcessor::Make(source, args, tileModeX, tileModeY, sampling, AddressOf(matrix));
+  return FragmentProcessor::Make(source, args, newSamplingArgs, AddressOf(matrix));
 }
 
 Orientation OrientImage::concatOrientation(Orientation newOrientation) const {

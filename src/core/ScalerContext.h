@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -21,6 +21,7 @@
 #include "tgfx/core/FontMetrics.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/Stroke.h"
 #include "tgfx/core/Typeface.h"
 
 namespace tgfx {
@@ -29,8 +30,6 @@ static constexpr float ITALIC_SKEW = -0.20f;
 class ScalerContext {
  public:
   static std::shared_ptr<ScalerContext> MakeEmpty(float size);
-
-  static std::shared_ptr<ScalerContext> Make(std::shared_ptr<Typeface> typeface, float size);
 
   virtual ~ScalerContext() = default;
 
@@ -60,9 +59,11 @@ class ScalerContext {
 
   virtual bool generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic, Path* path) const = 0;
 
-  virtual Rect getImageTransform(GlyphID glyphID, Matrix* matrix) const = 0;
+  virtual Rect getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
+                                 Matrix* matrix) const = 0;
 
-  virtual bool readPixels(GlyphID glyphID, const ImageInfo& dstInfo, void* dstPixels) const = 0;
+  virtual bool readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
+                          const ImageInfo& dstInfo, void* dstPixels) const = 0;
 
  protected:
   // Note: This could be nullptr.
@@ -72,8 +73,6 @@ class ScalerContext {
   ScalerContext(std::shared_ptr<Typeface> typeface, float size);
 
  private:
-  static std::shared_ptr<ScalerContext> CreateNew(std::shared_ptr<Typeface> typeface, float size);
-
   friend class Font;
 };
 }  // namespace tgfx

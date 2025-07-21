@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -566,8 +566,9 @@ PathRef* Path::writableRef() {
   if (pathRef.use_count() != 1) {
     pathRef = std::make_shared<PathRef>(pathRef->path);
   } else {
+    // There only one reference to this PathRef, so we can safely reset the uniqueKey and bounds.
     pathRef->uniqueKey.reset();
-    pathRef->resetBounds();
+    pathRef->bounds.reset();
   }
   return pathRef.get();
 }

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,9 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/TextLayer.h"
-#include "core/FontGlyphFace.h"
 #include "core/utils/Log.h"
-#include "layers/contents/TextContent.h"
 #include "tgfx/core/UTF.h"
 
 namespace tgfx {
@@ -93,9 +91,7 @@ std::vector<std::shared_ptr<Typeface>> GetFallbackTypefaces() {
 }
 
 std::shared_ptr<TextLayer> TextLayer::Make() {
-  auto layer = std::shared_ptr<TextLayer>(new TextLayer());
-  layer->weakThis = layer;
-  return layer;
+  return std::shared_ptr<TextLayer>(new TextLayer());
 }
 
 void TextLayer::setText(const std::string& text) {
@@ -160,9 +156,9 @@ void TextLayer::setAutoWrap(bool value) {
   invalidateContent();
 }
 
-std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
+void TextLayer::onUpdateContent(LayerRecorder* recorder) {
   if (_text.empty()) {
-    return nullptr;
+    return;
   }
 
   // 1. preprocess newlines, convert \r\n, \r to \n
@@ -171,7 +167,7 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
   // 2. shape text to glyphs, handle font fallback
   const auto& glyphInfos = ShapeText(text, _font.getTypeface());
   if (glyphInfos.empty()) {
-    return nullptr;
+    return;
   }
 
   // 3. Handle text wrapping and auto-wrapping
@@ -212,7 +208,7 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
   resolveTextAlignment(glyphLines, emptyAdvance, finalGlyphs, positions);
   if (finalGlyphs.size() != positions.size()) {
     LOGE("TextLayer::onUpdateContent finalGlyphs.size() != positions.size(), error.");
-    return nullptr;
+    return;
   }
 
   // 6. Calculate the final glyphs and positions for rendering
@@ -220,11 +216,10 @@ std::unique_ptr<LayerContent> TextLayer::onUpdateContent() {
   buildGlyphRunList(finalGlyphs, positions, glyphRunList);
 
   auto textBlob = TextBlob::MakeFrom(std::move(glyphRunList));
-  if (nullptr == textBlob) {
-    return nullptr;
-  }
-
-  return std::make_unique<TextContent>(std::move(textBlob), _textColor);
+  Paint paint = {};
+  paint.setColor(_textColor);
+  auto canvas = recorder->getCanvas();
+  canvas->drawTextBlob(textBlob, 0, 0, paint);
 }
 
 std::string TextLayer::PreprocessNewLines(const std::string& text) {

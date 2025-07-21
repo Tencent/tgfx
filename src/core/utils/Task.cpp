@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -38,39 +38,31 @@ void Task::ReleaseThreads() {
   TaskGroup::GetInstance()->releaseThreads(false);
 }
 
-std::shared_ptr<Task> Task::Run(std::function<void()> block) {
+std::shared_ptr<Task> Task::Run(std::function<void()> block, TaskPriority priority) {
   if (block == nullptr) {
     return nullptr;
   }
   auto task = std::make_shared<BlockTask>(std::move(block));
-  Run(task);
+  Run(task, priority);
   return task;
 }
 
-void Task::Run(std::shared_ptr<Task> task) {
+void Task::Run(std::shared_ptr<Task> task, TaskPriority priority) {
   if (task == nullptr) {
     return;
   }
-  if (!TaskGroup::GetInstance()->pushTask(task)) {
+  if (!TaskGroup::GetInstance()->pushTask(task, priority)) {
     task->execute();
   }
 }
 
 void Task::cancel() {
   auto currentStatus = _status.load(std::memory_order_acquire);
-  if (currentStatus == TaskStatus::Canceled || currentStatus == TaskStatus::Finished) {
-    return;
-  }
   if (currentStatus == TaskStatus::Queueing) {
     if (_status.compare_exchange_weak(currentStatus, TaskStatus::Canceled,
                                       std::memory_order_acq_rel, std::memory_order_relaxed)) {
       onCancel();
-      return;
     }
-  }
-  std::unique_lock<std::mutex> autoLock(locker);
-  if (_status.load(std::memory_order_acquire) == TaskStatus::Executing) {
-    condition.wait(autoLock);
   }
 }
 

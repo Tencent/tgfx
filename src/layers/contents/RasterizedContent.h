@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,13 +18,15 @@
 
 #pragma once
 
-#include "tgfx/layers/LayerContent.h"
+#include "tgfx/core/Canvas.h"
 
 namespace tgfx {
-class RasterizedContent : public LayerContent {
+class RasterizedContent {
  public:
-  RasterizedContent(uint32_t contextID, std::shared_ptr<Image> image, const Matrix& matrix)
-      : _contextID(contextID), image(std::move(image)), matrix(matrix) {
+  RasterizedContent(uint32_t contextID, float contentScale, std::shared_ptr<Image> image,
+                    const Matrix& matrix)
+      : _contextID(contextID), _contentScale(contentScale), image(std::move(image)),
+        matrix(matrix) {
   }
 
   /**
@@ -34,11 +36,9 @@ class RasterizedContent : public LayerContent {
     return _contextID;
   }
 
-  Rect getBounds() const override;
-
-  void draw(Canvas* canvas, const Paint& paint) const override;
-
-  bool hitTestPoint(float localX, float localY, bool pixelHitTest) override;
+  float contentScale() const {
+    return _contentScale;
+  }
 
   std::shared_ptr<Image> getImage() const {
     return image;
@@ -48,8 +48,12 @@ class RasterizedContent : public LayerContent {
     return matrix;
   }
 
+  void draw(Canvas* canvas, bool antiAlias, float alpha,
+            BlendMode blendMode = BlendMode::SrcOver) const;
+
  private:
   uint32_t _contextID = 0;
+  float _contentScale = 0.0f;
   std::shared_ptr<Image> image = nullptr;
   Matrix matrix = {};
 };

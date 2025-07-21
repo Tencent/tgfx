@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -110,7 +110,8 @@ void SVGImage::onRender(const SVGRenderContext& context) const {
                                   viewPort.height() / imgInfo.destinationRect.height());
   matrix.preTranslate(imgInfo.destinationRect.x(), imgInfo.destinationRect.y());
 
-  context.canvas()->drawImage(imgInfo.image, matrix);
+  context.canvas()->concat(matrix);
+  context.canvas()->drawImage(imgInfo.image);
 }
 
 Path SVGImage::onAsPath(const SVGRenderContext&) const {

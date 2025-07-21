@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -63,4 +63,18 @@ size_t PixelFormatBytesPerPixel(PixelFormat format) {
       return 0;
   }
 }
+
+PixelFormat MaskFormatToPixelFormat(MaskFormat format) {
+  switch (format) {
+    case MaskFormat::A8:
+      return PixelFormat::ALPHA_8;
+    case MaskFormat::RGBA:
+      return PixelFormat::RGBA_8888;
+    case MaskFormat::BGRA:
+      return PixelFormat::BGRA_8888;
+    default:
+      return PixelFormat::Unknown;
+  }
+}
+
 }  // namespace tgfx

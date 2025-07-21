@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -62,8 +62,7 @@ void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   // Setup position
   args.vertBuilder->emitNormalizedPosition(inPosition.name());
   // emit transforms
-  emitTransforms(vertBuilder, varyingHandler, uniformHandler, inPosition.asShaderVar(),
-                 args.fpCoordTransformHandler);
+  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, inPosition.asShaderVar());
   // For stroked ellipses, we use the full ellipse equation (x^2/a^2 + y^2/b^2 = 1)
   // to compute both the edges because we need two separate test equations for
   // the single offset.
@@ -124,7 +123,7 @@ void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
     } else {
       fragBuilder->codeAppend("invlen = inversesqrt(grad_dot);");
     }
-    fragBuilder->codeAppend("edgeAlpha *= saturate(0.5+test*invlen);");
+    fragBuilder->codeAppend("edgeAlpha *= clamp(0.5+test*invlen, 0.0, 1.0);");
   }
 
   fragBuilder->codeAppendf("%s = vec4(edgeAlpha);", args.outputCoverage.c_str());

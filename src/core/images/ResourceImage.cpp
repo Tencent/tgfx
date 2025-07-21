@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,7 +18,6 @@
 
 #include "ResourceImage.h"
 #include "core/images/MipmapImage.h"
-#include "gpu/ops/RectDrawOp.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
@@ -46,13 +45,11 @@ std::shared_ptr<Image> ResourceImage::onMakeMipmapped(bool enabled) const {
 }
 
 PlacementPtr<FragmentProcessor> ResourceImage::asFragmentProcessor(const FPArgs& args,
-                                                                   TileMode tileModeX,
-                                                                   TileMode tileModeY,
-                                                                   const SamplingOptions& sampling,
+                                                                   const SamplingArgs& samplingArgs,
                                                                    const Matrix* uvMatrix) const {
+
   TPArgs tpArgs(args.context, args.renderFlags, hasMipmaps());
   auto proxy = onLockTextureProxy(tpArgs, uniqueKey);
-  return TiledTextureEffect::Make(std::move(proxy), tileModeX, tileModeY, sampling, uvMatrix,
-                                  isAlphaOnly());
+  return TiledTextureEffect::Make(std::move(proxy), samplingArgs, uvMatrix, isAlphaOnly());
 }
 }  // namespace tgfx

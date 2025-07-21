@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -52,6 +52,8 @@ enum class LayerStyleExtraSourceType {
   Background
 };
 
+enum class LayerStyleType { LayerStyle, BackgroundBlur, DropShadow, InnerShadow };
+
 /**
  * LayerStyle is used to change the appearance of a layer. Unlike LayerFilter, it does not create a
  * new offscreen image to replace the original layer content. Instead, it adds visual elements
@@ -60,6 +62,10 @@ enum class LayerStyleExtraSourceType {
  */
 class LayerStyle : public LayerProperty {
  public:
+  virtual LayerStyleType Type() const {
+    return LayerStyleType::LayerStyle;
+  };
+
   /**
    * The blend mode used to composite the layer style with the existing content on the canvas.
    */
@@ -85,6 +91,15 @@ class LayerStyle : public LayerProperty {
    * @return The bounds of the layer style.
    */
   virtual Rect filterBounds(const Rect& srcRect, float contentScale) = 0;
+
+  /**
+   * Returns the bounds of the background content after applying the layer style.
+   * @param srcRect The scaled bounds of the background content.
+   * @param contentScale The scale factor of the background bounds relative to its original size.
+   * Some layerStyles have size-related parameters that must be adjusted with this scale factor.
+   * @return The bounds of the background content.
+   */
+  virtual Rect filterBackground(const Rect& srcRect, float contentScale);
 
   /**
    * Applies the layer style to the scaled image of the layer content and draws it on the canvas.

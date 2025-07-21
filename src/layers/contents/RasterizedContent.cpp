@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,18 +19,15 @@
 #include "RasterizedContent.h"
 
 namespace tgfx {
-Rect RasterizedContent::getBounds() const {
-  auto bounds = Rect::MakeWH(image->width(), image->height());
-  matrix.mapRect(&bounds);
-  return bounds;
-}
-
-void RasterizedContent::draw(Canvas* canvas, const Paint& paint) const {
-  canvas->drawImage(image, matrix, &paint);
-}
-
-bool RasterizedContent::hitTestPoint(float localX, float localY, bool) {
-  const auto imageBounds = Rect::MakeXYWH(0, 0, image->width(), image->height());
-  return imageBounds.contains(localX, localY);
+void RasterizedContent::draw(Canvas* canvas, bool antiAlias, float alpha,
+                             BlendMode blendMode) const {
+  auto oldMatrix = canvas->getMatrix();
+  canvas->concat(matrix);
+  Paint paint = {};
+  paint.setAntiAlias(antiAlias);
+  paint.setAlpha(alpha);
+  paint.setBlendMode(blendMode);
+  canvas->drawImage(image, &paint);
+  canvas->setMatrix(oldMatrix);
 }
 }  // namespace tgfx

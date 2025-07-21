@@ -219,9 +219,6 @@
         "targets": [
           "gtest"
         ],
-        "arguments": [
-          "-DCMAKE_POLICY_VERSION_MINIMUM=3.5"
-        ],
         "platforms": [
           "mac",
           "win",
@@ -239,6 +236,14 @@
         "arguments": [
           "-DBUILD_SHARED_LIBS=OFF",
           "-DCMAKE_C_FLAGS=\"-w\""
+        ]
+      }
+    },
+    {
+      "name": "highway",
+      "cmake": {
+        "targets": [
+          "hwy"
         ]
       }
     }

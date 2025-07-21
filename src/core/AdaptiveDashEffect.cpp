@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,10 +18,13 @@
 
 #include "AdaptiveDashEffect.h"
 #include "PathRef.h"
+#include "utils/MathExtra.h"
 
 using namespace pk;
 
 namespace tgfx {
+
+#define ADAPTIVE_DASH_SEGMENT_EPSILON 120000
 
 inline bool IsEven(int x) {
   return !(x & 1);
@@ -31,6 +34,7 @@ inline bool IsEven(int x) {
 struct Contour {
   std::vector<std::unique_ptr<SkPathMeasure>> segments;
   bool isClosed = false;
+  float length = 0.f;
 };
 
 // Build contours from path
@@ -96,6 +100,7 @@ std::vector<Contour> BuildContours(const Path& path) {
       }
       auto measure = std::make_unique<SkPathMeasure>(segmentPath, false);
       if (measure->getLength() > 0) {
+        contour.length += measure->getLength();
         contour.segments.push_back(std::move(measure));
       }
     } while ((verb = iter.next(pts)) != SkPath::kDone_Verb);
@@ -109,6 +114,7 @@ std::vector<Contour> BuildContours(const Path& path) {
         closingSegment.lineTo(firstPoint);
         auto measure = std::make_unique<SkPathMeasure>(closingSegment, false);
         if (measure->getLength() > 0) {
+          contour.length += measure->getLength();
           contour.segments.push_back(std::move(measure));
         }
       }
@@ -171,11 +177,25 @@ bool AdaptiveDashEffect::filterPath(Path* path) const {
 
     for (const auto& segment : contour.segments) {
       const float segmentLength = segment->getLength();
+      // Apply ULP-based length comparison to ensure dash generation on tiny contours
+      if (FloatNearlyZero(segmentLength) ||
+          AreWithinUlps(contour.length - segmentLength, contour.length,
+                        ADAPTIVE_DASH_SEGMENT_EPSILON)) {
+        // skip the small segments in case some bugs after paths merge.
+        if (!needMoveTo) {
+          segment->getSegment(0, segmentLength, &resultPath, false);
+        } else {
+          segment->getSegment(segmentLength, segmentLength, &resultPath, true);
+          needMoveTo = false;
+        }
+        skipFirstSegment = false;
+        continue;
+      }
       const float patternRatio = std::max(std::roundf(segmentLength / intervalLength), 1.0f);
 
       // Check dash count limit
       totalDashCount += patternRatio * static_cast<float>(patternCount >> 1);
-      if (totalDashCount > kMaxDashCount) {
+      if (totalDashCount > MaxDashCount) {
         return false;
       }
 

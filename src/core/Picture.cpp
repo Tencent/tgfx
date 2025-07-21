@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,16 +17,17 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Picture.h"
+#include "core/HitTestContext.h"
 #include "core/MeasureContext.h"
 #include "core/Records.h"
-#include "core/TransformContext.h"
 #include "core/utils/BlockBuffer.h"
 #include "core/utils/Log.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Image.h"
+#include "utils/MathExtra.h"
 
 namespace tgfx {
-Picture::Picture(std::shared_ptr<BlockData> data, std::vector<PlacementPtr<Record>> recordList,
+Picture::Picture(std::unique_ptr<BlockData> data, std::vector<PlacementPtr<Record>> recordList,
                  size_t drawCount)
     : blockData(std::move(data)), records(std::move(recordList)), drawCount(drawCount) {
   DEBUG_ASSERT(blockData != nullptr);
@@ -43,31 +44,56 @@ Picture::Picture(std::shared_ptr<BlockData> data, std::vector<PlacementPtr<Recor
 Picture::~Picture() {
   // Make sure the records are cleared before the block data is destroyed.
   records.clear();
+  auto oldBounds = bounds.exchange(nullptr, std::memory_order_acq_rel);
+  delete oldBounds;
 }
 
-Rect Picture::getBounds(const Matrix* matrix) const {
-  MeasureContext context = {};
+Rect Picture::getBounds() const {
+  if (auto cachedBounds = bounds.load(std::memory_order_acquire)) {
+    return *cachedBounds;
+  }
+  MeasureContext context(false);
+  MCState state(Matrix::I());
+  playback(&context, state);
+  auto totalBounds = context.getBounds();
+  auto newBounds = new Rect(totalBounds);
+  Rect* oldBounds = nullptr;
+  if (!bounds.compare_exchange_strong(oldBounds, newBounds, std::memory_order_acq_rel)) {
+    delete newBounds;
+  }
+  return totalBounds;
+}
+
+Rect Picture::getTightBounds(const Matrix* matrix) const {
+  MeasureContext context(true);
   MCState state(matrix ? *matrix : Matrix::I());
   playback(&context, state);
   return context.getBounds();
 }
 
-void Picture::playback(Canvas* canvas) const {
-  if (canvas != nullptr) {
-    playback(canvas->drawContext, *canvas->mcState);
+bool Picture::hitTestPoint(float localX, float localY, bool shapeHitTest) const {
+  PlaybackContext playbackContext = {};
+  HitTestContext hitTestContext(localX, localY, shapeHitTest);
+  for (auto& record : records) {
+    record->playback(&hitTestContext, &playbackContext);
+    if (hitTestContext.hasHit()) {
+      return true;
+    }
   }
+  return false;
 }
 
-void Picture::playback(DrawContext* drawContext, const MCState& state) const {
-  DEBUG_ASSERT(drawContext != nullptr);
-  if (state.clip.isEmpty() && !state.clip.isInverseFillType()) {
+void Picture::playback(Canvas* canvas, const FillModifier* fillModifier) const {
+  if (canvas == nullptr) {
     return;
   }
-  TransformContext transformContext(drawContext, state);
-  if (transformContext.type() != TransformContext::Type::None) {
-    drawContext = &transformContext;
-  }
-  PlaybackContext playbackContext = {};
+  playback(canvas->drawContext, *canvas->mcState, fillModifier);
+}
+
+void Picture::playback(DrawContext* drawContext, const MCState& state,
+                       const FillModifier* fillModifier) const {
+  DEBUG_ASSERT(drawContext != nullptr);
+  PlaybackContext playbackContext(state, fillModifier);
   for (auto& record : records) {
     record->playback(drawContext, &playbackContext);
   }
@@ -102,15 +128,16 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
   }
   MCState state = {};
   Fill fill = {};
-  auto record = firstDrawRecord(&state, &fill);
-  if (record == nullptr) {
+  bool hasStroke = false;
+  auto record = getFirstDrawRecord(&state, &fill, &hasStroke);
+  if (record == nullptr || hasStroke) {
     return nullptr;
   }
   if (record->type() != RecordType::DrawImage && record->type() != RecordType::DrawImageRect) {
     return nullptr;
   }
   auto imageRecord = static_cast<const DrawImage*>(record);
-  if (fill.maskFilter || fill.colorFilter) {
+  if (fill.maskFilter || fill.colorFilter || fill.color.alpha != 1.0f) {
     return nullptr;
   }
   auto image = imageRecord->image;
@@ -165,37 +192,26 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
   return image;
 }
 
-const Record* Picture::firstDrawRecord(tgfx::MCState* state, tgfx::Fill* fill) const {
+const Record* Picture::getFirstDrawRecord(MCState* state, Fill* fill, bool* hasStroke) const {
+  PlaybackContext playback = {};
+  Record* drawRecord = nullptr;
   for (auto& record : records) {
-    if (record->type() > RecordType::SetFill) {
-      return record.get();
+    if (record->type() >= RecordType::DrawFill) {
+      drawRecord = record.get();
+      break;
     }
-    switch (record->type()) {
-      case RecordType::SetMatrix:
-        if (state) {
-          state->matrix = static_cast<SetMatrix*>(record.get())->matrix;
-        }
-        break;
-      case RecordType::SetClip:
-        if (state) {
-          state->clip = static_cast<SetClip*>(record.get())->clip;
-        }
-        break;
-      case RecordType::SetColor:
-        if (fill) {
-          fill->color = static_cast<SetColor*>(record.get())->color;
-        }
-        break;
-      case RecordType::SetFill:
-        if (fill) {
-          *fill = static_cast<SetFill*>(record.get())->fill;
-        }
-        break;
-      default:
-        break;
-    }
+    record->playback(nullptr, &playback);
   }
-  return nullptr;
+  if (state) {
+    *state = playback.state();
+  }
+  if (fill) {
+    *fill = playback.fill();
+  }
+  if (hasStroke) {
+    *hasStroke = playback.stroke() != nullptr;
+  }
+  return drawRecord;
 }
 
 }  // namespace tgfx

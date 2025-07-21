@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,6 +19,7 @@
 #include "tgfx/core/ImageCodec.h"
 #include "core/PixelBuffer.h"
 #include "core/utils/USE.h"
+#include "core/utils/WeakMap.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Pixmap.h"
@@ -39,7 +40,15 @@
 #endif
 
 namespace tgfx {
+
 std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const std::string& filePath) {
+  static WeakMap<std::string, ImageCodec> imageCodecMap = {};
+  if (filePath.empty()) {
+    return nullptr;
+  }
+  if (auto cached = imageCodecMap.find(filePath)) {
+    return cached;
+  }
   std::shared_ptr<ImageCodec> codec = nullptr;
   auto stream = Stream::MakeFromFile(filePath);
   if (stream && stream->size() > 14) {
@@ -68,9 +77,11 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const std::string& filePath) {
   if (codec == nullptr) {
     codec = MakeNativeCodec(filePath);
   }
-
   if (codec && !ImageInfo::IsValidSize(codec->width(), codec->height())) {
     codec = nullptr;
+  }
+  if (codec) {
+    imageCodecMap.insert(filePath, codec);
   }
   return codec;
 }

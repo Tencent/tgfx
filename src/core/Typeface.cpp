@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,7 +18,9 @@
 
 #include "tgfx/core/Typeface.h"
 #include <vector>
+#include "core/ScalerContext.h"
 #include "core/utils/UniqueID.h"
+#include "tgfx/core/Font.h"
 #include "tgfx/core/UTF.h"
 
 namespace tgfx {
@@ -74,6 +76,10 @@ class EmptyTypeface : public Typeface {
   }
 
  private:
+  std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override {
+    return ScalerContext::MakeEmpty(size);
+  }
+
   uint32_t _uniqueID = UniqueID::Next();
 };
 
@@ -95,6 +101,10 @@ GlyphID Typeface::getGlyphID(const std::string& name) const {
   return getGlyphID(unichar);
 }
 
+bool Typeface::isCustom() const {
+  return false;
+}
+
 std::vector<Unichar> Typeface::getGlyphToUnicodeMap() const {
   return {};
 };
@@ -107,4 +117,49 @@ size_t Typeface::getTableSize(FontTableTag tag) const {
   return 0;
 }
 
+std::shared_ptr<ScalerContext> Typeface::getScalerContext(float size) {
+  if (size <= 0.0f) {
+    return ScalerContext::MakeEmpty(size);
+  }
+  std::lock_guard<std::mutex> autoLock(locker);
+  auto result = scalerContexts.find(size);
+  if (result != scalerContexts.end()) {
+    auto context = result->second.lock();
+    if (context != nullptr) {
+      return context;
+    }
+  }
+  auto context = onCreateScalerContext(size);
+  if (context == nullptr) {
+    return ScalerContext::MakeEmpty(size);
+  }
+  scalerContexts[size] = context;
+  return context;
+}
+
+Rect Typeface::getBounds() const {
+  std::call_once(onceFlag, [this] {
+    if (!computeBounds(&bounds)) {
+      bounds.setEmpty();
+    }
+  });
+  return bounds;
+}
+
+bool Typeface::computeBounds(Rect* bounds) const {
+  constexpr float TextSize = 2048.f;
+  constexpr float InvTextSize = 1.0f / TextSize;
+  auto scaleContext = onCreateScalerContext(TextSize);
+  if (scaleContext == nullptr) {
+    return false;
+  }
+  auto metrics = scaleContext->getFontMetrics();
+  //Check if the bounds is empty
+  if (metrics.xMin >= metrics.xMax || metrics.top >= metrics.bottom) {
+    return false;
+  }
+  bounds->setLTRB(metrics.xMin * InvTextSize, metrics.top * InvTextSize, metrics.xMax * InvTextSize,
+                  metrics.bottom * InvTextSize);
+  return true;
+}
 }  // namespace tgfx

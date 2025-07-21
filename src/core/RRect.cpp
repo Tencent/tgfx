@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -29,6 +29,14 @@ bool RRect::isOval() const {
 
 void RRect::setRectXY(const Rect& r, float radiusX, float radiusY) {
   rect = r.makeSorted();
+  if (radiusX < 0 || radiusY < 0) {
+    radiusX = radiusY = 0;
+  }
+  if (r.width() < radiusX + radiusX || r.height() < radiusY + radiusY) {
+    float scale = std::min(r.width() / (radiusX + radiusX), r.height() / (radiusY + radiusY));
+    radiusX *= scale;
+    radiusY *= scale;
+  }
   radii = {radiusX, radiusY};
 }
 

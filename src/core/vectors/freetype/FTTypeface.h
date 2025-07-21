@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -60,11 +60,12 @@ class FTTypeface : public Typeface {
 #endif
   std::shared_ptr<Data> openData() const override;
 
+  std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;
+
  private:
   uint32_t _uniqueID = 0;
   FTFontData data;
   FT_Face face = nullptr;
-  std::weak_ptr<FTTypeface> weakThis;
 
   FTTypeface(FTFontData data, FT_Face face);
 

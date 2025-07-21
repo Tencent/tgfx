@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -50,9 +50,7 @@ std::shared_ptr<Image> RGBAAAImage::onCloneWith(std::shared_ptr<Image> newSource
 }
 
 PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs& args,
-                                                                 TileMode tileModeX,
-                                                                 TileMode tileModeY,
-                                                                 const SamplingOptions& sampling,
+                                                                 const SamplingArgs& samplingArgs,
                                                                  const Matrix* uvMatrix) const {
   DEBUG_ASSERT(!source->isAlphaOnly());
   auto matrix = concatUVMatrix(uvMatrix);
@@ -60,18 +58,24 @@ PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs& a
   if (matrix) {
     matrix->mapRect(&drawBounds);
   }
-  auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
+  auto newSamplingArgs = samplingArgs;
+  auto mipmapped = source->hasMipmaps() && samplingArgs.sampling.mipmapMode != MipmapMode::None;
   if (bounds.contains(drawBounds)) {
+    if (samplingArgs.constraint != SrcRectConstraint::Strict) {
+      newSamplingArgs.sampleArea = getSubset(drawBounds);
+    }
     TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
     auto proxy = source->lockTextureProxy(tpArgs);
-    return TextureEffect::MakeRGBAAA(std::move(proxy), alphaStart, sampling, AddressOf(matrix));
+    return TextureEffect::MakeRGBAAA(std::move(proxy), newSamplingArgs, alphaStart,
+                                     AddressOf(matrix));
   }
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
   auto textureProxy = lockTextureProxy(tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  return TiledTextureEffect::Make(textureProxy, tileModeX, tileModeY, sampling, uvMatrix);
+  newSamplingArgs.sampleArea = std::nullopt;
+  return TiledTextureEffect::Make(textureProxy, newSamplingArgs, uvMatrix);
 }
 
 std::shared_ptr<Image> RGBAAAImage::onMakeSubset(const Rect& subset) const {

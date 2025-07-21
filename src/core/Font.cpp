@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,36 +18,15 @@
 
 #include "tgfx/core/Font.h"
 #include "ScalerContext.h"
+#include "core/GlyphRasterizer.h"
 #include "core/PixelBuffer.h"
 
 namespace tgfx {
-
-class FontGlyphImageCodec : public ImageCodec {
- public:
-  FontGlyphImageCodec(int width, int height, std::shared_ptr<ScalerContext> scalerContext,
-                      GlyphID glyphID)
-      : ImageCodec(width, height, Orientation::LeftTop), scalerContext(std::move(scalerContext)),
-        glyphID(glyphID) {
-  }
-
-  bool isAlphaOnly() const override {
-    return !scalerContext->hasColor();
-  }
-
-  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override {
-    return scalerContext->readPixels(glyphID, dstInfo, dstPixels);
-  }
-
- private:
-  std::shared_ptr<ScalerContext> scalerContext = nullptr;
-  GlyphID glyphID = 0;
-};
-
 Font::Font() : scalerContext(ScalerContext::MakeEmpty(0.0f)) {
 }
 
 Font::Font(std::shared_ptr<Typeface> tf, float textSize)
-    : scalerContext(ScalerContext::Make(std::move(tf), textSize)) {
+    : scalerContext(tf ? tf->getScalerContext(textSize) : ScalerContext::MakeEmpty(textSize)) {
 }
 
 Font Font::makeWithSize(float newSize) const {
@@ -72,7 +51,7 @@ void Font::setTypeface(std::shared_ptr<Typeface> newTypeface) {
   if (newTypeface == scalerContext->getTypeface()) {
     return;
   }
-  scalerContext = ScalerContext::Make(std::move(newTypeface), scalerContext->getSize());
+  scalerContext = newTypeface->getScalerContext(scalerContext->getSize());
 }
 
 float Font::getSize() const {
@@ -86,7 +65,12 @@ void Font::setSize(float newSize) {
   if (newSize == scalerContext->getSize()) {
     return;
   }
-  scalerContext = ScalerContext::Make(scalerContext->getTypeface(), newSize);
+  auto typeface = scalerContext->getTypeface();
+  if (typeface == nullptr) {
+    scalerContext = ScalerContext::MakeEmpty(newSize);
+  } else {
+    scalerContext = typeface->getScalerContext(newSize);
+  }
 }
 
 GlyphID Font::getGlyphID(const std::string& name) const {
@@ -131,11 +115,13 @@ bool Font::getPath(GlyphID glyphID, Path* path) const {
   return scalerContext->generatePath(glyphID, fauxBold, fauxItalic, path);
 }
 
-std::shared_ptr<ImageCodec> Font::getImage(GlyphID glyphID, Matrix* matrix) const {
+std::shared_ptr<ImageCodec> Font::getImage(GlyphID glyphID, const Stroke* stroke,
+                                           Matrix* matrix) const {
   if (glyphID == 0) {
     return nullptr;
   }
-  auto bounds = scalerContext->getImageTransform(glyphID, matrix);
+
+  auto bounds = scalerContext->getImageTransform(glyphID, fauxBold, stroke, matrix);
   if (bounds.isEmpty()) {
     return nullptr;
   }
@@ -144,7 +130,7 @@ std::shared_ptr<ImageCodec> Font::getImage(GlyphID glyphID, Matrix* matrix) cons
   }
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
-  return std::make_shared<FontGlyphImageCodec>(width, height, scalerContext, glyphID);
+  return std::make_shared<GlyphRasterizer>(width, height, scalerContext, glyphID, fauxBold, stroke);
 }
 
 bool Font::operator==(const Font& font) const {

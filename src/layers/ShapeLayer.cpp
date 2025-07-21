@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,14 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/ShapeLayer.h"
-#include "layers/contents/ShapeContent.h"
 #include "tgfx/core/PathEffect.h"
 
 namespace tgfx {
 std::shared_ptr<ShapeLayer> ShapeLayer::Make() {
-  auto layer = std::shared_ptr<ShapeLayer>(new ShapeLayer());
-  layer->weakThis = layer;
-  return layer;
+  return std::shared_ptr<ShapeLayer>(new ShapeLayer());
 }
 
 Path ShapeLayer::path() const {
@@ -56,11 +53,11 @@ void ShapeLayer::setFillStyles(std::vector<std::shared_ptr<ShapeStyle>> fills) {
       std::equal(_fillStyles.begin(), _fillStyles.end(), fills.begin())) {
     return;
   }
-  for (const auto& style : _fillStyles) {
+  for (auto& style : _fillStyles) {
     detachProperty(style.get());
   }
   _fillStyles = std::move(fills);
-  for (const auto& style : _fillStyles) {
+  for (auto& style : _fillStyles) {
     attachProperty(style.get());
   }
   invalidateContent();
@@ -252,64 +249,64 @@ ShapeLayer::~ShapeLayer() {
   }
 }
 
-static bool NothingToDraw(ShapeStyle* style) {
-  Fill fill = {};
-  fill.color.alpha = style->alpha();
-  fill.blendMode = style->blendMode();
-  return fill.nothingToDraw();
+static bool DrawContour(Canvas* canvas, std::shared_ptr<Shape> shape,
+                        const std::vector<Paint>& paints) {
+  if (shape == nullptr || paints.empty()) {
+    return false;
+  }
+  auto hasNonImageShader = std::any_of(paints.begin(), paints.end(), [](const Paint& paint) {
+    auto shader = paint.getShader();
+    return !shader || !shader->isAImage();
+  });
+  if (hasNonImageShader) {
+    canvas->drawShape(shape, {});
+  } else {
+    for (auto& paint : paints) {
+      canvas->drawShape(shape, paint);
+    }
+  }
+  return true;
 }
 
-std::unique_ptr<LayerContent> ShapeLayer::onUpdateContent() {
+void ShapeLayer::onUpdateContent(LayerRecorder* recorder) {
   if (_shape == nullptr) {
-    return nullptr;
+    return;
   }
-  std::vector<ShapePaint> paintList = {};
-  paintList.reserve(_fillStyles.size() + _strokeStyles.size());
-  for (auto& style : _fillStyles) {
-    if (!NothingToDraw(style.get())) {
-      paintList.emplace_back(style->getShader(), style->alpha(), style->blendMode());
-    }
-  }
-  auto fillPaintCount = paintList.size();
-  if (stroke.width > 0) {
-    for (auto& style : _strokeStyles) {
-      if (!NothingToDraw(style.get())) {
-        paintList.emplace_back(style->getShader(), style->alpha(), style->blendMode());
-      }
-    }
-  }
-  auto fillShape = fillPaintCount > 0 ? _shape : nullptr;
-  auto strokeShape = fillPaintCount < paintList.size() ? createStrokeShape() : nullptr;
-  return std::make_unique<ShapeContent>(fillShape, strokeShape, std::move(paintList),
-                                        fillPaintCount);
-}
-
-void ShapeLayer::drawContents(LayerContent* content, Canvas* canvas, float alpha, bool forContour,
-                              const std::function<bool()>& drawChildren) const {
-  auto shapeContent = static_cast<ShapeContent*>(content);
-  if (!shapeContent || !shapeContent->drawFills(canvas, getPaint(alpha), forContour)) {
-    if (forContour) {
-      canvas->drawShape(_shape, getPaint(alpha));
-    }
+  auto fillPaints = createShapePaints(_fillStyles);
+  auto strokePaints = stroke.width > 0 ? createShapePaints(_strokeStyles) : std::vector<Paint>();
+  auto strokeShape = strokePaints.empty() ? nullptr : createStrokeShape();
+  auto canvas = recorder->getCanvas(LayerContentType::Default);
+  for (auto& paint : fillPaints) {
+    canvas->drawShape(_shape, paint);
   }
   if (shapeBitFields.strokeOnTop) {
-    if (!drawChildren()) {
-      return;
-    }
+    canvas = recorder->getCanvas(LayerContentType::Foreground);
   }
-  if (shapeContent) {
-    shapeContent->drawStrokes(canvas, getPaint(alpha), forContour);
+  for (auto& paint : strokePaints) {
+    canvas->drawShape(strokeShape, paint);
   }
-  if (!shapeBitFields.strokeOnTop) {
-    drawChildren();
+  canvas = recorder->getCanvas(LayerContentType::Contour);
+  if (!DrawContour(canvas, _shape, fillPaints)) {
+    // If there is not any fill paints, we still need to draw the shape as contour.
+    canvas->drawShape(_shape, {});
   }
+  DrawContour(canvas, strokeShape, strokePaints);
 }
 
-Paint ShapeLayer::getPaint(float alpha) const {
-  Paint paint = {};
-  paint.setAntiAlias(allowsEdgeAntialiasing());
-  paint.setAlpha(alpha);
-  return paint;
+std::vector<Paint> ShapeLayer::createShapePaints(
+    const std::vector<std::shared_ptr<ShapeStyle>>& styles) const {
+  std::vector<Paint> paintList = {};
+  paintList.reserve(styles.size());
+  for (auto& style : styles) {
+    Paint paint = {};
+    paint.setAlpha(style->alpha());
+    paint.setBlendMode(style->blendMode());
+    paint.setShader(style->getShader());
+    if (!paint.getFill().nothingToDraw()) {
+      paintList.push_back(paint);
+    }
+  }
+  return paintList;
 }
 
 std::shared_ptr<Shape> ShapeLayer::createStrokeShape() const {

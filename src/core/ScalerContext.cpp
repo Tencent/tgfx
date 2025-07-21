@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -44,11 +44,11 @@ class EmptyScalerContext : public ScalerContext {
     return false;
   }
 
-  Rect getImageTransform(GlyphID, Matrix*) const override {
+  Rect getImageTransform(GlyphID, bool, const Stroke*, Matrix*) const override {
     return {};
   }
 
-  bool readPixels(GlyphID, const ImageInfo&, void*) const override {
+  bool readPixels(GlyphID, bool, const Stroke*, const ImageInfo&, void*) const override {
     return false;
   }
 };
@@ -62,27 +62,6 @@ std::shared_ptr<ScalerContext> ScalerContext::MakeEmpty(float size) {
     return EmptyContext;
   }
   return std::make_shared<EmptyScalerContext>(size);
-}
-
-std::shared_ptr<ScalerContext> ScalerContext::Make(std::shared_ptr<Typeface> typeface, float size) {
-  if (typeface == nullptr || typeface->glyphsCount() <= 0 || size < 0.0f) {
-    return MakeEmpty(size);
-  }
-  std::lock_guard<std::mutex> autoLock(typeface->locker);
-  auto& scalerContexts = typeface->scalerContexts;
-  auto result = scalerContexts.find(size);
-  if (result != scalerContexts.end()) {
-    auto context = result->second.lock();
-    if (context != nullptr) {
-      return context;
-    }
-  }
-  auto context = ScalerContext::CreateNew(std::move(typeface), size);
-  if (context == nullptr) {
-    return MakeEmpty(size);
-  }
-  scalerContexts[size] = context;
-  return context;
 }
 
 ScalerContext::ScalerContext(std::shared_ptr<Typeface> typeface, float size)

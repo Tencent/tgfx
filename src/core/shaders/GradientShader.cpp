@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GradientShader.h"
-#include "core/utils/Caster.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/Types.h"
 #include "gpu/ResourceProvider.h"
 #include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/ConicGradientLayout.h"
@@ -61,7 +61,7 @@ static PlacementPtr<FragmentProcessor> MakeColorizer(const Context* context, con
     return SingleIntervalGradientColorizer::Make(drawingBuffer, colors[offset], colors[offset + 1]);
   }
 
-  bool tryAnalyticColorizer = count <= UnrolledBinaryGradientColorizer::kMaxColorCount;
+  bool tryAnalyticColorizer = count <= UnrolledBinaryGradientColorizer::MaxColorCount;
 
   // The remaining analytic colorizes use scale*t+bias, and the scale/bias values can become
   // quite large when thresholds are close (but still outside the hard stop limit). If float isn't

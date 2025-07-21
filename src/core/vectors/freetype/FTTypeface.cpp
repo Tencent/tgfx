@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -199,6 +199,10 @@ std::shared_ptr<Data> FTTypeface::openData() const {
     return Data::MakeFromFile(data.path);
   }
   return nullptr;
+}
+
+std::shared_ptr<ScalerContext> FTTypeface::onCreateScalerContext(float size) const {
+  return std::make_shared<FTScalerContext>(weakThis.lock(), size);
 }
 
 }  // namespace tgfx

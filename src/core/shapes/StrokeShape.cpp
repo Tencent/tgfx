@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,12 +18,18 @@
 
 #include "StrokeShape.h"
 #include "core/shapes/MatrixShape.h"
+#include "core/utils/ApplyStrokeToBounds.h"
 #include "core/utils/Log.h"
 #include "core/utils/UniqueID.h"
 
 namespace tgfx {
 
 std::shared_ptr<Shape> Shape::ApplyStroke(std::shared_ptr<Shape> shape, const Stroke* stroke) {
+  return StrokeShape::Apply(std::move(shape), stroke, true);
+}
+
+std::shared_ptr<Shape> StrokeShape::Apply(std::shared_ptr<Shape> shape, const Stroke* stroke,
+                                          bool useOwnUniqueKey) {
   if (shape == nullptr) {
     return nullptr;
   }
@@ -34,25 +40,28 @@ std::shared_ptr<Shape> Shape::ApplyStroke(std::shared_ptr<Shape> shape, const St
     return nullptr;
   }
   if (shape->type() != Type::Matrix) {
-    return std::make_shared<StrokeShape>(std::move(shape), *stroke);
+    return std::shared_ptr<StrokeShape>(
+        new StrokeShape(std::move(shape), *stroke, useOwnUniqueKey));
   }
   // Always apply stroke to the shape before the matrix, so that the outer matrix can be used to
   // do some optimization.
   auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);
   auto scales = matrixShape->matrix.getAxisScales();
   if (scales.x != scales.y) {
-    return std::make_shared<StrokeShape>(std::move(shape), *stroke);
+    return std::shared_ptr<StrokeShape>(
+        new StrokeShape(std::move(shape), *stroke, useOwnUniqueKey));
   }
   auto scaleStroke = *stroke;
   DEBUG_ASSERT(scales.x != 0);
   scaleStroke.width /= scales.x;
-  shape = std::make_shared<StrokeShape>(matrixShape->shape, scaleStroke);
+  shape = std::shared_ptr<StrokeShape>(
+      new StrokeShape(matrixShape->shape, scaleStroke, useOwnUniqueKey));
   return std::make_shared<MatrixShape>(std::move(shape), matrixShape->matrix);
 }
 
 Rect StrokeShape::getBounds() const {
   auto bounds = shape->getBounds();
-  stroke.applyToBounds(&bounds);
+  ApplyStrokeToBounds(stroke, &bounds, 1.0f, true);
   return bounds;
 }
 
@@ -63,6 +72,9 @@ Path StrokeShape::getPath() const {
 }
 
 UniqueKey StrokeShape::getUniqueKey() const {
+  if (useOwnUniqueKey) {
+    return uniqueKey.get();
+  }
   static const auto WidthStrokeShapeType = UniqueID::Next();
   static const auto CapJoinStrokeShapeType = UniqueID::Next();
   static const auto FullStrokeShapeType = UniqueID::Next();

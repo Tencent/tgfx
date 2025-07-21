@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -35,10 +35,10 @@ SamplerHandle GLUniformHandler::internalAddSampler(const TextureSampler* sampler
                                                    const std::string& name) {
   auto mangledName = programBuilder->nameVariable(name);
   auto caps = GLCaps::Get(programBuilder->getContext());
-  const auto& swizzle = caps->getReadSwizzle(sampler->format);
+  const auto& swizzle = caps->getReadSwizzle(sampler->format());
 
   SLType type;
-  switch (static_cast<const GLSampler*>(sampler)->target) {
+  switch (static_cast<const GLTextureSampler*>(sampler)->target()) {
     case GL_TEXTURE_EXTERNAL_OES:
       programBuilder->fragmentShaderBuilder()->addFeature(PrivateFeature::OESTexture,
                                                           "GL_OES_EGL_image_external");

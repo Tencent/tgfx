@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -41,7 +41,7 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
                                                             const TPArgs& args) const {
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(clipBounds.width()), static_cast<int>(clipBounds.height()),
-      source->isAlphaOnly(), 1, args.mipmapped);
+      source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
   if (renderTarget == nullptr) {
     return nullptr;
   }
@@ -49,12 +49,13 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
   FPArgs fpArgs(args.context, args.renderFlags, drawRect);
   auto offsetMatrix = Matrix::MakeTrans(clipBounds.x(), clipBounds.y());
   // There is no scaling for the source image, so we can use the default sampling options.
-  auto processor = asFragmentProcessor(std::move(source), fpArgs, {}, &offsetMatrix);
+  auto processor =
+      asFragmentProcessor(std::move(source), fpArgs, {}, SrcRectConstraint::Fast, &offsetMatrix);
   auto drawingManager = args.context->drawingManager();
   if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags)) {
     return nullptr;
   }
-  return renderTarget->getTextureProxy();
+  return renderTarget->asTextureProxy();
 }
 
 bool ImageFilter::applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipBounds) const {
@@ -68,10 +69,9 @@ bool ImageFilter::applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* 
   return true;
 }
 
-PlacementPtr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(std::shared_ptr<Image> source,
-                                                                    const FPArgs& args,
-                                                                    const SamplingOptions& sampling,
-                                                                    const Matrix* uvMatrix) const {
+PlacementPtr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(
+    std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
+    const SrcRectConstraint constraint, const Matrix* uvMatrix) const {
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
   auto clipBounds = args.drawRect;
   if (uvMatrix) {
@@ -92,10 +92,10 @@ PlacementPtr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(std::shared_
   if (uvMatrix != nullptr) {
     fpMatrix.preConcat(*uvMatrix);
   }
+  SamplingArgs samplingArgs = {TileMode::Decal, TileMode::Decal, sampling, constraint};
   if (dstBounds.contains(clipBounds)) {
-    return TextureEffect::Make(std::move(textureProxy), sampling, &fpMatrix, isAlphaOnly);
+    return TextureEffect::Make(std::move(textureProxy), samplingArgs, &fpMatrix, isAlphaOnly);
   }
-  return TiledTextureEffect::Make(std::move(textureProxy), TileMode::Decal, TileMode::Decal,
-                                  sampling, &fpMatrix, isAlphaOnly);
+  return TiledTextureEffect::Make(std::move(textureProxy), samplingArgs, &fpMatrix, isAlphaOnly);
 }
 }  // namespace tgfx

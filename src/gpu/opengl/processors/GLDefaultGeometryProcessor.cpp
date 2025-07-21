@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -47,8 +47,7 @@ void GLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
   vertBuilder->codeAppendf("vec2 %s = (%s * vec3(%s, 1.0)).xy;", positionName.c_str(),
                            matrixName.c_str(), position.name().c_str());
 
-  emitTransforms(vertBuilder, varyingHandler, uniformHandler, position.asShaderVar(),
-                 args.fpCoordTransformHandler);
+  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, position.asShaderVar());
 
   if (aa == AAType::Coverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -22,13 +22,13 @@
 
 namespace tgfx {
 PlacementPtr<FragmentProcessor> TextureEffect::Make(std::shared_ptr<TextureProxy> proxy,
-                                                    const SamplingOptions& sampling,
+                                                    const SamplingArgs& args,
                                                     const Matrix* uvMatrix, bool forceAsMask) {
   if (proxy == nullptr) {
     return nullptr;
   }
   auto isAlphaOnly = proxy->isAlphaOnly();
-  auto processor = MakeRGBAAA(std::move(proxy), {}, sampling, uvMatrix);
+  auto processor = MakeRGBAAA(proxy, args, {}, uvMatrix);
   if (forceAsMask && !isAlphaOnly) {
     auto drawingBuffer = proxy->getContext()->drawingBuffer();
     processor = FragmentProcessor::MulInputByChildAlpha(drawingBuffer, std::move(processor));
@@ -37,9 +37,11 @@ PlacementPtr<FragmentProcessor> TextureEffect::Make(std::shared_ptr<TextureProxy
 }
 
 TextureEffect::TextureEffect(std::shared_ptr<TextureProxy> proxy, const SamplingOptions& sampling,
-                             const Point& alphaStart, const Matrix& uvMatrix)
+                             SrcRectConstraint constraint, const Point& alphaStart,
+                             const Matrix& uvMatrix, const std::optional<Rect>& subset)
     : FragmentProcessor(ClassID()), textureProxy(std::move(proxy)), samplerState(sampling),
-      alphaStart(alphaStart), coordTransform(uvMatrix, textureProxy.get(), alphaStart) {
+      constraint(constraint), alphaStart(alphaStart),
+      coordTransform(uvMatrix, textureProxy.get(), alphaStart), subset(subset) {
   addCoordTransform(&coordTransform);
 }
 
@@ -54,9 +56,11 @@ void TextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   flags |= textureProxy->isAlphaOnly() ? 2 : 0;
   auto yuvTexture = getYUVTexture();
   if (yuvTexture) {
-    flags |= yuvTexture->pixelFormat() == YUVPixelFormat::I420 ? 0 : 4;
+    flags |= yuvTexture->yuvFormat() == YUVFormat::I420 ? 0 : 4;
     flags |= IsLimitedYUVColorRange(yuvTexture->colorSpace()) ? 0 : 8;
   }
+  flags |= needSubset() ? 16 : 0;
+  flags |= constraint == SrcRectConstraint::Strict ? 32 : 0;
   bytesKey->write(flags);
 }
 
@@ -93,4 +97,19 @@ YUVTexture* TextureEffect::getYUVTexture() const {
   }
   return nullptr;
 }
+
+bool TextureEffect::needSubset() const {
+  auto bounds = Rect::MakeWH(textureProxy->width(), textureProxy->height());
+  if (subset.has_value() && !(*subset).contains(bounds)) {
+    // if subset equal to bounds, we don't need to use subset.
+    return true;
+  }
+  auto texture = getTexture();
+  if (textureProxy->width() != texture->width() || textureProxy->height() != texture->height()) {
+    // If the texture size is different from the proxy size, we need to use subset.
+    return true;
+  }
+  return false;
+}
+
 }  // namespace tgfx

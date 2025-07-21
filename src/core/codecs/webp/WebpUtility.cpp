@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -179,7 +179,7 @@ static bool ParseVP8L(WebpFile& webpFile, DecodeInfo& decodeInfo,
     if (!VP8LCheckSignature(vp8xHeader)) return false;
     int w, h, a;
     VP8LBitReader br;
-    VP8LInitBitReader(&br, vp8xHeader, 10);
+    VP8LInitBitReader(&br, vp8xHeader, VP8L_FRAME_HEADER_SIZE);
     if (!ReadImageInfo(&br, &w, &h, &a)) {
       free(vp8xHeader);
       return false;

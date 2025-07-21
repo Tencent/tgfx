@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -49,7 +49,7 @@ enum class MipmapMode {
 struct SamplingOptions {
   SamplingOptions() = default;
 
-  explicit SamplingOptions(FilterMode filterMode, MipmapMode mipmapMode = MipmapMode::None)
+  explicit SamplingOptions(FilterMode filterMode, MipmapMode mipmapMode = MipmapMode::Linear)
       : filterMode(filterMode), mipmapMode(mipmapMode) {
   }
 
@@ -62,6 +62,6 @@ struct SamplingOptions {
   }
 
   FilterMode filterMode = FilterMode::Linear;
-  MipmapMode mipmapMode = MipmapMode::None;
+  MipmapMode mipmapMode = MipmapMode::Linear;
 };
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -53,6 +53,8 @@ class GradientShader : public Shader {
 
   std::vector<Color> originalColors = {};
   std::vector<float> originalPositions = {};
+  const Matrix pointsToUnit;
+  bool colorsAreOpaque = false;
 
  protected:
   Type type() const override {
@@ -64,9 +66,6 @@ class GradientShader : public Shader {
     // GradientShaders with the same GradientInfo struct will not be considered equal.
     return shader == this;
   }
-
-  const Matrix pointsToUnit;
-  bool colorsAreOpaque = false;
 };
 
 class LinearGradientShader : public GradientShader {
