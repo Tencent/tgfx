@@ -88,18 +88,18 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto viewMatrix = Matrix::MakeScale(scales.x, scales.y);
-  viewMatrix.postTranslate(-rect.left, -rect.top);
-  if (!drawPicture(renderTarget, args.renderFlags, &viewMatrix)) {
+  auto extraMatrix = Matrix::MakeScale(scales.x, scales.y);
+  extraMatrix.postTranslate(-rect.left, -rect.top);
+  if (!drawPicture(renderTarget, args.renderFlags, &extraMatrix)) {
     return nullptr;
   }
-  auto finalUVMatrix = viewMatrix;
+  auto finalUVMatrix = extraMatrix;
   if (uvMatrix) {
     finalUVMatrix.preConcat(*uvMatrix);
   }
   auto newSamplingArgs = samplingArgs;
   if (samplingArgs.sampleArea) {
-    newSamplingArgs.sampleArea = viewMatrix.mapRect(*samplingArgs.sampleArea);
+    newSamplingArgs.sampleArea = extraMatrix.mapRect(*samplingArgs.sampleArea);
   }
   return TiledTextureEffect::Make(renderTarget->asTextureProxy(), newSamplingArgs, &finalUVMatrix,
                                   isAlphaOnly());
@@ -119,14 +119,14 @@ std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args)
 }
 
 bool PictureImage::drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget,
-                               uint32_t renderFlags, const Matrix* viewMatrix) const {
+                               uint32_t renderFlags, const Matrix* extraMatrix) const {
   if (renderTarget == nullptr) {
     return false;
   }
   RenderContext renderContext(std::move(renderTarget), renderFlags, true);
   Matrix totalMatrix = {};
-  if (viewMatrix) {
-    totalMatrix = *viewMatrix;
+  if (extraMatrix) {
+    totalMatrix = *extraMatrix;
   }
   if (matrix) {
     totalMatrix.preConcat(*matrix);
