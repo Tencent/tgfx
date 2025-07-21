@@ -57,11 +57,21 @@ class GlobalCache {
   std::shared_ptr<GpuBufferProxy> getRRectIndexBuffer(bool stroke);
 
  private:
+  struct GradientTexture {
+    GradientTexture(std::shared_ptr<TextureProxy> textureProxy, BytesKey gradientKey)
+        : textureProxy(std::move(textureProxy)), gradientKey(std::move(gradientKey)) {
+    }
+
+    std::shared_ptr<TextureProxy> textureProxy = nullptr;
+    BytesKey gradientKey = {};
+    std::list<GradientTexture*>::iterator cachedPosition = {};
+  };
+
   Context* context = nullptr;
   std::list<Program*> programLRU = {};
   BytesKeyMap<std::shared_ptr<Program>> programMap = {};
-  std::list<BytesKey> gradientKeys = {};
-  BytesKeyMap<std::shared_ptr<TextureProxy>> gradientTextures = {};
+  std::list<GradientTexture*> gradientLRU = {};
+  BytesKeyMap<std::unique_ptr<GradientTexture>> gradientTextures = {};
   std::shared_ptr<GpuBufferProxy> aaQuadIndexBuffer = nullptr;
   std::shared_ptr<GpuBufferProxy> nonAAQuadIndexBuffer = nullptr;
   std::shared_ptr<GpuBufferProxy> rRectFillIndexBuffer = nullptr;

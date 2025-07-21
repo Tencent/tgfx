@@ -39,8 +39,9 @@ std::shared_ptr<Program> GlobalCache::getProgram(const ProgramCreator* programCr
   auto result = programMap.find(programKey);
   if (result != programMap.end()) {
     auto program = result->second;
-    programLRU.remove(program.get());
+    programLRU.erase(program->cachedPosition);
     programLRU.push_front(program.get());
+    program->cachedPosition = programLRU.begin();
     return program;
   }
   auto newProgram = programCreator->createProgram(context);
@@ -50,6 +51,7 @@ std::shared_ptr<Program> GlobalCache::getProgram(const ProgramCreator* programCr
   auto program = Resource::AddToCache(context, newProgram.release());
   program->programKey = programKey;
   programLRU.push_front(program.get());
+  program->cachedPosition = programLRU.begin();
   programMap[programKey] = program;
   while (programLRU.size() > MAX_PROGRAM_COUNT) {
     auto oldProgram = programLRU.back();
@@ -60,9 +62,9 @@ std::shared_ptr<Program> GlobalCache::getProgram(const ProgramCreator* programCr
 }
 
 void GlobalCache::releaseAll() {
-  programMap.clear();
   programLRU.clear();
-  gradientKeys.clear();
+  programMap.clear();
+  gradientLRU.clear();
   gradientTextures.clear();
   aaQuadIndexBuffer = nullptr;
   nonAAQuadIndexBuffer = nullptr;
@@ -82,21 +84,25 @@ std::shared_ptr<TextureProxy> GlobalCache::getGradient(const Color* colors, cons
   }
   auto result = gradientTextures.find(bytesKey);
   if (result != gradientTextures.end()) {
-    gradientKeys.remove(bytesKey);
-    gradientKeys.push_front(bytesKey);
-    return result->second;
+    auto& texture = result->second;
+    gradientLRU.erase(texture->cachedPosition);
+    gradientLRU.push_front(texture.get());
+    texture->cachedPosition = gradientLRU.begin();
+    return texture->textureProxy;
   }
   auto generator = std::make_shared<GradientGenerator>(colors, positions, count);
   auto textureProxy = context->proxyProvider()->createTextureProxy({}, std::move(generator));
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  gradientTextures[bytesKey] = textureProxy;
-  gradientKeys.push_front(bytesKey);
-  while (gradientKeys.size() > MaxNumCachedGradientBitmaps) {
-    auto key = gradientKeys.back();
-    gradientKeys.pop_back();
-    gradientTextures.erase(key);
+  auto gradientTexture = std::make_unique<GradientTexture>(textureProxy, bytesKey);
+  gradientLRU.push_front(gradientTexture.get());
+  gradientTexture->cachedPosition = gradientLRU.begin();
+  gradientTextures[bytesKey] = std::move(gradientTexture);
+  while (gradientLRU.size() > MaxNumCachedGradientBitmaps) {
+    auto texture = gradientLRU.back();
+    gradientLRU.pop_back();
+    gradientTextures.erase(texture->gradientKey);
   }
   return textureProxy;
 }

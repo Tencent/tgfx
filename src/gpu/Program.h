@@ -33,6 +33,7 @@ class Program : public Resource {
 
  private:
   BytesKey programKey = {};
+  std::list<Program*>::iterator cachedPosition;
 
   friend class GlobalCache;
 };
