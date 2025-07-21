@@ -22,7 +22,6 @@
 #include "core/utils/MathExtra.h"
 #include "condition.h"
 #include "xsimd/xsimd.hpp"
-#include "MathDynamic.h"
 namespace tgfx {
 
 void Matrix::reset() {
@@ -361,6 +360,7 @@ void Matrix::IdentityPts(const Matrix&, Point dst[], const Point src[], int coun
   }
 }
 
+#ifndef HIGHWAY
 void Matrix::TransPts(const Matrix& m, Point dst[], const Point src[], int count) {
   (void)m;
   (void)dst;
@@ -417,11 +417,10 @@ void Matrix::TransPts(const Matrix& m, Point dst[], const Point src[], int count
     }
   }
 #endif
-#ifdef HIGHWAY
-  TransPtsDynamic(m, dst, src, count);
-#endif
 }
+#endif
 
+#ifndef HIGHWAY
 void Matrix::ScalePts(const Matrix& m, Point dst[], const Point src[], int count) {
   (void)m;
   (void)dst;
@@ -488,11 +487,10 @@ void Matrix::ScalePts(const Matrix& m, Point dst[], const Point src[], int count
     }
   }
 #endif
-#ifdef HIGHWAY
-  ScalePtsDynamic(m, dst, src, count);
-#endif
 }
+#endif
 
+#ifndef HIGHWAY
 void Matrix::AfflinePts(const Matrix& m, Point dst[], const Point src[], int count) {
   (void)m;
   (void)dst;
@@ -584,10 +582,8 @@ void Matrix::AfflinePts(const Matrix& m, Point dst[], const Point src[], int cou
     }
   }
 #endif
-#ifdef HIGHWAY
-  AfflinePtsDynamic(m, dst, src, count);
-#endif
 }
+#endif
 
 bool Matrix::invertNonIdentity(Matrix* inverse) const {
   TypeMask mask = this->getType();
@@ -680,6 +676,7 @@ bool Matrix::rectStaysRect() const {
   return xsimd::batch<float>(min.get(2), min.get(3), max.get(0), max.get(1));
 }
 
+#ifndef HIGHWAY
 void Matrix::mapRect(Rect* dst, const Rect& src) const {
 #ifdef NSIMD
   Point quad[4];
@@ -751,10 +748,8 @@ void Matrix::mapRect(Rect* dst, const Rect& src) const {
     dst->setBounds(quad, 4);
   }
 #endif
-#ifdef HIGHWAY
-  MapRectDynamic(*this, dst, src);
-#endif
 }
+#endif
 
 float Matrix::getMinScale() const {
   float results[2];

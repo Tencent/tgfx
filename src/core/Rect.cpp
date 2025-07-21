@@ -18,7 +18,6 @@
 
 #include "tgfx/core/Rect.h"
 #include <xsimd/xsimd.hpp>
-#include "MathDynamic.h"
 #include "SIMDVec.h"
 #include "condition.h"
 namespace tgfx {
@@ -29,6 +28,7 @@ void Rect::scale(float scaleX, float scaleY) {
   bottom *= scaleY;
 }
 
+#ifndef HIGHWAY
 bool Rect::setBounds(const Point pts[], int count) {
 #ifdef NSIMD
   if (count <= 0) {
@@ -134,10 +134,8 @@ bool Rect::setBounds(const Point pts[], int count) {
   }
 
 #endif
-#ifdef HIGHWAY
-  return SetBoundsDynamic(this, pts, count);
-#endif
 }
+#endif
 
 #define CHECK_INTERSECT(al, at, ar, ab, bl, bt, br, bb) \
   float L = al > bl ? al : bl;                          \

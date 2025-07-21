@@ -15,8 +15,8 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
-#include "MathDynamic.h"
+#include "condition.h"
+#ifdef HIGHWAY
 
 // First undef to prevent error when re-included.
 #undef HWY_TARGET_INCLUDE
@@ -28,6 +28,7 @@
 
 // Must come after foreach_target.h to avoid redefinition errors.
 #include "hwy/highway.h"
+#include "tgfx/core/Matrix.h"
 
 HWY_BEFORE_NAMESPACE();
 namespace tgfx {
@@ -218,24 +219,25 @@ HWY_EXPORT(ScalePtsDynamicImpl);
 HWY_EXPORT(AfflinePtsDynamicImpl);
 HWY_EXPORT(MapRectDynamicImpl);
 HWY_EXPORT(SetBoundsDynamicImpl);
-void TransPtsDynamic(const Matrix& m, Point* dst, const Point* src, int count) {
+void Matrix::TransPts(const Matrix& m, Point* dst, const Point* src, int count) {
   return HWY_DYNAMIC_DISPATCH(TransPtsDynamicImpl)(m, dst, src, count);
 }
 
-void ScalePtsDynamic(const Matrix& m, Point dst[], const Point src[], int count) {
+void Matrix::ScalePts(const Matrix& m, Point dst[], const Point src[], int count) {
   return HWY_DYNAMIC_DISPATCH(ScalePtsDynamicImpl)(m, dst, src, count);
 }
 
-void AfflinePtsDynamic(const Matrix& m, Point dst[], const Point src[], int count) {
+void Matrix::AfflinePts(const Matrix& m, Point dst[], const Point src[], int count) {
   return HWY_DYNAMIC_DISPATCH(AfflinePtsDynamicImpl)(m, dst, src, count);
 }
 
-void MapRectDynamic(const Matrix& m, Rect* dst, const Rect& src) {
-  return HWY_DYNAMIC_DISPATCH(MapRectDynamicImpl)(m, dst, src);
+void Matrix::mapRect(Rect* dst, const Rect& src) const {
+  return HWY_DYNAMIC_DISPATCH(MapRectDynamicImpl)(*this, dst, src);
 }
 
-bool SetBoundsDynamic(Rect* rect, const Point pts[], int count) {
-  return HWY_DYNAMIC_DISPATCH(SetBoundsDynamicImpl)(rect, pts, count);
+bool Rect::setBounds(const Point pts[], int count) {
+  return HWY_DYNAMIC_DISPATCH(SetBoundsDynamicImpl)(this, pts, count);
 }
 }  // namespace tgfx
+#endif
 #endif
