@@ -37,7 +37,7 @@ uint16_t TCPPortProvider::getValidPort() {
   uint16_t randomPort = dis(gen);
   std::unique_ptr<ListenSocket> listenSocket = std::make_unique<ListenSocket>();
   while (usedPortSet.find(randomPort) != usedPortSet.end() ||
-         !listenSocket->Listen(randomPort, 4)) {
+         !listenSocket->listen(randomPort, 4)) {
     randomPort = dis(gen);
   }
   usedPortSet.insert(randomPort);

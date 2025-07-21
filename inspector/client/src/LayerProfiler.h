@@ -27,7 +27,7 @@
 namespace inspector {
 class LayerProfiler {
  public:
-  static LayerProfiler& GetLayerProfiler() {
+  static LayerProfiler& Get() {
       static LayerProfiler instance;
       return instance;
   }

@@ -29,34 +29,34 @@ class Socket {
   Socket(int sock);
   ~Socket();
 
-  bool Connect(const char* addr, uint16_t port);
-  bool ConnectBlocking(const char* addr, uint16_t port);
-  void Close();
+  bool connect(const char* addr, uint16_t port);
+  bool connectBlocking(const char* addr, uint16_t port);
+  void close();
 
-  int Send(const void* buf, size_t len);
-  int GetSendBufSize();
+  int send(const void* buf, size_t len);
+  int getSendBufSize();
 
-  int ReadUpTo(void* buf, size_t len);
-  bool Read(void* buf, size_t len, int timeout);
-  bool ReadMax(void* buf, size_t& maxLen, int timeout);
+  int readUpTo(void* buf, size_t len);
+  bool read(void* buf, size_t len, int timeout);
+  bool readMax(void* buf, size_t& maxLen, int timeout);
 
   template <typename ShouldExit>
-  bool Read(void* buf, size_t len, int timeout, ShouldExit exitCb) {
+  bool read(void* buf, size_t len, int timeout, ShouldExit exitCb) {
     auto cbuf = (char*)buf;
     while (len > 0) {
       if (exitCb()) {
         return false;
       }
-      if (!ReadImpl(cbuf, len, timeout)) {
+      if (!readImpl(cbuf, len, timeout)) {
         return false;
       }
     }
     return true;
   }
 
-  bool ReadRaw(void* buf, size_t len, int timeout);
-  bool HasData();
-  bool IsValid() const;
+  bool readRaw(void* buf, size_t len, int timeout);
+  bool hasData();
+  bool isValid() const;
 
   Socket(const Socket&) = delete;
   Socket(Socket&&) = delete;
@@ -64,10 +64,10 @@ class Socket {
   Socket& operator=(Socket&&) = delete;
 
  private:
-  int RecvBuffered(void* buf, size_t len, int timeout);
-  int Recv(void* buf, size_t len, int timeout);
+  int recvBuffered(void* buf, size_t len, int timeout);
+  int recv(void* buf, size_t len, int timeout);
 
-  bool ReadImpl(char*& buf, size_t& len, int timeout);
+  bool readImpl(char*& buf, size_t& len, int timeout);
 
   char* buf;
   char* bufPtr;
@@ -84,9 +84,9 @@ class ListenSocket {
   ListenSocket();
   ~ListenSocket();
 
-  bool Listen(uint16_t port, int backlog);
-  std::shared_ptr<Socket> Accept();
-  void Close();
+  bool listen(uint16_t port, int backlog);
+  std::shared_ptr<Socket> accept();
+  void close();
 
   ListenSocket(const ListenSocket&) = delete;
   ListenSocket(ListenSocket&&) = delete;
@@ -103,10 +103,10 @@ class UdpBroadcast {
   UdpBroadcast();
   ~UdpBroadcast();
 
-  bool Open(const char* addr, uint16_t port);
-  void Close();
+  bool open(const char* addr, uint16_t port);
+  void close();
 
-  int Send(uint16_t port, const void* data, size_t len);
+  int send(uint16_t port, const void* data, size_t len);
 
   UdpBroadcast(const UdpBroadcast&) = delete;
   UdpBroadcast(UdpBroadcast&&) = delete;
@@ -123,12 +123,12 @@ class IpAddress {
   IpAddress();
   ~IpAddress();
 
-  void Set(const struct sockaddr& addr);
+  void set(const struct sockaddr& addr);
 
-  uint32_t GetNumber() const {
+  uint32_t getNumber() const {
     return number;
   }
-  const char* GetText() const {
+  const char* getText() const {
     return text;
   }
 
@@ -147,10 +147,10 @@ class UdpListen {
   UdpListen();
   ~UdpListen();
 
-  bool Listen(uint16_t port);
-  void Close();
+  bool listen(uint16_t port);
+  void close();
 
-  const char* Read(size_t& len, IpAddress& addr, int timeout);
+  const char* read(size_t& len, IpAddress& addr, int timeout);
 
   UdpListen(const UdpListen&) = delete;
   UdpListen(UdpListen&&) = delete;

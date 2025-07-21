@@ -244,9 +244,7 @@ void DisplayList::render(Surface* surface, bool autoClear) {
     return;
   }
 #ifdef TGFX_USE_INSPECTOR
-  auto& layerInspector = LayerViewerManager::Get();
-  //layerInspector.setCallBack();
-  layerInspector.RenderImageAndSend(surface->getContext());
+  LayerViewerManager::Get().RenderImageAndSend(surface->getContext());
 #endif
   _hasContentChanged = false;
   auto dirtyRegions = _root->updateDirtyRegions();

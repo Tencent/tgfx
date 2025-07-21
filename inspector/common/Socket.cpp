@@ -77,23 +77,23 @@ Socket::Socket(int sock)
 Socket::~Socket() {
   free(buf);
   if (sock.load(std::memory_order_relaxed) != -1) {
-    Close();
+    close();
   }
   if (ptr) {
     freeaddrinfo(res);
 #ifdef _WIN32
     closesocket(connSock);
 #else
-    close(connSock);
+    ::close(connSock);
 #endif
   }
 }
 
-bool Socket::Connect(const char* addr, uint16_t port) {
-  assert(!IsValid());
+bool Socket::connect(const char* addr, uint16_t port) {
+  assert(!isValid());
 
   if (ptr) {
-    const auto c = connect(connSock, ptr->ai_addr, ptr->ai_addrlen);
+    const auto c = ::connect(connSock, ptr->ai_addr, ptr->ai_addrlen);
     if (c == -1) {
 #if defined _WIN32
       const auto err = WSAGetLastError();
@@ -113,7 +113,7 @@ bool Socket::Connect(const char* addr, uint16_t port) {
       }
       if (err != EISCONN) {
         freeaddrinfo(res);
-        close(connSock);
+        ::close(connSock);
         ptr = nullptr;
         return false;
       }
@@ -162,7 +162,7 @@ bool Socket::Connect(const char* addr, uint16_t port) {
     int flags = fcntl(sock, F_GETFL, 0);
     fcntl(sock, F_SETFL, flags | O_NONBLOCK);
 #endif
-    if (connect(sock, ptr->ai_addr, ptr->ai_addrlen) == 0) {
+    if (::connect(sock, ptr->ai_addr, ptr->ai_addrlen) == 0) {
       break;
     } else {
 #if defined _WIN32
@@ -173,7 +173,7 @@ bool Socket::Connect(const char* addr, uint16_t port) {
       }
 #else
       if (errno != EINPROGRESS) {
-        close(sock);
+        ::close(sock);
         continue;
       }
 #endif
@@ -200,8 +200,8 @@ bool Socket::Connect(const char* addr, uint16_t port) {
   return true;
 }
 
-bool Socket::ConnectBlocking(const char* addr, uint16_t port) {
-  assert(!IsValid());
+bool Socket::connectBlocking(const char* addr, uint16_t port) {
+  assert(!isValid());
   assert(!ptr);
 
   struct addrinfo hints;
@@ -226,11 +226,11 @@ bool Socket::ConnectBlocking(const char* addr, uint16_t port) {
     int val = 1;
     setsockopt(sock, SOL_SOCKET, SO_NOSIGPIPE, &val, sizeof(val));
 #endif
-    if (connect(sock, ptr->ai_addr, ptr->ai_addrlen) == -1) {
+    if (::connect(sock, ptr->ai_addr, ptr->ai_addrlen) == -1) {
 #ifdef _WIN32
       closesocket(sock);
 #else
-      close(sock);
+      ::close(sock);
 #endif
       continue;
     }
@@ -245,24 +245,24 @@ bool Socket::ConnectBlocking(const char* addr, uint16_t port) {
   return true;
 }
 
-void Socket::Close() {
+void Socket::close() {
   const auto sock = this->sock.load(std::memory_order_relaxed);
   assert(sock != -1);
 #ifdef _WIN32
   closesocket(sock);
 #else
-  close(sock);
+  ::close(sock);
 #endif
   this->sock.store(-1, std::memory_order_relaxed);
 }
 
-int Socket::Send(const void* _buf, size_t len) {
+int Socket::send(const void* _buf, size_t len) {
   const auto sock = this->sock.load(std::memory_order_relaxed);
   auto buf = (const char*)_buf;
   assert(sock != -1);
   auto start = buf;
   while (len > 0) {
-    auto ret = send(sock, buf, len, MSG_NOSIGNAL);
+    auto ret = ::send(sock, buf, len, MSG_NOSIGNAL);
     if (ret == -1) {
       if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
         continue;
@@ -276,7 +276,7 @@ int Socket::Send(const void* _buf, size_t len) {
   return int(buf - start);
 }
 
-int Socket::GetSendBufSize() {
+int Socket::getSendBufSize() {
   const auto sock = this->sock.load(std::memory_order_relaxed);
   int bufSize;
 #if defined _WIN32
@@ -289,7 +289,7 @@ int Socket::GetSendBufSize() {
   return bufSize;
 }
 
-int Socket::RecvBuffered(void* buf, size_t len, int timeout) {
+int Socket::recvBuffered(void* buf, size_t len, int timeout) {
   if (static_cast<int>(len) <= bufLeft) {
     memcpy(buf, bufPtr, len);
     bufPtr += len;
@@ -305,10 +305,10 @@ int Socket::RecvBuffered(void* buf, size_t len, int timeout) {
   }
 
   if (len >= BufSize) {
-    return Recv(buf, len, timeout);
+    return recv(buf, len, timeout);
   }
 
-  bufLeft = Recv(this->buf, BufSize, timeout);
+  bufLeft = recv(this->buf, BufSize, timeout);
   if (bufLeft <= 0) {
     return bufLeft;
   }
@@ -319,7 +319,7 @@ int Socket::RecvBuffered(void* buf, size_t len, int timeout) {
   return static_cast<int>(sz);
 }
 
-int Socket::Recv(void* _buf, size_t len, int timeout) {
+int Socket::recv(void* _buf, size_t len, int timeout) {
   const auto sock = this->sock.load(std::memory_order_relaxed);
   auto buf = (char*)_buf;
 
@@ -328,19 +328,19 @@ int Socket::Recv(void* _buf, size_t len, int timeout) {
   fd.events = POLLIN;
 
   if (poll(&fd, 1, timeout) > 0) {
-    return static_cast<int>(recv(sock, buf, len, 0));
+    return static_cast<int>(::recv(sock, buf, len, 0));
   } else {
     return -1;
   }
 }
 
-int Socket::ReadUpTo(void* _buf, size_t len) {
+int Socket::readUpTo(void* _buf, size_t len) {
   const auto sock = this->sock.load(std::memory_order_relaxed);
   auto buf = (char*)_buf;
 
   int rd = 0;
   while (len > 0) {
-    const auto res = recv(sock, buf, len, 0);
+    const auto res = ::recv(sock, buf, len, 0);
     if (res == 0) {
       break;
     }
@@ -354,26 +354,26 @@ int Socket::ReadUpTo(void* _buf, size_t len) {
   return rd;
 }
 
-bool Socket::Read(void* buf, size_t len, int timeout) {
+bool Socket::read(void* buf, size_t len, int timeout) {
   auto cbuf = (char*)buf;
   while (len > 0) {
-    if (!ReadImpl(cbuf, len, timeout)) {
+    if (!readImpl(cbuf, len, timeout)) {
       return false;
     }
   }
   return true;
 }
 
-bool Socket::ReadMax(void* buf, size_t& maxLen, int timeout) {
+bool Socket::readMax(void* buf, size_t& maxLen, int timeout) {
   auto cbuf = (char*)buf;
-  if (!ReadImpl(cbuf, maxLen, timeout)) {
+  if (!readImpl(cbuf, maxLen, timeout)) {
     return false;
   }
   return true;
 }
 
-bool Socket::ReadImpl(char*& buf, size_t& len, int timeout) {
-  const auto sz = RecvBuffered(buf, len, timeout);
+bool Socket::readImpl(char*& buf, size_t& len, int timeout) {
+  const auto sz = recvBuffered(buf, len, timeout);
   switch (sz) {
     case 0:
       return false;
@@ -395,10 +395,10 @@ bool Socket::ReadImpl(char*& buf, size_t& len, int timeout) {
   return true;
 }
 
-bool Socket::ReadRaw(void* _buf, size_t len, int timeout) {
+bool Socket::readRaw(void* _buf, size_t len, int timeout) {
   auto buf = (char*)_buf;
   while (len > 0) {
-    const auto sz = Recv(buf, len, timeout);
+    const auto sz = recv(buf, len, timeout);
     if (sz <= 0) {
       return false;
     }
@@ -408,7 +408,7 @@ bool Socket::ReadRaw(void* _buf, size_t len, int timeout) {
   return true;
 }
 
-bool Socket::HasData() {
+bool Socket::hasData() {
   const auto sock = this->sock.load(std::memory_order_relaxed);
   if (bufLeft > 0) {
     return true;
@@ -421,7 +421,7 @@ bool Socket::HasData() {
   return poll(&fd, 1, 0) > 0;
 }
 
-bool Socket::IsValid() const {
+bool Socket::isValid() const {
   return this->sock.load(std::memory_order_relaxed) >= 0;
 }
 
@@ -430,7 +430,7 @@ ListenSocket::ListenSocket() : sock(-1), listenPort(0) {
 
 ListenSocket::~ListenSocket() {
   if (this->sock != -1) {
-    Close();
+    close();
   }
   TCPPortProvider::Get().clearUsedPort(listenPort);
 }
@@ -453,7 +453,7 @@ static int AddrinfoAndSocketForFamily(uint16_t port, int ai_family, struct addri
   return sock;
 }
 
-bool ListenSocket::Listen(uint16_t port, int backlog) {
+bool ListenSocket::listen(uint16_t port, int backlog) {
   assert(this->sock == -1);
   listenPort = port;
   struct addrinfo* res = nullptr;
@@ -481,20 +481,20 @@ bool ListenSocket::Listen(uint16_t port, int backlog) {
   if (bind(this->sock, res->ai_addr, res->ai_addrlen) == -1) {
     printf("bind error! %s\n", strerror(errno));
     freeaddrinfo(res);
-    Close();
+    close();
     return false;
   }
-  if (listen(this->sock, backlog) == -1) {
+  if (::listen(this->sock, backlog) == -1) {
     printf("listen error! %s\n", strerror(errno));
     freeaddrinfo(res);
-    Close();
+    close();
     return false;
   }
   freeaddrinfo(res);
   return true;
 }
 
-std::shared_ptr<Socket> ListenSocket::Accept() {
+std::shared_ptr<Socket> ListenSocket::accept() {
   struct sockaddr_storage remote;
   socklen_t sz = sizeof(remote);
 
@@ -503,7 +503,7 @@ std::shared_ptr<Socket> ListenSocket::Accept() {
   fd.events = POLLIN;
 
   if (poll(&fd, 1, 10) > 0) {
-    int sock = accept(this->sock, (sockaddr*)&remote, &sz);
+    int sock = ::accept(this->sock, (sockaddr*)&remote, &sz);
     if (sock == -1) {
       return nullptr;
     }
@@ -521,29 +521,26 @@ std::shared_ptr<Socket> ListenSocket::Accept() {
   }
 }
 
-void ListenSocket::Close() {
+void ListenSocket::close() {
   assert(this->sock != -1);
 #ifdef _WIN32
   closesocket(this->sock);
 #else
-  close(this->sock);
+  ::close(this->sock);
 #endif
   this->sock = -1;
 }
 
 UdpBroadcast::UdpBroadcast() : sock(-1) {
-#ifdef _WIN32
-  // InitWinSock();
-#endif
 }
 
 UdpBroadcast::~UdpBroadcast() {
   if (this->sock != -1) {
-    Close();
+    close();
   }
 }
 
-bool UdpBroadcast::Open(const char* addr, uint16_t port) {
+bool UdpBroadcast::open(const char* addr, uint16_t port) {
   assert(this->sock == -1);
 
   struct addrinfo hints;
@@ -580,7 +577,7 @@ bool UdpBroadcast::Open(const char* addr, uint16_t port) {
 #ifdef _WIN32
       closesocket(sock);
 #else
-      close(sock);
+      ::close(sock);
 #endif
       continue;
     }
@@ -596,17 +593,17 @@ bool UdpBroadcast::Open(const char* addr, uint16_t port) {
   return true;
 }
 
-void UdpBroadcast::Close() {
+void UdpBroadcast::close() {
   assert(this->sock != -1);
 #ifdef _WIN32
   closesocket(this->sock);
 #else
-  close(this->sock);
+  ::close(this->sock);
 #endif
   this->sock = -1;
 }
 
-int UdpBroadcast::Send(uint16_t port, const void* data, size_t len) {
+int UdpBroadcast::send(uint16_t port, const void* data, size_t len) {
   char strAddr[17] = {};
   inet_ntop(AF_INET, &this->addr, strAddr, 17);
   assert(this->sock != -1);
@@ -623,7 +620,7 @@ IpAddress::IpAddress() : number(0) {
 
 IpAddress::~IpAddress() = default;
 
-void IpAddress::Set(const struct sockaddr& addr) {
+void IpAddress::set(const struct sockaddr& addr) {
 #if defined _WIN32 && (!defined NTDDI_WIN10 || NTDDI_VERSION < NTDDI_WIN10)
   struct sockaddr_in tmp;
   memcpy(&tmp, &addr, sizeof(tmp));
@@ -636,18 +633,15 @@ void IpAddress::Set(const struct sockaddr& addr) {
 }
 
 UdpListen::UdpListen() : sock(-1) {
-#ifdef _WIN32
-  // InitWinSock();
-#endif
 }
 
 UdpListen::~UdpListen() {
   if (this->sock != -1) {
-    Close();
+    close();
   }
 }
 
-bool UdpListen::Listen(uint16_t port) {
+bool UdpListen::listen(uint16_t port) {
   assert(this->sock == -1);
 
   int sock;
@@ -677,7 +671,7 @@ bool UdpListen::Listen(uint16_t port) {
 #ifdef _WIN32
     closesocket(sock);
 #else
-    close(sock);
+    ::close(sock);
 #endif
     return false;
   }
@@ -691,7 +685,7 @@ bool UdpListen::Listen(uint16_t port) {
 #ifdef _WIN32
     closesocket(sock);
 #else
-    close(sock);
+    ::close(sock);
 #endif
     return false;
   }
@@ -700,17 +694,17 @@ bool UdpListen::Listen(uint16_t port) {
   return true;
 }
 
-void UdpListen::Close() {
+void UdpListen::close() {
   assert(this->sock != -1);
 #ifdef _WIN32
   closesocket(this->sock);
 #else
-  close(this->sock);
+  ::close(this->sock);
 #endif
   this->sock = -1;
 }
 
-const char* UdpListen::Read(size_t& len, IpAddress& addr, int timeout) {
+const char* UdpListen::read(size_t& len, IpAddress& addr, int timeout) {
   static char buf[2048];
 
   struct pollfd fd;
@@ -723,7 +717,7 @@ const char* UdpListen::Read(size_t& len, IpAddress& addr, int timeout) {
   sockaddr sa;
   socklen_t salen = sizeof(struct sockaddr);
   len = (size_t)recvfrom(this->sock, buf, 2048, 0, &sa, &salen);
-  addr.Set(sa);
+  addr.set(sa);
 
   return buf;
 }

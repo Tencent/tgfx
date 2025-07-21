@@ -35,7 +35,7 @@ LayerProfiler::LayerProfiler(){
   listenSocket = std::make_shared<ListenSocket>();
   for (uint16_t i = 0; i < broadcastNum; i++) {
     broadcasts[i] = std::make_shared<UdpBroadcast>();
-    isUDPOpened = isUDPOpened && broadcasts[i]->Open(addr, broadcastPort + i);
+    isUDPOpened = isUDPOpened && broadcasts[i]->open(addr, broadcastPort + i);
   }
 
 #endif
@@ -61,7 +61,7 @@ void LayerProfiler::sendWork() {
   const auto procname = GetProcessName();
   const auto pnsz = std::min<size_t>(strlen(procname), WelcomeMessageProgramNameSize - 1);
   uint16_t port = TCPPortProvider::Get().getValidPort();
-  if (!listenSocket->Listen(port, 4)) {
+  if (!listenSocket->listen(port, 4)) {
     return;
   }
   size_t broadcastLen = 0;
@@ -77,11 +77,11 @@ void LayerProfiler::sendWork() {
           if (broadcasts[i]) {
             const auto ts = GetCurrentTime<std::chrono::seconds>();
             broadcastMsg.activeTime = static_cast<int32_t>(ts - epoch);
-            broadcasts[i]->Send(broadcastPort + i, &broadcastMsg, broadcastLen);
+            broadcasts[i]->send(broadcastPort + i, &broadcastMsg, broadcastLen);
           }
         }
       }
-      socket = listenSocket->Accept();
+      socket = listenSocket->accept();
       if (socket) {
         break;
       }
@@ -96,8 +96,8 @@ void LayerProfiler::sendWork() {
         std::vector<uint8_t> data;
         if(queue.try_dequeue(data)) {
           int size = (int)data.size();
-          socket->Send(&size, sizeof(int));
-          socket->Send(data.data(), data.size());
+          socket->send(&size, sizeof(int));
+          socket->send(data.data(), data.size());
         }
       }
     }
@@ -109,11 +109,11 @@ void LayerProfiler::recvWork() {
 #ifndef __EMSCRIPTEN__
   while (!stopFlag.load(std::memory_order_acquire)) {
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    if (socket && socket->HasData()) {
+    if (socket && socket->hasData()) {
       int size;
-      int flag = socket->ReadUpTo(&size, sizeof(int));
+      int flag = socket->readUpTo(&size, sizeof(int));
       std::vector<uint8_t> data(static_cast<size_t>(size));
-      int flag1 = socket->ReadUpTo(data.data(), (size_t)size);
+      int flag1 = socket->readUpTo(data.data(), (size_t)size);
       messages.push(std::move(data));
       if (!flag || !flag1) {
         socket.reset();
