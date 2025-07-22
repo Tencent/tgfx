@@ -37,17 +37,17 @@ bool IsQueryPrio(ServerQuery type) {
 Worker::Worker(const char* addr, uint16_t port)
     : addr(addr), port(port), lz4Stream(LZ4_createStreamDecode()),
       dataBuffer(new char[TargetFrameSize * 3 + 1]), bufferOffset(0) {
-  workThread = std::thread([this] { Exec(); });
-  netThread = std::thread([this] { Network(); });
+  workThread = std::thread([this] { exec(); });
+  netThread = std::thread([this] { netWork(); });
 }
 
 Worker::Worker(std::string& filePath)
     : port(0), lz4Stream(nullptr), dataBuffer(nullptr), bufferOffset(0) {
-  Open(filePath);
+  openFile(filePath);
 }
 
 Worker::~Worker() {
-  Shutdown();
+  shutdown();
 
   if (netThread.joinable()) {
     netThread.join();
@@ -63,10 +63,10 @@ Worker::~Worker() {
   }
 }
 
-bool Worker::Open(const std::string& filePath) {
+bool Worker::openFile(const std::string& filePath) {
   auto data = tgfx::Data::MakeFromFile(filePath);
   DecodeStream stream(&dataContext, data->bytes(), static_cast<uint32_t>(data->size()));
-  auto body = ReadBodyBytes(&stream);
+  auto body = readBodyBytes(&stream);
   if (dataContext.hasException()) {
     return false;
   }
@@ -78,7 +78,7 @@ bool Worker::Open(const std::string& filePath) {
   return true;
 }
 
-bool Worker::Save(const std::string& filePath) {
+bool Worker::saveFile(const std::string& filePath) {
   EncodeStream bodyBytes(&dataContext);
   WriteTagsOfFile(&bodyBytes);
 
@@ -100,7 +100,7 @@ bool Worker::Save(const std::string& filePath) {
   return true;
 }
 
-DecodeStream Worker::ReadBodyBytes(DecodeStream* stream) {
+DecodeStream Worker::readBodyBytes(DecodeStream* stream) {
   DecodeStream emptyStream(stream->context);
   auto T = stream->readInt8();
   auto G = stream->readInt8();
@@ -121,7 +121,7 @@ DecodeStream Worker::ReadBodyBytes(DecodeStream* stream) {
   return stream->readBytes(bodyLength);
 }
 
-int64_t Worker::GetFrameTime(const FrameData& fd, size_t idx) const {
+int64_t Worker::getFrameTime(const FrameData& fd, size_t idx) const {
   if (fd.continuous) {
     if (idx < fd.frames.size() - 1) {
       return fd.frames[idx + 1].start - fd.frames[idx].start;
@@ -136,31 +136,31 @@ int64_t Worker::GetFrameTime(const FrameData& fd, size_t idx) const {
   return dataContext.lastTime - fd.frames.back().start;
 }
 
-int64_t Worker::GetLastTime() const {
+int64_t Worker::getLastTime() const {
   return dataContext.lastTime;
 }
 
-int64_t Worker::GetFrameStart(uint32_t index) const {
+int64_t Worker::getFrameStart(uint32_t index) const {
   return dataContext.frameData.frames[index].start;
 }
 
-int64_t Worker::GetFrameDrawCall(uint32_t index) const {
+int64_t Worker::getFrameDrawCall(uint32_t index) const {
   return dataContext.frameData.frames[index].drawCall;
 }
 
-int64_t Worker::GetFrameTriangles(uint32_t index) const {
+int64_t Worker::getFrameTriangles(uint32_t index) const {
   return dataContext.frameData.frames[index].triangles;
 }
 
-FrameData* Worker::GetFrameData() {
+FrameData* Worker::getFrameData() {
   return &dataContext.frameData;
 }
 
-const DataContext& Worker::GetDataContext() const {
+const DataContext& Worker::getDataContext() const {
   return dataContext;
 }
 
-size_t Worker::GetFrameCount() const {
+size_t Worker::getFrameCount() const {
   return dataContext.frameData.frames.size();
 }
 
@@ -172,18 +172,18 @@ std::vector<std::string>& Worker::getErrorMessage() {
   return dataContext.errorMessages;
 }
 
-void Worker::Shutdown() {
+void Worker::shutdown() {
   isShutDown.store(true, std::memory_order_relaxed);
 }
 
 #define CLOSE_EXEC                                     \
-  Shutdown();                                          \
+  shutdown();                                          \
   sock.Close();                                        \
   netWriteCv.notify_one();                             \
   isConnected.store(false, std::memory_order_relaxed); \
   return;
 
-void Worker::Exec() {
+void Worker::exec() {
   auto ShouldExit = [this] { return isShutDown.load(std::memory_order_relaxed); };
 
   while (true) {
@@ -308,7 +308,7 @@ void Worker::Exec() {
   netReadCv.notify_one();                        \
   return;
 
-void Worker::Network() {
+void Worker::netWork() {
   auto ShouldExit = [this] { return isShutDown.load(std::memory_order_relaxed); };
 
   auto lz4buf = std::unique_ptr<char[]>(new char[LZ4Size]);
@@ -353,7 +353,7 @@ void Worker::Network() {
   }
 }
 
-void Worker::NewOpTask(std::shared_ptr<OpTaskData> opTask) {
+void Worker::newOpTask(std::shared_ptr<OpTaskData> opTask) {
   ++dataContext.opTaskCount;
 
   auto& stack = dataContext.opTaskStack;
@@ -471,7 +471,7 @@ void Worker::ProcessOperateBegin(const QueueOperateBegin& ev) {
   opTask->end = -1;
   opTask->type = ev.type;
 
-  NewOpTask(std::move(opTask));
+  newOpTask(std::move(opTask));
 }
 
 void Worker::ProcessOperateEnd(const QueueOperateEnd& ev) {

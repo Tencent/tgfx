@@ -26,7 +26,6 @@
 #include "Protocol.h"
 #include "Queue.h"
 #include "Socket.h"
-#include "StringDiscovery.h"
 
 namespace inspector {
 class Worker : public QObject {
@@ -40,29 +39,29 @@ class Worker : public QObject {
   Worker(std::string& filePath);
   ~Worker();
 
-  bool Open(const std::string& filePath);
-  bool Save(const std::string& filePath);
+  bool openFile(const std::string& filePath);
+  bool saveFile(const std::string& filePath);
 
-  int64_t GetFrameTime(const FrameData& fd, size_t idx) const;
-  int64_t GetLastTime() const;
-  int64_t GetFrameStart(uint32_t index) const;
-  int64_t GetFrameDrawCall(uint32_t index) const;
-  int64_t GetFrameTriangles(uint32_t index) const;
-  size_t GetFrameCount() const;
+  int64_t getFrameTime(const FrameData& fd, size_t idx) const;
+  int64_t getLastTime() const;
+  int64_t getFrameStart(uint32_t index) const;
+  int64_t getFrameDrawCall(uint32_t index) const;
+  int64_t getFrameTriangles(uint32_t index) const;
+  size_t getFrameCount() const;
   bool hasExpection() const;
   std::vector<std::string>& getErrorMessage();
 
-  FrameData* GetFrameData();
-  const DataContext& GetDataContext() const;
+  FrameData* getFrameData();
+  const DataContext& getDataContext() const;
 
  private:
-  DecodeStream ReadBodyBytes(DecodeStream* stream);
+  DecodeStream readBodyBytes(DecodeStream* stream);
 
-  void Shutdown();
-  void Exec();
-  void Network();
+  void shutdown();
+  void exec();
+  void netWork();
 
-  void NewOpTask(std::shared_ptr<OpTaskData> opTask);
+  void newOpTask(std::shared_ptr<OpTaskData> opTask);
   void Query(ServerQuery type, uint64_t data, uint32_t extra = 0);
   void QueryTerminate();
   bool DispatchProcess(const QueueItem& ev, const char*& ptr);

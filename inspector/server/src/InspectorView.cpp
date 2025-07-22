@@ -140,12 +140,12 @@ bool InspectorView::saveFile() {
   if (saveFilePath.empty()) {
     return false;
   }
-  return worker.Save(saveFilePath);
+  return worker.saveFile(saveFilePath);
 }
 
 bool InspectorView::saveFileAs(const QUrl& filePath) {
   saveFilePath = filePath.path().toStdString();
-  return worker.Save(saveFilePath);
+  return worker.saveFile(saveFilePath);
 }
 
 void InspectorView::onCloseView(QQuickCloseEvent*) {
@@ -172,7 +172,7 @@ bool InspectorView::getHasSaveFilePath() const {
 }
 
 void InspectorView::nextFrame() {
-  if (viewData.selectFrame + 1 > worker.GetFrameCount() - 1) {
+  if (viewData.selectFrame + 1 > worker.getFrameCount() - 1) {
     return;
   }
   viewData.selectFrame++;

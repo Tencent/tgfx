@@ -29,16 +29,16 @@ void SelectFrameModel::refreshData() {
   beginResetModel();
   items.clear();
   const auto& selectFrame = viewData->selectFrame;
-  const auto& dataContext = worker->GetDataContext();
+  const auto& dataContext = worker->getDataContext();
   auto fps = 0;
   int64_t selectFrameTime = 0;
   int64_t drawCall = 0;
   int64_t triangles = 0;
   if (selectFrame > 1) {
-    selectFrameTime = worker->GetFrameTime(dataContext.frameData, selectFrame);
+    selectFrameTime = worker->getFrameTime(dataContext.frameData, selectFrame);
     fps = static_cast<int>(1000000000 / selectFrameTime);
-    drawCall = worker->GetFrameDrawCall(selectFrame);
-    triangles = worker->GetFrameTriangles(selectFrame);
+    drawCall = worker->getFrameDrawCall(selectFrame);
+    triangles = worker->getFrameTriangles(selectFrame);
   }
   auto frameItem = Item{tr("Frame"), selectFrame};
   auto timeItem = Item{tr("Time"), TimeToString(selectFrameTime)};

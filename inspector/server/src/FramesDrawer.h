@@ -47,7 +47,7 @@ class FramesDrawer : public QQuickItem {
   }
   void setWorker(Worker* worker) {
     this->worker = worker;
-    frames = worker->GetFrameData();
+    frames = worker->getFrameData();
   }
 
   ViewData* getViewData() const {

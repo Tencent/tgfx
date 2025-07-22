@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include "DecodeStream.h"
-#include "StringDiscovery.h"
+#include "InspectorEvent.h"
 #include "TagHeader.h"
 namespace inspector {
 void ReadFrameTag(DecodeStream* stream);

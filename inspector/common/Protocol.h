@@ -64,7 +64,6 @@ struct WelcomeMessage {
 enum ServerQuery : uint8_t {
   ServerQueryTerminate,
   ServerQueryString,
-  ServerQueryFrameName,
   ServerQueryValueName,
   ServerQueryDisconnect,
 };
