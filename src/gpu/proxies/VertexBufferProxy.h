@@ -18,35 +18,45 @@
 
 #pragma once
 
-#include <optional>
-#include "gpu/ProxyProvider.h"
-#include "gpu/RectsVertexProvider.h"
-#include "gpu/ops/DrawOp.h"
+#include "core/utils/Log.h"
 #include "gpu/proxies/GpuBufferProxy.h"
-#include "gpu/proxies/VertexBufferProxy.h"
-#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
-class AtlasTextOp final : public DrawOp {
+/**
+ * VertexBufferProxy serves as a proxy for a vertex buffer, referencing a specific range within a
+ * GpuBuffer through GpuBufferProxy. It keeps track of the offset and size of the data in the buffer.
+ */
+class VertexBufferProxy {
  public:
-  static PlacementPtr<AtlasTextOp> Make(Context* context,
-                                        PlacementPtr<RectsVertexProvider> provider,
-                                        uint32_t renderFlags,
-                                        std::shared_ptr<TextureProxy> textureProxy);
+  VertexBufferProxy(std::shared_ptr<GpuBufferProxy> bufferProxy, size_t offset, size_t size)
+      : proxy(std::move(bufferProxy)), _offset(offset), _size(size) {
+    DEBUG_ASSERT(proxy != nullptr);
+  }
 
-  void execute(RenderPass* renderPass) override;
+  /**
+   * Returns the GpuBuffer associated with this VertexBufferProxy.
+   */
+  std::shared_ptr<GpuBuffer> getBuffer() const {
+    return proxy ? proxy->getBuffer() : nullptr;
+  }
 
-  bool hasCoverage() const override;
+  /**
+   * Returns the offset of the vertex data in the buffer.
+   */
+  size_t offset() const {
+    return _offset;
+  }
+
+  /**
+   * Returns the size of the vertex data in the buffer.
+   */
+  size_t size() const {
+    return _size;
+  }
 
  private:
-  size_t rectCount = 0;
-  std::optional<Color> commonColor = std::nullopt;
-  std::shared_ptr<GpuBufferProxy> indexBufferProxy = nullptr;
-  std::shared_ptr<VertexBufferProxy> vertexBufferProxy = {};
-  std::shared_ptr<TextureProxy> textureProxy = nullptr;
-
-  explicit AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureProxy> textureProxy);
-
-  friend class BlockBuffer;
+  std::shared_ptr<GpuBufferProxy> proxy = nullptr;
+  size_t _offset = 0;
+  size_t _size = 0;
 };
 }  // namespace tgfx

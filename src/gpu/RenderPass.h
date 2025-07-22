@@ -18,13 +18,9 @@
 
 #pragma once
 
-#include "Program.h"
-#include "gpu/Gpu.h"
-#include "gpu/ProgramCreator.h"
+#include "gpu/GpuBuffer.h"
+#include "gpu/Pipeline.h"
 #include "gpu/RenderTarget.h"
-#include "gpu/processors/GeometryProcessor.h"
-#include "gpu/proxies/GpuBufferProxy.h"
-#include "gpu/proxies/RenderTargetProxy.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/gpu/Context.h"
 
@@ -56,7 +52,6 @@ class RenderPass {
   void bindProgramAndScissorClip(const Pipeline* pipeline, const Rect& scissorRect);
   void bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer, std::shared_ptr<GpuBuffer> vertexBuffer,
                    size_t vertexOffset = 0);
-  void bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer, std::shared_ptr<Data> vertexData);
   void draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount);
   void drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount);
   void clear(const Rect& scissor, Color color);
@@ -71,8 +66,7 @@ class RenderPass {
   virtual void onUnbindRenderTarget() = 0;
   virtual bool onBindProgramAndScissorClip(const Pipeline* pipeline, const Rect& drawBounds) = 0;
   virtual bool onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
-                             std::shared_ptr<GpuBuffer> vertexBuffer, size_t vertexOffset,
-                             std::shared_ptr<Data> vertexData) = 0;
+                             std::shared_ptr<GpuBuffer> vertexBuffer, size_t vertexOffset) = 0;
   virtual void onDraw(PrimitiveType primitiveType, size_t offset, size_t count,
                       bool drawIndexed) = 0;
   virtual void onClear(const Rect& scissor, Color color) = 0;
@@ -80,7 +74,7 @@ class RenderPass {
 
   Context* context = nullptr;
   std::shared_ptr<RenderTarget> _renderTarget = nullptr;
-  Program* _program = nullptr;
+  std::shared_ptr<Program> program = nullptr;
 
  private:
   enum class DrawPipelineStatus { Ok = 0, NotConfigured, FailedToBind };

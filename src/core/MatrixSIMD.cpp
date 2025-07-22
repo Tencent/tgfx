@@ -16,14 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#ifdef _MSC_VER
-#include "SIMDHighwayInterface.h"
-
+#include "tgfx/core/Matrix.h"
 // First undef to prevent error when re-included.
 #undef HWY_TARGET_INCLUDE
 // For dynamic dispatch, specify the name of the current file (unfortunately
 // __FILE__ is not reliable) so that foreach_target.h can re-include it.
-#define HWY_TARGET_INCLUDE "core/SIMDHighwayInterface.cpp"
+#define HWY_TARGET_INCLUDE "core/MatrixSIMD.cpp"
 // Generates code for each enabled target by re-including this source file.
 #include "hwy/foreach_target.h"  // IWYU pragma: keep
 
@@ -118,8 +116,8 @@ void AffinePointsHWYImpl(const Matrix& m, Point* dst, const Point* src, int coun
       float swz = 0.0f;
       size_t swzindex = (i % 2 == 0 ? i + 1 : i - 1);
       if (fdst == fsrc) {
-        temp = fsrc[i];
         swz = swzindex > i ? fsrc[swzindex] : temp;
+        temp = fsrc[i];
       } else {
         swz = fsrc[swzindex];
       }
@@ -167,48 +165,6 @@ void MapRectHWYImpl(const Matrix& m, Rect* dst, const Rect& src) {
     dst->setBounds(quad, 4);
   }
 }
-
-bool SetBoundsHWYImpl(Rect* rect, const Point* pts, int count) {
-  if (count <= 0) {
-    rect->setEmpty();
-    return false;
-  }
-  const hn::Full128<float> d;
-  hn::Vec<hn::Full128<float>> min, max;
-  if (count & 1) {
-    min = max = hn::Dup128VecFromValues(d, pts[0].x, pts[0].y, pts[0].x, pts[0].y);
-    pts += 1;
-    count -= 1;
-  } else {
-    min = max = hn::Dup128VecFromValues(d, pts[0].x, pts[0].y, pts[1].x, pts[1].y);
-    pts += 2;
-    count -= 2;
-  }
-  auto accum = hn::Mul(min, hn::Set(d, 0.0f));
-  while (count) {
-    auto xy = hn::Dup128VecFromValues(d, pts[0].x, pts[0].y, pts[1].x, pts[1].y);
-    accum = hn::Mul(accum, xy);
-    min = hn::Min(min, xy);
-    max = hn::Max(max, xy);
-    pts += 2;
-    count -= 2;
-  }
-  auto mask = hn::Eq(hn::Mul(accum, hn::Set(d, 0.0f)), Set(d, 0.0f));
-  hn::DFromM<decltype(mask)> md;
-  const bool allFinite = hn::AllTrue(md, mask);
-  if (allFinite) {
-    float minArray[4] = {};
-    float maxArray[4] = {};
-    hn::Store(min, d, minArray);
-    hn::Store(max, d, maxArray);
-    rect->setLTRB(std::min(minArray[0], minArray[2]), std::min(minArray[1], minArray[3]),
-                  std::max(maxArray[0], maxArray[2]), std::max(maxArray[1], maxArray[3]));
-    return true;
-  } else {
-    rect->setEmpty();
-    return false;
-  }
-}
 }  // namespace HWY_NAMESPACE
 }  // namespace tgfx
 HWY_AFTER_NAMESPACE();
@@ -219,27 +175,20 @@ HWY_EXPORT(TransPointsHWYImpl);
 HWY_EXPORT(ScalePointsHWYImpl);
 HWY_EXPORT(AffinePointsHWYImpl);
 HWY_EXPORT(MapRectHWYImpl);
-HWY_EXPORT(SetBoundsHWYImpl);
-void TransPointsHWY(const Matrix& m, Point* dst, const Point* src, int count) {
+void Matrix::TransPoints(const Matrix& m, Point* dst, const Point* src, int count) {
   return HWY_DYNAMIC_DISPATCH(TransPointsHWYImpl)(m, dst, src, count);
 }
 
-void ScalePointsHWY(const Matrix& m, Point dst[], const Point src[], int count) {
+void Matrix::ScalePoints(const Matrix& m, Point dst[], const Point src[], int count) {
   return HWY_DYNAMIC_DISPATCH(ScalePointsHWYImpl)(m, dst, src, count);
 }
 
-void AffinePointsHWY(const Matrix& m, Point dst[], const Point src[], int count) {
+void Matrix::AffinePoints(const Matrix& m, Point dst[], const Point src[], int count) {
   return HWY_DYNAMIC_DISPATCH(AffinePointsHWYImpl)(m, dst, src, count);
 }
 
-void MapRectHWY(const Matrix& m, Rect* dst, const Rect& src) {
-  return HWY_DYNAMIC_DISPATCH(MapRectHWYImpl)(m, dst, src);
-}
-
-bool SetBoundsHWY(Rect* rect, const Point pts[], int count) {
-  return HWY_DYNAMIC_DISPATCH(SetBoundsHWYImpl)(rect, pts, count);
+void Matrix::mapRect(Rect* dst, const Rect& src) const {
+  return HWY_DYNAMIC_DISPATCH(MapRectHWYImpl)(*this, dst, src);
 }
 }  // namespace tgfx
-#endif
-
 #endif
