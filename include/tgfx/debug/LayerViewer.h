@@ -15,27 +15,16 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#ifdef TGFX_USE_INSPECTOR
-
-#include "PointSerialization.h"
+#pragma once
+#include "tgfx/layers/Layer.h"
 
 namespace tgfx {
 
-static void SerializePointImpl(flexbuffers::Builder& fbb, const Point* point) {
-  SerializeUtils::SetFlexBufferMap(fbb, "x", point->x);
-  SerializeUtils::SetFlexBufferMap(fbb, "y", point->y);
-}
-
-std::shared_ptr<Data> PointSerialization::Serialize(const Point* point) {
-  DEBUG_ASSERT(point != nullptr)
-  flexbuffers::Builder fbb;
-  size_t startMap;
-  size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute, startMap,
-                                 contentMap);
-  SerializePointImpl(fbb, point);
-  SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
-  return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
-}
+/**
+  * In debug mode, this interface is used to set the layer to be inspected. The corresponding layer
+  * will be selected in the Tgfx Inspector tool, displaying its related properties (e.g：it can be
+  * set to select the layer at the cursor's position when the left mouse button is clicked). In
+  * release mode, the internal implementation is empty and does nothing.
+  */
+void SetSelectedLayer(std::shared_ptr<Layer> layer);
 }  // namespace tgfx
-#endif

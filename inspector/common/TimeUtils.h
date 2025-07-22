@@ -15,27 +15,15 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#ifdef TGFX_USE_INSPECTOR
 
-#include "PointSerialization.h"
-
-namespace tgfx {
-
-static void SerializePointImpl(flexbuffers::Builder& fbb, const Point* point) {
-  SerializeUtils::SetFlexBufferMap(fbb, "x", point->x);
-  SerializeUtils::SetFlexBufferMap(fbb, "y", point->y);
-}
-
-std::shared_ptr<Data> PointSerialization::Serialize(const Point* point) {
-  DEBUG_ASSERT(point != nullptr)
-  flexbuffers::Builder fbb;
-  size_t startMap;
-  size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute, startMap,
-                                 contentMap);
-  SerializePointImpl(fbb, point);
-  SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
-  return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
+#pragma once
+#include <cstdint>
+#include <chrono>
+namespace inspector {
+template<typename T>
+int64_t GetCurrentTime() {
+  return std::chrono::duration_cast<T>(
+                              std::chrono::system_clock::now().time_since_epoch())
+                              .count();
 }
 }  // namespace tgfx
-#endif
