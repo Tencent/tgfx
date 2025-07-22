@@ -60,11 +60,6 @@ class TGFXWindow {
   void createAppHost();
   void draw();
 
-  static constexpr UINT_PTR kRenderTimerId = 1;
-  bool isTimerRunning = false;
-
-  void startTimer();
-  void stopTimer();
-  void onTimer();
+  bool isDrawing = true;
 };
 }  // namespace hello2d
