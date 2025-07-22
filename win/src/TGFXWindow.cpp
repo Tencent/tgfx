@@ -87,7 +87,7 @@ LRESULT CALLBACK TGFXWindow::WndProc(HWND window, UINT message, WPARAM wparam,
 LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) noexcept {
   switch (message) {
     case WM_ACTIVATE:
-      isDrawing = !LOWORD(wparam) == WA_INACTIVE;
+      isDrawing = (LOWORD(wparam) != WA_INACTIVE);
       break;
     case WM_DESTROY:
       destroy();
