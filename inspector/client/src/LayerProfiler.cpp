@@ -17,11 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "LayerProfiler.h"
 #include <chrono>
-#include <thread>
 #include <cstring>
+#include <thread>
 #include "ProcessUtils.h"
-#include "TimeUtils.h"
 #include "Protocol.h"
+#include "TimeUtils.h"
 
 namespace inspector {
 
@@ -30,7 +30,7 @@ static const char* addr = "255.255.255.255";
 static uint16_t broadcastPort = 8086;
 #endif
 
-LayerProfiler::LayerProfiler(){
+LayerProfiler::LayerProfiler() {
 #ifndef __EMSCRIPTEN__
   listenSocket = std::make_shared<ListenSocket>();
   for (uint16_t i = 0; i < broadcastNum; i++) {
@@ -45,10 +45,10 @@ LayerProfiler::LayerProfiler(){
 
 LayerProfiler::~LayerProfiler() {
   stopFlag.store(true, std::memory_order_release);
-  if(sendThread && sendThread->joinable()) {
+  if (sendThread && sendThread->joinable()) {
     sendThread->join();
   }
-  if(recvThread && recvThread->joinable()) {
+  if (recvThread && recvThread->joinable()) {
     recvThread->join();
   }
 }
@@ -94,7 +94,7 @@ void LayerProfiler::sendWork() {
       }
       if (queue.size_approx() != 0) {
         std::vector<uint8_t> data;
-        if(queue.try_dequeue(data)) {
+        if (queue.try_dequeue(data)) {
           int size = (int)data.size();
           socket->sendData(&size, sizeof(int));
           socket->sendData(data.data(), data.size());
@@ -139,6 +139,6 @@ void LayerProfiler::setData(const std::vector<uint8_t>& data) {
   queue.enqueue(data);
 }
 void LayerProfiler::setCallBack(std::function<void(const std::vector<uint8_t>&)> callback) {
-    this->callback = std::move(callback);
+  this->callback = std::move(callback);
 }
 }  // namespace inspector

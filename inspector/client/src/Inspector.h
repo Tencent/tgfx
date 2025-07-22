@@ -59,9 +59,6 @@ class Inspector {
   static void QueueSerialFinish(const QueueItem& item) {
     auto inspector = InspectorSingleton::GetInstance();
     inspector->serialConcurrentQueue.enqueue(item);
-    // inspector->serialLock.lock();
-    // inspector->serialQueue.push_back(item);
-    // inspector->serialLock.unlock();
   }
 
   static void SendFrameMark(const char* name) {
@@ -82,7 +79,8 @@ class Inspector {
   }
 
   static void SendAttributeData(const char* name, float val) {
-    QueuePrepare(QueueType::ValueDataFloat) MemWrite(&item.attributeDataFloat.name, reinterpret_cast<uint64_t>(name));
+    QueuePrepare(QueueType::ValueDataFloat)
+        MemWrite(&item.attributeDataFloat.name, reinterpret_cast<uint64_t>(name));
     MemWrite(&item.attributeDataFloat.value, val);
     QueueCommit();
   }
@@ -165,12 +163,13 @@ class Inspector {
   bool commitData();
   bool sendData(const char* data, size_t len);
   DequeueStatus dequeueSerial();
+  bool confirmProtocol();
+  void handleConnect(WelcomeMessage& welcome);
 
  private:
-  static constexpr int BROAD_CAST_NUIM = 5;
-
+  const uint16_t broadcastPort = 8086;
   int64_t epoch = 0;
-  int64_t initTime = GetTime();
+  int64_t initTime = 0;
   char* dataBuffer = nullptr;
   char* lz4Buf = nullptr;
   void* lz4Stream = nullptr;
@@ -179,11 +178,7 @@ class Inspector {
   std::atomic<uint64_t> frameCount = 0;
   std::atomic<bool> isConnect = false;
   std::shared_ptr<Socket> sock = nullptr;
-
   int64_t refTimeThread = 0;
-
-  std::vector<QueueItem> serialQueue;
-  std::vector<QueueItem> serialDequeue;
   moodycamel::ConcurrentQueue<QueueItem> serialConcurrentQueue;
   std::mutex serialLock;
 
@@ -191,7 +186,6 @@ class Inspector {
   std::vector<std::shared_ptr<UdpBroadcast>> broadcast;
   const char* programName = nullptr;
   std::mutex programNameLock;
-
   int dataBufferOffset = 0;
   int dataBufferStart = 0;
 };

@@ -28,7 +28,7 @@ static constexpr int LZ4Size = Lz4CompressBound(TargetFrameSize);
 static constexpr int HandshakeShibbolethSize = 4;
 static constexpr char HandshakeShibboleth[HandshakeShibbolethSize] = {'T', 'G', 'F', 'X'};
 
-inline constexpr int broadcastNum = 5;
+inline constexpr size_t broadcastNum = 5;
 static constexpr int WelcomeMessageProgramNameSize = 64;
 static constexpr int WelcomeMessageHostInfoSize = 1024;
 static constexpr uint8_t ProtocolVersion = 1;

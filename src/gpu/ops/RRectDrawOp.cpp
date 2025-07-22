@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RRectDrawOp.h"
-#include "gpu/GlobalCache.h"
 #include "core/DataSource.h"
 #include "core/utils/Profiling.h"
+#include "gpu/GlobalCache.h"
 #include "gpu/GpuBuffer.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"

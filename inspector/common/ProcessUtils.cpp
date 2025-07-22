@@ -36,8 +36,8 @@
 #define __STDC_FORMAT_MACROS
 #endif
 
-#include <cinttypes>
 #include <chrono>
+#include <cinttypes>
 #include <cstdlib>
 #include <cstring>
 #include "ProcessUtils.h"
@@ -53,7 +53,7 @@ uint64_t GetPid() {
 
 const char* GetProcessName() {
   static std::string processName = "unknown";
-  if(processName != "unknown") {
+  if (processName != "unknown") {
     return processName.c_str();
   }
 #ifdef _WIN32
@@ -63,10 +63,10 @@ const char* GetProcessName() {
   while (*ptr != '\0') {
     ptr++;
   }
-  while (ptr > buf && *ptr != '\\' && *ptr != '/'){
+  while (ptr > buf && *ptr != '\\' && *ptr != '/') {
     ptr--;
   }
-  if (ptr > buf){
+  if (ptr > buf) {
     ptr++;
   }
   processName = ptr;

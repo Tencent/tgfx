@@ -53,7 +53,7 @@
 #include "TCPPortProvider.h"
 
 #ifndef MSG_NOSIGNAL
-#  define MSG_NOSIGNAL 0
+#define MSG_NOSIGNAL 0
 #endif
 
 namespace inspector {

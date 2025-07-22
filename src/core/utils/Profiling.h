@@ -16,7 +16,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma once
 #ifdef TGFX_USE_INSPECTOR
-#include "Define.h"
 #include <optional>
 #include "Define.h"
 #include "tgfx/core/Color.h"

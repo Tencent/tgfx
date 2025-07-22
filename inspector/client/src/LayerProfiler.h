@@ -20,21 +20,21 @@
 #include <queue>
 #include <thread>
 #include <vector>
-#include "concurrentqueue.h"
 #include "Protocol.h"
 #include "Socket.h"
 #include "TCPPortProvider.h"
+#include "concurrentqueue.h"
 namespace inspector {
 class LayerProfiler {
  public:
   static LayerProfiler& Get() {
-      static LayerProfiler instance;
-      return instance;
+    static LayerProfiler instance;
+    return instance;
   }
-    LayerProfiler(const LayerProfiler&) = delete;
-    LayerProfiler(LayerProfiler&&) = delete;
-    LayerProfiler& operator=(const LayerProfiler&) = delete;
-    LayerProfiler& operator=(LayerProfiler&&) = delete;
+  LayerProfiler(const LayerProfiler&) = delete;
+  LayerProfiler(LayerProfiler&&) = delete;
+  LayerProfiler& operator=(const LayerProfiler&) = delete;
+  LayerProfiler& operator=(LayerProfiler&&) = delete;
   ~LayerProfiler();
   void setData(const std::vector<uint8_t>& data);
   void setCallBack(std::function<void(const std::vector<uint8_t>&)> callback);

@@ -18,8 +18,8 @@
 #pragma once
 
 #include "Inspector.h"
-#include "Scoped.h"
 #include "LayerProfiler.h"
+#include "Scoped.h"
 
 #define SEND_LAYER_DATA(data) inspector::LayerProfiler::Get().setData(data)
 #define LAYER_CALLBACK(func) inspector::LayerProfiler::Get().setCallBack(func)
@@ -32,6 +32,6 @@
 
 #define AttributeName(name, value) inspector::Inspector::SendAttributeData(name, value)
 #define AttributeNameEnum(name, value, type)                                 \
-inspector::Inspector::SendAttributeData(name, static_cast<uint8_t>(value), \
-static_cast<uint8_t>(type))
+  inspector::Inspector::SendAttributeData(name, static_cast<uint8_t>(value), \
+                                          static_cast<uint8_t>(type))
 #define AttributeEnum(value, type) AttributeNameEnum(#value, value, type)

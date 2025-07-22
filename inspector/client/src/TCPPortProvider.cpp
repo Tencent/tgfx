@@ -44,7 +44,7 @@ uint16_t TCPPortProvider::getValidPort() {
   return randomPort;
 }
 bool TCPPortProvider::clearUsedPort(uint16_t port) {
-  if(usedPortSet.find(port) != usedPortSet.end()) {
+  if (usedPortSet.find(port) != usedPortSet.end()) {
     usedPortSet.erase(port);
     return true;
   }

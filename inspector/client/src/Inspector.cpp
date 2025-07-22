@@ -32,11 +32,9 @@ Inspector::Inspector()
     : epoch(std::chrono::duration_cast<std::chrono::seconds>(
                 std::chrono::system_clock::now().time_since_epoch())
                 .count()),
-      dataBuffer(static_cast<char*>(malloc(TargetFrameSize * 3))),
+      initTime(GetTime()), dataBuffer(static_cast<char*>(malloc(TargetFrameSize * 3))),
       lz4Buf(static_cast<char*>(malloc(LZ4Size + sizeof(lz4sz_t)))), lz4Stream(LZ4_createStream()),
-      broadcast(BROAD_CAST_NUIM) {
-  serialDequeue.reserve(1024 * 1024);
-  serialQueue.reserve(1024 * 1024);
+      broadcast(broadcastNum) {
   spawnWorkerThreads();
 }
 
@@ -56,7 +54,7 @@ Inspector::~Inspector() {
     dataBuffer = nullptr;
   }
   if (lz4Stream) {
-    LZ4_freeStream((LZ4_stream_t*)lz4Stream);
+    LZ4_freeStream(static_cast<LZ4_stream_t*>(lz4Stream));
     lz4Stream = nullptr;
   }
 }
@@ -75,10 +73,10 @@ bool Inspector::handleServerQuery() {
 
   switch (type) {
     case ServerQuery::ServerQueryString: {
-      sendString(ptr, (const char*)ptr, QueueType::StringData);
+      sendString(ptr, reinterpret_cast<const char*>(ptr), QueueType::StringData);
     }
     case ServerQuery::ServerQueryValueName: {
-      sendString(ptr, (const char*)ptr, QueueType::ValueName);
+      sendString(ptr, reinterpret_cast<const char*>(ptr), QueueType::ValueName);
     }
     case ServerQuery::ServerQueryDisconnect:
     default: {
@@ -97,7 +95,7 @@ void Inspector::sendString(uint64_t str, const char* ptr, size_t len, QueueType 
   MemWrite(&item.hdr.type, type);
   MemWrite(&item.stringTransfer.ptr, str);
 
-  auto l16 = uint16_t(len);
+  auto l16 = static_cast<uint16_t>(len);
   needDataSize(QueueDataSize[static_cast<int>(type)] + sizeof(l16) + l16);
 
   appendDataUnsafe(&item, QueueDataSize[static_cast<int>(type)]);
@@ -108,7 +106,6 @@ void Inspector::sendString(uint64_t str, const char* ptr, size_t len, QueueType 
 void Inspector::worker() {
   std::string addr = "255.255.255.255";
   auto dataPort = TCPPortProvider::Get().getValidPort();
-  const auto broadcastPort = 8086;
   const auto procname = GetProcessName();
   const auto pnsz = std::min<size_t>(strlen(procname), WelcomeMessageProgramNameSize - 1);
 
@@ -138,7 +135,7 @@ void Inspector::worker() {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
   }
-  for (uint16_t i = 0; i < BROAD_CAST_NUIM; i++) {
+  for (uint16_t i = 0; i < broadcastNum; i++) {
     broadcast[i] = std::make_shared<UdpBroadcast>();
     if (!broadcast[i]->openConnect(addr.c_str(), broadcastPort + i)) {
       broadcast[i].reset();
@@ -153,7 +150,7 @@ void Inspector::worker() {
     MemWrite(&welcome.refTime, refTimeThread);
     while (true) {
       if (ShouldExit()) {
-        for (uint16_t i = 0; i < BROAD_CAST_NUIM; i++) {
+        for (uint16_t i = 0; i < broadcastNum; i++) {
           if (broadcast[i]) {
             broadcastMsg.activeTime = -1;
             broadcast[i]->sendData(broadcastPort + i, &broadcastMsg, broadcastLen);
@@ -161,14 +158,14 @@ void Inspector::worker() {
         }
         return;
       }
-      this->sock = listen.acceptSock();
+      sock = listen.acceptSock();
       if (sock) {
         break;
       }
       const auto t = std::chrono::high_resolution_clock::now().time_since_epoch().count();
       if (t - lastBroadcast > 3000000000) {
         lastBroadcast = t;
-        for (uint16_t i = 0; i < BROAD_CAST_NUIM; i++) {
+        for (uint16_t i = 0; i < broadcastNum; i++) {
           if (broadcast[i]) {
             programNameLock.lock();
             if (programName) {
@@ -181,95 +178,26 @@ void Inspector::worker() {
             const auto ts = std::chrono::duration_cast<std::chrono::seconds>(
                                 std::chrono::system_clock::now().time_since_epoch())
                                 .count();
-            broadcastMsg.activeTime = int32_t(ts - epoch);
+            broadcastMsg.activeTime = static_cast<int32_t>(ts - epoch);
             broadcast[i]->sendData(broadcastPort + i, &broadcastMsg, broadcastLen);
           }
         }
       }
     }
-    for (uint16_t i = 0; i < BROAD_CAST_NUIM; i++) {
+    for (uint16_t i = 0; i < broadcastNum; i++) {
       if (broadcast[i]) {
         lastBroadcast = 0;
         broadcastMsg.activeTime = -1;
         broadcast[i]->sendData(broadcastPort + i, &broadcastMsg, broadcastLen);
       }
     }
-
-    {
-      char shibboleth[HandshakeShibbolethSize];
-      auto res = this->sock->readRaw(shibboleth, HandshakeShibbolethSize, 2000);
-      if (!res || memcmp(shibboleth, HandshakeShibboleth, HandshakeShibbolethSize) != 0) {
-        sock.reset();
-        continue;
-      }
-
-      uint32_t protocolVersion;
-      res = this->sock->readRaw(&protocolVersion, sizeof(protocolVersion), 2000);
-      if (!res) {
-        sock.reset();
-        continue;
-      }
-
-      if (protocolVersion != ProtocolVersion) {
-        auto status = HandshakeStatus::HandshakeProtocolMismatch;
-        this->sock->sendData(&status, sizeof(status));
-        sock.reset();
-        continue;
-      }
+    if (!confirmProtocol()) {
+      continue;
     }
-    isConnect.store(true, std::memory_order_release);
-    auto handshake = HandshakeStatus::HandshakeWelcome;
-    sock->sendData(&handshake, sizeof(handshake));
-
-    LZ4_resetStream((LZ4_stream_t*)lz4Stream);
-    this->sock->sendData(&welcome, sizeof(welcome));
-
-    auto keepAlive = 0;
-    while (true) {
-      const auto serialStatus = dequeueSerial();
-      if (serialStatus == DequeueStatus::ConnectionLost) {
-        break;
-      } else if (serialStatus == DequeueStatus::QueueEmpty) {
-        if (ShouldExit()) {
-          break;
-        }
-        if (dataBufferOffset != dataBufferStart) {
-          if (!commitData()) {
-            break;
-          }
-          if (keepAlive == 500) {
-            QueueItem ka = {};
-            ka.hdr.type = QueueType::KeepAlive;
-            appendData(&ka, QueueDataSize[ka.hdr.idx]);
-            if (!commitData()) {
-              break;
-            }
-
-            keepAlive = 0;
-          } else if (!this->sock->hasData()) {
-            ++keepAlive;
-            std::this_thread::sleep_for(std::chrono::microseconds(10));
-          }
-        } else {
-          keepAlive = 0;
-        }
-
-        bool connActive = true;
-        while (this->sock->hasData()) {
-          connActive = handleServerQuery();
-          if (!connActive) {
-            break;
-          }
-        }
-        if (!connActive) {
-          break;
-        }
-      }
-    }
+    handleConnect(welcome);
     if (ShouldExit()) {
       break;
     }
-
     isConnect.store(false, std::memory_order_release);
     sock.reset();
   }
@@ -285,21 +213,87 @@ bool Inspector::commitData() {
 }
 
 bool Inspector::sendData(const char* data, size_t len) {
-  const auto lz4sz = LZ4_compress_fast_continue((LZ4_stream_t*)lz4Stream, data,
+  const auto lz4sz = LZ4_compress_fast_continue(static_cast<LZ4_stream_t*>(lz4Stream), data,
                                                 lz4Buf + sizeof(lz4sz_t), (int)len, LZ4Size, 1);
   memcpy(lz4Buf, &lz4sz, sizeof(lz4sz));
   return sock->sendData(lz4Buf, size_t(lz4sz) + sizeof(lz4sz_t)) != -1;
 }
 
-Inspector::DequeueStatus Inspector::dequeueSerial() {
-  // {
-  //   std::lock_guard<std::mutex> lockGuard(serialLock);
-  //   if (!serialQueue.empty()) {
-  //     serialQueue.swap(serialDequeue);
-  //   }
-  // }
+bool Inspector::confirmProtocol() {
+  char shibboleth[HandshakeShibbolethSize] = "";
+  auto res = this->sock->readRaw(shibboleth, HandshakeShibbolethSize, 2000);
+  if (!res || memcmp(shibboleth, HandshakeShibboleth, HandshakeShibbolethSize) != 0) {
+    sock.reset();
+    return false;
+  }
+  uint32_t protocolVersion = 0;
+  res = this->sock->readRaw(&protocolVersion, sizeof(protocolVersion), 2000);
+  if (!res) {
+    sock.reset();
+    return false;
+  }
+  if (protocolVersion != ProtocolVersion) {
+    auto status = HandshakeStatus::HandshakeProtocolMismatch;
+    this->sock->sendData(&status, sizeof(status));
+    sock.reset();
+    return false;
+  }
+  return true;
+}
 
-  // const auto queueSize = serialDequeue.size();
+void Inspector::handleConnect(WelcomeMessage& welcome) {
+  isConnect.store(true, std::memory_order_release);
+  auto handshake = HandshakeStatus::HandshakeWelcome;
+  sock->sendData(&handshake, sizeof(handshake));
+
+  LZ4_resetStream(static_cast<LZ4_stream_t*>(lz4Stream));
+  this->sock->sendData(&welcome, sizeof(welcome));
+
+  auto keepAlive = 0;
+  while (true) {
+    const auto serialStatus = dequeueSerial();
+    if (serialStatus == DequeueStatus::ConnectionLost) {
+      break;
+    } else if (serialStatus == DequeueStatus::QueueEmpty) {
+      if (ShouldExit()) {
+        break;
+      }
+      if (dataBufferOffset != dataBufferStart) {
+        if (!commitData()) {
+          break;
+        }
+        if (keepAlive == 500) {
+          QueueItem ka = {};
+          ka.hdr.type = QueueType::KeepAlive;
+          appendData(&ka, QueueDataSize[ka.hdr.idx]);
+          if (!commitData()) {
+            break;
+          }
+
+          keepAlive = 0;
+        } else if (!this->sock->hasData()) {
+          ++keepAlive;
+          std::this_thread::sleep_for(std::chrono::microseconds(10));
+        }
+      } else {
+        keepAlive = 0;
+      }
+
+      bool connActive = true;
+      while (this->sock->hasData()) {
+        connActive = handleServerQuery();
+        if (!connActive) {
+          break;
+        }
+      }
+      if (!connActive) {
+        break;
+      }
+    }
+  }
+}
+
+Inspector::DequeueStatus Inspector::dequeueSerial() {
   const auto queueSize = serialConcurrentQueue.size_approx();
   if (queueSize > 0) {
     auto refThread = refTimeThread;
@@ -328,36 +322,7 @@ Inspector::DequeueStatus Inspector::dequeueSerial() {
         return DequeueStatus::ConnectionLost;
       }
     }
-
-    // auto item = serialDequeue.data();
-    // auto end = item + queueSize;
-    // while (item != end) {
-    //   auto idx = MemRead<uint8_t>(&item->hdr.idx);
-    //   switch ((QueueType)idx) {
-    //     case QueueType::OperateBegin: {
-    //       auto t = MemRead<int64_t>(&item->operateBegin.nsTime);
-    //       auto dt = t - refThread;
-    //       refThread = t;
-    //       MemWrite(&item->operateBegin.nsTime, dt);
-    //       break;
-    //     }
-    //     case QueueType::OperateEnd: {
-    //       auto t = MemRead<int64_t>(&item->operateEnd.nsTime);
-    //       auto dt = t - refThread;
-    //       refThread = t;
-    //       MemWrite(&item->operateEnd.nsTime, dt);
-    //       break;
-    //     }
-    //     default:
-    //       break;
-    //   }
-    //   if (!appendData(item, QueueDataSize[idx])) {
-    //     return DequeueStatus::ConnectionLost;
-    //   }
-    //   ++item;
-    // }
     refTimeThread = refThread;
-    serialDequeue.clear();
   } else {
     return DequeueStatus::QueueEmpty;
   }

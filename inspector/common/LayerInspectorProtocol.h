@@ -19,20 +19,20 @@
 #pragma once
 #include <cstdint>
 namespace inspector {
-  enum class LayerInspectorMsgType : uint8_t {
-    EnableLayerInspector,
-    HoverLayerAddress,
-    SelectedLayerAddress,
-    SerializeAttribute,
-    SerializeSubAttribute,
-    FlushAttribute,
-    FlushLayerTree,
-    FlushImage,
-    PickedLayerAddress,
-    FlushAttributeAck,
-    LayerTree,
-    LayerAttribute,
-    LayerSubAttribute,
-    ImageData
-  };
-}  // namespace tgfx
+enum class LayerInspectorMsgType : uint8_t {
+  EnableLayerInspector,
+  HoverLayerAddress,
+  SelectedLayerAddress,
+  SerializeAttribute,
+  SerializeSubAttribute,
+  FlushAttribute,
+  FlushLayerTree,
+  FlushImage,
+  PickedLayerAddress,
+  FlushAttributeAck,
+  LayerTree,
+  LayerAttribute,
+  LayerSubAttribute,
+  ImageData
+};
+}  // namespace inspector

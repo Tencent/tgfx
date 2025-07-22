@@ -17,13 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <cstdint>
 #include <chrono>
+#include <cstdint>
 namespace inspector {
-template<typename T>
+template <typename T>
 int64_t GetCurrentTime() {
-  return std::chrono::duration_cast<T>(
-                              std::chrono::system_clock::now().time_since_epoch())
-                              .count();
+  return std::chrono::duration_cast<T>(std::chrono::system_clock::now().time_since_epoch()).count();
 }
-}  // namespace tgfx
+}  // namespace inspector

@@ -20,7 +20,7 @@
 #include <set>
 namespace inspector {
 class TCPPortProvider {
-public:
+ public:
   static TCPPortProvider& Get() {
     static TCPPortProvider instance;
     return instance;
@@ -31,9 +31,9 @@ public:
   TCPPortProvider& operator=(TCPPortProvider&& provider) = delete;
   uint16_t getValidPort();
   bool clearUsedPort(uint16_t port);
-private:
+
+ private:
   TCPPortProvider() = default;
   std::set<uint16_t> usedPortSet = {};
 };
-}
-
+}  // namespace inspector
