@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13)
-project(TGFX)
+project(TGFX VERSION dev)
 
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 include(./third_party/vendor_tools/vendor.cmake)
