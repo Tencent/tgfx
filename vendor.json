@@ -237,6 +237,15 @@
           "-DCMAKE_C_FLAGS=\"-w\""
         ]
       }
+    },
+    {
+      "name": "inspector",
+      "dir": "../inspector",
+      "cmake": {
+        "targets": [
+          "inspector"
+        ]
+      }
     }
   ]
 }

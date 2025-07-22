@@ -293,14 +293,8 @@ if (TGFX_USE_INSPECTOR)
             ${INSPECTOR_DIR}/client/include
             ${INSPECTOR_DIR}/client/src
             ${INSPECTOR_DIR}/common)
-    add_subdirectory(${INSPECTOR_DIR} inspector EXCLUDE_FROM_ALL)
-    list(APPEND TGFX_STATIC_LIBS $<TARGET_FILE:inspector>)
-    list(APPEND TGFX_DEPEND_TARGETS inspector)
-
+    list(APPEND TGFX_STATIC_VENDORS inspector)
     list(APPEND TGFX_DEFINES TGFX_USE_INSPECTOR)
-    list(APPEND TGFX_INCLUDES third_party/flatbuffers/include)
-    file(GLOB_RECURSE SERIALIZATION_FILE src/serialization/*.*)
-    list(APPEND TGFX_FILES ${SERIALIZATION_FILE})
 endif ()
 
 if (TGFX_USE_QT)

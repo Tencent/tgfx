@@ -69,29 +69,21 @@ bool Inspector::handleServerQuery() {
   if (!sock->readData(&payload, sizeof(payload), 10)) {
     return false;
   }
-  ServerQuery type;
-  uint64_t ptr;
-  memcpy(&type, &payload.type, sizeof(payload.type));
-  memcpy(&ptr, &payload.ptr, sizeof(payload.ptr));
+  auto type = payload.type;
+  auto ptr = payload.ptr;
 
   switch (type) {
     case ServerQuery::ServerQueryString: {
       sendString(ptr, (const char*)ptr, QueueType::StringData);
     }
-    case ServerQuery::ServerQueryFrameName: {
-      break;
-    }
     case ServerQuery::ServerQueryValueName: {
       sendString(ptr, (const char*)ptr, QueueType::ValueName);
     }
-    case ServerQuery::ServerQueryDisconnect: {
-      break;
-    }
+    case ServerQuery::ServerQueryDisconnect:
     default: {
       break;
     }
   }
-
   return true;
 }
 
