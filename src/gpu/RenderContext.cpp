@@ -110,6 +110,15 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(const Font& font, GlyphID glyph
   return glyphCodec;
 }
 
+static bool IsGlyphVisible(const Matrix& viewMatrix, float fontScale, const Point& position,
+                           const Rect& localBounds, const Rect& clipBounds) {
+  auto matrix = viewMatrix;
+  matrix.preTranslate(position.x, position.y);
+  matrix.preScale(1.f / fontScale, 1.f / fontScale);
+  auto deviceBounds = matrix.mapRect(localBounds);
+  return Rect::Intersects(deviceBounds, clipBounds);
+}
+
 RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
                              bool clearAll, Surface* surface)
     : renderTarget(std::move(proxy)), renderFlags(renderFlags), surface(surface) {
@@ -227,7 +236,7 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
       continue;
     }
     GlyphRun rejectedGlyphRun = {};
-    drawGlyphsAsDirectMask(run, state, fill, stroke, &rejectedGlyphRun);
+    drawGlyphsAsDirectMask(run, state, fill, stroke, clipBounds, &rejectedGlyphRun);
     if (rejectedGlyphRun.glyphs.empty()) {
       continue;
     }
@@ -346,7 +355,7 @@ void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRe
 
 void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const MCState& state,
                                            const Fill& fill, const Stroke* stroke,
-                                           GlyphRun* rejectedGlyphRun) {
+                                           const Rect& clipBounds, GlyphRun* rejectedGlyphRun) {
   auto compositor = getOpsCompositor();
   if (compositor == nullptr) {
     return;
@@ -377,6 +386,9 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
     }
     if (scaledStroke) {
       ApplyStrokeToBounds(*scaledStroke, &bounds);
+    }
+    if (!IsGlyphVisible(state.matrix, maxScale, glyphPosition, bounds, clipBounds)) {
+      continue;
     }
     auto maxDimension = static_cast<int>(ceilf(std::max(bounds.width(), bounds.height())));
     if (maxDimension >= Atlas::MaxCellSize) {

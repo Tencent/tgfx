@@ -67,7 +67,8 @@ class RenderContext : public DrawContext {
 
  private:
   void drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const MCState& state,
-                              const Fill& fill, const Stroke* stroke, GlyphRun* rejectedGlyphRun);
+                              const Fill& fill, const Stroke* stroke, const Rect& clipBounds,
+                              GlyphRun* rejectedGlyphRun);
 
   void drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
                         const Fill& fill, const Stroke* stroke, const Rect& clipBounds);
