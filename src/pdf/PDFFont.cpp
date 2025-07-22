@@ -104,56 +104,15 @@ std::shared_ptr<PDFStrike> PDFStrike::Make(PDFDocument* doc, const Font& font) {
   DEBUG_ASSERT(0 < unitsPerEm);
 
   const Font& canonFont(font);
-
-  // canonFont.setBaselineSnap(false);                 // canonicalize
-  // canonFont.setEdging(SkFont::Edging::kAntiAlias);  // canonicalize
-  // canonFont.setEmbeddedBitmaps(false);              // canonicalize
-  // canonFont.setForceAutoHinting(false);        // canonicalize
-  // canonFont.setHinting(SkFontHinting::kNone);  // canonicalize
-  // canonFont.setLinearMetrics(true);            // canonicalize
-  // canonFont.setScaleX(1.0f);                   // original value applied by SkPDFDevice
-  // canonFont.setSkewX(0.0f);      // original value applied by SkPDFDevice
-  // canonFont.setSubpixel(false);  // canonicalize
-
-  // Paint pathPaint(paint);
-  // if (scale_paint(pathPaint, unitsPerEm / font.getSize())) {
-  //   canonFont.setSize(unitsPerEm);
-  // } else {
-  //   canonFont.setSize(font.getSize());
-  // }
-
   float pathStrikeEM = canonFont.getSize();
   auto typefaceID = font.getTypeface()->uniqueID();
-  // SkStrikeSpec pathStrikeSpec = SkStrikeSpec::MakeWithNoDevice(canonFont, &pathPaint);
   auto iter = doc->strikes.find(typefaceID);
   if (iter != doc->strikes.end()) {
     return iter->second;
   }
 
-  // if (kBitmapFontSize <= 0) {
-  //   // old code path compatibility
-  //   sk_sp<SkPDFStrike> strike(new SkPDFStrike(SkPDFStrikeSpec(pathStrikeSpec, pathStrikeEM),
-  //                                             SkPDFStrikeSpec(pathStrikeSpec, pathStrikeEM),
-  //                                             pathPaint.getMaskFilter(), doc));
-  //   doc->fStrikes.set(strike);
-  //   return strike;
-  // }
-
-  // Paint imagePaint(paint);
-  // if (scale_paint(imagePaint, kBitmapFontSize / font.getSize())) {
-  //   canonFont.setSize(kBitmapFontSize);
-  // } else {
-  //   canonFont.setSize(font.getSize());
-  // }
-  // float imageStrikeEM = canonFont.getSize();
-  // SkStrikeSpec imageStrikeSpec = SkStrikeSpec::MakeWithNoDevice(canonFont, &imagePaint);
-
   auto strike = std::shared_ptr<PDFStrike>(
       new PDFStrike(PDFStrikeSpec(font.getTypeface(), font.getSize(), pathStrikeEM), doc));
-  // sk_sp<SkPDFStrike>
-  //     strike(new SkPDFStrike(SkPDFStrikeSpec(pathStrikeSpec, pathStrikeEM),
-  //                            SkPDFStrikeSpec(imageStrikeSpec, imageStrikeEM),
-  //                            pathPaint.getMaskFilter(), doc));
   doc->strikes[typefaceID] = strike;
   return strike;
 }
@@ -192,6 +151,11 @@ const FontMetrics* PDFFont::GetMetrics(const std::shared_ptr<Typeface>& typeface
   return document->fontMetrics[id].get();
 }
 
+std::shared_ptr<ScalerContext> PDFFont::GetScalerContext(const std::shared_ptr<Typeface>& typeface,
+                                                         float textSize) {
+  return typeface->getScalerContext(textSize);
+}
+
 PDFFont::~PDFFont() = default;
 
 PDFFont::PDFFont(const PDFStrike* strike, GlyphID firstGlyphID, GlyphID lastGlyphID,
@@ -205,18 +169,6 @@ PDFFont::PDFFont(const PDFStrike* strike, GlyphID firstGlyphID, GlyphID lastGlyp
 void PDFFont::PopulateCommonFontDescriptor(PDFDictionary* descriptor, const FontMetrics& metrics,
                                            uint16_t emSize, int16_t defaultWidth) {
   descriptor->insertName("FontName", metrics.postScriptName);
-  // descriptor->insertInt("Flags", static_cast<size_t>(metrics.style | PDFSymbolic));
-  // descriptor->insertScalar("Ascent", scaleFromFontUnits(metrics.fAscent, emSize));
-  // descriptor->insertScalar("Descent", scaleFromFontUnits(metrics.fDescent, emSize));
-  // descriptor->insertScalar("StemV", scaleFromFontUnits(metrics.fStemV, emSize));
-  // descriptor->insertScalar("CapHeight", scaleFromFontUnits(metrics.fCapHeight, emSize));
-  // descriptor->insertInt("ItalicAngle", metrics.fItalicAngle);
-  // descriptor->insertObject(
-  //     "FontBBox",
-  //     MakePDFArray(scaleFromFontUnits(static_cast<int16_t>(metrics.fBBox.left), emSize),
-  //                  scaleFromFontUnits(static_cast<int16_t>(metrics.fBBox.bottom), emSize),
-  //                  scaleFromFontUnits(static_cast<int16_t>(metrics.fBBox.right), emSize),
-  //                  scaleFromFontUnits(static_cast<int16_t>(metrics.fBBox.top), emSize)));
   descriptor->insertInt("Flags", 32);
   descriptor->insertInt("ItalicAngle", 0);
   descriptor->insertObject("FontBBox", MakePDFArray(0.f, 0.f, 0.f, 0.f));
@@ -530,22 +482,9 @@ void PDFFont::emitSubsetType3(PDFDocument* doc) const {
   auto typeface = pdfStrike.strikeSpec.typeface;
   auto textSize = pdfStrike.strikeSpec.textSize;
 
-  // const auto& pathFont = pdfStrike.strikeSpec.font;
-  // auto glyphFace = GlyphFace::Wrap(pathFont);
-  // if (!glyphFace) {
-  //   return;
-  // }
-
-  // auto strike = pdfStrike.strikeSpec.font.  fStrikeSpec.findOrCreateStrike();
-  // SkASSERT(strike);
-
   GlyphID xGlyphID = typeface->getGlyphID('X');
-  auto scaleContext = ScalerContext::Make(typeface, textSize);
+  auto scaleContext = PDFFont::GetScalerContext(typeface, textSize);
   float xHeight = scaleContext->getBounds(xGlyphID, false, false).height();
-  // SkBulkGlyphMetricsAndPaths metricsAndPaths((sk_sp<SkStrike>(strike)));
-  // SkBulkGlyphMetricsAndDrawables metricsAndDrawables(std::move(strike));
-
-  // SkBulkGlyphMetricsAndImages smallGlyphs(pdfFont.strike().fImage.fStrikeSpec);
   float bitmapScale = 1.f;
 
   PDFDictionary font("Font");
@@ -587,9 +526,6 @@ void PDFFont::emitSubsetType3(PDFDocument* doc) const {
       continue;
     }
 
-    // const SkGlyph* pathGlyph = metricsAndPaths.glyph(gID);
-    // const SkGlyph* drawableGlyph = metricsAndDrawables.glyph(gID);
-
     {
       char buffer[16];
       std::snprintf(buffer, sizeof(buffer), "g%X", glyphID);
@@ -602,23 +538,7 @@ void PDFFont::emitSubsetType3(PDFDocument* doc) const {
     auto glyphBBox = scaleContext->getBounds(glyphID, false, false);
     bbox.join(glyphBBox);
 
-    // SkDrawable* drawable = drawableGlyph->drawable();
     auto content = MemoryWriteStream::Make();
-    // if (drawable && !drawable->getBounds().isEmpty()) {
-    //   sk_sp<SkPDFDevice> glyphDevice = sk_make_sp<SkPDFDevice>(glyphBBox.size(), doc);
-    //   SkCanvas canvas(glyphDevice);
-    //   canvas.translate(-glyphBBox.fLeft, -glyphBBox.fTop);
-    //   canvas.drawDrawable(drawable);
-    //   SkPDFIndirectReference xobject = SkPDFMakeFormXObject(
-    //       doc, glyphDevice->content(), SkPDFMakeArray(0, 0, glyphBBox.width(), glyphBBox.height()),
-    //       glyphDevice->makeResourceDict(), SkMatrix::Translate(glyphBBox.fLeft, glyphBBox.fTop),
-    //       nullptr);
-    //   xobjects->insertRef(SkStringPrintf("Xg%X", gID), xobject);
-    //   SkPDFUtils::AppendScalar(drawableGlyph->advanceX(), &content);
-    //   content.writeText(" 0 d0\n1 0 0 1 0 0 cm\n/X");
-    //   content.write(characterName.c_str(), characterName.size());
-    //   content.writeText(" Do\n");
-    // } else
     Path glyphPath;
     Matrix glyphImageMatrix;
     if (!typeface->hasColor() && scaleContext->generatePath(glyphID, false, false, &glyphPath)) {
@@ -627,32 +547,8 @@ void PDFFont::emitSubsetType3(PDFDocument* doc) const {
       PDFUtils::PaintPath(PathFillType::Winding, content);
     } else {
       Font imageFont(typeface, textSize);
-      auto glyphImage = imageFont.getImage(glyphID, &glyphImageMatrix);
+      auto glyphImage = imageFont.getImage(glyphID, nullptr, &glyphImageMatrix);
       if (glyphImage) {
-        // auto bufferImage = Caster::AsBufferImage(glyphImage.get());
-        // if (!bufferImage || !bufferImage->imageBuffer) {
-        //   continue;
-        // }
-        // bufferImage->imageBuffer;
-        // if (glyphImage->colorType() != kGray_8_SkColorType) {
-        //   AppendScalar(pathGlyph->advanceX(), &content);
-        //   content.writeText(" 0 d0\n");
-        //   AppendScalar(pimg.fImage->width() * bitmapScale, &content);
-        //   content.writeText(" 0 0 ");
-        //   AppendScalar(-pimg.fImage->height() * bitmapScale, &content);
-        //   content.writeText(" ");
-        //   AppendScalar(pimg.fOffset.x() * bitmapScale, &content);
-        //   content.writeText(" ");
-        //   AppendScalar((pimg.fImage->height() + pimg.fOffset.y()) * bitmapScale, &content);
-        //   content.writeText(" cm\n");
-        //   content.writeText("/X");
-        //   content.write(characterName.c_str(), characterName.size());
-        //   content.writeText(" Do\n");
-        //   SkPDFIndirectReference image = SkPDFSerializeImage(pimg.fImage.get(), doc);
-        //   xobjects->insertRef(SkStringPrintf("Xg%X", gID), image);
-        // } else {}
-
-        // const SkGlyph* smallGlyph = smallGlyphs.glyph(SkPackedGlyphID{gID});
         auto smallBBox = scaleContext->getBounds(glyphID, false, false);
         smallBBox = Matrix::MakeScale(bitmapScale).mapRect(smallBBox);
         smallBBox.roundOut();
@@ -667,21 +563,6 @@ void PDFFont::emitSubsetType3(PDFDocument* doc) const {
         content->writeText(" ");
         PDFUtils::AppendFloat(glyphImageMatrix.getTranslateY() * bitmapScale, content);
         content->writeText(" cm\n");
-
-        // Convert Gray image to jpeg if needed
-        // if (pdfStrike.fHasMaskFilter) {
-        //   SkJpegEncoder::Options jpegOptions;
-        //   jpegOptions.fQuality = 50;  // SK_PDF_MASK_QUALITY
-        //   SkImage* image = pimg.fImage.get();
-        //   sk_sp<SkData> jpegData = SkJpegEncoder::Encode(nullptr, image, jpegOptions);
-        //   if (jpegData) {
-        //     sk_sp<SkImage> jpegImage = SkImages::DeferredFromEncodedData(jpegData);
-        //     SkASSERT(jpegImage);
-        //     if (jpegImage) {
-        //       pimg.fImage = jpegImage;
-        //     }
-        //   }
-        // }
 
         // Draw image into a Form XObject
         const auto imageSize = ISize::Make(glyphImage->width(), glyphImage->height());
@@ -760,10 +641,8 @@ void PDFFont::emitSubset(PDFDocument* document) const {
     case FontMetrics::FontType::TrueType:
     case FontMetrics::FontType::CFF:
       return emitSubsetType0(document);
-#ifndef SK_PDF_DO_NOT_SUPPORT_TYPE_1_FONTS
     case FontMetrics::FontType::Type1:
       return EmitSubsetType1(*this, document);
-#endif
     default:
       return emitSubsetType3(document);
   }

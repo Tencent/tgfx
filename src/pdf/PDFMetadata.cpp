@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/pdf/PDFMetadata.h"
+#include <algorithm>
 #include "pdf/PDFDocument.h"
 #include "pdf/PDFTag.h"
 #include "pdf/PDFTypes.h"
@@ -84,7 +85,7 @@ void PDFAttributeList::appendNodeIdArray(const std::string& owner, const std::st
   auto pdfArray = MakePDFArray();
   for (int nodeId : nodeIds) {
     auto idString = PDFTagNode::nodeIdToString(nodeId);
-    pdfArray->appendByteString(idString);
+    pdfArray->appendTextString(idString);
   }
   attrDict->insertObject(name, std::move(pdfArray));
   attrs->appendObject(std::move(attrDict));
@@ -115,9 +116,7 @@ std::shared_ptr<Document> MakePDFDocument(std::shared_ptr<WriteStream> stream, C
   if (metadata.rasterDPI <= 0) {
     metadata.rasterDPI = 72.0f;
   }
-  if (metadata.encodingQuality < 0) {
-    metadata.encodingQuality = 0;
-  }
+  metadata.encodingQuality = std::max(metadata.encodingQuality, 0);
   return std::make_shared<PDFDocument>(stream, context, metadata);
 }
 

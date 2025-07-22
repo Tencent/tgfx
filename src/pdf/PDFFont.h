@@ -132,6 +132,9 @@ class PDFFont {
   static const FontMetrics* GetMetrics(const std::shared_ptr<Typeface>& typeface, float textSize,
                                        PDFDocument* document);
 
+  static std::shared_ptr<ScalerContext> GetScalerContext(const std::shared_ptr<Typeface>& typeface,
+                                                         float textSize);
+
   static const std::vector<Unichar>& GetUnicodeMap(const Typeface& typeface, PDFDocument* document);
 
   static void PopulateCommonFontDescriptor(PDFDictionary* descriptor, const FontMetrics& metrics,

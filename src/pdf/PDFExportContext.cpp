@@ -19,6 +19,7 @@
 #include "PDFExportContext.h"
 #include <cmath>
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <tuple>
 #include <unordered_set>
@@ -30,11 +31,15 @@
 #include "core/Records.h"
 #include "core/ScalerContext.h"
 #include "core/filters/DropShadowImageFilter.h"
+#include "core/filters/InnerShadowImageFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
 #include "core/images/PictureImage.h"
+#include "core/shaders/ColorShader.h"
 #include "core/shaders/ImageShader.h"
-#include "core/utils/Caster.h"
+#include "core/shaders/MatrixShader.h"
 #include "core/utils/Log.h"
+#include "core/utils/PlacementPtr.h"
+#include "core/utils/Types.h"
 #include "pdf/PDFBitmap.h"
 #include "pdf/PDFDocument.h"
 #include "pdf/PDFFont.h"
@@ -161,10 +166,10 @@ void PDFExportContext::reset() {
   // fActiveStackState = SkPDFGraphicStackState();
 }
 
-void PDFExportContext::drawFill(const MCState& state, const Fill& fill) {
+void PDFExportContext::drawFill(const Fill& fill) {
   Path path;
   path.addRect(Rect::MakeSize(_pageSize));
-  onDrawPath(state, path, fill);
+  onDrawPath(MCState(), path, fill);
 };
 
 void PDFExportContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
@@ -173,11 +178,19 @@ void PDFExportContext::drawRect(const Rect& rect, const MCState& state, const Fi
   onDrawPath(state, path, fill);
 }
 
-void PDFExportContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill) {
+void PDFExportContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
+                                 const Stroke* stroke) {
   Path path;
   path.addRRect(rRect);
+  if (stroke) {
+    stroke->applyToPath(&path);
+  }
   onDrawPath(state, path, fill);
 }
+
+void PDFExportContext::drawPath(const Path& path, const MCState& state, const Fill& fill) {
+  this->onDrawPath(state, path, fill);
+};
 
 void PDFExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                                  const Fill& fill) {
@@ -191,10 +204,14 @@ void PDFExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOpt
   onDrawImageRect(image, rect, sampling, state, fill);
 }
 
-void PDFExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
-                                     const SamplingOptions& sampling, const MCState& state,
-                                     const Fill& fill) {
-  onDrawImageRect(image, rect, sampling, state, fill);
+void PDFExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
+                                     const Rect& dstRect, const SamplingOptions& sampling,
+                                     const MCState& state, const Fill& fill, SrcRectConstraint) {
+  auto subsetImage = image->makeSubset(srcRect);
+  if (subsetImage == nullptr) {
+    return;
+  }
+  onDrawImageRect(image, dstRect, sampling, state, fill);
 }
 
 void PDFExportContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
@@ -207,14 +224,14 @@ void PDFExportContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunLi
 
 void PDFExportContext::onDrawGlyphRunAsPath(const GlyphRun& glyphRun, const MCState& state,
                                             const Fill& fill, const Stroke* stroke) {
-  auto glyphFace = glyphRun.glyphFace;
+  const auto& glyphFont = glyphRun.font;
   Path path;
 
   for (size_t i = 0; i < glyphRun.glyphs.size(); ++i) {
     auto glyphID = glyphRun.glyphs[i];
     auto glyphPosition = glyphRun.positions[i];
     Path glyphPath;
-    if (!glyphFace->getPath(glyphID, &glyphPath)) {
+    if (!glyphFont.getPath(glyphID, &glyphPath)) {
       continue;
     }
     glyphPath.transform(Matrix::MakeTrans(glyphPosition.x, glyphPosition.y));
@@ -396,8 +413,8 @@ bool needs_new_font(PDFFont* font, GlyphID glyphID, FontMetrics::FontType initia
     return false;
   }
 
-  auto scaleContext =
-      ScalerContext::Make(font->strike().strikeSpec.typeface, font->strike().strikeSpec.textSize);
+  auto scaleContext = PDFFont::GetScalerContext(font->strike().strikeSpec.typeface,
+                                                font->strike().strikeSpec.textSize);
   Path glyphPath;
   bool hasUnmodifiedPath = scaleContext->generatePath(glyphID, false, false, &glyphPath);
   bool convertedToType3 = font->getType() == FontMetrics::FontType::Other;
@@ -408,9 +425,7 @@ bool needs_new_font(PDFFont* font, GlyphID glyphID, FontMetrics::FontType initia
 void PDFExportContext::onDrawGlyphRun(const GlyphRun& glyphRun, const MCState& state,
                                       const Fill& fill, const Stroke* stroke) {
   const auto& glyphIDs = glyphRun.glyphs;
-  auto glyphFace = glyphRun.glyphFace;
-
-  if (glyphIDs.empty() || !glyphFace) {
+  if (glyphIDs.empty()) {
     return;
   }
 
@@ -419,10 +434,7 @@ void PDFExportContext::onDrawGlyphRun(const GlyphRun& glyphRun, const MCState& s
     return;
   }
 
-  Font glyphRunFont;
-  if (!glyphFace->asFont(&glyphRunFont)) {
-    return;
-  }
+  const auto& glyphRunFont = glyphRun.font;
   auto pdfStrike = PDFStrike::Make(document, glyphRunFont);
   if (!pdfStrike) {
     return;
@@ -438,10 +450,7 @@ void PDFExportContext::onDrawGlyphRun(const GlyphRun& glyphRun, const MCState& s
 
   const auto& glyphToUnicode = PDFFont::GetUnicodeMap(*typeface, document);
 
-  // TODO: FontType should probably be on PDFStrike?
   FontMetrics::FontType initialFontType = PDFFont::FontType(*pdfStrike, *metrics);
-
-  // SkClusterator clusterator(glyphRun);
 
   // The size, skewX, and scaleX are applied here.
   float advanceScale = textSize * 1.f / pdfStrike->strikeSpec.unitsPerEM;
@@ -450,12 +459,8 @@ void PDFExportContext::onDrawGlyphRun(const GlyphRun& glyphRun, const MCState& s
   float textScaleY = textSize / pdfStrike->strikeSpec.unitsPerEM;
   float textScaleX = advanceScale;
 
-  auto clipStackBounds = Rect::MakeEmpty();
-  if (state.clip.isEmpty()) {
-    clipStackBounds = Rect::MakeSize(_pageSize);
-  } else {
-    clipStackBounds = state.clip.getBounds();
-  }
+  const auto clipStackBounds =
+      state.clip.isEmpty() ? Rect::MakeSize(_pageSize) : state.clip.getBounds();
 
   // Clear everything from the runPaint that will be applied by the strike.
   Fill fillPaint(fill);
@@ -474,44 +479,27 @@ void PDFExportContext::onDrawGlyphRun(const GlyphRun& glyphRun, const MCState& s
     Matrix pageXform = state.matrix;
     pageXform.postConcat(document->currentPageTransform());
 
-    // ScopedOutputMarkedContentTags mark(fNodeId, {SK_ScalarNaN, SK_ScalarNaN}, fDocument, out);
-    // if (!glyphRun.text().empty()) {
-    //   fDocument->addNodeTitle(fNodeId, glyphRun.text());
-    // }
-
     const auto numGlyphs = typeface->glyphsCount();
-
-    // if (clusterator.reversedChars()) {
-    //   out->writeText("/ReversedChars BMC\n");
-    // }
-    // SK_AT_SCOPE_EXIT(if (clusterator.reversedChars()) { out->writeText("EMC\n"); });
-
     auto offset = glyphRun.positions[0];
     GlyphPositioner glyphPositioner(out, glyphRunFont.getMetrics().leading, offset);
     PDFFont* font = nullptr;
 
-    // SkBulkGlyphMetricsAndPaths paths{pdfStrike->fPath.fStrikeSpec};
-    // auto glyphs = paths.glyphs(glyphRun.glyphsIDs());
-
     for (size_t index = 0; index < glyphRun.glyphs.size(); ++index) {
       auto glyphID = glyphRun.glyphs[index];
-      // bool actualText = false;
 
       glyphPositioner.flush();
       out->writeText("/Span<</ActualText ");
       auto unichar = map_glyph(glyphToUnicode, glyphID);
       auto utf8Text = UTF::ToUTF8(unichar);
       PDFWriteTextString(out, utf8Text);
-      out->writeText(" >> BDC\n");  // begin marked-content sequence
-                                    // with an associated property list.
-      // actualText = true;
-
+      // begin marked-content sequence with an associated property list.
+      out->writeText(" >> BDC\n");
       if (numGlyphs <= glyphID) {
         continue;
       }
       auto xy = glyphRun.positions[index];
       // Do a glyph-by-glyph bounds-reject if positions are absolute.
-      auto glyphBounds = glyphFace->getBounds(glyphID);
+      auto glyphBounds = glyphRunFont.getBounds(glyphID);
       glyphBounds = Matrix::MakeScale(textScaleX, textScaleY).mapRect(glyphBounds);
       glyphBounds.offset(xy + offset);
       state.matrix.mapRect(&glyphBounds);
@@ -521,7 +509,7 @@ void PDFExportContext::onDrawGlyphRun(const GlyphRun& glyphRun, const MCState& s
           continue;
         }
       } else {
-        if (!clipStackBounds.intersects(glyphBounds)) {
+        if (!Rect::Intersects(clipStackBounds, glyphBounds)) {
           continue;
         }
       }
@@ -635,7 +623,7 @@ void PDFExportContext::drawDropShadowBeforeLayer(const std::shared_ptr<Picture>&
 void PDFExportContext::drawInnerShadowAfterLayer(const Record* record,
                                                  const InnerShadowImageFilter* innerShadowFilter,
                                                  const MCState& state) {
-  MeasureContext measureContext = {};
+  MeasureContext measureContext(true);
   PlaybackContext playbackContext = {};
   record->playback(&measureContext, &playbackContext);
   auto pictureBounds = measureContext.getBounds();
@@ -659,8 +647,8 @@ void PDFExportContext::drawInnerShadowAfterLayer(const Record* record,
     auto* surfaceContext = canvas->drawContext;
     auto matrix = Matrix::MakeTrans(-pictureBounds.x(), -pictureBounds.y());
     PlaybackContext tempPlaybackContext = {};
-    tempPlaybackContext.state.matrix = matrix;
-    tempPlaybackContext.state.clip = state.clip;
+    tempPlaybackContext.setMatrix(matrix);
+    tempPlaybackContext.setClip(state.clip);
     record->playback(surfaceContext, &playbackContext);
   }
   canvas->restore();
@@ -670,17 +658,12 @@ void PDFExportContext::drawInnerShadowAfterLayer(const Record* record,
     auto imageShader = Shader::MakeImageShader(image);
     imageShader =
         imageShader->makeWithMatrix(Matrix::MakeTrans(pictureBounds.x(), pictureBounds.y()));
-    PlaybackContext tempPlaybackContext = {.state = state};
-    tempPlaybackContext.fill.shader = imageShader;
+    PlaybackContext tempPlaybackContext(state);
+    Fill fill;
+    fill.shader = imageShader;
+    tempPlaybackContext.setFill(fill);
     record->playback(this, &tempPlaybackContext);
   }
-
-  // if (image) {
-  //   image = image->makeTextureImage(document->context());
-  //   auto imageState = state;
-  //   imageState.matrix.postTranslate(pictureBounds.x(), pictureBounds.y());
-  //   drawImage(std::move(image), SamplingOptions(), imageState, Fill());
-  // }
 }
 
 void PDFExportContext::drawBlurLayer(const std::shared_ptr<Picture>& picture,
@@ -719,14 +702,16 @@ void PDFExportContext::drawLayer(std::shared_ptr<Picture> picture,
                                  const Fill& fill) {
 
   if (imageFilter) {
-    if (const auto* dropShadowFilter = Caster::AsDropShadowImageFilter(imageFilter.get())) {
+    if (Types::Get(imageFilter.get()) == Types::ImageFilterType::DropShadow) {
+      const auto* dropShadowFilter = static_cast<const DropShadowImageFilter*>(imageFilter.get());
       drawDropShadowBeforeLayer(picture, dropShadowFilter, state, fill);
       if (!dropShadowFilter->shadowOnly) {
         picture->playback(this, state);
       }
       return;
     }
-    if (const auto* innerShadowFilter = Caster::AsInnerShadowImageFilter(imageFilter.get())) {
+    if (Types::Get(imageFilter.get()) == Types::ImageFilterType::InnerShadow) {
+      const auto* innerShadowFilter = static_cast<const InnerShadowImageFilter*>(imageFilter.get());
       PlaybackContext playbackContext = {};
       for (const auto& record : picture->records) {
         record->playback(this, &playbackContext);
@@ -734,7 +719,7 @@ void PDFExportContext::drawLayer(std::shared_ptr<Picture> picture,
       }
       return;
     }
-    if (Caster::AsBlurImageFilter(imageFilter.get())) {
+    if (Types::Get(imageFilter.get()) == Types::ImageFilterType::Blur) {
       drawBlurLayer(picture, imageFilter, state, fill);
       return;
     }
@@ -1116,7 +1101,8 @@ void populate_graphic_state_entry_from_paint(
   if (auto shader = fill.shader) {
     // note: we always present the alpha as 1 for the shader, knowing that it will be
     //       accounted for when we create our newGraphicsState (below)
-    if (const auto* colorShader = Caster::AsColorShader(shader.get())) {
+    if (Types::Get(shader.get()) == Types::ShaderType::Color) {
+      const auto* colorShader = static_cast<const ColorShader*>(shader.get());
       if (colorShader->asColor(&color)) {
         color.alpha = 1;
         entry->color = color;
@@ -1397,11 +1383,15 @@ std::tuple<std::shared_ptr<Picture>, Matrix> MaskFilterToPicture(
   auto matrix = Matrix::I();
   auto shader = shaderMaskFilter->getShader();
   while (true) {
-    if (const auto* matrixShader = Caster::AsMatrixShader(shader.get())) {
+    if (Types::Get(shader.get()) == Types::ShaderType::Matrix) {
+      const auto* matrixShader = static_cast<const MatrixShader*>(shader.get());
       matrix.postConcat(matrixShader->matrix);
       shader = matrixShader->source;
-    } else if (const auto* imageShader = Caster::AsImageShader(shader.get())) {
-      if (const auto* pictureImage = Caster::AsPictureImage(imageShader->image.get())) {
+    } else if (Types::Get(shader.get()) == Types::ShaderType::Image) {
+      const auto* imageShader = static_cast<const ImageShader*>(shader.get());
+      auto image = imageShader->image;
+      if (Types::Get(image.get()) == Types::ImageType::Picture) {
+        const auto* pictureImage = static_cast<const PictureImage*>(imageShader->image.get());
         return {pictureImage->picture, matrix};
       }
       return {nullptr, Matrix::I()};
@@ -1423,7 +1413,10 @@ void PDFExportContext::drawPathWithFilter(const MCState& state, const Path& orig
 
   Fill paint(originPaint);
 
-  const auto* shaderMaskFilter = Caster::AsShaderMaskFilter(originPaint.maskFilter.get());
+  if (Types::Get(originPaint.maskFilter.get()) != Types::MaskFilterType::Shader) {
+    return;
+  }
+  const auto* shaderMaskFilter = static_cast<const ShaderMaskFilter*>(originPaint.maskFilter.get());
   auto [picture, pictureMatrix] = MaskFilterToPicture(shaderMaskFilter);
 
   auto maskContext = makeCongruentDevice();

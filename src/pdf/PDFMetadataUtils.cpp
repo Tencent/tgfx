@@ -119,9 +119,9 @@ std::unique_ptr<PDFObject> PDFMetadataUtils::MakePDFId(const UUID& doc, const UU
   //       <81b14aafa313db63dbd6f981e49f94f4> ]
   auto array = MakePDFArray();
   static_assert(sizeof(UUID) == 16, "uuid_size");
-  array->appendByteString(
+  array->appendTextString(
       std::string(reinterpret_cast<const char*>(doc.data.data()), sizeof(UUID)));
-  array->appendByteString(
+  array->appendTextString(
       std::string(reinterpret_cast<const char*>(instance.data.data()), sizeof(UUID)));
   return array;
 }

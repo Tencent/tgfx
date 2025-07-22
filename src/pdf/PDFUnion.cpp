@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -20,11 +20,12 @@
 #include "core/utils/Log.h"
 #include "pdf/PDFTypes.h"
 #include "pdf/PDFUtils.h"
+#include "tgfx/core/MD5.h"
 #include "tgfx/core/Typeface.h"
+#include "tgfx/core/UTF.h"
 #include "tgfx/core/WriteStream.h"
 
 namespace tgfx {
-
 namespace {
 
 // Given an arbitrary string, write it as a valid name (not including leading slash).
@@ -74,7 +75,7 @@ void write_hex_byte_string(const std::shared_ptr<WriteStream>& stream, const cha
 
 void write_optimized_byte_string(const std::shared_ptr<WriteStream>& stream, const char* data,
                                  size_t length, size_t literalExtras) {
-  const size_t hexLength = 2 + 2 * length;
+  const size_t hexLength = 2 + (2 * length);
   const size_t literalLength = 2 + length + literalExtras;
   if (literalLength <= hexLength) {
     write_literal_byte_string(stream, data, length);

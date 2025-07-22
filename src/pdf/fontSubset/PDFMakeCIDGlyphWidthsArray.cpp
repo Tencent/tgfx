@@ -95,7 +95,7 @@ std::unique_ptr<PDFArray> PDFMakeCIDGlyphWidthsArray(const PDFStrikeSpec& pdfStr
 
   auto emSize = static_cast<uint16_t>(pdfStrikeSpec.unitsPerEM);
   // auto pathFont = pdfStrikeSpec.typeface;
-  auto scaleContext = ScalerContext::Make(pdfStrikeSpec.typeface, pdfStrikeSpec.textSize);
+  auto scaleContext = PDFFont::GetScalerContext(pdfStrikeSpec.typeface, pdfStrikeSpec.textSize);
   // SkBulkGlyphMetricsAndPaths paths{pdfStrikeSpec.fStrikeSpec};
 
   auto result = MakePDFArray();

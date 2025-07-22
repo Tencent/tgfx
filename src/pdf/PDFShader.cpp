@@ -17,8 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFShader.h"
-#include "core/utils/Caster.h"
+#include "core/shaders/ImageShader.h"
 #include "core/utils/Log.h"
+#include "core/utils/Types.h"
 #include "pdf/PDFDocument.h"
 #include "pdf/PDFExportContext.h"
 #include "pdf/PDFGradientShader.h"
@@ -87,7 +88,8 @@ void fill_color_from_bitmap(Canvas* canvas, float left, float top, float right, 
 }
 
 Color adjust_color(const std::shared_ptr<Shader>& shader, Color paintColor) {
-  if (const auto* imageShader = Caster::AsImageShader(shader.get())) {
+  if (Types::Get(shader.get()) == Types::ShaderType::Image) {
+    const auto* imageShader = static_cast<const ImageShader*>(shader.get());
     const auto* img = imageShader->image.get();
     if (img && img->isAlphaOnly()) {
       return paintColor;
@@ -121,8 +123,9 @@ PDFIndirectReference PDFShader::Make(PDFDocument* doc, const std::shared_ptr<Sha
                                      Color paintColor) {
   DEBUG_ASSERT(shader);
   DEBUG_ASSERT(doc);
-  if (Caster::AsGradientShader(shader.get())) {
-    return PDFGradientShader::Make(doc, shader.get(), canvasTransform, surfaceBBox);
+  if (Types::Get(shader.get()) == Types::ShaderType::Gradient) {
+    const auto* gradientShader = static_cast<const GradientShader*>(shader.get());
+    return PDFGradientShader::Make(doc, gradientShader, canvasTransform, surfaceBBox);
   }
   if (surfaceBBox.isEmpty()) {
     return PDFIndirectReference();
@@ -133,22 +136,14 @@ PDFIndirectReference PDFShader::Make(PDFDocument* doc, const std::shared_ptr<Sha
   Matrix shaderTransform;
   TileMode imageTileModes[2];
 
-  if (const auto* imageShader = Caster::AsImageShader(shader.get())) {
+  if (Types::Get(shader.get()) == Types::ShaderType::Image) {
+    const auto* imageShader = static_cast<const ImageShader*>(shader.get());
     auto shaderImage = imageShader->image;
     Matrix finalMatrix = canvasTransform * shaderTransform;
-    // SkPDFImageShaderKey key = {finalMatrix,
-    //                            surfaceBBox,
-    //                            SkBitmapKeyFromImage(shaderImage),
-    //                            {imageTileModes[0], imageTileModes[1]},
-    //                            paintColor};
-    // PDFIndirectReference* shaderPtr = doc->fImageShaderMap.find(key);
-    // if (shaderPtr) {
-    //   return *shaderPtr;
-    // }
+    // TODO (YGaurora): Cache image shaders and remove duplicates
     PDFIndirectReference pdfShader =
         MakeImageShader(doc, finalMatrix, imageTileModes[0], imageTileModes[1], surfaceBBox,
                         shaderImage, paintColor);
-    // doc->fImageShaderMap.set(std::move(key), pdfShader);
     return pdfShader;
   }
   // Don't bother to de-dup fallback shader.

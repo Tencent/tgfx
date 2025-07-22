@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -53,11 +53,9 @@ struct Location {
 };
 
 struct PDFTagNode {
-  // Structure element nodes need a unique alphanumeric ID,
-  // and we need to be able to output them sorted in lexicographic
-  // order. This helper function takes one of our node IDs and
-  // builds an ID string that zero-pads the digits so that lexicographic
-  // order matches numeric order.
+  // Structure element nodes need a unique alphanumeric ID, and we need to be able to output them
+  // sorted in lexicographic order. This helper function takes one of our node IDs and builds an ID
+  // string that zero-pads the digits so that lexicographic order matches numeric order.
   static std::string nodeIdToString(int nodeId) {
     char buffer[32];
     snprintf(buffer, sizeof(buffer), "node%08d", nodeId);
@@ -69,6 +67,7 @@ struct PDFTagNode {
     Location location;
     int markId;
   };
+
   std::vector<MarkedContentInfo> markedContent;
   int nodeId;
   bool wantTitle;
@@ -101,9 +100,6 @@ class PDFTagTree {
   void init(PDFStructureElementNode*, PDFMetadata::Outline);
 
   class Mark {
-    PDFTagNode* const node;
-    size_t const markIndex;
-
    public:
     Mark(PDFTagNode* node, size_t index) : node(node), markIndex(index) {
     }
@@ -119,6 +115,10 @@ class PDFTagTree {
     }
     int id();
     Point& point();
+
+   private:
+    PDFTagNode* const node;
+    const size_t markIndex;
   };
 
   Mark createMarkIdForNodeId(int nodeId, unsigned pageIndex, Point);
@@ -126,9 +126,13 @@ class PDFTagTree {
   int createStructParentKeyForNodeId(int nodeId, unsigned pageIndex);
 
   void addNodeAnnotation(int nodeId, PDFIndirectReference annotationRef, unsigned pageIndex);
+
   void addNodeTitle(int nodeId, const std::vector<char>& title);
+
   PDFIndirectReference makeStructTreeRoot(PDFDocument* doc);
+
   PDFIndirectReference makeOutline(PDFDocument* doc);
+
   std::string getRootLanguage();
 
  private:
@@ -139,6 +143,7 @@ class PDFTagTree {
 
   void Copy(PDFStructureElementNode& node, PDFTagNode* destination,
             std::unordered_map<int, PDFTagNode*>* nodeMap, bool wantTitle);
+
   PDFIndirectReference PrepareTagTreeToEmit(PDFIndirectReference parent, PDFTagNode* node,
                                             PDFDocument* doc);
 

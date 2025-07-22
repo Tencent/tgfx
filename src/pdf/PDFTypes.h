@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -78,8 +78,8 @@ class PDFArray final : public PDFObject {
   void appendName(const char name[]);
   void appendName(std::string name);
   void appendByteString(const char value[]);
-  void appendTextString(const char value[]);
-  void appendByteString(std::string value);
+  // void appendTextString(const char value[]);
+  // void appendByteString(std::string value);
   void appendTextString(std::string value);
   void appendObject(std::unique_ptr<PDFObject>&& object);
   void appendRef(PDFIndirectReference ref);

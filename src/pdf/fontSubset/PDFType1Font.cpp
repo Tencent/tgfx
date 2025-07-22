@@ -287,7 +287,7 @@ void EmitSubsetType1(const PDFFont& pdfFont, PDFDocument* document) {
   auto typeface = pdfFont.strike().strikeSpec.typeface;
   auto textSize = pdfFont.strike().strikeSpec.textSize;
   auto glyphNames = type_1_glyph_names(document, typeface);
-  auto scaleContext = ScalerContext::Make(typeface, pdfFont.strike().strikeSpec.textSize);
+  auto scaleContext = PDFFont::GetScalerContext(typeface, pdfFont.strike().strikeSpec.textSize);
 
   GlyphID firstGlyphID = pdfFont.firstGlyphID();
   GlyphID lastGlyphID = pdfFont.lastGlyphID();

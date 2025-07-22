@@ -50,9 +50,9 @@ PDFIndirectReference PDFGraphicState::GetGraphicStateForPaint(PDFDocument* docum
 
   PDFDictionary state;
   state.reserve(2);
-  state.insertScalar("ca", fillKey.fAlpha);
+  state.insertScalar("ca", fillKey.alpha);
   // state.insertColorComponentF("ca", fillKey.fAlpha);
-  state.insertName("BM", PDFUtils::BlendModeName(static_cast<BlendMode>(fillKey.fBlendMode)));
+  state.insertName("BM", PDFUtils::BlendModeName(static_cast<BlendMode>(fillKey.blendMode)));
   PDFIndirectReference ref = document->emit(state);
   fillMap[fillKey] = ref;
   return ref;

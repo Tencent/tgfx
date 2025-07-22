@@ -22,7 +22,8 @@
 #include <cstddef>
 #include <memory>
 #include "core/codecs/jpeg/JpegCodec.h"
-#include "core/utils/Caster.h"
+#include "core/images/CodecImage.h"
+#include "core/utils/Types.h"
 #include "pdf/DeflateStream.h"
 #include "pdf/PDFDocument.h"
 #include "pdf/PDFTypes.h"
@@ -98,7 +99,7 @@ uint32_t get_neighbor_avg_color(const Pixmap& pixmap, int xOrig, int yOrig) {
   auto rowBytes = pixmap.rowBytes();
   for (int y = ymin; y <= ymax; ++y) {
     const auto* scanline =
-        reinterpret_cast<const uint32_t*>(pixelPointer + static_cast<size_t>(y) * rowBytes);
+        reinterpret_cast<const uint32_t*>(pixelPointer + (static_cast<size_t>(y) * rowBytes));
     for (int x = xmin; x <= xmax; ++x) {
       uint32_t color = *scanline++;
       if (color != 0x00000000) {
@@ -180,7 +181,7 @@ void do_deflated_alpha(const Pixmap& pixmap, PDFDocument* document, PDFIndirectR
     uint8_t* bufferPointer = byteBuffer;
     for (int y = 0; y < pixmap.height(); ++y) {
       const auto* scanline =
-          reinterpret_cast<const uint32_t*>(pixelPointer + static_cast<size_t>(y) * rowBytes);
+          reinterpret_cast<const uint32_t*>(pixelPointer + (static_cast<size_t>(y) * rowBytes));
       for (int x = 0; x < pixmap.width(); ++x) {
         uint32_t color = *scanline++;
         *bufferPointer++ = (((color) >> 24) & 0xFF);
@@ -244,7 +245,7 @@ void do_deflated_image(const Pixmap& pixmap, PDFDocument* document, bool isOpaqu
       uint8_t* bufferPointer = byteBuffer;
       for (int y = 0; y < pixmap.height(); ++y) {
         const auto* scanline =
-            reinterpret_cast<const uint8_t*>(pixelPointer + static_cast<size_t>(y) * rowBytes);
+            reinterpret_cast<const uint8_t*>(pixelPointer + (static_cast<size_t>(y) * rowBytes));
         for (int x = 0; x < pixmap.width(); ++x) {
           *bufferPointer++ = *scanline++;
           if (bufferPointer == bufferStop) {
@@ -270,7 +271,7 @@ void do_deflated_image(const Pixmap& pixmap, PDFDocument* document, bool isOpaqu
       uint8_t* bufferPointer = byteBuffer;
       for (int y = 0; y < pixmap.height(); ++y) {
         const auto* scanline =
-            reinterpret_cast<const uint32_t*>(pixelPointer + static_cast<size_t>(y) * rowBytes);
+            reinterpret_cast<const uint32_t*>(pixelPointer + (static_cast<size_t>(y) * rowBytes));
         for (int x = 0; x < pixmap.width(); ++x) {
           uint32_t color = *scanline++;
           if ((((color) >> 24) & 0xFF) == 0x00) {
@@ -312,8 +313,10 @@ void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int /*encodi
                                PDFDocument* doc, PDFIndirectReference ref) {
   auto dimensions = ISize::Make(image->width(), image->height());
 
-  if (const auto* codecImage = Caster::AsCodecImage(image.get())) {
-    if (auto data = codecImage->codec()->getEncodedData()) {
+  ;
+  if (Types::Get(image.get()) == Types::ImageType::Codec) {
+    const auto* codecImage = static_cast<CodecImage*>(image.get());
+    if (auto data = codecImage->getCodec()->getEncodedData()) {
       if (do_jpeg(std::move(data), YUVColorSpace::JPEG_FULL, doc, dimensions, ref)) {
         return;
       }

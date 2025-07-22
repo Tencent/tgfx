@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -29,7 +29,6 @@ PDFTagTree::PDFTagTree() = default;
 
 PDFTagTree::~PDFTagTree() = default;
 
-// static
 void PDFTagTree::Copy(PDFStructureElementNode& node, PDFTagNode* dst,
                       std::unordered_map<int, PDFTagNode*>* nodeMap, bool wantTitle) {
   nodeMap->insert({node.nodeId, dst});
@@ -280,14 +279,14 @@ PDFIndirectReference PDFTagTree::makeStructTreeRoot(PDFDocument* doc) {
     PDFDictionary idTreeLeaf;
     auto limits = MakePDFArray();
     auto lowestNodeIdString = PDFTagNode::nodeIdToString(IDTreeEntries.begin()->nodeId);
-    limits->appendByteString(lowestNodeIdString);
+    limits->appendTextString(lowestNodeIdString);
     auto highestNodeIdString = PDFTagNode::nodeIdToString(IDTreeEntries.rbegin()->nodeId);
-    limits->appendByteString(highestNodeIdString);
+    limits->appendTextString(highestNodeIdString);
     idTreeLeaf.insertObject("Limits", std::move(limits));
     auto names = MakePDFArray();
     for (const IDTreeEntry& entry : IDTreeEntries) {
       auto idString = PDFTagNode::nodeIdToString(entry.nodeId);
-      names->appendByteString(idString);
+      names->appendTextString(idString);
       names->appendRef(entry.ref);
     }
     idTreeLeaf.insertObject("Names", std::move(names));
@@ -311,47 +310,47 @@ struct OutlineEntry {
     }
   };
 
-  Content fContent;
-  int fHeaderLevel;
-  PDFIndirectReference fRef;
-  PDFIndirectReference fStructureRef;
-  std::vector<OutlineEntry> fChildren = {};
-  size_t fDescendentsEmitted = 0;
+  Content content;
+  int headerLevel;
+  PDFIndirectReference ref;
+  PDFIndirectReference structureRef;
+  std::vector<OutlineEntry> children = {};
+  size_t descendentsEmitted = 0;
 
   void emitDescendents(PDFDocument* const doc) {
-    fDescendentsEmitted = fChildren.size();
-    for (size_t i = 0; i < fChildren.size(); ++i) {
-      auto&& child = fChildren[i];
+    descendentsEmitted = children.size();
+    for (size_t i = 0; i < children.size(); ++i) {
+      auto&& child = children[i];
       child.emitDescendents(doc);
-      fDescendentsEmitted += child.fDescendentsEmitted;
+      descendentsEmitted += child.descendentsEmitted;
 
       PDFDictionary entry;
-      entry.insertTextString("Title", child.fContent.fText);
+      entry.insertTextString("Title", child.content.fText);
 
       auto destination = MakePDFArray();
-      destination->appendRef(doc->getPage(child.fContent.fLocation.pageIndex));
+      destination->appendRef(doc->getPage(child.content.fLocation.pageIndex));
       destination->appendName("XYZ");
-      destination->appendScalar(child.fContent.fLocation.point.x);
-      destination->appendScalar(child.fContent.fLocation.point.y);
+      destination->appendScalar(child.content.fLocation.point.x);
+      destination->appendScalar(child.content.fLocation.point.y);
       destination->appendInt(0);
       entry.insertObject("Dest", std::move(destination));
 
-      entry.insertRef("Parent", child.fRef);
-      if (child.fStructureRef) {
-        entry.insertRef("SE", child.fStructureRef);
+      entry.insertRef("Parent", child.ref);
+      if (child.structureRef) {
+        entry.insertRef("SE", child.structureRef);
       }
       if (0 < i) {
-        entry.insertRef("Prev", fChildren[i - 1].fRef);
+        entry.insertRef("Prev", children[i - 1].ref);
       }
-      if (i < fChildren.size() - 1) {
-        entry.insertRef("Next", fChildren[i + 1].fRef);
+      if (i < children.size() - 1) {
+        entry.insertRef("Next", children[i + 1].ref);
       }
-      if (!child.fChildren.empty()) {
-        entry.insertRef("First", child.fChildren.front().fRef);
-        entry.insertRef("Last", child.fChildren.back().fRef);
-        entry.insertInt("Count", child.fDescendentsEmitted);
+      if (!child.children.empty()) {
+        entry.insertRef("First", child.children.front().ref);
+        entry.insertRef("Last", child.children.back().ref);
+        entry.insertInt("Count", child.descendentsEmitted);
       }
-      doc->emit(entry, child.fRef);
+      doc->emit(entry, child.ref);
     }
   }
 };
@@ -382,18 +381,19 @@ OutlineEntry::Content create_outline_entry_content(PDFTagNode* const node) {
   }
   return content;
 }
+
 void create_outline_from_headers(PDFDocument* const doc, PDFTagNode* const node,
                                  std::vector<OutlineEntry*>& stack) {
   char const* type = node->typeString.c_str();
   if (type[0] == 'H' && '1' <= type[1] && type[1] <= '6') {
     int level = type[1] - '0';
-    while (level <= stack.back()->fHeaderLevel) {
+    while (level <= stack.back()->headerLevel) {
       stack.pop_back();
     }
     OutlineEntry::Content content = create_outline_entry_content(node);
     if (!content.fText.empty()) {
       OutlineEntry e{std::move(content), level, doc->reserveRef(), node->ref};
-      stack.push_back(&stack.back()->fChildren.emplace_back(std::move(e)));
+      stack.push_back(&stack.back()->children.emplace_back(std::move(e)));
       return;
     }
   }
@@ -419,15 +419,15 @@ PDFIndirectReference PDFTagTree::makeOutline(PDFDocument* doc) {
   OutlineEntry top{{"", Location()}, 0, {}, {}};
   stack.push_back(&top);
   create_outline_from_headers(doc, root.get(), stack);
-  if (top.fChildren.empty()) {
+  if (top.children.empty()) {
     return PDFIndirectReference();
   }
   top.emitDescendents(doc);
   auto outlineRef = doc->reserveRef();
   PDFDictionary outline("Outlines");
-  outline.insertRef("First", top.fChildren.front().fRef);
-  outline.insertRef("Last", top.fChildren.back().fRef);
-  outline.insertInt("Count", top.fDescendentsEmitted);
+  outline.insertRef("First", top.children.front().ref);
+  outline.insertRef("Last", top.children.back().ref);
+  outline.insertInt("Count", top.descendentsEmitted);
 
   return doc->emit(outline, outlineRef);
 }

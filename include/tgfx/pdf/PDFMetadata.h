@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -98,7 +98,7 @@ struct PDFStructureElementNode {
  */
 struct DateTime {
   int16_t timeZoneMinutes = 0;  // The number of minutes that this is ahead of or behind UTC.
-  uint16_t year = 1;            //!< e.g. 2005
+  uint16_t year = 1;            //!< e.g. 2025
   uint8_t month = 1;            //!< 1..12
   uint8_t dayOfWeek = 0;        //!< 0..6, 0==Sunday
   uint8_t day = 1;              //!< 1..31

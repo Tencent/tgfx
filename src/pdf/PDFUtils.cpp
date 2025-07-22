@@ -22,9 +22,11 @@
 #include "pdf/PDFResourceDictionary.h"
 #include "pdf/PDFTypes.h"
 #include "tgfx/core/BlendMode.h"
+#include "tgfx/core/MD5.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/core/UTF.h"
 #include "tgfx/core/WriteStream.h"
 
 namespace tgfx {

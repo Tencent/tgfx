@@ -46,20 +46,23 @@ class PDFExportContext : public DrawContext {
 
   ~PDFExportContext() override;
 
-  void drawFill(const MCState& state, const Fill& fill) override;
+  void drawFill(const Fill& fill) override;
 
   void drawRect(const Rect& rect, const MCState& state, const Fill& fill) override;
 
-  void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill) override;
+  void drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
+                 const Stroke* stroke) override;
+
+  void drawPath(const Path& path, const MCState& state, const Fill& fill) override;
 
   void drawShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill) override;
 
   void drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                  const MCState& state, const Fill& fill) override;
 
-  void drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
-                     const SamplingOptions& sampling, const MCState& state,
-                     const Fill& fill) override;
+  void drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
+                     const SamplingOptions& sampling, const MCState& state, const Fill& fill,
+                     SrcRectConstraint constraint) override;
 
   void drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
                         const Fill& fill, const Stroke* stroke) override;

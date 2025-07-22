@@ -21,7 +21,6 @@
 #include "core/shaders/GradientShader.h"
 #include "pdf/PDFTypes.h"
 #include "tgfx/core/GradientType.h"
-#include "tgfx/core/Shader.h"
 
 namespace tgfx {
 
@@ -38,8 +37,8 @@ class PDFGradientShader {
     uint32_t fHash;
   };
 
-  static PDFIndirectReference Make(PDFDocument* doc, Shader* shader, const Matrix& matrix,
-                                   const Rect& surfaceBBox);
+  static PDFIndirectReference Make(PDFDocument* doc, const GradientShader* shader,
+                                   const Matrix& matrix, const Rect& surfaceBBox);
 };
 
 }  // namespace tgfx

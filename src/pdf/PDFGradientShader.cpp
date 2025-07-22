@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFGradientShader.h"
+#include <algorithm>
 #include "core/shaders/GradientShader.h"
-#include "core/utils/Caster.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "pdf/PDFDocument.h"
@@ -451,7 +451,7 @@ void twoPointConicalCode(const GradientInfo& info, const Matrix& perspectiveRemo
   float dy = info.points[1].y - info.points[0].y;
   float r0 = info.radiuses[0];
   float dr = info.radiuses[1] - info.radiuses[0];
-  float a = dx * dx + dy * dy - dr * dr;
+  float a = (dx * dx) + (dy * dy) - (dr * dr);
 
   // First compute t, if the pixel falls outside the cone, then we'll end
   // with 'false' on the stack, otherwise we'll push 'true' with t below it
@@ -721,9 +721,7 @@ std::unique_ptr<PDFDictionary> gradientStitchCode(const GradientInfo& info) {
   auto colorCount = colors.size();
   while (i < colorCount - 1) {
     // ensure stops are in order
-    if (colorOffsets[i - 1] > colorOffsets[i]) {
-      colorOffsets[i] = colorOffsets[i - 1];
-    }
+    colorOffsets[i] = std::max(colorOffsets[i - 1], colorOffsets[i]);
 
     // remove points that are between 2 coincident points
     if ((colorOffsets[i - 1] == colorOffsets[i]) && (colorOffsets[i] == colorOffsets[i + 1])) {
@@ -970,13 +968,11 @@ PDFIndirectReference find_pdf_shader(PDFDocument* doc, const PDFGradientShader::
 
 }  // namespace
 
-PDFIndirectReference PDFGradientShader::Make(PDFDocument* doc, Shader* shader, const Matrix& matrix,
-                                             const Rect& surfaceBBox) {
+PDFIndirectReference PDFGradientShader::Make(PDFDocument* doc, const GradientShader* shader,
+                                             const Matrix& matrix, const Rect& surfaceBBox) {
   DEBUG_ASSERT(shader);
-  const auto* gradientShader = Caster::AsGradientShader(shader);
-  DEBUG_ASSERT(gradientShader);
 
-  PDFGradientShader::Key key = make_key(gradientShader, matrix, surfaceBBox);
+  PDFGradientShader::Key key = make_key(shader, matrix, surfaceBBox);
   bool alpha = gradient_has_alpha(key);
   return find_pdf_shader(doc, std::move(key), alpha);
 }

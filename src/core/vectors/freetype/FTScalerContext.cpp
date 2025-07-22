@@ -167,10 +167,8 @@ FontMetrics::FontType GetFontType(FT_Face face) {
   return FontMetrics::FontType::Other;
 }
 
-}  // namespace
-
-FTScalerContext::FTScalerContext(std::shared_ptr<Typeface> tf, float size)
-    : ScalerContext(std::move(tf), size), textScale(size) {
+FTScalerContext::FTScalerContext(std::shared_ptr<Typeface> typeFace, float size)
+    : ScalerContext(std::move(typeFace), size), textScale(size) {
   loadGlyphFlags |= FT_LOAD_NO_BITMAP;
   // Always using FT_LOAD_IGNORE_GLOBAL_ADVANCE_WIDTH to get correct
   // advances, as fontconfig and cairo do.

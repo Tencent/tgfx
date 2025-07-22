@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -27,16 +27,32 @@ namespace tgfx {
 
 constexpr float ScalarDefaultRasterDPI = 72.0f;
 
+/**
+ * Document is a base abstract class for export documents.
+ */
 class Document {
  public:
   virtual ~Document();
 
+  /**
+   * Creates a new page with the given width and height. If contentRect is provided, content will be
+   * clipped to this area. Returns nullptr if the document has been closed.
+   */
   Canvas* beginPage(float pageWidth, float pageHeight, const Rect* contentRect = nullptr);
 
+  /**
+   * Ends the current page.
+   */
   void endPage();
 
+  /**
+   * Ends the current page and closes the document.
+   */
   void close();
 
+  /**
+   * Aborts the document and discards all writes.
+   */
   void abort();
 
  protected:

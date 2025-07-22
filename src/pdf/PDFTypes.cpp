@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -21,8 +21,10 @@
 #include "pdf/DeflateStream.h"
 #include "pdf/PDFDocument.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/MD5.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
+#include "tgfx/core/UTF.h"
 #include "tgfx/core/WriteStream.h"
 
 namespace tgfx {
@@ -74,9 +76,9 @@ void PDFArray::appendName(std::string name) {
   this->append(PDFUnion::Name(std::move(name)));
 }
 
-void PDFArray::appendByteString(std::string value) {
-  this->append(PDFUnion::ByteString(std::move(value)));
-}
+// void PDFArray::appendByteString(std::string value) {
+//   this->append(PDFUnion::ByteString(std::move(value)));
+// }
 
 void PDFArray::appendTextString(std::string value) {
   this->append(PDFUnion::TextString(std::move(value)));
@@ -86,9 +88,9 @@ void PDFArray::appendByteString(const char value[]) {
   this->append(PDFUnion::ByteString(value));
 }
 
-void PDFArray::appendTextString(const char value[]) {
-  this->append(PDFUnion::TextString(value));
-}
+// void PDFArray::appendTextString(const char value[]) {
+//   this->append(PDFUnion::TextString(value));
+// }
 
 void PDFArray::appendObject(std::unique_ptr<PDFObject>&& object) {
   this->append(PDFUnion::Object(std::move(object)));
