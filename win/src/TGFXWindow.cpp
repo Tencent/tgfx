@@ -94,7 +94,7 @@ LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM
       PostQuitMessage(0);
       break;
     case WM_PAINT: {
-      if(isDrawing) {
+      if (isDrawing) {
         draw();
       }
       break;
