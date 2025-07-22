@@ -22,7 +22,7 @@
 
 namespace tgfx {
 static void SerializeMatrixImpl(flexbuffers::Builder& fbb, const Matrix* matrix) {
-  float buffer[6];
+  float buffer[6] = {0.0f};
   matrix->get6(buffer);
   std::string key = "";
   for (int i = 0; i < 6; i++) {
