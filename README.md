@@ -410,3 +410,8 @@ If you find TGFX helpful, please give us a **Star**. We really appreciate your s
 
 TGFX is licensed under the [BSD-3-Clause License](./LICENSE.txt)
 
+The copyright notice pertaining to the Tencent code in this repo was previously in the name of "THL 
+A29 Limited". That entity has now been de-registered. You should treat all previously distributed
+copies of the code as if the copyright notice was in the name of "Tencent".
+
+

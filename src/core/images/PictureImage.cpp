@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -79,10 +79,9 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   }
   rect.roundOut();
   auto mipmapped = samplingArgs.sampling.mipmapMode != MipmapMode::None && hasMipmaps();
-  auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
   auto renderTarget = RenderTargetProxy::MakeFallback(
-      args.context, static_cast<int>(rect.width()), static_cast<int>(rect.height()),
-      isAlphaOnly() && alphaRenderable, 1, mipmapped);
+      args.context, static_cast<int>(rect.width()), static_cast<int>(rect.height()), isAlphaOnly(),
+      1, mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
 
   if (renderTarget == nullptr) {
     return nullptr;
@@ -99,22 +98,21 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (samplingArgs.sampleArea) {
     newSamplingArgs.sampleArea->offset(-rect.left, -rect.top);
   }
-  return TiledTextureEffect::Make(renderTarget->getTextureProxy(), newSamplingArgs, &finalUVMatrix,
+  return TiledTextureEffect::Make(renderTarget->asTextureProxy(), newSamplingArgs, &finalUVMatrix,
                                   isAlphaOnly());
 }
 
 std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args) const {
-  auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
-  auto renderTarget = RenderTargetProxy::MakeFallback(args.context, width(), height(),
-                                                      isAlphaOnly() && alphaRenderable, 1,
-                                                      hasMipmaps() && args.mipmapped);
+  auto renderTarget = RenderTargetProxy::MakeFallback(
+      args.context, width(), height(), isAlphaOnly(), 1, hasMipmaps() && args.mipmapped,
+      ImageOrigin::TopLeft, BackingFit::Approx);
   if (renderTarget == nullptr) {
     return nullptr;
   }
   if (!drawPicture(renderTarget, args.renderFlags, nullptr)) {
     return nullptr;
   }
-  return renderTarget->getTextureProxy();
+  return renderTarget->asTextureProxy();
 }
 
 bool PictureImage::drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget,
@@ -122,7 +120,7 @@ bool PictureImage::drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget,
   if (renderTarget == nullptr) {
     return false;
   }
-  RenderContext renderContext(renderTarget, renderFlags, true);
+  RenderContext renderContext(std::move(renderTarget), renderFlags, true);
   Matrix totalMatrix = {};
   if (offset) {
     totalMatrix.preTranslate(offset->x, offset->y);

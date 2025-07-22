@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,19 +19,22 @@
 #include "ResourceTask.h"
 
 namespace tgfx {
-ResourceTask::ResourceTask(UniqueKey uniqueKey) : uniqueKey(std::move(uniqueKey)) {
+ResourceTask::ResourceTask(std::shared_ptr<ResourceProxy> proxy) : proxy(std::move(proxy)) {
 }
 
 bool ResourceTask::execute(Context* context) {
-  if (uniqueKey.strongCount() <= 0) {
-    // Skip the resource creation if there is no proxy is referencing it.
+  if (proxy.use_count() == 1) {
+    // Skip resource creation if no external proxy needs it.
     return false;
   }
   auto resource = onMakeResource(context);
   if (resource == nullptr) {
     return false;
   }
-  resource->assignUniqueKey(uniqueKey);
+  if (!uniqueKey.empty()) {
+    resource->assignUniqueKey(uniqueKey);
+  }
+  proxy->resource = std::move(resource);
   return true;
 }
 }  // namespace tgfx

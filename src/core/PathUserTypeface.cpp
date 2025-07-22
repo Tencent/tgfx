@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -92,7 +92,7 @@ class PathUserScalerContext final : public UserScalerContext {
       return {};
     }
     if (stroke != nullptr) {
-      ApplyStrokeToBounds(*stroke, &bounds, true);
+      ApplyStrokeToBounds(*stroke, &bounds);
     }
     if (matrix) {
       matrix->setTranslate(bounds.x(), bounds.y());
@@ -121,7 +121,7 @@ class PathUserScalerContext final : public UserScalerContext {
     auto shape = Shape::MakeFrom(pathProvider);
     shape = Shape::ApplyStroke(std::move(shape), stroke);
     shape = Shape::ApplyMatrix(std::move(shape), matrix);
-    auto rasterizer = PathRasterizer::Make(width, height, std::move(shape), true, true);
+    auto rasterizer = PathRasterizer::MakeFrom(width, height, std::move(shape), true, true);
     if (rasterizer == nullptr) {
       return false;
     }

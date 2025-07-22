@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,14 +18,13 @@
 
 #pragma once
 
-#include "core/ImageStream.h"
 #include "core/PixelBuffer.h"
 
 namespace tgfx {
 /**
  * This class is the smart container for pixel memory, and is used with Bitmap.
  */
-class PixelRef : public ImageStream {
+class PixelRef {
  public:
   /**
    * Creates a new PixelRef object width specified width and height. Returns nullptr if width or
@@ -54,19 +53,7 @@ class PixelRef : public ImageStream {
     return pixelBuffer->info();
   }
 
-  int width() const override {
-    return pixelBuffer->width();
-  }
-
-  int height() const override {
-    return pixelBuffer->height();
-  }
-
-  bool isAlphaOnly() const override {
-    return pixelBuffer->isAlphaOnly();
-  }
-
-  bool isHardwareBacked() const override {
+  bool isHardwareBacked() const {
     return pixelBuffer->isHardwareBacked();
   }
 
@@ -110,11 +97,6 @@ class PixelRef : public ImageStream {
    * Replaces all pixel values with transparent colors.
    */
   void clear();
-
- protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) override;
-
-  bool onUpdateTexture(std::shared_ptr<Texture> texture, const Rect& bounds) override;
 
  private:
   std::shared_ptr<PixelBuffer> pixelBuffer = nullptr;

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PixelRef.h"
-#include "gpu/Gpu.h"
 
 namespace tgfx {
 std::shared_ptr<PixelRef> PixelRef::Make(int width, int height, bool alphaOnly, bool tryHardware) {
@@ -60,26 +59,8 @@ void* PixelRef::lockWritablePixels() {
 void PixelRef::clear() {
   auto pixels = lockWritablePixels();
   if (pixels != nullptr) {
-    markContentDirty(Rect::MakeWH(width(), height()));
     memset(pixels, 0, info().byteSize());
   }
   unlockPixels();
-}
-
-std::shared_ptr<Texture> PixelRef::onMakeTexture(Context* context, bool mipmapped) {
-  return Texture::MakeFrom(context, pixelBuffer, mipmapped);
-}
-
-bool PixelRef::onUpdateTexture(std::shared_ptr<Texture> texture, const Rect& bounds) {
-  auto gpu = texture->getContext()->gpu();
-  auto pixels = lockPixels();
-  if (pixels == nullptr) {
-    return false;
-  }
-  pixels =
-      info().computeOffset(pixels, static_cast<int>(bounds.left), static_cast<int>(bounds.top));
-  gpu->writePixels(texture->getSampler(), bounds, pixels, info().rowBytes());
-  unlockPixels();
-  return true;
 }
 }  // namespace tgfx

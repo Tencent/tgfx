@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -24,11 +24,16 @@
 #include "layers/RootLayer.h"
 #include "layers/TileCache.h"
 
+#ifdef TGFX_USE_INSPECTOR
+#include "layers/LayerViewerManager.h"
+#endif
+
 namespace tgfx {
 static constexpr size_t MAX_DIRTY_REGION_FRAMES = 5;
 static constexpr float DIRTY_REGION_ANTIALIAS_MARGIN = 0.5f;
 static constexpr int MIN_TILE_SIZE = 16;
 static constexpr int MAX_TILE_SIZE = 2048;
+static constexpr int MAX_ATLAS_SIZE = 8192;
 
 class DrawTask {
  public:
@@ -81,9 +86,8 @@ class DrawTask {
     auto offsetX = (tile->sourceX - tile->tileX) * tileSize;
     auto offsetY = (tile->sourceY - tile->tileY) * tileSize;
     _sourceRect.offset(static_cast<float>(offsetX), static_cast<float>(offsetY));
-    if (fabsf(scale - 1.0f) > std::numeric_limits<float>::epsilon()) {
-      _tileRect.scale(scale, scale);
-    }
+    _tileRect.scale(scale, scale);
+    _tileRect.round();
   }
 };
 
@@ -112,6 +116,10 @@ static int64_t ChangeZoomScalePrecision(int64_t zoomScaleInt, int oldPrecision, 
 
 DisplayList::DisplayList() : _root(RootLayer::Make()) {
   _root->_root = _root.get();
+#ifdef TGFX_USE_INSPECTOR
+  auto& layerInspectorManager = LayerViewerManager::Get();
+  layerInspectorManager.setDisplayList(this);
+#endif
 }
 
 DisplayList::~DisplayList() {
@@ -235,6 +243,9 @@ void DisplayList::render(Surface* surface, bool autoClear) {
   if (!surface) {
     return;
   }
+#ifdef TGFX_USE_INSPECTOR
+  LayerViewerManager::Get().RenderImageAndSend(surface->getContext());
+#endif
   _hasContentChanged = false;
   auto dirtyRegions = _root->updateDirtyRegions();
   if (_zoomScaleInt == 0) {
@@ -273,6 +284,9 @@ static std::vector<Rect> MapDirtyRegions(const std::vector<Rect>& dirtyRegions,
   dirtyRects.reserve(dirtyRegions.size());
   for (auto& region : dirtyRegions) {
     auto dirtyRect = viewMatrix.mapRect(region);
+    if (dirtyRect.isEmpty()) {
+      continue;
+    }
     // Expand by 0.5 pixels to preserve antialiasing results.
     dirtyRect.outset(DIRTY_REGION_ANTIALIAS_MARGIN, DIRTY_REGION_ANTIALIAS_MARGIN);
     // Snap to pixel boundaries to avoid subpixel clipping artifacts.
@@ -436,6 +450,14 @@ void DisplayList::invalidateCurrentTileCache(const TileCache* tileCache,
 
 std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
                                                       std::vector<DrawTask>* tileTasks) {
+  auto maxRefinedCount = _maxTilesRefinedPerFrame;
+  if (lastContentOffset != _contentOffset || lastZoomScaleInt != _zoomScaleInt) {
+    lastContentOffset = _contentOffset;
+    lastZoomScaleInt = _zoomScaleInt;
+    // To ensure smooth user interactions, we skip refinement when the offset or zoom scale is
+    // changing.
+    maxRefinedCount = 0;
+  }
   hasZoomBlurTiles = false;
   TileCache* currentTileCache = nullptr;
   auto result = tileCaches.find(_zoomScaleInt);
@@ -482,19 +504,20 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
     return {};
   }
   size_t tileIndex = 0;
-  auto refinedCount = _maxTilesRefinedPerFrame;
   std::vector<std::shared_ptr<Tile>> taskTiles = {};
   for (auto& grid : dirtyGrids) {
     auto& tile = freeTiles[tileIndex++];
-    auto fallbackTasks = getFallbackDrawTasks(grid.first, grid.second, sortedCaches);
-    if (!fallbackTasks.empty()) {
-      if (refinedCount <= 0) {
-        emptyTiles.emplace_back(tile);
-        screenTasks.insert(screenTasks.end(), fallbackTasks.begin(), fallbackTasks.end());
-        hasZoomBlurTiles = true;
-        continue;
+    if (_allowZoomBlur) {
+      auto fallbackTasks = getFallbackDrawTasks(grid.first, grid.second, sortedCaches);
+      if (!fallbackTasks.empty()) {
+        if (maxRefinedCount <= 0) {
+          emptyTiles.emplace_back(tile);
+          screenTasks.insert(screenTasks.end(), fallbackTasks.begin(), fallbackTasks.end());
+          hasZoomBlurTiles = true;
+          continue;
+        }
+        maxRefinedCount--;
       }
-      refinedCount--;
     }
     tile->tileX = grid.first;
     tile->tileY = grid.second;
@@ -709,7 +732,7 @@ int DisplayList::nextSurfaceTileCount(Context* context) const {
 }
 
 int DisplayList::getMaxTileCountPerAtlas(Context* context) const {
-  auto maxTextureSize = context->caps()->maxTextureSize;
+  auto maxTextureSize = std::min(context->caps()->maxTextureSize, MAX_ATLAS_SIZE);
   return (maxTextureSize / _tileSize) * (maxTextureSize / _tileSize);
 }
 
@@ -743,7 +766,7 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* su
   if (autoClear) {
     paint.setBlendMode(BlendMode::Src);
   }
-  static SamplingOptions sampling(FilterMode::Linear, MipmapMode::None);
+  static SamplingOptions sampling(FilterMode::Nearest, MipmapMode::None);
   canvas->setMatrix(Matrix::MakeTrans(_contentOffset.x, _contentOffset.y));
   for (auto& task : screenTasks) {
     auto surfaceCache = surfaceCaches[task.sourceIndex()];
@@ -798,7 +821,8 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   auto context = surface->getContext();
   AutoCanvasRestore autoRestore(canvas);
   auto surfaceRect = Rect::MakeWH(surface->width(), surface->height());
-  if (drawRect != surfaceRect) {
+  bool fullScreen = drawRect == surfaceRect;
+  if (!fullScreen) {
     canvas->clipRect(drawRect);
   }
   if (autoClear) {
@@ -812,8 +836,9 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   auto renderRect = inverse.mapRect(drawRect);
   renderRect.roundOut();
   args.renderRect = &renderRect;
-  if (_root->bitFields.hasBackgroundStyle) {
-    args.backgroundContext = BackgroundContext::Make(context, drawRect, viewMatrix);
+  auto backgroundRect = _root->getBackgroundRect(drawRect, viewMatrix.getMaxScale());
+  if (backgroundRect) {
+    args.backgroundContext = BackgroundContext::Make(context, *backgroundRect, viewMatrix);
   }
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }

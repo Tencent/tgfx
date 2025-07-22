@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "tgfx/layers/Layer.h"
 
 namespace tgfx {
@@ -62,6 +63,12 @@ class RootLayer : public Layer {
    * Resets the dirty regions of the root layer and returns the list of dirty rectangles.
    */
   std::vector<Rect> updateDirtyRegions();
+
+  /**
+   * Returns the background rectangle for the given drawRect and contentScale. If the background
+   * style is not set or does not require a background, returns an empty optional.
+   */
+  std::optional<Rect> getBackgroundRect(const Rect& drawRect, float contentScale) const;
 
  private:
   std::vector<Rect> dirtyRects = {};

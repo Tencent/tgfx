@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -27,7 +27,7 @@
 #include "utils/MathExtra.h"
 
 namespace tgfx {
-Picture::Picture(std::shared_ptr<BlockData> data, std::vector<PlacementPtr<Record>> recordList,
+Picture::Picture(std::unique_ptr<BlockData> data, std::vector<PlacementPtr<Record>> recordList,
                  size_t drawCount)
     : blockData(std::move(data)), records(std::move(recordList)), drawCount(drawCount) {
   DEBUG_ASSERT(blockData != nullptr);
@@ -48,29 +48,27 @@ Picture::~Picture() {
   delete oldBounds;
 }
 
-Rect Picture::getBounds(const Matrix* matrix, bool computeTightBounds) const {
-  if (matrix && FloatNearlyZero(matrix->getMaxScale())) {
-    return {};
+Rect Picture::getBounds() const {
+  if (auto cachedBounds = bounds.load(std::memory_order_acquire)) {
+    return *cachedBounds;
   }
-  auto useCachedBounds = !matrix && !computeTightBounds;
-  if (useCachedBounds) {
-    auto cachedBounds = bounds.load(std::memory_order_acquire);
-    if (cachedBounds) {
-      return *cachedBounds;
-    }
-  }
-  MeasureContext context(computeTightBounds);
-  MCState state(matrix ? *matrix : Matrix::I());
+  MeasureContext context(false);
+  MCState state(Matrix::I());
   playback(&context, state);
   auto totalBounds = context.getBounds();
-  if (useCachedBounds) {
-    auto newBounds = new Rect(totalBounds);
-    Rect* oldBounds = nullptr;
-    if (!bounds.compare_exchange_strong(oldBounds, newBounds, std::memory_order_acq_rel)) {
-      delete newBounds;
-    }
+  auto newBounds = new Rect(totalBounds);
+  Rect* oldBounds = nullptr;
+  if (!bounds.compare_exchange_strong(oldBounds, newBounds, std::memory_order_acq_rel)) {
+    delete newBounds;
   }
   return totalBounds;
+}
+
+Rect Picture::getTightBounds(const Matrix* matrix) const {
+  MeasureContext context(true);
+  MCState state(matrix ? *matrix : Matrix::I());
+  playback(&context, state);
+  return context.getBounds();
 }
 
 bool Picture::hitTestPoint(float localX, float localY, bool shapeHitTest) const {
@@ -89,15 +87,7 @@ void Picture::playback(Canvas* canvas, const FillModifier* fillModifier) const {
   if (canvas == nullptr) {
     return;
   }
-  auto& state = *canvas->mcState;
-  if (state.clip.isEmpty() && !state.clip.isInverseFillType()) {
-    return;
-  }
-  auto maxScale = state.matrix.getMaxScale();
-  if (FloatNearlyZero(maxScale)) {
-    return;
-  }
-  playback(canvas->drawContext, state, fillModifier);
+  playback(canvas->drawContext, *canvas->mcState, fillModifier);
 }
 
 void Picture::playback(DrawContext* drawContext, const MCState& state,

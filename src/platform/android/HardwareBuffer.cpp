@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -86,6 +86,16 @@ void HardwareBufferUnlock(HardwareBufferRef buffer) {
   }
 }
 
+ISize HardwareBufferGetSize(HardwareBufferRef buffer) {
+  static const auto describe = AHardwareBufferFunctions::Get()->describe;
+  if (!HardwareBufferAvailable() || buffer == nullptr) {
+    return {};
+  }
+  AHardwareBuffer_Desc desc;
+  describe(buffer, &desc);
+  return {static_cast<int>(desc.width), static_cast<int>(desc.height)};
+}
+
 ImageInfo HardwareBufferGetInfo(HardwareBufferRef buffer) {
   static const auto describe = AHardwareBufferFunctions::Get()->describe;
   if (!HardwareBufferAvailable() || buffer == nullptr) {
@@ -112,14 +122,6 @@ ImageInfo HardwareBufferGetInfo(HardwareBufferRef buffer) {
   auto bytesPerPixel = ImageInfo::GetBytesPerPixel(colorType);
   return ImageInfo::Make(static_cast<int>(desc.width), static_cast<int>(desc.height), colorType,
                          alphaType, desc.stride * bytesPerPixel);
-}
-
-PixelFormat HardwareBufferGetPixelFormat(HardwareBufferRef buffer) {
-  auto info = HardwareBufferGetInfo(buffer);
-  if (info.isEmpty()) {
-    return PixelFormat::Unknown;
-  }
-  return ColorTypeToPixelFormat(info.colorType());
 }
 
 HardwareBufferRef HardwareBufferFromJavaObject(JNIEnv* env, jobject hardwareBufferObject) {

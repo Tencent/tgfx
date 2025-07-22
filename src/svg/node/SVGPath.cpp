@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -24,6 +24,7 @@
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/svg/SVGPathParser.h"
 
 namespace tgfx {
 
@@ -37,11 +38,12 @@ bool SVGPath::parseAndSetAttribute(const std::string& n, const std::string& v) {
 
 template <>
 bool SVGAttributeParser::parse<Path>(Path* path) {
-  auto [success, parsePath] = PathMakeFromSVGString(currentPos);
-  if (success) {
+  auto parsePath = SVGPathParser::FromSVGString(currentPos);
+  if (parsePath) {
     *path = *parsePath;
+    return true;
   }
-  return success;
+  return false;
 }
 
 void SVGPath::onDrawFill(Canvas* canvas, const SVGLengthContext&, const Paint& paint,

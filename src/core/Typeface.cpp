@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -20,6 +20,7 @@
 #include <vector>
 #include "core/ScalerContext.h"
 #include "core/utils/UniqueID.h"
+#include "tgfx/core/Font.h"
 #include "tgfx/core/UTF.h"
 
 namespace tgfx {
@@ -122,5 +123,31 @@ std::shared_ptr<ScalerContext> Typeface::getScalerContext(float size) {
   }
   scalerContexts[size] = context;
   return context;
+}
+
+Rect Typeface::getBounds() const {
+  std::call_once(onceFlag, [this] {
+    if (!computeBounds(&bounds)) {
+      bounds.setEmpty();
+    }
+  });
+  return bounds;
+}
+
+bool Typeface::computeBounds(Rect* bounds) const {
+  constexpr float TextSize = 2048.f;
+  constexpr float InvTextSize = 1.0f / TextSize;
+  auto scaleContext = onCreateScalerContext(TextSize);
+  if (scaleContext == nullptr) {
+    return false;
+  }
+  auto metrics = scaleContext->getFontMetrics();
+  //Check if the bounds is empty
+  if (metrics.xMin >= metrics.xMax || metrics.top >= metrics.bottom) {
+    return false;
+  }
+  bounds->setLTRB(metrics.xMin * InvTextSize, metrics.top * InvTextSize, metrics.xMax * InvTextSize,
+                  metrics.bottom * InvTextSize);
+  return true;
 }
 }  // namespace tgfx

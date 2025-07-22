@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -26,6 +26,7 @@
 #include "core/images/CodecImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "core/utils/RectToRectMatrix.h"
 #include "core/utils/Types.h"
 #include "svg/SVGTextBuilder.h"
 #include "tgfx/core/Bitmap.h"
@@ -43,6 +44,7 @@
 #include "tgfx/core/TileMode.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/svg/SVGExporter.h"
+#include "tgfx/svg/SVGPathParser.h"
 
 namespace tgfx {
 
@@ -143,24 +145,36 @@ void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& st
   drawPath(shape->getPath(), state, fill);
 }
 
-void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
-                                     const SamplingOptions&, const MCState& state, const Fill& fill,
-                                     SrcRectConstraint) {
+void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions&,
+                                 const MCState& state, const Fill& fill) {
   DEBUG_ASSERT(image != nullptr);
   Bitmap bitmap = ImageExportToBitmap(context, image);
   if (!bitmap.isEmpty()) {
-    Rect srcRect = Rect::MakeWH(image->width(), image->height());
-    float scaleX = rect.width() / srcRect.width();
-    float scaleY = rect.height() / srcRect.height();
-    float transX = rect.left - srcRect.left * scaleX;
-    float transY = rect.top - srcRect.top * scaleY;
+    exportPixmap(Pixmap(bitmap), state, fill);
+  }
+}
+
+void SVGExportContext::drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
+                                     const Rect& dstRect, const SamplingOptions&,
+                                     const MCState& state, const Fill& fill, SrcRectConstraint) {
+  DEBUG_ASSERT(image != nullptr);
+  auto subsetImage = image->makeSubset(srcRect);
+  if (subsetImage == nullptr) {
+    return;
+  }
+  Bitmap bitmap = ImageExportToBitmap(context, subsetImage);
+  if (!bitmap.isEmpty()) {
+    auto viewMatrix =
+        MakeRectToRectMatrix(Rect::MakeWH(srcRect.width(), srcRect.height()), dstRect);
 
     MCState newState;
     newState.matrix = state.matrix;
-    newState.matrix.postScale(scaleX, scaleY);
-    newState.matrix.postTranslate(transX, transY);
+    newState.matrix.preConcat(viewMatrix);
 
-    exportPixmap(Pixmap(bitmap), newState, fill);
+    auto fillMatrix = Matrix::I();
+    viewMatrix.invert(&fillMatrix);
+
+    exportPixmap(Pixmap(bitmap), newState, fill.makeWithMatrix(fillMatrix));
   }
 }
 
@@ -198,7 +212,8 @@ void SVGExportContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunLi
   }
   // If the font needs to be converted to a path but lacks outlines (e.g., emoji font, web font),
   // it cannot be converted.
-  if (!state.clip.contains(glyphRunList->getBounds(state.matrix.getMaxScale()))) {
+  auto deviceBounds = state.matrix.mapRect(glyphRunList->getBounds());
+  if (!state.clip.contains(deviceBounds)) {
     applyClipPath(state.clip);
   }
   if (!typeface->isCustom()) {
@@ -273,7 +288,8 @@ void SVGExportContext::exportGlyphsAsImage(const std::shared_ptr<GlyphRunList>& 
       glyphState.matrix.postTranslate(position.x * scale, position.y * scale);
       glyphState.matrix.postConcat(viewMatrix);
       auto rect = Rect::MakeWH(glyphImage->width(), glyphImage->height());
-      drawImageRect(std::move(glyphImage), rect, {}, glyphState, fill, SrcRectConstraint::Fast);
+      drawImageRect(std::move(glyphImage), rect, rect, {}, glyphState, fill,
+                    SrcRectConstraint::Fast);
     }
   }
 }
@@ -319,8 +335,8 @@ bool SVGExportContext::RequiresViewportReset(const Fill& fill) {
   return false;
 }
 
-PathEncoding SVGExportContext::PathEncodingType() {
-  return PathEncoding::Absolute;
+SVGPathParser::PathEncoding SVGExportContext::PathEncodingType() {
+  return SVGPathParser::PathEncoding::Absolute;
 }
 
 void SVGExportContext::applyClipPath(const Path& clipPath) {
@@ -391,7 +407,7 @@ std::shared_ptr<Data> SVGExportContext::ImageToEncodedData(const std::shared_ptr
   Types::ImageType type = Types::Get(image.get());
   if (type != Types::ImageType::Codec) return nullptr;
   auto codecImage = static_cast<const CodecImage*>(image.get());
-  auto imageCodec = codecImage->codec();
+  auto imageCodec = codecImage->getCodec();
   return imageCodec->getEncodedData();
 }
 

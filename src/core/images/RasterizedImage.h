@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include "core/images/OffscreenImage.h"
+#include "core/images/ResourceImage.h"
 
 namespace tgfx {
 /**
  * RasterizedImage is an image that rasterizes another image with a scale and sampling options.
  */
-class RasterizedImage : public OffscreenImage {
+class RasterizedImage : public ResourceImage {
  public:
   /**
    * Note that this method always returns a non-mipmapped image.
@@ -54,7 +54,8 @@ class RasterizedImage : public OffscreenImage {
 
   std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
 
-  bool onDraw(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags) const override;
+  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
+                                                   const UniqueKey& key) const final;
 
  private:
   std::shared_ptr<Image> source = nullptr;

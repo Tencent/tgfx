@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -37,10 +37,6 @@ long UniqueDomain::useCount() const {
   return _useCount.load(std::memory_order_relaxed);
 }
 
-long UniqueDomain::strongCount() const {
-  return _strongCount.load(std::memory_order_relaxed);
-}
-
 void UniqueDomain::addReference() {
   _useCount.fetch_add(1, std::memory_order_relaxed);
 }
@@ -49,13 +45,5 @@ void UniqueDomain::releaseReference() {
   if (_useCount.fetch_add(-1, std::memory_order_acq_rel) <= 1) {
     delete this;
   }
-}
-
-void UniqueDomain::addStrong() {
-  _strongCount.fetch_add(1, std::memory_order_relaxed);
-}
-
-void UniqueDomain::releaseStrong() {
-  _strongCount.fetch_add(-1, std::memory_order_acq_rel);
 }
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -25,7 +25,7 @@ namespace tgfx {
 class TextureGradientColorizer : public FragmentProcessor {
  public:
   static PlacementPtr<TextureGradientColorizer> Make(BlockBuffer* buffer,
-                                                     std::shared_ptr<Texture> gradient);
+                                                     std::shared_ptr<TextureProxy> gradient);
 
   std::string name() const override {
     return "TextureGradientColorizer";
@@ -34,7 +34,7 @@ class TextureGradientColorizer : public FragmentProcessor {
  protected:
   DEFINE_PROCESSOR_CLASS_ID
 
-  explicit TextureGradientColorizer(std::shared_ptr<Texture> gradient)
+  explicit TextureGradientColorizer(std::shared_ptr<TextureProxy> gradient)
       : FragmentProcessor(ClassID()), gradient(std::move(gradient)) {
   }
 
@@ -43,9 +43,10 @@ class TextureGradientColorizer : public FragmentProcessor {
   }
 
   const TextureSampler* onTextureSampler(size_t) const override {
-    return gradient->getSampler();
+    auto texture = gradient->getTexture();
+    return texture ? texture->getSampler() : nullptr;
   }
 
-  std::shared_ptr<Texture> gradient;
+  std::shared_ptr<TextureProxy> gradient;
 };
 }  // namespace tgfx

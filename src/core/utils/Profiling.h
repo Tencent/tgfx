@@ -2,7 +2,6 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,8 +16,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma once
 #ifdef TGFX_USE_INSPECTOR
+#include "Define.h"
 #include <optional>
-#include "InspectorDefine.h"
+#include "Define.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Rect.h"
@@ -83,6 +83,6 @@ class TGFXTypeToInspector {
 #define AttributeNameEnum(name, value, type)
 #define AttributeEnum(value, type)
 
-#define LAYER_DATA(data)
+#define SEND_LAYER_DATA(data)
 #define LAYER_CALLBACK(x)
 #endif

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -27,13 +27,11 @@ namespace tgfx {
  */
 class TextShape : public UniqueKeyShape {
  public:
-  explicit TextShape(std::shared_ptr<GlyphRunList> glyphRunList, float resolutionScale)
-      : glyphRunList(std::move(glyphRunList)), resolutionScale(resolutionScale) {
+  explicit TextShape(std::shared_ptr<GlyphRunList> glyphRunList, float scale)
+      : glyphRunList(std::move(glyphRunList)), scale(scale) {
   }
 
-  Rect getBounds() const override {
-    return glyphRunList->getBounds(resolutionScale);
-  }
+  Rect getBounds() const override;
 
   Path getPath() const override;
 
@@ -44,6 +42,6 @@ class TextShape : public UniqueKeyShape {
 
  private:
   std::shared_ptr<GlyphRunList> glyphRunList = nullptr;
-  float resolutionScale = 1.0f;
+  float scale = 1.0f;
 };
 }  // namespace tgfx

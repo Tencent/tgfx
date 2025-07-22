@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -38,7 +38,7 @@ class CanvasState;
 /**
  * SrcRectConstraint controls the behavior at the edge of source rect, provided to drawImageRect()
  * when there is any filtering. If Strict is set, then extra code is used to ensure it never samples
- * outside of the src-rect. Strict disables the use of mipmaps.
+ * outside the src-rect. Strict disables the use of mipmaps.
 */
 enum class SrcRectConstraint {
   /**
@@ -458,15 +458,18 @@ class Canvas {
  private:
   DrawContext* drawContext = nullptr;
   Surface* surface = nullptr;
+  bool optimizeMemoryForLayer = false;
   std::unique_ptr<MCState> mcState;
   std::stack<std::unique_ptr<CanvasState>> stateStack;
 
-  explicit Canvas(DrawContext* drawContext, Surface* surface = nullptr);
+  explicit Canvas(DrawContext* drawContext, Surface* surface = nullptr,
+                  bool optimizeMemoryForLayer = false);
   void drawPath(const Path& path, const MCState& state, const Fill& fill,
                 const Stroke* stroke) const;
-  void drawImageRect(std::shared_ptr<Image> image, const Rect& rect,
+  void drawImage(std::shared_ptr<Image> image, const Fill& fill, const SamplingOptions& sampling,
+                 const Matrix* dstMatrix);
+  void drawImageRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
                      const SamplingOptions& sampling, const Fill& fill,
-                     const Matrix* dstMatrix = nullptr,
                      SrcRectConstraint constraint = SrcRectConstraint::Fast);
   void drawLayer(std::shared_ptr<Picture> picture, const MCState& state, const Fill& fill,
                  std::shared_ptr<ImageFilter> imageFilter = nullptr);

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -26,7 +26,7 @@ Canvas* LayerRecorder::getCanvas(LayerContentType contentType) {
   Canvas* canvas = nullptr;
   auto& recorder = recorders[static_cast<size_t>(contentType)];
   if (recorder == nullptr) {
-    recorder = std::make_unique<Recorder>();
+    recorder = std::make_unique<Recorder>(true);
     canvas = recorder->beginRecording();
   } else {
     canvas = recorder->getRecordingCanvas();

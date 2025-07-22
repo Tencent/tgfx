@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,23 +19,22 @@
 #include "ProxyProvider.h"
 #include "core/ShapeRasterizer.h"
 #include "core/shapes/MatrixShape.h"
+#include "core/utils/MathExtra.h"
 #include "core/utils/USE.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/DrawingManager.h"
-#include "gpu/PlainTexture.h"
+#include "gpu/proxies/BackendTextureRenderTargetProxy.h"
 #include "gpu/proxies/DefaultTextureProxy.h"
-#include "gpu/proxies/FlattenTextureProxy.h"
+#include "gpu/proxies/HardwareRenderTargetProxy.h"
 #include "gpu/proxies/TextureRenderTargetProxy.h"
 #include "gpu/tasks/GpuBufferUploadTask.h"
-#include "gpu/tasks/RenderTargetCreateTask.h"
 #include "gpu/tasks/ShapeBufferUploadTask.h"
-#include "gpu/tasks/TextureCreateTask.h"
-#include "gpu/tasks/TextureFlattenTask.h"
 #include "gpu/tasks/TextureUploadTask.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
-ProxyProvider::ProxyProvider(Context* context) : context(context), blockBuffer(1 << 14) {  // 16KB
+ProxyProvider::ProxyProvider(Context* context)
+    : context(context), vertexBlockBuffer(1 << 14, 1 << 21) {  // 16kb, 2MB
 }
 
 std::shared_ptr<GpuBufferProxy> ProxyProvider::createGpuBufferProxy(const UniqueKey& uniqueKey,
@@ -65,30 +64,29 @@ std::shared_ptr<GpuBufferProxy> ProxyProvider::createGpuBufferProxy(
     source = DataSource<Data>::Async(std::move(source));
   }
 #endif
-  auto proxyKey = GetProxyKey(uniqueKey, renderFlags);
-  auto task =
-      context->drawingBuffer()->make<GpuBufferUploadTask>(proxyKey, bufferType, std::move(source));
-  context->drawingManager()->addResourceTask(std::move(task));
-  proxy = std::shared_ptr<GpuBufferProxy>(new GpuBufferProxy(proxyKey, bufferType));
+  proxy = std::shared_ptr<GpuBufferProxy>(new GpuBufferProxy(bufferType));
   addResourceProxy(proxy, uniqueKey);
+  auto task =
+      context->drawingBuffer()->make<GpuBufferUploadTask>(proxy, bufferType, std::move(source));
+  context->drawingManager()->addResourceTask(std::move(task), uniqueKey, renderFlags);
   return proxy;
 }
 
-std::pair<std::shared_ptr<GpuBufferProxy>, size_t> ProxyProvider::createSharedVertexBuffer(
+std::shared_ptr<VertexBufferProxy> ProxyProvider::createVertexBuffer(
     PlacementPtr<VertexProvider> provider, uint32_t renderFlags) {
   if (provider == nullptr) {
-    return {nullptr, 0};
+    return nullptr;
   }
   DEBUG_ASSERT(!sharedVertexBufferFlushed);
   auto byteSize = provider->vertexCount() * sizeof(float);
-  auto lastBlock = blockBuffer.currentBlock();
-  auto vertices = reinterpret_cast<float*>(blockBuffer.allocate(byteSize));
+  auto lastBlock = vertexBlockBuffer.currentBlock();
+  auto vertices = reinterpret_cast<float*>(vertexBlockBuffer.allocate(byteSize));
   if (vertices == nullptr) {
-    LOGE("ProxyProvider::createSharedVertexBuffer() Failed to allocate memory!");
-    return {nullptr, 0};
+    LOGE("ProxyProvider::createVertexBuffer() Failed to allocate memory!");
+    return nullptr;
   }
   auto offset = lastBlock.second;
-  auto currentBlock = blockBuffer.currentBlock();
+  auto currentBlock = vertexBlockBuffer.currentBlock();
   if (lastBlock.first != nullptr && lastBlock.first != currentBlock.first) {
     DEBUG_ASSERT(sharedVertexBuffer != nullptr);
     auto data = Data::MakeWithoutCopy(lastBlock.first, lastBlock.second);
@@ -108,17 +106,15 @@ std::pair<std::shared_ptr<GpuBufferProxy>, size_t> ProxyProvider::createSharedVe
   provider->getVertices(vertices);
 #endif
   if (sharedVertexBuffer == nullptr) {
-    auto uniqueKey = UniqueKey::Make();
-    sharedVertexBuffer =
-        std::shared_ptr<GpuBufferProxy>(new GpuBufferProxy(uniqueKey, BufferType::Vertex));
-    addResourceProxy(sharedVertexBuffer, uniqueKey);
+    sharedVertexBuffer = std::shared_ptr<GpuBufferProxy>(new GpuBufferProxy(BufferType::Vertex));
+    addResourceProxy(sharedVertexBuffer);
   }
-  return {sharedVertexBuffer, offset};
+  return std::make_shared<VertexBufferProxy>(sharedVertexBuffer, offset, byteSize);
 }
 
 void ProxyProvider::flushSharedVertexBuffer() {
   if (sharedVertexBuffer != nullptr) {
-    auto lastBlock = blockBuffer.currentBlock();
+    auto lastBlock = vertexBlockBuffer.currentBlock();
     auto data = Data::MakeWithoutCopy(lastBlock.first, lastBlock.second);
     uploadSharedVertexBuffer(std::move(data));
   }
@@ -126,8 +122,8 @@ void ProxyProvider::flushSharedVertexBuffer() {
 }
 
 void ProxyProvider::clearSharedVertexBuffer() {
-  maxValueTracker.addValue(blockBuffer.size());
-  blockBuffer.clear(maxValueTracker.getMaxValue());
+  maxValueTracker.addValue(vertexBlockBuffer.size());
+  vertexBlockBuffer.clear(maxValueTracker.getMaxValue());
   sharedVertexBufferFlushed = false;
 }
 
@@ -136,7 +132,7 @@ void ProxyProvider::uploadSharedVertexBuffer(std::shared_ptr<Data> data) {
   auto dataSource =
       std::make_unique<AsyncVertexSource>(std::move(data), std::move(sharedVertexBufferTasks));
   auto task = context->drawingBuffer()->make<GpuBufferUploadTask>(
-      sharedVertexBuffer->getUniqueKey(), BufferType::Vertex, std::move(dataSource));
+      sharedVertexBuffer, BufferType::Vertex, std::move(dataSource));
   context->drawingManager()->addResourceTask(std::move(task));
   sharedVertexBuffer = nullptr;
 }
@@ -178,7 +174,7 @@ std::shared_ptr<GpuShapeProxy> ProxyProvider::createGpuShapeProxy(std::shared_pt
         AppendClipBoundsKey(uniqueKey, clipBounds.makeOffset(-shapeBounds.left, -shapeBounds.top));
   }
   if (aaType != AAType::None) {
-    // Add a 1-pixel outset to preserve anti-aliasing results.
+    // Add a 1-pixel outset to preserve antialiasing results.
     shapeBounds.outset(1.0f, 1.0f);
   } else {
     static const auto NonAntialiasShapeType = UniqueID::Next();
@@ -213,30 +209,29 @@ std::shared_ptr<GpuShapeProxy> ProxyProvider::createGpuShapeProxy(std::shared_pt
 #else
   dataSource = std::move(rasterizer);
 #endif
-  auto triangleProxyKey = GetProxyKey(triangleKey, renderFlags);
-  auto textureProxyKey = GetProxyKey(textureKey, renderFlags);
-  auto task = context->drawingBuffer()->make<ShapeBufferUploadTask>(
-      triangleProxyKey, textureProxyKey, std::move(dataSource));
-  context->drawingManager()->addResourceTask(std::move(task));
-  triangleProxy =
-      std::shared_ptr<GpuBufferProxy>(new GpuBufferProxy(triangleProxyKey, BufferType::Vertex));
+  triangleProxy = std::shared_ptr<GpuBufferProxy>(new GpuBufferProxy(BufferType::Vertex));
   addResourceProxy(triangleProxy, triangleKey);
-  textureProxy = std::shared_ptr<TextureProxy>(
-      new DefaultTextureProxy(textureProxyKey, width, height, false, true));
+  textureProxy =
+      std::shared_ptr<TextureProxy>(new TextureProxy(width, height, PixelFormat::ALPHA_8, true));
   addResourceProxy(textureProxy, textureKey);
+  auto task = context->drawingBuffer()->make<ShapeBufferUploadTask>(triangleProxy, textureProxy,
+                                                                    std::move(dataSource));
+  if (!(renderFlags & RenderFlags::DisableCache)) {
+    task->textureProxy = textureProxy;
+  }
+  context->drawingManager()->addResourceTask(std::move(task), triangleKey, renderFlags);
   return std::make_shared<GpuShapeProxy>(drawingMatrix, triangleProxy, textureProxy);
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxyByImageSource(
     const UniqueKey& uniqueKey, std::shared_ptr<DataSource<ImageBuffer>> source, int width,
     int height, bool alphaOnly, bool mipmapped, uint32_t renderFlags) {
-  auto proxyKey = GetProxyKey(uniqueKey, renderFlags);
-  auto task =
-      context->drawingBuffer()->make<TextureUploadTask>(proxyKey, std::move(source), mipmapped);
-  context->drawingManager()->addResourceTask(std::move(task));
-  auto proxy = std::shared_ptr<TextureProxy>(
-      new DefaultTextureProxy(proxyKey, width, height, mipmapped, alphaOnly));
+  auto format = alphaOnly ? PixelFormat::ALPHA_8 : PixelFormat::Unknown;
+  auto proxy = std::shared_ptr<TextureProxy>(new TextureProxy(width, height, format, mipmapped));
   addResourceProxy(proxy, uniqueKey);
+  auto task =
+      context->drawingBuffer()->make<TextureUploadTask>(proxy, std::move(source), mipmapped);
+  context->drawingManager()->addResourceTask(std::move(task), uniqueKey, renderFlags);
   return proxy;
 }
 
@@ -293,64 +288,73 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
                                          mipmapped, renderFlags);
 }
 
-std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(const UniqueKey& uniqueKey,
-                                                                int width, int height,
-                                                                PixelFormat format, bool mipmapped,
-                                                                ImageOrigin origin,
-                                                                uint32_t renderFlags) {
-  auto proxy = findOrWrapTextureProxy(uniqueKey);
-  if (proxy != nullptr) {
-    return proxy;
+static constexpr int MinApproxSize = 16;
+static constexpr int MagicTol = 1024;
+
+/**
+ * Map 'value' to a larger multiple of 2. Values <= 'MagicTol' will pop up to the next power of 2.
+ * Those above 'MagicTol' will only go up half the floor power of 2.
+ */
+int GetApproxSize(int value) {
+  value = std::max(MinApproxSize, value);
+  if (IsPow2(value)) {
+    return value;
   }
-  if (!PlainTexture::CheckSizeAndFormat(context, width, height, format)) {
-    return nullptr;
+  int ceilPow2 = NextPow2(value);
+  if (value <= MagicTol) {
+    return ceilPow2;
   }
-  auto proxyKey = GetProxyKey(uniqueKey, renderFlags);
-  auto task = context->drawingBuffer()->make<TextureCreateTask>(proxyKey, width, height, format,
-                                                                mipmapped, origin);
-  context->drawingManager()->addResourceTask(std::move(task));
-  auto isAlphaOnly = format == PixelFormat::ALPHA_8;
-  proxy = std::shared_ptr<TextureProxy>(
-      new DefaultTextureProxy(proxyKey, width, height, mipmapped, isAlphaOnly, origin));
-  addResourceProxy(proxy, uniqueKey);
-  return proxy;
+  int floorPow2 = ceilPow2 >> 1;
+  int mid = floorPow2 + (floorPow2 >> 1);
+  if (value <= mid) {
+    return mid;
+  }
+  return ceilPow2;
 }
 
-std::shared_ptr<TextureProxy> ProxyProvider::flattenTextureProxy(
-    std::shared_ptr<TextureProxy> source) {
-  if (source == nullptr) {
+std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
+    const UniqueKey& uniqueKey, int width, int height, PixelFormat format, bool mipmapped,
+    ImageOrigin origin, BackingFit backingFit, uint32_t renderFlags) {
+  if (!Texture::CheckSizeAndFormat(context, width, height, format)) {
     return nullptr;
   }
-  auto uniqueKey = UniqueKey::Make();
-  context->drawingManager()->addTextureFlattenTask(uniqueKey, source);
-  auto proxy = std::shared_ptr<TextureProxy>(new FlattenTextureProxy(uniqueKey, std::move(source)));
-  addResourceProxy(proxy, uniqueKey);
-  return proxy;
+  if (auto proxy = findOrWrapTextureProxy(uniqueKey)) {
+    proxy->_width = width;
+    proxy->_height = height;
+    return proxy;
+  }
+  auto hasMipmaps = context->caps()->mipmapSupport ? mipmapped : false;
+  auto textureProxy = std::shared_ptr<DefaultTextureProxy>(
+      new DefaultTextureProxy(width, height, format, hasMipmaps, origin));
+  if (backingFit == BackingFit::Approx) {
+    textureProxy->_backingStoreWidth = GetApproxSize(width);
+    textureProxy->_backingStoreHeight = GetApproxSize(height);
+  }
+  if (!(renderFlags & RenderFlags::DisableCache)) {
+    textureProxy->uniqueKey = uniqueKey;
+  }
+  addResourceProxy(textureProxy, uniqueKey);
+  return textureProxy;
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::wrapBackendTexture(
     const BackendTexture& backendTexture, ImageOrigin origin, bool adopted) {
-  std::shared_ptr<Texture> texture = nullptr;
-  if (adopted) {
-    texture = Texture::MakeAdopted(context, backendTexture, origin);
-  } else {
-    texture = Texture::MakeFrom(context, backendTexture, origin);
-  }
+  auto texture = Texture::MakeFrom(context, backendTexture, origin, adopted);
   if (texture == nullptr) {
     return nullptr;
   }
-  auto uniqueKey = UniqueKey::Make();
-  texture->assignUniqueKey(uniqueKey);
-  auto proxy = std::shared_ptr<TextureProxy>(
-      new DefaultTextureProxy(uniqueKey, texture->width(), texture->height(), texture->hasMipmaps(),
-                              texture->isAlphaOnly(), texture->origin(), !adopted));
-  addResourceProxy(proxy, uniqueKey);
+  auto format = TextureSampler::GetPixelFormat(backendTexture);
+  auto proxy = std::shared_ptr<TextureProxy>(new TextureProxy(
+      texture->width(), texture->height(), format, texture->hasMipmaps(), texture->origin()));
+  proxy->resource = std::move(texture);
+  addResourceProxy(proxy);
   return proxy;
 }
 
 std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
-    std::shared_ptr<TextureProxy> textureProxy, PixelFormat format, int sampleCount) {
-  if (textureProxy == nullptr) {
+    const BackendTexture& backendTexture, int sampleCount, ImageOrigin origin, bool adopted) {
+  auto format = TextureSampler::GetPixelFormat(backendTexture);
+  if (format == PixelFormat::Unknown) {
     return nullptr;
   }
   auto caps = context->caps();
@@ -358,28 +362,59 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
     return nullptr;
   }
   sampleCount = caps->getSampleCount(sampleCount, format);
-  auto uniqueKey = UniqueKey::Make();
-  auto task = context->drawingBuffer()->make<RenderTargetCreateTask>(uniqueKey, textureProxy,
-                                                                     format, sampleCount);
-  auto drawingManager = context->drawingManager();
-  drawingManager->addResourceTask(std::move(task));
-  auto proxy = std::shared_ptr<RenderTargetProxy>(
-      new TextureRenderTargetProxy(uniqueKey, std::move(textureProxy), format, sampleCount));
-  addResourceProxy(proxy, uniqueKey);
+  auto proxy = std::shared_ptr<TextureRenderTargetProxy>(
+      new BackendTextureRenderTargetProxy(backendTexture, format, sampleCount, origin, adopted));
+  addResourceProxy(proxy);
   return proxy;
 }
 
-std::shared_ptr<RenderTargetProxy> ProxyProvider::wrapBackendRenderTarget(
-    const BackendRenderTarget& backendRenderTarget, ImageOrigin origin) {
-  auto renderTarget = RenderTarget::MakeFrom(context, backendRenderTarget, origin);
-  if (renderTarget == nullptr) {
+std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
+    HardwareBufferRef hardwareBuffer, int sampleCount) {
+  auto size = HardwareBufferGetSize(hardwareBuffer);
+  if (size.isEmpty()) {
     return nullptr;
   }
-  auto uniqueKey = UniqueKey::Make();
-  renderTarget->assignUniqueKey(uniqueKey);
-  auto proxy = std::shared_ptr<RenderTargetProxy>(new RenderTargetProxy(
-      uniqueKey, renderTarget->width(), renderTarget->height(), renderTarget->format(),
-      renderTarget->sampleCount(), renderTarget->origin()));
+  auto format = TextureSampler::GetPixelFormat(hardwareBuffer);
+  if (format == PixelFormat::Unknown) {
+    return nullptr;
+  }
+  auto caps = context->caps();
+  if (!caps->isFormatRenderable(format)) {
+    return nullptr;
+  }
+  sampleCount = caps->getSampleCount(sampleCount, format);
+  auto proxy = std::shared_ptr<TextureRenderTargetProxy>(
+      new HardwareRenderTargetProxy(hardwareBuffer, size.width, size.height, format, sampleCount));
+  addResourceProxy(proxy);
+  return proxy;
+}
+
+std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
+    const UniqueKey& uniqueKey, int width, int height, PixelFormat format, int sampleCount,
+    bool mipmapped, ImageOrigin origin, BackingFit backingFit, uint32_t renderFlags) {
+  if (!Texture::CheckSizeAndFormat(context, width, height, format)) {
+    return nullptr;
+  }
+  if (auto proxy = findOrWrapTextureProxy(uniqueKey)) {
+    proxy->_width = width;
+    proxy->_height = height;
+    return proxy->asRenderTargetProxy();
+  }
+  auto caps = context->caps();
+  if (!caps->isFormatRenderable(format)) {
+    return nullptr;
+  }
+  sampleCount = caps->getSampleCount(sampleCount, format);
+  auto hasMipmaps = caps->mipmapSupport ? mipmapped : false;
+  auto proxy = std::shared_ptr<TextureRenderTargetProxy>(
+      new TextureRenderTargetProxy(width, height, format, sampleCount, hasMipmaps, origin));
+  if (backingFit == BackingFit::Approx) {
+    proxy->_backingStoreWidth = GetApproxSize(width);
+    proxy->_backingStoreHeight = GetApproxSize(height);
+  }
+  if (!(renderFlags & RenderFlags::DisableCache)) {
+    proxy->uniqueKey = uniqueKey;
+  }
   addResourceProxy(proxy, uniqueKey);
   return proxy;
 }
@@ -396,14 +431,6 @@ void ProxyProvider::purgeExpiredProxies() {
   }
 }
 
-UniqueKey ProxyProvider::GetProxyKey(const UniqueKey& uniqueKey, uint32_t renderFlags) {
-  if (uniqueKey.empty() || renderFlags & RenderFlags::DisableCache) {
-    // Disable cache, generate a temporary UniqueKey exclusively for proxy usage.
-    return UniqueKey::Make();
-  }
-  return uniqueKey;
-}
-
 std::shared_ptr<GpuBufferProxy> ProxyProvider::findOrWrapGpuBufferProxy(
     const UniqueKey& uniqueKey) {
   auto proxy = std::static_pointer_cast<GpuBufferProxy>(findProxy(uniqueKey));
@@ -414,7 +441,8 @@ std::shared_ptr<GpuBufferProxy> ProxyProvider::findOrWrapGpuBufferProxy(
   if (gpuBuffer == nullptr) {
     return nullptr;
   }
-  proxy = std::shared_ptr<GpuBufferProxy>(new GpuBufferProxy(uniqueKey, gpuBuffer->bufferType()));
+  proxy = std::shared_ptr<GpuBufferProxy>(new GpuBufferProxy(gpuBuffer->bufferType()));
+  proxy->resource = std::move(gpuBuffer);
   addResourceProxy(proxy, uniqueKey);
   return proxy;
 }
@@ -428,9 +456,16 @@ std::shared_ptr<TextureProxy> ProxyProvider::findOrWrapTextureProxy(const Unique
   if (texture == nullptr) {
     return nullptr;
   }
-  proxy = std::shared_ptr<TextureProxy>(
-      new DefaultTextureProxy(uniqueKey, texture->width(), texture->height(), texture->hasMipmaps(),
-                              texture->isAlphaOnly(), texture->origin()));
+  if (auto renderTarget = texture->asRenderTarget()) {
+    proxy = std::shared_ptr<TextureProxy>(new TextureRenderTargetProxy(
+        texture->width(), texture->height(), renderTarget->format(), renderTarget->sampleCount(),
+        texture->hasMipmaps(), texture->origin(), renderTarget->externallyOwned()));
+  } else {
+    auto format = texture->isYUV() ? PixelFormat::Unknown : texture->getSampler()->format();
+    proxy = std::shared_ptr<TextureProxy>(new TextureProxy(
+        texture->width(), texture->height(), format, texture->hasMipmaps(), texture->origin()));
+  }
+  proxy->resource = std::move(texture);
   addResourceProxy(proxy, uniqueKey);
   return proxy;
 }
@@ -453,9 +488,7 @@ std::shared_ptr<ResourceProxy> ProxyProvider::findProxy(const UniqueKey& uniqueK
 void ProxyProvider::addResourceProxy(std::shared_ptr<ResourceProxy> proxy,
                                      const UniqueKey& uniqueKey) {
   proxy->context = context;
-  if (uniqueKey.empty()) {
-    proxyMap[proxy->getUniqueKey()] = proxy;
-  } else {
+  if (!uniqueKey.empty()) {
     proxyMap[uniqueKey] = proxy;
   }
 }

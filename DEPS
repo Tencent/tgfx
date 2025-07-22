@@ -7,7 +7,7 @@
     "common": [
       {
         "url": "${PAG_GROUP}/vendor_tools.git",
-        "commit": "76b266c30e3314678a0d8daeb5b40a9389ea5544",
+        "commit": "3b4a23cd26db01b995d1a849b426523860588d7b",
         "dir": "third_party/vendor_tools"
       },
       {
@@ -76,9 +76,14 @@
          "dir": "third_party/concurrentqueue"
       },
       {
-         "url": "https://github.com/lz4/lz4",
-         "commit": "cacca37747572717ceb1f156eb9840644205ca4f",
-         "dir": "third_party/lz4"
+        "url": "https://github.com/google/highway.git",
+        "commit": "a523516d35e22a4ba8e2e70a319062cb87352de6",
+        "dir": "third_party/highway"
+      },
+      {
+        "url": "https://github.com/lz4/lz4.git",
+        "commit": "cacca37747572717ceb1f156eb9840644205ca4f",
+        "dir": "third_party/lz4"
       }
     ]
   },

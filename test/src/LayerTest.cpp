@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -435,10 +435,10 @@ TGFX_TEST(LayerTest, getbounds) {
   tgfx::Font font(typeface, 20);
   child->setFont(font);
   auto bounds = child->getBounds();
-  EXPECT_FLOAT_EQ(bounds.left, 1);
-  EXPECT_FLOAT_EQ(bounds.top, 11.959999f);
-  EXPECT_FLOAT_EQ(bounds.right, 47);
-  EXPECT_FLOAT_EQ(bounds.bottom, 28.959999f);
+  EXPECT_FLOAT_EQ(bounds.left, -20.039999f);
+  EXPECT_FLOAT_EQ(bounds.top, -7.2000007f);
+  EXPECT_FLOAT_EQ(bounds.right, 93.5599975f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 49.9199982f);
 
   auto grandChild = ImageLayer::Make();
   grandChild->setMatrix(Matrix::MakeRotate(40, 55, 55));
@@ -460,38 +460,38 @@ TGFX_TEST(LayerTest, getbounds) {
   root->addChild(cousin);
 
   bounds = child->getBounds();
-  EXPECT_FLOAT_EQ(bounds.left, 1);
+  EXPECT_FLOAT_EQ(bounds.left, -20.039999f);
   EXPECT_FLOAT_EQ(bounds.top, -22.485762f);
   EXPECT_FLOAT_EQ(bounds.right, 94.183533f);
   EXPECT_FLOAT_EQ(bounds.bottom, 62.044159f);
   bounds = child->getBounds(root.get());
-  EXPECT_FLOAT_EQ(bounds.left, -8.96520996f);
-  EXPECT_FLOAT_EQ(bounds.top, -4.63719559f);
-  EXPECT_FLOAT_EQ(bounds.right, 83.0033798f);
-  EXPECT_FLOAT_EQ(bounds.bottom, 77.3243255f);
+  EXPECT_FLOAT_EQ(bounds.left, -35.9050827f);
+  EXPECT_FLOAT_EQ(bounds.top, -13.6198702f);
+  EXPECT_FLOAT_EQ(bounds.right, 90.3801804f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 78.9088592f);
   bounds = child->getBounds(cousin.get());
-  EXPECT_FLOAT_EQ(bounds.left, -18.96521f);
-  EXPECT_FLOAT_EQ(bounds.top, -14.6371956f);
-  EXPECT_FLOAT_EQ(bounds.right, 73.0033798f);
-  EXPECT_FLOAT_EQ(bounds.bottom, 67.3243255f);
+  EXPECT_FLOAT_EQ(bounds.left, -45.9050827f);
+  EXPECT_FLOAT_EQ(bounds.top, -23.6198692f);
+  EXPECT_FLOAT_EQ(bounds.right, 80.3801804f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 68.9088592f);
 
   auto displayList = std::make_unique<DisplayList>();
   displayList->root()->addChild(root);
   bounds = child->getBounds();
-  EXPECT_FLOAT_EQ(bounds.left, 1);
+  EXPECT_FLOAT_EQ(bounds.left, -20.039999f);
   EXPECT_FLOAT_EQ(bounds.top, -22.485762f);
   EXPECT_FLOAT_EQ(bounds.right, 94.183533f);
   EXPECT_FLOAT_EQ(bounds.bottom, 62.044159f);
   bounds = child->getBounds(root.get());
-  EXPECT_FLOAT_EQ(bounds.left, -8.96520996f);
-  EXPECT_FLOAT_EQ(bounds.top, -4.63719559f);
-  EXPECT_FLOAT_EQ(bounds.right, 83.0033798f);
-  EXPECT_FLOAT_EQ(bounds.bottom, 77.3243255f);
+  EXPECT_FLOAT_EQ(bounds.left, -35.9050827f);
+  EXPECT_FLOAT_EQ(bounds.top, -13.6198702f);
+  EXPECT_FLOAT_EQ(bounds.right, 90.3801804f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 78.9088592f);
   bounds = child->getBounds(cousin.get());
-  EXPECT_FLOAT_EQ(bounds.left, -18.96521f);
-  EXPECT_FLOAT_EQ(bounds.top, -14.6371956f);
-  EXPECT_FLOAT_EQ(bounds.right, 73.0033798f);
-  EXPECT_FLOAT_EQ(bounds.bottom, 67.3243255f);
+  EXPECT_FLOAT_EQ(bounds.left, -45.9050827f);
+  EXPECT_FLOAT_EQ(bounds.top, -23.6198692f);
+  EXPECT_FLOAT_EQ(bounds.right, 80.3801804f);
+  EXPECT_FLOAT_EQ(bounds.bottom, 68.9088592f);
 
   ContextScope scope;
   auto context = scope.getContext();
@@ -564,7 +564,7 @@ TGFX_TEST(LayerTest, shapeLayer) {
         EXPECT_EQ(shapeLayerRect, Rect::MakeLTRB(-10, -10, 170, 110));
         break;
       case 1:
-        EXPECT_EQ(shapeLayerRect, Rect::MakeLTRB(-30, 70, 190, 230));
+        EXPECT_EQ(shapeLayerRect, Rect::MakeLTRB(10, 110, 150, 190));
         break;
       case 2:
         EXPECT_EQ(shapeLayerRect, Rect::MakeLTRB(-30, 170, 190, 330));
@@ -902,8 +902,6 @@ TGFX_TEST(LayerTest, imageMask) {
   auto alphaMaskImageLayer = ImageLayer::Make();
   alphaLayer->addChild(alphaMaskImageLayer);
   alphaMaskImageLayer->setImage(maskImage);
-  auto alphaFilter = ColorMatrixFilter::Make(alphaColorMatrix);
-  alphaMaskImageLayer->setFilters({alphaFilter});
   imageLayer1->setAlpha(0.5f);
   Matrix alphaMaskMatrix =
       Matrix::MakeAll(1.2f, 0, static_cast<float>(image->width()) * 0.5f, 0, 1.2f, 500);
@@ -923,16 +921,11 @@ TGFX_TEST(LayerTest, imageMask) {
   imageLayer2->setAlpha(1.0f);
   imageLayer2->setScrollRect(scrollRect);
 
-  const std::array<float, 20> vectorColorMatrix = {0, 0, 0, 0, 0,  // red
-                                                   0, 0, 0, 0, 0,  // green
-                                                   0, 0, 0, 0, 0,  // blue
-                                                   0, 0, 0, 0, 1.0f};
   auto vectorMaskImageLayer = ImageLayer::Make();
   layer->addChild(vectorMaskImageLayer);
   vectorMaskImageLayer->setImage(maskImage);
-  auto vectorFilter = ColorMatrixFilter::Make(vectorColorMatrix);
-  vectorMaskImageLayer->setFilters({vectorFilter});
   imageLayer2->setMask(vectorMaskImageLayer);
+  imageLayer2->setMaskType(LayerMaskType::Contour);
   imageLayer2->setAlpha(0.5f);
   Matrix vectorMaskMatrix =
       Matrix::MakeAll(1.2f, 0, 0, 0, 1.2f, 500 + static_cast<float>(image->height()) * 0.5f);
@@ -951,9 +944,8 @@ TGFX_TEST(LayerTest, imageMask) {
   auto lumaMaskImageLayer = ImageLayer::Make();
   layer->addChild(lumaMaskImageLayer);
   lumaMaskImageLayer->setImage(maskImage);
-  auto filter = ColorMatrixFilter::Make(lumaColorMatrix);
-  lumaMaskImageLayer->setFilters({filter});
   imageLayer3->setMask(lumaMaskImageLayer);
+  imageLayer3->setMaskType(LayerMaskType::Luminance);
   imageLayer3->setAlpha(0.5f);
   Matrix lumaMaskMatrix = Matrix::MakeAll(1.2f, 0, static_cast<float>(image->width()) * 0.5f, 0,
                                           1.2f, 500 + static_cast<float>(image->height()) * 0.5f);
@@ -1124,7 +1116,7 @@ TGFX_TEST(LayerTest, textMask) {
   textLayer->setMatrix(textLayerMatrix);
 
   auto originalLayerBounds = originalLayer->getBounds();
-  EXPECT_TRUE(originalLayerBounds == Rect::MakeXYWH(0, 0, 1512, 2016));
+  EXPECT_TRUE(originalLayerBounds == Rect::MakeXYWH(0.f, 0.f, 1694.2f, 2016.f));
 
   // Alpha mask effect
   auto alphaLayer = Layer::Make();
@@ -1151,7 +1143,7 @@ TGFX_TEST(LayerTest, textMask) {
   imageLayer1->setMask(alphaTextLayer);
 
   auto alphaLayerBounds = alphaLayer->getBounds();
-  EXPECT_EQ(alphaLayerBounds, Rect::MakeLTRB(1927.0f, 897.0f, 2754.f, 1236.f));
+  EXPECT_EQ(alphaLayerBounds, Rect::MakeLTRB(1761, 746, 3024, 1392));
 
   // Vector mask effect
   auto imageLayer2 = ImageLayer::Make();
@@ -1257,7 +1249,7 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   SamplingOptions options(FilterMode::Nearest, MipmapMode::None);
   imageLayer->setSampling(options);
   rootLayer->addChild(imageLayer);
-  auto imageLayerBounds = imageLayer->getBounds();
+  auto imageLayerBounds = imageLayer->getBounds(nullptr, true);
   imageLayer->getGlobalMatrix().mapRect(&imageLayerBounds);
   printf("imageLayerBounds: (%f, %f, %f, %f)\n", imageLayerBounds.left, imageLayerBounds.top,
          imageLayerBounds.right, imageLayerBounds.bottom);
@@ -1274,7 +1266,7 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   shaperLayer->setFillStyle(fillStyle);
   shaperLayer->setMatrix(Matrix::MakeTrans(100.0f, 0.0f) * Matrix::MakeScale(2.0f, 2.0f));
   rootLayer->addChild(shaperLayer);
-  auto shaperLayerBounds = shaperLayer->getBounds();
+  auto shaperLayerBounds = shaperLayer->getBounds(nullptr, true);
   shaperLayer->getGlobalMatrix().mapRect(&shaperLayerBounds);
   printf("shaperLayerBounds: (%f, %f, %f, %f)\n", shaperLayerBounds.left, shaperLayerBounds.top,
          shaperLayerBounds.right, shaperLayerBounds.bottom);
@@ -1287,7 +1279,7 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   tgfx::Font font(typeface, 20);
   textLayer->setFont(font);
   rootLayer->addChild(textLayer);
-  auto textLayerBounds = textLayer->getBounds();
+  auto textLayerBounds = textLayer->getBounds(nullptr, true);
   textLayer->getGlobalMatrix().mapRect(&textLayerBounds);
   printf("textLayerBounds: (%f, %f, %f, %f)\n", textLayerBounds.left, textLayerBounds.top,
          textLayerBounds.right, textLayerBounds.bottom);
@@ -1302,12 +1294,12 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
   auto fillStyle2 = SolidColor::Make(Color::FromRGBA(175, 27, 193, 255));
   shaperLayer2->setFillStyle(fillStyle2);
   rootLayer->addChild(shaperLayer2);
-  auto shaperLayer2Bounds = shaperLayer2->getBounds();
+  auto shaperLayer2Bounds = shaperLayer2->getBounds(nullptr, true);
   shaperLayer2->getGlobalMatrix().mapRect(&shaperLayer2Bounds);
   printf("shaperLayer2Bounds: (%f, %f, %f, %f)\n", shaperLayer2Bounds.left, shaperLayer2Bounds.top,
          shaperLayer2Bounds.right, shaperLayer2Bounds.bottom);
 
-  auto rootLayerBounds = rootLayer->getBounds();
+  auto rootLayerBounds = rootLayer->getBounds(nullptr, true);
   printf("rootLayerBounds: (%f, %f, %f, %f)\n", rootLayerBounds.left, rootLayerBounds.top,
          rootLayerBounds.right, rootLayerBounds.bottom);
 
@@ -1375,8 +1367,8 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
     layerNameJoin += layer->name() + "|";
   }
   printf("\n");
-  EXPECT_EQ(static_cast<int>(layers.size()), 2);
-  EXPECT_EQ(layerNameJoin, "shaper_layer|root_layer|");
+  EXPECT_EQ(static_cast<int>(layers.size()), 3);
+  EXPECT_EQ(layerNameJoin, "text_layer|shaper_layer|root_layer|");
 
   // P5(538.0126139222378, 91.4706448255447) is in the text_layer, root_layer
   layerNameJoin = "";
@@ -1453,8 +1445,8 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
     layerNameJoin += layer->name() + "|";
   }
   printf("\n");
-  EXPECT_EQ(static_cast<int>(layers.size()), 0);
-  EXPECT_EQ(layerNameJoin, "");
+  EXPECT_EQ(static_cast<int>(layers.size()), 2);
+  EXPECT_EQ(layerNameJoin, "text_layer|root_layer|");
 
   // P11(540, 200) is in the shaper_layer2, root_layer
   layerNameJoin = "";
@@ -1466,8 +1458,8 @@ TGFX_TEST(LayerTest, getLayersUnderPoint) {
     layerNameJoin += layer->name() + "|";
   }
   printf("\n");
-  EXPECT_EQ(static_cast<int>(layers.size()), 2);
-  EXPECT_EQ(layerNameJoin, "shaper_layer2|root_layer|");
+  EXPECT_EQ(static_cast<int>(layers.size()), 3);
+  EXPECT_EQ(layerNameJoin, "shaper_layer2|text_layer|root_layer|");
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/getLayersUnderPoint"));
 }
 
@@ -1716,7 +1708,7 @@ TGFX_TEST(LayerTest, hitTestPointNested) {
   imageLayer->setMatrix(Matrix::MakeScale(3.0f));
   parentLayer->addChild(imageLayer);
   rootLayer->addChild(parentLayer);
-  auto imageLayerBounds = imageLayer->getBounds();
+  auto imageLayerBounds = imageLayer->getBounds(nullptr, true);
   imageLayer->getGlobalMatrix().mapRect(&imageLayerBounds);
   printf("imageLayerBounds: (%f, %f, %f, %f)\n", imageLayerBounds.left, imageLayerBounds.top,
          imageLayerBounds.right, imageLayerBounds.bottom);
@@ -1735,7 +1727,7 @@ TGFX_TEST(LayerTest, hitTestPointNested) {
   shaperLayer->setFillStyle(fillStyle);
   childLayer->addChild(shaperLayer);
   parentLayer->addChild(childLayer);
-  auto shaperLayerBounds = shaperLayer->getBounds();
+  auto shaperLayerBounds = shaperLayer->getBounds(nullptr, true);
   shaperLayer->getGlobalMatrix().mapRect(&shaperLayerBounds);
   printf("shaperLayerBounds: (%f, %f, %f, %f)\n", shaperLayerBounds.left, shaperLayerBounds.top,
          shaperLayerBounds.right, shaperLayerBounds.bottom);
@@ -1753,12 +1745,12 @@ TGFX_TEST(LayerTest, hitTestPointNested) {
   textLayer->setFont(font);
   grandsonLayer->addChild(textLayer);
   childLayer->addChild(grandsonLayer);
-  auto textLayerBounds = textLayer->getBounds();
+  auto textLayerBounds = textLayer->getBounds(nullptr, true);
   textLayer->getGlobalMatrix().mapRect(&textLayerBounds);
   printf("textLayerBounds: (%f, %f, %f, %f)\n", textLayerBounds.left, textLayerBounds.top,
          textLayerBounds.right, textLayerBounds.bottom);
 
-  auto rootLayerBounds = rootLayer->getBounds();
+  auto rootLayerBounds = rootLayer->getBounds(nullptr, true);
   rootLayer->getGlobalMatrix().mapRect(&rootLayerBounds);
   printf("rootLayerBounds: (%f, %f, %f, %f)\n", rootLayerBounds.left, rootLayerBounds.top,
          rootLayerBounds.right, rootLayerBounds.bottom);
@@ -1840,7 +1832,7 @@ TGFX_TEST(LayerTest, hitTestPointNested) {
   paint.setStyle(PaintStyle::Fill);
   Point p3 = {80.0f, 80.0f};
   canvas->drawCircle(p3.x, p3.y, 2.0f, paint);
-  EXPECT_EQ(false, textLayer->hitTestPoint(p3.x, p3.y));
+  EXPECT_EQ(true, textLayer->hitTestPoint(p3.x, p3.y));
   EXPECT_EQ(false, textLayer->hitTestPoint(p3.x, p3.y, true));
   EXPECT_EQ(false, shaperLayer->hitTestPoint(p3.x, p3.y));
   EXPECT_EQ(false, shaperLayer->hitTestPoint(p3.x, p3.y, true));
@@ -1848,9 +1840,9 @@ TGFX_TEST(LayerTest, hitTestPointNested) {
   EXPECT_EQ(true, imageLayer->hitTestPoint(p3.x, p3.y, true));
   EXPECT_EQ(true, parentLayer->hitTestPoint(p3.x, p3.y));
   EXPECT_EQ(true, parentLayer->hitTestPoint(p3.x, p3.y, true));
-  EXPECT_EQ(false, childLayer->hitTestPoint(p3.x, p3.y));
+  EXPECT_EQ(true, childLayer->hitTestPoint(p3.x, p3.y));
   EXPECT_EQ(false, childLayer->hitTestPoint(p3.x, p3.y, true));
-  EXPECT_EQ(false, grandsonLayer->hitTestPoint(p3.x, p3.y));
+  EXPECT_EQ(true, grandsonLayer->hitTestPoint(p3.x, p3.y));
   EXPECT_EQ(false, grandsonLayer->hitTestPoint(p3.x, p3.y, true));
   EXPECT_EQ(true, rootLayer->hitTestPoint(p3.x, p3.y));
   EXPECT_EQ(true, rootLayer->hitTestPoint(p3.x, p3.y, true));
@@ -2748,6 +2740,7 @@ TGFX_TEST(LayerTest, DirtyRegionTest) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DirtyRegionTest5"));
 
   displayList->setRenderMode(RenderMode::Tiled);
+  displayList->setAllowZoomBlur(true);
   displayList->setMaxTileCount(512);
   displayList->render(surface.get());
   // Clear the previous dirty regions.
@@ -2843,7 +2836,7 @@ TGFX_TEST(LayerTest, BackgroundBlurStyleTest) {
   auto rootLayer = Layer::Make();
   displayList->root()->addChild(rootLayer);
   auto shapeLayer1 = ShapeLayer::Make();
-  shapeLayer1->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 0, 1)));
+  shapeLayer1->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 0, 2)));
   auto path1 = Path();
   path1.addRect(Rect::MakeXYWH(40.5f, 40.5f, 80.f, 80.f));
   shapeLayer1->setPath(path1);
@@ -2894,5 +2887,72 @@ TGFX_TEST(LayerTest, BackgroundBlurStyleTest) {
   canvas->translate(-50, -50);
   layer2->draw(canvas);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/BackgroundBlurStyleTest5"));
+}
+
+TGFX_TEST(LayerTest, PartialBackgroundBlur) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  auto surface = Surface::Make(context, 300, 300);
+  EXPECT_TRUE(context != nullptr);
+  DisplayList displayList;
+  auto rootLayer = Layer::Make();
+  displayList.root()->addChild(rootLayer);
+  auto background = ShapeLayer::Make();
+  Path backgroundPath;
+  backgroundPath.addRect(Rect::MakeXYWH(0, 0, 300, 300));
+  background->setPath(backgroundPath);
+  background->addFillStyle(Gradient::MakeRadial({150, 150}, 360, {Color::Red(), Color::Blue()}));
+  rootLayer->addChild(background);
+  auto solidLayer = SolidLayer::Make();
+  solidLayer->setColor(Color::FromRGBA(0, 0, 0, 50));
+  solidLayer->setWidth(200);
+  solidLayer->setHeight(200);
+  solidLayer->setMatrix(Matrix::MakeTrans(50, 50));
+  solidLayer->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  rootLayer->addChild(solidLayer);
+  auto solidLayer2 = SolidLayer::Make();
+  solidLayer2->setColor(Color::FromRGBA(0, 0, 0, 10));
+  solidLayer2->setWidth(50);
+  solidLayer2->setHeight(50);
+  solidLayer2->setMatrix(Matrix::MakeTrans(100, 100));
+  rootLayer->addChild(solidLayer2);
+  displayList.setRenderMode(RenderMode::Partial);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialBackgroundBlur"));
+  solidLayer2->removeFromParent();
+  rootLayer->addChild(solidLayer2);
+  EXPECT_TRUE(displayList.root()->bitFields.dirtyDescendents);
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialBackgroundBlur_partial"));
+  solidLayer2->setMatrix(Matrix::MakeTrans(120, 120));
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialBackgroundBlur_move"));
+}
+
+TGFX_TEST(LayerTest, PartialInnerShadow) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  DisplayList displayList;
+  auto surface = Surface::Make(context, 100, 100);
+  auto rootLayer = Layer::Make();
+  displayList.root()->addChild(rootLayer);
+  auto shapeLayer = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
+  shapeLayer->setPath(path);
+  shapeLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 255, 255, 255)));
+  shapeLayer->setLineWidth(1.0f);
+  rootLayer->addChild(shapeLayer);
+
+  auto innerShadowStyle = InnerShadowStyle::Make(10, 10, 0, 0, Color::Black());
+  displayList.setContentOffset(-5, -5);
+  displayList.setRenderMode(RenderMode::Tiled);
+  displayList.render(surface.get());
+
+  shapeLayer->setLayerStyles({});
+  shapeLayer->setLayerStyles({innerShadowStyle});
+  displayList.render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialInnerShadow"));
 }
 }  // namespace tgfx

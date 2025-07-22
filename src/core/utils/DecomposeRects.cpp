@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -22,7 +22,7 @@
 namespace tgfx {
 static void DecomposeRect(Rect* rectA, Rect* rectB) {
   // Ensure rectA and rectB overlap
-  DEBUG_ASSERT(rectA->intersects(*rectB));
+  DEBUG_ASSERT(Rect::Intersects(*rectA, *rectB));
 
   // Step 1: Build the 3 rect slabs on the y-axis
   Rect rects[3];
@@ -80,7 +80,7 @@ static void DecomposeRect(Rect* rectA, Rect* rectB) {
 void DecomposeRects(Rect* rects, size_t count) {
   for (size_t i = 0; i < count; i++) {
     for (size_t j = i + 1; j < count; j++) {
-      if (rects[i].intersects(rects[j])) {
+      if (Rect::Intersects(rects[i], rects[j])) {
         DecomposeRect(&rects[i], &rects[j]);
       }
     }

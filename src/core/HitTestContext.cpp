@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -22,6 +22,15 @@
 #include "utils/Log.h"
 
 namespace tgfx {
+static bool GetLocalPoint(const Matrix& matrix, float deviceX, float deviceY, Point* localPoint) {
+  Matrix inverseMatrix;
+  if (!matrix.invert(&inverseMatrix)) {
+    return {};
+  }
+  *localPoint = inverseMatrix.mapXY(deviceX, deviceY);
+  return true;
+}
+
 void HitTestContext::drawFill(const Fill& fill) {
   if (!fill.nothingToDraw()) {
     hit = true;
@@ -29,7 +38,10 @@ void HitTestContext::drawFill(const Fill& fill) {
 }
 
 void HitTestContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
-  auto local = state.matrix.mapXY(testX, testY);
+  Point local = {};
+  if (!GetLocalPoint(state.matrix, deviceX, deviceY, &local)) {
+    return;
+  }
   if (rect.contains(local.x, local.y) && checkClipAndFill(state.clip, fill, local)) {
     hit = true;
   }
@@ -37,7 +49,10 @@ void HitTestContext::drawRect(const Rect& rect, const MCState& state, const Fill
 
 void HitTestContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
                                const Stroke* stroke) {
-  auto local = state.matrix.mapXY(testX, testY);
+  Point local = {};
+  if (!GetLocalPoint(state.matrix, deviceX, deviceY, &local)) {
+    return;
+  }
   if (shapeHitTest) {
     Path path = {};
     path.addRRect(rRect);
@@ -62,7 +77,10 @@ void HitTestContext::drawRRect(const RRect& rRect, const MCState& state, const F
 }
 
 void HitTestContext::drawPath(const Path& path, const MCState& state, const Fill& fill) {
-  auto local = state.matrix.mapXY(testX, testY);
+  Point local = {};
+  if (!GetLocalPoint(state.matrix, deviceX, deviceY, &local)) {
+    return;
+  }
   if (shapeHitTest) {
     if (!path.contains(local.x, local.y)) {
       return;
@@ -81,7 +99,10 @@ void HitTestContext::drawPath(const Path& path, const MCState& state, const Fill
 void HitTestContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                                const Fill& fill) {
   DEBUG_ASSERT(shape != nullptr);
-  auto local = state.matrix.mapXY(testX, testY);
+  Point local = {};
+  if (!GetLocalPoint(state.matrix, deviceX, deviceY, &local)) {
+    return;
+  }
   if (shapeHitTest) {
     auto path = shape->getPath();
     if (!path.contains(local.x, local.y)) {
@@ -98,11 +119,28 @@ void HitTestContext::drawShape(std::shared_ptr<Shape> shape, const MCState& stat
   }
 }
 
-void HitTestContext::drawImageRect(std::shared_ptr<Image>, const Rect& rect, const SamplingOptions&,
-                                   const MCState& state, const Fill& fill, SrcRectConstraint) {
+void HitTestContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions&,
+                               const MCState& state, const Fill& fill) {
   // Images are always checked against their bounding box.
-  auto local = state.matrix.mapXY(testX, testY);
-  if (rect.contains(local.x, local.y) && checkClipAndFill(state.clip, fill, local)) {
+  Point local = {};
+  if (!GetLocalPoint(state.matrix, deviceX, deviceY, &local)) {
+    return;
+  }
+  auto imageBounds = Rect::MakeWH(image->width(), image->height());
+  if (imageBounds.contains(local.x, local.y) && checkClipAndFill(state.clip, fill, local)) {
+    hit = true;
+  }
+}
+
+void HitTestContext::drawImageRect(std::shared_ptr<Image>, const Rect&, const Rect& dstRect,
+                                   const SamplingOptions&, const MCState& state, const Fill& fill,
+                                   SrcRectConstraint) {
+  // Images are always checked against their bounding box.
+  Point local = {};
+  if (!GetLocalPoint(state.matrix, deviceX, deviceY, &local)) {
+    return;
+  }
+  if (dstRect.contains(local.x, local.y) && checkClipAndFill(state.clip, fill, local)) {
     hit = true;
   }
 }
@@ -115,24 +153,31 @@ void HitTestContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList
   if (FloatNearlyZero(maxScale)) {
     return;
   }
-  auto local = state.matrix.mapXY(testX, testY);
   if (shapeHitTest && glyphRunList->hasOutlines()) {
     Path glyphPath = {};
-    glyphRunList->getPath(&glyphPath, maxScale);
     if (stroke) {
+      glyphRunList->getPath(&glyphPath);
       stroke->applyToPath(&glyphPath);
+      glyphPath.transform(state.matrix);
+    } else {
+      glyphRunList->getPath(&glyphPath, &state.matrix);
     }
-    if (!glyphPath.contains(local.x, local.y)) {
+    if (!glyphPath.contains(deviceX, deviceY)) {
       return;
     }
   } else {
-    auto localBounds = glyphRunList->getBounds(maxScale);
+    auto localBounds = glyphRunList->getBounds();
     if (stroke) {
       ApplyStrokeToBounds(*stroke, &localBounds);
     }
-    if (!localBounds.contains(local.x, local.y)) {
+    auto deviceBounds = state.matrix.mapRect(localBounds);
+    if (!deviceBounds.contains(deviceX, deviceY)) {
       return;
     }
+  }
+  Point local = {};
+  if (!GetLocalPoint(state.matrix, deviceX, deviceY, &local)) {
+    return;
   }
   if (checkClipAndFill(state.clip, fill, local)) {
     hit = true;
@@ -143,9 +188,12 @@ void HitTestContext::drawLayer(std::shared_ptr<Picture> picture,
                                std::shared_ptr<ImageFilter> imageFilter, const MCState& state,
                                const Fill& fill) {
   DEBUG_ASSERT(picture != nullptr);
-  auto local = state.matrix.mapXY(testX, testY);
+  Point local = {};
+  if (!GetLocalPoint(state.matrix, deviceX, deviceY, &local)) {
+    return;
+  }
   if (imageFilter) {
-    auto localBounds = picture->getBounds(nullptr, shapeHitTest);
+    auto localBounds = shapeHitTest ? picture->getTightBounds(nullptr) : picture->getBounds();
     localBounds = imageFilter->filterBounds(localBounds);
     if (!localBounds.contains(local.x, local.y)) {
       return;
@@ -162,7 +210,10 @@ void HitTestContext::drawLayer(std::shared_ptr<Picture> picture,
 
 void HitTestContext::drawPicture(std::shared_ptr<Picture> picture, const MCState& state) {
   DEBUG_ASSERT(picture != nullptr);
-  auto local = state.matrix.mapXY(testX, testY);
+  Point local = {};
+  if (!GetLocalPoint(state.matrix, deviceX, deviceY, &local)) {
+    return;
+  }
   // Don't use picture->playback() here because it will not stop at the first hit.
   if (!picture->hitTestPoint(local.x, local.y, shapeHitTest)) {
     return;

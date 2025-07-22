@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -42,11 +42,6 @@ std::shared_ptr<GpuBufferProxy> GpuBufferProxy::MakeFrom(Context* context,
                                                         renderFlags);
 }
 
-GpuBufferProxy::GpuBufferProxy(UniqueKey uniqueKey, BufferType bufferType)
-    : ResourceProxy(std::move(uniqueKey)), _bufferType(bufferType) {
-}
-
-std::shared_ptr<GpuBuffer> GpuBufferProxy::getBuffer() const {
-  return Resource::Find<GpuBuffer>(context, handle.key());
+GpuBufferProxy::GpuBufferProxy(BufferType bufferType) : _bufferType(bufferType) {
 }
 }  // namespace tgfx

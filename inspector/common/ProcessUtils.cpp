@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -37,6 +37,7 @@
 #endif
 
 #include <cinttypes>
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include "ProcessUtils.h"
@@ -51,14 +52,23 @@ uint64_t GetPid() {
 }
 
 const char* GetProcessName() {
-  const char* processName = "unknown";
+  static std::string processName = "unknown";
+  if(processName != "unknown") {
+    return processName.c_str();
+  }
 #ifdef _WIN32
-  static char buf[_MAX_PATH];
+  char buf[_MAX_PATH] = {0};
   GetModuleFileNameA(nullptr, buf, _MAX_PATH);
   const char* ptr = buf;
-  while (*ptr != '\0') ptr++;
-  while (ptr > buf && *ptr != '\\' && *ptr != '/') ptr--;
-  if (ptr > buf) ptr++;
+  while (*ptr != '\0') {
+    ptr++;
+  }
+  while (ptr > buf && *ptr != '\\' && *ptr != '/'){
+    ptr--;
+  }
+  if (ptr > buf){
+    ptr++;
+  }
   processName = ptr;
 #elif defined __APPLE__ || defined BSD
   auto buf = getprogname();
@@ -66,7 +76,7 @@ const char* GetProcessName() {
     processName = buf;
   }
 #endif
-  return processName;
+  return processName.c_str();
 }
 
 BroadcastMessage GetBroadcastMessage(const char* procname, size_t pnsz, size_t& len, uint16_t port,

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -68,11 +68,7 @@ void* Bitmap::lockPixels() {
   if (pixelRef == nullptr) {
     return nullptr;
   }
-  auto pixels = pixelRef->lockWritablePixels();
-  if (pixels != nullptr) {
-    pixelRef->markContentDirty(Rect::MakeWH(width(), height()));
-  }
-  return pixels;
+  return pixelRef->lockWritablePixels();
 }
 
 const void* Bitmap::lockPixels() const {
@@ -110,11 +106,7 @@ bool Bitmap::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, int
 }
 
 bool Bitmap::writePixels(const ImageInfo& srcInfo, const void* srcPixels, int dstX, int dstY) {
-  auto success = Pixmap(*this).writePixels(srcInfo, srcPixels, dstX, dstY);
-  if (success) {
-    pixelRef->markContentDirty(Rect::MakeXYWH(dstX, dstY, srcInfo.width(), srcInfo.height()));
-  }
-  return success;
+  return Pixmap(*this).writePixels(srcInfo, srcPixels, dstX, dstY);
 }
 
 void Bitmap::clear() {

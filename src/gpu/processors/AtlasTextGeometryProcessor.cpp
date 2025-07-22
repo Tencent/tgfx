@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -20,16 +20,14 @@
 
 namespace tgfx {
 AtlasTextGeometryProcessor::AtlasTextGeometryProcessor(std::shared_ptr<TextureProxy> textureProxy,
-                                                       const SamplingOptions& sampling, AAType aa,
-                                                       std::optional<Color> commonColor,
-                                                       const Matrix& uvMatrix)
-    : GeometryProcessor(ClassID()), textureProxy(std::move(textureProxy)), samplerState(sampling),
-      commonColor(commonColor), uvMatrix(uvMatrix) {
+                                                       AAType aa, std::optional<Color> commonColor)
+    : GeometryProcessor(ClassID()), textureProxy(std::move(textureProxy)),
+      commonColor(commonColor) {
   position = {"aPosition", SLType::Float2};
   if (aa == AAType::Coverage) {
     coverage = {"inCoverage", SLType::Float};
   }
-  uvCoord = {"uvCoord", SLType::Float2};
+  maskCoord = {"maskCoord", SLType::Float2};
   if (!commonColor.has_value()) {
     color = {"inColor", SLType::UByte4Color};
   }

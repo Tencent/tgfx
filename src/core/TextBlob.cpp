@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -122,20 +122,28 @@ std::shared_ptr<TextBlob> TextBlob::MakeFrom(std::vector<GlyphRun> glyphRuns) {
   return std::shared_ptr<TextBlob>(new TextBlob(std::move(runLists)));
 }
 
-Rect TextBlob::getBounds(float resolutionScale) const {
+Rect TextBlob::getBounds() const {
   Rect bounds = {};
   for (auto& runList : glyphRunLists) {
-    bounds.join(runList->getBounds(resolutionScale));
+    bounds.join(runList->getBounds());
   }
   return bounds;
 }
 
-bool TextBlob::getPath(Path* path, float resolutionScale) const {
+Rect TextBlob::getTightBounds(const Matrix* matrix) const {
+  Rect bounds = {};
+  for (auto& runList : glyphRunLists) {
+    bounds.join(runList->getTightBounds(matrix));
+  }
+  return bounds;
+}
+
+bool TextBlob::getPath(Path* path, const Matrix* matrix) const {
   if (glyphRunLists.size() != 1) {
     // If there are multiple glyph run lists, meaning the text blob has multiple font types,
     // only one font type can be used to create a path.
     return false;
   }
-  return glyphRunLists.front()->getPath(path, resolutionScale);
+  return glyphRunLists.front()->getPath(path, matrix);
 }
 }  // namespace tgfx

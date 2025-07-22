@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -56,6 +56,15 @@ class ImageGenerator {
    */
   virtual bool asyncSupport() const {
     return true;
+  }
+
+  /**
+   * Returns true if this ImageGenerator is an ImageCodec, meaning it can read pixels directly from
+   * the decoded image buffer. If false, the ImageGenerator is a custom generator and cannot read
+   * pixels directly.
+   */
+  virtual bool isImageCodec() const {
+    return false;
   }
 
   /**

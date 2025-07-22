@@ -9,6 +9,7 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(INSPECTOR_COMMON_DIR common)
 set(INSPECTOR_CLIENT_DIR client/src)
 set(LZ4_DIR ../third_party/lz4/lib)
+set(CONCURRENT_QUEUE_DIR ../third_party/concurrentqueue)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     list(APPEND INSPECTOR_COMPILE_OPTIONS -Werror -Wall -Wextra -Weffc++ -Wconversion -pedantic -Werror=return-type -Wno-unused-command-line-argument)
@@ -27,5 +28,5 @@ file(GLOB INSPECTOR_CLIENT_FILES
         ${INSPECTOR_CLIENT_DIR}/*.*)
 
 add_library(inspector STATIC ${INSPECTOR_CLIENT_FILES})
-target_include_directories(inspector PUBLIC ${INSPECTOR_CLIENT_SRC})
+target_include_directories(inspector PUBLIC ${INSPECTOR_CLIENT_SRC} ${CONCURRENT_QUEUE_DIR})
 target_compile_options(inspector PUBLIC ${INSPECTOR_COMPILE_OPTIONS})

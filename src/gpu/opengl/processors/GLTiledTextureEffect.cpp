@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -271,12 +271,19 @@ void GLTiledTextureEffect::emitCode(EmitArgs& args) const {
     subsetCoord(args, sampling.shaderModeY, names.subsetName, "y", "y", "w", extraRepeatCoordY,
                 repeatCoordWeightY);
 
-    fragBuilder->codeAppend("vec2 clampedCoord;");
+    fragBuilder->codeAppend("highp vec2 clampedCoord;");
     clampCoord(args, useClamp, names.clampName);
 
     if (constraint == SrcRectConstraint::Strict) {
-      args.fragBuilder->codeAppend(
-          "clampedCoord = clamp(clampedCoord, vtexsubset_P0.xy, vtexsubset_P0.zw);");
+      std::string subsetName = args.inputSubset;
+      if (!names.dimensionsName.empty()) {
+        fragBuilder->codeAppendf("highp vec4 extraSubset = %s;", subsetName.c_str());
+        subsetName = "extraSubset";
+        fragBuilder->codeAppendf("extraSubset.xy /= %s;", names.dimensionsName.c_str());
+        fragBuilder->codeAppendf("extraSubset.zw /= %s;", names.dimensionsName.c_str());
+      }
+      args.fragBuilder->codeAppendf("clampedCoord = clamp(clampedCoord, %s.xy, %s.zw);",
+                                    subsetName.c_str(), subsetName.c_str());
     }
 
     if (mipmapRepeatX && mipmapRepeatY) {

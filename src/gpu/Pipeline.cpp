@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -103,7 +103,7 @@ void Pipeline::computeProgramKey(Context* context, BytesKey* programKey) const {
   }
   auto dstTexture = xferProcessor != nullptr ? xferProcessor->dstTexture() : nullptr;
   if (dstTexture != nullptr) {
-    dstTexture->getSampler()->computeKey(context, programKey);
+    dstTexture->getSampler()->computeSamplerKey(context, programKey);
   }
   getXferProcessor()->computeProcessorKey(context, programKey);
   programKey->write(static_cast<uint32_t>(_outputSwizzle->asKey()));

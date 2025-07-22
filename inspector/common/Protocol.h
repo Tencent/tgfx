@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -28,10 +28,11 @@ static constexpr int LZ4Size = Lz4CompressBound(TargetFrameSize);
 static constexpr int HandshakeShibbolethSize = 4;
 static constexpr char HandshakeShibboleth[HandshakeShibbolethSize] = {'T', 'G', 'F', 'X'};
 
+inline constexpr int broadcastNum = 5;
 static constexpr int WelcomeMessageProgramNameSize = 64;
 static constexpr int WelcomeMessageHostInfoSize = 1024;
 static constexpr uint8_t ProtocolVersion = 1;
-static constexpr uint16_t BroadcastVersion = 3;
+static constexpr uint16_t BroadcastVersion = 1;
 
 enum class HandshakeStatus : uint8_t {
   HandshakePending,

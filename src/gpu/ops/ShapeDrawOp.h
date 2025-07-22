@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -20,7 +20,7 @@
 
 #include "DrawOp.h"
 #include "gpu/proxies/GpuShapeProxy.h"
-#include "tgfx/core/Shape.h"
+#include "gpu/proxies/VertexBufferProxy.h"
 
 namespace tgfx {
 class ShapeDrawOp : public DrawOp {
@@ -34,11 +34,11 @@ class ShapeDrawOp : public DrawOp {
 
  private:
   std::shared_ptr<GpuShapeProxy> shapeProxy = nullptr;
+  std::shared_ptr<VertexBufferProxy> maskBufferProxy = {};
   Color color = Color::Transparent();
   Matrix uvMatrix = {};
-  std::vector<float> maskVertices = {};
 
-  ShapeDrawOp(std::shared_ptr<GpuShapeProxy> shapeProxy, Color color, const Matrix& uvMatrix,
+  ShapeDrawOp(std::shared_ptr<GpuShapeProxy> proxy, Color color, const Matrix& uvMatrix,
               AAType aaType);
 
   friend class BlockBuffer;

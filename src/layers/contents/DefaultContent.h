@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -32,7 +32,7 @@ class DefaultContent : public LayerContent {
   }
 
   Rect getTightBounds(const Matrix& matrix) const override {
-    return content->getBounds(&matrix, true);
+    return content->getTightBounds(&matrix);
   }
 
   bool hitTestPoint(float localX, float localY, bool shapeHitTest) const override {

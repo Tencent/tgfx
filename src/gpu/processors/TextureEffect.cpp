@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -28,7 +28,7 @@ PlacementPtr<FragmentProcessor> TextureEffect::Make(std::shared_ptr<TextureProxy
     return nullptr;
   }
   auto isAlphaOnly = proxy->isAlphaOnly();
-  auto processor = MakeRGBAAA(std::move(proxy), args, {}, uvMatrix);
+  auto processor = MakeRGBAAA(proxy, args, {}, uvMatrix);
   if (forceAsMask && !isAlphaOnly) {
     auto drawingBuffer = proxy->getContext()->drawingBuffer();
     processor = FragmentProcessor::MulInputByChildAlpha(drawingBuffer, std::move(processor));
@@ -56,10 +56,10 @@ void TextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
   flags |= textureProxy->isAlphaOnly() ? 2 : 0;
   auto yuvTexture = getYUVTexture();
   if (yuvTexture) {
-    flags |= yuvTexture->pixelFormat() == YUVPixelFormat::I420 ? 0 : 4;
+    flags |= yuvTexture->yuvFormat() == YUVFormat::I420 ? 0 : 4;
     flags |= IsLimitedYUVColorRange(yuvTexture->colorSpace()) ? 0 : 8;
   }
-  flags |= needSubset(texture) ? 16 : 0;
+  flags |= needSubset() ? 16 : 0;
   flags |= constraint == SrcRectConstraint::Strict ? 32 : 0;
   bytesKey->write(flags);
 }
@@ -98,20 +98,18 @@ YUVTexture* TextureEffect::getYUVTexture() const {
   return nullptr;
 }
 
-bool TextureEffect::needSubset(Texture* texture) const {
-  DEBUG_ASSERT(texture);
-  auto bounds = Rect::MakeWH(texture->width(), texture->height());
+bool TextureEffect::needSubset() const {
+  auto bounds = Rect::MakeWH(textureProxy->width(), textureProxy->height());
   if (subset.has_value() && !(*subset).contains(bounds)) {
     // if subset equal to bounds, we don't need to use subset.
     return true;
   }
-  // If the texture has a crop rectangle, we need to shrink it to prevent bilinear sampling beyond
-  // the edge of the crop rectangle.
-  auto samplerType = texture->getSampler()->type();
-  auto edgePoint = texture->getTextureCoord(static_cast<float>(texture->width()),
-                                            static_cast<float>(texture->height()));
-  static constexpr Point FullEdge = Point::Make(1.0f, 1.0f);
-  return samplerType != SamplerType::Rectangle && edgePoint != FullEdge;
+  auto texture = getTexture();
+  if (textureProxy->width() != texture->width() || textureProxy->height() != texture->height()) {
+    // If the texture size is different from the proxy size, we need to use subset.
+    return true;
+  }
+  return false;
 }
 
 }  // namespace tgfx

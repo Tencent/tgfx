@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -32,6 +32,7 @@
 #endif
 #else
 #include <arpa/inet.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -47,10 +48,12 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include "ProcessUtils.h"
 #include "Socket.h"
+#include "TCPPortProvider.h"
 
 #ifndef MSG_NOSIGNAL
-#define MSG_NOSIGNAL 0
+#  define MSG_NOSIGNAL 0
 #endif
 
 namespace inspector {
@@ -62,10 +65,14 @@ typedef int socket_t;
 
 static constexpr size_t BufSize = 128 * 1024;
 
-Socket::Socket() : buf(static_cast<char*>(malloc(BufSize))), sock(-1) {
+Socket::Socket()
+    : buf((char*)malloc(BufSize)), bufPtr(nullptr), sock(-1), bufLeft(0), res(nullptr),
+      ptr(nullptr), connSock(0) {
 }
 
-Socket::Socket(int sock) : buf(static_cast<char*>(malloc(BufSize))), sock(sock) {
+Socket::Socket(int sock)
+    : buf((char*)malloc(BufSize)), bufPtr(nullptr), sock(sock), bufLeft(0), res(nullptr),
+      ptr(nullptr), connSock(0) {
 }
 
 Socket::~Socket() {
@@ -263,7 +270,6 @@ int Socket::sendData(const void* _buf, size_t len) {
       if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
         continue;
       }
-      printf("%s\n", strerror(errno));
       return -1;
     }
     len -= static_cast<size_t>(ret);
@@ -421,19 +427,17 @@ bool Socket::isValid() const {
   return this->sock.load(std::memory_order_relaxed) >= 0;
 }
 
-ListenSocket::ListenSocket() : sock(-1) {
-#ifdef _WIN32
-// InitWinSock();
-#endif
+ListenSocket::ListenSocket() : sock(-1), listenPort(0) {
 }
 
 ListenSocket::~ListenSocket() {
   if (this->sock != -1) {
     closeSock();
   }
+  TCPPortProvider::Get().clearUsedPort(listenPort);
 }
 
-static int addrinfo_and_socket_for_family(uint16_t port, int ai_family, struct addrinfo** res) {
+static int AddrinfoAndSocketForFamily(uint16_t port, int ai_family, struct addrinfo** res) {
   struct addrinfo hints = {};
   memset(&hints, 0, sizeof(hints));
   hints.ai_family = ai_family;
@@ -455,11 +459,11 @@ bool ListenSocket::listenSock(uint16_t port, int backlog) {
   assert(this->sock == -1);
 
   struct addrinfo* res = nullptr;
-  this->sock = addrinfo_and_socket_for_family(port, AF_INET6, &res);
+  this->sock = AddrinfoAndSocketForFamily(port, AF_INET6, &res);
   if (this->sock == -1) {
     // IPV6 protocol may not be available/is disabled. Try to create a socket
     // with the IPV4 protocol
-    this->sock = addrinfo_and_socket_for_family(port, AF_INET, &res);
+    this->sock = AddrinfoAndSocketForFamily(port, AF_INET, &res);
     if (this->sock == -1) {
       return false;
     }
@@ -477,13 +481,11 @@ bool ListenSocket::listenSock(uint16_t port, int backlog) {
   setsockopt(this->sock, SOL_SOCKET, SO_REUSEADDR, &val, sizeof(val));
 #endif
   if (bind(this->sock, res->ai_addr, res->ai_addrlen) == -1) {
-    printf("bind error! %s\n", strerror(errno));
     freeaddrinfo(res);
     closeSock();
     return false;
   }
   if (listen(this->sock, backlog) == -1) {
-    printf("listen error! %s\n", strerror(errno));
     freeaddrinfo(res);
     closeSock();
     return false;
@@ -527,9 +529,6 @@ void ListenSocket::closeSock() {
 }
 
 UdpBroadcast::UdpBroadcast() : sock(-1) {
-#ifdef _WIN32
-// InitWinSock();
-#endif
 }
 
 UdpBroadcast::~UdpBroadcast() {
@@ -603,7 +602,7 @@ void UdpBroadcast::closeSock() {
 }
 
 int UdpBroadcast::sendData(uint16_t port, const void* data, size_t len) {
-  char strAddr[17];
+  char strAddr[17] = {};
   inet_ntop(AF_INET, &this->addr, strAddr, 17);
   assert(this->sock != -1);
   struct sockaddr_in addr = {};
@@ -633,9 +632,6 @@ void IpAddress::setAddr(const struct sockaddr& addr) {
 }
 
 UdpListen::UdpListen() : sock(-1) {
-#ifdef _WIN32
-// InitWinSock();
-#endif
 }
 
 UdpListen::~UdpListen() {

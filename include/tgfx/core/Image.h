@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -25,7 +25,6 @@
 #include "tgfx/core/Picture.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/SamplingOptions.h"
-#include "tgfx/core/TileMode.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/ImageOrigin.h"
 #include "tgfx/platform/HardwareBuffer.h"
@@ -79,12 +78,10 @@ class Image {
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageGenerator> generator);
 
   /**
-   * Creates an Image from the ImageInfo and shares pixels from the immutable Data object. The
-   * returned Image takes a reference to the pixels. The caller must ensure the pixels are always
-   * the same for the lifetime of the returned Image. If the ImageInfo is unsuitable for direct
-   * texture uploading, the Image will internally create an ImageGenerator for pixel format
-   * conventing instead of an ImageBuffer. Returns nullptr if the ImageInfo is empty or the pixels
-   * are nullptr.
+   * Creates an Image using the provided ImageInfo and pixel data from an immutable Data object. The
+   * returned Image holds a reference to the pixel data. The caller must ensure the pixel data
+   * remains unchanged for the lifetime of the Image. Returns nullptr if the ImageInfo is empty or
+   * the pixel data is nullptr.
    */
   static std::shared_ptr<Image> MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels);
 

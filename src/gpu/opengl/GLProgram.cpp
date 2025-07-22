@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -21,23 +21,10 @@
 #include "GLUtil.h"
 
 namespace tgfx {
-GLProgram::GLProgram(Context* context, unsigned programID,
-                     std::unique_ptr<GLUniformBuffer> uniformBuffer,
+GLProgram::GLProgram(unsigned programID, std::unique_ptr<GLUniformBuffer> uniformBuffer,
                      std::vector<Attribute> attributes, int vertexStride)
-    : Program(context), programId(programID), uniformBuffer(std::move(uniformBuffer)),
+    : programId(programID), uniformBuffer(std::move(uniformBuffer)),
       attributes(std::move(attributes)), _vertexStride(vertexStride) {
-}
-
-void GLProgram::setupSamplerUniforms(const std::vector<GLUniform>& textureSamplers) const {
-  auto gl = GLFunctions::Get(context);
-  gl->useProgram(programId);
-  // Assign texture units to sampler uniforms one time up front.
-  for (size_t i = 0; i < textureSamplers.size(); ++i) {
-    const auto& sampler = textureSamplers[i];
-    if (UNUSED_UNIFORM != sampler.location) {
-      gl->uniform1i(sampler.location, static_cast<int>(i));
-    }
-  }
 }
 
 void GLProgram::onReleaseGPU() {
@@ -48,11 +35,11 @@ void GLProgram::onReleaseGPU() {
 }
 
 void GLProgram::updateUniformsAndTextureBindings(const RenderTarget* renderTarget,
-                                                 const ProgramInfo* programInfo) {
+                                                 const Pipeline* pipeline) {
   setRenderTargetState(renderTarget);
-  programInfo->getUniforms(uniformBuffer.get());
+  pipeline->getUniforms(uniformBuffer.get());
   uniformBuffer->uploadToGPU(context);
-  auto samplers = programInfo->getSamplers();
+  auto samplers = pipeline->getSamplers();
   int textureUnit = 0;
   auto gpu = static_cast<GLGpu*>(context->gpu());
   for (auto& info : samplers) {

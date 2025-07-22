@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -58,6 +58,39 @@ static constexpr std::pair<SLType, const char*> SLTypes[] = {
     {SLType::Texture2DSampler, "sampler2D"},
 };
 
+static std::string SLTypePrecision(SLType t) {
+  switch (t) {
+    case SLType::Float:
+    case SLType::Float2:
+    case SLType::Float3:
+    case SLType::Float4:
+    case SLType::Float2x2:
+    case SLType::Float3x3:
+    case SLType::Float4x4:
+    case SLType::Int:
+    case SLType::Int2:
+    case SLType::Int3:
+    case SLType::Int4:
+    case SLType::UByte4Color:
+      return "highp";
+    // case SLType::Half:
+    // case SLType::Half2:
+    // case SLType::Half3:
+    // case SLType::Half4:
+    // case SLType::Short:
+    // case SLType::Short2:
+    // case SLType::Short3:
+    // case SLType::Short4:
+    // case SLType::UShort:
+    // case SLType::UShort2:
+    // case SLType::UShort3:
+    // case SLType::UShort4:
+    //   return "mediump";
+    default:
+      return "";
+  }
+}
+
 static std::string SLTypeString(SLType t) {
   for (const auto& pair : SLTypes) {
     if (pair.first == t) {
@@ -94,13 +127,13 @@ std::string GLProgramBuilder::getShaderVarDeclarations(const ShaderVar& var,
   if (var.typeModifier() != ShaderVar::TypeModifier::None) {
     ret += TypeModifierString(isDesktopGL(), var.typeModifier(), flag);
     ret += " ";
-    // On Android，fragment shader's varying needs high precision.
-    if ((var.typeModifier() == ShaderVar::TypeModifier::Varying ||
-         var.typeModifier() == ShaderVar::TypeModifier::FlatVarying) &&
-        flag == ShaderFlags::Fragment) {
-      ret += "highp ";
-    }
   }
+
+  if (context->caps()->usesPrecisionModifiers) {
+    ret += SLTypePrecision(var.type());
+    ret += " ";
+  }
+
   ret += SLTypeString(var.type());
   ret += " ";
   ret += var.name();
@@ -122,7 +155,19 @@ std::unique_ptr<GLProgram> GLProgramBuilder::finalize() {
   computeCountsAndStrides(programID);
   resolveProgramResourceLocations(programID);
 
-  return createProgram(programID);
+  auto uniformBuffer = _uniformHandler.makeUniformBuffer();
+  // Assign texture units to sampler uniforms up front, just once.
+  auto gl = GLFunctions::Get(context);
+  gl->useProgram(programID);
+  auto& samplers = _uniformHandler.samplers;
+  for (size_t i = 0; i < samplers.size(); ++i) {
+    const auto& sampler = samplers[i];
+    if (UNUSED_UNIFORM != sampler.location) {
+      gl->uniform1i(sampler.location, static_cast<int>(i));
+    }
+  }
+  return std::make_unique<GLProgram>(programID, std::move(uniformBuffer), attributes,
+                                     static_cast<int>(vertexStride));
 }
 
 void GLProgramBuilder::computeCountsAndStrides(unsigned int programID) {
@@ -151,14 +196,6 @@ bool GLProgramBuilder::checkSamplerCounts() {
     return false;
   }
   return true;
-}
-
-std::unique_ptr<GLProgram> GLProgramBuilder::createProgram(unsigned programID) {
-  auto uniformBuffer = _uniformHandler.makeUniformBuffer();
-  auto program = new GLProgram(context, programID, std::move(uniformBuffer), attributes,
-                               static_cast<int>(vertexStride));
-  program->setupSamplerUniforms(_uniformHandler.samplers);
-  return std::unique_ptr<GLProgram>(program);
 }
 
 bool GLProgramBuilder::isDesktopGL() const {

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -25,7 +25,7 @@
 #include "tgfx/gpu/Device.h"
 
 namespace tgfx {
-class ProgramCache;
+class GlobalCache;
 class ResourceCache;
 class DrawingManager;
 class Gpu;
@@ -33,6 +33,7 @@ class ResourceProvider;
 class ProxyProvider;
 class BlockBuffer;
 class SlidingWindowTracker;
+class AtlasManager;
 
 /**
  * Context is the main interface to the GPU. It is used to create and manage GPU resources, and to
@@ -57,10 +58,10 @@ class Context {
   }
 
   /**
-   * Returns the associated cache that manages the lifetime of all Program instances.
+   * Returns the cache for GPU resources that need to stay alive for the lifetime of the Context.
    */
-  ProgramCache* programCache() const {
-    return _programCache;
+  GlobalCache* globalCache() const {
+    return _globalCache;
   }
 
   /**
@@ -78,12 +79,12 @@ class Context {
     return _drawingBuffer;
   }
 
-  ResourceProvider* resourceProvider() const {
-    return _resourceProvider;
-  }
-
   ProxyProvider* proxyProvider() const {
     return _proxyProvider;
+  }
+
+  AtlasManager* atlasManager() const {
+    return _atlasManager;
   }
 
   /**
@@ -111,7 +112,7 @@ class Context {
    * Returns the number of frames (valid flushes) after which unused GPU resources are considered
    * expired. A 'frame' is defined as a non-empty flush where actual rendering work is performed and
    * commands are submitted to the GPU. If a GPU resource is not used for more than this number of
-   * frames, it will be automatically purged from the cache. The default value is 60 frames.
+   * frames, it will be automatically purged from the cache. The default value is 120 frames.
    */
   size_t resourceExpirationFrames() const;
 
@@ -207,13 +208,13 @@ class Context {
 
  private:
   Device* _device = nullptr;
-  ProgramCache* _programCache = nullptr;
+  GlobalCache* _globalCache = nullptr;
   ResourceCache* _resourceCache = nullptr;
   DrawingManager* _drawingManager = nullptr;
-  ResourceProvider* _resourceProvider = nullptr;
   ProxyProvider* _proxyProvider = nullptr;
   BlockBuffer* _drawingBuffer = nullptr;
   SlidingWindowTracker* _maxValueTracker = nullptr;
+  AtlasManager* _atlasManager = nullptr;
 
   void releaseAll(bool releaseGPU);
 

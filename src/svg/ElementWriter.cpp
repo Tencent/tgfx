@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -40,6 +40,7 @@
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Context.h"
+#include "tgfx/svg/SVGPathParser.h"
 
 namespace tgfx {
 
@@ -219,8 +220,8 @@ void ElementWriter::addEllipseAttributes(const Rect& bound) {
   addAttribute("ry", bound.height() * 0.5f);
 }
 
-void ElementWriter::addPathAttributes(const Path& path, PathEncoding encoding) {
-  addAttribute("d", ToSVGPath(path, encoding));
+void ElementWriter::addPathAttributes(const Path& path, SVGPathParser::PathEncoding encoding) {
+  addAttribute("d", SVGPathParser::ToSVGString(path, encoding));
 }
 
 Resources ElementWriter::addImageFilterResource(const std::shared_ptr<ImageFilter>& imageFilter,
@@ -770,7 +771,10 @@ void ElementWriter::addPictureImageMaskResources(const PictureImage* pictureImag
                                                  const std::string& filterID,
                                                  SVGExportContext* svgContext) {
   auto picture = pictureImage->picture;
-  auto pictureBound = picture->getBounds(pictureImage->matrix);
+  auto pictureBound = picture->getBounds();
+  if (pictureImage->matrix) {
+    pictureImage->matrix->mapRect(&pictureBound);
+  }
   auto imageBound = Rect::MakeWH(pictureImage->width(), pictureImage->height());
   std::string clipID;
   if (!imageBound.contains(pictureBound)) {

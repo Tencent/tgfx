@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -118,7 +118,7 @@ std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_
   auto isAlphaOnly = source->isAlphaOnly();
   auto lastRenderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(clipBounds.width()), static_cast<int>(clipBounds.height()),
-      isAlphaOnly, 1, args.mipmapped);
+      isAlphaOnly, 1, args.mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
   if (lastRenderTarget == nullptr) {
     return nullptr;
   }
@@ -157,7 +157,8 @@ std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_
     auto downWidth = static_cast<int>(roundf(textureSize.width * downScaling));
     auto downHeight = static_cast<int>(roundf(textureSize.height * downScaling));
     auto renderTarget =
-        RenderTargetProxy::MakeFallback(args.context, downWidth, downHeight, isAlphaOnly);
+        RenderTargetProxy::MakeFallback(args.context, downWidth, downHeight, isAlphaOnly, 1, false,
+                                        ImageOrigin::TopLeft, BackingFit::Approx);
     if (renderTarget == nullptr) {
       break;
     }
@@ -166,7 +167,7 @@ std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_
       uvMatrix = Matrix::MakeScale(textureSize.width / static_cast<float>(downWidth),
                                    textureSize.height / static_cast<float>(downHeight));
 
-      sourceProcessor = TextureEffect::Make(lastRenderTarget->getTextureProxy(), samplingArgs,
+      sourceProcessor = TextureEffect::Make(lastRenderTarget->asTextureProxy(), samplingArgs,
                                             &uvMatrix, isAlphaOnly);
     }
     draw(renderTarget, args.renderFlags, std::move(sourceProcessor), downScaling, true);
@@ -192,14 +193,14 @@ std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_
       uvMatrix = Matrix::MakeScale(textureSize.width / static_cast<float>(renderTarget->width()),
                                    textureSize.height / static_cast<float>(renderTarget->height()));
     }
-    sourceProcessor = TextureEffect::Make(lastRenderTarget->getTextureProxy(), samplingArgs,
+    sourceProcessor = TextureEffect::Make(lastRenderTarget->asTextureProxy(), samplingArgs,
                                           &uvMatrix, isAlphaOnly);
     draw(renderTarget, args.renderFlags, std::move(sourceProcessor), upSampleScale, false);
     lastRenderTarget = renderTarget;
     textureSize = Size::Make(static_cast<float>(renderTarget->width()),
                              static_cast<float>(renderTarget->height()));
   }
-  return lastRenderTarget->getTextureProxy();
+  return lastRenderTarget->asTextureProxy();
 }
 
 PlacementPtr<FragmentProcessor> DualBlurImageFilter::asFragmentProcessor(

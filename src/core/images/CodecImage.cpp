@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -20,20 +20,11 @@
 #include <memory>
 
 namespace tgfx {
-std::shared_ptr<Image> CodecImage::MakeFrom(const std::shared_ptr<ImageCodec>& codec) {
-  if (!codec) {
-    return nullptr;
-  }
-  auto image = std::shared_ptr<CodecImage>(new CodecImage(codec));
-  image->weakThis = image;
-  return image;
+CodecImage::CodecImage(UniqueKey uniqueKey, std::shared_ptr<ImageCodec> codec)
+    : GeneratorImage(std::move(uniqueKey), std::move(codec)) {
 }
 
-CodecImage::CodecImage(const std::shared_ptr<ImageCodec>& codec)
-    : GeneratorImage(UniqueKey::Make(), codec) {
-}
-
-std::shared_ptr<ImageCodec> CodecImage::codec() const {
+std::shared_ptr<ImageCodec> CodecImage::getCodec() const {
   return std::static_pointer_cast<ImageCodec>(generator);
 }
 

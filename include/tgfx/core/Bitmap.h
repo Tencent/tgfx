@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -221,8 +221,6 @@ class Bitmap {
    * Returns an ImageBuffer object capturing the pixels in the Bitmap. Subsequent writing of the
    * Bitmap will not be captured. Instead, the Bitmap will copy its pixels to a new memory buffer if
    * there is a subsequent writing call to the Bitmap while the returned ImageBuffer is still alive.
-   * If the Bitmap is modified frequently, create an ImageReader from the Bitmap instead, which
-   * allows you to continuously read the latest content from the Bitmap with minimal memory copying.
    * Returns nullptr if the Bitmap is empty.
    */
   std::shared_ptr<ImageBuffer> makeBuffer() const;
@@ -232,6 +230,5 @@ class Bitmap {
   std::shared_ptr<PixelRef> pixelRef = nullptr;
 
   friend class Pixmap;
-  friend class ImageReader;
 };
 }  // namespace tgfx

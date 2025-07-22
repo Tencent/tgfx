@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,40 +18,23 @@
 
 #pragma once
 
+#include "gpu/Resource.h"
 #include "tgfx/core/BytesKey.h"
-#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 /**
- * The base class for GPU program. Overrides the onReleaseGPU() method to free all GPU resources.
- * No backend API calls should be made during destructuring since there may be no GPU context that
- * is current on the calling thread.
+ * The base class for GPU programs.
  */
-class Program {
+class Program : public Resource {
  public:
-  explicit Program(Context* context) : context(context) {
+  size_t memoryUsage() const override {
+    return 0;
   }
-
-  virtual ~Program() = default;
-
-  /**
-   * Retrieves the context associated with this Program.
-   */
-  Context* getContext() const {
-    return context;
-  }
-
- protected:
-  Context* context = nullptr;
-
-  /**
-   * Overridden to free GPU resources in the backend API.
-   */
-  virtual void onReleaseGPU() = 0;
 
  private:
   BytesKey programKey = {};
+  std::list<Program*>::iterator cachedPosition;
 
-  friend class ProgramCache;
+  friend class GlobalCache;
 };
 }  // namespace tgfx

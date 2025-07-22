@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -52,17 +52,23 @@ class Picture {
   }
 
   /**
-   * Returns the bounding box of the Picture when drawn with the given Matrix. Since the Picture
-   * may contain glyph drawing commands whose outlines can change with different scale
-   * factors, it's best to use the final drawing matrix to calculate the bounds for accuracy.
+   * Returns the conservative bounding box of the Picture. Compared to getTightBounds, it may be
+   * larger than actual bounds but is faster to compute. Note that the bounds only include the
+   * combined geometry of each drawing command, but some commands may draw outside these bounds.
+   * Use the hasUnboundedFill() method to check for this.
+   */
+  Rect getBounds() const;
+
+  /**
+   * Returns the tight bounding box of the Picture when drawn with the given Matrix. Since the Picture
+   * may contain glyph drawing commands whose outlines can change with different scale factors,
+   * it's best to use the final drawing matrix to calculate the bounds for accuracy.
    * Note that the bounds only include the combined geometry of each drawing command, but some
    * commands may draw outside these bounds. Use the hasUnboundedFill() method to check for this.
    * @param matrix The Matrix to apply to the bounds of each drawing command. If null, the identity
    * matrix is used.
-   * @param computeTightBounds Determines whether to calculate the exact tight bounding box (true)
-   * or a general bounding box that may be larger but is faster to compute (false).
    */
-  Rect getBounds(const Matrix* matrix = nullptr, bool computeTightBounds = false) const;
+  Rect getTightBounds(const Matrix* matrix = nullptr) const;
 
   /**
    * Checks whether any drawing commands in the Picture overlap or intersect with the specified
@@ -86,13 +92,13 @@ class Picture {
   void playback(Canvas* canvas, const FillModifier* fillModifier = nullptr) const;
 
  private:
-  std::shared_ptr<BlockData> blockData = nullptr;
+  std::unique_ptr<BlockData> blockData;
   std::vector<PlacementPtr<Record>> records;
   mutable std::atomic<Rect*> bounds = {nullptr};
   size_t drawCount = 0;
   bool _hasUnboundedFill = false;
 
-  Picture(std::shared_ptr<BlockData> data, std::vector<PlacementPtr<Record>> records,
+  Picture(std::unique_ptr<BlockData> data, std::vector<PlacementPtr<Record>> records,
           size_t drawCount);
 
   void playback(DrawContext* drawContext, const MCState& state,

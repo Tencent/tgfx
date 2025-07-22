@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -33,6 +33,7 @@ namespace tgfx {
 // Therefore, 10 is chosen as the MAX_BLUR_SIGMA.
 #define MAX_BLUR_SIGMA 10.f
 
+#ifndef TGFX_USE_FASTER_BLUR
 std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrinessY,
                                                TileMode tileMode) {
   if (blurrinessX < 0 || blurrinessY < 0 || (blurrinessX == 0 && blurrinessY == 0)) {
@@ -40,6 +41,7 @@ std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrine
   }
   return std::make_shared<GaussianBlurImageFilter>(blurrinessX, blurrinessY, tileMode);
 }
+#endif
 
 GaussianBlurImageFilter::GaussianBlurImageFilter(float blurrinessX, float blurrinessY,
                                                  TileMode tileMode)
@@ -63,7 +65,8 @@ static std::shared_ptr<TextureProxy> ScaleTexture(const TPArgs& args,
                                                   std::shared_ptr<TextureProxy> texture,
                                                   int targetWidth, int targetHeight) {
   auto renderTarget = RenderTargetProxy::MakeFallback(args.context, targetWidth, targetHeight,
-                                                      texture->isAlphaOnly(), 1, args.mipmapped);
+                                                      texture->isAlphaOnly(), 1, args.mipmapped,
+                                                      ImageOrigin::TopLeft, BackingFit::Approx);
   if (!renderTarget) {
     return nullptr;
   }
@@ -74,7 +77,7 @@ static std::shared_ptr<TextureProxy> ScaleTexture(const TPArgs& args,
   auto finalProcessor = TextureEffect::Make(std::move(texture), {}, &uvMatrix);
   auto drawingManager = args.context->drawingManager();
   drawingManager->fillRTWithFP(renderTarget, std::move(finalProcessor), args.renderFlags);
-  return renderTarget->getTextureProxy();
+  return renderTarget->asTextureProxy();
 }
 
 std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
@@ -101,9 +104,10 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
   scaledBounds.roundOut();
 
   const auto isAlphaOnly = source->isAlphaOnly();
+  auto mipmapped = args.mipmapped && !blur2D && maxSigma <= MAX_BLUR_SIGMA;
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(scaledBounds.width()), static_cast<int>(scaledBounds.height()),
-      isAlphaOnly, 1, args.mipmapped);
+      isAlphaOnly, 1, mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
   if (!renderTarget) {
     return nullptr;
   }
@@ -129,11 +133,11 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
 
     SamplingArgs samplingArgs = {tileMode, tileMode, {}, SrcRectConstraint::Fast};
     sourceProcessor =
-        TiledTextureEffect::Make(renderTarget->getTextureProxy(), samplingArgs, &uvMatrix);
+        TiledTextureEffect::Make(renderTarget->asTextureProxy(), samplingArgs, &uvMatrix);
 
     renderTarget = RenderTargetProxy::MakeFallback(
         args.context, static_cast<int>(clipBounds.width()), static_cast<int>(clipBounds.height()),
-        isAlphaOnly, 1, args.mipmapped);
+        isAlphaOnly, 1, args.mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
 
     if (!renderTarget) {
       return nullptr;
@@ -142,7 +146,7 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     Blur1D(std::move(sourceProcessor), renderTarget, blurrinessY * scaleFactor,
            GaussianBlurDirection::Vertical, boundsWillSample.height() / scaledBounds.height(),
            args.renderFlags);
-    return renderTarget->getTextureProxy();
+    return renderTarget->asTextureProxy();
   }
 
   if (blurrinessX > 0) {
@@ -154,10 +158,10 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
   }
 
   if (maxSigma <= MAX_BLUR_SIGMA) {
-    return renderTarget->getTextureProxy();
+    return renderTarget->asTextureProxy();
   }
 
-  return ScaleTexture(args, renderTarget->getTextureProxy(), static_cast<int>(clipBounds.width()),
+  return ScaleTexture(args, renderTarget->asTextureProxy(), static_cast<int>(clipBounds.width()),
                       static_cast<int>(clipBounds.height()));
 }
 

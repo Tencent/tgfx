@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,6 +19,7 @@
 #pragma once
 
 #include <cstddef>
+#include <cstdint>
 #include <type_traits>
 
 namespace tgfx {
@@ -164,6 +165,14 @@ class PlacementPtr {
     T* temp = pointer;
     pointer = nullptr;
     return temp;
+  }
+
+  void remap(const void* oldBlock, const void* newBlock) {
+    if (pointer) {
+      auto oldPointer = reinterpret_cast<uint8_t*>(pointer);
+      pointer = reinterpret_cast<T*>(reinterpret_cast<uint8_t*>(const_cast<void*>(newBlock)) +
+                                     (oldPointer - reinterpret_cast<const uint8_t*>(oldBlock)));
+    }
   }
 
   T& operator*() const {

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -397,23 +397,6 @@ struct Rect {
    * Returns false if either a or b is empty, leaving Rect unchanged.
    */
   bool intersect(const Rect& a, const Rect& b);
-
-  /**
-   * Constructs Rect to intersect from (left, top, right, bottom). Does not sort construction.
-   * Returns true if Rect intersects construction.
-   * Returns false if either construction or Rect is empty, or do not intersect.
-   */
-  bool intersects(float l, float t, float r, float b) const {
-    return Intersects(left, top, right, bottom, l, t, r, b);
-  }
-
-  /**
-   * Returns true if Rect intersects r. Returns false if either r or Rect is empty, or do not
-   * intersect.
-   */
-  bool intersects(const Rect& r) const {
-    return Intersects(left, top, right, bottom, r.left, r.top, r.right, r.bottom);
-  }
 
   /**
    * Returns true if a intersects b. Returns false if either a or b is empty, or do not intersect.

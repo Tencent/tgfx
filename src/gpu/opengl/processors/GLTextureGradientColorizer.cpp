@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -20,11 +20,14 @@
 
 namespace tgfx {
 PlacementPtr<TextureGradientColorizer> TextureGradientColorizer::Make(
-    BlockBuffer* buffer, std::shared_ptr<Texture> gradient) {
+    BlockBuffer* buffer, std::shared_ptr<TextureProxy> gradient) {
+  if (gradient == nullptr) {
+    return nullptr;
+  }
   return buffer->make<GLTextureGradientColorizer>(std::move(gradient));
 }
 
-GLTextureGradientColorizer::GLTextureGradientColorizer(std::shared_ptr<Texture> gradient)
+GLTextureGradientColorizer::GLTextureGradientColorizer(std::shared_ptr<TextureProxy> gradient)
     : TextureGradientColorizer(std::move(gradient)) {
 }
 

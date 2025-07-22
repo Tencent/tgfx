@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -21,27 +21,22 @@
 #include "CornerPinEffect.h"
 #include "core/filters/ColorImageFilter.h"
 #include "core/filters/DropShadowImageFilter.h"
+#include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
 #include "core/shaders/GradientShader.h"
 #include "core/shaders/ImageShader.h"
-#include "core/vectors/freetype/FTMask.h"
-#include "gpu/opengl/GLUtil.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/GradientType.h"
 #include "tgfx/core/ImageFilter.h"
-#include "tgfx/core/Mask.h"
-#include "tgfx/core/PathEffect.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/TileMode.h"
-#include "tgfx/gpu/RuntimeEffect.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
 #include "utils/TestUtils.h"
 #include "utils/common.h"
 
@@ -683,5 +678,62 @@ TGFX_TEST(FilterTest, InnerShadowBadCase) {
   path.addOval(rect);
   canvas->drawPath(path, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/InnerShadowBadCase"));
+}
+
+TGFX_TEST(FilterTest, ClipInnerShadowImageFilter) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  int surfaceWidth = 100;
+  int surfaceHeight = 100;
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  ASSERT_TRUE(surface != nullptr);
+
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  ASSERT_TRUE(image != nullptr);
+  auto shadowFilter = ImageFilter::InnerShadow(0, -10.5, 10, 10, Color::FromRGBA(0, 0, 0, 128));
+  image = image->makeWithFilter(shadowFilter);
+  auto canvas = surface->getCanvas();
+  canvas->scale(0.8571f, 0.8571f);
+  {
+    AutoCanvasRestore restore(canvas);
+    canvas->clipRect(Rect::MakeWH(100.f, 30.f));
+    canvas->drawImage(image);
+  }
+  {
+    AutoCanvasRestore restore(canvas);
+    canvas->clipRect(Rect::MakeXYWH(0.f, 30.f, 100.f, 30.f));
+    canvas->drawImage(image);
+  }
+  {
+    AutoCanvasRestore restore(canvas);
+    canvas->clipRect(Rect::MakeXYWH(0, 60, 100, 30));
+    canvas->drawImage(image);
+  }
+  {
+    AutoCanvasRestore restore(canvas);
+    canvas->clipRect(Rect::MakeXYWH(0, 90, 100, 10));
+    canvas->drawImage(image);
+  }
+  context->flush();
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ClipInnerShadowImageFilter"));
+}
+
+TGFX_TEST(FilterTest, GaussianBlurImageFilter) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  ASSERT_TRUE(image != nullptr);
+  auto surface = Surface::Make(context, image->width(), image->height());
+  ASSERT_TRUE(surface != nullptr);
+  auto gaussianBlurFilter = std::make_shared<GaussianBlurImageFilter>(3, 3, TileMode::Decal);
+  auto offset = Point::Make(0, 0);
+  image = image->makeWithFilter(gaussianBlurFilter, &offset);
+  auto canvas = surface->getCanvas();
+  canvas->drawImage(image, offset.x, offset.y);
+  context->flush();
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/GaussianBlurImageFilter"));
 }
 }  // namespace tgfx

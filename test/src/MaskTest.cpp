@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,38 +17,35 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <vector>
+#include "core/PathRasterizer.h"
 #include "core/images/BufferImage.h"
-#include "core/vectors/freetype/FTMask.h"
-#include "tgfx/core/Mask.h"
 #include "tgfx/core/Surface.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
-TGFX_TEST(MaskTest, Rasterize) {
+TGFX_TEST(PathRasterizerTest, Rasterize) {
   Path path = {};
   path.addRect(100, 100, 400, 400);
   path.addRoundRect(Rect::MakeLTRB(150, 150, 350, 350), 30, 20, true);
   path.addOval(Rect::MakeLTRB(200, 200, 300, 300));
-  // 501*501 is for GL_UNPACK_ALIGNMENT testing
-  auto mask = Mask::Make(501, 501);
-  ASSERT_TRUE(mask != nullptr);
   auto matrix = Matrix::MakeTrans(50, 50);
-  mask->setMatrix(matrix);
-  mask->fillPath(path);
-  auto maskBuffer = std::static_pointer_cast<PixelBuffer>(mask->makeBuffer());
+  path.transform(matrix);
+  // 501*501 is for GL_UNPACK_ALIGNMENT testing
+  auto rasterizer = PathRasterizer::MakeFrom(501, 501, path, true);
+  ASSERT_TRUE(rasterizer != nullptr);
+  auto maskBuffer = std::static_pointer_cast<PixelBuffer>(rasterizer->makeBuffer());
   EXPECT_TRUE(Baseline::Compare(maskBuffer, "MaskTest/rasterize_path"));
 
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto image = Image::MakeFrom(mask->makeBuffer());
+  auto image = Image::MakeFrom(rasterizer->makeBuffer());
   ASSERT_TRUE(image != nullptr);
-  auto surface = Surface::Make(context, mask->width(), mask->height());
+  auto surface = Surface::Make(context, rasterizer->width(), rasterizer->height());
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
   canvas->drawImage(image);
-  Bitmap bitmap(mask->width(), mask->height(), true, false);
+  Bitmap bitmap(rasterizer->width(), rasterizer->height(), true, false);
   ASSERT_FALSE(bitmap.isEmpty());
   Pixmap pixmap(bitmap);
   pixmap.clear();

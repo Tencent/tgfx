@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,9 +19,11 @@
 #pragma once
 
 #include <optional>
+#include "gpu/ProxyProvider.h"
 #include "gpu/RectsVertexProvider.h"
 #include "gpu/ops/DrawOp.h"
 #include "gpu/proxies/GpuBufferProxy.h"
+#include "gpu/proxies/VertexBufferProxy.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
@@ -30,22 +32,20 @@ class AtlasTextOp final : public DrawOp {
   static PlacementPtr<AtlasTextOp> Make(Context* context,
                                         PlacementPtr<RectsVertexProvider> provider,
                                         uint32_t renderFlags,
-                                        std::shared_ptr<TextureProxy> textureProxy,
-                                        const SamplingOptions& sampling, const Matrix& uvMatrix);
+                                        std::shared_ptr<TextureProxy> textureProxy);
+
   void execute(RenderPass* renderPass) override;
+
+  bool hasCoverage() const override;
 
  private:
   size_t rectCount = 0;
   std::optional<Color> commonColor = std::nullopt;
   std::shared_ptr<GpuBufferProxy> indexBufferProxy = nullptr;
-  std::shared_ptr<GpuBufferProxy> vertexBufferProxy = nullptr;
-  size_t vertexBufferOffset = 0;
+  std::shared_ptr<VertexBufferProxy> vertexBufferProxy = {};
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
-  SamplingOptions sampling;
-  Matrix uvMatrix = {};
 
-  explicit AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureProxy> textureProxy,
-                       const SamplingOptions& sampling, const Matrix& uvMatrix);
+  explicit AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureProxy> textureProxy);
 
   friend class BlockBuffer;
 };

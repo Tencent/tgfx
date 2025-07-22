@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -88,7 +88,7 @@ Rect CGScalerContext::getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic)
     bounds.outset(fauxBoldSize, fauxBoldSize);
   }
   bounds.roundOut();
-  // Expand the bounds by 1 pixel, to give CG room for anti-aliasing.
+  // Expand the bounds by 1 pixel, to give CG room for antialiasing.
   // Note that this outset is to allow room for LCD smoothed glyphs. However, the correct outset
   // is not currently known, as CG dilates the outlines by some percentage.
   // Note that if this context is A8 and not back-forming from LCD, there is no need to outset.

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,8 +19,14 @@
 import * as types from '../types/types';
 import {TGFXBind} from '../lib/tgfx';
 import Hello2D from './wasm-mt/hello2d';
-import {ShareData, updateSize, onresizeEvent, onclickEvent, loadImage} from "./common";
-
+import {
+    ShareData,
+    updateSize,
+    onResizeEvent,
+    onClickEvent,
+    loadImage,
+    bindCanvasZoomAndPanEvents
+} from "./common";
 let shareData: ShareData = new ShareData();
 
 if (typeof window !== 'undefined') {
@@ -45,6 +51,8 @@ if (typeof window !== 'undefined') {
             const emojiFontUIntArray = new Uint8Array(emojiFontBuffer);
             tgfxView.registerFonts(fontUIntArray, emojiFontUIntArray);
             updateSize(shareData);
+            const canvas = document.getElementById('hello2d');
+            bindCanvasZoomAndPanEvents(canvas, shareData);
         } catch (error) {
             console.error(error);
             throw new Error("Hello2D init failed. Please check the .wasm file path!.");
@@ -52,11 +60,11 @@ if (typeof window !== 'undefined') {
     };
 
     window.onresize = () => {
-        onresizeEvent(shareData);
+        onResizeEvent(shareData);
         window.setTimeout(() => updateSize(shareData), 300);
     };
 
     window.onclick = () => {
-        onclickEvent(shareData);
+        onClickEvent(shareData);
     };
 }

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -24,7 +24,7 @@ namespace tgfx {
 /**
  * TextureImage wraps an existing texture proxy.
  */
-class TextureImage : public ResourceImage {
+class TextureImage : public Image {
  public:
   /**
    * Creates an Image wraps the existing TextureProxy, returns nullptr if textureProxy is nullptr.
@@ -55,6 +55,9 @@ class TextureImage : public ResourceImage {
 
   std::shared_ptr<Image> makeTextureImage(Context* context) const override;
 
+  std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f,
+                                        const SamplingOptions& sampling = {}) const override;
+
  protected:
   Type type() const override {
     return Type::Texture;
@@ -64,8 +67,11 @@ class TextureImage : public ResourceImage {
     return nullptr;
   }
 
-  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
-                                                   const UniqueKey& key) const override;
+  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
+
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
+                                                      const SamplingArgs& samplingArgs,
+                                                      const Matrix* uvMatrix) const override;
 
  private:
   std::shared_ptr<TextureProxy> textureProxy = nullptr;

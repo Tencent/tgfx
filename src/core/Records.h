@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -37,6 +37,7 @@ enum class RecordType {
   DrawShape,
   DrawImage,
   DrawImageRect,
+  DrawImageRectToRect,
   DrawGlyphRunList,
   DrawPicture,
   DrawLayer
@@ -271,7 +272,7 @@ class DrawImage : public Record {
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
     auto rect = Rect::MakeWH(image->width(), image->height());
-    context->drawImageRect(image, rect, sampling, playback->state(), playback->fill(),
+    context->drawImageRect(image, rect, rect, sampling, playback->state(), playback->fill(),
                            SrcRectConstraint::Fast);
   }
 
@@ -291,12 +292,31 @@ class DrawImageRect : public DrawImage {
   }
 
   void playback(DrawContext* context, PlaybackContext* playback) const override {
-    context->drawImageRect(image, rect, sampling, playback->state(), playback->fill(), constraint);
+    context->drawImageRect(image, rect, rect, sampling, playback->state(), playback->fill(),
+                           constraint);
   }
 
   Rect rect;
-
   SrcRectConstraint constraint = SrcRectConstraint::Fast;
+};
+
+class DrawImageRectToRect : public DrawImageRect {
+ public:
+  DrawImageRectToRect(std::shared_ptr<Image> image, const Rect& srcRect, const Rect& dstRect,
+                      const SamplingOptions& sampling, SrcRectConstraint constraint)
+      : DrawImageRect(std::move(image), srcRect, sampling, constraint), dstRect(dstRect) {
+  }
+
+  RecordType type() const override {
+    return RecordType::DrawImageRectToRect;
+  }
+
+  void playback(DrawContext* context, PlaybackContext* playback) const override {
+    context->drawImageRect(image, rect, dstRect, sampling, playback->state(), playback->fill(),
+                           constraint);
+  }
+
+  Rect dstRect;
 };
 
 class DrawGlyphRunList : public Record {

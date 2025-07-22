@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,9 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GlyphRunList.h"
+#include "ScalerContext.h"
+#include "core/utils/FauxBoldScale.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
-#include "tgfx/core/PathEffect.h"
 #include "tgfx/core/TextBlob.h"
 
 namespace tgfx {
@@ -46,17 +47,21 @@ GlyphRunList::GlyphRunList(std::vector<GlyphRun> glyphRuns) : _glyphRuns(std::mo
                            }));
 }
 
-Rect GlyphRunList::getBounds(float resolutionScale) const {
+Rect GlyphRunList::getBounds() const {
+  if (auto cachedBounds = bounds.get()) {
+    return *cachedBounds;
+  }
+  Rect totalBounds = computeConservativeBounds();
+  bounds.update(totalBounds);
+  return totalBounds;
+}
+
+Rect GlyphRunList::getTightBounds(const Matrix* matrix) const {
+  auto resolutionScale = matrix ? matrix->getMaxScale() : 1.0f;
   if (FloatNearlyZero(resolutionScale)) {
     return {};
   }
   auto hasScale = !FloatNearlyEqual(resolutionScale, 1.0f);
-  if (!hasScale) {
-    auto cachedBounds = bounds.get();
-    if (cachedBounds) {
-      return *cachedBounds;
-    }
-  }
   Rect totalBounds = {};
   for (auto& run : _glyphRuns) {
     auto font = run.font;
@@ -76,14 +81,54 @@ Rect GlyphRunList::getBounds(float resolutionScale) const {
   }
   if (hasScale) {
     totalBounds.scale(1.0f / resolutionScale, 1.0f / resolutionScale);
-  } else {
-    bounds.update(totalBounds);
+  }
+  if (matrix) {
+    totalBounds = matrix->mapRect(totalBounds);
   }
   return totalBounds;
 }
 
-bool GlyphRunList::getPath(Path* path, float resolutionScale) const {
-  if (FloatNearlyZero(resolutionScale) || !hasOutlines()) {
+Rect GlyphRunList::computeConservativeBounds() const {
+  Rect finalBounds = {};
+  Matrix transformMat = {};
+  for (auto& run : _glyphRuns) {
+    auto& font = run.font;
+    transformMat.reset();
+    transformMat.setScale(font.getSize(), font.getSize());
+    if (font.isFauxItalic()) {
+      transformMat.postSkew(ITALIC_SKEW, 0.0f);
+    }
+    auto typeface = font.getTypeface();
+    if (typeface == nullptr || typeface->getBounds().isEmpty()) {
+      finalBounds.setEmpty();
+      break;
+    }
+    auto fontBounds = typeface->getBounds();
+    if (font.isFauxBold()) {
+      auto fauxBoldScale = FauxBoldScale(font.getSize());
+      fontBounds.outset(fauxBoldScale, fauxBoldScale);
+    }
+    transformMat.mapRect(&fontBounds);
+    Rect runBounds = {};
+    runBounds.setBounds(run.positions.data(), static_cast<int>(run.positions.size()));
+    runBounds.left += fontBounds.left;
+    runBounds.top += fontBounds.top;
+    runBounds.right += fontBounds.right;
+    runBounds.bottom += fontBounds.bottom;
+    finalBounds.join(runBounds);
+  }
+  if (!finalBounds.isEmpty()) {
+    return finalBounds;
+  }
+  return getTightBounds();
+}
+
+bool GlyphRunList::getPath(Path* path, const Matrix* matrix) const {
+  if (!hasOutlines()) {
+    return false;
+  }
+  auto resolutionScale = matrix ? matrix->getMaxScale() : 1.0f;
+  if (FloatNearlyZero(resolutionScale)) {
     return false;
   }
   auto hasScale = !FloatNearlyEqual(resolutionScale, 1.0f);
@@ -102,6 +147,9 @@ bool GlyphRunList::getPath(Path* path, float resolutionScale) const {
         auto& position = positions[index];
         auto glyphMatrix = Matrix::MakeScale(1.0f / resolutionScale, 1.0f / resolutionScale);
         glyphMatrix.postTranslate(position.x, position.y);
+        if (matrix) {
+          glyphMatrix.postConcat(*matrix);
+        }
         glyphPath.transform(glyphMatrix);
         totalPath.addPath(glyphPath);
       } else {

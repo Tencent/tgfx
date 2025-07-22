@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -20,21 +20,22 @@
 
 #include <tgfx/core/Data.h>
 #include <functional>
-#include <variant>
+#include "LayerInspectorProtocol.h"
 #include "SerializationUtils.h"
-#include "flatbuffers/flatbuffers.h"
-#include "flatbuffers/flexbuffers.h"
 
 namespace tgfx {
+static const std::string HighLightLayerName = "HighLightLayer";
 class Layer;
-
 class LayerSerialization {
  public:
   static std::shared_ptr<Data> SerializeTreeNode(
       std::shared_ptr<Layer> layer,
       std::unordered_map<uint64_t, std::shared_ptr<tgfx::Layer>>& layerMap);
 
-  static std::shared_ptr<Data> SerializeLayer(const Layer* layer, SerializeUtils::Map* map);
+  static std::shared_ptr<Data> SerializeLayer(
+      const Layer* layer, SerializeUtils::ComplexObjSerMap* map,
+      SerializeUtils::RenderableObjSerMap* rosMap,
+      inspector::LayerInspectorMsgType type = inspector::LayerInspectorMsgType::LayerSubAttribute);
 
  private:
   static void SerializeTreeNodeImpl(
@@ -42,18 +43,7 @@ class LayerSerialization {
       std::unordered_map<uint64_t, std::shared_ptr<tgfx::Layer>>& layerMap);
 
   static void SerializeBasicLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
-                                      SerializeUtils::Map* map);
-
-  static void SerializeImageLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
-                                      SerializeUtils::Map* map);
-
-  static void SerializeShapeLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
-                                      SerializeUtils::Map* map);
-
-  static void SerializeSolidLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
-                                      SerializeUtils::Map* map);
-
-  static void SerializeTextLayerImpl(flexbuffers::Builder& fbb, const Layer* layer,
-                                     SerializeUtils::Map* map);
+                                      SerializeUtils::ComplexObjSerMap* map,
+                                      SerializeUtils::RenderableObjSerMap* rosMap);
 };
 }  // namespace tgfx

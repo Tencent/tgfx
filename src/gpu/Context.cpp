@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,39 +17,41 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Context.h"
+#include "core/AtlasManager.h"
 #include "core/utils/BlockBuffer.h"
 #include "core/utils/Log.h"
 #include "core/utils/SlidingWindowTracker.h"
 #include "gpu/DrawingManager.h"
-#include "gpu/ProgramCache.h"
+#include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ResourceCache.h"
-#include "gpu/ResourceProvider.h"
 #include "tgfx/core/Clock.h"
 
 namespace tgfx {
 Context::Context(Device* device) : _device(device) {
-  _drawingBuffer = new BlockBuffer(1 << 14);  // 16kb
-  _programCache = new ProgramCache(this);
+  // We set the maxBlockSize to 2MB because allocating blocks that are too large can cause memory
+  // fragmentation and slow down allocation. It may also increase the application's memory usage due
+  // to pre-allocation optimizations on some platforms.
+  _drawingBuffer = new BlockBuffer(1 << 14, 1 << 21);  // 16kb, 2MB
+  _globalCache = new GlobalCache(this);
   _resourceCache = new ResourceCache(this);
   _drawingManager = new DrawingManager(this);
-  _resourceProvider = new ResourceProvider(this);
   _proxyProvider = new ProxyProvider(this);
   _maxValueTracker = new SlidingWindowTracker(10);
+  _atlasManager = new AtlasManager(this);
 }
 
 Context::~Context() {
   // The Device owner must call releaseAll() before deleting this Context, otherwise, GPU resources
   // may leak.
   DEBUG_ASSERT(_resourceCache->empty());
-  DEBUG_ASSERT(_programCache->empty());
-  delete _programCache;
+  delete _globalCache;
   delete _resourceCache;
   delete _drawingManager;
   delete _gpu;
-  delete _resourceProvider;
   delete _proxyProvider;
   delete _drawingBuffer;
+  delete _atlasManager;
   delete _maxValueTracker;
 }
 
@@ -58,7 +60,9 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
   // particularly crucial for texture resources that are bound to render targets. Only after the
   // cleanup can they be unbound and reused.
   _resourceCache->processUnreferencedResources();
+  _atlasManager->preFlush();
   auto flushed = _drawingManager->flush();
+  _atlasManager->postFlush();
   bool semaphoreInserted = false;
   if (signalSemaphore != nullptr) {
     auto semaphore = Semaphore::Wrap(signalSemaphore);
@@ -127,8 +131,8 @@ bool Context::purgeResourcesUntilMemoryTo(size_t bytesLimit) {
 
 void Context::releaseAll(bool releaseGPU) {
   _drawingManager->releaseAll();
-  _resourceProvider->releaseAll();
-  _programCache->releaseAll(releaseGPU);
+  _atlasManager->releaseAll();
+  _globalCache->releaseAll();
   _resourceCache->releaseAll(releaseGPU);
 }
 }  // namespace tgfx

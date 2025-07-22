@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //
@@ -24,6 +24,7 @@
 #include "ProcessUtils.h"
 #include "Protocol.h"
 #include "Socket.h"
+#include "TCPPortProvider.h"
 #include "lz4.h"
 
 namespace inspector {
@@ -106,7 +107,7 @@ void Inspector::sendString(uint64_t str, const char* ptr, size_t len, QueueType 
 
 void Inspector::worker() {
   std::string addr = "255.255.255.255";
-  uint16_t dataPort = 8086;
+  auto dataPort = TCPPortProvider::Get().getValidPort();
   const auto broadcastPort = 8086;
   const auto procname = GetProcessName();
   const auto pnsz = std::min<size_t>(strlen(procname), WelcomeMessageProgramNameSize - 1);
@@ -237,7 +238,7 @@ void Inspector::worker() {
             break;
           }
           if (keepAlive == 500) {
-            QueueItem ka;
+            QueueItem ka = {};
             ka.hdr.type = QueueType::KeepAlive;
             appendData(&ka, QueueDataSize[ka.hdr.idx]);
             if (!commitData()) {
@@ -291,43 +292,70 @@ bool Inspector::sendData(const char* data, size_t len) {
 }
 
 Inspector::DequeueStatus Inspector::dequeueSerial() {
-  {
-    std::lock_guard<std::mutex> lockGuard(serialLock);
-    if (!serialQueue.empty()) {
-      serialQueue.swap(serialDequeue);
-    }
-  }
+  // {
+  //   std::lock_guard<std::mutex> lockGuard(serialLock);
+  //   if (!serialQueue.empty()) {
+  //     serialQueue.swap(serialDequeue);
+  //   }
+  // }
 
-  const auto queueSize = serialDequeue.size();
+  // const auto queueSize = serialDequeue.size();
+  const auto queueSize = serialConcurrentQueue.size_approx();
   if (queueSize > 0) {
     auto refThread = refTimeThread;
-    auto item = serialDequeue.data();
-    auto end = item + queueSize;
-    while (item != end) {
-      auto idx = MemRead<uint8_t>(&item->hdr.idx);
+    auto item = QueueItem{};
+    while (serialConcurrentQueue.try_dequeue(item)) {
+      auto idx = item.hdr.idx;
       switch ((QueueType)idx) {
         case QueueType::OperateBegin: {
-          auto t = MemRead<int64_t>(&item->operateBegin.time);
+          auto t = MemRead<int64_t>(&item.operateBegin.nsTime);
           auto dt = t - refThread;
           refThread = t;
-          MemWrite(&item->operateBegin.time, dt);
+          MemWrite(&item.operateBegin.nsTime, dt);
           break;
         }
         case QueueType::OperateEnd: {
-          auto t = MemRead<int64_t>(&item->operateEnd.time);
+          auto t = MemRead<int64_t>(&item.operateEnd.nsTime);
           auto dt = t - refThread;
           refThread = t;
-          MemWrite(&item->operateEnd.time, dt);
+          MemWrite(&item.operateEnd.nsTime, dt);
           break;
         }
         default:
           break;
       }
-      if (!appendData(item, QueueDataSize[idx])) {
+      if (!appendData(&item, QueueDataSize[idx])) {
         return DequeueStatus::ConnectionLost;
       }
-      ++item;
     }
+
+    // auto item = serialDequeue.data();
+    // auto end = item + queueSize;
+    // while (item != end) {
+    //   auto idx = MemRead<uint8_t>(&item->hdr.idx);
+    //   switch ((QueueType)idx) {
+    //     case QueueType::OperateBegin: {
+    //       auto t = MemRead<int64_t>(&item->operateBegin.nsTime);
+    //       auto dt = t - refThread;
+    //       refThread = t;
+    //       MemWrite(&item->operateBegin.nsTime, dt);
+    //       break;
+    //     }
+    //     case QueueType::OperateEnd: {
+    //       auto t = MemRead<int64_t>(&item->operateEnd.nsTime);
+    //       auto dt = t - refThread;
+    //       refThread = t;
+    //       MemWrite(&item->operateEnd.nsTime, dt);
+    //       break;
+    //     }
+    //     default:
+    //       break;
+    //   }
+    //   if (!appendData(item, QueueDataSize[idx])) {
+    //     return DequeueStatus::ConnectionLost;
+    //   }
+    //   ++item;
+    // }
     refTimeThread = refThread;
     serialDequeue.clear();
   } else {

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -32,13 +32,13 @@ bool TextureResolveTask::execute(RenderPass* renderPass) {
     LOGE("TextureResolveTask::execute() Failed to get render target!");
     return false;
   }
-  auto gpu = renderPass->getContext()->gpu();
+  auto context = renderPass->getContext();
   if (renderTarget->sampleCount() > 1) {
-    gpu->resolveRenderTarget(renderTarget.get(), renderTargetProxy->bounds());
+    context->gpu()->resolveRenderTarget(renderTarget.get(), renderTargetProxy->bounds());
   }
   auto texture = renderTargetProxy->getTexture();
-  if (texture != nullptr && texture->hasMipmaps()) {
-    gpu->regenerateMipmapLevels(texture->getSampler());
+  if (texture != nullptr) {
+    texture->getSampler()->regenerateMipmapLevels(context);
   }
   return true;
 }

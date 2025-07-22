@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -28,16 +28,27 @@ namespace tgfx {
 class PathRasterizer : public ImageCodec {
  public:
   /**
-   * Creates a new PathRasterizer instance with the specified width, height, shape, anti-aliasing
-   * setting, and gamma correction flag. Anti-aliasing and gamma correction are recommended for glyph
+   * Creates a new PathRasterizer instance with the specified width, height, path, antialiasing,
+   * and matrix. If the path is empty, it will be treated as a filled rectangle covering the
+   */
+  static std::shared_ptr<PathRasterizer> MakeFrom(int width, int height, Path path, bool antiAlias,
+                                                  const Matrix* matrix = nullptr,
+                                                  bool needsGammaCorrection = false);
+
+  /**
+   * Creates a new PathRasterizer instance with the specified width, height, shape, antialiasing
+   * setting, and gamma correction flag. Antialiasing and gamma correction are recommended for glyph
    * path rendering, while gamma correction is generally unnecessary for regular path rendering.
    */
-  static std::shared_ptr<PathRasterizer> Make(int width, int height, std::shared_ptr<Shape> shape,
-                                              bool antiAlias, bool needsGammaCorrection = false);
+  static std::shared_ptr<PathRasterizer> MakeFrom(int width, int height,
+                                                  std::shared_ptr<Shape> shape, bool antiAlias,
+                                                  bool needsGammaCorrection = false);
 
   bool isAlphaOnly() const override {
     return true;
   }
+
+  bool asyncSupport() const override;
 
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override = 0;
 

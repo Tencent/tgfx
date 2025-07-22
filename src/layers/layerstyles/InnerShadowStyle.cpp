@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2024 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2024 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/layerstyles/InnerShadowStyle.h"
-#include "OpaqueThreshold.h"
+#include "layers/OpaqueThreshold.h"
 
 namespace tgfx {
 
@@ -93,8 +93,8 @@ void InnerShadowStyle::onDraw(Canvas* canvas, std::shared_ptr<Image> content, fl
   if (!filter) {
     return;
   }
+  opaqueImage = opaqueImage->makeWithFilter(filter);
   Paint paint = {};
-  paint.setImageFilter(filter);
   paint.setBlendMode(blendMode);
   paint.setAlpha(alpha);
   canvas->drawImage(opaqueImage, &paint);

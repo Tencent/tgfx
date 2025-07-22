@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -24,41 +24,6 @@ void Rect::scale(float scaleX, float scaleY) {
   right *= scaleX;
   top *= scaleY;
   bottom *= scaleY;
-}
-
-bool Rect::setBounds(const Point pts[], int count) {
-  if (count <= 0) {
-    this->setEmpty();
-    return true;
-  }
-  float minX, maxX;
-  float minY, maxY;
-  minX = maxX = pts[0].x;
-  minY = maxY = pts[0].y;
-
-  for (int i = 1; i < count; i++) {
-    auto x = pts[i].x;
-    auto y = pts[i].y;
-    auto isFinite = ((x + y) * 0 == 0);
-    if (!isFinite) {
-      setEmpty();
-      return false;
-    }
-    if (x < minX) {
-      minX = x;
-    }
-    if (x > maxX) {
-      maxX = x;
-    }
-    if (y < minY) {
-      minY = y;
-    }
-    if (y > maxY) {
-      maxY = y;
-    }
-  }
-  setLTRB(minX, minY, maxX, maxY);
-  return true;
 }
 
 #define CHECK_INTERSECT(al, at, ar, ab, bl, bt, br, bb) \

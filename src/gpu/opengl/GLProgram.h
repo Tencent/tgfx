@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -19,11 +19,9 @@
 #pragma once
 
 #include <optional>
-#include "GLContext.h"
+#include "gpu/Pipeline.h"
 #include "gpu/Program.h"
-#include "gpu/ProgramInfo.h"
 #include "gpu/SLType.h"
-#include "gpu/opengl/GLRenderTarget.h"
 #include "gpu/opengl/GLUniformHandler.h"
 
 namespace tgfx {
@@ -35,10 +33,8 @@ class GLProgram : public Program {
     int location = 0;
   };
 
-  GLProgram(Context* context, unsigned programID, std::unique_ptr<GLUniformBuffer> uniformBuffer,
+  GLProgram(unsigned programID, std::unique_ptr<GLUniformBuffer> uniformBuffer,
             std::vector<Attribute> attributes, int vertexStride);
-
-  void setupSamplerUniforms(const std::vector<GLUniform>& textureSamplers) const;
 
   /**
    * Gets the GL program ID for this program.
@@ -53,8 +49,7 @@ class GLProgram : public Program {
    *
    * It is the caller's responsibility to ensure the program is bound before calling.
    */
-  void updateUniformsAndTextureBindings(const RenderTarget* renderTarget,
-                                        const ProgramInfo* programInfo);
+  void updateUniformsAndTextureBindings(const RenderTarget* renderTarget, const Pipeline* pipeline);
 
   int vertexStride() const {
     return _vertexStride;
