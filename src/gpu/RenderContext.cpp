@@ -110,13 +110,12 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(const Font& font, GlyphID glyph
   return glyphCodec;
 }
 
-static bool IsGlyphVisible(const Matrix& viewMatrix, float fontScale, const Point& position,
-                           const Rect& localBounds, const Rect& clipBounds) {
-  auto matrix = viewMatrix;
-  matrix.preTranslate(position.x, position.y);
-  matrix.preScale(1.f / fontScale, 1.f / fontScale);
-  auto deviceBounds = matrix.mapRect(localBounds);
-  return Rect::Intersects(deviceBounds, clipBounds);
+static bool IsGlyphVisible(float fontScale, const Point& position, const Rect& localBounds,
+                           const Rect& localClipBounds) {
+  auto bounds = localBounds;
+  bounds.scale(1.f / fontScale, 1.f / fontScale);
+  bounds.offset(position.x, position.y);
+  return Rect::Intersects(bounds, localClipBounds);
 }
 
 RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
@@ -227,6 +226,12 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   if (clipBounds.isEmpty() || !clipBounds.intersect(bounds)) {
     return;
   }
+  auto localClipBounds = clipBounds;
+  Matrix inverseMatrix = {};
+  if (!state.matrix.invert(&inverseMatrix)) {
+    return;
+  }
+  inverseMatrix.mapRect(&localClipBounds);
 
   std::vector<GlyphRun> rejectedGlyphRuns = {};
   const auto& glyphRuns = glyphRunList->glyphRuns();
@@ -236,7 +241,7 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
       continue;
     }
     GlyphRun rejectedGlyphRun = {};
-    drawGlyphsAsDirectMask(run, state, fill, stroke, clipBounds, &rejectedGlyphRun);
+    drawGlyphsAsDirectMask(run, state, fill, stroke, localClipBounds, &rejectedGlyphRun);
     if (rejectedGlyphRun.glyphs.empty()) {
       continue;
     }
@@ -250,7 +255,7 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
 
   if (!glyphRunList->hasColor() && glyphRunList->hasOutlines()) {
     auto rejectedGlyphRunList = std::make_shared<GlyphRunList>(std::move(rejectedGlyphRuns));
-    drawGlyphsAsPath(std::move(rejectedGlyphRunList), state, fill, stroke, clipBounds);
+    drawGlyphsAsPath(std::move(rejectedGlyphRunList), state, fill, stroke, localClipBounds);
     return;
   }
 
@@ -355,7 +360,8 @@ void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRe
 
 void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const MCState& state,
                                            const Fill& fill, const Stroke* stroke,
-                                           const Rect& clipBounds, GlyphRun* rejectedGlyphRun) {
+                                           const Rect& localClipBounds,
+                                           GlyphRun* rejectedGlyphRun) {
   auto compositor = getOpsCompositor();
   if (compositor == nullptr) {
     return;
@@ -387,7 +393,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
     if (scaledStroke) {
       ApplyStrokeToBounds(*scaledStroke, &bounds);
     }
-    if (!IsGlyphVisible(state.matrix, maxScale, glyphPosition, bounds, clipBounds)) {
+    if (!IsGlyphVisible(maxScale, glyphPosition, bounds, localClipBounds)) {
       continue;
     }
     auto maxDimension = static_cast<int>(ceilf(std::max(bounds.width(), bounds.height())));
@@ -453,14 +459,9 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
 }
 void RenderContext::drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList,
                                      const MCState& state, const Fill& fill, const Stroke* stroke,
-                                     const Rect& clipBounds) {
-  Matrix inverseMatrix = {};
-  if (!state.matrix.invert(&inverseMatrix)) {
-    return;
-  }
+                                     Rect& localClipBounds) {
   auto maxScale = state.matrix.getMaxScale();
   Path clipPath = {};
-  auto localClipBounds = inverseMatrix.mapRect(clipBounds);
   if (fill.antiAlias) {
     localClipBounds.outset(1.0f, 1.0f);
   }
