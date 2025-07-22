@@ -287,6 +287,18 @@ endif ()
 
 file(GLOB_RECURSE EGL_PLATFORM_FILES src/gpu/opengl/egl/*.*)
 
+if (TGFX_USE_INSPECTOR)
+    set(INSPECTOR_DIR ${CMAKE_CURRENT_LIST_DIR}/inspector)
+    list(APPEND TGFX_INCLUDES ${INSPECTOR_DIR}/client/include ${INSPECTOR_DIR}/client/src ${INSPECTOR_DIR}/common)
+    list(APPEND TGFX_STATIC_VENDORS inspector)
+
+    list(APPEND TGFX_DEFINES TGFX_USE_INSPECTOR)
+    list(APPEND TGFX_INCLUDES third_party/flatbuffers/include)
+    file(GLOB_RECURSE SERIALIZATION_FILE src/serialization/*.*)
+    list(APPEND TGFX_FILES ${SERIALIZATION_FILE})
+    list(APPEND TGFX_STATIC_VENDORS flatbuffers)
+endif ()
+
 if (TGFX_USE_QT)
     set(CMAKE_AUTOMOC ON)
     # need to set the CMAKE_PREFIX_PATH to local QT installation path, for example :
@@ -318,13 +330,6 @@ elseif (TGFX_USE_ANGLE)
     list(APPEND TGFX_FILES ${GPU_PLATFORM_FILES})
 else ()
     set(TGFX_USE_NATIVE_GL ON)
-endif ()
-
-if (TGFX_USE_INSPECTOR)
-    list(APPEND TGFX_DEFINES TGFX_USE_INSPECTOR)
-    list(APPEND TGFX_INCLUDES third_party/flatbuffers/include)
-    file(GLOB_RECURSE SERIALIZATION_FILE src/serialization/*.*)
-    list(APPEND TGFX_FILES ${SERIALIZATION_FILE})
 endif ()
 
 list(APPEND TGFX_STATIC_VENDORS pathkit)
