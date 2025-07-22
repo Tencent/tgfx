@@ -149,8 +149,8 @@ bool GLRenderPass::onBindProgramAndScissorClip(const Pipeline* pipeline, const R
   return true;
 }
 
-bool GLRenderPass::onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
-                                 std::shared_ptr<GpuBuffer> vertexBuffer, size_t vertexOffset) {
+bool GLRenderPass::onBindBuffers(std::shared_ptr<GPUBuffer> indexBuffer,
+                                 std::shared_ptr<GPUBuffer> vertexBuffer, size_t vertexOffset) {
   auto gl = GLFunctions::Get(context);
   if (vertexBuffer) {
     gl->bindBuffer(GL_ARRAY_BUFFER, std::static_pointer_cast<GLBuffer>(vertexBuffer)->bufferID());

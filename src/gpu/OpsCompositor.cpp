@@ -188,7 +188,7 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
     deviceBounds = shape->isInverseFillType() ? clipBounds : shape->getBounds();
   }
   auto aaType = getAAType(fill);
-  auto shapeProxy = proxyProvider()->createGpuShapeProxy(shape, aaType, clipBounds, renderFlags);
+  auto shapeProxy = proxyProvider()->createGPUShapeProxy(shape, aaType, clipBounds, renderFlags);
   auto drawOp =
       ShapeDrawOp::Make(std::move(shapeProxy), fill.color.premultiply(), uvMatrix, aaType);
   addDrawOp(std::move(drawOp), clip, fill, localBounds, deviceBounds);
@@ -526,7 +526,7 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
     auto clipBounds = Rect::MakeWH(width, height);
     auto shape = Shape::MakeFrom(clip);
     shape = Shape::ApplyMatrix(std::move(shape), rasterizeMatrix);
-    auto shapeProxy = proxyProvider()->createGpuShapeProxy(shape, aaType, clipBounds, renderFlags);
+    auto shapeProxy = proxyProvider()->createGPUShapeProxy(shape, aaType, clipBounds, renderFlags);
     auto uvMatrix = Matrix::MakeTrans(bounds.left, bounds.top);
     auto drawOp = ShapeDrawOp::Make(std::move(shapeProxy), {}, uvMatrix, aaType);
     auto clipRenderTarget = RenderTargetProxy::MakeFallback(

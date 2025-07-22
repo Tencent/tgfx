@@ -56,7 +56,7 @@ class RRectDrawOp : public DrawOp {
   bool useScale = false;
   bool hasStroke = false;
   std::optional<Color> commonColor = std::nullopt;
-  std::shared_ptr<GpuBufferProxy> indexBufferProxy = nullptr;
+  std::shared_ptr<GPUBufferProxy> indexBufferProxy = nullptr;
   std::shared_ptr<VertexBufferProxy> vertexBufferProxy = nullptr;
 
   explicit RRectDrawOp(RRectsVertexProvider* provider);

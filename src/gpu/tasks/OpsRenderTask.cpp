@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OpsRenderTask.h"
-#include "gpu/Gpu.h"
+#include "gpu/GPU.h"
 #include "gpu/RenderPass.h"
 
 namespace tgfx {

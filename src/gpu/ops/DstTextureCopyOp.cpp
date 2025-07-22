@@ -18,7 +18,7 @@
 
 #include "DstTextureCopyOp.h"
 #include "core/utils/Log.h"
-#include "gpu/Gpu.h"
+#include "gpu/GPU.h"
 #include "gpu/RenderPass.h"
 
 namespace tgfx {

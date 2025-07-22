@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLProgram.h"
-#include "GLGpu.h"
+#include "GLGPU.h"
 #include "GLUtil.h"
 
 namespace tgfx {
@@ -41,7 +41,7 @@ void GLProgram::updateUniformsAndTextureBindings(const RenderTarget* renderTarge
   uniformBuffer->uploadToGPU(context);
   auto samplers = pipeline->getSamplers();
   int textureUnit = 0;
-  auto gpu = static_cast<GLGpu*>(context->gpu());
+  auto gpu = static_cast<GLGPU*>(context->gpu());
   for (auto& info : samplers) {
     gpu->bindTexture(textureUnit++, info.sampler, info.state);
   }

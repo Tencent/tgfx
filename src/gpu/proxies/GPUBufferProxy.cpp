@@ -16,32 +16,32 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GpuBufferProxy.h"
+#include "GPUBufferProxy.h"
 #include "gpu/ProxyProvider.h"
 
 namespace tgfx {
-std::shared_ptr<GpuBufferProxy> GpuBufferProxy::MakeFrom(Context* context,
+std::shared_ptr<GPUBufferProxy> GPUBufferProxy::MakeFrom(Context* context,
                                                          std::shared_ptr<Data> data,
                                                          BufferType bufferType,
                                                          uint32_t renderFlags) {
   if (context == nullptr) {
     return nullptr;
   }
-  return context->proxyProvider()->createGpuBufferProxy({}, std::move(data), bufferType,
+  return context->proxyProvider()->createGPUBufferProxy({}, std::move(data), bufferType,
                                                         renderFlags);
 }
 
-std::shared_ptr<GpuBufferProxy> GpuBufferProxy::MakeFrom(Context* context,
+std::shared_ptr<GPUBufferProxy> GPUBufferProxy::MakeFrom(Context* context,
                                                          std::unique_ptr<DataSource<Data>> source,
                                                          BufferType bufferType,
                                                          uint32_t renderFlags) {
   if (context == nullptr) {
     return nullptr;
   }
-  return context->proxyProvider()->createGpuBufferProxy({}, std::move(source), bufferType,
+  return context->proxyProvider()->createGPUBufferProxy({}, std::move(source), bufferType,
                                                         renderFlags);
 }
 
-GpuBufferProxy::GpuBufferProxy(BufferType bufferType) : _bufferType(bufferType) {
+GPUBufferProxy::GPUBufferProxy(BufferType bufferType) : _bufferType(bufferType) {
 }
 }  // namespace tgfx

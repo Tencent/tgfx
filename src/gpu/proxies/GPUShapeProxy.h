@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include "gpu/proxies/GpuBufferProxy.h"
+#include "gpu/proxies/GPUBufferProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 
 namespace tgfx {
-class GpuShapeProxy {
+class GPUShapeProxy {
  public:
-  GpuShapeProxy(const Matrix& drawingMatrix, std::shared_ptr<GpuBufferProxy> triangles,
+  GPUShapeProxy(const Matrix& drawingMatrix, std::shared_ptr<GPUBufferProxy> triangles,
                 std::shared_ptr<TextureProxy> texture)
       : drawingMatrix(drawingMatrix), triangles(std::move(triangles)), texture(std::move(texture)) {
   }
@@ -40,7 +40,7 @@ class GpuShapeProxy {
     return drawingMatrix;
   }
 
-  std::shared_ptr<GpuBuffer> getTriangles() const {
+  std::shared_ptr<GPUBuffer> getTriangles() const {
     return triangles ? triangles->getBuffer() : nullptr;
   }
 
@@ -50,7 +50,7 @@ class GpuShapeProxy {
 
  private:
   Matrix drawingMatrix = {};
-  std::shared_ptr<GpuBufferProxy> triangles = nullptr;
+  std::shared_ptr<GPUBufferProxy> triangles = nullptr;
   std::shared_ptr<TextureProxy> texture = nullptr;
 };
 }  // namespace tgfx

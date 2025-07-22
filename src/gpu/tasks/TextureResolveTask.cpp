@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureResolveTask.h"
-#include "gpu/Gpu.h"
+#include "gpu/GPU.h"
 
 namespace tgfx {
 TextureResolveTask::TextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy)

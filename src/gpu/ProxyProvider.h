@@ -23,8 +23,8 @@
 #include "gpu/AAType.h"
 #include "gpu/BackingFit.h"
 #include "gpu/VertexProvider.h"
-#include "gpu/proxies/GpuBufferProxy.h"
-#include "gpu/proxies/GpuShapeProxy.h"
+#include "gpu/proxies/GPUBufferProxy.h"
+#include "gpu/proxies/GPUShapeProxy.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/proxies/VertexBufferProxy.h"
@@ -51,19 +51,19 @@ class ProxyProvider {
   std::shared_ptr<TextureProxy> findOrWrapTextureProxy(const UniqueKey& uniqueKey);
 
   /**
-   * Creates a GpuBufferProxy for the given Data. The data will be released after being uploaded to
+   * Creates a GPUBufferProxy for the given Data. The data will be released after being uploaded to
    * the GPU.
    */
-  std::shared_ptr<GpuBufferProxy> createGpuBufferProxy(const UniqueKey& uniqueKey,
+  std::shared_ptr<GPUBufferProxy> createGPUBufferProxy(const UniqueKey& uniqueKey,
                                                        std::shared_ptr<Data> data,
                                                        BufferType bufferType,
                                                        uint32_t renderFlags = 0);
 
   /**
-   * Creates a GpuBufferProxy for the given DataProvider. The source will be released after being
+   * Creates a GPUBufferProxy for the given DataProvider. The source will be released after being
    * uploaded to the GPU.
    */
-  std::shared_ptr<GpuBufferProxy> createGpuBufferProxy(const UniqueKey& uniqueKey,
+  std::shared_ptr<GPUBufferProxy> createGPUBufferProxy(const UniqueKey& uniqueKey,
                                                        std::unique_ptr<DataSource<Data>> source,
                                                        BufferType bufferType,
                                                        uint32_t renderFlags = 0);
@@ -76,10 +76,10 @@ class ProxyProvider {
                                                         uint32_t renderFlags = 0);
 
   /**
-   * Creates a GpuShapeProxy for the given Shape. The shape will be released after being uploaded to
+   * Creates a GPUShapeProxy for the given Shape. The shape will be released after being uploaded to
    * the GPU.
    */
-  std::shared_ptr<GpuShapeProxy> createGpuShapeProxy(std::shared_ptr<Shape> shape, AAType aaType,
+  std::shared_ptr<GPUShapeProxy> createGPUShapeProxy(std::shared_ptr<Shape> shape, AAType aaType,
                                                      const Rect& clipBounds,
                                                      uint32_t renderFlags = 0);
 
@@ -170,12 +170,12 @@ class ProxyProvider {
   Context* context = nullptr;
   ResourceKeyMap<std::weak_ptr<ResourceProxy>> proxyMap = {};
   bool sharedVertexBufferFlushed = false;
-  std::shared_ptr<GpuBufferProxy> sharedVertexBuffer = nullptr;
+  std::shared_ptr<GPUBufferProxy> sharedVertexBuffer = nullptr;
   std::vector<std::shared_ptr<Task>> sharedVertexBufferTasks = {};
   BlockBuffer vertexBlockBuffer = {};
   SlidingWindowTracker maxValueTracker = {10};
 
-  std::shared_ptr<GpuBufferProxy> findOrWrapGpuBufferProxy(const UniqueKey& uniqueKey);
+  std::shared_ptr<GPUBufferProxy> findOrWrapGPUBufferProxy(const UniqueKey& uniqueKey);
 
   void addResourceProxy(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& uniqueKey = {});
 

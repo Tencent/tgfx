@@ -58,14 +58,14 @@ RectDrawOp::RectDrawOp(RectsVertexProvider* provider)
 }
 
 void RectDrawOp::execute(RenderPass* renderPass) {
-  std::shared_ptr<GpuBuffer> indexBuffer;
+  std::shared_ptr<GPUBuffer> indexBuffer;
   if (indexBufferProxy) {
     indexBuffer = indexBufferProxy->getBuffer();
     if (indexBuffer == nullptr) {
       return;
     }
   }
-  std::shared_ptr<GpuBuffer> vertexBuffer =
+  std::shared_ptr<GPUBuffer> vertexBuffer =
       vertexBufferProxy ? vertexBufferProxy->getBuffer() : nullptr;
   if (vertexBuffer == nullptr) {
     return;

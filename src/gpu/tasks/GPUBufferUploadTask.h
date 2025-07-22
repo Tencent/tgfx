@@ -18,37 +18,22 @@
 
 #pragma once
 
-#include "gpu/Resource.h"
+#include "ResourceTask.h"
+#include "core/DataSource.h"
+#include "gpu/GPUBuffer.h"
+#include "tgfx/core/Data.h"
 
 namespace tgfx {
-enum class BufferType {
-  Index,
-  Vertex,
-};
-
-class GpuBuffer : public Resource {
+class GPUBufferUploadTask : public ResourceTask {
  public:
-  static std::shared_ptr<GpuBuffer> Make(Context* context, BufferType bufferType,
-                                         const void* buffer = nullptr, size_t size = 0);
-
-  BufferType bufferType() const {
-    return _bufferType;
-  }
-
-  size_t size() const {
-    return _size;
-  }
-
-  size_t memoryUsage() const override {
-    return _size;
-  }
+  GPUBufferUploadTask(std::shared_ptr<ResourceProxy> proxy, BufferType bufferType,
+                      std::unique_ptr<DataSource<Data>> source);
 
  protected:
-  BufferType _bufferType;
-  size_t _size;
+  std::shared_ptr<Resource> onMakeResource(Context* context) override;
 
-  GpuBuffer(BufferType bufferType, size_t sizeInBytes)
-      : _bufferType(bufferType), _size(sizeInBytes) {
-  }
+ private:
+  BufferType bufferType = BufferType::Vertex;
+  std::unique_ptr<DataSource<Data>> source = nullptr;
 };
 }  // namespace tgfx

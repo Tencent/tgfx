@@ -28,7 +28,7 @@ namespace tgfx {
 class GlobalCache;
 class ResourceCache;
 class DrawingManager;
-class Gpu;
+class GPU;
 class ResourceProvider;
 class ProxyProvider;
 class BlockBuffer;
@@ -197,14 +197,14 @@ class Context {
    */
   virtual void resetState() = 0;
 
-  Gpu* gpu() {
+  GPU* gpu() {
     return _gpu;
   }
 
  protected:
   explicit Context(Device* device);
 
-  Gpu* _gpu = nullptr;
+  GPU* _gpu = nullptr;
 
  private:
   Device* _device = nullptr;

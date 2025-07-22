@@ -16,28 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GpuBufferUploadTask.h"
+#include "GPUBufferUploadTask.h"
 #include "tgfx/core/Task.h"
 
 namespace tgfx {
-GpuBufferUploadTask::GpuBufferUploadTask(std::shared_ptr<ResourceProxy> proxy,
+GPUBufferUploadTask::GPUBufferUploadTask(std::shared_ptr<ResourceProxy> proxy,
                                          BufferType bufferType,
                                          std::unique_ptr<DataSource<Data>> source)
     : ResourceTask(std::move(proxy)), bufferType(bufferType), source(std::move(source)) {
 }
 
-std::shared_ptr<Resource> GpuBufferUploadTask::onMakeResource(Context* context) {
+std::shared_ptr<Resource> GPUBufferUploadTask::onMakeResource(Context* context) {
   if (source == nullptr) {
     return nullptr;
   }
   auto data = source->getData();
   if (data == nullptr || data->empty()) {
-    LOGE("GpuBufferUploadTask::onMakeResource() Failed to get data!");
+    LOGE("GPUBufferUploadTask::onMakeResource() Failed to get data!");
     return nullptr;
   }
-  auto gpuBuffer = GpuBuffer::Make(context, bufferType, data->data(), data->size());
+  auto gpuBuffer = GPUBuffer::Make(context, bufferType, data->data(), data->size());
   if (gpuBuffer == nullptr) {
-    LOGE("GpuBufferUploadTask::onMakeResource failed to upload the GpuBuffer!");
+    LOGE("GPUBufferUploadTask::onMakeResource failed to upload the GPUBuffer!");
   } else {
     // Free the data source immediately to reduce memory pressure.
     source = nullptr;

@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RRectDrawOp.h"
+#include "gpu/GPUBuffer.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/GpuBuffer.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"
 #include "tgfx/core/RenderFlags.h"
@@ -57,7 +57,7 @@ void RRectDrawOp::execute(RenderPass* renderPass) {
   if (indexBuffer == nullptr) {
     return;
   }
-  std::shared_ptr<GpuBuffer> vertexBuffer = vertexBufferProxy->getBuffer();
+  std::shared_ptr<GPUBuffer> vertexBuffer = vertexBufferProxy->getBuffer();
   if (vertexBuffer == nullptr) {
     return;
   }

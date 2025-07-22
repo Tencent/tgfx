@@ -18,22 +18,38 @@
 
 #pragma once
 
-#include "ResourceTask.h"
-#include "core/DataSource.h"
-#include "gpu/GpuBuffer.h"
-#include "tgfx/core/Data.h"
+#include <memory>
+#include "gpu/Semaphore.h"
+#include "gpu/TextureSampler.h"
+#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
-class GpuBufferUploadTask : public ResourceTask {
+class RenderTarget;
+class Texture;
+
+class GPU {
  public:
-  GpuBufferUploadTask(std::shared_ptr<ResourceProxy> proxy, BufferType bufferType,
-                      std::unique_ptr<DataSource<Data>> source);
+  virtual ~GPU() = default;
+
+  Context* getContext() {
+    return context;
+  }
+
+  virtual void copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture* texture,
+                                         int srcX, int srcY) = 0;
+
+  virtual void resolveRenderTarget(RenderTarget* renderTarget, const Rect& bounds) = 0;
+
+  virtual bool insertSemaphore(Semaphore* semaphore) = 0;
+
+  virtual bool waitSemaphore(const Semaphore* semaphore) = 0;
+
+  virtual bool submitToGPU(bool syncCpu) = 0;
 
  protected:
-  std::shared_ptr<Resource> onMakeResource(Context* context) override;
+  Context* context;
 
- private:
-  BufferType bufferType = BufferType::Vertex;
-  std::unique_ptr<DataSource<Data>> source = nullptr;
+  explicit GPU(Context* context) : context(context) {
+  }
 };
 }  // namespace tgfx
