@@ -58,7 +58,7 @@ AtlasTextOp::AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureP
 }
 
 void AtlasTextOp::execute(RenderPass* renderPass) {
-  std::shared_ptr<GpuBuffer> indexBuffer;
+  std::shared_ptr<GPUBuffer> indexBuffer;
   if (indexBufferProxy) {
     indexBuffer = indexBufferProxy->getBuffer();
     if (indexBuffer == nullptr) {

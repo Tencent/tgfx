@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/GpuBuffer.h"
+#include "gpu/GPUBuffer.h"
 #include "gpu/Pipeline.h"
 #include "gpu/RenderTarget.h"
 #include "tgfx/core/Color.h"
@@ -50,7 +50,7 @@ class RenderPass {
   bool begin(std::shared_ptr<RenderTarget> renderTarget);
   void end();
   void bindProgramAndScissorClip(const Pipeline* pipeline, const Rect& scissorRect);
-  void bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer, std::shared_ptr<GpuBuffer> vertexBuffer,
+  void bindBuffers(std::shared_ptr<GPUBuffer> indexBuffer, std::shared_ptr<GPUBuffer> vertexBuffer,
                    size_t vertexOffset = 0);
   void draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount);
   void drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount);
@@ -65,8 +65,8 @@ class RenderPass {
   virtual void onBindRenderTarget() = 0;
   virtual void onUnbindRenderTarget() = 0;
   virtual bool onBindProgramAndScissorClip(const Pipeline* pipeline, const Rect& drawBounds) = 0;
-  virtual bool onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
-                             std::shared_ptr<GpuBuffer> vertexBuffer, size_t vertexOffset) = 0;
+  virtual bool onBindBuffers(std::shared_ptr<GPUBuffer> indexBuffer,
+                             std::shared_ptr<GPUBuffer> vertexBuffer, size_t vertexOffset) = 0;
   virtual void onDraw(PrimitiveType primitiveType, size_t offset, size_t count,
                       bool drawIndexed) = 0;
   virtual void onClear(const Rect& scissor, Color color) = 0;

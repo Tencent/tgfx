@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include "gpu/Gpu.h"
+#include "gpu/GPU.h"
 #include "gpu/opengl/GLRenderPass.h"
 
 namespace tgfx {
-class GLGpu : public Gpu {
+class GLGPU : public GPU {
  public:
-  static std::unique_ptr<Gpu> Make(Context* context);
+  static std::unique_ptr<GPU> Make(Context* context);
 
   void bindTexture(int unitIndex, const TextureSampler* sampler, SamplerState samplerState = {});
 
@@ -37,10 +37,10 @@ class GLGpu : public Gpu {
 
   bool waitSemaphore(const Semaphore* semaphore) override;
 
-  bool submitToGpu(bool syncCpu) override;
+  bool submitToGPU(bool syncCpu) override;
 
  private:
-  explicit GLGpu(Context* context) : Gpu(context) {
+  explicit GLGPU(Context* context) : GPU(context) {
   }
 };
 }  // namespace tgfx

@@ -18,38 +18,37 @@
 
 #pragma once
 
-#include <memory>
-#include "gpu/Semaphore.h"
-#include "gpu/TextureSampler.h"
-#include "tgfx/gpu/Context.h"
+#include "gpu/Resource.h"
 
 namespace tgfx {
-class RenderTarget;
-class Texture;
+enum class BufferType {
+  Index,
+  Vertex,
+};
 
-class Gpu {
+class GPUBuffer : public Resource {
  public:
-  virtual ~Gpu() = default;
+  static std::shared_ptr<GPUBuffer> Make(Context* context, BufferType bufferType,
+                                         const void* buffer = nullptr, size_t size = 0);
 
-  Context* getContext() {
-    return context;
+  BufferType bufferType() const {
+    return _bufferType;
   }
 
-  virtual void copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture* texture,
-                                         int srcX, int srcY) = 0;
+  size_t size() const {
+    return _size;
+  }
 
-  virtual void resolveRenderTarget(RenderTarget* renderTarget, const Rect& bounds) = 0;
-
-  virtual bool insertSemaphore(Semaphore* semaphore) = 0;
-
-  virtual bool waitSemaphore(const Semaphore* semaphore) = 0;
-
-  virtual bool submitToGpu(bool syncCpu) = 0;
+  size_t memoryUsage() const override {
+    return _size;
+  }
 
  protected:
-  Context* context;
+  BufferType _bufferType;
+  size_t _size;
 
-  explicit Gpu(Context* context) : context(context) {
+  GPUBuffer(BufferType bufferType, size_t sizeInBytes)
+      : _bufferType(bufferType), _size(sizeInBytes) {
   }
 };
 }  // namespace tgfx

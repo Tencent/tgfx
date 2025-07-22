@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RenderPass.h"
-#include "gpu/Gpu.h"
+#include "gpu/GPU.h"
 
 namespace tgfx {
 bool RenderPass::begin(std::shared_ptr<RenderTarget> renderTarget) {
@@ -44,8 +44,8 @@ void RenderPass::bindProgramAndScissorClip(const Pipeline* pipeline, const Rect&
   drawPipelineStatus = DrawPipelineStatus::Ok;
 }
 
-void RenderPass::bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
-                             std::shared_ptr<GpuBuffer> vertexBuffer, size_t vertexOffset) {
+void RenderPass::bindBuffers(std::shared_ptr<GPUBuffer> indexBuffer,
+                             std::shared_ptr<GPUBuffer> vertexBuffer, size_t vertexOffset) {
   if (drawPipelineStatus != DrawPipelineStatus::Ok) {
     return;
   }

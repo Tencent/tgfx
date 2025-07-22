@@ -20,7 +20,7 @@
 #include "core/utils/PixelFormatUtil.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/DefaultTexture.h"
-#include "gpu/Gpu.h"
+#include "gpu/GPU.h"
 #include "gpu/YUVTexture.h"
 #if defined(__OHOS__)
 #include <native_buffer/native_buffer.h>

@@ -16,15 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLGpu.h"
+#include "GLGPU.h"
 #include "GLUtil.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/opengl/GLRenderTarget.h"
 #include "gpu/opengl/GLSemaphore.h"
 
 namespace tgfx {
-std::unique_ptr<Gpu> GLGpu::Make(Context* context) {
-  return std::unique_ptr<GLGpu>(new GLGpu(context));
+std::unique_ptr<GPU> GLGPU::Make(Context* context) {
+  return std::unique_ptr<GLGPU>(new GLGPU(context));
 }
 
 static int FilterToGLMagFilter(FilterMode filterMode) {
@@ -76,7 +76,7 @@ static int GetGLWrap(unsigned target, SamplerState::WrapMode wrapMode) {
   }
 }
 
-void GLGpu::bindTexture(int unitIndex, const TextureSampler* sampler, SamplerState samplerState) {
+void GLGPU::bindTexture(int unitIndex, const TextureSampler* sampler, SamplerState samplerState) {
   if (sampler == nullptr) {
     return;
   }
@@ -95,7 +95,7 @@ void GLGpu::bindTexture(int unitIndex, const TextureSampler* sampler, SamplerSta
   gl->texParameteri(target, GL_TEXTURE_MAG_FILTER, FilterToGLMagFilter(samplerState.filterMode));
 }
 
-void GLGpu::copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture* texture, int srcX,
+void GLGPU::copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture* texture, int srcX,
                                       int srcY) {
   auto width = std::min(texture->width(), renderTarget->width() - srcX);
   auto height = std::min(texture->height(), renderTarget->height() - srcY);
@@ -108,7 +108,7 @@ void GLGpu::copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture*
   gl->copyTexSubImage2D(target, 0, 0, 0, srcX, srcY, width, height);
 }
 
-void GLGpu::resolveRenderTarget(RenderTarget* renderTarget, const Rect& bounds) {
+void GLGPU::resolveRenderTarget(RenderTarget* renderTarget, const Rect& bounds) {
   if (renderTarget->sampleCount() <= 1) {
     return;
   }
@@ -141,7 +141,7 @@ void GLGpu::resolveRenderTarget(RenderTarget* renderTarget, const Rect& bounds) 
   }
 }
 
-bool GLGpu::insertSemaphore(Semaphore* semaphore) {
+bool GLGPU::insertSemaphore(Semaphore* semaphore) {
   if (semaphore == nullptr) {
     return false;
   }
@@ -156,7 +156,7 @@ bool GLGpu::insertSemaphore(Semaphore* semaphore) {
   return false;
 }
 
-bool GLGpu::waitSemaphore(const Semaphore* semaphore) {
+bool GLGPU::waitSemaphore(const Semaphore* semaphore) {
   auto glSync = static_cast<const GLSemaphore*>(semaphore)->glSync;
   if (glSync == nullptr) {
     return false;
@@ -167,7 +167,7 @@ bool GLGpu::waitSemaphore(const Semaphore* semaphore) {
   return true;
 }
 
-bool GLGpu::submitToGpu(bool syncCpu) {
+bool GLGPU::submitToGPU(bool syncCpu) {
   auto gl = GLFunctions::Get(context);
   if (syncCpu) {
     gl->finish();

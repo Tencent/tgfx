@@ -81,7 +81,7 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
 }
 
 bool Context::submit(bool syncCpu) {
-  return _gpu->submitToGpu(syncCpu);
+  return _gpu->submitToGPU(syncCpu);
 }
 
 void Context::flushAndSubmit(bool syncCpu) {

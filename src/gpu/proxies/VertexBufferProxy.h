@@ -19,24 +19,24 @@
 #pragma once
 
 #include "core/utils/Log.h"
-#include "gpu/proxies/GpuBufferProxy.h"
+#include "gpu/proxies/GPUBufferProxy.h"
 
 namespace tgfx {
 /**
  * VertexBufferProxy serves as a proxy for a vertex buffer, referencing a specific range within a
- * GpuBuffer through GpuBufferProxy. It keeps track of the offset and size of the data in the buffer.
+ * GPUBuffer through GPUBufferProxy. It keeps track of the offset and size of the data in the buffer.
  */
 class VertexBufferProxy {
  public:
-  VertexBufferProxy(std::shared_ptr<GpuBufferProxy> bufferProxy, size_t offset, size_t size)
+  VertexBufferProxy(std::shared_ptr<GPUBufferProxy> bufferProxy, size_t offset, size_t size)
       : proxy(std::move(bufferProxy)), _offset(offset), _size(size) {
     DEBUG_ASSERT(proxy != nullptr);
   }
 
   /**
-   * Returns the GpuBuffer associated with this VertexBufferProxy.
+   * Returns the GPUBuffer associated with this VertexBufferProxy.
    */
-  std::shared_ptr<GpuBuffer> getBuffer() const {
+  std::shared_ptr<GPUBuffer> getBuffer() const {
     return proxy ? proxy->getBuffer() : nullptr;
   }
 
@@ -55,7 +55,7 @@ class VertexBufferProxy {
   }
 
  private:
-  std::shared_ptr<GpuBufferProxy> proxy = nullptr;
+  std::shared_ptr<GPUBufferProxy> proxy = nullptr;
   size_t _offset = 0;
   size_t _size = 0;
 };

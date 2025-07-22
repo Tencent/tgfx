@@ -20,21 +20,21 @@
 
 #include "ResourceProxy.h"
 #include "core/DataSource.h"
-#include "gpu/GpuBuffer.h"
+#include "gpu/GPUBuffer.h"
 #include "tgfx/core/Data.h"
 
 namespace tgfx {
-class GpuBufferProxy : public ResourceProxy {
+class GPUBufferProxy : public ResourceProxy {
  public:
   /**
-   * Creates a GpuBufferProxy from the given data.
+   * Creates a GPUBufferProxy from the given data.
    */
-  static std::shared_ptr<GpuBufferProxy> MakeFrom(Context* context, std::shared_ptr<Data> data,
+  static std::shared_ptr<GPUBufferProxy> MakeFrom(Context* context, std::shared_ptr<Data> data,
                                                   BufferType bufferType, uint32_t renderFlags);
   /**
-   * Creates a GpuBufferProxy from the given data provider.
+   * Creates a GPUBufferProxy from the given data provider.
    */
-  static std::shared_ptr<GpuBufferProxy> MakeFrom(Context* context,
+  static std::shared_ptr<GPUBufferProxy> MakeFrom(Context* context,
                                                   std::unique_ptr<DataSource<Data>> source,
                                                   BufferType bufferType, uint32_t renderFlags);
 
@@ -46,16 +46,16 @@ class GpuBufferProxy : public ResourceProxy {
   }
 
   /**
-   * Returns the associated GpuBuffer instance.
+   * Returns the associated GPUBuffer instance.
    */
-  std::shared_ptr<GpuBuffer> getBuffer() const {
-    return std::static_pointer_cast<GpuBuffer>(resource);
+  std::shared_ptr<GPUBuffer> getBuffer() const {
+    return std::static_pointer_cast<GPUBuffer>(resource);
   }
 
  private:
   BufferType _bufferType = BufferType::Vertex;
 
-  explicit GpuBufferProxy(BufferType bufferType);
+  explicit GPUBufferProxy(BufferType bufferType);
 
   friend class ProxyProvider;
 };

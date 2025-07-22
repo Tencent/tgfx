@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShapeBufferUploadTask.h"
-#include "gpu/GpuBuffer.h"
+#include "gpu/GPUBuffer.h"
 #include "gpu/Texture.h"
 
 namespace tgfx {
@@ -37,11 +37,11 @@ std::shared_ptr<Resource> ShapeBufferUploadTask::onMakeResource(Context* context
     // No need to log an error here; the shape might not be a filled path or could be invisible.
     return nullptr;
   }
-  std::shared_ptr<GpuBuffer> gpuBuffer = nullptr;
+  std::shared_ptr<GPUBuffer> gpuBuffer = nullptr;
   if (auto triangles = shapeBuffer->triangles) {
-    gpuBuffer = GpuBuffer::Make(context, BufferType::Vertex, triangles->data(), triangles->size());
+    gpuBuffer = GPUBuffer::Make(context, BufferType::Vertex, triangles->data(), triangles->size());
     if (!gpuBuffer) {
-      LOGE("ShapeBufferUploadTask::execute() Failed to create the GpuBuffer!");
+      LOGE("ShapeBufferUploadTask::execute() Failed to create the GPUBuffer!");
       return nullptr;
     }
   } else {
