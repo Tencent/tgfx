@@ -235,8 +235,7 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
 
   std::vector<GlyphRun> rejectedGlyphRuns = {};
   const auto& glyphRuns = glyphRunList->glyphRuns();
-  for (size_t i = 0; i < glyphRuns.size(); ++i) {
-    auto& run = glyphRuns[i];
+  for (const auto& run : glyphRuns) {
     if (run.font.getTypeface() == nullptr) {
       continue;
     }
