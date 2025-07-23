@@ -126,6 +126,8 @@ class ImageFilter {
    */
   Rect filterBounds(const Rect& rect) const;
 
+  std::shared_ptr<ImageFilter> makeScaled(const Point& scale) const;
+
  protected:
   enum class Type { Blur, DropShadow, InnerShadow, Color, Compose, Runtime };
 
@@ -160,6 +162,8 @@ class ImageFilter {
                                                               SrcRectConstraint constraint,
                                                               const Matrix* uvMatrix) const = 0;
 
+  virtual std::shared_ptr<ImageFilter> onMakeScaled(const Point& scale) const = 0;
+
   bool applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipBounds = nullptr) const;
 
   PlacementPtr<FragmentProcessor> makeFPFromTextureProxy(std::shared_ptr<Image> source,
@@ -167,6 +171,8 @@ class ImageFilter {
                                                          const SamplingOptions& sampling,
                                                          SrcRectConstraint constraint,
                                                          const Matrix* uvMatrix) const;
+
+  std::weak_ptr<ImageFilter> weakThis;
 
   friend class DropShadowImageFilter;
   friend class InnerShadowImageFilter;

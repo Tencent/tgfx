@@ -32,9 +32,10 @@
 namespace tgfx {
 RuntimeDrawTask::RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
                                  std::vector<std::shared_ptr<TextureProxy>> inputs,
-                                 std::shared_ptr<RuntimeEffect> effect, const Point& offset)
+                                 std::shared_ptr<RuntimeEffect> effect, const Point& offset,
+                                 const Point& scale)
     : renderTargetProxy(std::move(target)), inputTextures(std::move(inputs)),
-      effect(std::move(effect)), offset(offset) {
+      effect(std::move(effect)), offset(offset), scale(scale) {
   auto context = renderTargetProxy->getContext();
   inputVertexBuffers.reserve(inputTextures.size());
   for (auto& input : inputTextures) {
@@ -83,7 +84,7 @@ void RuntimeDrawTask::execute(GPU* gpu) {
     backendTextures.push_back(texture->getBackendTexture());
   }
   effect->onDraw(RuntimeProgramWrapper::Unwrap(program.get()), backendTextures,
-                 renderTarget->getBackendRenderTarget(), offset);
+                 renderTarget->getBackendRenderTarget(), offset, scale);
   if (renderTarget->sampleCount() > 1) {
     auto renderPass = RenderPass::Make(renderTarget, true);
     DEBUG_ASSERT(renderPass != nullptr);

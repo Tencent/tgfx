@@ -35,6 +35,10 @@ class BlurImageFilter : public ImageFilter {
   Type type() const override {
     return Type::Blur;
   }
+
+  std::shared_ptr<ImageFilter> onMakeScaled(const Point& scale) const override {
+    return Blur(blurrinessX * scale.x, blurrinessY * scale.y, tileMode);
+  }
 };
 
 }  // namespace tgfx

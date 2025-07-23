@@ -39,7 +39,9 @@ std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrine
   if (blurrinessX < 0 || blurrinessY < 0 || (blurrinessX == 0 && blurrinessY == 0)) {
     return nullptr;
   }
-  return std::make_shared<GaussianBlurImageFilter>(blurrinessX, blurrinessY, tileMode);
+  auto result = std::make_shared<GaussianBlurImageFilter>(blurrinessX, blurrinessY, tileMode);
+  result->weakThis = result;
+  return result;
 }
 #endif
 

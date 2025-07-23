@@ -40,6 +40,8 @@ class ComposeImageFilter : public ImageFilter {
                                                       SrcRectConstraint constraint,
                                                       const Matrix* uvMatrix) const override;
 
+  std::shared_ptr<ImageFilter> onMakeScaled(const Point& scale) const override;
+
   friend class ImageFilter;
 };
 }  // namespace tgfx

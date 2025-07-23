@@ -26,6 +26,9 @@ class DropShadowImageFilter : public ImageFilter {
   DropShadowImageFilter(float dx, float dy, float blurrinessX, float blurrinessY,
                         const Color& color, bool shadowOnly);
 
+  DropShadowImageFilter(float dx, float dy, std::shared_ptr<ImageFilter> blurFilter,
+                        const Color& color, bool shadowOnly);
+
   float dx = 0;
   float dy = 0;
   std::shared_ptr<ImageFilter> blurFilter = nullptr;
@@ -44,5 +47,7 @@ class DropShadowImageFilter : public ImageFilter {
                                                       const SamplingOptions& sampling,
                                                       SrcRectConstraint constraint,
                                                       const Matrix* uvMatrix) const override;
+
+  std::shared_ptr<ImageFilter> onMakeScaled(const Point& scale) const override;
 };
 }  // namespace tgfx

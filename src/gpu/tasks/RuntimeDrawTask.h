@@ -28,7 +28,7 @@ class RuntimeDrawTask : public RenderTask {
  public:
   RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
                   std::vector<std::shared_ptr<TextureProxy>> inputs,
-                  std::shared_ptr<RuntimeEffect> effect, const Point& offset);
+                  std::shared_ptr<RuntimeEffect> effect, const Point& offset, const Point& scale);
 
   void execute(GPU* gpu) override;
 
@@ -38,6 +38,7 @@ class RuntimeDrawTask : public RenderTask {
   std::vector<std::shared_ptr<VertexBufferProxy>> inputVertexBuffers = {};
   std::shared_ptr<RuntimeEffect> effect = nullptr;
   Point offset = {};
+  Point scale = {1.0f, 1.0f};
 
   static std::shared_ptr<Texture> GetFlatTexture(GPU* gpu,
                                                  std::shared_ptr<TextureProxy> textureProxy,
