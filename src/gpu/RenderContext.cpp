@@ -218,16 +218,21 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
   if (clipBounds.isEmpty() || !clipBounds.intersect(bounds)) {
     return;
   }
+  auto localClipBounds = clipBounds;
+  Matrix inverseMatrix = {};
+  if (!state.matrix.invert(&inverseMatrix)) {
+    return;
+  }
+  inverseMatrix.mapRect(&localClipBounds);
 
   std::vector<GlyphRun> rejectedGlyphRuns = {};
   const auto& glyphRuns = glyphRunList->glyphRuns();
-  for (size_t i = 0; i < glyphRuns.size(); ++i) {
-    auto& run = glyphRuns[i];
+  for (const auto& run : glyphRuns) {
     if (run.font.getTypeface() == nullptr) {
       continue;
     }
     GlyphRun rejectedGlyphRun = {};
-    drawGlyphsAsDirectMask(run, state, fill, stroke, &rejectedGlyphRun);
+    drawGlyphsAsDirectMask(run, state, fill, stroke, localClipBounds, &rejectedGlyphRun);
     if (rejectedGlyphRun.glyphs.empty()) {
       continue;
     }
@@ -241,7 +246,7 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
 
   if (!glyphRunList->hasColor() && glyphRunList->hasOutlines()) {
     auto rejectedGlyphRunList = std::make_shared<GlyphRunList>(std::move(rejectedGlyphRuns));
-    drawGlyphsAsPath(std::move(rejectedGlyphRunList), state, fill, stroke, clipBounds);
+    drawGlyphsAsPath(std::move(rejectedGlyphRunList), state, fill, stroke, localClipBounds);
     return;
   }
 
@@ -346,6 +351,7 @@ void RenderContext::replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRe
 
 void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const MCState& state,
                                            const Fill& fill, const Stroke* stroke,
+                                           const Rect& localClipBounds,
                                            GlyphRun* rejectedGlyphRun) {
   auto compositor = getOpsCompositor();
   if (compositor == nullptr) {
@@ -377,6 +383,12 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
     }
     if (scaledStroke) {
       ApplyStrokeToBounds(*scaledStroke, &bounds);
+    }
+    auto localBounds = bounds;
+    localBounds.scale(1.f / maxScale, 1.f / maxScale);
+    localBounds.offset(glyphPosition.x, glyphPosition.y);
+    if (!Rect::Intersects(localBounds, localClipBounds)) {
+      continue;
     }
     auto maxDimension = static_cast<int>(ceilf(std::max(bounds.width(), bounds.height())));
     if (maxDimension >= Atlas::MaxCellSize) {
@@ -441,14 +453,9 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
 }
 void RenderContext::drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList,
                                      const MCState& state, const Fill& fill, const Stroke* stroke,
-                                     const Rect& clipBounds) {
-  Matrix inverseMatrix = {};
-  if (!state.matrix.invert(&inverseMatrix)) {
-    return;
-  }
+                                     Rect& localClipBounds) {
   auto maxScale = state.matrix.getMaxScale();
   Path clipPath = {};
-  auto localClipBounds = inverseMatrix.mapRect(clipBounds);
   if (fill.antiAlias) {
     localClipBounds.outset(1.0f, 1.0f);
   }
