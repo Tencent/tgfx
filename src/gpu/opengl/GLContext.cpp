@@ -23,9 +23,17 @@
 namespace tgfx {
 GLContext::GLContext(Device* device, const GLInterface* glInterface)
     : Context(device), glInterface(glInterface) {
-  _gpu = GLGPU::Make(this).release();
+  _gpu = new GLGPU(this);
+  if (glInterface->caps->vertexArrayObjectSupport) {
+    _sharedVertexArray = GLVertexArray::Make(this);
+    DEBUG_ASSERT(_sharedVertexArray != nullptr);
+  }
+  _sharedFrameBuffer = GLFrameBuffer::Make(this);
+  DEBUG_ASSERT(_sharedFrameBuffer != nullptr);
 }
 
-void GLContext::resetState() {
+GLContext::~GLContext() {
+  delete _gpu;
 }
+
 }  // namespace tgfx

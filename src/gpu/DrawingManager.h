@@ -58,7 +58,7 @@ class DrawingManager {
   void addTextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTarget);
 
   void addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
-                               std::shared_ptr<TextureProxy> dest);
+                               std::shared_ptr<TextureProxy> dest, int srcX = 0, int srcY = 0);
 
   void addResourceTask(PlacementPtr<ResourceTask> resourceTask, const UniqueKey& uniqueKey = {},
                        uint32_t renderFlags = 0);

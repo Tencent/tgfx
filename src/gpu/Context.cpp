@@ -48,7 +48,6 @@ Context::~Context() {
   delete _globalCache;
   delete _resourceCache;
   delete _drawingManager;
-  delete _gpu;
   delete _proxyProvider;
   delete _drawingBuffer;
   delete _atlasManager;
@@ -66,7 +65,7 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
   bool semaphoreInserted = false;
   if (signalSemaphore != nullptr) {
     auto semaphore = Semaphore::Wrap(signalSemaphore);
-    semaphoreInserted = caps()->semaphoreSupport && _gpu->insertSemaphore(semaphore.get());
+    semaphoreInserted = caps()->semaphoreSupport && gpu()->insertSemaphore(semaphore.get());
     if (semaphoreInserted) {
       *signalSemaphore = semaphore->getBackendSemaphore();
     }
@@ -81,7 +80,7 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
 }
 
 bool Context::submit(bool syncCpu) {
-  return _gpu->submitToGPU(syncCpu);
+  return gpu()->submitToGPU(syncCpu);
 }
 
 void Context::flushAndSubmit(bool syncCpu) {
@@ -94,7 +93,7 @@ bool Context::wait(const BackendSemaphore& waitSemaphore) {
   if (semaphore == nullptr) {
     return false;
   }
-  return caps()->semaphoreSupport && _gpu->waitSemaphore(semaphore.get());
+  return caps()->semaphoreSupport && gpu()->waitSemaphore(semaphore.get());
 }
 
 size_t Context::memoryUsage() const {

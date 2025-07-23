@@ -19,8 +19,9 @@
 #pragma once
 
 #include "GLInterface.h"
-#include "gpu/SamplerState.h"
+#include "gpu/opengl/GLFrameBuffer.h"
 #include "gpu/opengl/GLTextureSampler.h"
+#include "gpu/opengl/GLVertexArray.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
@@ -34,6 +35,8 @@ class GLContext : public Context {
 
   GLContext(Device* device, const GLInterface* glInterface);
 
+  ~GLContext() override;
+
   Backend backend() const override {
     return Backend::OPENGL;
   }
@@ -46,10 +49,23 @@ class GLContext : public Context {
     return glInterface->caps.get();
   }
 
-  void resetState() override;
+  GPU* gpu() const override {
+    return _gpu;
+  }
+
+  std::shared_ptr<GLVertexArray> sharedVertexArray() const {
+    return _sharedVertexArray;
+  }
+
+  std::shared_ptr<GLFrameBuffer> sharedFrameBuffer() const {
+    return _sharedFrameBuffer;
+  }
 
  private:
+  GPU* _gpu = nullptr;
   const GLInterface* glInterface = nullptr;
+  std::shared_ptr<GLVertexArray> _sharedVertexArray = nullptr;
+  std::shared_ptr<GLFrameBuffer> _sharedFrameBuffer = nullptr;
 
   friend class GLDevice;
   friend class GLInterface;

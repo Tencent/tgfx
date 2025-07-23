@@ -55,8 +55,6 @@ class RenderPass {
   void draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount);
   void drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount);
   void clear(const Rect& scissor, Color color);
-  void resolve(const Rect& bounds);
-  void copyToTexture(Texture* texture, int srcX, int srcY);
 
  protected:
   explicit RenderPass(Context* context) : context(context) {
@@ -70,7 +68,6 @@ class RenderPass {
   virtual void onDraw(PrimitiveType primitiveType, size_t offset, size_t count,
                       bool drawIndexed) = 0;
   virtual void onClear(const Rect& scissor, Color color) = 0;
-  virtual void onCopyToTexture(Texture* texture, int srcX, int srcY) = 0;
 
   Context* context = nullptr;
   std::shared_ptr<RenderTarget> _renderTarget = nullptr;

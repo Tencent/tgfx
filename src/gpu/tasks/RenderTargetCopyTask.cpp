@@ -20,8 +20,8 @@
 
 namespace tgfx {
 RenderTargetCopyTask::RenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
-                                           std::shared_ptr<TextureProxy> dest)
-    : RenderTask(std::move(source)), dest(std::move(dest)) {
+                                           std::shared_ptr<TextureProxy> dest, int srcX, int srcY)
+    : RenderTask(std::move(source)), dest(std::move(dest)), srcX(srcX), srcY(srcY) {
 }
 
 bool RenderTargetCopyTask::execute(RenderPass* renderPass) {
@@ -38,7 +38,7 @@ bool RenderTargetCopyTask::execute(RenderPass* renderPass) {
   DEBUG_ASSERT(renderTarget->width() == texture->width() &&
                renderTarget->height() == texture->height());
   auto context = renderPass->getContext();
-  context->gpu()->copyRenderTargetToTexture(renderTarget.get(), texture.get(), 0, 0);
+  context->gpu()->copyRenderTargetToTexture(renderTarget.get(), texture.get(), srcX, srcY);
   texture->getSampler()->regenerateMipmapLevels(context);
   return true;
 }

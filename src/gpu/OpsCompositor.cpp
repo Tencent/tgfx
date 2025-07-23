@@ -27,8 +27,6 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/AtlasTextOp.h"
 #include "gpu/ops/ClearOp.h"
-#include "gpu/ops/DstTextureCopyOp.h"
-#include "gpu/ops/ResolveOp.h"
 #include "gpu/ops/ShapeDrawOp.h"
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
@@ -446,11 +444,10 @@ void OpsCompositor::makeClosed() {
     return;
   }
   flushPendingOps();
-  auto drawingManager = context->drawingManager();
-  auto opArray = drawingBuffer()->makeArray(std::move(ops));
-  drawingManager->addOpsRenderTask(std::move(renderTarget), std::move(opArray));
+  submitDrawOps();
+  renderTarget = nullptr;
   // Remove the compositor from the list, so it won't be flushed again.
-  drawingManager->compositors.erase(cachedPosition);
+  context->drawingManager()->compositors.erase(cachedPosition);
 }
 
 AAType OpsCompositor::getAAType(const Fill& fill) const {
@@ -604,25 +601,23 @@ DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AATyp
   DstTextureInfo dstTextureInfo = {};
   if (textureProxy != nullptr) {
     if (renderTarget->sampleCount() > 1) {
-      auto resolveOp = ResolveOp::Make(context, bounds);
-      if (resolveOp) {
-        ops.emplace_back(std::move(resolveOp));
-      }
+      // Submit draw ops immediately to ensure the MSAA render target is resolved.
+      submitDrawOps();
     }
     dstTextureInfo.textureProxy = std::move(textureProxy);
     dstTextureInfo.requiresBarrier = true;
     return dstTextureInfo;
   }
+  submitDrawOps();
   dstTextureInfo.offset = {bounds.x(), bounds.y()};
   textureProxy = proxyProvider()->createTextureProxy(
       {}, static_cast<int>(bounds.width()), static_cast<int>(bounds.height()),
       renderTarget->format(), false, renderTarget->origin(), BackingFit::Approx);
-  auto dstTextureCopyOp = DstTextureCopyOp::Make(textureProxy, static_cast<int>(bounds.x()),
-                                                 static_cast<int>(bounds.y()));
-  if (dstTextureCopyOp == nullptr) {
+  if (textureProxy == nullptr) {
     return {};
   }
-  ops.emplace_back(std::move(dstTextureCopyOp));
+  context->drawingManager()->addRenderTargetCopyTask(
+      renderTarget, textureProxy, static_cast<int>(bounds.x()), static_cast<int>(bounds.y()));
   dstTextureInfo.textureProxy = std::move(textureProxy);
   return dstTextureInfo;
 }
@@ -695,4 +690,10 @@ void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, co
   auto record = drawingBuffer()->make<RectRecord>(rect, state.matrix, fill.color.premultiply());
   pendingRects.emplace_back(std::move(record));
 }
+
+void OpsCompositor::submitDrawOps() {
+  auto opArray = drawingBuffer()->makeArray(std::move(ops));
+  context->drawingManager()->addOpsRenderTask(renderTarget, std::move(opArray));
+}
+
 }  // namespace tgfx

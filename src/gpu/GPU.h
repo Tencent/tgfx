@@ -38,7 +38,7 @@ class GPU {
   virtual void copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture* texture,
                                          int srcX, int srcY) = 0;
 
-  virtual void resolveRenderTarget(RenderTarget* renderTarget, const Rect& bounds) = 0;
+  virtual void resolveRenderTarget(RenderTarget* renderTarget) = 0;
 
   virtual bool insertSemaphore(Semaphore* semaphore) = 0;
 

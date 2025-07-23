@@ -23,10 +23,6 @@
 #include "gpu/opengl/GLSemaphore.h"
 
 namespace tgfx {
-std::unique_ptr<GPU> GLGPU::Make(Context* context) {
-  return std::unique_ptr<GLGPU>(new GLGPU(context));
-}
-
 static int FilterToGLMagFilter(FilterMode filterMode) {
   switch (filterMode) {
     case FilterMode::Nearest:
@@ -108,7 +104,7 @@ void GLGPU::copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture*
   gl->copyTexSubImage2D(target, 0, 0, 0, srcX, srcY, width, height);
 }
 
-void GLGPU::resolveRenderTarget(RenderTarget* renderTarget, const Rect& bounds) {
+void GLGPU::resolveRenderTarget(RenderTarget* renderTarget) {
   if (renderTarget->sampleCount() <= 1) {
     return;
   }
@@ -117,26 +113,17 @@ void GLGPU::resolveRenderTarget(RenderTarget* renderTarget, const Rect& bounds) 
   if (!caps->usesMSAARenderBuffers()) {
     return;
   }
-  auto left = static_cast<int>(bounds.left);
-  auto top = static_cast<int>(bounds.top);
-  auto right = static_cast<int>(bounds.right);
-  auto bottom = static_cast<int>(bounds.bottom);
-  DEBUG_ASSERT(bounds.left == static_cast<float>(left) && bounds.top == static_cast<float>(top) &&
-               bounds.right == static_cast<float>(right) &&
-               bounds.bottom == static_cast<float>(bottom));
   auto glRT = static_cast<GLRenderTarget*>(renderTarget);
   gl->bindFramebuffer(GL_READ_FRAMEBUFFER, glRT->drawFrameBufferID());
   gl->bindFramebuffer(GL_DRAW_FRAMEBUFFER, glRT->readFrameBufferID());
+  // MSAA resolve may be affected by the scissor test, so disable it here.
+  gl->disable(GL_SCISSOR_TEST);
   if (caps->msFBOType == MSFBOType::ES_Apple) {
-    // Apple's extension uses the scissor as the blit bounds.
-    gl->enable(GL_SCISSOR_TEST);
-    gl->scissor(left, top, right - left, bottom - top);
+
     gl->resolveMultisampleFramebuffer();
-    gl->disable(GL_SCISSOR_TEST);
   } else {
-    // BlitFrameBuffer respects the scissor, so disable it.
-    gl->disable(GL_SCISSOR_TEST);
-    gl->blitFramebuffer(left, top, right, bottom, left, top, right, bottom, GL_COLOR_BUFFER_BIT,
+    gl->blitFramebuffer(0, 0, renderTarget->width(), renderTarget->height(), 0, 0,
+                        renderTarget->width(), renderTarget->height(), GL_COLOR_BUFFER_BIT,
                         GL_NEAREST);
   }
 }
