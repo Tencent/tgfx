@@ -17,12 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Image.h"
-#include "core/images/ScaleImage.h"
 #include "core/images/CodecImage.h"
 #include "core/images/FilterImage.h"
 #include "core/images/OrientImage.h"
 #include "core/images/RGBAAAImage.h"
 #include "core/images/RasterizedImage.h"
+#include "core/images/ScaleImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/WeakMap.h"
