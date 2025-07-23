@@ -22,25 +22,14 @@
 #include "tgfx/core/PathProvider.h"
 
 namespace tgfx {
-static void UpdateMetricsBounds(const Rect& bounds, FontMetrics* metrics) {
-  if (metrics->xMin >= metrics->xMax || metrics->top >= metrics->bottom) {
-    // If the metrics are not initialized, set them to the bounds.
-    metrics->xMin = bounds.left;
-    metrics->top = bounds.top;
-    metrics->xMax = bounds.right;
-    metrics->bottom = bounds.bottom;
-    return;
-  }
-  metrics->xMin = std::min(bounds.left, metrics->xMin);
-  metrics->top = std::min(bounds.top, metrics->top);
-  metrics->xMax = std::max(bounds.right, metrics->xMax);
-  metrics->bottom = std::max(bounds.bottom, metrics->bottom);
-}
-
 void CustomTypefaceBuilder::setFontName(const std::string& fontFamily,
                                         const std::string& fontStyle) {
   _fontFamily = fontFamily;
   _fontStyle = fontStyle;
+}
+
+void CustomTypefaceBuilder::setMetrics(const FontMetrics& metrics) {
+  _fontMetrics = metrics;
 }
 
 GlyphID PathTypefaceBuilder::addGlyph(const Path& path) {
@@ -51,7 +40,7 @@ GlyphID PathTypefaceBuilder::addGlyph(const Path& path) {
   // GlyphID starts from 1
   auto glyphID = static_cast<GlyphID>(glyphRecords.size() + 1);
   auto bounds = path.getBounds();
-  UpdateMetricsBounds(bounds, &fontMetrics);
+  fontBounds.join(bounds);
   glyphRecords.emplace_back(PathProvider::Wrap(path));
   return glyphID;
 }
@@ -64,7 +53,7 @@ GlyphID PathTypefaceBuilder::addGlyph(std::shared_ptr<PathProvider> provider) {
   // GlyphID starts from 1
   auto glyphID = static_cast<GlyphID>(glyphRecords.size() + 1);
   auto bounds = provider->getBounds();
-  UpdateMetricsBounds(bounds, &fontMetrics);
+  fontBounds.join(bounds);
   glyphRecords.emplace_back(std::move(provider));
   return glyphID;
 }
@@ -73,7 +62,8 @@ std::shared_ptr<Typeface> PathTypefaceBuilder::detach() const {
   if (glyphRecords.empty()) {
     return nullptr;
   }
-  return PathUserTypeface::Make(uniqueID, _fontFamily, _fontStyle, fontMetrics, glyphRecords);
+  return PathUserTypeface::Make(uniqueID, _fontFamily, _fontStyle, _fontMetrics, fontBounds,
+                                glyphRecords);
 }
 
 GlyphID ImageTypefaceBuilder::addGlyph(std::shared_ptr<ImageCodec> image, const Point& offset) {
@@ -84,7 +74,7 @@ GlyphID ImageTypefaceBuilder::addGlyph(std::shared_ptr<ImageCodec> image, const 
   auto glyphID = static_cast<GlyphID>(glyphRecords.size() + 1);
   auto bounds = Rect::MakeWH(image->width(), image->height());
   bounds.offset(offset);
-  UpdateMetricsBounds(bounds, &fontMetrics);
+  fontBounds.join(bounds);
   glyphRecords.emplace_back(std::make_shared<GlyphRecord>(std::move(image), offset));
   return glyphID;
 }
@@ -93,7 +83,8 @@ std::shared_ptr<Typeface> ImageTypefaceBuilder::detach() const {
   if (glyphRecords.empty()) {
     return nullptr;
   }
-  return ImageUserTypeface::Make(uniqueID, _fontFamily, _fontStyle, fontMetrics, glyphRecords);
+  return ImageUserTypeface::Make(uniqueID, _fontFamily, _fontStyle, _fontMetrics, fontBounds,
+                                 glyphRecords);
 }
 
 }  // namespace tgfx
