@@ -107,7 +107,6 @@ void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> 
   if (source == nullptr || dest == nullptr) {
     return;
   }
-  DEBUG_ASSERT(source->width() == dest->width() && source->height() == dest->height());
   auto task =
       drawingBuffer->make<RenderTargetCopyTask>(std::move(source), std::move(dest), srcX, srcY);
   renderTasks.emplace_back(std::move(task));
