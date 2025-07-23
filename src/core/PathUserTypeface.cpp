@@ -137,8 +137,6 @@ class PathUserScalerContext final : public UserScalerContext {
   float fauxBoldScale = 1.0f;
 };
 
-//////////////
-
 std::shared_ptr<UserTypeface> PathUserTypeface::Make(uint32_t builderID,
                                                      const std::string& fontFamily,
                                                      const std::string& fontStyle,

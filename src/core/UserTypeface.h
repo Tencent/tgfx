@@ -67,6 +67,11 @@ class UserTypeface : public Typeface {
     return true;
   }
 
+  bool onComputeBounds(Rect* bounds) const override {
+    bounds->setLTRB(_fontMetrics.xMin, _fontMetrics.top, _fontMetrics.xMax, _fontMetrics.bottom);
+    return true;
+  }
+
  protected:
   explicit UserTypeface(uint32_t builderID, const std::string& fontFamily,
                         const std::string& fontStyle, const FontMetrics& metrics)

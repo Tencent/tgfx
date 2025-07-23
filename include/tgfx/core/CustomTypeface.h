@@ -39,11 +39,6 @@ class CustomTypefaceBuilder {
   void setFontName(const std::string& fontFamily, const std::string& fontStyle);
 
   /**
-   * Sets the font metrics for the typeface.
-   */
-  void setMetrics(const FontMetrics& metrics);
-
-  /**
    * Detaches the typeface being built. After this call, the builder remains valid and can be used
    * to add more glyphs, but the returned typeface is no longer linked to this builder. Any later
    * detached typeface will include glyphs from previous detachments. You can safely release the
@@ -55,7 +50,7 @@ class CustomTypefaceBuilder {
  protected:
   std::string _fontFamily;
   std::string _fontStyle;
-  FontMetrics _fontMetrics = {};
+  FontMetrics fontMetrics = {};
   uint32_t uniqueID = 0;
 };
 
