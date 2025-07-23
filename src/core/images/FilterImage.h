@@ -43,8 +43,6 @@ class FilterImage : public SubsetImage {
     return static_cast<int>(bounds.height());
   }
 
-  std::shared_ptr<Image> makeScaled(float scale, const SamplingOptions& sampling) const override;
-
  protected:
   Type type() const override {
     return Type::Filter;
@@ -59,6 +57,8 @@ class FilterImage : public SubsetImage {
 
   std::shared_ptr<Image> onMakeWithFilter(std::shared_ptr<ImageFilter> filter, Point* offset,
                                           const Rect* clipRect) const override;
+
+  std::shared_ptr<Image> onMakeScaled(float scale, const SamplingOptions& sampling) const override;
 
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 

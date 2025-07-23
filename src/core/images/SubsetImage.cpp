@@ -18,6 +18,7 @@
 
 #include "SubsetImage.h"
 #include "core/utils/AddressOf.h"
+#include "core/utils/MathExtra.h"
 #include "gpu/TPArgs.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
@@ -42,6 +43,24 @@ std::shared_ptr<Image> SubsetImage::onCloneWith(std::shared_ptr<Image> newSource
 std::shared_ptr<Image> SubsetImage::onMakeSubset(const Rect& subset) const {
   auto newBounds = subset.makeOffset(bounds.x(), bounds.y());
   return SubsetImage::MakeFrom(source, newBounds);
+}
+
+std::shared_ptr<Image> SubsetImage::onMakeScaled(float scale,
+                                                 const SamplingOptions& sampling) const {
+  auto newSource = source->makeScaled(scale, sampling);
+  if (newSource == nullptr) {
+    return nullptr;
+  }
+  float scaleX = static_cast<float>(newSource->width()) / static_cast<float>(width());
+  float scaleY = static_cast<float>(newSource->height()) / static_cast<float>(height());
+  auto newBounds = bounds;
+  newBounds.scale(scaleX, scaleY);
+  auto roundOutBounds = newBounds;
+  roundOutBounds.roundOut();
+  if (newBounds != roundOutBounds) {
+    return Image::onMakeScaled(scale, sampling);
+  }
+  return SubsetImage::MakeFrom(std::move(newSource), newBounds);
 }
 
 PlacementPtr<FragmentProcessor> SubsetImage::asFragmentProcessor(const FPArgs& args,

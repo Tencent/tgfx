@@ -40,8 +40,6 @@ class TransformImage : public Image {
     return source->isAlphaOnly();
   }
 
-  std::shared_ptr<Image> makeScaled(float scale, const SamplingOptions& sampling) const override;
-
   std::shared_ptr<Image> source = nullptr;
 
  protected:

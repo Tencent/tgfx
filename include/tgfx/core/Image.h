@@ -250,13 +250,13 @@ class Image {
 
   /**
    * Returns a scaled Image with the specified scale factor.
+   * The returned Image always has the same mipmap state as the original Image.
    * @param scale The factor to scale the source.
    * @param sampling The sampling options to apply.
    * @return If the scale is 1.0, the original Image is returned. If the scale is less than or equal
    * to zero, nullptr is returned.
    */
-  virtual std::shared_ptr<Image> makeScaled(float scale,
-                                            const SamplingOptions& sampling = {}) const;
+  std::shared_ptr<Image> makeScaled(float scale, const SamplingOptions& sampling = {}) const;
 
   /**
    * Returns a rasterized Image can be cached as an independent GPU resource for repeated drawing.
@@ -264,8 +264,8 @@ class Image {
    * rasterized. Other image aren’t rasterized unless implicitly created by this method.
    * For example, if you create a subset Image from a rasterized Image, the subset Image doesn’t
    * create its own GPU cache but uses the full resolution cache created by the original Image.
-   * If you want the subset Image to create its own GPU cache, call makeRasterized() on the subset
-   * Image. The returned Image always has the same mipmap state as the original Image.
+   * If you want the subset Image or scaled Image to create its own GPU cache, call makeRasterized()
+   * on the Image. The returned Image always has the same mipmap state as the original Image.
    * @return If the Image is already rasterized the original Image is returned.
    */
   virtual std::shared_ptr<Image> makeRasterized() const;
@@ -324,6 +324,8 @@ class Image {
 
   virtual std::shared_ptr<Image> onMakeWithFilter(std::shared_ptr<ImageFilter> filter,
                                                   Point* offset, const Rect* clipRect) const;
+
+  virtual std::shared_ptr<Image> onMakeScaled(float scale, const SamplingOptions& sampling) const;
 
   /**
    * Returns a texture proxy for the entire Image.

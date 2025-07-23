@@ -46,7 +46,7 @@ class PictureImage : public Image {
 
   std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
 
-  std::shared_ptr<Image> makeScaled(float scale, const SamplingOptions& sampling) const override;
+  std::shared_ptr<Image> onMakeScaled(float scale, const SamplingOptions& sampling) const override;
 
   std::shared_ptr<Picture> picture = nullptr;
   Matrix* matrix = nullptr;

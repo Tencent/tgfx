@@ -62,10 +62,6 @@ FilterImage::FilterImage(std::shared_ptr<Image> source, const Rect& bounds,
     : SubsetImage(std::move(source), bounds), filter(std::move(filter)) {
 }
 
-std::shared_ptr<Image> FilterImage::makeScaled(float scale, const SamplingOptions& sampling) const {
-  return Image::makeScaled(scale, sampling);
-}
-
 std::shared_ptr<Image> FilterImage::onCloneWith(std::shared_ptr<Image> newSource) const {
   return FilterImage::Wrap(std::move(newSource), bounds, filter);
 }
@@ -108,6 +104,11 @@ std::shared_ptr<Image> FilterImage::onMakeWithFilter(std::shared_ptr<ImageFilter
   filterBounds.offset(bounds.x(), bounds.y());
   auto composeFilter = ImageFilter::Compose(filter, std::move(imageFilter));
   return FilterImage::Wrap(source, filterBounds, std::move(composeFilter));
+}
+
+std::shared_ptr<Image> FilterImage::onMakeScaled(float scale,
+                                                 const SamplingOptions& sampling) const {
+  return Image::onMakeScaled(scale, sampling);
 }
 
 std::shared_ptr<TextureProxy> FilterImage::lockTextureProxy(const TPArgs& args) const {

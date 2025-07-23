@@ -24,12 +24,11 @@ namespace tgfx {
 class ScaleImage : public Image {
  public:
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> image, float scale,
-                                         const SamplingOptions& sampling, bool mipmapped = false);
+                                         const SamplingOptions& sampling);
 
   static int GetScaledSize(int size, float scale);
 
-  ScaleImage(std::shared_ptr<Image> image, float scale, const SamplingOptions& sampling,
-             bool mipmapped);
+  ScaleImage(std::shared_ptr<Image> image, float scale, const SamplingOptions& sampling);
 
   ~ScaleImage() override = default;
 
@@ -38,16 +37,18 @@ class ScaleImage : public Image {
   int height() const override;
 
   bool isAlphaOnly() const override {
-    return false;
+    return source->isAlphaOnly();
   }
 
   bool hasMipmaps() const override {
-    return mipmapped;
+    return source->hasMipmaps();
   }
 
   bool isFullyDecoded() const override {
     return source->isFullyDecoded();
   }
+
+  std::shared_ptr<Image> onMakeScaled(float scale, const SamplingOptions& sampling) const override;
 
   std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
 
@@ -68,6 +69,5 @@ class ScaleImage : public Image {
   std::shared_ptr<Image> source = nullptr;
   float scale = 1.0f;
   SamplingOptions sampling = {};
-  bool mipmapped = false;
 };
 }  // namespace tgfx

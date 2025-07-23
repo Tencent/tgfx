@@ -175,10 +175,13 @@ std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {
 }
 
 std::shared_ptr<Image> Image::makeScaled(float scale, const SamplingOptions& sampling) const {
+  if (scale <= 0) {
+    return nullptr;
+  }
   if (scale == 1.0f) {
     return weakThis.lock();
   }
-  return ScaleImage::MakeFrom(weakThis.lock(), scale, sampling, hasMipmaps());
+  return onMakeScaled(scale, sampling);
 }
 
 std::shared_ptr<Image> Image::makeRasterized() const {
@@ -212,6 +215,10 @@ std::shared_ptr<Image> Image::makeWithFilter(std::shared_ptr<ImageFilter> filter
 std::shared_ptr<Image> Image::onMakeWithFilter(std::shared_ptr<ImageFilter> filter, Point* offset,
                                                const Rect* clipRect) const {
   return FilterImage::MakeFrom(weakThis.lock(), std::move(filter), offset, clipRect);
+}
+
+std::shared_ptr<Image> Image::onMakeScaled(float scale, const SamplingOptions& sampling) const {
+  return ScaleImage::MakeFrom(weakThis.lock(), scale, sampling);
 }
 
 std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,

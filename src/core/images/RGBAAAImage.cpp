@@ -19,6 +19,7 @@
 #include "RGBAAAImage.h"
 #include "core/utils/AddressOf.h"
 #include "core/utils/Log.h"
+#include "core/utils/MathExtra.h"
 #include "gpu/TPArgs.h"
 #include "gpu/ops/RectDrawOp.h"
 #include "gpu/processors/TextureEffect.h"
@@ -81,6 +82,31 @@ PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs& a
 std::shared_ptr<Image> RGBAAAImage::onMakeSubset(const Rect& subset) const {
   auto newBounds = subset.makeOffset(bounds.x(), bounds.y());
   auto image = std::shared_ptr<Image>(new RGBAAAImage(source, newBounds, alphaStart));
+  image->weakThis = image;
+  return image;
+}
+
+std::shared_ptr<Image> RGBAAAImage::onMakeScaled(float scale,
+                                                 const SamplingOptions& sampling) const {
+
+  auto newSource = source->makeScaled(scale, sampling);
+  if (newSource == nullptr) {
+    return nullptr;
+  }
+  float scaleX = static_cast<float>(newSource->width()) / static_cast<float>(width());
+  float scaleY = static_cast<float>(newSource->height()) / static_cast<float>(height());
+  auto newBounds = bounds;
+  newBounds.scale(scaleX, scaleY);
+  auto roundOutBounds = newBounds;
+  roundOutBounds.roundOut();
+  if (newBounds != roundOutBounds) {
+    return Image::onMakeScaled(scale, sampling);
+  }
+  Point newAlphaStart = Point::Make(alphaStart.x * scaleX, alphaStart.y * scaleY);
+  if (!IsInteger(newAlphaStart.x) || !IsInteger(newAlphaStart.y)) {
+    return Image::onMakeScaled(scale, sampling);
+  }
+  auto image = std::shared_ptr<Image>(new RGBAAAImage(source, newBounds, newAlphaStart));
   image->weakThis = image;
   return image;
 }

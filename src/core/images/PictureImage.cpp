@@ -80,13 +80,7 @@ std::shared_ptr<Image> PictureImage::onMakeMipmapped(bool enabled) const {
   return newImage;
 }
 
-std::shared_ptr<Image> PictureImage::makeScaled(float scale, const SamplingOptions&) const {
-  if (scale == 1.0f) {
-    return weakThis.lock();
-  }
-  if (scale <= 0) {
-    return nullptr;
-  }
+std::shared_ptr<Image> PictureImage::onMakeScaled(float scale, const SamplingOptions&) const {
   auto newImage =
       std::make_shared<PictureImage>(picture, _width, _height, matrix, mipmapped, scale * _scale);
   newImage->weakThis = newImage;

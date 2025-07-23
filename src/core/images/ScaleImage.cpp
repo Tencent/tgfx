@@ -31,21 +31,20 @@ int ScaleImage::GetScaledSize(int size, float scale) {
 }
 
 std::shared_ptr<Image> ScaleImage::MakeFrom(std::shared_ptr<Image> image, float scale,
-                                            const SamplingOptions& sampling, bool mipmapped) {
+                                            const SamplingOptions& sampling) {
   if (image == nullptr || scale <= 0) {
     return nullptr;
   }
   if (scale == 1.0f) {
     return image;
   }
-  auto scaledImage = std::make_shared<ScaleImage>(std::move(image), scale, sampling, mipmapped);
+  auto scaledImage = std::make_shared<ScaleImage>(std::move(image), scale, sampling);
   scaledImage->weakThis = scaledImage;
   return scaledImage;
 }
 
-ScaleImage::ScaleImage(std::shared_ptr<Image> image, float scale, const SamplingOptions& sampling,
-                       bool mipmapped)
-    : source(std::move(image)), scale(scale), sampling(sampling), mipmapped(mipmapped) {
+ScaleImage::ScaleImage(std::shared_ptr<Image> image, float scale, const SamplingOptions& sampling)
+    : source(std::move(image)), scale(scale), sampling(sampling) {
 }
 
 int ScaleImage::width() const {
@@ -56,11 +55,21 @@ int ScaleImage::height() const {
   return GetScaledSize(source->height(), scale);
 }
 
+std::shared_ptr<Image> ScaleImage::onMakeScaled(float scale,
+                                                const SamplingOptions& sampling) const {
+  return MakeFrom(source, this->scale * scale, sampling);
+}
+
 std::shared_ptr<Image> ScaleImage::onMakeMipmapped(bool enabled) const {
-  if (enabled == mipmapped) {
+  if (enabled == source->hasMipmaps()) {
     return weakThis.lock();
   }
-  auto newImage = std::shared_ptr<ScaleImage>(new ScaleImage(source, scale, sampling, enabled));
+  auto newSource = source->onMakeMipmapped(enabled);
+  if (newSource == nullptr) {
+    return nullptr;
+  }
+  auto newImage =
+      std::shared_ptr<ScaleImage>(new ScaleImage(std::move(newSource), scale, sampling));
   newImage->weakThis = newImage;
   return newImage;
 }
@@ -73,7 +82,7 @@ std::shared_ptr<Image> ScaleImage::onMakeDecoded(Context* context, bool) const {
     return nullptr;
   }
   auto newImage =
-      std::shared_ptr<ScaleImage>(new ScaleImage(std::move(newSource), scale, sampling, mipmapped));
+      std::shared_ptr<ScaleImage>(new ScaleImage(std::move(newSource), scale, sampling));
   newImage->weakThis = newImage;
   return newImage;
 }
@@ -106,11 +115,11 @@ PlacementPtr<FragmentProcessor> ScaleImage::asFragmentProcessor(const FPArgs& ar
   auto uvScaleX = static_cast<float>(sourceWidth) / static_cast<float>(scaledWidth);
   auto uvScaleY = static_cast<float>(sourceHeight) / static_cast<float>(scaledHeight);
   Matrix sourceUVMatrix = Matrix::MakeScale(uvScaleX, uvScaleY);
-  sourceUVMatrix.postTranslate(-rect.left, -rect.top);
+  sourceUVMatrix.preTranslate(rect.left, rect.top);
   auto drawRect = Rect::MakeWH(rect.width(), rect.height());
   FPArgs fpArgs(args.context, args.renderFlags, drawRect);
-  auto processor = FragmentProcessor::Make(source, fpArgs, this->sampling, SrcRectConstraint::Fast,
-                                           &sourceUVMatrix);
+  auto processor =
+      FragmentProcessor::Make(source, fpArgs, sampling, SrcRectConstraint::Fast, &sourceUVMatrix);
   if (processor == nullptr) {
     return nullptr;
   }
@@ -133,7 +142,7 @@ std::shared_ptr<TextureProxy> ScaleImage::lockTextureProxy(const TPArgs& args) c
   auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, width(), height(), isAlphaOnly() && alphaRenderable, 1, args.mipmapped,
-      ImageOrigin::TopLeft, BackingFit::Exact);
+      ImageOrigin::TopLeft, BackingFit::Approx);
   if (renderTarget == nullptr) {
     return nullptr;
   }
