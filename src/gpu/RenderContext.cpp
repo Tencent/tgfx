@@ -110,14 +110,6 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(const Font& font, GlyphID glyph
   return glyphCodec;
 }
 
-static bool IsGlyphVisible(float fontScale, const Point& position, const Rect& localBounds,
-                           const Rect& localClipBounds) {
-  auto bounds = localBounds;
-  bounds.scale(1.f / fontScale, 1.f / fontScale);
-  bounds.offset(position.x, position.y);
-  return Rect::Intersects(bounds, localClipBounds);
-}
-
 RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
                              bool clearAll, Surface* surface)
     : renderTarget(std::move(proxy)), renderFlags(renderFlags), surface(surface) {
@@ -392,7 +384,10 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
     if (scaledStroke) {
       ApplyStrokeToBounds(*scaledStroke, &bounds);
     }
-    if (!IsGlyphVisible(maxScale, glyphPosition, bounds, localClipBounds)) {
+    auto localBounds = bounds;
+    localBounds.scale(1.f / maxScale, 1.f / maxScale);
+    localBounds.offset(glyphPosition.x, glyphPosition.y);
+    if (!Rect::Intersects(localBounds, localClipBounds)) {
       continue;
     }
     auto maxDimension = static_cast<int>(ceilf(std::max(bounds.width(), bounds.height())));
