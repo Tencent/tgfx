@@ -39,12 +39,13 @@ class CornerPinEffect : public RuntimeEffect {
     return 4;
   }
 
-  Rect filterBounds(const Rect&) const override;
+  Rect filterBounds(const Rect&, const Point&) const override;
 
   std::unique_ptr<RuntimeProgram> onCreateProgram(Context* context) const override;
 
   bool onDraw(const RuntimeProgram* program, const std::vector<BackendTexture>& inputTextures,
-              const BackendRenderTarget& target, const Point& offset) const override;
+              const BackendRenderTarget& target, const Point& offset,
+              const Point& scale) const override;
 
  private:
   Point cornerPoints[4] = {};
@@ -54,7 +55,8 @@ class CornerPinEffect : public RuntimeEffect {
                   const Point& lowerLeft);
 
   std::vector<float> computeVertices(const BackendTexture& source,
-                                     const BackendRenderTarget& target, const Point& offset) const;
+                                     const BackendRenderTarget& target, const Point& offset,
+                                     const Point& scale) const;
 
   void calculateVertexQs();
 };

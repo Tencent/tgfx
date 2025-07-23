@@ -28,20 +28,32 @@ std::shared_ptr<ImageFilter> ImageFilter::DropShadow(float dx, float dy, float b
   if (color.alpha <= 0) {
     return nullptr;
   }
-  return std::make_shared<DropShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, false);
+  auto result =
+      std::make_shared<DropShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, false);
+  result->weakThis = result;
+  return result;
 }
 
 std::shared_ptr<ImageFilter> ImageFilter::DropShadowOnly(float dx, float dy, float blurrinessX,
                                                          float blurrinessY, const Color& color) {
   // If color is transparent, the image after applying the filter will be transparent.
   // So we should not return nullptr when color is transparent.
-  return std::make_shared<DropShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, true);
+  auto result =
+      std::make_shared<DropShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, true);
+  result->weakThis = result;
+  return result;
 }
 
 DropShadowImageFilter::DropShadowImageFilter(float dx, float dy, float blurrinessX,
                                              float blurrinessY, const Color& color, bool shadowOnly)
     : dx(dx), dy(dy), blurFilter(ImageFilter::Blur(blurrinessX, blurrinessY)), color(color),
       shadowOnly(shadowOnly) {
+}
+
+DropShadowImageFilter::DropShadowImageFilter(float dx, float dy,
+                                             std::shared_ptr<ImageFilter> blurFilter,
+                                             const Color& color, bool shadowOnly)
+    : dx(dx), dy(dy), blurFilter(std::move(blurFilter)), color(color), shadowOnly(shadowOnly) {
 }
 
 Rect DropShadowImageFilter::onFilterBounds(const Rect& srcRect) const {
@@ -120,6 +132,16 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
                                                 TileMode::Decal, sampling, constraint, &fpMatrix);
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(
       buffer, std::move(imageProcessor), std::move(colorShadowProcessor), BlendMode::SrcOver);
+}
+
+std::shared_ptr<ImageFilter> DropShadowImageFilter::onMakeScaled(const Point& scale) const {
+  auto newDx = dx * scale.x;
+  auto newDy = dy * scale.y;
+  auto newBlurFilter = blurFilter ? blurFilter->makeScaled(scale) : nullptr;
+  auto newFilter =
+      std::make_shared<DropShadowImageFilter>(newDx, newDy, newBlurFilter, color, shadowOnly);
+  newFilter->weakThis = newFilter;
+  return newFilter;
 }
 
 }  // namespace tgfx

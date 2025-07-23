@@ -60,7 +60,7 @@ class RuntimeEffect {
    * Returns the bounds of the image that will be produced by this filter when it is applied to an
    * image of the given bounds.
    */
-  virtual Rect filterBounds(const Rect& srcRect) const {
+  virtual Rect filterBounds(const Rect& srcRect, const Point& /*scale*/) const {
     return srcRect;
   }
 
@@ -78,7 +78,8 @@ class RuntimeEffect {
    */
   virtual bool onDraw(const RuntimeProgram* program,
                       const std::vector<BackendTexture>& inputTextures,
-                      const BackendRenderTarget& target, const Point& offset) const = 0;
+                      const BackendRenderTarget& target, const Point& offset,
+                      const Point& scale) const = 0;
 
  private:
   std::vector<std::shared_ptr<Image>> extraInputs = {};

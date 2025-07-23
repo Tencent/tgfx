@@ -37,5 +37,9 @@ class ColorImageFilter : public ImageFilter {
                                                       const SamplingOptions& sampling,
                                                       SrcRectConstraint constraint,
                                                       const Matrix* uvMatrix) const override;
+
+  std::shared_ptr<ImageFilter> onMakeScaled(const Point&) const override {
+    return weakThis.lock();
+  }
 };
 }  // namespace tgfx

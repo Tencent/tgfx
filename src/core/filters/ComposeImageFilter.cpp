@@ -44,7 +44,9 @@ std::shared_ptr<ImageFilter> ImageFilter::Compose(std::shared_ptr<ImageFilter> i
   } else {
     filters.push_back(std::move(outer));
   }
-  return std::make_shared<ComposeImageFilter>(std::move(filters));
+  auto result = std::make_shared<ComposeImageFilter>(std::move(filters));
+  result->weakThis = result;
+  return result;
 }
 
 std::shared_ptr<ImageFilter> ImageFilter::Compose(
@@ -55,7 +57,9 @@ std::shared_ptr<ImageFilter> ImageFilter::Compose(
   if (filters.size() == 1) {
     return filters[0];
   }
-  return std::make_shared<ComposeImageFilter>(std::move(filters));
+  auto result = std::make_shared<ComposeImageFilter>(std::move(filters));
+  result->weakThis = result;
+  return result;
 }
 
 ComposeImageFilter::ComposeImageFilter(std::vector<std::shared_ptr<ImageFilter>> filters)
@@ -89,4 +93,18 @@ PlacementPtr<FragmentProcessor> ComposeImageFilter::asFragmentProcessor(
   }
   return FragmentProcessor::Make(std::move(lastSource), args, sampling, constraint, &matrix);
 }
+
+std::shared_ptr<ImageFilter> ComposeImageFilter::onMakeScaled(const Point& scale) const {
+  auto newFilters = std::vector<std::shared_ptr<ImageFilter>>();
+  newFilters.reserve(filters.size());
+  for (const auto& filter : filters) {
+    auto newFilter = filter->makeScaled(scale);
+    if (!newFilter) {
+      return nullptr;
+    }
+    newFilters.push_back(std::move(newFilter));
+  }
+  return ImageFilter::Compose(std::move(newFilters));
+}
+
 }  // namespace tgfx

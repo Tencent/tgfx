@@ -26,6 +26,9 @@ class InnerShadowImageFilter : public ImageFilter {
   InnerShadowImageFilter(float dx, float dy, float blurrinessX, float blurrinessY,
                          const Color& color, bool shadowOnly);
 
+  InnerShadowImageFilter(float dx, float dy, std::shared_ptr<ImageFilter> blurFilter,
+                         const Color& color, bool shadowOnly);
+
   float dx = 0.0f;
   float dy = 0.0f;
   std::shared_ptr<ImageFilter> blurFilter = nullptr;
@@ -42,5 +45,7 @@ class InnerShadowImageFilter : public ImageFilter {
                                                       const SamplingOptions& sampling,
                                                       SrcRectConstraint constraint,
                                                       const Matrix* uvMatrix) const override;
+
+  std::shared_ptr<ImageFilter> onMakeScaled(const Point& scale) const override;
 };
 }  // namespace tgfx

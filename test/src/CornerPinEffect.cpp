@@ -73,7 +73,7 @@ uint32_t CornerPinEffect::programID() const {
   return CornerPinEffectID;
 }
 
-Rect CornerPinEffect::filterBounds(const Rect&) const {
+Rect CornerPinEffect::filterBounds(const Rect&, const Point& scale) const {
   auto& lowerLeft = cornerPoints[0];
   auto& lowerRight = cornerPoints[1];
   auto& upperLeft = cornerPoints[2];
@@ -82,7 +82,9 @@ Rect CornerPinEffect::filterBounds(const Rect&) const {
   auto top = std::min(std::min(upperLeft.y, lowerLeft.y), std::min(upperRight.y, lowerRight.y));
   auto right = std::max(std::max(upperLeft.x, lowerLeft.x), std::max(upperRight.x, lowerRight.x));
   auto bottom = std::max(std::max(upperLeft.y, lowerLeft.y), std::max(upperRight.y, lowerRight.y));
-  return Rect::MakeLTRB(left, top, right, bottom);
+  auto bounds = Rect::MakeLTRB(left, top, right, bottom);
+  bounds.scale(scale.x, scale.y);
+  return bounds;
 }
 
 std::unique_ptr<RuntimeProgram> CornerPinEffect::onCreateProgram(Context* context) const {
@@ -122,7 +124,8 @@ static void DisableMultisample(tgfx::Context* context, bool usesMSAA) {
 
 bool CornerPinEffect::onDraw(const RuntimeProgram* program,
                              const std::vector<BackendTexture>& inputTextures,
-                             const BackendRenderTarget& target, const Point& offset) const {
+                             const BackendRenderTarget& target, const Point& offset,
+                             const Point& scale) const {
   auto context = program->getContext();
   // Clear the previously generated GLError
   ClearGLError(context);
@@ -144,7 +147,7 @@ bool CornerPinEffect::onDraw(const RuntimeProgram* program,
   inputTextures[0].getGLTextureInfo(&sampler);
   gl->activeTexture(GL_TEXTURE0);
   gl->bindTexture(sampler.target, sampler.id);
-  auto vertices = computeVertices(inputTextures[0], target, offset);
+  auto vertices = computeVertices(inputTextures[0], target, offset, scale);
   if (filterProgram->vertexArray > 0) {
     gl->bindVertexArray(filterProgram->vertexArray);
   }
@@ -179,7 +182,7 @@ static Point ToGLTexturePoint(const Point& point, const BackendTexture& source) 
 
 std::vector<float> CornerPinEffect::computeVertices(const BackendTexture& source,
                                                     const BackendRenderTarget& target,
-                                                    const Point& offset) const {
+                                                    const Point& offset, const Point& scale) const {
   std::vector<float> vertices = {};
   auto textureWidth = static_cast<float>(source.width());
   auto textureHeight = static_cast<float>(source.height());
@@ -188,7 +191,8 @@ std::vector<float> CornerPinEffect::computeVertices(const BackendTexture& source
                             {0.0f, 0.0f},
                             {textureWidth, 0.0f}};
   for (size_t i = 0; i < 4; i++) {
-    auto vertexPoint = ToGLVertexPoint(cornerPoints[i] + offset, target);
+    Point pointsAfterScale = Point::Make(cornerPoints[i].x * scale.x, cornerPoints[i].y * scale.y);
+    auto vertexPoint = ToGLVertexPoint(pointsAfterScale + offset, target);
     vertices.push_back(vertexPoint.x);
     vertices.push_back(vertexPoint.y);
     auto texturePoint = ToGLTexturePoint(texturePoints[i], source);
