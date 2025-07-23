@@ -57,6 +57,7 @@ class CustomTypefaceBuilder {
   std::string _fontStyle;
   FontMetrics _fontMetrics = {};
   uint32_t uniqueID = 0;
+  Rect fontBounds = {};
 };
 
 /**
