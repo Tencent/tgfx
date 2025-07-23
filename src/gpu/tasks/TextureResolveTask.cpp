@@ -32,7 +32,7 @@ bool TextureResolveTask::execute(RenderPass* renderPass) {
   }
   auto context = renderPass->getContext();
   if (renderTarget->sampleCount() > 1) {
-    context->gpu()->resolveRenderTarget(renderTarget.get(), renderTargetProxy->bounds());
+    context->gpu()->resolveRenderTarget(renderTarget.get());
   }
   auto texture = renderTargetProxy->getTexture();
   if (texture != nullptr) {

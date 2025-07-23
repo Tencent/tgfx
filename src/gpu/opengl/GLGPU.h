@@ -24,23 +24,20 @@
 namespace tgfx {
 class GLGPU : public GPU {
  public:
-  static std::unique_ptr<GPU> Make(Context* context);
+  explicit GLGPU(Context* context) : GPU(context) {
+  }
 
   void bindTexture(int unitIndex, const TextureSampler* sampler, SamplerState samplerState = {});
 
   void copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture* texture, int srcX,
                                  int srcY) override;
 
-  void resolveRenderTarget(RenderTarget* renderTarget, const Rect& bounds) override;
+  void resolveRenderTarget(RenderTarget* renderTarget) override;
 
   bool insertSemaphore(Semaphore* semaphore) override;
 
   bool waitSemaphore(const Semaphore* semaphore) override;
 
   bool submitToGPU(bool syncCpu) override;
-
- private:
-  explicit GLGPU(Context* context) : GPU(context) {
-  }
 };
 }  // namespace tgfx

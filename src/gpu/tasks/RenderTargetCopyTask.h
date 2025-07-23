@@ -24,12 +24,14 @@ namespace tgfx {
 class RenderTargetCopyTask : public RenderTask {
  public:
   RenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
-                       std::shared_ptr<TextureProxy> dest);
+                       std::shared_ptr<TextureProxy> dest, int srcX, int srcY);
 
  protected:
   bool execute(RenderPass* renderPass) override;
 
  private:
   std::shared_ptr<TextureProxy> dest = nullptr;
+  int srcX = 0;
+  int srcY = 0;
 };
 }  // namespace tgfx

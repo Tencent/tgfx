@@ -102,12 +102,13 @@ void DrawingManager::addTextureResolveTask(std::shared_ptr<RenderTargetProxy> re
 }
 
 void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
-                                             std::shared_ptr<TextureProxy> dest) {
+                                             std::shared_ptr<TextureProxy> dest, int srcX,
+                                             int srcY) {
   if (source == nullptr || dest == nullptr) {
     return;
   }
-  DEBUG_ASSERT(source->width() == dest->width() && source->height() == dest->height());
-  auto task = drawingBuffer->make<RenderTargetCopyTask>(std::move(source), std::move(dest));
+  auto task =
+      drawingBuffer->make<RenderTargetCopyTask>(std::move(source), std::move(dest), srcX, srcY);
   renderTasks.emplace_back(std::move(task));
 }
 

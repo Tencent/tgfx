@@ -191,20 +191,12 @@ class Context {
   virtual const Caps* caps() const = 0;
 
   /**
-   * The Context normally assumes that no outsider is setting state within the underlying GPU API's
-   * context/device/whatever. This call informs the context that the state was modified and it
-   * should resend. Shouldn't be called frequently for good performance.
+   * Returns the GPU instance associated with this context.
    */
-  virtual void resetState() = 0;
-
-  GPU* gpu() {
-    return _gpu;
-  }
+  virtual GPU* gpu() const = 0;
 
  protected:
   explicit Context(Device* device);
-
-  GPU* _gpu = nullptr;
 
  private:
   Device* _device = nullptr;

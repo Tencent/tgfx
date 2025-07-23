@@ -144,6 +144,7 @@ class OpsCompositor {
   DstTextureInfo makeDstTextureInfo(const Rect& deviceBounds, AAType aaType);
   void addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const Fill& fill,
                  const std::optional<Rect>& localBounds, const std::optional<Rect>& deviceBounds);
+  void submitDrawOps();
 
   friend class DrawingManager;
   friend class PendingOpsAutoReset;
