@@ -18,7 +18,6 @@
 
 #include "SubsetImage.h"
 #include "core/utils/AddressOf.h"
-#include "core/utils/MathExtra.h"
 #include "gpu/TPArgs.h"
 #include "gpu/processors/TiledTextureEffect.h"
 

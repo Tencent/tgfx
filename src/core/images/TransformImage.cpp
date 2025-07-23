@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TransformImage.h"
-#include "core/utils/MathExtra.h"
 
 namespace tgfx {
 TransformImage::TransformImage(std::shared_ptr<Image> source) : source(std::move(source)) {
@@ -38,5 +37,4 @@ std::shared_ptr<Image> TransformImage::onMakeMipmapped(bool enabled) const {
   }
   return onCloneWith(std::move(newSource));
 }
-
 }  // namespace tgfx

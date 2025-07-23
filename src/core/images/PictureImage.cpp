@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PictureImage.h"
-#include "ScaleImage.h"
+#include "core/images/ScaleImage.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/OpsCompositor.h"
 #include "gpu/ProxyProvider.h"
@@ -130,7 +130,6 @@ std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args)
   if (renderTarget == nullptr) {
     return nullptr;
   }
-
   if (!drawPicture(renderTarget, args.renderFlags, nullptr)) {
     return nullptr;
   }

@@ -105,7 +105,8 @@ std::shared_ptr<Image> RGBAAAImage::onMakeScaled(float scale,
   if (!IsInteger(newAlphaStart.x) || !IsInteger(newAlphaStart.y)) {
     return Image::onMakeScaled(scale, sampling);
   }
-  auto image = std::make_shared<RGBAAAImage>(std::move(newSource), newBounds, newAlphaStart);
+  auto image =
+      std::shared_ptr<RGBAAAImage>(new RGBAAAImage(std::move(newSource), newBounds, newAlphaStart));
   image->weakThis = image;
   return image;
 }
