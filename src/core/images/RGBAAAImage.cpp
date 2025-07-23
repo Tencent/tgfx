@@ -88,7 +88,6 @@ std::shared_ptr<Image> RGBAAAImage::onMakeSubset(const Rect& subset) const {
 
 std::shared_ptr<Image> RGBAAAImage::onMakeScaled(float scale,
                                                  const SamplingOptions& sampling) const {
-
   auto newSource = source->makeScaled(scale, sampling);
   if (newSource == nullptr) {
     return nullptr;
@@ -106,7 +105,7 @@ std::shared_ptr<Image> RGBAAAImage::onMakeScaled(float scale,
   if (!IsInteger(newAlphaStart.x) || !IsInteger(newAlphaStart.y)) {
     return Image::onMakeScaled(scale, sampling);
   }
-  auto image = std::shared_ptr<Image>(new RGBAAAImage(source, newBounds, newAlphaStart));
+  auto image = std::make_shared<RGBAAAImage>(std::move(newSource), newBounds, newAlphaStart);
   image->weakThis = image;
   return image;
 }

@@ -139,7 +139,6 @@ std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args)
 
 bool PictureImage::drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget,
                                uint32_t renderFlags, const Point* offset) const {
-
   if (renderTarget == nullptr) {
     return false;
   }
