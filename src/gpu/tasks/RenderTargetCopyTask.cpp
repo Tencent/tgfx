@@ -35,8 +35,6 @@ bool RenderTargetCopyTask::execute(RenderPass* renderPass) {
     LOGE("RenderTargetCopyTask::execute() Failed to get the dest texture!");
     return false;
   }
-  DEBUG_ASSERT(renderTarget->width() == texture->width() &&
-               renderTarget->height() == texture->height());
   auto context = renderPass->getContext();
   context->gpu()->copyRenderTargetToTexture(renderTarget.get(), texture.get(), srcX, srcY);
   texture->getSampler()->regenerateMipmapLevels(context);
