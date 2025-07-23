@@ -29,10 +29,9 @@
 
 namespace inspector {
 Inspector::Inspector()
-    : epoch(std::chrono::duration_cast<std::chrono::seconds>(
-                std::chrono::system_clock::now().time_since_epoch())
-                .count()),
-      initTime(GetCurrentTime<std::chrono::nanoseconds>()), dataBuffer(static_cast<char*>(malloc(TargetFrameSize * 3))),
+    : epoch(GetCurrentTime<std::chrono::seconds>()),
+      initTime(GetCurrentTime<std::chrono::nanoseconds>()),
+      dataBuffer(static_cast<char*>(malloc(TargetFrameSize * 3))),
       lz4Buf(static_cast<char*>(malloc(LZ4Size + sizeof(lz4sz_t)))), lz4Stream(LZ4_createStream()),
       broadcast(broadcastNum) {
   spawnWorkerThreads();
