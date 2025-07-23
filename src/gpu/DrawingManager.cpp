@@ -153,9 +153,12 @@ bool DrawingManager::flush() {
   if (renderPass == nullptr) {
     renderPass = RenderPass::Make(context);
   }
-  for (auto& task : renderTasks) {
-    task->execute(renderPass.get());
-    task = nullptr;
+  {
+    TaskMark(inspector::OpTaskType::RenderTask);
+    for (auto& task : renderTasks) {
+      task->execute(renderPass.get());
+      task = nullptr;
+    }
   }
   renderTasks.clear();
   return true;

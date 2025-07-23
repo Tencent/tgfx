@@ -32,7 +32,7 @@ Inspector::Inspector()
     : epoch(std::chrono::duration_cast<std::chrono::seconds>(
                 std::chrono::system_clock::now().time_since_epoch())
                 .count()),
-      initTime(GetTime()), dataBuffer(static_cast<char*>(malloc(TargetFrameSize * 3))),
+      initTime(GetCurrentTime<std::chrono::nanoseconds>()), dataBuffer(static_cast<char*>(malloc(TargetFrameSize * 3))),
       lz4Buf(static_cast<char*>(malloc(LZ4Size + sizeof(lz4sz_t)))), lz4Stream(LZ4_createStream()),
       broadcast(broadcastNum) {
   spawnWorkerThreads();
@@ -60,7 +60,7 @@ Inspector::~Inspector() {
 }
 void Inspector::spawnWorkerThreads() {
   messageThread = std::make_unique<std::thread>(LaunchWorker, this);
-  timeBegin.store(GetTime(), std::memory_order_relaxed);
+  timeBegin.store(GetCurrentTime<std::chrono::nanoseconds>(), std::memory_order_relaxed);
 }
 
 bool Inspector::handleServerQuery() {

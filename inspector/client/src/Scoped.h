@@ -33,7 +33,7 @@ class Scoped {
       return;
     }
     QueuePrepare(QueueType::OperateBegin);
-    MemWrite(&item.operateBegin.nsTime, Inspector::GetTime());
+    MemWrite(&item.operateBegin.nsTime, GetCurrentTime<std::chrono::nanoseconds>());
     MemWrite(&item.operateBegin.type, type);
     QueueCommit();
   }
@@ -43,7 +43,7 @@ class Scoped {
       return;
     }
     QueuePrepare(QueueType::OperateEnd);
-    MemWrite(&item.operateEnd.nsTime, Inspector::GetTime());
+    MemWrite(&item.operateEnd.nsTime, GetCurrentTime<std::chrono::nanoseconds>());
     MemWrite(&item.operateEnd.type, type);
     QueueCommit();
   }

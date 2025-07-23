@@ -26,6 +26,7 @@
 #include "Queue.h"
 #include "Singleton.h"
 #include "Socket.h"
+#include "TimeUtils.h"
 #include "concurrentqueue.h"
 
 #if defined _WIN32
@@ -50,12 +51,6 @@ class Inspector {
   Inspector();
   ~Inspector();
 
-  static int64_t GetTime() {
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(
-               std::chrono::high_resolution_clock::now().time_since_epoch())
-        .count();
-  }
-
   static void QueueSerialFinish(const QueueItem& item) {
     auto inspector = InspectorSingleton::GetInstance();
     inspector->serialConcurrentQueue.enqueue(item);
@@ -67,7 +62,7 @@ class Inspector {
     }
     auto item = QueueItem();
     MemWrite(&item.hdr.type, QueueType::FrameMarkMsg);
-    MemWrite(&item.frameMark.nsTime, GetTime());
+    MemWrite(&item.frameMark.nsTime, GetCurrentTime<std::chrono::nanoseconds>());
     QueueSerialFinish(item);
   }
 
@@ -79,8 +74,8 @@ class Inspector {
   }
 
   static void SendAttributeData(const char* name, float val) {
-    QueuePrepare(QueueType::ValueDataFloat)
-        MemWrite(&item.attributeDataFloat.name, reinterpret_cast<uint64_t>(name));
+    QueuePrepare(QueueType::ValueDataFloat);
+    MemWrite(&item.attributeDataFloat.name, reinterpret_cast<uint64_t>(name));
     MemWrite(&item.attributeDataFloat.value, val);
     QueueCommit();
   }
@@ -180,7 +175,6 @@ class Inspector {
   std::shared_ptr<Socket> sock = nullptr;
   int64_t refTimeThread = 0;
   moodycamel::ConcurrentQueue<QueueItem> serialConcurrentQueue;
-  std::mutex serialLock;
 
   std::unique_ptr<std::thread> messageThread = nullptr;
   std::vector<std::shared_ptr<UdpBroadcast>> broadcast;
