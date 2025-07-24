@@ -33,16 +33,4 @@ Quad::Quad(const Rect& rect, const Matrix* matrix) {
     matrix->mapPoints(points, 4);
   }
 }
-
-std::shared_ptr<Data> Quad::toTriangleStrips() const {
-  Buffer buffer(8 * sizeof(float));
-  auto vertices = static_cast<float*>(buffer.data());
-  int index = 0;
-  for (size_t i = 4; i >= 1; --i) {
-    vertices[index++] = points[i - 1].x;
-    vertices[index++] = points[i - 1].y;
-  }
-  return buffer.release();
-}
-
 }  // namespace tgfx

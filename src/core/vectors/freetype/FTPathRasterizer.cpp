@@ -45,9 +45,10 @@ static void Iterator(PathVerb verb, const Point points[4], void* info) {
   }
 }
 
-std::shared_ptr<PathRasterizer> PathRasterizer::Make(int width, int height,
-                                                     std::shared_ptr<Shape> shape, bool antiAlias,
-                                                     bool needsGammaCorrection) {
+std::shared_ptr<PathRasterizer> PathRasterizer::MakeFrom(int width, int height,
+                                                         std::shared_ptr<Shape> shape,
+                                                         bool antiAlias,
+                                                         bool needsGammaCorrection) {
   if (shape == nullptr || width <= 0 || height <= 0) {
     return nullptr;
   }
@@ -68,9 +69,9 @@ bool FTPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) con
   totalMatrix.postTranslate(0, static_cast<float>(targetInfo.height()));
   path.transform(totalMatrix);
   if (path.isInverseFillType()) {
-    Path maskPath = {};
-    maskPath.addRect(Rect::MakeWH(targetInfo.width(), targetInfo.height()));
-    path.addPath(maskPath, PathOp::Intersect);
+    Path clipPath = {};
+    clipPath.addRect(Rect::MakeWH(targetInfo.width(), targetInfo.height()));
+    path.addPath(clipPath, PathOp::Intersect);
   }
   ClearPixels(targetInfo, dstPixels);
   FTPath ftPath = {};
@@ -94,7 +95,7 @@ bool FTPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) con
   }
   auto buffer = static_cast<unsigned char*>(dstPixels);
   auto rows = targetInfo.height();
-  // Anti-aliasing is always enabled because FreeType generates only 1-bit masks when it's off,
+  // Antialiasing is always enabled because FreeType generates only 1-bit masks when it's off,
   // and we haven't implemented conversion from 1-bit to 8-bit masks yet.
   auto pitch = static_cast<int>(targetInfo.rowBytes());
   FTRasterTarget target = {buffer + (rows - 1) * pitch, pitch,

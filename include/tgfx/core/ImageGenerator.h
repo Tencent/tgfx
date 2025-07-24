@@ -59,6 +59,15 @@ class ImageGenerator {
   }
 
   /**
+   * Returns true if this ImageGenerator is an ImageCodec, meaning it can read pixels directly from
+   * the decoded image buffer. If false, the ImageGenerator is a custom generator and cannot read
+   * pixels directly.
+   */
+  virtual bool isImageCodec() const {
+    return false;
+  }
+
+  /**
    * Crates a new image buffer capturing the pixels decoded from this image generator.
    * ImageGenerator does not cache the returned image buffer, each call to this method allocates
    * additional storage. Returns an ImageBuffer backed by hardware if tryHardware is true and

@@ -22,7 +22,7 @@
 namespace tgfx {
 static void DecomposeRect(Rect* rectA, Rect* rectB) {
   // Ensure rectA and rectB overlap
-  DEBUG_ASSERT(rectA->intersects(*rectB));
+  DEBUG_ASSERT(Rect::Intersects(*rectA, *rectB));
 
   // Step 1: Build the 3 rect slabs on the y-axis
   Rect rects[3];
@@ -80,7 +80,7 @@ static void DecomposeRect(Rect* rectA, Rect* rectB) {
 void DecomposeRects(Rect* rects, size_t count) {
   for (size_t i = 0; i < count; i++) {
     for (size_t j = i + 1; j < count; j++) {
-      if (rects[i].intersects(rects[j])) {
+      if (Rect::Intersects(rects[i], rects[j])) {
         DecomposeRect(&rects[i], &rects[j]);
       }
     }

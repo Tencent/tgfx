@@ -27,9 +27,9 @@
 #include "gpu/opengl/GLCaps.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Canvas.h"
-#include "tgfx/core/ImageReader.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
+#include "tgfx/platform/ImageReader.h"
 #include "utils/TestUtils.h"
 #include "utils/common.h"
 

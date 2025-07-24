@@ -21,7 +21,7 @@
 #include <optional>
 #include "core/DrawContext.h"
 #include "gpu/OpsCompositor.h"
-#include "gpu/ops/DrawOp.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
 class RenderContext : public DrawContext {
@@ -67,10 +67,11 @@ class RenderContext : public DrawContext {
 
  private:
   void drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const MCState& state,
-                              const Fill& fill, const Stroke* stroke, GlyphRun* rejectedGlyphRun);
+                              const Fill& fill, const Stroke* stroke, const Rect& localClipBounds,
+                              GlyphRun* rejectedGlyphRun);
 
   void drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList, const MCState& state,
-                        const Fill& fill, const Stroke* stroke, const Rect& clipBounds);
+                        const Fill& fill, const Stroke* stroke, Rect& localClipBounds);
 
   void drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun, const MCState& state,
                                    const Fill& fill, const Stroke* stroke);

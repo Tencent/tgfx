@@ -19,7 +19,6 @@
 #pragma once
 
 #include <optional>
-#include "GLContext.h"
 #include "gpu/Pipeline.h"
 #include "gpu/Program.h"
 #include "gpu/SLType.h"
@@ -34,10 +33,8 @@ class GLProgram : public Program {
     int location = 0;
   };
 
-  GLProgram(Context* context, unsigned programID, std::unique_ptr<GLUniformBuffer> uniformBuffer,
+  GLProgram(unsigned programID, std::unique_ptr<GLUniformBuffer> uniformBuffer,
             std::vector<Attribute> attributes, int vertexStride);
-
-  void setupSamplerUniforms(const std::vector<GLUniform>& textureSamplers) const;
 
   /**
    * Gets the GL program ID for this program.

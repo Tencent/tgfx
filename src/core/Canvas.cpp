@@ -383,7 +383,7 @@ void Canvas::drawPath(const Path& path, const MCState& state, const Fill& fill,
     if (shape == nullptr) {
       return;
     }
-    shape = StrokeShape::Apply(std::move(shape), stroke, false);
+    shape = Shape::ApplyStroke(std::move(shape), stroke);
     if (shape == nullptr) {
       return;
     }
@@ -417,7 +417,7 @@ void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
     drawPath(*path, state, fill, stroke);
     return;
   }
-  shape = StrokeShape::Apply(std::move(shape), stroke, false);
+  shape = Shape::ApplyStroke(std::move(shape), stroke);
   if (shape != nullptr) {
     drawContext->drawShape(std::move(shape), state, fill);
   }

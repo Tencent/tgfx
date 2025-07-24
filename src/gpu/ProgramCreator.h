@@ -34,7 +34,7 @@ class ProgramCreator {
   virtual ~ProgramCreator() = default;
 
   /**
-   * Computes the key for the program, which is used to cache the program in the ProgramCache.
+   * Computes the key for the program, which is used to cache the program in the GlobalCache.
    */
   virtual void computeProgramKey(Context* context, BytesKey* programKey) const = 0;
 

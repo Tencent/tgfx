@@ -19,7 +19,7 @@
 #pragma once
 
 #include <jni.h>
-#include "tgfx/core/ImageReader.h"
+#include "tgfx/platform/ImageReader.h"
 
 namespace tgfx {
 /**
@@ -46,19 +46,11 @@ class SurfaceTextureReader : public ImageReader {
   jobject getInputSurface() const;
 
   /**
-   * Notifies the previously returned ImageBuffer is available for generating textures. The method
-   * should be called by the listener passed in when creating the reader.
+   * Notifies that the previously returned ImageBuffer is now available for texture generation.
+   * Otherwise, the previous ImageBuffer will remain blocked for texture generation until this method
+   * is called. This method should be invoked by the listener provided when creating the reader.
    */
   void notifyFrameAvailable();
-
-  /**
-   * Acquires the next ImageBuffer from the SurfaceTextureReader after a new image frame has been
-   * rendered into the associated input Surface instance. The returned ImageBuffer will be blocked
-   * when generating textures until the SurfaceTextureReader.notifyFrameAvailable() method is
-   * called. Note that the previously returned image buffers will immediately expire after the newly
-   * created ImageBuffer is drawn.
-   */
-  std::shared_ptr<ImageBuffer> acquireNextBuffer() override;
 
  private:
   explicit SurfaceTextureReader(std::shared_ptr<ImageStream> stream);

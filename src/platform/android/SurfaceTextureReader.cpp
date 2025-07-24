@@ -47,9 +47,4 @@ jobject SurfaceTextureReader::getInputSurface() const {
 void SurfaceTextureReader::notifyFrameAvailable() {
   std::static_pointer_cast<SurfaceTexture>(stream)->notifyFrameAvailable();
 }
-
-std::shared_ptr<ImageBuffer> SurfaceTextureReader::acquireNextBuffer() {
-  stream->markContentDirty(Rect::MakeWH(stream->width(), stream->height()));
-  return ImageReader::acquireNextBuffer();
-}
 }  // namespace tgfx

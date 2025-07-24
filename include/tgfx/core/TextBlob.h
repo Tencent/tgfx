@@ -60,23 +60,26 @@ class TextBlob {
   virtual ~TextBlob() = default;
 
   /**
-   * Returns the bounding box of the TextBlob. Since text outlines can change with different scale
-   * factors, it's best to use the final drawing scale factor in the resolutionScale for accurate
-   * bounds calculation. Note that the resolutionScale is not applied to the returned bounds; it
-   * only affects the precision of the bounds.
-   * @param resolutionScale The intended resolution for the TextBlob. The default value is 1.0.
-   * @return The bounding box of the TextBlob.
+   * Returns a conservative bounding box for the TextBlob that is guaranteed to contain all glyphs.
+   * It may be larger than the actual bounds, but it is faster to compute.
    */
-  Rect getBounds(float resolutionScale = 1.0f) const;
+  Rect getBounds() const;
+
+  /**
+   * Returns the tight bounding box of the TextBlob when drawn with the given Matrix. Because text
+   * outlines can vary with different scale factors, it's best to use the final drawing matrix for
+   * accurate bounds. This method is more accurate than getBounds, but also more computationally
+   * expensive.
+   */
+  Rect getTightBounds(const Matrix* matrix = nullptr) const;
 
   /**
    * Creates a Path for the glyphs in the text blob. Since text outlines can change with different
-   * scale factors, it's best to use the final drawing scale factor in the resolutionScale for
-   * accuracy. Note that the resolutionScale is not applied to the returned Path; it only affects
-   * the precision of the Path. Returns true if the path was successfully created. Otherwise,
-   * returns false and leaves the path unchanged.
+   * scale factors, it's best to use the final drawing matrix to compute an accurate Path.
+   * Returns true if the path was created successfully; otherwise, returns false and leaves the
+   * path unchanged.
    */
-  bool getPath(Path* path, float resolutionScale = 1.0f) const;
+  bool getPath(Path* path, const Matrix* matrix = nullptr) const;
 
  private:
   std::vector<std::shared_ptr<GlyphRunList>> glyphRunLists = {};

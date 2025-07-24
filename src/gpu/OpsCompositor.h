@@ -106,12 +106,12 @@ class OpsCompositor {
   UniqueKey clipKey = {};
   std::shared_ptr<TextureProxy> clipTexture = nullptr;
   PendingOpType pendingType = PendingOpType::Unknown;
-  SrcRectConstraint pendingConstraint = SrcRectConstraint::Fast;
   Path pendingClip = {};
   Fill pendingFill = {};
   std::shared_ptr<Image> pendingImage = nullptr;
-  std::shared_ptr<TextureProxy> pendingAtlasTexture = nullptr;
+  SrcRectConstraint pendingConstraint = SrcRectConstraint::Fast;
   SamplingOptions pendingSampling = {};
+  std::shared_ptr<TextureProxy> pendingAtlasTexture = nullptr;
   std::vector<PlacementPtr<RectRecord>> pendingRects = {};
   std::vector<PlacementPtr<RRectRecord>> pendingRRects = {};
   std::vector<PlacementPtr<Stroke>> pendingStrokes = {};
@@ -129,7 +129,10 @@ class OpsCompositor {
 
   bool drawAsClear(const Rect& rect, const MCState& state, const Fill& fill);
   bool canAppend(PendingOpType type, const Path& clip, const Fill& fill) const;
-  void flushPendingOps(PendingOpType type = PendingOpType::Unknown, Path clip = {}, Fill fill = {});
+  void flushPendingOps(PendingOpType currentType = PendingOpType::Unknown, Path currentClip = {},
+                       Fill currentFill = {});
+  void resetPendingOps(PendingOpType currentType = PendingOpType::Unknown, Path currentClip = {},
+                       Fill currentFill = {});
   AAType getAAType(const Fill& fill) const;
   std::pair<bool, bool> needComputeBounds(const Fill& fill, bool hasCoverage,
                                           bool hasImageFill = false);
@@ -141,7 +144,9 @@ class OpsCompositor {
   DstTextureInfo makeDstTextureInfo(const Rect& deviceBounds, AAType aaType);
   void addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const Fill& fill,
                  const std::optional<Rect>& localBounds, const std::optional<Rect>& deviceBounds);
+  void submitDrawOps();
 
   friend class DrawingManager;
+  friend class PendingOpsAutoReset;
 };
 }  // namespace tgfx

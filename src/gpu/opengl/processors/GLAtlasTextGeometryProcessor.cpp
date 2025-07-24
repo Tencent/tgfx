@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLAtlasTextGeometryProcessor.h"
-#include "gpu/opengl/GLGpu.h"
+#include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
 PlacementPtr<AtlasTextGeometryProcessor> AtlasTextGeometryProcessor::Make(

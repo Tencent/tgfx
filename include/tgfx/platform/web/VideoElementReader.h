@@ -19,7 +19,7 @@
 #pragma once
 
 #include <emscripten/val.h>
-#include "tgfx/core/ImageReader.h"
+#include "tgfx/platform/ImageReader.h"
 
 namespace tgfx {
 /**
@@ -33,13 +33,6 @@ class VideoElementReader : public ImageReader {
    * Returns nullptr if the video is null or the buffer size is zero.
    */
   static std::shared_ptr<VideoElementReader> MakeFrom(emscripten::val video, int width, int height);
-
-  /**
-   * Acquires the next ImageBuffer from the VideoElementReader after a new image frame has been
-   * rendered into the associated HTMLVideoElement. Note that the previously returned image
-   * buffers will immediately expire after the newly created ImageBuffer is drawn.
-   */
-  std::shared_ptr<ImageBuffer> acquireNextBuffer() override;
 
   /**
    * Acquires the next ImageBuffer from the VideoElementReader after a new image frame is about to

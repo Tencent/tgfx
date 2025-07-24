@@ -21,13 +21,13 @@ import {setTGFXModule} from './tgfx-module'
 import * as tgfx from './tgfx'
 import {Matrix} from './core/matrix'
 import {ScalerContext} from './core/scaler-context';
-import {WebMask} from './core/web-mask';
+import {PathRasterizer} from './core/path-rasterizer';
 
 export const TGFXBind = (module: TGFX) => {
     setTGFXModule(module)
     module.module = module
     module.ScalerContext = ScalerContext
-    module.WebMask = WebMask
+    module.WebMask = PathRasterizer
     module.Matrix = Matrix
     module.tgfx = {...tgfx};
 }

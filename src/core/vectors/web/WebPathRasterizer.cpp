@@ -19,14 +19,14 @@
 #include "WebPathRasterizer.h"
 #include <emscripten/val.h>
 #include "ReadPixelsFromCanvasImage.h"
-#include "WebMask.h"
 
 using namespace emscripten;
 
 namespace tgfx {
-std::shared_ptr<PathRasterizer> PathRasterizer::Make(int width, int height,
-                                                     std::shared_ptr<Shape> shape, bool antiAlias,
-                                                     bool needsGammaCorrection) {
+std::shared_ptr<PathRasterizer> PathRasterizer::MakeFrom(int width, int height,
+                                                         std::shared_ptr<Shape> shape,
+                                                         bool antiAlias,
+                                                         bool needsGammaCorrection) {
   if (shape == nullptr || width <= 0 || height <= 0) {
     return nullptr;
   }
@@ -68,24 +68,15 @@ bool WebPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) co
   if (!path2DClass.as<bool>()) {
     return false;
   }
-  auto targetInfo = dstInfo.makeIntersect(0, 0, width(), height());
-  auto canvas = val::module_property("tgfx").call<val>("createCanvas2D", targetInfo.width(),
-                                                       targetInfo.height());
-  if (!canvas.as<bool>()) {
-    return false;
-  }
-  auto webMaskClass = val::module_property("WebMask");
-  if (!webMaskClass.as<bool>()) {
-    return false;
-  }
-  auto webMask = webMaskClass.call<val>("create", canvas);
-  if (!webMask.as<bool>()) {
-    return false;
-  }
   auto path2D = path2DClass.new_();
   path.decompose(Iterator, &path2D);
-  webMask.call<void>("fillPath", path2D, path.getFillType());
-  auto imageData = webMask.call<val>("getImageData");
+  auto PathRasterizerClass = val::module_property("PathRasterizer");
+  if (!PathRasterizerClass.as<bool>()) {
+    return false;
+  }
+  auto targetInfo = dstInfo.makeIntersect(0, 0, width(), height());
+  auto imageData = PathRasterizerClass.call<val>("readPixels", targetInfo.width(),
+                                                 targetInfo.height(), path2D, path.getFillType());
   if (!imageData.as<bool>()) {
     return false;
   }

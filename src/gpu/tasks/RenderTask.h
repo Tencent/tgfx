@@ -19,21 +19,13 @@
 #pragma once
 
 #include "core/utils/Log.h"
-#include "gpu/RenderPass.h"
-#include "gpu/proxies/RenderTargetProxy.h"
+#include "gpu/GPU.h"
 
 namespace tgfx {
 class RenderTask {
  public:
   virtual ~RenderTask() = default;
 
-  virtual bool execute(RenderPass* renderPass) = 0;
-
- protected:
-  explicit RenderTask(std::shared_ptr<RenderTargetProxy> proxy)
-      : renderTargetProxy(std::move(proxy)) {
-  }
-
-  std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
+  virtual void execute(GPU* gpu) = 0;
 };
 }  // namespace tgfx

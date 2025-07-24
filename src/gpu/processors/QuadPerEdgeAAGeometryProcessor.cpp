@@ -19,7 +19,12 @@
 #include "QuadPerEdgeAAGeometryProcessor.h"
 
 namespace tgfx {
-void QuadPerEdgeAAGeometryProcessor::fillAttribute() {
+QuadPerEdgeAAGeometryProcessor::QuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa,
+                                                               std::optional<Color> commonColor,
+                                                               std::optional<Matrix> uvMatrix,
+                                                               bool hasSubset)
+    : GeometryProcessor(ClassID()), width(width), height(height), aa(aa), commonColor(commonColor),
+      uvMatrix(uvMatrix), hasSubset(hasSubset) {
   position = {"aPosition", SLType::Float2};
   if (aa == AAType::Coverage) {
     coverage = {"inCoverage", SLType::Float};
@@ -34,14 +39,6 @@ void QuadPerEdgeAAGeometryProcessor::fillAttribute() {
     subset = {"texSubset", SLType::Float4};
   }
   setVertexAttributes(&position, 5);
-}
-
-QuadPerEdgeAAGeometryProcessor::QuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa,
-                                                               std::optional<Color> commonColor,
-                                                               std::optional<Matrix> uvMatrix,
-                                                               bool hasSubset)
-    : GeometryProcessor(ClassID()), width(width), height(height), aa(aa), commonColor(commonColor),
-      uvMatrix(uvMatrix), hasSubset(hasSubset) {
 }
 
 void QuadPerEdgeAAGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {

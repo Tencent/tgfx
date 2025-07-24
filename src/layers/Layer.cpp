@@ -739,7 +739,7 @@ std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float con
 
 void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
   DEBUG_ASSERT(canvas != nullptr);
-  if (args.renderRect && !args.renderRect->intersects(renderBounds)) {
+  if (args.renderRect && !Rect::Intersects(*args.renderRect, renderBounds)) {
     return;
   }
   if (auto rasterizedCache = getRasterizedCache(args, canvas->getMatrix())) {

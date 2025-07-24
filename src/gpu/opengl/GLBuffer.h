@@ -18,10 +18,10 @@
 
 #pragma once
 
-#include "gpu/GpuBuffer.h"
+#include "gpu/GPUBuffer.h"
 
 namespace tgfx {
-class GLBuffer : public GpuBuffer {
+class GLBuffer : public GPUBuffer {
  public:
   unsigned bufferID() const {
     return _bufferID;
@@ -34,9 +34,9 @@ class GLBuffer : public GpuBuffer {
   unsigned _bufferID = 0;
 
   GLBuffer(BufferType bufferType, size_t size, unsigned bufferID)
-      : GpuBuffer(bufferType, size), _bufferID(bufferID) {
+      : GPUBuffer(bufferType, size), _bufferID(bufferID) {
   }
 
-  friend class GpuBuffer;
+  friend class GPUBuffer;
 };
 }  // namespace tgfx

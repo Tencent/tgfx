@@ -27,7 +27,7 @@ TextureRenderTargetProxy::TextureRenderTargetProxy(int width, int height, PixelF
 }
 
 std::shared_ptr<RenderTarget> TextureRenderTargetProxy::getRenderTarget() const {
-  auto texture = TextureProxy::getTexture();
+  auto texture = DefaultTextureProxy::getTexture();
   return texture ? texture->asRenderTarget() : nullptr;
 }
 
@@ -35,8 +35,8 @@ std::shared_ptr<Texture> TextureRenderTargetProxy::onMakeTexture(Context* contex
   if (_externallyOwned) {
     return nullptr;
   }
-  auto renderTarget =
-      RenderTarget::Make(context, _width, _height, _format, _sampleCount, _mipmapped, _origin);
+  auto renderTarget = RenderTarget::Make(context, _backingStoreWidth, _backingStoreHeight, _format,
+                                         _sampleCount, _mipmapped, _origin);
   if (renderTarget == nullptr) {
     LOGE("TextureRenderTargetProxy::onMakeTexture() Failed to create the render target!");
     return nullptr;

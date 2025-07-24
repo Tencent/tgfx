@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "core/ImageStream.h"
+#include "platform/ImageStream.h"
 #include "tgfx/platform/android/Global.h"
 
 namespace tgfx {
@@ -43,22 +43,6 @@ class SurfaceTexture : public ImageStream {
 
   ~SurfaceTexture() override;
 
-  int width() const override {
-    return _width;
-  }
-
-  int height() const override {
-    return _height;
-  }
-
-  bool isAlphaOnly() const override {
-    return false;
-  }
-
-  bool isHardwareBacked() const override {
-    return false;
-  }
-
   /**
    * Returns the Surface object used as the input to the SurfaceTexture. The release() method of
    * the returned Surface will be called when the SurfaceTexture is released.
@@ -74,12 +58,10 @@ class SurfaceTexture : public ImageStream {
  protected:
   std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) override;
 
-  bool onUpdateTexture(std::shared_ptr<Texture> texture, const Rect& bounds) override;
+  bool onUpdateTexture(std::shared_ptr<Texture> texture) override;
 
  private:
   std::mutex locker = {};
-  int _width = 0;
-  int _height = 0;
   std::condition_variable condition = {};
   Global<jobject> surface;
   Global<jobject> surfaceTexture;

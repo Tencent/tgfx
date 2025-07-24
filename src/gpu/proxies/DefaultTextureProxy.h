@@ -23,42 +23,16 @@
 namespace tgfx {
 class DefaultTextureProxy : public TextureProxy {
  public:
-  int width() const override {
-    return _width;
-  }
-
-  int height() const override {
-    return _height;
-  }
-
-  bool isAlphaOnly() const override {
-    return _format == PixelFormat::ALPHA_8;
-  }
-
-  bool hasMipmaps() const override {
-    return _mipmapped;
-  }
-
-  ImageOrigin origin() const override {
-    return _origin;
-  }
+  std::shared_ptr<Texture> getTexture() const override;
 
  protected:
-  int _width = 0;
-  int _height = 0;
-  PixelFormat _format = PixelFormat::RGBA_8888;
-  bool _mipmapped = false;
-  ImageOrigin _origin = ImageOrigin::TopLeft;
-
   DefaultTextureProxy(int width, int height, PixelFormat pixelFormat, bool mipmapped = false,
-                      ImageOrigin origin = ImageOrigin::TopLeft)
-      : _width(width), _height(height), _format(pixelFormat), _mipmapped(mipmapped),
-        _origin(origin) {
-  }
+                      ImageOrigin origin = ImageOrigin::TopLeft);
 
-  std::shared_ptr<Texture> onMakeTexture(Context* context) const override {
-    return Texture::MakeFormat(context, _width, _height, _format, _mipmapped, _origin);
-  }
+  virtual std::shared_ptr<Texture> onMakeTexture(Context* context) const;
+
+ private:
+  UniqueKey uniqueKey = {};
 
   friend class ProxyProvider;
 };

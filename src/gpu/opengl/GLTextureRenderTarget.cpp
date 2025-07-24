@@ -19,7 +19,7 @@
 #include "GLTextureRenderTarget.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "core/utils/UniqueID.h"
-#include "gpu/Gpu.h"
+#include "gpu/GPU.h"
 #include "gpu/TextureSampler.h"
 #include "gpu/opengl/GLTextureSampler.h"
 #include "gpu/opengl/GLUtil.h"

@@ -33,7 +33,6 @@
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageFilter.h"
-#include "tgfx/core/ImageReader.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
@@ -42,6 +41,7 @@
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
+#include "tgfx/platform/ImageReader.h"
 #include "utils/TestUtils.h"
 #include "utils/TextShaper.h"
 #include "utils/common.h"
@@ -1260,7 +1260,7 @@ TGFX_TEST(CanvasTest, Picture) {
   auto picture = recorder.finishRecordingAsPicture();
   ASSERT_TRUE(picture != nullptr);
 
-  auto bounds = picture->getBounds();
+  auto bounds = picture->getTightBounds();
   auto surface = Surface::Make(context, static_cast<int>(bounds.width()),
                                static_cast<int>(bounds.height() + 20));
   canvas = surface->getCanvas();
@@ -1336,7 +1336,7 @@ TGFX_TEST(CanvasTest, Picture) {
   paint.reset();
   canvas->drawSimpleText("Hello TGFX~", 0, 0, font, paint);
   auto textRecord = recorder.finishRecordingAsPicture();
-  bounds = textRecord->getBounds();
+  bounds = textRecord->getTightBounds();
   matrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
   auto width = static_cast<int>(bounds.width());
   auto height = static_cast<int>(bounds.height());

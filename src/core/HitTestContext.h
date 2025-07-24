@@ -23,8 +23,8 @@
 namespace tgfx {
 class HitTestContext : public DrawContext {
  public:
-  HitTestContext(float testX, float testY, bool shapeHitTest)
-      : testX(testX), testY(testY), shapeHitTest(shapeHitTest) {
+  HitTestContext(float deviceX, float devcieY, bool shapeHitTest)
+      : deviceX(deviceX), deviceY(devcieY), shapeHitTest(shapeHitTest) {
   }
 
   bool hasHit() const {
@@ -58,8 +58,8 @@ class HitTestContext : public DrawContext {
                  const MCState& state, const Fill& fill) override;
 
  private:
-  float testX = 0;
-  float testY = 0;
+  float deviceX = 0;
+  float deviceY = 0;
   bool shapeHitTest = false;
   bool hit = false;
 

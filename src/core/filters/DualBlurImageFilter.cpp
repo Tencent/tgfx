@@ -118,7 +118,7 @@ std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_
   auto isAlphaOnly = source->isAlphaOnly();
   auto lastRenderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(clipBounds.width()), static_cast<int>(clipBounds.height()),
-      isAlphaOnly, 1, args.mipmapped);
+      isAlphaOnly, 1, args.mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
   if (lastRenderTarget == nullptr) {
     return nullptr;
   }
@@ -157,7 +157,8 @@ std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_
     auto downWidth = static_cast<int>(roundf(textureSize.width * downScaling));
     auto downHeight = static_cast<int>(roundf(textureSize.height * downScaling));
     auto renderTarget =
-        RenderTargetProxy::MakeFallback(args.context, downWidth, downHeight, isAlphaOnly);
+        RenderTargetProxy::MakeFallback(args.context, downWidth, downHeight, isAlphaOnly, 1, false,
+                                        ImageOrigin::TopLeft, BackingFit::Approx);
     if (renderTarget == nullptr) {
       break;
     }

@@ -27,7 +27,7 @@ class RuntimeProgramWrapper : public Program {
   static const RuntimeProgram* Unwrap(const Program* program);
 
   explicit RuntimeProgramWrapper(std::unique_ptr<RuntimeProgram> program)
-      : Program(program->getContext()), runtimeProgram(std::move(program)) {
+      : runtimeProgram(std::move(program)) {
   }
 
   void onReleaseGPU() override;

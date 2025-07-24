@@ -100,23 +100,4 @@ bool TileCache::removeTile(int tileX, int tileY) {
   auto key = TileKey(tileX, tileY);
   return tileMap.erase(key) > 0;
 }
-
-std::vector<std::shared_ptr<Tile>> TileCache::getReusableTiles(float centerX, float centerY) {
-  std::vector<std::shared_ptr<Tile>> tiles = {};
-  for (auto& item : tileMap) {
-    if (item.second.use_count() == 1) {
-      tiles.push_back(item.second);
-    }
-  }
-  std::sort(tiles.begin(), tiles.end(),
-            [centerX, centerY, tileSize = static_cast<float>(tileSize)](
-                const std::shared_ptr<Tile>& a, const std::shared_ptr<Tile>& b) {
-              float dxA = (static_cast<float>(a->tileX) + 0.5f) * tileSize - centerX;
-              float dyA = (static_cast<float>(a->tileY) + 0.5f) * tileSize - centerY;
-              float dxB = (static_cast<float>(b->tileX) + 0.5f) * tileSize - centerX;
-              float dyB = (static_cast<float>(b->tileY) + 0.5f) * tileSize - centerY;
-              return dxA * dxA + dyA * dyA < dxB * dxB + dyB * dyB;
-            });
-  return tiles;
-}
 }  // namespace tgfx

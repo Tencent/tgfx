@@ -117,7 +117,6 @@ class GLCaps : public Caps {
   bool unpackRowLengthSupport = false;
   bool textureRedSupport = false;
   MSFBOType msFBOType = MSFBOType::None;
-  bool blitRectsMustMatchForMSAASrc = false;
   bool frameBufferFetchRequiresEnablePerSample = false;
   std::string frameBufferFetchColorName;
   std::string frameBufferFetchExtensionString;

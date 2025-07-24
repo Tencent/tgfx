@@ -95,11 +95,11 @@ class AARectsVertexProvider : public RectsVertexProvider {
   }
 };
 
-class NonAARectVertexProvider : public RectsVertexProvider {
+class NonAARectsVertexProvider : public RectsVertexProvider {
  public:
-  NonAARectVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType, bool hasUVCoord,
-                          bool hasColor, UVSubsetMode subsetMode,
-                          std::shared_ptr<BlockBuffer> reference)
+  NonAARectsVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType, bool hasUVCoord,
+                           bool hasColor, UVSubsetMode subsetMode,
+                           std::shared_ptr<BlockBuffer> reference)
       : RectsVertexProvider(std::move(rects), aaType, hasUVCoord, hasColor, subsetMode,
                             std::move(reference)) {
   }
@@ -156,8 +156,8 @@ PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(BlockBuffer* buf
     return buffer->make<AARectsVertexProvider>(std::move(rects), aaType, false, false,
                                                UVSubsetMode::None, buffer->addReference());
   }
-  return buffer->make<NonAARectVertexProvider>(std::move(rects), aaType, false, false,
-                                               UVSubsetMode::None, buffer->addReference());
+  return buffer->make<NonAARectsVertexProvider>(std::move(rects), aaType, false, false,
+                                                UVSubsetMode::None, buffer->addReference());
 }
 
 PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
@@ -171,8 +171,8 @@ PlacementPtr<RectsVertexProvider> RectsVertexProvider::MakeFrom(
     return buffer->make<AARectsVertexProvider>(std::move(array), aaType, hasUVCoord, hasColor,
                                                subsetMode, buffer->addReference());
   }
-  return buffer->make<NonAARectVertexProvider>(std::move(array), aaType, hasUVCoord, hasColor,
-                                               subsetMode, buffer->addReference());
+  return buffer->make<NonAARectsVertexProvider>(std::move(array), aaType, hasUVCoord, hasColor,
+                                                subsetMode, buffer->addReference());
 }
 
 RectsVertexProvider::RectsVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType,

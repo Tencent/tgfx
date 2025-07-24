@@ -19,7 +19,7 @@
 #include "GradientShader.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/Types.h"
-#include "gpu/ResourceProvider.h"
+#include "gpu/GlobalCache.h"
 #include "gpu/processors/ClampedGradientEffect.h"
 #include "gpu/processors/ConicGradientLayout.h"
 #include "gpu/processors/DiamondGradientLayout.h"
@@ -102,12 +102,10 @@ static PlacementPtr<FragmentProcessor> MakeColorizer(const Context* context, con
       return unrolled;
     }
   }
-
   // Otherwise, fall back to a raster gradient sample by a texture, which can handle
   // arbitrary gradients (the only downside being sampling resolution).
-  return TextureGradientColorizer::Make(
-      drawingBuffer,
-      context->resourceProvider()->getGradient(colors + offset, positions + offset, count));
+  auto gradient = context->globalCache()->getGradient(colors + offset, positions + offset, count);
+  return TextureGradientColorizer::Make(drawingBuffer, std::move(gradient));
 }
 
 GradientShader::GradientShader(const std::vector<Color>& colors,

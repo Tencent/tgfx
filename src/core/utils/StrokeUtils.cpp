@@ -1,5 +1,6 @@
 #include <cmath>
 #include "ApplyStrokeToBounds.h"
+#include "core/utils/MathExtra.h"
 
 namespace tgfx {
 

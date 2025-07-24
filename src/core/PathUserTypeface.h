@@ -28,7 +28,7 @@ class PathUserTypeface final : public UserTypeface {
 
   static std::shared_ptr<UserTypeface> Make(uint32_t builderID, const std::string& fontFamily,
                                             const std::string& fontStyle,
-                                            const FontMetrics& metrics,
+                                            const FontMetrics& fontMetrics, const Rect& fontBounds,
                                             const VectorProviderType& glyphPathProviders);
   size_t glyphsCount() const override;
 
@@ -42,8 +42,8 @@ class PathUserTypeface final : public UserTypeface {
 
  private:
   explicit PathUserTypeface(uint32_t builderID, const std::string& fontFamily,
-                            const std::string& fontStyle, const FontMetrics& metrics,
-                            const VectorProviderType& glyphPathProviders);
+                            const std::string& fontStyle, const FontMetrics& fontMetrics,
+                            const Rect& fontBounds, const VectorProviderType& glyphPathProviders);
 
   VectorProviderType glyphPathProviders = {};
 };

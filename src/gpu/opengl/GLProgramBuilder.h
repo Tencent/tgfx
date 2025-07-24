@@ -45,8 +45,6 @@ class GLProgramBuilder : public ProgramBuilder {
 
   void resolveProgramResourceLocations(unsigned programID);
 
-  std::unique_ptr<GLProgram> createProgram(unsigned programID);
-
   UniformHandler* uniformHandler() override {
     return &_uniformHandler;
   }

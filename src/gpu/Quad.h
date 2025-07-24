@@ -33,11 +33,6 @@ class Quad {
     return points[i];
   }
 
-  /**
-   * Returns the basic vertex data of the quad as triangle strips.
-   */
-  std::shared_ptr<Data> toTriangleStrips() const;
-
  private:
   explicit Quad(const Rect& rect, const Matrix* matrix = nullptr);
 

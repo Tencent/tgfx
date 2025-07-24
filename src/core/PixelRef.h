@@ -18,14 +18,13 @@
 
 #pragma once
 
-#include "core/ImageStream.h"
 #include "core/PixelBuffer.h"
 
 namespace tgfx {
 /**
  * This class is the smart container for pixel memory, and is used with Bitmap.
  */
-class PixelRef : public ImageStream {
+class PixelRef {
  public:
   /**
    * Creates a new PixelRef object width specified width and height. Returns nullptr if width or
@@ -54,19 +53,7 @@ class PixelRef : public ImageStream {
     return pixelBuffer->info();
   }
 
-  int width() const override {
-    return pixelBuffer->width();
-  }
-
-  int height() const override {
-    return pixelBuffer->height();
-  }
-
-  bool isAlphaOnly() const override {
-    return pixelBuffer->isAlphaOnly();
-  }
-
-  bool isHardwareBacked() const override {
+  bool isHardwareBacked() const {
     return pixelBuffer->isHardwareBacked();
   }
 
@@ -110,11 +97,6 @@ class PixelRef : public ImageStream {
    * Replaces all pixel values with transparent colors.
    */
   void clear();
-
- protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) override;
-
-  bool onUpdateTexture(std::shared_ptr<Texture> texture, const Rect& bounds) override;
 
  private:
   std::shared_ptr<PixelBuffer> pixelBuffer = nullptr;
