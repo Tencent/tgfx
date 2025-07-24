@@ -18,12 +18,13 @@
 
 #pragma once
 
+#include "core/images/TransformImage.h"
 #include "tgfx/core/Image.h"
 
 namespace tgfx {
-class ScaledImage : public Image {
+class ScaledImage : public TransformImage {
  public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> image, const ISize& size,
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> image, int width, int height,
                                          const SamplingOptions& sampling);
 
   ScaledImage(std::shared_ptr<Image> image, int width, int height, const SamplingOptions& sampling);
@@ -38,25 +39,6 @@ class ScaledImage : public Image {
     return _height;
   }
 
-  bool isAlphaOnly() const override {
-    return source->isAlphaOnly();
-  }
-
-  bool hasMipmaps() const override {
-    return source->hasMipmaps();
-  }
-
-  bool isFullyDecoded() const override {
-    return source->isFullyDecoded();
-  }
-
-  std::shared_ptr<Image> onMakeScaled(const ISize& size,
-                                      const SamplingOptions& sampling) const override;
-
-  std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
-
-  std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
-
  protected:
   Type type() const override {
     return Type::Scaled;
@@ -68,8 +50,12 @@ class ScaledImage : public Image {
 
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
+  std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
+                                      const SamplingOptions& sampling) const override;
+
+  std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
+
  private:
-  std::shared_ptr<Image> source = nullptr;
   int _width = 0;
   int _height = 0;
   SamplingOptions sampling = {};

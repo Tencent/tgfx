@@ -40,9 +40,9 @@ std::shared_ptr<Image> ResourceImage::onMakeMipmapped(bool enabled) const {
   return enabled ? MipmapImage::MakeFrom(std::move(source)) : source;
 }
 
-std::shared_ptr<Image> ResourceImage::onMakeScaled(const ISize& size,
+std::shared_ptr<Image> ResourceImage::onMakeScaled(int newWidth, int newHeight,
                                                    const SamplingOptions& sampling) const {
-  auto result = Image::onMakeScaled(size, sampling);
+  auto result = Image::onMakeScaled(newWidth, newHeight, sampling);
   return result->makeRasterized();
 }
 

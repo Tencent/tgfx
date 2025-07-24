@@ -420,7 +420,7 @@ TGFX_TEST(CanvasTest, rasterizedImage) {
   canvas->clear();
   scaledImage = scaledImage->makeMipmapped(false);
   EXPECT_FALSE(scaledImage->hasMipmaps());
-  rasterImage = scaledImage->makeScaled(ISize::Make(907, 1210), sampling)->makeRasterized();
+  rasterImage = scaledImage->makeScaled(907, 1210, sampling)->makeRasterized();
   EXPECT_FALSE(rasterImage->hasMipmaps());
   rasterImage = rasterImage->makeMipmapped(true);
   EXPECT_TRUE(rasterImage->hasMipmaps());
@@ -2631,7 +2631,7 @@ TGFX_TEST(CanvasTest, ScaleImage) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/imageReplacement.png");
-  auto scaledImage = image->makeScaled(ISize::Make(image->width(), image->height()));
+  auto scaledImage = image->makeScaled(image->width(), image->height());
   EXPECT_TRUE(scaledImage == image);
   image = MakeImage("resources/apitest/rotation.jpg");
   scaledImage = ScaleImage(image, 0.15f);

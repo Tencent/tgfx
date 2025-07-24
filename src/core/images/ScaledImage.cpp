@@ -25,55 +25,22 @@
 #include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
-std::shared_ptr<Image> ScaledImage::MakeFrom(std::shared_ptr<Image> image, const ISize& size,
+std::shared_ptr<Image> ScaledImage::MakeFrom(std::shared_ptr<Image> image, int width, int height,
                                              const SamplingOptions& sampling) {
-  if (image == nullptr || size.width <= 0 || size.height <= 0) {
+  if (image == nullptr || width <= 0 || height <= 0) {
     return nullptr;
   }
-  if (image->width() == size.width && image->height() == size.height) {
+  if (image->width() == width && image->height() == height) {
     return image;
   }
-  auto scaledImage =
-      std::make_shared<ScaledImage>(std::move(image), size.width, size.height, sampling);
+  auto scaledImage = std::make_shared<ScaledImage>(std::move(image), width, height, sampling);
   scaledImage->weakThis = scaledImage;
   return scaledImage;
 }
 
 ScaledImage::ScaledImage(std::shared_ptr<Image> image, int width, int height,
                          const SamplingOptions& sampling)
-    : source(std::move(image)), _width(width), _height(height), sampling(sampling) {
-}
-
-std::shared_ptr<Image> ScaledImage::onMakeScaled(const ISize& size,
-                                                 const SamplingOptions& sampling) const {
-  return MakeFrom(source, size, sampling);
-}
-
-std::shared_ptr<Image> ScaledImage::onMakeMipmapped(bool enabled) const {
-  if (enabled == source->hasMipmaps()) {
-    return weakThis.lock();
-  }
-  auto newSource = source->onMakeMipmapped(enabled);
-  if (newSource == nullptr) {
-    return nullptr;
-  }
-  auto newImage = std::shared_ptr<ScaledImage>(
-      new ScaledImage(std::move(newSource), _width, _height, sampling));
-  newImage->weakThis = newImage;
-  return newImage;
-}
-
-std::shared_ptr<Image> ScaledImage::onMakeDecoded(Context* context, bool) const {
-  // There is no need to pass tryHardware (disabled) to the source image, as our texture proxy is
-  // not locked from the source image.
-  auto newSource = source->onMakeDecoded(context);
-  if (newSource == nullptr) {
-    return nullptr;
-  }
-  auto newImage = std::shared_ptr<ScaledImage>(
-      new ScaledImage(std::move(newSource), _width, _height, sampling));
-  newImage->weakThis = newImage;
-  return newImage;
+    : TransformImage(std::move(image)), _width(width), _height(height), sampling(sampling) {
 }
 
 PlacementPtr<FragmentProcessor> ScaledImage::asFragmentProcessor(const FPArgs& args,
@@ -148,6 +115,22 @@ std::shared_ptr<TextureProxy> ScaledImage::lockTextureProxy(const TPArgs& args) 
   auto drawingManager = renderTarget->getContext()->drawingManager();
   drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags);
   return renderTarget->asTextureProxy();
+}
+
+std::shared_ptr<Image> ScaledImage::onMakeScaled(int newWidth, int newHeight,
+                                                 const SamplingOptions& sampling) const {
+  if (source->width() == newWidth && source->height() == newHeight) {
+    return source;
+  }
+  auto scaledImage = std::make_shared<ScaledImage>(source, newWidth, newHeight, sampling);
+  scaledImage->weakThis = scaledImage;
+  return scaledImage;
+}
+
+std::shared_ptr<Image> ScaledImage::onCloneWith(std::shared_ptr<Image> newSource) const {
+  auto scaledImage = std::make_shared<ScaledImage>(newSource, _width, _height, sampling);
+  scaledImage->weakThis = scaledImage;
+  return scaledImage;
 }
 
 }  // namespace tgfx

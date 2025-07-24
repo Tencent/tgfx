@@ -38,7 +38,7 @@ class ResourceImage : public Image {
 
   std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
 
-  std::shared_ptr<Image> onMakeScaled(const ISize& size,
+  std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
                                       const SamplingOptions& sampling) const override;
 
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const final;

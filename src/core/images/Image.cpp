@@ -174,14 +174,15 @@ std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {
   return onMakeSubset(rect);
 }
 
-std::shared_ptr<Image> Image::makeScaled(ISize size, const SamplingOptions& sampling) const {
-  if (size.width <= 0 || size.height <= 0) {
+std::shared_ptr<Image> Image::makeScaled(int newWidth, int newHeight,
+                                         const SamplingOptions& sampling) const {
+  if (newWidth <= 0 || newHeight <= 0) {
     return nullptr;
   }
-  if (ISize::Make(width(), height()) == size) {
+  if (newWidth == width() && newHeight == height()) {
     return weakThis.lock();
   }
-  return onMakeScaled(size, sampling);
+  return onMakeScaled(newWidth, newHeight, sampling);
 }
 
 std::shared_ptr<Image> Image::makeRasterized() const {
@@ -217,9 +218,9 @@ std::shared_ptr<Image> Image::onMakeWithFilter(std::shared_ptr<ImageFilter> filt
   return FilterImage::MakeFrom(weakThis.lock(), std::move(filter), offset, clipRect);
 }
 
-std::shared_ptr<Image> Image::onMakeScaled(const ISize& size,
+std::shared_ptr<Image> Image::onMakeScaled(int newWidth, int newHeight,
                                            const SamplingOptions& sampling) const {
-  return ScaledImage::MakeFrom(weakThis.lock(), size, sampling);
+  return ScaledImage::MakeFrom(weakThis.lock(), newWidth, newHeight, sampling);
 }
 
 std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,

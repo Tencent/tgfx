@@ -107,9 +107,9 @@ std::shared_ptr<Image> FilterImage::onMakeWithFilter(std::shared_ptr<ImageFilter
   return FilterImage::Wrap(source, filterBounds, std::move(composeFilter));
 }
 
-std::shared_ptr<Image> FilterImage::onMakeScaled(const ISize& size,
+std::shared_ptr<Image> FilterImage::onMakeScaled(int newWidth, int newHeight,
                                                  const SamplingOptions& sampling) const {
-  return ScaledImage::MakeFrom(weakThis.lock(), size, sampling);
+  return ScaledImage::MakeFrom(weakThis.lock(), newWidth, newHeight, sampling);
 }
 
 std::shared_ptr<TextureProxy> FilterImage::lockTextureProxy(const TPArgs& args) const {

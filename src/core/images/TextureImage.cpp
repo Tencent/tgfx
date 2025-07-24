@@ -62,12 +62,9 @@ std::shared_ptr<Image> TextureImage::makeRasterized() const {
   return weakThis.lock();
 }
 
-std::shared_ptr<Image> TextureImage::onMakeScaled(const ISize& size,
+std::shared_ptr<Image> TextureImage::onMakeScaled(int newWidth, int newHeight,
                                                   const SamplingOptions& sampling) const {
-  auto scaledImage = ScaledImage::MakeFrom(weakThis.lock(), size, sampling);
-  if (scaledImage == nullptr) {
-    return nullptr;
-  }
+  auto scaledImage = ScaledImage::MakeFrom(weakThis.lock(), newWidth, newHeight, sampling);
   return scaledImage->makeTextureImage(textureProxy->getContext());
 }
 

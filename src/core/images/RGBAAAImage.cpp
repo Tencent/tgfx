@@ -87,20 +87,21 @@ std::shared_ptr<Image> RGBAAAImage::onMakeSubset(const Rect& subset) const {
   return image;
 }
 
-std::shared_ptr<Image> RGBAAAImage::onMakeScaled(const ISize& size,
+std::shared_ptr<Image> RGBAAAImage::onMakeScaled(int newWidth, int newHeight,
                                                  const SamplingOptions& sampling) const {
-  float scaleX = static_cast<float>(size.width) / static_cast<float>(width());
-  float scaleY = static_cast<float>(size.height) / static_cast<float>(height());
+  float scaleX = static_cast<float>(newWidth) / static_cast<float>(width());
+  float scaleY = static_cast<float>(newHeight) / static_cast<float>(height());
   auto sourceScaledWidth = scaleX * static_cast<float>(source->width());
   auto sourceScaledHeight = scaleY * static_cast<float>(source->height());
   if (!IsInteger(sourceScaledWidth) || !IsInteger(sourceScaledHeight)) {
-    return ScaledImage::MakeFrom(weakThis.lock(), size, sampling);
+    return ScaledImage::MakeFrom(weakThis.lock(), newWidth, newHeight, sampling);
   }
   Point newAlphaStart = Point::Make(alphaStart.x * scaleX, alphaStart.y * scaleY);
   if (!IsInteger(newAlphaStart.x) || !IsInteger(newAlphaStart.y)) {
-    return ScaledImage::MakeFrom(weakThis.lock(), size, sampling);
+    return ScaledImage::MakeFrom(weakThis.lock(), newWidth, newHeight, sampling);
   }
-  auto newSource = source->makeScaled(ISize::Make(sourceScaledWidth, sourceScaledHeight), sampling);
+  auto newSource = source->makeScaled(static_cast<int>(sourceScaledWidth),
+                                      static_cast<int>(sourceScaledHeight), sampling);
   if (newSource == nullptr) {
     return nullptr;
   }

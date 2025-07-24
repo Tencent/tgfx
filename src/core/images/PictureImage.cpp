@@ -62,20 +62,18 @@ PictureImage::~PictureImage() {
 }
 
 std::shared_ptr<Image> PictureImage::onMakeMipmapped(bool enabled) const {
-  if (enabled == mipmapped) {
-    return weakThis.lock();
-  }
   auto newImage = std::make_shared<PictureImage>(picture, _width, _height, matrix, enabled);
   newImage->weakThis = newImage;
   return newImage;
 }
 
-std::shared_ptr<Image> PictureImage::onMakeScaled(const ISize& size, const SamplingOptions&) const {
+std::shared_ptr<Image> PictureImage::onMakeScaled(int newWidth, int newHeight,
+                                                  const SamplingOptions&) const {
   auto newMatrix = *matrix;
-  newMatrix.postScale(static_cast<float>(size.width) / static_cast<float>(_width),
-                      static_cast<float>(size.height) / static_cast<float>(_height));
+  newMatrix.postScale(static_cast<float>(newWidth) / static_cast<float>(_width),
+                      static_cast<float>(newHeight) / static_cast<float>(_height));
   auto newImage =
-      std::make_shared<PictureImage>(picture, size.width, size.height, &newMatrix, mipmapped);
+      std::make_shared<PictureImage>(picture, newWidth, newHeight, &newMatrix, mipmapped);
   newImage->weakThis = newImage;
   return newImage;
 }

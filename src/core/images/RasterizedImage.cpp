@@ -64,12 +64,9 @@ std::shared_ptr<TextureProxy> RasterizedImage::onLockTextureProxy(const TPArgs& 
   return renderTarget->asTextureProxy();
 }
 
-std::shared_ptr<Image> RasterizedImage::onMakeScaled(const ISize& size,
+std::shared_ptr<Image> RasterizedImage::onMakeScaled(int newWidth, int newHeight,
                                                      const SamplingOptions& sampling) const {
-  auto newSource = source->onMakeScaled(size, sampling);
-  if (newSource == nullptr) {
-    return nullptr;
-  }
+  auto newSource = source->makeScaled(newWidth, newHeight, sampling);
   return RasterizedImage::MakeFrom(std::move(newSource));
 }
 

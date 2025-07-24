@@ -115,9 +115,9 @@ void RemoveImage(const std::string& key) {
 
 std::shared_ptr<Image> ScaleImage(const std::shared_ptr<Image>& image, float scale,
                                   const SamplingOptions& options) {
-  ISize scaledSize = ISize::Make(roundf(scale * static_cast<float>(image->width())),
-                                 roundf(scale * static_cast<float>(image->height())));
-  return image->makeScaled(scaledSize, options);
+  auto newWidth = static_cast<int>(roundf(scale * static_cast<float>(image->width())));
+  auto newHeight = static_cast<int>(roundf(scale * static_cast<float>(image->height())));
+  return image->makeScaled(newWidth, newHeight, options);
 }
 
 }  // namespace tgfx
