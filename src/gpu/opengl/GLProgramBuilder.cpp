@@ -155,7 +155,19 @@ std::unique_ptr<GLProgram> GLProgramBuilder::finalize() {
   computeCountsAndStrides(programID);
   resolveProgramResourceLocations(programID);
 
-  return createProgram(programID);
+  auto uniformBuffer = _uniformHandler.makeUniformBuffer();
+  // Assign texture units to sampler uniforms up front, just once.
+  auto gl = GLFunctions::Get(context);
+  gl->useProgram(programID);
+  auto& samplers = _uniformHandler.samplers;
+  for (size_t i = 0; i < samplers.size(); ++i) {
+    const auto& sampler = samplers[i];
+    if (UNUSED_UNIFORM != sampler.location) {
+      gl->uniform1i(sampler.location, static_cast<int>(i));
+    }
+  }
+  return std::make_unique<GLProgram>(programID, std::move(uniformBuffer), attributes,
+                                     static_cast<int>(vertexStride));
 }
 
 void GLProgramBuilder::computeCountsAndStrides(unsigned int programID) {
@@ -184,14 +196,6 @@ bool GLProgramBuilder::checkSamplerCounts() {
     return false;
   }
   return true;
-}
-
-std::unique_ptr<GLProgram> GLProgramBuilder::createProgram(unsigned programID) {
-  auto uniformBuffer = _uniformHandler.makeUniformBuffer();
-  auto program = new GLProgram(context, programID, std::move(uniformBuffer), attributes,
-                               static_cast<int>(vertexStride));
-  program->setupSamplerUniforms(_uniformHandler.samplers);
-  return std::unique_ptr<GLProgram>(program);
 }
 
 bool GLProgramBuilder::isDesktopGL() const {

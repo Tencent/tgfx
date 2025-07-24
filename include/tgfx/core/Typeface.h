@@ -168,7 +168,7 @@ class Typeface {
 
   virtual bool isCustom() const;
 
-  bool computeBounds(Rect* bounds) const;
+  virtual bool onComputeBounds(Rect* bounds) const;
 
   std::unordered_map<float, std::weak_ptr<ScalerContext>> scalerContexts = {};
   mutable Rect bounds = {};

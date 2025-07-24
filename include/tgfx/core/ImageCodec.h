@@ -31,7 +31,7 @@ namespace tgfx {
 class ImageBuffer;
 
 /**
- * Abstraction layer directly on top of an image codec.
+ * ImageCodec is an abstract class that defines the interface for decoding images.
  */
 class ImageCodec : public ImageGenerator {
  public:
@@ -46,6 +46,14 @@ class ImageCodec : public ImageGenerator {
    * that can decode it. Otherwise, return nullptr.
    */
   static std::shared_ptr<ImageCodec> MakeFrom(std::shared_ptr<Data> imageBytes);
+
+  /**
+   * Creates a new ImageCodec using the provided ImageInfo and pixel data from an immutable Data
+   * object. The returned ImageCodec holds a reference to the pixel data, so the caller must ensure
+   * the pixels remain unchanged for the lifetime of the ImageCodec. Returns nullptr if ImageInfo is
+   * empty or pixels is nullptr.
+   */
+  static std::shared_ptr<ImageCodec> MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels);
 
   /**
    * Creates a new ImageCodec object from a platform-specific NativeImage. For example, the
@@ -72,6 +80,10 @@ class ImageCodec : public ImageGenerator {
     return false;
   }
 
+  bool isImageCodec() const final {
+    return true;
+  }
+
   virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const;
 
   /**
@@ -83,7 +95,7 @@ class ImageCodec : public ImageGenerator {
   virtual bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const = 0;
 
  protected:
-  ImageCodec(int width, int height, Orientation orientation)
+  ImageCodec(int width, int height, Orientation orientation = Orientation::TopLeft)
       : ImageGenerator(width, height), _orientation(orientation) {
   }
 
@@ -94,7 +106,7 @@ class ImageCodec : public ImageGenerator {
   };
 
  private:
-  Orientation _orientation = Orientation::LeftTop;
+  Orientation _orientation = Orientation::TopLeft;
 
   /**
    * If the file path represents an encoded image that the current platform knows how to decode,

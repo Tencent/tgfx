@@ -25,10 +25,10 @@
 #include "tgfx/gpu/Device.h"
 
 namespace tgfx {
-class ProgramCache;
+class GlobalCache;
 class ResourceCache;
 class DrawingManager;
-class Gpu;
+class GPU;
 class ResourceProvider;
 class ProxyProvider;
 class BlockBuffer;
@@ -58,10 +58,10 @@ class Context {
   }
 
   /**
-   * Returns the associated cache that manages the lifetime of all Program instances.
+   * Returns the cache for GPU resources that need to stay alive for the lifetime of the Context.
    */
-  ProgramCache* programCache() const {
-    return _programCache;
+  GlobalCache* globalCache() const {
+    return _globalCache;
   }
 
   /**
@@ -77,10 +77,6 @@ class Context {
 
   BlockBuffer* drawingBuffer() const {
     return _drawingBuffer;
-  }
-
-  ResourceProvider* resourceProvider() const {
-    return _resourceProvider;
   }
 
   ProxyProvider* proxyProvider() const {
@@ -152,13 +148,13 @@ class Context {
   bool wait(const BackendSemaphore& waitSemaphore);
 
   /**
-   * Apply all pending changes to the render target immediately. After issuing all commands, the
-   * semaphore will be signaled by the GPU. If the signalSemaphore is not null and uninitialized,
-   * a new semaphore is created and initializes BackendSemaphore. The caller must delete the
-   * semaphore returned in signalSemaphore. BackendSemaphore can be deleted as soon as this function
-   * returns. If the back-end API is OpenGL, only uninitialized backend semaphores are supported.
-   * If false is returned, the GPU back-end did not create or add a semaphore to signal on the GPU;
-   * the caller should not instruct the GPU to wait on the semaphore.
+   * Ensures that all pending drawing operations for this context are flushed to the underlying GPU
+   * API objects. A call to Context::submit is always required to ensure work is actually sent to
+   * the GPU. If signalSemaphore is not null and uninitialized, a new semaphore will be created and
+   * assigned to signalSemaphore. The caller is responsible for deleting the semaphore returned in
+   * signalSemaphore. Returns false if there are no pending drawing operations and nothing was
+   * flushed to the GPU. In that case, signalSemaphore will not be initialized, and the caller
+   * should not wait on it.
    */
   bool flush(BackendSemaphore* signalSemaphore = nullptr);
 
@@ -195,27 +191,18 @@ class Context {
   virtual const Caps* caps() const = 0;
 
   /**
-   * The Context normally assumes that no outsider is setting state within the underlying GPU API's
-   * context/device/whatever. This call informs the context that the state was modified and it
-   * should resend. Shouldn't be called frequently for good performance.
+   * Returns the GPU instance associated with this context.
    */
-  virtual void resetState() = 0;
-
-  Gpu* gpu() {
-    return _gpu;
-  }
+  virtual GPU* gpu() const = 0;
 
  protected:
   explicit Context(Device* device);
 
-  Gpu* _gpu = nullptr;
-
  private:
   Device* _device = nullptr;
-  ProgramCache* _programCache = nullptr;
+  GlobalCache* _globalCache = nullptr;
   ResourceCache* _resourceCache = nullptr;
   DrawingManager* _drawingManager = nullptr;
-  ResourceProvider* _resourceProvider = nullptr;
   ProxyProvider* _proxyProvider = nullptr;
   BlockBuffer* _drawingBuffer = nullptr;
   SlidingWindowTracker* _maxValueTracker = nullptr;

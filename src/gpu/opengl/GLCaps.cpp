@@ -438,16 +438,13 @@ void GLCaps::initMSAASupport(const GLInfo& info) {
         (info.hasExtension("GL_EXT_framebuffer_multisample") &&
          info.hasExtension("GL_EXT_framebuffer_blit"))) {
       msFBOType = MSFBOType::Standard;
-      blitRectsMustMatchForMSAASrc = false;
     }
   } else if (standard == GLStandard::GLES) {
     msFBOType = GetMSFBOType_GLES(version, info);
-    blitRectsMustMatchForMSAASrc = true;
   } else if (standard == GLStandard::WebGL) {
     // No support in WebGL 1, but there is for 2.0
     if (version >= GL_VER(2, 0)) {
       msFBOType = MSFBOType::Standard;
-      blitRectsMustMatchForMSAASrc = true;
     }
   }
 

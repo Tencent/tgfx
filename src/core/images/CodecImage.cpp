@@ -23,20 +23,11 @@
 #include "gpu/ProxyProvider.h"
 
 namespace tgfx {
-std::shared_ptr<Image> CodecImage::MakeFrom(const std::shared_ptr<ImageCodec>& codec) {
-  if (!codec) {
-    return nullptr;
-  }
-  auto image = std::shared_ptr<CodecImage>(new CodecImage(codec->width(), codec->height(), codec));
-  image->weakThis = image;
-  return image;
+CodecImage::CodecImage(UniqueKey uniqueKey, std::shared_ptr<ImageCodec> codec)
+    : GeneratorImage(std::move(uniqueKey), std::move(codec)) {
 }
 
-CodecImage::CodecImage(int width, int height, const std::shared_ptr<ImageCodec>& codec)
-    : GeneratorImage(UniqueKey::Make(), codec), _width(width), _height(height) {
-}
-
-std::shared_ptr<ImageCodec> CodecImage::codec() const {
+std::shared_ptr<ImageCodec> CodecImage::getCodec() const {
   return std::static_pointer_cast<ImageCodec>(generator);
 }
 

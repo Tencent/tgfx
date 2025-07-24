@@ -27,9 +27,9 @@ namespace tgfx {
 
 class CodecImage : public GeneratorImage {
  public:
-  static std::shared_ptr<Image> MakeFrom(const std::shared_ptr<ImageCodec>& codec);
+  CodecImage(UniqueKey uniqueKey, std::shared_ptr<ImageCodec> codec);
 
-  ~CodecImage() override = default;
+  std::shared_ptr<ImageCodec> getCodec() const;
 
   int width() const override {
     return _width;
@@ -38,8 +38,6 @@ class CodecImage : public GeneratorImage {
   int height() const override {
     return _height;
   }
-
-  std::shared_ptr<ImageCodec> codec() const;
 
   std::shared_ptr<Image> makeScaled(int newWidth, int newHeight, const SamplingOptions& sampling) const override;
 
@@ -53,7 +51,6 @@ class CodecImage : public GeneratorImage {
  private:
   int _width;
   int _height;
-  explicit CodecImage(int width, int height, const std::shared_ptr<ImageCodec>& codec);
 };
 
 }  // namespace tgfx

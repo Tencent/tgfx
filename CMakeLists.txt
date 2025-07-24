@@ -160,8 +160,6 @@ if (MSVC)
     list(APPEND TGFX_COMPILE_OPTIONS /w44251 /w44275)
     list(APPEND TGFX_COMPILE_OPTIONS /W4)
     list(APPEND TGFX_DEFINES NOMINMAX _USE_MATH_DEFINES)
-    list(APPEND TGFX_STATIC_VENDORS highway)
-    list(APPEND TGFX_INCLUDES third_party/highway)
 endif (MSVC)
 
 # Sets flags
@@ -289,6 +287,18 @@ endif ()
 
 file(GLOB_RECURSE EGL_PLATFORM_FILES src/gpu/opengl/egl/*.*)
 
+if (TGFX_USE_INSPECTOR)
+    set(INSPECTOR_DIR ${CMAKE_CURRENT_LIST_DIR}/inspector)
+    list(APPEND TGFX_INCLUDES ${INSPECTOR_DIR}/client/include ${INSPECTOR_DIR}/client/src ${INSPECTOR_DIR}/common)
+    list(APPEND TGFX_STATIC_VENDORS inspector)
+
+    list(APPEND TGFX_DEFINES TGFX_USE_INSPECTOR)
+    list(APPEND TGFX_INCLUDES third_party/flatbuffers/include)
+    file(GLOB_RECURSE SERIALIZATION_FILE src/serialization/*.*)
+    list(APPEND TGFX_FILES ${SERIALIZATION_FILE})
+    list(APPEND TGFX_STATIC_VENDORS flatbuffers)
+endif ()
+
 if (TGFX_USE_QT)
     set(CMAKE_AUTOMOC ON)
     # need to set the CMAKE_PREFIX_PATH to local QT installation path, for example :
@@ -334,6 +344,8 @@ list(APPEND TGFX_INCLUDES third_party/pathkit)
 list(APPEND TGFX_STATIC_VENDORS skcms)
 list(APPEND TGFX_INCLUDES third_party/skcms)
 list(APPEND TGFX_INCLUDES third_party/concurrentqueue)
+list(APPEND TGFX_STATIC_VENDORS highway)
+list(APPEND TGFX_INCLUDES third_party/highway)
 if (TGFX_BUILD_SVG)
     list(APPEND TGFX_STATIC_VENDORS expat)
     list(APPEND TGFX_INCLUDES third_party/expat)

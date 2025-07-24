@@ -17,27 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLProgram.h"
-#include "GLGpu.h"
+#include "GLGPU.h"
 #include "GLUtil.h"
 
 namespace tgfx {
-GLProgram::GLProgram(Context* context, unsigned programID,
-                     std::unique_ptr<GLUniformBuffer> uniformBuffer,
+GLProgram::GLProgram(unsigned programID, std::unique_ptr<GLUniformBuffer> uniformBuffer,
                      std::vector<Attribute> attributes, int vertexStride)
-    : Program(context), programId(programID), uniformBuffer(std::move(uniformBuffer)),
+    : programId(programID), uniformBuffer(std::move(uniformBuffer)),
       attributes(std::move(attributes)), _vertexStride(vertexStride) {
-}
-
-void GLProgram::setupSamplerUniforms(const std::vector<GLUniform>& textureSamplers) const {
-  auto gl = GLFunctions::Get(context);
-  gl->useProgram(programId);
-  // Assign texture units to sampler uniforms one time up front.
-  for (size_t i = 0; i < textureSamplers.size(); ++i) {
-    const auto& sampler = textureSamplers[i];
-    if (UNUSED_UNIFORM != sampler.location) {
-      gl->uniform1i(sampler.location, static_cast<int>(i));
-    }
-  }
 }
 
 void GLProgram::onReleaseGPU() {
@@ -54,7 +41,7 @@ void GLProgram::updateUniformsAndTextureBindings(const RenderTarget* renderTarge
   uniformBuffer->uploadToGPU(context);
   auto samplers = pipeline->getSamplers();
   int textureUnit = 0;
-  auto gpu = static_cast<GLGpu*>(context->gpu());
+  auto gpu = static_cast<GLGPU*>(context->gpu());
   for (auto& info : samplers) {
     gpu->bindTexture(textureUnit++, info.sampler, info.state);
   }

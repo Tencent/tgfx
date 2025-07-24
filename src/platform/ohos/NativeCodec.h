@@ -26,6 +26,8 @@ struct OH_PixelmapNative;
 namespace tgfx {
 class NativeCodec : public ImageCodec {
  public:
+  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
+
   bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 
  private:
