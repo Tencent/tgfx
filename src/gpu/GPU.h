@@ -38,8 +38,6 @@ class GPU {
   virtual void copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture* texture,
                                          int srcX, int srcY) = 0;
 
-  virtual void resolveRenderTarget(RenderTarget* renderTarget) = 0;
-
   virtual std::shared_ptr<Semaphore> insertSemaphore() = 0;
 
   virtual void waitSemaphore(const Semaphore* semaphore) = 0;

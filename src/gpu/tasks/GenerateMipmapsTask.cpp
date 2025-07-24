@@ -16,19 +16,20 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "RenderTask.h"
-#include "gpu/proxies/RenderTargetProxy.h"
+#include "GenerateMipmapsTask.h"
+#include "gpu/GPU.h"
 
 namespace tgfx {
-class TextureResolveTask : public RenderTask {
- public:
-  explicit TextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy);
+GenerateMipmapsTask::GenerateMipmapsTask(std::shared_ptr<TextureProxy> textureProxy)
+    : textureProxy(std::move(textureProxy)) {
+}
 
-  void execute(GPU* gpu) override;
-
- private:
-  std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
-};
+void GenerateMipmapsTask::execute(GPU* gpu) {
+  auto texture = textureProxy->getTexture();
+  if (texture == nullptr) {
+    LOGE("GenerateMipmapsTask::execute() Failed to get texture!");
+    return;
+  }
+  texture->getSampler()->regenerateMipmapLevels(gpu->getContext());
+}
 }  // namespace tgfx

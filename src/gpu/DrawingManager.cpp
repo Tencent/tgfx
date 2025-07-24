@@ -17,15 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawingManager.h"
+#include "GPU.h"
 #include "ProxyProvider.h"
 #include "core/AtlasCellDecodeTask.h"
 #include "core/AtlasManager.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
+#include "gpu/tasks/GenerateMipmapsTask.h"
 #include "gpu/tasks/RenderTargetCopyTask.h"
 #include "gpu/tasks/RuntimeDrawTask.h"
 #include "gpu/tasks/SemaphoreWaitTask.h"
-#include "gpu/tasks/TextureResolveTask.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -55,9 +56,10 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   op->addColorFP(std::move(processor));
   op->setBlendMode(BlendMode::Src);
   auto ops = drawingBuffer->makeArray<Op>(&op, 1);
-  auto task = drawingBuffer->make<OpsRenderTask>(renderTarget, std::move(ops));
+  auto textureProxy = renderTarget->asTextureProxy();
+  auto task = drawingBuffer->make<OpsRenderTask>(std::move(renderTarget), std::move(ops));
   renderTasks.emplace_back(std::move(task));
-  addTextureResolveTask(std::move(renderTarget));
+  addGenerateMipmapsTask(std::move(textureProxy));
   return true;
 }
 
@@ -74,9 +76,10 @@ void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderT
   if (renderTarget == nullptr || ops.empty()) {
     return;
   }
-  auto task = drawingBuffer->make<OpsRenderTask>(renderTarget, std::move(ops));
+  auto textureProxy = renderTarget->asTextureProxy();
+  auto task = drawingBuffer->make<OpsRenderTask>(std::move(renderTarget), std::move(ops));
   renderTasks.emplace_back(std::move(task));
-  addTextureResolveTask(std::move(renderTarget));
+  addGenerateMipmapsTask(std::move(textureProxy));
 }
 
 void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> renderTarget,
@@ -86,19 +89,18 @@ void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> rende
   if (renderTarget == nullptr || inputs.empty() || effect == nullptr) {
     return;
   }
-  auto task = drawingBuffer->make<RuntimeDrawTask>(renderTarget, std::move(inputs),
+  auto textureProxy = renderTarget->asTextureProxy();
+  auto task = drawingBuffer->make<RuntimeDrawTask>(std::move(renderTarget), std::move(inputs),
                                                    std::move(effect), offset);
   renderTasks.emplace_back(std::move(task));
-  addTextureResolveTask(std::move(renderTarget));
+  addGenerateMipmapsTask(std::move(textureProxy));
 }
 
-void DrawingManager::addTextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTarget) {
-  auto textureProxy = renderTarget->asTextureProxy();
-  if (textureProxy == nullptr ||
-      (renderTarget->sampleCount() <= 1 && !textureProxy->hasMipmaps())) {
+void DrawingManager::addGenerateMipmapsTask(std::shared_ptr<TextureProxy> textureProxy) {
+  if (textureProxy == nullptr || !textureProxy->hasMipmaps()) {
     return;
   }
-  auto task = drawingBuffer->make<TextureResolveTask>(std::move(renderTarget));
+  auto task = drawingBuffer->make<GenerateMipmapsTask>(std::move(textureProxy));
   renderTasks.emplace_back(std::move(task));
 }
 

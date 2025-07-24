@@ -32,8 +32,6 @@ class GLGPU : public GPU {
   void copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture* texture, int srcX,
                                  int srcY) override;
 
-  void resolveRenderTarget(RenderTarget* renderTarget) override;
-
   std::shared_ptr<Semaphore> insertSemaphore() override;
 
   void waitSemaphore(const Semaphore* semaphore) override;

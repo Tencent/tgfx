@@ -50,17 +50,18 @@ static AttribLayout GetAttribLayout(SLType type) {
   return {false, 0, 0};
 }
 
-std::unique_ptr<RenderPass> RenderPass::Make(std::shared_ptr<RenderTarget> renderTarget) {
+std::unique_ptr<RenderPass> RenderPass::Make(std::shared_ptr<RenderTarget> renderTarget,
+                                             bool resolveMSAA) {
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto renderPass = std::make_unique<GLRenderPass>(std::move(renderTarget));
+  auto renderPass = std::make_unique<GLRenderPass>(std::move(renderTarget), resolveMSAA);
   renderPass->begin();
   return renderPass;
 }
 
-GLRenderPass::GLRenderPass(std::shared_ptr<RenderTarget> renderTarget)
-    : RenderPass(std::move(renderTarget)) {
+GLRenderPass::GLRenderPass(std::shared_ptr<RenderTarget> renderTarget, bool resolveMSAA)
+    : RenderPass(std::move(renderTarget)), resolveMSAA(resolveMSAA) {
 }
 
 static void UpdateScissor(Context* context, const Rect& scissorRect) {
@@ -128,6 +129,20 @@ void GLRenderPass::begin() {
 void GLRenderPass::onEnd() {
   auto context = getContext();
   auto gl = GLFunctions::Get(context);
+  auto caps = GLCaps::Get(context);
+  if (resolveMSAA && renderTarget->sampleCount() > 1 && caps->usesMSAARenderBuffers()) {
+    auto glRT = static_cast<GLRenderTarget*>(renderTarget.get());
+    gl->bindFramebuffer(GL_READ_FRAMEBUFFER, glRT->drawFrameBufferID());
+    gl->bindFramebuffer(GL_DRAW_FRAMEBUFFER, glRT->readFrameBufferID());
+    // MSAA resolve may be affected by the scissor test, so disable it here.
+    gl->disable(GL_SCISSOR_TEST);
+    if (caps->msFBOType == MSFBOType::ES_Apple) {
+      gl->resolveMultisampleFramebuffer();
+    } else {
+      gl->blitFramebuffer(0, 0, glRT->width(), glRT->height(), 0, 0, glRT->width(), glRT->height(),
+                          GL_COLOR_BUFFER_BIT, GL_NEAREST);
+    }
+  }
   if (GLContext::Unwrap(context)->sharedVertexArray()) {
     gl->bindVertexArray(0);
   }

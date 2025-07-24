@@ -35,7 +35,8 @@ enum class PrimitiveType {
 
 class RenderPass {
  public:
-  static std::unique_ptr<RenderPass> Make(std::shared_ptr<RenderTarget> renderTarget);
+  static std::unique_ptr<RenderPass> Make(std::shared_ptr<RenderTarget> renderTarget,
+                                          bool resolveMSAA = true);
 
   virtual ~RenderPass() = default;
 

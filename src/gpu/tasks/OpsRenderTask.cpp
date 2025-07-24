@@ -22,14 +22,14 @@
 
 namespace tgfx {
 void OpsRenderTask::execute(GPU*) {
-  auto renderPass = RenderPass::Make(renderTargetProxy->getRenderTarget());
+  auto renderPass = RenderPass::Make(renderTargetProxy->getRenderTarget(), true);
   if (renderPass == nullptr) {
     LOGE("OpsRenderTask::execute() Failed to initialize the render pass!");
     return;
   }
-  auto tempOps = std::move(ops);
-  for (auto& op : tempOps) {
+  for (auto& op : ops) {
     op->execute(renderPass.get());
+    // Release the Op immediately after execution to maximize GPU resource reuse.
     op = nullptr;
   }
   renderPass->end();

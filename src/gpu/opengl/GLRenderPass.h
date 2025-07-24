@@ -20,12 +20,13 @@
 
 #include "gpu/RenderPass.h"
 #include "gpu/opengl/GLBuffer.h"
+#include "gpu/opengl/GLInterface.h"
 
 namespace tgfx {
 
 class GLRenderPass : public RenderPass {
  public:
-  explicit GLRenderPass(std::shared_ptr<RenderTarget> renderTarget);
+  GLRenderPass(std::shared_ptr<RenderTarget> renderTarget, bool resolveMSAA);
 
   void begin();
 
@@ -37,5 +38,8 @@ class GLRenderPass : public RenderPass {
               bool drawIndexed) override;
   void onClear(const Rect& scissor, Color color) override;
   void onEnd() override;
+
+ private:
+  bool resolveMSAA = true;
 };
 }  // namespace tgfx
