@@ -61,7 +61,7 @@ void RRectDrawOp::execute(RenderPass* renderPass) {
   if (vertexBuffer == nullptr) {
     return;
   }
-  auto renderTarget = renderPass->renderTarget();
+  auto renderTarget = renderPass->getRenderTarget();
   auto drawingBuffer = renderPass->getContext()->drawingBuffer();
   auto gp =
       EllipseGeometryProcessor::Make(drawingBuffer, renderTarget->width(), renderTarget->height(),

@@ -17,24 +17,21 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OpsRenderTask.h"
-#include "gpu/GPU.h"
 #include "gpu/RenderPass.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
-bool OpsRenderTask::execute(RenderPass* renderPass) {
-  if (ops.empty() || renderTargetProxy == nullptr) {
-    return false;
-  }
-  if (!renderPass->begin(renderTargetProxy->getRenderTarget())) {
+void OpsRenderTask::execute(GPU*) {
+  auto renderPass = RenderPass::Make(renderTargetProxy->getRenderTarget());
+  if (renderPass == nullptr) {
     LOGE("OpsRenderTask::execute() Failed to initialize the render pass!");
-    return false;
+    return;
   }
   auto tempOps = std::move(ops);
   for (auto& op : tempOps) {
-    op->execute(renderPass);
+    op->execute(renderPass.get());
     op = nullptr;
   }
   renderPass->end();
-  return true;
 }
 }  // namespace tgfx

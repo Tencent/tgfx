@@ -70,7 +70,7 @@ void RectDrawOp::execute(RenderPass* renderPass) {
   if (vertexBuffer == nullptr) {
     return;
   }
-  auto renderTarget = renderPass->renderTarget();
+  auto renderTarget = renderPass->getRenderTarget();
   auto drawingBuffer = renderPass->getContext()->drawingBuffer();
   auto gp = QuadPerEdgeAAGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
                                                  renderTarget->height(), aaType, commonColor,

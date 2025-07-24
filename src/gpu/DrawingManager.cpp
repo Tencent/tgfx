@@ -24,6 +24,7 @@
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/tasks/RenderTargetCopyTask.h"
 #include "gpu/tasks/RuntimeDrawTask.h"
+#include "gpu/tasks/SemaphoreWaitTask.h"
 #include "gpu/tasks/TextureResolveTask.h"
 #include "tgfx/core/RenderFlags.h"
 
@@ -123,48 +124,6 @@ void DrawingManager::addResourceTask(PlacementPtr<ResourceTask> resourceTask,
   resourceTasks.emplace_back(std::move(resourceTask));
 }
 
-bool DrawingManager::flush() {
-  while (!compositors.empty()) {
-    auto compositor = compositors.back();
-    // The makeClosed() method may add more compositors to the list.
-    compositor->makeClosed();
-  }
-  auto proxyProvider = context->proxyProvider();
-  // Flush the shared vertex buffer before executing the tasks. It may generate new resource tasks.
-  proxyProvider->flushSharedVertexBuffer();
-
-  if (resourceTasks.empty() && renderTasks.empty()) {
-    proxyProvider->clearSharedVertexBuffer();
-    clearAtlasCellCodecTasks();
-    return false;
-  }
-  for (auto& task : resourceTasks) {
-    task->execute(context);
-    task = nullptr;
-  }
-  uploadAtlasToGPU();
-  resourceTasks.clear();
-  proxyProvider->clearSharedVertexBuffer();
-
-  if (renderPass == nullptr) {
-    renderPass = RenderPass::Make(context);
-  }
-  for (auto& task : renderTasks) {
-    task->execute(renderPass.get());
-    task = nullptr;
-  }
-  renderTasks.clear();
-  return true;
-}
-
-void DrawingManager::releaseAll() {
-  compositors.clear();
-  resourceTasks.clear();
-  renderTasks.clear();
-  atlasCellCodecTasks.clear();
-  atlasCellDatas.clear();
-}
-
 void DrawingManager::addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& textureProxy,
                                            const Point& atlasOffset,
                                            std::shared_ptr<ImageCodec> codec) {
@@ -187,6 +146,59 @@ void DrawingManager::addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& 
   atlasCellDatas[textureProxy].emplace_back(std::move(data), dstInfo, uploadOffset);
   auto task = std::make_shared<AtlasCellDecodeTask>(std::move(codec), buffer, dstInfo, padding);
   atlasCellCodecTasks.emplace_back(std::move(task));
+}
+
+void DrawingManager::addSemaphoreWaitTask(std::shared_ptr<Semaphore> semaphore) {
+  if (semaphore == nullptr) {
+    return;
+  }
+  auto task = drawingBuffer->make<SemaphoreWaitTask>(std::move(semaphore));
+  renderTasks.emplace_back(std::move(task));
+}
+
+bool DrawingManager::flush(BackendSemaphore* signalSemaphore) {
+  while (!compositors.empty()) {
+    auto compositor = compositors.back();
+    // The makeClosed() method may add more compositors to the list.
+    compositor->makeClosed();
+  }
+  auto proxyProvider = context->proxyProvider();
+  // Flush the shared vertex buffer before executing the tasks. It may generate new resource tasks.
+  proxyProvider->flushSharedVertexBuffer();
+
+  if (resourceTasks.empty() && renderTasks.empty()) {
+    proxyProvider->clearSharedVertexBuffer();
+    clearAtlasCellCodecTasks();
+    return false;
+  }
+  for (auto& task : resourceTasks) {
+    task->execute(context);
+    task = nullptr;
+  }
+  uploadAtlasToGPU();
+  resourceTasks.clear();
+  proxyProvider->clearSharedVertexBuffer();
+  auto gpu = context->gpu();
+  for (auto& task : renderTasks) {
+    task->execute(gpu);
+    task = nullptr;
+  }
+  renderTasks.clear();
+  if (signalSemaphore != nullptr) {
+    auto semaphore = context->gpu()->insertSemaphore();
+    if (semaphore != nullptr) {
+      *signalSemaphore = semaphore->releaseBackend();
+    }
+  }
+  return true;
+}
+
+void DrawingManager::releaseAll() {
+  compositors.clear();
+  resourceTasks.clear();
+  renderTasks.clear();
+  atlasCellCodecTasks.clear();
+  atlasCellDatas.clear();
 }
 
 void DrawingManager::clearAtlasCellCodecTasks() {

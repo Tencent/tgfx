@@ -25,16 +25,17 @@ namespace tgfx {
 
 class GLRenderPass : public RenderPass {
  public:
-  explicit GLRenderPass(Context* context);
+  explicit GLRenderPass(std::shared_ptr<RenderTarget> renderTarget);
+
+  void begin();
 
  protected:
-  void onBindRenderTarget() override;
-  void onUnbindRenderTarget() override;
   bool onBindProgramAndScissorClip(const Pipeline* pipeline, const Rect& scissorRect) override;
   bool onBindBuffers(std::shared_ptr<GPUBuffer> indexBuffer,
                      std::shared_ptr<GPUBuffer> vertexBuffer, size_t vertexOffset) override;
   void onDraw(PrimitiveType primitiveType, size_t baseVertex, size_t count,
               bool drawIndexed) override;
   void onClear(const Rect& scissor, Color color) override;
+  void onEnd() override;
 };
 }  // namespace tgfx

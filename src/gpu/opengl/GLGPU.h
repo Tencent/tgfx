@@ -34,9 +34,9 @@ class GLGPU : public GPU {
 
   void resolveRenderTarget(RenderTarget* renderTarget) override;
 
-  bool insertSemaphore(Semaphore* semaphore) override;
+  std::shared_ptr<Semaphore> insertSemaphore() override;
 
-  bool waitSemaphore(const Semaphore* semaphore) override;
+  void waitSemaphore(const Semaphore* semaphore) override;
 
   bool submitToGPU(bool syncCpu) override;
 };

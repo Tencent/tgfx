@@ -27,7 +27,7 @@ PlacementPtr<Pipeline> DrawOp::createPipeline(RenderPass* renderPass,
   for (auto& coverage : coverages) {
     fragmentProcessors.emplace_back(std::move(coverage));
   }
-  auto format = renderPass->renderTarget()->format();
+  auto format = renderPass->getRenderTarget()->format();
   auto context = renderPass->getContext();
   const auto& swizzle = context->caps()->getWriteSwizzle(format);
   return context->drawingBuffer()->make<Pipeline>(std::move(gp), std::move(fragmentProcessors),

@@ -35,19 +35,18 @@ enum class PrimitiveType {
 
 class RenderPass {
  public:
-  static std::unique_ptr<RenderPass> Make(Context* context);
+  static std::unique_ptr<RenderPass> Make(std::shared_ptr<RenderTarget> renderTarget);
 
   virtual ~RenderPass() = default;
 
   Context* getContext() {
-    return context;
+    return renderTarget->getContext();
   }
 
-  std::shared_ptr<RenderTarget> renderTarget() {
-    return _renderTarget;
+  std::shared_ptr<RenderTarget> getRenderTarget() {
+    return renderTarget;
   }
 
-  bool begin(std::shared_ptr<RenderTarget> renderTarget);
   void end();
   void bindProgramAndScissorClip(const Pipeline* pipeline, const Rect& scissorRect);
   void bindBuffers(std::shared_ptr<GPUBuffer> indexBuffer, std::shared_ptr<GPUBuffer> vertexBuffer,
@@ -57,20 +56,19 @@ class RenderPass {
   void clear(const Rect& scissor, Color color);
 
  protected:
-  explicit RenderPass(Context* context) : context(context) {
+  explicit RenderPass(std::shared_ptr<RenderTarget> renderTarget)
+      : renderTarget(std::move(renderTarget)) {
   }
 
-  virtual void onBindRenderTarget() = 0;
-  virtual void onUnbindRenderTarget() = 0;
   virtual bool onBindProgramAndScissorClip(const Pipeline* pipeline, const Rect& drawBounds) = 0;
   virtual bool onBindBuffers(std::shared_ptr<GPUBuffer> indexBuffer,
                              std::shared_ptr<GPUBuffer> vertexBuffer, size_t vertexOffset) = 0;
   virtual void onDraw(PrimitiveType primitiveType, size_t offset, size_t count,
                       bool drawIndexed) = 0;
   virtual void onClear(const Rect& scissor, Color color) = 0;
+  virtual void onEnd() = 0;
 
-  Context* context = nullptr;
-  std::shared_ptr<RenderTarget> _renderTarget = nullptr;
+  std::shared_ptr<RenderTarget> renderTarget = nullptr;
   std::shared_ptr<Program> program = nullptr;
 
  private:
