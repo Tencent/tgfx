@@ -249,8 +249,11 @@ class Image {
   std::shared_ptr<Image> makeOriented(Orientation orientation) const;
 
   /**
-   * Creates a new Image by scaling this Image to fit the specified width and height. The returned
-   * Image has the same mipmap and rasterization state as the original.
+   * Creates a new Image scaled to the specified width and height. The new Image keeps the
+   * original's mipmap and rasterization settings. If the original Image is rasterized, the scaled
+   * Image will also be rasterized and cached at its new size. If not, the scaled Image won't be
+   * cached and will only render the needed parts to a temporary offscreen image. To cache the
+   * entire scaled Image, use the makeRasterized() method on the returned Image.
    * @param newWidth Target width of the scaled Image.
    * @param newHeight Target height of the scaled Image.
    * @param sampling Sampling options for scaling.

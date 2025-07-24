@@ -56,6 +56,8 @@ class ScaledImage : public TransformImage {
   std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
 
  private:
+  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args, const Rect& drawRect) const;
+
   int _width = 0;
   int _height = 0;
   SamplingOptions sampling = {};

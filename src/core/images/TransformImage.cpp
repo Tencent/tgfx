@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TransformImage.h"
-#include "core/images/ScaledImage.h"
 
 namespace tgfx {
 TransformImage::TransformImage(std::shared_ptr<Image> source) : source(std::move(source)) {
