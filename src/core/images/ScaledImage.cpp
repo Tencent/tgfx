@@ -28,9 +28,7 @@ namespace tgfx {
 std::shared_ptr<Image> ScaledImage::MakeFrom(std::shared_ptr<Image> image, int width, int height,
                                              const SamplingOptions& sampling) {
   DEBUG_ASSERT(width > 0 && height > 0 && image != nullptr);
-  if (image->width() == width && image->height() == height) {
-    return image;
-  }
+  DEBUG_ASSERT(width != image->width() || height != image->height());
   auto scaledImage = std::make_shared<ScaledImage>(std::move(image), width, height, sampling);
   scaledImage->weakThis = scaledImage;
   return scaledImage;
@@ -101,6 +99,9 @@ std::shared_ptr<TextureProxy> ScaledImage::lockTextureProxy(const TPArgs& args,
 
 std::shared_ptr<Image> ScaledImage::onMakeScaled(int newWidth, int newHeight,
                                                  const SamplingOptions& sampling) const {
+  if (newWidth == source->width() && newHeight == source->height()) {
+    return source;
+  }
   return MakeFrom(source, newWidth, newHeight, sampling);
 }
 
