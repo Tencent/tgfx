@@ -21,23 +21,21 @@
 
 namespace tgfx {
 TextureResolveTask::TextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy)
-    : RenderTask(std::move(renderTargetProxy)) {
+    : renderTargetProxy(std::move(renderTargetProxy)) {
 }
 
-bool TextureResolveTask::execute(RenderPass* renderPass) {
+void TextureResolveTask::execute(GPU* gpu) {
   auto renderTarget = renderTargetProxy->getRenderTarget();
   if (renderTarget == nullptr) {
     LOGE("TextureResolveTask::execute() Failed to get render target!");
-    return false;
+    return;
   }
-  auto context = renderPass->getContext();
   if (renderTarget->sampleCount() > 1) {
-    context->gpu()->resolveRenderTarget(renderTarget.get());
+    gpu->resolveRenderTarget(renderTarget.get());
   }
   auto texture = renderTargetProxy->getTexture();
   if (texture != nullptr) {
-    texture->getSampler()->regenerateMipmapLevels(context);
+    texture->getSampler()->regenerateMipmapLevels(gpu->getContext());
   }
-  return true;
 }
 }  // namespace tgfx

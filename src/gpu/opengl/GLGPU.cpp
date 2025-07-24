@@ -93,6 +93,8 @@ void GLGPU::bindTexture(int unitIndex, const TextureSampler* sampler, SamplerSta
 
 void GLGPU::copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture* texture, int srcX,
                                       int srcY) {
+  DEBUG_ASSERT(renderTarget != nullptr);
+  DEBUG_ASSERT(texture != nullptr);
   auto width = std::min(texture->width(), renderTarget->width() - srcX);
   auto height = std::min(texture->height(), renderTarget->height() - srcY);
   auto gl = GLFunctions::Get(context);
@@ -105,6 +107,7 @@ void GLGPU::copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture*
 }
 
 void GLGPU::resolveRenderTarget(RenderTarget* renderTarget) {
+  DEBUG_ASSERT(renderTarget != nullptr);
   if (renderTarget->sampleCount() <= 1) {
     return;
   }
@@ -128,30 +131,27 @@ void GLGPU::resolveRenderTarget(RenderTarget* renderTarget) {
   }
 }
 
-bool GLGPU::insertSemaphore(Semaphore* semaphore) {
-  if (semaphore == nullptr) {
-    return false;
+std::shared_ptr<Semaphore> GLGPU::insertSemaphore() {
+  if (!context->caps()->semaphoreSupport) {
+    return nullptr;
   }
   auto gl = GLFunctions::Get(context);
-  auto* sync = gl->fenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-  if (sync) {
-    static_cast<GLSemaphore*>(semaphore)->glSync = sync;
+  auto* glSync = gl->fenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+  if (glSync) {
     // If we inserted semaphores during the flush, we need to call glFlush.
     gl->flush();
-    return true;
+    return Resource::AddToCache(context, new GLSemaphore(glSync));
   }
-  return false;
+  return nullptr;
 }
 
-bool GLGPU::waitSemaphore(const Semaphore* semaphore) {
-  auto glSync = static_cast<const GLSemaphore*>(semaphore)->glSync;
-  if (glSync == nullptr) {
-    return false;
+void GLGPU::waitSemaphore(const Semaphore* semaphore) {
+  DEBUG_ASSERT(semaphore != nullptr);
+  auto glSync = static_cast<const GLSemaphore*>(semaphore)->glSync();
+  if (glSync != nullptr) {
+    auto gl = GLFunctions::Get(context);
+    gl->waitSync(glSync, 0, GL_TIMEOUT_IGNORED);
   }
-  auto gl = GLFunctions::Get(context);
-  gl->waitSync(glSync, 0, GL_TIMEOUT_IGNORED);
-  gl->deleteSync(glSync);
-  return true;
 }
 
 bool GLGPU::submitToGPU(bool syncCpu) {

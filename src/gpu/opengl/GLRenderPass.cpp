@@ -50,12 +50,17 @@ static AttribLayout GetAttribLayout(SLType type) {
   return {false, 0, 0};
 }
 
-std::unique_ptr<RenderPass> RenderPass::Make(Context* context) {
-  DEBUG_ASSERT(context != nullptr);
-  return std::make_unique<GLRenderPass>(context);
+std::unique_ptr<RenderPass> RenderPass::Make(std::shared_ptr<RenderTarget> renderTarget) {
+  if (renderTarget == nullptr) {
+    return nullptr;
+  }
+  auto renderPass = std::make_unique<GLRenderPass>(std::move(renderTarget));
+  renderPass->begin();
+  return renderPass;
 }
 
-GLRenderPass::GLRenderPass(Context* context) : RenderPass(context) {
+GLRenderPass::GLRenderPass(std::shared_ptr<RenderTarget> renderTarget)
+    : RenderPass(std::move(renderTarget)) {
 }
 
 static void UpdateScissor(Context* context, const Rect& scissorRect) {
@@ -109,9 +114,10 @@ static void UpdateBlend(Context* context, const BlendFormula* blendFactors) {
   }
 }
 
-void GLRenderPass::onBindRenderTarget() {
+void GLRenderPass::begin() {
+  auto context = getContext();
   auto gl = GLFunctions::Get(context);
-  auto glRT = static_cast<GLRenderTarget*>(_renderTarget.get());
+  auto glRT = static_cast<GLRenderTarget*>(renderTarget.get());
   gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->drawFrameBufferID());
   gl->viewport(0, 0, glRT->width(), glRT->height());
   if (auto vertexArray = GLContext::Unwrap(context)->sharedVertexArray()) {
@@ -119,7 +125,8 @@ void GLRenderPass::onBindRenderTarget() {
   }
 }
 
-void GLRenderPass::onUnbindRenderTarget() {
+void GLRenderPass::onEnd() {
+  auto context = getContext();
   auto gl = GLFunctions::Get(context);
   if (GLContext::Unwrap(context)->sharedVertexArray()) {
     gl->bindVertexArray(0);
@@ -128,6 +135,7 @@ void GLRenderPass::onUnbindRenderTarget() {
 }
 
 bool GLRenderPass::onBindProgramAndScissorClip(const Pipeline* pipeline, const Rect& scissorRect) {
+  auto context = getContext();
   program = context->globalCache()->getProgram(pipeline);
   if (program == nullptr) {
     return false;
@@ -141,12 +149,13 @@ bool GLRenderPass::onBindProgramAndScissorClip(const Pipeline* pipeline, const R
   if (pipeline->requiresBarrier()) {
     gl->textureBarrier();
   }
-  glProgram->updateUniformsAndTextureBindings(_renderTarget.get(), pipeline);
+  glProgram->updateUniformsAndTextureBindings(renderTarget.get(), pipeline);
   return true;
 }
 
 bool GLRenderPass::onBindBuffers(std::shared_ptr<GPUBuffer> indexBuffer,
                                  std::shared_ptr<GPUBuffer> vertexBuffer, size_t vertexOffset) {
+  auto context = getContext();
   auto gl = GLFunctions::Get(context);
   if (vertexBuffer) {
     gl->bindBuffer(GL_ARRAY_BUFFER, std::static_pointer_cast<GLBuffer>(vertexBuffer)->bufferID());
@@ -173,7 +182,7 @@ static const unsigned gPrimitiveType[] = {GL_TRIANGLES, GL_TRIANGLE_STRIP};
 
 void GLRenderPass::onDraw(PrimitiveType primitiveType, size_t offset, size_t count,
                           bool drawIndexed) {
-  auto gl = GLFunctions::Get(context);
+  auto gl = GLFunctions::Get(getContext());
   if (drawIndexed) {
     gl->drawElements(gPrimitiveType[static_cast<int>(primitiveType)], static_cast<int>(count),
                      GL_UNSIGNED_SHORT, reinterpret_cast<void*>(offset * sizeof(uint16_t)));
@@ -184,6 +193,7 @@ void GLRenderPass::onDraw(PrimitiveType primitiveType, size_t offset, size_t cou
 }
 
 void GLRenderPass::onClear(const Rect& scissor, Color color) {
+  auto context = getContext();
   auto gl = GLFunctions::Get(context);
   UpdateScissor(context, scissor);
   gl->clearColor(color.red, color.green, color.blue, color.alpha);

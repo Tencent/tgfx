@@ -40,9 +40,9 @@ class GPU {
 
   virtual void resolveRenderTarget(RenderTarget* renderTarget) = 0;
 
-  virtual bool insertSemaphore(Semaphore* semaphore) = 0;
+  virtual std::shared_ptr<Semaphore> insertSemaphore() = 0;
 
-  virtual bool waitSemaphore(const Semaphore* semaphore) = 0;
+  virtual void waitSemaphore(const Semaphore* semaphore) = 0;
 
   virtual bool submitToGPU(bool syncCpu) = 0;
 

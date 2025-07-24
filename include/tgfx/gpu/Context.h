@@ -148,13 +148,13 @@ class Context {
   bool wait(const BackendSemaphore& waitSemaphore);
 
   /**
-   * Apply all pending changes to the render target immediately. After issuing all commands, the
-   * semaphore will be signaled by the GPU. If the signalSemaphore is not null and uninitialized,
-   * a new semaphore is created and initializes BackendSemaphore. The caller must delete the
-   * semaphore returned in signalSemaphore. BackendSemaphore can be deleted as soon as this function
-   * returns. If the back-end API is OpenGL, only uninitialized backend semaphores are supported.
-   * If false is returned, the GPU back-end did not create or add a semaphore to signal on the GPU;
-   * the caller should not instruct the GPU to wait on the semaphore.
+   * Ensures that all pending drawing operations for this context are flushed to the underlying GPU
+   * API objects. A call to Context::submit is always required to ensure work is actually sent to
+   * the GPU. If signalSemaphore is not null and uninitialized, a new semaphore will be created and
+   * assigned to signalSemaphore. The caller is responsible for deleting the semaphore returned in
+   * signalSemaphore. Returns false if there are no pending drawing operations and nothing was
+   * flushed to the GPU. In that case, signalSemaphore will not be initialized, and the caller
+   * should not wait on it.
    */
   bool flush(BackendSemaphore* signalSemaphore = nullptr);
 

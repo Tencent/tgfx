@@ -19,6 +19,7 @@
 #pragma once
 
 #include "RenderTask.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
 class RenderTargetCopyTask : public RenderTask {
@@ -26,10 +27,10 @@ class RenderTargetCopyTask : public RenderTask {
   RenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
                        std::shared_ptr<TextureProxy> dest, int srcX, int srcY);
 
- protected:
-  bool execute(RenderPass* renderPass) override;
+  void execute(GPU* gpu) override;
 
  private:
+  std::shared_ptr<RenderTargetProxy> source = nullptr;
   std::shared_ptr<TextureProxy> dest = nullptr;
   int srcX = 0;
   int srcY = 0;

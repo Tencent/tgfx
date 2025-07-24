@@ -54,29 +54,30 @@ Context::~Context() {
   delete _maxValueTracker;
 }
 
+bool Context::wait(const BackendSemaphore& waitSemaphore) {
+  auto semaphore = Semaphore::Wrap(this, waitSemaphore);
+  if (semaphore == nullptr) {
+    return false;
+  }
+  _drawingManager->addSemaphoreWaitTask(std::move(semaphore));
+  return true;
+}
+
 bool Context::flush(BackendSemaphore* signalSemaphore) {
   // Clean up all unreferenced resources before flushing, allowing them to be reused. This is
   // particularly crucial for texture resources that are bound to render targets. Only after the
   // cleanup can they be unbound and reused.
   _resourceCache->processUnreferencedResources();
   _atlasManager->preFlush();
-  auto flushed = _drawingManager->flush();
+  if (!_drawingManager->flush(signalSemaphore)) {
+    return false;
+  }
   _atlasManager->postFlush();
-  bool semaphoreInserted = false;
-  if (signalSemaphore != nullptr) {
-    auto semaphore = Semaphore::Wrap(signalSemaphore);
-    semaphoreInserted = caps()->semaphoreSupport && gpu()->insertSemaphore(semaphore.get());
-    if (semaphoreInserted) {
-      *signalSemaphore = semaphore->getBackendSemaphore();
-    }
-  }
-  if (flushed) {
-    _proxyProvider->purgeExpiredProxies();
-    _resourceCache->advanceFrameAndPurge();
-    _maxValueTracker->addValue(_drawingBuffer->size());
-    _drawingBuffer->clear(_maxValueTracker->getMaxValue());
-  }
-  return semaphoreInserted;
+  _proxyProvider->purgeExpiredProxies();
+  _resourceCache->advanceFrameAndPurge();
+  _maxValueTracker->addValue(_drawingBuffer->size());
+  _drawingBuffer->clear(_maxValueTracker->getMaxValue());
+  return true;
 }
 
 bool Context::submit(bool syncCpu) {
@@ -86,14 +87,6 @@ bool Context::submit(bool syncCpu) {
 void Context::flushAndSubmit(bool syncCpu) {
   flush();
   submit(syncCpu);
-}
-
-bool Context::wait(const BackendSemaphore& waitSemaphore) {
-  auto semaphore = Semaphore::Wrap(&waitSemaphore);
-  if (semaphore == nullptr) {
-    return false;
-  }
-  return caps()->semaphoreSupport && gpu()->waitSemaphore(semaphore.get());
 }
 
 size_t Context::memoryUsage() const {

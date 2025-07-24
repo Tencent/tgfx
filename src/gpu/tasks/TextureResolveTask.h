@@ -19,12 +19,16 @@
 #pragma once
 
 #include "RenderTask.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
 class TextureResolveTask : public RenderTask {
  public:
   explicit TextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy);
 
-  bool execute(RenderPass* renderPass) override;
+  void execute(GPU* gpu) override;
+
+ private:
+  std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;
 };
 }  // namespace tgfx

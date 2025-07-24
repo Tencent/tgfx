@@ -75,7 +75,7 @@ void ShapeDrawOp::execute(RenderPass* renderPass) {
     addCoverageFP(std::move(maskFP));
   }
   auto drawingBuffer = renderPass->getContext()->drawingBuffer();
-  auto renderTarget = renderPass->renderTarget();
+  auto renderTarget = renderPass->getRenderTarget();
   auto gp = DefaultGeometryProcessor::Make(drawingBuffer, color, renderTarget->width(),
                                            renderTarget->height(), aa, viewMatrix, realUVMatrix);
   auto pipeline = createPipeline(renderPass, std::move(gp));

@@ -20,19 +20,9 @@
 #include "gpu/GPU.h"
 
 namespace tgfx {
-bool RenderPass::begin(std::shared_ptr<RenderTarget> renderTarget) {
-  if (renderTarget == nullptr) {
-    return false;
-  }
-  _renderTarget = std::move(renderTarget);
-  drawPipelineStatus = DrawPipelineStatus::NotConfigured;
-  onBindRenderTarget();
-  return true;
-}
-
 void RenderPass::end() {
-  onUnbindRenderTarget();
-  _renderTarget = nullptr;
+  onEnd();
+  renderTarget = nullptr;
   program = nullptr;
 }
 
