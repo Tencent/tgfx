@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,38 +18,48 @@
 
 #pragma once
 
-#include "gpu/Resource.h"
-#include "gpu/TPArgs.h"
-#include "gpu/proxies/TextureProxy.h"
+#include "core/images/TransformImage.h"
 #include "tgfx/core/Image.h"
 
 namespace tgfx {
-/**
- * The base class for all images that contains a UniqueKey and can be cached as a GPU resource.
- */
-class ResourceImage : public Image {
+class ScaledImage : public TransformImage {
  public:
-  explicit ResourceImage(UniqueKey uniqueKey);
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> image, int width, int height,
+                                         const SamplingOptions& sampling);
 
-  std::shared_ptr<Image> makeRasterized() const override;
+  ScaledImage(std::shared_ptr<Image> image, int width, int height, const SamplingOptions& sampling);
+
+  ~ScaledImage() override = default;
+
+  int width() const override {
+    return _width;
+  }
+
+  int height() const override {
+    return _height;
+  }
 
  protected:
-  UniqueKey uniqueKey = {};
-
-  std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
-
-  std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
-                                      const SamplingOptions& sampling) const override;
-
-  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const final;
-
-  virtual std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
-                                                           const UniqueKey& key) const = 0;
+  Type type() const override {
+    return Type::Scaled;
+  }
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                       const SamplingArgs& samplingArgs,
                                                       const Matrix* uvMatrix) const override;
 
-  friend class MipmapImage;
+  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
+
+  std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
+                                      const SamplingOptions& sampling) const override;
+
+  std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
+
+ private:
+  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args, const Rect& drawRect) const;
+
+  int _width = 0;
+  int _height = 0;
+  SamplingOptions sampling = {};
 };
 }  // namespace tgfx
