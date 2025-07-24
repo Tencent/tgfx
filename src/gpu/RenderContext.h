@@ -21,7 +21,7 @@
 #include <optional>
 #include "core/DrawContext.h"
 #include "gpu/OpsCompositor.h"
-#include "gpu/ops/DrawOp.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
 class RenderContext : public DrawContext {

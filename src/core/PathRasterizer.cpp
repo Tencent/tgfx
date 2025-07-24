@@ -35,8 +35,8 @@ std::shared_ptr<PathRasterizer> PathRasterizer::MakeFrom(int width, int height, 
 
 PathRasterizer::PathRasterizer(int width, int height, std::shared_ptr<Shape> shape, bool antiAlias,
                                bool needsGammaCorrection)
-    : ImageCodec(width, height, Orientation::LeftTop), shape(std::move(shape)),
-      antiAlias(antiAlias), needsGammaCorrection(needsGammaCorrection) {
+    : ImageCodec(width, height), shape(std::move(shape)), antiAlias(antiAlias),
+      needsGammaCorrection(needsGammaCorrection) {
 }
 
 bool PathRasterizer::asyncSupport() const {

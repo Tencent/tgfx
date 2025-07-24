@@ -44,6 +44,24 @@ std::shared_ptr<Image> SubsetImage::onMakeSubset(const Rect& subset) const {
   return SubsetImage::MakeFrom(source, newBounds);
 }
 
+std::shared_ptr<Image> SubsetImage::onMakeScaled(float scale,
+                                                 const SamplingOptions& sampling) const {
+  auto newSource = source->makeScaled(scale, sampling);
+  if (newSource == nullptr) {
+    return nullptr;
+  }
+  float scaleX = static_cast<float>(newSource->width()) / static_cast<float>(width());
+  float scaleY = static_cast<float>(newSource->height()) / static_cast<float>(height());
+  auto newBounds = bounds;
+  newBounds.scale(scaleX, scaleY);
+  auto roundOutBounds = newBounds;
+  roundOutBounds.roundOut();
+  if (newBounds != roundOutBounds) {
+    return Image::onMakeScaled(scale, sampling);
+  }
+  return SubsetImage::MakeFrom(std::move(newSource), newBounds);
+}
+
 PlacementPtr<FragmentProcessor> SubsetImage::asFragmentProcessor(const FPArgs& args,
                                                                  const SamplingArgs& samplingArgs,
                                                                  const Matrix* uvMatrix) const {

@@ -80,13 +80,13 @@ void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderT
 
 void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> renderTarget,
                                         std::vector<std::shared_ptr<TextureProxy>> inputs,
-                                        std::shared_ptr<RuntimeEffect> effect,
-                                        const Point& offset) {
+                                        std::shared_ptr<RuntimeEffect> effect, const Point& offset,
+                                        const Point& scale) {
   if (renderTarget == nullptr || inputs.empty() || effect == nullptr) {
     return;
   }
   auto task = drawingBuffer->make<RuntimeDrawTask>(renderTarget, std::move(inputs),
-                                                   std::move(effect), offset);
+                                                   std::move(effect), offset, scale);
   renderTasks.emplace_back(std::move(task));
   addTextureResolveTask(std::move(renderTarget));
 }

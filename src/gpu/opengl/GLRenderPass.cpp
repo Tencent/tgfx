@@ -19,7 +19,7 @@
 #include "GLRenderPass.h"
 #include "GLUtil.h"
 #include "gpu/DrawingManager.h"
-#include "gpu/ProgramCache.h"
+#include "gpu/GlobalCache.h"
 #include "gpu/opengl/GLProgram.h"
 #include "gpu/opengl/GLRenderTarget.h"
 
@@ -60,9 +60,6 @@ GLRenderPass::GLRenderPass(Context* context) : RenderPass(context) {
     vertexArray = GLVertexArray::Make(context);
     DEBUG_ASSERT(vertexArray != nullptr);
   }
-  sharedVertexBuffer =
-      std::static_pointer_cast<GLBuffer>(GpuBuffer::Make(context, BufferType::Vertex));
-  DEBUG_ASSERT(sharedVertexBuffer != nullptr);
 }
 
 static void UpdateScissor(Context* context, const Rect& scissorRect) {
@@ -135,42 +132,37 @@ void GLRenderPass::onUnbindRenderTarget() {
 }
 
 bool GLRenderPass::onBindProgramAndScissorClip(const Pipeline* pipeline, const Rect& scissorRect) {
-  _program = static_cast<GLProgram*>(context->programCache()->getProgram(pipeline));
-  if (_program == nullptr) {
+  program = context->globalCache()->getProgram(pipeline);
+  if (program == nullptr) {
     return false;
   }
   ClearGLError(context);
   auto gl = GLFunctions::Get(context);
-  auto* program = static_cast<GLProgram*>(_program);
-  gl->useProgram(program->programID());
+  auto glProgram = static_cast<GLProgram*>(program.get());
+  gl->useProgram(glProgram->programID());
   UpdateScissor(context, scissorRect);
   UpdateBlend(context, pipeline->blendFormula());
   if (pipeline->requiresBarrier()) {
     gl->textureBarrier();
   }
-  program->updateUniformsAndTextureBindings(_renderTarget.get(), pipeline);
+  glProgram->updateUniformsAndTextureBindings(_renderTarget.get(), pipeline);
   return true;
 }
 
 bool GLRenderPass::onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
-                                 std::shared_ptr<GpuBuffer> vertexBuffer, size_t vertexOffset,
-                                 std::shared_ptr<Data> vertexData) {
+                                 std::shared_ptr<GpuBuffer> vertexBuffer, size_t vertexOffset) {
   auto gl = GLFunctions::Get(context);
   if (vertexBuffer) {
     gl->bindBuffer(GL_ARRAY_BUFFER, std::static_pointer_cast<GLBuffer>(vertexBuffer)->bufferID());
-  } else if (vertexData) {
-    gl->bindBuffer(GL_ARRAY_BUFFER, sharedVertexBuffer->bufferID());
-    gl->bufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(vertexData->size()), vertexData->data(),
-                   GL_STATIC_DRAW);
   } else {
     return false;
   }
-  auto* program = static_cast<GLProgram*>(_program);
-  for (const auto& attribute : program->vertexAttributes()) {
+  auto glProgram = static_cast<GLProgram*>(program.get());
+  for (const auto& attribute : glProgram->vertexAttributes()) {
     const AttribLayout& layout = GetAttribLayout(attribute.gpuType);
     auto offset = vertexOffset + attribute.offset;
     gl->vertexAttribPointer(static_cast<unsigned>(attribute.location), layout.count, layout.type,
-                            layout.normalized, program->vertexStride(),
+                            layout.normalized, glProgram->vertexStride(),
                             reinterpret_cast<void*>(offset));
     gl->enableVertexAttribArray(static_cast<unsigned>(attribute.location));
   }

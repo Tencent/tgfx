@@ -27,14 +27,20 @@ std::shared_ptr<ImageFilter> ImageFilter::InnerShadow(float dx, float dy, float 
   if (color.alpha <= 0) {
     return nullptr;
   }
-  return std::make_shared<InnerShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, false);
+  auto result =
+      std::make_shared<InnerShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, false);
+  result->weakThis = result;
+  return result;
 }
 
 std::shared_ptr<ImageFilter> ImageFilter::InnerShadowOnly(float dx, float dy, float blurrinessX,
                                                           float blurrinessY, const Color& color) {
   // If color is transparent, the image after applying the filter will be transparent.
   // So we should not return nullptr when color is transparent.
-  return std::make_shared<InnerShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, true);
+  auto result =
+      std::make_shared<InnerShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, true);
+  result->weakThis = result;
+  return result;
 }
 
 InnerShadowImageFilter::InnerShadowImageFilter(float dx, float dy, float blurrinessX,
@@ -43,6 +49,12 @@ InnerShadowImageFilter::InnerShadowImageFilter(float dx, float dy, float blurrin
 
     : dx(dx), dy(dy), blurFilter(ImageFilter::Blur(blurrinessX, blurrinessY)), color(color),
       shadowOnly(shadowOnly) {
+}
+
+InnerShadowImageFilter::InnerShadowImageFilter(float dx, float dy,
+                                               std::shared_ptr<ImageFilter> blurFilter,
+                                               const Color& color, bool shadowOnly)
+    : dx(dx), dy(dy), blurFilter(std::move(blurFilter)), color(color), shadowOnly(shadowOnly) {
 }
 
 PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowProcessor(
@@ -98,6 +110,16 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(
       buffer, getShadowProcessor(source, args, sampling, constraint, uvMatrix),
       std::move(imageProcessor), blendMode);
+}
+
+std::shared_ptr<ImageFilter> InnerShadowImageFilter::onMakeScaled(const Point& scale) const {
+  auto newDx = dx * scale.x;
+  auto newDy = dy * scale.y;
+  auto newBlurFilter = blurFilter ? blurFilter->makeScaled(scale) : nullptr;
+  auto result = std::make_shared<InnerShadowImageFilter>(newDx, newDy, std::move(newBlurFilter),
+                                                         color, shadowOnly);
+  result->weakThis = result;
+  return result;
 }
 
 }  // namespace tgfx

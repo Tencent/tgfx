@@ -49,6 +49,18 @@ std::shared_ptr<Image> FilterImage::MakeFrom(std::shared_ptr<Image> source,
   return Wrap(std::move(source), bounds, std::move(filter));
 }
 
+int FilterImage::width() const {
+  auto rect = bounds;
+  rect.roundOut();
+  return static_cast<int>(rect.width());
+}
+
+int FilterImage::height() const {
+  auto rect = bounds;
+  rect.roundOut();
+  return static_cast<int>(rect.height());
+}
+
 std::shared_ptr<Image> FilterImage::Wrap(std::shared_ptr<Image> source, const Rect& bounds,
                                          std::shared_ptr<ImageFilter> filter) {
   auto image =
@@ -104,6 +116,26 @@ std::shared_ptr<Image> FilterImage::onMakeWithFilter(std::shared_ptr<ImageFilter
   filterBounds.offset(bounds.x(), bounds.y());
   auto composeFilter = ImageFilter::Compose(filter, std::move(imageFilter));
   return FilterImage::Wrap(source, filterBounds, std::move(composeFilter));
+}
+
+std::shared_ptr<Image> FilterImage::onMakeScaled(float scale,
+                                                 const SamplingOptions& sampling) const {
+  auto inputBounds = Rect::MakeWH(source->width(), source->height());
+  if (filter->filterBounds(inputBounds) != bounds) {
+    return Image::onMakeScaled(scale, sampling);
+  }
+  auto newSource = source->makeScaled(scale, sampling);
+  if (newSource == nullptr) {
+    return nullptr;
+  }
+  float scaleX = static_cast<float>(newSource->width()) / static_cast<float>(width());
+  float scaleY = static_cast<float>(newSource->height()) / static_cast<float>(height());
+  auto newFilter = filter->makeScaled(Point::Make(scaleX, scaleY));
+  if (newFilter == nullptr) {
+    return nullptr;
+  }
+  auto newBounds = filter->filterBounds(Rect::MakeWH(newSource->width(), newSource->height()));
+  return FilterImage::Wrap(std::move(newSource), newBounds, std::move(newFilter));
 }
 
 std::shared_ptr<TextureProxy> FilterImage::lockTextureProxy(const TPArgs& args) const {

@@ -78,12 +78,10 @@ class Image {
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageGenerator> generator);
 
   /**
-   * Creates an Image from the ImageInfo and shares pixels from the immutable Data object. The
-   * returned Image takes a reference to the pixels. The caller must ensure the pixels are always
-   * the same for the lifetime of the returned Image. If the ImageInfo is unsuitable for direct
-   * texture uploading, the Image will internally create an ImageGenerator for pixel format
-   * conventing instead of an ImageBuffer. Returns nullptr if the ImageInfo is empty or the pixels
-   * are nullptr.
+   * Creates an Image using the provided ImageInfo and pixel data from an immutable Data object. The
+   * returned Image holds a reference to the pixel data. The caller must ensure the pixel data
+   * remains unchanged for the lifetime of the Image. Returns nullptr if the ImageInfo is empty or
+   * the pixel data is nullptr.
    */
   static std::shared_ptr<Image> MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels);
 
@@ -251,24 +249,26 @@ class Image {
   std::shared_ptr<Image> makeOriented(Orientation orientation) const;
 
   /**
-   * Returns a rasterized Image scaled by the specified rasterizationScale. A rasterized Image can
-   * be cached as an independent GPU resource for repeated drawing. By default, an Image directly
-   * backed by an ImageBuffer, an ImageGenerator, or a GPU texture is rasterized. Other image aren’t
-   * rasterized unless implicitly created by this method. For example, if you create a subset Image
-   * from a rasterized Image, the subset Image doesn’t create its own GPU cache but uses the full
-   * resolution cache created by the original Image. If you want the subset Image to create its own
-   * GPU cache, call makeRasterized() on the subset Image. The returned Image always has the same
-   * mipmap state as the original Image.
-   * @param rasterizationScale The factor to scale the Image by when rasterizing. The default value
-   * is 1.0, indicating that the Image should be rasterized at its current size. If the value is
-   * greater than 1.0, it may result in blurring.
-   * @param sampling The sampling options to apply when rasterizing the Image if the
-   * rasterizationScale is not 1.0.
-   * @return If the Image is already rasterized and the rasterizationScale is 1.0, the original
-   * Image is returned. If the rasterizationScale is less than zero, nullptr is returned.
+   * Returns a scaled Image with the specified scale factor.
+   * The returned Image always has the same mipmap state as the original Image.
+   * @param scale The factor to scale the source.
+   * @param sampling The sampling options to apply.
+   * @return If the scale is 1.0, the original Image is returned. If the scale is less than or equal
+   * to zero, nullptr is returned.
    */
-  virtual std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f,
-                                                const SamplingOptions& sampling = {}) const;
+  std::shared_ptr<Image> makeScaled(float scale, const SamplingOptions& sampling = {}) const;
+
+  /**
+   * Returns a rasterized Image can be cached as an independent GPU resource for repeated drawing.
+   * By default, an Image directly backed by an ImageBuffer, an ImageGenerator, or a GPU texture is
+   * rasterized. Other image aren’t rasterized unless implicitly created by this method.
+   * For example, if you create a subset Image from a rasterized Image, the subset Image doesn’t
+   * create its own GPU cache but uses the full resolution cache created by the original Image.
+   * If you want the subset Image or scaled Image to create its own GPU cache, call makeRasterized()
+   * on the Image. The returned Image always has the same mipmap state as the original Image.
+   * @return If the Image is already rasterized the original Image is returned.
+   */
+  virtual std::shared_ptr<Image> makeRasterized() const;
 
   /**
    * Returns a filtered Image with the specified filter. The filter has the potential to alter the
@@ -306,7 +306,8 @@ class Image {
     Rasterized,
     RGBAAA,
     Texture,
-    Subset
+    Subset,
+    Scale
   };
 
   virtual Type type() const = 0;
@@ -323,6 +324,8 @@ class Image {
 
   virtual std::shared_ptr<Image> onMakeWithFilter(std::shared_ptr<ImageFilter> filter,
                                                   Point* offset, const Rect* clipRect) const;
+
+  virtual std::shared_ptr<Image> onMakeScaled(float scale, const SamplingOptions& sampling) const;
 
   /**
    * Returns a texture proxy for the entire Image.
@@ -345,6 +348,7 @@ class Image {
   friend class TransformImage;
   friend class RGBAAAImage;
   friend class RasterizedImage;
+  friend class ScaleImage;
   friend class ImageShader;
   friend class Types;
 };

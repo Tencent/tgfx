@@ -43,8 +43,7 @@ std::shared_ptr<Shape> Shape::ApplyInverse(std::shared_ptr<Shape> shape) {
     case Type::Stroke: {
       auto strokeShape = std::static_pointer_cast<StrokeShape>(shape);
       auto invertShape = Shape::ApplyInverse(strokeShape->shape);
-      return std::shared_ptr<StrokeShape>(new StrokeShape(
-          std::move(invertShape), strokeShape->stroke, strokeShape->useOwnUniqueKey));
+      return std::make_shared<StrokeShape>(std::move(invertShape), strokeShape->stroke);
     }
     default:
       break;

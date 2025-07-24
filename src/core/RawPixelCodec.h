@@ -16,26 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "CopyDataFromUint8Array.h"
-#include "tgfx/core/Buffer.h"
+#pragma once
+
+#include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
-std::shared_ptr<Data> CopyDataFromUint8Array(const val& emscriptenData) {
-  if (!emscriptenData.as<bool>()) {
-    return nullptr;
+class RawPixelCodec : public ImageCodec {
+ public:
+  RawPixelCodec(const ImageInfo& info, std::shared_ptr<Data> pixels)
+      : ImageCodec(info.width(), info.height()), info(info), pixels(std::move(pixels)) {
   }
-  auto length = emscriptenData["length"].as<size_t>();
-  if (length == 0) {
-    return nullptr;
+
+  bool isAlphaOnly() const override {
+    return info.isAlphaOnly();
   }
-  Buffer imageBuffer(length);
-  if (imageBuffer.isEmpty()) {
-    return nullptr;
+
+  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override {
+    return Pixmap(info, pixels->data()).readPixels(dstInfo, dstPixels);
   }
-  auto memory = val::module_property("HEAPU8")["buffer"];
-  auto memoryView = val::global("Uint8Array")
-                        .new_(memory, reinterpret_cast<uintptr_t>(imageBuffer.data()), length);
-  memoryView.call<void>("set", emscriptenData);
-  return imageBuffer.release();
-}
+
+ protected:
+  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
+
+ private:
+  ImageInfo info = {};
+  std::shared_ptr<Data> pixels = nullptr;
+};
 }  // namespace tgfx

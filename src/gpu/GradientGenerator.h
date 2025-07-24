@@ -17,11 +17,26 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include "tgfx/core/Matrix.h"
+
+#include <vector>
+#include "tgfx/core/Color.h"
+#include "tgfx/core/ImageGenerator.h"
+
 namespace tgfx {
-void TransPointsHWY(const Matrix& m, Point dst[], const Point src[], int count);
-void ScalePointsHWY(const Matrix& m, Point dst[], const Point src[], int count);
-void AffinePointsHWY(const Matrix& m, Point dst[], const Point src[], int count);
-void MapRectHWY(const Matrix& m, Rect* dst, const Rect& src);
-bool SetBoundsHWY(Rect* rect, const Point pts[], int count);
+
+class GradientGenerator : public ImageGenerator {
+ public:
+  GradientGenerator(const Color* colors, const float* positions, int count);
+
+  bool isAlphaOnly() const override {
+    return false;
+  }
+
+ protected:
+  std::shared_ptr<ImageBuffer> onMakeBuffer(bool) const override;
+
+ private:
+  std::vector<Color> colors = {};
+  std::vector<float> positions = {};
+};
 }  // namespace tgfx

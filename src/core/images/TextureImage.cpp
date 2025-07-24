@@ -57,12 +57,8 @@ std::shared_ptr<Image> TextureImage::makeTextureImage(Context* context) const {
   return std::static_pointer_cast<Image>(weakThis.lock());
 }
 
-std::shared_ptr<Image> TextureImage::makeRasterized(float rasterizationScale,
-                                                    const SamplingOptions& sampling) const {
-  if (rasterizationScale == 1.0f) {
-    return weakThis.lock();
-  }
-  return Image::makeRasterized(rasterizationScale, sampling);
+std::shared_ptr<Image> TextureImage::makeRasterized() const {
+  return weakThis.lock();
 }
 
 std::shared_ptr<TextureProxy> TextureImage::lockTextureProxy(const TPArgs& args) const {

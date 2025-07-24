@@ -29,12 +29,15 @@ class RasterizedImage : public ResourceImage {
   /**
    * Note that this method always returns a non-mipmapped image.
    */
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, float rasterizationScale,
-                                         const SamplingOptions& sampling);
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source);
 
-  int width() const override;
+  int width() const override {
+    return source->width();
+  }
 
-  int height() const override;
+  int height() const override {
+    return source->height();
+  }
 
   bool isAlphaOnly() const override {
     return source->isAlphaOnly();
@@ -44,25 +47,17 @@ class RasterizedImage : public ResourceImage {
     return source->isFullyDecoded();
   }
 
-  std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f,
-                                        const SamplingOptions& sampling = {}) const override;
-
  protected:
   Type type() const override {
     return Type::Rasterized;
   }
-
-  std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
 
   std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
                                                    const UniqueKey& key) const final;
 
  private:
   std::shared_ptr<Image> source = nullptr;
-  float rasterizationScale = 1.0f;
-  SamplingOptions sampling = {};
 
-  RasterizedImage(UniqueKey uniqueKey, std::shared_ptr<Image> source, float rasterizationScale,
-                  const SamplingOptions& sampling);
+  RasterizedImage(UniqueKey uniqueKey, std::shared_ptr<Image> source);
 };
 }  // namespace tgfx

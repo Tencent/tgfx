@@ -53,7 +53,8 @@ class DrawingManager {
 
   void addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> renderTarget,
                           std::vector<std::shared_ptr<TextureProxy>> inputs,
-                          std::shared_ptr<RuntimeEffect> effect, const Point& offset);
+                          std::shared_ptr<RuntimeEffect> effect, const Point& offset,
+                          const Point& scale);
 
   void addTextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTarget);
 
