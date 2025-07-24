@@ -108,7 +108,7 @@ class Image {
    * picture will be drawn onto the Image using the provided matrix. The returned Image keeps a
    * reference to the picture and replays its drawing commands only when needed. A PictureImage is
    * not rasterized and does not cache its content, so it can render just the required portions of
-   * the picture to a temporary offscreen image.When clipping or scaling a PictureImage during
+   * the picture to a temporary offscreen image. When clipping or scaling a PictureImage during
    * drawing, the PictureImage will render the picture according to the new size. To cache the
    * entire content at full size, use the makeRasterized() method on the PictureImage.
    * Note: This method may return a different type of Image instead of PictureImage if the picture
