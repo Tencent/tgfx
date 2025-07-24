@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PictureImage.h"
-#include "core/images/ScaleImage.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/OpsCompositor.h"
 #include "gpu/ProxyProvider.h"
@@ -51,9 +50,8 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Picture> picture, int wid
 }
 
 PictureImage::PictureImage(std::shared_ptr<Picture> picture, int width, int height,
-                           const Matrix* matrix, bool mipmapped, float scale)
-    : picture(std::move(picture)), _width(width), _height(height), mipmapped(mipmapped),
-      _scale(scale) {
+                           const Matrix* matrix, bool mipmapped)
+    : picture(std::move(picture)), _width(width), _height(height), mipmapped(mipmapped) {
   if (matrix && !matrix->isIdentity()) {
     this->matrix = new Matrix(*matrix);
   }
@@ -63,26 +61,21 @@ PictureImage::~PictureImage() {
   delete matrix;
 }
 
-int PictureImage::width() const {
-  return ScaleImage::GetScaledSize(_width, _scale);
-}
-
-int PictureImage::height() const {
-  return ScaleImage::GetScaledSize(_height, _scale);
-}
-
 std::shared_ptr<Image> PictureImage::onMakeMipmapped(bool enabled) const {
   if (enabled == mipmapped) {
     return weakThis.lock();
   }
-  auto newImage = std::make_shared<PictureImage>(picture, _width, _height, matrix, enabled, _scale);
+  auto newImage = std::make_shared<PictureImage>(picture, _width, _height, matrix, enabled);
   newImage->weakThis = newImage;
   return newImage;
 }
 
-std::shared_ptr<Image> PictureImage::onMakeScaled(float scale, const SamplingOptions&) const {
+std::shared_ptr<Image> PictureImage::onMakeScaled(const ISize& size, const SamplingOptions&) const {
+  auto newMatrix = *matrix;
+  newMatrix.postScale(static_cast<float>(size.width) / static_cast<float>(_width),
+                      static_cast<float>(size.height) / static_cast<float>(_height));
   auto newImage =
-      std::make_shared<PictureImage>(picture, _width, _height, matrix, mipmapped, scale * _scale);
+      std::make_shared<PictureImage>(picture, size.width, size.height, &newMatrix, mipmapped);
   newImage->weakThis = newImage;
   return newImage;
 }
@@ -142,9 +135,7 @@ bool PictureImage::drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget,
     return false;
   }
   RenderContext renderContext(std::move(renderTarget), renderFlags, true);
-  Matrix totalMatrix =
-      Matrix::MakeScale(static_cast<float>(width()) / static_cast<float>(_width),
-                        static_cast<float>(height()) / static_cast<float>(_height));
+  Matrix totalMatrix = Matrix::I();
   if (offset) {
     totalMatrix.postTranslate(offset->x, offset->y);
   }

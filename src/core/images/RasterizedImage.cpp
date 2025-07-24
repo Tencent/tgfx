@@ -63,4 +63,14 @@ std::shared_ptr<TextureProxy> RasterizedImage::onLockTextureProxy(const TPArgs& 
   drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags);
   return renderTarget->asTextureProxy();
 }
+
+std::shared_ptr<Image> RasterizedImage::onMakeScaled(const ISize& size,
+                                                     const SamplingOptions& sampling) const {
+  auto newSource = source->onMakeScaled(size, sampling);
+  if (newSource == nullptr) {
+    return nullptr;
+  }
+  return RasterizedImage::MakeFrom(std::move(newSource));
+}
+
 }  // namespace tgfx

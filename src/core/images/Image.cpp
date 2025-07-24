@@ -22,7 +22,7 @@
 #include "core/images/OrientImage.h"
 #include "core/images/RGBAAAImage.h"
 #include "core/images/RasterizedImage.h"
-#include "core/images/ScaleImage.h"
+#include "core/images/ScaledImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/WeakMap.h"
@@ -174,14 +174,14 @@ std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {
   return onMakeSubset(rect);
 }
 
-std::shared_ptr<Image> Image::makeScaled(float scale, const SamplingOptions& sampling) const {
-  if (scale <= 0) {
+std::shared_ptr<Image> Image::makeScaled(ISize size, const SamplingOptions& sampling) const {
+  if (size.width <= 0 || size.height <= 0) {
     return nullptr;
   }
-  if (scale == 1.0f) {
+  if (ISize::Make(width(), height()) == size) {
     return weakThis.lock();
   }
-  return onMakeScaled(scale, sampling);
+  return onMakeScaled(size, sampling);
 }
 
 std::shared_ptr<Image> Image::makeRasterized() const {
@@ -217,8 +217,9 @@ std::shared_ptr<Image> Image::onMakeWithFilter(std::shared_ptr<ImageFilter> filt
   return FilterImage::MakeFrom(weakThis.lock(), std::move(filter), offset, clipRect);
 }
 
-std::shared_ptr<Image> Image::onMakeScaled(float scale, const SamplingOptions& sampling) const {
-  return ScaleImage::MakeFrom(weakThis.lock(), scale, sampling);
+std::shared_ptr<Image> Image::onMakeScaled(const ISize& size,
+                                           const SamplingOptions& sampling) const {
+  return ScaledImage::MakeFrom(weakThis.lock(), size, sampling);
 }
 
 std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,

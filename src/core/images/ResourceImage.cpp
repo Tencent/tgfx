@@ -40,6 +40,12 @@ std::shared_ptr<Image> ResourceImage::onMakeMipmapped(bool enabled) const {
   return enabled ? MipmapImage::MakeFrom(std::move(source)) : source;
 }
 
+std::shared_ptr<Image> ResourceImage::onMakeScaled(const ISize& size,
+                                                   const SamplingOptions& sampling) const {
+  auto result = Image::onMakeScaled(size, sampling);
+  return result->makeRasterized();
+}
+
 PlacementPtr<FragmentProcessor> ResourceImage::asFragmentProcessor(const FPArgs& args,
                                                                    const SamplingArgs& samplingArgs,
                                                                    const Matrix* uvMatrix) const {

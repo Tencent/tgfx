@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SubsetImage.h"
+#include "core/images/ScaledImage.h"
 #include "core/utils/AddressOf.h"
+#include "core/utils/MathExtra.h"
 #include "gpu/TPArgs.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
@@ -44,22 +46,22 @@ std::shared_ptr<Image> SubsetImage::onMakeSubset(const Rect& subset) const {
   return SubsetImage::MakeFrom(source, newBounds);
 }
 
-std::shared_ptr<Image> SubsetImage::onMakeScaled(float scale,
+std::shared_ptr<Image> SubsetImage::onMakeScaled(const ISize& size,
                                                  const SamplingOptions& sampling) const {
-  auto newSource = source->makeScaled(scale, sampling);
+  float scaleX = static_cast<float>(size.width) / static_cast<float>(width());
+  float scaleY = static_cast<float>(size.height) / static_cast<float>(height());
+  auto sourceScaledWidth = scaleX * static_cast<float>(source->width());
+  auto sourceScaledHeight = scaleY * static_cast<float>(source->height());
+  if (!IsInteger(sourceScaledWidth) || !IsInteger(sourceScaledHeight)) {
+    return ScaledImage::MakeFrom(weakThis.lock(), size, sampling);
+  }
+  auto newSource = source->makeScaled(ISize::Make(sourceScaledWidth, sourceScaledHeight), sampling);
   if (newSource == nullptr) {
     return nullptr;
   }
-  float scaleX = static_cast<float>(newSource->width()) / static_cast<float>(width());
-  float scaleY = static_cast<float>(newSource->height()) / static_cast<float>(height());
-  auto newBounds = bounds;
-  newBounds.scale(scaleX, scaleY);
-  auto roundOutBounds = newBounds;
-  roundOutBounds.roundOut();
-  if (newBounds != roundOutBounds) {
-    return Image::onMakeScaled(scale, sampling);
-  }
-  return SubsetImage::MakeFrom(std::move(newSource), newBounds);
+  auto newBounds = Rect::MakeXYWH(bounds.x() * scaleX, bounds.y() * scaleY, sourceScaledWidth,
+                                  sourceScaledHeight);
+  return MakeFrom(std::move(newSource), newBounds);
 }
 
 PlacementPtr<FragmentProcessor> SubsetImage::asFragmentProcessor(const FPArgs& args,

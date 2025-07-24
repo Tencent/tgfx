@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RGBAAAImage.h"
+#include "ScaledImage.h"
 #include "core/utils/AddressOf.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -86,25 +87,25 @@ std::shared_ptr<Image> RGBAAAImage::onMakeSubset(const Rect& subset) const {
   return image;
 }
 
-std::shared_ptr<Image> RGBAAAImage::onMakeScaled(float scale,
+std::shared_ptr<Image> RGBAAAImage::onMakeScaled(const ISize& size,
                                                  const SamplingOptions& sampling) const {
-  auto newSource = source->makeScaled(scale, sampling);
-  if (newSource == nullptr) {
-    return nullptr;
-  }
-  float scaleX = static_cast<float>(newSource->width()) / static_cast<float>(width());
-  float scaleY = static_cast<float>(newSource->height()) / static_cast<float>(height());
-  auto newBounds = bounds;
-  newBounds.scale(scaleX, scaleY);
-  auto roundOutBounds = newBounds;
-  roundOutBounds.roundOut();
-  if (newBounds != roundOutBounds) {
-    return Image::onMakeScaled(scale, sampling);
+  float scaleX = static_cast<float>(size.width) / static_cast<float>(width());
+  float scaleY = static_cast<float>(size.height) / static_cast<float>(height());
+  auto sourceScaledWidth = scaleX * static_cast<float>(source->width());
+  auto sourceScaledHeight = scaleY * static_cast<float>(source->height());
+  if (!IsInteger(sourceScaledWidth) || !IsInteger(sourceScaledHeight)) {
+    return ScaledImage::MakeFrom(weakThis.lock(), size, sampling);
   }
   Point newAlphaStart = Point::Make(alphaStart.x * scaleX, alphaStart.y * scaleY);
   if (!IsInteger(newAlphaStart.x) || !IsInteger(newAlphaStart.y)) {
-    return Image::onMakeScaled(scale, sampling);
+    return ScaledImage::MakeFrom(weakThis.lock(), size, sampling);
   }
+  auto newSource = source->makeScaled(ISize::Make(sourceScaledWidth, sourceScaledHeight), sampling);
+  if (newSource == nullptr) {
+    return nullptr;
+  }
+  auto newBounds = Rect::MakeXYWH(bounds.x() * scaleX, bounds.y() * scaleY, sourceScaledWidth,
+                                  sourceScaledHeight);
   auto image =
       std::shared_ptr<RGBAAAImage>(new RGBAAAImage(std::move(newSource), newBounds, newAlphaStart));
   image->weakThis = image;

@@ -17,7 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FilterImage.h"
-#include "SubsetImage.h"
+#include "core/images/ScaledImage.h"
+#include "core/images/SubsetImage.h"
 #include "core/utils/AddressOf.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
@@ -106,9 +107,9 @@ std::shared_ptr<Image> FilterImage::onMakeWithFilter(std::shared_ptr<ImageFilter
   return FilterImage::Wrap(source, filterBounds, std::move(composeFilter));
 }
 
-std::shared_ptr<Image> FilterImage::onMakeScaled(float scale,
+std::shared_ptr<Image> FilterImage::onMakeScaled(const ISize& size,
                                                  const SamplingOptions& sampling) const {
-  return Image::onMakeScaled(scale, sampling);
+  return ScaledImage::MakeFrom(weakThis.lock(), size, sampling);
 }
 
 std::shared_ptr<TextureProxy> FilterImage::lockTextureProxy(const TPArgs& args) const {

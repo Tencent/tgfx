@@ -28,13 +28,17 @@ namespace tgfx {
 class PictureImage : public Image {
  public:
   PictureImage(std::shared_ptr<Picture> picture, int width, int height,
-               const Matrix* matrix = nullptr, bool mipmapped = false, float scale = 1.0f);
+               const Matrix* matrix = nullptr, bool mipmapped = false);
 
   ~PictureImage() override;
 
-  int width() const override;
+  int width() const override {
+    return _width;
+  }
 
-  int height() const override;
+  int height() const override {
+    return _height;
+  }
 
   bool isAlphaOnly() const override {
     return false;
@@ -46,7 +50,8 @@ class PictureImage : public Image {
 
   std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
 
-  std::shared_ptr<Image> onMakeScaled(float scale, const SamplingOptions& sampling) const override;
+  std::shared_ptr<Image> onMakeScaled(const ISize& size,
+                                      const SamplingOptions& sampling) const override;
 
   std::shared_ptr<Picture> picture = nullptr;
   Matrix* matrix = nullptr;
@@ -69,6 +74,5 @@ class PictureImage : public Image {
   int _width = 0;
   int _height = 0;
   bool mipmapped = false;
-  float _scale = 1.0f;
 };
 }  // namespace tgfx

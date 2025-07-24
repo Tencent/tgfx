@@ -91,9 +91,13 @@ std::shared_ptr<Image> OrientImage::onMakeOriented(Orientation newOrientation) c
   return MakeFrom(source, newOrientation);
 }
 
-std::shared_ptr<Image> OrientImage::onMakeScaled(float scale,
+std::shared_ptr<Image> OrientImage::onMakeScaled(const ISize& size,
                                                  const SamplingOptions& sampling) const {
-  auto newSource = source->makeScaled(scale, sampling);
+  auto sourceSize = size;
+  if (OrientationSwapsWidthHeight(orientation)) {
+    sourceSize = ISize::Make(size.height, size.width);
+  }
+  auto newSource = source->makeScaled(sourceSize, sampling);
   if (newSource == nullptr) {
     return nullptr;
   }

@@ -43,7 +43,8 @@ class RGBAAAImage : public SubsetImage {
 
   std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override;
 
-  std::shared_ptr<Image> onMakeScaled(float scale, const SamplingOptions& sampling) const override;
+  std::shared_ptr<Image> onMakeScaled(const ISize& size,
+                                      const SamplingOptions& sampling) const override;
 
  private:
   Point alphaStart = {};

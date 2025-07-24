@@ -55,6 +55,9 @@ class RasterizedImage : public ResourceImage {
   std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
                                                    const UniqueKey& key) const final;
 
+  std::shared_ptr<Image> onMakeScaled(const ISize& size,
+                                      const SamplingOptions& sampling) const override;
+
  private:
   std::shared_ptr<Image> source = nullptr;
 

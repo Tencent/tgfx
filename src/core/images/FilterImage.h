@@ -58,7 +58,8 @@ class FilterImage : public SubsetImage {
   std::shared_ptr<Image> onMakeWithFilter(std::shared_ptr<ImageFilter> filter, Point* offset,
                                           const Rect* clipRect) const override;
 
-  std::shared_ptr<Image> onMakeScaled(float scale, const SamplingOptions& sampling) const override;
+  std::shared_ptr<Image> onMakeScaled(const ISize& size,
+                                      const SamplingOptions& sampling) const override;
 
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 

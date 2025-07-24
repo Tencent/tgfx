@@ -21,20 +21,22 @@
 #include "tgfx/core/Image.h"
 
 namespace tgfx {
-class ScaleImage : public Image {
+class ScaledImage : public Image {
  public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> image, float scale,
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> image, const ISize& size,
                                          const SamplingOptions& sampling);
 
-  static int GetScaledSize(int size, float scale);
+  ScaledImage(std::shared_ptr<Image> image, int width, int height, const SamplingOptions& sampling);
 
-  ScaleImage(std::shared_ptr<Image> image, float scale, const SamplingOptions& sampling);
+  ~ScaledImage() override = default;
 
-  ~ScaleImage() override = default;
+  int width() const override {
+    return _width;
+  }
 
-  int width() const override;
-
-  int height() const override;
+  int height() const override {
+    return _height;
+  }
 
   bool isAlphaOnly() const override {
     return source->isAlphaOnly();
@@ -48,7 +50,8 @@ class ScaleImage : public Image {
     return source->isFullyDecoded();
   }
 
-  std::shared_ptr<Image> onMakeScaled(float scale, const SamplingOptions& sampling) const override;
+  std::shared_ptr<Image> onMakeScaled(const ISize& size,
+                                      const SamplingOptions& sampling) const override;
 
   std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
 
@@ -56,7 +59,7 @@ class ScaleImage : public Image {
 
  protected:
   Type type() const override {
-    return Type::Scale;
+    return Type::Scaled;
   }
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
@@ -67,7 +70,8 @@ class ScaleImage : public Image {
 
  private:
   std::shared_ptr<Image> source = nullptr;
-  float scale = 1.0f;
+  int _width = 0;
+  int _height = 0;
   SamplingOptions sampling = {};
 };
 }  // namespace tgfx

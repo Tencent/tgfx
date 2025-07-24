@@ -108,10 +108,11 @@ class Image {
    * picture will be drawn onto the Image using the provided matrix. The returned Image keeps a
    * reference to the picture and replays its drawing commands only when needed. A PictureImage is
    * not rasterized and does not cache its content, so it can render just the required portions of
-   * the picture to a temporary offscreen image. To cache the entire content at full size, use the
-   * makeRasterized() method on the PictureImage. Note: This method may return a different type of
-   * Image instead of PictureImage if the picture is simple enough to be treated directly as an
-   * Image.
+   * the picture to a temporary offscreen image.When clipping or scaling a PictureImage during
+   * drawing, the PictureImage will render the picture according to the new size. To cache the
+   * entire content at full size, use the makeRasterized() method on the PictureImage.
+   * Note: This method may return a different type of Image instead of PictureImage if the picture
+   * is simple enough to be treated directly as an Image.
    * @param picture A stream of drawing commands.
    * @param width The width of the Image.
    * @param height The height of the Image.
@@ -249,14 +250,14 @@ class Image {
   std::shared_ptr<Image> makeOriented(Orientation orientation) const;
 
   /**
-   * Returns a scaled Image with the specified scale factor.
-   * The returned Image always has the same mipmap state as the original Image.
-   * @param scale The factor to scale the source.
-   * @param sampling The sampling options to apply.
-   * @return If the scale is 1.0, the original Image is returned. If the scale is less than or equal
-   * to zero, nullptr is returned.
+   * Returns a scaled Image with the specified size.
+   * The scaled Image retains the original mipmap and rasterization states.
+   * @param size Target size of the scaled Image.
+   * @param sampling Sampling options for scaling.
+   * @return The original Image if width and height are unchanged; nullptr if width or height is
+   * less than or equal to 0.
    */
-  std::shared_ptr<Image> makeScaled(float scale, const SamplingOptions& sampling = {}) const;
+  std::shared_ptr<Image> makeScaled(ISize size, const SamplingOptions& sampling = {}) const;
 
   /**
    * Returns a rasterized Image can be cached as an independent GPU resource for repeated drawing.
@@ -307,7 +308,7 @@ class Image {
     RGBAAA,
     Texture,
     Subset,
-    Scale
+    Scaled
   };
 
   virtual Type type() const = 0;
@@ -325,7 +326,8 @@ class Image {
   virtual std::shared_ptr<Image> onMakeWithFilter(std::shared_ptr<ImageFilter> filter,
                                                   Point* offset, const Rect* clipRect) const;
 
-  virtual std::shared_ptr<Image> onMakeScaled(float scale, const SamplingOptions& sampling) const;
+  virtual std::shared_ptr<Image> onMakeScaled(const ISize& size,
+                                              const SamplingOptions& sampling) const;
 
   /**
    * Returns a texture proxy for the entire Image.
@@ -348,7 +350,7 @@ class Image {
   friend class TransformImage;
   friend class RGBAAAImage;
   friend class RasterizedImage;
-  friend class ScaleImage;
+  friend class ScaledImage;
   friend class ImageShader;
   friend class Types;
 };

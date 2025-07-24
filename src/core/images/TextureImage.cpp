@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureImage.h"
+#include "ScaledImage.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
@@ -59,6 +60,15 @@ std::shared_ptr<Image> TextureImage::makeTextureImage(Context* context) const {
 
 std::shared_ptr<Image> TextureImage::makeRasterized() const {
   return weakThis.lock();
+}
+
+std::shared_ptr<Image> TextureImage::onMakeScaled(const ISize& size,
+                                                  const SamplingOptions& sampling) const {
+  auto scaledImage = ScaledImage::MakeFrom(weakThis.lock(), size, sampling);
+  if (scaledImage == nullptr) {
+    return nullptr;
+  }
+  return scaledImage->makeTextureImage(textureProxy->getContext());
 }
 
 std::shared_ptr<TextureProxy> TextureImage::lockTextureProxy(const TPArgs& args) const {
