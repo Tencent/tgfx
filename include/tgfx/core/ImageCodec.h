@@ -72,13 +72,15 @@ class ImageCodec : public ImageGenerator {
     return false;
   }
 
+  virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const;
+
   /**
    * Decodes the image with the specified image info into the given pixels. Returns true if the
    * decoding was successful. Note that we do not recommend calling this method due to performance
    * reasons, especially on the web platform. Use the makeBuffer() method for better performance if
    * your final goal is to draw the image.
    */
-  virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const = 0;
+  virtual bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const = 0;
 
  protected:
   ImageCodec(int width, int height, Orientation orientation)
@@ -92,7 +94,7 @@ class ImageCodec : public ImageGenerator {
   };
 
  private:
-  Orientation _orientation = Orientation::TopLeft;
+  Orientation _orientation = Orientation::LeftTop;
 
   /**
    * If the file path represents an encoded image that the current platform knows how to decode,

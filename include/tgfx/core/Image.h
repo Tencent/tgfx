@@ -267,9 +267,10 @@ class Image {
    * @return If the Image is already rasterized and the rasterizationScale is 1.0, the original
    * Image is returned. If the rasterizationScale is less than zero, nullptr is returned.
    */
-  virtual std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f,
-                                                const SamplingOptions& sampling = {}) const;
+  virtual std::shared_ptr<Image> makeRasterized() const;
 
+
+  virtual std::shared_ptr<Image> makeScaled(int newWidth, int newHeight, const SamplingOptions& sampling) const;
   /**
    * Returns a filtered Image with the specified filter. The filter has the potential to alter the
    * bounds of the source Image. If the clipRect is not nullptr, the filtered Image will be clipped

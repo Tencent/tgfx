@@ -202,9 +202,17 @@ std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {
   return onMakeSubset(rect);
 }
 
-std::shared_ptr<Image> Image::makeRasterized(float rasterizationScale,
-                                             const SamplingOptions& sampling) const {
-  auto rasterImage = RasterizedImage::MakeFrom(weakThis.lock(), rasterizationScale, sampling);
+std::shared_ptr<Image> Image::makeRasterized() const {
+  auto rasterImage = RasterizedImage::MakeFrom(weakThis.lock(), width(), height(), {});
+  if (rasterImage != nullptr && hasMipmaps()) {
+    return rasterImage->makeMipmapped(true);
+  }
+  return rasterImage;
+}
+
+std::shared_ptr<Image> Image::makeScaled(int newWidth, int newHeight,
+                                         const SamplingOptions& sampling) const {
+  auto rasterImage = RasterizedImage::MakeFrom(weakThis.lock(), newWidth, newHeight, sampling);
   if (rasterImage != nullptr && hasMipmaps()) {
     return rasterImage->makeMipmapped(true);
   }

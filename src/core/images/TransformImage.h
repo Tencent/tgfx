@@ -47,6 +47,8 @@ class TransformImage : public Image {
 
   std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
 
+  std::shared_ptr<Image> makeScaled(int newWidth, int newHeight, const SamplingOptions& sampling) const override;
+
   virtual std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const = 0;
 };
 }  // namespace tgfx

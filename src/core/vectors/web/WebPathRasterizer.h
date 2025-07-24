@@ -28,6 +28,6 @@ class WebPathRasterizer final : public PathRasterizer {
       : PathRasterizer(width, height, std::move(shape), antiAlias, needsGammaCorrection) {
   }
 
-  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
+  bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 };
 }  // namespace tgfx

@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "core/utils/MathExtra.h"
 #include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
@@ -31,7 +32,28 @@ class JpegCodec : public ImageCodec {
   static std::shared_ptr<Data> Encode(const Pixmap& pixmap, int quality);
 #endif
 
+  bool supportScaledDimensions(int newWidth, int newHeight) const {
+    auto scaledX = static_cast<float>(newWidth) / static_cast<float>(width());
+    auto scaledY = static_cast<float>(newHeight) / static_cast<float>(height());
+    if (!FloatNearlyEqual(scaledX, scaledY)) {
+      return false;
+    }
+    if (FloatNearlyEqual(scaledX, 1.f / 8.f) ||
+      FloatNearlyEqual(scaledX, 2.f / 8.f) ||
+      FloatNearlyEqual(scaledX, 3.f / 8.f) ||
+      FloatNearlyEqual(scaledX, 4.f / 8.f) ||
+      FloatNearlyEqual(scaledX, 5.f / 8.f) ||
+      FloatNearlyEqual(scaledX, 6.f / 8.f) ||
+      FloatNearlyEqual(scaledX, 7.f / 8.f) ||
+      FloatNearlyEqual(scaledX, 1.f)) {
+      return true;
+    }
+    return false;
+  }
+
  protected:
+  bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
+
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 
   std::shared_ptr<Data> getEncodedData() const override;

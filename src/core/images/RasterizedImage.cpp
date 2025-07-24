@@ -23,46 +23,39 @@
 #include "gpu/ops/DrawOp.h"
 
 namespace tgfx {
-static int GetSize(int size, float scale) {
-  return static_cast<int>(roundf(static_cast<float>(size) * scale));
-}
-
 std::shared_ptr<Image> RasterizedImage::MakeFrom(std::shared_ptr<Image> source,
-                                                 float rasterizationScale,
+                                                 int newWeight, int newHeight,
                                                  const SamplingOptions& sampling) {
-  if (source == nullptr || rasterizationScale <= 0) {
-    return nullptr;
-  }
-  auto sourceWidth = source->width();
-  auto sourceHeight = source->height();
-  auto width = GetSize(sourceWidth, rasterizationScale);
-  auto height = GetSize(sourceHeight, rasterizationScale);
-  if (width <= 0 || height <= 0) {
+  if (source == nullptr || newWeight <= 0 || newHeight <= 0) {
     return nullptr;
   }
   auto result = std::shared_ptr<RasterizedImage>(
-      new RasterizedImage(UniqueKey::Make(), std::move(source), rasterizationScale, sampling));
+      new RasterizedImage(UniqueKey::Make(), std::move(source), newWeight, newHeight, sampling));
   result->weakThis = result;
   return result;
 }
 
 RasterizedImage::RasterizedImage(UniqueKey uniqueKey, std::shared_ptr<Image> source,
-                                 float rasterizationScale, const SamplingOptions& sampling)
+                                 int width, int height, const SamplingOptions& sampling)
     : ResourceImage(std::move(uniqueKey)), source(std::move(source)),
-      rasterizationScale(rasterizationScale), sampling(sampling) {
+      _width(width), _height(height), sampling(sampling) {
 }
 
 int RasterizedImage::width() const {
-  return GetSize(source->width(), rasterizationScale);
+  return _width;
 }
 
 int RasterizedImage::height() const {
-  return GetSize(source->height(), rasterizationScale);
+  return _height;
 }
 
-std::shared_ptr<Image> RasterizedImage::makeRasterized(float newScale,
-                                                       const SamplingOptions& sampling) const {
-  return MakeFrom(source, rasterizationScale * newScale, sampling);
+std::shared_ptr<Image> RasterizedImage::makeRasterized() const {
+  return MakeFrom(source, width(), height(), {});
+}
+
+std::shared_ptr<Image> RasterizedImage::makeScaled(int newWidth, int newHeight,
+                                                   const SamplingOptions& sampling) const {
+  return MakeFrom(source, newWidth, newHeight, sampling);
 }
 
 std::shared_ptr<Image> RasterizedImage::onMakeDecoded(Context* context, bool) const {
@@ -73,7 +66,7 @@ std::shared_ptr<Image> RasterizedImage::onMakeDecoded(Context* context, bool) co
     return nullptr;
   }
   auto newImage = std::shared_ptr<RasterizedImage>(
-      new RasterizedImage(uniqueKey, std::move(newSource), rasterizationScale, sampling));
+      new RasterizedImage(uniqueKey, std::move(newSource), width(), height(), sampling));
   newImage->weakThis = newImage;
   return newImage;
 }
@@ -95,8 +88,8 @@ std::shared_ptr<TextureProxy> RasterizedImage::onLockTextureProxy(const TPArgs& 
   }
   auto sourceWidth = source->width();
   auto sourceHeight = source->height();
-  auto scaledWidth = GetSize(sourceWidth, rasterizationScale);
-  auto scaledHeight = GetSize(sourceHeight, rasterizationScale);
+  auto scaledWidth = width();
+  auto scaledHeight = height();
   auto uvScaleX = static_cast<float>(sourceWidth) / static_cast<float>(scaledWidth);
   auto uvScaleY = static_cast<float>(sourceHeight) / static_cast<float>(scaledHeight);
   Matrix uvMatrix = Matrix::MakeScale(uvScaleX, uvScaleY);

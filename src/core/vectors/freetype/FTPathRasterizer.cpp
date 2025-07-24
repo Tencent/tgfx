@@ -56,7 +56,7 @@ std::shared_ptr<PathRasterizer> PathRasterizer::MakeFrom(int width, int height,
                                             needsGammaCorrection);
 }
 
-bool FTPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
+bool FTPathRasterizer::onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (dstPixels == nullptr || dstInfo.isEmpty()) {
     return false;
   }

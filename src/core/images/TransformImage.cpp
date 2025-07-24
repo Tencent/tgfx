@@ -37,4 +37,14 @@ std::shared_ptr<Image> TransformImage::onMakeMipmapped(bool enabled) const {
   }
   return onCloneWith(std::move(newSource));
 }
+
+std::shared_ptr<Image> TransformImage::makeScaled(int newWidth, int newHeight,
+                                                  const SamplingOptions& sampling) const {
+  auto newSource = source->makeScaled(newWidth, newHeight, sampling);
+  if (newSource == nullptr) {
+    return nullptr;
+  }
+  return onCloneWith(std::move(newSource));
+}
+
 }  // namespace tgfx

@@ -18,16 +18,35 @@
 
 #pragma once
 
-#include "core/PathRasterizer.h"
+#include "images/CodecImage.h"
+#include "tgfx/core/Image.h"
+#include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
-class FTPathRasterizer final : public PathRasterizer {
+class ScaledImageGenerator : public ImageGenerator {
  public:
-  explicit FTPathRasterizer(int width, int height, std::shared_ptr<Shape> shape, bool antiAlias,
-                            bool needsGammaCorrection)
-      : PathRasterizer(width, height, std::move(shape), antiAlias, needsGammaCorrection) {
+  static std::shared_ptr<ScaledImageGenerator> MakeFrom(int width, int height,
+                                              const std::shared_ptr<ImageCodec>& codec);
+
+  ~ScaledImageGenerator() override = default;
+
+  bool isAlphaOnly() const override {
+    return source->isAlphaOnly();
   }
 
-  bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
+  bool asyncSupport() const override {
+    return source->asyncSupport();
+  }
+
+  std::shared_ptr<ImageCodec> codec() const {
+    return source;
+  }
+
+  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
+
+private:
+  std::shared_ptr<ImageCodec> source = nullptr;
+
+  explicit ScaledImageGenerator(int width, int height, const std::shared_ptr<ImageCodec>& codec);
 };
 }  // namespace tgfx

@@ -29,7 +29,7 @@ class RasterizedImage : public ResourceImage {
   /**
    * Note that this method always returns a non-mipmapped image.
    */
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, float rasterizationScale,
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, int width, int height,
                                          const SamplingOptions& sampling);
 
   int width() const override;
@@ -44,8 +44,9 @@ class RasterizedImage : public ResourceImage {
     return source->isFullyDecoded();
   }
 
-  std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f,
-                                        const SamplingOptions& sampling = {}) const override;
+  std::shared_ptr<Image> makeRasterized() const override;
+
+  std::shared_ptr<Image> makeScaled(int newWidth, int newHeight, const SamplingOptions& sampling) const override;
 
  protected:
   Type type() const override {
@@ -59,10 +60,11 @@ class RasterizedImage : public ResourceImage {
 
  private:
   std::shared_ptr<Image> source = nullptr;
-  float rasterizationScale = 1.0f;
+  int _width;
+  int _height;
   SamplingOptions sampling = {};
 
-  RasterizedImage(UniqueKey uniqueKey, std::shared_ptr<Image> source, float rasterizationScale,
+  RasterizedImage(UniqueKey uniqueKey, std::shared_ptr<Image> source, int width, int height,
                   const SamplingOptions& sampling);
 };
 }  // namespace tgfx

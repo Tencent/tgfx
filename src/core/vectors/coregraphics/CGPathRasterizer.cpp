@@ -113,7 +113,7 @@ std::shared_ptr<PathRasterizer> PathRasterizer::MakeFrom(int width, int height,
                                             needsGammaCorrection);
 }
 
-bool CGPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
+bool CGPathRasterizer::onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (dstPixels == nullptr || dstInfo.isEmpty()) {
     return false;
   }

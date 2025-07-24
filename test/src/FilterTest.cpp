@@ -117,7 +117,7 @@ TGFX_TEST(FilterTest, ShaderMaskFilter) {
   auto image = MakeImage("resources/apitest/rotation.jpg");
   image = image->makeOriented(Orientation::LeftBottom);
   image = image->makeMipmapped(true);
-  image = image->makeRasterized(0.25f);
+  image = image->makeRasterized();
   ASSERT_TRUE(image != nullptr);
   auto surface = Surface::Make(context, image->width(), image->height());
   auto canvas = surface->getCanvas();
@@ -249,7 +249,7 @@ TGFX_TEST(FilterTest, BlurLargePixel) {
   auto image = MakeImage("resources/apitest/rotation.jpg");
   ASSERT_TRUE(image != nullptr);
   Matrix imageMatrix = {};
-  image = image->makeRasterized(1.f);
+  image = image->makeRasterized();
   auto bounds = Rect::MakeWH(image->width(), image->height());
   imageMatrix.mapRect(&bounds);
   auto imageWidth = static_cast<float>(bounds.width());
@@ -333,7 +333,7 @@ TGFX_TEST(FilterTest, RuntimeEffect) {
   auto surface = Surface::Make(context, 720, 720);
   auto canvas = surface->getCanvas();
   image = image->makeMipmapped(true);
-  image = image->makeRasterized(0.5f, SamplingOptions(FilterMode::Linear, MipmapMode::Linear));
+  image = image->makeRasterized();
   auto effect = CornerPinEffect::Make({484, 54}, {764, 80}, {764, 504}, {482, 512});
   auto filter = ImageFilter::Runtime(std::move(effect));
   image = image->makeWithFilter(std::move(filter));

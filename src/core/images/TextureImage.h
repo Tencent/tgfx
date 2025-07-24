@@ -55,8 +55,7 @@ class TextureImage : public Image {
 
   std::shared_ptr<Image> makeTextureImage(Context* context) const override;
 
-  std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f,
-                                        const SamplingOptions& sampling = {}) const override;
+  std::shared_ptr<Image> makeRasterized() const override;
 
  protected:
   Type type() const override {

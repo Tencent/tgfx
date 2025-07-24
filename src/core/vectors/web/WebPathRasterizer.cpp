@@ -56,7 +56,7 @@ static void Iterator(PathVerb verb, const Point points[4], void* info) {
   }
 }
 
-bool WebPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
+bool WebPathRasterizer::onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (dstPixels == nullptr || dstInfo.isEmpty()) {
     return false;
   }

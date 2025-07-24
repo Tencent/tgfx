@@ -31,15 +31,29 @@ class CodecImage : public GeneratorImage {
 
   ~CodecImage() override = default;
 
+  int width() const override {
+    return _width;
+  }
+
+  int height() const override {
+    return _height;
+  }
+
   std::shared_ptr<ImageCodec> codec() const;
+
+  std::shared_ptr<Image> makeScaled(int newWidth, int newHeight, const SamplingOptions& sampling) const override;
 
  protected:
   Type type() const override {
     return Type::Codec;
   }
 
+  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args, const UniqueKey& key) const override;
+
  private:
-  explicit CodecImage(const std::shared_ptr<ImageCodec>& codec);
+  int _width;
+  int _height;
+  explicit CodecImage(int width, int height, const std::shared_ptr<ImageCodec>& codec);
 };
 
 }  // namespace tgfx

@@ -76,7 +76,7 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> im
   return result;
 }
 
-bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
+bool NativeCodec::onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   auto image = CreateImageSource();
   if (!image) {
     return false;

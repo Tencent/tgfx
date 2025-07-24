@@ -50,7 +50,7 @@ class PathRasterizer : public ImageCodec {
 
   bool asyncSupport() const override;
 
-  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override = 0;
+  bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const override = 0;
 
  protected:
   explicit PathRasterizer(int width, int height, std::shared_ptr<Shape> shape, bool antiAlias,
