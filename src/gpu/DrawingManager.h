@@ -55,7 +55,7 @@ class DrawingManager {
                           std::vector<std::shared_ptr<TextureProxy>> inputs,
                           std::shared_ptr<RuntimeEffect> effect, const Point& offset);
 
-  void addTextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTarget);
+  void addGenerateMipmapsTask(std::shared_ptr<TextureProxy> textureProxy);
 
   void addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
                                std::shared_ptr<TextureProxy> dest, int srcX = 0, int srcY = 0);

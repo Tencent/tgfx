@@ -106,31 +106,6 @@ void GLGPU::copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture*
   gl->copyTexSubImage2D(target, 0, 0, 0, srcX, srcY, width, height);
 }
 
-void GLGPU::resolveRenderTarget(RenderTarget* renderTarget) {
-  DEBUG_ASSERT(renderTarget != nullptr);
-  if (renderTarget->sampleCount() <= 1) {
-    return;
-  }
-  auto gl = GLFunctions::Get(context);
-  auto caps = GLCaps::Get(context);
-  if (!caps->usesMSAARenderBuffers()) {
-    return;
-  }
-  auto glRT = static_cast<GLRenderTarget*>(renderTarget);
-  gl->bindFramebuffer(GL_READ_FRAMEBUFFER, glRT->drawFrameBufferID());
-  gl->bindFramebuffer(GL_DRAW_FRAMEBUFFER, glRT->readFrameBufferID());
-  // MSAA resolve may be affected by the scissor test, so disable it here.
-  gl->disable(GL_SCISSOR_TEST);
-  if (caps->msFBOType == MSFBOType::ES_Apple) {
-
-    gl->resolveMultisampleFramebuffer();
-  } else {
-    gl->blitFramebuffer(0, 0, renderTarget->width(), renderTarget->height(), 0, 0,
-                        renderTarget->width(), renderTarget->height(), GL_COLOR_BUFFER_BIT,
-                        GL_NEAREST);
-  }
-}
-
 std::shared_ptr<Semaphore> GLGPU::insertSemaphore() {
   if (!context->caps()->semaphoreSupport) {
     return nullptr;

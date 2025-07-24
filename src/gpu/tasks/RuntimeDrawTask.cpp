@@ -52,11 +52,6 @@ RuntimeDrawTask::RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
 }
 
 void RuntimeDrawTask::execute(GPU* gpu) {
-  auto renderTarget = renderTargetProxy->getRenderTarget();
-  if (renderTarget == nullptr) {
-    LOGE("RuntimeDrawTask::execute() Failed to get the render target!");
-    return;
-  }
   std::vector<std::shared_ptr<Texture>> textures = {};
   textures.reserve(inputTextures.size());
   for (size_t i = 0; i < inputTextures.size(); i++) {
@@ -69,6 +64,11 @@ void RuntimeDrawTask::execute(GPU* gpu) {
       return;
     }
     textures.push_back(texture);
+  }
+  auto renderTarget = renderTargetProxy->getRenderTarget();
+  if (renderTarget == nullptr) {
+    LOGE("RuntimeDrawTask::execute() Failed to get the render target!");
+    return;
   }
   auto context = gpu->getContext();
   RuntimeProgramCreator programCreator(effect);
@@ -84,6 +84,11 @@ void RuntimeDrawTask::execute(GPU* gpu) {
   }
   effect->onDraw(RuntimeProgramWrapper::Unwrap(program.get()), backendTextures,
                  renderTarget->getBackendRenderTarget(), offset);
+  if (renderTarget->sampleCount() > 1) {
+    auto renderPass = RenderPass::Make(renderTarget, true);
+    DEBUG_ASSERT(renderPass != nullptr);
+    renderPass->end();
+  }
 }
 
 std::shared_ptr<Texture> RuntimeDrawTask::GetFlatTexture(
@@ -109,7 +114,7 @@ std::shared_ptr<Texture> RuntimeDrawTask::GetFlatTexture(
     return nullptr;
   }
   auto renderTarget = renderTargetProxy->getRenderTarget();
-  auto renderPass = RenderPass::Make(renderTarget);
+  auto renderPass = RenderPass::Make(renderTarget, false);
   if (renderPass == nullptr) {
     LOGE("RuntimeDrawTask::getFlatTexture() Failed to initialize the render pass!");
     return nullptr;
