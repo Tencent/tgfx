@@ -172,7 +172,7 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
   }
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
-  std::optional<Matrix> viewMatrix = std::nullopt;
+  std::optional<Point> drawScales = std::nullopt;
   auto [needLocalBounds, needDeviceBounds] = needComputeBounds(fill, true);
   auto& clip = state.clip;
   auto clipBounds = getClipBounds(clip);
@@ -183,7 +183,7 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
       localBounds = shape->getBounds();
       localBounds = ClipLocalBounds(*localBounds, state.matrix, clipBounds);
     }
-    viewMatrix = state.matrix;
+    drawScales = state.matrix.getAxisScales();
   }
   shape = Shape::ApplyMatrix(std::move(shape), state.matrix);
   if (needDeviceBounds) {
@@ -193,7 +193,7 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
   auto shapeProxy = proxyProvider()->createGpuShapeProxy(shape, aaType, clipBounds, renderFlags);
   auto drawOp =
       ShapeDrawOp::Make(std::move(shapeProxy), fill.color.premultiply(), uvMatrix, aaType);
-  addDrawOp(std::move(drawOp), clip, fill, localBounds, deviceBounds, viewMatrix);
+  addDrawOp(std::move(drawOp), clip, fill, localBounds, deviceBounds, drawScales);
 }
 
 void OpsCompositor::discardAll() {
@@ -300,7 +300,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
   PlacementPtr<DrawOp> drawOp = nullptr;
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
-  std::optional<Matrix> viewMatrix = std::nullopt;
+  std::optional<Point> drawScales = std::nullopt;
   bool hasCoverage = pendingFill.maskFilter != nullptr || !pendingClip.isEmpty() ||
                      pendingClip.isInverseFillType();
   bool hasImageFill = pendingType == PendingOpType::Image || pendingType == PendingOpType::Atlas;
@@ -311,6 +311,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
   if (needLocalBounds) {
     clipBounds = getClipBounds(pendingClip);
     localBounds = Rect::MakeEmpty();
+    drawScales = Point::Zero();
   }
 
   if (needLocalBounds || needDeviceBounds) {
@@ -319,13 +320,13 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
       for (auto& record : pendingRRects) {
         auto rect = record->viewMatrix.mapRect(record->rRect.rect);
         deviceBounds->join(rect);
+        auto viewMatrixScales = record->viewMatrix.getAxisScales();
+        drawScales->x = std::max(drawScales->x, viewMatrixScales.x);
+        drawScales->y = std::max(drawScales->y, viewMatrixScales.y);
       }
       localBounds = deviceBounds;
       if (!localBounds->intersect(clipBounds)) {
         localBounds->setEmpty();
-      }
-      if (pendingRRects.size() == 1) {
-        viewMatrix = pendingRRects.front()->viewMatrix;
       }
     } else {
       if (needLocalBounds) {
@@ -333,9 +334,9 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
           auto localViewMatrix = rect->viewMatrix;
           localViewMatrix.preConcat(MakeRectToRectMatrix(rect->uvRect, rect->rect));
           localBounds->join(ClipLocalBounds(rect->uvRect, localViewMatrix, clipBounds));
-        }
-        if (pendingRects.size() == 1) {
-          viewMatrix = pendingRects.front()->viewMatrix;
+          auto viewMatrixScales = localViewMatrix.getAxisScales();
+          drawScales->x = std::max(drawScales->x, viewMatrixScales.x);
+          drawScales->y = std::max(drawScales->y, viewMatrixScales.y);
         }
       }
       if (needDeviceBounds) {
@@ -392,7 +393,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
   }
   if (drawOp != nullptr && pendingType == PendingOpType::Image) {
     FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()),
-                   viewMatrix.value_or(Matrix::I())};
+                   drawScales.value_or(Point::Make(1.0f, 1.0f))};
     auto processor =
         FragmentProcessor::Make(std::move(pendingImage), args, pendingSampling, pendingConstraint);
     if (processor == nullptr) {
@@ -400,7 +401,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     }
     drawOp->addColorFP(std::move(processor));
   }
-  addDrawOp(std::move(drawOp), pendingClip, pendingFill, localBounds, deviceBounds, viewMatrix);
+  addDrawOp(std::move(drawOp), pendingClip, pendingFill, localBounds, deviceBounds, drawScales);
 }
 
 static void FlipYIfNeeded(Rect* rect, const RenderTargetProxy* renderTarget) {
@@ -640,7 +641,7 @@ DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AATyp
 void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const Fill& fill,
                               const std::optional<Rect>& localBounds,
                               const std::optional<Rect>& deviceBounds,
-                              const std::optional<Matrix>& viewMatrix) {
+                              const std::optional<Point>& drawScales) {
 
   if (op == nullptr || fill.nothingToDraw() || (clip.isEmpty() && !clip.isInverseFillType())) {
     return;
@@ -651,7 +652,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
   }
 
   FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()),
-                 viewMatrix.value_or(Matrix::I())};
+                 drawScales.value_or(Point::Make(1.0f, 1.0f))};
   if (fill.shader) {
     if (auto processor = FragmentProcessor::Make(fill.shader, args)) {
       op->addColorFP(std::move(processor));

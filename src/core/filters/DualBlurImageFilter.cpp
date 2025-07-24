@@ -149,9 +149,7 @@ std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_
                         sampleOffset.y * scaleFactor * downScaling);
   // SamplingOptions sampling(FilterMode::Linear, MipmapMode::None);
   SamplingOptions sampling(FilterMode::Linear, MipmapMode::None);
-  auto viewMatrix = Matrix::I();
-  uvMatrix.invert(&viewMatrix);
-  FPArgs fpArgs(args.context, args.renderFlags, drawRect, viewMatrix);
+  FPArgs fpArgs(args.context, args.renderFlags, drawRect, Point::Make(scaleFactor, scaleFactor));
   auto sourceProcessor = FragmentProcessor::Make(source, fpArgs, tileMode, tileMode, sampling,
                                                  SrcRectConstraint::Fast, &uvMatrix);
   SamplingArgs samplingArgs = {TileMode::Clamp, TileMode::Clamp, sampling, SrcRectConstraint::Fast};

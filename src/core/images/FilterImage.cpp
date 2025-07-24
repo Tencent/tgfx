@@ -167,12 +167,20 @@ PlacementPtr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs& a
                                        AddressOf(fpMatrix));
   }
   auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
+  auto currentSource = source->makeScaled(std::max(args.drawScales.x, args.drawScales.y), sampling);
+  auto sourceScaleX =
+      static_cast<float>(currentSource->width()) / static_cast<float>(source->width());
+  auto sourceScaleY =
+      static_cast<float>(currentSource->height()) / static_cast<float>(source->height());
+  auto currentFilter = filter->makeScaled(Point::Make(sourceScaleX, sourceScaleY));
+  dstBounds.scale(sourceScaleX, sourceScaleY);
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
-  auto textureProxy = filter->lockTextureProxy(source, dstBounds, tpArgs);
+  auto textureProxy = currentFilter->lockTextureProxy(currentSource, dstBounds, tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  auto matrix = Matrix::MakeTrans(-dstBounds.x(), -dstBounds.y());
+  auto matrix = Matrix::MakeScale(sourceScaleX, sourceScaleY);
+  matrix.postTranslate(-dstBounds.x(), -dstBounds.y());
   if (fpMatrix) {
     matrix.preConcat(*fpMatrix);
   }

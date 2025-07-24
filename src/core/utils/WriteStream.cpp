@@ -28,7 +28,7 @@ namespace tgfx {
  */
 class FileWriteStream : public WriteStream {
  public:
-  explicit FileWriteStream(FILE* file) : file(file){};
+  explicit FileWriteStream(FILE* file) : file(file) {};
 
   ~FileWriteStream() override {
     if (file) {
