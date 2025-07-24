@@ -22,12 +22,11 @@
 #include "core/images/GeneratorImage.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageCodec.h"
-
 namespace tgfx {
 
 class CodecImage : public GeneratorImage {
  public:
-  CodecImage(UniqueKey uniqueKey, std::shared_ptr<ImageCodec> codec);
+  CodecImage(int width, int height, UniqueKey uniqueKey, std::shared_ptr<ImageCodec> codec);
 
   std::shared_ptr<ImageCodec> getCodec() const;
 

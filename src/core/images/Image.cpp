@@ -67,7 +67,7 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageGenerator> generator
   if (generator->isImageCodec()) {
     auto codec = std::static_pointer_cast<ImageCodec>(generator);
     auto orientation = codec->orientation();
-    image = std::make_shared<CodecImage>(UniqueKey::Make(), std::move(codec));
+    image = std::make_shared<CodecImage>(codec->width(), codec->width(), UniqueKey::Make(), std::move(codec));
     image->weakThis = image;
     image = image->makeOriented(orientation);
   } else {
