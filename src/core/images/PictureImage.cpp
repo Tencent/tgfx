@@ -77,18 +77,17 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (!rect.intersect(drawBounds)) {
     return nullptr;
   }
-  auto scales = args.viewMatrix.getAxisScales();
-  rect.scale(scales.x, scales.y);
+  rect.scale(args.drawScales.x, args.drawScales.y);
   rect.roundOut();
   auto mipmapped = samplingArgs.sampling.mipmapMode != MipmapMode::None && hasMipmaps();
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(rect.width()), static_cast<int>(rect.height()), isAlphaOnly(),
       1, mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
-
+  LOGI("renderTarget size :%d %d", renderTarget->width(), renderTarget->height());
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto viewMatrix = Matrix::MakeScale(scales.x, scales.y);
+  auto viewMatrix = Matrix::MakeScale(args.drawScales.x, args.drawScales.y);
   viewMatrix.postTranslate(-rect.left, -rect.top);
   if (!drawPicture(renderTarget, args.renderFlags, &viewMatrix)) {
     return nullptr;

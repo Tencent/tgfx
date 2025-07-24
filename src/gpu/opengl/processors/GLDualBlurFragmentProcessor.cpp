@@ -97,7 +97,8 @@ void GLDualBlurFragmentProcessor::emitCode(EmitArgs& args) const {
 void GLDualBlurFragmentProcessor::onSetData(UniformBuffer* uniformBuffer) const {
   auto* processor = childProcessor(0);
   Point stepVectors[] = {{0, 0}, {0.5, 0.5}};
-  if (auto transform = processor->coordTransform(0)) {
+  if (processor->numCoordTransforms() > 0) {
+    auto transform = processor->coordTransform(0);
     auto matrix = transform->getTotalMatrix();
     matrix.mapPoints(stepVectors, 2);
   }
