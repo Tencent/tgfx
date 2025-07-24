@@ -94,11 +94,17 @@ PlacementPtr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(
   auto isAlphaOnly = source->isAlphaOnly();
   auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
-  auto textureProxy = lockTextureProxy(std::move(source), dstBounds, tpArgs);
+        auto newSource = source->makeScaled(std::max(args.drawScales.x, args.drawScales.y));
+        auto scaleX = (float)newSource->width() / source->width();
+        auto scaleY = (float)newSource->height() / source->height();
+        auto newFilter = this->makeScaled(Point(scaleX, scaleY));
+        dstBounds.scale(scaleX, scaleY);
+  auto textureProxy = newFilter->lockTextureProxy(std::move(source), dstBounds, tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;
   }
   auto fpMatrix = Matrix::MakeTrans(-dstBounds.x(), -dstBounds.y());
+        fpMatrix.postScale(scaleX, scaleY);
   if (uvMatrix != nullptr) {
     fpMatrix.preConcat(*uvMatrix);
   }
