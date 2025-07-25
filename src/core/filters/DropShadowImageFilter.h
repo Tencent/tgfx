@@ -48,6 +48,6 @@ class DropShadowImageFilter : public ImageFilter {
                                                       SrcRectConstraint constraint,
                                                       const Matrix* uvMatrix) const override;
 
-  std::shared_ptr<ImageFilter> onMakeScaled(const Point& scale) const override;
+  std::shared_ptr<ImageFilter> onMakeScaled(float scaleX, float scaleY) const override;
 };
 }  // namespace tgfx

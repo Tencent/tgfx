@@ -126,7 +126,10 @@ class ImageFilter {
    */
   Rect filterBounds(const Rect& rect) const;
 
-  std::shared_ptr<ImageFilter> makeScaled(const Point& scale) const;
+  /**
+   * Creates a new image filter that
+   */
+  std::shared_ptr<ImageFilter> makeScaled(float scaleX, float scaleY) const;
 
  protected:
   enum class Type { Blur, DropShadow, InnerShadow, Color, Compose, Runtime };
@@ -162,7 +165,7 @@ class ImageFilter {
                                                               SrcRectConstraint constraint,
                                                               const Matrix* uvMatrix) const = 0;
 
-  virtual std::shared_ptr<ImageFilter> onMakeScaled(const Point& scale) const = 0;
+  virtual std::shared_ptr<ImageFilter> onMakeScaled(float scaleX, float scaleY) const = 0;
 
   bool applyCropRect(const Rect& srcRect, Rect* dstRect, const Rect* clipBounds = nullptr) const;
 

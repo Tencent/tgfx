@@ -338,9 +338,18 @@ TGFX_TEST(FilterTest, RuntimeEffect) {
   image = image->makeRasterized();
   auto effect = CornerPinEffect::Make({484, 54}, {764, 80}, {764, 504}, {482, 512});
   auto filter = ImageFilter::Runtime(std::move(effect));
-  image = image->makeWithFilter(std::move(filter));
-  canvas->drawImage(image, 200, 100);
+  auto filterBounds = filter->filterBounds(Rect::MakeWH(image->width(), image->height()));
+  auto filterImage = image->makeWithFilter(filter);
+  canvas->drawImage(filterImage, 200, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/RuntimeEffect"));
+
+  auto scaled = filter->makeScaled(0.5f, 0.5f);
+  auto scaledFilterBounds = scaled->filterBounds(Rect::MakeWH(image->width(), image->height()));
+  filterBounds.scale(0.5f, 0.5f);
+  EXPECT_EQ(scaledFilterBounds, filterBounds);
+  filterImage = image->makeWithFilter(std::move(scaled));
+  canvas->drawImage(filterImage, 200, 100);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/RuntimeEffect-scaled"));
 }
 
 TGFX_TEST(FilterTest, InnerShadow) {
@@ -737,5 +746,10 @@ TGFX_TEST(FilterTest, GaussianBlurImageFilter) {
   canvas->drawImage(image, offset.x, offset.y);
   context->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/GaussianBlurImageFilter"));
+}
+
+TGFX_TEST(FilterTest, ScaleFilterTest) {
+
+
 }
 }  // namespace tgfx

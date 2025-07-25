@@ -83,8 +83,8 @@ PlacementPtr<FragmentProcessor> RuntimeImageFilter::asFragmentProcessor(
   return makeFPFromTextureProxy(source, args, sampling, constraint, uvMatrix);
 }
 
-std::shared_ptr<ImageFilter> RuntimeImageFilter::onMakeScaled(const Point& scale) const {
-  auto newScale = Point::Make(this->scale.x * scale.x, this->scale.y * scale.y);
+std::shared_ptr<ImageFilter> RuntimeImageFilter::onMakeScaled(float scaleX, float scaleY) const {
+  auto newScale = Point::Make(scale.x * scaleX, scale.y * scaleY);
   auto result = std::make_shared<RuntimeImageFilter>(effect, newScale);
   result->weakThis = result;
   return result;

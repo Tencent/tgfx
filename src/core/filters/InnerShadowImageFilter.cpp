@@ -137,10 +137,11 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::asFragmentProcessor(
   }
 }
 
-std::shared_ptr<ImageFilter> InnerShadowImageFilter::onMakeScaled(const Point& scale) const {
-  auto newDx = dx * scale.x;
-  auto newDy = dy * scale.y;
-  auto newBlurFilter = blurFilter ? blurFilter->makeScaled(scale) : nullptr;
+std::shared_ptr<ImageFilter> InnerShadowImageFilter::onMakeScaled(float scaleX,
+                                                                  float scaleY) const {
+  auto newDx = dx * scaleX;
+  auto newDy = dy * scaleY;
+  auto newBlurFilter = blurFilter ? blurFilter->makeScaled(scaleX, scaleY) : nullptr;
   auto result = std::make_shared<InnerShadowImageFilter>(newDx, newDy, std::move(newBlurFilter),
                                                          color, shadowOnly);
   result->weakThis = result;

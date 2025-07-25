@@ -38,7 +38,7 @@ class ColorImageFilter : public ImageFilter {
                                                       SrcRectConstraint constraint,
                                                       const Matrix* uvMatrix) const override;
 
-  std::shared_ptr<ImageFilter> onMakeScaled(const Point&) const override {
+  std::shared_ptr<ImageFilter> onMakeScaled(float, float) const override {
     return weakThis.lock();
   }
 };

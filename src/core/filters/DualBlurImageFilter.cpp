@@ -108,7 +108,7 @@ void DualBlurImageFilter::draw(std::shared_ptr<RenderTargetProxy> renderTarget,
 
 Rect DualBlurImageFilter::onFilterBounds(const Rect& srcRect) const {
   auto mul = static_cast<float>(std::pow(2, iteration)) / (scaleFactor * downScaling);
-  return srcRect.makeOutset(blurOffset.x * mul, blurOffset.y * mul);
+  return srcRect.makeOutset(blurOffset.x * mul * scaleX, blurOffset.y * mul * scaleY);
 }
 
 std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_ptr<Image> source,
@@ -136,18 +136,22 @@ std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_
   auto filterOriginBounds = filterBounds(Rect::MakeWH(source->width(), source->height()));
   boundsWillSample.intersect(filterOriginBounds);
 
+  auto scaleFactorX = scaleFactor * scaleX;
+  auto scaleFactorY = scaleFactor * scaleY;
+
   // sampleOffset means the offset between the source bounds and the sample bounds.
   auto sampleOffset = Point::Make(boundsWillSample.left, boundsWillSample.top);
-  boundsWillSample.scale(scaleFactor, scaleFactor);
+  boundsWillSample.scale(scaleFactorX, scaleFactorY);
 
   std::vector<std::shared_ptr<RenderTargetProxy>> renderTargets = {};
   // calculate the size of the source image of the first downsample
   auto textureSize = Size::Make(boundsWillSample.width(), boundsWillSample.height());
   // scale the source image to smaller size
-  auto uvMatrix = Matrix::MakeScale(1 / (downScaling * scaleFactor));
+  auto uvMatrix =
+      Matrix::MakeScale(1 / (downScaling * scaleFactorX), 1 / (downScaling * scaleFactorY));
   // calculate the uv matrix of the first downsample. Add sampleOffset to get the sample texture.
-  uvMatrix.preTranslate(sampleOffset.x * scaleFactor * downScaling,
-                        sampleOffset.y * scaleFactor * downScaling);
+  uvMatrix.preTranslate(sampleOffset.x * scaleFactorX * downScaling,
+                        sampleOffset.y * scaleFactorY * downScaling);
   // SamplingOptions sampling(FilterMode::Linear, MipmapMode::None);
   SamplingOptions sampling(FilterMode::Linear, MipmapMode::None);
   auto sourceProcessor = FragmentProcessor::Make(source, fpArgs, tileMode, tileMode, sampling,

@@ -134,10 +134,10 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
       buffer, std::move(imageProcessor), std::move(colorShadowProcessor), BlendMode::SrcOver);
 }
 
-std::shared_ptr<ImageFilter> DropShadowImageFilter::onMakeScaled(const Point& scale) const {
-  auto newDx = dx * scale.x;
-  auto newDy = dy * scale.y;
-  auto newBlurFilter = blurFilter ? blurFilter->makeScaled(scale) : nullptr;
+std::shared_ptr<ImageFilter> DropShadowImageFilter::onMakeScaled(float scaleX, float scaleY) const {
+  auto newDx = dx * scaleX;
+  auto newDy = dy * scaleY;
+  auto newBlurFilter = blurFilter ? blurFilter->makeScaled(scaleX, scaleY) : nullptr;
   auto newFilter =
       std::make_shared<DropShadowImageFilter>(newDx, newDy, newBlurFilter, color, shadowOnly);
   newFilter->weakThis = newFilter;

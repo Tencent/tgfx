@@ -94,11 +94,11 @@ PlacementPtr<FragmentProcessor> ComposeImageFilter::asFragmentProcessor(
   return FragmentProcessor::Make(std::move(lastSource), args, sampling, constraint, &matrix);
 }
 
-std::shared_ptr<ImageFilter> ComposeImageFilter::onMakeScaled(const Point& scale) const {
+std::shared_ptr<ImageFilter> ComposeImageFilter::onMakeScaled(float scaleX, float scaleY) const {
   auto newFilters = std::vector<std::shared_ptr<ImageFilter>>();
   newFilters.reserve(filters.size());
   for (const auto& filter : filters) {
-    auto newFilter = filter->makeScaled(scale);
+    auto newFilter = filter->makeScaled(scaleX, scaleY);
     if (!newFilter) {
       return nullptr;
     }

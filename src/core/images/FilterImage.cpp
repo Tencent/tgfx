@@ -20,7 +20,6 @@
 #include "core/images/ScaledImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/utils/AddressOf.h"
-#include "core/utils/MathExtra.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
@@ -110,7 +109,11 @@ std::shared_ptr<Image> FilterImage::onMakeWithFilter(std::shared_ptr<ImageFilter
 
 std::shared_ptr<Image> FilterImage::onMakeScaled(int newWidth, int newHeight,
                                                  const SamplingOptions& sampling) const {
-  return ScaledImage::MakeFrom(weakThis.lock(), newWidth, newHeight, sampling);
+  auto inputBounds = Rect::MakeWH(source->width(), source->height());
+  if (filter->filterBounds(inputBounds) != bounds) {
+    return ScaledImage::MakeFrom(weakThis.lock(), newWidth, newHeight, sampling);
+  }
+
 }
 
 std::shared_ptr<TextureProxy> FilterImage::lockTextureProxy(const TPArgs& args) const {
