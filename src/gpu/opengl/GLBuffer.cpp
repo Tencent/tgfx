@@ -17,9 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLBuffer.h"
-#include "GLContext.h"
+#include "GLGPU.h"
 #include "GLUtil.h"
-#include "core/utils/UniqueID.h"
 
 namespace tgfx {
 static unsigned GetTarget(BufferType bufferType) {

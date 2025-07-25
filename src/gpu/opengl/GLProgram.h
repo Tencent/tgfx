@@ -69,13 +69,14 @@ class GLProgram : public Program {
     std::optional<ImageOrigin> origin;
   };
 
-  void setRenderTargetState(const RenderTarget* renderTarget);
-
   RenderTargetState renderTargetState;
   unsigned programId = 0;
   std::unique_ptr<GLUniformBuffer> uniformBuffer = nullptr;
-
   std::vector<Attribute> attributes;
   int _vertexStride = 0;
+
+  void setRenderTargetState(const RenderTarget* renderTarget);
+
+  void bindTexture(int unitIndex, const TextureSampler* sampler, SamplerState samplerState = {});
 };
 }  // namespace tgfx

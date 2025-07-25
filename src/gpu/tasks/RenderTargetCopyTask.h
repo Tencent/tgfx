@@ -27,7 +27,7 @@ class RenderTargetCopyTask : public RenderTask {
   RenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
                        std::shared_ptr<TextureProxy> dest, int srcX, int srcY);
 
-  void execute(GPU* gpu) override;
+  void execute(CommandEncoder* encoder) override;
 
  private:
   std::shared_ptr<RenderTargetProxy> source = nullptr;

@@ -239,4 +239,17 @@ std::shared_ptr<GPUBufferProxy> GlobalCache::getRRectIndexBuffer(bool stroke) {
   return indexBuffer;
 }
 
+std::shared_ptr<Resource> GlobalCache::findStaticResource(const UniqueKey& uniqueKey) {
+  auto result = staticResources.find(uniqueKey);
+  return result != staticResources.end() ? result->second : nullptr;
+}
+
+void GlobalCache::addStaticResource(const UniqueKey& uniqueKey,
+                                    std::shared_ptr<Resource> resource) {
+  if (uniqueKey.empty()) {
+    return;
+  }
+  staticResources[uniqueKey] = std::move(resource);
+}
+
 }  // namespace tgfx

@@ -22,6 +22,7 @@
 namespace tgfx {
 void RenderPass::end() {
   onEnd();
+  isEnd = true;
   renderTarget = nullptr;
   program = nullptr;
 }

@@ -36,11 +36,18 @@ class SlidingWindowTracker;
 class AtlasManager;
 
 /**
- * Context is the main interface to the GPU. It is used to create and manage GPU resources, and to
- * issue drawing commands. Contexts are created by Devices.
+ * Context is responsible for creating and managing GPU resources, as well as issuing drawing
+ * commands. It is not thread-safe and should only be used from the single thread where it was
+ * locked from the Device. After unlocking the Context from the Device, do not use it further as
+ * this may result in undefined behavior.
  */
 class Context {
  public:
+  /**
+   * Creates a new Context with the specified device and GPU backend.
+   */
+  Context(Device* device, std::unique_ptr<GPU> gpu);
+
   virtual ~Context();
 
   /**
@@ -51,40 +58,27 @@ class Context {
   }
 
   /**
+   * Returns the GPU backend type of this context.
+   */
+  Backend backend() const;
+
+  /**
+   * Returns the capability info of the backend GPU.
+   */
+  const Caps* caps() const;
+
+  /**
+   * Returns the GPU instance associated with this context.
+   */
+  const GPU* gpu() const {
+    return _gpu;
+  }
+
+  /**
    * Returns the unique ID of the Context.
    */
   uint32_t uniqueID() const {
     return _device->uniqueID();
-  }
-
-  /**
-   * Returns the cache for GPU resources that need to stay alive for the lifetime of the Context.
-   */
-  GlobalCache* globalCache() const {
-    return _globalCache;
-  }
-
-  /**
-   * Returns the associated cache that manages the lifetime of all Resource instances.
-   */
-  ResourceCache* resourceCache() const {
-    return _resourceCache;
-  }
-
-  DrawingManager* drawingManager() const {
-    return _drawingManager;
-  }
-
-  BlockBuffer* drawingBuffer() const {
-    return _drawingBuffer;
-  }
-
-  ProxyProvider* proxyProvider() const {
-    return _proxyProvider;
-  }
-
-  AtlasManager* atlasManager() const {
-    return _atlasManager;
   }
 
   /**
@@ -150,8 +144,8 @@ class Context {
   /**
    * Ensures that all pending drawing operations for this context are flushed to the underlying GPU
    * API objects. A call to Context::submit is always required to ensure work is actually sent to
-   * the GPU. If signalSemaphore is not null and uninitialized, a new semaphore will be created and
-   * assigned to signalSemaphore. The caller is responsible for deleting the semaphore returned in
+   * the GPU. If signalSemaphore is not null, a new semaphore will be created and assigned to
+   * signalSemaphore. The caller is responsible for deleting the semaphore returned in
    * signalSemaphore. Returns false if there are no pending drawing operations and nothing was
    * flushed to the GPU. In that case, signalSemaphore will not be initialized, and the caller
    * should not wait on it.
@@ -180,26 +174,33 @@ class Context {
    */
   void flushAndSubmit(bool syncCpu = false);
 
-  /**
-   * Returns the GPU backend of this context.
-   */
-  virtual Backend backend() const = 0;
+  GlobalCache* globalCache() const {
+    return _globalCache;
+  }
 
-  /**
-   * Returns the capability info of this context.
-   */
-  virtual const Caps* caps() const = 0;
+  ResourceCache* resourceCache() const {
+    return _resourceCache;
+  }
 
-  /**
-   * Returns the GPU instance associated with this context.
-   */
-  virtual GPU* gpu() const = 0;
+  DrawingManager* drawingManager() const {
+    return _drawingManager;
+  }
 
- protected:
-  explicit Context(Device* device);
+  BlockBuffer* drawingBuffer() const {
+    return _drawingBuffer;
+  }
+
+  ProxyProvider* proxyProvider() const {
+    return _proxyProvider;
+  }
+
+  AtlasManager* atlasManager() const {
+    return _atlasManager;
+  }
 
  private:
   Device* _device = nullptr;
+  GPU* _gpu = nullptr;
   GlobalCache* _globalCache = nullptr;
   ResourceCache* _resourceCache = nullptr;
   DrawingManager* _drawingManager = nullptr;

@@ -28,8 +28,8 @@ class SemaphoreWaitTask : public RenderTask {
       : semaphore(std::move(semaphore)) {
   }
 
-  void execute(GPU* gpu) override {
-    gpu->waitSemaphore(semaphore.get());
+  void execute(CommandEncoder* encoder) override {
+    encoder->waitSemaphore(semaphore->getBackendSemaphore());
   }
 
  private:

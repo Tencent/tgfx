@@ -180,17 +180,14 @@ bool DrawingManager::flush(BackendSemaphore* signalSemaphore) {
   uploadAtlasToGPU();
   resourceTasks.clear();
   proxyProvider->clearSharedVertexBuffer();
-  auto gpu = context->gpu();
+  auto commandEncoder = context->gpu()->createCommandEncoder();
   for (auto& task : renderTasks) {
-    task->execute(gpu);
+    task->execute(commandEncoder.get());
     task = nullptr;
   }
   renderTasks.clear();
   if (signalSemaphore != nullptr) {
-    auto semaphore = context->gpu()->insertSemaphore();
-    if (semaphore != nullptr) {
-      *signalSemaphore = semaphore->releaseBackend();
-    }
+    *signalSemaphore = commandEncoder->insertSemaphore();
   }
   return true;
 }

@@ -26,7 +26,7 @@ class GenerateMipmapsTask : public RenderTask {
  public:
   explicit GenerateMipmapsTask(std::shared_ptr<TextureProxy> textureProxy);
 
-  void execute(GPU* gpu) override;
+  void execute(CommandEncoder* encoder) override;
 
  private:
   std::shared_ptr<TextureProxy> textureProxy = nullptr;

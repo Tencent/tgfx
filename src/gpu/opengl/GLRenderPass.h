@@ -21,12 +21,14 @@
 #include "gpu/RenderPass.h"
 #include "gpu/opengl/GLBuffer.h"
 #include "gpu/opengl/GLInterface.h"
+#include "gpu/opengl/GLVertexArray.h"
 
 namespace tgfx {
 
 class GLRenderPass : public RenderPass {
  public:
-  GLRenderPass(std::shared_ptr<RenderTarget> renderTarget, bool resolveMSAA);
+  GLRenderPass(std::shared_ptr<GLInterface> interface, std::shared_ptr<RenderTarget> renderTarget,
+               bool resolveMSAA);
 
   void begin();
 
@@ -40,6 +42,10 @@ class GLRenderPass : public RenderPass {
   void onEnd() override;
 
  private:
+  std::shared_ptr<GLInterface> interface = nullptr;
+  std::shared_ptr<GLVertexArray> vertexArray = nullptr;
   bool resolveMSAA = true;
+
+  unsigned getVertexArrayID(Context* context);
 };
 }  // namespace tgfx

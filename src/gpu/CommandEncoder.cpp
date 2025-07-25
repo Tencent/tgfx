@@ -16,29 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/Resource.h"
+#include "CommandEncoder.h"
 
 namespace tgfx {
-class GLFrameBuffer : public Resource {
- public:
-  static std::shared_ptr<GLFrameBuffer> Make(Context* context);
-
-  explicit GLFrameBuffer(unsigned id);
-
-  size_t memoryUsage() const override {
-    return 0;
+std::shared_ptr<RenderPass> CommandEncoder::beginRenderPass(
+    std::shared_ptr<RenderTarget> renderTarget, bool resolveMSAA) {
+  if (activeRenderPass && !activeRenderPass->isEnd) {
+    LOGE("CommandEncoder::beginRenderPass() Cannot begin a new render pass while one is active!");
+    return nullptr;
   }
+  activeRenderPass = onBeginRenderPass(std::move(renderTarget), resolveMSAA);
+  return activeRenderPass;
+}
 
-  unsigned id() const {
-    return _id;
-  }
-
- protected:
-  void onReleaseGPU() override;
-
- private:
-  unsigned _id = 0;
-};
 }  // namespace tgfx

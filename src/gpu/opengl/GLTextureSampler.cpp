@@ -155,16 +155,6 @@ void GLTextureSampler::writePixels(Context* context, const Rect& rect, const voi
   }
 }
 
-void GLTextureSampler::regenerateMipmapLevels(Context* context) {
-  DEBUG_ASSERT(context != nullptr);
-  if (_maxMipmapLevel <= 0 || _target != GL_TEXTURE_2D) {
-    return;
-  }
-  auto gl = GLFunctions::Get(context);
-  gl->bindTexture(_target, _id);
-  gl->generateMipmap(_target);
-}
-
 void GLTextureSampler::computeSamplerKey(Context* context, BytesKey* bytesKey) const {
   auto caps = GLCaps::Get(context);
   DEBUG_ASSERT(caps != nullptr);

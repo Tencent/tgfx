@@ -76,7 +76,6 @@ std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int he
   if (pixels != nullptr) {
     auto sampler = texture->getSampler();
     sampler->writePixels(context, Rect::MakeWH(width, height), pixels, rowBytes);
-    sampler->regenerateMipmapLevels(context);
   }
   return texture;
 }

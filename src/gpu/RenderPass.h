@@ -35,9 +35,6 @@ enum class PrimitiveType {
 
 class RenderPass {
  public:
-  static std::unique_ptr<RenderPass> Make(std::shared_ptr<RenderTarget> renderTarget,
-                                          bool resolveMSAA = true);
-
   virtual ~RenderPass() = default;
 
   Context* getContext() {
@@ -74,7 +71,9 @@ class RenderPass {
 
  private:
   enum class DrawPipelineStatus { Ok = 0, NotConfigured, FailedToBind };
-
   DrawPipelineStatus drawPipelineStatus = DrawPipelineStatus::NotConfigured;
+  bool isEnd = false;
+
+  friend class CommandEncoder;
 };
 }  // namespace tgfx
