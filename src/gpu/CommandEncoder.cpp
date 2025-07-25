@@ -29,4 +29,13 @@ std::shared_ptr<RenderPass> CommandEncoder::beginRenderPass(
   return activeRenderPass;
 }
 
+std::shared_ptr<CommandBuffer> CommandEncoder::finish() {
+  if (activeRenderPass && !activeRenderPass->isEnd) {
+    LOGE("CommandEncoder::finish() Cannot finish command encoder while a render pass is active!");
+    return nullptr;
+  }
+  activeRenderPass = nullptr;
+  return onFinish();
+}
+
 }  // namespace tgfx

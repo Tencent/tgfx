@@ -41,6 +41,8 @@ class GLCommandEncoder : public CommandEncoder {
   std::shared_ptr<RenderPass> onBeginRenderPass(std::shared_ptr<RenderTarget> renderTarget,
                                                 bool resolveMSAA) override;
 
+  std::shared_ptr<CommandBuffer> onFinish() override;
+
  private:
   std::shared_ptr<GLInterface> interface = nullptr;
 };

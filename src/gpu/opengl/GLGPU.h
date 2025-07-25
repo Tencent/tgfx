@@ -19,6 +19,7 @@
 #pragma once
 
 #include "gpu/GPU.h"
+#include "gpu/opengl/GLCommandQueue.h"
 #include "gpu/opengl/GLInterface.h"
 
 namespace tgfx {
@@ -26,8 +27,9 @@ class GLGPU : public GPU {
  public:
   static std::unique_ptr<GLGPU> MakeNative();
 
-  explicit GLGPU(std::shared_ptr<GLInterface> interface) : interface(std::move(interface)) {
-  }
+  explicit GLGPU(std::shared_ptr<GLInterface> glInterface);
+
+  ~GLGPU() override;
 
   Backend backend() const override {
     return Backend::OPENGL;
@@ -41,11 +43,14 @@ class GLGPU : public GPU {
     return interface->functions();
   }
 
-  std::shared_ptr<CommandEncoder> createCommandEncoder() const override;
+  CommandQueue* queue() const override {
+    return commandQueue;
+  }
 
-  bool submitToGPU(bool syncCpu) const override;
+  std::shared_ptr<CommandEncoder> createCommandEncoder() const override;
 
  private:
   std::shared_ptr<GLInterface> interface = nullptr;
+  GLCommandQueue* commandQueue = nullptr;
 };
 }  // namespace tgfx

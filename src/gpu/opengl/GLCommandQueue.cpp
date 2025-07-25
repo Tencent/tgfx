@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,27 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLGPU.h"
-#include "GLCommandEncoder.h"
+#include "GLCommandQueue.h"
 
 namespace tgfx {
-std::unique_ptr<GLGPU> GLGPU::MakeNative() {
-  auto interface = GLInterface::GetNative();
-  if (interface == nullptr) {
-    return nullptr;
-  }
-  return std::make_unique<GLGPU>(std::move(interface));
+void GLCommandQueue::submit(std::shared_ptr<CommandBuffer>) {
+  auto gl = interface->functions();
+  gl->flush();
 }
 
-GLGPU::GLGPU(std::shared_ptr<GLInterface> glInterface) : interface(std::move(glInterface)) {
-  commandQueue = new GLCommandQueue(interface);
+void GLCommandQueue::waitUntilCompleted() {
+  auto gl = interface->functions();
+  gl->finish();
 }
 
-GLGPU::~GLGPU() {
-  delete commandQueue;
-}
-
-std::shared_ptr<CommandEncoder> GLGPU::createCommandEncoder() const {
-  return std::make_shared<GLCommandEncoder>(interface);
-}
 }  // namespace tgfx

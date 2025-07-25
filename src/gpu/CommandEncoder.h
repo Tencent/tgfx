@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "gpu/CommandBuffer.h"
 #include "gpu/RenderPass.h"
 #include "gpu/RenderTarget.h"
 #include "gpu/Semaphore.h"
@@ -67,9 +68,19 @@ class CommandEncoder {
    */
   virtual void waitSemaphore(const BackendSemaphore& semaphore) = 0;
 
+  /**
+   * Completes the command encoding process and returns a CommandBuffer containing all recorded
+   * commands. The CommandBuffer can then be submitted to the GPU for execution using the
+   * GPU::submit() method. Returns nullptr if no commands were recorded or if the encoding process
+   * failed.
+   */
+  std::shared_ptr<CommandBuffer> finish();
+
  protected:
   virtual std::shared_ptr<RenderPass> onBeginRenderPass(std::shared_ptr<RenderTarget> renderTarget,
                                                         bool resolveMSAA) = 0;
+
+  virtual std::shared_ptr<CommandBuffer> onFinish() = 0;
 
  private:
   std::shared_ptr<RenderPass> activeRenderPass = nullptr;

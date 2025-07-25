@@ -1207,19 +1207,19 @@ TGFX_TEST(LayerTest, HasContentChanged) {
   displayList.root()->addChild(shapeLayer);
   EXPECT_TRUE(displayList.hasContentChanged());
   displayList.render(surface.get());
-  context->flush();
+  context->flushAndSubmit();
   EXPECT_FALSE(displayList.hasContentChanged());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/HasContentChanged_Org"));
   displayList.setContentOffset(50, 50);
   EXPECT_TRUE(displayList.hasContentChanged());
   displayList.render(surface.get(), false);
-  context->flush();
+  context->flushAndSubmit();
   EXPECT_FALSE(displayList.hasContentChanged());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/HasContentChanged_Offset"));
   displayList.setZoomScale(0.5f);
   EXPECT_TRUE(displayList.hasContentChanged());
   displayList.render(surface.get());
-  context->flush();
+  context->flushAndSubmit();
   EXPECT_FALSE(displayList.hasContentChanged());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/HasContentChanged_Zoom"));
 }

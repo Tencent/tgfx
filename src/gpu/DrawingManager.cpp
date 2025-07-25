@@ -158,7 +158,7 @@ void DrawingManager::addSemaphoreWaitTask(std::shared_ptr<Semaphore> semaphore) 
   renderTasks.emplace_back(std::move(task));
 }
 
-bool DrawingManager::flush(BackendSemaphore* signalSemaphore) {
+std::shared_ptr<CommandBuffer> DrawingManager::flush(BackendSemaphore* signalSemaphore) {
   while (!compositors.empty()) {
     auto compositor = compositors.back();
     // The makeClosed() method may add more compositors to the list.
@@ -171,7 +171,7 @@ bool DrawingManager::flush(BackendSemaphore* signalSemaphore) {
   if (resourceTasks.empty() && renderTasks.empty()) {
     proxyProvider->clearSharedVertexBuffer();
     clearAtlasCellCodecTasks();
-    return false;
+    return nullptr;
   }
   for (auto& task : resourceTasks) {
     task->execute(context);
@@ -189,7 +189,7 @@ bool DrawingManager::flush(BackendSemaphore* signalSemaphore) {
   if (signalSemaphore != nullptr) {
     *signalSemaphore = commandEncoder->insertSemaphore();
   }
-  return true;
+  return commandEncoder->finish();
 }
 
 void DrawingManager::releaseAll() {
