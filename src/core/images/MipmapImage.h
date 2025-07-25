@@ -41,8 +41,6 @@ class MipmapImage : public ResourceImage {
     return true;
   }
 
-  std::shared_ptr<Image> makeRasterized() const override;
-
  protected:
   Type type() const override {
     return Type::Mipmap;

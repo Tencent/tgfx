@@ -38,10 +38,6 @@ MipmapImage::MipmapImage(UniqueKey uniqueKey, std::shared_ptr<ResourceImage> sou
     : ResourceImage(std::move(uniqueKey)), source(std::move(source)) {
 }
 
-std::shared_ptr<Image> MipmapImage::makeRasterized() const {
-  return weakThis.lock();
-}
-
 std::shared_ptr<Image> MipmapImage::onMakeDecoded(Context* context, bool) const {
   auto newSource = std::static_pointer_cast<ResourceImage>(source->onMakeDecoded(context, false));
   if (newSource == nullptr) {

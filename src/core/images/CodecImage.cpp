@@ -31,24 +31,20 @@ std::shared_ptr<ImageCodec> CodecImage::getCodec() const {
   return std::static_pointer_cast<ImageCodec>(generator);
 }
 
-std::shared_ptr<Image> CodecImage::makeScaled(int newWidth, int newHeight,
+std::shared_ptr<Image> CodecImage::onMakeScaled(int newWidth, int newHeight,
                                               const SamplingOptions& sampling) const {
   if (newWidth <= width() && newHeight <= height()) {
-    auto image = std::shared_ptr<CodecImage>(new CodecImage(newWidth, newHeight, uniqueKey, getCodec()));
+    auto image = std::make_shared<CodecImage>(newWidth, newHeight, uniqueKey, getCodec());
     image->weakThis = image;
     return image;
   }
-  auto rasterImage = RasterizedImage::MakeFrom(weakThis.lock(), newWidth, newHeight, sampling);
-  if (rasterImage != nullptr && hasMipmaps()) {
-    return rasterImage->makeMipmapped(true);
-  }
-  return rasterImage;
+  return ResourceImage::onMakeScaled(newWidth, newHeight, sampling);
 }
 
 std::shared_ptr<TextureProxy> CodecImage::onLockTextureProxy(const TPArgs& args,
                                                              const UniqueKey& key) const {
   auto tempGenerator = generator;
-  if (width() != generator->width() || height() != generator->width()) {
+  if (width() != generator->width() || height() != generator->height()) {
     tempGenerator = ScaledImageGenerator::MakeFrom(width(), height(), getCodec());
   }
   return args.context->proxyProvider()->createTextureProxy(key, tempGenerator, args.mipmapped, args.renderFlags);

@@ -23,52 +23,19 @@
 #include "gpu/ops/DrawOp.h"
 
 namespace tgfx {
-std::shared_ptr<Image> RasterizedImage::MakeFrom(std::shared_ptr<Image> source,
-                                                 int newWeight, int newHeight,
-                                                 const SamplingOptions& sampling) {
-  if (source == nullptr || newWeight <= 0 || newHeight <= 0) {
+
+std::shared_ptr<Image> RasterizedImage::MakeFrom(std::shared_ptr<Image> source) {
+  if (source == nullptr) {
     return nullptr;
   }
-  auto result = std::shared_ptr<RasterizedImage>(
-      new RasterizedImage(UniqueKey::Make(), std::move(source), newWeight, newHeight, sampling));
+  auto result =
+      std::shared_ptr<RasterizedImage>(new RasterizedImage(UniqueKey::Make(), std::move(source)));
   result->weakThis = result;
   return result;
 }
 
-RasterizedImage::RasterizedImage(UniqueKey uniqueKey, std::shared_ptr<Image> source,
-                                 int width, int height, const SamplingOptions& sampling)
-    : ResourceImage(std::move(uniqueKey)), source(std::move(source)),
-      _width(width), _height(height), sampling(sampling) {
-}
-
-int RasterizedImage::width() const {
-  return _width;
-}
-
-int RasterizedImage::height() const {
-  return _height;
-}
-
-std::shared_ptr<Image> RasterizedImage::makeRasterized() const {
-  return MakeFrom(source, width(), height(), {});
-}
-
-std::shared_ptr<Image> RasterizedImage::makeScaled(int newWidth, int newHeight,
-                                                   const SamplingOptions& sampling) const {
-  return MakeFrom(source, newWidth, newHeight, sampling);
-}
-
-std::shared_ptr<Image> RasterizedImage::onMakeDecoded(Context* context, bool) const {
-  // There is no need to pass tryHardware (disabled) to the source image, as our texture proxy is
-  // not locked from the source image.
-  auto newSource = source->onMakeDecoded(context);
-  if (newSource == nullptr) {
-    return nullptr;
-  }
-  auto newImage = std::shared_ptr<RasterizedImage>(
-      new RasterizedImage(uniqueKey, std::move(newSource), width(), height(), sampling));
-  newImage->weakThis = newImage;
-  return newImage;
+RasterizedImage::RasterizedImage(UniqueKey uniqueKey, std::shared_ptr<Image> source)
+    : ResourceImage(std::move(uniqueKey)), source(std::move(source)) {
 }
 
 std::shared_ptr<TextureProxy> RasterizedImage::onLockTextureProxy(const TPArgs& args,
@@ -86,17 +53,9 @@ std::shared_ptr<TextureProxy> RasterizedImage::onLockTextureProxy(const TPArgs& 
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto sourceWidth = source->width();
-  auto sourceHeight = source->height();
-  auto scaledWidth = width();
-  auto scaledHeight = height();
-  auto uvScaleX = static_cast<float>(sourceWidth) / static_cast<float>(scaledWidth);
-  auto uvScaleY = static_cast<float>(sourceHeight) / static_cast<float>(scaledHeight);
-  Matrix uvMatrix = Matrix::MakeScale(uvScaleX, uvScaleY);
   auto drawRect = Rect::MakeWH(width(), height());
   FPArgs fpArgs(args.context, args.renderFlags, drawRect);
-  auto processor =
-      FragmentProcessor::Make(source, fpArgs, sampling, SrcRectConstraint::Fast, &uvMatrix);
+  auto processor = FragmentProcessor::Make(source, fpArgs, {}, SrcRectConstraint::Fast);
   if (processor == nullptr) {
     return nullptr;
   }
@@ -104,4 +63,11 @@ std::shared_ptr<TextureProxy> RasterizedImage::onLockTextureProxy(const TPArgs& 
   drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags);
   return renderTarget->asTextureProxy();
 }
+
+std::shared_ptr<Image> RasterizedImage::onMakeScaled(int newWidth, int newHeight,
+                                                     const SamplingOptions& sampling) const {
+  auto newSource = source->makeScaled(newWidth, newHeight, sampling);
+  return RasterizedImage::MakeFrom(std::move(newSource));
+}
+
 }  // namespace tgfx

@@ -20,6 +20,7 @@
 #include "core/Records.h"
 #include "core/images/CodecImage.h"
 #include "core/images/ResourceImage.h"
+#include "core/images/ScaledImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/images/TransformImage.h"
 #include "core/shapes/AppendShape.h"
@@ -381,10 +382,18 @@ TGFX_TEST(CanvasTest, scaleImage) {
   // auto imagePath = "resources/apitest/scaleImage.webp";
   auto imagePath = "resources/apitest/rotation.jpg";
   auto codec = MakeImageCodec(imagePath);
-  auto image = CodecImage::MakeFrom(codec);
-  auto scaleImage = image->makeScaled(image->width() / 8, image->height() / 8, {});
-  // auto scaleImage = image->makeScaled(image->width(), image->height(), {});
-  auto surface = Surface::Make(context, scaleImage->width(), scaleImage->height());
+  auto w = codec->width() / 8;
+  auto h = codec->height() / 8;
+  auto image = Image::MakeFrom(codec);
+  auto scaleImage = ScaledImage::MakeFrom(image, w, h, {});
+  // auto scaleImage = image->makeScaled(w, h, {});
+
+  // auto imageInfo = ImageInfo::Make(w, h, ColorType::RGBA_8888);
+  // auto buffer = Buffer(imageInfo.byteSize());
+  // codec->readPixels(imageInfo, buffer.data());
+  // auto scaleImage = Image::MakeFrom(imageInfo, Data::MakeWithCopy(buffer.data(), imageInfo.byteSize()));
+
+  auto surface = Surface::Make(context, w, h);
   auto canvas = surface->getCanvas();
   canvas->drawImage(scaleImage);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaleImage"));
@@ -400,7 +409,7 @@ TGFX_TEST(CanvasTest, rasterizedImage) {
   auto rasterImage = image->makeRasterized();
   EXPECT_TRUE(rasterImage == image);
   image = MakeImage("resources/apitest/rotation.jpg");
-  rasterImage = image->makeRasterized();
+  rasterImage = ScaleImage(image, 0.15f)->makeRasterized();
   EXPECT_FALSE(rasterImage->hasMipmaps());
   EXPECT_FALSE(rasterImage == image);
   EXPECT_EQ(rasterImage->width(), 454);
@@ -424,7 +433,8 @@ TGFX_TEST(CanvasTest, rasterizedImage) {
   image = image->makeMipmapped(true);
   EXPECT_TRUE(image->hasMipmaps());
   SamplingOptions sampling(FilterMode::Linear, MipmapMode::Linear);
-  rasterImage = image->makeRasterized();
+  auto scaledImage = ScaleImage(image, 0.15f, sampling);
+  rasterImage = scaledImage->makeRasterized();
   EXPECT_TRUE(rasterImage->hasMipmaps());
   canvas->drawImage(rasterImage, 100, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized_mipmap"));
@@ -434,11 +444,12 @@ TGFX_TEST(CanvasTest, rasterizedImage) {
   texture = Resource::Find<Texture>(context, rasterImageUniqueKey);
   EXPECT_TRUE(texture != nullptr);
   canvas->clear();
-  rasterImage = rasterImage->makeMipmapped(false);
-  EXPECT_FALSE(rasterImage->hasMipmaps());
-  rasterImage = rasterImage->makeRasterized();
+  scaledImage = scaledImage->makeMipmapped(false);
+  EXPECT_FALSE(scaledImage->hasMipmaps());
+  rasterImage = scaledImage->makeScaled(907, 1210, sampling)->makeRasterized();
   EXPECT_FALSE(rasterImage->hasMipmaps());
   rasterImage = rasterImage->makeMipmapped(true);
+  EXPECT_TRUE(rasterImage->hasMipmaps());
   EXPECT_EQ(rasterImage->width(), 907);
   EXPECT_EQ(rasterImage->height(), 1210);
   canvas->drawImage(rasterImage, 100, 100);
@@ -2639,5 +2650,91 @@ TGFX_TEST(CanvasTest, RotateImageRect) {
   canvas->drawImageRect(image, srcRect, dstRect, {}, nullptr, SrcRectConstraint::Strict);
   context->flush();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/RotateImageRect"));
+}
+
+TGFX_TEST(CanvasTest, ScaleImage) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  auto scaledImage = image->makeScaled(image->width(), image->height());
+  EXPECT_TRUE(scaledImage == image);
+  image = MakeImage("resources/apitest/rotation.jpg");
+  scaledImage = ScaleImage(image, 0.15f);
+  EXPECT_FALSE(scaledImage->hasMipmaps());
+  EXPECT_FALSE(scaledImage == image);
+  EXPECT_EQ(scaledImage->width(), 454);
+  EXPECT_EQ(scaledImage->height(), 605);
+  ASSERT_TRUE(image != nullptr);
+  auto surface = Surface::Make(context, 1100, 1400);
+  auto canvas = surface->getCanvas();
+  canvas->drawImage(scaledImage);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaled_image"));
+  canvas->clear();
+  image = image->makeMipmapped(true);
+  EXPECT_TRUE(image->hasMipmaps());
+  SamplingOptions sampling(FilterMode::Linear, MipmapMode::Linear);
+  scaledImage = ScaleImage(image, 0.15f, sampling);
+  EXPECT_TRUE(scaledImage->hasMipmaps());
+  canvas->drawImage(scaledImage, 100, 100);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaled_mipmap"));
+  canvas->clear();
+  scaledImage = scaledImage->makeMipmapped(false);
+  EXPECT_FALSE(scaledImage->hasMipmaps());
+  scaledImage = ScaleImage(scaledImage, 2.0f, sampling);
+  EXPECT_FALSE(scaledImage->hasMipmaps());
+  scaledImage = scaledImage->makeMipmapped(true);
+  EXPECT_TRUE(scaledImage->hasMipmaps());
+  EXPECT_EQ(scaledImage->width(), 908);
+  EXPECT_EQ(scaledImage->height(), 1210);
+  canvas->drawImage(scaledImage);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaled_scale_up"));
+  canvas->clear();
+  canvas->clipRect(Rect::MakeXYWH(100, 100, 500, 500));
+  canvas->drawImage(scaledImage);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaled_clip"));
+}
+
+TGFX_TEST(CanvasTest, ScalePictureImage) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/rotation.jpg");
+  Recorder recorder;
+  auto canvas = recorder.beginRecording();
+  auto filter = ImageFilter::DropShadow(10, 10, 0, 0, Color::Black());
+  auto paint = Paint();
+  paint.setImageFilter(filter);
+  canvas->clipRect(Rect::MakeLTRB(100, 100, 600, 800));
+  canvas->scale(0.15f, 0.15f);
+  canvas->drawImage(image, 0, 0, &paint);
+  auto picture = recorder.finishRecordingAsPicture();
+  auto bounds = picture->getBounds();
+  bounds.roundOut();
+  auto pictureMatrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
+  image = Image::MakeFrom(picture, static_cast<int>(bounds.width()),
+                          static_cast<int>(bounds.height()), &pictureMatrix);
+  auto surface = Surface::Make(context, 1100, 1400);
+  canvas = surface->getCanvas();
+  canvas->drawImage(image);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/pic_scaled_image_origin"));
+  auto scaledImage = ScaleImage(image, 0.55f);
+  canvas->clear();
+  canvas->drawImage(scaledImage);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/pic_scaled_image"));
+  canvas->clear();
+  image = image->makeMipmapped(true);
+  EXPECT_TRUE(image->hasMipmaps());
+  SamplingOptions sampling(FilterMode::Linear, MipmapMode::Linear);
+  canvas->clear();
+  scaledImage = ScaleImage(scaledImage, 2.f, sampling);
+  EXPECT_EQ(scaledImage->width(), 400);
+  EXPECT_EQ(scaledImage->height(), 566);
+  canvas->drawImage(scaledImage);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/pic_scaled_scale_up"));
+  canvas->clear();
+  canvas->clipRect(Rect::MakeXYWH(100, 100, 500, 500));
+  canvas->drawImage(scaledImage);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/pic_scaled_pic_clip"));
 }
 }  // namespace tgfx

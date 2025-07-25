@@ -25,7 +25,7 @@ ResourceImage::ResourceImage(UniqueKey uniqueKey) : uniqueKey(std::move(uniqueKe
 }
 
 std::shared_ptr<Image> ResourceImage::makeRasterized() const {
-  return weakThis.lock();
+  return std::static_pointer_cast<Image>(weakThis.lock());
 }
 
 std::shared_ptr<TextureProxy> ResourceImage::lockTextureProxy(const TPArgs& args) const {
@@ -38,6 +38,12 @@ std::shared_ptr<TextureProxy> ResourceImage::lockTextureProxy(const TPArgs& args
 std::shared_ptr<Image> ResourceImage::onMakeMipmapped(bool enabled) const {
   auto source = std::static_pointer_cast<ResourceImage>(weakThis.lock());
   return enabled ? MipmapImage::MakeFrom(std::move(source)) : source;
+}
+
+std::shared_ptr<Image> ResourceImage::onMakeScaled(int newWidth, int newHeight,
+                                                   const SamplingOptions& sampling) const {
+  auto result = Image::onMakeScaled(newWidth, newHeight, sampling);
+  return result->makeRasterized();
 }
 
 PlacementPtr<FragmentProcessor> ResourceImage::asFragmentProcessor(const FPArgs& args,
