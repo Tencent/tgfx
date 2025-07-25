@@ -17,13 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include "images/CodecImage.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
 class ScaledImageGenerator : public ImageGenerator {
- public:
+public:
   static std::shared_ptr<ScaledImageGenerator> MakeFrom(int width, int height,
                                               const std::shared_ptr<ImageCodec>& codec);
 
@@ -48,3 +47,4 @@ private:
 
   explicit ScaledImageGenerator(int width, int height, const std::shared_ptr<ImageCodec>& codec);
 };
+}

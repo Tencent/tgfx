@@ -31,7 +31,7 @@ class RawPixelCodec : public ImageCodec {
     return info.isAlphaOnly();
   }
 
-  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override {
+  bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const override {
     return Pixmap(info, pixels->data()).readPixels(dstInfo, dstPixels);
   }
 
