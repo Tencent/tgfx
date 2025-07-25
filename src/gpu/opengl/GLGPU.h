@@ -29,8 +29,6 @@ class GLGPU : public GPU {
 
   explicit GLGPU(std::shared_ptr<GLInterface> glInterface);
 
-  ~GLGPU() override;
-
   Backend backend() const override {
     return Backend::OPENGL;
   }
@@ -44,13 +42,13 @@ class GLGPU : public GPU {
   }
 
   CommandQueue* queue() const override {
-    return commandQueue;
+    return commandQueue.get();
   }
 
   std::shared_ptr<CommandEncoder> createCommandEncoder() const override;
 
  private:
   std::shared_ptr<GLInterface> interface = nullptr;
-  GLCommandQueue* commandQueue = nullptr;
+  std::unique_ptr<GLCommandQueue> commandQueue = nullptr;
 };
 }  // namespace tgfx

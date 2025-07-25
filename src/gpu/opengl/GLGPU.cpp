@@ -29,11 +29,7 @@ std::unique_ptr<GLGPU> GLGPU::MakeNative() {
 }
 
 GLGPU::GLGPU(std::shared_ptr<GLInterface> glInterface) : interface(std::move(glInterface)) {
-  commandQueue = new GLCommandQueue(interface);
-}
-
-GLGPU::~GLGPU() {
-  delete commandQueue;
+  commandQueue = std::make_unique<GLCommandQueue>(interface);
 }
 
 std::shared_ptr<CommandEncoder> GLGPU::createCommandEncoder() const {

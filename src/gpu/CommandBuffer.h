@@ -22,7 +22,7 @@ namespace tgfx {
 /**
  * CommandBuffer represents a sequence of commands that can be submitted to the GPU for execution.
  * A CommandBuffer is created via the CommandEncoder::finish() method, the GPU commands recorded
- * within are submitted for execution by calling the CommandQueue()::submit() method.
+ * within are submitted for execution by calling the CommandQueue::submit() method.
  */
 class CommandBuffer {
  public:
