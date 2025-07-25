@@ -19,23 +19,33 @@
 #pragma once
 
 #include "gpu/GPU.h"
-#include "gpu/opengl/GLRenderPass.h"
+#include "gpu/opengl/GLInterface.h"
 
 namespace tgfx {
 class GLGPU : public GPU {
  public:
-  explicit GLGPU(Context* context) : GPU(context) {
+  static std::unique_ptr<GLGPU> MakeNative();
+
+  explicit GLGPU(std::shared_ptr<GLInterface> interface) : interface(std::move(interface)) {
   }
 
-  void bindTexture(int unitIndex, const TextureSampler* sampler, SamplerState samplerState = {});
+  Backend backend() const override {
+    return Backend::OPENGL;
+  }
 
-  void copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture* texture, int srcX,
-                                 int srcY) override;
+  const Caps* caps() const override {
+    return interface->caps();
+  }
 
-  std::shared_ptr<Semaphore> insertSemaphore() override;
+  const GLFunctions* functions() const {
+    return interface->functions();
+  }
 
-  void waitSemaphore(const Semaphore* semaphore) override;
+  std::shared_ptr<CommandEncoder> createCommandEncoder() const override;
 
-  bool submitToGPU(bool syncCpu) override;
+  bool submitToGPU(bool syncCpu) const override;
+
+ private:
+  std::shared_ptr<GLInterface> interface = nullptr;
 };
 }  // namespace tgfx

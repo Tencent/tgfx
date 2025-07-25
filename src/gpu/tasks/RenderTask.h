@@ -18,14 +18,13 @@
 
 #pragma once
 
-#include "core/utils/Log.h"
-#include "gpu/GPU.h"
+#include "gpu/CommandEncoder.h"
 
 namespace tgfx {
 class RenderTask {
  public:
   virtual ~RenderTask() = default;
 
-  virtual void execute(GPU* gpu) = 0;
+  virtual void execute(CommandEncoder* encoder) = 0;
 };
 }  // namespace tgfx

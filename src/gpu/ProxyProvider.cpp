@@ -231,7 +231,9 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxyByImageSource(
   addResourceProxy(proxy, uniqueKey);
   auto task =
       context->drawingBuffer()->make<TextureUploadTask>(proxy, std::move(source), mipmapped);
-  context->drawingManager()->addResourceTask(std::move(task), uniqueKey, renderFlags);
+  auto drawingManager = context->drawingManager();
+  drawingManager->addResourceTask(std::move(task), uniqueKey, renderFlags);
+  drawingManager->addGenerateMipmapsTask(proxy);
   return proxy;
 }
 

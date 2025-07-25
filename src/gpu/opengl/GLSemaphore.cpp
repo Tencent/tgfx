@@ -31,14 +31,12 @@ std::shared_ptr<Semaphore> Semaphore::Wrap(Context* context,
   return Resource::AddToCache(context, semaphore);
 }
 
-BackendSemaphore GLSemaphore::releaseBackend() {
+BackendSemaphore GLSemaphore::getBackendSemaphore() const {
   if (_glSync == nullptr) {
     return {};
   }
   GLSyncInfo glSyncInfo = {};
   glSyncInfo.sync = _glSync;
-  // Release ownership of the sync object.
-  _glSync = nullptr;
   return {glSyncInfo};
 }
 

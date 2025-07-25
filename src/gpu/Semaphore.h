@@ -39,11 +39,8 @@ class Semaphore : public Resource {
   }
 
   /**
-   * Releases the semaphore and returns a BackendSemaphore object, which can be used to signal
-   * the semaphore in the backend API. After this method is called, the Semaphore object becomes
-   * invalid and must not be used. The caller then takes responsibility for managing the BackendSemaphore
-   * object.
+   * Returns the backend semaphore object associated with this Semaphore instance.
    */
-  virtual BackendSemaphore releaseBackend() = 0;
+  virtual BackendSemaphore getBackendSemaphore() const = 0;
 };
 }  // namespace tgfx

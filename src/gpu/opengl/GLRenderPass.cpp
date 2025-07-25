@@ -50,18 +50,10 @@ static AttribLayout GetAttribLayout(SLType type) {
   return {false, 0, 0};
 }
 
-std::unique_ptr<RenderPass> RenderPass::Make(std::shared_ptr<RenderTarget> renderTarget,
-                                             bool resolveMSAA) {
-  if (renderTarget == nullptr) {
-    return nullptr;
-  }
-  auto renderPass = std::make_unique<GLRenderPass>(std::move(renderTarget), resolveMSAA);
-  renderPass->begin();
-  return renderPass;
-}
-
-GLRenderPass::GLRenderPass(std::shared_ptr<RenderTarget> renderTarget, bool resolveMSAA)
-    : RenderPass(std::move(renderTarget)), resolveMSAA(resolveMSAA) {
+GLRenderPass::GLRenderPass(std::shared_ptr<GLInterface> interface,
+                           std::shared_ptr<RenderTarget> renderTarget, bool resolveMSAA)
+    : RenderPass(std::move(renderTarget)), interface(std::move(interface)),
+      resolveMSAA(resolveMSAA) {
 }
 
 static void UpdateScissor(Context* context, const Rect& scissorRect) {
@@ -121,8 +113,8 @@ void GLRenderPass::begin() {
   auto glRT = static_cast<GLRenderTarget*>(renderTarget.get());
   gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->drawFrameBufferID());
   gl->viewport(0, 0, glRT->width(), glRT->height());
-  if (auto vertexArray = GLContext::Unwrap(context)->sharedVertexArray()) {
-    gl->bindVertexArray(vertexArray->id());
+  if (auto vertexArrayID = getVertexArrayID(renderTarget->getContext())) {
+    gl->bindVertexArray(vertexArrayID);
   }
 }
 
@@ -143,7 +135,7 @@ void GLRenderPass::onEnd() {
                           GL_COLOR_BUFFER_BIT, GL_NEAREST);
     }
   }
-  if (GLContext::Unwrap(context)->sharedVertexArray()) {
+  if (vertexArray != nullptr) {
     gl->bindVertexArray(0);
   }
   gl->bindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -214,4 +206,23 @@ void GLRenderPass::onClear(const Rect& scissor, Color color) {
   gl->clearColor(color.red, color.green, color.blue, color.alpha);
   gl->clear(GL_COLOR_BUFFER_BIT);
 }
+
+unsigned GLRenderPass::getVertexArrayID(Context* context) {
+  if (!interface->caps()->vertexArrayObjectSupport) {
+    return 0;
+  }
+  if (vertexArray == nullptr) {
+    static const auto VertexArrayKey = UniqueKey::Make();
+    auto resource = context->globalCache()->findStaticResource(VertexArrayKey);
+    if (resource != nullptr) {
+      vertexArray = std::static_pointer_cast<GLVertexArray>(resource);
+    } else {
+      vertexArray = GLVertexArray::Make(context);
+      DEBUG_ASSERT(vertexArray != nullptr);
+      context->globalCache()->addStaticResource(VertexArrayKey, vertexArray);
+    }
+  }
+  return vertexArray->id();
+}
+
 }  // namespace tgfx

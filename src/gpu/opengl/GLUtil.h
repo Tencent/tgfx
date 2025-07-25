@@ -19,7 +19,7 @@
 #pragma once
 
 #include <string>
-#include "gpu/opengl/GLContext.h"
+#include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
 struct GLVersion {

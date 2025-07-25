@@ -16,28 +16,32 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLFrameBuffer.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
+#pragma once
+
+#include "gpu/CommandEncoder.h"
+#include "gpu/opengl/GLInterface.h"
 
 namespace tgfx {
-std::shared_ptr<GLFrameBuffer> GLFrameBuffer::Make(Context* context) {
-  auto gl = GLFunctions::Get(context);
-  unsigned id = 0;
-  gl->genFramebuffers(1, &id);
-  if (id == 0) {
-    return nullptr;
+class GLCommandEncoder : public CommandEncoder {
+ public:
+  explicit GLCommandEncoder(std::shared_ptr<GLInterface> interface)
+      : interface(std::move(interface)) {
   }
-  return Resource::AddToCache(context, new GLFrameBuffer(id));
-}
 
-GLFrameBuffer::GLFrameBuffer(unsigned int id) : _id(id) {
-}
+  void copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture* texture, int srcX,
+                                 int srcY) override;
 
-void GLFrameBuffer::onReleaseGPU() {
-  auto gl = GLFunctions::Get(context);
-  if (_id > 0) {
-    gl->deleteFramebuffers(1, &_id);
-    _id = 0;
-  }
-}
+  void generateMipmapsForTexture(TextureSampler* sampler) override;
+
+  BackendSemaphore insertSemaphore() override;
+
+  void waitSemaphore(const BackendSemaphore& semaphore) override;
+
+ protected:
+  std::shared_ptr<RenderPass> onBeginRenderPass(std::shared_ptr<RenderTarget> renderTarget,
+                                                bool resolveMSAA) override;
+
+ private:
+  std::shared_ptr<GLInterface> interface = nullptr;
+};
 }  // namespace tgfx

@@ -56,6 +56,19 @@ class GlobalCache {
    */
   std::shared_ptr<GPUBufferProxy> getRRectIndexBuffer(bool stroke);
 
+  /**
+   * Finds a static resource in the cache by its unique key. Returns nullptr if no resource is found.
+   * The resource will be kept alive for the lifetime of the GlobalCache.
+   */
+  std::shared_ptr<Resource> findStaticResource(const UniqueKey& uniqueKey);
+
+  /**
+   * Adds a static resource to the cache. If a resource with the same unique key already exists,
+   * it will be replaced with the new resource. The resource will be kept alive for the lifetime of
+   * the GlobalCache.
+   */
+  void addStaticResource(const UniqueKey& uniqueKey, std::shared_ptr<Resource> resource);
+
  private:
   struct GradientTexture {
     GradientTexture(std::shared_ptr<TextureProxy> textureProxy, BytesKey gradientKey)
@@ -76,6 +89,7 @@ class GlobalCache {
   std::shared_ptr<GPUBufferProxy> nonAAQuadIndexBuffer = nullptr;
   std::shared_ptr<GPUBufferProxy> rRectFillIndexBuffer = nullptr;
   std::shared_ptr<GPUBufferProxy> rRectStrokeIndexBuffer = nullptr;
+  ResourceKeyMap<std::shared_ptr<Resource>> staticResources = {};
 
   void releaseAll();
 
