@@ -34,6 +34,7 @@ class ProxyProvider;
 class BlockBuffer;
 class SlidingWindowTracker;
 class AtlasManager;
+class CommandBuffer;
 
 /**
  * Context is responsible for creating and managing GPU resources, as well as issuing drawing
@@ -208,6 +209,7 @@ class Context {
   BlockBuffer* _drawingBuffer = nullptr;
   SlidingWindowTracker* _maxValueTracker = nullptr;
   AtlasManager* _atlasManager = nullptr;
+  std::shared_ptr<CommandBuffer> commandBuffer = nullptr;
 
   void releaseAll(bool releaseGPU);
 

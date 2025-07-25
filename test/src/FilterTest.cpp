@@ -718,7 +718,7 @@ TGFX_TEST(FilterTest, ClipInnerShadowImageFilter) {
     canvas->clipRect(Rect::MakeXYWH(0, 90, 100, 10));
     canvas->drawImage(image);
   }
-  context->flush();
+  context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ClipInnerShadowImageFilter"));
 }
 
@@ -735,7 +735,7 @@ TGFX_TEST(FilterTest, GaussianBlurImageFilter) {
   image = image->makeWithFilter(gaussianBlurFilter, &offset);
   auto canvas = surface->getCanvas();
   canvas->drawImage(image, offset.x, offset.y);
-  context->flush();
+  context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/GaussianBlurImageFilter"));
 }
 }  // namespace tgfx

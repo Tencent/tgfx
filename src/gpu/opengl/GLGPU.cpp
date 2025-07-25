@@ -28,17 +28,11 @@ std::unique_ptr<GLGPU> GLGPU::MakeNative() {
   return std::make_unique<GLGPU>(std::move(interface));
 }
 
-std::shared_ptr<CommandEncoder> GLGPU::createCommandEncoder() const {
-  return std::make_shared<GLCommandEncoder>(interface);
+GLGPU::GLGPU(std::shared_ptr<GLInterface> glInterface) : interface(std::move(glInterface)) {
+  commandQueue = std::make_unique<GLCommandQueue>(interface);
 }
 
-bool GLGPU::submitToGPU(bool syncCpu) const {
-  auto gl = interface->functions();
-  if (syncCpu) {
-    gl->finish();
-  } else {
-    gl->flush();
-  }
-  return true;
+std::shared_ptr<CommandEncoder> GLGPU::createCommandEncoder() const {
+  return std::make_shared<GLCommandEncoder>(interface);
 }
 }  // namespace tgfx

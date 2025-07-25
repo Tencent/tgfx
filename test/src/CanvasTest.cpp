@@ -148,7 +148,7 @@ TGFX_TEST(CanvasTest, DiscardContent) {
   ASSERT_TRUE(drawingManager->renderTasks.size() == 3);
   task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.back().get());
   EXPECT_TRUE(task->ops.size() == 1);
-  context->flush();
+  context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/DiscardContent"));
 }
 
@@ -185,7 +185,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rect) {
   auto task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.front().get());
   ASSERT_TRUE(task->ops.size() == 2);
   EXPECT_EQ(static_cast<RectDrawOp*>(task->ops.back().get())->rectCount, drawCallCount);
-  context->flush();
+  context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rect"));
 }
 
@@ -225,7 +225,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
   auto task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.front().get());
   ASSERT_TRUE(task->ops.size() == 2);
   EXPECT_EQ(static_cast<RRectDrawOp*>(task->ops.back().get())->rectCount, drawCallCount);
-  context->flush();
+  context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rrect"));
 }
 
@@ -307,7 +307,7 @@ TGFX_TEST(CanvasTest, textShape) {
     canvas->drawGlyphs(textRun.ids.data(), textRun.positions.data(), textRun.ids.size(),
                        textRun.font, paint);
   }
-  context->flush();
+  context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/text_shape"));
 }
 
@@ -952,7 +952,7 @@ TGFX_TEST(CanvasTest, image) {
   canvas->drawImage(image);
   auto decodedImage = image->makeDecoded(context);
   EXPECT_FALSE(decodedImage == image);
-  context->flush();
+  context->flushAndSubmit();
   decodedImage = image->makeDecoded(context);
   EXPECT_FALSE(decodedImage == image);
   auto textureImage = image->makeTextureImage(context);
@@ -964,7 +964,7 @@ TGFX_TEST(CanvasTest, image) {
   textureImage = nullptr;
   decodedImage = image->makeDecoded(context);
   EXPECT_TRUE(decodedImage == image);
-  context->flush();
+  context->flushAndSubmit();
   decodedImage = image->makeDecoded(context);
   EXPECT_FALSE(decodedImage == image);
 
@@ -1774,7 +1774,7 @@ TGFX_TEST(CanvasTest, ShadowBoundIntersect) {
   canvas->clipRect(Rect::MakeXYWH(0.f, 4.f, 80.f, 3.7f));
   canvas->translate(0.7f, 0.7f);
   canvas->drawImage(image);
-  context->flush();
+  context->flushAndSubmit();
 }
 
 TGFX_TEST(CanvasTest, MultiImageRect_SameView) {
@@ -2167,7 +2167,7 @@ TGFX_TEST(CanvasTest, textEmojiMixedBlendModes1) {
     }
   }
 
-  context->flush();
+  context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/textEmojiMixedBlendModes"));
 }
 
@@ -2242,7 +2242,7 @@ TGFX_TEST(CanvasTest, textEmojiMixedBlendModes2) {
     }
   }
 
-  context->flush();
+  context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/textEmojiMixedBlendModes2"));
 }
 
@@ -2344,7 +2344,7 @@ TGFX_TEST(CanvasTest, complexEmojiTextBlending) {
     canvas->drawSimpleText(label, x, y + 15, labelFont, labelPaint);
   }
 
-  context->flush();
+  context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/complexEmojiTextBlending"));
 }
 
@@ -2472,7 +2472,7 @@ TGFX_TEST(CanvasTest, emojiTextStrokeBlending) {
     }
   }
 
-  context->flush();
+  context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/emojiTextStrokeBlending"));
 }
 
@@ -2601,7 +2601,7 @@ TGFX_TEST(CanvasTest, textEmojiOverlayBlendModes) {
     }
   }
 
-  context->flush();
+  context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/textEmojiOverlayBlendModes"));
 }
 
@@ -2622,7 +2622,7 @@ TGFX_TEST(CanvasTest, RotateImageRect) {
   auto srcRect = Rect::MakeXYWH(20, 20, 40, 40);
   auto dstRect = Rect::MakeXYWH(0, 0, 100, 100);
   canvas->drawImageRect(image, srcRect, dstRect, {}, nullptr, SrcRectConstraint::Strict);
-  context->flush();
+  context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/RotateImageRect"));
 }
 

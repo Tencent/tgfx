@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,39 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/GPU.h"
-#include "gpu/opengl/GLCommandQueue.h"
-#include "gpu/opengl/GLInterface.h"
+#include "GLCommandQueue.h"
 
 namespace tgfx {
-class GLGPU : public GPU {
- public:
-  static std::unique_ptr<GLGPU> MakeNative();
+void GLCommandQueue::submit(std::shared_ptr<CommandBuffer>) {
+  auto gl = interface->functions();
+  gl->flush();
+}
 
-  explicit GLGPU(std::shared_ptr<GLInterface> glInterface);
+void GLCommandQueue::waitUntilCompleted() {
+  auto gl = interface->functions();
+  gl->finish();
+}
 
-  Backend backend() const override {
-    return Backend::OPENGL;
-  }
-
-  const Caps* caps() const override {
-    return interface->caps();
-  }
-
-  const GLFunctions* functions() const {
-    return interface->functions();
-  }
-
-  CommandQueue* queue() const override {
-    return commandQueue.get();
-  }
-
-  std::shared_ptr<CommandEncoder> createCommandEncoder() const override;
-
- private:
-  std::shared_ptr<GLInterface> interface = nullptr;
-  std::unique_ptr<GLCommandQueue> commandQueue = nullptr;
-};
 }  // namespace tgfx

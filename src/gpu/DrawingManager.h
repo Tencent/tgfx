@@ -71,10 +71,10 @@ class DrawingManager {
   /**
    * Flushes the drawing manager, executing all resource and render tasks. If signalSemaphore is not
    * null and uninitialized, a new semaphore will be created and assigned to signalSemaphore after
-   * the flush is complete. Returns false if there are no tasks to execute, in which case the
+   * the flush is complete. Returns nullptr if there are no tasks to execute, in which case the
    * signalSemaphore will not be created.
    */
-  bool flush(BackendSemaphore* signalSemaphore);
+  std::shared_ptr<CommandBuffer> flush(BackendSemaphore* signalSemaphore);
 
   /**
    * Releases all tasks associated with the drawing manager.

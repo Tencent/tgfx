@@ -79,7 +79,8 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
   // cleanup can they be unbound and reused.
   _resourceCache->processUnreferencedResources();
   _atlasManager->preFlush();
-  if (!_drawingManager->flush(signalSemaphore)) {
+  commandBuffer = _drawingManager->flush(signalSemaphore);
+  if (commandBuffer == nullptr) {
     return false;
   }
   _atlasManager->postFlush();
@@ -91,7 +92,15 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
 }
 
 bool Context::submit(bool syncCpu) {
-  return gpu()->submitToGPU(syncCpu);
+  if (commandBuffer == nullptr) {
+    return false;
+  }
+  auto queue = gpu()->queue();
+  queue->submit(std::move(commandBuffer));
+  if (syncCpu) {
+    queue->waitUntilCompleted();
+  }
+  return true;
 }
 
 void Context::flushAndSubmit(bool syncCpu) {

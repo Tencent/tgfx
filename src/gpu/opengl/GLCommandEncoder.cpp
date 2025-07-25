@@ -81,4 +81,10 @@ void GLCommandEncoder::waitSemaphore(const BackendSemaphore& semaphore) {
   auto gl = interface->functions();
   gl->waitSync(glSync.sync, 0, GL_TIMEOUT_IGNORED);
 }
+
+std::shared_ptr<CommandBuffer> GLCommandEncoder::onFinish() {
+  // In OpenGL, we don't have a specific command buffer to return, so we just return an empty one.
+  return std::make_shared<CommandBuffer>();
+}
+
 }  // namespace tgfx

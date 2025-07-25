@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,38 +18,14 @@
 
 #pragma once
 
-#include <memory>
-#include "gpu/CommandEncoder.h"
-#include "gpu/CommandQueue.h"
-#include "tgfx/gpu/Context.h"
-
 namespace tgfx {
 /**
- * This is the main interface for accessing GPU functionality. In Metal, Vulkan, and WebGPU, its
- * equivalents are MTLDevice, VkDevice, and GPUDevice. For OpenGL, it simply refers to GL functions.
+ * CommandBuffer represents a sequence of commands that can be submitted to the GPU for execution.
+ * A CommandBuffer is created via the CommandEncoder::finish() method, the GPU commands recorded
+ * within are submitted for execution by calling the CommandQueue::submit() method.
  */
-class GPU {
+class CommandBuffer {
  public:
-  virtual ~GPU() = default;
-
-  /**
-   * Returns the backend type of the GPU.
-   */
-  virtual Backend backend() const = 0;
-
-  /**
-   * Returns the capability info of the GPU.
-   */
-  virtual const Caps* caps() const = 0;
-
-  /**
-   * Returns the primary CommandQueue associated with this GPU.
-   */
-  virtual CommandQueue* queue() const = 0;
-
-  /**
-   * Creates a command encoder that can be used to encode commands to be issued to the GPU.
-   */
-  virtual std::shared_ptr<CommandEncoder> createCommandEncoder() const = 0;
+  virtual ~CommandBuffer() = default;
 };
 }  // namespace tgfx
