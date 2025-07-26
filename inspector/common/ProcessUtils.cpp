@@ -39,6 +39,7 @@
 #include <cinttypes>
 #include <chrono>
 #include <cstring>
+#include <cstddef>
 #include "ProcessUtils.h"
 
 namespace inspector {
