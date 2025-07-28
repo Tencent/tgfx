@@ -749,7 +749,48 @@ TGFX_TEST(FilterTest, GaussianBlurImageFilter) {
 }
 
 TGFX_TEST(FilterTest, ScaleFilterTest) {
-
-
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto originImage = MakeImage("resources/apitest/image_as_mask.png");
+  ASSERT_TRUE(originImage != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto gaussianBlurFilter = std::make_shared<GaussianBlurImageFilter>(6, 6, TileMode::Decal);
+  auto image = originImage->makeWithFilter(gaussianBlurFilter);
+  auto canvas = surface->getCanvas();
+  canvas->drawImage(image);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ScaleFilterTest_Gaussian_Origin"));
+  image = ScaleImage(image, 0.5f);
+  canvas->clear();
+  canvas->drawImage(image);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ScaleFilterTest_Gaussian_Scaled"));
+  auto blur = ImageFilter::Blur(6, 6, TileMode::Decal);
+  image = originImage->makeWithFilter(blur);
+  canvas->clear();
+  canvas->drawImage(image);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ScaleFilterTest_Blur_Origin"));
+  image = ScaleImage(image, 0.5f);
+  canvas->clear();
+  canvas->drawImage(image);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ScaleFilterTest_Blur_Scaled"));
+  auto dropShadow = ImageFilter::DropShadow(6, 6, 0, 0, Color::Black());
+  image = originImage->makeWithFilter(dropShadow);
+  canvas->clear();
+  canvas->drawImage(image);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ScaleFilterTest_DropShadow_Origin"));
+  image = ScaleImage(image, 0.5f);
+  canvas->clear();
+  canvas->drawImage(image);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ScaleFilterTest_DropShadow_Scaled"));
+  auto innerShadow = ImageFilter::InnerShadow(6, 6, 0, 0, Color::Black());
+  image = originImage->makeWithFilter(innerShadow);
+  canvas->clear();
+  canvas->drawImage(image);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ScaleFilterTest_InnerShadow_Origin"));
+  image = ScaleImage(image, 0.5f);
+  canvas->clear();
+  canvas->drawImage(image);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ScaleFilterTest_InnerShadow_Scaled"));;
 }
 }  // namespace tgfx

@@ -191,7 +191,7 @@ std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_
       // Add offset of clipBounds to apply clipBounds.
       uvMatrix = Matrix::MakeScale(textureSize.width / boundsWillSample.width(),
                                    textureSize.height / boundsWillSample.height());
-      uvMatrix.preScale(scaleFactor, scaleFactor);
+      uvMatrix.preScale(scaleFactorX, scaleFactorY);
       uvMatrix.preTranslate(clipBounds.left - sampleOffset.x, clipBounds.top - sampleOffset.y);
       upSampleScale /= scaleFactor;
     } else {
