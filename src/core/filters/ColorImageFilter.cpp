@@ -25,7 +25,9 @@ namespace tgfx {
 
 std::shared_ptr<ImageFilter> ImageFilter::ColorFilter(
     std::shared_ptr<class ColorFilter> colorFilter) {
-  return std::make_shared<ColorImageFilter>(std::move(colorFilter));
+  auto result = std::make_shared<ColorImageFilter>(std::move(colorFilter));
+  result->weakThis = result;
+  return result;
 }
 
 ColorImageFilter::ColorImageFilter(std::shared_ptr<tgfx::ColorFilter> filter)

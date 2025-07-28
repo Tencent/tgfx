@@ -29,11 +29,13 @@ std::shared_ptr<ImageFilter> ImageFilter::Runtime(std::shared_ptr<RuntimeEffect>
   if (effect == nullptr) {
     return nullptr;
   }
-  return std::make_shared<RuntimeImageFilter>(effect);
+  auto result = std::make_shared<RuntimeImageFilter>(effect);
+  result->weakThis = result;
+  return result;
 }
 
 Rect RuntimeImageFilter::onFilterBounds(const Rect& srcRect) const {
-  return effect->filterBounds(srcRect);
+  return effect->filterBounds(srcRect, scale);
 }
 
 std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_ptr<Image> source,
@@ -70,7 +72,8 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_p
   }
   auto offset = Point::Make(-clipBounds.x(), -clipBounds.y());
   auto drawingManager = args.context->drawingManager();
-  drawingManager->addRuntimeDrawTask(renderTarget, std::move(textureProxies), effect, offset);
+  drawingManager->addRuntimeDrawTask(renderTarget, std::move(textureProxies), effect, offset,
+                                     scale);
   return renderTarget->asTextureProxy();
 }
 
@@ -79,4 +82,12 @@ PlacementPtr<FragmentProcessor> RuntimeImageFilter::asFragmentProcessor(
     SrcRectConstraint constraint, const Matrix* uvMatrix) const {
   return makeFPFromTextureProxy(source, args, sampling, constraint, uvMatrix);
 }
+
+std::shared_ptr<ImageFilter> RuntimeImageFilter::onMakeScaled(float scaleX, float scaleY) const {
+  auto newScale = Point::Make(scale.x * scaleX, scale.y * scaleY);
+  auto result = std::make_shared<RuntimeImageFilter>(effect, newScale);
+  result->weakThis = result;
+  return result;
+}
+
 }  // namespace tgfx

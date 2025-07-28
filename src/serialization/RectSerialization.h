@@ -22,11 +22,7 @@
 #include "SerializationUtils.h"
 
 namespace tgfx {
-class RectSerialization {
- public:
-  static std::shared_ptr<Data> Serialize(const Rect* rect);
-
- private:
-  static void SerializeRectImpl(flexbuffers::Builder& fbb, const Rect* rect);
+namespace RectSerialization {
+std::shared_ptr<Data> Serialize(const Rect* rect);
 };
 }  // namespace tgfx

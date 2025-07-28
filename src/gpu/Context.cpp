@@ -22,10 +22,9 @@
 #include "core/utils/Log.h"
 #include "core/utils/SlidingWindowTracker.h"
 #include "gpu/DrawingManager.h"
-#include "gpu/ProgramCache.h"
+#include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ResourceCache.h"
-#include "gpu/ResourceProvider.h"
 #include "tgfx/core/Clock.h"
 
 namespace tgfx {
@@ -34,10 +33,9 @@ Context::Context(Device* device) : _device(device) {
   // fragmentation and slow down allocation. It may also increase the application's memory usage due
   // to pre-allocation optimizations on some platforms.
   _drawingBuffer = new BlockBuffer(1 << 14, 1 << 21);  // 16kb, 2MB
-  _programCache = new ProgramCache(this);
+  _globalCache = new GlobalCache(this);
   _resourceCache = new ResourceCache(this);
   _drawingManager = new DrawingManager(this);
-  _resourceProvider = new ResourceProvider(this);
   _proxyProvider = new ProxyProvider(this);
   _maxValueTracker = new SlidingWindowTracker(10);
   _atlasManager = new AtlasManager(this);
@@ -47,16 +45,22 @@ Context::~Context() {
   // The Device owner must call releaseAll() before deleting this Context, otherwise, GPU resources
   // may leak.
   DEBUG_ASSERT(_resourceCache->empty());
-  DEBUG_ASSERT(_programCache->empty());
-  delete _programCache;
+  delete _globalCache;
   delete _resourceCache;
   delete _drawingManager;
-  delete _gpu;
-  delete _resourceProvider;
   delete _proxyProvider;
   delete _drawingBuffer;
   delete _atlasManager;
   delete _maxValueTracker;
+}
+
+bool Context::wait(const BackendSemaphore& waitSemaphore) {
+  auto semaphore = Semaphore::Wrap(this, waitSemaphore);
+  if (semaphore == nullptr) {
+    return false;
+  }
+  _drawingManager->addSemaphoreWaitTask(std::move(semaphore));
+  return true;
 }
 
 bool Context::flush(BackendSemaphore* signalSemaphore) {
@@ -65,40 +69,24 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
   // cleanup can they be unbound and reused.
   _resourceCache->processUnreferencedResources();
   _atlasManager->preFlush();
-  auto flushed = _drawingManager->flush();
+  if (!_drawingManager->flush(signalSemaphore)) {
+    return false;
+  }
   _atlasManager->postFlush();
-  bool semaphoreInserted = false;
-  if (signalSemaphore != nullptr) {
-    auto semaphore = Semaphore::Wrap(signalSemaphore);
-    semaphoreInserted = caps()->semaphoreSupport && _gpu->insertSemaphore(semaphore.get());
-    if (semaphoreInserted) {
-      *signalSemaphore = semaphore->getBackendSemaphore();
-    }
-  }
-  if (flushed) {
-    _proxyProvider->purgeExpiredProxies();
-    _resourceCache->advanceFrameAndPurge();
-    _maxValueTracker->addValue(_drawingBuffer->size());
-    _drawingBuffer->clear(_maxValueTracker->getMaxValue());
-  }
-  return semaphoreInserted;
+  _proxyProvider->purgeExpiredProxies();
+  _resourceCache->advanceFrameAndPurge();
+  _maxValueTracker->addValue(_drawingBuffer->size());
+  _drawingBuffer->clear(_maxValueTracker->getMaxValue());
+  return true;
 }
 
 bool Context::submit(bool syncCpu) {
-  return _gpu->submitToGpu(syncCpu);
+  return gpu()->submitToGPU(syncCpu);
 }
 
 void Context::flushAndSubmit(bool syncCpu) {
   flush();
   submit(syncCpu);
-}
-
-bool Context::wait(const BackendSemaphore& waitSemaphore) {
-  auto semaphore = Semaphore::Wrap(&waitSemaphore);
-  if (semaphore == nullptr) {
-    return false;
-  }
-  return caps()->semaphoreSupport && _gpu->waitSemaphore(semaphore.get());
 }
 
 size_t Context::memoryUsage() const {
@@ -135,9 +123,8 @@ bool Context::purgeResourcesUntilMemoryTo(size_t bytesLimit) {
 
 void Context::releaseAll(bool releaseGPU) {
   _drawingManager->releaseAll();
-  _resourceProvider->releaseAll();
-  _programCache->releaseAll(releaseGPU);
-  _resourceCache->releaseAll(releaseGPU);
   _atlasManager->releaseAll();
+  _globalCache->releaseAll();
+  _resourceCache->releaseAll(releaseGPU);
 }
 }  // namespace tgfx

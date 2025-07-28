@@ -145,6 +145,7 @@ class OpsCompositor {
   void addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const Fill& fill,
                  const std::optional<Rect>& localBounds, const std::optional<Rect>& deviceBounds,
                  const std::optional<Point>& drawScales);
+  void submitDrawOps();
 
   friend class DrawingManager;
   friend class PendingOpsAutoReset;

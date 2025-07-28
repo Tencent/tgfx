@@ -32,6 +32,16 @@ Rect ImageFilter::filterBounds(const Rect& rect) const {
   return dstBounds;
 }
 
+std::shared_ptr<ImageFilter> ImageFilter::makeScaled(float scaleX, float scaleY) const {
+  if (scaleX < 0 || scaleY < 0) {
+    return nullptr;
+  }
+  if (scaleX == 1.0f && scaleY == 1.0f) {
+    return weakThis.lock();
+  }
+  return onMakeScaled(scaleX, scaleY);
+}
+
 Rect ImageFilter::onFilterBounds(const Rect& srcRect) const {
   return srcRect;
 }

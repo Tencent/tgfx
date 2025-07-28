@@ -23,10 +23,14 @@
 namespace tgfx {
 class RuntimeImageFilter : public ImageFilter {
  public:
-  explicit RuntimeImageFilter(std::shared_ptr<RuntimeEffect> effect) : effect(std::move(effect)) {
+  explicit RuntimeImageFilter(std::shared_ptr<RuntimeEffect> effect,
+                              const Point& scale = Point(1.0f, 1.0f))
+      : effect(std::move(effect)), scale(scale) {
   }
 
   std::shared_ptr<RuntimeEffect> effect = nullptr;
+
+  Point scale = {};
 
  protected:
   Type type() const override {
@@ -44,5 +48,7 @@ class RuntimeImageFilter : public ImageFilter {
                                                       const SamplingOptions& sampling,
                                                       SrcRectConstraint constraint,
                                                       const Matrix* uvMatrix) const override;
+
+  std::shared_ptr<ImageFilter> onMakeScaled(float scaleX, float scaleY) const override;
 };
 }  // namespace tgfx

@@ -39,7 +39,9 @@ std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrine
   if (blurrinessX < 0 || blurrinessY < 0 || (blurrinessX == 0 && blurrinessY == 0)) {
     return nullptr;
   }
-  return std::make_shared<GaussianBlurImageFilter>(blurrinessX, blurrinessY, tileMode);
+  auto result = std::make_shared<GaussianBlurImageFilter>(blurrinessX, blurrinessY, tileMode);
+  result->weakThis = result;
+  return result;
 }
 #endif
 
@@ -83,7 +85,8 @@ static std::shared_ptr<TextureProxy> ScaleTexture(const TPArgs& args,
 std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     std::shared_ptr<Image> source, const Rect& clipBounds, const TPArgs& args) const {
   const float maxSigma = std::max(blurrinessX, blurrinessY);
-  float scaleFactor = 1.0f;
+  float scaleFactorX = scaleX;
+  float scaleFactorY = scaleY;
   bool blur2D = blurrinessX > 0 && blurrinessY > 0;
 
   Rect boundsWillSample = clipBounds;
@@ -97,8 +100,9 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
 
   Rect scaledBounds = boundsWillSample;
   if (maxSigma > MAX_BLUR_SIGMA) {
-    scaleFactor = MAX_BLUR_SIGMA / maxSigma;
-    Matrix matrix = Matrix::MakeScale(scaleFactor);
+    scaleFactorX *= MAX_BLUR_SIGMA / maxSigma;
+    scaleFactorY *= MAX_BLUR_SIGMA / maxSigma;
+    Matrix matrix = Matrix::MakeScale(scaleFactorX, scaleFactorY);
     matrix.mapRect(&scaledBounds);
   }
   scaledBounds.roundOut();
@@ -124,7 +128,7 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
                                                  SrcRectConstraint::Fast, &uvMatrix);
 
   if (blur2D) {
-    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessX * scaleFactor,
+    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessX * scaleFactorX,
            GaussianBlurDirection::Horizontal, 1.0f, args.renderFlags);
 
     // blur and scale the texture to the clip bounds.
@@ -145,17 +149,17 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
       return nullptr;
     }
 
-    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessY * scaleFactor,
+    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessY * scaleFactorY,
            GaussianBlurDirection::Vertical, boundsWillSample.height() / scaledBounds.height(),
            args.renderFlags);
     return renderTarget->asTextureProxy();
   }
 
   if (blurrinessX > 0) {
-    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessX * scaleFactor,
+    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessX * scaleFactorX,
            GaussianBlurDirection::Horizontal, 1.0f, args.renderFlags);
   } else if (blurrinessY > 0) {
-    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessY * scaleFactor,
+    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessY * scaleFactorY,
            GaussianBlurDirection::Vertical, 1.0f, args.renderFlags);
   }
 

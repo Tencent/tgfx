@@ -17,8 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FilterImage.h"
-#include "SubsetImage.h"
+#include "core/images/ScaledImage.h"
+#include "core/images/SubsetImage.h"
 #include "core/utils/AddressOf.h"
+#include "core/utils/MathExtra.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
@@ -104,6 +106,31 @@ std::shared_ptr<Image> FilterImage::onMakeWithFilter(std::shared_ptr<ImageFilter
   filterBounds.offset(bounds.x(), bounds.y());
   auto composeFilter = ImageFilter::Compose(filter, std::move(imageFilter));
   return FilterImage::Wrap(source, filterBounds, std::move(composeFilter));
+}
+
+std::shared_ptr<Image> FilterImage::onMakeScaled(int newWidth, int newHeight,
+                                                 const SamplingOptions& sampling) const {
+  auto inputBounds = Rect::MakeWH(source->width(), source->height());
+  if (filter->filterBounds(inputBounds) != bounds) {
+    return ScaledImage::MakeFrom(weakThis.lock(), newWidth, newHeight, sampling);
+  }
+  auto scaleX = static_cast<float>(newWidth) / static_cast<float>(width());
+  auto scaleY = static_cast<float>(newHeight) / static_cast<float>(height());
+  auto newSourceWidth = static_cast<int>(roundf(static_cast<float>(source->width()) * scaleX));
+  auto newSourceHeight = static_cast<int>(roundf(static_cast<float>(source->height()) * scaleY));
+  auto newSource = source->makeScaled(newSourceWidth, newSourceHeight, sampling);
+  auto filterScaleX = static_cast<float>(newSourceWidth) / static_cast<float>(source->width());
+  auto filterScaleY = static_cast<float>(newSourceHeight) / static_cast<float>(source->height());
+  auto newFilter = filter->makeScaled(filterScaleX, filterScaleY);
+  if (newSource == nullptr || newFilter == nullptr) {
+    return ScaledImage::MakeFrom(weakThis.lock(), newWidth, newHeight, sampling);
+  }
+  auto newBounds = Rect::MakeWH(newSourceWidth, newSourceHeight);
+  newBounds = newFilter->filterBounds(newBounds);
+  if (newBounds.width() != newWidth || newBounds.height() != newHeight) {
+    return ScaledImage::MakeFrom(weakThis.lock(), newWidth, newHeight, sampling);
+  }
+  return FilterImage::Wrap(std::move(newSource), newBounds, std::move(newFilter));
 }
 
 std::shared_ptr<TextureProxy> FilterImage::lockTextureProxy(const TPArgs& args) const {

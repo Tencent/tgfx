@@ -17,20 +17,37 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLSemaphore.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace tgfx {
-std::unique_ptr<Semaphore> Semaphore::Wrap(const BackendSemaphore* backendSemaphore) {
-  if (backendSemaphore == nullptr) {
+std::shared_ptr<Semaphore> Semaphore::Wrap(Context* context,
+                                           const BackendSemaphore& backendSemaphore) {
+  GLSyncInfo glSyncInfo = {};
+  if (context == nullptr || !context->caps()->semaphoreSupport ||
+      !backendSemaphore.getGLSync(&glSyncInfo)) {
     return nullptr;
   }
-  auto semaphore = std::make_unique<GLSemaphore>();
-  semaphore->glSync = backendSemaphore->glSync();
-  return semaphore;
+  auto semaphore = new GLSemaphore(glSyncInfo.sync);
+  return Resource::AddToCache(context, semaphore);
 }
 
-BackendSemaphore GLSemaphore::getBackendSemaphore() const {
-  BackendSemaphore semaphore = {};
-  semaphore.initGL(glSync);
-  return semaphore;
+BackendSemaphore GLSemaphore::releaseBackend() {
+  if (_glSync == nullptr) {
+    return {};
+  }
+  GLSyncInfo glSyncInfo = {};
+  glSyncInfo.sync = _glSync;
+  // Release ownership of the sync object.
+  _glSync = nullptr;
+  return {glSyncInfo};
 }
+
+void GLSemaphore::onReleaseGPU() {
+  if (_glSync != nullptr) {
+    auto gl = GLFunctions::Get(context);
+    gl->deleteSync(_glSync);
+    _glSync = nullptr;
+  }
+}
+
 }  // namespace tgfx

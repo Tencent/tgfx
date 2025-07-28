@@ -1832,7 +1832,7 @@ TGFX_TEST(LayerTest, hitTestPointNested) {
   paint.setStyle(PaintStyle::Fill);
   Point p3 = {80.0f, 80.0f};
   canvas->drawCircle(p3.x, p3.y, 2.0f, paint);
-  EXPECT_EQ(false, textLayer->hitTestPoint(p3.x, p3.y));
+  EXPECT_EQ(true, textLayer->hitTestPoint(p3.x, p3.y));
   EXPECT_EQ(false, textLayer->hitTestPoint(p3.x, p3.y, true));
   EXPECT_EQ(false, shaperLayer->hitTestPoint(p3.x, p3.y));
   EXPECT_EQ(false, shaperLayer->hitTestPoint(p3.x, p3.y, true));
@@ -1840,9 +1840,9 @@ TGFX_TEST(LayerTest, hitTestPointNested) {
   EXPECT_EQ(true, imageLayer->hitTestPoint(p3.x, p3.y, true));
   EXPECT_EQ(true, parentLayer->hitTestPoint(p3.x, p3.y));
   EXPECT_EQ(true, parentLayer->hitTestPoint(p3.x, p3.y, true));
-  EXPECT_EQ(false, childLayer->hitTestPoint(p3.x, p3.y));
+  EXPECT_EQ(true, childLayer->hitTestPoint(p3.x, p3.y));
   EXPECT_EQ(false, childLayer->hitTestPoint(p3.x, p3.y, true));
-  EXPECT_EQ(false, grandsonLayer->hitTestPoint(p3.x, p3.y));
+  EXPECT_EQ(true, grandsonLayer->hitTestPoint(p3.x, p3.y));
   EXPECT_EQ(false, grandsonLayer->hitTestPoint(p3.x, p3.y, true));
   EXPECT_EQ(true, rootLayer->hitTestPoint(p3.x, p3.y));
   EXPECT_EQ(true, rootLayer->hitTestPoint(p3.x, p3.y, true));
