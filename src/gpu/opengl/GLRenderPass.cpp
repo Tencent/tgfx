@@ -147,8 +147,8 @@ bool GLRenderPass::onBindProgramAndScissorClip(const Pipeline* pipeline, const R
   if (program == nullptr) {
     return false;
   }
-  ClearGLError(context);
   auto gl = GLFunctions::Get(context);
+  ClearGLError(gl);
   auto glProgram = static_cast<GLProgram*>(program.get());
   gl->useProgram(glProgram->programID());
   UpdateScissor(context, scissorRect);
