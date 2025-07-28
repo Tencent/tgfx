@@ -42,7 +42,7 @@ enum class HandshakeStatus : uint8_t {
   HandshakeDropped
 };
 
-enum class MsgType : uint8_t { FrameCapture = 0, LayerTree = 1 };
+enum class ToolType : uint8_t { FrameCapture = 0, LayerTree = 1 };
 
 struct BroadcastMessage {
   uint8_t type;

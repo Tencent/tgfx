@@ -63,7 +63,7 @@ class TGFXTypeToInspector {
     auto b = static_cast<uint8_t>(color.blue * 255.f);
     auto a = static_cast<uint8_t>(color.alpha * 255.f);
     auto value = static_cast<uint32_t>(r | g << 8 | b << 16 | a << 24);
-    inspector::Inspector::SendAttributeData(name, value, inspector::QueueType::ValueDataColor);
+    inspector::Inspector::SendAttributeData(name, value, inspector::MsgType::ValueDataColor);
   }
 };
 

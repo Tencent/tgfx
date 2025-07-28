@@ -65,7 +65,7 @@ void LayerProfiler::sendWork() {
     return;
   }
   size_t broadcastLen = 0;
-  auto broadcastMsg = GetBroadcastMessage(procname, pnsz, broadcastLen, port, MsgType::LayerTree);
+  auto broadcastMsg = GetBroadcastMessage(procname, pnsz, broadcastLen, port, ToolType::LayerTree);
   long long lastBroadcast = 0;
   while (!stopFlag.load(std::memory_order_acquire)) {
     while (!stopFlag.load(std::memory_order_acquire)) {

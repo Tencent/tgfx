@@ -24,5 +24,5 @@ namespace inspector {
 uint64_t GetPid();
 const char* GetProcessName();
 BroadcastMessage GetBroadcastMessage(const char* procname, size_t pnsz, size_t& len, uint16_t port,
-                                     MsgType type);
+                                     ToolType type);
 }  // namespace inspector

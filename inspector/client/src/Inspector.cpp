@@ -72,12 +72,11 @@ bool Inspector::handleServerQuery() {
 
   switch (type) {
     case ServerQuery::ServerQueryString: {
-      sendString(ptr, reinterpret_cast<const char*>(ptr), QueueType::StringData);
+      sendString(ptr, reinterpret_cast<const char*>(ptr), MsgType::StringData);
     }
     case ServerQuery::ServerQueryValueName: {
-      sendString(ptr, reinterpret_cast<const char*>(ptr), QueueType::ValueName);
+      sendString(ptr, reinterpret_cast<const char*>(ptr), MsgType::ValueName);
     }
-    case ServerQuery::ServerQueryDisconnect:
     default: {
       break;
     }
@@ -89,15 +88,15 @@ bool Inspector::ShouldExit() {
   return InspectorSingleton::GetInstance()->shutdown.load(std::memory_order_relaxed);
 }
 
-void Inspector::sendString(uint64_t str, const char* ptr, size_t len, QueueType type) {
-  QueueItem item = {};
+void Inspector::sendString(uint64_t str, const char* ptr, size_t len, MsgType type) {
+  MsgItem item = {};
   MemWrite(&item.hdr.type, type);
   MemWrite(&item.stringTransfer.ptr, str);
 
   auto l16 = static_cast<uint16_t>(len);
-  needDataSize(QueueDataSize[static_cast<int>(type)] + sizeof(l16) + l16);
+  needDataSize(MsgDataSize[static_cast<int>(type)] + sizeof(l16) + l16);
 
-  appendDataUnsafe(&item, QueueDataSize[static_cast<int>(type)]);
+  appendDataUnsafe(&item, MsgDataSize[static_cast<int>(type)]);
   appendDataUnsafe(&l16, sizeof(l16));
   appendDataUnsafe(ptr, l16);
 }
@@ -112,7 +111,7 @@ void Inspector::worker() {
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
   }
 
-  auto welcome = WelcomeMessage{};
+  auto welcome = WelcomeMessage();
   MemWrite(&welcome.initBegin, InspectorSingleton::GetInstance()->initTime);
   MemWrite(&welcome.initEnd, timeBegin.load(std::memory_order_relaxed));
 
@@ -143,7 +142,7 @@ void Inspector::worker() {
 
   size_t broadcastLen = 0;
   auto broadcastMsg =
-      GetBroadcastMessage(procname, pnsz, broadcastLen, dataPort, MsgType::FrameCapture);
+      GetBroadcastMessage(procname, pnsz, broadcastLen, dataPort, ToolType::FrameCapture);
   long long lastBroadcast = 0;
   while (true) {
     MemWrite(&welcome.refTime, refTimeThread);
@@ -169,7 +168,7 @@ void Inspector::worker() {
             programNameLock.lock();
             if (programName) {
               broadcastMsg = GetBroadcastMessage(programName, strlen(programName), broadcastLen,
-                                                 dataPort, MsgType::FrameCapture);
+                                                 dataPort, ToolType::FrameCapture);
               programName = nullptr;
             }
             programNameLock.unlock();
@@ -262,9 +261,9 @@ void Inspector::handleConnect(WelcomeMessage& welcome) {
           break;
         }
         if (keepAlive == 500) {
-          QueueItem ka = {};
-          ka.hdr.type = QueueType::KeepAlive;
-          appendData(&ka, QueueDataSize[ka.hdr.idx]);
+          MsgItem ka = {};
+          ka.hdr.type = MsgType::KeepAlive;
+          appendData(&ka, MsgDataSize[ka.hdr.idx]);
           if (!commitData()) {
             break;
           }
@@ -296,18 +295,18 @@ Inspector::DequeueStatus Inspector::dequeueSerial() {
   const auto queueSize = serialConcurrentQueue.size_approx();
   if (queueSize > 0) {
     auto refThread = refTimeThread;
-    auto item = QueueItem{};
+    auto item = MsgItem{};
     while (serialConcurrentQueue.try_dequeue(item)) {
       auto idx = item.hdr.idx;
-      switch ((QueueType)idx) {
-        case QueueType::OperateBegin: {
+      switch ((MsgType)idx) {
+        case MsgType::OperateBegin: {
           auto t = MemRead<int64_t>(&item.operateBegin.nsTime);
           auto dt = t - refThread;
           refThread = t;
           MemWrite(&item.operateBegin.nsTime, dt);
           break;
         }
-        case QueueType::OperateEnd: {
+        case MsgType::OperateEnd: {
           auto t = MemRead<int64_t>(&item.operateEnd.nsTime);
           auto dt = t - refThread;
           refThread = t;
@@ -317,7 +316,7 @@ Inspector::DequeueStatus Inspector::dequeueSerial() {
         default:
           break;
       }
-      if (!appendData(&item, QueueDataSize[idx])) {
+      if (!appendData(&item, MsgDataSize[idx])) {
         return DequeueStatus::ConnectionLost;
       }
     }

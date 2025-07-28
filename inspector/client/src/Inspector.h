@@ -23,7 +23,7 @@
 #include <vector>
 #include "MemoryUtils.h"
 #include "Protocol.h"
-#include "Queue.h"
+#include "Message.h"
 #include "Singleton.h"
 #include "Socket.h"
 #include "TimeUtils.h"
@@ -38,10 +38,10 @@
 #endif
 
 namespace inspector {
-#define QueuePrepare(_type) \
-  auto item = QueueItem();  \
+#define MsgPrepare(_type) \
+  auto item = MsgItem();  \
   MemWrite(&item.hdr.type, _type);
-#define QueueCommit() Inspector::QueueSerialFinish(item);
+#define MsgCommit() Inspector::QueueSerialFinish(item);
 
 class Inspector;
 typedef Singleton<Inspector> InspectorSingleton;
@@ -51,7 +51,7 @@ class Inspector {
   Inspector();
   ~Inspector();
 
-  static void QueueSerialFinish(const QueueItem& item) {
+  static void QueueSerialFinish(const MsgItem& item) {
     auto inspector = InspectorSingleton::GetInstance();
     inspector->serialConcurrentQueue.enqueue(item);
   }
@@ -60,60 +60,60 @@ class Inspector {
     if (!name) {
       InspectorSingleton::GetInstance()->frameCount.fetch_add(1, std::memory_order_relaxed);
     }
-    auto item = QueueItem();
-    MemWrite(&item.hdr.type, QueueType::FrameMarkMsg);
+    auto item = MsgItem();
+    MemWrite(&item.hdr.type, MsgType::FrameMarkMsg);
     MemWrite(&item.frameMark.nsTime, GetCurrentTime<std::chrono::nanoseconds>());
     QueueSerialFinish(item);
   }
 
   static void SendAttributeData(const char* name, int val) {
-    QueuePrepare(QueueType::ValueDataInt);
+    MsgPrepare(MsgType::ValueDataInt);
     MemWrite(&item.attributeDataInt.name, reinterpret_cast<uint64_t>(name));
     MemWrite(&item.attributeDataInt.value, val);
-    QueueCommit();
+    MsgCommit();
   }
 
   static void SendAttributeData(const char* name, float val) {
-    QueuePrepare(QueueType::ValueDataFloat);
+    MsgPrepare(MsgType::ValueDataFloat);
     MemWrite(&item.attributeDataFloat.name, reinterpret_cast<uint64_t>(name));
     MemWrite(&item.attributeDataFloat.value, val);
-    QueueCommit();
+    MsgCommit();
   }
 
   static void SendAttributeData(const char* name, bool val) {
-    QueuePrepare(QueueType::ValueDataBool);
+    MsgPrepare(MsgType::ValueDataBool);
     MemWrite(&item.attributeDataBool.name, reinterpret_cast<uint64_t>(name));
     MemWrite(&item.attributeDataBool.value, val);
-    QueueCommit();
+    MsgCommit();
   }
 
   static void SendAttributeData(const char* name, uint8_t val, uint8_t type) {
-    QueuePrepare(QueueType::ValueDataEnum);
+    MsgPrepare(MsgType::ValueDataEnum);
     MemWrite(&item.attributeDataEnum.name, reinterpret_cast<uint64_t>(name));
     auto value = static_cast<uint16_t>(type << 8 | val);
     MemWrite(&item.attributeDataEnum.value, value);
-    QueueCommit();
+    MsgCommit();
   }
 
   static void SendAttributeData(const char* name, uint32_t val,
-                                QueueType type = QueueType::ValueDataUint32) {
-    QueuePrepare(type);
+                                MsgType type = MsgType::ValueDataUint32) {
+    MsgPrepare(type);
     MemWrite(&item.attributeDataUint32.name, reinterpret_cast<uint64_t>(name));
     MemWrite(&item.attributeDataUint32.value, val);
-    QueueCommit();
+    MsgCommit();
   }
 
   static void SendAttributeData(const char* name, float* val, int size) {
     if (size == 4) {
-      QueuePrepare(QueueType::ValueDataFloat4);
+      MsgPrepare(MsgType::ValueDataFloat4);
       MemWrite(&item.attributeDataFloat4.name, reinterpret_cast<uint64_t>(name));
       MemWrite(item.attributeDataFloat4.value, val, static_cast<size_t>(size) * sizeof(float));
-      QueueCommit();
+      MsgCommit();
     } else if (size == 6) {
-      QueuePrepare(QueueType::ValueDataMat4);
+      MsgPrepare(MsgType::ValueDataMat4);
       MemWrite(&item.attributeDataMat4.name, reinterpret_cast<uint64_t>(name));
       MemWrite(item.attributeDataMat4.value, val, static_cast<size_t>(size) * sizeof(float));
-      QueueCommit();
+      MsgCommit();
     }
   }
 
@@ -123,10 +123,10 @@ class Inspector {
 
   static bool ShouldExit();
 
-  void sendString(uint64_t str, const char* ptr, QueueType type) {
+  void sendString(uint64_t str, const char* ptr, MsgType type) {
     sendString(str, ptr, strlen(ptr), type);
   }
-  void sendString(uint64_t str, const char* ptr, size_t len, QueueType type);
+  void sendString(uint64_t str, const char* ptr, size_t len, MsgType type);
 
   void worker();
   void spawnWorkerThreads();
@@ -174,7 +174,7 @@ class Inspector {
   std::atomic<bool> isConnect = false;
   std::shared_ptr<Socket> sock = nullptr;
   int64_t refTimeThread = 0;
-  moodycamel::ConcurrentQueue<QueueItem> serialConcurrentQueue;
+  moodycamel::ConcurrentQueue<MsgItem> serialConcurrentQueue;
 
   std::unique_ptr<std::thread> messageThread = nullptr;
   std::vector<std::shared_ptr<UdpBroadcast>> broadcast;

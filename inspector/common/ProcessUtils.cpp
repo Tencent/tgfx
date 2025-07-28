@@ -80,7 +80,7 @@ const char* GetProcessName() {
 }
 
 BroadcastMessage GetBroadcastMessage(const char* procname, size_t pnsz, size_t& len, uint16_t port,
-                                     MsgType type) {
+                                     ToolType type) {
   BroadcastMessage msg = {};
   msg.type = static_cast<uint8_t>(type);
   msg.protocolVersion = ProtocolVersion;

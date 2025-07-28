@@ -32,20 +32,20 @@ class Scoped {
     if (!active) {
       return;
     }
-    QueuePrepare(QueueType::OperateBegin);
+    MsgPrepare(MsgType::OperateBegin);
     MemWrite(&item.operateBegin.nsTime, GetCurrentTime<std::chrono::nanoseconds>());
     MemWrite(&item.operateBegin.type, type);
-    QueueCommit();
+    MsgCommit();
   }
 
   ~Scoped() {
     if (!active) {
       return;
     }
-    QueuePrepare(QueueType::OperateEnd);
+    MsgPrepare(MsgType::OperateEnd);
     MemWrite(&item.operateEnd.nsTime, GetCurrentTime<std::chrono::nanoseconds>());
     MemWrite(&item.operateEnd.type, type);
-    QueueCommit();
+    MsgCommit();
   }
 
  private:
