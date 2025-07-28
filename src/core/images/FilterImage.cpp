@@ -20,7 +20,6 @@
 #include "core/images/ScaledImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/utils/AddressOf.h"
-#include "core/utils/MathExtra.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
@@ -162,12 +161,23 @@ PlacementPtr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs& a
                                        AddressOf(fpMatrix));
   }
   auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
+  auto newSourceWidth = static_cast<int>(roundf(source->width() * args.drawScales.x));
+  auto newSourceHeight = static_cast<int>(roundf(source->height() * args.drawScales.y));
+  auto currentSource = source->makeScaled(newSourceWidth, newSourceHeight, sampling);
+  auto sourceScaleX =
+      static_cast<float>(currentSource->width()) / static_cast<float>(source->width());
+  auto sourceScaleY =
+      static_cast<float>(currentSource->height()) / static_cast<float>(source->height());
+  auto currentFilter = filter->makeScaled(sourceScaleX, sourceScaleY);
+  dstBounds.scale(sourceScaleX, sourceScaleY);
+  dstBounds.roundOut();
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
-  auto textureProxy = filter->lockTextureProxy(source, dstBounds, tpArgs);
+  auto textureProxy = currentFilter->lockTextureProxy(currentSource, dstBounds, tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  auto matrix = Matrix::MakeTrans(-dstBounds.x(), -dstBounds.y());
+  auto matrix = Matrix::MakeScale(sourceScaleX, sourceScaleY);
+  matrix.postTranslate(-dstBounds.x(), -dstBounds.y());
   if (fpMatrix) {
     matrix.preConcat(*fpMatrix);
   }
