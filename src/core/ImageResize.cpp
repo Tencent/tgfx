@@ -20,8 +20,10 @@
 #include "ImageResize.h"
 #include <cassert>
 #include <cmath>
-#include <cstring>
+#include <cstddef>
 #include <cstdint>
+#include <cstdlib>
+#include <cstring>
 
 namespace tgfx {
 
@@ -2540,7 +2542,7 @@ static void GetExtents(Sampler* samp, Extents* scanlineExtents) {
 }
 
 static int PackCoefficients(int numContibutors, Contributors* contributors, float* coefficents,
-                            int coefficientWidth, int widest, int row0, int row1) {
+                            int coefficientWidth, int widest, int row1) {
 #define TGFX_MOVE_1(dest, src)                      \
   {                                                 \
     TGFX_NO_UNROLL(dest);                           \
@@ -2737,8 +2739,6 @@ static int PackCoefficients(int numContibutors, Contributors* contributors, floa
           int backup = contribs->n0 - newN0;
           float* fromCo = coeffs + num - 1;
           float* toCo = fromCo + backup;
-
-          assert((newN0 >= row0) && (newN0 < contribs->n0));
 
           // move the coeffs over
           while (num) {
@@ -3047,10 +3047,10 @@ static ResizeInfo* AllocInternalMemAndBuildSamplers(Sampler* horizontal, Sampler
       GetExtents(horizontal, &info->scanlineExtents);
 
       // pack the horizontal coeffs
-      horizontal->coefficientWidth = PackCoefficients(
-          horizontal->numContibutors, horizontal->contributors, horizontal->coefficients,
-          horizontal->coefficientWidth, horizontal->extentInfo.widest,
-          info->scanlineExtents.conservative.n0, info->scanlineExtents.conservative.n1);
+      horizontal->coefficientWidth =
+          PackCoefficients(horizontal->numContibutors, horizontal->contributors,
+                           horizontal->coefficients, horizontal->coefficientWidth,
+                           horizontal->extentInfo.widest, info->scanlineExtents.conservative.n1);
 
       memcpy(&info->horizontal, horizontal, sizeof(Sampler));
 
