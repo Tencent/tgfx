@@ -107,20 +107,6 @@ std::unique_ptr<RuntimeProgram> CornerPinEffect::onCreateProgram(Context* contex
   return filterProgram;
 }
 
-static void EnableMultisample(tgfx::Context* context, bool usesMSAA) {
-  if (usesMSAA && context->caps()->multisampleDisableSupport) {
-    auto gl = tgfx::GLFunctions::Get(context);
-    gl->enable(GL_MULTISAMPLE);
-  }
-}
-
-static void DisableMultisample(tgfx::Context* context, bool usesMSAA) {
-  if (usesMSAA && context->caps()->multisampleDisableSupport) {
-    auto gl = tgfx::GLFunctions::Get(context);
-    gl->disable(GL_MULTISAMPLE);
-  }
-}
-
 bool CornerPinEffect::onDraw(const RuntimeProgram* program,
                              const std::vector<BackendTexture>& inputTextures,
                              const BackendRenderTarget& target, const Point& offset) const {
@@ -131,7 +117,9 @@ bool CornerPinEffect::onDraw(const RuntimeProgram* program,
   auto filterProgram = static_cast<const FilterProgram*>(program);
   auto uniforms = static_cast<const CornerPinUniforms*>(filterProgram->uniforms.get());
   auto needsMSAA = sampleCount() > 1;
-  EnableMultisample(context, needsMSAA);
+  if (needsMSAA && context->caps()->multisampleDisableSupport) {
+    gl->enable(GL_MULTISAMPLE);
+  }
   gl->useProgram(filterProgram->program);
   gl->disable(GL_SCISSOR_TEST);
   gl->enable(GL_BLEND);
@@ -164,7 +152,9 @@ bool CornerPinEffect::onDraw(const RuntimeProgram* program,
   if (filterProgram->vertexArray > 0) {
     gl->bindVertexArray(0);
   }
-  DisableMultisample(context, needsMSAA);
+  if (needsMSAA && context->caps()->multisampleDisableSupport) {
+    gl->disable(GL_MULTISAMPLE);
+  }
   return CheckGLError(gl);
 }
 
