@@ -89,16 +89,16 @@ GLVersion GetGLVersion(const char* versionString) {
   return {};
 }
 
-unsigned CreateGLProgram(Context* context, const std::string& vertex, const std::string& fragment) {
-  auto vertexShader = LoadGLShader(context, GL_VERTEX_SHADER, vertex);
+unsigned CreateGLProgram(const GLFunctions* gl, const std::string& vertex,
+                         const std::string& fragment) {
+  auto vertexShader = LoadGLShader(gl, GL_VERTEX_SHADER, vertex);
   if (vertexShader == 0) {
     return 0;
   }
-  auto fragmentShader = LoadGLShader(context, GL_FRAGMENT_SHADER, fragment);
+  auto fragmentShader = LoadGLShader(gl, GL_FRAGMENT_SHADER, fragment);
   if (fragmentShader == 0) {
     return 0;
   }
-  auto gl = GLFunctions::Get(context);
   auto programHandle = gl->createProgram();
   gl->attachShader(programHandle, vertexShader);
   gl->attachShader(programHandle, fragmentShader);
@@ -117,8 +117,7 @@ unsigned CreateGLProgram(Context* context, const std::string& vertex, const std:
   return programHandle;
 }
 
-unsigned LoadGLShader(Context* context, unsigned shaderType, const std::string& source) {
-  auto gl = GLFunctions::Get(context);
+unsigned LoadGLShader(const GLFunctions* gl, unsigned shaderType, const std::string& source) {
   auto shader = gl->createShader(shaderType);
   const char* files[] = {source.c_str()};
   gl->shaderSource(shader, 1, files, nullptr);
@@ -137,24 +136,22 @@ unsigned LoadGLShader(Context* context, unsigned shaderType, const std::string& 
   return shader;
 }
 
-void ClearGLError(Context* context) {
+void ClearGLError(const GLFunctions* gl) {
 #ifdef TGFX_BUILD_FOR_WEB
-  USE(context);
+  USE(gl);
 #else
-  auto gl = GLFunctions::Get(context);
   while (gl->getError() != GL_NO_ERROR) {
   }
 #endif
 }
 
-bool CheckGLErrorImpl(Context* context, std::string file, int line) {
+bool CheckGLErrorImpl(const GLFunctions* gl, std::string file, int line) {
 #ifdef TGFX_BUILD_FOR_WEB
-  USE(context);
+  USE(gl);
   USE(file);
   USE(line);
   return true;
 #else
-  auto gl = GLFunctions::Get(context);
   bool success = true;
   unsigned errorCode;
   while ((errorCode = gl->getError()) != GL_NO_ERROR) {

@@ -59,10 +59,10 @@ std::unique_ptr<TextureSampler> TextureSampler::MakeFrom(Context* context,
 
 std::unique_ptr<TextureSampler> TextureSampler::Make(Context* context, int width, int height,
                                                      PixelFormat format, bool mipmapped) {
+  auto gl = GLFunctions::Get(context);
   // Clear the previously generated GLError, causing the subsequent CheckGLError to return an
   // incorrect result.
-  ClearGLError(context);
-  auto gl = GLFunctions::Get(context);
+  ClearGLError(gl);
   unsigned target = GL_TEXTURE_2D;
   unsigned samplerID = 0;
   gl->genTextures(1, &samplerID);
@@ -86,7 +86,7 @@ std::unique_ptr<TextureSampler> TextureSampler::Make(Context* context, int width
     gl->texImage2D(target, level, static_cast<int>(textureFormat.internalFormatTexImage),
                    currentWidth, currentHeight, 0, textureFormat.externalFormat, GL_UNSIGNED_BYTE,
                    nullptr);
-    success = CheckGLError(context);
+    success = CheckGLError(gl);
   }
   if (!success) {
     gl->deleteTextures(1, &samplerID);

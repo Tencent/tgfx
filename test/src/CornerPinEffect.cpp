@@ -86,21 +86,22 @@ Rect CornerPinEffect::filterBounds(const Rect&) const {
 }
 
 std::unique_ptr<RuntimeProgram> CornerPinEffect::onCreateProgram(Context* context) const {
+  auto gl = GLFunctions::Get(context);
   // Clear the previously generated GLError, causing the subsequent CheckGLError to return an
   // incorrect result.
-  ClearGLError(context);
+  ClearGLError(gl);
   auto filterProgram =
       FilterProgram::Make(context, CORNER_PIN_VERTEX_SHADER, CORNER_PIN_FRAGMENT_SHADER);
   if (filterProgram == nullptr) {
     return nullptr;
   }
-  auto gl = GLFunctions::Get(context);
+
   auto program = filterProgram->program;
   auto uniforms = std::make_unique<CornerPinUniforms>();
   uniforms->positionHandle = gl->getAttribLocation(program, "aPosition");
   uniforms->textureCoordHandle = gl->getAttribLocation(program, "aTextureCoord");
   filterProgram->uniforms = std::move(uniforms);
-  if (!CheckGLError(context)) {
+  if (!CheckGLError(gl)) {
     return nullptr;
   }
   return filterProgram;
@@ -124,11 +125,11 @@ bool CornerPinEffect::onDraw(const RuntimeProgram* program,
                              const std::vector<BackendTexture>& inputTextures,
                              const BackendRenderTarget& target, const Point& offset) const {
   auto context = program->getContext();
+  auto gl = tgfx::GLFunctions::Get(context);
   // Clear the previously generated GLError
-  ClearGLError(context);
+  ClearGLError(gl);
   auto filterProgram = static_cast<const FilterProgram*>(program);
   auto uniforms = static_cast<const CornerPinUniforms*>(filterProgram->uniforms.get());
-  auto gl = tgfx::GLFunctions::Get(context);
   auto needsMSAA = sampleCount() > 1;
   EnableMultisample(context, needsMSAA);
   gl->useProgram(filterProgram->program);
@@ -164,7 +165,7 @@ bool CornerPinEffect::onDraw(const RuntimeProgram* program,
     gl->bindVertexArray(0);
   }
   DisableMultisample(context, needsMSAA);
-  return CheckGLError(context);
+  return CheckGLError(gl);
 }
 
 static Point ToGLVertexPoint(const Point& point, const BackendRenderTarget& target) {
