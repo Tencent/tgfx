@@ -21,6 +21,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstring>
+#include <cstdint>
 
 namespace tgfx {
 
@@ -371,7 +372,6 @@ static int CheckOutputStuff(void* outputPixels, int typeSize, int outputW, int o
                             int outputStrideInBytes, InternalPixelLayout pixelLayout) {
   size_t size;
   int pitch;
-  void* ptr;
 
   pitch = outputW * typeSize * PixelChannels[static_cast<size_t>(pixelLayout)];
   if (pitch == 0) return 0;
