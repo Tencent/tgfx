@@ -127,8 +127,19 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
   auto sourceProcessor = FragmentProcessor::Make(source, fpArgs, tileMode, tileMode, {},
                                                  SrcRectConstraint::Fast, &uvMatrix);
 
+  if (scaleFactorX != 1.0f || scaleFactorY != 1.0f) {
+    auto drawingManager = args.context->drawingManager();
+    drawingManager->fillRTWithFP(renderTarget, std::move(sourceProcessor), args.renderFlags);
+
+    sourceProcessor = TextureEffect::Make(renderTarget->asTextureProxy());
+
+    renderTarget = RenderTargetProxy::MakeFallback(
+        args.context, static_cast<int>(scaledBounds.width()), static_cast<int>(scaledBounds.height()),
+        isAlphaOnly, 1, mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
+  }
+
   if (blur2D) {
-    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessX * scaleFactorX,
+    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessX * scaleFactorX / scaleX,
            GaussianBlurDirection::Horizontal, 1.0f, args.renderFlags);
 
     // blur and scale the texture to the clip bounds.
@@ -149,17 +160,17 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
       return nullptr;
     }
 
-    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessY * scaleFactorY,
+    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessY * scaleFactorY / scaleY,
            GaussianBlurDirection::Vertical, boundsWillSample.height() / scaledBounds.height(),
            args.renderFlags);
     return renderTarget->asTextureProxy();
   }
 
   if (blurrinessX > 0) {
-    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessX * scaleFactorX,
+    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessX * scaleFactorX / scaleX,
            GaussianBlurDirection::Horizontal, 1.0f, args.renderFlags);
   } else if (blurrinessY > 0) {
-    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessY * scaleFactorY,
+    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessY * scaleFactorY / scaleY,
            GaussianBlurDirection::Vertical, 1.0f, args.renderFlags);
   }
 

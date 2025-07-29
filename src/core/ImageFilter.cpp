@@ -93,12 +93,25 @@ PlacementPtr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(
   }
   auto isAlphaOnly = source->isAlphaOnly();
   auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
+
+  auto newSourceWidth = static_cast<int>(roundf(source->width() * args.drawScales.x));
+  auto newSourceHeight = static_cast<int>(roundf(source->height() * args.drawScales.y));
+  auto currentSource = source->makeScaled(newSourceWidth, newSourceHeight, sampling);
+  auto sourceScaleX =
+      static_cast<float>(currentSource->width()) / static_cast<float>(source->width());
+  auto sourceScaleY =
+      static_cast<float>(currentSource->height()) / static_cast<float>(source->height());
+  // filter must be linear
+  auto scaledFilter = makeScaled(sourceScaleX, sourceScaleY);
+  dstBounds.scale(sourceScaleX, sourceScaleY);
+  dstBounds.roundOut();
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
-  auto textureProxy = lockTextureProxy(std::move(source), dstBounds, tpArgs);
+  auto textureProxy = scaledFilter->lockTextureProxy(currentSource, dstBounds, tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  auto fpMatrix = Matrix::MakeTrans(-dstBounds.x(), -dstBounds.y());
+  auto fpMatrix = Matrix::MakeScale(sourceScaleX, sourceScaleY);
+  fpMatrix.postTranslate(-dstBounds.x(), -dstBounds.y());
   if (uvMatrix != nullptr) {
     fpMatrix.preConcat(*uvMatrix);
   }
