@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ImageResize.h"
+#include <algorithm>
 #include <cfloat>
 #include <climits>
 #include <cmath>
@@ -68,22 +69,19 @@ inline int saturateCast<int>(double v) {
 }
 
 static void saturateStore(const float* sum, int width, uint8_t* D) {
-  int dx = 0;
-  for (; dx < width; ++dx) {
+  for (int dx = 0; dx < width; ++dx) {
     D[dx] = saturateCast<uint8_t>(sum[dx]);
   }
 }
 
 static void mul(const float* buf, int width, float beta, float* sum) {
-  int dx = 0;
-  for (; dx < width; ++dx) {
+  for (int dx = 0; dx < width; ++dx) {
     sum[dx] = beta * buf[dx];
   }
 }
 
 static void mulAdd(const float* buf, int width, float beta, float* sum) {
-  int dx = 0;
-  for (; dx < width; ++dx) {
+  for (int dx = 0; dx < width; ++dx) {
     sum[dx] += beta * buf[dx];
   }
 }
@@ -172,7 +170,7 @@ static void ResizeAreaFast(const FastFuncInfo& srcInfo, FastFuncInfo& dstInfo, c
           count++;
         }
       }
-      D[dx] = saturateCast<uint8_t>(static_cast<float>(sum) / count);
+      D[dx] = saturateCast<uint8_t>(static_cast<float>(sum) / static_cast<float>(count));
     }
   }
 }
