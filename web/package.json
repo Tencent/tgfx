@@ -18,7 +18,7 @@
     "build:st:debug": "node script/cmake.demo.js -a wasm --debug && npm run build:tgfx && rollup -c ./script/rollup.demo.js",
     "dev:st": "npm run build:tgfx && rollup -c ./script/rollup.dev.js -w",
     "server:st": "node server.js",
-    "build:workflow": "node script/cmake.demo.js -a wasm --debug && npm run build:tgfx && rollup -c ./script/rollup.demo.js"
+    "build:workflow": "node script/cmake.workflow.js -a wasm --debug && npm run build:tgfx && rollup -c ./script/rollup.demo.js"
   },
   "repository": {
     "type": "git",
