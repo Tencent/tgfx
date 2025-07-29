@@ -23,6 +23,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include "core/utils/AddressOf.h"
 #include "core/utils/Log.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/MaskFilter.h"
@@ -85,9 +86,9 @@ class CopyOnWrite {
   T* writable() {
     if (!optional.has_value()) {
       optional = *object;
-      object = &optional.value();
+      object = AddressOf(optional);
     }
-    return &optional.value();
+    return AddressOf(optional);
   }
 
   const T* get() const {
