@@ -219,7 +219,7 @@ jobs:
 
       - name: Build Windows
         run: |
-          node build_tgfx -s ./win Hello2D -o ./out/release/win -a x64 -d
+          node build_tgfx -s ./win Hello2D -DTGFX_BUILD_SVG=ON -o ./out/release/win -a x64 -d
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -268,7 +268,7 @@ jobs:
 
       - name: Build Linux
         run: |
-          node build_tgfx -s ./linux Hello2D -o ./out/release/linux -a x64 -d
+          node build_tgfx -s ./linux Hello2D -DTGFX_BUILD_SVG=ON -o ./out/release/linux -a x64 -d
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
