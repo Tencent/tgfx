@@ -43,7 +43,7 @@ jobs:
       - name: Build iOS
         run: |
           cd ios
-          node gen_ios
+          node gen_ios -DTGFX_BUILD_SVG=ON
           xcodebuild -workspace Hello2D.xcworkspace -scheme Hello2D -configuration Release -sdk iphoneos -arch arm64 CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
 
       - name: Save Third-Party Cache
