@@ -18,7 +18,7 @@
 
 #pragma once
 
-// #error "SVG test pipeline"
+#error "SVG test pipeline"
 
 #include <memory>
 #include "tgfx/core/Canvas.h"
