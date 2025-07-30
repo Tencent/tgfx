@@ -66,9 +66,9 @@ inline int SaturateCast<int>(double v) {
   return static_cast<int>(lrint(v));
 }
 
-static void SaturateStore(const float* sum, int width, uint8_t* D) {
+static void SaturateStore(const float* sum, int width, uint8_t* dstData) {
   for (int dstX = 0; dstX < width; ++dstX) {
-    D[dstX] = SaturateCast<uint8_t>(sum[dstX]);
+    dstData[dstX] = SaturateCast<uint8_t>(sum[dstX]);
   }
 }
 
