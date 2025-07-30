@@ -45,7 +45,7 @@ android {
 
             val cmakeArgs: String? = project.findProperty("cmakeArgs") as String?
             if (!cmakeArgs.isNullOrEmpty()) {
-                externalNativeBuild.cmake.arguments.addAll(cmakeArgs.split(" "))
+                arguments(cmakeArgs.split(" "))
             }
         }
     }
