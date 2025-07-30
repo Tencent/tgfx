@@ -42,6 +42,7 @@ android {
         cmake {
             path("./CMakeLists.txt")
             version = "3.22.1"
+            arguments "-DTGFX_BUILD_SVG=ON"
         }
     }
 
