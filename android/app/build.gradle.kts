@@ -42,7 +42,11 @@ android {
         cmake {
             path("./CMakeLists.txt")
             version = "3.22.1"
-            arguments = "-DTGFX_BUILD_SVG=ON"
+
+            val cmakeArgs: String? = project.findProperty("cmakeArgs") as String?
+            if (!cmakeArgs.isNullOrEmpty()) {
+                arguments += cmakeArgs.split(" ")
+            }
         }
     }
 
