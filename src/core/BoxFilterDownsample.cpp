@@ -84,6 +84,24 @@ static void MulAdd(const float* buf, int width, float beta, float* sum) {
   }
 }
 
+/**
+ * Computes the resize area table for downsampling an image channel.
+ *
+ * This function generates a table (tab) that maps each destination pixel to one or more source
+ * pixels, along with blending weights (alpha) that determine how much each source pixel contributes
+ * to the destination pixel. The weights are calculated based on the area of overlap between source
+ * and destination pixels.
+ *
+ * @param srcSize     The size (width or height) of the source image dimension being processed.
+ * @param dstSize     The size (width or height) of the destination image dimension.
+ * @param channelNum  The number of channels in the image (1 for grayscale, 4 for RGBA).
+ * @param scale       The scaling factor (srcSize/dstSize) for this dimension.
+ * @param tab         Output array of DecimateAlpha structs that will store the mapping between
+ *                    source and destination pixels, along with blending weights.
+ *
+ * @return            The total number of entries written to the tab array.
+ *
+ */
 static int ComputeResizeAreaTab(int srcSize, int dstSize, int channelNum, double scale,
                                 DecimateAlpha* tab) {
   int k = 0;
@@ -122,6 +140,22 @@ static int ComputeResizeAreaTab(int srcSize, int dstSize, int channelNum, double
   return k;
 }
 
+/**
+ * Performs fast area-based downsampling when the scaling factor is an exact integer ratio.
+ *
+ * This optimized version is used when both horizontal and vertical scaling factors are integers
+ * (e.g., 1/2, 1/3). It works by averaging pixel values in fixed-size blocks from the source image
+ * to produce each destination pixel.
+ *
+ * @param srcInfo    Contains source image data (pixels) and layout information
+ * @param dstInfo    Contains destination image buffer and layout information
+ * @param offset     Precomputed array of offsets for accessing source pixel blocks
+ * @param xOffset    Precomputed horizontal offsets for each destination pixel column
+ * @param scaleX     Horizontal scaling factor (must be integer)
+ * @param scaleY     Vertical scaling factor (must be integer)
+ * @param channelNum Number of channels (1 for grayscale, 4 for RGBA)
+ *
+ */
 static void ResizeAreaFast(const FastFuncInfo& srcInfo, FastFuncInfo& dstInfo, const int* offset,
                            const int* xOffset, int scaleX, int scaleY, int channelNum) {
   int area = scaleX * scaleY;
@@ -177,6 +211,25 @@ static void ResizeAreaFast(const FastFuncInfo& srcInfo, FastFuncInfo& dstInfo, c
   }
 }
 
+/**
+ * Performs generic area-based image downsampling for arbitrary scaling ratios.
+ *
+ * This function handles non-integer scaling factors by using weighted averaging of source pixels,
+ * where weights are proportional to the area of overlap between source and destination pixels.
+ * It supports both single-channel and multi-channel (RGBA) images.
+ *
+ * @param srcInfo    Source image information (pixel data and layout)
+ * @param dstInfo    Destination image buffer and layout
+ * @param xTab       Precomputed horizontal resizing table containing:
+ *                   - srcIndex: source pixel index
+ *                   - dstIndex: destination pixel index
+ *                   - alpha: blending weight for this pixel
+ * @param xTabSize   Number of entries in xTab
+ * @param yTab       Precomputed vertical resizing table (same structure as xTab)
+ * @param tabOffset  Offsets into yTab for each destination row
+ * @param channelNum Number of color channels (1 or 4)
+ *
+ */
 static void ResizeArea(const FastFuncInfo& srcInfo, FastFuncInfo& dstInfo,
                        const DecimateAlpha* xTab, int xTabSize, const DecimateAlpha* yTab, int,
                        const int* tabOffset, int channelNum) {
