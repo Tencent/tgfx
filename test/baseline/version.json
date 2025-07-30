@@ -130,6 +130,8 @@
         "RuntimeEffect-scaled": "9543f407",
         "ScaleFilterTest_Blur_Origin": "9543f407",
         "ScaleFilterTest_Blur_Scaled": "9543f407",
+        "ScaleFilterTest_Compose_Origin": "9543f407",
+        "ScaleFilterTest_Compose_Scaled": "9543f407",
         "ScaleFilterTest_DropShadow_Origin": "9543f407",
         "ScaleFilterTest_DropShadow_Scaled": "9543f407",
         "ScaleFilterTest_Gaussian_Origin": "9543f407",

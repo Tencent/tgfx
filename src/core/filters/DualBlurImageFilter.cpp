@@ -108,7 +108,7 @@ void DualBlurImageFilter::draw(std::shared_ptr<RenderTargetProxy> renderTarget,
 
 Rect DualBlurImageFilter::onFilterBounds(const Rect& srcRect) const {
   auto mul = static_cast<float>(std::pow(2, iteration)) / (scaleFactor * downScaling);
-  return srcRect.makeOutset(blurOffset.x * mul * scaleX, blurOffset.y * mul * scaleY);
+  return srcRect.makeOutset(blurOffset.x * mul * _scaleX, blurOffset.y * mul * _scaleY);
 }
 
 std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_ptr<Image> source,
@@ -136,8 +136,8 @@ std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_
   auto filterOriginBounds = filterBounds(Rect::MakeWH(source->width(), source->height()));
   boundsWillSample.intersect(filterOriginBounds);
 
-  auto scaleFactorX = scaleFactor * scaleX;
-  auto scaleFactorY = scaleFactor * scaleY;
+  auto scaleFactorX = scaleFactor / _scaleX;
+  auto scaleFactorY = scaleFactor / _scaleY;
 
   // sampleOffset means the offset between the source bounds and the sample bounds.
   auto sampleOffset = Point::Make(boundsWillSample.left, boundsWillSample.top);
