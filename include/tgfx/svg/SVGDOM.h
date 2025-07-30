@@ -18,8 +18,6 @@
 
 #pragma once
 
-#error "SVG test pipeline"
-
 #include <memory>
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Picture.h"
