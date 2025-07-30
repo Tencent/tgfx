@@ -23,6 +23,7 @@
 #include <optional>
 #include <string>
 #include <unordered_map>
+#include "core/utils/AddressOf.h"
 #include "core/utils/Log.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/MaskFilter.h"
@@ -69,25 +70,25 @@ class CopyOnWrite {
 
   CopyOnWrite& operator=(const CopyOnWrite& that) {
     optional = that.optional;
-    object = optional.has_value() ? &optional.value() : that.object;
+    object = optional.has_value() ? AddressOf(optional) : that.object;
     return *this;
   }
 
   CopyOnWrite& operator=(CopyOnWrite&& that) {
     optional = std::move(that.optional);
-    object = optional.has_value() ? &optional.value() : that.object;
+    object = optional.has_value() ? AddressOf(optional) : that.object;
     return *this;
   }
 
   /**
-     * Returns a writable T*. The first time this is called the initial object is cloned.
-     */
+   * Returns a writable T*. The first time this is called the initial object is cloned.
+   */
   T* writable() {
     if (!optional.has_value()) {
       optional = *object;
-      object = &optional.value();
+      object = AddressOf(optional);
     }
-    return &optional.value();
+    return AddressOf(optional);
   }
 
   const T* get() const {
