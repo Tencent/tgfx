@@ -20,9 +20,12 @@
 
 namespace tgfx {
 
-enum class PixelLayout { CHANNEL_1 = 1, RGB = 3, RGBA = 4 };
+struct PixelLayout {
+  int width;
+  int height;
+  int rowBytes;
+};
 
-void boxFilterDownSampling(const void* inputPixels, int inputW, int inputH, int inputStrideInBytes,
-                           void* outputPixels, int outputW, int outputH, int outputStrideInBytes,
-                           PixelLayout pixelLayout);
+void BoxFilterDownSample(const void* inputPixels, const PixelLayout& inputLayout,
+                         void* outputPixels, const PixelLayout& outputLayout, bool alphaOnly);
 }  // namespace tgfx
