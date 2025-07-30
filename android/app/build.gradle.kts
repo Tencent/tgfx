@@ -45,7 +45,7 @@ android {
 
             val cmakeArgs: String? = project.findProperty("cmakeArgs") as String?
             if (!cmakeArgs.isNullOrEmpty()) {
-                arguments(cmakeArgs.split(" "))
+                setArguments(cmakeArgs.split(" "))
             }
         }
     }
