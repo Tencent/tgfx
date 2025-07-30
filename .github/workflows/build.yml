@@ -94,7 +94,7 @@ jobs:
       - name: Build Android
         run: |
           cd android
-          ./gradlew assembleRelease -Parm64-only --no-daemon -Pandroid.externalNativeBuild.cmake.arguments="-DTGFX_BUILD_SVG=ON"
+          ./gradlew assembleRelease -Pandroid.externalNativeBuild.cmake.arguments="-DTGFX_BUILD_SVG=ON" -Parm64-only --no-daemon 
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
