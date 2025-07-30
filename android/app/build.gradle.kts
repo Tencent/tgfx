@@ -26,13 +26,6 @@ android {
                 abiFilters.add("x86_64")
             }
         }
-
-        externalNativeBuild {
-            cmake {
-                // Passes optional arguments to CMake.
-                arguments.add("-DTGFX_BUILD_SVG=ON")
-            }
-        }
     }
 
     buildTypes {
@@ -49,6 +42,7 @@ android {
         cmake {
             path("./CMakeLists.txt")
             version = "3.22.1"
+            arguments.add("-DTGFX_BUILD_SVG=ON")
         }
     }
 
