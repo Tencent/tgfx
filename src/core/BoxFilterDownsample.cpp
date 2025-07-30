@@ -236,7 +236,7 @@ static void ResizeArea(const FastFuncInfo& srcInfo, FastFuncInfo& dstInfo,
                 static_cast<uint8_t*>(dstInfo.pixels) + prevDstY * dstInfo.layout.rowBytes);
 }
 
-void BoxFilterDownSample(const void* inputPixels, const PixelLayout& inputLayout,
+void BoxFilterDownsample(const void* inputPixels, const PixelLayout& inputLayout,
                          void* outputPixels, const PixelLayout& outputLayout, bool alphaOnly) {
   ASSERT(inputPixels != nullptr && outputPixels != nullptr)
   ASSERT(inputLayout.width > 0 && inputLayout.height > 0 && outputLayout.width > 0 &&

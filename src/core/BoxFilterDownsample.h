@@ -26,6 +26,6 @@ struct PixelLayout {
   int rowBytes;
 };
 
-void BoxFilterDownSample(const void* inputPixels, const PixelLayout& inputLayout,
+void BoxFilterDownsample(const void* inputPixels, const PixelLayout& inputLayout,
                          void* outputPixels, const PixelLayout& outputLayout, bool alphaOnly);
 }  // namespace tgfx
