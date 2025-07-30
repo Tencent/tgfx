@@ -30,7 +30,7 @@ android {
         externalNativeBuild {
             cmake {
                 // Passes optional arguments to CMake.
-                arguments "-DTGFX_BUILD_SVG=ON"
+                arguments.add("-DTGFX_BUILD_SVG=ON")
             }
         }
     }
