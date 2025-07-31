@@ -31,7 +31,8 @@ HWY_BEFORE_NAMESPACE();
 namespace tgfx {
 namespace HWY_NAMESPACE {
 namespace hn = hwy::HWY_NAMESPACE;
-int ResizeAreaFastSIMDFuncImpl(int channelNum, int step, const uint8_t* srcData, uint8_t* dstData, int w) {
+int ResizeAreaFastSIMDFuncImpl(int channelNum, int step, const uint8_t* srcData, uint8_t* dstData,
+                               int w) {
   int dstX = 0;
   const uint8_t* srcData0 = srcData;
   const uint8_t* srcData1 = srcData0 + step;
@@ -39,8 +40,8 @@ int ResizeAreaFastSIMDFuncImpl(int channelNum, int step, const uint8_t* srcData,
   hn::ScalableTag<uint16_t> du16;
   const int n = static_cast<int>(hn::Lanes(du8));
   auto value2 = hn::Set(du16, 2);
-  if(channelNum == 1) {
-    for(; dstX <= w - n; dstX += n, srcData0 += 2 * n, srcData1 += 2 * n, dstData += n) {
+  if (channelNum == 1) {
+    for (; dstX <= w - n; dstX += n, srcData0 += 2 * n, srcData1 += 2 * n, dstData += n) {
       hn::Vec<decltype(du8)> row00, row01, row10, row11;
       hn::LoadInterleaved2(du8, srcData0, row00, row01);
       hn::LoadInterleaved2(du8, srcData1, row10, row11);
@@ -54,23 +55,28 @@ int ResizeAreaFastSIMDFuncImpl(int channelNum, int step, const uint8_t* srcData,
       auto dstValue = hn::OrderedDemote2To(du8, vDst0, vDst1);
       hn::Store(dstValue, du8, dstData);
     }
-  }else if(channelNum == 4) {
-    for(; dstX <= w - 2 * n; dstX += 2 * n, srcData0 += 4 * n, srcData1 += 4 * n, dstData += 2 * n) {
+  } else if (channelNum == 4) {
+    for (; dstX <= w - 2 * n;
+         dstX += 2 * n, srcData0 += 4 * n, srcData1 += 4 * n, dstData += 2 * n) {
       hn::Vec<decltype(du8)> row0r, row0g, row0b, row0a, row1r, row1g, row1b, row1a;
       hn::LoadInterleaved4(du8, srcData0, row0r, row0g, row0b, row0a);
       hn::LoadInterleaved4(du8, srcData1, row1r, row1g, row1b, row1a);
       auto row0rSum = hn::SumsOf2(row0r);
       auto row1rSum = hn::SumsOf2(row1r);
-      auto rSum = hn::DemoteTo(du8, hn::ShiftRight<2>(hn::Add(hn::Add(row0rSum, row1rSum), value2)));
+      auto rSum =
+          hn::DemoteTo(du8, hn::ShiftRight<2>(hn::Add(hn::Add(row0rSum, row1rSum), value2)));
       auto row0gSum = hn::SumsOf2(row0g);
       auto row1gSum = hn::SumsOf2(row1g);
-      auto gSum = hn::DemoteTo(du8, hn::ShiftRight<2>(hn::Add(hn::Add(row0gSum, row1gSum), value2)));
+      auto gSum =
+          hn::DemoteTo(du8, hn::ShiftRight<2>(hn::Add(hn::Add(row0gSum, row1gSum), value2)));
       auto row0bSum = hn::SumsOf2(row0b);
       auto row1bSum = hn::SumsOf2(row1b);
-      auto bSum = hn::DemoteTo(du8, hn::ShiftRight<2>(hn::Add(hn::Add(row0bSum, row1bSum), value2)));
+      auto bSum =
+          hn::DemoteTo(du8, hn::ShiftRight<2>(hn::Add(hn::Add(row0bSum, row1bSum), value2)));
       auto row0aSum = hn::SumsOf2(row0a);
       auto row1aSum = hn::SumsOf2(row1a);
-      auto aSum = hn::DemoteTo(du8, hn::ShiftRight<2>(hn::Add(hn::Add(row0aSum, row1aSum), value2)));
+      auto aSum =
+          hn::DemoteTo(du8, hn::ShiftRight<2>(hn::Add(hn::Add(row0aSum, row1aSum), value2)));
       auto d = hn::DFromV<decltype(rSum)>();
       hn::StoreInterleaved4(rSum, gSum, bSum, aSum, d, dstData);
     }
@@ -87,7 +93,7 @@ void MulImpl(const float* buf, int width, float beta, float* sum) {
     auto res = hn::Mul(bufVec, hn::Set(df, beta));
     hn::Store(res, df, &sum[dstX]);
   }
-  for(int dstX = vecSize; dstX < size; dstX++) {
+  for (int dstX = vecSize; dstX < size; dstX++) {
     sum[dstX] = beta * buf[dstX];
   }
 }
@@ -102,7 +108,7 @@ void MulAddImpl(const float* buf, int width, float beta, float* sum) {
     auto res = hn::Add(hn::Mul(bufVec, hn::Set(df, beta)), sumVec);
     hn::Store(res, df, &sum[dstX]);
   }
-  for(int dstX = vecSize; dstX < size; dstX++) {
+  for (int dstX = vecSize; dstX < size; dstX++) {
     sum[dstX] += beta * buf[dstX];
   }
 }
@@ -116,7 +122,8 @@ HWY_EXPORT(ResizeAreaFastSIMDFuncImpl);
 HWY_EXPORT(MulImpl);
 HWY_EXPORT(MulAddImpl);
 
-int ResizeAreaFastSIMDFunc(int channelNum, int step, const uint8_t* srcData, uint8_t* dstData, int w) {
+int ResizeAreaFastSIMDFunc(int channelNum, int step, const uint8_t* srcData, uint8_t* dstData,
+                           int w) {
   return HWY_DYNAMIC_DISPATCH(ResizeAreaFastSIMDFuncImpl)(channelNum, step, srcData, dstData, w);
 }
 
