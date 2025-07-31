@@ -39,16 +39,16 @@ void SVGShape::onRender(const SVGRenderContext& context) const {
   auto strokePaint = paintContext.strokePaint();
 
   if (fillPaint.has_value()) {
-    onDrawFill(context.canvas(), context.lengthContext(), fillPaint.value(), fillType);
+    onDrawFill(context.canvas(), context.lengthContext(), *fillPaint, fillType);
   }
 
   if (strokePaint.has_value()) {
     auto strokePathEffect = context.strokePathEffect();
     if (strokePathEffect) {
-      onDrawStroke(context.canvas(), context.lengthContext(), strokePaint.value(), fillType,
+      onDrawStroke(context.canvas(), context.lengthContext(), *strokePaint, fillType,
                    strokePathEffect);
     } else {
-      onDrawFill(context.canvas(), context.lengthContext(), strokePaint.value(), fillType);
+      onDrawFill(context.canvas(), context.lengthContext(), *strokePaint, fillType);
     }
   }
 }

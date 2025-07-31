@@ -54,7 +54,7 @@ float SVGLengthContext::resolve(const SVGLength& length, LengthType type) const 
   switch (length.unit()) {
     case SVGLength::Unit::Number: {
       if (unit.has_value()) {
-        if (unit.value().type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
+        if (unit->type() == SVGObjectBoundingBoxUnits::Type::ObjectBoundingBox) {
           return length.value() * length_size_for_type(_viewPort, type);
         } else {
           return length.value();

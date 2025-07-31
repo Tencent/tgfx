@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/opengl/GLFunctions.h"
-#include "gpu/opengl/GLContext.h"
+#include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
 const GLFunctions* GLFunctions::Get(const Context* context) {
-  return context ? static_cast<const GLContext*>(context)->functions() : nullptr;
+  return context ? static_cast<const GLGPU*>(context->gpu())->functions() : nullptr;
 }
 }  // namespace tgfx

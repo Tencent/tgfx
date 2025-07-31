@@ -18,30 +18,29 @@
 #ifdef TGFX_USE_INSPECTOR
 
 #include "MatrixSerialization.h"
-#include <sstream>
+#include <string>
 
 namespace tgfx {
+static void SerializeMatrixImpl(flexbuffers::Builder& fbb, const Matrix* matrix) {
+  float buffer[6] = {0.0f};
+  matrix->get6(buffer);
+  std::string key = "";
+  for (int i = 0; i < 6; i++) {
+    key = "[" + std::to_string(i) + "]";
+    SerializeUtils::SetFlexBufferMap(fbb, key.c_str(), buffer[i]);
+  }
+}
 
 std::shared_ptr<Data> MatrixSerialization::Serialize(const Matrix* matrix) {
   DEBUG_ASSERT(matrix != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, "LayerAttribute", startMap, contentMap);
+  SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute, startMap,
+                                 contentMap);
   SerializeMatrixImpl(fbb, matrix);
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
-
-void MatrixSerialization::SerializeMatrixImpl(flexbuffers::Builder& fbb, const Matrix* matrix) {
-  for (int i = 0; i < 6; i++) {
-    std::stringstream ss;
-    ss << "[" << i << "]";
-    float buffer[6];
-    matrix->get6(buffer);
-    SerializeUtils::SetFlexBufferMap(fbb, ss.str().c_str(), buffer[i]);
-  }
-}
-
 }  // namespace tgfx
 #endif

@@ -21,6 +21,8 @@
 #include <optional>
 #include "gpu/RectsVertexProvider.h"
 #include "gpu/ops/DrawOp.h"
+#include "gpu/proxies/IndexBufferProxy.h"
+#include "gpu/proxies/VertexBufferProxyView.h"
 
 namespace tgfx {
 class RectDrawOp : public DrawOp {
@@ -29,6 +31,16 @@ class RectDrawOp : public DrawOp {
    * The maximum number of rects that can be drawn in a single draw call.
    */
   static constexpr uint16_t MaxNumRects = 2048;
+
+  /**
+   * The maximum number of vertices per non-AA quad.
+   */
+  static constexpr uint16_t IndicesPerNonAAQuad = 6;
+
+  /**
+   * The maximum number of vertices per AA quad.
+   */
+  static constexpr uint16_t IndicesPerAAQuad = 30;
 
   /**
    * Create a new RectDrawOp for the specified vertex provider.
@@ -43,9 +55,8 @@ class RectDrawOp : public DrawOp {
   std::optional<Color> commonColor = std::nullopt;
   std::optional<Matrix> uvMatrix = std::nullopt;
   bool hasSubset = false;
-  std::shared_ptr<GpuBufferProxy> indexBufferProxy = nullptr;
-  std::shared_ptr<GpuBufferProxy> vertexBufferProxy = nullptr;
-  size_t vertexBufferOffset = 0;
+  std::shared_ptr<IndexBufferProxy> indexBufferProxy = nullptr;
+  std::shared_ptr<VertexBufferProxyView> vertexBufferProxyView = nullptr;
 
   explicit RectDrawOp(RectsVertexProvider* provider);
 

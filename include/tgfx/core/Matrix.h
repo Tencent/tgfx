@@ -882,7 +882,7 @@ class Matrix {
 
   static void ScalePoints(const Matrix& m, Point dst[], const Point src[], int count);
 
-  static void AfflinePoints(const Matrix& m, Point dst[], const Point src[], int count);
+  static void AffinePoints(const Matrix& m, Point dst[], const Point src[], int count);
 
   bool invertNonIdentity(Matrix* inverse) const;
 
