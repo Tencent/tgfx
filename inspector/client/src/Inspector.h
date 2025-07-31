@@ -22,8 +22,8 @@
 #include <thread>
 #include <vector>
 #include "MemoryUtils.h"
-#include "Protocol.h"
 #include "Message.h"
+#include "Protocol.h"
 #include "Singleton.h"
 #include "Socket.h"
 #include "TimeUtils.h"
