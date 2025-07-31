@@ -140,6 +140,44 @@ static int ComputeResizeAreaTab(int srcSize, int dstSize, int channelNum, double
   return k;
 }
 
+extern int ResizeAreaFastSIMDFunc(int channelNum, int step, const uint8_t* srcData, const uint8_t* dstData, int W);
+
+struct ResizeAreaFastVec {
+  ResizeAreaFastVec(int scaleX, int scaleY, int channelNum, int step)
+    :scaleX(scaleX), scaleY(scaleY), channelNum(channelNum), step(step){
+    fastMode = scaleX == 2 && scaleY == 2 && (channelNum == 1 || channelNum == 4);
+  }
+
+  int operator()(const uint8_t* srcData, uint8_t* dstData, int w) const {
+    if(!fastMode) {
+      return 0;
+    }
+    const uint8_t* nestRowSrcData = srcData + step;
+    int dstX = ResizeAreaFastSIMDFunc(channelNum, step, srcData, dstData, w);
+    if(channelNum == 1) {
+      for(; dstX < w; ++dstX) {
+        int index = dstX * 2;
+        dstData[dstX] = (srcData[index] + srcData[index + 1] + nestRowSrcData[index] + nestRowSrcData[index + 1] + 2) >> 2;
+      }
+    }else {
+      ASSERT(channelNum == 4);
+      for(; dstX < w; dstX += 4) {
+        int index = dstX * 2;
+        dstData[dstX] = (srcData[index] + srcData[index + 4] + nestRowSrcData[index] + nestRowSrcData[index + 4] + 2) >> 2;
+        dstData[dstX + 1] = (srcData[index + 1] + srcData[index + 5] + nestRowSrcData[index + 1] + nestRowSrcData[index + 5] + 2) >> 2;
+        dstData[dstX + 2] = (srcData[index + 2] + srcData[index + 6] + nestRowSrcData[index + 2] + nestRowSrcData[index + 6] + 2) >> 2;
+        dstData[dstX + 3] = (srcData[index + 3] + srcData[index + 7] + nestRowSrcData[index + 3] + nestRowSrcData[index + 7] + 2) >> 2;
+      }
+    }
+    return dstX;
+  }
+private:
+  int scaleX, scaleY;
+  int channelNum;
+  bool fastMode;
+  int step;
+};
+
 /**
  * Performs fast area-based downsampling when the scaling factor is an exact integer ratio.
  *
