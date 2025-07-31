@@ -21,7 +21,6 @@
 #include "svg/SVGRenderContext.h"
 #include "tgfx/core/ColorFilter.h"
 #include "tgfx/core/Paint.h"
-#include "tgfx/core/Recorder.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/svg/SVGTypes.h"
 
@@ -46,8 +45,8 @@ Rect SVGMask::bounds(const SVGRenderContext& context) const {
   SVGRenderContext resolveContext(context, lengthContext);
   if (Width.has_value() && Height.has_value()) {
     return resolveContext.resolveOBBRect(X.value_or(SVGLength(0, SVGLength::Unit::Number)),
-                                         Y.value_or(SVGLength(0, SVGLength::Unit::Number)),
-                                         Width.value(), Height.value(), MaskUnits);
+                                         Y.value_or(SVGLength(0, SVGLength::Unit::Number)), *Width,
+                                         *Height, MaskUnits);
   }
   return {};
 }

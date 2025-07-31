@@ -18,7 +18,7 @@
 
 #include "tgfx/gpu/opengl/GLDevice.h"
 #include <thread>
-#include "gpu/opengl/GLContext.h"
+#include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
 static std::mutex deviceMapLocker = {};
@@ -74,11 +74,11 @@ bool GLDevice::onLockContext() {
     return false;
   }
   if (context == nullptr) {
-    auto glInterface = GLInterface::GetNative();
-    if (glInterface != nullptr) {
-      context = new GLContext(this, glInterface);
+    auto gpu = GLGPU::MakeNative();
+    if (gpu != nullptr) {
+      context = new Context(this, std::move(gpu));
     } else {
-      LOGE("GLDevice::onLockContext(): Error on creating GLInterface! ");
+      LOGE("GLDevice::onLockContext(): Error on creating the GPU! ");
     }
   }
   if (context == nullptr) {

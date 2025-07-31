@@ -146,6 +146,8 @@ class OpsCompositor {
                  const std::optional<Rect>& localBounds, const std::optional<Rect>& deviceBounds,
                  const std::optional<Point>& drawScales);
 
+  void submitDrawOps();
+
   friend class DrawingManager;
   friend class PendingOpsAutoReset;
 };

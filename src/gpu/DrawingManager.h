@@ -55,38 +55,42 @@ class DrawingManager {
                           std::vector<std::shared_ptr<TextureProxy>> inputs,
                           std::shared_ptr<RuntimeEffect> effect, const Point& offset);
 
-  void addTextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTarget);
+  void addGenerateMipmapsTask(std::shared_ptr<TextureProxy> textureProxy);
 
   void addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
-                               std::shared_ptr<TextureProxy> dest);
+                               std::shared_ptr<TextureProxy> dest, int srcX = 0, int srcY = 0);
 
   void addResourceTask(PlacementPtr<ResourceTask> resourceTask, const UniqueKey& uniqueKey = {},
                        uint32_t renderFlags = 0);
 
+  void addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& textureProxy,
+                             const Point& atlasOffset, std::shared_ptr<ImageCodec> codec);
+
+  void addSemaphoreWaitTask(std::shared_ptr<Semaphore> semaphore);
+
   /**
-   * Returns true if any render tasks were executed.
+   * Flushes the drawing manager, executing all resource and render tasks. If signalSemaphore is not
+   * null and uninitialized, a new semaphore will be created and assigned to signalSemaphore after
+   * the flush is complete. Returns nullptr if there are no tasks to execute, in which case the
+   * signalSemaphore will not be created.
    */
-  bool flush();
+  std::shared_ptr<CommandBuffer> flush(BackendSemaphore* signalSemaphore);
 
   /**
    * Releases all tasks associated with the drawing manager.
    */
   void releaseAll();
 
-  void addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& textureProxy,
-                             const Point& atlasOffset, std::shared_ptr<ImageCodec> codec);
-
-  void uploadAtlasToGPU();
-
  private:
   Context* context = nullptr;
   BlockBuffer* drawingBuffer = nullptr;
-  std::unique_ptr<RenderPass> renderPass = nullptr;
   std::vector<PlacementPtr<ResourceTask>> resourceTasks = {};
   std::vector<PlacementPtr<RenderTask>> renderTasks = {};
   std::list<std::shared_ptr<OpsCompositor>> compositors = {};
   std::vector<std::shared_ptr<Task>> atlasCellCodecTasks = {};
   std::map<std::shared_ptr<TextureProxy>, std::vector<AtlasCellData>> atlasCellDatas = {};
+
+  void uploadAtlasToGPU();
 
   void clearAtlasCellCodecTasks();
 

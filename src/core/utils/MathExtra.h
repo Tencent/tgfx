@@ -129,4 +129,8 @@ int NextLog2(uint32_t value);
  */
 int NextPow2(int value);
 
+inline bool IsInteger(float f) {
+  return std::floor(f) == f;
+}
+
 }  // namespace tgfx

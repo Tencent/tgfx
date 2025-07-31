@@ -19,7 +19,7 @@
 #pragma once
 
 #include <string>
-#include "gpu/opengl/GLContext.h"
+#include "gpu/opengl/GLInterface.h"
 
 namespace tgfx {
 struct GLVersion {
@@ -38,21 +38,22 @@ unsigned PixelFormatToGLSizeFormat(PixelFormat pixelFormat);
 
 GLVersion GetGLVersion(const char* versionString);
 
-unsigned CreateGLProgram(Context* context, const std::string& vertex, const std::string& fragment);
+unsigned CreateGLProgram(const GLFunctions* gl, const std::string& vertex,
+                         const std::string& fragment);
 
-unsigned LoadGLShader(Context* context, unsigned shaderType, const std::string& source);
+unsigned LoadGLShader(const GLFunctions* gl, unsigned shaderType, const std::string& source);
 
-void ClearGLError(Context* context);
+void ClearGLError(const GLFunctions* gl);
 
-bool CheckGLErrorImpl(Context* context, std::string file, int line);
+bool CheckGLErrorImpl(const GLFunctions* gl, std::string file, int line);
 
 #ifdef DEBUG
 
-#define CheckGLError(context) CheckGLErrorImpl(context, __FILE__, __LINE__)
+#define CheckGLError(gl) CheckGLErrorImpl(gl, __FILE__, __LINE__)
 
 #else
 
-#define CheckGLError(context) CheckGLErrorImpl(context, "", 0)
+#define CheckGLError(gl) CheckGLErrorImpl(gl, "", 0)
 
 #endif
 }  // namespace tgfx

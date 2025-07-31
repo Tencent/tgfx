@@ -1207,19 +1207,19 @@ TGFX_TEST(LayerTest, HasContentChanged) {
   displayList.root()->addChild(shapeLayer);
   EXPECT_TRUE(displayList.hasContentChanged());
   displayList.render(surface.get());
-  context->flush();
+  context->flushAndSubmit();
   EXPECT_FALSE(displayList.hasContentChanged());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/HasContentChanged_Org"));
   displayList.setContentOffset(50, 50);
   EXPECT_TRUE(displayList.hasContentChanged());
   displayList.render(surface.get(), false);
-  context->flush();
+  context->flushAndSubmit();
   EXPECT_FALSE(displayList.hasContentChanged());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/HasContentChanged_Offset"));
   displayList.setZoomScale(0.5f);
   EXPECT_TRUE(displayList.hasContentChanged());
   displayList.render(surface.get());
-  context->flush();
+  context->flushAndSubmit();
   EXPECT_FALSE(displayList.hasContentChanged());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/HasContentChanged_Zoom"));
 }
@@ -1832,7 +1832,7 @@ TGFX_TEST(LayerTest, hitTestPointNested) {
   paint.setStyle(PaintStyle::Fill);
   Point p3 = {80.0f, 80.0f};
   canvas->drawCircle(p3.x, p3.y, 2.0f, paint);
-  EXPECT_EQ(false, textLayer->hitTestPoint(p3.x, p3.y));
+  EXPECT_EQ(true, textLayer->hitTestPoint(p3.x, p3.y));
   EXPECT_EQ(false, textLayer->hitTestPoint(p3.x, p3.y, true));
   EXPECT_EQ(false, shaperLayer->hitTestPoint(p3.x, p3.y));
   EXPECT_EQ(false, shaperLayer->hitTestPoint(p3.x, p3.y, true));
@@ -1840,9 +1840,9 @@ TGFX_TEST(LayerTest, hitTestPointNested) {
   EXPECT_EQ(true, imageLayer->hitTestPoint(p3.x, p3.y, true));
   EXPECT_EQ(true, parentLayer->hitTestPoint(p3.x, p3.y));
   EXPECT_EQ(true, parentLayer->hitTestPoint(p3.x, p3.y, true));
-  EXPECT_EQ(false, childLayer->hitTestPoint(p3.x, p3.y));
+  EXPECT_EQ(true, childLayer->hitTestPoint(p3.x, p3.y));
   EXPECT_EQ(false, childLayer->hitTestPoint(p3.x, p3.y, true));
-  EXPECT_EQ(false, grandsonLayer->hitTestPoint(p3.x, p3.y));
+  EXPECT_EQ(true, grandsonLayer->hitTestPoint(p3.x, p3.y));
   EXPECT_EQ(false, grandsonLayer->hitTestPoint(p3.x, p3.y, true));
   EXPECT_EQ(true, rootLayer->hitTestPoint(p3.x, p3.y));
   EXPECT_EQ(true, rootLayer->hitTestPoint(p3.x, p3.y, true));

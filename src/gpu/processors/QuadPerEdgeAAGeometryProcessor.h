@@ -35,8 +35,6 @@ class QuadPerEdgeAAGeometryProcessor : public GeometryProcessor {
     return "QuadPerEdgeAAGeometryProcessor";
   }
 
-  void fillAttribute();
-
  protected:
   DEFINE_PROCESSOR_CLASS_ID
   QuadPerEdgeAAGeometryProcessor(int width, int height, AAType aa, std::optional<Color> commonColor,
