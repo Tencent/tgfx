@@ -85,10 +85,10 @@ class ImageCodec : public ImageGenerator {
   }
 
  /**
-  * Decodes the image with the specified image info into the given pixels, Only supports parsing
-  * or scaling the original image. Returns true if the decoding was successful. Note that we do
-  * not recommend calling this method due to performance reasons, especially on the web platform.
-  * Use the makeBuffer() method for better performance if your final goal is to draw the image.
+  * Decodes or scale the image with the specified image info into the given pixels. Returns
+  * true if the decoding was successful. Note that we do not recommend calling this method due
+  * to performance reasons, especially on the web platform. Use the makeBuffer() method for
+  * better performance if your final goal is to draw the image.
   */
   virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const;
 
