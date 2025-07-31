@@ -36,6 +36,7 @@ class GlyphRasterizer : public ImageCodec {
     return !scalerContext->hasColor();
   }
 
+protected:
   bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 
  private:

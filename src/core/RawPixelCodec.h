@@ -31,12 +31,12 @@ class RawPixelCodec : public ImageCodec {
     return info.isAlphaOnly();
   }
 
+ protected:
+  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
+
   bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const override {
     return Pixmap(info, pixels->data()).readPixels(dstInfo, dstPixels);
   }
-
- protected:
-  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
  private:
   ImageInfo info = {};
