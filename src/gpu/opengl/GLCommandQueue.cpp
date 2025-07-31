@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,42 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "GLInterface.h"
-#include "gpu/SamplerState.h"
-#include "gpu/opengl/GLTextureSampler.h"
-#include "tgfx/gpu/Context.h"
+#include "GLCommandQueue.h"
 
 namespace tgfx {
-class GLCaps;
+void GLCommandQueue::submit(std::shared_ptr<CommandBuffer>) {
+  auto gl = interface->functions();
+  gl->flush();
+}
 
-class GLContext : public Context {
- public:
-  static GLContext* Unwrap(Context* context) {
-    return static_cast<GLContext*>(context);
-  }
+void GLCommandQueue::waitUntilCompleted() {
+  auto gl = interface->functions();
+  gl->finish();
+}
 
-  GLContext(Device* device, const GLInterface* glInterface);
-
-  Backend backend() const override {
-    return Backend::OPENGL;
-  }
-
-  const GLFunctions* functions() const {
-    return glInterface->functions.get();
-  }
-
-  const Caps* caps() const override {
-    return glInterface->caps.get();
-  }
-
-  void resetState() override;
-
- private:
-  const GLInterface* glInterface = nullptr;
-
-  friend class GLDevice;
-  friend class GLInterface;
-};
 }  // namespace tgfx

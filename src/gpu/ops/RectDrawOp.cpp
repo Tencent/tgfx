@@ -66,19 +66,19 @@ void RectDrawOp::execute(RenderPass* renderPass) {
   AttributeTGFXName("scissorRect", scissorRect());
   AttributeNameEnum("blenderMode", getBlendMode(), inspector::CustomEnumType::BlendMode);
   AttributeNameEnum("aaType", getAAType(), inspector::CustomEnumType::AAType);
-  std::shared_ptr<GpuBuffer> indexBuffer;
+  std::shared_ptr<GPUBuffer> indexBuffer;
   if (indexBufferProxy) {
     indexBuffer = indexBufferProxy->getBuffer();
     if (indexBuffer == nullptr) {
       return;
     }
   }
-  std::shared_ptr<GpuBuffer> vertexBuffer =
+  std::shared_ptr<GPUBuffer> vertexBuffer =
       vertexBufferProxy ? vertexBufferProxy->getBuffer() : nullptr;
   if (vertexBuffer == nullptr) {
     return;
   }
-  auto renderTarget = renderPass->renderTarget();
+  auto renderTarget = renderPass->getRenderTarget();
   auto drawingBuffer = renderPass->getContext()->drawingBuffer();
   auto gp = QuadPerEdgeAAGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
                                                  renderTarget->height(), aaType, commonColor,

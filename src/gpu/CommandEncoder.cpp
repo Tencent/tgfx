@@ -16,23 +16,26 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "Op.h"
+#include "CommandEncoder.h"
 
 namespace tgfx {
-class ResolveOp : public Op {
- public:
-  static PlacementPtr<ResolveOp> Make(Context* context, const Rect& bounds);
-
-  void execute(RenderPass* renderPass) override;
-
- private:
-  Rect bounds = {};
-
-  explicit ResolveOp(const Rect& bounds) : bounds(bounds) {
+std::shared_ptr<RenderPass> CommandEncoder::beginRenderPass(
+    std::shared_ptr<RenderTarget> renderTarget, bool resolveMSAA) {
+  if (activeRenderPass && !activeRenderPass->isEnd) {
+    LOGE("CommandEncoder::beginRenderPass() Cannot begin a new render pass while one is active!");
+    return nullptr;
   }
+  activeRenderPass = onBeginRenderPass(std::move(renderTarget), resolveMSAA);
+  return activeRenderPass;
+}
 
-  friend BlockBuffer;
-};
+std::shared_ptr<CommandBuffer> CommandEncoder::finish() {
+  if (activeRenderPass && !activeRenderPass->isEnd) {
+    LOGE("CommandEncoder::finish() Cannot finish command encoder while a render pass is active!");
+    return nullptr;
+  }
+  activeRenderPass = nullptr;
+  return onFinish();
+}
+
 }  // namespace tgfx

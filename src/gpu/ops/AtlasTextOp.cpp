@@ -64,7 +64,7 @@ void AtlasTextOp::execute(RenderPass* renderPass) {
   AttributeTGFXName("commonColor", commonColor);
   AttributeNameEnum("blenderMode", getBlendMode(), inspector::CustomEnumType::BlendMode);
   AttributeNameEnum("aaType", getAAType(), inspector::CustomEnumType::AAType);
-  std::shared_ptr<GpuBuffer> indexBuffer;
+  std::shared_ptr<GPUBuffer> indexBuffer;
   if (indexBufferProxy) {
     indexBuffer = indexBufferProxy->getBuffer();
     if (indexBuffer == nullptr) {

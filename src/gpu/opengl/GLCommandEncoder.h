@@ -16,22 +16,34 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ResolveOp.h"
-#include "core/utils/Profiling.h"
-#include "gpu/RenderPass.h"
+#pragma once
+
+#include "gpu/CommandEncoder.h"
+#include "gpu/opengl/GLInterface.h"
 
 namespace tgfx {
-PlacementPtr<ResolveOp> ResolveOp::Make(Context* context, const Rect& bounds) {
-  if (bounds.isEmpty()) {
-    return nullptr;
+class GLCommandEncoder : public CommandEncoder {
+ public:
+  explicit GLCommandEncoder(std::shared_ptr<GLInterface> interface)
+      : interface(std::move(interface)) {
   }
-  return context->drawingBuffer()->make<ResolveOp>(bounds);
-}
 
-void ResolveOp::execute(RenderPass* renderPass) {
-  OperateMark(inspector::OpTaskType::ResolveOp);
-  AttributeTGFXName("bounds", bounds);
-  renderPass->resolve(bounds);
-}
+  void copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture* texture, int srcX,
+                                 int srcY) override;
 
+  void generateMipmapsForTexture(TextureSampler* sampler) override;
+
+  BackendSemaphore insertSemaphore() override;
+
+  void waitSemaphore(const BackendSemaphore& semaphore) override;
+
+ protected:
+  std::shared_ptr<RenderPass> onBeginRenderPass(std::shared_ptr<RenderTarget> renderTarget,
+                                                bool resolveMSAA) override;
+
+  std::shared_ptr<CommandBuffer> onFinish() override;
+
+ private:
+  std::shared_ptr<GLInterface> interface = nullptr;
+};
 }  // namespace tgfx

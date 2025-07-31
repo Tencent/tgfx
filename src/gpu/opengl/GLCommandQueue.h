@@ -18,27 +18,21 @@
 
 #pragma once
 
-#include "Op.h"
-#include "gpu/proxies/TextureProxy.h"
+#include "gpu/CommandQueue.h"
+#include "gpu/opengl/GLInterface.h"
 
 namespace tgfx {
-/**
- * DstTextureCopyOp is an operation that copies a portion of a render target to the given texture.
- */
-class DstTextureCopyOp : public Op {
+class GLCommandQueue : public CommandQueue {
  public:
-  static PlacementPtr<DstTextureCopyOp> Make(std::shared_ptr<TextureProxy> textureProxy, int srcX,
-                                             int srcY);
+  explicit GLCommandQueue(std::shared_ptr<GLInterface> interface)
+      : interface(std::move(interface)) {
+  }
 
-  void execute(RenderPass* renderPass) override;
+  void submit(std::shared_ptr<CommandBuffer>) override;
+
+  void waitUntilCompleted() override;
 
  private:
-  std::shared_ptr<TextureProxy> textureProxy = nullptr;
-  int srcX = 0;
-  int srcY = 0;
-
-  DstTextureCopyOp(std::shared_ptr<TextureProxy> textureProxy, int srcX, int srcY);
-
-  friend class BlockBuffer;
+  std::shared_ptr<GLInterface> interface = nullptr;
 };
 }  // namespace tgfx

@@ -67,11 +67,17 @@ class UserTypeface : public Typeface {
     return true;
   }
 
+  bool onComputeBounds(Rect* bounds) const override {
+    *bounds = fontBounds;
+    return true;
+  }
+
  protected:
   explicit UserTypeface(uint32_t builderID, const std::string& fontFamily,
-                        const std::string& fontStyle, const FontMetrics& metrics)
+                        const std::string& fontStyle, const FontMetrics& fontMetrics,
+                        const Rect& fontBounds)
       : _builderID(builderID), _fontFamily(fontFamily), _fontStyle(fontStyle),
-        _fontMetrics(metrics) {
+        _fontMetrics(fontMetrics), fontBounds(fontBounds) {
   }
 
  private:
@@ -80,5 +86,6 @@ class UserTypeface : public Typeface {
   std::string _fontFamily;
   std::string _fontStyle;
   FontMetrics _fontMetrics = {};
+  Rect fontBounds = {};
 };
 }  // namespace tgfx

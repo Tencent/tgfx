@@ -59,8 +59,8 @@ void Task::Run(std::shared_ptr<Task> task, TaskPriority priority) {
 void Task::cancel() {
   auto currentStatus = _status.load(std::memory_order_acquire);
   if (currentStatus == TaskStatus::Queueing) {
-    if (_status.compare_exchange_weak(currentStatus, TaskStatus::Canceled,
-                                      std::memory_order_acq_rel, std::memory_order_relaxed)) {
+    if (_status.compare_exchange_strong(currentStatus, TaskStatus::Canceled,
+                                        std::memory_order_acq_rel, std::memory_order_relaxed)) {
       onCancel();
     }
   }
@@ -74,8 +74,8 @@ void Task::wait() {
   // If wait() is called from the thread pool, all threads might block, leaving no thread to execute
   // this task. To avoid deadlock, execute the task directly on the current thread if it's queued.
   if (oldStatus == TaskStatus::Queueing) {
-    if (_status.compare_exchange_weak(oldStatus, TaskStatus::Executing, std::memory_order_acq_rel,
-                                      std::memory_order_relaxed)) {
+    if (_status.compare_exchange_strong(oldStatus, TaskStatus::Executing, std::memory_order_acq_rel,
+                                        std::memory_order_relaxed)) {
       onExecute();
       oldStatus = TaskStatus::Executing;
       while (!_status.compare_exchange_weak(oldStatus, TaskStatus::Finished,
@@ -93,8 +93,8 @@ void Task::wait() {
 void Task::execute() {
   auto oldStatus = _status.load(std::memory_order_acquire);
   if (oldStatus == TaskStatus::Queueing &&
-      _status.compare_exchange_weak(oldStatus, TaskStatus::Executing, std::memory_order_acq_rel,
-                                    std::memory_order_relaxed)) {
+      _status.compare_exchange_strong(oldStatus, TaskStatus::Executing, std::memory_order_acq_rel,
+                                      std::memory_order_relaxed)) {
     onExecute();
     oldStatus = TaskStatus::Executing;
     while (!_status.compare_exchange_weak(oldStatus, TaskStatus::Finished,

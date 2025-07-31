@@ -18,29 +18,37 @@
 
 #pragma once
 
-#include "gpu/Gpu.h"
-#include "gpu/opengl/GLRenderPass.h"
+#include "gpu/GPU.h"
+#include "gpu/opengl/GLCommandQueue.h"
+#include "gpu/opengl/GLInterface.h"
 
 namespace tgfx {
-class GLGpu : public Gpu {
+class GLGPU : public GPU {
  public:
-  static std::unique_ptr<Gpu> Make(Context* context);
+  static std::unique_ptr<GLGPU> MakeNative();
 
-  void bindTexture(int unitIndex, const TextureSampler* sampler, SamplerState samplerState = {});
+  explicit GLGPU(std::shared_ptr<GLInterface> glInterface);
 
-  void copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture* texture, int srcX,
-                                 int srcY) override;
+  Backend backend() const override {
+    return Backend::OPENGL;
+  }
 
-  void resolveRenderTarget(RenderTarget* renderTarget, const Rect& bounds) override;
+  const Caps* caps() const override {
+    return interface->caps();
+  }
 
-  bool insertSemaphore(Semaphore* semaphore) override;
+  const GLFunctions* functions() const {
+    return interface->functions();
+  }
 
-  bool waitSemaphore(const Semaphore* semaphore) override;
+  CommandQueue* queue() const override {
+    return commandQueue.get();
+  }
 
-  bool submitToGpu(bool syncCpu) override;
+  std::shared_ptr<CommandEncoder> createCommandEncoder() const override;
 
  private:
-  explicit GLGpu(Context* context) : Gpu(context) {
-  }
+  std::shared_ptr<GLInterface> interface = nullptr;
+  std::unique_ptr<GLCommandQueue> commandQueue = nullptr;
 };
 }  // namespace tgfx

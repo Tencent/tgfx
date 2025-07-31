@@ -53,8 +53,6 @@ class GLTextureSampler : public TextureSampler {
   void writePixels(Context* context, const Rect& rect, const void* pixels,
                    size_t rowBytes) override;
 
-  void regenerateMipmapLevels(Context* context) override;
-
   void computeSamplerKey(Context* context, BytesKey* bytesKey) const override;
 
   void releaseGPU(Context* context) override;

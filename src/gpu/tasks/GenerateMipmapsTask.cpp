@@ -16,16 +16,20 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/opengl/GLContext.h"
-#include "GLGpu.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
+#include "GenerateMipmapsTask.h"
+#include "gpu/GPU.h"
 
 namespace tgfx {
-GLContext::GLContext(Device* device, const GLInterface* glInterface)
-    : Context(device), glInterface(glInterface) {
-  _gpu = GLGpu::Make(this).release();
+GenerateMipmapsTask::GenerateMipmapsTask(std::shared_ptr<TextureProxy> textureProxy)
+    : textureProxy(std::move(textureProxy)) {
 }
 
-void GLContext::resetState() {
+void GenerateMipmapsTask::execute(CommandEncoder* encoder) {
+  auto texture = textureProxy->getTexture();
+  if (texture == nullptr) {
+    LOGE("GenerateMipmapsTask::execute() Failed to get texture!");
+    return;
+  }
+  encoder->generateMipmapsForTexture(texture->getSampler());
 }
 }  // namespace tgfx

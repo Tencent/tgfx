@@ -16,28 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLFrameBuffer.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
+#pragma once
+
+#include "RenderTask.h"
+#include "gpu/Semaphore.h"
 
 namespace tgfx {
-std::shared_ptr<GLFrameBuffer> GLFrameBuffer::Make(Context* context) {
-  auto gl = GLFunctions::Get(context);
-  unsigned id = 0;
-  gl->genFramebuffers(1, &id);
-  if (id == 0) {
-    return nullptr;
+class SemaphoreWaitTask : public RenderTask {
+ public:
+  explicit SemaphoreWaitTask(std::shared_ptr<Semaphore> semaphore)
+      : semaphore(std::move(semaphore)) {
   }
-  return Resource::AddToCache(context, new GLFrameBuffer(id));
-}
 
-GLFrameBuffer::GLFrameBuffer(unsigned int id) : _id(id) {
-}
-
-void GLFrameBuffer::onReleaseGPU() {
-  auto gl = GLFunctions::Get(context);
-  if (_id > 0) {
-    gl->deleteFramebuffers(1, &_id);
-    _id = 0;
+  void execute(CommandEncoder* encoder) override {
+    encoder->waitSemaphore(semaphore->getBackendSemaphore());
   }
-}
+
+ private:
+  std::shared_ptr<Semaphore> semaphore = nullptr;
+};
 }  // namespace tgfx

@@ -19,7 +19,7 @@
 #include "GLTextureRenderTarget.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "core/utils/UniqueID.h"
-#include "gpu/Gpu.h"
+#include "gpu/GPU.h"
 #include "gpu/TextureSampler.h"
 #include "gpu/opengl/GLTextureSampler.h"
 #include "gpu/opengl/GLUtil.h"
@@ -106,8 +106,8 @@ std::shared_ptr<RenderTarget> RenderTarget::Make(Context* context, int width, in
 
 static bool RenderbufferStorageMSAA(Context* context, int sampleCount, PixelFormat pixelFormat,
                                     int width, int height) {
-  ClearGLError(context);
   auto gl = GLFunctions::Get(context);
+  ClearGLError(gl);
   auto caps = GLCaps::Get(context);
   auto format = caps->getTextureFormat(pixelFormat).sizedFormat;
   switch (caps->msFBOType) {
@@ -125,7 +125,7 @@ static bool RenderbufferStorageMSAA(Context* context, int sampleCount, PixelForm
       LOGE("Shouldn't be here if we don't support multisampled renderbuffers.");
       break;
   }
-  return CheckGLError(context);
+  return CheckGLError(gl);
 }
 
 static void FrameBufferTexture2D(Context* context, unsigned textureTarget, unsigned textureID,

@@ -16,15 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "RenderTask.h"
+#include "GLGPU.h"
+#include "GLCommandEncoder.h"
 
 namespace tgfx {
-class TextureResolveTask : public RenderTask {
- public:
-  explicit TextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTargetProxy);
+std::unique_ptr<GLGPU> GLGPU::MakeNative() {
+  auto interface = GLInterface::GetNative();
+  if (interface == nullptr) {
+    return nullptr;
+  }
+  return std::make_unique<GLGPU>(std::move(interface));
+}
 
-  bool execute(RenderPass* renderPass) override;
-};
+GLGPU::GLGPU(std::shared_ptr<GLInterface> glInterface) : interface(std::move(glInterface)) {
+  commandQueue = std::make_unique<GLCommandQueue>(interface);
+}
+
+std::shared_ptr<CommandEncoder> GLGPU::createCommandEncoder() const {
+  return std::make_shared<GLCommandEncoder>(interface);
+}
 }  // namespace tgfx

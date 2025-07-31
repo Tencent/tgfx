@@ -18,37 +18,17 @@
 
 #pragma once
 
-#include "gpu/Resource.h"
+#include "RenderTask.h"
+#include "gpu/proxies/TextureProxy.h"
 
 namespace tgfx {
-enum class BufferType {
-  Index,
-  Vertex,
-};
-
-class GpuBuffer : public Resource {
+class GenerateMipmapsTask : public RenderTask {
  public:
-  static std::shared_ptr<GpuBuffer> Make(Context* context, BufferType bufferType,
-                                         const void* buffer = nullptr, size_t size = 0);
+  explicit GenerateMipmapsTask(std::shared_ptr<TextureProxy> textureProxy);
 
-  BufferType bufferType() const {
-    return _bufferType;
-  }
+  void execute(CommandEncoder* encoder) override;
 
-  size_t size() const {
-    return _size;
-  }
-
-  size_t memoryUsage() const override {
-    return _size;
-  }
-
- protected:
-  BufferType _bufferType;
-  size_t _size;
-
-  GpuBuffer(BufferType bufferType, size_t sizeInBytes)
-      : _bufferType(bufferType), _size(sizeInBytes) {
-  }
+ private:
+  std::shared_ptr<TextureProxy> textureProxy = nullptr;
 };
 }  // namespace tgfx

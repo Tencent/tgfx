@@ -86,15 +86,17 @@ LRESULT CALLBACK TGFXWindow::WndProc(HWND window, UINT message, WPARAM wparam,
 
 LRESULT TGFXWindow::handleMessage(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam) noexcept {
   switch (message) {
+    case WM_ACTIVATE:
+      isDrawing = (LOWORD(wparam) != WA_INACTIVE);
+      break;
     case WM_DESTROY:
       destroy();
       PostQuitMessage(0);
       break;
     case WM_PAINT: {
-      PAINTSTRUCT ps;
-      BeginPaint(windowHandle, &ps);
-      draw();
-      EndPaint(windowHandle, &ps);
+      if (isDrawing) {
+        draw();
+      }
       break;
     }
     case WM_LBUTTONDOWN: {

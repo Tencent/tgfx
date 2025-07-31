@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,27 +18,22 @@
 
 #pragma once
 
-#include "gpu/Resource.h"
+#include "ResourceTask.h"
+#include "core/DataSource.h"
+#include "gpu/GPUBuffer.h"
+#include "tgfx/core/Data.h"
 
 namespace tgfx {
-class GLFrameBuffer : public Resource {
+class GPUBufferUploadTask : public ResourceTask {
  public:
-  static std::shared_ptr<GLFrameBuffer> Make(Context* context);
-
-  explicit GLFrameBuffer(unsigned id);
-
-  size_t memoryUsage() const override {
-    return 0;
-  }
-
-  unsigned id() const {
-    return _id;
-  }
+  GPUBufferUploadTask(std::shared_ptr<ResourceProxy> proxy, BufferType bufferType,
+                      std::unique_ptr<DataSource<Data>> source);
 
  protected:
-  void onReleaseGPU() override;
+  std::shared_ptr<Resource> onMakeResource(Context* context) override;
 
  private:
-  unsigned _id = 0;
+  BufferType bufferType = BufferType::Vertex;
+  std::unique_ptr<DataSource<Data>> source = nullptr;
 };
 }  // namespace tgfx
