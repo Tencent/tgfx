@@ -72,17 +72,8 @@ static void SaturateStore(const float* sum, int width, uint8_t* dstData) {
   }
 }
 
-static void Mul(const float* buf, int width, float beta, float* sum) {
-  for (int dstX = 0; dstX < width; ++dstX) {
-    sum[dstX] = beta * buf[dstX];
-  }
-}
-
-static void MulAdd(const float* buf, int width, float beta, float* sum) {
-  for (int dstX = 0; dstX < width; ++dstX) {
-    sum[dstX] += beta * buf[dstX];
-  }
-}
+extern void Mul(const float* buf, int width, float beta, float* sum);
+extern void MulAdd(const float* buf, int width, float beta, float* sum);
 
 /**
  * Computes the resize area table for downsampling an image channel.
@@ -140,12 +131,12 @@ static int ComputeResizeAreaTab(int srcSize, int dstSize, int channelNum, double
   return k;
 }
 
-extern int ResizeAreaFastSIMDFunc(int channelNum, int step, const uint8_t* srcData, const uint8_t* dstData, int W);
+extern int ResizeAreaFastSIMDFunc(int channelNum, int step, const uint8_t* srcData, uint8_t* dstData, int w);
 
 struct ResizeAreaFastVec {
   ResizeAreaFastVec(int scaleX, int scaleY, int channelNum, int step)
     :scaleX(scaleX), scaleY(scaleY), channelNum(channelNum), step(step){
-    fastMode = scaleX == 2 && scaleY == 2 && (channelNum == 1 || channelNum == 4);
+    fastMode = this->scaleX == 2 && this->scaleY == 2 && (this->channelNum == 1 || this->channelNum == 4);
   }
 
   int operator()(const uint8_t* srcData, uint8_t* dstData, int w) const {
@@ -202,7 +193,7 @@ static void ResizeAreaFast(const FastFuncInfo& srcInfo, FastFuncInfo& dstInfo, c
   int dstWidth = dstInfo.layout.width * channelNum;
   int srcWidth = srcInfo.layout.width * channelNum;
   int dstY, dstX, k = 0;
-
+  ResizeAreaFastVec vecOp(scaleX, scaleY, channelNum, srcInfo.layout.rowBytes);
   for (dstY = 0; dstY < dstInfo.layout.height; dstY++) {
     auto* dstData = static_cast<uint8_t*>(dstInfo.pixels) + dstY * dstInfo.layout.rowBytes;
     int srcY0 = dstY * scaleY;
@@ -213,8 +204,8 @@ static void ResizeAreaFast(const FastFuncInfo& srcInfo, FastFuncInfo& dstInfo, c
       }
       continue;
     }
-
-    for (dstX = 0; dstX < w; dstX++) {
+    dstX = vecOp(static_cast<uint8_t*>(srcInfo.pixels) + srcY0 * srcInfo.layout.rowBytes, dstData, w);
+    for (; dstX < w; dstX++) {
       const uint8_t* srcData =
           static_cast<uint8_t*>(srcInfo.pixels) + srcY0 * srcInfo.layout.rowBytes + xOffset[dstX];
       int sum = 0;
