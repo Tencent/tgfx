@@ -57,29 +57,27 @@ int ResizeAreaFastSIMDFuncImpl(int channelNum, int step, const uint8_t* srcData,
       hn::Store(dstValue, du8, dstData);
     }
   } else if (channelNum == 4) {
-    for (; dstX <= w - 2 * n;
-         dstX += 2 * n, srcData0 += 4 * n, srcData1 += 4 * n, dstData += 2 * n) {
-      hn::Vec<decltype(du8)> row0r, row0g, row0b, row0a, row1r, row1g, row1b, row1a;
-      hn::LoadInterleaved4(du8, srcData0, row0r, row0g, row0b, row0a);
-      hn::LoadInterleaved4(du8, srcData1, row1r, row1g, row1b, row1a);
-      auto row0rSum = hn::SumsOf2(row0r);
-      auto row1rSum = hn::SumsOf2(row1r);
-      auto rSum0 = hn::ShiftRight<2>(hn::Add(hn::Add(row0rSum, row1rSum), value2));
-      auto rSum = hn::DemoteTo(du8, rSum0);
-      auto row0gSum = hn::SumsOf2(row0g);
-      auto row1gSum = hn::SumsOf2(row1g);
-      auto gSum0 = hn::ShiftRight<2>(hn::Add(hn::Add(row0gSum, row1gSum), value2));
-      auto gSum = hn::DemoteTo(du8, gSum0);
-      auto row0bSum = hn::SumsOf2(row0b);
-      auto row1bSum = hn::SumsOf2(row1b);
-      auto bSum0 = hn::ShiftRight<2>(hn::Add(hn::Add(row0bSum, row1bSum), value2));
-      auto bSum = hn::DemoteTo(du8, bSum0);
-      auto row0aSum = hn::SumsOf2(row0a);
-      auto row1aSum = hn::SumsOf2(row1a);
-      auto aSum0 = hn::ShiftRight<2>(hn::Add(hn::Add(row0aSum, row1aSum), value2));
-      auto aSum = hn::DemoteTo(du8, aSum0);
-      auto d = hn::DFromV<decltype(rSum)>();
-      hn::StoreInterleaved4(rSum, gSum, bSum, aSum, d, dstData);
+    hn::Full128<uint8_t> fix128Du8;
+    hn::Full64<uint8_t> fix64Du8;
+    hn::Full128<uint16_t> fix128Du16;
+    hn::Full64<uint16_t> fix64Du16;
+    auto fixValue2 = hn::Set(fix128Du16, 2);
+    for (; dstX <= w - 8; dstX += 8, srcData0 += 16, srcData1 += 16, dstData += 8) {
+      auto vRow0 = hn::Load(fix128Du8, srcData0);
+      auto vRow1 = hn::Load(fix128Du8, srcData1);
+      auto vRow00 = hn::PromoteLowerTo(fix128Du16, vRow0);
+      auto vRow01 = hn::PromoteUpperTo(fix128Du16, vRow0);
+      auto vRow10 = hn::PromoteLowerTo(fix128Du16, vRow1);
+      auto vRow11 = hn::PromoteUpperTo(fix128Du16, vRow1);
+      auto vP0 =
+          hn::Add(hn::Add(hn::LowerHalf(fix64Du16, vRow00), hn::UpperHalf(fix64Du16, vRow00)),
+                  hn::Add(hn::LowerHalf(fix64Du16, vRow10), hn::UpperHalf(fix64Du16, vRow10)));
+      auto vP1 =
+          hn::Add(hn::Add(hn::LowerHalf(fix64Du16, vRow01), hn::UpperHalf(fix64Du16, vRow01)),
+                  hn::Add(hn::LowerHalf(fix64Du16, vRow11), hn::UpperHalf(fix64Du16, vRow11)));
+      auto vDst = hn::ShiftRight<2>(hn::Add(hn::Combine(fix128Du16, vP1, vP0), fixValue2));
+      auto res = hn::DemoteTo(fix64Du8, vDst);
+      hn::Store(res, fix64Du8, dstData);
     }
   }
   return dstX;
