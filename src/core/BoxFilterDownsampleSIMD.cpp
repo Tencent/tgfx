@@ -63,20 +63,20 @@ int ResizeAreaFastSIMDFuncImpl(int channelNum, int step, const uint8_t* srcData,
       hn::LoadInterleaved4(du8, srcData1, row1r, row1g, row1b, row1a);
       auto row0rSum = hn::SumsOf2(row0r);
       auto row1rSum = hn::SumsOf2(row1r);
-      auto rSum =
-          hn::DemoteTo(du8, hn::ShiftRight<2>(hn::Add(hn::Add(row0rSum, row1rSum), value2)));
+      auto rSum0 = hn::ShiftRight<2>(hn::Add(hn::Add(row0rSum, row1rSum), value2));
+      auto rSum = hn::DemoteTo(du8, rSum0);
       auto row0gSum = hn::SumsOf2(row0g);
       auto row1gSum = hn::SumsOf2(row1g);
-      auto gSum =
-          hn::DemoteTo(du8, hn::ShiftRight<2>(hn::Add(hn::Add(row0gSum, row1gSum), value2)));
+      auto gSum0 = hn::ShiftRight<2>(hn::Add(hn::Add(row0gSum, row1gSum), value2));
+      auto gSum = hn::DemoteTo(du8, gSum0);
       auto row0bSum = hn::SumsOf2(row0b);
       auto row1bSum = hn::SumsOf2(row1b);
-      auto bSum =
-          hn::DemoteTo(du8, hn::ShiftRight<2>(hn::Add(hn::Add(row0bSum, row1bSum), value2)));
+      auto bSum0 = hn::ShiftRight<2>(hn::Add(hn::Add(row0bSum, row1bSum), value2));
+      auto bSum = hn::DemoteTo(du8, bSum0);
       auto row0aSum = hn::SumsOf2(row0a);
       auto row1aSum = hn::SumsOf2(row1a);
-      auto aSum =
-          hn::DemoteTo(du8, hn::ShiftRight<2>(hn::Add(hn::Add(row0aSum, row1aSum), value2)));
+      auto aSum0 = hn::ShiftRight<2>(hn::Add(hn::Add(row0aSum, row1aSum), value2));
+      auto aSum = hn::DemoteTo(du8, aSum0);
       auto d = hn::DFromV<decltype(rSum)>();
       hn::StoreInterleaved4(rSum, gSum, bSum, aSum, d, dstData);
     }
