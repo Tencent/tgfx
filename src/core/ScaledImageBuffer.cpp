@@ -39,7 +39,7 @@ std::shared_ptr<Texture> ScaledImageBuffer::onMakeTexture(Context* context, bool
   if (!source->isPixelBuffer() || (width() == source->width() && height() == source->height())) {
     return source->onMakeTexture(context, mipmapped);
   }
-  auto pixelBuffer = std::dynamic_pointer_cast<PixelBuffer>(source);
+  auto pixelBuffer = dynamic_cast<PixelBuffer*>(source.get());
   auto scaledPixelBuffer = PixelBuffer::Make(width(), height(), pixelBuffer->isAlphaOnly(),
                                              pixelBuffer->isHardwareBacked());
   auto pixels = scaledPixelBuffer->lockPixels();
