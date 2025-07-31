@@ -177,6 +177,9 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (dstInfo.width() > width() || dstInfo.height() > height()) {
     return false;
   }
+  if (dstInfo.width() == width() && dstInfo.height() == height()) {
+    return onReadPixels(dstInfo, dstPixels);
+  }
   auto pixelBuffer = PixelBuffer::Make(width(), height(), isAlphaOnly());
   if (pixelBuffer == nullptr) {
     return false;
@@ -187,35 +190,8 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (!result) {
     return false;
   }
-  auto srcInfo = pixelBuffer->info();
-  auto dataType = DataType::UINT8;
-  auto channel = PixelLayout::RGBA;
-  ToStbDataTypeAndChannel(srcInfo.colorType(), &dataType, &channel);
-  Buffer dstTempBuffer = {};
-  Buffer srcTempBuffer = {};
-  auto dstImageInfo = dstInfo;
-  auto srcImageInfo = srcInfo;
-  auto srcData = pixels;
-  auto dstData = dstPixels;
-  if (srcInfo.colorType() == ColorType::RGBA_1010102 ||
-      srcInfo.colorType() == ColorType::RGBA_F16) {
-    srcImageInfo = srcInfo.makeColorType(ColorType::RGBA_8888);
-    srcTempBuffer.alloc(srcImageInfo.byteSize());
-    Pixmap(srcInfo, pixels).readPixels(srcImageInfo, srcTempBuffer.bytes());
-    srcData = srcTempBuffer.data();
-  }
-  if (srcImageInfo.colorType() != dstInfo.colorType()) {
-    dstImageInfo = dstInfo.makeColorType(srcImageInfo.colorType());
-    dstTempBuffer.alloc(dstImageInfo.byteSize());
-    dstData = dstTempBuffer.data();
-  }
 
-  ImageResize(srcData, srcImageInfo.width(), srcImageInfo.height(), 0,
-    dstData, dstImageInfo.width(), dstImageInfo.height(), 0, channel, dataType);
-
-  if (!dstTempBuffer.isEmpty()) {
-    Pixmap(dstImageInfo, dstData).readPixels(dstInfo, dstPixels);
-  }
+  ImageResize(pixels, pixelBuffer->info(), dstPixels, dstInfo);
   return true;
 }
 

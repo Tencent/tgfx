@@ -379,20 +379,12 @@ TGFX_TEST(CanvasTest, scaleImage) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  // auto imagePath = "resources/apitest/scaleImage.webp";
   auto imagePath = "resources/apitest/rotation.jpg";
   auto codec = MakeImageCodec(imagePath);
   auto w = codec->width() / 8;
   auto h = codec->height() / 8;
   auto image = Image::MakeFrom(codec);
   auto scaleImage = ScaledImage::MakeFrom(image, w, h, {});
-  // auto scaleImage = image->makeScaled(w, h, {});
-
-  // auto imageInfo = ImageInfo::Make(w, h, ColorType::RGBA_8888);
-  // auto buffer = Buffer(imageInfo.byteSize());
-  // codec->readPixels(imageInfo, buffer.data());
-  // auto scaleImage = Image::MakeFrom(imageInfo, Data::MakeWithCopy(buffer.data(), imageInfo.byteSize()));
-
   auto surface = Surface::Make(context, w, h);
   auto canvas = surface->getCanvas();
   canvas->drawImage(scaleImage);

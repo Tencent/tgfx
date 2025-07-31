@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include "tgfx/core/ImageInfo.h"
 
 namespace tgfx {
 
@@ -68,7 +69,5 @@ enum class DataType {
   HALF_FLOAT       = 5
 };
 
-void* ImageResize(const void* inputPixels, int inputW, int inputH, int inputStrideInBytes,
-  void* outputPixels, int outputW, int outputH, int outputStrideInBytes,
-  PixelLayout pixelLayout, DataType dataType);
+bool ImageResize(const void* inputPixels, const ImageInfo& inputInfo, void* outputPixels, const ImageInfo& dstImageInfo);
 }  // namespace tgfx

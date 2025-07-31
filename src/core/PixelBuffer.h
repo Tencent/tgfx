@@ -87,12 +87,12 @@ class PixelBuffer : public ImageBuffer {
    */
   virtual HardwareBufferRef getHardwareBuffer() const = 0;
 
- protected:
-  explicit PixelBuffer(const ImageInfo& info);
-
   bool isPixelBuffer() const final {
     return true;
   }
+
+ protected:
+  explicit PixelBuffer(const ImageInfo& info);
 
   std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const override;
 

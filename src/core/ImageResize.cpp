@@ -15,6 +15,8 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+#include <tgfx/core/Buffer.h>
+#include <tgfx/core/Pixmap.h>
 #if !defined(STB_IMAGE_RESIZE_DO_HORIZONTALS) && !defined(STB_IMAGE_RESIZE_DO_VERTICALS) && !defined(STB_IMAGE_RESIZE_DO_CODERS)
 #include "ImageResize.h"
 #include <assert.h>
@@ -3833,14 +3835,14 @@ static int stbir_resize_extended( ResizeData * resize )
   return result;
 }
 
-void* ImageResize(const void* inputPixels, int inputW, int inputH, int inputStrideInBytes,
+static bool ImageResize(const void* inputPixels, int inputW, int inputH, int inputStrideInBytes,
     void* outputPixels, int outputW, int outputH, int outputStrideInBytes, PixelLayout pixelLayout,
     DataType dataType) {
   ResizeData resize;
   float* optr;
   int opitch;
   if(!stbir__check_output_stuff((void**)&optr, &opitch, outputPixels, stbir__type_size[static_cast<size_t>(dataType)], outputW, outputH, outputStrideInBytes, stbir__pixel_layout_convert_public_to_internal[static_cast<size_t>(pixelLayout)])) {
-    return 0;
+    return false;
   }
   stbir_resize_init(&resize, inputPixels, inputW, inputH, inputStrideInBytes,
     (optr)? optr : outputPixels, outputW, outputH, outputStrideInBytes, pixelLayout, dataType);
@@ -3849,9 +3851,64 @@ void* ImageResize(const void* inputPixels, int inputW, int inputH, int inputStri
     if(optr) {
       free(optr);
     }
-    return 0;
+    return false;
   }
-  return (optr) ? optr : outputPixels;
+  return true;
+}
+
+
+static void ConvertDataTypeAndChannel(ColorType colorType, DataType* dataType,
+                                    PixelLayout* pixelLayout) {
+  switch (colorType) {
+    case ColorType::ALPHA_8:
+    case ColorType::Gray_8: {
+      *pixelLayout = PixelLayout::CHANNEL_1;
+      *dataType = DataType::UINT8;
+      break;
+    }
+    case ColorType::RGB_565: {
+      *pixelLayout = PixelLayout::RGB;
+      *dataType = DataType::UINT8;
+      break;
+    }
+    default: {
+      break;
+    }
+  }
+}
+
+bool ImageResize(const void* inputPixels, const ImageInfo& inputInfo, void* outputPixels, const ImageInfo& outputInfo) {
+  Buffer dstTempBuffer = {};
+  Buffer srcTempBuffer = {};
+  auto dataType = DataType::UINT8;
+  auto channel = PixelLayout::RGBA;
+  auto dstImageInfo = outputInfo;
+  auto srcImageInfo = inputInfo;
+  auto srcData = inputPixels;
+  auto dstData = outputPixels;
+  if (inputInfo.colorType() == ColorType::RGBA_1010102 ||
+      inputInfo.colorType() == ColorType::RGBA_F16) {
+    srcImageInfo = inputInfo.makeColorType(ColorType::RGBA_8888);
+    srcTempBuffer.alloc(srcImageInfo.byteSize());
+    Pixmap(inputInfo, inputPixels).readPixels(srcImageInfo, srcTempBuffer.bytes());
+    srcData = srcTempBuffer.data();
+  }
+  if (srcImageInfo.colorType() != outputInfo.colorType()) {
+    dstImageInfo = outputInfo.makeColorType(srcImageInfo.colorType());
+    dstTempBuffer.alloc(dstImageInfo.byteSize());
+    dstData = dstTempBuffer.data();
+  }
+  ConvertDataTypeAndChannel(srcImageInfo.colorType(), &dataType, &channel);
+
+  auto result = ImageResize(srcData, srcImageInfo.width(), srcImageInfo.height(), static_cast<int>(srcImageInfo.rowBytes()),
+    dstData, dstImageInfo.width(), dstImageInfo.height(), static_cast<int>(dstImageInfo.rowBytes()), channel, dataType);
+  if (!result) {
+    return false;
+  }
+  if (!dstTempBuffer.isEmpty()) {
+    Pixmap(dstImageInfo, dstData).readPixels(outputInfo, outputPixels);
+  }
+  return true;
 }
 }  // namespace tgfx
 #else

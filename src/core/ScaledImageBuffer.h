@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -15,19 +15,14 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
 #pragma once
 
-#include "ResourceImage.h"
+#include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
-/**
- * BufferImage wraps a fully decoded ImageBuffer that can generate textures on demand.
- */
-class BufferImage : public ResourceImage {
- public:
-  BufferImage(int width, int height, UniqueKey uniqueKey, std::shared_ptr<ImageBuffer> buffer);
-
+class ScaledImageBuffer: public ImageBuffer {
+public:
+  static std::shared_ptr<ScaledImageBuffer> Make(int width, int height, const std::shared_ptr<ImageBuffer>& source);
   int width() const override {
     return _width;
   }
@@ -37,22 +32,20 @@ class BufferImage : public ResourceImage {
   }
 
   bool isAlphaOnly() const override {
-    return imageBuffer->isAlphaOnly();
+    return source->isAlphaOnly();
   }
 
-  std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight, const SamplingOptions& sampling) const override;
-
- protected:
-  Type type() const override {
-    return Type::Buffer;
+  void setSource(std::shared_ptr<ImageBuffer> imageBuffer) {
+    source = std::move(imageBuffer);
   }
+protected:
+  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const override;
 
-  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
-                                                   const UniqueKey& key) const override;
-
- private:
+private:
   int _width;
   int _height;
-  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
+  std::shared_ptr<ImageBuffer> source = nullptr;
+
+  ScaledImageBuffer(int width, int height, const std::shared_ptr<ImageBuffer>& source);
 };
-}  // namespace tgfx
+}
