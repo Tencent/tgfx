@@ -17,7 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLGPU.h"
-#include "GLCommandEncoder.h"
+#include "gpu/opengl/GLBuffer.h"
+#include "gpu/opengl/GLCommandEncoder.h"
 
 namespace tgfx {
 std::unique_ptr<GLGPU> GLGPU::MakeNative() {
@@ -30,6 +31,31 @@ std::unique_ptr<GLGPU> GLGPU::MakeNative() {
 
 GLGPU::GLGPU(std::shared_ptr<GLInterface> glInterface) : interface(std::move(glInterface)) {
   commandQueue = std::make_unique<GLCommandQueue>(interface);
+}
+
+std::unique_ptr<GPUBuffer> GLGPU::createBuffer(size_t size, uint32_t usage) const {
+  if (size == 0) {
+    return nullptr;
+  }
+  unsigned target = 0;
+  if (usage & GPUBufferUsage::VERTEX) {
+    target = GL_ARRAY_BUFFER;
+  } else if (usage & GPUBufferUsage::INDEX) {
+    target = GL_ELEMENT_ARRAY_BUFFER;
+  } else {
+    LOGE("GLGPU::createBuffer() invalid buffer usage!");
+    return nullptr;
+  }
+  auto gl = interface->functions();
+  unsigned bufferID = 0;
+  gl->genBuffers(1, &bufferID);
+  if (bufferID == 0) {
+    return nullptr;
+  }
+  gl->bindBuffer(target, bufferID);
+  gl->bufferData(target, static_cast<GLsizeiptr>(size), nullptr, GL_STATIC_DRAW);
+  gl->bindBuffer(target, 0);
+  return std::make_unique<GLBuffer>(bufferID, size, usage);
 }
 
 std::shared_ptr<CommandEncoder> GLGPU::createCommandEncoder() const {
