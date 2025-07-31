@@ -54,7 +54,7 @@ TGFX_TEST(ResourceCacheTest, multiThreadRecycling) {
       auto context = device->lockContext();
       ASSERT_TRUE(context != nullptr);
       auto resource = TestResource::Make(context, i);
-      context->flush();
+      context->flushAndSubmit();
       context->resourceCache()->purgeUntilMemoryTo(0);
       device->unlock();
       tgfx::Task::Run([resource, device] {

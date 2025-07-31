@@ -79,7 +79,6 @@ bool VideoElement::onUpdateTexture(std::shared_ptr<Texture> texture) {
   auto sampler = static_cast<GLTextureSampler*>(texture->getSampler());
   val::module_property("tgfx").call<void>("uploadToTexture", emscripten::val::module_property("GL"),
                                           source, sampler->id(), false);
-  sampler->regenerateMipmapLevels(texture->getContext());
   return true;
 }
 }  // namespace tgfx

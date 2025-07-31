@@ -17,7 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLUniformHandler.h"
-#include "GLProgramBuilder.h"
+#include "gpu/opengl/GLProgramBuilder.h"
+#include "gpu/opengl/GLTextureSampler.h"
 
 namespace tgfx {
 std::string GLUniformHandler::internalAddUniform(ShaderFlags visibility, SLType type,

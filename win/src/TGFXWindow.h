@@ -59,5 +59,7 @@ class TGFXWindow {
   float getPixelRatio();
   void createAppHost();
   void draw();
+
+  bool isDrawing = true;
 };
 }  // namespace hello2d
