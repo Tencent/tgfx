@@ -126,7 +126,7 @@ std::shared_ptr<Image> FilterImage::onMakeScaled(int newWidth, int newHeight,
   newBounds.roundOut();
   auto filterBounds = newFilter->filterBounds(Rect::MakeWH(newSourceWidth, newSourceHeight));
   if (!newBounds.intersect(filterBounds)) {
-    ScaledImage::MakeFrom(weakThis.lock(), newWidth, newHeight, sampling);
+    return ScaledImage::MakeFrom(weakThis.lock(), newWidth, newHeight, sampling);
   }
   if (static_cast<int>(newBounds.width()) != newWidth ||
       static_cast<int>(newBounds.height()) != newHeight) {
