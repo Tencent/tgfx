@@ -332,13 +332,6 @@ else ()
     set(TGFX_USE_NATIVE_GL ON)
 endif ()
 
-if (TGFX_USE_INSPECTOR)
-    list(APPEND TGFX_DEFINES TGFX_USE_INSPECTOR)
-    list(APPEND TGFX_INCLUDES third_party/flatbuffers/include)
-    file(GLOB_RECURSE SERIALIZATION_FILE src/serialization/*.*)
-    list(APPEND TGFX_FILES ${SERIALIZATION_FILE})
-endif ()
-
 list(APPEND TGFX_STATIC_VENDORS pathkit)
 list(APPEND TGFX_INCLUDES third_party/pathkit)
 list(APPEND TGFX_STATIC_VENDORS skcms)
