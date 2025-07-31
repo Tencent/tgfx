@@ -18,37 +18,38 @@
 
 #pragma once
 
-#include "gpu/Resource.h"
+#include <cstddef>
+#include "gpu/GPUBufferUsage.h"
+#include "gpu/GPUResource.h"
 
 namespace tgfx {
-enum class BufferType {
-  Index,
-  Vertex,
-};
-
-class GPUBuffer : public Resource {
+/**
+ * GPUBuffer represents a block of memory on the GPU used to store raw data for GPU operations.
+ */
+class GPUBuffer : public GPUResource {
  public:
-  static std::shared_ptr<GPUBuffer> Make(Context* context, BufferType bufferType,
-                                         const void* buffer = nullptr, size_t size = 0);
-
-  BufferType bufferType() const {
-    return _bufferType;
-  }
-
+  /**
+   * Returns the size of the buffer in bytes. This size is determined at the time of buffer creation
+   * and cannot be changed later.
+   */
   size_t size() const {
     return _size;
   }
 
-  size_t memoryUsage() const override {
-    return _size;
+  /**
+   * Returns the usage flags for this buffer, which specify how it can be used in GPU operations.
+   * For example, a GPUBuffer with the GPUBufferUsage::VERTEX flag can be used as a vertex buffer in
+   * a RenderPass. See GPUBufferUsage for more details.
+   */
+  uint32_t usage() const {
+    return _usage;
   }
 
  protected:
-  BufferType _bufferType;
-  size_t _size;
+  size_t _size = 0;
+  uint32_t _usage = 0;
 
-  GPUBuffer(BufferType bufferType, size_t sizeInBytes)
-      : _bufferType(bufferType), _size(sizeInBytes) {
+  GPUBuffer(size_t size, uint32_t usage) : _size(size), _usage(usage) {
   }
 };
 }  // namespace tgfx

@@ -38,8 +38,8 @@ PlacementPtr<RRectDrawOp> RRectDrawOp::Make(Context* context,
     // If we only have one rect, it is not worth the async task overhead.
     renderFlags |= RenderFlags::DisableAsyncTask;
   }
-  drawOp->vertexBufferProxy =
-      context->proxyProvider()->createVertexBuffer(std::move(provider), renderFlags);
+  drawOp->vertexBufferProxyView =
+      context->proxyProvider()->createVertexBufferProxyView(std::move(provider), renderFlags);
   return drawOp;
 }
 
@@ -59,14 +59,14 @@ void RRectDrawOp::execute(RenderPass* renderPass) {
   AttributeTGFXName("commonColor", commonColor);
   AttributeNameEnum("blenderMode", getBlendMode(), inspector::CustomEnumType::BlendMode);
   AttributeNameEnum("aaType", getAAType(), inspector::CustomEnumType::AAType);
-  if (indexBufferProxy == nullptr || vertexBufferProxy == nullptr) {
+  if (indexBufferProxy == nullptr || vertexBufferProxyView == nullptr) {
     return;
   }
   auto indexBuffer = indexBufferProxy->getBuffer();
   if (indexBuffer == nullptr) {
     return;
   }
-  std::shared_ptr<GPUBuffer> vertexBuffer = vertexBufferProxy->getBuffer();
+  auto vertexBuffer = vertexBufferProxyView->getBuffer();
   if (vertexBuffer == nullptr) {
     return;
   }
@@ -77,7 +77,8 @@ void RRectDrawOp::execute(RenderPass* renderPass) {
                                      hasStroke, useScale, commonColor);
   auto pipeline = createPipeline(renderPass, std::move(gp));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
-  renderPass->bindBuffers(indexBuffer, vertexBuffer, vertexBufferProxy->offset());
+  renderPass->bindBuffers(indexBuffer->gpuBuffer(), vertexBuffer->gpuBuffer(),
+                          vertexBufferProxyView->offset());
   auto numIndicesPerRRect = hasStroke ? IndicesPerStrokeRRect : IndicesPerFillRRect;
   renderPass->drawIndexed(PrimitiveType::Triangles, 0, rectCount * numIndicesPerRRect);
 }
