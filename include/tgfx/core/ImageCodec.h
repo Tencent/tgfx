@@ -84,7 +84,7 @@ class ImageCodec : public ImageGenerator {
     return true;
   }
 
- /**
+  /**
   * Decodes or scale the image with the specified image info into the given pixels. Returns
   * true if the decoding was successful. Note that we do not recommend calling this method due
   * to performance reasons, especially on the web platform. Use the makeBuffer() method for

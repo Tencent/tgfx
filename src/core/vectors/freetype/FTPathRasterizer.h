@@ -28,7 +28,7 @@ class FTPathRasterizer final : public PathRasterizer {
       : PathRasterizer(width, height, std::move(shape), antiAlias, needsGammaCorrection) {
   }
 
-protected:
+ protected:
   bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 };
 }  // namespace tgfx

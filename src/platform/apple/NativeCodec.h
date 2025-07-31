@@ -26,7 +26,7 @@ class NativeCodec : public ImageCodec {
  public:
   ~NativeCodec() override;
 
-protected:
+ protected:
   bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 
  private:
