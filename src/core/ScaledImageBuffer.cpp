@@ -17,8 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ScaledImageBuffer.h"
-#include "ImageResize.h"
-#include "ImageResize2.h"
+#include "BoxFilterDownsample.h"
 #include "PixelBuffer.h"
 
 namespace tgfx {
@@ -27,13 +26,13 @@ std::shared_ptr<ScaledImageBuffer> ScaledImageBuffer::Make(
   if (!source || width <= 0 || height <= 0) {
     return nullptr;
   }
-  auto image = std::shared_ptr<ScaledImageBuffer>(
-      new ScaledImageBuffer(width, height, source));
+  auto image = std::shared_ptr<ScaledImageBuffer>(new ScaledImageBuffer(width, height, source));
   return image;
 }
 
 ScaledImageBuffer::ScaledImageBuffer(int width, int height,
-                                     const std::shared_ptr<ImageBuffer>& source): _width(width), _height(height), source(source) {
+                                     const std::shared_ptr<ImageBuffer>& source)
+    : _width(width), _height(height), source(source) {
 }
 
 std::shared_ptr<Texture> ScaledImageBuffer::onMakeTexture(Context* context, bool mipmapped) const {
@@ -41,14 +40,15 @@ std::shared_ptr<Texture> ScaledImageBuffer::onMakeTexture(Context* context, bool
     return source->onMakeTexture(context, mipmapped);
   }
   auto pixelBuffer = std::dynamic_pointer_cast<PixelBuffer>(source);
-  auto scaledPixelBuffer = PixelBuffer::Make(width(), height(), pixelBuffer->isAlphaOnly(), pixelBuffer->isHardwareBacked());
+  auto scaledPixelBuffer = PixelBuffer::Make(width(), height(), pixelBuffer->isAlphaOnly(),
+                                             pixelBuffer->isHardwareBacked());
   auto pixels = scaledPixelBuffer->lockPixels();
   auto srcPixels = pixelBuffer->lockPixels();
-  ImageResize2(srcPixels, pixelBuffer->info(), pixels, scaledPixelBuffer->info());
+  ImageResize(srcPixels, pixelBuffer->info(), pixels, scaledPixelBuffer->info());
   scaledPixelBuffer->unlockPixels();
   pixelBuffer->unlockPixels();
 
-  auto imageBuffer  = static_cast<std::shared_ptr<ImageBuffer>>(scaledPixelBuffer);
+  auto imageBuffer = static_cast<std::shared_ptr<ImageBuffer>>(scaledPixelBuffer);
   return imageBuffer->onMakeTexture(context, mipmapped);
 }
-}
+}  // namespace tgfx

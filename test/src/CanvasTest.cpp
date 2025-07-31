@@ -381,14 +381,22 @@ TGFX_TEST(CanvasTest, scaleImage) {
   ASSERT_TRUE(context != nullptr);
   auto imagePath = "resources/apitest/rotation.jpg";
   auto codec = MakeImageCodec(imagePath);
-  auto w = codec->width() / 8;
-  auto h = codec->height() / 8;
-  auto image = Image::MakeFrom(codec);
-  auto scaleImage = ScaledImage::MakeFrom(image, w, h, {});
-  auto surface = Surface::Make(context, w, h);
+  ASSERT_TRUE(codec != nullptr);
+  Bitmap bitmap(codec->width(), codec->height(), false);
+  ASSERT_FALSE(bitmap.isEmpty());
+  Pixmap pixmap(bitmap);
+  auto result = codec->readPixels(pixmap.info(), pixmap.writablePixels());
+  pixmap.reset();
+  EXPECT_TRUE(result);
+  auto image = Image::MakeFrom(bitmap);
+  auto newWidth = image->width() / 8;
+  auto newHeight = image->height() / 8;
+  auto scaleImage = image->makeScaled(newWidth, newHeight);
+  auto surface = Surface::Make(context, newWidth, newHeight);
   auto canvas = surface->getCanvas();
+  canvas->clear();
   canvas->drawImage(scaleImage);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaleImage"));
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/box_filter_scale_imageBuffer"));
 }
 
 TGFX_TEST(CanvasTest, rasterizedImage) {
@@ -2685,6 +2693,29 @@ TGFX_TEST(CanvasTest, ScaleImage) {
   canvas->clipRect(Rect::MakeXYWH(100, 100, 500, 500));
   canvas->drawImage(scaledImage);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaled_clip"));
+  auto imagePath = "resources/apitest/rotation.jpg";
+  image = MakeImage(imagePath);
+  auto newWidth = image->width() / 8;
+  auto newHeight = image->height() / 8;
+  scaledImage = image->makeScaled(newWidth, newHeight);
+  canvas->clear();
+  canvas->drawImage(scaledImage);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaled_imageCodec_box_filter"));
+  auto codec = MakeImageCodec(imagePath);
+  ASSERT_TRUE(codec != nullptr);
+  Bitmap bitmap(codec->width(), codec->height(), false);
+  ASSERT_FALSE(bitmap.isEmpty());
+  Pixmap pixmap(bitmap);
+  auto result = codec->readPixels(pixmap.info(), pixmap.writablePixels());
+  pixmap.reset();
+  EXPECT_TRUE(result);
+  image = Image::MakeFrom(bitmap);
+  newWidth = image->width() / 8;
+  newHeight = image->height() / 8;
+  scaledImage = image->makeScaled(newWidth, newHeight);
+  canvas->clear();
+  canvas->drawImage(scaledImage);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaled_imageBuffer_box_filter"));
 }
 
 TGFX_TEST(CanvasTest, ScalePictureImage) {

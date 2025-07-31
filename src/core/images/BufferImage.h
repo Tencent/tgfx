@@ -40,7 +40,8 @@ class BufferImage : public ResourceImage {
     return imageBuffer->isAlphaOnly();
   }
 
-  std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight, const SamplingOptions& sampling) const override;
+  std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
+                                      const SamplingOptions& sampling) const override;
 
  protected:
   Type type() const override {

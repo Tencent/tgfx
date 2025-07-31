@@ -64,7 +64,7 @@ static Orientation get_exif_orientation(jpeg_decompress_struct* dinfo) {
   return Orientation::TopLeft;
 }
 
-static uint32_t get_scaled_dimensions(float scaledDimensions){
+static uint32_t get_scaled_dimensions(float scaledDimensions) {
   if (FloatNearlyEqual(scaledDimensions, 1.f / 8.f)) {
     return 1;
   } else if (FloatNearlyEqual(scaledDimensions, 2.f / 8.f)) {
@@ -242,7 +242,8 @@ bool JpegCodec::onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     if (jpeg_read_header(&cinfo, TRUE) != JPEG_HEADER_OK) {
       break;
     }
-    cinfo.scale_num = get_scaled_dimensions(static_cast<float>(dstInfo.width()) / static_cast<float>(width()));
+    cinfo.scale_num =
+        get_scaled_dimensions(static_cast<float>(dstInfo.width()) / static_cast<float>(width()));
     cinfo.scale_denom = 8;
     cinfo.out_color_space = out_color_space;
     if (cinfo.jpeg_color_space == JCS_CMYK || cinfo.jpeg_color_space == JCS_YCCK) {

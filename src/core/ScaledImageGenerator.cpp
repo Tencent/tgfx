@@ -21,13 +21,13 @@
 #include "gpu/ProxyProvider.h"
 
 namespace tgfx {
-std::shared_ptr<ScaledImageGenerator> ScaledImageGenerator::MakeFrom(int width, int height,
-                                                          const std::shared_ptr<ImageCodec>& codec) {
+std::shared_ptr<ScaledImageGenerator> ScaledImageGenerator::MakeFrom(
+    int width, int height, const std::shared_ptr<ImageCodec>& codec) {
   if (!codec || width <= 0 || height <= 0) {
     return nullptr;
   }
-  auto image = std::shared_ptr<ScaledImageGenerator>(
-      new ScaledImageGenerator(width, height, codec));
+  auto image =
+      std::shared_ptr<ScaledImageGenerator>(new ScaledImageGenerator(width, height, codec));
   return image;
 }
 

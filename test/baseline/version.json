@@ -89,6 +89,8 @@
         "saveLayer": "0d4ef3f9",
         "scaled_clip": "c180584b",
         "scaled_image": "c180584b",
+        "scaled_imageBuffer_box_filter": "7c95c32d",
+        "scaled_imageCodec_box_filter": "7c95c32d",
         "scaled_mipmap": "c180584b",
         "scaled_scale_up": "c180584b",
         "shape": "b79ee1a6",

@@ -38,14 +38,10 @@ class JpegCodec : public ImageCodec {
     if (!FloatNearlyEqual(scaledX, scaledY)) {
       return false;
     }
-    if (FloatNearlyEqual(scaledX, 1.f / 8.f) ||
-      FloatNearlyEqual(scaledX, 2.f / 8.f) ||
-      FloatNearlyEqual(scaledX, 3.f / 8.f) ||
-      FloatNearlyEqual(scaledX, 4.f / 8.f) ||
-      FloatNearlyEqual(scaledX, 5.f / 8.f) ||
-      FloatNearlyEqual(scaledX, 6.f / 8.f) ||
-      FloatNearlyEqual(scaledX, 7.f / 8.f) ||
-      FloatNearlyEqual(scaledX, 1.f)) {
+    if (FloatNearlyEqual(scaledX, 1.f / 8.f) || FloatNearlyEqual(scaledX, 2.f / 8.f) ||
+        FloatNearlyEqual(scaledX, 3.f / 8.f) || FloatNearlyEqual(scaledX, 4.f / 8.f) ||
+        FloatNearlyEqual(scaledX, 5.f / 8.f) || FloatNearlyEqual(scaledX, 6.f / 8.f) ||
+        FloatNearlyEqual(scaledX, 7.f / 8.f) || FloatNearlyEqual(scaledX, 1.f)) {
       return true;
     }
     return false;

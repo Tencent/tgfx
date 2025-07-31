@@ -26,13 +26,16 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageBuffer> buffer) {
   if (buffer == nullptr) {
     return nullptr;
   }
-  auto image = std::make_shared<BufferImage>(buffer->width(), buffer->height(), UniqueKey::Make(), std::move(buffer));
+  auto image = std::make_shared<BufferImage>(buffer->width(), buffer->height(), UniqueKey::Make(),
+                                             std::move(buffer));
   image->weakThis = image;
   return image;
 }
 
-BufferImage::BufferImage(int width, int height, UniqueKey uniqueKey, std::shared_ptr<ImageBuffer> buffer)
-    : ResourceImage(std::move(uniqueKey)), _width(width), _height(height), imageBuffer(std::move(buffer)) {
+BufferImage::BufferImage(int width, int height, UniqueKey uniqueKey,
+                         std::shared_ptr<ImageBuffer> buffer)
+    : ResourceImage(std::move(uniqueKey)), _width(width), _height(height),
+      imageBuffer(std::move(buffer)) {
 }
 
 std::shared_ptr<Image> BufferImage::onMakeScaled(int newWidth, int newHeight,

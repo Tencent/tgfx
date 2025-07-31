@@ -20,9 +20,10 @@
 #include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
-class ScaledImageBuffer: public ImageBuffer {
-public:
-  static std::shared_ptr<ScaledImageBuffer> Make(int width, int height, const std::shared_ptr<ImageBuffer>& source);
+class ScaledImageBuffer : public ImageBuffer {
+ public:
+  static std::shared_ptr<ScaledImageBuffer> Make(int width, int height,
+                                                 const std::shared_ptr<ImageBuffer>& source);
   int width() const override {
     return _width;
   }
@@ -38,14 +39,15 @@ public:
   void setSource(std::shared_ptr<ImageBuffer> imageBuffer) {
     source = std::move(imageBuffer);
   }
-protected:
+
+ protected:
   std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const override;
 
-private:
+ private:
   int _width;
   int _height;
   std::shared_ptr<ImageBuffer> source = nullptr;
 
   ScaledImageBuffer(int width, int height, const std::shared_ptr<ImageBuffer>& source);
 };
-}
+}  // namespace tgfx

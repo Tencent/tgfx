@@ -38,14 +38,16 @@ class CodecImage : public GeneratorImage {
     return _height;
   }
 
-  std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight, const SamplingOptions& sampling) const override;
+  std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
+                                      const SamplingOptions& sampling) const override;
 
  protected:
   Type type() const override {
     return Type::Codec;
   }
 
-  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args, const UniqueKey& key) const override;
+  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
+                                                   const UniqueKey& key) const override;
 
  private:
   int _width;

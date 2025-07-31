@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/ImageCodec.h"
+#include "BoxFilterDownsample.h"
 #include "core/PixelBuffer.h"
 #include "core/utils/USE.h"
 #include "core/utils/WeakMap.h"
@@ -24,7 +25,6 @@
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Stream.h"
-#include "ImageResize.h"
 
 #if defined(TGFX_USE_WEBP_DECODE) || defined(TGFX_USE_WEBP_ENCODE)
 #include "core/codecs/webp/WebpCodec.h"
@@ -145,34 +145,6 @@ std::shared_ptr<Data> ImageCodec::Encode(const Pixmap& pixmap, EncodedFormat for
   return nullptr;
 }
 
-static void ToStbDataTypeAndChannel(ColorType colorType, DataType* dataType,
-                                    PixelLayout* pixelLayout) {
-  switch (colorType) {
-    case ColorType::ALPHA_8:
-    case ColorType::Gray_8: {
-      *pixelLayout = PixelLayout::CHANNEL_1;
-      *dataType = DataType::UINT8;
-      break;
-    }
-    case ColorType::BGRA_8888:
-    case ColorType::RGBA_1010102:
-    case ColorType::RGBA_F16:
-    case ColorType::RGBA_8888: {
-      *pixelLayout = PixelLayout::RGBA;
-      *dataType = DataType::UINT8;
-      break;
-    }
-    case ColorType::RGB_565: {
-      *pixelLayout = PixelLayout::RGB;
-      *dataType = DataType::UINT8;
-      break;
-    }
-    default: {
-      break;
-    }
-  }
-}
-
 bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (dstInfo.width() > width() || dstInfo.height() > height()) {
     return false;
@@ -194,7 +166,6 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   ImageResize(pixels, pixelBuffer->info(), dstPixels, dstInfo);
   return true;
 }
-
 
 std::shared_ptr<ImageBuffer> ImageCodec::onMakeBuffer(bool tryHardware) const {
   auto pixelBuffer = PixelBuffer::Make(width(), height(), isAlphaOnly(), tryHardware);

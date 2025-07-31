@@ -23,7 +23,8 @@
 
 namespace tgfx {
 
-CodecImage::CodecImage(int width, int height, UniqueKey uniqueKey, std::shared_ptr<ImageCodec> codec)
+CodecImage::CodecImage(int width, int height, UniqueKey uniqueKey,
+                       std::shared_ptr<ImageCodec> codec)
     : GeneratorImage(std::move(uniqueKey), std::move(codec)), _width(width), _height(height) {
 }
 
@@ -32,7 +33,7 @@ std::shared_ptr<ImageCodec> CodecImage::getCodec() const {
 }
 
 std::shared_ptr<Image> CodecImage::onMakeScaled(int newWidth, int newHeight,
-                                              const SamplingOptions& sampling) const {
+                                                const SamplingOptions& sampling) const {
   if (newWidth <= width() && newHeight <= height()) {
     auto image = std::make_shared<CodecImage>(newWidth, newHeight, uniqueKey, getCodec());
     image->weakThis = image;
@@ -47,6 +48,7 @@ std::shared_ptr<TextureProxy> CodecImage::onLockTextureProxy(const TPArgs& args,
   if (width() != generator->width() || height() != generator->height()) {
     tempGenerator = ScaledImageGenerator::MakeFrom(width(), height(), getCodec());
   }
-  return args.context->proxyProvider()->createTextureProxy(key, tempGenerator, args.mipmapped, args.renderFlags);
+  return args.context->proxyProvider()->createTextureProxy(key, tempGenerator, args.mipmapped,
+                                                           args.renderFlags);
 }
-}
+}  // namespace tgfx
