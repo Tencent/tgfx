@@ -103,5 +103,7 @@ class PixelBuffer : public ImageBuffer {
  private:
   mutable std::mutex locker = {};
   ImageInfo _info = {};
+
+  friend class ScaledImageBuffer;
 };
 }  // namespace tgfx

@@ -39,7 +39,7 @@ std::shared_ptr<Texture> ScaledImageBuffer::onMakeTexture(Context* context, bool
   if (!source->isPixelBuffer() || (width() == source->width() && height() == source->height())) {
     return source->onMakeTexture(context, mipmapped);
   }
-  auto pixelBuffer = dynamic_cast<PixelBuffer*>(source.get());
+  auto pixelBuffer = (PixelBuffer*)source.get();
   auto scaledPixelBuffer = PixelBuffer::Make(width(), height(), pixelBuffer->isAlphaOnly(),
                                              pixelBuffer->isHardwareBacked());
   auto pixels = scaledPixelBuffer->lockPixels();
@@ -48,7 +48,6 @@ std::shared_ptr<Texture> ScaledImageBuffer::onMakeTexture(Context* context, bool
   scaledPixelBuffer->unlockPixels();
   pixelBuffer->unlockPixels();
 
-  auto imageBuffer = static_cast<std::shared_ptr<ImageBuffer>>(scaledPixelBuffer);
-  return imageBuffer->onMakeTexture(context, mipmapped);
+  return scaledPixelBuffer->onMakeTexture(context, mipmapped);
 }
 }  // namespace tgfx

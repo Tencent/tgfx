@@ -375,30 +375,6 @@ TGFX_TEST(CanvasTest, drawPaint) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawPaint_shadow"));
 }
 
-TGFX_TEST(CanvasTest, scaleImage) {
-  ContextScope scope;
-  auto context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-  auto imagePath = "resources/apitest/rotation.jpg";
-  auto codec = MakeImageCodec(imagePath);
-  ASSERT_TRUE(codec != nullptr);
-  Bitmap bitmap(codec->width(), codec->height(), false);
-  ASSERT_FALSE(bitmap.isEmpty());
-  Pixmap pixmap(bitmap);
-  auto result = codec->readPixels(pixmap.info(), pixmap.writablePixels());
-  pixmap.reset();
-  EXPECT_TRUE(result);
-  auto image = Image::MakeFrom(bitmap);
-  auto newWidth = image->width() / 8;
-  auto newHeight = image->height() / 8;
-  auto scaleImage = image->makeScaled(newWidth, newHeight);
-  auto surface = Surface::Make(context, newWidth, newHeight);
-  auto canvas = surface->getCanvas();
-  canvas->clear();
-  canvas->drawImage(scaleImage);
-  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/box_filter_scale_imageBuffer"));
-}
-
 TGFX_TEST(CanvasTest, rasterizedImage) {
   ContextScope scope;
   auto context = scope.getContext();

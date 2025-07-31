@@ -36,10 +36,6 @@ class ScaledImageBuffer : public ImageBuffer {
     return source->isAlphaOnly();
   }
 
-  void setSource(std::shared_ptr<ImageBuffer> imageBuffer) {
-    source = std::move(imageBuffer);
-  }
-
  protected:
   std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const override;
 
