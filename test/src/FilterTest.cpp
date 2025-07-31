@@ -348,6 +348,7 @@ TGFX_TEST(FilterTest, RuntimeEffect) {
   filterBounds.scale(0.5f, 0.5f);
   EXPECT_EQ(scaledFilterBounds, filterBounds);
   filterImage = image->makeWithFilter(std::move(scaled));
+  canvas->clear();
   canvas->drawImage(filterImage, 200, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/RuntimeEffect-scaled"));
 }
@@ -791,6 +792,16 @@ TGFX_TEST(FilterTest, ScaleFilterTest) {
   image = ScaleImage(image, 0.5f);
   canvas->clear();
   canvas->drawImage(image);
-  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ScaleFilterTest_InnerShadow_Scaled"));;
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ScaleFilterTest_InnerShadow_Scaled"));
+  auto composeFilter = ImageFilter::Compose({ImageFilter::DropShadow(6, 6, 0, 0, Color::Black()),
+                                             ImageFilter::InnerShadow(6, 6, 0, 0, Color::Black())});
+  image = originImage->makeWithFilter(composeFilter);
+  canvas->clear();
+  canvas->drawImage(image);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ScaleFilterTest_Compose_Origin"));
+  image = ScaleImage(image, 0.5f);
+  canvas->clear();
+  canvas->drawImage(image);
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ScaleFilterTest_Compose_Scaled"));
 }
 }  // namespace tgfx

@@ -110,10 +110,6 @@ std::shared_ptr<Image> FilterImage::onMakeWithFilter(std::shared_ptr<ImageFilter
 
 std::shared_ptr<Image> FilterImage::onMakeScaled(int newWidth, int newHeight,
                                                  const SamplingOptions& sampling) const {
-  auto inputBounds = Rect::MakeWH(source->width(), source->height());
-  if (filter->filterBounds(inputBounds) != bounds) {
-    return ScaledImage::MakeFrom(weakThis.lock(), newWidth, newHeight, sampling);
-  }
   auto scaleX = static_cast<float>(newWidth) / static_cast<float>(width());
   auto scaleY = static_cast<float>(newHeight) / static_cast<float>(height());
   auto newSourceWidth = static_cast<int>(roundf(static_cast<float>(source->width()) * scaleX));
@@ -125,9 +121,15 @@ std::shared_ptr<Image> FilterImage::onMakeScaled(int newWidth, int newHeight,
   if (newSource == nullptr || newFilter == nullptr) {
     return ScaledImage::MakeFrom(weakThis.lock(), newWidth, newHeight, sampling);
   }
-  auto newBounds = Rect::MakeWH(newSourceWidth, newSourceHeight);
-  newBounds = newFilter->filterBounds(newBounds);
-  if (newBounds.width() != newWidth || newBounds.height() != newHeight) {
+  auto newBounds = bounds;
+  newBounds.scale(filterScaleX, filterScaleY);
+  newBounds.roundOut();
+  auto filterBounds = newFilter->filterBounds(Rect::MakeWH(newSourceWidth, newSourceHeight));
+  if (!newBounds.intersect(filterBounds)) {
+    ScaledImage::MakeFrom(weakThis.lock(), newWidth, newHeight, sampling);
+  }
+  if (static_cast<int>(newBounds.width()) != newWidth ||
+      static_cast<int>(newBounds.height()) != newHeight) {
     return ScaledImage::MakeFrom(weakThis.lock(), newWidth, newHeight, sampling);
   }
   return FilterImage::Wrap(std::move(newSource), newBounds, std::move(newFilter));

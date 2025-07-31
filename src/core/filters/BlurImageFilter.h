@@ -30,20 +30,10 @@ class BlurImageFilter : public ImageFilter {
   float blurrinessX = 0.0f;
   float blurrinessY = 0.0f;
   TileMode tileMode = TileMode::Decal;
-  float _scaleX = 1.0f;
-  float _scaleY = 1.0f;
 
  protected:
   Type type() const override {
     return Type::Blur;
-  }
-
-  std::shared_ptr<ImageFilter> onMakeScaled(float scaleX, float scaleY) const override {
-    auto result = std::static_pointer_cast<BlurImageFilter>(
-        ImageFilter::Blur(blurrinessX, blurrinessY, tileMode));
-    result->_scaleX = _scaleX * scaleX;
-    result->_scaleY = _scaleY * scaleY;
-    return result;
   }
 };
 

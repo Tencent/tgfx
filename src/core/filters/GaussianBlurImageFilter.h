@@ -31,6 +31,8 @@ class GaussianBlurImageFilter : public BlurImageFilter {
  protected:
   Rect onFilterBounds(const Rect& srcRect) const override;
 
+  std::shared_ptr<ImageFilter> onMakeScaled(float scaleX, float scaleY) const override;
+
   std::shared_ptr<TextureProxy> lockTextureProxy(std::shared_ptr<Image> source,
                                                  const Rect& clipBounds,
                                                  const TPArgs& args) const override;

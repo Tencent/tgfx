@@ -31,9 +31,13 @@ class DualBlurImageFilter : public BlurImageFilter {
   float downScaling;
   int iteration;
   float scaleFactor = 1.0f;
+  float filterScaleX = 1.0f;
+  float filterScaleY = 1.0f;
 
  protected:
   Rect onFilterBounds(const Rect& srcRect) const override;
+
+  std::shared_ptr<ImageFilter> onMakeScaled(float scaleX, float scaleY) const override;
 
   std::shared_ptr<TextureProxy> lockTextureProxy(std::shared_ptr<Image> source,
                                                  const Rect& clipBounds,
