@@ -152,14 +152,13 @@ class RectIndicesProvider : public DataSource<Data> {
   uint16_t vertCount = 0;
 };
 
-std::shared_ptr<GPUBufferProxy> GlobalCache::getRectIndexBuffer(bool antialias) {
+std::shared_ptr<IndexBufferProxy> GlobalCache::getRectIndexBuffer(bool antialias) {
   if (antialias) {
     if (aaQuadIndexBuffer == nullptr) {
       auto provider =
           std::make_unique<RectIndicesProvider>(AAQuadIndexPattern, RectDrawOp::IndicesPerAAQuad,
                                                 RectDrawOp::MaxNumRects, VerticesPerAAQuad);
-      aaQuadIndexBuffer =
-          GPUBufferProxy::MakeFrom(context, std::move(provider), BufferType::Index, 0);
+      aaQuadIndexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
     }
     return aaQuadIndexBuffer;
   }
@@ -167,8 +166,7 @@ std::shared_ptr<GPUBufferProxy> GlobalCache::getRectIndexBuffer(bool antialias) 
     auto provider = std::make_unique<RectIndicesProvider>(
         NonAAQuadIndexPattern, RectDrawOp::IndicesPerNonAAQuad, RectDrawOp::MaxNumRects,
         VerticesPerNonAAQuad);
-    nonAAQuadIndexBuffer =
-        GPUBufferProxy::MakeFrom(context, std::move(provider), BufferType::Index, 0);
+    nonAAQuadIndexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
   }
   return nonAAQuadIndexBuffer;
 }
@@ -230,11 +228,11 @@ class RRectIndicesProvider : public DataSource<Data> {
   bool stroke = false;
 };
 
-std::shared_ptr<GPUBufferProxy> GlobalCache::getRRectIndexBuffer(bool stroke) {
+std::shared_ptr<IndexBufferProxy> GlobalCache::getRRectIndexBuffer(bool stroke) {
   auto& indexBuffer = stroke ? rRectStrokeIndexBuffer : rRectFillIndexBuffer;
   if (indexBuffer == nullptr) {
     auto provider = std::make_unique<RRectIndicesProvider>(RRectDrawOp::MaxNumRRects, stroke);
-    indexBuffer = GPUBufferProxy::MakeFrom(context, std::move(provider), BufferType::Index, 0);
+    indexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
   }
   return indexBuffer;
 }

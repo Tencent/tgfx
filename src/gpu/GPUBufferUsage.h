@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,25 +18,24 @@
 
 #pragma once
 
-#include "ResourceProxy.h"
-#include "gpu/VertexBuffer.h"
+#include <cstdint>
 
 namespace tgfx {
 /**
- * VertexBufferProxy is a proxy for VertexBuffer resources.
+ * GPUBufferUsage defines the usage flags for GPU buffers.
  */
-class VertexBufferProxy : public ResourceProxy {
+class GPUBufferUsage {
  public:
   /**
-   * Returns the associated VertexBuffer instance.
+   * The buffer can be used as an index buffer, for example as the buffer argument passed to
+   * RenderPass::setIndexBuffer().
    */
-  std::shared_ptr<VertexBuffer> getBuffer() const {
-    return std::static_pointer_cast<VertexBuffer>(resource);
-  }
+  static constexpr uint32_t INDEX = 0x10;
 
- private:
-  VertexBufferProxy() = default;
-
-  friend class ProxyProvider;
+  /**
+   * The buffer can be used as a vertex buffer, for example as the buffer argument passed to
+   * RenderPass::setVertexBuffer().
+   */
+  static constexpr uint32_t VERTEX = 0x20;
 };
 }  // namespace tgfx

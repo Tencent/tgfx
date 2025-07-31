@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,25 +18,24 @@
 
 #pragma once
 
-#include "ResourceProxy.h"
-#include "gpu/VertexBuffer.h"
-
 namespace tgfx {
+class GPU;
+
 /**
- * VertexBufferProxy is a proxy for VertexBuffer resources.
+ * GPUResource is the base class for GPU resources that need manual release of their underlying
+ * allocations. It is intended for resources like buffers and textures that are not automatically
+ * managed by the GPU. This class decouples resource release from object destruction, allowing you
+ * to skip releasing resources in scenarios such as when the context is abandoned or the GPU has
+ * been destroyed. Otherwise, it may lead to undefined behavior.
  */
-class VertexBufferProxy : public ResourceProxy {
+class GPUResource {
  public:
+  virtual ~GPUResource() = default;
+
   /**
-   * Returns the associated VertexBuffer instance.
+   * Releases the underlying GPU resources. After calling this method, the GPUResource must not be
+   * used, as doing so may lead to undefined behavior.
    */
-  std::shared_ptr<VertexBuffer> getBuffer() const {
-    return std::static_pointer_cast<VertexBuffer>(resource);
-  }
-
- private:
-  VertexBufferProxy() = default;
-
-  friend class ProxyProvider;
+  virtual void release(const GPU* gpu) = 0;
 };
 }  // namespace tgfx
