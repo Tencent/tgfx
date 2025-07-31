@@ -33,7 +33,7 @@ class GLSemaphore : public Semaphore {
     return _glSync;
   }
 
-  BackendSemaphore releaseBackend() override;
+  BackendSemaphore getBackendSemaphore() const override;
 
  protected:
   void onReleaseGPU() override;

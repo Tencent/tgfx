@@ -29,7 +29,7 @@ class OpsRenderTask : public RenderTask {
       : renderTargetProxy(std::move(renderTargetProxy)), ops(std::move(ops)) {
   }
 
-  void execute(GPU* gpu) override;
+  void execute(CommandEncoder* encoder) override;
 
  private:
   std::shared_ptr<RenderTargetProxy> renderTargetProxy = nullptr;

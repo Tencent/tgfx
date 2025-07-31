@@ -24,7 +24,7 @@ RenderTargetCopyTask::RenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> so
     : source(std::move(source)), dest(std::move(dest)), srcX(srcX), srcY(srcY) {
 }
 
-void RenderTargetCopyTask::execute(GPU* gpu) {
+void RenderTargetCopyTask::execute(CommandEncoder* encoder) {
   auto renderTarget = source->getRenderTarget();
   if (renderTarget == nullptr) {
     LOGE("RenderTargetCopyTask::execute() Failed to get the source render target!");
@@ -35,8 +35,8 @@ void RenderTargetCopyTask::execute(GPU* gpu) {
     LOGE("RenderTargetCopyTask::execute() Failed to get the dest texture!");
     return;
   }
-  gpu->copyRenderTargetToTexture(renderTarget.get(), texture.get(), srcX, srcY);
-  texture->getSampler()->regenerateMipmapLevels(texture->getContext());
+  encoder->copyRenderTargetToTexture(renderTarget.get(), texture.get(), srcX, srcY);
+  encoder->generateMipmapsForTexture(texture->getSampler());
 }
 
 }  // namespace tgfx

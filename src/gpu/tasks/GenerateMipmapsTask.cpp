@@ -24,12 +24,12 @@ GenerateMipmapsTask::GenerateMipmapsTask(std::shared_ptr<TextureProxy> texturePr
     : textureProxy(std::move(textureProxy)) {
 }
 
-void GenerateMipmapsTask::execute(GPU* gpu) {
+void GenerateMipmapsTask::execute(CommandEncoder* encoder) {
   auto texture = textureProxy->getTexture();
   if (texture == nullptr) {
     LOGE("GenerateMipmapsTask::execute() Failed to get texture!");
     return;
   }
-  texture->getSampler()->regenerateMipmapLevels(gpu->getContext());
+  encoder->generateMipmapsForTexture(texture->getSampler());
 }
 }  // namespace tgfx

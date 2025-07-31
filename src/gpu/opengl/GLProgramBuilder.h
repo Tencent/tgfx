@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "GLContext.h"
 #include "GLFragmentShaderBuilder.h"
 #include "GLProgram.h"
 #include "GLUniformHandler.h"

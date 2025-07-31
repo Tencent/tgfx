@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,38 +18,21 @@
 
 #pragma once
 
-#include <memory>
-#include "gpu/CommandEncoder.h"
 #include "gpu/CommandQueue.h"
-#include "tgfx/gpu/Context.h"
+#include "gpu/opengl/GLInterface.h"
 
 namespace tgfx {
-/**
- * This is the main interface for accessing GPU functionality. In Metal, Vulkan, and WebGPU, its
- * equivalents are MTLDevice, VkDevice, and GPUDevice. For OpenGL, it simply refers to GL functions.
- */
-class GPU {
+class GLCommandQueue : public CommandQueue {
  public:
-  virtual ~GPU() = default;
+  explicit GLCommandQueue(std::shared_ptr<GLInterface> interface)
+      : interface(std::move(interface)) {
+  }
 
-  /**
-   * Returns the backend type of the GPU.
-   */
-  virtual Backend backend() const = 0;
+  void submit(std::shared_ptr<CommandBuffer>) override;
 
-  /**
-   * Returns the capability info of the GPU.
-   */
-  virtual const Caps* caps() const = 0;
+  void waitUntilCompleted() override;
 
-  /**
-   * Returns the primary CommandQueue associated with this GPU.
-   */
-  virtual CommandQueue* queue() const = 0;
-
-  /**
-   * Creates a command encoder that can be used to encode commands to be issued to the GPU.
-   */
-  virtual std::shared_ptr<CommandEncoder> createCommandEncoder() const = 0;
+ private:
+  std::shared_ptr<GLInterface> interface = nullptr;
 };
 }  // namespace tgfx

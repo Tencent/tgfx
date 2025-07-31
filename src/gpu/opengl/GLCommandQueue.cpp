@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,33 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "GLCaps.h"
-#include "GLProcGetter.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
+#include "GLCommandQueue.h"
 
 namespace tgfx {
-class GLInterface {
- public:
-  static std::shared_ptr<GLInterface> GetNative();
+void GLCommandQueue::submit(std::shared_ptr<CommandBuffer>) {
+  auto gl = interface->functions();
+  gl->flush();
+}
 
-  const GLCaps* caps() const {
-    return _caps.get();
-  }
+void GLCommandQueue::waitUntilCompleted() {
+  auto gl = interface->functions();
+  gl->finish();
+}
 
-  const GLFunctions* functions() const {
-    return _functions.get();
-  }
-
- private:
-  std::unique_ptr<GLCaps> _caps = nullptr;
-  std::unique_ptr<GLFunctions> _functions = nullptr;
-
-  static std::shared_ptr<GLInterface> MakeNativeInterface(const GLProcGetter* getter);
-
-  GLInterface(std::unique_ptr<GLCaps> caps, std::unique_ptr<GLFunctions> functions)
-      : _caps(std::move(caps)), _functions(std::move(functions)) {
-  }
-};
 }  // namespace tgfx

@@ -18,27 +18,32 @@
 
 #pragma once
 
-#include "gpu/Resource.h"
+#include "gpu/CommandEncoder.h"
+#include "gpu/opengl/GLInterface.h"
 
 namespace tgfx {
-class GLFrameBuffer : public Resource {
+class GLCommandEncoder : public CommandEncoder {
  public:
-  static std::shared_ptr<GLFrameBuffer> Make(Context* context);
-
-  explicit GLFrameBuffer(unsigned id);
-
-  size_t memoryUsage() const override {
-    return 0;
+  explicit GLCommandEncoder(std::shared_ptr<GLInterface> interface)
+      : interface(std::move(interface)) {
   }
 
-  unsigned id() const {
-    return _id;
-  }
+  void copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture* texture, int srcX,
+                                 int srcY) override;
+
+  void generateMipmapsForTexture(TextureSampler* sampler) override;
+
+  BackendSemaphore insertSemaphore() override;
+
+  void waitSemaphore(const BackendSemaphore& semaphore) override;
 
  protected:
-  void onReleaseGPU() override;
+  std::shared_ptr<RenderPass> onBeginRenderPass(std::shared_ptr<RenderTarget> renderTarget,
+                                                bool resolveMSAA) override;
+
+  std::shared_ptr<CommandBuffer> onFinish() override;
 
  private:
-  unsigned _id = 0;
+  std::shared_ptr<GLInterface> interface = nullptr;
 };
 }  // namespace tgfx

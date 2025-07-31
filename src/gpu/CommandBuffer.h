@@ -16,28 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLFrameBuffer.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
+#pragma once
 
 namespace tgfx {
-std::shared_ptr<GLFrameBuffer> GLFrameBuffer::Make(Context* context) {
-  auto gl = GLFunctions::Get(context);
-  unsigned id = 0;
-  gl->genFramebuffers(1, &id);
-  if (id == 0) {
-    return nullptr;
-  }
-  return Resource::AddToCache(context, new GLFrameBuffer(id));
-}
-
-GLFrameBuffer::GLFrameBuffer(unsigned int id) : _id(id) {
-}
-
-void GLFrameBuffer::onReleaseGPU() {
-  auto gl = GLFunctions::Get(context);
-  if (_id > 0) {
-    gl->deleteFramebuffers(1, &_id);
-    _id = 0;
-  }
-}
+/**
+ * CommandBuffer represents a sequence of commands that can be submitted to the GPU for execution.
+ * A CommandBuffer is created via the CommandEncoder::finish() method, the GPU commands recorded
+ * within are submitted for execution by calling the CommandQueue::submit() method.
+ */
+class CommandBuffer {
+ public:
+  virtual ~CommandBuffer() = default;
+};
 }  // namespace tgfx

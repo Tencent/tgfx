@@ -21,8 +21,8 @@
 #include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
-void OpsRenderTask::execute(GPU*) {
-  auto renderPass = RenderPass::Make(renderTargetProxy->getRenderTarget(), true);
+void OpsRenderTask::execute(CommandEncoder* encoder) {
+  auto renderPass = encoder->beginRenderPass(renderTargetProxy->getRenderTarget(), true);
   if (renderPass == nullptr) {
     LOGE("OpsRenderTask::execute() Failed to initialize the render pass!");
     return;

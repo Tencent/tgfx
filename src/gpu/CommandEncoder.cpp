@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,24 +16,26 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/opengl/GLContext.h"
-#include "GLGPU.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
+#include "CommandEncoder.h"
 
 namespace tgfx {
-GLContext::GLContext(Device* device, const GLInterface* glInterface)
-    : Context(device), glInterface(glInterface) {
-  _gpu = new GLGPU(this);
-  if (glInterface->caps->vertexArrayObjectSupport) {
-    _sharedVertexArray = GLVertexArray::Make(this);
-    DEBUG_ASSERT(_sharedVertexArray != nullptr);
+std::shared_ptr<RenderPass> CommandEncoder::beginRenderPass(
+    std::shared_ptr<RenderTarget> renderTarget, bool resolveMSAA) {
+  if (activeRenderPass && !activeRenderPass->isEnd) {
+    LOGE("CommandEncoder::beginRenderPass() Cannot begin a new render pass while one is active!");
+    return nullptr;
   }
-  _sharedFrameBuffer = GLFrameBuffer::Make(this);
-  DEBUG_ASSERT(_sharedFrameBuffer != nullptr);
+  activeRenderPass = onBeginRenderPass(std::move(renderTarget), resolveMSAA);
+  return activeRenderPass;
 }
 
-GLContext::~GLContext() {
-  delete _gpu;
+std::shared_ptr<CommandBuffer> CommandEncoder::finish() {
+  if (activeRenderPass && !activeRenderPass->isEnd) {
+    LOGE("CommandEncoder::finish() Cannot finish command encoder while a render pass is active!");
+    return nullptr;
+  }
+  activeRenderPass = nullptr;
+  return onFinish();
 }
 
 }  // namespace tgfx

@@ -18,6 +18,7 @@
 
 #include "GLCaps.h"
 #include "GLUtil.h"
+#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 static GLStandard GetGLStandard(const char* versionString) {

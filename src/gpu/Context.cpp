@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/Context.h"
+#include "GPU.h"
 #include "core/AtlasManager.h"
 #include "core/utils/BlockBuffer.h"
 #include "core/utils/Log.h"
@@ -28,7 +29,7 @@
 #include "tgfx/core/Clock.h"
 
 namespace tgfx {
-Context::Context(Device* device) : _device(device) {
+Context::Context(Device* device, std::unique_ptr<GPU> gpu) : _device(device), _gpu(gpu.release()) {
   // We set the maxBlockSize to 2MB because allocating blocks that are too large can cause memory
   // fragmentation and slow down allocation. It may also increase the application's memory usage due
   // to pre-allocation optimizations on some platforms.
@@ -52,6 +53,15 @@ Context::~Context() {
   delete _drawingBuffer;
   delete _atlasManager;
   delete _maxValueTracker;
+  delete _gpu;
+}
+
+Backend Context::backend() const {
+  return _gpu->backend();
+}
+
+const Caps* Context::caps() const {
+  return _gpu->caps();
 }
 
 bool Context::wait(const BackendSemaphore& waitSemaphore) {
@@ -69,7 +79,8 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
   // cleanup can they be unbound and reused.
   _resourceCache->processUnreferencedResources();
   _atlasManager->preFlush();
-  if (!_drawingManager->flush(signalSemaphore)) {
+  commandBuffer = _drawingManager->flush(signalSemaphore);
+  if (commandBuffer == nullptr) {
     return false;
   }
   _atlasManager->postFlush();
@@ -81,7 +92,15 @@ bool Context::flush(BackendSemaphore* signalSemaphore) {
 }
 
 bool Context::submit(bool syncCpu) {
-  return gpu()->submitToGPU(syncCpu);
+  if (commandBuffer == nullptr) {
+    return false;
+  }
+  auto queue = gpu()->queue();
+  queue->submit(std::move(commandBuffer));
+  if (syncCpu) {
+    queue->waitUntilCompleted();
+  }
+  return true;
 }
 
 void Context::flushAndSubmit(bool syncCpu) {

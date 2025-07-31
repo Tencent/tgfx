@@ -158,7 +158,7 @@ void DrawingManager::addSemaphoreWaitTask(std::shared_ptr<Semaphore> semaphore) 
   renderTasks.emplace_back(std::move(task));
 }
 
-bool DrawingManager::flush(BackendSemaphore* signalSemaphore) {
+std::shared_ptr<CommandBuffer> DrawingManager::flush(BackendSemaphore* signalSemaphore) {
   while (!compositors.empty()) {
     auto compositor = compositors.back();
     // The makeClosed() method may add more compositors to the list.
@@ -171,7 +171,7 @@ bool DrawingManager::flush(BackendSemaphore* signalSemaphore) {
   if (resourceTasks.empty() && renderTasks.empty()) {
     proxyProvider->clearSharedVertexBuffer();
     clearAtlasCellCodecTasks();
-    return false;
+    return nullptr;
   }
   for (auto& task : resourceTasks) {
     task->execute(context);
@@ -180,19 +180,16 @@ bool DrawingManager::flush(BackendSemaphore* signalSemaphore) {
   uploadAtlasToGPU();
   resourceTasks.clear();
   proxyProvider->clearSharedVertexBuffer();
-  auto gpu = context->gpu();
+  auto commandEncoder = context->gpu()->createCommandEncoder();
   for (auto& task : renderTasks) {
-    task->execute(gpu);
+    task->execute(commandEncoder.get());
     task = nullptr;
   }
   renderTasks.clear();
   if (signalSemaphore != nullptr) {
-    auto semaphore = context->gpu()->insertSemaphore();
-    if (semaphore != nullptr) {
-      *signalSemaphore = semaphore->releaseBackend();
-    }
+    *signalSemaphore = commandEncoder->insertSemaphore();
   }
-  return true;
+  return commandEncoder->finish();
 }
 
 void DrawingManager::releaseAll() {
