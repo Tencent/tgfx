@@ -46,6 +46,8 @@ std::shared_ptr<IndexBufferProxy> ProxyProvider::createIndexBufferProxy(
   if (!(renderFlags & RenderFlags::DisableAsyncTask)) {
     source = DataSource<Data>::Async(std::move(source));
   }
+#else
+  USE(renderFlags);
 #endif
   auto proxy = std::shared_ptr<IndexBufferProxy>(new IndexBufferProxy());
   addResourceProxy(proxy);
