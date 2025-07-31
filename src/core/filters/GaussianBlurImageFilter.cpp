@@ -99,8 +99,8 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
 
   Rect scaledBounds = boundsWillSample;
   if (maxSigma > MAX_BLUR_SIGMA) {
-    scaleFactor *= MAX_BLUR_SIGMA / maxSigma;
-    Matrix matrix = Matrix::MakeScale(scaleFactor, scaleFactor);
+    scaleFactor = MAX_BLUR_SIGMA / maxSigma;
+    Matrix matrix = Matrix::MakeScale(scaleFactor);
     matrix.mapRect(&scaledBounds);
   }
   scaledBounds.roundOut();
@@ -145,7 +145,7 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
       return nullptr;
     }
 
-    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessX * scaleFactor,
+    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessY * scaleFactor,
            GaussianBlurDirection::Vertical, boundsWillSample.height() / scaledBounds.height(),
            args.renderFlags);
     return renderTarget->asTextureProxy();
