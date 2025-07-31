@@ -32,7 +32,7 @@ GlyphRasterizer::~GlyphRasterizer() {
   }
 }
 
-bool GlyphRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
+bool GlyphRasterizer::onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   return scalerContext->readPixels(glyphID, fauxBold, stroke, dstInfo, dstPixels);
 }
 }  // namespace tgfx

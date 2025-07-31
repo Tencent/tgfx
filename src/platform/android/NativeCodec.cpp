@@ -294,7 +294,7 @@ static jobject ConvertHardwareBitmap(JNIEnv* env, jobject bitmap) {
   return bitmap;
 }
 
-bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
+bool NativeCodec::onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }

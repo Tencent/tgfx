@@ -64,7 +64,7 @@ static WEBP_CSP_MODE webp_decode_mode(ColorType dstCT, bool premultiply) {
   }
 }
 
-bool WebpCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
+bool WebpCodec::onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (dstPixels == nullptr || dstInfo.isEmpty()) {
     return false;
   }
@@ -76,7 +76,9 @@ bool WebpCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     return false;
   }
   WebPDecoderConfig config;
-  if (!WebPInitDecoderConfig(&config)) return false;
+  if (!WebPInitDecoderConfig(&config)) {
+    return false;
+  }
   if (WebPGetFeatures(byteData->bytes(), byteData->size(), &config.input) != VP8_STATUS_OK) {
     return false;
   }

@@ -15,31 +15,35 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
 #pragma once
 
-#include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
-class RawPixelCodec : public ImageCodec {
+class ScaledImageBuffer : public ImageBuffer {
  public:
-  RawPixelCodec(const ImageInfo& info, std::shared_ptr<Data> pixels)
-      : ImageCodec(info.width(), info.height()), info(info), pixels(std::move(pixels)) {
+  static std::shared_ptr<ScaledImageBuffer> Make(int width, int height,
+                                                 const std::shared_ptr<ImageBuffer>& source);
+  int width() const override {
+    return _width;
+  }
+
+  int height() const override {
+    return _height;
   }
 
   bool isAlphaOnly() const override {
-    return info.isAlphaOnly();
+    return source->isAlphaOnly();
   }
 
  protected:
-  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
-
-  bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const override {
-    return Pixmap(info, pixels->data()).readPixels(dstInfo, dstPixels);
-  }
+  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const override;
 
  private:
-  ImageInfo info = {};
-  std::shared_ptr<Data> pixels = nullptr;
+  int _width;
+  int _height;
+  std::shared_ptr<ImageBuffer> source = nullptr;
+
+  ScaledImageBuffer(int width, int height, const std::shared_ptr<ImageBuffer>& source);
 };
 }  // namespace tgfx

@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/ImageCodec.h"
+#include "BoxFilterDownsample.h"
 #include "core/PixelBuffer.h"
 #include "core/utils/USE.h"
 #include "core/utils/WeakMap.h"
@@ -142,6 +143,28 @@ std::shared_ptr<Data> ImageCodec::Encode(const Pixmap& pixmap, EncodedFormat for
   }
 #endif
   return nullptr;
+}
+
+bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
+  if (dstInfo.width() > width() || dstInfo.height() > height()) {
+    return false;
+  }
+  if (dstInfo.width() == width() && dstInfo.height() == height()) {
+    return onReadPixels(dstInfo, dstPixels);
+  }
+  auto pixelBuffer = PixelBuffer::Make(width(), height(), isAlphaOnly());
+  if (pixelBuffer == nullptr) {
+    return false;
+  }
+  auto pixels = pixelBuffer->lockPixels();
+  auto result = onReadPixels(pixelBuffer->info(), pixels);
+  pixelBuffer->unlockPixels();
+  if (!result) {
+    return false;
+  }
+
+  ImageResize(pixels, pixelBuffer->info(), dstPixels, dstInfo);
+  return true;
 }
 
 std::shared_ptr<ImageBuffer> ImageCodec::onMakeBuffer(bool tryHardware) const {

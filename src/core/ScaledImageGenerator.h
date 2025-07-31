@@ -17,29 +17,34 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
+#include "tgfx/core/Image.h"
 #include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
-class RawPixelCodec : public ImageCodec {
+class ScaledImageGenerator : public ImageGenerator {
  public:
-  RawPixelCodec(const ImageInfo& info, std::shared_ptr<Data> pixels)
-      : ImageCodec(info.width(), info.height()), info(info), pixels(std::move(pixels)) {
-  }
+  static std::shared_ptr<ScaledImageGenerator> MakeFrom(int width, int height,
+                                                        const std::shared_ptr<ImageCodec>& codec);
+
+  ~ScaledImageGenerator() override = default;
 
   bool isAlphaOnly() const override {
-    return info.isAlphaOnly();
+    return source->isAlphaOnly();
   }
 
- protected:
+  bool asyncSupport() const override {
+    return source->asyncSupport();
+  }
+
+  std::shared_ptr<ImageCodec> codec() const {
+    return source;
+  }
+
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
-  bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const override {
-    return Pixmap(info, pixels->data()).readPixels(dstInfo, dstPixels);
-  }
-
  private:
-  ImageInfo info = {};
-  std::shared_ptr<Data> pixels = nullptr;
+  std::shared_ptr<ImageCodec> source = nullptr;
+
+  explicit ScaledImageGenerator(int width, int height, const std::shared_ptr<ImageCodec>& codec);
 };
 }  // namespace tgfx

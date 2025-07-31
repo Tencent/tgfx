@@ -26,19 +26,22 @@ namespace tgfx {
  */
 class BufferImage : public ResourceImage {
  public:
-  BufferImage(UniqueKey uniqueKey, std::shared_ptr<ImageBuffer> buffer);
+  BufferImage(int width, int height, UniqueKey uniqueKey, std::shared_ptr<ImageBuffer> buffer);
 
   int width() const override {
-    return imageBuffer->width();
+    return _width;
   }
 
   int height() const override {
-    return imageBuffer->height();
+    return _height;
   }
 
   bool isAlphaOnly() const override {
     return imageBuffer->isAlphaOnly();
   }
+
+  std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
+                                      const SamplingOptions& sampling) const override;
 
  protected:
   Type type() const override {
@@ -49,6 +52,8 @@ class BufferImage : public ResourceImage {
                                                    const UniqueKey& key) const override;
 
  private:
+  int _width;
+  int _height;
   std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
 };
 }  // namespace tgfx

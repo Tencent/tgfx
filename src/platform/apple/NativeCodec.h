@@ -26,7 +26,8 @@ class NativeCodec : public ImageCodec {
  public:
   ~NativeCodec() override;
 
-  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
+ protected:
+  bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 
  private:
   std::string imagePath;

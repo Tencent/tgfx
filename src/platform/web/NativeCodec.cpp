@@ -103,7 +103,7 @@ bool NativeCodec::asyncSupport() const {
   return false;
 }
 
-bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
+bool NativeCodec::onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }

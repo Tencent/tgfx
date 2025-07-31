@@ -164,7 +164,7 @@ static void UpdateReadInfo(png_structp p, png_infop pi) {
   png_read_update_info(p, pi);
 }
 
-bool PngCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
+bool PngCodec::onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   auto readInfo = ReadInfo::Make(filePath, fileData);
   if (readInfo == nullptr) {
     return false;
