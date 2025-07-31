@@ -127,7 +127,10 @@ class ImageFilter {
   Rect filterBounds(const Rect& rect) const;
 
   /**
-   * Creates a new image filter that
+   * Creates a new image filter that applies the same effect scaled by the given factors.
+   * @param scaleX  The factor by which to scale the effect along the X axis.
+   * @param scaleY  The factor by which to scale the effect along the Y axis.
+   * @return A new ImageFilter instance with the scaled effect.
    */
   std::shared_ptr<ImageFilter> makeScaled(float scaleX, float scaleY) const;
 
