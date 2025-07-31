@@ -97,8 +97,12 @@ class PDFExportContext : public DrawContext {
   void onDrawGlyphRun(const GlyphRun& glyphRun, const MCState& state, const Fill& fill,
                       const Stroke* stroke);
 
-  void onDrawGlyphRunAsPath(const GlyphRun& glyphRun, const MCState& state, const Fill& fill,
+  void exportGlyphRunAsText(const GlyphRun& glyphRun, const MCState& state, const Fill& fill);
+
+  void exportGlyphRunAsPath(const GlyphRun& glyphRun, const MCState& state, const Fill& fill,
                             const Stroke* stroke);
+
+  void exportGlyphRunAsImage(const GlyphRun& glyphRun, const MCState& state, const Fill& fill);
 
   std::shared_ptr<MemoryWriteStream> setUpContentEntry(const MCState& state, const Matrix& matrix,
                                                        const Fill& fill, float scale,
@@ -164,6 +168,7 @@ class PDFExportContext : public DrawContext {
   std::unordered_set<PDFIndirectReference> fontResources;
 
   friend class ScopedContentEntry;
+  friend class PDFFont;
 };
 
 }  // namespace tgfx

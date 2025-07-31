@@ -17,34 +17,23 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFFont.h"
-#include <algorithm>
-#include <cmath>
-#include <cstddef>
-#include <memory>
-#include <string>
-#include <utility>
 #include "core/ScalerContext.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "pdf/PDFDocument.h"
-#include "pdf/PDFExportContext.h"
-#include "pdf/PDFFormXObject.h"
 #include "pdf/PDFTypes.h"
 #include "pdf/PDFUtils.h"
 #include "pdf/fontSubset/PDFMakeCIDGlyphWidthsArray.h"
 #include "pdf/fontSubset/PDFMakeToUnicodeCmap.h"
 #include "pdf/fontSubset/PDFSubsetFont.h"
 #include "pdf/fontSubset/PDFType1Font.h"
-#include "tgfx/core/Canvas.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/FontMetrics.h"
-#include "tgfx/core/Image.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
 #include "tgfx/core/Rect.h"
-#include "tgfx/core/Size.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/core/WriteStream.h"
@@ -485,7 +474,7 @@ void PDFFont::emitSubsetType3(PDFDocument* doc) const {
   GlyphID xGlyphID = typeface->getGlyphID('X');
   auto scaleContext = PDFFont::GetScalerContext(typeface, textSize);
   float xHeight = scaleContext->getBounds(xGlyphID, false, false).height();
-  float bitmapScale = 1.f;
+  // float bitmapScale = 1.f;
 
   PDFDictionary font("Font");
   font.insertName("Subtype", "Type3");
@@ -516,13 +505,13 @@ void PDFFont::emitSubsetType3(PDFDocument* doc) const {
 
   for (GlyphID glyphID : SingleByteGlyphIdIterator(firstGlyphID, lastGlyphID)) {
     std::string characterName;
-    float advance = 0.0f;
+    float glyphWidth = 0.0f;
 
     if (glyphID != 0 && !subset.has(glyphID)) {
       characterName.append("g0");
-      advance = 0.0f;
+      glyphWidth = 0.0f;
       encDiffs->appendName(std::move(characterName));
-      widthArray->appendScalar(advance);
+      widthArray->appendScalar(glyphWidth);
       continue;
     }
 
@@ -531,67 +520,21 @@ void PDFFont::emitSubsetType3(PDFDocument* doc) const {
       std::snprintf(buffer, sizeof(buffer), "g%X", glyphID);
       characterName = buffer;
     }
-    advance = scaleContext->getAdvance(glyphID, false);
+    glyphWidth = scaleContext->getAdvance(glyphID, false);
     encDiffs->appendName(characterName);
-    widthArray->appendScalar(advance);
+    widthArray->appendScalar(glyphWidth);
 
     auto glyphBBox = scaleContext->getBounds(glyphID, false, false);
     bbox.join(glyphBBox);
 
     auto content = MemoryWriteStream::Make();
     Path glyphPath;
-    Matrix glyphImageMatrix;
     if (!typeface->hasColor() && scaleContext->generatePath(glyphID, false, false, &glyphPath)) {
-      SetGlyphWidthAndBoundingBox(advance, glyphBBox, content);
+      SetGlyphWidthAndBoundingBox(glyphWidth, glyphBBox, content);
       PDFUtils::EmitPath(glyphPath, true, content);
       PDFUtils::PaintPath(PathFillType::Winding, content);
     } else {
-      Font imageFont(typeface, textSize);
-      auto glyphImage = imageFont.getImage(glyphID, nullptr, &glyphImageMatrix);
-      if (glyphImage) {
-        auto smallBBox = scaleContext->getBounds(glyphID, false, false);
-        smallBBox = Matrix::MakeScale(bitmapScale).mapRect(smallBBox);
-        smallBBox.roundOut();
-        bbox.join(smallBBox);
-        SetGlyphWidthAndBoundingBox(advance, smallBBox, content);
-
-        PDFUtils::AppendFloat(bitmapScale, content);
-        content->writeText(" 0 0 ");
-        PDFUtils::AppendFloat(bitmapScale, content);
-        content->writeText(" ");
-        PDFUtils::AppendFloat(glyphImageMatrix.getTranslateX() * bitmapScale, content);
-        content->writeText(" ");
-        PDFUtils::AppendFloat(glyphImageMatrix.getTranslateY() * bitmapScale, content);
-        content->writeText(" cm\n");
-
-        // Draw image into a Form XObject
-        const auto imageSize = ISize::Make(glyphImage->width(), glyphImage->height());
-        PDFExportContext glyphDevice(imageSize, doc);
-        Canvas canvas(&glyphDevice);
-        canvas.drawImage(Image::MakeFrom(glyphImage));
-        PDFIndirectReference sMask =
-            MakePDFFormXObject(doc, glyphDevice.getContent(),
-                               MakePDFArray(0, 0, glyphImage->width(), glyphImage->height()),
-                               glyphDevice.makeResourceDictionary(), Matrix(), "DeviceGray");
-
-        // Use Form XObject as SMask (luminosity) on the graphics state
-        PDFIndirectReference smaskGraphicState = PDFGraphicState::GetSMaskGraphicState(
-            sMask, false, PDFGraphicState::SMaskMode::Luminosity, doc);
-        PDFUtils::ApplyGraphicState(smaskGraphicState.value, content);
-
-        // Draw a rectangle the size of the glyph (masked by SMask)
-        PDFUtils::AppendRectangle(Rect::MakeWH(glyphImage->width(), glyphImage->height()), content);
-        PDFUtils::PaintPath(PathFillType::Winding, content);
-
-        // Add glyph resources to font resource dict
-        char buffer[16];
-        std::snprintf(buffer, sizeof(buffer), "g%X", glyphID);
-        xObjects->insertRef(buffer, sMask);
-        std::snprintf(buffer, sizeof(buffer), "G%d", smaskGraphicState.value);
-        graphicStates->insertRef(buffer, smaskGraphicState);
-      } else {
-        SetGlyphWidthAndBoundingBox(advance, glyphBBox, content);
-      }
+      SetGlyphWidthAndBoundingBox(glyphWidth, glyphBBox, content);
     }
 
     auto stream = Stream::MakeFromData(content->readData());

@@ -39,8 +39,6 @@ PDFIndirectReference MakePDFFormXObject(PDFDocument* document, std::shared_ptr<D
 
   // Right now FormXObject is only used for saveLayer, which implies
   // isolated blending.  Do this conditionally if that changes.
-  // TODO(halcanary): Is this comment obsolete, since we use it for
-  // alpha masks?
   auto group = PDFDictionary::Make("Group");
   group->insertName("S", "Transparency");
   if (colorSpace != nullptr) {

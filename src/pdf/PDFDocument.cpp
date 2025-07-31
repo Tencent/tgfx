@@ -309,11 +309,11 @@ Canvas* PDFDocument::onBeginPage(float width, float height) {
   initialTransform.setTranslateY(inverseRasterScale * pageSize.height);
 
   drawContext = new PDFExportContext(pageSize, this, initialTransform);
-  canvas = new Canvas(drawContext);
+  _canvas = new Canvas(drawContext);
 
   pageRefs.push_back(this->reserveRef());
   // return &fCanvas;
-  return canvas;
+  return _canvas;
 }
 
 void PDFDocument::onEndPage() {
@@ -337,8 +337,8 @@ void PDFDocument::onEndPage() {
   page->insertInt("StructParents", static_cast<int>(this->currentPageIndex()));
   pages.emplace_back(std::move(page));
 
-  delete canvas;
-  canvas = nullptr;
+  delete _canvas;
+  _canvas = nullptr;
   delete drawContext;
   drawContext = nullptr;
 }

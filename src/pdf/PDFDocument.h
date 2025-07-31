@@ -133,8 +133,13 @@ class PDFDocument : public Document {
   size_t currentPageIndex() {
     return pages.size();
   }
+
   size_t pageCount() {
     return pageRefs.size();
+  }
+
+  Canvas* canvas() const {
+    return _canvas;
   }
 
   const Matrix& currentPageTransform() const;
@@ -161,7 +166,7 @@ class PDFDocument : public Document {
 
   Context* _context = nullptr;
   PDFOffsetMap offsetMap;
-  Canvas* canvas = nullptr;
+  Canvas* _canvas = nullptr;
   PDFExportContext* drawContext = nullptr;
   std::vector<std::unique_ptr<PDFDictionary>> pages;
   std::vector<PDFIndirectReference> pageRefs;

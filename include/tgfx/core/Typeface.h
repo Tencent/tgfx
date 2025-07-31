@@ -193,6 +193,7 @@ class Typeface {
   friend class WebMask;
   friend class SVGExportContext;
   friend class RenderContext;
+  friend class PDFExportContext;
   friend class PDFFont;
 };
 }  // namespace tgfx
