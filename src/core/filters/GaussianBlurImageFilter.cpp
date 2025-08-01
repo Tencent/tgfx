@@ -81,11 +81,14 @@ static std::shared_ptr<TextureProxy> ScaleTexture(const TPArgs& args,
 }
 
 std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
-    std::shared_ptr<Image> source, const Rect& clipBounds, const TPArgs& args) const {
+    std::shared_ptr<Image> source, const Rect& clipBounds, const TPArgs& args,
+    Point* textureScales) const {
   const float maxSigma = std::max(blurrinessX, blurrinessY);
   float scaleFactor = 1.0f;
   bool blur2D = blurrinessX > 0 && blurrinessY > 0;
-
+  if (textureScales) {
+    *textureScales = Point::Make(1.0f, 1.0f);
+  }
   Rect boundsWillSample = clipBounds;
   if (blur2D) {
     // if blur2D, we need to make sure the pixels are in the clip bounds while blur y.

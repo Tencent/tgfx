@@ -124,8 +124,8 @@ std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {
   if (context == nullptr) {
     return nullptr;
   }
-  TPArgs args(context, 0, hasMipmaps(), BackingFit::Exact);
-  auto textureProxy = lockTextureProxy(args);
+  TPArgs args(context, 0, hasMipmaps(), Point::Make(1.0f, 1.0f), {}, BackingFit::Exact);
+  auto textureProxy = lockTextureProxy(args, nullptr);
   if (textureProxy == nullptr) {
     return nullptr;
   }
@@ -223,6 +223,16 @@ std::shared_ptr<Image> Image::onMakeScaled(int newWidth, int newHeight,
   return ScaledImage::MakeFrom(weakThis.lock(), newWidth, newHeight, sampling);
 }
 
+Size Image::getScaledSize(const Point& scales, Point* acturalScales) const {
+  auto scaledWidth = roundf(static_cast<float>(width()) * scales.x);
+  auto scaledHeight = roundf(static_cast<float>(height()) * scales.y);
+  if (acturalScales) {
+    *acturalScales = Point::Make(scaledWidth / static_cast<float>(width()),
+                                 scaledHeight / static_cast<float>(height()));
+  }
+  return Size::Make(scaledWidth, scaledHeight);
+}
+
 std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
                                          int alphaStartY) const {
   if (alphaStartX == 0 && alphaStartY == 0) {
@@ -232,21 +242,31 @@ std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, in
                                alphaStartY);
 }
 
-std::shared_ptr<TextureProxy> Image::lockTextureProxy(const TPArgs& args) const {
+std::shared_ptr<TextureProxy> Image::lockTextureProxy(const TPArgs& args,
+                                                      Point* textureScales) const {
+  auto scaledWidth = static_cast<int>(roundf(static_cast<float>(width()) * args.drawScales.x));
+  auto scaledHeight = static_cast<int>(roundf(static_cast<float>(height()) * args.drawScales.y));
   auto renderTarget =
-      RenderTargetProxy::MakeFallback(args.context, width(), height(), isAlphaOnly(), 1,
+      RenderTargetProxy::MakeFallback(args.context, scaledWidth, scaledHeight, isAlphaOnly(), 1,
                                       args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto drawRect = Rect::MakeWH(width(), height());
-  FPArgs fpArgs(args.context, args.renderFlags, drawRect);
-  SamplingArgs samplingArgs = {TileMode::Clamp, TileMode::Clamp, {}, SrcRectConstraint::Fast};
+  auto actualScales = Point::Make(static_cast<float>(scaledWidth) / static_cast<float>(width()),
+                                   static_cast<float>(scaledHeight) / static_cast<float>(height()));
+  auto uvMatrix = Matrix::MakeScale(1.0f / actualScales.x, 1.0f / actualScales.y);
+  auto drawRect = Rect::MakeWH(scaledWidth, scaledHeight);
+  FPArgs fpArgs(args.context, args.renderFlags, drawRect, actualScales);
+  SamplingArgs samplingArgs = {TileMode::Clamp, TileMode::Clamp, args.scaleSampling,
+                               SrcRectConstraint::Fast};
   // There is no scaling for the image, so we can use the default sampling options.
-  auto processor = asFragmentProcessor(fpArgs, samplingArgs, nullptr);
+  auto processor = asFragmentProcessor(fpArgs, samplingArgs, &uvMatrix);
   auto drawingManager = args.context->drawingManager();
   if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags)) {
     return nullptr;
+  }
+  if (textureScales) {
+    *textureScales = actualScales;
   }
   return renderTarget->asTextureProxy();
 }

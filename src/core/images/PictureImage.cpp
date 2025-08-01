@@ -95,36 +95,42 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(rect.width()), static_cast<int>(rect.height()), isAlphaOnly(),
       1, mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
-  LOGI("renderTarget size :%d %d", renderTarget->width(), renderTarget->height());
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto viewMatrix = Matrix::MakeScale(args.drawScales.x, args.drawScales.y);
-  viewMatrix.postTranslate(-rect.left, -rect.top);
-  if (!drawPicture(renderTarget, args.renderFlags, &viewMatrix)) {
+  auto extraMatrix = Matrix::MakeScale(args.drawScales.x, args.drawScales.y);
+  extraMatrix.postTranslate(-rect.left, -rect.top);
+  if (!drawPicture(renderTarget, args.renderFlags, &extraMatrix)) {
     return nullptr;
   }
-  auto finalUVMatrix = viewMatrix;
+  auto finalUVMatrix = extraMatrix;
   if (uvMatrix) {
     finalUVMatrix.preConcat(*uvMatrix);
   }
   auto newSamplingArgs = samplingArgs;
   if (samplingArgs.sampleArea) {
-    newSamplingArgs.sampleArea = viewMatrix.mapRect(*samplingArgs.sampleArea);
+    newSamplingArgs.sampleArea = extraMatrix.mapRect(*samplingArgs.sampleArea);
   }
   return TiledTextureEffect::Make(renderTarget->asTextureProxy(), newSamplingArgs, &finalUVMatrix,
                                   isAlphaOnly());
 }
 
-std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args) const {
+std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args,
+                                                             Point* textureScales) const {
+  auto scales = Point::Make(1.0f, 1.0f);
+  auto size = getScaledSize(args.drawScales, &scales);
   auto renderTarget = RenderTargetProxy::MakeFallback(
-      args.context, width(), height(), isAlphaOnly(), 1, hasMipmaps() && args.mipmapped,
-      ImageOrigin::TopLeft, BackingFit::Approx);
+      args.context, static_cast<int>(size.width), static_cast<int>(size.height), isAlphaOnly(), 1,
+      hasMipmaps() && args.mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  if (!drawPicture(renderTarget, args.renderFlags, nullptr)) {
+  auto matrix = Matrix::MakeScale(scales.x, scales.y);
+  if (!drawPicture(renderTarget, args.renderFlags, &matrix)) {
     return nullptr;
+  }
+  if (textureScales) {
+    *textureScales = scales;
   }
   return renderTarget->asTextureProxy();
 }

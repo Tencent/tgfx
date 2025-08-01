@@ -68,9 +68,13 @@ std::shared_ptr<Image> TextureImage::onMakeScaled(int newWidth, int newHeight,
   return scaledImage->makeTextureImage(textureProxy->getContext());
 }
 
-std::shared_ptr<TextureProxy> TextureImage::lockTextureProxy(const TPArgs& args) const {
+std::shared_ptr<TextureProxy> TextureImage::lockTextureProxy(const TPArgs& args,
+                                                             Point* textureScales) const {
   if (args.context == nullptr || args.context->uniqueID() != contextID) {
     return nullptr;
+  }
+  if (textureScales) {
+    *textureScales = Point::Make(1.0f, 1.0f);
   }
   return textureProxy;
 }

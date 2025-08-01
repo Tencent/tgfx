@@ -33,7 +33,7 @@ class GaussianBlurImageFilter : public BlurImageFilter {
 
   std::shared_ptr<TextureProxy> lockTextureProxy(std::shared_ptr<Image> source,
                                                  const Rect& clipBounds,
-                                                 const TPArgs& args) const override;
+                                                 const TPArgs& args, Point* textureScales) const override;
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,
                                                       const FPArgs& args,

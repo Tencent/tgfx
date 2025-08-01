@@ -145,10 +145,11 @@ class ImageFilter {
    * @param source The source image.
    * @param clipBounds The clip bounds of the filtered image, relative to the source image.
    * @param args The arguments for creating the texture proxy.
+   * @param textureScales The actual texture scales for the origin size.
    */
   virtual std::shared_ptr<TextureProxy> lockTextureProxy(std::shared_ptr<Image> source,
-                                                         const Rect& clipBounds,
-                                                         const TPArgs& args) const;
+                                                         const Rect& clipBounds, const TPArgs& args,
+                                                         Point* textureScales) const;
 
   /**
    * Returns a FragmentProcessor that applies this filter to the source image. The returned

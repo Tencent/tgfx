@@ -52,41 +52,56 @@ PlacementPtr<FragmentProcessor> ScaledImage::asFragmentProcessor(const FPArgs& a
   }
   drawRect.roundOut();
   auto mipmapped = hasMipmaps() && samplingArgs.sampling.mipmapMode != MipmapMode::None;
-  TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
-  auto textureProxy = lockTextureProxy(tpArgs, drawRect);
+  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScales, samplingArgs.sampling);
+  auto textureScales = Point::Make(1.0f, 1.0f);
+  auto textureProxy = lockTextureProxy(tpArgs, drawRect, &textureScales);
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  auto finalUVMatrix = Matrix::MakeTrans(-drawRect.left, -drawRect.top);
+  auto extraMatrix = Matrix::MakeTrans(-drawRect.left, -drawRect.top);
+  extraMatrix.preScale(1.0f / textureScales.x, 1.0f / textureScales.y);
+
+  auto fpMatrix = extraMatrix;
   if (uvMatrix) {
-    finalUVMatrix.preConcat(*uvMatrix);
+    fpMatrix.preConcat(*uvMatrix);
   }
   auto newSamplingArgs = samplingArgs;
   if (samplingArgs.sampleArea) {
-    newSamplingArgs.sampleArea = samplingArgs.sampleArea->makeOffset(-drawRect.left, -drawRect.top);
+    newSamplingArgs.sampleArea = extraMatrix.mapRect(*samplingArgs.sampleArea);
   }
-  return TiledTextureEffect::Make(textureProxy, newSamplingArgs, &finalUVMatrix, isAlphaOnly());
-}
-
-std::shared_ptr<TextureProxy> ScaledImage::lockTextureProxy(const TPArgs& args) const {
-  return lockTextureProxy(args, Rect::MakeWH(width(), height()));
+  return TiledTextureEffect::Make(textureProxy, newSamplingArgs, &fpMatrix, isAlphaOnly());
 }
 
 std::shared_ptr<TextureProxy> ScaledImage::lockTextureProxy(const TPArgs& args,
-                                                            const Rect& drawRect) const {
+                                                            Point* textureScales) const {
+  return lockTextureProxy(args, Rect::MakeWH(width(), height()), textureScales);
+}
+
+std::shared_ptr<TextureProxy> ScaledImage::lockTextureProxy(const TPArgs& args,
+                                                            const Rect& drawRect,
+                                                            Point* textureScales) const {
   auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
+  auto scaledRect = drawRect;
+  scaledRect.scale(args.drawScales.x, args.drawScales.y);
+  scaledRect.roundOut();
+  auto acturalScales =
+      Point::Make(scaledRect.width() / drawRect.width(), scaledRect.height() / drawRect.height());
+  if (textureScales) {
+    *textureScales = acturalScales;
+  }
   auto renderTarget = RenderTargetProxy::MakeFallback(
-      args.context, static_cast<int>(drawRect.width()), static_cast<int>(drawRect.height()),
+      args.context, static_cast<int>(scaledRect.width()), static_cast<int>(scaledRect.height()),
       alphaRenderable && isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft,
       BackingFit::Approx);
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto uvScaleX = static_cast<float>(source->width()) / static_cast<float>(_width);
-  auto uvScaleY = static_cast<float>(source->height()) / static_cast<float>(_height);
+  auto uvScaleX =
+      static_cast<float>(source->width()) / static_cast<float>(_width) / acturalScales.x;
+  auto uvScaleY =
+      static_cast<float>(source->height()) / static_cast<float>(_height) / acturalScales.y;
   Matrix sourceUVMatrix = Matrix::MakeScale(uvScaleX, uvScaleY);
-  sourceUVMatrix.preTranslate(drawRect.left, drawRect.top);
-  FPArgs fpArgs(args.context, args.renderFlags, Rect::MakeWH(drawRect.width(), drawRect.height()));
+  FPArgs fpArgs(args.context, args.renderFlags, scaledRect);
   auto processor =
       FragmentProcessor::Make(source, fpArgs, sampling, SrcRectConstraint::Fast, &sourceUVMatrix);
   if (processor == nullptr) {

@@ -41,7 +41,8 @@ class ResourceImage : public Image {
   std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
                                       const SamplingOptions& sampling) const override;
 
-  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const final;
+  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args,
+                                                 Point* textureScales) const final;
 
   virtual std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
                                                            const UniqueKey& key) const = 0;

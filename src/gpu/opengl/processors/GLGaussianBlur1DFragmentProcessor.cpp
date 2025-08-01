@@ -82,6 +82,7 @@ void GLGaussianBlur1DFragmentProcessor::onSetData(UniformBuffer* uniformBuffer) 
     stepVectors[1] = {0, stepLength};
   }
 
+  DEBUG_ASSERT(processor->numCoordTransforms() > 0);
   if (processor->numCoordTransforms() > 0) {
     auto transform = processor->coordTransform(0);
     auto matrix = transform->getTotalMatrix();
