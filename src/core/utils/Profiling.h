@@ -15,9 +15,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma once
-#ifdef TGFX_USE_INSPECTOR
+#ifdef TGFX_BUILD_INSPECTOR
 #include <optional>
-#include "Define.h"
+#include "debug/Define.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Rect.h"

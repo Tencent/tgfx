@@ -16,8 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#ifdef TGFX_USE_INSPECTOR
-
 #include "RecordedContentSerialization.h"
 #include "layers/contents/ContourContent.h"
 #include "layers/contents/DefaultContent.h"
@@ -99,4 +97,3 @@ std::shared_ptr<Data> RecordedContentSerialization::Serialize(
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
 }  // namespace tgfx
-#endif

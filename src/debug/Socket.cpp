@@ -468,6 +468,7 @@ bool ListenSocket::listenSock(uint16_t port, int backlog) {
       return false;
     }
   }
+  listenPort = port;
 #if defined _WIN32
   unsigned long val = 0;
   setsockopt(this->sock, IPPROTO_IPV6, IPV6_V6ONLY, (const char*)&val, sizeof(val));

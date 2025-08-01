@@ -15,7 +15,6 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#ifdef TGFX_USE_INSPECTOR
 #include "LayerViewerManager.h"
 #include <functional>
 #include <string>
@@ -215,4 +214,3 @@ void LayerViewerManager::AddHighLightOverlay(Color color, std::shared_ptr<Layer>
   highLightLayerIndex = hoverdLayer->getChildIndex(highlightLayer);
 }
 }  // namespace tgfx
-#endif
