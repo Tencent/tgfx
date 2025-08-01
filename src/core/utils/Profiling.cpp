@@ -58,5 +58,5 @@ void SendAttributeData(const char* name, const std::optional<tgfx::Color>& color
   }
   SendAttributeData(name, value);
 }
-}
+}  // namespace inspector
 #endif

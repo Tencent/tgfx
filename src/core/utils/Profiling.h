@@ -32,7 +32,7 @@ void SendAttributeData(const char* name, const std::optional<tgfx::Matrix>& matr
 void SendAttributeData(const char* name, const tgfx::Color& color);
 
 void SendAttributeData(const char* name, const std::optional<tgfx::Color>& color);
-}
+}  // namespace inspector
 
 #define AttributeTGFXName(name, value) inspector::SendAttributeData(name, value)
 #else
