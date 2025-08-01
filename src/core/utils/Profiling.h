@@ -22,53 +22,19 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Rect.h"
 
-namespace tgfx {
-class TGFXTypeToInspector {
- public:
-  static void SendAttributeData(const char* name, const tgfx::Rect& rect) {
-    float value[4] = {rect.left, rect.right, rect.top, rect.bottom};
-    inspector::Inspector::SendAttributeData(name, value, 4);
-  }
+namespace inspector {
+void SendAttributeData(const char* name, const tgfx::Rect& rect);
 
-  static void SendAttributeData(const char* name, const std::optional<tgfx::Matrix>& matrix) {
-    auto value = Matrix::MakeAll(1, 0, 0, 0, 1, 0);
-    if (matrix.has_value()) {
-      value = matrix.value();
-    }
-    SendAttributeData(name, value);
-  }
+void SendAttributeData(const char* name, const tgfx::Matrix& matrix);
 
-  static void SendAttributeData(const char* name, const tgfx::Matrix& matrix) {
-    float value[6] = {1, 0, 0, 0, 1, 0};
-    value[0] = matrix.getScaleX();
-    value[1] = matrix.getSkewX();
-    value[2] = matrix.getTranslateX();
-    value[3] = matrix.getSkewY();
-    value[4] = matrix.getScaleY();
-    value[5] = matrix.getTranslateY();
-    inspector::Inspector::SendAttributeData(name, value, 6);
-  }
+void SendAttributeData(const char* name, const std::optional<tgfx::Matrix>& matrix);
 
-  static void SendAttributeData(const char* name, const std::optional<tgfx::Color>& color) {
-    auto value = Color::FromRGBA(255, 255, 255, 255);
-    if (color.has_value()) {
-      value = color.value();
-    }
-    SendAttributeData(name, value);
-  }
+void SendAttributeData(const char* name, const tgfx::Color& color);
 
-  static void SendAttributeData(const char* name, const tgfx::Color& color) {
-    auto r = static_cast<uint8_t>(color.red * 255.f);
-    auto g = static_cast<uint8_t>(color.green * 255.f);
-    auto b = static_cast<uint8_t>(color.blue * 255.f);
-    auto a = static_cast<uint8_t>(color.alpha * 255.f);
-    auto value = static_cast<uint32_t>(r | g << 8 | b << 16 | a << 24);
-    inspector::Inspector::SendAttributeData(name, value, inspector::MsgType::ValueDataColor);
-  }
-};
+void SendAttributeData(const char* name, const std::optional<tgfx::Color>& color);
+}
 
-#define AttributeTGFXName(name, value) TGFXTypeToInspector::SendAttributeData(name, value)
-}  // namespace tgfx
+#define AttributeTGFXName(name, value) inspector::SendAttributeData(name, value)
 #else
 #define FrameMark
 

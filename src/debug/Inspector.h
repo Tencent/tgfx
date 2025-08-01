@@ -110,7 +110,7 @@ class Inspector {
       MemWrite(item.attributeDataFloat4.value, val, static_cast<size_t>(size) * sizeof(float));
       MsgCommit();
     } else if (size == 6) {
-      MsgPrepare(MsgType::ValueDataMat4);
+      MsgPrepare(MsgType::ValueDataMat3);
       MemWrite(&item.attributeDataMat4.name, reinterpret_cast<uint64_t>(name));
       MemWrite(item.attributeDataMat4.value, val, static_cast<size_t>(size) * sizeof(float));
       MsgCommit();

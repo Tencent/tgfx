@@ -25,7 +25,7 @@ enum class MsgType : uint8_t {
   FrameMarkMsg,
   ValueDataUint32,
   ValueDataFloat4,
-  ValueDataMat4,
+  ValueDataMat3,
   ValueDataInt,
   ValueDataColor,
   ValueDataFloat,
