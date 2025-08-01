@@ -21,7 +21,7 @@
 #include <thread>
 #include "ProcessUtils.h"
 #include "Protocol.h"
-#include "TimeUtils.h"
+#include "tgfx/core/Clock.h"
 
 namespace inspector {
 
@@ -39,7 +39,7 @@ LayerProfiler::LayerProfiler() {
   }
 
 #endif
-  epoch = GetCurrentTime<std::chrono::seconds>();
+  epoch = tgfx::Clock::Now<std::chrono::seconds>();
   spawnWorkTread();
 }
 
@@ -75,7 +75,7 @@ void LayerProfiler::sendWork() {
         lastBroadcast = t;
         for (uint16_t i = 0; i < broadcastNum; i++) {
           if (broadcasts[i]) {
-            const auto ts = GetCurrentTime<std::chrono::seconds>();
+            const auto ts = tgfx::Clock::Now<std::chrono::seconds>();
             broadcastMsg.activeTime = static_cast<int32_t>(ts - epoch);
             broadcasts[i]->sendData(broadcastPort + i, &broadcastMsg, broadcastLen);
           }

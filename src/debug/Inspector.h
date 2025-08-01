@@ -26,8 +26,8 @@
 #include "Protocol.h"
 #include "Singleton.h"
 #include "Socket.h"
-#include "TimeUtils.h"
 #include "concurrentqueue.h"
+#include "tgfx/core/Clock.h"
 
 #if defined _WIN32
 #include <intrin.h>
@@ -62,7 +62,7 @@ class Inspector {
     }
     auto item = MsgItem();
     MemWrite(&item.hdr.type, MsgType::FrameMarkMsg);
-    MemWrite(&item.frameMark.nsTime, GetCurrentTime<std::chrono::nanoseconds>());
+    MemWrite(&item.frameMark.nsTime, tgfx::Clock::Now());
     QueueSerialFinish(item);
   }
 

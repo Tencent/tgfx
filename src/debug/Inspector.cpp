@@ -25,11 +25,12 @@
 #include "Socket.h"
 #include "TCPPortProvider.h"
 #include "lz4.h"
+#include "tgfx/core/Clock.h"
 
 namespace inspector {
 Inspector::Inspector()
-    : epoch(GetCurrentTime<std::chrono::seconds>()),
-      initTime(GetCurrentTime<std::chrono::nanoseconds>()),
+    : epoch(tgfx::Clock::Now<std::chrono::seconds>()),
+      initTime(tgfx::Clock::Now<std::chrono::nanoseconds>()),
       dataBuffer(static_cast<char*>(malloc(TargetFrameSize * 3))),
       lz4Buf(static_cast<char*>(malloc(LZ4Size + sizeof(lz4sz_t)))), lz4Stream(LZ4_createStream()),
       broadcast(broadcastNum) {
@@ -56,9 +57,10 @@ Inspector::~Inspector() {
     lz4Stream = nullptr;
   }
 }
+
 void Inspector::spawnWorkerThreads() {
   messageThread = std::make_unique<std::thread>(LaunchWorker, this);
-  timeBegin.store(GetCurrentTime<std::chrono::nanoseconds>(), std::memory_order_relaxed);
+  timeBegin.store(tgfx::Clock::Now<std::chrono::nanoseconds>(), std::memory_order_relaxed);
 }
 
 bool Inspector::handleServerQuery() {

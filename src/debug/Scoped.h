@@ -18,6 +18,7 @@
 
 #pragma once
 #include "Inspector.h"
+#include "tgfx/core/Clock.h"
 
 namespace inspector {
 class Scoped {
@@ -33,7 +34,7 @@ class Scoped {
       return;
     }
     MsgPrepare(MsgType::OperateBegin);
-    MemWrite(&item.operateBegin.nsTime, GetCurrentTime<std::chrono::nanoseconds>());
+    MemWrite(&item.operateBegin.nsTime, tgfx::Clock::Now<std::chrono::nanoseconds>());
     MemWrite(&item.operateBegin.type, type);
     MsgCommit();
   }
@@ -43,7 +44,7 @@ class Scoped {
       return;
     }
     MsgPrepare(MsgType::OperateEnd);
-    MemWrite(&item.operateEnd.nsTime, GetCurrentTime<std::chrono::nanoseconds>());
+    MemWrite(&item.operateEnd.nsTime, tgfx::Clock::Now<std::chrono::nanoseconds>());
     MemWrite(&item.operateEnd.type, type);
     MsgCommit();
   }
