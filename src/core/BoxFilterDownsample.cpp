@@ -131,45 +131,83 @@ static int ComputeResizeAreaTab(int srcSize, int dstSize, int channelNum, double
   return k;
 }
 
-extern int ResizeAreaFastSIMDFunc(int channelNum, int step, const uint8_t* srcData,
-                                  uint8_t* dstData, int w);
+extern int ResizeAreaFastx2SIMDFunc(int channelNum, int step, const uint8_t* srcData,
+                                  uint8_t* dstData, int w, int padding, int shiftNum);
+
+extern int ResizeAreaFastx4SIMDFunc(int channelNum, int step, const uint8_t* srcData,
+                                  uint8_t* dstData, int w, int padding, int shiftNum);
+
+extern int ResizeAreaFastx8SIMDFunc(int channelNum, int step, const uint8_t* srcData,
+                                  uint8_t* dstData, int w, int padding, int shiftNum);
+
+static bool IsPowerOfTwo(int n) {
+  return (n > 0) && ((n & (n - 1)) == 0);
+}
+
+static int GetPowerOfTwo(int n) {
+  if (n <= 0 || (n & (n - 1)) != 0) {
+    return -1;  // 不是 2 的幂，返回 -1
+  }
+  int k = 0;
+  while (n >>= 1) {  // 右移直到 n = 1
+    k++;
+  }
+  return k;
+}
 
 struct ResizeAreaFastVec {
   ResizeAreaFastVec(int scaleX, int scaleY, int channelNum, int step)
       : scaleX(scaleX), scaleY(scaleY), channelNum(channelNum), step(step) {
-    fastMode =
-        this->scaleX == 2 && this->scaleY == 2 && (this->channelNum == 1 || this->channelNum == 4);
+    fastMode = this->scaleX == this->scaleY && IsPowerOfTwo(this->scaleX) && IsPowerOfTwo(this->scaleY);
   }
 
   int operator()(const uint8_t* srcData, uint8_t* dstData, int w) const {
-    if (!fastMode) {
-      return 0;
-    }
-    const uint8_t* nestRowSrcData = srcData + step;
-    int dstX = ResizeAreaFastSIMDFunc(channelNum, step, srcData, dstData, w);
-    if (channelNum == 1) {
-      for (; dstX < w; ++dstX) {
-        int index = dstX * 2;
-        dstData[dstX] = (srcData[index] + srcData[index + 1] + nestRowSrcData[index] +
-                         nestRowSrcData[index + 1] + 2) >>
-                        2;
+    int dstX = 0;
+    if(fastMode) {
+      int padding = scaleX * scaleY / 2;
+      int shiftNum = GetPowerOfTwo(scaleX) * 2;
+      switch (scaleX) {
+        case 2:
+          dstX = ResizeAreaFastx2SIMDFunc(channelNum, step, srcData, dstData, w, padding, shiftNum);
+          break;
+        case 4:
+          dstX = ResizeAreaFastx4SIMDFunc(channelNum, step, srcData, dstData, w, padding, shiftNum);
+          break;
+        case 8:
+          dstX = ResizeAreaFastx8SIMDFunc(channelNum, step, srcData, dstData, w, padding, shiftNum);
+          break;
       }
-    } else {
-      ASSERT(channelNum == 4);
-      for (; dstX < w; dstX += 4) {
-        int index = dstX * 2;
-        dstData[dstX] = (srcData[index] + srcData[index + 4] + nestRowSrcData[index] +
-                         nestRowSrcData[index + 4] + 2) >>
-                        2;
-        dstData[dstX + 1] = (srcData[index + 1] + srcData[index + 5] + nestRowSrcData[index + 1] +
-                             nestRowSrcData[index + 5] + 2) >>
-                            2;
-        dstData[dstX + 2] = (srcData[index + 2] + srcData[index + 6] + nestRowSrcData[index + 2] +
-                             nestRowSrcData[index + 6] + 2) >>
-                            2;
-        dstData[dstX + 3] = (srcData[index + 3] + srcData[index + 7] + nestRowSrcData[index + 3] +
-                             nestRowSrcData[index + 7] + 2) >>
-                            2;
+      if (channelNum == 1) {
+        for (; dstX < w; ++dstX) {
+          int index = dstX * scaleX;
+          int sum = 0;
+          for(int i = 0; i < scaleY; i++) {
+            for(int j = 0; j < scaleX; j++) {
+              const uint8_t* data = srcData + step * i;
+              sum += data[index + j];
+            }
+          }
+          dstData[dstX] = (sum + padding) >> shiftNum;
+        }
+      } else {
+        ASSERT(channelNum == 4);
+        for (; dstX < w; dstX += 4) {
+          int index = dstX * scaleX;
+          int sum[4] = {0};
+          for(int i = 0; i < scaleY; i++) {
+            for(int j = 0; j < scaleX; j++) {
+              const uint8_t* data = srcData + step * i;
+              sum[0] += data[index + 4 * j];
+              sum[1] += data[index + 4 * j + 1];
+              sum[2] += data[index + 4 * j + 2];
+              sum[3] += data[index + 4 * j + 3];
+            }
+          }
+          dstData[dstX] = (sum[0] + padding) >> shiftNum;
+          dstData[dstX + 1] = (sum[1] + padding) >> shiftNum;
+          dstData[dstX + 2] = (sum[2] + padding) >> shiftNum;
+          dstData[dstX + 3] = (sum[3] + padding) >> shiftNum;
+        }
       }
     }
     return dstX;
