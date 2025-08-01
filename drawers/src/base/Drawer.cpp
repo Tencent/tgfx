@@ -18,15 +18,14 @@
 
 #include "drawers/Drawer.h"
 #include <unordered_map>
-#include "LayerTreeDrawers.h"
+#include "GridBackground.h"
 #include "base/Drawers.h"
-#include "layertree/SimpleLayerTree.h"
 #include "tgfx/platform/Print.h"
 
 namespace drawers {
-static std::vector<Drawer*> drawers = {
-    new GridBackground(), new ConicGradient(),   new ImageWithMipmap(), new ImageWithShadow(),
-    new SimpleText(),     new SimpleLayerTree(), new CustomLayerTree()};
+static std::vector<Drawer*> drawers = {new ConicGradient(), new ImageWithMipmap(),
+                                       new ImageWithShadow(), new SimpleText(),
+                                       new SimpleLayerTree()};
 
 static std::vector<std::string> GetDrawerNames() {
   std::vector<std::string> names;
@@ -69,19 +68,37 @@ Drawer* Drawer::GetByName(const std::string& name) {
   return it->second;
 }
 
+void Drawer::DrawBackground(tgfx::Canvas* canvas, const AppHost* host) {
+  auto layer = GridBackgroundLayer::Make();
+  layer->setSize(static_cast<float>(host->width()), static_cast<float>(host->height()),
+                 host->density());
+  layer->draw(canvas);
+}
+
 Drawer::Drawer(std::string name) : _name(std::move(name)) {
 }
 
-void Drawer::draw(tgfx::Canvas* canvas, const AppHost* host) {
-  if (canvas == nullptr) {
-    tgfx::PrintError("Drawer::draw() canvas is nullptr!");
-    return;
-  }
+void Drawer::build(const AppHost* host) {
   if (host == nullptr) {
     tgfx::PrintError("Drawer::draw() appHost is nullptr!");
     return;
   }
-  tgfx::AutoCanvasRestore autoRestore(canvas);
-  onDraw(canvas, host);
+  if (!_root) {
+    _root = buildLayerTree(host);
+    displayList.root()->addChild(_root);
+    displayList.setRenderMode(tgfx::RenderMode::Tiled);
+    // Zoom blur is currently enabled because the Hello2D demo now support animation frame
+    // rendering with displayList:
+    displayList.setAllowZoomBlur(true);
+    displayList.setMaxTileCount(512);
+  }
+  auto bounds = _root->getBounds(nullptr, true);
+  auto totalScale = std::min(host->width() / (padding * 2 + bounds.width()),
+                             host->height() / (padding * 2 + bounds.height()));
+
+  auto rootMatrix = tgfx::Matrix::MakeScale(totalScale);
+  rootMatrix.postTranslate((host->width() - bounds.width() * totalScale) / 2,
+                           (host->height() - bounds.height() * totalScale) / 2);
+  _root->setMatrix(rootMatrix);
 }
 }  // namespace drawers

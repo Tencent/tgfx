@@ -17,40 +17,46 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "base/Drawers.h"
-#include "tgfx/core/Surface.h"
+#include "tgfx/layers/ImageLayer.h"
+#include "tgfx/layers/ShapeLayer.h"
+#include "tgfx/layers/SolidColor.h"
+#include "tgfx/layers/filters/DropShadowFilter.h"
 
 namespace drawers {
-void ImageWithShadow::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) {
+std::shared_ptr<tgfx::Layer> ImageWithShadow::buildLayerTree(const drawers::AppHost* host) {
+  auto root = tgfx::Layer::Make();
   auto scale = host->density();
+  // The value 57 is the DropShadowFilter bound width
+  padding = 75.f * scale - 57;
   auto width = host->width();
   auto height = host->height();
   auto screenSize = std::min(width, height);
-  auto size = screenSize - static_cast<int>(150 * scale);
+  auto size = screenSize - static_cast<int>(75.f * scale * 2);
   size = std::max(size, 50);
   auto image = host->getImage("bridge");
   if (image == nullptr) {
-    return;
+    return root;
   }
   image = image->makeMipmapped(true);
-  auto imageScale = static_cast<float>(size) / static_cast<float>(image->width());
-  auto matrix = tgfx::Matrix::MakeScale(imageScale);
-  tgfx::SamplingOptions sampling(tgfx::FilterMode::Linear, tgfx::MipmapMode::Linear);
-  auto surface = tgfx::Surface::Make(canvas->getSurface()->getContext(), size, size);
-  auto scaledCanvas = surface->getCanvas();
-  tgfx::Path path = {};
-  path.addOval(tgfx::Rect::MakeXYWH(0, 0, size, size));
-  scaledCanvas->clipPath(path);
-  scaledCanvas->setMatrix(matrix);
-  scaledCanvas->drawImage(image, sampling);
-  auto scaledImage = surface->makeImageSnapshot();
 
-  auto filter = tgfx::ImageFilter::DropShadow(5 * scale, 5 * scale, 50 * scale, 50 * scale,
-                                              tgfx::Color::Black());
-  tgfx::Paint paint = {};
-  paint.setImageFilter(filter);
-  canvas->translate(host->contentOffset().x, host->contentOffset().y);
-  canvas->scale(host->zoomScale(), host->zoomScale());
-  canvas->drawImage(scaledImage, static_cast<float>(width - size) / 2,
-                    static_cast<float>(height - size) / 2, &paint);
+  auto imageLayer = tgfx::ImageLayer::Make();
+  imageLayer->setImage(image);
+  auto matrix =
+      tgfx::Matrix::MakeScale(static_cast<float>(size) / static_cast<float>(image->width()));
+  matrix.postTranslate(57, 57);
+  auto maskLayer = tgfx::ShapeLayer::Make();
+  maskLayer->setFillStyle(tgfx::SolidColor::Make());
+  auto maskPath = tgfx::Path();
+  maskPath.addOval(tgfx::Rect::MakeWH(image->width(), image->height()));
+  maskLayer->setPath(maskPath);
+  maskLayer->setMatrix(matrix);
+  imageLayer->setMask(maskLayer);
+  imageLayer->setMatrix(matrix);
+
+  root->addChild(imageLayer);
+  root->addChild(maskLayer);
+  root->setFilters(
+      {tgfx::DropShadowFilter::Make(0, 0, 50 * scale, 50 * scale, tgfx::Color::Black())});
+  return root;
 }
 }  // namespace drawers

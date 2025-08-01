@@ -92,6 +92,8 @@ void TGFXView::createAppHost() {
   auto imagePath = rootPath + "/resources/assets/bridge.jpg";
   auto image = tgfx::Image::MakeFromFile(std::string(imagePath.toLocal8Bit()));
   appHost->addImage("bridge", image);
+  imagePath = rootPath + "/resources/assets/tgfx.png";
+  appHost->addImage("TGFX", tgfx::Image::MakeFromFile(std::string(imagePath.toLocal8Bit())));
 #ifdef __APPLE__
   auto defaultTypeface = tgfx::Typeface::MakeFromName("PingFang SC", "");
   auto emojiTypeface = tgfx::Typeface::MakeFromName("Apple Color Emoji", "");
@@ -118,17 +120,15 @@ void TGFXView::draw() {
     device->unlock();
     return;
   }
-  appHost->updateZoomAndOffset(
-      zoom, tgfx::Point(static_cast<float>(offset.x()), static_cast<float>(offset.y())));
   auto canvas = surface->getCanvas();
   canvas->clear();
   canvas->save();
-  auto numDrawers = drawers::Drawer::Count() - 1;
-  auto index = (currentDrawerIndex % numDrawers) + 1;
-  auto drawer = drawers::Drawer::GetByName("GridBackground");
-  drawer->draw(canvas, appHost.get());
-  drawer = drawers::Drawer::GetByIndex(index);
-  drawer->draw(canvas, appHost.get());
+  drawers::Drawer::DrawBackground(canvas, appHost.get());
+  auto drawer = drawers::Drawer::GetByIndex(currentDrawerIndex % drawers::Drawer::Count());
+  drawer->displayList.setZoomScale(zoom);
+  drawer->displayList.setContentOffset(offset.x(), offset.y());
+  drawer->build(appHost.get());
+  drawer->displayList.render(canvas->getSurface(), false);
   canvas->restore();
   context->flushAndSubmit();
   tgfxWindow->present(context);

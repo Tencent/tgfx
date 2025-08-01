@@ -21,20 +21,19 @@
 #include "drawers/Drawer.h"
 
 namespace drawers {
-#define DEFINE_DRAWER(DrawerName)                                             \
-  class DrawerName : public drawers::Drawer {                                 \
-   public:                                                                    \
-    DrawerName() : drawers::Drawer(#DrawerName) {                             \
-    }                                                                         \
-                                                                              \
-   protected:                                                                 \
-    void onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) override; \
+#define DEFINE_DRAWER(DrawerName)                                              \
+  class DrawerName : public drawers::Drawer {                                  \
+   public:                                                                     \
+    DrawerName() : drawers::Drawer(#DrawerName) {                              \
+    }                                                                          \
+                                                                               \
+   protected:                                                                  \
+    std::shared_ptr<tgfx::Layer> buildLayerTree(const AppHost* host) override; \
   }
 
-DEFINE_DRAWER(GridBackground);
 DEFINE_DRAWER(ConicGradient);
 DEFINE_DRAWER(ImageWithMipmap);
 DEFINE_DRAWER(ImageWithShadow);
 DEFINE_DRAWER(SimpleText);
-
+DEFINE_DRAWER(SimpleLayerTree);
 }  // namespace drawers

@@ -17,27 +17,30 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "base/Drawers.h"
+#include "tgfx/layers/ImageLayer.h"
 
 namespace drawers {
-void ImageWithMipmap::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) {
+std::shared_ptr<tgfx::Layer> ImageWithMipmap::buildLayerTree(const AppHost* host) {
+  auto root = tgfx::Layer::Make();
   auto scale = host->density();
+  padding = 75.f * scale;
   auto width = host->width();
   auto height = host->height();
-  auto screenSize = std::min(width, height);
-  auto size = screenSize - static_cast<int>(150 * scale);
+  auto size = std::min(width, height) - static_cast<int>(padding * 2);
   size = std::max(size, 50);
   auto image = host->getImage("bridge");
   if (image == nullptr) {
-    return;
+    return root;
   }
   image = image->makeMipmapped(true);
   auto imageScale = static_cast<float>(size) / static_cast<float>(image->width());
   auto matrix = tgfx::Matrix::MakeScale(imageScale);
-  matrix.postTranslate(static_cast<float>(width - size) / 2, static_cast<float>(height - size) / 2);
-  matrix.postScale(host->zoomScale(), host->zoomScale());
-  matrix.postTranslate(host->contentOffset().x, host->contentOffset().y);
-  canvas->concat(matrix);
-  tgfx::SamplingOptions sampling(tgfx::FilterMode::Linear, tgfx::MipmapMode::Linear);
-  canvas->drawImage(image, sampling);
+  auto imageLayer = tgfx::ImageLayer::Make();
+  imageLayer->setImage(image);
+  imageLayer->setSampling(
+      tgfx::SamplingOptions(tgfx::FilterMode::Linear, tgfx::MipmapMode::Linear));
+  imageLayer->setMatrix(matrix);
+  root->addChild(imageLayer);
+  return root;
 }
 }  // namespace drawers
