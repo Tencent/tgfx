@@ -23,7 +23,6 @@
 #include <string>
 #include <utility>
 #include <vector>
-#include "core/utils/AddressOf.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/PathTypes.h"
@@ -101,11 +100,11 @@ class SVGProperty {
   }
 
   T* operator->() {
-    return AddressOf(_value);
+    return _value ? std::addressof(*_value) : nullptr;
   }
 
   const T* operator->() const {
-    return AddressOf(_value);
+    return _value ? std::addressof(*_value) : nullptr;
   }
 
   T& operator*() {
