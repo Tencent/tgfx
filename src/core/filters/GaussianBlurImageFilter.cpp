@@ -83,8 +83,11 @@ static std::shared_ptr<TextureProxy> ScaleTexture(const TPArgs& args,
 std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     std::shared_ptr<Image> source, const Rect& clipBounds, const TPArgs& args,
     Point* textureScales) const {
-  const float maxSigma = std::max(blurrinessX, blurrinessY);
-  float scaleFactor = 1.0f;
+  float sigmaX = blurrinessX;
+  float sigmaY = blurrinessY;
+  const float maxSigma = std::max(sigmaX, sigmaY);
+  float scaleFactorX = 1.0f;
+  float scaleFactorY = 1.0f;
   bool blur2D = blurrinessX > 0 && blurrinessY > 0;
   if (textureScales) {
     *textureScales = Point::Make(1.0f, 1.0f);
@@ -99,11 +102,13 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
   }
 
   Rect scaledBounds = boundsWillSample;
-  if (maxSigma > MAX_BLUR_SIGMA) {
-    scaleFactor = MAX_BLUR_SIGMA / maxSigma;
-    Matrix matrix = Matrix::MakeScale(scaleFactor);
-    matrix.mapRect(&scaledBounds);
+  if (sigmaX > MAX_BLUR_SIGMA) {
+    scaleFactorX = MAX_BLUR_SIGMA / sigmaX;
   }
+  if (sigmaY > MAX_BLUR_SIGMA) {
+    scaleFactorY = MAX_BLUR_SIGMA / sigmaY;
+  }
+  scaledBounds.scale(scaleFactorX, scaleFactorY);
   scaledBounds.roundOut();
 
   const auto isAlphaOnly = source->isAlphaOnly();
@@ -115,29 +120,23 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     return nullptr;
   }
 
-  Matrix uvMatrix = Matrix::MakeTrans(boundsWillSample.left, boundsWillSample.top);
-  uvMatrix.preScale(boundsWillSample.width() / scaledBounds.width(),
-                    boundsWillSample.height() / scaledBounds.height());
-  FPArgs fpArgs(args.context, args.renderFlags,
-                Rect::MakeWH(scaledBounds.width(), scaledBounds.height()),
-                Point::Make(scaledBounds.width() / boundsWillSample.width(),
-                            scaledBounds.height() / boundsWillSample.height()));
+  auto sourceScale = Point::Make(scaledBounds.width() / boundsWillSample.width(),
+                                 scaledBounds.height() / boundsWillSample.height());
 
-  auto sourceProcessor = FragmentProcessor::Make(source, fpArgs, tileMode, tileMode, {},
-                                                 SrcRectConstraint::Fast, &uvMatrix);
+  auto sourceFragment =
+      getSourceFragment(source, args.context, args.renderFlags, boundsWillSample, sourceScale);
 
   if (blur2D) {
-    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessX * scaleFactor,
+    Blur1D(std::move(sourceFragment), renderTarget, blurrinessX * scaleFactorX,
            GaussianBlurDirection::Horizontal, 1.0f, args.renderFlags);
 
     // blur and scale the texture to the clip bounds.
-    uvMatrix = Matrix::MakeScale(scaledBounds.width() / boundsWillSample.width(),
-                                 scaledBounds.height() / boundsWillSample.height());
+    auto uvMatrix = Matrix::MakeScale(sourceScale.x, sourceScale.y);
     uvMatrix.preTranslate(clipBounds.left - boundsWillSample.left,
                           clipBounds.top - boundsWillSample.top);
 
     SamplingArgs samplingArgs = {tileMode, tileMode, {}, SrcRectConstraint::Fast};
-    sourceProcessor =
+    sourceFragment =
         TiledTextureEffect::Make(renderTarget->asTextureProxy(), samplingArgs, &uvMatrix);
 
     renderTarget = RenderTargetProxy::MakeFallback(
@@ -148,17 +147,17 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
       return nullptr;
     }
 
-    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessY * scaleFactor,
+    Blur1D(std::move(sourceFragment), renderTarget, blurrinessY * scaleFactorY,
            GaussianBlurDirection::Vertical, boundsWillSample.height() / scaledBounds.height(),
            args.renderFlags);
     return renderTarget->asTextureProxy();
   }
 
   if (blurrinessX > 0) {
-    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessX * scaleFactor,
+    Blur1D(std::move(sourceFragment), renderTarget, blurrinessX * scaleFactorX,
            GaussianBlurDirection::Horizontal, 1.0f, args.renderFlags);
   } else if (blurrinessY > 0) {
-    Blur1D(std::move(sourceProcessor), renderTarget, blurrinessY * scaleFactor,
+    Blur1D(std::move(sourceFragment), renderTarget, blurrinessY * scaleFactorX,
            GaussianBlurDirection::Vertical, 1.0f, args.renderFlags);
   }
 

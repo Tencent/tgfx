@@ -253,7 +253,7 @@ std::shared_ptr<TextureProxy> Image::lockTextureProxy(const TPArgs& args,
     return nullptr;
   }
   auto actualScales = Point::Make(static_cast<float>(scaledWidth) / static_cast<float>(width()),
-                                   static_cast<float>(scaledHeight) / static_cast<float>(height()));
+                                  static_cast<float>(scaledHeight) / static_cast<float>(height()));
   auto uvMatrix = Matrix::MakeScale(1.0f / actualScales.x, 1.0f / actualScales.y);
   auto drawRect = Rect::MakeWH(scaledWidth, scaledHeight);
   FPArgs fpArgs(args.context, args.renderFlags, drawRect, actualScales);

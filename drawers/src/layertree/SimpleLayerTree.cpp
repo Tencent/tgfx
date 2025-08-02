@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SimpleLayerTree.h"
-#include <tgfx/layers/layerstyles/BackgroundBlurStyle.h>
 #include <tgfx/layers/layerstyles/DropShadowStyle.h>
 #include "tgfx/layers/Gradient.h"
 #include "tgfx/layers/ImageLayer.h"
@@ -91,7 +90,6 @@ static std::shared_ptr<tgfx::Layer> CreateImageLayer(const AppHost* host) {
   auto cardMatrix = tgfx::Matrix::MakeTrans(24, 150);
   auto imageLayer = tgfx::ImageLayer::Make();
   imageLayer->setImage(image);
-  imageLayer->setAlpha(0.1f);
   auto imageScale = static_cast<float>(std::min(327.0 / image->width(), 344.0 / image->height()));
   auto maskLayer = tgfx::ShapeLayer::Make();
   maskLayer->setFillStyle(tgfx::SolidColor::Make());
@@ -105,8 +103,7 @@ static std::shared_ptr<tgfx::Layer> CreateImageLayer(const AppHost* host) {
   card->addChild(imageLayer);
   card->addChild(maskLayer);
   card->setLayerStyles(
-      {tgfx::DropShadowStyle::Make(0, 8, 32, 32, tgfx::Color::FromRGBA(6, 0, 71, 255)),
-       tgfx::BackgroundBlurStyle::Make(1, 1, tgfx::TileMode::Clamp)});
+      {tgfx::DropShadowStyle::Make(0, 8, 32, 32, tgfx::Color::FromRGBA(6, 0, 71, 51))});
   return card;
 }
 
