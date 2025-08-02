@@ -17,8 +17,31 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLCommandQueue.h"
+#include "gpu/opengl/GLBuffer.h"
+#include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
+bool GLCommandQueue::writeBuffer(const GPUBuffer* buffer, size_t bufferOffset, const void* data,
+                                 size_t size) {
+  if (data == nullptr || size == 0) {
+    LOGE("GLCommandQueue::writeBuffer() data is null or size is zero!");
+    return false;
+  }
+  if (bufferOffset + size > buffer->size()) {
+    LOGE("GLCommandQueue::writeBuffer() size exceeds buffer size!");
+    return false;
+  }
+  auto gl = interface->functions();
+  ClearGLError(gl);
+  auto glBuffer = static_cast<const GLBuffer*>(buffer);
+  auto target = glBuffer->target();
+  gl->bindBuffer(target, glBuffer->bufferID());
+  gl->bufferSubData(target, static_cast<GLintptr>(bufferOffset), static_cast<GLsizeiptr>(size),
+                    data);
+  gl->bindBuffer(target, 0);
+  return CheckGLError(gl);
+}
+
 void GLCommandQueue::submit(std::shared_ptr<CommandBuffer>) {
   auto gl = interface->functions();
   gl->flush();

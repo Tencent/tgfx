@@ -20,10 +20,14 @@
 
 #include "ResourceTask.h"
 #include "core/DataSource.h"
-#include "gpu/GPUBuffer.h"
 #include "tgfx/core/Data.h"
 
 namespace tgfx {
+enum class BufferType {
+  Index,
+  Vertex,
+};
+
 class GPUBufferUploadTask : public ResourceTask {
  public:
   GPUBufferUploadTask(std::shared_ptr<ResourceProxy> proxy, BufferType bufferType,

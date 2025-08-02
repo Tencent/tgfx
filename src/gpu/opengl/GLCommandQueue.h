@@ -28,6 +28,9 @@ class GLCommandQueue : public CommandQueue {
       : interface(std::move(interface)) {
   }
 
+  bool writeBuffer(const GPUBuffer* buffer, size_t bufferOffset, const void* data,
+                   size_t size) override;
+
   void submit(std::shared_ptr<CommandBuffer>) override;
 
   void waitUntilCompleted() override;
