@@ -15,7 +15,6 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#ifdef TGFX_USE_INSPECTOR
 
 #include "MatrixSerialization.h"
 #include <string>
@@ -43,4 +42,3 @@ std::shared_ptr<Data> MatrixSerialization::Serialize(const Matrix* matrix) {
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
 }  // namespace tgfx
-#endif

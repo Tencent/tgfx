@@ -15,7 +15,6 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#ifdef TGFX_USE_INSPECTOR
 
 #include "LayerSerialization.h"
 #include <tgfx/layers/ImageLayer.h>
@@ -169,4 +168,3 @@ void LayerSerialization::SerializeBasicLayerImpl(flexbuffers::Builder& fbb, cons
 }
 
 }  // namespace tgfx
-#endif

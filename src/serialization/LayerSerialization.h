@@ -18,10 +18,10 @@
 
 #pragma once
 
-#include <tgfx/core/Data.h>
 #include <functional>
-#include "LayerInspectorProtocol.h"
 #include "SerializationUtils.h"
+#include "debug/LayerInspectorProtocol.h"
+#include "tgfx/core/Data.h"
 
 namespace tgfx {
 static const std::string HighLightLayerName = "HighLightLayer";

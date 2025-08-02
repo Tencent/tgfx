@@ -17,13 +17,23 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <cstring>
 
-#include <tgfx/core/Data.h>
-#include "SerializationUtils.h"
+namespace inspector {
+template <typename T>
+T MemRead(const void* ptr) {
+  T val;
+  memcpy(&val, ptr, sizeof(T));
+  return val;
+}
 
-namespace tgfx {
-namespace RecordedContentSerialization {
-std::shared_ptr<Data> Serialize(const LayerContent* content, SerializeUtils::ComplexObjSerMap* map,
-                                SerializeUtils::RenderableObjSerMap* rosMap);
-};
-}  // namespace tgfx
+template <typename T>
+void MemWrite(void* ptr, T val) {
+  memcpy(ptr, &val, sizeof(T));
+}
+
+template <typename T>
+void MemWrite(void* ptr, T* val, size_t size) {
+  memcpy(ptr, val, size);
+}
+}  // namespace inspector

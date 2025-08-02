@@ -16,7 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#ifdef TGFX_USE_INSPECTOR
 #include "ColorSerialization.h"
 #include "LayerFilterSerialization.h"
 #include "LayerSerialization.h"
@@ -495,4 +494,3 @@ void SerializeUtils::SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key
   });
 }
 }  // namespace tgfx
-#endif

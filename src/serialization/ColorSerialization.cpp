@@ -16,8 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#ifdef TGFX_USE_INSPECTOR
-
 #include "ColorSerialization.h"
 
 namespace tgfx {
@@ -40,4 +38,3 @@ std::shared_ptr<Data> ColorSerialization::Serialize(const Color* color) {
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
 }  // namespace tgfx
-#endif
