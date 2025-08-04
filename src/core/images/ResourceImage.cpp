@@ -49,8 +49,7 @@ std::shared_ptr<Image> ResourceImage::onMakeScaled(int newWidth, int newHeight,
 PlacementPtr<FragmentProcessor> ResourceImage::asFragmentProcessor(const FPArgs& args,
                                                                    const SamplingArgs& samplingArgs,
                                                                    const Matrix* uvMatrix) const {
-
-  TPArgs tpArgs(args.context, args.renderFlags, hasMipmaps());
+  TPArgs tpArgs(args.context, args.renderFlags, hasMipmaps(), 1.0f, {});
   auto proxy = onLockTextureProxy(tpArgs, uniqueKey);
   return TiledTextureEffect::Make(std::move(proxy), samplingArgs, uvMatrix, isAlphaOnly());
 }

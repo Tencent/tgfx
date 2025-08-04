@@ -68,7 +68,7 @@ class PictureImage : public Image {
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
   bool drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags,
-                   const Point* offset) const;
+                   const Matrix* extraMatrix) const;
 
  private:
   int _width = 0;
