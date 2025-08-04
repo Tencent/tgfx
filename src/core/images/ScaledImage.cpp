@@ -116,7 +116,7 @@ std::shared_ptr<Image> ScaledImage::onMakeScaled(int newWidth, int newHeight,
   if (newWidth == source->width() && newHeight == source->height()) {
     return source;
   }
-  return MakeFrom(source, newWidth, newHeight, sampling);
+  return source->makeScaled(newWidth, newHeight, sampling);
 }
 
 std::shared_ptr<Image> ScaledImage::onCloneWith(std::shared_ptr<Image> newSource) const {
