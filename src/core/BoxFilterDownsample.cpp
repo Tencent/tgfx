@@ -23,6 +23,7 @@
 #include <cmath>
 #include <cstdint>
 #include <memory>
+#include "BoxFilterDownsampleSIMD.h"
 #include "utils/Log.h"
 
 namespace tgfx {
@@ -71,9 +72,6 @@ static void SaturateStore(const float* sum, int width, uint8_t* dstData) {
     dstData[dstX] = SaturateCast<uint8_t>(sum[dstX]);
   }
 }
-
-extern void Mul(const float* buf, int width, float beta, float* sum);
-extern void MulAdd(const float* buf, int width, float beta, float* sum);
 
 /**
  * Computes the resize area table for downsampling an image channel.
@@ -130,18 +128,6 @@ static int ComputeResizeAreaTab(int srcSize, int dstSize, int channelNum, double
   }
   return k;
 }
-
-extern int ResizeAreaFastx2SIMDFunc(int channelNum, int step, const uint8_t* srcData,
-                                    uint8_t* dstData, int w, int padding, int shiftNum);
-
-extern int ResizeAreaFastx4SIMDFunc(int channelNum, int step, const uint8_t* srcData,
-                                    uint8_t* dstData, int w, int scale, int padding, int shiftNum);
-
-extern int ResizeAreaFastx8SIMDFunc(int channelNum, int step, const uint8_t* srcData,
-                                    uint8_t* dstData, int w, int scale, int padding, int shiftNum);
-
-extern int ResizeAreaFastxNSimdFunc(int channelNum, int step, const uint8_t* srcData,
-                                    uint8_t* dstData, int w, int scale, int padding, int shiftNum);
 
 static bool IsPowerOfTwo(int n) {
   return (n > 0) && ((n & (n - 1)) == 0);
