@@ -96,12 +96,13 @@ std::shared_ptr<TextureProxy> ScaledImage::lockTextureProxy(const TPArgs& args,
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto uvScaleX =
-      static_cast<float>(source->width()) / static_cast<float>(_width) / acturalScales.x;
-  auto uvScaleY =
-      static_cast<float>(source->height()) / static_cast<float>(_height) / acturalScales.y;
-  Matrix sourceUVMatrix = Matrix::MakeScale(uvScaleX, uvScaleY);
-  FPArgs fpArgs(args.context, args.renderFlags, scaledRect);
+  Point scales = Point::Make(
+      acturalScales.x * static_cast<float>(_width) / static_cast<float>(source->width()),
+      acturalScales.y * static_cast<float>(_height) / static_cast<float>(source->height()));
+  Matrix sourceUVMatrix = Matrix::MakeScale(1.0f / scales.x, 1.0f / scales.y);
+  sourceUVMatrix.preTranslate(scaledRect.left, scaledRect.top);
+  FPArgs fpArgs(args.context, args.renderFlags,
+                Rect::MakeWH(renderTarget->width(), renderTarget->height()), scales);
   auto processor =
       FragmentProcessor::Make(source, fpArgs, sampling, SrcRectConstraint::Fast, &sourceUVMatrix);
   if (processor == nullptr) {

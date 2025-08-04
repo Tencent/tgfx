@@ -69,7 +69,7 @@ class PictureImage : public Image {
                                                  Point* textureScales) const override;
 
   bool drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags,
-                   const Matrix* viewMatrix) const;
+                   const Matrix* extraMatrix) const;
 
  private:
   int _width = 0;

@@ -257,7 +257,7 @@ std::shared_ptr<TextureProxy> Image::lockTextureProxy(const TPArgs& args,
   auto uvMatrix = Matrix::MakeScale(1.0f / actualScales.x, 1.0f / actualScales.y);
   auto drawRect = Rect::MakeWH(scaledWidth, scaledHeight);
   FPArgs fpArgs(args.context, args.renderFlags, drawRect, actualScales);
-  SamplingArgs samplingArgs = {TileMode::Clamp, TileMode::Clamp, args.scaleSampling,
+  SamplingArgs samplingArgs = {TileMode::Clamp, TileMode::Clamp, args.scalesSampling,
                                SrcRectConstraint::Fast};
   // There is no scaling for the image, so we can use the default sampling options.
   auto processor = asFragmentProcessor(fpArgs, samplingArgs, &uvMatrix);

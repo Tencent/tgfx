@@ -136,14 +136,14 @@ std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args,
 }
 
 bool PictureImage::drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget,
-                               uint32_t renderFlags, const Matrix* viewMatrix) const {
+                               uint32_t renderFlags, const Matrix* extraMatrix) const {
   if (renderTarget == nullptr) {
     return false;
   }
   RenderContext renderContext(std::move(renderTarget), renderFlags, true);
   Matrix totalMatrix = {};
-  if (viewMatrix) {
-    totalMatrix = *viewMatrix;
+  if (extraMatrix) {
+    totalMatrix = *extraMatrix;
   }
   if (matrix) {
     totalMatrix.preConcat(*matrix);

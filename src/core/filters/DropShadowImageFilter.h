@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "BlurImageFilter.h"
 #include "tgfx/core/ImageFilter.h"
 
 namespace tgfx {

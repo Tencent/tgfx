@@ -27,14 +27,14 @@ PlacementPtr<FragmentProcessor> BlurImageFilter::getSourceFragment(std::shared_p
                                                                    Context* context,
                                                                    uint32_t renderFlags,
                                                                    const Rect& drawRect,
-                                                                   const Point& scale) const {
-  Matrix uvMatrix = Matrix::MakeScale(1 / scale.x, 1 / scale.y);
+                                                                   const Point& scales) const {
+  Matrix uvMatrix = Matrix::MakeScale(1 / scales.x, 1 / scales.y);
   uvMatrix.postTranslate(drawRect.left, drawRect.top);
   auto sourceDrawRect = Rect::MakeWH(drawRect.width(), drawRect.height());
-  sourceDrawRect.scale(scale.x, scale.y);
+  sourceDrawRect.scale(scales.x, scales.y);
   sourceDrawRect.roundOut();
   FPArgs args = FPArgs(context, renderFlags,
-                       Rect::MakeWH(sourceDrawRect.width(), sourceDrawRect.height()), scale);
+                       Rect::MakeWH(sourceDrawRect.width(), sourceDrawRect.height()), scales);
 
   SamplingArgs samplingArgs = {};
   samplingArgs.tileModeX = tileMode;

@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SimpleLayerTree.h"
-#include <tgfx/layers/layerstyles/DropShadowStyle.h>
 #include "tgfx/layers/Gradient.h"
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/ShapeLayer.h"
@@ -102,8 +101,8 @@ static std::shared_ptr<tgfx::Layer> CreateImageLayer(const AppHost* host) {
   card->setMatrix(cardMatrix);
   card->addChild(imageLayer);
   card->addChild(maskLayer);
-  card->setLayerStyles(
-      {tgfx::DropShadowStyle::Make(0, 8, 32, 32, tgfx::Color::FromRGBA(6, 0, 71, 51))});
+  card->setFilters(
+      {tgfx::DropShadowFilter::Make(0, 8, 32, 32, tgfx::Color::FromRGBA(6, 0, 71, 51))});
   return card;
 }
 

@@ -58,7 +58,7 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
                 Rect::MakeWH(renderTarget->width(), renderTarget->height()), actualScales);
   Matrix matrix = Matrix::MakeTrans(clipBounds.left, clipBounds.top);
   matrix.preScale(1.0f / actualScales.x, 1.0f / actualScales.y);
-  auto processor = asFragmentProcessor(std::move(source), fpArgs, args.scaleSampling,
+  auto processor = asFragmentProcessor(std::move(source), fpArgs, args.scalesSampling,
                                        SrcRectConstraint::Fast, &matrix);
   auto drawingManager = args.context->drawingManager();
   if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags)) {
