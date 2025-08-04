@@ -18,12 +18,11 @@
 
 #pragma once
 #include <cstdint>
-#include <chrono>
+#include "Protocol.h"
+
 namespace inspector {
-template<typename T>
-int64_t GetCurrentTime() {
-  return std::chrono::duration_cast<T>(
-                              std::chrono::system_clock::now().time_since_epoch())
-                              .count();
-}
-}  // namespace tgfx
+uint64_t GetPid();
+const char* GetProcessName();
+BroadcastMessage GetBroadcastMessage(const char* procname, size_t pnsz, size_t& len, uint16_t port,
+                                     ToolType type);
+}  // namespace inspector

@@ -18,12 +18,19 @@
 
 #pragma once
 
-#include <tgfx/core/Data.h>
-#include "SerializationUtils.h"
+namespace inspector {
+template <class T>
+class Singleton {
+ public:
+  Singleton() = delete;
+  Singleton(const Singleton&) = delete;
+  Singleton& operator=(Singleton&) = delete;
+  Singleton(Singleton&&) = delete;
+  Singleton& operator=(Singleton&&) = delete;
 
-namespace tgfx {
-namespace RecordedContentSerialization {
-std::shared_ptr<Data> Serialize(const LayerContent* content, SerializeUtils::ComplexObjSerMap* map,
-                                SerializeUtils::RenderableObjSerMap* rosMap);
+  static T* GetInstance() {
+    static T v;
+    return &v;
+  }
 };
-}  // namespace tgfx
+}  // namespace inspector

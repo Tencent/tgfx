@@ -15,7 +15,6 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#ifdef TGFX_USE_INSPECTOR
 
 #include "LayerFilterSerialization.h"
 #include <tgfx/layers/filters/BlendFilter.h>
@@ -135,4 +134,3 @@ std::shared_ptr<Data> LayerFilterSerialization::Serialize(const LayerFilter* lay
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
 }  // namespace tgfx
-#endif
