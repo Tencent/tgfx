@@ -36,9 +36,10 @@ class BlurImageFilter : public ImageFilter {
     return Type::Blur;
   }
 
-  PlacementPtr<FragmentProcessor> getSourceFragment(std::shared_ptr<Image> source, Context* context,
-                                                    uint32_t renderFlags, const Rect& drawRect,
-                                                    const Point& scales) const;
+  PlacementPtr<FragmentProcessor> getSourceFragmentProcessor(std::shared_ptr<Image> source,
+                                                             Context* context, uint32_t renderFlags,
+                                                             const Rect& drawRect,
+                                                             const Point& scales) const;
 };
 
 }  // namespace tgfx

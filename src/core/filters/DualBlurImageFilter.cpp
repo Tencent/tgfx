@@ -138,8 +138,8 @@ std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_
       Size::Make(boundsWillSample.width() * scaleFactor, boundsWillSample.height() * scaleFactor);
 
   auto sourceProcessor =
-      getSourceFragment(source, args.context, args.renderFlags, boundsWillSample,
-                        Point::Make(scaleFactor * downScaling, scaleFactor * downScaling));
+      getSourceFragmentProcessor(source, args.context, args.renderFlags, boundsWillSample,
+                                 Point::Make(scaleFactor * downScaling, scaleFactor * downScaling));
 
   SamplingArgs samplingArgs = {TileMode::Decal, TileMode::Decal, {}, SrcRectConstraint::Fast};
 

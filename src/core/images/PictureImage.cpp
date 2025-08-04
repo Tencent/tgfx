@@ -116,16 +116,20 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
 }
 
 std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args) const {
-  auto scaledWidth = roundf(static_cast<float>(_width) * args.drawScale);
-  auto scaledHeight = roundf(static_cast<float>(_height) * args.drawScale);
+  auto textureWidth = _width;
+  auto textureHeight = _height;
+  if (args.drawScale < 1.0f) {
+    textureWidth = static_cast<int>(roundf(static_cast<float>(_width) * args.drawScale));
+    textureHeight = static_cast<int>(roundf(static_cast<float>(_height) * args.drawScale));
+  }
   auto renderTarget = RenderTargetProxy::MakeFallback(
-      args.context, static_cast<int>(scaledWidth), static_cast<int>(scaledHeight), isAlphaOnly(), 1,
-      hasMipmaps() && args.mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
+      args.context, textureWidth, textureHeight, isAlphaOnly(), 1, hasMipmaps() && args.mipmapped,
+      ImageOrigin::TopLeft, BackingFit::Approx);
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto matrix = Matrix::MakeScale(scaledWidth / static_cast<float>(_width),
-                                  scaledHeight / static_cast<float>(_height));
+  auto matrix = Matrix::MakeScale(static_cast<float>(textureWidth) / static_cast<float>(_width),
+                                  static_cast<float>(textureHeight) / static_cast<float>(_height));
   if (!drawPicture(renderTarget, args.renderFlags, &matrix)) {
     return nullptr;
   }

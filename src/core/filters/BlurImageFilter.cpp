@@ -23,11 +23,9 @@
 #include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
-PlacementPtr<FragmentProcessor> BlurImageFilter::getSourceFragment(std::shared_ptr<Image> source,
-                                                                   Context* context,
-                                                                   uint32_t renderFlags,
-                                                                   const Rect& drawRect,
-                                                                   const Point& scales) const {
+PlacementPtr<FragmentProcessor> BlurImageFilter::getSourceFragmentProcessor(
+    std::shared_ptr<Image> source, Context* context, uint32_t renderFlags, const Rect& drawRect,
+    const Point& scales) const {
   Matrix uvMatrix = Matrix::MakeScale(1 / scales.x, 1 / scales.y);
   uvMatrix.postTranslate(drawRect.left, drawRect.top);
   auto sourceDrawRect = Rect::MakeWH(drawRect.width(), drawRect.height());

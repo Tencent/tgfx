@@ -30,9 +30,9 @@ class TPArgs {
   TPArgs() = default;
 
   TPArgs(Context* context, uint32_t renderFlags, bool mipmapped, float drawScale,
-         SamplingOptions scalesSampling, BackingFit backingFit = BackingFit::Approx)
+         BackingFit backingFit = BackingFit::Approx)
       : context(context), renderFlags(renderFlags), mipmapped(mipmapped), backingFit(backingFit),
-        drawScale(drawScale), scalesSampling(scalesSampling) {
+        drawScale(drawScale) {
   }
 
   /**
@@ -60,10 +60,5 @@ class TPArgs {
    * Recommended scales for creating the TextureProxy.
    */
   float drawScale = 1.0f;
-
-  /**
-   * The sampling options for creating the TextureProxy.
-   */
-  SamplingOptions scalesSampling = {};
 };
 }  // namespace tgfx

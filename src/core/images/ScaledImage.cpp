@@ -52,7 +52,7 @@ PlacementPtr<FragmentProcessor> ScaledImage::asFragmentProcessor(const FPArgs& a
   }
   drawRect.roundOut();
   auto mipmapped = hasMipmaps() && samplingArgs.sampling.mipmapMode != MipmapMode::None;
-  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale, samplingArgs.sampling);
+  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale);
   auto textureProxy = lockTextureProxy(tpArgs, drawRect);
   if (textureProxy == nullptr) {
     return nullptr;
@@ -80,10 +80,12 @@ std::shared_ptr<TextureProxy> ScaledImage::lockTextureProxy(const TPArgs& args,
                                                             const Rect& drawRect) const {
   auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
   auto scaledRect = drawRect;
-  scaledRect.scale(args.drawScale, args.drawScale);
+  if (args.drawScale < 1.0f) {
+    scaledRect.scale(args.drawScale, args.drawScale);
+  }
   scaledRect.roundOut();
-  auto drawScales =
-      Point::Make(scaledRect.width() / drawRect.width(), scaledRect.height() / drawRect.height());
+  auto drawScaleX = scaledRect.width() / drawRect.width();
+  auto drawScaleY = scaledRect.height() / drawRect.height();
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(scaledRect.width()), static_cast<int>(scaledRect.height()),
       alphaRenderable && isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft,
@@ -91,9 +93,9 @@ std::shared_ptr<TextureProxy> ScaledImage::lockTextureProxy(const TPArgs& args,
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  Point scales = Point::Make(
-      drawScales.x * static_cast<float>(_width) / static_cast<float>(source->width()),
-      drawScales.y * static_cast<float>(_height) / static_cast<float>(source->height()));
+  Point scales =
+      Point::Make(drawScaleX * static_cast<float>(_width) / static_cast<float>(source->width()),
+                  drawScaleY * static_cast<float>(_height) / static_cast<float>(source->height()));
   Matrix sourceUVMatrix = Matrix::MakeScale(1.0f / scales.x, 1.0f / scales.y);
   sourceUVMatrix.preTranslate(scaledRect.left, scaledRect.top);
   FPArgs fpArgs(args.context, args.renderFlags,

@@ -56,7 +56,7 @@ Rect DropShadowImageFilter::onFilterBounds(const Rect& srcRect) const {
   return bounds;
 }
 
-PlacementPtr<FragmentProcessor> DropShadowImageFilter::getImageFragment(
+PlacementPtr<FragmentProcessor> DropShadowImageFilter::getSourceFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     SrcRectConstraint constraint, const Matrix* uvMatrix) const {
   auto result = FragmentProcessor::Make(std::move(source), args, TileMode::Decal, TileMode::Decal,
@@ -68,7 +68,7 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::getImageFragment(
                                    InputMode::Ignore);
 }
 
-PlacementPtr<FragmentProcessor> DropShadowImageFilter::getShadowFragment(
+PlacementPtr<FragmentProcessor> DropShadowImageFilter::getShadowFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     SrcRectConstraint constraint, const Matrix* uvMatrix) const {
   auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);
@@ -78,11 +78,11 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::getShadowFragment(
 
   PlacementPtr<FragmentProcessor> shadowProcessor;
   if (blurFilter != nullptr) {
-    shadowProcessor =
-        blurFilter->asFragmentProcessor(source, args, sampling, constraint, &shadowMatrix);
+    shadowProcessor = blurFilter->asFragmentProcessor(std::move(source), args, sampling, constraint,
+                                                      &shadowMatrix);
   } else {
-    shadowProcessor = FragmentProcessor::Make(source, args, TileMode::Decal, TileMode::Decal,
-                                              sampling, constraint, &shadowMatrix);
+    shadowProcessor = FragmentProcessor::Make(std::move(source), args, TileMode::Decal,
+                                              TileMode::Decal, sampling, constraint, &shadowMatrix);
   }
   if (shadowProcessor == nullptr) {
     return nullptr;
@@ -99,15 +99,16 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::asFragmentProcessor(
   if (color.alpha <= 0 && shadowOnly) {
     return nullptr;
   }
-  auto shadowFragment = getShadowFragment(source, args, sampling, constraint, uvMatrix);
+  auto shadowFragment = getShadowFragmentProcessor(source, args, sampling, constraint, uvMatrix);
   if (shadowOnly) {
     return shadowFragment;
   }
   if (!shadowFragment) {
-    return getImageFragment(source, args, sampling, constraint, uvMatrix);
+    return getSourceFragmentProcessor(source, args, sampling, constraint, uvMatrix);
   }
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(
-      args.context->drawingBuffer(), getImageFragment(source, args, sampling, constraint, uvMatrix),
+      args.context->drawingBuffer(),
+      getSourceFragmentProcessor(source, args, sampling, constraint, uvMatrix),
       std::move(shadowFragment), BlendMode::SrcOver);
 }
 

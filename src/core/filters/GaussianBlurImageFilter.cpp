@@ -119,8 +119,8 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
   auto sourceScale = Point::Make(scaledBounds.width() / boundsWillSample.width(),
                                  scaledBounds.height() / boundsWillSample.height());
 
-  auto sourceFragment =
-      getSourceFragment(source, args.context, args.renderFlags, boundsWillSample, sourceScale);
+  auto sourceFragment = getSourceFragmentProcessor(source, args.context, args.renderFlags,
+                                                   boundsWillSample, sourceScale);
 
   if (blur2D) {
     Blur1D(std::move(sourceFragment), renderTarget, blurrinessX * scaleFactorX,

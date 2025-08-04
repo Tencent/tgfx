@@ -181,7 +181,7 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
       localBounds = shape->getBounds();
       localBounds = ClipLocalBounds(*localBounds, state.matrix, clipBounds);
     }
-    drawScale = state.matrix.getMaxScale();
+    drawScale = std::min(state.matrix.getMaxScale(), 1.0f);
   }
   shape = Shape::ApplyMatrix(std::move(shape), state.matrix);
   if (needDeviceBounds) {
@@ -386,7 +386,8 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
       break;
   }
   if (drawOp != nullptr && pendingType == PendingOpType::Image) {
-    FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()), *drawScale};
+    FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()),
+                   drawScale.value_or(1.0f)};
     auto processor =
         FragmentProcessor::Make(std::move(pendingImage), args, pendingSampling, pendingConstraint);
     if (processor == nullptr) {

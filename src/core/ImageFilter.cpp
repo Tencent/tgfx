@@ -41,11 +41,13 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
                                                             const TPArgs& args) const {
 
   auto scaledBounds = clipBounds;
-  scaledBounds.scale(args.drawScale, args.drawScale);
+  if (args.drawScale < 1.0f) {
+    scaledBounds.scale(args.drawScale, args.drawScale);
+  }
   scaledBounds.roundOut();
 
-  auto textureScales = Point::Make(scaledBounds.width() / clipBounds.width(),
-                                   scaledBounds.height() / clipBounds.height());
+  auto textureScaleX = scaledBounds.width() / clipBounds.width();
+  auto textureScaleY = scaledBounds.height() / clipBounds.height();
 
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(scaledBounds.width()), static_cast<int>(scaledBounds.height()),
@@ -55,11 +57,11 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
   }
   FPArgs fpArgs(args.context, args.renderFlags,
                 Rect::MakeWH(renderTarget->width(), renderTarget->height()),
-                std::max(textureScales.x, textureScales.y));
+                std::max(textureScaleX, textureScaleY));
   Matrix matrix = Matrix::MakeTrans(clipBounds.left, clipBounds.top);
-  matrix.preScale(1.0f / textureScales.x, 1.0f / textureScales.y);
-  auto processor = asFragmentProcessor(std::move(source), fpArgs, args.scalesSampling,
-                                       SrcRectConstraint::Fast, &matrix);
+  matrix.preScale(1.0f / textureScaleX, 1.0f / textureScaleY);
+  auto processor =
+      asFragmentProcessor(std::move(source), fpArgs, {}, SrcRectConstraint::Fast, &matrix);
   auto drawingManager = args.context->drawingManager();
   if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags)) {
     return nullptr;
@@ -92,7 +94,7 @@ PlacementPtr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(
   }
   auto isAlphaOnly = source->isAlphaOnly();
   auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
-  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale, sampling);
+  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale);
   auto textureProxy = lockTextureProxy(std::move(source), dstBounds, tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;
