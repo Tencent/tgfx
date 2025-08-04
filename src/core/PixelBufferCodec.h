@@ -17,33 +17,26 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma once
 
-#include "tgfx/core/ImageBuffer.h"
+#include "PixelBuffer.h"
+#include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
-class ScaledImageBuffer : public ImageBuffer {
+class PixelBufferCodec : public ImageCodec {
  public:
-  static std::shared_ptr<ScaledImageBuffer> Make(int width, int height,
-                                                 const std::shared_ptr<ImageBuffer>& source);
-  int width() const override {
-    return _width;
-  }
+  static std::shared_ptr<PixelBufferCodec> Make(const std::shared_ptr<PixelBuffer>& source,
+                                                int width, int height);
 
-  int height() const override {
-    return _height;
+  PixelBufferCodec(const std::shared_ptr<PixelBuffer>& source, int width, int height)
+      : ImageCodec(width, height), source(source) {
   }
 
   bool isAlphaOnly() const override {
     return source->isAlphaOnly();
   }
 
- protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const override;
+  bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 
  private:
-  int _width;
-  int _height;
-  std::shared_ptr<ImageBuffer> source = nullptr;
-
-  ScaledImageBuffer(int width, int height, const std::shared_ptr<ImageBuffer>& source);
+  std::shared_ptr<PixelBuffer> source = nullptr;
 };
 }  // namespace tgfx

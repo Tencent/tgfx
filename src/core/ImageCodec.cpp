@@ -152,18 +152,15 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (dstInfo.width() == width() && dstInfo.height() == height()) {
     return onReadPixels(dstInfo, dstPixels);
   }
-  auto pixelBuffer = PixelBuffer::Make(width(), height(), isAlphaOnly());
-  if (pixelBuffer == nullptr) {
-    return false;
-  }
-  auto pixels = pixelBuffer->lockPixels();
-  auto result = onReadPixels(pixelBuffer->info(), pixels);
-  pixelBuffer->unlockPixels();
+  auto colorType = isAlphaOnly() ? ColorType::ALPHA_8 : ColorType::RGBA_8888;
+  auto srcInfo = ImageInfo::Make(width(), height(), colorType);
+  auto buffer = Buffer(srcInfo.byteSize());
+  auto result = onReadPixels(srcInfo, buffer.data());
   if (!result) {
     return false;
   }
 
-  ImageResize(pixels, pixelBuffer->info(), dstPixels, dstInfo);
+  BoxFilterDownsample(buffer.data(), srcInfo, dstPixels, dstInfo);
   return true;
 }
 

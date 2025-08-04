@@ -18,6 +18,7 @@
 
 #include "core/codecs/jpeg/JpegCodec.h"
 #include <csetjmp>
+#include "core/utils/MathExtra.h"
 #include "core/utils/OrientationHelper.h"
 #include "skcms.h"
 #include "tgfx/core/Buffer.h"
@@ -62,26 +63,6 @@ static Orientation get_exif_orientation(jpeg_decompress_struct* dinfo) {
     }
   }
   return Orientation::TopLeft;
-}
-
-static uint32_t get_scaled_dimensions(float scaledDimensions) {
-  if (FloatNearlyEqual(scaledDimensions, 1.f / 8.f)) {
-    return 1;
-  } else if (FloatNearlyEqual(scaledDimensions, 2.f / 8.f)) {
-    return 2;
-  } else if (FloatNearlyEqual(scaledDimensions, 3.f / 8.f)) {
-    return 3;
-  } else if (FloatNearlyEqual(scaledDimensions, 4.f / 8.f)) {
-    return 4;
-  } else if (FloatNearlyEqual(scaledDimensions, 5.f / 8.f)) {
-    return 5;
-  } else if (FloatNearlyEqual(scaledDimensions, 6.f / 8.f)) {
-    return 6;
-  } else if (FloatNearlyEqual(scaledDimensions, 7.f / 8.f)) {
-    return 7;
-  } else {
-    return 8;
-  }
 }
 
 struct my_error_mgr {
@@ -176,14 +157,45 @@ bool ConvertCMYKPixels(void* dst, const gfx::skcms_ICCProfile cmykProfile,
   return true;
 }
 
-bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
-  if (!supportScaledDimensions(dstInfo.width(), dstInfo.height())) {
-    return ImageCodec::readPixels(dstInfo, dstPixels);
+uint32_t JpegCodec::getScaledDimensions(int newWidth, int newHeight) const {
+  auto scaledX = static_cast<float>(newWidth) / static_cast<float>(width());
+  auto scaledY = static_cast<float>(newHeight) / static_cast<float>(height());
+  if (!FloatNearlyEqual(scaledX, scaledY)) {
+    return 0;
   }
-  return onReadPixels(dstInfo, dstPixels);
+  if (FloatNearlyEqual(scaledX, 1.f / 8.f)) {
+    return 1;
+  } else if (FloatNearlyEqual(scaledX, 2.f / 8.f)) {
+    return 2;
+  } else if (FloatNearlyEqual(scaledX, 3.f / 8.f)) {
+    return 3;
+  } else if (FloatNearlyEqual(scaledX, 4.f / 8.f)) {
+    return 4;
+  } else if (FloatNearlyEqual(scaledX, 5.f / 8.f)) {
+    return 5;
+  } else if (FloatNearlyEqual(scaledX, 6.f / 8.f)) {
+    return 6;
+  } else if (FloatNearlyEqual(scaledX, 7.f / 8.f)) {
+    return 7;
+  } else if (FloatNearlyEqual(scaledX, 1.f)) {
+    return 8;
+  }
+  return 0;
+}
+
+bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
+  if (auto scaleDimensions = getScaledDimensions(dstInfo.width(), dstInfo.height())) {
+    return readScaledPixels(dstInfo, dstPixels, scaleDimensions);
+  }
+  return ImageCodec::readPixels(dstInfo, dstPixels);
 }
 
 bool JpegCodec::onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const {
+  return readScaledPixels(dstInfo, dstPixels, 8);
+}
+
+bool JpegCodec::readScaledPixels(const ImageInfo& dstInfo, void* dstPixels,
+                                 uint32_t scaleNum) const {
   if (dstPixels == nullptr || dstInfo.isEmpty()) {
     return false;
   }
@@ -242,8 +254,7 @@ bool JpegCodec::onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     if (jpeg_read_header(&cinfo, TRUE) != JPEG_HEADER_OK) {
       break;
     }
-    cinfo.scale_num =
-        get_scaled_dimensions(static_cast<float>(dstInfo.width()) / static_cast<float>(width()));
+    cinfo.scale_num = scaleNum;
     cinfo.scale_denom = 8;
     cinfo.out_color_space = out_color_space;
     if (cinfo.jpeg_color_space == JCS_CMYK || cinfo.jpeg_color_space == JCS_YCCK) {

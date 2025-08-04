@@ -21,6 +21,12 @@
 
 namespace tgfx {
 
+struct PixelLayout {
+  int width;
+  int height;
+  int rowBytes;
+};
+
 /**
  * Performs box filter-based downsampling on an image with support for both single-channel and
  * 4-channel RGBA data.
@@ -31,19 +37,19 @@ namespace tgfx {
  * scaling ratio is an exact integer.
  *
  * @param inputPixels Pointer to the source image pixel data
- * @param inputInfo  Structure describing source image dimensions and layout
+ * @param inputLayout  Structure describing source image dimensions and layout
  * @param outputPixels Pointer to the destination buffer where downsampled image will be stored
- * @param outputInfo Structure describing destination image dimensions and layout
+ * @param outputLayout Structure describing destination image dimensions and layout
  * @param alphaOnly    Flag indicating whether to process only alpha channel (true) or all RGBA
  * channels (false)
  *
  */
-void BoxFilterDownsample(const void* inputPixels, const ImageInfo& inputInfo, void* outputPixels,
-                         const ImageInfo& outputInfo, bool alphaOnly);
+void BoxFilterDownsample(const void* inputPixels, const PixelLayout& inputLayout,
+                         void* outputPixels, const PixelLayout& outputLayout, bool alphaOnly);
 
 /**
  * Adjust the input and output imageInfo to adapt to the BoxFilterDownsample
  */
-bool ImageResize(const void* inputPixels, const ImageInfo& inputInfo, void* outputPixels,
-                 const ImageInfo& outputInfo);
+bool BoxFilterDownsample(const void* inputPixels, const ImageInfo& inputInfo, void* outputPixels,
+                         const ImageInfo& outputInfo);
 }  // namespace tgfx

@@ -54,8 +54,6 @@ class PathRasterizer : public ImageCodec {
   explicit PathRasterizer(int width, int height, std::shared_ptr<Shape> shape, bool antiAlias,
                           bool needsGammaCorrection);
 
-  bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const override = 0;
-
   std::shared_ptr<Shape> shape = nullptr;
   bool antiAlias = false;
   bool needsGammaCorrection = false;

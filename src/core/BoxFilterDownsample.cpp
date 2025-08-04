@@ -17,15 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BoxFilterDownsample.h"
-#include <tgfx/core/Buffer.h>
-#include <tgfx/core/ImageInfo.h>
-#include <tgfx/core/Pixmap.h>
 #include <algorithm>
 #include <cfloat>
 #include <climits>
 #include <cmath>
 #include <cstdint>
 #include <memory>
+#include "tgfx/core/Buffer.h"
+#include "tgfx/core/Pixmap.h"
 #include "utils/Log.h"
 
 namespace tgfx {
@@ -37,8 +36,8 @@ struct DecimateAlpha {
 };
 
 struct FastFuncInfo {
-  void* pixels = nullptr;
-  ImageInfo layout;
+  void* pixels;
+  PixelLayout layout;
 };
 
 template <typename Tp>
@@ -162,17 +161,16 @@ static void ResizeAreaFast(const FastFuncInfo& srcInfo, FastFuncInfo& dstInfo, c
                            const int* xOffset, int scaleX, int scaleY, int channelNum) {
   int area = scaleX * scaleY;
   float scale = 1.f / static_cast<float>(area);
-  int dwith1 = (srcInfo.layout.width() / scaleX) * channelNum;
-  int dstWidth = dstInfo.layout.width() * channelNum;
-  int srcWidth = srcInfo.layout.width() * channelNum;
+  int dwith1 = (srcInfo.layout.width / scaleX) * channelNum;
+  int dstWidth = dstInfo.layout.width * channelNum;
+  int srcWidth = srcInfo.layout.width * channelNum;
   int dstY, dstX, k = 0;
 
-  for (dstY = 0; dstY < dstInfo.layout.height(); dstY++) {
-    auto* dstData = static_cast<uint8_t*>(dstInfo.pixels) +
-                    static_cast<size_t>(dstY) * dstInfo.layout.rowBytes();
+  for (dstY = 0; dstY < dstInfo.layout.height; dstY++) {
+    auto* dstData = static_cast<uint8_t*>(dstInfo.pixels) + dstY * dstInfo.layout.rowBytes;
     int srcY0 = dstY * scaleY;
-    int w = srcY0 + scaleY <= srcInfo.layout.height() ? dwith1 : 0;
-    if (srcY0 >= srcInfo.layout.height()) {
+    int w = srcY0 + scaleY <= srcInfo.layout.height ? dwith1 : 0;
+    if (srcY0 >= srcInfo.layout.height) {
       for (dstX = 0; dstX < dstWidth; dstX++) {
         dstData[dstX] = 0;
       }
@@ -180,9 +178,8 @@ static void ResizeAreaFast(const FastFuncInfo& srcInfo, FastFuncInfo& dstInfo, c
     }
 
     for (dstX = 0; dstX < w; dstX++) {
-      const uint8_t* srcData = static_cast<uint8_t*>(srcInfo.pixels) +
-                               static_cast<size_t>(srcY0) * srcInfo.layout.rowBytes() +
-                               xOffset[dstX];
+      const uint8_t* srcData =
+          static_cast<uint8_t*>(srcInfo.pixels) + srcY0 * srcInfo.layout.rowBytes + xOffset[dstX];
       int sum = 0;
       for (k = 0; k < area; k++) {
         sum += srcData[offset[k]];
@@ -197,12 +194,11 @@ static void ResizeAreaFast(const FastFuncInfo& srcInfo, FastFuncInfo& dstInfo, c
         dstData[dstX] = 0;
       }
       for (int srcY = 0; srcY < scaleY; srcY++) {
-        if (srcY0 + srcY >= srcInfo.layout.height()) {
+        if (srcY0 + srcY >= srcInfo.layout.height) {
           break;
         }
         const uint8_t* srcData = static_cast<uint8_t*>(srcInfo.pixels) +
-                                 static_cast<size_t>(srcY0 + srcY) * srcInfo.layout.rowBytes() +
-                                 srcX0;
+                                 (srcY0 + srcY) * srcInfo.layout.rowBytes + srcX0;
         for (int srcX = 0; srcX < scaleX * channelNum; srcX += channelNum) {
           if (srcX0 + srcX >= srcWidth) {
             break;
@@ -223,8 +219,8 @@ static void ResizeAreaFast(const FastFuncInfo& srcInfo, FastFuncInfo& dstInfo, c
  * where weights are proportional to the area of overlap between source and destination pixels.
  * It supports both single-channel and multi-channel (RGBA) images.
  *
- * @param srcInfo    Source image information
- * @param dstInfo    Destination image information
+ * @param srcInfo    Source image information (pixel data and layout)
+ * @param dstInfo    Destination image buffer and layout
  * @param xTab       Precomputed horizontal resizing table containing:
  *                   - srcIndex: source pixel index
  *                   - dstIndex: destination pixel index
@@ -238,11 +234,11 @@ static void ResizeAreaFast(const FastFuncInfo& srcInfo, FastFuncInfo& dstInfo, c
 static void ResizeArea(const FastFuncInfo& srcInfo, FastFuncInfo& dstInfo,
                        const DecimateAlpha* xTab, int xTabSize, const DecimateAlpha* yTab, int,
                        const int* tabOffset, int channelNum) {
-  int dstWidth = dstInfo.layout.width() * channelNum;
+  int dstWidth = dstInfo.layout.width * channelNum;
   std::unique_ptr<float[]> _buffer(new float[static_cast<size_t>(dstWidth * 2)]);
   float* buf = _buffer.get();
   float* sum = buf + dstWidth;
-  int jStart = tabOffset[0], jEnd = tabOffset[dstInfo.layout.height()], j, k, dstX,
+  int jStart = tabOffset[0], jEnd = tabOffset[dstInfo.layout.height], j, k, dstX,
       prevDstY = yTab[jStart].dstIndex;
 
   for (dstX = 0; dstX < dstWidth; dstX++) {
@@ -253,8 +249,8 @@ static void ResizeArea(const FastFuncInfo& srcInfo, FastFuncInfo& dstInfo,
     int dstY = yTab[j].dstIndex;
     int srcY = yTab[j].srcIndex;
     {
-      const uint8_t* srcData = static_cast<uint8_t*>(srcInfo.pixels) +
-                               static_cast<size_t>(srcY) * srcInfo.layout.rowBytes();
+      const uint8_t* srcData =
+          static_cast<uint8_t*>(srcInfo.pixels) + srcY * srcInfo.layout.rowBytes;
       for (dstX = 0; dstX < dstWidth; dstX++) {
         buf[dstX] = 0.0f;
       }
@@ -283,8 +279,7 @@ static void ResizeArea(const FastFuncInfo& srcInfo, FastFuncInfo& dstInfo,
 
     if (dstY != prevDstY) {
       SaturateStore(sum, dstWidth,
-                    static_cast<uint8_t*>(dstInfo.pixels) +
-                        static_cast<size_t>(prevDstY) * dstInfo.layout.rowBytes());
+                    static_cast<uint8_t*>(dstInfo.pixels) + prevDstY * dstInfo.layout.rowBytes);
       Mul(buf, dstWidth, beta, sum);
       prevDstY = dstY;
     } else {
@@ -292,20 +287,19 @@ static void ResizeArea(const FastFuncInfo& srcInfo, FastFuncInfo& dstInfo,
     }
   }
   SaturateStore(sum, dstWidth,
-                static_cast<uint8_t*>(dstInfo.pixels) +
-                    static_cast<size_t>(prevDstY) * dstInfo.layout.rowBytes());
+                static_cast<uint8_t*>(dstInfo.pixels) + prevDstY * dstInfo.layout.rowBytes);
 }
 
-void BoxFilterDownsample(const void* inputPixels, const ImageInfo& inputInfo, void* outputPixels,
-                         const ImageInfo& outputInfo, bool alphaOnly) {
+void BoxFilterDownsample(const void* inputPixels, const PixelLayout& inputLayout,
+                         void* outputPixels, const PixelLayout& outputLayout, bool alphaOnly) {
   ASSERT(inputPixels != nullptr && outputPixels != nullptr)
-  ASSERT(inputInfo.width() > 0 && inputInfo.height() > 0 && outputInfo.width() > 0 &&
-         outputInfo.height() > 0)
-  ASSERT(inputInfo.rowBytes() > 0 && outputInfo.rowBytes() > 0)
-  ASSERT(outputInfo.width() <= inputInfo.width() && outputInfo.height() <= inputInfo.height())
+  ASSERT(inputLayout.width > 0 && inputLayout.height > 0 && outputLayout.width > 0 &&
+         outputLayout.height > 0)
+  ASSERT(inputLayout.rowBytes > 0 && outputLayout.rowBytes > 0)
+  ASSERT(outputLayout.width <= inputLayout.width && outputLayout.height <= inputLayout.height)
 
-  auto scaleX = static_cast<double>(inputInfo.width()) / outputInfo.width();
-  auto scaleY = static_cast<double>(inputInfo.height()) / outputInfo.height();
+  auto scaleX = static_cast<double>(inputLayout.width) / outputLayout.width;
+  auto scaleY = static_cast<double>(inputLayout.height) / outputLayout.height;
   int channelNum = alphaOnly ? 1 : 4;
   int iScaleX = SaturateCast<int>(scaleX);
   int iScaleY = SaturateCast<int>(scaleY);
@@ -314,19 +308,19 @@ void BoxFilterDownsample(const void* inputPixels, const ImageInfo& inputInfo, vo
 
   FastFuncInfo srcInfo = {};
   srcInfo.pixels = const_cast<void*>(inputPixels);
-  srcInfo.layout = inputInfo;
+  srcInfo.layout = inputLayout;
 
   FastFuncInfo dstInfo = {};
   dstInfo.pixels = outputPixels;
-  dstInfo.layout = outputInfo;
+  dstInfo.layout = outputLayout;
 
   int k, srcX, srcY, dstX, dstY;
 
   if (isAreaFast) {
     int area = iScaleX * iScaleY;
-    size_t srcStep = static_cast<size_t>(inputInfo.rowBytes() / ChannelSizeInBytes);
+    size_t srcStep = static_cast<size_t>(inputLayout.rowBytes / ChannelSizeInBytes);
     std::unique_ptr<int[]> data(
-        new int[static_cast<size_t>(area + outputInfo.width() * channelNum)]);
+        new int[static_cast<size_t>(area + outputLayout.width * channelNum)]);
     int* offset = data.get();
     int* xOffset = offset + area;
 
@@ -337,7 +331,7 @@ void BoxFilterDownsample(const void* inputPixels, const ImageInfo& inputInfo, vo
       }
     }
 
-    for (dstX = 0; dstX < outputInfo.width(); dstX++) {
+    for (dstX = 0; dstX < outputLayout.width; dstX++) {
       int j = dstX * channelNum;
       srcX = iScaleX * j;
       for (k = 0; k < channelNum; k++) {
@@ -350,14 +344,14 @@ void BoxFilterDownsample(const void* inputPixels, const ImageInfo& inputInfo, vo
   }
 
   std::unique_ptr<DecimateAlpha[]> _xytab(
-      new DecimateAlpha[static_cast<size_t>((inputInfo.width() + inputInfo.height()) * 2)]);
-  auto xtab = _xytab.get();
-  auto ytab = xtab + inputInfo.width() * 2;
-  auto xtabSize =
-      ComputeResizeAreaTab(inputInfo.width(), outputInfo.width(), channelNum, scaleX, xtab);
-  auto ytabSize = ComputeResizeAreaTab(inputInfo.height(), outputInfo.height(), 1, scaleY, ytab);
-  std::unique_ptr<int[]> _tabOffset(new int[static_cast<size_t>(outputInfo.height() + 1)]);
-  auto tabOffset = _tabOffset.get();
+      new DecimateAlpha[static_cast<size_t>((inputLayout.width + inputLayout.height) * 2)]);
+  DecimateAlpha* xtab = _xytab.get();
+  DecimateAlpha* ytab = xtab + inputLayout.width * 2;
+  int xtabSize =
+      ComputeResizeAreaTab(inputLayout.width, outputLayout.width, channelNum, scaleX, xtab);
+  int ytabSize = ComputeResizeAreaTab(inputLayout.height, outputLayout.height, 1, scaleY, ytab);
+  std::unique_ptr<int[]> _tabOffset(new int[static_cast<size_t>(outputLayout.height + 1)]);
+  int* tabOffset = _tabOffset.get();
   for (k = 0, dstY = 0; k < ytabSize; k++) {
     if (k == 0 || ytab[k].dstIndex != ytab[k - 1].dstIndex) {
       ASSERT(ytab[k].dstIndex == dstY);
@@ -368,8 +362,8 @@ void BoxFilterDownsample(const void* inputPixels, const ImageInfo& inputInfo, vo
   ResizeArea(srcInfo, dstInfo, xtab, xtabSize, ytab, ytabSize, tabOffset, channelNum);
 }
 
-bool ImageResize(const void* inputPixels, const ImageInfo& inputInfo, void* outputPixels,
-                 const ImageInfo& outputInfo) {
+bool BoxFilterDownsample(const void* inputPixels, const ImageInfo& inputInfo, void* outputPixels,
+                         const ImageInfo& outputInfo) {
   Buffer dstTempBuffer = {};
   Buffer srcTempBuffer = {};
   auto dstImageInfo = outputInfo;
@@ -388,7 +382,11 @@ bool ImageResize(const void* inputPixels, const ImageInfo& inputInfo, void* outp
     dstTempBuffer.alloc(dstImageInfo.byteSize());
     dstData = dstTempBuffer.data();
   }
-  BoxFilterDownsample(srcData, srcImageInfo, dstData, dstImageInfo, srcImageInfo.isAlphaOnly());
+  auto inputLayout = PixelLayout{srcImageInfo.width(), srcImageInfo.height(),
+                                 static_cast<int>(srcImageInfo.rowBytes())};
+  auto outputLayout = PixelLayout{dstImageInfo.width(), dstImageInfo.height(),
+                                  static_cast<int>(dstImageInfo.rowBytes())};
+  BoxFilterDownsample(srcData, inputLayout, dstData, outputLayout, srcImageInfo.isAlphaOnly());
 
   if (!dstTempBuffer.isEmpty()) {
     Pixmap(dstImageInfo, dstData).readPixels(outputInfo, outputPixels);

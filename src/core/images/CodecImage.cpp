@@ -23,8 +23,8 @@
 
 namespace tgfx {
 
-CodecImage::CodecImage(int width, int height, UniqueKey uniqueKey,
-                       std::shared_ptr<ImageCodec> codec)
+CodecImage::CodecImage(UniqueKey uniqueKey, std::shared_ptr<ImageCodec> codec, int width,
+                       int height)
     : GeneratorImage(std::move(uniqueKey), std::move(codec)), _width(width), _height(height) {
 }
 
@@ -34,8 +34,8 @@ std::shared_ptr<ImageCodec> CodecImage::getCodec() const {
 
 std::shared_ptr<Image> CodecImage::onMakeScaled(int newWidth, int newHeight,
                                                 const SamplingOptions& sampling) const {
-  if (newWidth <= width() && newHeight <= height()) {
-    auto image = std::make_shared<CodecImage>(newWidth, newHeight, uniqueKey, getCodec());
+  if (newWidth <= generator->width() && newHeight <= generator->height()) {
+    auto image = std::make_shared<CodecImage>(uniqueKey, getCodec(), newWidth, newHeight);
     image->weakThis = image;
     return image;
   }

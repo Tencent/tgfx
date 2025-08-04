@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
 #include "ResourceImage.h"
 
 namespace tgfx {
@@ -26,14 +25,14 @@ namespace tgfx {
  */
 class BufferImage : public ResourceImage {
  public:
-  BufferImage(int width, int height, UniqueKey uniqueKey, std::shared_ptr<ImageBuffer> buffer);
+  BufferImage(UniqueKey uniqueKey, std::shared_ptr<ImageBuffer> buffer);
 
   int width() const override {
-    return _width;
+    return imageBuffer->width();
   }
 
   int height() const override {
-    return _height;
+    return imageBuffer->height();
   }
 
   bool isAlphaOnly() const override {
@@ -52,8 +51,6 @@ class BufferImage : public ResourceImage {
                                                    const UniqueKey& key) const override;
 
  private:
-  int _width;
-  int _height;
   std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
 };
 }  // namespace tgfx
