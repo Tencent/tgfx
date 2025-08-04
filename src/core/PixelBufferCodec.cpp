@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "PixelBufferCodec.h"
 #include "BoxFilterDownsample.h"
 #include "PixelBuffer.h"
-#include "PixelBufferCodec.h"
 
 namespace tgfx {
 std::shared_ptr<PixelBufferCodec> PixelBufferCodec::Make(const std::shared_ptr<PixelBuffer>& source,
