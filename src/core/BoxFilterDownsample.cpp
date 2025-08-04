@@ -132,16 +132,16 @@ static int ComputeResizeAreaTab(int srcSize, int dstSize, int channelNum, double
 }
 
 extern int ResizeAreaFastx2SIMDFunc(int channelNum, int step, const uint8_t* srcData,
-                                  uint8_t* dstData, int w, int padding, int shiftNum);
+                                    uint8_t* dstData, int w, int padding, int shiftNum);
 
 extern int ResizeAreaFastx4SIMDFunc(int channelNum, int step, const uint8_t* srcData,
-                                  uint8_t* dstData, int w, int scale, int padding, int shiftNum);
+                                    uint8_t* dstData, int w, int scale, int padding, int shiftNum);
 
 extern int ResizeAreaFastx8SIMDFunc(int channelNum, int step, const uint8_t* srcData,
-                                  uint8_t* dstData, int w, int scale, int padding, int shiftNum);
+                                    uint8_t* dstData, int w, int scale, int padding, int shiftNum);
 
 extern int ResizeAreaFastxNSimdFunc(int channelNum, int step, const uint8_t* srcData,
-                                  uint8_t* dstData, int w, int scale, int padding, int shiftNum);
+                                    uint8_t* dstData, int w, int scale, int padding, int shiftNum);
 
 static bool IsPowerOfTwo(int n) {
   return (n > 0) && ((n & (n - 1)) == 0);
@@ -161,12 +161,13 @@ static int GetPowerOfTwo(int n) {
 struct ResizeAreaFastVec {
   ResizeAreaFastVec(int scaleX, int scaleY, int channelNum, int step)
       : scaleX(scaleX), scaleY(scaleY), channelNum(channelNum), step(step) {
-    fastMode = this->scaleX == this->scaleY && IsPowerOfTwo(this->scaleX) && IsPowerOfTwo(this->scaleY);
+    fastMode =
+        this->scaleX == this->scaleY && IsPowerOfTwo(this->scaleX) && IsPowerOfTwo(this->scaleY);
   }
 
   int operator()(const uint8_t* srcData, uint8_t* dstData, int w) const {
     int dstX = 0;
-    if(fastMode) {
+    if (fastMode) {
       int padding = scaleX * scaleY / 2;
       int shiftNum = GetPowerOfTwo(scaleX) * 2;
       switch (scaleX) {
@@ -174,20 +175,23 @@ struct ResizeAreaFastVec {
           dstX = ResizeAreaFastx2SIMDFunc(channelNum, step, srcData, dstData, w, padding, shiftNum);
           break;
         case 4:
-          dstX = ResizeAreaFastx4SIMDFunc(channelNum, step, srcData, dstData, w, scaleX, padding, shiftNum);
+          dstX = ResizeAreaFastx4SIMDFunc(channelNum, step, srcData, dstData, w, scaleX, padding,
+                                          shiftNum);
           break;
         case 8:
-          dstX = ResizeAreaFastx8SIMDFunc(channelNum, step, srcData, dstData, w, scaleX, padding, shiftNum);
+          dstX = ResizeAreaFastx8SIMDFunc(channelNum, step, srcData, dstData, w, scaleX, padding,
+                                          shiftNum);
           break;
         default:
-          dstX = ResizeAreaFastxNSimdFunc(channelNum, step, srcData, dstData, w, scaleX, padding, shiftNum);
+          dstX = ResizeAreaFastxNSimdFunc(channelNum, step, srcData, dstData, w, scaleX, padding,
+                                          shiftNum);
       }
       if (channelNum == 1) {
         for (; dstX < w; ++dstX) {
           int index = dstX * scaleX;
           int sum = 0;
-          for(int i = 0; i < scaleY; i++) {
-            for(int j = 0; j < scaleX; j++) {
+          for (int i = 0; i < scaleY; i++) {
+            for (int j = 0; j < scaleX; j++) {
               const uint8_t* data = srcData + step * i;
               sum += data[index + j];
             }
@@ -199,8 +203,8 @@ struct ResizeAreaFastVec {
         for (; dstX < w; dstX += 4) {
           int index = dstX * scaleX;
           int sum[4] = {0};
-          for(int i = 0; i < scaleY; i++) {
-            for(int j = 0; j < scaleX; j++) {
+          for (int i = 0; i < scaleY; i++) {
+            for (int j = 0; j < scaleX; j++) {
               const uint8_t* data = srcData + step * i;
               sum[0] += data[index + 4 * j];
               sum[1] += data[index + 4 * j + 1];
