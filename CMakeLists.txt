@@ -552,12 +552,12 @@ if(TGFX_BUILD_VCPKG)
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib
         RUNTIME DESTINATION bin
+        INCLUDES DESTINATION include
     )
 
-    # 只为Release配置安装头文件
+    # 安装头文件（不指定配置，让所有配置共享）
     install(DIRECTORY include/
         DESTINATION include
-        CONFIGURATIONS Release
         FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
     )
 
