@@ -565,7 +565,7 @@ if(TGFX_BUILD_VCPKG)
     install(EXPORT tgfxTargets
         FILE tgfxTargets.cmake
         NAMESPACE tgfx::
-        DESTINATION lib/cmake/tgfx
+        DESTINATION share/tgfx
     )
 
     # 创建配置文件
