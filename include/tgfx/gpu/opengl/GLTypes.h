@@ -51,4 +51,14 @@ struct GLFrameBufferInfo {
    */
   unsigned format = 0x8058;  // GL_RGBA8;
 };
+
+/**
+ * Types for interacting with GL sync objects created externally to TGFX.
+ */
+struct GLSyncInfo {
+  /*
+   * The GL sync object used for synchronization.
+   */
+  void* sync = nullptr;
+};
 }  // namespace tgfx

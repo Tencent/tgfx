@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RRectDrawOp.h"
+#include "gpu/GPUBuffer.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/GpuBuffer.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"
 #include "tgfx/core/RenderFlags.h"
@@ -36,8 +36,8 @@ PlacementPtr<RRectDrawOp> RRectDrawOp::Make(Context* context,
     // If we only have one rect, it is not worth the async task overhead.
     renderFlags |= RenderFlags::DisableAsyncTask;
   }
-  drawOp->vertexBufferProxy =
-      context->proxyProvider()->createVertexBuffer(std::move(provider), renderFlags);
+  drawOp->vertexBufferProxyView =
+      context->proxyProvider()->createVertexBufferProxyView(std::move(provider), renderFlags);
   return drawOp;
 }
 
@@ -50,25 +50,26 @@ RRectDrawOp::RRectDrawOp(RRectsVertexProvider* provider)
 }
 
 void RRectDrawOp::execute(RenderPass* renderPass) {
-  if (indexBufferProxy == nullptr || vertexBufferProxy == nullptr) {
+  if (indexBufferProxy == nullptr || vertexBufferProxyView == nullptr) {
     return;
   }
   auto indexBuffer = indexBufferProxy->getBuffer();
   if (indexBuffer == nullptr) {
     return;
   }
-  std::shared_ptr<GpuBuffer> vertexBuffer = vertexBufferProxy->getBuffer();
+  auto vertexBuffer = vertexBufferProxyView->getBuffer();
   if (vertexBuffer == nullptr) {
     return;
   }
-  auto renderTarget = renderPass->renderTarget();
+  auto renderTarget = renderPass->getRenderTarget();
   auto drawingBuffer = renderPass->getContext()->drawingBuffer();
   auto gp =
       EllipseGeometryProcessor::Make(drawingBuffer, renderTarget->width(), renderTarget->height(),
                                      hasStroke, useScale, commonColor);
   auto pipeline = createPipeline(renderPass, std::move(gp));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
-  renderPass->bindBuffers(indexBuffer, vertexBuffer, vertexBufferProxy->offset());
+  renderPass->bindBuffers(indexBuffer->gpuBuffer(), vertexBuffer->gpuBuffer(),
+                          vertexBufferProxyView->offset());
   auto numIndicesPerRRect = hasStroke ? IndicesPerStrokeRRect : IndicesPerFillRRect;
   renderPass->drawIndexed(PrimitiveType::Triangles, 0, rectCount * numIndicesPerRRect);
 }

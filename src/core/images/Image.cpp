@@ -22,6 +22,7 @@
 #include "core/images/OrientImage.h"
 #include "core/images/RGBAAAImage.h"
 #include "core/images/RasterizedImage.h"
+#include "core/images/ScaledImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/images/TextureImage.h"
 #include "core/utils/WeakMap.h"
@@ -173,9 +174,19 @@ std::shared_ptr<Image> Image::makeSubset(const Rect& subset) const {
   return onMakeSubset(rect);
 }
 
-std::shared_ptr<Image> Image::makeRasterized(float rasterizationScale,
-                                             const SamplingOptions& sampling) const {
-  auto rasterImage = RasterizedImage::MakeFrom(weakThis.lock(), rasterizationScale, sampling);
+std::shared_ptr<Image> Image::makeScaled(int newWidth, int newHeight,
+                                         const SamplingOptions& sampling) const {
+  if (newWidth <= 0 || newHeight <= 0) {
+    return nullptr;
+  }
+  if (newWidth == width() && newHeight == height()) {
+    return weakThis.lock();
+  }
+  return onMakeScaled(newWidth, newHeight, sampling);
+}
+
+std::shared_ptr<Image> Image::makeRasterized() const {
+  auto rasterImage = RasterizedImage::MakeFrom(weakThis.lock());
   if (rasterImage != nullptr && hasMipmaps()) {
     return rasterImage->makeMipmapped(true);
   }
@@ -205,6 +216,11 @@ std::shared_ptr<Image> Image::makeWithFilter(std::shared_ptr<ImageFilter> filter
 std::shared_ptr<Image> Image::onMakeWithFilter(std::shared_ptr<ImageFilter> filter, Point* offset,
                                                const Rect* clipRect) const {
   return FilterImage::MakeFrom(weakThis.lock(), std::move(filter), offset, clipRect);
+}
+
+std::shared_ptr<Image> Image::onMakeScaled(int newWidth, int newHeight,
+                                           const SamplingOptions& sampling) const {
+  return ScaledImage::MakeFrom(weakThis.lock(), newWidth, newHeight, sampling);
 }
 
 std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,

@@ -62,18 +62,30 @@ PictureImage::~PictureImage() {
 }
 
 std::shared_ptr<Image> PictureImage::onMakeMipmapped(bool enabled) const {
-  return std::make_shared<PictureImage>(picture, _width, _height, matrix, enabled);
+  auto newImage = std::make_shared<PictureImage>(picture, _width, _height, matrix, enabled);
+  newImage->weakThis = newImage;
+  return newImage;
+}
+
+std::shared_ptr<Image> PictureImage::onMakeScaled(int newWidth, int newHeight,
+                                                  const SamplingOptions&) const {
+  auto newMatrix = *matrix;
+  newMatrix.postScale(static_cast<float>(newWidth) / static_cast<float>(_width),
+                      static_cast<float>(newHeight) / static_cast<float>(_height));
+  auto newImage =
+      std::make_shared<PictureImage>(picture, newWidth, newHeight, &newMatrix, mipmapped);
+  newImage->weakThis = newImage;
+  return newImage;
 }
 
 PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& args,
                                                                   const SamplingArgs& samplingArgs,
                                                                   const Matrix* uvMatrix) const {
-
   auto drawBounds = args.drawRect;
   if (uvMatrix) {
     drawBounds = uvMatrix->mapRect(drawBounds);
   }
-  auto rect = Rect::MakeWH(_width, _height);
+  auto rect = Rect::MakeWH(width(), height());
   if (!rect.intersect(drawBounds)) {
     return nullptr;
   }
@@ -90,13 +102,13 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (!drawPicture(renderTarget, args.renderFlags, &offset)) {
     return nullptr;
   }
-  auto finalUVMatrix = Matrix::MakeTrans(offset.x, offset.y);
+  auto finalUVMatrix = Matrix::MakeTrans(-rect.left, -rect.top);
   if (uvMatrix) {
     finalUVMatrix.preConcat(*uvMatrix);
   }
   auto newSamplingArgs = samplingArgs;
   if (samplingArgs.sampleArea) {
-    newSamplingArgs.sampleArea->offset(-rect.left, -rect.top);
+    newSamplingArgs.sampleArea = samplingArgs.sampleArea->makeOffset(-rect.left, -rect.top);
   }
   return TiledTextureEffect::Make(renderTarget->asTextureProxy(), newSamplingArgs, &finalUVMatrix,
                                   isAlphaOnly());
@@ -121,9 +133,9 @@ bool PictureImage::drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget,
     return false;
   }
   RenderContext renderContext(std::move(renderTarget), renderFlags, true);
-  Matrix totalMatrix = {};
+  Matrix totalMatrix = Matrix::I();
   if (offset) {
-    totalMatrix.preTranslate(offset->x, offset->y);
+    totalMatrix.postTranslate(offset->x, offset->y);
   }
   if (matrix) {
     totalMatrix.preConcat(*matrix);

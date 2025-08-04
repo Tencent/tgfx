@@ -82,21 +82,20 @@ class ImageUserScalerContext final : public UserScalerContext {
 
 //////////////
 
-std::shared_ptr<UserTypeface> ImageUserTypeface::Make(uint32_t builderID,
-                                                      const std::string& fontFamily,
-                                                      const std::string& fontStyle,
-                                                      const FontMetrics& metrics,
-                                                      const ImageRecordType& glyphRecords) {
-  auto typeface = std::shared_ptr<ImageUserTypeface>(
-      new ImageUserTypeface(builderID, fontFamily, fontStyle, metrics, glyphRecords));
+std::shared_ptr<UserTypeface> ImageUserTypeface::Make(
+    uint32_t builderID, const std::string& fontFamily, const std::string& fontStyle,
+    const FontMetrics& fontMetrics, const Rect& fontBounds, const ImageRecordType& glyphRecords) {
+  auto typeface = std::shared_ptr<ImageUserTypeface>(new ImageUserTypeface(
+      builderID, fontFamily, fontStyle, fontMetrics, fontBounds, glyphRecords));
   typeface->weakThis = typeface;
   return typeface;
 }
 
 ImageUserTypeface::ImageUserTypeface(uint32_t builderID, const std::string& fontFamily,
-                                     const std::string& fontStyle, const FontMetrics& metrics,
-                                     const ImageRecordType& glyphRecords)
-    : UserTypeface(builderID, fontFamily, fontStyle, metrics), glyphRecords(glyphRecords) {
+                                     const std::string& fontStyle, const FontMetrics& fontMetrics,
+                                     const Rect& fontBounds, const ImageRecordType& glyphRecords)
+    : UserTypeface(builderID, fontFamily, fontStyle, fontMetrics, fontBounds),
+      glyphRecords(glyphRecords) {
 }
 
 size_t ImageUserTypeface::glyphsCount() const {

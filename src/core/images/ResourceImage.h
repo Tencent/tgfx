@@ -31,13 +31,15 @@ class ResourceImage : public Image {
  public:
   explicit ResourceImage(UniqueKey uniqueKey);
 
-  std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f,
-                                        const SamplingOptions& sampling = {}) const override;
+  std::shared_ptr<Image> makeRasterized() const override;
 
  protected:
   UniqueKey uniqueKey = {};
 
   std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
+
+  std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
+                                      const SamplingOptions& sampling) const override;
 
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const final;
 

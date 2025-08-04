@@ -158,8 +158,6 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     device->unlock();
     return;
   }
-//  appHost->updateZoomAndOffset(self.zoomScale,
-//                               tgfx::Point(self.contentOffset.x, self.contentOffset.y));
   auto canvas = surface->getCanvas();
   canvas->clear();
   drawers::Drawer::DrawBackground(canvas, appHost.get());

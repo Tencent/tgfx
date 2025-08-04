@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLProgramBuilder.h"
-#include "GLContext.h"
 #include "GLUtil.h"
 
 namespace tgfx {
@@ -145,10 +144,10 @@ std::unique_ptr<GLProgram> GLProgramBuilder::finalize() {
     fragmentShaderBuilder()->declareCustomOutputColor();
   }
   finalizeShaders();
-
   auto vertex = vertexShaderBuilder()->shaderString();
   auto fragment = fragmentShaderBuilder()->shaderString();
-  auto programID = CreateGLProgram(context, vertex, fragment);
+  auto gl = GLFunctions::Get(context);
+  auto programID = CreateGLProgram(gl, vertex, fragment);
   if (programID == 0) {
     return nullptr;
   }
@@ -157,7 +156,6 @@ std::unique_ptr<GLProgram> GLProgramBuilder::finalize() {
 
   auto uniformBuffer = _uniformHandler.makeUniformBuffer();
   // Assign texture units to sampler uniforms up front, just once.
-  auto gl = GLFunctions::Get(context);
   gl->useProgram(programID);
   auto& samplers = _uniformHandler.samplers;
   for (size_t i = 0; i < samplers.size(); ++i) {

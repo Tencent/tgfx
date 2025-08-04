@@ -152,14 +152,13 @@ class RectIndicesProvider : public DataSource<Data> {
   uint16_t vertCount = 0;
 };
 
-std::shared_ptr<GpuBufferProxy> GlobalCache::getRectIndexBuffer(bool antialias) {
+std::shared_ptr<IndexBufferProxy> GlobalCache::getRectIndexBuffer(bool antialias) {
   if (antialias) {
     if (aaQuadIndexBuffer == nullptr) {
       auto provider =
           std::make_unique<RectIndicesProvider>(AAQuadIndexPattern, RectDrawOp::IndicesPerAAQuad,
                                                 RectDrawOp::MaxNumRects, VerticesPerAAQuad);
-      aaQuadIndexBuffer =
-          GpuBufferProxy::MakeFrom(context, std::move(provider), BufferType::Index, 0);
+      aaQuadIndexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
     }
     return aaQuadIndexBuffer;
   }
@@ -167,8 +166,7 @@ std::shared_ptr<GpuBufferProxy> GlobalCache::getRectIndexBuffer(bool antialias) 
     auto provider = std::make_unique<RectIndicesProvider>(
         NonAAQuadIndexPattern, RectDrawOp::IndicesPerNonAAQuad, RectDrawOp::MaxNumRects,
         VerticesPerNonAAQuad);
-    nonAAQuadIndexBuffer =
-        GpuBufferProxy::MakeFrom(context, std::move(provider), BufferType::Index, 0);
+    nonAAQuadIndexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
   }
   return nonAAQuadIndexBuffer;
 }
@@ -230,13 +228,26 @@ class RRectIndicesProvider : public DataSource<Data> {
   bool stroke = false;
 };
 
-std::shared_ptr<GpuBufferProxy> GlobalCache::getRRectIndexBuffer(bool stroke) {
+std::shared_ptr<IndexBufferProxy> GlobalCache::getRRectIndexBuffer(bool stroke) {
   auto& indexBuffer = stroke ? rRectStrokeIndexBuffer : rRectFillIndexBuffer;
   if (indexBuffer == nullptr) {
     auto provider = std::make_unique<RRectIndicesProvider>(RRectDrawOp::MaxNumRRects, stroke);
-    indexBuffer = GpuBufferProxy::MakeFrom(context, std::move(provider), BufferType::Index, 0);
+    indexBuffer = context->proxyProvider()->createIndexBufferProxy(std::move(provider));
   }
   return indexBuffer;
+}
+
+std::shared_ptr<Resource> GlobalCache::findStaticResource(const UniqueKey& uniqueKey) {
+  auto result = staticResources.find(uniqueKey);
+  return result != staticResources.end() ? result->second : nullptr;
+}
+
+void GlobalCache::addStaticResource(const UniqueKey& uniqueKey,
+                                    std::shared_ptr<Resource> resource) {
+  if (uniqueKey.empty()) {
+    return;
+  }
+  staticResources[uniqueKey] = std::move(resource);
 }
 
 }  // namespace tgfx

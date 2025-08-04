@@ -100,11 +100,11 @@ class SVGProperty {
   }
 
   T* operator->() {
-    return &_value.value();
+    return _value ? std::addressof(*_value) : nullptr;
   }
 
   const T* operator->() const {
-    return &_value.value();
+    return _value ? std::addressof(*_value) : nullptr;
   }
 
   T& operator*() {

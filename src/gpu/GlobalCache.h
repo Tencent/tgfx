@@ -22,7 +22,7 @@
 #include <unordered_map>
 #include "gpu/Program.h"
 #include "gpu/ProgramCreator.h"
-#include "gpu/proxies/GpuBufferProxy.h"
+#include "gpu/proxies/IndexBufferProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 
 namespace tgfx {
@@ -48,13 +48,26 @@ class GlobalCache {
   /**
    * Returns a GPU buffer that contains indices for rendering a quad with or without antialiasing.
    */
-  std::shared_ptr<GpuBufferProxy> getRectIndexBuffer(bool antialias);
+  std::shared_ptr<IndexBufferProxy> getRectIndexBuffer(bool antialias);
 
   /**
    * Returns a GPU buffer containing indices for rendering a rounded rectangle, either for filling
    * or stroking.
    */
-  std::shared_ptr<GpuBufferProxy> getRRectIndexBuffer(bool stroke);
+  std::shared_ptr<IndexBufferProxy> getRRectIndexBuffer(bool stroke);
+
+  /**
+   * Finds a static resource in the cache by its unique key. Returns nullptr if no resource is found.
+   * The resource will be kept alive for the lifetime of the GlobalCache.
+   */
+  std::shared_ptr<Resource> findStaticResource(const UniqueKey& uniqueKey);
+
+  /**
+   * Adds a static resource to the cache. If a resource with the same unique key already exists,
+   * it will be replaced with the new resource. The resource will be kept alive for the lifetime of
+   * the GlobalCache.
+   */
+  void addStaticResource(const UniqueKey& uniqueKey, std::shared_ptr<Resource> resource);
 
  private:
   struct GradientTexture {
@@ -72,10 +85,11 @@ class GlobalCache {
   BytesKeyMap<std::shared_ptr<Program>> programMap = {};
   std::list<GradientTexture*> gradientLRU = {};
   BytesKeyMap<std::unique_ptr<GradientTexture>> gradientTextures = {};
-  std::shared_ptr<GpuBufferProxy> aaQuadIndexBuffer = nullptr;
-  std::shared_ptr<GpuBufferProxy> nonAAQuadIndexBuffer = nullptr;
-  std::shared_ptr<GpuBufferProxy> rRectFillIndexBuffer = nullptr;
-  std::shared_ptr<GpuBufferProxy> rRectStrokeIndexBuffer = nullptr;
+  std::shared_ptr<IndexBufferProxy> aaQuadIndexBuffer = nullptr;
+  std::shared_ptr<IndexBufferProxy> nonAAQuadIndexBuffer = nullptr;
+  std::shared_ptr<IndexBufferProxy> rRectFillIndexBuffer = nullptr;
+  std::shared_ptr<IndexBufferProxy> rRectStrokeIndexBuffer = nullptr;
+  ResourceKeyMap<std::shared_ptr<Resource>> staticResources = {};
 
   void releaseAll();
 
