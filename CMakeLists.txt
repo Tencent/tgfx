@@ -535,6 +535,40 @@ if (TGFX_BUILD_DRAWERS)
     target_link_libraries(tgfx-drawers)
 endif ()
 
+# -------------------------------------------------------------------------
+
+# 安装库文件
+install(TARGETS tgfx
+    EXPORT tgfxTargets
+    LIBRARY DESTINATION lib
+    ARCHIVE DESTINATION lib
+    RUNTIME DESTINATION bin
+    INCLUDES DESTINATION include
+)
+
+# 安装头文件
+install(DIRECTORY include/
+    DESTINATION include
+    FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
+)
+
+# 如果启用了drawers库，也安装它
+if (TGFX_BUILD_DRAWERS)
+    install(TARGETS tgfx-drawers
+        EXPORT tgfxTargets
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib
+        RUNTIME DESTINATION bin
+    )
+    
+    install(DIRECTORY drawers/include/
+        DESTINATION include
+        FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
+    )
+endif()
+
+# -------------------------------------------------------------------------
+
 if (TGFX_BUILD_TESTS)
     execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE HEAD_COMMIT)
     file(WRITE ${CMAKE_CURRENT_SOURCE_DIR}/test/baseline/.cache/HEAD "${HEAD_COMMIT}")
