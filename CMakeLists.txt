@@ -552,13 +552,13 @@ if(TGFX_BUILD_VCPKG)
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib
         RUNTIME DESTINATION bin
-        INCLUDES DESTINATION include
     )
 
-    # 安装头文件
+    # 只为Release配置安装头文件
     install(DIRECTORY include/
         DESTINATION include
         FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
+        CONFIGURATIONS Release
     )
 
     # 生成并安装CMake配置文件
