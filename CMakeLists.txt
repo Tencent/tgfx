@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13)
-project(TGFX)
+project(TGFX VERSION 0.0.0)
 
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 include(./third_party/vendor_tools/vendor.cmake)
@@ -25,6 +25,8 @@ option(TGFX_USE_FASTER_BLUR "Enable a faster blur algorithm instead of the stand
 # multiple flush() calls in a single frame, as it may cause screen tearing, where parts of the
 # screen update while others do not.
 option(TGFX_USE_ASYNC_PROMISE "Enable async promises for loading images on the web" OFF)
+
+option(TGFX_BUILD_VCPKG "Enable vcpkg package manager support for installation" OFF)
 
 # EMSCRIPTEN_PTHREADS can be set by vendor tools for building the wasm-mt architecture.
 if (NOT WEB OR EMSCRIPTEN_PTHREADS)
@@ -537,35 +539,49 @@ endif ()
 
 # -------------------------------------------------------------------------
 
-# 安装库文件
-install(TARGETS tgfx
-    EXPORT tgfxTargets
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-    RUNTIME DESTINATION bin
-    INCLUDES DESTINATION include
-)
-
-# 安装头文件
-install(DIRECTORY include/
-    DESTINATION include
-    FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
-)
-
-# 如果启用了drawers库，也安装它
-if (TGFX_BUILD_DRAWERS)
-    install(TARGETS tgfx-drawers
+if(TGFX_BUILD_VCPKG)
+    # 安装库文件
+    install(TARGETS tgfx
         EXPORT tgfxTargets
         LIBRARY DESTINATION lib
         ARCHIVE DESTINATION lib
         RUNTIME DESTINATION bin
+        INCLUDES DESTINATION include
     )
-    
-    install(DIRECTORY drawers/include/
+
+    # 安装头文件
+    install(DIRECTORY include/
         DESTINATION include
         FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
     )
-endif()
+
+    # 生成并安装CMake配置文件
+    install(EXPORT tgfxTargets
+        FILE tgfxTargets.cmake
+        NAMESPACE tgfx::
+        DESTINATION lib/cmake/tgfx
+    )
+
+    # 创建配置文件
+    include(CMakePackageConfigHelpers)
+    write_basic_package_version_file(
+        tgfxConfigVersion.cmake
+        VERSION ${PROJECT_VERSION}
+        COMPATIBILITY AnyNewerVersion
+    )
+
+    configure_package_config_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/tgfxConfig.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/tgfxConfig.cmake
+        INSTALL_DESTINATION share/tgfx
+    )
+
+    install(FILES
+        ${CMAKE_CURRENT_BINARY_DIR}/tgfxConfig.cmake
+        ${CMAKE_CURRENT_BINARY_DIR}/tgfxConfigVersion.cmake
+        DESTINATION share/tgfx
+    )
+endif ()
 
 # -------------------------------------------------------------------------
 
