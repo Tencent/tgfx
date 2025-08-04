@@ -522,7 +522,7 @@ target_compile_options(tgfx PUBLIC ${TGFX_COMPILE_OPTIONS})
 target_include_directories(tgfx 
     PUBLIC 
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
-        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
+        $<INSTALL_INTERFACE:include>
     PRIVATE 
         src
 )
