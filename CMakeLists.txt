@@ -522,6 +522,7 @@ target_compile_options(tgfx PUBLIC ${TGFX_COMPILE_OPTIONS})
 target_include_directories(tgfx 
     PUBLIC 
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
     PRIVATE 
         src
 )
@@ -552,6 +553,11 @@ if(TGFX_BUILD_VCPKG)
         ARCHIVE DESTINATION lib
         RUNTIME DESTINATION bin
         INCLUDES DESTINATION include
+    )
+
+    install(DIRECTORY include/
+        DESTINATION include
+        FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
     )
 
     # 生成并安装CMake配置文件
