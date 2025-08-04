@@ -519,7 +519,13 @@ add_library(tgfx STATIC ${TGFX_FILES})
 add_dependencies(tgfx tgfx-vendor)
 target_compile_definitions(tgfx PUBLIC ${TGFX_DEFINES})
 target_compile_options(tgfx PUBLIC ${TGFX_COMPILE_OPTIONS})
-target_include_directories(tgfx PUBLIC include PRIVATE src)
+target_include_directories(tgfx 
+    PUBLIC 
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+    PRIVATE 
+        src
+)
 target_include_directories(tgfx SYSTEM PRIVATE ${TGFX_INCLUDES})
 merge_libraries_into(tgfx ${TGFX_STATIC_LIBS})
 target_link_libraries(tgfx ${TGFX_SHARED_LIBS})
