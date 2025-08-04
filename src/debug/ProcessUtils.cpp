@@ -37,8 +37,8 @@
 
 #include <cinttypes>
 #include <cstddef>
-#include <string>
 #include <cstring>
+#include <string>
 #include "ProcessUtils.h"
 
 namespace inspector {
