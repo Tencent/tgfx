@@ -81,7 +81,7 @@ void SimpleTextLayer::onUpdateContent(tgfx::LayerRecorder* recorder) {
   auto linePaint = tgfx::Paint();
   linePaint.setColor(tgfx::Color::Black());
   linePaint.setStyle(tgfx::PaintStyle::Stroke);
-  linePaint.setStrokeWidth(1.5f);
+  linePaint.setStrokeWidth(1.0f);
   for (auto& richText : richTexts) {
     for (const auto& [left, right, linePosition] : richText.underline) {
       canvas->drawLine(left, linePosition, right, linePosition, linePaint);
@@ -143,12 +143,12 @@ void SimpleTextLayer::invalidateLayout() {
 
   // Calculate position for each richText and record text lines
   auto xOffset = 0.f;
-  auto lineIndex = 0;
+  size_t lineIndex = 0;
   for (auto& richText : richTexts) {
     if (richText.type == Element::Text) {
       std::vector<tgfx::GlyphID> glyphs = {};
       std::vector<tgfx::Point> positions = {};
-      int index = 0;
+      size_t index = 0;
       const char* textStart = richText.text.data();
       const char* textStop = textStart + richText.text.size();
       auto font = richText.font;
@@ -210,12 +210,12 @@ void SimpleTextLayer::invalidateLayout() {
   }
 }
 
-std::shared_ptr<tgfx::Layer> MakeDebugLayer(std::shared_ptr<tgfx::Layer>& root) {
+std::shared_ptr<tgfx::Layer> MakeDebugLayer(std::shared_ptr<tgfx::Layer>& root,const tgfx::Color& color = {1, 0, 0, 0.5}) {
   auto bounds = root->getBounds(nullptr, true);
   auto layer = tgfx::ShapeLayer::Make();
   tgfx::Path path;
   path.addRect(bounds);
-  layer->setFillStyle(tgfx::SolidColor::Make({1, 0, 0, 0.5}));
+  layer->setFillStyle(tgfx::SolidColor::Make(color));
   layer->setPath(path);
   return layer;
 }
@@ -223,11 +223,8 @@ std::shared_ptr<tgfx::Layer> MakeDebugLayer(std::shared_ptr<tgfx::Layer>& root) 
 std::shared_ptr<tgfx::Layer> SimpleText::buildLayerTree(const AppHost* host) {
   auto root = tgfx::Layer::Make();
 
-  auto scale = host->density();
-  padding = 50.f * scale;
-  auto width = static_cast<float>(host->width());
-  auto screenWidth = width - padding * 2;
-  screenWidth = std::max(screenWidth, 300.0f);
+  padding = 50.f;
+  auto screenWidth = 600.f;
 
   std::vector<std::string> texts = {"HelloTGFX!", "\nTGFX",
                                     "(Tencent Graphics) is a lightweight 2D graphics \nlibrary for "
@@ -236,26 +233,26 @@ std::shared_ptr<tgfx::Layer> SimpleText::buildLayerTree(const AppHost* host) {
 
   std::vector<tgfx::Font> fonts;
   auto typeface = host->getTypeface("default");
-  tgfx::Font font(typeface, 40 * scale);
+  tgfx::Font font(typeface, 60);
   font.setFauxBold(true);
   fonts.push_back(font);
-  font = tgfx::Font(typeface, 14 * scale);
+  font = tgfx::Font(typeface, 21);
   font.setFauxBold(true);
   fonts.push_back(font);
-  font = tgfx::Font(typeface, 10 * scale);
+  font = tgfx::Font(typeface, 15);
   font.setFauxBold(false);
   font.setFauxItalic(true);
   fonts.push_back(font);
   typeface = host->getTypeface("emoji");
-  font = tgfx::Font(typeface, 20 * scale);
+  font = tgfx::Font(typeface, 30);
   fonts.push_back(font);
 
   std::vector<tgfx::Paint> paints;
   tgfx::Paint paint = {};
   paint.setColor({1.0f, 1.0f, 1.0f, 1.0f});
   paint.setStyle(tgfx::PaintStyle::Stroke);
-  paint.setStrokeWidth(2 * scale);
-  strokeOffset = 2 * scale;
+  paint.setStrokeWidth(2);
+  //strokeOffset = 2;
   paints.push_back(paint);
   paint = {};
   paint.setStyle(tgfx::PaintStyle::Fill);
@@ -263,7 +260,7 @@ std::shared_ptr<tgfx::Layer> SimpleText::buildLayerTree(const AppHost* host) {
   tgfx::Color magenta = {1.0f, 0.0f, 1.0f, 1.0f};
   tgfx::Color yellow = {1.0f, 1.0f, 0.0f, 1.0f};
   auto startPoint = tgfx::Point::Make(0.0f, 0.0f);
-  auto endPoint = tgfx::Point::Make(800.f, 0.0f);
+  auto endPoint = tgfx::Point::Make(600.f, 0.0f);
   auto shader = tgfx::Shader::MakeLinearGradient(startPoint, endPoint, {cyan, magenta, yellow}, {});
   paint.setShader(shader);
   paints.push_back(paint);
@@ -276,7 +273,8 @@ std::shared_ptr<tgfx::Layer> SimpleText::buildLayerTree(const AppHost* host) {
   auto image = host->getImage("TGFX");
   image->makeMipmapped(true);
   element.image = image;
-  element.height = 36.f * scale;
+  auto textHeight = ceil(fonts[0].getSize() * 0.8f);
+  element.height = textHeight;
   element.width = image->width() * element.height / image->height();
   elements.push_back(element);
   //HelloTGFX!
@@ -305,6 +303,7 @@ std::shared_ptr<tgfx::Layer> SimpleText::buildLayerTree(const AppHost* host) {
   element.text = texts[3];
   element.font = fonts[3];
   element.paints = {paints[2]};
+  elements = {};
   elements.push_back(element);
 
   auto textLayer = SimpleTextLayer::Make();
@@ -316,7 +315,8 @@ std::shared_ptr<tgfx::Layer> SimpleText::buildLayerTree(const AppHost* host) {
   textLayer->setMatrix(matrix);
 
   root->addChild(textLayer);
-  //root->addChild(MakeDebugLayer(root));
+  //The bounds.bottom of emoji text is higher than the correct bottom, so a nearly transparent bounds needs to be added.
+  //root->addChild(MakeDebugLayer(root,{0.f,0.f,0.f,0.0001f}));
   return root;
 }
 

@@ -63,6 +63,9 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     NSString* imagePath = [[NSBundle mainBundle] pathForResource:@"bridge" ofType:@"jpg"];
     auto image = tgfx::Image::MakeFromFile(imagePath.UTF8String);
     appHost->addImage("bridge", image);
+    imagePath = [[NSBundle mainBundle] pathForResource:@"tgfx" ofType:@"png"];
+      image = tgfx::Image::MakeFromFile(imagePath.UTF8String);
+      appHost->addImage("bridge", image);
     auto typeface = tgfx::Typeface::MakeFromName("PingFang SC", "");
     appHost->addTypeface("default", typeface);
     typeface = tgfx::Typeface::MakeFromName("Apple Color Emoji", "");
@@ -155,16 +158,16 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     device->unlock();
     return;
   }
-  appHost->updateZoomAndOffset(self.zoomScale,
-                               tgfx::Point(self.contentOffset.x, self.contentOffset.y));
+//  appHost->updateZoomAndOffset(self.zoomScale,
+//                               tgfx::Point(self.contentOffset.x, self.contentOffset.y));
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto numDrawers = drawers::Drawer::Count() - 1;
-  int index = (self.drawIndex % numDrawers) + 1;
-  auto drawer = drawers::Drawer::GetByName("GridBackground");
-  drawer->draw(canvas, appHost.get());
-  drawer = drawers::Drawer::GetByIndex(index);
-  drawer->draw(canvas, appHost.get());
+  drawers::Drawer::DrawBackground(canvas, appHost.get());
+  auto drawer = drawers::Drawer::GetByIndex(self.drawIndex % drawers::Drawer::Count());
+  drawer->displayList.setZoomScale(self.zoomScale);
+  drawer->displayList.setContentOffset(static_cast<float>(self.contentOffset.x), static_cast<float>(self.contentOffset.y));
+  drawer->build(appHost.get());
+  drawer->displayList.render(canvas->getSurface(), false);
   context->flushAndSubmit();
   tgfxWindow->present(context);
   device->unlock();

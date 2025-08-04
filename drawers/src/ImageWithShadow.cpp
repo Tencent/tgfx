@@ -26,8 +26,8 @@ namespace drawers {
 std::shared_ptr<tgfx::Layer> ImageWithShadow::buildLayerTree(const drawers::AppHost* host) {
   auto root = tgfx::Layer::Make();
   auto scale = host->density();
-  // The value 57 is the DropShadowFilter bound width
-  padding = 75.f * scale - 57;
+  // The value 53 is the DropShadowFilter bound width
+  padding = 75.f * scale - 53;
   auto width = host->width();
   auto height = host->height();
   auto screenSize = std::min(width, height);
@@ -43,7 +43,7 @@ std::shared_ptr<tgfx::Layer> ImageWithShadow::buildLayerTree(const drawers::AppH
   imageLayer->setImage(image);
   auto matrix =
       tgfx::Matrix::MakeScale(static_cast<float>(size) / static_cast<float>(image->width()));
-  matrix.postTranslate(57, 57);
+  matrix.postTranslate(53, 53);
   auto maskLayer = tgfx::ShapeLayer::Make();
   maskLayer->setFillStyle(tgfx::SolidColor::Make());
   auto maskPath = tgfx::Path();
@@ -56,7 +56,7 @@ std::shared_ptr<tgfx::Layer> ImageWithShadow::buildLayerTree(const drawers::AppH
   root->addChild(imageLayer);
   root->addChild(maskLayer);
   root->setFilters(
-      {tgfx::DropShadowFilter::Make(0, 0, 50 * scale, 50 * scale, tgfx::Color::Black())});
+      {tgfx::DropShadowFilter::Make(0, 0, 70, 70, tgfx::Color::Black())});
   return root;
 }
 }  // namespace drawers
