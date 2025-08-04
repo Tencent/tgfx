@@ -157,7 +157,7 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     Blur1D(std::move(sourceFragment), renderTarget, blurrinessX * scaleFactorX,
            GaussianBlurDirection::Horizontal, 1.0f, args.renderFlags);
   } else if (blurrinessY > 0) {
-    Blur1D(std::move(sourceFragment), renderTarget, blurrinessY * scaleFactorX,
+    Blur1D(std::move(sourceFragment), renderTarget, blurrinessY * scaleFactorY,
            GaussianBlurDirection::Vertical, 1.0f, args.renderFlags);
   }
 

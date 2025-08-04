@@ -118,9 +118,12 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
 std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args,
                                                              Point* textureScales) const {
   auto scales = Point::Make(1.0f, 1.0f);
-  auto size = getScaledSize(args.drawScales, &scales);
+  auto scaledWidth = roundf(static_cast<float>(_width) * scales.x);
+  auto scaledHeight = roundf(static_cast<float>(_height) * scales.y);
+  scales = Point::Make(scaledWidth / static_cast<float>(_width),
+                       scaledHeight / static_cast<float>(_height));
   auto renderTarget = RenderTargetProxy::MakeFallback(
-      args.context, static_cast<int>(size.width), static_cast<int>(size.height), isAlphaOnly(), 1,
+      args.context, static_cast<int>(scaledWidth), static_cast<int>(scaledHeight), isAlphaOnly(), 1,
       hasMipmaps() && args.mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
   if (renderTarget == nullptr) {
     return nullptr;

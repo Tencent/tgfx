@@ -223,16 +223,6 @@ std::shared_ptr<Image> Image::onMakeScaled(int newWidth, int newHeight,
   return ScaledImage::MakeFrom(weakThis.lock(), newWidth, newHeight, sampling);
 }
 
-Size Image::getScaledSize(const Point& scales, Point* acturalScales) const {
-  auto scaledWidth = roundf(static_cast<float>(width()) * scales.x);
-  auto scaledHeight = roundf(static_cast<float>(height()) * scales.y);
-  if (acturalScales) {
-    *acturalScales = Point::Make(scaledWidth / static_cast<float>(width()),
-                                 scaledHeight / static_cast<float>(height()));
-  }
-  return Size::Make(scaledWidth, scaledHeight);
-}
-
 std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
                                          int alphaStartY) const {
   if (alphaStartX == 0 && alphaStartY == 0) {

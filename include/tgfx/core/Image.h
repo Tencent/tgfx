@@ -333,8 +333,6 @@ class Image {
   virtual std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
                                               const SamplingOptions& sampling) const;
 
-  virtual Size getScaledSize(const Point& scales, Point* acturalScales = nullptr) const;
-
   /**
    * Returns a texture proxy for the entire Image.
    * @param args The TPArgs used to create the texture proxy.
