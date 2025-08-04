@@ -135,10 +135,13 @@ extern int ResizeAreaFastx2SIMDFunc(int channelNum, int step, const uint8_t* src
                                   uint8_t* dstData, int w, int padding, int shiftNum);
 
 extern int ResizeAreaFastx4SIMDFunc(int channelNum, int step, const uint8_t* srcData,
-                                  uint8_t* dstData, int w, int padding, int shiftNum);
+                                  uint8_t* dstData, int w, int scale, int padding, int shiftNum);
 
 extern int ResizeAreaFastx8SIMDFunc(int channelNum, int step, const uint8_t* srcData,
-                                  uint8_t* dstData, int w, int padding, int shiftNum);
+                                  uint8_t* dstData, int w, int scale, int padding, int shiftNum);
+
+extern int ResizeAreaFastxNSimdFunc(int channelNum, int step, const uint8_t* srcData,
+                                  uint8_t* dstData, int w, int scale, int padding, int shiftNum);
 
 static bool IsPowerOfTwo(int n) {
   return (n > 0) && ((n & (n - 1)) == 0);
@@ -171,11 +174,13 @@ struct ResizeAreaFastVec {
           dstX = ResizeAreaFastx2SIMDFunc(channelNum, step, srcData, dstData, w, padding, shiftNum);
           break;
         case 4:
-          dstX = ResizeAreaFastx4SIMDFunc(channelNum, step, srcData, dstData, w, padding, shiftNum);
+          dstX = ResizeAreaFastx4SIMDFunc(channelNum, step, srcData, dstData, w, scaleX, padding, shiftNum);
           break;
         case 8:
-          dstX = ResizeAreaFastx8SIMDFunc(channelNum, step, srcData, dstData, w, padding, shiftNum);
+          dstX = ResizeAreaFastx8SIMDFunc(channelNum, step, srcData, dstData, w, scaleX, padding, shiftNum);
           break;
+        default:
+          dstX = ResizeAreaFastxNSimdFunc(channelNum, step, srcData, dstData, w, scaleX, padding, shiftNum);
       }
       if (channelNum == 1) {
         for (; dstX < w; ++dstX) {
@@ -187,7 +192,7 @@ struct ResizeAreaFastVec {
               sum += data[index + j];
             }
           }
-          dstData[dstX] = (sum + padding) >> shiftNum;
+          dstData[dstX] = static_cast<uint8_t>((sum + padding) >> shiftNum);
         }
       } else {
         ASSERT(channelNum == 4);
@@ -203,10 +208,10 @@ struct ResizeAreaFastVec {
               sum[3] += data[index + 4 * j + 3];
             }
           }
-          dstData[dstX] = (sum[0] + padding) >> shiftNum;
-          dstData[dstX + 1] = (sum[1] + padding) >> shiftNum;
-          dstData[dstX + 2] = (sum[2] + padding) >> shiftNum;
-          dstData[dstX + 3] = (sum[3] + padding) >> shiftNum;
+          dstData[dstX] = static_cast<uint8_t>((sum[0] + padding) >> shiftNum);
+          dstData[dstX + 1] = static_cast<uint8_t>((sum[1] + padding) >> shiftNum);
+          dstData[dstX + 2] = static_cast<uint8_t>((sum[2] + padding) >> shiftNum);
+          dstData[dstX + 3] = static_cast<uint8_t>((sum[3] + padding) >> shiftNum);
         }
       }
     }

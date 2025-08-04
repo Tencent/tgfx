@@ -27,32 +27,89 @@
 
 // Must come after foreach_target.h to avoid redefinition errors.
 #include "hwy/highway.h"
+#include "hwy/aligned_allocator.h"
 
 HWY_BEFORE_NAMESPACE();
 namespace tgfx {
 namespace HWY_NAMESPACE {
 namespace hn = hwy::HWY_NAMESPACE;
+
+int ResizeAreaFast4chxNSIMDFuncImpl(int step, const uint8_t* srcData, uint8_t* dstData, int w, int padding, int scale, int shiftNum) {
+  HWY_ASSERT(scale >= 4);
+  int dstX = 0;
+  hn::Full128<uint8_t> du8;
+  hn::Full128<uint16_t> du16;
+  hn::Full64<uint16_t> duh16;
+  hn::Full32<uint8_t> duh8;
+  auto value = hn::Set(duh16, padding);
+  size_t n = static_cast<size_t>(scale / 4);
+  for(; dstX <= w - 4; dstX += 4, srcData += hn::Lanes(du8) * n, dstData += 4) {
+    std::vector<hn::Vec<decltype(du8)>> rowData(static_cast<size_t>(scale) * n);
+
+    for(size_t i = 0; i < static_cast<size_t>(scale); i++) {
+      for(size_t j = 0; j < n; j++) {
+        rowData[i * n + j] = hn::Load(du8, srcData + i * static_cast<size_t>(step) + j * hn::Lanes(du8));
+      }
+    }
+
+    auto sum = hn::Set(du16,0);
+    for(size_t i = 0; i < n; i++) {
+      for(size_t j = 0; j < static_cast<size_t>(scale); j++) {
+        auto low = hn::PromoteLowerTo(du16, rowData[j * n + i]);
+        auto high = hn::PromoteUpperTo(du16, rowData[j * n + i]);
+        sum = hn::Add(hn::Add(low, high), sum);
+      }
+    }
+    auto vDst = hn::ShiftRightSame(hn::Add(hn::Add(hn::LowerHalf(duh16, sum), hn::UpperHalf(duh16, sum)), value), shiftNum);
+    auto res = hn::DemoteTo(duh8, vDst);
+    hn::Store(res, duh8, dstData);
+  }
+  return dstX;
+}
+
+int ResizeAreaFast1chxNSIMDFuncImpl(int step, const uint8_t* srcData, uint8_t* dstData, int w, int padding, int scale, int shiftNum) {
+  HWY_ASSERT(scale >= 16);
+  int dstX = 0;
+  hn::Full128<uint8_t> du8;
+  hn::Full128<uint16_t> du16;
+  size_t n = static_cast<size_t>(scale / 16);
+  for(; dstX <= w - 1; dstX += 1, srcData += n * hn::Lanes(du8), dstData += 1) {
+    auto sum = hn::Set(du16, 0);
+    for(size_t i = 0; i < n; i++) {
+      for(size_t j = 0; j < static_cast<size_t>(scale); j++) {
+        auto row = hn::Load(du8, srcData + j * static_cast<size_t>(step) + i * hn::Lanes(du8));
+        auto low = hn::PromoteLowerTo(du16, row);
+        auto high = hn::PromoteUpperTo(du16, row);
+        sum = hn::Add(hn::Add(low, high), sum);
+      }
+    }
+    auto res = (hn::ReduceSum(du16, sum) + padding) >> shiftNum;
+    dstData[0] = static_cast<uint8_t>(res);
+  }
+  return dstX;
+}
+
 int ResizeAreaFastx2SIMDFuncImpl(int channelNum, int step, const uint8_t* srcData, uint8_t* dstData,
-                               int w, int padding) {
+                               int w, int padding, int shiftNum) {
   int dstX = 0;
   const uint8_t* srcData0 = srcData;
   const uint8_t* srcData1 = srcData0 + step;
-  hn::ScalableTag<uint8_t> du8;
-  hn::ScalableTag<uint16_t> du16;
-  const int n = static_cast<int>(hn::Lanes(du8));
-  auto value = hn::Set(du16, padding);
   if (channelNum == 1) {
+    hn::ScalableTag<uint8_t> du8;
+    hn::ScalableTag<uint16_t> du16;
+    const int n = static_cast<int>(hn::Lanes(du8));
+    auto value = hn::Set(du16, padding);
     for (; dstX <= w - n; dstX += n, srcData0 += 2 * n, srcData1 += 2 * n, dstData += n) {
       hn::Vec<decltype(du8)> row00, row01, row10, row11;
       hn::LoadInterleaved2(du8, srcData0, row00, row01);
       hn::LoadInterleaved2(du8, srcData1, row10, row11);
       auto vDst00 = hn::Add(hn::PromoteLowerTo(du16, row00), hn::PromoteLowerTo(du16, row01));
       auto vDst10 = hn::Add(hn::PromoteLowerTo(du16, row10), hn::PromoteLowerTo(du16, row11));
-      auto vDst0 = hn::ShiftRight<2>(hn::Add(hn::Add(vDst00, vDst10), value));
+      auto vDst0 = hn::ShiftRightSame(hn::Add(hn::Add(vDst00, vDst10), value), shiftNum);
 
       auto vDst01 = hn::Add(hn::PromoteUpperTo(du16, row00), hn::PromoteUpperTo(du16, row01));
       auto vDst11 = hn::Add(hn::PromoteUpperTo(du16, row10), hn::PromoteUpperTo(du16, row11));
-      auto vDst1 = hn::ShiftRight<2>(hn::Add(hn::Add(vDst01, vDst11), value));
+      auto vDst1 = hn::ShiftRightSame(hn::Add(hn::Add(vDst01, vDst11), value), shiftNum);
       auto dstValue = hn::OrderedDemote2To(du8, vDst0, vDst1);
       hn::Store(dstValue, du8, dstData);
     }
@@ -69,13 +126,11 @@ int ResizeAreaFastx2SIMDFuncImpl(int channelNum, int step, const uint8_t* srcDat
       auto vRow01 = hn::PromoteUpperTo(fix128Du16, vRow0);
       auto vRow10 = hn::PromoteLowerTo(fix128Du16, vRow1);
       auto vRow11 = hn::PromoteUpperTo(fix128Du16, vRow1);
-      auto vP0 =
-          hn::Add(hn::Add(hn::LowerHalf(fix64Du16, vRow00), hn::UpperHalf(fix64Du16, vRow00)),
-                  hn::Add(hn::LowerHalf(fix64Du16, vRow10), hn::UpperHalf(fix64Du16, vRow10)));
-      auto vP1 =
-          hn::Add(hn::Add(hn::LowerHalf(fix64Du16, vRow01), hn::UpperHalf(fix64Du16, vRow01)),
-                  hn::Add(hn::LowerHalf(fix64Du16, vRow11), hn::UpperHalf(fix64Du16, vRow11)));
-      auto vDst = hn::ShiftRight<2>(hn::Add(hn::Combine(fix128Du16, vP1, vP0), fixValue));
+      auto vP0 = hn::Add(vRow00, vRow10);
+      auto vDst0 = hn::Add(hn::LowerHalf(fix64Du16, vP0), hn::UpperHalf(fix64Du16, vP0));
+      auto vP1 = hn::Add(vRow01, vRow11);
+      auto vDst1 =hn::Add(hn::LowerHalf(fix64Du16, vP1), hn::UpperHalf(fix64Du16, vP1));
+      auto vDst = hn::ShiftRightSame(hn::Add(hn::Combine(fix128Du16, vDst1, vDst0), fixValue), shiftNum);
       auto res = hn::DemoteTo(fix64Du8, vDst);
       hn::Store(res, fix64Du8, dstData);
     }
@@ -84,17 +139,17 @@ int ResizeAreaFastx2SIMDFuncImpl(int channelNum, int step, const uint8_t* srcDat
 }
 
 int ResizeAreaFastx4SIMDFuncImpl(int channelNum, int step, const uint8_t* srcData, uint8_t* dstData,
-                               int w, int padding) {
+                               int w, int scale, int padding, int shiftNum) {
   int dstX = 0;
-  const uint8_t* srcData0 = srcData;
-  const uint8_t* srcData1 = srcData0 + step;
-  const uint8_t* srcData2 = srcData1 + step;
-  const uint8_t* srcData3 = srcData2 + step;
-  hn::ScalableTag<uint8_t> du8;
-  hn::ScalableTag<uint16_t> du16;
-  const int n = static_cast<int>(hn::Lanes(du8));
-  auto value = hn::Set(du16, padding);
   if (channelNum == 1) {
+    const uint8_t* srcData0 = srcData;
+    const uint8_t* srcData1 = srcData0 + step;
+    const uint8_t* srcData2 = srcData1 + step;
+    const uint8_t* srcData3 = srcData2 + step;
+    hn::ScalableTag<uint8_t> du8;
+    hn::ScalableTag<uint16_t> du16;
+    const int n = static_cast<int>(hn::Lanes(du8));
+    auto value = hn::Set(du16, padding);
     for (; dstX <= w - n; dstX += n, srcData0 += 4 * n, srcData1 += 4 * n, srcData2 += 4 * n, srcData3 += 4 * n, dstData += n) {
       hn::Vec<decltype(du8)> row[4][4];
       hn::LoadInterleaved4(du8, srcData0, row[0][0], row[0][1], row[0][2], row[0][3]);
@@ -105,130 +160,54 @@ int ResizeAreaFastx4SIMDFuncImpl(int channelNum, int step, const uint8_t* srcDat
       auto vDst10 = hn::Add(hn::Add(hn::PromoteLowerTo(du16, row[1][0]), hn::PromoteLowerTo(du16, row[1][1])), hn::Add(hn::PromoteLowerTo(du16, row[1][2]), hn::PromoteLowerTo(du16, row[1][3])));
       auto vDst20 = hn::Add(hn::Add(hn::PromoteLowerTo(du16, row[2][0]), hn::PromoteLowerTo(du16, row[2][1])), hn::Add(hn::PromoteLowerTo(du16, row[2][2]), hn::PromoteLowerTo(du16, row[2][3])));
       auto vDst30 = hn::Add(hn::Add(hn::PromoteLowerTo(du16, row[3][0]), hn::PromoteLowerTo(du16, row[3][1])), hn::Add(hn::PromoteLowerTo(du16, row[3][2]), hn::PromoteLowerTo(du16, row[3][3])));
-      auto vDst0 = hn::ShiftRight<4>(hn::Add(hn::Add(hn::Add(vDst00, vDst10), hn::Add(vDst20, vDst30)), value));
+      auto vDst0 = hn::ShiftRightSame(hn::Add(hn::Add(hn::Add(vDst00, vDst10), hn::Add(vDst20, vDst30)), value), shiftNum);
 
       auto vDst01 = hn::Add(hn::Add(hn::PromoteUpperTo(du16, row[0][0]), hn::PromoteUpperTo(du16, row[0][1])), hn::Add(hn::PromoteUpperTo(du16, row[0][2]), hn::PromoteUpperTo(du16, row[0][3])));
       auto vDst11 = hn::Add(hn::Add(hn::PromoteUpperTo(du16, row[1][0]), hn::PromoteUpperTo(du16, row[1][1])), hn::Add(hn::PromoteUpperTo(du16, row[1][2]), hn::PromoteUpperTo(du16, row[1][3])));
       auto vDst21 = hn::Add(hn::Add(hn::PromoteUpperTo(du16, row[2][0]), hn::PromoteUpperTo(du16, row[2][1])), hn::Add(hn::PromoteUpperTo(du16, row[2][2]), hn::PromoteUpperTo(du16, row[2][3])));
       auto vDst31 = hn::Add(hn::Add(hn::PromoteUpperTo(du16, row[3][0]), hn::PromoteUpperTo(du16, row[3][1])), hn::Add(hn::PromoteUpperTo(du16, row[3][2]), hn::PromoteUpperTo(du16, row[3][3])));
-      auto vDst1 = hn::ShiftRight<4>(hn::Add(hn::Add(hn::Add(vDst01, vDst11), hn::Add(vDst21, vDst31)), value));
+      auto vDst1 = ShiftRightSame(hn::Add(hn::Add(hn::Add(vDst01, vDst11), hn::Add(vDst21, vDst31)), value), shiftNum);
       auto dstValue = hn::OrderedDemote2To(du8, vDst0, vDst1);
       hn::Store(dstValue, du8, dstData);
     }
   } else if (channelNum == 4) {
-    hn::Full128<uint8_t> fix128Du8;
-    hn::Full64<uint8_t> fix64Du8;
-    hn::Full128<uint16_t> fix128Du16;
-    hn::Full64<uint16_t> fix64Du16;
-    hn::Full32<uint8_t> fix32Du8;
-    auto fixValue = hn::Set(fix64Du16, padding);
-    for (; dstX <= w - 4; dstX += 4, srcData0 += 16, srcData1 += 16, srcData2 += 16, srcData3 += 16, dstData += 4) {
-      auto vRow0 = hn::Load(fix128Du8, srcData0);
-      auto vRow1 = hn::Load(fix128Du8, srcData1);
-      auto vRow2 = hn::Load(fix128Du8, srcData2);
-      auto vRow3 = hn::Load(fix128Du8, srcData3);
-
-      auto vRow00 = hn::PromoteLowerTo(fix128Du16, vRow0);
-      auto vRow01 = hn::PromoteUpperTo(fix128Du16, vRow0);
-      auto vRow10 = hn::PromoteLowerTo(fix128Du16, vRow1);
-      auto vRow11 = hn::PromoteUpperTo(fix128Du16, vRow1);
-      auto vRow20 = hn::PromoteLowerTo(fix128Du16, vRow2);
-      auto vRow21 = hn::PromoteUpperTo(fix128Du16, vRow2);
-      auto vRow30 = hn::PromoteLowerTo(fix128Du16, vRow3);
-      auto vRow31 = hn::PromoteUpperTo(fix128Du16, vRow3);
-
-      auto vP0 = hn::Add(
-          hn::Add(hn::Add(hn::LowerHalf(fix64Du16, vRow00), hn::UpperHalf(fix64Du16, vRow00)),
-                  hn::Add(hn::LowerHalf(fix64Du16, vRow10), hn::UpperHalf(fix64Du16, vRow10))),
-          hn::Add(hn::Add(hn::LowerHalf(fix64Du16, vRow20), hn::UpperHalf(fix64Du16, vRow20)),
-                  hn::Add(hn::LowerHalf(fix64Du16, vRow30), hn::UpperHalf(fix64Du16, vRow30))));
-
-      auto vP1 = hn::Add(
-          hn::Add(hn::Add(hn::LowerHalf(fix64Du16, vRow01), hn::UpperHalf(fix64Du16, vRow01)),
-                  hn::Add(hn::LowerHalf(fix64Du16, vRow11), hn::UpperHalf(fix64Du16, vRow11))),
-          hn::Add(hn::Add(hn::LowerHalf(fix64Du16, vRow21), hn::UpperHalf(fix64Du16, vRow21)),
-                  hn::Add(hn::LowerHalf(fix64Du16, vRow31), hn::UpperHalf(fix64Du16, vRow31))));
-      auto vDst = hn::ShiftRight<4>(hn::Add(hn::Add(vP1, vP0), fixValue));
-      auto res = hn::DemoteTo(fix32Du8, vDst);
-      hn::Store(res, fix32Du8, dstData);
-    }
+    dstX = ResizeAreaFast4chxNSIMDFuncImpl(step, srcData, dstData, w, padding, scale, shiftNum);
   }
   return dstX;
 }
 
 int ResizeAreaFastx8SIMDFuncImpl(int channelNum, int step, const uint8_t* srcData, uint8_t* dstData,
-                               int w, int padding) {
+                               int w, int scale, int padding, int shiftNum) {
   int dstX = 0;
-  const uint8_t* srcData0 = srcData;
-  const uint8_t* srcData1 = srcData0 + step;
-  const uint8_t* srcData2 = srcData1 + step;
-  const uint8_t* srcData3 = srcData2 + step;
-  const uint8_t* srcData4 = srcData3 + step;
-  const uint8_t* srcData5 = srcData4 + step;
-  const uint8_t* srcData6 = srcData5 + step;
-  const uint8_t* srcData7 = srcData6 + step;
-  hn::ScalableTag<uint8_t> du8;
-  hn::ScalableTag<uint16_t> du16;
-  const int n = static_cast<int>(hn::Lanes(du8));
-  auto value = hn::Set(du16, padding);
   if (channelNum == 1) {
-    for (; dstX <= w - n / 2; dstX += n / 2, srcData0 += 4 * n, srcData1 += 4 * n, srcData2 += 4 * n, srcData3 += 4 * n, srcData4 += 4 * n, srcData5 += 4 * n, srcData6 += 4 * n, srcData7 += 4 * n, dstData += n / 2) {
-      hn::Vec<decltype(du8)> row[4][4];
-      hn::LoadInterleaved4(du8, srcData0, row[0][0], row[0][1], row[0][2], row[0][3]);
-      hn::LoadInterleaved4(du8, srcData1, row[1][0], row[1][1], row[1][2], row[1][3]);
-      hn::LoadInterleaved4(du8, srcData2, row[2][0], row[2][1], row[2][2], row[2][3]);
-      hn::LoadInterleaved4(du8, srcData3, row[3][0], row[3][1], row[3][2], row[3][3]);
-      auto vDst00 = hn::Add(hn::Add(hn::PromoteLowerTo(du16, row[0][0]), hn::PromoteLowerTo(du16, row[0][1])), hn::Add(hn::PromoteLowerTo(du16, row[0][2]), hn::PromoteLowerTo(du16, row[0][3])));
-      auto vDst10 = hn::Add(hn::Add(hn::PromoteLowerTo(du16, row[1][0]), hn::PromoteLowerTo(du16, row[1][1])), hn::Add(hn::PromoteLowerTo(du16, row[1][2]), hn::PromoteLowerTo(du16, row[1][3])));
-      auto vDst20 = hn::Add(hn::Add(hn::PromoteLowerTo(du16, row[2][0]), hn::PromoteLowerTo(du16, row[2][1])), hn::Add(hn::PromoteLowerTo(du16, row[2][2]), hn::PromoteLowerTo(du16, row[2][3])));
-      auto vDst30 = hn::Add(hn::Add(hn::PromoteLowerTo(du16, row[3][0]), hn::PromoteLowerTo(du16, row[3][1])), hn::Add(hn::PromoteLowerTo(du16, row[3][2]), hn::PromoteLowerTo(du16, row[3][3])));
-      auto vDst0 = hn::ShiftRight<4>(hn::Add(hn::Add(hn::Add(vDst00, vDst10), hn::Add(vDst20, vDst30)), value));
-
-      auto vDst01 = hn::Add(hn::Add(hn::PromoteUpperTo(du16, row[0][0]), hn::PromoteUpperTo(du16, row[0][1])), hn::Add(hn::PromoteUpperTo(du16, row[0][2]), hn::PromoteUpperTo(du16, row[0][3])));
-      auto vDst11 = hn::Add(hn::Add(hn::PromoteUpperTo(du16, row[1][0]), hn::PromoteUpperTo(du16, row[1][1])), hn::Add(hn::PromoteUpperTo(du16, row[1][2]), hn::PromoteUpperTo(du16, row[1][3])));
-      auto vDst21 = hn::Add(hn::Add(hn::PromoteUpperTo(du16, row[2][0]), hn::PromoteUpperTo(du16, row[2][1])), hn::Add(hn::PromoteUpperTo(du16, row[2][2]), hn::PromoteUpperTo(du16, row[2][3])));
-      auto vDst31 = hn::Add(hn::Add(hn::PromoteUpperTo(du16, row[3][0]), hn::PromoteUpperTo(du16, row[3][1])), hn::Add(hn::PromoteUpperTo(du16, row[3][2]), hn::PromoteUpperTo(du16, row[3][3])));
-      auto vDst1 = hn::ShiftRight<4>(hn::Add(hn::Add(hn::Add(vDst01, vDst11), hn::Add(vDst21, vDst31)), value));
-      auto dstValue = hn::OrderedDemote2To(du8, vDst0, vDst1);
-      hn::Store(dstValue, du8, dstData);
+    hn::Full128<uint8_t> du8;
+    hn::Full128<uint16_t> du16;
+    for (; dstX <= w - 2; dstX += 2, srcData += 16, dstData += 2) {
+      hn::Vec<decltype(du16)> sum0 = hn::Set(du16, 0), sum1 = hn::Set(du16, 0);
+      for(int i= 0; i < 8; i++) {
+        auto row = hn::Load(du8, srcData + i * step);
+        sum0 = hn::Add(sum0, hn::PromoteLowerTo(du16, row));
+        sum1 = hn::Add(sum1, hn::PromoteUpperTo(du16, row));
+      }
+      auto v0 = (hn::ReduceSum(du16, sum0) + padding) >> shiftNum;
+      auto v1 = (hn::ReduceSum(du16, sum1) + padding) >> shiftNum;
+      dstData[0] = static_cast<uint8_t>(v0);
+      dstData[1] = static_cast<uint8_t>(v1);
     }
   } else if (channelNum == 4) {
-    hn::Full128<uint8_t> fix128Du8;
-    hn::Full64<uint8_t> fix64Du8;
-    hn::Full128<uint16_t> fix128Du16;
-    hn::Full64<uint16_t> fix64Du16;
-    hn::Full32<uint8_t> fix32Du8;
-    auto fixValue = hn::Set(fix64Du16, padding);
-    for (; dstX <= w - 4; dstX += 4, srcData0 += 16, srcData1 += 16, srcData2 += 16, srcData3 += 16, dstData += 4) {
-      auto vRow0 = hn::Load(fix128Du8, srcData0);
-      auto vRow1 = hn::Load(fix128Du8, srcData1);
-      auto vRow2 = hn::Load(fix128Du8, srcData2);
-      auto vRow3 = hn::Load(fix128Du8, srcData3);
+    dstX = ResizeAreaFast4chxNSIMDFuncImpl(step, srcData, dstData, w, padding, scale, shiftNum);
+  }
+  return dstX;
+}
 
-      auto vRow00 = hn::PromoteLowerTo(fix128Du16, vRow0);
-      auto vRow01 = hn::PromoteUpperTo(fix128Du16, vRow0);
-      auto vRow10 = hn::PromoteLowerTo(fix128Du16, vRow1);
-      auto vRow11 = hn::PromoteUpperTo(fix128Du16, vRow1);
-      auto vRow20 = hn::PromoteLowerTo(fix128Du16, vRow2);
-      auto vRow21 = hn::PromoteUpperTo(fix128Du16, vRow2);
-      auto vRow30 = hn::PromoteLowerTo(fix128Du16, vRow3);
-      auto vRow31 = hn::PromoteUpperTo(fix128Du16, vRow3);
-
-      auto vP0 = hn::Add(
-          hn::Add(hn::Add(hn::LowerHalf(fix64Du16, vRow00), hn::UpperHalf(fix64Du16, vRow00)),
-                  hn::Add(hn::LowerHalf(fix64Du16, vRow10), hn::UpperHalf(fix64Du16, vRow10))),
-          hn::Add(hn::Add(hn::LowerHalf(fix64Du16, vRow20), hn::UpperHalf(fix64Du16, vRow20)),
-                  hn::Add(hn::LowerHalf(fix64Du16, vRow30), hn::UpperHalf(fix64Du16, vRow30))));
-
-      auto vP1 = hn::Add(
-          hn::Add(hn::Add(hn::LowerHalf(fix64Du16, vRow01), hn::UpperHalf(fix64Du16, vRow01)),
-                  hn::Add(hn::LowerHalf(fix64Du16, vRow11), hn::UpperHalf(fix64Du16, vRow11))),
-          hn::Add(hn::Add(hn::LowerHalf(fix64Du16, vRow21), hn::UpperHalf(fix64Du16, vRow21)),
-                  hn::Add(hn::LowerHalf(fix64Du16, vRow31), hn::UpperHalf(fix64Du16, vRow31))));
-      auto vDst = hn::ShiftRight<4>(hn::Add(hn::Add(vP1, vP0), fixValue));
-      auto res = hn::DemoteTo(fix32Du8, vDst);
-      hn::Store(res, fix32Du8, dstData);
-    }
+int ResizeAreaFastxNSimdFuncImpl(int channelNum, int step, const uint8_t* srcData, uint8_t* dstData,
+                               int w, int scale, int padding, int shiftNum) {
+  HWY_ASSERT(scale >= 16);
+  int dstX = 0;
+  if(channelNum == 1) {
+    dstX = ResizeAreaFast1chxNSIMDFuncImpl(step, srcData, dstData, w, scale, padding, shiftNum);
+  }else if (channelNum == 4){
+    dstX = ResizeAreaFast4chxNSIMDFuncImpl(step, srcData, dstData, w, scale, padding, shiftNum);
   }
   return dstX;
 }
@@ -270,22 +249,28 @@ namespace tgfx {
 HWY_EXPORT(ResizeAreaFastx2SIMDFuncImpl);
 HWY_EXPORT(ResizeAreaFastx4SIMDFuncImpl);
 HWY_EXPORT(ResizeAreaFastx8SIMDFuncImpl);
+HWY_EXPORT(ResizeAreaFastxNSimdFuncImpl);
 HWY_EXPORT(MulImpl);
 HWY_EXPORT(MulAddImpl);
 
 int ResizeAreaFastx2SIMDFunc(int channelNum, int step, const uint8_t* srcData, uint8_t* dstData,
-                           int w, int padding, int shiftNum) {
+                           int w, int, int padding, int shiftNum) {
   return HWY_DYNAMIC_DISPATCH(ResizeAreaFastx2SIMDFuncImpl)(channelNum, step, srcData, dstData, w, padding, shiftNum);
 }
 
 int ResizeAreaFastx4SIMDFunc(int channelNum, int step, const uint8_t* srcData, uint8_t* dstData,
-                           int w, int padding, int shiftNum) {
-  return HWY_DYNAMIC_DISPATCH(ResizeAreaFastx4SIMDFuncImpl)(channelNum, step, srcData, dstData, w, padding, shiftNum);
+                           int w, int scale, int padding, int shiftNum) {
+  return HWY_DYNAMIC_DISPATCH(ResizeAreaFastx4SIMDFuncImpl)(channelNum, step, srcData, dstData, w, scale, padding, shiftNum);
 }
 
 int ResizeAreaFastx8SIMDFunc(int channelNum, int step, const uint8_t* srcData, uint8_t* dstData,
-                           int w, int padding, int shiftNum) {
-  return HWY_DYNAMIC_DISPATCH(ResizeAreaFastx8SIMDFuncImpl)(channelNum, step, srcData, dstData, w, padding, shiftNum);
+                           int w, int scale, int padding, int shiftNum) {
+  return HWY_DYNAMIC_DISPATCH(ResizeAreaFastx8SIMDFuncImpl)(channelNum, step, srcData, dstData, w, scale, padding, shiftNum);
+}
+
+int ResizeAreaFastxNSimdFunc(int channelNum, int step, const uint8_t* srcData, uint8_t* dstData,
+                           int w, int scale, int padding, int shiftNum) {
+  return HWY_DYNAMIC_DISPATCH(ResizeAreaFastxNSimdFuncImpl)(channelNum, step, srcData, dstData, w, scale, padding, shiftNum);
 }
 
 void Mul(const float* buf, int width, float beta, float* sum) {
