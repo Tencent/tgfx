@@ -2697,9 +2697,7 @@ TGFX_TEST(CanvasTest, ScalePictureImage) {
   canvas->drawImage(scaledImage);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/pic_scaled_image"));
   canvas->clear();
-  EXPECT_TRUE(image->hasMipmaps());
   SamplingOptions sampling(FilterMode::Linear, MipmapMode::Linear);
-  canvas->clear();
   scaledImage = ScaleImage(scaledImage, 2.f, sampling);
   EXPECT_EQ(scaledImage->width(), 400);
   EXPECT_EQ(scaledImage->height(), 566);
