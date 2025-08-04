@@ -20,7 +20,6 @@
 #include "core/images/SubsetImage.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/ops/DrawOp.h"
 
 namespace tgfx {
 
@@ -67,7 +66,8 @@ std::shared_ptr<TextureProxy> RasterizedImage::onLockTextureProxy(const TPArgs& 
 std::shared_ptr<Image> RasterizedImage::onMakeScaled(int newWidth, int newHeight,
                                                      const SamplingOptions& sampling) const {
   auto newSource = source->makeScaled(newWidth, newHeight, sampling);
-  return RasterizedImage::MakeFrom(std::move(newSource));
+  newSource = newSource->makeRasterized();
+  return newSource->makeMipmapped(false);
 }
 
 }  // namespace tgfx
