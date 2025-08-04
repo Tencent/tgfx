@@ -557,8 +557,8 @@ if(TGFX_BUILD_VCPKG)
     # 只为Release配置安装头文件
     install(DIRECTORY include/
         DESTINATION include
-        FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
         CONFIGURATIONS Release
+        FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
     )
 
     # 生成并安装CMake配置文件
