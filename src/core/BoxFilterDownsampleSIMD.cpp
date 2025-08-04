@@ -172,7 +172,7 @@ int ResizeAreaFastx8SIMDFuncImpl(int channelNum, int step, const uint8_t* srcDat
   const int n = static_cast<int>(hn::Lanes(du8));
   auto value = hn::Set(du16, padding);
   if (channelNum == 1) {
-    for (; dstX <= w - n / 2; dstX += n, srcData0 += 4 * n, srcData1 += 4 * n, srcData2 += 4 * n, srcData3 += 4 * n, dstData += n) {
+    for (; dstX <= w - n / 2; dstX += n / 2, srcData0 += 4 * n, srcData1 += 4 * n, srcData2 += 4 * n, srcData3 += 4 * n, srcData4 += 4 * n, srcData5 += 4 * n, srcData6 += 4 * n, srcData7 += 4 * n, dstData += n / 2) {
       hn::Vec<decltype(du8)> row[4][4];
       hn::LoadInterleaved4(du8, srcData0, row[0][0], row[0][1], row[0][2], row[0][3]);
       hn::LoadInterleaved4(du8, srcData1, row[1][0], row[1][1], row[1][2], row[1][3]);
