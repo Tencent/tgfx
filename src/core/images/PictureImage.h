@@ -65,8 +65,7 @@ class PictureImage : public Image {
                                                       const SamplingArgs& samplingArgs,
                                                       const Matrix* uvMatrix) const override;
 
-  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args,
-                                                 Point* textureScales) const override;
+  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
   bool drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags,
                    const Matrix* extraMatrix) const;

@@ -61,8 +61,7 @@ class FilterImage : public SubsetImage {
   std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
                                       const SamplingOptions& sampling) const override;
 
-  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args,
-                                                 Point* textureScales) const override;
+  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                       const SamplingArgs& samplingArgs,

@@ -48,8 +48,7 @@ class ScaledImage : public TransformImage {
                                                       const SamplingArgs& samplingArgs,
                                                       const Matrix* uvMatrix) const override;
 
-  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args,
-                                                 Point* textureScales) const override;
+  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
   std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
                                       const SamplingOptions& sampling) const override;
@@ -57,8 +56,7 @@ class ScaledImage : public TransformImage {
   std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
 
  private:
-  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args, const Rect& drawRect,
-                                                 Point* textureScales) const;
+  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args, const Rect& drawRect) const;
 
   int _width = 0;
   int _height = 0;

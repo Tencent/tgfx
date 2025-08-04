@@ -121,12 +121,10 @@ PlacementPtr<FragmentProcessor> OrientImage::asFragmentProcessor(const FPArgs& a
       matrix = *uvMatrix;
     }
   }
-  auto newArgs = args;
   if (OrientationSwapsWidthHeight(orientation)) {
     std::swap(newSamplingArgs.tileModeX, newSamplingArgs.tileModeY);
-    std::swap(newArgs.drawScales.x, newArgs.drawScales.y);
   }
-  return FragmentProcessor::Make(source, newArgs, newSamplingArgs, AddressOf(matrix));
+  return FragmentProcessor::Make(source, args, newSamplingArgs, AddressOf(matrix));
 }
 
 Orientation OrientImage::concatOrientation(Orientation newOrientation) const {

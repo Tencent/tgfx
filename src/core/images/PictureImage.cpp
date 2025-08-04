@@ -89,7 +89,7 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (!rect.intersect(drawBounds)) {
     return nullptr;
   }
-  rect.scale(args.drawScales.x, args.drawScales.y);
+  rect.scale(args.drawScale, args.drawScale);
   rect.roundOut();
   auto mipmapped = samplingArgs.sampling.mipmapMode != MipmapMode::None && hasMipmaps();
   auto renderTarget = RenderTargetProxy::MakeFallback(
@@ -98,7 +98,7 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto extraMatrix = Matrix::MakeScale(args.drawScales.x, args.drawScales.y);
+  auto extraMatrix = Matrix::MakeScale(args.drawScale, args.drawScale);
   extraMatrix.postTranslate(-rect.left, -rect.top);
   if (!drawPicture(renderTarget, args.renderFlags, &extraMatrix)) {
     return nullptr;
@@ -115,25 +115,19 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
                                   isAlphaOnly());
 }
 
-std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args,
-                                                             Point* textureScales) const {
-  auto scales = Point::Make(1.0f, 1.0f);
-  auto scaledWidth = roundf(static_cast<float>(_width) * scales.x);
-  auto scaledHeight = roundf(static_cast<float>(_height) * scales.y);
-  scales = Point::Make(scaledWidth / static_cast<float>(_width),
-                       scaledHeight / static_cast<float>(_height));
+std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args) const {
+  auto scaledWidth = roundf(static_cast<float>(_width) * args.drawScale);
+  auto scaledHeight = roundf(static_cast<float>(_height) * args.drawScale);
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(scaledWidth), static_cast<int>(scaledHeight), isAlphaOnly(), 1,
       hasMipmaps() && args.mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto matrix = Matrix::MakeScale(scales.x, scales.y);
+  auto matrix = Matrix::MakeScale(scaledWidth / static_cast<float>(_width),
+                                  scaledHeight / static_cast<float>(_height));
   if (!drawPicture(renderTarget, args.renderFlags, &matrix)) {
     return nullptr;
-  }
-  if (textureScales) {
-    *textureScales = scales;
   }
   return renderTarget->asTextureProxy();
 }

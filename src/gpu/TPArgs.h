@@ -29,10 +29,10 @@ class TPArgs {
  public:
   TPArgs() = default;
 
-  TPArgs(Context* context, uint32_t renderFlags, bool mipmapped, const Point& drawScales,
+  TPArgs(Context* context, uint32_t renderFlags, bool mipmapped, float drawScale,
          SamplingOptions scalesSampling, BackingFit backingFit = BackingFit::Approx)
       : context(context), renderFlags(renderFlags), mipmapped(mipmapped), backingFit(backingFit),
-        drawScales(drawScales), scalesSampling(scalesSampling) {
+        drawScale(drawScale), scalesSampling(scalesSampling) {
   }
 
   /**
@@ -59,7 +59,7 @@ class TPArgs {
   /**
    * Recommended scales for creating the TextureProxy.
    */
-  Point drawScales = Point::Make(1.0f, 1.0f);
+  float drawScale = 1.0f;
 
   /**
    * The sampling options for creating the TextureProxy.

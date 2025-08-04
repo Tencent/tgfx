@@ -81,14 +81,15 @@ PlacementPtr<FragmentProcessor> SubsetImage::asFragmentProcessor(const FPArgs& a
     return FragmentProcessor::Make(source, args, newSamplingArgs, AddressOf(matrix));
   }
   auto mipmapped = source->hasMipmaps() && samplingArgs.sampling.mipmapMode != MipmapMode::None;
-  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScales, samplingArgs.sampling);
-  Point textureScales = Point::Make(1.0f, 1.0f);
-  auto textureProxy = lockTextureProxy(tpArgs, &textureScales);
+  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale, samplingArgs.sampling);
+  auto textureProxy = lockTextureProxy(tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;
   }
   newSamplingArgs.sampleArea = std::nullopt;
-  auto fpMatrix = Matrix::MakeScale(textureScales.x, textureScales.y);
+  auto fpMatrix =
+      Matrix::MakeScale(static_cast<float>(textureProxy->width()) / static_cast<float>(width()),
+                        static_cast<float>(textureProxy->height()) / static_cast<float>(height()));
   if (uvMatrix) {
     fpMatrix.preConcat(*uvMatrix);
   }

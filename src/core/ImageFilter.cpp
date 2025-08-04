@@ -38,15 +38,14 @@ Rect ImageFilter::onFilterBounds(const Rect& srcRect) const {
 
 std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Image> source,
                                                             const Rect& clipBounds,
-                                                            const TPArgs& args,
-                                                            Point* textureScales) const {
+                                                            const TPArgs& args) const {
 
   auto scaledBounds = clipBounds;
-  scaledBounds.scale(args.drawScales.x, args.drawScales.y);
+  scaledBounds.scale(args.drawScale, args.drawScale);
   scaledBounds.roundOut();
 
-  auto actualScales = Point::Make(scaledBounds.width() / clipBounds.width(),
-                                  scaledBounds.height() / clipBounds.height());
+  auto textureScales = Point::Make(scaledBounds.width() / clipBounds.width(),
+                                   scaledBounds.height() / clipBounds.height());
 
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(scaledBounds.width()), static_cast<int>(scaledBounds.height()),
@@ -55,17 +54,15 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
     return nullptr;
   }
   FPArgs fpArgs(args.context, args.renderFlags,
-                Rect::MakeWH(renderTarget->width(), renderTarget->height()), actualScales);
+                Rect::MakeWH(renderTarget->width(), renderTarget->height()),
+                std::max(textureScales.x, textureScales.y));
   Matrix matrix = Matrix::MakeTrans(clipBounds.left, clipBounds.top);
-  matrix.preScale(1.0f / actualScales.x, 1.0f / actualScales.y);
+  matrix.preScale(1.0f / textureScales.x, 1.0f / textureScales.y);
   auto processor = asFragmentProcessor(std::move(source), fpArgs, args.scalesSampling,
                                        SrcRectConstraint::Fast, &matrix);
   auto drawingManager = args.context->drawingManager();
   if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags)) {
     return nullptr;
-  }
-  if (textureScales) {
-    *textureScales = actualScales;
   }
   return renderTarget->asTextureProxy();
 }
@@ -95,14 +92,14 @@ PlacementPtr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(
   }
   auto isAlphaOnly = source->isAlphaOnly();
   auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
-  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScales, sampling);
-  Point textureScales = Point::Make(1.0f, 1.0f);
-  auto textureProxy = lockTextureProxy(std::move(source), dstBounds, tpArgs, &textureScales);
+  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale, sampling);
+  auto textureProxy = lockTextureProxy(std::move(source), dstBounds, tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;
   }
   auto fpMatrix = Matrix::MakeTrans(-dstBounds.x(), -dstBounds.y());
-  fpMatrix.postScale(textureScales.x, textureScales.y);
+  fpMatrix.postScale(static_cast<float>(textureProxy->width()) / dstBounds.width(),
+                     static_cast<float>(textureProxy->height()) / dstBounds.height());
   if (uvMatrix != nullptr) {
     fpMatrix.preConcat(*uvMatrix);
   }

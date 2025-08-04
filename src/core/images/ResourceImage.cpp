@@ -28,11 +28,7 @@ std::shared_ptr<Image> ResourceImage::makeRasterized() const {
   return std::static_pointer_cast<Image>(weakThis.lock());
 }
 
-std::shared_ptr<TextureProxy> ResourceImage::lockTextureProxy(const TPArgs& args,
-                                                              Point* textureScales) const {
-  if (textureScales) {
-    *textureScales = Point::Make(1.0f, 1.0f);
-  }
+std::shared_ptr<TextureProxy> ResourceImage::lockTextureProxy(const TPArgs& args) const {
   auto newArgs = args;
   // ResourceImage has preset mipmaps.
   newArgs.mipmapped = hasMipmaps();
@@ -53,8 +49,7 @@ std::shared_ptr<Image> ResourceImage::onMakeScaled(int newWidth, int newHeight,
 PlacementPtr<FragmentProcessor> ResourceImage::asFragmentProcessor(const FPArgs& args,
                                                                    const SamplingArgs& samplingArgs,
                                                                    const Matrix* uvMatrix) const {
-
-  TPArgs tpArgs(args.context, args.renderFlags, hasMipmaps(), Point::Make(1.0f, 1.0f), {});
+  TPArgs tpArgs(args.context, args.renderFlags, hasMipmaps(), 1.0f, {});
   auto proxy = onLockTextureProxy(tpArgs, uniqueKey);
   return TiledTextureEffect::Make(std::move(proxy), samplingArgs, uvMatrix, isAlphaOnly());
 }

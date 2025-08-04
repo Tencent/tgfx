@@ -111,8 +111,7 @@ Rect DualBlurImageFilter::onFilterBounds(const Rect& srcRect) const {
 
 std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_ptr<Image> source,
                                                                     const Rect& clipBounds,
-                                                                    const TPArgs& args,
-                                                                    Point* textureScales) const {
+                                                                    const TPArgs& args) const {
   if (FloatNearlyZero(scaleFactor)) {
     return nullptr;
   }
@@ -194,9 +193,6 @@ std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_
     lastRenderTarget = renderTarget;
     textureSize = Size::Make(static_cast<float>(renderTarget->width()),
                              static_cast<float>(renderTarget->height()));
-  }
-  if (textureScales) {
-    *textureScales = Point::Make(1.0f, 1.0f);
   }
   return lastRenderTarget->asTextureProxy();
 }

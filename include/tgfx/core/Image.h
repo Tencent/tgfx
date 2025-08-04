@@ -336,10 +336,8 @@ class Image {
   /**
    * Returns a texture proxy for the entire Image.
    * @param args The TPArgs used to create the texture proxy.
-   * @param textureScales The actual texture scales for the origin size.
    */
-  virtual std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args,
-                                                         Point* textureScales) const;
+  virtual std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const;
 
   /**
    * Returns a fragment processor for the entire Image.
