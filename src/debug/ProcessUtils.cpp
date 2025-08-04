@@ -30,17 +30,14 @@
 #else
 #include <pthread.h>
 #include <unistd.h>
-#include <string>
 #endif
 #ifdef __MINGW32__
 #define __STDC_FORMAT_MACROS
 #endif
 
-#include <chrono>
 #include <cinttypes>
 #include <cstddef>
-#include <cstdlib>
-#include <cstring>
+#include <string>
 #include "ProcessUtils.h"
 
 namespace inspector {
