@@ -27,7 +27,8 @@ class ScaledImage : public TransformImage {
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> image, int width, int height,
                                          const SamplingOptions& sampling, bool mipmap);
 
-  ScaledImage(std::shared_ptr<Image> image, int width, int height, const SamplingOptions& sampling, bool mipmap);
+  ScaledImage(std::shared_ptr<Image> image, int width, int height, const SamplingOptions& sampling,
+              bool mipmap);
 
   ~ScaledImage() override = default;
 
