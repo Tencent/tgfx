@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include "BufferImage.h"
 #include "core/images/GeneratorImage.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageCodec.h"
@@ -52,6 +53,8 @@ class CodecImage : public GeneratorImage {
  private:
   int _width;
   int _height;
+
+  friend class BufferImage;
 };
 
 }  // namespace tgfx
