@@ -12,7 +12,7 @@
       },
       {
         "url": "${PAG_GROUP}/pathkit.git",
-        "commit": "1971e6f031aaa4b962dda553cf087cb4e3816921",
+        "commit": "1fce60d56f9c08d25d3868b5006dd2c9b52e9201",
         "dir": "third_party/pathkit"
       },
       {
