@@ -15,6 +15,8 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+#ifdef TGFX_USE_INSPECTOR
+
 #include "PointSerialization.h"
 
 namespace tgfx {
@@ -36,3 +38,4 @@ std::shared_ptr<Data> PointSerialization::Serialize(const Point* point) {
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
 }  // namespace tgfx
+#endif

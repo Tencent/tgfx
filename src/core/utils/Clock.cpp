@@ -20,6 +20,13 @@
 #include "core/utils/Log.h"
 
 namespace tgfx {
+int64_t Clock::Now() {
+  static const auto START_TIME = std::chrono::steady_clock::now();
+  auto now = std::chrono::steady_clock::now();
+  auto us = std::chrono::duration_cast<std::chrono::microseconds>(now - START_TIME);
+  return static_cast<int64_t>(us.count());
+}
+
 Clock::Clock() {
   startTime = Now();
 }
