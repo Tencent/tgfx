@@ -15,7 +15,6 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#ifdef TGFX_USE_INSPECTOR
 
 #include "LayerStyleSerialization.h"
 #include <tgfx/layers/filters/DropShadowFilter.h>
@@ -108,4 +107,3 @@ std::shared_ptr<Data> LayerStyleSerialization::Serialize(const LayerStyle* layer
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
 }  // namespace tgfx
-#endif

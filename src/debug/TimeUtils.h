@@ -15,9 +15,13 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+
 #pragma once
-
-#include "LayerProfiler.h"
-
-#define SEND_LAYER_DATA(data) inspector::LayerProfiler::Get().setData(data)
-#define LAYER_CALLBACK(func) inspector::LayerProfiler::Get().setCallBack(func)
+#include <chrono>
+#include <cstdint>
+namespace inspector {
+template <typename T>
+int64_t GetCurrentTime() {
+  return std::chrono::duration_cast<T>(std::chrono::system_clock::now().time_since_epoch()).count();
+}
+}  // namespace inspector

@@ -170,6 +170,7 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
   }
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
+  float drawScale = 1.0f;
   auto [needLocalBounds, needDeviceBounds] = needComputeBounds(fill, true);
   auto& clip = state.clip;
   auto clipBounds = getClipBounds(clip);
@@ -180,6 +181,7 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
       localBounds = shape->getBounds();
       localBounds = ClipLocalBounds(*localBounds, state.matrix, clipBounds);
     }
+    drawScale = std::min(state.matrix.getMaxScale(), 1.0f);
   }
   shape = Shape::ApplyMatrix(std::move(shape), state.matrix);
   if (needDeviceBounds) {
@@ -189,7 +191,7 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
   auto shapeProxy = proxyProvider()->createGPUShapeProxy(shape, aaType, clipBounds, renderFlags);
   auto drawOp =
       ShapeDrawOp::Make(std::move(shapeProxy), fill.color.premultiply(), uvMatrix, aaType);
-  addDrawOp(std::move(drawOp), clip, fill, localBounds, deviceBounds);
+  addDrawOp(std::move(drawOp), clip, fill, localBounds, deviceBounds, drawScale);
 }
 
 void OpsCompositor::discardAll() {
@@ -296,6 +298,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
   PlacementPtr<DrawOp> drawOp = nullptr;
   std::optional<Rect> localBounds = std::nullopt;
   std::optional<Rect> deviceBounds = std::nullopt;
+  std::optional<float> drawScale = std::nullopt;
   bool hasCoverage = pendingFill.maskFilter != nullptr || !pendingClip.isEmpty() ||
                      pendingClip.isInverseFillType();
   bool hasImageFill = pendingType == PendingOpType::Image || pendingType == PendingOpType::Atlas;
@@ -306,6 +309,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
   if (needLocalBounds) {
     clipBounds = getClipBounds(pendingClip);
     localBounds = Rect::MakeEmpty();
+    drawScale = 0.0f;
   }
 
   if (needLocalBounds || needDeviceBounds) {
@@ -314,6 +318,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
       for (auto& record : pendingRRects) {
         auto rect = record->viewMatrix.mapRect(record->rRect.rect);
         deviceBounds->join(rect);
+        drawScale = std::max(*drawScale, record->viewMatrix.getMaxScale());
       }
       localBounds = deviceBounds;
       if (!localBounds->intersect(clipBounds)) {
@@ -325,6 +330,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
           auto localViewMatrix = rect->viewMatrix;
           localViewMatrix.preConcat(MakeRectToRectMatrix(rect->uvRect, rect->rect));
           localBounds->join(ClipLocalBounds(rect->uvRect, localViewMatrix, clipBounds));
+          drawScale = std::max(*drawScale, localViewMatrix.getMaxScale());
         }
       }
       if (needDeviceBounds) {
@@ -380,7 +386,8 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
       break;
   }
   if (drawOp != nullptr && pendingType == PendingOpType::Image) {
-    FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty())};
+    FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()),
+                   drawScale.value_or(1.0f)};
     auto processor =
         FragmentProcessor::Make(std::move(pendingImage), args, pendingSampling, pendingConstraint);
     if (processor == nullptr) {
@@ -388,7 +395,8 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     }
     drawOp->addColorFP(std::move(processor));
   }
-  addDrawOp(std::move(drawOp), pendingClip, pendingFill, localBounds, deviceBounds);
+  addDrawOp(std::move(drawOp), pendingClip, pendingFill, localBounds, deviceBounds,
+            drawScale.value_or(1.0f));
 }
 
 static void FlipYIfNeeded(Rect* rect, const RenderTargetProxy* renderTarget) {
@@ -624,7 +632,8 @@ DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AATyp
 
 void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const Fill& fill,
                               const std::optional<Rect>& localBounds,
-                              const std::optional<Rect>& deviceBounds) {
+                              const std::optional<Rect>& deviceBounds, float drawScale) {
+
   if (op == nullptr || fill.nothingToDraw() || (clip.isEmpty() && !clip.isInverseFillType())) {
     return;
   }
@@ -633,7 +642,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
     return;
   }
 
-  FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty())};
+  FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()), drawScale};
   if (fill.shader) {
     if (auto processor = FragmentProcessor::Make(fill.shader, args)) {
       op->addColorFP(std::move(processor));

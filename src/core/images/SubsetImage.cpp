@@ -81,13 +81,19 @@ PlacementPtr<FragmentProcessor> SubsetImage::asFragmentProcessor(const FPArgs& a
     return FragmentProcessor::Make(source, args, newSamplingArgs, AddressOf(matrix));
   }
   auto mipmapped = source->hasMipmaps() && samplingArgs.sampling.mipmapMode != MipmapMode::None;
-  TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
+  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale);
   auto textureProxy = lockTextureProxy(tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;
   }
   newSamplingArgs.sampleArea = std::nullopt;
-  return TiledTextureEffect::Make(textureProxy, newSamplingArgs, uvMatrix, source->isAlphaOnly());
+  auto fpMatrix =
+      Matrix::MakeScale(static_cast<float>(textureProxy->width()) / static_cast<float>(width()),
+                        static_cast<float>(textureProxy->height()) / static_cast<float>(height()));
+  if (uvMatrix) {
+    fpMatrix.preConcat(*uvMatrix);
+  }
+  return TiledTextureEffect::Make(textureProxy, newSamplingArgs, &fpMatrix, source->isAlphaOnly());
 }
 
 std::optional<Matrix> SubsetImage::concatUVMatrix(const Matrix* uvMatrix) const {

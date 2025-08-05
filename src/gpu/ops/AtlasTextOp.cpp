@@ -18,6 +18,7 @@
 
 #include "AtlasTextOp.h"
 #include "RectDrawOp.h"
+#include "core/utils/Profiling.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RenderPass.h"
@@ -58,6 +59,11 @@ AtlasTextOp::AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureP
 }
 
 void AtlasTextOp::execute(RenderPass* renderPass) {
+  OperateMark(inspector::OpTaskType::RRectDrawOp);
+  AttributeName("rectCount", static_cast<uint32_t>(rectCount));
+  AttributeTGFXName("commonColor", commonColor);
+  AttributeNameEnum("blenderMode", getBlendMode(), inspector::CustomEnumType::BlendMode);
+  AttributeNameEnum("aaType", getAAType(), inspector::CustomEnumType::AAType);
   std::shared_ptr<IndexBuffer> indexBuffer = nullptr;
   if (indexBufferProxy) {
     indexBuffer = indexBufferProxy->getBuffer();
