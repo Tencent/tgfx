@@ -116,7 +116,7 @@ bool NativeCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t 
   }
 
   auto data = val::module_property("tgfx").call<val>(
-      "readImagePixels", val::module_property("module"), image, dstInfo.width(), dstInfo.height());
+      "readImagePixels", val::module_property("module"), image, width(), height());
   auto imageData = CopyDataFromUint8Array(data);
   if (imageData == nullptr) {
     return false;
