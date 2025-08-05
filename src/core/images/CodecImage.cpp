@@ -17,15 +17,38 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CodecImage.h"
-#include <memory>
+#include "RasterizedImage.h"
+#include "core/ScaledImageGenerator.h"
+#include "gpu/ProxyProvider.h"
 
 namespace tgfx {
-CodecImage::CodecImage(UniqueKey uniqueKey, std::shared_ptr<ImageCodec> codec)
-    : GeneratorImage(std::move(uniqueKey), std::move(codec)) {
+
+CodecImage::CodecImage(UniqueKey uniqueKey, std::shared_ptr<ImageCodec> codec, int width,
+                       int height)
+    : GeneratorImage(std::move(uniqueKey), std::move(codec)), _width(width), _height(height) {
 }
 
 std::shared_ptr<ImageCodec> CodecImage::getCodec() const {
   return std::static_pointer_cast<ImageCodec>(generator);
 }
 
+std::shared_ptr<Image> CodecImage::onMakeScaled(int newWidth, int newHeight,
+                                                const SamplingOptions& sampling) const {
+  if (newWidth <= generator->width() && newHeight <= generator->height()) {
+    auto image = std::make_shared<CodecImage>(UniqueKey::Make(), getCodec(), newWidth, newHeight);
+    image->weakThis = image;
+    return image;
+  }
+  return ResourceImage::onMakeScaled(newWidth, newHeight, sampling);
+}
+
+std::shared_ptr<TextureProxy> CodecImage::onLockTextureProxy(const TPArgs& args,
+                                                             const UniqueKey& key) const {
+  auto tempGenerator = generator;
+  if (width() != generator->width() || height() != generator->height()) {
+    tempGenerator = ScaledImageGenerator::MakeFrom(getCodec(), width(), height());
+  }
+  return args.context->proxyProvider()->createTextureProxy(key, tempGenerator, args.mipmapped,
+                                                           args.renderFlags);
+}
 }  // namespace tgfx

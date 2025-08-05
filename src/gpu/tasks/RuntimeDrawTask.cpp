@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RuntimeDrawTask.h"
+#include "core/utils/Profiling.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/Pipeline.h"
 #include "gpu/ProxyProvider.h"
@@ -42,8 +43,8 @@ RuntimeDrawTask::RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
       auto maskRect = Rect::MakeWH(input->width(), input->height());
       auto maskVertexProvider =
           RectsVertexProvider::MakeFrom(context->drawingBuffer(), maskRect, AAType::None);
-      auto maskBuffer = context->proxyProvider()->createVertexBuffer(std::move(maskVertexProvider),
-                                                                     RenderFlags::DisableAsyncTask);
+      auto maskBuffer = context->proxyProvider()->createVertexBufferProxyView(
+          std::move(maskVertexProvider), RenderFlags::DisableAsyncTask);
       inputVertexBuffers.push_back(std::move(maskBuffer));
     } else {
       inputVertexBuffers.push_back(nullptr);
@@ -52,12 +53,13 @@ RuntimeDrawTask::RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
 }
 
 void RuntimeDrawTask::execute(CommandEncoder* encoder) {
+  TaskMark(inspector::OpTaskType::RuntimeDrawTask);
   std::vector<std::shared_ptr<Texture>> textures = {};
   textures.reserve(inputTextures.size());
   for (size_t i = 0; i < inputTextures.size(); i++) {
     std::shared_ptr<Texture> texture;
     if (auto inputProxy = inputTextures[i]) {
-      texture = GetFlatTexture(encoder, std::move(inputProxy), inputVertexBuffers[i]);
+      texture = GetFlatTexture(encoder, std::move(inputProxy), inputVertexBuffers[i].get());
     }
     if (texture == nullptr) {
       LOGE("RuntimeDrawTask::execute() Failed to get the input %d texture!", i);
@@ -93,7 +95,7 @@ void RuntimeDrawTask::execute(CommandEncoder* encoder) {
 
 std::shared_ptr<Texture> RuntimeDrawTask::GetFlatTexture(
     CommandEncoder* encoder, std::shared_ptr<TextureProxy> textureProxy,
-    std::shared_ptr<VertexBufferProxy> vertexBufferProxy) {
+    VertexBufferProxyView* vertexBufferProxyView) {
   auto texture = textureProxy->getTexture();
   if (texture == nullptr) {
     return nullptr;
@@ -102,7 +104,8 @@ std::shared_ptr<Texture> RuntimeDrawTask::GetFlatTexture(
       texture->origin() == ImageOrigin::TopLeft) {
     return texture;
   }
-  if (vertexBufferProxy == nullptr || vertexBufferProxy->getBuffer() == nullptr) {
+  auto vertexBuffer = vertexBufferProxyView ? vertexBufferProxyView->getBuffer() : nullptr;
+  if (vertexBuffer == nullptr) {
     return nullptr;
   }
   auto context = texture->getContext();
@@ -136,7 +139,7 @@ std::shared_ptr<Texture> RuntimeDrawTask::GetFlatTexture(
       std::make_unique<Pipeline>(std::move(geometryProcessor), std::move(fragmentProcessors), 1,
                                  nullptr, BlendMode::Src, &swizzle);
   renderPass->bindProgramAndScissorClip(pipeline.get(), {});
-  renderPass->bindBuffers(nullptr, vertexBufferProxy->getBuffer(), vertexBufferProxy->offset());
+  renderPass->bindBuffers(nullptr, vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
   renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
   renderPass->end();
   return renderTarget->asTexture();

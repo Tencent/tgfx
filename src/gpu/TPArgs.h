@@ -19,7 +19,7 @@
 #pragma once
 
 #include "gpu/BackingFit.h"
-#include "gpu/proxies/TextureProxy.h"
+#include "tgfx/core/SamplingOptions.h"
 
 namespace tgfx {
 /**
@@ -29,9 +29,10 @@ class TPArgs {
  public:
   TPArgs() = default;
 
-  TPArgs(Context* context, uint32_t renderFlags, bool mipmapped,
+  TPArgs(Context* context, uint32_t renderFlags, bool mipmapped, float drawScale,
          BackingFit backingFit = BackingFit::Approx)
-      : context(context), renderFlags(renderFlags), mipmapped(mipmapped), backingFit(backingFit) {
+      : context(context), renderFlags(renderFlags), mipmapped(mipmapped), backingFit(backingFit),
+        drawScale(drawScale) {
   }
 
   /**
@@ -54,5 +55,10 @@ class TPArgs {
    * Specifies whether the texture size should be approximated based on the width and height.
    */
   BackingFit backingFit = BackingFit::Approx;
+
+  /**
+   * Recommended scales for creating the TextureProxy.
+   */
+  float drawScale = 1.0f;
 };
 }  // namespace tgfx

@@ -135,6 +135,11 @@ Rect Typeface::getBounds() const {
 }
 
 bool Typeface::onComputeBounds(Rect* bounds) const {
+  if (hasColor()) {
+    // The bounds are only valid for the default outline variation
+    // Bitmaps may be any size and placed at any offset.
+    return false;
+  }
   constexpr float TextSize = 2048.f;
   constexpr float InvTextSize = 1.0f / TextSize;
   auto scaleContext = onCreateScalerContext(TextSize);

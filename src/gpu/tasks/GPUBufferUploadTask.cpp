@@ -17,7 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GPUBufferUploadTask.h"
-#include "tgfx/core/Task.h"
+#include "core/utils/Profiling.h"
+#include "gpu/GPU.h"
+#include "gpu/IndexBuffer.h"
+#include "gpu/VertexBuffer.h"
 
 namespace tgfx {
 GPUBufferUploadTask::GPUBufferUploadTask(std::shared_ptr<ResourceProxy> proxy,
@@ -27,6 +30,8 @@ GPUBufferUploadTask::GPUBufferUploadTask(std::shared_ptr<ResourceProxy> proxy,
 }
 
 std::shared_ptr<Resource> GPUBufferUploadTask::onMakeResource(Context* context) {
+  TaskMark(inspector::OpTaskType::GpuUploadTask);
+  AttributeEnum(bufferType, inspector::CustomEnumType::BufferType);
   if (source == nullptr) {
     return nullptr;
   }
@@ -35,13 +40,23 @@ std::shared_ptr<Resource> GPUBufferUploadTask::onMakeResource(Context* context) 
     LOGE("GPUBufferUploadTask::onMakeResource() Failed to get data!");
     return nullptr;
   }
-  auto gpuBuffer = GPUBuffer::Make(context, bufferType, data->data(), data->size());
-  if (gpuBuffer == nullptr) {
-    LOGE("GPUBufferUploadTask::onMakeResource failed to upload the GPUBuffer!");
-  } else {
-    // Free the data source immediately to reduce memory pressure.
-    source = nullptr;
+  auto gpu = context->gpu();
+  auto usage = bufferType == BufferType::Index ? GPUBufferUsage::INDEX : GPUBufferUsage::VERTEX;
+  auto gpuBuffer = gpu->createBuffer(data->size(), usage);
+  if (!gpuBuffer) {
+    LOGE("GPUBufferUploadTask::onMakeResource() Failed to create buffer!");
+    return nullptr;
   }
-  return gpuBuffer;
+  if (!gpu->queue()->writeBuffer(gpuBuffer.get(), 0, data->data(), data->size())) {
+    gpuBuffer->release(gpu);
+    LOGE("GPUBufferUploadTask::onMakeResource() Failed to write buffer!");
+    return nullptr;
+  }
+  // Free the data source immediately to reduce memory pressure.
+  source = nullptr;
+  if (bufferType == BufferType::Index) {
+    return Resource::AddToCache(context, new IndexBuffer(std::move(gpuBuffer)));
+  }
+  return Resource::AddToCache(context, new VertexBuffer(std::move(gpuBuffer)));
 }
 }  // namespace tgfx

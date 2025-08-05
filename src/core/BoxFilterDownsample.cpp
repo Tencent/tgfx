@@ -28,7 +28,6 @@
 #include "utils/Log.h"
 
 namespace tgfx {
-
 constexpr int ChannelSizeInBytes = 1;
 
 struct DecimateAlpha {
@@ -377,7 +376,7 @@ static void ResizeArea(const FastFuncInfo& srcInfo, FastFuncInfo& dstInfo,
 }
 
 void BoxFilterDownsample(const void* inputPixels, const PixelLayout& inputLayout,
-                         void* outputPixels, const PixelLayout& outputLayout, bool alphaOnly) {
+                         void* outputPixels, const PixelLayout& outputLayout, bool isOneComponent) {
   ASSERT(inputPixels != nullptr && outputPixels != nullptr)
   ASSERT(inputLayout.width > 0 && inputLayout.height > 0 && outputLayout.width > 0 &&
          outputLayout.height > 0)
@@ -386,7 +385,7 @@ void BoxFilterDownsample(const void* inputPixels, const PixelLayout& inputLayout
 
   auto scaleX = static_cast<double>(inputLayout.width) / outputLayout.width;
   auto scaleY = static_cast<double>(inputLayout.height) / outputLayout.height;
-  int channelNum = alphaOnly ? 1 : 4;
+  int channelNum = isOneComponent ? 1 : 4;
   int iScaleX = SaturateCast<int>(scaleX);
   int iScaleY = SaturateCast<int>(scaleY);
   bool isAreaFast =

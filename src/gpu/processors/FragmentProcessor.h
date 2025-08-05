@@ -40,13 +40,14 @@ class FPArgs {
  public:
   FPArgs() = default;
 
-  FPArgs(Context* context, uint32_t renderFlags, const Rect& drawRect)
-      : context(context), renderFlags(renderFlags), drawRect(drawRect) {
+  FPArgs(Context* context, uint32_t renderFlags, const Rect& drawRect, float drawScale = 1.0f)
+      : context(context), renderFlags(renderFlags), drawRect(drawRect), drawScale(drawScale) {
   }
 
   Context* context = nullptr;
   uint32_t renderFlags = 0;
   Rect drawRect = {};
+  float drawScale = 1.0f;
 };
 
 class FragmentProcessor : public Processor {

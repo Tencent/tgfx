@@ -22,8 +22,7 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/RectsVertexProvider.h"
 #include "gpu/ops/DrawOp.h"
-#include "gpu/proxies/GPUBufferProxy.h"
-#include "gpu/proxies/VertexBufferProxy.h"
+#include "gpu/proxies/VertexBufferProxyView.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
@@ -41,8 +40,8 @@ class AtlasTextOp final : public DrawOp {
  private:
   size_t rectCount = 0;
   std::optional<Color> commonColor = std::nullopt;
-  std::shared_ptr<GPUBufferProxy> indexBufferProxy = nullptr;
-  std::shared_ptr<VertexBufferProxy> vertexBufferProxy = {};
+  std::shared_ptr<IndexBufferProxy> indexBufferProxy = nullptr;
+  std::shared_ptr<VertexBufferProxyView> vertexBufferProxyView = {};
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
 
   explicit AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureProxy> textureProxy);

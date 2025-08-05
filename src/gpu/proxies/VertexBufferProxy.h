@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,45 +18,25 @@
 
 #pragma once
 
-#include "core/utils/Log.h"
-#include "gpu/proxies/GPUBufferProxy.h"
+#include "ResourceProxy.h"
+#include "gpu/VertexBuffer.h"
 
 namespace tgfx {
 /**
- * VertexBufferProxy serves as a proxy for a vertex buffer, referencing a specific range within a
- * GPUBuffer through GPUBufferProxy. It keeps track of the offset and size of the data in the buffer.
+ * VertexBufferProxy is a proxy for VertexBuffer resources.
  */
-class VertexBufferProxy {
+class VertexBufferProxy : public ResourceProxy {
  public:
-  VertexBufferProxy(std::shared_ptr<GPUBufferProxy> bufferProxy, size_t offset, size_t size)
-      : proxy(std::move(bufferProxy)), _offset(offset), _size(size) {
-    DEBUG_ASSERT(proxy != nullptr);
-  }
-
   /**
-   * Returns the GPUBuffer associated with this VertexBufferProxy.
+   * Returns the associated VertexBuffer instance.
    */
-  std::shared_ptr<GPUBuffer> getBuffer() const {
-    return proxy ? proxy->getBuffer() : nullptr;
-  }
-
-  /**
-   * Returns the offset of the vertex data in the buffer.
-   */
-  size_t offset() const {
-    return _offset;
-  }
-
-  /**
-   * Returns the size of the vertex data in the buffer.
-   */
-  size_t size() const {
-    return _size;
+  std::shared_ptr<VertexBuffer> getBuffer() const {
+    return std::static_pointer_cast<VertexBuffer>(resource);
   }
 
  private:
-  std::shared_ptr<GPUBufferProxy> proxy = nullptr;
-  size_t _offset = 0;
-  size_t _size = 0;
+  VertexBufferProxy() = default;
+
+  friend class ProxyProvider;
 };
 }  // namespace tgfx

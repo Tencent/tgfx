@@ -17,22 +17,46 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <cstdint>
-namespace inspector {
-  enum class LayerInspectorMsgType : uint8_t {
-    EnableLayerInspector,
-    HoverLayerAddress,
-    SelectedLayerAddress,
-    SerializeAttribute,
-    SerializeSubAttribute,
-    FlushAttribute,
-    FlushLayerTree,
-    FlushImage,
-    PickedLayerAddress,
-    FlushAttributeAck,
-    LayerTree,
-    LayerAttribute,
-    LayerSubAttribute,
-    ImageData
-  };
+
+#include "gpu/GPUBuffer.h"
+#include "gpu/Resource.h"
+
+namespace tgfx {
+/**
+ * IndexBuffer is a resource that encapsulates a GPUBuffer, which can be used for index data in
+ * a RenderPass.
+ */
+class IndexBuffer : public Resource {
+ public:
+  size_t memoryUsage() const override {
+    return buffer->size();
+  }
+
+  /**
+   * Returns the size of the index buffer.
+   */
+  size_t size() const {
+    return buffer->size();
+  }
+
+  /**
+   * Returns the GPUBuffer associated with this IndexBuffer.
+   */
+  const GPUBuffer* gpuBuffer() const {
+    return buffer.get();
+  }
+
+ protected:
+  void onReleaseGPU() override {
+    buffer->release(context->gpu());
+  }
+
+ private:
+  std::unique_ptr<GPUBuffer> buffer = nullptr;
+
+  explicit IndexBuffer(std::unique_ptr<GPUBuffer> buffer) : buffer(std::move(buffer)) {
+  }
+
+  friend class GPUBufferUploadTask;
+};
 }  // namespace tgfx

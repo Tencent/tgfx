@@ -141,12 +141,14 @@ PlacementPtr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs& a
                                        AddressOf(fpMatrix));
   }
   auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
-  TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
+  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale);
   auto textureProxy = filter->lockTextureProxy(source, dstBounds, tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;
   }
   auto matrix = Matrix::MakeTrans(-dstBounds.x(), -dstBounds.y());
+  matrix.postScale(static_cast<float>(textureProxy->width()) / dstBounds.width(),
+                   static_cast<float>(textureProxy->height()) / dstBounds.height());
   if (fpMatrix) {
     matrix.preConcat(*fpMatrix);
   }

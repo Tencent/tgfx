@@ -89,53 +89,62 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (!rect.intersect(drawBounds)) {
     return nullptr;
   }
+  rect.scale(args.drawScale, args.drawScale);
   rect.roundOut();
   auto mipmapped = samplingArgs.sampling.mipmapMode != MipmapMode::None && hasMipmaps();
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(rect.width()), static_cast<int>(rect.height()), isAlphaOnly(),
       1, mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
-
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  Point offset = Point::Make(-rect.left, -rect.top);
-  if (!drawPicture(renderTarget, args.renderFlags, &offset)) {
+  auto extraMatrix = Matrix::MakeScale(args.drawScale, args.drawScale);
+  extraMatrix.postTranslate(-rect.left, -rect.top);
+  if (!drawPicture(renderTarget, args.renderFlags, &extraMatrix)) {
     return nullptr;
   }
-  auto finalUVMatrix = Matrix::MakeTrans(-rect.left, -rect.top);
+  auto finalUVMatrix = extraMatrix;
   if (uvMatrix) {
     finalUVMatrix.preConcat(*uvMatrix);
   }
   auto newSamplingArgs = samplingArgs;
   if (samplingArgs.sampleArea) {
-    newSamplingArgs.sampleArea = samplingArgs.sampleArea->makeOffset(-rect.left, -rect.top);
+    newSamplingArgs.sampleArea = extraMatrix.mapRect(*samplingArgs.sampleArea);
   }
   return TiledTextureEffect::Make(renderTarget->asTextureProxy(), newSamplingArgs, &finalUVMatrix,
                                   isAlphaOnly());
 }
 
 std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args) const {
+  auto textureWidth = _width;
+  auto textureHeight = _height;
+  if (args.drawScale < 1.0f) {
+    textureWidth = static_cast<int>(roundf(static_cast<float>(_width) * args.drawScale));
+    textureHeight = static_cast<int>(roundf(static_cast<float>(_height) * args.drawScale));
+  }
   auto renderTarget = RenderTargetProxy::MakeFallback(
-      args.context, width(), height(), isAlphaOnly(), 1, hasMipmaps() && args.mipmapped,
+      args.context, textureWidth, textureHeight, isAlphaOnly(), 1, hasMipmaps() && args.mipmapped,
       ImageOrigin::TopLeft, BackingFit::Approx);
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  if (!drawPicture(renderTarget, args.renderFlags, nullptr)) {
+  auto matrix = Matrix::MakeScale(static_cast<float>(textureWidth) / static_cast<float>(_width),
+                                  static_cast<float>(textureHeight) / static_cast<float>(_height));
+  if (!drawPicture(renderTarget, args.renderFlags, &matrix)) {
     return nullptr;
   }
   return renderTarget->asTextureProxy();
 }
 
 bool PictureImage::drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget,
-                               uint32_t renderFlags, const Point* offset) const {
+                               uint32_t renderFlags, const Matrix* extraMatrix) const {
   if (renderTarget == nullptr) {
     return false;
   }
   RenderContext renderContext(std::move(renderTarget), renderFlags, true);
-  Matrix totalMatrix = Matrix::I();
-  if (offset) {
-    totalMatrix.postTranslate(offset->x, offset->y);
+  Matrix totalMatrix = {};
+  if (extraMatrix) {
+    totalMatrix = *extraMatrix;
   }
   if (matrix) {
     totalMatrix.preConcat(*matrix);

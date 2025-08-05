@@ -18,6 +18,8 @@
 
 #include "ShapeDrawOp.h"
 #include "core/PathTriangulator.h"
+#include "core/utils/Log.h"
+#include "core/utils/Profiling.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
 #include "gpu/RectsVertexProvider.h"
@@ -43,12 +45,17 @@ ShapeDrawOp::ShapeDrawOp(std::shared_ptr<GPUShapeProxy> proxy, Color color, cons
     auto maskRect = Rect::MakeWH(textureProxy->width(), textureProxy->height());
     auto maskVertexProvider =
         RectsVertexProvider::MakeFrom(context->drawingBuffer(), maskRect, AAType::None);
-    maskBufferProxy = context->proxyProvider()->createVertexBuffer(std::move(maskVertexProvider),
-                                                                   RenderFlags::DisableAsyncTask);
+    maskBufferProxy = context->proxyProvider()->createVertexBufferProxyView(
+        std::move(maskVertexProvider), RenderFlags::DisableAsyncTask);
   }
 }
 
 void ShapeDrawOp::execute(RenderPass* renderPass) {
+  OperateMark(inspector::OpTaskType::ShapeDrawOp);
+  AttributeTGFXName("color", color);
+  AttributeTGFXName("uvMatrix", uvMatrix);
+  AttributeNameEnum("blenderMode", getBlendMode(), inspector::CustomEnumType::BlendMode);
+  AttributeNameEnum("aaType", getAAType(), inspector::CustomEnumType::AAType);
   if (shapeProxy == nullptr) {
     return;
   }
@@ -81,13 +88,14 @@ void ShapeDrawOp::execute(RenderPass* renderPass) {
   auto pipeline = createPipeline(renderPass, std::move(gp));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   if (vertexBuffer != nullptr) {
-    renderPass->bindBuffers(nullptr, vertexBuffer);
+    renderPass->bindBuffers(nullptr, vertexBuffer->gpuBuffer());
     auto vertexCount = aa == AAType::Coverage
                            ? PathTriangulator::GetAATriangleCount(vertexBuffer->size())
                            : PathTriangulator::GetTriangleCount(vertexBuffer->size());
     renderPass->draw(PrimitiveType::Triangles, 0, vertexCount);
   } else {
-    renderPass->bindBuffers(nullptr, maskBufferProxy->getBuffer(), maskBufferProxy->offset());
+    auto maskBuffer = maskBufferProxy->getBuffer();
+    renderPass->bindBuffers(nullptr, maskBuffer->gpuBuffer(), maskBufferProxy->offset());
     renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
   }
 }

@@ -18,7 +18,9 @@
 
 #include "core/PathRef.h"
 #include "core/Records.h"
+#include "core/images/CodecImage.h"
 #include "core/images/ResourceImage.h"
+#include "core/images/ScaledImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/images/TransformImage.h"
 #include "core/shapes/AppendShape.h"
@@ -36,12 +38,14 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/PathTypes.h"
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 #include "tgfx/platform/ImageReader.h"
+#include "tgfx/svg/SVGPathParser.h"
 #include "utils/TestUtils.h"
 #include "utils/TextShaper.h"
 #include "utils/common.h"
@@ -402,7 +406,7 @@ TGFX_TEST(CanvasTest, rasterizedImage) {
   auto source = std::static_pointer_cast<TransformImage>(image)->source;
   auto imageUniqueKey = std::static_pointer_cast<ResourceImage>(source)->uniqueKey;
   texture = Resource::Find<Texture>(context, imageUniqueKey);
-  EXPECT_TRUE(texture != nullptr);
+  EXPECT_TRUE(texture == nullptr);
   canvas->clear();
   image = image->makeMipmapped(true);
   EXPECT_TRUE(image->hasMipmaps());
@@ -1970,6 +1974,81 @@ TGFX_TEST(CanvasTest, MultiImageRect_NOSCALE_NEAREST) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect_NOSCALE_NEAREST_NEAREST"));
 }
 
+TGFX_TEST(CanvasTest, CornerEffectCompare) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  int surfaceWidth = 800;
+  int surfaceHeight = 800;
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  auto* canvas = surface->getCanvas();
+  Paint normalPaint;
+  normalPaint.setStyle(PaintStyle::Stroke);
+  normalPaint.setColor(Color::Red());
+  normalPaint.setStroke(Stroke(2));
+  Paint cornerPaint;
+  cornerPaint.setStyle(PaintStyle::Stroke);
+  cornerPaint.setColor(Color::White());
+  cornerPaint.setStroke(Stroke(2));
+
+  // rectangle
+  {
+    Path path;
+    path.addRect(Rect::MakeWH(200, 100));
+    auto effectedShape = Shape::MakeFrom(path);
+    effectedShape = tgfx::Shape::ApplyEffect(effectedShape, tgfx::PathEffect::MakeCorner(50));
+    canvas->translate(50, 50);
+    canvas->drawPath(path, normalPaint);
+    canvas->drawShape(effectedShape, cornerPaint);
+
+    canvas->translate(300, 0);
+    canvas->drawPath(path, normalPaint);
+    canvas->drawRoundRect(Rect::MakeWH(200, 100), 50, 50, cornerPaint);
+  }
+
+  // isolated bezier contour
+  {
+    auto path = SVGPathParser::FromSVGString(
+        "M63.6349 2.09663C-0.921635 70.6535 -10.5027 123.902 12.936 235.723L340.451 "
+        "345.547C273.528 "
+        "257.687 177.2 90.3553 327.269 123.902C514.855 165.834 165.216 -13.8778 63.6349 2.09663Z");
+    auto effectedShape = Shape::MakeFrom(*path);
+    effectedShape = tgfx::Shape::ApplyEffect(effectedShape, tgfx::PathEffect::MakeCorner(50));
+    canvas->translate(0, 200);
+    canvas->drawPath(*path, normalPaint);
+    canvas->drawShape(effectedShape, cornerPaint);
+  }
+
+  // open bezier contour
+  {
+    auto path = SVGPathParser::FromSVGString(
+        "M16.9138 155.924C-1.64829 106.216 -15.1766 1.13521 47.1166 1.13519C47.1166 143.654 "
+        "144.961 "
+        "149.632 150.939 226.712");
+    auto effectedShape = Shape::MakeFrom(*path);
+    effectedShape = tgfx::Shape::ApplyEffect(effectedShape, tgfx::PathEffect::MakeCorner(50));
+    canvas->translate(-300, 0);
+    canvas->drawPath(*path, normalPaint);
+    canvas->drawShape(effectedShape, cornerPaint);
+  }
+
+  // two circle union
+  {
+    Path path1;
+    path1.addOval(Rect::MakeXYWH(100, 100, 125, 125));
+    Path unionPath;
+    unionPath.addOval(Rect::MakeXYWH(200, 100, 125, 125));
+    unionPath.addPath(path1, PathOp::Union);
+    auto effectedShape = Shape::MakeFrom(unionPath);
+    effectedShape = tgfx::Shape::ApplyEffect(effectedShape, tgfx::PathEffect::MakeCorner(50));
+    canvas->translate(0, 300);
+    canvas->drawPath(unionPath, normalPaint);
+    canvas->drawShape(effectedShape, cornerPaint);
+  }
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/CornerEffectCompare"));
+}
+
 TGFX_TEST(CanvasTest, CornerTest) {
   ContextScope scope;
   auto* context = scope.getContext();
@@ -2667,6 +2746,29 @@ TGFX_TEST(CanvasTest, ScaleImage) {
   canvas->clipRect(Rect::MakeXYWH(100, 100, 500, 500));
   canvas->drawImage(scaledImage);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaled_clip"));
+  auto imagePath = "resources/apitest/rotation.jpg";
+  image = MakeImage(imagePath);
+  auto newWidth = image->width() / 8;
+  auto newHeight = image->height() / 8;
+  scaledImage = image->makeScaled(newWidth, newHeight);
+  canvas->clear();
+  canvas->drawImage(scaledImage);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaled_imageCodec_box_filter"));
+  auto codec = MakeImageCodec(imagePath);
+  ASSERT_TRUE(codec != nullptr);
+  Bitmap bitmap(codec->width(), codec->height(), false);
+  ASSERT_FALSE(bitmap.isEmpty());
+  Pixmap pixmap(bitmap);
+  auto result = codec->readPixels(pixmap.info(), pixmap.writablePixels());
+  pixmap.reset();
+  EXPECT_TRUE(result);
+  image = Image::MakeFrom(bitmap);
+  newWidth = image->width() / 8;
+  newHeight = image->height() / 8;
+  scaledImage = image->makeScaled(newWidth, newHeight);
+  canvas->clear();
+  canvas->drawImage(scaledImage);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaled_imageBuffer_box_filter"));
 }
 
 TGFX_TEST(CanvasTest, ScalePictureImage) {
@@ -2697,10 +2799,7 @@ TGFX_TEST(CanvasTest, ScalePictureImage) {
   canvas->drawImage(scaledImage);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/pic_scaled_image"));
   canvas->clear();
-  image = image->makeMipmapped(true);
-  EXPECT_TRUE(image->hasMipmaps());
   SamplingOptions sampling(FilterMode::Linear, MipmapMode::Linear);
-  canvas->clear();
   scaledImage = ScaleImage(scaledImage, 2.f, sampling);
   EXPECT_EQ(scaledImage->width(), 400);
   EXPECT_EQ(scaledImage->height(), 566);
