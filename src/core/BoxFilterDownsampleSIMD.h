@@ -19,17 +19,20 @@
 #pragma once
 #include <cstdint>
 namespace tgfx {
-int ResizeAreaFastx2SIMDFunc(int channelNum, int step, const uint8_t* srcData, uint8_t* dstData,
-                             int w, int padding, int shiftNum);
+int ResizeAreaFastx2SIMDFunc(int channelNum, int srcStep, int dstStep, const uint8_t* srcData,
+                             uint8_t* dstData, int w, int, int padding, int shiftNum);
 
-int ResizeAreaFastx4SIMDFunc(int channelNum, int step, const uint8_t* srcData, uint8_t* dstData,
-                             int w, int scale, int padding, int shiftNum);
+int ResizeAreaFastx4SIMDFunc(int channelNum, int srcStep, int dstStep, const uint8_t* srcData,
+                             uint8_t* dstData, int w, int scale, int padding, int shiftNum);
 
-int ResizeAreaFastx8SIMDFunc(int channelNum, int step, const uint8_t* srcData, uint8_t* dstData,
-                             int w, int scale, int padding, int shiftNum);
+int ResizeAreaFastx8SIMDFunc(int channelNum, int srcStep, int dstStep, const uint8_t* srcData,
+                             uint8_t* dstData, int w, int scale, int padding, int shiftNum);
 
-int ResizeAreaFastxNSimdFunc(int channelNum, int step, const uint8_t* srcData, uint8_t* dstData,
-                             int w, int scale, int padding, int shiftNum);
+int ResizeAreaFastx16SimdFunc(int channelNum, int srcStep, int dstStep, const uint8_t* srcData,
+                              uint8_t* dstData, int w, int scale, int padding, int shiftNum);
+
+int ResizeAreaFastxNSimdFunc(int channelNum, int srcStep, int dstStep, const uint8_t* srcData,
+                             uint8_t* dstData, int w, int scale, int padding, int shiftNum);
 
 void Mul(const float* buf, int width, float beta, float* sum);
 
