@@ -35,7 +35,7 @@ std::shared_ptr<ImageCodec> CodecImage::getCodec() const {
 std::shared_ptr<Image> CodecImage::onMakeScaled(int newWidth, int newHeight,
                                                 const SamplingOptions& sampling) const {
   if (newWidth <= generator->width() && newHeight <= generator->height()) {
-    auto image = std::make_shared<CodecImage>(uniqueKey, getCodec(), newWidth, newHeight);
+    auto image = std::make_shared<CodecImage>(UniqueKey::Make(), getCodec(), newWidth, newHeight);
     image->weakThis = image;
     return image;
   }

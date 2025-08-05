@@ -185,29 +185,32 @@ uint32_t JpegCodec::getScaledDimensions(int newWidth, int newHeight) const {
 
 bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (auto scaleDimensions = getScaledDimensions(dstInfo.width(), dstInfo.height())) {
-    return readScaledPixels(dstInfo, dstPixels, scaleDimensions);
+    return readScaledPixels(dstInfo.colorType(), dstInfo.alphaType(), dstInfo.rowBytes(), dstPixels,
+                            scaleDimensions);
   }
   return ImageCodec::readPixels(dstInfo, dstPixels);
 }
 
-bool JpegCodec::onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const {
-  return readScaledPixels(dstInfo, dstPixels, 8);
+bool JpegCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                             void* dstPixels) const {
+  return readScaledPixels(colorType, alphaType, dstRowBytes, dstPixels, 8);
 }
 
-bool JpegCodec::readScaledPixels(const ImageInfo& dstInfo, void* dstPixels,
-                                 uint32_t scaleNum) const {
-  if (dstPixels == nullptr || dstInfo.isEmpty()) {
+bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                                 void* dstPixels, uint32_t scaleNum) const {
+  if (dstPixels == nullptr) {
     return false;
   }
-  if (dstInfo.colorType() == ColorType::ALPHA_8) {
-    memset(dstPixels, 255, dstInfo.rowBytes() * static_cast<size_t>(height()));
+  if (colorType == ColorType::ALPHA_8) {
+    memset(dstPixels, 255, dstRowBytes * static_cast<size_t>(height()));
     return true;
   }
+  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
   Bitmap bitmap = {};
   auto outPixels = dstPixels;
-  auto outRowBytes = dstInfo.rowBytes();
+  auto outRowBytes = dstRowBytes;
   J_COLOR_SPACE out_color_space;
-  switch (dstInfo.colorType()) {
+  switch (colorType) {
     case ColorType::RGBA_8888:
       out_color_space = JCS_EXT_RGBA;
       break;
@@ -221,7 +224,7 @@ bool JpegCodec::readScaledPixels(const ImageInfo& dstInfo, void* dstPixels,
       out_color_space = JCS_RGB565;
       break;
     default:
-      auto success = bitmap.allocPixels(dstInfo.width(), dstInfo.height(), false, false);
+      auto success = bitmap.allocPixels(width(), height(), false, false);
       if (!success) {
         return false;
       }

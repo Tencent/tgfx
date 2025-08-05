@@ -23,18 +23,18 @@
 namespace tgfx {
 class PixelBufferCodec : public ImageCodec {
  public:
-  static std::shared_ptr<PixelBufferCodec> Make(const std::shared_ptr<PixelBuffer>& source,
-                                                int width, int height);
+  static std::shared_ptr<PixelBufferCodec> Make(std::shared_ptr<PixelBuffer> source);
 
-  PixelBufferCodec(const std::shared_ptr<PixelBuffer>& source, int width, int height)
-      : ImageCodec(width, height), source(source) {
+  PixelBufferCodec(std::shared_ptr<PixelBuffer> source)
+      : ImageCodec(source->width(), source->height()), source(std::move(source)) {
   }
 
   bool isAlphaOnly() const override {
     return source->isAlphaOnly();
   }
 
-  bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
+  bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                    void* dstPixels) const override;
 
  private:
   std::shared_ptr<PixelBuffer> source = nullptr;

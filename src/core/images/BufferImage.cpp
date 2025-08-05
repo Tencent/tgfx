@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BufferImage.h"
+#include "CodecImage.h"
 #include "core/PixelBuffer.h"
 #include "core/PixelBufferCodec.h"
 #include "gpu/ProxyProvider.h"
@@ -39,9 +40,9 @@ std::shared_ptr<Image> BufferImage::onMakeScaled(int newWidth, int newHeight,
                                                  const SamplingOptions& sampling) const {
   if (imageBuffer->isPixelBuffer() && newWidth < imageBuffer->width() &&
       newHeight < imageBuffer->height()) {
-    auto pixelBuffer = std::static_pointer_cast<PixelBuffer>(imageBuffer);
-    auto codec = PixelBufferCodec::Make(pixelBuffer, newWidth, newHeight);
-    return Image::MakeFrom(codec);
+    auto codec = PixelBufferCodec::Make(std::static_pointer_cast<PixelBuffer>(imageBuffer));
+    auto image = Image::MakeFrom(codec);
+    return image->makeScaled(newWidth, newHeight, sampling);
   }
   return ResourceImage::onMakeScaled(newWidth, newHeight, sampling);
 }

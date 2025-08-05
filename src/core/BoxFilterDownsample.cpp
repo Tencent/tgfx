@@ -23,8 +23,6 @@
 #include <cmath>
 #include <cstdint>
 #include <memory>
-#include "tgfx/core/Buffer.h"
-#include "tgfx/core/Pixmap.h"
 #include "utils/Log.h"
 
 namespace tgfx {
@@ -291,7 +289,7 @@ static void ResizeArea(const FastFuncInfo& srcInfo, FastFuncInfo& dstInfo,
 }
 
 void BoxFilterDownsample(const void* inputPixels, const PixelLayout& inputLayout,
-                         void* outputPixels, const PixelLayout& outputLayout, bool alphaOnly) {
+                         void* outputPixels, const PixelLayout& outputLayout, bool isOneComponent) {
   ASSERT(inputPixels != nullptr && outputPixels != nullptr)
   ASSERT(inputLayout.width > 0 && inputLayout.height > 0 && outputLayout.width > 0 &&
          outputLayout.height > 0)
@@ -300,7 +298,7 @@ void BoxFilterDownsample(const void* inputPixels, const PixelLayout& inputLayout
 
   auto scaleX = static_cast<double>(inputLayout.width) / outputLayout.width;
   auto scaleY = static_cast<double>(inputLayout.height) / outputLayout.height;
-  int channelNum = alphaOnly ? 1 : 4;
+  int channelNum = isOneComponent ? 1 : 4;
   int iScaleX = SaturateCast<int>(scaleX);
   int iScaleY = SaturateCast<int>(scaleY);
   bool isAreaFast =
@@ -360,37 +358,5 @@ void BoxFilterDownsample(const void* inputPixels, const PixelLayout& inputLayout
   }
   tabOffset[dstY] = ytabSize;
   ResizeArea(srcInfo, dstInfo, xtab, xtabSize, ytab, ytabSize, tabOffset, channelNum);
-}
-
-bool BoxFilterDownsample(const void* inputPixels, const ImageInfo& inputInfo, void* outputPixels,
-                         const ImageInfo& outputInfo) {
-  Buffer dstTempBuffer = {};
-  Buffer srcTempBuffer = {};
-  auto dstImageInfo = outputInfo;
-  auto srcImageInfo = inputInfo;
-  auto srcData = inputPixels;
-  auto dstData = outputPixels;
-  if (inputInfo.colorType() == ColorType::RGBA_1010102 ||
-      inputInfo.colorType() == ColorType::RGBA_F16) {
-    srcImageInfo = inputInfo.makeColorType(ColorType::RGBA_8888);
-    srcTempBuffer.alloc(srcImageInfo.byteSize());
-    Pixmap(inputInfo, inputPixels).readPixels(srcImageInfo, srcTempBuffer.bytes());
-    srcData = srcTempBuffer.data();
-  }
-  if (srcImageInfo.colorType() != outputInfo.colorType()) {
-    dstImageInfo = outputInfo.makeColorType(srcImageInfo.colorType());
-    dstTempBuffer.alloc(dstImageInfo.byteSize());
-    dstData = dstTempBuffer.data();
-  }
-  auto inputLayout = PixelLayout{srcImageInfo.width(), srcImageInfo.height(),
-                                 static_cast<int>(srcImageInfo.rowBytes())};
-  auto outputLayout = PixelLayout{dstImageInfo.width(), dstImageInfo.height(),
-                                  static_cast<int>(dstImageInfo.rowBytes())};
-  BoxFilterDownsample(srcData, inputLayout, dstData, outputLayout, srcImageInfo.isAlphaOnly());
-
-  if (!dstTempBuffer.isEmpty()) {
-    Pixmap(dstImageInfo, dstData).readPixels(outputInfo, outputPixels);
-  }
-  return true;
 }
 }  // namespace tgfx

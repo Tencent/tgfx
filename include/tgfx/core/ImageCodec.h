@@ -86,8 +86,9 @@ class ImageCodec : public ImageGenerator {
 
   /**
   * Decodes the image into the given pixel buffer using the specified image info. If the size
-  * in dstInfo differs from the codec's size, this method will try to scale the image down to
-  * fit dstInfo. Only downscaling is supported. Returns true if decoding succeeds, false otherwise.
+  * in dstInfo differs from the codec's size, this method will attempt to downscale the image
+  * using a box filter algorithm to fit dstInfo. Only downscaling is supported. Returns true
+  * if decoding succeeds, false otherwise.
   */
   virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const;
 
@@ -98,7 +99,8 @@ class ImageCodec : public ImageGenerator {
 
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
-  virtual bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const = 0;
+  virtual bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                            void* dstPixels) const = 0;
 
   virtual std::shared_ptr<Data> getEncodedData() const {
     return nullptr;

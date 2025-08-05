@@ -21,30 +21,22 @@
 #include "PixelBuffer.h"
 
 namespace tgfx {
-std::shared_ptr<PixelBufferCodec> PixelBufferCodec::Make(const std::shared_ptr<PixelBuffer>& source,
-                                                         int width, int height) {
-  if (!source || width <= 0 || height <= 0) {
+std::shared_ptr<PixelBufferCodec> PixelBufferCodec::Make(std::shared_ptr<PixelBuffer> source) {
+  if (!source) {
     return nullptr;
   }
-  auto image = std::make_shared<PixelBufferCodec>(source, width, height);
-  return image;
+  return std::make_shared<PixelBufferCodec>(std::move(source));
 }
 
-bool PixelBufferCodec::onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const {
-  if (dstInfo.width() > source->width() || dstInfo.height() > source->height()) {
-    return false;
-  }
+bool PixelBufferCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                                    void* dstPixels) const {
   auto pixels = source->lockPixels();
   if (pixels == nullptr) {
     return false;
   }
-  if (dstInfo.width() == source->width() && dstInfo.height() == source->height()) {
-    auto srcPixmap = Pixmap(source->info(), pixels);
-    return srcPixmap.readPixels(dstInfo, dstPixels);
-  }
-  auto result = BoxFilterDownsample(pixels, source->info(), dstPixels, dstInfo);
-  source->unlockPixels();
-  return result;
+  auto srcPixmap = Pixmap(source->info(), pixels);
+  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
+  return srcPixmap.readPixels(dstInfo, dstPixels);
 }
 
 }  // namespace tgfx

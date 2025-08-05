@@ -123,8 +123,9 @@ NativeCodec::~NativeCodec() {
   }
 }
 
-bool NativeCodec::onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const {
-  if (dstInfo.isEmpty() || dstPixels == nullptr) {
+bool NativeCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                               void* dstPixels) const {
+  if (dstPixels == nullptr) {
     return false;
   }
   NSData* data = nil;
@@ -157,7 +158,7 @@ bool NativeCodec::onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const 
     }
   }
   Buffer tempBuffer = {};
-  auto colorType = dstInfo.colorType();
+  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
   auto info = dstInfo;
   auto pixels = dstPixels;
   if (colorType != ColorType::RGBA_8888 && colorType != ColorType::BGRA_8888 &&

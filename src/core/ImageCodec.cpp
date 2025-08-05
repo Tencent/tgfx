@@ -150,17 +150,43 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     return false;
   }
   if (dstInfo.width() == width() && dstInfo.height() == height()) {
-    return onReadPixels(dstInfo, dstPixels);
+    return onReadPixels(dstInfo.colorType(), dstInfo.alphaType(), dstInfo.rowBytes(), dstPixels);
   }
-  auto colorType = isAlphaOnly() ? ColorType::ALPHA_8 : ColorType::RGBA_8888;
-  auto srcInfo = ImageInfo::Make(width(), height(), colorType);
-  auto buffer = Buffer(srcInfo.byteSize());
-  auto result = onReadPixels(srcInfo, buffer.data());
+
+  Buffer buffer = {};
+  Buffer dstTempBuffer = {};
+  auto dstData = dstPixels;
+  auto dstImageInfo = dstInfo;
+  auto colorType = dstInfo.colorType();
+  auto srcRowBytes = dstInfo.bytesPerPixel() * static_cast<size_t>(width());
+  if (dstInfo.colorType() == ColorType::RGBA_1010102 || dstInfo.colorType() == ColorType::RGB_565 ||
+      dstInfo.colorType() == ColorType::RGBA_F16) {
+    colorType = ColorType::RGBA_8888;
+    srcRowBytes = ImageInfo::GetBytesPerPixel(colorType) * static_cast<size_t>(width());
+    dstImageInfo = dstInfo.makeColorType(colorType);
+    dstTempBuffer.alloc(dstImageInfo.byteSize());
+    if (dstImageInfo.isEmpty()) {
+      return false;
+    }
+    dstData = dstTempBuffer.bytes();
+  }
+  buffer.alloc(srcRowBytes * static_cast<size_t>(height()));
+  if (buffer.isEmpty()) {
+    return false;
+  }
+  auto result = onReadPixels(colorType, dstInfo.alphaType(), srcRowBytes, buffer.data());
   if (!result) {
     return false;
   }
-
-  BoxFilterDownsample(buffer.data(), srcInfo, dstPixels, dstInfo);
+  auto isOneComponent = dstImageInfo.colorType() == ColorType::Gray_8 ||
+                        dstImageInfo.colorType() == ColorType::ALPHA_8;
+  auto inputLayout = PixelLayout{width(), height(), static_cast<int>(srcRowBytes)};
+  auto outputLayout = PixelLayout{dstImageInfo.width(), dstImageInfo.height(),
+                                  static_cast<int>(dstImageInfo.rowBytes())};
+  BoxFilterDownsample(buffer.data(), inputLayout, dstData, outputLayout, isOneComponent);
+  if (!dstTempBuffer.isEmpty()) {
+    Pixmap(dstImageInfo, dstData).readPixels(dstInfo, dstPixels);
+  }
   return true;
 }
 

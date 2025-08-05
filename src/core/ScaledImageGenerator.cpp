@@ -26,9 +26,7 @@ std::shared_ptr<ScaledImageGenerator> ScaledImageGenerator::MakeFrom(
   if (!codec || width <= 0 || height <= 0) {
     return nullptr;
   }
-  auto image =
-      std::shared_ptr<ScaledImageGenerator>(new ScaledImageGenerator(width, height, codec));
-  return image;
+  return std::shared_ptr<ScaledImageGenerator>(new ScaledImageGenerator(width, height, codec));
 }
 
 ScaledImageGenerator::ScaledImageGenerator(int width, int height,

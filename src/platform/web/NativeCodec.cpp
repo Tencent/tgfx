@@ -103,8 +103,9 @@ bool NativeCodec::asyncSupport() const {
   return false;
 }
 
-bool NativeCodec::onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const {
-  if (dstInfo.isEmpty() || dstPixels == nullptr) {
+bool NativeCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                               void* dstPixels) const {
+  if (dstPixels == nullptr) {
     return false;
   }
   auto image = nativeImage;
@@ -121,6 +122,7 @@ bool NativeCodec::onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const 
     return false;
   }
   auto info = ImageInfo::Make(width(), height(), ColorType::RGBA_8888, AlphaType::Unpremultiplied);
+  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
   Pixmap pixmap(info, imageData->data());
   auto result = pixmap.readPixels(dstInfo, dstPixels);
   return result;

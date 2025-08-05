@@ -34,7 +34,9 @@ class RawPixelCodec : public ImageCodec {
  protected:
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
-  bool onReadPixels(const ImageInfo& dstInfo, void* dstPixels) const override {
+  bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                    void* dstPixels) const override {
+    auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
     return Pixmap(info, pixels->data()).readPixels(dstInfo, dstPixels);
   }
 
