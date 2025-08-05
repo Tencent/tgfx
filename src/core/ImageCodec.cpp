@@ -159,19 +159,17 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   auto dstImageInfo = dstInfo;
   auto colorType = dstInfo.colorType();
   auto srcRowBytes = dstInfo.bytesPerPixel() * static_cast<size_t>(width());
-  if (dstInfo.colorType() == ColorType::RGBA_1010102 || dstInfo.colorType() == ColorType::RGB_565 ||
-      dstInfo.colorType() == ColorType::RGBA_F16) {
+  if (dstInfo.colorType() != ColorType::RGBA_8888 && dstInfo.colorType() != ColorType::BGRA_8888 &&
+      dstInfo.colorType() != ColorType::ALPHA_8 && dstInfo.colorType() != ColorType::Gray_8) {
     colorType = ColorType::RGBA_8888;
     srcRowBytes = ImageInfo::GetBytesPerPixel(colorType) * static_cast<size_t>(width());
     dstImageInfo = dstInfo.makeColorType(colorType);
-    dstTempBuffer.alloc(dstImageInfo.byteSize());
-    if (dstImageInfo.isEmpty()) {
+    if (!dstTempBuffer.alloc(dstImageInfo.byteSize())) {
       return false;
     }
     dstData = dstTempBuffer.bytes();
   }
-  buffer.alloc(srcRowBytes * static_cast<size_t>(height()));
-  if (buffer.isEmpty()) {
+  if (!buffer.alloc(srcRowBytes * static_cast<size_t>(height()))) {
     return false;
   }
   auto result = onReadPixels(colorType, dstInfo.alphaType(), srcRowBytes, buffer.data());

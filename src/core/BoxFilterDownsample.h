@@ -40,7 +40,7 @@ struct PixelLayout {
  * @param inputLayout  Structure describing source image dimensions and layout
  * @param outputPixels Pointer to the destination buffer where downsampled image will be stored
  * @param outputLayout Structure describing destination image dimensions and layout
- * @param isOneComponent Flag indicating whether to process only alpha channel (true) or all RGBA
+ * @param isOneComponent Indicates whether each pixel has a single channel (true) or four channels.
  * channels (false)
  *
  */
