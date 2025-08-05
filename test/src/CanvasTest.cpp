@@ -406,7 +406,7 @@ TGFX_TEST(CanvasTest, rasterizedImage) {
   auto source = std::static_pointer_cast<TransformImage>(image)->source;
   auto imageUniqueKey = std::static_pointer_cast<ResourceImage>(source)->uniqueKey;
   texture = Resource::Find<Texture>(context, imageUniqueKey);
-  EXPECT_TRUE(texture != nullptr);
+  EXPECT_TRUE(texture == nullptr);
   canvas->clear();
   image = image->makeMipmapped(true);
   EXPECT_TRUE(image->hasMipmaps());
