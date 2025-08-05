@@ -70,12 +70,13 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageGenerator> generator
     auto orientation = codec->orientation();
     image = std::make_shared<CodecImage>(std::move(codec), codec->width(), codec->height(), false);
     image->weakThis = image;
+    image = image->makeRasterized();
     image = image->makeOriented(orientation);
   } else {
     image = std::make_shared<GeneratorImage>(std::move(generator), false);
     image->weakThis = image;
+    image = image->makeRasterized();
   }
-  image = image->makeRasterized();
   return image;
 }
 
