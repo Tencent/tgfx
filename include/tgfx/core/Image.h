@@ -334,7 +334,8 @@ class Image {
                                               const SamplingOptions& sampling) const;
 
   /**
-   * Returns a texture proxy for the entire Image.
+   * Returns a texture proxy for the entire Image. Note that the returned texture size may differ
+   * from the scaling factor in TPArgs, as subclasses can choose whether to apply exact scaling.
    * @param args The TPArgs used to create the texture proxy.
    */
   virtual std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const;
