@@ -42,7 +42,7 @@ int ResizeAreaFast4chx16SIMDFuncImpl(int srcStep, int dstStep, const uint8_t* sr
   hn::Full128<uint16_t> du16;
   hn::Full64<uint16_t> duh16;
   hn::Full32<uint8_t> duh8;
-  auto value = hn::Set(duh16, padding);
+  auto value = hn::Set(duh16, static_cast<uint16_t>(padding));
   size_t n = static_cast<size_t>(scale / 4);
   for (; dstX <= w - 4; dstX += 4, srcData += hn::Lanes(du8) * n, dstData += 4) {
     auto sum = hn::Set(du16, 0);
@@ -79,7 +79,7 @@ int ResizeAreaFast4chxNSIMDFuncImpl(int srcStep, int dstStep, const uint8_t* src
   hn::Full32<uint8_t> duh8;
   hn::Full128<uint16_t> du16;
   hn::Full128<uint32_t> du32;
-  auto value = hn::Set(du32, padding);
+  auto value = hn::Set(du32, static_cast<uint32_t>(padding));
   size_t n = static_cast<size_t>(scale / 4);
   for (; dstX <= w - 4; dstX += 4, srcData += hn::Lanes(du8) * n, dstData += 4) {
     auto sum = hn::Set(du32, 0);
@@ -154,7 +154,7 @@ int ResizeAreaFastx2SIMDFuncImpl(int channelNum, int srcStep, int dstStep, const
     hn::ScalableTag<uint8_t> du8;
     hn::ScalableTag<uint16_t> du16;
     const int n = static_cast<int>(hn::Lanes(du8));
-    auto value = hn::Set(du16, padding);
+    auto value = hn::Set(du16, static_cast<uint16_t>(padding));
     for (; dstX <= w - n; dstX += n, srcData0 += 2 * n, srcData1 += 2 * n, dstData += n) {
       hn::Vec<decltype(du8)> row00, row01, row10, row11;
       hn::LoadInterleaved2(du8, srcData0, row00, row01);
@@ -178,7 +178,7 @@ int ResizeAreaFastx2SIMDFuncImpl(int channelNum, int srcStep, int dstStep, const
     hn::Full64<uint8_t> fix64Du8;
     hn::Full128<uint16_t> fix128Du16;
     hn::Full64<uint16_t> fix64Du16;
-    auto fixValue = hn::Set(fix128Du16, padding);
+    auto fixValue = hn::Set(fix128Du16, static_cast<uint16_t>(padding));
     for (; dstX <= w - 8; dstX += 8, srcData0 += 16, srcData1 += 16, dstData += 8) {
       hn::Vec<decltype(fix128Du8)> vRow0, vRow1;
       if (static_cast<size_t>(srcStep) % (hn::Lanes(fix128Du8) * sizeof(uint8_t)) == 0) {
@@ -220,7 +220,7 @@ int ResizeAreaFastx4SIMDFuncImpl(int channelNum, int srcStep, int dstStep, const
     hn::ScalableTag<uint8_t> du8;
     hn::ScalableTag<uint16_t> du16;
     const int n = static_cast<int>(hn::Lanes(du8));
-    auto value = hn::Set(du16, padding);
+    auto value = hn::Set(du16, static_cast<uint16_t>(padding));
     for (; dstX <= w - n; dstX += n, srcData0 += 4 * n, srcData1 += 4 * n, srcData2 += 4 * n,
                           srcData3 += 4 * n, dstData += n) {
       hn::Vec<decltype(du8)> row[4][4];
