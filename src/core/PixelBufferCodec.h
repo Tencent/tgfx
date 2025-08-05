@@ -15,33 +15,28 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
 #pragma once
 
+#include "PixelBuffer.h"
 #include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
-class RawPixelCodec : public ImageCodec {
+class PixelBufferCodec : public ImageCodec {
  public:
-  RawPixelCodec(const ImageInfo& info, std::shared_ptr<Data> pixels)
-      : ImageCodec(info.width(), info.height()), info(info), pixels(std::move(pixels)) {
+  static std::shared_ptr<PixelBufferCodec> Make(std::shared_ptr<PixelBuffer> source);
+
+  PixelBufferCodec(std::shared_ptr<PixelBuffer> source)
+      : ImageCodec(source->width(), source->height()), source(std::move(source)) {
   }
 
   bool isAlphaOnly() const override {
-    return info.isAlphaOnly();
+    return source->isAlphaOnly();
   }
-
- protected:
-  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
   bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
-                    void* dstPixels) const override {
-    auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
-    return Pixmap(info, pixels->data()).readPixels(dstInfo, dstPixels);
-  }
+                    void* dstPixels) const override;
 
  private:
-  ImageInfo info = {};
-  std::shared_ptr<Data> pixels = nullptr;
+  std::shared_ptr<PixelBuffer> source = nullptr;
 };
 }  // namespace tgfx

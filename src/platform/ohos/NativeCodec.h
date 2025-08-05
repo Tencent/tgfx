@@ -28,6 +28,9 @@ class NativeCodec : public ImageCodec {
  public:
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 
+  bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                    void* dstPixels) const override;
+
  private:
   std::string imagePath;
   std::shared_ptr<Data> imageBytes;

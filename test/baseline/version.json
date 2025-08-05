@@ -84,12 +84,14 @@
         "pic_scaled_image_origin": "80c523ee",
         "pic_scaled_pic_clip": "80c523ee",
         "pic_scaled_scale_up": "80c523ee",
-        "rasterized": "80c523ee",
+        "rasterized": "18b8a6e5",
         "rasterized_mipmap": "80c523ee",
         "rasterized_scale_up": "80c523ee",
         "saveLayer": "80c523ee",
         "scaled_clip": "80c523ee",
-        "scaled_image": "80c523ee",
+        "scaled_image": "18b8a6e5",
+        "scaled_imageBuffer_box_filter": "7c95c32d",
+        "scaled_imageCodec_box_filter": "7c95c32d",
         "scaled_mipmap": "80c523ee",
         "scaled_scale_up": "80c523ee",
         "shape": "b79ee1a6",
@@ -270,7 +272,10 @@
         "WebpCodec_Encode_Alpha8": "d010fb8",
         "WebpCodec_Encode_Gray8": "b74f86c1",
         "WebpCodec_Encode_RGB565": "d010fb8",
-        "WebpCodec_Encode_RGBA": "d010fb8"
+        "WebpCodec_Encode_RGBA": "d010fb8",
+        "read_RGBA_1010102_scaled_codec": "29745c73",
+        "read_RGBA_F16_scaled_codec": "29745c73",
+        "read_RGB_565_scaled_codec": "29745c73"
     },
     "SVGTest": {
         "blur": "b1db872",

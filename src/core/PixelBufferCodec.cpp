@@ -16,32 +16,27 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/core/ImageCodec.h"
+#include "PixelBufferCodec.h"
+#include "BoxFilterDownsample.h"
+#include "PixelBuffer.h"
 
 namespace tgfx {
-class RawPixelCodec : public ImageCodec {
- public:
-  RawPixelCodec(const ImageInfo& info, std::shared_ptr<Data> pixels)
-      : ImageCodec(info.width(), info.height()), info(info), pixels(std::move(pixels)) {
+std::shared_ptr<PixelBufferCodec> PixelBufferCodec::Make(std::shared_ptr<PixelBuffer> source) {
+  if (!source) {
+    return nullptr;
   }
+  return std::make_shared<PixelBufferCodec>(std::move(source));
+}
 
-  bool isAlphaOnly() const override {
-    return info.isAlphaOnly();
+bool PixelBufferCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                                    void* dstPixels) const {
+  auto pixels = source->lockPixels();
+  if (pixels == nullptr) {
+    return false;
   }
+  auto srcPixmap = Pixmap(source->info(), pixels);
+  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
+  return srcPixmap.readPixels(dstInfo, dstPixels);
+}
 
- protected:
-  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
-
-  bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
-                    void* dstPixels) const override {
-    auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
-    return Pixmap(info, pixels->data()).readPixels(dstInfo, dstPixels);
-  }
-
- private:
-  ImageInfo info = {};
-  std::shared_ptr<Data> pixels = nullptr;
-};
 }  // namespace tgfx

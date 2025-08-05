@@ -18,7 +18,9 @@
 
 #include "core/PathRef.h"
 #include "core/Records.h"
+#include "core/images/CodecImage.h"
 #include "core/images/ResourceImage.h"
+#include "core/images/ScaledImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/images/TransformImage.h"
 #include "core/shapes/AppendShape.h"
@@ -404,7 +406,7 @@ TGFX_TEST(CanvasTest, rasterizedImage) {
   auto source = std::static_pointer_cast<TransformImage>(image)->source;
   auto imageUniqueKey = std::static_pointer_cast<ResourceImage>(source)->uniqueKey;
   texture = Resource::Find<Texture>(context, imageUniqueKey);
-  EXPECT_TRUE(texture != nullptr);
+  EXPECT_TRUE(texture == nullptr);
   canvas->clear();
   image = image->makeMipmapped(true);
   EXPECT_TRUE(image->hasMipmaps());
@@ -2744,6 +2746,29 @@ TGFX_TEST(CanvasTest, ScaleImage) {
   canvas->clipRect(Rect::MakeXYWH(100, 100, 500, 500));
   canvas->drawImage(scaledImage);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaled_clip"));
+  auto imagePath = "resources/apitest/rotation.jpg";
+  image = MakeImage(imagePath);
+  auto newWidth = image->width() / 8;
+  auto newHeight = image->height() / 8;
+  scaledImage = image->makeScaled(newWidth, newHeight);
+  canvas->clear();
+  canvas->drawImage(scaledImage);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaled_imageCodec_box_filter"));
+  auto codec = MakeImageCodec(imagePath);
+  ASSERT_TRUE(codec != nullptr);
+  Bitmap bitmap(codec->width(), codec->height(), false);
+  ASSERT_FALSE(bitmap.isEmpty());
+  Pixmap pixmap(bitmap);
+  auto result = codec->readPixels(pixmap.info(), pixmap.writablePixels());
+  pixmap.reset();
+  EXPECT_TRUE(result);
+  image = Image::MakeFrom(bitmap);
+  newWidth = image->width() / 8;
+  newHeight = image->height() / 8;
+  scaledImage = image->makeScaled(newWidth, newHeight);
+  canvas->clear();
+  canvas->drawImage(scaledImage);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaled_imageBuffer_box_filter"));
 }
 
 TGFX_TEST(CanvasTest, ScalePictureImage) {
