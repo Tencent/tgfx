@@ -41,8 +41,9 @@ std::shared_ptr<Image> BufferImage::onMakeScaled(int newWidth, int newHeight,
   if (imageBuffer->isPixelBuffer() && newWidth < imageBuffer->width() &&
       newHeight < imageBuffer->height()) {
     auto codec = PixelBufferCodec::Make(std::static_pointer_cast<PixelBuffer>(imageBuffer));
-    auto image = Image::MakeFrom(codec);
-    return image->makeScaled(newWidth, newHeight, sampling);
+    auto image = std::make_shared<CodecImage>(UniqueKey::Make(), std::move(codec), newWidth, newHeight);
+    image->weakThis = image;
+    return image;
   }
   return ResourceImage::onMakeScaled(newWidth, newHeight, sampling);
 }
