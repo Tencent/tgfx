@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.13)
 project(TGFX VERSION 0.0.0)
 
 #set(CMAKE_VERBOSE_MAKEFILE ON)
+option(TGFX_BUILD_VCPKG "Enable vcpkg package manager support for installation" OFF)
 include(./third_party/vendor_tools/vendor.cmake)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -25,8 +26,6 @@ option(TGFX_USE_FASTER_BLUR "Enable a faster blur algorithm instead of the stand
 # multiple flush() calls in a single frame, as it may cause screen tearing, where parts of the
 # screen update while others do not.
 option(TGFX_USE_ASYNC_PROMISE "Enable async promises for loading images on the web" OFF)
-
-option(TGFX_BUILD_VCPKG "Enable vcpkg package manager support for installation" OFF)
 
 # EMSCRIPTEN_PTHREADS can be set by vendor tools for building the wasm-mt architecture.
 if (NOT WEB OR EMSCRIPTEN_PTHREADS)
@@ -519,11 +518,11 @@ add_library(tgfx STATIC ${TGFX_FILES})
 add_dependencies(tgfx tgfx-vendor)
 target_compile_definitions(tgfx PUBLIC ${TGFX_DEFINES})
 target_compile_options(tgfx PUBLIC ${TGFX_COMPILE_OPTIONS})
-target_include_directories(tgfx 
-    PUBLIC 
+target_include_directories(tgfx
+    PUBLIC
         $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
         $<INSTALL_INTERFACE:include>
-    PRIVATE 
+    PRIVATE
         src
 )
 target_include_directories(tgfx SYSTEM PRIVATE ${TGFX_INCLUDES})
