@@ -36,6 +36,7 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/PathTypes.h"
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
@@ -1988,7 +1989,7 @@ TGFX_TEST(CanvasTest, CornerEffectCompare) {
   cornerPaint.setColor(Color::White());
   cornerPaint.setStroke(Stroke(2));
 
-  // 矩形
+  // rectangle
   {
     Path path;
     path.addRect(Rect::MakeWH(200, 100));
@@ -2003,7 +2004,7 @@ TGFX_TEST(CanvasTest, CornerEffectCompare) {
     canvas->drawRoundRect(Rect::MakeWH(200, 100), 50, 50, cornerPaint);
   }
 
-  // 封闭贝塞尔路径
+  // isolated bezier contour
   {
     auto path = SVGPathParser::FromSVGString(
         "M63.6349 2.09663C-0.921635 70.6535 -10.5027 123.902 12.936 235.723L340.451 "
@@ -2016,7 +2017,7 @@ TGFX_TEST(CanvasTest, CornerEffectCompare) {
     canvas->drawShape(effectedShape, cornerPaint);
   }
 
-  // 开放贝塞尔路径
+  // open bezier contour
   {
     auto path = SVGPathParser::FromSVGString(
         "M16.9138 155.924C-1.64829 106.216 -15.1766 1.13521 47.1166 1.13519C47.1166 143.654 "
@@ -2026,6 +2027,20 @@ TGFX_TEST(CanvasTest, CornerEffectCompare) {
     effectedShape = tgfx::Shape::ApplyEffect(effectedShape, tgfx::PathEffect::MakeCorner(50));
     canvas->translate(-300, 0);
     canvas->drawPath(*path, normalPaint);
+    canvas->drawShape(effectedShape, cornerPaint);
+  }
+
+  // two circle union
+  {
+    Path path1;
+    path1.addOval(Rect::MakeXYWH(100, 100, 125, 125));
+    Path unionPath;
+    unionPath.addOval(Rect::MakeXYWH(200, 100, 125, 125));
+    unionPath.addPath(path1, PathOp::Union);
+    auto effectedShape = Shape::MakeFrom(unionPath);
+    effectedShape = tgfx::Shape::ApplyEffect(effectedShape, tgfx::PathEffect::MakeCorner(50));
+    canvas->translate(0, 300);
+    canvas->drawPath(unionPath, normalPaint);
     canvas->drawShape(effectedShape, cornerPaint);
   }
 
