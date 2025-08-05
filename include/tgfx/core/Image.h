@@ -305,7 +305,6 @@ class Image {
     Decoded,
     Filter,
     Generator,
-    Mipmap,
     Orient,
     Picture,
     Rasterized,

@@ -22,9 +22,9 @@
 
 namespace tgfx {
 /**
- * RasterizedImage is an image that rasterizes another image with a scale and sampling options.
+ * RasterizedImage is an image that rasterizes another image.
  */
-class RasterizedImage : public ResourceImage {
+class RasterizedImage : public Image {
  public:
   /**
    * Note that this method always returns a non-mipmapped image.
@@ -47,18 +47,35 @@ class RasterizedImage : public ResourceImage {
     return source->isFullyDecoded();
   }
 
+  bool hasMipmaps() const override {
+    return source->hasMipmaps();
+  }
+
+  std::shared_ptr<Image> makeRasterized() const override;
+
  protected:
   Type type() const override {
     return Type::Rasterized;
   }
 
-  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
-                                                   const UniqueKey& key) const final;
+  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
+
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
+                                                      const SamplingArgs& samplingArgs,
+                                                      const Matrix* uvMatrix) const override;
 
   std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
                                       const SamplingOptions& sampling) const override;
 
+  std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
+
+  std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
+
  private:
+  UniqueKey getTextureKey() const;
+
+  UniqueKey uniqueKey;
+
   std::shared_ptr<Image> source = nullptr;
 
   RasterizedImage(UniqueKey uniqueKey, std::shared_ptr<Image> source);

@@ -20,8 +20,8 @@
 #include <memory>
 
 namespace tgfx {
-CodecImage::CodecImage(UniqueKey uniqueKey, std::shared_ptr<ImageCodec> codec)
-    : GeneratorImage(std::move(uniqueKey), std::move(codec)) {
+CodecImage::CodecImage(std::shared_ptr<ImageCodec> codec, bool mipmap)
+    : GeneratorImage(std::move(codec), mipmap) {
 }
 
 std::shared_ptr<ImageCodec> CodecImage::getCodec() const {

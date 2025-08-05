@@ -18,7 +18,7 @@
 
 #include "core/PathRef.h"
 #include "core/Records.h"
-#include "core/images/ResourceImage.h"
+#include "core/images/RasterizedImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/images/TransformImage.h"
 #include "core/shapes/AppendShape.h"
@@ -393,16 +393,15 @@ TGFX_TEST(CanvasTest, rasterizedImage) {
   auto canvas = surface->getCanvas();
   canvas->drawImage(rasterImage, 100, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized"));
-  auto rasterImageUniqueKey = std::static_pointer_cast<ResourceImage>(rasterImage)->uniqueKey;
+  auto rasterImageUniqueKey = std::static_pointer_cast<RasterizedImage>(rasterImage)->getTextureKey();
   auto texture = Resource::Find<Texture>(context, rasterImageUniqueKey);
   ASSERT_TRUE(texture != nullptr);
   EXPECT_TRUE(texture != nullptr);
   EXPECT_EQ(texture->width(), 454);
   EXPECT_EQ(texture->height(), 605);
-  auto source = std::static_pointer_cast<TransformImage>(image)->source;
-  auto imageUniqueKey = std::static_pointer_cast<ResourceImage>(source)->uniqueKey;
+  auto imageUniqueKey = std::static_pointer_cast<RasterizedImage>(image)->getTextureKey();
   texture = Resource::Find<Texture>(context, imageUniqueKey);
-  EXPECT_TRUE(texture != nullptr);
+  EXPECT_TRUE(texture == nullptr);
   canvas->clear();
   image = image->makeMipmapped(true);
   EXPECT_TRUE(image->hasMipmaps());
@@ -414,7 +413,7 @@ TGFX_TEST(CanvasTest, rasterizedImage) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized_mipmap"));
   texture = Resource::Find<Texture>(context, rasterImageUniqueKey);
   EXPECT_TRUE(texture == nullptr);
-  rasterImageUniqueKey = std::static_pointer_cast<ResourceImage>(rasterImage)->uniqueKey;
+  rasterImageUniqueKey = std::static_pointer_cast<RasterizedImage>(rasterImage)->getTextureKey();
   texture = Resource::Find<Texture>(context, rasterImageUniqueKey);
   EXPECT_TRUE(texture != nullptr);
   canvas->clear();

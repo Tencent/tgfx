@@ -112,6 +112,24 @@ void ProxyProvider::clearSharedVertexBuffer() {
   sharedVertexBufferFlushed = false;
 }
 
+bool ProxyProvider::assignProxyUniqueKey(std::shared_ptr<ResourceProxy> proxy,
+                                         const UniqueKey& uniqueKey) {
+  if (proxy == nullptr || proxy->context != context) {
+    return false;
+  }
+  if (proxy->uniqueKey == uniqueKey) {
+    return true;
+  }
+  if (!proxy->uniqueKey.empty()) {
+    proxyMap.erase(proxy->uniqueKey);
+  }
+  if (!uniqueKey.empty()) {
+    proxyMap[uniqueKey] = proxy;
+    proxy->assginUniqueKey(uniqueKey);
+  }
+  return true;
+}
+
 void ProxyProvider::uploadSharedVertexBuffer(std::shared_ptr<Data> data) {
   DEBUG_ASSERT(sharedVertexBuffer != nullptr);
   auto dataSource =
@@ -196,15 +214,18 @@ std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(std::shared_pt
 #endif
   triangleProxy = std::shared_ptr<VertexBufferProxy>(new VertexBufferProxy());
   addResourceProxy(triangleProxy, triangleKey);
+  if (!(renderFlags & RenderFlags::DisableCache)) {
+    triangleProxy->uniqueKey = triangleKey;
+  }
   textureProxy =
       std::shared_ptr<TextureProxy>(new TextureProxy(width, height, PixelFormat::ALPHA_8, true));
   addResourceProxy(textureProxy, textureKey);
   auto task = context->drawingBuffer()->make<ShapeBufferUploadTask>(triangleProxy, textureProxy,
                                                                     std::move(dataSource));
   if (!(renderFlags & RenderFlags::DisableCache)) {
-    task->textureProxy = textureProxy;
+    textureProxy->uniqueKey = textureKey;
   }
-  context->drawingManager()->addResourceTask(std::move(task), triangleKey, renderFlags);
+  context->drawingManager()->addResourceTask(std::move(task));
   return std::make_shared<GPUShapeProxy>(drawingMatrix, triangleProxy, textureProxy);
 }
 
@@ -214,10 +235,13 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxyByImageSource(
   auto format = alphaOnly ? PixelFormat::ALPHA_8 : PixelFormat::Unknown;
   auto proxy = std::shared_ptr<TextureProxy>(new TextureProxy(width, height, format, mipmapped));
   addResourceProxy(proxy, uniqueKey);
+  if (!uniqueKey.empty() && !(renderFlags & RenderFlags::DisableCache)) {
+    proxy->uniqueKey = uniqueKey;
+  }
   auto task =
       context->drawingBuffer()->make<TextureUploadTask>(proxy, std::move(source), mipmapped);
   auto drawingManager = context->drawingManager();
-  drawingManager->addResourceTask(std::move(task), uniqueKey, renderFlags);
+  drawingManager->addResourceTask(std::move(task));
   drawingManager->addGenerateMipmapsTask(proxy);
   return proxy;
 }

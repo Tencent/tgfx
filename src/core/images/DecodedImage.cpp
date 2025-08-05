@@ -22,9 +22,8 @@
 #include "gpu/ProxyProvider.h"
 
 namespace tgfx {
-std::shared_ptr<Image> DecodedImage::MakeFrom(UniqueKey uniqueKey,
-                                              std::shared_ptr<ImageGenerator> generator,
-                                              bool tryHardware, bool asyncDecoding) {
+std::shared_ptr<Image> DecodedImage::MakeFrom(std::shared_ptr<ImageGenerator> generator,
+                                              bool tryHardware, bool asyncDecoding, bool mipmap) {
   if (generator == nullptr) {
     return nullptr;
   }
@@ -33,20 +32,27 @@ std::shared_ptr<Image> DecodedImage::MakeFrom(UniqueKey uniqueKey,
   auto alphaOnly = generator->isAlphaOnly();
   auto source = ImageSource::MakeFrom(std::move(generator), tryHardware, asyncDecoding);
   auto image = std::shared_ptr<DecodedImage>(
-      new DecodedImage(std::move(uniqueKey), width, height, alphaOnly, std::move(source)));
+      new DecodedImage(width, height, alphaOnly, std::move(source), mipmap));
   image->weakThis = image;
   return image;
 }
 
-DecodedImage::DecodedImage(UniqueKey uniqueKey, int width, int height, bool alphaOnly,
-                           std::shared_ptr<DataSource<ImageBuffer>> source)
-    : ResourceImage(std::move(uniqueKey)), _width(width), _height(height), _alphaOnly(alphaOnly),
+DecodedImage::DecodedImage(int width, int height, bool alphaOnly,
+                           std::shared_ptr<DataSource<ImageBuffer>> source, bool mipmap)
+    : ResourceImage(mipmap), _width(width), _height(height), _alphaOnly(alphaOnly),
       source(std::move(source)) {
 }
 
-std::shared_ptr<TextureProxy> DecodedImage::onLockTextureProxy(const TPArgs& args,
-                                                               const UniqueKey& key) const {
-  return args.context->proxyProvider()->createTextureProxy(key, source, _width, _height, _alphaOnly,
+std::shared_ptr<TextureProxy> DecodedImage::onLockTextureProxy(const TPArgs& args) const {
+  return args.context->proxyProvider()->createTextureProxy({}, source, _width, _height, _alphaOnly,
                                                            args.mipmapped, args.renderFlags);
 }
+
+std::shared_ptr<Image> DecodedImage::onCloneWith(bool mipmap) const {
+  auto image =
+      std::shared_ptr<DecodedImage>(new DecodedImage(_width, _height, _alphaOnly, source, mipmap));
+  image->weakThis = image;
+  return image;
+}
+
 }  // namespace tgfx

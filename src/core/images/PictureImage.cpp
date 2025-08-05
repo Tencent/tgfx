@@ -51,7 +51,7 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Picture> picture, int wid
 
 PictureImage::PictureImage(std::shared_ptr<Picture> picture, int width, int height,
                            const Matrix* matrix, bool mipmapped)
-    : picture(std::move(picture)), _width(width), _height(height), mipmapped(mipmapped) {
+    : MipmapImage(mipmapped), picture(std::move(picture)), _width(width), _height(height) {
   if (matrix && !matrix->isIdentity()) {
     this->matrix = new Matrix(*matrix);
   }
@@ -61,8 +61,8 @@ PictureImage::~PictureImage() {
   delete matrix;
 }
 
-std::shared_ptr<Image> PictureImage::onMakeMipmapped(bool enabled) const {
-  auto newImage = std::make_shared<PictureImage>(picture, _width, _height, matrix, enabled);
+std::shared_ptr<Image> PictureImage::onCloneWith(bool mipmap) const {
+  auto newImage = std::make_shared<PictureImage>(picture, _width, _height, matrix, mipmap);
   newImage->weakThis = newImage;
   return newImage;
 }
@@ -72,8 +72,7 @@ std::shared_ptr<Image> PictureImage::onMakeScaled(int newWidth, int newHeight,
   auto newMatrix = matrix != nullptr ? *matrix : Matrix::I();
   newMatrix.postScale(static_cast<float>(newWidth) / static_cast<float>(_width),
                       static_cast<float>(newHeight) / static_cast<float>(_height));
-  auto newImage =
-      std::make_shared<PictureImage>(picture, newWidth, newHeight, &newMatrix, mipmapped);
+  auto newImage = std::make_shared<PictureImage>(picture, newWidth, newHeight, &newMatrix, mipmap);
   newImage->weakThis = newImage;
   return newImage;
 }
@@ -124,7 +123,7 @@ std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args)
   }
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, textureWidth, textureHeight, isAlphaOnly(), 1, hasMipmaps() && args.mipmapped,
-      ImageOrigin::TopLeft, BackingFit::Approx);
+      ImageOrigin::TopLeft, args.backingFit);
   if (renderTarget == nullptr) {
     return nullptr;
   }

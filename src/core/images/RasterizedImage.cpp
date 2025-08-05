@@ -17,9 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RasterizedImage.h"
-#include "core/images/SubsetImage.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/processors/TiledTextureEffect.h"
+#include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
 
@@ -34,40 +35,76 @@ std::shared_ptr<Image> RasterizedImage::MakeFrom(std::shared_ptr<Image> source) 
 }
 
 RasterizedImage::RasterizedImage(UniqueKey uniqueKey, std::shared_ptr<Image> source)
-    : ResourceImage(std::move(uniqueKey)), source(std::move(source)) {
+    : uniqueKey(std::move(uniqueKey)), source(std::move(source)) {
 }
 
-std::shared_ptr<TextureProxy> RasterizedImage::onLockTextureProxy(const TPArgs& args,
-                                                                  const UniqueKey& key) const {
+std::shared_ptr<Image> RasterizedImage::makeRasterized() const {
+  return weakThis.lock();
+}
+
+std::shared_ptr<TextureProxy> RasterizedImage::lockTextureProxy(const TPArgs& args) const {
   auto proxyProvider = args.context->proxyProvider();
-  auto textureProxy = proxyProvider->findOrWrapTextureProxy(key);
+  auto textureKey = getTextureKey();
+  auto textureProxy = proxyProvider->findOrWrapTextureProxy(textureKey);
   if (textureProxy != nullptr) {
     return textureProxy;
   }
-  auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
-  auto format = isAlphaOnly() && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
-  auto renderTarget = proxyProvider->createRenderTargetProxy(key, width(), height(), format, 1,
-                                                             args.mipmapped, ImageOrigin::TopLeft,
-                                                             BackingFit::Exact, args.renderFlags);
-  if (renderTarget == nullptr) {
+  auto newArgs = args;
+  newArgs.renderFlags |= RenderFlags::DisableCache;
+  newArgs.backingFit = BackingFit::Exact;
+  textureProxy = source->lockTextureProxy(newArgs);
+  if (textureProxy == nullptr) {
     return nullptr;
   }
-  auto drawRect = Rect::MakeWH(width(), height());
-  FPArgs fpArgs(args.context, args.renderFlags, drawRect);
-  auto processor = FragmentProcessor::Make(source, fpArgs, {}, SrcRectConstraint::Fast);
-  if (processor == nullptr) {
+  proxyProvider->assignProxyUniqueKey(textureProxy, textureKey);
+  return textureProxy;
+}
+
+PlacementPtr<FragmentProcessor> RasterizedImage::asFragmentProcessor(
+    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const {
+  auto textureProxy = lockTextureProxy(
+      TPArgs(args.context, args.renderFlags, hasMipmaps(), 1.0f, BackingFit::Exact));
+  if (textureProxy == nullptr) {
     return nullptr;
   }
-  auto drawingManager = renderTarget->getContext()->drawingManager();
-  drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags);
-  return renderTarget->asTextureProxy();
+  return TiledTextureEffect::Make(std::move(textureProxy), samplingArgs, uvMatrix, isAlphaOnly());
 }
 
 std::shared_ptr<Image> RasterizedImage::onMakeScaled(int newWidth, int newHeight,
                                                      const SamplingOptions& sampling) const {
   auto newSource = source->makeScaled(newWidth, newHeight, sampling);
-  newSource = newSource->makeRasterized();
-  return newSource->makeMipmapped(false);
+  return newSource->makeRasterized();
+}
+
+std::shared_ptr<Image> RasterizedImage::onMakeDecoded(Context* context, bool tryHardware) const {
+  auto key = getTextureKey();
+  if (context != nullptr) {
+    auto proxy = context->proxyProvider()->findProxy(key);
+    if (proxy != nullptr) {
+      return nullptr;
+    }
+    if (context->resourceCache()->hasUniqueResource(key)) {
+      return nullptr;
+    }
+  }
+  auto newSource = source->onMakeDecoded(context, tryHardware);
+  if (newSource == nullptr) {
+    return nullptr;
+  }
+  return newSource->makeRasterized();
+}
+
+std::shared_ptr<Image> RasterizedImage::onMakeMipmapped(bool enabled) const {
+  auto newSource = source->makeMipmapped(enabled);
+  return newSource->makeRasterized();
+}
+
+UniqueKey RasterizedImage::getTextureKey() const {
+  if (hasMipmaps()) {
+    static const auto MipmapFlag = UniqueID::Next();
+    return UniqueKey::Append(uniqueKey, &MipmapFlag, 1);
+  }
+  return uniqueKey;
 }
 
 }  // namespace tgfx

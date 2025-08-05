@@ -26,7 +26,7 @@ namespace tgfx {
  */
 class GeneratorImage : public ResourceImage {
  public:
-  GeneratorImage(UniqueKey uniqueKey, std::shared_ptr<ImageGenerator> generator);
+  GeneratorImage(std::shared_ptr<ImageGenerator> generator, bool mipmap);
 
   int width() const override {
     return generator->width();
@@ -51,8 +51,9 @@ class GeneratorImage : public ResourceImage {
 
   std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
 
-  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
-                                                   const UniqueKey& key) const override;
+  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args) const override;
+
+  std::shared_ptr<Image> onCloneWith(bool mipmap) const override;
 
   std::shared_ptr<ImageGenerator> generator = nullptr;
 };

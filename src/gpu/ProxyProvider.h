@@ -155,6 +155,13 @@ class ProxyProvider {
    */
   void clearSharedVertexBuffer();
 
+  /**
+   * Assigns a unique key to the given proxy. If the proxy already has a unique key, it will be
+   * replaced. Returns true if the assignment is successful, false if proxy is nullptr or does not
+   * have the same context as this provider.
+   */
+  bool assignProxyUniqueKey(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& uniqueKey);
+
  private:
   Context* context = nullptr;
   ResourceKeyMap<std::weak_ptr<ResourceProxy>> proxyMap = {};

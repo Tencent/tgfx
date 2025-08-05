@@ -53,7 +53,7 @@ std::shared_ptr<Image> SubsetImage::onMakeScaled(int newWidth, int newHeight,
   auto sourceScaledWidth = scaleX * static_cast<float>(source->width());
   auto sourceScaledHeight = scaleY * static_cast<float>(source->height());
   if (!IsInteger(sourceScaledWidth) || !IsInteger(sourceScaledHeight)) {
-    return ScaledImage::MakeFrom(weakThis.lock(), newWidth, newHeight, sampling);
+    return Image::onMakeScaled(newWidth, newHeight, sampling);
   }
   auto newSource = source->makeScaled(static_cast<int>(sourceScaledWidth),
                                       static_cast<int>(sourceScaledHeight), sampling);

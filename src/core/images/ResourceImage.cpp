@@ -21,36 +21,18 @@
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
-ResourceImage::ResourceImage(UniqueKey uniqueKey) : uniqueKey(std::move(uniqueKey)) {
-}
-
-std::shared_ptr<Image> ResourceImage::makeRasterized() const {
-  return std::static_pointer_cast<Image>(weakThis.lock());
-}
 
 std::shared_ptr<TextureProxy> ResourceImage::lockTextureProxy(const TPArgs& args) const {
   auto newArgs = args;
-  // ResourceImage has preset mipmaps.
   newArgs.mipmapped = hasMipmaps();
-  return onLockTextureProxy(newArgs, uniqueKey);
-}
-
-std::shared_ptr<Image> ResourceImage::onMakeMipmapped(bool enabled) const {
-  auto source = std::static_pointer_cast<ResourceImage>(weakThis.lock());
-  return enabled ? MipmapImage::MakeFrom(std::move(source)) : source;
-}
-
-std::shared_ptr<Image> ResourceImage::onMakeScaled(int newWidth, int newHeight,
-                                                   const SamplingOptions& sampling) const {
-  auto result = Image::onMakeScaled(newWidth, newHeight, sampling);
-  return result->makeRasterized();
+  return onLockTextureProxy(newArgs);
 }
 
 PlacementPtr<FragmentProcessor> ResourceImage::asFragmentProcessor(const FPArgs& args,
                                                                    const SamplingArgs& samplingArgs,
                                                                    const Matrix* uvMatrix) const {
-  TPArgs tpArgs(args.context, args.renderFlags, hasMipmaps(), 1.0f, {});
-  auto proxy = onLockTextureProxy(tpArgs, uniqueKey);
+  TPArgs tpArgs(args.context, args.renderFlags, hasMipmaps(), 1.0f, BackingFit::Approx);
+  auto proxy = onLockTextureProxy(tpArgs);
   return TiledTextureEffect::Make(std::move(proxy), samplingArgs, uvMatrix, isAlphaOnly());
 }
 }  // namespace tgfx

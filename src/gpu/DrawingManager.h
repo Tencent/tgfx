@@ -60,8 +60,7 @@ class DrawingManager {
   void addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
                                std::shared_ptr<TextureProxy> dest, int srcX = 0, int srcY = 0);
 
-  void addResourceTask(PlacementPtr<ResourceTask> resourceTask, const UniqueKey& uniqueKey = {},
-                       uint32_t renderFlags = 0);
+  void addResourceTask(PlacementPtr<ResourceTask> resourceTask);
 
   void addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& textureProxy,
                              const Point& atlasOffset, std::shared_ptr<ImageCodec> codec);

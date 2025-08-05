@@ -18,44 +18,25 @@
 
 #pragma once
 
-#include "core/images/ResourceImage.h"
+#include "tgfx/core/Image.h"
 
 namespace tgfx {
-class MipmapImage : public ResourceImage {
+class MipmapImage : public Image {
  public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ResourceImage> source);
-
-  int width() const override {
-    return source->width();
-  }
-
-  int height() const override {
-    return source->height();
-  }
-
-  bool isAlphaOnly() const override {
-    return source->isAlphaOnly();
-  }
-
-  bool hasMipmaps() const override {
-    return true;
+  bool hasMipmaps() const final {
+    return mipmap;
   }
 
  protected:
-  Type type() const override {
-    return Type::Mipmap;
+  explicit MipmapImage(bool mipmap) : mipmap(mipmap) {
   }
 
-  std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
+  std::shared_ptr<Image> onMakeMipmapped(bool enabled) const final {
+    return onCloneWith(enabled);
+  }
 
-  std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
+  virtual std::shared_ptr<Image> onCloneWith(bool mipmap) const = 0;
 
-  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
-                                                   const UniqueKey& key) const override;
-
- private:
-  std::shared_ptr<ResourceImage> source = nullptr;
-
-  MipmapImage(UniqueKey uniqueKey, std::shared_ptr<ResourceImage> source);
+  bool mipmap = false;
 };
 }  // namespace tgfx

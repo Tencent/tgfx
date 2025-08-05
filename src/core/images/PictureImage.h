@@ -18,14 +18,14 @@
 
 #pragma once
 
+#include "core/images/MipmapImage.h"
 #include "gpu/proxies/RenderTargetProxy.h"
-#include "tgfx/core/Image.h"
 
 namespace tgfx {
 /**
  * PictureImage is an image that draws a Picture.
  */
-class PictureImage : public Image {
+class PictureImage : public MipmapImage {
  public:
   PictureImage(std::shared_ptr<Picture> picture, int width, int height,
                const Matrix* matrix = nullptr, bool mipmapped = false);
@@ -44,15 +44,6 @@ class PictureImage : public Image {
     return false;
   }
 
-  bool hasMipmaps() const override {
-    return mipmapped;
-  }
-
-  std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
-
-  std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
-                                      const SamplingOptions& sampling) const override;
-
   std::shared_ptr<Picture> picture = nullptr;
   Matrix* matrix = nullptr;
 
@@ -60,6 +51,11 @@ class PictureImage : public Image {
   Type type() const override {
     return Type::Picture;
   }
+
+  std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
+                                      const SamplingOptions& sampling) const override;
+
+  std::shared_ptr<Image> onCloneWith(bool mipmap) const override;
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                       const SamplingArgs& samplingArgs,
@@ -73,6 +69,5 @@ class PictureImage : public Image {
  private:
   int _width = 0;
   int _height = 0;
-  bool mipmapped = false;
 };
 }  // namespace tgfx

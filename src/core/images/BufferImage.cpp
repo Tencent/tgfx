@@ -24,18 +24,25 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageBuffer> buffer) {
   if (buffer == nullptr) {
     return nullptr;
   }
-  auto image = std::make_shared<BufferImage>(UniqueKey::Make(), std::move(buffer));
+  std::shared_ptr<Image> image = std::make_shared<BufferImage>(std::move(buffer), false);
+  image->weakThis = image;
+  image = image->makeRasterized();
+  return image;
+}
+
+BufferImage::BufferImage(std::shared_ptr<ImageBuffer> buffer, bool mipmap)
+    : ResourceImage(mipmap), imageBuffer(std::move(buffer)) {
+}
+
+std::shared_ptr<TextureProxy> BufferImage::onLockTextureProxy(const TPArgs& args) const {
+  return args.context->proxyProvider()->createTextureProxy({}, imageBuffer, args.mipmapped,
+                                                           args.renderFlags);
+}
+
+std::shared_ptr<Image> BufferImage::onCloneWith(bool mipmap) const {
+  auto image = std::make_shared<BufferImage>(imageBuffer, mipmap);
   image->weakThis = image;
   return image;
 }
 
-BufferImage::BufferImage(UniqueKey uniqueKey, std::shared_ptr<ImageBuffer> buffer)
-    : ResourceImage(std::move(uniqueKey)), imageBuffer(std::move(buffer)) {
-}
-
-std::shared_ptr<TextureProxy> BufferImage::onLockTextureProxy(const TPArgs& args,
-                                                              const UniqueKey& key) const {
-  return args.context->proxyProvider()->createTextureProxy(key, imageBuffer, args.mipmapped,
-                                                           args.renderFlags);
-}
 }  // namespace tgfx
