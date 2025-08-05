@@ -200,7 +200,7 @@ bool PngCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dst
   }
   png_read_image(readInfo->p, readInfo->rowPtrs);
   Pixmap pixmap(info, readInfo->data);
-  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType);
+  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
   return pixmap.readPixels(dstInfo, dstPixels);
 }
 
