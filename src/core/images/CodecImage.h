@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include "core/images/BufferImage.h"
 #include "core/images/GeneratorImage.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageCodec.h"
@@ -27,14 +28,33 @@ namespace tgfx {
 
 class CodecImage : public GeneratorImage {
  public:
-  CodecImage(std::shared_ptr<ImageCodec> codec, bool mipmap);
+  CodecImage(std::shared_ptr<ImageCodec> codec, int width, int height, bool mipmap);
 
   std::shared_ptr<ImageCodec> getCodec() const;
+
+  int width() const override {
+    return _width;
+  }
+
+  int height() const override {
+    return _height;
+  }
+
+  std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
+                                      const SamplingOptions& sampling) const override;
 
  protected:
   Type type() const override {
     return Type::Codec;
   }
+
+  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args) const override;
+
+ private:
+  int _width;
+  int _height;
+
+  friend class BufferImage;
 };
 
 }  // namespace tgfx

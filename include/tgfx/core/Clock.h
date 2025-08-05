@@ -29,9 +29,19 @@ namespace tgfx {
 class Clock {
  public:
   /**
-   * Returns the number of microseconds since the TGFX runtime was initialized.
+   * Returns the time elapsed since the TGFX runtime was initialized, in microseconds by default.
+   * You can specify different template parameters to obtain timestamps in various time units.
+   * For example, using std::chrono::seconds as the template parameter returns seconds,
+   * std::chrono::milliseconds returns milliseconds, and std::chrono::nanoseconds returns nanoseconds.
+   * If no template parameter is specified, microseconds are returned by default.
    */
-  static int64_t Now();
+  template <typename T = std::chrono::microseconds>
+  static int64_t Now() {
+    static const auto START_TIME = std::chrono::steady_clock::now();
+    auto now = std::chrono::steady_clock::now();
+    auto us = std::chrono::duration_cast<T>(now - START_TIME);
+    return static_cast<int64_t>(us.count());
+  }
 
   /**
    * Creates a new Clock object.

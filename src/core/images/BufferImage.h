@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
 #include "ResourceImage.h"
 
 namespace tgfx {
@@ -39,6 +38,9 @@ class BufferImage : public ResourceImage {
   bool isAlphaOnly() const override {
     return imageBuffer->isAlphaOnly();
   }
+
+  std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
+                                      const SamplingOptions& sampling) const override;
 
  protected:
   Type type() const override {

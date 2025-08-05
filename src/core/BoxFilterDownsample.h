@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include "tgfx/core/ImageInfo.h"
 
 namespace tgfx {
 
@@ -39,10 +40,10 @@ struct PixelLayout {
  * @param inputLayout  Structure describing source image dimensions and layout
  * @param outputPixels Pointer to the destination buffer where downsampled image will be stored
  * @param outputLayout Structure describing destination image dimensions and layout
- * @param alphaOnly    Flag indicating whether to process only alpha channel (true) or all RGBA
+ * @param isOneComponent Indicates whether each pixel has a single channel (true) or four channels.
  * channels (false)
  *
  */
 void BoxFilterDownsample(const void* inputPixels, const PixelLayout& inputLayout,
-                         void* outputPixels, const PixelLayout& outputLayout, bool alphaOnly);
+                         void* outputPixels, const PixelLayout& outputLayout, bool isOneComponent);
 }  // namespace tgfx

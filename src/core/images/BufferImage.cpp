@@ -17,6 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BufferImage.h"
+#include "core/images/CodecImage.h"
+#include "core/PixelBuffer.h"
+#include "core/PixelBufferCodec.h"
 #include "gpu/ProxyProvider.h"
 
 namespace tgfx {
@@ -43,6 +46,18 @@ std::shared_ptr<Image> BufferImage::onCloneWith(bool mipmap) const {
   auto image = std::make_shared<BufferImage>(imageBuffer, mipmap);
   image->weakThis = image;
   return image;
+}
+
+std::shared_ptr<Image> BufferImage::onMakeScaled(int newWidth, int newHeight,
+                                                 const SamplingOptions& sampling) const {
+  if (imageBuffer->isPixelBuffer() && newWidth < imageBuffer->width() &&
+      newHeight < imageBuffer->height()) {
+    auto codec = PixelBufferCodec::Make(std::static_pointer_cast<PixelBuffer>(imageBuffer));
+    auto image = std::make_shared<CodecImage>(std::move(codec), newWidth, newHeight, mipmap);
+    image->weakThis = image;
+    return image;
+  }
+  return ResourceImage::onMakeScaled(newWidth, newHeight, sampling);
 }
 
 }  // namespace tgfx

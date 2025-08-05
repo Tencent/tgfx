@@ -56,14 +56,16 @@ std::shared_ptr<PathRasterizer> PathRasterizer::MakeFrom(int width, int height,
                                             needsGammaCorrection);
 }
 
-bool FTPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
-  if (dstPixels == nullptr || dstInfo.isEmpty()) {
+bool FTPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                                    void* dstPixels) const {
+  if (dstPixels == nullptr) {
     return false;
   }
   auto path = shape->getPath();
   if (path.isEmpty()) {
     return false;
   }
+  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
   auto targetInfo = dstInfo.makeIntersect(0, 0, width(), height());
   auto totalMatrix = Matrix::MakeScale(1, -1);
   totalMatrix.postTranslate(0, static_cast<float>(targetInfo.height()));
