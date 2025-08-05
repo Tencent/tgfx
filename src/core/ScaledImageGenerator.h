@@ -23,8 +23,7 @@
 namespace tgfx {
 class ScaledImageGenerator : public ImageGenerator {
  public:
-  static std::shared_ptr<ScaledImageGenerator> MakeFrom(int width, int height,
-                                                        const std::shared_ptr<ImageCodec>& codec);
+  static std::shared_ptr<ScaledImageGenerator> MakeFrom(const std::shared_ptr<ImageCodec>& codec, int width, int height);
 
   ~ScaledImageGenerator() override = default;
 

@@ -22,7 +22,7 @@
 
 namespace tgfx {
 std::shared_ptr<ScaledImageGenerator> ScaledImageGenerator::MakeFrom(
-    int width, int height, const std::shared_ptr<ImageCodec>& codec) {
+    const std::shared_ptr<ImageCodec>& codec, int width, int height) {
   if (!codec || width <= 0 || height <= 0) {
     return nullptr;
   }

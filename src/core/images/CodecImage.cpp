@@ -46,7 +46,7 @@ std::shared_ptr<TextureProxy> CodecImage::onLockTextureProxy(const TPArgs& args,
                                                              const UniqueKey& key) const {
   auto tempGenerator = generator;
   if (width() != generator->width() || height() != generator->height()) {
-    tempGenerator = ScaledImageGenerator::MakeFrom(width(), height(), getCodec());
+    tempGenerator = ScaledImageGenerator::MakeFrom(getCodec(), width(), height());
   }
   return args.context->proxyProvider()->createTextureProxy(key, tempGenerator, args.mipmapped,
                                                            args.renderFlags);
