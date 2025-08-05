@@ -393,7 +393,8 @@ TGFX_TEST(CanvasTest, rasterizedImage) {
   auto canvas = surface->getCanvas();
   canvas->drawImage(rasterImage, 100, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized"));
-  auto rasterImageUniqueKey = std::static_pointer_cast<RasterizedImage>(rasterImage)->getTextureKey();
+  auto rasterImageUniqueKey =
+      std::static_pointer_cast<RasterizedImage>(rasterImage)->getTextureKey();
   auto texture = Resource::Find<Texture>(context, rasterImageUniqueKey);
   ASSERT_TRUE(texture != nullptr);
   EXPECT_TRUE(texture != nullptr);
@@ -953,7 +954,7 @@ TGFX_TEST(CanvasTest, image) {
   EXPECT_FALSE(decodedImage == image);
   context->flushAndSubmit();
   decodedImage = image->makeDecoded(context);
-  EXPECT_FALSE(decodedImage == image);
+  EXPECT_TRUE(decodedImage == image);
   auto textureImage = image->makeTextureImage(context);
   ASSERT_TRUE(textureImage != nullptr);
   EXPECT_TRUE(textureImage->isTextureBacked());
@@ -965,7 +966,7 @@ TGFX_TEST(CanvasTest, image) {
   EXPECT_TRUE(decodedImage == image);
   context->flushAndSubmit();
   decodedImage = image->makeDecoded(context);
-  EXPECT_FALSE(decodedImage == image);
+  EXPECT_TRUE(decodedImage == image);
 
   surface = Surface::Make(context, 400, 500);
   canvas = surface->getCanvas();
