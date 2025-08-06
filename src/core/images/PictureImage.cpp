@@ -51,7 +51,7 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<Picture> picture, int wid
 
 PictureImage::PictureImage(std::shared_ptr<Picture> picture, int width, int height,
                            const Matrix* matrix, bool mipmapped)
-    : MipmapImage(mipmapped), picture(std::move(picture)), _width(width), _height(height) {
+    : picture(std::move(picture)), _width(width), _height(height), mipmapped(mipmapped) {
   if (matrix && !matrix->isIdentity()) {
     this->matrix = new Matrix(*matrix);
   }

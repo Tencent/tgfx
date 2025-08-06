@@ -19,6 +19,7 @@
 #pragma once
 
 #include <memory>
+#include "core/images/BufferImage.h"
 #include "core/images/GeneratorImage.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageCodec.h"

@@ -18,8 +18,7 @@
 
 #pragma once
 
-#include "gpu/proxies/TextureProxy.h"
-#include "tgfx/core/Image.h"
+#include "core/images/ResourceImage.h"
 
 namespace tgfx {
 /**

@@ -30,7 +30,6 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"
 #include "gpu/TPArgs.h"
-#include "gpu/processors/TiledTextureEffect.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
 
@@ -237,22 +236,31 @@ std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, in
                                alphaStartY);
 }
 
-PlacementPtr<FragmentProcessor> Image::asFragmentProcessor(const FPArgs& args,
-                                                           const SamplingArgs& samplingArgs,
-                                                           const Matrix* uvMatrix) const {
-
-  auto mipmapped = hasMipmaps() && samplingArgs.sampling.mipmapMode != MipmapMode::None;
-  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale, BackingFit::Approx);
-  auto textureProxy = lockTextureProxy(tpArgs);
-  if (textureProxy == nullptr) {
+std::shared_ptr<TextureProxy> Image::lockTextureProxy(const TPArgs& args) const {
+  auto textureWidth = width();
+  auto textureHeight = height();
+  if (args.drawScale < 1.0) {
+    textureWidth = static_cast<int>(roundf(static_cast<float>(width()) * args.drawScale));
+    textureHeight = static_cast<int>(roundf(static_cast<float>(height()) * args.drawScale));
+  }
+  auto renderTarget =
+      RenderTargetProxy::MakeFallback(args.context, textureWidth, textureHeight, isAlphaOnly(), 1,
+                                      args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
+  if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto fpMatrix =
-      Matrix::MakeScale(static_cast<float>(textureProxy->width()) / static_cast<float>(width()),
-                        static_cast<float>(textureProxy->height()) / static_cast<float>(height()));
-  if (uvMatrix) {
-    fpMatrix.preConcat(*uvMatrix);
+
+  auto textureScaleX = static_cast<float>(textureWidth) / static_cast<float>(width());
+  auto textureScaleY = static_cast<float>(textureHeight) / static_cast<float>(height());
+  auto uvMatrix = Matrix::MakeScale(1.0f / textureScaleX, 1.0f / textureScaleY);
+  auto drawRect = Rect::MakeWH(textureWidth, textureHeight);
+  FPArgs fpArgs(args.context, args.renderFlags, drawRect, std::max(textureScaleX, textureScaleY));
+  SamplingArgs samplingArgs = {TileMode::Clamp, TileMode::Clamp, {}, SrcRectConstraint::Fast};
+  auto processor = asFragmentProcessor(fpArgs, samplingArgs, &uvMatrix);
+  auto drawingManager = args.context->drawingManager();
+  if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags)) {
+    return nullptr;
   }
-  return TiledTextureEffect::Make(textureProxy, samplingArgs, &fpMatrix, isAlphaOnly());
+  return renderTarget->asTextureProxy();
 }
 }  // namespace tgfx

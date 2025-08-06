@@ -19,7 +19,6 @@
 #include "RasterizedImage.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/TPArgs.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "tgfx/core/RenderFlags.h"
 

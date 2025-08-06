@@ -21,7 +21,6 @@
 #include "core/PixelBufferCodec.h"
 #include "core/images/CodecImage.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/TPArgs.h"
 
 namespace tgfx {
 std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageBuffer> buffer) {
@@ -34,7 +33,7 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageBuffer> buffer) {
 }
 
 BufferImage::BufferImage(std::shared_ptr<ImageBuffer> buffer, bool mipmapped)
-    : MipmapImage(mipmapped), imageBuffer(std::move(buffer)) {
+    : ResourceImage(mipmapped), imageBuffer(std::move(buffer)) {
 }
 
 std::shared_ptr<TextureProxy> BufferImage::lockTextureProxy(const TPArgs& args) const {
@@ -56,7 +55,7 @@ std::shared_ptr<Image> BufferImage::onMakeScaled(int newWidth, int newHeight,
     image->weakThis = image;
     return image;
   }
-  return MipmapImage::onMakeScaled(newWidth, newHeight, sampling);
+  return ResourceImage::onMakeScaled(newWidth, newHeight, sampling);
 }
 
 }  // namespace tgfx

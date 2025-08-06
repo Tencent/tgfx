@@ -18,14 +18,14 @@
 
 #pragma once
 
+#include "GeneratorImage.h"
 #include "core/DataSource.h"
-#include "core/images/GeneratorImage.h"
 
 namespace tgfx {
 /**
  * DecodedImage wraps an image source that can asynchronously decode ImageBuffers.
  */
-class DecodedImage : public MipmapImage {
+class DecodedImage : public ResourceImage {
  public:
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageGenerator> generator,
                                          bool tryHardware, bool asyncDecoding, bool mipmapped);

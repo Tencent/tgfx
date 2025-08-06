@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include "core/images/MipmapImage.h"
+#include "ResourceImage.h"
 
 namespace tgfx {
 /**
  * GeneratorImage wraps an ImageGenerator that can generate ImageBuffers on demand.
  */
-class GeneratorImage : public MipmapImage {
+class GeneratorImage : public ResourceImage {
  public:
   GeneratorImage(std::shared_ptr<ImageGenerator> generator, bool mipmapped);
 

@@ -20,7 +20,6 @@
 #include "RasterizedImage.h"
 #include "core/ScaledImageGenerator.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/TPArgs.h"
 
 namespace tgfx {
 CodecImage::CodecImage(std::shared_ptr<ImageCodec> codec, int width, int height, bool mipmapped)
@@ -38,7 +37,7 @@ std::shared_ptr<Image> CodecImage::onMakeScaled(int newWidth, int newHeight,
     image->weakThis = image;
     return image;
   }
-  return MipmapImage::onMakeScaled(newWidth, newHeight, sampling);
+  return ResourceImage::onMakeScaled(newWidth, newHeight, sampling);
 }
 
 std::shared_ptr<TextureProxy> CodecImage::lockTextureProxy(const TPArgs& args) const {

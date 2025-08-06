@@ -347,7 +347,7 @@ class Image {
    */
   virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                               const SamplingArgs& samplingArgs,
-                                                              const Matrix* uvMatrix) const;
+                                                              const Matrix* uvMatrix) const = 0;
 
   friend class FragmentProcessor;
   friend class RuntimeImageFilter;

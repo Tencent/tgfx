@@ -53,11 +53,6 @@ std::shared_ptr<TextureProxy> TransformImage::lockTextureProxy(const TPArgs& arg
   return renderTarget->asTextureProxy();
 }
 
-PlacementPtr<FragmentProcessor> TransformImage::asFragmentProcessor(
-    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const {
-  return onAsFragmentProcessor(args, samplingArgs, uvMatrix);
-}
-
 std::shared_ptr<Image> TransformImage::onMakeDecoded(Context* context, bool tryHardware) const {
   auto newSource = source->onMakeDecoded(context, tryHardware);
   if (newSource == nullptr) {

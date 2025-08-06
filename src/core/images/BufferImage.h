@@ -17,13 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include "core/images/MipmapImage.h"
+#include "ResourceImage.h"
 
 namespace tgfx {
 /**
  * BufferImage wraps a fully decoded ImageBuffer that can generate textures on demand.
  */
-class BufferImage : public MipmapImage {
+class BufferImage : public ResourceImage {
  public:
   BufferImage(std::shared_ptr<ImageBuffer> buffer, bool mipmapped);
 
