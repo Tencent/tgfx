@@ -570,7 +570,7 @@ if(TGFX_BUILD_VCPKG)
     
     if(TGFX_USE_FREETYPE)
         find_library(FREETYPE_LIB 
-            NAMES freetype libfreetype
+            NAMES freetype libfreetype freetyped libfreetyped
             PATHS ${VCPKG_LIB_DIR}
             NO_DEFAULT_PATH
         )
