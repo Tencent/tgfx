@@ -170,7 +170,7 @@ FontMetrics::FontType PDFFont::FontType(const PDFStrike& /*pdfStrike*/,
                                         const FontMetrics& metrics) {
   if (metrics.flags & FontMetrics::FontFlags::Variable ||
       metrics.flags & FontMetrics::FontFlags::AltDataFormat ||
-      metrics.flags & FontMetrics::FontFlags::NotEmbeddable /*|| pdfStrike.fHasMaskFilter*/) {
+      metrics.flags & FontMetrics::FontFlags::NotEmbeddable) {
     // force Type3 fallback.
     return FontMetrics::FontType::Other;
   }
@@ -419,17 +419,9 @@ PDFIndirectReference type3_descriptor(PDFDocument* doc, const std::shared_ptr<Ty
   }
 
   /** PDF32000_2008: FontStretch should be used for Type3 fonts in Tagged PDF documents. */
-  // static constexpr const char* stretchNames[9] = {
-  //     "UltraCondensed", "ExtraCondensed", "Condensed",     "SemiCondensed", "Normal",
-  //     "SemiExpanded",   "Expanded",       "ExtraExpanded", "UltraExpanded",
-  // };
-  // const char* stretchName = stretchNames[typeface.fontStyle().width() - 1];
-  // descriptor.insertName("FontStretch", stretchName);
   descriptor.insertName("FontStretch", "Normal");
 
   /** PDF32000_2008: FontWeight should be used for Type3 fonts in Tagged PDF documents. */
-  // int weight = (typeface.fontStyle().weight() + 50) / 100;
-  // descriptor.insertInt("FontWeight", std::clamp(weight, 1, 9) * 100);
   descriptor.insertInt("FontWeight", 400);
 
   if (const auto* metrics = PDFFont::GetMetrics(typeface, 1000.f, doc)) {

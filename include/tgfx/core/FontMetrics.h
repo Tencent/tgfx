@@ -66,19 +66,13 @@ class FontMetrics {
    * Underline position relative to baseline.
    */
   float underlinePosition = 0;
-
+  /**
+   * PostScript name.
+   */
   std::string postScriptName;
-
-  enum StyleFlags {
-    FixedPitch = 0x00000001,
-    Serif = 0x00000002,
-    Script = 0x00000008,
-    Italic = 0x00000040,
-    AllCaps = 0x00010000,
-    SmallCaps = 0x00020000,
-    ForceBold = 0x00040000
-  };
-
+  /**
+   * Font type.
+   */
   enum class FontType {
     Type1,
     Type1CID,
@@ -86,16 +80,43 @@ class FontMetrics {
     TrueType,
     Other,
   };
-
-  enum FontFlags {
-    Variable = 1 << 0,        //!<May be true for Type1, CFF, or TrueType fonts.
-    NotEmbeddable = 1 << 1,   //!<May not be embedded.
-    NotSubsettable = 1 << 2,  //!<May not be subset.
-    AltDataFormat = 1 << 3,   //!<Data compressed. Table access may still work.
-  };
-
-  StyleFlags style = static_cast<StyleFlags>(0);  // Font style characteristics.
   FontType type = FontType::Other;
-  FontFlags flags = static_cast<FontFlags>(0);  // Global font flags.
+
+  /**
+   * Font Descriptor Flags, aligned with the PDF specification's fontDescriptorFlags property.
+   */
+  enum StyleFlags {
+    // All characters in the font have the same width.
+    FixedPitch = 0x00000001,
+    // The font is a serif font (e.g., Times New Roman).
+    Serif = 0x00000002,
+    // The font is a symbolic font (e.g., Wingdings).
+    Symbolic = 0x00000004,
+    // The font is italic.
+    Italic = 0x00000040,
+    // The font uses all uppercase letters.
+    AllCaps = 0x00010000,
+    // The font uses small capital letters.
+    SmallCaps = 0x00020000,
+    // Forces bold display even if the font is not marked as bold.
+    ForceBold = 0x00040000
+  };
+  StyleFlags style = static_cast<StyleFlags>(0);
+
+  /**
+   * Font flags.
+   * Whether the font can be embedded and subset in the file during PDF export depends on these flags.
+   */
+  enum FontFlags {
+    // May be true for Type1, CFF, or TrueType fonts.
+    Variable = 1 << 0,
+    // May not be embedded.
+    NotEmbeddable = 1 << 1,
+    // May not be subset.
+    NotSubsettable = 1 << 2,
+    // Data compressed. Table access may still work.
+    AltDataFormat = 1 << 3,
+  };
+  FontFlags flags = static_cast<FontFlags>(0);
 };
 }  // namespace tgfx

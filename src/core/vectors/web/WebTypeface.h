@@ -72,6 +72,10 @@ class WebTypeface : public Typeface {
   std::vector<Unichar> getGlyphToUnicodeMap() const override;
 #endif
 
+  std::shared_ptr<Data> openData() const override {
+    return nullptr;
+  }
+
   std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;
 
  private:

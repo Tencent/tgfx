@@ -366,6 +366,9 @@ if (WEB)
         list(APPEND TGFX_FILES ${GPU_PLATFORM_FILES})
     endif ()
     list(APPEND TGFX_COMPILE_OPTIONS -fno-rtti -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0)
+    if (TGFX_BUILD_PDF)
+        list(APPEND TGFX_COMPILE_OPTIONS -s USE_ZLIB=1)
+    endif ()
 elseif (OHOS)
     find_library(PIXELMAP_NDK_LIB pixelmap_ndk.z)
     find_library(IMAGE_SOURCE_NDK_LIB image_source_ndk.z)
@@ -567,10 +570,11 @@ if (TGFX_BUILD_TESTS)
     list(APPEND TGFX_TEST_LIBS tgfx-drawers tgfx ${TGFX_SHARED_LIBS})
     list(APPEND TGFX_TEST_INCLUDES src test/src third_party/json/include)
 
-    add_vendor_target(test-vendor STATIC_VENDORS googletest)
+    add_vendor_target(test-vendor STATIC_VENDORS harfbuzz googletest)
     find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)
     list(APPEND TGFX_TEST_LIBS ${TEST_VENDOR_STATIC_LIBRARIES})
     list(APPEND TGFX_TEST_INCLUDES
+            third_party/harfbuzz/src
             third_party/googletest/googletest
             third_party/googletest/googletest/include)
 

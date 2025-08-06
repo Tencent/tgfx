@@ -18,8 +18,7 @@
 
 #pragma once
 
-#include <_types/_uint32_t.h>
-
+#include <cstdint>
 namespace tgfx {
 
 constexpr uint32_t MaximumFloatToDecimalLength = 49;

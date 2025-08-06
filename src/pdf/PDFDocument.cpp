@@ -299,7 +299,7 @@ Canvas* PDFDocument::onBeginPage(float width, float height) {
                     static_cast<int>(std::round(height * rasterScale))};
   Matrix initialTransform;
   initialTransform.setScale(inverseRasterScale, -inverseRasterScale);
-  initialTransform.setTranslateY(inverseRasterScale * pageSize.height);
+  initialTransform.setTranslateY(inverseRasterScale * static_cast<float>(pageSize.height));
 
   drawContext = new PDFExportContext(pageSize, this, initialTransform);
   _canvas = new Canvas(drawContext);
@@ -312,8 +312,9 @@ Canvas* PDFDocument::onBeginPage(float width, float height) {
 void PDFDocument::onEndPage() {
   auto page = PDFDictionary::Make("Page");
 
-  auto mediaSize = ISize::Make(drawContext->pageSize().width * inverseRasterScale,
-                               drawContext->pageSize().height * inverseRasterScale);
+  auto mediaSize =
+      ISize::Make(static_cast<float>(drawContext->pageSize().width) * inverseRasterScale,
+                  static_cast<float>(drawContext->pageSize().height) * inverseRasterScale);
   auto pageContent = drawContext->getContent();
 
   auto resourceDict = drawContext->makeResourceDict();
@@ -389,10 +390,7 @@ void PDFDocument::onClose() {
   for (const auto* f : get_fonts(*this)) {
     f->emitSubset(this);
   }
-
-  {
-    serialize_footer(offsetMap, stream(), infoDictionary, docCatalogRef, documentUUID);
-  }
+  serialize_footer(offsetMap, stream(), infoDictionary, docCatalogRef, documentUUID);
 }
 
 void PDFDocument::onAbort() {

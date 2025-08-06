@@ -252,7 +252,7 @@ PDFIndirectReference PDFShader::MakeImageShader(PDFDocument* doc, Matrix finalMa
     }
 
     if (deviceBounds.right > width) {
-      subset.offset(bitmap.width() - 1, 0);
+      subset.offset(static_cast<float>(bitmap.width()) - 1.f, 0.f);
       Bitmap right = ExtractSubset(bitmap, subset);
       auto rightMatrix = ScaleTranslate(deviceBounds.right - width, 1, width, 0);
       DrawBitmapMatrix(canvas.get(), right, rightMatrix, paintColor);
@@ -290,7 +290,7 @@ PDFIndirectReference PDFShader::MakeImageShader(PDFDocument* doc, Matrix finalMa
     }
 
     if (deviceBounds.bottom > height) {
-      subset.offset(0, bitmap.height() - 1);
+      subset.offset(0.f, static_cast<float>(bitmap.height()) - 1.f);
       Bitmap bottom = ExtractSubset(bitmap, subset);
 
       auto bottomMatrix = ScaleTranslate(1, deviceBounds.bottom - height, 0, height);
@@ -352,7 +352,8 @@ PDFIndirectReference PDFShader::MakeFallbackShader(PDFDocument* doc,
 
   ISize size = {ceilSize(rasterScale * surfaceBBox.width()),
                 ceilSize(rasterScale * surfaceBBox.height())};
-  Size scale = {size.width / shaderRect.width(), size.height / shaderRect.height()};
+  Size scale = {static_cast<float>(size.width) / shaderRect.width(),
+                static_cast<float>(size.height) / shaderRect.height()};
 
   auto surface = Surface::Make(doc->context(), size.width, size.height);
   DEBUG_ASSERT(surface);

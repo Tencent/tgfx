@@ -86,7 +86,7 @@ UUID PDFMetadataUtils::CreateUUID(const PDFMetadata& metadata) {
   md5.writeText(uuidNamespace);
 
   auto now = std::chrono::system_clock::now();
-  double millisecond =
+  auto millisecond =
       std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
   md5.write(&millisecond, sizeof(millisecond));
 

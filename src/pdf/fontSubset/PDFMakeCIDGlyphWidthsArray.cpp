@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFMakeCIDGlyphWidthsArray.h"
+#include <cstdint>
+#include <type_traits>
 #include "core/ScalerContext.h"
 #include "pdf/PDFFont.h"
 #include "pdf/PDFGlyphUse.h"
@@ -114,7 +116,8 @@ std::unique_ptr<PDFArray> PDFMakeCIDGlyphWidthsArray(const PDFStrikeSpec& pdfStr
   std::vector<float> advances(glyphIDs.size());
   for (auto glyphID : glyphIDs) {
     float currentAdvance = FromFontUnits(scaleContext->getAdvance(glyphID, false), emSize);
-    if (static_cast<int32_t>(currentAdvance) == currentAdvance) {
+    // 判断是否为整数
+    if (std::floor(currentAdvance) == currentAdvance) {
       advances[numIntAdvances++] = currentAdvance;
     }
   }
@@ -131,7 +134,7 @@ std::unique_ptr<PDFArray> PDFMakeCIDGlyphWidthsArray(const PDFStrikeSpec& pdfStr
     float advance = advances[i];
 
     // a. Skipping don't cares or defaults is a win (trivial)
-    if (advance == modeAdvance) {
+    if (static_cast<int32_t>(advance) == modeAdvance) {
       continue;
     }
 
@@ -162,7 +165,7 @@ std::unique_ptr<PDFArray> PDFMakeCIDGlyphWidthsArray(const PDFStrikeSpec& pdfStr
         advance = advances[j];
 
         // c. end range if default seen
-        if (advance == modeAdvance) {
+        if (static_cast<int32_t>(advance) == modeAdvance) {
           break;
         }
 

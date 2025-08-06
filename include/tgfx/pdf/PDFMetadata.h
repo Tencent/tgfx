@@ -20,9 +20,6 @@
 
 #error "PDF unit test"
 
-#include <memory>
-#include <string>
-#include <vector>
 #include "tgfx/core/Document.h"
 #include "tgfx/core/WriteStream.h"
 #include "tgfx/gpu/Context.h"
