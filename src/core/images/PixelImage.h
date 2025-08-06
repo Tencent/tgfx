@@ -18,22 +18,20 @@
 
 #pragma once
 
-#include "gpu/Resource.h"
-#include "gpu/TPArgs.h"
-#include "gpu/proxies/TextureProxy.h"
 #include "tgfx/core/Image.h"
 
 namespace tgfx {
 /**
- * The base class for all images that are created from resources (files, assets, etc.).
+ * The base class for all images that are directly backed by a block of pixels and can lock a
+ * texture proxy.
  */
-class ResourceImage : public Image {
+class PixelImage : public Image {
   bool hasMipmaps() const final {
     return mipmapped;
   }
 
  protected:
-  explicit ResourceImage(bool mipmapped) : mipmapped(mipmapped) {
+  explicit PixelImage(bool mipmapped) : mipmapped(mipmapped) {
   }
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,

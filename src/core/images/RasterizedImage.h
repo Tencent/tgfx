@@ -18,7 +18,8 @@
 
 #pragma once
 
-#include "core/images/ResourceImage.h"
+#include "core/images/PixelImage.h"
+#include "gpu/ResourceKey.h"
 
 namespace tgfx {
 /**

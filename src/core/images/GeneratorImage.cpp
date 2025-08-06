@@ -19,10 +19,11 @@
 #include "GeneratorImage.h"
 #include "DecodedImage.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/TPArgs.h"
 
 namespace tgfx {
 GeneratorImage::GeneratorImage(std::shared_ptr<ImageGenerator> generator, bool mipmapped)
-    : ResourceImage(mipmapped), generator(std::move(generator)) {
+    : PixelImage(mipmapped), generator(std::move(generator)) {
 }
 
 std::shared_ptr<Image> GeneratorImage::onMakeDecoded(Context*, bool tryHardware) const {

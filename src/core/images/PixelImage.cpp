@@ -16,14 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ResourceImage.h"
+#include "PixelImage.h"
+#include "gpu/TPArgs.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
 
-PlacementPtr<FragmentProcessor> ResourceImage::asFragmentProcessor(const FPArgs& args,
-                                                                   const SamplingArgs& samplingArgs,
-                                                                   const Matrix* uvMatrix) const {
+PlacementPtr<FragmentProcessor> PixelImage::asFragmentProcessor(const FPArgs& args,
+                                                                const SamplingArgs& samplingArgs,
+                                                                const Matrix* uvMatrix) const {
   auto mipmapped = hasMipmaps() && samplingArgs.sampling.mipmapMode != MipmapMode::None;
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale, BackingFit::Approx);
   auto textureProxy = lockTextureProxy(tpArgs);

@@ -20,6 +20,7 @@
 #include "BufferImage.h"
 #include "core/ImageSource.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/TPArgs.h"
 
 namespace tgfx {
 std::shared_ptr<Image> DecodedImage::MakeFrom(std::shared_ptr<ImageGenerator> generator,
@@ -40,7 +41,7 @@ std::shared_ptr<Image> DecodedImage::MakeFrom(std::shared_ptr<ImageGenerator> ge
 
 DecodedImage::DecodedImage(int width, int height, bool alphaOnly,
                            std::shared_ptr<DataSource<ImageBuffer>> source, bool mipmapped)
-    : ResourceImage(mipmapped), _width(width), _height(height), _alphaOnly(alphaOnly),
+    : PixelImage(mipmapped), _width(width), _height(height), _alphaOnly(alphaOnly),
       source(std::move(source)) {
 }
 
