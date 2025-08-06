@@ -23,7 +23,8 @@
 
 namespace tgfx {
 /**
- * RasterizedImage is an image that rasterizes another image.
+ * RasterizedImage is an image that rasterizes another image and stores the result as a GPU texture
+ * for repeated rendering.
  */
 class RasterizedImage : public Image {
  public:
