@@ -179,13 +179,6 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
       return false;
     }
     dstData = dstTempBuffer.bytes();
-  } else if (dstImageInfo.rowBytes() % 16) {
-    auto dstRowBytes = dstImageInfo.rowBytes() + GetPaddingAlignment16(dstImageInfo.rowBytes());
-    dstImageInfo = ImageInfo::Make(dstImageInfo.width(), dstImageInfo.height(),
-                                   dstImageInfo.colorType(), dstImageInfo.alphaType(), dstRowBytes);
-    if (!dstTempBuffer.alloc(dstImageInfo.byteSize())) {
-      return false;
-    }
   }
   srcRowBytes = srcRowBytes + GetPaddingAlignment16(srcRowBytes);
   if (!buffer.alloc(srcRowBytes * static_cast<size_t>(height()))) {
