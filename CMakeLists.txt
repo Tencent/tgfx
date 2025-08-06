@@ -528,7 +528,6 @@ if(TGFX_BUILD_VCPKG)
     if(TGFX_USE_ZLIB)
         find_package(ZLIB REQUIRED)
         list(APPEND TGFX_SHARED_LIBS ZLIB::ZLIB)
-        endif()
     endif()
     
     if(TGFX_USE_FREETYPE)
