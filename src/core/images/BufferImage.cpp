@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BufferImage.h"
-#include "core/images/CodecImage.h"
 #include "core/PixelBuffer.h"
 #include "core/PixelBufferCodec.h"
+#include "core/images/CodecImage.h"
 #include "gpu/ProxyProvider.h"
 
 namespace tgfx {
