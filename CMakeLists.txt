@@ -20,7 +20,7 @@ option(TGFX_USE_SWIFTSHADER "Enable building with the SwiftShader library" OFF)
 option(TGFX_USE_ANGLE "Enable building with the ANGLE library" OFF)
 option(TGFX_USE_FASTER_BLUR "Enable a faster blur algorithm instead of the standard Gaussian blur" ON)
 
-# When enabled, ImageBuffers created from web native codecs won’t be fully decoded right away.
+# When enabled, ImageBuffers created from web native codecs won't be fully decoded right away.
 # Instead, they will use promise-awaiting calls before generating textures, allowing multiple
 # images to be decoded simultaneously. Avoid enabling this if your rendering process requires
 # multiple flush() calls in a single frame, as it may cause screen tearing, where parts of the
@@ -161,8 +161,10 @@ if (MSVC)
     list(APPEND TGFX_COMPILE_OPTIONS /w44251 /w44275)
     list(APPEND TGFX_COMPILE_OPTIONS /W4)
     list(APPEND TGFX_DEFINES NOMINMAX _USE_MATH_DEFINES)
-    list(APPEND TGFX_STATIC_VENDORS highway)
-    list(APPEND TGFX_INCLUDES third_party/highway)
+    if(NOT TGFX_BUILD_VCPKG)
+        list(APPEND TGFX_STATIC_VENDORS highway)
+        list(APPEND TGFX_INCLUDES third_party/highway)
+    endif()
 endif (MSVC)
 
 # Sets flags
@@ -213,29 +215,37 @@ if (TGFX_USE_WEBP_ENCODE)
 endif ()
 
 if (TGFX_USE_JPEG)
-    list(APPEND TGFX_STATIC_VENDORS libjpeg-turbo)
+    if(NOT TGFX_BUILD_VCPKG)
+        list(APPEND TGFX_STATIC_VENDORS libjpeg-turbo)
+        list(APPEND TGFX_INCLUDES third_party/out/libjpeg-turbo/${INCLUDE_ENTRY})
+    endif()
     file(GLOB_RECURSE GFX_PLATFORM_FILES src/core/codecs/jpeg/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
-    list(APPEND TGFX_INCLUDES third_party/out/libjpeg-turbo/${INCLUDE_ENTRY})
 endif ()
 
 if (TGFX_USE_WEBP)
-    list(APPEND TGFX_STATIC_VENDORS libwebp)
+    if(NOT TGFX_BUILD_VCPKG)
+        list(APPEND TGFX_STATIC_VENDORS libwebp)
+        list(APPEND TGFX_INCLUDES third_party/libwebp/src)
+    endif()
     file(GLOB_RECURSE GFX_PLATFORM_FILES src/core/codecs/webp/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
-    list(APPEND TGFX_INCLUDES third_party/libwebp/src)
 endif ()
 
 if (TGFX_USE_PNG)
     set(TGFX_USE_ZLIB ON)
-    list(APPEND TGFX_STATIC_VENDORS libpng)
+    if(NOT TGFX_BUILD_VCPKG)
+        list(APPEND TGFX_STATIC_VENDORS libpng)
+        list(APPEND TGFX_INCLUDES third_party/out/libpng/${INCLUDE_ENTRY})
+    endif()
     file(GLOB_RECURSE GFX_PLATFORM_FILES src/core/codecs/png/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
-    list(APPEND TGFX_INCLUDES third_party/out/libpng/${INCLUDE_ENTRY})
 endif ()
 
 if (TGFX_USE_ZLIB)
-    list(APPEND TGFX_STATIC_VENDORS zlib)
+    if(NOT TGFX_BUILD_VCPKG)
+        list(APPEND TGFX_STATIC_VENDORS zlib)
+    endif()
 endif ()
 
 if (TGFX_BUILD_SVG)
@@ -259,10 +269,12 @@ endif ()
 
 if (TGFX_USE_FREETYPE)
     list(APPEND TGFX_DEFINES TGFX_USE_FREETYPE)
-    list(APPEND TGFX_STATIC_VENDORS freetype)
+    if(NOT TGFX_BUILD_VCPKG)
+        list(APPEND TGFX_STATIC_VENDORS freetype)
+        list(APPEND TGFX_INCLUDES third_party/freetype/include)
+    endif()
     file(GLOB_RECURSE GFX_PLATFORM_FILES src/core/vectors/freetype/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
-    list(APPEND TGFX_INCLUDES third_party/freetype/include)
 elseif (WEB)
     file(GLOB_RECURSE GFX_PLATFORM_FILES src/core/vectors/web/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
@@ -305,8 +317,8 @@ if (TGFX_USE_QT)
         file(GLOB CGL_PLATFORM_FILES src/gpu/opengl/cgl/CGLHardwareTextureSampler.mm)
         list(APPEND TGFX_FILES ${CGL_PLATFORM_FILES})
         list(APPEND TGFX_DEFINES GL_SILENCE_DEPRECATION)
-        find_library(OpenGL_LIBS OpenGL REQUIRED)
-        list(APPEND TGFX_SHARED_LIBS ${OpenGL_LIBS})
+        find_library(OpenGL_Libs OpenGL REQUIRED)
+        list(APPEND TGFX_SHARED_LIBS ${OpenGL_Libs})
     endif ()
 elseif (TGFX_USE_SWIFTSHADER)
     list(APPEND TGFX_INCLUDES vendor/swiftshader/include)
@@ -325,7 +337,9 @@ endif ()
 
 if (TGFX_USE_INSPECTOR)
     list(APPEND TGFX_DEFINES TGFX_USE_INSPECTOR)
-    list(APPEND TGFX_INCLUDES third_party/flatbuffers/include)
+    if(NOT TGFX_BUILD_VCPKG)
+        list(APPEND TGFX_INCLUDES third_party/flatbuffers/include)
+    endif()
     file(GLOB_RECURSE SERIALIZATION_FILE src/serialization/*.*)
     list(APPEND TGFX_FILES ${SERIALIZATION_FILE})
 endif ()
@@ -339,7 +353,9 @@ list(APPEND TGFX_STATIC_VENDORS pathkit)
 list(APPEND TGFX_INCLUDES third_party/pathkit)
 list(APPEND TGFX_STATIC_VENDORS skcms)
 list(APPEND TGFX_INCLUDES third_party/skcms)
-list(APPEND TGFX_INCLUDES third_party/concurrentqueue)
+if(NOT TGFX_BUILD_VCPKG)
+    list(APPEND TGFX_INCLUDES third_party/concurrentqueue)
+endif()
 if (TGFX_BUILD_SVG)
     list(APPEND TGFX_STATIC_VENDORS expat)
     list(APPEND TGFX_INCLUDES third_party/expat)
@@ -493,6 +509,50 @@ elseif (CMAKE_HOST_SYSTEM_NAME MATCHES "Linux")
     endif ()
 endif ()
 
+if(TGFX_BUILD_VCPKG)
+    if(TGFX_USE_JPEG)
+        find_package(JPEG REQUIRED)
+        list(APPEND TGFX_SHARED_LIBS JPEG::JPEG)
+    endif()
+    
+    if(TGFX_USE_WEBP)
+        find_package(WebP CONFIG REQUIRED)
+        list(APPEND TGFX_SHARED_LIBS WebP::webp WebP::webpdecoder WebP::webpdemux)
+    endif()
+    
+    if(TGFX_USE_PNG)
+        find_package(PNG REQUIRED)
+        list(APPEND TGFX_SHARED_LIBS PNG::PNG)
+    endif()
+    
+    if(TGFX_USE_ZLIB)
+        find_package(ZLIB REQUIRED)
+        list(APPEND TGFX_SHARED_LIBS ZLIB::ZLIB)
+        endif()
+    endif()
+    
+    if(TGFX_USE_FREETYPE)
+        find_package(Freetype REQUIRED)
+        list(APPEND TGFX_SHARED_LIBS Freetype::Freetype)
+    endif()
+    
+    if(MSVC)
+        find_package(hwy CONFIG REQUIRED)        
+        list(APPEND TGFX_SHARED_LIBS hwy::hwy)
+    endif()
+    
+    if(TGFX_USE_INSPECTOR)
+        find_package(flatbuffers REQUIRED)
+        list(APPEND TGFX_SHARED_LIBS flatbuffers::flatbuffers)
+    endif()
+
+    find_package(lz4 CONFIG REQUIRED)
+    list(APPEND TGFX_SHARED_LIBS lz4::lz4)
+    
+    # concurrentqueue 是 header-only 库，通过 vcpkg 安装后直接可用
+    find_package(concurrentqueue REQUIRED)
+endif()
+
 add_vendor_target(tgfx-vendor STATIC_VENDORS ${TGFX_STATIC_VENDORS} SHARED_VENDORS ${TGFX_SHARED_VENDORS})
 find_vendor_libraries(tgfx-vendor STATIC TGFX_VENDOR_STATIC_LIBRARIES SHARED TGFX_VENDOR_SHARED_LIBRARIES)
 list(APPEND TGFX_STATIC_LIBS ${TGFX_VENDOR_STATIC_LIBRARIES})
@@ -545,7 +605,6 @@ endif ()
 # -------------------------------------------------------------------------
 
 if(TGFX_BUILD_VCPKG)
-    # 安装库文件
     install(TARGETS tgfx
         EXPORT tgfxTargets
         LIBRARY DESTINATION lib
@@ -559,14 +618,12 @@ if(TGFX_BUILD_VCPKG)
         FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
     )
 
-    # 生成并安装CMake配置文件
     install(EXPORT tgfxTargets
         FILE tgfxTargets.cmake
         NAMESPACE tgfx::
         DESTINATION share/tgfx
     )
 
-    # 创建配置文件
     include(CMakePackageConfigHelpers)
     write_basic_package_version_file(
         tgfxConfigVersion.cmake
@@ -608,13 +665,25 @@ if (TGFX_BUILD_TESTS)
     list(APPEND TGFX_TEST_LIBS tgfx-drawers tgfx ${TGFX_SHARED_LIBS})
     list(APPEND TGFX_TEST_INCLUDES src test/src third_party/json/include)
 
-    add_vendor_target(test-vendor STATIC_VENDORS harfbuzz googletest)
-    find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)
-    list(APPEND TGFX_TEST_LIBS ${TEST_VENDOR_STATIC_LIBRARIES})
-    list(APPEND TGFX_TEST_INCLUDES
-            third_party/harfbuzz/src
-            third_party/googletest/googletest
-            third_party/googletest/googletest/include)
+    if(TGFX_BUILD_VCPKG)
+        find_package(harfbuzz CONFIG REQUIRED)
+        list(APPEND TGFX_TEST_LIBS harfbuzz::harfbuzz)
+        
+        add_vendor_target(test-vendor STATIC_VENDORS googletest)
+        find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)
+        list(APPEND TGFX_TEST_LIBS ${TEST_VENDOR_STATIC_LIBRARIES})
+        list(APPEND TGFX_TEST_INCLUDES
+                third_party/googletest/googletest
+                third_party/googletest/googletest/include)
+    else()
+        add_vendor_target(test-vendor STATIC_VENDORS harfbuzz googletest)
+        find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)
+        list(APPEND TGFX_TEST_LIBS ${TEST_VENDOR_STATIC_LIBRARIES})
+        list(APPEND TGFX_TEST_INCLUDES
+                third_party/harfbuzz/src
+                third_party/googletest/googletest
+                third_party/googletest/googletest/include)
+    endif()
 
     list(APPEND TGFX_TEST_COMPILE_OPTIONS ${TGFX_COMPILE_OPTIONS} -fno-access-control)
     list(APPEND TGFX_TEST_DEFINES ${TGFX_DEFINES})
