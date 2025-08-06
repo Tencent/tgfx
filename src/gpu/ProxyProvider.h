@@ -152,10 +152,8 @@ class ProxyProvider {
 
   /**
    * Stores the given proxy in the map with the new uniqueKey.
-   * Returns true if the assignment is successful, or false if the proxy is nullptr
-   * or does not belong to the same context as this provider.
    */
-  bool assignProxyUniqueKey(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& uniqueKey);
+  void assignProxyUniqueKey(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& uniqueKey);
 
  private:
   Context* context = nullptr;

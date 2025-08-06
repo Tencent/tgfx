@@ -112,18 +112,15 @@ void ProxyProvider::clearSharedVertexBuffer() {
   sharedVertexBufferFlushed = false;
 }
 
-bool ProxyProvider::assignProxyUniqueKey(std::shared_ptr<ResourceProxy> proxy,
+void ProxyProvider::assignProxyUniqueKey(std::shared_ptr<ResourceProxy> proxy,
                                          const UniqueKey& uniqueKey) {
-  if (proxy == nullptr || proxy->context != context) {
-    return false;
-  }
+  DEBUG_ASSERT(proxy != nullptr && proxy->context == context);
   if (!proxy->uniqueKey.empty()) {
     proxyMap.erase(proxy->uniqueKey);
   }
   if (!uniqueKey.empty()) {
     proxyMap[uniqueKey] = proxy;
   }
-  return true;
 }
 
 void ProxyProvider::uploadSharedVertexBuffer(std::shared_ptr<Data> data) {
