@@ -17,10 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFBitmap.h"
-#include <_types/_uint32_t.h>
-#include <_types/_uint8_t.h>
-#include <cstddef>
-#include <memory>
 #include "core/codecs/jpeg/JpegCodec.h"
 #include "core/images/CodecImage.h"
 #include "core/utils/Types.h"

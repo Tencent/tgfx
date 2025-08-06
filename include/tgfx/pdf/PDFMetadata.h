@@ -18,6 +18,8 @@
 
 #pragma once
 
+#error "PDF unit test"
+
 #include <memory>
 #include <string>
 #include <vector>

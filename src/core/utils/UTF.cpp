@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/UTF.h"
-#include <cstddef>
-#include <string>
 
 namespace tgfx {
 static int utf8_byte_type(uint8_t c) {
