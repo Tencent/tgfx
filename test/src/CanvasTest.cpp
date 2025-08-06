@@ -18,8 +18,8 @@
 
 #include "core/PathRef.h"
 #include "core/Records.h"
-#include "core/images/RasterizedImage.h"
 #include "core/images/CodecImage.h"
+#include "core/images/RasterizedImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/images/TransformImage.h"
 #include "core/shapes/AppendShape.h"
