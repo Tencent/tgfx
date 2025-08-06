@@ -34,7 +34,6 @@ class ShapeBufferUploadTask : public ResourceTask {
 
  private:
   std::shared_ptr<ResourceProxy> textureProxy = nullptr;
-  UniqueKey textureKey = {};
   std::unique_ptr<DataSource<ShapeBuffer>> source = nullptr;
 
   friend class ProxyProvider;

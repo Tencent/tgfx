@@ -17,15 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include "ResourceImage.h"
+#include "PixelImage.h"
 
 namespace tgfx {
 /**
  * BufferImage wraps a fully decoded ImageBuffer that can generate textures on demand.
  */
-class BufferImage : public ResourceImage {
+class BufferImage : public PixelImage {
  public:
-  BufferImage(UniqueKey uniqueKey, std::shared_ptr<ImageBuffer> buffer);
+  BufferImage(std::shared_ptr<ImageBuffer> buffer, bool mipmapped);
 
   int width() const override {
     return imageBuffer->width();
@@ -39,9 +39,6 @@ class BufferImage : public ResourceImage {
     return imageBuffer->isAlphaOnly();
   }
 
-  std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
-                                      const SamplingOptions& sampling) const override;
-
   std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
 
  protected:
@@ -49,7 +46,14 @@ class BufferImage : public ResourceImage {
     return Type::Buffer;
   }
 
-  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
-                                                   const UniqueKey& key) const override;
+  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
+
+  std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
+
+  std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
+                                      const SamplingOptions& sampling) const override;
+
+ private:
+  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
 };
 }  // namespace tgfx

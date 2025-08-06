@@ -58,7 +58,7 @@ std::shared_ptr<Resource> ShapeBufferUploadTask::onMakeResource(Context* context
       LOGE("ShapeBufferUploadTask::execute() Failed to create the texture!");
       return nullptr;
     }
-    texture->assignUniqueKey(textureKey);
+    texture->assignUniqueKey(textureProxy->uniqueKey);
     textureProxy->resource = std::move(texture);
   }
   // Free the data source immediately to reduce memory pressure.

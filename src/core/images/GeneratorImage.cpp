@@ -19,28 +19,26 @@
 #include "GeneratorImage.h"
 #include "DecodedImage.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/TPArgs.h"
 
 namespace tgfx {
-GeneratorImage::GeneratorImage(UniqueKey uniqueKey, std::shared_ptr<ImageGenerator> generator)
-    : ResourceImage(std::move(uniqueKey)), generator(std::move(generator)) {
+GeneratorImage::GeneratorImage(std::shared_ptr<ImageGenerator> generator, bool mipmapped)
+    : PixelImage(mipmapped), generator(std::move(generator)) {
 }
 
-std::shared_ptr<Image> GeneratorImage::onMakeDecoded(Context* context, bool tryHardware) const {
-  if (context != nullptr) {
-    auto proxy = context->proxyProvider()->findProxy(uniqueKey);
-    if (proxy != nullptr) {
-      return nullptr;
-    }
-    if (context->resourceCache()->hasUniqueResource(uniqueKey)) {
-      return nullptr;
-    }
-  }
-  return DecodedImage::MakeFrom(uniqueKey, generator, tryHardware, true);
+std::shared_ptr<Image> GeneratorImage::onMakeDecoded(Context*, bool tryHardware) const {
+  return DecodedImage::MakeFrom(generator, tryHardware, true, mipmapped);
 }
 
-std::shared_ptr<TextureProxy> GeneratorImage::onLockTextureProxy(const TPArgs& args,
-                                                                 const UniqueKey& key) const {
-  return args.context->proxyProvider()->createTextureProxy(key, generator, args.mipmapped,
+std::shared_ptr<TextureProxy> GeneratorImage::lockTextureProxy(const TPArgs& args) const {
+  return args.context->proxyProvider()->createTextureProxy(generator, args.mipmapped,
                                                            args.renderFlags);
 }
+
+std::shared_ptr<Image> GeneratorImage::onMakeMipmapped(bool mipmapped) const {
+  auto image = std::make_shared<GeneratorImage>(generator, mipmapped);
+  image->weakThis = image;
+  return image;
+}
+
 }  // namespace tgfx

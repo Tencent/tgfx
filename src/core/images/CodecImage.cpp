@@ -20,12 +20,11 @@
 #include "RasterizedImage.h"
 #include "core/ScaledImageGenerator.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/TPArgs.h"
 
 namespace tgfx {
-
-CodecImage::CodecImage(UniqueKey uniqueKey, std::shared_ptr<ImageCodec> codec, int width,
-                       int height)
-    : GeneratorImage(std::move(uniqueKey), std::move(codec)), _width(width), _height(height) {
+CodecImage::CodecImage(std::shared_ptr<ImageCodec> codec, int width, int height, bool mipmapped)
+    : GeneratorImage(std::move(codec), mipmapped), _width(width), _height(height) {
 }
 
 std::shared_ptr<ImageCodec> CodecImage::getCodec() const {
@@ -35,20 +34,19 @@ std::shared_ptr<ImageCodec> CodecImage::getCodec() const {
 std::shared_ptr<Image> CodecImage::onMakeScaled(int newWidth, int newHeight,
                                                 const SamplingOptions& sampling) const {
   if (newWidth <= generator->width() && newHeight <= generator->height()) {
-    auto image = std::make_shared<CodecImage>(UniqueKey::Make(), getCodec(), newWidth, newHeight);
+    auto image = std::make_shared<CodecImage>(getCodec(), newWidth, newHeight, mipmapped);
     image->weakThis = image;
     return image;
   }
-  return ResourceImage::onMakeScaled(newWidth, newHeight, sampling);
+  return PixelImage::onMakeScaled(newWidth, newHeight, sampling);
 }
 
-std::shared_ptr<TextureProxy> CodecImage::onLockTextureProxy(const TPArgs& args,
-                                                             const UniqueKey& key) const {
+std::shared_ptr<TextureProxy> CodecImage::lockTextureProxy(const TPArgs& args) const {
   auto tempGenerator = generator;
   if (width() != generator->width() || height() != generator->height()) {
     tempGenerator = ScaledImageGenerator::MakeFrom(getCodec(), width(), height());
   }
-  return args.context->proxyProvider()->createTextureProxy(key, tempGenerator, args.mipmapped,
+  return args.context->proxyProvider()->createTextureProxy(tempGenerator, args.mipmapped,
                                                            args.renderFlags);
 }
 }  // namespace tgfx

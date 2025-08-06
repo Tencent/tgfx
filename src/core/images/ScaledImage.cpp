@@ -25,18 +25,11 @@
 #include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
-std::shared_ptr<Image> ScaledImage::MakeFrom(std::shared_ptr<Image> image, int width, int height,
-                                             const SamplingOptions& sampling) {
-  DEBUG_ASSERT(width > 0 && height > 0 && image != nullptr);
-  DEBUG_ASSERT(width != image->width() || height != image->height());
-  auto scaledImage = std::make_shared<ScaledImage>(std::move(image), width, height, sampling);
-  scaledImage->weakThis = scaledImage;
-  return scaledImage;
-}
 
 ScaledImage::ScaledImage(std::shared_ptr<Image> image, int width, int height,
-                         const SamplingOptions& sampling)
-    : TransformImage(std::move(image)), _width(width), _height(height), sampling(sampling) {
+                         const SamplingOptions& sampling, bool mipmapped)
+    : TransformImage(std::move(image)), _width(width), _height(height), sampling(sampling),
+      mipmapped(mipmapped) {
 }
 
 PlacementPtr<FragmentProcessor> ScaledImage::asFragmentProcessor(const FPArgs& args,
@@ -88,8 +81,8 @@ std::shared_ptr<TextureProxy> ScaledImage::lockTextureProxy(const TPArgs& args,
   auto drawScaleY = scaledRect.height() / drawRect.height();
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(scaledRect.width()), static_cast<int>(scaledRect.height()),
-      alphaRenderable && isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft,
-      BackingFit::Approx);
+      alphaRenderable && isAlphaOnly(), 1, hasMipmaps() && args.mipmapped, ImageOrigin::TopLeft,
+      args.backingFit);
   if (renderTarget == nullptr) {
     return nullptr;
   }
@@ -116,11 +109,18 @@ std::shared_ptr<Image> ScaledImage::onMakeScaled(int newWidth, int newHeight,
   if (newWidth == source->width() && newHeight == source->height()) {
     return source;
   }
-  return MakeFrom(source, newWidth, newHeight, sampling);
+  auto result = source->makeScaled(newWidth, newHeight, sampling);
+  return result->makeMipmapped(hasMipmaps());
+}
+
+std::shared_ptr<Image> ScaledImage::onMakeMipmapped(bool enabled) const {
+  auto scaledImage = std::make_shared<ScaledImage>(source, _width, _height, sampling, enabled);
+  scaledImage->weakThis = scaledImage;
+  return scaledImage;
 }
 
 std::shared_ptr<Image> ScaledImage::onCloneWith(std::shared_ptr<Image> newSource) const {
-  auto scaledImage = std::make_shared<ScaledImage>(newSource, _width, _height, sampling);
+  auto scaledImage = std::make_shared<ScaledImage>(newSource, _width, _height, sampling, mipmapped);
   scaledImage->weakThis = scaledImage;
   return scaledImage;
 }
