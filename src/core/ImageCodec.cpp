@@ -42,6 +42,11 @@
 
 namespace tgfx {
 
+static size_t GetPaddingAlignment16(size_t size) {
+  auto remainder = size & 0xF;
+  return (16 - remainder) & 0xF;
+}
+
 std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const std::string& filePath) {
   static WeakMap<std::string, ImageCodec> imageCodecMap = {};
   if (filePath.empty()) {
@@ -163,12 +168,27 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
       dstInfo.colorType() != ColorType::ALPHA_8 && dstInfo.colorType() != ColorType::Gray_8) {
     colorType = ColorType::RGBA_8888;
     srcRowBytes = ImageInfo::GetBytesPerPixel(colorType) * static_cast<size_t>(width());
-    dstImageInfo = dstInfo.makeColorType(colorType);
+    auto dstRowBytes = dstInfo.rowBytes();
+    if (dstRowBytes % 16) {
+      dstRowBytes = dstImageInfo.rowBytes() + GetPaddingAlignment16(dstImageInfo.rowBytes());
+      dstImageInfo = ImageInfo::Make(dstInfo.width(), dstInfo.height(), colorType, dstInfo.alphaType(), dstRowBytes);
+    }
+    else {
+      dstImageInfo = dstInfo.makeColorType(colorType);
+    }
     if (!dstTempBuffer.alloc(dstImageInfo.byteSize())) {
       return false;
     }
     dstData = dstTempBuffer.bytes();
   }
+  else if (dstImageInfo.rowBytes() % 16) {
+    auto dstRowBytes = dstImageInfo.rowBytes() + GetPaddingAlignment16(dstImageInfo.rowBytes());
+    dstImageInfo = ImageInfo::Make(dstImageInfo.width(), dstImageInfo.height(), dstImageInfo.colorType(), dstImageInfo.alphaType(), dstRowBytes);
+    if (!dstTempBuffer.alloc(dstImageInfo.byteSize())) {
+      return false;
+    }
+  }
+  srcRowBytes = srcRowBytes + GetPaddingAlignment16(srcRowBytes);
   if (!buffer.alloc(srcRowBytes * static_cast<size_t>(height()))) {
     return false;
   }
@@ -180,7 +200,7 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
                         dstImageInfo.colorType() == ColorType::ALPHA_8;
   auto inputLayout = PixelLayout{width(), height(), static_cast<int>(srcRowBytes)};
   auto outputLayout = PixelLayout{dstImageInfo.width(), dstImageInfo.height(),
-                                  static_cast<int>(dstImageInfo.rowBytes())};
+    static_cast<int>(dstImageInfo.rowBytes())};
   BoxFilterDownsample(buffer.data(), inputLayout, dstData, outputLayout, isOneComponent);
   if (!dstTempBuffer.isEmpty()) {
     Pixmap(dstImageInfo, dstData).readPixels(dstInfo, dstPixels);
