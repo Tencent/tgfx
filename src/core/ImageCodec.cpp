@@ -168,13 +168,12 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
       dstInfo.colorType() != ColorType::ALPHA_8 && dstInfo.colorType() != ColorType::Gray_8) {
     colorType = ColorType::RGBA_8888;
     srcRowBytes = ImageInfo::GetBytesPerPixel(colorType) * static_cast<size_t>(width());
-    auto dstRowBytes = dstInfo.rowBytes();
+    dstImageInfo = dstInfo.makeColorType(colorType);
+    auto dstRowBytes = dstImageInfo.rowBytes();
     if (dstRowBytes % 16) {
       dstRowBytes = dstImageInfo.rowBytes() + GetPaddingAlignment16(dstImageInfo.rowBytes());
       dstImageInfo = ImageInfo::Make(dstInfo.width(), dstInfo.height(), colorType,
                                      dstInfo.alphaType(), dstRowBytes);
-    } else {
-      dstImageInfo = dstInfo.makeColorType(colorType);
     }
     if (!dstTempBuffer.alloc(dstImageInfo.byteSize())) {
       return false;
