@@ -21,10 +21,10 @@
 #include <core/utils/Types.h>
 #define FLATBUFFERS_LOCALE_INDEPENDENT 0
 #include <flatbuffers/flexbuffers.h>
+#include <tgfx/gpu/Context.h>
+#include <tgfx/layers/Layer.h>
 #include <string>
-#include "debug/LayerInspectorProtocol.h"
-#include "tgfx/gpu/Context.h"
-#include "tgfx/layers/Layer.h"
+#include "LayerInspectorProtocol.h"
 
 namespace tgfx {
 namespace SerializeUtils {

@@ -2,6 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
+//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -15,26 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma once
-#ifdef TGFX_BUILD_INSPECTOR
-#include <optional>
-#include "debug/Define.h"
-#include "tgfx/core/Color.h"
-#include "tgfx/core/Matrix.h"
-#include "tgfx/core/Rect.h"
-
-namespace inspector {
-void SendAttributeData(const char* name, const tgfx::Rect& rect);
-
-void SendAttributeData(const char* name, const tgfx::Matrix& matrix);
-
-void SendAttributeData(const char* name, const std::optional<tgfx::Matrix>& matrix);
-
-void SendAttributeData(const char* name, const tgfx::Color& color);
-
-void SendAttributeData(const char* name, const std::optional<tgfx::Color>& color);
-}  // namespace inspector
-
-#define AttributeTGFXName(name, value) inspector::SendAttributeData(name, value)
+#ifdef TGFX_USE_INSPECTOR
+#include "Define.h"
 #else
 #define FrameMark
 

@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RRectDrawOp.h"
-#include "core/DataSource.h"
-#include "core/utils/Profiling.h"
 #include "gpu/GPUBuffer.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
@@ -52,13 +50,6 @@ RRectDrawOp::RRectDrawOp(RRectsVertexProvider* provider)
 }
 
 void RRectDrawOp::execute(RenderPass* renderPass) {
-  OperateMark(inspector::OpTaskType::RRectDrawOp);
-  AttributeName("rectCount", static_cast<uint32_t>(rectCount));
-  AttributeName("useScale", useScale);
-  AttributeName("hasStroke", hasStroke);
-  AttributeTGFXName("commonColor", commonColor);
-  AttributeNameEnum("blenderMode", getBlendMode(), inspector::CustomEnumType::BlendMode);
-  AttributeNameEnum("aaType", getAAType(), inspector::CustomEnumType::AAType);
   if (indexBufferProxy == nullptr || vertexBufferProxyView == nullptr) {
     return;
   }

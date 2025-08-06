@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RectDrawOp.h"
-#include "core/utils/Profiling.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
@@ -59,13 +58,6 @@ RectDrawOp::RectDrawOp(RectsVertexProvider* provider)
 }
 
 void RectDrawOp::execute(RenderPass* renderPass) {
-  OperateMark(inspector::OpTaskType::RectDrawOp);
-  AttributeName("rectCount", static_cast<int>(rectCount));
-  AttributeTGFXName("commonColor", commonColor);
-  AttributeTGFXName("uvMatrix", uvMatrix);
-  AttributeTGFXName("scissorRect", scissorRect());
-  AttributeNameEnum("blenderMode", getBlendMode(), inspector::CustomEnumType::BlendMode);
-  AttributeNameEnum("aaType", getAAType(), inspector::CustomEnumType::AAType);
   std::shared_ptr<IndexBuffer> indexBuffer = nullptr;
   if (indexBufferProxy) {
     indexBuffer = indexBufferProxy->getBuffer();

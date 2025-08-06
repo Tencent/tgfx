@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GPUBufferUploadTask.h"
-#include "core/utils/Profiling.h"
 #include "gpu/GPU.h"
 #include "gpu/IndexBuffer.h"
 #include "gpu/VertexBuffer.h"
@@ -30,8 +29,6 @@ GPUBufferUploadTask::GPUBufferUploadTask(std::shared_ptr<ResourceProxy> proxy,
 }
 
 std::shared_ptr<Resource> GPUBufferUploadTask::onMakeResource(Context* context) {
-  TaskMark(inspector::OpTaskType::GpuUploadTask);
-  AttributeEnum(bufferType, inspector::CustomEnumType::BufferType);
   if (source == nullptr) {
     return nullptr;
   }
