@@ -516,45 +516,86 @@ if(TGFX_BUILD_VCPKG)
         set(VCPKG_LIB_DIR ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib)
     endif()
     set(VCPKG_INCLUDE_DIR ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/include)
-
     list(APPEND TGFX_INCLUDES ${VCPKG_INCLUDE_DIR})
 
     if(TGFX_USE_JPEG)
-        list(APPEND TGFX_STATIC_LIBS ${VCPKG_LIB_DIR}/libjpeg.a)
+        find_library(JPEG_LIB 
+            NAMES jpeg libjpeg
+            PATHS ${VCPKG_LIB_DIR}
+            NO_DEFAULT_PATH)
+        list(APPEND TGFX_STATIC_LIBS ${JPEG_LIB})
     endif()
     
     if(TGFX_USE_WEBP)
-        list(APPEND TGFX_STATIC_LIBS 
-            ${VCPKG_LIB_DIR}/libwebp.a
-            ${VCPKG_LIB_DIR}/libwebpdecoder.a
-            ${VCPKG_LIB_DIR}/libwebpmux.a)
+        find_library(WEBP_LIB 
+            NAMES webp libwebp
+            PATHS ${VCPKG_LIB_DIR}
+            NO_DEFAULT_PATH
+        )
+        find_library(WEBPDEMUX_LIB 
+            NAMES webpdemux libwebpdemux
+            PATHS ${VCPKG_LIB_DIR}
+            NO_DEFAULT_PATH
+        )
+        find_library(WEBPMUX_LIB 
+            NAMES webpmux libwebpmux
+            PATHS ${VCPKG_LIB_DIR}
+            NO_DEFAULT_PATH
+        )
+        list(APPEND TGFX_STATIC_LIBS ${WEBP_LIB} ${WEBPDEMUX_LIB} ${WEBPMUX_LIB})
     endif()
     
     if(TGFX_USE_PNG)
-        list(APPEND TGFX_STATIC_LIBS ${VCPKG_LIB_DIR}/libpng.a)
+        find_library(PNG_LIB 
+            NAMES png libpng png16 libpng16
+            PATHS ${VCPKG_LIB_DIR}
+            NO_DEFAULT_PATH
+        )
+        list(APPEND TGFX_STATIC_LIBS ${PNG_LIB})
     endif()
     
     if(TGFX_USE_ZLIB)
-        list(APPEND TGFX_STATIC_LIBS ${VCPKG_LIB_DIR}/libz.a)
+        find_library(ZLIB_LIB 
+            NAMES libz z zlib libzlib
+            PATHS ${VCPKG_LIB_DIR}
+            NO_DEFAULT_PATH
+        )
+        list(APPEND TGFX_STATIC_LIBS ${ZLIB_LIB})
     endif()
     
     if(TGFX_USE_FREETYPE)
-        find_package(Freetype REQUIRED)
-        list(APPEND TGFX_SHARED_LIBS Freetype::Freetype)
+        find_library(FREETYPE_LIB 
+            NAMES freetype libfreetype
+            PATHS ${VCPKG_LIB_DIR}
+            NO_DEFAULT_PATH
+        )
+        list(APPEND TGFX_STATIC_LIBS ${FREETYPE_LIB})
     endif()
     
     if(MSVC)
-        find_package(hwy CONFIG REQUIRED)        
-        list(APPEND TGFX_SHARED_LIBS hwy::hwy)
+        find_library(HWY_LIB 
+            NAMES hwy libhwy
+            PATHS ${VCPKG_LIB_DIR}
+            NO_DEFAULT_PATH
+        )
+        list(APPEND TGFX_STATIC_LIBS ${HWY_LIB})
     endif()
     
     if(TGFX_USE_INSPECTOR)
-        find_package(flatbuffers REQUIRED)
-        list(APPEND TGFX_SHARED_LIBS flatbuffers::flatbuffers)
+        find_library(FLATBUFFERS_LIB 
+            NAMES flatbuffers libflatbuffers
+            PATHS ${VCPKG_LIB_DIR}
+            NO_DEFAULT_PATH
+        )
+        list(APPEND TGFX_STATIC_LIBS ${FLATBUFFERS_LIB})
     endif()
 
-    find_package(lz4 CONFIG REQUIRED)
-    list(APPEND TGFX_SHARED_LIBS lz4::lz4)
+    find_library(LZ4_LIB 
+        NAMES lz4 liblz4
+        PATHS ${VCPKG_LIB_DIR}
+        NO_DEFAULT_PATH
+    )
+    list(APPEND TGFX_STATIC_LIBS ${LZ4_LIB})
     
     find_package(unofficial-concurrentqueue CONFIG REQUIRED)
     list(APPEND TGFX_INCLUDES ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/include/concurrentqueue)
@@ -673,8 +714,13 @@ if (TGFX_BUILD_TESTS)
     list(APPEND TGFX_TEST_INCLUDES src test/src third_party/json/include)
 
     if(TGFX_BUILD_VCPKG)
-        find_package(harfbuzz CONFIG REQUIRED)
-        list(APPEND TGFX_TEST_LIBS harfbuzz::harfbuzz)
+        find_library(HARFBUZZ_LIB 
+            NAMES harfbuzz libharfbuzz
+            PATHS ${VCPKG_LIB_DIR}
+            NO_DEFAULT_PATH
+        )
+        list(APPEND TGFX_TEST_LIBS ${HARFBUZZ_LIB})
+        list(APPEND TGFX_TEST_INCLUDES ${VCPKG_INCLUDE_DIR})
         
         add_vendor_target(test-vendor STATIC_VENDORS googletest)
         find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)
