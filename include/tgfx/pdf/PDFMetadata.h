@@ -18,8 +18,6 @@
 
 #pragma once
 
-#error "PDF unit test"
-
 #include "tgfx/core/Document.h"
 #include "tgfx/core/WriteStream.h"
 #include "tgfx/gpu/Context.h"
