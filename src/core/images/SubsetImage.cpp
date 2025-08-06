@@ -117,7 +117,7 @@ std::optional<Rect> SubsetImage::getSubset(const Rect& drawRect) const {
   if (saftBounds.contains(drawRect)) {
     return std::nullopt;
   }
-  return std::optional<Rect>(bounds);
+  return {bounds};
 }
 
 }  // namespace tgfx
