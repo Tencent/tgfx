@@ -18,14 +18,14 @@
 
 #pragma once
 
-#include "GeneratorImage.h"
 #include "core/DataSource.h"
+#include "core/images/GeneratorImage.h"
 
 namespace tgfx {
 /**
  * DecodedImage wraps an image source that can asynchronously decode ImageBuffers.
  */
-class DecodedImage : public ResourceImage {
+class DecodedImage : public MipmapImage {
  public:
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageGenerator> generator,
                                          bool tryHardware, bool asyncDecoding, bool mipmapped);
@@ -47,7 +47,7 @@ class DecodedImage : public ResourceImage {
     return Type::Decoded;
   }
 
-  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args) const override;
+  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
   std::shared_ptr<Image> onMakeMipmapped(bool mipmapped) const override;
 

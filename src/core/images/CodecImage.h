@@ -19,7 +19,6 @@
 #pragma once
 
 #include <memory>
-#include "core/images/BufferImage.h"
 #include "core/images/GeneratorImage.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageCodec.h"
@@ -40,15 +39,15 @@ class CodecImage : public GeneratorImage {
     return _height;
   }
 
-  std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
-                                      const SamplingOptions& sampling) const override;
-
  protected:
   Type type() const override {
     return Type::Codec;
   }
 
-  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args) const override;
+  std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
+                                      const SamplingOptions& sampling) const override;
+
+  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
  private:
   int _width;

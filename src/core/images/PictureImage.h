@@ -18,14 +18,14 @@
 
 #pragma once
 
+#include "core/images/MipmapImage.h"
 #include "gpu/proxies/RenderTargetProxy.h"
-#include "tgfx/core/Image.h"
 
 namespace tgfx {
 /**
  * PictureImage is an image that draws a Picture.
  */
-class PictureImage : public Image {
+class PictureImage : public MipmapImage {
  public:
   PictureImage(std::shared_ptr<Picture> picture, int width, int height,
                const Matrix* matrix = nullptr, bool mipmapped = false);
@@ -42,10 +42,6 @@ class PictureImage : public Image {
 
   bool isAlphaOnly() const override {
     return false;
-  }
-
-  bool hasMipmaps() const override {
-    return mipmapped;
   }
 
   std::shared_ptr<Picture> picture = nullptr;
@@ -73,6 +69,5 @@ class PictureImage : public Image {
  private:
   int _width = 0;
   int _height = 0;
-  bool mipmapped = false;
 };
 }  // namespace tgfx

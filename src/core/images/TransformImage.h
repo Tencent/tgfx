@@ -43,6 +43,16 @@ class TransformImage : public Image {
   std::shared_ptr<Image> source = nullptr;
 
  protected:
+  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
+
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
+                                                      const SamplingArgs& samplingArgs,
+                                                      const Matrix* uvMatrix) const final;
+
+  virtual PlacementPtr<FragmentProcessor> onAsFragmentProcessor(const FPArgs& args,
+                                                                const SamplingArgs& samplingArgs,
+                                                                const Matrix* uvMatrix) const = 0;
+
   std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
 
   std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;

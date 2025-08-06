@@ -18,13 +18,13 @@
 
 #pragma once
 
-#include "ResourceImage.h"
+#include "core/images/MipmapImage.h"
 
 namespace tgfx {
 /**
  * GeneratorImage wraps an ImageGenerator that can generate ImageBuffers on demand.
  */
-class GeneratorImage : public ResourceImage {
+class GeneratorImage : public MipmapImage {
  public:
   GeneratorImage(std::shared_ptr<ImageGenerator> generator, bool mipmapped);
 
@@ -51,7 +51,7 @@ class GeneratorImage : public ResourceImage {
 
   std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
 
-  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args) const override;
+  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
   std::shared_ptr<Image> onMakeMipmapped(bool mipmapped) const override;
 

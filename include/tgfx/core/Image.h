@@ -337,7 +337,7 @@ class Image {
    * from the scaling factor in TPArgs, as subclasses can choose whether to apply exact scaling.
    * @param args The TPArgs used to create the texture proxy.
    */
-  virtual std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const;
+  virtual std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const = 0;
 
   /**
    * Returns a fragment processor for the entire Image.
@@ -347,7 +347,7 @@ class Image {
    */
   virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                               const SamplingArgs& samplingArgs,
-                                                              const Matrix* uvMatrix) const = 0;
+                                                              const Matrix* uvMatrix) const;
 
   friend class FragmentProcessor;
   friend class RuntimeImageFilter;

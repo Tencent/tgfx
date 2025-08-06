@@ -20,6 +20,7 @@
 #include "BufferImage.h"
 #include "core/ImageSource.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/TPArgs.h"
 
 namespace tgfx {
 std::shared_ptr<Image> DecodedImage::MakeFrom(std::shared_ptr<ImageGenerator> generator,
@@ -40,11 +41,11 @@ std::shared_ptr<Image> DecodedImage::MakeFrom(std::shared_ptr<ImageGenerator> ge
 
 DecodedImage::DecodedImage(int width, int height, bool alphaOnly,
                            std::shared_ptr<DataSource<ImageBuffer>> source, bool mipmapped)
-    : ResourceImage(mipmapped), _width(width), _height(height), _alphaOnly(alphaOnly),
+    : MipmapImage(mipmapped), _width(width), _height(height), _alphaOnly(alphaOnly),
       source(std::move(source)) {
 }
 
-std::shared_ptr<TextureProxy> DecodedImage::onLockTextureProxy(const TPArgs& args) const {
+std::shared_ptr<TextureProxy> DecodedImage::lockTextureProxy(const TPArgs& args) const {
   return args.context->proxyProvider()->createTextureProxy(source, _width, _height, _alphaOnly,
                                                            args.mipmapped);
 }

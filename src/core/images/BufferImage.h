@@ -17,13 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include "ResourceImage.h"
+#include "core/images/MipmapImage.h"
 
 namespace tgfx {
 /**
  * BufferImage wraps a fully decoded ImageBuffer that can generate textures on demand.
  */
-class BufferImage : public ResourceImage {
+class BufferImage : public MipmapImage {
  public:
   BufferImage(std::shared_ptr<ImageBuffer> buffer, bool mipmapped);
 
@@ -44,7 +44,7 @@ class BufferImage : public ResourceImage {
     return Type::Buffer;
   }
 
-  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args) const override;
+  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
   std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
 

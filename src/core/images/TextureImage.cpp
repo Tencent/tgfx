@@ -18,6 +18,7 @@
 
 #include "TextureImage.h"
 #include "ScaledImage.h"
+#include "gpu/TPArgs.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
