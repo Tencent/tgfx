@@ -403,7 +403,8 @@ TGFX_TEST(CanvasTest, rasterizedImage) {
   EXPECT_TRUE(texture != nullptr);
   EXPECT_EQ(texture->width(), 454);
   EXPECT_EQ(texture->height(), 605);
-  auto imageUniqueKey = std::static_pointer_cast<RasterizedImage>(image)->getTextureKey();
+  auto source = std::static_pointer_cast<TransformImage>(image)->source;
+  auto imageUniqueKey = std::static_pointer_cast<RasterizedImage>(source)->getTextureKey();
   texture = Resource::Find<Texture>(context, imageUniqueKey);
   EXPECT_TRUE(texture == nullptr);
   canvas->clear();
