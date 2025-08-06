@@ -28,6 +28,7 @@ class WebPathRasterizer final : public PathRasterizer {
       : PathRasterizer(width, height, std::move(shape), antiAlias, needsGammaCorrection) {
   }
 
+ protected:
   bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
                     void* dstPixels) const override;
 };

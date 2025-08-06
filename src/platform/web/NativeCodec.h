@@ -26,10 +26,10 @@ class NativeCodec : public ImageCodec {
  public:
   bool asyncSupport() const override;
 
+ protected:
   bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
                     void* dstPixels) const override;
 
- protected:
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
  private:
