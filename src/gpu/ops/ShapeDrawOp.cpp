@@ -43,7 +43,7 @@ ShapeDrawOp::ShapeDrawOp(std::shared_ptr<GPUShapeProxy> proxy, Color color, cons
     auto maskRect = Rect::MakeWH(textureProxy->width(), textureProxy->height());
     auto maskVertexProvider =
         RectsVertexProvider::MakeFrom(context->drawingBuffer(), maskRect, AAType::None);
-    maskBufferProxy = context->proxyProvider()->createVertexBufferProxyView(
+    maskBufferProxy = context->proxyProvider()->createVertexBufferProxy(
         std::move(maskVertexProvider), RenderFlags::DisableAsyncTask);
   }
 }

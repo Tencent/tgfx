@@ -31,13 +31,4 @@ unsigned GLBuffer::target() const {
   LOGE("GLBuffer::target() invalid buffer usage!");
   return 0;
 }
-
-void GLBuffer::release(const GPU* gpu) {
-  DEBUG_ASSERT(gpu != nullptr);
-  if (_bufferID > 0) {
-    auto gl = static_cast<const GLGPU*>(gpu)->functions();
-    gl->deleteBuffers(1, &_bufferID);
-    _bufferID = 0;
-  }
-}
 }  // namespace tgfx

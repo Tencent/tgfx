@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "GPU.h"
 #include "gpu/GPUBuffer.h"
 #include "gpu/Resource.h"
 
@@ -48,7 +49,7 @@ class VertexBuffer : public Resource {
 
  protected:
   void onReleaseGPU() override {
-    buffer->release(context->gpu());
+    context->gpu()->destroyBuffer(buffer.get());
   }
 
  private:

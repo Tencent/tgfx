@@ -19,15 +19,37 @@
 #pragma once
 
 #include <cstddef>
-#include "gpu/GPUBufferUsage.h"
-#include "gpu/GPUResource.h"
+#include <cstdint>
 
 namespace tgfx {
 /**
- * GPUBuffer represents a block of memory on the GPU used to store raw data for GPU operations.
+ * GPUBufferUsage defines the usage flags for GPU buffers.
  */
-class GPUBuffer : public GPUResource {
+class GPUBufferUsage {
  public:
+  /**
+   * The buffer can be used as an index buffer, for example as the buffer argument passed to
+   * RenderPass::setIndexBuffer().
+   */
+  static constexpr uint32_t INDEX = 0x10;
+
+  /**
+   * The buffer can be used as a vertex buffer, for example as the buffer argument passed to
+   * RenderPass::setVertexBuffer().
+   */
+  static constexpr uint32_t VERTEX = 0x20;
+};
+
+/**
+ * GPUBuffer represents a block of GPU memory used to store raw data for GPU operations. GPUBuffer
+ * objects are created using the GPU::createBuffer() method, and their underlying allocations are
+ * not automatically managed by the GPU. You must call GPU::destroyBuffer() to release the resources
+ * when the buffer is no longer needed, unless the GPU context is lost.
+ */
+class GPUBuffer {
+ public:
+  virtual ~GPUBuffer() = default;
+
   /**
    * Returns the size of the buffer in bytes. This size is determined at the time of buffer creation
    * and cannot be changed later.
