@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -26,7 +26,7 @@ namespace tgfx {
 
 namespace {
 // returns `value * pow(base, e)`, assuming `e` is positive.
-double pow_by_squaring(double value, double base, int e) {
+double PowBySquaring(double value, double base, int e) {
   // https://en.wikipedia.org/wiki/Exponentiation_by_squaring
   DEBUG_ASSERT(e > 0);
   while (true) {
@@ -42,7 +42,7 @@ double pow_by_squaring(double value, double base, int e) {
 }
 
 // Return pow(10.0, e), optimized for common cases.
-double pow10(int e) {
+double Pow10(int e) {
   switch (e) {
     case 0:
       return 1.0;  // common cases
@@ -78,10 +78,10 @@ double pow10(int e) {
       return 1e+15;
     default:
       if (e > 15) {
-        return pow_by_squaring(1e+15, 10.0, e - 15);
+        return PowBySquaring(1e+15, 10.0, e - 15);
       } else {
         DEBUG_ASSERT(e < 0);
-        return pow_by_squaring(1.0, 0.1, -e);
+        return PowBySquaring(1.0, 0.1, -e);
       }
   }
 }
@@ -148,7 +148,7 @@ unsigned FloatToDecimal(float value, char output[MaximumFloatToDecimalLength]) {
   static const double kLog2 = 0.3010299956639812;  // log10(2.0);
   int decimalExponent = static_cast<int>(std::floor(kLog2 * binaryExponent));
   int decimalShift = decimalExponent - 8;
-  double power = pow10(-decimalShift);
+  double power = Pow10(-decimalShift);
   DEBUG_ASSERT(value * power <= (double)INT_MAX);
   auto d = static_cast<int>(std::lround(value * power));
 

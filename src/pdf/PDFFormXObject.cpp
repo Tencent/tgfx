@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -37,8 +37,8 @@ PDFIndirectReference MakePDFFormXObject(PDFDocument* document, std::shared_ptr<D
   dict->insertObject("Resources", std::move(resourceDictionary));
   dict->insertObject("BBox", std::move(mediaBox));
 
-  // Right now FormXObject is only used for saveLayer, which implies
-  // isolated blending.  Do this conditionally if that changes.
+  // Right now FormXObject is only used for saveLayer, which implies isolated blending. Do this
+  // conditionally if that changes.
   auto group = PDFDictionary::Make("Group");
   group->insertName("S", "Transparency");
   if (colorSpace != nullptr) {

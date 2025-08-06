@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -29,7 +29,7 @@
 namespace tgfx {
 
 namespace {
-bool parsePFBSection(const uint8_t** src, size_t* len, int sectionType, size_t* size) {
+bool ParsePFBSection(const uint8_t** src, size_t* len, int sectionType, size_t* size) {
   // PFB sections have a two or six bytes header. 0x80 and a one byte
   // section type followed by a four byte section length.  Type one is
   // an ASCII section (includes a length), type two is a binary section
@@ -56,26 +56,18 @@ bool parsePFBSection(const uint8_t** src, size_t* len, int sectionType, size_t* 
   return true;
 }
 
-bool parsePFB(const uint8_t* src, size_t size, size_t* headerLen, size_t* dataLen,
+bool ParsePFB(const uint8_t* src, size_t size, size_t* headerLen, size_t* dataLen,
               size_t* trailerLen) {
   const uint8_t* srcPtr = src;
   size_t remaining = size;
 
-  return parsePFBSection(&srcPtr, &remaining, 1, headerLen) &&
-         parsePFBSection(&srcPtr, &remaining, 2, dataLen) &&
-         parsePFBSection(&srcPtr, &remaining, 1, trailerLen) &&
-         parsePFBSection(&srcPtr, &remaining, 3, nullptr);
+  return ParsePFBSection(&srcPtr, &remaining, 1, headerLen) &&
+         ParsePFBSection(&srcPtr, &remaining, 2, dataLen) &&
+         ParsePFBSection(&srcPtr, &remaining, 1, trailerLen) &&
+         ParsePFBSection(&srcPtr, &remaining, 3, nullptr);
 }
 
-/* The sections of a PFA file are implicitly defined.  The body starts
- * after the line containing "eexec," and the trailer starts with 512
- * literal 0's followed by "cleartomark" (plus arbitrary white space).
- *
- * This function assumes that src is NUL terminated, but the NUL
- * termination is not included in size.
- *
- */
-bool parsePFA(const char* src, size_t size, size_t* headerLen, size_t* hexDataLen, size_t* dataLen,
+bool ParsePFA(const char* src, size_t size, size_t* headerLen, size_t* hexDataLen, size_t* dataLen,
               size_t* trailerLen) {
   const char* end = src + size;
 
@@ -116,7 +108,6 @@ bool parsePFA(const char* src, size_t size, size_t* headerLen, size_t* hexDataLe
     if (isspace(*dataPos)) {
       continue;
     }
-    // isxdigit() is locale-sensitive https://bugs.skia.org/8285
     if (nullptr == strchr("0123456789abcdefABCDEF", *dataPos)) {
       return false;
     }
@@ -127,7 +118,7 @@ bool parsePFA(const char* src, size_t size, size_t* headerLen, size_t* hexDataLe
   return true;
 }
 
-int8_t hexToBin(uint8_t c) {
+int8_t HexToBin(uint8_t c) {
   if (!isxdigit(c)) {
     return -1;
   } else if (c <= '9') {
@@ -140,63 +131,63 @@ int8_t hexToBin(uint8_t c) {
   return -1;
 }
 
-std::shared_ptr<Data> convert_type1_font_stream(const std::shared_ptr<Data>& srcData,
-                                                size_t* headerLen, size_t* dataLen,
-                                                size_t* trailerLen) {
-  size_t srcLen = srcData ? srcData->size() : 0;
-  DEBUG_ASSERT(srcLen);
-  if (!srcLen) {
+std::shared_ptr<Data> ConvertType1FontStream(const std::shared_ptr<Data>& sourceData,
+                                             size_t* headerLength, size_t* dataLength,
+                                             size_t* trailerLength) {
+  size_t srcLength = sourceData ? sourceData->size() : 0;
+  DEBUG_ASSERT(srcLength);
+  if (!srcLength) {
     return nullptr;
   }
-  const auto* src = static_cast<const uint8_t*>(srcData->data());
+  const auto* src = static_cast<const uint8_t*>(sourceData->data());
 
-  if (parsePFB(src, srcLen, headerLen, dataLen, trailerLen)) {
+  if (ParsePFB(src, srcLength, headerLength, dataLength, trailerLength)) {
     constexpr int PFBSectionHeaderLength = 6;
-    const size_t length = *headerLen + *dataLen + *trailerLen;
+    const size_t length = *headerLength + *dataLength + *trailerLength;
     DEBUG_ASSERT(length > 0);
-    DEBUG_ASSERT(length + (2 * PFBSectionHeaderLength) <= srcLen);
+    DEBUG_ASSERT(length + (2 * PFBSectionHeaderLength) <= srcLength);
 
     const uint8_t* const srcHeader = src + PFBSectionHeaderLength;
     // There is a six-byte section header before header and data
     // (but not trailer) that we're not going to copy.
-    const uint8_t* const srcData = srcHeader + *headerLen + PFBSectionHeaderLength;
-    const uint8_t* const srcTrailer = srcData + *headerLen;
+    const uint8_t* const srcData = srcHeader + *headerLength + PFBSectionHeaderLength;
+    const uint8_t* const srcTrailer = srcData + *headerLength;
 
     auto* data = malloc(length);
     auto* const resultHeader = static_cast<uint8_t*>(data);
-    uint8_t* const resultData = resultHeader + *headerLen;
-    uint8_t* const resultTrailer = resultData + *dataLen;
+    uint8_t* const resultData = resultHeader + *headerLength;
+    uint8_t* const resultTrailer = resultData + *dataLength;
 
-    DEBUG_ASSERT(resultTrailer + *trailerLen == resultHeader + length);
+    DEBUG_ASSERT(resultTrailer + *trailerLength == resultHeader + length);
 
-    memcpy(resultHeader, srcHeader, *headerLen);
-    memcpy(resultData, srcData, *dataLen);
-    memcpy(resultTrailer, srcTrailer, *trailerLen);
+    memcpy(resultHeader, srcHeader, *headerLength);
+    memcpy(resultData, srcData, *dataLength);
+    memcpy(resultTrailer, srcTrailer, *trailerLength);
 
     return Data::MakeAdopted(data, length, Data::FreeProc);
   }
 
   // A PFA has to be converted for PDF.
   size_t hexDataLen;
-  if (!parsePFA(reinterpret_cast<const char*>(src), srcLen, headerLen, &hexDataLen, dataLen,
-                trailerLen)) {
+  if (!ParsePFA(reinterpret_cast<const char*>(src), srcLength, headerLength, &hexDataLen,
+                dataLength, trailerLength)) {
     return nullptr;
   }
-  const size_t length = *headerLen + *dataLen + *trailerLen;
+  const size_t length = *headerLength + *dataLength + *trailerLength;
   DEBUG_ASSERT(length > 0);
   auto* data = malloc(length);
   auto* buffer = static_cast<uint8_t*>(data);
 
-  memcpy(buffer, src, *headerLen);
-  uint8_t* const resultData = &(buffer[*headerLen]);
+  memcpy(buffer, src, *headerLength);
+  uint8_t* const resultData = &(buffer[*headerLength]);
 
-  const uint8_t* hexData = src + *headerLen;
+  const uint8_t* hexData = src + *headerLength;
   const uint8_t* trailer = hexData + hexDataLen;
   size_t outputOffset = 0;
   uint8_t dataByte = 0;  // To hush compiler.
   bool highNibble = true;
   for (; hexData < trailer; hexData++) {
-    int8_t curNibble = hexToBin(*hexData);
+    int8_t curNibble = HexToBin(*hexData);
     if (curNibble < 0) {
       continue;
     }
@@ -212,52 +203,52 @@ std::shared_ptr<Data> convert_type1_font_stream(const std::shared_ptr<Data>& src
   if (!highNibble) {
     resultData[outputOffset++] = dataByte;
   }
-  DEBUG_ASSERT(outputOffset == *dataLen);
+  DEBUG_ASSERT(outputOffset == *dataLength);
 
-  uint8_t* const resultTrailer = &(buffer[*headerLen + outputOffset]);
-  memcpy(resultTrailer, src + *headerLen + hexDataLen, *trailerLen);
+  uint8_t* const resultTrailer = &(buffer[*headerLength + outputOffset]);
+  memcpy(resultTrailer, src + *headerLength + hexDataLen, *trailerLength);
 
   return Data::MakeAdopted(data, length, Data::FreeProc);
 }
 
-inline bool can_embed(const FontMetrics& metrics) {
+inline bool CanEmbed(const FontMetrics& metrics) {
   return !(metrics.flags & FontMetrics::FontFlags::NotEmbeddable);
 }
 
-inline float from_font_units(float scaled, uint16_t emSize) {
+inline float FromFontUnits(float scaled, uint16_t emSize) {
   return emSize == 1000 ? scaled : scaled * 1000 / emSize;
 }
 
-PDFIndirectReference make_type1_font_descriptor(PDFDocument* doc,
-                                                const PDFStrikeSpec& pdfStrikeSpec,
-                                                const FontMetrics* info) {
+PDFIndirectReference MakeType1FontDescriptor(PDFDocument* document,
+                                             const PDFStrikeSpec& pdfStrikeSpec,
+                                             const FontMetrics* info) {
   auto descriptor = PDFDictionary::Make("FontDescriptor");
   auto emSize = static_cast<uint16_t>(std::round(pdfStrikeSpec.unitsPerEM));
   if (info) {
     PDFFont::PopulateCommonFontDescriptor(descriptor.get(), *info, emSize, 0);
-    if (can_embed(*info)) {
+    if (CanEmbed(*info)) {
       size_t header = 0;
       size_t data = 0;
       size_t trailer = 0;
       auto typeface = pdfStrikeSpec.typeface;
       auto rawFontData = PDFFont::GetTypefaceData(typeface);
-      auto fontData = convert_type1_font_stream(std::move(rawFontData), &header, &data, &trailer);
+      auto fontData = ConvertType1FontStream(std::move(rawFontData), &header, &data, &trailer);
       if (fontData) {
         auto dict = PDFDictionary::Make();
         dict->insertInt("Length1", header);
         dict->insertInt("Length2", data);
         dict->insertInt("Length3", trailer);
         auto fontStream = Stream::MakeFromData(std::move(fontData));
-        descriptor->insertRef("FontFile", PDFStreamOut(std::move(dict), std::move(fontStream), doc,
-                                                       PDFSteamCompressionEnabled::Yes));
+        descriptor->insertRef("FontFile", PDFStreamOut(std::move(dict), std::move(fontStream),
+                                                       document, PDFSteamCompressionEnabled::Yes));
       }
     }
   }
-  return doc->emit(*descriptor);
+  return document->emit(*descriptor);
 }
 
-const std::vector<std::string>& type_1_glyph_names(PDFDocument* canon,
-                                                   const std::shared_ptr<Typeface>& typeface) {
+const std::vector<std::string>& Type1GlyphNames(PDFDocument* canon,
+                                                const std::shared_ptr<Typeface>& typeface) {
   auto typefaceID = typeface->uniqueID();
   auto iter = canon->type1GlyphNames.find(typefaceID);
   if (iter == canon->type1GlyphNames.end()) {
@@ -268,7 +259,7 @@ const std::vector<std::string>& type_1_glyph_names(PDFDocument* canon,
   return iter->second;
 }
 
-PDFIndirectReference type1_font_descriptor(PDFDocument* doc, const PDFStrikeSpec& pdfStrikeSpec) {
+PDFIndirectReference Type1FontDescriptor(PDFDocument* doc, const PDFStrikeSpec& pdfStrikeSpec) {
   auto typeface = pdfStrikeSpec.typeface;
   auto textSize = pdfStrikeSpec.textSize;
   auto typefaceID = typeface->uniqueID();
@@ -276,8 +267,8 @@ PDFIndirectReference type1_font_descriptor(PDFDocument* doc, const PDFStrikeSpec
   if (iter != doc->fontDescriptors.end()) {
     return iter->second;
   }
-  const FontMetrics* info = PDFFont::GetMetrics(typeface, textSize, doc);
-  auto fontDescriptor = make_type1_font_descriptor(doc, pdfStrikeSpec, info);
+  const auto* info = PDFFont::GetMetrics(typeface, textSize, doc);
+  auto fontDescriptor = MakeType1FontDescriptor(doc, pdfStrikeSpec, info);
   doc->fontDescriptors[typefaceID] = fontDescriptor;
   return fontDescriptor;
 }
@@ -286,7 +277,7 @@ PDFIndirectReference type1_font_descriptor(PDFDocument* doc, const PDFStrikeSpec
 void EmitSubsetType1(const PDFFont& pdfFont, PDFDocument* document) {
   auto typeface = pdfFont.strike().strikeSpec.typeface;
   auto textSize = pdfFont.strike().strikeSpec.textSize;
-  auto glyphNames = type_1_glyph_names(document, typeface);
+  auto glyphNames = Type1GlyphNames(document, typeface);
   auto scaleContext = PDFFont::GetScalerContext(typeface, pdfFont.strike().strikeSpec.textSize);
 
   GlyphID firstGlyphID = pdfFont.firstGlyphID();
@@ -294,7 +285,7 @@ void EmitSubsetType1(const PDFFont& pdfFont, PDFDocument* document) {
 
   auto fontDictionary = PDFDictionary::Make("Font");
   fontDictionary->insertRef("FontDescriptor",
-                            type1_font_descriptor(document, pdfFont.strike().strikeSpec));
+                            Type1FontDescriptor(document, pdfFont.strike().strikeSpec));
   fontDictionary->insertName("Subtype", "Type1");
   if (const auto* info = PDFFont::GetMetrics(typeface, textSize, document)) {
     fontDictionary->insertName("BaseFont", info->postScriptName);
@@ -318,8 +309,8 @@ void EmitSubsetType1(const PDFFont& pdfFont, PDFDocument* document) {
     // SkBulkGlyphMetrics metrics{pdfFont.strike().fPath.fStrikeSpec};
     // auto glyphs = metrics.glyphs(SkSpan(glyphIDs.get(), glyphRangeSize));
     for (size_t i = 0; i < glyphRangeSize; ++i) {
-      widths->appendScalar(from_font_units(scaleContext->getAdvance(glyphIDs[i], false),
-                                           static_cast<uint16_t>(emSize)));
+      widths->appendScalar(FromFontUnits(scaleContext->getAdvance(glyphIDs[i], false),
+                                         static_cast<uint16_t>(emSize)));
     }
     fontDictionary->insertObject("Widths", std::move(widths));
   }

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,13 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFExportContext.h"
-#include <cstddef>
-#include <cstdint>
-#include <memory>
-#include <tuple>
-#include <unordered_set>
-#include <utility>
-#include <vector>
 #include "core/DrawContext.h"
 #include "core/MCState.h"
 #include "core/MeasureContext.h"
@@ -157,12 +150,7 @@ PDFExportContext::PDFExportContext(ISize pageSize, PDFDocument* document, const 
 PDFExportContext::~PDFExportContext() = default;
 
 void PDFExportContext::reset() {
-  // fGraphicStateResources.reset();
-  // fXObjectResources.reset();
-  // fShaderResources.reset();
-  // fFontResources.reset();
   content.reset();
-  // fActiveStackState = SkPDFGraphicStackState();
 }
 
 void PDFExportContext::drawFill(const Fill& fill) {
@@ -362,11 +350,11 @@ class GlyphPositioner {
   bool initialized = false;
 };
 
-Unichar map_glyph(const std::vector<Unichar>& glyphToUnicode, GlyphID glyph) {
+Unichar MapGlyph(const std::vector<Unichar>& glyphToUnicode, GlyphID glyph) {
   return glyph < glyphToUnicode.size() ? glyphToUnicode[glyph] : -1;
 }
 
-bool needs_new_font(PDFFont* font, GlyphID glyphID, FontMetrics::FontType initialFontType) {
+bool NeedsNewFont(PDFFont* font, GlyphID glyphID, FontMetrics::FontType initialFontType) {
   if (!font || !font->hasGlyph(glyphID)) {
     return true;
   }
@@ -475,7 +463,7 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const MCSt
 
       glyphPositioner.flush();
       out->writeText("/Span<</ActualText ");
-      auto unichar = map_glyph(glyphToUnicode, glyphID);
+      auto unichar = MapGlyph(glyphToUnicode, glyphID);
       auto utf8Text = UTF::ToUTF8(unichar);
       PDFWriteTextString(out, utf8Text);
       // begin marked-content sequence with an associated property list.
@@ -499,7 +487,7 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const MCSt
           continue;
         }
       }
-      if (needs_new_font(font, glyphID, initialFontType)) {
+      if (NeedsNewFont(font, glyphID, initialFontType)) {
         // Not yet specified font or need to switch font.
         font = pdfStrike->getFontResource(glyphID);
         DEBUG_ASSERT(font);
@@ -886,7 +874,7 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
 }
 
 namespace {
-std::vector<PDFIndirectReference> sort(const std::unordered_set<PDFIndirectReference>& src) {
+std::vector<PDFIndirectReference> Sort(const std::unordered_set<PDFIndirectReference>& src) {
   std::vector<PDFIndirectReference> dst;
   dst.reserve(src.size());
   for (auto ref : src) {
@@ -899,13 +887,13 @@ std::vector<PDFIndirectReference> sort(const std::unordered_set<PDFIndirectRefer
 }  // namespace
 
 std::unique_ptr<PDFDictionary> PDFExportContext::makeResourceDict() {
-  return MakePDFResourceDictionary(sort(graphicStateResources), sort(shaderResources),
-                                   sort(xObjectResources), sort(fontResources));
+  return MakePDFResourceDictionary(Sort(graphicStateResources), Sort(shaderResources),
+                                   Sort(xObjectResources), Sort(fontResources));
 }
 
 std::unique_ptr<PDFDictionary> PDFExportContext::makeResourceDictionary() {
-  return MakePDFResourceDictionary(sort(graphicStateResources), sort(shaderResources),
-                                   sort(xObjectResources), sort(fontResources));
+  return MakePDFResourceDictionary(Sort(graphicStateResources), Sort(shaderResources),
+                                   Sort(xObjectResources), Sort(fontResources));
 }
 
 bool PDFExportContext::isContentEmpty() {
@@ -940,11 +928,11 @@ PDFIndirectReference PDFExportContext::makeFormXObjectFromDevice(bool alpha) {
 
 namespace {
 
-bool treat_as_regular_pdf_blend_mode(BlendMode blendMode) {
+bool TreatAsRegularPDFBlendMode(BlendMode blendMode) {
   return PDFUtils::BlendModeName(blendMode) != nullptr;
 }
 
-void populate_graphic_state_entry_from_paint(
+void PopulateGraphicStateEntryFromPaint(
     PDFDocument* document, const Matrix& matrix, const MCState& state, Rect deviceBounds,
     const Fill& fill, const Matrix& initialTransform, float textScale,
     PDFGraphicStackState::Entry* entry, std::unordered_set<PDFIndirectReference>* shaderResources,
@@ -1007,7 +995,7 @@ std::shared_ptr<MemoryWriteStream> PDFExportContext::setUpContentEntry(
     return nullptr;
   }
 
-  if (!treat_as_regular_pdf_blend_mode(blendMode) && blendMode != BlendMode::DstOver) {
+  if (!TreatAsRegularPDFBlendMode(blendMode) && blendMode != BlendMode::DstOver) {
     if (!isContentEmpty()) {
       *destination = this->makeFormXObjectFromDevice();
       DEBUG_ASSERT(isContentEmpty());
@@ -1016,7 +1004,7 @@ std::shared_ptr<MemoryWriteStream> PDFExportContext::setUpContentEntry(
     }
   }
 
-  if (treat_as_regular_pdf_blend_mode(blendMode)) {
+  if (TreatAsRegularPDFBlendMode(blendMode)) {
     if (!fActiveStackState.contentStream) {
       if (content->bytesWritten() != 0) {
         content->writeText("Q\nq\n");
@@ -1033,9 +1021,9 @@ std::shared_ptr<MemoryWriteStream> PDFExportContext::setUpContentEntry(
 
   DEBUG_ASSERT(fActiveStackState.contentStream);
   PDFGraphicStackState::Entry entry;
-  populate_graphic_state_entry_from_paint(document, matrix, state, Rect::MakeSize(_pageSize), fill,
-                                          _initialTransform, scale, &entry, &shaderResources,
-                                          &graphicStateResources);
+  PopulateGraphicStateEntryFromPaint(document, matrix, state, Rect::MakeSize(_pageSize), fill,
+                                     _initialTransform, scale, &entry, &shaderResources,
+                                     &graphicStateResources);
   fActiveStackState.updateClip(state);
   fActiveStackState.updateMatrix(entry.matrix);
   fActiveStackState.updateDrawingState(entry);
@@ -1046,7 +1034,7 @@ std::shared_ptr<MemoryWriteStream> PDFExportContext::setUpContentEntry(
 void PDFExportContext::finishContentEntry(const MCState& state, BlendMode blendMode,
                                           PDFIndirectReference destination, Path* path) {
   DEBUG_ASSERT(blendMode != BlendMode::Dst);
-  if (treat_as_regular_pdf_blend_mode(blendMode)) {
+  if (TreatAsRegularPDFBlendMode(blendMode)) {
     DEBUG_ASSERT(!destination);
     return;
   }

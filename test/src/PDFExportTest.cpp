@@ -20,7 +20,6 @@
 #include <hb-subset.h>
 #include <hb.h>
 #include <cstring>
-#include <filesystem>
 #include <memory>
 #include "base/TGFXTest.h"
 #include "tgfx/core/Buffer.h"
@@ -37,8 +36,8 @@
 #include "tgfx/core/WriteStream.h"
 #include "tgfx/pdf/PDFMetadata.h"
 #include "tgfx/svg/SVGPathParser.h"
+#include "utils/ContextScope.h"
 #include "utils/ProjectPath.h"
-#include "utils/TestUtils.h"
 
 namespace tgfx {
 
@@ -129,11 +128,6 @@ TGFX_TEST(PDFExportTest, DrawShape) {
   auto* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  // auto path = ProjectPath::Absolute("resources/apitest/PDF/DrawShape.pdf");
-  // std::filesystem::path filePath = path;
-  // std::filesystem::create_directories(filePath.parent_path());
-  // auto PDFStream = WriteStream::MakeFromFile(path);
-
   auto PDFStream = MemoryWriteStream::Make();
 
   auto document = MakePDFDocument(PDFStream, context, PDFMetadata());
@@ -166,12 +160,7 @@ TGFX_TEST(PDFExportTest, DrawShapeStroke) {
   auto* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  auto path = ProjectPath::Absolute("resources/apitest/PDF/DrawShapeStroke.pdf");
-  std::filesystem::path filePath = path;
-  std::filesystem::create_directories(filePath.parent_path());
-  auto PDFStream = WriteStream::MakeFromFile(path);
-
-  // auto PDFStream = MemoryWriteStream::Make();
+  auto PDFStream = MemoryWriteStream::Make();
 
   auto document = MakePDFDocument(PDFStream, context, PDFMetadata());
   auto* canvas = document->beginPage(512.f, 512.f);
@@ -196,7 +185,7 @@ TGFX_TEST(PDFExportTest, DrawShapeStroke) {
   document->close();
   PDFStream->flush();
 
-  // ASSERT_TRUE(CompareSteamWithFile(PDFStream, "resources/apitest/PDF/DrawShapeStroke.pdf"));
+  ASSERT_TRUE(CompareSteamWithFile(PDFStream, "resources/apitest/PDF/DrawShapeStroke.pdf"));
 }
 
 TGFX_TEST(PDFExportTest, SimpleText) {
@@ -204,17 +193,9 @@ TGFX_TEST(PDFExportTest, SimpleText) {
   auto* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  auto path = ProjectPath::Absolute("resources/apitest/PDF/SimpleText.pdf");
-  std::filesystem::path filePath = path;
-  std::filesystem::create_directories(filePath.parent_path());
-  auto PDFStream = WriteStream::MakeFromFile(path);
+  auto PDFStream = MemoryWriteStream::Make();
 
-  // auto PDFStream = MemoryWriteStream::Make();
-
-  PDFMetadata metadata;
-  metadata.compressionLevel = PDFMetadata::CompressionLevel::None;
-
-  auto document = MakePDFDocument(PDFStream, context, metadata);
+  auto document = MakePDFDocument(PDFStream, context, PDFMetadata());
   auto* canvas = document->beginPage(1500.f, 400.f);
   canvas->translate(40.0, 20.0);
   {
@@ -236,7 +217,7 @@ TGFX_TEST(PDFExportTest, SimpleText) {
   document->close();
   PDFStream->flush();
 
-  // ASSERT_TRUE(CompareSteamWithFile(PDFStream, "resources/apitest/PDF/DrawShapeStroke.pdf"));
+  ASSERT_TRUE(CompareSteamWithFile(PDFStream, "resources/apitest/PDF/SimpleText.pdf"));
 }
 
 TGFX_TEST(PDFExportTest, EmojiText) {
@@ -244,17 +225,9 @@ TGFX_TEST(PDFExportTest, EmojiText) {
   auto* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  auto path = ProjectPath::Absolute("resources/apitest/PDF/EmojiText.pdf");
-  std::filesystem::path filePath = path;
-  std::filesystem::create_directories(filePath.parent_path());
-  auto PDFStream = WriteStream::MakeFromFile(path);
+  auto PDFStream = MemoryWriteStream::Make();
 
-  // auto PDFStream = MemoryWriteStream::Make();
-
-  PDFMetadata metadata;
-  metadata.compressionLevel = PDFMetadata::CompressionLevel::None;
-
-  auto document = MakePDFDocument(PDFStream, context, metadata);
+  auto document = MakePDFDocument(PDFStream, context, PDFMetadata());
   auto* canvas = document->beginPage(1500.f, 500.f);
   canvas->translate(40.0, 20.0);
   {
@@ -269,7 +242,7 @@ TGFX_TEST(PDFExportTest, EmojiText) {
   document->close();
   PDFStream->flush();
 
-  // ASSERT_TRUE(CompareSteamWithFile(PDFStream, "resources/apitest/PDF/DrawShapeStroke.pdf"));
+  ASSERT_TRUE(CompareSteamWithFile(PDFStream, "resources/apitest/PDF/EmojiText.pdf"));
 }
 
 TGFX_TEST(PDFExportTest, Image) {
@@ -277,17 +250,9 @@ TGFX_TEST(PDFExportTest, Image) {
   auto* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  auto path = ProjectPath::Absolute("resources/apitest/PDF/Image.pdf");
-  std::filesystem::path filePath = path;
-  std::filesystem::create_directories(filePath.parent_path());
-  auto PDFStream = WriteStream::MakeFromFile(path);
+  auto PDFStream = MemoryWriteStream::Make();
 
-  // auto PDFStream = MemoryWriteStream::Make();
-
-  PDFMetadata metadata;
-  metadata.compressionLevel = PDFMetadata::CompressionLevel::None;
-
-  auto document = MakePDFDocument(PDFStream, context, metadata);
+  auto document = MakePDFDocument(PDFStream, context, PDFMetadata());
   auto* canvas = document->beginPage(500.f, 500.f);
   {
     canvas->translate(50.f, 50.f);
@@ -301,23 +266,16 @@ TGFX_TEST(PDFExportTest, Image) {
   document->close();
   PDFStream->flush();
 
-  // ASSERT_TRUE(CompareSteamWithFile(PDFStream, "resources/apitest/PDF/DrawShapeStroke.pdf"));
+  ASSERT_TRUE(CompareSteamWithFile(PDFStream, "resources/apitest/PDF/Image.pdf"));
 }
 
-TGFX_TEST(PDFExportTest, XXX) {
-  // auto path = ProjectPath::Absolute("resources/apitest/PDF/Complex.pdf");
-  // std::filesystem::path filePath = path;
-  // std::filesystem::create_directories(filePath.parent_path());
-  // auto PDFStream = WriteStream::MakeFromFile(path);
-
-  auto PDFStream = MemoryWriteStream::Make();
-
-  PDFMetadata metadata;
-
+TGFX_TEST(PDFExportTest, Complex) {
   ContextScope scope;
   auto* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto document = MakePDFDocument(PDFStream, context, metadata);
+
+  auto PDFStream = MemoryWriteStream::Make();
+  auto document = MakePDFDocument(PDFStream, context, PDFMetadata());
   auto* canvas = document->beginPage(1000.f, 500.f);
   canvas->translate(40.0, 20.0);
 

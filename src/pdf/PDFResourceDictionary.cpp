@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -22,7 +22,7 @@
 namespace tgfx {
 
 namespace {
-std::string get_resource_name(PDFResourceType type, int index) {
+std::string GetResourceName(PDFResourceType type, int index) {
   constexpr char ResourceTypePrefixes[] = {
       'G',  // ExtGState
       'P',  // Pattern
@@ -32,7 +32,7 @@ std::string get_resource_name(PDFResourceType type, int index) {
   return ResourceTypePrefixes[static_cast<size_t>(type)] + std::to_string(index);
 }
 
-std::unique_ptr<PDFArray> make_proc_set() {
+std::unique_ptr<PDFArray> MakeProcSet() {
   auto procSets = MakePDFArray();
   constexpr const char* Procs[] = {"PDF", "Text", "ImageB", "ImageC", "ImageI"};
   procSets->reserve(std::size(Procs));
@@ -42,19 +42,19 @@ std::unique_ptr<PDFArray> make_proc_set() {
   return procSets;
 }
 
-const char* resource_name(PDFResourceType type) {
+const char* ResourceName(PDFResourceType type) {
   constexpr const char* ResourceTypeNames[] = {"ExtGState", "Pattern", "XObject", "Font"};
   return ResourceTypeNames[static_cast<size_t>(type)];
 }
 
-void add_subdict(const std::vector<PDFIndirectReference>& resourceList, PDFResourceType type,
-                 PDFDictionary* destination) {
+void AddSubDictionary(const std::vector<PDFIndirectReference>& resourceList, PDFResourceType type,
+                      PDFDictionary* destination) {
   if (!resourceList.empty()) {
     auto resources = PDFDictionary::Make();
     for (auto ref : resourceList) {
-      resources->insertRef(get_resource_name(type, ref.value), ref);
+      resources->insertRef(GetResourceName(type, ref.value), ref);
     }
-    destination->insertObject(resource_name(type), std::move(resources));
+    destination->insertObject(ResourceName(type), std::move(resources));
   }
 }
 
@@ -66,18 +66,18 @@ std::unique_ptr<PDFDictionary> MakePDFResourceDictionary(
     const std::vector<PDFIndirectReference>& xObjectResources,
     const std::vector<PDFIndirectReference>& fontResources) {
   auto dict = PDFDictionary::Make();
-  dict->insertObject("ProcSet", make_proc_set());
-  add_subdict(graphicStateResources, PDFResourceType::ExtGState, dict.get());
-  add_subdict(shaderResources, PDFResourceType::Pattern, dict.get());
-  add_subdict(xObjectResources, PDFResourceType::XObject, dict.get());
-  add_subdict(fontResources, PDFResourceType::Font, dict.get());
+  dict->insertObject("ProcSet", MakeProcSet());
+  AddSubDictionary(graphicStateResources, PDFResourceType::ExtGState, dict.get());
+  AddSubDictionary(shaderResources, PDFResourceType::Pattern, dict.get());
+  AddSubDictionary(xObjectResources, PDFResourceType::XObject, dict.get());
+  AddSubDictionary(fontResources, PDFResourceType::Font, dict.get());
   return dict;
 }
 
 void PDFWriteResourceName(const std::shared_ptr<WriteStream>& stream, PDFResourceType type,
                           int key) {
   stream->writeText("/");
-  stream->writeText(get_resource_name(type, key));
+  stream->writeText(GetResourceName(type, key));
 }
 
 }  // namespace tgfx

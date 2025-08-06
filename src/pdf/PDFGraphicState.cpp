@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -26,7 +26,7 @@ namespace tgfx {
 
 namespace {
 
-uint8_t filter_pdf_blend_mode(BlendMode mode) {
+uint8_t FilterPDFBlendMode(BlendMode mode) {
   if (!PDFUtils::BlendModeName(mode) || BlendMode::Xor == mode || BlendMode::PlusDarker == mode ||
       BlendMode::PlusLighter == mode) {
     mode = BlendMode::SrcOver;
@@ -41,7 +41,7 @@ PDFIndirectReference PDFGraphicState::GetGraphicStateForPaint(PDFDocument* docum
   DEBUG_ASSERT(document);
   auto mode = fill.blendMode;
 
-  PDFFillGraphicState fillKey = {fill.color.alpha, filter_pdf_blend_mode(mode)};
+  PDFFillGraphicState fillKey = {fill.color.alpha, FilterPDFBlendMode(mode)};
   auto& fillMap = document->fillGSMap;
   auto iter = fillMap.find(fillKey);
   if (iter != fillMap.end()) {
@@ -51,47 +51,10 @@ PDFIndirectReference PDFGraphicState::GetGraphicStateForPaint(PDFDocument* docum
   PDFDictionary state;
   state.reserve(2);
   state.insertScalar("ca", fillKey.alpha);
-  // state.insertColorComponentF("ca", fillKey.fAlpha);
   state.insertName("BM", PDFUtils::BlendModeName(static_cast<BlendMode>(fillKey.blendMode)));
-  PDFIndirectReference ref = document->emit(state);
-  fillMap[fillKey] = ref;
-  return ref;
-
-  // if (SkPaint::kFill_Style == p.getStyle()) {
-  //   SkPDFFillGraphicState fillKey = {p.getColor4f().fA, pdf_blend_mode(mode)};
-  //   auto& fillMap = doc->fFillGSMap;
-  //   if (SkPDFIndirectReference* statePtr = fillMap.find(fillKey)) {
-  //     return *statePtr;
-  //   }
-  //   SkPDFDict state;
-  //   state.reserve(2);
-  //   state.insertColorComponentF("ca", fillKey.fAlpha);
-  //   state.insertName("BM", as_pdf_blend_mode_name((SkBlendMode)fillKey.fBlendMode));
-  //   SkPDFIndirectReference ref = doc->emit(state);
-  //   fillMap.set(fillKey, ref);
-  //   return ref;
-  // } else {
-  //   SkPDFStrokeGraphicState strokeKey = {p.getStrokeWidth(),        p.getStrokeMiter(),
-  //                                        p.getColor4f().fA,         SkToU8(p.getStrokeCap()),
-  //                                        SkToU8(p.getStrokeJoin()), pdf_blend_mode(mode)};
-  //   auto& sMap = doc->fStrokeGSMap;
-  //   if (SkPDFIndirectReference* statePtr = sMap.find(strokeKey)) {
-  //     return *statePtr;
-  //   }
-  //   SkPDFDict state;
-  //   state.reserve(8);
-  //   state.insertColorComponentF("CA", strokeKey.fAlpha);
-  //   state.insertColorComponentF("ca", strokeKey.fAlpha);
-  //   state.insertInt("LC", to_stroke_cap(strokeKey.fStrokeCap));
-  //   state.insertInt("LJ", to_stroke_join(strokeKey.fStrokeJoin));
-  //   state.insertScalar("LW", strokeKey.fStrokeWidth);
-  //   state.insertScalar("ML", strokeKey.fStrokeMiter);
-  //   state.insertBool("SA", true);  // SA = Auto stroke adjustment.
-  //   state.insertName("BM", as_pdf_blend_mode_name((SkBlendMode)strokeKey.fBlendMode));
-  //   SkPDFIndirectReference ref = doc->emit(state);
-  //   sMap.set(strokeKey, ref);
-  //   return ref;
-  // }
+  PDFIndirectReference reference = document->emit(state);
+  fillMap[fillKey] = reference;
+  return reference;
 }
 
 PDFIndirectReference PDFGraphicState::GetSMaskGraphicState(PDFIndirectReference sMask,
@@ -106,13 +69,6 @@ PDFIndirectReference PDFGraphicState::GetSMaskGraphicState(PDFIndirectReference 
     sMaskDict->insertName("S", "Luminosity");
   }
   sMaskDict->insertRef("G", sMask);
-  // if (invert) {
-  //   // let the doc deduplicate this object.
-  //   if (doc->fInvertFunction == SkPDFIndirectReference()) {
-  //     doc->fInvertFunction = make_invert_function(doc);
-  //   }
-  //   sMaskDict->insertRef("TR", doc->fInvertFunction);
-  // }
   auto result = PDFDictionary::Make("ExtGState");
   result->insertObject("SMask", std::move(sMaskDict));
   return doc->emit(*result);

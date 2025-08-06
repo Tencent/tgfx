@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -39,7 +39,7 @@ namespace tgfx {
 
 namespace {
 
-uint32_t hash(const GradientInfo& info) {
+uint32_t Hash(const GradientInfo& info) {
   std::hash<float> floatHasher;
   uint32_t hashValue = 0;
 
@@ -63,7 +63,7 @@ uint32_t hash(const GradientInfo& info) {
   return hashValue;
 }
 
-uint32_t hash(const Matrix& matrix) {
+uint32_t Hash(const Matrix& matrix) {
   std::hash<float> floatHasher;
   uint32_t hashValue = 0;
   for (int i = 0; i < 6; i++) {
@@ -72,7 +72,7 @@ uint32_t hash(const Matrix& matrix) {
   return hashValue;
 }
 
-uint32_t hash(const Rect& rect) {
+uint32_t Hash(const Rect& rect) {
   std::hash<float> floatHasher;
   uint32_t hashValue = 0;
   hashValue ^= floatHasher(rect.left) + 0x9e3779b9 + (hashValue << 6) + (hashValue >> 2);
@@ -82,19 +82,19 @@ uint32_t hash(const Rect& rect) {
   return hashValue;
 }
 
-uint32_t hash(const PDFGradientShader::Key& key) {
-  uint32_t hashValue = hash(key.fInfo);
-  hashValue ^= std::hash<int>{}(static_cast<int>(key.fType)) + 0x9e3779b9 + (hashValue << 6) +
+uint32_t Hash(const PDFGradientShader::Key& key) {
+  uint32_t hashValue = Hash(key.info);
+  hashValue ^= std::hash<int>{}(static_cast<int>(key.type)) + 0x9e3779b9 + (hashValue << 6) +
                (hashValue >> 2);
-  hashValue ^= -hash(key.fCanvasTransform);
-  hashValue ^= -hash(key.fShaderTransform);
-  hashValue ^= -hash(key.fBBox);
+  hashValue ^= -Hash(key.canvasTransform);
+  hashValue ^= -Hash(key.shaderTransform);
+  hashValue ^= -Hash(key.boundBox);
   return hashValue;
 }
 
 ///////////////////////////////////////////////////////////////////////////
-Matrix unit_to_points_matrix(const Point pts[2]) {
-  Point vec = pts[1] - pts[0];
+Matrix UnitToPointsMatrix(const Point points[2]) {
+  Point vec = points[1] - points[0];
   float mag = vec.length();
   float inv = mag != 0.f ? 1.f / mag : 0;
 
@@ -102,59 +102,11 @@ Matrix unit_to_points_matrix(const Point pts[2]) {
   Matrix matrix;
   matrix.setSinCos(vec.y, vec.x);
   matrix.preScale(mag, mag);
-  matrix.postTranslate(pts[0].x, pts[0].y);
+  matrix.postTranslate(points[0].x, points[0].y);
   return matrix;
 }
 
-/**
- *  Returns PS function code that applies inverse perspective
- *  to a x, y point.
- *  The function assumes that the stack has at least two elements,
- *  and that the top 2 elements are numeric values.
- *  After executing this code on a PS stack, the last 2 elements are updated
- *  while the rest of the stack is preserved intact.
- *  inversePerspectiveMatrix is the inverse perspective matrix.
- */
-void apply_perspective_to_coordinates(const Matrix& /*inversePerspectiveMatrix*/,
-                                      std::shared_ptr<MemoryWriteStream> /*code*/) {
-  // if (!inversePerspectiveMatrix.hasPerspective()) {
-  //   return;
-  // }
-
-  // // Perspective matrix should be:
-  // // 1   0  0
-  // // 0   1  0
-  // // p0 p1 p2
-
-  // const SkScalar p0 = inversePerspectiveMatrix[SkMatrix::kMPersp0];
-  // const SkScalar p1 = inversePerspectiveMatrix[SkMatrix::kMPersp1];
-  // const SkScalar p2 = inversePerspectiveMatrix[SkMatrix::kMPersp2];
-
-  // // y = y / (p2 + p0 x + p1 y)
-  // // x = x / (p2 + p0 x + p1 y)
-
-  // // Input on stack: x y
-  // code->writeText(" dup ");            // x y y
-  // SkPDFUtils::AppendScalar(p1, code);  // x y y p1
-  // code->writeText(
-  //     " mul "                          // x y y*p1
-  //     " 2 index ");                    // x y y*p1 x
-  // SkPDFUtils::AppendScalar(p0, code);  // x y y p1 x p0
-  // code->writeText(" mul ");            // x y y*p1 x*p0
-  // SkPDFUtils::AppendScalar(p2, code);  // x y y p1 x*p0 p2
-  // code->writeText(
-  //     " add "      // x y y*p1 x*p0+p2
-  //     "add "       // x y y*p1+x*p0+p2
-  //     "3 1 roll "  // y*p1+x*p0+p2 x y
-  //     "2 index "   // z x y y*p1+x*p0+p2
-  //     "div "       // y*p1+x*p0+p2 x y/(y*p1+x*p0+p2)
-  //     "3 1 roll "  // y/(y*p1+x*p0+p2) y*p1+x*p0+p2 x
-  //     "exch "      // y/(y*p1+x*p0+p2) x y*p1+x*p0+p2
-  //     "div "       // y/(y*p1+x*p0+p2) x/(y*p1+x*p0+p2)
-  //     "exch\n");   // x/(y*p1+x*p0+p2) y/(y*p1+x*p0+p2)
-}
-
-void tileModeCode(TileMode mode, const std::shared_ptr<MemoryWriteStream>& result) {
+void TileModeCode(TileMode mode, const std::shared_ptr<MemoryWriteStream>& result) {
   if (mode == TileMode::Repeat) {
     result->writeText("dup truncate sub\n");     // Get the fractional part.
     result->writeText("dup 0 le {1 add} if\n");  // Map (-1,0) => (0,1)
@@ -193,24 +145,21 @@ void tileModeCode(TileMode mode, const std::shared_ptr<MemoryWriteStream>& resul
    @param endColor    The current color.
    @param result      The result ps function.
  */
-void interpolate_color_code(float range, Color beginColor, Color endColor,
-                            const std::shared_ptr<MemoryWriteStream>& result) {
-  /* Linearly interpolate from the previous color to the current.
-       Scale the colors from 0..255 to 0..1 and determine the multipliers for interpolation.
-       C{r,g,b}(t, section) = t - offset_(section-1) + t * Multiplier{r,g,b}.
-     */
+void InterpolateColorCode(float range, Color beginColor, Color endColor,
+                          const std::shared_ptr<MemoryWriteStream>& result) {
+  // Linearly interpolate from the previous color to the current. Scale the colors from 0..255 to
+  // 0..1 and determine the multipliers for interpolation.
+  // C{r,g,b}(t, section) = t - offset_(section-1) + t * Multiplier{r,g,b}.
 
   // Figure out how to scale each color component.
   constexpr int ColorComponents = 3;
-
   float multiplier[ColorComponents];
   for (int i = 0; i < ColorComponents; i++) {
     multiplier[i] = (endColor[i] - beginColor[i]) / range;
   }
 
-  // Calculate when we no longer need to keep a copy of the input parameter t.
-  // If the last component to use t is i, then dupInput[0..i - 1] = true
-  // and dupInput[i .. components] = false.
+  // Calculate when we no longer need to keep a copy of the input parameter t. If the last component
+  // to use t is i, then dupInput[0..i - 1] = true and dupInput[i .. components] = false.
   bool dupInput[ColorComponents];
   dupInput[ColorComponents - 1] = false;
   for (int i = ColorComponents - 2; i >= 0; i--) {
@@ -249,8 +198,8 @@ void interpolate_color_code(float range, Color beginColor, Color endColor,
   }
 }
 
-void write_gradient_ranges(const GradientInfo& info, const std::vector<size_t>& rangeEnds, bool top,
-                           bool first, const std::shared_ptr<MemoryWriteStream>& result) {
+void WriteGradientRanges(const GradientInfo& info, const std::vector<size_t>& rangeEnds, bool top,
+                         bool first, const std::shared_ptr<MemoryWriteStream>& result) {
   DEBUG_ASSERT(!rangeEnds.empty());
 
   size_t rangeEndIndex = rangeEnds[rangeEnds.size() - 1];
@@ -279,18 +228,18 @@ void write_gradient_ranges(const GradientInfo& info, const std::vector<size_t>& 
     float rangeBegin = info.positions[rangeBeginIndex];
     PDFUtils::AppendFloat(rangeBegin, result);
     result->writeText(" sub ");  // consume t, put t - startOffset on the stack.
-    interpolate_color_code(rangeEnd - rangeBegin, info.colors[rangeBeginIndex],
-                           info.colors[rangeEndIndex], result);
+    InterpolateColorCode(rangeEnd - rangeBegin, info.colors[rangeBeginIndex],
+                         info.colors[rangeEndIndex], result);
     result->writeText("\n");
   } else {
     size_t lowCount = rangeEnds.size() / 2;
     std::vector<size_t> lowRanges(rangeEnds.begin(),
                                   rangeEnds.begin() + static_cast<std::ptrdiff_t>(lowCount));
-    write_gradient_ranges(info, lowRanges, false, true, result);
+    WriteGradientRanges(info, lowRanges, false, true, result);
 
     std::vector<size_t> highRanges(rangeEnds.begin() + static_cast<std::ptrdiff_t>(lowCount),
                                    rangeEnds.end());
-    write_gradient_ranges(info, highRanges, false, false, result);
+    WriteGradientRanges(info, highRanges, false, false, result);
   }
 
   if (top) {
@@ -353,11 +302,10 @@ void write_gradient_ranges(const GradientInfo& info, const std::vector<size_t>& 
   0} if
   0 gt {1 1 1} if
  */
-static void gradient_function_code(const GradientInfo& info,
-                                   const std::shared_ptr<MemoryWriteStream>& result) {
-  // While looking for a hit the stack is [t].
-  // After finding a hit the stack is [r g b 0].
-  // The 0 is consumed just before returning.
+void GradientFunctionCode(const GradientInfo& info,
+                          const std::shared_ptr<MemoryWriteStream>& result) {
+  // While looking for a hit the stack is [t]. After finding a hit the stack is [r g b 0]. The 0 is
+  // consumed just before returning.
 
   // The initial range has no previous and contains a solid color.
   // Any t <= 0 will be handled by this initial range, so later t == 0 indicates a hit was found.
@@ -397,7 +345,7 @@ static void gradient_function_code(const GradientInfo& info,
   // If a cap on depth is needed, loop here.
   std::vector<size_t> range(rangeEnds.begin(),
                             rangeEnds.begin() + static_cast<std::ptrdiff_t>(rangeEndsCount));
-  write_gradient_ranges(info, range, true, true, result);
+  WriteGradientRanges(info, range, true, true, result);
 
   // Clamp the final color.
   result->writeText("0 gt {");
@@ -409,23 +357,19 @@ static void gradient_function_code(const GradientInfo& info,
   result->writeText("} if\n");
 }
 
-void linearCode(const GradientInfo& info, const Matrix& perspectiveRemover,
+void LinearCode(const GradientInfo& info, const Matrix& /*perspectiveRemover*/,
                 const std::shared_ptr<MemoryWriteStream>& function) {
   function->writeText("{");
 
-  apply_perspective_to_coordinates(perspectiveRemover, function);
-
   function->writeText("pop\n");  // Just ditch the y value.
-  tileModeCode(TileMode::Clamp, function);
-  gradient_function_code(info, function);
+  TileModeCode(TileMode::Clamp, function);
+  GradientFunctionCode(info, function);
   function->writeText("}");
 }
 
-void radialCode(const GradientInfo& info, const Matrix& perspectiveRemover,
+void RadialCode(const GradientInfo& info, const Matrix& /*perspectiveRemover*/,
                 const std::shared_ptr<MemoryWriteStream>& function) {
   function->writeText("{");
-
-  apply_perspective_to_coordinates(perspectiveRemover, function);
 
   // Find the distance from the origin.
   function->writeText(
@@ -437,15 +381,15 @@ void radialCode(const GradientInfo& info, const Matrix& perspectiveRemover,
       "add "      // y^2+x^2
       "sqrt\n");  // sqrt(y^2+x^2)
 
-  tileModeCode(TileMode::Clamp, function);
-  gradient_function_code(info, function);
+  TileModeCode(TileMode::Clamp, function);
+  GradientFunctionCode(info, function);
   function->writeText("}");
 }
 
 /* Conical gradient shader, based on the Canvas spec for radial gradients
    See: http://www.w3.org/TR/2dcontext/#dom-context-2d-createradialgradient
  */
-void twoPointConicalCode(const GradientInfo& info, const Matrix& perspectiveRemover,
+void TwoPointConicalCode(const GradientInfo& info, const Matrix& /*perspectiveRemover*/,
                          const std::shared_ptr<MemoryWriteStream>& function) {
   float dx = info.points[1].x - info.points[0].x;
   float dy = info.points[1].y - info.points[0].y;
@@ -459,8 +403,6 @@ void twoPointConicalCode(const GradientInfo& info, const Matrix& perspectiveRemo
   // We start with a stack of (x y), copy it and then consume one copy in
   // order to calculate b and the other to calculate c.
   function->writeText("{");
-
-  apply_perspective_to_coordinates(perspectiveRemover, function);
 
   function->writeText("2 copy ");
 
@@ -478,7 +420,6 @@ void twoPointConicalCode(const GradientInfo& info, const Matrix& perspectiveRemo
   function->writeText(" sub dup 4 1 roll\n");
 
   // Contents of the stack at this point: c, b, b^2, c
-
   // if a = 0, then we collapse to a simpler linear case
   if (a == 0) {
 
@@ -548,8 +489,8 @@ void twoPointConicalCode(const GradientInfo& info, const Matrix& perspectiveRemo
 
   // if the pixel is in the cone, proceed to compute a color
   function->writeText("{");
-  tileModeCode(TileMode::Clamp, function);
-  gradient_function_code(info, function);
+  TileModeCode(TileMode::Clamp, function);
+  GradientFunctionCode(info, function);
 
   // otherwise, just write black
   // The "gradients" gm works as falls into the 8.7.4.5.4 "Type 3 (Radial) Shadings" case.
@@ -562,8 +503,8 @@ void twoPointConicalCode(const GradientInfo& info, const Matrix& perspectiveRemo
 // and make the inner circle just inside the outer one to match raster
 void FixUpRadius(const Point& p1, float& r1, const Point& p2, float& r2) {
   // detect touching circles
-  float distance = Point::Distance(p1, p2);
-  float subtractRadii = fabs(r1 - r2);
+  auto distance = Point::Distance(p1, p2);
+  auto subtractRadii = fabs(r1 - r2);
   if (fabs(distance - subtractRadii) < 0.002f) {
     if (r1 > r2) {
       r1 += 0.002f;
@@ -573,8 +514,8 @@ void FixUpRadius(const Point& p1, float& r1, const Point& p2, float& r2) {
   }
 }
 
-PDFGradientShader::Key make_key(const GradientShader* gradientShader, const Matrix& canvasTransform,
-                                const Rect& bbox) {
+PDFGradientShader::Key MakeKey(const GradientShader* gradientShader, const Matrix& canvasTransform,
+                               const Rect& bbox) {
   PDFGradientShader::Key key = {GradientType::None,
                                 {},
                                 nullptr,
@@ -583,36 +524,37 @@ PDFGradientShader::Key make_key(const GradientShader* gradientShader, const Matr
                                 Matrix::I(),  // PDFUtils::GetShaderLocalMatrix(shader),
                                 bbox,
                                 0};
-  key.fType = gradientShader->asGradient(&key.fInfo);
-  DEBUG_ASSERT(key.fType != GradientType::None);
-  DEBUG_ASSERT(!key.fInfo.colors.empty());
-  key.fColors = &key.fInfo.colors;
-  key.fStops = &key.fInfo.positions;
-  key.fHash = hash(key);
+  key.type = gradientShader->asGradient(&key.info);
+  DEBUG_ASSERT(key.type != GradientType::None);
+  DEBUG_ASSERT(!key.info.colors.empty());
+  key.colors = &key.info.colors;
+  key.stops = &key.info.positions;
+  key.hash = Hash(key);
   return key;
 }
 
-bool gradient_has_alpha(const PDFGradientShader::Key& key) {
-  DEBUG_ASSERT(key.fType != GradientType::None);
-  return std::any_of(key.fInfo.colors.begin(), key.fInfo.colors.end(),
+bool GradientHasAlpha(const PDFGradientShader::Key& key) {
+  DEBUG_ASSERT(key.type != GradientType::None);
+  return std::any_of(key.info.colors.begin(), key.info.colors.end(),
                      [](const auto& color) { return !FloatNearlyEqual(color.alpha, 1.0f); });
 }
 
-PDFGradientShader::Key clone_key(const PDFGradientShader::Key& k) {
-  PDFGradientShader::Key clone = {k.fType,
-                                  k.fInfo,  // change pointers later.
-                                  nullptr, nullptr, k.fCanvasTransform, k.fShaderTransform,
-                                  k.fBBox, 0};
-  clone.fColors = &clone.fInfo.colors;
-  clone.fStops = &clone.fInfo.positions;
+PDFGradientShader::Key CloneKey(const PDFGradientShader::Key& key) {
+  PDFGradientShader::Key clone = {
+      key.type,
+      key.info,  // change pointers later.
+      nullptr,  nullptr, key.canvasTransform, key.shaderTransform, key.boundBox, 0,
+  };
+  clone.colors = &clone.info.colors;
+  clone.stops = &clone.info.positions;
   return clone;
 }
 
-PDFIndirectReference find_pdf_shader(PDFDocument* doc, const PDFGradientShader::Key& key,
-                                     bool keyHasAlpha);
+PDFIndirectReference FindPDFShader(PDFDocument* doc, const PDFGradientShader::Key& key,
+                                   bool keyHasAlpha);
 
-std::unique_ptr<PDFDictionary> get_gradient_resource_dict(PDFIndirectReference functionShader,
-                                                          PDFIndirectReference gState) {
+std::unique_ptr<PDFDictionary> GetGradientResourceDictionary(PDFIndirectReference functionShader,
+                                                             PDFIndirectReference gState) {
   std::vector<PDFIndirectReference> patternShaders;
   if (functionShader != PDFIndirectReference()) {
     patternShaders.push_back(functionShader);
@@ -626,8 +568,8 @@ std::unique_ptr<PDFDictionary> get_gradient_resource_dict(PDFIndirectReference f
                                    std::vector<PDFIndirectReference>());
 }
 
-std::shared_ptr<MemoryWriteStream> create_pattern_fill_content(int gsIndex, int patternIndex,
-                                                               Rect& bounds) {
+std::shared_ptr<MemoryWriteStream> CreatePatternFillContent(int gsIndex, int patternIndex,
+                                                            Rect& bounds) {
   auto content = MemoryWriteStream::Make();
   if (gsIndex >= 0) {
     PDFUtils::ApplyGraphicState(gsIndex, content);
@@ -638,19 +580,19 @@ std::shared_ptr<MemoryWriteStream> create_pattern_fill_content(int gsIndex, int 
   return content;
 }
 
-PDFIndirectReference create_smask_graphic_state(PDFDocument* doc,
-                                                const PDFGradientShader::Key& state) {
-  PDFGradientShader::Key luminosityState = clone_key(state);
-  for (auto& color : luminosityState.fInfo.colors) {
+PDFIndirectReference CreateSmaskGraphicState(PDFDocument* doc,
+                                             const PDFGradientShader::Key& state) {
+  PDFGradientShader::Key luminosityState = CloneKey(state);
+  for (auto& color : luminosityState.info.colors) {
     color.alpha = 1.0f;
   }
-  luminosityState.fHash = hash(luminosityState);
+  luminosityState.hash = Hash(luminosityState);
 
-  DEBUG_ASSERT(!gradient_has_alpha(luminosityState));
-  PDFIndirectReference luminosityShader = find_pdf_shader(doc, std::move(luminosityState), false);
-  auto resources = get_gradient_resource_dict(luminosityShader, PDFIndirectReference());
-  auto bbox = state.fBBox;
-  auto contentStream = create_pattern_fill_content(-1, luminosityShader.value, bbox);
+  DEBUG_ASSERT(!GradientHasAlpha(luminosityState));
+  PDFIndirectReference luminosityShader = FindPDFShader(doc, std::move(luminosityState), false);
+  auto resources = GetGradientResourceDictionary(luminosityShader, PDFIndirectReference());
+  auto bbox = state.boundBox;
+  auto contentStream = CreatePatternFillContent(-1, luminosityShader.value, bbox);
   auto contentData = contentStream->readData();
   auto alphaMask = MakePDFFormXObject(doc, contentData, PDFUtils::RectToArray(bbox),
                                       std::move(resources), Matrix::I(), "DeviceRGB");
@@ -658,27 +600,27 @@ PDFIndirectReference create_smask_graphic_state(PDFDocument* doc,
                                                PDFGraphicState::SMaskMode::Luminosity, doc);
 }
 
-PDFIndirectReference make_alpha_function_shader(PDFDocument* doc,
-                                                const PDFGradientShader::Key& state) {
-  PDFGradientShader::Key opaqueState = clone_key(state);
-  for (auto& color : opaqueState.fInfo.colors) {
+PDFIndirectReference MakeAlphaFunctionShader(PDFDocument* doc,
+                                             const PDFGradientShader::Key& state) {
+  PDFGradientShader::Key opaqueState = CloneKey(state);
+  for (auto& color : opaqueState.info.colors) {
     color.alpha = 1.0f;
   }
-  opaqueState.fHash = hash(opaqueState);
+  opaqueState.hash = Hash(opaqueState);
 
-  DEBUG_ASSERT(!gradient_has_alpha(opaqueState));
-  auto bbox = state.fBBox;
-  PDFIndirectReference colorShader = find_pdf_shader(doc, std::move(opaqueState), false);
+  DEBUG_ASSERT(!GradientHasAlpha(opaqueState));
+  auto bbox = state.boundBox;
+  PDFIndirectReference colorShader = FindPDFShader(doc, std::move(opaqueState), false);
   if (!colorShader) {
     return PDFIndirectReference();
   }
   // Create resource dict with alpha graphics state as G0 and
   // pattern shader as P0, then write content stream.
-  PDFIndirectReference alphaGsRef = create_smask_graphic_state(doc, state);
+  PDFIndirectReference alphaGsRef = CreateSmaskGraphicState(doc, state);
 
-  auto resourceDict = get_gradient_resource_dict(colorShader, alphaGsRef);
+  auto resourceDict = GetGradientResourceDictionary(colorShader, alphaGsRef);
 
-  auto colorStream = create_pattern_fill_content(alphaGsRef.value, colorShader.value, bbox);
+  auto colorStream = CreatePatternFillContent(alphaGsRef.value, colorShader.value, bbox);
   auto alphaFunctionShader = PDFDictionary::Make();
   PDFUtils::PopulateTilingPatternDict(alphaFunctionShader.get(), bbox, std::move(resourceDict),
                                       Matrix::I());
@@ -710,7 +652,7 @@ std::unique_ptr<PDFDictionary> createInterpolationFunction(const Color& color1,
   return retval;
 }
 
-std::unique_ptr<PDFDictionary> gradientStitchCode(const GradientInfo& info) {
+std::unique_ptr<PDFDictionary> GradientStitchCode(const GradientInfo& info) {
   auto retval = PDFDictionary::Make();
 
   // normalize color stops
@@ -773,25 +715,25 @@ std::unique_ptr<PDFDictionary> gradientStitchCode(const GradientInfo& info) {
   return retval;
 }
 
-PDFIndirectReference make_ps_function(std::unique_ptr<Stream> psCode,
-                                      std::unique_ptr<PDFArray> domain,
-                                      std::unique_ptr<PDFObject> range, PDFDocument* doc) {
+PDFIndirectReference MakePSFunction(std::unique_ptr<Stream> psCode,
+                                    std::unique_ptr<PDFArray> domain,
+                                    std::unique_ptr<PDFObject> range, PDFDocument* document) {
   auto dict = PDFDictionary::Make();
   dict->insertInt("FunctionType", 4);
   dict->insertObject("Domain", std::move(domain));
   dict->insertObject("Range", std::move(range));
-  return PDFStreamOut(std::move(dict), std::move(psCode), doc);
+  return PDFStreamOut(std::move(dict), std::move(psCode), document);
 }
 
-PDFIndirectReference make_function_shader(PDFDocument* doc, const PDFGradientShader::Key& state) {
+PDFIndirectReference MakeFunctionShader(PDFDocument* doc, const PDFGradientShader::Key& state) {
   Point transformPoints[2];
-  const GradientInfo& info = state.fInfo;
-  Matrix finalMatrix = state.fCanvasTransform;
-  finalMatrix.preConcat(state.fShaderTransform);
+  const GradientInfo& info = state.info;
+  Matrix finalMatrix = state.canvasTransform;
+  finalMatrix.preConcat(state.shaderTransform);
 
   bool doStitchFunctions =
-      (state.fType == GradientType::Linear || state.fType == GradientType::Radial ||
-       state.fType == GradientType::Conic);
+      (state.type == GradientType::Linear || state.type == GradientType::Radial ||
+       state.type == GradientType::Conic);
 
   enum class ShadingType : int32_t {
     Function = 1,
@@ -806,7 +748,7 @@ PDFIndirectReference make_function_shader(PDFDocument* doc, const PDFGradientSha
 
   auto pdfShader = PDFDictionary::Make();
   if (doStitchFunctions) {
-    pdfShader->insertObject("Function", gradientStitchCode(info));
+    pdfShader->insertObject("Function", GradientStitchCode(info));
 
     {  //default tile is clamp mode
       auto extend = MakePDFArray();
@@ -817,7 +759,7 @@ PDFIndirectReference make_function_shader(PDFDocument* doc, const PDFGradientSha
     }
 
     std::unique_ptr<PDFArray> coords;
-    switch (state.fType) {
+    switch (state.type) {
       case GradientType::Linear: {
         shadingType = ShadingType::Axial;
         const Point& pt1 = info.points[0];
@@ -852,7 +794,7 @@ PDFIndirectReference make_function_shader(PDFDocument* doc, const PDFGradientSha
     // Transform the coordinate space for the type of gradient.
     transformPoints[0] = info.points[0];
     transformPoints[1] = info.points[1];
-    switch (state.fType) {
+    switch (state.type) {
       case GradientType::Linear:
         break;
       case GradientType::Radial:
@@ -864,10 +806,6 @@ PDFIndirectReference make_function_shader(PDFDocument* doc, const PDFGradientSha
         transformPoints[1].x += 1.0f;
         break;
       }
-      // case GradientType::Sweep:
-      //   transformPoints[1] = transformPoints[0];
-      //   transformPoints[1].x += 1.0f;
-      //   break;
       case GradientType::None:
       default:
         return PDFIndirectReference();
@@ -877,7 +815,7 @@ PDFIndirectReference make_function_shader(PDFDocument* doc, const PDFGradientSha
     // (and rotation for linear gradient), of the final gradient from
     // info.fPoints to the matrix (updating bbox appropriately).  Now
     // the gradient can be drawn on on the unit segment.
-    Matrix mapperMatrix = unit_to_points_matrix(transformPoints);
+    Matrix mapperMatrix = UnitToPointsMatrix(transformPoints);
 
     finalMatrix.preConcat(mapperMatrix);
 
@@ -894,18 +832,18 @@ PDFIndirectReference make_function_shader(PDFDocument* doc, const PDFGradientSha
     //   }
     // }
 
-    Rect bbox = state.fBBox;
+    Rect bbox = state.boundBox;
     if (!PDFUtils::InverseTransformBBox(finalMatrix, &bbox)) {
       return PDFIndirectReference();
     }
 
     auto functionCode = MemoryWriteStream::Make();
-    switch (state.fType) {
+    switch (state.type) {
       case GradientType::Linear:
-        linearCode(info, perspectiveInverseOnly, functionCode);
+        LinearCode(info, perspectiveInverseOnly, functionCode);
         break;
       case GradientType::Radial:
-        radialCode(info, perspectiveInverseOnly, functionCode);
+        RadialCode(info, perspectiveInverseOnly, functionCode);
         break;
       case GradientType::Conic: {
         // The two point radial gradient further references state.fInfo
@@ -922,11 +860,8 @@ PDFIndirectReference make_function_shader(PDFDocument* doc, const PDFGradientSha
             std::sqrt(inverseMapperMatrix.mapXY(info.radiuses[0], info.radiuses[0]).length());
         infoCopy.radiuses[1] =
             std::sqrt(inverseMapperMatrix.mapXY(info.radiuses[1], info.radiuses[1]).length());
-        twoPointConicalCode(infoCopy, perspectiveInverseOnly, functionCode);
+        TwoPointConicalCode(infoCopy, perspectiveInverseOnly, functionCode);
       } break;
-      // case SkShaderBase::GradientType::kSweep:
-      //   sweepCode(info, perspectiveInverseOnly, &functionCode);
-      //   break;
       default:
         DEBUG_ASSERT(false);
     }
@@ -935,8 +870,8 @@ PDFIndirectReference make_function_shader(PDFDocument* doc, const PDFGradientSha
     auto domain = MakePDFArray(bbox.left, bbox.right, bbox.top, bbox.bottom);
     auto rangeObject = MakePDFArray(0, 1, 0, 1, 0, 1);
     auto functionStream = Stream::MakeFromData(functionCode->readData());
-    pdfShader->insertRef("Function", make_ps_function(std::move(functionStream), std::move(domain),
-                                                      std::move(rangeObject), doc));
+    pdfShader->insertRef("Function", MakePSFunction(std::move(functionStream), std::move(domain),
+                                                    std::move(rangeObject), doc));
   }
 
   pdfShader->insertInt("ShadingType", static_cast<int>(shadingType));
@@ -949,20 +884,15 @@ PDFIndirectReference make_function_shader(PDFDocument* doc, const PDFGradientSha
   return doc->emit(*pdfFunctionShader);
 }
 
-PDFIndirectReference find_pdf_shader(PDFDocument* doc, const PDFGradientShader::Key& key,
-                                     bool keyHasAlpha) {
-  DEBUG_ASSERT(gradient_has_alpha(key) == keyHasAlpha);
-  // auto& gradientPatternMap = doc->fGradientPatternMap;
-  // if (PDFIndirectReference* ptr = gradientPatternMap.find(key)) {
-  //   return *ptr;
-  // }
+PDFIndirectReference FindPDFShader(PDFDocument* doc, const PDFGradientShader::Key& key,
+                                   bool keyHasAlpha) {
+  DEBUG_ASSERT(GradientHasAlpha(key) == keyHasAlpha);
   PDFIndirectReference pdfShader;
   if (keyHasAlpha) {
-    pdfShader = make_alpha_function_shader(doc, key);
+    pdfShader = MakeAlphaFunctionShader(doc, key);
   } else {
-    pdfShader = make_function_shader(doc, key);
+    pdfShader = MakeFunctionShader(doc, key);
   }
-  // gradientPatternMap.set(std::move(key), pdfShader);
   return pdfShader;
 }
 
@@ -972,9 +902,9 @@ PDFIndirectReference PDFGradientShader::Make(PDFDocument* doc, const GradientSha
                                              const Matrix& matrix, const Rect& surfaceBBox) {
   DEBUG_ASSERT(shader);
 
-  PDFGradientShader::Key key = make_key(shader, matrix, surfaceBBox);
-  bool alpha = gradient_has_alpha(key);
-  return find_pdf_shader(doc, std::move(key), alpha);
+  PDFGradientShader::Key key = MakeKey(shader, matrix, surfaceBBox);
+  bool alpha = GradientHasAlpha(key);
+  return FindPDFShader(doc, std::move(key), alpha);
 }
 
 }  // namespace tgfx

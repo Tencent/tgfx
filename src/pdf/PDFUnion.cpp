@@ -29,7 +29,7 @@ namespace tgfx {
 namespace {
 
 // Given an arbitrary string, write it as a valid name (not including leading slash).
-void write_name_escaped(const std::shared_ptr<WriteStream>& stream, const char* name) {
+void WriteNameEscaped(const std::shared_ptr<WriteStream>& stream, const char* name) {
   static const char kToEscape[] = "#/%()<>[]{}";
   for (const auto* n = reinterpret_cast<const uint8_t*>(name); *n; ++n) {
     uint8_t v = *n;
@@ -42,8 +42,8 @@ void write_name_escaped(const std::shared_ptr<WriteStream>& stream, const char* 
   }
 }
 
-void write_literal_byte_string(const std::shared_ptr<WriteStream>& stream, const char* data,
-                               size_t length) {
+void WriteLiteralByteString(const std::shared_ptr<WriteStream>& stream, const char* data,
+                            size_t length) {
   stream->writeText("(");
   for (size_t i = 0; i < length; i++) {
     auto c = static_cast<uint8_t>(data[i]);
@@ -62,8 +62,8 @@ void write_literal_byte_string(const std::shared_ptr<WriteStream>& stream, const
   stream->writeText(")");
 }
 
-void write_hex_byte_string(const std::shared_ptr<WriteStream>& stream, const char* data,
-                           size_t length) {
+void WriteHexByteString(const std::shared_ptr<WriteStream>& stream, const char* data,
+                        size_t length) {
   stream->writeText("<");
   for (size_t i = 0; i < length; i++) {
     auto c = static_cast<uint8_t>(data[i]);
@@ -73,19 +73,18 @@ void write_hex_byte_string(const std::shared_ptr<WriteStream>& stream, const cha
   stream->writeText(">");
 }
 
-void write_optimized_byte_string(const std::shared_ptr<WriteStream>& stream, const char* data,
-                                 size_t length, size_t literalExtras) {
+void WriteOptimizedByteString(const std::shared_ptr<WriteStream>& stream, const char* data,
+                              size_t length, size_t literalExtras) {
   const size_t hexLength = 2 + (2 * length);
   const size_t literalLength = 2 + length + literalExtras;
   if (literalLength <= hexLength) {
-    write_literal_byte_string(stream, data, length);
+    WriteLiteralByteString(stream, data, length);
   } else {
-    write_hex_byte_string(stream, data, length);
+    WriteHexByteString(stream, data, length);
   }
 }
 
-void write_byte_string(const std::shared_ptr<WriteStream>& stream, const char* data,
-                       size_t length) {
+void WriteByteString(const std::shared_ptr<WriteStream>& stream, const char* data, size_t length) {
   size_t literalExtras = 0;
   for (size_t i = 0; i < length; i++) {
     auto c = static_cast<uint8_t>(data[i]);
@@ -95,11 +94,10 @@ void write_byte_string(const std::shared_ptr<WriteStream>& stream, const char* d
       ++literalExtras;
     }
   }
-  write_optimized_byte_string(stream, data, length, literalExtras);
+  WriteOptimizedByteString(stream, data, length, literalExtras);
 }
 
-void write_text_string(const std::shared_ptr<WriteStream>& stream, const char* data,
-                       size_t length) {
+void WriteTextString(const std::shared_ptr<WriteStream>& stream, const char* data, size_t length) {
   bool inputIsValidUTF8 = true;
   bool inputIsPDFDocEncoding = true;
   size_t literalExtras = 0;
@@ -133,7 +131,7 @@ void write_text_string(const std::shared_ptr<WriteStream>& stream, const char* d
   }
 
   if (inputIsPDFDocEncoding) {
-    write_optimized_byte_string(stream, data, length, literalExtras);
+    WriteOptimizedByteString(stream, data, length, literalExtras);
     return;
   }
 
@@ -244,20 +242,20 @@ void PDFUnion::emitObject(const std::shared_ptr<WriteStream>& stream) const {
       stream->writeText(staticString);
       return;
     case Type::ByteStaticString:
-      write_byte_string(stream, staticString, std::strlen(staticString));
+      WriteByteString(stream, staticString, std::strlen(staticString));
       return;
     case Type::TextStaticString:
-      write_text_string(stream, staticString, std::strlen(staticString));
+      WriteTextString(stream, staticString, std::strlen(staticString));
       return;
     case Type::NameString:
       stream->writeText("/");
-      write_name_escaped(stream, stringValue.c_str());
+      WriteNameEscaped(stream, stringValue.c_str());
       return;
     case Type::ByteString:
-      write_byte_string(stream, stringValue.c_str(), stringValue.size());
+      WriteByteString(stream, stringValue.c_str(), stringValue.size());
       return;
     case Type::TextString:
-      write_text_string(stream, stringValue.c_str(), stringValue.size());
+      WriteTextString(stream, stringValue.c_str(), stringValue.size());
       return;
     case Type::Object:
       object->emitObject(stream);

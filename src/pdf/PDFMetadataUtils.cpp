@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -127,7 +127,7 @@ std::unique_ptr<PDFObject> PDFMetadataUtils::MakePDFId(const UUID& doc, const UU
 }
 
 namespace {
-uint32_t count_xml_escape_size(const std::string& input) {
+uint32_t CountXMLEscapeSize(const std::string& input) {
   uint32_t extra = 0;
   for (char i : input) {
     if (i == '&') {
@@ -139,8 +139,8 @@ uint32_t count_xml_escape_size(const std::string& input) {
   return extra;
 }
 
-std::string escape_xml(const std::string& input, const char* before = nullptr,
-                       const char* after = nullptr) {
+std::string EscapeXML(const std::string& input, const char* before = nullptr,
+                      const char* after = nullptr) {
   if (input.empty()) {
     return input;
   }
@@ -149,7 +149,7 @@ std::string escape_xml(const std::string& input, const char* before = nullptr,
   // all strings are xml content, not attribute values.
   auto beforeLen = before ? strlen(before) : 0;
   auto afterLen = after ? strlen(after) : 0;
-  auto extra = count_xml_escape_size(input);
+  auto extra = CountXMLEscapeSize(input);
   std::string output(input.size() + extra + beforeLen + afterLen, '\0');
   char* out = output.data();
   if (before) {
@@ -181,7 +181,7 @@ std::string escape_xml(const std::string& input, const char* before = nullptr,
 
 // Convert a block of memory to hexadecimal.  Input and output pointers will be
 // moved to end of the range.
-void hexify(const uint8_t** inputPtr, char** outputPtr, int count) {
+void Hexify(const uint8_t** inputPtr, char** outputPtr, int count) {
   DEBUG_ASSERT(inputPtr && *inputPtr);
   DEBUG_ASSERT(outputPtr && *outputPtr);
   while (count-- > 0) {
@@ -191,20 +191,20 @@ void hexify(const uint8_t** inputPtr, char** outputPtr, int count) {
   }
 }
 
-std::string uuid_to_string(const UUID& uuid) {
+std::string UUIDToString(const UUID& uuid) {
   //  8-4-4-4-12
   char buffer[36];  // [32 + 4]
   char* ptr = buffer;
   const uint8_t* data = uuid.data.data();
-  hexify(&data, &ptr, 4);
+  Hexify(&data, &ptr, 4);
   *ptr++ = '-';
-  hexify(&data, &ptr, 2);
+  Hexify(&data, &ptr, 2);
   *ptr++ = '-';
-  hexify(&data, &ptr, 2);
+  Hexify(&data, &ptr, 2);
   *ptr++ = '-';
-  hexify(&data, &ptr, 2);
+  Hexify(&data, &ptr, 2);
   *ptr++ = '-';
-  hexify(&data, &ptr, 6);
+  Hexify(&data, &ptr, 6);
   DEBUG_ASSERT(ptr == buffer + 36);
   DEBUG_ASSERT(data == uuid.data.data() + 16);
   return std::string(buffer, 36);
@@ -218,37 +218,37 @@ PDFIndirectReference PDFMetadataUtils::MakeXMPObject(const PDFMetadata& metadata
   std::string modificationDate;
   if (metadata.creation != ZeroTime) {
     std::string tmp = metadata.creation.toISO8601();
-    DEBUG_ASSERT(0 == count_xml_escape_size(tmp));
+    DEBUG_ASSERT(0 == CountXMLEscapeSize(tmp));
     // YYYY-mm-ddTHH:MM:SS[+|-]ZZ:ZZ; no need to escape
     creationDate = "<xmp:CreateDate>" + tmp + "</xmp:CreateDate>\n";
   }
   if (metadata.modified != ZeroTime) {
     std::string tmp = metadata.modified.toISO8601();
-    DEBUG_ASSERT(0 == count_xml_escape_size(tmp));
+    DEBUG_ASSERT(0 == CountXMLEscapeSize(tmp));
     modificationDate = "<xmp:ModifyDate>" + tmp + "</xmp:ModifyDate>\n";
   }
   std::string title =
-      escape_xml(metadata.title, "<dc:title><rdf:Alt><rdf:li xml:lang=\"x-default\">",
-                 "</rdf:li></rdf:Alt></dc:title>\n");
+      EscapeXML(metadata.title, "<dc:title><rdf:Alt><rdf:li xml:lang=\"x-default\">",
+                "</rdf:li></rdf:Alt></dc:title>\n");
 
-  std::string author = escape_xml(metadata.author, "<dc:creator><rdf:Seq><rdf:li>",
-                                  "</rdf:li></rdf:Seq></dc:creator>\n");
+  std::string author = EscapeXML(metadata.author, "<dc:creator><rdf:Seq><rdf:li>",
+                                 "</rdf:li></rdf:Seq></dc:creator>\n");
   // TODO (YGaurora): in theory, XMP can support multiple authors.  Split on a delimiter?
   std::string subject =
-      escape_xml(metadata.subject, "<dc:description><rdf:Alt><rdf:li xml:lang=\"x-default\">",
-                 "</rdf:li></rdf:Alt></dc:description>\n");
-  std::string keywords1 = escape_xml(metadata.keywords, "<dc:subject><rdf:Bag><rdf:li>",
-                                     "</rdf:li></rdf:Bag></dc:subject>\n");
-  std::string keywords2 = escape_xml(metadata.keywords, "<pdf:Keywords>", "</pdf:Keywords>\n");
+      EscapeXML(metadata.subject, "<dc:description><rdf:Alt><rdf:li xml:lang=\"x-default\">",
+                "</rdf:li></rdf:Alt></dc:description>\n");
+  std::string keywords1 = EscapeXML(metadata.keywords, "<dc:subject><rdf:Bag><rdf:li>",
+                                    "</rdf:li></rdf:Bag></dc:subject>\n");
+  std::string keywords2 = EscapeXML(metadata.keywords, "<pdf:Keywords>", "</pdf:Keywords>\n");
   // TODO (YGaurora): in theory, keywords can be a list too.
 
-  std::string producer = escape_xml(metadata.producer, "<pdf:Producer>", "</pdf:Producer>\n");
+  std::string producer = EscapeXML(metadata.producer, "<pdf:Producer>", "</pdf:Producer>\n");
 
-  std::string creator = escape_xml(metadata.creator, "<xmp:CreatorTool>", "</xmp:CreatorTool>\n");
-  std::string documentID = uuid_to_string(doc);  // no need to escape
-  DEBUG_ASSERT(0 == count_xml_escape_size(documentID));
-  std::string instanceID = uuid_to_string(instance);
-  DEBUG_ASSERT(0 == count_xml_escape_size(instanceID));
+  std::string creator = EscapeXML(metadata.creator, "<xmp:CreatorTool>", "</xmp:CreatorTool>\n");
+  std::string documentID = UUIDToString(doc);  // no need to escape
+  DEBUG_ASSERT(0 == CountXMLEscapeSize(documentID));
+  std::string instanceID = UUIDToString(instance);
+  DEBUG_ASSERT(0 == CountXMLEscapeSize(instanceID));
 
   // clang-format off
   std::string value =

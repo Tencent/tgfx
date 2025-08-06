@@ -355,7 +355,7 @@ struct OutlineEntry {
   }
 };
 
-OutlineEntry::Content create_outline_entry_content(PDFTagNode* const node) {
+OutlineEntry::Content CreateOutlineEntryContent(PDFTagNode* const node) {
   std::string text;
   if (!node->title.empty()) {
     text = node->title;
@@ -377,20 +377,20 @@ OutlineEntry::Content create_outline_entry_content(PDFTagNode* const node) {
     if (can_discard(&child)) {
       continue;
     }
-    content.accumulate(create_outline_entry_content(&child));
+    content.accumulate(CreateOutlineEntryContent(&child));
   }
   return content;
 }
 
-void create_outline_from_headers(PDFDocument* const doc, PDFTagNode* const node,
-                                 std::vector<OutlineEntry*>& stack) {
+void CreateOutlineFromHeaders(PDFDocument* const doc, PDFTagNode* const node,
+                              std::vector<OutlineEntry*>& stack) {
   char const* type = node->typeString.c_str();
   if (type[0] == 'H' && '1' <= type[1] && type[1] <= '6') {
     int level = type[1] - '0';
     while (level <= stack.back()->headerLevel) {
       stack.pop_back();
     }
-    OutlineEntry::Content content = create_outline_entry_content(node);
+    OutlineEntry::Content content = CreateOutlineEntryContent(node);
     if (!content.fText.empty()) {
       OutlineEntry e{std::move(content), level, doc->reserveRef(), node->ref};
       stack.push_back(&stack.back()->children.emplace_back(std::move(e)));
@@ -403,7 +403,7 @@ void create_outline_from_headers(PDFDocument* const doc, PDFTagNode* const node,
     if (can_discard(&child)) {
       continue;
     }
-    create_outline_from_headers(doc, &child, stack);
+    CreateOutlineFromHeaders(doc, &child, stack);
   }
 }
 
@@ -418,7 +418,7 @@ PDFIndirectReference PDFTagTree::makeOutline(PDFDocument* doc) {
   std::vector<OutlineEntry*> stack;
   OutlineEntry top{{"", Location()}, 0, {}, {}};
   stack.push_back(&top);
-  create_outline_from_headers(doc, root.get(), stack);
+  CreateOutlineFromHeaders(doc, root.get(), stack);
   if (top.children.empty()) {
     return PDFIndirectReference();
   }

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,13 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFDocument.h"
-#include <_types/_uint8_t.h>
-#include <cmath>
-#include <cstddef>
-#include <memory>
-#include <mutex>
-#include <string>
-#include <utility>
 #include "core/utils/Log.h"
 #include "pdf/PDFMetadataUtils.h"
 #include "pdf/PDFTypes.h"
@@ -40,7 +33,7 @@
 namespace tgfx {
 
 namespace {
-size_t difference(size_t minuend, size_t subtrahend) {
+size_t Difference(size_t minuend, size_t subtrahend) {
   DEBUG_ASSERT(minuend >= subtrahend);
   return minuend - subtrahend;
 }
@@ -57,7 +50,7 @@ void PDFOffsetMap::markStartOfObject(int referenceNumber,
   if (index >= offsets.size()) {
     offsets.resize(index + 1);
   }
-  offsets[index] = static_cast<int>(difference(stream->bytesWritten(), baseOffset));
+  offsets[index] = static_cast<int>(Difference(stream->bytesWritten(), baseOffset));
 }
 
 size_t PDFOffsetMap::objectCount() const {
@@ -65,7 +58,7 @@ size_t PDFOffsetMap::objectCount() const {
 }
 
 int PDFOffsetMap::emitCrossReferenceTable(const std::shared_ptr<WriteStream>& stream) const {
-  int xRefFileOffset = static_cast<int>(difference(stream->bytesWritten(), baseOffset));
+  int xRefFileOffset = static_cast<int>(Difference(stream->bytesWritten(), baseOffset));
   stream->writeText("xref\n0 ");
   stream->writeText(std::to_string(objectCount()));
   stream->writeText("\n0000000000 65535 f \n");
@@ -84,7 +77,7 @@ int PDFOffsetMap::emitCrossReferenceTable(const std::shared_ptr<WriteStream>& st
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
 namespace {
-void serializeHeader(PDFOffsetMap* offsetMap, const std::shared_ptr<WriteStream>& stream) {
+void SerializeHeader(PDFOffsetMap* offsetMap, const std::shared_ptr<WriteStream>& stream) {
   offsetMap->markStartOfDocument(stream);
   constexpr std::array<uint8_t, 4> TGFX_Mark = {'T' | 0x80, 'G' | 0x80, 'F' | 0x80, 'X' | 0x80};
   stream->writeText("%PDF-1.4\n%");
@@ -286,7 +279,7 @@ const Matrix& PDFDocument::currentPageTransform() const {
 Canvas* PDFDocument::onBeginPage(float width, float height) {
   if (pages.empty()) {
     // if this is the first page if the document.
-    serializeHeader(&offsetMap, stream());
+    SerializeHeader(&offsetMap, stream());
 
     infoDictionary = this->emit(*PDFMetadataUtils::MakeDocumentInformationDict(_metadata));
     if (_metadata.PDFA) {

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -27,7 +27,7 @@ namespace tgfx {
 namespace {
 
 // Scale from em-units to 1000-units.
-float from_font_units(float scaled, uint16_t emSize) {
+float FromFontUnits(float scaled, uint16_t emSize) {
   if (emSize == 1000) {
     return scaled;
   } else {
@@ -35,7 +35,7 @@ float from_font_units(float scaled, uint16_t emSize) {
   }
 }
 
-float find_mode_or_0(const std::vector<float>& advances) {
+float FindModeOrZero(const std::vector<float>& advances) {
   if (advances.empty()) {
     return 0;
   }
@@ -113,18 +113,18 @@ std::unique_ptr<PDFArray> PDFMakeCIDGlyphWidthsArray(const PDFStrikeSpec& pdfStr
   size_t numIntAdvances = 0;
   std::vector<float> advances(glyphIDs.size());
   for (auto glyphID : glyphIDs) {
-    float currentAdvance = from_font_units(scaleContext->getAdvance(glyphID, false), emSize);
+    float currentAdvance = FromFontUnits(scaleContext->getAdvance(glyphID, false), emSize);
     if (static_cast<int32_t>(currentAdvance) == currentAdvance) {
       advances[numIntAdvances++] = currentAdvance;
     }
   }
   std::sort(advances.begin(), advances.end());
-  auto modeAdvance = static_cast<int32_t>(find_mode_or_0(advances));
+  auto modeAdvance = static_cast<int32_t>(FindModeOrZero(advances));
   *defaultAdvance = modeAdvance;
 
   // Pre-convert to pdf advances.
   for (size_t i = 0; i < glyphIDs.size(); ++i) {
-    advances[i] = from_font_units(scaleContext->getAdvance(glyphIDs[i], false), emSize);
+    advances[i] = FromFontUnits(scaleContext->getAdvance(glyphIDs[i], false), emSize);
   }
 
   for (size_t i = 0; i < glyphIDs.size(); ++i) {

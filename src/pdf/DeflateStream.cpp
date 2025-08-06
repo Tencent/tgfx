@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -31,7 +31,7 @@ namespace tgfx {
 namespace {
 
 template <typename T>
-void* alloc_function(void*, T items, T size) {
+void* AllocFunction(void*, T items, T size) {
   const size_t maxItems = SIZE_MAX / size;
   if (maxItems < items) {
     return nullptr;
@@ -39,12 +39,12 @@ void* alloc_function(void*, T items, T size) {
   return malloc(static_cast<size_t>(items) * static_cast<size_t>(size));
 }
 
-void free_function(void*, void* address) {
+void FreeFunction(void*, void* address) {
   free(address);
 }
 
-void do_deflate(int flush, z_stream* zStream, WriteStream* out, unsigned char* inBuffer,
-                size_t inBufferSize) {
+void DoDeflate(int flush, z_stream* zStream, WriteStream* out, unsigned char* inBuffer,
+               size_t inBufferSize) {
   zStream->next_in = inBuffer;
   zStream->avail_in = static_cast<uInt>(inBufferSize);
   unsigned char outBuffer[DEFLATE_STREAM_OUTPUT_BUFFER_SIZE];
@@ -82,8 +82,8 @@ DeflateWriteStream::DeflateWriteStream(WriteStream* outStream, int compressionLe
     return;
   }
   impl->ZStream.next_in = nullptr;
-  impl->ZStream.zalloc = &alloc_function;
-  impl->ZStream.zfree = &free_function;
+  impl->ZStream.zalloc = &AllocFunction;
+  impl->ZStream.zfree = &FreeFunction;
   impl->ZStream.opaque = nullptr;
   DEBUG_ASSERT((compressionLevel <= 9 && compressionLevel >= -1));
   deflateInit2(&impl->ZStream, compressionLevel, Z_DEFLATED, gzip ? 0x1F : 0x0F, 8,
@@ -98,7 +98,7 @@ void DeflateWriteStream::finalize() {
   if (!impl->outStream) {
     return;
   }
-  do_deflate(Z_FINISH, &impl->ZStream, impl->outStream, impl->inBuffer, impl->inBufferIndex);
+  DoDeflate(Z_FINISH, &impl->ZStream, impl->outStream, impl->inBuffer, impl->inBufferIndex);
   (void)deflateEnd(&impl->ZStream);
   impl->outStream = nullptr;
 }
@@ -118,7 +118,7 @@ bool DeflateWriteStream::write(const void* data, size_t size) {
 
     // if the buffer isn't filled, don't call into zlib yet.
     if (sizeof(impl->inBuffer) == impl->inBufferIndex) {
-      do_deflate(Z_NO_FLUSH, &impl->ZStream, impl->outStream, impl->inBuffer, impl->inBufferIndex);
+      DoDeflate(Z_NO_FLUSH, &impl->ZStream, impl->outStream, impl->inBuffer, impl->inBufferIndex);
       impl->inBufferIndex = 0;
     }
   }

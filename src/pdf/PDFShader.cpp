@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -38,7 +38,7 @@
 namespace tgfx {
 
 namespace {
-void draw(Canvas* canvas, std::shared_ptr<Image> image, Color paintColor) {
+void Draw(Canvas* canvas, std::shared_ptr<Image> image, Color paintColor) {
   Paint paint;
   paint.setColor(paintColor);
   canvas->drawImage(std::move(image), SamplingOptions(), &paint);
@@ -59,14 +59,14 @@ Bitmap ImageExportToBitmap(Context* context, const std::shared_ptr<Image>& image
   return Bitmap();
 }
 
-void draw_matrix(Canvas* canvas, std::shared_ptr<Image> image, const Matrix& matrix,
-                 Color paintColor) {
+void DrawMatrix(Canvas* canvas, std::shared_ptr<Image> image, const Matrix& matrix,
+                Color paintColor) {
   AutoCanvasRestore acr(canvas);
   canvas->concat(matrix);
-  draw(canvas, std::move(image), paintColor);
+  Draw(canvas, std::move(image), paintColor);
 }
 
-void draw_bitmap_matrix(Canvas* canvas, const Bitmap& bm, const Matrix& matrix, Color paintColor) {
+void DrawBitmapMatrix(Canvas* canvas, const Bitmap& bm, const Matrix& matrix, Color paintColor) {
   AutoCanvasRestore acr(canvas);
   canvas->concat(matrix);
   Paint paint;
@@ -75,8 +75,8 @@ void draw_bitmap_matrix(Canvas* canvas, const Bitmap& bm, const Matrix& matrix, 
   canvas->drawImage(image, SamplingOptions(), &paint);
 }
 
-void fill_color_from_bitmap(Canvas* canvas, float left, float top, float right, float bottom,
-                            const Bitmap& bitmap, int x, int y, float alpha) {
+void FillColorFromBitmap(Canvas* canvas, float left, float top, float right, float bottom,
+                         const Bitmap& bitmap, int x, int y, float alpha) {
   Rect rect{left, top, right, bottom};
   if (!rect.isEmpty()) {
     Color color = bitmap.getColor(x, y);
@@ -87,7 +87,7 @@ void fill_color_from_bitmap(Canvas* canvas, float left, float top, float right, 
   }
 }
 
-Color adjust_color(const std::shared_ptr<Shader>& shader, Color paintColor) {
+Color AdjustColor(const std::shared_ptr<Shader>& shader, Color paintColor) {
   if (Types::Get(shader.get()) == Types::ShaderType::Image) {
     const auto* imageShader = static_cast<const ImageShader*>(shader.get());
     const auto* img = imageShader->image.get();
@@ -98,17 +98,17 @@ Color adjust_color(const std::shared_ptr<Shader>& shader, Color paintColor) {
   return Color{0, 0, 0, paintColor.alpha};  // only preserve the alpha.
 }
 
-bool is_tiled(TileMode mode) {
+bool IsTiled(TileMode mode) {
   return mode == TileMode::Mirror || mode == TileMode::Repeat;
 }
 
-Matrix scale_translate(float sx, float sy, float tx, float ty) {
+Matrix ScaleTranslate(float sx, float sy, float tx, float ty) {
   Matrix matrix;
   matrix.setAll(sx, 0.f, tx, 0.f, sy, ty);
   return matrix;
 }
 
-Bitmap extractSubset(Bitmap src, Rect subset) {
+Bitmap ExtractSubset(Bitmap src, Rect subset) {
   Bitmap destination(static_cast<int>(subset.width()), static_cast<int>(subset.height()));
   const auto* srcPixels = src.lockPixels();
   destination.writePixels(src.info(), srcPixels, static_cast<int>(subset.left),
@@ -132,7 +132,7 @@ PDFIndirectReference PDFShader::Make(PDFDocument* doc, const std::shared_ptr<Sha
   }
   Bitmap image;
 
-  paintColor = adjust_color(shader, paintColor);
+  paintColor = AdjustColor(shader, paintColor);
   Matrix shaderTransform;
   TileMode imageTileModes[2];
 
@@ -172,7 +172,7 @@ PDFIndirectReference PDFShader::MakeImageShader(PDFDocument* doc, Matrix finalMa
   // otherwise the bitmap gets clipped out and the shader is empty and awful.
   // For clamp modes, we're only interested in the clip region, whether
   // or not the main bitmap is in it.
-  if (is_tiled(tileModesX) || is_tiled(tileModesY)) {
+  if (IsTiled(tileModesX) || IsTiled(tileModesY)) {
     deviceBounds.join(bitmapBounds);
   }
 
@@ -194,19 +194,19 @@ PDFIndirectReference PDFShader::MakeImageShader(PDFDocument* doc, Matrix finalMa
   // If the bitmap is out of bounds (i.e. clamp mode where we only see the
   // stretched sides), canvas will clip this out and the extraneous data
   // won't be saved to the PDF.
-  draw(canvas.get(), image, paintColor);
+  Draw(canvas.get(), image, paintColor);
 
   // Tiling is implied.  First we handle mirroring.
   if (tileModesX == TileMode::Mirror) {
-    draw_matrix(canvas.get(), image, scale_translate(-1, 1, 2 * width, 0), paintColor);
+    DrawMatrix(canvas.get(), image, ScaleTranslate(-1, 1, 2 * width, 0), paintColor);
     patternBBox.right += width;
   }
   if (tileModesY == TileMode::Mirror) {
-    draw_matrix(canvas.get(), image, scale_translate(1, -1, 0, 2 * height), paintColor);
+    DrawMatrix(canvas.get(), image, ScaleTranslate(1, -1, 0, 2 * height), paintColor);
     patternBBox.bottom += height;
   }
   if (tileModesX == TileMode::Mirror && tileModesY == TileMode::Mirror) {
-    draw_matrix(canvas.get(), image, scale_translate(-1, -1, 2 * width, 2 * height), paintColor);
+    DrawMatrix(canvas.get(), image, ScaleTranslate(-1, -1, 2 * width, 2 * height), paintColor);
   }
 
   // Then handle Clamping, which requires expanding the pattern canvas to
@@ -222,45 +222,45 @@ PDFIndirectReference PDFShader::MakeImageShader(PDFDocument* doc, Matrix finalMa
   // If both x and y are in clamp mode, we start by filling in the corners.
   // (Which are just a rectangles of the corner colors.)
   if (tileModesX == TileMode::Clamp && tileModesY == TileMode::Clamp) {
-    fill_color_from_bitmap(canvas.get(), deviceBounds.left, deviceBounds.top, 0, 0, bitmap, 0, 0,
-                           paintColor.alpha);
+    FillColorFromBitmap(canvas.get(), deviceBounds.left, deviceBounds.top, 0, 0, bitmap, 0, 0,
+                        paintColor.alpha);
 
-    fill_color_from_bitmap(canvas.get(), width, deviceBounds.top, deviceBounds.right, 0, bitmap,
-                           bitmap.width() - 1, 0, paintColor.alpha);
+    FillColorFromBitmap(canvas.get(), width, deviceBounds.top, deviceBounds.right, 0, bitmap,
+                        bitmap.width() - 1, 0, paintColor.alpha);
 
-    fill_color_from_bitmap(canvas.get(), width, height, deviceBounds.right, deviceBounds.bottom,
-                           bitmap, bitmap.width() - 1, bitmap.height() - 1, paintColor.alpha);
+    FillColorFromBitmap(canvas.get(), width, height, deviceBounds.right, deviceBounds.bottom,
+                        bitmap, bitmap.width() - 1, bitmap.height() - 1, paintColor.alpha);
 
-    fill_color_from_bitmap(canvas.get(), deviceBounds.left, height, 0, deviceBounds.bottom, bitmap,
-                           0, bitmap.height() - 1, paintColor.alpha);
+    FillColorFromBitmap(canvas.get(), deviceBounds.left, height, 0, deviceBounds.bottom, bitmap, 0,
+                        bitmap.height() - 1, paintColor.alpha);
   }
 
   // Then expand the left, right, top, then bottom.
   if (tileModesX == TileMode::Clamp) {
     auto subset = Rect::MakeXYWH(0, 0, 1, bitmap.height());
     if (deviceBounds.left < 0) {
-      Bitmap left = extractSubset(bitmap, subset);
-      auto leftMatrix = scale_translate(-deviceBounds.left, 1, deviceBounds.left, 0);
-      draw_bitmap_matrix(canvas.get(), left, leftMatrix, paintColor);
+      Bitmap left = ExtractSubset(bitmap, subset);
+      auto leftMatrix = ScaleTranslate(-deviceBounds.left, 1, deviceBounds.left, 0);
+      DrawBitmapMatrix(canvas.get(), left, leftMatrix, paintColor);
 
       if (tileModesY == TileMode::Mirror) {
         leftMatrix.postScale(1.f, -1.f);
         leftMatrix.postTranslate(0, 2 * height);
-        draw_bitmap_matrix(canvas.get(), left, leftMatrix, paintColor);
+        DrawBitmapMatrix(canvas.get(), left, leftMatrix, paintColor);
       }
       patternBBox.left = 0;
     }
 
     if (deviceBounds.right > width) {
       subset.offset(bitmap.width() - 1, 0);
-      Bitmap right = extractSubset(bitmap, subset);
-      auto rightMatrix = scale_translate(deviceBounds.right - width, 1, width, 0);
-      draw_bitmap_matrix(canvas.get(), right, rightMatrix, paintColor);
+      Bitmap right = ExtractSubset(bitmap, subset);
+      auto rightMatrix = ScaleTranslate(deviceBounds.right - width, 1, width, 0);
+      DrawBitmapMatrix(canvas.get(), right, rightMatrix, paintColor);
 
       if (tileModesY == TileMode::Mirror) {
         rightMatrix.postScale(1.f, -1.f);
         rightMatrix.postTranslate(0, 2 * height);
-        draw_bitmap_matrix(canvas.get(), right, rightMatrix, paintColor);
+        DrawBitmapMatrix(canvas.get(), right, rightMatrix, paintColor);
       }
       patternBBox.right = deviceBounds.width();
     }
@@ -277,29 +277,29 @@ PDFIndirectReference PDFShader::MakeImageShader(PDFDocument* doc, Matrix finalMa
   if (tileModesY == TileMode::Clamp) {
     auto subset = Rect::MakeXYWH(0, 0, bitmap.width(), 1);
     if (deviceBounds.top < 0) {
-      Bitmap top = extractSubset(bitmap, subset);
-      auto topMatrix = scale_translate(1, -deviceBounds.top, 0, deviceBounds.top);
-      draw_bitmap_matrix(canvas.get(), top, topMatrix, paintColor);
+      Bitmap top = ExtractSubset(bitmap, subset);
+      auto topMatrix = ScaleTranslate(1, -deviceBounds.top, 0, deviceBounds.top);
+      DrawBitmapMatrix(canvas.get(), top, topMatrix, paintColor);
 
       if (tileModesX == TileMode::Mirror) {
         topMatrix.postScale(-1, 1);
         topMatrix.postTranslate(2 * width, 0);
-        draw_bitmap_matrix(canvas.get(), top, topMatrix, paintColor);
+        DrawBitmapMatrix(canvas.get(), top, topMatrix, paintColor);
       }
       patternBBox.top = 0;
     }
 
     if (deviceBounds.bottom > height) {
       subset.offset(0, bitmap.height() - 1);
-      Bitmap bottom = extractSubset(bitmap, subset);
+      Bitmap bottom = ExtractSubset(bitmap, subset);
 
-      auto bottomMatrix = scale_translate(1, deviceBounds.bottom - height, 0, height);
-      draw_bitmap_matrix(canvas.get(), bottom, bottomMatrix, paintColor);
+      auto bottomMatrix = ScaleTranslate(1, deviceBounds.bottom - height, 0, height);
+      DrawBitmapMatrix(canvas.get(), bottom, bottomMatrix, paintColor);
 
       if (tileModesX == TileMode::Mirror) {
         bottomMatrix.postScale(-1, 1);
         bottomMatrix.postTranslate(2 * width, 0);
-        draw_bitmap_matrix(canvas.get(), bottom, bottomMatrix, paintColor);
+        DrawBitmapMatrix(canvas.get(), bottom, bottomMatrix, paintColor);
       }
       patternBBox.bottom = deviceBounds.height();
     }

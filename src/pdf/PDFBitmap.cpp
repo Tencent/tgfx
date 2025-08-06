@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -43,9 +43,9 @@ namespace {
 enum class PDFStreamFormat { DCT, Flate, Uncompressed };
 
 template <typename T>
-void emit_image_stream(PDFDocument* doc, PDFIndirectReference ref, T writeStream, ISize size,
-                       PDFUnion&& colorSpace, PDFIndirectReference sMask, int length,
-                       PDFStreamFormat format) {
+void EmitImageStream(PDFDocument* doc, PDFIndirectReference ref, T writeStream, ISize size,
+                     PDFUnion&& colorSpace, PDFIndirectReference sMask, int length,
+                     PDFStreamFormat format) {
   auto pdfDict = PDFDictionary::Make("XObject");
   pdfDict->insertName("Subtype", "Image");
   pdfDict->insertInt("Width", size.width);
@@ -74,7 +74,7 @@ void emit_image_stream(PDFDocument* doc, PDFIndirectReference ref, T writeStream
   doc->emitStream(*pdfDict, std::move(writeStream), ref);
 }
 
-void fill_stream(WriteStream* out, char value, size_t n) {
+void FillStream(WriteStream* out, char value, size_t n) {
   char buffer[4096];
   memset(buffer, value, sizeof(buffer));
   for (size_t i = 0; i < n / sizeof(buffer); ++i) {
@@ -83,7 +83,7 @@ void fill_stream(WriteStream* out, char value, size_t n) {
   out->write(buffer, n % sizeof(buffer));
 }
 
-uint32_t get_neighbor_avg_color(const Pixmap& pixmap, int xOrig, int yOrig) {
+uint32_t GetNeighborAvgColor(const Pixmap& pixmap, int xOrig, int yOrig) {
   DEBUG_ASSERT(pixmap.colorType() == ColorType::BGRA_8888);
   unsigned r = 0;
   unsigned g = 0;
@@ -120,8 +120,8 @@ uint32_t get_neighbor_avg_color(const Pixmap& pixmap, int xOrig, int yOrig) {
   return 0x00000000;
 }
 
-bool do_jpeg(std::shared_ptr<Data> data, YUVColorSpace /*imageColorSpace*/, PDFDocument* doc,
-             ISize size, PDFIndirectReference ref) {
+bool DoJpeg(std::shared_ptr<Data> data, YUVColorSpace /*imageColorSpace*/, PDFDocument* doc,
+            ISize size, PDFIndirectReference ref) {
   if (!JpegCodec::IsJpeg(data)) {
     return false;
   }
@@ -131,12 +131,12 @@ bool do_jpeg(std::shared_ptr<Data> data, YUVColorSpace /*imageColorSpace*/, PDFD
   auto streamWriter = [&data](const std::shared_ptr<WriteStream>& stream) {
     stream->write(data->data(), data->size());
   };
-  emit_image_stream(doc, ref, streamWriter, jpegSize, std::move(colorSpace), PDFIndirectReference(),
-                    static_cast<int>(data->size()), PDFStreamFormat::DCT);
+  EmitImageStream(doc, ref, streamWriter, jpegSize, std::move(colorSpace), PDFIndirectReference(),
+                  static_cast<int>(data->size()), PDFStreamFormat::DCT);
   return true;
 }
 
-void do_deflated_alpha(const Pixmap& pixmap, PDFDocument* document, PDFIndirectReference ref) {
+void DoDeflatedAlpha(const Pixmap& pixmap, PDFDocument* document, PDFIndirectReference ref) {
   PDFMetadata::CompressionLevel compressionLevel = document->metadata().compressionLevel;
   PDFStreamFormat format = compressionLevel == PDFMetadata::CompressionLevel::None
                                ? PDFStreamFormat::Uncompressed
@@ -204,12 +204,12 @@ void do_deflated_alpha(const Pixmap& pixmap, PDFDocument* document, PDFIndirectR
     auto data = buffer->readData();
     stream->write(data->data(), data->size());
   };
-  emit_image_stream(document, ref, streamWriter, imageSize, PDFUnion::Name("DeviceGray"),
-                    PDFIndirectReference(), length, format);
+  EmitImageStream(document, ref, streamWriter, imageSize, PDFUnion::Name("DeviceGray"),
+                  PDFIndirectReference(), length, format);
 }
 
-void do_deflated_image(const Pixmap& pixmap, PDFDocument* document, bool isOpaque,
-                       PDFIndirectReference ref) {
+void DoDeflatedImage(const Pixmap& pixmap, PDFDocument* document, bool isOpaque,
+                     PDFIndirectReference ref) {
   PDFIndirectReference sMask;
   if (!isOpaque) {
     sMask = document->reserveRef();
@@ -232,8 +232,8 @@ void do_deflated_image(const Pixmap& pixmap, PDFDocument* document, bool isOpaqu
   switch (pixmap.colorType()) {
     case ColorType::ALPHA_8:
       // channels = 1;
-      fill_stream(stream, '\x00',
-                  static_cast<size_t>(pixmap.width()) * static_cast<size_t>(pixmap.height()));
+      FillStream(stream, '\x00',
+                 static_cast<size_t>(pixmap.width()) * static_cast<size_t>(pixmap.height()));
       break;
     case ColorType::Gray_8: {
       // channels = 1;
@@ -275,7 +275,7 @@ void do_deflated_image(const Pixmap& pixmap, PDFDocument* document, bool isOpaqu
         for (int x = 0; x < pixmap.width(); ++x) {
           uint32_t color = *scanline++;
           if ((((color) >> 24) & 0xFF) == 0x00) {
-            color = get_neighbor_avg_color(pixmap, x, y);
+            color = GetNeighborAvgColor(pixmap, x, y);
           }
           *bufferPointer++ = (((color) >> 16) & 0xFF);
           *bufferPointer++ = (((color) >> 8) & 0xFF);
@@ -299,11 +299,11 @@ void do_deflated_image(const Pixmap& pixmap, PDFDocument* document, bool isOpaqu
     auto data = buffer->readData();
     stream->write(data->data(), data->size());
   };
-  emit_image_stream(document, ref, streamWriter, imageSize, std::move(colorSpace), sMask, length,
-                    format);
+  EmitImageStream(document, ref, streamWriter, imageSize, std::move(colorSpace), sMask, length,
+                  format);
 
   if (!isOpaque) {
-    do_deflated_alpha(pixmap, document, sMask);
+    DoDeflatedAlpha(pixmap, document, sMask);
   }
 }
 
@@ -317,7 +317,7 @@ void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int /*encodi
   if (Types::Get(image.get()) == Types::ImageType::Codec) {
     const auto* codecImage = static_cast<CodecImage*>(image.get());
     if (auto data = codecImage->getCodec()->getEncodedData()) {
-      if (do_jpeg(std::move(data), YUVColorSpace::JPEG_FULL, doc, dimensions, ref)) {
+      if (DoJpeg(std::move(data), YUVColorSpace::JPEG_FULL, doc, dimensions, ref)) {
         return;
       }
     }
@@ -344,7 +344,7 @@ void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int /*encodi
     return;
   }
   auto pixmap = Pixmap(bitmap);
-  do_deflated_image(pixmap, doc, bitmap.isOpaque(), ref);
+  DoDeflatedImage(pixmap, doc, bitmap.isOpaque(), ref);
 }
 
 PDFIndirectReference PDFBitmap::Serialize(const std::shared_ptr<Image>& image,

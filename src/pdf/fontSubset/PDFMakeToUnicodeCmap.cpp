@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -26,7 +26,7 @@
 namespace tgfx {
 
 namespace {
-void append_tounicode_header(std::shared_ptr<MemoryWriteStream> cmap, bool multibyte) {
+void AppendToUnicodeHeader(const std::shared_ptr<MemoryWriteStream>& cmap, bool multibyte) {
   // 12 dict begin: 12 is an Adobe-suggested value. Shall not change.
   // It's there to prevent old version Adobe Readers from malfunctioning.
   const char* kHeader =
@@ -63,16 +63,15 @@ void append_tounicode_header(std::shared_ptr<MemoryWriteStream> cmap, bool multi
   cmap->writeText("endcodespacerange\n");
 }
 
-static void append_cmap_footer(std::shared_ptr<MemoryWriteStream> cmap) {
-  const char kFooter[] =
+void AppendCmapFooter(const std::shared_ptr<MemoryWriteStream>& cmap) {
+  const char footer[] =
       "endcmap\n"
       "CMapName currentdict /CMap defineresource pop\n"
       "end\n"
       "end";
-  cmap->writeText(kFooter);
+  cmap->writeText(footer);
 }
 
-namespace {
 struct BFChar {
   GlyphID fGlyphId;
   Unichar fUnicode;
@@ -83,27 +82,26 @@ struct BFRange {
   GlyphID fEnd;
   Unichar fUnicode;
 };
-}  // namespace
 
-void write_glyph(const std::shared_ptr<MemoryWriteStream>& cmap, bool multiByte, GlyphID gid) {
+void WriteGlyph(const std::shared_ptr<MemoryWriteStream>& cmap, bool multiByte, GlyphID glyphID) {
   if (multiByte) {
-    PDFUtils::WriteUInt16BE(cmap, gid);
+    PDFUtils::WriteUInt16BE(cmap, glyphID);
   } else {
-    PDFUtils::WriteUInt8(cmap, static_cast<uint8_t>(gid));
+    PDFUtils::WriteUInt8(cmap, static_cast<uint8_t>(glyphID));
   }
 }
 
-void append_bfchar_section(const std::vector<BFChar>& bfChar, bool multiByte,
-                           const std::shared_ptr<MemoryWriteStream>& cmap) {
+void AppendBFCharSection(const std::vector<BFChar>& bfChar, bool multiByte,
+                         const std::shared_ptr<MemoryWriteStream>& cmap) {
   // PDF spec defines that every bf* list can have at most 100 entries.
   for (size_t i = 0; i < bfChar.size(); i += 100) {
-    int count = static_cast<int>(bfChar.size() - i);
+    auto count = static_cast<int>(bfChar.size() - i);
     count = std::min(count, 100);
     cmap->writeText(std::to_string(count));
     cmap->writeText(" beginbfchar\n");
     for (size_t j = 0; j < static_cast<size_t>(count); ++j) {
       cmap->writeText("<");
-      write_glyph(cmap, multiByte, bfChar[i + j].fGlyphId);
+      WriteGlyph(cmap, multiByte, bfChar[i + j].fGlyphId);
       cmap->writeText("> <");
       PDFUtils::WriteUTF16beHex(cmap, bfChar[i + j].fUnicode);
       cmap->writeText(">\n");
@@ -112,8 +110,8 @@ void append_bfchar_section(const std::vector<BFChar>& bfChar, bool multiByte,
   }
 }
 
-void append_bfrange_section(const std::vector<BFRange>& bfRange, bool multiByte,
-                            const std::shared_ptr<MemoryWriteStream>& cmap) {
+void AppendBFRangeSection(const std::vector<BFRange>& bfRange, bool multiByte,
+                          const std::shared_ptr<MemoryWriteStream>& cmap) {
   // PDF spec defines that every bf* list can have at most 100 entries.
   for (size_t i = 0; i < bfRange.size(); i += 100) {
     int count = static_cast<int>(bfRange.size() - i);
@@ -122,9 +120,9 @@ void append_bfrange_section(const std::vector<BFRange>& bfRange, bool multiByte,
     cmap->writeText(" beginbfrange\n");
     for (size_t j = 0; j < static_cast<size_t>(count); ++j) {
       cmap->writeText("<");
-      write_glyph(cmap, multiByte, bfRange[i + j].fStart);
+      WriteGlyph(cmap, multiByte, bfRange[i + j].fStart);
       cmap->writeText("> <");
-      write_glyph(cmap, multiByte, bfRange[i + j].fEnd);
+      WriteGlyph(cmap, multiByte, bfRange[i + j].fEnd);
       cmap->writeText("> <");
       PDFUtils::WriteUTF16beHex(cmap, bfRange[i + j].fUnicode);
       cmap->writeText(">\n");
@@ -159,9 +157,9 @@ void append_bfrange_section(const std::vector<BFRange>& bfRange, bool multiByte,
 // For the worst case (having 65536 continuous unicode and we use every other
 // one of them), the possible savings by aggressive optimization is 416KB
 // pre-compressed and does not provide enough motivation for implementation.
-void append_cmap_sections(const Unichar* glyphToUnicode, const PDFGlyphUse* subset,
-                          const std::shared_ptr<MemoryWriteStream>& cmap, bool multiByteGlyphs,
-                          GlyphID firstGlyphID, GlyphID lastGlyphID) {
+void AppendCmapSections(const Unichar* glyphToUnicode, const PDFGlyphUse* subset,
+                        const std::shared_ptr<MemoryWriteStream>& cmap, bool multiByteGlyphs,
+                        GlyphID firstGlyphID, GlyphID lastGlyphID) {
   int glyphOffset = 0;
   if (!multiByteGlyphs) {
     glyphOffset = firstGlyphID - 1;
@@ -172,7 +170,7 @@ void append_cmap_sections(const Unichar* glyphToUnicode, const PDFGlyphUse* subs
 
   BFRange currentRangeEntry = {0, 0, 0};
   bool rangeEmpty = true;
-  const int limit = static_cast<int>(lastGlyphID) + 1 - glyphOffset;
+  const auto limit = static_cast<int>(lastGlyphID) + 1 - glyphOffset;
 
   for (int i = firstGlyphID - glyphOffset; i < limit + 1; ++i) {
     auto glyphID = static_cast<GlyphID>(i + glyphOffset);
@@ -205,8 +203,8 @@ void append_cmap_sections(const Unichar* glyphToUnicode, const PDFGlyphUse* subs
 
   // The spec requires all bfchar entries for a font must come before bfrange
   // entries.
-  append_bfchar_section(bfcharEntries, multiByteGlyphs, cmap);
-  append_bfrange_section(bfrangeEntries, multiByteGlyphs, cmap);
+  AppendBFCharSection(bfcharEntries, multiByteGlyphs, cmap);
+  AppendBFRangeSection(bfrangeEntries, multiByteGlyphs, cmap);
 }
 }  // namespace
 
@@ -214,9 +212,9 @@ std::unique_ptr<Stream> PDFMakeToUnicodeCmap(const Unichar* glyphToUnicode,
                                              const PDFGlyphUse* subset, bool multiByteGlyphs,
                                              GlyphID firstGlyphID, GlyphID lastGlyphID) {
   auto cmap = MemoryWriteStream::Make();
-  append_tounicode_header(cmap, multiByteGlyphs);
-  append_cmap_sections(glyphToUnicode, subset, cmap, multiByteGlyphs, firstGlyphID, lastGlyphID);
-  append_cmap_footer(cmap);
+  AppendToUnicodeHeader(cmap, multiByteGlyphs);
+  AppendCmapSections(glyphToUnicode, subset, cmap, multiByteGlyphs, firstGlyphID, lastGlyphID);
+  AppendCmapFooter(cmap);
   return Stream::MakeFromData(cmap->readData());
 }
 

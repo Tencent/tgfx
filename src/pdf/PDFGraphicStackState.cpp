@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -29,7 +29,7 @@
 namespace tgfx {
 
 namespace {
-void emit_pdf_color(Color color, const std::shared_ptr<WriteStream>& result) {
+void EmitPDFColor(Color color, const std::shared_ptr<WriteStream>& result) {
   DEBUG_ASSERT(color.alpha == 1);  // We handle alpha elsewhere.
   PDFUtils::AppendColorComponent(color.red, result);
   result->writeText(" ");
@@ -39,7 +39,7 @@ void emit_pdf_color(Color color, const std::shared_ptr<WriteStream>& result) {
   result->writeText(" ");
 }
 
-void append_clip(const MCState& state, const std::shared_ptr<MemoryWriteStream>& stream) {
+void AppendClip(const MCState& state, const std::shared_ptr<MemoryWriteStream>& stream) {
   if (state.clip.isRect()) {
     auto bound = state.clip.getBounds();
     PDFUtils::AppendRectangle(bound, stream);
@@ -76,7 +76,7 @@ void PDFGraphicStackState::updateClip(const MCState& state) {
 
   push();
   this->currentEntry()->state = state;
-  append_clip(state, contentStream);
+  AppendClip(state, contentStream);
 }
 
 void PDFGraphicStackState::updateMatrix(const Matrix& matrix) {
@@ -112,9 +112,9 @@ void PDFGraphicStackState::updateDrawingState(const PDFGraphicStackState::Entry&
       currentEntry()->shaderIndex = state.shaderIndex;
     }
   } else if (state.color != currentEntry()->color || currentEntry()->shaderIndex >= 0) {
-    emit_pdf_color(state.color, contentStream);
+    EmitPDFColor(state.color, contentStream);
     contentStream->writeText("RG ");
-    emit_pdf_color(state.color, contentStream);
+    EmitPDFColor(state.color, contentStream);
     contentStream->writeText("rg\n");
     currentEntry()->color = state.color;
     currentEntry()->shaderIndex = -1;
