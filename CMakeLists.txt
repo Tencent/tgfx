@@ -611,13 +611,6 @@ if(TGFX_BUILD_VCPKG)
         )
         list(APPEND TGFX_STATIC_LIBS ${EXPAT_LIB})
     endif ()
-
-    find_library(LZ4_LIB 
-        NAMES lz4 liblz4 lz4d liblz4d
-        PATHS ${VCPKG_LIB_DIR}
-        NO_DEFAULT_PATH
-    )
-    list(APPEND TGFX_STATIC_LIBS ${LZ4_LIB})
     
     find_package(unofficial-concurrentqueue CONFIG REQUIRED)
     list(APPEND TGFX_INCLUDES ${VCPKG_INCLUDE_DIR}/concurrentqueue)
