@@ -24,10 +24,8 @@
 namespace tgfx {
 class ScaledImage : public TransformImage {
  public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> image, int width, int height,
-                                         const SamplingOptions& sampling);
-
-  ScaledImage(std::shared_ptr<Image> image, int width, int height, const SamplingOptions& sampling);
+  ScaledImage(std::shared_ptr<Image> image, int width, int height, const SamplingOptions& sampling,
+              bool mipmapped);
 
   ~ScaledImage() override = default;
 
@@ -37,6 +35,10 @@ class ScaledImage : public TransformImage {
 
   int height() const override {
     return _height;
+  }
+
+  bool hasMipmaps() const override {
+    return mipmapped;
   }
 
  protected:
@@ -53,6 +55,8 @@ class ScaledImage : public TransformImage {
   std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
                                       const SamplingOptions& sampling) const override;
 
+  std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
+
   std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
 
  private:
@@ -61,5 +65,6 @@ class ScaledImage : public TransformImage {
   int _width = 0;
   int _height = 0;
   SamplingOptions sampling = {};
+  bool mipmapped = false;
 };
 }  // namespace tgfx

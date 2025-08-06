@@ -115,13 +115,9 @@ void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> 
   renderTasks.emplace_back(std::move(task));
 }
 
-void DrawingManager::addResourceTask(PlacementPtr<ResourceTask> resourceTask,
-                                     const UniqueKey& uniqueKey, uint32_t renderFlags) {
+void DrawingManager::addResourceTask(PlacementPtr<ResourceTask> resourceTask) {
   if (resourceTask == nullptr) {
     return;
-  }
-  if (!uniqueKey.empty() && !(renderFlags & RenderFlags::DisableCache)) {
-    resourceTask->uniqueKey = uniqueKey;
   }
   resourceTasks.emplace_back(std::move(resourceTask));
 }

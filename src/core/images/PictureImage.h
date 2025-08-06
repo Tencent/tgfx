@@ -48,11 +48,6 @@ class PictureImage : public Image {
     return mipmapped;
   }
 
-  std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
-
-  std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
-                                      const SamplingOptions& sampling) const override;
-
   std::shared_ptr<Picture> picture = nullptr;
   Matrix* matrix = nullptr;
 
@@ -60,6 +55,11 @@ class PictureImage : public Image {
   Type type() const override {
     return Type::Picture;
   }
+
+  std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
+                                      const SamplingOptions& sampling) const override;
+
+  std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                       const SamplingArgs& samplingArgs,

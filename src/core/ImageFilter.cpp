@@ -51,7 +51,7 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
 
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(scaledBounds.width()), static_cast<int>(scaledBounds.height()),
-      source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
+      source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
   if (renderTarget == nullptr) {
     return nullptr;
   }

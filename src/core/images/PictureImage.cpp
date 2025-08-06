@@ -61,19 +61,19 @@ PictureImage::~PictureImage() {
   delete matrix;
 }
 
-std::shared_ptr<Image> PictureImage::onMakeMipmapped(bool enabled) const {
-  auto newImage = std::make_shared<PictureImage>(picture, _width, _height, matrix, enabled);
-  newImage->weakThis = newImage;
-  return newImage;
-}
-
 std::shared_ptr<Image> PictureImage::onMakeScaled(int newWidth, int newHeight,
                                                   const SamplingOptions&) const {
-  auto newMatrix = *matrix;
+  auto newMatrix = matrix != nullptr ? *matrix : Matrix::I();
   newMatrix.postScale(static_cast<float>(newWidth) / static_cast<float>(_width),
                       static_cast<float>(newHeight) / static_cast<float>(_height));
   auto newImage =
       std::make_shared<PictureImage>(picture, newWidth, newHeight, &newMatrix, mipmapped);
+  newImage->weakThis = newImage;
+  return newImage;
+}
+
+std::shared_ptr<Image> PictureImage::onMakeMipmapped(bool enabled) const {
+  auto newImage = std::make_shared<PictureImage>(picture, _width, _height, matrix, enabled);
   newImage->weakThis = newImage;
   return newImage;
 }
@@ -124,7 +124,7 @@ std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args)
   }
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, textureWidth, textureHeight, isAlphaOnly(), 1, hasMipmaps() && args.mipmapped,
-      ImageOrigin::TopLeft, BackingFit::Approx);
+      ImageOrigin::TopLeft, args.backingFit);
   if (renderTarget == nullptr) {
     return nullptr;
   }

@@ -18,44 +18,25 @@
 
 #pragma once
 
-#include "core/images/ResourceImage.h"
+#include "tgfx/core/Image.h"
 
 namespace tgfx {
-class MipmapImage : public ResourceImage {
- public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ResourceImage> source);
-
-  int width() const override {
-    return source->width();
-  }
-
-  int height() const override {
-    return source->height();
-  }
-
-  bool isAlphaOnly() const override {
-    return source->isAlphaOnly();
-  }
-
-  bool hasMipmaps() const override {
-    return true;
+/**
+ * The base class for all images that are directly backed by a block of pixels and can lock a
+ * texture proxy.
+ */
+class PixelImage : public Image {
+  bool hasMipmaps() const final {
+    return mipmapped;
   }
 
  protected:
-  Type type() const override {
-    return Type::Mipmap;
+  explicit PixelImage(bool mipmapped) : mipmapped(mipmapped) {
   }
 
-  std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
-
-  std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
-
-  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
-                                                   const UniqueKey& key) const override;
-
- private:
-  std::shared_ptr<ResourceImage> source = nullptr;
-
-  MipmapImage(UniqueKey uniqueKey, std::shared_ptr<ResourceImage> source);
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
+                                                      const SamplingArgs& samplingArgs,
+                                                      const Matrix* uvMatrix) const override;
+  bool mipmapped = false;
 };
 }  // namespace tgfx
