@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Image.h"
+#include <memory>
 #include "core/images/CodecImage.h"
 #include "core/images/FilterImage.h"
 #include "core/images/OrientImage.h"
@@ -188,8 +189,7 @@ std::shared_ptr<Image> Image::makeScaled(int newWidth, int newHeight,
 }
 
 std::shared_ptr<Image> Image::makeRasterized() const {
-  auto result =
-      std::shared_ptr<RasterizedImage>(new RasterizedImage(UniqueKey::Make(), weakThis.lock()));
+  auto result = std::make_shared<RasterizedImage>(UniqueKey::Make(), weakThis.lock());
   result->weakThis = result;
   return result;
 }
