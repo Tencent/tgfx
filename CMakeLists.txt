@@ -548,8 +548,7 @@ if(TGFX_BUILD_VCPKG)
     find_package(lz4 CONFIG REQUIRED)
     list(APPEND TGFX_SHARED_LIBS lz4::lz4)
     
-    # concurrentqueue 是 header-only 库，通过 vcpkg 安装后直接可用
-    find_package(concurrentqueue REQUIRED)
+    find_package(unofficial-concurrentqueue CONFIG REQUIRED)
 endif()
 
 add_vendor_target(tgfx-vendor STATIC_VENDORS ${TGFX_STATIC_VENDORS} SHARED_VENDORS ${TGFX_SHARED_VENDORS})
