@@ -17,9 +17,17 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import "TGFXView.h"
+#import <QuartzCore/CADisplayLink.h>
 #include <cmath>
 #include "drawers/Drawer.h"
 #include "tgfx/core/Point.h"
+
+static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, const CVTimeStamp*,
+                                      CVOptionFlags, CVOptionFlags*, void* userInfo) {
+  TGFXView* view = (__bridge TGFXView*)userInfo;
+  [view draw];
+  return kCVReturnSuccess;
+}
 
 @implementation TGFXView {
   std::shared_ptr<tgfx::CGLWindow> tgfxWindow;
@@ -64,16 +72,67 @@
   auto sizeChanged = appHost->updateScreen(width, height, contentScale);
   if (sizeChanged && tgfxWindow != nullptr) {
     tgfxWindow->invalidSize();
+    [self draw];
   }
 }
 
 - (void)viewDidMoveToWindow {
   [super viewDidMoveToWindow];
+  self.drawIndex = 0;
+  self.zoomScale = 1.0f;
+  self.contentOffset = CGPointZero;
   [self.window makeFirstResponder:self];
+
+  if (@available(macOS 14, *)) {
+    self.caDisplayLink = [self displayLinkWithTarget:self selector:@selector(draw)];
+  } else {
+    CVDisplayLinkCreateWithActiveCGDisplays(&_cvDisplayLink);
+    CVDisplayLinkSetOutputCallback(_cvDisplayLink, &OnDisplayLinkCallback, (__bridge void*)self);
+  }
+
   [self updateSize];
 }
 
-- (void)draw:(int)index zoom:(float)zoom offset:(CGPoint)offset {
+- (void)startDisplayLink {
+  if (@available(macOS 14, *)) {
+    if (self.caDisplayLink) {
+      [self.caDisplayLink addToRunLoop:[NSRunLoop currentRunLoop] forMode:NSRunLoopCommonModes];
+    }
+  } else {
+    if (self.cvDisplayLink) {
+      CVDisplayLinkStart(self.cvDisplayLink);
+    }
+  }
+}
+
+- (void)stopDisplayLink {
+  if (@available(macOS 14, *)) {
+    if (self.caDisplayLink) {
+      [self.caDisplayLink removeFromRunLoop:[NSRunLoop currentRunLoop]
+                                    forMode:NSRunLoopCommonModes];
+    }
+  } else {
+    if (self.cvDisplayLink) {
+      CVDisplayLinkStop(self.cvDisplayLink);
+    }
+  }
+}
+
+- (void)dealloc {
+  if (@available(macOS 14, *)) {
+    if (self.caDisplayLink) {
+      [self.caDisplayLink invalidate];
+      self.caDisplayLink = nil;
+    }
+  } else {
+    if (self.cvDisplayLink) {
+      CVDisplayLinkStop(self.cvDisplayLink);
+      CVDisplayLinkRelease(self.cvDisplayLink);
+    }
+  }
+}
+
+- (void)draw {
   if (self.window == nil) {
     return;
   }
@@ -96,11 +155,12 @@
     device->unlock();
     return;
   }
-  appHost->updateZoomAndOffset(zoom, tgfx::Point(offset.x, offset.y));
+  appHost->updateZoomAndOffset(self.zoomScale,
+                               tgfx::Point(self.contentOffset.x, self.contentOffset.y));
   auto canvas = surface->getCanvas();
   canvas->clear();
   auto numDrawers = drawers::Drawer::Count() - 1;
-  index = (index % numDrawers) + 1;
+  int index = (self.drawIndex % numDrawers) + 1;
   auto drawer = drawers::Drawer::GetByName("GridBackground");
   drawer->draw(canvas, appHost.get());
   drawer = drawers::Drawer::GetByIndex(index);

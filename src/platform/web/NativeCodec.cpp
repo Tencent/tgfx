@@ -103,8 +103,9 @@ bool NativeCodec::asyncSupport() const {
   return false;
 }
 
-bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
-  if (dstInfo.isEmpty() || dstPixels == nullptr) {
+bool NativeCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                               void* dstPixels) const {
+  if (dstPixels == nullptr) {
     return false;
   }
   auto image = nativeImage;
@@ -115,12 +116,13 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   }
 
   auto data = val::module_property("tgfx").call<val>(
-      "readImagePixels", val::module_property("module"), image, dstInfo.width(), dstInfo.height());
+      "readImagePixels", val::module_property("module"), image, width(), height());
   auto imageData = CopyDataFromUint8Array(data);
   if (imageData == nullptr) {
     return false;
   }
   auto info = ImageInfo::Make(width(), height(), ColorType::RGBA_8888, AlphaType::Unpremultiplied);
+  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
   Pixmap pixmap(info, imageData->data());
   auto result = pixmap.readPixels(dstInfo, dstPixels);
   return result;

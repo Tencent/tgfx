@@ -24,12 +24,8 @@ namespace tgfx {
 ResourceImage::ResourceImage(UniqueKey uniqueKey) : uniqueKey(std::move(uniqueKey)) {
 }
 
-std::shared_ptr<Image> ResourceImage::makeRasterized(float rasterizationScale,
-                                                     const SamplingOptions& sampling) const {
-  if (rasterizationScale == 1.0f) {
-    return weakThis.lock();
-  }
-  return Image::makeRasterized(rasterizationScale, sampling);
+std::shared_ptr<Image> ResourceImage::makeRasterized() const {
+  return std::static_pointer_cast<Image>(weakThis.lock());
 }
 
 std::shared_ptr<TextureProxy> ResourceImage::lockTextureProxy(const TPArgs& args) const {
@@ -44,11 +40,16 @@ std::shared_ptr<Image> ResourceImage::onMakeMipmapped(bool enabled) const {
   return enabled ? MipmapImage::MakeFrom(std::move(source)) : source;
 }
 
+std::shared_ptr<Image> ResourceImage::onMakeScaled(int newWidth, int newHeight,
+                                                   const SamplingOptions& sampling) const {
+  auto result = Image::onMakeScaled(newWidth, newHeight, sampling);
+  return result->makeRasterized();
+}
+
 PlacementPtr<FragmentProcessor> ResourceImage::asFragmentProcessor(const FPArgs& args,
                                                                    const SamplingArgs& samplingArgs,
                                                                    const Matrix* uvMatrix) const {
-
-  TPArgs tpArgs(args.context, args.renderFlags, hasMipmaps());
+  TPArgs tpArgs(args.context, args.renderFlags, hasMipmaps(), 1.0f, {});
   auto proxy = onLockTextureProxy(tpArgs, uniqueKey);
   return TiledTextureEffect::Make(std::move(proxy), samplingArgs, uvMatrix, isAlphaOnly());
 }

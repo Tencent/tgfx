@@ -21,7 +21,8 @@
 #include <optional>
 #include "DrawOp.h"
 #include "gpu/RRectsVertexProvider.h"
-#include "gpu/proxies/VertexBufferProxy.h"
+#include "gpu/proxies/IndexBufferProxy.h"
+#include "gpu/proxies/VertexBufferProxyView.h"
 
 namespace tgfx {
 class RRectDrawOp : public DrawOp {
@@ -30,6 +31,16 @@ class RRectDrawOp : public DrawOp {
    * The maximum number of round rects that can be drawn in a single draw call.
    */
   static constexpr uint16_t MaxNumRRects = 1024;
+
+  /**
+   * The maximum number of vertices per fill round rect.
+   */
+  static constexpr uint16_t IndicesPerFillRRect = 54;
+
+  /**
+   * The maximum number of vertices per stroke round rect.
+   */
+  static constexpr uint16_t IndicesPerStrokeRRect = 48;
 
   /**
    * Create a new RRectDrawOp for a list of RRect records. Note that the returned RRectDrawOp is in
@@ -46,8 +57,8 @@ class RRectDrawOp : public DrawOp {
   bool useScale = false;
   bool hasStroke = false;
   std::optional<Color> commonColor = std::nullopt;
-  std::shared_ptr<GpuBufferProxy> indexBufferProxy = nullptr;
-  std::shared_ptr<VertexBufferProxy> vertexBufferProxy = nullptr;
+  std::shared_ptr<IndexBufferProxy> indexBufferProxy = nullptr;
+  std::shared_ptr<VertexBufferProxyView> vertexBufferProxyView = nullptr;
 
   explicit RRectDrawOp(RRectsVertexProvider* provider);
 

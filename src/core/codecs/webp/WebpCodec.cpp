@@ -64,8 +64,9 @@ static WEBP_CSP_MODE webp_decode_mode(ColorType dstCT, bool premultiply) {
   }
 }
 
-bool WebpCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
-  if (dstPixels == nullptr || dstInfo.isEmpty()) {
+bool WebpCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                             void* dstPixels) const {
+  if (dstPixels == nullptr) {
     return false;
   }
   auto byteData = fileData;
@@ -76,17 +77,18 @@ bool WebpCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     return false;
   }
   WebPDecoderConfig config;
-  if (!WebPInitDecoderConfig(&config)) return false;
+  if (!WebPInitDecoderConfig(&config)) {
+    return false;
+  }
   if (WebPGetFeatures(byteData->bytes(), byteData->size(), &config.input) != VP8_STATUS_OK) {
     return false;
   }
   config.output.is_external_memory = 1;
-  config.output.colorspace =
-      webp_decode_mode(dstInfo.colorType(), dstInfo.alphaType() == AlphaType::Premultiplied);
+  config.output.colorspace = webp_decode_mode(colorType, alphaType == AlphaType::Premultiplied);
   bool decodeSuccess = true;
   if (config.output.colorspace == MODE_LAST) {
     // decode to RGBA_8888
-    auto info = dstInfo.makeColorType(ColorType::RGBA_8888);
+    auto info = ImageInfo::Make(width(), height(), ColorType::RGBA_8888, alphaType);
     config.output.colorspace =
         webp_decode_mode(info.colorType(), info.alphaType() == AlphaType::Premultiplied);
     config.output.u.RGBA.stride = static_cast<int>(info.rowBytes());
@@ -98,13 +100,14 @@ bool WebpCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
       decodeSuccess = WebPDecode(byteData->bytes(), byteData->size(), &config) == VP8_STATUS_OK;
       if (decodeSuccess) {
         Pixmap pixmap(info, pixels);
+        auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
         decodeSuccess = pixmap.readPixels(dstInfo, dstPixels);
       }
     }
   } else {
     config.output.u.RGBA.rgba = reinterpret_cast<uint8_t*>(dstPixels);
-    config.output.u.RGBA.stride = static_cast<int>(dstInfo.rowBytes());
-    config.output.u.RGBA.size = dstInfo.byteSize();
+    config.output.u.RGBA.stride = static_cast<int>(dstRowBytes);
+    config.output.u.RGBA.size = dstRowBytes * static_cast<size_t>(height());
     auto code = WebPDecode(byteData->bytes(), byteData->size(), &config);
     decodeSuccess = (code == VP8_STATUS_OK);
   }

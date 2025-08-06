@@ -122,8 +122,6 @@ std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_
   if (lastRenderTarget == nullptr) {
     return nullptr;
   }
-  auto drawRect = Rect::MakeWH(lastRenderTarget->width(), lastRenderTarget->height());
-  FPArgs fpArgs(args.context, args.renderFlags, drawRect);
 
   // Calculate the bounds of the filter after scaling.
   // `boundsWillSample` will determine the size of the texture after the first downsample.
@@ -134,23 +132,18 @@ std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_
   auto filterOriginBounds = filterBounds(Rect::MakeWH(source->width(), source->height()));
   boundsWillSample.intersect(filterOriginBounds);
 
-  // sampleOffset means the offset between the source bounds and the sample bounds.
-  auto sampleOffset = Point::Make(boundsWillSample.left, boundsWillSample.top);
-  boundsWillSample.scale(scaleFactor, scaleFactor);
-
   std::vector<std::shared_ptr<RenderTargetProxy>> renderTargets = {};
   // calculate the size of the source image of the first downsample
-  auto textureSize = Size::Make(boundsWillSample.width(), boundsWillSample.height());
-  // scale the source image to smaller size
-  auto uvMatrix = Matrix::MakeScale(1 / (downScaling * scaleFactor));
-  // calculate the uv matrix of the first downsample. Add sampleOffset to get the sample texture.
-  uvMatrix.preTranslate(sampleOffset.x * scaleFactor * downScaling,
-                        sampleOffset.y * scaleFactor * downScaling);
-  // SamplingOptions sampling(FilterMode::Linear, MipmapMode::None);
-  SamplingOptions sampling(FilterMode::Linear, MipmapMode::None);
-  auto sourceProcessor = FragmentProcessor::Make(source, fpArgs, tileMode, tileMode, sampling,
-                                                 SrcRectConstraint::Fast, &uvMatrix);
-  SamplingArgs samplingArgs = {TileMode::Clamp, TileMode::Clamp, sampling, SrcRectConstraint::Fast};
+  auto textureSize =
+      Size::Make(boundsWillSample.width() * scaleFactor, boundsWillSample.height() * scaleFactor);
+
+  auto sourceProcessor =
+      getSourceFragmentProcessor(source, args.context, args.renderFlags, boundsWillSample,
+                                 Point::Make(scaleFactor * downScaling, scaleFactor * downScaling));
+
+  SamplingArgs samplingArgs = {TileMode::Decal, TileMode::Decal, {}, SrcRectConstraint::Fast};
+
+  Matrix uvMatrix = Matrix::I();
   // downsample
   for (int i = 0; i < iteration; ++i) {
     renderTargets.push_back(lastRenderTarget);
@@ -183,10 +176,11 @@ std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_
       // At the last iteration, we need to calculate the clip bounds of the filter.
       // Subtract sampleOffset means to convert sample bounds to origin bounds.
       // Add offset of clipBounds to apply clipBounds.
-      uvMatrix = Matrix::MakeScale(textureSize.width / boundsWillSample.width(),
-                                   textureSize.height / boundsWillSample.height());
+      uvMatrix = Matrix::MakeScale(textureSize.width / (boundsWillSample.width() * scaleFactor),
+                                   textureSize.height / (boundsWillSample.height() * scaleFactor));
       uvMatrix.preScale(scaleFactor, scaleFactor);
-      uvMatrix.preTranslate(clipBounds.left - sampleOffset.x, clipBounds.top - sampleOffset.y);
+      uvMatrix.preTranslate(clipBounds.left - boundsWillSample.left,
+                            clipBounds.top - boundsWillSample.top);
       upSampleScale /= scaleFactor;
     } else {
       // at other iterations, we upscale only

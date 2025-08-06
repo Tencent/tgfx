@@ -17,23 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RenderPass.h"
-#include "gpu/Gpu.h"
+#include "gpu/GPU.h"
 
 namespace tgfx {
-bool RenderPass::begin(std::shared_ptr<RenderTarget> renderTarget) {
-  if (renderTarget == nullptr) {
-    return false;
-  }
-  _renderTarget = std::move(renderTarget);
-  drawPipelineStatus = DrawPipelineStatus::NotConfigured;
-  onBindRenderTarget();
-  return true;
-}
-
 void RenderPass::end() {
-  onUnbindRenderTarget();
-  _renderTarget = nullptr;
-  _program = nullptr;
+  onEnd();
+  isEnd = true;
+  renderTarget = nullptr;
+  program = nullptr;
 }
 
 void RenderPass::bindProgramAndScissorClip(const Pipeline* pipeline, const Rect& scissorRect) {
@@ -44,12 +35,12 @@ void RenderPass::bindProgramAndScissorClip(const Pipeline* pipeline, const Rect&
   drawPipelineStatus = DrawPipelineStatus::Ok;
 }
 
-void RenderPass::bindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
-                             std::shared_ptr<GpuBuffer> vertexBuffer, size_t vertexOffset) {
+void RenderPass::bindBuffers(const GPUBuffer* indexBuffer, const GPUBuffer* vertexBuffer,
+                             size_t vertexOffset) {
   if (drawPipelineStatus != DrawPipelineStatus::Ok) {
     return;
   }
-  if (!onBindBuffers(std::move(indexBuffer), std::move(vertexBuffer), vertexOffset)) {
+  if (!onBindBuffers(indexBuffer, vertexBuffer, vertexOffset)) {
     drawPipelineStatus = DrawPipelineStatus::FailedToBind;
   }
 }
@@ -73,18 +64,5 @@ void RenderPass::drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size
 void RenderPass::clear(const Rect& scissor, Color color) {
   drawPipelineStatus = DrawPipelineStatus::NotConfigured;
   onClear(scissor, color);
-}
-
-void RenderPass::resolve(const Rect& bounds) {
-  auto gpu = context->gpu();
-  gpu->resolveRenderTarget(_renderTarget.get(), bounds);
-  // Reset the render target after the resolve operation.
-  onBindRenderTarget();
-  drawPipelineStatus = DrawPipelineStatus::NotConfigured;
-}
-
-void RenderPass::copyToTexture(Texture* texture, int srcX, int srcY) {
-  onCopyToTexture(texture, srcX, srcY);
-  drawPipelineStatus = DrawPipelineStatus::NotConfigured;
 }
 }  // namespace tgfx

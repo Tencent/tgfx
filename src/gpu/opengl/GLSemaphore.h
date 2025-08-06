@@ -26,11 +26,19 @@ namespace tgfx {
  */
 class GLSemaphore : public Semaphore {
  public:
-  /**
-   * Holds the GLsync as a void*.
-   */
-  void* glSync = nullptr;
+  explicit GLSemaphore(void* glSync) : _glSync(glSync) {
+  }
+
+  void* glSync() const {
+    return _glSync;
+  }
 
   BackendSemaphore getBackendSemaphore() const override;
+
+ protected:
+  void onReleaseGPU() override;
+
+ private:
+  void* _glSync = nullptr;
 };
 }  // namespace tgfx

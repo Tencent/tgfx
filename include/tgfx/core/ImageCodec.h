@@ -85,12 +85,12 @@ class ImageCodec : public ImageGenerator {
   }
 
   /**
-   * Decodes the image with the specified image info into the given pixels. Returns true if the
-   * decoding was successful. Note that we do not recommend calling this method due to performance
-   * reasons, especially on the web platform. Use the makeBuffer() method for better performance if
-   * your final goal is to draw the image.
-   */
-  virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const = 0;
+  * Decodes the image into the given pixel buffer using the specified image info. If the size
+  * in dstInfo differs from the codec's size, this method will attempt to downscale the image
+  * using a box filter algorithm to fit dstInfo. Only downscaling is supported. Returns true
+  * if decoding succeeds, false otherwise.
+  */
+  virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const;
 
  protected:
   ImageCodec(int width, int height, Orientation orientation = Orientation::TopLeft)
@@ -98,6 +98,9 @@ class ImageCodec : public ImageGenerator {
   }
 
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
+
+  virtual bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                            void* dstPixels) const = 0;
 
   virtual std::shared_ptr<Data> getEncodedData() const {
     return nullptr;

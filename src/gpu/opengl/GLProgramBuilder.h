@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "GLContext.h"
 #include "GLFragmentShaderBuilder.h"
 #include "GLProgram.h"
 #include "GLUniformHandler.h"
@@ -44,8 +43,6 @@ class GLProgramBuilder : public ProgramBuilder {
   std::unique_ptr<GLProgram> finalize();
 
   void resolveProgramResourceLocations(unsigned programID);
-
-  std::unique_ptr<GLProgram> createProgram(unsigned programID);
 
   UniformHandler* uniformHandler() override {
     return &_uniformHandler;
