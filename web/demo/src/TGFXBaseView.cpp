@@ -40,10 +40,10 @@ void TGFXBaseView::updateSize(float devicePixelRatio) {
   }
 }
 
-void TGFXBaseView::setImagePath(const std::string& imagePath) {
+void TGFXBaseView::setImagePath(const std::string& name, const std::string& imagePath) {
   auto image = tgfx::Image::MakeFromFile(imagePath.c_str());
   if (image) {
-    appHost->addImage("bridge", std::move(image));
+    appHost->addImage(name, std::move(image));
   }
 }
 
@@ -67,15 +67,14 @@ bool TGFXBaseView::draw(int drawIndex, float zoom, float offsetX, float offsetY)
     device->unlock();
     return true;
   }
-  appHost->updateZoomAndOffset(zoom, tgfx::Point(offsetX, offsetY));
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto numDrawers = drawers::Drawer::Count() - 1;
-  auto index = (drawIndex % numDrawers) + 1;
-  auto drawer = drawers::Drawer::GetByName("GridBackground");
-  drawer->draw(canvas, appHost.get());
-  drawer = drawers::Drawer::GetByIndex(index);
-  drawer->draw(canvas, appHost.get());
+  drawers::Drawer::DrawBackground(canvas, appHost.get());
+  auto drawer = drawers::Drawer::GetByIndex(drawIndex % drawers::Drawer::Count());
+  drawer->displayList.setZoomScale(zoom);
+  drawer->displayList.setContentOffset(offsetX, offsetY);
+  drawer->build(appHost.get());
+  drawer->displayList.render(canvas->getSurface(), false);
   context->flushAndSubmit();
   window->present(context);
   device->unlock();

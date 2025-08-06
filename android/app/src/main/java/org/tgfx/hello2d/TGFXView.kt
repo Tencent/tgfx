@@ -53,13 +53,18 @@ open class TGFXView : TextureView, TextureView.SurfaceTextureListener {
 
     override fun onSurfaceTextureAvailable(p0: SurfaceTexture, p1: Int, p2: Int) {
         release()
-        val stream: InputStream = context.assets.open("bridge.jpg")
-        val imageBytes: ByteArray = ByteArray(stream.available())
-        stream.read(imageBytes)
-        stream.close();
+        val imageList = listOf("bridge.jpg", "tgfx.png")
+        val imageBytesList = mutableListOf<ByteArray>()
+        for (imageName in imageList) {
+            val stream: InputStream = context.assets.open(imageName)
+            val imageBytes: ByteArray = ByteArray(stream.available())
+            stream.read(imageBytes)
+            stream.close()
+            imageBytesList.add(imageBytes)
+        }
         val metrics = resources.displayMetrics
         surface = Surface(p0)
-        nativePtr = setupFromSurface(surface!!, imageBytes, metrics.density)
+        nativePtr = setupFromSurface(surface!!, imageBytesList, metrics.density)
     }
 
     override fun onSurfaceTextureSizeChanged(p0: SurfaceTexture, p1: Int, p2: Int) {
@@ -99,7 +104,7 @@ open class TGFXView : TextureView, TextureView.SurfaceTextureListener {
         private external fun nativeInit()
 
         private external fun setupFromSurface(
-            surface: Surface, imageBytes: ByteArray,
+            surface: Surface, imageBytesArray: ObjectArray,
             density: Float
         ): Long
 

@@ -28,9 +28,9 @@ void GridBackgroundLayer::onUpdateContent(tgfx::LayerRecorder* recorder) {
   tgfx::Paint paint = {};
   paint.setColor(tgfx::Color{0.8f, 0.8f, 0.8f, 1.f});
   int tileSize = 8 * static_cast<int>(_density);
-  for (int y = 0; y < _height; y += tileSize) {
+  for (int y = 0; y < static_cast<int>(_height); y += tileSize) {
     bool draw = (y / tileSize) % 2 == 1;
-    for (int x = 0; x < _width; x += tileSize) {
+    for (int x = 0; x < static_cast<int>(_width); x += tileSize) {
       if (draw) {
         auto rect =
             tgfx::Rect::MakeXYWH(static_cast<float>(x), static_cast<float>(y),

@@ -189,6 +189,7 @@ function isPromise(obj: any): obj is Promise<any> {
 function draw(shareData: ShareData) {
     if (canDraw === true) {
         canDraw = false;
+        console.log("draw");
         const result = shareData.tgfxBaseView.draw(
             shareData.drawIndex,
             shareData.zoom,
@@ -206,10 +207,10 @@ function draw(shareData: ShareData) {
 }
 
 export function updateSize(shareData: ShareData) {
-    if (!shareData.tgfxBaseView) {
+    if (!shareData.tgfxBaseView || !canDraw) {
         return;
     }
-    shareData.resized = false;
+    console.log("resize");
     const canvas = document.getElementById('hello2d') as HTMLCanvasElement;
     const container = document.getElementById('container') as HTMLDivElement;
     const screenRect = container.getBoundingClientRect();
@@ -219,16 +220,15 @@ export function updateSize(shareData: ShareData) {
     canvas.style.width = screenRect.width + "px";
     canvas.style.height = screenRect.height + "px";
     shareData.tgfxBaseView.updateSize(scaleFactor);
+    shareData.resized = false;
 }
 
 export function onResizeEvent(shareData: ShareData) {
-    if (!shareData.tgfxBaseView || shareData.resized) {
+    if (!shareData.tgfxBaseView || shareData.resized || !canDraw) {
         return;
     }
     shareData.resized = true;
-    window.setTimeout(() => {
-        updateSize(shareData);
-    }, 300);
+    updateSize(shareData);
 }
 
 function handleVisibilityChange(shareData: ShareData) {

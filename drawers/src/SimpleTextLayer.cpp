@@ -275,7 +275,7 @@ std::shared_ptr<tgfx::Layer> SimpleText::buildLayerTree(const AppHost* host) {
   element.image = image;
   auto textHeight = ceil(fonts[0].getSize() * 0.8f);
   element.height = textHeight;
-  element.width = image->width() * element.height / image->height();
+  element.width = static_cast<float>(image->width()) * element.height / static_cast<float>(image->height());
   elements.push_back(element);
   //HelloTGFX!
   element = Element{};
@@ -303,7 +303,6 @@ std::shared_ptr<tgfx::Layer> SimpleText::buildLayerTree(const AppHost* host) {
   element.text = texts[3];
   element.font = fonts[3];
   element.paints = {paints[2]};
-  elements = {};
   elements.push_back(element);
 
   auto textLayer = SimpleTextLayer::Make();
@@ -315,8 +314,6 @@ std::shared_ptr<tgfx::Layer> SimpleText::buildLayerTree(const AppHost* host) {
   textLayer->setMatrix(matrix);
 
   root->addChild(textLayer);
-  //The bounds.bottom of emoji text is higher than the correct bottom, so a nearly transparent bounds needs to be added.
-  //root->addChild(MakeDebugLayer(root,{0.f,0.f,0.f,0.0001f}));
   return root;
 }
 

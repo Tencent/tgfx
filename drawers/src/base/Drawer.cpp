@@ -23,9 +23,8 @@
 #include "tgfx/platform/Print.h"
 
 namespace drawers {
-static std::vector<Drawer*> drawers = {new ConicGradient(), new ImageWithMipmap(),
-                                       new ImageWithShadow(), new SimpleText(),
-                                       new SimpleLayerTree()};
+static std::vector<Drawer*> drawers = { new SimpleText(),
+                                       };
 
 static std::vector<std::string> GetDrawerNames() {
   std::vector<std::string> names;
@@ -93,12 +92,12 @@ void Drawer::build(const AppHost* host) {
     displayList.setMaxTileCount(512);
   }
   auto bounds = _root->getBounds(nullptr, true);
-  auto totalScale = std::min(host->width() / (padding * 2 + bounds.width()),
-                             host->height() / (padding * 2 + bounds.height()));
+  auto totalScale = std::min(static_cast<float>(host->width()) / (padding * 2 + bounds.width()),
+                             static_cast<float>(host->height()) / (padding * 2 + bounds.height()));
 
   auto rootMatrix = tgfx::Matrix::MakeScale(totalScale);
-  rootMatrix.postTranslate((host->width() - bounds.width() * totalScale) / 2,
-                           (host->height() - bounds.height() * totalScale) / 2);
+  rootMatrix.postTranslate((static_cast<float>(host->width()) - bounds.width() * totalScale) / 2,
+                           (static_cast<float>(host->height()) - bounds.height() * totalScale) / 2);
   _root->setMatrix(rootMatrix);
 }
 }  // namespace drawers

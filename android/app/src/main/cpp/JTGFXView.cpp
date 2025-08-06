@@ -45,16 +45,15 @@ void JTGFXView::draw(int index, float zoom, float offsetX, float offsetY) {
     device->unlock();
     return;
   }
-  appHost->updateZoomAndOffset(zoom, tgfx::Point(offsetX, offsetY));
   auto canvas = surface->getCanvas();
   canvas->clear();
   canvas->save();
-  auto numDrawers = drawers::Drawer::Count() - 1;
-  index = (index % numDrawers) + 1;
-  auto drawer = drawers::Drawer::GetByName("GridBackground");
-  drawer->draw(canvas, appHost.get());
-  drawer = drawers::Drawer::GetByIndex(index);
-  drawer->draw(canvas, appHost.get());
+  drawers::Drawer::DrawBackground(canvas, appHost.get());
+  auto drawer = drawers::Drawer::GetByIndex(index % drawers::Drawer::Count());
+  drawer->displayList.setZoomScale(zoom);
+  drawer->displayList.setContentOffset(offsetX, offsetY);
+  drawer->build(appHost.get());
+  drawer->displayList.render(canvas->getSurface(), false);
   canvas->restore();
   context->flushAndSubmit();
   window->present(context);
@@ -103,7 +102,7 @@ JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_nativeInit(
 }
 
 JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromSurface(
-    JNIEnv* env, jobject, jobject surface, jbyteArray imageBytes, jfloat density) {
+    JNIEnv* env, jobject, jobject surface, jobjectArray imageBytesArray, jfloat density) {
   if (surface == nullptr) {
     printf("SetupFromSurface() Invalid surface specified.\n");
     return 0;
@@ -114,14 +113,20 @@ JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromS
     printf("SetupFromSurface() Invalid surface specified.\n");
     return 0;
   }
-  auto bytes = env->GetByteArrayElements(imageBytes, nullptr);
-  auto size = static_cast<size_t>(env->GetArrayLength(imageBytes));
-  auto data = tgfx::Data::MakeWithCopy(bytes, size);
-  auto image = tgfx::Image::MakeFromEncoded(data);
-  env->ReleaseByteArrayElements(imageBytes, bytes, 0);
   auto appHost = CreateAppHost(nativeWindow, density);
-  if (image) {
-    appHost->addImage("bridge", std::move(image));
+  if (imageBytesArray != nullptr) {
+    jsize numImages = env->GetArrayLength(imageBytesArray);
+    for (jsize i = 0; i < numImages; i++) {
+      auto imageBytes = (jbyteArray)env->GetObjectArrayElement(imageBytesArray, i);
+      auto bytes = env->GetByteArrayElements(imageBytes, nullptr);
+      auto size = static_cast<size_t>(env->GetArrayLength(imageBytes));
+      auto data = tgfx::Data::MakeWithCopy(bytes, size);
+      auto image = tgfx::Image::MakeFromEncoded(data);
+      env->ReleaseByteArrayElements(imageBytes, bytes, 0);
+      if (image) {
+        appHost->addImage("image_" + std::to_string(i), std::move(image));
+      }
+    }
   }
   return reinterpret_cast<jlong>(
       new hello2d::JTGFXView(nativeWindow, std::move(window), std::move(appHost)));
