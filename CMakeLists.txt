@@ -737,13 +737,20 @@ if (TGFX_BUILD_TESTS)
             NO_DEFAULT_PATH
         )
         list(APPEND TGFX_TEST_LIBS ${HARFBUZZ_LIB})
-        
-        add_vendor_target(test-vendor STATIC_VENDORS googletest)
-        find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)
-        list(APPEND TGFX_TEST_LIBS ${TEST_VENDOR_STATIC_LIBRARIES})
-        list(APPEND TGFX_TEST_INCLUDES
-                third_party/googletest/googletest
-                third_party/googletest/googletest/include)
+
+        find_library(GTEST_LIB 
+            NAMES gtest libgtest
+            PATHS ${VCPKG_LIB_DIR}
+            NO_DEFAULT_PATH
+        )
+        list(APPEND TGFX_TEST_LIBS ${GTEST_LIB})
+
+        find_library(GMOCK_LIB 
+            NAMES gmock libgmock
+            PATHS ${VCPKG_LIB_DIR}
+            NO_DEFAULT_PATH
+        )
+        list(APPEND TGFX_TEST_LIBS ${GMOCK_LIB})
     else()
         add_vendor_target(test-vendor STATIC_VENDORS harfbuzz googletest)
         find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)
