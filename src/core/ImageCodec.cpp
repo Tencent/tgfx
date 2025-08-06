@@ -171,19 +171,19 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     auto dstRowBytes = dstInfo.rowBytes();
     if (dstRowBytes % 16) {
       dstRowBytes = dstImageInfo.rowBytes() + GetPaddingAlignment16(dstImageInfo.rowBytes());
-      dstImageInfo = ImageInfo::Make(dstInfo.width(), dstInfo.height(), colorType, dstInfo.alphaType(), dstRowBytes);
-    }
-    else {
+      dstImageInfo = ImageInfo::Make(dstInfo.width(), dstInfo.height(), colorType,
+                                     dstInfo.alphaType(), dstRowBytes);
+    } else {
       dstImageInfo = dstInfo.makeColorType(colorType);
     }
     if (!dstTempBuffer.alloc(dstImageInfo.byteSize())) {
       return false;
     }
     dstData = dstTempBuffer.bytes();
-  }
-  else if (dstImageInfo.rowBytes() % 16) {
+  } else if (dstImageInfo.rowBytes() % 16) {
     auto dstRowBytes = dstImageInfo.rowBytes() + GetPaddingAlignment16(dstImageInfo.rowBytes());
-    dstImageInfo = ImageInfo::Make(dstImageInfo.width(), dstImageInfo.height(), dstImageInfo.colorType(), dstImageInfo.alphaType(), dstRowBytes);
+    dstImageInfo = ImageInfo::Make(dstImageInfo.width(), dstImageInfo.height(),
+                                   dstImageInfo.colorType(), dstImageInfo.alphaType(), dstRowBytes);
     if (!dstTempBuffer.alloc(dstImageInfo.byteSize())) {
       return false;
     }
@@ -200,7 +200,7 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
                         dstImageInfo.colorType() == ColorType::ALPHA_8;
   auto inputLayout = PixelLayout{width(), height(), static_cast<int>(srcRowBytes)};
   auto outputLayout = PixelLayout{dstImageInfo.width(), dstImageInfo.height(),
-    static_cast<int>(dstImageInfo.rowBytes())};
+                                  static_cast<int>(dstImageInfo.rowBytes())};
   BoxFilterDownsample(buffer.data(), inputLayout, dstData, outputLayout, isOneComponent);
   if (!dstTempBuffer.isEmpty()) {
     Pixmap(dstImageInfo, dstData).readPixels(dstInfo, dstPixels);
