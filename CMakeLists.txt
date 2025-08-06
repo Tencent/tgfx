@@ -602,7 +602,7 @@ if(TGFX_BUILD_VCPKG)
     )
     list(APPEND TGFX_STATIC_LIBS ${LZ4_LIB})
     
-    find_package(unofficial-concurrentqueue CONFIG REQUIRED)
+    # find_package(unofficial-concurrentqueue CONFIG REQUIRED)
     list(APPEND TGFX_INCLUDES ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/include/concurrentqueue)
 endif()
 
@@ -655,8 +655,6 @@ if (TGFX_BUILD_DRAWERS)
     target_link_libraries(tgfx-drawers)
 endif ()
 
-# -------------------------------------------------------------------------
-
 if(TGFX_BUILD_VCPKG)
     install(TARGETS tgfx
         EXPORT tgfxTargets
@@ -696,8 +694,6 @@ if(TGFX_BUILD_VCPKG)
         DESTINATION share/tgfx
     )
 endif ()
-
-# -------------------------------------------------------------------------
 
 if (TGFX_BUILD_TESTS)
     execute_process(COMMAND git rev-parse --short HEAD OUTPUT_VARIABLE HEAD_COMMIT)
