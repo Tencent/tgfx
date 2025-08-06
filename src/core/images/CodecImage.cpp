@@ -22,8 +22,8 @@
 #include "gpu/ProxyProvider.h"
 
 namespace tgfx {
-CodecImage::CodecImage(std::shared_ptr<ImageCodec> codec, int width, int height, bool mipmap)
-    : GeneratorImage(std::move(codec), mipmap), _width(width), _height(height) {
+CodecImage::CodecImage(std::shared_ptr<ImageCodec> codec, int width, int height, bool mipmapped)
+    : GeneratorImage(std::move(codec), mipmapped), _width(width), _height(height) {
 }
 
 std::shared_ptr<ImageCodec> CodecImage::getCodec() const {
@@ -33,7 +33,7 @@ std::shared_ptr<ImageCodec> CodecImage::getCodec() const {
 std::shared_ptr<Image> CodecImage::onMakeScaled(int newWidth, int newHeight,
                                                 const SamplingOptions& sampling) const {
   if (newWidth <= generator->width() && newHeight <= generator->height()) {
-    auto image = std::make_shared<CodecImage>(getCodec(), newWidth, newHeight, mipmap);
+    auto image = std::make_shared<CodecImage>(getCodec(), newWidth, newHeight, mipmapped);
     image->weakThis = image;
     return image;
   }
@@ -45,7 +45,7 @@ std::shared_ptr<TextureProxy> CodecImage::onLockTextureProxy(const TPArgs& args)
   if (width() != generator->width() || height() != generator->height()) {
     tempGenerator = ScaledImageGenerator::MakeFrom(getCodec(), width(), height());
   }
-  return args.context->proxyProvider()->createTextureProxy({}, tempGenerator, args.mipmapped,
+  return args.context->proxyProvider()->createTextureProxy(tempGenerator, args.mipmapped,
                                                            args.renderFlags);
 }
 }  // namespace tgfx

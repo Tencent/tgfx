@@ -28,7 +28,7 @@ namespace tgfx {
 class DecodedImage : public ResourceImage {
  public:
   static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageGenerator> generator,
-                                         bool tryHardware, bool asyncDecoding, bool mipmap);
+                                         bool tryHardware, bool asyncDecoding, bool mipmapped);
 
   int width() const override {
     return _width;
@@ -49,7 +49,7 @@ class DecodedImage : public ResourceImage {
 
   std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args) const override;
 
-  std::shared_ptr<Image> onCloneWith(bool mipmap) const override;
+  std::shared_ptr<Image> onMakeMipmapped(bool mipmapped) const override;
 
  private:
   int _width = 0;
@@ -58,6 +58,6 @@ class DecodedImage : public ResourceImage {
   std::shared_ptr<DataSource<ImageBuffer>> source = nullptr;
 
   DecodedImage(int width, int height, bool alphaOnly,
-               std::shared_ptr<DataSource<ImageBuffer>> source, bool mipmap);
+               std::shared_ptr<DataSource<ImageBuffer>> source, bool mipmapped);
 };
 }  // namespace tgfx

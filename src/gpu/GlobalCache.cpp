@@ -91,7 +91,7 @@ std::shared_ptr<TextureProxy> GlobalCache::getGradient(const Color* colors, cons
     return texture->textureProxy;
   }
   auto generator = std::make_shared<GradientGenerator>(colors, positions, count);
-  auto textureProxy = context->proxyProvider()->createTextureProxy({}, std::move(generator));
+  auto textureProxy = context->proxyProvider()->createTextureProxy(std::move(generator));
   if (textureProxy == nullptr) {
     return nullptr;
   }

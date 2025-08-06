@@ -958,7 +958,7 @@ TGFX_TEST(CanvasTest, image) {
   EXPECT_FALSE(decodedImage == image);
   context->flushAndSubmit();
   decodedImage = image->makeDecoded(context);
-  EXPECT_TRUE(decodedImage == image);
+  EXPECT_FALSE(decodedImage == image);
   auto textureImage = image->makeTextureImage(context);
   ASSERT_TRUE(textureImage != nullptr);
   EXPECT_TRUE(textureImage->isTextureBacked());
@@ -970,7 +970,7 @@ TGFX_TEST(CanvasTest, image) {
   EXPECT_TRUE(decodedImage == image);
   context->flushAndSubmit();
   decodedImage = image->makeDecoded(context);
-  EXPECT_TRUE(decodedImage == image);
+  EXPECT_FALSE(decodedImage == image);
 
   surface = Surface::Make(context, 400, 500);
   canvas = surface->getCanvas();

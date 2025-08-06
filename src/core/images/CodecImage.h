@@ -28,7 +28,7 @@ namespace tgfx {
 
 class CodecImage : public GeneratorImage {
  public:
-  CodecImage(std::shared_ptr<ImageCodec> codec, int width, int height, bool mipmap);
+  CodecImage(std::shared_ptr<ImageCodec> codec, int width, int height, bool mipmapped);
 
   std::shared_ptr<ImageCodec> getCodec() const;
 

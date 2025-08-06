@@ -17,21 +17,20 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ResourceImage.h"
-#include "core/images/MipmapImage.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
 
 std::shared_ptr<TextureProxy> ResourceImage::lockTextureProxy(const TPArgs& args) const {
   auto newArgs = args;
-  newArgs.mipmapped = hasMipmaps();
+  newArgs.mipmapped = mipmapped;
   return onLockTextureProxy(newArgs);
 }
 
 PlacementPtr<FragmentProcessor> ResourceImage::asFragmentProcessor(const FPArgs& args,
                                                                    const SamplingArgs& samplingArgs,
                                                                    const Matrix* uvMatrix) const {
-  TPArgs tpArgs(args.context, args.renderFlags, hasMipmaps(), 1.0f, BackingFit::Approx);
+  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, 1.0f, BackingFit::Exact);
   auto proxy = onLockTextureProxy(tpArgs);
   return TiledTextureEffect::Make(std::move(proxy), samplingArgs, uvMatrix, isAlphaOnly());
 }

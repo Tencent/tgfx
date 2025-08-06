@@ -548,7 +548,7 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
   } else {
     auto rasterizer =
         PathRasterizer::MakeFrom(width, height, clip, aaType != AAType::None, &rasterizeMatrix);
-    clipTexture = proxyProvider()->createTextureProxy({}, rasterizer, false, renderFlags);
+    clipTexture = proxyProvider()->createTextureProxy(rasterizer, false, renderFlags);
   }
   clipKey = uniqueKey;
   return clipTexture;

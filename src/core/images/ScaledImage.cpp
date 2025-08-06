@@ -25,20 +25,11 @@
 #include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
-std::shared_ptr<Image> ScaledImage::MakeFrom(std::shared_ptr<Image> image, int width, int height,
-                                             const SamplingOptions& sampling, bool mipmap) {
-  DEBUG_ASSERT(width > 0 && height > 0 && image != nullptr);
-  DEBUG_ASSERT(width != image->width() || height != image->height());
-  auto scaledImage =
-      std::make_shared<ScaledImage>(std::move(image), width, height, sampling, mipmap);
-  scaledImage->weakThis = scaledImage;
-  return scaledImage;
-}
 
 ScaledImage::ScaledImage(std::shared_ptr<Image> image, int width, int height,
-                         const SamplingOptions& sampling, bool mipmap)
+                         const SamplingOptions& sampling, bool mipmapped)
     : TransformImage(std::move(image)), _width(width), _height(height), sampling(sampling),
-      mipmap(mipmap) {
+      mipmapped(mipmapped) {
 }
 
 PlacementPtr<FragmentProcessor> ScaledImage::asFragmentProcessor(const FPArgs& args,
@@ -122,11 +113,13 @@ std::shared_ptr<Image> ScaledImage::onMakeScaled(int newWidth, int newHeight,
 }
 
 std::shared_ptr<Image> ScaledImage::onMakeMipmapped(bool enabled) const {
-  return MakeFrom(source, _width, _height, sampling, enabled);
+  auto scaledImage = std::make_shared<ScaledImage>(source, _width, _height, sampling, enabled);
+  scaledImage->weakThis = scaledImage;
+  return scaledImage;
 }
 
 std::shared_ptr<Image> ScaledImage::onCloneWith(std::shared_ptr<Image> newSource) const {
-  auto scaledImage = std::make_shared<ScaledImage>(newSource, _width, _height, sampling, mipmap);
+  auto scaledImage = std::make_shared<ScaledImage>(newSource, _width, _height, sampling, mipmapped);
   scaledImage->weakThis = scaledImage;
   return scaledImage;
 }

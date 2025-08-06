@@ -29,21 +29,19 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageBuffer> buffer) {
   }
   std::shared_ptr<Image> image = std::make_shared<BufferImage>(std::move(buffer), false);
   image->weakThis = image;
-  image = image->makeRasterized();
-  return image;
+  return image->makeRasterized();
 }
 
-BufferImage::BufferImage(std::shared_ptr<ImageBuffer> buffer, bool mipmap)
-    : ResourceImage(mipmap), imageBuffer(std::move(buffer)) {
+BufferImage::BufferImage(std::shared_ptr<ImageBuffer> buffer, bool mipmapped)
+    : ResourceImage(mipmapped), imageBuffer(std::move(buffer)) {
 }
 
 std::shared_ptr<TextureProxy> BufferImage::onLockTextureProxy(const TPArgs& args) const {
-  return args.context->proxyProvider()->createTextureProxy({}, imageBuffer, args.mipmapped,
-                                                           args.renderFlags);
+  return args.context->proxyProvider()->createTextureProxy(imageBuffer, args.mipmapped);
 }
 
-std::shared_ptr<Image> BufferImage::onCloneWith(bool mipmap) const {
-  auto image = std::make_shared<BufferImage>(imageBuffer, mipmap);
+std::shared_ptr<Image> BufferImage::onMakeMipmapped(bool mipmapped) const {
+  auto image = std::make_shared<BufferImage>(imageBuffer, mipmapped);
   image->weakThis = image;
   return image;
 }
@@ -53,7 +51,7 @@ std::shared_ptr<Image> BufferImage::onMakeScaled(int newWidth, int newHeight,
   if (imageBuffer->isPixelBuffer() && newWidth < imageBuffer->width() &&
       newHeight < imageBuffer->height()) {
     auto codec = PixelBufferCodec::Make(std::static_pointer_cast<PixelBuffer>(imageBuffer));
-    auto image = std::make_shared<CodecImage>(std::move(codec), newWidth, newHeight, mipmap);
+    auto image = std::make_shared<CodecImage>(std::move(codec), newWidth, newHeight, mipmapped);
     image->weakThis = image;
     return image;
   }

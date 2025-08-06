@@ -117,15 +117,11 @@ bool ProxyProvider::assignProxyUniqueKey(std::shared_ptr<ResourceProxy> proxy,
   if (proxy == nullptr || proxy->context != context) {
     return false;
   }
-  if (proxy->uniqueKey == uniqueKey) {
-    return true;
-  }
   if (!proxy->uniqueKey.empty()) {
     proxyMap.erase(proxy->uniqueKey);
   }
   if (!uniqueKey.empty()) {
     proxyMap[uniqueKey] = proxy;
-    proxy->assginUniqueKey(uniqueKey);
   }
   return true;
 }
@@ -230,14 +226,11 @@ std::shared_ptr<GPUShapeProxy> ProxyProvider::createGPUShapeProxy(std::shared_pt
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxyByImageSource(
-    const UniqueKey& uniqueKey, std::shared_ptr<DataSource<ImageBuffer>> source, int width,
-    int height, bool alphaOnly, bool mipmapped, uint32_t renderFlags) {
+    std::shared_ptr<DataSource<ImageBuffer>> source, int width, int height, bool alphaOnly,
+    bool mipmapped) {
   auto format = alphaOnly ? PixelFormat::ALPHA_8 : PixelFormat::Unknown;
   auto proxy = std::shared_ptr<TextureProxy>(new TextureProxy(width, height, format, mipmapped));
-  addResourceProxy(proxy, uniqueKey);
-  if (!uniqueKey.empty() && !(renderFlags & RenderFlags::DisableCache)) {
-    proxy->uniqueKey = uniqueKey;
-  }
+  addResourceProxy(proxy, {});
   auto task =
       context->drawingBuffer()->make<TextureUploadTask>(proxy, std::move(source), mipmapped);
   auto drawingManager = context->drawingManager();
@@ -247,32 +240,21 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxyByImageSource(
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
-    const UniqueKey& uniqueKey, std::shared_ptr<ImageBuffer> imageBuffer, bool mipmapped,
-    uint32_t renderFlags) {
+    std::shared_ptr<ImageBuffer> imageBuffer, bool mipmapped) {
   if (imageBuffer == nullptr) {
     return nullptr;
-  }
-  auto proxy = findOrWrapTextureProxy(uniqueKey);
-  if (proxy != nullptr) {
-    return proxy;
   }
   auto width = imageBuffer->width();
   auto height = imageBuffer->height();
   auto alphaOnly = imageBuffer->isAlphaOnly();
   auto source = ImageSource::Wrap(std::move(imageBuffer));
-  return createTextureProxyByImageSource(uniqueKey, std::move(source), width, height, alphaOnly,
-                                         mipmapped, renderFlags);
+  return createTextureProxyByImageSource(std::move(source), width, height, alphaOnly, mipmapped);
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
-    const UniqueKey& uniqueKey, std::shared_ptr<ImageGenerator> generator, bool mipmapped,
-    uint32_t renderFlags) {
+    std::shared_ptr<ImageGenerator> generator, bool mipmapped, uint32_t renderFlags) {
   if (generator == nullptr) {
     return nullptr;
-  }
-  auto proxy = findOrWrapTextureProxy(uniqueKey);
-  if (proxy != nullptr) {
-    return proxy;
   }
   auto width = generator->width();
   auto height = generator->height();
@@ -284,19 +266,13 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
 #endif
   // Ensure the image source is retained so it won't be destroyed prematurely during async decoding.
   auto source = ImageSource::MakeFrom(std::move(generator), !mipmapped, asyncDecoding);
-  return createTextureProxyByImageSource(uniqueKey, std::move(source), width, height, alphaOnly,
-                                         mipmapped, renderFlags);
+  return createTextureProxyByImageSource(std::move(source), width, height, alphaOnly, mipmapped);
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
-    const UniqueKey& uniqueKey, std::shared_ptr<DataSource<ImageBuffer>> source, int width,
-    int height, bool alphaOnly, bool mipmapped, uint32_t renderFlags) {
-  auto proxy = findOrWrapTextureProxy(uniqueKey);
-  if (proxy != nullptr || source == nullptr) {
-    return proxy;
-  }
-  return createTextureProxyByImageSource(uniqueKey, std::move(source), width, height, alphaOnly,
-                                         mipmapped, renderFlags);
+    std::shared_ptr<DataSource<ImageBuffer>> source, int width, int height, bool alphaOnly,
+    bool mipmapped) {
+  return createTextureProxyByImageSource(std::move(source), width, height, alphaOnly, mipmapped);
 }
 
 static constexpr int MinApproxSize = 16;

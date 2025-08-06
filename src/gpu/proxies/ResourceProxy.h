@@ -36,6 +36,13 @@ class ResourceProxy {
     return context;
   }
 
+  void assignUniqueKey(const UniqueKey& key) {
+    uniqueKey = key;
+    if (resource != nullptr) {
+      resource->assignUniqueKey(key);
+    }
+  }
+
  protected:
   Context* context = nullptr;
   mutable std::shared_ptr<Resource> resource = nullptr;
@@ -45,13 +52,6 @@ class ResourceProxy {
   }
 
   ResourceProxy() = default;
-
-  void assginUniqueKey(const UniqueKey& key) {
-    uniqueKey = key;
-    if (resource != nullptr) {
-      resource->assignUniqueKey(key);
-    }
-  }
 
   friend class ResourceTask;
   friend class ShapeBufferUploadTask;

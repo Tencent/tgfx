@@ -23,7 +23,8 @@
 
 namespace tgfx {
 std::shared_ptr<Image> DecodedImage::MakeFrom(std::shared_ptr<ImageGenerator> generator,
-                                              bool tryHardware, bool asyncDecoding, bool mipmap) {
+                                              bool tryHardware, bool asyncDecoding,
+                                              bool mipmapped) {
   if (generator == nullptr) {
     return nullptr;
   }
@@ -32,25 +33,25 @@ std::shared_ptr<Image> DecodedImage::MakeFrom(std::shared_ptr<ImageGenerator> ge
   auto alphaOnly = generator->isAlphaOnly();
   auto source = ImageSource::MakeFrom(std::move(generator), tryHardware, asyncDecoding);
   auto image = std::shared_ptr<DecodedImage>(
-      new DecodedImage(width, height, alphaOnly, std::move(source), mipmap));
+      new DecodedImage(width, height, alphaOnly, std::move(source), mipmapped));
   image->weakThis = image;
   return image;
 }
 
 DecodedImage::DecodedImage(int width, int height, bool alphaOnly,
-                           std::shared_ptr<DataSource<ImageBuffer>> source, bool mipmap)
-    : ResourceImage(mipmap), _width(width), _height(height), _alphaOnly(alphaOnly),
+                           std::shared_ptr<DataSource<ImageBuffer>> source, bool mipmapped)
+    : ResourceImage(mipmapped), _width(width), _height(height), _alphaOnly(alphaOnly),
       source(std::move(source)) {
 }
 
 std::shared_ptr<TextureProxy> DecodedImage::onLockTextureProxy(const TPArgs& args) const {
-  return args.context->proxyProvider()->createTextureProxy({}, source, _width, _height, _alphaOnly,
-                                                           args.mipmapped, args.renderFlags);
+  return args.context->proxyProvider()->createTextureProxy(source, _width, _height, _alphaOnly,
+                                                           args.mipmapped);
 }
 
-std::shared_ptr<Image> DecodedImage::onCloneWith(bool mipmap) const {
-  auto image =
-      std::shared_ptr<DecodedImage>(new DecodedImage(_width, _height, _alphaOnly, source, mipmap));
+std::shared_ptr<Image> DecodedImage::onMakeMipmapped(bool mipmapped) const {
+  auto image = std::shared_ptr<DecodedImage>(
+      new DecodedImage(_width, _height, _alphaOnly, source, mipmapped));
   image->weakThis = image;
   return image;
 }

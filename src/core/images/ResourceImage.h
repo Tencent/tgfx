@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "core/images/MipmapImage.h"
 #include "gpu/Resource.h"
 #include "gpu/TPArgs.h"
 #include "gpu/proxies/TextureProxy.h"
@@ -26,11 +25,15 @@
 
 namespace tgfx {
 /**
- * The base class for all images that contains a UniqueKey and can be cached as a GPU resource.
+ * The base class for all images that are created from resources (files, assets, etc.).
  */
-class ResourceImage : public MipmapImage {
+class ResourceImage : public Image {
+  bool hasMipmaps() const final {
+    return mipmapped;
+  }
+
  protected:
-  explicit ResourceImage(bool mipmap) : MipmapImage(mipmap) {
+  explicit ResourceImage(bool mipmapped) : mipmapped(mipmapped) {
   }
 
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const final;
@@ -40,5 +43,6 @@ class ResourceImage : public MipmapImage {
   PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                       const SamplingArgs& samplingArgs,
                                                       const Matrix* uvMatrix) const override;
+  bool mipmapped = false;
 };
 }  // namespace tgfx

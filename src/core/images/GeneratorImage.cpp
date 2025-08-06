@@ -21,21 +21,21 @@
 #include "gpu/ProxyProvider.h"
 
 namespace tgfx {
-GeneratorImage::GeneratorImage(std::shared_ptr<ImageGenerator> generator, bool mipmap)
-    : ResourceImage(mipmap), generator(std::move(generator)) {
+GeneratorImage::GeneratorImage(std::shared_ptr<ImageGenerator> generator, bool mipmapped)
+    : ResourceImage(mipmapped), generator(std::move(generator)) {
 }
 
 std::shared_ptr<Image> GeneratorImage::onMakeDecoded(Context*, bool tryHardware) const {
-  return DecodedImage::MakeFrom(generator, tryHardware, true, mipmap);
+  return DecodedImage::MakeFrom(generator, tryHardware, true, mipmapped);
 }
 
 std::shared_ptr<TextureProxy> GeneratorImage::onLockTextureProxy(const TPArgs& args) const {
-  return args.context->proxyProvider()->createTextureProxy({}, generator, args.mipmapped,
+  return args.context->proxyProvider()->createTextureProxy(generator, args.mipmapped,
                                                            args.renderFlags);
 }
 
-std::shared_ptr<Image> GeneratorImage::onCloneWith(bool mipmap) const {
-  auto image = std::make_shared<GeneratorImage>(generator, mipmap);
+std::shared_ptr<Image> GeneratorImage::onMakeMipmapped(bool mipmapped) const {
+  auto image = std::make_shared<GeneratorImage>(generator, mipmapped);
   image->weakThis = image;
   return image;
 }

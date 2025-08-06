@@ -26,10 +26,7 @@ namespace tgfx {
  */
 class RasterizedImage : public Image {
  public:
-  /**
-   * Note that this method always returns a non-mipmapped image.
-   */
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source);
+  RasterizedImage(UniqueKey uniqueKey, std::shared_ptr<Image> source);
 
   int width() const override {
     return source->width();
@@ -77,7 +74,5 @@ class RasterizedImage : public Image {
   UniqueKey uniqueKey;
 
   std::shared_ptr<Image> source = nullptr;
-
-  RasterizedImage(UniqueKey uniqueKey, std::shared_ptr<Image> source);
 };
 }  // namespace tgfx

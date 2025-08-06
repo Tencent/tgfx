@@ -188,7 +188,10 @@ std::shared_ptr<Image> Image::makeScaled(int newWidth, int newHeight,
 }
 
 std::shared_ptr<Image> Image::makeRasterized() const {
-  return RasterizedImage::MakeFrom(weakThis.lock());
+  auto result =
+      std::shared_ptr<RasterizedImage>(new RasterizedImage(UniqueKey::Make(), weakThis.lock()));
+  result->weakThis = result;
+  return result;
 }
 
 std::shared_ptr<Image> Image::onMakeSubset(const Rect& subset) const {
@@ -218,7 +221,10 @@ std::shared_ptr<Image> Image::onMakeWithFilter(std::shared_ptr<ImageFilter> filt
 
 std::shared_ptr<Image> Image::onMakeScaled(int newWidth, int newHeight,
                                            const SamplingOptions& sampling) const {
-  return ScaledImage::MakeFrom(weakThis.lock(), newWidth, newHeight, sampling, hasMipmaps());
+  auto scaledImage =
+      std::make_shared<ScaledImage>(weakThis.lock(), newWidth, newHeight, sampling, hasMipmaps());
+  scaledImage->weakThis = scaledImage;
+  return scaledImage;
 }
 
 std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,

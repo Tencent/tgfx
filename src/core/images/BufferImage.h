@@ -25,7 +25,7 @@ namespace tgfx {
  */
 class BufferImage : public ResourceImage {
  public:
-  BufferImage(std::shared_ptr<ImageBuffer> buffer, bool mipmap);
+  BufferImage(std::shared_ptr<ImageBuffer> buffer, bool mipmapped);
 
   int width() const override {
     return imageBuffer->width();
@@ -39,9 +39,6 @@ class BufferImage : public ResourceImage {
     return imageBuffer->isAlphaOnly();
   }
 
-  std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
-                                      const SamplingOptions& sampling) const override;
-
  protected:
   Type type() const override {
     return Type::Buffer;
@@ -49,7 +46,10 @@ class BufferImage : public ResourceImage {
 
   std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args) const override;
 
-  std::shared_ptr<Image> onCloneWith(bool mipmap) const override;
+  std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
+
+  std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
+                                      const SamplingOptions& sampling) const override;
 
  private:
   std::shared_ptr<ImageBuffer> imageBuffer = nullptr;

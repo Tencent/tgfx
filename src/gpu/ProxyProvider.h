@@ -76,27 +76,22 @@ class ProxyProvider {
    * Creates a TextureProxy for the given ImageBuffer. The image buffer will be released after being
    * uploaded to the GPU.
    */
-  std::shared_ptr<TextureProxy> createTextureProxy(const UniqueKey& uniqueKey,
-                                                   std::shared_ptr<ImageBuffer> imageBuffer,
-                                                   bool mipmapped = false,
-                                                   uint32_t renderFlags = 0);
+  std::shared_ptr<TextureProxy> createTextureProxy(std::shared_ptr<ImageBuffer> imageBuffer,
+                                                   bool mipmapped = false);
 
   /*
    * Creates a TextureProxy for the given ImageGenerator.
    */
-  std::shared_ptr<TextureProxy> createTextureProxy(const UniqueKey& uniqueKey,
-                                                   std::shared_ptr<ImageGenerator> generator,
+  std::shared_ptr<TextureProxy> createTextureProxy(std::shared_ptr<ImageGenerator> generator,
                                                    bool mipmapped = false,
                                                    uint32_t renderFlags = 0);
 
   /**
    * Creates a TextureProxy for the given image source.
    */
-  std::shared_ptr<TextureProxy> createTextureProxy(const UniqueKey& uniqueKey,
-                                                   std::shared_ptr<DataSource<ImageBuffer>> source,
+  std::shared_ptr<TextureProxy> createTextureProxy(std::shared_ptr<DataSource<ImageBuffer>> source,
                                                    int width, int height, bool alphaOnly,
-                                                   bool mipmapped = false,
-                                                   uint32_t renderFlags = 0);
+                                                   bool mipmapped = false);
 
   /**
    * Creates an empty TextureProxy with specified width, height, format, mipmap state and origin.
@@ -156,9 +151,9 @@ class ProxyProvider {
   void clearSharedVertexBuffer();
 
   /**
-   * Assigns a unique key to the given proxy. If the proxy already has a unique key, it will be
-   * replaced. Returns true if the assignment is successful, false if proxy is nullptr or does not
-   * have the same context as this provider.
+   * Stores the given proxy in the map with the new uniqueKey.
+   * Returns true if the assignment is successful, or false if the proxy is nullptr
+   * or does not belong to the same context as this provider.
    */
   bool assignProxyUniqueKey(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& uniqueKey);
 
@@ -178,7 +173,7 @@ class ProxyProvider {
   void uploadSharedVertexBuffer(std::shared_ptr<Data> data);
 
   std::shared_ptr<TextureProxy> createTextureProxyByImageSource(
-      const UniqueKey& uniqueKey, std::shared_ptr<DataSource<ImageBuffer>> source, int width,
-      int height, bool alphaOnly, bool mipmapped = false, uint32_t renderFlags = 0);
+      std::shared_ptr<DataSource<ImageBuffer>> source, int width, int height, bool alphaOnly,
+      bool mipmapped = false);
 };
 }  // namespace tgfx

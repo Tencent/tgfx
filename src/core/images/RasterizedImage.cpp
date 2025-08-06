@@ -24,16 +24,6 @@
 
 namespace tgfx {
 
-std::shared_ptr<Image> RasterizedImage::MakeFrom(std::shared_ptr<Image> source) {
-  if (source == nullptr) {
-    return nullptr;
-  }
-  auto result =
-      std::shared_ptr<RasterizedImage>(new RasterizedImage(UniqueKey::Make(), std::move(source)));
-  result->weakThis = result;
-  return result;
-}
-
 RasterizedImage::RasterizedImage(UniqueKey uniqueKey, std::shared_ptr<Image> source)
     : uniqueKey(std::move(uniqueKey)), source(std::move(source)) {
 }
@@ -50,13 +40,15 @@ std::shared_ptr<TextureProxy> RasterizedImage::lockTextureProxy(const TPArgs& ar
     return textureProxy;
   }
   auto newArgs = args;
-  newArgs.renderFlags |= RenderFlags::DisableCache;
   newArgs.backingFit = BackingFit::Exact;
   textureProxy = source->lockTextureProxy(newArgs);
   if (textureProxy == nullptr) {
     return nullptr;
   }
   proxyProvider->assignProxyUniqueKey(textureProxy, textureKey);
+  if (!(args.renderFlags & RenderFlags::DisableCache)) {
+    textureProxy->assignUniqueKey(textureKey);
+  }
   return textureProxy;
 }
 
