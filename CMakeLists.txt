@@ -161,10 +161,10 @@ if (MSVC)
     list(APPEND TGFX_COMPILE_OPTIONS /w44251 /w44275)
     list(APPEND TGFX_COMPILE_OPTIONS /W4)
     list(APPEND TGFX_DEFINES NOMINMAX _USE_MATH_DEFINES)
-    if(NOT TGFX_BUILD_VCPKG)
+#    if(NOT TGFX_BUILD_VCPKG)
         list(APPEND TGFX_STATIC_VENDORS highway)
         list(APPEND TGFX_INCLUDES third_party/highway)
-    endif()
+#    endif()
 endif (MSVC)
 
 # Sets flags
@@ -345,7 +345,9 @@ if (TGFX_USE_INSPECTOR)
 endif ()
 
 if (NOT APPLE AND NOT OHOS AND (NOT WEB OR EMSCRIPTEN_PTHREADS))
-    list(APPEND TGFX_INCLUDES third_party/stb)
+    if (NOT TGFX_BUILD_VCPKG)
+        list(APPEND TGFX_INCLUDES third_party/stb)
+    endif ()
     list(APPEND TGFX_DEFINES TGFX_USE_STB_IMAGE)
 endif()
 
@@ -357,8 +359,10 @@ if(NOT TGFX_BUILD_VCPKG)
     list(APPEND TGFX_INCLUDES third_party/concurrentqueue)
 endif()
 if (TGFX_BUILD_SVG)
-    list(APPEND TGFX_STATIC_VENDORS expat)
-    list(APPEND TGFX_INCLUDES third_party/expat)
+    if (NOT TGFX_BUILD_VCPKG)
+        list(APPEND TGFX_STATIC_VENDORS expat)
+        list(APPEND TGFX_INCLUDES third_party/expat)
+    endif ()
 endif ()
 
 if (WEB)
@@ -577,14 +581,14 @@ if(TGFX_BUILD_VCPKG)
         list(APPEND TGFX_STATIC_LIBS ${FREETYPE_LIB})
     endif()
     
-    if(MSVC)
-        find_library(HWY_LIB 
-            NAMES hwy libhwy
-            PATHS ${VCPKG_LIB_DIR}
-            NO_DEFAULT_PATH
-        )
-        list(APPEND TGFX_STATIC_LIBS ${HWY_LIB})
-    endif()
+#    if(MSVC)
+#        find_library(HWY_LIB 
+#            NAMES hwy libhwy
+#            PATHS ${VCPKG_LIB_DIR}
+#            NO_DEFAULT_PATH
+#        )
+#        list(APPEND TGFX_STATIC_LIBS ${HWY_LIB})
+#    endif()
     
     if(TGFX_USE_INSPECTOR)
         find_library(FLATBUFFERS_LIB 
@@ -595,6 +599,19 @@ if(TGFX_BUILD_VCPKG)
         list(APPEND TGFX_STATIC_LIBS ${FLATBUFFERS_LIB})
     endif()
 
+    if (NOT APPLE AND NOT OHOS AND (NOT WEB OR EMSCRIPTEN_PTHREADS))
+        find_package(Stb REQUIRED)
+    endif()
+
+    if (TGFX_BUILD_SVG)
+        find_library(EXPAT_LIB 
+            NAMES libexpat expat
+            PATHS ${VCPKG_LIB_DIR}
+            NO_DEFAULT_PATH
+        )
+        list(APPEND TGFX_STATIC_LIBS ${EXPAT_LIB})
+    endif ()
+
     find_library(LZ4_LIB 
         NAMES lz4 liblz4 lz4d liblz4d
         PATHS ${VCPKG_LIB_DIR}
@@ -602,8 +619,8 @@ if(TGFX_BUILD_VCPKG)
     )
     list(APPEND TGFX_STATIC_LIBS ${LZ4_LIB})
     
-    # find_package(unofficial-concurrentqueue CONFIG REQUIRED)
-    list(APPEND TGFX_INCLUDES ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/include/concurrentqueue)
+    find_package(unofficial-concurrentqueue CONFIG REQUIRED)
+    list(APPEND TGFX_INCLUDES ${VCPKG_INCLUDE_DIR}/concurrentqueue)
 endif()
 
 add_vendor_target(tgfx-vendor STATIC_VENDORS ${TGFX_STATIC_VENDORS} SHARED_VENDORS ${TGFX_SHARED_VENDORS})
@@ -712,7 +729,13 @@ if (TGFX_BUILD_TESTS)
 
     file(GLOB_RECURSE TGFX_TEST_FILES test/src/*.*)
     list(APPEND TGFX_TEST_LIBS tgfx-drawers tgfx ${TGFX_SHARED_LIBS})
-    list(APPEND TGFX_TEST_INCLUDES src test/src third_party/json/include)
+    if (TGFX_BUILD_VCPKG)
+        find_package(nlohmann_json REQUIRED)
+        list(APPEND TGFX_TEST_INCLUDES ${VCPKG_INCLUDE_DIR})
+        list(APPEND TGFX_TEST_INCLUDES src test/src)
+    else ()
+        list(APPEND TGFX_TEST_INCLUDES src test/src third_party/json/include)
+    endif ()
 
     if(TGFX_BUILD_VCPKG)
         find_library(HARFBUZZ_LIB 
@@ -721,7 +744,6 @@ if (TGFX_BUILD_TESTS)
             NO_DEFAULT_PATH
         )
         list(APPEND TGFX_TEST_LIBS ${HARFBUZZ_LIB})
-        list(APPEND TGFX_TEST_INCLUDES ${VCPKG_INCLUDE_DIR})
         
         add_vendor_target(test-vendor STATIC_VENDORS googletest)
         find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)
