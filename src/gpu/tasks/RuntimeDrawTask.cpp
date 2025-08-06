@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RuntimeDrawTask.h"
-#include "core/utils/Profiling.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/Pipeline.h"
 #include "gpu/ProxyProvider.h"
@@ -53,7 +52,6 @@ RuntimeDrawTask::RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
 }
 
 void RuntimeDrawTask::execute(CommandEncoder* encoder) {
-  TaskMark(inspector::OpTaskType::RuntimeDrawTask);
   std::vector<std::shared_ptr<Texture>> textures = {};
   textures.reserve(inputTextures.size());
   for (size_t i = 0; i < inputTextures.size(); i++) {
