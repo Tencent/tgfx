@@ -40,7 +40,7 @@ class CommandQueue {
    * @param size The size of the data in bytes.
    * @return true if the write operation was successful, false otherwise.
    */
-  virtual bool writeBuffer(const GPUBuffer* buffer, size_t bufferOffset, const void* data,
+  virtual bool writeBuffer(GPUBuffer* buffer, size_t bufferOffset, const void* data,
                            size_t size) = 0;
 
   /**

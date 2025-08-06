@@ -61,7 +61,7 @@ class ProxyProvider {
    * Creates a VertexBufferProxyView from the given VertexProvider. The provider will be released
    * after being uploaded to the GPU.
    */
-  std::shared_ptr<VertexBufferProxyView> createVertexBufferProxyView(
+  std::shared_ptr<VertexBufferProxyView> createVertexBufferProxy(
       PlacementPtr<VertexProvider> provider, uint32_t renderFlags = 0);
 
   /**

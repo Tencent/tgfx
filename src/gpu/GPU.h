@@ -59,6 +59,14 @@ class GPU {
   virtual std::unique_ptr<GPUBuffer> createBuffer(size_t size, uint32_t usage) const = 0;
 
   /**
+   * Destroys the specified GPUBuffer. This method should be called when the buffer is no longer
+   * needed, allowing the GPU to release its underlying allocations. After calling this method, the
+   * GPUBuffer must not be used, as doing so may lead to undefined behavior.
+   * @param buffer The GPUBuffer to be destroyed.
+   */
+  virtual void destroyBuffer(GPUBuffer* buffer) const = 0;
+
+  /**
    * Creates a command encoder that can be used to encode commands to be issued to the GPU.
    */
   virtual std::shared_ptr<CommandEncoder> createCommandEncoder() const = 0;

@@ -58,6 +58,19 @@ std::unique_ptr<GPUBuffer> GLGPU::createBuffer(size_t size, uint32_t usage) cons
   return std::make_unique<GLBuffer>(bufferID, size, usage);
 }
 
+void GLGPU::destroyBuffer(GPUBuffer* buffer) const {
+  if (buffer == nullptr) {
+    return;
+  }
+  auto& bufferID = static_cast<GLBuffer*>(buffer)->_bufferID;
+  if (bufferID == 0) {
+    return;
+  }
+  auto gl = interface->functions();
+  gl->deleteBuffers(1, &bufferID);
+  bufferID = 0;
+}
+
 std::shared_ptr<CommandEncoder> GLGPU::createCommandEncoder() const {
   return std::make_shared<GLCommandEncoder>(interface);
 }
