@@ -510,24 +510,32 @@ elseif (CMAKE_HOST_SYSTEM_NAME MATCHES "Linux")
 endif ()
 
 if(TGFX_BUILD_VCPKG)
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        set(VCPKG_LIB_DIR ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/debug/lib)
+    else()
+        set(VCPKG_LIB_DIR ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib)
+    endif()
+    set(VCPKG_INCLUDE_DIR ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/include)
+
+    list(APPEND TGFX_INCLUDES ${VCPKG_INCLUDE_DIR})
+
     if(TGFX_USE_JPEG)
-        find_package(JPEG REQUIRED)
-        list(APPEND TGFX_SHARED_LIBS JPEG::JPEG)
+        list(APPEND TGFX_STATIC_LIBS ${VCPKG_LIB_DIR}/libjpeg.a)
     endif()
     
     if(TGFX_USE_WEBP)
-        find_package(WebP CONFIG REQUIRED)
-        list(APPEND TGFX_SHARED_LIBS WebP::webp WebP::webpdecoder WebP::webpdemux)
+        list(APPEND TGFX_STATIC_LIBS 
+            ${VCPKG_LIB_DIR}/libwebp.a
+            ${VCPKG_LIB_DIR}/libwebpdecoder.a
+            ${VCPKG_LIB_DIR}/libwebpmux.a)
     endif()
     
     if(TGFX_USE_PNG)
-        find_package(PNG REQUIRED)
-        list(APPEND TGFX_SHARED_LIBS PNG::PNG)
+        list(APPEND TGFX_STATIC_LIBS ${VCPKG_LIB_DIR}/libpng.a)
     endif()
     
     if(TGFX_USE_ZLIB)
-        find_package(ZLIB REQUIRED)
-        list(APPEND TGFX_SHARED_LIBS ZLIB::ZLIB)
+        list(APPEND TGFX_STATIC_LIBS ${VCPKG_LIB_DIR}/libz.a)
     endif()
     
     if(TGFX_USE_FREETYPE)
