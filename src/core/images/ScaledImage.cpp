@@ -81,7 +81,8 @@ std::shared_ptr<TextureProxy> ScaledImage::lockTextureProxy(const TPArgs& args,
   auto drawScaleY = scaledRect.height() / drawRect.height();
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(scaledRect.width()), static_cast<int>(scaledRect.height()),
-      alphaRenderable && isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
+      alphaRenderable && isAlphaOnly(), 1, hasMipmaps() && args.mipmapped, ImageOrigin::TopLeft,
+      args.backingFit);
   if (renderTarget == nullptr) {
     return nullptr;
   }
