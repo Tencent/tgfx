@@ -591,7 +591,7 @@ if(TGFX_BUILD_VCPKG)
     endif()
 
     find_library(LZ4_LIB 
-        NAMES lz4 liblz4
+        NAMES lz4 liblz4 lz4d liblz4d
         PATHS ${VCPKG_LIB_DIR}
         NO_DEFAULT_PATH
     )
