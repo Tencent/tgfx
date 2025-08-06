@@ -542,7 +542,12 @@ if(TGFX_BUILD_VCPKG)
             PATHS ${VCPKG_LIB_DIR}
             NO_DEFAULT_PATH
         )
-        list(APPEND TGFX_STATIC_LIBS ${WEBP_LIB} ${WEBPDEMUX_LIB} ${WEBPMUX_LIB})
+        find_library(SHARPYUV_LIB 
+            NAMES sharpyuv libsharpyuv
+            PATHS ${VCPKG_LIB_DIR}
+            NO_DEFAULT_PATH
+        )
+        list(APPEND TGFX_STATIC_LIBS ${WEBP_LIB} ${WEBPDEMUX_LIB} ${WEBPMUX_LIB} ${SHARPYUV_LIB})
     endif()
     
     if(TGFX_USE_PNG)
