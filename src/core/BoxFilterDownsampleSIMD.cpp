@@ -16,6 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "BoxFilterDownsampleSIMD.h"
+#include "core/utils/Log.h"
 // First undef to prevent error when re-included.
 #undef HWY_TARGET_INCLUDE
 // For dynamic dispatch, specify the name of the current file (unfortunately
@@ -35,9 +36,8 @@ namespace hn = hwy::HWY_NAMESPACE;
 int ResizeAreaFast4chx16SIMDFuncImpl(int srcStep, int dstStep, const uint8_t* srcData,
                                      uint8_t* dstData, int w, int padding, int scale,
                                      int shiftNum) {
-  if (scale < 4 || scale > 16) {
-    return 0;
-  }
+  DEBUG_ASSERT(scale >= 4);
+  DEBUG_ASSERT(scale <= 16);
   int dstX = 0;
   hn::Full128<uint8_t> du8;
   hn::Full128<uint16_t> du16;
@@ -74,9 +74,7 @@ int ResizeAreaFast4chx16SIMDFuncImpl(int srcStep, int dstStep, const uint8_t* sr
 
 int ResizeAreaFast4chxNSIMDFuncImpl(int srcStep, int dstStep, const uint8_t* srcData,
                                     uint8_t* dstData, int w, int padding, int scale, int shiftNum) {
-  if (scale < 32) {
-    return 0;
-  }
+  DEBUG_ASSERT(scale >= 32);
   int dstX = 0;
   hn::Full128<uint8_t> du8;
   hn::Full32<uint8_t> duh8;
@@ -116,9 +114,7 @@ int ResizeAreaFast4chxNSIMDFuncImpl(int srcStep, int dstStep, const uint8_t* src
 
 int ResizeAreaFast1chxNSIMDFuncImpl(int srcStep, int, const uint8_t* srcData, uint8_t* dstData,
                                     int w, int padding, int scale, int shiftNum) {
-  if (scale < 16) {
-    return 0;
-  }
+  DEBUG_ASSERT(scale >= 16);
   int dstX = 0;
   hn::Full128<uint8_t> du8;
   hn::Full128<uint16_t> du16;
@@ -321,9 +317,7 @@ int ResizeAreaFastx16SimdFuncImpl(int channelNum, int srcStep, int dstStep, cons
 
 int ResizeAreaFastxNSimdFuncImpl(int channelNum, int srcStep, int dstStep, const uint8_t* srcData,
                                  uint8_t* dstData, int w, int scale, int padding, int shiftNum) {
-  if (scale < 32) {
-    return 0;
-  }
+  DEBUG_ASSERT(scale >= 32);
   int dstX = 0;
   if (channelNum == 1) {
     dstX = ResizeAreaFast1chxNSIMDFuncImpl(srcStep, dstStep, srcData, dstData, w, padding, scale,
