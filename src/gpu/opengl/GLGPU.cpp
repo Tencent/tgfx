@@ -55,7 +55,7 @@ std::unique_ptr<GPUBuffer> GLGPU::createBuffer(size_t size, uint32_t usage) cons
   gl->bindBuffer(target, bufferID);
   gl->bufferData(target, static_cast<GLsizeiptr>(size), nullptr, GL_STATIC_DRAW);
   gl->bindBuffer(target, 0);
-  return std::make_unique<GLBuffer>(interface, bufferID, size, usage);
+  return std::make_unique<GLBuffer>(bufferID, size, usage);
 }
 
 void GLGPU::destroyBuffer(GPUBuffer* buffer) const {
