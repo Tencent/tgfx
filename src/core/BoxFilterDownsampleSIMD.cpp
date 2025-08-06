@@ -35,7 +35,7 @@ namespace hn = hwy::HWY_NAMESPACE;
 int ResizeAreaFast4chx16SIMDFuncImpl(int srcStep, int dstStep, const uint8_t* srcData,
                                      uint8_t* dstData, int w, int padding, int scale,
                                      int shiftNum) {
-  if(scale < 4 || scale >16) {
+  if (scale < 4 || scale > 16) {
     return 0;
   }
   int dstX = 0;
@@ -74,7 +74,7 @@ int ResizeAreaFast4chx16SIMDFuncImpl(int srcStep, int dstStep, const uint8_t* sr
 
 int ResizeAreaFast4chxNSIMDFuncImpl(int srcStep, int dstStep, const uint8_t* srcData,
                                     uint8_t* dstData, int w, int padding, int scale, int shiftNum) {
-  if(scale < 32) {
+  if (scale < 32) {
     return 0;
   }
   int dstX = 0;
@@ -116,7 +116,7 @@ int ResizeAreaFast4chxNSIMDFuncImpl(int srcStep, int dstStep, const uint8_t* src
 
 int ResizeAreaFast1chxNSIMDFuncImpl(int srcStep, int, const uint8_t* srcData, uint8_t* dstData,
                                     int w, int padding, int scale, int shiftNum) {
-  if(scale < 16) {
+  if (scale < 16) {
     return 0;
   }
   int dstX = 0;
@@ -321,7 +321,7 @@ int ResizeAreaFastx16SimdFuncImpl(int channelNum, int srcStep, int dstStep, cons
 
 int ResizeAreaFastxNSimdFuncImpl(int channelNum, int srcStep, int dstStep, const uint8_t* srcData,
                                  uint8_t* dstData, int w, int scale, int padding, int shiftNum) {
-  if(scale < 32) {
+  if (scale < 32) {
     return 0;
   }
   int dstX = 0;
