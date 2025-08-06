@@ -259,6 +259,7 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
 #ifdef TGFX_USE_THREADS
   auto asyncDecoding = !(renderFlags & RenderFlags::DisableAsyncTask);
 #else
+  USE(renderFlags);
   auto asyncDecoding = false;
 #endif
   // Ensure the image source is retained so it won't be destroyed prematurely during async decoding.
