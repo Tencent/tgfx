@@ -255,8 +255,6 @@ void DoDeflatedImage(const Pixmap& pixmap, PDFDocument* document, bool isOpaque,
     }
     default:
       colorSpace = PDFUnion::Name("DeviceRGB");
-      // channels = 3;
-      // DEBUG_ASSERT(pm.alphaType() == AlphaType::Unpremultiplied);
       const auto* pixelPointer = reinterpret_cast<const uint8_t*>(pixmap.pixels());
       auto rowBytes = pixmap.rowBytes();
 

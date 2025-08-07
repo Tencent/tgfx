@@ -272,6 +272,7 @@ TGFX_TEST(PDFExportTest, Complex) {
   ASSERT_TRUE(context != nullptr);
 
   auto PDFStream = MemoryWriteStream::Make();
+
   auto document = MakePDFDocument(PDFStream, context, PDFMetadata());
   auto* canvas = document->beginPage(1000.f, 500.f);
   canvas->translate(40.0, 20.0);

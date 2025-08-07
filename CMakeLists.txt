@@ -250,6 +250,7 @@ endif ()
 
 if (TGFX_USE_ZLIB)
     list(APPEND TGFX_STATIC_VENDORS zlib)
+    list(APPEND TGFX_INCLUDES third_party/out/zlib/${INCLUDE_ENTRY})
 endif ()
 
 if (TGFX_USE_FASTER_BLUR)
