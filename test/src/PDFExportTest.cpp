@@ -349,6 +349,5 @@ TGFX_TEST(PDFExportTest, Complex) {
   PDFStream->flush();
 
   EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/Complex"));
-  EXPECT_TRUE(false);
 }
 }  // namespace tgfx
