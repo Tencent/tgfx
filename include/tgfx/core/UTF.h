@@ -21,7 +21,6 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
-#include "tgfx/core/Typeface.h"
 
 namespace tgfx {
 class UTF {

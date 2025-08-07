@@ -22,6 +22,7 @@
 #include "core/MeasureContext.h"
 #include "core/Records.h"
 #include "core/ScalerContext.h"
+#include "core/filters/BlurImageFilter.h"
 #include "core/filters/DropShadowImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
@@ -68,6 +69,7 @@
 #include "tgfx/core/Typeface.h"
 #include "tgfx/core/UTF.h"
 #include "tgfx/core/WriteStream.h"
+#include "tgfx/layers/filters/DropShadowFilter.h"
 
 namespace tgfx {
 
@@ -586,10 +588,11 @@ void PDFExportContext::drawDropShadowBeforeLayer(const std::shared_ptr<Picture>&
   auto* canvas = surface->getCanvas();
   canvas->clear(Color::Transparent());
 
-  auto copyFilter = dropShadowFilter->clone();
-  copyFilter->dx = 0;
-  copyFilter->dy = 0;
-  copyFilter->shadowOnly = true;
+  DEBUG_ASSERT(Types::Get(dropShadowFilter->blurFilter.get()) == Types::ImageFilterType::Blur);
+  const auto* blurFilter = static_cast<const BlurImageFilter*>(dropShadowFilter->blurFilter.get());
+  auto copyFilter = ImageFilter::DropShadowOnly(dropShadowFilter->dx, dropShadowFilter->dy,
+                                                blurFilter->blurrinessX, blurFilter->blurrinessY,
+                                                dropShadowFilter->color);
 
   Paint picturePaint = {};
   picturePaint.setImageFilter(copyFilter);
@@ -624,8 +627,12 @@ void PDFExportContext::drawInnerShadowAfterLayer(const Record* record,
   auto* canvas = surface->getCanvas();
   canvas->translate(-pictureBounds.x(), -pictureBounds.y());
 
-  auto copyFilter = innerShadowFilter->clone();
-  copyFilter->shadowOnly = true;
+  DEBUG_ASSERT(Types::Get(innerShadowFilter->blurFilter.get()) == Types::ImageFilterType::Blur);
+  const auto* blurFilter = static_cast<const BlurImageFilter*>(innerShadowFilter->blurFilter.get());
+  auto copyFilter = ImageFilter::InnerShadowOnly(innerShadowFilter->dx, innerShadowFilter->dy,
+                                                 blurFilter->blurrinessX, blurFilter->blurrinessY,
+                                                 innerShadowFilter->color);
+
   Paint picturePaint = {};
   picturePaint.setImageFilter(copyFilter);
 
