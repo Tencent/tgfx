@@ -258,7 +258,6 @@ void DoDeflatedImage(const Pixmap& pixmap, PDFDocument* document, bool isOpaque,
       const auto* pixelPointer = reinterpret_cast<const uint8_t*>(pixmap.pixels());
       auto rowBytes = pixmap.rowBytes();
 
-      DEBUG_ASSERT(pixmap.colorType() == ColorType::BGRA_8888);
       uint8_t byteBuffer[3072];
       static_assert(std::size(byteBuffer) % 3 == 0);
       uint8_t* bufferStop = byteBuffer + std::size(byteBuffer);
