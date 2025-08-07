@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,45 +17,30 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include "core/images/ResourceImage.h"
+#include "tgfx/core/Image.h"
+#include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
-class MipmapImage : public ResourceImage {
+class ScaledImageGenerator : public ImageGenerator {
  public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ResourceImage> source);
+  static std::shared_ptr<ScaledImageGenerator> MakeFrom(const std::shared_ptr<ImageCodec>& codec,
+                                                        int width, int height);
 
-  int width() const override {
-    return source->width();
-  }
-
-  int height() const override {
-    return source->height();
-  }
+  ~ScaledImageGenerator() override = default;
 
   bool isAlphaOnly() const override {
     return source->isAlphaOnly();
   }
 
-  bool hasMipmaps() const override {
-    return true;
+  bool asyncSupport() const override {
+    return source->asyncSupport();
   }
 
- protected:
-  Type type() const override {
-    return Type::Mipmap;
-  }
-
-  std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
-
-  std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
-
-  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
-                                                   const UniqueKey& key) const override;
+  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
  private:
-  std::shared_ptr<ResourceImage> source = nullptr;
+  std::shared_ptr<ImageCodec> source = nullptr;
 
-  MipmapImage(UniqueKey uniqueKey, std::shared_ptr<ResourceImage> source);
+  explicit ScaledImageGenerator(int width, int height, const std::shared_ptr<ImageCodec>& codec);
 };
 }  // namespace tgfx

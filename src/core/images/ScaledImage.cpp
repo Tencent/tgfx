@@ -25,18 +25,11 @@
 #include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
-std::shared_ptr<Image> ScaledImage::MakeFrom(std::shared_ptr<Image> image, int width, int height,
-                                             const SamplingOptions& sampling) {
-  DEBUG_ASSERT(width > 0 && height > 0 && image != nullptr);
-  DEBUG_ASSERT(width != image->width() || height != image->height());
-  auto scaledImage = std::make_shared<ScaledImage>(std::move(image), width, height, sampling);
-  scaledImage->weakThis = scaledImage;
-  return scaledImage;
-}
 
 ScaledImage::ScaledImage(std::shared_ptr<Image> image, int width, int height,
-                         const SamplingOptions& sampling)
-    : TransformImage(std::move(image)), _width(width), _height(height), sampling(sampling) {
+                         const SamplingOptions& sampling, bool mipmapped)
+    : TransformImage(std::move(image)), _width(width), _height(height), sampling(sampling),
+      mipmapped(mipmapped) {
 }
 
 PlacementPtr<FragmentProcessor> ScaledImage::asFragmentProcessor(const FPArgs& args,
@@ -52,20 +45,24 @@ PlacementPtr<FragmentProcessor> ScaledImage::asFragmentProcessor(const FPArgs& a
   }
   drawRect.roundOut();
   auto mipmapped = hasMipmaps() && samplingArgs.sampling.mipmapMode != MipmapMode::None;
-  TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
+  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale);
   auto textureProxy = lockTextureProxy(tpArgs, drawRect);
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  auto finalUVMatrix = Matrix::MakeTrans(-drawRect.left, -drawRect.top);
+  auto extraMatrix = Matrix::MakeTrans(-drawRect.left, -drawRect.top);
+  extraMatrix.preScale(drawRect.width() / static_cast<float>(textureProxy->width()),
+                       drawRect.height() / static_cast<float>(textureProxy->height()));
+
+  auto fpMatrix = extraMatrix;
   if (uvMatrix) {
-    finalUVMatrix.preConcat(*uvMatrix);
+    fpMatrix.preConcat(*uvMatrix);
   }
   auto newSamplingArgs = samplingArgs;
   if (samplingArgs.sampleArea) {
-    newSamplingArgs.sampleArea = samplingArgs.sampleArea->makeOffset(-drawRect.left, -drawRect.top);
+    newSamplingArgs.sampleArea = extraMatrix.mapRect(*samplingArgs.sampleArea);
   }
-  return TiledTextureEffect::Make(textureProxy, newSamplingArgs, &finalUVMatrix, isAlphaOnly());
+  return TiledTextureEffect::Make(textureProxy, newSamplingArgs, &fpMatrix, isAlphaOnly());
 }
 
 std::shared_ptr<TextureProxy> ScaledImage::lockTextureProxy(const TPArgs& args) const {
@@ -75,18 +72,28 @@ std::shared_ptr<TextureProxy> ScaledImage::lockTextureProxy(const TPArgs& args) 
 std::shared_ptr<TextureProxy> ScaledImage::lockTextureProxy(const TPArgs& args,
                                                             const Rect& drawRect) const {
   auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
+  auto scaledRect = drawRect;
+  if (args.drawScale < 1.0f) {
+    scaledRect.scale(args.drawScale, args.drawScale);
+  }
+  scaledRect.roundOut();
+  auto drawScaleX = scaledRect.width() / drawRect.width();
+  auto drawScaleY = scaledRect.height() / drawRect.height();
   auto renderTarget = RenderTargetProxy::MakeFallback(
-      args.context, static_cast<int>(drawRect.width()), static_cast<int>(drawRect.height()),
-      alphaRenderable && isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft,
-      BackingFit::Approx);
+      args.context, static_cast<int>(scaledRect.width()), static_cast<int>(scaledRect.height()),
+      alphaRenderable && isAlphaOnly(), 1, hasMipmaps() && args.mipmapped, ImageOrigin::TopLeft,
+      args.backingFit);
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto uvScaleX = static_cast<float>(source->width()) / static_cast<float>(_width);
-  auto uvScaleY = static_cast<float>(source->height()) / static_cast<float>(_height);
-  Matrix sourceUVMatrix = Matrix::MakeScale(uvScaleX, uvScaleY);
-  sourceUVMatrix.preTranslate(drawRect.left, drawRect.top);
-  FPArgs fpArgs(args.context, args.renderFlags, Rect::MakeWH(drawRect.width(), drawRect.height()));
+  Point scales =
+      Point::Make(drawScaleX * static_cast<float>(_width) / static_cast<float>(source->width()),
+                  drawScaleY * static_cast<float>(_height) / static_cast<float>(source->height()));
+  Matrix sourceUVMatrix = Matrix::MakeScale(1.0f / scales.x, 1.0f / scales.y);
+  sourceUVMatrix.preTranslate(scaledRect.left, scaledRect.top);
+  FPArgs fpArgs(args.context, args.renderFlags,
+                Rect::MakeWH(renderTarget->width(), renderTarget->height()),
+                std::max(scales.x, scales.y));
   auto processor =
       FragmentProcessor::Make(source, fpArgs, sampling, SrcRectConstraint::Fast, &sourceUVMatrix);
   if (processor == nullptr) {
@@ -102,11 +109,18 @@ std::shared_ptr<Image> ScaledImage::onMakeScaled(int newWidth, int newHeight,
   if (newWidth == source->width() && newHeight == source->height()) {
     return source;
   }
-  return MakeFrom(source, newWidth, newHeight, sampling);
+  auto result = source->makeScaled(newWidth, newHeight, sampling);
+  return result->makeMipmapped(hasMipmaps());
+}
+
+std::shared_ptr<Image> ScaledImage::onMakeMipmapped(bool enabled) const {
+  auto scaledImage = std::make_shared<ScaledImage>(source, _width, _height, sampling, enabled);
+  scaledImage->weakThis = scaledImage;
+  return scaledImage;
 }
 
 std::shared_ptr<Image> ScaledImage::onCloneWith(std::shared_ptr<Image> newSource) const {
-  auto scaledImage = std::make_shared<ScaledImage>(newSource, _width, _height, sampling);
+  auto scaledImage = std::make_shared<ScaledImage>(newSource, _width, _height, sampling, mipmapped);
   scaledImage->weakThis = scaledImage;
   return scaledImage;
 }

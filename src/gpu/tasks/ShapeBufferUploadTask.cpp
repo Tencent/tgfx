@@ -47,7 +47,7 @@ std::shared_ptr<Resource> ShapeBufferUploadTask::onMakeResource(Context* context
       return nullptr;
     }
     if (!gpu->queue()->writeBuffer(gpuBuffer.get(), 0, triangles->data(), triangles->size())) {
-      gpuBuffer->release(gpu);
+      gpu->destroyBuffer(gpuBuffer.get());
       LOGE("ShapeBufferUploadTask::onMakeResource() Failed to write buffer!");
       return nullptr;
     }
@@ -58,7 +58,7 @@ std::shared_ptr<Resource> ShapeBufferUploadTask::onMakeResource(Context* context
       LOGE("ShapeBufferUploadTask::execute() Failed to create the texture!");
       return nullptr;
     }
-    texture->assignUniqueKey(textureKey);
+    texture->assignUniqueKey(textureProxy->uniqueKey);
     textureProxy->resource = std::move(texture);
   }
   // Free the data source immediately to reduce memory pressure.

@@ -22,11 +22,12 @@
 #include <climits>
 #include <cmath>
 #include <cstdint>
+#include <functional>
 #include <memory>
+#include "BoxFilterDownsampleSIMD.h"
 #include "utils/Log.h"
 
 namespace tgfx {
-
 constexpr int ChannelSizeInBytes = 1;
 
 struct DecimateAlpha {
@@ -69,18 +70,6 @@ inline int SaturateCast<int>(double v) {
 static void SaturateStore(const float* sum, int width, uint8_t* dstData) {
   for (int dstX = 0; dstX < width; ++dstX) {
     dstData[dstX] = SaturateCast<uint8_t>(sum[dstX]);
-  }
-}
-
-static void Mul(const float* buf, int width, float beta, float* sum) {
-  for (int dstX = 0; dstX < width; ++dstX) {
-    sum[dstX] = beta * buf[dstX];
-  }
-}
-
-static void MulAdd(const float* buf, int width, float beta, float* sum) {
-  for (int dstX = 0; dstX < width; ++dstX) {
-    sum[dstX] += beta * buf[dstX];
   }
 }
 
@@ -140,6 +129,101 @@ static int ComputeResizeAreaTab(int srcSize, int dstSize, int channelNum, double
   return k;
 }
 
+using ResizeFunc = int (*)(int, int, int, const uint8_t*, uint8_t*, int, int, int, int);
+
+static bool IsPowerOfTwo(int n) {
+  return (n > 0) && ((n & (n - 1)) == 0);
+}
+
+static int GetPowerOfTwo(int n) {
+  if (n <= 0 || (n & (n - 1)) != 0) {
+    return -1;
+  }
+  int k = 0;
+  while (n >>= 1) {
+    k++;
+  }
+  return k;
+}
+
+struct ResizeAreaFastVec {
+  ResizeAreaFastVec(int scaleX, int scaleY, int channelNum, int srcStep, int dstStep)
+      : scaleX(scaleX), scaleY(scaleY), channelNum(channelNum), srcStep(srcStep), dstStep(dstStep) {
+    fastMode =
+        this->scaleX == this->scaleY && IsPowerOfTwo(this->scaleX) && IsPowerOfTwo(this->scaleY);
+    padding = scaleX * scaleY / 2;
+    shiftNum = GetPowerOfTwo(scaleX) * 2;
+    switch (this->scaleX) {
+      case 2:
+        resizeFunc = ResizeAreaFastx2SIMDFunc;
+        break;
+      case 4:
+        resizeFunc = ResizeAreaFastx4SIMDFunc;
+        break;
+      case 8:
+        resizeFunc = ResizeAreaFastx8SIMDFunc;
+        break;
+      case 16:
+        resizeFunc = ResizeAreaFastx16SimdFunc;
+        break;
+      default:
+        resizeFunc = ResizeAreaFastxNSimdFunc;
+    }
+  }
+
+  int operator()(const uint8_t* srcData, uint8_t* dstData, int w) const {
+    int dstX = 0;
+    if (fastMode) {
+      dstX =
+          resizeFunc(channelNum, srcStep, dstStep, srcData, dstData, w, scaleX, padding, shiftNum);
+      if (channelNum == 1) {
+        for (; dstX < w; ++dstX) {
+          int index = dstX * scaleX;
+          int sum = 0;
+          for (int i = 0; i < scaleY; i++) {
+            for (int j = 0; j < scaleX; j++) {
+              const uint8_t* data = srcData + srcStep * i;
+              sum += data[index + j];
+            }
+          }
+          dstData[dstX] = static_cast<uint8_t>((sum + padding) >> shiftNum);
+        }
+      } else {
+        ASSERT(channelNum == 4);
+        for (; dstX < w; dstX += 4) {
+          int index = dstX * scaleX;
+          int sum[4] = {0};
+          for (int i = 0; i < scaleY; i++) {
+            for (int j = 0; j < scaleX; j++) {
+              const uint8_t* data = srcData + srcStep * i;
+              sum[0] += data[index + 4 * j];
+              sum[1] += data[index + 4 * j + 1];
+              sum[2] += data[index + 4 * j + 2];
+              sum[3] += data[index + 4 * j + 3];
+            }
+          }
+          dstData[dstX] = static_cast<uint8_t>((sum[0] + padding) >> shiftNum);
+          dstData[dstX + 1] = static_cast<uint8_t>((sum[1] + padding) >> shiftNum);
+          dstData[dstX + 2] = static_cast<uint8_t>((sum[2] + padding) >> shiftNum);
+          dstData[dstX + 3] = static_cast<uint8_t>((sum[3] + padding) >> shiftNum);
+        }
+      }
+    }
+    return dstX;
+  }
+
+ private:
+  int scaleX = 0;
+  int scaleY = 0;
+  int channelNum = 0;
+  bool fastMode = false;
+  int srcStep = 0;
+  int dstStep = 0;
+  ResizeFunc resizeFunc = nullptr;
+  int padding = 0;
+  int shiftNum = 0;
+};
+
 /**
  * Performs fast area-based downsampling when the scaling factor is an exact integer ratio.
  *
@@ -164,7 +248,8 @@ static void ResizeAreaFast(const FastFuncInfo& srcInfo, FastFuncInfo& dstInfo, c
   int dstWidth = dstInfo.layout.width * channelNum;
   int srcWidth = srcInfo.layout.width * channelNum;
   int dstY, dstX, k = 0;
-
+  ResizeAreaFastVec vecOp(scaleX, scaleY, channelNum, srcInfo.layout.rowBytes,
+                          dstInfo.layout.rowBytes);
   for (dstY = 0; dstY < dstInfo.layout.height; dstY++) {
     auto* dstData = static_cast<uint8_t*>(dstInfo.pixels) + dstY * dstInfo.layout.rowBytes;
     int srcY0 = dstY * scaleY;
@@ -175,8 +260,9 @@ static void ResizeAreaFast(const FastFuncInfo& srcInfo, FastFuncInfo& dstInfo, c
       }
       continue;
     }
-
-    for (dstX = 0; dstX < w; dstX++) {
+    dstX =
+        vecOp(static_cast<uint8_t*>(srcInfo.pixels) + srcY0 * srcInfo.layout.rowBytes, dstData, w);
+    for (; dstX < w; dstX++) {
       const uint8_t* srcData =
           static_cast<uint8_t*>(srcInfo.pixels) + srcY0 * srcInfo.layout.rowBytes + xOffset[dstX];
       int sum = 0;
@@ -290,7 +376,7 @@ static void ResizeArea(const FastFuncInfo& srcInfo, FastFuncInfo& dstInfo,
 }
 
 void BoxFilterDownsample(const void* inputPixels, const PixelLayout& inputLayout,
-                         void* outputPixels, const PixelLayout& outputLayout, bool alphaOnly) {
+                         void* outputPixels, const PixelLayout& outputLayout, bool isOneComponent) {
   ASSERT(inputPixels != nullptr && outputPixels != nullptr)
   ASSERT(inputLayout.width > 0 && inputLayout.height > 0 && outputLayout.width > 0 &&
          outputLayout.height > 0)
@@ -299,7 +385,7 @@ void BoxFilterDownsample(const void* inputPixels, const PixelLayout& inputLayout
 
   auto scaleX = static_cast<double>(inputLayout.width) / outputLayout.width;
   auto scaleY = static_cast<double>(inputLayout.height) / outputLayout.height;
-  int channelNum = alphaOnly ? 1 : 4;
+  int channelNum = isOneComponent ? 1 : 4;
   int iScaleX = SaturateCast<int>(scaleX);
   int iScaleY = SaturateCast<int>(scaleY);
   bool isAreaFast =

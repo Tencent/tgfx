@@ -33,9 +33,7 @@ namespace tgfx {
 enum class SamplerType { None, TwoD, Rectangle, External };
 
 /**
- * TextureSampler is an abstract class representing a GPU backend texture sampler. Note that you
- * must call releaseGPU() to release GPU resources; destroying the TextureSampler alone will not
- * free them.
+ * GPUTexture represents a texture in the GPU backend for rendering operations.
  */
 class TextureSampler {
  public:

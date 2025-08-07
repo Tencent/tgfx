@@ -32,7 +32,9 @@ class BackendTexture;
 class RenderTarget;
 
 /**
- * Texture describes a two-dimensional array of pixels in the GPU backend for drawing.
+ * TextureView represents a complete image stored in GPU memory. It can consist of multiple
+ * GPUTextures, such as when the image uses a YUV format. It also includes an origin property to
+ * specify the image orientation, such as top-left or bottom-left.
  */
 class Texture : public Resource {
  public:

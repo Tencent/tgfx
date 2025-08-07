@@ -16,26 +16,27 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <cstdint>
+#include "PixelBufferCodec.h"
+#include "BoxFilterDownsample.h"
+#include "PixelBuffer.h"
 
 namespace tgfx {
-/**
- * GPUBufferUsage defines the usage flags for GPU buffers.
- */
-class GPUBufferUsage {
- public:
-  /**
-   * The buffer can be used as an index buffer, for example as the buffer argument passed to
-   * RenderPass::setIndexBuffer().
-   */
-  static constexpr uint32_t INDEX = 0x10;
+std::shared_ptr<PixelBufferCodec> PixelBufferCodec::Make(std::shared_ptr<PixelBuffer> source) {
+  if (!source) {
+    return nullptr;
+  }
+  return std::make_shared<PixelBufferCodec>(std::move(source));
+}
 
-  /**
-   * The buffer can be used as a vertex buffer, for example as the buffer argument passed to
-   * RenderPass::setVertexBuffer().
-   */
-  static constexpr uint32_t VERTEX = 0x20;
-};
+bool PixelBufferCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                                    void* dstPixels) const {
+  auto pixels = source->lockPixels();
+  if (pixels == nullptr) {
+    return false;
+  }
+  auto srcPixmap = Pixmap(source->info(), pixels);
+  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
+  return srcPixmap.readPixels(dstInfo, dstPixels);
+}
+
 }  // namespace tgfx

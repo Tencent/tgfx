@@ -61,7 +61,7 @@ class ProxyProvider {
    * Creates a VertexBufferProxyView from the given VertexProvider. The provider will be released
    * after being uploaded to the GPU.
    */
-  std::shared_ptr<VertexBufferProxyView> createVertexBufferProxyView(
+  std::shared_ptr<VertexBufferProxyView> createVertexBufferProxy(
       PlacementPtr<VertexProvider> provider, uint32_t renderFlags = 0);
 
   /**
@@ -76,27 +76,22 @@ class ProxyProvider {
    * Creates a TextureProxy for the given ImageBuffer. The image buffer will be released after being
    * uploaded to the GPU.
    */
-  std::shared_ptr<TextureProxy> createTextureProxy(const UniqueKey& uniqueKey,
-                                                   std::shared_ptr<ImageBuffer> imageBuffer,
-                                                   bool mipmapped = false,
-                                                   uint32_t renderFlags = 0);
+  std::shared_ptr<TextureProxy> createTextureProxy(std::shared_ptr<ImageBuffer> imageBuffer,
+                                                   bool mipmapped = false);
 
   /*
    * Creates a TextureProxy for the given ImageGenerator.
    */
-  std::shared_ptr<TextureProxy> createTextureProxy(const UniqueKey& uniqueKey,
-                                                   std::shared_ptr<ImageGenerator> generator,
+  std::shared_ptr<TextureProxy> createTextureProxy(std::shared_ptr<ImageGenerator> generator,
                                                    bool mipmapped = false,
                                                    uint32_t renderFlags = 0);
 
   /**
    * Creates a TextureProxy for the given image source.
    */
-  std::shared_ptr<TextureProxy> createTextureProxy(const UniqueKey& uniqueKey,
-                                                   std::shared_ptr<DataSource<ImageBuffer>> source,
+  std::shared_ptr<TextureProxy> createTextureProxy(std::shared_ptr<DataSource<ImageBuffer>> source,
                                                    int width, int height, bool alphaOnly,
-                                                   bool mipmapped = false,
-                                                   uint32_t renderFlags = 0);
+                                                   bool mipmapped = false);
 
   /**
    * Creates an empty TextureProxy with specified width, height, format, mipmap state and origin.
@@ -155,6 +150,11 @@ class ProxyProvider {
    */
   void clearSharedVertexBuffer();
 
+  /**
+   * Stores the given proxy in the map with the new uniqueKey.
+   */
+  void assignProxyUniqueKey(std::shared_ptr<ResourceProxy> proxy, const UniqueKey& uniqueKey);
+
  private:
   Context* context = nullptr;
   ResourceKeyMap<std::weak_ptr<ResourceProxy>> proxyMap = {};
@@ -171,7 +171,7 @@ class ProxyProvider {
   void uploadSharedVertexBuffer(std::shared_ptr<Data> data);
 
   std::shared_ptr<TextureProxy> createTextureProxyByImageSource(
-      const UniqueKey& uniqueKey, std::shared_ptr<DataSource<ImageBuffer>> source, int width,
-      int height, bool alphaOnly, bool mipmapped = false, uint32_t renderFlags = 0);
+      std::shared_ptr<DataSource<ImageBuffer>> source, int width, int height, bool alphaOnly,
+      bool mipmapped = false);
 };
 }  // namespace tgfx

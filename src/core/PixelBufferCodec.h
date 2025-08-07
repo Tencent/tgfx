@@ -15,27 +15,28 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
 #pragma once
 
+#include "PixelBuffer.h"
+#include "tgfx/core/ImageCodec.h"
+
 namespace tgfx {
-class GPU;
-
-/**
- * GPUResource is the base class for GPU resources that need manual release of their underlying
- * allocations. It is intended for resources like buffers and textures that are not automatically
- * managed by the GPU. This class decouples resource release from object destruction, allowing you
- * to skip releasing resources in scenarios such as when the context is abandoned or the GPU has
- * been destroyed. Otherwise, it may lead to undefined behavior.
- */
-class GPUResource {
+class PixelBufferCodec : public ImageCodec {
  public:
-  virtual ~GPUResource() = default;
+  static std::shared_ptr<PixelBufferCodec> Make(std::shared_ptr<PixelBuffer> source);
 
-  /**
-   * Releases the underlying GPU resources. After calling this method, the GPUResource must not be
-   * used, as doing so may lead to undefined behavior.
-   */
-  virtual void release(const GPU* gpu) = 0;
+  PixelBufferCodec(std::shared_ptr<PixelBuffer> source)
+      : ImageCodec(source->width(), source->height()), source(std::move(source)) {
+  }
+
+  bool isAlphaOnly() const override {
+    return source->isAlphaOnly();
+  }
+
+  bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                    void* dstPixels) const override;
+
+ private:
+  std::shared_ptr<PixelBuffer> source = nullptr;
 };
 }  // namespace tgfx

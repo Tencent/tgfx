@@ -21,7 +21,7 @@
 #include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
-bool GLCommandQueue::writeBuffer(const GPUBuffer* buffer, size_t bufferOffset, const void* data,
+bool GLCommandQueue::writeBuffer(GPUBuffer* buffer, size_t bufferOffset, const void* data,
                                  size_t size) {
   if (data == nullptr || size == 0) {
     LOGE("GLCommandQueue::writeBuffer() data is null or size is zero!");

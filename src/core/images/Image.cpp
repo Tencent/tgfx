@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Image.h"
+#include <memory>
 #include "core/images/CodecImage.h"
 #include "core/images/FilterImage.h"
 #include "core/images/OrientImage.h"
@@ -68,12 +69,14 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageGenerator> generator
   if (generator->isImageCodec()) {
     auto codec = std::static_pointer_cast<ImageCodec>(generator);
     auto orientation = codec->orientation();
-    image = std::make_shared<CodecImage>(UniqueKey::Make(), std::move(codec));
+    image = std::make_shared<CodecImage>(std::move(codec), codec->width(), codec->height(), false);
     image->weakThis = image;
+    image = image->makeRasterized();
     image = image->makeOriented(orientation);
   } else {
-    image = std::make_shared<GeneratorImage>(UniqueKey::Make(), std::move(generator));
+    image = std::make_shared<GeneratorImage>(std::move(generator), false);
     image->weakThis = image;
+    image = image->makeRasterized();
   }
   return image;
 }
@@ -124,7 +127,7 @@ std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {
   if (context == nullptr) {
     return nullptr;
   }
-  TPArgs args(context, 0, hasMipmaps(), BackingFit::Exact);
+  TPArgs args(context, 0, hasMipmaps(), 1.0f, BackingFit::Exact);
   auto textureProxy = lockTextureProxy(args);
   if (textureProxy == nullptr) {
     return nullptr;
@@ -186,11 +189,9 @@ std::shared_ptr<Image> Image::makeScaled(int newWidth, int newHeight,
 }
 
 std::shared_ptr<Image> Image::makeRasterized() const {
-  auto rasterImage = RasterizedImage::MakeFrom(weakThis.lock());
-  if (rasterImage != nullptr && hasMipmaps()) {
-    return rasterImage->makeMipmapped(true);
-  }
-  return rasterImage;
+  auto result = std::make_shared<RasterizedImage>(UniqueKey::Make(), weakThis.lock());
+  result->weakThis = result;
+  return result;
 }
 
 std::shared_ptr<Image> Image::onMakeSubset(const Rect& subset) const {
@@ -220,7 +221,10 @@ std::shared_ptr<Image> Image::onMakeWithFilter(std::shared_ptr<ImageFilter> filt
 
 std::shared_ptr<Image> Image::onMakeScaled(int newWidth, int newHeight,
                                            const SamplingOptions& sampling) const {
-  return ScaledImage::MakeFrom(weakThis.lock(), newWidth, newHeight, sampling);
+  auto scaledImage =
+      std::make_shared<ScaledImage>(weakThis.lock(), newWidth, newHeight, sampling, hasMipmaps());
+  scaledImage->weakThis = scaledImage;
+  return scaledImage;
 }
 
 std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, int alphaStartX,
@@ -233,17 +237,26 @@ std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, in
 }
 
 std::shared_ptr<TextureProxy> Image::lockTextureProxy(const TPArgs& args) const {
+  auto textureWidth = width();
+  auto textureHeight = height();
+  if (args.drawScale < 1.0) {
+    textureWidth = static_cast<int>(roundf(static_cast<float>(width()) * args.drawScale));
+    textureHeight = static_cast<int>(roundf(static_cast<float>(height()) * args.drawScale));
+  }
   auto renderTarget =
-      RenderTargetProxy::MakeFallback(args.context, width(), height(), isAlphaOnly(), 1,
+      RenderTargetProxy::MakeFallback(args.context, textureWidth, textureHeight, isAlphaOnly(), 1,
                                       args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto drawRect = Rect::MakeWH(width(), height());
-  FPArgs fpArgs(args.context, args.renderFlags, drawRect);
+
+  auto textureScaleX = static_cast<float>(textureWidth) / static_cast<float>(width());
+  auto textureScaleY = static_cast<float>(textureHeight) / static_cast<float>(height());
+  auto uvMatrix = Matrix::MakeScale(1.0f / textureScaleX, 1.0f / textureScaleY);
+  auto drawRect = Rect::MakeWH(textureWidth, textureHeight);
+  FPArgs fpArgs(args.context, args.renderFlags, drawRect, std::max(textureScaleX, textureScaleY));
   SamplingArgs samplingArgs = {TileMode::Clamp, TileMode::Clamp, {}, SrcRectConstraint::Fast};
-  // There is no scaling for the image, so we can use the default sampling options.
-  auto processor = asFragmentProcessor(fpArgs, samplingArgs, nullptr);
+  auto processor = asFragmentProcessor(fpArgs, samplingArgs, &uvMatrix);
   auto drawingManager = args.context->drawingManager();
   if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags)) {
     return nullptr;

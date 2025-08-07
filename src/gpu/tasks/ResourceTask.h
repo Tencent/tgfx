@@ -42,7 +42,6 @@ class ResourceTask {
 
  private:
   std::shared_ptr<ResourceProxy> proxy = nullptr;
-  UniqueKey uniqueKey = {};
 
   friend class DrawingManager;
 };

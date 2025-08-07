@@ -17,9 +17,40 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TransformImage.h"
+#include "gpu/DrawingManager.h"
+#include "gpu/TPArgs.h"
+#include "gpu/processors/FragmentProcessor.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
 TransformImage::TransformImage(std::shared_ptr<Image> source) : source(std::move(source)) {
+}
+
+std::shared_ptr<TextureProxy> TransformImage::lockTextureProxy(const TPArgs& args) const {
+  auto textureWidth = width();
+  auto textureHeight = height();
+  if (args.drawScale < 1.0) {
+    textureWidth = static_cast<int>(roundf(static_cast<float>(width()) * args.drawScale));
+    textureHeight = static_cast<int>(roundf(static_cast<float>(height()) * args.drawScale));
+  }
+  auto renderTarget =
+      RenderTargetProxy::MakeFallback(args.context, textureWidth, textureHeight, isAlphaOnly(), 1,
+                                      args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
+  if (renderTarget == nullptr) {
+    return nullptr;
+  }
+  auto textureScaleX = static_cast<float>(textureWidth) / static_cast<float>(width());
+  auto textureScaleY = static_cast<float>(textureHeight) / static_cast<float>(height());
+  auto uvMatrix = Matrix::MakeScale(1.0f / textureScaleX, 1.0f / textureScaleY);
+  auto drawRect = Rect::MakeWH(textureWidth, textureHeight);
+  FPArgs fpArgs(args.context, args.renderFlags, drawRect, std::max(textureScaleX, textureScaleY));
+  SamplingArgs samplingArgs = {TileMode::Clamp, TileMode::Clamp, {}, SrcRectConstraint::Fast};
+  auto processor = asFragmentProcessor(fpArgs, samplingArgs, &uvMatrix);
+  auto drawingManager = args.context->drawingManager();
+  if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags)) {
+    return nullptr;
+  }
+  return renderTarget->asTextureProxy();
 }
 
 std::shared_ptr<Image> TransformImage::onMakeDecoded(Context* context, bool tryHardware) const {

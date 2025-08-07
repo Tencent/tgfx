@@ -74,9 +74,6 @@ bool Context::wait(const BackendSemaphore& waitSemaphore) {
 }
 
 bool Context::flush(BackendSemaphore* signalSemaphore) {
-  // Clean up all unreferenced resources before flushing, allowing them to be reused. This is
-  // particularly crucial for texture resources that are bound to render targets. Only after the
-  // cleanup can they be unbound and reused.
   _resourceCache->processUnreferencedResources();
   _atlasManager->preFlush();
   commandBuffer = _drawingManager->flush(signalSemaphore);
