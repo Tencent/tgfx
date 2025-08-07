@@ -28,6 +28,13 @@ struct Index {
       const buffer = value.buffer.slice(0);
       hello2d.addImageFromEncoded("bridge", buffer);
     });
+    getContext(this).resourceManager.getRawFileContent("tgfx.png", async (error, value) => {
+      if (error) {
+        return;
+      }
+      const buffer = value.buffer.slice(0);
+      hello2d.addImageFromEncoded("TGFX", buffer);
+    });
     hello2d.startDrawLoop();
   }
 
