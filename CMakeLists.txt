@@ -359,10 +359,10 @@ if(NOT TGFX_BUILD_VCPKG)
     list(APPEND TGFX_INCLUDES third_party/concurrentqueue)
 endif()
 if (TGFX_BUILD_SVG)
-    if (NOT TGFX_BUILD_VCPKG)
+#    if (NOT TGFX_BUILD_VCPKG)
         list(APPEND TGFX_STATIC_VENDORS expat)
         list(APPEND TGFX_INCLUDES third_party/expat)
-    endif ()
+#    endif ()
 endif ()
 
 if (WEB)
@@ -621,25 +621,25 @@ if(TGFX_BUILD_VCPKG)
         find_package(Stb REQUIRED)
     endif()
 
-    if (TGFX_BUILD_SVG)
-        set(EXPATNAMES expat expatw libexpat libexpatw)
-        set(DEBUGEXPATNAMES)
-        foreach(_CRT "" MT MD)
-            foreach(name IN LISTS EXPATNAMES)
-                list(APPEND EXPATNAMES ${name}${_CRT})
-                list(APPEND DEBUGEXPATNAMES ${name}d${_CRT})
-            endforeach()
-        endforeach()
-        find_library(EXPAT_LIB 
-            NAMES ${DEBUGEXPATNAMES} ${EXPATNAMES}
-            PATHS ${VCPKG_LIB_DIR}
-            NO_DEFAULT_PATH
-        )
-        if(NOT EXPAT_LIB)
-            message(FATAL_ERROR "Expat library not found in vcpkg")
-        endif()
-        list(APPEND TGFX_STATIC_LIBS ${EXPAT_LIB})
-    endif ()
+#    if (TGFX_BUILD_SVG)
+#        set(EXPATNAMES expat expatw libexpat libexpatw)
+#        set(DEBUGEXPATNAMES)
+#        foreach(_CRT "" MT MD)
+#            foreach(name IN LISTS EXPATNAMES)
+#                list(APPEND EXPATNAMES ${name}${_CRT})
+#                list(APPEND DEBUGEXPATNAMES ${name}d${_CRT})
+#            endforeach()
+#        endforeach()
+#        find_library(EXPAT_LIB 
+#            NAMES ${DEBUGEXPATNAMES} ${EXPATNAMES}
+#            PATHS ${VCPKG_LIB_DIR}
+#            NO_DEFAULT_PATH
+#        )
+#        if(NOT EXPAT_LIB)
+#            message(FATAL_ERROR "Expat library not found in vcpkg")
+#        endif()
+#        list(APPEND TGFX_STATIC_LIBS ${EXPAT_LIB})
+#    endif ()
     
     find_package(unofficial-concurrentqueue CONFIG REQUIRED)
     list(APPEND TGFX_INCLUDES ${VCPKG_INCLUDE_DIR}/concurrentqueue)
