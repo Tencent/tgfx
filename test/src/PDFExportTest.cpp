@@ -33,6 +33,7 @@
 #include "tgfx/core/WriteStream.h"
 #include "tgfx/pdf/PDFMetadata.h"
 #include "tgfx/svg/SVGPathParser.h"
+#include "utils/Baseline.h"
 #include "utils/ContextScope.h"
 #include "utils/ProjectPath.h"
 
@@ -189,6 +190,9 @@ TGFX_TEST(PDFExportTest, DrawShapeStroke) {
   PDFStream->flush();
 
   ASSERT_TRUE(CompareSteamWithFile(PDFStream, "resources/apitest/PDF/DrawShapeStroke.pdf"));
+
+  auto data = PDFStream->readData();
+  EXPECT_TRUE(Baseline::Compare(data, "PDFTest/ShapeStroke"));
 }
 
 TGFX_TEST(PDFExportTest, SimpleText) {

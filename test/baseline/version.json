@@ -211,6 +211,9 @@
         "rasterize_path": "b062b9a",
         "rasterize_path_texture": "c475bfb"
     },
+    "PDFTest": {
+        "ShapeStroke": "a9b29daa"
+    },
     "ReadPixelsTest": {
         "JpegCodec_Decode_Alpha8": "afd80b4",
         "JpegCodec_Decode_Gray8": "afd80b4",
