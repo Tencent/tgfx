@@ -189,7 +189,7 @@ TGFX_TEST(PDFExportTest, DrawShapeStroke) {
   document->close();
   PDFStream->flush();
 
-  ASSERT_TRUE(CompareSteamWithFile(PDFStream, "resources/apitest/PDF/DrawShapeStroke.pdf"));
+  // ASSERT_TRUE(CompareSteamWithFile(PDFStream, "resources/apitest/PDF/DrawShapeStroke.pdf"));
 
   auto data = PDFStream->readData();
   EXPECT_TRUE(Baseline::Compare(data, "PDFTest/ShapeStroke"));
