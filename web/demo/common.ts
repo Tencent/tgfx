@@ -35,7 +35,8 @@ export class ShareData {
     public offsetY: number = 0;
     public animationFrameId: number | null = null;
     public isPageVisible: boolean = true;
-    public resized: boolean = false;
+    public resized: boolean = true;
+    public updateSizeTimer: number | null = null;
 }
 
 enum ScaleGestureState {
@@ -189,7 +190,6 @@ function isPromise(obj: any): obj is Promise<any> {
 function draw(shareData: ShareData) {
     if (canDraw === true) {
         canDraw = false;
-        console.log("draw");
         const result = shareData.tgfxBaseView.draw(
             shareData.drawIndex,
             shareData.zoom,
@@ -208,9 +208,20 @@ function draw(shareData: ShareData) {
 
 export function updateSize(shareData: ShareData) {
     if (!shareData.tgfxBaseView || !canDraw) {
+        shareData.resized = false;
         return;
     }
-    console.log("resize");
+    if (!canDraw) {
+        if (shareData.updateSizeTimer) {
+            clearTimeout(shareData.updateSizeTimer);
+        }
+        shareData.updateSizeTimer = window.setTimeout(() => {
+            updateSize(shareData);
+        }, 300);
+        return;
+    }
+    shareData.resized = false;
+    console.log("updateSize");
     const canvas = document.getElementById('hello2d') as HTMLCanvasElement;
     const container = document.getElementById('container') as HTMLDivElement;
     const screenRect = container.getBoundingClientRect();
@@ -220,15 +231,19 @@ export function updateSize(shareData: ShareData) {
     canvas.style.width = screenRect.width + "px";
     canvas.style.height = screenRect.height + "px";
     shareData.tgfxBaseView.updateSize(scaleFactor);
-    shareData.resized = false;
 }
 
 export function onResizeEvent(shareData: ShareData) {
-    if (!shareData.tgfxBaseView || shareData.resized || !canDraw) {
+    if (!shareData.tgfxBaseView || shareData.resized) {
         return;
     }
     shareData.resized = true;
-    updateSize(shareData);
+    if (shareData.updateSizeTimer) {
+        clearTimeout(shareData.updateSizeTimer);
+    }
+    shareData.updateSizeTimer = window.setTimeout(() => {
+        updateSize(shareData);
+    }, 300);
 }
 
 function handleVisibilityChange(shareData: ShareData) {
