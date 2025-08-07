@@ -80,7 +80,6 @@ void FillStream(WriteStream* out, char value, size_t n) {
 }
 
 uint32_t GetNeighborAvgColor(const Pixmap& pixmap, int xOrig, int yOrig) {
-  DEBUG_ASSERT(pixmap.colorType() == ColorType::BGRA_8888);
   unsigned r = 0;
   unsigned g = 0;
   unsigned b = 0;
@@ -166,9 +165,6 @@ void DoDeflatedAlpha(const Pixmap& pixmap, PDFDocument* document, PDFIndirectRef
     }
     stream->write(byteBuffer, static_cast<size_t>(bufferPointer - byteBuffer));
   } else {
-    // DEBUG_ASSERT(pm.alphaType() == AlphaType::Unpremultiplied);
-    DEBUG_ASSERT(pixmap.colorType() == ColorType::BGRA_8888);
-
     const auto* pixelPointer = reinterpret_cast<const uint8_t*>(pixmap.pixels());
     auto rowBytes = pixmap.rowBytes();
 
