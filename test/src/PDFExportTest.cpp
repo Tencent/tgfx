@@ -159,7 +159,13 @@ TGFX_TEST(PDFExportTest, DrawShapeStroke) {
 
   auto PDFStream = MemoryWriteStream::Make();
 
-  auto document = MakePDFDocument(PDFStream, context, PDFMetadata());
+  // auto path = ProjectPath::Absolute("resources/apitest/PDF/DrawShapeStroke.pdf");
+  // auto PDFStream = WriteStream::MakeFromFile(path);
+
+  PDFMetadata metadata;
+  metadata.compressionLevel = PDFMetadata::CompressionLevel::None;
+
+  auto document = MakePDFDocument(PDFStream, context, metadata);
   auto* canvas = document->beginPage(512.f, 512.f);
   {
     Paint paint;
