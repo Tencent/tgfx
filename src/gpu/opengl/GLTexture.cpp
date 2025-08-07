@@ -95,16 +95,16 @@ std::unique_ptr<GPUTexture> GPUTexture::Make(Context* context, int width, int he
   return std::make_unique<GLTexture>(textureID, target, format, maxMipmapLevel);
 }
 
-GPUTextureType GLTexture::type() const {
+TextureType GLTexture::type() const {
   switch (_target) {
     case GL_TEXTURE_2D:
-      return GPUTextureType::TwoD;
+      return TextureType::TwoD;
     case GL_TEXTURE_RECTANGLE:
-      return GPUTextureType::Rectangle;
+      return TextureType::Rectangle;
     case GL_TEXTURE_EXTERNAL_OES:
-      return GPUTextureType::External;
+      return TextureType::External;
     default:
-      return GPUTextureType::None;
+      return TextureType::None;
   }
 }
 
