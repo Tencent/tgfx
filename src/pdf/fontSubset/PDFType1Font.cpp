@@ -23,6 +23,7 @@
 #include "pdf/PDFFont.h"
 #include "pdf/PDFTypes.h"
 #include "tgfx/core/Data.h"
+#include "tgfx/core/Font.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
 
@@ -148,8 +149,8 @@ std::shared_ptr<Data> ConvertType1FontStream(const std::shared_ptr<Data>& source
     DEBUG_ASSERT(length + (2 * PFBSectionHeaderLength) <= srcLength);
 
     const uint8_t* const srcHeader = src + PFBSectionHeaderLength;
-    // There is a six-byte section header before header and data
-    // (but not trailer) that we're not going to copy.
+    // There is a six-byte section header before header and data (but not trailer) that we're not
+    // going to copy.
     const uint8_t* const srcData = srcHeader + *headerLength + PFBSectionHeaderLength;
     const uint8_t* const srcTrailer = srcData + *headerLength;
 
@@ -252,9 +253,9 @@ const std::vector<std::string>& Type1GlyphNames(PDFDocument* canon,
   auto typefaceID = typeface->uniqueID();
   auto iter = canon->type1GlyphNames.find(typefaceID);
   if (iter == canon->type1GlyphNames.end()) {
+    // TODO (YGaurora)
     std::vector<std::string> names(typeface->glyphsCount());
-    PDFFont::GetType1GlyphNames(*typeface, names.data());
-    canon->type1GlyphNames[typefaceID] = std::move(names);
+    canon->type1GlyphNames[typefaceID] = names;
   }
   return iter->second;
 }
@@ -306,8 +307,6 @@ void EmitSubsetType1(const PDFFont& pdfFont, PDFDocument* document) {
     for (GlyphID glyphID = firstGlyphID; glyphID <= lastGlyphID; glyphID++) {
       glyphIDs[glyphID - firstGlyphID + 1] = glyphID;
     }
-    // SkBulkGlyphMetrics metrics{pdfFont.strike().fPath.fStrikeSpec};
-    // auto glyphs = metrics.glyphs(SkSpan(glyphIDs.get(), glyphRangeSize));
     for (size_t i = 0; i < glyphRangeSize; ++i) {
       widths->appendScalar(FromFontUnits(scaleContext->getAdvance(glyphIDs[i], false),
                                          static_cast<uint16_t>(emSize)));

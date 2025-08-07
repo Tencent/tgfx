@@ -43,7 +43,6 @@ static inline constexpr FontTableTag SetFourByteTag(char a, char b, char c, char
 }
 
 class ScalerContext;
-struct TypefaceMetrics;
 
 /**
  * A set of character glyphs and layout information for drawing text.

@@ -76,10 +76,6 @@ void PDFArray::appendName(std::string name) {
   this->append(PDFUnion::Name(std::move(name)));
 }
 
-// void PDFArray::appendByteString(std::string value) {
-//   this->append(PDFUnion::ByteString(std::move(value)));
-// }
-
 void PDFArray::appendTextString(std::string value) {
   this->append(PDFUnion::TextString(std::move(value)));
 }
@@ -87,10 +83,6 @@ void PDFArray::appendTextString(std::string value) {
 void PDFArray::appendByteString(const char value[]) {
   this->append(PDFUnion::ByteString(value));
 }
-
-// void PDFArray::appendTextString(const char value[]) {
-//   this->append(PDFUnion::TextString(value));
-// }
 
 void PDFArray::appendObject(std::unique_ptr<PDFObject>&& object) {
   this->append(PDFUnion::Object(std::move(object)));
@@ -161,10 +153,6 @@ void PDFDictionary::insertInt(const char key[], int32_t value) {
 void PDFDictionary::insertInt(const char key[], size_t value) {
   this->insertInt(key, static_cast<int>(value));
 }
-
-// void PDFDictionary::insertColorComponentF(const char key[], float value) {
-//   fRecords.emplace_back(PDFUnion::Name(key), PDFUnion::ColorComponentF(value));
-// }
 
 void PDFDictionary::insertScalar(const char key[], float value) {
   records.emplace_back(PDFUnion::Name(key), PDFUnion::Float(value));

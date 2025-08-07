@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <memory>
 #include "pdf/PDFGlyphUse.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Typeface.h"

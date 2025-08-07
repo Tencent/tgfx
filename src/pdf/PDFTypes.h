@@ -18,9 +18,6 @@
 
 #pragma once
 
-#include <cstddef>
-#include <memory>
-#include <string>
 #include "pdf/PDFUnion.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/WriteStream.h"
@@ -78,8 +75,6 @@ class PDFArray final : public PDFObject {
   void appendName(const char name[]);
   void appendName(std::string name);
   void appendByteString(const char value[]);
-  // void appendTextString(const char value[]);
-  // void appendByteString(std::string value);
   void appendTextString(std::string value);
   void appendObject(std::unique_ptr<PDFObject>&& object);
   void appendRef(PDFIndirectReference ref);

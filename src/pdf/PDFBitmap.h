@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include <memory>
 #include "pdf/PDFTypes.h"
 #include "tgfx/core/Image.h"
 
@@ -27,9 +26,8 @@ namespace tgfx {
 class PDFBitmap {
  public:
   /**
- * Serialize a image as an Image Xobject.
- *  quality > 100 means lossless
- */
+   * Serialize a image as an Image Xobject. quality > 100 means lossless
+   */
   static PDFIndirectReference Serialize(const std::shared_ptr<Image>& image, PDFDocument* document,
                                         int encodingQuality = 101);
 

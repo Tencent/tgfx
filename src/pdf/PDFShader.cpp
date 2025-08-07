@@ -328,10 +328,8 @@ PDFIndirectReference PDFShader::MakeFallbackShader(PDFDocument* doc,
                                                    const std::shared_ptr<Shader>& shader,
                                                    const Matrix& canvasTransform,
                                                    const Rect& surfaceBBox, Color paintColor) {
-  // surfaceBBox is in device space. While that's exactly what we
-  // want for sizing our bitmap, we need to map it into
-  // shader space for adjustments (to match
-  // MakeImageShader's behavior).
+  // surfaceBBox is in device space. While that's exactly what we want for sizing our bitmap,
+  // need to map it into shader space for adjustments (to match MakeImageShader's behavior).
   auto shaderRect = surfaceBBox;
   if (!PDFUtils::InverseTransformBBox(canvasTransform, &shaderRect)) {
     return PDFIndirectReference();

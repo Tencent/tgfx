@@ -147,7 +147,6 @@ class PDFExportContext : public DrawContext {
                           const Fill& originPaint);
 
   ISize _pageSize = {};
-  // uint32_t nodeId = 0;
   PDFDocument* document = nullptr;
   Matrix _initialTransform = {};
 

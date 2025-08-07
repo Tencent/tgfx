@@ -77,10 +77,6 @@ class PDFFont {
 
   static FontMetrics::FontType FontType(const PDFStrike& pdfStrike, const FontMetrics& metrics);
 
-  static void GetType1GlyphNames(const Typeface& /*facetype*/, std::string*) {
-    // facetype. .getPostScriptGlyphNames(dst);
-  }
-
   static bool IsMultiByte(FontMetrics::FontType type) {
     return type == FontMetrics::FontType::Type1 || type == FontMetrics::FontType::TrueType ||
            type == FontMetrics::FontType::CFF;
@@ -121,9 +117,8 @@ class PDFFont {
     return _indirectReference;
   }
 
-  /** Gets SkAdvancedTypefaceMetrics, and caches the result.
-   *  @param typeface can not be nullptr.
-   *  @return nullptr only when typeface is bad.
+  /** 
+   * Gets SkAdvancedTypefaceMetrics, and caches the result.
    */
   static const FontMetrics* GetMetrics(const std::shared_ptr<Typeface>& typeface, float textSize,
                                        PDFDocument* document);

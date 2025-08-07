@@ -70,7 +70,7 @@ class PDFAttributeList {
                          const std::vector<int>& nodeIds);
 
  private:
-  std::unique_ptr<PDFArray> attrs;
+  std::unique_ptr<PDFArray> attributes;
 
   friend class PDFTagTree;
 };

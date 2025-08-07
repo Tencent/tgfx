@@ -54,7 +54,7 @@ void PDFTagTree::Copy(PDFStructureElementNode& node, PDFTagNode* dst,
     Copy(*node.children[i], &(*children)[i], nodeMap, wantTitle);
   }
   dst->children = std::move(children);
-  dst->attributes = std::move(node.attributes.attrs);
+  dst->attributes = std::move(node.attributes.attributes);
 }
 
 void PDFTagTree::init(PDFStructureElementNode* node, PDFMetadata::Outline inputOutline) {

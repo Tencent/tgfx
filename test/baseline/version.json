@@ -212,7 +212,15 @@
         "rasterize_path_texture": "c475bfb"
     },
     "PDFTest": {
-        "ShapeStroke": "a9b29daa"
+        "Complex": "a9b29daa",
+        "DrawColor": "a9b29daa",
+        "DrawShape": "a9b29daa",
+        "DrawShapeStroke": "a9b29daa",
+        "EmojiText": "a9b29daa",
+        "Empty": "a9b29daa",
+        "EmptyMultiPage": "a9b29daa",
+        "Image": "a9b29daa",
+        "SimpleText": "a9b29daa"
     },
     "ReadPixelsTest": {
         "JpegCodec_Decode_Alpha8": "afd80b4",

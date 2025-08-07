@@ -19,7 +19,6 @@
 #include <hb-subset.h>
 #include <hb.h>
 #include "base/TGFXTest.h"
-#include "tgfx/core/Buffer.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageFilter.h"
@@ -27,7 +26,6 @@
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
-#include "tgfx/core/Stream.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/core/TileMode.h"
 #include "tgfx/core/WriteStream.h"
@@ -36,38 +34,24 @@
 #include "utils/Baseline.h"
 #include "utils/ContextScope.h"
 #include "utils/ProjectPath.h"
+#include "utils/TestUtils.h"
 
 namespace tgfx {
 
 namespace {
-bool CompareSteamWithFile(const std::shared_ptr<MemoryWriteStream>& stream,
-                          const std::string& filePath) {
-  auto path = ProjectPath::Absolute(filePath);
-  auto readStream = Stream::MakeFromFile(path);
-  if (readStream == nullptr) {
-    return false;
-  }
-  if (stream->bytesWritten() != readStream->size()) {
-    return false;
-  }
-  Buffer readBuffer(readStream->size());
-  readStream->read(readBuffer.data(), readBuffer.size());
-
-  Buffer writeBuffer(stream->bytesWritten());
-  stream->read(writeBuffer.data(), 0, writeBuffer.size());
-  return std::memcmp(writeBuffer.data(), readBuffer.data(), writeBuffer.size()) == 0;
+bool ComparePDF(const std::shared_ptr<MemoryWriteStream>& stream, const std::string& key) {
+  auto data = stream->readData();
+#ifdef GENERATE_BASELINE_IMAGES
+  SaveFile(data, key + "_base.pdf");
+#endif
+  return Baseline::Compare(data, key);
 }
 }  // namespace
 
 TGFX_TEST(PDFExportTest, Empty) {
   ContextScope scope;
   auto* context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
-
-  // auto path = ProjectPath::Absolute("resources/apitest/PDF/Empty.pdf");
-  // std::filesystem::path filePath = path;
-  // std::filesystem::create_directories(filePath.parent_path());
-  // auto PDFStream = WriteStream::MakeFromFile(path);
+  EXPECT_TRUE(context != nullptr);
 
   auto PDFStream = MemoryWriteStream::Make();
 
@@ -80,13 +64,13 @@ TGFX_TEST(PDFExportTest, Empty) {
   document->close();
   PDFStream->flush();
 
-  ASSERT_TRUE(CompareSteamWithFile(PDFStream, "resources/apitest/PDF/Empty.pdf"));
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/Empty"));
 }
 
 TGFX_TEST(PDFExportTest, EmptyMultiPage) {
   ContextScope scope;
   auto* context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
+  EXPECT_TRUE(context != nullptr);
 
   auto PDFStream = MemoryWriteStream::Make();
 
@@ -101,13 +85,13 @@ TGFX_TEST(PDFExportTest, EmptyMultiPage) {
   document->close();
   PDFStream->flush();
 
-  ASSERT_TRUE(CompareSteamWithFile(PDFStream, "resources/apitest/PDF/EmptyMultiPage.pdf"));
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/EmptyMultiPage"));
 }
 
 TGFX_TEST(PDFExportTest, DrawColor) {
   ContextScope scope;
   auto* context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
+  EXPECT_TRUE(context != nullptr);
 
   auto PDFStream = MemoryWriteStream::Make();
 
@@ -118,13 +102,13 @@ TGFX_TEST(PDFExportTest, DrawColor) {
   document->close();
   PDFStream->flush();
 
-  ASSERT_TRUE(CompareSteamWithFile(PDFStream, "resources/apitest/PDF/DrawColor.pdf"));
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/DrawColor"));
 }
 
 TGFX_TEST(PDFExportTest, DrawShape) {
   ContextScope scope;
   auto* context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
+  EXPECT_TRUE(context != nullptr);
 
   auto PDFStream = MemoryWriteStream::Make();
 
@@ -150,23 +134,17 @@ TGFX_TEST(PDFExportTest, DrawShape) {
   document->close();
   PDFStream->flush();
 
-  ASSERT_TRUE(CompareSteamWithFile(PDFStream, "resources/apitest/PDF/DrawShape.pdf"));
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/DrawShape"));
 }
 
 TGFX_TEST(PDFExportTest, DrawShapeStroke) {
   ContextScope scope;
   auto* context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
+  EXPECT_TRUE(context != nullptr);
 
   auto PDFStream = MemoryWriteStream::Make();
 
-  // auto path = ProjectPath::Absolute("resources/apitest/PDF/DrawShapeStroke.pdf");
-  // auto PDFStream = WriteStream::MakeFromFile(path);
-
-  PDFMetadata metadata;
-  metadata.compressionLevel = PDFMetadata::CompressionLevel::None;
-
-  auto document = MakePDFDocument(PDFStream, context, metadata);
+  auto document = MakePDFDocument(PDFStream, context, PDFMetadata());
   auto* canvas = document->beginPage(512.f, 512.f);
   {
     Paint paint;
@@ -189,16 +167,13 @@ TGFX_TEST(PDFExportTest, DrawShapeStroke) {
   document->close();
   PDFStream->flush();
 
-  // ASSERT_TRUE(CompareSteamWithFile(PDFStream, "resources/apitest/PDF/DrawShapeStroke.pdf"));
-
-  auto data = PDFStream->readData();
-  EXPECT_TRUE(Baseline::Compare(data, "PDFTest/ShapeStroke"));
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/DrawShapeStroke"));
 }
 
 TGFX_TEST(PDFExportTest, SimpleText) {
   ContextScope scope;
   auto* context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
+  EXPECT_TRUE(context != nullptr);
 
   auto PDFStream = MemoryWriteStream::Make();
 
@@ -224,13 +199,13 @@ TGFX_TEST(PDFExportTest, SimpleText) {
   document->close();
   PDFStream->flush();
 
-  ASSERT_TRUE(CompareSteamWithFile(PDFStream, "resources/apitest/PDF/SimpleText.pdf"));
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/SimpleText"));
 }
 
 TGFX_TEST(PDFExportTest, EmojiText) {
   ContextScope scope;
   auto* context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
+  EXPECT_TRUE(context != nullptr);
 
   auto PDFStream = MemoryWriteStream::Make();
 
@@ -249,13 +224,13 @@ TGFX_TEST(PDFExportTest, EmojiText) {
   document->close();
   PDFStream->flush();
 
-  ASSERT_TRUE(CompareSteamWithFile(PDFStream, "resources/apitest/PDF/EmojiText.pdf"));
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/EmojiText"));
 }
 
 TGFX_TEST(PDFExportTest, Image) {
   ContextScope scope;
   auto* context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
+  EXPECT_TRUE(context != nullptr);
 
   auto PDFStream = MemoryWriteStream::Make();
 
@@ -273,13 +248,13 @@ TGFX_TEST(PDFExportTest, Image) {
   document->close();
   PDFStream->flush();
 
-  ASSERT_TRUE(CompareSteamWithFile(PDFStream, "resources/apitest/PDF/Image.pdf"));
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/Image"));
 }
 
 TGFX_TEST(PDFExportTest, Complex) {
   ContextScope scope;
   auto* context = scope.getContext();
-  ASSERT_TRUE(context != nullptr);
+  EXPECT_TRUE(context != nullptr);
 
   auto PDFStream = MemoryWriteStream::Make();
 
@@ -373,6 +348,7 @@ TGFX_TEST(PDFExportTest, Complex) {
   document->close();
   PDFStream->flush();
 
-  ASSERT_TRUE(CompareSteamWithFile(PDFStream, "resources/apitest/PDF/Complex.pdf"));
+  EXPECT_TRUE(ComparePDF(PDFStream, "PDFTest/Complex"));
+  EXPECT_TRUE(false);
 }
 }  // namespace tgfx

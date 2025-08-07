@@ -17,8 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFUtils.h"
-#include "core/utils/Log.h"
-#include "pdf/FloatToDecimal.h"
+#include <string>
 #include "pdf/PDFResourceDictionary.h"
 #include "pdf/PDFTypes.h"
 #include "tgfx/core/BlendMode.h"
@@ -140,10 +139,17 @@ void PDFUtils::WriteUTF16beHex(const std::shared_ptr<WriteStream>& stream, Unich
 }
 
 void PDFUtils::AppendFloat(float value, const std::shared_ptr<WriteStream>& stream) {
-  char result[MaximumFloatToDecimalLength];
-  size_t len = FloatToDecimal(value, result);
-  DEBUG_ASSERT(len < MaximumFloatToDecimalLength);
-  stream->write(result, len);
+  if (value == INFINITY) {
+    value = FLT_MAX;
+  }
+  if (value == -INFINITY) {
+    value = -FLT_MAX;
+  }
+  if (!std::isfinite(value)) {
+    value = 0.0f;  // PDF does not support NaN, so we use 0.0f as a fallback.
+  }
+  auto result = std::to_string(value);
+  stream->write(result.data(), result.size());
 }
 
 void PDFUtils::AppendTransform(const Matrix& matrix, const std::shared_ptr<WriteStream>& stream) {

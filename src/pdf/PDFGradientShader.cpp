@@ -136,14 +136,10 @@ void TileModeCode(TileMode mode, const std::shared_ptr<MemoryWriteStream>& resul
   }
 }
 
-/* Assumes t - startOffset is on the stack and does a linear interpolation on t
-   between startOffset and endOffset from prevColor to curColor (for each color
-   component), leaving the result in component order on the stack. It assumes
-   there are always 3 components per color.
-   @param range       endOffset - startOffset
-   @param beginColor  The previous color.
-   @param endColor    The current color.
-   @param result      The result ps function.
+/** 
+ * Assumes t - startOffset is on the stack and does a linear interpolation on t between startOffset
+ * and endOffset from prevColor to curColor (for each color component), leaving the result in
+ * component order on the stack. It assumes there are always 3 components per color.
  */
 void InterpolateColorCode(float range, Color beginColor, Color endColor,
                           const std::shared_ptr<MemoryWriteStream>& result) {
@@ -386,8 +382,9 @@ void RadialCode(const GradientInfo& info, const Matrix& /*perspectiveRemover*/,
   function->writeText("}");
 }
 
-/* Conical gradient shader, based on the Canvas spec for radial gradients
-   See: http://www.w3.org/TR/2dcontext/#dom-context-2d-createradialgradient
+/**  
+ * Conical gradient shader, based on the Canvas spec for radial gradients
+ * See: http://www.w3.org/TR/2dcontext/#dom-context-2d-createradialgradient
  */
 void TwoPointConicalCode(const GradientInfo& info, const Matrix& /*perspectiveRemover*/,
                          const std::shared_ptr<MemoryWriteStream>& function) {
@@ -826,11 +823,6 @@ PDFIndirectReference MakeFunctionShader(PDFDocument* doc, const PDFGradientShade
     // In this way the shader will handle it eficiently, with minimal code.
 
     auto perspectiveInverseOnly = Matrix::I();
-    // if (finalMatrix.hasPerspective()) {
-    //   if (!split_perspective(finalMatrix, &finalMatrix, &perspectiveInverseOnly)) {
-    //     return SkPDFIndirectReference();
-    //   }
-    // }
 
     Rect bbox = state.boundBox;
     if (!PDFUtils::InverseTransformBBox(finalMatrix, &bbox)) {

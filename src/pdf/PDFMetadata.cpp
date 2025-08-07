@@ -30,40 +30,40 @@ PDFAttributeList::PDFAttributeList() = default;
 PDFAttributeList::~PDFAttributeList() = default;
 
 void PDFAttributeList::appendInt(const std::string& owner, const std::string& name, int value) {
-  if (!attrs) {
-    attrs = MakePDFArray();
+  if (!attributes) {
+    attributes = MakePDFArray();
   }
   auto attrDict = PDFDictionary::Make();
   attrDict->insertName("O", owner);
   attrDict->insertInt(name.c_str(), value);
-  attrs->appendObject(std::move(attrDict));
+  attributes->appendObject(std::move(attrDict));
 }
 
 void PDFAttributeList::appendFloat(const std::string& owner, const std::string& name, float value) {
-  if (!attrs) {
-    attrs = MakePDFArray();
+  if (!attributes) {
+    attributes = MakePDFArray();
   }
   auto attrDict = PDFDictionary::Make();
   attrDict->insertName("O", owner);
   attrDict->insertScalar(name.c_str(), value);
-  attrs->appendObject(std::move(attrDict));
+  attributes->appendObject(std::move(attrDict));
 }
 
 void PDFAttributeList::appendName(const std::string& owner, const std::string& name,
                                   const std::string& value) {
-  if (!attrs) {
-    attrs = MakePDFArray();
+  if (!attributes) {
+    attributes = MakePDFArray();
   }
   auto attrDict = PDFDictionary::Make();
   attrDict->insertName("O", owner);
   attrDict->insertName(name.c_str(), value);
-  attrs->appendObject(std::move(attrDict));
+  attributes->appendObject(std::move(attrDict));
 }
 
 void PDFAttributeList::appendFloatArray(const std::string& owner, const std::string& name,
                                         const std::vector<float>& value) {
-  if (!attrs) {
-    attrs = MakePDFArray();
+  if (!attributes) {
+    attributes = MakePDFArray();
   }
   auto attrDict = PDFDictionary::Make();
   attrDict->insertName("O", owner);
@@ -72,13 +72,13 @@ void PDFAttributeList::appendFloatArray(const std::string& owner, const std::str
     pdfArray->appendScalar(element);
   }
   attrDict->insertObject(name, std::move(pdfArray));
-  attrs->appendObject(std::move(attrDict));
+  attributes->appendObject(std::move(attrDict));
 }
 
 void PDFAttributeList::appendNodeIdArray(const std::string& owner, const std::string& name,
                                          const std::vector<int>& nodeIds) {
-  if (!attrs) {
-    attrs = MakePDFArray();
+  if (!attributes) {
+    attributes = MakePDFArray();
   }
   auto attrDict = PDFDictionary::Make();
   attrDict->insertName("O", owner);
@@ -88,7 +88,7 @@ void PDFAttributeList::appendNodeIdArray(const std::string& owner, const std::st
     pdfArray->appendTextString(idString);
   }
   attrDict->insertObject(name, std::move(pdfArray));
-  attrs->appendObject(std::move(attrDict));
+  attributes->appendObject(std::move(attrDict));
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////
