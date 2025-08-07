@@ -32,8 +32,8 @@ AtlasTextGeometryProcessor::AtlasTextGeometryProcessor(std::shared_ptr<TexturePr
     color = {"inColor", SLType::UByte4Color};
   }
   setVertexAttributes(&position, 4);
-  textureSamplers.emplace_back(this->textureProxy->getTexture()->getSampler());
-  setTextureSamplerCount(textureSamplers.size());
+  textures.emplace_back(this->textureProxy->getTextureView()->getTexture());
+  setTextureSamplerCount(textures.size());
 }
 void AtlasTextGeometryProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
   uint32_t flags = aa == AAType::Coverage ? 1 : 0;

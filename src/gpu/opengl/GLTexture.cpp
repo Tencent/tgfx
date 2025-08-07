@@ -16,17 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/opengl/GLTextureSampler.h"
+#include "gpu/opengl/GLTexture.h"
 #include <memory>
 #include "GLCaps.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
-class GLExternalTextureSampler : public GLTextureSampler {
+class GLExternalTexture : public GLTexture {
  public:
-  GLExternalTextureSampler(unsigned id, unsigned target, PixelFormat format)
-      : GLTextureSampler(id, target, format) {
+  GLExternalTexture(unsigned id, unsigned target, PixelFormat format)
+      : GLTexture(id, target, format) {
   }
 
   void releaseGPU(Context*) override {
@@ -34,7 +34,7 @@ class GLExternalTextureSampler : public GLTextureSampler {
   }
 };
 
-PixelFormat TextureSampler::GetPixelFormat(const BackendTexture& backendTexture) {
+PixelFormat GPUTexture::GetPixelFormat(const BackendTexture& backendTexture) {
   GLTextureInfo textureInfo = {};
   if (!backendTexture.isValid() || !backendTexture.getGLTextureInfo(&textureInfo)) {
     return PixelFormat::Unknown;
@@ -42,9 +42,9 @@ PixelFormat TextureSampler::GetPixelFormat(const BackendTexture& backendTexture)
   return GLSizeFormatToPixelFormat(textureInfo.format);
 }
 
-std::unique_ptr<TextureSampler> TextureSampler::MakeFrom(Context* context,
-                                                         const BackendTexture& backendTexture,
-                                                         bool adopted) {
+std::unique_ptr<GPUTexture> GPUTexture::MakeFrom(Context* context,
+                                                 const BackendTexture& backendTexture,
+                                                 bool adopted) {
   GLTextureInfo textureInfo = {};
   if (context == nullptr || !backendTexture.isValid() ||
       !backendTexture.getGLTextureInfo(&textureInfo)) {
@@ -52,24 +52,24 @@ std::unique_ptr<TextureSampler> TextureSampler::MakeFrom(Context* context,
   }
   auto format = GLSizeFormatToPixelFormat(textureInfo.format);
   if (adopted) {
-    return std::make_unique<GLTextureSampler>(textureInfo.id, textureInfo.target, format);
+    return std::make_unique<GLTexture>(textureInfo.id, textureInfo.target, format);
   }
-  return std::make_unique<GLExternalTextureSampler>(textureInfo.id, textureInfo.target, format);
+  return std::make_unique<GLExternalTexture>(textureInfo.id, textureInfo.target, format);
 }
 
-std::unique_ptr<TextureSampler> TextureSampler::Make(Context* context, int width, int height,
-                                                     PixelFormat format, bool mipmapped) {
+std::unique_ptr<GPUTexture> GPUTexture::Make(Context* context, int width, int height,
+                                             PixelFormat format, bool mipmapped) {
   auto gl = GLFunctions::Get(context);
   // Clear the previously generated GLError, causing the subsequent CheckGLError to return an
   // incorrect result.
   ClearGLError(gl);
   unsigned target = GL_TEXTURE_2D;
-  unsigned samplerID = 0;
-  gl->genTextures(1, &samplerID);
-  if (samplerID == 0) {
+  unsigned textureID = 0;
+  gl->genTextures(1, &textureID);
+  if (textureID == 0) {
     return nullptr;
   }
-  gl->bindTexture(target, samplerID);
+  gl->bindTexture(target, textureID);
   gl->texParameteri(target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   gl->texParameteri(target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   gl->texParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
@@ -89,26 +89,26 @@ std::unique_ptr<TextureSampler> TextureSampler::Make(Context* context, int width
     success = CheckGLError(gl);
   }
   if (!success) {
-    gl->deleteTextures(1, &samplerID);
+    gl->deleteTextures(1, &textureID);
     return nullptr;
   }
-  return std::make_unique<GLTextureSampler>(samplerID, target, format, maxMipmapLevel);
+  return std::make_unique<GLTexture>(textureID, target, format, maxMipmapLevel);
 }
 
-SamplerType GLTextureSampler::type() const {
+GPUTextureType GLTexture::type() const {
   switch (_target) {
     case GL_TEXTURE_2D:
-      return SamplerType::TwoD;
+      return GPUTextureType::TwoD;
     case GL_TEXTURE_RECTANGLE:
-      return SamplerType::Rectangle;
+      return GPUTextureType::Rectangle;
     case GL_TEXTURE_EXTERNAL_OES:
-      return SamplerType::External;
+      return GPUTextureType::External;
     default:
-      return SamplerType::None;
+      return GPUTextureType::None;
   }
 }
 
-BackendTexture GLTextureSampler::getBackendTexture(int width, int height) const {
+BackendTexture GLTexture::getBackendTexture(int width, int height) const {
   GLTextureInfo textureInfo = {};
   textureInfo.id = _id;
   textureInfo.target = _target;
@@ -116,8 +116,8 @@ BackendTexture GLTextureSampler::getBackendTexture(int width, int height) const 
   return {textureInfo, width, height};
 }
 
-void GLTextureSampler::writePixels(Context* context, const Rect& rect, const void* pixels,
-                                   size_t rowBytes) {
+void GLTexture::writePixels(Context* context, const Rect& rect, const void* pixels,
+                            size_t rowBytes) {
   if (context == nullptr || rect.isEmpty()) {
     return;
   }
@@ -155,14 +155,14 @@ void GLTextureSampler::writePixels(Context* context, const Rect& rect, const voi
   }
 }
 
-void GLTextureSampler::computeSamplerKey(Context* context, BytesKey* bytesKey) const {
+void GLTexture::computeTextureKey(Context* context, BytesKey* bytesKey) const {
   auto caps = GLCaps::Get(context);
   DEBUG_ASSERT(caps != nullptr);
   bytesKey->write(static_cast<uint32_t>(caps->getReadSwizzle(_format).asKey()));
   bytesKey->write(_target);
 }
 
-void GLTextureSampler::releaseGPU(Context* context) {
+void GLTexture::releaseGPU(Context* context) {
   if (context == nullptr || _id == 0) {
     return;
   }

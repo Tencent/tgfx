@@ -18,7 +18,7 @@
 
 #include "ShapeBufferUploadTask.h"
 #include "gpu/GPU.h"
-#include "gpu/Texture.h"
+#include "gpu/TextureView.h"
 #include "gpu/VertexBuffer.h"
 
 namespace tgfx {
@@ -53,13 +53,13 @@ std::shared_ptr<Resource> ShapeBufferUploadTask::onMakeResource(Context* context
     }
     vertexBuffer = Resource::AddToCache(context, new VertexBuffer(std::move(gpuBuffer)));
   } else {
-    auto texture = Texture::MakeFrom(context, std::move(shapeBuffer->imageBuffer));
-    if (!texture) {
-      LOGE("ShapeBufferUploadTask::execute() Failed to create the texture!");
+    auto textureView = TextureView::MakeFrom(context, std::move(shapeBuffer->imageBuffer));
+    if (!textureView) {
+      LOGE("ShapeBufferUploadTask::execute() Failed to create the texture view!");
       return nullptr;
     }
-    texture->assignUniqueKey(textureProxy->uniqueKey);
-    textureProxy->resource = std::move(texture);
+    textureView->assignUniqueKey(textureProxy->uniqueKey);
+    textureProxy->resource = std::move(textureView);
   }
   // Free the data source immediately to reduce memory pressure.
   source = nullptr;

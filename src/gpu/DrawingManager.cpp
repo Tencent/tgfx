@@ -209,8 +209,8 @@ void DrawingManager::uploadAtlasToGPU() {
     if (textureProxy == nullptr || cellDatas.empty()) {
       continue;
     }
-    auto texture = textureProxy->getTexture();
-    if (texture == nullptr) {
+    auto textureView = textureProxy->getTextureView();
+    if (textureView == nullptr) {
       continue;
     }
     for (auto& [data, info, atlasOffset] : cellDatas) {
@@ -219,7 +219,7 @@ void DrawingManager::uploadAtlasToGPU() {
       }
       auto rect = Rect::MakeXYWH(atlasOffset.x, atlasOffset.y, static_cast<float>(info.width()),
                                  static_cast<float>(info.height()));
-      texture->getSampler()->writePixels(context, rect, data->data(), info.rowBytes());
+      textureView->getTexture()->writePixels(context, rect, data->data(), info.rowBytes());
       // Text atlas has no mipmaps, so we don't need to regenerate mipmaps.
     }
   }

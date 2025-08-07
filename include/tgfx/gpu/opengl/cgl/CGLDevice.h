@@ -52,6 +52,6 @@ class CGLDevice : public GLDevice {
 
   friend class GLDevice;
   friend class CGLWindow;
-  friend class TextureSampler;
+  friend class GPUTexture;
 };
 }  // namespace tgfx

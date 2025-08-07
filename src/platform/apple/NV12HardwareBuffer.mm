@@ -18,7 +18,7 @@
 
 #include "NV12HardwareBuffer.h"
 #include "core/utils/USE.h"
-#include "gpu/Texture.h"
+#include "gpu/TextureView.h"
 
 namespace tgfx {
 static std::mutex cacheLocker = {};
@@ -68,7 +68,7 @@ int NV12HardwareBuffer::height() const {
   return static_cast<int>(CVPixelBufferGetHeight(pixelBuffer));
 }
 
-std::shared_ptr<Texture> NV12HardwareBuffer::onMakeTexture(Context* context, bool) const {
-  return Texture::MakeFrom(context, pixelBuffer, colorSpace);
+std::shared_ptr<TextureView> NV12HardwareBuffer::onMakeTexture(Context* context, bool) const {
+  return TextureView::MakeFrom(context, pixelBuffer, colorSpace);
 }
 }  // namespace tgfx

@@ -24,8 +24,8 @@ DeviceSpaceTextureEffect::DeviceSpaceTextureEffect(std::shared_ptr<TextureProxy>
     : FragmentProcessor(ClassID()), textureProxy(std::move(textureProxy)), uvMatrix(uvMatrix) {
 }
 
-const TextureSampler* DeviceSpaceTextureEffect::onTextureSampler(size_t) const {
-  auto texture = textureProxy->getTexture();
-  return texture == nullptr ? nullptr : texture->getSampler();
+GPUTexture* DeviceSpaceTextureEffect::onTextureAt(size_t) const {
+  auto textureView = textureProxy->getTextureView();
+  return textureView == nullptr ? nullptr : textureView->getTexture();
 }
 }  // namespace tgfx

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,28 +18,28 @@
 
 #pragma once
 
-#include "gpu/Texture.h"
+#include <CoreVideo/CoreVideo.h>
+#include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
-/**
- * DefaultTexture is a simple texture implementation that stores pixel data using a single sampler.
- */
-class DefaultTexture : public Texture {
+class EAGLHardwareTexture : public GLTexture {
  public:
-  DefaultTexture(std::unique_ptr<TextureSampler> sampler, int width, int height,
-                 ImageOrigin origin = ImageOrigin::TopLeft);
+  static std::vector<std::unique_ptr<GPUTexture>> MakeFrom(Context* context,
+                                                           CVPixelBufferRef pixelBuffer);
 
-  size_t memoryUsage() const override;
+  explicit EAGLHardwareTexture(CVPixelBufferRef pixelBuffer, CVOpenGLESTextureRef texture,
+                               unsigned id, unsigned target, PixelFormat format);
 
-  TextureSampler* getSampler() const override {
-    return _sampler.get();
+  ~EAGLHardwareTexture() override;
+
+  HardwareBufferRef getHardwareBuffer() const override {
+    return pixelBuffer;
   }
 
- protected:
-  std::unique_ptr<TextureSampler> _sampler = {};
+  void releaseGPU(Context* context) override;
 
-  void onReleaseGPU() override {
-    _sampler->releaseGPU(context);
-  }
+ private:
+  CVPixelBufferRef pixelBuffer = nullptr;
+  CVOpenGLESTextureRef texture = nil;
 };
 }  // namespace tgfx

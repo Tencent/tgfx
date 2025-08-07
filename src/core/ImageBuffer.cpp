@@ -18,7 +18,7 @@
 
 #include "tgfx/core/ImageBuffer.h"
 #include <memory>
-#include "gpu/YUVTexture.h"
+#include "gpu/YUVTextureView.h"
 
 namespace tgfx {
 /**
@@ -43,11 +43,11 @@ class YUVBuffer : public ImageBuffer {
   }
 
  protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool) const override {
+  std::shared_ptr<TextureView> onMakeTexture(Context* context, bool) const override {
     if (format == YUVFormat::NV12) {
-      return YUVTexture::MakeNV12(context, data.get(), colorSpace);
+      return YUVTextureView::MakeNV12(context, data.get(), colorSpace);
     }
-    return YUVTexture::MakeI420(context, data.get(), colorSpace);
+    return YUVTextureView::MakeI420(context, data.get(), colorSpace);
   }
 
  private:

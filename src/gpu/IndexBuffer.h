@@ -43,7 +43,7 @@ class IndexBuffer : public Resource {
   /**
    * Returns the GPUBuffer associated with this IndexBuffer.
    */
-  const GPUBuffer* gpuBuffer() const {
+  GPUBuffer* gpuBuffer() const {
     return buffer.get();
   }
 

@@ -20,8 +20,8 @@
 
 #include <vector>
 #include "gpu/FragmentShaderBuilder.h"
+#include "gpu/GPUTexture.h"
 #include "gpu/ShaderVar.h"
-#include "gpu/TextureSampler.h"
 #include "gpu/UniformBuffer.h"
 #include "gpu/UniformHandler.h"
 #include "gpu/VaryingHandler.h"
@@ -127,12 +127,12 @@ class GeometryProcessor : public Processor {
     return textureSamplerCount;
   }
 
-  const TextureSampler* textureSampler(size_t index) const {
-    return onTextureSampler(index);
+  GPUTexture* textureAt(size_t index) const {
+    return onTextureAt(index);
   }
 
-  SamplerState samplerState(size_t index) const {
-    return onSamplerState(index);
+  SamplerState samplerStateAt(size_t index) const {
+    return onSamplerStateAt(index);
   }
 
   void setTextureSamplerCount(size_t count) {
@@ -163,11 +163,11 @@ class GeometryProcessor : public Processor {
   virtual void onComputeProcessorKey(BytesKey*) const {
   }
 
-  virtual const TextureSampler* onTextureSampler(size_t) const {
+  virtual GPUTexture* onTextureAt(size_t) const {
     return nullptr;
   }
 
-  virtual SamplerState onSamplerState(size_t) const {
+  virtual SamplerState onSamplerStateAt(size_t) const {
     return {};
   }
 

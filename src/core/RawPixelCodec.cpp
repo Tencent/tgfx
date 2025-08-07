@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RawPixelCodec.h"
-#include "gpu/Texture.h"
+#include "gpu/TextureView.h"
 
 namespace tgfx {
 std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const ImageInfo& info,
@@ -47,17 +47,17 @@ class RawPixelData : public ImageBuffer {
   }
 
  protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const override {
+  std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override {
     switch (info.colorType()) {
       case ColorType::ALPHA_8:
-        return Texture::MakeAlpha(context, info.width(), info.height(), pixels->data(),
-                                  info.rowBytes(), mipmapped);
+        return TextureView::MakeAlpha(context, info.width(), info.height(), pixels->data(),
+                                      info.rowBytes(), mipmapped);
       case ColorType::BGRA_8888:
-        return Texture::MakeFormat(context, info.width(), info.height(), pixels->data(),
-                                   info.rowBytes(), PixelFormat::BGRA_8888, mipmapped);
+        return TextureView::MakeFormat(context, info.width(), info.height(), pixels->data(),
+                                       info.rowBytes(), PixelFormat::BGRA_8888, mipmapped);
       case ColorType::RGBA_8888:
-        return Texture::MakeRGBA(context, info.width(), info.height(), pixels->data(),
-                                 info.rowBytes(), mipmapped);
+        return TextureView::MakeRGBA(context, info.width(), info.height(), pixels->data(),
+                                     info.rowBytes(), mipmapped);
       default:
         return nullptr;
     }
