@@ -66,7 +66,7 @@ class PDFGraphicState {
 
 namespace std {
 template <>
-struct std::hash<tgfx::PDFFillGraphicState> {
+struct hash<tgfx::PDFFillGraphicState> {
   std::size_t operator()(const tgfx::PDFFillGraphicState& s) const {
     return s.hash();
   }

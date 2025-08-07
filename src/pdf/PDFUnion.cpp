@@ -165,7 +165,7 @@ PDFUnion::~PDFUnion() {
     case Type::NameString:
     case Type::ByteString:
     case Type::TextString:
-      stringValue.std::string::~string();
+      stringValue.~basic_string();
       return;
     case Type::Object:
       object.~unique_ptr();

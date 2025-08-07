@@ -93,9 +93,9 @@ FontMetrics CGScalerContext::getFontMetrics() const {
     if (stylisticClass >= kCTFontOldStyleSerifsClass && stylisticClass <= kCTFontSlabSerifsClass) {
       metrics.style =
           static_cast<FontMetrics::StyleFlags>(metrics.style | FontMetrics::StyleFlags::Serif);
-    } else if (stylisticClass & kCTFontScriptsClass) {
+    } else if (stylisticClass & kCTFontSymbolicClass) {
       metrics.style =
-          static_cast<FontMetrics::StyleFlags>(metrics.style | FontMetrics::StyleFlags::Script);
+          static_cast<FontMetrics::StyleFlags>(metrics.style | FontMetrics::StyleFlags::Symbolic);
     }
   }
   return metrics;
