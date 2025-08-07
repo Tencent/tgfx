@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,30 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <CoreVideo/CoreVideo.h>
-#include "gpu/opengl/GLTextureSampler.h"
+#include "DefaultTextureView.h"
+#include "core/utils/PixelFormatUtil.h"
 
 namespace tgfx {
-class EAGLHardwareTextureSampler : public GLTextureSampler {
- public:
-  static std::vector<std::unique_ptr<TextureSampler>> MakeFrom(Context* context,
-                                                               CVPixelBufferRef pixelBuffer);
+DefaultTextureView::DefaultTextureView(std::unique_ptr<GPUTexture> texture, int width, int height,
+                                       ImageOrigin origin)
+    : TextureView(width, height, origin), _texture(std::move(texture)) {
+}
 
-  explicit EAGLHardwareTextureSampler(CVPixelBufferRef pixelBuffer, CVOpenGLESTextureRef texture,
-                                      unsigned id, unsigned target, PixelFormat format);
-
-  ~EAGLHardwareTextureSampler() override;
-
-  HardwareBufferRef getHardwareBuffer() const override {
-    return pixelBuffer;
+size_t DefaultTextureView::memoryUsage() const {
+  if (auto hardwareBuffer = _texture->getHardwareBuffer()) {
+    return HardwareBufferGetInfo(hardwareBuffer).byteSize();
   }
-
-  void releaseGPU(Context* context) override;
-
- private:
-  CVPixelBufferRef pixelBuffer = nullptr;
-  CVOpenGLESTextureRef texture = nil;
-};
+  auto colorSize = static_cast<size_t>(_width) * static_cast<size_t>(_height) *
+                   PixelFormatBytesPerPixel(_texture->format());
+  return _texture->hasMipmaps() ? colorSize * 4 / 3 : colorSize;
+}
 }  // namespace tgfx

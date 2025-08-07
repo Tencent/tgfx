@@ -20,7 +20,7 @@
 
 namespace tgfx {
 /**
- * Describes the possible pixel formats of a TextureSampler.
+ * Describes the possible pixel formats of a GPUTexture.
  */
 enum class PixelFormat {
   /**

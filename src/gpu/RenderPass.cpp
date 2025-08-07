@@ -35,8 +35,7 @@ void RenderPass::bindProgramAndScissorClip(const Pipeline* pipeline, const Rect&
   drawPipelineStatus = DrawPipelineStatus::Ok;
 }
 
-void RenderPass::bindBuffers(const GPUBuffer* indexBuffer, const GPUBuffer* vertexBuffer,
-                             size_t vertexOffset) {
+void RenderPass::bindBuffers(GPUBuffer* indexBuffer, GPUBuffer* vertexBuffer, size_t vertexOffset) {
   if (drawPipelineStatus != DrawPipelineStatus::Ok) {
     return;
   }

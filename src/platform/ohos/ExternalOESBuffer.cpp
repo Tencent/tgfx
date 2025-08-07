@@ -18,7 +18,7 @@
 
 #include "ExternalOESBuffer.h"
 #include <mutex>
-#include "gpu/Texture.h"
+#include "gpu/TextureView.h"
 
 namespace tgfx {
 static std::mutex cacheLocker = {};
@@ -73,7 +73,7 @@ int ExternalOESBuffer::height() const {
   return config.height;
 }
 
-std::shared_ptr<Texture> ExternalOESBuffer::onMakeTexture(Context* context, bool) const {
-  return Texture::MakeFrom(context, hardwareBuffer, colorSpace);
+std::shared_ptr<TextureView> ExternalOESBuffer::onMakeTexture(Context* context, bool) const {
+  return TextureView::MakeFrom(context, hardwareBuffer, colorSpace);
 }
 }  // namespace tgfx

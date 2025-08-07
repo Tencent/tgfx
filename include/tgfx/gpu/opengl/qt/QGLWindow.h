@@ -27,7 +27,6 @@
 #include "tgfx/gpu/Window.h"
 
 namespace tgfx {
-class Texture;
 class GLRenderTarget;
 class QGLDeviceCreator;
 

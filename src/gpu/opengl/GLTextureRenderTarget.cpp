@@ -20,8 +20,8 @@
 #include "core/utils/PixelFormatUtil.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/GPU.h"
-#include "gpu/TextureSampler.h"
-#include "gpu/opengl/GLTextureSampler.h"
+#include "gpu/GPUTexture.h"
+#include "gpu/opengl/GLTexture.h"
 #include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
@@ -43,18 +43,18 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
                                                      const BackendTexture& backendTexture,
                                                      int sampleCount, ImageOrigin origin,
                                                      bool adopted) {
-  auto sampler = TextureSampler::MakeFrom(context, backendTexture, adopted);
-  if (sampler == nullptr) {
+  auto texture = GPUTexture::MakeFrom(context, backendTexture, adopted);
+  if (texture == nullptr) {
     return nullptr;
   }
-  sampleCount = context->caps()->getSampleCount(sampleCount, sampler->format());
+  sampleCount = context->caps()->getSampleCount(sampleCount, texture->format());
   ScratchKey scratchKey = {};
   if (adopted) {
     scratchKey =
         ComputeRenderTargetScratchKey(backendTexture.width(), backendTexture.height(),
-                                      sampler->format(), sampleCount, sampler->hasMipmaps());
+                                      texture->format(), sampleCount, texture->hasMipmaps());
   }
-  return GLTextureRenderTarget::MakeFrom(context, std::move(sampler), backendTexture.width(),
+  return GLTextureRenderTarget::MakeFrom(context, std::move(texture), backendTexture.width(),
                                          backendTexture.height(), sampleCount, origin, !adopted,
                                          scratchKey);
 }
@@ -62,7 +62,7 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
 std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
                                                      HardwareBufferRef hardwareBuffer,
                                                      int sampleCount) {
-  auto format = TextureSampler::GetPixelFormat(hardwareBuffer);
+  auto format = GPUTexture::GetPixelFormat(hardwareBuffer);
   if (format == PixelFormat::Unknown) {
     return nullptr;
   }
@@ -70,19 +70,19 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
   if (size.isEmpty()) {
     return nullptr;
   }
-  auto samplers = TextureSampler::MakeFrom(context, hardwareBuffer);
-  if (samplers.size() != 1) {
+  auto textures = GPUTexture::MakeFrom(context, hardwareBuffer);
+  if (textures.size() != 1) {
     return nullptr;
   }
   sampleCount = context->caps()->getSampleCount(sampleCount, format);
-  return GLTextureRenderTarget::MakeFrom(context, std::move(samplers.front()), size.width,
+  return GLTextureRenderTarget::MakeFrom(context, std::move(textures.front()), size.width,
                                          size.height, sampleCount, ImageOrigin::TopLeft, true);
 }
 
 std::shared_ptr<RenderTarget> RenderTarget::Make(Context* context, int width, int height,
                                                  PixelFormat format, int sampleCount,
                                                  bool mipmapped, ImageOrigin origin) {
-  if (!Texture::CheckSizeAndFormat(context, width, height, format)) {
+  if (!TextureView::CheckSizeAndFormat(context, width, height, format)) {
     return nullptr;
   }
   auto caps = context->caps();
@@ -96,11 +96,11 @@ std::shared_ptr<RenderTarget> RenderTarget::Make(Context* context, int width, in
     renderTarget->_origin = origin;
     return renderTarget;
   }
-  auto sampler = TextureSampler::Make(context, width, height, format, hasMipmaps);
-  if (sampler == nullptr) {
+  auto texture = GPUTexture::Make(context, width, height, format, hasMipmaps);
+  if (texture == nullptr) {
     return nullptr;
   }
-  return GLTextureRenderTarget::MakeFrom(context, std::move(sampler), width, height, sampleCount,
+  return GLTextureRenderTarget::MakeFrom(context, std::move(texture), width, height, sampleCount,
                                          origin, false, scratchKey);
 }
 
@@ -165,7 +165,7 @@ static void ReleaseResource(Context* context, unsigned frameBufferRead, unsigned
   }
 }
 
-static bool CreateRenderBuffer(Context* context, TextureSampler* sampler, int width, int height,
+static bool CreateRenderBuffer(Context* context, GPUTexture* texture, int width, int height,
                                int sampleCount, unsigned* frameBufferID, unsigned* renderBufferID) {
   auto gl = GLFunctions::Get(context);
   gl->genFramebuffers(1, frameBufferID);
@@ -177,7 +177,7 @@ static bool CreateRenderBuffer(Context* context, TextureSampler* sampler, int wi
     return false;
   }
   gl->bindRenderbuffer(GL_RENDERBUFFER, *renderBufferID);
-  if (!RenderbufferStorageMSAA(context, sampleCount, sampler->format(), width, height)) {
+  if (!RenderbufferStorageMSAA(context, sampleCount, texture->format(), width, height)) {
     return false;
   }
   gl->bindFramebuffer(GL_FRAMEBUFFER, *frameBufferID);
@@ -191,45 +191,45 @@ static bool CreateRenderBuffer(Context* context, TextureSampler* sampler, int wi
 }
 
 std::shared_ptr<RenderTarget> GLTextureRenderTarget::MakeFrom(
-    Context* context, std::unique_ptr<TextureSampler> sampler, int width, int height,
-    int sampleCount, ImageOrigin origin, bool externallyOwned, const ScratchKey& scratchKey) {
+    Context* context, std::unique_ptr<GPUTexture> texture, int width, int height, int sampleCount,
+    ImageOrigin origin, bool externallyOwned, const ScratchKey& scratchKey) {
   DEBUG_ASSERT(context != nullptr);
-  DEBUG_ASSERT(sampler != nullptr);
+  DEBUG_ASSERT(texture != nullptr);
   auto caps = GLCaps::Get(context);
-  auto glSampler = static_cast<const GLTextureSampler*>(sampler.get());
-  if (!caps->isFormatRenderable(glSampler->format())) {
-    sampler->releaseGPU(context);
+  auto glTexture = static_cast<const GLTexture*>(texture.get());
+  if (!caps->isFormatRenderable(glTexture->format())) {
+    texture->releaseGPU(context);
     return nullptr;
   }
   auto gl = GLFunctions::Get(context);
   unsigned frameBufferRead = 0;
   gl->genFramebuffers(1, &frameBufferRead);
   if (frameBufferRead == 0) {
-    sampler->releaseGPU(context);
+    texture->releaseGPU(context);
     return nullptr;
   }
   unsigned frameBufferDraw = 0;
   unsigned renderBufferId = 0;
   if (sampleCount > 1 && caps->usesMSAARenderBuffers()) {
-    if (!CreateRenderBuffer(context, sampler.get(), width, height, sampleCount, &frameBufferDraw,
+    if (!CreateRenderBuffer(context, texture.get(), width, height, sampleCount, &frameBufferDraw,
                             &renderBufferId)) {
       ReleaseResource(context, frameBufferRead, frameBufferDraw, renderBufferId);
-      sampler->releaseGPU(context);
+      texture->releaseGPU(context);
       return nullptr;
     }
   } else {
     frameBufferDraw = frameBufferRead;
   }
   gl->bindFramebuffer(GL_FRAMEBUFFER, frameBufferRead);
-  FrameBufferTexture2D(context, glSampler->target(), glSampler->id(), sampleCount);
+  FrameBufferTexture2D(context, glTexture->target(), glTexture->id(), sampleCount);
 #ifndef TGFX_BUILD_FOR_WEB
   if (gl->checkFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
     ReleaseResource(context, frameBufferRead, frameBufferDraw, renderBufferId);
-    sampler->releaseGPU(context);
+    texture->releaseGPU(context);
     return nullptr;
   }
 #endif
-  auto renderTarget = new GLTextureRenderTarget(std::move(sampler), width, height, origin,
+  auto renderTarget = new GLTextureRenderTarget(std::move(texture), width, height, origin,
                                                 sampleCount, externallyOwned);
   renderTarget->_readFrameBufferID = frameBufferRead;
   renderTarget->_drawFrameBufferID = frameBufferDraw;
@@ -238,12 +238,12 @@ std::shared_ptr<RenderTarget> GLTextureRenderTarget::MakeFrom(
 }
 
 void GLTextureRenderTarget::onReleaseGPU() {
-  auto glSampler = static_cast<const GLTextureSampler*>(_sampler.get());
+  auto glTexture = static_cast<const GLTexture*>(_texture.get());
   auto gl = GLFunctions::Get(context);
   gl->bindFramebuffer(GL_FRAMEBUFFER, _readFrameBufferID);
-  FrameBufferTexture2D(context, glSampler->target(), 0, _sampleCount);
+  FrameBufferTexture2D(context, glTexture->target(), 0, _sampleCount);
   gl->bindFramebuffer(GL_FRAMEBUFFER, 0);
   ReleaseResource(context, _readFrameBufferID, _drawFrameBufferID, renderBufferID);
-  _sampler->releaseGPU(context);
+  _texture->releaseGPU(context);
 }
 }  // namespace tgfx

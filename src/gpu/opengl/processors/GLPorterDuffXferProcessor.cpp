@@ -80,19 +80,19 @@ void GLPorterDuffXferProcessor::setData(UniformBuffer* uniformBuffer) const {
   if (dstTextureInfo.textureProxy == nullptr) {
     return;
   }
-  auto dstTexture = dstTextureInfo.textureProxy->getTexture();
-  if (dstTexture == nullptr) {
+  auto dstTextureView = dstTextureInfo.textureProxy->getTextureView();
+  if (dstTextureView == nullptr) {
     return;
   }
   uniformBuffer->setData("DstTextureUpperLeft", dstTextureInfo.offset);
   int width;
   int height;
-  if (dstTexture->getSampler()->type() == SamplerType::Rectangle) {
+  if (dstTextureView->getTexture()->type() == TextureType::Rectangle) {
     width = 1;
     height = 1;
   } else {
-    width = dstTexture->width();
-    height = dstTexture->height();
+    width = dstTextureView->width();
+    height = dstTextureView->height();
   }
   float scales[] = {1.f / static_cast<float>(width), 1.f / static_cast<float>(height)};
   uniformBuffer->setData("DstTextureCoordScale", scales);

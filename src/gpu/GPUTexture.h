@@ -26,19 +26,19 @@
 
 namespace tgfx {
 /**
- * The type of texture sampler. While only the 2D value is used by non-GL backends, the type must
- * still be known at the API-neutral layer to determine the legality of mipmapped, renderable, and
+ * The type of GPUTexture. While only the 2D value is used by non-GL backends, the type must still
+ * be known at the API-neutral layer to determine the legality of mipmapped, renderable, and
  * sampling parameters for proxies instantiated with wrapped textures.
  */
-enum class SamplerType { None, TwoD, Rectangle, External };
+enum class TextureType { None, TwoD, Rectangle, External };
 
 /**
  * GPUTexture represents a texture in the GPU backend for rendering operations.
  */
-class TextureSampler {
+class GPUTexture {
  public:
   /**
-   * Returns the PixelFormat of the texture sampler created from the given hardware buffer. If the
+   * Returns the PixelFormat of the texture created from the given hardware buffer. If the
    * hardwareBuffer is invalid or contains multiple planes (such as YUV formats), returns
    * PixelFormat::Unknown.
    */
@@ -51,62 +51,62 @@ class TextureSampler {
   static PixelFormat GetPixelFormat(const BackendTexture& backendTexture);
 
   /**
-   * Creates texture samplers from a platform-specific hardware buffer, such as AHardwareBuffer on
-   * Android or CVPixelBufferRef on Apple platforms. The caller must ensure the hardwareBuffer stays
-   * valid for the sampler's lifetime. Multiple samplers can be created from the same hardwareBuffer
+   * Creates textures from a platform-specific hardware buffer, such as AHardwareBuffer on Android
+   * or CVPixelBufferRef on Apple platforms. The caller must ensure the hardwareBuffer stays valid
+   * for the texture's lifetime. Multiple textures can be created from the same hardwareBuffer
    * (typically for YUV formats). If yuvFormat is not nullptr, it will be set to the
    * hardwareBuffer's YUVFormat. Returns nullptr if any parameter is invalid or the GPU backend does
    * not support the hardwareBuffer, leaving yuvFormat unchanged.
    */
-  static std::vector<std::unique_ptr<TextureSampler>> MakeFrom(Context* context,
-                                                               HardwareBufferRef hardwareBuffer,
-                                                               YUVFormat* yuvFormat = nullptr);
+  static std::vector<std::unique_ptr<GPUTexture>> MakeFrom(Context* context,
+                                                           HardwareBufferRef hardwareBuffer,
+                                                           YUVFormat* yuvFormat = nullptr);
 
   /**
-   * Creates a new TextureSampler that wraps the given backend texture. If adopted is true, the
-   * sampler will take ownership of the backend texture and destroy it when no longer needed.
-   * Otherwise, the backend texture must remain valid for as long as the sampler exists.
+   * Creates a new GPUTexture that wraps the given backend texture. If adopted is true, the
+   * GPUTexture will take ownership of the backend texture and destroy it when no longer needed.
+   * Otherwise, the backend texture must remain valid for as long as the GPUTexture exists.
    */
-  static std::unique_ptr<TextureSampler> MakeFrom(Context* context,
-                                                  const BackendTexture& backendTexture,
-                                                  bool adopted = false);
+  static std::unique_ptr<GPUTexture> MakeFrom(Context* context,
+                                              const BackendTexture& backendTexture,
+                                              bool adopted = false);
 
   /**
-   * Creates a new TextureSampler with the given width, height, and pixel format. If mipmapped is
-   * true, mipmap levels will be generated. Returns nullptr if the sampler cannot be created.
+   * Creates a new GPUTexture with the given width, height, and pixel format. If mipmapped is
+   * true, mipmap levels will be generated. Returns nullptr if the texture cannot be created.
    */
-  static std::unique_ptr<TextureSampler> Make(Context* context, int width, int height,
-                                              PixelFormat format = PixelFormat::RGBA_8888,
-                                              bool mipmapped = false);
+  static std::unique_ptr<GPUTexture> Make(Context* context, int width, int height,
+                                          PixelFormat format = PixelFormat::RGBA_8888,
+                                          bool mipmapped = false);
 
-  virtual ~TextureSampler() = default;
+  virtual ~GPUTexture() = default;
 
   /**
-   * Returns the pixel format of the sampler.
+   * Returns the pixel format of the texture.
    */
   PixelFormat format() const {
     return _format;
   }
 
   /**
-   * Returns the maximum mipmap level of the sampler.
+   * Returns the maximum mipmap level of the texture.
    */
   int maxMipmapLevel() const {
     return _maxMipmapLevel;
   }
 
   /**
-   * Returns true if the TextureSampler has mipmap levels.
+   * Returns true if the texture has mipmap levels.
    */
   bool hasMipmaps() const {
     return _maxMipmapLevel > 0;
   }
 
   /**
-   * The texture type of the sampler.
+   * The type of the texture.
    */
-  virtual SamplerType type() const {
-    return SamplerType::TwoD;
+  virtual TextureType type() const {
+    return TextureType::TwoD;
   }
 
   /**
@@ -116,7 +116,7 @@ class TextureSampler {
 
   /**
    * Retrieves the backing hardware buffer. This method does not acquire any additional reference to
-   * the returned hardware buffer. Returns nullptr if the sampler is not created from a hardware
+   * the returned hardware buffer. Returns nullptr if the texture is not created from a hardware
    * buffer.
    */
   virtual HardwareBufferRef getHardwareBuffer() const {
@@ -124,21 +124,21 @@ class TextureSampler {
   }
 
   /**
-   * Writes pixel data to the sampler within the specified rectangle. The pixel data must match the
-   * sampler's pixel format, and the rectangle must be fully contained within the sampler's
-   * dimensions. If the sampler has mipmaps, you must call regenerateMipmapLevels() after writing
+   * Writes pixel data to the texture within the specified rectangle. The pixel data must match the
+   * texture's pixel format, and the rectangle must be fully contained within the texture's
+   * dimensions. If the texture has mipmaps, you must call regenerateMipmapLevels() after writing
    * pixels; this will not happen automatically.
    */
   virtual void writePixels(Context* context, const Rect& rect, const void* pixels,
                            size_t rowBytes) = 0;
   /**
-   * Computes a key for the sampler that can be used to identify it in a cache. The key is written
+   * Computes a key for the texture that can be used to identify it in a cache. The key is written
    * to the provided BytesKey object.
    */
-  virtual void computeSamplerKey(Context* context, BytesKey* bytesKey) const = 0;
+  virtual void computeTextureKey(Context* context, BytesKey* bytesKey) const = 0;
 
   /**
-   * Releases the sampler and its GPU resources. Do not use the sampler after calling this method.
+   * Releases the texture and its GPU resources. Do not use the texture after calling this method.
    * You must call this method explicitly, as GPU resources are not released automatically upon
    * destruction because a valid context may not be available at that time.
    */
@@ -148,7 +148,7 @@ class TextureSampler {
   PixelFormat _format = PixelFormat::RGBA_8888;
   int _maxMipmapLevel = 0;
 
-  TextureSampler(PixelFormat format, int maxMipmapLevel)
+  GPUTexture(PixelFormat format, int maxMipmapLevel)
       : _format(format), _maxMipmapLevel(maxMipmapLevel) {
   }
 };

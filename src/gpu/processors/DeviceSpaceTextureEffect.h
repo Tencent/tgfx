@@ -40,7 +40,7 @@ class DeviceSpaceTextureEffect : public FragmentProcessor {
     return 1;
   }
 
-  const TextureSampler* onTextureSampler(size_t) const override;
+  GPUTexture* onTextureAt(size_t) const override;
 
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
   Matrix uvMatrix = {};

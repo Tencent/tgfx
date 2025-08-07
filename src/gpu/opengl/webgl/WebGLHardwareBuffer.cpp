@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/Texture.h"
+#include "gpu/TextureView.h"
 #include "tgfx/platform/HardwareBuffer.h"
 
 namespace tgfx {
@@ -24,12 +24,12 @@ bool HardwareBufferAvailable() {
   return false;
 }
 
-PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef) {
+PixelFormat GPUTexture::GetPixelFormat(HardwareBufferRef) {
   return PixelFormat::Unknown;
 }
 
-std::vector<std::unique_ptr<TextureSampler>> TextureSampler::MakeFrom(Context*, HardwareBufferRef,
-                                                                      YUVFormat*) {
+std::vector<std::unique_ptr<GPUTexture>> GPUTexture::MakeFrom(Context*, HardwareBufferRef,
+                                                              YUVFormat*) {
   return {};
 }
 }  // namespace tgfx

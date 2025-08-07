@@ -25,11 +25,11 @@ GenerateMipmapsTask::GenerateMipmapsTask(std::shared_ptr<TextureProxy> texturePr
 }
 
 void GenerateMipmapsTask::execute(CommandEncoder* encoder) {
-  auto texture = textureProxy->getTexture();
-  if (texture == nullptr) {
-    LOGE("GenerateMipmapsTask::execute() Failed to get texture!");
+  auto textureView = textureProxy->getTextureView();
+  if (textureView == nullptr) {
+    LOGE("GenerateMipmapsTask::execute() Failed to get texture view!");
     return;
   }
-  encoder->generateMipmapsForTexture(texture->getSampler());
+  encoder->generateMipmapsForTexture(textureView->getTexture());
 }
 }  // namespace tgfx

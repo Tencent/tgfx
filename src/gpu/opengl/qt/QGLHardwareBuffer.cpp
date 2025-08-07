@@ -16,10 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/Texture.h"
+#include "gpu/TextureView.h"
 #include "tgfx/gpu/opengl/qt/QGLDevice.h"
 #ifdef __APPLE__
-#include "gpu/opengl/cgl/CGLHardwareTextureSampler.h"
+#include "gpu/opengl/cgl/CGLHardwareTexture.h"
 #endif
 #include "tgfx/platform/HardwareBuffer.h"
 
@@ -30,7 +30,7 @@ bool HardwareBufferAvailable() {
   return true;
 }
 
-PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
+PixelFormat GPUTexture::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return PixelFormat::Unknown;
   }
@@ -45,22 +45,23 @@ PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
   }
 }
 
-std::vector<std::unique_ptr<TextureSampler>> TextureSampler::MakeFrom(
-    Context* context, HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) {
+std::vector<std::unique_ptr<GPUTexture>> GPUTexture::MakeFrom(Context* context,
+                                                              HardwareBufferRef hardwareBuffer,
+                                                              YUVFormat* yuvFormat) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return {};
   }
   auto textureCache = static_cast<QGLDevice*>(context->device())->getTextureCache();
-  auto sampler = CGLHardwareTextureSampler::MakeFrom(hardwareBuffer, textureCache);
-  if (sampler == nullptr) {
+  auto texture = CGLHardwareTexture::MakeFrom(hardwareBuffer, textureCache);
+  if (texture == nullptr) {
     return {};
   }
   if (yuvFormat != nullptr) {
     *yuvFormat = YUVFormat::Unknown;
   }
-  std::vector<std::unique_ptr<TextureSampler>> samplers = {};
-  samplers.push_back(std::move(sampler));
-  return samplers;
+  std::vector<std::unique_ptr<GPUTexture>> textures = {};
+  textures.push_back(std::move(texture));
+  return textures;
 }
 
 #else
@@ -69,12 +70,12 @@ bool HardwareBufferAvailable() {
   return false;
 }
 
-PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef) {
+PixelFormat GPUTexture::GetPixelFormat(HardwareBufferRef) {
   return PixelFormat::Unknown;
 }
 
-std::vector<std::unique_ptr<TextureSampler>> TextureSampler::MakeFrom(Context*, HardwareBufferRef,
-                                                                      YUVFormat*) {
+std::vector<std::unique_ptr<GPUTexture>> GPUTexture::MakeFrom(Context*, HardwareBufferRef,
+                                                              YUVFormat*) {
   return {};
 }
 

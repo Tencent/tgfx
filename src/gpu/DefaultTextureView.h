@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,34 +16,31 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#if defined(__ANDROID__) || defined(ANDROID) || defined(__OHOS__)
-
 #pragma once
 
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
-#include "gpu/opengl/GLTextureSampler.h"
+#include "gpu/TextureView.h"
 
 namespace tgfx {
-class EGLHardwareTextureSampler : public GLTextureSampler {
+/**
+ * DefaultTextureView is a simple TextureView implementation that stores pixel data using a single
+ * GPUTexture.
+ */
+class DefaultTextureView : public TextureView {
  public:
-  static std::unique_ptr<EGLHardwareTextureSampler> MakeFrom(Context* context,
-                                                             HardwareBufferRef hardwareBuffer);
-  ~EGLHardwareTextureSampler() override;
+  DefaultTextureView(std::unique_ptr<GPUTexture> texture, int width, int height,
+                     ImageOrigin origin = ImageOrigin::TopLeft);
 
-  HardwareBufferRef getHardwareBuffer() const override {
-    return hardwareBuffer;
+  size_t memoryUsage() const override;
+
+  GPUTexture* getTexture() const override {
+    return _texture.get();
   }
 
-  void releaseGPU(Context* context) override;
+ protected:
+  std::unique_ptr<GPUTexture> _texture = {};
 
- private:
-  HardwareBufferRef hardwareBuffer = nullptr;
-  EGLImageKHR eglImage = EGL_NO_IMAGE_KHR;
-
-  EGLHardwareTextureSampler(HardwareBufferRef hardwareBuffer, EGLImageKHR eglImage, unsigned id,
-                            unsigned target, PixelFormat format);
+  void onReleaseGPU() override {
+    _texture->releaseGPU(context);
+  }
 };
 }  // namespace tgfx
-
-#endif

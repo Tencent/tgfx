@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/Texture.h"
+#include "gpu/TextureView.h"
 
 namespace tgfx {
 /**
@@ -101,7 +101,7 @@ class RenderTarget {
    * Returns a reference to the underlying texture representation of this render target, may be
    * nullptr.
    */
-  virtual std::shared_ptr<Texture> asTexture() const {
+  virtual std::shared_ptr<TextureView> asTextureView() const {
     return nullptr;
   }
 

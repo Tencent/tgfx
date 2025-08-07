@@ -19,44 +19,44 @@
 #pragma once
 
 #include <array>
-#include "gpu/Texture.h"
-#include "gpu/TextureSampler.h"
+#include "gpu/GPUTexture.h"
+#include "gpu/TextureView.h"
 #include "gpu/YUVFormat.h"
 #include "tgfx/core/YUVColorSpace.h"
 
 namespace tgfx {
 /**
- * YUVTexture wraps separate texture samplers in the GPU backend for Y, U, and V planes.
+ * YUVTextureView wraps separate textures in the GPU backend for Y, U, and V planes.
  */
-class YUVTexture : public Texture {
+class YUVTextureView : public TextureView {
  public:
   /**
-   * The pixel format of this yuv texture.
+   * The pixel format of the texture view.
    */
   YUVFormat yuvFormat() const {
     return _yuvFormat;
   }
 
   /**
-   * The color space of the yuv texture.
+   * The color space of the texture view.
    */
   YUVColorSpace colorSpace() const {
     return _colorSpace;
   }
 
-  TextureSampler* getSampler() const override {
-    return samplers.front().get();
+  GPUTexture* getTexture() const override {
+    return textures.front().get();
   }
 
   /**
-   * Returns the number of the samplers in the texture.
+   * Returns the number of GPUTextures in the texture view.
    */
-  size_t samplerCount() const;
+  size_t textureCount() const;
 
   /**
-   * Returns a texture sampler at the specified index.
+   * Returns the GPUTexture at the specified index.
    */
-  TextureSampler* getSamplerAt(size_t index) const;
+  GPUTexture* getTextureAt(size_t index) const;
 
   bool isAlphaOnly() const override {
     return false;
@@ -79,16 +79,16 @@ class YUVTexture : public Texture {
   }
 
  protected:
-  YUVTexture(std::vector<std::unique_ptr<TextureSampler>> yuvSamplers, int width, int height,
-             YUVFormat yuvFormat, YUVColorSpace colorSpace);
+  YUVTextureView(std::vector<std::unique_ptr<GPUTexture>> yuvTextures, int width, int height,
+                 YUVFormat yuvFormat, YUVColorSpace colorSpace);
 
   void onReleaseGPU() override;
 
  private:
-  std::array<std::unique_ptr<TextureSampler>, 3> samplers = {};
+  std::array<std::unique_ptr<GPUTexture>, 3> textures = {};
   YUVFormat _yuvFormat = YUVFormat::Unknown;
   YUVColorSpace _colorSpace = YUVColorSpace::BT601_LIMITED;
 
-  friend class Texture;
+  friend class TextureView;
 };
 }  // namespace tgfx
