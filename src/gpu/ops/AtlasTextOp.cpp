@@ -45,7 +45,7 @@ PlacementPtr<AtlasTextOp> AtlasTextOp::Make(Context* context,
     renderFlags |= RenderFlags::DisableAsyncTask;
   }
   atlasTextOp->vertexBufferProxyView =
-      context->proxyProvider()->createVertexBufferProxyView(std::move(provider), renderFlags);
+      context->proxyProvider()->createVertexBufferProxy(std::move(provider), renderFlags);
   return atlasTextOp;
 }
 

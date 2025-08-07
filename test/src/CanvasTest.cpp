@@ -24,6 +24,7 @@
 #include "core/images/TransformImage.h"
 #include "core/shapes/AppendShape.h"
 #include "gpu/DrawingManager.h"
+#include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"
 #include "gpu/Texture.h"
 #include "gpu/opengl/GLCaps.h"
@@ -2809,5 +2810,44 @@ TGFX_TEST(CanvasTest, ScalePictureImage) {
   canvas->clipRect(Rect::MakeXYWH(100, 100, 500, 500));
   canvas->drawImage(scaledImage);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/pic_scaled_pic_clip"));
+}
+
+TGFX_TEST(CanvasTest, RasterizedMipmapImage) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  auto originKey = std::static_pointer_cast<RasterizedImage>(image)->getTextureKey();
+  auto texture = context->proxyProvider()->findOrWrapTextureProxy(originKey);
+  EXPECT_TRUE(texture == nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  auto canvas = surface->getCanvas();
+  canvas->drawImage(image);
+  context->flushAndSubmit();
+  texture = context->proxyProvider()->findOrWrapTextureProxy(originKey);
+  EXPECT_TRUE(texture != nullptr);
+
+  image = image->makeMipmapped(true);
+  EXPECT_TRUE(image->hasMipmaps());
+  auto mipmapKey = std::static_pointer_cast<RasterizedImage>(image)->getTextureKey();
+  EXPECT_TRUE(mipmapKey != originKey);
+  auto mipmapTexture = context->proxyProvider()->findOrWrapTextureProxy(mipmapKey);
+  EXPECT_TRUE(mipmapTexture == nullptr);
+  canvas->drawImage(image);
+  context->flushAndSubmit();
+  mipmapTexture = context->proxyProvider()->findOrWrapTextureProxy(mipmapKey);
+  EXPECT_TRUE(mipmapTexture != nullptr);
+
+  image = image->makeMipmapped(false);
+  EXPECT_FALSE(image->hasMipmaps());
+  EXPECT_TRUE(originKey == std::static_pointer_cast<RasterizedImage>(image)->getTextureKey());
+
+  texture = context->proxyProvider()->findOrWrapTextureProxy(originKey);
+  EXPECT_TRUE(texture != nullptr);
+  image = image->makeMipmapped(true);
+  EXPECT_TRUE(image->hasMipmaps());
+  EXPECT_TRUE(mipmapKey == std::static_pointer_cast<RasterizedImage>(image)->getTextureKey());
+  mipmapTexture = context->proxyProvider()->findOrWrapTextureProxy(mipmapKey);
+  EXPECT_TRUE(mipmapTexture != nullptr);
 }
 }  // namespace tgfx

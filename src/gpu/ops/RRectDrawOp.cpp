@@ -37,7 +37,7 @@ PlacementPtr<RRectDrawOp> RRectDrawOp::Make(Context* context,
     renderFlags |= RenderFlags::DisableAsyncTask;
   }
   drawOp->vertexBufferProxyView =
-      context->proxyProvider()->createVertexBufferProxyView(std::move(provider), renderFlags);
+      context->proxyProvider()->createVertexBufferProxy(std::move(provider), renderFlags);
   return drawOp;
 }
 

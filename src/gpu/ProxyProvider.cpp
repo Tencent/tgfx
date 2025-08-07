@@ -57,7 +57,7 @@ std::shared_ptr<IndexBufferProxy> ProxyProvider::createIndexBufferProxy(
   return proxy;
 }
 
-std::shared_ptr<VertexBufferProxyView> ProxyProvider::createVertexBufferProxyView(
+std::shared_ptr<VertexBufferProxyView> ProxyProvider::createVertexBufferProxy(
     PlacementPtr<VertexProvider> provider, uint32_t renderFlags) {
   if (provider == nullptr) {
     return nullptr;

@@ -42,6 +42,11 @@
 
 namespace tgfx {
 
+static size_t GetPaddingAlignment16(size_t size) {
+  auto remainder = size & 0xF;
+  return (16 - remainder) & 0xF;
+}
+
 std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(const std::string& filePath) {
   static WeakMap<std::string, ImageCodec> imageCodecMap = {};
   if (filePath.empty()) {
@@ -164,11 +169,18 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     colorType = ColorType::RGBA_8888;
     srcRowBytes = ImageInfo::GetBytesPerPixel(colorType) * static_cast<size_t>(width());
     dstImageInfo = dstInfo.makeColorType(colorType);
+    auto dstRowBytes = dstImageInfo.rowBytes();
+    if (dstRowBytes % 16) {
+      dstRowBytes = dstImageInfo.rowBytes() + GetPaddingAlignment16(dstImageInfo.rowBytes());
+      dstImageInfo = ImageInfo::Make(dstInfo.width(), dstInfo.height(), colorType,
+                                     dstInfo.alphaType(), dstRowBytes);
+    }
     if (!dstTempBuffer.alloc(dstImageInfo.byteSize())) {
       return false;
     }
     dstData = dstTempBuffer.bytes();
   }
+  srcRowBytes = srcRowBytes + GetPaddingAlignment16(srcRowBytes);
   if (!buffer.alloc(srcRowBytes * static_cast<size_t>(height()))) {
     return false;
   }

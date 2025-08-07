@@ -42,7 +42,7 @@ RuntimeDrawTask::RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
       auto maskRect = Rect::MakeWH(input->width(), input->height());
       auto maskVertexProvider =
           RectsVertexProvider::MakeFrom(context->drawingBuffer(), maskRect, AAType::None);
-      auto maskBuffer = context->proxyProvider()->createVertexBufferProxyView(
+      auto maskBuffer = context->proxyProvider()->createVertexBufferProxy(
           std::move(maskVertexProvider), RenderFlags::DisableAsyncTask);
       inputVertexBuffers.push_back(std::move(maskBuffer));
     } else {
