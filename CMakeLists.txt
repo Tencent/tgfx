@@ -527,6 +527,9 @@ if(TGFX_BUILD_VCPKG)
             NAMES jpeg libjpeg
             PATHS ${VCPKG_LIB_DIR}
             NO_DEFAULT_PATH)
+        if(NOT JPEG_LIB)
+            message(FATAL_ERROR "JPEG library not found in vcpkg")
+        endif()
         list(APPEND TGFX_STATIC_LIBS ${JPEG_LIB})
     endif()
     
@@ -551,6 +554,9 @@ if(TGFX_BUILD_VCPKG)
             PATHS ${VCPKG_LIB_DIR}
             NO_DEFAULT_PATH
         )
+        if(NOT WEBP_LIB OR NOT WEBPDEMUX_LIB OR NOT WEBPMUX_LIB OR NOT SHARPYUV_LIB)
+            message(FATAL_ERROR "WebP libraries not found in vcpkg")
+        endif()
         list(APPEND TGFX_STATIC_LIBS ${WEBP_LIB} ${WEBPDEMUX_LIB} ${WEBPMUX_LIB} ${SHARPYUV_LIB})
     endif()
     
@@ -560,6 +566,9 @@ if(TGFX_BUILD_VCPKG)
             PATHS ${VCPKG_LIB_DIR}
             NO_DEFAULT_PATH
         )
+        if(NOT PNG_LIB)
+            message(FATAL_ERROR "PNG library not found in vcpkg")
+        endif()
         list(APPEND TGFX_STATIC_LIBS ${PNG_LIB})
     endif()
     
@@ -569,6 +578,9 @@ if(TGFX_BUILD_VCPKG)
             PATHS ${VCPKG_LIB_DIR}
             NO_DEFAULT_PATH
         )
+        if(NOT ZLIB_LIB)
+            message(FATAL_ERROR "ZLIB library not found in vcpkg")
+        endif()
         list(APPEND TGFX_STATIC_LIBS ${ZLIB_LIB})
     endif()
     
@@ -578,6 +590,9 @@ if(TGFX_BUILD_VCPKG)
             PATHS ${VCPKG_LIB_DIR}
             NO_DEFAULT_PATH
         )
+        if(NOT FREETYPE_LIB)
+            message(FATAL_ERROR "FreeType library not found in vcpkg")
+        endif()
         list(APPEND TGFX_STATIC_LIBS ${FREETYPE_LIB})
     endif()
     
@@ -596,6 +611,9 @@ if(TGFX_BUILD_VCPKG)
             PATHS ${VCPKG_LIB_DIR}
             NO_DEFAULT_PATH
         )
+        if(NOT FLATBUFFERS_LIB)
+            message(FATAL_ERROR "FlatBuffers library not found in vcpkg")
+        endif()
         list(APPEND TGFX_STATIC_LIBS ${FLATBUFFERS_LIB})
     endif()
 
@@ -604,11 +622,22 @@ if(TGFX_BUILD_VCPKG)
     endif()
 
     if (TGFX_BUILD_SVG)
+        set(EXPATNAMES expat expatw libexpat libexpatw)
+        set(DEBUGEXPATNAMES)
+        foreach(_CRT "" MT MD)
+            foreach(name IN LISTS EXPATNAMES)
+                list(APPEND EXPATNAMES ${name}${_CRT})
+                list(APPEND DEBUGEXPATNAMES ${name}d${_CRT})
+            endforeach()
+        endforeach()
         find_library(EXPAT_LIB 
-            NAMES libexpat expat
+            NAMES ${DEBUGEXPATNAMES} ${EXPATNAMES}
             PATHS ${VCPKG_LIB_DIR}
             NO_DEFAULT_PATH
         )
+        if(NOT EXPAT_LIB)
+            message(FATAL_ERROR "Expat library not found in vcpkg")
+        endif()
         list(APPEND TGFX_STATIC_LIBS ${EXPAT_LIB})
     endif ()
     
@@ -736,6 +765,9 @@ if (TGFX_BUILD_TESTS)
             PATHS ${VCPKG_LIB_DIR}
             NO_DEFAULT_PATH
         )
+        if(NOT HARFBUZZ_LIB)
+            message(FATAL_ERROR "HarfBuzz library not found in vcpkg")
+        endif()
         list(APPEND TGFX_TEST_LIBS ${HARFBUZZ_LIB})
 
         find_library(GTEST_LIB 
@@ -743,6 +775,9 @@ if (TGFX_BUILD_TESTS)
             PATHS ${VCPKG_LIB_DIR}
             NO_DEFAULT_PATH
         )
+        if(NOT GTEST_LIB)
+            message(FATAL_ERROR "Google Test library not found in vcpkg")
+        endif()
         list(APPEND TGFX_TEST_LIBS ${GTEST_LIB})
 
         find_library(GMOCK_LIB 
@@ -750,6 +785,9 @@ if (TGFX_BUILD_TESTS)
             PATHS ${VCPKG_LIB_DIR}
             NO_DEFAULT_PATH
         )
+        if(NOT GMOCK_LIB)
+            message(FATAL_ERROR "Google Mock library not found in vcpkg")
+        endif()
         list(APPEND TGFX_TEST_LIBS ${GMOCK_LIB})
     else()
         add_vendor_target(test-vendor STATIC_VENDORS harfbuzz googletest)
