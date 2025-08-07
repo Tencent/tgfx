@@ -21,7 +21,7 @@
 #include <cstdlib>
 #include <string>
 #include "core/utils/Log.h"
-#include "expat/lib/expat.h"
+#include "expat.h"
 
 namespace tgfx {
 

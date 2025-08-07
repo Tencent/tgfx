@@ -361,7 +361,7 @@ endif()
 if (TGFX_BUILD_SVG)
     if (NOT TGFX_BUILD_VCPKG)
         list(APPEND TGFX_STATIC_VENDORS expat)
-        list(APPEND TGFX_INCLUDES third_party/expat)
+        list(APPEND TGFX_INCLUDES third_party/expat/expat/lib)
     endif ()
 endif ()
 
