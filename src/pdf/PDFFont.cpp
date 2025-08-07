@@ -246,7 +246,7 @@ void PDFFont::emitSubsetType0(PDFDocument* document) const {
     return;
   }
   const FontMetrics& metrics = *metricsPtr;
-  DEBUG_ASSERT(CanEmbed(metrics));
+  ASSERT(CanEmbed(metrics));
   FontMetrics::FontType type = getType();
 
   auto descriptor = PDFDictionary::Make("FontDescriptor");
