@@ -90,7 +90,11 @@ void PDFUtils::GetDateTime(DateTime* dataTime) {
     time_t m_time;
     time(&m_time);
     tm tstruct;
+#ifdef _WIN32
+    gmtime_s(&tstruct, &m_time);
+#else
     gmtime_r(&m_time, &tstruct);
+#endif
 
     dataTime->timeZoneMinutes = 0;
     dataTime->year = static_cast<uint16_t>(tstruct.tm_year + 1900);
