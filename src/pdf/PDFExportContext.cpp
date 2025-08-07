@@ -293,10 +293,10 @@ class GlyphPositioner {
   }
   void setFont(PDFFont* pdfFont) {
     this->flush();
-    PDFFont = pdfFont;
+    _pdfFont = pdfFont;
     // Reader 2020.013.20064 incorrectly advances some Type3 fonts https://crbug.com/1226960
-    bool convertedToType3 = PDFFont->getType() == FontMetrics::FontType::Other;
-    bool thousandEM = PDFFont->strike().strikeSpec.unitsPerEM == 1000;
+    bool convertedToType3 = _pdfFont->getType() == FontMetrics::FontType::Other;
+    bool thousandEM = _pdfFont->strike().strikeSpec.unitsPerEM == 1000;
     viewersAgreeOnAdvancesInFont = thousandEM || !convertedToType3;
   }
 
@@ -333,7 +333,7 @@ class GlyphPositioner {
       content->writeText("<");
       inText = true;
     }
-    if (PDFFont->multiByteGlyphs()) {
+    if (_pdfFont->multiByteGlyphs()) {
       PDFUtils::WriteUInt16BE(content, glyph);
     } else {
       PDFUtils::WriteUInt8(content, static_cast<uint8_t>(glyph));
@@ -342,7 +342,7 @@ class GlyphPositioner {
 
  private:
   std::shared_ptr<MemoryWriteStream> content;
-  PDFFont* PDFFont = nullptr;
+  PDFFont* _pdfFont = nullptr;
   Point currentMatrixOrigin;
   float XAdvance = 0.0f;
   bool viewersAgreeOnAdvancesInFont = true;

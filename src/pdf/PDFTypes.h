@@ -171,7 +171,7 @@ PDFIndirectReference PDFStreamOut(
 
 namespace std {
 template <>
-struct std::hash<tgfx::PDFIndirectReference> {
+struct hash<tgfx::PDFIndirectReference> {
   std::size_t operator()(const tgfx::PDFIndirectReference& s) const {
     return std::hash<int>()(s.value);
   }

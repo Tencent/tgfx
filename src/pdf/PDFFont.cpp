@@ -87,10 +87,7 @@ PDFStrike::PDFStrike(PDFStrikeSpec strikeSpec, PDFDocument* document)
 }
 
 std::shared_ptr<PDFStrike> PDFStrike::Make(PDFDocument* doc, const Font& font) {
-  // constexpr float kBitmapFontSize = 64;
-
-  float unitsPerEm = static_cast<float>(font.getTypeface()->unitsPerEm());
-  DEBUG_ASSERT(0 < unitsPerEm);
+  DEBUG_ASSERT(0 < font.getTypeface()->unitsPerEm());
 
   const Font& canonFont(font);
   float pathStrikeEM = canonFont.getSize();

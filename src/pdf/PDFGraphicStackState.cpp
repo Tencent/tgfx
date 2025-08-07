@@ -89,8 +89,8 @@ void PDFGraphicStackState::updateMatrix(const Matrix& matrix) {
     const auto& currentState = entries[stackDepth].state;
     const auto& previousState = entries[stackDepth - 1].state;
 
-    DEBUG_ASSERT(currentState.clip.isSame(previousState.clip) &&
-                 currentState.matrix == previousState.matrix);
+    ASSERT(currentState.clip.isSame(previousState.clip) &&
+           currentState.matrix == previousState.matrix);
     pop();
     DEBUG_ASSERT(currentEntry()->matrix.isIdentity());
   }
