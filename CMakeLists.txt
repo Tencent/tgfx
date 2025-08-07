@@ -562,7 +562,7 @@ if(TGFX_BUILD_VCPKG)
     
     if(TGFX_USE_PNG)
         find_library(PNG_LIB 
-            NAMES png libpng png16 libpng16
+            NAMES png libpng png16 libpng16 png16d libpng16d
             PATHS ${VCPKG_LIB_DIR}
             NO_DEFAULT_PATH
         )
