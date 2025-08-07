@@ -21,6 +21,7 @@
 #include <cmath>
 #include <memory>
 #include <optional>
+#include "core/utils/AddressOf.h"
 #include "core/utils/Log.h"
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Color.h"
@@ -340,7 +341,7 @@ std::optional<Paint> SVGRenderContext::commonPaint(const SVGPaint& svgPaint, flo
                                     presentContext, scope, {});
 
       const auto node = this->findNodeById(svgPaint.iri());
-      if (!node || !node->asPaint(localContext, &(paint.value()))) {
+      if (!node || !node->asPaint(localContext, AddressOf(paint))) {
         // Use the fallback color.
         paint->setColor(this->resolveSVGColor(svgPaint.color()));
       }

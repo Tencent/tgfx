@@ -18,7 +18,6 @@
 
 #include "NativeCodec.h"
 #include <atomic>
-#include "CopyDataFromUint8Array.h"
 #include "WebImageBuffer.h"
 #include "WebImageInfo.h"
 #include "tgfx/core/Buffer.h"
@@ -27,6 +26,25 @@
 using namespace emscripten;
 
 namespace tgfx {
+
+std::shared_ptr<Data> CopyDataFromUint8Array(const val& emscriptenData) {
+  if (!emscriptenData.as<bool>()) {
+    return nullptr;
+  }
+  auto length = emscriptenData["length"].as<size_t>();
+  if (length == 0) {
+    return nullptr;
+  }
+  Buffer imageBuffer(length);
+  if (imageBuffer.isEmpty()) {
+    return nullptr;
+  }
+  auto memory = val::module_property("HEAPU8")["buffer"];
+  auto memoryView = val::global("Uint8Array")
+                        .new_(memory, reinterpret_cast<uintptr_t>(imageBuffer.data()), length);
+  memoryView.call<void>("set", emscriptenData);
+  return imageBuffer.release();
+}
 
 std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& filePath) {
   if (filePath.find("http://") == 0 || filePath.find("https://") == 0) {
@@ -73,11 +91,11 @@ std::shared_ptr<ImageCodec> ImageCodec::MakeFrom(NativeImageRef nativeImage) {
 }
 
 NativeCodec::NativeCodec(int width, int height, std::shared_ptr<Data> imageBytes)
-    : ImageCodec(width, height, Orientation::TopLeft), imageBytes(std::move(imageBytes)) {
+    : ImageCodec(width, height), imageBytes(std::move(imageBytes)) {
 }
 
 NativeCodec::NativeCodec(int width, int height, emscripten::val nativeImage)
-    : ImageCodec(width, height, Orientation::TopLeft), nativeImage(std::move(nativeImage)) {
+    : ImageCodec(width, height), nativeImage(std::move(nativeImage)) {
 }
 
 bool NativeCodec::asyncSupport() const {
@@ -85,8 +103,9 @@ bool NativeCodec::asyncSupport() const {
   return false;
 }
 
-bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
-  if (dstInfo.isEmpty() || dstPixels == nullptr) {
+bool NativeCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                               void* dstPixels) const {
+  if (dstPixels == nullptr) {
     return false;
   }
   auto image = nativeImage;
@@ -97,12 +116,13 @@ bool NativeCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   }
 
   auto data = val::module_property("tgfx").call<val>(
-      "readImagePixels", val::module_property("module"), image, dstInfo.width(), dstInfo.height());
+      "readImagePixels", val::module_property("module"), image, width(), height());
   auto imageData = CopyDataFromUint8Array(data);
   if (imageData == nullptr) {
     return false;
   }
   auto info = ImageInfo::Make(width(), height(), ColorType::RGBA_8888, AlphaType::Unpremultiplied);
+  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
   Pixmap pixmap(info, imageData->data());
   auto result = pixmap.readPixels(dstInfo, dstPixels);
   return result;

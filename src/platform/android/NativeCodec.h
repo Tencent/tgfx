@@ -26,9 +26,10 @@ class NativeCodec : public ImageCodec {
  public:
   static void JNIInit(JNIEnv* env);
 
-  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
-
  protected:
+  bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                    void* dstPixels) const override;
+
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
  private:

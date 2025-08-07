@@ -25,11 +25,10 @@ namespace tgfx {
 /**
  * DecodedImage wraps an image source that can asynchronously decode ImageBuffers.
  */
-class DecodedImage : public ResourceImage {
+class DecodedImage : public PixelImage {
  public:
-  static std::shared_ptr<Image> MakeFrom(UniqueKey uniqueKey,
-                                         std::shared_ptr<ImageGenerator> generator,
-                                         bool tryHardware, bool asyncDecoding);
+  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ImageGenerator> generator,
+                                         bool tryHardware, bool asyncDecoding, bool mipmapped);
 
   int width() const override {
     return _width;
@@ -48,8 +47,9 @@ class DecodedImage : public ResourceImage {
     return Type::Decoded;
   }
 
-  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
-                                                   const UniqueKey& key) const override;
+  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
+
+  std::shared_ptr<Image> onMakeMipmapped(bool mipmapped) const override;
 
  private:
   int _width = 0;
@@ -57,7 +57,7 @@ class DecodedImage : public ResourceImage {
   bool _alphaOnly = false;
   std::shared_ptr<DataSource<ImageBuffer>> source = nullptr;
 
-  DecodedImage(UniqueKey uniqueKey, int width, int height, bool alphaOnly,
-               std::shared_ptr<DataSource<ImageBuffer>> source);
+  DecodedImage(int width, int height, bool alphaOnly,
+               std::shared_ptr<DataSource<ImageBuffer>> source, bool mipmapped);
 };
 }  // namespace tgfx

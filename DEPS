@@ -12,7 +12,7 @@
       },
       {
         "url": "${PAG_GROUP}/pathkit.git",
-        "commit": "1971e6f031aaa4b962dda553cf087cb4e3816921",
+        "commit": "1fce60d56f9c08d25d3868b5006dd2c9b52e9201",
         "dir": "third_party/pathkit"
       },
       {
@@ -76,9 +76,9 @@
          "dir": "third_party/concurrentqueue"
       },
       {
-         "url": "https://github.com/nothings/stb.git",
-         "commit": "f58f558c120e9b32c217290b80bad1a0729fbb2c",
-         "dir": "third_party/stb"
+        "url": "https://github.com/google/highway.git",
+        "commit": "a523516d35e22a4ba8e2e70a319062cb87352de6",
+        "dir": "third_party/highway"
       }
     ]
   },

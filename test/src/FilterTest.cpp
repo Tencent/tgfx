@@ -21,6 +21,7 @@
 #include "CornerPinEffect.h"
 #include "core/filters/ColorImageFilter.h"
 #include "core/filters/DropShadowImageFilter.h"
+#include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
 #include "core/shaders/GradientShader.h"
 #include "core/shaders/ImageShader.h"
@@ -116,7 +117,8 @@ TGFX_TEST(FilterTest, ShaderMaskFilter) {
   auto image = MakeImage("resources/apitest/rotation.jpg");
   image = image->makeOriented(Orientation::LeftBottom);
   image = image->makeMipmapped(true);
-  image = image->makeRasterized(0.25f);
+  image = ScaleImage(image, 0.25f);
+  image = image->makeRasterized();
   ASSERT_TRUE(image != nullptr);
   auto surface = Surface::Make(context, image->width(), image->height());
   auto canvas = surface->getCanvas();
@@ -248,7 +250,7 @@ TGFX_TEST(FilterTest, BlurLargePixel) {
   auto image = MakeImage("resources/apitest/rotation.jpg");
   ASSERT_TRUE(image != nullptr);
   Matrix imageMatrix = {};
-  image = image->makeRasterized(1.f);
+  image = image->makeRasterized();
   auto bounds = Rect::MakeWH(image->width(), image->height());
   imageMatrix.mapRect(&bounds);
   auto imageWidth = static_cast<float>(bounds.width());
@@ -332,7 +334,8 @@ TGFX_TEST(FilterTest, RuntimeEffect) {
   auto surface = Surface::Make(context, 720, 720);
   auto canvas = surface->getCanvas();
   image = image->makeMipmapped(true);
-  image = image->makeRasterized(0.5f, SamplingOptions(FilterMode::Linear, MipmapMode::Linear));
+  image = ScaleImage(image, 0.5f, SamplingOptions(FilterMode::Linear, MipmapMode::Linear));
+  image = image->makeRasterized();
   auto effect = CornerPinEffect::Make({484, 54}, {764, 80}, {764, 504}, {482, 512});
   auto filter = ImageFilter::Runtime(std::move(effect));
   image = image->makeWithFilter(std::move(filter));
@@ -715,7 +718,24 @@ TGFX_TEST(FilterTest, ClipInnerShadowImageFilter) {
     canvas->clipRect(Rect::MakeXYWH(0, 90, 100, 10));
     canvas->drawImage(image);
   }
-  context->flush();
+  context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/ClipInnerShadowImageFilter"));
+}
+
+TGFX_TEST(FilterTest, GaussianBlurImageFilter) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/image_as_mask.png");
+  ASSERT_TRUE(image != nullptr);
+  auto surface = Surface::Make(context, image->width(), image->height());
+  ASSERT_TRUE(surface != nullptr);
+  auto gaussianBlurFilter = std::make_shared<GaussianBlurImageFilter>(3, 3, TileMode::Decal);
+  auto offset = Point::Make(0, 0);
+  image = image->makeWithFilter(gaussianBlurFilter, &offset);
+  auto canvas = surface->getCanvas();
+  canvas->drawImage(image, offset.x, offset.y);
+  context->flushAndSubmit();
+  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/GaussianBlurImageFilter"));
 }
 }  // namespace tgfx

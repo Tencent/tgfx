@@ -39,18 +39,29 @@ Rect ImageFilter::onFilterBounds(const Rect& srcRect) const {
 std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Image> source,
                                                             const Rect& clipBounds,
                                                             const TPArgs& args) const {
+
+  auto scaledBounds = clipBounds;
+  if (args.drawScale < 1.0f) {
+    scaledBounds.scale(args.drawScale, args.drawScale);
+  }
+  scaledBounds.roundOut();
+
+  auto textureScaleX = scaledBounds.width() / clipBounds.width();
+  auto textureScaleY = scaledBounds.height() / clipBounds.height();
+
   auto renderTarget = RenderTargetProxy::MakeFallback(
-      args.context, static_cast<int>(clipBounds.width()), static_cast<int>(clipBounds.height()),
-      source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
+      args.context, static_cast<int>(scaledBounds.width()), static_cast<int>(scaledBounds.height()),
+      source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto drawRect = Rect::MakeWH(renderTarget->width(), renderTarget->height());
-  FPArgs fpArgs(args.context, args.renderFlags, drawRect);
-  auto offsetMatrix = Matrix::MakeTrans(clipBounds.x(), clipBounds.y());
-  // There is no scaling for the source image, so we can use the default sampling options.
+  FPArgs fpArgs(args.context, args.renderFlags,
+                Rect::MakeWH(renderTarget->width(), renderTarget->height()),
+                std::max(textureScaleX, textureScaleY));
+  Matrix matrix = Matrix::MakeTrans(clipBounds.left, clipBounds.top);
+  matrix.preScale(1.0f / textureScaleX, 1.0f / textureScaleY);
   auto processor =
-      asFragmentProcessor(std::move(source), fpArgs, {}, SrcRectConstraint::Fast, &offsetMatrix);
+      asFragmentProcessor(std::move(source), fpArgs, {}, SrcRectConstraint::Fast, &matrix);
   auto drawingManager = args.context->drawingManager();
   if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags)) {
     return nullptr;
@@ -83,12 +94,14 @@ PlacementPtr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(
   }
   auto isAlphaOnly = source->isAlphaOnly();
   auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
-  TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
+  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale);
   auto textureProxy = lockTextureProxy(std::move(source), dstBounds, tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;
   }
   auto fpMatrix = Matrix::MakeTrans(-dstBounds.x(), -dstBounds.y());
+  fpMatrix.postScale(static_cast<float>(textureProxy->width()) / dstBounds.width(),
+                     static_cast<float>(textureProxy->height()) / dstBounds.height());
   if (uvMatrix != nullptr) {
     fpMatrix.preConcat(*uvMatrix);
   }

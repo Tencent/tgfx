@@ -28,6 +28,7 @@
 namespace tgfx {
 class Context;
 class Texture;
+class BufferImage;
 
 /**
  * ImageBuffer describes a two-dimensional array of pixels and is optimized for creating textures.
@@ -48,16 +49,6 @@ class ImageBuffer {
    */
   static std::shared_ptr<ImageBuffer> MakeFrom(
       HardwareBufferRef hardwareBuffer, YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED);
-
-  /**
-   * Creates an ImageBuffer from the ImageInfo and shares pixels from the immutable Data object. The
-   * caller must ensure the pixel data stay unchanged for the lifetime of the returned ImageBuffer.
-   * Returns nullptr if the pixels are nullptr or the ImageInfo is not suitable for direct texture
-   * uploading. ImageInfo parameters suitable for direct texture uploading include:
-   * The alpha type is either AlphaType::Premultiplied or AlphaType::Opaque;
-   * The color type is one of ColorType::ALPHA_8, ColorType::RGBA_8888, and ColorType::BGRA_8888.
-   */
-  static std::shared_ptr<ImageBuffer> MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels);
 
   /**
    * Creates an ImageBuffer in the I420 format with the specified YUVData and YUVColorSpace. The
@@ -104,11 +95,19 @@ class ImageBuffer {
   ImageBuffer() = default;
 
   /**
+   * Returns true if the ImageBuffer is backed by a PixelBuffer, allowing pixel locking.
+   */
+  virtual bool isPixelBuffer() const {
+    return false;
+  }
+
+  /**
    * Creates a new Texture capturing the pixels of the ImageBuffer. The mipmapped parameter
    * specifies whether created texture must allocate mip map levels.
    */
   virtual std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const = 0;
 
   friend class Texture;
+  friend class BufferImage;
 };
 }  // namespace tgfx

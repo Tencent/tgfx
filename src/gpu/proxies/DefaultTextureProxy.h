@@ -32,8 +32,6 @@ class DefaultTextureProxy : public TextureProxy {
   virtual std::shared_ptr<Texture> onMakeTexture(Context* context) const;
 
  private:
-  UniqueKey uniqueKey = {};
-
   friend class ProxyProvider;
 };
 }  // namespace tgfx

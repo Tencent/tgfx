@@ -17,98 +17,89 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RasterizedImage.h"
-#include "core/images/SubsetImage.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/ops/DrawOp.h"
+#include "gpu/TPArgs.h"
+#include "gpu/processors/TiledTextureEffect.h"
+#include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
-static int GetSize(int size, float scale) {
-  return static_cast<int>(roundf(static_cast<float>(size) * scale));
+
+RasterizedImage::RasterizedImage(UniqueKey uniqueKey, std::shared_ptr<Image> source)
+    : uniqueKey(std::move(uniqueKey)), source(std::move(source)) {
 }
 
-std::shared_ptr<Image> RasterizedImage::MakeFrom(std::shared_ptr<Image> source,
-                                                 float rasterizationScale,
-                                                 const SamplingOptions& sampling) {
-  if (source == nullptr || rasterizationScale <= 0) {
-    return nullptr;
-  }
-  auto sourceWidth = source->width();
-  auto sourceHeight = source->height();
-  auto width = GetSize(sourceWidth, rasterizationScale);
-  auto height = GetSize(sourceHeight, rasterizationScale);
-  if (width <= 0 || height <= 0) {
-    return nullptr;
-  }
-  auto result = std::shared_ptr<RasterizedImage>(
-      new RasterizedImage(UniqueKey::Make(), std::move(source), rasterizationScale, sampling));
-  result->weakThis = result;
-  return result;
+std::shared_ptr<Image> RasterizedImage::makeRasterized() const {
+  return weakThis.lock();
 }
 
-RasterizedImage::RasterizedImage(UniqueKey uniqueKey, std::shared_ptr<Image> source,
-                                 float rasterizationScale, const SamplingOptions& sampling)
-    : ResourceImage(std::move(uniqueKey)), source(std::move(source)),
-      rasterizationScale(rasterizationScale), sampling(sampling) {
-}
-
-int RasterizedImage::width() const {
-  return GetSize(source->width(), rasterizationScale);
-}
-
-int RasterizedImage::height() const {
-  return GetSize(source->height(), rasterizationScale);
-}
-
-std::shared_ptr<Image> RasterizedImage::makeRasterized(float newScale,
-                                                       const SamplingOptions& sampling) const {
-  return MakeFrom(source, rasterizationScale * newScale, sampling);
-}
-
-std::shared_ptr<Image> RasterizedImage::onMakeDecoded(Context* context, bool) const {
-  // There is no need to pass tryHardware (disabled) to the source image, as our texture proxy is
-  // not locked from the source image.
-  auto newSource = source->onMakeDecoded(context);
-  if (newSource == nullptr) {
-    return nullptr;
-  }
-  auto newImage = std::shared_ptr<RasterizedImage>(
-      new RasterizedImage(uniqueKey, std::move(newSource), rasterizationScale, sampling));
-  newImage->weakThis = newImage;
-  return newImage;
-}
-
-std::shared_ptr<TextureProxy> RasterizedImage::onLockTextureProxy(const TPArgs& args,
-                                                                  const UniqueKey& key) const {
+std::shared_ptr<TextureProxy> RasterizedImage::lockTextureProxy(const TPArgs& args) const {
   auto proxyProvider = args.context->proxyProvider();
-  auto textureProxy = proxyProvider->findOrWrapTextureProxy(key);
+  auto textureKey = getTextureKey();
+  auto textureProxy = proxyProvider->findOrWrapTextureProxy(textureKey);
   if (textureProxy != nullptr) {
     return textureProxy;
   }
-  auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
-  auto format = isAlphaOnly() && alphaRenderable ? PixelFormat::ALPHA_8 : PixelFormat::RGBA_8888;
-  auto renderTarget = proxyProvider->createRenderTargetProxy(key, width(), height(), format, 1,
-                                                             args.mipmapped, ImageOrigin::TopLeft,
-                                                             BackingFit::Exact, args.renderFlags);
-  if (renderTarget == nullptr) {
+  auto newArgs = args;
+  newArgs.backingFit = BackingFit::Exact;
+  textureProxy = source->lockTextureProxy(newArgs);
+  if (textureProxy == nullptr) {
     return nullptr;
   }
-  auto sourceWidth = source->width();
-  auto sourceHeight = source->height();
-  auto scaledWidth = GetSize(sourceWidth, rasterizationScale);
-  auto scaledHeight = GetSize(sourceHeight, rasterizationScale);
-  auto uvScaleX = static_cast<float>(sourceWidth) / static_cast<float>(scaledWidth);
-  auto uvScaleY = static_cast<float>(sourceHeight) / static_cast<float>(scaledHeight);
-  Matrix uvMatrix = Matrix::MakeScale(uvScaleX, uvScaleY);
-  auto drawRect = Rect::MakeWH(width(), height());
-  FPArgs fpArgs(args.context, args.renderFlags, drawRect);
-  auto processor =
-      FragmentProcessor::Make(source, fpArgs, sampling, SrcRectConstraint::Fast, &uvMatrix);
-  if (processor == nullptr) {
-    return nullptr;
+  proxyProvider->assignProxyUniqueKey(textureProxy, textureKey);
+  if (!(args.renderFlags & RenderFlags::DisableCache)) {
+    textureProxy->assignUniqueKey(textureKey);
   }
-  auto drawingManager = renderTarget->getContext()->drawingManager();
-  drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags);
-  return renderTarget->asTextureProxy();
+  return textureProxy;
 }
+
+PlacementPtr<FragmentProcessor> RasterizedImage::asFragmentProcessor(
+    const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const {
+  auto textureProxy = lockTextureProxy(
+      TPArgs(args.context, args.renderFlags, hasMipmaps(), 1.0f, BackingFit::Exact));
+  if (textureProxy == nullptr) {
+    return nullptr;
+  }
+  return TiledTextureEffect::Make(std::move(textureProxy), samplingArgs, uvMatrix, isAlphaOnly());
+}
+
+std::shared_ptr<Image> RasterizedImage::onMakeScaled(int newWidth, int newHeight,
+                                                     const SamplingOptions& sampling) const {
+  auto newSource = source->makeScaled(newWidth, newHeight, sampling);
+  return newSource->makeRasterized();
+}
+
+std::shared_ptr<Image> RasterizedImage::onMakeDecoded(Context* context, bool tryHardware) const {
+  auto key = getTextureKey();
+  if (context != nullptr) {
+    auto proxy = context->proxyProvider()->findProxy(key);
+    if (proxy != nullptr) {
+      return nullptr;
+    }
+    if (context->resourceCache()->hasUniqueResource(key)) {
+      return nullptr;
+    }
+  }
+  auto newSource = source->onMakeDecoded(context, tryHardware);
+  if (newSource == nullptr) {
+    return nullptr;
+  }
+  return newSource->makeRasterized();
+}
+
+std::shared_ptr<Image> RasterizedImage::onMakeMipmapped(bool enabled) const {
+  auto newSource = source->makeMipmapped(enabled);
+  auto image = std::make_shared<RasterizedImage>(uniqueKey, std::move(newSource));
+  image->weakThis = image;
+  return image;
+}
+
+UniqueKey RasterizedImage::getTextureKey() const {
+  if (hasMipmaps()) {
+    static const auto MipmapFlag = UniqueID::Next();
+    return UniqueKey::Append(uniqueKey, &MipmapFlag, 1);
+  }
+  return uniqueKey;
+}
+
 }  // namespace tgfx

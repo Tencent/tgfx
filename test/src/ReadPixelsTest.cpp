@@ -33,30 +33,6 @@ namespace tgfx {
     EXPECT_TRUE(Baseline::Compare(bm, "ReadPixelsTest/" + std::string(key))); \
   }
 
-TGFX_TEST(ReadPixelsTest, ScalePixMap) {
-  std::string imagePath = "resources/assets/bridge.jpg";
-  auto codec = MakeNativeCodec(imagePath);
-  EXPECT_TRUE(codec != nullptr);
-  auto width = codec->width();
-  auto height = codec->height();
-  auto RGBAInfo = ImageInfo::Make(width, height, ColorType::RGBA_8888, AlphaType::Premultiplied);
-  auto byteSize = RGBAInfo.byteSize();
-  Buffer pixels(byteSize);
-  auto result = codec->readPixels(RGBAInfo, pixels.data());
-  EXPECT_TRUE(result);
-  Pixmap pixmap(RGBAInfo, pixels.data());
-
-  auto scale = 0.5f;
-  width = static_cast<int>(width * scale);
-  height = static_cast<int>(height * scale);
-  auto scaleRGBAInfo = ImageInfo::Make(width, height, ColorType::RGB_565, AlphaType::Premultiplied);
-
-  Buffer scalePixels(byteSize);
-  auto scalePixmap = Pixmap(scaleRGBAInfo, scalePixels.data());
-  pixmap.scalePixels(scalePixmap.info(), scalePixmap.writablePixels(), FilterQuality::Medium);
-  EXPECT_TRUE(Baseline::Compare(scalePixmap, "ReadPixelsTest/scale_RGBA_8888_To_RGB_565_image"));
-}
-
 TGFX_TEST(ReadPixelsTest, PixelMap) {
   auto codec = MakeImageCodec("resources/apitest/test_timestretch.png");
   EXPECT_TRUE(codec != nullptr);
@@ -496,5 +472,35 @@ TGFX_TEST(ReadPixelsTest, NativeCodec) {
   buffer.clear();
   EXPECT_TRUE(codec->readPixels(A8Info, pixels));
   CHECK_PIXELS(A8Info, pixels, "NativeCodec_Encode_Alpha8");
+}
+
+TGFX_TEST(ReadPixelsTest, ReadScaleCodec) {
+  auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
+  EXPECT_TRUE(codec != nullptr);
+  auto width = codec->width() / 10;
+  auto height = codec->height() / 10;
+  auto RGBA_1010102Info =
+      ImageInfo::Make(width, height, ColorType::RGBA_1010102, AlphaType::Unpremultiplied);
+  auto byteSize = RGBA_1010102Info.byteSize();
+  Buffer pixelsA(byteSize);
+  auto result = codec->readPixels(RGBA_1010102Info, pixelsA.data());
+  EXPECT_TRUE(result);
+  EXPECT_TRUE(Baseline::Compare(Pixmap(RGBA_1010102Info, pixelsA.data()),
+                                "ReadPixelsTest/read_RGBA_1010102_scaled_codec"));
+  auto RGBInfo = ImageInfo::Make(width, height, ColorType::RGB_565, AlphaType::Unpremultiplied);
+  byteSize = RGBInfo.byteSize();
+  Buffer pixelsB(byteSize);
+  result = codec->readPixels(RGBInfo, pixelsB.data());
+  EXPECT_TRUE(result);
+  EXPECT_TRUE(Baseline::Compare(Pixmap(RGBInfo, pixelsB.data()),
+                                "ReadPixelsTest/read_RGB_565_scaled_codec"));
+  auto RGBA_F16Info =
+      ImageInfo::Make(width, height, ColorType::RGBA_F16, AlphaType::Unpremultiplied);
+  byteSize = RGBA_F16Info.byteSize();
+  Buffer pixelsC(byteSize);
+  result = codec->readPixels(RGBA_F16Info, pixelsC.data());
+  EXPECT_TRUE(result);
+  EXPECT_TRUE(Baseline::Compare(Pixmap(RGBA_F16Info, pixelsC.data()),
+                                "ReadPixelsTest/read_RGBA_F16_scaled_codec"));
 }
 }  // namespace tgfx

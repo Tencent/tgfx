@@ -17,7 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FilterImage.h"
-#include "SubsetImage.h"
+#include "core/images/ScaledImage.h"
+#include "core/images/SubsetImage.h"
 #include "core/utils/AddressOf.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
@@ -106,6 +107,11 @@ std::shared_ptr<Image> FilterImage::onMakeWithFilter(std::shared_ptr<ImageFilter
   return FilterImage::Wrap(source, filterBounds, std::move(composeFilter));
 }
 
+std::shared_ptr<Image> FilterImage::onMakeScaled(int newWidth, int newHeight,
+                                                 const SamplingOptions& sampling) const {
+  return Image::onMakeScaled(newWidth, newHeight, sampling);
+}
+
 std::shared_ptr<TextureProxy> FilterImage::lockTextureProxy(const TPArgs& args) const {
   auto inputBounds = Rect::MakeWH(source->width(), source->height());
   auto filterBounds = filter->filterBounds(inputBounds);
@@ -135,12 +141,14 @@ PlacementPtr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs& a
                                        AddressOf(fpMatrix));
   }
   auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
-  TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
+  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale);
   auto textureProxy = filter->lockTextureProxy(source, dstBounds, tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;
   }
   auto matrix = Matrix::MakeTrans(-dstBounds.x(), -dstBounds.y());
+  matrix.postScale(static_cast<float>(textureProxy->width()) / dstBounds.width(),
+                   static_cast<float>(textureProxy->height()) / dstBounds.height());
   if (fpMatrix) {
     matrix.preConcat(*fpMatrix);
   }

@@ -23,7 +23,7 @@
 namespace tgfx {
 class GLTextureGradientColorizer : public TextureGradientColorizer {
  public:
-  explicit GLTextureGradientColorizer(std::shared_ptr<Texture> gradient);
+  explicit GLTextureGradientColorizer(std::shared_ptr<TextureProxy> gradient);
 
   void emitCode(EmitArgs& args) const override;
 };

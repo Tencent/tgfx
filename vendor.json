@@ -237,6 +237,35 @@
           "-DCMAKE_C_FLAGS=\"-w\""
         ]
       }
+    },
+    {
+      "name": "flatbuffers",
+      "cmake": {
+        "targets": [
+          "flatbuffers"
+        ],
+        "arguments": [
+          "-DFLATBUFFERS_BUILD_FLATLIB=ON",
+          "-DFLATBUFFERS_BUILD_CPP17=ON"
+        ]
+      }
+    },
+    {
+      "name": "inspector",
+      "dir": "../inspector",
+      "cmake": {
+        "targets": [
+          "inspector"
+        ]
+      }
+    },
+    {
+      "name": "highway",
+      "cmake": {
+        "targets": [
+          "hwy"
+        ]
+      }
     }
   ]
 }

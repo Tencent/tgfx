@@ -36,9 +36,17 @@ class ResourceProxy {
     return context;
   }
 
+  void assignUniqueKey(const UniqueKey& key) {
+    uniqueKey = key;
+    if (resource != nullptr) {
+      resource->assignUniqueKey(key);
+    }
+  }
+
  protected:
   Context* context = nullptr;
   mutable std::shared_ptr<Resource> resource = nullptr;
+  UniqueKey uniqueKey;
 
   explicit ResourceProxy(std::shared_ptr<Resource> resource) : resource(std::move(resource)) {
   }

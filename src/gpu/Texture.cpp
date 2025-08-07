@@ -20,7 +20,7 @@
 #include "core/utils/PixelFormatUtil.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/DefaultTexture.h"
-#include "gpu/Gpu.h"
+#include "gpu/GPU.h"
 #include "gpu/YUVTexture.h"
 #if defined(__OHOS__)
 #include <native_buffer/native_buffer.h>
@@ -76,7 +76,6 @@ std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int he
   if (pixels != nullptr) {
     auto sampler = texture->getSampler();
     sampler->writePixels(context, Rect::MakeWH(width, height), pixels, rowBytes);
-    sampler->regenerateMipmapLevels(context);
   }
   return texture;
 }

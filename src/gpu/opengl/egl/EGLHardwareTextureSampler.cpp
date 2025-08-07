@@ -23,7 +23,7 @@
 #include <GLES2/gl2ext.h>
 #include "EGLHardwareTextureSampler.h"
 #include "core/utils/PixelFormatUtil.h"
-#include "gpu/Gpu.h"
+#include "gpu/GPU.h"
 #include "tgfx/gpu/opengl/egl/EGLDevice.h"
 #if defined(__OHOS__)
 #include <native_buffer/native_buffer.h>

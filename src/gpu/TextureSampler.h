@@ -33,9 +33,7 @@ namespace tgfx {
 enum class SamplerType { None, TwoD, Rectangle, External };
 
 /**
- * TextureSampler is an abstract class representing a GPU backend texture sampler. Note that you
- * must call releaseGPU() to release GPU resources; destroying the TextureSampler alone will not
- * free them.
+ * GPUTexture represents a texture in the GPU backend for rendering operations.
  */
 class TextureSampler {
  public:
@@ -133,13 +131,6 @@ class TextureSampler {
    */
   virtual void writePixels(Context* context, const Rect& rect, const void* pixels,
                            size_t rowBytes) = 0;
-
-  /**
-   * Regenerates the sampler's mipmap levels. Call this after modifying pixels with writePixels() or
-   * rendering. Does nothing if the sampler has no mipmaps.
-   */
-  virtual void regenerateMipmapLevels(Context* context) = 0;
-
   /**
    * Computes a key for the sampler that can be used to identify it in a cache. The key is written
    * to the provided BytesKey object.

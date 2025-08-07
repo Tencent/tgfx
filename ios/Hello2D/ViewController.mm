@@ -21,7 +21,7 @@
 
 @interface ViewController () <UIGestureRecognizerDelegate>
 @property(weak, nonatomic) IBOutlet TGFXView* tgfxView;
-@property(nonatomic) int drawCount;
+@property(nonatomic) int drawIndex;
 @property(nonatomic) CGFloat zoomScale;
 @property(nonatomic) CGPoint contentOffset;
 
@@ -96,7 +96,7 @@ static const float MaxZoom = 1000.0f;
   if (!self.isTapEnabled) {
     return;
   }
-  self.drawCount++;
+  self.drawIndex++;
   self.zoomScale = 1.0f;
   self.contentOffset = CGPointZero;
   self.currentZoom = 1.0f;
@@ -122,7 +122,7 @@ static const float MaxZoom = 1000.0f;
   self.currentPanOffset = translation;
 }
 - (void)update:(CADisplayLink*)displayLink {
-  [self.tgfxView draw:self.drawCount zoom:self.zoomScale offset:self.contentOffset];
+  [self.tgfxView draw:self.drawIndex zoom:self.zoomScale offset:self.contentOffset];
 }
 - (void)handlePinch:(UIPinchGestureRecognizer*)gesture {
   self.isTapEnabled = false;

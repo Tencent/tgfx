@@ -92,7 +92,7 @@ class PathUserScalerContext final : public UserScalerContext {
       return {};
     }
     if (stroke != nullptr) {
-      ApplyStrokeToBounds(*stroke, &bounds, true);
+      ApplyStrokeToBounds(*stroke, &bounds);
     }
     if (matrix) {
       matrix->setTranslate(bounds.x(), bounds.y());
@@ -137,23 +137,23 @@ class PathUserScalerContext final : public UserScalerContext {
   float fauxBoldScale = 1.0f;
 };
 
-//////////////
-
 std::shared_ptr<UserTypeface> PathUserTypeface::Make(uint32_t builderID,
                                                      const std::string& fontFamily,
                                                      const std::string& fontStyle,
-                                                     const FontMetrics& metrics,
+                                                     const FontMetrics& fontMetrics,
+                                                     const Rect& fontBounds,
                                                      const VectorProviderType& glyphPathProviders) {
-  auto typeface = std::shared_ptr<PathUserTypeface>(
-      new PathUserTypeface(builderID, fontFamily, fontStyle, metrics, glyphPathProviders));
+  auto typeface = std::shared_ptr<PathUserTypeface>(new PathUserTypeface(
+      builderID, fontFamily, fontStyle, fontMetrics, fontBounds, glyphPathProviders));
   typeface->weakThis = typeface;
   return typeface;
 }
 
 PathUserTypeface::PathUserTypeface(uint32_t builderID, const std::string& fontFamily,
-                                   const std::string& fontStyle, const FontMetrics& metrics,
+                                   const std::string& fontStyle, const FontMetrics& fontMetrics,
+                                   const Rect& fontBounds,
                                    const VectorProviderType& glyphPathProviders)
-    : UserTypeface(builderID, fontFamily, fontStyle, metrics),
+    : UserTypeface(builderID, fontFamily, fontStyle, fontMetrics, fontBounds),
       glyphPathProviders(glyphPathProviders) {
 }
 

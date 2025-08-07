@@ -20,32 +20,32 @@
 
 #include "gpu/RenderPass.h"
 #include "gpu/opengl/GLBuffer.h"
-#include "gpu/opengl/GLFrameBuffer.h"
+#include "gpu/opengl/GLInterface.h"
 #include "gpu/opengl/GLVertexArray.h"
 
 namespace tgfx {
 
 class GLRenderPass : public RenderPass {
  public:
-  explicit GLRenderPass(Context* context);
+  GLRenderPass(std::shared_ptr<GLInterface> interface, std::shared_ptr<RenderTarget> renderTarget,
+               bool resolveMSAA);
+
+  void begin();
 
  protected:
-  void onBindRenderTarget() override;
-  void onUnbindRenderTarget() override;
   bool onBindProgramAndScissorClip(const Pipeline* pipeline, const Rect& scissorRect) override;
-  bool onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
-                     std::shared_ptr<GpuBuffer> vertexBuffer, size_t vertexOffset,
-                     std::shared_ptr<Data> vertexData) override;
+  bool onBindBuffers(const GPUBuffer* indexBuffer, const GPUBuffer* vertexBuffer,
+                     size_t vertexOffset) override;
   void onDraw(PrimitiveType primitiveType, size_t baseVertex, size_t count,
               bool drawIndexed) override;
   void onClear(const Rect& scissor, Color color) override;
-  void onCopyToTexture(Texture* texture, int srcX, int srcY) override;
+  void onEnd() override;
 
  private:
+  std::shared_ptr<GLInterface> interface = nullptr;
   std::shared_ptr<GLVertexArray> vertexArray = nullptr;
-  std::shared_ptr<GLFrameBuffer> frameBuffer = nullptr;
-  std::shared_ptr<GLBuffer> sharedVertexBuffer = nullptr;
+  bool resolveMSAA = true;
 
-  bool copyAsBlit(Texture* texture, int srcX, int srcY);
+  unsigned getVertexArrayID(Context* context);
 };
 }  // namespace tgfx

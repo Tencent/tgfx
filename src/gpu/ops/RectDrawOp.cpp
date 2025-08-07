@@ -17,9 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RectDrawOp.h"
+#include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
-#include "gpu/ResourceProvider.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
 #include "tgfx/core/RenderFlags.h"
 
@@ -31,19 +31,16 @@ PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
     return nullptr;
   }
   auto drawOp = context->drawingBuffer()->make<RectDrawOp>(provider.get());
-  if (provider->aaType() == AAType::Coverage) {
-    drawOp->indexBufferProxy = context->resourceProvider()->aaQuadIndexBuffer();
-  } else if (provider->rectCount() > 1) {
-    drawOp->indexBufferProxy = context->resourceProvider()->nonAAQuadIndexBuffer();
+  if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1) {
+    drawOp->indexBufferProxy =
+        context->globalCache()->getRectIndexBuffer(provider->aaType() == AAType::Coverage);
   }
   if (provider->rectCount() <= 1) {
     // If we only have one rect, it is not worth the async task overhead.
     renderFlags |= RenderFlags::DisableAsyncTask;
   }
-  auto sharedVertexBuffer =
-      context->proxyProvider()->createSharedVertexBuffer(std::move(provider), renderFlags);
-  drawOp->vertexBufferProxy = sharedVertexBuffer.first;
-  drawOp->vertexBufferOffset = sharedVertexBuffer.second;
+  drawOp->vertexBufferProxyView =
+      context->proxyProvider()->createVertexBufferProxy(std::move(provider), renderFlags);
   return drawOp;
 }
 
@@ -61,34 +58,28 @@ RectDrawOp::RectDrawOp(RectsVertexProvider* provider)
 }
 
 void RectDrawOp::execute(RenderPass* renderPass) {
-  std::shared_ptr<GpuBuffer> indexBuffer;
+  std::shared_ptr<IndexBuffer> indexBuffer = nullptr;
   if (indexBufferProxy) {
     indexBuffer = indexBufferProxy->getBuffer();
     if (indexBuffer == nullptr) {
       return;
     }
   }
-  std::shared_ptr<GpuBuffer> vertexBuffer =
-      vertexBufferProxy ? vertexBufferProxy->getBuffer() : nullptr;
+  auto vertexBuffer = vertexBufferProxyView ? vertexBufferProxyView->getBuffer() : nullptr;
   if (vertexBuffer == nullptr) {
     return;
   }
-  auto renderTarget = renderPass->renderTarget();
+  auto renderTarget = renderPass->getRenderTarget();
   auto drawingBuffer = renderPass->getContext()->drawingBuffer();
   auto gp = QuadPerEdgeAAGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
                                                  renderTarget->height(), aaType, commonColor,
                                                  uvMatrix, hasSubset);
-  gp->fillAttribute();
   auto pipeline = createPipeline(renderPass, std::move(gp));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
-  renderPass->bindBuffers(indexBuffer, vertexBuffer, vertexBufferOffset);
+  renderPass->bindBuffers(indexBuffer ? indexBuffer->gpuBuffer() : nullptr,
+                          vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
   if (indexBuffer != nullptr) {
-    uint16_t numIndicesPerQuad;
-    if (aaType == AAType::Coverage) {
-      numIndicesPerQuad = ResourceProvider::NumIndicesPerAAQuad();
-    } else {
-      numIndicesPerQuad = ResourceProvider::NumIndicesPerNonAAQuad();
-    }
+    auto numIndicesPerQuad = aaType == AAType::Coverage ? IndicesPerAAQuad : IndicesPerNonAAQuad;
     renderPass->drawIndexed(PrimitiveType::Triangles, 0, rectCount * numIndicesPerQuad);
   } else {
     renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);

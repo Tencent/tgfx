@@ -26,6 +26,15 @@ android {
                 abiFilters.add("x86_64")
             }
         }
+
+        externalNativeBuild {
+            cmake {
+                val cmakeArgs: String? = project.findProperty("cmakeArgs") as String?
+                if (!cmakeArgs.isNullOrEmpty()) {
+                    arguments.addAll(cmakeArgs.split(" "))
+                }
+            }
+        }
     }
 
     buildTypes {
