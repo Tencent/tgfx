@@ -16,11 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <_string.h>
 #include <hb-subset.h>
 #include <hb.h>
-#include <cstring>
-#include <memory>
 #include "base/TGFXTest.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Color.h"

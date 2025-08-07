@@ -96,18 +96,12 @@ std::unique_ptr<PDFArray> PDFMakeCIDGlyphWidthsArray(const PDFStrikeSpec& pdfStr
   //     rule: end range for 3+ repeats
 
   auto emSize = static_cast<uint16_t>(pdfStrikeSpec.unitsPerEM);
-  // auto pathFont = pdfStrikeSpec.typeface;
   auto scaleContext = PDFFont::GetScalerContext(pdfStrikeSpec.typeface, pdfStrikeSpec.textSize);
-  // SkBulkGlyphMetricsAndPaths paths{pdfStrikeSpec.fStrikeSpec};
 
   auto result = MakePDFArray();
 
   std::vector<GlyphID> glyphIDs;
   subset.getSetValues([&](size_t index) { glyphIDs.push_back(static_cast<GlyphID>(index)); });
-
-  // auto glyphs = paths.glyphs(SkSpan(glyphIDs));
-  // // C++20 = make_unique_for_overwrite<SkScalar[]>(glyphs.size());
-  // auto advances = std::unique_ptr<SkScalar[]>(new SkScalar[glyphs.size()]);
 
   // Find the pdf integer mode (most common pdf integer advance).
   // Unfortunately, poppler enforces DW (default width) must be an integer,

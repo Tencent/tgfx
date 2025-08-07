@@ -83,8 +83,10 @@ auto PDFTagTree::createMarkIdForNodeId(int nodeId, unsigned pageIndex, Point poi
   }
   PDFTagNode* tag = iter->second;
   DEBUG_ASSERT(tag);
-  marksPerPage.resize(std::max(static_cast<uint32_t>(marksPerPage.size()), pageIndex + 1));
-  auto pageMarks = marksPerPage[pageIndex];
+  if (pageIndex >= marksPerPage.size()) {
+    marksPerPage.resize(pageIndex + 1);
+  }
+  auto& pageMarks = marksPerPage[pageIndex];
   auto markID = pageMarks.size();
   tag->markedContent.push_back({{point, pageIndex}, static_cast<int>(markID)});
   pageMarks.push_back(tag);

@@ -133,16 +133,14 @@ PDFIndirectReference PDFShader::Make(PDFDocument* doc, const std::shared_ptr<Sha
   Bitmap image;
 
   paintColor = AdjustColor(shader, paintColor);
-  Matrix shaderTransform;
   TileMode imageTileModes[2];
 
   if (Types::Get(shader.get()) == Types::ShaderType::Image) {
     const auto* imageShader = static_cast<const ImageShader*>(shader.get());
     auto shaderImage = imageShader->image;
-    Matrix finalMatrix = canvasTransform * shaderTransform;
     // TODO (YGaurora): Cache image shaders and remove duplicates
     PDFIndirectReference pdfShader =
-        MakeImageShader(doc, finalMatrix, imageTileModes[0], imageTileModes[1], surfaceBBox,
+        MakeImageShader(doc, canvasTransform, imageTileModes[0], imageTileModes[1], surfaceBBox,
                         shaderImage, paintColor);
     return pdfShader;
   }
