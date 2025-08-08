@@ -28,23 +28,28 @@ constexpr uint16_t MinPort = 49152;
 
 uint16_t TCPPortProvider::getValidPort() {
   uint32_t rangeSize = MaxPort - MinPort + 1;
+  mtx.lock();
   if (rangeSize == usedPortSet.size()) {
     usedPortSet.clear();
   }
+  mtx.unlock();
   std::random_device rd;
   std::mt19937 gen(rd());
   std::uniform_int_distribution<uint16_t> dis(MinPort, MaxPort);
   uint16_t randomPort = dis(gen);
   std::unique_ptr<ListenSocket> listenSocket = std::make_unique<ListenSocket>();
+  mtx.lock();
   while (usedPortSet.find(randomPort) != usedPortSet.end() ||
          !listenSocket->listenSock(randomPort, 4)) {
     randomPort = dis(gen);
   }
   usedPortSet.insert(randomPort);
+  mtx.unlock();
   return randomPort;
 }
 
 bool TCPPortProvider::clearUsedPort(uint16_t port) {
+  std::lock_guard<std::mutex> lock(mtx);
   if (usedPortSet.find(port) != usedPortSet.end()) {
     usedPortSet.erase(port);
     return true;

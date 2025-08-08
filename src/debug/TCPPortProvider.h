@@ -18,12 +18,15 @@
 #pragma once
 #include <cstdint>
 #include <set>
+#include <mutex>
+
 namespace inspector {
+
 class TCPPortProvider {
  public:
   static TCPPortProvider& Get() {
-    static TCPPortProvider instance;
-    return instance;
+    static TCPPortProvider* instance = new TCPPortProvider();
+    return *instance;
   }
   TCPPortProvider(const TCPPortProvider& provider) = delete;
   TCPPortProvider(TCPPortProvider&& provider) = delete;
@@ -35,5 +38,6 @@ class TCPPortProvider {
  private:
   TCPPortProvider() = default;
   std::set<uint16_t> usedPortSet = {};
+  std::mutex mtx = {};
 };
 }  // namespace inspector
