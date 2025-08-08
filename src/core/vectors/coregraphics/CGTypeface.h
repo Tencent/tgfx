@@ -60,10 +60,14 @@ class CGTypeface : public Typeface {
 
   std::shared_ptr<Data> copyTableData(FontTableTag tag) const override;
 
+  static std::string StringFromCFString(CFStringRef src);
+
  protected:
 #ifdef TGFX_USE_GLYPH_TO_UNICODE
   std::vector<Unichar> getGlyphToUnicodeMap() const override;
 #endif
+
+  std::shared_ptr<Data> openData() const override;
 
   std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;
 

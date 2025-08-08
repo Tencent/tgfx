@@ -21,11 +21,25 @@
 #include "CGScalerContext.h"
 #include "core/utils/UniqueID.h"
 #include "tgfx/core/FontStyle.h"
+#include "tgfx/core/Rect.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/core/UTF.h"
 
 namespace tgfx {
-std::string StringFromCFString(CFStringRef src) {
+
+template <typename CFRef>
+struct CFReleaseDeleter {
+  void operator()(CFTypeRef ref) const {
+    if (ref) {
+      CFRelease(ref);
+    }
+  }
+};
+
+template <typename CFRef>
+using UniqueCFRef = std::unique_ptr<std::remove_pointer_t<CFRef>, CFReleaseDeleter<CFRef>>;
+
+std::string CGTypeface::StringFromCFString(CFStringRef src) {
   static const CFIndex kCStringSize = 128;
   char temporaryCString[kCStringSize];
   bzero(temporaryCString, kCStringSize);
@@ -385,6 +399,10 @@ std::vector<Unichar> CGTypeface::getGlyphToUnicodeMap() const {
   return returnMap;
 }
 #endif
+
+std::shared_ptr<Data> CGTypeface::openData() const {
+  return data;
+};
 
 std::shared_ptr<ScalerContext> CGTypeface::onCreateScalerContext(float size) const {
   return std::make_shared<CGScalerContext>(weakThis.lock(), size);

@@ -123,5 +123,6 @@ class ImageCodec : public ImageGenerator {
 
   friend class Pixmap;
   friend class SVGExportContext;
+  friend class PDFBitmap;
 };
 }  // namespace tgfx

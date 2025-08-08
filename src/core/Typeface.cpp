@@ -71,6 +71,10 @@ class EmptyTypeface : public Typeface {
     return {};
   }
 
+  std::shared_ptr<Data> openData() const override {
+    return nullptr;
+  }
+
  private:
   std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override {
     return ScalerContext::MakeEmpty(size);
@@ -104,6 +108,14 @@ bool Typeface::isCustom() const {
 std::vector<Unichar> Typeface::getGlyphToUnicodeMap() const {
   return {};
 };
+
+size_t Typeface::getTableSize(FontTableTag tag) const {
+  auto data = copyTableData(tag);
+  if (data) {
+    return data->size();
+  }
+  return 0;
+}
 
 std::shared_ptr<ScalerContext> Typeface::getScalerContext(float size) {
   if (size <= 0.0f) {

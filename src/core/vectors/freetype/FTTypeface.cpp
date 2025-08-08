@@ -17,9 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FTTypeface.h"
-#include <cstddef>
 #include "FTLibrary.h"
+#include "tgfx/core/Data.h"
+#include "tgfx/core/Typeface.h"
 #include FT_TRUETYPE_TABLES_H
+#include FT_FONT_FORMATS_H
+#include FT_TYPE1_TABLES_H
 #include "FTScalerContext.h"
 #include "SystemFont.h"
 #include "core/utils/UniqueID.h"
@@ -189,7 +192,17 @@ std::vector<Unichar> FTTypeface::getGlyphToUnicodeMap() const {
 }
 #endif
 
+std::shared_ptr<Data> FTTypeface::openData() const {
+  if (data.data) {
+    return data.data;
+  } else if (!data.path.empty()) {
+    return Data::MakeFromFile(data.path);
+  }
+  return nullptr;
+}
+
 std::shared_ptr<ScalerContext> FTTypeface::onCreateScalerContext(float size) const {
   return std::make_shared<FTScalerContext>(weakThis.lock(), size);
 }
+
 }  // namespace tgfx

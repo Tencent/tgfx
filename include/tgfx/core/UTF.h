@@ -42,6 +42,8 @@ class UTF {
    * Given a unicode codepoint, return the UTF-8 string.
    */
   static std::string ToUTF8(int32_t unichar);
+
+  static std::wstring ToUTF16(int32_t unichar);
 };
 
 }  // namespace tgfx

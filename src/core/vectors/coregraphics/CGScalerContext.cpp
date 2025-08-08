@@ -21,7 +21,9 @@
 #include "core/utils/FauxBoldScale.h"
 #include "core/utils/Log.h"
 #include "platform/apple/BitmapContextUtil.h"
+#include "tgfx/core/FontMetrics.h"
 #include "tgfx/core/PathEffect.h"
+#include "tgfx/core/Typeface.h"
 
 namespace tgfx {
 
@@ -59,6 +61,43 @@ FontMetrics CGScalerContext::getFontMetrics() const {
   metrics.capHeight = static_cast<float>(CTFontGetCapHeight(ctFont));
   metrics.underlineThickness = static_cast<float>(CTFontGetUnderlineThickness(ctFont));
   metrics.underlinePosition = -static_cast<float>(CTFontGetUnderlinePosition(ctFont));
+
+  {
+    const auto* fontName = CTFontCopyPostScriptName(ctFont);
+    if (fontName) {
+      metrics.postScriptName = CGTypeface::StringFromCFString(fontName);
+    }
+    CFRelease(fontName);
+  }
+  {
+    constexpr auto glyf = SetFourByteTag('g', 'l', 'y', 'f');
+    constexpr auto loca = SetFourByteTag('l', 'o', 'c', 'a');
+    constexpr auto CFF = SetFourByteTag('C', 'F', 'F', ' ');
+    if (typeface->getTableSize(glyf) && typeface->getTableSize(loca)) {
+      metrics.type = FontMetrics::FontType::TrueType;
+    } else if (typeface->getTableSize(CFF)) {
+      metrics.type = FontMetrics::FontType::CFF;
+    }
+  }
+  {
+    CTFontSymbolicTraits symbolicTraits = CTFontGetSymbolicTraits(ctFont);
+    if (symbolicTraits & kCTFontMonoSpaceTrait) {
+      metrics.style =
+          static_cast<FontMetrics::StyleFlags>(metrics.style | FontMetrics::StyleFlags::FixedPitch);
+    }
+    if (symbolicTraits & kCTFontItalicTrait) {
+      metrics.style =
+          static_cast<FontMetrics::StyleFlags>(metrics.style | FontMetrics::StyleFlags::Italic);
+    }
+    CTFontStylisticClass stylisticClass = symbolicTraits & kCTFontClassMaskTrait;
+    if (stylisticClass >= kCTFontOldStyleSerifsClass && stylisticClass <= kCTFontSlabSerifsClass) {
+      metrics.style =
+          static_cast<FontMetrics::StyleFlags>(metrics.style | FontMetrics::StyleFlags::Serif);
+    } else if (stylisticClass & kCTFontSymbolicClass) {
+      metrics.style =
+          static_cast<FontMetrics::StyleFlags>(metrics.style | FontMetrics::StyleFlags::Symbolic);
+    }
+  }
   return metrics;
 }
 

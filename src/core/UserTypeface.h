@@ -80,6 +80,10 @@ class UserTypeface : public Typeface {
         _fontMetrics(fontMetrics), fontBounds(fontBounds) {
   }
 
+  std::shared_ptr<Data> openData() const override {
+    return nullptr;
+  }
+
  private:
   uint32_t _builderID = 0;  // Builder ID for tracking the source builder
   uint32_t _uniqueID = UniqueID::Next();

@@ -37,6 +37,10 @@ typedef uint16_t GlyphID;
 typedef int32_t Unichar;
 
 typedef uint32_t FontTableTag;
+static inline constexpr FontTableTag SetFourByteTag(char a, char b, char c, char d) {
+  return ((static_cast<uint32_t>(a) << 24) | (static_cast<uint32_t>(b) << 16) |
+          (static_cast<uint32_t>(c) << 8) | static_cast<uint32_t>(d));
+}
 
 class ScalerContext;
 
@@ -146,6 +150,8 @@ class Typeface {
    */
   Rect getBounds() const;
 
+  size_t getTableSize(FontTableTag tag) const;
+
  protected:
   /**
    * Gets the mapping from GlyphID to unicode. The array index is GlyphID, and the array value is
@@ -155,6 +161,8 @@ class Typeface {
   virtual std::vector<Unichar> getGlyphToUnicodeMap() const;
 
   virtual std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const = 0;
+
+  virtual std::shared_ptr<Data> openData() const = 0;
 
   mutable std::mutex locker = {};
 
@@ -176,10 +184,13 @@ class Typeface {
 
   friend class Font;
   friend class ScalerContext;
+  friend class FTScalerContext;
   friend class GlyphConverter;
   friend class CGMask;
   friend class WebMask;
   friend class SVGExportContext;
   friend class RenderContext;
+  friend class PDFExportContext;
+  friend class PDFFont;
 };
 }  // namespace tgfx
