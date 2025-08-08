@@ -21,7 +21,8 @@
 #include <optional>
 #include "DrawOp.h"
 #include "gpu/RRectsVertexProvider.h"
-#include "gpu/proxies/VertexBufferProxy.h"
+#include "gpu/proxies/IndexBufferProxy.h"
+#include "gpu/proxies/VertexBufferProxyView.h"
 
 namespace tgfx {
 class RRectDrawOp : public DrawOp {
@@ -56,8 +57,8 @@ class RRectDrawOp : public DrawOp {
   bool useScale = false;
   bool hasStroke = false;
   std::optional<Color> commonColor = std::nullopt;
-  std::shared_ptr<GPUBufferProxy> indexBufferProxy = nullptr;
-  std::shared_ptr<VertexBufferProxy> vertexBufferProxy = nullptr;
+  std::shared_ptr<IndexBufferProxy> indexBufferProxy = nullptr;
+  std::shared_ptr<VertexBufferProxyView> vertexBufferProxyView = nullptr;
 
   explicit RRectDrawOp(RRectsVertexProvider* provider);
 

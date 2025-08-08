@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,29 +17,30 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include <CoreVideo/CoreVideo.h>
-#include "gpu/opengl/GLTextureSampler.h"
+#include "tgfx/core/Image.h"
+#include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
-class EAGLHardwareTextureSampler : public GLTextureSampler {
+class ScaledImageGenerator : public ImageGenerator {
  public:
-  static std::vector<std::unique_ptr<TextureSampler>> MakeFrom(Context* context,
-                                                               CVPixelBufferRef pixelBuffer);
+  static std::shared_ptr<ScaledImageGenerator> MakeFrom(const std::shared_ptr<ImageCodec>& codec,
+                                                        int width, int height);
 
-  explicit EAGLHardwareTextureSampler(CVPixelBufferRef pixelBuffer, CVOpenGLESTextureRef texture,
-                                      unsigned id, unsigned target, PixelFormat format);
+  ~ScaledImageGenerator() override = default;
 
-  ~EAGLHardwareTextureSampler() override;
-
-  HardwareBufferRef getHardwareBuffer() const override {
-    return pixelBuffer;
+  bool isAlphaOnly() const override {
+    return source->isAlphaOnly();
   }
 
-  void releaseGPU(Context* context) override;
+  bool asyncSupport() const override {
+    return source->asyncSupport();
+  }
+
+  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
  private:
-  CVPixelBufferRef pixelBuffer = nullptr;
-  CVOpenGLESTextureRef texture = nil;
+  std::shared_ptr<ImageCodec> source = nullptr;
+
+  explicit ScaledImageGenerator(int width, int height, const std::shared_ptr<ImageCodec>& codec);
 };
 }  // namespace tgfx

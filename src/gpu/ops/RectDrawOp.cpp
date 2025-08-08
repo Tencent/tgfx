@@ -39,8 +39,8 @@ PlacementPtr<RectDrawOp> RectDrawOp::Make(Context* context,
     // If we only have one rect, it is not worth the async task overhead.
     renderFlags |= RenderFlags::DisableAsyncTask;
   }
-  drawOp->vertexBufferProxy =
-      context->proxyProvider()->createVertexBuffer(std::move(provider), renderFlags);
+  drawOp->vertexBufferProxyView =
+      context->proxyProvider()->createVertexBufferProxy(std::move(provider), renderFlags);
   return drawOp;
 }
 
@@ -58,15 +58,14 @@ RectDrawOp::RectDrawOp(RectsVertexProvider* provider)
 }
 
 void RectDrawOp::execute(RenderPass* renderPass) {
-  std::shared_ptr<GPUBuffer> indexBuffer;
+  std::shared_ptr<IndexBuffer> indexBuffer = nullptr;
   if (indexBufferProxy) {
     indexBuffer = indexBufferProxy->getBuffer();
     if (indexBuffer == nullptr) {
       return;
     }
   }
-  std::shared_ptr<GPUBuffer> vertexBuffer =
-      vertexBufferProxy ? vertexBufferProxy->getBuffer() : nullptr;
+  auto vertexBuffer = vertexBufferProxyView ? vertexBufferProxyView->getBuffer() : nullptr;
   if (vertexBuffer == nullptr) {
     return;
   }
@@ -77,7 +76,8 @@ void RectDrawOp::execute(RenderPass* renderPass) {
                                                  uvMatrix, hasSubset);
   auto pipeline = createPipeline(renderPass, std::move(gp));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
-  renderPass->bindBuffers(indexBuffer, vertexBuffer, vertexBufferProxy->offset());
+  renderPass->bindBuffers(indexBuffer ? indexBuffer->gpuBuffer() : nullptr,
+                          vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
   if (indexBuffer != nullptr) {
     auto numIndicesPerQuad = aaType == AAType::Coverage ? IndicesPerAAQuad : IndicesPerNonAAQuad;
     renderPass->drawIndexed(PrimitiveType::Triangles, 0, rectCount * numIndicesPerQuad);

@@ -115,13 +115,9 @@ void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> 
   renderTasks.emplace_back(std::move(task));
 }
 
-void DrawingManager::addResourceTask(PlacementPtr<ResourceTask> resourceTask,
-                                     const UniqueKey& uniqueKey, uint32_t renderFlags) {
+void DrawingManager::addResourceTask(PlacementPtr<ResourceTask> resourceTask) {
   if (resourceTask == nullptr) {
     return;
-  }
-  if (!uniqueKey.empty() && !(renderFlags & RenderFlags::DisableCache)) {
-    resourceTask->uniqueKey = uniqueKey;
   }
   resourceTasks.emplace_back(std::move(resourceTask));
 }
@@ -213,8 +209,8 @@ void DrawingManager::uploadAtlasToGPU() {
     if (textureProxy == nullptr || cellDatas.empty()) {
       continue;
     }
-    auto texture = textureProxy->getTexture();
-    if (texture == nullptr) {
+    auto textureView = textureProxy->getTextureView();
+    if (textureView == nullptr) {
       continue;
     }
     for (auto& [data, info, atlasOffset] : cellDatas) {
@@ -223,7 +219,7 @@ void DrawingManager::uploadAtlasToGPU() {
       }
       auto rect = Rect::MakeXYWH(atlasOffset.x, atlasOffset.y, static_cast<float>(info.width()),
                                  static_cast<float>(info.height()));
-      texture->getSampler()->writePixels(context, rect, data->data(), info.rowBytes());
+      textureView->getTexture()->writePixels(context, rect, data->data(), info.rowBytes());
       // Text atlas has no mipmaps, so we don't need to regenerate mipmaps.
     }
   }

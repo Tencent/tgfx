@@ -473,4 +473,34 @@ TGFX_TEST(ReadPixelsTest, NativeCodec) {
   EXPECT_TRUE(codec->readPixels(A8Info, pixels));
   CHECK_PIXELS(A8Info, pixels, "NativeCodec_Encode_Alpha8");
 }
+
+TGFX_TEST(ReadPixelsTest, ReadScaleCodec) {
+  auto codec = MakeImageCodec("resources/apitest/rotation.jpg");
+  EXPECT_TRUE(codec != nullptr);
+  auto width = codec->width() / 10;
+  auto height = codec->height() / 10;
+  auto RGBA_1010102Info =
+      ImageInfo::Make(width, height, ColorType::RGBA_1010102, AlphaType::Unpremultiplied);
+  auto byteSize = RGBA_1010102Info.byteSize();
+  Buffer pixelsA(byteSize);
+  auto result = codec->readPixels(RGBA_1010102Info, pixelsA.data());
+  EXPECT_TRUE(result);
+  EXPECT_TRUE(Baseline::Compare(Pixmap(RGBA_1010102Info, pixelsA.data()),
+                                "ReadPixelsTest/read_RGBA_1010102_scaled_codec"));
+  auto RGBInfo = ImageInfo::Make(width, height, ColorType::RGB_565, AlphaType::Unpremultiplied);
+  byteSize = RGBInfo.byteSize();
+  Buffer pixelsB(byteSize);
+  result = codec->readPixels(RGBInfo, pixelsB.data());
+  EXPECT_TRUE(result);
+  EXPECT_TRUE(Baseline::Compare(Pixmap(RGBInfo, pixelsB.data()),
+                                "ReadPixelsTest/read_RGB_565_scaled_codec"));
+  auto RGBA_F16Info =
+      ImageInfo::Make(width, height, ColorType::RGBA_F16, AlphaType::Unpremultiplied);
+  byteSize = RGBA_F16Info.byteSize();
+  Buffer pixelsC(byteSize);
+  result = codec->readPixels(RGBA_F16Info, pixelsC.data());
+  EXPECT_TRUE(result);
+  EXPECT_TRUE(Baseline::Compare(Pixmap(RGBA_F16Info, pixelsC.data()),
+                                "ReadPixelsTest/read_RGBA_F16_scaled_codec"));
+}
 }  // namespace tgfx

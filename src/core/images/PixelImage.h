@@ -18,38 +18,25 @@
 
 #pragma once
 
-#include "gpu/Resource.h"
-#include "gpu/TPArgs.h"
-#include "gpu/proxies/TextureProxy.h"
 #include "tgfx/core/Image.h"
 
 namespace tgfx {
 /**
- * The base class for all images that contains a UniqueKey and can be cached as a GPU resource.
+ * The base class for all images that are directly backed by a block of pixels and can lock a
+ * texture proxy.
  */
-class ResourceImage : public Image {
- public:
-  explicit ResourceImage(UniqueKey uniqueKey);
-
-  std::shared_ptr<Image> makeRasterized() const override;
+class PixelImage : public Image {
+  bool hasMipmaps() const final {
+    return mipmapped;
+  }
 
  protected:
-  UniqueKey uniqueKey = {};
-
-  std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
-
-  std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
-                                      const SamplingOptions& sampling) const override;
-
-  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const final;
-
-  virtual std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
-                                                           const UniqueKey& key) const = 0;
+  explicit PixelImage(bool mipmapped) : mipmapped(mipmapped) {
+  }
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                       const SamplingArgs& samplingArgs,
                                                       const Matrix* uvMatrix) const override;
-
-  friend class MipmapImage;
+  bool mipmapped = false;
 };
 }  // namespace tgfx

@@ -19,24 +19,37 @@
 #pragma once
 
 #include "gpu/GPUBuffer.h"
+#include "gpu/opengl/GLInterface.h"
 
 namespace tgfx {
+/**
+ * GLBuffer is a GPUBuffer implementation for OpenGL. It encapsulates an OpenGL buffer object and
+ * provides methods to access its properties and release its resources.
+ */
 class GLBuffer : public GPUBuffer {
  public:
+  /**
+   * Creates a new GLBuffer with the specified size and usage flags.
+   */
+  GLBuffer(unsigned bufferID, size_t size, uint32_t usage)
+      : GPUBuffer(size, usage), _bufferID(bufferID) {
+  }
+
+  /**
+   * Returns the OpenGL target for this buffer based on its usage flags.
+   */
+  unsigned target() const;
+
+  /**
+   * Returns the OpenGL buffer ID associated with this buffer.
+   */
   unsigned bufferID() const {
     return _bufferID;
   }
 
- protected:
-  void onReleaseGPU() override;
-
  private:
   unsigned _bufferID = 0;
 
-  GLBuffer(BufferType bufferType, size_t size, unsigned bufferID)
-      : GPUBuffer(bufferType, size), _bufferID(bufferID) {
-  }
-
-  friend class GPUBuffer;
+  friend class GLGPU;
 };
 }  // namespace tgfx

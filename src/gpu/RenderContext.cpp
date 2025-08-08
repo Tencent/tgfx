@@ -265,22 +265,10 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
   DEBUG_ASSERT(fill.shader == nullptr);
   Matrix viewMatrix = {};
   Rect bounds = {};
-  if (filter) {
-    if (picture->hasUnboundedFill()) {
-      bounds = ToLocalBounds(getClipBounds(state.clip), state.matrix);
-    } else {
-      bounds = picture->getBounds();
-    }
+  if (picture->hasUnboundedFill()) {
+    bounds = ToLocalBounds(getClipBounds(state.clip), state.matrix);
   } else {
-    bounds = getClipBounds(state.clip);
-    if (!picture->hasUnboundedFill()) {
-      auto deviceBounds = picture->getBounds();
-      state.matrix.mapRect(&deviceBounds);
-      if (!bounds.intersect(deviceBounds)) {
-        return;
-      }
-    }
-    viewMatrix = state.matrix;
+    bounds = picture->getBounds();
   }
   if (bounds.isEmpty()) {
     return;
@@ -306,9 +294,7 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
     return;
   }
   drawState.matrix.preConcat(invertMatrix);
-  auto imageRect = Rect::MakeWH(image->width(), image->height());
-  drawImageRect(std::move(image), imageRect, imageRect, {}, drawState,
-                fill.makeWithMatrix(viewMatrix), SrcRectConstraint::Fast);
+  drawImage(image, {}, drawState, fill.makeWithMatrix(viewMatrix));
 }
 
 bool RenderContext::flush() {

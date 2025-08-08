@@ -21,7 +21,8 @@
 #include <memory>
 #include "gpu/CommandEncoder.h"
 #include "gpu/CommandQueue.h"
-#include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/Backend.h"
+#include "tgfx/gpu/Caps.h"
 
 namespace tgfx {
 /**
@@ -46,6 +47,24 @@ class GPU {
    * Returns the primary CommandQueue associated with this GPU.
    */
   virtual CommandQueue* queue() const = 0;
+
+  /**
+   * Creates a GPUBuffer with the specified size and usage flags. The usage flags determine how the
+   * buffer can be used in GPU operations, such as vertex or index buffers.
+   * @param size The size of the buffer in bytes.
+   * @param usage The usage flags for the buffer, defined in GPUBufferUsage.
+   * @return A unique pointer to the created GPUBuffer. The caller is responsible for managing the
+   * lifetime of the buffer. If the creation fails, it returns nullptr.
+   */
+  virtual std::unique_ptr<GPUBuffer> createBuffer(size_t size, uint32_t usage) const = 0;
+
+  /**
+   * Destroys the specified GPUBuffer. This method should be called when the buffer is no longer
+   * needed, allowing the GPU to release its underlying allocations. After calling this method, the
+   * GPUBuffer must not be used, as doing so may lead to undefined behavior.
+   * @param buffer The GPUBuffer to be destroyed.
+   */
+  virtual void destroyBuffer(GPUBuffer* buffer) const = 0;
 
   /**
    * Creates a command encoder that can be used to encode commands to be issued to the GPU.

@@ -66,12 +66,12 @@ PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs& a
     if (samplingArgs.constraint != SrcRectConstraint::Strict) {
       newSamplingArgs.sampleArea = getSubset(drawBounds);
     }
-    TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
+    TPArgs tpArgs(args.context, args.renderFlags, mipmapped, 1.0f, {});
     auto proxy = source->lockTextureProxy(tpArgs);
     return TextureEffect::MakeRGBAAA(std::move(proxy), newSamplingArgs, alphaStart,
                                      AddressOf(matrix));
   }
-  TPArgs tpArgs(args.context, args.renderFlags, mipmapped);
+  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, 1.0f, {});
   auto textureProxy = lockTextureProxy(tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;
@@ -94,11 +94,11 @@ std::shared_ptr<Image> RGBAAAImage::onMakeScaled(int newWidth, int newHeight,
   auto sourceScaledWidth = scaleX * static_cast<float>(source->width());
   auto sourceScaledHeight = scaleY * static_cast<float>(source->height());
   if (!IsInteger(sourceScaledWidth) || !IsInteger(sourceScaledHeight)) {
-    return ScaledImage::MakeFrom(weakThis.lock(), newWidth, newHeight, sampling);
+    return Image::onMakeScaled(newWidth, newHeight, sampling);
   }
   Point newAlphaStart = Point::Make(alphaStart.x * scaleX, alphaStart.y * scaleY);
   if (!IsInteger(newAlphaStart.x) || !IsInteger(newAlphaStart.y)) {
-    return ScaledImage::MakeFrom(weakThis.lock(), newWidth, newHeight, sampling);
+    return Image::onMakeScaled(newWidth, newHeight, sampling);
   }
   auto newSource = source->makeScaled(static_cast<int>(sourceScaledWidth),
                                       static_cast<int>(sourceScaledHeight), sampling);

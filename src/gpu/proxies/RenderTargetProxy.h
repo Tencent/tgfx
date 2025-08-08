@@ -103,10 +103,10 @@ class RenderTargetProxy {
   }
 
   /**
-   * Returns the Texture associated with the RenderTargetProxy. Returns nullptr if the proxy is not
-   * instantiated yet, or it is not backed by a Texture.
+   * Returns the TextureView associated with the RenderTargetProxy. Returns nullptr if the proxy is
+   * not instantiated yet, or it is not backed by a texture view.
    */
-  virtual std::shared_ptr<Texture> getTexture() const = 0;
+  virtual std::shared_ptr<TextureView> getTextureView() const = 0;
 
   /**
    * Returns the RenderTarget of the proxy. Returns nullptr if the proxy is not instantiated yet.

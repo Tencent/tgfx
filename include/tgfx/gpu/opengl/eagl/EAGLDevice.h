@@ -56,7 +56,7 @@ class EAGLDevice : public GLDevice {
 
   friend class GLDevice;
   friend class EAGLWindow;
-  friend class EAGLHardwareTextureSampler;
+  friend class EAGLHardwareTexture;
 
   friend void ApplicationWillResignActive();
   friend void ApplicationDidBecomeActive();

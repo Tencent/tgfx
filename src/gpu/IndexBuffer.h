@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,29 +18,46 @@
 
 #pragma once
 
-#include <CoreVideo/CoreVideo.h>
-#include "gpu/opengl/GLTextureSampler.h"
+#include "gpu/GPU.h"
+#include "gpu/GPUBuffer.h"
+#include "gpu/Resource.h"
 
 namespace tgfx {
-class CGLHardwareTextureSampler : public GLTextureSampler {
+/**
+ * IndexBuffer is a resource that encapsulates a GPUBuffer, which can be used for index data in
+ * a RenderPass.
+ */
+class IndexBuffer : public Resource {
  public:
-  static std::unique_ptr<CGLHardwareTextureSampler> MakeFrom(CVPixelBufferRef pixelBuffer,
-                                                             CVOpenGLTextureCacheRef textureCache);
-
-  ~CGLHardwareTextureSampler() override;
-
-  HardwareBufferRef getHardwareBuffer() const override {
-    return pixelBuffer;
+  size_t memoryUsage() const override {
+    return buffer->size();
   }
 
-  void releaseGPU(Context*) override;
+  /**
+   * Returns the size of the index buffer.
+   */
+  size_t size() const {
+    return buffer->size();
+  }
+
+  /**
+   * Returns the GPUBuffer associated with this IndexBuffer.
+   */
+  GPUBuffer* gpuBuffer() const {
+    return buffer.get();
+  }
+
+ protected:
+  void onReleaseGPU() override {
+    context->gpu()->destroyBuffer(buffer.get());
+  }
 
  private:
-  CVPixelBufferRef pixelBuffer = nullptr;
-  CVOpenGLTextureRef texture = nil;
-  CVOpenGLTextureCacheRef textureCache = nil;
+  std::unique_ptr<GPUBuffer> buffer = nullptr;
 
-  CGLHardwareTextureSampler(CVPixelBufferRef pixelBuffer, CVOpenGLTextureCacheRef textureCache,
-                            unsigned id, unsigned target, PixelFormat format);
+  explicit IndexBuffer(std::unique_ptr<GPUBuffer> buffer) : buffer(std::move(buffer)) {
+  }
+
+  friend class GPUBufferUploadTask;
 };
 }  // namespace tgfx

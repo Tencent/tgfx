@@ -18,44 +18,29 @@
 
 #pragma once
 
-#include "core/images/ResourceImage.h"
+#include <CoreVideo/CoreVideo.h>
+#include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
-class MipmapImage : public ResourceImage {
+class CGLHardwareTexture : public GLTexture {
  public:
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<ResourceImage> source);
+  static std::unique_ptr<CGLHardwareTexture> MakeFrom(CVPixelBufferRef pixelBuffer,
+                                                      CVOpenGLTextureCacheRef textureCache);
 
-  int width() const override {
-    return source->width();
+  ~CGLHardwareTexture() override;
+
+  HardwareBufferRef getHardwareBuffer() const override {
+    return pixelBuffer;
   }
 
-  int height() const override {
-    return source->height();
-  }
-
-  bool isAlphaOnly() const override {
-    return source->isAlphaOnly();
-  }
-
-  bool hasMipmaps() const override {
-    return true;
-  }
-
- protected:
-  Type type() const override {
-    return Type::Mipmap;
-  }
-
-  std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
-
-  std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
-
-  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
-                                                   const UniqueKey& key) const override;
+  void releaseGPU(Context*) override;
 
  private:
-  std::shared_ptr<ResourceImage> source = nullptr;
+  CVPixelBufferRef pixelBuffer = nullptr;
+  CVOpenGLTextureRef texture = nil;
+  CVOpenGLTextureCacheRef textureCache = nil;
 
-  MipmapImage(UniqueKey uniqueKey, std::shared_ptr<ResourceImage> source);
+  CGLHardwareTexture(CVPixelBufferRef pixelBuffer, CVOpenGLTextureCacheRef textureCache,
+                     unsigned id, unsigned target, PixelFormat format);
 };
 }  // namespace tgfx

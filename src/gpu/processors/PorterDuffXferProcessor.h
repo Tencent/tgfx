@@ -32,7 +32,7 @@ class PorterDuffXferProcessor : public XferProcessor {
     return "PorterDuffXferProcessor";
   }
 
-  const Texture* dstTexture() const override;
+  const TextureView* dstTextureView() const override;
 
   bool requiresBarrier() const override {
     return dstTextureInfo.requiresBarrier;

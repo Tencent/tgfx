@@ -18,13 +18,15 @@
 
 #include "core/PathRef.h"
 #include "core/Records.h"
-#include "core/images/ResourceImage.h"
+#include "core/images/CodecImage.h"
+#include "core/images/RasterizedImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/images/TransformImage.h"
 #include "core/shapes/AppendShape.h"
 #include "gpu/DrawingManager.h"
+#include "gpu/ProxyProvider.h"
 #include "gpu/RenderContext.h"
-#include "gpu/Texture.h"
+#include "gpu/TextureView.h"
 #include "gpu/opengl/GLCaps.h"
 #include "gpu/ops/RRectDrawOp.h"
 #include "gpu/ops/RectDrawOp.h"
@@ -36,12 +38,14 @@
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
+#include "tgfx/core/PathTypes.h"
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 #include "tgfx/platform/ImageReader.h"
+#include "tgfx/svg/SVGPathParser.h"
 #include "utils/TestUtils.h"
 #include "utils/TextShaper.h"
 #include "utils/common.h"
@@ -393,16 +397,17 @@ TGFX_TEST(CanvasTest, rasterizedImage) {
   auto canvas = surface->getCanvas();
   canvas->drawImage(rasterImage, 100, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized"));
-  auto rasterImageUniqueKey = std::static_pointer_cast<ResourceImage>(rasterImage)->uniqueKey;
-  auto texture = Resource::Find<Texture>(context, rasterImageUniqueKey);
-  ASSERT_TRUE(texture != nullptr);
-  EXPECT_TRUE(texture != nullptr);
-  EXPECT_EQ(texture->width(), 454);
-  EXPECT_EQ(texture->height(), 605);
+  auto rasterImageUniqueKey =
+      std::static_pointer_cast<RasterizedImage>(rasterImage)->getTextureKey();
+  auto textureView = Resource::Find<TextureView>(context, rasterImageUniqueKey);
+  ASSERT_TRUE(textureView != nullptr);
+  EXPECT_TRUE(textureView != nullptr);
+  EXPECT_EQ(textureView->width(), 454);
+  EXPECT_EQ(textureView->height(), 605);
   auto source = std::static_pointer_cast<TransformImage>(image)->source;
-  auto imageUniqueKey = std::static_pointer_cast<ResourceImage>(source)->uniqueKey;
-  texture = Resource::Find<Texture>(context, imageUniqueKey);
-  EXPECT_TRUE(texture != nullptr);
+  auto imageUniqueKey = std::static_pointer_cast<RasterizedImage>(source)->getTextureKey();
+  textureView = Resource::Find<TextureView>(context, imageUniqueKey);
+  EXPECT_TRUE(textureView == nullptr);
   canvas->clear();
   image = image->makeMipmapped(true);
   EXPECT_TRUE(image->hasMipmaps());
@@ -412,11 +417,11 @@ TGFX_TEST(CanvasTest, rasterizedImage) {
   EXPECT_TRUE(rasterImage->hasMipmaps());
   canvas->drawImage(rasterImage, 100, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/rasterized_mipmap"));
-  texture = Resource::Find<Texture>(context, rasterImageUniqueKey);
-  EXPECT_TRUE(texture == nullptr);
-  rasterImageUniqueKey = std::static_pointer_cast<ResourceImage>(rasterImage)->uniqueKey;
-  texture = Resource::Find<Texture>(context, rasterImageUniqueKey);
-  EXPECT_TRUE(texture != nullptr);
+  textureView = Resource::Find<TextureView>(context, rasterImageUniqueKey);
+  EXPECT_TRUE(textureView == nullptr);
+  rasterImageUniqueKey = std::static_pointer_cast<RasterizedImage>(rasterImage)->getTextureKey();
+  textureView = Resource::Find<TextureView>(context, rasterImageUniqueKey);
+  EXPECT_TRUE(textureView != nullptr);
   canvas->clear();
   scaledImage = scaledImage->makeMipmapped(false);
   EXPECT_FALSE(scaledImage->hasMipmaps());
@@ -1112,30 +1117,30 @@ TGFX_TEST(CanvasTest, atlas) {
 
 static GLTextureInfo CreateRectangleTexture(Context* context, int width, int heigh) {
   auto gl = GLFunctions::Get(context);
-  GLTextureInfo sampler = {};
-  gl->genTextures(1, &(sampler.id));
-  if (sampler.id == 0) {
+  GLTextureInfo glInfo = {};
+  gl->genTextures(1, &(glInfo.id));
+  if (glInfo.id == 0) {
     return {};
   }
-  sampler.target = GL_TEXTURE_RECTANGLE;
-  gl->bindTexture(sampler.target, sampler.id);
-  gl->texParameteri(sampler.target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  gl->texParameteri(sampler.target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  gl->texParameteri(sampler.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  gl->texParameteri(sampler.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+  glInfo.target = GL_TEXTURE_RECTANGLE;
+  gl->bindTexture(glInfo.target, glInfo.id);
+  gl->texParameteri(glInfo.target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  gl->texParameteri(glInfo.target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  gl->texParameteri(glInfo.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  gl->texParameteri(glInfo.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   const auto& textureFormat = GLCaps::Get(context)->getTextureFormat(PixelFormat::RGBA_8888);
-  gl->texImage2D(sampler.target, 0, static_cast<int>(textureFormat.internalFormatTexImage), width,
+  gl->texImage2D(glInfo.target, 0, static_cast<int>(textureFormat.internalFormatTexImage), width,
                  heigh, 0, textureFormat.externalFormat, GL_UNSIGNED_BYTE, nullptr);
-  return sampler;
+  return glInfo;
 }
 
 TGFX_TEST(CanvasTest, rectangleTextureAsBlendDst) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto sampler = CreateRectangleTexture(context, 110, 110);
-  ASSERT_TRUE(sampler.id > 0);
-  auto backendTexture = BackendTexture(sampler, 110, 110);
+  auto glInfo = CreateRectangleTexture(context, 110, 110);
+  ASSERT_TRUE(glInfo.id > 0);
+  auto backendTexture = BackendTexture(glInfo, 110, 110);
   auto surface = Surface::MakeFrom(context, backendTexture, ImageOrigin::TopLeft, 4);
   auto canvas = surface->getCanvas();
   canvas->clear();
@@ -1148,7 +1153,7 @@ TGFX_TEST(CanvasTest, rectangleTextureAsBlendDst) {
   paint.setBlendMode(BlendMode::Multiply);
   canvas->drawImage(image, &paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/hardware_render_target_blend"));
-  GLFunctions::Get(context)->deleteTextures(1, &(sampler.id));
+  GLFunctions::Get(context)->deleteTextures(1, &(glInfo.id));
 }
 
 TGFX_TEST(CanvasTest, YUVImage) {
@@ -1970,6 +1975,81 @@ TGFX_TEST(CanvasTest, MultiImageRect_NOSCALE_NEAREST) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/MultiImageRect_NOSCALE_NEAREST_NEAREST"));
 }
 
+TGFX_TEST(CanvasTest, CornerEffectCompare) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  int surfaceWidth = 800;
+  int surfaceHeight = 800;
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+  auto* canvas = surface->getCanvas();
+  Paint normalPaint;
+  normalPaint.setStyle(PaintStyle::Stroke);
+  normalPaint.setColor(Color::Red());
+  normalPaint.setStroke(Stroke(2));
+  Paint cornerPaint;
+  cornerPaint.setStyle(PaintStyle::Stroke);
+  cornerPaint.setColor(Color::White());
+  cornerPaint.setStroke(Stroke(2));
+
+  // rectangle
+  {
+    Path path;
+    path.addRect(Rect::MakeWH(200, 100));
+    auto effectedShape = Shape::MakeFrom(path);
+    effectedShape = tgfx::Shape::ApplyEffect(effectedShape, tgfx::PathEffect::MakeCorner(50));
+    canvas->translate(50, 50);
+    canvas->drawPath(path, normalPaint);
+    canvas->drawShape(effectedShape, cornerPaint);
+
+    canvas->translate(300, 0);
+    canvas->drawPath(path, normalPaint);
+    canvas->drawRoundRect(Rect::MakeWH(200, 100), 50, 50, cornerPaint);
+  }
+
+  // isolated bezier contour
+  {
+    auto path = SVGPathParser::FromSVGString(
+        "M63.6349 2.09663C-0.921635 70.6535 -10.5027 123.902 12.936 235.723L340.451 "
+        "345.547C273.528 "
+        "257.687 177.2 90.3553 327.269 123.902C514.855 165.834 165.216 -13.8778 63.6349 2.09663Z");
+    auto effectedShape = Shape::MakeFrom(*path);
+    effectedShape = tgfx::Shape::ApplyEffect(effectedShape, tgfx::PathEffect::MakeCorner(50));
+    canvas->translate(0, 200);
+    canvas->drawPath(*path, normalPaint);
+    canvas->drawShape(effectedShape, cornerPaint);
+  }
+
+  // open bezier contour
+  {
+    auto path = SVGPathParser::FromSVGString(
+        "M16.9138 155.924C-1.64829 106.216 -15.1766 1.13521 47.1166 1.13519C47.1166 143.654 "
+        "144.961 "
+        "149.632 150.939 226.712");
+    auto effectedShape = Shape::MakeFrom(*path);
+    effectedShape = tgfx::Shape::ApplyEffect(effectedShape, tgfx::PathEffect::MakeCorner(50));
+    canvas->translate(-300, 0);
+    canvas->drawPath(*path, normalPaint);
+    canvas->drawShape(effectedShape, cornerPaint);
+  }
+
+  // two circle union
+  {
+    Path path1;
+    path1.addOval(Rect::MakeXYWH(100, 100, 125, 125));
+    Path unionPath;
+    unionPath.addOval(Rect::MakeXYWH(200, 100, 125, 125));
+    unionPath.addPath(path1, PathOp::Union);
+    auto effectedShape = Shape::MakeFrom(unionPath);
+    effectedShape = tgfx::Shape::ApplyEffect(effectedShape, tgfx::PathEffect::MakeCorner(50));
+    canvas->translate(0, 300);
+    canvas->drawPath(unionPath, normalPaint);
+    canvas->drawShape(effectedShape, cornerPaint);
+  }
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/CornerEffectCompare"));
+}
+
 TGFX_TEST(CanvasTest, CornerTest) {
   ContextScope scope;
   auto* context = scope.getContext();
@@ -2667,6 +2747,29 @@ TGFX_TEST(CanvasTest, ScaleImage) {
   canvas->clipRect(Rect::MakeXYWH(100, 100, 500, 500));
   canvas->drawImage(scaledImage);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaled_clip"));
+  auto imagePath = "resources/apitest/rotation.jpg";
+  image = MakeImage(imagePath);
+  auto newWidth = image->width() / 8;
+  auto newHeight = image->height() / 8;
+  scaledImage = image->makeScaled(newWidth, newHeight);
+  canvas->clear();
+  canvas->drawImage(scaledImage);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaled_imageCodec_box_filter"));
+  auto codec = MakeImageCodec(imagePath);
+  ASSERT_TRUE(codec != nullptr);
+  Bitmap bitmap(codec->width(), codec->height(), false);
+  ASSERT_FALSE(bitmap.isEmpty());
+  Pixmap pixmap(bitmap);
+  auto result = codec->readPixels(pixmap.info(), pixmap.writablePixels());
+  pixmap.reset();
+  EXPECT_TRUE(result);
+  image = Image::MakeFrom(bitmap);
+  newWidth = image->width() / 8;
+  newHeight = image->height() / 8;
+  scaledImage = image->makeScaled(newWidth, newHeight);
+  canvas->clear();
+  canvas->drawImage(scaledImage);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/scaled_imageBuffer_box_filter"));
 }
 
 TGFX_TEST(CanvasTest, ScalePictureImage) {
@@ -2697,10 +2800,7 @@ TGFX_TEST(CanvasTest, ScalePictureImage) {
   canvas->drawImage(scaledImage);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/pic_scaled_image"));
   canvas->clear();
-  image = image->makeMipmapped(true);
-  EXPECT_TRUE(image->hasMipmaps());
   SamplingOptions sampling(FilterMode::Linear, MipmapMode::Linear);
-  canvas->clear();
   scaledImage = ScaleImage(scaledImage, 2.f, sampling);
   EXPECT_EQ(scaledImage->width(), 400);
   EXPECT_EQ(scaledImage->height(), 566);
@@ -2710,5 +2810,44 @@ TGFX_TEST(CanvasTest, ScalePictureImage) {
   canvas->clipRect(Rect::MakeXYWH(100, 100, 500, 500));
   canvas->drawImage(scaledImage);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/pic_scaled_pic_clip"));
+}
+
+TGFX_TEST(CanvasTest, RasterizedMipmapImage) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  auto originKey = std::static_pointer_cast<RasterizedImage>(image)->getTextureKey();
+  auto textureProxy = context->proxyProvider()->findOrWrapTextureProxy(originKey);
+  EXPECT_TRUE(textureProxy == nullptr);
+  auto surface = Surface::Make(context, 300, 300);
+  auto canvas = surface->getCanvas();
+  canvas->drawImage(image);
+  context->flushAndSubmit();
+  textureProxy = context->proxyProvider()->findOrWrapTextureProxy(originKey);
+  EXPECT_TRUE(textureProxy != nullptr);
+
+  image = image->makeMipmapped(true);
+  EXPECT_TRUE(image->hasMipmaps());
+  auto mipmapKey = std::static_pointer_cast<RasterizedImage>(image)->getTextureKey();
+  EXPECT_TRUE(mipmapKey != originKey);
+  auto mipmapTexture = context->proxyProvider()->findOrWrapTextureProxy(mipmapKey);
+  EXPECT_TRUE(mipmapTexture == nullptr);
+  canvas->drawImage(image);
+  context->flushAndSubmit();
+  mipmapTexture = context->proxyProvider()->findOrWrapTextureProxy(mipmapKey);
+  EXPECT_TRUE(mipmapTexture != nullptr);
+
+  image = image->makeMipmapped(false);
+  EXPECT_FALSE(image->hasMipmaps());
+  EXPECT_TRUE(originKey == std::static_pointer_cast<RasterizedImage>(image)->getTextureKey());
+
+  textureProxy = context->proxyProvider()->findOrWrapTextureProxy(originKey);
+  EXPECT_TRUE(textureProxy != nullptr);
+  image = image->makeMipmapped(true);
+  EXPECT_TRUE(image->hasMipmaps());
+  EXPECT_TRUE(mipmapKey == std::static_pointer_cast<RasterizedImage>(image)->getTextureKey());
+  mipmapTexture = context->proxyProvider()->findOrWrapTextureProxy(mipmapKey);
+  EXPECT_TRUE(mipmapTexture != nullptr);
 }
 }  // namespace tgfx

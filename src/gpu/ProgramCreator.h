@@ -19,9 +19,9 @@
 #pragma once
 
 #include "gpu/Blend.h"
+#include "gpu/GPUTexture.h"
 #include "gpu/Program.h"
 #include "gpu/SamplerState.h"
-#include "gpu/TextureSampler.h"
 #include "gpu/UniformBuffer.h"
 
 namespace tgfx {

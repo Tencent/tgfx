@@ -160,12 +160,12 @@ bool GLRenderPass::onBindProgramAndScissorClip(const Pipeline* pipeline, const R
   return true;
 }
 
-bool GLRenderPass::onBindBuffers(std::shared_ptr<GPUBuffer> indexBuffer,
-                                 std::shared_ptr<GPUBuffer> vertexBuffer, size_t vertexOffset) {
+bool GLRenderPass::onBindBuffers(GPUBuffer* indexBuffer, GPUBuffer* vertexBuffer,
+                                 size_t vertexOffset) {
   auto context = getContext();
   auto gl = GLFunctions::Get(context);
   if (vertexBuffer) {
-    gl->bindBuffer(GL_ARRAY_BUFFER, std::static_pointer_cast<GLBuffer>(vertexBuffer)->bufferID());
+    gl->bindBuffer(GL_ARRAY_BUFFER, static_cast<const GLBuffer*>(vertexBuffer)->bufferID());
   } else {
     return false;
   }
@@ -179,8 +179,7 @@ bool GLRenderPass::onBindBuffers(std::shared_ptr<GPUBuffer> indexBuffer,
     gl->enableVertexAttribArray(static_cast<unsigned>(attribute.location));
   }
   if (indexBuffer) {
-    gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER,
-                   std::static_pointer_cast<GLBuffer>(indexBuffer)->bufferID());
+    gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, static_cast<const GLBuffer*>(indexBuffer)->bufferID());
   }
   return true;
 }

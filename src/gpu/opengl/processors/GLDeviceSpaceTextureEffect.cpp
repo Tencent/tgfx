@@ -53,12 +53,12 @@ void GLDeviceSpaceTextureEffect::emitCode(EmitArgs& args) const {
 }
 
 void GLDeviceSpaceTextureEffect::onSetData(UniformBuffer* uniformBuffer) const {
-  auto texture = textureProxy->getTexture();
-  if (texture == nullptr) {
+  auto textureView = textureProxy->getTextureView();
+  if (textureView == nullptr) {
     return;
   }
   auto deviceCoordMatrix = uvMatrix;
-  auto scale = texture->getTextureCoord(1, 1);
+  auto scale = textureView->getTextureCoord(1, 1);
   deviceCoordMatrix.postScale(scale.x, scale.y);
   uniformBuffer->setData("DeviceCoordMatrix", deviceCoordMatrix);
 }

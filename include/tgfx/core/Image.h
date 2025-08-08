@@ -215,7 +215,7 @@ class Image {
 
   /**
    * Retrieves the backend texture of the Image. Returns an invalid BackendTexture if the Image is
-   * not backed by a Texture. If the origin is not nullptr, the origin of the backend texture is
+   * not backed by a texture. If the origin is not nullptr, the origin of the backend texture is
    * returned.
    */
   virtual BackendTexture getBackendTexture(Context* context, ImageOrigin* origin = nullptr) const;
@@ -305,7 +305,6 @@ class Image {
     Decoded,
     Filter,
     Generator,
-    Mipmap,
     Orient,
     Picture,
     Rasterized,
@@ -334,10 +333,11 @@ class Image {
                                               const SamplingOptions& sampling) const;
 
   /**
-   * Returns a texture proxy for the entire Image.
+   * Returns a texture proxy for the entire Image. Note that the returned texture size may differ
+   * from the scaling factor in TPArgs, as subclasses can choose whether to apply exact scaling.
    * @param args The TPArgs used to create the texture proxy.
    */
-  virtual std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const;
+  virtual std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const = 0;
 
   /**
    * Returns a fragment processor for the entire Image.

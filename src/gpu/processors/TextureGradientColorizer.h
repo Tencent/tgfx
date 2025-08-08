@@ -42,9 +42,9 @@ class TextureGradientColorizer : public FragmentProcessor {
     return 1;
   }
 
-  const TextureSampler* onTextureSampler(size_t) const override {
-    auto texture = gradient->getTexture();
-    return texture ? texture->getSampler() : nullptr;
+  GPUTexture* onTextureAt(size_t) const override {
+    auto textureView = gradient->getTextureView();
+    return textureView ? textureView->getTexture() : nullptr;
   }
 
   std::shared_ptr<TextureProxy> gradient;

@@ -47,8 +47,7 @@ class RenderPass {
 
   void end();
   void bindProgramAndScissorClip(const Pipeline* pipeline, const Rect& scissorRect);
-  void bindBuffers(std::shared_ptr<GPUBuffer> indexBuffer, std::shared_ptr<GPUBuffer> vertexBuffer,
-                   size_t vertexOffset = 0);
+  void bindBuffers(GPUBuffer* indexBuffer, GPUBuffer* vertexBuffer, size_t vertexOffset = 0);
   void draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount);
   void drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount);
   void clear(const Rect& scissor, Color color);
@@ -59,8 +58,8 @@ class RenderPass {
   }
 
   virtual bool onBindProgramAndScissorClip(const Pipeline* pipeline, const Rect& drawBounds) = 0;
-  virtual bool onBindBuffers(std::shared_ptr<GPUBuffer> indexBuffer,
-                             std::shared_ptr<GPUBuffer> vertexBuffer, size_t vertexOffset) = 0;
+  virtual bool onBindBuffers(GPUBuffer* indexBuffer, GPUBuffer* vertexBuffer,
+                             size_t vertexOffset) = 0;
   virtual void onDraw(PrimitiveType primitiveType, size_t offset, size_t count,
                       bool drawIndexed) = 0;
   virtual void onClear(const Rect& scissor, Color color) = 0;

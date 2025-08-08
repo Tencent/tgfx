@@ -17,21 +17,21 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "CoordTransform.h"
-#include "gpu/TextureSampler.h"
+#include "gpu/GPUTexture.h"
 
 namespace tgfx {
 Matrix CoordTransform::getTotalMatrix() const {
-  if (textureProxy == nullptr || textureProxy->getTexture() == nullptr) {
+  if (textureProxy == nullptr || textureProxy->getTextureView() == nullptr) {
     return matrix;
   }
-  auto texture = textureProxy->getTexture();
+  auto textureView = textureProxy->getTextureView();
   auto combined = matrix;
   // normalize
-  auto scale = texture->getTextureCoord(1, 1);
+  auto scale = textureView->getTextureCoord(1, 1);
   combined.postScale(scale.x, scale.y);
-  if (texture->origin() == ImageOrigin::BottomLeft) {
+  if (textureView->origin() == ImageOrigin::BottomLeft) {
     combined.postScale(1, -1);
-    auto translate = texture->getTextureCoord(0, static_cast<float>(texture->height()));
+    auto translate = textureView->getTextureCoord(0, static_cast<float>(textureView->height()));
     combined.postTranslate(translate.x, translate.y);
   }
   return combined;

@@ -27,7 +27,8 @@
 
 namespace tgfx {
 class Context;
-class Texture;
+class TextureView;
+class BufferImage;
 
 /**
  * ImageBuffer describes a two-dimensional array of pixels and is optimized for creating textures.
@@ -101,11 +102,12 @@ class ImageBuffer {
   }
 
   /**
-   * Creates a new Texture capturing the pixels of the ImageBuffer. The mipmapped parameter
+   * Creates a new TextureView capturing the pixels of the ImageBuffer. The mipmapped parameter
    * specifies whether created texture must allocate mip map levels.
    */
-  virtual std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const = 0;
+  virtual std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const = 0;
 
-  friend class Texture;
+  friend class TextureView;
+  friend class BufferImage;
 };
 }  // namespace tgfx

@@ -56,8 +56,9 @@ static void Iterator(PathVerb verb, const Point points[4], void* info) {
   }
 }
 
-bool WebPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
-  if (dstPixels == nullptr || dstInfo.isEmpty()) {
+bool WebPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                                     void* dstPixels) const {
+  if (dstPixels == nullptr) {
     return false;
   }
   auto path = shape->getPath();
@@ -74,6 +75,7 @@ bool WebPathRasterizer::readPixels(const ImageInfo& dstInfo, void* dstPixels) co
   if (!PathRasterizerClass.as<bool>()) {
     return false;
   }
+  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
   auto targetInfo = dstInfo.makeIntersect(0, 0, width(), height());
   auto imageData = PathRasterizerClass.call<val>("readPixels", targetInfo.width(),
                                                  targetInfo.height(), path2D, path.getFillType());

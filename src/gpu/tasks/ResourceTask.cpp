@@ -31,8 +31,8 @@ bool ResourceTask::execute(Context* context) {
   if (resource == nullptr) {
     return false;
   }
-  if (!uniqueKey.empty()) {
-    resource->assignUniqueKey(uniqueKey);
+  if (!proxy->uniqueKey.empty()) {
+    resource->assignUniqueKey(proxy->uniqueKey);
   }
   proxy->resource = std::move(resource);
   return true;

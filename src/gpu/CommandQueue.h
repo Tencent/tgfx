@@ -20,6 +20,7 @@
 
 #include <memory>
 #include "gpu/CommandBuffer.h"
+#include "gpu/GPUBuffer.h"
 
 namespace tgfx {
 /**
@@ -29,6 +30,18 @@ namespace tgfx {
 class CommandQueue {
  public:
   virtual ~CommandQueue() = default;
+
+  /**
+   * Writes data to the specified GPUBuffer at the given offset. The size of the data must not
+   * exceed the size of the buffer.
+   * @param buffer The GPUBuffer to write to.
+   * @param bufferOffset The offset in the buffer where the data should be written.
+   * @param data Pointer to the data to write.
+   * @param size The size of the data in bytes.
+   * @return true if the write operation was successful, false otherwise.
+   */
+  virtual bool writeBuffer(GPUBuffer* buffer, size_t bufferOffset, const void* data,
+                           size_t size) = 0;
 
   /**
    * Schedules the execution of the specified command buffer on the GPU.

@@ -2966,7 +2966,7 @@ TGFX_TEST(LayerTest, RectCustomStroke) {
   path.addRect(rect);
   rectShape->setPath(path);
   rectShape->setStrokeStyle(SolidColor::Make(Color::Red()));
-  rectShape->setRectCustomStrokeWeight({10.f, 15.f, 5.f, 0.f});
+  rectShape->setRectCustomStrokeWeights({10.f, 15.f, 5.f, 0.f});
   rectShape->setStrokeAlign(StrokeAlign::Outside);
   root->addChild(rectShape);
 

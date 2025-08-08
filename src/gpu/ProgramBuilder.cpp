@@ -117,8 +117,8 @@ std::string ProgramBuilder::emitAndInstallFragProc(const FragmentProcessor* proc
     for (size_t i = 0; i < subFP->numTextureSamplers(); ++i) {
       std::string name = "TextureSampler_";
       name += std::to_string(samplerIndex++);
-      const auto* sampler = subFP->textureSampler(i);
-      texSamplers.emplace_back(emitSampler(sampler, name));
+      auto texture = subFP->textureAt(i);
+      texSamplers.emplace_back(emitSampler(texture, name));
     }
   }
   FragmentProcessor::TransformedCoordVars coords(
@@ -141,8 +141,8 @@ void ProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
                                        xferProcessor->name().c_str());
 
   SamplerHandle dstTextureSamplerHandle;
-  if (auto dstTexture = xferProcessor->dstTexture()) {
-    dstTextureSamplerHandle = emitSampler(dstTexture->getSampler(), "DstTextureSampler");
+  if (auto dstTextureView = xferProcessor->dstTextureView()) {
+    dstTextureSamplerHandle = emitSampler(dstTextureView->getTexture(), "DstTextureSampler");
   }
 
   std::string inputColor = !colorIn.empty() ? colorIn : "vec4(1.0)";
@@ -153,9 +153,9 @@ void ProgramBuilder::emitAndInstallXferProc(const std::string& colorIn,
   fragmentShaderBuilder()->codeAppend("}");
 }
 
-SamplerHandle ProgramBuilder::emitSampler(const TextureSampler* sampler, const std::string& name) {
+SamplerHandle ProgramBuilder::emitSampler(GPUTexture* texture, const std::string& name) {
   ++numFragmentSamplers;
-  return uniformHandler()->addSampler(sampler, name);
+  return uniformHandler()->addSampler(texture, name);
 }
 
 void ProgramBuilder::emitFSOutputSwizzle() {

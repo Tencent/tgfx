@@ -48,11 +48,6 @@ class PictureImage : public Image {
     return mipmapped;
   }
 
-  std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
-
-  std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
-                                      const SamplingOptions& sampling) const override;
-
   std::shared_ptr<Picture> picture = nullptr;
   Matrix* matrix = nullptr;
 
@@ -61,6 +56,11 @@ class PictureImage : public Image {
     return Type::Picture;
   }
 
+  std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
+                                      const SamplingOptions& sampling) const override;
+
+  std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
+
   PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                       const SamplingArgs& samplingArgs,
                                                       const Matrix* uvMatrix) const override;
@@ -68,7 +68,7 @@ class PictureImage : public Image {
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
   bool drawPicture(std::shared_ptr<RenderTargetProxy> renderTarget, uint32_t renderFlags,
-                   const Point* offset) const;
+                   const Matrix* extraMatrix) const;
 
  private:
   int _width = 0;

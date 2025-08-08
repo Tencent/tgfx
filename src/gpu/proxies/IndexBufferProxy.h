@@ -16,34 +16,27 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#if defined(__ANDROID__) || defined(ANDROID) || defined(__OHOS__)
-
 #pragma once
 
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
-#include "gpu/opengl/GLTextureSampler.h"
+#include "ResourceProxy.h"
+#include "gpu/IndexBuffer.h"
 
 namespace tgfx {
-class EGLHardwareTextureSampler : public GLTextureSampler {
+/**
+ * IndexBufferProxy is a proxy for IndexBuffer resources.
+ */
+class IndexBufferProxy : public ResourceProxy {
  public:
-  static std::unique_ptr<EGLHardwareTextureSampler> MakeFrom(Context* context,
-                                                             HardwareBufferRef hardwareBuffer);
-  ~EGLHardwareTextureSampler() override;
-
-  HardwareBufferRef getHardwareBuffer() const override {
-    return hardwareBuffer;
+  /**
+   * Returns the associated IndexBuffer instance.
+   */
+  std::shared_ptr<IndexBuffer> getBuffer() const {
+    return std::static_pointer_cast<IndexBuffer>(resource);
   }
 
-  void releaseGPU(Context* context) override;
-
  private:
-  HardwareBufferRef hardwareBuffer = nullptr;
-  EGLImageKHR eglImage = EGL_NO_IMAGE_KHR;
+  IndexBufferProxy() = default;
 
-  EGLHardwareTextureSampler(HardwareBufferRef hardwareBuffer, EGLImageKHR eglImage, unsigned id,
-                            unsigned target, PixelFormat format);
+  friend class ProxyProvider;
 };
 }  // namespace tgfx
-
-#endif

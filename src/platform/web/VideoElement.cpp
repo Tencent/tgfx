@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "platform/web/VideoElement.h"
-#include "gpu/DefaultTexture.h"
-#include "gpu/opengl/GLTextureSampler.h"
+#include "gpu/DefaultTextureView.h"
+#include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
 using namespace emscripten;
@@ -45,7 +45,7 @@ void VideoElement::markFrameChanged(emscripten::val promise) {
 #endif
 }
 
-std::shared_ptr<Texture> VideoElement::onMakeTexture(Context* context, bool mipmapped) {
+std::shared_ptr<TextureView> VideoElement::onMakeTexture(Context* context, bool mipmapped) {
   static auto isAndroidMiniprogram =
       val::module_property("tgfx").call<bool>("isAndroidMiniprogram");
   auto textureWidth = width();
@@ -62,23 +62,23 @@ std::shared_ptr<Texture> VideoElement::onMakeTexture(Context* context, bool mipm
           ANDROID_MINIPROGRAM_ALIGNMENT - (textureHeight % ANDROID_MINIPROGRAM_ALIGNMENT);
     }
   }
-  auto texture =
-      Texture::MakeFormat(context, textureWidth, textureHeight, PixelFormat::RGBA_8888, mipmapped);
-  if (texture != nullptr) {
-    onUpdateTexture(texture);
+  auto textureView = TextureView::MakeFormat(context, textureWidth, textureHeight,
+                                             PixelFormat::RGBA_8888, mipmapped);
+  if (textureView != nullptr) {
+    onUpdateTexture(textureView);
   }
-  return texture;
+  return textureView;
 }
 
-bool VideoElement::onUpdateTexture(std::shared_ptr<Texture> texture) {
+bool VideoElement::onUpdateTexture(std::shared_ptr<TextureView> textureView) {
 #ifdef TGFX_USE_ASYNC_PROMISE
   if (currentPromise != val::null()) {
     currentPromise.await();
   }
 #endif
-  auto sampler = static_cast<GLTextureSampler*>(texture->getSampler());
+  auto glTexture = static_cast<const GLTexture*>(textureView->getTexture());
   val::module_property("tgfx").call<void>("uploadToTexture", emscripten::val::module_property("GL"),
-                                          source, sampler->id(), false);
+                                          source, glTexture->id(), false);
   return true;
 }
 }  // namespace tgfx

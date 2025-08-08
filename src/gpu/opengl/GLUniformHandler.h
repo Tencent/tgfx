@@ -39,7 +39,7 @@ class GLUniformHandler : public UniformHandler {
   std::string internalAddUniform(ShaderFlags visibility, SLType type,
                                  const std::string& name) override;
 
-  SamplerHandle internalAddSampler(const TextureSampler* sampler, const std::string& name) override;
+  SamplerHandle internalAddSampler(GPUTexture* texture, const std::string& name) override;
 
   const ShaderVar& samplerVariable(SamplerHandle handle) const override {
     return samplers[handle.toIndex()].variable;

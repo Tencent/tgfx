@@ -20,7 +20,7 @@
 
 #include "gpu/SamplerState.h"
 #include "gpu/SamplingArgs.h"
-#include "gpu/YUVTexture.h"
+#include "gpu/YUVTextureView.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/proxies/TextureProxy.h"
 
@@ -52,15 +52,15 @@ class TextureEffect : public FragmentProcessor {
 
   size_t onCountTextureSamplers() const override;
 
-  const TextureSampler* onTextureSampler(size_t index) const override;
+  GPUTexture* onTextureAt(size_t index) const override;
 
-  SamplerState onSamplerState(size_t) const override {
+  SamplerState onSamplerStateAt(size_t) const override {
     return samplerState;
   }
 
-  Texture* getTexture() const;
+  TextureView* getTextureView() const;
 
-  YUVTexture* getYUVTexture() const;
+  YUVTextureView* getYUVTexture() const;
 
   bool needSubset() const;
 

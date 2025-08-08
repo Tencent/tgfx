@@ -75,7 +75,8 @@ class OpsCompositor {
   void fillShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill);
 
   /**
-   * Fills the given rect with the given fill, using the provided texture proxy and sampling options.
+   * Fills the given rect with the given fill, using the provided texture proxy and sampling
+   * options.
    */
   void fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,
                      const MCState& state, const Fill& fill);
@@ -143,7 +144,9 @@ class OpsCompositor {
                                                                  Rect* scissorRect);
   DstTextureInfo makeDstTextureInfo(const Rect& deviceBounds, AAType aaType);
   void addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const Fill& fill,
-                 const std::optional<Rect>& localBounds, const std::optional<Rect>& deviceBounds);
+                 const std::optional<Rect>& localBounds, const std::optional<Rect>& deviceBounds,
+                 float drawScale);
+
   void submitDrawOps();
 
   friend class DrawingManager;

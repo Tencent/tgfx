@@ -18,28 +18,47 @@
 
 #pragma once
 
-#include "gpu/Texture.h"
+#include "GPU.h"
+#include "gpu/GPUBuffer.h"
+#include "gpu/Resource.h"
 
 namespace tgfx {
 /**
- * DefaultTexture is a simple texture implementation that stores pixel data using a single sampler.
+ * VertexBuffer is a resource that encapsulates a GPUBuffer, which can be used for vertex data in
+ * a RenderPass.
  */
-class DefaultTexture : public Texture {
+class VertexBuffer : public Resource {
  public:
-  DefaultTexture(std::unique_ptr<TextureSampler> sampler, int width, int height,
-                 ImageOrigin origin = ImageOrigin::TopLeft);
+  size_t memoryUsage() const override {
+    return buffer->size();
+  }
 
-  size_t memoryUsage() const override;
+  /**
+   * Returns the size of the vertex buffer.
+   */
+  size_t size() const {
+    return buffer->size();
+  }
 
-  TextureSampler* getSampler() const override {
-    return _sampler.get();
+  /**
+   * Returns the GPUBuffer associated with this VertexBuffer.
+   */
+  GPUBuffer* gpuBuffer() const {
+    return buffer.get();
   }
 
  protected:
-  std::unique_ptr<TextureSampler> _sampler = {};
-
   void onReleaseGPU() override {
-    _sampler->releaseGPU(context);
+    context->gpu()->destroyBuffer(buffer.get());
   }
+
+ private:
+  std::unique_ptr<GPUBuffer> buffer = nullptr;
+
+  explicit VertexBuffer(std::unique_ptr<GPUBuffer> buffer) : buffer(std::move(buffer)) {
+  }
+
+  friend class GPUBufferUploadTask;
+  friend class ShapeBufferUploadTask;
 };
 }  // namespace tgfx

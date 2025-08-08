@@ -18,7 +18,8 @@
 
 #pragma once
 
-#include "core/images/ResourceImage.h"
+#include "gpu/proxies/TextureProxy.h"
+#include "tgfx/core/Image.h"
 
 namespace tgfx {
 /**
@@ -51,7 +52,7 @@ class TextureImage : public Image {
     return true;
   }
 
-  BackendTexture getBackendTexture(Context* context, ImageOrigin* origin = nullptr) const override;
+  BackendTexture getBackendTexture(Context* context, ImageOrigin* origin) const override;
 
   std::shared_ptr<Image> makeTextureImage(Context* context) const override;
 

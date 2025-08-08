@@ -19,9 +19,9 @@
 #include "PorterDuffXferProcessor.h"
 
 namespace tgfx {
-const Texture* PorterDuffXferProcessor::dstTexture() const {
+const TextureView* PorterDuffXferProcessor::dstTextureView() const {
   auto textureProxy = dstTextureInfo.textureProxy;
-  return textureProxy ? textureProxy->getTexture().get() : nullptr;
+  return textureProxy ? textureProxy->getTextureView().get() : nullptr;
 }
 
 void PorterDuffXferProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) const {

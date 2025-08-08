@@ -18,19 +18,20 @@
 
 #pragma once
 
-#include "gpu/proxies/GPUBufferProxy.h"
 #include "gpu/proxies/TextureProxy.h"
+#include "gpu/proxies/VertexBufferProxy.h"
 
 namespace tgfx {
 class GPUShapeProxy {
  public:
-  GPUShapeProxy(const Matrix& drawingMatrix, std::shared_ptr<GPUBufferProxy> triangles,
-                std::shared_ptr<TextureProxy> texture)
-      : drawingMatrix(drawingMatrix), triangles(std::move(triangles)), texture(std::move(texture)) {
+  GPUShapeProxy(const Matrix& drawingMatrix, std::shared_ptr<VertexBufferProxy> triangles,
+                std::shared_ptr<TextureProxy> proxy)
+      : drawingMatrix(drawingMatrix), triangles(std::move(triangles)),
+        textureView(std::move(proxy)) {
   }
 
   Context* getContext() const {
-    return triangles ? triangles->getContext() : texture->getContext();
+    return triangles ? triangles->getContext() : textureView->getContext();
   }
 
   /**
@@ -40,17 +41,17 @@ class GPUShapeProxy {
     return drawingMatrix;
   }
 
-  std::shared_ptr<GPUBuffer> getTriangles() const {
+  std::shared_ptr<VertexBuffer> getTriangles() const {
     return triangles ? triangles->getBuffer() : nullptr;
   }
 
   std::shared_ptr<TextureProxy> getTextureProxy() const {
-    return texture;
+    return textureView;
   }
 
  private:
   Matrix drawingMatrix = {};
-  std::shared_ptr<GPUBufferProxy> triangles = nullptr;
-  std::shared_ptr<TextureProxy> texture = nullptr;
+  std::shared_ptr<VertexBufferProxy> triangles = nullptr;
+  std::shared_ptr<TextureProxy> textureView = nullptr;
 };
 }  // namespace tgfx
