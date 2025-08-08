@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SimpleLayerTree.h"
+#include <tgfx/layers/layerstyles/BackgroundBlurStyle.h>
+#include <tgfx/layers/layerstyles/DropShadowStyle.h>
 #include "tgfx/layers/Gradient.h"
 #include "tgfx/layers/ImageLayer.h"
 #include "tgfx/layers/ShapeLayer.h"
@@ -97,12 +99,16 @@ static std::shared_ptr<tgfx::Layer> CreateImageLayer(const AppHost* host) {
   maskPath.addRoundRect(tgfx::Rect::MakeWH(image->width(), image->height()), radius, radius);
   maskLayer->setPath(maskPath);
   imageLayer->setMask(maskLayer);
+  imageLayer->setAlpha(0.01f);
   cardMatrix.preScale(imageScale, imageScale);
   card->setMatrix(cardMatrix);
   card->addChild(imageLayer);
   card->addChild(maskLayer);
-  card->setFilters(
-      {tgfx::DropShadowFilter::Make(0, 8, 32, 32, tgfx::Color::FromRGBA(6, 0, 71, 51))});
+  // card->setFilters(
+  //     {tgfx::DropShadowFilter::Make(0, 8, 32, 32, tgfx::Color::FromRGBA(6, 0, 71, 51))});
+  // card->setLayerStyles(
+      // {tgfx::DropShadowStyle::Make(0, 8, 8, 8, tgfx::Color::FromRGBA(6, 0, 71, 255)),
+       // tgfx::BackgroundBlurStyle::Make(8.0f, 8.0f)});
   return card;
 }
 
@@ -115,12 +121,24 @@ std::shared_ptr<tgfx::Layer> SimpleLayerTree::buildLayerTree(const AppHost* host
   root->addChild(CreateImageLayer(host));
 
   // text
-  auto textLayer = tgfx::TextLayer::Make();
-  textLayer->setText("        TGFX  |  Image of bridge");
-  textLayer->setMatrix(tgfx::Matrix::MakeTrans(48, 550));
-  tgfx::Font font(host->getTypeface("default"), 18);
-  textLayer->setFont(font);
+  auto textLayer = tgfx::ShapeLayer::Make();
+  // textLayer->setText("        TGFX  |  Image of bridge");
+  textLayer->setMatrix(tgfx::Matrix::MakeTrans(0, 400));
+  // tgfx::Font font(host->getTypeface("default"), 18);
+  // textLayer->setFont(font);
+  auto shape = tgfx::Path();
+  shape.addRect(tgfx::Rect::MakeWH(279, 300));
+  textLayer->setPath(shape);
+  textLayer->setFillStyle(tgfx::SolidColor::Make(tgfx::Color::FromRGBA(255, 255, 255, 100)));
+  auto shapeLayer = tgfx::ShapeLayer::Make();
+  auto textPath = tgfx::Path();
+  textPath.addRect(tgfx::Rect::MakeWH(279, 24));
+  shapeLayer->setPath(textPath);
+  shapeLayer->setFillStyle(tgfx::SolidColor::Make(tgfx::Color::FromRGBA(255, 255, 255, 1)));
+  shapeLayer->setMatrix(tgfx::Matrix::MakeTrans(48, 550));
+  shapeLayer->setLayerStyles({tgfx::BackgroundBlurStyle::Make(5.0f, 5.0f, tgfx::TileMode::Clamp)});
   root->addChild(textLayer);
+  root->addChild(shapeLayer);
 
   // progress shape
   auto progressBar = CreateProgressBar();
