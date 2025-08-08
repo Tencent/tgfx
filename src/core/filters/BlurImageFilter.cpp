@@ -39,6 +39,9 @@ PlacementPtr<FragmentProcessor> BlurImageFilter::getSourceFragmentProcessor(
   samplingArgs.tileModeX = tileMode;
   samplingArgs.tileModeY = tileMode;
   auto fp = FragmentProcessor::Make(source, args, samplingArgs, &uvMatrix);
+  if (fp == nullptr) {
+    return nullptr;
+  }
   if (fp->numCoordTransforms() == 1) {
     return fp;
   }

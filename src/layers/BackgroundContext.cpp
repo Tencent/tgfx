@@ -19,6 +19,8 @@
 #include "BackgroundContext.h"
 #include "tgfx/core/Recorder.h"
 
+#define MAX_BACKGROUND_CONTEXT_SIZE 1024
+
 namespace tgfx {
 std::shared_ptr<BackgroundContext> BackgroundContext::Make(Context* context, const Rect& drawRect,
                                                            const Matrix& matrix) {
@@ -26,10 +28,20 @@ std::shared_ptr<BackgroundContext> BackgroundContext::Make(Context* context, con
     return nullptr;
   }
   auto backgroundContext = std::shared_ptr<BackgroundContext>(new BackgroundContext());
-  auto rect = drawRect;
+  Point sufaceScales = Point::Make(1.0f, 1.0f);
+  if (drawRect.width() > MAX_BACKGROUND_CONTEXT_SIZE) {
+    sufaceScales.x = MAX_BACKGROUND_CONTEXT_SIZE / drawRect.width();
+  }
+  if (drawRect.height() > MAX_BACKGROUND_CONTEXT_SIZE) {
+    sufaceScales.y = MAX_BACKGROUND_CONTEXT_SIZE / drawRect.height();
+  }
+  auto rect = drawRect.makeOffset(-drawRect.x(), -drawRect.y());
+  rect.scale(sufaceScales.x, sufaceScales.y);
   rect.roundOut();
-  auto surfaceMatrix = Matrix::MakeTrans(-rect.x(), -rect.y());
+  auto surfaceMatrix = Matrix::MakeTrans(-drawRect.x(), -drawRect.y());
   surfaceMatrix.preConcat(matrix);
+  surfaceMatrix.postScale(sufaceScales.x, sufaceScales.y);
+
   if (!surfaceMatrix.invert(&backgroundContext->imageMatrix)) {
     return nullptr;
   }
