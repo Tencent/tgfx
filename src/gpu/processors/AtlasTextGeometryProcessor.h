@@ -40,9 +40,9 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
 
   void onComputeProcessorKey(BytesKey* bytesKey) const override;
 
-  const TextureSampler* onTextureSampler(size_t index) const override {
-    DEBUG_ASSERT(index < textureSamplers.size());
-    return textureSamplers[index];
+  GPUTexture* onTextureAt(size_t index) const override {
+    DEBUG_ASSERT(index < textures.size());
+    return textures[index];
   }
 
   Attribute position;  // May contain coverage as last channel
@@ -53,6 +53,6 @@ class AtlasTextGeometryProcessor : public GeometryProcessor {
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
   AAType aa = AAType::None;
   std::optional<Color> commonColor = std::nullopt;
-  std::vector<const TextureSampler*> textureSamplers;
+  std::vector<GPUTexture*> textures;
 };
 }  // namespace tgfx

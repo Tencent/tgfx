@@ -16,14 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "EAGLHardwareTextureSampler.h"
+#include "EAGLHardwareTexture.h"
 #include "gpu/opengl/GLCaps.h"
 #include "tgfx/gpu/opengl/eagl/EAGLDevice.h"
 
 namespace tgfx {
-static std::unique_ptr<TextureSampler> CreateSamplerOfPlane(
-    Context* context, CVPixelBufferRef pixelBuffer, size_t planeIndex, PixelFormat pixelFormat,
-    CVOpenGLESTextureCacheRef textureCache) {
+static std::unique_ptr<GPUTexture> CreateTextureOfPlane(Context* context,
+                                                        CVPixelBufferRef pixelBuffer,
+                                                        size_t planeIndex, PixelFormat pixelFormat,
+                                                        CVOpenGLESTextureCacheRef textureCache) {
   auto width = static_cast<int>(CVPixelBufferGetWidthOfPlane(pixelBuffer, planeIndex));
   auto height = static_cast<int>(CVPixelBufferGetHeightOfPlane(pixelBuffer, planeIndex));
   CVOpenGLESTextureRef texture = nil;
@@ -39,14 +40,13 @@ static std::unique_ptr<TextureSampler> CreateSamplerOfPlane(
     CFRelease(texture);
     return nullptr;
   }
-  auto samplerID = CVOpenGLESTextureGetName(texture);
+  auto textureID = CVOpenGLESTextureGetName(texture);
   auto target = CVOpenGLESTextureGetTarget(texture);
-  auto sampler = std::unique_ptr<EAGLHardwareTextureSampler>(
-      new EAGLHardwareTextureSampler(pixelBuffer, texture, samplerID, target, pixelFormat));
-  return sampler;
+  return std::unique_ptr<EAGLHardwareTexture>(
+      new EAGLHardwareTexture(pixelBuffer, texture, textureID, target, pixelFormat));
 }
 
-std::vector<std::unique_ptr<TextureSampler>> EAGLHardwareTextureSampler::MakeFrom(
+std::vector<std::unique_ptr<GPUTexture>> EAGLHardwareTexture::MakeFrom(
     Context* context, CVPixelBufferRef pixelBuffer) {
   auto textureCache = static_cast<EAGLDevice*>(context->device())->getTextureCache();
   if (textureCache == nil) {
@@ -69,35 +69,34 @@ std::vector<std::unique_ptr<TextureSampler>> EAGLHardwareTextureSampler::MakeFro
     default:
       return {};  // Unsupported pixel format
   }
-  std::vector<std::unique_ptr<TextureSampler>> samplers = {};
+  std::vector<std::unique_ptr<GPUTexture>> textures = {};
   for (size_t i = 0; i < planeFormats.size(); ++i) {
-    auto sampler = CreateSamplerOfPlane(context, pixelBuffer, i, planeFormats[i], textureCache);
-    if (sampler == nullptr) {
-      for (auto& plane : samplers) {
+    auto texture = CreateTextureOfPlane(context, pixelBuffer, i, planeFormats[i], textureCache);
+    if (texture == nullptr) {
+      for (auto& plane : textures) {
         plane->releaseGPU(context);
       }
       return {};
     }
-    samplers.push_back(std::move(sampler));
+    textures.push_back(std::move(texture));
   }
-  return samplers;
+  return textures;
 }
 
-EAGLHardwareTextureSampler::EAGLHardwareTextureSampler(CVPixelBufferRef pixelBuffer,
-                                                       CVOpenGLESTextureRef texture, unsigned id,
-                                                       unsigned target, PixelFormat format)
-    : GLTextureSampler(id, target, format), pixelBuffer(pixelBuffer), texture(texture) {
+EAGLHardwareTexture::EAGLHardwareTexture(CVPixelBufferRef pixelBuffer, CVOpenGLESTextureRef texture,
+                                         unsigned id, unsigned target, PixelFormat format)
+    : GLTexture(id, target, format), pixelBuffer(pixelBuffer), texture(texture) {
   CFRetain(pixelBuffer);
 }
 
-EAGLHardwareTextureSampler::~EAGLHardwareTextureSampler() {
+EAGLHardwareTexture::~EAGLHardwareTexture() {
   CFRelease(pixelBuffer);
   if (texture) {
     CFRelease(texture);
   }
 }
 
-void EAGLHardwareTextureSampler::releaseGPU(Context* context) {
+void EAGLHardwareTexture::releaseGPU(Context* context) {
   if (texture == nil) {
     return;
   }

@@ -32,12 +32,12 @@ HardwareRenderTargetProxy::~HardwareRenderTargetProxy() {
   HardwareBufferRelease(hardwareBuffer);
 }
 
-std::shared_ptr<Texture> HardwareRenderTargetProxy::onMakeTexture(Context* context) const {
+std::shared_ptr<TextureView> HardwareRenderTargetProxy::onMakeTexture(Context* context) const {
   auto renderTarget = RenderTarget::MakeFrom(context, hardwareBuffer, _sampleCount);
   if (renderTarget == nullptr) {
     LOGE("HardwareRenderTargetProxy::onMakeTexture() Failed to create the render target!");
   }
-  return renderTarget->asTexture();
+  return renderTarget->asTextureView();
 }
 
 }  // namespace tgfx

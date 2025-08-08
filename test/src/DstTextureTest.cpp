@@ -23,7 +23,7 @@
 #include "core/shapes/ProviderShape.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/RenderContext.h"
-#include "gpu/Texture.h"
+#include "gpu/TextureView.h"
 #include "gpu/opengl/GLCaps.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Canvas.h"

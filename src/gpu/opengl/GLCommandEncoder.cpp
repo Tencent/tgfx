@@ -20,7 +20,7 @@
 #include "gpu/opengl/GLRenderPass.h"
 #include "gpu/opengl/GLRenderTarget.h"
 #include "gpu/opengl/GLSemaphore.h"
-#include "gpu/opengl/GLTextureSampler.h"
+#include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
 std::shared_ptr<RenderPass> GLCommandEncoder::onBeginRenderPass(
@@ -33,29 +33,29 @@ std::shared_ptr<RenderPass> GLCommandEncoder::onBeginRenderPass(
   return renderPass;
 }
 
-void GLCommandEncoder::copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture* texture,
-                                                 int srcX, int srcY) {
+void GLCommandEncoder::copyRenderTargetToTexture(const RenderTarget* renderTarget,
+                                                 TextureView* textureView, int srcX, int srcY) {
   DEBUG_ASSERT(renderTarget != nullptr);
-  DEBUG_ASSERT(texture != nullptr);
-  auto width = std::min(texture->width(), renderTarget->width() - srcX);
-  auto height = std::min(texture->height(), renderTarget->height() - srcY);
+  DEBUG_ASSERT(textureView != nullptr);
+  auto width = std::min(textureView->width(), renderTarget->width() - srcX);
+  auto height = std::min(textureView->height(), renderTarget->height() - srcY);
   auto gl = interface->functions();
   auto glRenderTarget = static_cast<const GLRenderTarget*>(renderTarget);
   gl->bindFramebuffer(GL_FRAMEBUFFER, glRenderTarget->readFrameBufferID());
-  auto glSampler = static_cast<const GLTextureSampler*>(texture->getSampler());
-  auto target = glSampler->target();
-  gl->bindTexture(target, glSampler->id());
+  auto glTexture = static_cast<const GLTexture*>(textureView->getTexture());
+  auto target = glTexture->target();
+  gl->bindTexture(target, glTexture->id());
   gl->copyTexSubImage2D(target, 0, 0, 0, srcX, srcY, width, height);
 }
 
-void GLCommandEncoder::generateMipmapsForTexture(TextureSampler* sampler) {
-  auto glSampler = static_cast<GLTextureSampler*>(sampler);
-  if (!glSampler->hasMipmaps() || glSampler->target() != GL_TEXTURE_2D) {
+void GLCommandEncoder::generateMipmapsForTexture(GPUTexture* texture) {
+  auto glTexture = static_cast<GLTexture*>(texture);
+  if (!glTexture->hasMipmaps() || glTexture->target() != GL_TEXTURE_2D) {
     return;
   }
   auto gl = interface->functions();
-  gl->bindTexture(glSampler->target(), glSampler->id());
-  gl->generateMipmap(glSampler->target());
+  gl->bindTexture(glTexture->target(), glTexture->id());
+  gl->generateMipmap(glTexture->target());
 }
 
 BackendSemaphore GLCommandEncoder::insertSemaphore() {

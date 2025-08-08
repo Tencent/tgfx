@@ -18,7 +18,7 @@
 
 #include "GLProgram.h"
 #include "gpu/opengl/GLGPU.h"
-#include "gpu/opengl/GLTextureSampler.h"
+#include "gpu/opengl/GLTexture.h"
 #include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
@@ -43,7 +43,7 @@ void GLProgram::updateUniformsAndTextureBindings(const RenderTarget* renderTarge
   auto samplers = pipeline->getSamplers();
   int textureUnit = 0;
   for (auto& info : samplers) {
-    bindTexture(textureUnit++, info.sampler, info.state);
+    bindTexture(textureUnit++, info.texture, info.state);
   }
 }
 
@@ -127,19 +127,18 @@ static int GetGLWrap(unsigned target, SamplerState::WrapMode wrapMode) {
   return 0;
 }
 
-void GLProgram::bindTexture(int unitIndex, const TextureSampler* sampler,
-                            SamplerState samplerState) {
-  if (sampler == nullptr) {
+void GLProgram::bindTexture(int unitIndex, GPUTexture* texture, SamplerState samplerState) {
+  if (texture == nullptr) {
     return;
   }
   auto gl = GLFunctions::Get(context);
-  auto glSampler = static_cast<const GLTextureSampler*>(sampler);
-  auto target = glSampler->target();
+  auto glTexture = static_cast<const GLTexture*>(texture);
+  auto target = glTexture->target();
   gl->activeTexture(static_cast<unsigned>(GL_TEXTURE0 + unitIndex));
-  gl->bindTexture(target, glSampler->id());
+  gl->bindTexture(target, glTexture->id());
   gl->texParameteri(target, GL_TEXTURE_WRAP_S, GetGLWrap(target, samplerState.wrapModeX));
   gl->texParameteri(target, GL_TEXTURE_WRAP_T, GetGLWrap(target, samplerState.wrapModeY));
-  if (samplerState.mipmapped() && (!context->caps()->mipmapSupport || !glSampler->hasMipmaps())) {
+  if (samplerState.mipmapped() && (!context->caps()->mipmapSupport || !glTexture->hasMipmaps())) {
     samplerState.mipmapMode = MipmapMode::None;
   }
   gl->texParameteri(target, GL_TEXTURE_MIN_FILTER,

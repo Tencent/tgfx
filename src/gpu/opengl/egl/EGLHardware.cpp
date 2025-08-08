@@ -16,9 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "EGLHardwareTextureSampler.h"
+#include "EGLHardwareTexture.h"
 #include "core/utils/PixelFormatUtil.h"
-#include "gpu/TextureSampler.h"
+#include "gpu/GPUTexture.h"
 #include "tgfx/platform/HardwareBuffer.h"
 
 #if defined(__ANDROID__) || defined(ANDROID)
@@ -42,7 +42,7 @@ bool HardwareBufferAvailable() {
   return available;
 }
 
-PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
+PixelFormat GPUTexture::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
   auto info = HardwareBufferGetInfo(hardwareBuffer);
   if (info.isEmpty()) {
     return PixelFormat::Unknown;
@@ -50,21 +50,22 @@ PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
   return ColorTypeToPixelFormat(info.colorType());
 }
 
-std::vector<std::unique_ptr<TextureSampler>> TextureSampler::MakeFrom(
-    Context* context, HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) {
+std::vector<std::unique_ptr<GPUTexture>> GPUTexture::MakeFrom(Context* context,
+                                                              HardwareBufferRef hardwareBuffer,
+                                                              YUVFormat* yuvFormat) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return {};
   }
-  auto sampler = EGLHardwareTextureSampler::MakeFrom(context, hardwareBuffer);
-  if (sampler == nullptr) {
+  auto texture = EGLHardwareTexture::MakeFrom(context, hardwareBuffer);
+  if (texture == nullptr) {
     return {};
   }
   if (yuvFormat != nullptr) {
     *yuvFormat = YUVFormat::Unknown;
   }
-  std::vector<std::unique_ptr<TextureSampler>> samplers = {};
-  samplers.push_back(std::move(sampler));
-  return samplers;
+  std::vector<std::unique_ptr<GPUTexture>> textures = {};
+  textures.push_back(std::move(texture));
+  return textures;
 }
 
 #elif defined(__OHOS__)
@@ -73,7 +74,7 @@ bool HardwareBufferAvailable() {
   return true;
 }
 
-PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
+PixelFormat GPUTexture::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
   auto info = HardwareBufferGetInfo(hardwareBuffer);
   if (info.isEmpty()) {
     return PixelFormat::Unknown;
@@ -81,21 +82,22 @@ PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
   return ColorTypeToPixelFormat(info.colorType());
 }
 
-std::vector<std::unique_ptr<TextureSampler>> TextureSampler::MakeFrom(
-    Context* context, HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) {
+std::vector<std::unique_ptr<GPUTexture>> GPUTexture::MakeFrom(Context* context,
+                                                              HardwareBufferRef hardwareBuffer,
+                                                              YUVFormat* yuvFormat) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return {};
   }
-  auto sampler = EGLHardwareTextureSampler::MakeFrom(context, hardwareBuffer);
-  if (sampler == nullptr) {
+  auto texture = EGLHardwareTexture::MakeFrom(context, hardwareBuffer);
+  if (texture == nullptr) {
     return {};
   }
   if (yuvFormat != nullptr) {
     *yuvFormat = YUVFormat::Unknown;
   }
-  std::vector<std::unique_ptr<TextureSampler>> samplers = {};
-  samplers.push_back(std::move(sampler));
-  return samplers;
+  std::vector<std::unique_ptr<GPUTexture>> textures = {};
+  textures.push_back(std::move(texture));
+  return textures;
 }
 
 #else
@@ -104,12 +106,12 @@ bool HardwareBufferAvailable() {
   return false;
 }
 
-PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef) {
+PixelFormat GPUTexture::GetPixelFormat(HardwareBufferRef) {
   return PixelFormat::Unknown;
 }
 
-std::vector<std::unique_ptr<TextureSampler>> TextureSampler::MakeFrom(Context*, HardwareBufferRef,
-                                                                      YUVFormat*) {
+std::vector<std::unique_ptr<GPUTexture>> GPUTexture::MakeFrom(Context*, HardwareBufferRef,
+                                                              YUVFormat*) {
   return {};
 }
 

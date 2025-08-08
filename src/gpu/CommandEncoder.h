@@ -44,16 +44,16 @@ class CommandEncoder {
                                               bool resolveMSAA = true);
 
   /**
-   * Copy the contents of the specified render target to a texture at the specified source
+   * Copy the contents of the specified render target to a texture view at the specified source
    * coordinates.
    */
-  virtual void copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture* texture,
+  virtual void copyRenderTargetToTexture(const RenderTarget* renderTarget, TextureView* textureView,
                                          int srcX, int srcY) = 0;
 
   /**
-   * Generates mipmaps for the given texture sampler based on its current content.
+   * Generates mipmaps for the given texture based on its current content.
    */
-  virtual void generateMipmapsForTexture(TextureSampler* sampler) = 0;
+  virtual void generateMipmapsForTexture(GPUTexture* texture) = 0;
 
   /**
    * Inserts a signal semaphore into the command encoder. This is used to notify other

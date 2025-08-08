@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #import <TargetConditionals.h>
-#include "EAGLHardwareTextureSampler.h"
+#include "EAGLHardwareTexture.h"
 #include "core/PixelBuffer.h"
 #include "platform/apple/NV12HardwareBuffer.h"
 
@@ -30,7 +30,7 @@ bool HardwareBufferAvailable() {
 #endif
 }
 
-PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
+PixelFormat GPUTexture::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return PixelFormat::Unknown;
   }
@@ -45,15 +45,16 @@ PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
   }
 }
 
-std::vector<std::unique_ptr<TextureSampler>> TextureSampler::MakeFrom(
-    Context* context, HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) {
+std::vector<std::unique_ptr<GPUTexture>> GPUTexture::MakeFrom(Context* context,
+                                                              HardwareBufferRef hardwareBuffer,
+                                                              YUVFormat* yuvFormat) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return {};
   }
-  auto samplers = EAGLHardwareTextureSampler::MakeFrom(context, hardwareBuffer);
-  if (yuvFormat != nullptr && !samplers.empty()) {
-    *yuvFormat = samplers.size() == 2 ? YUVFormat::NV12 : YUVFormat::Unknown;
+  auto textures = EAGLHardwareTexture::MakeFrom(context, hardwareBuffer);
+  if (yuvFormat != nullptr && !textures.empty()) {
+    *yuvFormat = textures.size() == 2 ? YUVFormat::NV12 : YUVFormat::Unknown;
   }
-  return samplers;
+  return textures;
 }
 }  // namespace tgfx

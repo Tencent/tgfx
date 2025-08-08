@@ -47,8 +47,8 @@ class ShaderBuilder {
   void setPrecisionQualifier(const std::string& precision);
 
   /**
-   * Appends a 2D texture sample. The vec length and swizzle order of the result depends on the
-   * TextureSampler associated with the SamplerHandle.
+   * Appends a 2D texture sampler. The vec length and swizzle order of the result depends on the
+   * GPUTexture associated with the SamplerHandle.
    */
   void appendTextureLookup(SamplerHandle samplerHandle, const std::string& coordName);
 

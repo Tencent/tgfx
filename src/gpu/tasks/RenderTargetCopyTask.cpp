@@ -30,13 +30,13 @@ void RenderTargetCopyTask::execute(CommandEncoder* encoder) {
     LOGE("RenderTargetCopyTask::execute() Failed to get the source render target!");
     return;
   }
-  auto texture = dest->getTexture();
-  if (texture == nullptr) {
-    LOGE("RenderTargetCopyTask::execute() Failed to get the dest texture!");
+  auto textureView = dest->getTextureView();
+  if (textureView == nullptr) {
+    LOGE("RenderTargetCopyTask::execute() Failed to get the dest texture view!");
     return;
   }
-  encoder->copyRenderTargetToTexture(renderTarget.get(), texture.get(), srcX, srcY);
-  encoder->generateMipmapsForTexture(texture->getSampler());
+  encoder->copyRenderTargetToTexture(renderTarget.get(), textureView.get(), srcX, srcY);
+  encoder->generateMipmapsForTexture(textureView->getTexture());
 }
 
 }  // namespace tgfx
