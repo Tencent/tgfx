@@ -297,6 +297,42 @@ class ShapeLayer : public Layer {
 
   void setStrokeOnTop(bool value);
 
+  /**
+   * Sets the four corner radii for a custom-stroked rectangle.
+   * This is only valid for a rectangle shape.
+   * Radii order: [top-left, top-right, bottom-right, bottom-left]
+   *      0      1
+   *      *------*
+   *     |        |
+   *      *------*
+   *      3      2
+   */
+  void setRectCustomStrokeRadii(const std::array<float, 4>& radii);
+
+  /**
+   * Configures custom stroke weights for each side of a rectangular path.
+   *
+   * Important: The effect only applies to rectangular paths. Non-rectangular inputs
+   * will pass through unmodified.
+   *
+   * Stroke weight order: [left, top, right, bottom]
+   */
+  void setRectCustomStrokeWeight(const std::array<float, 4>& strokeWeights);
+
+  /**
+   * Returns the four corner radii for a custom stroke rectangle shape.
+   */
+  const std::array<float, 4>& rectCustomRectRadii() const {
+    return _rectCustomStrokeRadii;
+  }
+
+  /**
+   * Returns the four border weights for a custom-stroked rectangle.
+   */
+  const std::array<float, 4>& rectCustomStrokeWeight() const {
+    return _rectCustomStrokeWeight;
+  }
+
  protected:
   ShapeLayer();
 
@@ -316,10 +352,14 @@ class ShapeLayer : public Layer {
     bool lineDashAdaptive : 1;
     uint8_t strokeAlign : 2;
   } shapeBitFields = {};
+  std::array<float, 4> _rectCustomStrokeRadii = {};
+  std::array<float, 4> _rectCustomStrokeWeight = {};
 
   std::vector<Paint> createShapePaints(
       const std::vector<std::shared_ptr<ShapeStyle>>& styles) const;
 
   std::shared_ptr<Shape> createStrokeShape() const;
+
+  std::shared_ptr<Shape> applyCustomRectStroke() const;
 };
 }  // namespace tgfx

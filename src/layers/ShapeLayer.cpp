@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/ShapeLayer.h"
+#include "core/shapes/MatrixShape.h"
+#include "core/shapes/RectCustomStrokeShape.h"
 #include "tgfx/core/PathEffect.h"
 
 namespace tgfx {
@@ -310,6 +312,18 @@ std::vector<Paint> ShapeLayer::createShapePaints(
 }
 
 std::shared_ptr<Shape> ShapeLayer::createStrokeShape() const {
+  auto adjustStroke = stroke;
+  auto maxWeight =
+      *std::max_element(_rectCustomStrokeWeight.begin(), _rectCustomStrokeWeight.end());
+  if (maxWeight > 0.f) {
+    auto minWeight =
+        *std::min_element(_rectCustomStrokeWeight.begin(), _rectCustomStrokeWeight.end());
+    if (maxWeight != minWeight) {
+      return applyCustomRectStroke();
+    }
+    adjustStroke.width = maxWeight;
+  }
+
   auto strokeShape = _shape;
   if ((_strokeStart != 0 || _strokeEnd != 1)) {
     auto pathEffect = PathEffect::MakeTrim(_strokeStart, _strokeEnd);
@@ -327,7 +341,7 @@ std::shared_ptr<Shape> ShapeLayer::createStrokeShape() const {
   }
   auto strokeAlign = static_cast<StrokeAlign>(shapeBitFields.strokeAlign);
   if (strokeAlign != StrokeAlign::Center) {
-    auto tempStroke = stroke;
+    auto tempStroke = adjustStroke;
     tempStroke.width *= 2;
     strokeShape = Shape::ApplyStroke(std::move(strokeShape), &tempStroke);
     if (strokeAlign == StrokeAlign::Inside) {
@@ -336,8 +350,43 @@ std::shared_ptr<Shape> ShapeLayer::createStrokeShape() const {
       strokeShape = Shape::Merge(std::move(strokeShape), _shape, PathOp::Difference);
     }
   } else {
-    strokeShape = Shape::ApplyStroke(std::move(strokeShape), &stroke);
+    strokeShape = Shape::ApplyStroke(std::move(strokeShape), &adjustStroke);
   }
   return strokeShape;
 }
+
+void ShapeLayer::setRectCustomStrokeRadii(const std::array<float, 4>& radii) {
+  _rectCustomStrokeRadii = radii;
+  invalidateContent();
+}
+
+void ShapeLayer::setRectCustomStrokeWeight(const std::array<float, 4>& strokeWeight) {
+  _rectCustomStrokeWeight = strokeWeight;
+  invalidateContent();
+}
+
+std::shared_ptr<Shape> ShapeLayer::applyCustomRectStroke() const {
+  if (_shape == nullptr) {
+    return nullptr;
+  }
+  auto maxStroke =
+      *std::max_element(_rectCustomStrokeWeight.begin(), _rectCustomStrokeWeight.end());
+  if (maxStroke <= 0.f) {
+    return nullptr;
+  }
+  auto shape = std::make_shared<RectCustomStrokeShape>(_shape, stroke);
+  if (!_lineDashPattern.empty()) {
+    auto dashes = _lineDashPattern;
+    if (_lineDashPattern.size() % 2 != 0) {
+      dashes.insert(dashes.end(), _lineDashPattern.begin(), _lineDashPattern.end());
+    }
+    shape->setLineDashPattern(dashes);
+  }
+  auto strokeAlign = static_cast<StrokeAlign>(shapeBitFields.strokeAlign);
+  shape->setStrokeAlign(strokeAlign);
+  shape->setCornerRadii(_rectCustomStrokeRadii);
+  shape->setBorderWeights(_rectCustomStrokeWeight);
+  return shape;
+}
+
 }  // namespace tgfx

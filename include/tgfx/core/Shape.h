@@ -126,7 +126,19 @@ class Shape {
   virtual Path getPath() const = 0;
 
  protected:
-  enum class Type { Append, Effect, Text, Inverse, Matrix, Merge, Path, Stroke, Provider, Glyph };
+  enum class Type {
+    Append,
+    Effect,
+    Text,
+    Inverse,
+    Matrix,
+    Merge,
+    Path,
+    Stroke,
+    Provider,
+    Glyph,
+    CustomStroke
+  };
 
   /**
    * Returns the type of the Shape.
@@ -146,5 +158,6 @@ class Shape {
   friend class ProxyProvider;
   friend class Canvas;
   friend class Types;
+  friend class RectCustomStrokeShape;
 };
 }  // namespace tgfx

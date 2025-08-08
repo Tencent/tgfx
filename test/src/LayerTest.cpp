@@ -2955,4 +2955,45 @@ TGFX_TEST(LayerTest, PartialInnerShadow) {
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialInnerShadow"));
 }
+
+TGFX_TEST(LayerTest, RectCustomStroke) {
+  auto root = Layer::Make();
+  root->setMatrix(Matrix::MakeTrans(75, 25));
+
+  auto rectShape = ShapeLayer::Make();
+  auto rect = Rect::MakeWH(250.f, 150.f);
+  Path path = {};
+  path.addRect(rect);
+  rectShape->setPath(path);
+  rectShape->setStrokeStyle(SolidColor::Make(Color::Red()));
+  rectShape->setRectCustomStrokeWeight({10.f, 15.f, 5.f, 0.f});
+  rectShape->setStrokeAlign(StrokeAlign::Outside);
+  root->addChild(rectShape);
+
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 400, 200);
+  auto displayList = std::make_unique<DisplayList>();
+  displayList->root()->addChild(root);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/rectCustomOutStroke"));
+
+  rectShape->setLineJoin(LineJoin::Bevel);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/rectCustomBevelStroke"));
+
+  rectShape->setRectCustomStrokeRadii({20.f, 20.f, 20.f, 20.f});
+  rectShape->setLineDashPattern({4, 4});
+  rectShape->setStrokeAlign(StrokeAlign::Outside);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/rrectCustomCenterStroke"));
+
+  rectShape->setRectCustomStrokeRadii({20.f, 20.f});
+  rectShape->setLineDashPattern({4, 20});
+  rectShape->setStrokeAlign(StrokeAlign::Center);
+  rectShape->setLineCap(LineCap::Round);
+  displayList->render(surface.get());
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/rrectDashCustomOutStroke"));
+}
 }  // namespace tgfx

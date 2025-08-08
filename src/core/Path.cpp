@@ -459,6 +459,13 @@ void Path::addRoundRect(const Rect& rect, float radiusX, float radiusY, bool rev
                                ToSkDirection(reversed), startIndex);
 }
 
+void Path::addRoundRect(const Rect& rect, const Point radii[4], bool reversed,
+                        unsigned startIndex) {
+  SkRRect skRRect;
+  skRRect.setRectRadii(ToSkRect(rect), reinterpret_cast<const SkPoint*>(radii));
+  writableRef()->path.addRRect(skRRect, ToSkDirection(reversed), startIndex);
+}
+
 void Path::addRRect(const RRect& rRect, bool reversed, unsigned int startIndex) {
   auto skRRect = SkRRect::MakeRectXY(ToSkRect(rRect.rect), rRect.radii.x, rRect.radii.y);
   writableRef()->path.addRRect(skRRect, ToSkDirection(reversed), startIndex);

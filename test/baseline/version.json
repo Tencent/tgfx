@@ -201,7 +201,11 @@
         "imageMask": "67961560",
         "innerShadow": "67961560",
         "shapeMask": "67961560",
-        "textMask": "5e6bf497"
+        "textMask": "5e6bf497",
+        "rectCustomBevelStroke": "7834a3e8",
+        "rectCustomOutStroke": "7834a3e8",
+        "rrectCustomCenterStroke": "7834a3e8",
+        "rrectDashCustomOutStroke": "7834a3e8"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",
