@@ -836,9 +836,15 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   auto renderRect = inverse.mapRect(drawRect);
   renderRect.roundOut();
   args.renderRect = &renderRect;
-  auto backgroundRect = _root->getBackgroundRect(drawRect, viewMatrix.getMaxScale());
-  if (backgroundRect) {
-    args.backgroundContext = BackgroundContext::Make(context, *backgroundRect, viewMatrix);
+  auto backgroundOffset = _root->getBackgroundOffset(viewMatrix.getMaxScale());
+  if (backgroundOffset) {
+    if (fullScreen) {
+      args.backgroundContext =
+          BackgroundContext::Make(context, drawRect, Point::Zero(), viewMatrix);
+    } else {
+      args.backgroundContext =
+          BackgroundContext::Make(context, drawRect, *backgroundOffset, viewMatrix);
+    }
   }
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }

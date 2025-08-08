@@ -28,22 +28,25 @@ PlacementPtr<FragmentProcessor> BlurImageFilter::getSourceFragmentProcessor(
     const Point& scales) const {
   Matrix uvMatrix = Matrix::MakeScale(1 / scales.x, 1 / scales.y);
   uvMatrix.postTranslate(drawRect.left, drawRect.top);
-  auto sourceDrawRect = Rect::MakeWH(drawRect.width(), drawRect.height());
-  sourceDrawRect.scale(scales.x, scales.y);
-  sourceDrawRect.roundOut();
+  auto scaledDrawRect = drawRect;
+  scaledDrawRect.scale(scales.x, scales.y);
+  scaledDrawRect.round();
   FPArgs args =
-      FPArgs(context, renderFlags, Rect::MakeWH(sourceDrawRect.width(), sourceDrawRect.height()),
+      FPArgs(context, renderFlags, Rect::MakeWH(scaledDrawRect.width(), scaledDrawRect.height()),
              std::max(scales.x, scales.y));
 
   SamplingArgs samplingArgs = {};
   samplingArgs.tileModeX = tileMode;
   samplingArgs.tileModeY = tileMode;
   auto fp = FragmentProcessor::Make(source, args, samplingArgs, &uvMatrix);
+  if (fp == nullptr) {
+    return nullptr;
+  }
   if (fp->numCoordTransforms() == 1) {
     return fp;
   }
   auto renderTarget = RenderTargetProxy::MakeFallback(
-      context, static_cast<int>(sourceDrawRect.width()), static_cast<int>(sourceDrawRect.height()),
+      context, static_cast<int>(scaledDrawRect.width()), static_cast<int>(scaledDrawRect.height()),
       source->isAlphaOnly(), 1);
   if (renderTarget == nullptr) {
     return nullptr;

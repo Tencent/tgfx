@@ -20,16 +20,34 @@
 #include "tgfx/core/Recorder.h"
 
 namespace tgfx {
+
+constexpr static int MAX_BACKGROUND_OFFSET = 512;
+
 std::shared_ptr<BackgroundContext> BackgroundContext::Make(Context* context, const Rect& drawRect,
+                                                           const Point& backgroundOffset,
                                                            const Matrix& matrix) {
   if (context == nullptr) {
     return nullptr;
   }
   auto backgroundContext = std::shared_ptr<BackgroundContext>(new BackgroundContext());
+  Point sufaceScales = Point::Make(1.0f, 1.0f);
+  auto maxWidth = drawRect.width() + MAX_BACKGROUND_OFFSET;
+  auto maxHeight = drawRect.height() + MAX_BACKGROUND_OFFSET;
   auto rect = drawRect;
+  rect.outset(backgroundOffset.x, backgroundOffset.y);
+  rect.roundOut();
+  if (rect.width() > maxWidth) {
+    sufaceScales.x = maxWidth / rect.width();
+  }
+  if (rect.height() > maxHeight) {
+    sufaceScales.y = maxHeight / rect.height();
+  }
+  rect.scale(sufaceScales.x, sufaceScales.y);
   rect.roundOut();
   auto surfaceMatrix = Matrix::MakeTrans(-rect.x(), -rect.y());
+  surfaceMatrix.preScale(sufaceScales.x, sufaceScales.y);
   surfaceMatrix.preConcat(matrix);
+
   if (!surfaceMatrix.invert(&backgroundContext->imageMatrix)) {
     return nullptr;
   }
@@ -38,6 +56,10 @@ std::shared_ptr<BackgroundContext> BackgroundContext::Make(Context* context, con
   if (!backgroundContext->surface) {
     return nullptr;
   }
+  auto backgroundRect =
+      Rect::MakeWH(backgroundContext->surface->width(), backgroundContext->surface->height());
+  backgroundContext->imageMatrix.mapRect(&backgroundRect);
+  backgroundContext->backgroundRect = backgroundRect;
   auto canvas = backgroundContext->getCanvas();
   canvas->clear();
   canvas->setMatrix(surfaceMatrix);
@@ -61,16 +83,20 @@ std::shared_ptr<BackgroundContext> BackgroundContext::createSubContext() const {
   if (!surface) {
     return nullptr;
   }
-  auto child =
-      Make(surface->getContext(), Rect::MakeWH(surface->width(), surface->height()), Matrix::I());
-  if (!child) {
+
+  auto child = std::shared_ptr<BackgroundContext>(new BackgroundContext());
+  child->surface = Surface::Make(surface->getContext(), surface->width(), surface->height());
+  if (!child->surface) {
     return nullptr;
   }
+  auto canvas = getCanvas();
   auto childCanvas = child->getCanvas();
-  childCanvas->clipPath(getCanvas()->getTotalClip());
-  childCanvas->setMatrix(getCanvas()->getMatrix());
+  childCanvas->clear();
+  childCanvas->clipPath(canvas->getTotalClip());
+  childCanvas->setMatrix(canvas->getMatrix());
   child->parent = this;
   child->imageMatrix = imageMatrix;
+  child->backgroundRect = backgroundRect;
   return child;
 }
 

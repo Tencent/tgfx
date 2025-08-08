@@ -24,6 +24,7 @@ namespace tgfx {
 class BackgroundContext {
  public:
   static std::shared_ptr<BackgroundContext> Make(Context* context, const Rect& drawRect,
+                                                 const Point& backgroundOffset,
                                                  const Matrix& matrix);
 
   Canvas* getCanvas() const {
@@ -40,11 +41,16 @@ class BackgroundContext {
 
   void drawToParent(const Matrix& paintMatrix, const Paint& paint);
 
+  Rect getBackgroundRect() const {
+    return backgroundRect;
+  }
+
  private:
   BackgroundContext() = default;
   std::shared_ptr<Surface> surface = nullptr;
   Matrix imageMatrix = Matrix::I();
   const BackgroundContext* parent = nullptr;
+  Rect backgroundRect = Rect::MakeEmpty();
 };
 
 }  // namespace tgfx

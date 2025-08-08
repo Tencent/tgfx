@@ -533,7 +533,7 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     globalMatrix.preScale(1 / scale, 1 / scale);
     auto invert = Matrix::I();
     if (globalMatrix.invert(&invert)) {
-      auto backgroundContext = BackgroundContext::Make(context, bounds, invert);
+      auto backgroundContext = BackgroundContext::Make(context, bounds, Point::Zero(), invert);
       if (backgroundContext) {
         auto backgroundCanvas = backgroundContext->getCanvas();
         auto image = getBackgroundImage(args, scale, nullptr);
@@ -740,6 +740,17 @@ std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float con
 void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
   DEBUG_ASSERT(canvas != nullptr);
   if (args.renderRect && !Rect::Intersects(*args.renderRect, renderBounds)) {
+    if (args.backgroundContext) {
+      auto backgroundRect = args.backgroundContext->getBackgroundRect();
+      if (!Rect::Intersects(*args.renderRect, backgroundRect)) {
+        return;
+      }
+      auto backgroundArgs = args;
+      backgroundArgs.drawMode = DrawMode::Background;
+      backgroundArgs.backgroundContext = nullptr;
+      backgroundArgs.renderRect = &backgroundRect;
+      drawLayer(backgroundArgs, args.backgroundContext->getCanvas(), alpha, blendMode);
+    }
     return;
   }
   if (auto rasterizedCache = getRasterizedCache(args, canvas->getMatrix())) {
@@ -1007,6 +1018,7 @@ std::shared_ptr<Image> Layer::getBackgroundImage(const DrawArgs& args, float con
   auto canvas = recorder.beginRecording();
   auto bounds = getBounds();
   bounds.scale(contentScale, contentScale);
+  bounds.roundOut();
   canvas->clipRect(bounds);
   canvas->scale(contentScale, contentScale);
   auto globalMatrix = getGlobalMatrix();
