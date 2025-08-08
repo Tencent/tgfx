@@ -574,7 +574,7 @@ if(TGFX_BUILD_VCPKG)
     
     if(TGFX_USE_ZLIB)
         find_library(ZLIB_LIB 
-            NAMES libz z zlib libzlib
+            NAMES libz z zlib zlibd libzd zd
             PATHS ${VCPKG_LIB_DIR}
             NO_DEFAULT_PATH
         )
