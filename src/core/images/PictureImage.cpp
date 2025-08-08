@@ -89,8 +89,11 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (!rect.intersect(drawBounds)) {
     return nullptr;
   }
+  auto clipRect = rect;
   rect.scale(args.drawScale, args.drawScale);
   rect.roundOut();
+  auto scaleX = rect.width() / clipRect.width();
+  auto scaleY = rect.height() / clipRect.height();
   auto mipmapped = samplingArgs.sampling.mipmapMode != MipmapMode::None && hasMipmaps();
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(rect.width()), static_cast<int>(rect.height()), isAlphaOnly(),
@@ -98,7 +101,7 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto extraMatrix = Matrix::MakeScale(args.drawScale, args.drawScale);
+  auto extraMatrix = Matrix::MakeScale(scaleX, scaleY);
   extraMatrix.postTranslate(-rect.left, -rect.top);
   if (!drawPicture(renderTarget, args.renderFlags, &extraMatrix)) {
     return nullptr;

@@ -65,12 +65,8 @@ void BackgroundBlurStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<
     return;
   }
 
-  // draw background out of the mask
-  // Paint maskPaint = {};
   auto opaqueFilter = ImageFilter::ColorFilter(ColorFilter::AlphaThreshold(OPAQUE_THRESHOLD));
   auto opaqueContent = content->makeWithFilter(opaqueFilter);
-  // maskPaint.setBlendMode(BlendMode::DstOut);
-  // canvas->drawImage(opaqueContent, &maskPaint);
 
   // create blurred background
   auto blurFilter = getBackgroundFilter(contentScale);
@@ -85,7 +81,7 @@ void BackgroundBlurStyle::onDrawWithExtraSource(Canvas* canvas, std::shared_ptr<
   Paint paint = {};
   paint.setMaskFilter(MaskFilter::MakeShader(maskShader, false));
   paint.setBlendMode(BlendMode::Src);
-  canvas->drawImage(extraSource, backgroundOffset.x, backgroundOffset.y, &paint);
+  canvas->drawImage(blurBackground, backgroundOffset.x, backgroundOffset.y, &paint);
 }
 
 BackgroundBlurStyle::BackgroundBlurStyle(float blurrinessX, float blurrinessY, TileMode tileMode)

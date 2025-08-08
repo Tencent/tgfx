@@ -58,7 +58,7 @@ static void Blur1D(PlacementPtr<FragmentProcessor> source,
   auto drawingManager = context->drawingManager();
   auto processor = GaussianBlur1DFragmentProcessor::Make(
       context->drawingBuffer(), std::move(source), sigma, direction, stepLength, MAX_BLUR_SIGMA);
-  drawingManager->fillRTWithFP(renderTarget, std::move(processor), renderFlags);
+  drawingManager->fillRTWithFP(std::move(renderTarget), std::move(processor), renderFlags);
 }
 
 static std::shared_ptr<TextureProxy> ScaleTexture(const TPArgs& args,
