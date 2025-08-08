@@ -317,12 +317,12 @@ class ShapeLayer : public Layer {
    *
    * Stroke weight order: [left, top, right, bottom]
    */
-  void setRectCustomStrokeWeight(const std::array<float, 4>& strokeWeights);
+  void setRectCustomStrokeWeights(const std::array<float, 4>& strokeWeights);
 
   /**
    * Returns the four corner radii for a custom stroke rectangle shape.
    */
-  const std::array<float, 4>& rectCustomRectRadii() const {
+  const std::array<float, 4>& rectCustomStrokeRadii() const {
     return _rectCustomStrokeRadii;
   }
 

@@ -360,7 +360,7 @@ void ShapeLayer::setRectCustomStrokeRadii(const std::array<float, 4>& radii) {
   invalidateContent();
 }
 
-void ShapeLayer::setRectCustomStrokeWeight(const std::array<float, 4>& strokeWeight) {
+void ShapeLayer::setRectCustomStrokeWeights(const std::array<float, 4>& strokeWeight) {
   _rectCustomStrokeWeight = strokeWeight;
   invalidateContent();
 }
