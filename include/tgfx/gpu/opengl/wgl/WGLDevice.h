@@ -23,7 +23,7 @@
 
 namespace tgfx {
 struct HPBUFFER__;
-typedef struct HPBUFFER__* HPBUFFER;
+typedef HPBUFFER__* HPBUFFER;
 
 class WGLDevice : public GLDevice {
  public:
