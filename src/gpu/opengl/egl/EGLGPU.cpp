@@ -57,7 +57,7 @@ bool HardwareBufferAvailable() {
 
 #if defined(__ANDROID__) || defined(ANDROID) || defined(__OHOS__)
 
-PixelFormat EGLGPU::getPixelFormat(HardwareBufferRef) const {
+PixelFormat EGLGPU::getPixelFormat(HardwareBufferRef hardwareBuffer) const {
   auto info = HardwareBufferGetInfo(hardwareBuffer);
   if (info.isEmpty()) {
     return PixelFormat::Unknown;
