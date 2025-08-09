@@ -22,6 +22,8 @@
 #include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace tgfx {
+DECLARE_HANDLE(HPBUFFER);
+
 class WGLDevice : public GLDevice {
  public:
   /**

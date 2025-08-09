@@ -22,6 +22,10 @@
 #include <EGL/eglext.h>
 #include "gpu/opengl/GLGPU.h"
 
+#ifdef None
+#undef None
+#endif
+
 namespace tgfx {
 class EGLGPU : public GLGPU {
  public:

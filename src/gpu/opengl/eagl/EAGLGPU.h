@@ -24,7 +24,8 @@
 namespace tgfx {
 class EAGLGPU : public GLGPU {
  public:
-  explicit EAGLGPU(std::shared_ptr<GLInterface> glInterface) : GLGPU(std::move(glInterface)) {
+  explicit EAGLGPU(std::shared_ptr<GLInterface> glInterface, EAGLContext* eaglContext)
+      : GLGPU(std::move(glInterface)), eaglContext(eaglContext) {
   }
 
   ~EAGLGPU() override;
@@ -37,6 +38,7 @@ class EAGLGPU : public GLGPU {
       HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) const override;
 
  private:
+  EAGLContext* eaglContext = nil;
   CVOpenGLESTextureCacheRef textureCache = nil;
 };
 }  // namespace tgfx

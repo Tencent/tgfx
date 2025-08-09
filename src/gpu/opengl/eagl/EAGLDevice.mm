@@ -108,7 +108,7 @@ std::shared_ptr<EAGLDevice> EAGLDevice::Wrap(EAGLContext* eaglContext, bool exte
   std::shared_ptr<EAGLDevice> device = nullptr;
   auto interface = GLInterface::GetNative();
   if (interface != nullptr) {
-    auto gpu = std::make_unique<EAGLGPU>(std::move(interface));
+    auto gpu = std::make_unique<EAGLGPU>(std::move(interface), eaglContext);
     device = std::shared_ptr<EAGLDevice>(new EAGLDevice(std::move(gpu), eaglContext),
                                          EAGLDevice::NotifyReferenceReachedZero);
     device->externallyOwned = externallyOwned;

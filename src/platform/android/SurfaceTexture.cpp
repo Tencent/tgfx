@@ -201,7 +201,7 @@ std::shared_ptr<TextureView> SurfaceTexture::onMakeTexture(Context* context, boo
   }
   auto textureSize = updateTexImage();
   if (textureSize.isEmpty()) {
-    texture->releaseGPU(context);
+    texture->release(context->gpu());
     return nullptr;
   }
   return Resource::AddToCache(

@@ -65,7 +65,7 @@ PixelFormat EGLGPU::getPixelFormat(HardwareBufferRef) const {
   return ColorTypeToPixelFormat(info.colorType());
 }
 
-std::vector<std::unique_ptr<GPUTexture>> QGLGPU::createHardwareTextures(
+std::vector<std::unique_ptr<GPUTexture>> EGLGPU::createHardwareTextures(
     HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) const {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return {};
