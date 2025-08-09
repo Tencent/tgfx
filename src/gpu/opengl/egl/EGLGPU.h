@@ -18,22 +18,16 @@
 
 #pragma once
 
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
 #include "gpu/opengl/GLGPU.h"
-
-#ifdef None
-#undef None
-#endif
 
 namespace tgfx {
 class EGLGPU : public GLGPU {
  public:
-  EGLGPU(std::shared_ptr<GLInterface> glInterface, EGLDisplay eglDisplay)
+  EGLGPU(std::shared_ptr<GLInterface> glInterface, void* eglDisplay)
       : GLGPU(std::move(glInterface)), eglDisplay(eglDisplay) {
   }
 
-  EGLDisplay getDisplay() const {
+  void* getDisplay() const {
     return eglDisplay;
   }
 
@@ -43,6 +37,6 @@ class EGLGPU : public GLGPU {
       HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) const override;
 
  private:
-  EGLDisplay eglDisplay = EGL_NO_DISPLAY;
+  void* eglDisplay = nullptr;
 };
 }  // namespace tgfx
