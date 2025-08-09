@@ -20,6 +20,7 @@
 
 #include <cstddef>
 #include <cstdint>
+#include "gpu/GPUResource.h"
 
 namespace tgfx {
 /**
@@ -41,15 +42,10 @@ class GPUBufferUsage {
 };
 
 /**
- * GPUBuffer represents a block of GPU memory used to store raw data for GPU operations. GPUBuffer
- * objects are created using the GPU::createBuffer() method, and their underlying allocations are
- * not automatically managed by the GPU. You must call GPU::destroyBuffer() to release the resources
- * when the buffer is no longer needed, unless the GPU context is lost.
+ * GPUBuffer represents a block of GPU memory used to store raw data for GPU operations.
  */
-class GPUBuffer {
+class GPUBuffer : public GPUResource {
  public:
-  virtual ~GPUBuffer() = default;
-
   /**
    * Returns the size of the buffer in bytes. This size is determined at the time of buffer creation
    * and cannot be changed later.

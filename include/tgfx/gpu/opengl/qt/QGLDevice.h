@@ -18,9 +18,6 @@
 
 #pragma once
 
-#ifdef __APPLE__
-#include <CoreVideo/CoreVideo.h>
-#endif
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wdeprecated-copy"
 #include <QOffscreenSurface>
@@ -69,8 +66,8 @@ class QGLDevice : public GLDevice {
   void moveToThread(QThread* renderThread);
 
  protected:
-  bool onMakeCurrent() override;
-  void onClearCurrent() override;
+  bool onLockContext() override;
+  void onUnlockContext() override;
 
  private:
   QThread* ownerThread = nullptr;
@@ -82,12 +79,7 @@ class QGLDevice : public GLDevice {
   static std::shared_ptr<QGLDevice> Wrap(QOpenGLContext* context, QSurface* surface,
                                          bool externallyOwned);
 
-  explicit QGLDevice(void* nativeHandle);
-
-#ifdef __APPLE__
-  CVOpenGLTextureCacheRef textureCache = nil;
-  CVOpenGLTextureCacheRef getTextureCache();
-#endif
+  QGLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle);
 
   friend class GLDevice;
   friend class QGLWindow;

@@ -34,7 +34,7 @@ static std::vector<std::unique_ptr<GPUTexture>> MakeTexturePlanes(Context* conte
     auto texture = GPUTexture::Make(context, w, h, formats[index]);
     if (texture == nullptr) {
       for (auto& plane : texturePlanes) {
-        plane->releaseGPU(context);
+        plane->release(context->gpu());
       }
       return {};
     }
@@ -138,7 +138,7 @@ Point YUVTextureView::getTextureCoord(float x, float y) const {
 void YUVTextureView::onReleaseGPU() {
   auto count = textureCount();
   for (size_t i = 0; i < count; ++i) {
-    textures[i]->releaseGPU(context);
+    textures[i]->release(context->gpu());
   }
 }
 }  // namespace tgfx

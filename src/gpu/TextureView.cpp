@@ -150,7 +150,7 @@ std::shared_ptr<TextureView> TextureView::MakeFrom(Context* context,
 #endif
 
   YUVFormat yuvFormat = YUVFormat::Unknown;
-  auto textures = GPUTexture::MakeFrom(context, hardwareBuffer, &yuvFormat);
+  auto textures = context->gpu()->createHardwareTextures(hardwareBuffer, &yuvFormat);
   if (textures.empty()) {
     return nullptr;
   }

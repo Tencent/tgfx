@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/gpu/opengl/webgl/WebGLDevice.h"
-#include "WebGLProcGetter.h"
 #include "core/utils/Log.h"
+#include "gpu/opengl/webgl/WebGLGPU.h"
 
 namespace tgfx {
 
@@ -92,10 +92,16 @@ std::shared_ptr<WebGLDevice> WebGLDevice::Wrap(EMSCRIPTEN_WEBGL_CONTEXT_HANDLE w
       return nullptr;
     }
   }
-  auto device = std::shared_ptr<WebGLDevice>(new WebGLDevice(webglContext));
-  device->externallyOwned = externallyOwned;
-  device->context = webglContext;
-  device->weakThis = device;
+  std::shared_ptr<WebGLDevice> device = nullptr;
+  auto interface = GLInterface::GetNative();
+  if (interface != nullptr) {
+    auto gpu = std::make_unique<WebGLGPU>(std::move(interface));
+    device = std::shared_ptr<WebGLDevice>(new WebGLDevice(std::move(gpu), webglContext));
+    device->externallyOwned = externallyOwned;
+    device->context = webglContext;
+    device->weakThis = device;
+  }
+
   if (oldContext != webglContext) {
     emscripten_webgl_make_context_current(0);
     if (oldContext) {
@@ -105,8 +111,8 @@ std::shared_ptr<WebGLDevice> WebGLDevice::Wrap(EMSCRIPTEN_WEBGL_CONTEXT_HANDLE w
   return device;
 }
 
-WebGLDevice::WebGLDevice(EMSCRIPTEN_WEBGL_CONTEXT_HANDLE nativeHandle)
-    : GLDevice(reinterpret_cast<void*>(nativeHandle)) {
+WebGLDevice::WebGLDevice(std::unique_ptr<GPU> gpu, EMSCRIPTEN_WEBGL_CONTEXT_HANDLE nativeHandle)
+    : GLDevice(std::move(gpu), reinterpret_cast<void*>(nativeHandle)) {
 }
 
 WebGLDevice::~WebGLDevice() {
@@ -117,21 +123,20 @@ WebGLDevice::~WebGLDevice() {
   emscripten_webgl_destroy_context(context);
 }
 
-bool WebGLDevice::onMakeCurrent() {
+bool WebGLDevice::onLockContext() {
   oldContext = emscripten_webgl_get_current_context();
   if (oldContext == context) {
-    // 如果外部已经设定好了当前的 Context，以外部设定的为准，不再切换。
     return true;
   }
   auto result = emscripten_webgl_make_context_current(context);
   if (result != EMSCRIPTEN_RESULT_SUCCESS) {
-    LOGE("WebGLDevice::onMakeCurrent failure result = %d", result);
+    LOGE("WebGLDevice::onLockContext failure result = %d", result);
     return false;
   }
   return true;
 }
 
-void WebGLDevice::onClearCurrent() {
+void WebGLDevice::onUnlockContext() {
   emscripten_webgl_make_context_current(0);
   if (oldContext) {
     emscripten_webgl_make_context_current(oldContext);

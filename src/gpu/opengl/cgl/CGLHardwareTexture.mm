@@ -20,8 +20,9 @@
 #include "core/utils/UniqueID.h"
 
 namespace tgfx {
-std::unique_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(
-    CVPixelBufferRef pixelBuffer, CVOpenGLTextureCacheRef textureCache) {
+std::unique_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(CGLGPU* gpu,
+                                                                 CVPixelBufferRef pixelBuffer) {
+  auto textureCache = gpu->getTextureCache();
   if (textureCache == nil) {
     return nullptr;
   }
@@ -58,7 +59,7 @@ CGLHardwareTexture::~CGLHardwareTexture() {
   }
 }
 
-void CGLHardwareTexture::releaseGPU(Context*) {
+void CGLHardwareTexture::release(GPU*) {
   if (texture == nil) {
     return;
   }

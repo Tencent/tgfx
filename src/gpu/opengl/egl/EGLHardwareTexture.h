@@ -23,11 +23,12 @@
 #include <EGL/egl.h>
 #include <EGL/eglext.h>
 #include "gpu/opengl/GLTexture.h"
+#include "gpu/opengl/egl/EGLGPU.h"
 
 namespace tgfx {
 class EGLHardwareTexture : public GLTexture {
  public:
-  static std::unique_ptr<EGLHardwareTexture> MakeFrom(Context* context,
+  static std::unique_ptr<EGLHardwareTexture> MakeFrom(const EGLGPU* gpu,
                                                       HardwareBufferRef hardwareBuffer);
   ~EGLHardwareTexture() override;
 
@@ -35,7 +36,7 @@ class EGLHardwareTexture : public GLTexture {
     return hardwareBuffer;
   }
 
-  void releaseGPU(Context* context) override;
+  void release(GPU* gpu) override;
 
  private:
   HardwareBufferRef hardwareBuffer = nullptr;

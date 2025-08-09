@@ -29,7 +29,7 @@
 #include "tgfx/core/Clock.h"
 
 namespace tgfx {
-Context::Context(Device* device, std::unique_ptr<GPU> gpu) : _device(device), _gpu(gpu.release()) {
+Context::Context(Device* device, GPU* gpu) : _device(device), _gpu(gpu) {
   // We set the maxBlockSize to 2MB because allocating blocks that are too large can cause memory
   // fragmentation and slow down allocation. It may also increase the application's memory usage due
   // to pre-allocation optimizations on some platforms.
@@ -53,7 +53,6 @@ Context::~Context() {
   delete _drawingBuffer;
   delete _atlasManager;
   delete _maxValueTracker;
-  delete _gpu;
 }
 
 Backend Context::backend() const {

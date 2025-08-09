@@ -55,7 +55,7 @@ class GLTexture : public GPUTexture {
 
   void computeTextureKey(Context* context, BytesKey* bytesKey) const override;
 
-  void releaseGPU(Context* context) override;
+  void release(GPU* gpu) override;
 
  protected:
   unsigned _id = 0;

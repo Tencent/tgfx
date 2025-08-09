@@ -62,18 +62,15 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
 std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
                                                      HardwareBufferRef hardwareBuffer,
                                                      int sampleCount) {
-  auto format = GPUTexture::GetPixelFormat(hardwareBuffer);
-  if (format == PixelFormat::Unknown) {
-    return nullptr;
-  }
   auto size = HardwareBufferGetSize(hardwareBuffer);
   if (size.isEmpty()) {
     return nullptr;
   }
-  auto textures = GPUTexture::MakeFrom(context, hardwareBuffer);
+  auto textures = context->gpu()->createHardwareTextures(hardwareBuffer);
   if (textures.size() != 1) {
     return nullptr;
   }
+  auto format = textures[0]->format();
   sampleCount = context->caps()->getSampleCount(sampleCount, format);
   return GLTextureRenderTarget::MakeFrom(context, std::move(textures.front()), size.width,
                                          size.height, sampleCount, ImageOrigin::TopLeft, true);
@@ -198,14 +195,14 @@ std::shared_ptr<RenderTarget> GLTextureRenderTarget::MakeFrom(
   auto caps = GLCaps::Get(context);
   auto glTexture = static_cast<const GLTexture*>(texture.get());
   if (!caps->isFormatRenderable(glTexture->format())) {
-    texture->releaseGPU(context);
+    texture->release(context->gpu());
     return nullptr;
   }
   auto gl = GLFunctions::Get(context);
   unsigned frameBufferRead = 0;
   gl->genFramebuffers(1, &frameBufferRead);
   if (frameBufferRead == 0) {
-    texture->releaseGPU(context);
+    texture->release(context->gpu());
     return nullptr;
   }
   unsigned frameBufferDraw = 0;
@@ -214,7 +211,7 @@ std::shared_ptr<RenderTarget> GLTextureRenderTarget::MakeFrom(
     if (!CreateRenderBuffer(context, texture.get(), width, height, sampleCount, &frameBufferDraw,
                             &renderBufferId)) {
       ReleaseResource(context, frameBufferRead, frameBufferDraw, renderBufferId);
-      texture->releaseGPU(context);
+      texture->release(context->gpu());
       return nullptr;
     }
   } else {
@@ -225,7 +222,7 @@ std::shared_ptr<RenderTarget> GLTextureRenderTarget::MakeFrom(
 #ifndef TGFX_BUILD_FOR_WEB
   if (gl->checkFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
     ReleaseResource(context, frameBufferRead, frameBufferDraw, renderBufferId);
-    texture->releaseGPU(context);
+    texture->release(context->gpu());
     return nullptr;
   }
 #endif
@@ -244,6 +241,6 @@ void GLTextureRenderTarget::onReleaseGPU() {
   FrameBufferTexture2D(context, glTexture->target(), 0, _sampleCount);
   gl->bindFramebuffer(GL_FRAMEBUFFER, 0);
   ReleaseResource(context, _readFrameBufferID, _drawFrameBufferID, renderBufferID);
-  _texture->releaseGPU(context);
+  _texture->release(context->gpu());
 }
 }  // namespace tgfx

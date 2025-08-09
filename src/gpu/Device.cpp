@@ -19,16 +19,19 @@
 #include "tgfx/gpu/Device.h"
 #include "core/utils/Log.h"
 #include "core/utils/UniqueID.h"
+#include "gpu/GPU.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
-Device::Device() : _uniqueID(UniqueID::Next()) {
+Device::Device(std::unique_ptr<GPU> gpu) : _uniqueID(UniqueID::Next()), _gpu(gpu.release()) {
+  DEBUG_ASSERT(_gpu != nullptr);
 }
 
 Device::~Device() {
   // Subclasses must call releaseAll() before the Device is destructed to clean up all GPU
   // resources in context.
   DEBUG_ASSERT(context == nullptr);
+  delete _gpu;
 }
 
 Context* Device::lockContext() {
@@ -37,6 +40,9 @@ Context* Device::lockContext() {
   if (!contextLocked) {
     locker.unlock();
     return nullptr;
+  }
+  if (context == nullptr) {
+    context = new Context(this, _gpu);
   }
   return context;
 }
@@ -65,7 +71,7 @@ void Device::releaseAll() {
 }
 
 bool Device::onLockContext() {
-  return context != nullptr;
+  return true;
 }
 
 void Device::onUnlockContext() {

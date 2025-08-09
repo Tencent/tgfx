@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,20 +16,29 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/TextureView.h"
-#include "tgfx/platform/HardwareBuffer.h"
+#pragma once
+
+#include <AppKit/AppKit.h>
+#include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
-bool HardwareBufferAvailable() {
-  return false;
-}
+class CGLGPU : public GLGPU {
+ public:
+  explicit CGLGPU(std::shared_ptr<GLInterface> glInterface, CGLContextObj cglContext)
+      : GLGPU(std::move(glInterface)), cglContext(cglContext) {
+  }
 
-PixelFormat GPUTexture::GetPixelFormat(HardwareBufferRef) {
-  return PixelFormat::Unknown;
-}
+  ~CGLGPU() override;
 
-std::vector<std::unique_ptr<GPUTexture>> GPUTexture::MakeFrom(Context*, HardwareBufferRef,
-                                                              YUVFormat*) {
-  return {};
-}
+  CVOpenGLTextureCacheRef getTextureCache();
+
+  PixelFormat getPixelFormat(HardwareBufferRef hardwareBuffer) const override;
+
+  std::vector<std::unique_ptr<GPUTexture>> createHardwareTextures(
+      HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) const override;
+
+ private:
+  CGLContextObj cglContext = nil;
+  CVOpenGLTextureCacheRef textureCache = nil;
+};
 }  // namespace tgfx

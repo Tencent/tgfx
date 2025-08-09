@@ -20,12 +20,12 @@
 
 #include <CoreVideo/CoreVideo.h>
 #include "gpu/opengl/GLTexture.h"
+#include "gpu/opengl/cgl/CGLGPU.h"
 
 namespace tgfx {
 class CGLHardwareTexture : public GLTexture {
  public:
-  static std::unique_ptr<CGLHardwareTexture> MakeFrom(CVPixelBufferRef pixelBuffer,
-                                                      CVOpenGLTextureCacheRef textureCache);
+  static std::unique_ptr<CGLHardwareTexture> MakeFrom(CGLGPU* gpu, CVPixelBufferRef pixelBuffer);
 
   ~CGLHardwareTexture() override;
 
@@ -33,7 +33,7 @@ class CGLHardwareTexture : public GLTexture {
     return pixelBuffer;
   }
 
-  void releaseGPU(Context*) override;
+  void release(GPU* gpu) override;
 
  private:
   CVPixelBufferRef pixelBuffer = nullptr;

@@ -49,7 +49,7 @@ class VertexBuffer : public Resource {
 
  protected:
   void onReleaseGPU() override {
-    context->gpu()->destroyBuffer(buffer.get());
+    buffer->release(context->gpu());
   }
 
  private:

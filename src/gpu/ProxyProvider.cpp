@@ -360,7 +360,7 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
   if (size.isEmpty()) {
     return nullptr;
   }
-  auto format = GPUTexture::GetPixelFormat(hardwareBuffer);
+  auto format = context->gpu()->getPixelFormat(hardwareBuffer);
   if (format == PixelFormat::Unknown) {
     return nullptr;
   }

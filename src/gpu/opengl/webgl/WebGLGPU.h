@@ -18,18 +18,17 @@
 
 #pragma once
 
-#include "tgfx/gpu/opengl/wgl/WGLDevice.h"
+#include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
-class WGLWindowDevice final : public WGLDevice {
+class WebGLGPU : public GLGPU {
  public:
-  ~WGLWindowDevice() override;
+  explicit WebGLGPU(std::shared_ptr<GLInterface> glInterface) : GLGPU(std::move(glInterface)) {
+  }
 
- private:
-  HWND nativeWindow = nullptr;
+  PixelFormat getPixelFormat(HardwareBufferRef hardwareBuffer) const override;
 
-  explicit WGLWindowDevice(HGLRC nativeHandle);
-
-  friend class WGLDevice;
+  std::vector<std::unique_ptr<GPUTexture>> createHardwareTextures(
+      HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) const override;
 };
 }  // namespace tgfx

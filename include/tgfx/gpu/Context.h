@@ -47,7 +47,7 @@ class Context {
   /**
    * Creates a new Context with the specified device and GPU backend.
    */
-  Context(Device* device, std::unique_ptr<GPU> gpu);
+  Context(Device* device, GPU* gpu);
 
   virtual ~Context();
 
@@ -71,7 +71,7 @@ class Context {
   /**
    * Returns the GPU instance associated with this context.
    */
-  const GPU* gpu() const {
+  GPU* gpu() const {
     return _gpu;
   }
 
