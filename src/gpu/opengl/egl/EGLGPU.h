@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,20 +16,29 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/TextureView.h"
-#include "tgfx/platform/HardwareBuffer.h"
+#pragma once
+
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+#include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
-bool HardwareBufferAvailable() {
-  return false;
-}
+class EGLGPU : public GLGPU {
+ public:
+  EGLGPU(std::shared_ptr<GLInterface> glInterface, EGLDisplay eglDisplay)
+      : GLGPU(std::move(glInterface)), eglDisplay(eglDisplay) {
+  }
 
-PixelFormat GPUTexture::GetPixelFormat(HardwareBufferRef) {
-  return PixelFormat::Unknown;
-}
+  EGLDisplay getDisplay() const {
+    return eglDisplay;
+  }
 
-std::vector<std::unique_ptr<GPUTexture>> GPUTexture::MakeFrom(Context*, HardwareBufferRef,
-                                                              YUVFormat*) {
-  return {};
-}
+  PixelFormat getPixelFormat(HardwareBufferRef hardwareBuffer) const override;
+
+  std::vector<std::unique_ptr<GPUTexture>> createHardwareTextures(
+      HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) const override;
+
+ private:
+  EGLDisplay eglDisplay = EGL_NO_DISPLAY;
+};
 }  // namespace tgfx

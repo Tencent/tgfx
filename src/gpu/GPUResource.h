@@ -17,19 +17,25 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <tgfx/gpu/opengl/wgl/WGLDevice.h>
-#include "WGLInterface.h"
 
 namespace tgfx {
-class WGLPbufferDevice final : public WGLDevice {
+class GPU;
+
+/**
+ * GPUResource is the base class for GPU resources that need manual release of their underlying
+ * allocations. It is intended for resources like buffers and textures that are not automatically
+ * managed by the GPU. This class decouples resource release from object destruction, allowing you
+ * to skip releasing resources in scenarios such as when the GPU device is lost or destroyed.
+ * Otherwise, it may lead to undefined behavior.
+ */
+class GPUResource {
  public:
-  ~WGLPbufferDevice() override;
+  virtual ~GPUResource() = default;
 
- private:
-  HPBUFFER pBuffer = nullptr;
-
-  explicit WGLPbufferDevice(HGLRC nativeHandle);
-
-  friend class GLDevice;
+  /**
+   * Releases the underlying GPU resources. After calling this method, the GPUResource must not be
+   * used, as doing so may lead to undefined behavior.
+   */
+  virtual void release(GPU* gpu) = 0;
 };
 }  // namespace tgfx

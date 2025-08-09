@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,29 +18,30 @@
 
 #pragma once
 
+#ifdef __APPLE__
 #include <CoreVideo/CoreVideo.h>
-#include "gpu/opengl/GLTexture.h"
-#include "gpu/opengl/eagl/EAGLGPU.h"
+#endif
+#include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
-class EAGLHardwareTexture : public GLTexture {
+class QGLGPU : public GLGPU {
  public:
-  static std::vector<std::unique_ptr<GPUTexture>> MakeFrom(EAGLGPU* gpu,
-                                                           CVPixelBufferRef pixelBuffer);
-
-  explicit EAGLHardwareTexture(CVPixelBufferRef pixelBuffer, CVOpenGLESTextureRef texture,
-                               unsigned id, unsigned target, PixelFormat format);
-
-  ~EAGLHardwareTexture() override;
-
-  HardwareBufferRef getHardwareBuffer() const override {
-    return pixelBuffer;
+  explicit QGLGPU(std::shared_ptr<GLInterface> glInterface) : GLGPU(std::move(glInterface)) {
   }
 
-  void release(GPU* gpu) override;
+#ifdef __APPLE__
+  ~QGLGPU() override;
+#endif
+
+  PixelFormat getPixelFormat(HardwareBufferRef hardwareBuffer) const override;
+
+  std::vector<std::unique_ptr<GPUTexture>> createHardwareTextures(
+      HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) const override;
 
  private:
-  CVPixelBufferRef pixelBuffer = nullptr;
-  CVOpenGLESTextureRef texture = nil;
+#ifdef __APPLE__
+  CVOpenGLTextureCacheRef textureCache = nil;
+  CVOpenGLTextureCacheRef getTextureCache();
+#endif
 };
 }  // namespace tgfx

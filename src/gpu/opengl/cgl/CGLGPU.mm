@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,6 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "CGLGPU.h"
+
 #include "CGLHardwareTexture.h"
 #include "tgfx/gpu/opengl/cgl/CGLDevice.h"
 
@@ -24,7 +26,14 @@ bool HardwareBufferAvailable() {
   return true;
 }
 
-PixelFormat GPUTexture::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
+CGLGPU::~CGLGPU() {
+  if (textureCache != nil) {
+    CFRelease(textureCache);
+    textureCache = nil;
+  }
+}
+
+PixelFormat CGLGPU::getPixelFormat(HardwareBufferRef hardwareBuffer) const {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return PixelFormat::Unknown;
   }
@@ -39,14 +48,12 @@ PixelFormat GPUTexture::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
   }
 }
 
-std::vector<std::unique_ptr<GPUTexture>> GPUTexture::MakeFrom(Context* context,
-                                                              HardwareBufferRef hardwareBuffer,
-                                                              YUVFormat* yuvFormat) {
+std::vector<std::unique_ptr<GPUTexture>> CGLGPU::createHardwareTextures(
+    HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) const {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return {};
   }
-  auto textureCache = static_cast<CGLDevice*>(context->device())->getTextureCache();
-  auto texture = CGLHardwareTexture::MakeFrom(hardwareBuffer, textureCache);
+  auto texture = CGLHardwareTexture::MakeFrom(const_cast<CGLGPU*>(this), hardwareBuffer);
   if (texture == nullptr) {
     return {};
   }
@@ -56,5 +63,14 @@ std::vector<std::unique_ptr<GPUTexture>> GPUTexture::MakeFrom(Context* context,
   std::vector<std::unique_ptr<GPUTexture>> textures = {};
   textures.push_back(std::move(texture));
   return textures;
+}
+
+CVOpenGLTextureCacheRef CGLGPU::getTextureCache() {
+  if (!textureCache) {
+    auto pixelFormatObj = CGLGetPixelFormat(cglContext);
+    CVOpenGLTextureCacheCreate(kCFAllocatorDefault, nil, cglContext, pixelFormatObj, nil,
+                               &textureCache);
+  }
+  return textureCache;
 }
 }  // namespace tgfx

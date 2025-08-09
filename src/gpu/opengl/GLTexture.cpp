@@ -19,6 +19,7 @@
 #include "gpu/opengl/GLTexture.h"
 #include <memory>
 #include "GLCaps.h"
+#include "GLGPU.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/opengl/GLUtil.h"
 
@@ -29,7 +30,7 @@ class GLExternalTexture : public GLTexture {
       : GLTexture(id, target, format) {
   }
 
-  void releaseGPU(Context*) override {
+  void release(GPU*) override {
     // External textures are not owned by TGFX, so we do not release them.
   }
 };
@@ -162,11 +163,11 @@ void GLTexture::computeTextureKey(Context* context, BytesKey* bytesKey) const {
   bytesKey->write(_target);
 }
 
-void GLTexture::releaseGPU(Context* context) {
-  if (context == nullptr || _id == 0) {
+void GLTexture::release(GPU* gpu) {
+  if (gpu == nullptr || _id == 0) {
     return;
   }
-  auto gl = GLFunctions::Get(context);
+  auto gl = static_cast<GLGPU*>(gpu)->functions();
   gl->deleteTextures(1, &_id);
   _id = 0;
 }

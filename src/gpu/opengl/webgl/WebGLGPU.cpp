@@ -16,21 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/TextureView.h"
-#include "tgfx/platform/HardwareBuffer.h"
+#include "WebGLGPU.h"
 
 namespace tgfx {
 bool HardwareBufferAvailable() {
   return false;
 }
 
-PixelFormat GPUTexture::GetPixelFormat(HardwareBufferRef) {
+PixelFormat WebGLGPU::getPixelFormat(HardwareBufferRef) const {
   return PixelFormat::Unknown;
 }
 
-std::vector<std::unique_ptr<GPUTexture>> GPUTexture::MakeFrom(Context*, HardwareBufferRef,
-                                                              YUVFormat*) {
+std::vector<std::unique_ptr<GPUTexture>> WebGLGPU::createHardwareTextures(HardwareBufferRef,
+                                                                          YUVFormat*) const {
   return {};
 }
-
 }  // namespace tgfx

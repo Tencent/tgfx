@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,12 +16,12 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/TextureView.h"
-#include "tgfx/gpu/opengl/qt/QGLDevice.h"
 #ifdef __APPLE__
+#include <OpenGL/OpenGL.h>
+#include <dlfcn.h>
 #include "gpu/opengl/cgl/CGLHardwareTexture.h"
 #endif
-#include "tgfx/platform/HardwareBuffer.h"
+#include "gpu/opengl/qt/QGLGPU.h"
 
 namespace tgfx {
 #ifdef __APPLE__
@@ -30,7 +30,7 @@ bool HardwareBufferAvailable() {
   return true;
 }
 
-PixelFormat GPUTexture::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
+PixelFormat QGLGPU::getPixelFormat(HardwareBufferRef hardwareBuffer) const {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return PixelFormat::Unknown;
   }
@@ -45,13 +45,12 @@ PixelFormat GPUTexture::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
   }
 }
 
-std::vector<std::unique_ptr<GPUTexture>> GPUTexture::MakeFrom(Context* context,
-                                                              HardwareBufferRef hardwareBuffer,
-                                                              YUVFormat* yuvFormat) {
+std::vector<std::unique_ptr<GPUTexture>> QGLGPU::createHardwareTextures(
+    HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) const {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return {};
   }
-  auto textureCache = static_cast<QGLDevice*>(context->device())->getTextureCache();
+  auto textureCache = getTextureCache();
   auto texture = CGLHardwareTexture::MakeFrom(hardwareBuffer, textureCache);
   if (texture == nullptr) {
     return {};
@@ -64,18 +63,42 @@ std::vector<std::unique_ptr<GPUTexture>> GPUTexture::MakeFrom(Context* context,
   return textures;
 }
 
+QGLGPU::~QGLGPU() {
+  if (textureCache != nil) {
+    CFRelease(textureCache);
+    textureCache = nil;
+  }
+}
+
+CVOpenGLTextureCacheRef QGLGPU::getTextureCache() {
+  if (!textureCache) {
+    // The toolchain of QT does not allow us to access the native OpenGL interface directly.
+    typedef CGLContextObj (*GetCurrentContext)();
+    typedef CGLPixelFormatObj (*GetPixelFormat)(CGLContextObj);
+    auto getCurrentContext =
+        reinterpret_cast<GetCurrentContext>(dlsym(RTLD_DEFAULT, "CGLGetCurrentContext"));
+    auto getPixelFormat =
+        reinterpret_cast<GetPixelFormat>(dlsym(RTLD_DEFAULT, "CGLGetPixelFormat"));
+    auto cglContext = getCurrentContext();
+    auto pixelFormatObj = getPixelFormat(cglContext);
+    CVOpenGLTextureCacheCreate(kCFAllocatorDefault, NULL, cglContext, pixelFormatObj, NULL,
+                               &textureCache);
+  }
+  return textureCache;
+}
+
 #else
 
 bool HardwareBufferAvailable() {
   return false;
 }
 
-PixelFormat GPUTexture::GetPixelFormat(HardwareBufferRef) {
+PixelFormat QGLGPU::getPixelFormat(HardwareBufferRef) const {
   return PixelFormat::Unknown;
 }
 
-std::vector<std::unique_ptr<GPUTexture>> GPUTexture::MakeFrom(Context*, HardwareBufferRef,
-                                                              YUVFormat*) {
+std::vector<std::unique_ptr<GPUTexture>> QGLGPU::createHardwareTextures(HardwareBufferRef,
+                                                                        YUVFormat*) const {
   return {};
 }
 

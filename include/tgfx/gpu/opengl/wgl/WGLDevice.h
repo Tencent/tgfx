@@ -29,13 +29,17 @@ class WGLDevice : public GLDevice {
    */
   static std::shared_ptr<WGLDevice> MakeFrom(HWND nativeWindow, HGLRC sharedContext);
 
+  ~WGLDevice() override;
+
   bool sharableWith(void* nativeConext) const override;
 
  protected:
-  bool onMakeCurrent() override;
-  void onClearCurrent() override;
+  bool onLockContext() override;
+  void onUnlockContext() override;
 
- protected:
+ private:
+  HWND nativeWindow = nullptr;
+  HPBUFFER pBuffer = nullptr;
   HDC deviceContext = nullptr;
   HGLRC glContext = nullptr;
   HGLRC sharedContext = nullptr;
@@ -43,10 +47,10 @@ class WGLDevice : public GLDevice {
   HDC oldDeviceContext = nullptr;
   HGLRC oldGLContext = nullptr;
 
-  explicit WGLDevice(HGLRC nativeHandle);
+  WGLDevice(std::unique_ptr<GPU> gpu, HGLRC nativeHandle);
 
-  static std::shared_ptr<WGLDevice> Wrap(HWND nativeWindow, HDC deviceContext, HGLRC glContext,
-                                         HGLRC sharedContext, bool externallyOwned);
+  static std::shared_ptr<WGLDevice> Wrap(HDC deviceContext, HGLRC glContext, HGLRC sharedContext,
+                                         HWND nativeWindow, HPBUFFER pBuffer, bool externallyOwned);
 
   friend class GLDevice;
   friend class WGLWindow;

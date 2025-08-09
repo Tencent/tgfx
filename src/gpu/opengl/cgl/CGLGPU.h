@@ -18,18 +18,27 @@
 
 #pragma once
 
-#include "tgfx/gpu/opengl/wgl/WGLDevice.h"
+#include <AppKit/AppKit.h>
+#include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
-class WGLWindowDevice final : public WGLDevice {
+class CGLGPU : public GLGPU {
  public:
-  ~WGLWindowDevice() override;
+  explicit CGLGPU(std::shared_ptr<GLInterface> glInterface, CGLContextObj cglContext)
+      : GLGPU(std::move(glInterface)), cglContext(cglContext) {
+  }
+
+  ~CGLGPU() override;
+
+  CVOpenGLTextureCacheRef getTextureCache();
+
+  PixelFormat getPixelFormat(HardwareBufferRef hardwareBuffer) const override;
+
+  std::vector<std::unique_ptr<GPUTexture>> createHardwareTextures(
+      HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) const override;
 
  private:
-  HWND nativeWindow = nullptr;
-
-  explicit WGLWindowDevice(HGLRC nativeHandle);
-
-  friend class WGLDevice;
+  CGLContextObj cglContext = nil;
+  CVOpenGLTextureCacheRef textureCache = nil;
 };
 }  // namespace tgfx
