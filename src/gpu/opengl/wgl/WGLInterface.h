@@ -18,11 +18,9 @@
 
 #pragma once
 
-#include <windows.h>
+#include "tgfx/gpu/opengl/wgl/WGLDevice.h"
 
 namespace tgfx {
-DECLARE_HANDLE(HPBUFFER);
-
 #define WGL_DRAW_TO_WINDOW 0x2001
 #define WGL_ACCELERATION 0x2003
 #define WGL_SUPPORT_OPENGL 0x2010

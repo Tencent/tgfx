@@ -22,8 +22,7 @@
 #include "tgfx/gpu/opengl/GLDevice.h"
 
 namespace tgfx {
-struct HPBUFFER__;
-typedef HPBUFFER__* HPBUFFER;
+DECLARE_HANDLE(HPBUFFER);
 
 class WGLDevice : public GLDevice {
  public:
