@@ -32,10 +32,11 @@ class EAGLGPU : public GLGPU {
 
   CVOpenGLESTextureCacheRef getTextureCache();
 
-  PixelFormat getPixelFormat(HardwareBufferRef hardwareBuffer) const override;
+  std::vector<PixelFormat> getHardwareTextureFormats(HardwareBufferRef hardwareBuffer,
+                                                     YUVFormat* yuvFormat) const override;
 
-  std::vector<std::unique_ptr<GPUTexture>> createHardwareTextures(HardwareBufferRef hardwareBuffer,
-                                                                  YUVFormat* yuvFormat) override;
+  std::vector<std::unique_ptr<GPUTexture>> importHardwareTextures(
+      HardwareBufferRef hardwareBuffer) override;
 
  private:
   EAGLContext* eaglContext = nil;

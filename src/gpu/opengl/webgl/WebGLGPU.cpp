@@ -23,12 +23,11 @@ bool HardwareBufferAvailable() {
   return false;
 }
 
-PixelFormat WebGLGPU::getPixelFormat(HardwareBufferRef) const {
-  return PixelFormat::Unknown;
+std::vector<PixelFormat> WebGLGPU::getHardwareTextureFormats(HardwareBufferRef, YUVFormat*) const {
+  return {};
 }
 
-std::vector<std::unique_ptr<GPUTexture>> WebGLGPU::createHardwareTextures(HardwareBufferRef,
-                                                                          YUVFormat*) {
+std::vector<std::unique_ptr<GPUTexture>> WebGLGPU::importHardwareTextures(HardwareBufferRef) {
   return {};
 }
 }  // namespace tgfx

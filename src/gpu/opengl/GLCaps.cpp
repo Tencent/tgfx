@@ -186,7 +186,7 @@ GLCaps::GLCaps(const GLInfo& info) {
   initFormatMap(info);
 }
 
-const TextureFormat& GLCaps::getTextureFormat(PixelFormat pixelFormat) const {
+const GLTextureFormat& GLCaps::getTextureFormat(PixelFormat pixelFormat) const {
   return pixelFormatMap.at(pixelFormat).format;
 }
 

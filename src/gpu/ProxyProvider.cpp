@@ -360,17 +360,18 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
   if (size.isEmpty()) {
     return nullptr;
   }
-  auto format = context->gpu()->getPixelFormat(hardwareBuffer);
-  if (format == PixelFormat::Unknown) {
+  YUVFormat yuvFormat = YUVFormat::Unknown;
+  auto formats = context->gpu()->getHardwareTextureFormats(hardwareBuffer, &yuvFormat);
+  if (formats.size() != 1 || yuvFormat != YUVFormat::Unknown) {
     return nullptr;
   }
   auto caps = context->caps();
-  if (!caps->isFormatRenderable(format)) {
+  if (!caps->isFormatRenderable(formats.front())) {
     return nullptr;
   }
-  sampleCount = caps->getSampleCount(sampleCount, format);
-  auto proxy = std::shared_ptr<TextureRenderTargetProxy>(
-      new HardwareRenderTargetProxy(hardwareBuffer, size.width, size.height, format, sampleCount));
+  sampleCount = caps->getSampleCount(sampleCount, formats.front());
+  auto proxy = std::shared_ptr<TextureRenderTargetProxy>(new HardwareRenderTargetProxy(
+      hardwareBuffer, size.width, size.height, formats.front(), sampleCount));
   addResourceProxy(proxy);
   return proxy;
 }

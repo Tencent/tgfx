@@ -41,32 +41,34 @@ bool HardwareBufferAvailable() {
   return available;
 }
 
-#elif defined(__OHOS__)
-
-bool HardwareBufferAvailable() {
-  return true;
-}
-
-#else
-
-bool HardwareBufferAvailable() {
-  return false;
-}
-
-#endif
-
-#if defined(__ANDROID__) || defined(ANDROID) || defined(__OHOS__)
-
-PixelFormat EGLGPU::getPixelFormat(HardwareBufferRef hardwareBuffer) const {
-  auto info = HardwareBufferGetInfo(hardwareBuffer);
-  if (info.isEmpty()) {
-    return PixelFormat::Unknown;
+std::vector<PixelFormat> EGLGPU::getHardwareTextureFormats(HardwareBufferRef hardwareBuffer,
+                                                           YUVFormat* yuvFormat) const {
+  static const auto describe = AHardwareBufferFunctions::Get()->describe;
+  if (!HardwareBufferCheck(hardwareBuffer)) {
+    return {};
   }
-  return ColorTypeToPixelFormat(info.colorType());
+  std::vector<PixelFormat> formats = {};
+  AHardwareBuffer_Desc desc;
+  describe(hardwareBuffer, &desc);
+  switch (desc.format) {
+    case HARDWAREBUFFER_FORMAT_R8_UNORM:
+      formats.push_back(PixelFormat::ALPHA_8);
+      break;
+    case AHARDWAREBUFFER_FORMAT_R8G8B8A8_UNORM:
+    case AHARDWAREBUFFER_FORMAT_R8G8B8X8_UNORM:
+      formats.push_back(PixelFormat::RGBA_8888);
+      break;
+    default:
+      break;
+  }
+  if (yuvFormat != nullptr) {
+    *yuvFormat = YUVFormat::Unknown;
+  }
+  return formats;
 }
 
-std::vector<std::unique_ptr<GPUTexture>> EGLGPU::createHardwareTextures(
-    HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) {
+std::vector<std::unique_ptr<GPUTexture>> EGLGPU::importHardwareTextures(
+    HardwareBufferRef hardwareBuffer) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return {};
   }
@@ -74,8 +76,67 @@ std::vector<std::unique_ptr<GPUTexture>> EGLGPU::createHardwareTextures(
   if (texture == nullptr) {
     return {};
   }
+  std::vector<std::unique_ptr<GPUTexture>> textures = {};
+  textures.push_back(std::move(texture));
+  return textures;
+}
+
+#elif defined(__OHOS__)
+
+bool HardwareBufferAvailable() {
+  return true;
+}
+
+std::vector<PixelFormat> EGLGPU::getHardwareTextureFormats(HardwareBufferRef hardwareBuffer,
+                                                           YUVFormat* yuvFormat) const {
+  if (!HardwareBufferCheck(hardwareBuffer)) {
+    return {};
+  }
   if (yuvFormat != nullptr) {
     *yuvFormat = YUVFormat::Unknown;
+  }
+  std::vector<PixelFormat> formats = {};
+  OH_NativeBuffer_Config config;
+  OH_NativeBuffer_GetConfig(hardwareBuffer, &config);
+  switch (config.format) {
+    case NATIVEBUFFER_PIXEL_FMT_RGBA_8888:
+    case NATIVEBUFFER_PIXEL_FMT_RGBX_8888:
+      formats.push_back(PixelFormat::RGBA_8888);
+      break;
+    case NATIVEBUFFER_PIXEL_FMT_YUV_422_I:
+    case NATIVEBUFFER_PIXEL_FMT_YCBCR_422_SP:
+    case NATIVEBUFFER_PIXEL_FMT_YCRCB_422_SP:
+    case NATIVEBUFFER_PIXEL_FMT_YCBCR_420_SP:
+    case NATIVEBUFFER_PIXEL_FMT_YCRCB_420_SP:
+    case NATIVEBUFFER_PIXEL_FMT_YCBCR_422_P:
+    case NATIVEBUFFER_PIXEL_FMT_YCRCB_422_P:
+    case NATIVEBUFFER_PIXEL_FMT_YCBCR_420_P:
+    case NATIVEBUFFER_PIXEL_FMT_YCRCB_420_P:
+    case NATIVEBUFFER_PIXEL_FMT_YUYV_422_PKG:
+    case NATIVEBUFFER_PIXEL_FMT_UYVY_422_PKG:
+    case NATIVEBUFFER_PIXEL_FMT_YVYU_422_PKG:
+    case NATIVEBUFFER_PIXEL_FMT_VYUY_422_PKG:
+    case NATIVEBUFFER_PIXEL_FMT_YCBCR_P010:
+    case NATIVEBUFFER_PIXEL_FMT_YCRCB_P010:
+      formats.push_back(PixelFormat::RGBA_8888);
+      if (yuvFormat != nullptr) {
+        *yuvFormat = YUVFormat::I420;
+      }
+      break;
+    default:
+      break;
+  }
+  return formats;
+}
+
+std::vector<std::unique_ptr<GPUTexture>> EGLGPU::importHardwareTextures(
+    HardwareBufferRef hardwareBuffer) {
+  if (!HardwareBufferCheck(hardwareBuffer)) {
+    return {};
+  }
+  auto texture = EGLHardwareTexture::MakeFrom(this, hardwareBuffer);
+  if (texture == nullptr) {
+    return {};
   }
   std::vector<std::unique_ptr<GPUTexture>> textures = {};
   textures.push_back(std::move(texture));
@@ -84,12 +145,17 @@ std::vector<std::unique_ptr<GPUTexture>> EGLGPU::createHardwareTextures(
 
 #else
 
-PixelFormat EGLGPU::getPixelFormat(HardwareBufferRef) const {
-  return PixelFormat::Unknown;
+bool HardwareBufferAvailable() {
+  return false;
 }
 
-std::vector<std::unique_ptr<GPUTexture>> EGLGPU::createHardwareTextures(HardwareBufferRef,
-                                                                        YUVFormat*) {
+std::vector<PixelFormat> EGLGPU::getHardwareTextureFormats(HardwareBufferRef,
+                                                           YUVFormat*) const override {
+  return {};
+}
+
+std::vector<std::unique_ptr<GPUTexture>> EGLGPU::importHardwareTextures(
+    HardwareBufferRef) override {
   return {};
 }
 
