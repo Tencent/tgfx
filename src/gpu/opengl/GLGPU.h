@@ -41,9 +41,9 @@ class GLGPU : public GPU {
     return commandQueue.get();
   }
 
-  std::unique_ptr<GPUBuffer> createBuffer(size_t size, uint32_t usage) const override;
+  std::unique_ptr<GPUBuffer> createBuffer(size_t size, uint32_t usage) override;
 
-  std::shared_ptr<CommandEncoder> createCommandEncoder() const override;
+  std::shared_ptr<CommandEncoder> createCommandEncoder() override;
 
  protected:
   explicit GLGPU(std::shared_ptr<GLInterface> glInterface);
