@@ -22,7 +22,7 @@
 
 namespace tgfx {
 
-static float MaxBlurOutSet() {
+static float MaxBlurOutset() {
   static float MaxOutset = 0;
   if (MaxOutset != 0) {
     return MaxOutset;
@@ -39,13 +39,13 @@ std::shared_ptr<BackgroundContext> BackgroundContext::Make(Context* context, con
     return nullptr;
   }
   auto backgroundContext = std::shared_ptr<BackgroundContext>(new BackgroundContext());
-    auto surfaceScale = 1.0f;
+  auto surfaceScale = 1.0f;
   auto rect = drawRect;
   rect.outset(maxOutset, maxOutset);
   rect.roundOut();
-  auto maxBlurOutSet = MaxBlurOutSet();
-  if (minOutset > maxBlurOutSet) {
-    surfaceScale = maxBlurOutSet / minOutset;
+  auto maxBlurOutset = MaxBlurOutset();
+  if (minOutset > maxBlurOutset) {
+    surfaceScale = maxBlurOutset / minOutset;
   }
   rect.scale(surfaceScale, surfaceScale);
   rect.roundOut();
