@@ -65,11 +65,7 @@ class GLDevice : public Device {
   void* nativeHandle = nullptr;
   bool externallyOwned = false;
 
-  explicit GLDevice(void* nativeHandle);
-  bool onLockContext() override;
-  void onUnlockContext() override;
-  virtual bool onMakeCurrent() = 0;
-  virtual void onClearCurrent() = 0;
+  GLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle);
 
   friend class GLContext;
 };

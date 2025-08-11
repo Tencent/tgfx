@@ -61,7 +61,7 @@ static bool InitEGLEXTProc() {
          eglext::eglCreateImageKHR && eglext::eglDestroyImageKHR;
 }
 
-std::unique_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* context,
+std::unique_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(const EGLGPU* gpu,
                                                                  HardwareBufferRef hardwareBuffer) {
   static const bool initialized = InitEGLEXTProc();
   if (!initialized || hardwareBuffer == nullptr) {
@@ -89,7 +89,7 @@ std::unique_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(Context* contex
   if (!clientBuffer) {
     return nullptr;
   }
-  auto display = static_cast<EGLDevice*>(context->device())->getDisplay();
+  auto display = gpu->getDisplay();
   EGLint attributes[] = {EGL_IMAGE_PRESERVED_KHR, EGL_TRUE, EGL_NONE};
   EGLImageKHR eglImage = eglext::eglCreateImageKHR(
       display, EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_TARGET, clientBuffer, attributes);
@@ -123,9 +123,9 @@ EGLHardwareTexture::~EGLHardwareTexture() {
   HardwareBufferRelease(hardwareBuffer);
 }
 
-void EGLHardwareTexture::releaseGPU(Context* context) {
-  GLTexture::releaseGPU(context);
-  auto display = static_cast<EGLDevice*>(context->device())->getDisplay();
+void EGLHardwareTexture::release(GPU* gpu) {
+  GLTexture::release(gpu);
+  auto display = static_cast<EGLGPU*>(gpu)->getDisplay();
   eglext::eglDestroyImageKHR(display, eglImage);
 }
 }  // namespace tgfx

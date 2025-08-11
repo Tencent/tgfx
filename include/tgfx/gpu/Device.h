@@ -23,6 +23,8 @@
 
 namespace tgfx {
 class Context;
+class GPU;
+
 /**
  * The GPU interface for drawing graphics.
  */
@@ -56,13 +58,14 @@ class Device {
   Context* context = nullptr;
   std::weak_ptr<Device> weakThis;
 
-  Device();
+  explicit Device(std::unique_ptr<GPU> gpu);
   void releaseAll();
   virtual bool onLockContext();
   virtual void onUnlockContext();
 
  private:
   uint32_t _uniqueID = 0;
+  GPU* _gpu = nullptr;
   bool contextLocked = false;
 
   friend class ResourceCache;

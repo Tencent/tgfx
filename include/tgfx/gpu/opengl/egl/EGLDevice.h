@@ -41,15 +41,11 @@ class EGLDevice : public GLDevice {
 
   ~EGLDevice() override;
 
-  EGLDisplay getDisplay() const {
-    return eglDisplay;
-  }
-
   bool sharableWith(void* nativeHandle) const override;
 
  protected:
-  bool onMakeCurrent() override;
-  void onClearCurrent() override;
+  bool onLockContext() override;
+  void onUnlockContext() override;
 
  private:
   EGLDisplay eglDisplay = nullptr;
@@ -70,7 +66,7 @@ class EGLDevice : public GLDevice {
                                          EGLContext eglContext, EGLContext shareContext,
                                          bool externallyOwned);
 
-  explicit EGLDevice(void* nativeHandle);
+  EGLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle);
 
   friend class GLDevice;
 

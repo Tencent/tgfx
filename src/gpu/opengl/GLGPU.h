@@ -25,10 +25,6 @@
 namespace tgfx {
 class GLGPU : public GPU {
  public:
-  static std::unique_ptr<GLGPU> MakeNative();
-
-  explicit GLGPU(std::shared_ptr<GLInterface> glInterface);
-
   Backend backend() const override {
     return Backend::OPENGL;
   }
@@ -47,9 +43,10 @@ class GLGPU : public GPU {
 
   std::unique_ptr<GPUBuffer> createBuffer(size_t size, uint32_t usage) const override;
 
-  void destroyBuffer(GPUBuffer* buffer) const override;
-
   std::shared_ptr<CommandEncoder> createCommandEncoder() const override;
+
+ protected:
+  explicit GLGPU(std::shared_ptr<GLInterface> glInterface);
 
  private:
   std::shared_ptr<GLInterface> interface = nullptr;
