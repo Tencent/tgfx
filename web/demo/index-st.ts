@@ -40,10 +40,10 @@ if (typeof window !== 'undefined') {
 
             let tgfxView = shareData.Hello2DModule.TGFXView.MakeFrom('#hello2d');
             shareData.tgfxBaseView = tgfxView;
-            var imagePath = "http://localhost:8081/../../resources/assets/bridge.jpg";
-            await tgfxView.setImagePath("bridge", imagePath);
-            imagePath = "http://localhost:8081/../../resources/assets/tgfx.png";
-            await tgfxView.setImagePath("TGFX", imagePath);
+            var image = await loadImage("http://localhost:8081/../../resources/assets/bridge.jpg");
+            tgfxView.setImageRef("bridge",image);
+            image = await loadImage("http://localhost:8081/../../resources/assets/tgfx.png");
+            tgfxView.setImageRef("TGFX",image);
             updateSize(shareData);
             const canvas = document.getElementById('hello2d');
             bindCanvasZoomAndPanEvents(canvas, shareData);

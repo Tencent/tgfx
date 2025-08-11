@@ -35,8 +35,6 @@ export class ShareData {
     public offsetY: number = 0;
     public animationFrameId: number | null = null;
     public isPageVisible: boolean = true;
-    public resized: boolean = true;
-    public updateSizeTimer: number | null = null;
 }
 
 enum ScaleGestureState {
@@ -180,48 +178,12 @@ class GestureManager {
     }
 }
 
-let canDraw = true;
 const gestureManager: GestureManager = new GestureManager();
 
-function isPromise(obj: any): obj is Promise<any> {
-    return !!obj && typeof obj.then === "function";
-}
-
-function draw(shareData: ShareData) {
-    if (canDraw === true) {
-        canDraw = false;
-        const result = shareData.tgfxBaseView.draw(
-            shareData.drawIndex,
-            shareData.zoom,
-            shareData.offsetX,
-            shareData.offsetY
-        );
-        if (isPromise(result)) {
-            result.then((res: boolean) => {
-                canDraw = res;
-            });
-        } else {
-            canDraw = result;
-        }
-    }
-}
-
 export function updateSize(shareData: ShareData) {
-    if (!shareData.tgfxBaseView || !canDraw) {
-        shareData.resized = false;
+    if (!shareData.tgfxBaseView) {
         return;
     }
-    if (!canDraw) {
-        if (shareData.updateSizeTimer) {
-            clearTimeout(shareData.updateSizeTimer);
-        }
-        shareData.updateSizeTimer = window.setTimeout(() => {
-            updateSize(shareData);
-        }, 300);
-        return;
-    }
-    shareData.resized = false;
-    console.log("updateSize");
     const canvas = document.getElementById('hello2d') as HTMLCanvasElement;
     const container = document.getElementById('container') as HTMLDivElement;
     const screenRect = container.getBoundingClientRect();
@@ -234,16 +196,7 @@ export function updateSize(shareData: ShareData) {
 }
 
 export function onResizeEvent(shareData: ShareData) {
-    if (!shareData.tgfxBaseView || shareData.resized) {
-        return;
-    }
-    shareData.resized = true;
-    if (shareData.updateSizeTimer) {
-        clearTimeout(shareData.updateSizeTimer);
-    }
-    shareData.updateSizeTimer = window.setTimeout(() => {
-        updateSize(shareData);
-    }, 300);
+    updateSize(shareData);
 }
 
 function handleVisibilityChange(shareData: ShareData) {
@@ -256,7 +209,12 @@ function handleVisibilityChange(shareData: ShareData) {
 export function animationLoop(shareData: ShareData) {
     const frame = async (timestamp: number) => {
         if (shareData.tgfxBaseView && shareData.isPageVisible) {
-            await draw(shareData);
+            shareData.tgfxBaseView.draw(
+                shareData.drawIndex,
+                shareData.zoom,
+                shareData.offsetX,
+                shareData.offsetY
+            );
             shareData.animationFrameId = requestAnimationFrame(frame);
         } else {
             shareData.animationFrameId = null;

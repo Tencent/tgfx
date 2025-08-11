@@ -271,7 +271,7 @@ std::shared_ptr<tgfx::Layer> SimpleText::buildLayerTree(const AppHost* host) {
   Element element;
   element.type = Element::Image;
   auto image = host->getImage("TGFX");
-  image->makeMipmapped(true);
+  image = image->makeMipmapped(true);
   element.image = image;
   auto textHeight = ceil(fonts[0].getSize() * 0.8f);
   element.height = textHeight;
