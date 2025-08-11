@@ -181,8 +181,7 @@ void SimpleTextLayer::invalidateLayout() {
           richText.underline.push_back({left, xOffset, underlines[lineIndex]});
         }
         if (!richText.deletelineIndex.empty() && richText.deletelineIndex[index]) {
-          richText.deleteline.push_back(
-              {left, xOffset, baselines[lineIndex] + (metrics.top + metrics.bottom) / 2});
+          richText.deleteline.push_back({left, xOffset, baselines[lineIndex] - metrics.xHeight / 2});
         }
         index++;
       }

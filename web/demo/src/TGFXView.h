@@ -24,5 +24,6 @@ namespace hello2d {
 class TGFXView : public TGFXBaseView {
  public:
   TGFXView(const std::string& canvasID);
+  void registerFonts();
 };
 }  // namespace hello2d
