@@ -40,10 +40,10 @@ void TGFXBaseView::updateSize(float devicePixelRatio) {
   }
 }
 
-void TGFXBaseView::setImagePath(const std::string& imagePath) {
-  auto image = tgfx::Image::MakeFromFile(imagePath.c_str());
+void TGFXBaseView::setImageRef(const std::string& name, tgfx::NativeImageRef imageRef) {
+  auto image = tgfx::Image::MakeFrom(imageRef);
   if (image) {
-    appHost->addImage("bridge", std::move(image));
+    appHost->addImage(name, image);
   }
 }
 

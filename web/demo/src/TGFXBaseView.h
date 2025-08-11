@@ -28,7 +28,7 @@ class TGFXBaseView {
  public:
   TGFXBaseView(const std::string& canvasID);
 
-  void setImagePath(const std::string& imagePath);
+  void setImageRef(const std::string& name, tgfx::NativeImageRef imageRef);
 
   void updateSize(float devicePixelRatio);
 

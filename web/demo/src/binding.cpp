@@ -26,7 +26,7 @@ using namespace emscripten;
 EMSCRIPTEN_BINDINGS(TGFXDemo) {
 
   class_<TGFXBaseView>("TGFXBaseView")
-      .function("setImagePath", &TGFXBaseView::setImagePath)
+      .function("setImageRef", &TGFXBaseView::setImageRef)
       .function("updateSize", &TGFXBaseView::updateSize)
       .function("draw", &TGFXBaseView::draw);
 
