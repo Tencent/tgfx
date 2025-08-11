@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureUploadTask.h"
-#include "gpu/Texture.h"
+#include "gpu/TextureView.h"
 
 namespace tgfx {
 TextureUploadTask::TextureUploadTask(std::shared_ptr<ResourceProxy> proxy,
@@ -35,13 +35,13 @@ std::shared_ptr<Resource> TextureUploadTask::onMakeResource(Context* context) {
     LOGE("TextureUploadTask::onMakeResource() Failed to decode the image!");
     return nullptr;
   }
-  auto texture = Texture::MakeFrom(context, imageBuffer, mipmapped);
-  if (texture == nullptr) {
-    LOGE("TextureUploadTask::onMakeResource() Failed to upload the texture!");
+  auto textureView = TextureView::MakeFrom(context, imageBuffer, mipmapped);
+  if (textureView == nullptr) {
+    LOGE("TextureUploadTask::onMakeResource() Failed to upload the texture view!");
   } else {
     // Free the image source immediately to reduce memory pressure.
     source = nullptr;
   }
-  return texture;
+  return textureView;
 }
 }  // namespace tgfx

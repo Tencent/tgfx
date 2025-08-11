@@ -28,9 +28,7 @@ void LayerTreeDrawer::onDraw(tgfx::Canvas* canvas, const AppHost* host) {
     root = buildLayerTree(host);
     displayList.root()->addChild(root);
     displayList.setRenderMode(tgfx::RenderMode::Tiled);
-    // Zoom blur is currently disabled because the Hello2D demo doesn't yet support animation frame
-    // rendering with displayList:
-    // displayList.setAllowZoomBlur(true);
+    displayList.setAllowZoomBlur(true);
     displayList.setMaxTileCount(512);
   }
   updateRootMatrix(host);

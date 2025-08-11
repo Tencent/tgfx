@@ -24,19 +24,19 @@ DefaultTextureProxy::DefaultTextureProxy(int width, int height, PixelFormat pixe
     : TextureProxy(width, height, pixelFormat, mipmapped, origin) {
 }
 
-std::shared_ptr<Texture> DefaultTextureProxy::getTexture() const {
+std::shared_ptr<TextureView> DefaultTextureProxy::getTextureView() const {
   if (resource == nullptr) {
     resource = onMakeTexture(context);
     if (resource != nullptr && !uniqueKey.empty()) {
       resource->assignUniqueKey(uniqueKey);
     }
   }
-  return std::static_pointer_cast<Texture>(resource);
+  return std::static_pointer_cast<TextureView>(resource);
 }
 
-std::shared_ptr<Texture> DefaultTextureProxy::onMakeTexture(Context* context) const {
-  return Texture::MakeFormat(context, _backingStoreWidth, _backingStoreHeight, _format, _mipmapped,
-                             _origin);
+std::shared_ptr<TextureView> DefaultTextureProxy::onMakeTexture(Context* context) const {
+  return TextureView::MakeFormat(context, _backingStoreWidth, _backingStoreHeight, _format,
+                                 _mipmapped, _origin);
 }
 
 }  // namespace tgfx

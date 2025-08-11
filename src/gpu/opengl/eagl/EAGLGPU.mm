@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,8 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include "EAGLGPU.h"
+#import <OpenGLES/ES2/gl.h>
+#import <OpenGLES/ES3/glext.h>
 #import <TargetConditionals.h>
-#include "EAGLHardwareTextureSampler.h"
+#include "EAGLHardwareTexture.h"
 #include "core/PixelBuffer.h"
 #include "platform/apple/NV12HardwareBuffer.h"
 
@@ -30,7 +33,14 @@ bool HardwareBufferAvailable() {
 #endif
 }
 
-PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
+EAGLGPU::~EAGLGPU() {
+  if (textureCache != nil) {
+    CFRelease(textureCache);
+    textureCache = nil;
+  }
+}
+
+PixelFormat EAGLGPU::getPixelFormat(HardwareBufferRef hardwareBuffer) const {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return PixelFormat::Unknown;
   }
@@ -45,15 +55,27 @@ PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
   }
 }
 
-std::vector<std::unique_ptr<TextureSampler>> TextureSampler::MakeFrom(
-    Context* context, HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) {
+std::vector<std::unique_ptr<GPUTexture>> EAGLGPU::createHardwareTextures(
+    HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return {};
   }
-  auto samplers = EAGLHardwareTextureSampler::MakeFrom(context, hardwareBuffer);
-  if (yuvFormat != nullptr && !samplers.empty()) {
-    *yuvFormat = samplers.size() == 2 ? YUVFormat::NV12 : YUVFormat::Unknown;
+  auto textures = EAGLHardwareTexture::MakeFrom(this, hardwareBuffer);
+  if (yuvFormat != nullptr && !textures.empty()) {
+    *yuvFormat = textures.size() == 2 ? YUVFormat::NV12 : YUVFormat::Unknown;
   }
-  return samplers;
+  return textures;
+}
+
+CVOpenGLESTextureCacheRef EAGLGPU::getTextureCache() {
+  if (!textureCache) {
+    CFMutableDictionaryRef attrs = CFDictionaryCreateMutable(
+        kCFAllocatorDefault, 1, &kCFTypeDictionaryKeyCallBacks, &kCFTypeDictionaryValueCallBacks);
+    CFDictionarySetValue(attrs, kCVOpenGLESTextureCacheMaximumTextureAgeKey,
+                         [NSNumber numberWithFloat:0]);
+    CVOpenGLESTextureCacheCreate(kCFAllocatorDefault, attrs, eaglContext, NULL, &textureCache);
+    CFRelease(attrs);
+  }
+  return textureCache;
 }
 }  // namespace tgfx

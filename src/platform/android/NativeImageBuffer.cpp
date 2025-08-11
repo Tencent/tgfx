@@ -34,7 +34,8 @@ std::shared_ptr<ImageBuffer> NativeImageBuffer::MakeFrom(JNIEnv* env, jobject bi
   return pixelBuffer;
 }
 
-std::shared_ptr<Texture> NativeImageBuffer::onMakeTexture(Context* context, bool mipmapped) const {
+std::shared_ptr<TextureView> NativeImageBuffer::onMakeTexture(Context* context,
+                                                              bool mipmapped) const {
   JNIEnvironment environment;
   auto env = environment.current();
   if (env == nullptr) {
@@ -46,15 +47,15 @@ std::shared_ptr<Texture> NativeImageBuffer::onMakeTexture(Context* context, bool
     LOGE("NativeImageBuffer::onMakeTexture() Failed to lockPixels() from a Java Bitmap!");
     return nullptr;
   }
-  std::shared_ptr<Texture> texture = nullptr;
+  std::shared_ptr<TextureView> textureView = nullptr;
   if (isAlphaOnly()) {
-    texture = Texture::MakeAlpha(context, info.width(), info.height(), pixels, info.rowBytes(),
-                                 mipmapped);
+    textureView = TextureView::MakeAlpha(context, info.width(), info.height(), pixels,
+                                         info.rowBytes(), mipmapped);
   } else {
-    texture =
-        Texture::MakeRGBA(context, info.width(), info.height(), pixels, info.rowBytes(), mipmapped);
+    textureView = TextureView::MakeRGBA(context, info.width(), info.height(), pixels,
+                                        info.rowBytes(), mipmapped);
   }
   AndroidBitmap_unlockPixels(env, bitmap.get());
-  return texture;
+  return textureView;
 }
 }  // namespace tgfx

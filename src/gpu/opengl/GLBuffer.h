@@ -47,6 +47,8 @@ class GLBuffer : public GPUBuffer {
     return _bufferID;
   }
 
+  void release(GPU* gpu) override;
+
  private:
   unsigned _bufferID = 0;
 

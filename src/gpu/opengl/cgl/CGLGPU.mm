@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,21 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/Texture.h"
-#include "tgfx/gpu/opengl/qt/QGLDevice.h"
-#ifdef __APPLE__
-#include "gpu/opengl/cgl/CGLHardwareTextureSampler.h"
-#endif
-#include "tgfx/platform/HardwareBuffer.h"
+#include "CGLGPU.h"
+
+#include "CGLHardwareTexture.h"
+#include "tgfx/gpu/opengl/cgl/CGLDevice.h"
 
 namespace tgfx {
-#ifdef __APPLE__
-
 bool HardwareBufferAvailable() {
   return true;
 }
 
-PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
+CGLGPU::~CGLGPU() {
+  if (textureCache != nil) {
+    CFRelease(textureCache);
+    textureCache = nil;
+  }
+}
+
+PixelFormat CGLGPU::getPixelFormat(HardwareBufferRef hardwareBuffer) const {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return PixelFormat::Unknown;
   }
@@ -45,38 +48,29 @@ PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
   }
 }
 
-std::vector<std::unique_ptr<TextureSampler>> TextureSampler::MakeFrom(
-    Context* context, HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) {
+std::vector<std::unique_ptr<GPUTexture>> CGLGPU::createHardwareTextures(
+    HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return {};
   }
-  auto textureCache = static_cast<QGLDevice*>(context->device())->getTextureCache();
-  auto sampler = CGLHardwareTextureSampler::MakeFrom(hardwareBuffer, textureCache);
-  if (sampler == nullptr) {
+  auto texture = CGLHardwareTexture::MakeFrom(hardwareBuffer, getTextureCache());
+  if (texture == nullptr) {
     return {};
   }
   if (yuvFormat != nullptr) {
     *yuvFormat = YUVFormat::Unknown;
   }
-  std::vector<std::unique_ptr<TextureSampler>> samplers = {};
-  samplers.push_back(std::move(sampler));
-  return samplers;
+  std::vector<std::unique_ptr<GPUTexture>> textures = {};
+  textures.push_back(std::move(texture));
+  return textures;
 }
 
-#else
-
-bool HardwareBufferAvailable() {
-  return false;
+CVOpenGLTextureCacheRef CGLGPU::getTextureCache() {
+  if (!textureCache) {
+    auto pixelFormatObj = CGLGetPixelFormat(cglContext);
+    CVOpenGLTextureCacheCreate(kCFAllocatorDefault, nil, cglContext, pixelFormatObj, nil,
+                               &textureCache);
+  }
+  return textureCache;
 }
-
-PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef) {
-  return PixelFormat::Unknown;
-}
-
-std::vector<std::unique_ptr<TextureSampler>> TextureSampler::MakeFrom(Context*, HardwareBufferRef,
-                                                                      YUVFormat*) {
-  return {};
-}
-
-#endif
 }  // namespace tgfx

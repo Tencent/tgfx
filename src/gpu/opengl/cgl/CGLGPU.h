@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,34 +16,29 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#if defined(__ANDROID__) || defined(ANDROID) || defined(__OHOS__)
-
 #pragma once
 
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
-#include "gpu/opengl/GLTextureSampler.h"
+#include <AppKit/AppKit.h>
+#include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
-class EGLHardwareTextureSampler : public GLTextureSampler {
+class CGLGPU : public GLGPU {
  public:
-  static std::unique_ptr<EGLHardwareTextureSampler> MakeFrom(Context* context,
-                                                             HardwareBufferRef hardwareBuffer);
-  ~EGLHardwareTextureSampler() override;
-
-  HardwareBufferRef getHardwareBuffer() const override {
-    return hardwareBuffer;
+  explicit CGLGPU(std::shared_ptr<GLInterface> glInterface, CGLContextObj cglContext)
+      : GLGPU(std::move(glInterface)), cglContext(cglContext) {
   }
 
-  void releaseGPU(Context* context) override;
+  ~CGLGPU() override;
+
+  CVOpenGLTextureCacheRef getTextureCache();
+
+  PixelFormat getPixelFormat(HardwareBufferRef hardwareBuffer) const override;
+
+  std::vector<std::unique_ptr<GPUTexture>> createHardwareTextures(HardwareBufferRef hardwareBuffer,
+                                                                  YUVFormat* yuvFormat) override;
 
  private:
-  HardwareBufferRef hardwareBuffer = nullptr;
-  EGLImageKHR eglImage = EGL_NO_IMAGE_KHR;
-
-  EGLHardwareTextureSampler(HardwareBufferRef hardwareBuffer, EGLImageKHR eglImage, unsigned id,
-                            unsigned target, PixelFormat format);
+  CGLContextObj cglContext = nil;
+  CVOpenGLTextureCacheRef textureCache = nil;
 };
 }  // namespace tgfx
-
-#endif

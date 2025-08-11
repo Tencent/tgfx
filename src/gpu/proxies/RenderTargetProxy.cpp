@@ -56,7 +56,7 @@ class BackendRenderTargetWrapper : public RenderTargetProxy {
     return true;
   }
 
-  std::shared_ptr<Texture> getTexture() const override {
+  std::shared_ptr<TextureView> getTextureView() const override {
     return nullptr;
   }
 

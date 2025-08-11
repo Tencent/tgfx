@@ -18,44 +18,44 @@
 
 #pragma once
 
-#include "gpu/TextureSampler.h"
+#include "gpu/GPUTexture.h"
 #include "tgfx/gpu/opengl/GLDefines.h"
 
 namespace tgfx {
 /**
- * GLSampler is a TextureSampler that wraps an OpenGL texture sampler, providing access to its
- * OpenGL texture ID and target.
+ * GLTexture is a GPUTexture that wraps an OpenGL texture, providing access to its OpenGL texture ID
+ * and target.
  */
-class GLTextureSampler : public TextureSampler {
+class GLTexture : public GPUTexture {
  public:
-  GLTextureSampler(unsigned id, unsigned target, PixelFormat format, int maxMipmapLevel = 0)
-      : TextureSampler(format, maxMipmapLevel), _id(id), _target(target) {
+  GLTexture(unsigned id, unsigned target, PixelFormat format, int maxMipmapLevel = 0)
+      : GPUTexture(format, maxMipmapLevel), _id(id), _target(target) {
   }
 
   /**
-   * Returns the OpenGL texture ID for this sampler.
+   * Returns the OpenGL ID for this texture.
    */
   unsigned id() const {
     return _id;
   }
 
   /**
-   * Returns the OpenGL texture target for this sampler.
+   * Returns the OpenGL target for this texture.
    */
   unsigned target() const {
     return _target;
   }
 
-  SamplerType type() const override;
+  TextureType type() const override;
 
   BackendTexture getBackendTexture(int width, int height) const override;
 
   void writePixels(Context* context, const Rect& rect, const void* pixels,
                    size_t rowBytes) override;
 
-  void computeSamplerKey(Context* context, BytesKey* bytesKey) const override;
+  void computeTextureKey(Context* context, BytesKey* bytesKey) const override;
 
-  void releaseGPU(Context* context) override;
+  void release(GPU* gpu) override;
 
  protected:
   unsigned _id = 0;

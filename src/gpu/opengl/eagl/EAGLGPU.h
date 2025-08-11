@@ -16,21 +16,29 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DefaultTexture.h"
-#include "core/utils/PixelFormatUtil.h"
+#pragma once
+
+#include <CoreVideo/CoreVideo.h>
+#include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
-DefaultTexture::DefaultTexture(std::unique_ptr<TextureSampler> sampler, int width, int height,
-                               ImageOrigin origin)
-    : Texture(width, height, origin), _sampler(std::move(sampler)) {
-}
-
-size_t DefaultTexture::memoryUsage() const {
-  if (auto hardwareBuffer = _sampler->getHardwareBuffer()) {
-    return HardwareBufferGetInfo(hardwareBuffer).byteSize();
+class EAGLGPU : public GLGPU {
+ public:
+  explicit EAGLGPU(std::shared_ptr<GLInterface> glInterface, EAGLContext* eaglContext)
+      : GLGPU(std::move(glInterface)), eaglContext(eaglContext) {
   }
-  auto colorSize = static_cast<size_t>(_width) * static_cast<size_t>(_height) *
-                   PixelFormatBytesPerPixel(_sampler->format());
-  return _sampler->hasMipmaps() ? colorSize * 4 / 3 : colorSize;
-}
+
+  ~EAGLGPU() override;
+
+  CVOpenGLESTextureCacheRef getTextureCache();
+
+  PixelFormat getPixelFormat(HardwareBufferRef hardwareBuffer) const override;
+
+  std::vector<std::unique_ptr<GPUTexture>> createHardwareTextures(HardwareBufferRef hardwareBuffer,
+                                                                  YUVFormat* yuvFormat) override;
+
+ private:
+  EAGLContext* eaglContext = nil;
+  CVOpenGLESTextureCacheRef textureCache = nil;
+};
 }  // namespace tgfx

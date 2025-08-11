@@ -23,6 +23,7 @@
 #include "gpu/CommandQueue.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/Caps.h"
+#include "tgfx/platform/HardwareBuffer.h"
 
 namespace tgfx {
 /**
@@ -56,19 +57,28 @@ class GPU {
    * @return A unique pointer to the created GPUBuffer. The caller is responsible for managing the
    * lifetime of the buffer. If the creation fails, it returns nullptr.
    */
-  virtual std::unique_ptr<GPUBuffer> createBuffer(size_t size, uint32_t usage) const = 0;
+  virtual std::unique_ptr<GPUBuffer> createBuffer(size_t size, uint32_t usage) = 0;
 
   /**
-   * Destroys the specified GPUBuffer. This method should be called when the buffer is no longer
-   * needed, allowing the GPU to release its underlying allocations. After calling this method, the
-   * GPUBuffer must not be used, as doing so may lead to undefined behavior.
-   * @param buffer The GPUBuffer to be destroyed.
+   * Returns the PixelFormat of the texture created from the given hardware buffer. If the
+   * hardwareBuffer is invalid or contains multiple planes (such as YUV formats), returns
+   * PixelFormat::Unknown.
    */
-  virtual void destroyBuffer(GPUBuffer* buffer) const = 0;
+  virtual PixelFormat getPixelFormat(HardwareBufferRef hardwareBuffer) const = 0;
+
+  /**
+   * Creates hardware textures from a platform-specific hardware buffer, such as AHardwareBuffer on
+   * Android or CVPixelBufferRef on Apple platforms. Multiple textures can be created from the same
+   * hardwareBuffer (typically for YUV formats). If yuvFormat is not nullptr, it will be set to the
+   * hardwareBuffer's YUVFormat. Returns nullptr if any parameter is invalid or the GPU backend does
+   * not support the hardwareBuffer, leaving yuvFormat unchanged.
+   */
+  virtual std::vector<std::unique_ptr<GPUTexture>> createHardwareTextures(
+      HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat = nullptr) = 0;
 
   /**
    * Creates a command encoder that can be used to encode commands to be issued to the GPU.
    */
-  virtual std::shared_ptr<CommandEncoder> createCommandEncoder() const = 0;
+  virtual std::shared_ptr<CommandEncoder> createCommandEncoder() = 0;
 };
 }  // namespace tgfx

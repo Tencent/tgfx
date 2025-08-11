@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,10 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "EGLHardwareTextureSampler.h"
+#include "EGLGPU.h"
+#include "EGLHardwareTexture.h"
 #include "core/utils/PixelFormatUtil.h"
-#include "gpu/TextureSampler.h"
-#include "tgfx/platform/HardwareBuffer.h"
 
 #if defined(__ANDROID__) || defined(ANDROID)
 #include "platform/android/AHardwareBufferFunctions.h"
@@ -42,60 +41,10 @@ bool HardwareBufferAvailable() {
   return available;
 }
 
-PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
-  auto info = HardwareBufferGetInfo(hardwareBuffer);
-  if (info.isEmpty()) {
-    return PixelFormat::Unknown;
-  }
-  return ColorTypeToPixelFormat(info.colorType());
-}
-
-std::vector<std::unique_ptr<TextureSampler>> TextureSampler::MakeFrom(
-    Context* context, HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) {
-  if (!HardwareBufferCheck(hardwareBuffer)) {
-    return {};
-  }
-  auto sampler = EGLHardwareTextureSampler::MakeFrom(context, hardwareBuffer);
-  if (sampler == nullptr) {
-    return {};
-  }
-  if (yuvFormat != nullptr) {
-    *yuvFormat = YUVFormat::Unknown;
-  }
-  std::vector<std::unique_ptr<TextureSampler>> samplers = {};
-  samplers.push_back(std::move(sampler));
-  return samplers;
-}
-
 #elif defined(__OHOS__)
 
 bool HardwareBufferAvailable() {
   return true;
-}
-
-PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef hardwareBuffer) {
-  auto info = HardwareBufferGetInfo(hardwareBuffer);
-  if (info.isEmpty()) {
-    return PixelFormat::Unknown;
-  }
-  return ColorTypeToPixelFormat(info.colorType());
-}
-
-std::vector<std::unique_ptr<TextureSampler>> TextureSampler::MakeFrom(
-    Context* context, HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) {
-  if (!HardwareBufferCheck(hardwareBuffer)) {
-    return {};
-  }
-  auto sampler = EGLHardwareTextureSampler::MakeFrom(context, hardwareBuffer);
-  if (sampler == nullptr) {
-    return {};
-  }
-  if (yuvFormat != nullptr) {
-    *yuvFormat = YUVFormat::Unknown;
-  }
-  std::vector<std::unique_ptr<TextureSampler>> samplers = {};
-  samplers.push_back(std::move(sampler));
-  return samplers;
 }
 
 #else
@@ -104,12 +53,43 @@ bool HardwareBufferAvailable() {
   return false;
 }
 
-PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef) {
+#endif
+
+#if defined(__ANDROID__) || defined(ANDROID) || defined(__OHOS__)
+
+PixelFormat EGLGPU::getPixelFormat(HardwareBufferRef hardwareBuffer) const {
+  auto info = HardwareBufferGetInfo(hardwareBuffer);
+  if (info.isEmpty()) {
+    return PixelFormat::Unknown;
+  }
+  return ColorTypeToPixelFormat(info.colorType());
+}
+
+std::vector<std::unique_ptr<GPUTexture>> EGLGPU::createHardwareTextures(
+    HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) {
+  if (!HardwareBufferCheck(hardwareBuffer)) {
+    return {};
+  }
+  auto texture = EGLHardwareTexture::MakeFrom(this, hardwareBuffer);
+  if (texture == nullptr) {
+    return {};
+  }
+  if (yuvFormat != nullptr) {
+    *yuvFormat = YUVFormat::Unknown;
+  }
+  std::vector<std::unique_ptr<GPUTexture>> textures = {};
+  textures.push_back(std::move(texture));
+  return textures;
+}
+
+#else
+
+PixelFormat EGLGPU::getPixelFormat(HardwareBufferRef) const {
   return PixelFormat::Unknown;
 }
 
-std::vector<std::unique_ptr<TextureSampler>> TextureSampler::MakeFrom(Context*, HardwareBufferRef,
-                                                                      YUVFormat*) {
+std::vector<std::unique_ptr<GPUTexture>> EGLGPU::createHardwareTextures(HardwareBufferRef,
+                                                                        YUVFormat*) {
   return {};
 }
 

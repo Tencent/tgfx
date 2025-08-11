@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,33 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/processors/FragmentProcessor.h"
+#include "DefaultTextureView.h"
+#include "core/utils/PixelFormatUtil.h"
 
 namespace tgfx {
-class DeviceSpaceTextureEffect : public FragmentProcessor {
- public:
-  static PlacementPtr<DeviceSpaceTextureEffect> Make(BlockBuffer* buffer,
-                                                     std::shared_ptr<TextureProxy> textureProxy,
-                                                     const Matrix& uvMatrix);
+DefaultTextureView::DefaultTextureView(std::unique_ptr<GPUTexture> texture, int width, int height,
+                                       ImageOrigin origin)
+    : TextureView(width, height, origin), _texture(std::move(texture)) {
+}
 
-  std::string name() const override {
-    return "DeviceSpaceTextureEffect";
+size_t DefaultTextureView::memoryUsage() const {
+  if (auto hardwareBuffer = _texture->getHardwareBuffer()) {
+    return HardwareBufferGetInfo(hardwareBuffer).byteSize();
   }
-
- protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
-  DeviceSpaceTextureEffect(std::shared_ptr<TextureProxy> textureProxy, const Matrix& uvMatrix);
-
-  size_t onCountTextureSamplers() const override {
-    return 1;
-  }
-
-  GPUTexture* onTextureAt(size_t) const override;
-
-  std::shared_ptr<TextureProxy> textureProxy = nullptr;
-  Matrix uvMatrix = {};
-};
+  auto colorSize = static_cast<size_t>(_width) * static_cast<size_t>(_height) *
+                   PixelFormatBytesPerPixel(_texture->format());
+  return _texture->hasMipmaps() ? colorSize * 4 / 3 : colorSize;
+}
 }  // namespace tgfx

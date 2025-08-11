@@ -18,10 +18,17 @@
 
 #pragma once
 
-#include <windows.h>
+#include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
-void GetPixelFormatsToTry(HDC deviceContext, int formatsToTry[2]);
+class WebGLGPU : public GLGPU {
+ public:
+  explicit WebGLGPU(std::shared_ptr<GLInterface> glInterface) : GLGPU(std::move(glInterface)) {
+  }
 
-HGLRC CreateGLContext(HDC deviceContext, HGLRC sharedContext);
+  PixelFormat getPixelFormat(HardwareBufferRef hardwareBuffer) const override;
+
+  std::vector<std::unique_ptr<GPUTexture>> createHardwareTextures(HardwareBufferRef hardwareBuffer,
+                                                                  YUVFormat* yuvFormat) override;
+};
 }  // namespace tgfx

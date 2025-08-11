@@ -77,6 +77,6 @@ class GLProgram : public Program {
 
   void setRenderTargetState(const RenderTarget* renderTarget);
 
-  void bindTexture(int unitIndex, const TextureSampler* sampler, SamplerState samplerState = {});
+  void bindTexture(int unitIndex, GPUTexture* texture, SamplerState samplerState = {});
 };
 }  // namespace tgfx

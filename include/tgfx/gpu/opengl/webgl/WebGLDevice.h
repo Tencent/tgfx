@@ -34,8 +34,8 @@ class WebGLDevice : public GLDevice {
   bool sharableWith(void* nativeHandle) const override;
 
  protected:
-  bool onMakeCurrent() override;
-  void onClearCurrent() override;
+  bool onLockContext() override;
+  void onUnlockContext() override;
 
  private:
   EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context = 0;
@@ -44,7 +44,7 @@ class WebGLDevice : public GLDevice {
   static std::shared_ptr<WebGLDevice> Wrap(EMSCRIPTEN_WEBGL_CONTEXT_HANDLE context,
                                            bool externallyOwned);
 
-  explicit WebGLDevice(EMSCRIPTEN_WEBGL_CONTEXT_HANDLE nativeHandle);
+  WebGLDevice(std::unique_ptr<GPU> gpu, EMSCRIPTEN_WEBGL_CONTEXT_HANDLE nativeHandle);
 
   friend class GLDevice;
   friend class WebGLWindow;

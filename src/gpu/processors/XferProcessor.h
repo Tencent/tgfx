@@ -50,7 +50,7 @@ class XferProcessor : public Processor {
     const SamplerHandle dstTextureSamplerHandle;
   };
 
-  virtual const Texture* dstTexture() const {
+  virtual const TextureView* dstTextureView() const {
     return nullptr;
   }
 

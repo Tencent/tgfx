@@ -17,19 +17,18 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <tgfx/gpu/opengl/wgl/WGLDevice.h>
-#include "WGLInterface.h"
+
+#include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
-class WGLPbufferDevice final : public WGLDevice {
+class WGLGPU : public GLGPU {
  public:
-  ~WGLPbufferDevice() override;
+  explicit WGLGPU(std::shared_ptr<GLInterface> glInterface) : GLGPU(std::move(glInterface)) {
+  }
 
- private:
-  HPBUFFER pBuffer = nullptr;
+  PixelFormat getPixelFormat(HardwareBufferRef hardwareBuffer) const override;
 
-  explicit WGLPbufferDevice(HGLRC nativeHandle);
-
-  friend class GLDevice;
+  std::vector<std::unique_ptr<GPUTexture>> createHardwareTextures(HardwareBufferRef hardwareBuffer,
+                                                                  YUVFormat* yuvFormat) override;
 };
 }  // namespace tgfx

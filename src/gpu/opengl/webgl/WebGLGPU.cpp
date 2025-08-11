@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,33 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/processors/FragmentProcessor.h"
+#include "WebGLGPU.h"
 
 namespace tgfx {
-class DeviceSpaceTextureEffect : public FragmentProcessor {
- public:
-  static PlacementPtr<DeviceSpaceTextureEffect> Make(BlockBuffer* buffer,
-                                                     std::shared_ptr<TextureProxy> textureProxy,
-                                                     const Matrix& uvMatrix);
+bool HardwareBufferAvailable() {
+  return false;
+}
 
-  std::string name() const override {
-    return "DeviceSpaceTextureEffect";
-  }
+PixelFormat WebGLGPU::getPixelFormat(HardwareBufferRef) const {
+  return PixelFormat::Unknown;
+}
 
- protected:
-  DEFINE_PROCESSOR_CLASS_ID
-
-  DeviceSpaceTextureEffect(std::shared_ptr<TextureProxy> textureProxy, const Matrix& uvMatrix);
-
-  size_t onCountTextureSamplers() const override {
-    return 1;
-  }
-
-  GPUTexture* onTextureAt(size_t) const override;
-
-  std::shared_ptr<TextureProxy> textureProxy = nullptr;
-  Matrix uvMatrix = {};
-};
+std::vector<std::unique_ptr<GPUTexture>> WebGLGPU::createHardwareTextures(HardwareBufferRef,
+                                                                          YUVFormat*) {
+  return {};
+}
 }  // namespace tgfx

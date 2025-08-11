@@ -19,28 +19,28 @@
 #pragma once
 
 #include <CoreVideo/CoreVideo.h>
-#include "gpu/opengl/GLTextureSampler.h"
+#include "gpu/opengl/GLTexture.h"
+#include "gpu/opengl/eagl/EAGLGPU.h"
 
 namespace tgfx {
-class CGLHardwareTextureSampler : public GLTextureSampler {
+class EAGLHardwareTexture : public GLTexture {
  public:
-  static std::unique_ptr<CGLHardwareTextureSampler> MakeFrom(CVPixelBufferRef pixelBuffer,
-                                                             CVOpenGLTextureCacheRef textureCache);
+  static std::vector<std::unique_ptr<GPUTexture>> MakeFrom(EAGLGPU* gpu,
+                                                           CVPixelBufferRef pixelBuffer);
 
-  ~CGLHardwareTextureSampler() override;
+  explicit EAGLHardwareTexture(CVPixelBufferRef pixelBuffer, CVOpenGLESTextureRef texture,
+                               unsigned id, unsigned target, PixelFormat format);
+
+  ~EAGLHardwareTexture() override;
 
   HardwareBufferRef getHardwareBuffer() const override {
     return pixelBuffer;
   }
 
-  void releaseGPU(Context*) override;
+  void release(GPU* gpu) override;
 
  private:
   CVPixelBufferRef pixelBuffer = nullptr;
-  CVOpenGLTextureRef texture = nil;
-  CVOpenGLTextureCacheRef textureCache = nil;
-
-  CGLHardwareTextureSampler(CVPixelBufferRef pixelBuffer, CVOpenGLTextureCacheRef textureCache,
-                            unsigned id, unsigned target, PixelFormat format);
+  CVOpenGLESTextureRef texture = nil;
 };
 }  // namespace tgfx

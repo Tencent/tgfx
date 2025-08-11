@@ -46,7 +46,7 @@ class RasterPixelBuffer : public PixelBuffer {
   void onUnlockPixels() const override {
   }
 
-  std::shared_ptr<Texture> onBindToHardwareTexture(Context*) const override {
+  std::shared_ptr<TextureView> onBindToHardwareTexture(Context*) const override {
     return nullptr;
   }
 
@@ -81,8 +81,8 @@ class HardwarePixelBuffer : public PixelBuffer {
     HardwareBufferUnlock(hardwareBuffer);
   }
 
-  std::shared_ptr<Texture> onBindToHardwareTexture(Context* context) const override {
-    return Texture::MakeFrom(context, hardwareBuffer);
+  std::shared_ptr<TextureView> onBindToHardwareTexture(Context* context) const override {
+    return TextureView::MakeFrom(context, hardwareBuffer);
   }
 
  private:
@@ -136,7 +136,7 @@ void PixelBuffer::unlockPixels() {
   locker.unlock();
 }
 
-std::shared_ptr<Texture> PixelBuffer::onMakeTexture(Context* context, bool mipmapped) const {
+std::shared_ptr<TextureView> PixelBuffer::onMakeTexture(Context* context, bool mipmapped) const {
   std::lock_guard<std::mutex> autoLock(locker);
   if (!mipmapped && isHardwareBacked()) {
     return onBindToHardwareTexture(context);
@@ -146,9 +146,9 @@ std::shared_ptr<Texture> PixelBuffer::onMakeTexture(Context* context, bool mipma
     return nullptr;
   }
   auto format = ColorTypeToPixelFormat(_info.colorType());
-  auto texture =
-      Texture::MakeFormat(context, width(), height(), pixels, _info.rowBytes(), format, mipmapped);
+  auto textureView = TextureView::MakeFormat(context, width(), height(), pixels, _info.rowBytes(),
+                                             format, mipmapped);
   onUnlockPixels();
-  return texture;
+  return textureView;
 }
 }  // namespace tgfx

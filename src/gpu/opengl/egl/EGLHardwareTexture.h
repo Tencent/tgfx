@@ -16,33 +16,35 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#if defined(__ANDROID__) || defined(ANDROID) || defined(__OHOS__)
+
 #pragma once
 
-#include "gpu/processors/FragmentProcessor.h"
+#include <EGL/egl.h>
+#include <EGL/eglext.h>
+#include "gpu/opengl/GLTexture.h"
+#include "gpu/opengl/egl/EGLGPU.h"
 
 namespace tgfx {
-class DeviceSpaceTextureEffect : public FragmentProcessor {
+class EGLHardwareTexture : public GLTexture {
  public:
-  static PlacementPtr<DeviceSpaceTextureEffect> Make(BlockBuffer* buffer,
-                                                     std::shared_ptr<TextureProxy> textureProxy,
-                                                     const Matrix& uvMatrix);
+  static std::unique_ptr<EGLHardwareTexture> MakeFrom(const EGLGPU* gpu,
+                                                      HardwareBufferRef hardwareBuffer);
+  ~EGLHardwareTexture() override;
 
-  std::string name() const override {
-    return "DeviceSpaceTextureEffect";
+  HardwareBufferRef getHardwareBuffer() const override {
+    return hardwareBuffer;
   }
 
- protected:
-  DEFINE_PROCESSOR_CLASS_ID
+  void release(GPU* gpu) override;
 
-  DeviceSpaceTextureEffect(std::shared_ptr<TextureProxy> textureProxy, const Matrix& uvMatrix);
+ private:
+  HardwareBufferRef hardwareBuffer = nullptr;
+  EGLImageKHR eglImage = EGL_NO_IMAGE_KHR;
 
-  size_t onCountTextureSamplers() const override {
-    return 1;
-  }
-
-  GPUTexture* onTextureAt(size_t) const override;
-
-  std::shared_ptr<TextureProxy> textureProxy = nullptr;
-  Matrix uvMatrix = {};
+  EGLHardwareTexture(HardwareBufferRef hardwareBuffer, EGLImageKHR eglImage, unsigned id,
+                     unsigned target, PixelFormat format);
 };
 }  // namespace tgfx
+
+#endif

@@ -21,7 +21,7 @@
 
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
-#include "EGLHardwareTextureSampler.h"
+#include "EGLHardwareTexture.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/GPU.h"
 #include "tgfx/gpu/opengl/egl/EGLDevice.h"
@@ -61,8 +61,8 @@ static bool InitEGLEXTProc() {
          eglext::eglCreateImageKHR && eglext::eglDestroyImageKHR;
 }
 
-std::unique_ptr<EGLHardwareTextureSampler> EGLHardwareTextureSampler::MakeFrom(
-    Context* context, HardwareBufferRef hardwareBuffer) {
+std::unique_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(const EGLGPU* gpu,
+                                                                 HardwareBufferRef hardwareBuffer) {
   static const bool initialized = InitEGLEXTProc();
   if (!initialized || hardwareBuffer == nullptr) {
     return nullptr;
@@ -89,7 +89,7 @@ std::unique_ptr<EGLHardwareTextureSampler> EGLHardwareTextureSampler::MakeFrom(
   if (!clientBuffer) {
     return nullptr;
   }
-  auto display = static_cast<EGLDevice*>(context->device())->getDisplay();
+  auto display = gpu->getDisplay();
   EGLint attributes[] = {EGL_IMAGE_PRESERVED_KHR, EGL_TRUE, EGL_NONE};
   EGLImageKHR eglImage = eglext::eglCreateImageKHR(
       display, EGL_NO_CONTEXT, EGL_NATIVE_BUFFER_TARGET, clientBuffer, attributes);
@@ -97,36 +97,35 @@ std::unique_ptr<EGLHardwareTextureSampler> EGLHardwareTextureSampler::MakeFrom(
     return nullptr;
   }
 
-  unsigned samplerID = 0;
-  glGenTextures(1, &samplerID);
-  if (samplerID == 0) {
+  unsigned textureID = 0;
+  glGenTextures(1, &textureID);
+  if (textureID == 0) {
     eglext::eglDestroyImageKHR(display, eglImage);
     return nullptr;
   }
-  glBindTexture(target, samplerID);
+  glBindTexture(target, textureID);
   glTexParameteri(target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
   glTexParameteri(target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
   glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   eglext::glEGLImageTargetTexture2DOES(target, (GLeglImageOES)eglImage);
-  return std::unique_ptr<EGLHardwareTextureSampler>(
-      new EGLHardwareTextureSampler(hardwareBuffer, eglImage, samplerID, target, format));
+  return std::unique_ptr<EGLHardwareTexture>(
+      new EGLHardwareTexture(hardwareBuffer, eglImage, textureID, target, format));
 }
 
-EGLHardwareTextureSampler::EGLHardwareTextureSampler(HardwareBufferRef hardwareBuffer,
-                                                     EGLImageKHR eglImage, unsigned id,
-                                                     unsigned target, PixelFormat format)
-    : GLTextureSampler(id, target, format), hardwareBuffer(hardwareBuffer), eglImage(eglImage) {
+EGLHardwareTexture::EGLHardwareTexture(HardwareBufferRef hardwareBuffer, EGLImageKHR eglImage,
+                                       unsigned id, unsigned target, PixelFormat format)
+    : GLTexture(id, target, format), hardwareBuffer(hardwareBuffer), eglImage(eglImage) {
   HardwareBufferRetain(hardwareBuffer);
 }
 
-EGLHardwareTextureSampler::~EGLHardwareTextureSampler() {
+EGLHardwareTexture::~EGLHardwareTexture() {
   HardwareBufferRelease(hardwareBuffer);
 }
 
-void EGLHardwareTextureSampler::releaseGPU(Context* context) {
-  GLTextureSampler::releaseGPU(context);
-  auto display = static_cast<EGLDevice*>(context->device())->getDisplay();
+void EGLHardwareTexture::release(GPU* gpu) {
+  GLTexture::release(gpu);
+  auto display = static_cast<EGLGPU*>(gpu)->getDisplay();
   eglext::eglDestroyImageKHR(display, eglImage);
 }
 }  // namespace tgfx

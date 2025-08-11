@@ -16,21 +16,31 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/Texture.h"
-#include "tgfx/platform/HardwareBuffer.h"
+#pragma once
+
+#include "gpu/TextureView.h"
 
 namespace tgfx {
-bool HardwareBufferAvailable() {
-  return false;
-}
+/**
+ * DefaultTextureView is a simple TextureView implementation that stores pixel data using a single
+ * GPUTexture.
+ */
+class DefaultTextureView : public TextureView {
+ public:
+  DefaultTextureView(std::unique_ptr<GPUTexture> texture, int width, int height,
+                     ImageOrigin origin = ImageOrigin::TopLeft);
 
-PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef) {
-  return PixelFormat::Unknown;
-}
+  size_t memoryUsage() const override;
 
-std::vector<std::unique_ptr<TextureSampler>> TextureSampler::MakeFrom(Context*, HardwareBufferRef,
-                                                                      YUVFormat*) {
-  return {};
-}
+  GPUTexture* getTexture() const override {
+    return _texture.get();
+  }
 
+ protected:
+  std::unique_ptr<GPUTexture> _texture = {};
+
+  void onReleaseGPU() override {
+    _texture->release(context->gpu());
+  }
+};
 }  // namespace tgfx

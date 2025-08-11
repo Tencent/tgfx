@@ -19,12 +19,8 @@
 #include "tgfx/gpu/opengl/qt/QGLDevice.h"
 #include <QApplication>
 #include <QThread>
-#include "QGLProcGetter.h"
 #include "core/utils/Log.h"
-#ifdef __APPLE__
-#include <OpenGL/OpenGL.h>
-#include <dlfcn.h>
-#endif
+#include "gpu/opengl/qt/QGLGPU.h"
 
 namespace tgfx {
 void* GLDevice::CurrentNativeHandle() {
@@ -86,11 +82,16 @@ std::shared_ptr<QGLDevice> QGLDevice::Wrap(QOpenGLContext* qtContext, QSurface* 
       return nullptr;
     }
   }
-  auto device = std::shared_ptr<QGLDevice>(new QGLDevice(qtContext));
-  device->externallyOwned = externallyOwned;
-  device->qtContext = qtContext;
-  device->qtSurface = qtSurface;
-  device->weakThis = device;
+  std::shared_ptr<QGLDevice> device = nullptr;
+  auto interface = GLInterface::GetNative();
+  if (interface != nullptr) {
+    auto gpu = std::make_unique<QGLGPU>(std::move(interface));
+    device = std::shared_ptr<QGLDevice>(new QGLDevice(std::move(gpu), qtContext));
+    device->externallyOwned = externallyOwned;
+    device->qtContext = qtContext;
+    device->qtSurface = qtSurface;
+    device->weakThis = device;
+  }
   if (oldContext != qtContext) {
     qtContext->doneCurrent();
     if (oldContext != nullptr) {
@@ -100,17 +101,12 @@ std::shared_ptr<QGLDevice> QGLDevice::Wrap(QOpenGLContext* qtContext, QSurface* 
   return device;
 }
 
-QGLDevice::QGLDevice(void* nativeHandle) : GLDevice(nativeHandle) {
+QGLDevice::QGLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle)
+    : GLDevice(std::move(gpu), nativeHandle) {
 }
 
 QGLDevice::~QGLDevice() {
   releaseAll();
-#ifdef __APPLE__
-  if (textureCache != nil) {
-    CFRelease(textureCache);
-    textureCache = nil;
-  }
-#endif
   if (externallyOwned) {
     return;
   }
@@ -137,7 +133,7 @@ void QGLDevice::moveToThread(QThread* targetThread) {
   }
 }
 
-bool QGLDevice::onMakeCurrent() {
+bool QGLDevice::onLockContext() {
   if (ownerThread != nullptr && QThread::currentThread() != ownerThread) {
     LOGE("QGLDevice can not be locked in a different thread.");
     return false;
@@ -150,13 +146,13 @@ bool QGLDevice::onMakeCurrent() {
     return true;
   }
   if (!qtContext->makeCurrent(qtSurface)) {
-    LOGE("QGLDevice::makeCurrent() failed!");
+    LOGE("QGLDevice::onLockContext() failed!");
     return false;
   }
   return true;
 }
 
-void QGLDevice::onClearCurrent() {
+void QGLDevice::onUnlockContext() {
   if (oldContext == qtContext) {
     oldContext = nullptr;
     oldSurface = nullptr;
@@ -169,23 +165,4 @@ void QGLDevice::onClearCurrent() {
     oldSurface = nullptr;
   }
 }
-
-#ifdef __APPLE__
-CVOpenGLTextureCacheRef QGLDevice::getTextureCache() {
-  if (!textureCache) {
-    // The toolchain of QT does not allow us to access the native OpenGL interface directly.
-    typedef CGLContextObj (*GetCurrentContext)();
-    typedef CGLPixelFormatObj (*GetPixelFormat)(CGLContextObj);
-    auto getCurrentContext =
-        reinterpret_cast<GetCurrentContext>(dlsym(RTLD_DEFAULT, "CGLGetCurrentContext"));
-    auto getPixelFormat =
-        reinterpret_cast<GetPixelFormat>(dlsym(RTLD_DEFAULT, "CGLGetPixelFormat"));
-    auto cglContext = getCurrentContext();
-    auto pixelFormatObj = getPixelFormat(cglContext);
-    CVOpenGLTextureCacheCreate(kCFAllocatorDefault, NULL, cglContext, pixelFormatObj, NULL,
-                               &textureCache);
-  }
-  return textureCache;
-}
-#endif
 }  // namespace tgfx

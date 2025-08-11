@@ -18,11 +18,11 @@
 
 #pragma once
 
-#include "gpu/DefaultTexture.h"
+#include "gpu/DefaultTextureView.h"
 #include "gpu/opengl/GLRenderTarget.h"
 
 namespace tgfx {
-class GLTextureRenderTarget : public DefaultTexture, public GLRenderTarget {
+class GLTextureRenderTarget : public DefaultTextureView, public GLRenderTarget {
  public:
   Context* getContext() const override {
     return context;
@@ -45,15 +45,15 @@ class GLTextureRenderTarget : public DefaultTexture, public GLRenderTarget {
   }
 
   PixelFormat format() const override {
-    return _sampler->format();
+    return _texture->format();
   }
 
   bool externallyOwned() const override {
     return _externallyOwned;
   }
 
-  std::shared_ptr<Texture> asTexture() const override {
-    return std::static_pointer_cast<Texture>(reference);
+  std::shared_ptr<TextureView> asTextureView() const override {
+    return std::static_pointer_cast<TextureView>(reference);
   }
 
   std::shared_ptr<RenderTarget> asRenderTarget() const override {
@@ -79,15 +79,15 @@ class GLTextureRenderTarget : public DefaultTexture, public GLRenderTarget {
   unsigned renderBufferID = 0;
 
   static std::shared_ptr<RenderTarget> MakeFrom(Context* context,
-                                                std::unique_ptr<TextureSampler> sampler, int width,
+                                                std::unique_ptr<GPUTexture> texture, int width,
                                                 int height, int sampleCount,
                                                 ImageOrigin origin = ImageOrigin::TopLeft,
                                                 bool externallyOwned = false,
                                                 const ScratchKey& scratchKey = {});
 
-  GLTextureRenderTarget(std::unique_ptr<TextureSampler> sampler, int width, int height,
+  GLTextureRenderTarget(std::unique_ptr<GPUTexture> texture, int width, int height,
                         ImageOrigin origin, int sampleCount, bool externallyOwned)
-      : DefaultTexture(std::move(sampler), width, height, origin), _sampleCount(sampleCount),
+      : DefaultTextureView(std::move(texture), width, height, origin), _sampleCount(sampleCount),
         _externallyOwned(externallyOwned) {
   }
 
