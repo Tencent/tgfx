@@ -25,7 +25,7 @@ GLGPU::GLGPU(std::shared_ptr<GLInterface> glInterface) : interface(std::move(glI
   commandQueue = std::make_unique<GLCommandQueue>(interface);
 }
 
-std::unique_ptr<GPUBuffer> GLGPU::createBuffer(size_t size, uint32_t usage) const {
+std::unique_ptr<GPUBuffer> GLGPU::createBuffer(size_t size, uint32_t usage) {
   if (size == 0) {
     return nullptr;
   }
@@ -50,7 +50,7 @@ std::unique_ptr<GPUBuffer> GLGPU::createBuffer(size_t size, uint32_t usage) cons
   return std::make_unique<GLBuffer>(bufferID, size, usage);
 }
 
-std::shared_ptr<CommandEncoder> GLGPU::createCommandEncoder() const {
+std::shared_ptr<CommandEncoder> GLGPU::createCommandEncoder() {
   return std::make_shared<GLCommandEncoder>(interface);
 }
 }  // namespace tgfx

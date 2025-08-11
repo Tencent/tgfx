@@ -49,11 +49,11 @@ PixelFormat CGLGPU::getPixelFormat(HardwareBufferRef hardwareBuffer) const {
 }
 
 std::vector<std::unique_ptr<GPUTexture>> CGLGPU::createHardwareTextures(
-    HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) const {
+    HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return {};
   }
-  auto texture = CGLHardwareTexture::MakeFrom(const_cast<CGLGPU*>(this), hardwareBuffer);
+  auto texture = CGLHardwareTexture::MakeFrom(hardwareBuffer, getTextureCache());
   if (texture == nullptr) {
     return {};
   }

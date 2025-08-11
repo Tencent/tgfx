@@ -57,7 +57,7 @@ class GPU {
    * @return A unique pointer to the created GPUBuffer. The caller is responsible for managing the
    * lifetime of the buffer. If the creation fails, it returns nullptr.
    */
-  virtual std::unique_ptr<GPUBuffer> createBuffer(size_t size, uint32_t usage) const = 0;
+  virtual std::unique_ptr<GPUBuffer> createBuffer(size_t size, uint32_t usage) = 0;
 
   /**
    * Returns the PixelFormat of the texture created from the given hardware buffer. If the
@@ -74,11 +74,11 @@ class GPU {
    * not support the hardwareBuffer, leaving yuvFormat unchanged.
    */
   virtual std::vector<std::unique_ptr<GPUTexture>> createHardwareTextures(
-      HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat = nullptr) const = 0;
+      HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat = nullptr) = 0;
 
   /**
    * Creates a command encoder that can be used to encode commands to be issued to the GPU.
    */
-  virtual std::shared_ptr<CommandEncoder> createCommandEncoder() const = 0;
+  virtual std::shared_ptr<CommandEncoder> createCommandEncoder() = 0;
 };
 }  // namespace tgfx

@@ -28,7 +28,7 @@ PixelFormat WebGLGPU::getPixelFormat(HardwareBufferRef) const {
 }
 
 std::vector<std::unique_ptr<GPUTexture>> WebGLGPU::createHardwareTextures(HardwareBufferRef,
-                                                                          YUVFormat*) const {
+                                                                          YUVFormat*) {
   return {};
 }
 }  // namespace tgfx
