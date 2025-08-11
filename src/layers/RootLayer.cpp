@@ -111,10 +111,4 @@ std::vector<Rect> RootLayer::updateDirtyRegions() {
   return std::move(dirtyRects);
 }
 
-std::optional<Point> RootLayer::getBackgroundOffset(float contentScale) const {
-  if (backgroundOutset <= 0.f) {
-    return std::nullopt;
-  }
-  return Point::Make(backgroundOutset * contentScale, backgroundOutset * contentScale);
-}
 }  // namespace tgfx

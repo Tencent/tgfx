@@ -24,7 +24,7 @@ namespace tgfx {
 class BackgroundContext {
  public:
   static std::shared_ptr<BackgroundContext> Make(Context* context, const Rect& drawRect,
-                                                 const Point& backgroundOffset,
+                                                 float maxOutset, float minOutset,
                                                  const Matrix& matrix);
 
   Canvas* getCanvas() const {

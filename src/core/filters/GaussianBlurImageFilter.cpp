@@ -41,6 +41,10 @@ std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrine
   }
   return std::make_shared<GaussianBlurImageFilter>(blurrinessX, blurrinessY, tileMode);
 }
+
+float BlurImageFilter::MaxSigma() {
+  return MAX_BLUR_SIGMA;
+}
 #endif
 
 GaussianBlurImageFilter::GaussianBlurImageFilter(float blurrinessX, float blurrinessY,

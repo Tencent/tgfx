@@ -17,35 +17,40 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BackgroundContext.h"
+#include "core/filters/BlurImageFilter.h"
 #include "tgfx/core/Recorder.h"
 
 namespace tgfx {
 
-constexpr static int MAX_BACKGROUND_OFFSET = 512;
+static float MaxBlurOutSet() {
+  static float MaxOutset = 0;
+  if (MaxOutset != 0) {
+    return MaxOutset;
+  }
+  auto filter = ImageFilter::Blur(BlurImageFilter::MaxSigma(), BlurImageFilter::MaxSigma());
+  MaxOutset = filter->filterBounds(Rect::MakeEmpty()).right;
+  return MaxOutset;
+}
 
 std::shared_ptr<BackgroundContext> BackgroundContext::Make(Context* context, const Rect& drawRect,
-                                                           const Point& backgroundOffset,
+                                                           float maxOutset, float minOutset,
                                                            const Matrix& matrix) {
   if (context == nullptr) {
     return nullptr;
   }
   auto backgroundContext = std::shared_ptr<BackgroundContext>(new BackgroundContext());
-  Point surfaceScales = Point::Make(1.0f, 1.0f);
-  auto maxWidth = drawRect.width() + MAX_BACKGROUND_OFFSET;
-  auto maxHeight = drawRect.height() + MAX_BACKGROUND_OFFSET;
+    auto surfaceScale = 1.0f;
   auto rect = drawRect;
-  rect.outset(backgroundOffset.x, backgroundOffset.y);
+  rect.outset(maxOutset, maxOutset);
   rect.roundOut();
-  if (rect.width() > maxWidth) {
-    surfaceScales.x = maxWidth / rect.width();
+  auto maxBlurOutSet = MaxBlurOutSet();
+  if (minOutset > maxBlurOutSet) {
+    surfaceScale = maxBlurOutSet / minOutset;
   }
-  if (rect.height() > maxHeight) {
-    surfaceScales.y = maxHeight / rect.height();
-  }
-  rect.scale(surfaceScales.x, surfaceScales.y);
+  rect.scale(surfaceScale, surfaceScale);
   rect.roundOut();
   auto surfaceMatrix = Matrix::MakeTrans(-rect.x(), -rect.y());
-  surfaceMatrix.preScale(surfaceScales.x, surfaceScales.y);
+  surfaceMatrix.preScale(surfaceScale, surfaceScale);
   surfaceMatrix.preConcat(matrix);
 
   if (!surfaceMatrix.invert(&backgroundContext->imageMatrix)) {
