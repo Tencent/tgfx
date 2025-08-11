@@ -2850,4 +2850,34 @@ TGFX_TEST(CanvasTest, RasterizedMipmapImage) {
   mipmapTexture = context->proxyProvider()->findOrWrapTextureProxy(mipmapKey);
   EXPECT_TRUE(mipmapTexture != nullptr);
 }
+
+TGFX_TEST(CanvasTest, RoundRectRadii) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto rect = Rect::MakeWH(250, 150);
+  std::array<Point, 4> radii = {Point{20, 20}, Point{60, 60}, Point{10, 10}, Point{0, 0}};
+  Path path = {};
+  path.addRoundRect(rect, radii);
+  auto surface = Surface::Make(context, 400, 200);
+  auto canvas = surface->getCanvas();
+  canvas->setMatrix(Matrix::MakeTrans(75, 25));
+  Paint paint;
+  paint.setColor(Color::Blue());
+  paint.setStrokeWidth(10.f);
+  canvas->drawPath(path, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/roundRectRadii"));
+
+  radii[1] = {60, 20};
+  Path path2 = {};
+  path2.addRoundRect(rect, radii);
+  paint.setColor(Color::Red());
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(10.f);
+  canvas->clear();
+  canvas->drawPath(path2, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/roundRectRadiiStroke"));
+}
+
 }  // namespace tgfx
