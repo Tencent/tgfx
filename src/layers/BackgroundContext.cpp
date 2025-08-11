@@ -30,22 +30,22 @@ std::shared_ptr<BackgroundContext> BackgroundContext::Make(Context* context, con
     return nullptr;
   }
   auto backgroundContext = std::shared_ptr<BackgroundContext>(new BackgroundContext());
-  Point sufaceScales = Point::Make(1.0f, 1.0f);
+  Point surfaceScales = Point::Make(1.0f, 1.0f);
   auto maxWidth = drawRect.width() + MAX_BACKGROUND_OFFSET;
   auto maxHeight = drawRect.height() + MAX_BACKGROUND_OFFSET;
   auto rect = drawRect;
   rect.outset(backgroundOffset.x, backgroundOffset.y);
   rect.roundOut();
   if (rect.width() > maxWidth) {
-    sufaceScales.x = maxWidth / rect.width();
+    surfaceScales.x = maxWidth / rect.width();
   }
   if (rect.height() > maxHeight) {
-    sufaceScales.y = maxHeight / rect.height();
+    surfaceScales.y = maxHeight / rect.height();
   }
-  rect.scale(sufaceScales.x, sufaceScales.y);
+  rect.scale(surfaceScales.x, surfaceScales.y);
   rect.roundOut();
   auto surfaceMatrix = Matrix::MakeTrans(-rect.x(), -rect.y());
-  surfaceMatrix.preScale(sufaceScales.x, sufaceScales.y);
+  surfaceMatrix.preScale(surfaceScales.x, surfaceScales.y);
   surfaceMatrix.preConcat(matrix);
 
   if (!surfaceMatrix.invert(&backgroundContext->imageMatrix)) {
