@@ -66,12 +66,16 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
   if (size.isEmpty()) {
     return nullptr;
   }
-  auto textures = context->gpu()->createHardwareTextures(hardwareBuffer);
+  YUVFormat yuvFormat = YUVFormat::Unknown;
+  auto formats = context->gpu()->getHardwareTextureFormats(hardwareBuffer, &yuvFormat);
+  if (formats.size() != 1 || yuvFormat != YUVFormat::Unknown) {
+    return nullptr;
+  }
+  auto textures = context->gpu()->importHardwareTextures(hardwareBuffer);
   if (textures.size() != 1) {
     return nullptr;
   }
-  auto format = textures[0]->format();
-  sampleCount = context->caps()->getSampleCount(sampleCount, format);
+  sampleCount = context->caps()->getSampleCount(sampleCount, formats.front());
   return GLTextureRenderTarget::MakeFrom(context, std::move(textures.front()), size.width,
                                          size.height, sampleCount, ImageOrigin::TopLeft, true);
 }

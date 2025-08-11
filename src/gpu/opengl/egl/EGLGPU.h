@@ -31,10 +31,11 @@ class EGLGPU : public GLGPU {
     return eglDisplay;
   }
 
-  PixelFormat getPixelFormat(HardwareBufferRef hardwareBuffer) const override;
+  std::vector<PixelFormat> getHardwareTextureFormats(HardwareBufferRef hardwareBuffer,
+                                                     YUVFormat* yuvFormat) const override;
 
-  std::vector<std::unique_ptr<GPUTexture>> createHardwareTextures(HardwareBufferRef hardwareBuffer,
-                                                                  YUVFormat* yuvFormat) override;
+  std::vector<std::unique_ptr<GPUTexture>> importHardwareTextures(
+      HardwareBufferRef hardwareBuffer) override;
 
  private:
   void* eglDisplay = nullptr;

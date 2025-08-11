@@ -16,12 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/core/AlphaType.h"
 #if defined(__ANDROID__) || defined(ANDROID) || defined(__OHOS__)
 
+#include "EGLHardwareTexture.h"
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
-#include "EGLHardwareTexture.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/GPU.h"
 #include "tgfx/gpu/opengl/egl/EGLDevice.h"
@@ -67,24 +66,12 @@ std::unique_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(const EGLGPU* g
   if (!initialized || hardwareBuffer == nullptr) {
     return nullptr;
   }
-  unsigned target = GL_TEXTURE_2D;
-  auto format = PixelFormat::RGBA_8888;
-  auto info = HardwareBufferGetInfo(hardwareBuffer);
-  if (!info.isEmpty()) {
-    format = ColorTypeToPixelFormat(info.colorType());
-  } else {
-#if defined(__OHOS__)
-    OH_NativeBuffer_Config config;
-    OH_NativeBuffer_GetConfig(hardwareBuffer, &config);
-    if (config.format < NATIVEBUFFER_PIXEL_FMT_YUV_422_I ||
-        config.format > NATIVEBUFFER_PIXEL_FMT_YCRCB_P010) {
-      return nullptr;
-    }
-    target = GL_TEXTURE_EXTERNAL_OES;
-#else
+  auto yuvFormat = YUVFormat::Unknown;
+  auto formats = gpu->getHardwareTextureFormats(hardwareBuffer, &yuvFormat);
+  if (formats.empty()) {
     return nullptr;
-#endif
   }
+  unsigned target = yuvFormat == YUVFormat::Unknown ? GL_TEXTURE_2D : GL_TEXTURE_EXTERNAL_OES;
   auto clientBuffer = eglext::eglGetNativeClientBuffer(hardwareBuffer);
   if (!clientBuffer) {
     return nullptr;
@@ -110,7 +97,7 @@ std::unique_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(const EGLGPU* g
   glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   eglext::glEGLImageTargetTexture2DOES(target, (GLeglImageOES)eglImage);
   return std::unique_ptr<EGLHardwareTexture>(
-      new EGLHardwareTexture(hardwareBuffer, eglImage, textureID, target, format));
+      new EGLHardwareTexture(hardwareBuffer, eglImage, textureID, target, formats.front()));
 }
 
 EGLHardwareTexture::EGLHardwareTexture(HardwareBufferRef hardwareBuffer, EGLImageKHR eglImage,

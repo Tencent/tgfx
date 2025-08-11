@@ -60,21 +60,25 @@ class GPU {
   virtual std::unique_ptr<GPUBuffer> createBuffer(size_t size, uint32_t usage) = 0;
 
   /**
-   * Returns the PixelFormat of the texture created from the given hardware buffer. If the
-   * hardwareBuffer is invalid or contains multiple planes (such as YUV formats), returns
-   * PixelFormat::Unknown.
+   * Returns the pixel formats for textures created from a platform-specific hardware buffer, such
+   * as AHardwareBuffer on Android or CVPixelBufferRef on Apple platforms. If yuvFormat is not
+   * nullptr, it will be set to the YUV format of the hardwareBuffer if applicable. Note: On some
+   * platforms, only a single pixel format may be returned, even if yuvFormat is not
+   * YUVFormat::Unknown. In this case, the resulting texture will be read-only and cannot be used as
+   * a render target. Returns an empty vector if the hardwareBuffer is invalid or not supported by
+   * the GPU backend.
    */
-  virtual PixelFormat getPixelFormat(HardwareBufferRef hardwareBuffer) const = 0;
+  virtual std::vector<PixelFormat> getHardwareTextureFormats(
+      HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat = nullptr) const = 0;
 
   /**
    * Creates hardware textures from a platform-specific hardware buffer, such as AHardwareBuffer on
    * Android or CVPixelBufferRef on Apple platforms. Multiple textures can be created from the same
-   * hardwareBuffer (typically for YUV formats). If yuvFormat is not nullptr, it will be set to the
-   * hardwareBuffer's YUVFormat. Returns nullptr if any parameter is invalid or the GPU backend does
-   * not support the hardwareBuffer, leaving yuvFormat unchanged.
+   * hardwareBuffer (typically for YUV formats). Returns an empty vector if the hardwareBuffer is
+   * invalid or the GPU backend does not support the hardwareBuffer.
    */
-  virtual std::vector<std::unique_ptr<GPUTexture>> createHardwareTextures(
-      HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat = nullptr) = 0;
+  virtual std::vector<std::unique_ptr<GPUTexture>> importHardwareTextures(
+      HardwareBufferRef hardwareBuffer) = 0;
 
   /**
    * Creates a command encoder that can be used to encode commands to be issued to the GPU.

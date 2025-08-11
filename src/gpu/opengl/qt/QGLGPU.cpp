@@ -30,32 +30,37 @@ bool HardwareBufferAvailable() {
   return true;
 }
 
-PixelFormat QGLGPU::getPixelFormat(HardwareBufferRef hardwareBuffer) const {
+std::vector<PixelFormat> QGLGPU::getHardwareTextureFormats(HardwareBufferRef hardwareBuffer,
+                                                           YUVFormat* yuvFormat) const {
   if (!HardwareBufferCheck(hardwareBuffer)) {
-    return PixelFormat::Unknown;
+    return {};
   }
+  std::vector<PixelFormat> formats = {};
   auto pixelFormat = CVPixelBufferGetPixelFormatType(hardwareBuffer);
   switch (pixelFormat) {
     case kCVPixelFormatType_OneComponent8:
-      return PixelFormat::ALPHA_8;
+      formats.push_back(PixelFormat::ALPHA_8);
+      break;
     case kCVPixelFormatType_32BGRA:
-      return PixelFormat::RGBA_8888;
+      formats.push_back(PixelFormat::RGBA_8888);
+      break;
     default:
-      return PixelFormat::Unknown;
+      break;
   }
+  if (yuvFormat != nullptr) {
+    *yuvFormat = YUVFormat::Unknown;
+  }
+  return formats;
 }
 
-std::vector<std::unique_ptr<GPUTexture>> QGLGPU::createHardwareTextures(
-    HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) {
+std::vector<std::unique_ptr<GPUTexture>> QGLGPU::importHardwareTextures(
+    HardwareBufferRef hardwareBuffer) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return {};
   }
   auto texture = CGLHardwareTexture::MakeFrom(hardwareBuffer, getTextureCache());
   if (texture == nullptr) {
     return {};
-  }
-  if (yuvFormat != nullptr) {
-    *yuvFormat = YUVFormat::Unknown;
   }
   std::vector<std::unique_ptr<GPUTexture>> textures = {};
   textures.push_back(std::move(texture));
@@ -92,12 +97,11 @@ bool HardwareBufferAvailable() {
   return false;
 }
 
-PixelFormat QGLGPU::getPixelFormat(HardwareBufferRef) const {
-  return PixelFormat::Unknown;
+std::vector<PixelFormat> QGLGPU::getHardwareTextureFormats(HardwareBufferRef, YUVFormat*) const {
+  return {};
 }
 
-std::vector<std::unique_ptr<GPUTexture>> QGLGPU::createHardwareTextures(HardwareBufferRef,
-                                                                        YUVFormat*) {
+std::vector<std::unique_ptr<GPUTexture>> QGLGPU::importHardwareTextures(HardwareBufferRef) {
   return {};
 }
 

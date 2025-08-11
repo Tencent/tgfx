@@ -51,22 +51,9 @@ std::vector<std::unique_ptr<GPUTexture>> EAGLHardwareTexture::MakeFrom(
   if (textureCache == nil) {
     return {};
   }
-  auto pixelFormat = CVPixelBufferGetPixelFormatType(pixelBuffer);
-  std::vector<PixelFormat> planeFormats = {};
-  switch (pixelFormat) {
-    case kCVPixelFormatType_OneComponent8:
-      planeFormats.push_back(PixelFormat::ALPHA_8);
-      break;
-    case kCVPixelFormatType_32BGRA:
-      planeFormats.push_back(PixelFormat::BGRA_8888);
-      break;
-    case kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange:
-    case kCVPixelFormatType_420YpCbCr8BiPlanarFullRange:
-      planeFormats.push_back(PixelFormat::GRAY_8);
-      planeFormats.push_back(PixelFormat::RG_88);
-      break;
-    default:
-      return {};  // Unsupported pixel format
+  auto planeFormats = gpu->getHardwareTextureFormats(pixelBuffer, nullptr);
+  if (planeFormats.empty()) {
+    return {};
   }
   std::vector<std::unique_ptr<GPUTexture>> textures = {};
   for (size_t i = 0; i < planeFormats.size(); ++i) {

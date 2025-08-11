@@ -40,31 +40,44 @@ EAGLGPU::~EAGLGPU() {
   }
 }
 
-PixelFormat EAGLGPU::getPixelFormat(HardwareBufferRef hardwareBuffer) const {
-  if (!HardwareBufferCheck(hardwareBuffer)) {
-    return PixelFormat::Unknown;
-  }
-  auto pixelFormat = CVPixelBufferGetPixelFormatType(hardwareBuffer);
-  switch (pixelFormat) {
-    case kCVPixelFormatType_OneComponent8:
-      return PixelFormat::ALPHA_8;
-    case kCVPixelFormatType_32BGRA:
-      return PixelFormat::BGRA_8888;
-    default:
-      return PixelFormat::Unknown;
-  }
-}
-
-std::vector<std::unique_ptr<GPUTexture>> EAGLGPU::createHardwareTextures(
-    HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) {
+std::vector<PixelFormat> EAGLGPU::getHardwareTextureFormats(HardwareBufferRef hardwareBuffer,
+                                                            YUVFormat* yuvFormat) const {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return {};
   }
-  auto textures = EAGLHardwareTexture::MakeFrom(this, hardwareBuffer);
-  if (yuvFormat != nullptr && !textures.empty()) {
-    *yuvFormat = textures.size() == 2 ? YUVFormat::NV12 : YUVFormat::Unknown;
+  auto pixelFormat = CVPixelBufferGetPixelFormatType(hardwareBuffer);
+  std::vector<PixelFormat> formats = {};
+  switch (pixelFormat) {
+    case kCVPixelFormatType_OneComponent8:
+      formats.push_back(PixelFormat::ALPHA_8);
+      break;
+    case kCVPixelFormatType_32BGRA:
+      formats.push_back(PixelFormat::BGRA_8888);
+      break;
+    case kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange:
+    case kCVPixelFormatType_420YpCbCr8BiPlanarFullRange:
+      formats.push_back(PixelFormat::GRAY_8);
+      formats.push_back(PixelFormat::RG_88);
+      break;
+    default:
+      break;
   }
-  return textures;
+  if (yuvFormat != nullptr) {
+    if (formats.size() == 2) {
+      *yuvFormat = YUVFormat::NV12;
+    } else {
+      *yuvFormat = YUVFormat::Unknown;
+    }
+  }
+  return formats;
+}
+
+std::vector<std::unique_ptr<GPUTexture>> EAGLGPU::importHardwareTextures(
+    HardwareBufferRef hardwareBuffer) {
+  if (!HardwareBufferCheck(hardwareBuffer)) {
+    return {};
+  }
+  return EAGLHardwareTexture::MakeFrom(this, hardwareBuffer);
 }
 
 CVOpenGLESTextureCacheRef EAGLGPU::getTextureCache() {
