@@ -149,13 +149,11 @@ bool HardwareBufferAvailable() {
   return false;
 }
 
-std::vector<PixelFormat> EGLGPU::getHardwareTextureFormats(HardwareBufferRef,
-                                                           YUVFormat*) const override {
+std::vector<PixelFormat> EGLGPU::getHardwareTextureFormats(HardwareBufferRef, YUVFormat*) const {
   return {};
 }
 
-std::vector<std::unique_ptr<GPUTexture>> EGLGPU::importHardwareTextures(
-    HardwareBufferRef) override {
+std::vector<std::unique_ptr<GPUTexture>> EGLGPU::importHardwareTextures(HardwareBufferRef) {
   return {};
 }
 

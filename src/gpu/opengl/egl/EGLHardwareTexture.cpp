@@ -18,9 +18,9 @@
 
 #if defined(__ANDROID__) || defined(ANDROID) || defined(__OHOS__)
 
+#include "EGLHardwareTexture.h"
 #include <GLES2/gl2.h>
 #include <GLES2/gl2ext.h>
-#include "EGLHardwareTexture.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/GPU.h"
 #include "tgfx/gpu/opengl/egl/EGLDevice.h"
