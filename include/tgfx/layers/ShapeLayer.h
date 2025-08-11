@@ -313,7 +313,7 @@ class ShapeLayer : public Layer {
    * Configures custom stroke weights for each side of a rectangular path.
    *
    * Important: The effect only applies to rectangular paths. Non-rectangular inputs
-   * will pass through unmodified.
+   * will pass through unmodified. So you must ensure the input shape is a rectangle before.
    *
    * Stroke weight order: [left, top, right, bottom]
    */

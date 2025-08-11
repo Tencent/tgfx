@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/layers/ShapeLayer.h"
-#include "core/shapes/MatrixShape.h"
 #include "core/shapes/RectCustomStrokeShape.h"
 #include "tgfx/core/PathEffect.h"
 
