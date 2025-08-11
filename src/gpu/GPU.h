@@ -74,7 +74,7 @@ class GPU {
    * not support the hardwareBuffer, leaving yuvFormat unchanged.
    */
   virtual std::vector<std::unique_ptr<GPUTexture>> createHardwareTextures(
-      HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat = nullptr) const = 0;
+      HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat = nullptr) = 0;
 
   /**
    * Creates a command encoder that can be used to encode commands to be issued to the GPU.

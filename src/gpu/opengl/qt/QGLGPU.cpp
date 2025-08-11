@@ -46,12 +46,11 @@ PixelFormat QGLGPU::getPixelFormat(HardwareBufferRef hardwareBuffer) const {
 }
 
 std::vector<std::unique_ptr<GPUTexture>> QGLGPU::createHardwareTextures(
-    HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) const {
+    HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return {};
   }
-  auto textureCache = getTextureCache();
-  auto texture = CGLHardwareTexture::MakeFrom(hardwareBuffer, textureCache);
+  auto texture = CGLHardwareTexture::MakeFrom(hardwareBuffer, getTextureCache());
   if (texture == nullptr) {
     return {};
   }
@@ -98,7 +97,7 @@ PixelFormat QGLGPU::getPixelFormat(HardwareBufferRef) const {
 }
 
 std::vector<std::unique_ptr<GPUTexture>> QGLGPU::createHardwareTextures(HardwareBufferRef,
-                                                                        YUVFormat*) const {
+                                                                        YUVFormat*) {
   return {};
 }
 

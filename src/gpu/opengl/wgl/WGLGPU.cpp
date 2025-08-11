@@ -28,7 +28,7 @@ PixelFormat WGLGPU::getPixelFormat(HardwareBufferRef) const {
 }
 
 std::vector<std::unique_ptr<GPUTexture>> WGLGPU::createHardwareTextures(HardwareBufferRef,
-                                                                        YUVFormat*) const {
+                                                                        YUVFormat*) {
   return {};
 }
 

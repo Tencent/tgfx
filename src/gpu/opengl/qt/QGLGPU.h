@@ -35,8 +35,8 @@ class QGLGPU : public GLGPU {
 
   PixelFormat getPixelFormat(HardwareBufferRef hardwareBuffer) const override;
 
-  std::vector<std::unique_ptr<GPUTexture>> createHardwareTextures(
-      HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) const override;
+  std::vector<std::unique_ptr<GPUTexture>> createHardwareTextures(HardwareBufferRef hardwareBuffer,
+                                                                  YUVFormat* yuvFormat) override;
 
  private:
 #ifdef __APPLE__

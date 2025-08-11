@@ -56,11 +56,11 @@ PixelFormat EAGLGPU::getPixelFormat(HardwareBufferRef hardwareBuffer) const {
 }
 
 std::vector<std::unique_ptr<GPUTexture>> EAGLGPU::createHardwareTextures(
-    HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) const {
+    HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return {};
   }
-  auto textures = EAGLHardwareTexture::MakeFrom(const_cast<EAGLGPU*>(this), hardwareBuffer);
+  auto textures = EAGLHardwareTexture::MakeFrom(this, hardwareBuffer);
   if (yuvFormat != nullptr && !textures.empty()) {
     *yuvFormat = textures.size() == 2 ? YUVFormat::NV12 : YUVFormat::Unknown;
   }

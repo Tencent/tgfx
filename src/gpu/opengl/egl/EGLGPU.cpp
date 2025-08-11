@@ -66,7 +66,7 @@ PixelFormat EGLGPU::getPixelFormat(HardwareBufferRef hardwareBuffer) const {
 }
 
 std::vector<std::unique_ptr<GPUTexture>> EGLGPU::createHardwareTextures(
-    HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) const {
+    HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return {};
   }
@@ -89,7 +89,7 @@ PixelFormat EGLGPU::getPixelFormat(HardwareBufferRef) const {
 }
 
 std::vector<std::unique_ptr<GPUTexture>> EGLGPU::createHardwareTextures(HardwareBufferRef,
-                                                                        YUVFormat*) const {
+                                                                        YUVFormat*) {
   return {};
 }
 
