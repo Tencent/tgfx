@@ -64,12 +64,6 @@ class RootLayer : public Layer {
    */
   std::vector<Rect> updateDirtyRegions();
 
-  /**
-   * Returns the background rectangle for the given drawRect and contentScale. If the background
-   * style is not set or does not require a background, returns an empty optional.
-   */
-  std::optional<Rect> getBackgroundRect(const Rect& drawRect, float contentScale) const;
-
  private:
   std::vector<Rect> dirtyRects = {};
   std::vector<float> dirtyAreas = {};

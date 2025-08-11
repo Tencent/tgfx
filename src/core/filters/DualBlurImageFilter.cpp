@@ -93,6 +93,10 @@ DualBlurImageFilter::DualBlurImageFilter(float blurrinessX, float blurrinessY, T
   scaleFactor = std::min(std::get<3>(x), std::get<3>(y));
 }
 
+float BlurImageFilter::MaxSigma() {
+  return BLUR_LEVEL_MAX_LIMIT;
+}
+
 void DualBlurImageFilter::draw(std::shared_ptr<RenderTargetProxy> renderTarget,
                                uint32_t renderFlags, PlacementPtr<FragmentProcessor> imageProcessor,
                                float scaleFactor, bool isDown) const {
