@@ -405,6 +405,7 @@ jobs:
       - name: Install Dependencies
         run: |
           cd ohos
+          ohpm config set registry https://ohpm.openharmony.cn/ohpm/
           ohpm install --all
         shell: bash
           
