@@ -60,13 +60,14 @@ std::shared_ptr<TextureView> TextureView::MakeFormat(Context* context, int width
   if (!CheckSizeAndFormat(context, width, height, pixelFormat)) {
     return nullptr;
   }
+  auto gpu = context->gpu();
   auto hasMipmaps = context->caps()->mipmapSupport ? mipmapped : false;
   auto scratchKey = ComputeTextureScratchKey(width, height, pixelFormat, hasMipmaps);
   auto textureView = Resource::Find<TextureView>(context, scratchKey);
   if (textureView) {
     textureView->_origin = origin;
   } else {
-    auto texture = GPUTexture::Make(context, width, height, pixelFormat, hasMipmaps);
+    auto texture = gpu->createTexture(width, height, pixelFormat, hasMipmaps);
     if (texture == nullptr) {
       return nullptr;
     }
@@ -75,7 +76,7 @@ std::shared_ptr<TextureView> TextureView::MakeFormat(Context* context, int width
   }
   if (pixels != nullptr) {
     auto texture = textureView->getTexture();
-    texture->writePixels(context, Rect::MakeWH(width, height), pixels, rowBytes);
+    gpu->queue()->writeTexture(texture, Rect::MakeWH(width, height), pixels, rowBytes);
   }
   return textureView;
 }
@@ -83,10 +84,10 @@ std::shared_ptr<TextureView> TextureView::MakeFormat(Context* context, int width
 std::shared_ptr<TextureView> TextureView::MakeFrom(Context* context,
                                                    const BackendTexture& backendTexture,
                                                    ImageOrigin origin, bool adopted) {
-  if (context == nullptr || !backendTexture.isValid()) {
+  if (context == nullptr) {
     return nullptr;
   }
-  auto texture = GPUTexture::MakeFrom(context, backendTexture, adopted);
+  auto texture = context->gpu()->importExternalTexture(backendTexture, adopted);
   if (texture == nullptr) {
     return nullptr;
   }
@@ -112,6 +113,9 @@ std::shared_ptr<TextureView> TextureView::MakeFrom(Context* context,
 std::shared_ptr<TextureView> TextureView::MakeFrom(Context* context,
                                                    HardwareBufferRef hardwareBuffer,
                                                    YUVColorSpace colorSpace) {
+  if (context == nullptr) {
+    return nullptr;
+  }
   auto size = HardwareBufferGetSize(hardwareBuffer);
   if (size.isEmpty()) {
     return nullptr;

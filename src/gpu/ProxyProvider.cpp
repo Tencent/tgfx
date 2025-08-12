@@ -23,8 +23,8 @@
 #include "core/utils/USE.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/DrawingManager.h"
-#include "gpu/proxies/BackendTextureRenderTargetProxy.h"
 #include "gpu/proxies/DefaultTextureProxy.h"
+#include "gpu/proxies/ExternalTextureRenderTargetProxy.h"
 #include "gpu/proxies/HardwareRenderTargetProxy.h"
 #include "gpu/proxies/TextureRenderTargetProxy.h"
 #include "gpu/tasks/GPUBufferUploadTask.h"
@@ -322,13 +322,13 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
   return textureProxy;
 }
 
-std::shared_ptr<TextureProxy> ProxyProvider::wrapBackendTexture(
+std::shared_ptr<TextureProxy> ProxyProvider::wrapExternalTexture(
     const BackendTexture& backendTexture, ImageOrigin origin, bool adopted) {
   auto textureView = TextureView::MakeFrom(context, backendTexture, origin, adopted);
   if (textureView == nullptr) {
     return nullptr;
   }
-  auto format = GPUTexture::GetPixelFormat(backendTexture);
+  auto format = context->gpu()->getExternalTextureFormat(backendTexture);
   auto proxy = std::shared_ptr<TextureProxy>(
       new TextureProxy(textureView->width(), textureView->height(), format,
                        textureView->hasMipmaps(), textureView->origin()));
@@ -339,7 +339,7 @@ std::shared_ptr<TextureProxy> ProxyProvider::wrapBackendTexture(
 
 std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
     const BackendTexture& backendTexture, int sampleCount, ImageOrigin origin, bool adopted) {
-  auto format = GPUTexture::GetPixelFormat(backendTexture);
+  auto format = context->gpu()->getExternalTextureFormat(backendTexture);
   if (format == PixelFormat::Unknown) {
     return nullptr;
   }
@@ -349,7 +349,7 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
   }
   sampleCount = caps->getSampleCount(sampleCount, format);
   auto proxy = std::shared_ptr<TextureRenderTargetProxy>(
-      new BackendTextureRenderTargetProxy(backendTexture, format, sampleCount, origin, adopted));
+      new ExternalTextureRenderTargetProxy(backendTexture, format, sampleCount, origin, adopted));
   addResourceProxy(proxy);
   return proxy;
 }

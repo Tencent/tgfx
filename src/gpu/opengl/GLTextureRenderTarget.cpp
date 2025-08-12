@@ -43,7 +43,10 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
                                                      const BackendTexture& backendTexture,
                                                      int sampleCount, ImageOrigin origin,
                                                      bool adopted) {
-  auto texture = GPUTexture::MakeFrom(context, backendTexture, adopted);
+  if (context == nullptr) {
+    return nullptr;
+  }
+  auto texture = context->gpu()->importExternalTexture(backendTexture, adopted);
   if (texture == nullptr) {
     return nullptr;
   }
@@ -62,16 +65,20 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
 std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
                                                      HardwareBufferRef hardwareBuffer,
                                                      int sampleCount) {
+  if (context == nullptr) {
+    return nullptr;
+  }
   auto size = HardwareBufferGetSize(hardwareBuffer);
   if (size.isEmpty()) {
     return nullptr;
   }
+  auto gpu = context->gpu();
   YUVFormat yuvFormat = YUVFormat::Unknown;
-  auto formats = context->gpu()->getHardwareTextureFormats(hardwareBuffer, &yuvFormat);
+  auto formats = gpu->getHardwareTextureFormats(hardwareBuffer, &yuvFormat);
   if (formats.size() != 1 || yuvFormat != YUVFormat::Unknown) {
     return nullptr;
   }
-  auto textures = context->gpu()->importHardwareTextures(hardwareBuffer);
+  auto textures = gpu->importHardwareTextures(hardwareBuffer);
   if (textures.size() != 1) {
     return nullptr;
   }
@@ -97,7 +104,7 @@ std::shared_ptr<RenderTarget> RenderTarget::Make(Context* context, int width, in
     renderTarget->_origin = origin;
     return renderTarget;
   }
-  auto texture = GPUTexture::Make(context, width, height, format, hasMipmaps);
+  auto texture = context->gpu()->createTexture(width, height, format, hasMipmaps);
   if (texture == nullptr) {
     return nullptr;
   }

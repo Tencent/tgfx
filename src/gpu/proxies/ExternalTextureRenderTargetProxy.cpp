@@ -16,25 +16,25 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLBackendRenderTarget.h"
-#include "gpu/opengl/GLUtil.h"
+#include "ExternalTextureRenderTargetProxy.h"
 
 namespace tgfx {
-std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
-                                                     const BackendRenderTarget& renderTarget,
-                                                     ImageOrigin origin) {
-  if (context == nullptr || !renderTarget.isValid()) {
+ExternalTextureRenderTargetProxy::ExternalTextureRenderTargetProxy(
+    const BackendTexture& backendTexture, PixelFormat format, int sampleCount, ImageOrigin origin,
+    bool adopted)
+    : TextureRenderTargetProxy(backendTexture.width(), backendTexture.height(), format, sampleCount,
+                               false, origin, !adopted),
+      backendTexture(backendTexture) {
+}
+
+std::shared_ptr<TextureView> ExternalTextureRenderTargetProxy::onMakeTexture(
+    Context* context) const {
+  auto renderTarget =
+      RenderTarget::MakeFrom(context, backendTexture, _sampleCount, _origin, !externallyOwned());
+  if (renderTarget == nullptr) {
+    LOGE("BackendTextureRenderTargetProxy::onMakeTexture() Failed to create the render target!");
     return nullptr;
   }
-  GLFrameBufferInfo frameBufferInfo = {};
-  if (!renderTarget.getGLFramebufferInfo(&frameBufferInfo)) {
-    return nullptr;
-  }
-  auto format = GLSizeFormatToPixelFormat(frameBufferInfo.format);
-  if (!context->caps()->isFormatRenderable(format)) {
-    return nullptr;
-  }
-  return std::make_shared<GLBackendRenderTarget>(
-      context, renderTarget.width(), renderTarget.height(), origin, format, frameBufferInfo.id);
+  return renderTarget->asTextureView();
 }
 }  // namespace tgfx

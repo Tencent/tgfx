@@ -21,10 +21,10 @@
 #include "gpu/opengl/GLRenderTarget.h"
 
 namespace tgfx {
-class GLBackendRenderTarget : public GLRenderTarget {
+class GLExternalRenderTarget : public GLRenderTarget {
  public:
-  GLBackendRenderTarget(Context* context, int width, int height, ImageOrigin origin,
-                        PixelFormat format, unsigned frameBufferID)
+  GLExternalRenderTarget(Context* context, int width, int height, ImageOrigin origin,
+                         PixelFormat format, unsigned frameBufferID)
       : context(context), _width(width), _height(height), _origin(origin), _format(format),
         frameBufferID(frameBufferID) {
   }

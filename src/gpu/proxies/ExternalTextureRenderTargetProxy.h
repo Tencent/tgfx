@@ -21,16 +21,16 @@
 #include "gpu/proxies/TextureRenderTargetProxy.h"
 
 namespace tgfx {
-class BackendTextureRenderTargetProxy : public TextureRenderTargetProxy {
+class ExternalTextureRenderTargetProxy : public TextureRenderTargetProxy {
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context) const override;
 
  private:
   BackendTexture backendTexture = {};
 
-  BackendTextureRenderTargetProxy(const BackendTexture& backendTexture, PixelFormat format,
-                                  int sampleCount, ImageOrigin origin = ImageOrigin::TopLeft,
-                                  bool adopted = false);
+  ExternalTextureRenderTargetProxy(const BackendTexture& backendTexture, PixelFormat format,
+                                   int sampleCount, ImageOrigin origin = ImageOrigin::TopLeft,
+                                   bool adopted = false);
   friend class ProxyProvider;
 };
 }  // namespace tgfx
