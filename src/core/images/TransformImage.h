@@ -46,8 +46,8 @@ class TransformImage : public Image {
  protected:
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
-  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args, const Rect& drawRect,
-                                                 const SamplingOptions& samplingOptions = {}) const;
+  std::shared_ptr<TextureProxy> lockTextureProxySubset(
+      const TPArgs& args, const Rect& drawRect, const SamplingOptions& samplingOptions = {}) const;
 
   virtual std::optional<Matrix> concatUVMatrix(const Matrix* uvMatrix) const = 0;
 

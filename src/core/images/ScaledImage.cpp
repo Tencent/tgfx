@@ -45,7 +45,7 @@ PlacementPtr<FragmentProcessor> ScaledImage::asFragmentProcessor(const FPArgs& a
   drawRect.roundOut();
   auto mipmapped = hasMipmaps() && samplingArgs.sampling.mipmapMode != MipmapMode::None;
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale);
-  auto textureProxy = TransformImage::lockTextureProxy(tpArgs, drawRect, sampling);
+  auto textureProxy = lockTextureProxySubset(tpArgs, drawRect, sampling);
   if (textureProxy == nullptr) {
     return nullptr;
   }
@@ -63,7 +63,7 @@ PlacementPtr<FragmentProcessor> ScaledImage::asFragmentProcessor(const FPArgs& a
 }
 
 std::shared_ptr<TextureProxy> ScaledImage::lockTextureProxy(const TPArgs& args) const {
-  return TransformImage::lockTextureProxy(args, Rect::MakeWH(width(), height()), sampling);
+  return lockTextureProxySubset(args, Rect::MakeWH(width(), height()), sampling);
 }
 
 std::shared_ptr<Image> ScaledImage::onMakeScaled(int newWidth, int newHeight,

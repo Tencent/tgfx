@@ -28,16 +28,16 @@ TransformImage::TransformImage(std::shared_ptr<Image> source) : source(std::move
 }
 
 std::shared_ptr<TextureProxy> TransformImage::lockTextureProxy(const TPArgs& args) const {
-  return lockTextureProxy(args, Rect::MakeWH(width(), height()));
+  return lockTextureProxySubset(args, Rect::MakeWH(width(), height()));
 }
 
-std::shared_ptr<TextureProxy> TransformImage::lockTextureProxy(
+std::shared_ptr<TextureProxy> TransformImage::lockTextureProxySubset(
     const TPArgs& args, const Rect& drawRect, const SamplingOptions& samplingOptions) const {
   auto rect = drawRect;
   if (args.drawScale < 1.0) {
     rect.scale(args.drawScale, args.drawScale);
   }
-  rect.roundOut();
+  rect.round();
   auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(rect.width()), static_cast<int>(rect.height()),
