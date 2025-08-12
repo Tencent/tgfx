@@ -375,9 +375,15 @@ elseif (OHOS)
     find_library(ACE_NAPI_LIB ace_napi.z)
     find_library(NATIVE_BUFFER_LIB native_buffer)
     find_library(NATIVE_WINDOW_LIB native_window)
-    list(APPEND TGFX_SHARED_LIBS ${PIXELMAP_NDK_LIB} ${IMAGE_SOURCE_NDK_LIB} ${PIXELMAP_LIB}
-            ${IMAGE_SOURCE_LIB} ${ACE_NDK_LIB} ${HILOG_NDK_LIB} ${ACE_NAPI_LIB} ${NATIVE_BUFFER_LIB}
+    list(APPEND TGFX_SHARED_LIBS ${PIXELMAP_NDK_LIB} ${IMAGE_SOURCE_NDK_LIB}
+            ${ACE_NDK_LIB} ${HILOG_NDK_LIB} ${ACE_NAPI_LIB} ${NATIVE_BUFFER_LIB}
             ${NATIVE_WINDOW_LIB})
+    if (PIXELMAP_LIB)
+        list(APPEND TGFX_SHARED_LIBS ${PIXELMAP_LIB})
+    endif()
+    if (IMAGE_SOURCE_LIB)
+        list(APPEND TGFX_SHARED_LIBS ${IMAGE_SOURCE_LIB})
+    endif()
     file(GLOB_RECURSE PLATFORM_FILES src/platform/ohos/*.*)
     list(APPEND TGFX_FILES ${PLATFORM_FILES})
     if (TGFX_USE_NATIVE_GL)
