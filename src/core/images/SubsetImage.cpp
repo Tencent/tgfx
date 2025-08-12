@@ -60,8 +60,8 @@ std::shared_ptr<Image> SubsetImage::onMakeScaled(int newWidth, int newHeight,
   if (newSource == nullptr) {
     return nullptr;
   }
-  auto newBounds = Rect::MakeXYWH(bounds.x() * scaleX, bounds.y() * scaleY, sourceScaledWidth,
-                                  sourceScaledHeight);
+  auto newBounds = Rect::MakeXYWH(bounds.x() * scaleX, bounds.y() * scaleY, static_cast<float>(newWidth),
+                                  static_cast<float>(newHeight));
   return MakeFrom(std::move(newSource), newBounds);
 }
 

@@ -48,6 +48,10 @@ class PictureImage : public Image {
     return mipmapped;
   }
 
+  ISize getScaledTextureSize(float scale) const override {
+    return ISize::Make(width() * scale, height() * scale);
+  }
+
   std::shared_ptr<Picture> picture = nullptr;
   Matrix* matrix = nullptr;
 

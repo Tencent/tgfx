@@ -220,6 +220,9 @@ class Image {
    */
   virtual BackendTexture getBackendTexture(Context* context, ImageOrigin* origin = nullptr) const;
 
+
+  virtual ISize getScaledTextureSize(float scale) const;
+
   /**
    * Returns a fully decoded Image from this Image. The returned Image shares the same GPU cache
    * with the original Image and immediately schedules an asynchronous decoding task, which will not

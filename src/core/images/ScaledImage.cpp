@@ -71,9 +71,12 @@ std::shared_ptr<TextureProxy> ScaledImage::lockTextureProxy(const TPArgs& args) 
 
 std::shared_ptr<TextureProxy> ScaledImage::lockTextureProxy(const TPArgs& args,
                                                             const Rect& drawRect) const {
+  if (args.drawScale > 1.f) {
+    return nullptr;
+  }
   auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
   auto scaledRect = drawRect;
-  if (args.drawScale < 1.0f) {
+  if (args.drawScale < 1.f) {
     scaledRect.scale(args.drawScale, args.drawScale);
   }
   scaledRect.roundOut();

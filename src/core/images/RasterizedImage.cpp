@@ -25,6 +25,15 @@
 
 namespace tgfx {
 
+static uint32_t GetMipmapLevel(float scale) {
+  scale = std::clamp(scale, 0.f, 1.f);
+  if (scale > 0.5f) {
+    return 0;
+  }
+  float exactLevel = std::log2(1.f / scale);
+  return static_cast<uint32_t>(std::floor(exactLevel));
+}
+
 RasterizedImage::RasterizedImage(UniqueKey uniqueKey, std::shared_ptr<Image> source)
     : uniqueKey(std::move(uniqueKey)), source(std::move(source)) {
 }
@@ -36,12 +45,20 @@ std::shared_ptr<Image> RasterizedImage::makeRasterized() const {
 std::shared_ptr<TextureProxy> RasterizedImage::lockTextureProxy(const TPArgs& args) const {
   auto proxyProvider = args.context->proxyProvider();
   auto textureKey = getTextureKey();
+  auto textureSize = source->getScaledTextureSize(args.drawScale);
+  auto newScale = 1.f;
+  if (textureSize.height != source->height() || textureSize.width != source->width()) {
+    auto mipmapLevel = GetMipmapLevel(args.drawScale);
+    UniqueKey::Append(textureKey, &mipmapLevel, 1);
+    newScale = 1.f / static_cast<float>(1 << mipmapLevel);
+  }
   auto textureProxy = proxyProvider->findOrWrapTextureProxy(textureKey);
   if (textureProxy != nullptr) {
     return textureProxy;
   }
   auto newArgs = args;
   newArgs.backingFit = BackingFit::Exact;
+  newArgs.drawScale = newScale;
   textureProxy = source->lockTextureProxy(newArgs);
   if (textureProxy == nullptr) {
     return nullptr;
@@ -56,11 +73,23 @@ std::shared_ptr<TextureProxy> RasterizedImage::lockTextureProxy(const TPArgs& ar
 PlacementPtr<FragmentProcessor> RasterizedImage::asFragmentProcessor(
     const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const {
   auto textureProxy = lockTextureProxy(
-      TPArgs(args.context, args.renderFlags, hasMipmaps(), 1.0f, BackingFit::Exact));
+      TPArgs(args.context, args.renderFlags, hasMipmaps(), args.drawScale, BackingFit::Exact));
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  return TiledTextureEffect::Make(std::move(textureProxy), samplingArgs, uvMatrix, isAlphaOnly());
+  auto fpMatrix =
+      Matrix::MakeScale(static_cast<float>(textureProxy->width()) / static_cast<float>(width()),
+      static_cast<float>(textureProxy->height()) / static_cast<float>(height()));
+  SamplingArgs newSamplingArgs = samplingArgs;
+  if (samplingArgs.sampleArea) {
+    Rect subset = *samplingArgs.sampleArea;
+    fpMatrix.mapRect(&subset);
+    newSamplingArgs.sampleArea = subset;
+  }
+  if (uvMatrix) {
+    fpMatrix.preConcat(*uvMatrix);
+  }
+  return TiledTextureEffect::Make(std::move(textureProxy), newSamplingArgs, &fpMatrix, isAlphaOnly());
 }
 
 std::shared_ptr<Image> RasterizedImage::onMakeScaled(int newWidth, int newHeight,

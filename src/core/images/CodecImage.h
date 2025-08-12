@@ -40,6 +40,10 @@ class CodecImage : public GeneratorImage {
     return _height;
   }
 
+  ISize getScaledTextureSize(float scale) const override {
+    return ISize::Make(width() * scale, height() * scale);
+  }
+
  protected:
   Type type() const override {
     return Type::Codec;

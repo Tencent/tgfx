@@ -38,6 +38,10 @@ class SubsetImage : public TransformImage {
     return static_cast<int>(bounds.height());
   }
 
+  ISize getScaledTextureSize(float scale) const override {
+    return ISize::Make(width() * scale, height() * scale);
+  }
+
   Rect bounds = {};
 
  protected:

@@ -39,6 +39,10 @@ class BufferImage : public PixelImage {
     return imageBuffer->isAlphaOnly();
   }
 
+  ISize getScaledTextureSize(float scale) const override {
+    return ISize::Make(width() * scale, height() * scale);
+  }
+
  protected:
   Type type() const override {
     return Type::Buffer;

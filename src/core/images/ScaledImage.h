@@ -41,6 +41,10 @@ class ScaledImage : public TransformImage {
     return mipmapped;
   }
 
+  ISize getScaledTextureSize(float scale) const override {
+    return ISize::Make(width() * scale, height() * scale);
+  }
+
  protected:
   Type type() const override {
     return Type::Scaled;

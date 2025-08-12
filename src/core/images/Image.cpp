@@ -138,6 +138,10 @@ BackendTexture Image::getBackendTexture(Context*, ImageOrigin*) const {
   return {};
 }
 
+ISize Image::getScaledTextureSize(float) const {
+  return ISize::Make(width(), height());
+}
+
 std::shared_ptr<Image> Image::makeDecoded(Context* context) const {
   if (isFullyDecoded()) {
     return weakThis.lock();

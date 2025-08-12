@@ -42,9 +42,14 @@ std::shared_ptr<Image> CodecImage::onMakeScaled(int newWidth, int newHeight,
 }
 
 std::shared_ptr<TextureProxy> CodecImage::lockTextureProxy(const TPArgs& args) const {
+  if (args.drawScale > 1.f) {
+    return nullptr;
+  }
   auto tempGenerator = generator;
-  if (width() != generator->width() || height() != generator->height()) {
-    tempGenerator = ScaledImageGenerator::MakeFrom(getCodec(), width(), height());
+  auto scaleWidth = static_cast<int>(width() * args.drawScale);
+  auto scaleHeight = static_cast<int>(height() * args.drawScale);
+  if (scaleWidth != generator->width() || scaleHeight != generator->height()) {
+    tempGenerator = ScaledImageGenerator::MakeFrom(getCodec(), scaleWidth, scaleHeight);
   }
   return args.context->proxyProvider()->createTextureProxy(tempGenerator, args.mipmapped,
                                                            args.renderFlags);
