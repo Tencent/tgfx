@@ -45,6 +45,11 @@ class TransformImage : public Image {
  protected:
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
+  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args, const Rect& drawRect,
+                                                 const SamplingOptions& samplingOptions = {}) const;
+
+  virtual std::optional<Matrix> concatUVMatrix(const Matrix* uvMatrix) const = 0;
+
   std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
 
   std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;

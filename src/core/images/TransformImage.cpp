@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TransformImage.h"
+#include "core/utils/AddressOf.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/TPArgs.h"
 #include "gpu/processors/FragmentProcessor.h"
@@ -27,25 +28,31 @@ TransformImage::TransformImage(std::shared_ptr<Image> source) : source(std::move
 }
 
 std::shared_ptr<TextureProxy> TransformImage::lockTextureProxy(const TPArgs& args) const {
-  auto textureWidth = width();
-  auto textureHeight = height();
+  return lockTextureProxy(args, Rect::MakeWH(width(), height()));
+}
+
+std::shared_ptr<TextureProxy> TransformImage::lockTextureProxy(
+    const TPArgs& args, const Rect& drawRect, const SamplingOptions& samplingOptions) const {
+  auto rect = drawRect;
   if (args.drawScale < 1.0) {
-    textureWidth = static_cast<int>(roundf(static_cast<float>(width()) * args.drawScale));
-    textureHeight = static_cast<int>(roundf(static_cast<float>(height()) * args.drawScale));
+    rect.scale(args.drawScale, args.drawScale);
   }
-  auto renderTarget =
-      RenderTargetProxy::MakeFallback(args.context, textureWidth, textureHeight, isAlphaOnly(), 1,
-                                      args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
+  rect.roundOut();
+  auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
+  auto renderTarget = RenderTargetProxy::MakeFallback(
+      args.context, static_cast<int>(rect.width()), static_cast<int>(rect.height()),
+      alphaRenderable && isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  auto textureScaleX = static_cast<float>(textureWidth) / static_cast<float>(width());
-  auto textureScaleY = static_cast<float>(textureHeight) / static_cast<float>(height());
-  auto uvMatrix = Matrix::MakeScale(1.0f / textureScaleX, 1.0f / textureScaleY);
-  auto drawRect = Rect::MakeWH(textureWidth, textureHeight);
-  FPArgs fpArgs(args.context, args.renderFlags, drawRect, std::max(textureScaleX, textureScaleY));
-  SamplingArgs samplingArgs = {TileMode::Clamp, TileMode::Clamp, {}, SrcRectConstraint::Fast};
-  auto processor = asFragmentProcessor(fpArgs, samplingArgs, &uvMatrix);
+  auto uvMatrix =
+      Matrix::MakeScale(drawRect.width() / rect.width(), drawRect.height() / rect.height());
+  uvMatrix.postTranslate(drawRect.left, drawRect.top);
+  auto sourceMatrix = concatUVMatrix(&uvMatrix);
+  FPArgs fpArgs(args.context, args.renderFlags, Rect::MakeWH(rect.width(), rect.height()),
+                1.0f / sourceMatrix->getMinScale());
+  auto processor = FragmentProcessor::Make(source, fpArgs, samplingOptions, SrcRectConstraint::Fast,
+                                           AddressOf(sourceMatrix));
   auto drawingManager = args.context->drawingManager();
   if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags)) {
     return nullptr;
