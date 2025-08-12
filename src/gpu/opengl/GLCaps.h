@@ -118,7 +118,7 @@ class GLCaps : public Caps {
   bool frameBufferFetchRequiresEnablePerSample = false;
   std::string frameBufferFetchColorName;
   std::string frameBufferFetchExtensionString;
-  int maxFragmentSamplers = 32;
+  int maxFragmentSamplers = 0;
   bool flushBeforeWritePixels = false;
 
   static const GLCaps* Get(Context* context);
