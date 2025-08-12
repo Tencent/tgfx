@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLCommandQueue.h"
+#include "GLTexture.h"
+#include "core/utils/PixelFormatUtil.h"
 #include "gpu/opengl/GLBuffer.h"
 #include "gpu/opengl/GLUtil.h"
 
@@ -40,6 +42,46 @@ bool GLCommandQueue::writeBuffer(GPUBuffer* buffer, size_t bufferOffset, const v
                     data);
   gl->bindBuffer(target, 0);
   return CheckGLError(gl);
+}
+
+void GLCommandQueue::writeTexture(GPUTexture* texture, const Rect& rect, const void* pixels,
+                                  size_t rowBytes) {
+  if (texture == nullptr || rect.isEmpty()) {
+    return;
+  }
+  auto gl = interface->functions();
+  auto caps = interface->caps();
+  if (caps->flushBeforeWritePixels) {
+    gl->flush();
+  }
+  auto glTexture = static_cast<const GLTexture*>(texture);
+  gl->bindTexture(glTexture->target(), glTexture->id());
+  const auto& textureFormat = caps->getTextureFormat(glTexture->format());
+  auto bytesPerPixel = PixelFormatBytesPerPixel(glTexture->format());
+  gl->pixelStorei(GL_UNPACK_ALIGNMENT, static_cast<int>(bytesPerPixel));
+  int x = static_cast<int>(rect.x());
+  int y = static_cast<int>(rect.y());
+  int width = static_cast<int>(rect.width());
+  int height = static_cast<int>(rect.height());
+  if (caps->unpackRowLengthSupport) {
+    // the number of pixels, not bytes
+    gl->pixelStorei(GL_UNPACK_ROW_LENGTH, static_cast<int>(rowBytes / bytesPerPixel));
+    gl->texSubImage2D(glTexture->target(), 0, x, y, width, height, textureFormat.externalFormat,
+                      GL_UNSIGNED_BYTE, pixels);
+    gl->pixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+  } else {
+    if (static_cast<size_t>(width) * bytesPerPixel == rowBytes) {
+      gl->texSubImage2D(glTexture->target(), 0, x, y, width, height, textureFormat.externalFormat,
+                        GL_UNSIGNED_BYTE, pixels);
+    } else {
+      auto data = reinterpret_cast<const uint8_t*>(pixels);
+      for (int row = 0; row < height; ++row) {
+        gl->texSubImage2D(glTexture->target(), 0, x, y + row, width, 1,
+                          textureFormat.externalFormat, GL_UNSIGNED_BYTE,
+                          data + (static_cast<size_t>(row) * rowBytes));
+      }
+    }
+  }
 }
 
 void GLCommandQueue::submit(std::shared_ptr<CommandBuffer>) {

@@ -16,28 +16,25 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/CommandQueue.h"
-#include "gpu/opengl/GLInterface.h"
+#include "GLExternalRenderTarget.h"
+#include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
-class GLCommandQueue : public CommandQueue {
- public:
-  explicit GLCommandQueue(std::shared_ptr<GLInterface> interface)
-      : interface(std::move(interface)) {
+std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
+                                                     const BackendRenderTarget& renderTarget,
+                                                     ImageOrigin origin) {
+  if (context == nullptr || !renderTarget.isValid()) {
+    return nullptr;
   }
-
-  bool writeBuffer(GPUBuffer* buffer, size_t bufferOffset, const void* data, size_t size) override;
-
-  void writeTexture(GPUTexture* texture, const Rect& rect, const void* pixels,
-                    size_t rowBytes) override;
-
-  void submit(std::shared_ptr<CommandBuffer>) override;
-
-  void waitUntilCompleted() override;
-
- private:
-  std::shared_ptr<GLInterface> interface = nullptr;
-};
+  GLFrameBufferInfo frameBufferInfo = {};
+  if (!renderTarget.getGLFramebufferInfo(&frameBufferInfo)) {
+    return nullptr;
+  }
+  auto format = GLSizeFormatToPixelFormat(frameBufferInfo.format);
+  if (!context->caps()->isFormatRenderable(format)) {
+    return nullptr;
+  }
+  return std::make_shared<GLExternalRenderTarget>(
+      context, renderTarget.width(), renderTarget.height(), origin, format, frameBufferInfo.id);
+}
 }  // namespace tgfx

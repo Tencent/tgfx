@@ -16,25 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "BackendTextureRenderTargetProxy.h"
+#pragma once
+
+#include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
-BackendTextureRenderTargetProxy::BackendTextureRenderTargetProxy(
-    const BackendTexture& backendTexture, PixelFormat format, int sampleCount, ImageOrigin origin,
-    bool adopted)
-    : TextureRenderTargetProxy(backendTexture.width(), backendTexture.height(), format, sampleCount,
-                               false, origin, !adopted),
-      backendTexture(backendTexture) {
-}
-
-std::shared_ptr<TextureView> BackendTextureRenderTargetProxy::onMakeTexture(
-    Context* context) const {
-  auto renderTarget =
-      RenderTarget::MakeFrom(context, backendTexture, _sampleCount, _origin, !externallyOwned());
-  if (renderTarget == nullptr) {
-    LOGE("BackendTextureRenderTargetProxy::onMakeTexture() Failed to create the render target!");
-    return nullptr;
+class GLExternalTexture : public GLTexture {
+ public:
+  GLExternalTexture(unsigned id, unsigned target, PixelFormat format)
+      : GLTexture(id, target, format) {
   }
-  return renderTarget->asTextureView();
-}
+
+  void release(GPU*) override {
+    // External textures are not owned by TGFX, so we do not release them.
+  }
+};
 }  // namespace tgfx
