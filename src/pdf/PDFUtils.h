@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <array>
 #include "pdf/PDFTypes.h"
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Matrix.h"
@@ -28,6 +29,15 @@
 #include "tgfx/pdf/PDFMetadata.h"
 
 namespace tgfx {
+
+class HexadecimalDigits {
+ public:
+  static inline const std::array<char, 16> upper = {'0', '1', '2', '3', '4', '5', '6', '7',
+                                                    '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+
+  static inline const std::array<char, 16> lower = {'0', '1', '2', '3', '4', '5', '6', '7',
+                                                    '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
+};
 
 struct UUID {
   std::array<uint8_t, 16> data = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};

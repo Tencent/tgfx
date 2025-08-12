@@ -80,7 +80,7 @@ class UserTypeface : public Typeface {
         _fontMetrics(fontMetrics), fontBounds(fontBounds) {
   }
 
-  std::shared_ptr<Data> openData() const override {
+  std::shared_ptr<Data> openAndGetBytes() const override {
     return nullptr;
   }
 

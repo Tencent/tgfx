@@ -52,11 +52,31 @@ class PDFAttributeList {
   PDFAttributeList();
   ~PDFAttributeList();
 
+  /**
+   * appends an integer attribute to the list.
+   */
   void appendInt(const std::string& owner, const std::string& name, int value);
+
+  /**
+   * appends a float attribute to the list.
+   */
   void appendFloat(const std::string& owner, const std::string& name, float value);
+
+  /**
+   * Appends a name attribute to the list. 
+   * Note: this is not a string attribute, but the name of another attribute.
+   */
   void appendName(const std::string& owner, const std::string& attrName, const std::string& value);
+
+  /**
+   * Appends a float array attribute to the list.
+   */
   void appendFloatArray(const std::string& owner, const std::string& name,
                         const std::vector<float>& value);
+
+  /**
+   * Appends an array of node IDs (integers) to the list.
+   */
   void appendNodeIdArray(const std::string& owner, const std::string& attrName,
                          const std::vector<int>& nodeIds);
 

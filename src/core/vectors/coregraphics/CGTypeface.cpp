@@ -19,6 +19,7 @@
 #include "CGTypeface.h"
 #include <CoreFoundation/CoreFoundation.h>
 #include "CGScalerContext.h"
+#include "core/AdvancedTypefaceProperty.h"
 #include "core/utils/UniqueID.h"
 #include "tgfx/core/FontStyle.h"
 #include "tgfx/core/Rect.h"
@@ -397,6 +398,48 @@ std::vector<Unichar> CGTypeface::getGlyphToUnicodeMap() const {
     GetGlyphMapByPlane(bits, ctFont, returnMap, planeIndex);
   }
   return returnMap;
+}
+#endif
+
+#ifdef TGFX_USE_ADVANCED_TYPEFACE_PROPERTY
+AdvancedTypefaceProperty CGTypeface::getAdvancedProperty() const {
+  AdvancedTypefaceProperty advancedProperty;
+  const auto* fontName = CTFontCopyPostScriptName(ctFont);
+  if (fontName) {
+    advancedProperty.postScriptName = CGTypeface::StringFromCFString(fontName);
+  }
+  CFRelease(fontName);
+
+  constexpr auto glyf = SetFourByteTag('g', 'l', 'y', 'f');
+  constexpr auto loca = SetFourByteTag('l', 'o', 'c', 'a');
+  constexpr auto CFF = SetFourByteTag('C', 'F', 'F', ' ');
+  // Use copyTableData to check if the font table exists.
+  // TODO(YGaurora): Implement a function to check for the existence of a font table without
+  // copying its data, which would improve performance.
+  if (copyTableData(glyf) && copyTableData(loca)) {
+    advancedProperty.type = AdvancedTypefaceProperty::FontType::TrueType;
+  } else if (copyTableData(CFF)) {
+    advancedProperty.type = AdvancedTypefaceProperty::FontType::CFF;
+  }
+
+  CTFontSymbolicTraits symbolicTraits = CTFontGetSymbolicTraits(ctFont);
+  if (symbolicTraits & kCTFontMonoSpaceTrait) {
+    advancedProperty.style = static_cast<AdvancedTypefaceProperty::StyleFlags>(
+        advancedProperty.style | AdvancedTypefaceProperty::StyleFlags::FixedPitch);
+  }
+  if (symbolicTraits & kCTFontItalicTrait) {
+    advancedProperty.style = static_cast<AdvancedTypefaceProperty::StyleFlags>(
+        advancedProperty.style | AdvancedTypefaceProperty::StyleFlags::Italic);
+  }
+  CTFontStylisticClass stylisticClass = symbolicTraits & kCTFontClassMaskTrait;
+  if (stylisticClass >= kCTFontOldStyleSerifsClass && stylisticClass <= kCTFontSlabSerifsClass) {
+    advancedProperty.style = static_cast<AdvancedTypefaceProperty::StyleFlags>(
+        advancedProperty.style | AdvancedTypefaceProperty::StyleFlags::Serif);
+  } else if (stylisticClass & kCTFontSymbolicClass) {
+    advancedProperty.style = static_cast<AdvancedTypefaceProperty::StyleFlags>(
+        advancedProperty.style | AdvancedTypefaceProperty::StyleFlags::Symbolic);
+  }
+  return advancedProperty;
 }
 #endif
 

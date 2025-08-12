@@ -88,10 +88,23 @@ class MemoryWriteStream : public WriteStream {
    */
   bool write(const void* data, size_t size) override;
 
-  bool writeToAndReset(const std::shared_ptr<MemoryWriteStream>& destStream);
-
+  /**
+   * Writes the contents of this stream to the destination stream and then resets this stream.
+   * Returns true if the write was successful.
+   */
   void writeToStream(const std::shared_ptr<MemoryWriteStream>& destStream);
 
+  /**
+   * Writes the contents of this stream to the destination stream and then resets this stream.
+   * Equivalent to writeToStream() followed by reset(), but may save memory use.
+   * Returns true if the write was successful.
+   */
+  bool writeToAndReset(const std::shared_ptr<MemoryWriteStream>& destStream);
+
+  /**
+   * Prepends the contents of this stream to the destination stream and then resets this stream.
+   * Returns true if the write was successful.
+   */
   bool prependToAndReset(const std::shared_ptr<MemoryWriteStream>& destStream);
   /**
    * Returns the current size of the written bytes.

@@ -20,7 +20,6 @@
 #include "core/utils/Log.h"
 #include "pdf/PDFTypes.h"
 #include "pdf/PDFUtils.h"
-#include "tgfx/core/MD5.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/core/UTF.h"
 #include "tgfx/core/WriteStream.h"

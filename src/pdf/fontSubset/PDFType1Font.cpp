@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFType1Font.h"
+#include "core/AdvancedTypefaceProperty.h"
 #include "core/ScalerContext.h"
 #include "core/utils/Log.h"
 #include "pdf/PDFDocumentImpl.h"
@@ -212,8 +213,8 @@ std::shared_ptr<Data> ConvertType1FontStream(const std::shared_ptr<Data>& source
   return Data::MakeAdopted(data, length, Data::FreeProc);
 }
 
-inline bool CanEmbed(const FontMetrics& metrics) {
-  return !(metrics.flags & FontMetrics::FontFlags::NotEmbeddable);
+inline bool CanEmbed(const AdvancedTypefaceProperty& advancedProperty) {
+  return !(advancedProperty.flags & AdvancedTypefaceProperty::FontFlags::NotEmbeddable);
 }
 
 inline float FromFontUnits(float scaled, uint16_t emSize) {
@@ -222,7 +223,7 @@ inline float FromFontUnits(float scaled, uint16_t emSize) {
 
 PDFIndirectReference MakeType1FontDescriptor(PDFDocumentImpl* document,
                                              const PDFStrikeSpec& pdfStrikeSpec,
-                                             const FontMetrics* info) {
+                                             const AdvancedTypefaceProperty* info) {
   auto descriptor = PDFDictionary::Make("FontDescriptor");
   auto emSize = static_cast<uint16_t>(std::round(pdfStrikeSpec.unitsPerEM));
   if (info) {
@@ -268,7 +269,7 @@ PDFIndirectReference Type1FontDescriptor(PDFDocumentImpl* doc, const PDFStrikeSp
   if (iter != doc->fontDescriptors.end()) {
     return iter->second;
   }
-  const auto* info = PDFFont::GetMetrics(typeface, textSize, doc);
+  const auto* info = PDFFont::GetAdvancedProperty(typeface, textSize, doc);
   auto fontDescriptor = MakeType1FontDescriptor(doc, pdfStrikeSpec, info);
   doc->fontDescriptors[typefaceID] = fontDescriptor;
   return fontDescriptor;
@@ -288,7 +289,7 @@ void EmitSubsetType1(const PDFFont& pdfFont, PDFDocumentImpl* document) {
   fontDictionary->insertRef("FontDescriptor",
                             Type1FontDescriptor(document, pdfFont.strike().strikeSpec));
   fontDictionary->insertName("Subtype", "Type1");
-  if (const auto* info = PDFFont::GetMetrics(typeface, textSize, document)) {
+  if (const auto* info = PDFFont::GetAdvancedProperty(typeface, textSize, document)) {
     fontDictionary->insertName("BaseFont", info->postScriptName);
   }
 

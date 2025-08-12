@@ -18,6 +18,7 @@
 
 #include "FTTypeface.h"
 #include "FTLibrary.h"
+#include "core/AdvancedTypefaceProperty.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Typeface.h"
 #include FT_TRUETYPE_TABLES_H
@@ -26,6 +27,7 @@
 #include "FTScalerContext.h"
 #include "SystemFont.h"
 #include "core/utils/UniqueID.h"
+#include "tgfx/core/Stream.h"
 #include "tgfx/core/UTF.h"
 
 namespace tgfx {
@@ -192,7 +194,103 @@ std::vector<Unichar> FTTypeface::getGlyphToUnicodeMap() const {
 }
 #endif
 
-std::shared_ptr<Data> FTTypeface::openData() const {
+#ifdef TGFX_USE_ADVANCED_TYPEFACE_PROPERTY
+namespace {
+bool CanEmbed(FT_Face face) {
+  FT_UShort fsType = FT_Get_FSType_Flags(face);
+  return (fsType & (FT_FSTYPE_RESTRICTED_LICENSE_EMBEDDING | FT_FSTYPE_BITMAP_EMBEDDING_ONLY)) == 0;
+}
+
+bool CanSubset(FT_Face face) {
+  FT_UShort fsType = FT_Get_FSType_Flags(face);
+  return (fsType & FT_FSTYPE_NO_SUBSETTING) == 0;
+}
+
+AdvancedTypefaceProperty::FontType GetFontType(FT_Face face) {
+  const char* fontType = FT_Get_X11_Font_Format(face);
+  struct TextToFontType {
+    const char* text;
+    AdvancedTypefaceProperty::FontType type;
+  };
+
+  static TextToFontType values[] = {
+      {"Type 1", AdvancedTypefaceProperty::FontType::Type1},
+      {"CID Type 1", AdvancedTypefaceProperty::FontType::Type1CID},
+      {"CFF", AdvancedTypefaceProperty::FontType::CFF},
+      {"TrueType", AdvancedTypefaceProperty::FontType::TrueType},
+  };
+  for (const auto& value : values) {
+    if (strcmp(fontType, value.text) == 0) {
+      return value.type;
+    }
+  }
+  return AdvancedTypefaceProperty::FontType::Other;
+}
+}  // namespace
+
+bool FTTypeface::isOpentypeFontDataStandardFormat() const {
+  // FreeType reports TrueType for any data that can be decoded to TrueType or OpenType.
+  // However, there are alternate data formats for OpenType, like wOFF and wOF2.
+  auto data = openAndGetBytes();
+  if (!data) {
+    return false;
+  }
+  auto stream = Stream::MakeFromData(data);
+  std::array<char, 4> buffer;
+  if (stream->read(buffer.data(), 4) < 4) {
+    return false;
+  }
+  auto fontTag = SetFourByteTag(buffer[0], buffer[1], buffer[2], buffer[3]);
+
+  constexpr auto windowsTrueTypeTag = SetFourByteTag(0, 1, 0, 0);
+  constexpr auto macTrueTypeTag = SetFourByteTag('t', 'r', 'u', 'e');
+  constexpr auto postScriptTag = SetFourByteTag('t', 'y', 'p', '1');
+  constexpr auto opentypeCFFTag = SetFourByteTag('O', 'T', 'T', 'O');
+  constexpr auto ttcTag = SetFourByteTag('t', 't', 'c', 'f');
+
+  return fontTag == windowsTrueTypeTag || fontTag == macTrueTypeTag || fontTag == postScriptTag ||
+         fontTag == opentypeCFFTag || fontTag == ttcTag;
+}
+
+AdvancedTypefaceProperty FTTypeface::getAdvancedProperty() const {
+  AdvancedTypefaceProperty advancedProperty;
+  advancedProperty.postScriptName = FT_Get_Postscript_Name(face);
+
+  if (FT_HAS_MULTIPLE_MASTERS(face)) {
+    advancedProperty.flags = static_cast<AdvancedTypefaceProperty::FontFlags>(
+        advancedProperty.flags | AdvancedTypefaceProperty::FontFlags::Variable);
+  }
+  if (!CanEmbed(face)) {
+    advancedProperty.flags = static_cast<AdvancedTypefaceProperty::FontFlags>(
+        advancedProperty.flags | AdvancedTypefaceProperty::FontFlags::NotEmbeddable);
+  }
+  if (!CanSubset(face)) {
+    advancedProperty.flags = static_cast<AdvancedTypefaceProperty::FontFlags>(
+        advancedProperty.flags | AdvancedTypefaceProperty::FontFlags::NotSubsettable);
+  }
+
+  advancedProperty.type = GetFontType(face);
+  if ((advancedProperty.type == AdvancedTypefaceProperty::FontType::TrueType ||
+       advancedProperty.type == AdvancedTypefaceProperty::FontType::CFF) &&
+      !isOpentypeFontDataStandardFormat()) {
+    advancedProperty.flags = static_cast<AdvancedTypefaceProperty::FontFlags>(
+        advancedProperty.flags | AdvancedTypefaceProperty::FontFlags::AltDataFormat);
+  }
+
+  advancedProperty.style = static_cast<AdvancedTypefaceProperty::StyleFlags>(0);
+  if (FT_IS_FIXED_WIDTH(face)) {
+    advancedProperty.style = static_cast<AdvancedTypefaceProperty::StyleFlags>(
+        advancedProperty.style | AdvancedTypefaceProperty::StyleFlags::FixedPitch);
+  }
+  if (face->style_flags & FT_STYLE_FLAG_ITALIC) {
+    advancedProperty.style = static_cast<AdvancedTypefaceProperty::StyleFlags>(
+        advancedProperty.style | AdvancedTypefaceProperty::StyleFlags::Italic);
+  }
+  return advancedProperty;
+}
+#endif
+
+std::shared_ptr<Data> FTTypeface::openAndGetBytes() const {
   if (data.data) {
     return data.data;
   } else if (!data.path.empty()) {

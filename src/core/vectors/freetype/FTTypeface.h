@@ -58,7 +58,12 @@ class FTTypeface : public Typeface {
 #ifdef TGFX_USE_GLYPH_TO_UNICODE
   std::vector<Unichar> getGlyphToUnicodeMap() const override;
 #endif
-  std::shared_ptr<Data> openData() const override;
+
+#ifdef TGFX_USE_ADVANCED_TYPEFACE_PROPERTY
+  AdvancedTypefaceProperty getAdvancedProperty() const override;
+#endif
+
+  std::shared_ptr<Data> openAndGetBytes() const override;
 
   std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;
 
@@ -71,7 +76,9 @@ class FTTypeface : public Typeface {
 
   int unitsPerEmInternal() const;
 
+#ifdef TGFX_USE_ADVANCED_TYPEFACE_PROPERTY
   bool isOpentypeFontDataStandardFormat() const;
+#endif
 
   friend class FTScalerContext;
 };

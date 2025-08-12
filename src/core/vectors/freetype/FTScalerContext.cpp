@@ -136,37 +136,6 @@ FT_Int ChooseBitmapStrike(FT_Face face, FT_F26Dot6 scaleY) {
   return chosenStrikeIndex;
 }
 
-bool CanEmbed(FT_Face face) {
-  FT_UShort fsType = FT_Get_FSType_Flags(face);
-  return (fsType & (FT_FSTYPE_RESTRICTED_LICENSE_EMBEDDING | FT_FSTYPE_BITMAP_EMBEDDING_ONLY)) == 0;
-}
-
-bool CanSubset(FT_Face face) {
-  FT_UShort fsType = FT_Get_FSType_Flags(face);
-  return (fsType & FT_FSTYPE_NO_SUBSETTING) == 0;
-}
-
-FontMetrics::FontType GetFontType(FT_Face face) {
-  const char* fontType = FT_Get_X11_Font_Format(face);
-  struct TextToFontType {
-    const char* text;
-    FontMetrics::FontType type;
-  };
-
-  static TextToFontType values[] = {
-      {"Type 1", FontMetrics::FontType::Type1},
-      {"CID Type 1", FontMetrics::FontType::Type1CID},
-      {"CFF", FontMetrics::FontType::CFF},
-      {"TrueType", FontMetrics::FontType::TrueType},
-  };
-  for (const auto& value : values) {
-    if (strcmp(fontType, value.text) == 0) {
-      return value.type;
-    }
-  }
-  return FontMetrics::FontType::Other;
-}
-
 FTScalerContext::FTScalerContext(std::shared_ptr<Typeface> typeFace, float size)
     : ScalerContext(std::move(typeFace), size), textScale(size) {
   loadGlyphFlags |= FT_LOAD_NO_BITMAP;
@@ -281,30 +250,6 @@ FontMetrics FTScalerContext::getFontMetrics() const {
   return metrics;
 }
 
-bool FTScalerContext::isOpentypeFontDataStandardFormat() const {
-  // FreeType reports TrueType for any data that can be decoded to TrueType or OpenType.
-  // However, there are alternate data formats for OpenType, like wOFF and wOF2.
-  auto data = typeface->openData();
-  if (!data) {
-    return false;
-  }
-  auto stream = Stream::MakeFromData(data);
-  std::array<char, 4> buffer;
-  if (stream->read(buffer.data(), 4) < 4) {
-    return false;
-  }
-  auto fontTag = SetFourByteTag(buffer[0], buffer[1], buffer[2], buffer[3]);
-
-  constexpr auto windowsTrueTypeTag = SetFourByteTag(0, 1, 0, 0);
-  constexpr auto macTrueTypeTag = SetFourByteTag('t', 'r', 'u', 'e');
-  constexpr auto postScriptTag = SetFourByteTag('t', 'y', 'p', '1');
-  constexpr auto opentypeCFFTag = SetFourByteTag('O', 'T', 'T', 'O');
-  constexpr auto ttcTag = SetFourByteTag('t', 't', 'c', 'f');
-
-  return fontTag == windowsTrueTypeTag || fontTag == macTrueTypeTag || fontTag == postScriptTag ||
-         fontTag == opentypeCFFTag || fontTag == ttcTag;
-}
-
 void FTScalerContext::getFontMetricsInternal(FontMetrics* metrics) const {
   auto face = ftTypeface()->face;
   auto upem = static_cast<float>(ftTypeface()->unitsPerEmInternal());
@@ -414,40 +359,6 @@ void FTScalerContext::getFontMetricsInternal(FontMetrics* metrics) const {
   metrics->capHeight = capHeight;
   metrics->underlineThickness = underlineThickness * textScale;
   metrics->underlinePosition = underlinePosition * textScale;
-
-  metrics->postScriptName = FT_Get_Postscript_Name(face);
-
-  if (FT_HAS_MULTIPLE_MASTERS(face)) {
-    metrics->flags =
-        static_cast<FontMetrics::FontFlags>(metrics->flags | FontMetrics::FontFlags::Variable);
-  }
-  if (!CanEmbed(face)) {
-    metrics->flags =
-        static_cast<FontMetrics::FontFlags>(metrics->flags | FontMetrics::FontFlags::NotEmbeddable);
-  }
-  if (!CanSubset(face)) {
-    metrics->flags = static_cast<FontMetrics::FontFlags>(metrics->flags |
-                                                         FontMetrics::FontFlags::NotSubsettable);
-  }
-
-  metrics->type = GetFontType(face);
-  if ((metrics->type == FontMetrics::FontType::TrueType ||
-       metrics->type == FontMetrics::FontType::CFF) &&
-      !isOpentypeFontDataStandardFormat()) {
-    metrics->flags =
-        static_cast<FontMetrics::FontFlags>(metrics->flags | FontMetrics::FontFlags::AltDataFormat);
-  }
-
-  metrics->style = static_cast<FontMetrics::StyleFlags>(0);
-  if (FT_IS_FIXED_WIDTH(face)) {
-    metrics->style =
-        static_cast<FontMetrics::StyleFlags>(metrics->style | FontMetrics::StyleFlags::FixedPitch);
-  }
-  if (face->style_flags & FT_STYLE_FLAG_ITALIC) {
-    metrics->style =
-        static_cast<FontMetrics::StyleFlags>(metrics->style | FontMetrics::StyleFlags::Italic);
-    ;
-  }
 }
 
 bool FTScalerContext::getCBoxForLetter(char letter, FT_BBox* bbox) const {

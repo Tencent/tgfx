@@ -72,6 +72,10 @@ class WebTypeface : public Typeface {
   std::vector<Unichar> getGlyphToUnicodeMap() const override;
 #endif
 
+#ifdef TGFX_USE_ADVANCED_TYPEFACE_PROPERTY
+  AdvancedTypefaceProperty getAdvancedProperty() const override;
+#endif
+
   std::shared_ptr<Data> openData() const override {
     return nullptr;
   }

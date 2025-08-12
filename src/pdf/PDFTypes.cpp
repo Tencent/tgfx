@@ -21,7 +21,6 @@
 #include "pdf/DeflateStream.h"
 #include "pdf/PDFDocumentImpl.h"
 #include "tgfx/core/Data.h"
-#include "tgfx/core/MD5.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/core/UTF.h"

@@ -67,8 +67,6 @@ class FTScalerContext : public ScalerContext {
 
   bool loadOutlineGlyph(FT_Face face, GlyphID glyphID, bool fauxBold, bool fauxItalic) const;
 
-  bool isOpentypeFontDataStandardFormat() const;
-
   float textScale = 1.0f;
   Point extraScale = Point::Make(1.f, 1.f);
   FT_Size ftSize = nullptr;

@@ -18,6 +18,7 @@
 
 #include "tgfx/core/Typeface.h"
 #include <vector>
+#include "core/AdvancedTypefaceProperty.h"
 #include "core/ScalerContext.h"
 #include "core/utils/UniqueID.h"
 #include "tgfx/core/Font.h"
@@ -71,8 +72,12 @@ class EmptyTypeface : public Typeface {
     return {};
   }
 
-  std::shared_ptr<Data> openData() const override {
+  std::shared_ptr<Data> openAndGetBytes() const override {
     return nullptr;
+  }
+
+  AdvancedTypefaceProperty getAdvancedProperty() const override {
+    return AdvancedTypefaceProperty();
   }
 
  private:
@@ -108,6 +113,10 @@ bool Typeface::isCustom() const {
 std::vector<Unichar> Typeface::getGlyphToUnicodeMap() const {
   return {};
 };
+
+AdvancedTypefaceProperty Typeface::getAdvancedProperty() const {
+  return AdvancedTypefaceProperty();
+}
 
 size_t Typeface::getTableSize(FontTableTag tag) const {
   auto data = copyTableData(tag);

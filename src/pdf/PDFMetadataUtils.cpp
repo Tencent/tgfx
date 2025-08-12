@@ -18,11 +18,12 @@
 
 #include "PDFMetadataUtils.h"
 #include "core/utils/Log.h"
+#include "pdf/MD5.h"
 #include "pdf/PDFTypes.h"
 #include "pdf/PDFUtils.h"
 #include "tgfx/core/Data.h"
-#include "tgfx/core/MD5.h"
 #include "tgfx/core/Stream.h"
+#include "tgfx/core/WriteStream.h"
 
 namespace tgfx {
 
@@ -78,39 +79,77 @@ std::unique_ptr<PDFObject> PDFMetadataUtils::MakeDocumentInformationDict(
   return dict;
 }
 
+// UUID PDFMetadataUtils::CreateUUID(const PDFMetadata& metadata) {
+//   // The main requirement is for the UUID to be unique; the exact
+//   // format of the data that will be hashed is not important.
+//   MD5 md5;
+//   const char uuidNamespace[] = "TGFX.pdf\n";
+//   md5.writeText(uuidNamespace);
+
+//   auto now = std::chrono::system_clock::now();
+//   auto millisecond =
+//       std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
+//   md5.write(&millisecond, sizeof(millisecond));
+
+//   DateTime dateTime;
+//   PDFUtils::GetDateTime(&dateTime);
+//   md5.write(&dateTime, sizeof(dateTime));
+//   md5.write(&metadata.creation, sizeof(metadata.creation));
+//   md5.write(&metadata.modified, sizeof(metadata.modified));
+
+//   for (const auto [key, valuePointer] : MetadataKeyList) {
+//     md5.writeText(key);
+//     md5.write("\037", 1);
+//     const std::string& valueText = metadata.*(valuePointer);
+//     md5.writeText(valueText);
+//     md5.write("\036", 1);
+//   }
+
+//   MD5::Digest digest = md5.finish();
+//   // See RFC 4122, page 6-7.
+//   digest.data[6] = (digest.data[6] & 0x0F) | 0x30;
+//   digest.data[8] = (digest.data[6] & 0x3F) | 0x80;
+//   static_assert(sizeof(digest) == sizeof(UUID), "uuid_size");
+//   UUID uuid;
+//   memcpy(reinterpret_cast<void*>(&uuid), &digest, sizeof(digest));
+//   return uuid;
+// }
+
 UUID PDFMetadataUtils::CreateUUID(const PDFMetadata& metadata) {
   // The main requirement is for the UUID to be unique; the exact
   // format of the data that will be hashed is not important.
-  MD5 md5;
+  // MD5 md5;
+  auto md5 = MemoryWriteStream::Make();
   const char uuidNamespace[] = "TGFX.pdf\n";
-  md5.writeText(uuidNamespace);
+  md5->writeText(uuidNamespace);
 
   auto now = std::chrono::system_clock::now();
   auto millisecond =
       std::chrono::duration_cast<std::chrono::milliseconds>(now.time_since_epoch()).count();
-  md5.write(&millisecond, sizeof(millisecond));
+  md5->write(&millisecond, sizeof(millisecond));
 
   DateTime dateTime;
   PDFUtils::GetDateTime(&dateTime);
-  md5.write(&dateTime, sizeof(dateTime));
-  md5.write(&metadata.creation, sizeof(metadata.creation));
-  md5.write(&metadata.modified, sizeof(metadata.modified));
+  md5->write(&dateTime, sizeof(dateTime));
+  md5->write(&metadata.creation, sizeof(metadata.creation));
+  md5->write(&metadata.modified, sizeof(metadata.modified));
 
   for (const auto [key, valuePointer] : MetadataKeyList) {
-    md5.writeText(key);
-    md5.write("\037", 1);
+    md5->writeText(key);
+    md5->write("\037", 1);
     const std::string& valueText = metadata.*(valuePointer);
-    md5.writeText(valueText);
-    md5.write("\036", 1);
+    md5->writeText(valueText);
+    md5->write("\036", 1);
   }
+  auto data = md5->readData();
 
-  MD5::Digest digest = md5.finish();
+  auto digest = MD5::Calculate(data->data(), data->size());
   // See RFC 4122, page 6-7.
-  digest.data[6] = (digest.data[6] & 0x0F) | 0x30;
-  digest.data[8] = (digest.data[6] & 0x3F) | 0x80;
+  digest[6] = (digest[6] & 0x0F) | 0x30;
+  digest[8] = (digest[6] & 0x3F) | 0x80;
   static_assert(sizeof(digest) == sizeof(UUID), "uuid_size");
   UUID uuid;
-  memcpy(reinterpret_cast<void*>(&uuid), &digest, sizeof(digest));
+  memcpy(reinterpret_cast<void*>(&uuid), digest.data(), sizeof(digest));
   return uuid;
 }
 
