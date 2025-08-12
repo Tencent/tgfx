@@ -46,8 +46,8 @@ std::shared_ptr<TextureProxy> CodecImage::lockTextureProxy(const TPArgs& args) c
     return nullptr;
   }
   auto tempGenerator = generator;
-  auto scaleWidth = static_cast<int>(width() * args.drawScale);
-  auto scaleHeight = static_cast<int>(height() * args.drawScale);
+  auto scaleWidth = static_cast<int>(static_cast<float>(width()) * args.drawScale);
+  auto scaleHeight = static_cast<int>(static_cast<float>(height()) * args.drawScale);
   if (scaleWidth != generator->width() || scaleHeight != generator->height()) {
     tempGenerator = ScaledImageGenerator::MakeFrom(getCodec(), scaleWidth, scaleHeight);
   }
