@@ -38,15 +38,15 @@ class SubsetImage : public TransformImage {
     return static_cast<int>(bounds.height());
   }
 
-  ISize getScaledTextureSize(float scale) const override {
-    return ISize::Make(static_cast<float>(width()) * scale, static_cast<float>(height()) * scale);
-  }
-
   Rect bounds = {};
 
  protected:
   Type type() const override {
     return Type::Subset;
+  }
+
+  ISize getScaledTextureSize(float scale) const override {
+    return ISize::Make(static_cast<float>(width()) * scale, static_cast<float>(height()) * scale);
   }
 
   std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;

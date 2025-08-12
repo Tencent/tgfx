@@ -48,16 +48,16 @@ class PictureImage : public Image {
     return mipmapped;
   }
 
-  ISize getScaledTextureSize(float scale) const override {
-    return ISize::Make(static_cast<float>(width()) * scale, static_cast<float>(height()) * scale);
-  }
-
   std::shared_ptr<Picture> picture = nullptr;
   Matrix* matrix = nullptr;
 
  protected:
   Type type() const override {
     return Type::Picture;
+  }
+
+  ISize getScaledTextureSize(float scale) const override {
+    return ISize::Make(static_cast<float>(width()) * scale, static_cast<float>(height()) * scale);
   }
 
   std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,

@@ -221,12 +221,6 @@ class Image {
   virtual BackendTexture getBackendTexture(Context* context, ImageOrigin* origin = nullptr) const;
 
   /**
-   * Returns the scaled width and height according to the scaling value. If the current image does
-   * not support scaling, returns the original width and height.
-   */
-  virtual ISize getScaledTextureSize(float scale) const;
-
-  /**
    * Returns a fully decoded Image from this Image. The returned Image shares the same GPU cache
    * with the original Image and immediately schedules an asynchronous decoding task, which will not
    * block the calling thread. If the Image is fully decoded or has a corresponding texture cache in
@@ -337,6 +331,12 @@ class Image {
 
   virtual std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
                                               const SamplingOptions& sampling) const;
+
+  /**
+   * Returns the size of the texture proxy after applying the scale factor, if the subclass's
+   * lockTextureProxy method supports direct scaling; otherwise, returns the original size.
+   */
+  virtual ISize getScaledTextureSize(float scale) const;
 
   /**
    * Returns a texture proxy for the entire Image. Note that the returned texture size may differ

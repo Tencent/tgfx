@@ -41,13 +41,13 @@ class ScaledImage : public TransformImage {
     return mipmapped;
   }
 
-  ISize getScaledTextureSize(float scale) const override {
-    return ISize::Make(static_cast<float>(width()) * scale, static_cast<float>(height()) * scale);
-  }
-
  protected:
   Type type() const override {
     return Type::Scaled;
+  }
+
+  ISize getScaledTextureSize(float scale) const override {
+    return ISize::Make(static_cast<float>(width()) * scale, static_cast<float>(height()) * scale);
   }
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
