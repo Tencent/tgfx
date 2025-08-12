@@ -43,6 +43,8 @@ int main() {
   drawers::AppHost appHost(720, 720, 2.0f);
   auto image = tgfx::Image::MakeFromFile(rootPath + "resources/assets/bridge.jpg");
   appHost.addImage("bridge", std::move(image));
+  auto image2 = tgfx::Image::MakeFromFile(rootPath + "resources/assets/tgfx.png");
+  appHost.addImage("TGFX", std::move(image2));
   auto typeface = tgfx::Typeface::MakeFromPath(rootPath + "resources/font/NotoSansSC-Regular.otf");
   appHost.addTypeface("default", std::move(typeface));
   typeface = tgfx::Typeface::MakeFromPath(rootPath + "resources/font/NotoColorEmoji.ttf");
@@ -64,7 +66,8 @@ int main() {
   for (auto& name : drawerNames) {
     auto drawer = drawers::Drawer::GetByName(name);
     canvas->clear();
-    drawer->draw(canvas, &appHost);
+    drawer->build(&appHost);
+    drawer->displayList.render(canvas->getSurface(),false);
     tgfx::Bitmap bitmap = {};
     bitmap.allocPixels(surface->width(), surface->height());
     auto pixels = bitmap.lockPixels();

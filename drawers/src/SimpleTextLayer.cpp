@@ -115,9 +115,9 @@ void SimpleTextLayer::invalidateLayout() {
     if (richText.type == Element::Text) {
       auto font = richText.font;
       auto metrics = font.getMetrics();
-      auto textHeight = ceil(font.getSize() * 1.2f);
-      auto textBaseline = (textHeight + metrics.xHeight) / 2.f;
-      auto textUnderline = textBaseline + metrics.descent;
+      float textHeight = ceil(font.getSize() * 1.2f);
+      float textBaseline = (textHeight + metrics.xHeight) / 2.f;
+      float textUnderline = textBaseline + metrics.descent;
       lineHeight = std::max(lineHeight, textHeight);
       baselineHeight = std::max(baselineHeight, textBaseline);
       underlineHeight = std::max(underlineHeight, textUnderline + strokeOffset);
