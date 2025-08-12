@@ -41,6 +41,8 @@ class RGBAAAImage : public SubsetImage {
                                                       const SamplingArgs& samplingArgs,
                                                       const Matrix* uvMatrix) const override;
 
+  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
+
   std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override;
 
   std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
