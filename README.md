@@ -55,7 +55,7 @@ TGFX uses **C++17** features. Here are the minimum tools needed to build TGFX on
 - Ninja 1.9.0+
 - CMake 3.13.0+
 - QT 5.13.0+
-- NDK 19.2+ (**19.2.5345600 recommended**)
+- NDK 20.1+ (**20.1.5948944 recommended**)
 - Emscripten 3.1.58+ 
 
 
@@ -112,7 +112,7 @@ These will guide you through the necessary steps to set up your development envi
 
 ### Android
 
-The Android demo project requires the **Android NDK**. We recommend using version **19.2.5345600**,
+The Android demo project requires the **Android NDK**. We recommend using version **20.1.5948944**,
 which has been fully tested with the TGFX library. If you open the project with Android Studio, it
 will automatically download the NDK during Gradle synchronization. Alternatively, you can download 
 it from the [NDK Downloads](https://developer.android.com/ndk/downloads) page.
@@ -121,13 +121,13 @@ If you choose to manually download the Android NDK, please extract it to the def
 On macOS, this would be:
 
 ```
-/Users/yourname/Library/Android/sdk/ndk/19.2.5345600
+/Users/yourname/Library/Android/sdk/ndk/20.1.5948944
 ```
 
 On Windows, it would be：
 
 ```
-C:\Users\yourname\AppData\Local\Android\Sdk\ndk\19.2.5345600
+C:\Users\yourname\AppData\Local\Android\Sdk\ndk\20.1.5948944
 ```
 
 Alternatively, you can set one of the following environment variables to help tgfx locate the NDK:
