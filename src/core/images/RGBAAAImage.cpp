@@ -105,8 +105,8 @@ std::shared_ptr<Image> RGBAAAImage::onMakeScaled(int newWidth, int newHeight,
   if (newSource == nullptr) {
     return nullptr;
   }
-  auto newBounds = Rect::MakeXYWH(bounds.x() * scaleX, bounds.y() * scaleY, sourceScaledWidth,
-                                  sourceScaledHeight);
+  auto newBounds = Rect::MakeXYWH(bounds.x() * scaleX, bounds.y() * scaleY,
+                                  static_cast<float>(newWidth), static_cast<float>(newHeight));
   auto image =
       std::shared_ptr<RGBAAAImage>(new RGBAAAImage(std::move(newSource), newBounds, newAlphaStart));
   image->weakThis = image;

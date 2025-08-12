@@ -18,18 +18,31 @@
 
 #pragma once
 
-#include "tgfx/gpu/opengl/wgl/WGLDevice.h"
+#ifdef __APPLE__
+#include <CoreVideo/CoreVideo.h>
+#endif
+#include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
-class WGLWindowDevice final : public WGLDevice {
+class QGLGPU : public GLGPU {
  public:
-  ~WGLWindowDevice() override;
+  explicit QGLGPU(std::shared_ptr<GLInterface> glInterface) : GLGPU(std::move(glInterface)) {
+  }
+
+#ifdef __APPLE__
+  ~QGLGPU() override;
+#endif
+
+  std::vector<PixelFormat> getHardwareTextureFormats(HardwareBufferRef hardwareBuffer,
+                                                     YUVFormat* yuvFormat) const override;
+
+  std::vector<std::unique_ptr<GPUTexture>> importHardwareTextures(
+      HardwareBufferRef hardwareBuffer) override;
 
  private:
-  HWND nativeWindow = nullptr;
-
-  explicit WGLWindowDevice(HGLRC nativeHandle);
-
-  friend class WGLDevice;
+#ifdef __APPLE__
+  CVOpenGLTextureCacheRef textureCache = nil;
+  CVOpenGLTextureCacheRef getTextureCache();
+#endif
 };
 }  // namespace tgfx

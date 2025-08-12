@@ -27,13 +27,14 @@ BackendTextureRenderTargetProxy::BackendTextureRenderTargetProxy(
       backendTexture(backendTexture) {
 }
 
-std::shared_ptr<Texture> BackendTextureRenderTargetProxy::onMakeTexture(Context* context) const {
+std::shared_ptr<TextureView> BackendTextureRenderTargetProxy::onMakeTexture(
+    Context* context) const {
   auto renderTarget =
       RenderTarget::MakeFrom(context, backendTexture, _sampleCount, _origin, !externallyOwned());
   if (renderTarget == nullptr) {
     LOGE("BackendTextureRenderTargetProxy::onMakeTexture() Failed to create the render target!");
     return nullptr;
   }
-  return renderTarget->asTexture();
+  return renderTarget->asTextureView();
 }
 }  // namespace tgfx

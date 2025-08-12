@@ -25,8 +25,8 @@ class GPU;
  * GPUResource is the base class for GPU resources that need manual release of their underlying
  * allocations. It is intended for resources like buffers and textures that are not automatically
  * managed by the GPU. This class decouples resource release from object destruction, allowing you
- * to skip releasing resources in scenarios such as when the context is abandoned or the GPU has
- * been destroyed. Otherwise, it may lead to undefined behavior.
+ * to skip releasing resources in scenarios such as when the GPU device is lost or destroyed.
+ * Otherwise, it may lead to undefined behavior.
  */
 class GPUResource {
  public:
@@ -36,6 +36,6 @@ class GPUResource {
    * Releases the underlying GPU resources. After calling this method, the GPUResource must not be
    * used, as doing so may lead to undefined behavior.
    */
-  virtual void release(const GPU* gpu) = 0;
+  virtual void release(GPU* gpu) = 0;
 };
 }  // namespace tgfx

@@ -59,7 +59,7 @@ class GLTiledTextureEffect : public TiledTextureEffect {
 
   void clampCoord(EmitArgs& args, const bool useClamp[2], const std::string& clampName) const;
 
-  UniformNames initUniform(EmitArgs& args, const Texture* texture, const Sampling& sampling,
+  UniformNames initUniform(EmitArgs& args, const TextureView* textureView, const Sampling& sampling,
                            const bool useClamp[2]) const;
 };
 }  // namespace tgfx

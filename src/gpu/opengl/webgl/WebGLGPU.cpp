@@ -16,30 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/Texture.h"
+#include "WebGLGPU.h"
 
 namespace tgfx {
-/**
- * DefaultTexture is a simple texture implementation that stores pixel data using a single sampler.
- */
-class DefaultTexture : public Texture {
- public:
-  DefaultTexture(std::unique_ptr<TextureSampler> sampler, int width, int height,
-                 ImageOrigin origin = ImageOrigin::TopLeft);
+bool HardwareBufferAvailable() {
+  return false;
+}
 
-  size_t memoryUsage() const override;
+std::vector<PixelFormat> WebGLGPU::getHardwareTextureFormats(HardwareBufferRef, YUVFormat*) const {
+  return {};
+}
 
-  TextureSampler* getSampler() const override {
-    return _sampler.get();
-  }
-
- protected:
-  std::unique_ptr<TextureSampler> _sampler = {};
-
-  void onReleaseGPU() override {
-    _sampler->releaseGPU(context);
-  }
-};
+std::vector<std::unique_ptr<GPUTexture>> WebGLGPU::importHardwareTextures(HardwareBufferRef) {
+  return {};
+}
 }  // namespace tgfx

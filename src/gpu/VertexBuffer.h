@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "GPU.h"
 #include "gpu/GPUBuffer.h"
 #include "gpu/Resource.h"
 
@@ -42,7 +43,7 @@ class VertexBuffer : public Resource {
   /**
    * Returns the GPUBuffer associated with this VertexBuffer.
    */
-  const GPUBuffer* gpuBuffer() const {
+  GPUBuffer* gpuBuffer() const {
     return buffer.get();
   }
 

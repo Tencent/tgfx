@@ -20,9 +20,8 @@
 #include <QApplication>
 #include <QQuickWindow>
 #include <QThread>
-#include "gpu/Texture.h"
 #include "gpu/opengl/GLRenderTarget.h"
-#include "gpu/opengl/GLTextureSampler.h"
+#include "gpu/opengl/GLTexture.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace tgfx {

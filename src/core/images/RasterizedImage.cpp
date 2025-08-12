@@ -118,7 +118,9 @@ std::shared_ptr<Image> RasterizedImage::onMakeDecoded(Context* context, bool try
 
 std::shared_ptr<Image> RasterizedImage::onMakeMipmapped(bool enabled) const {
   auto newSource = source->makeMipmapped(enabled);
-  return newSource->makeRasterized();
+  auto image = std::make_shared<RasterizedImage>(uniqueKey, std::move(newSource));
+  image->weakThis = image;
+  return image;
 }
 
 UniqueKey RasterizedImage::getTextureKey() const {

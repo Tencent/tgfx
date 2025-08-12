@@ -25,7 +25,7 @@
 
 namespace tgfx {
 class ImageReader;
-class Texture;
+class TextureView;
 class Context;
 
 /**
@@ -56,15 +56,15 @@ class ImageStream {
   }
 
   /**
-   * Creates a new Texture capturing the pixels in the TextureBuffer. The mipmapped parameter
-   * specifies whether created texture must allocate mip map levels.
+   * Creates a new TextureView capturing the pixels in the ImageBuffer. The mipmapped parameter
+   * specifies whether created texture view must allocate mip map levels.
    */
-  virtual std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) = 0;
+  virtual std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) = 0;
 
   /**
-   * Updates the specified bounds of the texture with the pixels in the TextureBuffer.
+   * Updates the specified bounds of the texture view with the pixels in the ImageBuffer.
    */
-  virtual bool onUpdateTexture(std::shared_ptr<Texture> texture) = 0;
+  virtual bool onUpdateTexture(std::shared_ptr<TextureView> textureView) = 0;
 
  private:
   int _width = 0;

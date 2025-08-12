@@ -16,26 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <cstdint>
+#include "WGLGPU.h"
 
 namespace tgfx {
-/**
- * GPUBufferUsage defines the usage flags for GPU buffers.
- */
-class GPUBufferUsage {
- public:
-  /**
-   * The buffer can be used as an index buffer, for example as the buffer argument passed to
-   * RenderPass::setIndexBuffer().
-   */
-  static constexpr uint32_t INDEX = 0x10;
+bool HardwareBufferAvailable() {
+  return false;
+}
 
-  /**
-   * The buffer can be used as a vertex buffer, for example as the buffer argument passed to
-   * RenderPass::setVertexBuffer().
-   */
-  static constexpr uint32_t VERTEX = 0x20;
-};
+std::vector<PixelFormat> WGLGPU::getHardwareTextureFormats(HardwareBufferRef, YUVFormat*) const {
+  return {};
+}
+
+std::vector<std::unique_ptr<GPUTexture>> WGLGPU::importHardwareTextures(HardwareBufferRef) {
+  return {};
+}
 }  // namespace tgfx

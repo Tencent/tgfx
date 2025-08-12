@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,21 +16,31 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DefaultTexture.h"
-#include "core/utils/PixelFormatUtil.h"
+#pragma once
+
+#include <CoreVideo/CoreVideo.h>
+#include "gpu/opengl/GLTexture.h"
+#include "gpu/opengl/eagl/EAGLGPU.h"
 
 namespace tgfx {
-DefaultTexture::DefaultTexture(std::unique_ptr<TextureSampler> sampler, int width, int height,
-                               ImageOrigin origin)
-    : Texture(width, height, origin), _sampler(std::move(sampler)) {
-}
+class EAGLHardwareTexture : public GLTexture {
+ public:
+  static std::vector<std::unique_ptr<GPUTexture>> MakeFrom(EAGLGPU* gpu,
+                                                           CVPixelBufferRef pixelBuffer);
 
-size_t DefaultTexture::memoryUsage() const {
-  if (auto hardwareBuffer = _sampler->getHardwareBuffer()) {
-    return HardwareBufferGetInfo(hardwareBuffer).byteSize();
+  explicit EAGLHardwareTexture(CVPixelBufferRef pixelBuffer, CVOpenGLESTextureRef texture,
+                               unsigned id, unsigned target, PixelFormat format);
+
+  ~EAGLHardwareTexture() override;
+
+  HardwareBufferRef getHardwareBuffer() const override {
+    return pixelBuffer;
   }
-  auto colorSize = static_cast<size_t>(_width) * static_cast<size_t>(_height) *
-                   PixelFormatBytesPerPixel(_sampler->format());
-  return _sampler->hasMipmaps() ? colorSize * 4 / 3 : colorSize;
-}
+
+  void release(GPU* gpu) override;
+
+ private:
+  CVPixelBufferRef pixelBuffer = nullptr;
+  CVOpenGLESTextureRef texture = nil;
+};
 }  // namespace tgfx

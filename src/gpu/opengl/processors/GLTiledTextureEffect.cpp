@@ -191,7 +191,7 @@ void GLTiledTextureEffect::clampCoord(EmitArgs& args, const bool useClamp[2],
 }
 
 GLTiledTextureEffect::UniformNames GLTiledTextureEffect::initUniform(EmitArgs& args,
-                                                                     const Texture* texture,
+                                                                     const TextureView* textureView,
                                                                      const Sampling& sampling,
                                                                      const bool useClamp[2]) const {
   UniformNames names = {};
@@ -204,7 +204,7 @@ GLTiledTextureEffect::UniformNames GLTiledTextureEffect::initUniform(EmitArgs& a
   }
   bool unormCoordsRequiredForShaderMode = ShaderModeRequiresUnormCoord(sampling.shaderModeX) ||
                                           ShaderModeRequiresUnormCoord(sampling.shaderModeY);
-  bool sampleCoordsMustBeNormalized = texture->getSampler()->type() != SamplerType::Rectangle;
+  bool sampleCoordsMustBeNormalized = textureView->getTexture()->type() != TextureType::Rectangle;
   if (unormCoordsRequiredForShaderMode && sampleCoordsMustBeNormalized) {
     names.dimensionsName =
         uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float2, "Dimension");
@@ -214,8 +214,8 @@ GLTiledTextureEffect::UniformNames GLTiledTextureEffect::initUniform(EmitArgs& a
 
 void GLTiledTextureEffect::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
-  auto texture = getTexture();
-  if (texture == nullptr) {
+  auto textureView = getTextureView();
+  if (textureView == nullptr) {
     // emit a transparent color as the output color.
     fragBuilder->codeAppendf("%s = vec4(0.0);", args.outputColor.c_str());
     return;
@@ -224,7 +224,7 @@ void GLTiledTextureEffect::emitCode(EmitArgs& args) const {
   if (args.coordFunc) {
     vertexColor = args.coordFunc(vertexColor);
   }
-  Sampling sampling(texture, samplerState, subset);
+  Sampling sampling(textureView, samplerState, subset);
   if (sampling.shaderModeX == TiledTextureEffect::ShaderMode::None &&
       sampling.shaderModeY == TiledTextureEffect::ShaderMode::None) {
     fragBuilder->codeAppendf("%s = ", args.outputColor.c_str());
@@ -234,7 +234,7 @@ void GLTiledTextureEffect::emitCode(EmitArgs& args) const {
     fragBuilder->codeAppendf("vec2 inCoord = %s;", vertexColor.c_str());
     bool useClamp[2] = {ShaderModeUsesClamp(sampling.shaderModeX),
                         ShaderModeUsesClamp(sampling.shaderModeY)};
-    auto names = initUniform(args, texture, sampling, useClamp);
+    auto names = initUniform(args, textureView, sampling, useClamp);
     if (!names.dimensionsName.empty()) {
       fragBuilder->codeAppendf("inCoord /= %s;", names.dimensionsName.c_str());
     }
@@ -413,30 +413,32 @@ void GLTiledTextureEffect::emitCode(EmitArgs& args) const {
 }
 
 void GLTiledTextureEffect::onSetData(UniformBuffer* uniformBuffer) const {
-  auto texture = getTexture();
-  if (texture == nullptr) {
+  auto textureView = getTextureView();
+  if (textureView == nullptr) {
     return;
   }
-  Sampling sampling(texture, samplerState, subset);
+  Sampling sampling(textureView, samplerState, subset);
   auto hasDimensionUniform = (ShaderModeRequiresUnormCoord(sampling.shaderModeX) ||
                               ShaderModeRequiresUnormCoord(sampling.shaderModeY)) &&
-                             texture->getSampler()->type() != SamplerType::Rectangle;
+                             textureView->getTexture()->type() != TextureType::Rectangle;
   if (hasDimensionUniform) {
-    auto dimensions = texture->getTextureCoord(1.f, 1.f);
+    auto dimensions = textureView->getTextureCoord(1.f, 1.f);
     uniformBuffer->setData("Dimension", dimensions);
   }
   auto pushRect = [&](Rect subset, const std::string& uni) {
     float rect[4] = {subset.left, subset.top, subset.right, subset.bottom};
-    if (texture->origin() == ImageOrigin::BottomLeft) {
-      auto h = static_cast<float>(texture->height());
+    if (textureView->origin() == ImageOrigin::BottomLeft) {
+      auto h = static_cast<float>(textureView->height());
       rect[1] = h - rect[1];
       rect[3] = h - rect[3];
       std::swap(rect[1], rect[3]);
     }
-    auto type = texture->getSampler()->type();
-    if (!hasDimensionUniform && type != SamplerType::Rectangle) {
-      auto lt = texture->getTextureCoord(static_cast<float>(rect[0]), static_cast<float>(rect[1]));
-      auto rb = texture->getTextureCoord(static_cast<float>(rect[2]), static_cast<float>(rect[3]));
+    auto type = textureView->getTexture()->type();
+    if (!hasDimensionUniform && type != TextureType::Rectangle) {
+      auto lt =
+          textureView->getTextureCoord(static_cast<float>(rect[0]), static_cast<float>(rect[1]));
+      auto rb =
+          textureView->getTextureCoord(static_cast<float>(rect[2]), static_cast<float>(rect[3]));
       rect[0] = lt.x;
       rect[1] = lt.y;
       rect[2] = rb.x;

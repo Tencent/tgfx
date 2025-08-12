@@ -22,7 +22,7 @@
 #include "tgfx/platform/android/Global.h"
 
 namespace tgfx {
-class TextureSampler;
+class GPUTexture;
 
 /**
  * The SurfaceTexture class allows direct access to image data rendered into the Java Surface object
@@ -56,9 +56,9 @@ class SurfaceTexture : public ImageStream {
   void notifyFrameAvailable();
 
  protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) override;
+  std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) override;
 
-  bool onUpdateTexture(std::shared_ptr<Texture> texture) override;
+  bool onUpdateTexture(std::shared_ptr<TextureView> textureView) override;
 
  private:
   std::mutex locker = {};
@@ -71,7 +71,7 @@ class SurfaceTexture : public ImageStream {
 
   SurfaceTexture(int width, int height, JNIEnv* env, jobject surfaceTexture);
 
-  std::unique_ptr<TextureSampler> makeTextureSampler(Context* context);
+  std::unique_ptr<GPUTexture> makeGPUTexture(Context* context);
 
   ISize updateTexImage();
 

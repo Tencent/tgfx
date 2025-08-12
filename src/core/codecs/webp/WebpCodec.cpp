@@ -176,7 +176,7 @@ std::shared_ptr<Data> WebpCodec::Encode(const Pixmap& pixmap, int quality) {
   pic.writer = webp_reader_write_data;
   if (isLossless) {
     webp_config.lossless = 1;
-    webp_config.method = 0;
+    webp_config.method = 1;
     pic.use_argb = 1;
   } else {
     webp_config.lossless = 0;

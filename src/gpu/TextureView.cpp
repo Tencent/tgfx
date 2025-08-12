@@ -16,18 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/Texture.h"
+#include "gpu/TextureView.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "core/utils/UniqueID.h"
-#include "gpu/DefaultTexture.h"
+#include "gpu/DefaultTextureView.h"
 #include "gpu/GPU.h"
-#include "gpu/YUVTexture.h"
+#include "gpu/YUVTextureView.h"
 #if defined(__OHOS__)
 #include <native_buffer/native_buffer.h>
 #endif
 
 namespace tgfx {
-bool Texture::CheckSizeAndFormat(Context* context, int width, int height, PixelFormat format) {
+bool TextureView::CheckSizeAndFormat(Context* context, int width, int height, PixelFormat format) {
   if (context == nullptr || width < 1 || height < 1) {
     return false;
   }
@@ -53,63 +53,65 @@ static ScratchKey ComputeTextureScratchKey(int width, int height, PixelFormat fo
   return bytesKey;
 }
 
-std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int height,
-                                             const void* pixels, size_t rowBytes,
-                                             PixelFormat pixelFormat, bool mipmapped,
-                                             ImageOrigin origin) {
+std::shared_ptr<TextureView> TextureView::MakeFormat(Context* context, int width, int height,
+                                                     const void* pixels, size_t rowBytes,
+                                                     PixelFormat pixelFormat, bool mipmapped,
+                                                     ImageOrigin origin) {
   if (!CheckSizeAndFormat(context, width, height, pixelFormat)) {
     return nullptr;
   }
   auto hasMipmaps = context->caps()->mipmapSupport ? mipmapped : false;
   auto scratchKey = ComputeTextureScratchKey(width, height, pixelFormat, hasMipmaps);
-  auto texture = Resource::Find<Texture>(context, scratchKey);
-  if (texture) {
-    texture->_origin = origin;
+  auto textureView = Resource::Find<TextureView>(context, scratchKey);
+  if (textureView) {
+    textureView->_origin = origin;
   } else {
-    auto sampler = TextureSampler::Make(context, width, height, pixelFormat, hasMipmaps);
-    if (sampler == nullptr) {
+    auto texture = GPUTexture::Make(context, width, height, pixelFormat, hasMipmaps);
+    if (texture == nullptr) {
       return nullptr;
     }
-    texture = Resource::AddToCache(
-        context, new DefaultTexture(std::move(sampler), width, height, origin), scratchKey);
+    textureView = Resource::AddToCache(
+        context, new DefaultTextureView(std::move(texture), width, height, origin), scratchKey);
   }
   if (pixels != nullptr) {
-    auto sampler = texture->getSampler();
-    sampler->writePixels(context, Rect::MakeWH(width, height), pixels, rowBytes);
+    auto texture = textureView->getTexture();
+    texture->writePixels(context, Rect::MakeWH(width, height), pixels, rowBytes);
   }
-  return texture;
+  return textureView;
 }
 
-std::shared_ptr<Texture> Texture::MakeFrom(Context* context, const BackendTexture& backendTexture,
-                                           ImageOrigin origin, bool adopted) {
+std::shared_ptr<TextureView> TextureView::MakeFrom(Context* context,
+                                                   const BackendTexture& backendTexture,
+                                                   ImageOrigin origin, bool adopted) {
   if (context == nullptr || !backendTexture.isValid()) {
     return nullptr;
   }
-  auto sampler = TextureSampler::MakeFrom(context, backendTexture, adopted);
-  if (sampler == nullptr) {
+  auto texture = GPUTexture::MakeFrom(context, backendTexture, adopted);
+  if (texture == nullptr) {
     return nullptr;
   }
   ScratchKey scratchKey = {};
   if (adopted) {
     scratchKey = ComputeTextureScratchKey(backendTexture.width(), backendTexture.height(),
-                                          sampler->format(), sampler->hasMipmaps());
+                                          texture->format(), texture->hasMipmaps());
   }
-  auto texture = new DefaultTexture(std::move(sampler), backendTexture.width(),
-                                    backendTexture.height(), origin);
-  return Resource::AddToCache(context, texture, scratchKey);
+  auto textureView = new DefaultTextureView(std::move(texture), backendTexture.width(),
+                                            backendTexture.height(), origin);
+  return Resource::AddToCache(context, textureView, scratchKey);
 }
 
-std::shared_ptr<Texture> Texture::MakeFrom(Context* context,
-                                           std::shared_ptr<ImageBuffer> imageBuffer,
-                                           bool mipmapped) {
+std::shared_ptr<TextureView> TextureView::MakeFrom(Context* context,
+                                                   std::shared_ptr<ImageBuffer> imageBuffer,
+                                                   bool mipmapped) {
   if (context == nullptr || imageBuffer == nullptr) {
     return nullptr;
   }
   return imageBuffer->onMakeTexture(context, mipmapped);
 }
 
-std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
-                                           YUVColorSpace colorSpace) {
+std::shared_ptr<TextureView> TextureView::MakeFrom(Context* context,
+                                                   HardwareBufferRef hardwareBuffer,
+                                                   YUVColorSpace colorSpace) {
   auto size = HardwareBufferGetSize(hardwareBuffer);
   if (size.isEmpty()) {
     return nullptr;
@@ -147,22 +149,25 @@ std::shared_ptr<Texture> Texture::MakeFrom(Context* context, HardwareBufferRef h
   }
 #endif
 
-  YUVFormat yuvFormat = YUVFormat::Unknown;
-  auto samplers = TextureSampler::MakeFrom(context, hardwareBuffer, &yuvFormat);
-  if (samplers.empty()) {
+  auto textures = context->gpu()->importHardwareTextures(hardwareBuffer);
+  if (textures.empty()) {
     return nullptr;
   }
-  Texture* texture = nullptr;
-  if (samplers.size() == 1) {
-    texture = new DefaultTexture(std::move(samplers.front()), size.width, size.height);
+  TextureView* textureView = nullptr;
+  if (textures.size() == 1) {
+    textureView = new DefaultTextureView(std::move(textures.front()), size.width, size.height);
   } else {
-    texture = new YUVTexture(std::move(samplers), size.width, size.height, yuvFormat, colorSpace);
+    YUVFormat yuvFormat = YUVFormat::Unknown;
+    context->gpu()->getHardwareTextureFormats(hardwareBuffer, &yuvFormat);
+    DEBUG_ASSERT(yuvFormat != YUVFormat::Unknown);
+    textureView =
+        new YUVTextureView(std::move(textures), size.width, size.height, yuvFormat, colorSpace);
   }
-  return Resource::AddToCache(context, texture);
+  return Resource::AddToCache(context, textureView);
 }
 
-Point Texture::getTextureCoord(float x, float y) const {
-  if (getSampler()->type() == SamplerType::Rectangle) {
+Point TextureView::getTextureCoord(float x, float y) const {
+  if (getTexture()->type() == TextureType::Rectangle) {
     return {x, y};
   }
   return {x / static_cast<float>(width()), y / static_cast<float>(height())};

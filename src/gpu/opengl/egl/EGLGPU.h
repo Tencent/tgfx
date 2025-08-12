@@ -18,10 +18,26 @@
 
 #pragma once
 
-#include <windows.h>
+#include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
-void GetPixelFormatsToTry(HDC deviceContext, int formatsToTry[2]);
+class EGLGPU : public GLGPU {
+ public:
+  EGLGPU(std::shared_ptr<GLInterface> glInterface, void* eglDisplay)
+      : GLGPU(std::move(glInterface)), eglDisplay(eglDisplay) {
+  }
 
-HGLRC CreateGLContext(HDC deviceContext, HGLRC sharedContext);
+  void* getDisplay() const {
+    return eglDisplay;
+  }
+
+  std::vector<PixelFormat> getHardwareTextureFormats(HardwareBufferRef hardwareBuffer,
+                                                     YUVFormat* yuvFormat) const override;
+
+  std::vector<std::unique_ptr<GPUTexture>> importHardwareTextures(
+      HardwareBufferRef hardwareBuffer) override;
+
+ private:
+  void* eglDisplay = nullptr;
+};
 }  // namespace tgfx

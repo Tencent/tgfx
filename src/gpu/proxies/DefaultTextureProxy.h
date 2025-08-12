@@ -23,13 +23,13 @@
 namespace tgfx {
 class DefaultTextureProxy : public TextureProxy {
  public:
-  std::shared_ptr<Texture> getTexture() const override;
+  std::shared_ptr<TextureView> getTextureView() const override;
 
  protected:
   DefaultTextureProxy(int width, int height, PixelFormat pixelFormat, bool mipmapped = false,
                       ImageOrigin origin = ImageOrigin::TopLeft);
 
-  virtual std::shared_ptr<Texture> onMakeTexture(Context* context) const;
+  virtual std::shared_ptr<TextureView> onMakeTexture(Context* context) const;
 
  private:
   friend class ProxyProvider;

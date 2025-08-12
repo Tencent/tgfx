@@ -19,6 +19,7 @@
 #pragma once
 
 #include "gpu/GPUBuffer.h"
+#include "gpu/opengl/GLInterface.h"
 
 namespace tgfx {
 /**
@@ -46,9 +47,11 @@ class GLBuffer : public GPUBuffer {
     return _bufferID;
   }
 
-  void release(const GPU* gpu) override;
+  void release(GPU* gpu) override;
 
  private:
   unsigned _bufferID = 0;
+
+  friend class GLGPU;
 };
 }  // namespace tgfx

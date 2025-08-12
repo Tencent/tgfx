@@ -32,7 +32,7 @@ unsigned GLBuffer::target() const {
   return 0;
 }
 
-void GLBuffer::release(const GPU* gpu) {
+void GLBuffer::release(GPU* gpu) {
   DEBUG_ASSERT(gpu != nullptr);
   if (_bufferID > 0) {
     auto gl = static_cast<const GLGPU*>(gpu)->functions();

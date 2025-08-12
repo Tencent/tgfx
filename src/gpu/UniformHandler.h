@@ -21,7 +21,7 @@
 #include "SamplerHandle.h"
 #include "ShaderVar.h"
 #include "Swizzle.h"
-#include "gpu/TextureSampler.h"
+#include "gpu/GPUTexture.h"
 
 namespace tgfx {
 class ProgramBuilder;
@@ -43,7 +43,7 @@ class UniformHandler {
   /**
    * Adds a sampler to the current program.
    */
-  SamplerHandle addSampler(const TextureSampler* sampler, const std::string& name);
+  SamplerHandle addSampler(GPUTexture* texture, const std::string& name);
 
  protected:
   explicit UniformHandler(ProgramBuilder* program) : programBuilder(program) {
@@ -60,8 +60,7 @@ class UniformHandler {
   virtual std::string internalAddUniform(ShaderFlags visibility, SLType type,
                                          const std::string& name) = 0;
 
-  virtual SamplerHandle internalAddSampler(const TextureSampler* sampler,
-                                           const std::string& name) = 0;
+  virtual SamplerHandle internalAddSampler(GPUTexture* texture, const std::string& name) = 0;
 
   virtual std::string getUniformDeclarations(ShaderFlags visibility) const = 0;
 

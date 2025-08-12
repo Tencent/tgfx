@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "gpu/GPU.h"
 #include "gpu/GPUBuffer.h"
 #include "gpu/Resource.h"
 
@@ -42,7 +43,7 @@ class IndexBuffer : public Resource {
   /**
    * Returns the GPUBuffer associated with this IndexBuffer.
    */
-  const GPUBuffer* gpuBuffer() const {
+  GPUBuffer* gpuBuffer() const {
     return buffer.get();
   }
 

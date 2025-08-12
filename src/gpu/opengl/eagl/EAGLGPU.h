@@ -16,21 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/Texture.h"
-#include "tgfx/platform/HardwareBuffer.h"
+#pragma once
+
+#include <CoreVideo/CoreVideo.h>
+#include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
-bool HardwareBufferAvailable() {
-  return false;
-}
+class EAGLGPU : public GLGPU {
+ public:
+  explicit EAGLGPU(std::shared_ptr<GLInterface> glInterface, EAGLContext* eaglContext)
+      : GLGPU(std::move(glInterface)), eaglContext(eaglContext) {
+  }
 
-PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef) {
-  return PixelFormat::Unknown;
-}
+  ~EAGLGPU() override;
 
-std::vector<std::unique_ptr<TextureSampler>> TextureSampler::MakeFrom(Context*, HardwareBufferRef,
-                                                                      YUVFormat*) {
-  return {};
-}
+  CVOpenGLESTextureCacheRef getTextureCache();
 
+  std::vector<PixelFormat> getHardwareTextureFormats(HardwareBufferRef hardwareBuffer,
+                                                     YUVFormat* yuvFormat) const override;
+
+  std::vector<std::unique_ptr<GPUTexture>> importHardwareTextures(
+      HardwareBufferRef hardwareBuffer) override;
+
+ private:
+  EAGLContext* eaglContext = nil;
+  CVOpenGLESTextureCacheRef textureCache = nil;
+};
 }  // namespace tgfx

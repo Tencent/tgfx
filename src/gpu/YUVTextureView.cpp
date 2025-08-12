@@ -16,49 +16,49 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "YUVTexture.h"
+#include "YUVTextureView.h"
 #include "core/utils/Log.h"
 #include "gpu/GPU.h"
 
 namespace tgfx {
 static constexpr int YUV_SIZE_FACTORS[] = {0, 1, 1};
 
-static std::vector<std::unique_ptr<TextureSampler>> MakeTexturePlanes(Context* context,
-                                                                      const YUVData* yuvData,
-                                                                      const PixelFormat* formats) {
-  std::vector<std::unique_ptr<TextureSampler>> texturePlanes = {};
+static std::vector<std::unique_ptr<GPUTexture>> MakeTexturePlanes(Context* context,
+                                                                  const YUVData* yuvData,
+                                                                  const PixelFormat* formats) {
+  std::vector<std::unique_ptr<GPUTexture>> texturePlanes = {};
   auto count = static_cast<int>(yuvData->planeCount());
   for (int index = 0; index < count; index++) {
     auto w = yuvData->width() >> YUV_SIZE_FACTORS[index];
     auto h = yuvData->height() >> YUV_SIZE_FACTORS[index];
-    auto sampler = TextureSampler::Make(context, w, h, formats[index]);
-    if (sampler == nullptr) {
+    auto texture = GPUTexture::Make(context, w, h, formats[index]);
+    if (texture == nullptr) {
       for (auto& plane : texturePlanes) {
-        plane->releaseGPU(context);
+        plane->release(context->gpu());
       }
       return {};
     }
-    texturePlanes.push_back(std::move(sampler));
+    texturePlanes.push_back(std::move(texture));
   }
   return texturePlanes;
 }
 
 static void SubmitYUVTexture(Context* context, const YUVData* yuvData,
-                             std::unique_ptr<TextureSampler> samplers[]) {
+                             std::unique_ptr<GPUTexture> textures[]) {
   auto count = yuvData->planeCount();
   for (size_t index = 0; index < count; index++) {
-    auto& sampler = samplers[index];
+    auto& texture = textures[index];
     auto w = yuvData->width() >> YUV_SIZE_FACTORS[index];
     auto h = yuvData->height() >> YUV_SIZE_FACTORS[index];
     auto pixels = yuvData->getBaseAddressAt(index);
     auto rowBytes = yuvData->getRowBytesAt(index);
-    sampler->writePixels(context, Rect::MakeWH(w, h), pixels, rowBytes);
+    texture->writePixels(context, Rect::MakeWH(w, h), pixels, rowBytes);
     // YUV textures do not support mipmaps, so we don't need to regenerate mipmaps.
   }
 }
 
-std::shared_ptr<Texture> Texture::MakeI420(Context* context, const YUVData* yuvData,
-                                           YUVColorSpace colorSpace) {
+std::shared_ptr<TextureView> TextureView::MakeI420(Context* context, const YUVData* yuvData,
+                                                   YUVColorSpace colorSpace) {
   if (context == nullptr || yuvData == nullptr ||
       yuvData->planeCount() != YUVData::I420_PLANE_COUNT) {
     return nullptr;
@@ -69,15 +69,16 @@ std::shared_ptr<Texture> Texture::MakeI420(Context* context, const YUVData* yuvD
   if (texturePlanes.empty()) {
     return nullptr;
   }
-  auto yuvTexture = new YUVTexture(std::move(texturePlanes), yuvData->width(), yuvData->height(),
-                                   YUVFormat::I420, colorSpace);
-  auto texture = std::static_pointer_cast<YUVTexture>(Resource::AddToCache(context, yuvTexture));
-  SubmitYUVTexture(context, yuvData, texture->samplers.data());
+  auto yuvTexture = new YUVTextureView(std::move(texturePlanes), yuvData->width(),
+                                       yuvData->height(), YUVFormat::I420, colorSpace);
+  auto texture =
+      std::static_pointer_cast<YUVTextureView>(Resource::AddToCache(context, yuvTexture));
+  SubmitYUVTexture(context, yuvData, texture->textures.data());
   return texture;
 }
 
-std::shared_ptr<Texture> Texture::MakeNV12(Context* context, const YUVData* yuvData,
-                                           YUVColorSpace colorSpace) {
+std::shared_ptr<TextureView> TextureView::MakeNV12(Context* context, const YUVData* yuvData,
+                                                   YUVColorSpace colorSpace) {
   if (context == nullptr || yuvData == nullptr ||
       yuvData->planeCount() != YUVData::NV12_PLANE_COUNT) {
     return nullptr;
@@ -87,24 +88,26 @@ std::shared_ptr<Texture> Texture::MakeNV12(Context* context, const YUVData* yuvD
   if (texturePlanes.empty()) {
     return nullptr;
   }
-  auto yuvTexture = new YUVTexture(std::move(texturePlanes), yuvData->width(), yuvData->height(),
-                                   YUVFormat::NV12, colorSpace);
-  auto texture = std::static_pointer_cast<YUVTexture>(Resource::AddToCache(context, yuvTexture));
-  SubmitYUVTexture(context, yuvData, texture->samplers.data());
+  auto yuvTexture = new YUVTextureView(std::move(texturePlanes), yuvData->width(),
+                                       yuvData->height(), YUVFormat::NV12, colorSpace);
+  auto texture =
+      std::static_pointer_cast<YUVTextureView>(Resource::AddToCache(context, yuvTexture));
+  SubmitYUVTexture(context, yuvData, texture->textures.data());
   return texture;
 }
 
-YUVTexture::YUVTexture(std::vector<std::unique_ptr<TextureSampler>> yuvSamplers, int width,
-                       int height, YUVFormat yuvFormat, YUVColorSpace colorSpace)
-    : Texture(width, height, ImageOrigin::TopLeft), _yuvFormat(yuvFormat), _colorSpace(colorSpace) {
+YUVTextureView::YUVTextureView(std::vector<std::unique_ptr<GPUTexture>> yuvTextures, int width,
+                               int height, YUVFormat yuvFormat, YUVColorSpace colorSpace)
+    : TextureView(width, height, ImageOrigin::TopLeft), _yuvFormat(yuvFormat),
+      _colorSpace(colorSpace) {
   DEBUG_ASSERT(_yuvFormat != YUVFormat::Unknown);
-  DEBUG_ASSERT(yuvSamplers.size() == samplerCount());
-  for (size_t i = 0; i < yuvSamplers.size(); ++i) {
-    samplers[i] = std::move(yuvSamplers[i]);
+  DEBUG_ASSERT(yuvTextures.size() == textureCount());
+  for (size_t i = 0; i < yuvTextures.size(); ++i) {
+    textures[i] = std::move(yuvTextures[i]);
   }
 }
 
-size_t YUVTexture::samplerCount() const {
+size_t YUVTextureView::textureCount() const {
   switch (_yuvFormat) {
     case YUVFormat::I420:
       return YUVData::I420_PLANE_COUNT;
@@ -116,26 +119,26 @@ size_t YUVTexture::samplerCount() const {
   }
 }
 
-TextureSampler* YUVTexture::getSamplerAt(size_t index) const {
-  DEBUG_ASSERT(index < samplerCount());
-  return samplers[index].get();
+GPUTexture* YUVTextureView::getTextureAt(size_t index) const {
+  DEBUG_ASSERT(index < textureCount());
+  return textures[index].get();
 }
 
-size_t YUVTexture::memoryUsage() const {
-  if (auto hardwareBuffer = samplers.front()->getHardwareBuffer()) {
+size_t YUVTextureView::memoryUsage() const {
+  if (auto hardwareBuffer = textures.front()->getHardwareBuffer()) {
     return HardwareBufferGetInfo(hardwareBuffer).byteSize();
   }
   return static_cast<size_t>(_width) * static_cast<size_t>(_height) * 3 / 2;
 }
 
-Point YUVTexture::getTextureCoord(float x, float y) const {
+Point YUVTextureView::getTextureCoord(float x, float y) const {
   return {x / static_cast<float>(_width), y / static_cast<float>(_height)};
 }
 
-void YUVTexture::onReleaseGPU() {
-  auto count = samplerCount();
+void YUVTextureView::onReleaseGPU() {
+  auto count = textureCount();
   for (size_t i = 0; i < count; ++i) {
-    samplers[i]->releaseGPU(context);
+    textures[i]->release(context->gpu());
   }
 }
 }  // namespace tgfx

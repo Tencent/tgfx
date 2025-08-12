@@ -23,7 +23,7 @@
 #include "gpu/FragmentShaderBuilder.h"
 #include "gpu/SamplerState.h"
 #include "gpu/SamplingArgs.h"
-#include "gpu/Texture.h"
+#include "gpu/TextureView.h"
 #include "gpu/UniformBuffer.h"
 #include "gpu/UniformHandler.h"
 #include "gpu/processors/Processor.h"
@@ -115,12 +115,12 @@ class FragmentProcessor : public Processor {
     return onCountTextureSamplers();
   }
 
-  const TextureSampler* textureSampler(size_t i) const {
-    return onTextureSampler(i);
+  GPUTexture* textureAt(size_t i) const {
+    return onTextureAt(i);
   }
 
-  SamplerState samplerState(size_t i) const {
-    return onSamplerState(i);
+  SamplerState samplerStateAt(size_t i) const {
+    return onSamplerStateAt(i);
   }
 
   void computeProcessorKey(Context* context, BytesKey* bytesKey) const override;
@@ -234,7 +234,7 @@ class FragmentProcessor : public Processor {
      */
     const TransformedCoordVars* transformedCoords;
     /**
-     * Contains one entry for each TextureSampler of the Processor. These can be passed to the
+     * Contains one entry for each GPUTexture of the Processor. These can be passed to the
      * builder to emit texture reads in the generated code.
      */
     const TextureSamplers* textureSamplers;
@@ -321,11 +321,11 @@ class FragmentProcessor : public Processor {
     return 0;
   }
 
-  virtual const TextureSampler* onTextureSampler(size_t) const {
+  virtual GPUTexture* onTextureAt(size_t) const {
     return nullptr;
   }
 
-  virtual SamplerState onSamplerState(size_t) const {
+  virtual SamplerState onSamplerStateAt(size_t) const {
     return {};
   }
 

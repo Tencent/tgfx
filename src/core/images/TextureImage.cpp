@@ -42,14 +42,14 @@ BackendTexture TextureImage::getBackendTexture(Context* context, ImageOrigin* or
     return {};
   }
   context->flush();
-  auto texture = textureProxy->getTexture();
-  if (texture == nullptr) {
+  auto textureView = textureProxy->getTextureView();
+  if (textureView == nullptr) {
     return {};
   }
   if (origin != nullptr) {
     *origin = textureProxy->origin();
   }
-  return texture->getBackendTexture();
+  return textureView->getBackendTexture();
 }
 
 std::shared_ptr<Image> TextureImage::makeTextureImage(Context* context) const {

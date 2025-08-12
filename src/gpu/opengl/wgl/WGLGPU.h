@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,29 +18,18 @@
 
 #pragma once
 
-#include <CoreVideo/CoreVideo.h>
-#include "gpu/opengl/GLTextureSampler.h"
+#include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
-class CGLHardwareTextureSampler : public GLTextureSampler {
+class WGLGPU : public GLGPU {
  public:
-  static std::unique_ptr<CGLHardwareTextureSampler> MakeFrom(CVPixelBufferRef pixelBuffer,
-                                                             CVOpenGLTextureCacheRef textureCache);
-
-  ~CGLHardwareTextureSampler() override;
-
-  HardwareBufferRef getHardwareBuffer() const override {
-    return pixelBuffer;
+  explicit WGLGPU(std::shared_ptr<GLInterface> glInterface) : GLGPU(std::move(glInterface)) {
   }
 
-  void releaseGPU(Context*) override;
+  std::vector<PixelFormat> getHardwareTextureFormats(HardwareBufferRef hardwareBuffer,
+                                                     YUVFormat* yuvFormat) const override;
 
- private:
-  CVPixelBufferRef pixelBuffer = nullptr;
-  CVOpenGLTextureRef texture = nil;
-  CVOpenGLTextureCacheRef textureCache = nil;
-
-  CGLHardwareTextureSampler(CVPixelBufferRef pixelBuffer, CVOpenGLTextureCacheRef textureCache,
-                            unsigned id, unsigned target, PixelFormat format);
+  std::vector<std::unique_ptr<GPUTexture>> importHardwareTextures(
+      HardwareBufferRef hardwareBuffer) override;
 };
 }  // namespace tgfx

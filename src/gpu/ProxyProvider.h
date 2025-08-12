@@ -46,7 +46,7 @@ class ProxyProvider {
 
   /**
    * Returns the texture proxy for the given UniqueKey. If the proxy doesn't exist but a texture
-   * with the same UniqueKey does, it wraps the texture in a TextureProxy and returns it.
+   * view with the same UniqueKey does, it wraps the texture view in a texture proxy and returns it.
    */
   std::shared_ptr<TextureProxy> findOrWrapTextureProxy(const UniqueKey& uniqueKey);
 
@@ -61,7 +61,7 @@ class ProxyProvider {
    * Creates a VertexBufferProxyView from the given VertexProvider. The provider will be released
    * after being uploaded to the GPU.
    */
-  std::shared_ptr<VertexBufferProxyView> createVertexBufferProxyView(
+  std::shared_ptr<VertexBufferProxyView> createVertexBufferProxy(
       PlacementPtr<VertexProvider> provider, uint32_t renderFlags = 0);
 
   /**
@@ -104,8 +104,8 @@ class ProxyProvider {
                                                    uint32_t renderFlags = 0);
 
   /**
-   * Creates a TextureProxy for the provided BackendTexture. If adopted is true, the backend
-   * texture will be destroyed at a later point after the proxy is released.
+   * Creates a texture proxy for the provided BackendTexture. If adopted is true, the backend
+   * texture will be destroyed at a later point after the texture proxy is released.
    */
   std::shared_ptr<TextureProxy> wrapBackendTexture(const BackendTexture& backendTexture,
                                                    ImageOrigin origin = ImageOrigin::TopLeft,

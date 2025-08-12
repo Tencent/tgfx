@@ -864,7 +864,7 @@ class Matrix {
     }
   }
 
-  using MapPtsProc = void (*)(const Matrix& mat, Point dst[], const Point src[], int count);
+  using MapPtsProc = void (*)(const Matrix& mat, Point* dst, const Point* src, int count);
 
   static MapPtsProc GetMapPtsProc(TypeMask mask) {
     return MapPtsProcs[mask & AllMasks];

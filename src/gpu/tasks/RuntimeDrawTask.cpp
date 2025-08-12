@@ -42,7 +42,7 @@ RuntimeDrawTask::RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
       auto maskRect = Rect::MakeWH(input->width(), input->height());
       auto maskVertexProvider =
           RectsVertexProvider::MakeFrom(context->drawingBuffer(), maskRect, AAType::None);
-      auto maskBuffer = context->proxyProvider()->createVertexBufferProxyView(
+      auto maskBuffer = context->proxyProvider()->createVertexBufferProxy(
           std::move(maskVertexProvider), RenderFlags::DisableAsyncTask);
       inputVertexBuffers.push_back(std::move(maskBuffer));
     } else {
@@ -52,18 +52,18 @@ RuntimeDrawTask::RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
 }
 
 void RuntimeDrawTask::execute(CommandEncoder* encoder) {
-  std::vector<std::shared_ptr<Texture>> textures = {};
+  std::vector<std::shared_ptr<TextureView>> textures = {};
   textures.reserve(inputTextures.size());
   for (size_t i = 0; i < inputTextures.size(); i++) {
-    std::shared_ptr<Texture> texture;
+    std::shared_ptr<TextureView> textureView = nullptr;
     if (auto inputProxy = inputTextures[i]) {
-      texture = GetFlatTexture(encoder, std::move(inputProxy), inputVertexBuffers[i].get());
+      textureView = GetFlatTextureView(encoder, std::move(inputProxy), inputVertexBuffers[i].get());
     }
-    if (texture == nullptr) {
-      LOGE("RuntimeDrawTask::execute() Failed to get the input %d texture!", i);
+    if (textureView == nullptr) {
+      LOGE("RuntimeDrawTask::execute() Failed to get the input %d texture view!", i);
       return;
     }
-    textures.push_back(texture);
+    textures.push_back(textureView);
   }
   auto renderTarget = renderTargetProxy->getRenderTarget();
   if (renderTarget == nullptr) {
@@ -79,8 +79,8 @@ void RuntimeDrawTask::execute(CommandEncoder* encoder) {
   }
   std::vector<BackendTexture> backendTextures = {};
   backendTextures.reserve(textures.size());
-  for (auto& texture : textures) {
-    backendTextures.push_back(texture->getBackendTexture());
+  for (auto& textureView : textures) {
+    backendTextures.push_back(textureView->getBackendTexture());
   }
   effect->onDraw(RuntimeProgramWrapper::Unwrap(program.get()), backendTextures,
                  renderTarget->getBackendRenderTarget(), offset);
@@ -91,25 +91,25 @@ void RuntimeDrawTask::execute(CommandEncoder* encoder) {
   }
 }
 
-std::shared_ptr<Texture> RuntimeDrawTask::GetFlatTexture(
+std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
     CommandEncoder* encoder, std::shared_ptr<TextureProxy> textureProxy,
     VertexBufferProxyView* vertexBufferProxyView) {
-  auto texture = textureProxy->getTexture();
-  if (texture == nullptr) {
+  auto textureView = textureProxy->getTextureView();
+  if (textureView == nullptr) {
     return nullptr;
   }
-  if (!texture->isYUV() && texture->getSampler()->type() == SamplerType::TwoD &&
-      texture->origin() == ImageOrigin::TopLeft) {
-    return texture;
+  if (!textureView->isYUV() && textureView->getTexture()->type() == TextureType::TwoD &&
+      textureView->origin() == ImageOrigin::TopLeft) {
+    return textureView;
   }
   auto vertexBuffer = vertexBufferProxyView ? vertexBufferProxyView->getBuffer() : nullptr;
   if (vertexBuffer == nullptr) {
     return nullptr;
   }
-  auto context = texture->getContext();
+  auto context = textureView->getContext();
   auto renderTargetProxy = RenderTargetProxy::MakeFallback(
-      context, texture->width(), texture->height(), texture->isAlphaOnly(), 1,
-      texture->hasMipmaps(), ImageOrigin::TopLeft, BackingFit::Exact);
+      context, textureView->width(), textureView->height(), textureView->isAlphaOnly(), 1,
+      textureView->hasMipmaps(), ImageOrigin::TopLeft, BackingFit::Exact);
   if (renderTargetProxy == nullptr) {
     LOGE("RuntimeDrawTask::getFlatTexture() Failed to create the render target!");
     return nullptr;
@@ -140,7 +140,7 @@ std::shared_ptr<Texture> RuntimeDrawTask::GetFlatTexture(
   renderPass->bindBuffers(nullptr, vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
   renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
   renderPass->end();
-  return renderTarget->asTexture();
+  return renderTarget->asTextureView();
 }
 
 }  // namespace tgfx
