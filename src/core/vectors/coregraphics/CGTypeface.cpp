@@ -22,9 +22,7 @@
 #include "core/AdvancedTypefaceProperty.h"
 #include "core/utils/UniqueID.h"
 #include "tgfx/core/FontStyle.h"
-#include "tgfx/core/Rect.h"
 #include "tgfx/core/Typeface.h"
-#include "tgfx/core/UTF.h"
 
 namespace tgfx {
 
@@ -443,7 +441,7 @@ AdvancedTypefaceProperty CGTypeface::getAdvancedProperty() const {
 }
 #endif
 
-std::shared_ptr<Data> CGTypeface::openData() const {
+std::shared_ptr<Data> CGTypeface::openAndGetBytes() const {
   return data;
 };
 

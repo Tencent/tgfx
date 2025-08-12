@@ -20,14 +20,10 @@
 #include <freetype/ftfntfmt.h>
 #include <memory>
 #include "ft2build.h"
-#include "tgfx/core/FontMetrics.h"
-#include "tgfx/core/Stream.h"
-#include "tgfx/core/Typeface.h"
 #include FT_BITMAP_H
 #include FT_OUTLINE_H
 #include FT_SIZES_H
 #include FT_TRUETYPE_TABLES_H
-#include <array>
 #include "FTRasterTarget.h"
 #include "FTUtil.h"
 #include "core/utils/ClearPixels.h"
@@ -110,7 +106,7 @@ static void ApplyEmbolden(FT_Face face, FT_GlyphSlot glyph, GlyphID glyphId, FT_
 /**
  * Returns the bitmap strike equal to or just larger than the requested size.
  */
-FT_Int ChooseBitmapStrike(FT_Face face, FT_F26Dot6 scaleY) {
+static FT_Int ChooseBitmapStrike(FT_Face face, FT_F26Dot6 scaleY) {
   FT_Pos requestedPPEM = scaleY;  // FT_Bitmap_Size::y_ppem is in 26.6 format.
   FT_Int chosenStrikeIndex = -1;
   FT_Pos chosenPPEM = 0;

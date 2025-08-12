@@ -21,9 +21,7 @@
 #include "core/utils/FauxBoldScale.h"
 #include "core/utils/Log.h"
 #include "platform/apple/BitmapContextUtil.h"
-#include "tgfx/core/FontMetrics.h"
 #include "tgfx/core/PathEffect.h"
-#include "tgfx/core/Typeface.h"
 
 namespace tgfx {
 

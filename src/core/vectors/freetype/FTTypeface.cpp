@@ -28,7 +28,6 @@
 #include "SystemFont.h"
 #include "core/utils/UniqueID.h"
 #include "tgfx/core/Stream.h"
-#include "tgfx/core/UTF.h"
 
 namespace tgfx {
 std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,

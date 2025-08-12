@@ -22,7 +22,7 @@
 #elif defined(_WIN32)
 #include <wincrypt.h>
 #include <windows.h>
-#elif defined(__linux__)
+#elif defined(__linux__) && !defined(__ANDROID__) && !defined(ANDROID)
 #include <openssl/md5.h>
 #else
 #include "algorithm/md5.hpp"
@@ -53,7 +53,7 @@ MD5::Digest MD5::Calculate(const void* bytes, size_t size) {
     }
     CryptReleaseContext(hProv, 0);
   }
-#elif defined(__linux__)
+#elif defined(__linux__) && !defined(__ANDROID__) && !defined(ANDROID)
   MD5(static_cast<const unsigned char*>(bytes), size, digest.data());
 #else
   // Fallback to digestpp for other platforms

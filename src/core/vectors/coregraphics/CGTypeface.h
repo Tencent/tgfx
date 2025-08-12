@@ -71,7 +71,7 @@ class CGTypeface : public Typeface {
   AdvancedTypefaceProperty getAdvancedProperty() const override;
 #endif
 
-  std::shared_ptr<Data> openData() const override;
+  std::shared_ptr<Data> openAndGetBytes() const override;
 
   std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;
 
