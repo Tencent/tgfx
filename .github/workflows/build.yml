@@ -5,6 +5,22 @@ on:
     branches: [ main ]
   push:
     branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      job:
+        description: 'Job to run (optional)'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - ios
+          - android
+          - web
+          - win
+          - linux
+          - qt
+          - openharmony
 
 jobs:
   ios:
@@ -340,3 +356,82 @@ jobs:
         with:
           name: qt_build
           path: out
+
+
+  openharmony:
+    runs-on: macos-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+          
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            third_party
+          key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third-party-openharmony-
+
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+        shell: bash
+
+      - name: Setup OpenHarmony Build Environment
+        uses: eclipse-oniro4openharmony/oh-app-action@main
+        with:
+          working-directory: './ohos'
+
+      - name: Configure SDK Path
+        run: |
+          cd ohos
+          # Set SDK path from environment variables set by oh-app-action
+          if [ -n "${HOS_SDK_HOME:-}" ]; then
+            SDK_PATH="${HOS_SDK_HOME}"
+          elif [ -n "${CMD_PATH:-}" ]; then
+            SDK_PATH="${CMD_PATH}"
+          else
+            SDK_PATH="${HOME}/command-line-tools"
+          fi
+          
+          echo "hwsdk.dir=${SDK_PATH}" > local.properties
+          echo "Configured SDK path: ${SDK_PATH}"
+        shell: bash
+
+      - name: Install Dependencies
+        run: |
+          cd ohos
+          ohpm install --all
+        shell: bash
+          
+      - name: Build OpenHarmony Project
+        run: |
+          cd ohos
+          chmod +x ./hvigorw
+          ./hvigorw --version --accept-license
+          ./hvigorw clean --no-parallel --no-daemon
+          ./hvigorw assembleHap --mode module -p product=default --stacktrace --no-parallel --no-daemon
+        shell: bash
+          
+      - name: Additional Setup
+        run: |
+          mkdir -p third_party/tgfx/out/cache
+
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with: 
+          path: |
+            third_party
+          key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          
+      - name: Job Failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with: 
+          name: openharmony_build
+          path: ohos        
