@@ -20,8 +20,10 @@
 #if defined(__APPLE__)
 #include <CommonCrypto/CommonDigest.h>
 #elif defined(_WIN32)
-#include <wincrypt.h>
+// clang-format off
 #include <windows.h>
+#include <wincrypt.h>
+// clang-format on
 #elif defined(__linux__) && !defined(__ANDROID__) && !defined(ANDROID)
 #include <openssl/md5.h>
 #else
@@ -54,7 +56,7 @@ MD5::Digest MD5::Calculate(const void* bytes, size_t size) {
     CryptReleaseContext(hProv, 0);
   }
 #elif defined(__linux__) && !defined(__ANDROID__) && !defined(ANDROID)
-  MD5(static_cast<const unsigned char*>(bytes), size, digest.data());
+  ::MD5(static_cast<const unsigned char*>(bytes), size, digest.data());
 #else
   // Fallback to digestpp for other platforms
   digestpp::md5 hasher;
