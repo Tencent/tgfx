@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <optional>
 #include "tgfx/core/Image.h"
 
 namespace tgfx {
