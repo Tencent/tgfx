@@ -164,7 +164,11 @@ if (TGFX_BUILD_LAYERS)
 endif ()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-    list(APPEND TGFX_COMPILE_OPTIONS -Werror -Wall -Wextra -Weffc++ -Wconversion -pedantic -Werror=return-type -Wno-unused-command-line-argument)
+    if (OHOS)
+        list(APPEND TGFX_COMPILE_OPTIONS -Wall -Wextra -Weffc++ -Wconversion -pedantic -Wno-unused-command-line-argument)
+    else()
+        list(APPEND TGFX_COMPILE_OPTIONS -Werror -Wall -Wextra -Weffc++ -Wconversion -pedantic -Werror=return-type -Wno-unused-command-line-argument)
+    endif()
 endif ()
 
 if (MSVC)
