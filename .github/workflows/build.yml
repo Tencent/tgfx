@@ -419,7 +419,8 @@ jobs:
           chmod +x ./hvigorw
           ./hvigorw --version --accept-license
           ./hvigorw clean --no-parallel --no-daemon
-          ./hvigorw assembleHap --mode module -p product=default --stacktrace --no-parallel --no-daemon
+          ./hvigorw assembleHap --mode module -p product=default --stacktrace --no-parallel --no-daemon -PcmakeArgs="-DZLIB_LIBRARY_TYPE=STATIC -DPNG_SHARED=OFF"
+ 
         shell: bash
           
       - name: Additional Setup
