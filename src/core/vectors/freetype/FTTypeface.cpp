@@ -24,11 +24,11 @@
 #include FT_TRUETYPE_TABLES_H
 #include FT_FONT_FORMATS_H
 #include FT_TYPE1_TABLES_H
+#include <array>
 #include "FTScalerContext.h"
 #include "SystemFont.h"
 #include "core/utils/UniqueID.h"
 #include "tgfx/core/Stream.h"
-#include <array>
 
 namespace tgfx {
 std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
