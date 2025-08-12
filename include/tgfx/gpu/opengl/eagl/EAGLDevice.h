@@ -36,27 +36,25 @@ class EAGLDevice : public GLDevice {
   EAGLContext* eaglContext() const;
 
  protected:
-  bool onMakeCurrent() override;
-  void onClearCurrent() override;
+  bool onLockContext() override;
+  void onUnlockContext() override;
 
  private:
   EAGLContext* _eaglContext = nil;
   EAGLContext* oldContext = nil;
-  CVOpenGLESTextureCacheRef textureCache = nil;
   size_t cacheArrayIndex = 0;
 
   static std::shared_ptr<EAGLDevice> Wrap(EAGLContext* eaglContext, bool externallyOwned);
   static void NotifyReferenceReachedZero(EAGLDevice* device);
 
-  explicit EAGLDevice(EAGLContext* eaglContext);
+  EAGLDevice(std::unique_ptr<GPU> gpu, EAGLContext* eaglContext);
   bool makeCurrent(bool force = false);
   void clearCurrent();
   void finish();
-  CVOpenGLESTextureCacheRef getTextureCache();
 
   friend class GLDevice;
   friend class EAGLWindow;
-  friend class EAGLHardwareTextureSampler;
+  friend class EAGLHardwareTexture;
 
   friend void ApplicationWillResignActive();
   friend void ApplicationDidBecomeActive();

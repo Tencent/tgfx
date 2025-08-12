@@ -23,7 +23,7 @@
 namespace tgfx {
 class BackendTextureRenderTargetProxy : public TextureRenderTargetProxy {
  protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context) const override;
+  std::shared_ptr<TextureView> onMakeTexture(Context* context) const override;
 
  private:
   BackendTexture backendTexture = {};

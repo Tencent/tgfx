@@ -36,22 +36,19 @@ class CGLDevice : public GLDevice {
   CGLContextObj cglContext() const;
 
  protected:
-  bool onMakeCurrent() override;
-  void onClearCurrent() override;
+  bool onLockContext() override;
+  void onUnlockContext() override;
 
  private:
   NSOpenGLContext* glContext = nil;
   CGLContextObj oldContext = nil;
-  CVOpenGLTextureCacheRef textureCache = nil;
 
   static std::shared_ptr<CGLDevice> Wrap(CGLContextObj cglContext, bool externallyOwned);
 
-  explicit CGLDevice(CGLContextObj cglContext);
-
-  CVOpenGLTextureCacheRef getTextureCache();
+  CGLDevice(std::unique_ptr<GPU> gpu, CGLContextObj cglContext);
 
   friend class GLDevice;
   friend class CGLWindow;
-  friend class TextureSampler;
+  friend class GPUTexture;
 };
 }  // namespace tgfx

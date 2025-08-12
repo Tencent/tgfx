@@ -16,11 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "CGLHardwareTextureSampler.h"
+#include "CGLHardwareTexture.h"
 #include "core/utils/UniqueID.h"
 
 namespace tgfx {
-std::unique_ptr<CGLHardwareTextureSampler> CGLHardwareTextureSampler::MakeFrom(
+std::unique_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(
     CVPixelBufferRef pixelBuffer, CVOpenGLTextureCacheRef textureCache) {
   if (textureCache == nil) {
     return nullptr;
@@ -36,22 +36,21 @@ std::unique_ptr<CGLHardwareTextureSampler> CGLHardwareTextureSampler::MakeFrom(
   auto format = CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_OneComponent8
                     ? PixelFormat::ALPHA_8
                     : PixelFormat::RGBA_8888;
-  auto sampler = std::unique_ptr<CGLHardwareTextureSampler>(
-      new CGLHardwareTextureSampler(pixelBuffer, textureCache, id, target, format));
-  sampler->texture = texture;
-  return sampler;
+  auto gpuTexture = std::unique_ptr<CGLHardwareTexture>(
+      new CGLHardwareTexture(pixelBuffer, textureCache, id, target, format));
+  gpuTexture->texture = texture;
+  return gpuTexture;
 }
 
-CGLHardwareTextureSampler::CGLHardwareTextureSampler(CVPixelBufferRef pixelBuffer,
-                                                     CVOpenGLTextureCacheRef textureCache,
-                                                     unsigned id, unsigned target,
-                                                     PixelFormat format)
-    : GLTextureSampler(id, target, format), pixelBuffer(pixelBuffer), textureCache(textureCache) {
+CGLHardwareTexture::CGLHardwareTexture(CVPixelBufferRef pixelBuffer,
+                                       CVOpenGLTextureCacheRef textureCache, unsigned id,
+                                       unsigned target, PixelFormat format)
+    : GLTexture(id, target, format), pixelBuffer(pixelBuffer), textureCache(textureCache) {
   CFRetain(pixelBuffer);
   CFRetain(textureCache);
 }
 
-CGLHardwareTextureSampler::~CGLHardwareTextureSampler() {
+CGLHardwareTexture::~CGLHardwareTexture() {
   CFRelease(pixelBuffer);
   if (texture != nil) {
     CFRelease(texture);
@@ -59,7 +58,7 @@ CGLHardwareTextureSampler::~CGLHardwareTextureSampler() {
   }
 }
 
-void CGLHardwareTextureSampler::releaseGPU(Context*) {
+void CGLHardwareTexture::release(GPU*) {
   if (texture == nil) {
     return;
   }

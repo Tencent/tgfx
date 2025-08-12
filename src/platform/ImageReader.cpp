@@ -19,7 +19,7 @@
 #include "tgfx/platform/ImageReader.h"
 #include "core/PixelRef.h"
 #include "core/utils/Log.h"
-#include "gpu/Texture.h"
+#include "gpu/TextureView.h"
 #include "platform/ImageStream.h"
 
 namespace tgfx {
@@ -46,7 +46,7 @@ class ImageReaderBuffer : public ImageBuffer {
   }
 
  protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const override {
+  std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override {
     return imageReader->readTexture(contentVersion, context, mipmapped);
   }
 
@@ -88,29 +88,29 @@ bool ImageReader::checkExpired(uint64_t contentVersion) {
   return contentVersion != textureVersion && contentVersion < bufferVersion;
 }
 
-std::shared_ptr<Texture> ImageReader::readTexture(uint64_t contentVersion, Context* context,
-                                                  bool mipmapped) {
+std::shared_ptr<TextureView> ImageReader::readTexture(uint64_t contentVersion, Context* context,
+                                                      bool mipmapped) {
   std::lock_guard<std::mutex> autoLock(locker);
   if (contentVersion == textureVersion) {
-    return texture;
+    return textureView;
   }
   if (contentVersion < bufferVersion) {
     LOGE(
-        "ImageReader::readTexture(): Failed to read texture, the target ImageBuffer is already "
-        "expired!");
+        "ImageReader::readTexture(): Failed to read the texture view, the target ImageBuffer is "
+        "already expired!");
     return nullptr;
   }
   bool success = true;
-  if (texture == nullptr) {
-    texture = stream->onMakeTexture(context, mipmapped);
-    success = texture != nullptr;
+  if (textureView == nullptr) {
+    textureView = stream->onMakeTexture(context, mipmapped);
+    success = textureView != nullptr;
   } else {
-    success = stream->onUpdateTexture(texture);
+    success = stream->onUpdateTexture(textureView);
   }
   if (success) {
-    texture->removeUniqueKey();
+    textureView->removeUniqueKey();
     textureVersion = contentVersion;
   }
-  return texture;
+  return textureView;
 }
 }  // namespace tgfx

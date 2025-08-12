@@ -17,19 +17,30 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <tgfx/gpu/opengl/wgl/WGLDevice.h>
-#include "WGLInterface.h"
+
+#include "gpu/TextureView.h"
 
 namespace tgfx {
-class WGLPbufferDevice final : public WGLDevice {
+/**
+ * DefaultTextureView is a simple TextureView implementation that stores pixel data using a single
+ * GPUTexture.
+ */
+class DefaultTextureView : public TextureView {
  public:
-  ~WGLPbufferDevice() override;
+  DefaultTextureView(std::unique_ptr<GPUTexture> texture, int width, int height,
+                     ImageOrigin origin = ImageOrigin::TopLeft);
 
- private:
-  HPBUFFER pBuffer = nullptr;
+  size_t memoryUsage() const override;
 
-  explicit WGLPbufferDevice(HGLRC nativeHandle);
+  GPUTexture* getTexture() const override {
+    return _texture.get();
+  }
 
-  friend class GLDevice;
+ protected:
+  std::unique_ptr<GPUTexture> _texture = {};
+
+  void onReleaseGPU() override {
+    _texture->release(context->gpu());
+  }
 };
 }  // namespace tgfx

@@ -50,7 +50,7 @@ class TiledTextureEffect : public FragmentProcessor {
   };
 
   struct Sampling {
-    Sampling(const Texture* texture, SamplerState sampler, const Rect& subset);
+    Sampling(const TextureView* textureView, SamplerState sampler, const Rect& subset);
 
     SamplerState hwSampler;
     ShaderMode shaderModeX = ShaderMode::None;
@@ -67,11 +67,11 @@ class TiledTextureEffect : public FragmentProcessor {
 
   size_t onCountTextureSamplers() const override;
 
-  const TextureSampler* onTextureSampler(size_t) const override;
+  GPUTexture* onTextureAt(size_t) const override;
 
-  SamplerState onSamplerState(size_t) const override;
+  SamplerState onSamplerStateAt(size_t) const override;
 
-  const Texture* getTexture() const;
+  const TextureView* getTextureView() const;
 
   static ShaderMode GetShaderMode(SamplerState::WrapMode mode, FilterMode filter, MipmapMode mm);
 

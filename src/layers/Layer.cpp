@@ -533,7 +533,7 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     globalMatrix.preScale(1 / scale, 1 / scale);
     auto invert = Matrix::I();
     if (globalMatrix.invert(&invert)) {
-      auto backgroundContext = BackgroundContext::Make(context, bounds, invert);
+      auto backgroundContext = BackgroundContext::Make(context, bounds, 0, 0, invert);
       if (backgroundContext) {
         auto backgroundCanvas = backgroundContext->getCanvas();
         auto image = getBackgroundImage(args, scale, nullptr);
@@ -740,6 +740,17 @@ std::shared_ptr<Image> Layer::getRasterizedImage(const DrawArgs& args, float con
 void Layer::drawLayer(const DrawArgs& args, Canvas* canvas, float alpha, BlendMode blendMode) {
   DEBUG_ASSERT(canvas != nullptr);
   if (args.renderRect && !Rect::Intersects(*args.renderRect, renderBounds)) {
+    if (args.backgroundContext) {
+      auto backgroundRect = args.backgroundContext->getBackgroundRect();
+      if (!Rect::Intersects(*args.renderRect, backgroundRect)) {
+        return;
+      }
+      auto backgroundArgs = args;
+      backgroundArgs.drawMode = DrawMode::Background;
+      backgroundArgs.backgroundContext = nullptr;
+      backgroundArgs.renderRect = &backgroundRect;
+      drawLayer(backgroundArgs, args.backgroundContext->getCanvas(), alpha, blendMode);
+    }
     return;
   }
   if (auto rasterizedCache = getRasterizedCache(args, canvas->getMatrix())) {
@@ -1007,6 +1018,7 @@ std::shared_ptr<Image> Layer::getBackgroundImage(const DrawArgs& args, float con
   auto canvas = recorder.beginRecording();
   auto bounds = getBounds();
   bounds.scale(contentScale, contentScale);
+  bounds.roundOut();
   canvas->clipRect(bounds);
   canvas->scale(contentScale, contentScale);
   auto globalMatrix = getGlobalMatrix();
@@ -1143,7 +1155,7 @@ bool Layer::hasValidMask() const {
 void Layer::updateRenderBounds(const Matrix& renderMatrix,
                                std::shared_ptr<RegionTransformer> transformer, bool forceDirty) {
   if (!forceDirty && !bitFields.dirtyDescendents) {
-    if (backgroundOutset > 0) {
+    if (maxBackgroundOutset > 0) {
       propagateBackgroundStyleOutset();
       if (_root->hasDirtyRegions()) {
         checkBackgroundStyles(renderMatrix);
@@ -1151,7 +1163,8 @@ void Layer::updateRenderBounds(const Matrix& renderMatrix,
     }
     return;
   }
-  backgroundOutset = 0;
+  maxBackgroundOutset = 0;
+  minBackgroundOutset = std::numeric_limits<float>::max();
   if (!_layerStyles.empty() || !_filters.empty()) {
     auto contentScale = renderMatrix.getMaxScale();
     transformer =
@@ -1215,7 +1228,8 @@ void Layer::updateRenderBounds(const Matrix& renderMatrix,
     backOutset = std::max(backOutset, outset.bottom);
   }
   if (backOutset > 0) {
-    backgroundOutset = std::max(backOutset, backgroundOutset);
+    maxBackgroundOutset = std::max(backOutset, maxBackgroundOutset);
+    minBackgroundOutset = std::min(backOutset, minBackgroundOutset);
     propagateBackgroundStyleOutset();
     updateBackgroundBounds(renderMatrix);
   }
@@ -1224,7 +1238,7 @@ void Layer::updateRenderBounds(const Matrix& renderMatrix,
 
 void Layer::checkBackgroundStyles(const Matrix& renderMatrix) {
   for (auto& child : _children) {
-    if (child->backgroundOutset <= 0 || !child->bitFields.visible || child->_alpha <= 0) {
+    if (child->maxBackgroundOutset <= 0 || !child->bitFields.visible || child->_alpha <= 0) {
       continue;
     }
     auto childMatrix = child->getMatrixWithScrollRect();
@@ -1259,14 +1273,25 @@ void Layer::updateBackgroundBounds(const Matrix& renderMatrix) {
 
 void Layer::propagateBackgroundStyleOutset() {
   auto layer = _parent;
-  while (layer && layer->backgroundOutset < backgroundOutset) {
-    layer->backgroundOutset = backgroundOutset;
+  while (layer) {
+    bool change = false;
+    if (layer->maxBackgroundOutset < maxBackgroundOutset) {
+      layer->maxBackgroundOutset = maxBackgroundOutset;
+      change = true;
+    }
+    if (layer->minBackgroundOutset > minBackgroundOutset) {
+      layer->minBackgroundOutset = minBackgroundOutset;
+      change = true;
+    }
+    if (!change) {
+      break;
+    }
     layer = layer->_parent;
   }
 }
 
 bool Layer::hasBackgroundStyle() {
-  if (!bitFields.dirtyDescendents && backgroundOutset > 0) {
+  if (!bitFields.dirtyDescendents && maxBackgroundOutset > 0) {
     return true;
   }
   for (const auto& style : _layerStyles) {

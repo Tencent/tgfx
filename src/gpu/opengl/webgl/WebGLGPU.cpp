@@ -16,20 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "tgfx/gpu/opengl/wgl/WGLDevice.h"
+#include "WebGLGPU.h"
 
 namespace tgfx {
-class WGLWindowDevice final : public WGLDevice {
- public:
-  ~WGLWindowDevice() override;
+bool HardwareBufferAvailable() {
+  return false;
+}
 
- private:
-  HWND nativeWindow = nullptr;
+std::vector<PixelFormat> WebGLGPU::getHardwareTextureFormats(HardwareBufferRef, YUVFormat*) const {
+  return {};
+}
 
-  explicit WGLWindowDevice(HGLRC nativeHandle);
-
-  friend class WGLDevice;
-};
+std::vector<std::unique_ptr<GPUTexture>> WebGLGPU::importHardwareTextures(HardwareBufferRef) {
+  return {};
+}
 }  // namespace tgfx

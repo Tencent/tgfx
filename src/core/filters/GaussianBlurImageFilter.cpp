@@ -41,6 +41,10 @@ std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrine
   }
   return std::make_shared<GaussianBlurImageFilter>(blurrinessX, blurrinessY, tileMode);
 }
+
+float BlurImageFilter::MaxSigma() {
+  return MAX_BLUR_SIGMA;
+}
 #endif
 
 GaussianBlurImageFilter::GaussianBlurImageFilter(float blurrinessX, float blurrinessY,
@@ -58,23 +62,23 @@ static void Blur1D(PlacementPtr<FragmentProcessor> source,
   auto drawingManager = context->drawingManager();
   auto processor = GaussianBlur1DFragmentProcessor::Make(
       context->drawingBuffer(), std::move(source), sigma, direction, stepLength, MAX_BLUR_SIGMA);
-  drawingManager->fillRTWithFP(renderTarget, std::move(processor), renderFlags);
+  drawingManager->fillRTWithFP(std::move(renderTarget), std::move(processor), renderFlags);
 }
 
 static std::shared_ptr<TextureProxy> ScaleTexture(const TPArgs& args,
-                                                  std::shared_ptr<TextureProxy> texture,
+                                                  std::shared_ptr<TextureProxy> proxy,
                                                   int targetWidth, int targetHeight) {
-  auto renderTarget = RenderTargetProxy::MakeFallback(args.context, targetWidth, targetHeight,
-                                                      texture->isAlphaOnly(), 1, args.mipmapped,
-                                                      ImageOrigin::TopLeft, BackingFit::Approx);
+  auto renderTarget =
+      RenderTargetProxy::MakeFallback(args.context, targetWidth, targetHeight, proxy->isAlphaOnly(),
+                                      1, args.mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
   if (!renderTarget) {
     return nullptr;
   }
 
   auto uvMatrix =
-      Matrix::MakeScale(static_cast<float>(texture->width()) / static_cast<float>(targetWidth),
-                        static_cast<float>(texture->height()) / static_cast<float>(targetHeight));
-  auto finalProcessor = TextureEffect::Make(std::move(texture), {}, &uvMatrix);
+      Matrix::MakeScale(static_cast<float>(proxy->width()) / static_cast<float>(targetWidth),
+                        static_cast<float>(proxy->height()) / static_cast<float>(targetHeight));
+  auto finalProcessor = TextureEffect::Make(std::move(proxy), {}, &uvMatrix);
   auto drawingManager = args.context->drawingManager();
   drawingManager->fillRTWithFP(renderTarget, std::move(finalProcessor), args.renderFlags);
   return renderTarget->asTextureProxy();

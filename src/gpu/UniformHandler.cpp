@@ -19,10 +19,9 @@
 #include "UniformHandler.h"
 
 namespace tgfx {
-SamplerHandle UniformHandler::addSampler(const tgfx::TextureSampler* sampler,
-                                         const std::string& name) {
+SamplerHandle UniformHandler::addSampler(GPUTexture* texture, const std::string& name) {
   // The same sampler can be added multiple times with different names because the same handler of
   // the program can be used with different samplers.
-  return internalAddSampler(sampler, name);
+  return internalAddSampler(texture, name);
 }
 }  // namespace tgfx

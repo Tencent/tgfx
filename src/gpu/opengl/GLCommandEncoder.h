@@ -28,10 +28,10 @@ class GLCommandEncoder : public CommandEncoder {
       : interface(std::move(interface)) {
   }
 
-  void copyRenderTargetToTexture(const RenderTarget* renderTarget, Texture* texture, int srcX,
-                                 int srcY) override;
+  void copyRenderTargetToTexture(const RenderTarget* renderTarget, TextureView* textureView,
+                                 int srcX, int srcY) override;
 
-  void generateMipmapsForTexture(TextureSampler* sampler) override;
+  void generateMipmapsForTexture(GPUTexture* texture) override;
 
   BackendSemaphore insertSemaphore() override;
 

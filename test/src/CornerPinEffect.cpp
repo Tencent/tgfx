@@ -129,10 +129,10 @@ bool CornerPinEffect::onDraw(const RuntimeProgram* program,
   target.getGLFramebufferInfo(&frameBuffer);
   gl->bindFramebuffer(GL_FRAMEBUFFER, frameBuffer.id);
   gl->viewport(0, 0, target.width(), target.height());
-  GLTextureInfo sampler = {};
-  inputTextures[0].getGLTextureInfo(&sampler);
+  GLTextureInfo glInfo = {};
+  inputTextures[0].getGLTextureInfo(&glInfo);
   gl->activeTexture(GL_TEXTURE0);
-  gl->bindTexture(sampler.target, sampler.id);
+  gl->bindTexture(glInfo.target, glInfo.id);
   auto vertices = computeVertices(inputTextures[0], target, offset);
   if (filterProgram->vertexArray > 0) {
     gl->bindVertexArray(filterProgram->vertexArray);

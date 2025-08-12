@@ -42,9 +42,9 @@ class VideoElement : public ImageStream {
   void markFrameChanged(emscripten::val promise);
 
  protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) override;
+  std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) override;
 
-  bool onUpdateTexture(std::shared_ptr<Texture> texture) override;
+  bool onUpdateTexture(std::shared_ptr<TextureView> textureView) override;
 
  private:
   emscripten::val source = emscripten::val::null();

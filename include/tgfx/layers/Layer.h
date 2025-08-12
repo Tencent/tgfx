@@ -638,7 +638,8 @@ class Layer : public std::enable_shared_from_this<Layer> {
   Rect* contentBounds = nullptr;  //  in global coordinates
 
   // if > 0, means the layer or any of its descendants has a background style
-  float backgroundOutset = 0.f;
+  float maxBackgroundOutset = 0.f;
+  float minBackgroundOutset = std::numeric_limits<float>::max();
 
   friend class RootLayer;
   friend class DisplayList;

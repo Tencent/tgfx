@@ -160,7 +160,7 @@ bool GLRenderPass::onBindProgramAndScissorClip(const Pipeline* pipeline, const R
   return true;
 }
 
-bool GLRenderPass::onBindBuffers(const GPUBuffer* indexBuffer, const GPUBuffer* vertexBuffer,
+bool GLRenderPass::onBindBuffers(GPUBuffer* indexBuffer, GPUBuffer* vertexBuffer,
                                  size_t vertexOffset) {
   auto context = getContext();
   auto gl = GLFunctions::Get(context);

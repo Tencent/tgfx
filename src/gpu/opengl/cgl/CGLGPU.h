@@ -16,21 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/Texture.h"
-#include "tgfx/platform/HardwareBuffer.h"
+#pragma once
+
+#include <AppKit/AppKit.h>
+#include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
-bool HardwareBufferAvailable() {
-  return false;
-}
+class CGLGPU : public GLGPU {
+ public:
+  explicit CGLGPU(std::shared_ptr<GLInterface> glInterface, CGLContextObj cglContext)
+      : GLGPU(std::move(glInterface)), cglContext(cglContext) {
+  }
 
-PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef) {
-  return PixelFormat::Unknown;
-}
+  ~CGLGPU() override;
 
-std::vector<std::unique_ptr<TextureSampler>> TextureSampler::MakeFrom(Context*, HardwareBufferRef,
-                                                                      YUVFormat*) {
-  return {};
-}
+  CVOpenGLTextureCacheRef getTextureCache();
 
+  std::vector<PixelFormat> getHardwareTextureFormats(HardwareBufferRef hardwareBuffer,
+                                                     YUVFormat* yuvFormat) const override;
+
+  std::vector<std::unique_ptr<GPUTexture>> importHardwareTextures(
+      HardwareBufferRef hardwareBuffer) override;
+
+ private:
+  CGLContextObj cglContext = nil;
+  CVOpenGLTextureCacheRef textureCache = nil;
+};
 }  // namespace tgfx

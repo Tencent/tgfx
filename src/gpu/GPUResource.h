@@ -18,28 +18,24 @@
 
 #pragma once
 
-#include "gpu/Texture.h"
-
 namespace tgfx {
+class GPU;
+
 /**
- * DefaultTexture is a simple texture implementation that stores pixel data using a single sampler.
+ * GPUResource is the base class for GPU resources that need manual release of their underlying
+ * allocations. It is intended for resources like buffers and textures that are not automatically
+ * managed by the GPU. This class decouples resource release from object destruction, allowing you
+ * to skip releasing resources in scenarios such as when the GPU device is lost or destroyed.
+ * Otherwise, it may lead to undefined behavior.
  */
-class DefaultTexture : public Texture {
+class GPUResource {
  public:
-  DefaultTexture(std::unique_ptr<TextureSampler> sampler, int width, int height,
-                 ImageOrigin origin = ImageOrigin::TopLeft);
+  virtual ~GPUResource() = default;
 
-  size_t memoryUsage() const override;
-
-  TextureSampler* getSampler() const override {
-    return _sampler.get();
-  }
-
- protected:
-  std::unique_ptr<TextureSampler> _sampler = {};
-
-  void onReleaseGPU() override {
-    _sampler->releaseGPU(context);
-  }
+  /**
+   * Releases the underlying GPU resources. After calling this method, the GPUResource must not be
+   * used, as doing so may lead to undefined behavior.
+   */
+  virtual void release(GPU* gpu) = 0;
 };
 }  // namespace tgfx

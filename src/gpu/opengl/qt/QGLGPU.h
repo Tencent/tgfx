@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,20 +16,33 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/Texture.h"
-#include "tgfx/platform/HardwareBuffer.h"
+#pragma once
+
+#ifdef __APPLE__
+#include <CoreVideo/CoreVideo.h>
+#endif
+#include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
-bool HardwareBufferAvailable() {
-  return false;
-}
+class QGLGPU : public GLGPU {
+ public:
+  explicit QGLGPU(std::shared_ptr<GLInterface> glInterface) : GLGPU(std::move(glInterface)) {
+  }
 
-PixelFormat TextureSampler::GetPixelFormat(HardwareBufferRef) {
-  return PixelFormat::Unknown;
-}
+#ifdef __APPLE__
+  ~QGLGPU() override;
+#endif
 
-std::vector<std::unique_ptr<TextureSampler>> TextureSampler::MakeFrom(Context*, HardwareBufferRef,
-                                                                      YUVFormat*) {
-  return {};
-}
+  std::vector<PixelFormat> getHardwareTextureFormats(HardwareBufferRef hardwareBuffer,
+                                                     YUVFormat* yuvFormat) const override;
+
+  std::vector<std::unique_ptr<GPUTexture>> importHardwareTextures(
+      HardwareBufferRef hardwareBuffer) override;
+
+ private:
+#ifdef __APPLE__
+  CVOpenGLTextureCacheRef textureCache = nil;
+  CVOpenGLTextureCacheRef getTextureCache();
+#endif
+};
 }  // namespace tgfx

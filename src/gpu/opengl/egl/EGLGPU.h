@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,34 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#if defined(__ANDROID__) || defined(ANDROID) || defined(__OHOS__)
-
 #pragma once
 
-#include <EGL/egl.h>
-#include <EGL/eglext.h>
-#include "gpu/opengl/GLTextureSampler.h"
+#include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
-class EGLHardwareTextureSampler : public GLTextureSampler {
+class EGLGPU : public GLGPU {
  public:
-  static std::unique_ptr<EGLHardwareTextureSampler> MakeFrom(Context* context,
-                                                             HardwareBufferRef hardwareBuffer);
-  ~EGLHardwareTextureSampler() override;
-
-  HardwareBufferRef getHardwareBuffer() const override {
-    return hardwareBuffer;
+  EGLGPU(std::shared_ptr<GLInterface> glInterface, void* eglDisplay)
+      : GLGPU(std::move(glInterface)), eglDisplay(eglDisplay) {
   }
 
-  void releaseGPU(Context* context) override;
+  void* getDisplay() const {
+    return eglDisplay;
+  }
+
+  std::vector<PixelFormat> getHardwareTextureFormats(HardwareBufferRef hardwareBuffer,
+                                                     YUVFormat* yuvFormat) const override;
+
+  std::vector<std::unique_ptr<GPUTexture>> importHardwareTextures(
+      HardwareBufferRef hardwareBuffer) override;
 
  private:
-  HardwareBufferRef hardwareBuffer = nullptr;
-  EGLImageKHR eglImage = EGL_NO_IMAGE_KHR;
-
-  EGLHardwareTextureSampler(HardwareBufferRef hardwareBuffer, EGLImageKHR eglImage, unsigned id,
-                            unsigned target, PixelFormat format);
+  void* eglDisplay = nullptr;
 };
 }  // namespace tgfx
-
-#endif

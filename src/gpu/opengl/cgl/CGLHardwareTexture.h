@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,10 +18,29 @@
 
 #pragma once
 
-#include <windows.h>
+#include <CoreVideo/CoreVideo.h>
+#include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
-void GetPixelFormatsToTry(HDC deviceContext, int formatsToTry[2]);
+class CGLHardwareTexture : public GLTexture {
+ public:
+  static std::unique_ptr<CGLHardwareTexture> MakeFrom(CVPixelBufferRef pixelBuffer,
+                                                      CVOpenGLTextureCacheRef textureCache);
 
-HGLRC CreateGLContext(HDC deviceContext, HGLRC sharedContext);
+  ~CGLHardwareTexture() override;
+
+  HardwareBufferRef getHardwareBuffer() const override {
+    return pixelBuffer;
+  }
+
+  void release(GPU* gpu) override;
+
+ private:
+  CVPixelBufferRef pixelBuffer = nullptr;
+  CVOpenGLTextureRef texture = nil;
+  CVOpenGLTextureCacheRef textureCache = nil;
+
+  CGLHardwareTexture(CVPixelBufferRef pixelBuffer, CVOpenGLTextureCacheRef textureCache,
+                     unsigned id, unsigned target, PixelFormat format);
+};
 }  // namespace tgfx

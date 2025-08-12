@@ -43,13 +43,13 @@ class VertexBuffer : public Resource {
   /**
    * Returns the GPUBuffer associated with this VertexBuffer.
    */
-  const GPUBuffer* gpuBuffer() const {
+  GPUBuffer* gpuBuffer() const {
     return buffer.get();
   }
 
  protected:
   void onReleaseGPU() override {
-    context->gpu()->destroyBuffer(buffer.get());
+    buffer->release(context->gpu());
   }
 
  private:

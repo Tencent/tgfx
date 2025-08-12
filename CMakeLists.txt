@@ -9,6 +9,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 cmake_policy(SET CMP0063 NEW)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
+set(TGFX_VERSION "2.1.0")
+
 # Options for building tgfx
 option(TGFX_BUILD_SVG "Enable building the SVG module" OFF)
 option(TGFX_BUILD_LAYERS "Enable building the layers module" OFF)
@@ -52,6 +54,12 @@ elseif (NOT ANDROID AND NOT OHOS)
     option(TGFX_USE_WEBP_ENCODE "Enable embedded WEBP encoding support" ON)
 endif ()
 
+if (MACOS OR IOS)
+    option(TGFX_BUILD_FRAMEWORK "Enable building framework" OFF)
+else ()
+    set(TGFX_BUILD_FRAMEWORK OFF)
+endif ()
+
 
 if ($ENV{CLION_IDE})
     set(CLION_IDE ON)
@@ -86,6 +94,7 @@ if (TGFX_USE_FREETYPE)
     set(TGFX_USE_PNG_DECODE ON)
 endif ()
 
+message("TGFX_VERSION: ${TGFX_VERSION}")
 message("TGFX_BUILD_SVG: ${TGFX_BUILD_SVG}")
 message("TGFX_BUILD_LAYERS: ${TGFX_BUILD_LAYERS}")
 message("TGFX_USE_OPENGL: ${TGFX_USE_OPENGL}")
@@ -104,6 +113,7 @@ message("TGFX_USE_WEBP_ENCODE: ${TGFX_USE_WEBP_ENCODE}")
 message("TGFX_BUILD_TESTS: ${TGFX_BUILD_TESTS}")
 message("TGFX_USE_ASYNC_PROMISE: ${TGFX_USE_ASYNC_PROMISE}")
 message("TGFX_USE_INSPECTOR: ${TGFX_USE_INSPECTOR}")
+message("TGFX_BUILD_FRAMEWORK: ${TGFX_BUILD_FRAMEWORK}")
 
 if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
     if (DEPLOYMENT_TARGET)
@@ -119,6 +129,8 @@ if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
     endif ()
 endif ()
 
+file(GLOB_RECURSE TGFX_HEADERS include/*.h)
+list(APPEND TGFX_FILES ${TGFX_HEADERS})
 # collects tgfx common files.
 file(GLOB_RECURSE SRC_FILES
         src/core/filters/*.*
@@ -311,7 +323,7 @@ if (TGFX_USE_QT)
     file(GLOB_RECURSE GPU_PLATFORM_FILES src/gpu/opengl/qt/*.*)
     list(APPEND TGFX_FILES ${GPU_PLATFORM_FILES})
     if (MACOS)
-        file(GLOB CGL_PLATFORM_FILES src/gpu/opengl/cgl/CGLHardwareTextureSampler.mm)
+        file(GLOB CGL_PLATFORM_FILES src/gpu/opengl/cgl/CGLHardwareTexture.mm)
         list(APPEND TGFX_FILES ${CGL_PLATFORM_FILES})
         list(APPEND TGFX_DEFINES GL_SILENCE_DEPRECATION)
         find_library(OpenGL_LIBS OpenGL REQUIRED)
@@ -522,6 +534,27 @@ target_include_directories(tgfx SYSTEM PRIVATE ${TGFX_INCLUDES})
 merge_libraries_into(tgfx ${TGFX_STATIC_LIBS})
 target_link_libraries(tgfx ${TGFX_SHARED_LIBS})
 set_target_properties(tgfx PROPERTIES PREFIX "")
+
+if (TGFX_BUILD_FRAMEWORK)
+    set(TGFX_IDENTIFIER "org.tgfx")
+    set_target_properties(tgfx PROPERTIES
+            FRAMEWORK TRUE
+            MACOSX_FRAMEWORK_IDENTIFIER ${TGFX_IDENTIFIER}
+            MACOSX_FRAMEWORK_BUNDLE_VERSION ${TGFX_VERSION}
+            MACOSX_FRAMEWORK_SHORT_VERSION_STRING ${TGFX_VERSION})
+    set(CMAKE_XCODE_ATTRIBUTE_DEFINES_MODULE YES)
+    set(CMAKE_XCODE_ATTRIBUTE_PRODUCT_BUNDLE_IDENTIFIER ${TGFX_IDENTIFIER})
+    foreach (header ${TGFX_HEADERS})
+        file(RELATIVE_PATH dir ${CMAKE_CURRENT_SOURCE_DIR}/include ${header})
+        get_filename_component(dir "${dir}" DIRECTORY)
+        if (dir)
+            set(location "Headers/${dir}")
+        else ()
+            set(location "Headers")
+        endif ()
+        set_source_files_properties(${header} PROPERTIES MACOSX_PACKAGE_LOCATION "${location}")
+    endforeach ()
+endif ()
 
 
 if (TGFX_BUILD_DRAWERS)

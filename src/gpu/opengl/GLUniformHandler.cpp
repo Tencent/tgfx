@@ -18,7 +18,7 @@
 
 #include "GLUniformHandler.h"
 #include "gpu/opengl/GLProgramBuilder.h"
-#include "gpu/opengl/GLTextureSampler.h"
+#include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
 std::string GLUniformHandler::internalAddUniform(ShaderFlags visibility, SLType type,
@@ -32,14 +32,13 @@ std::string GLUniformHandler::internalAddUniform(ShaderFlags visibility, SLType 
   return uniform.variable.name();
 }
 
-SamplerHandle GLUniformHandler::internalAddSampler(const TextureSampler* sampler,
-                                                   const std::string& name) {
+SamplerHandle GLUniformHandler::internalAddSampler(GPUTexture* texture, const std::string& name) {
   auto mangledName = programBuilder->nameVariable(name);
   auto caps = GLCaps::Get(programBuilder->getContext());
-  const auto& swizzle = caps->getReadSwizzle(sampler->format());
+  const auto& swizzle = caps->getReadSwizzle(texture->format());
 
   SLType type;
-  switch (static_cast<const GLTextureSampler*>(sampler)->target()) {
+  switch (static_cast<const GLTexture*>(texture)->target()) {
     case GL_TEXTURE_EXTERNAL_OES:
       programBuilder->fragmentShaderBuilder()->addFeature(PrivateFeature::OESTexture,
                                                           "GL_OES_EGL_image_external");

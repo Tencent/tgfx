@@ -28,7 +28,7 @@
 
 namespace tgfx {
 struct SamplerInfo {
-  const TextureSampler* sampler;
+  GPUTexture* texture;
   SamplerState state;
 };
 
