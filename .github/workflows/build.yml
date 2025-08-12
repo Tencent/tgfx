@@ -381,6 +381,11 @@ jobs:
           depsync
         shell: bash
 
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: '3.25.x'  
+
       - name: Setup OpenHarmony Build Environment
         uses: eclipse-oniro4openharmony/oh-app-action@main
         with:
