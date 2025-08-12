@@ -1,10 +1,10 @@
 {
-  "modelVersion": "5.0.0",
-
+  "hvigorVersion": "3.2.4",
   "dependencies": {
+    "@ohos/hvigor-ohos-plugin": "3.2.4"
   },
   "execution": {
-    // "analyze": "normal",                     /* Define the build analyze mode. Value: [ "normal" | "advanced" | false ]. Default: "normal" */
+    // "analyze": "default",                    /* Define the build analyze mode. Value: [ "default" | "verbose" | false ]. Default: "default" */
     // "daemon": true,                          /* Enable daemon compilation. Value: [ true | false ]. Default: true */
     // "incremental": true,                     /* Enable incremental compilation. Value: [ true | false ]. Default: true */
     // "parallel": true,                        /* Enable parallel compilation. Value: [ true | false ]. Default: true */
@@ -17,7 +17,6 @@
     // "stacktrace": false                      /* Disable stacktrace compilation. Value: [ true | false ]. Default: false */
   },
   "nodeOptions": {
-    // "maxOldSpaceSize": 8192                  /* Enable nodeOptions maxOldSpaceSize compilation. Unit M. Used for the daemon process. Default: 8192*/
-    // "exposeGC": true                         /* Enable to trigger garbage collection explicitly. Default: true*/
+    // "maxOldSpaceSize": 4096                  /* Enable nodeOptions maxOldSpaceSize compilation. Unit M. Used for the daemon process */
   }
 }
