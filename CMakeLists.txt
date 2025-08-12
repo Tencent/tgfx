@@ -10,8 +10,8 @@ cmake_policy(SET CMP0063 NEW)
 set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 # Options for building tgfx
-option(TGFX_BUILD_SVG "Enable building the SVG module" ON)
-option(TGFX_BUILD_PDF "Enable building the PDF module" ON)
+option(TGFX_BUILD_SVG "Enable building the SVG module" OFF)
+option(TGFX_BUILD_PDF "Enable building the PDF module" OFF)
 option(TGFX_BUILD_LAYERS "Enable building the layers module" OFF)
 option(TGFX_BUILD_DRAWERS "Enable building the tgfx-drawers library for testing" OFF)
 option(TGFX_USE_OPENGL "Use OpenGL as the GPU backend" ON)
