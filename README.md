@@ -28,13 +28,14 @@ and various video-editing apps.
 
 ## Backing Renderers
 
-| Vector Backend |  GPU Backend   |      Target Platforms        |    Status     |
-|:--------------:|:--------------:|:----------------------------:|:-------------:|
-|    FreeType    |  OpenGL        |  All                         |   complete    |
-|  CoreGraphics  |  OpenGL        |  iOS, macOS                  |   complete    |
-|    Canvas2D    |  WebGL         |  Web                         |   complete    |
-|  CoreGraphics  |  Metal         |  iOS, macOS                  |  in progress  |
-|    FreeType    |  Vulkan        |  Android, Linux              |    planned    |
+|   Vector Backend    | GPU Backend | Target Platforms |   Status    |
+|:-------------------:|:-----------:|:----------------:|:-----------:|
+|      FreeType       |   OpenGL    |       All        |  complete   |
+|    CoreGraphics     |   OpenGL    |    iOS, macOS    |  complete   |
+| Canvas2D / FreeType |    WebGL    |       Web        |  complete   |
+|    CoreGraphics     |    Metal    |    iOS, macOS    | in progress |
+|      FreeType       |   Vulkan    |  Android, Linux  | in progress |
+| Canvas2D / FreeType |   WebGPU    |       Web        | in progress |
 
 
 ## Branch Management
