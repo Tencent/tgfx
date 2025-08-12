@@ -43,6 +43,9 @@ class UTF {
    */
   static std::string ToUTF8(int32_t unichar);
 
+  /**
+   * Given a unicode codepoint, return the UTF-16 string.
+   */
   static std::wstring ToUTF16(int32_t unichar);
 };
 

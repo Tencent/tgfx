@@ -34,7 +34,7 @@
 #include "core/utils/PlacementPtr.h"
 #include "core/utils/Types.h"
 #include "pdf/PDFBitmap.h"
-#include "pdf/PDFDocument.h"
+#include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFFont.h"
 #include "pdf/PDFFormXObject.h"
 #include "pdf/PDFGraphicState.h"
@@ -143,7 +143,8 @@ class ScopedContentEntry {
   const MCState& state;
 };
 
-PDFExportContext::PDFExportContext(ISize pageSize, PDFDocument* document, const Matrix& transform)
+PDFExportContext::PDFExportContext(ISize pageSize, PDFDocumentImpl* document,
+                                   const Matrix& transform)
     : _pageSize(pageSize), document(document), _initialTransform(transform) {
   DEBUG_ASSERT(!_pageSize.isEmpty());
   content = MemoryWriteStream::Make();
@@ -801,7 +802,7 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
     // Form XObject.
     auto maskContext = PDFExportContext(ISize::Make(image->width(), image->height()), document);
     {
-      auto canvas = PDFDocument::MakeCanvas(&maskContext);
+      auto canvas = PDFDocumentImpl::MakeCanvas(&maskContext);
       // This clip prevents the mask image shader from covering entire device if unnecessary.
       canvas->clipRect(state.clip.getBounds());
       if (modifiedFill.maskFilter) {
@@ -940,7 +941,7 @@ bool TreatAsRegularPDFBlendMode(BlendMode blendMode) {
 }
 
 void PopulateGraphicStateEntryFromPaint(
-    PDFDocument* document, const Matrix& matrix, const MCState& state, Rect deviceBounds,
+    PDFDocumentImpl* document, const Matrix& matrix, const MCState& state, Rect deviceBounds,
     const Fill& fill, const Matrix& initialTransform, float textScale,
     PDFGraphicStackState::Entry* entry, std::unordered_set<PDFIndirectReference>* shaderResources,
     std::unordered_set<PDFIndirectReference>* graphicStateResources) {

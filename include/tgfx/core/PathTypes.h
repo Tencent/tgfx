@@ -110,17 +110,6 @@ enum class PathArcSize {
   Large,
 };
 
-enum class PathDirection {
-  /** 
-   * clockwise direction for adding closed contours
-   */
-  CW,
-  /** 
-   * counter-clockwise direction for adding closed contours
-   */
-  CCW,
-};
-
 /**
  * Zero to four Point are stored in points, depending on the returned PathVerb
  */

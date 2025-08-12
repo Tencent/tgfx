@@ -21,7 +21,7 @@
 #include "core/shaders/GradientShader.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
-#include "pdf/PDFDocument.h"
+#include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFFormXObject.h"
 #include "pdf/PDFGraphicState.h"
 #include "pdf/PDFResourceDictionary.h"
@@ -547,7 +547,7 @@ PDFGradientShader::Key CloneKey(const PDFGradientShader::Key& key) {
   return clone;
 }
 
-PDFIndirectReference FindPDFShader(PDFDocument* doc, const PDFGradientShader::Key& key,
+PDFIndirectReference FindPDFShader(PDFDocumentImpl* doc, const PDFGradientShader::Key& key,
                                    bool keyHasAlpha);
 
 std::unique_ptr<PDFDictionary> GetGradientResourceDictionary(PDFIndirectReference functionShader,
@@ -577,7 +577,7 @@ std::shared_ptr<MemoryWriteStream> CreatePatternFillContent(int gsIndex, int pat
   return content;
 }
 
-PDFIndirectReference CreateSmaskGraphicState(PDFDocument* doc,
+PDFIndirectReference CreateSmaskGraphicState(PDFDocumentImpl* doc,
                                              const PDFGradientShader::Key& state) {
   PDFGradientShader::Key luminosityState = CloneKey(state);
   for (auto& color : luminosityState.info.colors) {
@@ -597,7 +597,7 @@ PDFIndirectReference CreateSmaskGraphicState(PDFDocument* doc,
                                                PDFGraphicState::SMaskMode::Luminosity, doc);
 }
 
-PDFIndirectReference MakeAlphaFunctionShader(PDFDocument* doc,
+PDFIndirectReference MakeAlphaFunctionShader(PDFDocumentImpl* doc,
                                              const PDFGradientShader::Key& state) {
   PDFGradientShader::Key opaqueState = CloneKey(state);
   for (auto& color : opaqueState.info.colors) {
@@ -714,7 +714,7 @@ std::unique_ptr<PDFDictionary> GradientStitchCode(const GradientInfo& info) {
 
 PDFIndirectReference MakePSFunction(std::unique_ptr<Stream> psCode,
                                     std::unique_ptr<PDFArray> domain,
-                                    std::unique_ptr<PDFObject> range, PDFDocument* document) {
+                                    std::unique_ptr<PDFObject> range, PDFDocumentImpl* document) {
   auto dict = PDFDictionary::Make();
   dict->insertInt("FunctionType", 4);
   dict->insertObject("Domain", std::move(domain));
@@ -722,7 +722,7 @@ PDFIndirectReference MakePSFunction(std::unique_ptr<Stream> psCode,
   return PDFStreamOut(std::move(dict), std::move(psCode), document);
 }
 
-PDFIndirectReference MakeFunctionShader(PDFDocument* doc, const PDFGradientShader::Key& state) {
+PDFIndirectReference MakeFunctionShader(PDFDocumentImpl* doc, const PDFGradientShader::Key& state) {
   Point transformPoints[2];
   const GradientInfo& info = state.info;
   Matrix finalMatrix = state.canvasTransform;
@@ -876,7 +876,7 @@ PDFIndirectReference MakeFunctionShader(PDFDocument* doc, const PDFGradientShade
   return doc->emit(*pdfFunctionShader);
 }
 
-PDFIndirectReference FindPDFShader(PDFDocument* doc, const PDFGradientShader::Key& key,
+PDFIndirectReference FindPDFShader(PDFDocumentImpl* doc, const PDFGradientShader::Key& key,
                                    bool keyHasAlpha) {
   DEBUG_ASSERT(GradientHasAlpha(key) == keyHasAlpha);
   PDFIndirectReference pdfShader;
@@ -890,7 +890,7 @@ PDFIndirectReference FindPDFShader(PDFDocument* doc, const PDFGradientShader::Ke
 
 }  // namespace
 
-PDFIndirectReference PDFGradientShader::Make(PDFDocument* doc, const GradientShader* shader,
+PDFIndirectReference PDFGradientShader::Make(PDFDocumentImpl* doc, const GradientShader* shader,
                                              const Matrix& matrix, const Rect& surfaceBBox) {
   DEBUG_ASSERT(shader);
 

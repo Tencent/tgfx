@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "pdf/PDFDocument.h"
+#include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFTypes.h"
 #include "pdf/PDFUtils.h"
 #include "tgfx/pdf/PDFMetadata.h"
@@ -33,7 +33,7 @@ class PDFMetadataUtils {
   static std::unique_ptr<PDFObject> MakePDFId(const UUID& doc, const UUID& instance);
 
   static PDFIndirectReference MakeXMPObject(const PDFMetadata& metadata, const UUID& doc,
-                                            const UUID& instance, PDFDocument*);
+                                            const UUID& instance, PDFDocumentImpl*);
 };
 
 }  // namespace tgfx

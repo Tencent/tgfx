@@ -213,7 +213,8 @@ std::string UUIDToString(const UUID& uuid) {
 }  // namespace
 
 PDFIndirectReference PDFMetadataUtils::MakeXMPObject(const PDFMetadata& metadata, const UUID& doc,
-                                                     const UUID& instance, PDFDocument* document) {
+                                                     const UUID& instance,
+                                                     PDFDocumentImpl* document) {
   std::string creationDate;
   std::string modificationDate;
   if (metadata.creation != ZeroTime) {

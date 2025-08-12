@@ -42,7 +42,7 @@ class PDFStrikeSpec {
 
 class PDFStrike {
  public:
-  static std::shared_ptr<PDFStrike> Make(PDFDocument* doc, const Font& font);
+  static std::shared_ptr<PDFStrike> Make(PDFDocumentImpl* doc, const Font& font);
 
   /** Get the font resource for the glyph.
    *  The returned SkPDFFont is owned by the SkPDFStrike.
@@ -51,11 +51,11 @@ class PDFStrike {
   PDFFont* getFontResource(GlyphID glyphID);
 
   const PDFStrikeSpec strikeSpec;
-  PDFDocument* document;
+  PDFDocumentImpl* document;
   std::unordered_map<GlyphID, std::unique_ptr<PDFFont>> fontMap;
 
  private:
-  PDFStrike(PDFStrikeSpec strikeSpec, PDFDocument* document);
+  PDFStrike(PDFStrikeSpec strikeSpec, PDFDocumentImpl* document);
 };
 
 class PDFFont {
@@ -121,20 +121,23 @@ class PDFFont {
    * Gets SkAdvancedTypefaceMetrics, and caches the result.
    */
   static const FontMetrics* GetMetrics(const std::shared_ptr<Typeface>& typeface, float textSize,
-                                       PDFDocument* document);
+                                       PDFDocumentImpl* document);
 
   static std::shared_ptr<ScalerContext> GetScalerContext(const std::shared_ptr<Typeface>& typeface,
                                                          float textSize);
 
-  static const std::vector<Unichar>& GetUnicodeMap(const Typeface& typeface, PDFDocument* document);
+  static const std::vector<Unichar>& GetUnicodeMap(const Typeface& typeface,
+                                                   PDFDocumentImpl* document);
 
   static void PopulateCommonFontDescriptor(PDFDictionary* descriptor, const FontMetrics& metrics,
                                            uint16_t emSize, int16_t defaultWidth);
 
-  void emitSubset(PDFDocument*) const;
+  void emitSubset(PDFDocumentImpl* document) const;
 
-  /** Return false iff the typeface has its NotEmbeddable flag set. */
-  static bool CanEmbedTypeface(const Typeface&, PDFDocument*);
+  /** 
+   * Return false iff the typeface has its NotEmbeddable flag set.
+   */
+  static bool CanEmbedTypeface(const Typeface& typeface, PDFDocumentImpl* document);
 
   GlyphID firstGlyphID() const {
     return _glyphUsage.firstNonZero();
@@ -157,8 +160,8 @@ class PDFFont {
   }
 
  private:
-  void emitSubsetType0(PDFDocument* document) const;
-  void emitSubsetType3(PDFDocument* doc) const;
+  void emitSubsetType0(PDFDocumentImpl* document) const;
+  void emitSubsetType3(PDFDocumentImpl* document) const;
 
   const PDFStrike* _strike;
   PDFGlyphUse _glyphUsage;

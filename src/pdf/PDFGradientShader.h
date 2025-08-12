@@ -37,7 +37,7 @@ class PDFGradientShader {
     uint32_t hash;
   };
 
-  static PDFIndirectReference Make(PDFDocument* doc, const GradientShader* shader,
+  static PDFIndirectReference Make(PDFDocumentImpl* doc, const GradientShader* shader,
                                    const Matrix& matrix, const Rect& surfaceBBox);
 };
 

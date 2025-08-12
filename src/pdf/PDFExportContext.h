@@ -40,7 +40,7 @@ namespace tgfx {
 
 class PDFExportContext : public DrawContext {
  public:
-  explicit PDFExportContext(ISize pageSize, PDFDocument* document,
+  explicit PDFExportContext(ISize pageSize, PDFDocumentImpl* document,
                             const Matrix& transform = Matrix::I());
 
   ~PDFExportContext() override;
@@ -147,7 +147,7 @@ class PDFExportContext : public DrawContext {
                           const Fill& originPaint);
 
   ISize _pageSize = {};
-  PDFDocument* document = nullptr;
+  PDFDocumentImpl* document = nullptr;
   Matrix _initialTransform = {};
 
   bool needsExtraSave = false;

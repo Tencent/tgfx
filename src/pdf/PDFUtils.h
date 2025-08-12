@@ -19,6 +19,7 @@
 #pragma once
 
 #include "pdf/PDFTypes.h"
+#include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Rect.h"

@@ -73,9 +73,12 @@ FontMetrics CGScalerContext::getFontMetrics() const {
     constexpr auto glyf = SetFourByteTag('g', 'l', 'y', 'f');
     constexpr auto loca = SetFourByteTag('l', 'o', 'c', 'a');
     constexpr auto CFF = SetFourByteTag('C', 'F', 'F', ' ');
-    if (typeface->getTableSize(glyf) && typeface->getTableSize(loca)) {
+    // Use copyTableData to check if the font table exists.
+    // TODO(YGaurora): Implement a function to check for the existence of a font table without
+    // copying its data, which would improve performance.
+    if (typeface->copyTableData(glyf) && typeface->copyTableData(loca)) {
       metrics.type = FontMetrics::FontType::TrueType;
-    } else if (typeface->getTableSize(CFF)) {
+    } else if (typeface->copyTableData(CFF)) {
       metrics.type = FontMetrics::FontType::CFF;
     }
   }

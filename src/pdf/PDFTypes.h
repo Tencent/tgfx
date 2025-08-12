@@ -23,7 +23,7 @@
 #include "tgfx/core/WriteStream.h"
 namespace tgfx {
 
-class PDFDocument;
+class PDFDocumentImpl;
 
 struct PDFIndirectReference {
   int value = -1;
@@ -159,7 +159,7 @@ void PDFWriteByteString(const std::shared_ptr<WriteStream>& stream, const char* 
                         size_t length);
 
 PDFIndirectReference PDFStreamOut(
-    std::unique_ptr<PDFDictionary> dict, std::unique_ptr<Stream> stream, PDFDocument* doc,
+    std::unique_ptr<PDFDictionary> dict, std::unique_ptr<Stream> stream, PDFDocumentImpl* doc,
     PDFSteamCompressionEnabled compress = PDFSteamCompressionEnabled::Default);
 
 }  // namespace tgfx

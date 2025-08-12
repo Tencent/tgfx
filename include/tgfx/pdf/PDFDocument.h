@@ -22,63 +22,51 @@
 #include "tgfx/core/Canvas.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/WriteStream.h"
+#include "tgfx/pdf/PDFMetadata.h"
 
 namespace tgfx {
 
-constexpr float ScalarDefaultRasterDPI = 72.0f;
-
 /**
- * Document is a base abstract class for export documents.
+ * PDFDocument is a class for export documents.
  */
-class Document {
+class PDFDocument {
  public:
-  virtual ~Document();
+  /**
+   * Creates a PDF document.
+   * @param stream The output stream where the PDF file will be written.
+   * @param context The GPU context used for processing images.
+   * @param metadata Metadata describing the PDF file.
+   * @return A Document object that provides interfaces for import operations.
+   */
+  static std::shared_ptr<PDFDocument> Make(std::shared_ptr<WriteStream> stream, Context* context,
+                                           PDFMetadata metadata);
+
+  /**
+   * Destroy the PDFDocument object
+   */
+  virtual ~PDFDocument() = default;
 
   /**
    * Creates a new page with the given width and height. If contentRect is provided, content will be
    * clipped to this area. Returns nullptr if the document has been closed.
    */
-  Canvas* beginPage(float pageWidth, float pageHeight, const Rect* contentRect = nullptr);
+  virtual Canvas* beginPage(float pageWidth, float pageHeight,
+                            const Rect* contentRect = nullptr) = 0;
 
   /**
    * Ends the current page.
    */
-  void endPage();
+  virtual void endPage() = 0;
 
   /**
    * Ends the current page and closes the document.
    */
-  void close();
+  virtual void close() = 0;
 
   /**
    * Aborts the document and discards all writes.
    */
-  void abort();
-
- protected:
-  explicit Document(std::shared_ptr<WriteStream> stream);
-
-  virtual Canvas* onBeginPage(float pageWidth, float pageHeight) = 0;
-
-  virtual void onEndPage() = 0;
-
-  virtual void onClose() = 0;
-
-  virtual void onAbort() = 0;
-
-  std::shared_ptr<WriteStream> stream() const {
-    return _stream;
-  }
-
- private:
-  enum class State {
-    BetweenPages,
-    InPage,
-    Closed,
-  };
-
-  std::shared_ptr<WriteStream> _stream = nullptr;
-  State state = State::BetweenPages;
+  virtual void abort() = 0;
 };
 
 }  // namespace tgfx

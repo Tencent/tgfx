@@ -56,10 +56,10 @@ class PDFGraphicState {
     Luminosity,
   };
 
-  static PDFIndirectReference GetGraphicStateForPaint(PDFDocument* document, const Fill& fill);
+  static PDFIndirectReference GetGraphicStateForPaint(PDFDocumentImpl* document, const Fill& fill);
 
   static PDFIndirectReference GetSMaskGraphicState(PDFIndirectReference sMask, bool invert,
-                                                   SMaskMode sMaskMode, PDFDocument* doc);
+                                                   SMaskMode sMaskMode, PDFDocumentImpl* document);
 };
 
 }  // namespace tgfx

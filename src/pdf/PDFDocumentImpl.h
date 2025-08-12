@@ -25,7 +25,6 @@
 #include "pdf/PDFTypes.h"
 #include "pdf/PDFUtils.h"
 #include "tgfx/core/Canvas.h"
-#include "tgfx/core/Document.h"
 #include "tgfx/core/FontMetrics.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Point.h"
@@ -33,6 +32,7 @@
 #include "tgfx/core/Typeface.h"
 #include "tgfx/core/WriteStream.h"
 #include "tgfx/gpu/Context.h"
+#include "tgfx/pdf/PDFDocument.h"
 #include "tgfx/pdf/PDFMetadata.h"
 
 namespace tgfx {
@@ -75,19 +75,27 @@ struct PDFLink {
   const int nodeId;
 };
 
-class PDFDocument : public Document {
+class PDFDocumentImpl : public PDFDocument {
  public:
-  PDFDocument(std::shared_ptr<WriteStream> stream, Context* context, PDFMetadata Metadata);
+  PDFDocumentImpl(std::shared_ptr<WriteStream> stream, Context* context, PDFMetadata Metadata);
 
-  ~PDFDocument() override;
+  ~PDFDocumentImpl() override;
 
-  Canvas* onBeginPage(float width, float height) override;
+  Canvas* beginPage(float pageWidth, float pageHeight, const Rect* contentRect) override;
 
-  void onEndPage() override;
+  void endPage() override;
 
-  void onClose() override;
+  void close() override;
 
-  void onAbort() override;
+  void abort() override;
+
+  Canvas* onBeginPage(float width, float height);
+
+  void onEndPage();
+
+  void onClose();
+
+  void onAbort();
 
   static std::unique_ptr<Canvas> MakeCanvas(PDFExportContext* drawContext);
 
@@ -156,6 +164,15 @@ class PDFDocument : public Document {
   std::shared_ptr<WriteStream> beginObject(PDFIndirectReference ref);
 
   void endObject();
+
+  enum class State {
+    BetweenPages,
+    InPage,
+    Closed,
+  };
+
+  State state = State::BetweenPages;
+  std::shared_ptr<WriteStream> _stream = nullptr;
 
   Context* _context = nullptr;
   PDFOffsetMap offsetMap;

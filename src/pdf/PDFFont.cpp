@@ -20,7 +20,7 @@
 #include "core/ScalerContext.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
-#include "pdf/PDFDocument.h"
+#include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFTypes.h"
 #include "pdf/PDFUtils.h"
 #include "pdf/fontSubset/PDFMakeCIDGlyphWidthsArray.h"
@@ -82,11 +82,11 @@ GlyphID FirstNonzeroGlyphForSingleByteEncoding(GlyphID glyphID) {
 
 }  // namespace
 
-PDFStrike::PDFStrike(PDFStrikeSpec strikeSpec, PDFDocument* document)
+PDFStrike::PDFStrike(PDFStrikeSpec strikeSpec, PDFDocumentImpl* document)
     : strikeSpec(std::move(strikeSpec)), document(document) {
 }
 
-std::shared_ptr<PDFStrike> PDFStrike::Make(PDFDocument* doc, const Font& font) {
+std::shared_ptr<PDFStrike> PDFStrike::Make(PDFDocumentImpl* doc, const Font& font) {
   DEBUG_ASSERT(0 < font.getTypeface()->unitsPerEm());
 
   const Font& canonFont(font);
@@ -104,7 +104,7 @@ std::shared_ptr<PDFStrike> PDFStrike::Make(PDFDocument* doc, const Font& font) {
 }
 
 const FontMetrics* PDFFont::GetMetrics(const std::shared_ptr<Typeface>& typeface, float textSize,
-                                       PDFDocument* document) {
+                                       PDFDocumentImpl* document) {
   auto id = typeface->uniqueID();
   auto iter = document->fontMetrics.find(id);
   if (iter != document->fontMetrics.end()) {
@@ -222,7 +222,7 @@ PDFFont* PDFStrike::getFontResource(GlyphID glyphID) {
 }
 
 const std::vector<Unichar>& PDFFont::GetUnicodeMap(const Typeface& typeface,
-                                                   PDFDocument* document) {
+                                                   PDFDocumentImpl* document) {
   DEBUG_ASSERT(document);
   auto id = typeface.uniqueID();
   auto iter = document->toUnicodeMap.find(id);
@@ -238,7 +238,7 @@ const std::vector<Unichar>& PDFFont::GetUnicodeMap(const Typeface& typeface,
 //  Type0Font
 ///////////////////////////////////////////////////////////////////////////////
 
-void PDFFont::emitSubsetType0(PDFDocument* document) const {
+void PDFFont::emitSubsetType0(PDFDocumentImpl* document) const {
   auto typeface = strike().strikeSpec.typeface;
   auto textSize = strike().strikeSpec.textSize;
   const auto* metricsPtr = PDFFont::GetMetrics(typeface, textSize, document);
@@ -272,10 +272,7 @@ void PDFFont::emitSubsetType0(PDFDocument* document) const {
     if (!subsetFontData) {
       // If the data cannot be subset, still ensure bare CFF.
       constexpr FontTableTag CFFTag = SetFourByteTag('C', 'F', 'F', ' ');
-      size_t cffTableSize = typeface->getTableSize(CFFTag);
-      if (cffTableSize) {
-        subsetFontData = typeface->copyTableData(CFFTag);
-      }
+      subsetFontData = typeface->copyTableData(CFFTag);
     }
     std::unique_ptr<Stream> subsetFontStream = nullptr;
     if (subsetFontData) {
@@ -399,8 +396,8 @@ struct SingleByteGlyphIdIterator {
   const GlyphID last;
 };
 
-PDFIndirectReference type3_descriptor(PDFDocument* doc, const std::shared_ptr<Typeface>& typeface,
-                                      float xHeight) {
+PDFIndirectReference type3_descriptor(PDFDocumentImpl* doc,
+                                      const std::shared_ptr<Typeface>& typeface, float xHeight) {
   auto iter = doc->type3FontDescriptors.find(typeface->uniqueID());
   if (iter != doc->type3FontDescriptors.end()) {
     return iter->second;
@@ -444,7 +441,7 @@ PDFIndirectReference type3_descriptor(PDFDocument* doc, const std::shared_ptr<Ty
 
 }  // namespace
 
-void PDFFont::emitSubsetType3(PDFDocument* doc) const {
+void PDFFont::emitSubsetType3(PDFDocumentImpl* doc) const {
   const PDFStrike& pdfStrike = *_strike;
   GlyphID firstGlyphID = this->firstGlyphID();
   GlyphID lastGlyphID = this->lastGlyphID();
@@ -567,7 +564,7 @@ void PDFFont::emitSubsetType3(PDFDocument* doc) const {
   doc->emit(font, indirectReference());
 }
 
-void PDFFont::emitSubset(PDFDocument* document) const {
+void PDFFont::emitSubset(PDFDocumentImpl* document) const {
   switch (fontType) {
     case FontMetrics::FontType::Type1CID:
     case FontMetrics::FontType::TrueType:

@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFUtils.h"
+#include <array>
+#include <cfloat>
 #include <string>
 #include "pdf/PDFResourceDictionary.h"
 #include "pdf/PDFTypes.h"
@@ -52,6 +54,26 @@ constexpr int IntPow(int base, unsigned exp, int acc = 1) {
   return exp < 1 ? acc : IntPow(base * base, exp / 2, (exp % 2) ? acc * base : acc);
 }
 
+std::array<float, 6> MatrixToPDFAffine(const Matrix& matrix) {
+  std::array<float, 6> origin = {};
+  matrix.get6(origin.data());
+
+  std::array<float, 6> affine = {};
+  constexpr int AFFINE_SCALE_X = 0;
+  constexpr int AFFINE_SKEW_Y = 1;
+  constexpr int AFFINE_SKEW_X = 2;
+  constexpr int AFFINE_SCALE_Y = 3;
+  constexpr int AFFINE_TRANS_X = 4;
+  constexpr int AFFINE_TRANS_Y = 5;
+
+  affine[AFFINE_SCALE_X] = origin[0];  // Matrix::SCALE_X
+  affine[AFFINE_SKEW_Y] = origin[3];   // Matrix::SKEW_Y
+  affine[AFFINE_SKEW_X] = origin[1];   // Matrix::SKEW_X
+  affine[AFFINE_SCALE_Y] = origin[4];  // Matrix::SCALE_Y
+  affine[AFFINE_TRANS_X] = origin[2];  // Matrix::TRANS_X
+  affine[AFFINE_TRANS_Y] = origin[5];  // Matrix::TRANS_Y
+  return affine;
+}
 }  // namespace
 
 std::unique_ptr<PDFArray> PDFUtils::RectToArray(const Rect& rect) {
@@ -59,7 +81,7 @@ std::unique_ptr<PDFArray> PDFUtils::RectToArray(const Rect& rect) {
 }
 
 std::unique_ptr<PDFArray> PDFUtils::MatrixToArray(const Matrix& matrix) {
-  auto affine = matrix.asAffine();
+  auto affine = MatrixToPDFAffine(matrix);
   return MakePDFArray(affine[0], affine[1], affine[2], affine[3], affine[4], affine[5]);
 }
 
@@ -153,7 +175,7 @@ void PDFUtils::AppendFloat(float value, const std::shared_ptr<WriteStream>& stre
 }
 
 void PDFUtils::AppendTransform(const Matrix& matrix, const std::shared_ptr<WriteStream>& stream) {
-  auto affine = matrix.asAffine();
+  auto affine = MatrixToPDFAffine(matrix);
   for (float value : affine) {
     PDFUtils::AppendFloat(value, stream);
     stream->writeText(" ");
@@ -265,10 +287,10 @@ void PDFUtils::EmitPath(const Path& path, bool doConsumeDegerates,
   // Specifically: moveTo(X), lineTo(Y) and moveTo(X), lineTo(X), lineTo(Y).
 
   auto rect = Rect::MakeEmpty();
-  bool isClosed;  // Both closure and direction need to be checked.
-  PathDirection direction;
-  if (path.isRect(&rect, &isClosed, &direction) && isClosed &&
-      (direction == PathDirection::CW || PathFillType::EvenOdd == path.getFillType())) {
+  bool isClosed = true;  // Both closure and direction need to be checked.
+  bool isReversed = false;
+  if (path.isRect(&rect, &isClosed, &isReversed) && isClosed &&
+      (!isReversed || PathFillType::EvenOdd == path.getFillType())) {
     PDFUtils::AppendRectangle(rect, content);
     return;
   }

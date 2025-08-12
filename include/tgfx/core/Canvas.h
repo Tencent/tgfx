@@ -480,7 +480,7 @@ class Canvas {
   friend class Picture;
   friend class Recorder;
   friend class SVGExporter;
-  friend class PDFDocument;
+  friend class PDFDocumentImpl;
   friend class PDFShader;
   friend class PDFExportContext;
   friend class PDFFont;

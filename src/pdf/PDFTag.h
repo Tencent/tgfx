@@ -26,7 +26,7 @@
 
 namespace tgfx {
 
-class PDFDocument;
+class PDFDocumentImpl;
 
 struct Location {
   Point point{std::numeric_limits<float>::quiet_NaN(), std::numeric_limits<float>::quiet_NaN()};
@@ -129,9 +129,9 @@ class PDFTagTree {
 
   void addNodeTitle(int nodeId, const std::vector<char>& title);
 
-  PDFIndirectReference makeStructTreeRoot(PDFDocument* doc);
+  PDFIndirectReference makeStructTreeRoot(PDFDocumentImpl* document);
 
-  PDFIndirectReference makeOutline(PDFDocument* doc);
+  PDFIndirectReference makeOutline(PDFDocumentImpl* document);
 
   std::string getRootLanguage();
 
@@ -145,7 +145,7 @@ class PDFTagTree {
             std::unordered_map<int, PDFTagNode*>* nodeMap, bool wantTitle);
 
   PDFIndirectReference PrepareTagTreeToEmit(PDFIndirectReference parent, PDFTagNode* node,
-                                            PDFDocument* doc);
+                                            PDFDocumentImpl* document);
 
   std::unordered_map<int, PDFTagNode*> nodeMap;
   std::unique_ptr<PDFTagNode> root = nullptr;

@@ -24,7 +24,8 @@
 
 namespace tgfx {
 
-PDFIndirectReference MakePDFFormXObject(PDFDocument* document, std::shared_ptr<Data> contentData,
+PDFIndirectReference MakePDFFormXObject(PDFDocumentImpl* document,
+                                        std::shared_ptr<Data> contentData,
                                         std::unique_ptr<PDFArray> mediaBox,
                                         std::unique_ptr<PDFDictionary> resourceDictionary,
                                         const Matrix& inverseTransform, const char* colorSpace);

@@ -512,22 +512,4 @@ const Matrix::MapPtsProc Matrix::MapPtsProcs[] = {
     Matrix::IdentityPoints, Matrix::TransPoints,  Matrix::ScalePoints,  Matrix::ScalePoints,
     Matrix::AffinePoints,   Matrix::AffinePoints, Matrix::AffinePoints, Matrix::AffinePoints};
 
-std::array<float, 6> Matrix::asAffine() const {
-  constexpr int AFFINE_SCALE_X = 0;
-  constexpr int AFFINE_SKEW_Y = 1;
-  constexpr int AFFINE_SKEW_X = 2;
-  constexpr int AFFINE_SCALE_Y = 3;
-  constexpr int AFFINE_TRANS_X = 4;
-  constexpr int AFFINE_TRANS_Y = 5;
-
-  std::array<float, 6> affine;
-  affine[AFFINE_SCALE_X] = values[SCALE_X];
-  affine[AFFINE_SKEW_Y] = values[SKEW_Y];
-  affine[AFFINE_SKEW_X] = values[SKEW_X];
-  affine[AFFINE_SCALE_Y] = values[SCALE_Y];
-  affine[AFFINE_TRANS_X] = values[TRANS_X];
-  affine[AFFINE_TRANS_Y] = values[TRANS_Y];
-  return affine;
-}
-
 }  // namespace tgfx

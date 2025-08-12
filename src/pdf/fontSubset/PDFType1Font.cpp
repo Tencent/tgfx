@@ -19,7 +19,7 @@
 #include "PDFType1Font.h"
 #include "core/ScalerContext.h"
 #include "core/utils/Log.h"
-#include "pdf/PDFDocument.h"
+#include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFFont.h"
 #include "pdf/PDFTypes.h"
 #include "tgfx/core/Data.h"
@@ -220,7 +220,7 @@ inline float FromFontUnits(float scaled, uint16_t emSize) {
   return emSize == 1000 ? scaled : scaled * 1000 / emSize;
 }
 
-PDFIndirectReference MakeType1FontDescriptor(PDFDocument* document,
+PDFIndirectReference MakeType1FontDescriptor(PDFDocumentImpl* document,
                                              const PDFStrikeSpec& pdfStrikeSpec,
                                              const FontMetrics* info) {
   auto descriptor = PDFDictionary::Make("FontDescriptor");
@@ -248,7 +248,7 @@ PDFIndirectReference MakeType1FontDescriptor(PDFDocument* document,
   return document->emit(*descriptor);
 }
 
-const std::vector<std::string>& Type1GlyphNames(PDFDocument* canon,
+const std::vector<std::string>& Type1GlyphNames(PDFDocumentImpl* canon,
                                                 const std::shared_ptr<Typeface>& typeface) {
   auto typefaceID = typeface->uniqueID();
   auto iter = canon->type1GlyphNames.find(typefaceID);
@@ -260,7 +260,7 @@ const std::vector<std::string>& Type1GlyphNames(PDFDocument* canon,
   return iter->second;
 }
 
-PDFIndirectReference Type1FontDescriptor(PDFDocument* doc, const PDFStrikeSpec& pdfStrikeSpec) {
+PDFIndirectReference Type1FontDescriptor(PDFDocumentImpl* doc, const PDFStrikeSpec& pdfStrikeSpec) {
   auto typeface = pdfStrikeSpec.typeface;
   auto textSize = pdfStrikeSpec.textSize;
   auto typefaceID = typeface->uniqueID();
@@ -275,7 +275,7 @@ PDFIndirectReference Type1FontDescriptor(PDFDocument* doc, const PDFStrikeSpec& 
 }
 }  // namespace
 
-void EmitSubsetType1(const PDFFont& pdfFont, PDFDocument* document) {
+void EmitSubsetType1(const PDFFont& pdfFont, PDFDocumentImpl* document) {
   auto typeface = pdfFont.strike().strikeSpec.typeface;
   auto textSize = pdfFont.strike().strikeSpec.textSize;
   auto glyphNames = Type1GlyphNames(document, typeface);

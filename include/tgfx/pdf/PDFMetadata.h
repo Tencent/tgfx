@@ -18,23 +18,14 @@
 
 #pragma once
 
-#include "tgfx/core/Document.h"
-#include "tgfx/core/WriteStream.h"
-#include "tgfx/gpu/Context.h"
+#include <string>
+#include <vector>
 
 namespace tgfx {
 class PDFArray;
 struct PDFMetadata;
 
-/**
- * Creates a PDF document.
- * @param stream The output stream where the PDF file will be written.
- * @param context The GPU context used for processing images.
- * @param metadata Metadata describing the PDF file.
- * @return A Document object that provides interfaces for import operations.
- */
-std::shared_ptr<Document> MakePDFDocument(std::shared_ptr<WriteStream> stream, Context* context,
-                                          PDFMetadata metadata);
+static constexpr float ScalarDefaultRasterDPI = 72.0f;
 
 /**
  * Supports writing custom PDF objects. 

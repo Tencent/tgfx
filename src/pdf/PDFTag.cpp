@@ -18,7 +18,7 @@
 
 #include "PDFTag.h"
 #include "core/utils/Log.h"
-#include "pdf/PDFDocument.h"
+#include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFTypes.h"
 
 constexpr int FirstAnnotationStructParentKey = 100000;
@@ -135,26 +135,26 @@ static bool can_discard(PDFTagNode* node) {
 }
 
 PDFIndirectReference PDFTagTree::PrepareTagTreeToEmit(PDFIndirectReference parent, PDFTagNode* node,
-                                                      PDFDocument* doc) {
-  PDFIndirectReference ref = doc->reserveRef();
+                                                      PDFDocumentImpl* document) {
+  PDFIndirectReference ref = document->reserveRef();
   std::unique_ptr<PDFArray> kids = MakePDFArray();
   const auto& children = node->children;
   for (size_t i = 0; i < children->size(); ++i) {
     auto* child = &(*children)[i];
     if (!(can_discard(child))) {
-      kids->appendRef(PrepareTagTreeToEmit(ref, child, doc));
+      kids->appendRef(PrepareTagTreeToEmit(ref, child, document));
     }
   }
   for (const PDFTagNode::MarkedContentInfo& info : node->markedContent) {
     std::unique_ptr<PDFDictionary> mcr = PDFDictionary::Make("MCR");
-    mcr->insertRef("Pg", doc->getPage(info.location.pageIndex));
+    mcr->insertRef("Pg", document->getPage(info.location.pageIndex));
     mcr->insertInt("MCID", info.markId);
     kids->appendObject(std::move(mcr));
   }
   for (const PDFTagNode::AnnotationInfo& annotationInfo : node->annotations) {
     std::unique_ptr<PDFDictionary> annotationDict = PDFDictionary::Make("OBJR");
     annotationDict->insertRef("Obj", annotationInfo.annotationRef);
-    annotationDict->insertRef("Pg", doc->getPage(annotationInfo.pageIndex));
+    annotationDict->insertRef("Pg", document->getPage(annotationInfo.pageIndex));
     kids->appendObject(std::move(annotationDict));
   }
   node->ref = ref;
@@ -180,7 +180,7 @@ PDFIndirectReference PDFTagTree::PrepareTagTreeToEmit(PDFIndirectReference paren
   IDTreeEntry idTreeEntry = {node->nodeId, ref};
   IDTreeEntries.push_back(idTreeEntry);
 
-  return doc->emit(*dict, ref);
+  return document->emit(*dict, ref);
 }
 
 void PDFTagTree::addNodeAnnotation(int nodeId, PDFIndirectReference annotationRef,
@@ -219,18 +219,18 @@ void PDFTagTree::addNodeTitle(int nodeId, const std::vector<char>& title) {
   }
 }
 
-PDFIndirectReference PDFTagTree::makeStructTreeRoot(PDFDocument* doc) {
+PDFIndirectReference PDFTagTree::makeStructTreeRoot(PDFDocumentImpl* document) {
   if (!root || can_discard(root.get())) {
     return PDFIndirectReference();
   }
 
-  PDFIndirectReference ref = doc->reserveRef();
+  PDFIndirectReference ref = document->reserveRef();
 
-  auto pageCount = static_cast<uint32_t>(doc->pageCount());
+  auto pageCount = static_cast<uint32_t>(document->pageCount());
 
   // Build the StructTreeRoot.
   PDFDictionary structTreeRoot("StructTreeRoot");
-  structTreeRoot.insertRef("K", PrepareTagTreeToEmit(ref, root.get(), doc));
+  structTreeRoot.insertRef("K", PrepareTagTreeToEmit(ref, root.get(), document));
   structTreeRoot.insertInt("ParentTreeNextKey", static_cast<int>(pageCount));
 
   // Build the parent tree, which consists of two things:
@@ -251,7 +251,7 @@ PDFIndirectReference PDFTagTree::makeStructTreeRoot(PDFDocument* doc) {
       markToTagArray.appendRef(mark->ref);
     }
     parentTreeNums->appendInt(static_cast<int>(j));
-    parentTreeNums->appendRef(doc->emit(markToTagArray));
+    parentTreeNums->appendRef(document->emit(markToTagArray));
   }
 
   // Then, one entry per annotation.
@@ -269,7 +269,7 @@ PDFIndirectReference PDFTagTree::makeStructTreeRoot(PDFDocument* doc) {
   }
 
   parentTree.insertObject("Nums", std::move(parentTreeNums));
-  structTreeRoot.insertRef("ParentTree", doc->emit(parentTree));
+  structTreeRoot.insertRef("ParentTree", document->emit(parentTree));
 
   // Build the IDTree, a mapping from every unique ID string to
   // a reference to its corresponding structure element node.
@@ -293,12 +293,12 @@ PDFIndirectReference PDFTagTree::makeStructTreeRoot(PDFDocument* doc) {
     }
     idTreeLeaf.insertObject("Names", std::move(names));
     auto idTreeKids = MakePDFArray();
-    idTreeKids->appendRef(doc->emit(idTreeLeaf));
+    idTreeKids->appendRef(document->emit(idTreeLeaf));
     idTree.insertObject("Kids", std::move(idTreeKids));
-    structTreeRoot.insertRef("IDTree", doc->emit(idTree));
+    structTreeRoot.insertRef("IDTree", document->emit(idTree));
   }
 
-  return doc->emit(structTreeRoot, ref);
+  return document->emit(structTreeRoot, ref);
 }
 
 namespace {
@@ -319,7 +319,7 @@ struct OutlineEntry {
   std::vector<OutlineEntry> children = {};
   size_t descendentsEmitted = 0;
 
-  void emitDescendents(PDFDocument* const doc) {
+  void emitDescendents(PDFDocumentImpl* const doc) {
     descendentsEmitted = children.size();
     for (size_t i = 0; i < children.size(); ++i) {
       auto&& child = children[i];
@@ -384,7 +384,7 @@ OutlineEntry::Content CreateOutlineEntryContent(PDFTagNode* const node) {
   return content;
 }
 
-void CreateOutlineFromHeaders(PDFDocument* const doc, PDFTagNode* const node,
+void CreateOutlineFromHeaders(PDFDocumentImpl* const doc, PDFTagNode* const node,
                               std::vector<OutlineEntry*>& stack) {
   char const* type = node->typeString.c_str();
   if (type[0] == 'H' && '1' <= type[1] && type[1] <= '6') {
@@ -411,7 +411,7 @@ void CreateOutlineFromHeaders(PDFDocument* const doc, PDFTagNode* const node,
 
 }  // namespace
 
-PDFIndirectReference PDFTagTree::makeOutline(PDFDocument* doc) {
+PDFIndirectReference PDFTagTree::makeOutline(PDFDocumentImpl* doc) {
   if (!root || can_discard(root.get()) ||
       outline != PDFMetadata::Outline::StructureElementHeaders) {
     return PDFIndirectReference();

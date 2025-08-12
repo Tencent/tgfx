@@ -28,12 +28,12 @@ class PDFBitmap {
   /**
    * Serialize a image as an Image Xobject. quality > 100 means lossless
    */
-  static PDFIndirectReference Serialize(const std::shared_ptr<Image>& image, PDFDocument* document,
-                                        int encodingQuality = 101);
+  static PDFIndirectReference Serialize(const std::shared_ptr<Image>& image,
+                                        PDFDocumentImpl* document, int encodingQuality = 101);
 
  private:
   static void SerializeImage(const std::shared_ptr<Image>& image, int encodingQuality,
-                             PDFDocument* doc, PDFIndirectReference ref);
+                             PDFDocumentImpl* doc, PDFIndirectReference ref);
 };
 
 }  // namespace tgfx

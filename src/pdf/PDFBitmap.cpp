@@ -21,7 +21,7 @@
 #include "core/images/CodecImage.h"
 #include "core/utils/Types.h"
 #include "pdf/DeflateStream.h"
-#include "pdf/PDFDocument.h"
+#include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFTypes.h"
 #include "tgfx/core/AlphaType.h"
 #include "tgfx/core/ColorType.h"
@@ -39,7 +39,7 @@ namespace {
 enum class PDFStreamFormat { DCT, Flate, Uncompressed };
 
 template <typename T>
-void EmitImageStream(PDFDocument* doc, PDFIndirectReference ref, T writeStream, ISize size,
+void EmitImageStream(PDFDocumentImpl* doc, PDFIndirectReference ref, T writeStream, ISize size,
                      PDFUnion&& colorSpace, PDFIndirectReference sMask, int length,
                      PDFStreamFormat format) {
   auto pdfDict = PDFDictionary::Make("XObject");
@@ -115,7 +115,7 @@ uint32_t GetNeighborAvgColor(const Pixmap& pixmap, int xOrig, int yOrig) {
   return 0x00000000;
 }
 
-bool DoJpeg(std::shared_ptr<Data> data, YUVColorSpace /*imageColorSpace*/, PDFDocument* doc,
+bool DoJpeg(std::shared_ptr<Data> data, YUVColorSpace /*imageColorSpace*/, PDFDocumentImpl* doc,
             ISize size, PDFIndirectReference ref) {
   if (!JpegCodec::IsJpeg(data)) {
     return false;
@@ -131,7 +131,7 @@ bool DoJpeg(std::shared_ptr<Data> data, YUVColorSpace /*imageColorSpace*/, PDFDo
   return true;
 }
 
-void DoDeflatedAlpha(const Pixmap& pixmap, PDFDocument* document, PDFIndirectReference ref) {
+void DoDeflatedAlpha(const Pixmap& pixmap, PDFDocumentImpl* document, PDFIndirectReference ref) {
   PDFMetadata::CompressionLevel compressionLevel = document->metadata().compressionLevel;
   PDFStreamFormat format = compressionLevel == PDFMetadata::CompressionLevel::None
                                ? PDFStreamFormat::Uncompressed
@@ -200,7 +200,7 @@ void DoDeflatedAlpha(const Pixmap& pixmap, PDFDocument* document, PDFIndirectRef
                   PDFIndirectReference(), length, format);
 }
 
-void DoDeflatedImage(const Pixmap& pixmap, PDFDocument* document, bool isOpaque,
+void DoDeflatedImage(const Pixmap& pixmap, PDFDocumentImpl* document, bool isOpaque,
                      PDFIndirectReference ref) {
   PDFIndirectReference sMask;
   if (!isOpaque) {
@@ -299,7 +299,7 @@ void DoDeflatedImage(const Pixmap& pixmap, PDFDocument* document, bool isOpaque,
 }  // namespace
 
 void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int /*encodingQuality*/,
-                               PDFDocument* doc, PDFIndirectReference ref) {
+                               PDFDocumentImpl* doc, PDFIndirectReference ref) {
   auto dimensions = ISize::Make(image->width(), image->height());
 
   ;
@@ -337,7 +337,7 @@ void PDFBitmap::SerializeImage(const std::shared_ptr<Image>& image, int /*encodi
 }
 
 PDFIndirectReference PDFBitmap::Serialize(const std::shared_ptr<Image>& image,
-                                          PDFDocument* document, int encodingQuality) {
+                                          PDFDocumentImpl* document, int encodingQuality) {
   DEBUG_ASSERT(image);
   DEBUG_ASSERT(document);
   auto ref = document->reserveRef();

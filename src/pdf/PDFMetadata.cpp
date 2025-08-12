@@ -18,7 +18,7 @@
 
 #include "tgfx/pdf/PDFMetadata.h"
 #include <algorithm>
-#include "pdf/PDFDocument.h"
+#include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFTag.h"
 #include "pdf/PDFTypes.h"
 #include "tgfx/gpu/Context.h"
@@ -104,20 +104,6 @@ std::string DateTime::toISO8601() const {
            static_cast<uint32_t>(hour), static_cast<uint32_t>(minute),
            static_cast<uint32_t>(second), timezoneSign, timeZoneHours, timeZoneMinutes);
   return std::string(buffer);
-}
-
-/////////////////////////////////////////////////////////////////////////////////////////////////
-
-std::shared_ptr<Document> MakePDFDocument(std::shared_ptr<WriteStream> stream, Context* context,
-                                          PDFMetadata metadata) {
-  if (!stream || !context) {
-    return nullptr;
-  }
-  if (metadata.rasterDPI <= 0) {
-    metadata.rasterDPI = 72.0f;
-  }
-  metadata.encodingQuality = std::max(metadata.encodingQuality, 0);
-  return std::make_shared<PDFDocument>(stream, context, metadata);
 }
 
 }  // namespace tgfx

@@ -28,17 +28,17 @@ namespace tgfx {
 
 class PDFShader {
  public:
-  static PDFIndirectReference Make(PDFDocument* doc, const std::shared_ptr<Shader>& shader,
+  static PDFIndirectReference Make(PDFDocumentImpl* doc, const std::shared_ptr<Shader>& shader,
                                    const Matrix& canvasTransform, const Rect& surfaceBBox,
                                    Color paintColor);
 
  private:
-  static PDFIndirectReference MakeImageShader(PDFDocument* doc, Matrix finalMatrix,
+  static PDFIndirectReference MakeImageShader(PDFDocumentImpl* doc, Matrix finalMatrix,
                                               TileMode tileModesX, TileMode tileModesY, Rect bBox,
                                               const std::shared_ptr<Image>& image,
                                               Color paintColor);
 
-  static PDFIndirectReference MakeFallbackShader(PDFDocument* doc,
+  static PDFIndirectReference MakeFallbackShader(PDFDocumentImpl* doc,
                                                  const std::shared_ptr<Shader>& shader,
                                                  const Matrix& canvasTransform,
                                                  const Rect& surfaceBBox, Color paintColor);

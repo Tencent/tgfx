@@ -20,7 +20,7 @@
 #include "core/shaders/ImageShader.h"
 #include "core/utils/Log.h"
 #include "core/utils/Types.h"
-#include "pdf/PDFDocument.h"
+#include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFExportContext.h"
 #include "pdf/PDFGradientShader.h"
 #include "pdf/PDFTypes.h"
@@ -118,7 +118,7 @@ Bitmap ExtractSubset(Bitmap src, Rect subset) {
 }
 }  // namespace
 
-PDFIndirectReference PDFShader::Make(PDFDocument* doc, const std::shared_ptr<Shader>& shader,
+PDFIndirectReference PDFShader::Make(PDFDocumentImpl* doc, const std::shared_ptr<Shader>& shader,
                                      const Matrix& canvasTransform, const Rect& surfaceBBox,
                                      Color paintColor) {
   DEBUG_ASSERT(shader);
@@ -148,7 +148,7 @@ PDFIndirectReference PDFShader::Make(PDFDocument* doc, const std::shared_ptr<Sha
   return MakeFallbackShader(doc, shader, canvasTransform, surfaceBBox, paintColor);
 }
 
-PDFIndirectReference PDFShader::MakeImageShader(PDFDocument* doc, Matrix finalMatrix,
+PDFIndirectReference PDFShader::MakeImageShader(PDFDocumentImpl* doc, Matrix finalMatrix,
                                                 TileMode tileModesX, TileMode tileModesY, Rect bBox,
                                                 const std::shared_ptr<Image>& image,
                                                 Color paintColor) {
@@ -177,7 +177,7 @@ PDFIndirectReference PDFShader::MakeImageShader(PDFDocument* doc, Matrix finalMa
   ISize patternDeviceSize = {static_cast<int>(std::ceil(deviceBounds.width())),
                              static_cast<int>(std::ceil(deviceBounds.height()))};
   auto patternContext = PDFExportContext(patternDeviceSize, doc);
-  auto canvas = PDFDocument::MakeCanvas(&patternContext);
+  auto canvas = PDFDocumentImpl::MakeCanvas(&patternContext);
 
   auto patternBBox = Rect::MakeWH(image->width(), image->height());
   float width = patternBBox.width();
@@ -324,7 +324,7 @@ PDFIndirectReference PDFShader::MakeImageShader(PDFDocument* doc, Matrix finalMa
 //  * allocate a surfaceBBox-sized bitmap
 //  * shade the whole area
 //  * use the result as a bitmap shader
-PDFIndirectReference PDFShader::MakeFallbackShader(PDFDocument* doc,
+PDFIndirectReference PDFShader::MakeFallbackShader(PDFDocumentImpl* doc,
                                                    const std::shared_ptr<Shader>& shader,
                                                    const Matrix& canvasTransform,
                                                    const Rect& surfaceBBox, Color paintColor) {

@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFGraphicState.h"
-#include "pdf/PDFDocument.h"
+#include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFTypes.h"
 #include "pdf/PDFUtils.h"
 #include "tgfx/core/BlendMode.h"
@@ -36,7 +36,7 @@ uint8_t FilterPDFBlendMode(BlendMode mode) {
 
 }  // namespace
 
-PDFIndirectReference PDFGraphicState::GetGraphicStateForPaint(PDFDocument* document,
+PDFIndirectReference PDFGraphicState::GetGraphicStateForPaint(PDFDocumentImpl* document,
                                                               const Fill& fill) {
   DEBUG_ASSERT(document);
   auto mode = fill.blendMode;
@@ -59,7 +59,7 @@ PDFIndirectReference PDFGraphicState::GetGraphicStateForPaint(PDFDocument* docum
 
 PDFIndirectReference PDFGraphicState::GetSMaskGraphicState(PDFIndirectReference sMask,
                                                            bool /*invert*/, SMaskMode sMaskMode,
-                                                           PDFDocument* doc) {
+                                                           PDFDocumentImpl* doc) {
   // The practical chances of using the same mask more than once are unlikely
   // enough that it's not worth canonicalizing.
   auto sMaskDict = PDFDictionary::Make("Mask");

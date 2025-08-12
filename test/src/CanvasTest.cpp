@@ -2039,7 +2039,8 @@ TGFX_TEST(CanvasTest, CornerEffectCompare) {
     path1.addOval(Rect::MakeXYWH(100, 100, 125, 125));
     Path unionPath;
     unionPath.addOval(Rect::MakeXYWH(200, 100, 125, 125));
-    unionPath.addPath(path1, PathOp::Union);
+    unionPath.addPath(path1, PathOp::XOR);
+    unionPath.setFillType(PathFillType::EvenOdd);
     auto effectedShape = Shape::MakeFrom(unionPath);
     effectedShape = tgfx::Shape::ApplyEffect(effectedShape, tgfx::PathEffect::MakeCorner(50));
     canvas->translate(0, 300);

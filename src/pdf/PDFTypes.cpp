@@ -19,7 +19,7 @@
 #include "PDFTypes.h"
 #include "core/utils/Log.h"
 #include "pdf/DeflateStream.h"
-#include "pdf/PDFDocument.h"
+#include "pdf/PDFDocumentImpl.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/MD5.h"
 #include "tgfx/core/Stream.h"
@@ -204,7 +204,7 @@ bool StreamCopy(WriteStream* out, Stream* input) {
 }
 
 void SerializeStream(PDFDictionary* origDict, Stream* stream, PDFSteamCompressionEnabled compress,
-                     PDFDocument* doc, PDFIndirectReference ref) {
+                     PDFDocumentImpl* doc, PDFIndirectReference ref) {
   // Code assumes that the stream starts at the beginning.
   DEBUG_ASSERT(stream);
 
@@ -330,7 +330,7 @@ void WriteTextString(const std::shared_ptr<WriteStream>& stream, const char* cin
 }  // namespace
 
 PDFIndirectReference PDFStreamOut(std::unique_ptr<PDFDictionary> dict,
-                                  std::unique_ptr<Stream> stream, PDFDocument* doc,
+                                  std::unique_ptr<Stream> stream, PDFDocumentImpl* doc,
                                   PDFSteamCompressionEnabled compress) {
   PDFIndirectReference ref = doc->reserveRef();
   SerializeStream(dict.get(), stream.get(), compress, doc, ref);

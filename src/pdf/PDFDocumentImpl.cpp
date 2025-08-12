@@ -16,7 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PDFDocument.h"
+#include "PDFDocumentImpl.h"
+#include <utility>
 #include "core/utils/Log.h"
 #include "pdf/PDFMetadataUtils.h"
 #include "pdf/PDFTypes.h"
@@ -31,6 +32,18 @@
 #include "tgfx/pdf/PDFMetadata.h"
 
 namespace tgfx {
+
+std::shared_ptr<PDFDocument> PDFDocument::Make(std::shared_ptr<WriteStream> stream,
+                                               Context* context, PDFMetadata metadata) {
+  if (!stream || !context) {
+    return nullptr;
+  }
+  if (metadata.rasterDPI <= 0) {
+    metadata.rasterDPI = 72.0f;
+  }
+  metadata.encodingQuality = std::max(metadata.encodingQuality, 0);
+  return std::make_shared<PDFDocumentImpl>(stream, context, metadata);
+}
 
 namespace {
 size_t Difference(size_t minuend, size_t subtrahend) {
@@ -87,7 +100,7 @@ void SerializeHeader(PDFOffsetMap* offsetMap, const std::shared_ptr<WriteStream>
   // to prevent the file from being misidentified as text. Here we use TGFX with high bits set.
 }
 
-std::unique_ptr<PDFArray> make_srgb_output_intents(PDFDocument* /*doc*/) {
+std::unique_ptr<PDFArray> make_srgb_output_intents(PDFDocumentImpl* /*doc*/) {
   // sRGB is specified by HTML, CSS, and SVG.
   auto outputIntent = PDFDictionary::Make("OutputIntent");
   outputIntent->insertName("S", "GTS_PDFA1");
@@ -100,7 +113,7 @@ std::unique_ptr<PDFArray> make_srgb_output_intents(PDFDocument* /*doc*/) {
   return intentArray;
 }
 
-PDFIndirectReference generate_page_tree(PDFDocument* doc,
+PDFIndirectReference generate_page_tree(PDFDocumentImpl* doc,
                                         std::vector<std::unique_ptr<PDFDictionary>> pages,
                                         const std::vector<PDFIndirectReference>& pageRefs) {
   // PDF wants a tree describing all the pages in the document.  We arbitrary
@@ -116,7 +129,7 @@ PDFIndirectReference generate_page_tree(PDFDocument* doc,
     PDFIndirectReference fReservedRef;
     int fPageObjectDescendantCount;
 
-    static std::vector<PageTreeNode> Layer(std::vector<PageTreeNode> vec, PDFDocument* doc) {
+    static std::vector<PageTreeNode> Layer(std::vector<PageTreeNode> vec, PDFDocumentImpl* doc) {
       std::vector<PageTreeNode> result;
       static constexpr size_t kMaxNodeSize = 8;
       const size_t n = vec.size();
@@ -186,7 +199,7 @@ std::string ToValidUtf8String(const Data& d) {
 }
 
 PDFIndirectReference append_destinations(
-    PDFDocument* doc, const std::vector<PDFNamedDestination>& namedDestinations) {
+    PDFDocumentImpl* doc, const std::vector<PDFNamedDestination>& namedDestinations) {
   PDFDictionary destinations;
   for (const PDFNamedDestination& dest : namedDestinations) {
     auto pdfDest = MakePDFArray();
@@ -231,7 +244,7 @@ void end_indirect_object(const std::shared_ptr<WriteStream>& stream) {
   stream->writeText("\nendobj\n");
 }
 
-std::vector<const PDFFont*> get_fonts(const PDFDocument& canon) {
+std::vector<const PDFFont*> get_fonts(const PDFDocumentImpl& canon) {
   std::vector<const PDFFont*> fonts;
   for (const auto& [_, strike] : canon.strikes) {
     for (const auto& [unused, font] : strike->fontMap) {
@@ -248,27 +261,27 @@ std::vector<const PDFFont*> get_fonts(const PDFDocument& canon) {
 
 }  // namespace
 
-PDFDocument::PDFDocument(std::shared_ptr<WriteStream> stream, Context* context, PDFMetadata meta)
-    : Document(std::move(stream)), _context(context), _metadata(std::move(meta)) {
-  constexpr float DpiForRasterScaleOne = 72.0f;
-  if (_metadata.rasterDPI != DpiForRasterScaleOne) {
-    inverseRasterScale = DpiForRasterScaleOne / _metadata.rasterDPI;
-    rasterScale = _metadata.rasterDPI / DpiForRasterScaleOne;
+PDFDocumentImpl::PDFDocumentImpl(std::shared_ptr<WriteStream> stream, Context* context,
+                                 PDFMetadata meta)
+    : _stream(std::move(stream)), _context(context), _metadata(std::move(meta)) {
+  if (_metadata.rasterDPI != ScalarDefaultRasterDPI) {
+    inverseRasterScale = ScalarDefaultRasterDPI / _metadata.rasterDPI;
+    rasterScale = _metadata.rasterDPI / ScalarDefaultRasterDPI;
   }
   if (_metadata.structureElementTreeRoot) {
     tagTree.init(_metadata.structureElementTreeRoot, _metadata.outline);
   }
 }
 
-PDFDocument::~PDFDocument() {
+PDFDocumentImpl::~PDFDocumentImpl() {
   close();
 }
 
-std::unique_ptr<Canvas> PDFDocument::MakeCanvas(PDFExportContext* drawContext) {
+std::unique_ptr<Canvas> PDFDocumentImpl::MakeCanvas(PDFExportContext* drawContext) {
   return std::unique_ptr<Canvas>(new Canvas(drawContext));
 }
 
-const Matrix& PDFDocument::currentPageTransform() const {
+const Matrix& PDFDocumentImpl::currentPageTransform() const {
   // If not on a page (like when emitting a Type3 glyph) return identity.
   if (!this->hasCurrentPage()) {
     return Matrix::I();
@@ -276,10 +289,60 @@ const Matrix& PDFDocument::currentPageTransform() const {
   return drawContext->initialTransform();
 }
 
-Canvas* PDFDocument::onBeginPage(float width, float height) {
+Canvas* PDFDocumentImpl::beginPage(float pageWidth, float pageHeight, const Rect* contentRect) {
+  if (pageWidth <= 0 || pageHeight <= 0 || state == State::Closed) {
+    return nullptr;
+  }
+  if (state == State::InPage) {
+    endPage();
+  }
+  auto* canvas = onBeginPage(pageWidth, pageHeight);
+  state = State::InPage;
+  if (canvas && contentRect) {
+    Rect rect = *contentRect;
+    if (!rect.intersect({0, 0, pageWidth, pageWidth})) {
+      return nullptr;
+    }
+    canvas->clipRect(rect);
+    canvas->translate(rect.x(), rect.y());
+  }
+  return canvas;
+}
+
+void PDFDocumentImpl::endPage() {
+  if (state == State::InPage) {
+    onEndPage();
+    state = State::BetweenPages;
+  }
+}
+
+void PDFDocumentImpl::close() {
+  while (true) {
+    switch (state) {
+      case State::BetweenPages:
+        onClose();
+        state = State::Closed;
+        return;
+      case State::InPage:
+        endPage();
+        break;
+      case State::Closed:
+        return;
+    }
+  }
+}
+
+void PDFDocumentImpl::abort() {
+  if (state != State::Closed) {
+    onAbort();
+    state = State::Closed;
+  }
+}
+
+Canvas* PDFDocumentImpl::onBeginPage(float width, float height) {
   if (pages.empty()) {
     // if this is the first page if the document.
-    SerializeHeader(&offsetMap, stream());
+    SerializeHeader(&offsetMap, _stream);
 
     infoDictionary = this->emit(*PDFMetadataUtils::MakeDocumentInformationDict(_metadata));
     if (_metadata.PDFA) {
@@ -309,7 +372,7 @@ Canvas* PDFDocument::onBeginPage(float width, float height) {
   return _canvas;
 }
 
-void PDFDocument::onEndPage() {
+void PDFDocumentImpl::onEndPage() {
   auto page = PDFDictionary::Make("Page");
 
   auto mediaSize =
@@ -337,7 +400,7 @@ void PDFDocument::onEndPage() {
   drawContext = nullptr;
 }
 
-void PDFDocument::onClose() {
+void PDFDocumentImpl::onClose() {
   if (pages.empty()) {
     return;
   }
@@ -390,13 +453,13 @@ void PDFDocument::onClose() {
   for (const auto* f : get_fonts(*this)) {
     f->emitSubset(this);
   }
-  serialize_footer(offsetMap, stream(), infoDictionary, docCatalogRef, documentUUID);
+  serialize_footer(offsetMap, _stream, infoDictionary, docCatalogRef, documentUUID);
 }
 
-void PDFDocument::onAbort() {
+void PDFDocumentImpl::onAbort() {
 }
 
-std::string PDFDocument::nextFontSubsetTag() {
+std::string PDFDocumentImpl::nextFontSubsetTag() {
   // PDF 32000-1:2008 Section 9.6.4 FontSubsets "The tag shall consist of six uppercase letters"
   // "followed by a plus sign" "different subsets in the same PDF file shall have different tags."
   // There are 26^6 or 308,915,776 possible values. So start in range then increment and mod.
@@ -413,22 +476,22 @@ std::string PDFDocument::nextFontSubsetTag() {
   return subsetTag;
 }
 
-PDFIndirectReference PDFDocument::emit(const PDFObject& object, PDFIndirectReference ref) {
+PDFIndirectReference PDFDocumentImpl::emit(const PDFObject& object, PDFIndirectReference ref) {
   object.emitObject(this->beginObject(ref));
   this->endObject();
   return ref;
 }
 
-std::shared_ptr<WriteStream> PDFDocument::beginObject(PDFIndirectReference ref) {
-  begin_indirect_object(&offsetMap, ref, stream());
-  return stream();
+std::shared_ptr<WriteStream> PDFDocumentImpl::beginObject(PDFIndirectReference ref) {
+  begin_indirect_object(&offsetMap, ref, _stream);
+  return _stream;
 }
 
-void PDFDocument::endObject() {
-  end_indirect_object(stream());
+void PDFDocumentImpl::endObject() {
+  end_indirect_object(_stream);
 }
 
-PDFIndirectReference PDFDocument::getPage(size_t pageIndex) const {
+PDFIndirectReference PDFDocumentImpl::getPage(size_t pageIndex) const {
   DEBUG_ASSERT(pageIndex < pageRefs.size());
   return pageRefs[pageIndex];
 }

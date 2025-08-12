@@ -29,6 +29,7 @@
 #include "tgfx/core/Stroke.h"
 #include "tgfx/core/TileMode.h"
 #include "tgfx/core/WriteStream.h"
+#include "tgfx/pdf/PDFDocument.h"
 #include "tgfx/pdf/PDFMetadata.h"
 #include "tgfx/svg/SVGPathParser.h"
 #include "utils/Baseline.h"
@@ -58,7 +59,7 @@ TGFX_TEST(PDFExportTest, Empty) {
   PDFMetadata metadata;
   metadata.title = "Empty PDF";
 
-  auto document = MakePDFDocument(PDFStream, context, metadata);
+  auto document = PDFDocument::Make(PDFStream, context, metadata);
   document->beginPage(256.f, 256.f);
   document->endPage();
   document->close();
@@ -77,7 +78,7 @@ TGFX_TEST(PDFExportTest, EmptyMultiPage) {
   PDFMetadata metadata;
   metadata.title = "Empty Multi Page";
 
-  auto document = MakePDFDocument(PDFStream, context, metadata);
+  auto document = PDFDocument::Make(PDFStream, context, metadata);
   document->beginPage(256.f, 256.f);
   document->endPage();
   document->beginPage(512.f, 512.f);
@@ -95,7 +96,7 @@ TGFX_TEST(PDFExportTest, DrawColor) {
 
   auto PDFStream = MemoryWriteStream::Make();
 
-  auto document = MakePDFDocument(PDFStream, context, PDFMetadata());
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
   auto* canvas = document->beginPage(256.f, 256.f);
   canvas->drawColor(Color::Red());
   document->endPage();
@@ -112,7 +113,7 @@ TGFX_TEST(PDFExportTest, DrawShape) {
 
   auto PDFStream = MemoryWriteStream::Make();
 
-  auto document = MakePDFDocument(PDFStream, context, PDFMetadata());
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
   auto* canvas = document->beginPage(512.f, 512.f);
   {
     Paint paint;
@@ -144,7 +145,7 @@ TGFX_TEST(PDFExportTest, DrawShapeStroke) {
 
   auto PDFStream = MemoryWriteStream::Make();
 
-  auto document = MakePDFDocument(PDFStream, context, PDFMetadata());
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
   auto* canvas = document->beginPage(512.f, 512.f);
   {
     Paint paint;
@@ -177,7 +178,7 @@ TGFX_TEST(PDFExportTest, SimpleText) {
 
   auto PDFStream = MemoryWriteStream::Make();
 
-  auto document = MakePDFDocument(PDFStream, context, PDFMetadata());
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
   auto* canvas = document->beginPage(1500.f, 400.f);
   canvas->translate(40.0, 20.0);
   {
@@ -209,7 +210,7 @@ TGFX_TEST(PDFExportTest, EmojiText) {
 
   auto PDFStream = MemoryWriteStream::Make();
 
-  auto document = MakePDFDocument(PDFStream, context, PDFMetadata());
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
   auto* canvas = document->beginPage(1500.f, 500.f);
   canvas->translate(40.0, 20.0);
   {
@@ -234,7 +235,7 @@ TGFX_TEST(PDFExportTest, Image) {
 
   auto PDFStream = MemoryWriteStream::Make();
 
-  auto document = MakePDFDocument(PDFStream, context, PDFMetadata());
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
   auto* canvas = document->beginPage(500.f, 500.f);
   {
     canvas->translate(50.f, 50.f);
@@ -258,7 +259,7 @@ TGFX_TEST(PDFExportTest, Complex) {
 
   auto PDFStream = MemoryWriteStream::Make();
 
-  auto document = MakePDFDocument(PDFStream, context, PDFMetadata());
+  auto document = PDFDocument::Make(PDFStream, context, PDFMetadata());
   auto* canvas = document->beginPage(1000.f, 500.f);
   canvas->translate(40.0, 20.0);
 

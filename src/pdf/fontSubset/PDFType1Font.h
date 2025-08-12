@@ -21,8 +21,8 @@
 namespace tgfx {
 
 class PDFFont;
-class PDFDocument;
+class PDFDocumentImpl;
 
-void EmitSubsetType1(const PDFFont&, PDFDocument*);
+void EmitSubsetType1(const PDFFont&, PDFDocumentImpl*);
 
 }  // namespace tgfx
