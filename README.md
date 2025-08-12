@@ -55,7 +55,7 @@ TGFX uses **C++17** features. Here are the minimum tools needed to build TGFX on
 - Ninja 1.9.0+
 - CMake 3.13.0+
 - QT 5.13.0+
-- NDK 20.1+ (**20.1.5948944 recommended**)
+- NDK 20+ (**20.1.5948944 recommended**)
 - Emscripten 3.1.58+ 
 
 
