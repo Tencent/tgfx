@@ -181,7 +181,8 @@ void SimpleTextLayer::invalidateLayout() {
           richText.underline.push_back({left, xOffset, underlines[lineIndex]});
         }
         if (!richText.deletelineIndex.empty() && richText.deletelineIndex[index]) {
-          richText.deleteline.push_back({left, xOffset, baselines[lineIndex] - metrics.xHeight / 2});
+          richText.deleteline.push_back(
+              {left, xOffset, baselines[lineIndex] - metrics.xHeight / 2});
         }
         index++;
       }
@@ -209,7 +210,8 @@ void SimpleTextLayer::invalidateLayout() {
   }
 }
 
-std::shared_ptr<tgfx::Layer> MakeDebugLayer(std::shared_ptr<tgfx::Layer>& root,const tgfx::Color& color = {1, 0, 0, 0.5}) {
+std::shared_ptr<tgfx::Layer> MakeDebugLayer(std::shared_ptr<tgfx::Layer>& root,
+                                            const tgfx::Color& color = {1, 0, 0, 0.5}) {
   auto bounds = root->getBounds(nullptr, true);
   auto layer = tgfx::ShapeLayer::Make();
   tgfx::Path path;
@@ -274,7 +276,8 @@ std::shared_ptr<tgfx::Layer> SimpleText::buildLayerTree(const AppHost* host) {
   element.image = image;
   auto textHeight = ceil(fonts[0].getSize() * 0.8f);
   element.height = textHeight;
-  element.width = static_cast<float>(image->width()) * element.height / static_cast<float>(image->height());
+  element.width =
+      static_cast<float>(image->width()) * element.height / static_cast<float>(image->height());
   elements.push_back(element);
   //HelloTGFX!
   element = Element{};

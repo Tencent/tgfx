@@ -163,7 +163,8 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   drawers::Drawer::DrawBackground(canvas, appHost.get());
   auto drawer = drawers::Drawer::GetByIndex(self.drawIndex % drawers::Drawer::Count());
   drawer->displayList.setZoomScale(self.zoomScale);
-  drawer->displayList.setContentOffset(static_cast<float>(self.contentOffset.x), static_cast<float>(self.contentOffset.y));
+  drawer->displayList.setContentOffset(static_cast<float>(self.contentOffset.x),
+                                       static_cast<float>(self.contentOffset.y));
   drawer->build(appHost.get());
   drawer->displayList.render(canvas->getSurface(), false);
   context->flushAndSubmit();

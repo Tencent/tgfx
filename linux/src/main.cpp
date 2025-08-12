@@ -67,7 +67,7 @@ int main() {
     auto drawer = drawers::Drawer::GetByName(name);
     canvas->clear();
     drawer->build(&appHost);
-    drawer->displayList.render(canvas->getSurface(),false);
+    drawer->displayList.render(canvas->getSurface(), false);
     tgfx::Bitmap bitmap = {};
     bitmap.allocPixels(surface->width(), surface->height());
     auto pixels = bitmap.lockPixels();

@@ -40,7 +40,7 @@ void TGFXBaseView::updateSize(float devicePixelRatio) {
   }
 }
 
-void TGFXBaseView::setImageRef(const std::string &name, tgfx::NativeImageRef imageRef) {
+void TGFXBaseView::setImageRef(const std::string& name, tgfx::NativeImageRef imageRef) {
   auto image = tgfx::Image::MakeFrom(imageRef);
   if (image) {
     appHost->addImage(name, image);

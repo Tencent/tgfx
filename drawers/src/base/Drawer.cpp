@@ -23,9 +23,9 @@
 #include "tgfx/platform/Print.h"
 
 namespace drawers {
-  static std::vector<Drawer*> drawers = {new ConicGradient(), new ImageWithMipmap(),
-                                         new ImageWithShadow(), new SimpleText(),
-                                         new SimpleLayerTree()};
+static std::vector<Drawer*> drawers = {new ConicGradient(), new ImageWithMipmap(),
+                                       new ImageWithShadow(), new SimpleText(),
+                                       new SimpleLayerTree()};
 
 static std::vector<std::string> GetDrawerNames() {
   std::vector<std::string> names;

@@ -55,8 +55,7 @@ std::shared_ptr<tgfx::Layer> ImageWithShadow::buildLayerTree(const drawers::AppH
 
   root->addChild(imageLayer);
   root->addChild(maskLayer);
-  root->setFilters(
-      {tgfx::DropShadowFilter::Make(0, 0, 70, 70, tgfx::Color::Black())});
+  root->setFilters({tgfx::DropShadowFilter::Make(0, 0, 70, 70, tgfx::Color::Black())});
   return root;
 }
 }  // namespace drawers

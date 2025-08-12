@@ -126,7 +126,8 @@ void TGFXView::draw() {
   drawers::Drawer::DrawBackground(canvas, appHost.get());
   auto drawer = drawers::Drawer::GetByIndex(currentDrawerIndex % drawers::Drawer::Count());
   drawer->displayList.setZoomScale(zoom);
-  drawer->displayList.setContentOffset(static_cast<float>(offset.x()), static_cast<float>(offset.y()));
+  drawer->displayList.setContentOffset(static_cast<float>(offset.x()),
+                                       static_cast<float>(offset.y()));
   drawer->build(appHost.get());
   drawer->displayList.render(canvas->getSurface(), false);
   canvas->restore();
