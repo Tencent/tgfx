@@ -2917,7 +2917,6 @@ TGFX_TEST(CanvasTest, ScaleTest) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ScaleTest"));
 }
 
-
 TGFX_TEST(CanvassTest, drawScaleImage) {
   ContextScope scope;
   auto context = scope.getContext();

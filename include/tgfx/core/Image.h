@@ -220,7 +220,10 @@ class Image {
    */
   virtual BackendTexture getBackendTexture(Context* context, ImageOrigin* origin = nullptr) const;
 
-
+  /**
+   * Returns the scaled width and height according to the scaling value. If the current image does
+   * not support scaling, returns the original width and height.
+   */
   virtual ISize getScaledTextureSize(float scale) const;
 
   /**

@@ -79,7 +79,7 @@ PlacementPtr<FragmentProcessor> RasterizedImage::asFragmentProcessor(
   }
   auto fpMatrix =
       Matrix::MakeScale(static_cast<float>(textureProxy->width()) / static_cast<float>(width()),
-      static_cast<float>(textureProxy->height()) / static_cast<float>(height()));
+                        static_cast<float>(textureProxy->height()) / static_cast<float>(height()));
   SamplingArgs newSamplingArgs = samplingArgs;
   if (samplingArgs.sampleArea) {
     Rect subset = *samplingArgs.sampleArea;
@@ -89,7 +89,8 @@ PlacementPtr<FragmentProcessor> RasterizedImage::asFragmentProcessor(
   if (uvMatrix) {
     fpMatrix.preConcat(*uvMatrix);
   }
-  return TiledTextureEffect::Make(std::move(textureProxy), newSamplingArgs, &fpMatrix, isAlphaOnly());
+  return TiledTextureEffect::Make(std::move(textureProxy), newSamplingArgs, &fpMatrix,
+                                  isAlphaOnly());
 }
 
 std::shared_ptr<Image> RasterizedImage::onMakeScaled(int newWidth, int newHeight,
