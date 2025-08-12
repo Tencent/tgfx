@@ -405,13 +405,6 @@ jobs:
       - name: Install Dependencies
         run: |
           cd ohos
-          # Create .ohpmrc file with registry configuration
-          echo "registry=https://ohpm.openharmony.cn/ohpm/" > .ohpmrc
-          # Also set via command for redundancy
-          ohpm config set registry https://ohpm.openharmony.cn/ohpm/
-          # Verify configuration
-          ohpm config get registry
-          # Install dependencies
           ohpm install --all
         shell: bash
           
