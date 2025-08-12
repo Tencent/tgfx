@@ -365,21 +365,48 @@ if (WEB)
         list(APPEND TGFX_FILES ${GPU_PLATFORM_FILES})
     endif ()
     list(APPEND TGFX_COMPILE_OPTIONS -fno-rtti -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0)
-elseif (OHOS)
-    find_library(PIXELMAP_NDK_LIB pixelmap_ndk.z)
-    find_library(IMAGE_SOURCE_NDK_LIB image_source_ndk.z)
-    find_library(PIXELMAP_LIB pixelmap)
-    find_library(IMAGE_SOURCE_LIB image_source)
+    elseif (OHOS)
+    # 添加OpenHarmony NDK路径
+    if(DEFINED ENV{HOS_SDK_HOME})
+        set(OHOS_NDK_PATH $ENV{HOS_SDK_HOME})
+    elseif(DEFINED ENV{OHOS_SDK_HOME})
+        set(OHOS_NDK_PATH $ENV{OHOS_SDK_HOME})
+    else()
+        message(WARNING "OpenHarmony SDK path not found. Please set HOS_SDK_HOME or OHOS_SDK_HOME environment variable.")
+    endif()
+    
+    # 查找系统库，添加NO_DEFAULT_PATH和指定路径
+    find_library(PIXELMAP_NDK_LIB pixelmap_ndk.z PATHS ${OHOS_NDK_PATH}/native/sysroot/usr/lib NO_DEFAULT_PATH)
+    find_library(IMAGE_SOURCE_NDK_LIB image_source_ndk.z PATHS ${OHOS_NDK_PATH}/native/sysroot/usr/lib NO_DEFAULT_PATH)
+    find_library(PIXELMAP_LIB pixelmap PATHS ${OHOS_NDK_PATH}/native/sysroot/usr/lib NO_DEFAULT_PATH)
+    find_library(IMAGE_SOURCE_LIB image_source PATHS ${OHOS_NDK_PATH}/native/sysroot/usr/lib NO_DEFAULT_PATH)
+    
+    # 如果找不到，尝试备用库名
+    if(NOT PIXELMAP_LIB)
+        find_library(PIXELMAP_LIB pixelmap.z)
+    endif()
+    if(NOT IMAGE_SOURCE_LIB)
+        find_library(IMAGE_SOURCE_LIB image_source.z)
+    endif()
+    
+    # 检查必需的库是否存在
+    if(NOT PIXELMAP_LIB OR NOT IMAGE_SOURCE_LIB)
+        message(FATAL_ERROR "Required OpenHarmony libraries not found. Please check your OpenHarmony SDK installation.")
+    endif()
+    
     find_library(ACE_NDK_LIB ace_ndk.z)
     find_library(HILOG_NDK_LIB hilog_ndk.z)
     find_library(ACE_NAPI_LIB ace_napi.z)
     find_library(NATIVE_BUFFER_LIB native_buffer)
     find_library(NATIVE_WINDOW_LIB native_window)
+    
     list(APPEND TGFX_SHARED_LIBS ${PIXELMAP_NDK_LIB} ${IMAGE_SOURCE_NDK_LIB} ${PIXELMAP_LIB}
             ${IMAGE_SOURCE_LIB} ${ACE_NDK_LIB} ${HILOG_NDK_LIB} ${ACE_NAPI_LIB} ${NATIVE_BUFFER_LIB}
             ${NATIVE_WINDOW_LIB})
+    
     file(GLOB_RECURSE PLATFORM_FILES src/platform/ohos/*.*)
     list(APPEND TGFX_FILES ${PLATFORM_FILES})
+    
     if (TGFX_USE_NATIVE_GL)
         find_library(EGL_LIB EGL)
         find_library(GLES_LIB GLESv3)
@@ -387,6 +414,7 @@ elseif (OHOS)
         file(GLOB_RECURSE GPU_PLATFORM_FILES src/gpu/opengl/egl/*.*)
         list(APPEND TGFX_FILES ${GPU_PLATFORM_FILES})
     endif ()
+
 elseif (IOS)
     # finds all required platform libraries.
     find_library(UIKit_LIBS UIKit REQUIRED)

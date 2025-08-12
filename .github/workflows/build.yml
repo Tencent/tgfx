@@ -393,19 +393,28 @@ jobs:
 
       - name: Configure SDK Path
         run: |
-          cd ohos
-          # Set SDK path from environment variables set by oh-app-action
-          if [ -n "${HOS_SDK_HOME:-}" ]; then
-            SDK_PATH="${HOS_SDK_HOME}"
-          elif [ -n "${CMD_PATH:-}" ]; then
-            SDK_PATH="${CMD_PATH}"
-          else
-            SDK_PATH="${HOME}/command-line-tools"
-          fi
-          
-          echo "hwsdk.dir=${SDK_PATH}" > local.properties
-          echo "Configured SDK path: ${SDK_PATH}"
-        shell: bash
+            cd ohos
+            # 设置SDK路径从环境变量
+            if [ -n "${HOS_SDK_HOME:-}" ]; then
+              SDK_PATH="${HOS_SDK_HOME}"
+            elif [ -n "${OHOS_SDK_HOME:-}" ]; then
+              SDK_PATH="${OHOS_SDK_HOME}"
+            else
+              # 默认路径
+              SDK_PATH="${HOME}/command-line-tools"
+            fi
+            
+            echo "hwsdk.dir=${SDK_PATH}" > local.properties
+            echo "Configured SDK path: ${SDK_PATH}"
+            
+            # 验证库文件存在
+            if [ -d "${SDK_PATH}/native/sysroot/usr/lib" ]; then
+              echo "Library directory found: ${SDK_PATH}/native/sysroot/usr/lib"
+              ls -la "${SDK_PATH}/native/sysroot/usr/lib" | grep -E "(pixelmap|image_source)"
+            else
+              echo "Warning: Library directory not found at ${SDK_PATH}/native/sysroot/usr/lib"
+            fi
+        shell: bash 
 
       - name: Install Dependencies
         run: |
