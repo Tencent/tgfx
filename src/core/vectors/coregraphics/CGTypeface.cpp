@@ -21,6 +21,7 @@
 #include "CGScalerContext.h"
 #include "core/utils/UniqueID.h"
 #include "tgfx/core/FontStyle.h"
+#include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/core/UTF.h"
 
@@ -268,8 +269,8 @@ GlyphID CGTypeface::getGlyphID(Unichar unichar) const {
   return macGlyphs[0];
 }
 
-std::shared_ptr<Data> CGTypeface::getBytes() const {
-  return data;
+std::shared_ptr<Stream> CGTypeface::openStream() const {
+  return Stream::MakeFromData(data);
 }
 
 std::shared_ptr<Data> CGTypeface::copyTableData(FontTableTag tag) const {

@@ -22,7 +22,6 @@
 #include "gpu/TPArgs.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/TiledTextureEffect.h"
-#include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
 
@@ -55,7 +54,7 @@ PlacementPtr<FragmentProcessor> ScaledImage::asFragmentProcessor(const FPArgs& a
     scaledRect.roundOut();
   }
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped, scaleWidth, scaleHeight);
-  auto textureProxy = lockTextureProxy(tpArgs, scaledRect);
+  auto textureProxy = lockTextureProxySubset(tpArgs, scaledRect, sampling);
   if (textureProxy == nullptr) {
     return nullptr;
   }
@@ -68,48 +67,12 @@ PlacementPtr<FragmentProcessor> ScaledImage::asFragmentProcessor(const FPArgs& a
     fpMatrix.preConcat(*uvMatrix);
   }
   auto newSamplingArgs = samplingArgs;
-  if (samplingArgs.sampleArea) {
-    newSamplingArgs.sampleArea = extraMatrix.mapRect(*samplingArgs.sampleArea);
-  }
+  newSamplingArgs.sampleArea = std::nullopt;
   return TiledTextureEffect::Make(textureProxy, newSamplingArgs, &fpMatrix, isAlphaOnly());
 }
 
 std::shared_ptr<TextureProxy> ScaledImage::lockTextureProxy(const TPArgs& args) const {
-  auto scaledWidth = args.width;
-  auto scaledHeight = args.height;
-  if (args.width < source->width() && args.height < source->height()) {
-    scaledWidth = args.width;
-    scaledHeight = args.height;
-  }
-  return lockTextureProxy(args, Rect::MakeWH(scaledWidth, scaledHeight));
-}
-
-std::shared_ptr<TextureProxy> ScaledImage::lockTextureProxy(const TPArgs& args,
-                                                            const Rect& drawRect) const {
-  auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
-  auto renderTarget = RenderTargetProxy::MakeFallback(
-      args.context, static_cast<int>(drawRect.width()), static_cast<int>(drawRect.height()),
-      alphaRenderable && isAlphaOnly(), 1, hasMipmaps() && args.mipmapped, ImageOrigin::TopLeft,
-      args.backingFit);
-  if (renderTarget == nullptr) {
-    return nullptr;
-  }
-  Point scales =
-      Point::Make(static_cast<float>(args.width) / static_cast<float>(source->width()),
-                  static_cast<float>(args.height) / static_cast<float>(source->height()));
-  Matrix sourceUVMatrix = Matrix::MakeScale(1.0f / scales.x, 1.0f / scales.y);
-  sourceUVMatrix.preTranslate(drawRect.left, drawRect.top);
-  FPArgs fpArgs(args.context, args.renderFlags,
-                Rect::MakeWH(renderTarget->width(), renderTarget->height()),
-                std::max(scales.x, scales.y));
-  auto processor =
-      FragmentProcessor::Make(source, fpArgs, sampling, SrcRectConstraint::Fast, &sourceUVMatrix);
-  if (processor == nullptr) {
-    return nullptr;
-  }
-  auto drawingManager = renderTarget->getContext()->drawingManager();
-  drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags);
-  return renderTarget->asTextureProxy();
+  return lockTextureProxySubset(args, Rect::MakeWH(width(), height()), sampling);
 }
 
 std::shared_ptr<Image> ScaledImage::onMakeScaled(int newWidth, int newHeight,
@@ -131,6 +94,16 @@ std::shared_ptr<Image> ScaledImage::onCloneWith(std::shared_ptr<Image> newSource
   auto scaledImage = std::make_shared<ScaledImage>(newSource, _width, _height, sampling, mipmapped);
   scaledImage->weakThis = scaledImage;
   return scaledImage;
+}
+
+std::optional<Matrix> ScaledImage::concatUVMatrix(const Matrix* uvMatrix) const {
+  Matrix result =
+      Matrix::MakeScale(static_cast<float>(source->width()) / static_cast<float>(_width),
+                        static_cast<float>(source->height()) / static_cast<float>(_height));
+  if (uvMatrix) {
+    result.preConcat(*uvMatrix);
+  }
+  return result;
 }
 
 }  // namespace tgfx

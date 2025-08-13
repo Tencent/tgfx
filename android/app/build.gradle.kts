@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "org.tgfx.hello2d"
-    ndkVersion = "19.2.5345600"
+    ndkVersion = "20.1.5948944"
     compileSdk = 34
 
     defaultConfig {

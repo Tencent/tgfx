@@ -16,21 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/proxies/TextureRenderTargetProxy.h"
+#include "GLFrameBuffer.h"
+#include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
-class BackendTextureRenderTargetProxy : public TextureRenderTargetProxy {
- protected:
-  std::shared_ptr<TextureView> onMakeTexture(Context* context) const override;
-
- private:
-  BackendTexture backendTexture = {};
-
-  BackendTextureRenderTargetProxy(const BackendTexture& backendTexture, PixelFormat format,
-                                  int sampleCount, ImageOrigin origin = ImageOrigin::TopLeft,
-                                  bool adopted = false);
-  friend class ProxyProvider;
-};
+BackendRenderTarget GLFrameBuffer::getBackendRenderTarget(int width, int height) const {
+  GLFrameBufferInfo glInfo = {};
+  glInfo.id = drawFrameBufferID();
+  glInfo.format = PixelFormatToGLSizeFormat(format());
+  return {glInfo, width, height};
+}
 }  // namespace tgfx

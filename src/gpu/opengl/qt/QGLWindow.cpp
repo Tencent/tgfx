@@ -20,9 +20,7 @@
 #include <QApplication>
 #include <QQuickWindow>
 #include <QThread>
-#include "gpu/opengl/GLRenderTarget.h"
 #include "gpu/opengl/GLTexture.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace tgfx {
 class QGLDeviceCreator : public QObject {

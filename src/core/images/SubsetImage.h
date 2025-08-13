@@ -60,7 +60,7 @@ class SubsetImage : public TransformImage {
                                                       const SamplingArgs& samplingArgs,
                                                       const Matrix* uvMatrix) const override;
 
-  std::optional<Matrix> concatUVMatrix(const Matrix* uvMatrix) const;
+  std::optional<Matrix> concatUVMatrix(const Matrix* uvMatrix) const override;
 
   std::optional<Rect> getSubset(const Rect& drawRect) const;
 

@@ -21,10 +21,12 @@
 #include "core/utils/AddressOf.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "gpu/DrawingManager.h"
 #include "gpu/TPArgs.h"
 #include "gpu/ops/RectDrawOp.h"
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
 std::shared_ptr<Image> RGBAAAImage::MakeFrom(std::shared_ptr<Image> source, int displayWidth,
@@ -63,7 +65,8 @@ PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs& a
   auto newSamplingArgs = samplingArgs;
   auto mipmapped = source->hasMipmaps() && samplingArgs.sampling.mipmapMode != MipmapMode::None;
   if (bounds.contains(drawBounds)) {
-    if (samplingArgs.constraint != SrcRectConstraint::Strict) {
+    if (samplingArgs.constraint != SrcRectConstraint::Strict && !newSamplingArgs.sampleArea) {
+      // if samplingArgs has sampleArea, means the area is already subsetted
       newSamplingArgs.sampleArea = getSubset(drawBounds);
     }
     TPArgs tpArgs(args.context, args.renderFlags, mipmapped, width(), height(), {});
@@ -78,6 +81,25 @@ PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs& a
   }
   newSamplingArgs.sampleArea = std::nullopt;
   return TiledTextureEffect::Make(textureProxy, newSamplingArgs, uvMatrix);
+}
+
+std::shared_ptr<TextureProxy> RGBAAAImage::lockTextureProxy(const TPArgs& args) const {
+  auto textureWidth = width();
+  auto textureHeight = height();
+  auto renderTarget =
+      RenderTargetProxy::MakeFallback(args.context, textureWidth, textureHeight, isAlphaOnly(), 1,
+                                      args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
+  if (renderTarget == nullptr) {
+    return nullptr;
+  }
+  auto drawRect = Rect::MakeWH(textureWidth, textureHeight);
+  FPArgs fpArgs(args.context, args.renderFlags, drawRect, 1.0f);
+  auto processor = asFragmentProcessor(fpArgs, {}, nullptr);
+  auto drawingManager = args.context->drawingManager();
+  if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags)) {
+    return nullptr;
+  }
+  return renderTarget->asTextureProxy();
 }
 
 std::shared_ptr<Image> RGBAAAImage::onMakeSubset(const Rect& subset) const {

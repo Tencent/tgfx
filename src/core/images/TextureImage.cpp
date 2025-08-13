@@ -41,7 +41,7 @@ BackendTexture TextureImage::getBackendTexture(Context* context, ImageOrigin* or
   if (context == nullptr || context->uniqueID() != contextID) {
     return {};
   }
-  context->flush();
+  context->flushAndSubmit();
   auto textureView = textureProxy->getTextureView();
   if (textureView == nullptr) {
     return {};

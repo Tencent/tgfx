@@ -16,10 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "BackendTextureRenderTargetProxy.h"
+#include "ExternalTextureRenderTargetProxy.h"
 
 namespace tgfx {
-BackendTextureRenderTargetProxy::BackendTextureRenderTargetProxy(
+ExternalTextureRenderTargetProxy::ExternalTextureRenderTargetProxy(
     const BackendTexture& backendTexture, PixelFormat format, int sampleCount, ImageOrigin origin,
     bool adopted)
     : TextureRenderTargetProxy(backendTexture.width(), backendTexture.height(), format, sampleCount,
@@ -27,7 +27,7 @@ BackendTextureRenderTargetProxy::BackendTextureRenderTargetProxy(
       backendTexture(backendTexture) {
 }
 
-std::shared_ptr<TextureView> BackendTextureRenderTargetProxy::onMakeTexture(
+std::shared_ptr<TextureView> ExternalTextureRenderTargetProxy::onMakeTexture(
     Context* context) const {
   auto renderTarget =
       RenderTarget::MakeFrom(context, backendTexture, _sampleCount, _origin, !externallyOwned());

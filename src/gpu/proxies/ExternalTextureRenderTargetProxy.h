@@ -16,25 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLBackendRenderTarget.h"
-#include "gpu/opengl/GLUtil.h"
+#pragma once
+
+#include "gpu/proxies/TextureRenderTargetProxy.h"
 
 namespace tgfx {
-std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
-                                                     const BackendRenderTarget& renderTarget,
-                                                     ImageOrigin origin) {
-  if (context == nullptr || !renderTarget.isValid()) {
-    return nullptr;
-  }
-  GLFrameBufferInfo frameBufferInfo = {};
-  if (!renderTarget.getGLFramebufferInfo(&frameBufferInfo)) {
-    return nullptr;
-  }
-  auto format = GLSizeFormatToPixelFormat(frameBufferInfo.format);
-  if (!context->caps()->isFormatRenderable(format)) {
-    return nullptr;
-  }
-  return std::make_shared<GLBackendRenderTarget>(
-      context, renderTarget.width(), renderTarget.height(), origin, format, frameBufferInfo.id);
-}
+class ExternalTextureRenderTargetProxy : public TextureRenderTargetProxy {
+ protected:
+  std::shared_ptr<TextureView> onMakeTexture(Context* context) const override;
+
+ private:
+  BackendTexture backendTexture = {};
+
+  ExternalTextureRenderTargetProxy(const BackendTexture& backendTexture, PixelFormat format,
+                                   int sampleCount, ImageOrigin origin = ImageOrigin::TopLeft,
+                                   bool adopted = false);
+  friend class ProxyProvider;
+};
 }  // namespace tgfx

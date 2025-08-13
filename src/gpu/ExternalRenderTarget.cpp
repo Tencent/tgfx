@@ -16,34 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/CommandEncoder.h"
-#include "gpu/opengl/GLInterface.h"
+#include "ExternalRenderTarget.h"
+#include "gpu/GPU.h"
 
 namespace tgfx {
-class GLCommandEncoder : public CommandEncoder {
- public:
-  explicit GLCommandEncoder(std::shared_ptr<GLInterface> interface)
-      : interface(std::move(interface)) {
+std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
+                                                     const BackendRenderTarget& backendRenderTarget,
+                                                     ImageOrigin origin) {
+  if (context == nullptr) {
+    return nullptr;
   }
+  auto frameBuffer = context->gpu()->importExternalFrameBuffer(backendRenderTarget);
+  if (!frameBuffer) {
+    return nullptr;
+  }
+  auto renderTarget = new ExternalRenderTarget(std::move(frameBuffer), backendRenderTarget.width(),
+                                               backendRenderTarget.height(), origin);
+  return Resource::AddToCache(context, renderTarget);
+}
 
-  void copyFrameBufferToTexture(GPUFrameBuffer* frameBuffer, const Point& srcOffset,
-                                GPUTexture* texture, const Rect& dstRect) override;
-
-  void generateMipmapsForTexture(GPUTexture* texture) override;
-
-  BackendSemaphore insertSemaphore() override;
-
-  void waitSemaphore(const BackendSemaphore& semaphore) override;
-
- protected:
-  std::shared_ptr<RenderPass> onBeginRenderPass(std::shared_ptr<RenderTarget> renderTarget,
-                                                bool resolveMSAA) override;
-
-  std::shared_ptr<CommandBuffer> onFinish() override;
-
- private:
-  std::shared_ptr<GLInterface> interface = nullptr;
-};
 }  // namespace tgfx

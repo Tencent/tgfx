@@ -105,8 +105,6 @@ class GLInfo {
   std::vector<std::string> extensions = {};
 };
 
-static const int MaxSaneSamplers = 32;
-
 class GLCaps : public Caps {
  public:
   GLStandard standard = GLStandard::None;
@@ -120,7 +118,8 @@ class GLCaps : public Caps {
   bool frameBufferFetchRequiresEnablePerSample = false;
   std::string frameBufferFetchColorName;
   std::string frameBufferFetchExtensionString;
-  int maxFragmentSamplers = MaxSaneSamplers;
+  int maxFragmentSamplers = 0;
+  bool flushBeforeWritePixels = false;
 
   static const GLCaps* Get(Context* context);
 

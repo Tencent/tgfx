@@ -22,6 +22,7 @@
 #include <unordered_map>
 #include <vector>
 #include "tgfx/core/Font.h"
+#include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
 
 namespace tgfx {
@@ -61,7 +62,7 @@ class WebTypeface : public Typeface {
 
   GlyphID getGlyphID(Unichar unichar) const override;
 
-  std::shared_ptr<Data> getBytes() const override;
+  std::shared_ptr<Stream> openStream() const override;
 
   std::shared_ptr<Data> copyTableData(FontTableTag) const override {
     return nullptr;
