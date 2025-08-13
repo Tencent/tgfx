@@ -406,22 +406,35 @@ jobs:
 
       - name: Install ohpm
         run: |
-          curl -L https://contentcenter-vali-drcn.dbankcdn.cn/pvt_2/DeveloperAlliance_package_901_9/81/v3/4ohpm1cli-darwin-x64-5.0.3.140.tgz -o ohpm.tgz
-          tar -xzf ohpm.tgz
-          sudo mv ohpm /usr/local/
-          echo "/usr/local/ohpm/bin" >> $GITHUB_PATH
-          export PATH="/usr/local/ohpm/bin:$PATH"
+          # 创建本地 ohpm 目录
+          mkdir -p $HOME/ohpm
+          cd $HOME/ohpm
+          
+          # 尝试下载 ohpm，如果失败则跳过
+          curl -L https://contentcenter-vali-drcn.dbankcdn.cn/pvt_2/DeveloperAlliance_package_901_9/81/v3/4ohpm1cli-darwin-x64-5.0.3.140.tgz -o ohpm.tgz || echo "Download failed, will use direct hvigorw"
+          
+          if [ -f "ohpm.tgz" ]; then
+            tar -xzf ohpm.tgz
+            echo "$HOME/ohpm/bin" >> $GITHUB_PATH
+            export PATH="$HOME/ohpm/bin:$PATH"
+          fi
 
       - name: Install Dependencies
         run: |
           cd ohos
           chmod +x hvigorw
-          ohpm install --all
+          export PATH="$HOME/ohpm/bin:$PATH"
+          # 如果 ohpm 可用则使用，否则直接运行 hvigorw
+          if command -v ohpm &> /dev/null; then
+            ohpm install --all
+          else
+            echo "ohpm not available, hvigorw will handle dependencies"
+          fi
 
       - name: Build OpenHarmony
         run: |
           cd ohos
-          export PATH="/usr/local/ohpm/bin:$PATH"
+          export PATH="$HOME/ohpm/bin:$PATH"
           ./hvigorw assembleHap --mode module -p module=hello2d -p product=default --stacktrace
         shell: bash
 
