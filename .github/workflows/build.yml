@@ -405,11 +405,12 @@ jobs:
 
       - name: Install ohpm
         run: |
-          mkdir -p $HOME/ohpm
-          cd $HOME/ohpm
-          curl -L https://contentcenter-vali-drcn.dbankcdn.cn/pvt_2/DeveloperAlliance_package_901_9/81/v3/4ohpm1cli-darwin-x64-5.0.3.140.tgz -o ohpm.tgz
-          tar -xzf ohpm.tgz
-          echo "$HOME/ohpm/bin" >> $GITHUB_PATH
+          mkdir -p "$HOME/ohpm"
+          curl -L \
+            https://contentcenter-vali-drcn.dbankcdn.cn/pvt_2/DeveloperAlliance_package_901_9/81/v3/4ohpm1cli-darwin-x64-5.0.3.140.tgz \
+            -o "$HOME/ohpm/ohpm.tgz"
+          tar -xzf "$HOME/ohpm/ohpm.tgz" -C "$HOME/ohpm"
+          echo "$HOME/ohpm/bin" >> "$GITHUB_PATH"
 
       - name: Install Dependencies & Build
         run: |
