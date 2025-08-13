@@ -380,12 +380,11 @@ jobs:
           echo "OHOS_SDK_NATIVE=/Users/runner/openharmony-sdk-5.0.3.140" >> $GITHUB_ENV
 
 
-      - name: Show SDK layout
+      - name: Find real SDK sysroot
         run: |
-          echo "=== 5.0.3.140 SDK 实际目录 ==="
-          ls -l /Users/runner/openharmony-sdk-5.0.3.140/sysroot/usr/lib/aarch64-linux-ohos
-          find /Users/runner/openharmony-sdk-5.0.3.140 -name "*.so" | head -5
-
+          find /Users/runner/openharmony-sdk-5.0.3.140 -type d -name "*linux*"
+      
+      
 
       - name: Get Third-Party Cache
         id: third-party-cache
