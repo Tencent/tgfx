@@ -44,13 +44,13 @@ void GLCommandEncoder::copyFrameBufferToTexture(GPUFrameBuffer* frameBuffer, con
   auto glTexture = static_cast<const GLTexture*>(texture);
   auto target = glTexture->target();
   gl->bindTexture(target, glTexture->id());
-  auto dstX = static_cast<int>(srcOffset.x);
-  auto dstY = static_cast<int>(srcOffset.y);
-  auto srcX = static_cast<int>(dstRect.left);
-  auto srcY = static_cast<int>(dstRect.top);
+  auto offsetX = static_cast<int>(dstRect.left);
+  auto offsetY = static_cast<int>(dstRect.top);
+  auto x = static_cast<int>(srcOffset.x);
+  auto y = static_cast<int>(srcOffset.y);
   auto width = static_cast<int>(dstRect.width());
   auto height = static_cast<int>(dstRect.height());
-  gl->copyTexSubImage2D(target, 0, dstX, dstY, srcX, srcY, width, height);
+  gl->copyTexSubImage2D(target, 0, offsetX, offsetY, x, y, width, height);
 }
 
 void GLCommandEncoder::generateMipmapsForTexture(GPUTexture* texture) {
