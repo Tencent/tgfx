@@ -388,9 +388,10 @@ jobs:
         uses: openharmony-rs/setup-ohos-sdk@v0.2
         with:
           version: '5.0.3'
+          components: all
           cache: true
 
-      
+
       - name: Configure SDK Path
         run: |
           cd ohos
