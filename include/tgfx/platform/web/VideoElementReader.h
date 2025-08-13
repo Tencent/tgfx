@@ -34,13 +34,6 @@ class VideoElementReader : public ImageReader {
    */
   static std::shared_ptr<VideoElementReader> MakeFrom(emscripten::val video, int width, int height);
 
-  /**
-   * Acquires the next ImageBuffer from the VideoElementReader after a new image frame is about to
-   * be rendered into the associated HTMLVideoElement. Note that the previously returned image
-   * buffers will immediately expire after the newly created ImageBuffer is drawn.
-   */
-  std::shared_ptr<ImageBuffer> acquireNextBuffer();
-
  private:
   explicit VideoElementReader(std::shared_ptr<ImageStream> stream);
 };
