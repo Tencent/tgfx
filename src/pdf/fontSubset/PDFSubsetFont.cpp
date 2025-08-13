@@ -84,8 +84,7 @@ HBFace MakeSubset(hb_subset_input_t* input, hb_face_t* face, bool retainZeroGlyp
 
 std::shared_ptr<Data> SubsetHarfbuzz(const std::shared_ptr<Typeface>& typeface,
                                      const PDFGlyphUse& glyphUsage) {
-  auto typefaceData = PDFFont::GetTypefaceData(typeface);
-  auto typefaceStream = Stream::MakeFromData(typefaceData);
+  auto typefaceStream = PDFFont::GetTypefaceStream(typeface);
   HBFace face(nullptr, hb_face_destroy);
   HBBlob blob(StreamToBlob(std::move(typefaceStream)));
   // hb_face_create always succeeds. Check that the format is minimally recognized first.

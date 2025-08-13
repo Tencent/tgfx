@@ -17,12 +17,14 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFType1Font.h"
+#include <memory>
 #include "core/AdvancedTypefaceInfo.h"
 #include "core/ScalerContext.h"
 #include "core/utils/Log.h"
 #include "pdf/PDFDocumentImpl.h"
 #include "pdf/PDFFont.h"
 #include "pdf/PDFTypes.h"
+#include "tgfx/core/Buffer.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
@@ -132,27 +134,30 @@ int8_t HexToBin(uint8_t c) {
   return -1;
 }
 
-std::shared_ptr<Data> ConvertType1FontStream(const std::shared_ptr<Data>& sourceData,
+std::shared_ptr<Data> ConvertType1FontStream(const std::unique_ptr<Stream>& sourceStream,
                                              size_t* headerLength, size_t* dataLength,
                                              size_t* trailerLength) {
-  size_t srcLength = sourceData ? sourceData->size() : 0;
-  DEBUG_ASSERT(srcLength);
-  if (!srcLength) {
+  size_t sourceLength = sourceStream ? sourceStream->size() : 0;
+  DEBUG_ASSERT(sourceLength);
+  if (!sourceLength) {
     return nullptr;
   }
-  const auto* src = static_cast<const uint8_t*>(sourceData->data());
-
-  if (ParsePFB(src, srcLength, headerLength, dataLength, trailerLength)) {
+  Buffer sourceBuffer(sourceLength);
+  if (!sourceStream->read(sourceBuffer.data(), sourceLength)) {
+    return nullptr;
+  }
+  const auto* source = sourceBuffer.bytes();
+  if (ParsePFB(source, sourceLength, headerLength, dataLength, trailerLength)) {
     constexpr int PFBSectionHeaderLength = 6;
     const size_t length = *headerLength + *dataLength + *trailerLength;
     DEBUG_ASSERT(length > 0);
-    DEBUG_ASSERT(length + (2 * PFBSectionHeaderLength) <= srcLength);
+    DEBUG_ASSERT(length + (2 * PFBSectionHeaderLength) <= sourceLength);
 
-    const uint8_t* const srcHeader = src + PFBSectionHeaderLength;
+    const uint8_t* const sourceHeader = source + PFBSectionHeaderLength;
     // There is a six-byte section header before header and data (but not trailer) that we're not
     // going to copy.
-    const uint8_t* const srcData = srcHeader + *headerLength + PFBSectionHeaderLength;
-    const uint8_t* const srcTrailer = srcData + *headerLength;
+    const uint8_t* const sourceData = sourceHeader + *headerLength + PFBSectionHeaderLength;
+    const uint8_t* const srcTrailer = sourceData + *headerLength;
 
     auto* data = malloc(length);
     auto* const resultHeader = static_cast<uint8_t*>(data);
@@ -161,8 +166,8 @@ std::shared_ptr<Data> ConvertType1FontStream(const std::shared_ptr<Data>& source
 
     DEBUG_ASSERT(resultTrailer + *trailerLength == resultHeader + length);
 
-    memcpy(resultHeader, srcHeader, *headerLength);
-    memcpy(resultData, srcData, *dataLength);
+    memcpy(resultHeader, sourceHeader, *headerLength);
+    memcpy(resultData, sourceData, *dataLength);
     memcpy(resultTrailer, srcTrailer, *trailerLength);
 
     return Data::MakeAdopted(data, length, Data::FreeProc);
@@ -170,7 +175,7 @@ std::shared_ptr<Data> ConvertType1FontStream(const std::shared_ptr<Data>& source
 
   // A PFA has to be converted for PDF.
   size_t hexDataLen;
-  if (!ParsePFA(reinterpret_cast<const char*>(src), srcLength, headerLength, &hexDataLen,
+  if (!ParsePFA(reinterpret_cast<const char*>(source), sourceLength, headerLength, &hexDataLen,
                 dataLength, trailerLength)) {
     return nullptr;
   }
@@ -179,10 +184,10 @@ std::shared_ptr<Data> ConvertType1FontStream(const std::shared_ptr<Data>& source
   auto* data = malloc(length);
   auto* buffer = static_cast<uint8_t*>(data);
 
-  memcpy(buffer, src, *headerLength);
+  memcpy(buffer, source, *headerLength);
   uint8_t* const resultData = &(buffer[*headerLength]);
 
-  const uint8_t* hexData = src + *headerLength;
+  const uint8_t* hexData = source + *headerLength;
   const uint8_t* trailer = hexData + hexDataLen;
   size_t outputOffset = 0;
   uint8_t dataByte = 0;  // To hush compiler.
@@ -207,7 +212,7 @@ std::shared_ptr<Data> ConvertType1FontStream(const std::shared_ptr<Data>& source
   DEBUG_ASSERT(outputOffset == *dataLength);
 
   uint8_t* const resultTrailer = &(buffer[*headerLength + outputOffset]);
-  memcpy(resultTrailer, src + *headerLength + hexDataLen, *trailerLength);
+  memcpy(resultTrailer, source + *headerLength + hexDataLen, *trailerLength);
 
   return Data::MakeAdopted(data, length, Data::FreeProc);
 }
@@ -232,7 +237,7 @@ PDFIndirectReference MakeType1FontDescriptor(PDFDocumentImpl* document,
       size_t data = 0;
       size_t trailer = 0;
       auto typeface = pdfStrikeSpec.typeface;
-      auto rawFontData = PDFFont::GetTypefaceData(typeface);
+      auto rawFontData = PDFFont::GetTypefaceStream(typeface);
       auto fontData = ConvertType1FontStream(std::move(rawFontData), &header, &data, &trailer);
       if (fontData) {
         auto dict = PDFDictionary::Make();

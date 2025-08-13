@@ -282,7 +282,7 @@ void PDFFont::emitSubsetType0(PDFDocumentImpl* document) const {
       subsetFontStream = Stream::MakeFromData(subsetFontData);
     } else {
       // If subsetting fails, fall back to original font data.
-      subsetFontStream = fontStream;
+      subsetFontStream = std::move(fontStream);
     }
     auto streamDictionary = PDFDictionary::Make();
     streamDictionary->insertInt("Length1", subsetFontStream->size());
@@ -299,7 +299,6 @@ void PDFFont::emitSubsetType0(PDFDocumentImpl* document) const {
   } else if (type == AdvancedTypefaceInfo::FontType::Type1CID) {
     auto streamDictionary = PDFDictionary::Make();
     streamDictionary->insertName("Subtype", "CIDFontType0C");
-    auto fontStream = Stream::MakeFromData(fontData);
     auto fontStreamRef = PDFStreamOut(std::move(streamDictionary), std::move(fontStream), document,
                                       PDFSteamCompressionEnabled::Yes);
     descriptor->insertRef("FontFile3", fontStreamRef);

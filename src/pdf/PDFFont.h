@@ -18,12 +18,14 @@
 
 #pragma once
 
+#include <memory>
 #include "core/AdvancedTypefaceInfo.h"
 #include "pdf/PDFGlyphUse.h"
 #include "pdf/PDFTypes.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Font.h"
 #include "tgfx/core/FontMetrics.h"
+#include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
 
 namespace tgfx {
@@ -159,8 +161,8 @@ class PDFFont {
     return *_strike;
   }
 
-  static std::shared_ptr<Data> GetTypefaceData(const std::shared_ptr<Typeface>& typeface) {
-    return typeface->openAndGetBytes();
+  static std::unique_ptr<Stream> GetTypefaceStream(const std::shared_ptr<Typeface>& typeface) {
+    return typeface->openStream();
   }
 
  private:
