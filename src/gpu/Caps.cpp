@@ -16,8 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <algorithm>
 #include "tgfx/gpu/Caps.h"
+#include <algorithm>
+#include <cmath>
 
 namespace tgfx {
 int Caps::getMipLevelCount(int width, int height) const {
