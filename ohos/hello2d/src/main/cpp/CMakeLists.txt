@@ -1,4 +1,5 @@
 # the minimum version of CMake.
+cmake_minimum_required(VERSION 3.4.1)
 if (NOT CMAKE_FIND_LIBRARY_PREFIXES)
     set(CMAKE_FIND_LIBRARY_PREFIXES "lib")
 endif()
