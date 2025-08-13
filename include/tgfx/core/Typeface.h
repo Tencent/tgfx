@@ -24,6 +24,7 @@
 #include "tgfx/core/Data.h"
 #include "tgfx/core/FontStyle.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/core/Stream.h"
 
 namespace tgfx {
 /**
@@ -132,7 +133,11 @@ class Typeface {
    */
   virtual GlyphID getGlyphID(Unichar unichar) const = 0;
 
-  virtual std::shared_ptr<Data> getBytes() const = 0;
+  /**
+   * Returns a Stream object containing the font data, or nullptr if unavailable.
+   * For local file fonts, this will return a stream object of the file
+   */
+  virtual std::shared_ptr<Stream> openStream() const = 0;
 
   /**
    * Returns an immutable copy of the requested font table, or nullptr if that table was not found.

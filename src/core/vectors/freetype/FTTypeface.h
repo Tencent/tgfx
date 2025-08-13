@@ -20,6 +20,7 @@
 
 #include <mutex>
 #include "ft2build.h"
+#include "tgfx/core/Stream.h"
 #include FT_FREETYPE_H
 #include "FTFontData.h"
 #include "tgfx/core/Font.h"
@@ -50,7 +51,7 @@ class FTTypeface : public Typeface {
 
   GlyphID getGlyphID(Unichar unichar) const override;
 
-  std::shared_ptr<Data> getBytes() const override;
+  std::shared_ptr<Stream> openStream() const override;
 
   std::shared_ptr<Data> copyTableData(FontTableTag tag) const override;
 

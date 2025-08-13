@@ -21,6 +21,7 @@
 #include "core/ScalerContext.h"
 #include "core/utils/UniqueID.h"
 #include "tgfx/core/Font.h"
+#include "tgfx/core/Stream.h"
 #include "tgfx/core/UTF.h"
 
 namespace tgfx {
@@ -58,7 +59,7 @@ class EmptyTypeface : public Typeface {
     return 0;
   }
 
-  std::shared_ptr<Data> getBytes() const override {
+  std::shared_ptr<Stream> openStream() const override {
     return nullptr;
   }
 

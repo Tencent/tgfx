@@ -20,6 +20,7 @@
 
 #include "core/utils/UniqueID.h"
 #include "tgfx/core/FontMetrics.h"
+#include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
 
 namespace tgfx {
@@ -53,7 +54,7 @@ class UserTypeface : public Typeface {
     return 0;
   }
 
-  std::shared_ptr<Data> getBytes() const override {
+  std::shared_ptr<Stream> openStream() const override {
     // UserTypeface does not have byte data.
     return nullptr;
   }

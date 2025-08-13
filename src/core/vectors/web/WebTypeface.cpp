@@ -21,6 +21,7 @@
 #include "WebScalerContext.h"
 #include "core/utils/UniqueID.h"
 #include "platform/web/WebImageBuffer.h"
+#include "tgfx/core/Stream.h"
 #include "tgfx/core/UTF.h"
 
 using namespace emscripten;
@@ -92,7 +93,7 @@ GlyphID WebTypeface::getGlyphID(Unichar unichar) const {
   return static_cast<GlyphID>(glyphs.size());
 }
 
-std::shared_ptr<Data> WebTypeface::getBytes() const {
+std::shared_ptr<Stream> WebTypeface::openStream() const {
   return nullptr;
 }
 
