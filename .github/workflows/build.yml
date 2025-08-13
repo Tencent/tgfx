@@ -399,25 +399,29 @@ jobs:
           depsync
         shell: bash
 
-      - name: Install ohpm and dependencies
+      - name: Setup .npmrc for OpenHarmony
+        run: |
+          echo "@ohos:registry=https://repo.harmonyos.com/npm/" >> $HOME/.npmrc
+          echo "registry=https://registry.npmjs.org/" >> $HOME/.npmrc
+
+      - name: Install ohpm
+        run: |
+          curl -L https://contentcenter-vali-drcn.dbankcdn.cn/pvt_2/DeveloperAlliance_package_901_9/81/v3/4ohpm1cli-darwin-x64-5.0.3.140.tgz -o ohpm.tgz
+          tar -xzf ohpm.tgz
+          sudo mv ohpm /usr/local/
+          echo "/usr/local/ohpm/bin" >> $GITHUB_PATH
+          export PATH="/usr/local/ohpm/bin:$PATH"
+
+      - name: Install Dependencies
         run: |
           cd ohos
           chmod +x hvigorw
-          # 使用鸿蒙的 ohpm 包管理器
-          if ! command -v ohpm &> /dev/null; then
-            echo "Installing ohpm..."
-            # 下载并安装 ohpm
-            curl -L https://contentcenter-vali-drcn.dbankcdn.cn/pvt_2/DeveloperAlliance_package_901_9/81/v3/4ohpm1cli-linux-x64-5.0.3.140.tgz -o ohpm.tgz
-            tar -xzf ohpm.tgz
-            export PATH=$PWD/ohpm/bin:$PATH
-          fi
-          # 安装依赖
-          ohpm install
+          ohpm install --all
 
       - name: Build OpenHarmony
         run: |
           cd ohos
-          export PATH=$PWD/ohpm/bin:$PATH
+          export PATH="/usr/local/ohpm/bin:$PATH"
           ./hvigorw assembleHap --mode module -p module=hello2d -p product=default --stacktrace
         shell: bash
 
