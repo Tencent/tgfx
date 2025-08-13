@@ -406,11 +406,9 @@ jobs:
 
       - name: Install ohpm
         run: |
-          # 创建本地 ohpm 目录
           mkdir -p $HOME/ohpm
           cd $HOME/ohpm
           
-          # 尝试下载 ohpm，如果失败则跳过
           curl -L https://contentcenter-vali-drcn.dbankcdn.cn/pvt_2/DeveloperAlliance_package_901_9/81/v3/4ohpm1cli-darwin-x64-5.0.3.140.tgz -o ohpm.tgz || echo "Download failed, will use direct hvigorw"
           
           if [ -f "ohpm.tgz" ]; then
@@ -424,7 +422,6 @@ jobs:
           cd ohos
           chmod +x hvigorw
           export PATH="$HOME/ohpm/bin:$PATH"
-          # 如果 ohpm 可用则使用，否则直接运行 hvigorw
           if command -v ohpm &> /dev/null; then
             ohpm install --all
           else
