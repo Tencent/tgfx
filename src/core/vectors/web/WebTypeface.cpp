@@ -93,7 +93,7 @@ GlyphID WebTypeface::getGlyphID(Unichar unichar) const {
   return static_cast<GlyphID>(glyphs.size());
 }
 
-std::shared_ptr<Stream> WebTypeface::openStream() const {
+std::unique_ptr<Stream> WebTypeface::openStream() const {
   return nullptr;
 }
 

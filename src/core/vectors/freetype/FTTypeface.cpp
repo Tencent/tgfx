@@ -150,7 +150,7 @@ GlyphID FTTypeface::getGlyphID(Unichar unichar) const {
   return static_cast<GlyphID>(FT_Get_Char_Index(face, static_cast<FT_ULong>(unichar)));
 }
 
-std::shared_ptr<Stream> FTTypeface::openStream() const {
+std::unique_ptr<Stream> FTTypeface::openStream() const {
   if (data.data) {
     return Stream::MakeFromData(data.data);
   }

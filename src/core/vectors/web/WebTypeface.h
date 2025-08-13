@@ -62,7 +62,7 @@ class WebTypeface : public Typeface {
 
   GlyphID getGlyphID(Unichar unichar) const override;
 
-  std::shared_ptr<Stream> openStream() const override;
+  std::unique_ptr<Stream> openStream() const override;
 
   std::shared_ptr<Data> copyTableData(FontTableTag) const override {
     return nullptr;
