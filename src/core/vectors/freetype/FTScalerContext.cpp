@@ -17,8 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FTScalerContext.h"
-#include <freetype/ftfntfmt.h>
-#include <memory>
 #include "ft2build.h"
 #include FT_BITMAP_H
 #include FT_OUTLINE_H
