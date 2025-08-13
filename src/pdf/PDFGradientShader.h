@@ -16,25 +16,29 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "BackendTextureRenderTargetProxy.h"
+#pragma once
+
+#include "core/shaders/GradientShader.h"
+#include "pdf/PDFTypes.h"
+#include "tgfx/core/GradientType.h"
 
 namespace tgfx {
-BackendTextureRenderTargetProxy::BackendTextureRenderTargetProxy(
-    const BackendTexture& backendTexture, PixelFormat format, int sampleCount, ImageOrigin origin,
-    bool adopted)
-    : TextureRenderTargetProxy(backendTexture.width(), backendTexture.height(), format, sampleCount,
-                               false, origin, !adopted),
-      backendTexture(backendTexture) {
-}
 
-std::shared_ptr<TextureView> BackendTextureRenderTargetProxy::onMakeTexture(
-    Context* context) const {
-  auto renderTarget =
-      RenderTarget::MakeFrom(context, backendTexture, _sampleCount, _origin, !externallyOwned());
-  if (renderTarget == nullptr) {
-    LOGE("BackendTextureRenderTargetProxy::onMakeTexture() Failed to create the render target!");
-    return nullptr;
-  }
-  return renderTarget->asTextureView();
-}
+class PDFGradientShader {
+ public:
+  struct Key {
+    GradientType type;
+    GradientInfo info;
+    const std::vector<Color>* colors;
+    const std::vector<float>* stops;
+    Matrix canvasTransform;
+    Matrix shaderTransform;
+    Rect boundBox;
+    uint32_t hash;
+  };
+
+  static PDFIndirectReference Make(PDFDocumentImpl* doc, const GradientShader* shader,
+                                   const Matrix& matrix, const Rect& surfaceBBox);
+};
+
 }  // namespace tgfx

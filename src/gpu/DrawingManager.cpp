@@ -202,6 +202,7 @@ void DrawingManager::clearAtlasCellCodecTasks() {
 }
 
 void DrawingManager::uploadAtlasToGPU() {
+  auto queue = context->gpu()->queue();
   for (auto& task : atlasCellCodecTasks) {
     task->wait();
   }
@@ -219,7 +220,7 @@ void DrawingManager::uploadAtlasToGPU() {
       }
       auto rect = Rect::MakeXYWH(atlasOffset.x, atlasOffset.y, static_cast<float>(info.width()),
                                  static_cast<float>(info.height()));
-      textureView->getTexture()->writePixels(context, rect, data->data(), info.rowBytes());
+      queue->writeTexture(textureView->getTexture(), rect, data->data(), info.rowBytes());
       // Text atlas has no mipmaps, so we don't need to regenerate mipmaps.
     }
   }

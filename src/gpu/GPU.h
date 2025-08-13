@@ -21,6 +21,7 @@
 #include <memory>
 #include "gpu/CommandEncoder.h"
 #include "gpu/CommandQueue.h"
+#include "gpu/YUVFormat.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/Caps.h"
 #include "tgfx/platform/HardwareBuffer.h"
@@ -60,6 +61,14 @@ class GPU {
   virtual std::unique_ptr<GPUBuffer> createBuffer(size_t size, uint32_t usage) = 0;
 
   /**
+   * Creates a new GPUTexture with the given width, height, and pixel format. If mipmapped is
+   * true, mipmap levels will be generated. Returns nullptr if the texture cannot be created.
+   */
+  virtual std::unique_ptr<GPUTexture> createTexture(int width, int height,
+                                                    PixelFormat format = PixelFormat::RGBA_8888,
+                                                    int mipLevelCount = 1) = 0;
+
+  /**
    * Returns the pixel formats for textures created from a platform-specific hardware buffer, such
    * as AHardwareBuffer on Android or CVPixelBufferRef on Apple platforms. If yuvFormat is not
    * nullptr, it will be set to the YUV format of the hardwareBuffer if applicable. Note: On some
@@ -72,13 +81,50 @@ class GPU {
       HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat = nullptr) const = 0;
 
   /**
-   * Creates hardware textures from a platform-specific hardware buffer, such as AHardwareBuffer on
-   * Android or CVPixelBufferRef on Apple platforms. Multiple textures can be created from the same
+   * Creates textures from a platform-specific hardware buffer, such as AHardwareBuffer on Android
+   * or CVPixelBufferRef on Apple platforms. Multiple textures can be created from the same
    * hardwareBuffer (typically for YUV formats). Returns an empty vector if the hardwareBuffer is
    * invalid or the GPU backend does not support the hardwareBuffer.
    */
   virtual std::vector<std::unique_ptr<GPUTexture>> importHardwareTextures(
       HardwareBufferRef hardwareBuffer) = 0;
+
+  /**
+   * Returns the pixel format of the given backend texture. If the backend texture is invalid,
+   * returns PixelFormat::Unknown.
+   */
+  virtual PixelFormat getExternalTextureFormat(const BackendTexture& backendTexture) const = 0;
+
+  /**
+   * Creates a GPUTexture that wraps the given backend texture. If adopted is true, the
+   * GPUTexture will take ownership of the backend texture and destroy it when no longer needed.
+   * Otherwise, the backend texture must remain valid for as long as the GPUTexture exists.
+   */
+  virtual std::unique_ptr<GPUTexture> importExternalTexture(const BackendTexture& backendTexture,
+                                                            bool adopted = false) = 0;
+
+  /**
+   * Creates a GPUFrameBuffer that can be used for rendering to a texture. A GPUFrameBuffer with
+   * MSAA enabled is returned if the sample count is greater than 1. Returns nullptr if the texture
+   * is not renderable in the GPU backend or if the width or height is invalid.
+   */
+  virtual std::unique_ptr<GPUFrameBuffer> createFrameBuffer(GPUTexture* texture, int width,
+                                                            int height, int sampleCount = 1) = 0;
+
+  /**
+   * Returns the pixel format of the given backend render target. If the backend render target is
+   * invalid, returns PixelFormat::Unknown.
+   */
+  virtual PixelFormat getExternalFrameBufferFormat(
+      const BackendRenderTarget& backendRenderTarget) const = 0;
+
+  /**
+   * Creates a GPUFrameBuffer that wraps the given backend render target. The caller must ensure the
+   * backend render target is valid for the lifetime of the returned GPUFrameBuffer. Returns nullptr
+   * if the backend render target is invalid.
+   */
+  virtual std::unique_ptr<GPUFrameBuffer> importExternalFrameBuffer(
+      const BackendRenderTarget& backendRenderTarget) = 0;
 
   /**
    * Creates a command encoder that can be used to encode commands to be issued to the GPU.

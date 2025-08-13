@@ -16,25 +16,17 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLBackendRenderTarget.h"
-#include "gpu/opengl/GLUtil.h"
+#pragma once
+
+#include "tgfx/core/Typeface.h"
 
 namespace tgfx {
-std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
-                                                     const BackendRenderTarget& renderTarget,
-                                                     ImageOrigin origin) {
-  if (context == nullptr || !renderTarget.isValid()) {
-    return nullptr;
-  }
-  GLFrameBufferInfo frameBufferInfo = {};
-  if (!renderTarget.getGLFramebufferInfo(&frameBufferInfo)) {
-    return nullptr;
-  }
-  auto format = GLSizeFormatToPixelFormat(frameBufferInfo.format);
-  if (!context->caps()->isFormatRenderable(format)) {
-    return nullptr;
-  }
-  return std::make_shared<GLBackendRenderTarget>(
-      context, renderTarget.width(), renderTarget.height(), origin, format, frameBufferInfo.id);
-}
+
+class PDFGlyphUse;
+class Stream;
+
+std::unique_ptr<Stream> PDFMakeToUnicodeCmap(const Unichar* glyphToUnicode,
+                                             const PDFGlyphUse* subset, bool multiByteGlyphs,
+                                             GlyphID firstGlyphID, GlyphID lastGlyphID);
+
 }  // namespace tgfx

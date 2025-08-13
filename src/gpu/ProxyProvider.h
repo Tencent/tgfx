@@ -107,9 +107,9 @@ class ProxyProvider {
    * Creates a texture proxy for the provided BackendTexture. If adopted is true, the backend
    * texture will be destroyed at a later point after the texture proxy is released.
    */
-  std::shared_ptr<TextureProxy> wrapBackendTexture(const BackendTexture& backendTexture,
-                                                   ImageOrigin origin = ImageOrigin::TopLeft,
-                                                   bool adopted = false);
+  std::shared_ptr<TextureProxy> wrapExternalTexture(const BackendTexture& backendTexture,
+                                                    ImageOrigin origin = ImageOrigin::TopLeft,
+                                                    bool adopted = false);
 
   /**
    * Creates a RenderTargetProxy for the specified BackendTexture, sample count, origin, and

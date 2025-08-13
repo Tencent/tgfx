@@ -19,7 +19,6 @@
 #pragma once
 
 #include "gpu/GPUResource.h"
-#include "gpu/YUVFormat.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/PixelFormat.h"
@@ -39,29 +38,6 @@ enum class TextureType { None, TwoD, Rectangle, External };
 class GPUTexture : public GPUResource {
  public:
   /**
-   * Returns the PixelFormat of the backend texture. If the backendTexture is invalid, returns
-   * PixelFormat::Unknown.
-   */
-  static PixelFormat GetPixelFormat(const BackendTexture& backendTexture);
-
-  /**
-   * Creates a new GPUTexture that wraps the given backend texture. If adopted is true, the
-   * GPUTexture will take ownership of the backend texture and destroy it when no longer needed.
-   * Otherwise, the backend texture must remain valid for as long as the GPUTexture exists.
-   */
-  static std::unique_ptr<GPUTexture> MakeFrom(Context* context,
-                                              const BackendTexture& backendTexture,
-                                              bool adopted = false);
-
-  /**
-   * Creates a new GPUTexture with the given width, height, and pixel format. If mipmapped is
-   * true, mipmap levels will be generated. Returns nullptr if the texture cannot be created.
-   */
-  static std::unique_ptr<GPUTexture> Make(Context* context, int width, int height,
-                                          PixelFormat format = PixelFormat::RGBA_8888,
-                                          bool mipmapped = false);
-
-  /**
    * Returns the pixel format of the texture.
    */
   PixelFormat format() const {
@@ -69,17 +45,10 @@ class GPUTexture : public GPUResource {
   }
 
   /**
-   * Returns the maximum mipmap level of the texture.
+   * Returns the number of mipmap levels in the texture.
    */
-  int maxMipmapLevel() const {
-    return _maxMipmapLevel;
-  }
-
-  /**
-   * Returns true if the texture has mipmap levels.
-   */
-  bool hasMipmaps() const {
-    return _maxMipmapLevel > 0;
+  int mipLevelCount() const {
+    return _mipLevelCount;
   }
 
   /**
@@ -104,14 +73,6 @@ class GPUTexture : public GPUResource {
   }
 
   /**
-   * Writes pixel data to the texture within the specified rectangle. The pixel data must match the
-   * texture's pixel format, and the rectangle must be fully contained within the texture's
-   * dimensions. If the texture has mipmaps, you must call regenerateMipmapLevels() after writing
-   * pixels; this will not happen automatically.
-   */
-  virtual void writePixels(Context* context, const Rect& rect, const void* pixels,
-                           size_t rowBytes) = 0;
-  /**
    * Computes a key for the texture that can be used to identify it in a cache. The key is written
    * to the provided BytesKey object.
    */
@@ -119,10 +80,10 @@ class GPUTexture : public GPUResource {
 
  protected:
   PixelFormat _format = PixelFormat::RGBA_8888;
-  int _maxMipmapLevel = 0;
+  int _mipLevelCount = 1;
 
-  GPUTexture(PixelFormat format, int maxMipmapLevel)
-      : _format(format), _maxMipmapLevel(maxMipmapLevel) {
+  GPUTexture(PixelFormat format, int mipLevelCount)
+      : _format(format), _mipLevelCount(mipLevelCount) {
   }
 };
 }  // namespace tgfx

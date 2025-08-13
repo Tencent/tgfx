@@ -28,8 +28,8 @@ namespace tgfx {
  */
 class GLTexture : public GPUTexture {
  public:
-  GLTexture(unsigned id, unsigned target, PixelFormat format, int maxMipmapLevel = 0)
-      : GPUTexture(format, maxMipmapLevel), _id(id), _target(target) {
+  GLTexture(unsigned id, unsigned target, PixelFormat format, int mipLevelCount = 1)
+      : GPUTexture(format, mipLevelCount), _id(id), _target(target) {
   }
 
   /**
@@ -49,9 +49,6 @@ class GLTexture : public GPUTexture {
   TextureType type() const override;
 
   BackendTexture getBackendTexture(int width, int height) const override;
-
-  void writePixels(Context* context, const Rect& rect, const void* pixels,
-                   size_t rowBytes) override;
 
   void computeTextureKey(Context* context, BytesKey* bytesKey) const override;
 

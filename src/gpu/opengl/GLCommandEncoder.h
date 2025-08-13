@@ -28,8 +28,8 @@ class GLCommandEncoder : public CommandEncoder {
       : interface(std::move(interface)) {
   }
 
-  void copyRenderTargetToTexture(const RenderTarget* renderTarget, TextureView* textureView,
-                                 int srcX, int srcY) override;
+  void copyFrameBufferToTexture(GPUFrameBuffer* frameBuffer, const Point& srcOffset,
+                                GPUTexture* texture, const Rect& dstRect) override;
 
   void generateMipmapsForTexture(GPUTexture* texture) override;
 

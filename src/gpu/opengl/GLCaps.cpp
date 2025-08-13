@@ -182,6 +182,13 @@ GLCaps::GLCaps(const GLInfo& info) {
   }
   info.getIntegerv(GL_MAX_TEXTURE_SIZE, &maxTextureSize);
   info.getIntegerv(GL_MAX_TEXTURE_IMAGE_UNITS, &maxFragmentSamplers);
+  if (vendor == GLVendor::Qualcomm) {
+    // https://skia-review.googlesource.com/c/skia/+/571418
+    // On certain Adreno devices running WebGL, glTexSubImage2D() may not upload texels in time for
+    // sampling. Similar issues have also been observed with Android OpenGL ES. To work around this,
+    // call glFlush() before glTexSubImage2D().
+    flushBeforeWritePixels = true;
+  }
   initMSAASupport(info);
   initFormatMap(info);
 }
@@ -228,14 +235,6 @@ int GLCaps::getSampleCount(int requestedCount, PixelFormat pixelFormat) const {
     }
   }
   return 1;
-}
-
-int GLCaps::getMaxMipmapLevel(int width, int height) const {
-  if (!mipmapSupport) {
-    return 0;
-  }
-  int maxDimension = std::max(width, height);
-  return static_cast<int>(std::log2(maxDimension));
 }
 
 void GLCaps::initGLSupport(const GLInfo& info) {
