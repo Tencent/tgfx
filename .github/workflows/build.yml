@@ -366,7 +366,7 @@ jobs:
         lfs: true
 
     - name: Find OHOS system libs
-        run: |
+      run: |
           echo "=== 查找 image / pixelmap 库 ==="
           find /Users/runner/setup-ohos-sdk -name "*image*" -o -name "*pixelmap*" 2>/dev/null
   
