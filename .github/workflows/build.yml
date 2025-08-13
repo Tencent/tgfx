@@ -391,7 +391,7 @@ jobs:
         with:
           working-directory: './ohos'
 
-      - name: Configure SDK Path and Find Libraries
+      - name: Configure SDK Path and Create Toolchain File
         id: setup_sdk
         run: |
           cd ohos
@@ -420,8 +420,13 @@ jobs:
           echo "Found PIXELMAP_LIB at: ${PIXELMAP_LIB_PATH}"
           echo "Found IMAGE_SOURCE_LIB at: ${IMAGE_SOURCE_LIB_PATH}"
 
-          echo "PIXELMAP_LIB_PATH=${PIXELMAP_LIB_PATH}" >> $GITHUB_ENV
-          echo "IMAGE_SOURCE_LIB_PATH=${IMAGE_SOURCE_LIB_PATH}" >> $GITHUB_ENV
+          # Create a CMake toolchain file to set the variables
+          TOOLCHAIN_FILE="variables.cmake"
+          echo "set(PIXELMAP_LIB \"${PIXELMAP_LIB_PATH}\" CACHE FILEPATH \"Path to PixelMap Library\")" > ${TOOLCHAIN_FILE}
+          echo "set(IMAGE_SOURCE_LIB \"${IMAGE_SOURCE_LIB_PATH}\" CACHE FILEPATH \"Path to Image Source Library\")" >> ${TOOLCHAIN_FILE}
+          
+          echo "CMake toolchain file created at ohos/${TOOLCHAIN_FILE}"
+          cat ${TOOLCHAIN_FILE}
         shell: bash
 
       - name: Install Dependencies
@@ -436,7 +441,7 @@ jobs:
           chmod +x ./hvigorw
           ./hvigorw --version --accept-license
           ./hvigorw clean --no-parallel --no-daemon
-          ./hvigorw assembleHap --mode module -p product=default --stacktrace --no-parallel --no-daemon -PcmakeArgs="-DPIXELMAP_LIB=${{ env.PIXELMAP_LIB_PATH }} -DIMAGE_SOURCE_LIB=${{ env.IMAGE_SOURCE_LIB_PATH }} -DZLIB_LIBRARY_TYPE=STATIC -DPNG_SHARED=OFF"
+          ./hvigorw assembleHap --mode module -p product=default --stacktrace --no-parallel --no-daemon -PcmakeArgs="-DCMAKE_TOOLCHAIN_FILE=variables.cmake -DZLIB_LIBRARY_TYPE=STATIC -DPNG_SHARED=OFF"
  
         shell: bash
           
