@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,31 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/RenderTarget.h"
+#include "ExternalRenderTarget.h"
+#include "gpu/GPU.h"
 
 namespace tgfx {
-class GLInterface;
+std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
+                                                     const BackendRenderTarget& backendRenderTarget,
+                                                     ImageOrigin origin) {
+  if (context == nullptr) {
+    return nullptr;
+  }
+  auto frameBuffer = context->gpu()->importExternalFrameBuffer(backendRenderTarget);
+  if (!frameBuffer) {
+    return nullptr;
+  }
+  auto renderTarget = new ExternalRenderTarget(std::move(frameBuffer), backendRenderTarget.width(),
+                                               backendRenderTarget.height(), origin);
+  return Resource::AddToCache(context, renderTarget);
+}
 
-/**
- * Represents an OpenGL 2D buffer of pixels that can be rendered to.
- */
-class GLRenderTarget : public RenderTarget {
- public:
-  /**
-   * Returns the frame buffer ID used for reading pixels.
-   */
-  virtual unsigned readFrameBufferID() const = 0;
-
-  /**
-   * Returns the frame buffer ID used for drawing pixels.
-   */
-  virtual unsigned drawFrameBufferID() const = 0;
-
-  BackendRenderTarget getBackendRenderTarget() const override;
-
-  bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0,
-                  int srcY = 0) const override;
-};
 }  // namespace tgfx

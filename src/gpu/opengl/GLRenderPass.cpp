@@ -20,8 +20,8 @@
 #include "GLUtil.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/GlobalCache.h"
+#include "gpu/opengl/GLFrameBuffer.h"
 #include "gpu/opengl/GLProgram.h"
-#include "gpu/opengl/GLRenderTarget.h"
 
 namespace tgfx {
 struct AttribLayout {
@@ -110,9 +110,9 @@ static void UpdateBlend(Context* context, const BlendFormula* blendFactors) {
 void GLRenderPass::begin() {
   auto context = getContext();
   auto gl = GLFunctions::Get(context);
-  auto glRT = static_cast<GLRenderTarget*>(renderTarget.get());
+  auto glRT = static_cast<GLFrameBuffer*>(renderTarget->getFrameBuffer());
   gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->drawFrameBufferID());
-  gl->viewport(0, 0, glRT->width(), glRT->height());
+  gl->viewport(0, 0, renderTarget->width(), renderTarget->height());
   if (auto vertexArrayID = getVertexArrayID(renderTarget->getContext())) {
     gl->bindVertexArray(vertexArrayID);
   }
@@ -123,7 +123,7 @@ void GLRenderPass::onEnd() {
   auto gl = GLFunctions::Get(context);
   auto caps = GLCaps::Get(context);
   if (resolveMSAA && renderTarget->sampleCount() > 1 && caps->usesMSAARenderBuffers()) {
-    auto glRT = static_cast<GLRenderTarget*>(renderTarget.get());
+    auto glRT = static_cast<GLFrameBuffer*>(renderTarget->getFrameBuffer());
     gl->bindFramebuffer(GL_READ_FRAMEBUFFER, glRT->drawFrameBufferID());
     gl->bindFramebuffer(GL_DRAW_FRAMEBUFFER, glRT->readFrameBufferID());
     // MSAA resolve may be affected by the scissor test, so disable it here.
@@ -131,8 +131,9 @@ void GLRenderPass::onEnd() {
     if (caps->msFBOType == MSFBOType::ES_Apple) {
       gl->resolveMultisampleFramebuffer();
     } else {
-      gl->blitFramebuffer(0, 0, glRT->width(), glRT->height(), 0, 0, glRT->width(), glRT->height(),
-                          GL_COLOR_BUFFER_BIT, GL_NEAREST);
+      gl->blitFramebuffer(0, 0, renderTarget->width(), renderTarget->height(), 0, 0,
+                          renderTarget->width(), renderTarget->height(), GL_COLOR_BUFFER_BIT,
+                          GL_NEAREST);
     }
   }
   if (vertexArray != nullptr) {

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,25 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLExternalRenderTarget.h"
+#include "GLFrameBuffer.h"
 #include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
-std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
-                                                     const BackendRenderTarget& renderTarget,
-                                                     ImageOrigin origin) {
-  if (context == nullptr || !renderTarget.isValid()) {
-    return nullptr;
-  }
-  GLFrameBufferInfo frameBufferInfo = {};
-  if (!renderTarget.getGLFramebufferInfo(&frameBufferInfo)) {
-    return nullptr;
-  }
-  auto format = GLSizeFormatToPixelFormat(frameBufferInfo.format);
-  if (!context->caps()->isFormatRenderable(format)) {
-    return nullptr;
-  }
-  return std::make_shared<GLExternalRenderTarget>(
-      context, renderTarget.width(), renderTarget.height(), origin, format, frameBufferInfo.id);
+BackendRenderTarget GLFrameBuffer::getBackendRenderTarget(int width, int height) const {
+  GLFrameBufferInfo glInfo = {};
+  glInfo.id = drawFrameBufferID();
+  glInfo.format = PixelFormatToGLSizeFormat(format());
+  return {glInfo, width, height};
 }
 }  // namespace tgfx

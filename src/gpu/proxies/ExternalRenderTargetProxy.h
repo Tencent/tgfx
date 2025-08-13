@@ -18,59 +18,54 @@
 
 #pragma once
 
-#include "gpu/opengl/GLRenderTarget.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
-class GLExternalRenderTarget : public GLRenderTarget {
+class ExternalRenderTargetProxy : public RenderTargetProxy {
  public:
-  GLExternalRenderTarget(Context* context, int width, int height, ImageOrigin origin,
-                         PixelFormat format, unsigned frameBufferID)
-      : context(context), _width(width), _height(height), _origin(origin), _format(format),
-        frameBufferID(frameBufferID) {
-  }
-
   Context* getContext() const override {
-    return context;
+    return renderTarget->getContext();
   }
 
   int width() const override {
-    return _width;
+    return renderTarget->width();
   }
 
   int height() const override {
-    return _height;
-  }
-
-  ImageOrigin origin() const override {
-    return _origin;
-  }
-
-  int sampleCount() const override {
-    return 1;
+    return renderTarget->height();
   }
 
   PixelFormat format() const override {
-    return _format;
+    return renderTarget->format();
+  }
+
+  int sampleCount() const override {
+    return renderTarget->sampleCount();
+  }
+
+  ImageOrigin origin() const override {
+    return renderTarget->origin();
   }
 
   bool externallyOwned() const override {
     return true;
   }
 
-  unsigned readFrameBufferID() const override {
-    return frameBufferID;
+  std::shared_ptr<TextureView> getTextureView() const override {
+    return nullptr;
   }
 
-  unsigned drawFrameBufferID() const override {
-    return frameBufferID;
+  std::shared_ptr<RenderTarget> getRenderTarget() const override {
+    return renderTarget;
   }
 
  private:
-  Context* context = nullptr;
-  int _width = 0;
-  int _height = 0;
-  ImageOrigin _origin = ImageOrigin::TopLeft;
-  PixelFormat _format = PixelFormat::RGBA_8888;
-  unsigned frameBufferID = 0;
+  std::shared_ptr<RenderTarget> renderTarget = nullptr;
+
+  explicit ExternalRenderTargetProxy(std::shared_ptr<RenderTarget> renderTarget)
+      : renderTarget(std::move(renderTarget)) {
+  }
+
+  friend class RenderTargetProxy;
 };
 }  // namespace tgfx

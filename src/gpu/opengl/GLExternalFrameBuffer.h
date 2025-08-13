@@ -18,32 +18,39 @@
 
 #pragma once
 
-#include "gpu/CommandEncoder.h"
-#include "gpu/opengl/GLInterface.h"
+#include "gpu/opengl/GLFrameBuffer.h"
 
 namespace tgfx {
-class GLCommandEncoder : public CommandEncoder {
+class GLExternalFrameBuffer : public GLFrameBuffer {
  public:
-  explicit GLCommandEncoder(std::shared_ptr<GLInterface> interface)
-      : interface(std::move(interface)) {
+  PixelFormat format() const override {
+    return _format;
   }
 
-  void copyFrameBufferToTexture(GPUFrameBuffer* frameBuffer, const Point& srcOffset,
-                                GPUTexture* texture, const Rect& dstRect) override;
+  int sampleCount() const override {
+    return 1;
+  }
 
-  void generateMipmapsForTexture(GPUTexture* texture) override;
+  unsigned readFrameBufferID() const override {
+    return frameBufferID;
+  }
 
-  BackendSemaphore insertSemaphore() override;
+  unsigned drawFrameBufferID() const override {
+    return frameBufferID;
+  }
 
-  void waitSemaphore(const BackendSemaphore& semaphore) override;
-
- protected:
-  std::shared_ptr<RenderPass> onBeginRenderPass(std::shared_ptr<RenderTarget> renderTarget,
-                                                bool resolveMSAA) override;
-
-  std::shared_ptr<CommandBuffer> onFinish() override;
+  void release(GPU*) override {
+    // Do nothing, the external FBO is not owned by us.
+  }
 
  private:
-  std::shared_ptr<GLInterface> interface = nullptr;
+  unsigned frameBufferID = 0;
+  PixelFormat _format = PixelFormat::RGBA_8888;
+
+  GLExternalFrameBuffer(unsigned frameBufferID, PixelFormat format)
+      : frameBufferID(frameBufferID), _format(format) {
+  }
+
+  friend class GLGPU;
 };
 }  // namespace tgfx
