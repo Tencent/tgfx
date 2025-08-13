@@ -397,22 +397,45 @@ jobs:
             # 设置SDK路径从环境变量
             if [ -n "${HOS_SDK_HOME:-}" ]; then
               SDK_PATH="${HOS_SDK_HOME}"
+              echo "Using HOS_SDK_HOME: ${SDK_PATH}"
             elif [ -n "${OHOS_SDK_HOME:-}" ]; then
               SDK_PATH="${OHOS_SDK_HOME}"
+              echo "Using OHOS_SDK_HOME: ${SDK_PATH}"
             else
-              # 默认路径
-              SDK_PATH="${HOME}/command-line-tools"
+              echo "Error: Neither HOS_SDK_HOME nor OHOS_SDK_HOME is set"
+              exit 1
             fi
             
             echo "hwsdk.dir=${SDK_PATH}" > local.properties
             echo "Configured SDK path: ${SDK_PATH}"
             
+            # 验证SDK目录结构
+            if [ ! -d "${SDK_PATH}" ]; then
+              echo "Error: SDK path does not exist: ${SDK_PATH}"
+              exit 1
+            fi
+            
             # 验证库文件存在
-            if [ -d "${SDK_PATH}/native/sysroot/usr/lib" ]; then
-              echo "Library directory found: ${SDK_PATH}/native/sysroot/usr/lib"
-              ls -la "${SDK_PATH}/native/sysroot/usr/lib" | grep -E "(pixelmap|image_source)"
+            LIB_PATH="${SDK_PATH}/native/sysroot/usr/lib"
+            if [ -d "${LIB_PATH}" ]; then
+              echo "Library directory found: ${LIB_PATH}"
+              echo "Available libraries:"
+              ls -la "${LIB_PATH}" | grep -E "(pixelmap|image_source)"
+              
+              # 检查必需的库文件
+              REQUIRED_LIBS=("libpixelmap.so" "libimage_source.so" "libpixelmap_ndk.z.so" "libimage_source_ndk.z.so")
+              for lib in "${REQUIRED_LIBS[@]}"; do
+                if [ -f "${LIB_PATH}/${lib}" ]; then
+                  echo "✓ Found: ${lib}"
+                else
+                  echo "✗ Missing: ${lib}"
+                fi
+              done
             else
-              echo "Warning: Library directory not found at ${SDK_PATH}/native/sysroot/usr/lib"
+              echo "Error: Library directory not found at ${LIB_PATH}"
+              echo "SDK structure:"
+              find "${SDK_PATH}" -type d -name "lib*" | head -20
+              exit 1
             fi
         shell: bash 
 
