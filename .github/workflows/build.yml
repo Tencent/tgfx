@@ -375,10 +375,11 @@ jobs:
       - name: Show SDK layout
         run: |
           echo "=== SDK 实际目录 ==="
-          ls -l /Users/runner/setup-ohos-sdk/darwin/11/native/sysroot/usr/lib || echo "SDK not found"
+          ls -l /Users/runner/setup-ohos-sdk/darwin/11/native/sysroot/usr/lib/aarch64-linux-ohos || echo "SDK not found"
           find /Users/runner/setup-ohos-sdk/darwin/11/native -name "*.so" 2>/dev/null | head -5
+      
+      
 
-    
       - name: Get Third-Party Cache
         id: third-party-cache
         uses: actions/cache/restore@v4

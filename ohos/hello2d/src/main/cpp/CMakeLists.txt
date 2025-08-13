@@ -1,6 +1,7 @@
 # the minimum version of CMake.
 cmake_minimum_required(VERSION 3.4.1)
-set(OHOS_SDK_DIR "/Users/runner/setup-ohos-sdk/darwin/11/native/sysroot/usr/lib")
+
+set(OHOS_SDK_DIR "/Users/runner/setup-ohos-sdk/darwin/11/native/sysroot/usr/lib/aarch64-linux-ohos")
 
 set(CMAKE_FIND_LIBRARY_PREFIXES "lib")
 set(CMAKE_FIND_LIBRARY_SUFFIXES ".so")
