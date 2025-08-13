@@ -380,6 +380,13 @@ jobs:
       - name: Set SDK Environment
         run: |
           echo "OHOS_SDK_NATIVE=/Users/runner/openharmony-sdk-5.0.3.140" >> $GITHUB_ENV
+          echo "OHOS_BASE_SDK_HOME=/Users/runner/openharmony-sdk-5.0.3.140" >> $GITHUB_ENV
+
+      - name: Configure SDK Path
+        run: |
+          cd ohos
+          echo "sdk.dir=/Users/runner/openharmony-sdk-5.0.3.140" > local.properties
+          echo "OHOS_BASE_SDK_HOME=/Users/runner/openharmony-sdk-5.0.3.140" >> local.properties
 
       - name: Find real SDK sysroot
         run: |
