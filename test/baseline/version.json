@@ -107,12 +107,12 @@
         "tile_mode_subset": "67961560"
     },
     "DrawersTest": {
-        "ConicGradient": "69683f78",
+        "ConicGradient": "bbfb7f9b",
         "GridBackground": "2ae64df",
-        "ImageWithMipmap": "da590da",
-        "ImageWithShadow": "67961560",
+        "ImageWithMipmap": "bbfb7f9b",
+        "ImageWithShadow": "bbfb7f9b",
         "SimpleLayerTree": "ddf50680",
-        "SimpleText": "af60d8ff"
+        "SimpleText": "bbfb7f9b"
     },
     "DstTextureTest": {
         "EmptyLocalBounds": "be94e666",
@@ -124,7 +124,7 @@
         "ClipInnerShadowImageFilter": "80c523ee",
         "ComposeColorFilter": "c475bfb",
         "ComposeImageFilter": "80c523ee",
-        "ComposeImageFilter2": "80c523ee",
+        "ComposeImageFilter2": "bbfb7f9b",
         "EmptyShadowTest": "b9a42bf",
         "GaussianBlurImageFilter": "9275e450",
         "ImageFilterShader": "67961560",
@@ -192,12 +192,12 @@
         "backgroundLayerBlur": "42ecc4c7",
         "draw_shape": "b2073fc2",
         "draw_solid": "b4a1231",
-        "draw_text": "80c523ee",
+        "draw_text": "bbfb7f9b",
         "dropShadow": "67961560",
         "filterClip": "c475bfb",
         "filterTest": "80c523ee",
         "filters": "80c523ee",
-        "getBounds": "0d4ef3f9",
+        "getBounds": "bbfb7f9b",
         "getLayersUnderPoint": "42ecc4c7",
         "getTightBounds": "ae4290b3",
         "greyColorMatrix": "a1605b2",
@@ -284,7 +284,7 @@
         "complex1": "ba1c7c2",
         "complex2": "42ecc4c7",
         "complex3": "a6ff60e1",
-        "complex4": "42ecc4c7",
+        "complex4": "bbfb7f9b",
         "complex5": "b2073fc2",
         "complex6": "42ecc4c7",
         "complex7": "42ecc4c7",
@@ -305,14 +305,14 @@
         "ImageSnapshot_Surface2": "d010fb8"
     },
     "TextAlignTest": {
-        "FontFallbackTest": "42ecc4c7",
+        "FontFallbackTest": "bbfb7f9b",
         "SingleLineTextAlign": "42ecc4c7",
         "TextAlign": "42ecc4c7",
         "TextAlignBlankLineTest": "80c523ee",
         "TextAlignSimulateVerticalTextLayout": "42ecc4c7",
-        "TextAlignWidth0Height0": "42ecc4c7",
+        "TextAlignWidth0Height0": "bbfb7f9b",
         "TextAlignWidth1Height10": "42ecc4c7",
-        "TruncateTextLineTest": "42ecc4c7"
+        "TruncateTextLineTest": "bbfb7f9b"
     },
     "TypefaceTest": {
         "CustomImageTypeface": "5983bdca",
