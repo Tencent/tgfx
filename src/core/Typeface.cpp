@@ -18,6 +18,7 @@
 
 #include "tgfx/core/Typeface.h"
 #include <vector>
+#include "core/AdvancedTypefaceInfo.h"
 #include "core/ScalerContext.h"
 #include "core/utils/UniqueID.h"
 #include "tgfx/core/Font.h"
@@ -72,6 +73,10 @@ class EmptyTypeface : public Typeface {
     return {};
   }
 
+  AdvancedTypefaceInfo getAdvancedInfo() const override {
+    return {};
+  }
+
  private:
   std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override {
     return ScalerContext::MakeEmpty(size);
@@ -105,6 +110,10 @@ bool Typeface::isCustom() const {
 std::vector<Unichar> Typeface::getGlyphToUnicodeMap() const {
   return {};
 };
+
+AdvancedTypefaceInfo Typeface::getAdvancedInfo() const {
+  return {};
+}
 
 std::shared_ptr<ScalerContext> Typeface::getScalerContext(float size) {
   if (size <= 0.0f) {

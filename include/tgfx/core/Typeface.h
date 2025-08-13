@@ -41,6 +41,7 @@ typedef int32_t Unichar;
 typedef uint32_t FontTableTag;
 
 class ScalerContext;
+class AdvancedTypefaceInfo;
 
 /**
  * A set of character glyphs and layout information for drawing text.
@@ -162,6 +163,11 @@ class Typeface {
 
   virtual std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const = 0;
 
+  /**
+   * Returns advanced information about the typeface. This method is used by the PDF backend.
+   */
+  virtual AdvancedTypefaceInfo getAdvancedInfo() const;
+
   mutable std::mutex locker = {};
 
   std::weak_ptr<Typeface> weakThis;
@@ -187,5 +193,7 @@ class Typeface {
   friend class WebMask;
   friend class SVGExportContext;
   friend class RenderContext;
+  friend class PDFExportContext;
+  friend class PDFFont;
 };
 }  // namespace tgfx

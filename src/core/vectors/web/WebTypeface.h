@@ -73,6 +73,10 @@ class WebTypeface : public Typeface {
   std::vector<Unichar> getGlyphToUnicodeMap() const override;
 #endif
 
+#ifdef TGFX_USE_ADVANCED_TYPEFACE_PROPERTY
+  AdvancedTypefaceInfo getAdvancedInfo() const override;
+#endif
+
   std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;
 
  private:

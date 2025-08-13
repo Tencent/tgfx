@@ -115,6 +115,17 @@ std::vector<Unichar> WebTypeface::getGlyphToUnicodeMap() const {
 }
 #endif
 
+#ifdef TGFX_USE_GLYPH_TO_UNICODE
+AdvancedTypefaceInfo getAdvancedProperty() const {
+  return AdvancedTypefaceProperty{.postScriptName = webFontFamily,
+                                  .type = AdvancedTypefaceProperty::FontType::Other,
+                                  .flags = static_cast<AdvancedTypefaceProperty::FontFlags>(
+                                      AdvancedTypefaceProperty::FontFlags::NotEmbeddable |
+                                      AdvancedTypefaceProperty::FontFlags::NotSubsettable),
+                                  .style = static_cast<AdvancedTypefaceProperty::StyleFlags>(0)};
+}
+#endif
+
 std::shared_ptr<ScalerContext> WebTypeface::onCreateScalerContext(float size) const {
   auto scalerContextClass = emscripten::val::module_property("ScalerContext");
   if (!scalerContextClass.as<bool>()) {
