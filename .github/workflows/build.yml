@@ -359,16 +359,15 @@ jobs:
   
   openharmony:
     runs-on: macos-latest
-    if: | 
-      (github.event_name != 'workflow_dispatch') ||
-      (github.event.inputs.job == 'all') ||
-      (github.event.inputs.job == 'openharmony')
-
     steps:
     - name: Check Out Repo
       uses: actions/checkout@v4
       with:
         lfs: true
+
+    - name: Show OHOS SDK path
+      run: echo "$OHOS_SDK_NATIVE"   
+          
 
     - name: Get Third-Party Cache
       id: third-party-cache
