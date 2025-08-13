@@ -375,11 +375,11 @@ jobs:
           set -e
           curl -L -o sdk.tar.gz \
             https://cidownload.openharmony.cn/version/Release_Version/OpenHarmony-5.0.3.140/20250802_033957/version-Release_Version-OpenHarmony-5.0.3.140-20250802_033957-ohos-sdk-full_5.0.3-Release.tar.gz
-          sudo mkdir -p /opt/ohos-sdk-5.0.3
-          sudo tar -xzf sdk.tar.gz -C /opt/ohos-sdk-5.0.3 --strip-components=1
+          mkdir -p "$HOME/ohos-sdk-5.0.3"
+          tar -xzf sdk.tar.gz -C "$HOME/ohos-sdk-5.0.3" --strip-components=1
           rm sdk.tar.gz
-          echo "OHOS_SDK_NATIVE=/opt/ohos-sdk-5.0.3" >> $GITHUB_ENV
-          echo "OHOS_BASE_SDK_HOME=/opt/ohos-sdk-5.0.3" >> $GITHUB_ENV
+          echo "OHOS_SDK_NATIVE=$HOME/ohos-sdk-5.0.3" >> $GITHUB_ENV
+          echo "OHOS_BASE_SDK_HOME=$HOME/ohos-sdk-5.0.3" >> $GITHUB_ENV
 
 
       - name: Configure SDK Path
