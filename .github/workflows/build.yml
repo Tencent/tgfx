@@ -367,8 +367,8 @@ jobs:
 
     - name: Find OHOS system libs
       run: |
-          echo "=== 查找 image / pixelmap 库 ==="
-          find /Users/runner/setup-ohos-sdk -name "*image*" -o -name "*pixelmap*" 2>/dev/null
+          echo "=== SDK 目录结构 ==="
+          ls -R /Users/runner/setup-ohos-sdk/darwin/11/native/sysroot || echo "无 sysroot"
   
           
 
