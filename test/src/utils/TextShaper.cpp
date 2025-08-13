@@ -60,7 +60,7 @@ std::shared_ptr<hb_face_t> CreateHBFace(const std::shared_ptr<Typeface>& typefac
         hb_blob_create(static_cast<const char*>(buffer->data()),
                        static_cast<unsigned int>(buffer->size()), HB_MEMORY_MODE_READONLY,
                        static_cast<void*>(wrapper),
-                       [](void* ctx) { delete reinterpret_cast<PtrWrapper<Data>*>(ctx); }),
+                       [](void* ctx) { delete reinterpret_cast<PtrWrapper<Buffer>*>(ctx); }),
         hb_blob_destroy);
     if (hb_blob_get_empty() == blob.get()) {
       return nullptr;
