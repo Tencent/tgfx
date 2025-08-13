@@ -19,7 +19,9 @@
 #include "GLGPU.h"
 #include "gpu/opengl/GLBuffer.h"
 #include "gpu/opengl/GLCommandEncoder.h"
+#include "gpu/opengl/GLExternalFrameBuffer.h"
 #include "gpu/opengl/GLExternalTexture.h"
+#include "gpu/opengl/GLTextureFrameBuffer.h"
 #include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
@@ -110,6 +112,33 @@ std::unique_ptr<GPUTexture> GLGPU::importExternalTexture(const BackendTexture& b
     return std::make_unique<GLTexture>(textureInfo.id, textureInfo.target, format);
   }
   return std::make_unique<GLExternalTexture>(textureInfo.id, textureInfo.target, format);
+}
+
+std::unique_ptr<GPUFrameBuffer> GLGPU::createFrameBuffer(GPUTexture* texture, int width, int height,
+                                                         int sampleCount) {
+  return GLTextureFrameBuffer::MakeFrom(this, texture, width, height, sampleCount);
+}
+
+PixelFormat GLGPU::getExternalFrameBufferFormat(const BackendRenderTarget& renderTarget) const {
+  GLFrameBufferInfo frameBufferInfo = {};
+  if (!renderTarget.getGLFramebufferInfo(&frameBufferInfo)) {
+    return PixelFormat::Unknown;
+  }
+  return GLSizeFormatToPixelFormat(frameBufferInfo.format);
+}
+
+std::unique_ptr<GPUFrameBuffer> GLGPU::importExternalFrameBuffer(
+    const BackendRenderTarget& renderTarget) {
+  GLFrameBufferInfo frameBufferInfo = {};
+  if (!renderTarget.getGLFramebufferInfo(&frameBufferInfo)) {
+    return nullptr;
+  }
+  auto format = GLSizeFormatToPixelFormat(frameBufferInfo.format);
+  if (!caps()->isFormatRenderable(format)) {
+    return nullptr;
+  }
+  return std::unique_ptr<GLExternalFrameBuffer>(
+      new GLExternalFrameBuffer(frameBufferInfo.id, format));
 }
 
 std::shared_ptr<CommandEncoder> GLGPU::createCommandEncoder() {

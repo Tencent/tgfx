@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include "gpu/GPUFrameBuffer.h"
 #include "gpu/TextureView.h"
 
 namespace tgfx {
@@ -85,12 +86,16 @@ class RenderTarget {
   /**
    * Returns the sample count of the render target.
    */
-  virtual int sampleCount() const = 0;
+  int sampleCount() const {
+    return getFrameBuffer()->sampleCount();
+  }
 
   /**
    * Returns the pixel format of the render target.
    */
-  virtual PixelFormat format() const = 0;
+  PixelFormat format() const {
+    return getFrameBuffer()->format();
+  }
 
   /**
    * Returns true if the render target is externally owned.
@@ -105,17 +110,20 @@ class RenderTarget {
     return nullptr;
   }
 
+  virtual GPUFrameBuffer* getFrameBuffer() const = 0;
+
   /**
    * Retrieves the backend render target.
    */
-  virtual BackendRenderTarget getBackendRenderTarget() const = 0;
+  BackendRenderTarget getBackendRenderTarget() const {
+    return getFrameBuffer()->getBackendRenderTarget(width(), height());
+  }
 
   /**
-   * Copies a rect of pixels to dstPixels with specified color type, alpha type and row bytes. Copy
-   * starts at (srcX, srcY), and does not exceed Surface (width(), height()). Pixels are copied
-   * only if pixel conversion is possible. Returns true if pixels are copied to dstPixels.
+   * Copies a rect of pixels to dstPixels with the specified dstInfo. Copy starts at (srcX, srcY),
+   * and does not exceed (width(), height()). Pixels are copied only if pixel conversion is
+   * possible. Returns true if pixels are copied to dstPixels.
    */
-  virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0,
-                          int srcY = 0) const = 0;
+  bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0, int srcY = 0) const;
 };
 }  // namespace tgfx

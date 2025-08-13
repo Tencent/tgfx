@@ -20,7 +20,9 @@
 #include "GLTexture.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/opengl/GLBuffer.h"
+#include "gpu/opengl/GLFrameBuffer.h"
 #include "gpu/opengl/GLUtil.h"
+#include "tgfx/core/Buffer.h"
 
 namespace tgfx {
 bool GLCommandQueue::writeBuffer(GPUBuffer* buffer, size_t bufferOffset, const void* data,
@@ -82,6 +84,59 @@ void GLCommandQueue::writeTexture(GPUTexture* texture, const Rect& rect, const v
       }
     }
   }
+}
+
+bool GLCommandQueue::readPixels(GPUFrameBuffer* frameBuffer, const Rect& rect, void* pixels,
+                                size_t rowBytes) const {
+  if (frameBuffer == nullptr || rect.isEmpty() || pixels == nullptr) {
+    return false;
+  }
+  auto format = frameBuffer->format();
+  auto bytesPerPixel = PixelFormatBytesPerPixel(format);
+  auto minRowBytes = static_cast<size_t>(rect.width()) * bytesPerPixel;
+  if (rowBytes < minRowBytes) {
+    LOGE("GLCommandQueue::readPixels() rowBytes is too small!");
+    return false;
+  }
+  auto gl = interface->functions();
+  auto caps = interface->caps();
+  ClearGLError(gl);
+  auto glFrameBuffer = static_cast<GLFrameBuffer*>(frameBuffer);
+  gl->bindFramebuffer(GL_FRAMEBUFFER, glFrameBuffer->readFrameBufferID());
+  void* outPixels = nullptr;
+  Buffer tempBuffer = {};
+  auto restoreGLRowLength = false;
+  if (rowBytes == minRowBytes) {
+    outPixels = pixels;
+  } else if (caps->packRowLengthSupport) {
+    outPixels = pixels;
+    gl->pixelStorei(GL_PACK_ROW_LENGTH, static_cast<int>(rowBytes / bytesPerPixel));
+    restoreGLRowLength = true;
+  } else {
+    tempBuffer.alloc(minRowBytes * static_cast<size_t>(rect.height()));
+    outPixels = tempBuffer.data();
+  }
+  gl->pixelStorei(GL_PACK_ALIGNMENT, static_cast<int>(bytesPerPixel));
+  auto x = static_cast<int>(rect.left);
+  auto y = static_cast<int>(rect.top);
+  auto width = static_cast<int>(rect.width());
+  auto height = static_cast<int>(rect.height());
+  auto textureFormat = caps->getTextureFormat(format);
+  gl->readPixels(x, y, width, height, textureFormat.externalFormat, GL_UNSIGNED_BYTE, outPixels);
+  if (restoreGLRowLength) {
+    gl->pixelStorei(GL_PACK_ROW_LENGTH, 0);
+  }
+  if (!tempBuffer.isEmpty()) {
+    auto srcPixels = static_cast<const uint8_t*>(outPixels);
+    auto dstPixels = static_cast<uint8_t*>(pixels);
+    auto rowCount = static_cast<size_t>(rect.height());
+    for (size_t row = 0; row < rowCount; ++row) {
+      memcpy(dstPixels, srcPixels, minRowBytes);
+      dstPixels += rowBytes;
+      srcPixels += minRowBytes;
+    }
+  }
+  return CheckGLError(gl);
 }
 
 void GLCommandQueue::submit(std::shared_ptr<CommandBuffer>) {

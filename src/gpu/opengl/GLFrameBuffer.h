@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,29 +18,24 @@
 
 #pragma once
 
-#include "gpu/CommandQueue.h"
-#include "gpu/opengl/GLInterface.h"
+#include "gpu/GPUFrameBuffer.h"
 
 namespace tgfx {
-class GLCommandQueue : public CommandQueue {
+/**
+ * Represents an OpenGL 2D buffer of pixels that can be rendered to.
+ */
+class GLFrameBuffer : public GPUFrameBuffer {
  public:
-  explicit GLCommandQueue(std::shared_ptr<GLInterface> interface)
-      : interface(std::move(interface)) {
-  }
+  /**
+   * Returns the frame buffer ID used for reading pixels.
+   */
+  virtual unsigned readFrameBufferID() const = 0;
 
-  bool writeBuffer(GPUBuffer* buffer, size_t bufferOffset, const void* data, size_t size) override;
+  /**
+   * Returns the frame buffer ID used for drawing pixels.
+   */
+  virtual unsigned drawFrameBufferID() const = 0;
 
-  void writeTexture(GPUTexture* texture, const Rect& rect, const void* pixels,
-                    size_t rowBytes) override;
-
-  bool readPixels(GPUFrameBuffer* frameBuffer, const Rect& rect, void* pixels,
-                  size_t rowBytes) const override;
-
-  void submit(std::shared_ptr<CommandBuffer>) override;
-
-  void waitUntilCompleted() override;
-
- private:
-  std::shared_ptr<GLInterface> interface = nullptr;
+  BackendRenderTarget getBackendRenderTarget(int width, int height) const override;
 };
 }  // namespace tgfx

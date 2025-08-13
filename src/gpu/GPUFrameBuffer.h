@@ -18,32 +18,30 @@
 
 #pragma once
 
-#include "gpu/CommandEncoder.h"
-#include "gpu/opengl/GLInterface.h"
+#include "gpu/GPUResource.h"
+#include "tgfx/gpu/Backend.h"
+#include "tgfx/gpu/PixelFormat.h"
 
 namespace tgfx {
-class GLCommandEncoder : public CommandEncoder {
+/**
+ * GPUFrameBuffer represents a frame buffer in the GPU backend that can be rendered to.
+ */
+class GPUFrameBuffer : public GPUResource {
  public:
-  explicit GLCommandEncoder(std::shared_ptr<GLInterface> interface)
-      : interface(std::move(interface)) {
-  }
+  /**
+   * Returns the pixel format of the frame buffer.
+   */
+  virtual PixelFormat format() const = 0;
 
-  void copyFrameBufferToTexture(GPUFrameBuffer* frameBuffer, const Point& srcOffset,
-                                GPUTexture* texture, const Rect& dstRect) override;
+  /**
+   * Returns the number of samples used by the frame buffer. Returns 1 if multisampling is disabled,
+   * or the number of samples per pixel if enabled.
+   */
+  virtual int sampleCount() const = 0;
 
-  void generateMipmapsForTexture(GPUTexture* texture) override;
-
-  BackendSemaphore insertSemaphore() override;
-
-  void waitSemaphore(const BackendSemaphore& semaphore) override;
-
- protected:
-  std::shared_ptr<RenderPass> onBeginRenderPass(std::shared_ptr<RenderTarget> renderTarget,
-                                                bool resolveMSAA) override;
-
-  std::shared_ptr<CommandBuffer> onFinish() override;
-
- private:
-  std::shared_ptr<GLInterface> interface = nullptr;
+  /**
+   * Retrieves the backend render target.
+   */
+  virtual BackendRenderTarget getBackendRenderTarget(int width, int height) const = 0;
 };
 }  // namespace tgfx

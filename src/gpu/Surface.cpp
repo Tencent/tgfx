@@ -112,7 +112,7 @@ ImageOrigin Surface::origin() const {
 }
 
 BackendRenderTarget Surface::getBackendRenderTarget() {
-  getContext()->flush();
+  getContext()->flushAndSubmit();
   auto renderTarget = renderContext->renderTarget->getRenderTarget();
   if (renderTarget == nullptr) {
     return {};
@@ -125,7 +125,7 @@ BackendTexture Surface::getBackendTexture() {
   if (textureProxy == nullptr) {
     return {};
   }
-  getContext()->flush();
+  getContext()->flushAndSubmit();
   auto textureView = textureProxy->getTextureView();
   if (textureView == nullptr) {
     return {};
@@ -183,12 +183,10 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
     return false;
   }
   auto renderTargetProxy = renderContext->renderTarget;
-  auto context = renderTargetProxy->getContext();
-  context->flush();
   auto textureView = renderTargetProxy->getTextureView();
   auto hardwareBuffer = textureView ? textureView->getTexture()->getHardwareBuffer() : nullptr;
+  renderTargetProxy->getContext()->flushAndSubmit(hardwareBuffer != nullptr);
   if (hardwareBuffer != nullptr) {
-    context->submit(true);
     auto pixels = HardwareBufferLock(hardwareBuffer);
     if (pixels != nullptr) {
       auto info = HardwareBufferGetInfo(hardwareBuffer);

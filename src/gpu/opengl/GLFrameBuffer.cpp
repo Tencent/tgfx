@@ -16,25 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLExternalRenderTarget.h"
+#include "GLFrameBuffer.h"
 #include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
-std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
-                                                     const BackendRenderTarget& renderTarget,
-                                                     ImageOrigin origin) {
-  if (context == nullptr || !renderTarget.isValid()) {
-    return nullptr;
-  }
-  GLFrameBufferInfo frameBufferInfo = {};
-  if (!renderTarget.getGLFramebufferInfo(&frameBufferInfo)) {
-    return nullptr;
-  }
-  auto format = GLSizeFormatToPixelFormat(frameBufferInfo.format);
-  if (!context->caps()->isFormatRenderable(format)) {
-    return nullptr;
-  }
-  return std::make_shared<GLExternalRenderTarget>(
-      context, renderTarget.width(), renderTarget.height(), origin, format, frameBufferInfo.id);
+BackendRenderTarget GLFrameBuffer::getBackendRenderTarget(int width, int height) const {
+  GLFrameBufferInfo glInfo = {};
+  glInfo.id = drawFrameBufferID();
+  glInfo.format = PixelFormatToGLSizeFormat(format());
+  return {glInfo, width, height};
 }
 }  // namespace tgfx
