@@ -436,11 +436,11 @@ jobs:
             echo "ohpm not available, hvigorw will handle dependencies"
           fi
           
-      - name: Setup OpenHarmony SDK
-        uses: openharmony/setup-ohos-sdk@v1
-        with:
-          version: '5.0.3.140'
-          arch: 'aarch64'
+      - name: Register SDK with hvigor
+        run: |
+          mkdir -p ohos
+          echo "sdk.dir=/Users/runner/openharmony-sdk-5.0.3.140" > ohos/local.properties
+          echo "OHOS_BASE_SDK_HOME=/Users/runner/openharmony-sdk-5.0.3.140" >> $GITHUB_ENV
 
 
       - name: Build OpenHarmony
