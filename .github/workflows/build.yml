@@ -370,8 +370,25 @@ jobs:
         with:
           node-version: '18'
 
+      - name: Download & Extract 5.0.3 SDK
+        run: |
+          set -e
+          curl -L -o sdk.tar.gz \
+            https://cidownload.openharmony.cn/version/Release_Version/OpenHarmony-5.0.3.140/20250802_033957/version-Release_Version-OpenHarmony-5.0.3.140-20250802_033957-ohos-sdk-full_5.0.3-Release.tar.gz
+          sudo mkdir -p /opt/ohos-sdk-5.0.3
+          sudo tar -xzf sdk.tar.gz -C /opt/ohos-sdk-5.0.3 --strip-components=1
+          rm sdk.tar.gz
+          echo "OHOS_SDK_NATIVE=/opt/ohos-sdk-5.0.3" >> $GITHUB_ENV
+          echo "OHOS_BASE_SDK_HOME=/opt/ohos-sdk-5.0.3" >> $GITHUB_ENV
+
+
+      - name: Configure SDK Path
+        run: |
+          cd ohos
+          echo "sdk.dir=${OHOS_SDK_NATIVE}" > local.properties
+          echo "OHOS_BASE_SDK_HOME=${OHOS_SDK_NATIVE}" >> local.properties
+
       - name: Get Third-Party Cache
-        id: third-party-cache
         uses: actions/cache/restore@v4
         with:
           path: third_party
@@ -383,22 +400,7 @@ jobs:
           npm install depsync -g
           depsync
 
-
-      - name: Setup OpenHarmony SDK
-        uses: openharmony-rs/setup-ohos-sdk@v0.2
-        with:
-          version: '5.0.2'
-          components: all
-          cache: true
-
-
-      - name: Configure SDK Path
-        run: |
-          cd ohos
-          echo "sdk.dir=${OHOS_SDK_NATIVE}" > local.properties
-          echo "OHOS_BASE_SDK_HOME=${OHOS_SDK_NATIVE}" >> local.properties
-
-      - name: Setup .npmrc for OpenHarmony
+      - name: Setup .npmrc
         run: |
           echo "@ohos:registry=https://repo.harmonyos.com/npm/" >> $HOME/.npmrc
           echo "registry=https://registry.npmjs.org/" >> $HOME/.npmrc
@@ -407,20 +409,16 @@ jobs:
         run: |
           mkdir -p $HOME/ohpm
           cd $HOME/ohpm
-          curl -L https://contentcenter-vali-drcn.dbankcdn.cn/pvt_2/DeveloperAlliance_package_901_9/81/v3/4ohpm1cli-darwin-x64-5.0.3.140.tgz -o ohpm.tgz || echo "Download failed, will use direct hvigorw"
-          if [ -f "ohpm.tgz" ]; then
-            tar -xzf ohpm.tgz
-            echo "$HOME/ohpm/bin" >> $GITHUB_PATH
-          fi
+          curl -L https://contentcenter-vali-drcn.dbankcdn.cn/pvt_2/DeveloperAlliance_package_901_9/81/v3/4ohpm1cli-darwin-x64-5.0.3.140.tgz -o ohpm.tgz
+          tar -xzf ohpm.tgz
+          echo "$HOME/ohpm/bin" >> $GITHUB_PATH
 
       - name: Install Dependencies & Build
         run: |
           cd ohos
-          chmod +x hvigorw
           export PATH="$HOME/ohpm/bin:$PATH"
-          if command -v ohpm &> /dev/null; then
-            ohpm install --all
-          fi
+          chmod +x hvigorw
+          ohpm install --all || true
           ./hvigorw assembleHap --mode module -p module=hello2d -p product=default --stacktrace
 
       - name: Job Failed
