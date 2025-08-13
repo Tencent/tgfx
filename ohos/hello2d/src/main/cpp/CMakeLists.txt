@@ -1,5 +1,4 @@
 # the minimum version of CMake.
-set(CMAKE_TOOLCHAIN_FILE $ENV{OHOS_SDK_NATIVE}/build/cmake/ohos.toolchain.cmake)
 set(OHOS_ARCH arm64-v8a)
 set(OHOS_NATIVE_API_LEVEL 11)
 cmake_minimum_required(VERSION 3.4.1)
