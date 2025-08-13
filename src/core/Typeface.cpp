@@ -60,7 +60,7 @@ class EmptyTypeface : public Typeface {
     return 0;
   }
 
-  std::shared_ptr<Stream> openStream() const override {
+  std::unique_ptr<Stream> openStream() const override {
     return nullptr;
   }
 

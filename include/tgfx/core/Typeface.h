@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <memory>
 #include <mutex>
 #include <unordered_map>
 #include <vector>
@@ -147,7 +148,7 @@ class Typeface {
    * Returns a Stream object containing the font data, or nullptr if unavailable.
    * For local file fonts, this will return a stream object of the file
    */
-  virtual std::shared_ptr<Stream> openStream() const = 0;
+  virtual std::unique_ptr<Stream> openStream() const = 0;
 
   /**
    * Returns an immutable copy of the requested font table, or nullptr if that table was not found.

@@ -57,7 +57,7 @@ class CGTypeface : public Typeface {
 
   GlyphID getGlyphID(Unichar unichar) const override;
 
-  std::shared_ptr<Stream> openStream() const override;
+  std::unique_ptr<Stream> openStream() const override;
 
   std::shared_ptr<Data> copyTableData(FontTableTag tag) const override;
 
