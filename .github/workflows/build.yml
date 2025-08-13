@@ -435,8 +435,8 @@ jobs:
           else
             echo "ohpm not available, hvigorw will handle dependencies"
           fi
-          
-      - name: Setup OpenHarmony SDK
+
+      - name: Install hvigorw
         uses: openharmony/setup-ohos-sdk@v1
         with:
           version: '5.0.3.140'
