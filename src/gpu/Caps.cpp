@@ -16,21 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DefaultTextureView.h"
-#include "core/utils/PixelFormatUtil.h"
+#include "tgfx/gpu/Caps.h"
+#include <algorithm>
+#include <cmath>
 
 namespace tgfx {
-DefaultTextureView::DefaultTextureView(std::unique_ptr<GPUTexture> texture, int width, int height,
-                                       ImageOrigin origin)
-    : TextureView(width, height, origin), _texture(std::move(texture)) {
-}
-
-size_t DefaultTextureView::memoryUsage() const {
-  if (auto hardwareBuffer = _texture->getHardwareBuffer()) {
-    return HardwareBufferGetInfo(hardwareBuffer).byteSize();
+int Caps::getMipLevelCount(int width, int height) const {
+  if (!mipmapSupport) {
+    return 1;
   }
-  auto colorSize = static_cast<size_t>(_width) * static_cast<size_t>(_height) *
-                   PixelFormatBytesPerPixel(_texture->format());
-  return _texture->mipLevelCount() > 1 ? colorSize * 4 / 3 : colorSize;
+  int maxDimension = std::max(width, height);
+  return static_cast<int>(std::log2(maxDimension)) + 1;
 }
 }  // namespace tgfx

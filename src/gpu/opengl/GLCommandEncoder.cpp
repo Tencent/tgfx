@@ -55,7 +55,7 @@ void GLCommandEncoder::copyFrameBufferToTexture(GPUFrameBuffer* frameBuffer, con
 
 void GLCommandEncoder::generateMipmapsForTexture(GPUTexture* texture) {
   auto glTexture = static_cast<GLTexture*>(texture);
-  if (!glTexture->hasMipmaps() || glTexture->target() != GL_TEXTURE_2D) {
+  if (glTexture->mipLevelCount() <= 1 || glTexture->target() != GL_TEXTURE_2D) {
     return;
   }
   auto gl = interface->functions();
