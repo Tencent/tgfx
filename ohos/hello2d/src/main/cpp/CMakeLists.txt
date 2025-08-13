@@ -1,13 +1,15 @@
 # the minimum version of CMake.
-set(OHOS_ARCH arm64-v8a)
-set(OHOS_NATIVE_API_LEVEL 11)
-cmake_minimum_required(VERSION 3.4.1)
-list(APPEND CMAKE_FIND_ROOT_PATH
-     /Users/runner/setup-ohos-sdk/darwin/11/native/sysroot/usr/lib
-     /Users/runner/setup-ohos-sdk/darwin/11/native/sysroot/usr/lib/arm-linux-ohos)
+if (NOT CMAKE_FIND_LIBRARY_PREFIXES)
+    set(CMAKE_FIND_LIBRARY_PREFIXES "lib")
+endif()
+if (NOT CMAKE_FIND_LIBRARY_SUFFIXES)
+    set(CMAKE_FIND_LIBRARY_SUFFIXES ".so")
+endif()
 
-find_library(IMAGE_SOURCE_LIB image_source REQUIRED)
-find_library(PIXELMAP_LIB    pixelmap    REQUIRED)
+set(OHOS_SYSROOT_DIR "/Users/runner/setup-ohos-sdk/darwin/11/native/sysroot/usr/lib")
+
+set(IMAGE_SOURCE_LIB "${OHOS_SYSROOT_DIR}/libimage_source.so")
+set(PIXELMAP_LIB "${OHOS_SYSROOT_DIR}/libpixelmap.so")
 
 project(Hello2D)
 
