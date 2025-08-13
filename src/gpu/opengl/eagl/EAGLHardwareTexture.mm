@@ -21,14 +21,13 @@
 #include "tgfx/gpu/opengl/eagl/EAGLDevice.h"
 
 namespace tgfx {
-static std::unique_ptr<GPUTexture> CreateTextureOfPlane(Context* context,
-                                                        CVPixelBufferRef pixelBuffer,
+static std::unique_ptr<GPUTexture> CreateTextureOfPlane(EAGLGPU* gpu, CVPixelBufferRef pixelBuffer,
                                                         size_t planeIndex, PixelFormat pixelFormat,
                                                         CVOpenGLESTextureCacheRef textureCache) {
   auto width = static_cast<int>(CVPixelBufferGetWidthOfPlane(pixelBuffer, planeIndex));
   auto height = static_cast<int>(CVPixelBufferGetHeightOfPlane(pixelBuffer, planeIndex));
   CVOpenGLESTextureRef texture = nil;
-  auto caps = GLCaps::Get(context);
+  auto caps = static_cast<const GLCaps*>(gpu->caps());
   const auto& format = caps->getTextureFormat(pixelFormat);
   // The returned texture object has a strong reference count of 1.
   CVReturn result = CVOpenGLESTextureCacheCreateTextureFromImage(
@@ -47,34 +46,21 @@ static std::unique_ptr<GPUTexture> CreateTextureOfPlane(Context* context,
 }
 
 std::vector<std::unique_ptr<GPUTexture>> EAGLHardwareTexture::MakeFrom(
-    Context* context, CVPixelBufferRef pixelBuffer) {
-  auto textureCache = static_cast<EAGLDevice*>(context->device())->getTextureCache();
+    EAGLGPU* gpu, CVPixelBufferRef pixelBuffer) {
+  auto textureCache = gpu->getTextureCache();
   if (textureCache == nil) {
     return {};
   }
-  auto pixelFormat = CVPixelBufferGetPixelFormatType(pixelBuffer);
-  std::vector<PixelFormat> planeFormats = {};
-  switch (pixelFormat) {
-    case kCVPixelFormatType_OneComponent8:
-      planeFormats.push_back(PixelFormat::ALPHA_8);
-      break;
-    case kCVPixelFormatType_32BGRA:
-      planeFormats.push_back(PixelFormat::BGRA_8888);
-      break;
-    case kCVPixelFormatType_420YpCbCr8BiPlanarVideoRange:
-    case kCVPixelFormatType_420YpCbCr8BiPlanarFullRange:
-      planeFormats.push_back(PixelFormat::GRAY_8);
-      planeFormats.push_back(PixelFormat::RG_88);
-      break;
-    default:
-      return {};  // Unsupported pixel format
+  auto planeFormats = gpu->getHardwareTextureFormats(pixelBuffer, nullptr);
+  if (planeFormats.empty()) {
+    return {};
   }
   std::vector<std::unique_ptr<GPUTexture>> textures = {};
   for (size_t i = 0; i < planeFormats.size(); ++i) {
-    auto texture = CreateTextureOfPlane(context, pixelBuffer, i, planeFormats[i], textureCache);
+    auto texture = CreateTextureOfPlane(gpu, pixelBuffer, i, planeFormats[i], textureCache);
     if (texture == nullptr) {
       for (auto& plane : textures) {
-        plane->releaseGPU(context);
+        plane->release(gpu);
       }
       return {};
     }
@@ -96,13 +82,13 @@ EAGLHardwareTexture::~EAGLHardwareTexture() {
   }
 }
 
-void EAGLHardwareTexture::releaseGPU(Context* context) {
+void EAGLHardwareTexture::release(GPU* gpu) {
   if (texture == nil) {
     return;
   }
   CFRelease(texture);
   texture = nil;
-  auto textureCache = static_cast<EAGLDevice*>(context->device())->getTextureCache();
+  auto textureCache = static_cast<EAGLGPU*>(gpu)->getTextureCache();
   if (textureCache != nil) {
     CVOpenGLESTextureCacheFlush(textureCache, 0);
   }

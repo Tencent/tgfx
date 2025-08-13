@@ -60,8 +60,8 @@ std::shared_ptr<Image> SubsetImage::onMakeScaled(int newWidth, int newHeight,
   if (newSource == nullptr) {
     return nullptr;
   }
-  auto newBounds = Rect::MakeXYWH(bounds.x() * scaleX, bounds.y() * scaleY, sourceScaledWidth,
-                                  sourceScaledHeight);
+  auto newBounds = Rect::MakeXYWH(bounds.x() * scaleX, bounds.y() * scaleY,
+                                  static_cast<float>(newWidth), static_cast<float>(newHeight));
   return MakeFrom(std::move(newSource), newBounds);
 }
 
@@ -75,21 +75,27 @@ PlacementPtr<FragmentProcessor> SubsetImage::asFragmentProcessor(const FPArgs& a
   }
   auto newSamplingArgs = samplingArgs;
   if (bounds.contains(drawBounds)) {
-    if (samplingArgs.constraint != SrcRectConstraint::Strict) {
+    if (samplingArgs.constraint != SrcRectConstraint::Strict && !newSamplingArgs.sampleArea) {
+      // if samplingArgs has sampleArea, means the area is already subsetted
       newSamplingArgs.sampleArea = getSubset(drawBounds);
     }
     return FragmentProcessor::Make(source, args, newSamplingArgs, AddressOf(matrix));
   }
+  if (!drawBounds.intersect(bounds)) {
+    return nullptr;
+  }
+  drawBounds.offset(-bounds.x(), -bounds.y());
+  drawBounds.roundOut();
   auto mipmapped = source->hasMipmaps() && samplingArgs.sampling.mipmapMode != MipmapMode::None;
   TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale);
-  auto textureProxy = lockTextureProxy(tpArgs);
+  auto textureProxy = lockTextureProxySubset(tpArgs, drawBounds);
   if (textureProxy == nullptr) {
     return nullptr;
   }
   newSamplingArgs.sampleArea = std::nullopt;
-  auto fpMatrix =
-      Matrix::MakeScale(static_cast<float>(textureProxy->width()) / static_cast<float>(width()),
-                        static_cast<float>(textureProxy->height()) / static_cast<float>(height()));
+  auto fpMatrix = Matrix::MakeTrans(-drawBounds.left, -drawBounds.top);
+  fpMatrix.preScale(static_cast<float>(textureProxy->width()) / drawBounds.width(),
+                    static_cast<float>(textureProxy->height()) / drawBounds.height());
   if (uvMatrix) {
     fpMatrix.preConcat(*uvMatrix);
   }

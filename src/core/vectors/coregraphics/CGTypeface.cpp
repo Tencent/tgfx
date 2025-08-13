@@ -22,6 +22,7 @@
 #include "core/AdvancedTypefaceInfo.h"
 #include "core/utils/UniqueID.h"
 #include "tgfx/core/FontStyle.h"
+#include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
 
 namespace tgfx {
@@ -281,8 +282,8 @@ GlyphID CGTypeface::getGlyphID(Unichar unichar) const {
   return macGlyphs[0];
 }
 
-std::shared_ptr<Data> CGTypeface::getBytes() const {
-  return data;
+std::shared_ptr<Stream> CGTypeface::openStream() const {
+  return Stream::MakeFromData(data);
 }
 
 std::shared_ptr<Data> CGTypeface::copyTableData(FontTableTag tag) const {
@@ -440,10 +441,6 @@ AdvancedTypefaceInfo CGTypeface::getAdvancedInfo() const {
   return advancedProperty;
 }
 #endif
-
-std::shared_ptr<Data> CGTypeface::openAndGetBytes() const {
-  return data;
-};
 
 std::shared_ptr<ScalerContext> CGTypeface::onCreateScalerContext(float size) const {
   return std::make_shared<CGScalerContext>(weakThis.lock(), size);

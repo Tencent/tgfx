@@ -50,12 +50,9 @@ class GLTexture : public GPUTexture {
 
   BackendTexture getBackendTexture(int width, int height) const override;
 
-  void writePixels(Context* context, const Rect& rect, const void* pixels,
-                   size_t rowBytes) override;
-
   void computeTextureKey(Context* context, BytesKey* bytesKey) const override;
 
-  void releaseGPU(Context* context) override;
+  void release(GPU* gpu) override;
 
  protected:
   unsigned _id = 0;

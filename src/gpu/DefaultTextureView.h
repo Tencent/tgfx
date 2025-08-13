@@ -37,10 +37,10 @@ class DefaultTextureView : public TextureView {
   }
 
  protected:
-  std::unique_ptr<GPUTexture> _texture = {};
+  std::unique_ptr<GPUTexture> _texture = nullptr;
 
   void onReleaseGPU() override {
-    _texture->releaseGPU(context);
+    _texture->release(context->gpu());
   }
 };
 }  // namespace tgfx

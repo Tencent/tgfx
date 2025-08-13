@@ -41,6 +41,10 @@ std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrine
   }
   return std::make_shared<GaussianBlurImageFilter>(blurrinessX, blurrinessY, tileMode);
 }
+
+float BlurImageFilter::MaxSigma() {
+  return MAX_BLUR_SIGMA;
+}
 #endif
 
 GaussianBlurImageFilter::GaussianBlurImageFilter(float blurrinessX, float blurrinessY,
@@ -58,7 +62,7 @@ static void Blur1D(PlacementPtr<FragmentProcessor> source,
   auto drawingManager = context->drawingManager();
   auto processor = GaussianBlur1DFragmentProcessor::Make(
       context->drawingBuffer(), std::move(source), sigma, direction, stepLength, MAX_BLUR_SIGMA);
-  drawingManager->fillRTWithFP(renderTarget, std::move(processor), renderFlags);
+  drawingManager->fillRTWithFP(std::move(renderTarget), std::move(processor), renderFlags);
 }
 
 static std::shared_ptr<TextureProxy> ScaleTexture(const TPArgs& args,

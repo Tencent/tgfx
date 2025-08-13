@@ -255,8 +255,8 @@ void PDFFont::emitSubsetType0(PDFDocumentImpl* document) const {
   auto emSize = static_cast<uint16_t>(std::round(strike().strikeSpec.unitsPerEM));
   PDFFont::PopulateCommonFontDescriptor(descriptor.get(), metrics, emSize, 0);
 
-  auto fontData = typeface->openAndGetBytes();
-  size_t fontSize = fontData ? fontData->size() : 0;
+  auto fontStream = typeface->openStream();
+  size_t fontSize = fontStream ? fontStream->size() : 0;
   if (0 == fontSize) {
     return;
   }
@@ -282,7 +282,7 @@ void PDFFont::emitSubsetType0(PDFDocumentImpl* document) const {
       subsetFontStream = Stream::MakeFromData(subsetFontData);
     } else {
       // If subsetting fails, fall back to original font data.
-      subsetFontStream = Stream::MakeFromData(fontData);
+      subsetFontStream = fontStream;
     }
     auto streamDictionary = PDFDictionary::Make();
     streamDictionary->insertInt("Length1", subsetFontStream->size());

@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/YUVFormat.h"
+#include "gpu/GPUResource.h"
 #include "tgfx/core/BytesKey.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/PixelFormat.h"
@@ -35,52 +35,8 @@ enum class TextureType { None, TwoD, Rectangle, External };
 /**
  * GPUTexture represents a texture in the GPU backend for rendering operations.
  */
-class GPUTexture {
+class GPUTexture : public GPUResource {
  public:
-  /**
-   * Returns the PixelFormat of the texture created from the given hardware buffer. If the
-   * hardwareBuffer is invalid or contains multiple planes (such as YUV formats), returns
-   * PixelFormat::Unknown.
-   */
-  static PixelFormat GetPixelFormat(HardwareBufferRef hardwareBuffer);
-
-  /**
-   * Returns the PixelFormat of the backend texture. If the backendTexture is invalid, returns
-   * PixelFormat::Unknown.
-   */
-  static PixelFormat GetPixelFormat(const BackendTexture& backendTexture);
-
-  /**
-   * Creates textures from a platform-specific hardware buffer, such as AHardwareBuffer on Android
-   * or CVPixelBufferRef on Apple platforms. The caller must ensure the hardwareBuffer stays valid
-   * for the texture's lifetime. Multiple textures can be created from the same hardwareBuffer
-   * (typically for YUV formats). If yuvFormat is not nullptr, it will be set to the
-   * hardwareBuffer's YUVFormat. Returns nullptr if any parameter is invalid or the GPU backend does
-   * not support the hardwareBuffer, leaving yuvFormat unchanged.
-   */
-  static std::vector<std::unique_ptr<GPUTexture>> MakeFrom(Context* context,
-                                                           HardwareBufferRef hardwareBuffer,
-                                                           YUVFormat* yuvFormat = nullptr);
-
-  /**
-   * Creates a new GPUTexture that wraps the given backend texture. If adopted is true, the
-   * GPUTexture will take ownership of the backend texture and destroy it when no longer needed.
-   * Otherwise, the backend texture must remain valid for as long as the GPUTexture exists.
-   */
-  static std::unique_ptr<GPUTexture> MakeFrom(Context* context,
-                                              const BackendTexture& backendTexture,
-                                              bool adopted = false);
-
-  /**
-   * Creates a new GPUTexture with the given width, height, and pixel format. If mipmapped is
-   * true, mipmap levels will be generated. Returns nullptr if the texture cannot be created.
-   */
-  static std::unique_ptr<GPUTexture> Make(Context* context, int width, int height,
-                                          PixelFormat format = PixelFormat::RGBA_8888,
-                                          bool mipmapped = false);
-
-  virtual ~GPUTexture() = default;
-
   /**
    * Returns the pixel format of the texture.
    */
@@ -124,25 +80,10 @@ class GPUTexture {
   }
 
   /**
-   * Writes pixel data to the texture within the specified rectangle. The pixel data must match the
-   * texture's pixel format, and the rectangle must be fully contained within the texture's
-   * dimensions. If the texture has mipmaps, you must call regenerateMipmapLevels() after writing
-   * pixels; this will not happen automatically.
-   */
-  virtual void writePixels(Context* context, const Rect& rect, const void* pixels,
-                           size_t rowBytes) = 0;
-  /**
    * Computes a key for the texture that can be used to identify it in a cache. The key is written
    * to the provided BytesKey object.
    */
   virtual void computeTextureKey(Context* context, BytesKey* bytesKey) const = 0;
-
-  /**
-   * Releases the texture and its GPU resources. Do not use the texture after calling this method.
-   * You must call this method explicitly, as GPU resources are not released automatically upon
-   * destruction because a valid context may not be available at that time.
-   */
-  virtual void releaseGPU(Context* context) = 0;
 
  protected:
   PixelFormat _format = PixelFormat::RGBA_8888;

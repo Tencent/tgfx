@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,20 +16,20 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/TextureView.h"
-#include "tgfx/platform/HardwareBuffer.h"
+#pragma once
+
+#include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
-bool HardwareBufferAvailable() {
-  return false;
-}
+class WGLGPU : public GLGPU {
+ public:
+  explicit WGLGPU(std::shared_ptr<GLInterface> glInterface) : GLGPU(std::move(glInterface)) {
+  }
 
-PixelFormat GPUTexture::GetPixelFormat(HardwareBufferRef) {
-  return PixelFormat::Unknown;
-}
+  std::vector<PixelFormat> getHardwareTextureFormats(HardwareBufferRef hardwareBuffer,
+                                                     YUVFormat* yuvFormat) const override;
 
-std::vector<std::unique_ptr<GPUTexture>> GPUTexture::MakeFrom(Context*, HardwareBufferRef,
-                                                              YUVFormat*) {
-  return {};
-}
+  std::vector<std::unique_ptr<GPUTexture>> importHardwareTextures(
+      HardwareBufferRef hardwareBuffer) override;
+};
 }  // namespace tgfx

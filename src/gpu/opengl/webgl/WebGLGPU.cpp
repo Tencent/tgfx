@@ -16,25 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "BackendTextureRenderTargetProxy.h"
+#include "WebGLGPU.h"
 
 namespace tgfx {
-BackendTextureRenderTargetProxy::BackendTextureRenderTargetProxy(
-    const BackendTexture& backendTexture, PixelFormat format, int sampleCount, ImageOrigin origin,
-    bool adopted)
-    : TextureRenderTargetProxy(backendTexture.width(), backendTexture.height(), format, sampleCount,
-                               false, origin, !adopted),
-      backendTexture(backendTexture) {
+bool HardwareBufferAvailable() {
+  return false;
 }
 
-std::shared_ptr<TextureView> BackendTextureRenderTargetProxy::onMakeTexture(
-    Context* context) const {
-  auto renderTarget =
-      RenderTarget::MakeFrom(context, backendTexture, _sampleCount, _origin, !externallyOwned());
-  if (renderTarget == nullptr) {
-    LOGE("BackendTextureRenderTargetProxy::onMakeTexture() Failed to create the render target!");
-    return nullptr;
-  }
-  return renderTarget->asTextureView();
+std::vector<PixelFormat> WebGLGPU::getHardwareTextureFormats(HardwareBufferRef, YUVFormat*) const {
+  return {};
+}
+
+std::vector<std::unique_ptr<GPUTexture>> WebGLGPU::importHardwareTextures(HardwareBufferRef) {
+  return {};
 }
 }  // namespace tgfx

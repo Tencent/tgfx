@@ -20,6 +20,7 @@
 #include "core/Records.h"
 #include "core/images/CodecImage.h"
 #include "core/images/RasterizedImage.h"
+#include "core/images/ScaledImage.h"
 #include "core/images/SubsetImage.h"
 #include "core/images/TransformImage.h"
 #include "core/shapes/AppendShape.h"
@@ -2850,4 +2851,70 @@ TGFX_TEST(CanvasTest, RasterizedMipmapImage) {
   mipmapTexture = context->proxyProvider()->findOrWrapTextureProxy(mipmapKey);
   EXPECT_TRUE(mipmapTexture != nullptr);
 }
+
+TGFX_TEST(CanvasTest, RoundRectRadii) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+
+  auto rect = Rect::MakeWH(250, 150);
+  std::array<Point, 4> radii = {Point{20, 20}, Point{60, 60}, Point{10, 10}, Point{0, 0}};
+  Path path = {};
+  path.addRoundRect(rect, radii);
+  auto surface = Surface::Make(context, 400, 200);
+  auto canvas = surface->getCanvas();
+  canvas->setMatrix(Matrix::MakeTrans(75, 25));
+  Paint paint;
+  paint.setColor(Color::Blue());
+  paint.setStrokeWidth(10.f);
+  canvas->drawPath(path, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/roundRectRadii"));
+
+  radii[1] = {60, 20};
+  Path path2 = {};
+  path2.addRoundRect(rect, radii);
+  paint.setColor(Color::Red());
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(10.f);
+  canvas->clear();
+  canvas->drawPath(path2, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/roundRectRadiiStroke"));
+}
+
+TGFX_TEST(CanvasTest, ScaleTest) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 250, 250);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  EXPECT_TRUE(image != nullptr);
+  auto subsetImage = image->makeSubset(Rect::MakeXYWH(20, 20, 50, 50));
+  EXPECT_TRUE(subsetImage != nullptr);
+  auto scaledImage = ScaleImage(subsetImage, 0.9f);
+  EXPECT_TRUE(scaledImage != nullptr);
+  EXPECT_TRUE(scaledImage->type() == Image::Type::Subset);
+  canvas->drawImage(scaledImage, 10, 10);
+  scaledImage = ScaleImage(subsetImage, 0.51f);
+  EXPECT_TRUE(scaledImage != nullptr);
+  EXPECT_TRUE(scaledImage->type() == Image::Type::Scaled);
+  canvas->drawImage(scaledImage, 70, 10);
+  image = MakeImage("resources/apitest/rgbaaa.png");
+  EXPECT_TRUE(image != nullptr);
+  image = image->makeRGBAAA(512, 512, 512, 0);
+  image = image->makeSubset(Rect::MakeXYWH(20, 20, 300, 300));
+  EXPECT_TRUE(image != nullptr);
+  auto scaledImage2 = ScaleImage(image, 0.25f);
+  EXPECT_TRUE(scaledImage2 != nullptr);
+  EXPECT_TRUE(scaledImage2->type() == Image::Type::RGBAAA);
+  canvas->drawImage(scaledImage2, 10, 100);
+  scaledImage2 = ScaleImage(image, 0.3f);
+  EXPECT_TRUE(scaledImage2 != nullptr);
+  EXPECT_TRUE(scaledImage2->type() == Image::Type::Scaled);
+  canvas->drawImage(scaledImage2, 150, 100);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ScaleTest"));
+}
+
 }  // namespace tgfx

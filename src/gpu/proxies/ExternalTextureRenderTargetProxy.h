@@ -18,18 +18,19 @@
 
 #pragma once
 
-#include "tgfx/gpu/opengl/wgl/WGLDevice.h"
+#include "gpu/proxies/TextureRenderTargetProxy.h"
 
 namespace tgfx {
-class WGLWindowDevice final : public WGLDevice {
- public:
-  ~WGLWindowDevice() override;
+class ExternalTextureRenderTargetProxy : public TextureRenderTargetProxy {
+ protected:
+  std::shared_ptr<TextureView> onMakeTexture(Context* context) const override;
 
  private:
-  HWND nativeWindow = nullptr;
+  BackendTexture backendTexture = {};
 
-  explicit WGLWindowDevice(HGLRC nativeHandle);
-
-  friend class WGLDevice;
+  ExternalTextureRenderTargetProxy(const BackendTexture& backendTexture, PixelFormat format,
+                                   int sampleCount, ImageOrigin origin = ImageOrigin::TopLeft,
+                                   bool adopted = false);
+  friend class ProxyProvider;
 };
 }  // namespace tgfx

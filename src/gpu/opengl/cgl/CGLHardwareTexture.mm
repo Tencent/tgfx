@@ -58,7 +58,7 @@ CGLHardwareTexture::~CGLHardwareTexture() {
   }
 }
 
-void CGLHardwareTexture::releaseGPU(Context*) {
+void CGLHardwareTexture::release(GPU*) {
   if (texture == nil) {
     return;
   }

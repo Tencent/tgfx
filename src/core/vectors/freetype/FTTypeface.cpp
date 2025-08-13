@@ -19,7 +19,7 @@
 #include "FTTypeface.h"
 #include "FTLibrary.h"
 #include "core/AdvancedTypefaceInfo.h"
-#include "tgfx/core/Data.h"
+#include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
 #include FT_TRUETYPE_TABLES_H
 #include FT_FONT_FORMATS_H
@@ -28,7 +28,6 @@
 #include "FTScalerContext.h"
 #include "SystemFont.h"
 #include "core/utils/UniqueID.h"
-#include "tgfx/core/Stream.h"
 
 namespace tgfx {
 std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
@@ -154,8 +153,11 @@ GlyphID FTTypeface::getGlyphID(Unichar unichar) const {
   return static_cast<GlyphID>(FT_Get_Char_Index(face, static_cast<FT_ULong>(unichar)));
 }
 
-std::shared_ptr<Data> FTTypeface::getBytes() const {
-  return data.data;
+std::shared_ptr<Stream> FTTypeface::openStream() const {
+  if (data.data) {
+    return Stream::MakeFromData(data.data);
+  }
+  return Stream::MakeFromFile(data.path);
 }
 
 std::shared_ptr<Data> FTTypeface::copyTableData(FontTableTag tag) const {
@@ -231,11 +233,7 @@ AdvancedTypefaceInfo::FontType GetFontType(FT_Face face) {
 bool FTTypeface::isOpentypeFontDataStandardFormat() const {
   // FreeType reports TrueType for any data that can be decoded to TrueType or OpenType.
   // However, there are alternate data formats for OpenType, like wOFF and wOF2.
-  auto data = openAndGetBytes();
-  if (!data) {
-    return false;
-  }
-  auto stream = Stream::MakeFromData(data);
+  auto stream = openStream();
   std::array<char, 4> buffer;
   if (stream->read(buffer.data(), 4) < 4) {
     return false;
@@ -289,15 +287,6 @@ AdvancedTypefaceInfo FTTypeface::getAdvancedInfo() const {
   return advancedProperty;
 }
 #endif
-
-std::shared_ptr<Data> FTTypeface::openAndGetBytes() const {
-  if (data.data) {
-    return data.data;
-  } else if (!data.path.empty()) {
-    return Data::MakeFromFile(data.path);
-  }
-  return nullptr;
-}
 
 std::shared_ptr<ScalerContext> FTTypeface::onCreateScalerContext(float size) const {
   return std::make_shared<FTScalerContext>(weakThis.lock(), size);

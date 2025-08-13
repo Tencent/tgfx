@@ -16,20 +16,23 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-#include <tgfx/gpu/opengl/wgl/WGLDevice.h>
-#include "WGLInterface.h"
+#include "ExternalRenderTarget.h"
+#include "gpu/GPU.h"
 
 namespace tgfx {
-class WGLPbufferDevice final : public WGLDevice {
- public:
-  ~WGLPbufferDevice() override;
+std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
+                                                     const BackendRenderTarget& backendRenderTarget,
+                                                     ImageOrigin origin) {
+  if (context == nullptr) {
+    return nullptr;
+  }
+  auto frameBuffer = context->gpu()->importExternalFrameBuffer(backendRenderTarget);
+  if (!frameBuffer) {
+    return nullptr;
+  }
+  auto renderTarget = new ExternalRenderTarget(std::move(frameBuffer), backendRenderTarget.width(),
+                                               backendRenderTarget.height(), origin);
+  return Resource::AddToCache(context, renderTarget);
+}
 
- private:
-  HPBUFFER pBuffer = nullptr;
-
-  explicit WGLPbufferDevice(HGLRC nativeHandle);
-
-  friend class GLDevice;
-};
 }  // namespace tgfx

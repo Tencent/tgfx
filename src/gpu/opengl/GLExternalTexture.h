@@ -16,25 +16,19 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLBackendRenderTarget.h"
-#include "gpu/opengl/GLUtil.h"
+#pragma once
+
+#include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
-std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
-                                                     const BackendRenderTarget& renderTarget,
-                                                     ImageOrigin origin) {
-  if (context == nullptr || !renderTarget.isValid()) {
-    return nullptr;
+class GLExternalTexture : public GLTexture {
+ public:
+  GLExternalTexture(unsigned id, unsigned target, PixelFormat format)
+      : GLTexture(id, target, format) {
   }
-  GLFrameBufferInfo frameBufferInfo = {};
-  if (!renderTarget.getGLFramebufferInfo(&frameBufferInfo)) {
-    return nullptr;
+
+  void release(GPU*) override {
+    // External textures are not owned by TGFX, so we do not release them.
   }
-  auto format = GLSizeFormatToPixelFormat(frameBufferInfo.format);
-  if (!context->caps()->isFormatRenderable(format)) {
-    return nullptr;
-  }
-  return std::make_shared<GLBackendRenderTarget>(
-      context, renderTarget.width(), renderTarget.height(), origin, format, frameBufferInfo.id);
-}
+};
 }  // namespace tgfx

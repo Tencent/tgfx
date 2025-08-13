@@ -27,6 +27,12 @@ class BlurImageFilter : public ImageFilter {
       : ImageFilter(), blurrinessX(blurrinessX), blurrinessY(blurrinessY), tileMode(tileMode) {
   }
 
+  /**
+   * The maximum sigma that can be passed to blur() in the X and/or Y sigma values. Larger requested
+   * sigmas must manually downscale the input image and upscale the output image.
+   */
+  static float MaxSigma();
+
   float blurrinessX = 0.0f;
   float blurrinessY = 0.0f;
   TileMode tileMode = TileMode::Decal;

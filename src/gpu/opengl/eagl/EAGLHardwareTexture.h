@@ -20,11 +20,12 @@
 
 #include <CoreVideo/CoreVideo.h>
 #include "gpu/opengl/GLTexture.h"
+#include "gpu/opengl/eagl/EAGLGPU.h"
 
 namespace tgfx {
 class EAGLHardwareTexture : public GLTexture {
  public:
-  static std::vector<std::unique_ptr<GPUTexture>> MakeFrom(Context* context,
+  static std::vector<std::unique_ptr<GPUTexture>> MakeFrom(EAGLGPU* gpu,
                                                            CVPixelBufferRef pixelBuffer);
 
   explicit EAGLHardwareTexture(CVPixelBufferRef pixelBuffer, CVOpenGLESTextureRef texture,
@@ -36,7 +37,7 @@ class EAGLHardwareTexture : public GLTexture {
     return pixelBuffer;
   }
 
-  void releaseGPU(Context* context) override;
+  void release(GPU* gpu) override;
 
  private:
   CVPixelBufferRef pixelBuffer = nullptr;

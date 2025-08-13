@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,29 +18,31 @@
 
 #pragma once
 
-#include "gpu/RenderTarget.h"
+#ifdef __APPLE__
+#include <CoreVideo/CoreVideo.h>
+#endif
+#include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
-class GLInterface;
-
-/**
- * Represents an OpenGL 2D buffer of pixels that can be rendered to.
- */
-class GLRenderTarget : public RenderTarget {
+class QGLGPU : public GLGPU {
  public:
-  /**
-   * Returns the frame buffer ID used for reading pixels.
-   */
-  virtual unsigned readFrameBufferID() const = 0;
+  explicit QGLGPU(std::shared_ptr<GLInterface> glInterface) : GLGPU(std::move(glInterface)) {
+  }
 
-  /**
-   * Returns the frame buffer ID used for drawing pixels.
-   */
-  virtual unsigned drawFrameBufferID() const = 0;
+#ifdef __APPLE__
+  ~QGLGPU() override;
+#endif
 
-  BackendRenderTarget getBackendRenderTarget() const override;
+  std::vector<PixelFormat> getHardwareTextureFormats(HardwareBufferRef hardwareBuffer,
+                                                     YUVFormat* yuvFormat) const override;
 
-  bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0,
-                  int srcY = 0) const override;
+  std::vector<std::unique_ptr<GPUTexture>> importHardwareTextures(
+      HardwareBufferRef hardwareBuffer) override;
+
+ private:
+#ifdef __APPLE__
+  CVOpenGLTextureCacheRef textureCache = nil;
+  CVOpenGLTextureCacheRef getTextureCache();
+#endif
 };
 }  // namespace tgfx

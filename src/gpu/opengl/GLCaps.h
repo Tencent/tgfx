@@ -34,7 +34,7 @@
 namespace tgfx {
 enum class GLStandard { None, GL, GLES, WebGL };
 
-struct TextureFormat {
+struct GLTextureFormat {
   unsigned sizedFormat = 0;
   unsigned internalFormatTexImage = 0;
   unsigned internalFormatRenderBuffer = 0;
@@ -42,7 +42,7 @@ struct TextureFormat {
 };
 
 struct ConfigInfo {
-  TextureFormat format;
+  GLTextureFormat format;
   std::vector<int> colorSampleCounts;
   Swizzle readSwizzle = Swizzle::RGBA();
   Swizzle writeSwizzle = Swizzle::RGBA();
@@ -105,8 +105,6 @@ class GLInfo {
   std::vector<std::string> extensions = {};
 };
 
-static const int MaxSaneSamplers = 32;
-
 class GLCaps : public Caps {
  public:
   GLStandard standard = GLStandard::None;
@@ -120,13 +118,14 @@ class GLCaps : public Caps {
   bool frameBufferFetchRequiresEnablePerSample = false;
   std::string frameBufferFetchColorName;
   std::string frameBufferFetchExtensionString;
-  int maxFragmentSamplers = MaxSaneSamplers;
+  int maxFragmentSamplers = 0;
+  bool flushBeforeWritePixels = false;
 
   static const GLCaps* Get(Context* context);
 
   explicit GLCaps(const GLInfo& info);
 
-  const TextureFormat& getTextureFormat(PixelFormat pixelFormat) const;
+  const GLTextureFormat& getTextureFormat(PixelFormat pixelFormat) const;
 
   const Swizzle& getReadSwizzle(PixelFormat pixelFormat) const;
 

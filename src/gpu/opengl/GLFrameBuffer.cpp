@@ -16,21 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/TextureView.h"
-#include "tgfx/platform/HardwareBuffer.h"
+#include "GLFrameBuffer.h"
+#include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
-bool HardwareBufferAvailable() {
-  return false;
+BackendRenderTarget GLFrameBuffer::getBackendRenderTarget(int width, int height) const {
+  GLFrameBufferInfo glInfo = {};
+  glInfo.id = drawFrameBufferID();
+  glInfo.format = PixelFormatToGLSizeFormat(format());
+  return {glInfo, width, height};
 }
-
-PixelFormat GPUTexture::GetPixelFormat(HardwareBufferRef) {
-  return PixelFormat::Unknown;
-}
-
-std::vector<std::unique_ptr<GPUTexture>> GPUTexture::MakeFrom(Context*, HardwareBufferRef,
-                                                              YUVFormat*) {
-  return {};
-}
-
 }  // namespace tgfx

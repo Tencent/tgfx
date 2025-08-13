@@ -33,7 +33,7 @@ class CGLHardwareTexture : public GLTexture {
     return pixelBuffer;
   }
 
-  void releaseGPU(Context*) override;
+  void release(GPU* gpu) override;
 
  private:
   CVPixelBufferRef pixelBuffer = nullptr;

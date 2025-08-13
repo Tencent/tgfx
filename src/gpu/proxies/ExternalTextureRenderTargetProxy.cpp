@@ -16,21 +16,25 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/proxies/TextureRenderTargetProxy.h"
+#include "ExternalTextureRenderTargetProxy.h"
 
 namespace tgfx {
-class BackendTextureRenderTargetProxy : public TextureRenderTargetProxy {
- protected:
-  std::shared_ptr<TextureView> onMakeTexture(Context* context) const override;
+ExternalTextureRenderTargetProxy::ExternalTextureRenderTargetProxy(
+    const BackendTexture& backendTexture, PixelFormat format, int sampleCount, ImageOrigin origin,
+    bool adopted)
+    : TextureRenderTargetProxy(backendTexture.width(), backendTexture.height(), format, sampleCount,
+                               false, origin, !adopted),
+      backendTexture(backendTexture) {
+}
 
- private:
-  BackendTexture backendTexture = {};
-
-  BackendTextureRenderTargetProxy(const BackendTexture& backendTexture, PixelFormat format,
-                                  int sampleCount, ImageOrigin origin = ImageOrigin::TopLeft,
-                                  bool adopted = false);
-  friend class ProxyProvider;
-};
+std::shared_ptr<TextureView> ExternalTextureRenderTargetProxy::onMakeTexture(
+    Context* context) const {
+  auto renderTarget =
+      RenderTarget::MakeFrom(context, backendTexture, _sampleCount, _origin, !externallyOwned());
+  if (renderTarget == nullptr) {
+    LOGE("BackendTextureRenderTargetProxy::onMakeTexture() Failed to create the render target!");
+    return nullptr;
+  }
+  return renderTarget->asTextureView();
+}
 }  // namespace tgfx

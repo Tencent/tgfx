@@ -61,7 +61,7 @@ void Window::present(Context* context, int64_t presentationTime) {
   if (!checkContext(context)) {
     return;
   }
-  context->flush();
+  context->flushAndSubmit();
   onPresent(context, presentationTime);
 }
 

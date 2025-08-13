@@ -19,10 +19,11 @@
 #pragma once
 
 #include "gpu/DefaultTextureView.h"
-#include "gpu/opengl/GLRenderTarget.h"
+#include "gpu/GPUFrameBuffer.h"
+#include "gpu/RenderTarget.h"
 
 namespace tgfx {
-class GLTextureRenderTarget : public DefaultTextureView, public GLRenderTarget {
+class TextureRenderTarget : public DefaultTextureView, public RenderTarget {
  public:
   Context* getContext() const override {
     return context;
@@ -40,16 +41,12 @@ class GLTextureRenderTarget : public DefaultTextureView, public GLRenderTarget {
     return _origin;
   }
 
-  int sampleCount() const override {
-    return _sampleCount;
-  }
-
-  PixelFormat format() const override {
-    return _texture->format();
-  }
-
   bool externallyOwned() const override {
     return _externallyOwned;
+  }
+
+  GPUFrameBuffer* getFrameBuffer() const override {
+    return frameBuffer.get();
   }
 
   std::shared_ptr<TextureView> asTextureView() const override {
@@ -57,26 +54,15 @@ class GLTextureRenderTarget : public DefaultTextureView, public GLRenderTarget {
   }
 
   std::shared_ptr<RenderTarget> asRenderTarget() const override {
-    return std::static_pointer_cast<GLTextureRenderTarget>(reference);
-  }
-
-  unsigned readFrameBufferID() const override {
-    return _readFrameBufferID;
-  }
-
-  unsigned drawFrameBufferID() const override {
-    return _drawFrameBufferID;
+    return std::static_pointer_cast<TextureRenderTarget>(reference);
   }
 
  protected:
   void onReleaseGPU() override;
 
  private:
-  int _sampleCount = 1;
+  std::unique_ptr<GPUFrameBuffer> frameBuffer = nullptr;
   bool _externallyOwned = false;
-  unsigned _readFrameBufferID = 0;
-  unsigned _drawFrameBufferID = 0;
-  unsigned renderBufferID = 0;
 
   static std::shared_ptr<RenderTarget> MakeFrom(Context* context,
                                                 std::unique_ptr<GPUTexture> texture, int width,
@@ -85,10 +71,11 @@ class GLTextureRenderTarget : public DefaultTextureView, public GLRenderTarget {
                                                 bool externallyOwned = false,
                                                 const ScratchKey& scratchKey = {});
 
-  GLTextureRenderTarget(std::unique_ptr<GPUTexture> texture, int width, int height,
-                        ImageOrigin origin, int sampleCount, bool externallyOwned)
-      : DefaultTextureView(std::move(texture), width, height, origin), _sampleCount(sampleCount),
-        _externallyOwned(externallyOwned) {
+  TextureRenderTarget(std::unique_ptr<GPUTexture> texture,
+                      std::unique_ptr<GPUFrameBuffer> frameBuffer, int width, int height,
+                      ImageOrigin origin, bool externallyOwned)
+      : DefaultTextureView(std::move(texture), width, height, origin),
+        frameBuffer(std::move(frameBuffer)), _externallyOwned(externallyOwned) {
   }
 
   friend class RenderTarget;
