@@ -1,12 +1,12 @@
 {
   "app": {
     "signingConfigs": [],
+    "compileSdkVersion": 14,
+    "compatibleSdkVersion": 14,
     "products": [
       {
         "name": "default",
         "signingConfig": "default",
-        "compileSdkVersion": 10,
-        "compatibleSdkVersion": 10,
         "runtimeOS": "OpenHarmony"
       }
     ],
