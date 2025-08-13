@@ -49,7 +49,8 @@ std::shared_ptr<TextureProxy> RasterizedImage::lockTextureProxy(const TPArgs& ar
   auto currentWidth = static_cast<float>(width());
   auto currentHeight = static_cast<float>(height());
   if (source->canDirectDownscale()) {
-    auto drawScale = std::max(static_cast<float>(args.width) / currentWidth, static_cast<float>(args.height) / currentHeight);
+    auto drawScale = std::max(static_cast<float>(args.width) / currentWidth,
+                              static_cast<float>(args.height) / currentHeight);
     auto mipmapLevel = GetPowerOfTwoScaleLevel(drawScale);
     UniqueKey::Append(textureKey, &mipmapLevel, 1);
     newScale = 1.f / static_cast<float>(1 << mipmapLevel);
@@ -77,8 +78,8 @@ PlacementPtr<FragmentProcessor> RasterizedImage::asFragmentProcessor(
     const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const {
   auto textureWidth = static_cast<int>(static_cast<float>(width()) * args.drawScale);
   auto textureHeight = static_cast<int>(static_cast<float>(height()) * args.drawScale);
-  auto textureProxy = lockTextureProxy(
-      TPArgs(args.context, args.renderFlags, hasMipmaps(), textureWidth, textureHeight, BackingFit::Exact));
+  auto textureProxy = lockTextureProxy(TPArgs(args.context, args.renderFlags, hasMipmaps(),
+                                              textureWidth, textureHeight, BackingFit::Exact));
   if (textureProxy == nullptr) {
     return nullptr;
   }

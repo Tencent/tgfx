@@ -28,7 +28,8 @@ PlacementPtr<FragmentProcessor> PixelImage::asFragmentProcessor(const FPArgs& ar
   auto mipmapped = hasMipmaps() && samplingArgs.sampling.mipmapMode != MipmapMode::None;
   auto scaleWidth = static_cast<int>(args.drawScale * static_cast<float>(width()));
   auto scaleHeight = static_cast<int>(args.drawScale * static_cast<float>(height()));
-  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, scaleWidth, scaleHeight, BackingFit::Approx);
+  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, scaleWidth, scaleHeight,
+                BackingFit::Approx);
   auto textureProxy = lockTextureProxy(tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;
