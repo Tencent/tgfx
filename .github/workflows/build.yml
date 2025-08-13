@@ -366,7 +366,9 @@ jobs:
         lfs: true
 
     - name: Show OHOS SDK path
-      run: echo "$OHOS_SDK_NATIVE"   
+      run: |
+        echo "OHOS_SDK_NATIVE=$OHOS_SDK_NATIVE"
+        ls -l "$OHOS_SDK_NATIVE"/build/cmake/ohos.toolchain.cmake  
           
 
     - name: Get Third-Party Cache

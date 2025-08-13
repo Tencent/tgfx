@@ -4,7 +4,7 @@
     "externalNativeOptions": {
       "path": "./src/main/cpp/CMakeLists.txt",
       "abiFilters": ["arm64-v8a", "x86_64"],
-      "arguments": "-DOHOS_STL=c++_static -DOHOS=1 -DUSE_NATIVE_PLATFORM=ON -DCMAKE_TOOLCHAIN_FILE=/Users/runner/openharmony/sdk/4.1.0/native/build/cmake/ohos.toolchain.cmake -DOHOS_ARCH=arm64-v8a -DOHOS_NATIVE_API_LEVEL=11",
+      "arguments": "-DOHOS_STL=c++_static -DOHOS=1 -DUSE_NATIVE_PLATFORM=ON -DCMAKE_TOOLCHAIN_FILE=/Users/runner/setup-ohos-sdk/darwin/11/native/build/cmake/ohos.toolchain.cmake -DOHOS_ARCH=arm64-v8a -DOHOS_NATIVE_API_LEVEL=11",
       "cppFlags": ""
     }
   },
