@@ -410,7 +410,13 @@ jobs:
             https://contentcenter-vali-drcn.dbankcdn.cn/pvt_2/DeveloperAlliance_package_901_9/81/v3/4ohpm1cli-darwin-x64-5.0.3.140.tgz \
             -o "$HOME/ohpm/ohpm.tgz"
           tar -xzf "$HOME/ohpm/ohpm.tgz" -C "$HOME/ohpm"
-          echo "$HOME/ohpm/bin" >> "$GITHUB_PATH"
+          # 把真正的 bin 目录加到 PATH
+          echo "$HOME/ohpm/ohpm/bin" >> "$GITHUB_PATH"
+          # 立即生效（当前 step）
+          export PATH="$HOME/ohpm/ohpm/bin:$PATH"
+          # 验证
+          which ohpm || echo "ohpm still not found"
+
 
       - name: Install Dependencies & Build
         run: |
