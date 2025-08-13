@@ -389,89 +389,18 @@ jobs:
       - name: Setup OpenHarmony Build Environment
         uses: eclipse-oniro4openharmony/oh-app-action@main
         with:
-          working-directory: './ohos'
-
+            working-directory: './ohos'
+  
       - name: Configure SDK Path
         run: |
             cd ohos
-            # 设置SDK路径从环境变量 - 支持多种变量名
-            if [ -n "${OHOS_SDK_NATIVE:-}" ]; then
-              SDK_PATH="${OHOS_SDK_NATIVE}"
-              echo "Using OHOS_SDK_NATIVE: ${SDK_PATH}"
-            elif [ -n "${OHOS_NDK_HOME:-}" ]; then
-              SDK_PATH="${OHOS_NDK_HOME}"
-              echo "Using OHOS_NDK_HOME: ${SDK_PATH}"
-            elif [ -n "${OHOS_BASE_SDK_HOME:-}" ]; then
-              SDK_PATH="${OHOS_BASE_SDK_HOME}"
-              echo "Using OHOS_BASE_SDK_HOME: ${SDK_PATH}"
-            elif [ -n "${HOS_SDK_HOME:-}" ]; then
-              SDK_PATH="${HOS_SDK_HOME}"
-              echo "Using HOS_SDK_HOME: ${SDK_PATH}"
-            elif [ -n "${OHOS_SDK_HOME:-}" ]; then
-              SDK_PATH="${OHOS_SDK_HOME}"
-              echo "Using OHOS_SDK_HOME: ${SDK_PATH}"
-            else
-              echo "Error: No OpenHarmony SDK environment variable found"
-              echo "Available environment variables:"
-              env | grep -i ohos || true
-              env | grep -i hos || true
+            if [ -z "${OHOS_SDK_NATIVE}" ]; then
+              echo "Error: OHOS_SDK_NATIVE environment variable not set."
               exit 1
             fi
-            
-            echo "hwsdk.dir=${SDK_PATH}" > local.properties
-            echo "Configured SDK path: ${SDK_PATH}"
-            
-            # 验证SDK目录结构
-            if [ ! -d "${SDK_PATH}" ]; then
-              echo "Error: SDK path does not exist: ${SDK_PATH}"
-              exit 1
-            fi
-            
-            # 定义可能的库路径
-            LIB_PATHS=(
-              "${SDK_PATH}/sysroot/usr/lib"
-              "${SDK_PATH}/usr/lib"
-              "${SDK_PATH}/lib"
-              "${SDK_PATH}/llvm/lib"
-              "${SDK_PATH}/system/lib"
-            )
-            
-            # 查找库文件
-            FOUND_LIB_PATH=""
-            for lib_path in "${LIB_PATHS[@]}"; do
-              if [ -d "${lib_path}" ]; then
-                echo "Checking library path: ${lib_path}"
-                ls -la "${lib_path}" | grep -E "(pixelmap|image_source)" || true
-                
-                # 检查必需的库文件
-                REQUIRED_LIBS=("libpixelmap.so" "libimage_source.so" "libpixelmap_ndk.z.so" "libimage_source_ndk.z.so")
-                FOUND_COUNT=0
-                for lib in "${REQUIRED_LIBS[@]}"; do
-                  if [ -f "${lib_path}/${lib}" ]; then
-                    echo "✓ Found: ${lib_path}/${lib}"
-                    ((FOUND_COUNT++))
-                  fi
-                done
-                
-                if [ $FOUND_COUNT -gt 0 ]; then
-                  FOUND_LIB_PATH="${lib_path}"
-                  echo "Found libraries in: ${FOUND_LIB_PATH}"
-                  break
-                fi
-              fi
-            done
-            
-            if [ -z "${FOUND_LIB_PATH}" ]; then
-              echo "Error: No library directories found with required OpenHarmony libraries"
-              echo "Searching entire SDK for library files..."
-              find "${SDK_PATH}" -type f -name "*pixelmap*" -o -name "*image_source*" | head -20 || echo "No library files found"
-              exit 1
-            fi
-            
-            # 设置环境变量供CMake使用
-            echo "OHOS_LIB_PATH=${FOUND_LIB_PATH}" >> $GITHUB_ENV
-            echo "Successfully configured OpenHarmony SDK with library path: ${FOUND_LIB_PATH}"
-        shell: bash 
+            echo "hwsdk.dir=${OHOS_SDK_NATIVE}" > local.properties
+            echo "Successfully configured OpenHarmony SDK path in local.properties."
+        shell: bash
 
       - name: Install Dependencies
         run: |

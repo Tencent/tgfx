@@ -366,111 +366,15 @@ if (WEB)
     endif ()
     list(APPEND TGFX_COMPILE_OPTIONS -fno-rtti -DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0)
 elseif (OHOS)
-    # 设置OpenHarmony SDK路径 - 支持多种环境变量名
-    if(DEFINED ENV{OHOS_SDK_NATIVE})
-        set(OHOS_SDK_PATH $ENV{OHOS_SDK_NATIVE})
-    elseif(DEFINED ENV{OHOS_NDK_HOME})
-        set(OHOS_SDK_PATH $ENV{OHOS_NDK_HOME})
-    elseif(DEFINED ENV{OHOS_BASE_SDK_HOME})
-        set(OHOS_SDK_PATH $ENV{OHOS_BASE_SDK_HOME})
-    elseif(DEFINED ENV{HOS_SDK_HOME})
-        set(OHOS_SDK_PATH $ENV{HOS_SDK_HOME})
-    elseif(DEFINED ENV{OHOS_SDK_HOME})
-        set(OHOS_SDK_PATH $ENV{OHOS_SDK_HOME})
-    else()
-        message(FATAL_ERROR "OpenHarmony SDK not found. Please set OHOS_SDK_NATIVE, OHOS_NDK_HOME, OHOS_BASE_SDK_HOME, HOS_SDK_HOME, or OHOS_SDK_HOME environment variable.")
-    endif()
-    
-    message(STATUS "Using OpenHarmony SDK: ${OHOS_SDK_PATH}")
-    
-    # 查找可能的库路径
-    set(OHOS_LIB_PATHS
-        ${OHOS_SDK_PATH}/sysroot/usr/lib
-        ${OHOS_SDK_PATH}/usr/lib
-        ${OHOS_SDK_PATH}/lib
-        ${OHOS_SDK_PATH}/llvm/lib
-        ${OHOS_SDK_PATH}/system/lib
-    )
-    
-    # 查找NDK库
-    find_library(PIXELMAP_NDK_LIB pixelmap_ndk.z
-        PATHS ${OHOS_LIB_PATHS}
-        NO_DEFAULT_PATH)
-    find_library(IMAGE_SOURCE_NDK_LIB image_source_ndk.z
-        PATHS ${OHOS_LIB_PATHS}
-        NO_DEFAULT_PATH)
-    
-    # 查找系统库
-    find_library(PIXELMAP_LIB pixelmap
-        PATHS ${OHOS_LIB_PATHS}
-        NO_DEFAULT_PATH)
-    find_library(IMAGE_SOURCE_LIB image_source
-        PATHS ${OHOS_LIB_PATHS}
-        NO_DEFAULT_PATH)
-    
-    # 查找其他必需的库
-    find_library(ACE_NDK_LIB ace_ndk.z
-        PATHS ${OHOS_LIB_PATHS}
-        NO_DEFAULT_PATH)
-    find_library(HILOG_NDK_LIB hilog_ndk.z
-        PATHS ${OHOS_LIB_PATHS}
-        NO_DEFAULT_PATH)
-    find_library(ACE_NAPI_LIB ace_napi.z
-        PATHS ${OHOS_LIB_PATHS}
-        NO_DEFAULT_PATH)
-    find_library(NATIVE_BUFFER_LIB native_buffer
-        PATHS ${OHOS_LIB_PATHS}
-        NO_DEFAULT_PATH)
-    find_library(NATIVE_WINDOW_LIB native_window
-        PATHS ${OHOS_LIB_PATHS}
-        NO_DEFAULT_PATH)
-    
-    # 如果标准路径找不到，尝试更广泛的搜索
-    if(NOT PIXELMAP_NDK_LIB OR NOT IMAGE_SOURCE_NDK_LIB OR NOT PIXELMAP_LIB OR NOT IMAGE_SOURCE_LIB)
-        message(STATUS "Standard library paths not found, searching entire SDK...")
-        find_library(PIXELMAP_NDK_LIB pixelmap_ndk.z
-            PATHS ${OHOS_SDK_PATH}
-            PATH_SUFFIXES sysroot/usr/lib usr/lib lib system/lib
-            NO_DEFAULT_PATH)
-        find_library(IMAGE_SOURCE_NDK_LIB image_source_ndk.z
-            PATHS ${OHOS_SDK_PATH}
-            PATH_SUFFIXES sysroot/usr/lib usr/lib lib system/lib
-            NO_DEFAULT_PATH)
-        find_library(PIXELMAP_LIB pixelmap
-            PATHS ${OHOS_SDK_PATH}
-            PATH_SUFFIXES sysroot/usr/lib usr/lib lib system/lib
-            NO_DEFAULT_PATH)
-        find_library(IMAGE_SOURCE_LIB image_source
-            PATHS ${OHOS_SDK_PATH}
-            PATH_SUFFIXES sysroot/usr/lib usr/lib lib system/lib
-            NO_DEFAULT_PATH)
-    endif()
-    
-    # 验证所有必需的库都已找到
-    if(NOT PIXELMAP_NDK_LIB OR NOT IMAGE_SOURCE_NDK_LIB OR NOT PIXELMAP_LIB OR NOT IMAGE_SOURCE_LIB)
-        message(STATUS "Available library paths:")
-        foreach(path ${OHOS_LIB_PATHS})
-            if(EXISTS ${path})
-                message(STATUS "  Found: ${path}")
-                file(GLOB LIB_FILES "${path}/*pixelmap*")
-                if(LIB_FILES)
-                    message(STATUS "    pixelmap libraries: ${LIB_FILES}")
-                endif()
-                file(GLOB LIB_FILES "${path}/*image_source*")
-                if(LIB_FILES)
-                    message(STATUS "    image_source libraries: ${LIB_FILES}")
-                endif()
-            endif()
-        endforeach()
-        
-        message(FATAL_ERROR "Required OpenHarmony libraries not found:\n"
-            "PIXELMAP_NDK_LIB: ${PIXELMAP_NDK_LIB}\n"
-            "IMAGE_SOURCE_NDK_LIB: ${IMAGE_SOURCE_NDK_LIB}\n"
-            "PIXELMAP_LIB: ${PIXELMAP_LIB}\n"
-            "IMAGE_SOURCE_LIB: ${IMAGE_SOURCE_LIB}\n"
-            "Please check your OpenHarmony SDK installation.")
-    endif()
-    
+    find_library(PIXELMAP_NDK_LIB pixelmap_ndk.z)
+    find_library(IMAGE_SOURCE_NDK_LIB image_source_ndk.z)
+    find_library(PIXELMAP_LIB pixelmap)
+    find_library(IMAGE_SOURCE_LIB image_source)
+    find_library(ACE_NDK_LIB ace_ndk.z)
+    find_library(HILOG_NDK_LIB hilog_ndk.z)
+    find_library(ACE_NAPI_LIB ace_napi.z)
+    find_library(NATIVE_BUFFER_LIB native_buffer)
+    find_library(NATIVE_WINDOW_LIB native_window)
     list(APPEND TGFX_SHARED_LIBS ${PIXELMAP_NDK_LIB} ${IMAGE_SOURCE_NDK_LIB} ${PIXELMAP_LIB}
             ${IMAGE_SOURCE_LIB} ${ACE_NDK_LIB} ${HILOG_NDK_LIB} ${ACE_NAPI_LIB} ${NATIVE_BUFFER_LIB}
             ${NATIVE_WINDOW_LIB})
