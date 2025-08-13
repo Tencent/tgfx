@@ -387,7 +387,7 @@ jobs:
       - name: Setup OpenHarmony SDK
         uses: openharmony-rs/setup-ohos-sdk@v0.2
         with:
-          version: '5.0.3'
+          version: '5.0.2'
           components: all
           cache: true
 
