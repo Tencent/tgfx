@@ -390,7 +390,8 @@ jobs:
 
       - name: Find real SDK sysroot
         run: |
-          find /Users/runner/openharmony-sdk-5.0.3.140 -type d -name "*linux*"
+          find /Users/runner/openharmony-sdk-5.0.3.140 -type d -name "*api*" | head -10
+          find /Users/runner/openharmony-sdk-5.0.3.140 -name "*toolchains*" -type d | head -5
 
       - name: Get Third-Party Cache
         id: third-party-cache
