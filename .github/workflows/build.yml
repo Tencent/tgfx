@@ -365,12 +365,19 @@ jobs:
         with:
           lfs: true
 
-    
+
+      - name: Download and Extract OpenHarmony SDK
+        run: |
+          wget https://cidownload.openharmony.cn/version/Release_Version/OpenHarmony-5.0.3.140/20250802_033957/version-Release_Version-OpenHarmony-5.0.3.140-20250802_033957-ohos-sdk-full_5.0.3-Release.tar.gz -O openharmony-sdk.tar.gz
+          mkdir -p /Users/runner/openharmony-sdk
+          tar -xzf openharmony-sdk.tar.gz -C /Users/runner/openharmony-sdk
+          rm openharmony-sdk.tar.gz
+        
       - name: Setup OpenHarmony
         uses: eclipse-oniro4openharmony/oh-app-action@main
         with:
           working-directory: ohos
-          install-dependencies: true
+          install-dependencies: false
     
       - name: Show SDK layout
         run: |
