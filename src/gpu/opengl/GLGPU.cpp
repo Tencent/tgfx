@@ -55,7 +55,10 @@ std::unique_ptr<GPUBuffer> GLGPU::createBuffer(size_t size, uint32_t usage) {
 }
 
 std::unique_ptr<GPUTexture> GLGPU::createTexture(int width, int height, PixelFormat format,
-                                                 bool mipmapped) {
+                                                 int mipLevelCount) {
+  if (mipLevelCount < 1) {
+    return nullptr;
+  }
   auto gl = functions();
   // Clear the previously generated GLError, causing the subsequent CheckGLError to return an
   // incorrect result.
@@ -74,10 +77,9 @@ std::unique_ptr<GPUTexture> GLGPU::createTexture(int width, int height, PixelFor
 
   auto glCaps = interface->caps();
   auto& textureFormat = glCaps->getTextureFormat(format);
-  int maxMipmapLevel = mipmapped ? glCaps->getMaxMipmapLevel(width, height) : 0;
   bool success = true;
   // Texture memory must be allocated first on the web platform then can write pixels.
-  for (int level = 0; level <= maxMipmapLevel && success; level++) {
+  for (int level = 0; level < mipLevelCount && success; level++) {
     const int twoToTheMipLevel = 1 << level;
     const int currentWidth = std::max(1, width / twoToTheMipLevel);
     const int currentHeight = std::max(1, height / twoToTheMipLevel);
@@ -90,7 +92,7 @@ std::unique_ptr<GPUTexture> GLGPU::createTexture(int width, int height, PixelFor
     gl->deleteTextures(1, &textureID);
     return nullptr;
   }
-  return std::make_unique<GLTexture>(textureID, target, format, maxMipmapLevel);
+  return std::make_unique<GLTexture>(textureID, target, format, mipLevelCount);
 }
 
 PixelFormat GLGPU::getExternalTextureFormat(const BackendTexture& backendTexture) const {

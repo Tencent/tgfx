@@ -45,17 +45,10 @@ class GPUTexture : public GPUResource {
   }
 
   /**
-   * Returns the maximum mipmap level of the texture.
+   * Returns the number of mipmap levels in the texture.
    */
-  int maxMipmapLevel() const {
-    return _maxMipmapLevel;
-  }
-
-  /**
-   * Returns true if the texture has mipmap levels.
-   */
-  bool hasMipmaps() const {
-    return _maxMipmapLevel > 0;
+  int mipLevelCount() const {
+    return _mipLevelCount;
   }
 
   /**
@@ -87,10 +80,10 @@ class GPUTexture : public GPUResource {
 
  protected:
   PixelFormat _format = PixelFormat::RGBA_8888;
-  int _maxMipmapLevel = 0;
+  int _mipLevelCount = 1;
 
-  GPUTexture(PixelFormat format, int maxMipmapLevel)
-      : _format(format), _maxMipmapLevel(maxMipmapLevel) {
+  GPUTexture(PixelFormat format, int mipLevelCount)
+      : _format(format), _mipLevelCount(mipLevelCount) {
   }
 };
 }  // namespace tgfx

@@ -61,13 +61,13 @@ std::shared_ptr<TextureView> TextureView::MakeFormat(Context* context, int width
     return nullptr;
   }
   auto gpu = context->gpu();
-  auto hasMipmaps = context->caps()->mipmapSupport ? mipmapped : false;
-  auto scratchKey = ComputeTextureScratchKey(width, height, pixelFormat, hasMipmaps);
+  int mipLevelCount = mipmapped ? context->caps()->getMipLevelCount(width, height) : 1;
+  auto scratchKey = ComputeTextureScratchKey(width, height, pixelFormat, mipLevelCount > 1);
   auto textureView = Resource::Find<TextureView>(context, scratchKey);
   if (textureView) {
     textureView->_origin = origin;
   } else {
-    auto texture = gpu->createTexture(width, height, pixelFormat, hasMipmaps);
+    auto texture = gpu->createTexture(width, height, pixelFormat, mipLevelCount);
     if (texture == nullptr) {
       return nullptr;
     }
@@ -94,7 +94,7 @@ std::shared_ptr<TextureView> TextureView::MakeFrom(Context* context,
   ScratchKey scratchKey = {};
   if (adopted) {
     scratchKey = ComputeTextureScratchKey(backendTexture.width(), backendTexture.height(),
-                                          texture->format(), texture->hasMipmaps());
+                                          texture->format(), texture->mipLevelCount() > 1);
   }
   auto textureView = new DefaultTextureView(std::move(texture), backendTexture.width(),
                                             backendTexture.height(), origin);
