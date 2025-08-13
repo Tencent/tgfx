@@ -441,7 +441,7 @@ jobs:
         with:
           version: '5.0.3.140'
           arch: 'aarch64'
-          
+
       - name: Build OpenHarmony
         run: |
           cd ohos
