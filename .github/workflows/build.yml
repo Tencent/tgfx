@@ -365,6 +365,12 @@ jobs:
         with:
           lfs: true
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+          cache-dependency-path: '**/package-lock.json'
 
       - name: Download & Extract SDK
         run: |
@@ -373,20 +379,13 @@ jobs:
           tar -xzf version-Release_Version-OpenHarmony-5.0.3.140-20250802_033957-ohos-sdk-full_5.0.3-Release.tar.gz -C /Users/runner/openharmony-sdk-5.0.3.140
           rm version-Release_Version-OpenHarmony-5.0.3.140-20250802_033957-ohos-sdk-full_5.0.3-Release.tar.gz
 
-
-
       - name: Set SDK Environment
         run: |
           echo "OHOS_SDK_NATIVE=/Users/runner/openharmony-sdk-5.0.3.140" >> $GITHUB_ENV
 
-
       - name: Find real SDK sysroot
         run: |
           find /Users/runner/openharmony-sdk-5.0.3.140 -type d -name "*linux*"
-
-      - name: Set PATH for hvigorw
-        run: |
-          echo "$GITHUB_WORKSPACE/node_modules/.bin:$PATH" >> $GITHUB_PATH
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -402,13 +401,18 @@ jobs:
           depsync
         shell: bash
 
+      - name: Install ohpm
+        run: |
+          cd ohos
+          chmod +x hvigorw
+          npm install -g @ohos/hvigor
+          npm install -g @ohos/hvigor-ohos-plugin
 
       - name: Build OpenHarmony
         run: |
           cd ohos
-          hvigorw assembleHap --mode module -p module=hello2d -p product=default --stacktrace
+          ./hvigorw assembleHap --mode module -p module=hello2d -p product=default --stacktrace
         shell: bash
-
 
       - name: Job Failed
         if: ${{ failure() }}
