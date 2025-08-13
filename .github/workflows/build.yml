@@ -368,7 +368,7 @@ jobs:
 
       - name: Download and Extract OpenHarmony SDK
         run: |
-          wget https://cidownload.openharmony.cn/version/Release_Version/OpenHarmony-5.0.3.140/20250802_033957/version-Release_Version-OpenHarmony-5.0.3.140-20250802_033957-ohos-sdk-full_5.0.3-Release.tar.gz -O openharmony-sdk.tar.gz
+          wget wget https://cidownload.openharmony.cn/version/Release_Version/OpenHarmony-5.0.3.135/20250725_033957/version-Release_Version-OpenHarmony-5.0.3.135-20250725_033957-ohos-sdk-full_5.0.3-Release.tar.gz
           mkdir -p /Users/runner/openharmony-sdk
           tar -xzf openharmony-sdk.tar.gz -C /Users/runner/openharmony-sdk
           rm openharmony-sdk.tar.gz
@@ -384,9 +384,6 @@ jobs:
           echo "=== SDK 实际目录 ==="
           ls -l /Users/runner/openharmony-sdk/sysroot/usr/lib/aarch64-linux-ohos || echo "目录不存在"
           find /Users/runner/openharmony-sdk -name "*image*" -o -name "*pixelmap*" 2>/dev/null | head -20
-      
-      
-      
 
       - name: Get Third-Party Cache
         id: third-party-cache
