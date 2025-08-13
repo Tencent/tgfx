@@ -1,71 +1,431 @@
-openharmony:
-  runs-on: macos-latest
-  steps:
-    - name: Check Out Repo
-      uses: actions/checkout@v4
-      with:
-        lfs: true
+name: build
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: '18'
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      job:
+        description: 'Job to run (optional)'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - ios
+          - android
+          - web
+          - win
+          - linux
+          - qt
+          - openharmony
 
-    - name: Get Third-Party Cache
-      id: third-party-cache
-      uses: actions/cache/restore@v4
-      with:
-        path: third_party
-        key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
-        restore-keys: third-party-openharmony-
+jobs:
+  ios:
+    runs-on: macos-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+        with:
+          lfs: true
 
-    - name: Run depsync
-      run: |
-        npm install depsync -g
-        depsync
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            third_party
+          key: third-party-ios-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third-party-ios-
 
-    # 用官方 Action 代替手工下载
-    - name: Setup OpenHarmony SDK
-      uses: openharmony-rs/setup-ohos-sdk@v0.2
-      with:
-        version: '5.0.3'     # 对应 API 15
-        cache: true
+      - uses: tecolicom/actions-use-homebrew-tools@v1
+        with:
+          tools: ninja yasm
 
-    # Action 会自动把 OHOS_SDK_NATIVE 注入到 GITHUB_ENV，无需手动 echo
-    - name: Configure SDK Path
-      run: |
-        cd ohos
-        echo "sdk.dir=${OHOS_SDK_NATIVE}" > local.properties
-        echo "OHOS_BASE_SDK_HOME=${OHOS_SDK_NATIVE}" >> local.properties
+      - name: Install Build Tools
+        run: |
+          chmod +x install_tools.sh
+          ./install_tools.sh
+        shell: bash
 
-    - name: Setup .npmrc for OpenHarmony
-      run: |
-        echo "@ohos:registry=https://repo.harmonyos.com/npm/" >> $HOME/.npmrc
-        echo "registry=https://registry.npmjs.org/" >> $HOME/.npmrc
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+        shell: bash
 
-    - name: Install ohpm
-      run: |
-        mkdir -p $HOME/ohpm
-        cd $HOME/ohpm
-        curl -L https://contentcenter-vali-drcn.dbankcdn.cn/pvt_2/DeveloperAlliance_package_901_9/81/v3/4ohpm1cli-darwin-x64-5.0.3.140.tgz -o ohpm.tgz || echo "Download failed, will use direct hvigorw"
-        if [ -f "ohpm.tgz" ]; then
-          tar -xzf ohpm.tgz
-          echo "$HOME/ohpm/bin" >> $GITHUB_PATH
-        fi
+      - name: Build iOS
+        run: |
+          cd ios
+          node gen_ios -DTGFX_BUILD_SVG=ON
+          xcodebuild -workspace Hello2D.xcworkspace -scheme Hello2D -configuration Release -sdk iphoneos -arch arm64 CODE_SIGN_IDENTITY="" CODE_SIGNING_REQUIRED=NO
 
-    - name: Install Dependencies & Build
-      run: |
-        cd ohos
-        chmod +x hvigorw
-        export PATH="$HOME/ohpm/bin:$PATH"
-        if command -v ohpm &> /dev/null; then
-          ohpm install --all
-        fi
-        ./hvigorw assembleHap --mode module -p module=hello2d -p product=default --stacktrace
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            third_party
+          key: third-party-ios-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
 
-    - name: Job Failed
-      if: ${{ failure() }}
-      uses: actions/upload-artifact@v4
-      with:
-        name: openharmony_build
-        path: ohos/out
+      - name: Job Failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios_build
+          path: ios
+
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            third_party
+          key: third-party-android-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third-party-android-
+
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+
+      - uses: seanmiddleditch/gha-setup-ninja@master
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Build Android
+        run: |
+          cd android
+          ./gradlew assembleRelease -Parm64-only --no-daemon -PcmakeArgs="-DTGFX_BUILD_SVG=ON"
+
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            third_party
+          key: third-party-android-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+
+      - name: Job Failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: android_build
+          path: android
+
+  web:
+    runs-on: windows-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Get Environment Cache
+        id: environment-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            web/emsdk
+            web/node_modules
+          key: tgfx-environment-web-20241106
+          restore-keys: tgfx-environment-web-
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            third_party
+          key: third-party-web-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third-party-web-
+
+      - name: Install Build Tools
+        if: ${{ (steps.environment-cache.outputs.cache-hit != 'true') }}
+        run: |
+          cd web
+          npm install
+          if [ ! -d "emsdk" ]; then
+            git clone https://github.com/emscripten-core/emsdk.git
+          else
+            cd emsdk
+            git pull
+            cd ..
+          fi
+          cd emsdk
+          ./emsdk install 3.1.71
+          ./emsdk activate 3.1.71
+        shell: bash
+
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+        shell: bash
+
+      - name: Build Web
+        run: |
+          cd web
+          emsdk/emsdk_env
+          npm run build:st:debug
+
+      - name: Save Environment Cache
+        if: ${{ (github.event_name == 'push') && (steps.environment-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            web/emsdk
+            web/node_modules
+          key: tgfx-environment-web-20241106
+
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            third_party
+          key: third-party-web-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+
+      - name: Job Failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: web_build
+          path: |
+            web
+            !web/emsdk
+            !web/node_modules
+
+  win:
+    runs-on: windows-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            third_party
+          key: third-party-windows-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third-party-windows-
+
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+        shell: bash
+
+      - name: Build Windows
+        run: |
+          node build_tgfx -s ./win Hello2D -DTGFX_BUILD_SVG=ON -o ./out/release/win -a x64 -d
+
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            third_party
+          key: third-party-windows-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+
+      - name: Job Failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: win_build
+          path: out
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            third_party
+          key: third-party-linux-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third-party-linux-
+
+      - uses: seanmiddleditch/gha-setup-ninja@master
+
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+        shell: bash
+
+      - uses: awalsh128/cache-apt-pkgs-action@latest
+        with:
+          packages: libx11-dev
+          version: 1.0
+
+      - name: Build Linux
+        run: |
+          node build_tgfx -s ./linux Hello2D -DTGFX_BUILD_SVG=ON -o ./out/release/linux -a x64 -d
+
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            third_party
+          key: third-party-linux-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+
+      - name: Job Failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux_build
+          path: out
+
+  qt:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            third_party
+          key: third-party-qt-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third-party-qt-
+
+      - uses: seanmiddleditch/gha-setup-ninja@master
+
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+        shell: bash
+
+      - name: Install Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          host: 'linux'
+          target: 'desktop'
+          version: '6.8.3'
+          dir: '${{github.workspace}}/qt/'
+          install-deps: 'true'
+          cache: 'true'
+          aqtversion: '==3.2.1'
+          cache-key-prefix: 'install-qt-action'
+
+      - name: Build QT
+        run: |
+          node build_tgfx -s ./qt Hello2D -DCMAKE_PREFIX_PATH="${{env.QT_ROOT_DIR}}/lib/cmake" -DTGFX_BUILD_SVG=ON -o ./out/release/qt -a x64
+
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            third_party
+          key: third-party-qt-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+
+      - name: Job Failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: qt_build
+          path: out
+
+  openharmony:
+    runs-on: macos-latest
+    steps:
+      - name: Check Out Repo
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: third_party
+          key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third-party-openharmony-
+
+      - name: Run depsync
+        run: |
+          npm install depsync -g
+          depsync
+
+      # 用官方 Action 代替手工下载
+      - name: Setup OpenHarmony SDK
+        uses: openharmony-rs/setup-ohos-sdk@v0.2
+        with:
+          version: '5.0.3'     # 对应 API 15
+          cache: true
+
+      # Action 会自动把 OHOS_SDK_NATIVE 注入到 GITHUB_ENV，无需手动 echo
+      - name: Configure SDK Path
+        run: |
+          cd ohos
+          echo "sdk.dir=${OHOS_SDK_NATIVE}" > local.properties
+          echo "OHOS_BASE_SDK_HOME=${OHOS_SDK_NATIVE}" >> local.properties
+
+      - name: Setup .npmrc for OpenHarmony
+        run: |
+          echo "@ohos:registry=https://repo.harmonyos.com/npm/" >> $HOME/.npmrc
+          echo "registry=https://registry.npmjs.org/" >> $HOME/.npmrc
+
+      - name: Install ohpm
+        run: |
+          mkdir -p $HOME/ohpm
+          cd $HOME/ohpm
+          curl -L https://contentcenter-vali-drcn.dbankcdn.cn/pvt_2/DeveloperAlliance_package_901_9/81/v3/4ohpm1cli-darwin-x64-5.0.3.140.tgz -o ohpm.tgz || echo "Download failed, will use direct hvigorw"
+          if [ -f "ohpm.tgz" ]; then
+            tar -xzf ohpm.tgz
+            echo "$HOME/ohpm/bin" >> $GITHUB_PATH
+          fi
+
+      - name: Install Dependencies & Build
+        run: |
+          cd ohos
+          chmod +x hvigorw
+          export PATH="$HOME/ohpm/bin:$PATH"
+          if command -v ohpm &> /dev/null; then
+            ohpm install --all
+          fi
+          ./hvigorw assembleHap --mode module -p module=hello2d -p product=default --stacktrace
+
+      - name: Job Failed
+        if: ${{ failure() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: openharmony_build
+          path: ohos/out
+  
