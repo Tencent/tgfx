@@ -365,10 +365,10 @@ jobs:
       with:
         lfs: true
 
-    - name: Show OHOS SDK path
+    - name: Find OHOS toolchain file
       run: |
-        echo "OHOS_SDK_NATIVE=$OHOS_SDK_NATIVE"
-        ls -l "$OHOS_SDK_NATIVE"/build/cmake/ohos.toolchain.cmake  
+        echo "=== Searching for ohos.toolchain.cmake ==="
+        find /Users/runner -name ohos.toolchain.cmake 2>/dev/null || echo "Not found" 
           
 
     - name: Get Third-Party Cache
