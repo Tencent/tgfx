@@ -370,8 +370,9 @@ jobs:
         run: |
           wget https://cidownload.openharmony.cn/version/Release_Version/OpenHarmony-5.0.3.140/20250802_033957/version-Release_Version-OpenHarmony-5.0.3.140-20250802_033957-ohos-sdk-full_5.0.3-Release.tar.gz
           mkdir -p /Users/runner/openharmony-sdk-5.0.3.140
-          tar -xzf sdk.tar.gz -C /Users/runner/openharmony-sdk-5.0.3.140
-          rm sdk.tar.gz
+          tar -xzf version-Release_Version-OpenHarmony-5.0.3.140-20250802_033957-ohos-sdk-full_5.0.3-Release.tar.gz -C /Users/runner/openharmony-sdk-5.0.3.140
+          rm version-Release_Version-OpenHarmony-5.0.3.140-20250802_033957-ohos-sdk-full_5.0.3-Release.tar.gz
+
 
 
       - name: Set SDK Environment
