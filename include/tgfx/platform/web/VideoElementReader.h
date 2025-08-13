@@ -36,11 +36,10 @@ class VideoElementReader : public ImageReader {
 
   /**
    * Acquires the next ImageBuffer from the VideoElementReader after a new image frame is about to
-   * be rendered into the associated HTMLVideoElement. The returned ImageBuffer will call the
-   * promise.await() method before generating textures. Note that the previously returned image
+   * be rendered into the associated HTMLVideoElement. Note that the previously returned image
    * buffers will immediately expire after the newly created ImageBuffer is drawn.
    */
-  std::shared_ptr<ImageBuffer> acquireNextBuffer(emscripten::val promise);
+  std::shared_ptr<ImageBuffer> acquireNextBuffer();
 
  private:
   explicit VideoElementReader(std::shared_ptr<ImageStream> stream);
