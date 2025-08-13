@@ -436,18 +436,17 @@ jobs:
             echo "ohpm not available, hvigorw will handle dependencies"
           fi
 
-      - name: Install hvigorw
-        uses: openharmony/setup-ohos-sdk@v1
+      - name: Setup OpenHarmony SDK
+        uses: openharmony-rs/setup-ohos-sdk@v0.2
         with:
-          version: '5.0.3.140'
-          arch: 'aarch64'
+            version: '5.0.3'
+            arch: 'aarch64'
+            cache: true
 
       - name: Build OpenHarmony
         run: |
           cd ohos
-          export PATH="$HOME/ohpm/bin:$PATH"
           ./hvigorw assembleHap --mode module -p module=hello2d -p product=default --stacktrace
-        shell: bash
 
       - name: Job Failed
         if: ${{ failure() }}
