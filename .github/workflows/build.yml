@@ -356,111 +356,60 @@ jobs:
         with:
           name: qt_build
           path: out
-
-
+  
   openharmony:
     runs-on: macos-latest
+    if: | 
+      (github.event_name != 'workflow_dispatch') ||
+      (github.event.inputs.job == 'all') ||
+      (github.event.inputs.job == 'openharmony')
+
     steps:
-      - name: Check Out Repo
-        uses: actions/checkout@v4
-        with:
-          lfs: true
-          
-      - name: Get Third-Party Cache
-        id: third-party-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            third_party
-          key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
-          restore-keys: third-party-openharmony-
+    - name: Check Out Repo
+      uses: actions/checkout@v4
+      with:
+        lfs: true
 
-      - name: Run depsync
-        run: |
-          npm install depsync -g
-          depsync
-        shell: bash
+    - name: Get Third-Party Cache
+      id: third-party-cache
+      uses: actions/cache/restore@v4
+      with: 
+        path: |
+          third_party
+        key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+        restore-keys: third-party-openharmony-
 
-      - name: Setup CMake
-        uses: jwlawson/actions-setup-cmake@v2
-        with:
-          cmake-version: '3.25.x'  
+    - name: Run depsync
+      run: |
+        npm install depsync -g
+        depsync
+      shell: bash 
+      
+    - name: Setup OpenHarmony
+      uses: eclipse-oniro4openharmony/oh-app-action@v0.1
+      with: 
+        working-directory: '${{github.workspace}}/ohos/'
+        install-dependencies: true
 
-      - name: Setup OpenHarmony Build Environment
-        uses: eclipse-oniro4openharmony/oh-app-action@main
-        with:
-          working-directory: './ohos'
-
-      - name: Configure SDK Path and Create Toolchain File
-        id: setup_sdk
-        run: |
-          cd ohos
-          if [ -z "${OHOS_SDK_NATIVE}" ]; then
-            echo "Error: OHOS_SDK_NATIVE environment variable not set."
-            exit 1
-          fi
-          
-          echo "hwsdk.dir=${OHOS_SDK_NATIVE}" > local.properties
-          echo "OHOS SDK path set in local.properties."
-
-          echo "Searching for native libraries in ${OHOS_SDK_NATIVE}..."
-          
-          PIXELMAP_LIB_PATH=$(find "${OHOS_SDK_NATIVE}" -name "libpixelmap_ndk.z.so" | head -n 1)
-          IMAGE_SOURCE_LIB_PATH=$(find "${OHOS_SDK_NATIVE}" -name "libimage_source_ndk.z.so" | head -n 1)
-
-          if [ -z "${PIXELMAP_LIB_PATH}" ]; then
-            echo "Error: libpixelmap_ndk.z.so not found!"
-            exit 1
-          fi
-          if [ -z "${IMAGE_SOURCE_LIB_PATH}" ]; then
-            echo "Error: libimage_source_ndk.z.so not found!"
-            exit 1
-          fi
-
-          echo "Found PIXELMAP_LIB at: ${PIXELMAP_LIB_PATH}"
-          echo "Found IMAGE_SOURCE_LIB at: ${IMAGE_SOURCE_LIB_PATH}"
-
-          # Create a CMake toolchain file to set the variables
-          TOOLCHAIN_FILE="variables.cmake"
-          echo "set(PIXELMAP_LIB \"${PIXELMAP_LIB_PATH}\" CACHE FILEPATH \"Path to PixelMap Library\")" > ${TOOLCHAIN_FILE}
-          echo "set(IMAGE_SOURCE_LIB \"${IMAGE_SOURCE_LIB_PATH}\" CACHE FILEPATH \"Path to Image Source Library\")" >> ${TOOLCHAIN_FILE}
-          
-          echo "CMake toolchain file created at ohos/${TOOLCHAIN_FILE}"
-          cat ${TOOLCHAIN_FILE}
-        shell: bash
-
-      - name: Install Dependencies
-        run: |
-          cd ohos
-          ohpm install --all
-        shell: bash
-          
-      - name: Build OpenHarmony Project
-        run: |
-          cd ohos
-          chmod +x ./hvigorw
-          ./hvigorw --version --accept-license
-          ./hvigorw clean --no-parallel --no-daemon
-          ./hvigorw assembleHap --mode module -p product=default --stacktrace --no-parallel --no-daemon -PcmakeArgs="-DCMAKE_TOOLCHAIN_FILE=variables.cmake -DZLIB_LIBRARY_TYPE=STATIC -DPNG_SHARED=OFF"
- 
-        shell: bash
-          
-      - name: Additional Setup
-        run: |
-          mkdir -p third_party/tgfx/out/cache
-
-      - name: Save Third-Party Cache
-        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
-        uses: actions/cache/save@v4
-        with: 
-          path: |
-            third_party
-          key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
-          
-      - name: Job Failed
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@v4
-        with: 
-          name: openharmony_build
-          path: ohos
+    - name: Build OpenHarmony
+      run: |
+        cd ohos
+        hvigorw assembleHap --mode module -p module=hello2d -p product=default --stacktrace
+      shell: bash
+      
+    - name: Save Third-Party Cache
+      if: |
+        (github.event_name == 'push') && 
+        (steps.third-party-cache.outputs.cache-hit != 'true')  
+      uses: actions/cache/save@v4
+      with: 
+        path: |
+          third_party
+        key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
         
+    - name: Job Failed
+      if: ${{ failure() }}
+      uses: actions/upload-artifact@v4
+      with:
+        name: openharmony_build
+        path: ohos/out
