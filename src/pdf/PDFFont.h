@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "core/AdvancedTypefaceProperty.h"
+#include "core/AdvancedTypefaceInfo.h"
 #include "pdf/PDFGlyphUse.h"
 #include "pdf/PDFTypes.h"
 #include "tgfx/core/Data.h"
@@ -72,17 +72,17 @@ class PDFFont {
    * Returns the font type represented in this font. For Type0 fonts, returns the type of the
    * descendant font. 
    */
-  AdvancedTypefaceProperty::FontType getType() const {
+  AdvancedTypefaceInfo::FontType getType() const {
     return fontType;
   }
 
-  static AdvancedTypefaceProperty::FontType FontType(
-      const PDFStrike& pdfStrike, const AdvancedTypefaceProperty& advancedProperty);
+  static AdvancedTypefaceInfo::FontType FontType(const PDFStrike& pdfStrike,
+                                                 const AdvancedTypefaceInfo& advancedInfo);
 
-  static bool IsMultiByte(AdvancedTypefaceProperty::FontType type) {
-    return type == AdvancedTypefaceProperty::FontType::Type1 ||
-           type == AdvancedTypefaceProperty::FontType::TrueType ||
-           type == AdvancedTypefaceProperty::FontType::CFF;
+  static bool IsMultiByte(AdvancedTypefaceInfo::FontType type) {
+    return type == AdvancedTypefaceInfo::FontType::Type1 ||
+           type == AdvancedTypefaceInfo::FontType::TrueType ||
+           type == AdvancedTypefaceInfo::FontType::CFF;
   }
 
   /** 
@@ -123,8 +123,8 @@ class PDFFont {
   /** 
    * Gets SkAdvancedTypefaceMetrics, and caches the result.
    */
-  static const AdvancedTypefaceProperty* GetAdvancedProperty(
-      const std::shared_ptr<Typeface>& typeface, float textSize, PDFDocumentImpl* document);
+  static const AdvancedTypefaceInfo* GetAdvancedInfo(const std::shared_ptr<Typeface>& typeface,
+                                                     float textSize, PDFDocumentImpl* document);
 
   static std::shared_ptr<ScalerContext> GetScalerContext(const std::shared_ptr<Typeface>& typeface,
                                                          float textSize);
@@ -133,7 +133,7 @@ class PDFFont {
                                                    PDFDocumentImpl* document);
 
   static void PopulateCommonFontDescriptor(PDFDictionary* descriptor,
-                                           const AdvancedTypefaceProperty& advancedProperty,
+                                           const AdvancedTypefaceInfo& advancedInfo,
                                            uint16_t emSize, int16_t defaultWidth);
 
   void emitSubset(PDFDocumentImpl* document) const;
@@ -170,10 +170,10 @@ class PDFFont {
   const PDFStrike* _strike;
   PDFGlyphUse _glyphUsage;
   PDFIndirectReference _indirectReference;
-  AdvancedTypefaceProperty::FontType fontType;
+  AdvancedTypefaceInfo::FontType fontType;
 
   PDFFont(const PDFStrike*, GlyphID firstGlyphID, GlyphID lastGlyphID,
-          AdvancedTypefaceProperty::FontType fontType, PDFIndirectReference indirectReference);
+          AdvancedTypefaceInfo::FontType fontType, PDFIndirectReference indirectReference);
 
   friend class PDFStrike;
 };

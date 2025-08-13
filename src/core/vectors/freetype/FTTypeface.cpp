@@ -18,7 +18,7 @@
 
 #include "FTTypeface.h"
 #include "FTLibrary.h"
-#include "core/AdvancedTypefaceProperty.h"
+#include "core/AdvancedTypefaceInfo.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Typeface.h"
 #include FT_TRUETYPE_TABLES_H
@@ -206,25 +206,25 @@ bool CanSubset(FT_Face face) {
   return (fsType & FT_FSTYPE_NO_SUBSETTING) == 0;
 }
 
-AdvancedTypefaceProperty::FontType GetFontType(FT_Face face) {
+AdvancedTypefaceInfo::FontType GetFontType(FT_Face face) {
   const char* fontType = FT_Get_X11_Font_Format(face);
   struct TextToFontType {
     const char* text;
-    AdvancedTypefaceProperty::FontType type;
+    AdvancedTypefaceInfo::FontType type;
   };
 
   static TextToFontType values[] = {
-      {"Type 1", AdvancedTypefaceProperty::FontType::Type1},
-      {"CID Type 1", AdvancedTypefaceProperty::FontType::Type1CID},
-      {"CFF", AdvancedTypefaceProperty::FontType::CFF},
-      {"TrueType", AdvancedTypefaceProperty::FontType::TrueType},
+      {"Type 1", AdvancedTypefaceInfo::FontType::Type1},
+      {"CID Type 1", AdvancedTypefaceInfo::FontType::Type1CID},
+      {"CFF", AdvancedTypefaceInfo::FontType::CFF},
+      {"TrueType", AdvancedTypefaceInfo::FontType::TrueType},
   };
   for (const auto& value : values) {
     if (strcmp(fontType, value.text) == 0) {
       return value.type;
     }
   }
-  return AdvancedTypefaceProperty::FontType::Other;
+  return AdvancedTypefaceInfo::FontType::Other;
 }
 }  // namespace
 
@@ -252,39 +252,39 @@ bool FTTypeface::isOpentypeFontDataStandardFormat() const {
          fontTag == opentypeCFFTag || fontTag == ttcTag;
 }
 
-AdvancedTypefaceProperty FTTypeface::getAdvancedProperty() const {
-  AdvancedTypefaceProperty advancedProperty;
+AdvancedTypefaceInfo FTTypeface::getAdvancedInfo() const {
+  AdvancedTypefaceInfo advancedProperty;
   advancedProperty.postScriptName = FT_Get_Postscript_Name(face);
 
   if (FT_HAS_MULTIPLE_MASTERS(face)) {
-    advancedProperty.flags = static_cast<AdvancedTypefaceProperty::FontFlags>(
-        advancedProperty.flags | AdvancedTypefaceProperty::FontFlags::Variable);
+    advancedProperty.flags = static_cast<AdvancedTypefaceInfo::FontFlags>(
+        advancedProperty.flags | AdvancedTypefaceInfo::FontFlags::Variable);
   }
   if (!CanEmbed(face)) {
-    advancedProperty.flags = static_cast<AdvancedTypefaceProperty::FontFlags>(
-        advancedProperty.flags | AdvancedTypefaceProperty::FontFlags::NotEmbeddable);
+    advancedProperty.flags = static_cast<AdvancedTypefaceInfo::FontFlags>(
+        advancedProperty.flags | AdvancedTypefaceInfo::FontFlags::NotEmbeddable);
   }
   if (!CanSubset(face)) {
-    advancedProperty.flags = static_cast<AdvancedTypefaceProperty::FontFlags>(
-        advancedProperty.flags | AdvancedTypefaceProperty::FontFlags::NotSubsettable);
+    advancedProperty.flags = static_cast<AdvancedTypefaceInfo::FontFlags>(
+        advancedProperty.flags | AdvancedTypefaceInfo::FontFlags::NotSubsettable);
   }
 
   advancedProperty.type = GetFontType(face);
-  if ((advancedProperty.type == AdvancedTypefaceProperty::FontType::TrueType ||
-       advancedProperty.type == AdvancedTypefaceProperty::FontType::CFF) &&
+  if ((advancedProperty.type == AdvancedTypefaceInfo::FontType::TrueType ||
+       advancedProperty.type == AdvancedTypefaceInfo::FontType::CFF) &&
       !isOpentypeFontDataStandardFormat()) {
-    advancedProperty.flags = static_cast<AdvancedTypefaceProperty::FontFlags>(
-        advancedProperty.flags | AdvancedTypefaceProperty::FontFlags::AltDataFormat);
+    advancedProperty.flags = static_cast<AdvancedTypefaceInfo::FontFlags>(
+        advancedProperty.flags | AdvancedTypefaceInfo::FontFlags::AltDataFormat);
   }
 
-  advancedProperty.style = static_cast<AdvancedTypefaceProperty::StyleFlags>(0);
+  advancedProperty.style = static_cast<AdvancedTypefaceInfo::StyleFlags>(0);
   if (FT_IS_FIXED_WIDTH(face)) {
-    advancedProperty.style = static_cast<AdvancedTypefaceProperty::StyleFlags>(
-        advancedProperty.style | AdvancedTypefaceProperty::StyleFlags::FixedPitch);
+    advancedProperty.style = static_cast<AdvancedTypefaceInfo::StyleFlags>(
+        advancedProperty.style | AdvancedTypefaceInfo::StyleFlags::FixedPitch);
   }
   if (face->style_flags & FT_STYLE_FLAG_ITALIC) {
-    advancedProperty.style = static_cast<AdvancedTypefaceProperty::StyleFlags>(
-        advancedProperty.style | AdvancedTypefaceProperty::StyleFlags::Italic);
+    advancedProperty.style = static_cast<AdvancedTypefaceInfo::StyleFlags>(
+        advancedProperty.style | AdvancedTypefaceInfo::StyleFlags::Italic);
   }
   return advancedProperty;
 }

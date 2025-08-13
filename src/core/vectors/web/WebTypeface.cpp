@@ -115,7 +115,7 @@ std::vector<Unichar> WebTypeface::getGlyphToUnicodeMap() const {
 #endif
 
 #ifdef TGFX_USE_GLYPH_TO_UNICODE
-AdvancedTypefaceProperty getAdvancedProperty() const {
+AdvancedTypefaceInfo getAdvancedProperty() const {
   return AdvancedTypefaceProperty{.postScriptName = webFontFamily,
                                   .type = AdvancedTypefaceProperty::FontType::Other,
                                   .flags = static_cast<AdvancedTypefaceProperty::FontFlags>(

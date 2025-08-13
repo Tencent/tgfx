@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFExportContext.h"
-#include "core/AdvancedTypefaceProperty.h"
+#include "core/AdvancedTypefaceInfo.h"
 #include "core/DrawContext.h"
 #include "core/MCState.h"
 #include "core/MeasureContext.h"
@@ -297,7 +297,7 @@ class GlyphPositioner {
     this->flush();
     _pdfFont = pdfFont;
     // Reader 2020.013.20064 incorrectly advances some Type3 fonts https://crbug.com/1226960
-    bool convertedToType3 = _pdfFont->getType() == AdvancedTypefaceProperty::FontType::Other;
+    bool convertedToType3 = _pdfFont->getType() == AdvancedTypefaceInfo::FontType::Other;
     bool thousandEM = _pdfFont->strike().strikeSpec.unitsPerEM == 1000;
     viewersAgreeOnAdvancesInFont = thousandEM || !convertedToType3;
   }
@@ -358,12 +358,11 @@ Unichar MapGlyph(const std::vector<Unichar>& glyphToUnicode, GlyphID glyph) {
   return glyph < glyphToUnicode.size() ? glyphToUnicode[glyph] : -1;
 }
 
-bool NeedsNewFont(PDFFont* font, GlyphID glyphID,
-                  AdvancedTypefaceProperty::FontType initialFontType) {
+bool NeedsNewFont(PDFFont* font, GlyphID glyphID, AdvancedTypefaceInfo::FontType initialFontType) {
   if (!font || !font->hasGlyph(glyphID)) {
     return true;
   }
-  if (initialFontType == AdvancedTypefaceProperty::FontType::Other) {
+  if (initialFontType == AdvancedTypefaceInfo::FontType::Other) {
     return false;
   }
 
@@ -371,7 +370,7 @@ bool NeedsNewFont(PDFFont* font, GlyphID glyphID,
                                                 font->strike().strikeSpec.textSize);
   Path glyphPath;
   bool hasUnmodifiedPath = scaleContext->generatePath(glyphID, false, false, &glyphPath);
-  bool convertedToType3 = font->getType() == AdvancedTypefaceProperty::FontType::Other;
+  bool convertedToType3 = font->getType() == AdvancedTypefaceInfo::FontType::Other;
   return convertedToType3 == hasUnmodifiedPath;
 }
 }  // namespace
@@ -422,15 +421,14 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const MCSt
   auto typeface = pdfStrike->strikeSpec.typeface;
   auto textSize = pdfStrike->strikeSpec.textSize;
 
-  const auto* advancedProperty = PDFFont::GetAdvancedProperty(typeface, textSize, document);
-  if (!advancedProperty) {
+  const auto* advancedInfo = PDFFont::GetAdvancedInfo(typeface, textSize, document);
+  if (!advancedInfo) {
     return;
   }
 
   const auto& glyphToUnicode = PDFFont::GetUnicodeMap(*typeface, document);
 
-  AdvancedTypefaceProperty::FontType initialFontType =
-      PDFFont::FontType(*pdfStrike, *advancedProperty);
+  AdvancedTypefaceInfo::FontType initialFontType = PDFFont::FontType(*pdfStrike, *advancedInfo);
 
   // The size, skewX, and scaleX are applied here.
   float advanceScale = textSize * 1.f / pdfStrike->strikeSpec.unitsPerEM;

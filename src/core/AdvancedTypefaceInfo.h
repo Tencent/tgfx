@@ -22,7 +22,7 @@
 
 namespace tgfx {
 
-class AdvancedTypefaceProperty {
+class AdvancedTypefaceInfo {
  public:
   /**
    * PostScript name.

@@ -48,7 +48,7 @@ static constexpr FontTableTag SetFourByteTag(char a, char b, char c, char d) {
 }
 
 class ScalerContext;
-class AdvancedTypefaceProperty;
+class AdvancedTypefaceInfo;
 
 /**
  * A set of character glyphs and layout information for drawing text.
@@ -173,9 +173,9 @@ class Typeface {
   virtual std::shared_ptr<Data> openAndGetBytes() const = 0;
 
   /**
-   * Returns advanced properties of the typeface. This method is used by the PDF backend.
+   * Returns advanced information about the typeface. This method is used by the PDF backend.
    */
-  virtual AdvancedTypefaceProperty getAdvancedProperty() const;
+  virtual AdvancedTypefaceInfo getAdvancedInfo() const;
 
   mutable std::mutex locker = {};
 

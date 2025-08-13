@@ -68,7 +68,7 @@ class CGTypeface : public Typeface {
 #endif
 
 #ifdef TGFX_USE_ADVANCED_TYPEFACE_PROPERTY
-  AdvancedTypefaceProperty getAdvancedProperty() const override;
+  AdvancedTypefaceInfo getAdvancedInfo() const override;
 #endif
 
   std::shared_ptr<Data> openAndGetBytes() const override;

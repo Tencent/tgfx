@@ -18,7 +18,7 @@
 
 #include "tgfx/core/Typeface.h"
 #include <vector>
-#include "core/AdvancedTypefaceProperty.h"
+#include "core/AdvancedTypefaceInfo.h"
 #include "core/ScalerContext.h"
 #include "core/utils/UniqueID.h"
 #include "tgfx/core/Font.h"
@@ -76,8 +76,8 @@ class EmptyTypeface : public Typeface {
     return nullptr;
   }
 
-  AdvancedTypefaceProperty getAdvancedProperty() const override {
-    return AdvancedTypefaceProperty();
+  AdvancedTypefaceInfo getAdvancedInfo() const override {
+    return {};
   }
 
  private:
@@ -114,8 +114,8 @@ std::vector<Unichar> Typeface::getGlyphToUnicodeMap() const {
   return {};
 };
 
-AdvancedTypefaceProperty Typeface::getAdvancedProperty() const {
-  return AdvancedTypefaceProperty();
+AdvancedTypefaceInfo Typeface::getAdvancedInfo() const {
+  return {};
 }
 
 std::shared_ptr<ScalerContext> Typeface::getScalerContext(float size) {

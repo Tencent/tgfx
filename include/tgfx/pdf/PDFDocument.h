@@ -27,7 +27,7 @@
 namespace tgfx {
 
 /**
- * PDFDocument is a class for export documents.
+ * PDFDocument is a class used for exporting PDF documents.
  */
 class PDFDocument {
  public:

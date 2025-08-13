@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "PDFFont.h"
-#include "core/AdvancedTypefaceProperty.h"
+#include "core/AdvancedTypefaceInfo.h"
 #include "core/ScalerContext.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
@@ -30,12 +30,10 @@
 #include "pdf/fontSubset/PDFType1Font.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Font.h"
-#include "tgfx/core/FontMetrics.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
 #include "tgfx/core/Rect.h"
-#include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
 #include "tgfx/core/WriteStream.h"
 
@@ -55,12 +53,12 @@ inline float ScaleFromFontUnits(int16_t val, uint16_t emSize) {
   return FromFontUnits(val, emSize);
 }
 
-bool CanEmbed(const AdvancedTypefaceProperty& metrics) {
-  return !(metrics.flags & AdvancedTypefaceProperty::FontFlags::NotEmbeddable);
+bool CanEmbed(const AdvancedTypefaceInfo& metrics) {
+  return !(metrics.flags & AdvancedTypefaceInfo::FontFlags::NotEmbeddable);
 }
 
-bool CanSubset(const AdvancedTypefaceProperty& metrics) {
-  return !(metrics.flags & AdvancedTypefaceProperty::FontFlags::NotSubsettable);
+bool CanSubset(const AdvancedTypefaceInfo& metrics) {
+  return !(metrics.flags & AdvancedTypefaceInfo::FontFlags::NotSubsettable);
 }
 
 void SetGlyphWidthAndBoundingBox(float width, Rect box,
@@ -104,23 +102,23 @@ std::shared_ptr<PDFStrike> PDFStrike::Make(PDFDocumentImpl* doc, const Font& fon
   return strike;
 }
 
-const AdvancedTypefaceProperty* PDFFont::GetAdvancedProperty(
-    const std::shared_ptr<Typeface>& typeface, float textSize, PDFDocumentImpl* document) {
+const AdvancedTypefaceInfo* PDFFont::GetAdvancedInfo(const std::shared_ptr<Typeface>& typeface,
+                                                     float textSize, PDFDocumentImpl* document) {
   auto id = typeface->uniqueID();
-  auto iter = document->fontAdvancedProperty.find(id);
-  if (iter != document->fontAdvancedProperty.end()) {
+  auto iter = document->fontAdvancedInfo.find(id);
+  if (iter != document->fontAdvancedInfo.end()) {
     return iter->second.get();  // canon retains ownership.
   }
 
   auto count = typeface->glyphsCount();
   if (count <= 0 || count > 1 + UINT16_MAX) {
     // Cache nullptr to skip this check.  Use SkSafeUnref().
-    document->fontAdvancedProperty[id] = nullptr;
+    document->fontAdvancedInfo[id] = nullptr;
     return nullptr;
   }
 
-  auto advancedProperty = typeface->getAdvancedProperty();
-  if (advancedProperty.capHeight == 0) {
+  auto advancedInfo = typeface->getAdvancedInfo();
+  if (advancedInfo.capHeight == 0) {
     Font font;
     font.setTypeface(typeface);
     font.setSize(textSize);
@@ -131,13 +129,13 @@ const AdvancedTypefaceProperty* PDFFont::GetAdvancedProperty(
       auto bounds = font.getBounds(glyphID);
       capHeight += bounds.height();
     }
-    advancedProperty.capHeight = static_cast<int16_t>(std::round(capHeight / 2));
+    advancedInfo.capHeight = static_cast<int16_t>(std::round(capHeight / 2));
   }
 
   // Fonts are always subset, so always prepend the subset tag.
-  advancedProperty.postScriptName = document->nextFontSubsetTag() + advancedProperty.postScriptName;
-  document->fontAdvancedProperty[id] = std::make_unique<AdvancedTypefaceProperty>(advancedProperty);
-  return document->fontAdvancedProperty[id].get();
+  advancedInfo.postScriptName = document->nextFontSubsetTag() + advancedInfo.postScriptName;
+  document->fontAdvancedInfo[id] = std::make_unique<AdvancedTypefaceInfo>(advancedInfo);
+  return document->fontAdvancedInfo[id].get();
 }
 
 std::shared_ptr<ScalerContext> PDFFont::GetScalerContext(const std::shared_ptr<Typeface>& typeface,
@@ -148,8 +146,7 @@ std::shared_ptr<ScalerContext> PDFFont::GetScalerContext(const std::shared_ptr<T
 PDFFont::~PDFFont() = default;
 
 PDFFont::PDFFont(const PDFStrike* strike, GlyphID firstGlyphID, GlyphID lastGlyphID,
-                 AdvancedTypefaceProperty::FontType fontType,
-                 PDFIndirectReference indirectReference)
+                 AdvancedTypefaceInfo::FontType fontType, PDFIndirectReference indirectReference)
     : _strike(strike), _glyphUsage(firstGlyphID, lastGlyphID),
       _indirectReference(indirectReference), fontType(fontType) {
   // Always include glyph 0
@@ -157,9 +154,9 @@ PDFFont::PDFFont(const PDFStrike* strike, GlyphID firstGlyphID, GlyphID lastGlyp
 }
 
 void PDFFont::PopulateCommonFontDescriptor(PDFDictionary* descriptor,
-                                           const AdvancedTypefaceProperty& advancedProperty,
+                                           const AdvancedTypefaceInfo& advancedInfo,
                                            uint16_t emSize, int16_t defaultWidth) {
-  descriptor->insertName("FontName", advancedProperty.postScriptName);
+  descriptor->insertName("FontName", advancedInfo.postScriptName);
   descriptor->insertInt("Flags", 32);
   descriptor->insertInt("ItalicAngle", 0);
   descriptor->insertObject("FontBBox", MakePDFArray(0.f, 0.f, 0.f, 0.f));
@@ -168,21 +165,21 @@ void PDFFont::PopulateCommonFontDescriptor(PDFDictionary* descriptor,
   }
 }
 
-AdvancedTypefaceProperty::FontType PDFFont::FontType(
-    const PDFStrike& /*pdfStrike*/, const AdvancedTypefaceProperty& advancedProperty) {
-  if (advancedProperty.flags & AdvancedTypefaceProperty::FontFlags::Variable ||
-      advancedProperty.flags & AdvancedTypefaceProperty::FontFlags::AltDataFormat ||
-      advancedProperty.flags & AdvancedTypefaceProperty::FontFlags::NotEmbeddable) {
+AdvancedTypefaceInfo::FontType PDFFont::FontType(const PDFStrike& /*pdfStrike*/,
+                                                 const AdvancedTypefaceInfo& advancedInfo) {
+  if (advancedInfo.flags & AdvancedTypefaceInfo::FontFlags::Variable ||
+      advancedInfo.flags & AdvancedTypefaceInfo::FontFlags::AltDataFormat ||
+      advancedInfo.flags & AdvancedTypefaceInfo::FontFlags::NotEmbeddable) {
     // force Type3 fallback.
-    return AdvancedTypefaceProperty::FontType::Other;
+    return AdvancedTypefaceInfo::FontType::Other;
   }
-  return advancedProperty.type;
+  return advancedInfo.type;
 }
 
 PDFFont* PDFStrike::getFontResource(GlyphID glyphID) {
   auto typeface = strikeSpec.typeface;
   auto textSize = strikeSpec.textSize;
-  const auto* fontMetrics = PDFFont::GetAdvancedProperty(typeface, textSize, document);
+  const auto* fontMetrics = PDFFont::GetAdvancedInfo(typeface, textSize, document);
   DEBUG_ASSERT(fontMetrics);  // SkPDFDevice::internalDrawText ensures the typeface is good.
                               // GetMetrics only returns null to signify a bad typeface.
   const auto& metrics = *fontMetrics;
@@ -246,7 +243,7 @@ const std::vector<Unichar>& PDFFont::GetUnicodeMap(const Typeface& typeface,
 void PDFFont::emitSubsetType0(PDFDocumentImpl* document) const {
   auto typeface = strike().strikeSpec.typeface;
   auto textSize = strike().strikeSpec.textSize;
-  const auto* metricsPtr = PDFFont::GetAdvancedProperty(typeface, textSize, document);
+  const auto* metricsPtr = PDFFont::GetAdvancedInfo(typeface, textSize, document);
   if (!metricsPtr) {
     return;
   }
@@ -264,8 +261,8 @@ void PDFFont::emitSubsetType0(PDFDocumentImpl* document) const {
     return;
   }
 
-  if (type == AdvancedTypefaceProperty::FontType::TrueType ||
-      type == AdvancedTypefaceProperty::FontType::CFF) {
+  if (type == AdvancedTypefaceInfo::FontType::TrueType ||
+      type == AdvancedTypefaceInfo::FontType::CFF) {
     // Avoid use of FontFile3 OpenType (OpenType with CFF) which is PDF 1.6 (2004).
     // Instead use FontFile3 CIDFontType0C (bare CFF) which is PDF 1.3 (2000).
     // See b/352098914
@@ -290,7 +287,7 @@ void PDFFont::emitSubsetType0(PDFDocumentImpl* document) const {
     auto streamDictionary = PDFDictionary::Make();
     streamDictionary->insertInt("Length1", subsetFontStream->size());
     const char* fontFileKey;
-    if (type == AdvancedTypefaceProperty::FontType::TrueType) {
+    if (type == AdvancedTypefaceInfo::FontType::TrueType) {
       fontFileKey = "FontFile2";
     } else {
       streamDictionary->insertName("Subtype", "CIDFontType0C");
@@ -299,7 +296,7 @@ void PDFFont::emitSubsetType0(PDFDocumentImpl* document) const {
     auto fontStreamRef = PDFStreamOut(std::move(streamDictionary), std::move(subsetFontStream),
                                       document, PDFSteamCompressionEnabled::Yes);
     descriptor->insertRef(fontFileKey, fontStreamRef);
-  } else if (type == AdvancedTypefaceProperty::FontType::Type1CID) {
+  } else if (type == AdvancedTypefaceInfo::FontType::Type1CID) {
     auto streamDictionary = PDFDictionary::Make();
     streamDictionary->insertName("Subtype", "CIDFontType0C");
     auto fontStream = Stream::MakeFromData(fontData);
@@ -316,14 +313,14 @@ void PDFFont::emitSubsetType0(PDFDocumentImpl* document) const {
   newCIDFont->insertName("BaseFont", metrics.postScriptName);
 
   switch (type) {
-    case AdvancedTypefaceProperty::FontType::Type1CID:
+    case AdvancedTypefaceInfo::FontType::Type1CID:
       newCIDFont->insertName("Subtype", "CIDFontType0");
       break;
-    case AdvancedTypefaceProperty::FontType::CFF:
+    case AdvancedTypefaceInfo::FontType::CFF:
       newCIDFont->insertName("Subtype", "CIDFontType0");
       newCIDFont->insertName("CIDToGIDMap", "Identity");
       break;
-    case AdvancedTypefaceProperty::FontType::TrueType:
+    case AdvancedTypefaceInfo::FontType::TrueType:
       newCIDFont->insertName("Subtype", "CIDFontType2");
       newCIDFont->insertName("CIDToGIDMap", "Identity");
       break;
@@ -424,7 +421,7 @@ PDFIndirectReference type3_descriptor(PDFDocumentImpl* doc,
   /** PDF32000_2008: FontWeight should be used for Type3 fonts in Tagged PDF documents. */
   descriptor.insertInt("FontWeight", 400);
 
-  if (const auto* metrics = PDFFont::GetAdvancedProperty(typeface, 1000.f, doc)) {
+  if (const auto* metrics = PDFFont::GetAdvancedInfo(typeface, 1000.f, doc)) {
     // Type3 FontDescriptor does not require all the same fields.
     descriptor.insertName("FontName", metrics->postScriptName);
     // descriptor.insertInt("ItalicAngle", metrics->fItalicAngle);
@@ -571,11 +568,11 @@ void PDFFont::emitSubsetType3(PDFDocumentImpl* doc) const {
 
 void PDFFont::emitSubset(PDFDocumentImpl* document) const {
   switch (fontType) {
-    case AdvancedTypefaceProperty::FontType::Type1CID:
-    case AdvancedTypefaceProperty::FontType::TrueType:
-    case AdvancedTypefaceProperty::FontType::CFF:
+    case AdvancedTypefaceInfo::FontType::Type1CID:
+    case AdvancedTypefaceInfo::FontType::TrueType:
+    case AdvancedTypefaceInfo::FontType::CFF:
       return emitSubsetType0(document);
-    case AdvancedTypefaceProperty::FontType::Type1:
+    case AdvancedTypefaceInfo::FontType::Type1:
       return EmitSubsetType1(*this, document);
     default:
       return emitSubsetType3(document);

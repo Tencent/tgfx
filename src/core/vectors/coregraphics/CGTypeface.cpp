@@ -19,7 +19,7 @@
 #include "CGTypeface.h"
 #include <CoreFoundation/CoreFoundation.h>
 #include "CGScalerContext.h"
-#include "core/AdvancedTypefaceProperty.h"
+#include "core/AdvancedTypefaceInfo.h"
 #include "core/utils/UniqueID.h"
 #include "tgfx/core/FontStyle.h"
 #include "tgfx/core/Typeface.h"
@@ -400,8 +400,8 @@ std::vector<Unichar> CGTypeface::getGlyphToUnicodeMap() const {
 #endif
 
 #ifdef TGFX_USE_ADVANCED_TYPEFACE_PROPERTY
-AdvancedTypefaceProperty CGTypeface::getAdvancedProperty() const {
-  AdvancedTypefaceProperty advancedProperty;
+AdvancedTypefaceInfo CGTypeface::getAdvancedInfo() const {
+  AdvancedTypefaceInfo advancedProperty;
   const auto* fontName = CTFontCopyPostScriptName(ctFont);
   if (fontName) {
     advancedProperty.postScriptName = CGTypeface::StringFromCFString(fontName);
@@ -415,27 +415,27 @@ AdvancedTypefaceProperty CGTypeface::getAdvancedProperty() const {
   // TODO(YGaurora): Implement a function to check for the existence of a font table without
   // copying its data, which would improve performance.
   if (copyTableData(glyf) && copyTableData(loca)) {
-    advancedProperty.type = AdvancedTypefaceProperty::FontType::TrueType;
+    advancedProperty.type = AdvancedTypefaceInfo::FontType::TrueType;
   } else if (copyTableData(CFF)) {
-    advancedProperty.type = AdvancedTypefaceProperty::FontType::CFF;
+    advancedProperty.type = AdvancedTypefaceInfo::FontType::CFF;
   }
 
   CTFontSymbolicTraits symbolicTraits = CTFontGetSymbolicTraits(ctFont);
   if (symbolicTraits & kCTFontMonoSpaceTrait) {
-    advancedProperty.style = static_cast<AdvancedTypefaceProperty::StyleFlags>(
-        advancedProperty.style | AdvancedTypefaceProperty::StyleFlags::FixedPitch);
+    advancedProperty.style = static_cast<AdvancedTypefaceInfo::StyleFlags>(
+        advancedProperty.style | AdvancedTypefaceInfo::StyleFlags::FixedPitch);
   }
   if (symbolicTraits & kCTFontItalicTrait) {
-    advancedProperty.style = static_cast<AdvancedTypefaceProperty::StyleFlags>(
-        advancedProperty.style | AdvancedTypefaceProperty::StyleFlags::Italic);
+    advancedProperty.style = static_cast<AdvancedTypefaceInfo::StyleFlags>(
+        advancedProperty.style | AdvancedTypefaceInfo::StyleFlags::Italic);
   }
   CTFontStylisticClass stylisticClass = symbolicTraits & kCTFontClassMaskTrait;
   if (stylisticClass >= kCTFontOldStyleSerifsClass && stylisticClass <= kCTFontSlabSerifsClass) {
-    advancedProperty.style = static_cast<AdvancedTypefaceProperty::StyleFlags>(
-        advancedProperty.style | AdvancedTypefaceProperty::StyleFlags::Serif);
+    advancedProperty.style = static_cast<AdvancedTypefaceInfo::StyleFlags>(
+        advancedProperty.style | AdvancedTypefaceInfo::StyleFlags::Serif);
   } else if (stylisticClass & kCTFontSymbolicClass) {
-    advancedProperty.style = static_cast<AdvancedTypefaceProperty::StyleFlags>(
-        advancedProperty.style | AdvancedTypefaceProperty::StyleFlags::Symbolic);
+    advancedProperty.style = static_cast<AdvancedTypefaceInfo::StyleFlags>(
+        advancedProperty.style | AdvancedTypefaceInfo::StyleFlags::Symbolic);
   }
   return advancedProperty;
 }

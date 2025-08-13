@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "core/AdvancedTypefaceProperty.h"
+#include "core/AdvancedTypefaceInfo.h"
 #include "pdf/PDFExportContext.h"
 #include "pdf/PDFFont.h"
 #include "pdf/PDFGraphicState.h"
@@ -26,7 +26,6 @@
 #include "pdf/PDFTypes.h"
 #include "pdf/PDFUtils.h"
 #include "tgfx/core/Canvas.h"
-#include "tgfx/core/FontMetrics.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/core/Rect.h"
@@ -151,7 +150,7 @@ class PDFDocumentImpl : public PDFDocument {
 
   const Matrix& currentPageTransform() const;
 
-  std::unordered_map<uint32_t, std::unique_ptr<AdvancedTypefaceProperty>> fontAdvancedProperty;
+  std::unordered_map<uint32_t, std::unique_ptr<AdvancedTypefaceInfo>> fontAdvancedInfo;
   std::unordered_map<uint32_t, std::vector<std::string>> type1GlyphNames;
   std::unordered_map<uint32_t, std::vector<Unichar>> toUnicodeMap;
   std::unordered_map<uint32_t, PDFIndirectReference> fontDescriptors;
