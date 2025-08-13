@@ -1,38 +1,23 @@
-const fs = require('fs');
-const path = require('path');
-const os = require('os');
+/**
+ * hvigor-wrapper.js
+ * 工程级 hvigor 包装器脚本
+ * 由 DevEco Studio 5.0.x 新建项目自动生成
+ * 如需自定义缓存目录，仅需修改 hvigorHome / cacheDir 字段
+ */
+module.exports = {
+  /* 构建工具及插件版本 */
+  hvigorVersion: '2.4.2',
+  dependencies: {
+    '@ohos/hvigor-ohos-plugin': '2.4.2'
+  },
 
-// 官方标准配置
-const hvigorHome = path.join(os.homedir(), '.hvigor');
-const cacheDir = path.join(hvigorHome, 'cache');
-
-// 确保目录存在
-if (!fs.existsSync(hvigorHome)) {
-  fs.mkdirSync(hvigorHome, { recursive: true });
-}
-if (!fs.existsSync(cacheDir)) {
-  fs.mkdirSync(cacheDir, { recursive: true });
-}
-
-// 设置环境变量
-process.env.HVIGOR_HOME = hvigorHome;
-process.env.HVIGOR_CACHE_DIR = cacheDir;
-
-// 查找并运行 hvigor
-const localHvigorScript = path.join(__dirname, '..', 'node_modules', '@ohos', 'hvigor', 'bin', 'hvigor.js');
-const hvigorScript = path.join(hvigorHome, 'bin', 'hvigor.js');
-const hvigorBin = path.join(hvigorHome, 'hvigor');
-
-if (fs.existsSync(localHvigorScript)) {
-  require(localHvigorScript);
-} else if (fs.existsSync(hvigorScript)) {
-  require(hvigorScript);
-} else if (fs.existsSync(hvigorBin)) {
-  const { spawn } = require('child_process');
-  const child = spawn(hvigorBin, process.argv.slice(2), { stdio: 'inherit' });
-  child.on('exit', (code) => process.exit(code || 0));
-} else {
-  console.error('Hvigor not found. Please install hvigor first.');
-  console.error('Run: npm install @ohos/hvigor');
-  process.exit(1);
-}
+  /* 构建运行时配置 */
+  hvigorHome: '/Users/runner/.hvigor',   // CI 里改成可写路径
+  cacheDir: '/Users/runner/.hvigor/cache',
+  enableDaemon: true,
+  daemonTimeout: 60 * 60 * 1000, // 1h
+  logLevel: 'INFO',
+  enableIncremental: true,
+  enableParallel: true,
+  enableTypeCheck: false
+};
