@@ -20,6 +20,7 @@
 #include <CoreFoundation/CoreFoundation.h>
 #include "CGScalerContext.h"
 #include "core/AdvancedTypefaceInfo.h"
+#include "core/utils/FontTableTag.h"
 #include "core/utils/UniqueID.h"
 #include "tgfx/core/FontStyle.h"
 #include "tgfx/core/Stream.h"

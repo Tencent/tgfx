@@ -19,6 +19,7 @@
 #include "PDFFont.h"
 #include "core/AdvancedTypefaceInfo.h"
 #include "core/ScalerContext.h"
+#include "core/utils/FontTableTag.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "pdf/PDFDocumentImpl.h"

@@ -19,6 +19,7 @@
 #include "FTTypeface.h"
 #include "FTLibrary.h"
 #include "core/AdvancedTypefaceInfo.h"
+#include "core/utils/FontTableTag.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
 #include FT_TRUETYPE_TABLES_H
