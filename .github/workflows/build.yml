@@ -383,8 +383,10 @@ jobs:
       - name: Find real SDK sysroot
         run: |
           find /Users/runner/openharmony-sdk-5.0.3.140 -type d -name "*linux*"
-      
-      
+
+      - name: Set PATH for hvigorw
+        run: |
+          echo "$GITHUB_WORKSPACE/node_modules/.bin:$PATH" >> $GITHUB_PATH
 
       - name: Get Third-Party Cache
         id: third-party-cache
