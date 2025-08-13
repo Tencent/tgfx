@@ -388,12 +388,11 @@ jobs:
     - name: Setup OpenHarmony
       uses: eclipse-oniro4openharmony/oh-app-action@main
       with: 
-        working-directory: '${{github.workspace}}/ohos/'
+        working-directory: 'ohos'
         install-dependencies: true
 
     - name: Build OpenHarmony
       run: |
-        cd ohos
         hvigorw assembleHap --mode module -p module=hello2d -p product=default --stacktrace
       shell: bash
       
