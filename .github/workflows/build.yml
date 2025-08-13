@@ -366,7 +366,7 @@ jobs:
         lfs: true
 
     - name: Check SDK layout
-        run: |
+      run: |
         ls -l /Users/runner/setup-ohos-sdk/darwin/11/native/build || echo "No build dir"
         find /Users/runner/setup-ohos-sdk/darwin/11/native -name "*.so" | head -10
           
