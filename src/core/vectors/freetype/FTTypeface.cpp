@@ -19,6 +19,7 @@
 #include "FTTypeface.h"
 #include <cstddef>
 #include "FTLibrary.h"
+#include "tgfx/core/Stream.h"
 #include FT_TRUETYPE_TABLES_H
 #include "FTScalerContext.h"
 #include "SystemFont.h"
@@ -149,8 +150,11 @@ GlyphID FTTypeface::getGlyphID(Unichar unichar) const {
   return static_cast<GlyphID>(FT_Get_Char_Index(face, static_cast<FT_ULong>(unichar)));
 }
 
-std::shared_ptr<Data> FTTypeface::getBytes() const {
-  return data.data;
+std::shared_ptr<Stream> FTTypeface::openStream() const {
+  if (data.data) {
+    return Stream::MakeFromData(data.data);
+  }
+  return Stream::MakeFromFile(data.path);
 }
 
 std::shared_ptr<Data> FTTypeface::copyTableData(FontTableTag tag) const {

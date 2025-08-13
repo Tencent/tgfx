@@ -19,9 +19,11 @@
 #include "TextShaper.h"
 #include <list>
 #include <map>
+#include <memory>
 #include <mutex>
 #include "core/utils/Log.h"
 #include "hb.h"
+#include "tgfx/core/Buffer.h"
 #include "utils/ProjectPath.h"
 
 namespace tgfx {
@@ -46,12 +48,17 @@ hb_blob_t* HBGetTable(hb_face_t*, hb_tag_t tag, void* userData) {
 
 std::shared_ptr<hb_face_t> CreateHBFace(const std::shared_ptr<Typeface>& typeface) {
   std::shared_ptr<hb_face_t> hbFace;
-  auto data = typeface->getBytes();
-  if (data && !data->empty()) {
-    auto wrapper = new PtrWrapper<Data>(data);
+  auto stream = typeface->openStream();
+  if (stream && stream->size() > 0) {
+    auto size = stream->size();
+    auto buffer = std::make_shared<Buffer>(size);
+    if (stream->read(buffer->data(), size) != size) {
+      return nullptr;
+    }
+    auto* wrapper = new PtrWrapper<Buffer>(buffer);
     auto blob = std::shared_ptr<hb_blob_t>(
-        hb_blob_create(static_cast<const char*>(data->data()),
-                       static_cast<unsigned int>(data->size()), HB_MEMORY_MODE_READONLY,
+        hb_blob_create(static_cast<const char*>(buffer->data()),
+                       static_cast<unsigned int>(buffer->size()), HB_MEMORY_MODE_READONLY,
                        static_cast<void*>(wrapper),
                        [](void* ctx) { delete reinterpret_cast<PtrWrapper<Data>*>(ctx); }),
         hb_blob_destroy);
