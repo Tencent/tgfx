@@ -375,8 +375,8 @@ jobs:
       - name: Show SDK layout
         run: |
           echo "=== SDK 实际目录 ==="
-          ls -l /Users/runner/openharmony/sdk/4.1.0/native/sysroot/usr/lib/x86_64-linux-ohos || echo "SDK not found"
-          find /Users/runner/openharmony/sdk/4.1.0/native -name "*.so" 2>/dev/null | head -5
+          ls -l /Users/runner/setup-ohos-sdk/darwin/11/native/sysroot/usr/lib || echo "SDK not found"
+          find /Users/runner/setup-ohos-sdk/darwin/11/native -name "*.so" 2>/dev/null | head -5
 
     
       - name: Get Third-Party Cache
