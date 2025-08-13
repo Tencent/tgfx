@@ -358,7 +358,7 @@ jobs:
           path: out
 
 
-  openharmony:
+    openharmony:
     runs-on: macos-latest
     steps:
       - name: Check Out Repo
@@ -389,17 +389,39 @@ jobs:
       - name: Setup OpenHarmony Build Environment
         uses: eclipse-oniro4openharmony/oh-app-action@main
         with:
-            working-directory: './ohos'
-  
-      - name: Configure SDK Path
+          working-directory: './ohos'
+
+      - name: Configure SDK Path and Find Libraries
+        id: setup_sdk
         run: |
-            cd ohos
-            if [ -z "${OHOS_SDK_NATIVE}" ]; then
-              echo "Error: OHOS_SDK_NATIVE environment variable not set."
-              exit 1
-            fi
-            echo "hwsdk.dir=${OHOS_SDK_NATIVE}" > local.properties
-            echo "Successfully configured OpenHarmony SDK path in local.properties."
+          cd ohos
+          if [ -z "${OHOS_SDK_NATIVE}" ]; then
+            echo "Error: OHOS_SDK_NATIVE environment variable not set."
+            exit 1
+          fi
+          
+          echo "hwsdk.dir=${OHOS_SDK_NATIVE}" > local.properties
+          echo "OHOS SDK path set in local.properties."
+
+          echo "Searching for native libraries in ${OHOS_SDK_NATIVE}..."
+          
+          PIXELMAP_LIB_PATH=$(find "${OHOS_SDK_NATIVE}" -name "libpixelmap_ndk.z.so" | head -n 1)
+          IMAGE_SOURCE_LIB_PATH=$(find "${OHOS_SDK_NATIVE}" -name "libimage_source_ndk.z.so" | head -n 1)
+
+          if [ -z "${PIXELMAP_LIB_PATH}" ]; then
+            echo "Error: libpixelmap_ndk.z.so not found!"
+            exit 1
+          fi
+          if [ -z "${IMAGE_SOURCE_LIB_PATH}" ]; then
+            echo "Error: libimage_source_ndk.z.so not found!"
+            exit 1
+          fi
+
+          echo "Found PIXELMAP_LIB at: ${PIXELMAP_LIB_PATH}"
+          echo "Found IMAGE_SOURCE_LIB at: ${IMAGE_SOURCE_LIB_PATH}"
+
+          echo "PIXELMAP_LIB_PATH=${PIXELMAP_LIB_PATH}" >> $GITHUB_ENV
+          echo "IMAGE_SOURCE_LIB_PATH=${IMAGE_SOURCE_LIB_PATH}" >> $GITHUB_ENV
         shell: bash
 
       - name: Install Dependencies
@@ -414,7 +436,7 @@ jobs:
           chmod +x ./hvigorw
           ./hvigorw --version --accept-license
           ./hvigorw clean --no-parallel --no-daemon
-          ./hvigorw assembleHap --mode module -p product=default --stacktrace --no-parallel --no-daemon -PcmakeArgs="-DZLIB_LIBRARY_TYPE=STATIC -DPNG_SHARED=OFF"
+          ./hvigorw assembleHap --mode module -p product=default --stacktrace --no-parallel --no-daemon -PcmakeArgs="-DPIXELMAP_LIB=${{ env.PIXELMAP_LIB_PATH }} -DIMAGE_SOURCE_LIB=${{ env.IMAGE_SOURCE_LIB_PATH }} -DZLIB_LIBRARY_TYPE=STATIC -DPNG_SHARED=OFF"
  
         shell: bash
           
@@ -435,4 +457,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with: 
           name: openharmony_build
-          path: ohos        
+          path: ohos
+        
