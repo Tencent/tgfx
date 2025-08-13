@@ -98,7 +98,8 @@ JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_nativeInit(
 }
 
 JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromSurface(
-    JNIEnv* env, jobject, jobject surface, jbyteArray imageBytesBridge, jbyteArray imageBytesTGFX, jbyteArray fontBytes, jfloat density) {
+    JNIEnv* env, jobject, jobject surface, jbyteArray imageBytesBridge, jbyteArray imageBytesTGFX,
+    jbyteArray fontBytes, jfloat density) {
   if (surface == nullptr) {
     printf("SetupFromSurface() Invalid surface specified.\n");
     return 0;
@@ -132,7 +133,7 @@ JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromS
   auto typeface = tgfx::Typeface::MakeFromData(data);
   env->ReleaseByteArrayElements(fontBytes, bytes, 0);
   if (typeface) {
-      appHost->addTypeface("emoji", std::move(typeface));
+    appHost->addTypeface("emoji", std::move(typeface));
   }
   return reinterpret_cast<jlong>(
       new hello2d::JTGFXView(nativeWindow, std::move(window), std::move(appHost)));
