@@ -11,7 +11,7 @@
 # ----------------------------------------------------------------------------
 
 HVIGOR_APP_HOME="`pwd -P`"
-HVIGOR_WRAPPER_SCRIPT=${HVIGOR_APP_HOME}/hvigor/hvigor-wrapper.json5
+HVIGOR_WRAPPER_SCRIPT=${HVIGOR_APP_HOME}/hvigor/hvigor-wrapper.js
 #NODE_OPTS="--max-old-space-size=4096"
 
 fail() {
