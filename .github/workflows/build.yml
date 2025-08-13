@@ -370,29 +370,6 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Download & Extract SDK
-        run: |
-          wget https://cidownload.openharmony.cn/version/Release_Version/OpenHarmony-5.0.3.140/20250802_033957/version-Release_Version-OpenHarmony-5.0.3.140-20250802_033957-ohos-sdk-full_5.0.3-Release.tar.gz
-          mkdir -p /Users/runner/openharmony-sdk-5.0.3.140
-          tar -xzf version-Release_Version-OpenHarmony-5.0.3.140-20250802_033957-ohos-sdk-full_5.0.3-Release.tar.gz -C /Users/runner/openharmony-sdk-5.0.3.140
-          rm version-Release_Version-OpenHarmony-5.0.3.140-20250802_033957-ohos-sdk-full_5.0.3-Release.tar.gz
-
-      - name: Set SDK Environment
-        run: |
-          echo "OHOS_SDK_NATIVE=/Users/runner/openharmony-sdk-5.0.3.140" >> $GITHUB_ENV
-          echo "OHOS_BASE_SDK_HOME=/Users/runner/openharmony-sdk-5.0.3.140" >> $GITHUB_ENV
-
-      - name: Configure SDK Path
-        run: |
-          cd ohos
-          echo "sdk.dir=/Users/runner/openharmony-sdk-5.0.3.140" > local.properties
-          echo "OHOS_BASE_SDK_HOME=/Users/runner/openharmony-sdk-5.0.3.140" >> local.properties
-
-      - name: Find real SDK sysroot
-        run: |
-          find /Users/runner/openharmony-sdk-5.0.3.140 -type d -name "*api*" | head -10
-          find /Users/runner/openharmony-sdk-5.0.3.140 -name "*toolchains*" -type d | head -5
-
       - name: Get Third-Party Cache
         id: third-party-cache
         uses: actions/cache/restore@v4
@@ -405,7 +382,20 @@ jobs:
         run: |
           npm install depsync -g
           depsync
-        shell: bash
+
+
+      - name: Setup OpenHarmony SDK
+        uses: openharmony-rs/setup-ohos-sdk@v0.2
+        with:
+          version: '5.0.3'
+          cache: true
+
+      
+      - name: Configure SDK Path
+        run: |
+          cd ohos
+          echo "sdk.dir=${OHOS_SDK_NATIVE}" > local.properties
+          echo "OHOS_BASE_SDK_HOME=${OHOS_SDK_NATIVE}" >> local.properties
 
       - name: Setup .npmrc for OpenHarmony
         run: |
@@ -416,36 +406,20 @@ jobs:
         run: |
           mkdir -p $HOME/ohpm
           cd $HOME/ohpm
-          
           curl -L https://contentcenter-vali-drcn.dbankcdn.cn/pvt_2/DeveloperAlliance_package_901_9/81/v3/4ohpm1cli-darwin-x64-5.0.3.140.tgz -o ohpm.tgz || echo "Download failed, will use direct hvigorw"
-          
           if [ -f "ohpm.tgz" ]; then
             tar -xzf ohpm.tgz
             echo "$HOME/ohpm/bin" >> $GITHUB_PATH
-            export PATH="$HOME/ohpm/bin:$PATH"
           fi
 
-      - name: Install Dependencies
+      - name: Install Dependencies & Build
         run: |
           cd ohos
           chmod +x hvigorw
           export PATH="$HOME/ohpm/bin:$PATH"
           if command -v ohpm &> /dev/null; then
             ohpm install --all
-          else
-            echo "ohpm not available, hvigorw will handle dependencies"
           fi
-
-      - name: Setup OpenHarmony SDK
-        uses: openharmony-rs/setup-ohos-sdk@v0.2
-        with:
-            version: '5.0.3'
-            arch: 'aarch64'
-            cache: true
-
-      - name: Build OpenHarmony
-        run: |
-          cd ohos
           ./hvigorw assembleHap --mode module -p module=hello2d -p product=default --stacktrace
 
       - name: Job Failed
