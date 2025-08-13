@@ -368,7 +368,7 @@ jobs:
     - name: Find OHOS system libs
       run: |
           echo "=== SDK 目录结构 ==="
-          ls -R /Users/runner/setup-ohos-sdk/darwin/11/native/sysroot || echo "无 sysroot"
+          find /Users/runner/setup-ohos-sdk -type f -name "*.so" | head -20
   
           
 
