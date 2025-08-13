@@ -386,7 +386,7 @@ jobs:
       shell: bash 
       
     - name: Setup OpenHarmony
-      uses: eclipse-oniro4openharmony/oh-app-action@v0.1
+      uses: eclipse-oniro4openharmony/oh-app-action@main
       with: 
         working-directory: '${{github.workspace}}/ohos/'
         install-dependencies: true
