@@ -365,10 +365,11 @@ jobs:
       with:
         lfs: true
 
-    - name: Check SDK layout
-      run: |
-        ls -l /Users/runner/setup-ohos-sdk/darwin/11/native/build || echo "No build dir"
-        find /Users/runner/setup-ohos-sdk/darwin/11/native -name "*.so" | head -10
+    - name: Find OHOS system libs
+        run: |
+          echo "=== 查找 image / pixelmap 库 ==="
+          find /Users/runner/setup-ohos-sdk -name "*image*" -o -name "*pixelmap*" 2>/dev/null
+  
           
 
     - name: Get Third-Party Cache
