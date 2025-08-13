@@ -1,16 +1,19 @@
 # the minimum version of CMake.
 cmake_minimum_required(VERSION 3.4.1)
-if (NOT CMAKE_FIND_LIBRARY_PREFIXES)
-    set(CMAKE_FIND_LIBRARY_PREFIXES "lib")
-endif()
-if (NOT CMAKE_FIND_LIBRARY_SUFFIXES)
-    set(CMAKE_FIND_LIBRARY_SUFFIXES ".so")
-endif()
+set(OHOS_SDK_DIR "/Users/runner/openharmony/sdk/4.1.0/native/sysroot/usr/lib/x86_64-linux-ohos")
 
-set(OHOS_SYSROOT_DIR "/Users/runner/setup-ohos-sdk/darwin/11/native/sysroot/usr/lib")
+set(CMAKE_FIND_LIBRARY_PREFIXES "lib")
+set(CMAKE_FIND_LIBRARY_SUFFIXES ".so")
 
-set(IMAGE_SOURCE_LIB "${OHOS_SYSROOT_DIR}/libimage_source.so")
-set(PIXELMAP_LIB "${OHOS_SYSROOT_DIR}/libpixelmap.so")
+set(IMAGE_SOURCE_LIB "${OHOS_SDK_DIR}/libimage_source_ndk.z.so")
+set(PIXELMAP_LIB    "${OHOS_SDK_DIR}/libpixelmap_ndk.z.so")
+
+if (NOT EXISTS "${IMAGE_SOURCE_LIB}")
+    message(FATAL_ERROR "Missing ${IMAGE_SOURCE_LIB}")
+endif()
+if (NOT EXISTS "${PIXELMAP_LIB}")
+    message(FATAL_ERROR "Missing ${PIXELMAP_LIB}")
+endif()
 
 project(Hello2D)
 
