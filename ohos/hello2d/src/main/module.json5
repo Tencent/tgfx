@@ -5,7 +5,7 @@
     "description": "$string:module_desc",
     "mainElement": "Hello2dAbility",
     "deviceTypes": [
-      "phone",
+      "default",
       "tablet",
       "2in1"
     ],
