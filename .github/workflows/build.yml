@@ -427,43 +427,50 @@ jobs:
               exit 1
             fi
             
-            # 验证库文件存在
-            LIB_PATH="${SDK_PATH}/native/sysroot/usr/lib"
-            if [ -d "${LIB_PATH}" ]; then
-              echo "Library directory found: ${LIB_PATH}"
-              echo "Available libraries:"
-              ls -la "${LIB_PATH}" | grep -E "(pixelmap|image_source)" || echo "No pixelmap/image_source libraries found"
-              
-              # 检查必需的库文件
-              REQUIRED_LIBS=("libpixelmap.so" "libimage_source.so" "libpixelmap_ndk.z.so" "libimage_source_ndk.z.so")
-              MISSING_LIBS=()
-              for lib in "${REQUIRED_LIBS[@]}"; do
-                if [ -f "${LIB_PATH}/${lib}" ]; then
-                  echo "✓ Found: ${lib}"
-                else
-                  echo "✗ Missing: ${lib}"
-                  MISSING_LIBS+=("${lib}")
-                fi
-              done
-              
-              # 如果标准路径找不到，尝试其他可能的路径
-              if [ ${#MISSING_LIBS[@]} -gt 0 ]; then
-                echo "Searching for libraries in alternative paths..."
-                for alt_path in "${SDK_PATH}/lib" "${SDK_PATH}/usr/lib" "${SDK_PATH}/system/lib"; do
-                  if [ -d "${alt_path}" ]; then
-                    echo "Checking alternative path: ${alt_path}"
-                    ls -la "${alt_path}" | grep -E "(pixelmap|image_source)" || true
+            # 定义可能的库路径
+            LIB_PATHS=(
+              "${SDK_PATH}/sysroot/usr/lib"
+              "${SDK_PATH}/usr/lib"
+              "${SDK_PATH}/lib"
+              "${SDK_PATH}/llvm/lib"
+              "${SDK_PATH}/system/lib"
+            )
+            
+            # 查找库文件
+            FOUND_LIB_PATH=""
+            for lib_path in "${LIB_PATHS[@]}"; do
+              if [ -d "${lib_path}" ]; then
+                echo "Checking library path: ${lib_path}"
+                ls -la "${lib_path}" | grep -E "(pixelmap|image_source)" || true
+                
+                # 检查必需的库文件
+                REQUIRED_LIBS=("libpixelmap.so" "libimage_source.so" "libpixelmap_ndk.z.so" "libimage_source_ndk.z.so")
+                FOUND_COUNT=0
+                for lib in "${REQUIRED_LIBS[@]}"; do
+                  if [ -f "${lib_path}/${lib}" ]; then
+                    echo "✓ Found: ${lib_path}/${lib}"
+                    ((FOUND_COUNT++))
                   fi
                 done
+                
+                if [ $FOUND_COUNT -gt 0 ]; then
+                  FOUND_LIB_PATH="${lib_path}"
+                  echo "Found libraries in: ${FOUND_LIB_PATH}"
+                  break
+                fi
               fi
-            else
-              echo "Error: Library directory not found at ${LIB_PATH}"
-              echo "SDK structure:"
-              find "${SDK_PATH}" -type d -name "*lib*" | head -20 || echo "No lib directories found"
-              echo "All directories:"
-              find "${SDK_PATH}" -type d | head -20 || echo "No directories found"
+            done
+            
+            if [ -z "${FOUND_LIB_PATH}" ]; then
+              echo "Error: No library directories found with required OpenHarmony libraries"
+              echo "Searching entire SDK for library files..."
+              find "${SDK_PATH}" -type f -name "*pixelmap*" -o -name "*image_source*" | head -20 || echo "No library files found"
               exit 1
             fi
+            
+            # 设置环境变量供CMake使用
+            echo "OHOS_LIB_PATH=${FOUND_LIB_PATH}" >> $GITHUB_ENV
+            echo "Successfully configured OpenHarmony SDK with library path: ${FOUND_LIB_PATH}"
         shell: bash 
 
       - name: Install Dependencies
