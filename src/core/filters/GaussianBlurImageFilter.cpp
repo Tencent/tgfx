@@ -235,9 +235,12 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy1(
 
     // Blur y
     // 最后一次模糊不需要扩展额外的区域
-    auto uvMatrix = Matrix::MakeScale(blurScaleFactor.x, blurScaleFactor.y);
-    uvMatrix.preTranslate(clipBounds.left - srcSampleBounds.left,
+    auto uvMatrix = Matrix::I();
+    // 源数据采样偏移。2D模糊时首次模糊会扩大目标尺寸从而生成临时纹理，在最终阶段需要裁剪纹理满足整个模糊任务的输出尺寸。通过设置输入纹理采样偏移确保裁剪后的纹理被绘制在正确的位置。
+    Point srcSampleOffset(clipBounds.left - srcSampleBounds.left,
                           clipBounds.top - srcSampleBounds.top);
+    srcSampleOffset.scale(blurScaleFactor.x, blurScaleFactor.y);
+    uvMatrix.postTranslate(srcSampleOffset.x, srcSampleOffset.y);
     SamplingArgs samplingArgs = {tileMode, tileMode, {}, SrcRectConstraint::Fast};
     sourceFragment =
         TiledTextureEffect::Make(blurTarget->asTextureProxy(), samplingArgs, &uvMatrix);
