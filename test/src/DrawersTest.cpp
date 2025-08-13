@@ -49,7 +49,7 @@ TGFX_TEST(DrawersTest, Compare) {
   }
   canvas->clear();
   drawers::Drawer::DrawBackground(canvas, &appHost);
-  std::string key = "DrawersTest/GridBackGround";
+  std::string key = "DrawersTest/GridBackground";
   auto result = Baseline::Compare(surface, key);
   if (!result) {
     ADD_FAILURE();
