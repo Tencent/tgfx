@@ -36,7 +36,7 @@ class Caps {
 
   virtual int getSampleCount(int requestedCount, PixelFormat pixelFormat) const = 0;
 
-  virtual int getMaxMipmapLevel(int width, int height) const = 0;
+  int getMipLevelCount(int width, int height) const;
 
   bool floatIs32Bits = true;
   int maxTextureSize = 0;

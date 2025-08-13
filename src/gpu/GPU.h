@@ -66,7 +66,7 @@ class GPU {
    */
   virtual std::unique_ptr<GPUTexture> createTexture(int width, int height,
                                                     PixelFormat format = PixelFormat::RGBA_8888,
-                                                    bool mipmapped = false) = 0;
+                                                    int mipLevelCount = 1) = 0;
 
   /**
    * Returns the pixel formats for textures created from a platform-specific hardware buffer, such

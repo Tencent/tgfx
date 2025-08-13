@@ -44,7 +44,7 @@ class GLGPU : public GPU {
   std::unique_ptr<GPUBuffer> createBuffer(size_t size, uint32_t usage) override;
 
   std::unique_ptr<GPUTexture> createTexture(int width, int height, PixelFormat format,
-                                            bool mipmapped) override;
+                                            int mipLevelCount) override;
 
   PixelFormat getExternalTextureFormat(const BackendTexture& backendTexture) const override;
 
