@@ -269,7 +269,7 @@ GlyphID CGTypeface::getGlyphID(Unichar unichar) const {
   return macGlyphs[0];
 }
 
-std::shared_ptr<Stream> CGTypeface::openStream() const {
+std::unique_ptr<Stream> CGTypeface::openStream() const {
   return Stream::MakeFromData(data);
 }
 
