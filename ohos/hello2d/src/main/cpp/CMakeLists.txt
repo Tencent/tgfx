@@ -1,7 +1,8 @@
 # the minimum version of CMake.
 cmake_minimum_required(VERSION 3.4.1)
 
-set(OHOS_SDK_DIR "/Users/runner/openharmony-sdk-5.0.3.135/sysroot/usr/lib/aarch64-linux-ohos")
+set(OHOS_SDK_DIR "/Users/runner/openharmony-sdk-5.0.3.140/sysroot/usr/lib/aarch64-linux-ohos")
+
 
 set(IMAGE_SOURCE_LIB "${OHOS_SDK_DIR}/libimage_source_ndk.z.so")
 set(PIXELMAP_LIB    "${OHOS_SDK_DIR}/libpixelmap_ndk.z.so")

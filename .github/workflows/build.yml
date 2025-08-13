@@ -366,31 +366,31 @@ jobs:
           lfs: true
 
 
-      - name: Download and Extract OpenHarmony SDK
+      - name: Download & Extract SDK
         run: |
-          wget https://cidownload.openharmony.cn/version/Release_Version/OpenHarmony-5.0.3.140/20250802_033957/version-Release_Version-OpenHarmony-5.0.3.140-20250802_033957-ohos-sdk-full_5.0.3-Release.tar.gz -O openharmony-sdk.tar.gz
-          mkdir -p /Users/runner/openharmony-sdk
-          tar -xzf openharmony-sdk.tar.gz -C /Users/runner/openharmony-sdk
-          rm openharmony-sdk.tar.gz
-        
-      - name: Setup OpenHarmony
-        uses: eclipse-oniro4openharmony/oh-app-action@main
-        with:
-          working-directory: ohos
-          install-dependencies: false
-    
+          wget https://cidownload.openharmony.cn/version/Release_Version/OpenHarmony-5.0.3.140/20250802_033957/version-Release_Version-OpenHarmony-5.0.3.140-20250802_033957-ohos-sdk-full_5.0.3-Release.tar.gz -O sdk.tar.gz
+          mkdir -p /Users/runner/openharmony-sdk-5.0.3.140
+          tar -xzf sdk.tar.gz -C /Users/runner/openharmony-sdk-5.0.3.140
+          rm sdk.tar.gz
+
+
+      - name: Set SDK Environment
+        run: |
+          echo "OHOS_SDK_NATIVE=/Users/runner/openharmony-sdk-5.0.3.140" >> $GITHUB_ENV
+
+
       - name: Show SDK layout
         run: |
-          echo "=== SDK 实际目录 ==="
-          ls -l /Users/runner/openharmony-sdk/sysroot/usr/lib/aarch64-linux-ohos || echo "目录不存在"
-          find /Users/runner/openharmony-sdk -name "*image*" -o -name "*pixelmap*" 2>/dev/null | head -20
+          echo "=== 5.0.3.140 SDK 实际目录 ==="
+          ls -l /Users/runner/openharmony-sdk-5.0.3.140/sysroot/usr/lib/aarch64-linux-ohos
+          find /Users/runner/openharmony-sdk-5.0.3.140 -name "*.so" | head -5
+
 
       - name: Get Third-Party Cache
         id: third-party-cache
         uses: actions/cache/restore@v4
         with:
-          path: |
-            third_party
+          path: third_party
           key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-openharmony-
 
@@ -400,14 +400,14 @@ jobs:
           depsync
         shell: bash
 
-  
+
       - name: Build OpenHarmony
         run: |
           cd ohos
           hvigorw assembleHap --mode module -p module=hello2d -p product=default --stacktrace
         shell: bash
 
-    
+
       - name: Job Failed
         if: ${{ failure() }}
         uses: actions/upload-artifact@v4
