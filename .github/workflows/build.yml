@@ -367,8 +367,9 @@ jobs:
 
     - name: Find OHOS system libs
       run: |
-          echo "=== SDK 目录结构 ==="
-          find /Users/runner/setup-ohos-sdk -type f -name "*.so" | head -20
+        echo "=== 实际 SDK 路径 ==="
+        find /Users/runner/openharmony -type d -name "native" 2>/dev/null || true
+        find /Users/runner -type f -name "*.so" | head -10 || true
   
           
 
