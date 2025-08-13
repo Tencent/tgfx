@@ -358,7 +358,7 @@ jobs:
           path: out
 
 
-    openharmony:
+  openharmony:
     runs-on: macos-latest
     steps:
       - name: Check Out Repo
