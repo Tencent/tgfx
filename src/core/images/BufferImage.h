@@ -44,8 +44,8 @@ class BufferImage : public PixelImage {
     return Type::Buffer;
   }
 
-  ISize getScaledTextureSize(float scale) const override {
-    return ISize::Make(static_cast<float>(width()) * scale, static_cast<float>(height()) * scale);
+  bool canDirectDownscale() const override {
+    return true;
   }
 
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;

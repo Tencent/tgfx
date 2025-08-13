@@ -39,14 +39,9 @@ BufferImage::BufferImage(std::shared_ptr<ImageBuffer> buffer, bool mipmapped)
 }
 
 std::shared_ptr<TextureProxy> BufferImage::lockTextureProxy(const TPArgs& args) const {
-  if (args.drawScale > 1.f) {
-    return nullptr;
-  }
-  if (imageBuffer->isPixelBuffer() && args.drawScale < 1.f) {
+  if (imageBuffer->isPixelBuffer() && args.width < width() && args.height < height()) {
     auto codec = PixelBufferCodec::Make(std::static_pointer_cast<PixelBuffer>(imageBuffer));
-    auto scaleWidth = static_cast<int>(static_cast<float>(width()) * args.drawScale);
-    auto scaleHeight = static_cast<int>(static_cast<float>(height()) * args.drawScale);
-    auto generator = ScaledImageGenerator::MakeFrom(codec, scaleWidth, scaleHeight);
+    auto generator = ScaledImageGenerator::MakeFrom(codec, args.width, args.height);
     return args.context->proxyProvider()->createTextureProxy(generator, args.mipmapped,
                                                              args.renderFlags);
   }

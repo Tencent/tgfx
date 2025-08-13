@@ -66,12 +66,12 @@ PlacementPtr<FragmentProcessor> RGBAAAImage::asFragmentProcessor(const FPArgs& a
     if (samplingArgs.constraint != SrcRectConstraint::Strict) {
       newSamplingArgs.sampleArea = getSubset(drawBounds);
     }
-    TPArgs tpArgs(args.context, args.renderFlags, mipmapped, 1.0f, {});
+    TPArgs tpArgs(args.context, args.renderFlags, mipmapped, width(), height(), {});
     auto proxy = source->lockTextureProxy(tpArgs);
     return TextureEffect::MakeRGBAAA(std::move(proxy), newSamplingArgs, alphaStart,
                                      AddressOf(matrix));
   }
-  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, 1.0f, {});
+  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, width(), height(), {});
   auto textureProxy = lockTextureProxy(tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;

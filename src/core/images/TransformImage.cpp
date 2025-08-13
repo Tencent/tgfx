@@ -27,14 +27,11 @@ TransformImage::TransformImage(std::shared_ptr<Image> source) : source(std::move
 }
 
 std::shared_ptr<TextureProxy> TransformImage::lockTextureProxy(const TPArgs& args) const {
-  if (args.drawScale > 1.f) {
-    return nullptr;
-  }
   auto textureWidth = width();
   auto textureHeight = height();
-  if (args.drawScale < 1.f) {
-    textureWidth = static_cast<int>(roundf(static_cast<float>(width()) * args.drawScale));
-    textureHeight = static_cast<int>(roundf(static_cast<float>(height()) * args.drawScale));
+  if (textureWidth < args.width && textureHeight < args.height) {
+    textureWidth = args.width;
+    textureHeight = args.height;
   }
   auto renderTarget =
       RenderTargetProxy::MakeFallback(args.context, textureWidth, textureHeight, isAlphaOnly(), 1,

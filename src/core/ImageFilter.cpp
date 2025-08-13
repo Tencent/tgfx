@@ -40,18 +40,12 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
                                                             const Rect& clipBounds,
                                                             const TPArgs& args) const {
 
-  auto scaledBounds = clipBounds;
-  if (args.drawScale < 1.0f) {
-    scaledBounds.scale(args.drawScale, args.drawScale);
-  }
-  scaledBounds.roundOut();
-
-  auto textureScaleX = scaledBounds.width() / clipBounds.width();
-  auto textureScaleY = scaledBounds.height() / clipBounds.height();
+  auto textureScaleX = static_cast<float>(args.width) / clipBounds.width();
+  auto textureScaleY = static_cast<float>(args.height) / clipBounds.height();
 
   auto renderTarget = RenderTargetProxy::MakeFallback(
-      args.context, static_cast<int>(scaledBounds.width()), static_cast<int>(scaledBounds.height()),
-      source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
+      args.context, args.width, args.height, source->isAlphaOnly(), 1,
+      args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
   if (renderTarget == nullptr) {
     return nullptr;
   }
@@ -94,7 +88,13 @@ PlacementPtr<FragmentProcessor> ImageFilter::makeFPFromTextureProxy(
   }
   auto isAlphaOnly = source->isAlphaOnly();
   auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
-  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale);
+  auto scaleWidth = source->width();
+  auto scaleHeight = source->height();
+  if (args.drawScale < 1.f) {
+    scaleWidth = static_cast<int>(args.drawScale * static_cast<float>(source->width()));
+    scaleHeight = static_cast<int>(args.drawScale * static_cast<float>(source->height()));
+  }
+  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, scaleWidth, scaleHeight);
   auto textureProxy = lockTextureProxy(std::move(source), dstBounds, tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;

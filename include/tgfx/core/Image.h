@@ -333,10 +333,10 @@ class Image {
                                               const SamplingOptions& sampling) const;
 
   /**
-   * Returns the size of the texture proxy after applying the scale factor, if the subclass's
-   * lockTextureProxy method supports direct scaling; otherwise, returns the original size.
+   * Returns true if the subclass's lockTextureProxy method supports direct scaling; otherwise,
+   * returns false
    */
-  virtual ISize getScaledTextureSize(float scale) const;
+  virtual bool canDirectDownscale() const;
 
   /**
    * Returns a texture proxy for the entire Image. Note that the returned texture size may differ

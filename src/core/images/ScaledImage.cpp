@@ -45,8 +45,17 @@ PlacementPtr<FragmentProcessor> ScaledImage::asFragmentProcessor(const FPArgs& a
   }
   drawRect.roundOut();
   auto mipmapped = hasMipmaps() && samplingArgs.sampling.mipmapMode != MipmapMode::None;
-  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale);
-  auto textureProxy = lockTextureProxy(tpArgs, drawRect);
+  auto scaleWidth = width();
+  auto scaleHeight = height();
+  auto scaledRect = drawRect;
+  if (args.drawScale < 1.f) {
+    scaleWidth = static_cast<int>(args.drawScale * static_cast<float>(width()));
+    scaleHeight = static_cast<int>(args.drawScale * static_cast<float>(height()));
+    scaledRect.scale(args.drawScale, args.drawScale);
+    scaledRect.roundOut();
+  }
+  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, scaleWidth, scaleHeight);
+  auto textureProxy = lockTextureProxy(tpArgs, scaledRect);
   if (textureProxy == nullptr) {
     return nullptr;
   }
@@ -66,34 +75,30 @@ PlacementPtr<FragmentProcessor> ScaledImage::asFragmentProcessor(const FPArgs& a
 }
 
 std::shared_ptr<TextureProxy> ScaledImage::lockTextureProxy(const TPArgs& args) const {
-  return lockTextureProxy(args, Rect::MakeWH(width(), height()));
+  auto scaledWidth = args.width;
+  auto scaledHeight = args.height;
+  if (args.width < source->width() && args.height < source->height()) {
+    scaledWidth = args.width;
+    scaledHeight = args.height;
+  }
+  return lockTextureProxy(args, Rect::MakeWH(scaledWidth, scaledHeight));
 }
 
 std::shared_ptr<TextureProxy> ScaledImage::lockTextureProxy(const TPArgs& args,
                                                             const Rect& drawRect) const {
-  if (args.drawScale > 1.f) {
-    return nullptr;
-  }
   auto alphaRenderable = args.context->caps()->isFormatRenderable(PixelFormat::ALPHA_8);
-  auto scaledRect = drawRect;
-  if (args.drawScale < 1.f) {
-    scaledRect.scale(args.drawScale, args.drawScale);
-  }
-  scaledRect.roundOut();
-  auto drawScaleX = scaledRect.width() / drawRect.width();
-  auto drawScaleY = scaledRect.height() / drawRect.height();
   auto renderTarget = RenderTargetProxy::MakeFallback(
-      args.context, static_cast<int>(scaledRect.width()), static_cast<int>(scaledRect.height()),
+      args.context, static_cast<int>(drawRect.width()), static_cast<int>(drawRect.height()),
       alphaRenderable && isAlphaOnly(), 1, hasMipmaps() && args.mipmapped, ImageOrigin::TopLeft,
       args.backingFit);
   if (renderTarget == nullptr) {
     return nullptr;
   }
   Point scales =
-      Point::Make(drawScaleX * static_cast<float>(_width) / static_cast<float>(source->width()),
-                  drawScaleY * static_cast<float>(_height) / static_cast<float>(source->height()));
+      Point::Make(static_cast<float>(args.width) / static_cast<float>(source->width()),
+                  static_cast<float>(args.height) / static_cast<float>(source->height()));
   Matrix sourceUVMatrix = Matrix::MakeScale(1.0f / scales.x, 1.0f / scales.y);
-  sourceUVMatrix.preTranslate(scaledRect.left, scaledRect.top);
+  sourceUVMatrix.preTranslate(drawRect.left, drawRect.top);
   FPArgs fpArgs(args.context, args.renderFlags,
                 Rect::MakeWH(renderTarget->width(), renderTarget->height()),
                 std::max(scales.x, scales.y));

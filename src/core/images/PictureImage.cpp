@@ -120,14 +120,11 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
 }
 
 std::shared_ptr<TextureProxy> PictureImage::lockTextureProxy(const TPArgs& args) const {
-  if (args.drawScale > 1.f) {
-    return nullptr;
-  }
   auto textureWidth = _width;
   auto textureHeight = _height;
-  if (args.drawScale < 1.f) {
-    textureWidth = static_cast<int>(floorf(static_cast<float>(_width) * args.drawScale));
-    textureHeight = static_cast<int>(floorf(static_cast<float>(_height) * args.drawScale));
+  if (textureWidth < args.width && textureHeight < args.height) {
+    textureWidth = args.width;
+    textureHeight = args.height;
   }
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, textureWidth, textureHeight, isAlphaOnly(), 1, hasMipmaps() && args.mipmapped,

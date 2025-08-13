@@ -141,7 +141,13 @@ PlacementPtr<FragmentProcessor> FilterImage::asFragmentProcessor(const FPArgs& a
                                        AddressOf(fpMatrix));
   }
   auto mipmapped = source->hasMipmaps() && sampling.mipmapMode != MipmapMode::None;
-  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale);
+  auto scaleWidth = width();
+  auto scaleHeight = height();
+  if (args.drawScale < 1.f) {
+    scaleWidth = static_cast<int>(args.drawScale * static_cast<float>(width()));
+    scaleHeight = static_cast<int>(args.drawScale * static_cast<float>(height()));
+  }
+  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, scaleWidth, scaleHeight);
   auto textureProxy = filter->lockTextureProxy(source, dstBounds, tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;

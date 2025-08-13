@@ -26,7 +26,9 @@ PlacementPtr<FragmentProcessor> PixelImage::asFragmentProcessor(const FPArgs& ar
                                                                 const SamplingArgs& samplingArgs,
                                                                 const Matrix* uvMatrix) const {
   auto mipmapped = hasMipmaps() && samplingArgs.sampling.mipmapMode != MipmapMode::None;
-  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale, BackingFit::Approx);
+  auto scaleWidth = static_cast<int>(args.drawScale * static_cast<float>(width()));
+  auto scaleHeight = static_cast<int>(args.drawScale * static_cast<float>(height()));
+  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, scaleWidth, scaleHeight, BackingFit::Approx);
   auto textureProxy = lockTextureProxy(tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;
