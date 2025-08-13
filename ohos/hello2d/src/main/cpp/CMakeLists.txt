@@ -2,6 +2,13 @@
 set(OHOS_ARCH arm64-v8a)
 set(OHOS_NATIVE_API_LEVEL 11)
 cmake_minimum_required(VERSION 3.4.1)
+list(APPEND CMAKE_FIND_ROOT_PATH
+     /Users/runner/setup-ohos-sdk/darwin/11/native/sysroot/usr/lib
+     /Users/runner/setup-ohos-sdk/darwin/11/native/sysroot/usr/lib/arm-linux-ohos)
+
+find_library(IMAGE_SOURCE_LIB image_source REQUIRED)
+find_library(PIXELMAP_LIB    pixelmap    REQUIRED)
+
 project(Hello2D)
 
 set(CMAKE_CXX_STANDARD 17)
