@@ -167,6 +167,106 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
                       static_cast<int>(clipBounds.height()));
 }
 
+//TODO: testcode
+std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy1(
+    std::shared_ptr<Image> source, const Rect& clipBounds, const TPArgs& args) const {
+
+  Rect srcSampleBounds = clipBounds;
+  // The pixels involved in the convolution operation may be outside the clipping area.
+  srcSampleBounds = filterBounds(srcSampleBounds);
+  srcSampleBounds.intersect(filterBounds(Rect::MakeWH(source->width(), source->height())));
+  srcSampleBounds.roundOut();
+
+  Size dstDrawSize(clipBounds.width(), clipBounds.height());
+  const float drawScale = std::max(0.0f, args.drawScale);
+  const float epsilon = std::numeric_limits<float>::epsilon();
+  if (fabs(drawScale - 1.0f) > epsilon) {
+    dstDrawSize.scale(drawScale, drawScale);
+  }
+  const ISize dstDrawISize = dstDrawSize.toRound();
+
+  Point sigma(blurrinessX, blurrinessY);
+  Point blurScaleFactor(1.0f, 1.0f);
+  bool isDrawScaleDown = drawScale < 1.0f;
+  if (isDrawScaleDown) {
+    // 小于1减小卷积核，加速运算
+    blurScaleFactor = Point(drawScale, drawScale);
+    sigma *= drawScale;
+  }
+  if (sigma.x > MAX_BLUR_SIGMA) {
+    blurScaleFactor.x *= MAX_BLUR_SIGMA / sigma.x;
+    sigma.x = MAX_BLUR_SIGMA;
+  }
+  if (sigma.y > MAX_BLUR_SIGMA) {
+    blurScaleFactor.y *= MAX_BLUR_SIGMA / sigma.y;
+    sigma.y = MAX_BLUR_SIGMA;
+  }
+
+  Size blurDstSize(clipBounds.width(), clipBounds.height());
+  if (blurScaleFactor.x < 1.0f || blurScaleFactor.y < 1.0f) {
+    blurDstSize.scale(blurScaleFactor.x, blurScaleFactor.y);
+  }
+  const ISize blurDstISize = blurDstSize.toRound();
+
+  auto sourceFragment = getSourceFragmentProcessor(source, args.context, args.renderFlags,
+                                                   srcSampleBounds, blurScaleFactor);
+  const auto isAlphaOnly = source->isAlphaOnly();
+  bool blur2D = (sigma.x > 0.0f && sigma.y > 0.0f);
+  std::shared_ptr<RenderTargetProxy> blurTarget = nullptr;
+  bool isBlurDstNotScaled = (dstDrawISize.width == blurDstISize.width
+      && dstDrawISize.height == blurDstISize.height);
+  bool blurTargetMipmaped = (args.mipmapped && isBlurDstNotScaled);
+  if (blur2D) {
+    // Blur X
+    // 首次模糊生成的纹理尺寸必须能够容纳后续Y轴卷积运算所需要用到的所有像素
+    Size xBlurDstSize(srcSampleBounds.width(), srcSampleBounds.height());
+    if (blurScaleFactor.x < 1.0f || blurScaleFactor.y < 1.0f) {
+      xBlurDstSize.scale(blurScaleFactor.x, blurScaleFactor.y);
+    }
+    const ISize xBlurDstISize = xBlurDstSize.toRound();
+    blurTarget = RenderTargetProxy::MakeFallback(
+        args.context, xBlurDstISize.width, xBlurDstISize.height,
+        isAlphaOnly, 1, false, ImageOrigin::TopLeft, BackingFit::Approx);
+    if (blurTarget == nullptr) {
+      return nullptr;
+    }
+    Blur1D(std::move(sourceFragment), blurTarget, sigma.x,
+           GaussianBlurDirection::Horizontal, 1.0f, args.renderFlags);
+
+    // Blur y
+    // 最后一次模糊不需要扩展额外的区域
+    auto uvMatrix = Matrix::MakeScale(blurScaleFactor.x, blurScaleFactor.y);
+    uvMatrix.preTranslate(clipBounds.left - srcSampleBounds.left,
+                          clipBounds.top - srcSampleBounds.top);
+    SamplingArgs samplingArgs = {tileMode, tileMode, {}, SrcRectConstraint::Fast};
+    sourceFragment =
+        TiledTextureEffect::Make(blurTarget->asTextureProxy(), samplingArgs, &uvMatrix);
+    blurTarget = RenderTargetProxy::MakeFallback(
+        args.context, blurDstISize.width, blurDstISize.height,
+        isAlphaOnly, 1, blurTargetMipmaped, ImageOrigin::TopLeft, BackingFit::Approx);
+    if (!blurTarget) {
+      return nullptr;
+    }
+    Blur1D(std::move(sourceFragment), blurTarget, sigma.y,
+           GaussianBlurDirection::Vertical, 1.0f, args.renderFlags);
+  } else {
+    blurTarget = RenderTargetProxy::MakeFallback(
+        args.context, blurDstISize.width, blurDstISize.height,
+        isAlphaOnly, 1, blurTargetMipmaped, ImageOrigin::TopLeft, BackingFit::Approx);
+    auto blur1DDirection = (sigma.x > sigma.y
+        ? GaussianBlurDirection::Horizontal : GaussianBlurDirection::Vertical);
+    float blur1DSegma = std::max(sigma.x, sigma.y);
+    Blur1D(std::move(sourceFragment), blurTarget, blur1DSegma,
+           blur1DDirection, 1.0f, args.renderFlags);
+  }
+
+  if (isBlurDstNotScaled) {
+    return blurTarget->asTextureProxy();
+  } else {
+    return ScaleTexture(args, blurTarget->asTextureProxy(), dstDrawISize.width, dstDrawISize.height);
+  }
+}
+
 Rect GaussianBlurImageFilter::onFilterBounds(const Rect& srcRect) const {
   return srcRect.makeOutset(2.f * blurrinessX, 2.f * blurrinessY);
 }
