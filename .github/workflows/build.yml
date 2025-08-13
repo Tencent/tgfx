@@ -438,9 +438,15 @@ jobs:
           
       - name: Register SDK with hvigor
         run: |
+          
+          SDK_ROOT=$(find /Users/runner -type d -name "toolchains" | head -1)
+          SDK_ROOT=$(dirname "$SDK_ROOT") 
+          echo "Real SDK root = $SDK_ROOT"
+        
+        
           mkdir -p ohos
-          echo "sdk.dir=/Users/runner/openharmony-sdk-5.0.3.140" > ohos/local.properties
-          echo "OHOS_BASE_SDK_HOME=/Users/runner/openharmony-sdk-5.0.3.140" >> $GITHUB_ENV
+          echo "sdk.dir=$SDK_ROOT" > ohos/local.properties
+          echo "OHOS_BASE_SDK_HOME=$SDK_ROOT" >> $GITHUB_ENV
 
 
       - name: Build OpenHarmony
