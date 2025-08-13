@@ -131,12 +131,12 @@ bool Path::isLine(Point line[2]) const {
   return pathRef->path.isLine(reinterpret_cast<SkPoint*>(line));
 }
 
-bool Path::isRect(Rect* rect, bool* isClosed, bool* reversed) const {
+bool Path::isRect(Rect* rect, bool* closed, bool* reversed) const {
   std::unique_ptr<SkRect> rectPointer = rect ? std::make_unique<SkRect>() : nullptr;
   std::unique_ptr<SkPathDirection> directionPointer =
       reversed ? std::make_unique<SkPathDirection>() : nullptr;
 
-  if (!pathRef->path.isRect(rectPointer.get(), isClosed, directionPointer.get())) {
+  if (!pathRef->path.isRect(rectPointer.get(), closed, directionPointer.get())) {
     return false;
   }
 

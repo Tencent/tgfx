@@ -37,7 +37,12 @@ typedef uint16_t GlyphID;
 typedef int32_t Unichar;
 
 typedef uint32_t FontTableTag;
-static inline constexpr FontTableTag SetFourByteTag(char a, char b, char c, char d) {
+
+/**
+ * A 4-byte tag used to identify a font table.
+ * The tag is stored in big-endian order, so the first byte is the most significant.
+ */
+static constexpr FontTableTag SetFourByteTag(char a, char b, char c, char d) {
   return ((static_cast<uint32_t>(a) << 24) | (static_cast<uint32_t>(b) << 16) |
           (static_cast<uint32_t>(c) << 8) | static_cast<uint32_t>(d));
 }
@@ -151,8 +156,6 @@ class Typeface {
    */
   Rect getBounds() const;
 
-  size_t getTableSize(FontTableTag tag) const;
-
  protected:
   /**
    * Gets the mapping from GlyphID to unicode. The array index is GlyphID, and the array value is
@@ -194,7 +197,6 @@ class Typeface {
 
   friend class Font;
   friend class ScalerContext;
-  friend class FTScalerContext;
   friend class GlyphConverter;
   friend class CGMask;
   friend class WebMask;

@@ -118,14 +118,6 @@ AdvancedTypefaceProperty Typeface::getAdvancedProperty() const {
   return AdvancedTypefaceProperty();
 }
 
-size_t Typeface::getTableSize(FontTableTag tag) const {
-  auto data = copyTableData(tag);
-  if (data) {
-    return data->size();
-  }
-  return 0;
-}
-
 std::shared_ptr<ScalerContext> Typeface::getScalerContext(float size) {
   if (size <= 0.0f) {
     return ScalerContext::MakeEmpty(size);

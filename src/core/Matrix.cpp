@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Matrix.h"
-#include <array>
 #include <cfloat>
 #include "core/utils/MathExtra.h"
 
@@ -511,5 +510,4 @@ const Matrix& Matrix::I() {
 const Matrix::MapPtsProc Matrix::MapPtsProcs[] = {
     Matrix::IdentityPoints, Matrix::TransPoints,  Matrix::ScalePoints,  Matrix::ScalePoints,
     Matrix::AffinePoints,   Matrix::AffinePoints, Matrix::AffinePoints, Matrix::AffinePoints};
-
 }  // namespace tgfx

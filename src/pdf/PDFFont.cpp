@@ -466,7 +466,6 @@ void PDFFont::emitSubsetType3(PDFDocumentImpl* doc) const {
   GlyphID xGlyphID = typeface->getGlyphID('X');
   auto scaleContext = PDFFont::GetScalerContext(typeface, textSize);
   float xHeight = scaleContext->getBounds(xGlyphID, false, false).height();
-  // float bitmapScale = 1.f;
 
   PDFDictionary font("Font");
   font.insertName("Subtype", "Type3");
