@@ -56,6 +56,7 @@ std::shared_ptr<Image> BufferImage::onMakeScaled(int newWidth, int newHeight,
     image->weakThis = image;
     return image;
   }
+
   return PixelImage::onMakeScaled(newWidth, newHeight, sampling);
 }
 
