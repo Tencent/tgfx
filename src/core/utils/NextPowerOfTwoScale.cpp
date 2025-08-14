@@ -19,6 +19,7 @@
 #include "NextPowerOfTwoScale.h"
 #include <algorithm>
 #include <cmath>
+#include <cstdint>
 
 namespace tgfx {
 

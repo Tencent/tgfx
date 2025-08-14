@@ -17,11 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BufferImage.h"
-#include "core/utils/NextPowerOfTwoScale.h"
 #include "core/PixelBuffer.h"
 #include "core/PixelBufferCodec.h"
 #include "core/ScaledImageGenerator.h"
 #include "core/images/CodecImage.h"
+#include "core/utils/NextPowerOfTwoScale.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/TPArgs.h"
 
