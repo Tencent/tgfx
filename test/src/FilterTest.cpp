@@ -730,7 +730,8 @@ TGFX_TEST(FilterTest, GaussianBlurImageFilter) {
   ASSERT_TRUE(image != nullptr);
   int margin = 25;
   auto originOffset = static_cast<float>(margin);
-  Point srcImgCenter(static_cast<float>(image->width()) * 0.5f + originOffset, static_cast<float>(image->height()) * 0.5f + originOffset);
+  Point srcImgCenter(static_cast<float>(image->width()) * 0.5f + originOffset,
+                     static_cast<float>(image->height()) * 0.5f + originOffset);
   int surfaceWidth = image->width() + margin * 2;
   int surfaceHeight = image->height() + margin * 2;
   auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
@@ -774,10 +775,12 @@ TGFX_TEST(FilterTest, GaussianBlurImageFilter) {
     canvas->scale(imageScale, imageScale);
     Point scaledImgCenter(srcImgCenter.x * imageScale, srcImgCenter.y * imageScale);
     Point imgCenterDiff = srcImgCenter - scaledImgCenter;
-    Point canvasOffset(static_cast<float>(surfaceWidth) * 0.5f, static_cast<float>(surfaceHeight) * 0.5f);
+    Point canvasOffset(static_cast<float>(surfaceWidth) * 0.5f,
+                       static_cast<float>(surfaceHeight) * 0.5f);
     // Move the image center to the right-down corner of the canvas
-    canvas->translate((canvasOffset.x + imgCenterDiff.x) / imageScale, (canvasOffset.y + imgCenterDiff.y) / imageScale);
-    canvas->drawImage(image, filterOffset.x +originOffset, filterOffset.y + originOffset);
+    canvas->translate((canvasOffset.x + imgCenterDiff.x) / imageScale,
+                      (canvasOffset.y + imgCenterDiff.y) / imageScale);
+    canvas->drawImage(image, filterOffset.x + originOffset, filterOffset.y + originOffset);
     context->flushAndSubmit();
     EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/GaussianBlurImageFilterComplex1D"));
     canvas->restore();
@@ -795,10 +798,12 @@ TGFX_TEST(FilterTest, GaussianBlurImageFilter) {
     canvas->scale(imageScale, imageScale);
     Point scaledImgCenter(srcImgCenter.x * imageScale, srcImgCenter.y * imageScale);
     Point imgCenterDiff = srcImgCenter - scaledImgCenter;
-    Point canvasOffset(static_cast<float>(surfaceWidth) * -0.5f, static_cast<float>(surfaceHeight) * -0.5f);
+    Point canvasOffset(static_cast<float>(surfaceWidth) * -0.5f,
+                       static_cast<float>(surfaceHeight) * -0.5f);
     // Move the image center to the top-left corner of the canvas
-    canvas->translate((canvasOffset.x + imgCenterDiff.x) / imageScale, (canvasOffset.y + imgCenterDiff.y) / imageScale);
-    canvas->drawImage(image, filterOffset.x +originOffset, filterOffset.y + originOffset);
+    canvas->translate((canvasOffset.x + imgCenterDiff.x) / imageScale,
+                      (canvasOffset.y + imgCenterDiff.y) / imageScale);
+    canvas->drawImage(image, filterOffset.x + originOffset, filterOffset.y + originOffset);
     context->flushAndSubmit();
     EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/GaussianBlurImageFilterComplex2D"));
     canvas->restore();

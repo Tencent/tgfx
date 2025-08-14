@@ -93,7 +93,7 @@ struct Point {
     x += dx;
     y += dy;
   }
-  
+
   /**
    * Scale the Point by scaleX and scaleY.
    */

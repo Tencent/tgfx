@@ -82,7 +82,7 @@ static std::shared_ptr<TextureProxy> ScaleTexture(const TPArgs& args,
   return renderTarget->asTextureProxy();
 }
 
-std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy (
+std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     std::shared_ptr<Image> source, const Rect& clipBounds, const TPArgs& args) const {
 
   Rect srcSampleBounds = clipBounds;
@@ -127,8 +127,8 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy (
   const auto isAlphaOnly = source->isAlphaOnly();
   bool blur2D = (sigma.x > 0.0f && sigma.y > 0.0f);
   std::shared_ptr<RenderTargetProxy> blurTarget = nullptr;
-  bool isBlurDstNotScaled = (dstDrawISize.width == blurDstISize.width
-      && dstDrawISize.height == blurDstISize.height);
+  bool isBlurDstNotScaled =
+      (dstDrawISize.width == blurDstISize.width && dstDrawISize.height == blurDstISize.height);
   bool blurTargetMipmaped = (args.mipmapped && isBlurDstNotScaled);
   if (blur2D) {
     // Blur X
@@ -138,14 +138,14 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy (
       xBlurDstSize.scale(blurScaleFactor.x, blurScaleFactor.y);
     }
     const ISize xBlurDstISize = xBlurDstSize.toRound();
-    blurTarget = RenderTargetProxy::MakeFallback(
-        args.context, xBlurDstISize.width, xBlurDstISize.height,
-        isAlphaOnly, 1, false, ImageOrigin::TopLeft, BackingFit::Approx);
+    blurTarget = RenderTargetProxy::MakeFallback(args.context, xBlurDstISize.width,
+                                                 xBlurDstISize.height, isAlphaOnly, 1, false,
+                                                 ImageOrigin::TopLeft, BackingFit::Approx);
     if (blurTarget == nullptr) {
       return nullptr;
     }
-    Blur1D(std::move(sourceFragment), blurTarget, sigma.x,
-           GaussianBlurDirection::Horizontal, 1.0f, args.renderFlags);
+    Blur1D(std::move(sourceFragment), blurTarget, sigma.x, GaussianBlurDirection::Horizontal, 1.0f,
+           args.renderFlags);
 
     // Blur y
     // 最后一次模糊不需要扩展额外的区域
@@ -159,28 +159,29 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy (
     sourceFragment =
         TiledTextureEffect::Make(blurTarget->asTextureProxy(), samplingArgs, &uvMatrix);
     blurTarget = RenderTargetProxy::MakeFallback(
-        args.context, blurDstISize.width, blurDstISize.height,
-        isAlphaOnly, 1, blurTargetMipmaped, ImageOrigin::TopLeft, BackingFit::Approx);
+        args.context, blurDstISize.width, blurDstISize.height, isAlphaOnly, 1, blurTargetMipmaped,
+        ImageOrigin::TopLeft, BackingFit::Approx);
     if (!blurTarget) {
       return nullptr;
     }
-    Blur1D(std::move(sourceFragment), blurTarget, sigma.y,
-           GaussianBlurDirection::Vertical, 1.0f, args.renderFlags);
+    Blur1D(std::move(sourceFragment), blurTarget, sigma.y, GaussianBlurDirection::Vertical, 1.0f,
+           args.renderFlags);
   } else {
     blurTarget = RenderTargetProxy::MakeFallback(
-        args.context, blurDstISize.width, blurDstISize.height,
-        isAlphaOnly, 1, blurTargetMipmaped, ImageOrigin::TopLeft, BackingFit::Approx);
-    auto blur1DDirection = (sigma.x > sigma.y
-        ? GaussianBlurDirection::Horizontal : GaussianBlurDirection::Vertical);
+        args.context, blurDstISize.width, blurDstISize.height, isAlphaOnly, 1, blurTargetMipmaped,
+        ImageOrigin::TopLeft, BackingFit::Approx);
+    auto blur1DDirection =
+        (sigma.x > sigma.y ? GaussianBlurDirection::Horizontal : GaussianBlurDirection::Vertical);
     float blur1DSegma = std::max(sigma.x, sigma.y);
-    Blur1D(std::move(sourceFragment), blurTarget, blur1DSegma,
-           blur1DDirection, 1.0f, args.renderFlags);
+    Blur1D(std::move(sourceFragment), blurTarget, blur1DSegma, blur1DDirection, 1.0f,
+           args.renderFlags);
   }
 
   if (isBlurDstNotScaled) {
     return blurTarget->asTextureProxy();
   } else {
-    return ScaleTexture(args, blurTarget->asTextureProxy(), dstDrawISize.width, dstDrawISize.height);
+    return ScaleTexture(args, blurTarget->asTextureProxy(), dstDrawISize.width,
+                        dstDrawISize.height);
   }
 }
 
