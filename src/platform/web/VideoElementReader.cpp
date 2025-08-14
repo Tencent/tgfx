@@ -39,9 +39,4 @@ std::shared_ptr<VideoElementReader> VideoElementReader::MakeFrom(val video, int 
 VideoElementReader::VideoElementReader(std::shared_ptr<ImageStream> stream)
     : ImageReader(std::move(stream)) {
 }
-
-std::shared_ptr<ImageBuffer> VideoElementReader::acquireNextBuffer(val promise) {
-  std::static_pointer_cast<VideoElement>(stream)->markFrameChanged(promise);
-  return ImageReader::acquireNextBuffer();
-}
 }  // namespace tgfx

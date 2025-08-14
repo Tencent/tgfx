@@ -41,9 +41,9 @@ if (typeof window !== 'undefined') {
             let tgfxView = shareData.Hello2DModule.TGFXView.MakeFrom('#hello2d');
             shareData.tgfxBaseView = tgfxView;
             var image = await loadImage("http://localhost:8081/../../resources/assets/bridge.jpg");
-            tgfxView.setImageRef("bridge",image);
+            tgfxView.setImage("bridge",image);
             image = await loadImage("http://localhost:8081/../../resources/assets/tgfx.png");
-            tgfxView.setImageRef("TGFX",image);
+            tgfxView.setImage("TGFX",image);
 
             var font = new FontFace('default', "url(../../resources/font/NotoSansSC-Regular.otf)");
             font.load().then((loadedFont) => {

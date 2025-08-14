@@ -114,7 +114,11 @@ void SaveImage(const Pixmap& pixmap, const std::string& key) {
 }
 
 void RemoveImage(const std::string& key) {
-  std::filesystem::remove(OUT_ROOT + "/" + key + WEBP_FILE_EXT);
+  RemoveFile(key + WEBP_FILE_EXT);
+}
+
+void RemoveFile(const std::string& key) {
+  std::filesystem::remove(OUT_ROOT + "/" + key);
 }
 
 std::shared_ptr<Image> ScaleImage(const std::shared_ptr<Image>& image, float scale,
