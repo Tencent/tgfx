@@ -18,6 +18,7 @@
 
 #include "CacheScaleLevel.h"
 #include <algorithm>
+#include <cmath>
 
 namespace tgfx {
 
