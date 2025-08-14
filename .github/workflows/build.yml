@@ -383,14 +383,12 @@ jobs:
           npm install depsync -g
           depsync
 
-      # 用官方 Action 代替手工下载
       - name: Setup OpenHarmony SDK
         uses: openharmony-rs/setup-ohos-sdk@v0.2
         with:
-          version: '5.0.3'     # 对应 API 15
+          version: '5.0.3'
           cache: true
 
-      # Action 会自动把 OHOS_SDK_NATIVE 注入到 GITHUB_ENV，无需手动 echo
       - name: Configure SDK Path
         run: |
           cd ohos
