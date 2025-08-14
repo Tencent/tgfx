@@ -36,10 +36,6 @@ Rect ImageFilter::onFilterBounds(const Rect& srcRect) const {
   return srcRect;
 }
 
-bool ImageFilter::canDirectDownscale() const {
-  return true;
-}
-
 std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Image> source,
                                                             const Rect& renderBounds,
                                                             const TPArgs& args) const {

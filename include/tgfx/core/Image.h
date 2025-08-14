@@ -336,7 +336,9 @@ class Image {
    * Returns true if the subclass's lockTextureProxy method supports direct downscaling; otherwise,
    * returns false
    */
-  virtual bool canDirectDownscale() const;
+  virtual bool canDirectDownscale() const {
+    return true;
+  }
 
   /**
    * Returns a texture proxy for the entire Image. Note that the returned texture size may differ
