@@ -46,10 +46,6 @@ class ScaledImage : public TransformImage {
     return Type::Scaled;
   }
 
-  bool canDirectDownscale() const override {
-    return true;
-  }
-
   PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
                                                       const SamplingArgs& samplingArgs,
                                                       const Matrix* uvMatrix) const override;
