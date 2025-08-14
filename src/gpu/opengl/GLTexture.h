@@ -28,8 +28,8 @@ namespace tgfx {
  */
 class GLTexture : public GPUTexture {
  public:
-  GLTexture(unsigned id, unsigned target, PixelFormat format, int maxMipmapLevel = 0)
-      : GPUTexture(format, maxMipmapLevel), _id(id), _target(target) {
+  GLTexture(unsigned id, unsigned target, PixelFormat format, int mipLevelCount = 1)
+      : GPUTexture(format, mipLevelCount), _id(id), _target(target) {
   }
 
   /**

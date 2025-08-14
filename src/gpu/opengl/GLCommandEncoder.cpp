@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLCommandEncoder.h"
+#include "gpu/opengl/GLFrameBuffer.h"
 #include "gpu/opengl/GLRenderPass.h"
-#include "gpu/opengl/GLRenderTarget.h"
 #include "gpu/opengl/GLSemaphore.h"
 #include "gpu/opengl/GLTexture.h"
 
@@ -33,24 +33,29 @@ std::shared_ptr<RenderPass> GLCommandEncoder::onBeginRenderPass(
   return renderPass;
 }
 
-void GLCommandEncoder::copyRenderTargetToTexture(const RenderTarget* renderTarget,
-                                                 TextureView* textureView, int srcX, int srcY) {
-  DEBUG_ASSERT(renderTarget != nullptr);
-  DEBUG_ASSERT(textureView != nullptr);
-  auto width = std::min(textureView->width(), renderTarget->width() - srcX);
-  auto height = std::min(textureView->height(), renderTarget->height() - srcY);
+void GLCommandEncoder::copyFrameBufferToTexture(GPUFrameBuffer* frameBuffer, const Point& srcOffset,
+                                                GPUTexture* texture, const Rect& dstRect) {
+  if (frameBuffer == nullptr || texture == nullptr || dstRect.isEmpty()) {
+    return;
+  }
   auto gl = interface->functions();
-  auto glRenderTarget = static_cast<const GLRenderTarget*>(renderTarget);
+  auto glRenderTarget = static_cast<GLFrameBuffer*>(frameBuffer);
   gl->bindFramebuffer(GL_FRAMEBUFFER, glRenderTarget->readFrameBufferID());
-  auto glTexture = static_cast<const GLTexture*>(textureView->getTexture());
+  auto glTexture = static_cast<const GLTexture*>(texture);
   auto target = glTexture->target();
   gl->bindTexture(target, glTexture->id());
-  gl->copyTexSubImage2D(target, 0, 0, 0, srcX, srcY, width, height);
+  auto offsetX = static_cast<int>(dstRect.left);
+  auto offsetY = static_cast<int>(dstRect.top);
+  auto x = static_cast<int>(srcOffset.x);
+  auto y = static_cast<int>(srcOffset.y);
+  auto width = static_cast<int>(dstRect.width());
+  auto height = static_cast<int>(dstRect.height());
+  gl->copyTexSubImage2D(target, 0, offsetX, offsetY, x, y, width, height);
 }
 
 void GLCommandEncoder::generateMipmapsForTexture(GPUTexture* texture) {
   auto glTexture = static_cast<GLTexture*>(texture);
-  if (!glTexture->hasMipmaps() || glTexture->target() != GL_TEXTURE_2D) {
+  if (glTexture->mipLevelCount() <= 1 || glTexture->target() != GL_TEXTURE_2D) {
     return;
   }
   auto gl = interface->functions();

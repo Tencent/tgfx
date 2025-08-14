@@ -138,7 +138,8 @@ void GLProgram::bindTexture(int unitIndex, GPUTexture* texture, SamplerState sam
   gl->bindTexture(target, glTexture->id());
   gl->texParameteri(target, GL_TEXTURE_WRAP_S, GetGLWrap(target, samplerState.wrapModeX));
   gl->texParameteri(target, GL_TEXTURE_WRAP_T, GetGLWrap(target, samplerState.wrapModeY));
-  if (samplerState.mipmapped() && (!context->caps()->mipmapSupport || !glTexture->hasMipmaps())) {
+  if (samplerState.mipmapped() &&
+      (!context->caps()->mipmapSupport || glTexture->mipLevelCount() <= 1)) {
     samplerState.mipmapMode = MipmapMode::None;
   }
   gl->texParameteri(target, GL_TEXTURE_MIN_FILTER,

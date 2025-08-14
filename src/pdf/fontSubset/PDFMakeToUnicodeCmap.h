@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,29 +18,15 @@
 
 #pragma once
 
-#include "gpu/RenderTarget.h"
+#include "tgfx/core/Typeface.h"
 
 namespace tgfx {
-class GLInterface;
 
-/**
- * Represents an OpenGL 2D buffer of pixels that can be rendered to.
- */
-class GLRenderTarget : public RenderTarget {
- public:
-  /**
-   * Returns the frame buffer ID used for reading pixels.
-   */
-  virtual unsigned readFrameBufferID() const = 0;
+class PDFGlyphUse;
+class Stream;
 
-  /**
-   * Returns the frame buffer ID used for drawing pixels.
-   */
-  virtual unsigned drawFrameBufferID() const = 0;
+std::unique_ptr<Stream> PDFMakeToUnicodeCmap(const Unichar* glyphToUnicode,
+                                             const PDFGlyphUse* subset, bool multiByteGlyphs,
+                                             GlyphID firstGlyphID, GlyphID lastGlyphID);
 
-  BackendRenderTarget getBackendRenderTarget() const override;
-
-  bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0,
-                  int srcY = 0) const override;
-};
 }  // namespace tgfx

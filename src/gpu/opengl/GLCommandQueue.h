@@ -33,6 +33,9 @@ class GLCommandQueue : public CommandQueue {
   void writeTexture(GPUTexture* texture, const Rect& rect, const void* pixels,
                     size_t rowBytes) override;
 
+  bool readPixels(GPUFrameBuffer* frameBuffer, const Rect& rect, void* pixels,
+                  size_t rowBytes) const override;
+
   void submit(std::shared_ptr<CommandBuffer>) override;
 
   void waitUntilCompleted() override;

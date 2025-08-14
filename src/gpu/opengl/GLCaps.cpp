@@ -237,14 +237,6 @@ int GLCaps::getSampleCount(int requestedCount, PixelFormat pixelFormat) const {
   return 1;
 }
 
-int GLCaps::getMaxMipmapLevel(int width, int height) const {
-  if (!mipmapSupport) {
-    return 0;
-  }
-  int maxDimension = std::max(width, height);
-  return static_cast<int>(std::log2(maxDimension));
-}
-
 void GLCaps::initGLSupport(const GLInfo& info) {
   packRowLengthSupport = true;
   unpackRowLengthSupport = true;

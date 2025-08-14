@@ -18,9 +18,11 @@
 
 #include "tgfx/core/Typeface.h"
 #include <vector>
+#include "core/AdvancedTypefaceInfo.h"
 #include "core/ScalerContext.h"
 #include "core/utils/UniqueID.h"
 #include "tgfx/core/Font.h"
+#include "tgfx/core/Stream.h"
 #include "tgfx/core/UTF.h"
 
 namespace tgfx {
@@ -58,7 +60,7 @@ class EmptyTypeface : public Typeface {
     return 0;
   }
 
-  std::shared_ptr<Data> getBytes() const override {
+  std::unique_ptr<Stream> openStream() const override {
     return nullptr;
   }
 
@@ -68,6 +70,10 @@ class EmptyTypeface : public Typeface {
 
  protected:
   std::vector<Unichar> getGlyphToUnicodeMap() const override {
+    return {};
+  }
+
+  AdvancedTypefaceInfo getAdvancedInfo() const override {
     return {};
   }
 
@@ -104,6 +110,10 @@ bool Typeface::isCustom() const {
 std::vector<Unichar> Typeface::getGlyphToUnicodeMap() const {
   return {};
 };
+
+AdvancedTypefaceInfo Typeface::getAdvancedInfo() const {
+  return {};
+}
 
 std::shared_ptr<ScalerContext> Typeface::getScalerContext(float size) {
   if (size <= 0.0f) {

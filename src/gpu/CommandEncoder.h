@@ -19,8 +19,9 @@
 #pragma once
 
 #include "gpu/CommandBuffer.h"
+#include "gpu/GPUFrameBuffer.h"
+#include "gpu/GPUTexture.h"
 #include "gpu/RenderPass.h"
-#include "gpu/RenderTarget.h"
 #include "gpu/Semaphore.h"
 
 namespace tgfx {
@@ -44,14 +45,21 @@ class CommandEncoder {
                                               bool resolveMSAA = true);
 
   /**
-   * Copy the contents of the specified render target to a texture view at the specified source
-   * coordinates.
+   * Copies a region from the source GPUFrameBuffer to a region of the destination GPUTexture. If
+   * the texture has mipmaps, you should call the generateMipmapsForTexture() method after copying,
+   * as mipmaps will not be generated automatically.
+   * @param frameBuffer The source frame buffer to copy from.
+   * @param srcOffset The starting point in the source frame buffer.
+   * @param texture The destination texture to copy to.
+   * @param dstRect The target rectangle in the destination texture.
    */
-  virtual void copyRenderTargetToTexture(const RenderTarget* renderTarget, TextureView* textureView,
-                                         int srcX, int srcY) = 0;
+  virtual void copyFrameBufferToTexture(GPUFrameBuffer* frameBuffer, const Point& srcOffset,
+                                        GPUTexture* texture, const Rect& dstRect) = 0;
 
   /**
-   * Generates mipmaps for the given texture based on its current content.
+   * Encodes a command that generates mipmaps for the specified GPUTexture from the base level to
+   * the highest level. This method only has an effect if the texture was created with mipmap
+   * enabled.
    */
   virtual void generateMipmapsForTexture(GPUTexture* texture) = 0;
 

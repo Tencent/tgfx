@@ -66,7 +66,7 @@ class GPU {
    */
   virtual std::unique_ptr<GPUTexture> createTexture(int width, int height,
                                                     PixelFormat format = PixelFormat::RGBA_8888,
-                                                    bool mipmapped = false) = 0;
+                                                    int mipLevelCount = 1) = 0;
 
   /**
    * Returns the pixel formats for textures created from a platform-specific hardware buffer, such
@@ -102,6 +102,29 @@ class GPU {
    */
   virtual std::unique_ptr<GPUTexture> importExternalTexture(const BackendTexture& backendTexture,
                                                             bool adopted = false) = 0;
+
+  /**
+   * Creates a GPUFrameBuffer that can be used for rendering to a texture. A GPUFrameBuffer with
+   * MSAA enabled is returned if the sample count is greater than 1. Returns nullptr if the texture
+   * is not renderable in the GPU backend or if the width or height is invalid.
+   */
+  virtual std::unique_ptr<GPUFrameBuffer> createFrameBuffer(GPUTexture* texture, int width,
+                                                            int height, int sampleCount = 1) = 0;
+
+  /**
+   * Returns the pixel format of the given backend render target. If the backend render target is
+   * invalid, returns PixelFormat::Unknown.
+   */
+  virtual PixelFormat getExternalFrameBufferFormat(
+      const BackendRenderTarget& backendRenderTarget) const = 0;
+
+  /**
+   * Creates a GPUFrameBuffer that wraps the given backend render target. The caller must ensure the
+   * backend render target is valid for the lifetime of the returned GPUFrameBuffer. Returns nullptr
+   * if the backend render target is invalid.
+   */
+  virtual std::unique_ptr<GPUFrameBuffer> importExternalFrameBuffer(
+      const BackendRenderTarget& backendRenderTarget) = 0;
 
   /**
    * Creates a command encoder that can be used to encode commands to be issued to the GPU.
