@@ -70,7 +70,8 @@ open class TGFXView : TextureView, TextureView.SurfaceTextureListener {
 
         val metrics = resources.displayMetrics
         surface = Surface(p0)
-        nativePtr = setupFromSurface(surface!!, imageBytesBridge, imageBytesTGFX, fontBytes, metrics.density)
+        val imageBytesArray = arrayOf(imageBytesBridge, imageBytesTGFX)
+        nativePtr = setupFromSurface(surface!!, imageBytesArray, fontBytes, metrics.density)
     }
 
     override fun onSurfaceTextureSizeChanged(p0: SurfaceTexture, p1: Int, p2: Int) {
@@ -110,7 +111,7 @@ open class TGFXView : TextureView, TextureView.SurfaceTextureListener {
         private external fun nativeInit()
 
         private external fun setupFromSurface(
-            surface: Surface, imageBytesBridge: ByteArray, imageBytesTGFX: ByteArray,fontBytes: ByteArray,
+            surface: Surface, imageBytes: Array<ByteArray>, fontBytes: ByteArray,
             density: Float
         ): Long
 

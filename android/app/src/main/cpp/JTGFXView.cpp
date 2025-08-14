@@ -98,8 +98,7 @@ JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_nativeInit(
 }
 
 JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromSurface(
-    JNIEnv* env, jobject, jobject surface, jbyteArray imageBytesBridge, jbyteArray imageBytesTGFX,
-    jbyteArray fontBytes, jfloat density) {
+    JNIEnv* env, jobject, jobject surface, jobjectArray imageBytesArrays, jbyteArray fontBytes, jfloat density) {
   if (surface == nullptr) {
     printf("SetupFromSurface() Invalid surface specified.\n");
     return 0;
@@ -110,26 +109,22 @@ JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromS
     printf("SetupFromSurface() Invalid surface specified.\n");
     return 0;
   }
-  auto bytes = env->GetByteArrayElements(imageBytesBridge, nullptr);
-  auto size = static_cast<size_t>(env->GetArrayLength(imageBytesBridge));
-  auto data = tgfx::Data::MakeWithCopy(bytes, size);
-  auto image = tgfx::Image::MakeFromEncoded(data);
-  env->ReleaseByteArrayElements(imageBytesBridge, bytes, 0);
   auto appHost = CreateAppHost(nativeWindow, density);
-  if (image) {
-    appHost->addImage("bridge", std::move(image));
+  jsize numArrays = env->GetArrayLength(imageBytesArrays);
+  for (jsize i = 0; i < numArrays; i++) {
+    jbyteArray imageBytes = static_cast<jbyteArray>(env->GetObjectArrayElement(imageBytesArrays, i));
+    auto bytes = env->GetByteArrayElements(imageBytes, nullptr);
+    auto size = static_cast<size_t>(env->GetArrayLength(imageBytes));
+    auto data = tgfx::Data::MakeWithCopy(bytes, size);
+    auto image = tgfx::Image::MakeFromEncoded(data);
+    env->ReleaseByteArrayElements(imageBytes, bytes, 0);
+    if (image) {
+      appHost->addImage(i == 0 ? "bridge" : "TGFX", std::move(image));
+    }
   }
-  bytes = env->GetByteArrayElements(imageBytesTGFX, nullptr);
-  size = static_cast<size_t>(env->GetArrayLength(imageBytesTGFX));
-  data = tgfx::Data::MakeWithCopy(bytes, size);
-  image = tgfx::Image::MakeFromEncoded(data);
-  env->ReleaseByteArrayElements(imageBytesTGFX, bytes, 0);
-  if (image) {
-    appHost->addImage("TGFX", std::move(image));
-  }
-  bytes = env->GetByteArrayElements(fontBytes, nullptr);
-  size = static_cast<size_t>(env->GetArrayLength(fontBytes));
-  data = tgfx::Data::MakeWithCopy(bytes, size);
+  auto bytes = env->GetByteArrayElements(fontBytes, nullptr);
+  auto size = static_cast<size_t>(env->GetArrayLength(fontBytes));
+  auto data = tgfx::Data::MakeWithCopy(bytes, size);
   auto typeface = tgfx::Typeface::MakeFromData(data);
   env->ReleaseByteArrayElements(fontBytes, bytes, 0);
   if (typeface) {
