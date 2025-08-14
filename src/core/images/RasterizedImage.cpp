@@ -109,16 +109,15 @@ std::shared_ptr<Image> RasterizedImage::onMakeMipmapped(bool enabled) const {
 }
 
 UniqueKey RasterizedImage::getTextureKey(float cacheScale) const {
-  auto textureKey = uniqueKey;
+  BytesKey byteKey;
   if (hasMipmaps()) {
     static const auto MipmapFlag = UniqueID::Next();
-    textureKey = UniqueKey::Append(textureKey, &MipmapFlag, 1);
+    byteKey.write(MipmapFlag);
   }
   if (cacheScale < 1.f) {
-    auto scaleLevel = static_cast<uint32_t>(1.0f / cacheScale);
-    textureKey = UniqueKey::Append(uniqueKey, &scaleLevel, 1);
+    byteKey.write(cacheScale);
   }
-  return textureKey;
+  return UniqueKey::Append(uniqueKey, byteKey.data(), byteKey.size());
 }
 
 }  // namespace tgfx
