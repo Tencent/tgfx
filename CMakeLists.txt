@@ -20,7 +20,6 @@ option(TGFX_USE_OPENGL "Use OpenGL as the GPU backend" ON)
 option(TGFX_USE_QT "Enable building with the Qt framework." OFF)
 option(TGFX_USE_SWIFTSHADER "Enable building with the SwiftShader library" OFF)
 option(TGFX_USE_ANGLE "Enable building with the ANGLE library" OFF)
-option(TGFX_USE_FASTER_BLUR "Enable a faster blur algorithm instead of the standard Gaussian blur" ON)
 
 # When enabled, ImageBuffers created from web native codecs won’t be fully decoded right away.
 # Instead, they will use promise-awaiting calls before generating textures, allowing multiple
@@ -104,7 +103,6 @@ message("TGFX_USE_OPENGL: ${TGFX_USE_OPENGL}")
 message("TGFX_USE_QT: ${TGFX_USE_QT}")
 message("TGFX_USE_SWIFTSHADER: ${TGFX_USE_SWIFTSHADER}")
 message("TGFX_USE_ANGLE: ${TGFX_USE_ANGLE}")
-message("TGFX_USE_FASTER_BLUR: ${TGFX_USE_FASTER_BLUR}")
 message("TGFX_USE_THREADS: ${TGFX_USE_THREADS}")
 message("TGFX_USE_FREETYPE: ${TGFX_USE_FREETYPE}")
 message("TGFX_USE_PNG_DECODE: ${TGFX_USE_PNG_DECODE}")
@@ -264,12 +262,6 @@ endif ()
 if (TGFX_USE_ZLIB)
     list(APPEND TGFX_STATIC_VENDORS zlib)
     list(APPEND TGFX_INCLUDES third_party/out/zlib/${INCLUDE_ENTRY})
-endif ()
-
-if (TGFX_USE_FASTER_BLUR)
-    list(FILTER TGFX_FILES EXCLUDE REGEX "src/(gpu/processors|core/filters)/.*GaussianBlur.*")
-else ()
-    list(FILTER TGFX_FILES EXCLUDE REGEX "src/(gpu/processors|core/filters)/.*DualBlur.*")
 endif ()
 
 if (TGFX_USE_ASYNC_PROMISE)
@@ -631,12 +623,6 @@ if (TGFX_BUILD_TESTS)
 
     if (TGFX_TEST_EXCLUDE_FILES)
         list(REMOVE_ITEM TGFX_TEST_FILES ${TGFX_TEST_EXCLUDE_FILES})
-    endif ()
-
-    if (TGFX_USE_FASTER_BLUR)
-        file(GLOB_RECURSE GAUSSIAN_BLUR_TEST_FILES src/gpu/processors/*GaussianBlur* src/core/filters/*GaussianBlur*)
-        list(APPEND TGFX_TEST_FILES ${GAUSSIAN_BLUR_TEST_FILES})
-        add_definitions(-DTGFX_USE_FASTER_BLUR)
     endif ()
 
     list(APPEND TGFX_BASELINE_DEFINES ${TGFX_TEST_DEFINES} UPDATE_BASELINE)

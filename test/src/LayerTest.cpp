@@ -18,7 +18,7 @@
 
 #include <math.h>
 #include <vector>
-#include "core/filters/BlurImageFilter.h"
+#include "core/filters/GaussianBlurImageFilter.h"
 #include "core/shaders/GradientShader.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "layers/RootLayer.h"
@@ -660,7 +660,7 @@ TGFX_TEST(LayerTest, StrokeOnTop) {
 TGFX_TEST(LayerTest, FilterTest) {
   auto filter = DropShadowFilter::Make(-80, -80, 0, 0, Color::Black());
   auto filter2 = DropShadowFilter::Make(-40, -40, 0, 0, Color::Green());
-  auto filter3 = BlurFilter::Make(40, 40);
+  auto filter3 = BlurFilter::Make(10, 10);
   auto image = MakeImage("resources/apitest/rotation.jpg");
   ContextScope scope;
   auto context = scope.getContext();
@@ -676,7 +676,7 @@ TGFX_TEST(LayerTest, FilterTest) {
   displayList->root()->addChild(layer);
   displayList->render(surface.get());
   auto bounds = displayList->root()->getBounds();
-  EXPECT_EQ(Rect::MakeLTRB(131.f, 131.f, 1721.f, 2225.f), bounds);
+  EXPECT_EQ(Rect::MakeLTRB(130.f, 130.f, 1722.f, 2226.f), bounds);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/filterTest"));
 }
 
@@ -714,7 +714,7 @@ TGFX_TEST(LayerTest, dropshadowLayerFilter) {
   Paint paint;
   auto surface = Surface::Make(context, static_cast<int>(imageWidth * 2.f + padding * 3.f),
                                static_cast<int>(imageHeight * 2.f + padding * 3.f));
-  auto filter = BlurFilter::Make(15, 15);
+  auto filter = BlurFilter::Make(5, 5);
   auto layer = ImageLayer::Make();
   layer->setImage(image);
   layer->setMatrix(Matrix::MakeTrans(padding, padding));
@@ -725,14 +725,14 @@ TGFX_TEST(LayerTest, dropshadowLayerFilter) {
   auto layer2 = ImageLayer::Make();
   layer2->setImage(image);
   layer2->setMatrix(Matrix::MakeTrans(imageWidth + padding * 2, padding));
-  auto filter2 = DropShadowFilter::Make(0, 0, 15, 15, Color::White(), true);
+  auto filter2 = DropShadowFilter::Make(0, 0, 5, 5, Color::White(), true);
   layer2->setFilters({filter2});
   displayList->root()->addChild(layer2);
 
   auto layer3 = ImageLayer::Make();
   layer3->setImage(image);
   layer3->setMatrix(Matrix::MakeTrans(padding, imageWidth + padding * 2));
-  auto filter3 = DropShadowFilter::Make(0, 0, 15, 15, Color::White());
+  auto filter3 = DropShadowFilter::Make(0, 0, 5, 5, Color::White());
   layer3->setFilters({filter3});
   displayList->root()->addChild(layer3);
 
@@ -807,9 +807,9 @@ TGFX_TEST(LayerTest, blurLayerFilter) {
   EXPECT_EQ(blur->blurrinessX(), 130.f);
   blur->setTileMode(TileMode::Clamp);
   EXPECT_EQ(blur->tileMode(), TileMode::Clamp);
-  auto imageFilter = std::static_pointer_cast<BlurImageFilter>(blur->getImageFilter(0.5f));
-  auto imageFilter2 =
-      std::static_pointer_cast<BlurImageFilter>(ImageFilter::Blur(65.f, 65.f, TileMode::Clamp));
+  auto imageFilter = std::static_pointer_cast<GaussianBlurImageFilter>(blur->getImageFilter(0.5f));
+  auto imageFilter2 = std::static_pointer_cast<GaussianBlurImageFilter>(
+      ImageFilter::Blur(65.f, 65.f, TileMode::Clamp));
   EXPECT_EQ(imageFilter->blurrinessX, imageFilter2->blurrinessX);
   EXPECT_EQ(imageFilter->blurrinessY, imageFilter2->blurrinessY);
   EXPECT_EQ(imageFilter->tileMode, imageFilter2->tileMode);
@@ -2037,7 +2037,7 @@ TGFX_TEST(LayerTest, Filters) {
   layer->setPath(path);
   auto fillStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0, 128));
   layer->setFillStyle(fillStyle);
-  auto filter = BlurFilter::Make(10, 10);
+  auto filter = BlurFilter::Make(5, 5);
   auto filter2 = DropShadowFilter::Make(10, 10, 0, 0, Color::Black());
   auto filter3 = InnerShadowFilter::Make(10, 10, 0, 0, Color::White());
   layer->setFilters({filter, filter2, filter3});
@@ -2230,7 +2230,7 @@ TGFX_TEST(LayerTest, ChildMask) {
   groupMatrix.postRotate(30);
   group->setMatrix(groupMatrix);
 
-  group->setFilters({BlurFilter::Make(30, 30)});
+  group->setFilters({BlurFilter::Make(10, 10)});
 
   list.root()->addChild(group);
   auto surface = Surface::Make(context, 300, 300);
@@ -2841,7 +2841,7 @@ TGFX_TEST(LayerTest, BackgroundBlurStyleTest) {
   path1.addRect(Rect::MakeXYWH(40.5f, 40.5f, 80.f, 80.f));
   shapeLayer1->setPath(path1);
   shapeLayer1->setMatrix(Matrix::MakeTrans(0.5f, 0.5f));
-  shapeLayer1->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  shapeLayer1->setLayerStyles({BackgroundBlurStyle::Make(4, 4)});
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   auto imageLayer = ImageLayer::Make();
   imageLayer->setImage(image);
