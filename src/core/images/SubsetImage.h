@@ -45,10 +45,6 @@ class SubsetImage : public TransformImage {
     return Type::Subset;
   }
 
-  bool canDirectDownscale() const override {
-    return true;
-  }
-
   std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
 
   std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override;

@@ -44,6 +44,10 @@ class TransformImage : public Image {
   std::shared_ptr<Image> source = nullptr;
 
  protected:
+  bool canDirectDownscale() const override {
+    return true;
+  }
+
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
   std::shared_ptr<TextureProxy> lockTextureProxySubset(

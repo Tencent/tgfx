@@ -33,10 +33,14 @@ class RuntimeImageFilter : public ImageFilter {
     return Type::Runtime;
   }
 
+  bool canDirectDownscale() const override {
+    return false;
+  }
+
   Rect onFilterBounds(const Rect& srcRect) const override;
 
   std::shared_ptr<TextureProxy> lockTextureProxy(std::shared_ptr<Image> source,
-                                                 const Rect& clipBounds,
+                                                 const Rect& renderBounds,
                                                  const TPArgs& args) const override;
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(std::shared_ptr<Image> source,

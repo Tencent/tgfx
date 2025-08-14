@@ -48,6 +48,10 @@ class FilterImage : public SubsetImage {
     return Type::Filter;
   }
 
+  bool canDirectDownscale() const override {
+    return filter->canDirectDownscale();
+  }
+
   FilterImage(std::shared_ptr<Image> source, const Rect& bounds,
               std::shared_ptr<ImageFilter> filter);
 

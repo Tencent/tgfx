@@ -44,17 +44,8 @@ PlacementPtr<FragmentProcessor> ScaledImage::asFragmentProcessor(const FPArgs& a
   }
   drawRect.roundOut();
   auto mipmapped = hasMipmaps() && samplingArgs.sampling.mipmapMode != MipmapMode::None;
-  auto scaleWidth = width();
-  auto scaleHeight = height();
-  auto scaledRect = drawRect;
-  if (args.drawScale < 1.f) {
-    scaleWidth = static_cast<int>(args.drawScale * static_cast<float>(width()));
-    scaleHeight = static_cast<int>(args.drawScale * static_cast<float>(height()));
-    scaledRect.scale(args.drawScale, args.drawScale);
-    scaledRect.roundOut();
-  }
-  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, scaleWidth, scaleHeight);
-  auto textureProxy = lockTextureProxySubset(tpArgs, scaledRect, sampling);
+  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, 1.f);
+  auto textureProxy = lockTextureProxySubset(tpArgs, drawRect, sampling);
   if (textureProxy == nullptr) {
     return nullptr;
   }

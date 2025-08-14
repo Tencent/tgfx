@@ -87,9 +87,7 @@ PlacementPtr<FragmentProcessor> SubsetImage::asFragmentProcessor(const FPArgs& a
   drawBounds.offset(-bounds.x(), -bounds.y());
   drawBounds.roundOut();
   auto mipmapped = source->hasMipmaps() && samplingArgs.sampling.mipmapMode != MipmapMode::None;
-  auto scaleWidth = static_cast<int>(args.drawScale * static_cast<float>(width()));
-  auto scaleHeight = static_cast<int>(args.drawScale * static_cast<float>(height()));
-  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, scaleWidth, scaleHeight);
+  TPArgs tpArgs(args.context, args.renderFlags, mipmapped, args.drawScale);
   auto textureProxy = lockTextureProxySubset(tpArgs, drawBounds);
   if (textureProxy == nullptr) {
     return nullptr;

@@ -135,6 +135,12 @@ class ImageFilter {
   virtual Type type() const = 0;
 
   /**
+   * Returns true if the subclass's lockTextureProxy method supports direct downscaling; otherwise,
+   * returns false
+   */
+  virtual bool canDirectDownscale() const;
+
+  /**
    * Returns the bounds of the image that will be produced by this filter when it is applied to an
    * image of the given bounds.
    */
@@ -143,11 +149,11 @@ class ImageFilter {
   /**
    * Returns a texture proxy that applies this filter to the source image.
    * @param source The source image.
-   * @param clipBounds The clip bounds of the filtered image, relative to the source image.
+   * @param renderBounds Render bounds of the filtered image.
    * @param args The arguments for creating the texture proxy.
    */
   virtual std::shared_ptr<TextureProxy> lockTextureProxy(std::shared_ptr<Image> source,
-                                                         const Rect& clipBounds,
+                                                         const Rect& renderBounds,
                                                          const TPArgs& args) const;
 
   /**

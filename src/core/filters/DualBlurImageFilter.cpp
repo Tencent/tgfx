@@ -114,14 +114,14 @@ Rect DualBlurImageFilter::onFilterBounds(const Rect& srcRect) const {
 }
 
 std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_ptr<Image> source,
-                                                                    const Rect& clipBounds,
+                                                                    const Rect& renderBounds,
                                                                     const TPArgs& args) const {
   if (FloatNearlyZero(scaleFactor)) {
     return nullptr;
   }
   auto isAlphaOnly = source->isAlphaOnly();
   auto lastRenderTarget = RenderTargetProxy::MakeFallback(
-      args.context, static_cast<int>(clipBounds.width()), static_cast<int>(clipBounds.height()),
+      args.context, static_cast<int>(renderBounds.width()), static_cast<int>(renderBounds.height()),
       isAlphaOnly, 1, args.mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
   if (lastRenderTarget == nullptr) {
     return nullptr;
@@ -132,7 +132,7 @@ std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_
   // By calculating the clip bound after filter, we can determine the bounds that will affect the
   // result. However, the bounds may be larger than the origin filter bounds, so we need to
   // intersect the bounds.
-  auto boundsWillSample = filterBounds(clipBounds);
+  auto boundsWillSample = filterBounds(renderBounds);
   auto filterOriginBounds = filterBounds(Rect::MakeWH(source->width(), source->height()));
   boundsWillSample.intersect(filterOriginBounds);
 
@@ -183,8 +183,8 @@ std::shared_ptr<TextureProxy> DualBlurImageFilter::lockTextureProxy(std::shared_
       uvMatrix = Matrix::MakeScale(textureSize.width / (boundsWillSample.width() * scaleFactor),
                                    textureSize.height / (boundsWillSample.height() * scaleFactor));
       uvMatrix.preScale(scaleFactor, scaleFactor);
-      uvMatrix.preTranslate(clipBounds.left - boundsWillSample.left,
-                            clipBounds.top - boundsWillSample.top);
+      uvMatrix.preTranslate(renderBounds.left - boundsWillSample.left,
+                            renderBounds.top - boundsWillSample.top);
       upSampleScale /= scaleFactor;
     } else {
       // at other iterations, we upscale only

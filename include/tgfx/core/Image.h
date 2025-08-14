@@ -333,7 +333,7 @@ class Image {
                                               const SamplingOptions& sampling) const;
 
   /**
-   * Returns true if the subclass's lockTextureProxy method supports direct scaling; otherwise,
+   * Returns true if the subclass's lockTextureProxy method supports direct downscaling; otherwise,
    * returns false
    */
   virtual bool canDirectDownscale() const;
