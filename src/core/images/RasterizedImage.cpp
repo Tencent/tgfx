@@ -71,8 +71,8 @@ std::shared_ptr<TextureProxy> RasterizedImage::lockTextureProxy(const TPArgs& ar
 
 PlacementPtr<FragmentProcessor> RasterizedImage::asFragmentProcessor(
     const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const {
-  auto textureProxy = lockTextureProxy(TPArgs(args.context, args.renderFlags, hasMipmaps(),
-                                              args.drawScale, BackingFit::Exact));
+  auto textureProxy = lockTextureProxy(
+      TPArgs(args.context, args.renderFlags, hasMipmaps(), args.drawScale, BackingFit::Exact));
   if (textureProxy == nullptr) {
     return nullptr;
   }

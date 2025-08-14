@@ -137,9 +137,10 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     sourceFragment =
         TiledTextureEffect::Make(renderTarget->asTextureProxy(), samplingArgs, &uvMatrix);
 
-    renderTarget = RenderTargetProxy::MakeFallback(
-        args.context, static_cast<int>(renderBounds.width()), static_cast<int>(renderBounds.height()),
-        isAlphaOnly, 1, args.mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
+    renderTarget =
+        RenderTargetProxy::MakeFallback(args.context, static_cast<int>(renderBounds.width()),
+                                        static_cast<int>(renderBounds.height()), isAlphaOnly, 1,
+                                        args.mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
 
     if (!renderTarget) {
       return nullptr;
