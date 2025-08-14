@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BackgroundContext.h"
-#include "core/filters/BlurImageFilter.h"
+#include "core/filters/GaussianBlurImageFilter.h"
 #include "tgfx/core/Recorder.h"
 
 namespace tgfx {
@@ -27,7 +27,8 @@ static float MaxBlurOutset() {
   if (MaxOutset != 0) {
     return MaxOutset;
   }
-  auto filter = ImageFilter::Blur(BlurImageFilter::MaxSigma(), BlurImageFilter::MaxSigma());
+  auto filter =
+      ImageFilter::Blur(GaussianBlurImageFilter::MaxSigma(), GaussianBlurImageFilter::MaxSigma());
   MaxOutset = filter->filterBounds(Rect::MakeEmpty()).right;
   return MaxOutset;
 }

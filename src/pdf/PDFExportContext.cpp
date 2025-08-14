@@ -23,8 +23,8 @@
 #include "core/MeasureContext.h"
 #include "core/Records.h"
 #include "core/ScalerContext.h"
-#include "core/filters/BlurImageFilter.h"
 #include "core/filters/DropShadowImageFilter.h"
+#include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
 #include "core/images/PictureImage.h"
@@ -591,7 +591,8 @@ void PDFExportContext::drawDropShadowBeforeLayer(const std::shared_ptr<Picture>&
   canvas->clear(Color::Transparent());
 
   DEBUG_ASSERT(Types::Get(dropShadowFilter->blurFilter.get()) == Types::ImageFilterType::Blur);
-  const auto* blurFilter = static_cast<const BlurImageFilter*>(dropShadowFilter->blurFilter.get());
+  const auto* blurFilter =
+      static_cast<const GaussianBlurImageFilter*>(dropShadowFilter->blurFilter.get());
   auto copyFilter = ImageFilter::DropShadowOnly(dropShadowFilter->dx, dropShadowFilter->dy,
                                                 blurFilter->blurrinessX, blurFilter->blurrinessY,
                                                 dropShadowFilter->color);
@@ -630,7 +631,8 @@ void PDFExportContext::drawInnerShadowAfterLayer(const Record* record,
   canvas->translate(-pictureBounds.x(), -pictureBounds.y());
 
   DEBUG_ASSERT(Types::Get(innerShadowFilter->blurFilter.get()) == Types::ImageFilterType::Blur);
-  const auto* blurFilter = static_cast<const BlurImageFilter*>(innerShadowFilter->blurFilter.get());
+  const auto* blurFilter =
+      static_cast<const GaussianBlurImageFilter*>(innerShadowFilter->blurFilter.get());
   auto copyFilter = ImageFilter::InnerShadowOnly(innerShadowFilter->dx, innerShadowFilter->dy,
                                                  blurFilter->blurrinessX, blurFilter->blurrinessY,
                                                  innerShadowFilter->color);

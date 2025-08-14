@@ -33,7 +33,6 @@ namespace tgfx {
 // Therefore, 10 is chosen as the MAX_BLUR_SIGMA.
 #define MAX_BLUR_SIGMA 10.f
 
-#ifndef TGFX_USE_FASTER_BLUR
 std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrinessY,
                                                TileMode tileMode) {
   if (blurrinessX < 0 || blurrinessY < 0 || (blurrinessX == 0 && blurrinessY == 0)) {
@@ -42,14 +41,13 @@ std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrine
   return std::make_shared<GaussianBlurImageFilter>(blurrinessX, blurrinessY, tileMode);
 }
 
-float BlurImageFilter::MaxSigma() {
+float GaussianBlurImageFilter::MaxSigma() {
   return MAX_BLUR_SIGMA;
 }
-#endif
 
 GaussianBlurImageFilter::GaussianBlurImageFilter(float blurrinessX, float blurrinessY,
                                                  TileMode tileMode)
-    : BlurImageFilter(blurrinessX, blurrinessY, tileMode) {
+    : blurrinessX(blurrinessX), blurrinessY(blurrinessY), tileMode(tileMode) {
 }
 
 static void Blur1D(PlacementPtr<FragmentProcessor> source,
@@ -177,6 +175,38 @@ PlacementPtr<FragmentProcessor> GaussianBlurImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     SrcRectConstraint constraint, const Matrix* uvMatrix) const {
   return makeFPFromTextureProxy(source, args, sampling, constraint, uvMatrix);
+}
+
+PlacementPtr<FragmentProcessor> GaussianBlurImageFilter::getSourceFragmentProcessor(
+    std::shared_ptr<Image> source, Context* context, uint32_t renderFlags, const Rect& drawRect,
+    const Point& scales) const {
+  Matrix uvMatrix = Matrix::MakeScale(1 / scales.x, 1 / scales.y);
+  uvMatrix.postTranslate(drawRect.left, drawRect.top);
+  auto scaledDrawRect = drawRect;
+  scaledDrawRect.scale(scales.x, scales.y);
+  scaledDrawRect.round();
+  FPArgs args =
+      FPArgs(context, renderFlags, Rect::MakeWH(scaledDrawRect.width(), scaledDrawRect.height()),
+             std::max(scales.x, scales.y));
+
+  SamplingArgs samplingArgs = {};
+  samplingArgs.tileModeX = tileMode;
+  samplingArgs.tileModeY = tileMode;
+  auto fp = FragmentProcessor::Make(source, args, samplingArgs, &uvMatrix);
+  if (fp == nullptr) {
+    return nullptr;
+  }
+  if (fp->numCoordTransforms() == 1) {
+    return fp;
+  }
+  auto renderTarget = RenderTargetProxy::MakeFallback(
+      context, static_cast<int>(scaledDrawRect.width()), static_cast<int>(scaledDrawRect.height()),
+      source->isAlphaOnly(), 1);
+  if (renderTarget == nullptr) {
+    return nullptr;
+  }
+  context->drawingManager()->fillRTWithFP(renderTarget, std::move(fp), renderFlags);
+  return TiledTextureEffect::Make(renderTarget->asTextureProxy(), samplingArgs);
 }
 
 }  // namespace tgfx
