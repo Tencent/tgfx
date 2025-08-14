@@ -37,15 +37,7 @@ export function wasmAwaitRewind(constructor: any) {
     const proxyFn = (target: { [prop: string]: (...args: any[]) => any }, methodName: string) => {
         const fn = target[methodName];
         target[methodName] = function (...args) {
-            if (TGFXModule.Asyncify.currData !== null) {
-                const currData = TGFXModule.Asyncify.currData;
-                TGFXModule.Asyncify.currData = null;
-                const ret = fn.call(this, ...args);
-                TGFXModule.Asyncify.currData = currData;
-                return ret;
-            } else {
-                return fn.call(this, ...args);
-            }
+            return fn.call(this, ...args);
         };
     };
 
