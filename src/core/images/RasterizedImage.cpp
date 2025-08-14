@@ -109,7 +109,7 @@ std::shared_ptr<Image> RasterizedImage::onMakeMipmapped(bool enabled) const {
 }
 
 UniqueKey RasterizedImage::getTextureKey(float cacheScale) const {
-  BytesKey byteKey;
+  BytesKey byteKey = {};
   if (hasMipmaps()) {
     static const auto MipmapFlag = UniqueID::Next();
     byteKey.write(MipmapFlag);
