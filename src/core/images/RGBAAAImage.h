@@ -35,10 +35,6 @@ class RGBAAAImage : public SubsetImage {
     return Type::RGBAAA;
   }
 
-  bool canDirectDownscale() const override {
-    return false;
-  }
-
   std::shared_ptr<Image> onCloneWith(std::shared_ptr<Image> newSource) const override;
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,

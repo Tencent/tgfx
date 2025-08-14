@@ -333,11 +333,11 @@ class Image {
                                               const SamplingOptions& sampling) const;
 
   /**
-   * Returns true if the subclass's lockTextureProxy method supports direct downscaling; otherwise,
-   * returns false
+   * Returns given scale if the subclass's lockTextureProxy method supports direct downscaling; otherwise,
+   * returns 1.0f.
    */
-  virtual bool canDirectDownscale() const {
-    return true;
+  virtual float getRasterizedScale(float) const {
+    return 1.0f;
   }
 
   /**

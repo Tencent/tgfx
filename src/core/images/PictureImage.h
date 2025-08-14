@@ -56,10 +56,6 @@ class PictureImage : public Image {
     return Type::Picture;
   }
 
-  bool canDirectDownscale() const override {
-    return true;
-  }
-
   std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
                                       const SamplingOptions& sampling) const override;
 

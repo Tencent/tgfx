@@ -42,10 +42,6 @@ class GaussianBlurImageFilter : public ImageFilter {
     return Type::Blur;
   }
 
-  bool canDirectDownscale() const override {
-    return false;
-  }
-
   Rect onFilterBounds(const Rect& srcRect) const override;
 
   std::shared_ptr<TextureProxy> lockTextureProxy(std::shared_ptr<Image> source,

@@ -46,7 +46,7 @@ std::shared_ptr<TextureProxy> RasterizedImage::lockTextureProxy(const TPArgs& ar
   auto proxyProvider = args.context->proxyProvider();
   uint32_t scaleLevel = 0;
   auto newScale = 1.0f;
-  if (source->canDirectDownscale()) {
+  if (source->getRasterizedScale(args.drawScale) < 1.0f) {
     scaleLevel = GetCacheScaleLevel(args.drawScale);
     newScale = 1.0f / static_cast<float>(1 << scaleLevel);
   }

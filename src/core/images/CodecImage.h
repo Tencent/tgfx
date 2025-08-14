@@ -45,8 +45,8 @@ class CodecImage : public GeneratorImage {
     return Type::Codec;
   }
 
-  bool canDirectDownscale() const override {
-    return true;
+  float getRasterizedScale(float scale) const override {
+    return scale;
   }
 
   std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,

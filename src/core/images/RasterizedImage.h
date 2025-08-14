@@ -57,10 +57,6 @@ class RasterizedImage : public Image {
     return Type::Rasterized;
   }
 
-  bool canDirectDownscale() const override {
-    return source->canDirectDownscale();
-  }
-
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,

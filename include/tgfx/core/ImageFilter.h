@@ -135,14 +135,6 @@ class ImageFilter {
   virtual Type type() const = 0;
 
   /**
-   * Returns true if the subclass's lockTextureProxy method supports direct downscaling; otherwise,
-   * returns false
-   */
-  virtual bool canDirectDownscale() const {
-    return true;
-  }
-
-  /**
    * Returns the bounds of the image that will be produced by this filter when it is applied to an
    * image of the given bounds.
    */

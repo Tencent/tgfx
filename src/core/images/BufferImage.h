@@ -46,8 +46,8 @@ class BufferImage : public PixelImage {
     return Type::Buffer;
   }
 
-  bool canDirectDownscale() const override {
-    return imageBuffer->isPixelBuffer();
+  float getRasterizedScale(float scale) const override {
+    return scale;
   }
 
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
