@@ -45,7 +45,13 @@ bool ComparePDF(const std::shared_ptr<MemoryWriteStream>& stream, const std::str
 #ifdef GENERATE_BASELINE_IMAGES
   SaveFile(data, key + "_base.pdf");
 #endif
-  return Baseline::Compare(data, key);
+  auto result = Baseline::Compare(data, key);
+  if (result) {
+    RemoveFile(key + ".pdf");
+  } else {
+    SaveFile(data, key + ".pdf");
+  }
+  return result;
 }
 }  // namespace
 
@@ -287,7 +293,7 @@ TGFX_TEST(PDFExportTest, Complex) {
           tgfx::Point{0.f, 0.f}, tgfx::Point{0.f, 200.f},
           {tgfx::Color::FromRGBA(157, 239, 132), tgfx::Color::FromRGBA(255, 156, 69)}, {});
       strokePaint.setShader(gradientShader);
-      auto blurFilter = ImageFilter::Blur(25, 25, TileMode::Decal);
+      auto blurFilter = ImageFilter::Blur(6, 6, TileMode::Decal);
       strokePaint.setImageFilter(blurFilter);
       canvas->drawPath(*path, strokePaint);
     }
@@ -306,7 +312,7 @@ TGFX_TEST(PDFExportTest, Complex) {
           center, 75, {tgfx::Color::FromRGBA(69, 151, 247), tgfx::Color::FromRGBA(130, 228, 153)},
           {0, 1.0});
       paint.setShader(gradientShader);
-      auto imageFilter = ImageFilter::InnerShadow(20, 20, 35, 35, Color::Red());
+      auto imageFilter = ImageFilter::InnerShadow(20, 20, 9, 9, Color::Red());
       paint.setImageFilter(imageFilter);
       canvas->drawPath(*path, paint);
 
@@ -322,7 +328,7 @@ TGFX_TEST(PDFExportTest, Complex) {
     if (path) {
       Paint paint;
       paint.setColor(Color::FromRGBA(230, 234, 147));
-      auto imageFilter = ImageFilter::DropShadow(30, 30, 50, 50, Color::Blue());
+      auto imageFilter = ImageFilter::DropShadow(30, 30, 13, 13, Color::Blue());
       paint.setImageFilter(imageFilter);
       canvas->drawPath(*path, paint);
     }
@@ -332,7 +338,7 @@ TGFX_TEST(PDFExportTest, Complex) {
     if (path) {
       Paint paint;
       paint.setColor(Color::FromRGBA(230, 234, 147));
-      auto imageFilter = ImageFilter::InnerShadow(10, 10, 10, 10, Color::Blue());
+      auto imageFilter = ImageFilter::InnerShadow(10, 10, 3, 3, Color::Blue());
       paint.setImageFilter(imageFilter);
       canvas->drawPath(*path, paint);
 

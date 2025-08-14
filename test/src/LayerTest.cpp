@@ -1990,7 +1990,7 @@ TGFX_TEST(LayerTest, DropShadowStyle) {
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DropShadowStyle-stroke"));
 
-  auto blur = BlurFilter::Make(10, 10);
+  auto blur = BlurFilter::Make(2.5, 2.5);
   layer->setFilters({blur});
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DropShadowStyle-stroke-blur"));
@@ -2115,13 +2115,13 @@ TGFX_TEST(LayerTest, BackgroundBlur) {
   layer->setLineWidth(10);
   layer->setStrokeOnTop(true);
   layer->setExcludeChildEffectsInLayerStyle(true);
-  auto filter = BackgroundBlurStyle::Make(10, 10);
+  auto filter = BackgroundBlurStyle::Make(2, 2);
   auto dropShadow = DropShadowStyle::Make(10, 10, 0, 0, Color::FromRGBA(0, 0, 0, 100));
   dropShadow->setShowBehindLayer(true);
   layer->setExcludeChildEffectsInLayerStyle(true);
   layer->setLayerStyles({dropShadow, filter});
 
-  auto blurFilter = BlurFilter::Make(1, 20);
+  auto blurFilter = BlurFilter::Make(1, 2);
   layer->setFilters({blurFilter});
 
   auto silbing = ShapeLayer::Make();
@@ -2129,7 +2129,7 @@ TGFX_TEST(LayerTest, BackgroundBlur) {
   rect.addRect(Rect::MakeWH(50, 50));
   silbing->setPath(rect);
   silbing->setMatrix(Matrix::MakeTrans(-10, 0));
-  auto newBackgroundBlur = BackgroundBlurStyle::Make(15, 15);
+  auto newBackgroundBlur = BackgroundBlurStyle::Make(3, 3);
   silbing->setLayerStyles({dropShadow, newBackgroundBlur});
   silbing->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 100, 100)));
   layer->addChild(silbing);
@@ -2145,7 +2145,7 @@ TGFX_TEST(LayerTest, BackgroundBlur) {
   child->setMatrix(Matrix::MakeScale(0.5, 0.5));
   auto fillStyle2 = SolidColor::Make(Color::FromRGBA(0, 100, 0, 100));
   child->setFillStyle(fillStyle2);
-  auto backgroundBlur = BackgroundBlurStyle::Make(20, 20);
+  auto backgroundBlur = BackgroundBlurStyle::Make(5, 5);
   child->setLayerStyles({backgroundBlur});
   child->setBlendMode(BlendMode::Multiply);
   clipLayer->addChild(child);
