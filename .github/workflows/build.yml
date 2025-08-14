@@ -402,7 +402,8 @@ jobs:
           if command -v ohpm &> /dev/null; then
             ohpm install --all
           fi
-          ./hvigorw assembleHap --mode module -p module=hello2d -p product=default --stacktrace
+          ./hvigorw assembleHap --mode module -p module=${MODULE_NAME} -p product=default --stacktrace
+
 
       - name: Job Failed
         if: ${{ failure() }}
