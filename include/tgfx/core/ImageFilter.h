@@ -143,7 +143,7 @@ class ImageFilter {
   /**
    * Returns a texture proxy that applies this filter to the source image.
    * @param source The source image.
-   * @param renderBounds Render bounds of the filtered image.
+   * @param renderBounds Render bounds of the filtered image, relative to the source image.
    * @param args The arguments for creating the texture proxy.
    */
   virtual std::shared_ptr<TextureProxy> lockTextureProxy(std::shared_ptr<Image> source,

@@ -139,6 +139,10 @@ BackendTexture Image::getBackendTexture(Context*, ImageOrigin*) const {
   return {};
 }
 
+float Image::getRasterizedScale(float) const {
+  return 1.0f;
+}
+
 std::shared_ptr<Image> Image::makeDecoded(Context* context) const {
   if (isFullyDecoded()) {
     return weakThis.lock();

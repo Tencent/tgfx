@@ -24,16 +24,6 @@
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
-
-static uint32_t GetCacheScaleLevel(float scale) {
-  scale = std::clamp(scale, 0.0f, 1.0f);
-  if (scale > 0.5f) {
-    return 0;
-  }
-  float exactLevel = std::log2(1.0f / scale);
-  return static_cast<uint32_t>(std::floor(exactLevel));
-}
-
 RasterizedImage::RasterizedImage(UniqueKey uniqueKey, std::shared_ptr<Image> source)
     : uniqueKey(std::move(uniqueKey)), source(std::move(source)) {
 }
@@ -44,13 +34,8 @@ std::shared_ptr<Image> RasterizedImage::makeRasterized() const {
 
 std::shared_ptr<TextureProxy> RasterizedImage::lockTextureProxy(const TPArgs& args) const {
   auto proxyProvider = args.context->proxyProvider();
-  uint32_t scaleLevel = 0;
-  auto newScale = 1.0f;
-  if (source->getRasterizedScale(args.drawScale) < 1.0f) {
-    scaleLevel = GetCacheScaleLevel(args.drawScale);
-    newScale = 1.0f / static_cast<float>(1 << scaleLevel);
-  }
-  auto textureKey = getTextureKey(scaleLevel);
+  auto newScale = source->getRasterizedScale(args.drawScale);
+  auto textureKey = getTextureKey(newScale);
   auto textureProxy = proxyProvider->findOrWrapTextureProxy(textureKey);
   if (textureProxy != nullptr) {
     return textureProxy;
@@ -123,8 +108,12 @@ std::shared_ptr<Image> RasterizedImage::onMakeMipmapped(bool enabled) const {
   return image;
 }
 
-UniqueKey RasterizedImage::getTextureKey(uint32_t scaleLevel) const {
-  auto textureKey = UniqueKey::Append(uniqueKey, &scaleLevel, 1);
+UniqueKey RasterizedImage::getTextureKey(float drawScale) const {
+  auto textureKey = uniqueKey;
+  if (drawScale < 1.f) {
+    auto scaleLevel = static_cast<uint32_t>(1.0f / drawScale);
+    textureKey = UniqueKey::Append(uniqueKey, &scaleLevel, 1);
+  }
   if (hasMipmaps()) {
     static const auto MipmapFlag = UniqueID::Next();
     return UniqueKey::Append(textureKey, &MipmapFlag, 1);

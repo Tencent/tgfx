@@ -333,12 +333,10 @@ class Image {
                                               const SamplingOptions& sampling) const;
 
   /**
-   * Returns given scale if the subclass's lockTextureProxy method supports direct downscaling; otherwise,
-   * returns 1.0f.
+   * Returns the scale factor for rasterized cache based on the given draw scale if the subclass's
+   * lockTextureProxy method supports direct downscaling; otherwise, returns 1.0f.
    */
-  virtual float getRasterizedScale(float) const {
-    return 1.0f;
-  }
+  virtual float getRasterizedScale(float drawScale) const;
 
   /**
    * Returns a texture proxy for the entire Image. Note that the returned texture size may differ
