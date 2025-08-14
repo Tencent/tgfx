@@ -22,13 +22,6 @@ option(TGFX_USE_SWIFTSHADER "Enable building with the SwiftShader library" OFF)
 option(TGFX_USE_ANGLE "Enable building with the ANGLE library" OFF)
 option(TGFX_USE_FASTER_BLUR "Enable a faster blur algorithm instead of the standard Gaussian blur" ON)
 
-# When enabled, ImageBuffers created from web native codecs won’t be fully decoded right away.
-# Instead, they will use promise-awaiting calls before generating textures, allowing multiple
-# images to be decoded simultaneously. Avoid enabling this if your rendering process requires
-# multiple flush() calls in a single frame, as it may cause screen tearing, where parts of the
-# screen update while others do not.
-option(TGFX_USE_ASYNC_PROMISE "Enable async promises for loading images on the web" OFF)
-
 # EMSCRIPTEN_PTHREADS can be set by vendor tools for building the wasm-mt architecture.
 if (NOT WEB OR EMSCRIPTEN_PTHREADS)
     option(TGFX_USE_THREADS "Enable support for multithreaded rendering" ON)
@@ -114,7 +107,6 @@ message("TGFX_USE_JPEG_ENCODE: ${TGFX_USE_JPEG_ENCODE}")
 message("TGFX_USE_WEBP_DECODE: ${TGFX_USE_WEBP_DECODE}")
 message("TGFX_USE_WEBP_ENCODE: ${TGFX_USE_WEBP_ENCODE}")
 message("TGFX_BUILD_TESTS: ${TGFX_BUILD_TESTS}")
-message("TGFX_USE_ASYNC_PROMISE: ${TGFX_USE_ASYNC_PROMISE}")
 message("TGFX_USE_INSPECTOR: ${TGFX_USE_INSPECTOR}")
 message("TGFX_BUILD_FRAMEWORK: ${TGFX_BUILD_FRAMEWORK}")
 
@@ -270,10 +262,6 @@ if (TGFX_USE_FASTER_BLUR)
     list(FILTER TGFX_FILES EXCLUDE REGEX "src/(gpu/processors|core/filters)/.*GaussianBlur.*")
 else ()
     list(FILTER TGFX_FILES EXCLUDE REGEX "src/(gpu/processors|core/filters)/.*DualBlur.*")
-endif ()
-
-if (TGFX_USE_ASYNC_PROMISE)
-    list(APPEND TGFX_DEFINES TGFX_USE_ASYNC_PROMISE)
 endif ()
 
 if (TGFX_USE_THREADS)
