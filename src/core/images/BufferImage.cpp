@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BufferImage.h"
+#include "core/utils/NextPowerOfTwoScale.h"
 #include "core/PixelBuffer.h"
 #include "core/PixelBufferCodec.h"
 #include "core/ScaledImageGenerator.h"
@@ -36,6 +37,13 @@ std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageBuffer> buffer) {
 
 BufferImage::BufferImage(std::shared_ptr<ImageBuffer> buffer, bool mipmapped)
     : PixelImage(mipmapped), imageBuffer(std::move(buffer)) {
+}
+
+float BufferImage::getRasterizedScale(float drawScale) const {
+  if (imageBuffer->isPixelBuffer()) {
+    return NextPowerOfTwoScale(drawScale);
+  }
+  return 1.0f;
 }
 
 std::shared_ptr<TextureProxy> BufferImage::lockTextureProxy(const TPArgs& args) const {

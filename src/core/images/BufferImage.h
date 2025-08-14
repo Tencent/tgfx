@@ -18,7 +18,6 @@
 
 #pragma once
 #include "PixelImage.h"
-#include "core/utils/CacheScaleLevel.h"
 
 namespace tgfx {
 /**
@@ -47,13 +46,7 @@ class BufferImage : public PixelImage {
     return Type::Buffer;
   }
 
-  float getRasterizedScale(float drawScale) const override {
-    if (imageBuffer->isPixelBuffer()) {
-      auto scaleLevel = GetCacheScaleLevel(drawScale);
-      return 1.0f / static_cast<float>(1 << scaleLevel);
-    }
-    return 1.0f;
-  }
+  float getRasterizedScale(float drawScale) const override;
 
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 

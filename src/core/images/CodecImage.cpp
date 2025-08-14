@@ -31,6 +31,11 @@ std::shared_ptr<ImageCodec> CodecImage::getCodec() const {
   return std::static_pointer_cast<ImageCodec>(generator);
 }
 
+float CodecImage::getRasterizedScale(float drawScale) const {
+  return NextPowerOfTwoScale(drawScale);
+}
+
+
 std::shared_ptr<Image> CodecImage::onMakeScaled(int newWidth, int newHeight,
                                                 const SamplingOptions& sampling) const {
   if (newWidth <= generator->width() && newHeight <= generator->height()) {

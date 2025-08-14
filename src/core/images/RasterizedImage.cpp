@@ -108,15 +108,15 @@ std::shared_ptr<Image> RasterizedImage::onMakeMipmapped(bool enabled) const {
   return image;
 }
 
-UniqueKey RasterizedImage::getTextureKey(float drawScale) const {
+UniqueKey RasterizedImage::getTextureKey(float cacheScale) const {
   auto textureKey = uniqueKey;
-  if (drawScale < 1.f) {
-    auto scaleLevel = static_cast<uint32_t>(1.0f / drawScale);
-    textureKey = UniqueKey::Append(uniqueKey, &scaleLevel, 1);
-  }
   if (hasMipmaps()) {
     static const auto MipmapFlag = UniqueID::Next();
-    return UniqueKey::Append(textureKey, &MipmapFlag, 1);
+    textureKey = UniqueKey::Append(textureKey, &MipmapFlag, 1);
+  }
+  if (cacheScale < 1.f) {
+    auto scaleLevel = static_cast<uint32_t>(1.0f / cacheScale);
+    textureKey = UniqueKey::Append(uniqueKey, &scaleLevel, 1);
   }
   return textureKey;
 }

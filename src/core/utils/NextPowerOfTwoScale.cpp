@@ -16,19 +16,20 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "CacheScaleLevel.h"
+#include "NextPowerOfTwoScale.h"
 #include <algorithm>
 #include <cmath>
 
 namespace tgfx {
 
-uint32_t GetCacheScaleLevel(float scale) {
+float NextPowerOfTwoScale(float scale) {
   scale = std::clamp(scale, 0.0f, 1.0f);
   if (scale > 0.5f) {
-    return 0;
+    return 1.0f;
   }
   float exactLevel = std::log2(1.0f / scale);
-  return static_cast<uint32_t>(std::floor(exactLevel));
+  auto scaleLevel = static_cast<uint32_t>(std::floor(exactLevel));
+  return 1.0f / static_cast<float>(1 << scaleLevel);
 }
 
 }  // namespace tgfx

@@ -16,9 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <cstdint>
+#pragma once
+
 namespace tgfx {
 
-uint32_t GetCacheScaleLevel(float scale);
+float NextPowerOfTwoScale(float scale);
 
 }
