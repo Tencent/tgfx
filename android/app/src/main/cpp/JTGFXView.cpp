@@ -98,7 +98,8 @@ JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_nativeInit(
 }
 
 JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromSurface(
-    JNIEnv* env, jobject, jobject surface, jobjectArray imageBytesArrays, jbyteArray fontBytes, jfloat density) {
+    JNIEnv* env, jobject, jobject surface, jobjectArray imageBytesArrays, jbyteArray fontBytes,
+    jfloat density) {
   if (surface == nullptr) {
     printf("SetupFromSurface() Invalid surface specified.\n");
     return 0;
@@ -112,7 +113,8 @@ JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromS
   auto appHost = CreateAppHost(nativeWindow, density);
   jsize numArrays = env->GetArrayLength(imageBytesArrays);
   for (jsize i = 0; i < numArrays; i++) {
-    jbyteArray imageBytes = static_cast<jbyteArray>(env->GetObjectArrayElement(imageBytesArrays, i));
+    jbyteArray imageBytes =
+        static_cast<jbyteArray>(env->GetObjectArrayElement(imageBytesArrays, i));
     auto bytes = env->GetByteArrayElements(imageBytes, nullptr);
     auto size = static_cast<size_t>(env->GetArrayLength(imageBytes));
     auto data = tgfx::Data::MakeWithCopy(bytes, size);
