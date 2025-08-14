@@ -16,29 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PixelBufferCodec.h"
-#include "BoxFilterDownsample.h"
-#include "PixelBuffer.h"
+#include "NextPowerOfTwoScale.h"
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
 
 namespace tgfx {
-std::shared_ptr<PixelBufferCodec> PixelBufferCodec::Make(std::shared_ptr<PixelBuffer> source) {
-  if (!source) {
-    return nullptr;
-  }
-  return std::make_shared<PixelBufferCodec>(std::move(source));
-}
 
-bool PixelBufferCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
-                                    void* dstPixels) const {
-  auto pixels = source->lockPixels();
-  if (pixels == nullptr) {
-    return false;
+float NextPowerOfTwoScale(float scale) {
+  scale = std::clamp(scale, 0.0f, 1.0f);
+  if (scale > 0.5f) {
+    return 1.0f;
   }
-  auto srcPixmap = Pixmap(source->info(), pixels);
-  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
-  auto result = srcPixmap.readPixels(dstInfo, dstPixels);
-  source->unlockPixels();
-  return result;
+  float exactLevel = std::log2(1.0f / scale);
+  auto scaleLevel = static_cast<uint32_t>(std::floor(exactLevel));
+  return 1.0f / static_cast<float>(1 << scaleLevel);
 }
 
 }  // namespace tgfx

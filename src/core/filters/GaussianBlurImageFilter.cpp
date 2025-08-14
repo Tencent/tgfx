@@ -83,14 +83,14 @@ static std::shared_ptr<TextureProxy> ScaleTexture(const TPArgs& args,
 }
 
 std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
-    std::shared_ptr<Image> source, const Rect& clipBounds, const TPArgs& args) const {
+    std::shared_ptr<Image> source, const Rect& renderBounds, const TPArgs& args) const {
   float sigmaX = blurrinessX;
   float sigmaY = blurrinessY;
   const float maxSigma = std::max(sigmaX, sigmaY);
   float scaleFactorX = 1.0f;
   float scaleFactorY = 1.0f;
   bool blur2D = blurrinessX > 0 && blurrinessY > 0;
-  Rect boundsWillSample = clipBounds;
+  Rect boundsWillSample = renderBounds;
   if (blur2D) {
     // if blur2D, we need to make sure the pixels are in the clip bounds while blur y.
     // if blur1D, we use the origin image.
@@ -130,16 +130,17 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
 
     // blur and scale the texture to the clip bounds.
     auto uvMatrix = Matrix::MakeScale(sourceScale.x, sourceScale.y);
-    uvMatrix.preTranslate(clipBounds.left - boundsWillSample.left,
-                          clipBounds.top - boundsWillSample.top);
+    uvMatrix.preTranslate(renderBounds.left - boundsWillSample.left,
+                          renderBounds.top - boundsWillSample.top);
 
     SamplingArgs samplingArgs = {tileMode, tileMode, {}, SrcRectConstraint::Fast};
     sourceFragment =
         TiledTextureEffect::Make(renderTarget->asTextureProxy(), samplingArgs, &uvMatrix);
 
-    renderTarget = RenderTargetProxy::MakeFallback(
-        args.context, static_cast<int>(clipBounds.width()), static_cast<int>(clipBounds.height()),
-        isAlphaOnly, 1, args.mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
+    renderTarget =
+        RenderTargetProxy::MakeFallback(args.context, static_cast<int>(renderBounds.width()),
+                                        static_cast<int>(renderBounds.height()), isAlphaOnly, 1,
+                                        args.mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
 
     if (!renderTarget) {
       return nullptr;
@@ -163,8 +164,8 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     return renderTarget->asTextureProxy();
   }
 
-  return ScaleTexture(args, renderTarget->asTextureProxy(), static_cast<int>(clipBounds.width()),
-                      static_cast<int>(clipBounds.height()));
+  return ScaleTexture(args, renderTarget->asTextureProxy(), static_cast<int>(renderBounds.width()),
+                      static_cast<int>(renderBounds.height()));
 }
 
 Rect GaussianBlurImageFilter::onFilterBounds(const Rect& srcRect) const {

@@ -16,29 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "PixelBufferCodec.h"
-#include "BoxFilterDownsample.h"
-#include "PixelBuffer.h"
+#pragma once
 
 namespace tgfx {
-std::shared_ptr<PixelBufferCodec> PixelBufferCodec::Make(std::shared_ptr<PixelBuffer> source) {
-  if (!source) {
-    return nullptr;
-  }
-  return std::make_shared<PixelBufferCodec>(std::move(source));
-}
 
-bool PixelBufferCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
-                                    void* dstPixels) const {
-  auto pixels = source->lockPixels();
-  if (pixels == nullptr) {
-    return false;
-  }
-  auto srcPixmap = Pixmap(source->info(), pixels);
-  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
-  auto result = srcPixmap.readPixels(dstInfo, dstPixels);
-  source->unlockPixels();
-  return result;
-}
+float NextPowerOfTwoScale(float scale);
 
-}  // namespace tgfx
+}
