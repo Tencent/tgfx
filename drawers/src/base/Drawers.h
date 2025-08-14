@@ -34,6 +34,6 @@ namespace drawers {
 DEFINE_DRAWER(ConicGradient);
 DEFINE_DRAWER(ImageWithMipmap);
 DEFINE_DRAWER(ImageWithShadow);
-DEFINE_DRAWER(SimpleText);
+DEFINE_DRAWER(RichText);
 DEFINE_DRAWER(SimpleLayerTree);
 }  // namespace drawers

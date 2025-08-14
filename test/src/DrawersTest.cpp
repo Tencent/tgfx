@@ -37,9 +37,8 @@ TGFX_TEST(DrawersTest, Compare) {
   for (auto& name : drawerNames) {
     auto drawer = drawers::Drawer::GetByName(name);
     ASSERT_TRUE(drawer != nullptr);
-    canvas->clear();
     drawer->build(&appHost);
-    drawer->displayList.render(canvas->getSurface(), false);
+    drawer->displayList.render(surface.get());
     auto key = "DrawersTest/" + name;
     auto result = Baseline::Compare(surface, key);
     if (!result) {

@@ -56,17 +56,16 @@ static void mergeLines(std::vector<TextLine>& lines) {
 }
 
 // Set the positions of the first occurrence of B in string A to true, for quickly setting underlineIndex and deletelineIndex
-std::vector<bool> findFirstOccurrence(const std::string& A, const std::string& B) {
-  std::vector<bool> result(A.size(), false);
+std::vector<std::pair<size_t, size_t>> findFirstOccurrence(const std::string& A,
+                                                           const std::string& B) {
+  std::vector<std::pair<size_t, size_t>> result;
   if (B.empty() || A.empty() || B.size() > A.size()) {
     return result;
   }
 
   size_t foundPos = A.find(B);
   if (foundPos != std::string::npos) {
-    for (size_t i = foundPos; i < foundPos + B.size(); ++i) {
-      result[i] = true;
-    }
+    result.emplace_back(foundPos, foundPos + B.size() - 1);
   }
   return result;
 }
@@ -115,20 +114,27 @@ void SimpleTextLayer::invalidateLayout() {
     if (richText.type == Element::Text) {
       auto font = richText.font;
       auto metrics = font.getMetrics();
-      float textHeight = ceil(font.getSize() * 1.2f);
+      float textHeight =
+          std::fabs(metrics.ascent) + std::fabs(metrics.descent) + std::fabs(metrics.leading);
       float textBaseline = (textHeight + metrics.xHeight) / 2.f;
       float textUnderline = textBaseline + metrics.descent;
       lineHeight = std::max(lineHeight, textHeight);
       baselineHeight = std::max(baselineHeight, textBaseline);
       underlineHeight = std::max(underlineHeight, textUnderline + strokeOffset);
-      for (auto& c : richText.text) {
-        if (c == '\n') {
+      for (size_t i = 0; i < richText.text.size(); i++) {
+        if (richText.text[i] == '\n') {
           baselines.push_back(lineTop + baselineHeight);
           underlines.push_back(lineTop + underlineHeight);
           lineTop += lineHeight;
-          lineHeight = textHeight;
-          baselineHeight = textBaseline;
-          underlineHeight = textUnderline;
+          if (i == richText.text.size() - 1) {
+            lineHeight = 0;
+            baselineHeight = 0;
+            underlineHeight = 0;
+          } else {
+            lineHeight = textHeight;
+            baselineHeight = textBaseline;
+            underlineHeight = textUnderline;
+          }
         }
       }
     } else if (richText.type == Element::Image) {
@@ -177,12 +183,20 @@ void SimpleTextLayer::invalidateLayout() {
           xOffset += emptyAdvance;
         }
 
-        if (!richText.underlineIndex.empty() && richText.underlineIndex[index]) {
-          richText.underline.push_back({left, xOffset, underlines[lineIndex]});
+        if (!richText.underlineIndex.empty()) {
+          for (const auto& [start, end] : richText.underlineIndex) {
+            if (start <= index && end >= index) {
+              richText.underline.push_back({left, xOffset, underlines[lineIndex]});
+            }
+          }
         }
-        if (!richText.deletelineIndex.empty() && richText.deletelineIndex[index]) {
-          richText.deleteline.push_back(
-              {left, xOffset, baselines[lineIndex] - metrics.xHeight / 2});
+        if (!richText.deletelineIndex.empty()) {
+          for (const auto& [start, end] : richText.deletelineIndex) {
+            if (start <= index && end >= index) {
+              richText.deleteline.push_back(
+                  {left, xOffset, baselines[lineIndex] - metrics.xHeight / 2});
+            }
+          }
         }
         index++;
       }
@@ -210,18 +224,7 @@ void SimpleTextLayer::invalidateLayout() {
   }
 }
 
-std::shared_ptr<tgfx::Layer> MakeDebugLayer(std::shared_ptr<tgfx::Layer>& root,
-                                            const tgfx::Color& color = {1, 0, 0, 0.5}) {
-  auto bounds = root->getBounds(nullptr, true);
-  auto layer = tgfx::ShapeLayer::Make();
-  tgfx::Path path;
-  path.addRect(bounds);
-  layer->setFillStyle(tgfx::SolidColor::Make(color));
-  layer->setPath(path);
-  return layer;
-}
-
-std::shared_ptr<tgfx::Layer> SimpleText::buildLayerTree(const AppHost* host) {
+std::shared_ptr<tgfx::Layer> RichText::buildLayerTree(const AppHost* host) {
   auto root = tgfx::Layer::Make();
 
   padding = 50.f;
@@ -248,64 +251,48 @@ std::shared_ptr<tgfx::Layer> SimpleText::buildLayerTree(const AppHost* host) {
   font = tgfx::Font(typeface, 30);
   fonts.push_back(font);
 
-  std::vector<tgfx::Paint> paints;
-  tgfx::Paint paint = {};
-  paint.setColor({1.0f, 1.0f, 1.0f, 1.0f});
-  paint.setStyle(tgfx::PaintStyle::Stroke);
-  paint.setStrokeWidth(2);
-  //strokeOffset = 2;
-  paints.push_back(paint);
-  paint = {};
-  paint.setStyle(tgfx::PaintStyle::Fill);
+  std::vector<tgfx::Paint> paints(2);
+  paints[0].setColor({1.0f, 1.0f, 1.0f, 1.0f});
+  paints[0].setStyle(tgfx::PaintStyle::Stroke);
+  paints[0].setStrokeWidth(2);
+  paints[1].setStyle(tgfx::PaintStyle::Fill);
   tgfx::Color cyan = {0.0f, 1.0f, 1.0f, 1.0f};
   tgfx::Color magenta = {1.0f, 0.0f, 1.0f, 1.0f};
   tgfx::Color yellow = {1.0f, 1.0f, 0.0f, 1.0f};
   auto startPoint = tgfx::Point::Make(0.0f, 0.0f);
   auto endPoint = tgfx::Point::Make(600.f, 0.0f);
   auto shader = tgfx::Shader::MakeLinearGradient(startPoint, endPoint, {cyan, magenta, yellow}, {});
-  paint.setShader(shader);
-  paints.push_back(paint);
-  paints.push_back({});
+  paints[1].setShader(shader);
 
-  std::vector<Element> elements;
+  std::vector<Element> elements(5);
   //Image
-  Element element;
-  element.type = Element::Image;
+  elements[0].type = Element::Image;
   auto image = host->getImage("TGFX");
   image = image->makeMipmapped(true);
-  element.image = image;
+  elements[0].image = image;
   auto textHeight = ceil(fonts[0].getSize() * 0.8f);
-  element.height = textHeight;
-  element.width =
-      static_cast<float>(image->width()) * element.height / static_cast<float>(image->height());
-  elements.push_back(element);
+  elements[0].height = textHeight;
+  elements[0].width =
+      static_cast<float>(image->width()) * textHeight / static_cast<float>(image->height());
   //HelloTGFX!
-  element = Element{};
-  element.text = texts[0];
-  element.font = fonts[0];
-  element.paints = {paints[0], paints[1]};
-  elements.push_back(element);
+  elements[1].text = texts[0];
+  elements[1].font = fonts[0];
+  elements[1].paints = {paints[0], paints[1]};
   //TGFX
-  element = Element{};
-  element.text = texts[1];
-  element.font = fonts[1];
-  element.paints = {paints[0], paints[1]};
-  element.underlineIndex = std::vector(texts[1].size(), true);
-  elements.push_back(element);
+  elements[2].text = texts[1];
+  elements[2].font = fonts[1];
+  elements[2].paints = {paints[0], paints[1]};
+  elements[2].underlineIndex = findFirstOccurrence(texts[1], "TGFX");
   //.....
-  element = Element{};
-  element.text = texts[2];
-  element.font = fonts[2];
-  element.paints = {paints[0], paints[1]};
-  element.underlineIndex = findFirstOccurrence(texts[2], "(Tencent Graphics)");
-  element.deletelineIndex = findFirstOccurrence(texts[2], "video");
-  elements.push_back(element);
+  elements[3].text = texts[2];
+  elements[3].font = fonts[2];
+  elements[3].paints = {paints[0], paints[1]};
+  elements[3].underlineIndex = findFirstOccurrence(texts[2], "(Tencent Graphics)");
+  elements[3].deletelineIndex = findFirstOccurrence(texts[2], "video");
   //emoji
-  element = Element{};
-  element.text = texts[3];
-  element.font = fonts[3];
-  element.paints = {paints[2]};
-  elements.push_back(element);
+  elements[4].text = texts[3];
+  elements[4].font = fonts[3];
+  elements[4].paints = {{}};
 
   auto textLayer = SimpleTextLayer::Make();
   textLayer->setElements(elements);

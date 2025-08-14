@@ -37,7 +37,9 @@ class GridBackgroundLayer : public tgfx::Layer {
   void onUpdateContent(tgfx::LayerRecorder* recorder) override;
 
  private:
-  float _width = 0, _height = 0, _density = 1.0;
+  float _width = 0.f;
+  float _height = 0.f;
+  float _density = 1.f;
 };
 
 }  // namespace drawers

@@ -24,7 +24,7 @@
 
 namespace drawers {
 static std::vector<Drawer*> drawers = {new ConicGradient(), new ImageWithMipmap(),
-                                       new ImageWithShadow(), new SimpleText(),
+                                       new ImageWithShadow(), new RichText(),
                                        new SimpleLayerTree()};
 
 static std::vector<std::string> GetDrawerNames() {
@@ -87,8 +87,6 @@ void Drawer::build(const AppHost* host) {
     _root = buildLayerTree(host);
     displayList.root()->addChild(_root);
     displayList.setRenderMode(tgfx::RenderMode::Tiled);
-    // Zoom blur is currently enabled because the Hello2D demo now support animation frame
-    // rendering with displayList:
     displayList.setAllowZoomBlur(true);
     displayList.setMaxTileCount(512);
   }

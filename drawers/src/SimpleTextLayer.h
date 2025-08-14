@@ -38,10 +38,11 @@ class Element {
   std::vector<tgfx::Paint> paints = {};
 
   std::shared_ptr<tgfx::Image> image = nullptr;
-  float width = 0.f, height = 0.f;
+  float width = 0.f;
+  float height = 0.f;
 
-  std::vector<bool> underlineIndex = {};
-  std::vector<bool> deletelineIndex = {};
+  std::vector<std::pair<size_t, size_t>> underlineIndex = {};
+  std::vector<std::pair<size_t, size_t>> deletelineIndex = {};
   Type type = Text;
 
  private:
@@ -68,7 +69,7 @@ class SimpleTextLayer : public tgfx::Layer {
   void onUpdateContent(tgfx::LayerRecorder* recorder) override;
 
  private:
-  std::vector<Element> richTexts;
+  std::vector<Element> richTexts = {};
 };
 
 }  // namespace drawers
