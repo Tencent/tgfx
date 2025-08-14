@@ -185,7 +185,7 @@ class TextureView : public Resource {
    * Returns true if the texture has mipmap levels.
    */
   virtual bool hasMipmaps() const {
-    return getTexture()->hasMipmaps();
+    return getTexture()->mipLevelCount() > 1;
   }
 
   /**

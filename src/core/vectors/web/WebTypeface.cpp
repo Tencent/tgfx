@@ -93,7 +93,7 @@ GlyphID WebTypeface::getGlyphID(Unichar unichar) const {
   return static_cast<GlyphID>(glyphs.size());
 }
 
-std::shared_ptr<Stream> WebTypeface::openStream() const {
+std::unique_ptr<Stream> WebTypeface::openStream() const {
   return nullptr;
 }
 
@@ -112,6 +112,17 @@ std::string WebTypeface::getText(GlyphID glyphID) const {
 #ifdef TGFX_USE_GLYPH_TO_UNICODE
 std::vector<Unichar> WebTypeface::getGlyphToUnicodeMap() const {
   return GlyphsMap()[webFontFamily];
+}
+#endif
+
+#ifdef TGFX_USE_GLYPH_TO_UNICODE
+AdvancedTypefaceInfo getAdvancedProperty() const {
+  return AdvancedTypefaceProperty{.postScriptName = webFontFamily,
+                                  .type = AdvancedTypefaceProperty::FontType::Other,
+                                  .flags = static_cast<AdvancedTypefaceProperty::FontFlags>(
+                                      AdvancedTypefaceProperty::FontFlags::NotEmbeddable |
+                                      AdvancedTypefaceProperty::FontFlags::NotSubsettable),
+                                  .style = static_cast<AdvancedTypefaceProperty::StyleFlags>(0)};
 }
 #endif
 

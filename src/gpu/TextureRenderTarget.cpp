@@ -52,7 +52,7 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
   if (adopted) {
     scratchKey =
         ComputeRenderTargetScratchKey(backendTexture.width(), backendTexture.height(),
-                                      texture->format(), sampleCount, texture->hasMipmaps());
+                                      texture->format(), sampleCount, texture->mipLevelCount() > 1);
   }
   return TextureRenderTarget::MakeFrom(context, std::move(texture), backendTexture.width(),
                                        backendTexture.height(), sampleCount, origin, !adopted,
@@ -94,14 +94,15 @@ std::shared_ptr<RenderTarget> RenderTarget::Make(Context* context, int width, in
   if (!caps->isFormatRenderable(format)) {
     return nullptr;
   }
-  auto hasMipmaps = caps->mipmapSupport ? mipmapped : false;
+  int mipLevelCount = mipmapped ? caps->getMipLevelCount(width, height) : 1;
   sampleCount = caps->getSampleCount(sampleCount, format);
-  auto scratchKey = ComputeRenderTargetScratchKey(width, height, format, sampleCount, hasMipmaps);
+  auto scratchKey =
+      ComputeRenderTargetScratchKey(width, height, format, sampleCount, mipLevelCount > 1);
   if (auto renderTarget = Resource::Find<TextureRenderTarget>(context, scratchKey)) {
     renderTarget->_origin = origin;
     return renderTarget;
   }
-  auto texture = context->gpu()->createTexture(width, height, format, hasMipmaps);
+  auto texture = context->gpu()->createTexture(width, height, format, mipLevelCount);
   if (texture == nullptr) {
     return nullptr;
   }

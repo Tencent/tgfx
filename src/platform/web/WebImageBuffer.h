@@ -60,10 +60,9 @@ class WebImageBuffer : public ImageBuffer {
   int _width = 0;
   int _height = 0;
   emscripten::val nativeImage = emscripten::val::null();
-  bool usePromise = false;
   bool adopted = false;
 
-  WebImageBuffer(int width, int height, emscripten::val nativeImage, bool usePromise);
+  WebImageBuffer(int width, int height, emscripten::val nativeImage);
 
   emscripten::val getImage() const;
 

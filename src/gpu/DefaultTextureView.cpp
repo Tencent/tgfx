@@ -31,6 +31,6 @@ size_t DefaultTextureView::memoryUsage() const {
   }
   auto colorSize = static_cast<size_t>(_width) * static_cast<size_t>(_height) *
                    PixelFormatBytesPerPixel(_texture->format());
-  return _texture->hasMipmaps() ? colorSize * 4 / 3 : colorSize;
+  return _texture->mipLevelCount() > 1 ? colorSize * 4 / 3 : colorSize;
 }
 }  // namespace tgfx

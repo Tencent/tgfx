@@ -34,7 +34,7 @@ std::shared_ptr<WebImageBuffer> WebImageBuffer::MakeFrom(emscripten::val nativeI
   if (width < 1 || height < 1) {
     return nullptr;
   }
-  return std::shared_ptr<WebImageBuffer>(new WebImageBuffer(width, height, nativeImage, false));
+  return std::shared_ptr<WebImageBuffer>(new WebImageBuffer(width, height, nativeImage));
 }
 
 std::shared_ptr<WebImageBuffer> WebImageBuffer::MakeAdopted(emscripten::val nativeImage) {
@@ -45,8 +45,8 @@ std::shared_ptr<WebImageBuffer> WebImageBuffer::MakeAdopted(emscripten::val nati
   return imageBuffer;
 }
 
-WebImageBuffer::WebImageBuffer(int width, int height, emscripten::val nativeImage, bool usePromise)
-    : _width(width), _height(height), nativeImage(nativeImage), usePromise(usePromise) {
+WebImageBuffer::WebImageBuffer(int width, int height, emscripten::val nativeImage)
+    : _width(width), _height(height), nativeImage(nativeImage) {
 }
 
 WebImageBuffer::~WebImageBuffer() {
@@ -67,9 +67,6 @@ std::shared_ptr<TextureView> WebImageBuffer::onMakeTexture(Context* context, boo
 }
 
 emscripten::val WebImageBuffer::getImage() const {
-  if (usePromise) {
-    return nativeImage.await();
-  }
   return nativeImage;
 }
 }  // namespace tgfx

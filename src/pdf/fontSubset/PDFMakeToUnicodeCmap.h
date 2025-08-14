@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,18 +18,15 @@
 
 #pragma once
 
-#include <optional>
-#include "gpu/processors/DualBlurFragmentProcessor.h"
+#include "tgfx/core/Typeface.h"
 
 namespace tgfx {
-class GLDualBlurFragmentProcessor : public DualBlurFragmentProcessor {
- public:
-  GLDualBlurFragmentProcessor(DualBlurPassMode passMode, PlacementPtr<FragmentProcessor> processor,
-                              Point blurOffset);
 
-  void emitCode(EmitArgs& args) const override;
+class PDFGlyphUse;
+class Stream;
 
- private:
-  void onSetData(UniformBuffer* uniformBuffer) const override;
-};
+std::unique_ptr<Stream> PDFMakeToUnicodeCmap(const Unichar* glyphToUnicode,
+                                             const PDFGlyphUse* subset, bool multiByteGlyphs,
+                                             GlyphID firstGlyphID, GlyphID lastGlyphID);
+
 }  // namespace tgfx

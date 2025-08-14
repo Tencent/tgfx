@@ -17,14 +17,18 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "FTTypeface.h"
-#include <cstddef>
 #include "FTLibrary.h"
+#include "core/AdvancedTypefaceInfo.h"
+#include "core/utils/FontTableTag.h"
 #include "tgfx/core/Stream.h"
+#include "tgfx/core/Typeface.h"
 #include FT_TRUETYPE_TABLES_H
+#include FT_FONT_FORMATS_H
+#include FT_TYPE1_TABLES_H
+#include <array>
 #include "FTScalerContext.h"
 #include "SystemFont.h"
 #include "core/utils/UniqueID.h"
-#include "tgfx/core/UTF.h"
 
 namespace tgfx {
 std::shared_ptr<Typeface> Typeface::MakeFromName(const std::string& fontFamily,
@@ -150,7 +154,7 @@ GlyphID FTTypeface::getGlyphID(Unichar unichar) const {
   return static_cast<GlyphID>(FT_Get_Char_Index(face, static_cast<FT_ULong>(unichar)));
 }
 
-std::shared_ptr<Stream> FTTypeface::openStream() const {
+std::unique_ptr<Stream> FTTypeface::openStream() const {
   if (data.data) {
     return Stream::MakeFromData(data.data);
   }
@@ -193,7 +197,100 @@ std::vector<Unichar> FTTypeface::getGlyphToUnicodeMap() const {
 }
 #endif
 
+#ifdef TGFX_USE_ADVANCED_TYPEFACE_PROPERTY
+namespace {
+bool CanEmbed(FT_Face face) {
+  FT_UShort fsType = FT_Get_FSType_Flags(face);
+  return (fsType & (FT_FSTYPE_RESTRICTED_LICENSE_EMBEDDING | FT_FSTYPE_BITMAP_EMBEDDING_ONLY)) == 0;
+}
+
+bool CanSubset(FT_Face face) {
+  FT_UShort fsType = FT_Get_FSType_Flags(face);
+  return (fsType & FT_FSTYPE_NO_SUBSETTING) == 0;
+}
+
+AdvancedTypefaceInfo::FontType GetFontType(FT_Face face) {
+  const char* fontType = FT_Get_X11_Font_Format(face);
+  struct TextToFontType {
+    const char* text;
+    AdvancedTypefaceInfo::FontType type;
+  };
+
+  static TextToFontType values[] = {
+      {"Type 1", AdvancedTypefaceInfo::FontType::Type1},
+      {"CID Type 1", AdvancedTypefaceInfo::FontType::Type1CID},
+      {"CFF", AdvancedTypefaceInfo::FontType::CFF},
+      {"TrueType", AdvancedTypefaceInfo::FontType::TrueType},
+  };
+  for (const auto& value : values) {
+    if (strcmp(fontType, value.text) == 0) {
+      return value.type;
+    }
+  }
+  return AdvancedTypefaceInfo::FontType::Other;
+}
+}  // namespace
+
+bool FTTypeface::isOpentypeFontDataStandardFormat() const {
+  // FreeType reports TrueType for any data that can be decoded to TrueType or OpenType.
+  // However, there are alternate data formats for OpenType, like wOFF and wOF2.
+  auto stream = openStream();
+  std::array<char, 4> buffer;
+  if (stream->read(buffer.data(), 4) < 4) {
+    return false;
+  }
+  auto fontTag = SetFourByteTag(buffer[0], buffer[1], buffer[2], buffer[3]);
+
+  constexpr auto windowsTrueTypeTag = SetFourByteTag(0, 1, 0, 0);
+  constexpr auto macTrueTypeTag = SetFourByteTag('t', 'r', 'u', 'e');
+  constexpr auto postScriptTag = SetFourByteTag('t', 'y', 'p', '1');
+  constexpr auto opentypeCFFTag = SetFourByteTag('O', 'T', 'T', 'O');
+  constexpr auto ttcTag = SetFourByteTag('t', 't', 'c', 'f');
+
+  return fontTag == windowsTrueTypeTag || fontTag == macTrueTypeTag || fontTag == postScriptTag ||
+         fontTag == opentypeCFFTag || fontTag == ttcTag;
+}
+
+AdvancedTypefaceInfo FTTypeface::getAdvancedInfo() const {
+  AdvancedTypefaceInfo advancedProperty;
+  advancedProperty.postScriptName = FT_Get_Postscript_Name(face);
+
+  if (FT_HAS_MULTIPLE_MASTERS(face)) {
+    advancedProperty.flags = static_cast<AdvancedTypefaceInfo::FontFlags>(
+        advancedProperty.flags | AdvancedTypefaceInfo::FontFlags::Variable);
+  }
+  if (!CanEmbed(face)) {
+    advancedProperty.flags = static_cast<AdvancedTypefaceInfo::FontFlags>(
+        advancedProperty.flags | AdvancedTypefaceInfo::FontFlags::NotEmbeddable);
+  }
+  if (!CanSubset(face)) {
+    advancedProperty.flags = static_cast<AdvancedTypefaceInfo::FontFlags>(
+        advancedProperty.flags | AdvancedTypefaceInfo::FontFlags::NotSubsettable);
+  }
+
+  advancedProperty.type = GetFontType(face);
+  if ((advancedProperty.type == AdvancedTypefaceInfo::FontType::TrueType ||
+       advancedProperty.type == AdvancedTypefaceInfo::FontType::CFF) &&
+      !isOpentypeFontDataStandardFormat()) {
+    advancedProperty.flags = static_cast<AdvancedTypefaceInfo::FontFlags>(
+        advancedProperty.flags | AdvancedTypefaceInfo::FontFlags::AltDataFormat);
+  }
+
+  advancedProperty.style = static_cast<AdvancedTypefaceInfo::StyleFlags>(0);
+  if (FT_IS_FIXED_WIDTH(face)) {
+    advancedProperty.style = static_cast<AdvancedTypefaceInfo::StyleFlags>(
+        advancedProperty.style | AdvancedTypefaceInfo::StyleFlags::FixedPitch);
+  }
+  if (face->style_flags & FT_STYLE_FLAG_ITALIC) {
+    advancedProperty.style = static_cast<AdvancedTypefaceInfo::StyleFlags>(
+        advancedProperty.style | AdvancedTypefaceInfo::StyleFlags::Italic);
+  }
+  return advancedProperty;
+}
+#endif
+
 std::shared_ptr<ScalerContext> FTTypeface::onCreateScalerContext(float size) const {
   return std::make_shared<FTScalerContext>(weakThis.lock(), size);
 }
+
 }  // namespace tgfx

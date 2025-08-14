@@ -13,20 +13,13 @@ set(TGFX_VERSION "2.1.0")
 
 # Options for building tgfx
 option(TGFX_BUILD_SVG "Enable building the SVG module" OFF)
+option(TGFX_BUILD_PDF "Enable building the PDF module" OFF)
 option(TGFX_BUILD_LAYERS "Enable building the layers module" OFF)
 option(TGFX_BUILD_DRAWERS "Enable building the tgfx-drawers library for testing" OFF)
 option(TGFX_USE_OPENGL "Use OpenGL as the GPU backend" ON)
 option(TGFX_USE_QT "Enable building with the Qt framework." OFF)
 option(TGFX_USE_SWIFTSHADER "Enable building with the SwiftShader library" OFF)
 option(TGFX_USE_ANGLE "Enable building with the ANGLE library" OFF)
-option(TGFX_USE_FASTER_BLUR "Enable a faster blur algorithm instead of the standard Gaussian blur" ON)
-
-# When enabled, ImageBuffers created from web native codecs won’t be fully decoded right away.
-# Instead, they will use promise-awaiting calls before generating textures, allowing multiple
-# images to be decoded simultaneously. Avoid enabling this if your rendering process requires
-# multiple flush() calls in a single frame, as it may cause screen tearing, where parts of the
-# screen update while others do not.
-option(TGFX_USE_ASYNC_PROMISE "Enable async promises for loading images on the web" OFF)
 
 # EMSCRIPTEN_PTHREADS can be set by vendor tools for building the wasm-mt architecture.
 if (NOT WEB OR EMSCRIPTEN_PTHREADS)
@@ -72,13 +65,14 @@ if (MACOS AND CLION_IDE AND NOT HasParent)
     option(TGFX_BUILD_TESTS "Enable building tgfx test targets" ON)
 endif ()
 
-if (TGFX_BUILD_SVG)
+if (TGFX_BUILD_SVG OR TGFX_BUILD_PDF)
     set(TGFX_USE_PNG_ENCODE ON)
     set(TGFX_USE_JPEG_DECODE ON)
 endif ()
 
 if (TGFX_BUILD_TESTS)
     set(TGFX_BUILD_SVG ON)
+    set(TGFX_BUILD_PDF ON)
     set(TGFX_BUILD_DRAWERS ON)
     set(TGFX_USE_FREETYPE ON)
 else ()
@@ -96,12 +90,12 @@ endif ()
 
 message("TGFX_VERSION: ${TGFX_VERSION}")
 message("TGFX_BUILD_SVG: ${TGFX_BUILD_SVG}")
+message("TGFX_BUILD_PDF: ${TGFX_BUILD_PDF}")
 message("TGFX_BUILD_LAYERS: ${TGFX_BUILD_LAYERS}")
 message("TGFX_USE_OPENGL: ${TGFX_USE_OPENGL}")
 message("TGFX_USE_QT: ${TGFX_USE_QT}")
 message("TGFX_USE_SWIFTSHADER: ${TGFX_USE_SWIFTSHADER}")
 message("TGFX_USE_ANGLE: ${TGFX_USE_ANGLE}")
-message("TGFX_USE_FASTER_BLUR: ${TGFX_USE_FASTER_BLUR}")
 message("TGFX_USE_THREADS: ${TGFX_USE_THREADS}")
 message("TGFX_USE_FREETYPE: ${TGFX_USE_FREETYPE}")
 message("TGFX_USE_PNG_DECODE: ${TGFX_USE_PNG_DECODE}")
@@ -111,7 +105,6 @@ message("TGFX_USE_JPEG_ENCODE: ${TGFX_USE_JPEG_ENCODE}")
 message("TGFX_USE_WEBP_DECODE: ${TGFX_USE_WEBP_DECODE}")
 message("TGFX_USE_WEBP_ENCODE: ${TGFX_USE_WEBP_ENCODE}")
 message("TGFX_BUILD_TESTS: ${TGFX_BUILD_TESTS}")
-message("TGFX_USE_ASYNC_PROMISE: ${TGFX_USE_ASYNC_PROMISE}")
 message("TGFX_USE_INSPECTOR: ${TGFX_USE_INSPECTOR}")
 message("TGFX_BUILD_FRAMEWORK: ${TGFX_BUILD_FRAMEWORK}")
 
@@ -161,6 +154,12 @@ if (TGFX_BUILD_LAYERS)
     file(GLOB_RECURSE LAYERS_FILES
             src/layers/*.*)
     list(APPEND TGFX_FILES ${LAYERS_FILES})
+endif ()
+
+if(TGFX_BUILD_PDF)
+    file(GLOB_RECURSE PDF_FILES
+            src/pdf/*.*)
+    list(APPEND TGFX_FILES ${PDF_FILES})
 endif ()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -243,23 +242,18 @@ if (TGFX_USE_PNG)
     list(APPEND TGFX_INCLUDES third_party/out/libpng/${INCLUDE_ENTRY})
 endif ()
 
-if (TGFX_USE_ZLIB)
-    list(APPEND TGFX_STATIC_VENDORS zlib)
-endif ()
-
-if (TGFX_BUILD_SVG)
+if (TGFX_BUILD_SVG OR TGFX_BUILD_PDF)
     # SVG and PDF exports require glyphs to be convertible back to Unicode.
     list(APPEND TGFX_DEFINES TGFX_USE_GLYPH_TO_UNICODE)
+    if(TGFX_BUILD_PDF)
+        list(APPEND TGFX_DEFINES TGFX_USE_ADVANCED_TYPEFACE_PROPERTY)
+        set(TGFX_USE_ZLIB ON)
+    endif()
 endif ()
 
-if (TGFX_USE_FASTER_BLUR)
-    list(FILTER TGFX_FILES EXCLUDE REGEX "src/(gpu/processors|core/filters)/.*GaussianBlur.*")
-else ()
-    list(FILTER TGFX_FILES EXCLUDE REGEX "src/(gpu/processors|core/filters)/.*DualBlur.*")
-endif ()
-
-if (TGFX_USE_ASYNC_PROMISE)
-    list(APPEND TGFX_DEFINES TGFX_USE_ASYNC_PROMISE)
+if (TGFX_USE_ZLIB)
+    list(APPEND TGFX_STATIC_VENDORS zlib)
+    list(APPEND TGFX_INCLUDES third_party/out/zlib/${INCLUDE_ENTRY})
 endif ()
 
 if (TGFX_USE_THREADS)
@@ -354,6 +348,13 @@ list(APPEND TGFX_INCLUDES third_party/highway)
 if (TGFX_BUILD_SVG)
     list(APPEND TGFX_STATIC_VENDORS expat)
     list(APPEND TGFX_INCLUDES third_party/expat)
+endif ()
+if (TGFX_BUILD_PDF)
+    list(APPEND TGFX_STATIC_VENDORS harfbuzz)
+    list(APPEND TGFX_INCLUDES third_party/harfbuzz/src)
+    if (NOT (APPLE OR WIN32 OR LINUX))
+        list(APPEND TGFX_INCLUDES third_party/digestpp)
+    endif ()
 endif ()
 
 if (WEB)
@@ -490,6 +491,9 @@ elseif (CMAKE_HOST_SYSTEM_NAME MATCHES "Linux")
     list(APPEND TGFX_SHARED_LIBS ${CMAKE_THREAD_LIBS_INIT})
     list(APPEND TGFX_SHARED_LIBS dl)
     list(APPEND TGFX_COMPILE_OPTIONS -fPIC -pthread)
+    if (TGFX_BUILD_PDF)
+        list(APPEND TGFX_COMPILE_OPTIONS -lcrypto)
+    endif ()
 
     file(GLOB_RECURSE PLATFORM_FILES src/platform/mock/*.*)
     list(APPEND TGFX_FILES ${PLATFORM_FILES})
@@ -607,12 +611,6 @@ if (TGFX_BUILD_TESTS)
 
     if (TGFX_TEST_EXCLUDE_FILES)
         list(REMOVE_ITEM TGFX_TEST_FILES ${TGFX_TEST_EXCLUDE_FILES})
-    endif ()
-
-    if (TGFX_USE_FASTER_BLUR)
-        file(GLOB_RECURSE GAUSSIAN_BLUR_TEST_FILES src/gpu/processors/*GaussianBlur* src/core/filters/*GaussianBlur*)
-        list(APPEND TGFX_TEST_FILES ${GAUSSIAN_BLUR_TEST_FILES})
-        add_definitions(-DTGFX_USE_FASTER_BLUR)
     endif ()
 
     list(APPEND TGFX_BASELINE_DEFINES ${TGFX_TEST_DEFINES} UPDATE_BASELINE)

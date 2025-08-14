@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,17 +16,29 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/processors/DualBlurFragmentProcessor.h"
+#pragma once
+
+#include "core/shaders/GradientShader.h"
+#include "pdf/PDFTypes.h"
+#include "tgfx/core/GradientType.h"
 
 namespace tgfx {
-DualBlurFragmentProcessor::DualBlurFragmentProcessor(DualBlurPassMode passMode,
-                                                     PlacementPtr<FragmentProcessor> processor,
-                                                     Point blurOffset)
-    : FragmentProcessor(ClassID()), passMode(passMode), blurOffset(blurOffset) {
-  registerChildProcessor(std::move(processor));
-}
 
-void DualBlurFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
-  bytesKey->write(static_cast<uint32_t>(passMode));
-}
+class PDFGradientShader {
+ public:
+  struct Key {
+    GradientType type;
+    GradientInfo info;
+    const std::vector<Color>* colors;
+    const std::vector<float>* stops;
+    Matrix canvasTransform;
+    Matrix shaderTransform;
+    Rect boundBox;
+    uint32_t hash;
+  };
+
+  static PDFIndirectReference Make(PDFDocumentImpl* doc, const GradientShader* shader,
+                                   const Matrix& matrix, const Rect& surfaceBBox);
+};
+
 }  // namespace tgfx

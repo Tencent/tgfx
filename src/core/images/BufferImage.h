@@ -39,6 +39,8 @@ class BufferImage : public PixelImage {
     return imageBuffer->isAlphaOnly();
   }
 
+  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
+
  protected:
   Type type() const override {
     return Type::Buffer;
@@ -54,8 +56,5 @@ class BufferImage : public PixelImage {
 
   std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
                                       const SamplingOptions& sampling) const override;
-
- private:
-  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
 };
 }  // namespace tgfx

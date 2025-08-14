@@ -19,14 +19,28 @@
 #include "CGTypeface.h"
 #include <CoreFoundation/CoreFoundation.h>
 #include "CGScalerContext.h"
+#include "core/AdvancedTypefaceInfo.h"
+#include "core/utils/FontTableTag.h"
 #include "core/utils/UniqueID.h"
 #include "tgfx/core/FontStyle.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
-#include "tgfx/core/UTF.h"
 
 namespace tgfx {
-std::string StringFromCFString(CFStringRef src) {
+
+template <typename CFRef>
+struct CFReleaseDeleter {
+  void operator()(CFTypeRef ref) const {
+    if (ref) {
+      CFRelease(ref);
+    }
+  }
+};
+
+template <typename CFRef>
+using UniqueCFRef = std::unique_ptr<std::remove_pointer_t<CFRef>, CFReleaseDeleter<CFRef>>;
+
+std::string CGTypeface::StringFromCFString(CFStringRef src) {
   static const CFIndex kCStringSize = 128;
   char temporaryCString[kCStringSize];
   bzero(temporaryCString, kCStringSize);
@@ -269,7 +283,7 @@ GlyphID CGTypeface::getGlyphID(Unichar unichar) const {
   return macGlyphs[0];
 }
 
-std::shared_ptr<Stream> CGTypeface::openStream() const {
+std::unique_ptr<Stream> CGTypeface::openStream() const {
   return Stream::MakeFromData(data);
 }
 
@@ -384,6 +398,48 @@ std::vector<Unichar> CGTypeface::getGlyphToUnicodeMap() const {
     GetGlyphMapByPlane(bits, ctFont, returnMap, planeIndex);
   }
   return returnMap;
+}
+#endif
+
+#ifdef TGFX_USE_ADVANCED_TYPEFACE_PROPERTY
+AdvancedTypefaceInfo CGTypeface::getAdvancedInfo() const {
+  AdvancedTypefaceInfo advancedProperty;
+  const auto* fontName = CTFontCopyPostScriptName(ctFont);
+  if (fontName) {
+    advancedProperty.postScriptName = CGTypeface::StringFromCFString(fontName);
+  }
+  CFRelease(fontName);
+
+  constexpr auto glyf = SetFourByteTag('g', 'l', 'y', 'f');
+  constexpr auto loca = SetFourByteTag('l', 'o', 'c', 'a');
+  constexpr auto CFF = SetFourByteTag('C', 'F', 'F', ' ');
+  // Use copyTableData to check if the font table exists.
+  // TODO(YGaurora): Implement a function to check for the existence of a font table without
+  // copying its data, which would improve performance.
+  if (copyTableData(glyf) && copyTableData(loca)) {
+    advancedProperty.type = AdvancedTypefaceInfo::FontType::TrueType;
+  } else if (copyTableData(CFF)) {
+    advancedProperty.type = AdvancedTypefaceInfo::FontType::CFF;
+  }
+
+  CTFontSymbolicTraits symbolicTraits = CTFontGetSymbolicTraits(ctFont);
+  if (symbolicTraits & kCTFontMonoSpaceTrait) {
+    advancedProperty.style = static_cast<AdvancedTypefaceInfo::StyleFlags>(
+        advancedProperty.style | AdvancedTypefaceInfo::StyleFlags::FixedPitch);
+  }
+  if (symbolicTraits & kCTFontItalicTrait) {
+    advancedProperty.style = static_cast<AdvancedTypefaceInfo::StyleFlags>(
+        advancedProperty.style | AdvancedTypefaceInfo::StyleFlags::Italic);
+  }
+  CTFontStylisticClass stylisticClass = symbolicTraits & kCTFontClassMaskTrait;
+  if (stylisticClass >= kCTFontOldStyleSerifsClass && stylisticClass <= kCTFontSlabSerifsClass) {
+    advancedProperty.style = static_cast<AdvancedTypefaceInfo::StyleFlags>(
+        advancedProperty.style | AdvancedTypefaceInfo::StyleFlags::Serif);
+  } else if (stylisticClass & kCTFontSymbolicClass) {
+    advancedProperty.style = static_cast<AdvancedTypefaceInfo::StyleFlags>(
+        advancedProperty.style | AdvancedTypefaceInfo::StyleFlags::Symbolic);
+  }
+  return advancedProperty;
 }
 #endif
 
