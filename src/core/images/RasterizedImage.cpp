@@ -25,7 +25,7 @@
 
 namespace tgfx {
 
-static uint32_t GetPowerOfTwoScaleLevel(float scale) {
+static uint32_t GetCacheScaleLevel(float scale) {
   scale = std::clamp(scale, 0.f, 1.f);
   if (scale > 0.5f) {
     return 0;
@@ -47,7 +47,7 @@ std::shared_ptr<TextureProxy> RasterizedImage::lockTextureProxy(const TPArgs& ar
   auto textureKey = getTextureKey();
   auto newScale = 1.f;
   if (source->canDirectDownscale()) {
-    auto mipmapLevel = GetPowerOfTwoScaleLevel(args.drawScale);
+    auto mipmapLevel = GetCacheScaleLevel(args.drawScale);
     UniqueKey::Append(textureKey, &mipmapLevel, 1);
     newScale = 1.f / static_cast<float>(1 << mipmapLevel);
   }
