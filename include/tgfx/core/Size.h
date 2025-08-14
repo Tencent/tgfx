@@ -167,6 +167,14 @@ struct Size {
   }
 
   /**
+   * Scale the size by scaleWidth and scaleHeight.
+   */
+  void scale(float scaleWidth, float scaleHeight) {
+    width *= scaleWidth;
+    height *= scaleHeight;
+  }
+
+  /**
    * Returns a ISize by rounding of width and height.
    */
   ISize toRound() {

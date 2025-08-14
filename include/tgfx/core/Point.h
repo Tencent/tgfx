@@ -95,6 +95,14 @@ struct Point {
   }
 
   /**
+   * Scale the Point by scaleX and scaleY.
+   */
+  void scale(float scaleX, float scaleY) {
+    x *= scaleX;
+    y *= scaleY;
+  }
+
+  /**
    * Returns the Euclidean distance from origin.
    */
   float length() const {

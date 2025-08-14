@@ -728,14 +728,85 @@ TGFX_TEST(FilterTest, GaussianBlurImageFilter) {
   ASSERT_TRUE(context != nullptr);
   auto image = MakeImage("resources/apitest/image_as_mask.png");
   ASSERT_TRUE(image != nullptr);
-  auto surface = Surface::Make(context, image->width(), image->height());
+  int margin = 25;
+  auto originOffset = static_cast<float>(margin);
+  Point srcImgCenter(static_cast<float>(image->width()) * 0.5f + originOffset,
+                     static_cast<float>(image->height()) * 0.5f + originOffset);
+  int surfaceWidth = image->width() + margin * 2;
+  int surfaceHeight = image->height() + margin * 2;
+  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
   ASSERT_TRUE(surface != nullptr);
-  auto gaussianBlurFilter = std::make_shared<GaussianBlurImageFilter>(3, 3, TileMode::Decal);
-  auto offset = Point::Make(0, 0);
-  image = image->makeWithFilter(gaussianBlurFilter, &offset);
   auto canvas = surface->getCanvas();
-  canvas->drawImage(image, offset.x, offset.y);
-  context->flushAndSubmit();
-  EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/GaussianBlurImageFilter"));
+
+  // Simple one-dimensional image blur
+  {
+    canvas->save();
+    auto gaussianBlurFilter = std::make_shared<GaussianBlurImageFilter>(0, 3, TileMode::Decal);
+    auto offset = Point::Make(0.0f, 0.0f);
+    image = image->makeWithFilter(gaussianBlurFilter, &offset);
+    canvas->drawImage(image, offset.x + originOffset, offset.y + originOffset);
+    context->flushAndSubmit();
+    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/GaussianBlurImageFilterSimple1D"));
+    canvas->restore();
+  }
+
+  // Simple two-dimensional image blur
+  {
+    canvas->save();
+    canvas->clear();
+    auto gaussianBlurFilter = std::make_shared<GaussianBlurImageFilter>(3, 3, TileMode::Decal);
+    auto offset = Point::Make(0.0f, 0.0f);
+    image = image->makeWithFilter(gaussianBlurFilter, &offset);
+    canvas->drawImage(image, offset.x + originOffset, offset.y + originOffset);
+    context->flushAndSubmit();
+    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/GaussianBlurImageFilterSimple2D"));
+    canvas->restore();
+  }
+
+  // Complex one-dimensional image blur (with scaling applied and moved to the right-down corner of the canvas)
+  {
+    canvas->save();
+    canvas->clear();
+    // Set a value exceeding the maximum blur factor
+    auto gaussianBlurFilter = std::make_shared<GaussianBlurImageFilter>(3, 0, TileMode::Decal);
+    auto filterOffset = Point::Make(0.0f, 0.0f);
+    image = image->makeWithFilter(gaussianBlurFilter, &filterOffset);
+    float imageScale = 0.8f;
+    canvas->scale(imageScale, imageScale);
+    Point scaledImgCenter(srcImgCenter.x * imageScale, srcImgCenter.y * imageScale);
+    Point imgCenterDiff = srcImgCenter - scaledImgCenter;
+    Point canvasOffset(static_cast<float>(surfaceWidth) * 0.5f,
+                       static_cast<float>(surfaceHeight) * 0.5f);
+    // Move the image center to the right-down corner of the canvas
+    canvas->translate((canvasOffset.x + imgCenterDiff.x) / imageScale,
+                      (canvasOffset.y + imgCenterDiff.y) / imageScale);
+    canvas->drawImage(image, filterOffset.x + originOffset, filterOffset.y + originOffset);
+    context->flushAndSubmit();
+    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/GaussianBlurImageFilterComplex1D"));
+    canvas->restore();
+  }
+
+  // Complex two-dimensional image blur (with scaling applied and moved to the top-left corner of the canvas)
+  {
+    canvas->save();
+    canvas->clear();
+    // Set a value exceeding the maximum blur factor
+    auto gaussianBlurFilter = std::make_shared<GaussianBlurImageFilter>(15, 15, TileMode::Decal);
+    auto filterOffset = Point::Make(0.0f, 0.0f);
+    image = image->makeWithFilter(gaussianBlurFilter, &filterOffset);
+    float imageScale = 0.8f;
+    canvas->scale(imageScale, imageScale);
+    Point scaledImgCenter(srcImgCenter.x * imageScale, srcImgCenter.y * imageScale);
+    Point imgCenterDiff = srcImgCenter - scaledImgCenter;
+    Point canvasOffset(static_cast<float>(surfaceWidth) * -0.5f,
+                       static_cast<float>(surfaceHeight) * -0.5f);
+    // Move the image center to the top-left corner of the canvas
+    canvas->translate((canvasOffset.x + imgCenterDiff.x) / imageScale,
+                      (canvasOffset.y + imgCenterDiff.y) / imageScale);
+    canvas->drawImage(image, filterOffset.x + originOffset, filterOffset.y + originOffset);
+    context->flushAndSubmit();
+    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/GaussianBlurImageFilterComplex2D"));
+    canvas->restore();
+  }
 }
 }  // namespace tgfx
