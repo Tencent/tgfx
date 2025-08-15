@@ -68,6 +68,10 @@ std::unique_ptr<GPUTexture> GLGPU::createTexture(const GPUTextureDescriptor& des
     LOGE("GLGPU::createTexture() format is not renderable, but usage includes RENDER_ATTACHMENT!");
     return nullptr;
   }
+  if (descriptor.mipLevelCount > 1 && !caps()->mipmapSupport) {
+    LOGE("GLGPU::createTexture() mipmaps are not supported!");
+    return nullptr;
+  }
   auto gl = functions();
   // Clear the previously generated GLError, causing the subsequent CheckGLError to return an
   // incorrect result.
@@ -87,9 +91,9 @@ std::unique_ptr<GPUTexture> GLGPU::createTexture(const GPUTextureDescriptor& des
   bool success = true;
   // Texture memory must be allocated first on the web platform then can write pixels.
   for (int level = 0; level < descriptor.mipLevelCount && success; level++) {
-    const int twoToTheMipLevel = 1 << level;
-    const int currentWidth = std::max(1, descriptor.width / twoToTheMipLevel);
-    const int currentHeight = std::max(1, descriptor.height / twoToTheMipLevel);
+    auto twoToTheMipLevel = 1 << level;
+    auto currentWidth = std::max(1, descriptor.width / twoToTheMipLevel);
+    auto currentHeight = std::max(1, descriptor.height / twoToTheMipLevel);
     gl->texImage2D(target, level, static_cast<int>(textureFormat.internalFormatTexImage),
                    currentWidth, currentHeight, 0, textureFormat.externalFormat, GL_UNSIGNED_BYTE,
                    nullptr);
@@ -128,11 +132,8 @@ std::unique_ptr<GPUTexture> GLGPU::importExternalTexture(const BackendTexture& b
         "set!");
     return nullptr;
   }
-  GPUTextureDescriptor descriptor = {};
-  descriptor.width = backendTexture.width();
-  descriptor.height = backendTexture.height();
-  descriptor.format = format;
-  descriptor.usage = usage;
+  GPUTextureDescriptor descriptor = {
+      backendTexture.width(), backendTexture.height(), format, false, 1, usage};
   std::unique_ptr<GLTexture> texture = nullptr;
   if (adopted) {
     texture = std::make_unique<GLTexture>(descriptor, textureInfo.target, textureInfo.id);
@@ -163,11 +164,12 @@ std::unique_ptr<GPUTexture> GLGPU::importExternalTexture(const BackendRenderTarg
   if (!caps()->isFormatRenderable(format)) {
     return nullptr;
   }
-  GPUTextureDescriptor descriptor = {};
-  descriptor.width = renderTarget.width();
-  descriptor.height = renderTarget.height();
-  descriptor.format = format;
-  descriptor.usage = GPUTextureUsage::RENDER_ATTACHMENT;
+  GPUTextureDescriptor descriptor = {renderTarget.width(),
+                                     renderTarget.height(),
+                                     format,
+                                     false,
+                                     1,
+                                     GPUTextureUsage::RENDER_ATTACHMENT};
   return std::make_unique<GLExternalTexture>(descriptor, GL_TEXTURE_2D, 0, frameBufferInfo.id);
 }
 

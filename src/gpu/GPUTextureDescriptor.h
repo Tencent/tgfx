@@ -42,7 +42,19 @@ class GPUTextureUsage {
 /**
  * GPUTextureDescriptor is used to describe the properties of a GPUTexture.
  */
-struct GPUTextureDescriptor {
+class GPUTextureDescriptor {
+ public:
+  /**
+   * Default constructor initializes the texture descriptor with default values.
+   */
+  GPUTextureDescriptor() = default;
+
+  /**
+   * Constructs a GPUTextureDescriptor with the specified properties.
+   */
+  GPUTextureDescriptor(int width, int height, PixelFormat format, bool mipmapped = false,
+                       int sampleCount = 1, uint32_t usage = GPUTextureUsage::TEXTURE_BINDING);
+
   /**
    * The width of the texture in pixels.
    */

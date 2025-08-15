@@ -88,19 +88,16 @@ std::shared_ptr<RenderTarget> RenderTarget::Make(Context* context, int width, in
     return nullptr;
   }
   auto caps = context->caps();
-  GPUTextureDescriptor descriptor = {};
-  descriptor.width = width;
-  descriptor.height = height;
-  descriptor.format = format;
-  descriptor.mipLevelCount = mipmapped ? caps->getMipLevelCount(width, height) : 1;
-  descriptor.usage = GPUTextureUsage::TEXTURE_BINDING | GPUTextureUsage::RENDER_ATTACHMENT;
+  mipmapped = caps->mipmapSupport && mipmapped;
   sampleCount = caps->getSampleCount(sampleCount, format);
-  auto scratchKey = ComputeRenderTargetScratchKey(width, height, format, sampleCount,
-                                                  descriptor.mipLevelCount > 1);
+  auto scratchKey = ComputeRenderTargetScratchKey(width, height, format, sampleCount, mipmapped);
   if (auto renderTarget = Resource::Find<TextureRenderTarget>(context, scratchKey)) {
     renderTarget->_origin = origin;
     return renderTarget;
   }
+  GPUTextureDescriptor descriptor = {
+      width,     height, format,
+      mipmapped, 1,      GPUTextureUsage::TEXTURE_BINDING | GPUTextureUsage::RENDER_ATTACHMENT};
   auto texture = context->gpu()->createTexture(descriptor);
   if (texture == nullptr) {
     return nullptr;
@@ -118,12 +115,9 @@ std::shared_ptr<RenderTarget> TextureRenderTarget::MakeFrom(Context* context,
   DEBUG_ASSERT(texture != nullptr);
   std::unique_ptr<GPUTexture> renderTexture = nullptr;
   if (sampleCount > 1) {
-    GPUTextureDescriptor descriptor = {};
-    descriptor.width = texture->width();
-    descriptor.height = texture->height();
-    descriptor.format = texture->format();
-    descriptor.sampleCount = sampleCount;
-    descriptor.usage = GPUTextureUsage::RENDER_ATTACHMENT;
+    GPUTextureDescriptor descriptor = {texture->width(),  texture->height(),
+                                       texture->format(), false,
+                                       sampleCount,       GPUTextureUsage::RENDER_ATTACHMENT};
     renderTexture = context->gpu()->createTexture(descriptor);
     if (renderTexture == nullptr) {
       texture->release(context->gpu());

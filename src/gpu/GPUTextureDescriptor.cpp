@@ -16,16 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "tgfx/gpu/Caps.h"
+#include "gpu/GPUTextureDescriptor.h"
 #include <algorithm>
 #include <cmath>
 
 namespace tgfx {
-int Caps::getMipLevelCount(int width, int height) const {
-  if (!mipmapSupport) {
-    return 1;
+GPUTextureDescriptor::GPUTextureDescriptor(int width, int height, PixelFormat format,
+                                           bool mipmapped, int sampleCount, uint32_t usage)
+    : width(width), height(height), format(format), sampleCount(sampleCount), usage(usage) {
+  if (mipmapped) {
+    int maxDimension = std::max(width, height);
+    mipLevelCount = static_cast<int>(std::log2(maxDimension)) + 1;
   }
-  int maxDimension = std::max(width, height);
-  return static_cast<int>(std::log2(maxDimension)) + 1;
 }
+
 }  // namespace tgfx

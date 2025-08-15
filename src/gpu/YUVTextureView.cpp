@@ -30,11 +30,7 @@ static std::vector<std::unique_ptr<GPUTexture>> MakeTexturePlanes(GPU* gpu, cons
   for (int index = 0; index < count; index++) {
     auto w = yuvData->width() >> YUV_SIZE_FACTORS[index];
     auto h = yuvData->height() >> YUV_SIZE_FACTORS[index];
-    GPUTextureDescriptor descriptor = {};
-    descriptor.width = w;
-    descriptor.height = h;
-    descriptor.format = formats[index];
-    descriptor.usage = GPUTextureUsage::TEXTURE_BINDING;
+    GPUTextureDescriptor descriptor = {w, h, formats[index]};
     auto texture = gpu->createTexture(descriptor);
     if (texture == nullptr) {
       for (auto& plane : texturePlanes) {
