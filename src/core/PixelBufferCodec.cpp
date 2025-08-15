@@ -36,7 +36,9 @@ bool PixelBufferCodec::onReadPixels(ColorType colorType, AlphaType alphaType, si
   }
   auto srcPixmap = Pixmap(source->info(), pixels);
   auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
-  return srcPixmap.readPixels(dstInfo, dstPixels);
+  auto result = srcPixmap.readPixels(dstInfo, dstPixels);
+  source->unlockPixels();
+  return result;
 }
 
 }  // namespace tgfx

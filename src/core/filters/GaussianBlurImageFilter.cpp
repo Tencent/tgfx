@@ -33,7 +33,6 @@ namespace tgfx {
 // Therefore, 10 is chosen as the MAX_BLUR_SIGMA.
 #define MAX_BLUR_SIGMA 10.f
 
-#ifndef TGFX_USE_FASTER_BLUR
 std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrinessY,
                                                TileMode tileMode) {
   if (blurrinessX < 0 || blurrinessY < 0 || (blurrinessX == 0 && blurrinessY == 0)) {
@@ -42,14 +41,13 @@ std::shared_ptr<ImageFilter> ImageFilter::Blur(float blurrinessX, float blurrine
   return std::make_shared<GaussianBlurImageFilter>(blurrinessX, blurrinessY, tileMode);
 }
 
-float BlurImageFilter::MaxSigma() {
+float GaussianBlurImageFilter::MaxSigma() {
   return MAX_BLUR_SIGMA;
 }
-#endif
 
 GaussianBlurImageFilter::GaussianBlurImageFilter(float blurrinessX, float blurrinessY,
                                                  TileMode tileMode)
-    : BlurImageFilter(blurrinessX, blurrinessY, tileMode) {
+    : blurrinessX(blurrinessX), blurrinessY(blurrinessY), tileMode(tileMode) {
 }
 
 static void Blur1D(PlacementPtr<FragmentProcessor> source,
@@ -85,14 +83,14 @@ static std::shared_ptr<TextureProxy> ScaleTexture(const TPArgs& args,
 }
 
 std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
-    std::shared_ptr<Image> source, const Rect& clipBounds, const TPArgs& args) const {
+    std::shared_ptr<Image> source, const Rect& renderBounds, const TPArgs& args) const {
   float sigmaX = blurrinessX;
   float sigmaY = blurrinessY;
   const float maxSigma = std::max(sigmaX, sigmaY);
   float scaleFactorX = 1.0f;
   float scaleFactorY = 1.0f;
   bool blur2D = blurrinessX > 0 && blurrinessY > 0;
-  Rect boundsWillSample = clipBounds;
+  Rect boundsWillSample = renderBounds;
   if (blur2D) {
     // if blur2D, we need to make sure the pixels are in the clip bounds while blur y.
     // if blur1D, we use the origin image.
@@ -132,16 +130,17 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
 
     // blur and scale the texture to the clip bounds.
     auto uvMatrix = Matrix::MakeScale(sourceScale.x, sourceScale.y);
-    uvMatrix.preTranslate(clipBounds.left - boundsWillSample.left,
-                          clipBounds.top - boundsWillSample.top);
+    uvMatrix.preTranslate(renderBounds.left - boundsWillSample.left,
+                          renderBounds.top - boundsWillSample.top);
 
     SamplingArgs samplingArgs = {tileMode, tileMode, {}, SrcRectConstraint::Fast};
     sourceFragment =
         TiledTextureEffect::Make(renderTarget->asTextureProxy(), samplingArgs, &uvMatrix);
 
-    renderTarget = RenderTargetProxy::MakeFallback(
-        args.context, static_cast<int>(clipBounds.width()), static_cast<int>(clipBounds.height()),
-        isAlphaOnly, 1, args.mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
+    renderTarget =
+        RenderTargetProxy::MakeFallback(args.context, static_cast<int>(renderBounds.width()),
+                                        static_cast<int>(renderBounds.height()), isAlphaOnly, 1,
+                                        args.mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
 
     if (!renderTarget) {
       return nullptr;
@@ -165,8 +164,8 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     return renderTarget->asTextureProxy();
   }
 
-  return ScaleTexture(args, renderTarget->asTextureProxy(), static_cast<int>(clipBounds.width()),
-                      static_cast<int>(clipBounds.height()));
+  return ScaleTexture(args, renderTarget->asTextureProxy(), static_cast<int>(renderBounds.width()),
+                      static_cast<int>(renderBounds.height()));
 }
 
 Rect GaussianBlurImageFilter::onFilterBounds(const Rect& srcRect) const {
@@ -177,6 +176,38 @@ PlacementPtr<FragmentProcessor> GaussianBlurImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     SrcRectConstraint constraint, const Matrix* uvMatrix) const {
   return makeFPFromTextureProxy(source, args, sampling, constraint, uvMatrix);
+}
+
+PlacementPtr<FragmentProcessor> GaussianBlurImageFilter::getSourceFragmentProcessor(
+    std::shared_ptr<Image> source, Context* context, uint32_t renderFlags, const Rect& drawRect,
+    const Point& scales) const {
+  Matrix uvMatrix = Matrix::MakeScale(1 / scales.x, 1 / scales.y);
+  uvMatrix.postTranslate(drawRect.left, drawRect.top);
+  auto scaledDrawRect = drawRect;
+  scaledDrawRect.scale(scales.x, scales.y);
+  scaledDrawRect.round();
+  FPArgs args =
+      FPArgs(context, renderFlags, Rect::MakeWH(scaledDrawRect.width(), scaledDrawRect.height()),
+             std::max(scales.x, scales.y));
+
+  SamplingArgs samplingArgs = {};
+  samplingArgs.tileModeX = tileMode;
+  samplingArgs.tileModeY = tileMode;
+  auto fp = FragmentProcessor::Make(source, args, samplingArgs, &uvMatrix);
+  if (fp == nullptr) {
+    return nullptr;
+  }
+  if (fp->numCoordTransforms() == 1) {
+    return fp;
+  }
+  auto renderTarget = RenderTargetProxy::MakeFallback(
+      context, static_cast<int>(scaledDrawRect.width()), static_cast<int>(scaledDrawRect.height()),
+      source->isAlphaOnly(), 1);
+  if (renderTarget == nullptr) {
+    return nullptr;
+  }
+  context->drawingManager()->fillRTWithFP(renderTarget, std::move(fp), renderFlags);
+  return TiledTextureEffect::Make(renderTarget->asTextureProxy(), samplingArgs);
 }
 
 }  // namespace tgfx

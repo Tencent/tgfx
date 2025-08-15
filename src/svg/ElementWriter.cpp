@@ -25,7 +25,7 @@
 #include "core/CanvasState.h"
 #include "core/codecs/jpeg/JpegCodec.h"
 #include "core/codecs/png/PngCodec.h"
-#include "core/filters/BlurImageFilter.h"
+#include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/ShaderMaskFilter.h"
 #include "core/shaders/MatrixShader.h"
 #include "core/utils/Log.h"
@@ -233,7 +233,7 @@ Resources ElementWriter::addImageFilterResource(const std::shared_ptr<ImageFilte
     auto type = Types::Get(imageFilter.get());
     switch (type) {
       case Types::ImageFilterType::Blur: {
-        auto blurFilter = static_cast<const BlurImageFilter*>(imageFilter.get());
+        auto blurFilter = static_cast<const GaussianBlurImageFilter*>(imageFilter.get());
         bound = blurFilter->filterBounds(bound);
         filterElement.addAttribute("x", bound.x());
         filterElement.addAttribute("y", bound.y());
@@ -276,7 +276,7 @@ Resources ElementWriter::addImageFilterResource(const std::shared_ptr<ImageFilte
   return resources;
 }
 
-void ElementWriter::addBlurImageFilter(const BlurImageFilter* filter) {
+void ElementWriter::addBlurImageFilter(const GaussianBlurImageFilter* filter) {
   ElementWriter blurElement("feGaussianBlur", writer);
   blurElement.addAttribute("stdDeviation",
                            std::max(filter->blurrinessX, filter->blurrinessY) / 2.f);
@@ -295,7 +295,7 @@ void ElementWriter::addDropShadowImageFilter(const DropShadowImageFilter* filter
   {
     ElementWriter blurElement("feGaussianBlur", writer);
     if (Types::Get(filter->blurFilter.get()) == Types::ImageFilterType::Blur) {
-      auto blurFilter = static_cast<const BlurImageFilter*>(filter->blurFilter.get());
+      auto blurFilter = static_cast<const GaussianBlurImageFilter*>(filter->blurFilter.get());
       blurElement.addAttribute("stdDeviation",
                                std::max(blurFilter->blurrinessX, blurFilter->blurrinessY) / 2.f);
       blurElement.addAttribute("result", "blur");
@@ -349,7 +349,7 @@ void ElementWriter::addInnerShadowImageFilter(const InnerShadowImageFilter* filt
   {
     ElementWriter blurElement("feGaussianBlur", writer);
     if (Types::Get(filter->blurFilter.get()) == Types::ImageFilterType::Blur) {
-      auto blurFilter = static_cast<const BlurImageFilter*>(filter->blurFilter.get());
+      auto blurFilter = static_cast<const GaussianBlurImageFilter*>(filter->blurFilter.get());
       blurElement.addAttribute("stdDeviation",
                                std::max(blurFilter->blurrinessX, blurFilter->blurrinessY) / 2.f);
     }

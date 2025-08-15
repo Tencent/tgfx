@@ -46,26 +46,8 @@ std::shared_ptr<Data> CopyDataFromUint8Array(const val& emscriptenData) {
   return imageBuffer.release();
 }
 
-std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string& filePath) {
-  if (filePath.find("http://") == 0 || filePath.find("https://") == 0) {
-    auto data = val::module_property("tgfx")
-                    .call<val>("getBytesFromPath", val::module_property("module"), filePath)
-                    .await();
-    auto imageData = CopyDataFromUint8Array(data);
-    if (imageData == nullptr) {
-      return nullptr;
-    }
-    return ImageCodec::MakeNativeCodec(imageData);
-  } else {
-    auto imageStream = Stream::MakeFromFile(filePath);
-    if (imageStream == nullptr || imageStream->size() <= 14) {
-      return nullptr;
-    }
-    Buffer imageBuffer(imageStream->size());
-    imageStream->read(imageBuffer.data(), imageStream->size());
-    auto imageData = imageBuffer.release();
-    return ImageCodec::MakeNativeCodec(imageData);
-  }
+std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(const std::string&) {
+  return nullptr;
 }
 
 std::shared_ptr<ImageCodec> ImageCodec::MakeNativeCodec(std::shared_ptr<Data> imageBytes) {
@@ -108,15 +90,9 @@ bool NativeCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t 
   if (dstPixels == nullptr) {
     return false;
   }
-  auto image = nativeImage;
-  if (!image.as<bool>()) {
-    auto bytes =
-        val(typed_memory_view(imageBytes->size(), static_cast<const uint8_t*>(imageBytes->data())));
-    image = val::module_property("tgfx").call<val>("createImageFromBytes", bytes).await();
-  }
 
   auto data = val::module_property("tgfx").call<val>(
-      "readImagePixels", val::module_property("module"), image, width(), height());
+      "readImagePixels", val::module_property("module"), nativeImage, width(), height());
   auto imageData = CopyDataFromUint8Array(data);
   if (imageData == nullptr) {
     return false;
@@ -130,16 +106,6 @@ bool NativeCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t 
 
 std::shared_ptr<ImageBuffer> NativeCodec::onMakeBuffer(bool) const {
   auto image = nativeImage;
-  bool usePromise = false;
-  if (!image.as<bool>()) {
-    auto bytes =
-        val(typed_memory_view(imageBytes->size(), static_cast<const uint8_t*>(imageBytes->data())));
-    image = val::module_property("tgfx").call<val>("createImageFromBytes", bytes);
-#ifndef TGFX_USE_ASYNC_PROMISE
-    image = image.await();
-#endif
-  }
-  return std::shared_ptr<WebImageBuffer>(
-      new WebImageBuffer(width(), height(), std::move(image), usePromise));
+  return std::shared_ptr<WebImageBuffer>(new WebImageBuffer(width(), height(), std::move(image)));
 }
 }  // namespace tgfx

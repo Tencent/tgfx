@@ -37,10 +37,10 @@ Rect RuntimeImageFilter::onFilterBounds(const Rect& srcRect) const {
 }
 
 std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_ptr<Image> source,
-                                                                   const Rect& clipBounds,
+                                                                   const Rect& renderBounds,
                                                                    const TPArgs& args) const {
   auto renderTarget = RenderTargetProxy::MakeFallback(
-      args.context, static_cast<int>(clipBounds.width()), static_cast<int>(clipBounds.height()),
+      args.context, static_cast<int>(renderBounds.width()), static_cast<int>(renderBounds.height()),
       source->isAlphaOnly(), effect->sampleCount(), args.mipmapped, ImageOrigin::TopLeft,
       BackingFit::Approx);
   if (renderTarget == nullptr) {
@@ -68,7 +68,7 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_p
     }
     textureProxies.push_back(textureProxy);
   }
-  auto offset = Point::Make(-clipBounds.x(), -clipBounds.y());
+  auto offset = Point::Make(-renderBounds.x(), -renderBounds.y());
   auto drawingManager = args.context->drawingManager();
   drawingManager->addRuntimeDrawTask(renderTarget, std::move(textureProxies), effect, offset);
   return renderTarget->asTextureProxy();

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,17 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "gpu/processors/DualBlurFragmentProcessor.h"
+#include "NextPowerOfTwoScale.h"
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
 
 namespace tgfx {
-DualBlurFragmentProcessor::DualBlurFragmentProcessor(DualBlurPassMode passMode,
-                                                     PlacementPtr<FragmentProcessor> processor,
-                                                     Point blurOffset)
-    : FragmentProcessor(ClassID()), passMode(passMode), blurOffset(blurOffset) {
-  registerChildProcessor(std::move(processor));
+
+float NextPowerOfTwoScale(float scale) {
+  scale = std::clamp(scale, 0.0f, 1.0f);
+  if (scale > 0.5f) {
+    return 1.0f;
+  }
+  float exactLevel = std::log2(1.0f / scale);
+  auto scaleLevel = static_cast<uint32_t>(std::floor(exactLevel));
+  return 1.0f / static_cast<float>(1 << scaleLevel);
 }
 
-void DualBlurFragmentProcessor::onComputeProcessorKey(BytesKey* bytesKey) const {
-  bytesKey->write(static_cast<uint32_t>(passMode));
-}
 }  // namespace tgfx
