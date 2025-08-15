@@ -42,11 +42,12 @@ static std::unique_ptr<GPUTexture> CreateTextureOfPlane(EAGLGPU* gpu, CVPixelBuf
   }
   auto textureID = CVOpenGLESTextureGetName(texture);
   auto target = CVOpenGLESTextureGetTarget(texture);
-  GPUTextureDescriptor descriptor = {};
-  descriptor.width = static_cast<int>(CVPixelBufferGetWidth(pixelBuffer));
-  descriptor.height = static_cast<int>(CVPixelBufferGetHeight(pixelBuffer));
-  descriptor.format = pixelFormat;
-  descriptor.usage = usage;
+  GPUTextureDescriptor descriptor = {static_cast<int>(CVPixelBufferGetWidth(pixelBuffer)),
+                                     static_cast<int>(CVPixelBufferGetHeight(pixelBuffer)),
+                                     pixelFormat,
+                                     false,
+                                     1,
+                                     usage};
   auto hardwareTexture = std::unique_ptr<EAGLHardwareTexture>(
       new EAGLHardwareTexture(descriptor, pixelBuffer, texture, target, textureID));
   if (!hardwareTexture->checkFrameBuffer(gpu)) {

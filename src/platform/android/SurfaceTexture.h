@@ -71,7 +71,7 @@ class SurfaceTexture : public ImageStream {
 
   SurfaceTexture(int width, int height, JNIEnv* env, jobject surfaceTexture);
 
-  std::unique_ptr<GPUTexture> makeGPUTexture(Context* context);
+  unsigned makeExternalOESTexture(Context* context);
 
   ISize updateTexImage();
 

@@ -102,11 +102,7 @@ std::unique_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(EGLGPU* gpu,
   glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   eglext::glEGLImageTargetTexture2DOES(target, (GLeglImageOES)eglImage);
   auto size = HardwareBufferGetSize(hardwareBuffer);
-  GPUTextureDescriptor descriptor = {};
-  descriptor.width = size.width;
-  descriptor.height = size.height;
-  descriptor.format = formats.front();
-  descriptor.usage = usage;
+  GPUTextureDescriptor descriptor = {size.width, size.height, formats.front(), false, 1, usage};
   auto texture = std::unique_ptr<EGLHardwareTexture>(
       new EGLHardwareTexture(descriptor, hardwareBuffer, eglImage, target, textureID));
   if (!texture->checkFrameBuffer(gpu)) {

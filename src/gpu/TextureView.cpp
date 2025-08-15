@@ -67,18 +67,13 @@ std::shared_ptr<TextureView> TextureView::MakeFormat(Context* context, int width
     return nullptr;
   }
   auto gpu = context->gpu();
-  GPUTextureDescriptor descriptor = {};
-  descriptor.width = width;
-  descriptor.height = height;
-  descriptor.format = pixelFormat;
-  descriptor.usage = GPUTextureUsage::TEXTURE_BINDING;
-  descriptor.mipLevelCount = mipmapped ? context->caps()->getMipLevelCount(width, height) : 1;
-  auto scratchKey =
-      ComputeTextureScratchKey(width, height, pixelFormat, descriptor.mipLevelCount > 1);
+  mipmapped = context->caps()->mipmapSupport && mipmapped;
+  auto scratchKey = ComputeTextureScratchKey(width, height, pixelFormat, mipmapped);
   auto textureView = Resource::Find<TextureView>(context, scratchKey);
   if (textureView) {
     textureView->_origin = origin;
   } else {
+    GPUTextureDescriptor descriptor = {width, height, pixelFormat, mipmapped};
     auto texture = gpu->createTexture(descriptor);
     if (texture == nullptr) {
       return nullptr;

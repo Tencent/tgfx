@@ -40,11 +40,12 @@ std::unique_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(
   }
   auto target = CVOpenGLTextureGetTarget(texture);
   auto textureID = CVOpenGLTextureGetName(texture);
-  GPUTextureDescriptor descriptor = {};
-  descriptor.width = static_cast<int>(CVPixelBufferGetWidth(pixelBuffer));
-  descriptor.height = static_cast<int>(CVPixelBufferGetHeight(pixelBuffer));
-  descriptor.format = format;
-  descriptor.usage = usage;
+  GPUTextureDescriptor descriptor = {static_cast<int>(CVPixelBufferGetWidth(pixelBuffer)),
+                                     static_cast<int>(CVPixelBufferGetHeight(pixelBuffer)),
+                                     format,
+                                     false,
+                                     1,
+                                     usage};
   auto gpuTexture = std::unique_ptr<CGLHardwareTexture>(
       new CGLHardwareTexture(descriptor, pixelBuffer, textureCache, target, textureID));
   gpuTexture->texture = texture;
