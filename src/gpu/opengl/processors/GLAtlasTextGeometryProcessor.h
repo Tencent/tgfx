@@ -31,6 +31,10 @@ class GLAtlasTextGeometryProcessor : public AtlasTextGeometryProcessor {
   void setData(UniformBuffer* uniformBuffer,
                FPCoordTransformIter* coordTransformIter) const override;
 
+  SamplerState onSamplerStateAt(size_t) const override {
+    return {SamplerState::WrapMode::Clamp, SamplerState::WrapMode::Clamp, FilterMode::Nearest};
+  }
+
  private:
   std::string atlasSizeUniformName = "atlasSizeInv";
 };
