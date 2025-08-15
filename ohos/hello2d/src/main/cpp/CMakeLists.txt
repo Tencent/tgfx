@@ -15,7 +15,7 @@ if(DEFINED PACKAGE_FIND_FILE)
 endif()
 
 include_directories(${NATIVERENDER_ROOT_PATH}
-                    ${NATIVERENDER_ROOT_PATH}/include)
+        ${NATIVERENDER_ROOT_PATH}/include)
 
 find_library(NATIVE_VSYNC_LIB native_vsync)
 set(TGFX_BUILD_DRAWERS ON)
