@@ -135,7 +135,7 @@ void GLProgram::bindTexture(int unitIndex, GPUTexture* texture, SamplerState sam
   auto glTexture = static_cast<const GLTexture*>(texture);
   auto target = glTexture->target();
   gl->activeTexture(static_cast<unsigned>(GL_TEXTURE0 + unitIndex));
-  gl->bindTexture(target, glTexture->id());
+  gl->bindTexture(target, glTexture->textureID());
   gl->texParameteri(target, GL_TEXTURE_WRAP_S, GetGLWrap(target, samplerState.wrapModeX));
   gl->texParameteri(target, GL_TEXTURE_WRAP_T, GetGLWrap(target, samplerState.wrapModeY));
   if (samplerState.mipmapped() &&

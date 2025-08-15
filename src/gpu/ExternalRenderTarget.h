@@ -28,14 +28,6 @@ class ExternalRenderTarget : public Resource, public RenderTarget {
     return context;
   }
 
-  int width() const override {
-    return _width;
-  }
-
-  int height() const override {
-    return _height;
-  }
-
   ImageOrigin origin() const override {
     return _origin;
   }
@@ -44,8 +36,12 @@ class ExternalRenderTarget : public Resource, public RenderTarget {
     return true;
   }
 
-  GPUFrameBuffer* getFrameBuffer() const override {
-    return frameBuffer.get();
+  GPUTexture* getRenderTexture() const override {
+    return renderTexture.get();
+  }
+
+  GPUTexture* getSampleTexture() const override {
+    return renderTexture.get();
   }
 
   size_t memoryUsage() const override {
@@ -54,18 +50,15 @@ class ExternalRenderTarget : public Resource, public RenderTarget {
 
  protected:
   void onReleaseGPU() override {
-    frameBuffer->release(context->gpu());
+    renderTexture->release(context->gpu());
   }
 
  private:
-  std::unique_ptr<GPUFrameBuffer> frameBuffer = nullptr;
-  int _width = 0;
-  int _height = 0;
+  std::unique_ptr<GPUTexture> renderTexture = nullptr;
   ImageOrigin _origin = ImageOrigin::TopLeft;
 
-  ExternalRenderTarget(std::unique_ptr<GPUFrameBuffer> frameBuffer, int width, int height,
-                       ImageOrigin origin)
-      : frameBuffer(std::move(frameBuffer)), _width(width), _height(height), _origin(origin) {
+  ExternalRenderTarget(std::unique_ptr<GPUTexture> texture, ImageOrigin origin)
+      : renderTexture(std::move(texture)), _origin(origin) {
   }
 
   friend class RenderTarget;

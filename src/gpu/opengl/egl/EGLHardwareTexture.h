@@ -28,22 +28,23 @@
 namespace tgfx {
 class EGLHardwareTexture : public GLTexture {
  public:
-  static std::unique_ptr<EGLHardwareTexture> MakeFrom(const EGLGPU* gpu,
-                                                      HardwareBufferRef hardwareBuffer);
+  static std::unique_ptr<EGLHardwareTexture> MakeFrom(EGLGPU* gpu, HardwareBufferRef hardwareBuffer,
+                                                      uint32_t usage);
   ~EGLHardwareTexture() override;
 
   HardwareBufferRef getHardwareBuffer() const override {
     return hardwareBuffer;
   }
 
-  void release(GPU* gpu) override;
+ protected:
+  void onRelease(GLGPU* gpu) override;
 
  private:
   HardwareBufferRef hardwareBuffer = nullptr;
   EGLImageKHR eglImage = EGL_NO_IMAGE_KHR;
 
-  EGLHardwareTexture(HardwareBufferRef hardwareBuffer, EGLImageKHR eglImage, unsigned id,
-                     unsigned target, PixelFormat format);
+  EGLHardwareTexture(const GPUTextureDescriptor& descriptor, HardwareBufferRef hardwareBuffer,
+                     EGLImageKHR eglImage, unsigned target, unsigned textureID);
 };
 }  // namespace tgfx
 

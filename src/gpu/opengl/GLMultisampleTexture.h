@@ -16,14 +16,29 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLFrameBuffer.h"
-#include "gpu/opengl/GLUtil.h"
+#pragma once
+
+#include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
-BackendRenderTarget GLFrameBuffer::getBackendRenderTarget(int width, int height) const {
-  GLFrameBufferInfo glInfo = {};
-  glInfo.id = drawFrameBufferID();
-  glInfo.format = PixelFormatToGLSizeFormat(format());
-  return {glInfo, width, height};
-}
+class GLMultisampleTexture : public GLTexture {
+ public:
+  static std::unique_ptr<GLMultisampleTexture> MakeFrom(GLGPU* gpu,
+                                                        const GPUTextureDescriptor& descriptor);
+
+  unsigned frameBufferID() const override {
+    return _frameBufferID;
+  }
+
+ protected:
+  void onRelease(GLGPU*) override;
+
+ private:
+  unsigned _frameBufferID = 0;
+  unsigned renderBufferID = 0;
+
+  GLMultisampleTexture(const GPUTextureDescriptor& descriptor, unsigned frameBufferID)
+      : GLTexture(descriptor, GL_TEXTURE_2D, 0), _frameBufferID(frameBufferID) {
+  }
+};
 }  // namespace tgfx

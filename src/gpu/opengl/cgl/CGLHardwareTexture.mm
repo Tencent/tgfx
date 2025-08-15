@@ -21,8 +21,15 @@
 
 namespace tgfx {
 std::unique_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(
-    CVPixelBufferRef pixelBuffer, CVOpenGLTextureCacheRef textureCache) {
+    const Caps* caps, CVPixelBufferRef pixelBuffer, uint32_t usage,
+    CVOpenGLTextureCacheRef textureCache) {
   if (textureCache == nil) {
+    return nullptr;
+  }
+  auto format = CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_OneComponent8
+                    ? PixelFormat::ALPHA_8
+                    : PixelFormat::RGBA_8888;
+  if (usage & GPUTextureUsage::RENDER_ATTACHMENT && !caps->isFormatRenderable(format)) {
     return nullptr;
   }
   CVOpenGLTextureRef texture = nil;
@@ -32,20 +39,25 @@ std::unique_ptr<CGLHardwareTexture> CGLHardwareTexture::MakeFrom(
     return nullptr;
   }
   auto target = CVOpenGLTextureGetTarget(texture);
-  auto id = CVOpenGLTextureGetName(texture);
-  auto format = CVPixelBufferGetPixelFormatType(pixelBuffer) == kCVPixelFormatType_OneComponent8
-                    ? PixelFormat::ALPHA_8
-                    : PixelFormat::RGBA_8888;
+  auto textureID = CVOpenGLTextureGetName(texture);
+  GPUTextureDescriptor descriptor = {};
+  descriptor.width = static_cast<int>(CVPixelBufferGetWidth(pixelBuffer));
+  descriptor.height = static_cast<int>(CVPixelBufferGetHeight(pixelBuffer));
+  descriptor.format = format;
+  descriptor.usage = usage;
   auto gpuTexture = std::unique_ptr<CGLHardwareTexture>(
-      new CGLHardwareTexture(pixelBuffer, textureCache, id, target, format));
+      new CGLHardwareTexture(descriptor, pixelBuffer, textureCache, target, textureID));
   gpuTexture->texture = texture;
   return gpuTexture;
 }
 
-CGLHardwareTexture::CGLHardwareTexture(CVPixelBufferRef pixelBuffer,
-                                       CVOpenGLTextureCacheRef textureCache, unsigned id,
-                                       unsigned target, PixelFormat format)
-    : GLTexture(id, target, format), pixelBuffer(pixelBuffer), textureCache(textureCache) {
+CGLHardwareTexture::CGLHardwareTexture(const GPUTextureDescriptor& descriptor,
+                                       CVPixelBufferRef pixelBuffer,
+                                       CVOpenGLTextureCacheRef textureCache, unsigned target,
+                                       unsigned textureID)
+    : GLTexture(descriptor, target, textureID),
+      pixelBuffer(pixelBuffer),
+      textureCache(textureCache) {
   CFRetain(pixelBuffer);
   CFRetain(textureCache);
 }
@@ -58,7 +70,7 @@ CGLHardwareTexture::~CGLHardwareTexture() {
   }
 }
 
-void CGLHardwareTexture::release(GPU*) {
+void CGLHardwareTexture::onRelease(GLGPU*) {
   if (texture == nil) {
     return;
   }

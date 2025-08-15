@@ -73,11 +73,11 @@ std::vector<PixelFormat> EAGLGPU::getHardwareTextureFormats(HardwareBufferRef ha
 }
 
 std::vector<std::unique_ptr<GPUTexture>> EAGLGPU::importHardwareTextures(
-    HardwareBufferRef hardwareBuffer) {
+    HardwareBufferRef hardwareBuffer, uint32_t usage) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return {};
   }
-  return EAGLHardwareTexture::MakeFrom(this, hardwareBuffer);
+  return EAGLHardwareTexture::MakeFrom(this, hardwareBuffer, usage);
 }
 
 CVOpenGLESTextureCacheRef EAGLGPU::getTextureCache() {

@@ -27,8 +27,8 @@ namespace tgfx {
  */
 class DefaultTextureView : public TextureView {
  public:
-  DefaultTextureView(std::unique_ptr<GPUTexture> texture, int width, int height,
-                     ImageOrigin origin = ImageOrigin::TopLeft);
+  explicit DefaultTextureView(std::unique_ptr<GPUTexture> texture,
+                              ImageOrigin origin = ImageOrigin::TopLeft);
 
   size_t memoryUsage() const override;
 

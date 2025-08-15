@@ -60,8 +60,9 @@ static bool InitEGLEXTProc() {
          eglext::eglCreateImageKHR && eglext::eglDestroyImageKHR;
 }
 
-std::unique_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(const EGLGPU* gpu,
-                                                                 HardwareBufferRef hardwareBuffer) {
+std::unique_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(EGLGPU* gpu,
+                                                                 HardwareBufferRef hardwareBuffer,
+                                                                 uint32_t usage) {
   static const bool initialized = InitEGLEXTProc();
   if (!initialized || hardwareBuffer == nullptr) {
     return nullptr;
@@ -69,6 +70,10 @@ std::unique_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(const EGLGPU* g
   auto yuvFormat = YUVFormat::Unknown;
   auto formats = gpu->getHardwareTextureFormats(hardwareBuffer, &yuvFormat);
   if (formats.empty()) {
+    return nullptr;
+  }
+  if (usage & GPUTextureUsage::RENDER_ATTACHMENT &&
+      (yuvFormat != YUVFormat::Unknown || !gpu->caps()->isFormatRenderable(formats.front()))) {
     return nullptr;
   }
   unsigned target = yuvFormat == YUVFormat::Unknown ? GL_TEXTURE_2D : GL_TEXTURE_EXTERNAL_OES;
@@ -96,13 +101,25 @@ std::unique_ptr<EGLHardwareTexture> EGLHardwareTexture::MakeFrom(const EGLGPU* g
   glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
   eglext::glEGLImageTargetTexture2DOES(target, (GLeglImageOES)eglImage);
-  return std::unique_ptr<EGLHardwareTexture>(
-      new EGLHardwareTexture(hardwareBuffer, eglImage, textureID, target, formats.front()));
+  auto size = HardwareBufferGetSize(hardwareBuffer);
+  GPUTextureDescriptor descriptor = {};
+  descriptor.width = size.width;
+  descriptor.height = size.height;
+  descriptor.format = formats.front();
+  descriptor.usage = usage;
+  auto texture = std::unique_ptr<EGLHardwareTexture>(
+      new EGLHardwareTexture(descriptor, hardwareBuffer, eglImage, target, textureID));
+  if (!texture->checkFrameBuffer(gpu)) {
+    texture->release(gpu);
+    return nullptr;
+  }
+  return texture;
 }
 
-EGLHardwareTexture::EGLHardwareTexture(HardwareBufferRef hardwareBuffer, EGLImageKHR eglImage,
-                                       unsigned id, unsigned target, PixelFormat format)
-    : GLTexture(id, target, format), hardwareBuffer(hardwareBuffer), eglImage(eglImage) {
+EGLHardwareTexture::EGLHardwareTexture(const GPUTextureDescriptor& descriptor,
+                                       HardwareBufferRef hardwareBuffer, EGLImageKHR eglImage,
+                                       unsigned target, unsigned textureID)
+    : GLTexture(descriptor, target, textureID), hardwareBuffer(hardwareBuffer), eglImage(eglImage) {
   HardwareBufferRetain(hardwareBuffer);
 }
 
@@ -110,10 +127,10 @@ EGLHardwareTexture::~EGLHardwareTexture() {
   HardwareBufferRelease(hardwareBuffer);
 }
 
-void EGLHardwareTexture::release(GPU* gpu) {
-  GLTexture::release(gpu);
+void EGLHardwareTexture::onRelease(GLGPU* gpu) {
   auto display = static_cast<EGLGPU*>(gpu)->getDisplay();
   eglext::eglDestroyImageKHR(display, eglImage);
+  GLTexture::onRelease(gpu);
 }
 }  // namespace tgfx
 

@@ -204,8 +204,7 @@ std::shared_ptr<TextureView> SurfaceTexture::onMakeTexture(Context* context, boo
     texture->release(context->gpu());
     return nullptr;
   }
-  return Resource::AddToCache(
-      context, new DefaultTextureView(std::move(texture), textureSize.width, textureSize.height));
+  return Resource::AddToCache(context, new DefaultTextureView(std::move(texture)));
 }
 
 bool SurfaceTexture::onUpdateTexture(std::shared_ptr<TextureView>) {
@@ -233,7 +232,12 @@ std::unique_ptr<GPUTexture> SurfaceTexture::makeGPUTexture(Context* context) {
     LOGE("NativeImageReader::makeTexture(): failed to attached to a SurfaceTexture!");
     return nullptr;
   }
-  return std::make_unique<GLTexture>(textureID, GL_TEXTURE_EXTERNAL_OES, PixelFormat::RGBA_8888);
+  GPUTextureDescriptor descriptor = {};
+  descriptor.width = width();
+  descriptor.height = height();
+  descriptor.format = PixelFormat::RGBA_8888;
+  descriptor.usage = GPUTextureUsage::TEXTURE_BINDING;
+  return std::make_unique<GLTexture>(descriptor, GL_TEXTURE_EXTERNAL_OES, textureID);
 }
 
 ISize SurfaceTexture::updateTexImage() {

@@ -24,7 +24,8 @@
 namespace tgfx {
 class CGLHardwareTexture : public GLTexture {
  public:
-  static std::unique_ptr<CGLHardwareTexture> MakeFrom(CVPixelBufferRef pixelBuffer,
+  static std::unique_ptr<CGLHardwareTexture> MakeFrom(const Caps* caps,
+                                                      CVPixelBufferRef pixelBuffer, uint32_t usage,
                                                       CVOpenGLTextureCacheRef textureCache);
 
   ~CGLHardwareTexture() override;
@@ -33,14 +34,15 @@ class CGLHardwareTexture : public GLTexture {
     return pixelBuffer;
   }
 
-  void release(GPU* gpu) override;
+ protected:
+  void onRelease(GLGPU* gpu) override;
 
  private:
   CVPixelBufferRef pixelBuffer = nullptr;
   CVOpenGLTextureRef texture = nil;
   CVOpenGLTextureCacheRef textureCache = nil;
 
-  CGLHardwareTexture(CVPixelBufferRef pixelBuffer, CVOpenGLTextureCacheRef textureCache,
-                     unsigned id, unsigned target, PixelFormat format);
+  CGLHardwareTexture(const GPUTextureDescriptor& descriptor, CVPixelBufferRef pixelBuffer,
+                     CVOpenGLTextureCacheRef textureCache, unsigned target, unsigned textureID);
 };
 }  // namespace tgfx

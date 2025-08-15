@@ -30,7 +30,12 @@ static std::vector<std::unique_ptr<GPUTexture>> MakeTexturePlanes(GPU* gpu, cons
   for (int index = 0; index < count; index++) {
     auto w = yuvData->width() >> YUV_SIZE_FACTORS[index];
     auto h = yuvData->height() >> YUV_SIZE_FACTORS[index];
-    auto texture = gpu->createTexture(w, h, formats[index]);
+    GPUTextureDescriptor descriptor = {};
+    descriptor.width = w;
+    descriptor.height = h;
+    descriptor.format = formats[index];
+    descriptor.usage = GPUTextureUsage::TEXTURE_BINDING;
+    auto texture = gpu->createTexture(descriptor);
     if (texture == nullptr) {
       for (auto& plane : texturePlanes) {
         plane->release(gpu);
@@ -68,8 +73,7 @@ std::shared_ptr<TextureView> TextureView::MakeI420(Context* context, const YUVDa
   if (texturePlanes.empty()) {
     return nullptr;
   }
-  auto yuvTexture = new YUVTextureView(std::move(texturePlanes), yuvData->width(),
-                                       yuvData->height(), YUVFormat::I420, colorSpace);
+  auto yuvTexture = new YUVTextureView(std::move(texturePlanes), YUVFormat::I420, colorSpace);
   auto texture =
       std::static_pointer_cast<YUVTextureView>(Resource::AddToCache(context, yuvTexture));
   SubmitYUVTexture(context->gpu(), yuvData, texture->textures.data());
@@ -87,18 +91,16 @@ std::shared_ptr<TextureView> TextureView::MakeNV12(Context* context, const YUVDa
   if (texturePlanes.empty()) {
     return nullptr;
   }
-  auto yuvTexture = new YUVTextureView(std::move(texturePlanes), yuvData->width(),
-                                       yuvData->height(), YUVFormat::NV12, colorSpace);
+  auto yuvTexture = new YUVTextureView(std::move(texturePlanes), YUVFormat::NV12, colorSpace);
   auto texture =
       std::static_pointer_cast<YUVTextureView>(Resource::AddToCache(context, yuvTexture));
   SubmitYUVTexture(context->gpu(), yuvData, texture->textures.data());
   return texture;
 }
 
-YUVTextureView::YUVTextureView(std::vector<std::unique_ptr<GPUTexture>> yuvTextures, int width,
-                               int height, YUVFormat yuvFormat, YUVColorSpace colorSpace)
-    : TextureView(width, height, ImageOrigin::TopLeft), _yuvFormat(yuvFormat),
-      _colorSpace(colorSpace) {
+YUVTextureView::YUVTextureView(std::vector<std::unique_ptr<GPUTexture>> yuvTextures,
+                               YUVFormat yuvFormat, YUVColorSpace colorSpace)
+    : _yuvFormat(yuvFormat), _colorSpace(colorSpace) {
   DEBUG_ASSERT(_yuvFormat != YUVFormat::Unknown);
   DEBUG_ASSERT(yuvTextures.size() == textureCount());
   for (size_t i = 0; i < yuvTextures.size(); ++i) {
@@ -127,11 +129,11 @@ size_t YUVTextureView::memoryUsage() const {
   if (auto hardwareBuffer = textures.front()->getHardwareBuffer()) {
     return HardwareBufferGetInfo(hardwareBuffer).byteSize();
   }
-  return static_cast<size_t>(_width) * static_cast<size_t>(_height) * 3 / 2;
+  return static_cast<size_t>(width()) * static_cast<size_t>(height()) * 3 / 2;
 }
 
 Point YUVTextureView::getTextureCoord(float x, float y) const {
-  return {x / static_cast<float>(_width), y / static_cast<float>(_height)};
+  return {x / static_cast<float>(width()), y / static_cast<float>(height())};
 }
 
 void YUVTextureView::onReleaseGPU() {
