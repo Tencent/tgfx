@@ -34,6 +34,7 @@ static std::vector<std::unique_ptr<GPUTexture>> MakeTexturePlanes(GPU* gpu, cons
     descriptor.width = w;
     descriptor.height = h;
     descriptor.format = formats[index];
+    descriptor.usage = GPUTextureUsage::TEXTURE_BINDING;
     auto texture = gpu->createTexture(descriptor);
     if (texture == nullptr) {
       for (auto& plane : texturePlanes) {

@@ -69,7 +69,7 @@ std::vector<std::unique_ptr<GPUTexture>> EAGLHardwareTexture::MakeFrom(EAGLGPU* 
     return {};
   }
   if (usage & GPUTextureUsage::RENDER_ATTACHMENT &&
-      (yuvFormat != YUVFormat::Unknown || gpu->caps()->isFormatRenderable(formats.front()))) {
+      (yuvFormat != YUVFormat::Unknown || !gpu->caps()->isFormatRenderable(formats.front()))) {
     return {};
   }
   std::vector<std::unique_ptr<GPUTexture>> textures = {};
