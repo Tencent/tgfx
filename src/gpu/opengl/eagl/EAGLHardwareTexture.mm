@@ -23,6 +23,7 @@
 namespace tgfx {
 static std::unique_ptr<GPUTexture> CreateTextureOfPlane(EAGLGPU* gpu, CVPixelBufferRef pixelBuffer,
                                                         size_t planeIndex, PixelFormat pixelFormat,
+                                                        uint32_t usage,
                                                         CVOpenGLESTextureCacheRef textureCache) {
   auto width = static_cast<int>(CVPixelBufferGetWidthOfPlane(pixelBuffer, planeIndex));
   auto height = static_cast<int>(CVPixelBufferGetHeightOfPlane(pixelBuffer, planeIndex));
@@ -41,23 +42,39 @@ static std::unique_ptr<GPUTexture> CreateTextureOfPlane(EAGLGPU* gpu, CVPixelBuf
   }
   auto textureID = CVOpenGLESTextureGetName(texture);
   auto target = CVOpenGLESTextureGetTarget(texture);
-  return std::unique_ptr<EAGLHardwareTexture>(
-      new EAGLHardwareTexture(pixelBuffer, texture, textureID, target, pixelFormat));
+  GPUTextureDescriptor descriptor = {};
+  descriptor.width = static_cast<int>(CVPixelBufferGetWidth(pixelBuffer));
+  descriptor.height = static_cast<int>(CVPixelBufferGetHeight(pixelBuffer));
+  descriptor.format = pixelFormat;
+  descriptor.usage = usage;
+  auto hardwareTexture = std::unique_ptr<EAGLHardwareTexture>(
+      new EAGLHardwareTexture(descriptor, pixelBuffer, texture, target, textureID));
+  if (!hardwareTexture->checkFrameBuffer(gpu)) {
+    hardwareTexture->release(gpu);
+    return nullptr;
+  }
+  return hardwareTexture;
 }
 
-std::vector<std::unique_ptr<GPUTexture>> EAGLHardwareTexture::MakeFrom(
-    EAGLGPU* gpu, CVPixelBufferRef pixelBuffer) {
+std::vector<std::unique_ptr<GPUTexture>> EAGLHardwareTexture::MakeFrom(EAGLGPU* gpu,
+                                                                       CVPixelBufferRef pixelBuffer,
+                                                                       uint32_t usage) {
   auto textureCache = gpu->getTextureCache();
   if (textureCache == nil) {
     return {};
   }
-  auto planeFormats = gpu->getHardwareTextureFormats(pixelBuffer, nullptr);
-  if (planeFormats.empty()) {
+  auto yuvFormat = YUVFormat::Unknown;
+  auto formats = gpu->getHardwareTextureFormats(pixelBuffer, &yuvFormat);
+  if (formats.empty()) {
+    return {};
+  }
+  if (usage & GPUTextureUsage::RENDER_ATTACHMENT &&
+      (yuvFormat != YUVFormat::Unknown || gpu->caps()->isFormatRenderable(formats.front()))) {
     return {};
   }
   std::vector<std::unique_ptr<GPUTexture>> textures = {};
-  for (size_t i = 0; i < planeFormats.size(); ++i) {
-    auto texture = CreateTextureOfPlane(gpu, pixelBuffer, i, planeFormats[i], textureCache);
+  for (size_t i = 0; i < formats.size(); ++i) {
+    auto texture = CreateTextureOfPlane(gpu, pixelBuffer, i, formats[i], usage, textureCache);
     if (texture == nullptr) {
       for (auto& plane : textures) {
         plane->release(gpu);
@@ -69,9 +86,10 @@ std::vector<std::unique_ptr<GPUTexture>> EAGLHardwareTexture::MakeFrom(
   return textures;
 }
 
-EAGLHardwareTexture::EAGLHardwareTexture(CVPixelBufferRef pixelBuffer, CVOpenGLESTextureRef texture,
-                                         unsigned id, unsigned target, PixelFormat format)
-    : GLTexture(id, target, format), pixelBuffer(pixelBuffer), texture(texture) {
+EAGLHardwareTexture::EAGLHardwareTexture(const GPUTextureDescriptor& descriptor,
+                                         CVPixelBufferRef pixelBuffer, CVOpenGLESTextureRef texture,
+                                         unsigned target, unsigned textureID)
+    : GLTexture(descriptor, target, textureID), pixelBuffer(pixelBuffer), texture(texture) {
   CFRetain(pixelBuffer);
 }
 
@@ -82,7 +100,7 @@ EAGLHardwareTexture::~EAGLHardwareTexture() {
   }
 }
 
-void EAGLHardwareTexture::release(GPU* gpu) {
+void EAGLHardwareTexture::onRelease(GLGPU* gpu) {
   if (texture == nil) {
     return;
   }

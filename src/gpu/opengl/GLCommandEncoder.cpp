@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLCommandEncoder.h"
-#include "gpu/opengl/GLFrameBuffer.h"
 #include "gpu/opengl/GLRenderPass.h"
 #include "gpu/opengl/GLSemaphore.h"
 #include "gpu/opengl/GLTexture.h"
@@ -33,23 +32,26 @@ std::shared_ptr<RenderPass> GLCommandEncoder::onBeginRenderPass(
   return renderPass;
 }
 
-void GLCommandEncoder::copyFrameBufferToTexture(GPUFrameBuffer* frameBuffer, const Point& srcOffset,
-                                                GPUTexture* texture, const Rect& dstRect) {
-  if (frameBuffer == nullptr || texture == nullptr || dstRect.isEmpty()) {
+void GLCommandEncoder::copyTextureToTexture(GPUTexture* srcTexture, const Rect& srcRect,
+                                            GPUTexture* dstTexture, const Point& dstOffset) {
+  if (srcTexture == nullptr || dstTexture == nullptr || srcRect.isEmpty()) {
+    return;
+  }
+  if (!(srcTexture->usage() & GPUTextureUsage::RENDER_ATTACHMENT)) {
+    LOGE("GLCommandEncoder::copyTextureToTexture() source texture is not copyable!");
     return;
   }
   auto gl = interface->functions();
-  auto glRenderTarget = static_cast<GLFrameBuffer*>(frameBuffer);
-  gl->bindFramebuffer(GL_FRAMEBUFFER, glRenderTarget->readFrameBufferID());
-  auto glTexture = static_cast<const GLTexture*>(texture);
+  gl->bindFramebuffer(GL_FRAMEBUFFER, static_cast<GLTexture*>(srcTexture)->frameBufferID());
+  auto glTexture = static_cast<const GLTexture*>(dstTexture);
   auto target = glTexture->target();
-  gl->bindTexture(target, glTexture->id());
-  auto offsetX = static_cast<int>(dstRect.left);
-  auto offsetY = static_cast<int>(dstRect.top);
-  auto x = static_cast<int>(srcOffset.x);
-  auto y = static_cast<int>(srcOffset.y);
-  auto width = static_cast<int>(dstRect.width());
-  auto height = static_cast<int>(dstRect.height());
+  gl->bindTexture(target, glTexture->textureID());
+  auto offsetX = static_cast<int>(dstOffset.x);
+  auto offsetY = static_cast<int>(dstOffset.y);
+  auto x = static_cast<int>(srcRect.left);
+  auto y = static_cast<int>(srcRect.top);
+  auto width = static_cast<int>(srcRect.width());
+  auto height = static_cast<int>(srcRect.height());
   gl->copyTexSubImage2D(target, 0, offsetX, offsetY, x, y, width, height);
 }
 
@@ -59,7 +61,7 @@ void GLCommandEncoder::generateMipmapsForTexture(GPUTexture* texture) {
     return;
   }
   auto gl = interface->functions();
-  gl->bindTexture(glTexture->target(), glTexture->id());
+  gl->bindTexture(glTexture->target(), glTexture->textureID());
   gl->generateMipmap(glTexture->target());
 }
 

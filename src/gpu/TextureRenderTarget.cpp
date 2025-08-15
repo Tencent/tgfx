@@ -43,7 +43,8 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
   if (context == nullptr) {
     return nullptr;
   }
-  auto texture = context->gpu()->importExternalTexture(backendTexture, adopted);
+  uint32_t usage = GPUTextureUsage::TEXTURE_BINDING | GPUTextureUsage::RENDER_ATTACHMENT;
+  auto texture = context->gpu()->importExternalTexture(backendTexture, usage, adopted);
   if (texture == nullptr) {
     return nullptr;
   }
@@ -54,8 +55,7 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
         ComputeRenderTargetScratchKey(backendTexture.width(), backendTexture.height(),
                                       texture->format(), sampleCount, texture->mipLevelCount() > 1);
   }
-  return TextureRenderTarget::MakeFrom(context, std::move(texture), backendTexture.width(),
-                                       backendTexture.height(), sampleCount, origin, !adopted,
+  return TextureRenderTarget::MakeFrom(context, std::move(texture), sampleCount, origin, !adopted,
                                        scratchKey);
 }
 
@@ -65,23 +65,20 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
   if (context == nullptr) {
     return nullptr;
   }
-  auto size = HardwareBufferGetSize(hardwareBuffer);
-  if (size.isEmpty()) {
-    return nullptr;
-  }
   auto gpu = context->gpu();
   YUVFormat yuvFormat = YUVFormat::Unknown;
   auto formats = gpu->getHardwareTextureFormats(hardwareBuffer, &yuvFormat);
   if (formats.size() != 1 || yuvFormat != YUVFormat::Unknown) {
     return nullptr;
   }
-  auto textures = gpu->importHardwareTextures(hardwareBuffer);
+  uint32_t usage = GPUTextureUsage::TEXTURE_BINDING | GPUTextureUsage::RENDER_ATTACHMENT;
+  auto textures = gpu->importHardwareTextures(hardwareBuffer, usage);
   if (textures.size() != 1) {
     return nullptr;
   }
   sampleCount = context->caps()->getSampleCount(sampleCount, formats.front());
-  return TextureRenderTarget::MakeFrom(context, std::move(textures.front()), size.width,
-                                       size.height, sampleCount, ImageOrigin::TopLeft, true);
+  return TextureRenderTarget::MakeFrom(context, std::move(textures.front()), sampleCount,
+                                       ImageOrigin::TopLeft, true);
 }
 
 std::shared_ptr<RenderTarget> RenderTarget::Make(Context* context, int width, int height,
@@ -91,42 +88,57 @@ std::shared_ptr<RenderTarget> RenderTarget::Make(Context* context, int width, in
     return nullptr;
   }
   auto caps = context->caps();
-  if (!caps->isFormatRenderable(format)) {
-    return nullptr;
-  }
-  int mipLevelCount = mipmapped ? caps->getMipLevelCount(width, height) : 1;
+  GPUTextureDescriptor descriptor = {};
+  descriptor.width = width;
+  descriptor.height = height;
+  descriptor.format = format;
+  descriptor.mipLevelCount = mipmapped ? caps->getMipLevelCount(width, height) : 1;
+  descriptor.usage = GPUTextureUsage::TEXTURE_BINDING | GPUTextureUsage::RENDER_ATTACHMENT;
   sampleCount = caps->getSampleCount(sampleCount, format);
-  auto scratchKey =
-      ComputeRenderTargetScratchKey(width, height, format, sampleCount, mipLevelCount > 1);
+  auto scratchKey = ComputeRenderTargetScratchKey(width, height, format, sampleCount,
+                                                  descriptor.mipLevelCount > 1);
   if (auto renderTarget = Resource::Find<TextureRenderTarget>(context, scratchKey)) {
     renderTarget->_origin = origin;
     return renderTarget;
   }
-  auto texture = context->gpu()->createTexture(width, height, format, mipLevelCount);
+  auto texture = context->gpu()->createTexture(descriptor);
   if (texture == nullptr) {
     return nullptr;
   }
-  return TextureRenderTarget::MakeFrom(context, std::move(texture), width, height, sampleCount,
-                                       origin, false, scratchKey);
+  return TextureRenderTarget::MakeFrom(context, std::move(texture), sampleCount, origin, false,
+                                       scratchKey);
 }
 
-std::shared_ptr<RenderTarget> TextureRenderTarget::MakeFrom(
-    Context* context, std::unique_ptr<GPUTexture> texture, int width, int height, int sampleCount,
-    ImageOrigin origin, bool externallyOwned, const ScratchKey& scratchKey) {
+std::shared_ptr<RenderTarget> TextureRenderTarget::MakeFrom(Context* context,
+                                                            std::unique_ptr<GPUTexture> texture,
+                                                            int sampleCount, ImageOrigin origin,
+                                                            bool externallyOwned,
+                                                            const ScratchKey& scratchKey) {
   DEBUG_ASSERT(context != nullptr);
   DEBUG_ASSERT(texture != nullptr);
-  auto frameBuffer = context->gpu()->createFrameBuffer(texture.get(), width, height, sampleCount);
-  if (frameBuffer == nullptr) {
-    texture->release(context->gpu());
-    return nullptr;
+  std::unique_ptr<GPUTexture> renderTexture = nullptr;
+  if (sampleCount > 1) {
+    GPUTextureDescriptor descriptor = {};
+    descriptor.width = texture->width();
+    descriptor.height = texture->height();
+    descriptor.format = texture->format();
+    descriptor.sampleCount = sampleCount;
+    descriptor.usage = GPUTextureUsage::RENDER_ATTACHMENT;
+    renderTexture = context->gpu()->createTexture(descriptor);
+    if (renderTexture == nullptr) {
+      texture->release(context->gpu());
+      return nullptr;
+    }
   }
-  auto renderTarget = new TextureRenderTarget(std::move(texture), std::move(frameBuffer), width,
-                                              height, origin, externallyOwned);
+  auto renderTarget = new TextureRenderTarget(std::move(texture), std::move(renderTexture), origin,
+                                              externallyOwned);
   return Resource::AddToCache(context, renderTarget, scratchKey);
 }
 
 void TextureRenderTarget::onReleaseGPU() {
-  frameBuffer->release(context->gpu());
-  _texture->release(context->gpu());
+  DefaultTextureView::onReleaseGPU();
+  if (renderTexture != nullptr) {
+    renderTexture->release(context->gpu());
+  }
 }
 }  // namespace tgfx

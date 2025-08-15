@@ -72,7 +72,7 @@ bool RenderTarget::readPixels(const ImageInfo& dstInfo, void* dstPixels, int src
   }
   auto gpu = getContext()->gpu();
   auto rect = Rect::MakeXYWH(readX, readY, outInfo.width(), outInfo.height());
-  if (!gpu->queue()->readPixels(getFrameBuffer(), rect, pixels, rowBytes)) {
+  if (!gpu->queue()->readTexture(getSampleTexture(), rect, pixels, rowBytes)) {
     return false;
   }
   if (!tempBuffer.isEmpty()) {

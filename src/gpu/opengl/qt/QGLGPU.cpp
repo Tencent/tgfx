@@ -54,12 +54,16 @@ std::vector<PixelFormat> QGLGPU::getHardwareTextureFormats(HardwareBufferRef har
 }
 
 std::vector<std::unique_ptr<GPUTexture>> QGLGPU::importHardwareTextures(
-    HardwareBufferRef hardwareBuffer) {
+    HardwareBufferRef hardwareBuffer, uint32_t usage) {
   if (!HardwareBufferCheck(hardwareBuffer)) {
     return {};
   }
-  auto texture = CGLHardwareTexture::MakeFrom(hardwareBuffer, getTextureCache());
+  auto texture = CGLHardwareTexture::MakeFrom(caps(), hardwareBuffer, usage, getTextureCache());
   if (texture == nullptr) {
+    return {};
+  }
+  if (!texture->checkFrameBuffer(this)) {
+    texture->release(this);
     return {};
   }
   std::vector<std::unique_ptr<GPUTexture>> textures = {};
@@ -101,7 +105,8 @@ std::vector<PixelFormat> QGLGPU::getHardwareTextureFormats(HardwareBufferRef, YU
   return {};
 }
 
-std::vector<std::unique_ptr<GPUTexture>> QGLGPU::importHardwareTextures(HardwareBufferRef) {
+std::vector<std::unique_ptr<GPUTexture>> QGLGPU::importHardwareTextures(HardwareBufferRef,
+                                                                        uint32_t) {
   return {};
 }
 

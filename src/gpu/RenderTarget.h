@@ -18,7 +18,6 @@
 
 #pragma once
 
-#include "gpu/GPUFrameBuffer.h"
 #include "gpu/TextureView.h"
 
 namespace tgfx {
@@ -70,12 +69,30 @@ class RenderTarget {
   /**
    * Returns the width of the render target.
    */
-  virtual int width() const = 0;
+  int width() const {
+    return getRenderTexture()->width();
+  }
 
   /**
    * Returns the height of the render target.
    */
-  virtual int height() const = 0;
+  int height() const {
+    return getRenderTexture()->height();
+  }
+
+  /**
+   * Returns the sample count of the render target.
+   */
+  int sampleCount() const {
+    return getRenderTexture()->sampleCount();
+  }
+
+  /**
+   * Returns the pixel format of the render target.
+   */
+  PixelFormat format() const {
+    return getRenderTexture()->format();
+  }
 
   /**
    * Returns the origin of the render target, either ImageOrigin::TopLeft or
@@ -84,23 +101,20 @@ class RenderTarget {
   virtual ImageOrigin origin() const = 0;
 
   /**
-   * Returns the sample count of the render target.
-   */
-  int sampleCount() const {
-    return getFrameBuffer()->sampleCount();
-  }
-
-  /**
-   * Returns the pixel format of the render target.
-   */
-  PixelFormat format() const {
-    return getFrameBuffer()->format();
-  }
-
-  /**
    * Returns true if the render target is externally owned.
    */
   virtual bool externallyOwned() const = 0;
+
+  /**
+   * Returns the underlying GPUTexture that can be used for rendering. This may be the same as
+   * getSampleTexture(), or a different texture if MSAA is enabled on the render target.
+   */
+  virtual GPUTexture* getRenderTexture() const = 0;
+
+  /**
+   * Returns the underlying GPUTexture used for sampling in shaders or reading pixels.
+   */
+  virtual GPUTexture* getSampleTexture() const = 0;
 
   /**
    * Returns a reference to the underlying texture representation of this render target, may be
@@ -110,13 +124,11 @@ class RenderTarget {
     return nullptr;
   }
 
-  virtual GPUFrameBuffer* getFrameBuffer() const = 0;
-
   /**
    * Retrieves the backend render target.
    */
   BackendRenderTarget getBackendRenderTarget() const {
-    return getFrameBuffer()->getBackendRenderTarget(width(), height());
+    return getRenderTexture()->getBackendRenderTarget();
   }
 
   /**

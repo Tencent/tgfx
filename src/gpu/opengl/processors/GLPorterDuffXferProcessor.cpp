@@ -87,7 +87,7 @@ void GLPorterDuffXferProcessor::setData(UniformBuffer* uniformBuffer) const {
   uniformBuffer->setData("DstTextureUpperLeft", dstTextureInfo.offset);
   int width;
   int height;
-  if (dstTextureView->getTexture()->type() == TextureType::Rectangle) {
+  if (dstTextureView->getTexture()->type() == GPUTextureType::Rectangle) {
     width = 1;
     height = 1;
   } else {

@@ -23,12 +23,20 @@
 namespace tgfx {
 class GLExternalTexture : public GLTexture {
  public:
-  GLExternalTexture(unsigned id, unsigned target, PixelFormat format)
-      : GLTexture(id, target, format) {
+  GLExternalTexture(const GPUTextureDescriptor& descriptor, unsigned target, unsigned textureID,
+                    unsigned frameBufferID = 0)
+      : GLTexture(descriptor, target, textureID), _frameBufferID(frameBufferID) {
   }
 
-  void release(GPU*) override {
+  unsigned frameBufferID() const override {
+    return _textureID > 0 ? GLTexture::frameBufferID() : _frameBufferID;
+  }
+
+  void onRelease(GLGPU*) override {
     // External textures are not owned by TGFX, so we do not release them.
   }
+
+ private:
+  unsigned _frameBufferID = 0;
 };
 }  // namespace tgfx
