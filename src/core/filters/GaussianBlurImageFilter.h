@@ -54,9 +54,16 @@ class GaussianBlurImageFilter : public ImageFilter {
                                                       SrcRectConstraint constraint,
                                                       const Matrix* uvMatrix) const override;
 
+  /**
+   * Create a sampling source description.
+   * @param drawRect A sampling region defined using the coordinate system of the source itself as a reference.
+   * @param scales The scaling factor of the source image after sampling.
+   * @param srcSampleOffset Sampling offset defined using the coordinate system of the source itself as a reference.
+   */
   PlacementPtr<FragmentProcessor> getSourceFragmentProcessor(std::shared_ptr<Image> source,
                                                              Context* context, uint32_t renderFlags,
                                                              const Rect& drawRect,
-                                                             const Point& scales) const;
+                                                             const Point& scales,
+                                                             const Point& srcSampleOffset = Point::Zero()) const;
 };
 }  // namespace tgfx

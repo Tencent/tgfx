@@ -25,6 +25,7 @@
 #include "gpu/processors/TextureEffect.h"
 #include "gpu/processors/TiledTextureEffect.h"
 #include "gpu/proxies/RenderTargetProxy.h"
+#include "core/utils/MathExtra.h"
 
 namespace tgfx {
 
@@ -63,20 +64,18 @@ static void Blur1D(PlacementPtr<FragmentProcessor> source,
   drawingManager->fillRTWithFP(std::move(renderTarget), std::move(processor), renderFlags);
 }
 
-static std::shared_ptr<TextureProxy> ScaleTexture(const TPArgs& args,
-                                                  std::shared_ptr<TextureProxy> proxy,
-                                                  int targetWidth, int targetHeight) {
+static std::shared_ptr<TextureProxy> RecreateTexture(const TPArgs& args,
+                                                     std::shared_ptr<TextureProxy> source,
+                                                     int targetWidth, int targetHeight,
+                                                     const Matrix* uvMatrix) {
   auto renderTarget =
-      RenderTargetProxy::MakeFallback(args.context, targetWidth, targetHeight, proxy->isAlphaOnly(),
+      RenderTargetProxy::MakeFallback(args.context, targetWidth, targetHeight, source->isAlphaOnly(),
                                       1, args.mipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
   if (!renderTarget) {
     return nullptr;
   }
 
-  auto uvMatrix =
-      Matrix::MakeScale(static_cast<float>(proxy->width()) / static_cast<float>(targetWidth),
-                        static_cast<float>(proxy->height()) / static_cast<float>(targetHeight));
-  auto finalProcessor = TextureEffect::Make(std::move(proxy), {}, &uvMatrix);
+  auto finalProcessor = TextureEffect::Make(std::move(source), {}, uvMatrix);
   auto drawingManager = args.context->drawingManager();
   drawingManager->fillRTWithFP(renderTarget, std::move(finalProcessor), args.renderFlags);
   return renderTarget->asTextureProxy();
@@ -89,55 +88,64 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
   // The pixels involved in the convolution operation may be outside the clipping area.
   srcSampleBounds = filterBounds(srcSampleBounds);
   srcSampleBounds.intersect(filterBounds(Rect::MakeWH(source->width(), source->height())));
+  // Expand outward to prevent loss of intermediate state data.
   srcSampleBounds.roundOut();
+  // Sample buounds left bottom offset from clip bounds.
+  Point sampleBoundsLBOffset(srcSampleBounds.left - clipBounds.left, srcSampleBounds.bottom - clipBounds.bottom);
 
   Size dstDrawSize(clipBounds.width(), clipBounds.height());
   const float drawScale = std::max(0.0f, args.drawScale);
-  const float epsilon = std::numeric_limits<float>::epsilon();
-  if (fabs(drawScale - 1.0f) > epsilon) {
+  if (!FloatNearlyEqual(drawScale, 1.0)) {
     dstDrawSize.scale(drawScale, drawScale);
   }
-  const ISize dstDrawISize = dstDrawSize.toRound();
+  // Shrink inward to ensure that all target texture points have corresponding sampling points in the original data.
+  const ISize dstDrawISize = dstDrawSize.toFloor();
 
   Point sigma(blurrinessX, blurrinessY);
-  Point blurScaleFactor(1.0f, 1.0f);
-  bool isDrawScaleDown = drawScale < 1.0f;
+  Point blurDstScaleFactor(1.0f, 1.0f);
+  bool isDrawScaleDown = (drawScale < 1.0f);
   if (isDrawScaleDown) {
-    // When the drawing scale factor is less than 1, directly reduce the size of the blur target to improve computation speed.
-    blurScaleFactor = Point(drawScale, drawScale);
+    // Reduce the size of the blur target to improve computation speed.
+    blurDstScaleFactor = Point(drawScale, drawScale);
     sigma *= drawScale;
   }
   if (sigma.x > MAX_BLUR_SIGMA) {
-    blurScaleFactor.x *= MAX_BLUR_SIGMA / sigma.x;
+    blurDstScaleFactor.x *= MAX_BLUR_SIGMA / sigma.x;
     sigma.x = MAX_BLUR_SIGMA;
   }
   if (sigma.y > MAX_BLUR_SIGMA) {
-    blurScaleFactor.y *= MAX_BLUR_SIGMA / sigma.y;
+    blurDstScaleFactor.y *= MAX_BLUR_SIGMA / sigma.y;
     sigma.y = MAX_BLUR_SIGMA;
   }
+  Point blurDstToDrawDstScale(1.0f / blurDstScaleFactor.x, 1.0f / blurDstScaleFactor.y);
+  blurDstToDrawDstScale.scale(drawScale, drawScale);
 
   Size blurDstSize(clipBounds.width(), clipBounds.height());
-  if (blurScaleFactor.x < 1.0f || blurScaleFactor.y < 1.0f) {
-    blurDstSize.scale(blurScaleFactor.x, blurScaleFactor.y);
+  if (blurDstScaleFactor.x < 1.0f || blurDstScaleFactor.y < 1.0f) {
+    blurDstSize.scale(blurDstScaleFactor.x, blurDstScaleFactor.y);
   }
-  const ISize blurDstISize = blurDstSize.toRound();
+  // Expand outward to prevent loss of intermediate state data.
+  const ISize blurDstISize = blurDstSize.toCeil();
 
-  auto sourceFragment = getSourceFragmentProcessor(source, args.context, args.renderFlags,
-                                                   srcSampleBounds, blurScaleFactor);
   const auto isAlphaOnly = source->isAlphaOnly();
   bool blur2D = (sigma.x > 0.0f && sigma.y > 0.0f);
   std::shared_ptr<RenderTargetProxy> blurTarget = nullptr;
-  bool isBlurDstNotScaled =
-      (dstDrawISize.width == blurDstISize.width && dstDrawISize.height == blurDstISize.height);
-  bool blurTargetMipmaped = (args.mipmapped && isBlurDstNotScaled);
+  bool isBlurDstScaled =
+      (dstDrawISize.width != blurDstISize.width || dstDrawISize.height != blurDstISize.height);
+  bool blurTargetMipmaped = (args.mipmapped && !isBlurDstScaled);
   if (blur2D) {
+    auto sourceFragment = getSourceFragmentProcessor(source, args.context, args.renderFlags,
+                                                     srcSampleBounds, blurDstScaleFactor);
+
     // Blur X
-    // The texture size generated by the first blur must be able to accommodate all the pixels required for the subsequent Y-axis convolution operation.
+    // The texture size generated by the first blur must be able to accozmmodate all the pixels required for the
+    // subsequent Y-axis convolution operation.
     Size xBlurDstSize(srcSampleBounds.width(), srcSampleBounds.height());
-    if (blurScaleFactor.x < 1.0f || blurScaleFactor.y < 1.0f) {
-      xBlurDstSize.scale(blurScaleFactor.x, blurScaleFactor.y);
+    if (blurDstScaleFactor.x < 1.0f || blurDstScaleFactor.y < 1.0f) {
+      xBlurDstSize.scale(blurDstScaleFactor.x, blurDstScaleFactor.y);
     }
-    const ISize xBlurDstISize = xBlurDstSize.toRound();
+    // Expand outward to prevent loss of intermediate state data.
+    const ISize xBlurDstISize = xBlurDstSize.toCeil();
     blurTarget = RenderTargetProxy::MakeFallback(args.context, xBlurDstISize.width,
                                                  xBlurDstISize.height, isAlphaOnly, 1, false,
                                                  ImageOrigin::TopLeft, BackingFit::Approx);
@@ -149,12 +157,9 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
 
     // Blur y
     // The final blur does not require expanding any additional area.
-    auto uvMatrix = Matrix::I();
-    // Source data sampling offset. During 2D blur, the first blur expands the target size to generate a temporary texture. In the final stage, the texture needs to be cropped to match the output size of the entire blur operation. By setting the input texture sampling offset, the cropped texture can be drawn in the correct position.
-    Point srcSampleOffset(clipBounds.left - srcSampleBounds.left,
-                          clipBounds.top - srcSampleBounds.top);
-    srcSampleOffset.scale(blurScaleFactor.x, blurScaleFactor.y);
-    uvMatrix.postTranslate(srcSampleOffset.x, srcSampleOffset.y);
+    // In the final stage, the texture needs to be cropped to match the output size of the entire blur operation. Align
+    // origin by setting the texture sampling offset.
+    auto uvMatrix = Matrix::MakeTrans(-sampleBoundsLBOffset.x, -sampleBoundsLBOffset.y);
     SamplingArgs samplingArgs = {tileMode, tileMode, {}, SrcRectConstraint::Fast};
     sourceFragment =
         TiledTextureEffect::Make(blurTarget->asTextureProxy(), samplingArgs, &uvMatrix);
@@ -167,21 +172,26 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     Blur1D(std::move(sourceFragment), blurTarget, sigma.y, GaussianBlurDirection::Vertical, 1.0f,
            args.renderFlags);
   } else {
+    // Crop source image and Align origin.
+    Point srcSampleOffset(-sampleBoundsLBOffset.x, sampleBoundsLBOffset.y);
+    auto sourceFragment = getSourceFragmentProcessor(source, args.context, args.renderFlags,
+                                                     srcSampleBounds, blurDstScaleFactor, srcSampleOffset);
+
     blurTarget = RenderTargetProxy::MakeFallback(
         args.context, blurDstISize.width, blurDstISize.height, isAlphaOnly, 1, blurTargetMipmaped,
         ImageOrigin::TopLeft, BackingFit::Approx);
-    auto blur1DDirection =
+    auto blurDirection =
         (sigma.x > sigma.y ? GaussianBlurDirection::Horizontal : GaussianBlurDirection::Vertical);
-    float blur1DSegma = std::max(sigma.x, sigma.y);
-    Blur1D(std::move(sourceFragment), blurTarget, blur1DSegma, blur1DDirection, 1.0f,
+    float blurSigma = std::max(sigma.x, sigma.y);
+    Blur1D(std::move(sourceFragment), blurTarget, blurSigma, blurDirection, 1.0f,
            args.renderFlags);
   }
 
-  if (isBlurDstNotScaled) {
-    return blurTarget->asTextureProxy();
+  if (isBlurDstScaled) {
+    auto uvMatrix = Matrix::MakeScale(1.0f / blurDstToDrawDstScale.x, 1.0f / blurDstToDrawDstScale.y);
+    return RecreateTexture(args, blurTarget->asTextureProxy(), dstDrawISize.width, dstDrawISize.height, &uvMatrix);
   } else {
-    return ScaleTexture(args, blurTarget->asTextureProxy(), dstDrawISize.width,
-                        dstDrawISize.height);
+    return blurTarget->asTextureProxy();
   }
 }
 
@@ -197,9 +207,9 @@ PlacementPtr<FragmentProcessor> GaussianBlurImageFilter::asFragmentProcessor(
 
 PlacementPtr<FragmentProcessor> GaussianBlurImageFilter::getSourceFragmentProcessor(
     std::shared_ptr<Image> source, Context* context, uint32_t renderFlags, const Rect& drawRect,
-    const Point& scales) const {
+    const Point& scales, const Point& srcSampleOffset) const {
   Matrix uvMatrix = Matrix::MakeScale(1 / scales.x, 1 / scales.y);
-  uvMatrix.postTranslate(drawRect.left, drawRect.top);
+  uvMatrix.postTranslate(drawRect.left + srcSampleOffset.x, drawRect.top + srcSampleOffset.y);
   auto scaledDrawRect = drawRect;
   scaledDrawRect.scale(scales.x, scales.y);
   scaledDrawRect.round();
