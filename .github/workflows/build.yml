@@ -5,6 +5,31 @@ on:
     branches: [ main ]
   push:
     branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build'
+        required: true
+        default: 'openharmony'
+        type: choice
+        options:
+          - ios
+          - android
+          - web
+          - win
+          - linux
+          - qt
+          - openharmony
+      debug:
+        description: 'Enable debug mode'
+        required: false
+        type: boolean
+        default: false
+      skip_cache:
+        description: 'Skip all caches'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   ios:
@@ -354,13 +379,18 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Get Third-Party Cache
-        id: third-party-cache
+      - name: Get Environment Cache
+        id: env-cache
         uses: actions/cache/restore@v4
         with:
-          path: third_party
-          key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
-          restore-keys: third-party-openharmony-
+          path: |
+            ~/.ohpm
+            ~/ohpm
+            ~/.npmrc
+            third_party
+            ~/.npm-global
+          key: env-openharmony-${{ hashFiles('DEPS', 'vendor.json', 'ohos/oh-package.json5', 'ohos/oh-package-lock.json5', 'install_tools.sh') }}
+          restore-keys: env-openharmony-
 
       - name: Run depsync
         run: |
@@ -373,18 +403,16 @@ jobs:
           version: '5.0.3'
           cache: true
 
-      - name: Configure SDK Path
+      - name: Configure Environment
         run: |
           cd ohos
           echo "sdk.dir=${OHOS_SDK_NATIVE}" > local.properties
           echo "OHOS_BASE_SDK_HOME=${OHOS_SDK_NATIVE}" >> local.properties
-
-      - name: Setup .npmrc for OpenHarmony
-        run: |
           echo "@ohos:registry=https://repo.harmonyos.com/npm/" >> $HOME/.npmrc
           echo "registry=https://registry.npmjs.org/" >> $HOME/.npmrc
 
       - name: Install ohpm
+        if: steps.env-cache.outputs.cache-hit != 'true'
         run: |
           mkdir -p $HOME/ohpm
           cd $HOME/ohpm
@@ -404,6 +432,34 @@ jobs:
           fi
           ./hvigorw assembleHap --mode module -p module=${MODULE_NAME} -p product=default --stacktrace
 
+      - name: Save Environment Cache
+        if: ${{ (github.event_name == 'push') && (steps.env-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.ohpm
+            ~/ohpm
+            ~/.npmrc
+            third_party
+            ~/.npm-global
+          key: env-openharmony-${{ hashFiles('DEPS', 'vendor.json', 'ohos/oh-package.json5', 'ohos/oh-package-lock.json5', 'install_tools.sh') }}
+
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: third_party
+          key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+
+      - name: Save OHPM Cache
+        if: ${{ (github.event_name == 'push') && (steps.ohpm-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.ohpm
+            ohos/.ohpm
+            ohos/oh_modules
+          key: ohpm-openharmony-${{ hashFiles('ohos/oh-package.json5', 'ohos/oh-package-lock.json5') }}
 
       - name: Job Failed
         if: ${{ failure() }}
