@@ -5,31 +5,6 @@ on:
     branches: [ main ]
   push:
     branches: [ main ]
-  workflow_dispatch:
-    inputs:
-      platform:
-        description: 'Platform to build'
-        required: true
-        default: 'openharmony'
-        type: choice
-        options:
-          - ios
-          - android
-          - web
-          - win
-          - linux
-          - qt
-          - openharmony
-      debug:
-        description: 'Enable debug mode'
-        required: false
-        type: boolean
-        default: false
-      skip_cache:
-        description: 'Skip all caches'
-        required: false
-        type: boolean
-        default: false
 
 jobs:
   ios:
