@@ -11,6 +11,7 @@
 		857B02AD2455D81200E533CF /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 857B02AC2455D81200E533CF /* Assets.xcassets */; };
 		857B02B02455D81200E533CF /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 857B02AE2455D81200E533CF /* Main.storyboard */; };
 		857B02B32455D81200E533CF /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 857B02B22455D81200E533CF /* main.m */; };
+		E105D3952E4098B800F4831B /* tgfx.png in Resources */ = {isa = PBXBuildFile; fileRef = E105D3942E4098B800F4831B /* tgfx.png */; };
 		F201BD722B046BB30020C0FA /* tgfx.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F201BD712B046BB30020C0FA /* tgfx.a */; };
 		F201BD752B0471C00020C0FA /* TGFXView.mm in Sources */ = {isa = PBXBuildFile; fileRef = F201BD742B0471C00020C0FA /* TGFXView.mm */; };
 		F201BD772B0472B40020C0FA /* bridge.jpg in Resources */ = {isa = PBXBuildFile; fileRef = F201BD762B0472B40020C0FA /* bridge.jpg */; };
@@ -30,6 +31,7 @@
 		857B02B12455D81200E533CF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		857B02B22455D81200E533CF /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		857B02B42455D81200E533CF /* Hello2D.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Hello2D.entitlements; sourceTree = "<group>"; };
+		E105D3942E4098B800F4831B /* tgfx.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = tgfx.png; path = ../resources/assets/tgfx.png; sourceTree = SOURCE_ROOT; };
 		F201BD712B046BB30020C0FA /* tgfx.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = tgfx.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		F201BD732B0471C00020C0FA /* TGFXView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TGFXView.h; sourceTree = "<group>"; };
 		F201BD742B0471C00020C0FA /* TGFXView.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = TGFXView.mm; sourceTree = "<group>"; };
@@ -72,6 +74,7 @@
 		857B02A52455D81100E533CF /* Hello2D */ = {
 			isa = PBXGroup;
 			children = (
+				E105D3942E4098B800F4831B /* tgfx.png */,
 				F201BD762B0472B40020C0FA /* bridge.jpg */,
 				857B02A62455D81100E533CF /* AppDelegate.h */,
 				857B02A72455D81100E533CF /* AppDelegate.m */,
@@ -157,6 +160,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E105D3952E4098B800F4831B /* tgfx.png in Resources */,
 				F201BD772B0472B40020C0FA /* bridge.jpg in Resources */,
 				857B02AD2455D81200E533CF /* Assets.xcassets in Resources */,
 				857B02B02455D81200E533CF /* Main.storyboard in Resources */,

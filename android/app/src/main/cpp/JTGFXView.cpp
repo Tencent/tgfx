@@ -45,16 +45,15 @@ void JTGFXView::draw(int index, float zoom, float offsetX, float offsetY) {
     device->unlock();
     return;
   }
-  appHost->updateZoomAndOffset(zoom, tgfx::Point(offsetX, offsetY));
   auto canvas = surface->getCanvas();
   canvas->clear();
   canvas->save();
-  auto numDrawers = drawers::Drawer::Count() - 1;
-  index = (index % numDrawers) + 1;
-  auto drawer = drawers::Drawer::GetByName("GridBackground");
-  drawer->draw(canvas, appHost.get());
-  drawer = drawers::Drawer::GetByIndex(index);
-  drawer->draw(canvas, appHost.get());
+  drawers::Drawer::DrawBackground(canvas, appHost.get());
+  auto drawer = drawers::Drawer::GetByIndex(index % drawers::Drawer::Count());
+  drawer->displayList.setZoomScale(zoom);
+  drawer->displayList.setContentOffset(offsetX, offsetY);
+  drawer->build(appHost.get());
+  drawer->displayList.render(canvas->getSurface(), false);
   canvas->restore();
   context->flushAndSubmit();
   window->present(context);
@@ -82,10 +81,6 @@ static std::unique_ptr<drawers::AppHost> CreateAppHost(ANativeWindow* nativeWind
       break;
     }
   }
-  auto typeface = tgfx::Typeface::MakeFromPath("/system/fonts/NotoColorEmoji.ttf");
-  if (typeface != nullptr) {
-    host->addTypeface("emoji", std::move(typeface));
-  }
   return host;
 }
 
@@ -103,7 +98,8 @@ JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_nativeInit(
 }
 
 JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromSurface(
-    JNIEnv* env, jobject, jobject surface, jbyteArray imageBytes, jfloat density) {
+    JNIEnv* env, jobject, jobject surface, jobjectArray imageBytesArrays, jbyteArray fontBytes,
+    jfloat density) {
   if (surface == nullptr) {
     printf("SetupFromSurface() Invalid surface specified.\n");
     return 0;
@@ -114,14 +110,27 @@ JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromS
     printf("SetupFromSurface() Invalid surface specified.\n");
     return 0;
   }
-  auto bytes = env->GetByteArrayElements(imageBytes, nullptr);
-  auto size = static_cast<size_t>(env->GetArrayLength(imageBytes));
-  auto data = tgfx::Data::MakeWithCopy(bytes, size);
-  auto image = tgfx::Image::MakeFromEncoded(data);
-  env->ReleaseByteArrayElements(imageBytes, bytes, 0);
   auto appHost = CreateAppHost(nativeWindow, density);
-  if (image) {
-    appHost->addImage("bridge", std::move(image));
+  jsize numArrays = env->GetArrayLength(imageBytesArrays);
+  for (jsize i = 0; i < numArrays; i++) {
+    jbyteArray imageBytes =
+        static_cast<jbyteArray>(env->GetObjectArrayElement(imageBytesArrays, i));
+    auto bytes = env->GetByteArrayElements(imageBytes, nullptr);
+    auto size = static_cast<size_t>(env->GetArrayLength(imageBytes));
+    auto data = tgfx::Data::MakeWithCopy(bytes, size);
+    auto image = tgfx::Image::MakeFromEncoded(data);
+    env->ReleaseByteArrayElements(imageBytes, bytes, 0);
+    if (image) {
+      appHost->addImage(i == 0 ? "bridge" : "TGFX", std::move(image));
+    }
+  }
+  auto bytes = env->GetByteArrayElements(fontBytes, nullptr);
+  auto size = static_cast<size_t>(env->GetArrayLength(fontBytes));
+  auto data = tgfx::Data::MakeWithCopy(bytes, size);
+  auto typeface = tgfx::Typeface::MakeFromData(data);
+  env->ReleaseByteArrayElements(fontBytes, bytes, 0);
+  if (typeface) {
+    appHost->addTypeface("emoji", std::move(typeface));
   }
   return reinterpret_cast<jlong>(
       new hello2d::JTGFXView(nativeWindow, std::move(window), std::move(appHost)));

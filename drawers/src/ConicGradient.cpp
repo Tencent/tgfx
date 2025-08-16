@@ -17,28 +17,35 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "base/Drawers.h"
+#include "tgfx/layers/Gradient.h"
+#include "tgfx/layers/ShapeLayer.h"
 
 namespace drawers {
-void ConicGradient::onDraw(tgfx::Canvas* canvas, const AppHost* host) {
+std::shared_ptr<tgfx::Layer> ConicGradient::buildLayerTree(const AppHost* host) {
+  auto root = tgfx::Layer::Make();
+  auto shapeLayer = tgfx::ShapeLayer::Make();
+
   auto scale = host->density();
+  padding = 75.f * scale;
   auto width = host->width();
   auto height = host->height();
+  auto size = std::min(width, height) - static_cast<int>(padding * 2);
+  size = std::max(size, 50);
   tgfx::Color cyan = {0.0f, 1.0f, 1.0f, 1.0f};
   tgfx::Color magenta = {1.0f, 0.0f, 1.0f, 1.0f};
   tgfx::Color yellow = {1.0f, 1.0f, 0.0f, 1.0f};
-  auto shader = tgfx::Shader::MakeConicGradient(tgfx::Point::Make(width / 2, height / 2), 0, 360,
-                                                {cyan, magenta, yellow, cyan}, {});
-  tgfx::Paint paint = {};
-  paint.setShader(shader);
-  auto screenSize = std::min(width, height);
-  auto size = screenSize - static_cast<int>(150 * scale);
-  size = std::max(size, 50);
-  auto rect = tgfx::Rect::MakeXYWH((width - size) / 2, (height - size) / 2, size, size);
+
+  auto conicGradient = tgfx::Gradient::MakeConic(tgfx::Point::Make(size / 2, size / 2), 0, 360,
+                                                 {cyan, magenta, yellow, cyan}, {});
+  auto rect = tgfx::Rect::MakeXYWH(0, 0, size, size);
+
   tgfx::Path path = {};
   path.addRoundRect(rect, 20 * scale, 20 * scale);
-  canvas->translate(host->contentOffset().x, host->contentOffset().y);
-  canvas->scale(host->zoomScale(), host->zoomScale());
-  canvas->drawPath(path, paint);
+  shapeLayer->setPath(path);
+  shapeLayer->setFillStyle(conicGradient);
+
+  root->addChild(shapeLayer);
+  return root;
 }
 
 }  // namespace drawers

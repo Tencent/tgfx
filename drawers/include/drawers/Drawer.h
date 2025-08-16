@@ -20,6 +20,7 @@
 
 #include "drawers/AppHost.h"
 #include "tgfx/core/Canvas.h"
+#include "tgfx/layers/DisplayList.h"
 
 namespace drawers {
 class Drawer {
@@ -44,6 +45,8 @@ class Drawer {
    */
   static Drawer* GetByName(const std::string& name);
 
+  static void DrawBackground(tgfx::Canvas* canvas, const AppHost* host);
+
   explicit Drawer(std::string name);
 
   virtual ~Drawer() = default;
@@ -53,12 +56,17 @@ class Drawer {
   }
 
   /**
-   * Draws the contents to the given canvas.
+   * Build the contents.
    */
-  void draw(tgfx::Canvas* canvas, const AppHost* host);
+  void build(const AppHost* host);
+
+  tgfx::DisplayList displayList = {};
 
  protected:
-  virtual void onDraw(tgfx::Canvas* canvas, const AppHost* host) = 0;
+  float padding = 30.f;
+  std::shared_ptr<tgfx::Layer> _root = nullptr;
+
+  virtual std::shared_ptr<tgfx::Layer> buildLayerTree(const AppHost* host) = 0;
 
  private:
   std::string _name;

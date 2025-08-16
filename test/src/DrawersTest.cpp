@@ -24,6 +24,7 @@ namespace tgfx {
 TGFX_TEST(DrawersTest, Compare) {
   drawers::AppHost appHost(720, 720, 2.0f);
   appHost.addImage("bridge", MakeImage("resources/assets/bridge.jpg"));
+  appHost.addImage("TGFX", MakeImage("resources/assets/tgfx.png"));
   appHost.addTypeface("default", MakeTypeface("resources/font/NotoSansSC-Regular.otf"));
   appHost.addTypeface("emoji", MakeTypeface("resources/font/NotoColorEmoji.ttf"));
 
@@ -36,14 +37,22 @@ TGFX_TEST(DrawersTest, Compare) {
   for (auto& name : drawerNames) {
     auto drawer = drawers::Drawer::GetByName(name);
     ASSERT_TRUE(drawer != nullptr);
-    canvas->clear();
-    drawer->draw(canvas, &appHost);
+    drawer->build(&appHost);
+    drawer->displayList.render(surface.get());
     auto key = "DrawersTest/" + name;
     auto result = Baseline::Compare(surface, key);
     if (!result) {
       ADD_FAILURE();
       LOGI("Baseline::Compare failed for %s", key.c_str());
     }
+  }
+  canvas->clear();
+  drawers::Drawer::DrawBackground(canvas, &appHost);
+  std::string key = "DrawersTest/GridBackground";
+  auto result = Baseline::Compare(surface, key);
+  if (!result) {
+    ADD_FAILURE();
+    LOGI("Baseline::Compare failed for %s", key.c_str());
   }
 }
 }  // namespace tgfx

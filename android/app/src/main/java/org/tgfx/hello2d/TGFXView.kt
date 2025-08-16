@@ -53,13 +53,25 @@ open class TGFXView : TextureView, TextureView.SurfaceTextureListener {
 
     override fun onSurfaceTextureAvailable(p0: SurfaceTexture, p1: Int, p2: Int) {
         release()
-        val stream: InputStream = context.assets.open("bridge.jpg")
-        val imageBytes: ByteArray = ByteArray(stream.available())
-        stream.read(imageBytes)
-        stream.close();
+        val streamBridge: InputStream = context.assets.open("bridge.jpg")
+        val imageBytesBridge: ByteArray = ByteArray(streamBridge.available())
+        streamBridge.read(imageBytesBridge)
+        streamBridge.close()
+
+        val streamTGFX: InputStream = context.assets.open("tgfx.png")
+        val imageBytesTGFX: ByteArray = ByteArray(streamTGFX.available())
+        streamTGFX.read(imageBytesTGFX)
+        streamTGFX.close()
+
+        val streamFont: InputStream = context.assets.open("NotoColorEmoji.ttf")
+        val fontBytes: ByteArray = ByteArray(streamFont.available())
+        streamFont.read(fontBytes)
+        streamFont.close()
+
         val metrics = resources.displayMetrics
         surface = Surface(p0)
-        nativePtr = setupFromSurface(surface!!, imageBytes, metrics.density)
+        val imageBytesArray = arrayOf(imageBytesBridge, imageBytesTGFX)
+        nativePtr = setupFromSurface(surface!!, imageBytesArray, fontBytes, metrics.density)
     }
 
     override fun onSurfaceTextureSizeChanged(p0: SurfaceTexture, p1: Int, p2: Int) {
@@ -99,7 +111,7 @@ open class TGFXView : TextureView, TextureView.SurfaceTextureListener {
         private external fun nativeInit()
 
         private external fun setupFromSurface(
-            surface: Surface, imageBytes: ByteArray,
+            surface: Surface, imageBytes: Array<ByteArray>, fontBytes: ByteArray,
             density: Float
         ): Long
 
