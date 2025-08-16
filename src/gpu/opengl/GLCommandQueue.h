@@ -20,7 +20,9 @@
 
 #include "gpu/CommandQueue.h"
 #include "gpu/opengl/GLInterface.h"
-
+#ifdef interface
+#undef interface
+#endif
 namespace tgfx {
 class GLCommandQueue : public CommandQueue {
  public:
