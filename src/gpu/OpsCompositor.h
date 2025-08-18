@@ -106,6 +106,7 @@ class OpsCompositor {
   uint32_t renderFlags = 0;
   UniqueKey clipKey = {};
   std::shared_ptr<TextureProxy> clipTexture = nullptr;
+  bool hasRectToRectDraw = false;
   PendingOpType pendingType = PendingOpType::Unknown;
   Path pendingClip = {};
   Fill pendingFill = {};
@@ -114,6 +115,7 @@ class OpsCompositor {
   SamplingOptions pendingSampling = {};
   std::shared_ptr<TextureProxy> pendingAtlasTexture = nullptr;
   std::vector<PlacementPtr<RectRecord>> pendingRects = {};
+  std::vector<PlacementPtr<Rect>> pendingUVRects = {};
   std::vector<PlacementPtr<RRectRecord>> pendingRRects = {};
   std::vector<PlacementPtr<Stroke>> pendingStrokes = {};
   std::vector<PlacementPtr<Op>> ops = {};
