@@ -62,7 +62,7 @@ std::shared_ptr<TextureView> WebImageBuffer::onMakeTexture(Context* context, boo
   }
   auto glTexture = static_cast<const GLTexture*>(textureView->getTexture());
   val::module_property("tgfx").call<void>("uploadToTexture", emscripten::val::module_property("GL"),
-                                          getImage(), glTexture->id(), false);
+                                          getImage(), glTexture->textureID(), false);
   return textureView;
 }
 

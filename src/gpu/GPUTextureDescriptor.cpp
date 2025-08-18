@@ -16,14 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLFrameBuffer.h"
-#include "gpu/opengl/GLUtil.h"
+#include "gpu/GPUTextureDescriptor.h"
+#include <algorithm>
+#include <cmath>
 
 namespace tgfx {
-BackendRenderTarget GLFrameBuffer::getBackendRenderTarget(int width, int height) const {
-  GLFrameBufferInfo glInfo = {};
-  glInfo.id = drawFrameBufferID();
-  glInfo.format = PixelFormatToGLSizeFormat(format());
-  return {glInfo, width, height};
+GPUTextureDescriptor::GPUTextureDescriptor(int width, int height, PixelFormat format,
+                                           bool mipmapped, int sampleCount, uint32_t usage)
+    : width(width), height(height), format(format), sampleCount(sampleCount), usage(usage) {
+  if (mipmapped) {
+    int maxDimension = std::max(width, height);
+    mipLevelCount = static_cast<int>(std::log2(maxDimension)) + 1;
+  }
 }
+
 }  // namespace tgfx

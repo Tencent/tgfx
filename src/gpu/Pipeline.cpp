@@ -102,7 +102,7 @@ void Pipeline::computeProgramKey(Context* context, BytesKey* programKey) const {
   }
   auto dstTextureView = xferProcessor != nullptr ? xferProcessor->dstTextureView() : nullptr;
   if (dstTextureView != nullptr) {
-    dstTextureView->getTexture()->computeTextureKey(context, programKey);
+    TextureView::ComputeTextureKey(dstTextureView->getTexture(), programKey);
   }
   getXferProcessor()->computeProcessorKey(context, programKey);
   programKey->write(static_cast<uint32_t>(_outputSwizzle->asKey()));

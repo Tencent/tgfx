@@ -18,6 +18,7 @@
 
 #include "GLFragmentShaderBuilder.h"
 #include "GLProgramBuilder.h"
+#include "gpu/opengl/GLCaps.h"
 
 namespace tgfx {
 static constexpr char DstColorName[] = "_dstColor";

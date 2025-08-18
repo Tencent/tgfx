@@ -21,7 +21,6 @@
 #include <memory>
 #include "gpu/CommandBuffer.h"
 #include "gpu/GPUBuffer.h"
-#include "gpu/GPUFrameBuffer.h"
 #include "gpu/GPUTexture.h"
 
 namespace tgfx {
@@ -56,13 +55,13 @@ class CommandQueue {
                             size_t rowBytes) = 0;
 
   /**
-   * Copies pixel data from the GPUFrameBuffer within the specified rectangle into the provided
-   * memory buffer. The buffer must be large enough to hold all the data for the rectangle.
-   * The rectangle must be entirely within the frame buffer's dimensions. Returns true if
-   * the read operation succeeds, false otherwise.
+   * Copies pixel data from the GPUTexture within the specified rectangle into the provided memory
+   * buffer. The buffer must be large enough to hold all the data for the rectangle. The rectangle
+   * must be entirely within the frame buffer's dimensions. Returns true if the read operation
+   * succeeds, false otherwise.
    */
-  virtual bool readPixels(GPUFrameBuffer* frameBuffer, const Rect& rect, void* pixels,
-                          size_t rowBytes) const = 0;
+  virtual bool readTexture(GPUTexture* texture, const Rect& rect, void* pixels,
+                           size_t rowBytes) const = 0;
 
   /**
    * Schedules the execution of the specified command buffer on the GPU.
