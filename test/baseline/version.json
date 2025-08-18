@@ -197,7 +197,7 @@
         "backgroundLayerBlur": "f58595d0",
         "draw_shape": "80a4bd69",
         "draw_solid": "b4a1231",
-        "draw_text": "6095b909",
+        "draw_text": "fe428880",
         "dropShadow": "ee2cc771",
         "filterClip": "8bd149a4",
         "filterTest": "8bd149a4",
@@ -211,7 +211,7 @@
         "imageMask": "8bd149a4",
         "innerShadow": "ee2cc771",
         "shapeMask": "8bd149a4",
-        "textMask": "6095b909"
+        "textMask": "fe428880"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",
@@ -331,7 +331,7 @@
         "TruncateTextLineTest": "6095b909"
     },
     "TypefaceTest": {
-        "CustomImageTypeface": "6095b909",
+        "CustomImageTypeface": "fe428880",
         "CustomPathTypeface": "42ecc4c7"
     }
 }
