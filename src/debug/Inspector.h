@@ -19,9 +19,9 @@
 #pragma once
 #include <chrono>
 #include <mutex>
+#include <optional>
 #include <thread>
 #include <vector>
-#include <optional>
 #include "Message.h"
 #include "Protocol.h"
 #include "Socket.h"
