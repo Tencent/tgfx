@@ -95,7 +95,11 @@ void Inspector::sendString(uint64_t str, const char* ptr, MsgType type) {
 
 void Inspector::worker() {
   std::string addr = "255.255.255.255";
-  auto dataPort = TCPPortProvider::Get().getValidPort();
+  auto portProvider = TCPPortProvider::Get();
+  auto dataPort = portProvider->getValidPort();
+  if (dataPort == 0) {
+    return;
+  }
   const auto procname = GetProcessName();
   const auto pnsz = std::min<size_t>(strlen(procname), WelcomeMessageProgramNameSize - 1);
 

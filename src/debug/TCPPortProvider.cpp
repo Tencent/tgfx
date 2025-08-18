@@ -26,6 +26,7 @@ static constexpr uint16_t MaxPort = 65535;
 static constexpr uint16_t MinPort = 49152;
 
 uint16_t TCPPortProvider::getValidPort() {
+  std::lock_guard<std::mutex> lock(mutex);
   uint32_t rangeSize = MaxPort - MinPort + 1;
   if (rangeSize == usedPortSet.size()) {
     usedPortSet.clear();
@@ -35,19 +36,15 @@ uint16_t TCPPortProvider::getValidPort() {
   std::uniform_int_distribution<uint16_t> dis(MinPort, MaxPort);
   uint16_t randomPort = dis(gen);
   std::unique_ptr<ListenSocket> listenSocket = std::make_unique<ListenSocket>();
-  while (usedPortSet.find(randomPort) != usedPortSet.end() ||
-         !listenSocket->listenSock(randomPort, 4)) {
+  while (usedPortSet.find(randomPort) != usedPortSet.end()) {
     randomPort = dis(gen);
   }
-  usedPortSet.insert(randomPort);
-  return randomPort;
-}
-
-bool TCPPortProvider::clearUsedPort(uint16_t port) {
-  if (usedPortSet.find(port) != usedPortSet.end()) {
-    usedPortSet.erase(port);
-    return true;
+  if (!listenSocket->listenSock(randomPort, 4)) {
+    return 0;
   }
-  return false;
+  if (usedPortSet.find(randomPort) != usedPortSet.end()) {
+    usedPortSet.insert(randomPort);
+  }
+  return randomPort;
 }
 }  // namespace tgfx::debug

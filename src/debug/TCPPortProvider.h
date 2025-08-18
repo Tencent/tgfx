@@ -17,18 +17,21 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include <cstdint>
+#include <mutex>
 #include <set>
 namespace tgfx::debug {
 class TCPPortProvider {
  public:
-  static TCPPortProvider& Get() {
-    static TCPPortProvider instance;
-    return instance;
+  static TCPPortProvider* Get() {
+    static auto instance = std::make_shared<TCPPortProvider>();
+    return instance.get();
   }
 
-  uint16_t getValidPort();
+  TCPPortProvider() = default;
 
-  bool clearUsedPort(uint16_t port);
+  ~TCPPortProvider() = default;
+
+  uint16_t getValidPort();
 
   TCPPortProvider(const TCPPortProvider& provider) = delete;
 
@@ -39,8 +42,7 @@ class TCPPortProvider {
   TCPPortProvider& operator=(TCPPortProvider&& provider) = delete;
 
  private:
-  TCPPortProvider() = default;
-
   std::set<uint16_t> usedPortSet = {};
+  std::mutex mutex = {};
 };
 }  // namespace tgfx::debug

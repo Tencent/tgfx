@@ -63,9 +63,32 @@ typedef SOCKET socket_t;
 typedef int socket_t;
 #endif
 
+#ifdef _WIN32
+struct __wsinit
+{
+  __wsinit()
+  {
+    WSADATA wsaData;
+    if(WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
+    {
+      fprintf(stderr, "Cannot init winsock.\n");
+      exit(1);
+    }
+  }
+};
+
+void initWinSock()
+{
+  static __wsinit init;
+}
+#endif
+
 static constexpr size_t BufSize = 128 * 1024;
 
 Socket::Socket() : buf((char*)malloc(BufSize)), sock(-1) {
+#ifdef _WIN32
+  initWinSock();
+#endif
 }
 
 Socket::Socket(int sock) : buf((char*)malloc(BufSize)), sock(sock) {
@@ -424,13 +447,15 @@ bool Socket::isValid() const {
 }
 
 ListenSocket::ListenSocket() : sock(-1), listenPort(0) {
+#ifdef _WIN32
+  initWinSock();
+#endif
 }
 
 ListenSocket::~ListenSocket() {
   if (this->sock != -1) {
     closeSock();
   }
-  TCPPortProvider::Get().clearUsedPort(listenPort);
 }
 
 static int AddrinfoAndSocketForFamily(uint16_t port, int ai_family, struct addrinfo** res) {
@@ -438,7 +463,7 @@ static int AddrinfoAndSocketForFamily(uint16_t port, int ai_family, struct addri
   memset(&hints, 0, sizeof(hints));
   hints.ai_family = ai_family;
   hints.ai_socktype = SOCK_STREAM;
-  hints.ai_flags = AI_PASSIVE;
+  // hints.ai_flags = AI_PASSIVE;
   char portbuf[32];
   snprintf(portbuf, 32, "%" PRIu16, port);
   if (getaddrinfo(nullptr, portbuf, &hints, res) != 0) {
@@ -526,6 +551,9 @@ void ListenSocket::closeSock() {
 }
 
 UdpBroadcast::UdpBroadcast() : sock(-1) {
+#ifdef _WIN32
+  initWinSock();
+#endif
 }
 
 UdpBroadcast::~UdpBroadcast() {
@@ -606,7 +634,7 @@ int UdpBroadcast::sendData(uint16_t port, const void* data, size_t len) {
   addr.sin_family = AF_INET;
   addr.sin_port = htons(port);
   addr.sin_addr.s_addr = this->addr;
-  return (int)sendto(this->sock, data, len, MSG_NOSIGNAL, (sockaddr*)&addr, sizeof(addr));
+  return (int)sendto(this->sock, static_cast<const char*>(data), len, MSG_NOSIGNAL, (sockaddr*)&addr, sizeof(addr));
 }
 
 IpAddress::IpAddress() : number(0) {
@@ -619,7 +647,7 @@ void IpAddress::setAddr(const struct sockaddr& addr) {
 #if defined _WIN32 && (!defined NTDDI_WIN10 || NTDDI_VERSION < NTDDI_WIN10)
   struct sockaddr_in tmp;
   memcpy(&tmp, &addr, sizeof(tmp));
-  auto ai = &tmp;
+  auto addrIn = &tmp;
 #else
   auto addrIn = (const struct sockaddr_in*)&addr;
 #endif
@@ -628,6 +656,9 @@ void IpAddress::setAddr(const struct sockaddr& addr) {
 }
 
 UdpListen::UdpListen() : sock(-1) {
+#ifdef _WIN32
+  initWinSock();
+#endif
 }
 
 UdpListen::~UdpListen() {

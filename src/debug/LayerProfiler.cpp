@@ -60,7 +60,11 @@ void LayerProfiler::sendWork() {
   }
   const auto procname = GetProcessName();
   const auto pnsz = std::min<size_t>(strlen(procname), WelcomeMessageProgramNameSize - 1);
-  uint16_t port = TCPPortProvider::Get().getValidPort();
+  auto portProvider = TCPPortProvider::Get();
+  auto port = portProvider->getValidPort();
+  if (port == 0) {
+    return;
+  }
   if (!listenSocket->listenSock(port, 4)) {
     return;
   }
