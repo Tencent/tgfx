@@ -1,7 +1,7 @@
 {
     "CanvasTest": {
         "AdaptiveDashEffect": "330279d",
-        "BlendFormula": "67961560",
+        "BlendFormula": "80a4bd69",
         "Clip": "d010fb8",
         "ClipAll": "d0e35c3",
         "CloseQuadShape": "ded7faef",
@@ -42,10 +42,10 @@
         "Path_addArc_reversed7": "4802e56",
         "Path_addArc_reversed8": "4802e56",
         "Path_complex": "6095b909",
-        "Picture": "80c523ee",
+        "Picture": "80a4bd69",
         "PictureImage": "ee2cc771",
         "PictureImage_Path": "1ae5042",
-        "PictureImage_Text": "80c523ee",
+        "PictureImage_Text": "80a4bd69",
         "QuadRectShape": "5681ef0e",
         "QuadRectShapeCorner": "eca3cc0d",
         "RevertRect": "06aface",
@@ -76,7 +76,7 @@
         "filter_mode_nearest": "d010fb8",
         "hardware_render_target_blend": "67961560",
         "inversePath_rect": "67961560",
-        "inversePath_text": "ee2cc771",
+        "inversePath_text": "80a4bd69",
         "merge_draw_call_rect": "d010fb8",
         "merge_draw_call_rrect": "d010fb8",
         "mipmap_linear": "a4c64919",
@@ -146,7 +146,7 @@
         "shaderMaskFilter": "53656ae4"
     },
     "LayerTest": {
-        "AdaptiveDashEffect": "330279d",
+        "AdaptiveDashEffect": "80a4bd69",
         "BackgroundBlurStyleTest1": "ee2cc771",
         "BackgroundBlurStyleTest2": "ee2cc771",
         "BackgroundBlurStyleTest3": "ee2cc771",
@@ -195,7 +195,7 @@
         "StrokeOnTop_On": "80c523ee",
         "ZoomAndOffset": "8bd149a4",
         "backgroundLayerBlur": "f58595d0",
-        "draw_shape": "b2073fc2",
+        "draw_shape": "80a4bd69",
         "draw_solid": "b4a1231",
         "draw_text": "6095b909",
         "dropShadow": "ee2cc771",
