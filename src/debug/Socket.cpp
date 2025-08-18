@@ -64,21 +64,17 @@ typedef int socket_t;
 #endif
 
 #ifdef _WIN32
-struct __wsinit
-{
-  __wsinit()
-  {
+struct __wsinit {
+  __wsinit() {
     WSADATA wsaData;
-    if(WSAStartup(MAKEWORD(2, 2), &wsaData) != 0)
-    {
+    if (WSAStartup(MAKEWORD(2, 2), &wsaData) != 0) {
       fprintf(stderr, "Cannot init winsock.\n");
       exit(1);
     }
   }
 };
 
-void initWinSock()
-{
+void initWinSock() {
   static __wsinit init;
 }
 #endif
@@ -634,7 +630,8 @@ int UdpBroadcast::sendData(uint16_t port, const void* data, size_t len) {
   addr.sin_family = AF_INET;
   addr.sin_port = htons(port);
   addr.sin_addr.s_addr = this->addr;
-  return (int)sendto(this->sock, static_cast<const char*>(data), len, MSG_NOSIGNAL, (sockaddr*)&addr, sizeof(addr));
+  return (int)sendto(this->sock, static_cast<const char*>(data), len, MSG_NOSIGNAL,
+                     (sockaddr*)&addr, sizeof(addr));
 }
 
 IpAddress::IpAddress() : number(0) {
