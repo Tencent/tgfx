@@ -15,9 +15,24 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+
 #pragma once
-
-#include "LayerProfiler.h"
-
-#define SEND_LAYER_DATA(data) inspector::LayerProfiler::Get().setData(data)
-#define LAYER_CALLBACK(func) inspector::LayerProfiler::Get().setCallBack(func)
+#include <cstdint>
+namespace tgfx::debug {
+enum class LayerInspectorMsgType : uint8_t {
+  EnableLayerInspector,
+  HoverLayerAddress,
+  SelectedLayerAddress,
+  SerializeAttribute,
+  SerializeSubAttribute,
+  FlushAttribute,
+  FlushLayerTree,
+  FlushImage,
+  PickedLayerAddress,
+  FlushAttributeAck,
+  LayerTree,
+  LayerAttribute,
+  LayerSubAttribute,
+  ImageData
+};
+}  // namespace tgfx::debug

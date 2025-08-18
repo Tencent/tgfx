@@ -17,11 +17,13 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OpsRenderTask.h"
+#include "debug/DebugMacros.h"
 #include "gpu/RenderPass.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
 void OpsRenderTask::execute(CommandEncoder* encoder) {
+  TASK_MARK(tgfx::debug::OpTaskType::OpsRenderTask);
   auto renderPass = encoder->beginRenderPass(renderTargetProxy->getRenderTarget(), true);
   if (renderPass == nullptr) {
     LOGE("OpsRenderTask::execute() Failed to initialize the render pass!");

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -15,22 +15,14 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
+
 #pragma once
-#ifdef TGFX_USE_INSPECTOR
-#include "Define.h"
-#else
-#define FrameMark
+#include <cstdint>
+#include "Protocol.h"
 
-#define ScopedMark(type, active)
-#define OperateMark(type)
-#define TaskMark(type)
-
-#define AttributeName(name, value)
-#define AttributeTGFXName(name, value)
-#define AttributeNameFloatArray(name, value, size)
-#define AttributeNameEnum(name, value, type)
-#define AttributeEnum(value, type)
-
-#define SEND_LAYER_DATA(data)
-#define LAYER_CALLBACK(x)
-#endif
+namespace tgfx::debug {
+uint64_t GetPid();
+const char* GetProcessName();
+BroadcastMessage GetBroadcastMessage(const char* procname, size_t pnsz, size_t& len, uint16_t port,
+                                     ToolType type);
+}  // namespace tgfx::debug

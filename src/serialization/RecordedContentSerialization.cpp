@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -15,8 +15,6 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
-#ifdef TGFX_USE_INSPECTOR
 
 #include "RecordedContentSerialization.h"
 #include "layers/contents/ContourContent.h"
@@ -78,8 +76,8 @@ std::shared_ptr<Data> RecordedContentSerialization::Serialize(
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute, startMap,
-                                 contentMap);
+  SerializeUtils::SerializeBegin(fbb, tgfx::debug::LayerInspectorMsgType::LayerSubAttribute,
+                                 startMap, contentMap);
   auto type = Types::Get(content);
   SerializeUtils::SetFlexBufferMap(fbb, "type", SerializeUtils::RecordedContentTypeToString(type));
   switch (type) {
@@ -99,4 +97,3 @@ std::shared_ptr<Data> RecordedContentSerialization::Serialize(
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
 }  // namespace tgfx
-#endif

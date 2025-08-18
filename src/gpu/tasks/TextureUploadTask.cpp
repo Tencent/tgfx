@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureUploadTask.h"
+#include "debug/DebugMacros.h"
 #include "gpu/TextureView.h"
 
 namespace tgfx {
@@ -27,6 +28,8 @@ TextureUploadTask::TextureUploadTask(std::shared_ptr<ResourceProxy> proxy,
 }
 
 std::shared_ptr<Resource> TextureUploadTask::onMakeResource(Context* context) {
+  TASK_MARK(tgfx::debug::OpTaskType::TextureUploadTask);
+  ATTRIBUTE_NAME("mipmaped", mipmapped);
   if (source == nullptr) {
     return nullptr;
   }

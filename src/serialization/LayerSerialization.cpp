@@ -15,7 +15,6 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#ifdef TGFX_USE_INSPECTOR
 
 #include "LayerSerialization.h"
 #include <tgfx/layers/ImageLayer.h>
@@ -30,7 +29,7 @@ namespace tgfx {
 
 std::shared_ptr<Data> LayerSerialization::SerializeLayer(
     const Layer* layer, SerializeUtils::ComplexObjSerMap* map,
-    SerializeUtils::RenderableObjSerMap* rosMap, inspector::LayerInspectorMsgType type) {
+    SerializeUtils::RenderableObjSerMap* rosMap, tgfx::debug::LayerInspectorMsgType type) {
   DEBUG_ASSERT(layer != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
@@ -47,7 +46,7 @@ std::shared_ptr<Data> LayerSerialization::SerializeTreeNode(
   flexbuffers::Builder fbb;
   size_t startMap = fbb.StartMap();
   fbb.Key("Type");
-  fbb.UInt(static_cast<uint8_t>(inspector::LayerInspectorMsgType::LayerTree));
+  fbb.UInt(static_cast<uint8_t>(tgfx::debug::LayerInspectorMsgType::LayerTree));
   fbb.Key("Content");
   SerializeTreeNodeImpl(fbb, layer, layerMap);
   fbb.EndMap(startMap);
@@ -169,4 +168,3 @@ void LayerSerialization::SerializeBasicLayerImpl(flexbuffers::Builder& fbb, cons
 }
 
 }  // namespace tgfx
-#endif

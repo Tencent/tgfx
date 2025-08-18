@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,38 +17,38 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "LayerProfiler.h"
 #include <chrono>
-#include <thread>
 #include <cstring>
+#include <thread>
 #include "ProcessUtils.h"
-#include "TimeUtils.h"
 #include "Protocol.h"
+#include "tgfx/core/Clock.h"
 
-namespace inspector {
+namespace tgfx::debug {
 
 #ifndef __EMSCRIPTEN__
 static const char* addr = "255.255.255.255";
 static uint16_t broadcastPort = 8086;
 #endif
 
-LayerProfiler::LayerProfiler(){
+LayerProfiler::LayerProfiler() {
 #ifndef __EMSCRIPTEN__
   listenSocket = std::make_shared<ListenSocket>();
-  for (uint16_t i = 0; i < broadcastNum; i++) {
+  for (uint16_t i = 0; i < BroadcastNum; i++) {
     broadcasts[i] = std::make_shared<UdpBroadcast>();
-    isUDPOpened = isUDPOpened && broadcasts[i]->open(addr, broadcastPort + i);
+    isUDPOpened = isUDPOpened && broadcasts[i]->openConnect(addr, broadcastPort + i);
   }
 
 #endif
-  epoch = GetCurrentTime<std::chrono::seconds>();
+  epoch = Clock::Now();
   spawnWorkTread();
 }
 
 LayerProfiler::~LayerProfiler() {
   stopFlag.store(true, std::memory_order_release);
-  if(sendThread && sendThread->joinable()) {
+  if (sendThread && sendThread->joinable()) {
     sendThread->join();
   }
-  if(recvThread && recvThread->joinable()) {
+  if (recvThread && recvThread->joinable()) {
     recvThread->join();
   }
 }
@@ -61,11 +61,11 @@ void LayerProfiler::sendWork() {
   const auto procname = GetProcessName();
   const auto pnsz = std::min<size_t>(strlen(procname), WelcomeMessageProgramNameSize - 1);
   uint16_t port = TCPPortProvider::Get().getValidPort();
-  if (!listenSocket->listen(port, 4)) {
+  if (!listenSocket->listenSock(port, 4)) {
     return;
   }
   size_t broadcastLen = 0;
-  auto broadcastMsg = GetBroadcastMessage(procname, pnsz, broadcastLen, port, static_cast<uint8_t>(MsgType::LayerTree));
+  auto broadcastMsg = GetBroadcastMessage(procname, pnsz, broadcastLen, port, ToolType::LayerTree);
   long long lastBroadcast = 0;
   while (!stopFlag.load(std::memory_order_acquire)) {
     while (!stopFlag.load(std::memory_order_acquire)) {
@@ -73,15 +73,15 @@ void LayerProfiler::sendWork() {
       const auto t = std::chrono::high_resolution_clock::now().time_since_epoch().count();
       if (t - lastBroadcast > 3000000000) {
         lastBroadcast = t;
-        for (uint16_t i = 0; i < broadcastNum; i++) {
+        for (uint16_t i = 0; i < BroadcastNum; i++) {
           if (broadcasts[i]) {
-            const auto ts = GetCurrentTime<std::chrono::seconds>();
+            const auto ts = Clock::Now();
             broadcastMsg.activeTime = static_cast<int32_t>(ts - epoch);
-            broadcasts[i]->send(broadcastPort + i, &broadcastMsg, broadcastLen);
+            broadcasts[i]->sendData(broadcastPort + i, &broadcastMsg, broadcastLen);
           }
         }
       }
-      socket = listenSocket->accept();
+      socket = listenSocket->acceptSock();
       if (socket) {
         break;
       }
@@ -94,10 +94,10 @@ void LayerProfiler::sendWork() {
       }
       if (queue.size_approx() != 0) {
         std::vector<uint8_t> data;
-        if(queue.try_dequeue(data)) {
+        if (queue.try_dequeue(data)) {
           int size = (int)data.size();
-          socket->send(&size, sizeof(int));
-          socket->send(data.data(), data.size());
+          socket->sendData(&size, sizeof(int));
+          socket->sendData(data.data(), data.size());
         }
       }
     }
@@ -139,6 +139,6 @@ void LayerProfiler::setData(const std::vector<uint8_t>& data) {
   queue.enqueue(data);
 }
 void LayerProfiler::setCallBack(std::function<void(const std::vector<uint8_t>&)> callback) {
-    this->callback = std::move(callback);
+  this->callback = std::move(callback);
 }
-}  // namespace inspector
+}  // namespace tgfx::debug

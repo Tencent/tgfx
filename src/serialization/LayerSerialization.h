@@ -18,10 +18,10 @@
 
 #pragma once
 
-#include <tgfx/core/Data.h>
 #include <functional>
-#include "LayerInspectorProtocol.h"
 #include "SerializationUtils.h"
+#include "debug/LayerInspectorProtocol.h"
+#include "tgfx/core/Data.h"
 
 namespace tgfx {
 static const std::string HighLightLayerName = "HighLightLayer";
@@ -35,7 +35,8 @@ class LayerSerialization {
   static std::shared_ptr<Data> SerializeLayer(
       const Layer* layer, SerializeUtils::ComplexObjSerMap* map,
       SerializeUtils::RenderableObjSerMap* rosMap,
-      inspector::LayerInspectorMsgType type = inspector::LayerInspectorMsgType::LayerSubAttribute);
+      tgfx::debug::LayerInspectorMsgType type =
+          tgfx::debug::LayerInspectorMsgType::LayerSubAttribute);
 
  private:
   static void SerializeTreeNodeImpl(

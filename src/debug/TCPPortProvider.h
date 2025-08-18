@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 THL A29 Limited, a Tencent company. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -15,25 +15,32 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
 #pragma once
-namespace inspector {
+#include <cstdint>
+#include <set>
+namespace tgfx::debug {
+class TCPPortProvider {
+ public:
+  static TCPPortProvider& Get() {
+    static TCPPortProvider instance;
+    return instance;
+  }
 
-inline constexpr int broadcastNum = 5;
+  uint16_t getValidPort();
 
-inline constexpr uint8_t WelcomeMessageProgramNameSize = 64;
-inline constexpr uint8_t ProtocolVersion = 1;
-inline constexpr uint16_t BroadcastVersion = 1;
+  bool clearUsedPort(uint16_t port);
 
-enum class MsgType : uint8_t { FrameCapture = 0, LayerTree = 1 };
+  TCPPortProvider(const TCPPortProvider& provider) = delete;
 
-struct BroadcastMessage {
-  uint8_t type;
-  uint16_t listenPort;
-  uint32_t protocolVersion;
-  uint64_t pid;
-  int32_t activeTime;  // in seconds
-  char programName[WelcomeMessageProgramNameSize];
+  TCPPortProvider(TCPPortProvider&& provider) = delete;
+
+  TCPPortProvider& operator=(const TCPPortProvider& provider) = delete;
+
+  TCPPortProvider& operator=(TCPPortProvider&& provider) = delete;
+
+ private:
+  TCPPortProvider() = default;
+
+  std::set<uint16_t> usedPortSet = {};
 };
-
-}  // namespace inspector
+}  // namespace tgfx::debug

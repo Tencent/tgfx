@@ -17,13 +17,42 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <cstdint>
-#include <chrono>
-namespace inspector {
-template<typename T>
-int64_t GetCurrentTime() {
-  return std::chrono::duration_cast<T>(
-                              std::chrono::system_clock::now().time_since_epoch())
-                              .count();
-}
-}  // namespace tgfx
+#include "Inspector.h"
+#include "tgfx/core/Clock.h"
+
+namespace tgfx::debug {
+class Scoped {
+ public:
+  Scoped(OpTaskType type, bool isActive) : active(isActive), type(type) {
+    if (!active) {
+      return;
+    }
+    MsgPrepare(MsgType::OperateBegin);
+    item.operateBegin.nsTime = Clock::Now();
+    item.operateBegin.type = static_cast<uint8_t>(type);
+    MsgCommit();
+  }
+
+  ~Scoped() {
+    if (!active) {
+      return;
+    }
+    MsgPrepare(MsgType::OperateEnd);
+    item.operateEnd.nsTime = Clock::Now();
+    item.operateEnd.type = static_cast<uint8_t>(type);
+    MsgCommit();
+  }
+
+  Scoped(const Scoped&) = delete;
+
+  Scoped(Scoped&&) = delete;
+
+  Scoped& operator=(const Scoped&) = delete;
+
+  Scoped& operator=(Scoped&&) = delete;
+
+ private:
+  bool active = false;
+  OpTaskType type = OpTaskType::Unknown;
+};
+}  // namespace tgfx::debug
