@@ -68,7 +68,10 @@ void ShapeDrawOp::execute(RenderPass* renderPass) {
     if (!realUVMatrix.invert(&maskMatrix)) {
       return;
     }
-    auto maskFP = TextureEffect::Make(std::move(textureProxy), {}, &maskMatrix, true);
+    static SamplingArgs args(TileMode::Clamp, TileMode::Clamp,
+                             SamplingOptions(FilterMode::Nearest, MipmapMode::None),
+                             SrcRectConstraint::Fast);
+    auto maskFP = TextureEffect::Make(std::move(textureProxy), args, &maskMatrix, true);
     if (maskFP == nullptr) {
       return;
     }
