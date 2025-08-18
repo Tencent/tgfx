@@ -20,6 +20,8 @@
 #include <cstdint>
 #include <unordered_map>
 #include <vector>
+#include <tgfx/core/Pixmap.h>
+
 #include "Protocol.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/gpu/PixelFormat.h"
@@ -118,6 +120,8 @@ struct PropertyData {
 struct TextureData {
   std::vector<std::shared_ptr<tgfx::Data>> inputTextures;
   std::shared_ptr<tgfx::Data> outputTexture;
+  std::vector<std::shared_ptr<tgfx::Pixmap>> inputTexture;
+  std::shared_ptr<tgfx::Pixmap> outputTextures;
 };
 
 struct VertexData {

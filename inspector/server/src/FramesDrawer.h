@@ -33,14 +33,13 @@ class FramesDrawer : public QQuickItem {
   Q_PROPERTY(Worker* worker READ getWorker WRITE setWorker)
   Q_PROPERTY(ViewData* viewData READ getViewData WRITE setViewData)
  public:
-  FramesDrawer(QQuickItem* parent = nullptr);
-  ~FramesDrawer() = default;
+  explicit FramesDrawer(QQuickItem* parent = nullptr);
+  ~FramesDrawer() override = default;
 
   void wheelEvent(QWheelEvent* event) override;
   void mouseMoveEvent(QMouseEvent* event) override;
   void mousePressEvent(QMouseEvent* event) override;
   void mouseReleaseEvent(QMouseEvent* event) override;
-  // void hoverMoveEvent(QHoverEvent* event) override;
 
   Worker* getWorker() const {
     return worker;
@@ -72,15 +71,13 @@ class FramesDrawer : public QQuickItem {
   Worker* worker = nullptr;
   const FrameData* frames = nullptr;
   ViewData* viewData = nullptr;
-
-  uint64_t frameTarget;
+  uint64_t frameTarget = 0;
   std::shared_ptr<tgfx::QGLWindow> tgfxWindow = nullptr;
   std::shared_ptr<AppHost> appHost = nullptr;
 
-  //Left button
   float viewOffset = 0.0f;
   float placeWidth = 50.f;
 
-  QPoint lastRightDragPos;
+  QPoint lastRightDragPos = {0, 0};
 };
 }  // namespace inspector

@@ -15,11 +15,16 @@
         "commit": "bdf4e7bd4ee49c961cac8a0caff44c25ca2a06b4",
         "dir": "third_party/KDDockWidgets"
       },
-    {
-      "url": "https://github.com/google/flatbuffers.git",
-      "commit": "1c514626e83c20fffa8557e75641848e1e15cd5e",
-      "dir": "third_party/flatbuffers"
-    }
+      {
+        "url": "https://github.com/google/flatbuffers.git",
+        "commit": "1c514626e83c20fffa8557e75641848e1e15cd5e",
+        "dir": "third_party/flatbuffers"
+      },
+      {
+        "url": "https://github.com/DataDog/zstd.git",
+        "commit": "06fc470c217ed173e17990d0a65a95b7d638a6ee",
+        "dir": "third_party/zstd"
+      }
     ]
   },
   "actions": {

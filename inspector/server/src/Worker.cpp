@@ -27,21 +27,38 @@
 #include "Protocol.h"
 #include "Queue.h"
 #include "TagHeader.h"
+#include "Utils.h"
 #include "tgfx/core/Data.h"
 
 namespace inspector {
+
+tgfx::ColorType PixelFormatToColorType(tgfx::PixelFormat format) {
+  switch (format) {
+    case tgfx::PixelFormat::RGBA_8888:
+      return tgfx::ColorType::RGBA_8888;
+    case tgfx::PixelFormat::ALPHA_8:
+      return tgfx::ColorType::ALPHA_8;
+    case tgfx::PixelFormat::BGRA_8888:
+      return tgfx::ColorType::BGRA_8888;
+    case tgfx::PixelFormat::GRAY_8:
+      return tgfx::ColorType::Gray_8;
+    default:
+      return tgfx::ColorType::Unknown;
+  }
+}
+
 bool IsQueryPrio(ServerQuery type) {
   return type < ServerQuery::ServerQueryDisconnect;
 }
 
 Worker::Worker(const char* addr, uint16_t port)
     : addr(addr), port(port), lz4Stream(LZ4_createStreamDecode()),
-      dataBuffer(new char[TargetFrameSize * 3 + 1]), bufferOffset(0) {
+      dataBuffer(new char[MaxTargetSize]), bufferOffset(0) {
   workThread = std::thread([this] { exec(); });
   netThread = std::thread([this] { netWork(); });
 }
 
-Worker::Worker(std::string& filePath)
+Worker::Worker(const std::string& filePath)
     : port(0), lz4Stream(nullptr), dataBuffer(nullptr), bufferOffset(0) {
   openFile(filePath);
 }
@@ -74,7 +91,6 @@ bool Worker::openFile(const std::string& filePath) {
   if (dataContext.hasException()) {
     return false;
   }
-
   return true;
 }
 
@@ -91,7 +107,6 @@ bool Worker::saveFile(const std::string& filePath) {
   fileBytes.writeEncodedUint32(bodyBytes.length());
   fileBytes.writeBytes(&bodyBytes);
   auto data = fileBytes.release();
-
   auto writeStream = tgfx::WriteStream::MakeFromFile(filePath);
   if (!writeStream) {
     return false;
@@ -215,13 +230,13 @@ void Worker::exec() {
   }
 
   {
-    WelcomeMessage welcome;
+    WelcomeMessage welcome = {};
     if (!sock.Read(&welcome, sizeof(welcome), 10, ShouldExit)) {
       this->handshake.store(HandshakeDropped, std::memory_order_relaxed);
       CLOSE_EXEC;
     }
     dataContext.baseTime = welcome.initBegin;
-    const auto initEnd = TscTime(welcome.initEnd);
+    const auto initEnd = tscTime(welcome.initEnd);
     dataContext.frameData.frames.push_back(FrameEvent{0, -1, 0, 0, -1});
     dataContext.frameData.frames.push_back(FrameEvent{initEnd, -1, 0, 0, -1});
     dataContext.lastTime = initEnd;
@@ -242,7 +257,7 @@ void Worker::exec() {
 
   while (true) {
     if (isShutDown.load(std::memory_order_relaxed)) {
-      QueryTerminate();
+      queryTerminate();
       CLOSE_EXEC;
     }
 
@@ -265,8 +280,8 @@ void Worker::exec() {
       std::lock_guard<std::mutex> lock(dataContext.lock);
       while (ptr < end) {
         auto ev = (const QueueItem*)ptr;
-        if (!DispatchProcess(*ev, ptr)) {
-          QueryTerminate();
+        if (!dispatchProcess(*ev, ptr)) {
+          queryTerminate();
           CLOSE_EXEC;
         }
       }
@@ -334,8 +349,15 @@ void Worker::netWork() {
     auto bb = bytes.load(std::memory_order_relaxed);
     bytes.store(bb + sizeof(lz4sz) + static_cast<size_t>(lz4sz), std::memory_order_relaxed);
 
-    auto sz = LZ4_decompress_safe_continue((LZ4_streamDecode_t*)lz4Stream, lz4buf.get(), buf, lz4sz,
-                                           TargetFrameSize);
+    auto sz = 0;
+    if (lz4sz <= TargetFrameSize) {
+      sz = LZ4_decompress_safe_continue((LZ4_streamDecode_t*)lz4Stream, lz4buf.get(), buf, lz4sz,
+                                             TargetFrameSize);
+    }
+    else {
+      sz = lz4sz;
+      // MemWrite(buf, lz4buf.get(), static_cast<size_t>(lz4sz));
+    }
     assert(sz >= 0);
     bb = decBytes.load(std::memory_order_relaxed);
     decBytes.store(bb + static_cast<uint64_t>(sz), std::memory_order_relaxed);
@@ -347,13 +369,13 @@ void Worker::netWork() {
     }
 
     bufferOffset += sz;
-    if (bufferOffset > TargetFrameSize * 2) {
+    if (bufferOffset > MaxTargetSize) {
       bufferOffset = 0;
     }
   }
 }
 
-void Worker::newOpTask(std::shared_ptr<OpTaskData> opTask) {
+void Worker::newOpTask(const std::shared_ptr<OpTaskData>& opTask) {
   ++dataContext.opTaskCount;
 
   auto& stack = dataContext.opTaskStack;
@@ -371,7 +393,7 @@ void Worker::newOpTask(std::shared_ptr<OpTaskData> opTask) {
   stack.push_back(opTask);
 }
 
-void Worker::Query(ServerQuery type, uint64_t data, uint32_t extra) {
+void Worker::query(ServerQuery type, uint64_t data, uint32_t extra) {
   ServerQueryPacket query{type, data, extra};
   if (serverQuerySpaceLeft > 0 && serverQueryQueuePrio.empty() && serverQueryQueue.empty()) {
     serverQuerySpaceLeft--;
@@ -383,77 +405,95 @@ void Worker::Query(ServerQuery type, uint64_t data, uint32_t extra) {
   }
 }
 
-void Worker::QueryTerminate() {
+void Worker::queryTerminate() {
   ServerQueryPacket query{ServerQueryTerminate, 0, 0};
   sock.Send(&query, ServerQueryPacketSize);
 }
 
-bool Worker::DispatchProcess(const QueueItem& ev, const char*& ptr) {
+bool Worker::dispatchProcess(const QueueItem& ev, const char*& ptr) {
   if (ev.hdr.idx >= static_cast<uint8_t>(QueueType::StringData)) {
     ptr += sizeof(QueueHeader) + sizeof(QueueStringTransfer);
-    uint16_t sz;
-    memcpy(&sz, ptr, sizeof(sz));
-    ptr += sizeof(sz);
-    switch (ev.hdr.type) {
-      case QueueType::StringData: {
-        serverQuerySpaceLeft++;
-        break;
-      }
-      case QueueType::ValueName: {
-        HandleValueName(ev.stringTransfer.ptr, ptr, sz);
-        serverQuerySpaceLeft++;
-        break;
-      }
-      default: {
-        break;
-      }
+    if (ev.hdr.type == QueueType::PixelsData) {
+      uint32_t sz;
+      memcpy(&sz, ptr, sizeof(sz));
+      ptr += sizeof(sz);
+
     }
-    ptr += sz;
-    return true;
+    else {
+      uint16_t sz;
+      memcpy(&sz, ptr, sizeof(sz));
+      ptr += sizeof(sz);
+      switch (ev.hdr.type) {
+        case QueueType::StringData: {
+          serverQuerySpaceLeft++;
+          break;
+        }
+        case QueueType::ValueName: {
+          handleValueName(ev.stringTransfer.ptr, ptr, sz);
+          serverQuerySpaceLeft++;
+          break;
+        }
+        case QueueType::PixelsData: {
+          handleTexturePixels(ev.stringTransfer.ptr, ptr, sz);
+          break;
+        }
+        default: {
+          break;
+        }
+      }
+      ptr += sz;
+      return true;
+    }
   }
   ptr += QueueDataSize[ev.hdr.idx];
-  return Process(ev);
+  return process(ev);
 }
 
-bool Worker::Process(const QueueItem& ev) {
+bool Worker::process(const QueueItem& ev) {
   switch (ev.hdr.type) {
     case QueueType::OperateBegin:
-      ProcessOperateBegin(ev.operateBegin);
+      processOperateBegin(ev.operateBegin);
       break;
     case QueueType::OperateEnd:
-      ProcessOperateEnd(ev.operateEnd);
+      processOperateEnd(ev.operateEnd);
       break;
     case QueueType::ValueDataUint32:
-      ProcessUint32Value(ev.attributeDataUint32);
+      processUint32Value(ev.attributeDataUint32);
       break;
     case QueueType::ValueDataFloat4:
-      ProcessFloat4Value(ev.attributeDataFloat4);
+      processFloat4Value(ev.attributeDataFloat4);
       break;
     case QueueType::ValueDataMat4:
-      ProcessMat4Value(ev.attributeDataMat4);
+      processMat4Value(ev.attributeDataMat4);
       break;
     case QueueType::ValueDataInt:
-      ProcessIntValue(ev.attributeDataInt);
+      processIntValue(ev.attributeDataInt);
       break;
     case QueueType::ValueDataColor:
-      ProcessColorValue(ev.attributeDataUint32);
+      processColorValue(ev.attributeDataUint32);
       break;
     case QueueType::ValueDataFloat:
-      ProcessFloatValue(ev.attributeDataFloat);
+      processFloatValue(ev.attributeDataFloat);
       break;
     case QueueType::ValueDataBool:
-      ProcessBoolValue(ev.attributeDataBool);
+      processBoolValue(ev.attributeDataBool);
       break;
     case QueueType::ValueDataEnum:
-      ProcessEnumValue(ev.attributeDataEnum);
+      processEnumValue(ev.attributeDataEnum);
       break;
     case QueueType::FrameMarkMsg:
-      ProcessFrameMark(ev.frameMark);
+      processFrameMark(ev.frameMark);
+      break;
+    case QueueType::TextureData:
+      processTextureData(ev.textureData);
+      break;
+    case QueueType::TextureSampler:
+      processTextureSampler(ev.textureSampler);
       break;
     case QueueType::KeepAlive:
       break;
     default:
-      break;
+      return false;
   }
   return true;
 }
@@ -464,9 +504,9 @@ int64_t RefTime(int64_t& reference, int64_t delta) {
   return refTime;
 }
 
-void Worker::ProcessOperateBegin(const QueueOperateBegin& ev) {
+void Worker::processOperateBegin(const QueueOperateBegin& ev) {
   std::shared_ptr<OpTaskData> opTask(new OpTaskData);
-  const auto start = TscTime(RefTime(refTime, ev.time));
+  const auto start = tscTime(RefTime(refTime, ev.nsTime));
   opTask->start = start;
   opTask->end = -1;
   opTask->type = ev.type;
@@ -474,7 +514,7 @@ void Worker::ProcessOperateBegin(const QueueOperateBegin& ev) {
   newOpTask(std::move(opTask));
 }
 
-void Worker::ProcessOperateEnd(const QueueOperateEnd& ev) {
+void Worker::processOperateEnd(const QueueOperateEnd& ev) {
   auto& stack = dataContext.opTaskStack;
   if (stack.empty()) {
     return;
@@ -483,12 +523,12 @@ void Worker::ProcessOperateEnd(const QueueOperateEnd& ev) {
   stack.pop_back();
   assert(opTask->end == -1);
   assert(opTask->type == ev.type);
-  const auto timeEnd = TscTime(RefTime(refTime, ev.time));
+  const auto timeEnd = tscTime(RefTime(refTime, ev.nsTime));
   opTask->end = timeEnd;
   assert(timeEnd >= opTask->start);
 }
 
-void Worker::ProcessAttributeImpl(DataHead& head, std::shared_ptr<tgfx::Data> data) {
+void Worker::processAttributeImpl(DataHead& head, std::shared_ptr<tgfx::Data> data) {
   auto& stack = dataContext.opTaskStack;
   if (stack.empty()) {
     return;
@@ -503,7 +543,7 @@ void Worker::ProcessAttributeImpl(DataHead& head, std::shared_ptr<tgfx::Data> da
     propertyData = propertyIter->second;
   }
   if (nameMap.find(head.name) == nameMap.end()) {
-    Query(ServerQueryValueName, head.name);
+    query(ServerQueryValueName, head.name);
   }
   propertyData->summaryName.push_back(head);
   auto& summaryData = propertyData->summaryData;
@@ -511,69 +551,147 @@ void Worker::ProcessAttributeImpl(DataHead& head, std::shared_ptr<tgfx::Data> da
   dataContext.properties[opTask->id] = propertyData;
 }
 
-void Worker::ProcessFloatValue(const QueueAttributeDataFloat& ev) {
+void Worker::processFloatValue(const QueueAttributeDataFloat& ev) {
   auto head = DataHead{DataType::Float, ev.name};
   auto data = tgfx::Data::MakeWithCopy(&ev.value, sizeof(float));
-  ProcessAttributeImpl(head, std::move(data));
+  processAttributeImpl(head, std::move(data));
 }
 
-void Worker::ProcessFloat4Value(const QueueAttributeDataFloat4& ev) {
+void Worker::processFloat4Value(const QueueAttributeDataFloat4& ev) {
   auto head = DataHead{DataType::Vec4, ev.name};
   auto data = tgfx::Data::MakeWithCopy(ev.value, sizeof(float) * 4);
-  ProcessAttributeImpl(head, std::move(data));
+  processAttributeImpl(head, std::move(data));
 }
 
-void Worker::ProcessIntValue(const QueueAttributeDataInt& ev) {
+void Worker::processIntValue(const QueueAttributeDataInt& ev) {
   auto head = DataHead{DataType::Int, ev.name};
   auto data = tgfx::Data::MakeWithCopy(&ev.value, sizeof(int));
-  ProcessAttributeImpl(head, std::move(data));
+  processAttributeImpl(head, std::move(data));
 }
 
-void Worker::ProcessBoolValue(const QueueAttributeDataBool& ev) {
+void Worker::processBoolValue(const QueueAttributeDataBool& ev) {
   auto head = DataHead{DataType::Bool, ev.name};
   auto data = tgfx::Data::MakeWithCopy(&ev.value, sizeof(bool));
-  ProcessAttributeImpl(head, std::move(data));
+  processAttributeImpl(head, std::move(data));
 }
 
-void Worker::ProcessMat4Value(const QueueAttributeDataMat4& ev) {
+void Worker::processMat4Value(const QueueAttributeDataMat4& ev) {
   auto head = DataHead{DataType::Mat4, ev.name};
   auto data = tgfx::Data::MakeWithCopy(ev.value, sizeof(float) * 6);
-  ProcessAttributeImpl(head, std::move(data));
+  processAttributeImpl(head, std::move(data));
 }
 
-void Worker::ProcessEnumValue(const QueueAttributeDataEnum& ev) {
+void Worker::processEnumValue(const QueueAttributeDataEnum& ev) {
   auto head = DataHead{DataType::Enum, ev.name};
   auto data = tgfx::Data::MakeWithCopy(&ev.value, sizeof(uint16_t));
-  ProcessAttributeImpl(head, std::move(data));
+  processAttributeImpl(head, std::move(data));
 }
 
-void Worker::ProcessUint32Value(const QueueAttributeDataUInt32& ev) {
+void Worker::processUint32Value(const QueueAttributeDataUInt32& ev) {
   auto head = DataHead{DataType::Uint32, ev.name};
   auto data = tgfx::Data::MakeWithCopy(&ev.value, sizeof(uint32_t));
-  ProcessAttributeImpl(head, std::move(data));
+  processAttributeImpl(head, std::move(data));
 }
 
-void Worker::ProcessColorValue(const QueueAttributeDataUInt32& ev) {
+void Worker::processColorValue(const QueueAttributeDataUInt32& ev) {
   auto head = DataHead{DataType::Color, ev.name};
   auto data = tgfx::Data::MakeWithCopy(&ev.value, sizeof(uint32_t));
-  ProcessAttributeImpl(head, std::move(data));
+  processAttributeImpl(head, std::move(data));
 }
 
-void Worker::ProcessFrameMark(const QueueFrameMark& ev) {
+void Worker::processFrameMark(const QueueFrameMark& ev) {
   auto& fd = dataContext.frameData;
 
-  const auto time = TscTime(ev.time);
+  const auto time = tscTime(ev.nsTime);
   fd.frames.push_back(FrameEvent{time, -1, 0, 0, -1});
   if (dataContext.lastTime < time) {
     dataContext.lastTime = time;
   }
 }
 
-void Worker::HandleValueName(uint64_t name, const char* str, size_t sz) {
+void Worker::processTextureData(const QueueTextureData& ev) {
+  auto& stack = dataContext.opTaskStack;
+  if (stack.empty()) {
+    return;
+  }
+  auto opTask = stack.back();
+  auto& textures = dataContext.textures;
+
+  auto texture = textures.find(opTask->id);
+  std::shared_ptr<TextureData> textureData;
+  if (texture == textures.end()) {
+    textureData = std::make_shared<TextureData>();
+    textures[opTask->id] = textureData;
+  }
+  else {
+    textureData = texture->second;
+  }
+  auto input = textureData->inputTexture;
+  auto imageInfo = tgfx::ImageInfo::Make(ev.width, ev.height, PixelFormatToColorType(static_cast<tgfx::PixelFormat>(ev.format)));
+  auto& pixelsData = dataContext.pixelsData;
+  auto pixelsIter = pixelsData.find(ev.samplerPtr);
+  if (pixelsIter == pixelsData.end()) {
+    return;
+  }
+  auto pixels = pixelsIter->second;
+  auto pixmap = std::make_shared<tgfx::Pixmap>(imageInfo, pixels->data());
+  dataContext.pixelmap[ev.samplerPtr] = pixmap;
+  pixelsData.erase(ev.samplerPtr);
+  input.push_back(pixmap);
+}
+
+void Worker::processTextureSampler(const QueueTextureSampler& ev){
+  auto& stack = dataContext.opTaskStack;
+  if (stack.empty()) {
+    return;
+  }
+  auto opTask = stack.back();
+  auto& textures = dataContext.textures;
+  auto texture = textures.find(opTask->id);
+  std::shared_ptr<TextureData> textureData;
+  if (texture == textures.end()) {
+    textureData = std::make_shared<TextureData>();
+    textures[opTask->id] = textureData;
+  }
+  else {
+    textureData = texture->second;
+  }
+  auto& pixelmap = dataContext.pixelmap;
+  auto pixmapIter = pixelmap.find(ev.samplerPtr);
+  if (pixmapIter == pixelmap.end()) {
+    return;
+  }
+  auto pixmap = pixmapIter->second;
+  auto input = textureData->inputTexture;
+  input.push_back(pixmap);
+}
+
+void Worker::addPixelsData(const char *data, size_t sz) {
+  ASSERT(sz % 8 == 0);
+  if (pixelsDataSize < sz) {
+    pixelsDataSize = sz;
+    delete[] pixelsDataBuffer;
+    pixelsDataBuffer = new char[sz];
+  }
+
+  auto src = (uint8_t*)data;
+  auto dst = (uint8_t*)pixelsDataBuffer;
+  memcpy(dst, src, sz);
+
+}
+
+
+void Worker::handleValueName(uint64_t name, const char* str, size_t sz) {
   auto& nameMap = dataContext.nameMap;
   if (nameMap.find(name) == nameMap.end()) {
     nameMap[name] = std::string(str, sz);
   }
 }
 
+void Worker::handleTexturePixels(uint64_t samplerPtr, const void* data, size_t sz) {
+  auto& pixlesData = dataContext.pixelsData;
+  if (pixlesData.find(samplerPtr) == pixlesData.end()) {
+    pixlesData[samplerPtr] = tgfx::Data::MakeWithCopy(data, sz);
+  }
+}
 }  // namespace inspector

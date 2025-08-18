@@ -10,12 +10,11 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 set(INSPECTOR_COMMON_DIR common)
 set(INSPECTOR_CLIENT_DIR client/src)
 
-
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     list(APPEND INSPECTOR_COMPILE_OPTIONS -Werror -Wall -Wextra -Weffc++ -Wconversion -pedantic -Werror=return-type -Wno-unused-command-line-argument)
 endif ()
 
-list(APPEND INSPECTOR_CLIENT_SRC
+list(APPEND INSPECTOR_INCLUDES
         ${INSPECTOR_COMMON_DIR}
         ${INSPECTOR_CLIENT_DIR})
 file(GLOB INSPECTOR_CLIENT_FILES
@@ -23,5 +22,5 @@ file(GLOB INSPECTOR_CLIENT_FILES
         ${INSPECTOR_CLIENT_DIR}/*.*)
 
 add_library(inspector STATIC ${INSPECTOR_CLIENT_FILES})
-target_include_directories(inspector PUBLIC ${INSPECTOR_CLIENT_SRC})
+target_include_directories(inspector PUBLIC ${INSPECTOR_INCLUDES})
 target_compile_options(inspector PUBLIC ${INSPECTOR_COMPILE_OPTIONS})
