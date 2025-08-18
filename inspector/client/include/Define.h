@@ -35,3 +35,5 @@
   inspector::Inspector::SendAttributeData(name, static_cast<uint8_t>(value), \
                                           static_cast<uint8_t>(type))
 #define AttributeEnum(value, type) AttributeNameEnum(#value, value, type)
+
+#define OperateTextureSampler(sampler) inspector::Inspector::SendOpTextureSampler(sampler)

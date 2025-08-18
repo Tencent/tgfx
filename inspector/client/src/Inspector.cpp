@@ -21,6 +21,8 @@
 #include <atomic>
 #include <chrono>
 #include <iostream>
+#include "../../../src/core/utils/Log.h"
+#include "CompressImage.h"
 #include "ProcessUtils.h"
 #include "Protocol.h"
 #include "Socket.h"
@@ -43,6 +45,10 @@ Inspector::~Inspector() {
     messageThread->join();
     messageThread.reset();
   }
+  if (compressThread) {
+    compressThread->join();
+    compressThread.reset();
+  }
   broadcast.clear();
   if (lz4Buf) {
     free(lz4Buf);
@@ -59,6 +65,7 @@ Inspector::~Inspector() {
 }
 void Inspector::spawnWorkerThreads() {
   messageThread = std::make_unique<std::thread>(LaunchWorker, this);
+  compressThread = std::make_unique<std::thread>(LaunchCompressWorker, this);
   timeBegin.store(GetCurrentTime<std::chrono::nanoseconds>(), std::memory_order_relaxed);
 }
 
@@ -93,12 +100,28 @@ void Inspector::sendString(uint64_t str, const char* ptr, size_t len, MsgType ty
   MemWrite(&item.hdr.type, type);
   MemWrite(&item.stringTransfer.ptr, str);
 
+  ASSERT( len <= std::numeric_limits<uint16_t>::max() );
   auto l16 = static_cast<uint16_t>(len);
   needDataSize(MsgDataSize[static_cast<int>(type)] + sizeof(l16) + l16);
 
   appendDataUnsafe(&item, MsgDataSize[static_cast<int>(type)]);
   appendDataUnsafe(&l16, sizeof(l16));
   appendDataUnsafe(ptr, l16);
+}
+
+void Inspector::sendLongString(uint64_t str, const char* ptr, size_t len, MsgType type) {
+  ASSERT(type == MsgType::PixelsData);
+  MsgItem item = {};
+  MemWrite(&item.hdr.type, type);
+  MemWrite(&item.stringTransfer.ptr, str);
+
+  assert(MsgDataSize[static_cast<int>(type)] + sizeof(uint32_t) + len <= TargetFrameSize);
+  auto l32 = uint32_t( len );
+  needDataSize(MsgDataSize[static_cast<int>(type)] + sizeof(l32) + l32);
+
+  appendDataUnsafe(&item, MsgDataSize[static_cast<int>(type)]);
+  appendDataUnsafe(&l32, sizeof(l32));
+  appendDataUnsafe(ptr, l32);
 }
 
 void Inspector::worker() {
@@ -201,6 +224,32 @@ void Inspector::worker() {
   }
 }
 
+void Inspector::compressWorker() {
+  while (true) {
+    auto imageItem = ImageItem();
+    while (imageQueue.try_dequeue(imageItem)) {
+      const auto width = imageItem.width;
+      const auto height = imageItem.height;
+      const auto compressSize = static_cast<size_t>(width * height / 2);
+      auto compressBuffer = static_cast<char*>(malloc(compressSize));
+      CompressImage((const char*)imageItem.image.get(), compressBuffer, width, height);
+      imageItem.image.reset();
+
+      MsgPrepare(MsgType::TextureData);
+      MemWrite(&item.textureData.samplerPtr, imageItem.samplerPtr);
+      MemWrite(&item.textureData.width, imageItem.width);
+      MemWrite(&item.textureData.height, imageItem.height);
+      MemWrite(&item.textureData.rowBytes, imageItem.rowBytes);
+      MemWrite(&item.textureData.format, imageItem.format);
+      MemWrite(&item.textureData.pixels, reinterpret_cast<uint64_t>(compressBuffer));
+      MsgCommit();
+      if (ShouldExit()) {
+        return;
+      }
+    }
+  }
+}
+
 bool Inspector::commitData() {
   bool ret = sendData(dataBuffer + dataBufferStart, size_t(dataBufferOffset - dataBufferStart));
   if (dataBufferOffset > TargetFrameSize * 2) {
@@ -211,8 +260,11 @@ bool Inspector::commitData() {
 }
 
 bool Inspector::sendData(const char* data, size_t len) {
-  const auto lz4sz = LZ4_compress_fast_continue(static_cast<LZ4_stream_t*>(lz4Stream), data,
-                                                lz4Buf + sizeof(lz4sz_t), (int)len, LZ4Size, 1);
+  if (len == 0) {
+    return true;
+  }
+  const int lz4sz = LZ4_compress_fast_continue(static_cast<LZ4_stream_t*>(lz4Stream), data,
+                                               lz4Buf + sizeof(lz4sz_t), (int)len, LZ4Size, 1);
   memcpy(lz4Buf, &lz4sz, sizeof(lz4sz));
   return sock->sendData(lz4Buf, size_t(lz4sz) + sizeof(lz4sz_t)) != -1;
 }
@@ -295,10 +347,19 @@ Inspector::DequeueStatus Inspector::dequeueSerial() {
   const auto queueSize = serialConcurrentQueue.size_approx();
   if (queueSize > 0) {
     auto refThread = refTimeThread;
-    auto item = MsgItem{};
+    auto item = MsgItem();
     while (serialConcurrentQueue.try_dequeue(item)) {
       auto idx = item.hdr.idx;
       switch ((MsgType)idx) {
+        case MsgType::TextureData: {
+          auto ptr = MemRead<uint64_t>(&item.textureData.pixels);
+          const auto w = MemRead<uint16_t>(&item.textureData.width);
+          const auto h = MemRead<uint16_t>(&item.textureData.height);
+          const auto csz = static_cast<size_t>(w * h / 2);
+          sendLongString(ptr, (const char*)ptr, csz, MsgType::PixelsData);
+          free((void*)ptr);
+          break;
+        }
         case MsgType::OperateBegin: {
           auto t = MemRead<int64_t>(&item.operateBegin.nsTime);
           auto dt = t - refThread;

@@ -22,8 +22,8 @@
 #include <thread>
 #include <vector>
 #include "MemoryUtils.h"
-#include "Protocol.h"
 #include "Message.h"
+#include "Protocol.h"
 #include "Singleton.h"
 #include "Socket.h"
 #include "TimeUtils.h"
@@ -47,6 +47,16 @@ class Inspector;
 typedef Singleton<Inspector> InspectorSingleton;
 
 class Inspector {
+  struct ImageItem
+  {
+    uint8_t format = 0;
+    int width = 0;
+    int height = 0;
+    size_t rowBytes = 0;
+    uint64_t samplerPtr = 0;
+    std::shared_ptr<uint8_t> image = nullptr;
+  };
+
  public:
   Inspector();
   ~Inspector();
@@ -117,8 +127,35 @@ class Inspector {
     }
   }
 
+  static void SendOpTextureSampler(uint64_t samplerPtr) {
+    MsgPrepare(MsgType::TextureSampler);
+    MemWrite(&item.textureSampler.samplerPtr, samplerPtr);
+    MsgCommit();
+  }
+
+  static void SendTextureData(uint64_t samplerPtr, int width, int height, size_t rowBytes,
+                              uint8_t format, const void* pixels) {
+    auto inspector = InspectorSingleton::GetInstance();
+    const auto sz = static_cast<size_t>(width) * rowBytes;
+    std::shared_ptr<uint8_t> ptr(new uint8_t(sz));
+    MemWrite(ptr.get(), pixels, sz);
+
+    auto imageItem = ImageItem();
+    imageItem.image = std::move(ptr);
+    imageItem.samplerPtr = samplerPtr;
+    imageItem.width = width;
+    imageItem.height = height;
+    imageItem.format = format;
+    imageItem.rowBytes = rowBytes;
+    inspector->imageQueue.enqueue(imageItem);
+  }
+
   static void LaunchWorker(Inspector* inspector) {
     inspector->worker();
+  }
+
+  static void LaunchCompressWorker(Inspector* inspector) {
+    inspector->compressWorker();
   }
 
   static bool ShouldExit();
@@ -127,8 +164,10 @@ class Inspector {
     sendString(str, ptr, strlen(ptr), type);
   }
   void sendString(uint64_t str, const char* ptr, size_t len, MsgType type);
+  void sendLongString(uint64_t str, const char* ptr, size_t len, MsgType type);
 
   void worker();
+  void compressWorker();
   void spawnWorkerThreads();
   bool handleServerQuery();
 
@@ -175,8 +214,10 @@ class Inspector {
   std::shared_ptr<Socket> sock = nullptr;
   int64_t refTimeThread = 0;
   moodycamel::ConcurrentQueue<MsgItem> serialConcurrentQueue;
+  moodycamel::ConcurrentQueue<ImageItem> imageQueue;
 
   std::unique_ptr<std::thread> messageThread = nullptr;
+  std::unique_ptr<std::thread> compressThread = nullptr;
   std::vector<std::shared_ptr<UdpBroadcast>> broadcast;
   const char* programName = nullptr;
   std::mutex programNameLock;

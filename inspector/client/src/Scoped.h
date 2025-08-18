@@ -21,7 +21,6 @@
 
 namespace inspector {
 class Scoped {
-
  public:
   Scoped(const Scoped&) = delete;
   Scoped(Scoped&&) = delete;

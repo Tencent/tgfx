@@ -18,6 +18,7 @@
 
 #include "gpu/Texture.h"
 #include "core/utils/PixelFormatUtil.h"
+#include "core/utils/Profiling.h"
 #include "core/utils/UniqueID.h"
 #include "gpu/DefaultTexture.h"
 #include "gpu/Gpu.h"
@@ -77,6 +78,7 @@ std::shared_ptr<Texture> Texture::MakeFormat(Context* context, int width, int he
     auto sampler = texture->getSampler();
     sampler->writePixels(context, Rect::MakeWH(width, height), pixels, rowBytes);
     sampler->regenerateMipmapLevels(context);
+    TextureData(sampler, width, height, rowBytes, pixelFormat, pixels);
   }
   return texture;
 }

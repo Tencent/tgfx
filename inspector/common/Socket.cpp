@@ -490,6 +490,7 @@ bool ListenSocket::listenSock(uint16_t port, int backlog) {
     closeSock();
     return false;
   }
+  listenPort = port;
   freeaddrinfo(res);
   return true;
 }

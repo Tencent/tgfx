@@ -31,9 +31,12 @@ enum class MsgType : uint8_t {
   ValueDataFloat,
   ValueDataBool,
   ValueDataEnum,
+  TextureSampler,
+  TextureData,
   KeepAlive,
   StringData,
-  ValueName
+  ValueName,
+  PixelsData,
 };
 
 #pragma pack(push, 1)
@@ -97,6 +100,18 @@ struct StringTransferMsg {
   uint64_t ptr;
 };
 
+struct TextureSamplerMsg {
+  uint64_t samplerPtr;
+};
+
+struct TextureDataMsg : TextureSamplerMsg {
+  uint8_t format;
+  int width;
+  int height;
+  size_t rowBytes;
+  uint64_t pixels;
+};
+
 struct MsgItem {
   MsgHeader hdr;
   union {
@@ -111,6 +126,8 @@ struct MsgItem {
     AttributeDataFloatMsg attributeDataFloat;
     AttributeDataBoolMsg attributeDataBool;
     AttributeDataEnumMsg attributeDataEnum;
+    TextureSamplerMsg textureSampler;
+    TextureDataMsg textureData;
   };
 };
 
@@ -127,7 +144,10 @@ static constexpr size_t MsgDataSize[] = {
     sizeof(MsgHeader) + sizeof(AttributeDataFloatMsg),
     sizeof(MsgHeader) + sizeof(AttributeDataBoolMsg),
     sizeof(MsgHeader) + sizeof(AttributeDataEnumMsg),
+    sizeof(MsgHeader) + sizeof(TextureSamplerMsg),
+    sizeof(MsgHeader) + sizeof(TextureDataMsg),
     sizeof(MsgHeader),
+    sizeof(MsgHeader) + sizeof(StringTransferMsg),
     sizeof(MsgHeader) + sizeof(StringTransferMsg),
     sizeof(MsgHeader) + sizeof(StringTransferMsg),
 };

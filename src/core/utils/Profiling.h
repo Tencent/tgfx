@@ -18,6 +18,7 @@
 #ifdef TGFX_USE_INSPECTOR
 #include <optional>
 #include "Define.h"
+#include "gpu/Pipeline.h"
 #include "tgfx/core/Color.h"
 #include "tgfx/core/Matrix.h"
 #include "tgfx/core/Rect.h"
@@ -65,9 +66,31 @@ class TGFXTypeToInspector {
     auto value = static_cast<uint32_t>(r | g << 8 | b << 16 | a << 24);
     inspector::Inspector::SendAttributeData(name, value, inspector::MsgType::ValueDataColor);
   }
+
+  static void SendPipelineData(const PlacementPtr<Pipeline>& pipeline) {
+    for (size_t i = 0; i < pipeline->numFragmentProcessors(); ++i) {
+      auto processor = pipeline->getFragmentProcessor(i);
+      FragmentProcessor::Iter fpIter(processor);
+      while (const auto* subFP = fpIter.next()) {
+        for (size_t j = 0; j < subFP->numTextureSamplers(); ++j) {
+          const auto* sampler = subFP->textureSampler(i);
+          OperateTextureSampler(reinterpret_cast<uint64_t>(sampler));
+        }
+      }
+    }
+  }
+
+  static void SendTextureData(TextureSampler* samplerPtr, int width, int height, size_t rowBytes,
+                              PixelFormat format, const void* pixels) {
+    inspector::Inspector::SendTextureData(reinterpret_cast<uint64_t>(samplerPtr), width, height,
+                                          rowBytes, static_cast<uint8_t>(format), pixels);
+  }
 };
 
 #define AttributeTGFXName(name, value) TGFXTypeToInspector::SendAttributeData(name, value)
+#define TextureData(samplerPtr, width, height, rowBytes, format, pixels) \
+  TGFXTypeToInspector::SendTextureData(samplerPtr, width, height, rowBytes, format, pixels)
+#define OperatePiplineData(pipline) TGFXTypeToInspector::SendPipelineData(pipline)
 }  // namespace tgfx
 #else
 #define FrameMark
@@ -81,6 +104,10 @@ class TGFXTypeToInspector {
 #define AttributeNameFloatArray(name, value, size)
 #define AttributeNameEnum(name, value, type)
 #define AttributeEnum(value, type)
+
+#define TextureData(samplerPtr, width, height, rowBytes, format, pixels)
+#define OperatePiplineData(pipline)
+#define OperateTextureSampler(sampler)
 
 #define SEND_LAYER_DATA(data)
 #define LAYER_CALLBACK(x)
