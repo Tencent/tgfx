@@ -21,6 +21,7 @@
 #include <mutex>
 #include <thread>
 #include <vector>
+#include <optional>
 #include "Message.h"
 #include "Protocol.h"
 #include "Socket.h"
