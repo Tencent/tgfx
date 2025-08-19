@@ -371,17 +371,6 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Get Environment Cache
-        id: env-cache
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ~/.ohpm
-            ~/.npmrc
-            ~/.npm-global
-          key: env-openharmony-${{ hashFiles('DEPS', 'vendor.json', 'ohos/oh-package.json5', 'ohos/oh-package-lock.json5', 'install_tools.sh') }}
-          restore-keys: env-openharmony-
-
       - name: Get Third-Party Cache
         id: third-party-cache
         uses: actions/cache/restore@v4
@@ -401,45 +390,11 @@ jobs:
           version: '5.0.3'
           cache: true
 
-      #question1
-      - name: Configure Environment
-        run: |
-          cd ohos
-          echo "sdk.dir=${OHOS_SDK_NATIVE}" > local.properties
-          echo "OHOS_BASE_SDK_HOME=${OHOS_SDK_NATIVE}" >> local.properties
-          echo "@ohos:registry=https://repo.harmonyos.com/npm/" >> $HOME/.npmrc
-          echo "registry=https://registry.npmjs.org/" >> $HOME/.npmrc
-
-      - name: Install ohpm
-        if: steps.env-cache.outputs.cache-hit != 'true'
-        run: |
-          mkdir -p $HOME/ohpm
-          cd $HOME/ohpm
-          curl -L https://contentcenter-vali-drcn.dbankcdn.cn/pvt_2/DeveloperAlliance_package_901_9/81/v3/4ohpm1cli-darwin-x64-5.0.3.140.tgz -o ohpm.tgz || echo "Download failed, will use direct hvigorw"
-          if [ -f "ohpm.tgz" ]; then
-            tar -xzf ohpm.tgz
-            echo "$HOME/ohpm/bin" >> $GITHUB_PATH
-          fi
-
       - name: Install Dependencies & Build
         run: |
           cd ohos
           chmod +x hvigorw
-          export PATH="$HOME/ohpm/bin:$PATH"
-          if command -v ohpm &> /dev/null; then
-            ohpm install --all
-          fi
-          ./hvigorw assembleHap --mode module -p module=${MODULE_NAME} -p product=default --stacktrace
-
-      - name: Save Environment Cache
-        if: ${{ github.event_name == 'push' }}
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            ~/.ohpm
-            ~/.npmrc
-            ~/.npm-global
-          key: env-openharmony-${{ hashFiles('DEPS', 'vendor.json', 'ohos/oh-package.json5', 'ohos/oh-package-lock.json5', 'install_tools.sh') }}
+          ./hvigorw assembleHap --mode module -p module=hello2d -p product=default --stacktrace
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
@@ -447,16 +402,6 @@ jobs:
         with:
           path: third_party
           key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
-
-      - name: Save OHPM Cache
-        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
-        uses: actions/cache/save@v4
-        with:
-          path: |
-            ~/.ohpm
-            ohos/.ohpm
-            ohos/oh_modules
-          key: ohpm-openharmony-${{ hashFiles('ohos/oh-package.json5', 'ohos/oh-package-lock.json5') }}
 
       - name: Job Failed
         if: ${{ failure() }}
