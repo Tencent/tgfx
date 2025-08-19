@@ -393,6 +393,8 @@ jobs:
       - name: Install Dependencies & Build
         run: |
           cd ohos
+          npm install -g @ohos/hvigor
+          npm install -g @ohos/ohpm
           ohpm install
           hvigorw assembleHap --mode module -p module=hello2d -p product=default --stacktrace
 
