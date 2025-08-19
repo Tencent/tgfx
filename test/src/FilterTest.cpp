@@ -749,7 +749,7 @@ TGFX_TEST(FilterTest, GaussianBlurImageFilter) {
     const float drawTop = static_cast<float>(simpleSurfaceHeight - image->height()) * 0.5f;
     simpleCanvas->drawImage(image, drawLeft, drawTop);
     context->flushAndSubmit();
-    EXPECT_TRUE(Baseline::Compare(simpleSurface, "FilterTest/GaussianBlurImageFilterSimple2D11"));
+    EXPECT_TRUE(Baseline::Compare(simpleSurface, "FilterTest/GaussianBlurImageFilterSimple2D"));
 
     simpleCanvas->restore();
   }
@@ -776,7 +776,7 @@ TGFX_TEST(FilterTest, GaussianBlurImageFilter) {
                           0.5f / imageScale;
     simpleCanvas->drawImage(image, drawLeft, drawTop);
     context->flushAndSubmit();
-    EXPECT_TRUE(Baseline::Compare(simpleSurface, "FilterTest/GaussianBlurImageFilterComplex1D11"));
+    EXPECT_TRUE(Baseline::Compare(simpleSurface, "FilterTest/GaussianBlurImageFilterComplex1D"));
 
     simpleCanvas->restore();
   }
@@ -823,7 +823,7 @@ TGFX_TEST(FilterTest, GaussianBlurImageFilter) {
                       static_cast<float>(opaqueImage->height()) * 0.5f);
 
     context->flushAndSubmit();
-    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/GaussianBlurImageFilterComplex2D11"));
+    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/GaussianBlurImageFilterComplex2D"));
   }
 }
 }  // namespace tgfx
