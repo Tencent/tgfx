@@ -20,6 +20,7 @@ option(TGFX_USE_OPENGL "Use OpenGL as the GPU backend" ON)
 option(TGFX_USE_QT "Enable building with the Qt framework." OFF)
 option(TGFX_USE_SWIFTSHADER "Enable building with the SwiftShader library" OFF)
 option(TGFX_USE_ANGLE "Enable building with the ANGLE library" OFF)
+option(TGFX_TEXT_GAMMA_CORRECTION "Enable text gamma correction" OFF)
 
 # EMSCRIPTEN_PTHREADS can be set by vendor tools for building the wasm-mt architecture.
 if (NOT WEB OR EMSCRIPTEN_PTHREADS)
@@ -107,6 +108,7 @@ message("TGFX_USE_WEBP_ENCODE: ${TGFX_USE_WEBP_ENCODE}")
 message("TGFX_BUILD_TESTS: ${TGFX_BUILD_TESTS}")
 message("TGFX_USE_INSPECTOR: ${TGFX_USE_INSPECTOR}")
 message("TGFX_BUILD_FRAMEWORK: ${TGFX_BUILD_FRAMEWORK}")
+message("TGFX_TEXT_GAMMA_CORRECTION: ${TGFX_TEXT_GAMMA_CORRECTION}")
 
 if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
     if (DEPLOYMENT_TARGET)
@@ -274,6 +276,10 @@ elseif (APPLE)
     list(APPEND TGFX_DEFINES TGFX_USE_CORE_GRAPHICS)
     file(GLOB_RECURSE GFX_PLATFORM_FILES src/core/vectors/coregraphics/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
+endif ()
+
+if (TGFX_TEXT_GAMMA_CORRECTION)
+    list(APPEND TGFX_DEFINES TGFX_TEXT_GAMMA_CORRECTION)
 endif ()
 
 if (TGFX_USE_OPENGL)

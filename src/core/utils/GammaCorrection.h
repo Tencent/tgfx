@@ -22,6 +22,15 @@
 #include <cstdint>
 
 namespace tgfx {
+
+constexpr bool GammaCorrectionEnable() {
+#ifdef TGFX_TEXT_GAMMA_CORRECTION
+  return true;
+#else
+  return false;
+#endif
+}
+
 class GammaCorrection {
  public:
   static const std::array<uint8_t, 256>& GammaTable();

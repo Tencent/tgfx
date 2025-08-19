@@ -29,6 +29,7 @@
 #include "core/images/SubsetImage.h"
 #include "core/shapes/TextShape.h"
 #include "core/utils/ApplyStrokeToBounds.h"
+#include "core/utils/GammaCorrection.h"
 #include "core/utils/MathExtra.h"
 #include "gpu/DrawingManager.h"
 
@@ -105,7 +106,8 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(const Font& font, GlyphID glyph
   shape = Shape::ApplyMatrix(std::move(shape), Matrix::MakeTrans(-bounds.x(), -bounds.y()));
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
-  glyphCodec = PathRasterizer::MakeFrom(width, height, std::move(shape), true, true);
+  glyphCodec =
+      PathRasterizer::MakeFrom(width, height, std::move(shape), true, GammaCorrectionEnable());
   matrix->setTranslate(bounds.x(), bounds.y());
   return glyphCodec;
 }
