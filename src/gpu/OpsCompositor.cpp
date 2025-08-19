@@ -373,7 +373,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
     } break;
     case PendingOpType::Atlas: {
       auto provider = RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects), {},
-                                                    aaType, true, UVSubsetMode::None);
+                                                    AAType::None, true, UVSubsetMode::None);
       drawOp = AtlasTextOp::Make(context, std::move(provider), renderFlags,
                                  std::move(pendingAtlasTexture));
     } break;
