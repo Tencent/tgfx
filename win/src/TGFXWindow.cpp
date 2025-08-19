@@ -251,6 +251,8 @@ void TGFXWindow::createAppHost() {
   auto imagePath = rootPath + R"(\resources\assets\bridge.jpg)";
   auto image = tgfx::Image::MakeFromFile(imagePath);
   appHost->addImage("bridge", image);
+  imagePath = rootPath + R"(\resources\assets\tgfx.png)";
+  appHost->addImage("TGFX", tgfx::Image::MakeFromFile(imagePath));
   auto typeface = tgfx::Typeface::MakeFromName("Microsoft YaHei", "");
   appHost->addTypeface("default", typeface);
   auto emojiPath = rootPath + R"(\resources\font\NotoColorEmoji.ttf)";
@@ -287,16 +289,15 @@ void TGFXWindow::draw() {
     device->unlock();
     return;
   }
-  appHost->updateZoomAndOffset(zoomScale, contentOffset);
   auto canvas = surface->getCanvas();
   canvas->clear();
   canvas->save();
-  auto numDrawers = drawers::Drawer::Count() - 1;
-  auto index = (currentDrawerIndex % numDrawers) + 1;
-  auto drawer = drawers::Drawer::GetByName("GridBackground");
-  drawer->draw(canvas, appHost.get());
-  drawer = drawers::Drawer::GetByIndex(index);
-  drawer->draw(canvas, appHost.get());
+  drawers::Drawer::DrawBackground(canvas, appHost.get());
+  auto drawer = drawers::Drawer::GetByIndex(currentDrawerIndex % drawers::Drawer::Count());
+  drawer->displayList.setZoomScale(zoomScale);
+  drawer->displayList.setContentOffset(contentOffset.x, contentOffset.y);
+  drawer->build(appHost.get());
+  drawer->displayList.render(canvas->getSurface(), false);
   canvas->restore();
   context->flushAndSubmit();
   tgfxWindow->present(context);

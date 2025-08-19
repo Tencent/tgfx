@@ -44,7 +44,8 @@ if (typeof window !== 'undefined') {
             shareData.tgfxBaseView = tgfxView;
             var image = await loadImage("http://localhost:8081/../../resources/assets/bridge.jpg");
             tgfxView.setImage("bridge",image);
-
+            image = await loadImage("http://localhost:8081/../../resources/assets/tgfx.png");
+            tgfxView.setImage("TGFX",image);
             var fontPath = "../../resources/font/NotoSansSC-Regular.otf";
             const fontBuffer = await fetch(fontPath).then((response) => response.arrayBuffer());
             const fontUIntArray = new Uint8Array(fontBuffer);

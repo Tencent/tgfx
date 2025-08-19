@@ -63,16 +63,15 @@ static void Draw(int index, float zoom = 1.0f, float offsetX = 0.0f, float offse
     device->unlock();
     return;
   }
-  appHost->updateZoomAndOffset(zoom, tgfx::Point(offsetX, offsetY));
   auto canvas = surface->getCanvas();
   canvas->clear();
   canvas->save();
-  auto numDrawers = drawers::Drawer::Count() - 1;
-  index = (index % numDrawers) + 1;
-  auto drawer = drawers::Drawer::GetByName("GridBackground");
-  drawer->draw(canvas, appHost.get());
-  drawer = drawers::Drawer::GetByIndex(index);
-  drawer->draw(canvas, appHost.get());
+  drawers::Drawer::DrawBackground(canvas, appHost.get());
+  auto drawer = drawers::Drawer::GetByIndex(index % drawers::Drawer::Count());
+  drawer->displayList.setZoomScale(zoom);
+  drawer->displayList.setContentOffset(offsetX, offsetY);
+  drawer->build(appHost.get());
+  drawer->displayList.render(canvas->getSurface(), false);
   canvas->restore();
   context->flushAndSubmit();
   window->present(context);
