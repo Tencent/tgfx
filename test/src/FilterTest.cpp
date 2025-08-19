@@ -723,78 +723,107 @@ TGFX_TEST(FilterTest, ClipInnerShadowImageFilter) {
 }
 
 TGFX_TEST(FilterTest, GaussianBlurImageFilter) {
-  ContextScope scope;
-  auto context = scope.getContext();
+  const ContextScope scope;
+  Context* context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
-  auto image = MakeImage("resources/apitest/image_as_mask.png");
-  ASSERT_TRUE(image != nullptr);
-  int margin = 25;
-  auto originOffset = static_cast<float>(margin);
-  Point srcImgCenter(static_cast<float>(image->width()) * 0.5f + originOffset,
-                     static_cast<float>(image->height()) * 0.5f + originOffset);
-  int surfaceWidth = image->width() + margin * 2;
-  int surfaceHeight = image->height() + margin * 2;
-  auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
-  ASSERT_TRUE(surface != nullptr);
-  auto canvas = surface->getCanvas();
 
-  // Simple two-dimensional image blur
+  std::shared_ptr<Image> simpleImage = MakeImage("resources/apitest/image_as_mask.png");
+  ASSERT_TRUE(simpleImage != nullptr);
+  // The Gaussian blur operation expands image boundaries to reserve space for effect validation.
+  constexpr float simpleCanvasMargin = 25.0f;
+  const int simpleSurfaceWidth = simpleImage->width() + static_cast<int>(simpleCanvasMargin) * 2;
+  const int simpleSurfaceHeight = simpleImage->height() + static_cast<int>(simpleCanvasMargin) * 2;
+  auto simpleSurface = Surface::Make(context, simpleSurfaceWidth, simpleSurfaceHeight);
+  ASSERT_TRUE(simpleSurface != nullptr);
+  Canvas* simpleCanvas = simpleSurface->getCanvas();
+
+  // Simple two-dimensional image blur.
   {
-    canvas->save();
-    canvas->clear();
-    auto gaussianBlurFilter = std::make_shared<GaussianBlurImageFilter>(3, 3, TileMode::Decal);
-    auto offset = Point::Make(0.0f, 0.0f);
-    image = image->makeWithFilter(gaussianBlurFilter, &offset);
-    canvas->drawImage(image, offset.x + originOffset, offset.y + originOffset);
+    simpleCanvas->save();
+
+    simpleCanvas->clear();
+    auto gaussianBlurFilter =
+        std::make_shared<GaussianBlurImageFilter>(3.0f, 3.0f, TileMode::Decal);
+    auto image = simpleImage->makeWithFilter(gaussianBlurFilter);
+    const float drawLeft = static_cast<float>(simpleSurfaceWidth - image->width()) * 0.5f;
+    const float drawTop = static_cast<float>(simpleSurfaceHeight - image->height()) * 0.5f;
+    simpleCanvas->drawImage(image, drawLeft, drawTop);
     context->flushAndSubmit();
-    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/GaussianBlurImageFilterSimple2D"));
-    canvas->restore();
+    EXPECT_TRUE(Baseline::Compare(simpleSurface, "FilterTest/GaussianBlurImageFilterSimple2D11"));
+
+    simpleCanvas->restore();
   }
 
-  // Complex one-dimensional image blur (with scaling applied and moved to the right-down corner of the canvas)
+  // Complex one-dimensional image blur.
   {
-    canvas->save();
-    canvas->clear();
-    // Set a value exceeding the maximum blur factor
-    auto gaussianBlurFilter = std::make_shared<GaussianBlurImageFilter>(3, 0, TileMode::Decal);
-    auto filterOffset = Point::Make(0.0f, 0.0f);
-    image = image->makeWithFilter(gaussianBlurFilter, &filterOffset);
-    float imageScale = 0.8f;
-    canvas->scale(imageScale, imageScale);
-    Point scaledImgCenter(srcImgCenter.x * imageScale, srcImgCenter.y * imageScale);
-    Point imgCenterDiff = srcImgCenter - scaledImgCenter;
-    Point canvasOffset(static_cast<float>(surfaceWidth) * 0.5f,
-                       static_cast<float>(surfaceHeight) * 0.5f);
-    // Move the image center to the right-down corner of the canvas
-    canvas->translate((canvasOffset.x + imgCenterDiff.x) / imageScale,
-                      (canvasOffset.y + imgCenterDiff.y) / imageScale);
-    canvas->drawImage(image, filterOffset.x + originOffset, filterOffset.y + originOffset);
+    simpleCanvas->save();
+
+    simpleCanvas->clear();
+    constexpr float imageScale = 0.8f;
+    simpleCanvas->scale(imageScale, imageScale);
+    // Move the image center to the left-top corner of the canvas.
+    simpleCanvas->translate(static_cast<float>(simpleSurfaceWidth) * -0.5f / imageScale,
+                            static_cast<float>(simpleSurfaceHeight) * -0.5f / imageScale);
+    // Set a value exceeding the maximum blur factor.
+    auto gaussianBlurFilter =
+        std::make_shared<GaussianBlurImageFilter>(12.0f, 0.0f, TileMode::Decal);
+    auto image = simpleImage->makeWithFilter(gaussianBlurFilter);
+    const float drawLeft =
+        (static_cast<float>(simpleSurfaceWidth) - static_cast<float>(image->width()) * imageScale) *
+        0.5f / imageScale;
+    const float drawTop = (static_cast<float>(simpleSurfaceHeight) -
+                           static_cast<float>(image->height()) * imageScale) *
+                          0.5f / imageScale;
+    simpleCanvas->drawImage(image, drawLeft, drawTop);
     context->flushAndSubmit();
-    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/GaussianBlurImageFilterComplex1D"));
-    canvas->restore();
+    EXPECT_TRUE(Baseline::Compare(simpleSurface, "FilterTest/GaussianBlurImageFilterComplex1D11"));
+
+    simpleCanvas->restore();
   }
 
-  // Complex two-dimensional image blur (with scaling applied and moved to the top-left corner of the canvas)
+  std::shared_ptr<Image> opaqueImage = MakeImage("resources/apitest/imageReplacement.jpg");
+  ASSERT_TRUE(opaqueImage != nullptr);
+  // Simulate tile-based rendering to validate seamless pixel transitions between adjacent tiles.
   {
-    canvas->save();
-    canvas->clear();
-    // Set a value exceeding the maximum blur factor
-    auto gaussianBlurFilter = std::make_shared<GaussianBlurImageFilter>(15, 15, TileMode::Decal);
-    auto filterOffset = Point::Make(0.0f, 0.0f);
-    image = image->makeWithFilter(gaussianBlurFilter, &filterOffset);
-    float imageScale = 0.8f;
+    constexpr float canvasMargin = 25.0f;
+    constexpr float imageScale = 1.2f;
+    const int surfaceWidth = static_cast<int>(
+        static_cast<float>(opaqueImage->width()) * imageScale + canvasMargin * 2.0f);
+    const int surfaceHeight = static_cast<int>(
+        static_cast<float>(opaqueImage->height()) * imageScale + canvasMargin * 2.0f);
+    auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
+    ASSERT_TRUE(surface != nullptr);
+    Canvas* canvas = surface->getCanvas();
     canvas->scale(imageScale, imageScale);
-    Point scaledImgCenter(srcImgCenter.x * imageScale, srcImgCenter.y * imageScale);
-    Point imgCenterDiff = srcImgCenter - scaledImgCenter;
-    Point canvasOffset(static_cast<float>(surfaceWidth) * -0.5f,
-                       static_cast<float>(surfaceHeight) * -0.5f);
-    // Move the image center to the top-left corner of the canvas
-    canvas->translate((canvasOffset.x + imgCenterDiff.x) / imageScale,
-                      (canvasOffset.y + imgCenterDiff.y) / imageScale);
-    canvas->drawImage(image, filterOffset.x + originOffset, filterOffset.y + originOffset);
+    canvas->translate(canvasMargin / imageScale, canvasMargin / imageScale);
+    auto gaussianBlurFilter =
+        std::make_shared<GaussianBlurImageFilter>(5.0f, 5.0f, TileMode::Decal);
+
+    // Divide into 4 equal tiles.
+    const auto clipRect1 =
+        Rect::MakeWH(std::floor(static_cast<float>(opaqueImage->width()) * 0.5f),
+                     std::floor(static_cast<float>(opaqueImage->height()) * 0.5f));
+    auto image1 = opaqueImage->makeWithFilter(gaussianBlurFilter, nullptr, &clipRect1);
+    canvas->drawImage(image1, 0.0f, 0.0f);
+
+    const auto clipRect2 =
+        Rect(clipRect1.right, 0.0f, static_cast<float>(opaqueImage->width()), clipRect1.bottom);
+    auto image2 = opaqueImage->makeWithFilter(gaussianBlurFilter, nullptr, &clipRect2);
+    canvas->drawImage(image2, static_cast<float>(opaqueImage->width()) * 0.5f, 0.0f);
+
+    const auto clipRect3 =
+        Rect(0.0f, clipRect1.bottom, clipRect1.right, static_cast<float>(opaqueImage->height()));
+    auto image3 = opaqueImage->makeWithFilter(gaussianBlurFilter, nullptr, &clipRect3);
+    canvas->drawImage(image3, 0.0f, static_cast<float>(opaqueImage->height()) * 0.5f);
+
+    const auto clipRect4 =
+        Rect(clipRect2.left, clipRect2.bottom, clipRect2.right, clipRect3.bottom);
+    auto image4 = opaqueImage->makeWithFilter(gaussianBlurFilter, nullptr, &clipRect4);
+    canvas->drawImage(image4, static_cast<float>(opaqueImage->width()) * 0.5f,
+                      static_cast<float>(opaqueImage->height()) * 0.5f);
+
     context->flushAndSubmit();
-    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/GaussianBlurImageFilterComplex2D"));
-    canvas->restore();
+    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/GaussianBlurImageFilterComplex2D11"));
   }
 }
 }  // namespace tgfx
