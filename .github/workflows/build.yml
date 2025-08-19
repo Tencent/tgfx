@@ -393,8 +393,8 @@ jobs:
       - name: Install Dependencies & Build
         run: |
           cd ohos
-          chmod +x hvigorw
-          ./hvigorw assembleHap --mode module -p module=hello2d -p product=default --stacktrace
+          npm install
+          npx hvigor assembleHap --mode module -p module=hello2d -p product=default --stacktrace
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
