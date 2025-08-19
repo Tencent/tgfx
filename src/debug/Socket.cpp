@@ -459,7 +459,7 @@ static int AddrinfoAndSocketForFamily(uint16_t port, int ai_family, struct addri
   memset(&hints, 0, sizeof(hints));
   hints.ai_family = ai_family;
   hints.ai_socktype = SOCK_STREAM;
-  // hints.ai_flags = AI_PASSIVE;
+  hints.ai_flags = AI_PASSIVE;
   char portbuf[32];
   snprintf(portbuf, 32, "%" PRIu16, port);
   if (getaddrinfo(nullptr, portbuf, &hints, res) != 0) {
