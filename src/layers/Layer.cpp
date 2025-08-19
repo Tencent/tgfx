@@ -560,12 +560,10 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   }
   auto localToGlobalMatrix = getGlobalMatrix();
   auto globalToLocalMatrix = Matrix::I();
-  if (!localToGlobalMatrix.invert(&globalToLocalMatrix)) {
-    return;
-  }
+  bool canInvert = localToGlobalMatrix.invert(&globalToLocalMatrix);
 
   Rect renderRect = {};
-  if (_root) {
+  if (_root && canInvert) {
     _root->updateRenderBounds();
     renderRect = localToGlobalMatrix.mapRect(clippedBounds);
     args.renderRect = &renderRect;
@@ -578,7 +576,7 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     }
   }
 
-  if (context && hasBackgroundStyle()) {
+  if (context && canInvert && hasBackgroundStyle()) {
     auto scale = canvas->getMatrix().getMaxScale();
     auto backgroundRect = clippedBounds;
     backgroundRect.scale(scale, scale);
@@ -588,8 +586,9 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
             context, clippedBounds, globalToLocalMatrix, bounds == clippedBounds)) {
       auto backgroundCanvas = backgroundContext->getCanvas();
       auto actualMatrix = backgroundCanvas->getMatrix();
-      // because the background recorder start with current layer, we need to pre-concat
-      // localToGlobalMatrix to the background canvas matrix.
+      // Since the background recorder starts from the current layer, we need to pre-concatenate
+      // localToGlobalMatrix to the background canvas matrix to ensure the coordinate space is
+      // correct.
       actualMatrix.preConcat(localToGlobalMatrix);
       if (auto image = getBackgroundImage(args, scale, nullptr)) {
         backgroundCanvas->resetMatrix();
