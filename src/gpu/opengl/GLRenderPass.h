@@ -46,5 +46,7 @@ class GLRenderPass : public RenderPass {
   bool resolveMSAA = true;
 
   unsigned getVertexArrayID(Context* context);
+
+  void bindTexture(int unitIndex, GPUTexture* texture, SamplerState samplerState = {});
 };
 }  // namespace tgfx

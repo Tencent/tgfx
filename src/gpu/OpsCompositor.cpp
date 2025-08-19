@@ -608,7 +608,6 @@ DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AATyp
       submitDrawOps();
     }
     dstTextureInfo.textureProxy = std::move(textureProxy);
-    dstTextureInfo.requiresBarrier = true;
     return dstTextureInfo;
   }
   submitDrawOps();

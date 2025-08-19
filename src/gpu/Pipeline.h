@@ -65,10 +65,6 @@ class Pipeline : public ProgramCreator {
     return _outputSwizzle;
   }
 
-  bool requiresBarrier() const {
-    return xferProcessor != nullptr && xferProcessor->requiresBarrier();
-  }
-
   std::unique_ptr<BlendFormula> getBlendFormula() const;
 
   void getUniforms(const RenderTarget* renderTarget, UniformBuffer* uniformBuffer) const;
