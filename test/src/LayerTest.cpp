@@ -2955,4 +2955,41 @@ TGFX_TEST(LayerTest, PartialInnerShadow) {
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialInnerShadow"));
 }
+
+TGFX_TEST(LayerTest, PartialDrawLayer) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  DisplayList displayList;
+  auto surface = Surface::Make(context, 200, 200);
+  auto rootLayer = Layer::Make();
+  rootLayer->setMatrix(Matrix::MakeTrans(40, 40));
+  displayList.root()->addChild(rootLayer);
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  auto imageLayer = ImageLayer::Make();
+  imageLayer->setImage(image);
+  rootLayer->addChild(imageLayer);
+  auto shapeLayer = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
+  shapeLayer->setPath(path);
+  shapeLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 255, 255, 50)));
+  shapeLayer->setLayerStyles({BackgroundBlurStyle::Make(1, 1)});
+  rootLayer->addChild(shapeLayer);
+  auto layerInvisible = SolidLayer::Make();
+  layerInvisible->setColor(Color::FromRGBA(0, 0, 0, 255));
+  layerInvisible->setWidth(100);
+  layerInvisible->setHeight(100);
+  layerInvisible->setMatrix(Matrix::MakeTrans(100, 100));
+  layerInvisible->setShouldRasterize(true);
+  rootLayer->addChild(layerInvisible);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  canvas->rotate(30, 45, 45);
+  canvas->clipRect(Rect::MakeXYWH(0, 0, 90, 90));
+  canvas->scale(2.0, 1.0f);
+  rootLayer->draw(canvas);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialDrawLayer"));
+  EXPECT_EQ(layerInvisible->rasterizedContent, nullptr);
+}
 }  // namespace tgfx
