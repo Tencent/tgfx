@@ -66,7 +66,9 @@ GLDevice::GLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle)
 }
 
 GLDevice::~GLDevice() {
+  printf("----GLDevice::~GLDevice() ----\n");
   std::lock_guard<std::mutex> autoLock(deviceMapLocker);
   deviceMap.erase(nativeHandle);
+  releaseAll();
 }
 }  // namespace tgfx

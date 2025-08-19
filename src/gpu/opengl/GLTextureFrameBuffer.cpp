@@ -139,6 +139,7 @@ std::unique_ptr<GLTextureFrameBuffer> GLTextureFrameBuffer::MakeFrom(GLGPU* gpu,
   auto glTexture = static_cast<GLTexture*>(texture);
   FrameBufferTexture2D(gpu, glTexture->target(), glTexture->id(), sampleCount);
 #ifndef TGFX_BUILD_FOR_WEB
+  LOGI("-------- GLTextureFrameBuffer::CreateRenderBuffer -----------");
   if (gl->checkFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
     ReleaseResource(gpu, frameBufferRead, frameBufferDraw, renderBufferId);
     return nullptr;
@@ -150,6 +151,7 @@ std::unique_ptr<GLTextureFrameBuffer> GLTextureFrameBuffer::MakeFrom(GLGPU* gpu,
 }
 
 void GLTextureFrameBuffer::release(GPU* gpu) {
+  LOGI("-------- GLTextureFrameBuffer::release -----------");
   auto glGPU = static_cast<GLGPU*>(gpu);
   auto gl = glGPU->functions();
   gl->bindFramebuffer(GL_FRAMEBUFFER, _readFrameBufferID);
