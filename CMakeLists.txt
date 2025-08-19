@@ -20,7 +20,7 @@ option(TGFX_USE_OPENGL "Use OpenGL as the GPU backend" ON)
 option(TGFX_USE_QT "Enable building with the Qt framework." OFF)
 option(TGFX_USE_SWIFTSHADER "Enable building with the SwiftShader library" OFF)
 option(TGFX_USE_ANGLE "Enable building with the ANGLE library" OFF)
-option(TGFX_TEXT_GAMMA_CORRECTION "Enable text gamma correction" OFF)
+option(TGFX_TEXT_GAMMA_CORRECTION "Enable gamma correction when rendering text" OFF)
 
 # EMSCRIPTEN_PTHREADS can be set by vendor tools for building the wasm-mt architecture.
 if (NOT WEB OR EMSCRIPTEN_PTHREADS)

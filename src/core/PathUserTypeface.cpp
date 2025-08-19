@@ -21,7 +21,6 @@
 #include "core/PathRasterizer.h"
 #include "core/utils/ApplyStrokeToBounds.h"
 #include "core/utils/FauxBoldScale.h"
-#include "core/utils/GammaCorrection.h"
 #include "tgfx/core/Shape.h"
 
 namespace tgfx {
@@ -121,8 +120,13 @@ class PathUserScalerContext final : public UserScalerContext {
     auto shape = Shape::MakeFrom(pathProvider);
     shape = Shape::ApplyStroke(std::move(shape), stroke);
     shape = Shape::ApplyMatrix(std::move(shape), matrix);
-    auto rasterizer =
-        PathRasterizer::MakeFrom(width, height, std::move(shape), true, GammaCorrectionEnable());
+    auto rasterizer = PathRasterizer::MakeFrom(width, height, std::move(shape), true,
+#ifdef TGFX_TEXT_GAMMA_CORRECTION
+                                               true
+#else
+                                               false
+#endif
+    );
     if (rasterizer == nullptr) {
       return false;
     }
