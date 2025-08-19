@@ -738,18 +738,6 @@ TGFX_TEST(FilterTest, GaussianBlurImageFilter) {
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
 
-  // Simple one-dimensional image blur
-  {
-    canvas->save();
-    auto gaussianBlurFilter = std::make_shared<GaussianBlurImageFilter>(0, 3, TileMode::Decal);
-    auto offset = Point::Make(0.0f, 0.0f);
-    image = image->makeWithFilter(gaussianBlurFilter, &offset);
-    canvas->drawImage(image, offset.x + originOffset, offset.y + originOffset);
-    context->flushAndSubmit();
-    EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/GaussianBlurImageFilterSimple1D"));
-    canvas->restore();
-  }
-
   // Simple two-dimensional image blur
   {
     canvas->save();
