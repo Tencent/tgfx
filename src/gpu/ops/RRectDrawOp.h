@@ -50,7 +50,7 @@ class RRectDrawOp : public DrawOp {
                                         PlacementPtr<RRectsVertexProvider> provider,
                                         uint32_t renderFlags);
 
-  void execute(RenderPass* renderPass) override;
+  void execute(RenderPass* renderPass, RenderTarget* renderTarget) override;
 
  private:
   size_t rectCount = 0;

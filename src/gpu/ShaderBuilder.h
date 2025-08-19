@@ -106,7 +106,6 @@ class ShaderBuilder {
   bool atLineStart = false;
 
   friend class ProgramBuilder;
-
-  friend class GLUniformHandler;
+  friend class UniformHandler;
 };
 }  // namespace tgfx

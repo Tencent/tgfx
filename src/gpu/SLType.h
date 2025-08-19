@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <cstddef>
+
 namespace tgfx {
 /**
  * Types of shader-language-specific boxed variables we can create.
@@ -40,4 +42,9 @@ enum class SLType {
   TextureExternalSampler,
   Texture2DRectSampler,
 };
+
+/**
+ * Returns the size of the SLType in bytes.
+ */
+size_t GetSLTypeSize(SLType type);
 }  // namespace tgfx

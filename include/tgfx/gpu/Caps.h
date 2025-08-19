@@ -30,6 +30,8 @@ class Caps {
  public:
   virtual ~Caps() = default;
 
+  virtual const Swizzle& getReadSwizzle(PixelFormat pixelFormat) const = 0;
+
   virtual const Swizzle& getWriteSwizzle(PixelFormat pixelFormat) const = 0;
 
   virtual bool isFormatRenderable(PixelFormat pixelFormat) const = 0;

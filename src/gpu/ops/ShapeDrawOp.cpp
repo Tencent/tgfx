@@ -48,7 +48,7 @@ ShapeDrawOp::ShapeDrawOp(std::shared_ptr<GPUShapeProxy> proxy, Color color, cons
   }
 }
 
-void ShapeDrawOp::execute(RenderPass* renderPass) {
+void ShapeDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   if (shapeProxy == nullptr) {
     return;
   }
@@ -77,11 +77,10 @@ void ShapeDrawOp::execute(RenderPass* renderPass) {
     }
     addCoverageFP(std::move(maskFP));
   }
-  auto drawingBuffer = renderPass->getContext()->drawingBuffer();
-  auto renderTarget = renderPass->getRenderTarget();
+  auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
   auto gp = DefaultGeometryProcessor::Make(drawingBuffer, color, renderTarget->width(),
                                            renderTarget->height(), aa, viewMatrix, realUVMatrix);
-  auto pipeline = createPipeline(renderPass, std::move(gp));
+  auto pipeline = createPipeline(renderTarget, std::move(gp));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   if (vertexBuffer != nullptr) {
     renderPass->bindBuffers(nullptr, vertexBuffer->gpuBuffer());
