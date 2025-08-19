@@ -35,10 +35,9 @@ void RenderTargetCopyTask::execute(CommandEncoder* encoder) {
     LOGE("RenderTargetCopyTask::execute() Failed to get the dest texture view!");
     return;
   }
-  auto srcOffset = Point::Make(srcX, srcY);
-  auto dstRect = Rect::MakeWH(textureView->width(), textureView->height());
-  encoder->copyFrameBufferToTexture(renderTarget->getFrameBuffer(), srcOffset,
-                                    textureView->getTexture(), dstRect);
+  auto srcRect = Rect::MakeXYWH(srcX, srcY, textureView->width(), textureView->height());
+  encoder->copyTextureToTexture(renderTarget->getSampleTexture(), srcRect,
+                                textureView->getTexture(), Point::Zero());
   encoder->generateMipmapsForTexture(textureView->getTexture());
 }
 

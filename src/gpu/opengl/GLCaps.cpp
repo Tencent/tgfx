@@ -394,9 +394,7 @@ void GLCaps::initColorSampleCount(const GLInfo& info) {
     } else {
       // Fake out the table using some semi-standard counts up to the max allowed sample count.
       int maxSampleCnt = 1;
-      if (MSFBOType::ES_IMG_MsToTexture == msFBOType) {
-        info.getIntegerv(GL_MAX_SAMPLES_IMG, &maxSampleCnt);
-      } else if (MSFBOType::None != msFBOType) {
+      if (MSFBOType::None != msFBOType) {
         info.getIntegerv(GL_MAX_SAMPLES, &maxSampleCnt);
       }
       // Chrome has a mock GL implementation that returns 0.
@@ -413,25 +411,6 @@ void GLCaps::initColorSampleCount(const GLInfo& info) {
   }
 }
 
-static MSFBOType GetMSFBOType_GLES(uint32_t version, const GLInfo& glInterface) {
-  // We prefer multisampled-render-to-texture extensions over ES3 MSAA because we've observed
-  // ES3 driver bugs on at least one device with a tiled GPU (N10).
-  if (glInterface.hasExtension("GL_EXT_multisampled_render_to_texture")) {
-    return MSFBOType::ES_EXT_MsToTexture;
-  }
-  if (glInterface.hasExtension("GL_IMG_multisampled_render_to_texture")) {
-    return MSFBOType::ES_IMG_MsToTexture;
-  }
-  if (version >= GL_VER(3, 0) || glInterface.hasExtension("GL_CHROMIUM_framebuffer_multisample") ||
-      glInterface.hasExtension("GL_ANGLE_framebuffer_multisample")) {
-    return MSFBOType::Standard;
-  }
-  if (glInterface.hasExtension("GL_APPLE_framebuffer_multisample")) {
-    return MSFBOType::ES_Apple;
-  }
-  return MSFBOType::None;
-}
-
 void GLCaps::initMSAASupport(const GLInfo& info) {
   if (standard == GLStandard::GL) {
     if (version >= GL_VER(3, 0) || info.hasExtension("GL_ARB_framebuffer_object") ||
@@ -440,7 +419,12 @@ void GLCaps::initMSAASupport(const GLInfo& info) {
       msFBOType = MSFBOType::Standard;
     }
   } else if (standard == GLStandard::GLES) {
-    msFBOType = GetMSFBOType_GLES(version, info);
+    if (version >= GL_VER(3, 0) || info.hasExtension("GL_CHROMIUM_framebuffer_multisample") ||
+        info.hasExtension("GL_ANGLE_framebuffer_multisample")) {
+      msFBOType = MSFBOType::Standard;
+    } else if (info.hasExtension("GL_APPLE_framebuffer_multisample")) {
+      msFBOType = MSFBOType::ES_Apple;
+    }
   } else if (standard == GLStandard::WebGL) {
     // No support in WebGL 1, but there is for 2.0
     if (version >= GL_VER(2, 0)) {
@@ -452,13 +436,5 @@ void GLCaps::initMSAASupport(const GLInfo& info) {
   if (GLVendor::Intel == vendor) {
     msFBOType = MSFBOType::None;
   }
-}
-bool GLCaps::usesMSAARenderBuffers() const {
-  return MSFBOType::None != msFBOType && MSFBOType::ES_IMG_MsToTexture != msFBOType &&
-         MSFBOType::ES_EXT_MsToTexture != msFBOType;
-}
-
-bool GLCaps::usesImplicitMSAAResolve() const {
-  return MSFBOType::ES_IMG_MsToTexture == msFBOType || MSFBOType::ES_EXT_MsToTexture == msFBOType;
 }
 }  // namespace tgfx

@@ -19,25 +19,21 @@
 #pragma once
 
 #include "gpu/GPUTexture.h"
-#include "tgfx/gpu/opengl/GLDefines.h"
+#include "gpu/opengl/GLInterface.h"
 
 namespace tgfx {
+class GLGPU;
+
 /**
  * GLTexture is a GPUTexture that wraps an OpenGL texture, providing access to its OpenGL texture ID
  * and target.
  */
 class GLTexture : public GPUTexture {
  public:
-  GLTexture(unsigned id, unsigned target, PixelFormat format, int mipLevelCount = 1)
-      : GPUTexture(format, mipLevelCount), _id(id), _target(target) {
-  }
-
   /**
-   * Returns the OpenGL ID for this texture.
+   * Creates a GLTexture with the specified descriptor, OpenGL target, and texture ID.
    */
-  unsigned id() const {
-    return _id;
-  }
+  GLTexture(const GPUTextureDescriptor& descriptor, unsigned target, unsigned textureID);
 
   /**
    * Returns the OpenGL target for this texture.
@@ -46,16 +42,40 @@ class GLTexture : public GPUTexture {
     return _target;
   }
 
-  TextureType type() const override;
+  /**
+   * Returns the OpenGL ID for this texture.
+   */
+  unsigned textureID() const {
+    return _textureID;
+  }
 
-  BackendTexture getBackendTexture(int width, int height) const override;
+  /**
+   * Returns the OpenGL ID for the framebuffer associated with this texture. This is used for
+   * rendering to the texture.
+   */
+  virtual unsigned frameBufferID() const;
 
-  void computeTextureKey(Context* context, BytesKey* bytesKey) const override;
+  /**
+   * Checks whether a framebuffer is needed for rendering, and creates one if necessary. Returns
+   * true if the framebuffer is successfully created or not needed; returns false otherwise.
+   */
+  bool checkFrameBuffer(GLGPU* gpu);
 
-  void release(GPU* gpu) override;
+  GPUTextureType type() const override;
+
+  BackendTexture getBackendTexture() const override;
+
+  BackendRenderTarget getBackendRenderTarget() const override;
+
+  void release(GPU* gpu) final;
 
  protected:
-  unsigned _id = 0;
   unsigned _target = GL_TEXTURE_2D;
+  unsigned _textureID = 0;
+
+  virtual void onRelease(GLGPU* gpu);
+
+ private:
+  unsigned textureFrameBuffer = 0;
 };
 }  // namespace tgfx

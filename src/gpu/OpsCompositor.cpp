@@ -41,37 +41,17 @@ namespace tgfx {
  */
 static constexpr float BOUNDS_TOLERANCE = 1e-3f;
 
-static bool AnyRectHasUniqueColor(const std::vector<PlacementPtr<RectRecord>>& rects) {
+static bool HasDifferentViewMatrix(const std::vector<PlacementPtr<RectRecord>>& rects) {
   if (rects.size() <= 1) {
     return false;
   }
-  bool hasColor = false;
-  auto& firstColor = rects.front()->color;
-  for (auto& record : rects) {
-    if (record->color != firstColor) {
-      hasColor = true;
-      break;
-    }
-  }
-  return hasColor;
-}
-
-static bool AnyRectHasUniqueMatrix(const std::vector<PlacementPtr<RectRecord>>& rects) {
-  if (rects.empty()) {
-    return false;
-  }
-  if (rects.size() == 1) {
-    return rects.front()->rect != rects.front()->uvRect;
-  }
-  bool hasUVCoord = false;
   auto& firstMatrix = rects.front()->viewMatrix;
   for (auto& record : rects) {
-    if (record->viewMatrix != firstMatrix || record->rect != record->uvRect) {
-      hasUVCoord = true;
-      break;
+    if (record->viewMatrix != firstMatrix) {
+      return true;
     }
   }
-  return hasUVCoord;
+  return false;
 }
 
 OpsCompositor::OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags)
@@ -93,6 +73,7 @@ void OpsCompositor::fillImage(std::shared_ptr<Image> image, const SamplingOption
   auto record =
       drawingBuffer()->make<RectRecord>(imageRect, state.matrix, fill.color.premultiply());
   pendingRects.emplace_back(std::move(record));
+  pendingUVRects.emplace_back(drawingBuffer()->make<Rect>(imageRect));
 }
 
 void OpsCompositor::fillImageRect(std::shared_ptr<Image> image, const Rect& srcRect,
@@ -110,9 +91,13 @@ void OpsCompositor::fillImageRect(std::shared_ptr<Image> image, const Rect& srcR
     pendingSampling = sampling;
     pendingConstraint = constraint;
   }
-  auto record = drawingBuffer()->make<RectRecord>(dstRect, state.matrix,
-                                                  fillInLocal.color.premultiply(), &srcRect);
+  auto record =
+      drawingBuffer()->make<RectRecord>(dstRect, state.matrix, fillInLocal.color.premultiply());
   pendingRects.emplace_back(std::move(record));
+  pendingUVRects.emplace_back(drawingBuffer()->make<Rect>(srcRect));
+  if (!hasRectToRectDraw && srcRect != dstRect) {
+    hasRectToRectDraw = true;
+  }
 }
 
 void OpsCompositor::fillRect(const Rect& rect, const MCState& state, const Fill& fill) {
@@ -202,6 +187,7 @@ void OpsCompositor::discardAll() {
 }
 
 void OpsCompositor::resetPendingOps(PendingOpType type, Path clip, Fill fill) {
+  hasRectToRectDraw = false;
   pendingType = type;
   pendingClip = std::move(clip);
   pendingFill = std::move(fill);
@@ -209,6 +195,7 @@ void OpsCompositor::resetPendingOps(PendingOpType type, Path clip, Fill fill) {
   pendingSampling = {};
   pendingConstraint = SrcRectConstraint::Fast;
   pendingRects.clear();
+  pendingUVRects.clear();
   pendingRRects.clear();
   pendingStrokes.clear();
   pendingAtlasTexture = nullptr;
@@ -326,11 +313,18 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
       }
     } else {
       if (needLocalBounds) {
-        for (auto& rect : pendingRects) {
-          auto localViewMatrix = rect->viewMatrix;
-          localViewMatrix.preConcat(MakeRectToRectMatrix(rect->uvRect, rect->rect));
-          localBounds->join(ClipLocalBounds(rect->uvRect, localViewMatrix, clipBounds));
-          drawScale = std::max(*drawScale, localViewMatrix.getMaxScale());
+        auto rectCount = pendingRects.size();
+        for (size_t i = 0; i < rectCount; i++) {
+          auto& record = pendingRects[i];
+          auto viewMatrix = record->viewMatrix;
+          auto rect = &record->rect;
+          if (hasRectToRectDraw) {
+            auto& uvRect = *pendingUVRects[i];
+            viewMatrix.preConcat(MakeRectToRectMatrix(uvRect, record->rect));
+            rect = &uvRect;
+          }
+          localBounds->join(ClipLocalBounds(*rect, viewMatrix, clipBounds));
+          drawScale = std::max(*drawScale, viewMatrix.getMaxScale());
         }
       }
       if (needDeviceBounds) {
@@ -356,16 +350,19 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
       }
     // fallthrough
     case PendingOpType::Image: {
-      auto subsetMode = RectsVertexProvider::UVSubsetMode::None;
+      auto subsetMode = UVSubsetMode::None;
       if (pendingConstraint == SrcRectConstraint::Strict && pendingImage) {
         subsetMode = pendingSampling.filterMode == FilterMode::Linear
-                         ? RectsVertexProvider::UVSubsetMode::SubsetOnly
-                         : RectsVertexProvider::UVSubsetMode::RoundOutAndSubset;
+                         ? UVSubsetMode::SubsetOnly
+                         : UVSubsetMode::RoundOutAndSubset;
       }
-      bool hasColor = AnyRectHasUniqueColor(pendingRects);
-      bool hasUVCoord = AnyRectHasUniqueMatrix(pendingRects);
-      auto provider = RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects),
-                                                    aaType, hasColor, hasUVCoord, subsetMode);
+      bool needUVCoord =
+          needLocalBounds && (hasRectToRectDraw || HasDifferentViewMatrix(pendingRects));
+      auto uvRects =
+          hasRectToRectDraw ? std::move(pendingUVRects) : std::vector<PlacementPtr<Rect>>();
+      auto provider =
+          RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects),
+                                        std::move(uvRects), aaType, needUVCoord, subsetMode);
       drawOp = RectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::RRect: {
@@ -375,10 +372,8 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
       drawOp = RRectDrawOp::Make(context, std::move(provider), renderFlags);
     } break;
     case PendingOpType::Atlas: {
-      bool hasColor = AnyRectHasUniqueColor(pendingRects);
-      auto provider =
-          RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects), aaType, hasColor,
-                                        true, RectsVertexProvider::UVSubsetMode::None);
+      auto provider = RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects), {},
+                                                    AAType::None, true, UVSubsetMode::None);
       drawOp = AtlasTextOp::Make(context, std::move(provider), renderFlags,
                                  std::move(pendingAtlasTexture));
     } break;

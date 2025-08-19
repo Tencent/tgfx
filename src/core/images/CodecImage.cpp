@@ -31,6 +31,10 @@ std::shared_ptr<ImageCodec> CodecImage::getCodec() const {
   return std::static_pointer_cast<ImageCodec>(generator);
 }
 
+float CodecImage::getRasterizedScale(float drawScale) const {
+  return NextPowerOfTwoScale(drawScale);
+}
+
 std::shared_ptr<Image> CodecImage::onMakeScaled(int newWidth, int newHeight,
                                                 const SamplingOptions& sampling) const {
   if (newWidth <= generator->width() && newHeight <= generator->height()) {
@@ -43,8 +47,10 @@ std::shared_ptr<Image> CodecImage::onMakeScaled(int newWidth, int newHeight,
 
 std::shared_ptr<TextureProxy> CodecImage::lockTextureProxy(const TPArgs& args) const {
   auto tempGenerator = generator;
-  if (width() != generator->width() || height() != generator->height()) {
-    tempGenerator = ScaledImageGenerator::MakeFrom(getCodec(), width(), height());
+  auto scaleWidth = static_cast<int>(roundf(static_cast<float>(width()) * args.drawScale));
+  auto scaleHeight = static_cast<int>(roundf(static_cast<float>(height()) * args.drawScale));
+  if (scaleWidth < generator->width() && scaleHeight < generator->height()) {
+    tempGenerator = ScaledImageGenerator::MakeFrom(getCodec(), scaleWidth, scaleHeight);
   }
   return args.context->proxyProvider()->createTextureProxy(tempGenerator, args.mipmapped,
                                                            args.renderFlags);

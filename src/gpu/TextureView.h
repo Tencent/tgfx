@@ -44,6 +44,11 @@ class TextureView : public Resource {
   static bool CheckSizeAndFormat(Context* context, int width, int height, PixelFormat format);
 
   /**
+   * Computes a BytesKey for the texture that can be used to identify it in a cache.
+   */
+  static void ComputeTextureKey(const GPUTexture* texture, BytesKey* bytesKey);
+
+  /**
    * Creates a new texture view from the specified pixel data with each pixel stored as 32-bit RGBA
    * data. Returns nullptr if any of the parameters is invalid.
    */
@@ -154,17 +159,17 @@ class TextureView : public Resource {
       YUVColorSpace colorSpace = YUVColorSpace::BT601_LIMITED);
 
   /**
-   * Returns the display width of this texture view.
+   * Returns the width of the texture view in pixels.
    */
-  virtual int width() const {
-    return _width;
+  int width() const {
+    return getTexture()->width();
   }
 
   /**
-   * Returns the display height of this texture view.
+   * Returns the height of the texture view in pixels.
    */
-  virtual int height() const {
-    return _height;
+  int height() const {
+    return getTexture()->height();
   }
 
   /**
@@ -210,7 +215,7 @@ class TextureView : public Resource {
    * YUVTexture.
    */
   virtual BackendTexture getBackendTexture() const {
-    return getTexture()->getBackendTexture(_width, _height);
+    return getTexture()->getBackendTexture();
   }
 
   /**
@@ -222,12 +227,9 @@ class TextureView : public Resource {
   }
 
  protected:
-  int _width = 0;
-  int _height = 0;
   ImageOrigin _origin = ImageOrigin::TopLeft;
 
-  TextureView(int width, int height, ImageOrigin origin)
-      : _width(width), _height(height), _origin(origin) {
+  explicit TextureView(ImageOrigin origin = ImageOrigin::TopLeft) : _origin(origin) {
   }
 };
 }  // namespace tgfx

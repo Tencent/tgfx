@@ -24,7 +24,6 @@
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
-
 RasterizedImage::RasterizedImage(UniqueKey uniqueKey, std::shared_ptr<Image> source)
     : uniqueKey(std::move(uniqueKey)), source(std::move(source)) {
 }
@@ -35,13 +34,15 @@ std::shared_ptr<Image> RasterizedImage::makeRasterized() const {
 
 std::shared_ptr<TextureProxy> RasterizedImage::lockTextureProxy(const TPArgs& args) const {
   auto proxyProvider = args.context->proxyProvider();
-  auto textureKey = getTextureKey();
+  auto newScale = source->getRasterizedScale(args.drawScale);
+  auto textureKey = getTextureKey(newScale);
   auto textureProxy = proxyProvider->findOrWrapTextureProxy(textureKey);
   if (textureProxy != nullptr) {
     return textureProxy;
   }
   auto newArgs = args;
   newArgs.backingFit = BackingFit::Exact;
+  newArgs.drawScale = newScale;
   textureProxy = source->lockTextureProxy(newArgs);
   if (textureProxy == nullptr) {
     return nullptr;
@@ -56,11 +57,24 @@ std::shared_ptr<TextureProxy> RasterizedImage::lockTextureProxy(const TPArgs& ar
 PlacementPtr<FragmentProcessor> RasterizedImage::asFragmentProcessor(
     const FPArgs& args, const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const {
   auto textureProxy = lockTextureProxy(
-      TPArgs(args.context, args.renderFlags, hasMipmaps(), 1.0f, BackingFit::Exact));
+      TPArgs(args.context, args.renderFlags, hasMipmaps(), args.drawScale, BackingFit::Exact));
   if (textureProxy == nullptr) {
     return nullptr;
   }
-  return TiledTextureEffect::Make(std::move(textureProxy), samplingArgs, uvMatrix, isAlphaOnly());
+  auto fpMatrix =
+      Matrix::MakeScale(static_cast<float>(textureProxy->width()) / static_cast<float>(width()),
+                        static_cast<float>(textureProxy->height()) / static_cast<float>(height()));
+  SamplingArgs newSamplingArgs = samplingArgs;
+  if (samplingArgs.sampleArea) {
+    Rect subset = *samplingArgs.sampleArea;
+    fpMatrix.mapRect(&subset);
+    newSamplingArgs.sampleArea = subset;
+  }
+  if (uvMatrix) {
+    fpMatrix.preConcat(*uvMatrix);
+  }
+  return TiledTextureEffect::Make(std::move(textureProxy), newSamplingArgs, &fpMatrix,
+                                  isAlphaOnly());
 }
 
 std::shared_ptr<Image> RasterizedImage::onMakeScaled(int newWidth, int newHeight,
@@ -94,12 +108,16 @@ std::shared_ptr<Image> RasterizedImage::onMakeMipmapped(bool enabled) const {
   return image;
 }
 
-UniqueKey RasterizedImage::getTextureKey() const {
+UniqueKey RasterizedImage::getTextureKey(float cacheScale) const {
+  BytesKey byteKey = {};
   if (hasMipmaps()) {
     static const auto MipmapFlag = UniqueID::Next();
-    return UniqueKey::Append(uniqueKey, &MipmapFlag, 1);
+    byteKey.write(MipmapFlag);
   }
-  return uniqueKey;
+  if (cacheScale < 1.f) {
+    byteKey.write(cacheScale);
+  }
+  return UniqueKey::Append(uniqueKey, byteKey.data(), byteKey.size());
 }
 
 }  // namespace tgfx

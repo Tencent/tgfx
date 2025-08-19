@@ -19,7 +19,6 @@
 #pragma once
 
 #include "gpu/DefaultTextureView.h"
-#include "gpu/GPUFrameBuffer.h"
 #include "gpu/RenderTarget.h"
 
 namespace tgfx {
@@ -27,14 +26,6 @@ class TextureRenderTarget : public DefaultTextureView, public RenderTarget {
  public:
   Context* getContext() const override {
     return context;
-  }
-
-  int width() const override {
-    return _width;
-  }
-
-  int height() const override {
-    return _height;
   }
 
   ImageOrigin origin() const override {
@@ -45,8 +36,12 @@ class TextureRenderTarget : public DefaultTextureView, public RenderTarget {
     return _externallyOwned;
   }
 
-  GPUFrameBuffer* getFrameBuffer() const override {
-    return frameBuffer.get();
+  GPUTexture* getRenderTexture() const override {
+    return renderTexture ? renderTexture.get() : _texture.get();
+  }
+
+  GPUTexture* getSampleTexture() const override {
+    return _texture.get();
   }
 
   std::shared_ptr<TextureView> asTextureView() const override {
@@ -57,25 +52,24 @@ class TextureRenderTarget : public DefaultTextureView, public RenderTarget {
     return std::static_pointer_cast<TextureRenderTarget>(reference);
   }
 
- protected:
   void onReleaseGPU() override;
 
  private:
-  std::unique_ptr<GPUFrameBuffer> frameBuffer = nullptr;
+  std::unique_ptr<GPUTexture> renderTexture = nullptr;
   bool _externallyOwned = false;
 
   static std::shared_ptr<RenderTarget> MakeFrom(Context* context,
-                                                std::unique_ptr<GPUTexture> texture, int width,
-                                                int height, int sampleCount,
+                                                std::unique_ptr<GPUTexture> texture,
+                                                int sampleCount,
                                                 ImageOrigin origin = ImageOrigin::TopLeft,
                                                 bool externallyOwned = false,
                                                 const ScratchKey& scratchKey = {});
 
   TextureRenderTarget(std::unique_ptr<GPUTexture> texture,
-                      std::unique_ptr<GPUFrameBuffer> frameBuffer, int width, int height,
-                      ImageOrigin origin, bool externallyOwned)
-      : DefaultTextureView(std::move(texture), width, height, origin),
-        frameBuffer(std::move(frameBuffer)), _externallyOwned(externallyOwned) {
+                      std::unique_ptr<GPUTexture> renderTexture, ImageOrigin origin,
+                      bool externallyOwned)
+      : DefaultTextureView(std::move(texture), origin), renderTexture(std::move(renderTexture)),
+        _externallyOwned(externallyOwned) {
   }
 
   friend class RenderTarget;

@@ -20,7 +20,6 @@
 #include "GLTexture.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/opengl/GLBuffer.h"
-#include "gpu/opengl/GLFrameBuffer.h"
 #include "gpu/opengl/GLUtil.h"
 #include "tgfx/core/Buffer.h"
 
@@ -48,7 +47,8 @@ bool GLCommandQueue::writeBuffer(GPUBuffer* buffer, size_t bufferOffset, const v
 
 void GLCommandQueue::writeTexture(GPUTexture* texture, const Rect& rect, const void* pixels,
                                   size_t rowBytes) {
-  if (texture == nullptr || rect.isEmpty()) {
+  if (texture == nullptr || rect.isEmpty() ||
+      !(texture->usage() & GPUTextureUsage::TEXTURE_BINDING)) {
     return;
   }
   auto gl = interface->functions();
@@ -57,7 +57,7 @@ void GLCommandQueue::writeTexture(GPUTexture* texture, const Rect& rect, const v
     gl->flush();
   }
   auto glTexture = static_cast<const GLTexture*>(texture);
-  gl->bindTexture(glTexture->target(), glTexture->id());
+  gl->bindTexture(glTexture->target(), glTexture->textureID());
   const auto& textureFormat = caps->getTextureFormat(glTexture->format());
   auto bytesPerPixel = PixelFormatBytesPerPixel(glTexture->format());
   gl->pixelStorei(GL_UNPACK_ALIGNMENT, static_cast<int>(bytesPerPixel));
@@ -86,23 +86,27 @@ void GLCommandQueue::writeTexture(GPUTexture* texture, const Rect& rect, const v
   }
 }
 
-bool GLCommandQueue::readPixels(GPUFrameBuffer* frameBuffer, const Rect& rect, void* pixels,
-                                size_t rowBytes) const {
-  if (frameBuffer == nullptr || rect.isEmpty() || pixels == nullptr) {
+bool GLCommandQueue::readTexture(GPUTexture* texture, const Rect& rect, void* pixels,
+                                 size_t rowBytes) const {
+  if (texture == nullptr || rect.isEmpty() || pixels == nullptr) {
     return false;
   }
-  auto format = frameBuffer->format();
+  if (!(texture->usage() & GPUTextureUsage::RENDER_ATTACHMENT)) {
+    LOGE("GLCommandQueue::readTexture() texture usage does not support readback!");
+    return false;
+  }
+  auto format = texture->format();
   auto bytesPerPixel = PixelFormatBytesPerPixel(format);
   auto minRowBytes = static_cast<size_t>(rect.width()) * bytesPerPixel;
   if (rowBytes < minRowBytes) {
-    LOGE("GLCommandQueue::readPixels() rowBytes is too small!");
+    LOGE("GLCommandQueue::readTexture() rowBytes is too small!");
     return false;
   }
   auto gl = interface->functions();
   auto caps = interface->caps();
   ClearGLError(gl);
-  auto glFrameBuffer = static_cast<GLFrameBuffer*>(frameBuffer);
-  gl->bindFramebuffer(GL_FRAMEBUFFER, glFrameBuffer->readFrameBufferID());
+  auto glTexture = static_cast<GLTexture*>(texture);
+  gl->bindFramebuffer(GL_FRAMEBUFFER, glTexture->frameBufferID());
   void* outPixels = nullptr;
   Buffer tempBuffer = {};
   auto restoreGLRowLength = false;

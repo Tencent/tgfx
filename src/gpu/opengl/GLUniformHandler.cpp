@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLUniformHandler.h"
+#include "gpu/opengl/GLCaps.h"
 #include "gpu/opengl/GLProgramBuilder.h"
 #include "gpu/opengl/GLTexture.h"
 

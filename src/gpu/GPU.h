@@ -61,12 +61,11 @@ class GPU {
   virtual std::unique_ptr<GPUBuffer> createBuffer(size_t size, uint32_t usage) = 0;
 
   /**
-   * Creates a new GPUTexture with the given width, height, and pixel format. If mipmapped is
-   * true, mipmap levels will be generated. Returns nullptr if the texture cannot be created.
+   * Creates a new GPUTexture with the given descriptor. The descriptor specifies the texture's
+   * properties, such as width, height, format, mip levels, sample count and usage flags. Returns
+   * nullptr if the texture cannot be created.
    */
-  virtual std::unique_ptr<GPUTexture> createTexture(int width, int height,
-                                                    PixelFormat format = PixelFormat::RGBA_8888,
-                                                    int mipLevelCount = 1) = 0;
+  virtual std::unique_ptr<GPUTexture> createTexture(const GPUTextureDescriptor& descriptor) = 0;
 
   /**
    * Returns the pixel formats for textures created from a platform-specific hardware buffer, such
@@ -81,13 +80,15 @@ class GPU {
       HardwareBufferRef hardwareBuffer, YUVFormat* yuvFormat = nullptr) const = 0;
 
   /**
-   * Creates textures from a platform-specific hardware buffer, such as AHardwareBuffer on Android
-   * or CVPixelBufferRef on Apple platforms. Multiple textures can be created from the same
-   * hardwareBuffer (typically for YUV formats). Returns an empty vector if the hardwareBuffer is
-   * invalid or the GPU backend does not support the hardwareBuffer.
+   * Creates one or more textures from a platform-specific hardware buffer, such as AHardwareBuffer
+   * on Android or CVPixelBufferRef on Apple platforms. Multiple textures may be created from the
+   * same hardwareBuffer, especially for YUV formats.
+   * @param hardwareBuffer The platform-specific hardware buffer to import textures from.
+   * @param usage A bitmask of GPUTextureUsage flags specifying how the textures will be used.
+   * @return An empty vector if the hardwareBuffer is invalid or not supported by the GPU backend.
    */
   virtual std::vector<std::unique_ptr<GPUTexture>> importHardwareTextures(
-      HardwareBufferRef hardwareBuffer) = 0;
+      HardwareBufferRef hardwareBuffer, uint32_t usage) = 0;
 
   /**
    * Returns the pixel format of the given backend texture. If the backend texture is invalid,
@@ -96,34 +97,32 @@ class GPU {
   virtual PixelFormat getExternalTextureFormat(const BackendTexture& backendTexture) const = 0;
 
   /**
-   * Creates a GPUTexture that wraps the given backend texture. If adopted is true, the
-   * GPUTexture will take ownership of the backend texture and destroy it when no longer needed.
-   * Otherwise, the backend texture must remain valid for as long as the GPUTexture exists.
-   */
-  virtual std::unique_ptr<GPUTexture> importExternalTexture(const BackendTexture& backendTexture,
-                                                            bool adopted = false) = 0;
-
-  /**
-   * Creates a GPUFrameBuffer that can be used for rendering to a texture. A GPUFrameBuffer with
-   * MSAA enabled is returned if the sample count is greater than 1. Returns nullptr if the texture
-   * is not renderable in the GPU backend or if the width or height is invalid.
-   */
-  virtual std::unique_ptr<GPUFrameBuffer> createFrameBuffer(GPUTexture* texture, int width,
-                                                            int height, int sampleCount = 1) = 0;
-
-  /**
    * Returns the pixel format of the given backend render target. If the backend render target is
    * invalid, returns PixelFormat::Unknown.
    */
-  virtual PixelFormat getExternalFrameBufferFormat(
+  virtual PixelFormat getExternalTextureFormat(
       const BackendRenderTarget& backendRenderTarget) const = 0;
 
   /**
-   * Creates a GPUFrameBuffer that wraps the given backend render target. The caller must ensure the
-   * backend render target is valid for the lifetime of the returned GPUFrameBuffer. Returns nullptr
+  * Creates a GPUTexture that wraps the specified backend texture.
+  * @param backendTexture The backend texture to be wrapped.
+  * @param usage A bitmask of GPUTextureUsage flags specifying how the texture will be used.
+  * @param adopted If true, the returned GPUTexture takes ownership of the backend texture and will
+  * destroy it when no longer needed. If false, the backend texture must remain valid for the
+  * lifetime of the GPUTexture.
+  * @return A unique pointer to the created GPUTexture. Returns nullptr if the backend texture is
+  * invalid or not supported by the GPU backend.
+  */
+  virtual std::unique_ptr<GPUTexture> importExternalTexture(const BackendTexture& backendTexture,
+                                                            uint32_t usage,
+                                                            bool adopted = false) = 0;
+
+  /**
+   * Creates a GPUTexture that wraps the given backend render target. The caller must ensure the
+   * backend render target is valid for the lifetime of the returned GPUTexture. Returns nullptr
    * if the backend render target is invalid.
    */
-  virtual std::unique_ptr<GPUFrameBuffer> importExternalFrameBuffer(
+  virtual std::unique_ptr<GPUTexture> importExternalTexture(
       const BackendRenderTarget& backendRenderTarget) = 0;
 
   /**

@@ -16,41 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/opengl/GLFrameBuffer.h"
+#include "NextPowerOfTwoScale.h"
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
 
 namespace tgfx {
-class GLExternalFrameBuffer : public GLFrameBuffer {
- public:
-  PixelFormat format() const override {
-    return _format;
+
+float NextPowerOfTwoScale(float scale) {
+  scale = std::clamp(scale, 0.0f, 1.0f);
+  if (scale > 0.5f) {
+    return 1.0f;
   }
+  float exactLevel = std::log2(1.0f / scale);
+  auto scaleLevel = static_cast<uint32_t>(std::floor(exactLevel));
+  return 1.0f / static_cast<float>(1 << scaleLevel);
+}
 
-  int sampleCount() const override {
-    return 1;
-  }
-
-  unsigned readFrameBufferID() const override {
-    return frameBufferID;
-  }
-
-  unsigned drawFrameBufferID() const override {
-    return frameBufferID;
-  }
-
-  void release(GPU*) override {
-    // Do nothing, the external FBO is not owned by us.
-  }
-
- private:
-  unsigned frameBufferID = 0;
-  PixelFormat _format = PixelFormat::RGBA_8888;
-
-  GLExternalFrameBuffer(unsigned frameBufferID, PixelFormat format)
-      : frameBufferID(frameBufferID), _format(format) {
-  }
-
-  friend class GLGPU;
-};
 }  // namespace tgfx
