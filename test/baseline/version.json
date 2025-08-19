@@ -112,12 +112,12 @@
     },
     "DrawersTest": {
         "ConicGradient": "69683f78",
-        "CustomLayerTreeDrawer": "66c02859",
+        "CustomLayerTreeDrawer": "95326766",
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "da590da",
         "ImageWithShadow": "ee2cc771",
         "SimpleLayerTreeDrawer": "66c02859",
-        "SimpleText": "66c02859"
+        "SimpleText": "95326766"
     },
     "DstTextureTest": {
         "EmptyLocalBounds": "be94e666",
