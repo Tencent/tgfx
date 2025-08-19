@@ -88,7 +88,7 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
 
   float sigmaX = blurrinessX;
   float sigmaY = blurrinessY;
-  bool isDrawScaleDown = (drawScaleX < 1.0f || drawScaleY < 1.0f);
+  const bool isDrawScaleDown = (drawScaleX < 1.0f || drawScaleY < 1.0f);
   if (isDrawScaleDown) {
     // Reduce the size of the blur target to improve computation speed.
     sigmaX *= drawScaleX;
@@ -96,7 +96,7 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
   }
   sigmaX = std::min(sigmaX, MAX_BLUR_SIGMA);
   sigmaY = std::min(sigmaY, MAX_BLUR_SIGMA);
-  bool blur2D = (sigmaX > 0.0f && sigmaY > 0.0f);
+  const bool blur2D = (sigmaX > 0.0f && sigmaY > 0.0f);
 
   // BlurDstScale describes the scaling factor of the Gaussian blur render target size relative to the size of the
   // source data clip bounds.
@@ -110,17 +110,17 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
   // points in the source texture. In a tiled rendering scenario, the edges of each tile need to blend with the edge
   // pixels of adjacent tiles to ensure smooth transitions between them. Therefore, the data region contained in
   // intermediate textures must be larger than the actual clipped data region.
-  float blurDstWidth = scaledSrcSampleBounds.width();
-  float blurDstHeight = scaledSrcSampleBounds.height();
+  const float blurDstWidth = scaledSrcSampleBounds.width();
+  const float blurDstHeight = scaledSrcSampleBounds.height();
   blurDstScaleX = blurDstWidth / srcSampleBounds.width();
   blurDstScaleY = blurDstHeight / srcSampleBounds.height();
 
   PlacementPtr<FragmentProcessor> sourceFragment = getSourceFragmentProcessor(
       source, args.context, args.renderFlags, srcSampleBounds, Point(blurDstScaleX, blurDstScaleY));
   const auto isAlphaOnly = source->isAlphaOnly();
-  bool isBlurDstScaled = (!FloatNearlyEqual(blurDstWidth, dstDrawWidth) ||
-                          !FloatNearlyEqual(blurDstHeight, dstDrawHeight));
-  bool defaultBlurTargetMipmapped = (args.mipmapped && !blur2D && !isBlurDstScaled);
+  const bool isBlurDstScaled = (!FloatNearlyEqual(blurDstWidth, dstDrawWidth) ||
+                                !FloatNearlyEqual(blurDstHeight, dstDrawHeight));
+  const bool defaultBlurTargetMipmapped = (args.mipmapped && !blur2D && !isBlurDstScaled);
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(blurDstWidth), static_cast<int>(blurDstHeight), isAlphaOnly, 1,
       defaultBlurTargetMipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
@@ -134,7 +134,7 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
 
     SamplingArgs samplingArgs = {tileMode, tileMode, {}, SrcRectConstraint::Fast};
     sourceFragment = TiledTextureEffect::Make(renderTarget->asTextureProxy(), samplingArgs);
-    bool finalBlurTargetMipmapped = (args.mipmapped && !isBlurDstScaled);
+    const bool finalBlurTargetMipmapped = (args.mipmapped && !isBlurDstScaled);
     renderTarget = RenderTargetProxy::MakeFallback(
         args.context, static_cast<int>(blurDstWidth), static_cast<int>(blurDstHeight), isAlphaOnly,
         1, finalBlurTargetMipmapped, ImageOrigin::TopLeft, BackingFit::Approx);
@@ -144,9 +144,9 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     Blur1D(std::move(sourceFragment), renderTarget, sigmaY, GaussianBlurDirection::Vertical, 1.0f,
            args.renderFlags);
   } else {
-    auto blurDirection =
+    const auto blurDirection =
         (sigmaX > sigmaY ? GaussianBlurDirection::Horizontal : GaussianBlurDirection::Vertical);
-    float blurSigma = std::max(sigmaX, sigmaY);
+    const float blurSigma = std::max(sigmaX, sigmaY);
     Blur1D(std::move(sourceFragment), renderTarget, blurSigma, blurDirection, 1.0f,
            args.renderFlags);
   }
@@ -163,7 +163,7 @@ std::shared_ptr<TextureProxy> GaussianBlurImageFilter::lockTextureProxy(
     if (!renderTarget) {
       return nullptr;
     }
-    auto drawingManager = args.context->drawingManager();
+    const auto drawingManager = args.context->drawingManager();
     drawingManager->fillRTWithFP(renderTarget, std::move(finalProcessor), args.renderFlags);
   }
 
