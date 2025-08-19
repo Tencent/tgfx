@@ -26,7 +26,8 @@
 namespace tgfx {
 class DrawOp : public Op {
  public:
-  PlacementPtr<Pipeline> createPipeline(RenderPass* renderPass, PlacementPtr<GeometryProcessor> gp);
+  PlacementPtr<Pipeline> createPipeline(RenderTarget* renderTarget,
+                                        PlacementPtr<GeometryProcessor> geometryProcessor);
 
   const Rect& scissorRect() const {
     return _scissorRect;

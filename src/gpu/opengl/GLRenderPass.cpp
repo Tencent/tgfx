@@ -56,8 +56,7 @@ GLRenderPass::GLRenderPass(std::shared_ptr<GLInterface> interface,
       resolveMSAA(resolveMSAA) {
 }
 
-static void UpdateScissor(Context* context, const Rect& scissorRect) {
-  auto gl = GLFunctions::Get(context);
+static void UpdateScissor(const GLFunctions* gl, const Rect& scissorRect) {
   if (scissorRect.isEmpty()) {
     gl->disable(GL_SCISSOR_TEST);
   } else {
@@ -83,9 +82,9 @@ static const unsigned gXfermodeEquation2Blend[] = {
     GL_FUNC_REVERSE_SUBTRACT,
 };
 
-static void UpdateBlend(Context* context, const BlendFormula* blendFactors) {
-  auto gl = GLFunctions::Get(context);
-  auto caps = GLCaps::Get(context);
+static void UpdateBlend(const GLInterface* interface, const BlendFormula* blendFactors) {
+  auto gl = interface->functions();
+  auto caps = interface->caps();
   if (caps->frameBufferFetchSupport && caps->frameBufferFetchRequiresEnablePerSample) {
     if (blendFactors == nullptr) {
       gl->enable(GL_FETCH_PER_SAMPLE_ARM);
@@ -108,8 +107,7 @@ static void UpdateBlend(Context* context, const BlendFormula* blendFactors) {
 }
 
 void GLRenderPass::begin() {
-  auto context = getContext();
-  auto gl = GLFunctions::Get(context);
+  auto gl = interface->functions();
   auto renderTexture = static_cast<GLTexture*>(renderTarget->getRenderTexture());
   gl->bindFramebuffer(GL_FRAMEBUFFER, renderTexture->frameBufferID());
   gl->viewport(0, 0, renderTarget->width(), renderTarget->height());
@@ -119,9 +117,8 @@ void GLRenderPass::begin() {
 }
 
 void GLRenderPass::onEnd() {
-  auto context = getContext();
-  auto gl = GLFunctions::Get(context);
-  auto caps = GLCaps::Get(context);
+  auto gl = interface->functions();
+  auto caps = interface->caps();
   if (resolveMSAA && renderTarget->sampleCount() > 1) {
     auto renderTexture = static_cast<GLTexture*>(renderTarget->getRenderTexture());
     auto sampleTexture = static_cast<GLTexture*>(renderTarget->getSampleTexture());
@@ -144,17 +141,18 @@ void GLRenderPass::onEnd() {
 }
 
 bool GLRenderPass::onBindProgramAndScissorClip(const Pipeline* pipeline, const Rect& scissorRect) {
-  auto context = getContext();
+  auto context = renderTarget->getContext();
   program = context->globalCache()->getProgram(pipeline);
   if (program == nullptr) {
     return false;
   }
-  auto gl = GLFunctions::Get(context);
+  auto gl = interface->functions();
   ClearGLError(gl);
   auto glProgram = static_cast<GLProgram*>(program.get());
   gl->useProgram(glProgram->programID());
-  UpdateScissor(context, scissorRect);
-  UpdateBlend(context, pipeline->blendFormula());
+  UpdateScissor(gl, scissorRect);
+  auto blendFormula = pipeline->getBlendFormula();
+  UpdateBlend(interface.get(), blendFormula.get());
   if (pipeline->requiresBarrier()) {
     gl->textureBarrier();
   }
@@ -164,8 +162,7 @@ bool GLRenderPass::onBindProgramAndScissorClip(const Pipeline* pipeline, const R
 
 bool GLRenderPass::onBindBuffers(GPUBuffer* indexBuffer, GPUBuffer* vertexBuffer,
                                  size_t vertexOffset) {
-  auto context = getContext();
-  auto gl = GLFunctions::Get(context);
+  auto gl = interface->functions();
   if (vertexBuffer) {
     gl->bindBuffer(GL_ARRAY_BUFFER, static_cast<const GLBuffer*>(vertexBuffer)->bufferID());
   } else {
@@ -190,7 +187,7 @@ static const unsigned gPrimitiveType[] = {GL_TRIANGLES, GL_TRIANGLE_STRIP};
 
 void GLRenderPass::onDraw(PrimitiveType primitiveType, size_t offset, size_t count,
                           bool drawIndexed) {
-  auto gl = GLFunctions::Get(getContext());
+  auto gl = interface->functions();
   if (drawIndexed) {
     gl->drawElements(gPrimitiveType[static_cast<int>(primitiveType)], static_cast<int>(count),
                      GL_UNSIGNED_SHORT, reinterpret_cast<void*>(offset * sizeof(uint16_t)));
@@ -201,9 +198,8 @@ void GLRenderPass::onDraw(PrimitiveType primitiveType, size_t offset, size_t cou
 }
 
 void GLRenderPass::onClear(const Rect& scissor, Color color) {
-  auto context = getContext();
-  auto gl = GLFunctions::Get(context);
-  UpdateScissor(context, scissor);
+  auto gl = interface->functions();
+  UpdateScissor(gl, scissor);
   gl->clearColor(color.red, color.green, color.blue, color.alpha);
   gl->clear(GL_COLOR_BUFFER_BIT);
 }

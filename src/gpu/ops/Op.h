@@ -28,6 +28,6 @@ class Op {
  public:
   virtual ~Op() = default;
 
-  virtual void execute(RenderPass* renderPass) = 0;
+  virtual void execute(RenderPass* renderPass, RenderTarget* renderTarget) = 0;
 };
 }  // namespace tgfx

@@ -22,7 +22,6 @@
 #include "gpu/Pipeline.h"
 #include "gpu/RenderTarget.h"
 #include "tgfx/core/Color.h"
-#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
 /**
@@ -36,14 +35,6 @@ enum class PrimitiveType {
 class RenderPass {
  public:
   virtual ~RenderPass() = default;
-
-  Context* getContext() {
-    return renderTarget->getContext();
-  }
-
-  std::shared_ptr<RenderTarget> getRenderTarget() {
-    return renderTarget;
-  }
 
   void end();
   void bindProgramAndScissorClip(const Pipeline* pipeline, const Rect& scissorRect);

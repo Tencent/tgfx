@@ -27,7 +27,7 @@ PlacementPtr<ClearOp> ClearOp::Make(Context* context, Color color, const Rect& s
   return context->drawingBuffer()->make<ClearOp>(color, scissor);
 }
 
-void ClearOp::execute(RenderPass* renderPass) {
+void ClearOp::execute(RenderPass* renderPass, RenderTarget*) {
   renderPass->clear(scissor, color);
 }
 }  // namespace tgfx

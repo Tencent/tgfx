@@ -19,7 +19,6 @@
 #include "GLProgram.h"
 #include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/GLTexture.h"
-#include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
 GLProgram::GLProgram(unsigned programID, std::unique_ptr<GLUniformBuffer> uniformBuffer,
@@ -29,7 +28,7 @@ GLProgram::GLProgram(unsigned programID, std::unique_ptr<GLUniformBuffer> unifor
 }
 
 void GLProgram::onReleaseGPU() {
-  if (programId) {
+  if (programId > 0) {
     auto gl = GLFunctions::Get(context);
     gl->deleteProgram(programId);
   }
@@ -37,42 +36,13 @@ void GLProgram::onReleaseGPU() {
 
 void GLProgram::updateUniformsAndTextureBindings(const RenderTarget* renderTarget,
                                                  const Pipeline* pipeline) {
-  setRenderTargetState(renderTarget);
-  pipeline->getUniforms(uniformBuffer.get());
+  pipeline->getUniforms(renderTarget, uniformBuffer.get());
   uniformBuffer->uploadToGPU(context);
   auto samplers = pipeline->getSamplers();
   int textureUnit = 0;
   for (auto& info : samplers) {
     bindTexture(textureUnit++, info.texture, info.state);
   }
-}
-
-static std::array<float, 4> GetRTAdjustArray(int width, int height, bool flipY) {
-  std::array<float, 4> result = {};
-  result[0] = 2.f / static_cast<float>(width);
-  result[2] = 2.f / static_cast<float>(height);
-  result[1] = -1.f;
-  result[3] = -1.f;
-  if (flipY) {
-    result[2] = -result[2];
-    result[3] = -result[3];
-  }
-  return result;
-}
-
-void GLProgram::setRenderTargetState(const RenderTarget* renderTarget) {
-  int width = renderTarget->width();
-  int height = renderTarget->height();
-  auto origin = renderTarget->origin();
-  if (renderTargetState.width == width && renderTargetState.height == height &&
-      renderTargetState.origin == origin) {
-    return;
-  }
-  renderTargetState.width = width;
-  renderTargetState.height = height;
-  renderTargetState.origin = origin;
-  auto v = GetRTAdjustArray(width, height, origin == ImageOrigin::BottomLeft);
-  uniformBuffer->setData(RTAdjustName, v);
 }
 
 static int FilterToGLMagFilter(FilterMode filterMode) {
