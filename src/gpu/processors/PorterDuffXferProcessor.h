@@ -34,10 +34,6 @@ class PorterDuffXferProcessor : public XferProcessor {
 
   const TextureView* dstTextureView() const override;
 
-  bool requiresBarrier() const override {
-    return dstTextureInfo.requiresBarrier;
-  }
-
   void computeProcessorKey(Context* context, BytesKey* bytesKey) const override;
 
  protected:

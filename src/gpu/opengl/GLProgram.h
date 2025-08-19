@@ -43,13 +43,9 @@ class GLProgram : public Program {
     return programId;
   }
 
-  /**
-   * This function uploads uniforms, calls each GL*Processor's setData. It binds all fragment
-   * processor textures.
-   *
-   * It is the caller's responsibility to ensure the program is bound before calling.
-   */
-  void updateUniformsAndTextureBindings(const RenderTarget* renderTarget, const Pipeline* pipeline);
+  GLUniformBuffer* uniformBuffer() const {
+    return _uniformBuffer.get();
+  }
 
   int vertexStride() const {
     return _vertexStride;
@@ -64,10 +60,8 @@ class GLProgram : public Program {
 
  private:
   unsigned programId = 0;
-  std::unique_ptr<GLUniformBuffer> uniformBuffer = nullptr;
+  std::unique_ptr<GLUniformBuffer> _uniformBuffer = nullptr;
   std::vector<Attribute> attributes = {};
   int _vertexStride = 0;
-
-  void bindTexture(int unitIndex, GPUTexture* texture, SamplerState samplerState = {});
 };
 }  // namespace tgfx
