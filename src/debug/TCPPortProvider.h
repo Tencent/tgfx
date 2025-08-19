@@ -17,14 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma once
 #include <cstdint>
+#include <memory>
 #include <mutex>
 #include <set>
+
 namespace tgfx::debug {
 class TCPPortProvider {
  public:
-  static TCPPortProvider* Get() {
+  static std::shared_ptr<TCPPortProvider> Get() {
     static auto instance = std::make_shared<TCPPortProvider>();
-    return instance.get();
+    return instance;
   }
 
   TCPPortProvider() = default;
