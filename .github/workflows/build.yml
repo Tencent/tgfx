@@ -393,8 +393,9 @@ jobs:
       - name: Install Dependencies & Build
         run: |
           cd ohos
-          npm install -g @ohos/hvigor
-          npm install -g @ohos/ohpm
+          curl -o ohpm-install.sh https://contentcenter-drcn.dbankcdn.cn/pub_1/DevEcoSpace_1_900_9/ohpm/v5/ohpm-install.sh
+          bash ohpm-install.sh
+          export PATH=$PATH:$HOME/.ohpm/bin
           ohpm install
           hvigorw assembleHap --mode module -p module=hello2d -p product=default --stacktrace
 
