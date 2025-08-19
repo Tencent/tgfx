@@ -511,13 +511,58 @@ bool Layer::hitTestPoint(float x, float y, bool shapeHitTest) {
   return false;
 }
 
+static Rect GetRenderRect(const Rect& bounds, const Canvas* canvas) {
+  DEBUG_ASSERT(canvas != nullptr);
+  const auto& clipPath = canvas->getTotalClip();
+  auto renderRect = bounds;
+  auto clipBounds = Rect::MakeEmpty();
+  auto surface = canvas->getSurface();
+  if (clipPath.isInverseFillType()) {
+    if (!surface) {
+      return bounds;
+    }
+    clipBounds = Rect::MakeWH(surface->width(), surface->height());
+  } else {
+    clipBounds = clipPath.getBounds();
+    if (surface && !clipBounds.intersect(Rect::MakeWH(surface->width(), surface->height()))) {
+      return Rect::MakeEmpty();
+    }
+  }
+  if (clipBounds.isEmpty()) {
+    return Rect::MakeEmpty();
+  }
+  auto invert = Matrix::I();
+  auto viewMatrix = canvas->getMatrix();
+  if (!viewMatrix.invert(&invert)) {
+    return Rect::MakeEmpty();
+  }
+  clipBounds = invert.mapRect(clipBounds);
+  if (!renderRect.intersect(clipBounds)) {
+    return Rect::MakeEmpty();
+  }
+  renderRect.roundOut();
+  return renderRect;
+}
+
 void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   if (canvas == nullptr || alpha <= 0) {
     return;
   }
+  if (_root) {
+    _root->updateDirtyRegions();
+  }
+
   auto surface = canvas->getSurface();
   DrawArgs args = {};
   Context* context = nullptr;
+  auto clipPath = canvas->getTotalClip();
+  auto bounds = getBounds();
+  auto renderRect = GetRenderRect(bounds, canvas);
+  if (renderRect.isEmpty()) {
+    return;
+  }
+  args.renderRect = &renderRect;
+
   if (surface) {
     context = surface->getContext();
     if (!(surface->renderFlags() & RenderFlags::DisableCache)) {
@@ -527,17 +572,16 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
 
   if (context && hasBackgroundStyle()) {
     auto scale = canvas->getMatrix().getMaxScale();
-    auto bounds = getBounds();
-    bounds.scale(scale, scale);
+    auto backgroundBounds = renderRect;
+    backgroundBounds.scale(scale, scale);
     auto globalMatrix = getGlobalMatrix();
     globalMatrix.preScale(1 / scale, 1 / scale);
-    auto invert = Matrix::I();
-    if (globalMatrix.invert(&invert)) {
-      auto backgroundContext = BackgroundContext::Make(context, bounds, 0, 0, invert);
-      if (backgroundContext) {
-        auto backgroundCanvas = backgroundContext->getCanvas();
-        auto image = getBackgroundImage(args, scale, nullptr);
-        if (image) {
+    auto viewMatrix = Matrix::I();
+    if (globalMatrix.invert(&viewMatrix)) {
+      if (auto backgroundContext = createBackgroundContext(context, backgroundBounds, viewMatrix,
+                                                           bounds == renderRect)) {
+        if (auto image = getBackgroundImage(args, scale, nullptr)) {
+          auto backgroundCanvas = backgroundContext->getCanvas();
           AutoCanvasRestore restore(backgroundCanvas);
           backgroundCanvas->setMatrix(Matrix::I());
           backgroundCanvas->drawImage(image);
@@ -546,7 +590,6 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
       }
     }
   }
-
   drawLayer(args, canvas, alpha, blendMode);
 }
 
@@ -1305,6 +1348,21 @@ bool Layer::hasBackgroundStyle() {
     }
   }
   return false;
+}
+
+std::shared_ptr<BackgroundContext> Layer::createBackgroundContext(Context* context,
+                                                                  const Rect& drawRect,
+                                                                  const Matrix& viewMatrix,
+                                                                  bool fullLayer) const {
+  if (maxBackgroundOutset <= 0.0f) {
+    return nullptr;
+  }
+  if (fullLayer) {
+    return BackgroundContext::Make(context, drawRect, 0, 0, viewMatrix);
+  }
+  auto scale = viewMatrix.getMaxScale();
+  return BackgroundContext::Make(context, drawRect, maxBackgroundOutset * scale,
+                                 minBackgroundOutset * scale, viewMatrix);
 }
 
 }  // namespace tgfx
