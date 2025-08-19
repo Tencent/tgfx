@@ -390,13 +390,17 @@ jobs:
           version: '5.0.3'
           cache: true
 
+      - name: Install OHPM
+        run: |
+          cd ohos
+          npm install -g @ohos/ohpm
+          export PATH=$PATH:$(npm config get prefix)/bin
+          ohpm install
+        shell: bash   
+
       - name: Install Dependencies & Build
         run: |
           cd ohos
-          curl -o ohpm-install.sh https://contentcenter-drcn.dbankcdn.cn/pub_1/DevEcoSpace_1_900_9/ohpm/v5/ohpm-install.sh
-          bash ohpm-install.sh
-          export PATH=$PATH:$HOME/.ohpm/bin
-          ohpm install
           hvigorw assembleHap --mode module -p module=hello2d -p product=default --stacktrace
 
       - name: Save Third-Party Cache
