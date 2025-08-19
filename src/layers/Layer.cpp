@@ -548,20 +548,21 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   if (canvas == nullptr || alpha <= 0) {
     return;
   }
-  if (_root) {
-    _root->updateDirtyRegions();
-  }
 
   auto surface = canvas->getSurface();
   DrawArgs args = {};
   Context* context = nullptr;
   auto clipPath = canvas->getTotalClip();
   auto bounds = getBounds();
-  auto renderRect = GetRenderRect(bounds, canvas);
-  if (renderRect.isEmpty()) {
-    return;
+  auto renderRect = bounds;
+  if (_root) {
+    _root->updateRenderBounds();
+    renderRect = GetRenderRect(bounds, canvas);
+    if (renderRect.isEmpty()) {
+      return;
+    }
+    args.renderRect = &renderRect;
   }
-  args.renderRect = &renderRect;
 
   if (surface) {
     context = surface->getContext();
