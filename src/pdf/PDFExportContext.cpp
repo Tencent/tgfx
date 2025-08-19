@@ -578,24 +578,20 @@ void PDFExportContext::drawPicture(std::shared_ptr<Picture> picture, const MCSta
 void PDFExportContext::drawDropShadowBeforeLayer(const std::shared_ptr<Picture>& picture,
                                                  const DropShadowImageFilter* dropShadowFilter,
                                                  const MCState& state, const Fill& fill) {
+  DEBUG_ASSERT(Types::Get(dropShadowFilter->blurFilter.get()) == Types::ImageFilterType::Blur);
+  const auto* blurFilter =
+      static_cast<const GaussianBlurImageFilter*>(dropShadowFilter->blurFilter.get());
+  auto copyFilter = ImageFilter::DropShadowOnly(0.f, 0.f, blurFilter->blurrinessX,
+                                                blurFilter->blurrinessY, dropShadowFilter->color);
 
   auto pictureBounds = picture->getBounds();
-  auto blurBounds = dropShadowFilter->blurFilter->filterBounds(pictureBounds);
-  Point offset = {pictureBounds.x() - blurBounds.x(), pictureBounds.y() - blurBounds.y()};
+  auto blurBounds = copyFilter->filterBounds(pictureBounds);
+  auto offset = Point::Make(pictureBounds.x() - blurBounds.x(), pictureBounds.y() - blurBounds.y());
 
   auto surface = Surface::Make(document->context(), static_cast<int>(blurBounds.width()),
                                static_cast<int>(blurBounds.height()));
   DEBUG_ASSERT(surface);
-
   auto* canvas = surface->getCanvas();
-  canvas->clear(Color::Transparent());
-
-  DEBUG_ASSERT(Types::Get(dropShadowFilter->blurFilter.get()) == Types::ImageFilterType::Blur);
-  const auto* blurFilter =
-      static_cast<const GaussianBlurImageFilter*>(dropShadowFilter->blurFilter.get());
-  auto copyFilter = ImageFilter::DropShadowOnly(dropShadowFilter->dx, dropShadowFilter->dy,
-                                                blurFilter->blurrinessX, blurFilter->blurrinessY,
-                                                dropShadowFilter->color);
 
   Paint picturePaint = {};
   picturePaint.setImageFilter(copyFilter);
