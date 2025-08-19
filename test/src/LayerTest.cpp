@@ -2963,11 +2963,11 @@ TGFX_TEST(LayerTest, PartialDrawLayer) {
   DisplayList displayList;
   auto surface = Surface::Make(context, 200, 200);
   auto rootLayer = Layer::Make();
+  rootLayer->setMatrix(Matrix::MakeTrans(40, 40));
   displayList.root()->addChild(rootLayer);
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   auto imageLayer = ImageLayer::Make();
   imageLayer->setImage(image);
-  imageLayer->setMatrix(Matrix::MakeTrans(0, 0));
   rootLayer->addChild(imageLayer);
   auto shapeLayer = ShapeLayer::Make();
   Path path;
@@ -2980,7 +2980,7 @@ TGFX_TEST(LayerTest, PartialDrawLayer) {
   layerInvisible->setColor(Color::FromRGBA(0, 0, 0, 255));
   layerInvisible->setWidth(100);
   layerInvisible->setHeight(100);
-  layerInvisible->setMatrix(Matrix::MakeTrans(200, 200));
+  layerInvisible->setMatrix(Matrix::MakeTrans(100, 100));
   layerInvisible->setShouldRasterize(true);
   rootLayer->addChild(layerInvisible);
   auto canvas = surface->getCanvas();

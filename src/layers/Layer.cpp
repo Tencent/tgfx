@@ -511,24 +511,24 @@ bool Layer::hitTestPoint(float x, float y, bool shapeHitTest) {
   return false;
 }
 
-static Rect GetRenderRect(const Rect& bounds, const Canvas* canvas) {
+static Rect GetClippedBounds(const Rect& bounds, const Canvas* canvas) {
   DEBUG_ASSERT(canvas != nullptr);
   const auto& clipPath = canvas->getTotalClip();
-  auto renderRect = bounds;
-  auto clipBounds = Rect::MakeEmpty();
+  auto clippedBounds = bounds;
+  auto clipRect = Rect::MakeEmpty();
   auto surface = canvas->getSurface();
   if (clipPath.isInverseFillType()) {
     if (!surface) {
       return bounds;
     }
-    clipBounds = Rect::MakeWH(surface->width(), surface->height());
+    clipRect = Rect::MakeWH(surface->width(), surface->height());
   } else {
-    clipBounds = clipPath.getBounds();
-    if (surface && !clipBounds.intersect(Rect::MakeWH(surface->width(), surface->height()))) {
+    clipRect = clipPath.getBounds();
+    if (surface && !clipRect.intersect(Rect::MakeWH(surface->width(), surface->height()))) {
       return Rect::MakeEmpty();
     }
   }
-  if (clipBounds.isEmpty()) {
+  if (clipRect.isEmpty()) {
     return Rect::MakeEmpty();
   }
   auto invert = Matrix::I();
@@ -536,12 +536,12 @@ static Rect GetRenderRect(const Rect& bounds, const Canvas* canvas) {
   if (!viewMatrix.invert(&invert)) {
     return Rect::MakeEmpty();
   }
-  clipBounds = invert.mapRect(clipBounds);
-  if (!renderRect.intersect(clipBounds)) {
+  clipRect = invert.mapRect(clipRect);
+  if (!clippedBounds.intersect(clipRect)) {
     return Rect::MakeEmpty();
   }
-  renderRect.roundOut();
-  return renderRect;
+  clippedBounds.roundOut();
+  return clippedBounds;
 }
 
 void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
@@ -552,15 +552,22 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   auto surface = canvas->getSurface();
   DrawArgs args = {};
   Context* context = nullptr;
-  auto clipPath = canvas->getTotalClip();
+
   auto bounds = getBounds();
-  auto renderRect = bounds;
+  auto clippedBounds = GetClippedBounds(bounds, canvas);
+  if (clippedBounds.isEmpty()) {
+    return;
+  }
+  auto localToGlobalMatrix = getGlobalMatrix();
+  auto globalToLocalMatrix = Matrix::I();
+  if (!localToGlobalMatrix.invert(&globalToLocalMatrix)) {
+    return;
+  }
+
+  Rect renderRect = {};
   if (_root) {
     _root->updateRenderBounds();
-    renderRect = GetRenderRect(bounds, canvas);
-    if (renderRect.isEmpty()) {
-      return;
-    }
+    renderRect = localToGlobalMatrix.mapRect(clippedBounds);
     args.renderRect = &renderRect;
   }
 
@@ -573,22 +580,23 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
 
   if (context && hasBackgroundStyle()) {
     auto scale = canvas->getMatrix().getMaxScale();
-    auto backgroundBounds = renderRect;
-    backgroundBounds.scale(scale, scale);
-    auto globalMatrix = getGlobalMatrix();
-    globalMatrix.preScale(1 / scale, 1 / scale);
-    auto viewMatrix = Matrix::I();
-    if (globalMatrix.invert(&viewMatrix)) {
-      if (auto backgroundContext = createBackgroundContext(context, backgroundBounds, viewMatrix,
-                                                           bounds == renderRect)) {
-        if (auto image = getBackgroundImage(args, scale, nullptr)) {
-          auto backgroundCanvas = backgroundContext->getCanvas();
-          AutoCanvasRestore restore(backgroundCanvas);
-          backgroundCanvas->setMatrix(Matrix::I());
-          backgroundCanvas->drawImage(image);
-        }
-        args.backgroundContext = std::move(backgroundContext);
+    auto backgroundRect = clippedBounds;
+    backgroundRect.scale(scale, scale);
+    auto backgroundMatrix = globalToLocalMatrix;
+    backgroundMatrix.postScale(scale, scale);
+    if (auto backgroundContext = createBackgroundContext(
+            context, clippedBounds, globalToLocalMatrix, bounds == clippedBounds)) {
+      auto backgroundCanvas = backgroundContext->getCanvas();
+      auto actualMatrix = backgroundCanvas->getMatrix();
+      // because the background recorder start with current layer, we need to pre-concat
+      // localToGlobalMatrix to the background canvas matrix.
+      actualMatrix.preConcat(localToGlobalMatrix);
+      if (auto image = getBackgroundImage(args, scale, nullptr)) {
+        backgroundCanvas->resetMatrix();
+        backgroundCanvas->drawImage(image);
       }
+      backgroundCanvas->setMatrix(actualMatrix);
+      args.backgroundContext = std::move(backgroundContext);
     }
   }
   drawLayer(args, canvas, alpha, blendMode);
