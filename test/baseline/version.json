@@ -112,12 +112,12 @@
     },
     "DrawersTest": {
         "ConicGradient": "69683f78",
-        "CustomLayerTreeDrawer": "66c02859",
+        "CustomLayerTreeDrawer": "95326766",
         "GridBackground": "2ae64df",
         "ImageWithMipmap": "da590da",
         "ImageWithShadow": "ee2cc771",
         "SimpleLayerTreeDrawer": "66c02859",
-        "SimpleText": "66c02859"
+        "SimpleText": "95326766"
     },
     "DstTextureTest": {
         "EmptyLocalBounds": "be94e666",
@@ -181,7 +181,7 @@
         "LayerVisible1": "4edccb64",
         "Layer_drawRRect": "66aef718",
         "Layer_hitTestPoint": "99c36f0c",
-        "Layer_hitTestPointNested": "66c02859",
+        "Layer_hitTestPointNested": "f964dce1",
         "MaskAlpha": "3dbeed5",
         "ModeColorFilter": "8bd149a4",
         "PartialBackgroundBlur": "ee2cc771",
@@ -211,7 +211,7 @@
         "imageMask": "8bd149a4",
         "innerShadow": "ee2cc771",
         "shapeMask": "8bd149a4",
-        "textMask": "66c02859"
+        "textMask": "f964dce1"
     },
     "MaskTest": {
         "rasterize_emoji": "c0f39f8",
@@ -323,12 +323,12 @@
     "TextAlignTest": {
         "FontFallbackTest": "66c02859",
         "SingleLineTextAlign": "66c02859",
-        "TextAlign": "66c02859",
+        "TextAlign": "f964dce1",
         "TextAlignBlankLineTest": "66c02859",
         "TextAlignSimulateVerticalTextLayout": "66c02859",
         "TextAlignWidth0Height0": "66c02859",
         "TextAlignWidth1Height10": "66c02859",
-        "TruncateTextLineTest": "66c02859"
+        "TruncateTextLineTest": "f964dce1"
     },
     "TypefaceTest": {
         "CustomImageTypeface": "fe428880",
