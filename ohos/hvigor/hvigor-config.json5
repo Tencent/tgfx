@@ -1,9 +1,7 @@
 {
-  "modelVersion": "5.0.0",
+  "modelVersion": "5.0.3",
 
-  "@ohos/hvigor": "1.6.0",
   "dependencies": {
-    "@ohos/hvigor-ohos-plugin": "1.6.0"
   },
   "execution": {
     // "analyze": "normal",                     /* Define the build analyze mode. Value: [ "normal" | "advanced" | false ]. Default: "normal" */

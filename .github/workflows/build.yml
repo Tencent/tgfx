@@ -360,12 +360,18 @@ jobs:
         with:
           path: |
             ~/.ohpm
-            ~/ohpm
             ~/.npmrc
-            third_party
             ~/.npm-global
           key: env-openharmony-${{ hashFiles('DEPS', 'vendor.json', 'ohos/oh-package.json5', 'ohos/oh-package-lock.json5', 'install_tools.sh') }}
           restore-keys: env-openharmony-
+
+      - name: Get Third-Party Cache
+        id: third-party-cache
+        uses: actions/cache/restore@v4
+        with:
+          path: third_party
+          key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          restore-keys: third-party-openharmony-
 
       - name: Run depsync
         run: |
@@ -378,6 +384,7 @@ jobs:
           version: '5.0.3'
           cache: true
 
+      #question1
       - name: Configure Environment
         run: |
           cd ohos
@@ -408,14 +415,12 @@ jobs:
           ./hvigorw assembleHap --mode module -p module=${MODULE_NAME} -p product=default --stacktrace
 
       - name: Save Environment Cache
-        if: ${{ (github.event_name == 'push') && (steps.env-cache.outputs.cache-hit != 'true') }}
+        if: ${{ github.event_name == 'push' }}
         uses: actions/cache/save@v4
         with:
           path: |
             ~/.ohpm
-            ~/ohpm
             ~/.npmrc
-            third_party
             ~/.npm-global
           key: env-openharmony-${{ hashFiles('DEPS', 'vendor.json', 'ohos/oh-package.json5', 'ohos/oh-package-lock.json5', 'install_tools.sh') }}
 
@@ -427,7 +432,7 @@ jobs:
           key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
 
       - name: Save OHPM Cache
-        if: ${{ (github.event_name == 'push') && (steps.ohpm-cache.outputs.cache-hit != 'true') }}
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
         uses: actions/cache/save@v4
         with:
           path: |
