@@ -28,6 +28,8 @@ class ComposeColorFilter : public ColorFilter {
 
   bool isAlphaUnchanged() const override;
 
+  [[nodiscard]] Color filterColor(const Color& src) const override;
+
   std::shared_ptr<ColorFilter> inner = nullptr;
   std::shared_ptr<ColorFilter> outer = nullptr;
 

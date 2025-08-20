@@ -44,6 +44,11 @@ bool ComposeColorFilter::isAlphaUnchanged() const {
   return outer->isAlphaUnchanged() && inner->isAlphaUnchanged();
 }
 
+Color ComposeColorFilter::filterColor(const Color& src) const {
+  // TODO: StarryThrone Complete Logic.
+  return {0, 0, 0, 0};
+}
+
 bool ComposeColorFilter::isEqual(const ColorFilter* colorFilter) const {
   auto type = Types::Get(colorFilter);
   if (type != Types::ColorFilterType::Compose) {

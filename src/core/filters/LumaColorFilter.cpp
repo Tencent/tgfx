@@ -29,4 +29,9 @@ PlacementPtr<FragmentProcessor> LumaColorFilter::asFragmentProcessor(Context* co
   return LumaFragmentProcessor::Make(context->drawingBuffer());
 }
 
+Color LumaColorFilter::filterColor(const Color& src) const {
+  // TODO: StarryThrone Complete Logic.
+  return {0, 0, 0, 0};
+}
+
 }  // namespace tgfx

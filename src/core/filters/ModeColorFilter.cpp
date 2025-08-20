@@ -59,6 +59,11 @@ bool ModeColorFilter::asColorMode(Color* color, BlendMode* mode) const {
   return true;
 }
 
+Color ModeColorFilter::filterColor(const Color& src) const {
+  // TODO: StarryThrone Complete Logic.
+  return {0, 0, 0, 0};
+}
+
 bool ModeColorFilter::isEqual(const ColorFilter* colorFilter) const {
   auto type = Types::Get(colorFilter);
   if (type != Types::ColorFilterType::Blend) {

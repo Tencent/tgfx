@@ -27,6 +27,11 @@ std::shared_ptr<ColorFilter> ColorFilter::AlphaThreshold(float threshold) {
   return std::make_shared<AlphaThresholdColorFilter>(threshold);
 }
 
+Color AlphaThresholdColorFilter::filterColor(const Color& src) const {
+  // TODO: StarryThrone Complete Logic.
+  return {0, 0, 0, 0};
+}
+
 bool AlphaThresholdColorFilter::isEqual(const ColorFilter* colorFilter) const {
   auto type = Types::Get(colorFilter);
   if (type != Types::ColorFilterType::AlphaThreshold) {

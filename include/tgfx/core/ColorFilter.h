@@ -99,6 +99,9 @@ class ColorFilter {
     return false;
   }
 
+  // 对指定颜色应用滤镜，返回滤镜后的颜色
+  [[nodiscard]] virtual Color filterColor(const Color& src) const = 0;
+
  protected:
   enum class Type { Blend, Matrix, AlphaThreshold, Compose, Luma };
 

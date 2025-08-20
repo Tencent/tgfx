@@ -26,6 +26,9 @@ namespace tgfx {
  * while LumaFilter uses premultiplied RGBA.
  */
 class LumaColorFilter : public ColorFilter {
+ public:
+  [[nodiscard]] Color filterColor(const Color& src) const override;
+
  protected:
   Type type() const override {
     return Type::Luma;

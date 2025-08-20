@@ -31,6 +31,8 @@ class ModeColorFilter : public ColorFilter {
 
   bool asColorMode(Color* color, BlendMode* mode) const override;
 
+  [[nodiscard]] Color filterColor(const Color& src) const override;
+
   Color color;
   BlendMode mode;
 
