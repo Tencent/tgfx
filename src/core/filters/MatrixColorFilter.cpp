@@ -38,8 +38,21 @@ MatrixColorFilter::MatrixColorFilter(const std::array<float, 20>& matrix)
 }
 
 Color MatrixColorFilter::filterColor(const Color& src) const {
-  // TODO: StarryThrone Complete Logic.
-  return {0, 0, 0, 0};
+  Color transformedColor;
+  transformedColor.red = matrix[0] * src.red + matrix[1] * src.green + matrix[2] * src.blue +
+                         matrix[3] * src.alpha + matrix[4];
+  transformedColor.green = matrix[5] * src.red + matrix[6] * src.green + matrix[7] * src.blue +
+                           matrix[8] * src.alpha + matrix[9];
+  transformedColor.blue = matrix[10] * src.red + matrix[11] * src.green + matrix[12] * src.blue +
+                          matrix[13] * src.alpha + matrix[14];
+  transformedColor.alpha = matrix[15] * src.red + matrix[16] * src.green + matrix[17] * src.blue +
+                           matrix[18] * src.alpha + matrix[19];
+
+  transformedColor.red = std::clamp(transformedColor.red, 0.0f, 1.0f);
+  transformedColor.green = std::clamp(transformedColor.green, 0.0f, 1.0f);
+  transformedColor.blue = std::clamp(transformedColor.blue, 0.0f, 1.0f);
+  transformedColor.alpha = std::clamp(transformedColor.alpha, 0.0f, 1.0f);
+  return transformedColor;
 }
 
 bool MatrixColorFilter::isEqual(const ColorFilter* colorFilter) const {
