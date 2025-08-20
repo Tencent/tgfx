@@ -789,6 +789,9 @@ if (TGFX_BUILD_TESTS)
             message(FATAL_ERROR "Google Mock library not found in vcpkg")
         endif()
         list(APPEND TGFX_TEST_LIBS ${GMOCK_LIB})
+
+        # 创建一个虚拟的 test-vendor 目标，用于保持依赖关系的一致性
+        add_custom_target(test-vendor)
     else()
         add_vendor_target(test-vendor STATIC_VENDORS harfbuzz googletest)
         find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)
