@@ -140,7 +140,7 @@ class Inspector {
   }
 
   static void SendAttributeData(const char* name, uint32_t val,
-  MsgType type = MsgType::ValueDataUint32) {
+                                MsgType type = MsgType::ValueDataUint32) {
     auto item = MsgItem();
     item.hdr.type = type;
     item.attributeDataUint32.name = reinterpret_cast<uint64_t>(name);
