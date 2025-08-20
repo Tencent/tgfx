@@ -1,8 +1,12 @@
 cmake_minimum_required(VERSION 3.13)
 project(TGFX)
 
-#set(CMAKE_VERBOSE_MAKEFILE ON)
 option(TGFX_USE_VCPKG "Enable vcpkg package manager support for installation" OFF)
+if (TGFX_USE_VCPKG)
+    set(ENV{VCPKG_INCLUDE_DIR} "${VCPKG_INCLUDE_DIR}")
+endif ()
+
+#set(CMAKE_VERBOSE_MAKEFILE ON)
 include(./third_party/vendor_tools/vendor.cmake)
 
 set(CMAKE_CXX_STANDARD 17)
@@ -651,8 +655,7 @@ if(TGFX_USE_VCPKG)
         endif()
         list(APPEND TGFX_STATIC_LIBS ${EXPAT_LIB})
     endif ()
-    
-    find_package(unofficial-concurrentqueue REQUIRED)
+       
     list(APPEND TGFX_INCLUDES ${VCPKG_INCLUDE_DIR}/concurrentqueue)
 endif()
 
