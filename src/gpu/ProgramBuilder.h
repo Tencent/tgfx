@@ -49,16 +49,6 @@ class ProgramBuilder {
 
   virtual std::string getShaderVarDeclarations(const ShaderVar& var, ShaderFlags flag) const = 0;
 
-  std::string getUniformDeclarations(ShaderFlags visibility) const;
-
-  const ShaderVar& samplerVariable(SamplerHandle handle) const {
-    return uniformHandler()->samplerVariable(handle);
-  }
-
-  Swizzle samplerSwizzle(SamplerHandle handle) const {
-    return uniformHandler()->samplerSwizzle(handle);
-  }
-
   /**
    * Generates a name for a variable. The generated string will be mangled to be processor-specific.
    */

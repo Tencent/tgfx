@@ -105,7 +105,13 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(const Font& font, GlyphID glyph
   shape = Shape::ApplyMatrix(std::move(shape), Matrix::MakeTrans(-bounds.x(), -bounds.y()));
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
-  glyphCodec = PathRasterizer::MakeFrom(width, height, std::move(shape), true, true);
+  glyphCodec = PathRasterizer::MakeFrom(width, height, std::move(shape), true,
+#ifdef TGFX_TEXT_GAMMA_CORRECTION
+                                        true
+#else
+                                        false
+#endif
+  );
   matrix->setTranslate(bounds.x(), bounds.y());
   return glyphCodec;
 }

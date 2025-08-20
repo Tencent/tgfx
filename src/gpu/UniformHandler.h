@@ -22,13 +22,15 @@
 #include "ShaderVar.h"
 #include "Swizzle.h"
 #include "gpu/GPUTexture.h"
+#include "gpu/UniformBuffer.h"
 
 namespace tgfx {
 class ProgramBuilder;
 
 class UniformHandler {
  public:
-  virtual ~UniformHandler() = default;
+  explicit UniformHandler(ProgramBuilder* builder) : programBuilder(builder) {
+  }
 
   /**
    * Adds a uniform variable to the current program, that has visibility in one or more shaders.
@@ -36,8 +38,20 @@ class UniformHandler {
    * be accessible. At least one bit must be set. The actual uniform name will be mangled. Returns
    * the final uniform name.
    */
-  std::string addUniform(ShaderFlags visibility, SLType type, const std::string& name) {
-    return internalAddUniform(visibility, type, name);
+  std::string addUniform(ShaderFlags visibility, SLType type, const std::string& name);
+
+  /**
+   * Returns all uniforms added by addUniform().
+   */
+  const std::vector<Uniform>& getUniforms() const {
+    return uniforms;
+  }
+
+  /**
+   * Returns all samplers added by addSampler().
+   */
+  const std::vector<Uniform>& getSamplers() const {
+    return samplers;
   }
 
   /**
@@ -45,25 +59,28 @@ class UniformHandler {
    */
   SamplerHandle addSampler(GPUTexture* texture, const std::string& name);
 
- protected:
-  explicit UniformHandler(ProgramBuilder* program) : programBuilder(program) {
+  /**
+   * Returns the sampler variable for the given sampler handle.
+   */
+  ShaderVar getSamplerVariable(SamplerHandle samplerHandle) const;
+
+  /**
+   * Returns the sampler swizzle for the given sampler handle.
+   */
+  Swizzle getSamplerSwizzle(SamplerHandle samplerHandle) const {
+    return samplerSwizzles[samplerHandle.toIndex()];
   }
 
-  // This is not owned by the class
-  ProgramBuilder* programBuilder;
+  /**
+   * Returns the declarations of all uniforms that are visible in the given shader visibility.
+   */
+  std::string getUniformDeclarations(ShaderFlags visibility) const;
 
  private:
-  virtual const ShaderVar& samplerVariable(SamplerHandle samplerHandle) const = 0;
-
-  virtual const Swizzle& samplerSwizzle(SamplerHandle samplerHandle) const = 0;
-
-  virtual std::string internalAddUniform(ShaderFlags visibility, SLType type,
-                                         const std::string& name) = 0;
-
-  virtual SamplerHandle internalAddSampler(GPUTexture* texture, const std::string& name) = 0;
-
-  virtual std::string getUniformDeclarations(ShaderFlags visibility) const = 0;
-
-  friend class ProgramBuilder;
+  // This is not owned by the class
+  ProgramBuilder* programBuilder = nullptr;
+  std::vector<Uniform> uniforms = {};
+  std::vector<Uniform> samplers = {};
+  std::vector<Swizzle> samplerSwizzles = {};
 };
 }  // namespace tgfx

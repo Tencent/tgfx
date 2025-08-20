@@ -51,7 +51,7 @@ RRectDrawOp::RRectDrawOp(RRectsVertexProvider* provider)
   hasStroke = provider->hasStroke();
 }
 
-void RRectDrawOp::execute(RenderPass* renderPass) {
+void RRectDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   OPERATE_MARK(tgfx::debug::OpTaskType::RRectDrawOp);
   ATTRIBUTE_NAME("rectCount", static_cast<uint32_t>(rectCount));
   ATTRIBUTE_NAME("useScale", useScale);
@@ -70,12 +70,11 @@ void RRectDrawOp::execute(RenderPass* renderPass) {
   if (vertexBuffer == nullptr) {
     return;
   }
-  auto renderTarget = renderPass->getRenderTarget();
-  auto drawingBuffer = renderPass->getContext()->drawingBuffer();
+  auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
   auto gp =
       EllipseGeometryProcessor::Make(drawingBuffer, renderTarget->width(), renderTarget->height(),
                                      hasStroke, useScale, commonColor);
-  auto pipeline = createPipeline(renderPass, std::move(gp));
+  auto pipeline = createPipeline(renderTarget, std::move(gp));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   renderPass->bindBuffers(indexBuffer->gpuBuffer(), vertexBuffer->gpuBuffer(),
                           vertexBufferProxyView->offset());

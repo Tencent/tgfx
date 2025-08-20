@@ -24,13 +24,18 @@
 namespace tgfx {
 void OpsRenderTask::execute(CommandEncoder* encoder) {
   TASK_MARK(tgfx::debug::OpTaskType::OpsRenderTask);
-  auto renderPass = encoder->beginRenderPass(renderTargetProxy->getRenderTarget(), true);
+  auto renderTarget = renderTargetProxy->getRenderTarget();
+  if (renderTarget == nullptr) {
+    LOGE("OpsRenderTask::execute() Render target is null!");
+    return;
+  }
+  auto renderPass = encoder->beginRenderPass(renderTarget, true);
   if (renderPass == nullptr) {
     LOGE("OpsRenderTask::execute() Failed to initialize the render pass!");
     return;
   }
   for (auto& op : ops) {
-    op->execute(renderPass.get());
+    op->execute(renderPass.get(), renderTarget.get());
     // Release the Op immediately after execution to maximize GPU resource reuse.
     op = nullptr;
   }

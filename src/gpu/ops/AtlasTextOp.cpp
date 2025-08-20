@@ -58,7 +58,7 @@ AtlasTextOp::AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureP
   }
 }
 
-void AtlasTextOp::execute(RenderPass* renderPass) {
+void AtlasTextOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   OPERATE_MARK(tgfx::debug::OpTaskType::RRectDrawOp);
   ATTRIBUTE_NAME("rectCount", static_cast<uint32_t>(rectCount));
   ATTRIBUTE_NAME("commonColor", commonColor);
@@ -76,10 +76,10 @@ void AtlasTextOp::execute(RenderPass* renderPass) {
     return;
   }
 
-  auto drawingBuffer = renderPass->getContext()->drawingBuffer();
+  auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
   auto atlasGeometryProcessor =
       AtlasTextGeometryProcessor::Make(drawingBuffer, textureProxy, aaType, commonColor);
-  auto pipeline = createPipeline(renderPass, std::move(atlasGeometryProcessor));
+  auto pipeline = createPipeline(renderTarget, std::move(atlasGeometryProcessor));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   renderPass->bindBuffers(indexBuffer ? indexBuffer->gpuBuffer() : nullptr,
                           vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());

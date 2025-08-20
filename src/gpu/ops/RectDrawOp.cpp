@@ -58,7 +58,7 @@ RectDrawOp::RectDrawOp(RectsVertexProvider* provider)
   hasSubset = provider->hasSubset();
 }
 
-void RectDrawOp::execute(RenderPass* renderPass) {
+void RectDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   OPERATE_MARK(tgfx::debug::OpTaskType::RectDrawOp);
   ATTRIBUTE_NAME("rectCount", static_cast<int>(rectCount));
   ATTRIBUTE_NAME("commonColor", commonColor);
@@ -77,12 +77,11 @@ void RectDrawOp::execute(RenderPass* renderPass) {
   if (vertexBuffer == nullptr) {
     return;
   }
-  auto renderTarget = renderPass->getRenderTarget();
-  auto drawingBuffer = renderPass->getContext()->drawingBuffer();
+  auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
   auto gp = QuadPerEdgeAAGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
                                                  renderTarget->height(), aaType, commonColor,
                                                  uvMatrix, hasSubset);
-  auto pipeline = createPipeline(renderPass, std::move(gp));
+  auto pipeline = createPipeline(renderTarget, std::move(gp));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   renderPass->bindBuffers(indexBuffer ? indexBuffer->gpuBuffer() : nullptr,
                           vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());

@@ -17,7 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLProgramBuilder.h"
-#include "GLUtil.h"
+#include "gpu/opengl/GLUniformBuffer.h"
+#include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
 static std::string TypeModifierString(bool isDesktopGL, ShaderVar::TypeModifier t,
@@ -152,18 +153,23 @@ std::unique_ptr<GLProgram> GLProgramBuilder::finalize() {
     return nullptr;
   }
   computeCountsAndStrides(programID);
-  resolveProgramResourceLocations(programID);
-
-  auto uniformBuffer = _uniformHandler.makeUniformBuffer();
-  // Assign texture units to sampler uniforms up front, just once.
   gl->useProgram(programID);
-  auto& samplers = _uniformHandler.samplers;
-  for (size_t i = 0; i < samplers.size(); ++i) {
-    const auto& sampler = samplers[i];
-    if (UNUSED_UNIFORM != sampler.location) {
-      gl->uniform1i(sampler.location, static_cast<int>(i));
-    }
+  auto& uniforms = _uniformHandler.getUniforms();
+  auto& samplers = _uniformHandler.getSamplers();
+  std::vector<int> uniformLocations = {};
+  uniformLocations.reserve(uniforms.size());
+  for (auto& uniform : uniforms) {
+    auto location = gl->getUniformLocation(programID, uniform.name().c_str());
+    uniformLocations.push_back(location);
   }
+  // Assign texture units to sampler uniforms up front, just once.
+  int textureUint = 0;
+  for (auto& sampler : samplers) {
+    auto location = gl->getUniformLocation(programID, sampler.name().c_str());
+    DEBUG_ASSERT(location != -1);
+    gl->uniform1i(location, textureUint++);
+  }
+  auto uniformBuffer = std::make_unique<GLUniformBuffer>(uniforms, std::move(uniformLocations));
   return std::make_unique<GLProgram>(programID, std::move(uniformBuffer), attributes,
                                      static_cast<int>(vertexStride));
 }
@@ -181,10 +187,6 @@ void GLProgramBuilder::computeCountsAndStrides(unsigned int programID) {
       attributes.push_back(attribute);
     }
   }
-}
-
-void GLProgramBuilder::resolveProgramResourceLocations(unsigned programID) {
-  _uniformHandler.resolveUniformLocations(programID);
 }
 
 bool GLProgramBuilder::checkSamplerCounts() {

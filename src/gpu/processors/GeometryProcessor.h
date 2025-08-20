@@ -19,6 +19,7 @@
 #pragma once
 
 #include <vector>
+#include "core/utils/Algin.h"
 #include "gpu/FragmentShaderBuilder.h"
 #include "gpu/GPUTexture.h"
 #include "gpu/ShaderVar.h"
@@ -41,6 +42,7 @@ class GeometryProcessor : public Processor {
   class Attribute {
    public:
     Attribute() = default;
+
     Attribute(std::string name, SLType gpuType) : _name(std::move(name)), _gpuType(gpuType) {
     }
 
@@ -51,11 +53,14 @@ class GeometryProcessor : public Processor {
     const std::string& name() const {
       return _name;
     }
+
     SLType gpuType() const {
       return _gpuType;
     }
 
-    size_t sizeAlign4() const;
+    size_t sizeAlign4() const {
+      return Align4(GetSLTypeSize(_gpuType));
+    }
 
     ShaderVar asShaderVar() const {
       return {_name, _gpuType, ShaderVar::TypeModifier::Attribute};

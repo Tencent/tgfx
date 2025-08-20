@@ -511,13 +511,64 @@ bool Layer::hitTestPoint(float x, float y, bool shapeHitTest) {
   return false;
 }
 
+static Rect GetClippedBounds(const Rect& bounds, const Canvas* canvas) {
+  DEBUG_ASSERT(canvas != nullptr);
+  const auto& clipPath = canvas->getTotalClip();
+  auto clippedBounds = bounds;
+  auto clipRect = Rect::MakeEmpty();
+  auto surface = canvas->getSurface();
+  if (clipPath.isInverseFillType()) {
+    if (!surface) {
+      return bounds;
+    }
+    clipRect = Rect::MakeWH(surface->width(), surface->height());
+  } else {
+    clipRect = clipPath.getBounds();
+    if (surface && !clipRect.intersect(Rect::MakeWH(surface->width(), surface->height()))) {
+      return Rect::MakeEmpty();
+    }
+  }
+  if (clipRect.isEmpty()) {
+    return Rect::MakeEmpty();
+  }
+  auto invert = Matrix::I();
+  auto viewMatrix = canvas->getMatrix();
+  if (!viewMatrix.invert(&invert)) {
+    return Rect::MakeEmpty();
+  }
+  clipRect = invert.mapRect(clipRect);
+  if (!clippedBounds.intersect(clipRect)) {
+    return Rect::MakeEmpty();
+  }
+  clippedBounds.roundOut();
+  return clippedBounds;
+}
+
 void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
   if (canvas == nullptr || alpha <= 0) {
     return;
   }
+
   auto surface = canvas->getSurface();
   DrawArgs args = {};
   Context* context = nullptr;
+
+  auto bounds = getBounds();
+  auto clippedBounds = GetClippedBounds(bounds, canvas);
+  if (clippedBounds.isEmpty()) {
+    return;
+  }
+  auto localToGlobalMatrix = getGlobalMatrix();
+  auto globalToLocalMatrix = Matrix::I();
+  bool canInvert = localToGlobalMatrix.invert(&globalToLocalMatrix);
+
+  Rect renderRect = {};
+  if (_root && canInvert) {
+    _root->updateRenderBounds();
+    renderRect = localToGlobalMatrix.mapRect(clippedBounds);
+    args.renderRect = &renderRect;
+  }
+
   if (surface) {
     context = surface->getContext();
     if (!(surface->renderFlags() & RenderFlags::DisableCache)) {
@@ -525,28 +576,28 @@ void Layer::draw(Canvas* canvas, float alpha, BlendMode blendMode) {
     }
   }
 
-  if (context && hasBackgroundStyle()) {
+  if (context && canInvert && hasBackgroundStyle()) {
     auto scale = canvas->getMatrix().getMaxScale();
-    auto bounds = getBounds();
-    bounds.scale(scale, scale);
-    auto globalMatrix = getGlobalMatrix();
-    globalMatrix.preScale(1 / scale, 1 / scale);
-    auto invert = Matrix::I();
-    if (globalMatrix.invert(&invert)) {
-      auto backgroundContext = BackgroundContext::Make(context, bounds, 0, 0, invert);
-      if (backgroundContext) {
-        auto backgroundCanvas = backgroundContext->getCanvas();
-        auto image = getBackgroundImage(args, scale, nullptr);
-        if (image) {
-          AutoCanvasRestore restore(backgroundCanvas);
-          backgroundCanvas->setMatrix(Matrix::I());
-          backgroundCanvas->drawImage(image);
-        }
-        args.backgroundContext = std::move(backgroundContext);
+    auto backgroundRect = clippedBounds;
+    backgroundRect.scale(scale, scale);
+    auto backgroundMatrix = globalToLocalMatrix;
+    backgroundMatrix.postScale(scale, scale);
+    if (auto backgroundContext = createBackgroundContext(
+            context, clippedBounds, globalToLocalMatrix, bounds == clippedBounds)) {
+      auto backgroundCanvas = backgroundContext->getCanvas();
+      auto actualMatrix = backgroundCanvas->getMatrix();
+      // Since the background recorder starts from the current layer, we need to pre-concatenate
+      // localToGlobalMatrix to the background canvas matrix to ensure the coordinate space is
+      // correct.
+      actualMatrix.preConcat(localToGlobalMatrix);
+      if (auto image = getBackgroundImage(args, scale, nullptr)) {
+        backgroundCanvas->resetMatrix();
+        backgroundCanvas->drawImage(image);
       }
+      backgroundCanvas->setMatrix(actualMatrix);
+      args.backgroundContext = std::move(backgroundContext);
     }
   }
-
   drawLayer(args, canvas, alpha, blendMode);
 }
 
@@ -1305,6 +1356,21 @@ bool Layer::hasBackgroundStyle() {
     }
   }
   return false;
+}
+
+std::shared_ptr<BackgroundContext> Layer::createBackgroundContext(Context* context,
+                                                                  const Rect& drawRect,
+                                                                  const Matrix& viewMatrix,
+                                                                  bool fullLayer) const {
+  if (maxBackgroundOutset <= 0.0f) {
+    return nullptr;
+  }
+  if (fullLayer) {
+    return BackgroundContext::Make(context, drawRect, 0, 0, viewMatrix);
+  }
+  auto scale = viewMatrix.getMaxScale();
+  return BackgroundContext::Make(context, drawRect, maxBackgroundOutset * scale,
+                                 minBackgroundOutset * scale, viewMatrix);
 }
 
 }  // namespace tgfx

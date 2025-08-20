@@ -131,14 +131,13 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
       DefaultGeometryProcessor::Make(context->drawingBuffer(), {}, renderTarget->width(),
                                      renderTarget->height(), AAType::None, {}, {});
   auto format = renderTarget->format();
-  auto caps = renderPass->getContext()->caps();
+  auto caps = renderTarget->getContext()->caps();
   const auto& swizzle = caps->getWriteSwizzle(format);
   std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors = {};
   fragmentProcessors.emplace_back(std::move(colorProcessor));
-  auto pipeline =
-      std::make_unique<Pipeline>(std::move(geometryProcessor), std::move(fragmentProcessors), 1,
-                                 nullptr, BlendMode::Src, &swizzle);
-  renderPass->bindProgramAndScissorClip(pipeline.get(), {});
+  Pipeline pipeline(std::move(geometryProcessor), std::move(fragmentProcessors), 1, nullptr,
+                    BlendMode::Src, &swizzle);
+  renderPass->bindProgramAndScissorClip(&pipeline, {});
   renderPass->bindBuffers(nullptr, vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
   renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
   renderPass->end();

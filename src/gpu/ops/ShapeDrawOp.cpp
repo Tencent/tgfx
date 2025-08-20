@@ -50,7 +50,7 @@ ShapeDrawOp::ShapeDrawOp(std::shared_ptr<GPUShapeProxy> proxy, Color color, cons
   }
 }
 
-void ShapeDrawOp::execute(RenderPass* renderPass) {
+void ShapeDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   OPERATE_MARK(tgfx::debug::OpTaskType::ShapeDrawOp);
   ATTRIBUTE_NAME("color", color);
   ATTRIBUTE_NAME("uvMatrix", uvMatrix);
@@ -75,17 +75,19 @@ void ShapeDrawOp::execute(RenderPass* renderPass) {
     if (!realUVMatrix.invert(&maskMatrix)) {
       return;
     }
-    auto maskFP = TextureEffect::Make(std::move(textureProxy), {}, &maskMatrix, true);
+    static SamplingArgs args(TileMode::Clamp, TileMode::Clamp,
+                             SamplingOptions(FilterMode::Nearest, MipmapMode::None),
+                             SrcRectConstraint::Fast);
+    auto maskFP = TextureEffect::Make(std::move(textureProxy), args, &maskMatrix, true);
     if (maskFP == nullptr) {
       return;
     }
     addCoverageFP(std::move(maskFP));
   }
-  auto drawingBuffer = renderPass->getContext()->drawingBuffer();
-  auto renderTarget = renderPass->getRenderTarget();
+  auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
   auto gp = DefaultGeometryProcessor::Make(drawingBuffer, color, renderTarget->width(),
                                            renderTarget->height(), aa, viewMatrix, realUVMatrix);
-  auto pipeline = createPipeline(renderPass, std::move(gp));
+  auto pipeline = createPipeline(renderTarget, std::move(gp));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   if (vertexBuffer != nullptr) {
     renderPass->bindBuffers(nullptr, vertexBuffer->gpuBuffer());

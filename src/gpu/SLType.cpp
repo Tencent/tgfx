@@ -16,26 +16,38 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include <optional>
-#include "gpu/processors/AtlasTextGeometryProcessor.h"
+#include "SLType.h"
+#include <cinttypes>
 
 namespace tgfx {
-class GLAtlasTextGeometryProcessor : public AtlasTextGeometryProcessor {
- public:
-  GLAtlasTextGeometryProcessor(std::shared_ptr<TextureProxy> textureProxy, AAType aa,
-                               std::optional<Color> commonColor);
-  void emitCode(EmitArgs&) const override;
-
-  void setData(UniformBuffer* uniformBuffer,
-               FPCoordTransformIter* coordTransformIter) const override;
-
-  SamplerState onSamplerStateAt(size_t) const override {
-    return {SamplerState::WrapMode::Clamp, SamplerState::WrapMode::Clamp, FilterMode::Nearest};
+size_t GetSLTypeSize(SLType type) {
+  switch (type) {
+    case SLType::Float:
+      return sizeof(float);
+    case SLType::Float2:
+      return 2 * sizeof(float);
+    case SLType::Float3:
+      return 3 * sizeof(float);
+    case SLType::Float4:
+      return 4 * sizeof(float);
+    case SLType::Int:
+      return sizeof(int32_t);
+    case SLType::Int2:
+      return 2 * sizeof(int32_t);
+    case SLType::Int3:
+      return 3 * sizeof(int32_t);
+    case SLType::Int4:
+      return 4 * sizeof(int32_t);
+    case SLType::UByte4Color:
+      return 4 * sizeof(uint8_t);
+    case SLType::Float2x2:
+      return 4 * sizeof(float);
+    case SLType::Float3x3:
+      return 9 * sizeof(float);
+    case SLType::Float4x4:
+      return 16 * sizeof(float);
+    default:
+      return 0;
   }
-
- private:
-  std::string atlasSizeUniformName = "atlasSizeInv";
-};
+}
 }  // namespace tgfx

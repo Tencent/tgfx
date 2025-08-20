@@ -87,10 +87,11 @@ static std::string TextureSwizzleString(const Swizzle& swizzle) {
 }
 
 void ShaderBuilder::appendTextureLookup(SamplerHandle samplerHandle, const std::string& coordName) {
-  const auto& sampler = programBuilder->samplerVariable(samplerHandle);
+  auto uniformHandler = programBuilder->uniformHandler();
+  auto sampler = uniformHandler->getSamplerVariable(samplerHandle);
   codeAppendf("%s(%s, %s)", programBuilder->textureFuncName().c_str(), sampler.name().c_str(),
               coordName.c_str());
-  codeAppend(TextureSwizzleString(programBuilder->samplerSwizzle(samplerHandle)));
+  codeAppend(TextureSwizzleString(uniformHandler->getSamplerSwizzle(samplerHandle)));
 }
 
 void ShaderBuilder::addFeature(PrivateFeature featureBit, const std::string& extensionName) {
@@ -119,7 +120,8 @@ void ShaderBuilder::finalize(ShaderFlags visibility) {
     return;
   }
   shaderStrings[Type::VersionDecl] = programBuilder->versionDeclString();
-  shaderStrings[Type::Uniforms] += programBuilder->getUniformDeclarations(visibility);
+  shaderStrings[Type::Uniforms] +=
+      programBuilder->uniformHandler()->getUniformDeclarations(visibility);
   shaderStrings[Type::Inputs] += getDeclarations(inputs, visibility);
   shaderStrings[Type::Outputs] += getDeclarations(outputs, visibility);
   onFinalize();
