@@ -11,6 +11,7 @@ set(INSPECTOR_CLIENT_DIR client/src)
 if(DEFINED ENV{VCPKG_INCLUDE_DIR})
         set(CONCURRENT_QUEUE_DIR "$ENV{VCPKG_INCLUDE_DIR}/concurrentqueue")
 else ()
+        message(FATAL_ERROR "VCPKG_INCLUDE_DIR is not defined")
         set(CONCURRENT_QUEUE_DIR ../third_party/concurrentqueue)
 endif ()
 
