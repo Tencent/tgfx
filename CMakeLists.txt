@@ -3,6 +3,7 @@ project(TGFX)
 
 option(TGFX_USE_VCPKG "Enable vcpkg package manager support for installation" OFF)
 if (TGFX_USE_VCPKG)
+    set(VCPKG_INCLUDE_DIR ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/include)
     set(ENV{VCPKG_INCLUDE_DIR} "${VCPKG_INCLUDE_DIR}")
 endif ()
 
@@ -543,7 +544,6 @@ if(TGFX_USE_VCPKG)
     else()
         set(VCPKG_LIB_DIR ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib)
     endif()
-    set(VCPKG_INCLUDE_DIR ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/include)
     list(APPEND TGFX_INCLUDES ${VCPKG_INCLUDE_DIR})
 
     if(TGFX_USE_JPEG)
