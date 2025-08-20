@@ -8,8 +8,13 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 set(INSPECTOR_COMMON_DIR common)
 set(INSPECTOR_CLIENT_DIR client/src)
-set(CONCURRENT_QUEUE_DIR ../third_party/concurrentqueue)
-
+if(TGFX_USE_VCPKG)
+message(FATAL_ERROR "---------------INSPECTOR: TGFX_USE_VCPKG----------------")
+        find_package(unofficial-concurrentqueue REQUIRED)
+        target_link_libraries(inspector PRIVATE unofficial::concurrentqueue::concurrentqueue)
+else ()
+        set(CONCURRENT_QUEUE_DIR ../third_party/concurrentqueue)
+endif ()
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     list(APPEND INSPECTOR_COMPILE_OPTIONS -Werror -Wall -Wextra -Weffc++ -Wconversion -pedantic -Werror=return-type -Wno-unused-command-line-argument)

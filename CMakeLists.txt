@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.13)
-project(TGFX VERSION 0.0.0)
+project(TGFX)
 
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 option(TGFX_USE_VCPKG "Enable vcpkg package manager support for installation" OFF)
@@ -62,7 +62,7 @@ else ()
     set(CLION_IDE OFF)
 endif ()
 get_directory_property(HasParent PARENT_DIRECTORY)
-if (MACOS AND CLION_IDE AND NOT HasParent)
+if (MACOS AND CLION_IDE AND NOT HasParent AND NOT TGFX_USE_VCPKG)
     # CLion project needs test targets.
     option(TGFX_BUILD_TESTS "Enable building tgfx test targets" ON)
 endif ()
@@ -616,15 +616,6 @@ if(TGFX_USE_VCPKG)
         list(APPEND TGFX_STATIC_LIBS ${FREETYPE_LIB})
     endif()
     
-#    if(MSVC)
-#        find_library(HWY_LIB 
-#            NAMES hwy libhwy
-#            PATHS ${VCPKG_LIB_DIR}
-#            NO_DEFAULT_PATH
-#        )
-#        list(APPEND TGFX_STATIC_LIBS ${HWY_LIB})
-#    endif()
-    
     if(TGFX_USE_INSPECTOR)
         find_library(FLATBUFFERS_LIB 
             NAMES flatbuffers libflatbuffers
@@ -661,7 +652,7 @@ if(TGFX_USE_VCPKG)
         list(APPEND TGFX_STATIC_LIBS ${EXPAT_LIB})
     endif ()
     
-    find_package(unofficial-concurrentqueue CONFIG REQUIRED)
+    find_package(unofficial-concurrentqueue REQUIRED)
     list(APPEND TGFX_INCLUDES ${VCPKG_INCLUDE_DIR}/concurrentqueue)
 endif()
 
@@ -758,7 +749,7 @@ if(TGFX_USE_VCPKG)
     include(CMakePackageConfigHelpers)
     write_basic_package_version_file(
         tgfxConfigVersion.cmake
-        VERSION ${PROJECT_VERSION}
+        VERSION ${TGFX_VERSION}
         COMPATIBILITY AnyNewerVersion
     )
 
