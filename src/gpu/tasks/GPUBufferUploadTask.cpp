@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GPUBufferUploadTask.h"
-#include "debug/DebugMacros.h"
+#include "debug/Mark.h"
 #include "gpu/GPU.h"
 #include "gpu/IndexBuffer.h"
 #include "gpu/VertexBuffer.h"

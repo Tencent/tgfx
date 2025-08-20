@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RenderTargetCopyTask.h"
-#include "debug/DebugMacros.h"
+#include "debug/Mark.h"
 
 namespace tgfx {
 RenderTargetCopyTask::RenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,

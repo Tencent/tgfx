@@ -18,7 +18,7 @@
 
 #include "RRectDrawOp.h"
 #include "core/DataSource.h"
-#include "debug/DebugMacros.h"
+#include "debug/Mark.h"
 #include "gpu/GPUBuffer.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"

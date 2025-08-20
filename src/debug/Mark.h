@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma once
-#ifdef TGFX_BUILD_INSPECTOR
+#ifdef TGFX_USE_INSPECTOR
 
 #include "Inspector.h"
 #include "LayerProfiler.h"

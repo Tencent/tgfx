@@ -19,7 +19,7 @@
 #include "ShapeDrawOp.h"
 #include "core/PathTriangulator.h"
 #include "core/utils/Log.h"
-#include "debug/DebugMacros.h"
+#include "debug/Mark.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
 #include "gpu/RectsVertexProvider.h"

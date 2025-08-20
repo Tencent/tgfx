@@ -18,7 +18,7 @@
 
 #include "AtlasTextOp.h"
 #include "RectDrawOp.h"
-#include "debug/DebugMacros.h"
+#include "debug/Mark.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/RenderPass.h"

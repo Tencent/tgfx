@@ -64,15 +64,14 @@ bool Inspector::handleServerQuery() {
   auto type = payload.type;
   auto ptr = payload.ptr;
   switch (type) {
-    case ServerQuery::ServerQueryString: {
+    case ServerQuery::String: {
       sendString(ptr, reinterpret_cast<const char*>(ptr), MsgType::StringData);
     }
-    case ServerQuery::ServerQueryValueName: {
+    case ServerQuery::ValueName: {
       sendString(ptr, reinterpret_cast<const char*>(ptr), MsgType::ValueName);
     }
-    default: {
+    default:
       break;
-    }
   }
   return true;
 }
@@ -82,11 +81,11 @@ void Inspector::sendString(uint64_t str, const char* ptr, size_t len, MsgType ty
   item.hdr.type = type;
   item.stringTransfer.ptr = str;
 
-  auto l16 = static_cast<uint16_t>(len);
-  needDataSize(MsgDataSize[static_cast<int>(type)] + sizeof(l16) + l16);
+  auto dataLen = static_cast<uint16_t>(len);
+  needDataSize(MsgDataSize[static_cast<int>(type)] + sizeof(uint16_t) + dataLen);
   appendDataUnsafe(&item, MsgDataSize[static_cast<int>(type)]);
-  appendDataUnsafe(&l16, sizeof(l16));
-  appendDataUnsafe(ptr, l16);
+  appendDataUnsafe(&dataLen, sizeof(uint16_t));
+  appendDataUnsafe(ptr, dataLen);
 }
 
 void Inspector::sendString(uint64_t str, const char* ptr, MsgType type) {
@@ -95,8 +94,7 @@ void Inspector::sendString(uint64_t str, const char* ptr, MsgType type) {
 
 void Inspector::worker() {
   std::string addr = "255.255.255.255";
-  auto portProvider = TCPPortProvider::Get();
-  auto dataPort = portProvider->getValidPort();
+  auto dataPort = TCPPortProvider::Get()->getValidPort();
   if (dataPort == 0) {
     return;
   }
@@ -152,10 +150,12 @@ void Inspector::worker() {
         }
         return;
       }
+
       sock = listen.acceptSock();
       if (sock) {
         break;
       }
+
       const auto t = std::chrono::high_resolution_clock::now().time_since_epoch().count();
       if (t - lastBroadcast > 3000000000) {
         lastBroadcast = t;
@@ -178,6 +178,7 @@ void Inspector::worker() {
         }
       }
     }
+
     for (uint16_t i = 0; i < BroadcastNum; i++) {
       if (broadcast[i]) {
         lastBroadcast = 0;
@@ -185,9 +186,11 @@ void Inspector::worker() {
         broadcast[i]->sendData(broadcastPort + i, &broadcastMsg, broadcastLen);
       }
     }
+
     if (!confirmProtocol()) {
       continue;
     }
+
     handleConnect(welcome);
     if (ShouldExit()) {
       break;

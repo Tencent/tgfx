@@ -21,7 +21,7 @@
 #include "LayerInspectorProtocol.h"
 #include "LayerProfiler.h"
 #include "concurrentqueue.h"
-#include "debug/DebugMacros.h"
+#include "debug/Mark.h"
 #include "serialization/LayerSerialization.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ShapeLayer.h"

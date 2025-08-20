@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OpsRenderTask.h"
-#include "debug/DebugMacros.h"
+#include "debug/Mark.h"
 #include "gpu/RenderPass.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 

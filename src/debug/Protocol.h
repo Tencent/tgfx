@@ -60,10 +60,10 @@ struct WelcomeMessage {
 };
 
 enum class ServerQuery : uint8_t {
-  ServerQueryTerminate,
-  ServerQueryString,
-  ServerQueryValueName,
-  ServerQueryDisconnect,
+  Terminate,
+  String,
+  ValueName,
+  Disconnect,
 };
 
 struct ServerQueryPacket {

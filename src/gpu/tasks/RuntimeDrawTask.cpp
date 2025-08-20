@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RuntimeDrawTask.h"
-#include "debug/DebugMacros.h"
+#include "debug/Mark.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/Pipeline.h"
 #include "gpu/ProxyProvider.h"
