@@ -8,7 +8,7 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 set(INSPECTOR_COMMON_DIR common)
 set(INSPECTOR_CLIENT_DIR client/src)
-if(DEFINED ENV{VCPKG_INSTALLED_DIR})
+if(DEFINED ENV{VCPKG_INCLUDE_DIR})
         set(CONCURRENT_QUEUE_DIR "$ENV{VCPKG_INCLUDE_DIR}/concurrentqueue")
 else ()
         set(CONCURRENT_QUEUE_DIR ../third_party/concurrentqueue)
