@@ -28,8 +28,9 @@ std::shared_ptr<ColorFilter> ColorFilter::AlphaThreshold(float threshold) {
 }
 
 Color AlphaThresholdColorFilter::filterColor(const Color& src) const {
-  // TODO: StarryThrone Complete Logic.
-  return {0, 0, 0, 0};
+  Color dstColor = src;
+  dstColor.alpha = (dstColor.alpha >= threshold ? 1.0f : 0.0f);
+  return dstColor;
 }
 
 bool AlphaThresholdColorFilter::isEqual(const ColorFilter* colorFilter) const {
