@@ -475,6 +475,9 @@ std::pair<bool, bool> OpsCompositor::needComputeBounds(const Fill& fill, bool ha
       needDeviceBounds = true;
     }
   }
+  if (needDeviceBounds && pendingType == PendingOpType::RRect) {
+    needLocalBounds = true;
+  }
   return {needLocalBounds, needDeviceBounds};
 }
 
