@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TextureImage.h"
+#include "ScaledImage.h"
+#include "gpu/TPArgs.h"
 #include "gpu/processors/TiledTextureEffect.h"
 
 namespace tgfx {
@@ -39,15 +41,15 @@ BackendTexture TextureImage::getBackendTexture(Context* context, ImageOrigin* or
   if (context == nullptr || context->uniqueID() != contextID) {
     return {};
   }
-  context->flush();
-  auto texture = textureProxy->getTexture();
-  if (texture == nullptr) {
+  context->flushAndSubmit();
+  auto textureView = textureProxy->getTextureView();
+  if (textureView == nullptr) {
     return {};
   }
   if (origin != nullptr) {
     *origin = textureProxy->origin();
   }
-  return texture->getBackendTexture();
+  return textureView->getBackendTexture();
 }
 
 std::shared_ptr<Image> TextureImage::makeTextureImage(Context* context) const {
@@ -57,12 +59,14 @@ std::shared_ptr<Image> TextureImage::makeTextureImage(Context* context) const {
   return std::static_pointer_cast<Image>(weakThis.lock());
 }
 
-std::shared_ptr<Image> TextureImage::makeRasterized(float rasterizationScale,
-                                                    const SamplingOptions& sampling) const {
-  if (rasterizationScale == 1.0f) {
-    return weakThis.lock();
-  }
-  return Image::makeRasterized(rasterizationScale, sampling);
+std::shared_ptr<Image> TextureImage::makeRasterized() const {
+  return weakThis.lock();
+}
+
+std::shared_ptr<Image> TextureImage::onMakeScaled(int newWidth, int newHeight,
+                                                  const SamplingOptions& sampling) const {
+  auto scaledImage = Image::onMakeScaled(newWidth, newHeight, sampling);
+  return scaledImage->makeTextureImage(textureProxy->getContext());
 }
 
 std::shared_ptr<TextureProxy> TextureImage::lockTextureProxy(const TPArgs& args) const {

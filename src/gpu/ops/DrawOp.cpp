@@ -19,19 +19,18 @@
 #include "DrawOp.h"
 
 namespace tgfx {
-PlacementPtr<Pipeline> DrawOp::createPipeline(RenderPass* renderPass,
-                                              PlacementPtr<GeometryProcessor> gp) {
+PlacementPtr<Pipeline> DrawOp::createPipeline(RenderTarget* renderTarget,
+                                              PlacementPtr<GeometryProcessor> geometryProcessor) {
   auto numColorProcessors = colors.size();
   auto fragmentProcessors = std::move(colors);
   fragmentProcessors.reserve(numColorProcessors + coverages.size());
   for (auto& coverage : coverages) {
     fragmentProcessors.emplace_back(std::move(coverage));
   }
-  auto format = renderPass->renderTarget()->format();
-  auto context = renderPass->getContext();
-  const auto& swizzle = context->caps()->getWriteSwizzle(format);
-  return context->drawingBuffer()->make<Pipeline>(std::move(gp), std::move(fragmentProcessors),
-                                                  numColorProcessors, std::move(xferProcessor),
-                                                  blendMode, &swizzle);
+  auto context = renderTarget->getContext();
+  const auto& swizzle = context->caps()->getWriteSwizzle(renderTarget->format());
+  return context->drawingBuffer()->make<Pipeline>(std::move(geometryProcessor),
+                                                  std::move(fragmentProcessors), numColorProcessors,
+                                                  std::move(xferProcessor), blendMode, &swizzle);
 }
 }  // namespace tgfx

@@ -27,11 +27,11 @@ TextureRenderTargetProxy::TextureRenderTargetProxy(int width, int height, PixelF
 }
 
 std::shared_ptr<RenderTarget> TextureRenderTargetProxy::getRenderTarget() const {
-  auto texture = DefaultTextureProxy::getTexture();
-  return texture ? texture->asRenderTarget() : nullptr;
+  auto textureView = DefaultTextureProxy::getTextureView();
+  return textureView ? textureView->asRenderTarget() : nullptr;
 }
 
-std::shared_ptr<Texture> TextureRenderTargetProxy::onMakeTexture(Context* context) const {
+std::shared_ptr<TextureView> TextureRenderTargetProxy::onMakeTexture(Context* context) const {
   if (_externallyOwned) {
     return nullptr;
   }
@@ -41,6 +41,6 @@ std::shared_ptr<Texture> TextureRenderTargetProxy::onMakeTexture(Context* contex
     LOGE("TextureRenderTargetProxy::onMakeTexture() Failed to create the render target!");
     return nullptr;
   }
-  return renderTarget->asTexture();
+  return renderTarget->asTextureView();
 }
 }  // namespace tgfx

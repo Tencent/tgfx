@@ -46,6 +46,8 @@ std::shared_ptr<Data> ReadFile(const std::string& path);
 
 void SaveFile(std::shared_ptr<Data> data, const std::string& key);
 
+void SaveWebpFile(std::shared_ptr<Data> data, const std::string& key);
+
 void SaveImage(std::shared_ptr<PixelBuffer> pixelBuffer, const std::string& key);
 
 void SaveImage(const Bitmap& bitmap, const std::string& key);
@@ -53,4 +55,10 @@ void SaveImage(const Bitmap& bitmap, const std::string& key);
 void SaveImage(const Pixmap& pixmap, const std::string& key);
 
 void RemoveImage(const std::string& key);
+
+void RemoveFile(const std::string& key);
+
+std::shared_ptr<Image> ScaleImage(const std::shared_ptr<Image>& image, float scale,
+                                  const SamplingOptions& options = {});
+
 }  // namespace tgfx

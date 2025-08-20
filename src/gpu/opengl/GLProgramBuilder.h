@@ -18,12 +18,11 @@
 
 #pragma once
 
-#include "GLContext.h"
 #include "GLFragmentShaderBuilder.h"
 #include "GLProgram.h"
-#include "GLUniformHandler.h"
 #include "GLVertexShaderBuilder.h"
 #include "gpu/ProgramBuilder.h"
+#include "gpu/UniformHandler.h"
 
 namespace tgfx {
 class GLProgramBuilder : public ProgramBuilder {
@@ -42,10 +41,6 @@ class GLProgramBuilder : public ProgramBuilder {
   void computeCountsAndStrides(unsigned programID);
 
   std::unique_ptr<GLProgram> finalize();
-
-  void resolveProgramResourceLocations(unsigned programID);
-
-  std::unique_ptr<GLProgram> createProgram(unsigned programID);
 
   UniformHandler* uniformHandler() override {
     return &_uniformHandler;
@@ -70,7 +65,7 @@ class GLProgramBuilder : public ProgramBuilder {
   bool checkSamplerCounts() override;
 
   VaryingHandler _varyingHandler;
-  GLUniformHandler _uniformHandler;
+  UniformHandler _uniformHandler;
   GLVertexShaderBuilder _vertexBuilder;
   GLFragmentShaderBuilder _fragBuilder;
   std::vector<GLProgram::Attribute> attributes;

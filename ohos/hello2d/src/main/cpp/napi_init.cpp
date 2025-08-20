@@ -3,10 +3,16 @@
 #include "tgfx/gpu/opengl/egl/EGLWindow.h"
 #include "drawers/AppHost.h"
 #include "drawers/Drawer.h"
+#include "DisplayLink.h"
 
 static float screenDensity = 1.0f;
+static double drawIndex = 0;
+static double zoomScale = 1;
+static double contentOffsetX = 0;
+static double contentOffsetY = 0;
 static std::shared_ptr<drawers::AppHost> appHost = nullptr;
 static std::shared_ptr<tgfx::Window> window = nullptr;
+static std::shared_ptr<DisplayLink> displayLink = nullptr;
 
 static std::shared_ptr<drawers::AppHost> CreateAppHost();
 
@@ -73,20 +79,33 @@ static void Draw(int index, float zoom = 1.0f, float offsetX = 0.0f, float offse
   device->unlock();
 }
 
-static napi_value OnDraw(napi_env env, napi_callback_info info) {
+static napi_value UpdateDrawParams(napi_env env, napi_callback_info info) {
   size_t argc = 4;
   napi_value args[4] = {nullptr};
   napi_get_cb_info(env, info, &argc, args, nullptr, nullptr);
-  double drawIndex = 0;
-  double zoomScale = 1;
-  double contentOffsetX = 0;
-  double contentOffsetY = 0;
   napi_get_value_double(env, args[0], &drawIndex);
   napi_get_value_double(env, args[1], &zoomScale);
   napi_get_value_double(env, args[2], &contentOffsetX);
   napi_get_value_double(env, args[3], &contentOffsetY);
-  Draw(static_cast<int>(drawIndex), static_cast<float>(zoomScale), static_cast<float>(contentOffsetX), static_cast<float>(contentOffsetY));
   return nullptr;
+}
+
+static napi_value StartDrawLoop(napi_env, napi_callback_info) {
+    if (displayLink == nullptr) {
+        displayLink = std::make_shared<DisplayLink>([&]() {
+            Draw(static_cast<int>(drawIndex), static_cast<float>(zoomScale),
+                 static_cast<float>(contentOffsetX), static_cast<float>(contentOffsetY));
+        });
+    }
+    displayLink->start();
+    return nullptr;
+}
+
+static napi_value StopDrawLoop(napi_env, napi_callback_info) {
+    if (displayLink != nullptr) {
+        displayLink->stop();
+    }
+    return nullptr;
 }
 
 static std::shared_ptr<drawers::AppHost> CreateAppHost() {
@@ -130,6 +149,7 @@ static void OnSurfaceChangedCB(OH_NativeXComponent* component, void* nativeWindo
 
 static void OnSurfaceDestroyedCB(OH_NativeXComponent*, void*) {
   window = nullptr;
+  displayLink = nullptr;
 }
 
 static void DispatchTouchEventCB(OH_NativeXComponent*, void*) {
@@ -168,10 +188,12 @@ static void RegisterCallback(napi_env env, napi_value exports) {
 EXTERN_C_START
 static napi_value Init(napi_env env, napi_value exports) {
   napi_property_descriptor desc[] = {
-      {"draw", nullptr, OnDraw, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"startDrawLoop", nullptr, StartDrawLoop, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"updateDrawParams", nullptr, UpdateDrawParams, nullptr, nullptr, nullptr, napi_default, nullptr},
+      {"stopDrawLoop", nullptr, StopDrawLoop, nullptr, nullptr, nullptr, napi_default, nullptr},
       {"updateDensity", nullptr, OnUpdateDensity, nullptr, nullptr, nullptr, napi_default, nullptr},
-      {"addImageFromEncoded", nullptr, AddImageFromEncoded, nullptr, nullptr, nullptr, napi_default,
-       nullptr}};
+      {"addImageFromEncoded", nullptr, AddImageFromEncoded, nullptr, nullptr, nullptr, napi_default, nullptr},
+  };
   napi_define_properties(env, exports, sizeof(desc) / sizeof(desc[0]), desc);
   RegisterCallback(env, exports);
   return exports;

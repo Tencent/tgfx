@@ -19,9 +19,10 @@
 #pragma once
 
 #include <vector>
+#include "core/utils/Algin.h"
 #include "gpu/FragmentShaderBuilder.h"
+#include "gpu/GPUTexture.h"
 #include "gpu/ShaderVar.h"
-#include "gpu/TextureSampler.h"
 #include "gpu/UniformBuffer.h"
 #include "gpu/UniformHandler.h"
 #include "gpu/VaryingHandler.h"
@@ -41,6 +42,7 @@ class GeometryProcessor : public Processor {
   class Attribute {
    public:
     Attribute() = default;
+
     Attribute(std::string name, SLType gpuType) : _name(std::move(name)), _gpuType(gpuType) {
     }
 
@@ -51,11 +53,14 @@ class GeometryProcessor : public Processor {
     const std::string& name() const {
       return _name;
     }
+
     SLType gpuType() const {
       return _gpuType;
     }
 
-    size_t sizeAlign4() const;
+    size_t sizeAlign4() const {
+      return Align4(GetSLTypeSize(_gpuType));
+    }
 
     ShaderVar asShaderVar() const {
       return {_name, _gpuType, ShaderVar::TypeModifier::Attribute};
@@ -127,12 +132,12 @@ class GeometryProcessor : public Processor {
     return textureSamplerCount;
   }
 
-  const TextureSampler* textureSampler(size_t index) const {
-    return onTextureSampler(index);
+  GPUTexture* textureAt(size_t index) const {
+    return onTextureAt(index);
   }
 
-  SamplerState samplerState(size_t index) const {
-    return onSamplerState(index);
+  SamplerState samplerStateAt(size_t index) const {
+    return onSamplerStateAt(index);
   }
 
   void setTextureSamplerCount(size_t count) {
@@ -163,11 +168,11 @@ class GeometryProcessor : public Processor {
   virtual void onComputeProcessorKey(BytesKey*) const {
   }
 
-  virtual const TextureSampler* onTextureSampler(size_t) const {
+  virtual GPUTexture* onTextureAt(size_t) const {
     return nullptr;
   }
 
-  virtual SamplerState onSamplerState(size_t) const {
+  virtual SamplerState onSamplerStateAt(size_t) const {
     return {};
   }
 

@@ -17,12 +17,67 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "UniformHandler.h"
+#include "gpu/FragmentShaderBuilder.h"
+#include "gpu/ProgramBuilder.h"
 
 namespace tgfx {
-SamplerHandle UniformHandler::addSampler(const tgfx::TextureSampler* sampler,
-                                         const std::string& name) {
-  // The same sampler can be added multiple times with different names because the same handler of
-  // the program can be used with different samplers.
-  return internalAddSampler(sampler, name);
+static const std::string OES_TEXTURE_EXTENSION = "GL_OES_EGL_image_external";
+
+std::string UniformHandler::addUniform(ShaderFlags visibility, SLType type,
+                                       const std::string& name) {
+  auto uniformName = programBuilder->nameVariable(name);
+  Uniform uniform(uniformName, type, visibility);
+  uniforms.push_back(uniform);
+  return uniform.name();
 }
+
+SamplerHandle UniformHandler::addSampler(GPUTexture* texture, const std::string& name) {
+  // The same texture can be added multiple times, each with a different name.
+  SLType type;
+  switch (texture->type()) {
+    case GPUTextureType::External:
+      programBuilder->fragmentShaderBuilder()->addFeature(PrivateFeature::OESTexture,
+                                                          OES_TEXTURE_EXTENSION);
+      type = SLType::TextureExternalSampler;
+      break;
+    case GPUTextureType::Rectangle:
+      type = SLType::Texture2DRectSampler;
+      break;
+    default:
+      type = SLType::Texture2DSampler;
+      break;
+  }
+  auto samplerName = programBuilder->nameVariable(name);
+  Uniform uniform = {samplerName, type, ShaderFlags::Fragment};
+  samplers.push_back(uniform);
+  auto caps = programBuilder->getContext()->caps();
+  auto& swizzle = caps->getReadSwizzle(texture->format());
+  samplerSwizzles.push_back(swizzle);
+  return SamplerHandle(samplers.size() - 1);
+}
+
+ShaderVar UniformHandler::getSamplerVariable(SamplerHandle handle) const {
+  auto& uniform = samplers[handle.toIndex()];
+  return {uniform.name(), uniform.type(), ShaderVar::TypeModifier::Uniform};
+}
+
+std::string UniformHandler::getUniformDeclarations(ShaderFlags visibility) const {
+  std::string ret;
+  for (auto& uniform : uniforms) {
+    if ((uniform.visibility() & visibility) == visibility) {
+      ShaderVar variable = {uniform.name(), uniform.type(), ShaderVar::TypeModifier::Uniform};
+      ret += programBuilder->getShaderVarDeclarations(variable, visibility);
+      ret += ";\n";
+    }
+  }
+  for (const auto& sampler : samplers) {
+    if ((sampler.visibility() & visibility) == visibility) {
+      ShaderVar variable = {sampler.name(), sampler.type(), ShaderVar::TypeModifier::Uniform};
+      ret += programBuilder->getShaderVarDeclarations(variable, visibility);
+      ret += ";\n";
+    }
+  }
+  return ret;
+}
+
 }  // namespace tgfx

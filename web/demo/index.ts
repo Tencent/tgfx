@@ -24,6 +24,8 @@ import {
     updateSize,
     onResizeEvent,
     onClickEvent,
+    animationLoop,
+    setupVisibilityListeners,
     loadImage,
     bindCanvasZoomAndPanEvents
 } from "./common";
@@ -40,8 +42,8 @@ if (typeof window !== 'undefined') {
 
             let tgfxView = shareData.Hello2DModule.TGFXThreadsView.MakeFrom('#hello2d');
             shareData.tgfxBaseView = tgfxView;
-            var imagePath = "http://localhost:8081/../../resources/assets/bridge.jpg";
-            await tgfxView.setImagePath(imagePath);
+            var image = await loadImage("http://localhost:8081/../../resources/assets/bridge.jpg");
+            tgfxView.setImage("bridge",image);
 
             var fontPath = "../../resources/font/NotoSansSC-Regular.otf";
             const fontBuffer = await fetch(fontPath).then((response) => response.arrayBuffer());
@@ -53,6 +55,8 @@ if (typeof window !== 'undefined') {
             updateSize(shareData);
             const canvas = document.getElementById('hello2d');
             bindCanvasZoomAndPanEvents(canvas, shareData);
+            animationLoop(shareData);
+            setupVisibilityListeners(shareData);
         } catch (error) {
             console.error(error);
             throw new Error("Hello2D init failed. Please check the .wasm file path!.");
@@ -61,7 +65,6 @@ if (typeof window !== 'undefined') {
 
     window.onresize = () => {
         onResizeEvent(shareData);
-        window.setTimeout(() => updateSize(shareData), 300);
     };
 
     window.onclick = () => {

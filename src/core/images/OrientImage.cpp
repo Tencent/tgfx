@@ -91,19 +91,24 @@ std::shared_ptr<Image> OrientImage::onMakeOriented(Orientation newOrientation) c
   return MakeFrom(source, newOrientation);
 }
 
+std::shared_ptr<Image> OrientImage::onMakeScaled(int newWidth, int newHeight,
+                                                 const SamplingOptions& sampling) const {
+  if (OrientationSwapsWidthHeight(orientation)) {
+    std::swap(newWidth, newHeight);
+  }
+  auto newSource = source->makeScaled(newWidth, newHeight, sampling);
+  return MakeFrom(std::move(newSource), orientation);
+}
+
 PlacementPtr<FragmentProcessor> OrientImage::asFragmentProcessor(const FPArgs& args,
                                                                  const SamplingArgs& samplingArgs,
                                                                  const Matrix* uvMatrix) const {
-  std::optional<Matrix> matrix = std::nullopt;
+  std::optional<Matrix> matrix = concatUVMatrix(nullptr);
   SamplingArgs newSamplingArgs = samplingArgs;
-  if (orientation != Orientation::TopLeft) {
-    matrix = OrientationToMatrix(orientation, source->width(), source->height());
-    matrix->invert(AddressOf(matrix));
-    if (samplingArgs.sampleArea) {
-      Rect subset = *samplingArgs.sampleArea;
-      matrix->mapRect(&subset);
-      newSamplingArgs.sampleArea = subset;
-    }
+  if (matrix.has_value() && samplingArgs.sampleArea) {
+    Rect subset = *samplingArgs.sampleArea;
+    matrix->mapRect(&subset);
+    newSamplingArgs.sampleArea = subset;
   }
   if (uvMatrix) {
     if (matrix) {
@@ -145,4 +150,21 @@ Orientation OrientImage::concatOrientation(Orientation newOrientation) const {
   }
   return Orientation::TopLeft;
 }
+
+std::optional<Matrix> OrientImage::concatUVMatrix(const Matrix* uvMatrix) const {
+  std::optional<Matrix> matrix = std::nullopt;
+  if (orientation != Orientation::TopLeft) {
+    matrix = OrientationToMatrix(orientation, source->width(), source->height());
+    matrix->invert(AddressOf(matrix));
+  }
+  if (uvMatrix) {
+    if (matrix) {
+      matrix->preConcat(*uvMatrix);
+    } else {
+      matrix = *uvMatrix;
+    }
+  }
+  return matrix;
+}
+
 }  // namespace tgfx

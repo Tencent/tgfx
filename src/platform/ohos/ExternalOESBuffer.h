@@ -38,7 +38,7 @@ class ExternalOESBuffer : public ImageBuffer {
   }
 
  protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const override;
+  std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override;
 
  private:
   OH_NativeBuffer* hardwareBuffer = nullptr;

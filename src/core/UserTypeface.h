@@ -20,6 +20,7 @@
 
 #include "core/utils/UniqueID.h"
 #include "tgfx/core/FontMetrics.h"
+#include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
 
 namespace tgfx {
@@ -53,7 +54,7 @@ class UserTypeface : public Typeface {
     return 0;
   }
 
-  std::shared_ptr<Data> getBytes() const override {
+  std::unique_ptr<Stream> openStream() const override {
     // UserTypeface does not have byte data.
     return nullptr;
   }
@@ -67,11 +68,17 @@ class UserTypeface : public Typeface {
     return true;
   }
 
+  bool onComputeBounds(Rect* bounds) const override {
+    *bounds = fontBounds;
+    return true;
+  }
+
  protected:
   explicit UserTypeface(uint32_t builderID, const std::string& fontFamily,
-                        const std::string& fontStyle, const FontMetrics& metrics)
+                        const std::string& fontStyle, const FontMetrics& fontMetrics,
+                        const Rect& fontBounds)
       : _builderID(builderID), _fontFamily(fontFamily), _fontStyle(fontStyle),
-        _fontMetrics(metrics) {
+        _fontMetrics(fontMetrics), fontBounds(fontBounds) {
   }
 
  private:
@@ -80,5 +87,6 @@ class UserTypeface : public Typeface {
   std::string _fontFamily;
   std::string _fontStyle;
   FontMetrics _fontMetrics = {};
+  Rect fontBounds = {};
 };
 }  // namespace tgfx

@@ -24,6 +24,10 @@
 #include "layers/RootLayer.h"
 #include "layers/TileCache.h"
 
+#ifdef TGFX_USE_INSPECTOR
+#include "layers/LayerViewerManager.h"
+#endif
+
 namespace tgfx {
 static constexpr size_t MAX_DIRTY_REGION_FRAMES = 5;
 static constexpr float DIRTY_REGION_ANTIALIAS_MARGIN = 0.5f;
@@ -112,6 +116,10 @@ static int64_t ChangeZoomScalePrecision(int64_t zoomScaleInt, int oldPrecision, 
 
 DisplayList::DisplayList() : _root(RootLayer::Make()) {
   _root->_root = _root.get();
+#ifdef TGFX_USE_INSPECTOR
+  auto& layerInspectorManager = LayerViewerManager::Get();
+  layerInspectorManager.setDisplayList(this);
+#endif
 }
 
 DisplayList::~DisplayList() {
@@ -235,6 +243,9 @@ void DisplayList::render(Surface* surface, bool autoClear) {
   if (!surface) {
     return;
   }
+#ifdef TGFX_USE_INSPECTOR
+  LayerViewerManager::Get().RenderImageAndSend(surface->getContext());
+#endif
   _hasContentChanged = false;
   auto dirtyRegions = _root->updateDirtyRegions();
   if (_zoomScaleInt == 0) {
@@ -825,10 +836,7 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   auto renderRect = inverse.mapRect(drawRect);
   renderRect.roundOut();
   args.renderRect = &renderRect;
-  auto backgroundRect = _root->getBackgroundRect(drawRect, viewMatrix.getMaxScale());
-  if (backgroundRect) {
-    args.backgroundContext = BackgroundContext::Make(context, *backgroundRect, viewMatrix);
-  }
+  args.backgroundContext = _root->createBackgroundContext(context, drawRect, viewMatrix);
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }
 

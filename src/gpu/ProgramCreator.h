@@ -18,11 +18,7 @@
 
 #pragma once
 
-#include "gpu/Blend.h"
 #include "gpu/Program.h"
-#include "gpu/SamplerState.h"
-#include "gpu/TextureSampler.h"
-#include "gpu/UniformBuffer.h"
 
 namespace tgfx {
 /**
@@ -34,7 +30,7 @@ class ProgramCreator {
   virtual ~ProgramCreator() = default;
 
   /**
-   * Computes the key for the program, which is used to cache the program in the ProgramCache.
+   * Computes the key for the program, which is used to cache the program in the GlobalCache.
    */
   virtual void computeProgramKey(Context* context, BytesKey* programKey) const = 0;
 

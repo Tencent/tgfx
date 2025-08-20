@@ -17,24 +17,26 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "OpsRenderTask.h"
-#include "gpu/Gpu.h"
 #include "gpu/RenderPass.h"
+#include "gpu/proxies/RenderTargetProxy.h"
 
 namespace tgfx {
-bool OpsRenderTask::execute(RenderPass* renderPass) {
-  if (ops.empty() || renderTargetProxy == nullptr) {
-    return false;
+void OpsRenderTask::execute(CommandEncoder* encoder) {
+  auto renderTarget = renderTargetProxy->getRenderTarget();
+  if (renderTarget == nullptr) {
+    LOGE("OpsRenderTask::execute() Render target is null!");
+    return;
   }
-  if (!renderPass->begin(renderTargetProxy->getRenderTarget())) {
+  auto renderPass = encoder->beginRenderPass(renderTarget, true);
+  if (renderPass == nullptr) {
     LOGE("OpsRenderTask::execute() Failed to initialize the render pass!");
-    return false;
+    return;
   }
-  auto tempOps = std::move(ops);
-  for (auto& op : tempOps) {
-    op->execute(renderPass);
+  for (auto& op : ops) {
+    op->execute(renderPass.get(), renderTarget.get());
+    // Release the Op immediately after execution to maximize GPU resource reuse.
     op = nullptr;
   }
   renderPass->end();
-  return true;
 }
 }  // namespace tgfx

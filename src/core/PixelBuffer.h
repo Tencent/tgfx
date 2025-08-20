@@ -18,7 +18,7 @@
 
 #pragma once
 
-#include "gpu/Texture.h"
+#include "gpu/TextureView.h"
 #include "tgfx/core/ImageBuffer.h"
 #include "tgfx/platform/HardwareBuffer.h"
 
@@ -90,11 +90,15 @@ class PixelBuffer : public ImageBuffer {
  protected:
   explicit PixelBuffer(const ImageInfo& info);
 
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const override;
+  bool isPixelBuffer() const final {
+    return true;
+  }
+
+  std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override;
 
   virtual void* onLockPixels() const = 0;
   virtual void onUnlockPixels() const = 0;
-  virtual std::shared_ptr<Texture> onBindToHardwareTexture(Context* context) const = 0;
+  virtual std::shared_ptr<TextureView> onBindToHardwareTexture(Context* context) const = 0;
 
  private:
   mutable std::mutex locker = {};

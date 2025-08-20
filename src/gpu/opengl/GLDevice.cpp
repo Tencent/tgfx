@@ -18,7 +18,7 @@
 
 #include "tgfx/gpu/opengl/GLDevice.h"
 #include <thread>
-#include "gpu/opengl/GLContext.h"
+#include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
 static std::mutex deviceMapLocker = {};
@@ -59,7 +59,8 @@ std::shared_ptr<GLDevice> GLDevice::Get(void* nativeHandle) {
   return nullptr;
 }
 
-GLDevice::GLDevice(void* nativeHandle) : nativeHandle(nativeHandle) {
+GLDevice::GLDevice(std::unique_ptr<GPU> gpu, void* nativeHandle)
+    : Device(std::move(gpu)), nativeHandle(nativeHandle) {
   std::lock_guard<std::mutex> autoLock(deviceMapLocker);
   deviceMap[nativeHandle] = this;
 }
@@ -67,28 +68,5 @@ GLDevice::GLDevice(void* nativeHandle) : nativeHandle(nativeHandle) {
 GLDevice::~GLDevice() {
   std::lock_guard<std::mutex> autoLock(deviceMapLocker);
   deviceMap.erase(nativeHandle);
-}
-
-bool GLDevice::onLockContext() {
-  if (!onMakeCurrent()) {
-    return false;
-  }
-  if (context == nullptr) {
-    auto glInterface = GLInterface::GetNative();
-    if (glInterface != nullptr) {
-      context = new GLContext(this, glInterface);
-    } else {
-      LOGE("GLDevice::onLockContext(): Error on creating GLInterface! ");
-    }
-  }
-  if (context == nullptr) {
-    onClearCurrent();
-    return false;
-  }
-  return true;
-}
-
-void GLDevice::onUnlockContext() {
-  onClearCurrent();
 }
 }  // namespace tgfx

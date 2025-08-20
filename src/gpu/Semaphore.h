@@ -19,18 +19,28 @@
 #pragma once
 
 #include <memory>
+#include "gpu/Resource.h"
 #include "tgfx/gpu/Backend.h"
 
 namespace tgfx {
 /**
  * Wrapper class for a backend semaphore object.
  */
-class Semaphore {
+class Semaphore : public Resource {
  public:
-  static std::unique_ptr<Semaphore> Wrap(const BackendSemaphore* backendSemaphore);
+  /**
+   * Wraps a backend semaphore object into a Semaphore instance.
+   */
+  static std::shared_ptr<Semaphore> Wrap(Context* context,
+                                         const BackendSemaphore& backendSemaphore);
 
-  virtual ~Semaphore() = default;
+  size_t memoryUsage() const override {
+    return 0;
+  }
 
+  /**
+   * Returns the backend semaphore object associated with this Semaphore instance.
+   */
   virtual BackendSemaphore getBackendSemaphore() const = 0;
 };
 }  // namespace tgfx

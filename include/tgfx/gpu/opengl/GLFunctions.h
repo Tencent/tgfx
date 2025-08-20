@@ -102,11 +102,6 @@ using GLFramebufferRenderbuffer = void GL_FUNCTION_TYPE(unsigned target, unsigne
 using GLFramebufferTexture2D = void GL_FUNCTION_TYPE(unsigned target, unsigned attachment,
                                                      unsigned textarget, unsigned texture,
                                                      int level);
-using GLFramebufferTexture2DMultisample = void GL_FUNCTION_TYPE(unsigned target,
-                                                                unsigned attachment,
-                                                                unsigned textarget,
-                                                                unsigned texture, int level,
-                                                                int samples);
 using GLFrontFace = void GL_FUNCTION_TYPE(unsigned mode);
 using GLGenBuffers = void GL_FUNCTION_TYPE(int n, unsigned* buffers);
 using GLGenVertexArrays = void GL_FUNCTION_TYPE(int n, unsigned* vertexArrays);
@@ -155,9 +150,6 @@ using GLRenderbufferStorageMultisample = void GL_FUNCTION_TYPE(unsigned target, 
 using GLRenderbufferStorageMultisampleAPPLE = void GL_FUNCTION_TYPE(unsigned target, int samples,
                                                                     unsigned internalformat,
                                                                     int width, int height);
-using GLRenderbufferStorageMultisampleEXT = void GL_FUNCTION_TYPE(unsigned target, int samples,
-                                                                  unsigned internalformat,
-                                                                  int width, int height);
 using GLResolveMultisampleFramebuffer = void GL_FUNCTION_TYPE();
 using GLBlitFramebuffer = void GL_FUNCTION_TYPE(int srcX0, int srcY0, int srcX1, int srcY1,
                                                 int dstX0, int dstY0, int dstX1, int dstY1,
@@ -280,7 +272,6 @@ class GLFunctions {
   GLFlush* flush = nullptr;
   GLFramebufferRenderbuffer* framebufferRenderbuffer = nullptr;
   GLFramebufferTexture2D* framebufferTexture2D = nullptr;
-  GLFramebufferTexture2DMultisample* framebufferTexture2DMultisample = nullptr;
   GLFrontFace* frontFace = nullptr;
   GLGenBuffers* genBuffers = nullptr;
   GLGenFramebuffers* genFramebuffers = nullptr;
@@ -314,7 +305,6 @@ class GLFunctions {
   GLRenderbufferStorage* renderbufferStorage = nullptr;
   GLRenderbufferStorageMultisample* renderbufferStorageMultisample = nullptr;
   GLRenderbufferStorageMultisampleAPPLE* renderbufferStorageMultisampleAPPLE = nullptr;
-  GLRenderbufferStorageMultisampleEXT* renderbufferStorageMultisampleEXT = nullptr;
   GLResolveMultisampleFramebuffer* resolveMultisampleFramebuffer = nullptr;
   GLBlitFramebuffer* blitFramebuffer = nullptr;
   GLScissor* scissor = nullptr;

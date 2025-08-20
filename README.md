@@ -28,13 +28,14 @@ and various video-editing apps.
 
 ## Backing Renderers
 
-| Vector Backend |  GPU Backend   |      Target Platforms        |    Status     |
-|:--------------:|:--------------:|:----------------------------:|:-------------:|
-|    FreeType    |  OpenGL        |  All                         |   complete    |
-|  CoreGraphics  |  OpenGL        |  iOS, macOS                  |   complete    |
-|    Canvas2D    |  WebGL         |  Web                         |   complete    |
-|  CoreGraphics  |  Metal         |  iOS, macOS                  |  in progress  |
-|    FreeType    |  Vulkan        |  Android, Linux              |    planned    |
+|   Vector Backend    | GPU Backend | Target Platforms |   Status    |
+|:-------------------:|:-----------:|:----------------:|:-----------:|
+|      FreeType       |   OpenGL    |       All        |  complete   |
+|    CoreGraphics     |   OpenGL    |    iOS, macOS    |  complete   |
+| Canvas2D / FreeType |    WebGL    |       Web        |  complete   |
+|    CoreGraphics     |    Metal    |    iOS, macOS    | in progress |
+|      FreeType       |   Vulkan    |  Android, Linux  | in progress |
+| Canvas2D / FreeType |   WebGPU    |       Web        | in progress |
 
 
 ## Branch Management
@@ -55,7 +56,7 @@ TGFX uses **C++17** features. Here are the minimum tools needed to build TGFX on
 - Ninja 1.9.0+
 - CMake 3.13.0+
 - QT 5.13.0+
-- NDK 19.2+ (**19.2.5345600 recommended**)
+- NDK 20+ (**20.1.5948944 recommended**)
 - Emscripten 3.1.58+ 
 
 
@@ -112,7 +113,7 @@ These will guide you through the necessary steps to set up your development envi
 
 ### Android
 
-The Android demo project requires the **Android NDK**. We recommend using version **19.2.5345600**,
+The Android demo project requires the **Android NDK**. We recommend using version **20.1.5948944**,
 which has been fully tested with the TGFX library. If you open the project with Android Studio, it
 will automatically download the NDK during Gradle synchronization. Alternatively, you can download 
 it from the [NDK Downloads](https://developer.android.com/ndk/downloads) page.
@@ -121,13 +122,13 @@ If you choose to manually download the Android NDK, please extract it to the def
 On macOS, this would be:
 
 ```
-/Users/yourname/Library/Android/sdk/ndk/19.2.5345600
+/Users/yourname/Library/Android/sdk/ndk/20.1.5948944
 ```
 
 On Windows, it would be：
 
 ```
-C:\Users\yourname\AppData\Local\Android\Sdk\ndk\19.2.5345600
+C:\Users\yourname\AppData\Local\Android\Sdk\ndk\20.1.5948944
 ```
 
 Alternatively, you can set one of the following environment variables to help tgfx locate the NDK:
@@ -245,8 +246,33 @@ npm run build:debug
 
 With these steps completed, you can debug C++ files directly in Chrome DevTools.
 
-The above commands build and run a multithreaded version. To build a single-threaded version,
-just add the suffix ":st" to each command. For example:
+The above commands build and run a multithreaded version. 
+
+>**⚠️** In the multithreaded version, if you modify the filename of the compiled output hello2d.js, you need to search for
+> the keyword "hello2d.js" within the hello2d.js file and replace all occurrences of "hello2d.js" with the new filename.
+> Failure to do this will result in the program failing to run. Here's an example of how to modify it:
+
+Before modification:
+
+```js
+    // filename: hello2d.js
+    var worker = new Worker(new URL("hello2d.js", import.meta.url), {
+     type: "module",
+     name: "em-pthread"
+    });
+```
+
+After modification:
+
+```js
+    // filename: hello2d-test.js
+    var worker = new Worker(new URL("hello2d-test.js", import.meta.url), {
+     type: "module",
+     name: "em-pthread"
+    });
+```
+
+To build a single-threaded version, just add the suffix ":st" to each command. For example:
 
 ```
 npm run build:st

@@ -19,9 +19,10 @@
 #pragma once
 
 #include <optional>
+#include "gpu/ProxyProvider.h"
 #include "gpu/RectsVertexProvider.h"
 #include "gpu/ops/DrawOp.h"
-#include "gpu/proxies/GpuBufferProxy.h"
+#include "gpu/proxies/VertexBufferProxyView.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
@@ -31,15 +32,16 @@ class AtlasTextOp final : public DrawOp {
                                         PlacementPtr<RectsVertexProvider> provider,
                                         uint32_t renderFlags,
                                         std::shared_ptr<TextureProxy> textureProxy);
-  void execute(RenderPass* renderPass) override;
+
+  void execute(RenderPass* renderPass, RenderTarget* renderTarget) override;
+
   bool hasCoverage() const override;
 
  private:
   size_t rectCount = 0;
   std::optional<Color> commonColor = std::nullopt;
-  std::shared_ptr<GpuBufferProxy> indexBufferProxy = nullptr;
-  std::shared_ptr<GpuBufferProxy> vertexBufferProxy = nullptr;
-  size_t vertexBufferOffset = 0;
+  std::shared_ptr<IndexBufferProxy> indexBufferProxy = nullptr;
+  std::shared_ptr<VertexBufferProxyView> vertexBufferProxyView = {};
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
 
   explicit AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureProxy> textureProxy);

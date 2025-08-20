@@ -18,23 +18,25 @@
 
 #pragma once
 
-#include "core/images/ResourceImage.h"
+#include "core/images/PixelImage.h"
+#include "gpu/ResourceKey.h"
 
 namespace tgfx {
 /**
- * RasterizedImage is an image that rasterizes another image with a scale and sampling options.
+ * RasterizedImage is an image that rasterizes another image and stores the result as a GPU texture
+ * for repeated rendering.
  */
-class RasterizedImage : public ResourceImage {
+class RasterizedImage : public Image {
  public:
-  /**
-   * Note that this method always returns a non-mipmapped image.
-   */
-  static std::shared_ptr<Image> MakeFrom(std::shared_ptr<Image> source, float rasterizationScale,
-                                         const SamplingOptions& sampling);
+  RasterizedImage(UniqueKey uniqueKey, std::shared_ptr<Image> source);
 
-  int width() const override;
+  int width() const override {
+    return source->width();
+  }
 
-  int height() const override;
+  int height() const override {
+    return source->height();
+  }
 
   bool isAlphaOnly() const override {
     return source->isAlphaOnly();
@@ -44,25 +46,35 @@ class RasterizedImage : public ResourceImage {
     return source->isFullyDecoded();
   }
 
-  std::shared_ptr<Image> makeRasterized(float rasterizationScale = 1.0f,
-                                        const SamplingOptions& sampling = {}) const override;
+  bool hasMipmaps() const override {
+    return source->hasMipmaps();
+  }
+
+  std::shared_ptr<Image> makeRasterized() const override;
 
  protected:
   Type type() const override {
     return Type::Rasterized;
   }
 
+  std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
+
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(const FPArgs& args,
+                                                      const SamplingArgs& samplingArgs,
+                                                      const Matrix* uvMatrix) const override;
+
+  std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
+                                      const SamplingOptions& sampling) const override;
+
   std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override;
 
-  std::shared_ptr<TextureProxy> onLockTextureProxy(const TPArgs& args,
-                                                   const UniqueKey& key) const final;
+  std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
 
  private:
-  std::shared_ptr<Image> source = nullptr;
-  float rasterizationScale = 1.0f;
-  SamplingOptions sampling = {};
+  UniqueKey getTextureKey(float cacheScale = 1.0f) const;
 
-  RasterizedImage(UniqueKey uniqueKey, std::shared_ptr<Image> source, float rasterizationScale,
-                  const SamplingOptions& sampling);
+  UniqueKey uniqueKey;
+
+  std::shared_ptr<Image> source = nullptr;
 };
 }  // namespace tgfx

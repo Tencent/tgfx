@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLProgramBuilder.h"
-#include "GLContext.h"
-#include "GLUtil.h"
+#include "gpu/opengl/GLUniformBuffer.h"
+#include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
 static std::string TypeModifierString(bool isDesktopGL, ShaderVar::TypeModifier t,
@@ -145,17 +145,33 @@ std::unique_ptr<GLProgram> GLProgramBuilder::finalize() {
     fragmentShaderBuilder()->declareCustomOutputColor();
   }
   finalizeShaders();
-
   auto vertex = vertexShaderBuilder()->shaderString();
   auto fragment = fragmentShaderBuilder()->shaderString();
-  auto programID = CreateGLProgram(context, vertex, fragment);
+  auto gl = GLFunctions::Get(context);
+  auto programID = CreateGLProgram(gl, vertex, fragment);
   if (programID == 0) {
     return nullptr;
   }
   computeCountsAndStrides(programID);
-  resolveProgramResourceLocations(programID);
-
-  return createProgram(programID);
+  gl->useProgram(programID);
+  auto& uniforms = _uniformHandler.getUniforms();
+  auto& samplers = _uniformHandler.getSamplers();
+  std::vector<int> uniformLocations = {};
+  uniformLocations.reserve(uniforms.size());
+  for (auto& uniform : uniforms) {
+    auto location = gl->getUniformLocation(programID, uniform.name().c_str());
+    uniformLocations.push_back(location);
+  }
+  // Assign texture units to sampler uniforms up front, just once.
+  int textureUint = 0;
+  for (auto& sampler : samplers) {
+    auto location = gl->getUniformLocation(programID, sampler.name().c_str());
+    DEBUG_ASSERT(location != -1);
+    gl->uniform1i(location, textureUint++);
+  }
+  auto uniformBuffer = std::make_unique<GLUniformBuffer>(uniforms, std::move(uniformLocations));
+  return std::make_unique<GLProgram>(programID, std::move(uniformBuffer), attributes,
+                                     static_cast<int>(vertexStride));
 }
 
 void GLProgramBuilder::computeCountsAndStrides(unsigned int programID) {
@@ -173,10 +189,6 @@ void GLProgramBuilder::computeCountsAndStrides(unsigned int programID) {
   }
 }
 
-void GLProgramBuilder::resolveProgramResourceLocations(unsigned programID) {
-  _uniformHandler.resolveUniformLocations(programID);
-}
-
 bool GLProgramBuilder::checkSamplerCounts() {
   auto caps = GLCaps::Get(context);
   if (numFragmentSamplers > caps->maxFragmentSamplers) {
@@ -184,14 +196,6 @@ bool GLProgramBuilder::checkSamplerCounts() {
     return false;
   }
   return true;
-}
-
-std::unique_ptr<GLProgram> GLProgramBuilder::createProgram(unsigned programID) {
-  auto uniformBuffer = _uniformHandler.makeUniformBuffer();
-  auto program = new GLProgram(context, programID, std::move(uniformBuffer), attributes,
-                               static_cast<int>(vertexStride));
-  program->setupSamplerUniforms(_uniformHandler.samplers);
-  return std::unique_ptr<GLProgram>(program);
 }
 
 bool GLProgramBuilder::isDesktopGL() const {

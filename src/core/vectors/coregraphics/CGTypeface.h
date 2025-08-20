@@ -19,6 +19,7 @@
 #pragma once
 
 #include <CoreText/CoreText.h>
+#include "tgfx/core/Stream.h"
 #include "tgfx/core/Typeface.h"
 
 namespace tgfx {
@@ -56,13 +57,19 @@ class CGTypeface : public Typeface {
 
   GlyphID getGlyphID(Unichar unichar) const override;
 
-  std::shared_ptr<Data> getBytes() const override;
+  std::unique_ptr<Stream> openStream() const override;
 
   std::shared_ptr<Data> copyTableData(FontTableTag tag) const override;
+
+  static std::string StringFromCFString(CFStringRef src);
 
  protected:
 #ifdef TGFX_USE_GLYPH_TO_UNICODE
   std::vector<Unichar> getGlyphToUnicodeMap() const override;
+#endif
+
+#ifdef TGFX_USE_ADVANCED_TYPEFACE_PROPERTY
+  AdvancedTypefaceInfo getAdvancedInfo() const override;
 #endif
 
   std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;

@@ -54,16 +54,15 @@ class WebImageBuffer : public ImageBuffer {
   }
 
  protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) const override;
+  std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override;
 
  private:
   int _width = 0;
   int _height = 0;
   emscripten::val nativeImage = emscripten::val::null();
-  bool usePromise = false;
   bool adopted = false;
 
-  WebImageBuffer(int width, int height, emscripten::val nativeImage, bool usePromise);
+  WebImageBuffer(int width, int height, emscripten::val nativeImage);
 
   emscripten::val getImage() const;
 

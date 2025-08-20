@@ -17,6 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/Path.h"
+#include <include/core/SkPathTypes.h>
+#include <include/core/SkRect.h>
+#include <memory>
 #include "core/PathRef.h"
 #include "core/utils/MathExtra.h"
 
@@ -128,15 +131,21 @@ bool Path::isLine(Point line[2]) const {
   return pathRef->path.isLine(reinterpret_cast<SkPoint*>(line));
 }
 
-bool Path::isRect(Rect* rect) const {
-  if (!rect) {
-    return pathRef->path.isRect(nullptr);
-  }
-  SkRect skRect = {};
-  if (!pathRef->path.isRect(&skRect)) {
+bool Path::isRect(Rect* rect, bool* closed, bool* reversed) const {
+  std::unique_ptr<SkRect> rectPointer = rect ? std::make_unique<SkRect>() : nullptr;
+  std::unique_ptr<SkPathDirection> directionPointer =
+      reversed ? std::make_unique<SkPathDirection>() : nullptr;
+
+  if (!pathRef->path.isRect(rectPointer.get(), closed, directionPointer.get())) {
     return false;
   }
-  rect->setLTRB(skRect.fLeft, skRect.fTop, skRect.fRight, skRect.fBottom);
+
+  if (rectPointer) {
+    rect->setLTRB(rectPointer->fLeft, rectPointer->fTop, rectPointer->fRight, rectPointer->fBottom);
+  }
+  if (directionPointer) {
+    *reversed = *directionPointer != SkPathDirection::kCW;
+  }
   return true;
 }
 
@@ -457,6 +466,13 @@ void Path::addRoundRect(const Rect& rect, float radiusX, float radiusY, bool rev
                         unsigned startIndex) {
   writableRef()->path.addRRect(SkRRect::MakeRectXY(ToSkRect(rect), radiusX, radiusY),
                                ToSkDirection(reversed), startIndex);
+}
+
+void Path::addRoundRect(const Rect& rect, const std::array<Point, 4>& radii, bool reversed,
+                        unsigned startIndex) {
+  SkRRect skRRect;
+  skRRect.setRectRadii(ToSkRect(rect), reinterpret_cast<const SkPoint*>(radii.data()));
+  writableRef()->path.addRRect(skRRect, ToSkDirection(reversed), startIndex);
 }
 
 void Path::addRRect(const RRect& rRect, bool reversed, unsigned int startIndex) {

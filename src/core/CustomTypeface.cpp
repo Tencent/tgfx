@@ -39,6 +39,8 @@ GlyphID PathTypefaceBuilder::addGlyph(const Path& path) {
   }
   // GlyphID starts from 1
   auto glyphID = static_cast<GlyphID>(glyphRecords.size() + 1);
+  auto bounds = path.getBounds();
+  fontBounds.join(bounds);
   glyphRecords.emplace_back(PathProvider::Wrap(path));
   return glyphID;
 }
@@ -50,6 +52,8 @@ GlyphID PathTypefaceBuilder::addGlyph(std::shared_ptr<PathProvider> provider) {
   }
   // GlyphID starts from 1
   auto glyphID = static_cast<GlyphID>(glyphRecords.size() + 1);
+  auto bounds = provider->getBounds();
+  fontBounds.join(bounds);
   glyphRecords.emplace_back(std::move(provider));
   return glyphID;
 }
@@ -58,7 +62,8 @@ std::shared_ptr<Typeface> PathTypefaceBuilder::detach() const {
   if (glyphRecords.empty()) {
     return nullptr;
   }
-  return PathUserTypeface::Make(uniqueID, _fontFamily, _fontStyle, _fontMetrics, glyphRecords);
+  return PathUserTypeface::Make(uniqueID, _fontFamily, _fontStyle, _fontMetrics, fontBounds,
+                                glyphRecords);
 }
 
 GlyphID ImageTypefaceBuilder::addGlyph(std::shared_ptr<ImageCodec> image, const Point& offset) {
@@ -67,6 +72,9 @@ GlyphID ImageTypefaceBuilder::addGlyph(std::shared_ptr<ImageCodec> image, const 
     return 0;
   }
   auto glyphID = static_cast<GlyphID>(glyphRecords.size() + 1);
+  auto bounds = Rect::MakeWH(image->width(), image->height());
+  bounds.offset(offset);
+  fontBounds.join(bounds);
   glyphRecords.emplace_back(std::make_shared<GlyphRecord>(std::move(image), offset));
   return glyphID;
 }
@@ -75,7 +83,8 @@ std::shared_ptr<Typeface> ImageTypefaceBuilder::detach() const {
   if (glyphRecords.empty()) {
     return nullptr;
   }
-  return ImageUserTypeface::Make(uniqueID, _fontFamily, _fontStyle, _fontMetrics, glyphRecords);
+  return ImageUserTypeface::Make(uniqueID, _fontFamily, _fontStyle, _fontMetrics, fontBounds,
+                                 glyphRecords);
 }
 
 }  // namespace tgfx

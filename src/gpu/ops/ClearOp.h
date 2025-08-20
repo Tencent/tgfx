@@ -26,7 +26,7 @@ class ClearOp : public Op {
  public:
   static PlacementPtr<ClearOp> Make(Context* context, Color color, const Rect& scissor);
 
-  void execute(RenderPass* renderPass) override;
+  void execute(RenderPass* renderPass, RenderTarget* renderTarget) override;
 
  private:
   Color color = Color::Transparent();

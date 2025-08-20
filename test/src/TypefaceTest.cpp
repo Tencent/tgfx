@@ -88,7 +88,7 @@ TGFX_TEST(TypefaceTest, CustomPathTypeface) {
   ASSERT_TRUE(typeface != nullptr);
   ASSERT_TRUE(typeface->hasOutlines());
   ASSERT_FALSE(typeface->hasColor());
-  ASSERT_TRUE(typeface->getBytes() == nullptr);
+  ASSERT_TRUE(typeface->openStream() == nullptr);
   ASSERT_TRUE(typeface->copyTableData(0) == nullptr);
   ASSERT_EQ(typeface->fontFamily(), fontFamily);
   ASSERT_EQ(typeface->fontStyle(), fontStyle);
@@ -141,7 +141,7 @@ TGFX_TEST(TypefaceTest, CustomImageTypeface) {
   ASSERT_TRUE(typeface != nullptr);
   ASSERT_TRUE(typeface->hasColor());
   ASSERT_FALSE(typeface->hasOutlines());
-  ASSERT_TRUE(typeface->getBytes() == nullptr);
+  ASSERT_TRUE(typeface->openStream() == nullptr);
   ASSERT_TRUE(typeface->copyTableData(0) == nullptr);
   ASSERT_EQ(typeface->fontFamily(), fontFamily);
   ASSERT_EQ(typeface->fontStyle(), fontStyle);

@@ -156,6 +156,13 @@ class Bitmap {
   }
 
   /**
+   * Returns true if the alpha type of the pixels is opaque.
+   */
+  bool isOpaque() const {
+    return _info.isOpaque();
+  }
+
+  /**
    * Returns the rowBytes of the pixels.
    */
   size_t rowBytes() const {

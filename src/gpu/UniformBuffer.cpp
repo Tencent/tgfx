@@ -20,34 +20,11 @@
 #include "core/utils/Log.h"
 
 namespace tgfx {
-size_t Uniform::size() const {
-  switch (type) {
-    case Uniform::Type::Float:
-    case Uniform::Type::Int:
-      return 4;
-    case Uniform::Type::Float2:
-    case Uniform::Type::Int2:
-      return 8;
-    case Uniform::Type::Float3:
-    case Uniform::Type::Int3:
-      return 12;
-    case Uniform::Type::Float4:
-    case Uniform::Type::Int4:
-    case Uniform::Type::Float2x2:
-      return 16;
-    case Uniform::Type::Float3x3:
-      return 36;
-    case Uniform::Type::Float4x4:
-      return 64;
-  }
-  return 0;
-}
-
 UniformBuffer::UniformBuffer(std::vector<Uniform> uniformList) : uniforms(std::move(uniformList)) {
   size_t index = 0;
   size_t offset = 0;
   for (auto& uniform : uniforms) {
-    uniformMap[uniform.name] = index++;
+    uniformMap[uniform.name()] = index++;
     offsets.push_back(offset);
     offset += uniform.size();
   }

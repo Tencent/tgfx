@@ -19,9 +19,9 @@
 #include "GLRenderPass.h"
 #include "GLUtil.h"
 #include "gpu/DrawingManager.h"
-#include "gpu/ProgramCache.h"
+#include "gpu/GlobalCache.h"
 #include "gpu/opengl/GLProgram.h"
-#include "gpu/opengl/GLRenderTarget.h"
+#include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
 struct AttribLayout {
@@ -50,23 +50,13 @@ static AttribLayout GetAttribLayout(SLType type) {
   return {false, 0, 0};
 }
 
-std::unique_ptr<RenderPass> RenderPass::Make(Context* context) {
-  DEBUG_ASSERT(context != nullptr);
-  return std::make_unique<GLRenderPass>(context);
+GLRenderPass::GLRenderPass(std::shared_ptr<GLInterface> interface,
+                           std::shared_ptr<RenderTarget> renderTarget, bool resolveMSAA)
+    : RenderPass(std::move(renderTarget)), interface(std::move(interface)),
+      resolveMSAA(resolveMSAA) {
 }
 
-GLRenderPass::GLRenderPass(Context* context) : RenderPass(context) {
-  if (GLCaps::Get(context)->vertexArrayObjectSupport) {
-    vertexArray = GLVertexArray::Make(context);
-    DEBUG_ASSERT(vertexArray != nullptr);
-  }
-  sharedVertexBuffer =
-      std::static_pointer_cast<GLBuffer>(GpuBuffer::Make(context, BufferType::Vertex));
-  DEBUG_ASSERT(sharedVertexBuffer != nullptr);
-}
-
-static void UpdateScissor(Context* context, const Rect& scissorRect) {
-  auto gl = GLFunctions::Get(context);
+static void UpdateScissor(const GLFunctions* gl, const Rect& scissorRect) {
   if (scissorRect.isEmpty()) {
     gl->disable(GL_SCISSOR_TEST);
   } else {
@@ -76,7 +66,7 @@ static void UpdateScissor(Context* context, const Rect& scissorRect) {
   }
 }
 
-static const unsigned gXfermodeCoeff2Blend[] = {
+static const unsigned XfermodeCoeff2Blend[] = {
     GL_ZERO,       GL_ONE,
     GL_SRC_COLOR,  GL_ONE_MINUS_SRC_COLOR,
     GL_DST_COLOR,  GL_ONE_MINUS_DST_COLOR,
@@ -86,15 +76,15 @@ static const unsigned gXfermodeCoeff2Blend[] = {
     GL_SRC1_ALPHA, GL_ONE_MINUS_SRC1_ALPHA,
 };
 
-static const unsigned gXfermodeEquation2Blend[] = {
+static const unsigned XfermodeEquation2Blend[] = {
     GL_FUNC_ADD,
     GL_FUNC_SUBTRACT,
     GL_FUNC_REVERSE_SUBTRACT,
 };
 
-static void UpdateBlend(Context* context, const BlendFormula* blendFactors) {
-  auto gl = GLFunctions::Get(context);
-  auto caps = GLCaps::Get(context);
+static void UpdateBlend(const GLInterface* interface, const BlendFormula* blendFactors) {
+  auto gl = interface->functions();
+  auto caps = interface->caps();
   if (caps->frameBufferFetchSupport && caps->frameBufferFetchRequiresEnablePerSample) {
     if (blendFactors == nullptr) {
       gl->enable(GL_FETCH_PER_SAMPLE_ARM);
@@ -110,73 +100,97 @@ static void UpdateBlend(Context* context, const BlendFormula* blendFactors) {
     gl->disable(GL_BLEND);
   } else {
     gl->enable(GL_BLEND);
-    gl->blendFunc(gXfermodeCoeff2Blend[static_cast<int>(blendFactors->srcCoeff())],
-                  gXfermodeCoeff2Blend[static_cast<int>(blendFactors->dstCoeff())]);
-    gl->blendEquation(gXfermodeEquation2Blend[static_cast<int>(blendFactors->equation())]);
+    gl->blendFunc(XfermodeCoeff2Blend[static_cast<int>(blendFactors->srcCoeff())],
+                  XfermodeCoeff2Blend[static_cast<int>(blendFactors->dstCoeff())]);
+    gl->blendEquation(XfermodeEquation2Blend[static_cast<int>(blendFactors->equation())]);
   }
 }
 
-void GLRenderPass::onBindRenderTarget() {
-  auto gl = GLFunctions::Get(context);
-  auto glRT = static_cast<GLRenderTarget*>(_renderTarget.get());
-  gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->drawFrameBufferID());
-  gl->viewport(0, 0, glRT->width(), glRT->height());
-  if (vertexArray) {
-    gl->bindVertexArray(vertexArray->id());
+void GLRenderPass::begin() {
+  auto gl = interface->functions();
+  auto renderTexture = static_cast<GLTexture*>(renderTarget->getRenderTexture());
+  gl->bindFramebuffer(GL_FRAMEBUFFER, renderTexture->frameBufferID());
+  gl->viewport(0, 0, renderTarget->width(), renderTarget->height());
+  if (auto vertexArrayID = getVertexArrayID(renderTarget->getContext())) {
+    gl->bindVertexArray(vertexArrayID);
   }
 }
 
-void GLRenderPass::onUnbindRenderTarget() {
-  auto gl = GLFunctions::Get(context);
-  if (vertexArray) {
+void GLRenderPass::onEnd() {
+  auto gl = interface->functions();
+  auto caps = interface->caps();
+  if (resolveMSAA && renderTarget->sampleCount() > 1) {
+    auto renderTexture = static_cast<GLTexture*>(renderTarget->getRenderTexture());
+    auto sampleTexture = static_cast<GLTexture*>(renderTarget->getSampleTexture());
+    gl->bindFramebuffer(GL_READ_FRAMEBUFFER, renderTexture->frameBufferID());
+    gl->bindFramebuffer(GL_DRAW_FRAMEBUFFER, sampleTexture->frameBufferID());
+    // MSAA resolve may be affected by the scissor test, so disable it here.
+    gl->disable(GL_SCISSOR_TEST);
+    if (caps->msFBOType == MSFBOType::ES_Apple) {
+      gl->resolveMultisampleFramebuffer();
+    } else {
+      gl->blitFramebuffer(0, 0, renderTarget->width(), renderTarget->height(), 0, 0,
+                          renderTarget->width(), renderTarget->height(), GL_COLOR_BUFFER_BIT,
+                          GL_NEAREST);
+    }
+  }
+  if (vertexArray != nullptr) {
     gl->bindVertexArray(0);
   }
   gl->bindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
 bool GLRenderPass::onBindProgramAndScissorClip(const Pipeline* pipeline, const Rect& scissorRect) {
-  _program = static_cast<GLProgram*>(context->programCache()->getProgram(pipeline));
-  if (_program == nullptr) {
+  auto context = renderTarget->getContext();
+  program = context->globalCache()->getProgram(pipeline);
+  if (program == nullptr) {
     return false;
   }
-  ClearGLError(context);
-  auto gl = GLFunctions::Get(context);
-  auto* program = static_cast<GLProgram*>(_program);
-  gl->useProgram(program->programID());
-  UpdateScissor(context, scissorRect);
-  UpdateBlend(context, pipeline->blendFormula());
-  if (pipeline->requiresBarrier()) {
+  auto gl = interface->functions();
+  ClearGLError(gl);
+  auto glProgram = static_cast<GLProgram*>(program.get());
+  gl->useProgram(glProgram->programID());
+  UpdateScissor(gl, scissorRect);
+  auto blendFormula = pipeline->getBlendFormula();
+  UpdateBlend(interface.get(), blendFormula.get());
+  auto renderTexture = renderTarget->getRenderTexture();
+  auto samplers = pipeline->getSamplers();
+  int textureUnit = 0;
+  bool requiresBarrier = false;
+  for (auto& info : samplers) {
+    if (info.texture == renderTexture) {
+      requiresBarrier = true;
+    }
+    bindTexture(textureUnit++, info.texture, info.state);
+  }
+  if (requiresBarrier && interface->caps()->textureRedSupport) {
     gl->textureBarrier();
   }
-  program->updateUniformsAndTextureBindings(_renderTarget.get(), pipeline);
+  auto uniformBuffer = glProgram->uniformBuffer();
+  pipeline->getUniforms(renderTarget.get(), uniformBuffer);
+  uniformBuffer->uploadToGPU(context);
   return true;
 }
 
-bool GLRenderPass::onBindBuffers(std::shared_ptr<GpuBuffer> indexBuffer,
-                                 std::shared_ptr<GpuBuffer> vertexBuffer, size_t vertexOffset,
-                                 std::shared_ptr<Data> vertexData) {
-  auto gl = GLFunctions::Get(context);
+bool GLRenderPass::onBindBuffers(GPUBuffer* indexBuffer, GPUBuffer* vertexBuffer,
+                                 size_t vertexOffset) {
+  auto gl = interface->functions();
   if (vertexBuffer) {
-    gl->bindBuffer(GL_ARRAY_BUFFER, std::static_pointer_cast<GLBuffer>(vertexBuffer)->bufferID());
-  } else if (vertexData) {
-    gl->bindBuffer(GL_ARRAY_BUFFER, sharedVertexBuffer->bufferID());
-    gl->bufferData(GL_ARRAY_BUFFER, static_cast<GLsizeiptr>(vertexData->size()), vertexData->data(),
-                   GL_STATIC_DRAW);
+    gl->bindBuffer(GL_ARRAY_BUFFER, static_cast<const GLBuffer*>(vertexBuffer)->bufferID());
   } else {
     return false;
   }
-  auto* program = static_cast<GLProgram*>(_program);
-  for (const auto& attribute : program->vertexAttributes()) {
+  auto glProgram = static_cast<GLProgram*>(program.get());
+  for (const auto& attribute : glProgram->vertexAttributes()) {
     const AttribLayout& layout = GetAttribLayout(attribute.gpuType);
     auto offset = vertexOffset + attribute.offset;
     gl->vertexAttribPointer(static_cast<unsigned>(attribute.location), layout.count, layout.type,
-                            layout.normalized, program->vertexStride(),
+                            layout.normalized, glProgram->vertexStride(),
                             reinterpret_cast<void*>(offset));
     gl->enableVertexAttribArray(static_cast<unsigned>(attribute.location));
   }
   if (indexBuffer) {
-    gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER,
-                   std::static_pointer_cast<GLBuffer>(indexBuffer)->bufferID());
+    gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, static_cast<const GLBuffer*>(indexBuffer)->bufferID());
   }
   return true;
 }
@@ -185,7 +199,7 @@ static const unsigned gPrimitiveType[] = {GL_TRIANGLES, GL_TRIANGLE_STRIP};
 
 void GLRenderPass::onDraw(PrimitiveType primitiveType, size_t offset, size_t count,
                           bool drawIndexed) {
-  auto gl = GLFunctions::Get(context);
+  auto gl = interface->functions();
   if (drawIndexed) {
     gl->drawElements(gPrimitiveType[static_cast<int>(primitiveType)], static_cast<int>(count),
                      GL_UNSIGNED_SHORT, reinterpret_cast<void*>(offset * sizeof(uint16_t)));
@@ -196,76 +210,100 @@ void GLRenderPass::onDraw(PrimitiveType primitiveType, size_t offset, size_t cou
 }
 
 void GLRenderPass::onClear(const Rect& scissor, Color color) {
-  auto gl = GLFunctions::Get(context);
-  UpdateScissor(context, scissor);
+  auto gl = interface->functions();
+  UpdateScissor(gl, scissor);
   gl->clearColor(color.red, color.green, color.blue, color.alpha);
   gl->clear(GL_COLOR_BUFFER_BIT);
 }
 
-void GLRenderPass::onCopyToTexture(Texture* texture, int srcX, int srcY) {
-  auto gpu = context->gpu();
-  if (_renderTarget->sampleCount() > 1) {
-    if (copyAsBlit(texture, srcX, srcY)) {
-      texture->getSampler()->regenerateMipmapLevels(context);
-      return;
-    }
-    auto bounds = Rect::MakeXYWH(srcX, srcY, texture->width(), texture->height());
-    gpu->resolveRenderTarget(_renderTarget.get(), bounds);
+unsigned GLRenderPass::getVertexArrayID(Context* context) {
+  if (!interface->caps()->vertexArrayObjectSupport) {
+    return 0;
   }
-  gpu->copyRenderTargetToTexture(_renderTarget.get(), texture, srcX, srcY);
-  texture->getSampler()->regenerateMipmapLevels(context);
-  // Reset the render target after the copy operation.
-  auto gl = GLFunctions::Get(context);
-  gl->bindFramebuffer(GL_FRAMEBUFFER,
-                      static_cast<GLRenderTarget*>(_renderTarget.get())->drawFrameBufferID());
+  if (vertexArray == nullptr) {
+    static const auto VertexArrayKey = UniqueKey::Make();
+    auto resource = context->globalCache()->findStaticResource(VertexArrayKey);
+    if (resource != nullptr) {
+      vertexArray = std::static_pointer_cast<GLVertexArray>(resource);
+    } else {
+      vertexArray = GLVertexArray::Make(context);
+      DEBUG_ASSERT(vertexArray != nullptr);
+      context->globalCache()->addStaticResource(VertexArrayKey, vertexArray);
+    }
+  }
+  return vertexArray->id();
 }
 
-bool GLRenderPass::copyAsBlit(Texture* texture, int srcX, int srcY) {
-  auto caps = GLCaps::Get(context);
-  if (!caps->usesMSAARenderBuffers() || caps->msFBOType == MSFBOType::ES_Apple) {
-    return false;
+static int FilterToGLMagFilter(FilterMode filterMode) {
+  switch (filterMode) {
+    case FilterMode::Nearest:
+      return GL_NEAREST;
+    case FilterMode::Linear:
+      return GL_LINEAR;
   }
-  if (caps->blitRectsMustMatchForMSAASrc && (srcX != 0 || srcY != 0)) {
-    return false;
-  }
-  auto glSampler = static_cast<const GLTextureSampler*>(texture->getSampler());
-  auto target = glSampler->target();
-  if (glSampler->format() != _renderTarget->format()) {
-    return false;
-  }
-  if (frameBuffer == nullptr) {
-    frameBuffer = GLFrameBuffer::Make(context);
-    if (frameBuffer == nullptr) {
-      return false;
-    }
-  }
-  ClearGLError(context);
-  auto gl = GLFunctions::Get(context);
+  return 0;
+}
 
-  gl->bindFramebuffer(GL_FRAMEBUFFER, frameBuffer->id());
-  gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, target, glSampler->id(), 0);
-  auto sourceFrameBufferID = static_cast<GLRenderTarget*>(_renderTarget.get())->drawFrameBufferID();
-#ifndef TGFX_BUILD_FOR_WEB
-  if (gl->checkFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
-    gl->bindFramebuffer(GL_FRAMEBUFFER, sourceFrameBufferID);
-    return false;
+static int FilterToGLMinFilter(FilterMode filterMode, MipmapMode mipmapMode) {
+  switch (mipmapMode) {
+    case MipmapMode::None:
+      return FilterToGLMagFilter(filterMode);
+    case MipmapMode::Nearest:
+      switch (filterMode) {
+        case FilterMode::Nearest:
+          return GL_NEAREST_MIPMAP_NEAREST;
+        case FilterMode::Linear:
+          return GL_LINEAR_MIPMAP_NEAREST;
+      }
+    case MipmapMode::Linear:
+      switch (filterMode) {
+        case FilterMode::Nearest:
+          return GL_NEAREST_MIPMAP_LINEAR;
+        case FilterMode::Linear:
+          return GL_LINEAR_MIPMAP_LINEAR;
+      }
   }
-#endif
-  gl->bindFramebuffer(GL_READ_FRAMEBUFFER, sourceFrameBufferID);
-  gl->bindFramebuffer(GL_DRAW_FRAMEBUFFER, frameBuffer->id());
-  gl->disable(GL_SCISSOR_TEST);
-  auto right = srcX + texture->width();
-  auto bottom = srcY + texture->height();
-  gl->blitFramebuffer(srcX, srcY, right, bottom, 0, 0, texture->width(), texture->height(),
-                      GL_COLOR_BUFFER_BIT, GL_NEAREST);
-  if (!CheckGLError(context)) {
-    gl->bindFramebuffer(GL_FRAMEBUFFER, sourceFrameBufferID);
-    return false;
+  return 0;
+}
+
+static int GetGLWrap(unsigned target, SamplerState::WrapMode wrapMode) {
+  if (target == GL_TEXTURE_RECTANGLE) {
+    if (wrapMode == SamplerState::WrapMode::ClampToBorder) {
+      return GL_CLAMP_TO_BORDER;
+    }
+    return GL_CLAMP_TO_EDGE;
   }
-  gl->bindFramebuffer(GL_FRAMEBUFFER, frameBuffer->id());
-  gl->framebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, target, 0, 0);
-  gl->bindFramebuffer(GL_FRAMEBUFFER, sourceFrameBufferID);
-  return true;
+  switch (wrapMode) {
+    case SamplerState::WrapMode::Clamp:
+      return GL_CLAMP_TO_EDGE;
+    case SamplerState::WrapMode::Repeat:
+      return GL_REPEAT;
+    case SamplerState::WrapMode::MirrorRepeat:
+      return GL_MIRRORED_REPEAT;
+    case SamplerState::WrapMode::ClampToBorder:
+      return GL_CLAMP_TO_BORDER;
+  }
+  return 0;
+}
+
+void GLRenderPass::bindTexture(int unitIndex, GPUTexture* texture, SamplerState samplerState) {
+  if (texture == nullptr) {
+    return;
+  }
+  auto gl = interface->functions();
+  auto caps = interface->caps();
+  auto glTexture = static_cast<const GLTexture*>(texture);
+  auto target = glTexture->target();
+  gl->activeTexture(static_cast<unsigned>(GL_TEXTURE0 + unitIndex));
+  gl->bindTexture(target, glTexture->textureID());
+  gl->texParameteri(target, GL_TEXTURE_WRAP_S, GetGLWrap(target, samplerState.wrapModeX));
+  gl->texParameteri(target, GL_TEXTURE_WRAP_T, GetGLWrap(target, samplerState.wrapModeY));
+  if (samplerState.mipmapped() && (!caps->mipmapSupport || glTexture->mipLevelCount() <= 1)) {
+    samplerState.mipmapMode = MipmapMode::None;
+  }
+  gl->texParameteri(target, GL_TEXTURE_MIN_FILTER,
+                    FilterToGLMinFilter(samplerState.filterMode, samplerState.mipmapMode));
+  gl->texParameteri(target, GL_TEXTURE_MAG_FILTER, FilterToGLMagFilter(samplerState.filterMode));
 }
 
 }  // namespace tgfx

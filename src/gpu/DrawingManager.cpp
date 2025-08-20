@@ -17,14 +17,16 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawingManager.h"
+#include "GPU.h"
 #include "ProxyProvider.h"
 #include "core/AtlasCellDecodeTask.h"
 #include "core/AtlasManager.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
+#include "gpu/tasks/GenerateMipmapsTask.h"
 #include "gpu/tasks/RenderTargetCopyTask.h"
 #include "gpu/tasks/RuntimeDrawTask.h"
-#include "gpu/tasks/TextureResolveTask.h"
+#include "gpu/tasks/SemaphoreWaitTask.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -54,9 +56,10 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   op->addColorFP(std::move(processor));
   op->setBlendMode(BlendMode::Src);
   auto ops = drawingBuffer->makeArray<Op>(&op, 1);
-  auto task = drawingBuffer->make<OpsRenderTask>(renderTarget, std::move(ops));
+  auto textureProxy = renderTarget->asTextureProxy();
+  auto task = drawingBuffer->make<OpsRenderTask>(std::move(renderTarget), std::move(ops));
   renderTasks.emplace_back(std::move(task));
-  addTextureResolveTask(std::move(renderTarget));
+  addGenerateMipmapsTask(std::move(textureProxy));
   return true;
 }
 
@@ -73,9 +76,10 @@ void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderT
   if (renderTarget == nullptr || ops.empty()) {
     return;
   }
-  auto task = drawingBuffer->make<OpsRenderTask>(renderTarget, std::move(ops));
+  auto textureProxy = renderTarget->asTextureProxy();
+  auto task = drawingBuffer->make<OpsRenderTask>(std::move(renderTarget), std::move(ops));
   renderTasks.emplace_back(std::move(task));
-  addTextureResolveTask(std::move(renderTarget));
+  addGenerateMipmapsTask(std::move(textureProxy));
 }
 
 void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> renderTarget,
@@ -85,83 +89,37 @@ void DrawingManager::addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> rende
   if (renderTarget == nullptr || inputs.empty() || effect == nullptr) {
     return;
   }
-  auto task = drawingBuffer->make<RuntimeDrawTask>(renderTarget, std::move(inputs),
+  auto textureProxy = renderTarget->asTextureProxy();
+  auto task = drawingBuffer->make<RuntimeDrawTask>(std::move(renderTarget), std::move(inputs),
                                                    std::move(effect), offset);
   renderTasks.emplace_back(std::move(task));
-  addTextureResolveTask(std::move(renderTarget));
+  addGenerateMipmapsTask(std::move(textureProxy));
 }
 
-void DrawingManager::addTextureResolveTask(std::shared_ptr<RenderTargetProxy> renderTarget) {
-  auto textureProxy = renderTarget->asTextureProxy();
-  if (textureProxy == nullptr ||
-      (renderTarget->sampleCount() <= 1 && !textureProxy->hasMipmaps())) {
+void DrawingManager::addGenerateMipmapsTask(std::shared_ptr<TextureProxy> textureProxy) {
+  if (textureProxy == nullptr || !textureProxy->hasMipmaps()) {
     return;
   }
-  auto task = drawingBuffer->make<TextureResolveTask>(std::move(renderTarget));
+  auto task = drawingBuffer->make<GenerateMipmapsTask>(std::move(textureProxy));
   renderTasks.emplace_back(std::move(task));
 }
 
 void DrawingManager::addRenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
-                                             std::shared_ptr<TextureProxy> dest) {
+                                             std::shared_ptr<TextureProxy> dest, int srcX,
+                                             int srcY) {
   if (source == nullptr || dest == nullptr) {
     return;
   }
-  DEBUG_ASSERT(source->width() == dest->width() && source->height() == dest->height());
-  auto task = drawingBuffer->make<RenderTargetCopyTask>(std::move(source), std::move(dest));
+  auto task =
+      drawingBuffer->make<RenderTargetCopyTask>(std::move(source), std::move(dest), srcX, srcY);
   renderTasks.emplace_back(std::move(task));
 }
 
-void DrawingManager::addResourceTask(PlacementPtr<ResourceTask> resourceTask,
-                                     const UniqueKey& uniqueKey, uint32_t renderFlags) {
+void DrawingManager::addResourceTask(PlacementPtr<ResourceTask> resourceTask) {
   if (resourceTask == nullptr) {
     return;
   }
-  if (!uniqueKey.empty() && !(renderFlags & RenderFlags::DisableCache)) {
-    resourceTask->uniqueKey = uniqueKey;
-  }
   resourceTasks.emplace_back(std::move(resourceTask));
-}
-
-bool DrawingManager::flush() {
-  while (!compositors.empty()) {
-    auto compositor = compositors.back();
-    // The makeClosed() method may add more compositors to the list.
-    compositor->makeClosed();
-  }
-  auto proxyProvider = context->proxyProvider();
-  // Flush the shared vertex buffer before executing the tasks. It may generate new resource tasks.
-  proxyProvider->flushSharedVertexBuffer();
-
-  if (resourceTasks.empty() && renderTasks.empty()) {
-    proxyProvider->clearSharedVertexBuffer();
-    clearAtlasCellCodecTasks();
-    return false;
-  }
-  for (auto& task : resourceTasks) {
-    task->execute(context);
-    task = nullptr;
-  }
-  uploadAtlasToGPU();
-  resourceTasks.clear();
-  proxyProvider->clearSharedVertexBuffer();
-
-  if (renderPass == nullptr) {
-    renderPass = RenderPass::Make(context);
-  }
-  for (auto& task : renderTasks) {
-    task->execute(renderPass.get());
-    task = nullptr;
-  }
-  renderTasks.clear();
-  return true;
-}
-
-void DrawingManager::releaseAll() {
-  compositors.clear();
-  resourceTasks.clear();
-  renderTasks.clear();
-  atlasCellCodecTasks.clear();
-  atlasCellDatas.clear();
 }
 
 void DrawingManager::addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& textureProxy,
@@ -188,12 +146,63 @@ void DrawingManager::addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& 
   atlasCellCodecTasks.emplace_back(std::move(task));
 }
 
+void DrawingManager::addSemaphoreWaitTask(std::shared_ptr<Semaphore> semaphore) {
+  if (semaphore == nullptr) {
+    return;
+  }
+  auto task = drawingBuffer->make<SemaphoreWaitTask>(std::move(semaphore));
+  renderTasks.emplace_back(std::move(task));
+}
+
+std::shared_ptr<CommandBuffer> DrawingManager::flush(BackendSemaphore* signalSemaphore) {
+  while (!compositors.empty()) {
+    auto compositor = compositors.back();
+    // The makeClosed() method may add more compositors to the list.
+    compositor->makeClosed();
+  }
+  auto proxyProvider = context->proxyProvider();
+  // Flush the shared vertex buffer before executing the tasks. It may generate new resource tasks.
+  proxyProvider->flushSharedVertexBuffer();
+
+  if (resourceTasks.empty() && renderTasks.empty()) {
+    proxyProvider->clearSharedVertexBuffer();
+    clearAtlasCellCodecTasks();
+    return nullptr;
+  }
+  for (auto& task : resourceTasks) {
+    task->execute(context);
+    task = nullptr;
+  }
+  uploadAtlasToGPU();
+  resourceTasks.clear();
+  proxyProvider->clearSharedVertexBuffer();
+  auto commandEncoder = context->gpu()->createCommandEncoder();
+  for (auto& task : renderTasks) {
+    task->execute(commandEncoder.get());
+    task = nullptr;
+  }
+  renderTasks.clear();
+  if (signalSemaphore != nullptr) {
+    *signalSemaphore = commandEncoder->insertSemaphore();
+  }
+  return commandEncoder->finish();
+}
+
+void DrawingManager::releaseAll() {
+  compositors.clear();
+  resourceTasks.clear();
+  renderTasks.clear();
+  atlasCellCodecTasks.clear();
+  atlasCellDatas.clear();
+}
+
 void DrawingManager::clearAtlasCellCodecTasks() {
   atlasCellCodecTasks.clear();
   atlasCellDatas.clear();
 }
 
 void DrawingManager::uploadAtlasToGPU() {
+  auto queue = context->gpu()->queue();
   for (auto& task : atlasCellCodecTasks) {
     task->wait();
   }
@@ -201,8 +210,8 @@ void DrawingManager::uploadAtlasToGPU() {
     if (textureProxy == nullptr || cellDatas.empty()) {
       continue;
     }
-    auto texture = textureProxy->getTexture();
-    if (texture == nullptr) {
+    auto textureView = textureProxy->getTextureView();
+    if (textureView == nullptr) {
       continue;
     }
     for (auto& [data, info, atlasOffset] : cellDatas) {
@@ -211,7 +220,7 @@ void DrawingManager::uploadAtlasToGPU() {
       }
       auto rect = Rect::MakeXYWH(atlasOffset.x, atlasOffset.y, static_cast<float>(info.width()),
                                  static_cast<float>(info.height()));
-      texture->getSampler()->writePixels(context, rect, data->data(), info.rowBytes());
+      queue->writeTexture(textureView->getTexture(), rect, data->data(), info.rowBytes());
       // Text atlas has no mipmaps, so we don't need to regenerate mipmaps.
     }
   }

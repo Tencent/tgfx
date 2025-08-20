@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RuntimeImageFilter.h"
-#include "core/images/ResourceImage.h"
+#include "core/images/PixelImage.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/TPArgs.h"
@@ -37,10 +37,10 @@ Rect RuntimeImageFilter::onFilterBounds(const Rect& srcRect) const {
 }
 
 std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_ptr<Image> source,
-                                                                   const Rect& clipBounds,
+                                                                   const Rect& renderBounds,
                                                                    const TPArgs& args) const {
   auto renderTarget = RenderTargetProxy::MakeFallback(
-      args.context, static_cast<int>(clipBounds.width()), static_cast<int>(clipBounds.height()),
+      args.context, static_cast<int>(renderBounds.width()), static_cast<int>(renderBounds.height()),
       source->isAlphaOnly(), effect->sampleCount(), args.mipmapped, ImageOrigin::TopLeft,
       BackingFit::Approx);
   if (renderTarget == nullptr) {
@@ -50,7 +50,7 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_p
   textureProxies.reserve(1 + effect->extraInputs.size());
   // Request a texture proxy from the source image without mipmaps to save memory.
   // It may be ignored if the source image has preset mipmaps.
-  TPArgs tpArgs(args.context, args.renderFlags, false, BackingFit::Exact);
+  TPArgs tpArgs(args.context, args.renderFlags, false, 1.0f, BackingFit::Exact);
   auto textureProxy = source->lockTextureProxy(tpArgs);
   if (textureProxy == nullptr) {
     return nullptr;
@@ -68,7 +68,7 @@ std::shared_ptr<TextureProxy> RuntimeImageFilter::lockTextureProxy(std::shared_p
     }
     textureProxies.push_back(textureProxy);
   }
-  auto offset = Point::Make(-clipBounds.x(), -clipBounds.y());
+  auto offset = Point::Make(-renderBounds.x(), -renderBounds.y());
   auto drawingManager = args.context->drawingManager();
   drawingManager->addRuntimeDrawTask(renderTarget, std::move(textureProxies), effect, offset);
   return renderTarget->asTextureProxy();

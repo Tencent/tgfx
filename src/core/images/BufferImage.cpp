@@ -17,25 +17,64 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "BufferImage.h"
+#include "core/PixelBuffer.h"
+#include "core/PixelBufferCodec.h"
+#include "core/ScaledImageGenerator.h"
+#include "core/images/CodecImage.h"
+#include "core/utils/NextPowerOfTwoScale.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/TPArgs.h"
 
 namespace tgfx {
 std::shared_ptr<Image> Image::MakeFrom(std::shared_ptr<ImageBuffer> buffer) {
   if (buffer == nullptr) {
     return nullptr;
   }
-  auto image = std::make_shared<BufferImage>(UniqueKey::Make(), std::move(buffer));
+  std::shared_ptr<Image> image = std::make_shared<BufferImage>(std::move(buffer), false);
+  image->weakThis = image;
+  return image->makeRasterized();
+}
+
+BufferImage::BufferImage(std::shared_ptr<ImageBuffer> buffer, bool mipmapped)
+    : PixelImage(mipmapped), imageBuffer(std::move(buffer)) {
+}
+
+float BufferImage::getRasterizedScale(float drawScale) const {
+  if (imageBuffer->isPixelBuffer()) {
+    return NextPowerOfTwoScale(drawScale);
+  }
+  return 1.0f;
+}
+
+std::shared_ptr<TextureProxy> BufferImage::lockTextureProxy(const TPArgs& args) const {
+  auto scaleWidth = static_cast<int>(roundf(static_cast<float>(width()) * args.drawScale));
+  auto scaleHeight = static_cast<int>(roundf(static_cast<float>(height()) * args.drawScale));
+  if (imageBuffer->isPixelBuffer() && scaleWidth < imageBuffer->width() &&
+      scaleHeight < imageBuffer->height()) {
+    auto codec = PixelBufferCodec::Make(std::static_pointer_cast<PixelBuffer>(imageBuffer));
+    auto generator = ScaledImageGenerator::MakeFrom(codec, scaleWidth, scaleHeight);
+    return args.context->proxyProvider()->createTextureProxy(generator, args.mipmapped,
+                                                             args.renderFlags);
+  }
+  return args.context->proxyProvider()->createTextureProxy(imageBuffer, args.mipmapped);
+}
+
+std::shared_ptr<Image> BufferImage::onMakeMipmapped(bool mipmapped) const {
+  auto image = std::make_shared<BufferImage>(imageBuffer, mipmapped);
   image->weakThis = image;
   return image;
 }
 
-BufferImage::BufferImage(UniqueKey uniqueKey, std::shared_ptr<ImageBuffer> buffer)
-    : ResourceImage(std::move(uniqueKey)), imageBuffer(std::move(buffer)) {
+std::shared_ptr<Image> BufferImage::onMakeScaled(int newWidth, int newHeight,
+                                                 const SamplingOptions& sampling) const {
+  if (imageBuffer->isPixelBuffer() && newWidth < imageBuffer->width() &&
+      newHeight < imageBuffer->height()) {
+    auto codec = PixelBufferCodec::Make(std::static_pointer_cast<PixelBuffer>(imageBuffer));
+    auto image = std::make_shared<CodecImage>(std::move(codec), newWidth, newHeight, mipmapped);
+    image->weakThis = image;
+    return image;
+  }
+  return PixelImage::onMakeScaled(newWidth, newHeight, sampling);
 }
 
-std::shared_ptr<TextureProxy> BufferImage::onLockTextureProxy(const TPArgs& args,
-                                                              const UniqueKey& key) const {
-  return args.context->proxyProvider()->createTextureProxy(key, imageBuffer, args.mipmapped,
-                                                           args.renderFlags);
-}
 }  // namespace tgfx

@@ -112,7 +112,7 @@ ImageOrigin Surface::origin() const {
 }
 
 BackendRenderTarget Surface::getBackendRenderTarget() {
-  getContext()->flush();
+  getContext()->flushAndSubmit();
   auto renderTarget = renderContext->renderTarget->getRenderTarget();
   if (renderTarget == nullptr) {
     return {};
@@ -125,12 +125,12 @@ BackendTexture Surface::getBackendTexture() {
   if (textureProxy == nullptr) {
     return {};
   }
-  getContext()->flush();
-  auto texture = textureProxy->getTexture();
-  if (texture == nullptr) {
+  getContext()->flushAndSubmit();
+  auto textureView = textureProxy->getTextureView();
+  if (textureView == nullptr) {
     return {};
   }
-  return texture->getBackendTexture();
+  return textureView->getBackendTexture();
 }
 
 HardwareBufferRef Surface::getHardwareBuffer() {
@@ -139,11 +139,11 @@ HardwareBufferRef Surface::getHardwareBuffer() {
     return {};
   }
   getContext()->flushAndSubmit(true);
-  auto texture = textureProxy->getTexture();
-  if (texture == nullptr) {
+  auto textureView = textureProxy->getTextureView();
+  if (textureView == nullptr) {
     return nullptr;
   }
-  return texture->getSampler()->getHardwareBuffer();
+  return textureView->getTexture()->getHardwareBuffer();
 }
 
 Canvas* Surface::getCanvas() {
@@ -183,12 +183,10 @@ bool Surface::readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX, in
     return false;
   }
   auto renderTargetProxy = renderContext->renderTarget;
-  auto context = renderTargetProxy->getContext();
-  context->flush();
-  auto texture = renderTargetProxy->getTexture();
-  auto hardwareBuffer = texture ? texture->getSampler()->getHardwareBuffer() : nullptr;
+  auto textureView = renderTargetProxy->getTextureView();
+  auto hardwareBuffer = textureView ? textureView->getTexture()->getHardwareBuffer() : nullptr;
+  renderTargetProxy->getContext()->flushAndSubmit(hardwareBuffer != nullptr);
   if (hardwareBuffer != nullptr) {
-    context->submit(true);
     auto pixels = HardwareBufferLock(hardwareBuffer);
     if (pixels != nullptr) {
       auto info = HardwareBufferGetInfo(hardwareBuffer);

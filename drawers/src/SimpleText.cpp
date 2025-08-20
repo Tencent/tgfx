@@ -31,7 +31,7 @@ void SimpleText::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) {
   tgfx::Font font(typeface, 40 * scale);
   font.setFauxBold(true);
   auto textBlob = tgfx::TextBlob::MakeFrom(text, font);
-  auto bounds = textBlob->getBounds();
+  auto bounds = textBlob->getTightBounds();
   auto textScale = screenWidth / bounds.width();
   tgfx::Point textStart = {(width - bounds.width()) / 2, height / 2 - bounds.bottom * 1.2f};
   tgfx::Matrix matrix = {};

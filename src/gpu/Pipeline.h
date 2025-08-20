@@ -28,7 +28,7 @@
 
 namespace tgfx {
 struct SamplerInfo {
-  const TextureSampler* sampler;
+  GPUTexture* texture;
   SamplerState state;
 };
 
@@ -65,15 +65,9 @@ class Pipeline : public ProgramCreator {
     return _outputSwizzle;
   }
 
-  bool requiresBarrier() const {
-    return xferProcessor != nullptr && xferProcessor->requiresBarrier();
-  }
+  std::unique_ptr<BlendFormula> getBlendFormula() const;
 
-  const BlendFormula* blendFormula() const {
-    return xferProcessor == nullptr ? &_blendFormula : nullptr;
-  }
-
-  void getUniforms(UniformBuffer* uniformBuffer) const;
+  void getUniforms(const RenderTarget* renderTarget, UniformBuffer* uniformBuffer) const;
 
   std::vector<SamplerInfo> getSamplers() const;
 
@@ -96,7 +90,7 @@ class Pipeline : public ProgramCreator {
   // This value is also the index in fragmentProcessors where coverage processors begin.
   size_t numColorProcessors = 0;
   PlacementPtr<XferProcessor> xferProcessor = nullptr;
-  BlendFormula _blendFormula = {};
+  BlendMode blendMode = BlendMode::SrcOver;
   const Swizzle* _outputSwizzle = nullptr;
 
   void updateProcessorIndices();

@@ -18,7 +18,7 @@
 
 #include <math.h>
 #include <vector>
-#include "core/filters/BlurImageFilter.h"
+#include "core/filters/GaussianBlurImageFilter.h"
 #include "core/shaders/GradientShader.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "layers/RootLayer.h"
@@ -660,7 +660,7 @@ TGFX_TEST(LayerTest, StrokeOnTop) {
 TGFX_TEST(LayerTest, FilterTest) {
   auto filter = DropShadowFilter::Make(-80, -80, 0, 0, Color::Black());
   auto filter2 = DropShadowFilter::Make(-40, -40, 0, 0, Color::Green());
-  auto filter3 = BlurFilter::Make(40, 40);
+  auto filter3 = BlurFilter::Make(10, 10);
   auto image = MakeImage("resources/apitest/rotation.jpg");
   ContextScope scope;
   auto context = scope.getContext();
@@ -676,7 +676,7 @@ TGFX_TEST(LayerTest, FilterTest) {
   displayList->root()->addChild(layer);
   displayList->render(surface.get());
   auto bounds = displayList->root()->getBounds();
-  EXPECT_EQ(Rect::MakeLTRB(131.f, 131.f, 1721.f, 2225.f), bounds);
+  EXPECT_EQ(Rect::MakeLTRB(130.f, 130.f, 1722.f, 2226.f), bounds);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/filterTest"));
 }
 
@@ -714,7 +714,7 @@ TGFX_TEST(LayerTest, dropshadowLayerFilter) {
   Paint paint;
   auto surface = Surface::Make(context, static_cast<int>(imageWidth * 2.f + padding * 3.f),
                                static_cast<int>(imageHeight * 2.f + padding * 3.f));
-  auto filter = BlurFilter::Make(15, 15);
+  auto filter = BlurFilter::Make(5, 5);
   auto layer = ImageLayer::Make();
   layer->setImage(image);
   layer->setMatrix(Matrix::MakeTrans(padding, padding));
@@ -725,14 +725,14 @@ TGFX_TEST(LayerTest, dropshadowLayerFilter) {
   auto layer2 = ImageLayer::Make();
   layer2->setImage(image);
   layer2->setMatrix(Matrix::MakeTrans(imageWidth + padding * 2, padding));
-  auto filter2 = DropShadowFilter::Make(0, 0, 15, 15, Color::White(), true);
+  auto filter2 = DropShadowFilter::Make(0, 0, 5, 5, Color::White(), true);
   layer2->setFilters({filter2});
   displayList->root()->addChild(layer2);
 
   auto layer3 = ImageLayer::Make();
   layer3->setImage(image);
   layer3->setMatrix(Matrix::MakeTrans(padding, imageWidth + padding * 2));
-  auto filter3 = DropShadowFilter::Make(0, 0, 15, 15, Color::White());
+  auto filter3 = DropShadowFilter::Make(0, 0, 5, 5, Color::White());
   layer3->setFilters({filter3});
   displayList->root()->addChild(layer3);
 
@@ -807,9 +807,9 @@ TGFX_TEST(LayerTest, blurLayerFilter) {
   EXPECT_EQ(blur->blurrinessX(), 130.f);
   blur->setTileMode(TileMode::Clamp);
   EXPECT_EQ(blur->tileMode(), TileMode::Clamp);
-  auto imageFilter = std::static_pointer_cast<BlurImageFilter>(blur->getImageFilter(0.5f));
-  auto imageFilter2 =
-      std::static_pointer_cast<BlurImageFilter>(ImageFilter::Blur(65.f, 65.f, TileMode::Clamp));
+  auto imageFilter = std::static_pointer_cast<GaussianBlurImageFilter>(blur->getImageFilter(0.5f));
+  auto imageFilter2 = std::static_pointer_cast<GaussianBlurImageFilter>(
+      ImageFilter::Blur(65.f, 65.f, TileMode::Clamp));
   EXPECT_EQ(imageFilter->blurrinessX, imageFilter2->blurrinessX);
   EXPECT_EQ(imageFilter->blurrinessY, imageFilter2->blurrinessY);
   EXPECT_EQ(imageFilter->tileMode, imageFilter2->tileMode);
@@ -1207,19 +1207,19 @@ TGFX_TEST(LayerTest, HasContentChanged) {
   displayList.root()->addChild(shapeLayer);
   EXPECT_TRUE(displayList.hasContentChanged());
   displayList.render(surface.get());
-  context->flush();
+  context->flushAndSubmit();
   EXPECT_FALSE(displayList.hasContentChanged());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/HasContentChanged_Org"));
   displayList.setContentOffset(50, 50);
   EXPECT_TRUE(displayList.hasContentChanged());
   displayList.render(surface.get(), false);
-  context->flush();
+  context->flushAndSubmit();
   EXPECT_FALSE(displayList.hasContentChanged());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/HasContentChanged_Offset"));
   displayList.setZoomScale(0.5f);
   EXPECT_TRUE(displayList.hasContentChanged());
   displayList.render(surface.get());
-  context->flush();
+  context->flushAndSubmit();
   EXPECT_FALSE(displayList.hasContentChanged());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/HasContentChanged_Zoom"));
 }
@@ -1832,7 +1832,7 @@ TGFX_TEST(LayerTest, hitTestPointNested) {
   paint.setStyle(PaintStyle::Fill);
   Point p3 = {80.0f, 80.0f};
   canvas->drawCircle(p3.x, p3.y, 2.0f, paint);
-  EXPECT_EQ(false, textLayer->hitTestPoint(p3.x, p3.y));
+  EXPECT_EQ(true, textLayer->hitTestPoint(p3.x, p3.y));
   EXPECT_EQ(false, textLayer->hitTestPoint(p3.x, p3.y, true));
   EXPECT_EQ(false, shaperLayer->hitTestPoint(p3.x, p3.y));
   EXPECT_EQ(false, shaperLayer->hitTestPoint(p3.x, p3.y, true));
@@ -1840,9 +1840,9 @@ TGFX_TEST(LayerTest, hitTestPointNested) {
   EXPECT_EQ(true, imageLayer->hitTestPoint(p3.x, p3.y, true));
   EXPECT_EQ(true, parentLayer->hitTestPoint(p3.x, p3.y));
   EXPECT_EQ(true, parentLayer->hitTestPoint(p3.x, p3.y, true));
-  EXPECT_EQ(false, childLayer->hitTestPoint(p3.x, p3.y));
+  EXPECT_EQ(true, childLayer->hitTestPoint(p3.x, p3.y));
   EXPECT_EQ(false, childLayer->hitTestPoint(p3.x, p3.y, true));
-  EXPECT_EQ(false, grandsonLayer->hitTestPoint(p3.x, p3.y));
+  EXPECT_EQ(true, grandsonLayer->hitTestPoint(p3.x, p3.y));
   EXPECT_EQ(false, grandsonLayer->hitTestPoint(p3.x, p3.y, true));
   EXPECT_EQ(true, rootLayer->hitTestPoint(p3.x, p3.y));
   EXPECT_EQ(true, rootLayer->hitTestPoint(p3.x, p3.y, true));
@@ -1990,7 +1990,7 @@ TGFX_TEST(LayerTest, DropShadowStyle) {
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DropShadowStyle-stroke"));
 
-  auto blur = BlurFilter::Make(10, 10);
+  auto blur = BlurFilter::Make(2.5, 2.5);
   layer->setFilters({blur});
   displayList->render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/DropShadowStyle-stroke-blur"));
@@ -2037,7 +2037,7 @@ TGFX_TEST(LayerTest, Filters) {
   layer->setPath(path);
   auto fillStyle = SolidColor::Make(Color::FromRGBA(100, 0, 0, 128));
   layer->setFillStyle(fillStyle);
-  auto filter = BlurFilter::Make(10, 10);
+  auto filter = BlurFilter::Make(5, 5);
   auto filter2 = DropShadowFilter::Make(10, 10, 0, 0, Color::Black());
   auto filter3 = InnerShadowFilter::Make(10, 10, 0, 0, Color::White());
   layer->setFilters({filter, filter2, filter3});
@@ -2115,13 +2115,13 @@ TGFX_TEST(LayerTest, BackgroundBlur) {
   layer->setLineWidth(10);
   layer->setStrokeOnTop(true);
   layer->setExcludeChildEffectsInLayerStyle(true);
-  auto filter = BackgroundBlurStyle::Make(10, 10);
+  auto filter = BackgroundBlurStyle::Make(2, 2);
   auto dropShadow = DropShadowStyle::Make(10, 10, 0, 0, Color::FromRGBA(0, 0, 0, 100));
   dropShadow->setShowBehindLayer(true);
   layer->setExcludeChildEffectsInLayerStyle(true);
   layer->setLayerStyles({dropShadow, filter});
 
-  auto blurFilter = BlurFilter::Make(1, 20);
+  auto blurFilter = BlurFilter::Make(1, 2);
   layer->setFilters({blurFilter});
 
   auto silbing = ShapeLayer::Make();
@@ -2129,7 +2129,7 @@ TGFX_TEST(LayerTest, BackgroundBlur) {
   rect.addRect(Rect::MakeWH(50, 50));
   silbing->setPath(rect);
   silbing->setMatrix(Matrix::MakeTrans(-10, 0));
-  auto newBackgroundBlur = BackgroundBlurStyle::Make(15, 15);
+  auto newBackgroundBlur = BackgroundBlurStyle::Make(3, 3);
   silbing->setLayerStyles({dropShadow, newBackgroundBlur});
   silbing->setFillStyle(SolidColor::Make(Color::FromRGBA(0, 0, 100, 100)));
   layer->addChild(silbing);
@@ -2145,7 +2145,7 @@ TGFX_TEST(LayerTest, BackgroundBlur) {
   child->setMatrix(Matrix::MakeScale(0.5, 0.5));
   auto fillStyle2 = SolidColor::Make(Color::FromRGBA(0, 100, 0, 100));
   child->setFillStyle(fillStyle2);
-  auto backgroundBlur = BackgroundBlurStyle::Make(20, 20);
+  auto backgroundBlur = BackgroundBlurStyle::Make(5, 5);
   child->setLayerStyles({backgroundBlur});
   child->setBlendMode(BlendMode::Multiply);
   clipLayer->addChild(child);
@@ -2230,7 +2230,7 @@ TGFX_TEST(LayerTest, ChildMask) {
   groupMatrix.postRotate(30);
   group->setMatrix(groupMatrix);
 
-  group->setFilters({BlurFilter::Make(30, 30)});
+  group->setFilters({BlurFilter::Make(10, 10)});
 
   list.root()->addChild(group);
   auto surface = Surface::Make(context, 300, 300);
@@ -2841,7 +2841,7 @@ TGFX_TEST(LayerTest, BackgroundBlurStyleTest) {
   path1.addRect(Rect::MakeXYWH(40.5f, 40.5f, 80.f, 80.f));
   shapeLayer1->setPath(path1);
   shapeLayer1->setMatrix(Matrix::MakeTrans(0.5f, 0.5f));
-  shapeLayer1->setLayerStyles({BackgroundBlurStyle::Make(10, 10)});
+  shapeLayer1->setLayerStyles({BackgroundBlurStyle::Make(4, 4)});
   auto image = MakeImage("resources/apitest/imageReplacement.png");
   auto imageLayer = ImageLayer::Make();
   imageLayer->setImage(image);
@@ -2954,5 +2954,42 @@ TGFX_TEST(LayerTest, PartialInnerShadow) {
   shapeLayer->setLayerStyles({innerShadowStyle});
   displayList.render(surface.get());
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialInnerShadow"));
+}
+
+TGFX_TEST(LayerTest, PartialDrawLayer) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  DisplayList displayList;
+  auto surface = Surface::Make(context, 200, 200);
+  auto rootLayer = Layer::Make();
+  rootLayer->setMatrix(Matrix::MakeTrans(40, 40));
+  displayList.root()->addChild(rootLayer);
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
+  auto imageLayer = ImageLayer::Make();
+  imageLayer->setImage(image);
+  rootLayer->addChild(imageLayer);
+  auto shapeLayer = ShapeLayer::Make();
+  Path path;
+  path.addRect(Rect::MakeXYWH(0, 0, 100, 100));
+  shapeLayer->setPath(path);
+  shapeLayer->setFillStyle(SolidColor::Make(Color::FromRGBA(255, 255, 255, 50)));
+  shapeLayer->setLayerStyles({BackgroundBlurStyle::Make(1, 1)});
+  rootLayer->addChild(shapeLayer);
+  auto layerInvisible = SolidLayer::Make();
+  layerInvisible->setColor(Color::FromRGBA(0, 0, 0, 255));
+  layerInvisible->setWidth(100);
+  layerInvisible->setHeight(100);
+  layerInvisible->setMatrix(Matrix::MakeTrans(100, 100));
+  layerInvisible->setShouldRasterize(true);
+  rootLayer->addChild(layerInvisible);
+  auto canvas = surface->getCanvas();
+  canvas->clear();
+  canvas->rotate(30, 45, 45);
+  canvas->clipRect(Rect::MakeXYWH(0, 0, 90, 90));
+  canvas->scale(2.0, 1.0f);
+  rootLayer->draw(canvas);
+  EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialDrawLayer"));
+  EXPECT_EQ(layerInvisible->rasterizedContent, nullptr);
 }
 }  // namespace tgfx

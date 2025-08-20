@@ -75,7 +75,8 @@ class OpsCompositor {
   void fillShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill);
 
   /**
-   * Fills the given rect with the given fill, using the provided texture proxy and sampling options.
+   * Fills the given rect with the given fill, using the provided texture proxy and sampling
+   * options.
    */
   void fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,
                      const MCState& state, const Fill& fill);
@@ -105,6 +106,7 @@ class OpsCompositor {
   uint32_t renderFlags = 0;
   UniqueKey clipKey = {};
   std::shared_ptr<TextureProxy> clipTexture = nullptr;
+  bool hasRectToRectDraw = false;
   PendingOpType pendingType = PendingOpType::Unknown;
   Path pendingClip = {};
   Fill pendingFill = {};
@@ -113,6 +115,7 @@ class OpsCompositor {
   SamplingOptions pendingSampling = {};
   std::shared_ptr<TextureProxy> pendingAtlasTexture = nullptr;
   std::vector<PlacementPtr<RectRecord>> pendingRects = {};
+  std::vector<PlacementPtr<Rect>> pendingUVRects = {};
   std::vector<PlacementPtr<RRectRecord>> pendingRRects = {};
   std::vector<PlacementPtr<Stroke>> pendingStrokes = {};
   std::vector<PlacementPtr<Op>> ops = {};
@@ -143,7 +146,10 @@ class OpsCompositor {
                                                                  Rect* scissorRect);
   DstTextureInfo makeDstTextureInfo(const Rect& deviceBounds, AAType aaType);
   void addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const Fill& fill,
-                 const std::optional<Rect>& localBounds, const std::optional<Rect>& deviceBounds);
+                 const std::optional<Rect>& localBounds, const std::optional<Rect>& deviceBounds,
+                 float drawScale);
+
+  void submitDrawOps();
 
   friend class DrawingManager;
   friend class PendingOpsAutoReset;

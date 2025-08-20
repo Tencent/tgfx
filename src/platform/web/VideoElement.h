@@ -34,21 +34,13 @@ class VideoElement : public ImageStream {
    */
   static std::shared_ptr<VideoElement> MakeFrom(emscripten::val video, int width, int height);
 
-  /**
-   * Notifies the VideoElement that a new image frame has been rendered into the associated
-   * HTMLVideoElement. The next acquired ImageBuffer will call the promise.await() method before
-   * generating textures.
-   */
-  void markFrameChanged(emscripten::val promise);
-
  protected:
-  std::shared_ptr<Texture> onMakeTexture(Context* context, bool mipmapped) override;
+  std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) override;
 
-  bool onUpdateTexture(std::shared_ptr<Texture> texture) override;
+  bool onUpdateTexture(std::shared_ptr<TextureView> textureView) override;
 
  private:
   emscripten::val source = emscripten::val::null();
-  emscripten::val currentPromise = emscripten::val::null();
 
   VideoElement(emscripten::val video, int width, int height);
 };

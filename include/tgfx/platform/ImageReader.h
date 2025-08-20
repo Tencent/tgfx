@@ -23,7 +23,7 @@
 #include "tgfx/core/Rect.h"
 
 namespace tgfx {
-class Texture;
+class TextureView;
 class ImageStream;
 
 /**
@@ -70,7 +70,7 @@ class ImageReader {
   explicit ImageReader(std::shared_ptr<ImageStream> stream);
 
  private:
-  std::shared_ptr<Texture> texture = nullptr;
+  std::shared_ptr<TextureView> textureView = nullptr;
   uint64_t bufferVersion = 0;
   uint64_t textureVersion = 0;
 
@@ -78,7 +78,8 @@ class ImageReader {
 
   bool checkExpired(uint64_t contentVersion);
 
-  std::shared_ptr<Texture> readTexture(uint64_t contentVersion, Context* context, bool mipmapped);
+  std::shared_ptr<TextureView> readTexture(uint64_t contentVersion, Context* context,
+                                           bool mipmapped);
 
   friend class ImageReaderBuffer;
   friend class ImageStream;

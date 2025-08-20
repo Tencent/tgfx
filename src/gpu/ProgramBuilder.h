@@ -49,16 +49,6 @@ class ProgramBuilder {
 
   virtual std::string getShaderVarDeclarations(const ShaderVar& var, ShaderFlags flag) const = 0;
 
-  std::string getUniformDeclarations(ShaderFlags visibility) const;
-
-  const ShaderVar& samplerVariable(SamplerHandle handle) const {
-    return uniformHandler()->samplerVariable(handle);
-  }
-
-  Swizzle samplerSwizzle(SamplerHandle handle) const {
-    return uniformHandler()->samplerSwizzle(handle);
-  }
-
   /**
    * Generates a name for a variable. The generated string will be mangled to be processor-specific.
    */
@@ -106,7 +96,7 @@ class ProgramBuilder {
 
   void emitAndInstallXferProc(const std::string& colorIn, const std::string& coverageIn);
 
-  SamplerHandle emitSampler(const TextureSampler* sampler, const std::string& name);
+  SamplerHandle emitSampler(GPUTexture* texture, const std::string& name);
 
   void emitFSOutputSwizzle();
 

@@ -29,7 +29,6 @@ namespace tgfx {
 struct DstTextureInfo {
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
   Point offset = {};
-  bool requiresBarrier = false;
 };
 
 class XferProcessor : public Processor {
@@ -50,12 +49,8 @@ class XferProcessor : public Processor {
     const SamplerHandle dstTextureSamplerHandle;
   };
 
-  virtual const Texture* dstTexture() const {
+  virtual const TextureView* dstTextureView() const {
     return nullptr;
-  }
-
-  virtual bool requiresBarrier() const {
-    return false;
   }
 
   virtual void emitCode(const EmitArgs& args) const = 0;

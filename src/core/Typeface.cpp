@@ -18,9 +18,11 @@
 
 #include "tgfx/core/Typeface.h"
 #include <vector>
+#include "core/AdvancedTypefaceInfo.h"
 #include "core/ScalerContext.h"
 #include "core/utils/UniqueID.h"
 #include "tgfx/core/Font.h"
+#include "tgfx/core/Stream.h"
 #include "tgfx/core/UTF.h"
 
 namespace tgfx {
@@ -58,7 +60,7 @@ class EmptyTypeface : public Typeface {
     return 0;
   }
 
-  std::shared_ptr<Data> getBytes() const override {
+  std::unique_ptr<Stream> openStream() const override {
     return nullptr;
   }
 
@@ -68,6 +70,10 @@ class EmptyTypeface : public Typeface {
 
  protected:
   std::vector<Unichar> getGlyphToUnicodeMap() const override {
+    return {};
+  }
+
+  AdvancedTypefaceInfo getAdvancedInfo() const override {
     return {};
   }
 
@@ -105,6 +111,10 @@ std::vector<Unichar> Typeface::getGlyphToUnicodeMap() const {
   return {};
 };
 
+AdvancedTypefaceInfo Typeface::getAdvancedInfo() const {
+  return {};
+}
+
 std::shared_ptr<ScalerContext> Typeface::getScalerContext(float size) {
   if (size <= 0.0f) {
     return ScalerContext::MakeEmpty(size);
@@ -127,14 +137,19 @@ std::shared_ptr<ScalerContext> Typeface::getScalerContext(float size) {
 
 Rect Typeface::getBounds() const {
   std::call_once(onceFlag, [this] {
-    if (!computeBounds(&bounds)) {
+    if (!onComputeBounds(&bounds)) {
       bounds.setEmpty();
     }
   });
   return bounds;
 }
 
-bool Typeface::computeBounds(Rect* bounds) const {
+bool Typeface::onComputeBounds(Rect* bounds) const {
+  if (hasColor()) {
+    // The bounds are only valid for the default outline variation
+    // Bitmaps may be any size and placed at any offset.
+    return false;
+  }
   constexpr float TextSize = 2048.f;
   constexpr float InvTextSize = 1.0f / TextSize;
   auto scaleContext = onCreateScalerContext(TextSize);

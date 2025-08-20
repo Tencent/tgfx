@@ -31,7 +31,7 @@ namespace tgfx {
 class ImageBuffer;
 
 /**
- * Abstraction layer directly on top of an image codec.
+ * ImageCodec is an abstract class that defines the interface for decoding images.
  */
 class ImageCodec : public ImageGenerator {
  public:
@@ -46,6 +46,14 @@ class ImageCodec : public ImageGenerator {
    * that can decode it. Otherwise, return nullptr.
    */
   static std::shared_ptr<ImageCodec> MakeFrom(std::shared_ptr<Data> imageBytes);
+
+  /**
+   * Creates a new ImageCodec using the provided ImageInfo and pixel data from an immutable Data
+   * object. The returned ImageCodec holds a reference to the pixel data, so the caller must ensure
+   * the pixels remain unchanged for the lifetime of the ImageCodec. Returns nullptr if ImageInfo is
+   * empty or pixels is nullptr.
+   */
+  static std::shared_ptr<ImageCodec> MakeFrom(const ImageInfo& info, std::shared_ptr<Data> pixels);
 
   /**
    * Creates a new ImageCodec object from a platform-specific NativeImage. For example, the
@@ -72,20 +80,27 @@ class ImageCodec : public ImageGenerator {
     return false;
   }
 
+  bool isImageCodec() const final {
+    return true;
+  }
+
   /**
-   * Decodes the image with the specified image info into the given pixels. Returns true if the
-   * decoding was successful. Note that we do not recommend calling this method due to performance
-   * reasons, especially on the web platform. Use the makeBuffer() method for better performance if
-   * your final goal is to draw the image.
-   */
-  virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const = 0;
+  * Decodes the image into the given pixel buffer using the specified image info. If the size
+  * in dstInfo differs from the codec's size, this method will attempt to downscale the image
+  * using a box filter algorithm to fit dstInfo. Only downscaling is supported. Returns true
+  * if decoding succeeds, false otherwise.
+  */
+  virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const;
 
  protected:
-  ImageCodec(int width, int height, Orientation orientation)
+  ImageCodec(int width, int height, Orientation orientation = Orientation::TopLeft)
       : ImageGenerator(width, height), _orientation(orientation) {
   }
 
   std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
+
+  virtual bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+                            void* dstPixels) const = 0;
 
   virtual std::shared_ptr<Data> getEncodedData() const {
     return nullptr;
@@ -108,5 +123,6 @@ class ImageCodec : public ImageGenerator {
 
   friend class Pixmap;
   friend class SVGExportContext;
+  friend class PDFBitmap;
 };
 }  // namespace tgfx

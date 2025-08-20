@@ -21,8 +21,8 @@
 #include "HandlerThread.h"
 #include "JNIUtil.h"
 #include "core/utils/Log.h"
-#include "gpu/DefaultTexture.h"
-#include "gpu/opengl/GLTextureSampler.h"
+#include "gpu/DefaultTextureView.h"
+#include "gpu/opengl/GLTexture.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace tgfx {
@@ -194,47 +194,53 @@ static ISize ComputeTextureSize(float matrix[16], int width, int height) {
   return size.toRound();
 }
 
-std::shared_ptr<Texture> SurfaceTexture::onMakeTexture(Context* context, bool) {
-  auto sampler = makeTextureSampler(context);
-  if (sampler == nullptr) {
+std::shared_ptr<TextureView> SurfaceTexture::onMakeTexture(Context* context, bool) {
+  auto textureID = makeExternalOESTexture(context);
+  if (textureID == 0) {
     return nullptr;
   }
   auto textureSize = updateTexImage();
   if (textureSize.isEmpty()) {
-    sampler->releaseGPU(context);
+    auto gl = GLFunctions::Get(context);
+    gl->deleteTextures(1, &textureID);
     return nullptr;
   }
-  return Resource::AddToCache(
-      context, new DefaultTexture(std::move(sampler), textureSize.width, textureSize.height));
+  GPUTextureDescriptor descriptor = {textureSize.width,
+                                     textureSize.height,
+                                     PixelFormat::RGBA_8888,
+                                     false,
+                                     1,
+                                     GPUTextureUsage::TEXTURE_BINDING};
+  auto texture = std::make_unique<GLTexture>(descriptor, GL_TEXTURE_EXTERNAL_OES, textureID);
+  return Resource::AddToCache(context, new DefaultTextureView(std::move(texture)));
 }
 
-bool SurfaceTexture::onUpdateTexture(std::shared_ptr<Texture>) {
+bool SurfaceTexture::onUpdateTexture(std::shared_ptr<TextureView>) {
   auto size = updateTexImage();
   return !size.isEmpty();
 }
 
-std::unique_ptr<TextureSampler> SurfaceTexture::makeTextureSampler(Context* context) {
+unsigned SurfaceTexture::makeExternalOESTexture(Context* context) {
   std::lock_guard<std::mutex> autoLock(locker);
   JNIEnvironment environment;
   auto env = environment.current();
   if (env == nullptr) {
-    return nullptr;
+    return 0;
   }
   auto gl = GLFunctions::Get(context);
-  unsigned samplerID = 0;
-  gl->genTextures(1, &samplerID);
-  if (samplerID == 0) {
-    return nullptr;
+  unsigned textureID = 0;
+  gl->genTextures(1, &textureID);
+  if (textureID == 0) {
+    return 0;
   }
-  env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_attachToGLContext, samplerID);
+  env->CallVoidMethod(surfaceTexture.get(), SurfaceTexture_attachToGLContext, textureID);
   if (env->ExceptionCheck()) {
     env->ExceptionClear();
-    gl->deleteTextures(1, &samplerID);
+    gl->deleteTextures(1, &textureID);
     LOGE("NativeImageReader::makeTexture(): failed to attached to a SurfaceTexture!");
-    return nullptr;
+    return 0;
   }
-  return std::make_unique<GLTextureSampler>(samplerID, GL_TEXTURE_EXTERNAL_OES,
-                                            PixelFormat::RGBA_8888);
+  return textureID;
 }
 
 ISize SurfaceTexture::updateTexImage() {

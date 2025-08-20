@@ -19,26 +19,25 @@
 #pragma once
 
 #include "ResourceProxy.h"
-#include "gpu/Texture.h"
-#include "gpu/opengl/GLCaps.h"
+#include "gpu/TextureView.h"
 
 namespace tgfx {
 class RenderTargetProxy;
 
 /**
- * This class defers the acquisition of textures until they are actually required.
+ * This class defers the acquisition of texture views until they are actually required.
  */
 class TextureProxy : public ResourceProxy {
  public:
   /**
-   * Returns the width of the texture.
+   * Returns the width of the texture view.
    */
   virtual int width() const {
     return _width;
   }
 
   /**
-   * Returns the height of the texture.
+   * Returns the height of the texture view.
    */
   virtual int height() const {
     return _height;
@@ -46,7 +45,7 @@ class TextureProxy : public ResourceProxy {
 
   /**
    * Returns the width of the backing store, which may differ from the texture width if the texture
-   * is approximate size.
+   * view has approximate size.
    */
   int backingStoreWidth() const {
     return _backingStoreWidth;
@@ -54,28 +53,28 @@ class TextureProxy : public ResourceProxy {
 
   /**
    * Returns the height of the backing store, which may differ from the texture height if the
-   * texture is approximate size.
+   * texture view has approximate size.
    */
   int backingStoreHeight() const {
     return _backingStoreHeight;
   }
 
   /**
-   * Returns the origin of the texture, either ImageOrigin::TopLeft or ImageOrigin::BottomLeft.
+   * Returns the origin of the texture view, either ImageOrigin::TopLeft or ImageOrigin::BottomLeft.
    */
   virtual ImageOrigin origin() const {
     return _origin;
   }
 
   /**
-   * Return the mipmap state of the texture.
+   * Return the mipmap state of the texture view.
    */
   virtual bool hasMipmaps() const {
     return _mipmapped;
   }
 
   /**
-   * Returns true if the texture represents transparency only.
+   * Returns true if the texture view represents transparency only.
    */
   virtual bool isAlphaOnly() const {
     return _format == PixelFormat::ALPHA_8;
@@ -90,10 +89,10 @@ class TextureProxy : public ResourceProxy {
   }
 
   /**
-   * Returns the associated Texture instance.
+   * Returns the associated texture view instance.
    */
-  virtual std::shared_ptr<Texture> getTexture() const {
-    return std::static_pointer_cast<Texture>(resource);
+  virtual std::shared_ptr<TextureView> getTextureView() const {
+    return std::static_pointer_cast<TextureView>(resource);
   }
 
  protected:

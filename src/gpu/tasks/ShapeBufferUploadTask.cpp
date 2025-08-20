@@ -17,8 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ShapeBufferUploadTask.h"
-#include "gpu/GpuBuffer.h"
-#include "gpu/Texture.h"
+#include "gpu/GPU.h"
+#include "gpu/TextureView.h"
+#include "gpu/VertexBuffer.h"
 
 namespace tgfx {
 ShapeBufferUploadTask::ShapeBufferUploadTask(std::shared_ptr<ResourceProxy> trianglesProxy,
@@ -37,24 +38,31 @@ std::shared_ptr<Resource> ShapeBufferUploadTask::onMakeResource(Context* context
     // No need to log an error here; the shape might not be a filled path or could be invisible.
     return nullptr;
   }
-  std::shared_ptr<GpuBuffer> gpuBuffer = nullptr;
+  std::shared_ptr<VertexBuffer> vertexBuffer = nullptr;
   if (auto triangles = shapeBuffer->triangles) {
-    gpuBuffer = GpuBuffer::Make(context, BufferType::Vertex, triangles->data(), triangles->size());
+    auto gpu = context->gpu();
+    auto gpuBuffer = gpu->createBuffer(triangles->size(), GPUBufferUsage::VERTEX);
     if (!gpuBuffer) {
-      LOGE("ShapeBufferUploadTask::execute() Failed to create the GpuBuffer!");
+      LOGE("ShapeBufferUploadTask::onMakeResource() Failed to create buffer!");
       return nullptr;
     }
+    if (!gpu->queue()->writeBuffer(gpuBuffer.get(), 0, triangles->data(), triangles->size())) {
+      gpuBuffer->release(gpu);
+      LOGE("ShapeBufferUploadTask::onMakeResource() Failed to write buffer!");
+      return nullptr;
+    }
+    vertexBuffer = Resource::AddToCache(context, new VertexBuffer(std::move(gpuBuffer)));
   } else {
-    auto texture = Texture::MakeFrom(context, std::move(shapeBuffer->imageBuffer));
-    if (!texture) {
-      LOGE("ShapeBufferUploadTask::execute() Failed to create the texture!");
+    auto textureView = TextureView::MakeFrom(context, std::move(shapeBuffer->imageBuffer));
+    if (!textureView) {
+      LOGE("ShapeBufferUploadTask::execute() Failed to create the texture view!");
       return nullptr;
     }
-    texture->assignUniqueKey(textureKey);
-    textureProxy->resource = std::move(texture);
+    textureView->assignUniqueKey(textureProxy->uniqueKey);
+    textureProxy->resource = std::move(textureView);
   }
   // Free the data source immediately to reduce memory pressure.
   source = nullptr;
-  return gpuBuffer;
+  return vertexBuffer;
 }
 }  // namespace tgfx

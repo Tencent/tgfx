@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLAtlasTextGeometryProcessor.h"
-#include "gpu/opengl/GLGpu.h"
+#include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
 PlacementPtr<AtlasTextGeometryProcessor> AtlasTextGeometryProcessor::Make(
@@ -66,14 +66,14 @@ void GLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
     vertBuilder->codeAppendf("%s = %s;", colorVar.vsOut().c_str(), color.name().c_str());
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorVar.fsIn().c_str());
   }
-  auto texture = textureProxy->getTexture();
-  DEBUG_ASSERT(texture != nullptr);
-  DEBUG_ASSERT(texture->getSampler() != nullptr);
-  auto samplerHandle = uniformHandler->addSampler(texture->getSampler(), "TextureSampler");
+  auto textureView = textureProxy->getTextureView();
+  DEBUG_ASSERT(textureView != nullptr);
+  DEBUG_ASSERT(textureView->getTexture() != nullptr);
+  auto samplerHandle = uniformHandler->addSampler(textureView->getTexture(), "TextureSampler");
   fragBuilder->codeAppend("vec4 color = ");
   fragBuilder->appendTextureLookup(samplerHandle, samplerVarying.vsOut());
   fragBuilder->codeAppend(";");
-  if (texture->isAlphaOnly()) {
+  if (textureView->isAlphaOnly()) {
     fragBuilder->codeAppendf("%s = vec4(color.a);", args.outputCoverage.c_str());
   } else {
     fragBuilder->codeAppendf("%s = clamp(vec4(color.rgb/color.a, 1.0), 0.0, 1.0);",
@@ -87,7 +87,7 @@ void GLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
 
 void GLAtlasTextGeometryProcessor::setData(UniformBuffer* uniformBuffer,
                                            FPCoordTransformIter* transformIter) const {
-  auto atlasSizeInv = textureProxy->getTexture()->getTextureCoord(1.f, 1.f);
+  auto atlasSizeInv = textureProxy->getTextureView()->getTextureCoord(1.f, 1.f);
   uniformBuffer->setData(atlasSizeUniformName, atlasSizeInv);
   setTransformDataHelper(Matrix::I(), uniformBuffer, transformIter);
   if (commonColor.has_value()) {

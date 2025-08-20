@@ -46,8 +46,8 @@ TextureEffect::TextureEffect(std::shared_ptr<TextureProxy> proxy, const Sampling
 }
 
 void TextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
-  auto texture = getTexture();
-  if (texture == nullptr) {
+  auto textureView = getTextureView();
+  if (textureView == nullptr) {
     return;
   }
   uint32_t flags = alphaStart == Point::Zero() ? 1 : 0;
@@ -65,35 +65,35 @@ void TextureEffect::onComputeProcessorKey(BytesKey* bytesKey) const {
 }
 
 size_t TextureEffect::onCountTextureSamplers() const {
-  auto texture = getTexture();
-  if (texture == nullptr) {
+  auto textureView = getTextureView();
+  if (textureView == nullptr) {
     return 0;
   }
-  if (texture->isYUV()) {
-    return reinterpret_cast<YUVTexture*>(texture)->samplerCount();
+  if (textureView->isYUV()) {
+    return reinterpret_cast<YUVTextureView*>(textureView)->textureCount();
   }
   return 1;
 }
 
-const TextureSampler* TextureEffect::onTextureSampler(size_t index) const {
-  auto texture = getTexture();
-  if (texture == nullptr) {
+GPUTexture* TextureEffect::onTextureAt(size_t index) const {
+  auto textureView = getTextureView();
+  if (textureView == nullptr) {
     return nullptr;
   }
-  if (texture->isYUV()) {
-    return reinterpret_cast<YUVTexture*>(texture)->getSamplerAt(index);
+  if (textureView->isYUV()) {
+    return reinterpret_cast<YUVTextureView*>(textureView)->getTextureAt(index);
   }
-  return texture->getSampler();
+  return textureView->getTexture();
 }
 
-Texture* TextureEffect::getTexture() const {
-  return textureProxy->getTexture().get();
+TextureView* TextureEffect::getTextureView() const {
+  return textureProxy->getTextureView().get();
 }
 
-YUVTexture* TextureEffect::getYUVTexture() const {
-  auto texture = textureProxy->getTexture().get();
-  if (texture && texture->isYUV()) {
-    return reinterpret_cast<YUVTexture*>(texture);
+YUVTextureView* TextureEffect::getYUVTexture() const {
+  auto textureView = textureProxy->getTextureView().get();
+  if (textureView && textureView->isYUV()) {
+    return reinterpret_cast<YUVTextureView*>(textureView);
   }
   return nullptr;
 }
@@ -104,8 +104,9 @@ bool TextureEffect::needSubset() const {
     // if subset equal to bounds, we don't need to use subset.
     return true;
   }
-  auto texture = getTexture();
-  if (textureProxy->width() != texture->width() || textureProxy->height() != texture->height()) {
+  auto textureView = getTextureView();
+  if (textureProxy->width() != textureView->width() ||
+      textureProxy->height() != textureView->height()) {
     // If the texture size is different from the proxy size, we need to use subset.
     return true;
   }
