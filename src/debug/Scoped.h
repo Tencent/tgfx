@@ -27,20 +27,22 @@ class Scoped {
     if (!active) {
       return;
     }
-    MsgPrepare(MsgType::OperateBegin);
-    item.operateBegin.nsTime = Clock::Now();
+    auto item = MsgItem();
+    item.hdr.type = MsgType::OperateBegin;
+    item.operateBegin.usTime = Clock::Now();
     item.operateBegin.type = static_cast<uint8_t>(type);
-    MsgCommit();
+    Inspector::QueueSerialFinish(item);
   }
 
   ~Scoped() {
     if (!active) {
       return;
     }
-    MsgPrepare(MsgType::OperateEnd);
-    item.operateEnd.nsTime = Clock::Now();
+    auto item = MsgItem();
+    item.hdr.type = MsgType::OperateEnd;
+    item.operateEnd.usTime = Clock::Now();
     item.operateEnd.type = static_cast<uint8_t>(type);
-    MsgCommit();
+    Inspector::QueueSerialFinish(item);
   }
 
   Scoped(const Scoped&) = delete;

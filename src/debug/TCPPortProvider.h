@@ -24,8 +24,8 @@
 namespace tgfx::debug {
 class TCPPortProvider {
  public:
-  static std::shared_ptr<TCPPortProvider> Get() {
-    static auto instance = std::make_shared<TCPPortProvider>();
+  static TCPPortProvider& Get() {
+    static TCPPortProvider instance;
     return instance;
   }
 

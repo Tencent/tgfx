@@ -182,6 +182,7 @@ std::shared_ptr<CommandBuffer> DrawingManager::flush(BackendSemaphore* signalSem
   resourceTasks.clear();
   proxyProvider->clearSharedVertexBuffer();
   auto commandEncoder = context->gpu()->createCommandEncoder();
+
   {
     TASK_MARK(tgfx::debug::OpTaskType::RenderTask);
     for (auto& task : renderTasks) {
@@ -190,6 +191,7 @@ std::shared_ptr<CommandBuffer> DrawingManager::flush(BackendSemaphore* signalSem
     }
   }
   renderTasks.clear();
+
   if (signalSemaphore != nullptr) {
     *signalSemaphore = commandEncoder->insertSemaphore();
   }

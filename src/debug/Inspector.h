@@ -41,11 +41,6 @@
 #endif
 
 namespace tgfx::debug {
-#define MsgPrepare(_type) \
-  auto item = MsgItem();  \
-  item.hdr.type = _type;
-#define MsgCommit() Inspector::QueueSerialFinish(item);
-
 class Inspector {
  public:
   static Inspector& GetInspector() {
@@ -106,58 +101,66 @@ class Inspector {
     if (!name) {
       GetInspector().frameCount.fetch_add(1, std::memory_order_relaxed);
     }
-    MsgPrepare(MsgType::FrameMarkMsg);
-    item.frameMark.nsTime = Clock::Now();
-    MsgCommit();
+    auto item = MsgItem();
+    item.hdr.type = MsgType::FrameMarkMsg;
+    item.frameMark.usTime = Clock::Now();
+    QueueSerialFinish(item);
   }
 
   static void SendAttributeData(const char* name, int val) {
-    MsgPrepare(MsgType::ValueDataInt);
+    auto item = MsgItem();
+    item.hdr.type = MsgType::ValueDataInt;
     item.attributeDataInt.name = reinterpret_cast<uint64_t>(name);
     item.attributeDataInt.value = val;
-    MsgCommit();
+    QueueSerialFinish(item);
   }
 
   static void SendAttributeData(const char* name, float val) {
-    MsgPrepare(MsgType::ValueDataFloat);
+    auto item = MsgItem();
+    item.hdr.type = MsgType::ValueDataFloat;
     item.attributeDataFloat.name = reinterpret_cast<uint64_t>(name);
     item.attributeDataFloat.value = val;
-    MsgCommit();
+    QueueSerialFinish(item);
   }
 
   static void SendAttributeData(const char* name, bool val) {
-    MsgPrepare(MsgType::ValueDataBool);
+    auto item = MsgItem();
+    item.hdr.type = MsgType::ValueDataBool;
     item.attributeDataBool.name = reinterpret_cast<uint64_t>(name);
     item.attributeDataBool.value = val;
-    MsgCommit();
+    QueueSerialFinish(item);
   }
 
   static void SendAttributeData(const char* name, uint8_t val, uint8_t type) {
-    MsgPrepare(MsgType::ValueDataEnum);
+    auto item = MsgItem();
+    item.hdr.type = MsgType::ValueDataEnum;
     item.attributeDataEnum.name = reinterpret_cast<uint64_t>(name);
     item.attributeDataEnum.value = static_cast<uint16_t>(type << 8 | val);
-    MsgCommit();
+    QueueSerialFinish(item);
   }
 
   static void SendAttributeData(const char* name, uint32_t val,
-                                MsgType type = MsgType::ValueDataUint32) {
-    MsgPrepare(type);
+  MsgType type = MsgType::ValueDataUint32) {
+    auto item = MsgItem();
+    item.hdr.type = type;
     item.attributeDataUint32.name = reinterpret_cast<uint64_t>(name);
     item.attributeDataUint32.value = val;
-    MsgCommit();
+    QueueSerialFinish(item);
   }
 
   static void SendAttributeData(const char* name, float* val, int size) {
     if (size == 4) {
-      MsgPrepare(MsgType::ValueDataFloat4);
+      auto item = MsgItem();
+      item.hdr.type = MsgType::ValueDataFloat4;
       item.attributeDataFloat4.name = reinterpret_cast<uint64_t>(name);
       memcpy(item.attributeDataFloat4.value, val, static_cast<size_t>(size) * sizeof(float));
-      MsgCommit();
+      QueueSerialFinish(item);
     } else if (size == 6) {
-      MsgPrepare(MsgType::ValueDataMat3);
+      auto item = MsgItem();
+      item.hdr.type = MsgType::ValueDataMat3;
       item.attributeDataMat4.name = reinterpret_cast<uint64_t>(name);
       memcpy(item.attributeDataMat4.value, val, static_cast<size_t>(size) * sizeof(float));
-      MsgCommit();
+      QueueSerialFinish(item);
     }
   }
 
@@ -178,7 +181,7 @@ class Inspector {
 
   bool handleServerQuery();
 
-  void handleConnect(WelcomeMessage& welcome);
+  void handleConnect(const WelcomeMessage& welcome);
 
   void appendDataUnsafe(const void* data, size_t len);
 
@@ -213,7 +216,7 @@ class Inspector {
   int64_t refTimeThread = 0;
   moodycamel::ConcurrentQueue<MsgItem> serialConcurrentQueue;
   std::unique_ptr<std::thread> messageThread = nullptr;
-  std::vector<std::shared_ptr<UdpBroadcast>> broadcast;
+  std::vector<std::shared_ptr<UdpBroadcast>> broadcast = {};
   const char* programName = nullptr;
   std::mutex programNameLock;
   int dataBufferOffset = 0;

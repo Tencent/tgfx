@@ -94,7 +94,7 @@ void Inspector::sendString(uint64_t str, const char* ptr, MsgType type) {
 
 void Inspector::worker() {
   std::string addr = "255.255.255.255";
-  auto dataPort = TCPPortProvider::Get()->getValidPort();
+  auto dataPort = TCPPortProvider::Get().getValidPort();
   if (dataPort == 0) {
     return;
   }
@@ -259,7 +259,7 @@ bool Inspector::confirmProtocol() {
   return true;
 }
 
-void Inspector::handleConnect(WelcomeMessage& welcome) {
+void Inspector::handleConnect(const WelcomeMessage& welcome) {
   isConnect.store(true, std::memory_order_release);
   auto handshake = HandshakeStatus::HandshakeWelcome;
   sock->sendData(&handshake, sizeof(handshake));
@@ -314,22 +314,22 @@ Inspector::DequeueStatus Inspector::dequeueSerial() {
   const auto queueSize = serialConcurrentQueue.size_approx();
   if (queueSize > 0) {
     auto refThread = refTimeThread;
-    auto item = MsgItem{};
+    MsgItem item = {};
     while (serialConcurrentQueue.try_dequeue(item)) {
       auto idx = item.hdr.idx;
       switch (static_cast<MsgType>(idx)) {
         case MsgType::OperateBegin: {
-          auto t = item.operateBegin.nsTime;
+          auto t = item.operateBegin.usTime;
           auto dt = t - refThread;
           refThread = t;
-          item.operateBegin.nsTime = dt;
+          item.operateBegin.usTime = dt;
           break;
         }
         case MsgType::OperateEnd: {
-          auto t = item.operateEnd.nsTime;
+          auto t = item.operateEnd.usTime;
           auto dt = t - refThread;
           refThread = t;
-          item.operateEnd.nsTime = dt;
+          item.operateEnd.usTime = dt;
           break;
         }
         default:

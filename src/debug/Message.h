@@ -45,7 +45,7 @@ struct MsgHeader {
 };
 
 struct OperateBaseMsg {
-  int64_t nsTime;
+  int64_t usTime;
 };
 
 struct OperateBeginMsg : OperateBaseMsg {
@@ -57,7 +57,7 @@ struct OperateEndMsg : OperateBaseMsg {
 };
 
 struct FrameMarkMsg {
-  int64_t nsTime;
+  int64_t usTime;
 };
 
 struct AttributeDataMsg {
