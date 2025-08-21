@@ -378,10 +378,10 @@ jobs:
 
       - name: Download HarmonyOS CLI
         run: |
-          wget -q https://download.harmonyos.com/sdk/commandline-tools-darwin-arm64.zip 
-          unzip -q commandline-tools-linux.zip -d $HOME
-          echo "$HOME/command-line-tools/bin" >> $GITHUB_PATH
-          echo "$HOME/command-line-tools/sdk/HarmonyOS-NEXT-DB2/openharmony/toolchains" >> $GITHUB_PATH  
+          curl -L https://contentcenter-vali-drcn.dbankcdn.cn/pvt_2/DeveloperAlliance_package_901_9/81/v3/4ohpm1cli-darwin-x64-5.0.3.140.tgz -o ohpm.tgz  
+          tar -xzf ohpm.tgz
+          echo "$HOME/ohpm/bin" >> $GITHUB_PATH
+          export PATH="$HOME/ohpm/bin:$PATH"  
 
       - name: Get Third-Party Cache
         id: third-party-cache
