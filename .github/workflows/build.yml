@@ -389,16 +389,19 @@ jobs:
         with:
           version: '5.0.3'
           cache: true
+          components: "all"
+          mirror: true
 
-      - name: Install OHPM
+      - name: Install Dependencies
         run: |
           cd ohos
-          OHPM_PATH=$(find $OHOS_BASE_SDK_HOME -name "ohpm" -type f -executable 2>/dev/null | head -n 1)
-          if [ -n "$OHPM_PATH" ]; then
-            export PATH=$(dirname $OHPM_PATH):$PATH
+          OHPM_PATH=$(which ohpm || find /usr/local -name ohpm 2>/dev/null | head -1)
+           if [ -z "$OHPM_PATH" ]; then
+            echo "ohpm not found"
+            exit 1
           fi  
-          ohpm install
-        shell: bash   
+          $OHPM_PATH install
+           
 
       - name: Install Dependencies & Build
         run: |
