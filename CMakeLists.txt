@@ -656,6 +656,7 @@ if(TGFX_USE_VCPKG)
         list(APPEND TGFX_STATIC_LIBS ${EXPAT_LIB})
     endif ()
        
+    find_package(unofficial-concurrentqueue REQUIRED)
     list(APPEND TGFX_INCLUDES ${VCPKG_INCLUDE_DIR}/concurrentqueue)
 endif()
 
