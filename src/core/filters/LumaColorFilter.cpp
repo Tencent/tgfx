@@ -30,8 +30,9 @@ PlacementPtr<FragmentProcessor> LumaColorFilter::asFragmentProcessor(Context* co
 }
 
 Color LumaColorFilter::filterColor(const Color& src) const {
-  // TODO: StarryThrone Complete Logic.
-  return {0, 0, 0, 0};
+  /** See ITU-R Recommendation BT.709 at http://www.itu.int/rec/R-REC-BT.709/ .*/
+  float luma = src.red * 0.2126f + src.green * 0.7152f + src.blue * 0.0722f;
+  return {luma, luma, luma, src.alpha};
 }
 
 }  // namespace tgfx
