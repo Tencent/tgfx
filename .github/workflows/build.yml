@@ -393,7 +393,7 @@ jobs:
       - name: Install OHPM
         run: |
           cd ohos
-          ohom install
+          ohpm install
         shell: bash   
 
       - name: Install Dependencies & Build
