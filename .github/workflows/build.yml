@@ -399,7 +399,7 @@ jobs:
 
       - name: Add OHPM to PATH
         run: |
-          echo "$OHOS_BASE_SDK_HOME/toolchains/ohpm/bin" >> $GITHUB_PATH    
+          echo "$OHOS_BASE_SDK_HOME/command-line-tools/bin" >> $GITHUB_PATH    
 
       - name: Install Dependencies
         run: |
