@@ -29,6 +29,20 @@ namespace tgfx {
 class RuntimeEffect {
  public:
   /**
+   * Generates a unique programID for the effect.
+   * The programID MUST be generated using NextProgramID to avoid conflicts with other effects.
+   */
+  static uint32_t NextProgramID() {
+    static std::atomic<uint32_t> nextID{1};
+    static constexpr uint32_t InvalidUniqueID = 0;
+    uint32_t id;
+    do {
+      id = nextID.fetch_add(1, std::memory_order_relaxed);
+    } while (id == InvalidUniqueID);
+    return id;
+  }
+
+  /**
    * Constructs a RuntimeEffect with the given extra input images.
    * @param extraInputs A collection of additional input images used during rendering. When the
    * onDraw() method is called, these extraInputs will be converted to inputTextures.
@@ -45,6 +59,8 @@ class RuntimeEffect {
    * Returns the unique program ID for this effect. This ID identifies the RuntimeProgram created
    * by the effect and is used to cache it in the GPU context. Make sure the program ID stays the
    * same for all instances of the same effect class so the GPU context can reuse the program.
+   *
+   * The programID MUST be generated using NextProgramID to avoid conflicts with other effects.
    */
   virtual uint32_t programID() const = 0;
 
