@@ -366,11 +366,6 @@ jobs:
         with:
           lfs: true
 
-      - name: Setup JDK 17
-        uses: actions/setup-java@v1
-        with:
-          java-version: '17'
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
@@ -378,10 +373,13 @@ jobs:
 
       - name: Download HarmonyOS CLI
         run: |
-          curl -L https://contentcenter-vali-drcn.dbankcdn.cn/pvt_2/DeveloperAlliance_package_901_9/81/v3/4ohpm1cli-darwin-x64-5.0.3.140.tgz -o ohpm.tgz  
-          tar -xzf ohpm.tgz
-          echo "$HOME/ohpm/bin" >> $GITHUB_PATH
-          export PATH="$HOME/ohpm/bin:$PATH"  
+          curl -L -o cli.zip \
+            https://contentcenter-vali-drcn.dbankcdn.cn/cch5/devtool/devEco/commandline-tools/5.0.0.200/commandline-tools-darwin-arm64.zip
+          unzip -q cli.zip -d $HOME/harmony-cli
+        
+          echo "$HOME/harmony-cli/command-line-tools/bin" >> $GITHUB_PATH
+          echo "$HOME/harmony-cli/command-line-tools/sdk/default/openharmony/toolchains" >> $GITHUB_PATH
+  
 
       - name: Get Third-Party Cache
         id: third-party-cache
