@@ -63,7 +63,7 @@ static void RenderOutLineGlyph(FT_Face face, const ImageInfo& dstInfo, void* dst
   auto pitch = static_cast<int>(dstInfo.rowBytes());
   FT_Raster_Params params;
   params.flags = FT_RASTER_FLAG_CLIP | FT_RASTER_FLAG_AA;
-#if defined(TGFX_TEXT_GAMMA_CORRECTION)
+#if defined(TGFX_USE_TEXT_GAMMA_CORRECTION)
   auto rows = dstInfo.height();
   params.flags |= FT_RASTER_FLAG_DIRECT;
   params.gray_spans = GraySpanFunc;
