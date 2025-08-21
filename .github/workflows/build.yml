@@ -371,6 +371,11 @@ jobs:
         with:
           node-version: '18'
 
+      - name: Configure npm scope for @ohos
+        run: |
+          echo "@ohos:registry=https://ohpm.openharmony.cn/ohpm/" >> ~/.npmrc
+          npm config get @ohos:registry    
+
       - name: Get Third-Party Cache
         id: third-party-cache
         uses: actions/cache/restore@v4
