@@ -43,14 +43,12 @@ class UniformHandler {
   /**
    * Returns all uniforms added by addUniform().
    */
-  const std::vector<Uniform>& getUniforms() const {
-    return uniforms;
-  }
+  std::vector<Uniform> getUniforms() const;
 
   /**
    * Returns all samplers added by addSampler().
    */
-  const std::vector<Uniform>& getSamplers() const {
+  std::vector<Uniform> getSamplers() const {
     return samplers;
   }
 
@@ -79,7 +77,8 @@ class UniformHandler {
  private:
   // This is not owned by the class
   ProgramBuilder* programBuilder = nullptr;
-  std::vector<Uniform> uniforms = {};
+  std::vector<Uniform> vertexUniforms = {};
+  std::vector<Uniform> fragmentUniforms = {};
   std::vector<Uniform> samplers = {};
   std::vector<Swizzle> samplerSwizzles = {};
 };
