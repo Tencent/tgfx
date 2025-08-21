@@ -121,7 +121,7 @@ class PathUserScalerContext final : public UserScalerContext {
     shape = Shape::ApplyStroke(std::move(shape), stroke);
     shape = Shape::ApplyMatrix(std::move(shape), matrix);
     auto rasterizer = PathRasterizer::MakeFrom(width, height, std::move(shape), true,
-#ifdef TGFX_TEXT_GAMMA_CORRECTION
+#ifdef TGFX_USE_TEXT_GAMMA_CORRECTION
                                                true
 #else
                                                false
