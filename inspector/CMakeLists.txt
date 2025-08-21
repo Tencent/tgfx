@@ -8,11 +8,7 @@ set(CMAKE_CXX_VISIBILITY_PRESET hidden)
 
 set(INSPECTOR_COMMON_DIR common)
 set(INSPECTOR_CLIENT_DIR client/src)
-if(DEFINED ENV{VCPKG_INCLUDE_DIR})
-        set(CONCURRENT_QUEUE_DIR "$ENV{VCPKG_INCLUDE_DIR}/concurrentqueue")
-else ()
-        set(CONCURRENT_QUEUE_DIR ../third_party/concurrentqueue)
-endif ()
+set(CONCURRENT_QUEUE_DIR ../third_party/concurrentqueue)
 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     list(APPEND INSPECTOR_COMPILE_OPTIONS -Werror -Wall -Wextra -Weffc++ -Wconversion -pedantic -Werror=return-type -Wno-unused-command-line-argument)

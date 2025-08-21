@@ -34,7 +34,7 @@ if (NOT WEB OR EMSCRIPTEN_PTHREADS)
 endif ()
 
 if (CMAKE_BUILD_TYPE MATCHES "Debug")
-    option(TGFX_USE_INSPECTOR "Enable profiling support for the TGFX Inspector tool" ON)
+#    option(TGFX_USE_INSPECTOR "Enable profiling support for the TGFX Inspector tool" ON)
 endif ()
 
 if (APPLE OR (WEB AND NOT TGFX_USE_THREADS))
