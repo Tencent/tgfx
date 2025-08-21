@@ -371,17 +371,6 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Export DevEco bundled tools to PATH
-        run: |
-          echo "/Applications/DevEco-Studio.app/Contents/tools/ohpm/bin"      >> $GITHUB_PATH
-          echo "/Applications/DevEco-Studio.app/Contents/tools/hvigor/bin"    >> $GITHUB_PATH
-          echo "/Applications/DevEco-Studio.app/Contents/tools/node/bin"      >> $GITHUB_PATH
-
-      - name: Verify tools
-        run: |
-          ohpm --version
-          hvigorw --version    
-
       - name: Get Third-Party Cache
         id: third-party-cache
         uses: actions/cache/restore@v4
@@ -407,14 +396,14 @@ jobs:
       - name: Install ohpm dependencies
         run: |
           cd ohos
-          ohpm config set registry https://ohpm.openharmony.cn/ohpm/
-          ohpm install --all  
+          npx -y @ohos/ohpm@latest config set registry https://ohpm.openharmony.cn/ohpm/
+          npx -y @ohos/ohpm@latest install --all  
 
   
       - name: Install Dependencies & Build
         run: |
           cd ohos
-          hvigorw --mode module \
+          npx -y @ohos/hvigor@latest --mode module \
             -p module=hello2d@default \
             -p product=default \
             -p requiredDeviceType=phone \
