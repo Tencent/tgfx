@@ -392,11 +392,37 @@ jobs:
           components: "all"
           mirror: true
 
+      - name: Add hvigorw & ohpm to PATH
+        run: |
+          set -e
+          HVIGORW_PATH=$(find "$OHOS_BASE_SDK_HOME" -type f -name hvigorw | head -n 1)
+          OHPM_PATH=$(find "$OHOS_BASE_SDK_HOME" -type f -name ohpm | head -n 1)
+  
+          [[ -z "$HVIGORW_PATH" ]] && { echo "hvigorw not found"; exit 1; }
+          [[ -z "$OHPM_PATH" ]]   && { echo "ohpm not found";   exit 1; }
+  
+          chmod +x "$HVIGORW_PATH" "$OHPM_PATH"
+          echo "$(dirname "$HVIGORW_PATH")" >> $GITHUB_PATH
+          echo "$(dirname "$OHPM_PATH")"    >> $GITHUB_PATH
+  
+          echo "hvigorw : $HVIGORW_PATH"
+          echo "ohpm    : $OHPM_PATH"
+          
+      - name: Install ohpm dependencies
+        run: |
+          cd ohos
+          ohpm install    
+
   
       - name: Install Dependencies & Build
         run: |
           cd ohos
-          hvigorw --mode module -p module=hello2d@default -p product=default -p requiredDeviceType=phone assembleHap --stacktrace --parallel --incremental --daemon
+          hvigorw --mode module \
+            -p module=hello2d@default \
+            -p product=default \
+            -p requiredDeviceType=phone \
+            assembleHap \
+            --stacktrace --parallel --incremental --daemon
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
