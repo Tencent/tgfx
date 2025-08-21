@@ -79,7 +79,7 @@ void GLProgram::setUniformBytes(const void* data, size_t size) {
         gl->uniform4iv(location, 1, reinterpret_cast<int*>(buffer + offset));
         break;
       default:
-        LOGE("GLProgram::updateUniforms() unsupported uniform type: %d",
+        LOGE("GLProgram::setUniformBytes() unsupported uniform type: %d",
              static_cast<int>(uniform.type()));
         break;
     }
