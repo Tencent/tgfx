@@ -88,7 +88,7 @@ static void* egl_get_gl_proc(void*, const char name[]) {
   M(glGetError)
   M(glGetFramebufferAttachmentParameteriv)
   M(glGetIntegerv)
-  M(getActiveUniform)
+  M(glGetActiveUniform)
   M(glGetBooleanv)
   M(glGetProgramInfoLog)
   M(glGetProgramiv)
