@@ -26,9 +26,18 @@ static const std::string OES_TEXTURE_EXTENSION = "GL_OES_EGL_image_external";
 std::string UniformHandler::addUniform(ShaderFlags visibility, SLType type,
                                        const std::string& name) {
   auto uniformName = programBuilder->nameVariable(name);
-  Uniform uniform(uniformName, type, visibility);
-  uniforms.push_back(uniform);
-  return uniform.name();
+  switch (visibility) {
+    case ShaderFlags::Vertex:
+      vertexUniforms.emplace_back(uniformName, type);
+      break;
+    case ShaderFlags::Fragment:
+      fragmentUniforms.emplace_back(uniformName, type);
+      break;
+    default:
+      return "";
+      break;
+  }
+  return uniformName;
 }
 
 SamplerHandle UniformHandler::addSampler(GPUTexture* texture, const std::string& name) {
@@ -48,8 +57,7 @@ SamplerHandle UniformHandler::addSampler(GPUTexture* texture, const std::string&
       break;
   }
   auto samplerName = programBuilder->nameVariable(name);
-  Uniform uniform = {samplerName, type, ShaderFlags::Fragment};
-  samplers.push_back(uniform);
+  samplers.emplace_back(samplerName, type);
   auto caps = programBuilder->getContext()->caps();
   auto& swizzle = caps->getReadSwizzle(texture->format());
   samplerSwizzles.push_back(swizzle);
@@ -61,17 +69,22 @@ ShaderVar UniformHandler::getSamplerVariable(SamplerHandle handle) const {
   return {uniform.name(), uniform.type(), ShaderVar::TypeModifier::Uniform};
 }
 
+std::vector<Uniform> UniformHandler::getUniforms() const {
+  auto uniforms = vertexUniforms;
+  uniforms.insert(uniforms.end(), fragmentUniforms.begin(), fragmentUniforms.end());
+  return uniforms;
+}
+
 std::string UniformHandler::getUniformDeclarations(ShaderFlags visibility) const {
   std::string ret;
+  auto& uniforms = visibility == ShaderFlags::Vertex ? vertexUniforms : fragmentUniforms;
   for (auto& uniform : uniforms) {
-    if ((uniform.visibility() & visibility) == visibility) {
-      ShaderVar variable = {uniform.name(), uniform.type(), ShaderVar::TypeModifier::Uniform};
-      ret += programBuilder->getShaderVarDeclarations(variable, visibility);
-      ret += ";\n";
-    }
+    ShaderVar variable = {uniform.name(), uniform.type(), ShaderVar::TypeModifier::Uniform};
+    ret += programBuilder->getShaderVarDeclarations(variable, visibility);
+    ret += ";\n";
   }
-  for (const auto& sampler : samplers) {
-    if ((sampler.visibility() & visibility) == visibility) {
+  if (visibility == ShaderFlags::Fragment) {
+    for (const auto& sampler : samplers) {
       ShaderVar variable = {sampler.name(), sampler.type(), ShaderVar::TypeModifier::Uniform};
       ret += programBuilder->getShaderVarDeclarations(variable, visibility);
       ret += ";\n";

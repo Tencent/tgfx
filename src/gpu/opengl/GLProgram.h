@@ -22,18 +22,17 @@
 #include "gpu/Pipeline.h"
 #include "gpu/Program.h"
 #include "gpu/SLType.h"
-#include "gpu/opengl/GLUniformBuffer.h"
 
 namespace tgfx {
+struct Attribute {
+  SLType gpuType = SLType::Float;
+  size_t offset = 0;
+  int location = 0;
+};
+
 class GLProgram : public Program {
  public:
-  struct Attribute {
-    SLType gpuType = SLType::Float;
-    size_t offset = 0;
-    int location = 0;
-  };
-
-  GLProgram(unsigned programID, std::unique_ptr<GLUniformBuffer> uniformBuffer,
+  GLProgram(unsigned programID, std::vector<Uniform> uniforms, std::vector<int> locations,
             std::vector<Attribute> attributes, int vertexStride);
 
   /**
@@ -41,10 +40,6 @@ class GLProgram : public Program {
    */
   unsigned programID() const {
     return programId;
-  }
-
-  GLUniformBuffer* uniformBuffer() const {
-    return _uniformBuffer.get();
   }
 
   int vertexStride() const {
@@ -55,12 +50,15 @@ class GLProgram : public Program {
     return attributes;
   }
 
+  void setUniformBytes(const void* data, size_t size);
+
  protected:
   void onReleaseGPU() override;
 
  private:
   unsigned programId = 0;
-  std::unique_ptr<GLUniformBuffer> _uniformBuffer = nullptr;
+  std::vector<Uniform> uniforms = {};
+  std::vector<int> uniformLocations = {};
   std::vector<Attribute> attributes = {};
   int _vertexStride = 0;
 };

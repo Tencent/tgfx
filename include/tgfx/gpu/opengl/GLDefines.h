@@ -724,6 +724,8 @@ namespace tgfx {
 #define GL_FLOAT_MAT3 0x8B5B
 #define GL_FLOAT_MAT4 0x8B5C
 #define GL_SAMPLER_2D 0x8B5E
+#define GL_SAMPLER_2D_RECT 0x8B63
+#define GL_SAMPLER_EXTERNAL_OES 0x8D66
 #define GL_SAMPLER_CUBE 0x8B60
 
 // Vertex Arrays

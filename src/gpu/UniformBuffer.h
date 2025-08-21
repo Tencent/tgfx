@@ -38,14 +38,13 @@ class Uniform {
   /**
    * Creates a uniform variable with the specified name, type, and visibility.
    */
-  Uniform(const std::string& name, SLType type, ShaderFlags visibility)
-      : _name(name), _type(type), _visibility(visibility) {
+  Uniform(std::string name, SLType type) : _name(std::move(name)), _type(type) {
   }
 
   /**
    * The name of the uniform variable.
    */
-  std::string name() const {
+  const std::string& name() const {
     return _name;
   }
 
@@ -54,13 +53,6 @@ class Uniform {
    */
   SLType type() const {
     return _type;
-  }
-
-  /**
-   * The visibility of the uniform variable, indicating which shaders can access it.
-   */
-  ShaderFlags visibility() const {
-    return _visibility;
   }
 
   /**
@@ -73,7 +65,6 @@ class Uniform {
  private:
   std::string _name = {};
   SLType _type = SLType::Void;
-  ShaderFlags _visibility = ShaderFlags::None;
 };
 
 /**
@@ -86,7 +77,7 @@ class UniformBuffer {
    */
   explicit UniformBuffer(std::vector<Uniform> uniforms);
 
-  virtual ~UniformBuffer() = default;
+  ~UniformBuffer();
 
   /**
    * Copies value into the uniform buffer. The data must have the same size as the uniform specified
@@ -103,19 +94,26 @@ class UniformBuffer {
    */
   void setData(const std::string& name, const Matrix& matrix);
 
- protected:
-  std::vector<Uniform> uniforms = {};
-  std::vector<size_t> offsets = {};
+  /**
+   * Returns a pointer to the start of the uniform buffer in memory.
+   */
+  const void* data() const {
+    return _buffer;
+  }
 
   /**
-   * Copies data into the uniform buffer. The data must have the same size as the uniform specified
-   * by name.
+   * Returns the size of the uniform buffer in bytes.
    */
-  virtual void onCopyData(size_t index, size_t offset, size_t size, const void* data) = 0;
+  size_t size() const {
+    return offsets.back();
+  }
 
  private:
-  std::string nameSuffix = "";
+  uint8_t* _buffer = nullptr;
+  std::vector<Uniform> uniforms = {};
+  std::vector<size_t> offsets = {};
   std::unordered_map<std::string, size_t> uniformMap = {};
+  std::string nameSuffix = "";
 
   void onSetData(const std::string& name, const void* data, size_t size);
 

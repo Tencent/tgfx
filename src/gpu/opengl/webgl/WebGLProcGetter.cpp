@@ -90,6 +90,7 @@ void* WebGLProcGetter::getProcAddress(const char* name) const {
   N(glGetFramebufferAttachmentParameteriv)
   N(glGetIntegerv)
   N(glGetInternalformativ)
+  N(glGetActiveUniform)
   N(glGetBooleanv)
   N(glGetProgramInfoLog)
   N(glGetProgramiv)
