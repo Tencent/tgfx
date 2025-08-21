@@ -222,26 +222,43 @@ void GLUnrolledBinaryGradientColorizer::emitCode(EmitArgs& args) const {
   auto* uniformHandler = args.uniformHandler;
   UnrolledBinaryUniformName uniformNames = {};
   uniformNames.scale0_1 = AddUniform(uniformHandler, "scale0_1", intervalCount, 0);
-  uniformNames.scale2_3 = AddUniform(uniformHandler, "scale2_3", intervalCount, 1);
-  uniformNames.scale4_5 = AddUniform(uniformHandler, "scale4_5", intervalCount, 2);
-  uniformNames.scale6_7 = AddUniform(uniformHandler, "scale6_7", intervalCount, 3);
-  uniformNames.scale8_9 = AddUniform(uniformHandler, "scale8_9", intervalCount, 4);
-  uniformNames.scale10_11 = AddUniform(uniformHandler, "scale10_11", intervalCount, 5);
-  uniformNames.scale12_13 = AddUniform(uniformHandler, "scale12_13", intervalCount, 6);
-  uniformNames.scale14_15 = AddUniform(uniformHandler, "scale14_15", intervalCount, 7);
   uniformNames.bias0_1 = AddUniform(uniformHandler, "bias0_1", intervalCount, 0);
-  uniformNames.bias2_3 = AddUniform(uniformHandler, "bias2_3", intervalCount, 1);
-  uniformNames.bias4_5 = AddUniform(uniformHandler, "bias4_5", intervalCount, 2);
-  uniformNames.bias6_7 = AddUniform(uniformHandler, "bias6_7", intervalCount, 3);
-  uniformNames.bias8_9 = AddUniform(uniformHandler, "bias8_9", intervalCount, 4);
-  uniformNames.bias10_11 = AddUniform(uniformHandler, "bias10_11", intervalCount, 5);
-  uniformNames.bias12_13 = AddUniform(uniformHandler, "bias12_13", intervalCount, 6);
-  uniformNames.bias14_15 = AddUniform(uniformHandler, "bias14_15", intervalCount, 7);
-  uniformNames.thresholds1_7 =
-      args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "thresholds1_7");
-  uniformNames.thresholds9_13 =
-      args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "thresholds9_13");
-
+  if (intervalCount > 1) {
+    uniformNames.scale2_3 = AddUniform(uniformHandler, "scale2_3", intervalCount, 1);
+    uniformNames.bias2_3 = AddUniform(uniformHandler, "bias2_3", intervalCount, 1);
+  }
+  if (intervalCount > 2) {
+    uniformNames.scale4_5 = AddUniform(uniformHandler, "scale4_5", intervalCount, 2);
+    uniformNames.bias4_5 = AddUniform(uniformHandler, "bias4_5", intervalCount, 2);
+  }
+  if (intervalCount > 3) {
+    uniformNames.scale6_7 = AddUniform(uniformHandler, "scale6_7", intervalCount, 3);
+    uniformNames.bias6_7 = AddUniform(uniformHandler, "bias6_7", intervalCount, 3);
+  }
+  if (intervalCount > 4) {
+    uniformNames.scale8_9 = AddUniform(uniformHandler, "scale8_9", intervalCount, 4);
+    uniformNames.bias8_9 = AddUniform(uniformHandler, "bias8_9", intervalCount, 4);
+  }
+  if (intervalCount > 5) {
+    uniformNames.scale10_11 = AddUniform(uniformHandler, "scale10_11", intervalCount, 5);
+    uniformNames.bias10_11 = AddUniform(uniformHandler, "bias10_11", intervalCount, 5);
+  }
+  if (intervalCount > 6) {
+    uniformNames.scale12_13 = AddUniform(uniformHandler, "scale12_13", intervalCount, 6);
+    uniformNames.bias12_13 = AddUniform(uniformHandler, "bias12_13", intervalCount, 6);
+  }
+  if (intervalCount > 7) {
+    uniformNames.bias14_15 = AddUniform(uniformHandler, "bias14_15", intervalCount, 7);
+    uniformNames.scale14_15 = AddUniform(uniformHandler, "scale14_15", intervalCount, 7);
+  }
+  if (intervalCount >= 2) {
+    uniformNames.thresholds1_7 =
+        args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "thresholds1_7");
+  }
+  if (intervalCount >= 5) {
+    uniformNames.thresholds9_13 =
+        args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "thresholds9_13");
+  }
   fragBuilder->codeAppendf("float t = %s.x;", args.inputColor.c_str());
   fragBuilder->codeAppend("vec4 scale, bias;");
   fragBuilder->codeAppendf("// interval count: %d\n", intervalCount);
