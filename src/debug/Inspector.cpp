@@ -20,10 +20,12 @@
 #include <atomic>
 #include <chrono>
 #include <iostream>
+#include "CompressImage.h"
 #include "ProcessUtils.h"
 #include "Protocol.h"
 #include "Socket.h"
 #include "TCPPortProvider.h"
+#include "core/utils/Log.h"
 #include "lz4.h"
 #include "tgfx/core/Clock.h"
 
@@ -40,6 +42,10 @@ Inspector::~Inspector() {
     messageThread->join();
     messageThread.reset();
   }
+  if (compressThread) {
+    compressThread->join();
+    compressThread.reset();
+  }
   broadcast.clear();
   if (lz4Stream) {
     LZ4_freeStream(static_cast<LZ4_stream_t*>(lz4Stream));
@@ -53,6 +59,7 @@ bool Inspector::ShouldExit() {
 
 void Inspector::spawnWorkerThreads() {
   messageThread = std::make_unique<std::thread>(LaunchWorker, this);
+  compressThread = std::make_unique<std::thread>(LaunchCompressWorker, this);
   timeBegin.store(Clock::Now(), std::memory_order_relaxed);
 }
 
@@ -90,6 +97,20 @@ void Inspector::sendString(uint64_t str, const char* ptr, size_t len, MsgType ty
 
 void Inspector::sendString(uint64_t str, const char* ptr, MsgType type) {
   sendString(str, ptr, strlen(ptr), type);
+}
+
+void Inspector::sendLongString(uint64_t str, const char* ptr, size_t len, MsgType type) {
+  ASSERT(type == MsgType::PixelsData);
+  MsgItem item = {};
+  item.hdr.type = type;
+  item.stringTransfer.ptr = str;
+
+  ASSERT(MsgDataSize[static_cast<int>(type)] + sizeof(uint32_t) + len <= TargetFrameSize);
+  auto dataLen = static_cast<uint32_t>(len);
+  needDataSize(MsgDataSize[static_cast<int>(type)] + sizeof(uint32_t) + dataLen);
+  appendDataUnsafe(&item, MsgDataSize[static_cast<int>(type)]);
+  appendDataUnsafe(&dataLen, sizeof(uint32_t));
+  appendDataUnsafe(ptr, dataLen);
 }
 
 void Inspector::worker() {
@@ -197,6 +218,33 @@ void Inspector::worker() {
     }
     isConnect.store(false, std::memory_order_release);
     sock.reset();
+  }
+}
+
+void Inspector::compressWorker() {
+  while (true) {
+    if (ShouldExit()) {
+      return;
+    }
+    auto imageItem = ImageItem();
+    while (imageQueue.try_dequeue(imageItem)) {
+      const auto width = imageItem.width;
+      const auto height = imageItem.height;
+      const auto compressSize = static_cast<size_t>(width * height / 2);
+      auto compressBuffer = static_cast<uint8_t*>(malloc(compressSize));
+      CompressImage(imageItem.image->bytes(), compressBuffer, width, height);
+      imageItem.image->release();
+
+      auto item = MsgItem();
+      item.hdr.type = MsgType::TextureData;
+      item.textureData.texturePtr = imageItem.texturePtr;
+      item.textureData.width = imageItem.width;
+      item.textureData.height = imageItem.height;
+      item.textureData.rowBytes = imageItem.rowBytes;
+      item.textureData.format = imageItem.format;
+      item.textureData.pixels = reinterpret_cast<uint64_t>(compressBuffer);
+      QueueSerialFinish(item);
+    }
   }
 }
 
@@ -318,6 +366,15 @@ Inspector::DequeueStatus Inspector::dequeueSerial() {
     while (serialConcurrentQueue.try_dequeue(item)) {
       auto idx = item.hdr.idx;
       switch (static_cast<MsgType>(idx)) {
+        case MsgType::TextureData: {
+          auto ptr = item.textureData.pixels;
+          const auto w = item.textureData.width;
+          const auto h = item.textureData.height;
+          const auto csz = static_cast<size_t>(w * h / 2);
+          sendLongString(ptr, (const char*)ptr, csz, MsgType::PixelsData);
+          free((void*)ptr);
+          break;
+        }
         case MsgType::OperateBegin: {
           auto t = item.operateBegin.usTime;
           auto dt = t - refThread;

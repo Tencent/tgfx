@@ -26,6 +26,8 @@
 #include "Protocol.h"
 #include "Socket.h"
 #include "concurrentqueue.h"
+#include "core/utils/PlacementPtr.h"
+#include "gpu/Pipeline.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Clock.h"
 #include "tgfx/core/Color.h"
@@ -42,6 +44,16 @@
 
 namespace tgfx::debug {
 class Inspector {
+  struct ImageItem
+  {
+    uint8_t format = 0;
+    int width = 0;
+    int height = 0;
+    size_t rowBytes = 0;
+    uint64_t texturePtr = 0;
+    std::shared_ptr<Buffer> image = nullptr;
+  };
+
  public:
   static Inspector& GetInspector() {
     static Inspector inspector;
@@ -51,6 +63,54 @@ class Inspector {
   Inspector();
 
   ~Inspector();
+
+  static void QueueSerialFinish(const MsgItem& item) {
+    GetInspector().serialConcurrentQueue.enqueue(item);
+  }
+
+  static void SendOpTexture(uint64_t texturePtr) {
+    auto item = MsgItem();
+    item.hdr.type = MsgType::Texture;
+    item.textureSampler.texturePtr = texturePtr;
+    QueueSerialFinish(item);
+  }
+
+  static void SendTextureData(uint64_t texturePtr, int width, int height, size_t rowBytes,
+                              uint8_t format, const void* pixels) {
+    const auto sz = static_cast<size_t>(width) * rowBytes;
+    // std::shared_ptr<uint8_t> ptr(new uint8_t[sz]);
+    auto imageBuffer = std::make_shared<Buffer>(sz);
+    imageBuffer->writeRange(0, sz, pixels);
+    // memcpy(imageBuffer-, pixels, sz);
+
+    auto imageItem = ImageItem();
+    imageItem.image = std::move(imageBuffer);
+    imageItem.texturePtr = texturePtr;
+    imageItem.width = width;
+    imageItem.height = height;
+    imageItem.format = format;
+    imageItem.rowBytes = rowBytes;
+    GetInspector().imageQueue.enqueue(imageItem);
+  }
+
+  static void SendPipelineData(const PlacementPtr<Pipeline>& pipeline) {
+    for (size_t i = 0; i < pipeline->numFragmentProcessors(); ++i) {
+      auto processor = pipeline->getFragmentProcessor(i);
+      FragmentProcessor::Iter fpIter(processor);
+      while (const auto* subFP = fpIter.next()) {
+        for (size_t j = 0; j < subFP->numTextureSamplers(); ++j) {
+          auto texture = subFP->textureAt(j);
+          SendOpTexture(reinterpret_cast<uint64_t>(texture));
+        }
+      }
+    }
+  }
+
+  static void SendTextureData(GPUTexture* samplerPtr, int width, int height, size_t rowBytes,
+                              PixelFormat format, const void* pixels) {
+    SendTextureData(reinterpret_cast<uint64_t>(samplerPtr), width, height, rowBytes,
+                    static_cast<uint8_t>(format), pixels);
+  }
 
   static void SendAttributeData(const char* name, const Rect& rect) {
     float value[4] = {rect.left, rect.right, rect.top, rect.bottom};
@@ -91,10 +151,6 @@ class Inspector {
       value = color.value();
     }
     SendAttributeData(name, value);
-  }
-
-  static void QueueSerialFinish(const MsgItem& item) {
-    GetInspector().serialConcurrentQueue.enqueue(item);
   }
 
   static void SendFrameMark(const char* name) {
@@ -173,9 +229,15 @@ class Inspector {
     inspector->worker();
   }
 
+  static void LaunchCompressWorker(Inspector* inspector) {
+    inspector->compressWorker();
+  }
+
   static bool ShouldExit();
 
   void worker();
+
+  void compressWorker();
 
   void spawnWorkerThreads();
 
@@ -197,6 +259,8 @@ class Inspector {
 
   void sendString(uint64_t str, const char* ptr, size_t len, MsgType type);
 
+  void sendLongString(uint64_t str, const char* ptr, size_t len, MsgType type);
+
   bool confirmProtocol();
 
   DequeueStatus dequeueSerial();
@@ -215,7 +279,9 @@ class Inspector {
   std::shared_ptr<Socket> sock = nullptr;
   int64_t refTimeThread = 0;
   moodycamel::ConcurrentQueue<MsgItem> serialConcurrentQueue;
+  moodycamel::ConcurrentQueue<ImageItem> imageQueue;
   std::unique_ptr<std::thread> messageThread = nullptr;
+  std::unique_ptr<std::thread> compressThread = nullptr;
   std::vector<std::shared_ptr<UdpBroadcast>> broadcast = {};
   const char* programName = nullptr;
   std::mutex programNameLock;

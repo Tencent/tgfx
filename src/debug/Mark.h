@@ -37,6 +37,10 @@
                                             static_cast<uint8_t>(type))
 #define ATTRIBUTE_ENUM(value, type) ATTRIBUTE_NAME_ENUM(#value, value, type)
 
+#define TEXTURE_DATA(texturePtr, width, height, rowBytes, format, pixels) \
+  tgfx::debug::Inspector::SendTextureData(texturePtr, width, height, rowBytes, format, pixels)
+#define OPERATE_PIPLINE_DATA(pipline) tgfx::debug::Inspector::SendPipelineData(pipline)
+
 #else
 
 #define SEND_LAYER_DATA(data)
@@ -48,5 +52,7 @@
 #define ATTRIBUTE_NAME(name, value)
 #define ATTRIBUTE_NAME_ENUM(name, value, type)
 #define ATTRIBUTE_ENUM(value, type)
+#define TEXTURE_DATA(samplerPtr, width, height, rowBytes, format, pixels)
+#define OPERATE_PIPLINE_DATA(pipline)
 
 #endif
