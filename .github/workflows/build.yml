@@ -393,6 +393,7 @@ jobs:
       - name: Install OHPM
         run: |
           cd ohos
+          export PATH=$PATH:$OHOS_BASE_SDK_HOME/toolchains
           ohpm install
         shell: bash   
 
