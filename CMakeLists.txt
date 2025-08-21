@@ -652,9 +652,8 @@ if(TGFX_USE_VCPKG)
         endif()
         list(APPEND TGFX_STATIC_LIBS ${EXPAT_LIB})
     endif ()
-       
-    find_package(unofficial-concurrentqueue CONFIG REQUIRED)
-    list(APPEND TGFX_INCLUDES ${VCPKG_INCLUDE_DIR}/concurrentqueue)
+
+    list(APPEND TGFX_INCLUDES ${VCPKG_INCLUDE_DIR}/concurrentqueue/moodycamel)
 endif()
 
 add_vendor_target(tgfx-vendor STATIC_VENDORS ${TGFX_STATIC_VENDORS} SHARED_VENDORS ${TGFX_SHARED_VENDORS})
@@ -827,7 +826,6 @@ if (TGFX_BUILD_TESTS)
         endif()
         list(APPEND TGFX_TEST_LIBS ${GMOCK_LIB})
 
-        # 创建一个虚拟的 test-vendor 目标，用于保持依赖关系的一致性
         add_custom_target(test-vendor)
     else()
         add_vendor_target(test-vendor STATIC_VENDORS harfbuzz googletest)
