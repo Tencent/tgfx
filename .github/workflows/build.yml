@@ -392,15 +392,14 @@ jobs:
           components: "all"
           mirror: true
 
+      - name: Add OHPM to PATH
+        run: |
+          echo "$OHOS_BASE_SDK_HOME/toolchains/ohpm/bin" >> $GITHUB_PATH    
+
       - name: Install Dependencies
         run: |
           cd ohos
-          OHPM_PATH=$(which ohpm || find /usr/local -name ohpm 2>/dev/null | head -1)
-           if [ -z "$OHPM_PATH" ]; then
-            echo "ohpm not found"
-            exit 1
-          fi  
-          $OHPM_PATH install
+          ohpm install
            
 
       - name: Install Dependencies & Build
