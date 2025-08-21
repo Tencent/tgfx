@@ -396,14 +396,12 @@ jobs:
         run: |
           find "$OHOS_BASE_SDK_HOME" -type f -name ohpm || true
             
-
-      - name: Add OHPM to PATH
-        run: |
-          echo "$OHOS_BASE_SDK_HOME/command-line-tools/bin" >> $GITHUB_PATH    
+              
 
       - name: Install Dependencies
         run: |
           cd ohos
+          echo "$OHOS_BASE_SDK_HOME/command-line-tools/bin" >> $GITHUB_PATH
           ohpm install
            
 
