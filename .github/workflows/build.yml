@@ -393,9 +393,7 @@ jobs:
       - name: Install OHPM
         run: |
           cd ohos
-          npm install -g @ohos/ohpm
-          export PATH=$PATH:$(npm config get prefix)/bin
-          ohpm install
+          ohom install
         shell: bash   
 
       - name: Install Dependencies & Build
