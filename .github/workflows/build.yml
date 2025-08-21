@@ -393,11 +393,31 @@ jobs:
           mirror: true
 
   
+      - name: Debug SDK Structure
+        run: |
+          echo "OHOS_BASE_SDK_HOME: $OHOS_BASE_SDK_HOME"
+          echo "Contents of SDK directory:"
+          ls -la "$OHOS_BASE_SDK_HOME" || echo "SDK directory not found"
+          echo "Looking for ohpm in different locations:"
+          find "$OHOS_BASE_SDK_HOME" -name "ohpm" -type f 2>/dev/null || echo "ohpm not found"
+          
       - name: Install Dependencies
         run: |
           cd ohos
-          echo "$OHOS_BASE_SDK_HOME/command-line-tools/bin" >> $GITHUB_PATH
-          "$OHOS_BASE_SDK_HOME/command-line-tools/bin/ohpm" install
+          # Try different possible paths for ohpm
+          if [ -f "$OHOS_BASE_SDK_HOME/bin/ohpm" ]; then
+            echo "$OHOS_BASE_SDK_HOME/bin" >> $GITHUB_PATH
+            "$OHOS_BASE_SDK_HOME/bin/ohpm" install
+          elif [ -f "$OHOS_BASE_SDK_HOME/command-line-tools/ohpm/bin/ohpm" ]; then
+            echo "$OHOS_BASE_SDK_HOME/command-line-tools/ohpm/bin" >> $GITHUB_PATH
+            "$OHOS_BASE_SDK_HOME/command-line-tools/ohpm/bin/ohpm" install
+          elif [ -f "$OHOS_BASE_SDK_HOME/toolchains/bin/ohpm" ]; then
+            echo "$OHOS_BASE_SDK_HOME/toolchains/bin" >> $GITHUB_PATH
+            "$OHOS_BASE_SDK_HOME/toolchains/bin/ohpm" install
+          else
+            echo "ohpm command not found in expected locations"
+            exit 1
+          fi
            
 
       - name: Install Dependencies & Build
