@@ -2917,7 +2917,7 @@ TGFX_TEST(CanvasTest, ScaleTest) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ScaleTest"));
 }
 
-TGFX_TEST(CanvassTest, drawScaleImage) {
+TGFX_TEST(CanvasTest, drawScaleImage) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -2972,5 +2972,22 @@ TGFX_TEST(CanvassTest, drawScaleImage) {
   canvas->setMatrix(matrix);
   canvas->drawImage(scaleImage);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawScaleBufferImage"));
+}
+
+TGFX_TEST(CanvasTest, RRectBlendMode) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  Paint paint;
+  paint.setColor(Color::FromRGBA(255, 0, 0, 255));
+  paint.setBlendMode(BlendMode::Darken);
+  auto path = Path();
+  path.addRoundRect(Rect::MakeXYWH(25, 25, 150, 150), 20, 20);
+  canvas->drawPath(path, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/RRectBlendMode"));
 }
 }  // namespace tgfx
