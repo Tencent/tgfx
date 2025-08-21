@@ -371,15 +371,16 @@ jobs:
         with:
           node-version: '18'
 
-      - name: Download HarmonyOS CLI
+      - name: Export DevEco bundled tools to PATH
         run: |
-          curl -L -o cli.zip \
-            https://contentcenter-vali-drcn.dbankcdn.cn/cch5/devtool/devEco/commandline-tools/5.0.0.200/commandline-tools-darwin-arm64.zip
-          unzip -q cli.zip -d $HOME/harmony-cli
-        
-          echo "$HOME/harmony-cli/command-line-tools/bin" >> $GITHUB_PATH
-          echo "$HOME/harmony-cli/command-line-tools/sdk/default/openharmony/toolchains" >> $GITHUB_PATH
-  
+          echo "/Applications/DevEco-Studio.app/Contents/tools/ohpm/bin"      >> $GITHUB_PATH
+          echo "/Applications/DevEco-Studio.app/Contents/tools/hvigor/bin"    >> $GITHUB_PATH
+          echo "/Applications/DevEco-Studio.app/Contents/tools/node/bin"      >> $GITHUB_PATH
+
+      - name: Verify tools
+        run: |
+          ohpm --version
+          hvigorw --version    
 
       - name: Get Third-Party Cache
         id: third-party-cache
