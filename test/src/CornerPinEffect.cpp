@@ -57,11 +57,6 @@ CornerPinEffect::CornerPinEffect(const Point& upperLeft, const Point& upperRight
   calculateVertexQs();
 }
 
-uint32_t CornerPinEffect::programID() const {
-  static auto CornerPinEffectID = NextProgramID();
-  return CornerPinEffectID;
-}
-
 Rect CornerPinEffect::filterBounds(const Rect&) const {
   auto& lowerLeft = cornerPoints[0];
   auto& lowerRight = cornerPoints[1];
