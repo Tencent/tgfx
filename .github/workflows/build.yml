@@ -366,10 +366,22 @@ jobs:
         with:
           lfs: true
 
+      - name: Setup JDK 17
+        uses: actions/setup-java@v1
+        with:
+          java-version: '17'
+
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: '18'
+
+      - name: Download HarmonyOS CLI
+        run: |
+          wget -q https://download.harmonyos.com/sdk/commandline-tools-darwin-arm64.zip 
+          unzip -q commandline-tools-linux.zip -d $HOME
+          echo "$HOME/command-line-tools/bin" >> $GITHUB_PATH
+          echo "$HOME/command-line-tools/sdk/HarmonyOS-NEXT-DB2/openharmony/toolchains" >> $GITHUB_PATH  
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -392,26 +404,12 @@ jobs:
           components: "all"
           mirror: true
 
-      - name: Add hvigorw & ohpm to PATH
-        run: |
-          set -e
-          HVIGORW_PATH=$(find "$OHOS_BASE_SDK_HOME" -type f -name hvigorw | head -n 1)
-          OHPM_PATH=$(find "$OHOS_BASE_SDK_HOME" -type f -name ohpm | head -n 1)
-  
-          [[ -z "$HVIGORW_PATH" ]] && { echo "hvigorw not found"; exit 1; }
-          [[ -z "$OHPM_PATH" ]]   && { echo "ohpm not found";   exit 1; }
-  
-          chmod +x "$HVIGORW_PATH" "$OHPM_PATH"
-          echo "$(dirname "$HVIGORW_PATH")" >> $GITHUB_PATH
-          echo "$(dirname "$OHPM_PATH")"    >> $GITHUB_PATH
-  
-          echo "hvigorw : $HVIGORW_PATH"
-          echo "ohpm    : $OHPM_PATH"
           
       - name: Install ohpm dependencies
         run: |
           cd ohos
-          ohpm install    
+          ohpm config set registry https://ohpm.openharmony.cn/ohpm/
+          ohpm install --all  
 
   
       - name: Install Dependencies & Build
