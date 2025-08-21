@@ -392,6 +392,11 @@ jobs:
           components: "all"
           mirror: true
 
+      - name: Debug ohpm path
+        run: |
+          find "$OHOS_BASE_SDK_HOME" -type f -name ohpm || true
+            
+
       - name: Add OHPM to PATH
         run: |
           echo "$OHOS_BASE_SDK_HOME/toolchains/ohpm/bin" >> $GITHUB_PATH    
