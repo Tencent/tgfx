@@ -401,7 +401,7 @@ jobs:
       - name: Install Dependencies & Build
         run: |
           cd ohos
-          hvigorw assembleHap --mode module -p module=hello2d -p product=default --stacktrace
+          hvigorw --mode module -p module=hello2d@default -p product=default -p requiredDeviceType=phone assembleHap --stacktrace --parallel --incremental --daemon
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
