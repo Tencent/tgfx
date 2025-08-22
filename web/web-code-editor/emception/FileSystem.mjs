@@ -27,9 +27,12 @@ export default class FileSystem extends EmProcess {
     unpack(path, cwd = "/") {
         if (path.endsWith(".br")) {
             // it's a brotli file, decompress it first
+            this.mkdirTree("/tmp");
             this._brotli.exec(["brotli", "--decompress", "-o", "/tmp/archive.pack", path], { cwd: "/tmp/" });
             this.exec(["wasm-package", "unpack", "/tmp/archive.pack"], { cwd });
-            this.FS.unlink("/tmp/archive.pack");
+            if (this.exists("/tmp/archive.pack")) {
+                this.FS.unlink("/tmp/archive.pack");
+            }
         } else {
             this.exec(["wasm-package", "unpack", path], { cwd });
         }

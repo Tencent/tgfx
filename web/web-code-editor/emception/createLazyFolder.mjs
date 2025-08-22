@@ -6,18 +6,27 @@ function doFetchSync(url) {
     const xhr = new XMLHttpRequest();
     xhr.open("GET", url, false);
 
-    // Some hints to the browser that we want binary data.
-    xhr.responseType = "arraybuffer";
+    // For synchronous requests, we cannot set responseType
+    // xhr.responseType = "arraybuffer";
     xhr.overrideMimeType?.("text/plain; charset=x-user-defined");
 
     xhr.send(null);
     if (!(xhr.status >= 200 && xhr.status < 300 || xhr.status === 304)) {
         throw new Error(`Couldn't load ${url}. Status: ${xhr.status}`);
     }
-    if (!xhr.response) {
+    
+    // Handle response as text and convert to Uint8Array
+    const responseText = xhr.responseText;
+    if (!responseText) {
         throw new Error(`Couldn't load ${url}. No xhr response.`);
     }
-    return new Uint8Array(xhr.response);
+    
+    // Convert string to Uint8Array
+    const bytes = new Uint8Array(responseText.length);
+    for (let i = 0; i < responseText.length; i++) {
+        bytes[i] = responseText.charCodeAt(i) & 0xff;
+    }
+    return bytes;
 }
 
 async function doFetchAsync(url) {
