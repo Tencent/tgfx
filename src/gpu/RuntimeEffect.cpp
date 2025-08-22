@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,27 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/UniformBuffer.h"
-#include "tgfx/gpu/Context.h"
+#include "tgfx/gpu/RuntimeEffect.h"
 
 namespace tgfx {
-class GLUniformBuffer : public UniformBuffer {
- public:
-  GLUniformBuffer(std::vector<Uniform> uniforms, std::vector<int> locations);
+uint32_t RuntimeEffect::NextProgramID() {
 
-  ~GLUniformBuffer() override;
+  static std::atomic<uint32_t> nextID{1};
+  static constexpr uint32_t InvalidUniqueID = 0;
+  uint32_t id;
+  do {
+    id = nextID.fetch_add(1, std::memory_order_relaxed);
+  } while (id == InvalidUniqueID);
+  return id;
+}
 
-  void uploadToGPU(Context* context);
-
- protected:
-  void onCopyData(size_t index, size_t offset, size_t size, const void* data) override;
-
- private:
-  uint8_t* buffer = nullptr;
-  bool bufferChanged = false;
-  std::vector<int> locations = {};
-  std::vector<bool> dirtyFlags = {};
-};
 }  // namespace tgfx

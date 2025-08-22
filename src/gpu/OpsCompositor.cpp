@@ -475,6 +475,12 @@ std::pair<bool, bool> OpsCompositor::needComputeBounds(const Fill& fill, bool ha
       needDeviceBounds = true;
     }
   }
+  if (pendingType == PendingOpType::RRect && (needDeviceBounds || needLocalBounds)) {
+    // When either localBounds or deviceBounds needs to be computed for RRect, both should be set to
+    // true, since localBounds and deviceBounds are computed together in that case.
+    needLocalBounds = true;
+    needDeviceBounds = true;
+  }
   return {needLocalBounds, needDeviceBounds};
 }
 
