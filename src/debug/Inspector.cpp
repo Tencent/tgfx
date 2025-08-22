@@ -283,9 +283,9 @@ bool Inspector::sendData(const uint8_t* data, size_t len) {
     }
   }
   const auto lz4Size =
-      lz4Handler->encode(lz4Buf.bytes() + sizeof(lz4sz_t), maxOutputSize, data, len);
-  memcpy(lz4Buf.data(), &lz4Size, sizeof(lz4Size));
-  return sock->sendData(lz4Buf.bytes(), static_cast<size_t>(lz4Size) + sizeof(lz4sz_t)) != -1;
+      lz4Handler->encode(lz4Buf.bytes() + sizeof(size_t), maxOutputSize, data, len);
+  memcpy(lz4Buf.bytes(), &lz4Size, sizeof(size_t));
+  return sock->sendData(lz4Buf.bytes(), lz4Size + sizeof(size_t)) != -1;
 }
 
 bool Inspector::confirmProtocol() {
