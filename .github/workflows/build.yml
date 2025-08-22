@@ -413,6 +413,13 @@ jobs:
         run: |
           npm install depsync -g
           depsync
+
+      - name: Setup OpenHarmony SDK
+        uses: openharmony-rs/setup-ohos-sdk@v0.2
+        with:
+          version: '5.0.3'
+          cache: true
+          components: 'all'   
       
       - name: Install ohpm dependencies
         run: |
@@ -420,13 +427,6 @@ jobs:
           ohpm config set registry https://ohpm.openharmony.cn/ohpm/
           ohpm install --all
 
-      - name: Setup Environment
-        run: |
-          SDK_ROOT="${COMMANDLINE_TOOL_DIR}/sdk/default/openharmony"
-          echo "DEVECO_SDK_HOME=$SDK_ROOT" >> $GITHUB_ENV
-          echo "$SDK_ROOT/toolchains" >> $GITHUB_PATH    
-
-  
       - name: Build Harmony
         run: |
           cd ohos
