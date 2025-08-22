@@ -383,6 +383,7 @@ jobs:
         if: steps.cli-cache.outputs.cache-hit != 'true'
         run: |
           TOOLS_URL="https://pag.io/file/sdk/commandline-tools-mac-arm64-5.0.9.310.zip"
+          curl -L -o /tmp/cmdtools.zip "$TOOLS_URL"
           unzip -q /tmp/cmdtools.zip -d /tmp
           sudo mv /tmp/command-line-tools /opt/ohos-cmd-tools
           
@@ -412,16 +413,7 @@ jobs:
         run: |
           npm install depsync -g
           depsync
-
-      - name: Setup OpenHarmony SDK
-        uses: openharmony-rs/setup-ohos-sdk@v0.2
-        with:
-          version: '5.0.3'
-          cache: true
-          components: "all"
-          mirror: true
-
-          
+      
       - name: Install ohpm dependencies
         run: |
           cd ohos
