@@ -82,7 +82,7 @@ void RectDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
                                                  renderTarget->height(), aaType, commonColor,
                                                  uvMatrix, hasSubset);
   auto pipeline = createPipeline(renderTarget, std::move(gp));
-  OPERATE_PIPLINE_DATA(pipeline);
+  // OPERATE_PIPLINE_DATA(pipeline);
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   renderPass->bindBuffers(indexBuffer ? indexBuffer->gpuBuffer() : nullptr,
                           vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());

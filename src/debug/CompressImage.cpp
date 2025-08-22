@@ -30,7 +30,8 @@ static inline uint16_t To565(uint8_t r, uint8_t g, uint8_t b) {
 
 #if !defined __aarch64__
 static inline uint16_t To565(uint32_t c) {
-  return static_cast<uint16_t>(((c & 0xF80000) >> 19) | ((c & 0x00FC00) >> 5) | ((c & 0x0000F8) << 8));
+  return static_cast<uint16_t>(((c & 0xF80000) >> 19) | ((c & 0x00FC00) >> 5) |
+                               ((c & 0x0000F8) << 8));
 }
 #endif
 
@@ -653,4 +654,4 @@ void CompressImage(const uint8_t* src, uint8_t* dst, int width, int height) {
     } while (--blocks);
   }
 }
-}  // namespace tracy
+}  // namespace tgfx::debug

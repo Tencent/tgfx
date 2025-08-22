@@ -85,7 +85,7 @@ std::shared_ptr<TextureView> TextureView::MakeFormat(Context* context, int width
   if (pixels != nullptr) {
     auto texture = textureView->getTexture();
     gpu->queue()->writeTexture(texture, Rect::MakeWH(width, height), pixels, rowBytes);
-    TEXTURE_DATA(texture, width, height, rowBytes, pixelFormat, pixels);
+    // TEXTURE_DATA(texture, width, height, rowBytes, pixelFormat, pixels);
   }
   return textureView;
 }

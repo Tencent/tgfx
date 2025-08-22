@@ -32,7 +32,7 @@
 namespace tgfx::debug {
 Inspector::Inspector()
     : epoch(Clock::Now()), initTime(Clock::Now()), dataBuffer(TargetFrameSize * 3),
-      lz4Buf(LZ4Size + sizeof(lz4sz_t)), lz4Stream(LZ4_createStream()), broadcast(BroadcastNum) {
+      lz4Handler(LZ4CompressionHandler::Make()), broadcast(BroadcastNum) {
   spawnWorkerThreads();
 }
 
@@ -47,10 +47,6 @@ Inspector::~Inspector() {
     compressThread.reset();
   }
   broadcast.clear();
-  if (lz4Stream) {
-    LZ4_freeStream(static_cast<LZ4_stream_t*>(lz4Stream));
-    lz4Stream = nullptr;
-  }
 }
 
 bool Inspector::ShouldExit() {
@@ -105,7 +101,6 @@ void Inspector::sendLongString(uint64_t str, const char* ptr, size_t len, MsgTyp
   item.hdr.type = type;
   item.stringTransfer.ptr = str;
 
-  ASSERT(MsgDataSize[static_cast<int>(type)] + sizeof(uint32_t) + len <= TargetFrameSize);
   auto dataLen = static_cast<uint32_t>(len);
   needDataSize(MsgDataSize[static_cast<int>(type)] + sizeof(uint32_t) + dataLen);
   appendDataUnsafe(&item, MsgDataSize[static_cast<int>(type)]);
@@ -235,7 +230,7 @@ void Inspector::compressWorker() {
       CompressImage(imageItem.image->bytes(), compressBuffer, width, height);
       imageItem.image->release();
 
-      auto item = MsgItem();
+      MsgItem item = {};
       item.hdr.type = MsgType::TextureData;
       item.textureData.texturePtr = imageItem.texturePtr;
       item.textureData.width = imageItem.width;
@@ -268,7 +263,7 @@ void Inspector::appendDataUnsafe(const void* data, size_t len) {
 }
 
 bool Inspector::commitData() {
-  bool ret = sendData(static_cast<const char*>(dataBuffer.data()) + dataBufferStart,
+  bool ret = sendData(dataBuffer.bytes() + dataBufferStart,
                       static_cast<size_t>(dataBufferOffset - dataBufferStart));
   if (dataBufferOffset > TargetFrameSize * 2) {
     dataBufferOffset = 0;
@@ -277,12 +272,20 @@ bool Inspector::commitData() {
   return ret;
 }
 
-bool Inspector::sendData(const char* data, size_t len) {
-  const auto lz4sz = LZ4_compress_fast_continue(static_cast<LZ4_stream_t*>(lz4Stream), data,
-                                                static_cast<char*>(lz4Buf.data()) + sizeof(lz4sz_t),
-                                                static_cast<int>(len), LZ4Size, 1);
-  memcpy(lz4Buf.data(), &lz4sz, sizeof(lz4sz));
-  return sock->sendData(lz4Buf.bytes(), static_cast<size_t>(lz4sz) + sizeof(lz4sz_t)) != -1;
+bool Inspector::sendData(const uint8_t* data, size_t len) {
+  auto maxOutputSize = LZ4CompressionHandler::GetMaxOutputSize(len);
+  if (lz4Buf.size() < maxOutputSize) {
+    lz4Buf.clear();
+    lz4Buf.alloc(maxOutputSize);
+    if (lz4Buf.isEmpty()) {
+      LOGE("Inspector failed to send data!");
+      return false;
+    }
+  }
+  const auto lz4Size =
+      lz4Handler->encode(lz4Buf.bytes() + sizeof(lz4sz_t), maxOutputSize, data, len);
+  memcpy(lz4Buf.data(), &lz4Size, sizeof(lz4Size));
+  return sock->sendData(lz4Buf.bytes(), static_cast<size_t>(lz4Size) + sizeof(lz4sz_t)) != -1;
 }
 
 bool Inspector::confirmProtocol() {
@@ -312,7 +315,7 @@ void Inspector::handleConnect(const WelcomeMessage& welcome) {
   auto handshake = HandshakeStatus::HandshakeWelcome;
   sock->sendData(&handshake, sizeof(handshake));
 
-  LZ4_resetStream(static_cast<LZ4_stream_t*>(lz4Stream));
+  lz4Handler->reset();
   sock->sendData(&welcome, sizeof(welcome));
 
   auto keepAlive = 0;

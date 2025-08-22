@@ -22,6 +22,7 @@
 #include <optional>
 #include <thread>
 #include <vector>
+#include "LZ4CompressionHandler.h"
 #include "Message.h"
 #include "Protocol.h"
 #include "Socket.h"
@@ -44,8 +45,7 @@
 
 namespace tgfx::debug {
 class Inspector {
-  struct ImageItem
-  {
+  struct ImageItem {
     uint8_t format = 0;
     int width = 0;
     int height = 0;
@@ -253,7 +253,7 @@ class Inspector {
 
   bool commitData();
 
-  bool sendData(const char* data, size_t len);
+  bool sendData(const uint8_t* data, size_t len);
 
   void sendString(uint64_t str, const char* ptr, MsgType type);
 
@@ -271,7 +271,7 @@ class Inspector {
   int64_t initTime = 0;
   Buffer dataBuffer = {};
   Buffer lz4Buf = {};
-  void* lz4Stream = nullptr;
+  std::unique_ptr<LZ4CompressionHandler> lz4Handler = nullptr;
   std::atomic<bool> shutdown = false;
   std::atomic<int64_t> timeBegin = 0;
   std::atomic<uint64_t> frameCount = 0;
