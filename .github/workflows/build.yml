@@ -430,12 +430,8 @@ jobs:
       - name: Build Harmony
         run: |
           cd ohos
-          hvigorw --mode module \
-            -p module=hello2d@default \
-            -p product=default \
-            -p requiredDeviceType=phone \
-            assembleHap \
-            --stacktrace --parallel --incremental --daemon
+          hvigorw clean --no-daemon
+          hvigorw assembleApp --mode project -p product=default -p buildMode=debug --no-daemon
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
