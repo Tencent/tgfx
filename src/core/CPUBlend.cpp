@@ -326,8 +326,8 @@ static void StandardBlendHandler_Multiply(const Color& srcColor, const Color& ds
 static void StandardBlendHandler_Hue(const Color& srcColor, const Color& dstColor,
                                      Color& outColor) {
   // SetLum(SetSat(S * Da, Sat(D * Sa)), Sa*Da, D*Sa) + (1 - Sa) * D + (1 - Da) * S
-  const auto dstSrcAlpha = Color(dstColor.red * srcColor.alpha, dstColor.green * srcColor.alpha,
-                                 dstColor.blue * srcColor.alpha, dstColor.alpha * srcColor.alpha);
+  const Color dstSrcAlpha(dstColor.red * srcColor.alpha, dstColor.green * srcColor.alpha,
+                          dstColor.blue * srcColor.alpha, dstColor.alpha * srcColor.alpha);
   const Vector3 dstSrcAlphaRGB(dstSrcAlpha.red, dstSrcAlpha.green, dstSrcAlpha.blue);
   const Vector3 srcColorRGB(srcColor.red, srcColor.green, srcColor.blue);
   const Vector3 hueLumSatColorRGB =
@@ -345,8 +345,8 @@ static void StandardBlendHandler_Hue(const Color& srcColor, const Color& dstColo
 static void StandardBlendHandler_Saturation(const Color& srcColor, const Color& dstColor,
                                             Color& outColor) {
   // SetLum(SetSat(D * Sa, Sat(S * Da)), Sa*Da, D*Sa)) + (1 - Sa) * D + (1 - Da) * S
-  const auto dstSrcAlpha = Color(dstColor.red * srcColor.alpha, dstColor.green * srcColor.alpha,
-                                 dstColor.blue * srcColor.alpha, dstColor.alpha * srcColor.alpha);
+  const Color dstSrcAlpha(dstColor.red * srcColor.alpha, dstColor.green * srcColor.alpha,
+                          dstColor.blue * srcColor.alpha, dstColor.alpha * srcColor.alpha);
   const Vector3 dstSrcAlphaRGB(dstSrcAlpha.red, dstSrcAlpha.green, dstSrcAlpha.blue);
   const Vector3 srcColorRGB(srcColor.red, srcColor.green, srcColor.blue);
   const Vector3 hueLumSatColorRGB =
@@ -429,11 +429,226 @@ static constexpr std::pair<BlendMode, StandardBlendHandler> StandardBlendHandler
 
 static bool TryApplyStandardBlend(const Color& srcColor, const Color& dstColor, BlendMode blendMode,
                                   Color& outColor) {
-  for (const auto& handler : StandardBlendHandlers) {
-    if (handler.first == blendMode) {
+  for (const auto& [itemBlendMode, handler] : StandardBlendHandlers) {
+    if (itemBlendMode == blendMode) {
       // All standard blending scenarios require performing src-over blending mode on the alpha channel.
       outColor.alpha = srcColor.alpha + (1.0f - srcColor.alpha) * dstColor.alpha;
-      handler.second(srcColor, dstColor, outColor);
+      handler(srcColor, dstColor, outColor);
+      return true;
+    }
+  }
+  return false;
+}
+
+static void FormulaCoverageHandler_None(const Color& srcColor, const Color& coverage,
+                                        Color& outColor) {
+  (void)srcColor;
+  (void)coverage;
+  outColor = Color(0.0f, 0.0f, 0.0f, 0.0f);
+}
+
+static void FormulaCoverageHandler_Coverage(const Color& srcColor, const Color& coverage,
+                                            Color& outColor) {
+  (void)srcColor;
+  outColor = coverage;
+}
+
+static void FormulaCoverageHandler_Modulate(const Color& srcColor, const Color& coverage,
+                                            Color& outColor) {
+  outColor = Color(srcColor.red * coverage.red, srcColor.green * coverage.green,
+                   srcColor.blue * coverage.blue, srcColor.alpha * coverage.alpha);
+}
+
+static void FormulaCoverageHandler_SAModulate(const Color& srcColor, const Color& coverage,
+                                              Color& outColor) {
+  outColor = Color(srcColor.alpha * coverage.red, srcColor.alpha * coverage.green,
+                   srcColor.alpha * coverage.blue, srcColor.alpha * coverage.alpha);
+}
+
+static void FormulaCoverageHandler_ISAModulate(const Color& srcColor, const Color& coverage,
+                                               Color& outColor) {
+  const float alpha = 1.0f - srcColor.alpha;
+  outColor = Color(alpha * coverage.red, alpha * coverage.green, alpha * coverage.blue,
+                   alpha * coverage.alpha);
+}
+
+static void FormulaCoverageHandler_ISCModulate(const Color& srcColor, const Color& coverage,
+                                               Color& outColor) {
+  const Color inverseSrcColor(1.0f - srcColor.red, 1.0f - srcColor.green, 1.0f - srcColor.blue,
+                              1.0f - srcColor.alpha);
+  outColor = Color(inverseSrcColor.red * coverage.red, inverseSrcColor.green * coverage.green,
+                   inverseSrcColor.blue * coverage.blue, inverseSrcColor.alpha * coverage.alpha);
+}
+
+using FormulaCoverageHandler = void (*)(const Color& srcColor, const Color& coverage,
+                                        Color& outColor);
+
+static constexpr std::pair<BlendFormula::OutputType, FormulaCoverageHandler>
+    FormulaCoverageHandlers[] = {
+        {BlendFormula::OutputType::None, FormulaCoverageHandler_None},
+        {BlendFormula::OutputType::Coverage, FormulaCoverageHandler_Coverage},
+        {BlendFormula::OutputType::Modulate, FormulaCoverageHandler_Modulate},
+        {BlendFormula::OutputType::SAModulate, FormulaCoverageHandler_SAModulate},
+        {BlendFormula::OutputType::ISAModulate, FormulaCoverageHandler_ISAModulate},
+        {BlendFormula::OutputType::ISCModulate, FormulaCoverageHandler_ISCModulate}};
+
+static bool MakeCoveragedColor(const Color& srcColor, const Color& coverageColor,
+                               BlendFormula::OutputType outputType, Color& outColor) {
+  for (const auto& [outputTypeItem, handler] : FormulaCoverageHandlers) {
+    if (outputTypeItem == outputType) {
+      handler(srcColor, coverageColor, outColor);
+      return true;
+    }
+  }
+  return false;
+}
+
+static void FormulaCoeffHandler_ONE(const Color& srcColor, const Color* src2Color,
+                                    const Color& dstColor, Color& coeffColor) {
+  (void)srcColor;
+  (void)src2Color;
+  (void)dstColor;
+  coeffColor = Color(1.0f, 1.0f, 1.0f, 1.0f);
+}
+
+static void FormulaCoeffHandler_SRC_COLOR(const Color& srcColor, const Color* src2Color,
+                                          const Color& dstColor, Color& coeffColor) {
+  (void)src2Color;
+  (void)dstColor;
+  coeffColor = srcColor;
+}
+
+static void FormulaCoeffHandler_ONE_MINUS_SRC_COLOR(const Color& srcColor, const Color* src2Color,
+                                                    const Color& dstColor, Color& coeffColor) {
+  (void)src2Color;
+  (void)dstColor;
+  coeffColor = Color(1.0f - srcColor.red, 1.0f - srcColor.green, 1.0f - srcColor.blue,
+                     1.0f - srcColor.alpha);
+}
+
+static void FormulaCoeffHandler_DST_COLOR(const Color& srcColor, const Color* src2Color,
+                                          const Color& dstColor, Color& coeffColor) {
+  (void)srcColor;
+  (void)src2Color;
+  coeffColor = dstColor;
+}
+
+static void FormulaCoeffHandler_ONE_MINUS_DST_COLOR(const Color& srcColor, const Color* src2Color,
+                                                    const Color& dstColor, Color& coeffColor) {
+  (void)srcColor;
+  (void)src2Color;
+  coeffColor = Color(1.0f - dstColor.red, 1.0f - dstColor.green, 1.0f - dstColor.blue,
+                     1.0f - dstColor.alpha);
+}
+
+static void FormulaCoeffHandler_SRC_ALPHA(const Color& srcColor, const Color* src2Color,
+                                          const Color& dstColor, Color& coeffColor) {
+  (void)src2Color;
+  (void)dstColor;
+  coeffColor = Color(srcColor.alpha, srcColor.alpha, srcColor.alpha, srcColor.alpha);
+}
+
+static void FormulaCoeffHandler_ONE_MINUS_SRC_ALPHA(const Color& srcColor, const Color* src2Color,
+                                                    const Color& dstColor, Color& coeffColor) {
+  (void)src2Color;
+  (void)dstColor;
+  const float alpha = 1.0f - srcColor.alpha;
+  coeffColor = Color(alpha, alpha, alpha, alpha);
+}
+
+static void FormulaCoeffHandler_DST_ALPHA(const Color& srcColor, const Color* src2Color,
+                                          const Color& dstColor, Color& coeffColor) {
+  (void)srcColor;
+  (void)src2Color;
+  coeffColor = Color(dstColor.alpha, dstColor.alpha, dstColor.alpha, dstColor.alpha);
+}
+
+static void FormulaCoeffHandler_ONE_MINUS_DST_ALPHA(const Color& srcColor, const Color* src2Color,
+                                                    const Color& dstColor, Color& coeffColor) {
+  (void)srcColor;
+  (void)src2Color;
+  const float alpha = 1.0f - dstColor.alpha;
+  coeffColor = Color(alpha, alpha, alpha, alpha);
+}
+
+static void FormulaCoeffHandler_SRC2_COLOR(const Color& srcColor, const Color* src2Color,
+                                           const Color& dstColor, Color& coeffColor) {
+  (void)srcColor;
+  (void)dstColor;
+  if (src2Color == nullptr) {
+    DEBUG_ASSERT(false);
+    coeffColor = Color(0.0f, 0.0f, 0.0f, 0.0f);
+    return;
+  }
+
+  coeffColor = *src2Color;
+}
+
+static void FormulaCoeffHandler_ONE_MINUS_SRC2_COLOR(const Color& srcColor, const Color* src2Color,
+                                                     const Color& dstColor, Color& coeffColor) {
+  (void)srcColor;
+  (void)dstColor;
+  if (src2Color == nullptr) {
+    DEBUG_ASSERT(false);
+    coeffColor = Color(0.0f, 0.0f, 0.0f, 0.0f);
+    return;
+  }
+
+  coeffColor = Color(1.0f - (*src2Color).red, 1.0f - (*src2Color).green, 1.0f - (*src2Color).blue,
+                     1.0f - (*src2Color).alpha);
+}
+
+static void FormulaCoeffHandler_SRC2_ALPHA(const Color& srcColor, const Color* src2Color,
+                                           const Color& dstColor, Color& coeffColor) {
+  (void)srcColor;
+  (void)dstColor;
+  if (src2Color == nullptr) {
+    DEBUG_ASSERT(false);
+    coeffColor = Color(0.0f, 0.0f, 0.0f, 0.0f);
+    return;
+  }
+
+  coeffColor =
+      Color((*src2Color).alpha, (*src2Color).alpha, (*src2Color).alpha, (*src2Color).alpha);
+}
+
+static void FormulaCoeffHandler_ONE_MINUS_SRC2_ALPHA(const Color& srcColor, const Color* src2Color,
+                                                     const Color& dstColor, Color& coeffColor) {
+  (void)srcColor;
+  (void)dstColor;
+  if (src2Color == nullptr) {
+    DEBUG_ASSERT(false);
+    coeffColor = Color(0.0f, 0.0f, 0.0f, 0.0f);
+    return;
+  }
+
+  const float alpha = 1.0f - (*src2Color).alpha;
+  coeffColor = Color(alpha, alpha, alpha, alpha);
+}
+
+using FormulaCoeffHandler = void (*)(const Color& srcColor, const Color* src2Color,
+                                     const Color& dstColor, Color& coeffColor);
+
+static constexpr std::pair<BlendModeCoeff, FormulaCoeffHandler> FormulaCoeffHandlers[] = {
+    {BlendModeCoeff::One, FormulaCoeffHandler_ONE},
+    {BlendModeCoeff::SC, FormulaCoeffHandler_SRC_COLOR},
+    {BlendModeCoeff::ISC, FormulaCoeffHandler_ONE_MINUS_SRC_COLOR},
+    {BlendModeCoeff::DC, FormulaCoeffHandler_DST_COLOR},
+    {BlendModeCoeff::IDC, FormulaCoeffHandler_ONE_MINUS_DST_COLOR},
+    {BlendModeCoeff::SA, FormulaCoeffHandler_SRC_ALPHA},
+    {BlendModeCoeff::ISA, FormulaCoeffHandler_ONE_MINUS_SRC_ALPHA},
+    {BlendModeCoeff::DA, FormulaCoeffHandler_DST_ALPHA},
+    {BlendModeCoeff::IDA, FormulaCoeffHandler_ONE_MINUS_DST_ALPHA},
+    {BlendModeCoeff::S2C, FormulaCoeffHandler_SRC2_COLOR},
+    {BlendModeCoeff::IS2C, FormulaCoeffHandler_ONE_MINUS_SRC2_COLOR},
+    {BlendModeCoeff::S2A, FormulaCoeffHandler_SRC2_ALPHA},
+    {BlendModeCoeff::IS2A, FormulaCoeffHandler_ONE_MINUS_SRC2_ALPHA}};
+
+static bool MakeCoeffColor(const Color& srcColor, const Color* src2Color, const Color& dstColor,
+                           BlendModeCoeff blendModeCoeff, Color& coeffColor) {
+  for (const auto& [itemBlendModeCoeff, handler] : FormulaCoeffHandlers) {
+    if (itemBlendModeCoeff == blendModeCoeff) {
+      handler(srcColor, src2Color, dstColor, coeffColor);
       return true;
     }
   }
@@ -442,12 +657,77 @@ static bool TryApplyStandardBlend(const Color& srcColor, const Color& dstColor, 
 
 static bool TryApplyFormulaBlend(const Color& srcColor, const Color& dstColor, BlendMode blendMode,
                                  Color& outColor) {
-  //TODO: implement formula blending
-  if (srcColor.red == dstColor.red || blendMode == BlendMode::Clear) {
-    outColor = srcColor;
-    return true;
+  BlendFormula blendFormula = {};
+  if (BlendModeAsCoeff(blendMode, false, &blendFormula)) {
+    return false;
   }
-  return false;
+
+  const Color coverageColor(1.0f, 1.0f, 1.0f, 1.0f);
+  Color primaryOutputColor{0.0f, 0.0f, 0.0f, 0.0f};
+  if (!MakeCoveragedColor(srcColor, coverageColor, blendFormula.primaryOutputType(),
+                          primaryOutputColor)) {
+    DEBUG_ASSERT(false);
+    return false;
+  }
+
+  Color secondaryOutputColor(0.0f, 0.0f, 0.0f, 0.0f);
+  Color* secondaryOutputColorPtr = nullptr;
+  if (blendFormula.needSecondaryOutput()) {
+    if (!MakeCoveragedColor(srcColor, coverageColor, blendFormula.secondaryOutputType(),
+                            secondaryOutputColor)) {
+      DEBUG_ASSERT(false);
+      return false;
+    }
+    secondaryOutputColorPtr = &secondaryOutputColor;
+  }
+
+  Color coeffSrcColor(0.0f, 0.0f, 0.0f, 0.0f);
+  if (blendFormula.srcCoeff() != BlendModeCoeff::Zero) {
+    Color coeffColor(0.0f, 0.0f, 0.0f, 0.0f);
+    MakeCoeffColor(primaryOutputColor, secondaryOutputColorPtr, dstColor, blendFormula.srcCoeff(),
+                   coeffColor);
+    for (int i = 0; i < 4; ++i) {
+      coeffSrcColor.array()[i] = primaryOutputColor.array()[i] * coeffColor.array()[i];
+    }
+  }
+
+  Color coeffDstColor(0.0f, 0.0f, 0.0f, 0.0f);
+  if (blendFormula.dstCoeff() != BlendModeCoeff::Zero) {
+    Color coeffColor(0.0f, 0.0f, 0.0f, 0.0f);
+    MakeCoeffColor(primaryOutputColor, secondaryOutputColorPtr, dstColor, blendFormula.dstCoeff(),
+                   coeffColor);
+    for (int i = 0; i < 4; ++i) {
+      coeffDstColor.array()[i] = dstColor.array()[i] * coeffColor.array()[i];
+    }
+  }
+
+  switch (blendFormula.equation()) {
+    case BlendEquation::Add: {
+      for (int i = 0; i < 4; ++i) {
+        outColor.array()[i] =
+            std::clamp(coeffSrcColor.array()[i] + coeffDstColor.array()[i], 0.0f, 1.0f);
+      }
+      break;
+    }
+    case BlendEquation::Subtract: {
+      for (int i = 0; i < 4; ++i) {
+        outColor.array()[i] =
+            std::clamp(coeffSrcColor.array()[i] - coeffDstColor.array()[i], 0.0f, 1.0f);
+      }
+      break;
+    }
+    case BlendEquation::ReverseSubtract: {
+      for (int i = 0; i < 4; ++i) {
+        outColor.array()[i] =
+            std::clamp(coeffDstColor.array()[i] - coeffSrcColor.array()[i], 0.0f, 1.0f);
+      }
+      break;
+    }
+    default:
+      DEBUG_ASSERT(false);
+      return false;
+  }
+  return true;
 }
 
 void Blend(const Color& srcColor, const Color& dstColor, BlendMode blendMode, Color& outColor) {
