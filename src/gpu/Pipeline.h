@@ -20,7 +20,7 @@
 
 #include <unordered_map>
 #include "Swizzle.h"
-#include "gpu/Blend.h"
+#include "core/Blend.h"
 #include "gpu/ProgramCreator.h"
 #include "gpu/processors/EmptyXferProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"

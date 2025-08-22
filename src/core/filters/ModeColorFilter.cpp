@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ModeColorFilter.h"
+#include "core/CPUBlend.h"
 #include "core/utils/Types.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/XfermodeFragmentProcessor.h"
@@ -60,8 +61,11 @@ bool ModeColorFilter::asColorMode(Color* color, BlendMode* mode) const {
 }
 
 Color ModeColorFilter::filterColor(const Color& src) const {
-  // TODO: StarryThrone Complete Logic.
-  return {0, 0, 0, 0};
+  const Color blendSrc = color.premultiply();
+  const Color blendDst = src.premultiply();
+  Color blendResult = {};
+  CPUBlend::Blend(blendSrc, blendDst, mode, blendResult);
+  return blendResult.unpremultiply();
 }
 
 bool ModeColorFilter::isEqual(const ColorFilter* colorFilter) const {

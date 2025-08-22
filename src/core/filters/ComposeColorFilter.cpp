@@ -46,7 +46,7 @@ bool ComposeColorFilter::isAlphaUnchanged() const {
 
 Color ComposeColorFilter::filterColor(const Color& src) const {
   // TODO: StarryThrone Complete Logic.
-  return {0, 0, 0, 0};
+  return src;
 }
 
 bool ComposeColorFilter::isEqual(const ColorFilter* colorFilter) const {

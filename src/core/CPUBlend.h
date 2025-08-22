@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -17,30 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <string>
+#include "tgfx/core/BlendMode.h"
+#include "tgfx/core/Color.h"
 
-#include "core/Blend.h"
-#include "gpu/GPUTexture.h"
-#include "gpu/Program.h"
-#include "gpu/SamplerState.h"
-#include "gpu/UniformBuffer.h"
+namespace tgfx::CPUBlend {
 
-namespace tgfx {
-/**
- * ProgramCreator is an interface for creating GPU programs. It provides methods to compute the
- * key for the program and to create a Program instance.
- */
-class ProgramCreator {
- public:
-  virtual ~ProgramCreator() = default;
+void Blend(const Color& srcColor, const Color& dstColor, BlendMode blendMode, Color& outColor);
 
-  /**
-   * Computes the key for the program, which is used to cache the program in the GlobalCache.
-   */
-  virtual void computeProgramKey(Context* context, BytesKey* programKey) const = 0;
-
-  /**
-   * Creates a Program instance based on the current state of the ProgramCreator.
-   */
-  virtual std::unique_ptr<Program> createProgram(Context* context) const = 0;
-};
-}  // namespace tgfx
+}  // namespace tgfx::CPUBlend
