@@ -30,6 +30,7 @@
 #include "gpu/tasks/GPUBufferUploadTask.h"
 #include "gpu/tasks/ShapeBufferUploadTask.h"
 #include "gpu/tasks/TextureUploadTask.h"
+#include "proxies/HardwareTextureProxy.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -320,6 +321,26 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
   }
   addResourceProxy(textureProxy, uniqueKey);
   return textureProxy;
+}
+
+std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(HardwareBufferRef hardwareBuffer) {
+  auto size = HardwareBufferGetSize(hardwareBuffer);
+  if (size.isEmpty()) {
+    return nullptr;
+  }
+  YUVFormat yuvFormat = YUVFormat::Unknown;
+  auto formats = context->gpu()->getHardwareTextureFormats(hardwareBuffer, &yuvFormat);
+  if (formats.size() != 1 || yuvFormat != YUVFormat::Unknown) {
+    return nullptr;
+  }
+  auto format = formats.front();
+  if (!context->caps()->isFormatRenderable(format)) {
+    return nullptr;
+  }
+  auto proxy = std::shared_ptr<HardwareTextureProxy>(
+      new HardwareTextureProxy(hardwareBuffer, size.width, size.height, format));
+  addResourceProxy(proxy);
+  return proxy;
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::wrapExternalTexture(

@@ -18,10 +18,12 @@
 
 #pragma once
 
+#include <map>
 #include <memory>
 #include <set>
 #include "core/AtlasCell.h"
 #include "core/AtlasTypes.h"
+#include "core/PixelBuffer.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "tgfx/core/Size.h"
@@ -50,6 +52,8 @@ class Atlas {
 
   void removeExpiredKeys();
 
+  HardwareBufferRef getHardwareBuffer(const TextureProxy* proxy) const;
+
  private:
   Atlas(ProxyProvider* proxyProvider, PixelFormat pixelFormat, int width, int height, int plotWidth,
         int plotHeight, AtlasGenerationCounter* generationCounter);
@@ -73,6 +77,7 @@ class Atlas {
   PixelFormat pixelFormat = PixelFormat::Unknown;
   AtlasGenerationCounter* const generationCounter;
   std::vector<std::shared_ptr<TextureProxy>> textureProxies = {};
+  std::map<const TextureProxy*, std::shared_ptr<PixelBuffer>> hardwareBuffers = {};
   std::vector<Page> pages = {};
   AtlasToken previousFlushToken = AtlasToken::InvalidToken();
   uint32_t flushesSinceLastUse = 0;

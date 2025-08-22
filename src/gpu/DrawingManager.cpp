@@ -123,26 +123,46 @@ void DrawingManager::addResourceTask(PlacementPtr<ResourceTask> resourceTask) {
 }
 
 void DrawingManager::addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& textureProxy,
+                                           HardwareBufferRef hardwareBuffer,
                                            const Point& atlasOffset,
                                            std::shared_ptr<ImageCodec> codec) {
   if (textureProxy == nullptr || codec == nullptr) {
     return;
   }
   auto padding = Plot::CellPadding;
-  auto colorType = GetAtlasColorType(codec->isAlphaOnly());
-  auto dstInfo =
-      ImageInfo::Make(codec->width() + 2 * padding, codec->height() + 2 * padding, colorType);
-  auto length = dstInfo.byteSize();
-  auto buffer = new (std::nothrow) uint8_t[length];
-  if (buffer == nullptr) {
-    return;
+  void* dstPixels = nullptr;
+  auto dstWidth = codec->width() + 2 * padding;
+  auto dstHeight = codec->height() + 2 * padding;
+  ImageInfo dstInfo = {};
+  if (hardwareBuffer != nullptr) {
+    auto hardwareInfo = HardwareBufferGetInfo(hardwareBuffer);
+    dstInfo = hardwareInfo.makeIntersect(0, 0, dstWidth, dstHeight);
+    void* pixels = nullptr;
+    if (auto iter = atlasHardwareBuffers.find(textureProxy.get());
+        iter == atlasHardwareBuffers.end()) {
+      pixels = HardwareBufferLock(hardwareBuffer);
+      atlasHardwareBuffers.emplace(textureProxy.get(), std::make_pair(hardwareBuffer, pixels));
+    } else {
+      pixels = iter->second.second;
+    }
+    auto offsetX = static_cast<int>(atlasOffset.x) - padding;
+    auto offsetY = static_cast<int>(atlasOffset.y) - padding;
+    dstPixels = hardwareInfo.computeOffset(pixels, offsetX, offsetY);
+  } else {
+    auto colorType = GetAtlasColorType(codec->isAlphaOnly());
+    dstInfo = ImageInfo::Make(dstWidth, dstHeight, colorType);
+    auto length = dstInfo.byteSize();
+    dstPixels = drawingBuffer->allocate(length);
+    if (dstPixels == nullptr) {
+      return;
+    }
+    auto data = Data::MakeWithoutCopy(dstPixels, length);
+    auto uploadOffset = atlasOffset;
+    auto floatPadding = static_cast<float>(padding);
+    uploadOffset.offset(-floatPadding, -floatPadding);
+    atlasCellDatas[textureProxy].emplace_back(std::move(data), dstInfo, uploadOffset);
   }
-  auto data = Data::MakeAdopted(buffer, length, Data::DeleteProc);
-  auto uploadOffset = atlasOffset;
-  auto floatPadding = static_cast<float>(padding);
-  uploadOffset.offset(-floatPadding, -floatPadding);
-  atlasCellDatas[textureProxy].emplace_back(std::move(data), dstInfo, uploadOffset);
-  auto task = std::make_shared<AtlasCellDecodeTask>(std::move(codec), buffer, dstInfo, padding);
+  auto task = std::make_shared<AtlasCellDecodeTask>(std::move(codec), dstPixels, dstInfo, padding);
   atlasCellCodecTasks.emplace_back(std::move(task));
 }
 
@@ -166,7 +186,7 @@ std::shared_ptr<CommandBuffer> DrawingManager::flush(BackendSemaphore* signalSem
 
   if (resourceTasks.empty() && renderTasks.empty()) {
     proxyProvider->clearSharedVertexBuffer();
-    clearAtlasCellCodecTasks();
+    resetAtlasCache();
     return nullptr;
   }
   for (auto& task : resourceTasks) {
@@ -192,19 +212,22 @@ void DrawingManager::releaseAll() {
   compositors.clear();
   resourceTasks.clear();
   renderTasks.clear();
-  atlasCellCodecTasks.clear();
-  atlasCellDatas.clear();
+  resetAtlasCache();
 }
 
-void DrawingManager::clearAtlasCellCodecTasks() {
+void DrawingManager::resetAtlasCache() {
   atlasCellCodecTasks.clear();
   atlasCellDatas.clear();
+  atlasHardwareBuffers.clear();
 }
 
 void DrawingManager::uploadAtlasToGPU() {
   auto queue = context->gpu()->queue();
   for (auto& task : atlasCellCodecTasks) {
     task->wait();
+  }
+  for (auto& [_, buffer] : atlasHardwareBuffers) {
+    HardwareBufferUnlock(buffer.first);
   }
   for (auto& [textureProxy, cellDatas] : atlasCellDatas) {
     if (textureProxy == nullptr || cellDatas.empty()) {
@@ -224,7 +247,7 @@ void DrawingManager::uploadAtlasToGPU() {
       // Text atlas has no mipmaps, so we don't need to regenerate mipmaps.
     }
   }
-  clearAtlasCellCodecTasks();
+  resetAtlasCache();
 }
 
 }  // namespace tgfx

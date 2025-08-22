@@ -63,7 +63,8 @@ class DrawingManager {
   void addResourceTask(PlacementPtr<ResourceTask> resourceTask);
 
   void addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& textureProxy,
-                             const Point& atlasOffset, std::shared_ptr<ImageCodec> codec);
+                             HardwareBufferRef hardwareBuffer, const Point& atlasOffset,
+                             std::shared_ptr<ImageCodec> codec);
 
   void addSemaphoreWaitTask(std::shared_ptr<Semaphore> semaphore);
 
@@ -88,10 +89,11 @@ class DrawingManager {
   std::list<std::shared_ptr<OpsCompositor>> compositors = {};
   std::vector<std::shared_ptr<Task>> atlasCellCodecTasks = {};
   std::map<std::shared_ptr<TextureProxy>, std::vector<AtlasCellData>> atlasCellDatas = {};
+  std::map<const TextureProxy*, std::pair<HardwareBufferRef, void*>> atlasHardwareBuffers = {};
 
   void uploadAtlasToGPU();
 
-  void clearAtlasCellCodecTasks();
+  void resetAtlasCache();
 
   friend class OpsCompositor;
 };

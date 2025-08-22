@@ -18,40 +18,21 @@
 
 #pragma once
 
-#include <memory>
-#include "Atlas.h"
-#include "AtlasTypes.h"
+#include "gpu/proxies/TextureProxy.h"
+#include "tgfx/platform/HardwareBuffer.h"
 
 namespace tgfx {
-class AtlasManager : public AtlasGenerationCounter {
+class HardwareTextureProxy final : public TextureProxy {
  public:
-  explicit AtlasManager(Context* context);
+  std::shared_ptr<TextureView> getTextureView() const override;
 
-  const std::vector<std::shared_ptr<TextureProxy>>& getTextureProxies(MaskFormat maskFormat);
-
-  bool getCellLocator(MaskFormat, const BytesKey& key, AtlasCellLocator& locator) const;
-
-  bool addCellToAtlas(const AtlasCell& cell, AtlasToken nextFlushToken, AtlasLocator&) const;
-
-  void setPlotUseToken(PlotUseUpdater&, const PlotLocator&, MaskFormat, AtlasToken) const;
-
-  void preFlush();
-
-  void postFlush();
-
-  void releaseAll();
-
-  AtlasToken nextFlushToken() const;
-
-  HardwareBufferRef getHardwareBuffer(MaskFormat maskFormat, const TextureProxy* proxy) const;
+  ~HardwareTextureProxy() override;
 
  private:
-  bool initAtlas(MaskFormat format);
+  HardwareTextureProxy(HardwareBufferRef hardwareBuffer, int width, int height, PixelFormat format);
 
-  Atlas* getAtlas(MaskFormat format) const;
+  HardwareBufferRef hardwareBuffer = nullptr;
 
-  Context* context = nullptr;
-  std::unique_ptr<Atlas> atlases[MaskFormatCount];
-  AtlasTokenTracker atlasTokenTracker = {};
+  friend class ProxyProvider;
 };
 }  // namespace tgfx
