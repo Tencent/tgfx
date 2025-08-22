@@ -418,10 +418,16 @@ jobs:
         run: |
           cd ohos
           ohpm config set registry https://ohpm.openharmony.cn/ohpm/
-          ohpm install --all  
+          ohpm install --all
+
+      - name: Setup Environment
+        run: |
+          SDK_ROOT="${COMMANDLINE_TOOL_DIR}/sdk/default/openharmony"
+          echo "DEVECO_SDK_HOME=$SDK_ROOT" >> $GITHUB_ENV
+          echo "$SDK_ROOT/toolchains" >> $GITHUB_PATH    
 
   
-      - name: Install Dependencies & Build
+      - name: Build Harmony
         run: |
           cd ohos
           hvigorw --mode module \
