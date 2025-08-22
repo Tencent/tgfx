@@ -437,6 +437,12 @@ jobs:
           ls -l "$DEVECO_SDK_HOME"
           ls -l "$DEVECO_SDK_HOME/native" || true
 
+      - name: Check CLI/SDK version
+        run: |
+          hvigorw --version
+          cat $DEVECO_SDK_HOME/oh-uni-package.json | jq -r .version || true
+    
+
       - name: Build Harmony
         run: |
           cd ohos
