@@ -380,7 +380,7 @@ jobs:
           restore-keys: ohos-cli-
             
       - name: Install CLI Tools
-        if: steps.cli-cache.outputs.cache-hit != 'true'
+        if: steps.cli-tools-cache.outputs.cache-hit != 'true'
         run: |
           TOOLS_URL="https://pag.io/file/sdk/commandline-tools-mac-arm64-5.0.9.310.zip"
           curl -L -o /tmp/cmdtools.zip "$TOOLS_URL"
@@ -395,7 +395,7 @@ jobs:
           echo "COMMANDLINE_TOOL_DIR=${COMMANDLINE_TOOL_DIR}" >> $GITHUB_ENV
           
       - name: Save CLI Tools Cache
-        if: ${{ (github.event_name == 'push') && (steps.cli-cache.outputs.cache-hit != 'true') }}
+        if: ${{ (github.event_name == 'push') && (steps.cli-tools-cache.outputs.cache-hit != 'true') }}
         uses: actions/cache/save@v4
         with: 
           path: /opt/ohos-cmd-tools
@@ -419,7 +419,11 @@ jobs:
         with:
           version: '5.0.3'
           cache: true
-          components: 'all'   
+          components: 'all' 
+          
+      - name: Configure OpenHarmony SDK
+        run: |
+          echo "DEVECO_SDK_HOME=$OHOS_BASE_SDK_HOME" >> $GITHUB_ENV    
       
       - name: Install ohpm dependencies
         run: |
