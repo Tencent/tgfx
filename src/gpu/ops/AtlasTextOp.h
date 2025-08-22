@@ -33,7 +33,7 @@ class AtlasTextOp final : public DrawOp {
                                         uint32_t renderFlags,
                                         std::shared_ptr<TextureProxy> textureProxy);
 
-  void execute(RenderPass* renderPass) override;
+  void execute(RenderPass* renderPass, RenderTarget* renderTarget) override;
 
   bool hasCoverage() const override;
 

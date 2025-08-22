@@ -18,132 +18,73 @@
 
 #include "GLProgram.h"
 #include "gpu/opengl/GLGPU.h"
-#include "gpu/opengl/GLTexture.h"
-#include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
-GLProgram::GLProgram(unsigned programID, std::unique_ptr<GLUniformBuffer> uniformBuffer,
+GLProgram::GLProgram(unsigned programID, std::vector<Uniform> uniforms, std::vector<int> locations,
                      std::vector<Attribute> attributes, int vertexStride)
-    : programId(programID), uniformBuffer(std::move(uniformBuffer)),
+    : Program(std::make_unique<UniformBuffer>(uniforms)), programId(programID),
+      uniforms(std::move(uniforms)), uniformLocations(std::move(locations)),
       attributes(std::move(attributes)), _vertexStride(vertexStride) {
 }
 
 void GLProgram::onReleaseGPU() {
-  if (programId) {
+  if (programId > 0) {
     auto gl = GLFunctions::Get(context);
     gl->deleteProgram(programId);
   }
 }
 
-void GLProgram::updateUniformsAndTextureBindings(const RenderTarget* renderTarget,
-                                                 const Pipeline* pipeline) {
-  setRenderTargetState(renderTarget);
-  pipeline->getUniforms(uniformBuffer.get());
-  uniformBuffer->uploadToGPU(context);
-  auto samplers = pipeline->getSamplers();
-  int textureUnit = 0;
-  for (auto& info : samplers) {
-    bindTexture(textureUnit++, info.texture, info.state);
-  }
-}
-
-static std::array<float, 4> GetRTAdjustArray(int width, int height, bool flipY) {
-  std::array<float, 4> result = {};
-  result[0] = 2.f / static_cast<float>(width);
-  result[2] = 2.f / static_cast<float>(height);
-  result[1] = -1.f;
-  result[3] = -1.f;
-  if (flipY) {
-    result[2] = -result[2];
-    result[3] = -result[3];
-  }
-  return result;
-}
-
-void GLProgram::setRenderTargetState(const RenderTarget* renderTarget) {
-  int width = renderTarget->width();
-  int height = renderTarget->height();
-  auto origin = renderTarget->origin();
-  if (renderTargetState.width == width && renderTargetState.height == height &&
-      renderTargetState.origin == origin) {
+void GLProgram::setUniformBytes(const void* data, size_t size) {
+  if (data == nullptr || size == 0) {
     return;
   }
-  renderTargetState.width = width;
-  renderTargetState.height = height;
-  renderTargetState.origin = origin;
-  auto v = GetRTAdjustArray(width, height, origin == ImageOrigin::BottomLeft);
-  uniformBuffer->setData(RTAdjustName, v);
-}
-
-static int FilterToGLMagFilter(FilterMode filterMode) {
-  switch (filterMode) {
-    case FilterMode::Nearest:
-      return GL_NEAREST;
-    case FilterMode::Linear:
-      return GL_LINEAR;
-  }
-  return 0;
-}
-
-static int FilterToGLMinFilter(FilterMode filterMode, MipmapMode mipmapMode) {
-  switch (mipmapMode) {
-    case MipmapMode::None:
-      return FilterToGLMagFilter(filterMode);
-    case MipmapMode::Nearest:
-      switch (filterMode) {
-        case FilterMode::Nearest:
-          return GL_NEAREST_MIPMAP_NEAREST;
-        case FilterMode::Linear:
-          return GL_LINEAR_MIPMAP_NEAREST;
-      }
-    case MipmapMode::Linear:
-      switch (filterMode) {
-        case FilterMode::Nearest:
-          return GL_NEAREST_MIPMAP_LINEAR;
-        case FilterMode::Linear:
-          return GL_LINEAR_MIPMAP_LINEAR;
-      }
-  }
-  return 0;
-}
-
-static int GetGLWrap(unsigned target, SamplerState::WrapMode wrapMode) {
-  if (target == GL_TEXTURE_RECTANGLE) {
-    if (wrapMode == SamplerState::WrapMode::ClampToBorder) {
-      return GL_CLAMP_TO_BORDER;
-    }
-    return GL_CLAMP_TO_EDGE;
-  }
-  switch (wrapMode) {
-    case SamplerState::WrapMode::Clamp:
-      return GL_CLAMP_TO_EDGE;
-    case SamplerState::WrapMode::Repeat:
-      return GL_REPEAT;
-    case SamplerState::WrapMode::MirrorRepeat:
-      return GL_MIRRORED_REPEAT;
-    case SamplerState::WrapMode::ClampToBorder:
-      return GL_CLAMP_TO_BORDER;
-  }
-  return 0;
-}
-
-void GLProgram::bindTexture(int unitIndex, GPUTexture* texture, SamplerState samplerState) {
-  if (texture == nullptr) {
-    return;
-  }
+  auto buffer = reinterpret_cast<uint8_t*>(const_cast<void*>(data));
   auto gl = GLFunctions::Get(context);
-  auto glTexture = static_cast<const GLTexture*>(texture);
-  auto target = glTexture->target();
-  gl->activeTexture(static_cast<unsigned>(GL_TEXTURE0 + unitIndex));
-  gl->bindTexture(target, glTexture->textureID());
-  gl->texParameteri(target, GL_TEXTURE_WRAP_S, GetGLWrap(target, samplerState.wrapModeX));
-  gl->texParameteri(target, GL_TEXTURE_WRAP_T, GetGLWrap(target, samplerState.wrapModeY));
-  if (samplerState.mipmapped() &&
-      (!context->caps()->mipmapSupport || glTexture->mipLevelCount() <= 1)) {
-    samplerState.mipmapMode = MipmapMode::None;
+  size_t index = 0;
+  size_t offset = 0;
+  for (auto& uniform : uniforms) {
+    auto location = uniformLocations[index];
+    switch (uniform.type()) {
+      case SLType::Float:
+        gl->uniform1fv(location, 1, reinterpret_cast<float*>(buffer + offset));
+        break;
+      case SLType::Float2:
+        gl->uniform2fv(location, 1, reinterpret_cast<float*>(buffer + offset));
+        break;
+      case SLType::Float3:
+        gl->uniform3fv(location, 1, reinterpret_cast<float*>(buffer + offset));
+        break;
+      case SLType::Float4:
+        gl->uniform4fv(location, 1, reinterpret_cast<float*>(buffer + offset));
+        break;
+      case SLType::Float2x2:
+        gl->uniformMatrix2fv(location, 1, GL_FALSE, reinterpret_cast<float*>(buffer + offset));
+        break;
+      case SLType::Float3x3:
+        gl->uniformMatrix3fv(location, 1, GL_FALSE, reinterpret_cast<float*>(buffer + offset));
+        break;
+      case SLType::Float4x4:
+        gl->uniformMatrix4fv(location, 1, GL_FALSE, reinterpret_cast<float*>(buffer + offset));
+        break;
+      case SLType::Int:
+        gl->uniform1iv(location, 1, reinterpret_cast<int*>(buffer + offset));
+        break;
+      case SLType::Int2:
+        gl->uniform2iv(location, 1, reinterpret_cast<int*>(buffer + offset));
+        break;
+      case SLType::Int3:
+        gl->uniform3iv(location, 1, reinterpret_cast<int*>(buffer + offset));
+        break;
+      case SLType::Int4:
+        gl->uniform4iv(location, 1, reinterpret_cast<int*>(buffer + offset));
+        break;
+      default:
+        LOGE("GLProgram::setUniformBytes() unsupported uniform type: %d",
+             static_cast<int>(uniform.type()));
+        break;
+    }
+    index++;
+    offset += uniform.size();
   }
-  gl->texParameteri(target, GL_TEXTURE_MIN_FILTER,
-                    FilterToGLMinFilter(samplerState.filterMode, samplerState.mipmapMode));
-  gl->texParameteri(target, GL_TEXTURE_MAG_FILTER, FilterToGLMagFilter(samplerState.filterMode));
 }
 }  // namespace tgfx

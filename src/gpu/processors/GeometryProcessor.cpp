@@ -17,42 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GeometryProcessor.h"
-#include "core/utils/Algin.h"
 
 namespace tgfx {
 static constexpr char TRANSFORM_UNIFORM_PREFIX[] = "CoordTransformMatrix_";
-
-/**
- * Returns the size of the attrib type in bytes.
- */
-static constexpr size_t VertexAttribTypeSize(SLType type) {
-  switch (type) {
-    case SLType::Float:
-      return sizeof(float);
-    case SLType::Float2:
-      return 2 * sizeof(float);
-    case SLType::Float3:
-      return 3 * sizeof(float);
-    case SLType::Float4:
-      return 4 * sizeof(float);
-    case SLType::Int:
-      return sizeof(int32_t);
-    case SLType::Int2:
-      return 2 * sizeof(int32_t);
-    case SLType::Int3:
-      return 3 * sizeof(int32_t);
-    case SLType::Int4:
-      return 4 * sizeof(int32_t);
-    case SLType::UByte4Color:
-      return 4 * sizeof(uint8_t);
-    default:
-      return 0;
-  }
-}
-
-size_t GeometryProcessor::Attribute::sizeAlign4() const {
-  return Align4(VertexAttribTypeSize(_gpuType));
-}
 
 void GeometryProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) const {
   bytesKey->write(classID());

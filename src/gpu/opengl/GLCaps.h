@@ -115,7 +115,7 @@ class GLCaps : public Caps {
 
   const GLTextureFormat& getTextureFormat(PixelFormat pixelFormat) const;
 
-  const Swizzle& getReadSwizzle(PixelFormat pixelFormat) const;
+  const Swizzle& getReadSwizzle(PixelFormat pixelFormat) const override;
 
   const Swizzle& getWriteSwizzle(PixelFormat pixelFormat) const override;
 

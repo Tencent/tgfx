@@ -33,7 +33,7 @@ class CornerPinEffect : public RuntimeEffect {
   static std::shared_ptr<CornerPinEffect> Make(const Point& upperLeft, const Point& upperRight,
                                                const Point& lowerRight, const Point& lowerLeft);
 
-  uint32_t programID() const override;
+  DEFINE_RUNTIME_EFFECT_PROGRAM_ID
 
   int sampleCount() const override {
     return 4;

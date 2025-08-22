@@ -21,37 +21,50 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "gpu/ShaderVar.h"
 #include "tgfx/core/Matrix.h"
 
 namespace tgfx {
 /**
- * Reflected description of a uniform variable in the GPU program.
+ * Represents a uniform variable in a GPU program.
  */
-struct Uniform {
+class Uniform {
+ public:
   /**
-   * Possible types of a uniform variable.
+   * Default constructor for Uniform.
    */
-  enum class Type {
-    Float,
-    Float2,
-    Float3,
-    Float4,
-    Float2x2,
-    Float3x3,
-    Float4x4,
-    Int,
-    Int2,
-    Int3,
-    Int4,
-  };
-
-  std::string name;
-  Type type;
+  Uniform() = default;
 
   /**
-   * Returns the size of the uniform in bytes.
+   * Creates a uniform variable with the specified name, type, and visibility.
    */
-  size_t size() const;
+  Uniform(std::string name, SLType type) : _name(std::move(name)), _type(type) {
+  }
+
+  /**
+   * The name of the uniform variable.
+   */
+  const std::string& name() const {
+    return _name;
+  }
+
+  /**
+   * The type of the uniform variable.
+   */
+  SLType type() const {
+    return _type;
+  }
+
+  /**
+   * Returns the size of the uniform variable in bytes.
+   */
+  size_t size() const {
+    return GetSLTypeSize(_type);
+  }
+
+ private:
+  std::string _name = {};
+  SLType _type = SLType::Void;
 };
 
 /**
@@ -64,7 +77,7 @@ class UniformBuffer {
    */
   explicit UniformBuffer(std::vector<Uniform> uniforms);
 
-  virtual ~UniformBuffer() = default;
+  ~UniformBuffer();
 
   /**
    * Copies value into the uniform buffer. The data must have the same size as the uniform specified
@@ -81,19 +94,26 @@ class UniformBuffer {
    */
   void setData(const std::string& name, const Matrix& matrix);
 
- protected:
-  std::vector<Uniform> uniforms = {};
-  std::vector<size_t> offsets = {};
+  /**
+   * Returns a pointer to the start of the uniform buffer in memory.
+   */
+  const void* data() const {
+    return _buffer;
+  }
 
   /**
-   * Copies data into the uniform buffer. The data must have the same size as the uniform specified
-   * by name.
+   * Returns the size of the uniform buffer in bytes.
    */
-  virtual void onCopyData(size_t index, size_t offset, size_t size, const void* data) = 0;
+  size_t size() const {
+    return offsets.back();
+  }
 
  private:
-  std::string nameSuffix = "";
+  uint8_t* _buffer = nullptr;
+  std::vector<Uniform> uniforms = {};
+  std::vector<size_t> offsets = {};
   std::unordered_map<std::string, size_t> uniformMap = {};
+  std::string nameSuffix = "";
 
   void onSetData(const std::string& name, const void* data, size_t size);
 

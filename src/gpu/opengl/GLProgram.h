@@ -22,18 +22,17 @@
 #include "gpu/Pipeline.h"
 #include "gpu/Program.h"
 #include "gpu/SLType.h"
-#include "gpu/opengl/GLUniformHandler.h"
 
 namespace tgfx {
+struct Attribute {
+  SLType gpuType = SLType::Float;
+  size_t offset = 0;
+  int location = 0;
+};
+
 class GLProgram : public Program {
  public:
-  struct Attribute {
-    SLType gpuType = SLType::Float;
-    size_t offset = 0;
-    int location = 0;
-  };
-
-  GLProgram(unsigned programID, std::unique_ptr<GLUniformBuffer> uniformBuffer,
+  GLProgram(unsigned programID, std::vector<Uniform> uniforms, std::vector<int> locations,
             std::vector<Attribute> attributes, int vertexStride);
 
   /**
@@ -43,14 +42,6 @@ class GLProgram : public Program {
     return programId;
   }
 
-  /**
-   * This function uploads uniforms, calls each GL*Processor's setData. It binds all fragment
-   * processor textures.
-   *
-   * It is the caller's responsibility to ensure the program is bound before calling.
-   */
-  void updateUniformsAndTextureBindings(const RenderTarget* renderTarget, const Pipeline* pipeline);
-
   int vertexStride() const {
     return _vertexStride;
   }
@@ -59,24 +50,16 @@ class GLProgram : public Program {
     return attributes;
   }
 
+  void setUniformBytes(const void* data, size_t size);
+
  protected:
   void onReleaseGPU() override;
 
  private:
-  struct RenderTargetState {
-    std::optional<int> width;
-    std::optional<int> height;
-    std::optional<ImageOrigin> origin;
-  };
-
-  RenderTargetState renderTargetState;
   unsigned programId = 0;
-  std::unique_ptr<GLUniformBuffer> uniformBuffer = nullptr;
-  std::vector<Attribute> attributes;
+  std::vector<Uniform> uniforms = {};
+  std::vector<int> uniformLocations = {};
+  std::vector<Attribute> attributes = {};
   int _vertexStride = 0;
-
-  void setRenderTargetState(const RenderTarget* renderTarget);
-
-  void bindTexture(int unitIndex, GPUTexture* texture, SamplerState samplerState = {});
 };
 }  // namespace tgfx

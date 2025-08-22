@@ -57,7 +57,7 @@ RectDrawOp::RectDrawOp(RectsVertexProvider* provider)
   hasSubset = provider->hasSubset();
 }
 
-void RectDrawOp::execute(RenderPass* renderPass) {
+void RectDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   std::shared_ptr<IndexBuffer> indexBuffer = nullptr;
   if (indexBufferProxy) {
     indexBuffer = indexBufferProxy->getBuffer();
@@ -69,12 +69,11 @@ void RectDrawOp::execute(RenderPass* renderPass) {
   if (vertexBuffer == nullptr) {
     return;
   }
-  auto renderTarget = renderPass->getRenderTarget();
-  auto drawingBuffer = renderPass->getContext()->drawingBuffer();
+  auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
   auto gp = QuadPerEdgeAAGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
                                                  renderTarget->height(), aaType, commonColor,
                                                  uvMatrix, hasSubset);
-  auto pipeline = createPipeline(renderPass, std::move(gp));
+  auto pipeline = createPipeline(renderTarget, std::move(gp));
   renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
   renderPass->bindBuffers(indexBuffer ? indexBuffer->gpuBuffer() : nullptr,
                           vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());

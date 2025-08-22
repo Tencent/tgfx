@@ -18,11 +18,7 @@
 
 #pragma once
 
-#include "core/Blend.h"
-#include "gpu/GPUTexture.h"
 #include "gpu/Program.h"
-#include "gpu/SamplerState.h"
-#include "gpu/UniformBuffer.h"
 
 namespace tgfx {
 /**

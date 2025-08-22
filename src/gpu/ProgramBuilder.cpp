@@ -191,10 +191,6 @@ void ProgramBuilder::nameExpression(std::string* output, const std::string& base
   *output = outName;
 }
 
-std::string ProgramBuilder::getUniformDeclarations(ShaderFlags visibility) const {
-  return uniformHandler()->getUniformDeclarations(visibility);
-}
-
 void ProgramBuilder::finalizeShaders() {
   varyingHandler()->finalize();
   vertexShaderBuilder()->finalize(ShaderFlags::Vertex);

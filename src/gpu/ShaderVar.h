@@ -44,11 +44,11 @@ class ShaderVar {
 
   ShaderVar() = default;
 
-  ShaderVar(std::string name, SLType type) : _type(type), _name(std::move(name)) {
+  ShaderVar(const std::string& name, SLType type) : _type(type), _name(name) {
   }
 
-  ShaderVar(std::string name, SLType type, TypeModifier typeModifier)
-      : _type(type), _typeModifier(typeModifier), _name(std::move(name)) {
+  ShaderVar(const std::string& name, SLType type, TypeModifier typeModifier)
+      : _type(type), _typeModifier(typeModifier), _name(name) {
   }
 
   void setName(const std::string& name) {
