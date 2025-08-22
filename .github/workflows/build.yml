@@ -418,7 +418,7 @@ jobs:
         uses: openharmony-rs/setup-ohos-sdk@v0.2
         with:
           version: '5.0.3'
-          cache: true
+          cache: false
           components: 'all' 
           
       - name: Configure OpenHarmony SDK
@@ -430,6 +430,12 @@ jobs:
           cd ohos
           ohpm config set registry https://ohpm.openharmony.cn/ohpm/
           ohpm install --all
+
+      - name: Debug SDK contents
+        run: |
+          echo "DEVECO_SDK_HOME=$DEVECO_SDK_HOME"
+          ls -l "$DEVECO_SDK_HOME"
+          ls -l "$DEVECO_SDK_HOME/native" || true
 
       - name: Build Harmony
         run: |
