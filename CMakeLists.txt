@@ -29,8 +29,8 @@ if (NOT WEB OR EMSCRIPTEN_PTHREADS)
     option(TGFX_USE_THREADS "Enable support for multithreaded rendering" ON)
 endif ()
 
-if (CMAKE_BUILD_TYPE MATCHES "Debug")
-#    option(TGFX_USE_INSPECTOR "Enable profiling support for the TGFX Inspector tool" ON)
+if (CMAKE_BUILD_TYPE MATCHES "Debug" AND NOT TGFX_USE_VCPKG)
+    option(TGFX_USE_INSPECTOR "Enable profiling support for the TGFX Inspector tool" ON)
 endif ()
 
 if (APPLE OR (WEB AND NOT TGFX_USE_THREADS))
@@ -63,7 +63,7 @@ else ()
     set(CLION_IDE OFF)
 endif ()
 get_directory_property(HasParent PARENT_DIRECTORY)
-if (MACOS AND CLION_IDE AND NOT HasParent AND NOT TGFX_USE_VCPKG)
+if (MACOS AND CLION_IDE AND NOT HasParent)
     # CLion project needs test targets.
     option(TGFX_BUILD_TESTS "Enable building tgfx test targets" ON)
 endif ()
@@ -111,6 +111,7 @@ message("TGFX_BUILD_TESTS: ${TGFX_BUILD_TESTS}")
 message("TGFX_USE_INSPECTOR: ${TGFX_USE_INSPECTOR}")
 message("TGFX_BUILD_FRAMEWORK: ${TGFX_BUILD_FRAMEWORK}")
 message("TGFX_TEXT_GAMMA_CORRECTION: ${TGFX_TEXT_GAMMA_CORRECTION}")
+message("TGFX_USE_VCPKG: ${TGFX_USE_VCPKG}")
 
 if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
     if (DEPLOYMENT_TARGET)
@@ -147,6 +148,16 @@ file(GLOB PLATFORM_COMMON_FILES
         src/core/vectors/*.*
         src/platform/*.*)
 list(APPEND TGFX_FILES ${PLATFORM_COMMON_FILES})
+
+if(TGFX_USE_VCPKG)
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+        set(VCPKG_LIB_DIR ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/debug/lib)
+    else()
+        set(VCPKG_LIB_DIR ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib)
+    endif()
+    set(VCPKG_INCLUDE_DIR ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/include)
+    list(APPEND TGFX_INCLUDES ${VCPKG_INCLUDE_DIR})
+endif()
 
 if (TGFX_BUILD_SVG)
     file(GLOB_RECURSE SVG_FILES
@@ -228,6 +239,15 @@ if (TGFX_USE_JPEG)
     if(NOT TGFX_USE_VCPKG)
         list(APPEND TGFX_STATIC_VENDORS libjpeg-turbo)
         list(APPEND TGFX_INCLUDES third_party/out/libjpeg-turbo/${INCLUDE_ENTRY})
+    else()
+        find_library(JPEG_LIB 
+            NAMES jpeg libjpeg
+            PATHS ${VCPKG_LIB_DIR}
+            NO_DEFAULT_PATH)
+        if(NOT JPEG_LIB)
+            message(FATAL_ERROR "JPEG library not found in vcpkg")
+        endif()
+        list(APPEND TGFX_STATIC_LIBS ${JPEG_LIB})
     endif()
     file(GLOB_RECURSE GFX_PLATFORM_FILES src/core/codecs/jpeg/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
@@ -237,6 +257,26 @@ if (TGFX_USE_WEBP)
     if(NOT TGFX_USE_VCPKG)
         list(APPEND TGFX_STATIC_VENDORS libwebp)
         list(APPEND TGFX_INCLUDES third_party/libwebp/src)
+    else()
+        find_library(WEBP_LIB 
+            NAMES webp libwebp
+            PATHS ${VCPKG_LIB_DIR}
+            NO_DEFAULT_PATH
+        )
+        find_library(WEBPDEMUX_LIB 
+            NAMES webpdemux libwebpdemux
+            PATHS ${VCPKG_LIB_DIR}
+            NO_DEFAULT_PATH
+        )
+        find_library(SHARPYUV_LIB 
+            NAMES sharpyuv libsharpyuv
+            PATHS ${VCPKG_LIB_DIR}
+            NO_DEFAULT_PATH
+        )
+        if(NOT WEBP_LIB OR NOT WEBPDEMUX_LIB OR NOT SHARPYUV_LIB)
+            message(FATAL_ERROR "WebP libraries not found in vcpkg")
+        endif()
+        list(APPEND TGFX_STATIC_LIBS ${WEBP_LIB} ${WEBPDEMUX_LIB} ${SHARPYUV_LIB})
     endif()
     file(GLOB_RECURSE GFX_PLATFORM_FILES src/core/codecs/webp/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
@@ -247,6 +287,16 @@ if (TGFX_USE_PNG)
     if(NOT TGFX_USE_VCPKG)
         list(APPEND TGFX_STATIC_VENDORS libpng)
         list(APPEND TGFX_INCLUDES third_party/out/libpng/${INCLUDE_ENTRY})
+    else()
+        find_library(PNG_LIB 
+            NAMES png libpng png16 libpng16 png16d libpng16d
+            PATHS ${VCPKG_LIB_DIR}
+            NO_DEFAULT_PATH
+        )
+        if(NOT PNG_LIB)
+            message(FATAL_ERROR "PNG library not found in vcpkg")
+        endif()
+        list(APPEND TGFX_STATIC_LIBS ${PNG_LIB})
     endif()
     file(GLOB_RECURSE GFX_PLATFORM_FILES src/core/codecs/png/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
@@ -265,6 +315,16 @@ if (TGFX_USE_ZLIB)
     if(NOT TGFX_USE_VCPKG)
         list(APPEND TGFX_STATIC_VENDORS zlib)
         list(APPEND TGFX_INCLUDES third_party/out/zlib/${INCLUDE_ENTRY})
+    else()
+        find_library(ZLIB_LIB 
+            NAMES libz z zlib zlibd libzd zd
+            PATHS ${VCPKG_LIB_DIR}
+            NO_DEFAULT_PATH
+        )
+        if(NOT ZLIB_LIB)
+            message(FATAL_ERROR "ZLIB library not found in vcpkg")
+        endif()
+        list(APPEND TGFX_STATIC_LIBS ${ZLIB_LIB})
     endif()
 endif ()
 
@@ -277,6 +337,16 @@ if (TGFX_USE_FREETYPE)
     if(NOT TGFX_USE_VCPKG)
         list(APPEND TGFX_STATIC_VENDORS freetype)
         list(APPEND TGFX_INCLUDES third_party/freetype/include)
+    else()
+        find_library(FREETYPE_LIB 
+            NAMES freetype libfreetype freetyped libfreetyped
+            PATHS ${VCPKG_LIB_DIR}
+            NO_DEFAULT_PATH
+        )
+        if(NOT FREETYPE_LIB)
+            message(FATAL_ERROR "FreeType library not found in vcpkg")
+        endif()
+        list(APPEND TGFX_STATIC_LIBS ${FREETYPE_LIB})
     endif()
     file(GLOB_RECURSE GFX_PLATFORM_FILES src/core/vectors/freetype/*.*)
     list(APPEND TGFX_FILES ${GFX_PLATFORM_FILES})
@@ -320,6 +390,16 @@ if (TGFX_USE_INSPECTOR)
     if(NOT TGFX_USE_VCPKG)
         list(APPEND TGFX_INCLUDES third_party/flatbuffers/include)
         list(APPEND TGFX_STATIC_VENDORS flatbuffers)
+    else()
+        find_library(FLATBUFFERS_LIB 
+            NAMES flatbuffers libflatbuffers
+            PATHS ${VCPKG_LIB_DIR}
+            NO_DEFAULT_PATH
+        )
+        if(NOT FLATBUFFERS_LIB)
+            message(FATAL_ERROR "FlatBuffers library not found in vcpkg")
+        endif()
+        list(APPEND TGFX_STATIC_LIBS ${FLATBUFFERS_LIB})
     endif()
     file(GLOB_RECURSE SERIALIZATION_FILE src/serialization/*.*)
     list(APPEND TGFX_FILES ${SERIALIZATION_FILE})
@@ -364,6 +444,8 @@ list(APPEND TGFX_STATIC_VENDORS skcms)
 list(APPEND TGFX_INCLUDES third_party/skcms)
 if(NOT TGFX_USE_VCPKG)
     list(APPEND TGFX_INCLUDES third_party/concurrentqueue)
+else()
+    list(APPEND TGFX_INCLUDES ${VCPKG_INCLUDE_DIR}/concurrentqueue/moodycamel)
 endif()
 list(APPEND TGFX_STATIC_VENDORS highway)
 list(APPEND TGFX_INCLUDES third_party/highway)
@@ -371,12 +453,46 @@ if (TGFX_BUILD_SVG)
     if (NOT TGFX_USE_VCPKG)
         list(APPEND TGFX_STATIC_VENDORS expat)
         list(APPEND TGFX_INCLUDES third_party/expat/expat/lib)
+    else()
+        set(EXPATNAMES expat expatw libexpat libexpatw)
+        set(DEBUGEXPATNAMES)
+        foreach(_CRT "" MT MD)
+            foreach(name IN LISTS EXPATNAMES)
+                list(APPEND EXPATNAMES ${name}${_CRT})
+                list(APPEND DEBUGEXPATNAMES ${name}d${_CRT})
+            endforeach()
+        endforeach()
+        find_library(EXPAT_LIB 
+            NAMES ${DEBUGEXPATNAMES} ${EXPATNAMES}
+            PATHS ${VCPKG_LIB_DIR}
+            NO_DEFAULT_PATH
+        )
+        if(NOT EXPAT_LIB)
+            message(FATAL_ERROR "Expat library not found in vcpkg")
+        endif()
+        list(APPEND TGFX_STATIC_LIBS ${EXPAT_LIB})
     endif ()
 endif ()
 if (TGFX_BUILD_PDF)
     if (NOT TGFX_USE_VCPKG)
         list(APPEND TGFX_STATIC_VENDORS harfbuzz)
         list(APPEND TGFX_INCLUDES third_party/harfbuzz/src)
+    else()
+        find_library(HARFBUZZ_LIB 
+            NAMES harfbuzz libharfbuzz
+            PATHS ${VCPKG_LIB_DIR}
+            NO_DEFAULT_PATH
+        )
+        find_library(HARFBUZZ_SUBSET_LIB 
+            NAMES harfbuzz-subset libharfbuzz-subset
+            PATHS ${VCPKG_LIB_DIR}
+            NO_DEFAULT_PATH
+        )
+        if(NOT HARFBUZZ_LIB OR NOT HARFBUZZ_SUBSET_LIB)
+            message(FATAL_ERROR "HarfBuzz library not found in vcpkg")
+        endif()
+        list(APPEND TGFX_INCLUDES ${VCPKG_INCLUDE_DIR}/harfbuzz)
+        list(APPEND TGFX_TEST_LIBS ${HARFBUZZ_LIB} ${HARFBUZZ_SUBSET_LIB})
     endif ()
     if (NOT (APPLE OR WIN32 OR LINUX))
         list(APPEND TGFX_INCLUDES third_party/digestpp)
@@ -534,128 +650,6 @@ elseif (CMAKE_HOST_SYSTEM_NAME MATCHES "Linux")
     endif ()
 endif ()
 
-if(TGFX_USE_VCPKG)
-    if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-        set(VCPKG_LIB_DIR ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/debug/lib)
-    else()
-        set(VCPKG_LIB_DIR ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/lib)
-    endif()
-    set(VCPKG_INCLUDE_DIR ${VCPKG_INSTALLED_DIR}/${VCPKG_TARGET_TRIPLET}/include)
-    list(APPEND TGFX_INCLUDES ${VCPKG_INCLUDE_DIR})
-
-    if(TGFX_USE_JPEG)
-        find_library(JPEG_LIB 
-            NAMES jpeg libjpeg
-            PATHS ${VCPKG_LIB_DIR}
-            NO_DEFAULT_PATH)
-        if(NOT JPEG_LIB)
-            message(FATAL_ERROR "JPEG library not found in vcpkg")
-        endif()
-        list(APPEND TGFX_STATIC_LIBS ${JPEG_LIB})
-    endif()
-    
-    if(TGFX_USE_WEBP)
-        find_library(WEBP_LIB 
-            NAMES webp libwebp
-            PATHS ${VCPKG_LIB_DIR}
-            NO_DEFAULT_PATH
-        )
-        find_library(WEBPDEMUX_LIB 
-            NAMES webpdemux libwebpdemux
-            PATHS ${VCPKG_LIB_DIR}
-            NO_DEFAULT_PATH
-        )
-        find_library(WEBPMUX_LIB 
-            NAMES webpmux libwebpmux
-            PATHS ${VCPKG_LIB_DIR}
-            NO_DEFAULT_PATH
-        )
-        find_library(SHARPYUV_LIB 
-            NAMES sharpyuv libsharpyuv
-            PATHS ${VCPKG_LIB_DIR}
-            NO_DEFAULT_PATH
-        )
-        if(NOT WEBP_LIB OR NOT WEBPDEMUX_LIB OR NOT WEBPMUX_LIB OR NOT SHARPYUV_LIB)
-            message(FATAL_ERROR "WebP libraries not found in vcpkg")
-        endif()
-        list(APPEND TGFX_STATIC_LIBS ${WEBP_LIB} ${WEBPDEMUX_LIB} ${WEBPMUX_LIB} ${SHARPYUV_LIB})
-    endif()
-    
-    if(TGFX_USE_PNG)
-        find_library(PNG_LIB 
-            NAMES png libpng png16 libpng16 png16d libpng16d
-            PATHS ${VCPKG_LIB_DIR}
-            NO_DEFAULT_PATH
-        )
-        if(NOT PNG_LIB)
-            message(FATAL_ERROR "PNG library not found in vcpkg")
-        endif()
-        list(APPEND TGFX_STATIC_LIBS ${PNG_LIB})
-    endif()
-    
-    if(TGFX_USE_ZLIB)
-        find_library(ZLIB_LIB 
-            NAMES libz z zlib zlibd libzd zd
-            PATHS ${VCPKG_LIB_DIR}
-            NO_DEFAULT_PATH
-        )
-        if(NOT ZLIB_LIB)
-            message(FATAL_ERROR "ZLIB library not found in vcpkg")
-        endif()
-        list(APPEND TGFX_STATIC_LIBS ${ZLIB_LIB})
-    endif()
-    
-    if(TGFX_USE_FREETYPE)
-        find_library(FREETYPE_LIB 
-            NAMES freetype libfreetype freetyped libfreetyped
-            PATHS ${VCPKG_LIB_DIR}
-            NO_DEFAULT_PATH
-        )
-        if(NOT FREETYPE_LIB)
-            message(FATAL_ERROR "FreeType library not found in vcpkg")
-        endif()
-        list(APPEND TGFX_STATIC_LIBS ${FREETYPE_LIB})
-    endif()
-    
-    if(TGFX_USE_INSPECTOR)
-        find_library(FLATBUFFERS_LIB 
-            NAMES flatbuffers libflatbuffers
-            PATHS ${VCPKG_LIB_DIR}
-            NO_DEFAULT_PATH
-        )
-        if(NOT FLATBUFFERS_LIB)
-            message(FATAL_ERROR "FlatBuffers library not found in vcpkg")
-        endif()
-        list(APPEND TGFX_STATIC_LIBS ${FLATBUFFERS_LIB})
-    endif()
-
-    if (NOT APPLE AND NOT OHOS AND (NOT WEB OR EMSCRIPTEN_PTHREADS))
-        find_package(Stb REQUIRED)
-    endif()
-
-    if (TGFX_BUILD_SVG)
-        set(EXPATNAMES expat expatw libexpat libexpatw)
-        set(DEBUGEXPATNAMES)
-        foreach(_CRT "" MT MD)
-            foreach(name IN LISTS EXPATNAMES)
-                list(APPEND EXPATNAMES ${name}${_CRT})
-                list(APPEND DEBUGEXPATNAMES ${name}d${_CRT})
-            endforeach()
-        endforeach()
-        find_library(EXPAT_LIB 
-            NAMES ${DEBUGEXPATNAMES} ${EXPATNAMES}
-            PATHS ${VCPKG_LIB_DIR}
-            NO_DEFAULT_PATH
-        )
-        if(NOT EXPAT_LIB)
-            message(FATAL_ERROR "Expat library not found in vcpkg")
-        endif()
-        list(APPEND TGFX_STATIC_LIBS ${EXPAT_LIB})
-    endif ()
-
-    list(APPEND TGFX_INCLUDES ${VCPKG_INCLUDE_DIR}/concurrentqueue/moodycamel)
-endif()
-
 add_vendor_target(tgfx-vendor STATIC_VENDORS ${TGFX_STATIC_VENDORS} SHARED_VENDORS ${TGFX_SHARED_VENDORS})
 find_vendor_libraries(tgfx-vendor STATIC TGFX_VENDOR_STATIC_LIBRARIES SHARED TGFX_VENDOR_SHARED_LIBRARIES)
 list(APPEND TGFX_STATIC_LIBS ${TGFX_VENDOR_STATIC_LIBRARIES})
@@ -783,28 +777,25 @@ if (TGFX_BUILD_TESTS)
 
     file(GLOB_RECURSE TGFX_TEST_FILES test/src/*.*)
     list(APPEND TGFX_TEST_LIBS tgfx-drawers tgfx ${TGFX_SHARED_LIBS})
-    if (TGFX_USE_VCPKG)
-        find_package(nlohmann_json REQUIRED)
-        list(APPEND TGFX_TEST_INCLUDES ${VCPKG_INCLUDE_DIR})
-        list(APPEND TGFX_TEST_INCLUDES src test/src)
-    else ()
-        if(NOT TGFX_USE_VCPKG)
-            list(APPEND TGFX_TEST_INCLUDES src test/src third_party/json/include)
-        else ()
-            list(APPEND TGFX_TEST_INCLUDES src test/src)
-        endif ()
-    endif ()
 
     if (TGFX_USE_VCPKG)
+        list(APPEND TGFX_TEST_INCLUDES src test/src)
+
         find_library(HARFBUZZ_LIB 
             NAMES harfbuzz libharfbuzz
             PATHS ${VCPKG_LIB_DIR}
             NO_DEFAULT_PATH
         )
-        if(NOT HARFBUZZ_LIB)
+        find_library(HARFBUZZ_SUBSET_LIB
+            NAMES harfbuzz-subset libharfbuzz-subset
+            PATHS ${VCPKG_LIB_DIR}
+            NO_DEFAULT_PATH
+        )
+        if(NOT HARFBUZZ_LIB OR NOT HARFBUZZ_SUBSET_LIB)
             message(FATAL_ERROR "HarfBuzz library not found in vcpkg")
         endif()
-        list(APPEND TGFX_TEST_LIBS ${HARFBUZZ_LIB})
+        list(APPEND TGFX_INCLUDES ${VCPKG_INCLUDE_DIR}/harfbuzz)
+        list(APPEND TGFX_TEST_LIBS ${HARFBUZZ_LIB} ${HARFBUZZ_SUBSET_LIB})
 
         find_library(GTEST_LIB 
             NAMES gtest libgtest
@@ -828,6 +819,7 @@ if (TGFX_BUILD_TESTS)
 
         add_custom_target(test-vendor)
     else()
+        list(APPEND TGFX_TEST_INCLUDES src test/src third_party/json/include)
         add_vendor_target(test-vendor STATIC_VENDORS harfbuzz googletest)
         find_vendor_libraries(test-vendor STATIC TEST_VENDOR_STATIC_LIBRARIES)
         list(APPEND TGFX_TEST_LIBS ${TEST_VENDOR_STATIC_LIBRARIES})
