@@ -445,9 +445,8 @@ jobs:
 
       - name: Build Harmony
         run: |
-          cd ohos
-          hvigorw clean --no-daemon
-          hvigorw assembleApp --mode project -p product=default -p buildMode=debug --no-daemon
+          ./ohos/hvigorw clean --no-daemon
+          ./ohos/hvigorw assembleApp --mode project -p product=default -p buildMode=debug --no-daemon
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
