@@ -147,12 +147,9 @@ bool GLRenderPass::onBindBuffers(GPUBuffer* indexBuffer, GPUBuffer* vertexBuffer
   if (vertexBuffer == nullptr) {
     return false;
   }
-  auto gl = interface->functions();
   auto glProgram = static_cast<GLProgram*>(program.get());
-  glProgram->setVertexBuffer(static_cast<GLBuffer*>(vertexBuffer), vertexOffset);
-  if (indexBuffer) {
-    gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, static_cast<const GLBuffer*>(indexBuffer)->bufferID());
-  }
+  glProgram->bindBuffers(static_cast<GLBuffer*>(indexBuffer), static_cast<GLBuffer*>(vertexBuffer),
+                         vertexOffset);
   return true;
 }
 

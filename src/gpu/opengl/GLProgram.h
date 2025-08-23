@@ -40,7 +40,7 @@ class GLProgram : public Program {
     return _blendFormula.get();
   }
 
-  void setVertexBuffer(GLBuffer* vertexBuffer, size_t offset);
+  void bindBuffers(GLBuffer* indexBuffer, GLBuffer* vertexBuffer, size_t vertexOffset);
 
   void setUniformBytes(const void* data, size_t size);
 

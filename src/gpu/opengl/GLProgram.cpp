@@ -76,7 +76,7 @@ static AttribLayout GetAttribLayout(VertexFormat format) {
   return {false, 0, 0};
 }
 
-void GLProgram::setVertexBuffer(GLBuffer* vertexBuffer, size_t bufferOffset) {
+void GLProgram::bindBuffers(GLBuffer* indexBuffer, GLBuffer* vertexBuffer, size_t vertexOffset) {
   DEBUG_ASSERT(vertexBuffer != nullptr);
   auto gl = GLFunctions::Get(context);
   if (vertexArray == 0 && GLCaps::Get(context)->vertexArrayObjectSupport) {
@@ -86,6 +86,9 @@ void GLProgram::setVertexBuffer(GLBuffer* vertexBuffer, size_t bufferOffset) {
     gl->bindVertexArray(vertexArray);
   }
   gl->bindBuffer(GL_ARRAY_BUFFER, vertexBuffer->bufferID());
+  if (indexBuffer) {
+    gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, indexBuffer->bufferID());
+  }
   if (attributeLocations.empty()) {
     for (auto& attribute : _attributes) {
       auto location = gl->getAttribLocation(_programID, attribute.name().c_str());
@@ -93,7 +96,7 @@ void GLProgram::setVertexBuffer(GLBuffer* vertexBuffer, size_t bufferOffset) {
     }
   }
   size_t index = 0;
-  size_t offset = bufferOffset;
+  size_t offset = vertexOffset;
   for (auto& attribute : _attributes) {
     auto location = attributeLocations[index++];
     if (location >= 0) {
