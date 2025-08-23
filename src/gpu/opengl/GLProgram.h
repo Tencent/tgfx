@@ -27,7 +27,7 @@ namespace tgfx {
 class GLProgram : public Program {
  public:
   GLProgram(unsigned programID, std::unique_ptr<UniformBuffer> uniformBuffer,
-            std::vector<Attribute> attributes);
+            std::vector<Attribute> attributes, std::unique_ptr<BlendFormula> blendFormula);
 
   /**
    * Gets the GL program ID for this program.
@@ -36,7 +36,11 @@ class GLProgram : public Program {
     return _programID;
   }
 
-  void setVertexBuffer(GLBuffer* buffer, size_t offset);
+  BlendFormula* blendFormula() const {
+    return _blendFormula.get();
+  }
+
+  void setVertexBuffer(GLBuffer* vertexBuffer, size_t offset);
 
   void setUniformBytes(const void* data, size_t size);
 
@@ -45,9 +49,11 @@ class GLProgram : public Program {
 
  private:
   unsigned _programID = 0;
-  std::vector<int> uniformLocations = {};
+  unsigned vertexArray = 0;
   std::vector<Attribute> _attributes = {};
   std::vector<int> attributeLocations = {};
+  std::vector<int> uniformLocations = {};
   int vertexStride = 0;
+  std::unique_ptr<BlendFormula> _blendFormula = nullptr;
 };
 }  // namespace tgfx

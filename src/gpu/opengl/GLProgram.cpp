@@ -21,8 +21,9 @@
 
 namespace tgfx {
 GLProgram::GLProgram(unsigned programID, std::unique_ptr<UniformBuffer> uniformBuffer,
-                     std::vector<Attribute> attributes)
-    : Program(std::move(uniformBuffer)), _programID(programID), _attributes(std::move(attributes)) {
+                     std::vector<Attribute> attributes, std::unique_ptr<BlendFormula> blendFormula)
+    : Program(std::move(uniformBuffer)), _programID(programID), _attributes(std::move(attributes)),
+      _blendFormula(std::move(blendFormula)) {
   DEBUG_ASSERT(!_attributes.empty());
   size_t offset = 0;
   for (auto& attribute : _attributes) {
@@ -75,11 +76,16 @@ static AttribLayout GetAttribLayout(VertexFormat format) {
   return {false, 0, 0};
 }
 
-void GLProgram::setVertexBuffer(GLBuffer* buffer, size_t bufferOffset) {
-  if (buffer == nullptr) {
-    return;
-  }
+void GLProgram::setVertexBuffer(GLBuffer* vertexBuffer, size_t bufferOffset) {
+  DEBUG_ASSERT(vertexBuffer != nullptr);
   auto gl = GLFunctions::Get(context);
+  if (vertexArray == 0 && GLCaps::Get(context)->vertexArrayObjectSupport) {
+    gl->genVertexArrays(1, &vertexArray);
+  }
+  if (vertexArray > 0) {
+    gl->bindVertexArray(vertexArray);
+  }
+  gl->bindBuffer(GL_ARRAY_BUFFER, vertexBuffer->bufferID());
   if (attributeLocations.empty()) {
     for (auto& attribute : _attributes) {
       auto location = gl->getAttribLocation(_programID, attribute.name().c_str());
@@ -171,9 +177,12 @@ void GLProgram::setUniformBytes(const void* data, size_t size) {
 }
 
 void GLProgram::onReleaseGPU() {
+  auto gl = GLFunctions::Get(context);
   if (_programID > 0) {
-    auto gl = GLFunctions::Get(context);
     gl->deleteProgram(_programID);
+  }
+  if (vertexArray > 0) {
+    gl->deleteVertexArrays(1, &vertexArray);
   }
 }
 }  // namespace tgfx

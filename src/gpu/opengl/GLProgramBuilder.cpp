@@ -163,7 +163,7 @@ std::unique_ptr<GLProgram> GLProgramBuilder::finalize() {
     gl->uniform1i(location, textureUint++);
   }
   return std::make_unique<GLProgram>(programID, _uniformHandler.makeUniformBuffer(),
-                                     pipeline->getGeometryProcessor()->vertexAttributes());
+                                     pipeline->getVertexAttributes(), pipeline->getBlendFormula());
 }
 
 bool GLProgramBuilder::checkSamplerCounts() {
