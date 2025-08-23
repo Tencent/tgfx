@@ -27,7 +27,6 @@ static SLType GetSLType(VertexFormat format) {
       return SLType::Float2;
     case VertexFormat::Float3:
       return SLType::Float3;
-      break;
     case VertexFormat::Float4:
       return SLType::Float4;
     case VertexFormat::Half:
