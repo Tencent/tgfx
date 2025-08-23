@@ -40,46 +40,6 @@ static void UpdateScissor(const GLFunctions* gl, const Rect& scissorRect) {
   }
 }
 
-static const unsigned XfermodeCoeff2Blend[] = {
-    GL_ZERO,       GL_ONE,
-    GL_SRC_COLOR,  GL_ONE_MINUS_SRC_COLOR,
-    GL_DST_COLOR,  GL_ONE_MINUS_DST_COLOR,
-    GL_SRC_ALPHA,  GL_ONE_MINUS_SRC_ALPHA,
-    GL_DST_ALPHA,  GL_ONE_MINUS_DST_ALPHA,
-    GL_SRC1_COLOR, GL_ONE_MINUS_SRC1_COLOR,
-    GL_SRC1_ALPHA, GL_ONE_MINUS_SRC1_ALPHA,
-};
-
-static const unsigned XfermodeEquation2Blend[] = {
-    GL_FUNC_ADD,
-    GL_FUNC_SUBTRACT,
-    GL_FUNC_REVERSE_SUBTRACT,
-};
-
-static void UpdateBlend(const GLInterface* interface, const BlendFormula* blendFactors) {
-  auto gl = interface->functions();
-  auto caps = interface->caps();
-  if (caps->frameBufferFetchSupport && caps->frameBufferFetchRequiresEnablePerSample) {
-    if (blendFactors == nullptr) {
-      gl->enable(GL_FETCH_PER_SAMPLE_ARM);
-    } else {
-      gl->disable(GL_FETCH_PER_SAMPLE_ARM);
-    }
-  }
-  if (blendFactors == nullptr || (blendFactors->srcCoeff() == BlendModeCoeff::One &&
-                                  blendFactors->dstCoeff() == BlendModeCoeff::Zero &&
-                                  (blendFactors->equation() == BlendEquation::Add ||
-                                   blendFactors->equation() == BlendEquation::Subtract))) {
-    // There is no need to enable blending if the blend mode is src.
-    gl->disable(GL_BLEND);
-  } else {
-    gl->enable(GL_BLEND);
-    gl->blendFunc(XfermodeCoeff2Blend[static_cast<int>(blendFactors->srcCoeff())],
-                  XfermodeCoeff2Blend[static_cast<int>(blendFactors->dstCoeff())]);
-    gl->blendEquation(XfermodeEquation2Blend[static_cast<int>(blendFactors->equation())]);
-  }
-}
-
 void GLRenderPass::begin() {
   auto gl = interface->functions();
   auto renderTexture = static_cast<GLTexture*>(renderTarget->getRenderTexture());
@@ -120,9 +80,8 @@ bool GLRenderPass::onBindProgramAndScissorClip(const Pipeline* pipeline, const R
   auto gl = interface->functions();
   ClearGLError(gl);
   auto glProgram = static_cast<GLProgram*>(program.get());
-  gl->useProgram(glProgram->programID());
+  glProgram->activate();
   UpdateScissor(gl, scissorRect);
-  UpdateBlend(interface.get(), glProgram->blendFormula());
   auto renderTexture = renderTarget->getRenderTexture();
   auto samplers = pipeline->getSamplers();
   int textureUnit = 0;
@@ -148,8 +107,8 @@ bool GLRenderPass::onBindBuffers(GPUBuffer* indexBuffer, GPUBuffer* vertexBuffer
     return false;
   }
   auto glProgram = static_cast<GLProgram*>(program.get());
-  glProgram->bindBuffers(static_cast<GLBuffer*>(indexBuffer), static_cast<GLBuffer*>(vertexBuffer),
-                         vertexOffset);
+  glProgram->setVertexBuffer(vertexBuffer, vertexOffset);
+  glProgram->setIndexBuffer(indexBuffer);
   return true;
 }
 
