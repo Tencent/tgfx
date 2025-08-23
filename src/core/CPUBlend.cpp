@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "core/CPUBlend.h"
+#include <algorithm>
 #include <array>
 #include "core/Blend.h"
 #include "core/MathVector.h"
