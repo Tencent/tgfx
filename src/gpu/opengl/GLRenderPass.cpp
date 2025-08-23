@@ -24,32 +24,6 @@
 #include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
-struct AttribLayout {
-  bool normalized = false;  // Only used by floating point types.
-  int count = 0;
-  unsigned type = 0;
-};
-
-static constexpr std::pair<SLType, AttribLayout> attribLayoutPair[] = {
-    {SLType::Float, {false, 1, GL_FLOAT}},
-    {SLType::Float2, {false, 2, GL_FLOAT}},
-    {SLType::Float3, {false, 3, GL_FLOAT}},
-    {SLType::Float4, {false, 4, GL_FLOAT}},
-    {SLType::Int, {false, 1, GL_INT}},
-    {SLType::Int2, {false, 2, GL_INT}},
-    {SLType::Int3, {false, 3, GL_INT}},
-    {SLType::Int4, {false, 4, GL_INT}},
-    {SLType::UByte4Color, {true, 4, GL_UNSIGNED_BYTE}}};
-
-static AttribLayout GetAttribLayout(SLType type) {
-  for (const auto& pair : attribLayoutPair) {
-    if (pair.first == type) {
-      return pair.second;
-    }
-  }
-  return {false, 0, 0};
-}
-
 GLRenderPass::GLRenderPass(std::shared_ptr<GLInterface> interface,
                            std::shared_ptr<RenderTarget> renderTarget, bool resolveMSAA)
     : RenderPass(std::move(renderTarget)), interface(std::move(interface)),
@@ -168,7 +142,7 @@ bool GLRenderPass::onBindProgramAndScissorClip(const Pipeline* pipeline, const R
   }
   auto uniformBuffer = glProgram->uniformBuffer();
   pipeline->getUniforms(renderTarget.get(), uniformBuffer);
-  uniformBuffer->uploadToGPU(context);
+  glProgram->setUniformBytes(uniformBuffer->data(), uniformBuffer->size());
   return true;
 }
 
@@ -181,14 +155,7 @@ bool GLRenderPass::onBindBuffers(GPUBuffer* indexBuffer, GPUBuffer* vertexBuffer
     return false;
   }
   auto glProgram = static_cast<GLProgram*>(program.get());
-  for (const auto& attribute : glProgram->vertexAttributes()) {
-    const AttribLayout& layout = GetAttribLayout(attribute.gpuType);
-    auto offset = vertexOffset + attribute.offset;
-    gl->vertexAttribPointer(static_cast<unsigned>(attribute.location), layout.count, layout.type,
-                            layout.normalized, glProgram->vertexStride(),
-                            reinterpret_cast<void*>(offset));
-    gl->enableVertexAttribArray(static_cast<unsigned>(attribute.location));
-  }
+  glProgram->setVertexBuffer(static_cast<GLBuffer*>(vertexBuffer), vertexOffset);
   if (indexBuffer) {
     gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, static_cast<const GLBuffer*>(indexBuffer)->bufferID());
   }

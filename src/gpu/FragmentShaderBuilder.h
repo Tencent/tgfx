@@ -27,6 +27,10 @@ class FragmentShaderBuilder : public ShaderBuilder {
  public:
   explicit FragmentShaderBuilder(ProgramBuilder* program);
 
+  ShaderStage shaderStage() const override {
+    return ShaderStage::Fragment;
+  }
+
   virtual std::string dstColor() = 0;
 
   void onBeforeChildProcEmitCode(const FragmentProcessor* child);
@@ -41,8 +45,6 @@ class FragmentShaderBuilder : public ShaderBuilder {
   static std::string CustomColorOutputName() {
     return "tgfx_FragColor";
   }
-
-  void onFinalize() override;
 
   friend class ProgramBuilder;
 };

@@ -33,18 +33,16 @@ enum class SLType {
   Float2x2,
   Float3x3,
   Float4x4,
+  Half,
+  Half2,
+  Half3,
+  Half4,
   Int,
   Int2,
   Int3,
   Int4,
-  UByte4Color,
   Texture2DSampler,
   TextureExternalSampler,
   Texture2DRectSampler,
 };
-
-/**
- * Returns the size of the SLType in bytes.
- */
-size_t GetSLTypeSize(SLType type);
 }  // namespace tgfx

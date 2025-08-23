@@ -30,7 +30,8 @@ GLConstColorProcessor::GLConstColorProcessor(Color color, InputMode mode)
 
 void GLConstColorProcessor::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
-  auto colorName = args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "Color");
+  auto colorName =
+      args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
   switch (inputMode) {
     case InputMode::Ignore:

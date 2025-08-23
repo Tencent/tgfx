@@ -20,14 +20,27 @@
 #include "core/utils/Log.h"
 
 namespace tgfx {
-UniformBuffer::UniformBuffer(std::vector<Uniform> uniformList) : uniforms(std::move(uniformList)) {
-  size_t index = 0;
+UniformBuffer::UniformBuffer(std::vector<Uniform> uniforms,
+                             std::unordered_map<std::string, size_t> uniformMap)
+    : _uniforms(std::move(uniforms)), uniformMap(std::move(uniformMap)) {
+  DEBUG_ASSERT(uniforms.size() == uniformMap.size());
   size_t offset = 0;
-  for (auto& uniform : uniforms) {
-    uniformMap[uniform.name()] = index++;
-    offsets.push_back(offset);
+  offsets.push_back(offset);
+  for (auto& uniform : _uniforms) {
     offset += uniform.size();
+    offsets.push_back(offset);
   }
+  if (offset > 0) {
+    _buffer = new (std::nothrow) uint8_t[offset];
+    if (_buffer == nullptr) {
+      offsets.resize(1);
+      LOGE("UniformBuffer::UniformBuffer() failed to allocate memory for uniform buffer!");
+    }
+  }
+}
+
+UniformBuffer::~UniformBuffer() {
+  delete[] _buffer;
 }
 
 void UniformBuffer::setData(const std::string& name, const Matrix& matrix) {
@@ -45,12 +58,8 @@ void UniformBuffer::onSetData(const std::string& name, const void* data, size_t 
     return;
   }
   auto index = result->second;
-  auto uniformSize = uniforms[index].size();
-  if (uniformSize != size) {
-    LOGE("UniformBuffer::onSetData() data size mismatch!");
-    return;
-  }
-  onCopyData(index, offsets[index], size, data);
+  DEBUG_ASSERT(_uniforms[index].size() == size);
+  memcpy(_buffer + offsets[index], data, size);
 }
 
 }  // namespace tgfx

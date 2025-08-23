@@ -23,10 +23,6 @@ namespace tgfx {
 FragmentShaderBuilder::FragmentShaderBuilder(ProgramBuilder* program) : ShaderBuilder(program) {
 }
 
-void FragmentShaderBuilder::onFinalize() {
-  programBuilder->varyingHandler()->getFragDecls(&shaderStrings[Type::Inputs]);
-}
-
 void FragmentShaderBuilder::declareCustomOutputColor() {
   outputs.emplace_back(CustomColorOutputName(), SLType::Float4, ShaderVar::TypeModifier::Out);
 }

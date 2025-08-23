@@ -31,14 +31,12 @@ class GLProgramBuilder : public ProgramBuilder {
 
   std::string textureFuncName() const override;
 
-  std::string getShaderVarDeclarations(const ShaderVar& var, ShaderFlags flag) const override;
+  std::string getShaderVarDeclarations(const ShaderVar& var, ShaderStage stage) const override;
 
   bool isDesktopGL() const;
 
  private:
   GLProgramBuilder(Context* context, const Pipeline* pipeline);
-
-  void computeCountsAndStrides(unsigned programID);
 
   std::unique_ptr<GLProgram> finalize();
 
@@ -68,7 +66,6 @@ class GLProgramBuilder : public ProgramBuilder {
   UniformHandler _uniformHandler;
   GLVertexShaderBuilder _vertexBuilder;
   GLFragmentShaderBuilder _fragBuilder;
-  std::vector<GLProgram::Attribute> attributes;
   size_t vertexStride = 0;
 
   friend class ProgramBuilder;
