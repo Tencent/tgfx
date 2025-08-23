@@ -170,8 +170,6 @@ std::shared_ptr<GLInterface> GLInterface::MakeNativeInterface(const GLProcGetter
       reinterpret_cast<GLGetIntegerv*>(getter->getProcAddress("glGetIntegerv"));
   functions->getInternalformativ =
       reinterpret_cast<GLGetInternalformativ*>(getter->getProcAddress("glGetInternalformativ"));
-  functions->getActiveUniform =
-      reinterpret_cast<GLGetActiveUniform*>(getter->getProcAddress("glGetActiveUniform"));
   functions->getBooleanv =
       reinterpret_cast<GLGetBooleanv*>(getter->getProcAddress("glGetBooleanv"));
   functions->getProgramInfoLog =
