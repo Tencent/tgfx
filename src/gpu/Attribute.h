@@ -25,85 +25,22 @@ namespace tgfx {
  * Vertex attribute formats.
  */
 enum class VertexFormat {
-  /**
-   * 32-bit floating point scalar.
-   */
-  Float,
-
-  /**
-   * 2-component vector of 32-bit floating point values.
-   */
-  Float2,
-
-  /**
-   * 3-component vector of 32-bit floating point values.
-   */
-  Float3,
-
-  /**
-   * 4-component vector of 32-bit floating point values.
-   */
-  Float4,
-
-  /**
-   * 16-bit floating point scalar.
-   */
-  Half,
-
-  /**
-   * 2-component vector of 16-bit floating point values.
-   */
-  Half2,
-
-  /**
-   * 3-component vector of 16-bit floating point values.
-   */
-  Half3,
-
-  /**
-   * 4-component vector of 16-bit floating point values.
-   */
-  Half4,
-
-  /**
-   * 32-bit signed integer scalar.
-   */
-  Int,
-
-  /**
-   * 2-component vector of 32-bit signed integer values.
-   */
-  Int2,
-
-  /**
-   * 3-component vector of 32-bit signed integer values.
-   */
-  Int3,
-
-  /**
-   * 4-component vector of 32-bit signed integer values.
-   */
-  Int4,
-
-  /**
-   * 8-bit unsigned integer scalar, normalized to [0,1].
-   */
-  UByteNormalized,
-
-  /**
-   * 2-component vector of 8-bit unsigned integer values, normalized to [0,1].
-   */
-  UByte2Normalized,
-
-  /**
-   * 3-component vector of 8-bit unsigned integer values, normalized to [0,1].
-   */
-  UByte3Normalized,
-
-  /**
-   * 4-component vector of 8-bit unsigned integer values, normalized to [0,1].
-   */
-  UByte4Normalized,
+  Float,             // 32-bit floating point scalar.
+  Float2,            // 2-component vector of 32-bit floating point values.
+  Float3,            // 3-component vector of 32-bit floating point values.
+  Float4,            // 4-component vector of 32-bit floating point values.
+  Half,              // 16-bit floating point scalar.
+  Half2,             // 2-component vector of 16-bit floating point values.
+  Half3,             // 3-component vector of 16-bit floating point values.
+  Half4,             // 4-component vector of 16-bit floating point values.
+  Int,               // 32-bit signed integer scalar.
+  Int2,              // 2-component vector of 32-bit signed integer values.
+  Int3,              // 3-component vector of 32-bit signed integer values.
+  Int4,              // 4-component vector of 32-bit signed integer values.
+  UByteNormalized,   // 8-bit unsigned integer scalar, normalized to [0,1].
+  UByte2Normalized,  // 2-component vector of 8-bit unsigned integer values, normalized to [0,1].
+  UByte3Normalized,  // 3-component vector of 8-bit unsigned integer values, normalized to [0,1].
+  UByte4Normalized,  // 4-component vector of 8-bit unsigned integer values, normalized to [0,1].
 };
 
 /**
