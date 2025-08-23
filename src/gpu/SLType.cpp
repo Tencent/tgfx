@@ -46,10 +46,6 @@ size_t GetSLTypeSize(SLType type) {
       return 9 * sizeof(float);
     case SLType::Float4x4:
       return 16 * sizeof(float);
-    case SLType::Texture2DSampler:
-    case SLType::Texture2DRectSampler:
-    case SLType::TextureExternalSampler:
-      return sizeof(int32_t);
     default:
       return 0;
   }

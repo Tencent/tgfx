@@ -19,7 +19,6 @@
 #pragma once
 
 #include "gpu/Resource.h"
-#include "gpu/UniformBuffer.h"
 #include "tgfx/core/BytesKey.h"
 
 namespace tgfx {
@@ -32,19 +31,9 @@ class Program : public Resource {
     return 0;
   }
 
-  UniformBuffer* uniformBuffer() const {
-    return _uniformBuffer.get();
-  }
-
- protected:
-  explicit Program(std::unique_ptr<UniformBuffer> uniformBuffer)
-      : _uniformBuffer(std::move(uniformBuffer)) {
-  }
-
  private:
   BytesKey programKey = {};
   std::list<Program*>::iterator cachedPosition;
-  std::unique_ptr<UniformBuffer> _uniformBuffer = nullptr;
 
   friend class GlobalCache;
 };

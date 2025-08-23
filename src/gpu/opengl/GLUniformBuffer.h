@@ -18,50 +18,25 @@
 
 #pragma once
 
-#include <optional>
-#include "gpu/Pipeline.h"
-#include "gpu/Program.h"
-#include "gpu/SLType.h"
-#include "gpu/opengl/GLUniformBuffer.h"
+#include "gpu/UniformBuffer.h"
+#include "tgfx/gpu/Context.h"
 
 namespace tgfx {
-class GLProgram : public Program {
+class GLUniformBuffer : public UniformBuffer {
  public:
-  struct Attribute {
-    SLType gpuType = SLType::Float;
-    size_t offset = 0;
-    int location = 0;
-  };
+  GLUniformBuffer(std::vector<Uniform> uniforms, std::vector<int> locations);
 
-  GLProgram(unsigned programID, std::unique_ptr<GLUniformBuffer> uniformBuffer,
-            std::vector<Attribute> attributes, int vertexStride);
+  ~GLUniformBuffer() override;
 
-  /**
-   * Gets the GL program ID for this program.
-   */
-  unsigned programID() const {
-    return programId;
-  }
-
-  GLUniformBuffer* uniformBuffer() const {
-    return _uniformBuffer.get();
-  }
-
-  int vertexStride() const {
-    return _vertexStride;
-  }
-
-  const std::vector<Attribute>& vertexAttributes() const {
-    return attributes;
-  }
+  void uploadToGPU(Context* context);
 
  protected:
-  void onReleaseGPU() override;
+  void onCopyData(size_t index, size_t offset, size_t size, const void* data) override;
 
  private:
-  unsigned programId = 0;
-  std::unique_ptr<GLUniformBuffer> _uniformBuffer = nullptr;
-  std::vector<Attribute> attributes = {};
-  int _vertexStride = 0;
+  uint8_t* buffer = nullptr;
+  bool bufferChanged = false;
+  std::vector<int> locations = {};
+  std::vector<bool> dirtyFlags = {};
 };
 }  // namespace tgfx

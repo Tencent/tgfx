@@ -109,9 +109,6 @@ using GLGenFramebuffers = void GL_FUNCTION_TYPE(int n, unsigned* framebuffers);
 using GLGenerateMipmap = void GL_FUNCTION_TYPE(unsigned target);
 using GLGenRenderbuffers = void GL_FUNCTION_TYPE(int n, unsigned* renderbuffers);
 using GLGenTextures = void GL_FUNCTION_TYPE(int n, unsigned* textures);
-using GLGetActiveUniform = void GL_FUNCTION_TYPE(unsigned program, unsigned index, int bufSize,
-                                                 int* length, int* size, unsigned* type,
-                                                 char* name);
 using GLGetBooleanv = void GL_FUNCTION_TYPE(unsigned pname, unsigned char* data);
 using GLGetBufferParameteriv = void GL_FUNCTION_TYPE(unsigned target, unsigned pname, int* params);
 using GLGetError = unsigned GL_FUNCTION_TYPE();
@@ -287,7 +284,6 @@ class GLFunctions {
   GLGetFramebufferAttachmentParameteriv* getFramebufferAttachmentParameteriv = nullptr;
   GLGetIntegerv* getIntegerv = nullptr;
   GLGetInternalformativ* getInternalformativ = nullptr;
-  GLGetActiveUniform* getActiveUniform = nullptr;
   GLGetBooleanv* getBooleanv = nullptr;
   GLGetProgramInfoLog* getProgramInfoLog = nullptr;
   GLGetProgramiv* getProgramiv = nullptr;
