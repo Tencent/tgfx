@@ -160,7 +160,6 @@ std::unique_ptr<GLProgram> GLProgramBuilder::finalize() {
   uniformLocations.reserve(uniforms.size());
   for (auto& uniform : uniforms) {
     auto location = gl->getUniformLocation(programID, uniform.name().c_str());
-    DEBUG_ASSERT(location != -1);
     uniformLocations.push_back(location);
   }
   // Assign texture units to sampler uniforms up front, just once.
@@ -184,8 +183,9 @@ void GLProgramBuilder::computeCountsAndStrides(unsigned int programID) {
     attribute.offset = vertexStride;
     vertexStride += attr->sizeAlign4();
     attribute.location = gl->getAttribLocation(programID, attr->name().c_str());
-    DEBUG_ASSERT(attribute.location != -1);
-    attributes.push_back(attribute);
+    if (attribute.location >= 0) {
+      attributes.push_back(attribute);
+    }
   }
 }
 
