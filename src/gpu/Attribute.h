@@ -18,6 +18,7 @@
 
 #pragma once
 
+#include <cinttypes>
 #include <string>
 
 namespace tgfx {
