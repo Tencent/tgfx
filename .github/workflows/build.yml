@@ -404,6 +404,11 @@ jobs:
           distribution: temurin
           java-version: 17
 
+      - name: Setup pnpm
+        run: |
+          npm install -g pnpm@8.13.1
+          echo "$(npm prefix -g)/bin" >> $GITHUB_PATH
+
       - name: Get Third-Party Cache
         id: third-party-cache
         uses: actions/cache/restore@v4
