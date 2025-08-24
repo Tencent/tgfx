@@ -395,7 +395,7 @@ jobs:
           echo "$CLI_DIR/sdk/default/openharmony/toolchains" >> $GITHUB_PATH
           echo "$CLI_DIR/ohpm/bin"                       >> $GITHUB_PATH
           echo "$CLI_DIR/hvigor/bin"                     >> $GITHUB_PATH
-          echo "OHOS_SDK_HOME=$CLI_DIR/sdk"              >> $GITHUB_ENV
+          echo "DEVECO_SDK_HOME=$CLI_DIR/sdk"            >> $GITHUB_ENV
           echo "JAVA_HOME=$JAVA_HOME"                    >> $GITHUB_ENV
 
       - name: Setup JDK 17
@@ -438,8 +438,8 @@ jobs:
       - name: Build Harmony (Release)
         run: |
           cd ohos
-          hvigorw clean --no-daemon -Dohos.sdk.root=$OHOS_SDK_HOME
-          hvigorw assembleApp -Dohos.sdk.root=$OHOS_SDK_HOME -p buildMode=release --no-daemon
+            hvigorw clean --no-daemon -Dohos.sdk.root=$DEVECO_SDK_HOME
+          hvigorw assembleApp -Dohos.sdk.root=$DEVECO_SDK_HOME -p buildMode=release --no-daemon
 
       - name: Job Failed
         if: ${{ failure() }}
