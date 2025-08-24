@@ -366,19 +366,14 @@ jobs:
         with:
           lfs: true
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-
       - name: Get CLI Tools Cache
         id: cli-tools-cache
         uses: actions/cache/restore@v4
-        with: 
+        with:
           path: /opt/ohos-cmd-tools
-          key:  ohos-cli-5.0.9.310-mac-arm64
+          key: ohos-cli-5.0.9.310-mac-arm64
           restore-keys: ohos-cli-
-            
+
       - name: Install CLI Tools
         if: steps.cli-tools-cache.outputs.cache-hit != 'true'
         run: |
@@ -386,20 +381,28 @@ jobs:
           curl -L -o /tmp/cmdtools.zip "$TOOLS_URL"
           unzip -q /tmp/cmdtools.zip -d /tmp
           sudo mv /tmp/command-line-tools /opt/ohos-cmd-tools
-          
-      - name: Configure CLI Tools
-        run: |
-          echo "${COMMANDLINE_TOOL_DIR:=/opt/ohos-cmd-tools}/ohpm/bin" >> $GITHUB_PATH
-          echo "${COMMANDLINE_TOOL_DIR}/hvigor/bin" >> $GITHUB_PATH
-          export PATH="${COMMANDLINE_TOOL_DIR}/ohpm/bin:${COMMANDLINE_TOOL_DIR}/hvigor/bin:$PATH"
-          echo "COMMANDLINE_TOOL_DIR=${COMMANDLINE_TOOL_DIR}" >> $GITHUB_ENV
-          
+
       - name: Save CLI Tools Cache
         if: ${{ (github.event_name == 'push') && (steps.cli-tools-cache.outputs.cache-hit != 'true') }}
         uses: actions/cache/save@v4
-        with: 
+        with:
           path: /opt/ohos-cmd-tools
           key: ohos-cli-5.0.9.310-mac-arm64
+
+      - name: Configure Environment
+        run: |
+          CLI_DIR=/opt/ohos-cmd-tools
+          echo "$CLI_DIR/sdk/default/openharmony/toolchains" >> $GITHUB_PATH
+          echo "$CLI_DIR/ohpm/bin"                       >> $GITHUB_PATH
+          echo "$CLI_DIR/hvigor/bin"                     >> $GITHUB_PATH
+          echo "OHOS_SDK_HOME=$CLI_DIR/sdk"              >> $GITHUB_ENV
+          echo "JAVA_HOME=$JAVA_HOME"                    >> $GITHUB_ENV
+
+      - name: Setup JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
 
       - name: Get Third-Party Cache
         id: third-party-cache
@@ -414,34 +417,6 @@ jobs:
           npm install depsync -g
           depsync
 
-      - name: Setup OpenHarmony SDK
-        uses: openharmony-rs/setup-ohos-sdk@v0.2
-        with:
-          version: '5.0.3'
-          cache: false
-          components: 'all' 
-          
-      - name: Configure OpenHarmony SDK
-        run: |
-          echo "DEVECO_SDK_HOME=$OHOS_BASE_SDK_HOME" >> $GITHUB_ENV    
-      
-      - name: Install ohpm dependencies
-        run: |
-          cd ohos
-          ohpm config set registry https://ohpm.openharmony.cn/ohpm/
-          ohpm install --all
-
-      - name: Debug SDK contents
-        run: |
-          echo "DEVECO_SDK_HOME=$DEVECO_SDK_HOME"
-          ls -l "$DEVECO_SDK_HOME"
-          ls -l "$DEVECO_SDK_HOME/native" || true
-
-      - name: Build Harmony
-        run: |
-          ./ohos/hvigorw clean --no-daemon
-          ./ohos/hvigorw assembleApp --mode project -p product=default -p buildMode=debug --no-daemon
-
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
         uses: actions/cache/save@v4
@@ -449,10 +424,21 @@ jobs:
           path: third_party
           key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
 
+      - name: Install ohpm dependencies
+        run: |
+          cd ohos
+          ohpm config set registry https://ohpm.openharmony.cn/ohpm/
+          ohpm install --all
+
+      - name: Build Harmony (Release)
+        run: |
+          cd ohos
+          hvigorw clean --no-daemon -Dohos.sdk.root=$OHOS_SDK_HOME
+          hvigorw assembleApp -Dohos.sdk.root=$OHOS_SDK_HOME -p buildMode=release --no-daemon
+
       - name: Job Failed
         if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
           name: openharmony_build
           path: ohos/out
-  
