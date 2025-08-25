@@ -16,28 +16,26 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "TextureRenderTargetProxy.h"
+#include "HardwareTextureProxy.h"
 
 namespace tgfx {
-class HardwareRenderTargetProxy : public TextureRenderTargetProxy {
- public:
-  ~HardwareRenderTargetProxy() override;
+HardwareTextureProxy::HardwareTextureProxy(HardwareBufferRef hardwareBuffer, int width, int height,
+                                           PixelFormat format)
+    : TextureProxy(width, height, format), hardwareBuffer(hardwareBuffer) {
+  HardwareBufferRetain(hardwareBuffer);
+}
 
-  HardwareBufferRef getHardwareBuffer() const override {
-    return hardwareBuffer;
+HardwareTextureProxy::~HardwareTextureProxy() {
+  HardwareBufferRelease(hardwareBuffer);
+}
+
+std::shared_ptr<TextureView> HardwareTextureProxy::getTextureView() const {
+  if (resource == nullptr) {
+    resource = TextureView::MakeFrom(context, hardwareBuffer);
+    if (resource == nullptr && !uniqueKey.empty()) {
+      resource->assignUniqueKey(uniqueKey);
+    }
   }
-
- protected:
-  std::shared_ptr<TextureView> onMakeTexture(Context* context) const override;
-
- private:
-  HardwareBufferRef hardwareBuffer = nullptr;
-
-  HardwareRenderTargetProxy(HardwareBufferRef hardwareBuffer, int width, int height,
-                            PixelFormat format, int sampleCount);
-
-  friend class ProxyProvider;
-};
+  return std::static_pointer_cast<TextureView>(resource);
+}
 }  // namespace tgfx

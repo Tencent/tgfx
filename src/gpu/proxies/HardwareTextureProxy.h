@@ -18,25 +18,24 @@
 
 #pragma once
 
-#include "TextureRenderTargetProxy.h"
+#include "gpu/proxies/TextureProxy.h"
+#include "tgfx/platform/HardwareBuffer.h"
 
 namespace tgfx {
-class HardwareRenderTargetProxy : public TextureRenderTargetProxy {
+class HardwareTextureProxy final : public TextureProxy {
  public:
-  ~HardwareRenderTargetProxy() override;
+  std::shared_ptr<TextureView> getTextureView() const override;
+
+  ~HardwareTextureProxy() override;
 
   HardwareBufferRef getHardwareBuffer() const override {
     return hardwareBuffer;
   }
 
- protected:
-  std::shared_ptr<TextureView> onMakeTexture(Context* context) const override;
-
  private:
-  HardwareBufferRef hardwareBuffer = nullptr;
+  HardwareTextureProxy(HardwareBufferRef hardwareBuffer, int width, int height, PixelFormat format);
 
-  HardwareRenderTargetProxy(HardwareBufferRef hardwareBuffer, int width, int height,
-                            PixelFormat format, int sampleCount);
+  HardwareBufferRef hardwareBuffer = nullptr;
 
   friend class ProxyProvider;
 };
