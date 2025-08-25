@@ -125,11 +125,10 @@ void Pipeline::computeProgramKey(Context* context, BytesKey* programKey) const {
   for (const auto& processor : fragmentProcessors) {
     processor->computeProcessorKey(context, programKey);
   }
-  auto dstTextureView = xferProcessor != nullptr ? xferProcessor->dstTextureView() : nullptr;
-  if (dstTextureView != nullptr) {
-    TextureView::ComputeTextureKey(dstTextureView->getTexture(), programKey);
+  if (xferProcessor != nullptr) {
+    xferProcessor->computeProcessorKey(context, programKey);
   }
-  getXferProcessor()->computeProcessorKey(context, programKey);
+  programKey->write(static_cast<uint32_t>(blendMode));
   programKey->write(static_cast<uint32_t>(_outputSwizzle->asKey()));
 }
 

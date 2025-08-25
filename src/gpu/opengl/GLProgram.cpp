@@ -20,9 +20,33 @@
 #include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
+
+static const unsigned XfermodeCoeff2Blend[] = {
+    GL_ZERO,       GL_ONE,
+    GL_SRC_COLOR,  GL_ONE_MINUS_SRC_COLOR,
+    GL_DST_COLOR,  GL_ONE_MINUS_DST_COLOR,
+    GL_SRC_ALPHA,  GL_ONE_MINUS_SRC_ALPHA,
+    GL_DST_ALPHA,  GL_ONE_MINUS_DST_ALPHA,
+    GL_SRC1_COLOR, GL_ONE_MINUS_SRC1_COLOR,
+    GL_SRC1_ALPHA, GL_ONE_MINUS_SRC1_ALPHA,
+};
+
+static const unsigned XfermodeEquation2Blend[] = {
+    GL_FUNC_ADD,
+    GL_FUNC_SUBTRACT,
+    GL_FUNC_REVERSE_SUBTRACT,
+};
+
+struct AttribLayout {
+  bool normalized = false;
+  int count = 0;
+  unsigned type = 0;
+};
+
 GLProgram::GLProgram(unsigned programID, std::unique_ptr<UniformBuffer> uniformBuffer,
-                     std::vector<Attribute> attributes)
-    : Program(std::move(uniformBuffer)), _programID(programID), _attributes(std::move(attributes)) {
+                     std::vector<Attribute> attributes, std::unique_ptr<BlendFormula> blendFormula)
+    : Program(std::move(uniformBuffer)), programID(programID), _attributes(std::move(attributes)),
+      blendFormula(std::move(blendFormula)) {
   DEBUG_ASSERT(!_attributes.empty());
   size_t offset = 0;
   for (auto& attribute : _attributes) {
@@ -31,72 +55,36 @@ GLProgram::GLProgram(unsigned programID, std::unique_ptr<UniformBuffer> uniformB
   vertexStride = static_cast<int>(offset);
 }
 
-struct AttribLayout {
-  bool normalized = false;
-  int count = 0;
-  unsigned type = 0;
-};
-
-static AttribLayout GetAttribLayout(VertexFormat format) {
-  switch (format) {
-    case VertexFormat::Float:
-      return {false, 1, GL_FLOAT};
-    case VertexFormat::Float2:
-      return {false, 2, GL_FLOAT};
-    case VertexFormat::Float3:
-      return {false, 3, GL_FLOAT};
-    case VertexFormat::Float4:
-      return {false, 4, GL_FLOAT};
-    case VertexFormat::Half:
-      return {false, 1, GL_HALF_FLOAT};
-    case VertexFormat::Half2:
-      return {false, 2, GL_HALF_FLOAT};
-    case VertexFormat::Half3:
-      return {false, 3, GL_HALF_FLOAT};
-    case VertexFormat::Half4:
-      return {false, 4, GL_HALF_FLOAT};
-    case VertexFormat::Int:
-      return {false, 1, GL_INT};
-    case VertexFormat::Int2:
-      return {false, 2, GL_INT};
-    case VertexFormat::Int3:
-      return {false, 3, GL_INT};
-    case VertexFormat::Int4:
-      return {false, 4, GL_INT};
-    case VertexFormat::UByteNormalized:
-      return {true, 1, GL_UNSIGNED_BYTE};
-    case VertexFormat::UByte2Normalized:
-      return {true, 2, GL_UNSIGNED_BYTE};
-    case VertexFormat::UByte3Normalized:
-      return {true, 3, GL_UNSIGNED_BYTE};
-    case VertexFormat::UByte4Normalized:
-      return {true, 4, GL_UNSIGNED_BYTE};
-  }
-  return {false, 0, 0};
-}
-
-void GLProgram::setVertexBuffer(GLBuffer* buffer, size_t bufferOffset) {
-  if (buffer == nullptr) {
-    return;
-  }
+void GLProgram::activate() {
   auto gl = GLFunctions::Get(context);
-  if (attributeLocations.empty()) {
-    for (auto& attribute : _attributes) {
-      auto location = gl->getAttribLocation(_programID, attribute.name().c_str());
-      attributeLocations.push_back(location);
+  auto caps = GLCaps::Get(context);
+  gl->useProgram(programID);
+  if (caps->frameBufferFetchSupport && caps->frameBufferFetchRequiresEnablePerSample) {
+    if (blendFormula == nullptr) {
+      gl->enable(GL_FETCH_PER_SAMPLE_ARM);
+    } else {
+      gl->disable(GL_FETCH_PER_SAMPLE_ARM);
     }
   }
-  size_t index = 0;
-  size_t offset = bufferOffset;
-  for (auto& attribute : _attributes) {
-    auto location = attributeLocations[index++];
-    if (location >= 0) {
-      auto layout = GetAttribLayout(attribute.format());
-      gl->vertexAttribPointer(static_cast<unsigned>(location), layout.count, layout.type,
-                              layout.normalized, vertexStride, reinterpret_cast<void*>(offset));
-      gl->enableVertexAttribArray(static_cast<unsigned>(location));
+  if (blendFormula == nullptr || (blendFormula->srcCoeff() == BlendModeCoeff::One &&
+                                  blendFormula->dstCoeff() == BlendModeCoeff::Zero &&
+                                  (blendFormula->equation() == BlendEquation::Add ||
+                                   blendFormula->equation() == BlendEquation::Subtract))) {
+    // There is no need to enable blending if the blend mode is src.
+    gl->disable(GL_BLEND);
+  } else {
+    gl->enable(GL_BLEND);
+    gl->blendFunc(XfermodeCoeff2Blend[static_cast<int>(blendFormula->srcCoeff())],
+                  XfermodeCoeff2Blend[static_cast<int>(blendFormula->dstCoeff())]);
+    gl->blendEquation(XfermodeEquation2Blend[static_cast<int>(blendFormula->equation())]);
+  }
+  if (caps->vertexArrayObjectSupport) {
+    if (vertexArray == 0) {
+      gl->genVertexArrays(1, &vertexArray);
     }
-    offset += attribute.size();
+    if (vertexArray > 0) {
+      gl->bindVertexArray(vertexArray);
+    }
   }
 }
 
@@ -113,7 +101,7 @@ void GLProgram::setUniformBytes(const void* data, size_t size) {
   if (uniformLocations.empty()) {
     uniformLocations.reserve(uniforms.size());
     for (auto& uniform : uniforms) {
-      auto location = gl->getUniformLocation(_programID, uniform.name().c_str());
+      auto location = gl->getUniformLocation(programID, uniform.name().c_str());
       uniformLocations.push_back(location);
     }
   }
@@ -170,10 +158,85 @@ void GLProgram::setUniformBytes(const void* data, size_t size) {
   }
 }
 
+static AttribLayout GetAttribLayout(VertexFormat format) {
+  switch (format) {
+    case VertexFormat::Float:
+      return {false, 1, GL_FLOAT};
+    case VertexFormat::Float2:
+      return {false, 2, GL_FLOAT};
+    case VertexFormat::Float3:
+      return {false, 3, GL_FLOAT};
+    case VertexFormat::Float4:
+      return {false, 4, GL_FLOAT};
+    case VertexFormat::Half:
+      return {false, 1, GL_HALF_FLOAT};
+    case VertexFormat::Half2:
+      return {false, 2, GL_HALF_FLOAT};
+    case VertexFormat::Half3:
+      return {false, 3, GL_HALF_FLOAT};
+    case VertexFormat::Half4:
+      return {false, 4, GL_HALF_FLOAT};
+    case VertexFormat::Int:
+      return {false, 1, GL_INT};
+    case VertexFormat::Int2:
+      return {false, 2, GL_INT};
+    case VertexFormat::Int3:
+      return {false, 3, GL_INT};
+    case VertexFormat::Int4:
+      return {false, 4, GL_INT};
+    case VertexFormat::UByteNormalized:
+      return {true, 1, GL_UNSIGNED_BYTE};
+    case VertexFormat::UByte2Normalized:
+      return {true, 2, GL_UNSIGNED_BYTE};
+    case VertexFormat::UByte3Normalized:
+      return {true, 3, GL_UNSIGNED_BYTE};
+    case VertexFormat::UByte4Normalized:
+      return {true, 4, GL_UNSIGNED_BYTE};
+  }
+  return {false, 0, 0};
+}
+
+void GLProgram::setVertexBuffer(GPUBuffer* vertexBuffer, size_t vertexOffset) {
+  if (vertexBuffer == nullptr) {
+    return;
+  }
+  auto gl = GLFunctions::Get(context);
+  gl->bindBuffer(GL_ARRAY_BUFFER, static_cast<GLBuffer*>(vertexBuffer)->bufferID());
+  if (attributeLocations.empty()) {
+    for (auto& attribute : _attributes) {
+      auto location = gl->getAttribLocation(programID, attribute.name().c_str());
+      attributeLocations.push_back(location);
+    }
+  }
+  size_t index = 0;
+  size_t offset = vertexOffset;
+  for (auto& attribute : _attributes) {
+    auto location = attributeLocations[index++];
+    if (location >= 0) {
+      auto layout = GetAttribLayout(attribute.format());
+      gl->vertexAttribPointer(static_cast<unsigned>(location), layout.count, layout.type,
+                              layout.normalized, vertexStride, reinterpret_cast<void*>(offset));
+      gl->enableVertexAttribArray(static_cast<unsigned>(location));
+    }
+    offset += attribute.size();
+  }
+}
+
+void GLProgram::setIndexBuffer(GPUBuffer* indexBuffer) {
+  if (indexBuffer == nullptr) {
+    return;
+  }
+  auto gl = GLFunctions::Get(context);
+  gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLBuffer*>(indexBuffer)->bufferID());
+}
+
 void GLProgram::onReleaseGPU() {
-  if (_programID > 0) {
-    auto gl = GLFunctions::Get(context);
-    gl->deleteProgram(_programID);
+  auto gl = GLFunctions::Get(context);
+  if (programID > 0) {
+    gl->deleteProgram(programID);
+  }
+  if (vertexArray > 0) {
+    gl->deleteVertexArrays(1, &vertexArray);
   }
 }
 }  // namespace tgfx
