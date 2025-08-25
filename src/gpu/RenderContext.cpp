@@ -139,7 +139,9 @@ Rect RenderContext::getClipBounds(const Path& clip) {
 }
 
 static Fill ApplyFillColorFilter(const Fill& fill) {
-  if (fill.colorFilter == nullptr) {
+  // Only solid colors can have color filters applied in advance during drawing. If a shader exists, it means the color
+  // is dynamically generated and cannot have the color filter applied at this stage.
+  if (fill.shader != nullptr || fill.colorFilter == nullptr) {
     return fill;
   }
 
