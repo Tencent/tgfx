@@ -36,6 +36,7 @@ void TGFXBaseView::updateSize(float devicePixelRatio) {
     auto sizeChanged = appHost->updateScreen(width, height, devicePixelRatio);
     if (sizeChanged && window) {
       window->invalidSize();
+      forceRedraw = true;
     }
   }
 }
@@ -68,16 +69,18 @@ bool TGFXBaseView::draw(int drawIndex, float zoom, float offsetX, float offsetY)
     return true;
   }
   appHost->updateZoomAndOffset(zoom, tgfx::Point(offsetX, offsetY));
+  appHost->forceRedraw = forceRedraw;
+  forceRedraw = false;
   auto canvas = surface->getCanvas();
-  canvas->clear();
-  auto numDrawers = drawers::Drawer::Count() - 1;
-  auto index = (drawIndex % numDrawers) + 1;
-  auto drawer = drawers::Drawer::GetByName("GridBackground");
-  drawer->draw(canvas, appHost.get());
-  drawer = drawers::Drawer::GetByIndex(index);
-  drawer->draw(canvas, appHost.get());
-  context->flushAndSubmit();
-  window->present(context);
+  auto numDrawers = drawers::Drawer::Count();
+  auto index = (drawIndex % numDrawers);
+  auto drawer = drawers::Drawer::GetByIndex(index);
+  if (drawer->draw(canvas, appHost.get())) {
+    context->flushAndSubmit();
+    window->present(context);
+    device->unlock();
+    return true;
+  }
   device->unlock();
   return true;
 }

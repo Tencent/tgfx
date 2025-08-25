@@ -106,6 +106,7 @@ class AppHost {
    */
   void addTypeface(const std::string& name, std::shared_ptr<tgfx::Typeface> typeface);
 
+  bool forceRedraw = true;
  private:
   int _width = 1280;
   int _height = 720;

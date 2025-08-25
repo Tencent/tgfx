@@ -31,10 +31,5 @@ namespace drawers {
     void onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) override; \
   }
 
-DEFINE_DRAWER(GridBackground);
-DEFINE_DRAWER(ConicGradient);
-DEFINE_DRAWER(ImageWithMipmap);
-DEFINE_DRAWER(ImageWithShadow);
-DEFINE_DRAWER(SimpleText);
 
 }  // namespace drawers

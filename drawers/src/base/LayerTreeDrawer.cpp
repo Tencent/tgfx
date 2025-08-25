@@ -23,7 +23,7 @@ namespace drawers {
 LayerTreeDrawer::LayerTreeDrawer(const std::string& name) : Drawer(name + "Drawer") {
 }
 
-void LayerTreeDrawer::onDraw(tgfx::Canvas* canvas, const AppHost* host) {
+bool LayerTreeDrawer::onDraw(tgfx::Canvas* canvas, const AppHost* host) {
   if (!root) {
     root = buildLayerTree(host);
     displayList.root()->addChild(root);
@@ -31,11 +31,15 @@ void LayerTreeDrawer::onDraw(tgfx::Canvas* canvas, const AppHost* host) {
     displayList.setAllowZoomBlur(true);
     displayList.setMaxTileCount(512);
   }
-  updateRootMatrix(host);
+  // updateRootMatrix(host);
   displayList.setZoomScale(host->zoomScale());
   auto offset = host->contentOffset();
   displayList.setContentOffset(offset.x, offset.y);
-  displayList.render(canvas->getSurface(), false);
+  if (displayList.hasContentChanged() || host->forceRedraw) {
+    displayList.render(canvas->getSurface(), false);
+    return true;
+  }
+  return false;
 }
 
 void LayerTreeDrawer::updateRootMatrix(const AppHost* host) {

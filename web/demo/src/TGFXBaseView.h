@@ -36,7 +36,7 @@ class TGFXBaseView {
 
  protected:
   std::shared_ptr<drawers::AppHost> appHost;
-
+  bool forceRedraw = false;
  private:
   std::string canvasID = "";
   std::shared_ptr<tgfx::Window> window = nullptr;

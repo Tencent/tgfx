@@ -158,15 +158,15 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   appHost->updateZoomAndOffset(self.zoomScale,
                                tgfx::Point(self.contentOffset.x, self.contentOffset.y));
   auto canvas = surface->getCanvas();
-  canvas->clear();
-  auto numDrawers = drawers::Drawer::Count() - 1;
-  int index = (self.drawIndex % numDrawers) + 1;
-  auto drawer = drawers::Drawer::GetByName("GridBackground");
-  drawer->draw(canvas, appHost.get());
-  drawer = drawers::Drawer::GetByIndex(index);
-  drawer->draw(canvas, appHost.get());
-  context->flushAndSubmit();
-  tgfxWindow->present(context);
+  //canvas->clear();
+  auto numDrawers = drawers::Drawer::Count();
+  int index = (self.drawIndex % numDrawers);
+  auto drawer = drawers::Drawer::GetByIndex(index);
+    if (drawer->draw(canvas, appHost.get())) {
+        context->flushAndSubmit();
+        tgfxWindow->present(context);
+    }
+
   device->unlock();
 }
 

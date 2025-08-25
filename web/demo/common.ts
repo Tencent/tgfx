@@ -226,9 +226,7 @@ export function onResizeEvent(shareData: ShareData) {
         return;
     }
     shareData.resized = true;
-    window.setTimeout(() => {
-        updateSize(shareData);
-    }, 300);
+    updateSize(shareData);
 }
 
 function handleVisibilityChange(shareData: ShareData) {

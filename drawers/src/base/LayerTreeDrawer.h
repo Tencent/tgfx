@@ -32,7 +32,7 @@ class LayerTreeDrawer : public Drawer {
  protected:
   virtual std::shared_ptr<tgfx::Layer> buildLayerTree(const AppHost* host) = 0;
 
-  void onDraw(tgfx::Canvas* canvas, const AppHost* host) override;
+  bool onDraw(tgfx::Canvas* canvas, const AppHost* host) override;
 
  private:
   void updateRootMatrix(const AppHost* host);
