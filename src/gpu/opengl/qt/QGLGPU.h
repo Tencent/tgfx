@@ -21,6 +21,7 @@
 #ifdef __APPLE__
 #include <CoreVideo/CoreVideo.h>
 #endif
+
 #if defined(_MSC_VER) && (QT_VERSION_MAJOR < 6)
 // For Qt5 on Windows, combaseapi.h is included, in which interface is defined as struct FAR.
 #ifdef interface
