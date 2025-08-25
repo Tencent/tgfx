@@ -25,6 +25,16 @@ std::shared_ptr<ColorFilter> ColorFilter::Luma() {
   return std::make_shared<LumaColorFilter>();
 }
 
+bool LumaColorFilter::onFilterColor(const Color& srcColor, Color* dstColor) const {
+  /** See ITU-R Recommendation BT.709 at http://www.itu.int/rec/R-REC-BT.709/ .*/
+  // Must use premultiplied color to compute luma. Othereise, use 'MatrixColorFilter' instead.
+  const auto pmColor = srcColor.premultiply();
+  const float luma = pmColor.red * 0.2126f + pmColor.green * 0.7152f + pmColor.blue * 0.0722f;
+  // Return non-premultiplied RGBA color.
+  *dstColor = Color(1.0f, 1.0f, 1.0f, luma);
+  return true;
+}
+
 PlacementPtr<FragmentProcessor> LumaColorFilter::asFragmentProcessor(Context* context) const {
   return LumaFragmentProcessor::Make(context->drawingBuffer());
 }

@@ -34,6 +34,8 @@ class AlphaThresholdColorFilter : public ColorFilter {
 
   bool isEqual(const ColorFilter* colorFilter) const override;
 
+  bool onFilterColor(const Color& srcColor, Color* dstColor) const override;
+
  private:
   PlacementPtr<FragmentProcessor> asFragmentProcessor(Context* context) const override;
 };

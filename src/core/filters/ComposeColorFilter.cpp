@@ -53,6 +53,15 @@ bool ComposeColorFilter::isEqual(const ColorFilter* colorFilter) const {
   return inner->isEqual(other->inner.get()) && outer->isEqual(other->outer.get());
 }
 
+bool ComposeColorFilter::onFilterColor(const Color& srcColor, Color* dstColor) const {
+  DEBUG_ASSERT(dstColor != nullptr);
+  Color innerResult{};
+  if (!inner->onFilterColor(srcColor, &innerResult)) {
+    return false;
+  }
+  return outer->onFilterColor(innerResult, dstColor);
+}
+
 PlacementPtr<FragmentProcessor> ComposeColorFilter::asFragmentProcessor(Context* context) const {
   auto innerProcessor = inner->asFragmentProcessor(context);
   auto outerProcessor = outer->asFragmentProcessor(context);

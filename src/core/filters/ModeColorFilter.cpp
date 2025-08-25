@@ -68,6 +68,11 @@ bool ModeColorFilter::isEqual(const ColorFilter* colorFilter) const {
   return color == other->color && mode == other->mode;
 }
 
+bool ModeColorFilter::onFilterColor(const Color&, Color*) const {
+  // Blend logic do not support to be applied immediately.
+  return false;
+}
+
 PlacementPtr<FragmentProcessor> ModeColorFilter::asFragmentProcessor(Context* context) const {
   auto processor =
       ConstColorProcessor::Make(context->drawingBuffer(), color.premultiply(), InputMode::Ignore);

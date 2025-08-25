@@ -46,6 +46,25 @@ bool MatrixColorFilter::isEqual(const ColorFilter* colorFilter) const {
   return matrix == other->matrix;
 }
 
+bool MatrixColorFilter::onFilterColor(const Color& srcColor, Color* dstColor) const {
+  Color transformedColor;
+  transformedColor.red = matrix[0] * srcColor.red + matrix[1] * srcColor.green +
+                         matrix[2] * srcColor.blue + matrix[3] * srcColor.alpha + matrix[4];
+  transformedColor.green = matrix[5] * srcColor.red + matrix[6] * srcColor.green +
+                           matrix[7] * srcColor.blue + matrix[8] * srcColor.alpha + matrix[9];
+  transformedColor.blue = matrix[10] * srcColor.red + matrix[11] * srcColor.green +
+                          matrix[12] * srcColor.blue + matrix[13] * srcColor.alpha + matrix[14];
+  transformedColor.alpha = matrix[15] * srcColor.red + matrix[16] * srcColor.green +
+                           matrix[17] * srcColor.blue + matrix[18] * srcColor.alpha + matrix[19];
+
+  transformedColor.red = std::clamp(transformedColor.red, 0.0f, 1.0f);
+  transformedColor.green = std::clamp(transformedColor.green, 0.0f, 1.0f);
+  transformedColor.blue = std::clamp(transformedColor.blue, 0.0f, 1.0f);
+  transformedColor.alpha = std::clamp(transformedColor.alpha, 0.0f, 1.0f);
+  *dstColor = transformedColor;
+  return true;
+}
+
 PlacementPtr<FragmentProcessor> MatrixColorFilter::asFragmentProcessor(Context* context) const {
   return ColorMatrixFragmentProcessor::Make(context->drawingBuffer(), matrix);
 }

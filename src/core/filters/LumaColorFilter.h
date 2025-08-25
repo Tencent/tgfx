@@ -36,6 +36,8 @@ class LumaColorFilter : public ColorFilter {
     return type == Type::Luma;
   }
 
+  bool onFilterColor(const Color& srcColor, Color* dstColor) const override;
+
   PlacementPtr<FragmentProcessor> asFragmentProcessor(Context* context) const override;
 };
 }  // namespace tgfx

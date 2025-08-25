@@ -36,6 +36,17 @@ bool AlphaThresholdColorFilter::isEqual(const ColorFilter* colorFilter) const {
   return threshold == other->threshold;
 }
 
+bool AlphaThresholdColorFilter::onFilterColor(const Color& srcColor, Color* dstColor) const {
+  if (srcColor.alpha >= threshold) {
+    *dstColor = Color(srcColor.red, srcColor.green, srcColor.blue, 1.0f);
+    return true;
+  } else {
+    // When the generated color’s alpha is 0, premultiplication can zero out all channels, causing
+    // data loss and computation errors.
+    return false;
+  }
+}
+
 PlacementPtr<FragmentProcessor> AlphaThresholdColorFilter::asFragmentProcessor(
     Context* context) const {
   return AlphaThresholdFragmentProcessor::Make(context->drawingBuffer(), threshold);

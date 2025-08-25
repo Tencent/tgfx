@@ -27,7 +27,7 @@ PlacementPtr<FragmentProcessor> LumaFragmentProcessor::Make(BlockBuffer* buffer)
 void GLLumaFragmentProcessor::emitCode(EmitArgs& args) const {
   /** See ITU-R Recommendation BT.709 at http://www.itu.int/rec/R-REC-BT.709/ .*/
   args.fragBuilder->codeAppendf("float luma = dot(%s.rgb, vec3(0.2126, 0.7152, 0.0722));\n",
-                                args.inputColor.c_str(), args.inputColor.c_str());
+                                args.inputColor.c_str());
   args.fragBuilder->codeAppendf("%s = vec4(luma);\n", args.outputColor.c_str());
 }
 
