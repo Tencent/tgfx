@@ -104,7 +104,7 @@ class ProxyProvider {
                                                    uint32_t renderFlags = 0);
 
   /**
-   * Creates a TextureProxy for the specified HardwareBuffer and sample count. Returns nullptr if
+   * Creates a TextureProxy for the specified HardwareBuffer. Returns nullptr if
    * the hardware buffer is not supported on the current platform.
    */
   std::shared_ptr<TextureProxy> createTextureProxy(HardwareBufferRef hardwareBuffer);
