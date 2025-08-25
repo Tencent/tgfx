@@ -27,27 +27,39 @@ namespace tgfx {
 class GLProgram : public Program {
  public:
   GLProgram(unsigned programID, std::unique_ptr<UniformBuffer> uniformBuffer,
-            std::vector<Attribute> attributes);
+            std::vector<Attribute> attributes, std::unique_ptr<BlendFormula> blendFormula);
 
   /**
-   * Gets the GL program ID for this program.
+   * Binds the program so that it is used in subsequent draw calls.
    */
-  unsigned programID() const {
-    return _programID;
-  }
+  void activate();
 
-  void setVertexBuffer(GLBuffer* buffer, size_t offset);
-
+  /**
+   * Sets the uniform data to be used in subsequent draw calls.
+   */
   void setUniformBytes(const void* data, size_t size);
+
+  /**
+   * Binds the vertex buffer to be used in subsequent draw calls. The vertexOffset is the offset
+   * into the buffer where the vertex data begins.
+   */
+  void setVertexBuffer(GPUBuffer* vertexBuffer, size_t vertexOffset);
+
+  /**
+   * Binds the index buffer to be used in subsequent draw calls.
+   */
+  void setIndexBuffer(GPUBuffer* indexBuffer);
 
  protected:
   void onReleaseGPU() override;
 
  private:
-  unsigned _programID = 0;
-  std::vector<int> uniformLocations = {};
+  unsigned programID = 0;
+  unsigned vertexArray = 0;
   std::vector<Attribute> _attributes = {};
   std::vector<int> attributeLocations = {};
+  std::vector<int> uniformLocations = {};
   int vertexStride = 0;
+  std::unique_ptr<BlendFormula> blendFormula = nullptr;
 };
 }  // namespace tgfx

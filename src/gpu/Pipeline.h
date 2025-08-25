@@ -65,6 +65,10 @@ class Pipeline : public ProgramCreator {
     return _outputSwizzle;
   }
 
+  const std::vector<Attribute>& getVertexAttributes() const {
+    return geometryProcessor->vertexAttributes();
+  }
+
   std::unique_ptr<BlendFormula> getBlendFormula() const;
 
   void getUniforms(const RenderTarget* renderTarget, UniformBuffer* uniformBuffer) const;

@@ -40,54 +40,11 @@ static void UpdateScissor(const GLFunctions* gl, const Rect& scissorRect) {
   }
 }
 
-static const unsigned XfermodeCoeff2Blend[] = {
-    GL_ZERO,       GL_ONE,
-    GL_SRC_COLOR,  GL_ONE_MINUS_SRC_COLOR,
-    GL_DST_COLOR,  GL_ONE_MINUS_DST_COLOR,
-    GL_SRC_ALPHA,  GL_ONE_MINUS_SRC_ALPHA,
-    GL_DST_ALPHA,  GL_ONE_MINUS_DST_ALPHA,
-    GL_SRC1_COLOR, GL_ONE_MINUS_SRC1_COLOR,
-    GL_SRC1_ALPHA, GL_ONE_MINUS_SRC1_ALPHA,
-};
-
-static const unsigned XfermodeEquation2Blend[] = {
-    GL_FUNC_ADD,
-    GL_FUNC_SUBTRACT,
-    GL_FUNC_REVERSE_SUBTRACT,
-};
-
-static void UpdateBlend(const GLInterface* interface, const BlendFormula* blendFactors) {
-  auto gl = interface->functions();
-  auto caps = interface->caps();
-  if (caps->frameBufferFetchSupport && caps->frameBufferFetchRequiresEnablePerSample) {
-    if (blendFactors == nullptr) {
-      gl->enable(GL_FETCH_PER_SAMPLE_ARM);
-    } else {
-      gl->disable(GL_FETCH_PER_SAMPLE_ARM);
-    }
-  }
-  if (blendFactors == nullptr || (blendFactors->srcCoeff() == BlendModeCoeff::One &&
-                                  blendFactors->dstCoeff() == BlendModeCoeff::Zero &&
-                                  (blendFactors->equation() == BlendEquation::Add ||
-                                   blendFactors->equation() == BlendEquation::Subtract))) {
-    // There is no need to enable blending if the blend mode is src.
-    gl->disable(GL_BLEND);
-  } else {
-    gl->enable(GL_BLEND);
-    gl->blendFunc(XfermodeCoeff2Blend[static_cast<int>(blendFactors->srcCoeff())],
-                  XfermodeCoeff2Blend[static_cast<int>(blendFactors->dstCoeff())]);
-    gl->blendEquation(XfermodeEquation2Blend[static_cast<int>(blendFactors->equation())]);
-  }
-}
-
 void GLRenderPass::begin() {
   auto gl = interface->functions();
   auto renderTexture = static_cast<GLTexture*>(renderTarget->getRenderTexture());
   gl->bindFramebuffer(GL_FRAMEBUFFER, renderTexture->frameBufferID());
   gl->viewport(0, 0, renderTarget->width(), renderTarget->height());
-  if (auto vertexArrayID = getVertexArrayID(renderTarget->getContext())) {
-    gl->bindVertexArray(vertexArrayID);
-  }
 }
 
 void GLRenderPass::onEnd() {
@@ -108,7 +65,7 @@ void GLRenderPass::onEnd() {
                           GL_NEAREST);
     }
   }
-  if (vertexArray != nullptr) {
+  if (caps->vertexArrayObjectSupport) {
     gl->bindVertexArray(0);
   }
   gl->bindFramebuffer(GL_FRAMEBUFFER, 0);
@@ -123,10 +80,8 @@ bool GLRenderPass::onBindProgramAndScissorClip(const Pipeline* pipeline, const R
   auto gl = interface->functions();
   ClearGLError(gl);
   auto glProgram = static_cast<GLProgram*>(program.get());
-  gl->useProgram(glProgram->programID());
+  glProgram->activate();
   UpdateScissor(gl, scissorRect);
-  auto blendFormula = pipeline->getBlendFormula();
-  UpdateBlend(interface.get(), blendFormula.get());
   auto renderTexture = renderTarget->getRenderTexture();
   auto samplers = pipeline->getSamplers();
   int textureUnit = 0;
@@ -148,17 +103,12 @@ bool GLRenderPass::onBindProgramAndScissorClip(const Pipeline* pipeline, const R
 
 bool GLRenderPass::onBindBuffers(GPUBuffer* indexBuffer, GPUBuffer* vertexBuffer,
                                  size_t vertexOffset) {
-  auto gl = interface->functions();
-  if (vertexBuffer) {
-    gl->bindBuffer(GL_ARRAY_BUFFER, static_cast<const GLBuffer*>(vertexBuffer)->bufferID());
-  } else {
+  if (vertexBuffer == nullptr) {
     return false;
   }
   auto glProgram = static_cast<GLProgram*>(program.get());
-  glProgram->setVertexBuffer(static_cast<GLBuffer*>(vertexBuffer), vertexOffset);
-  if (indexBuffer) {
-    gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, static_cast<const GLBuffer*>(indexBuffer)->bufferID());
-  }
+  glProgram->setVertexBuffer(vertexBuffer, vertexOffset);
+  glProgram->setIndexBuffer(indexBuffer);
   return true;
 }
 
@@ -181,24 +131,6 @@ void GLRenderPass::onClear(const Rect& scissor, Color color) {
   UpdateScissor(gl, scissor);
   gl->clearColor(color.red, color.green, color.blue, color.alpha);
   gl->clear(GL_COLOR_BUFFER_BIT);
-}
-
-unsigned GLRenderPass::getVertexArrayID(Context* context) {
-  if (!interface->caps()->vertexArrayObjectSupport) {
-    return 0;
-  }
-  if (vertexArray == nullptr) {
-    static const auto VertexArrayKey = UniqueKey::Make();
-    auto resource = context->globalCache()->findStaticResource(VertexArrayKey);
-    if (resource != nullptr) {
-      vertexArray = std::static_pointer_cast<GLVertexArray>(resource);
-    } else {
-      vertexArray = GLVertexArray::Make(context);
-      DEBUG_ASSERT(vertexArray != nullptr);
-      context->globalCache()->addStaticResource(VertexArrayKey, vertexArray);
-    }
-  }
-  return vertexArray->id();
 }
 
 static int FilterToGLMagFilter(FilterMode filterMode) {
