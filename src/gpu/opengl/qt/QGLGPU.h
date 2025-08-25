@@ -25,7 +25,7 @@
 // For Qt5 on Windows, combaseapi.h is included, in which interface is defined as struct FAR.
 #ifdef interface
 #undef interface
-#endif // interface
+#endif
 #endif
 #include "gpu/opengl/GLGPU.h"
 
