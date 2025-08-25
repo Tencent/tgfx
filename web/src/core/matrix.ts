@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-import {destroyVerify, wasmAwaitRewind} from '../utils/decorators';
+import {destroyVerify} from '../utils/decorators';
 import {MatrixIndex} from '../types';
 
 @destroyVerify
