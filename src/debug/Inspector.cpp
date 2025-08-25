@@ -25,10 +25,10 @@
 #include "Protocol.h"
 #include "Socket.h"
 #include "TCPPortProvider.h"
-#include "core/utils/Log.h"
-#include "lz4.h"
 #include "core/codecs/jpeg/JpegCodec.h"
+#include "core/utils/Log.h"
 #include "core/utils/PixelFormatUtil.h"
+#include "lz4.h"
 #include "tgfx/core/Clock.h"
 
 namespace tgfx::debug {
@@ -228,7 +228,8 @@ void Inspector::compressWorker() {
       const auto width = imageItem.width;
       const auto height = imageItem.height;
       auto colorType = PixelFormatToColorType(static_cast<PixelFormat>(imageItem.format));
-      auto imageInfo = ImageInfo::Make(width, height, colorType, AlphaType::Premultiplied, imageItem.rowBytes);
+      auto imageInfo =
+          ImageInfo::Make(width, height, colorType, AlphaType::Premultiplied, imageItem.rowBytes);
       auto jpgBuffer = JpegCodec::Encode(Pixmap(imageInfo, imageItem.image->bytes()), 100);
       auto size = jpgBuffer->size();
       auto pxielsBuffer = static_cast<uint8_t*>(malloc(size));
@@ -284,6 +285,12 @@ bool Inspector::commitData() {
   return ret;
 }
 
+static bool IsJPEG(const uint8_t* data, size_t size) {
+  auto offset = sizeof(MsgHeader) + sizeof(StringTransferMsg) + sizeof(uint32_t);
+  const auto pixelsData = data + offset;
+  return (size >= 3 + offset && pixelsData[0] == 0xFF && pixelsData[1] == 0xD8 && pixelsData[2] == 0xFF);
+}
+
 bool Inspector::sendData(const uint8_t* data, size_t len) {
   if (len == 0) {
     return true;
@@ -291,15 +298,18 @@ bool Inspector::sendData(const uint8_t* data, size_t len) {
   auto maxOutputSize = LZ4CompressionHandler::GetMaxOutputSize(len);
   if (lz4Buf.size() < maxOutputSize) {
     lz4Buf.clear();
-    lz4Buf.alloc(maxOutputSize);
+    lz4Buf.alloc(maxOutputSize + sizeof(size_t));
     if (lz4Buf.isEmpty()) {
       LOGE("Inspector failed to send data!");
       return false;
     }
   }
-  const auto lz4Size =
-      lz4Handler->encode(lz4Buf.bytes() + sizeof(size_t), maxOutputSize, data, len);
-  LOGI("send data %ld, compress size %ld", len, lz4Size);
+  auto lz4Size = len;
+  if (IsJPEG(data, len)) {
+    memcpy(lz4Buf.bytes() + sizeof(size_t), data, len);
+  } else {
+    lz4Size = lz4Handler->encode(lz4Buf.bytes() + sizeof(size_t), maxOutputSize, data, len);
+  }
   memcpy(lz4Buf.bytes(), &lz4Size, sizeof(size_t));
   return sock->sendData(lz4Buf.bytes(), lz4Size + sizeof(size_t)) != -1;
 }
