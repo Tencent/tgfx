@@ -227,32 +227,6 @@ export default class EmceptionAdapter {
     }
 
     /**
-    /**
-     * 包装用户代码 - 支持标准C++语法的Paint类
-     */
-    wrapUserCode(userCode) {
-        // 检查用户代码是否已经包含函数定义（包含 extern "C" 的 user_main/main）
-        const hasFunctionDef = /(extern\s+\"C\"\s+)?int\s+user_main\s*\(|(extern\s+\"C\"\s+)?int\s+main\s*\(|void\s+\w+\s*\(/.test(userCode);
-
-        let processedCode = userCode;
-
-        if (hasFunctionDef) {
-            // 如果包含 draw()，则提升为 user_main()
-            if (processedCode.includes('void draw(')) {
-                processedCode = processedCode.replace(/void\s+draw\s*\(\s*\)\s*\{/, 'extern "C" int user_main() {');
-                processedCode = processedCode.replace(/\}(\s*)$/, '    return 0;\n}$1');
-            } else if (processedCode.includes('int main(')) {
-                processedCode = processedCode.replace(/int\s+main\s*\([^)]*\)\s*\{/, 'extern "C" int user_main() {');
-            }
-            return processedCode;
-        }
-
-        // 代码片段：包装到 user_main()
-        const finalCode = `extern "C" {\n    int user_main() {\n        ${processedCode}\n        return 0;\n    }\n}`;
-        return finalCode;
-    }
-
-    /**
      * 执行编译操作
      */
     async performCompilation(sourceFile, options) {
@@ -324,22 +298,6 @@ export default class EmceptionAdapter {
             '  return window;',
             '}',
             '}',
-            // 'static uint8_t* __tgfx_fb = nullptr; static int __tgfx_w = 0, __tgfx_h = 0;',
-            // 'static inline void __tgfx_fill(uint8_t* fb,int w,int h,int x,int y,int rw,int rh,uint8_t r,uint8_t g,uint8_t b,uint8_t a){',
-            // '  int x0 = std::max(0, x), y0 = std::max(0, y);',
-            // '  int x1 = std::min(w, x + rw), y1 = std::min(h, y + rh);',
-            // '  for (int yy = y0; yy < y1; ++yy) { uint8_t* row = fb + (size_t)yy * w * 4; for (int xx = x0; xx < x1; ++xx) { uint8_t* px = row + xx * 4; px[0]=r; px[1]=g; px[2]=b; px[3]=a; } }',
-            // '}',
-            // 'extern "C" {',
-            // '__attribute__((weak)) int tgfx_init(int w, int h) { if (w<=0||h<=0) return 0; std::free(__tgfx_fb); __tgfx_w=w; __tgfx_h=h; __tgfx_fb=(uint8_t*)std::malloc((size_t)w*h*4); if(!__tgfx_fb){__tgfx_w=__tgfx_h=0;return 0;} return 1; }',
-            // '__attribute__((weak)) void tgfx_resize(int w, int h) { (void)tgfx_init(w,h); }',
-            // '__attribute__((weak)) void tgfx_clear(float r,float g,float b,float a) { if(!__tgfx_fb||__tgfx_w<=0||__tgfx_h<=0) return; uint8_t R=(uint8_t)std::clamp(r*255.f,0.f,255.f); uint8_t G=(uint8_t)std::clamp(g*255.f,0.f,255.f); uint8_t B=(uint8_t)std::clamp(b*255.f,0.f,255.f); uint8_t A=(uint8_t)std::clamp(a*255.f,0.f,255.f); for(int yy=0; yy<__tgfx_h; ++yy){ uint8_t* row=__tgfx_fb + (size_t)yy*__tgfx_w*4; for(int xx=0; xx<__tgfx_w; ++xx){ uint8_t* px=row+xx*4; px[0]=R; px[1]=G; px[2]=B; px[3]=A; } } }',
-            // '__attribute__((weak)) void tgfx_render() { if(!__tgfx_fb||__tgfx_w<=0||__tgfx_h<=0) return; __tgfx_fill(__tgfx_fb,__tgfx_w,__tgfx_h,40,40,160,100,255,0,0,255); for(int xx=0; xx<__tgfx_w; ++xx){ uint8_t r=(uint8_t)((xx/(float)__tgfx_w)*255); for(int yy=0; yy<20; ++yy){ uint8_t* px=__tgfx_fb + ((size_t)yy*__tgfx_w + xx)*4; px[0]=r; px[1]=128; px[2]=255-r; px[3]=255; } } }',
-            // '__attribute__((weak)) void tgfx_present() { }',
-            // '__attribute__((weak)) unsigned char* tgfx_get_framebuffer_ptr() { return __tgfx_fb; }',
-            // '__attribute__((weak)) int tgfx_get_width() { return __tgfx_w; }',
-            // '__attribute__((weak)) int tgfx_get_height() { return __tgfx_h; }',
-            // '}'
         ].join('\n');
         this.fsWriteFile(stubFile, stubs);
 
@@ -392,7 +350,6 @@ export default class EmceptionAdapter {
             '/usr/local/lib/tgfx.a',
             '-O0',
             '-Wno-error=version-check',  // 忽略版本检查错误
-            // 方案A：允许 em++ 后处理（Binaryen/wasm-emscripten-finalize）完整执行
             '-sMODULARIZE=1',
             '-sEXPORT_ES6=1',
             '-sENVIRONMENT=web,worker',
@@ -448,7 +405,6 @@ export default class EmceptionAdapter {
         };
     }
 
-    // 兼容 emception-core 与 emception-fixed 的文件系统访问
     fsWriteFile(path, content) {
         if (this.emceptionModule.writeFile) return this.emceptionModule.writeFile(path, content);
         return this.emceptionModule.fileSystem.writeFile(path, content);

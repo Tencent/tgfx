@@ -3,26 +3,32 @@
 <head>
     <meta charset="utf-8">
     <title>TGFX 在线代码编辑器</title>
+    <script src="https://unpkg.com/monaco-editor@0.44.0/min/vs/loader.js"></script>
     <style>
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Segoe WPC', 'Segoe UI', system-ui, -apple-system, 'Ubuntu', 'Droid Sans', sans-serif;
             margin: 0;
-            padding: 20px;
-            background-color: #f5f5f5;
+            padding: 0;
+            background-color: #1e1e1e;
+            color: #d4d4d4;
         }
         .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            background: white;
-            border-radius: 8px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            max-width: 100%;
+            height: 100vh;
+            margin: 0;
+            background: #252526;
+            border-radius: 0;
+            box-shadow: none;
             overflow: hidden;
+            display: flex;
+            flex-direction: column;
         }
         .header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 20px;
-            text-align: center;
+            background: #1f1f1f;
+            color: #d4d4d4;
+            padding: 10px 16px;
+            border-bottom: 1px solid #3c3c3c;
+            text-align: left;
         }
         .header h1 {
             margin: 0;
@@ -30,106 +36,101 @@
         }
         .content {
             display: flex;
-            height: 70vh;
+            height: calc(100vh - 56px);
+            background: #252526;
         }
         .editor-panel {
             flex: 1;
             display: flex;
             flex-direction: column;
-            border-right: 1px solid #ddd;
+            border-right: 1px solid #3c3c3c;
+            background: #252526;
         }
         .editor-header {
-            background: #f8f9fa;
-            padding: 10px 15px;
-            border-bottom: 1px solid #ddd;
+            background: #2d2d2d;
+            padding: 8px 12px;
+            border-bottom: 1px solid #3c3c3c;
             display: flex;
             justify-content: space-between;
             align-items: center;
         }
         .editor-title {
-            font-weight: bold;
-            color: #333;
+            font-weight: 600;
+            color: #cccccc;
         }
         .run-button {
-            background: #28a745;
-            color: white;
-            border: none;
-            padding: 8px 16px;
-            border-radius: 4px;
+            background: #0e639c;
+            color: #ffffff;
+            border: 1px solid #0e639c;
+            padding: 6px 12px;
+            border-radius: 2px;
             cursor: pointer;
-            font-size: 14px;
-            transition: background 0.3s;
+            font-size: 13px;
         }
-        .run-button:hover {
-            background: #218838;
-        }
-        .run-button:disabled {
-            background: #6c757d;
-            cursor: not-allowed;
-        }
+        .run-button:hover { background: #1177bb; border-color: #1177bb; }
+        .run-button:disabled { background: #3c3c3c; border-color: #3c3c3c; color: #999999; cursor: not-allowed; }
         .editor {
             flex: 1;
-            font-family: 'Courier New', monospace;
-            font-size: 14px;
-            padding: 15px;
             border: none;
             outline: none;
-            resize: none;
-            background: #fafafa;
-            line-height: 1.5;
+            background: #1e1e1e;
+        }
+        
+        #monacoEditor {
+            width: 100%;
+            height: 100%;
         }
         .output-panel {
             flex: 1;
             display: flex;
             flex-direction: column;
+            background: #252526;
         }
         .canvas-container {
             flex: 1;
-            padding: 20px;
-            background: #f8f9fa;
+            padding: 12px;
+            background: #252526;
             display: flex;
             justify-content: center;
             align-items: center;
+            border-bottom: 1px solid #3c3c3c;
         }
         canvas {
-            border: 2px solid #ddd;
-            background: white;
-            border-radius: 4px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            border: 1px solid #3c3c3c;
+            background: #1e1e1e;
+            border-radius: 2px;
         }
         .console {
-            height: 150px;
-            border-top: 1px solid #ddd;
+            height: 160px;
+            border-top: 1px solid #3c3c3c;
             padding: 10px;
-            background: #2d3748;
-            color: #e2e8f0;
-            font-family: 'Courier New', monospace;
+            background: #1e1e1e;
+            color: #d4d4d4;
+            font-family: 'Consolas', 'Courier New', monospace;
             font-size: 12px;
             overflow-y: auto;
             white-space: pre-wrap;
         }
-        .console .info { color: #63b3ed; }
-        .console .success { color: #68d391; }
-        .console .error { color: #fc8181; }
-        .console .warning { color: #fbd38d; }
+        .console .info { color: #4fc1ff; }
+        .console .success { color: #6a9955; }
+        .console .error { color: #f14c4c; }
+        .console .warning { color: #cca700; }
         .examples {
-            background: #f8f9fa;
-            padding: 10px 15px;
-            border-bottom: 1px solid #ddd;
+            background: #2d2d2d;
+            padding: 8px 12px;
+            border-bottom: 1px solid #3c3c3c;
         }
         .example-btn {
-            background: #007bff;
-            color: white;
-            border: none;
-            padding: 5px 10px;
-            margin: 0 5px 5px 0;
-            border-radius: 3px;
+            background: #0e639c;
+            color: #ffffff;
+            border: 1px solid #0e639c;
+            padding: 4px 8px;
+            margin: 0 6px 6px 0;
+            border-radius: 2px;
             cursor: pointer;
             font-size: 12px;
         }
-        .example-btn:hover {
-            background: #0056b3;
-        }
+        .example-btn:hover { background: #1177bb; border-color: #1177bb; }
 
         /* 编译模式选择器样式 */
         .compile-mode-selector {
@@ -156,38 +157,38 @@
 
         /* 编译状态显示 */
         .compile-status {
-            margin: 10px 0;
-            padding: 8px;
-            border-radius: 4px;
-            font-size: 14px;
+            margin: 8px 12px;
+            padding: 6px 8px;
+            border-radius: 2px;
+            font-size: 13px;
             display: none;
         }
 
         .compile-status.compiling {
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            color: #856404;
+            background: #3c3c3c;
+            border: 1px solid #6b6b6b;
+            color: #e5e5e5;
             display: block;
         }
 
         .compile-status.success {
-            background: #d4edda;
-            border: 1px solid #c3e6cb;
-            color: #155724;
+            background: #1e5128;
+            border: 1px solid #2ea043;
+            color: #c9ffd8;
             display: block;
         }
 
         .compile-status.error {
-            background: #f8d7da;
-            border: 1px solid #f5c6cb;
-            color: #721c24;
+            background: #512020;
+            border: 1px solid #f14c4c;
+            color: #ffd6d6;
             display: block;
         }
 
         .progress-bar {
             width: 100%;
             height: 4px;
-            background: #e9ecef;
+            background: #3c3c3c;
             border-radius: 2px;
             overflow: hidden;
             margin-top: 5px;
@@ -195,7 +196,7 @@
 
         .progress-fill {
             height: 100%;
-            background: #007bff;
+            background: #0e639c;
             border-radius: 2px;
             transition: width 0.3s ease;
             width: 0%;
@@ -233,8 +234,24 @@
                         ▶️ 运行代码
                     </button>
                 </div>
-                <textarea id="codeEditor" class="editor" placeholder="在这里编写您的C++代码...">
-#include <tgfx/core/Color.h>
+                <div id="monacoEditor" class="editor"></div>
+            </div>
+
+            <div class="output-panel">
+                <div class="canvas-container">
+                    <canvas id="renderCanvas" width="640" height="480"></canvas>
+                </div>
+                <div id="console" class="console"></div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        // Monaco Editor 实例
+        let monacoEditor = null;
+        
+        // 默认代码
+        const defaultCode = `#include <tgfx/core/Color.h>
 #include <tgfx/core/Paint.h>
 #include <tgfx/core/Rect.h>
 #include <tgfx/core/Point.h>
@@ -263,30 +280,158 @@ int main() {
 
     window->present(context);
     return 0;
-}
-                </textarea>
-            </div>
+}`;
 
-            <div class="output-panel">
-                <div class="canvas-container">
-                    <canvas id="renderCanvas" width="400" height="300"></canvas>
-                </div>
-                <div id="console" class="console"></div>
-            </div>
-        </div>
-    </div>
+        // 初始化 Monaco Editor
+        function initializeMonacoEditor() {
+            return new Promise((resolve, reject) => {
+                require.config({ paths: { vs: 'https://unpkg.com/monaco-editor@0.44.0/min/vs' } });
+                require(['vs/editor/editor.main'], function () {
+                    try {
+                        monacoEditor = monaco.editor.create(document.getElementById('monacoEditor'), {
+                            value: defaultCode,
+                            language: 'cpp',
+                            theme: 'vs-dark',
+                            fontSize: 14,
+                            minimap: { enabled: true },
+                            scrollBeyondLastLine: false,
+                            automaticLayout: true,
+                            wordWrap: 'on',
+                            lineNumbers: 'on',
+                            folding: true,
+                            renderWhitespace: 'selection',
+                            contextmenu: true,
+                            mouseWheelZoom: true,
+                            cursorBlinking: 'blink',
+                            cursorSmoothCaretAnimation: true,
+                            smoothScrolling: true,
+                            selectOnLineNumbers: true,
+                            roundedSelection: false,
+                            readOnly: false,
+                            cursorStyle: 'line',
+                            fontLigatures: true,
+                            suggest: {
+                                showKeywords: true,
+                                showSnippets: true,
+                                showClasses: true,
+                                showFunctions: true,
+                                showVariables: true
+                            }
+                        });
+                        
+                        // 添加快捷键
+                        monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, function() {
+                            executeCode();
+                        });
+                        
+                        addConsoleOutput('Monaco Editor 已初始化', 'success');
+                        resolve(monacoEditor);
+                    } catch (error) {
+                        addConsoleOutput(`Monaco Editor 初始化失败: ${error.message}`, 'error');
+                        reject(error);
+                    }
+                });
+            });
+        }
 
-    <script type="module">
         // 示例代码
         const examples = {
-            rect: `#include <tgfx/core/Color.h>\n#include <tgfx/core/Paint.h>\n#include <tgfx/core/Rect.h>\n\nextern "C" int user_main(){\n  tgfx::Paint p; p.setColor(tgfx::Color::FromRGBA(255,0,0,255));\n  auto rc = tgfx::Rect::MakeLTRB(50,50,200,150); (void)rc;\n  return 0;\n}`,
-            circle: `#include <tgfx/core/Color.h>\n#include <tgfx/core/Paint.h>\n#include <tgfx/core/Point.h>\n\nextern "C" int user_main(){\n  tgfx::Paint fill; fill.setColor(tgfx::Color::FromRGBA(0,0,255,255));\n  auto c = tgfx::Point::Make(200,150); (void)c;\n  return 0;\n}`,
-            simple: `#include <tgfx/core/Color.h>\n#include <tgfx/core/Paint.h>\n#include <tgfx/core/Rect.h>\n\nextern "C" int user_main(){\n  tgfx::Paint p; p.setColor(tgfx::Color::FromRGBA(128,0,128,255));\n  auto rc = tgfx::Rect::MakeLTRB(100,100,300,200); (void)rc;\n  return 0;\n}`,
-            improved: `#include <tgfx/core/Color.h>\n#include <tgfx/core/Paint.h>\n\nextern "C" int user_main(){\n  tgfx::Paint p1; p1.setColor(tgfx::Color::FromRGBA(255,51,51,204));\n  tgfx::Paint p2; p2.setColor(tgfx::Color::FromRGBA(51,255,51,204));\n  tgfx::Paint p3; p3.setColor(tgfx::Color::FromRGBA(51,51,255,204));\n  return 0;\n}`,
-            memory: `#include <tgfx/core/Color.h>\n#include <tgfx/core/Paint.h>\n\nextern "C" int user_main(){\n  tgfx::Paint r; r.setColor(tgfx::Color::FromRGBA(255,0,0,179));\n  tgfx::Paint g; g.setColor(tgfx::Color::FromRGBA(0,255,0,179));\n  tgfx::Paint b; b.setColor(tgfx::Color::FromRGBA(0,0,255,179));\n  return 0;\n}`,
-            webgl_basic: `#include <tgfx/core/Color.h>\n#include <tgfx/core/Paint.h>\n#include <tgfx/core/Rect.h>\n#include <tgfx/core/Point.h>\n#include <tgfx/core/Canvas.h>\n#include <tgfx/gpu/opengl/webgl/WebGLWindow.h>\n\nextern "C" int user_main(){\n  auto window = tgfx::WebGLWindow::MakeFrom("#renderCanvas");\n  if(!window) return 1; auto device = window->getDevice(); if(!device) return 2; auto context = device->lockContext(); if(!context) return 3; auto surface = window->getSurface(context); if(!surface) return 4; auto canvas = surface->getCanvas();\n  canvas->clear(tgfx::Color::White());\n  tgfx::Paint p; p.setColor(tgfx::Color::FromRGBA(255,0,0,255));\n  canvas->drawRect(tgfx::Rect::MakeLTRB(50,50,200,150), p);\n  p.setColor(tgfx::Color::FromRGBA(0,0,255,179));\n  canvas->drawCircle(tgfx::Point::Make(300,100), 40, p);\n  window->present(context);\n  return 0;\n}`,
-            webgl_blend: `#include <tgfx/core/Color.h>\n#include <tgfx/core/Paint.h>\n#include <tgfx/core/Point.h>\n#include <tgfx/core/Canvas.h>\n#include <tgfx/gpu/opengl/webgl/WebGLWindow.h>\n\nextern "C" int user_main(){\n  auto window = tgfx::WebGLWindow::MakeFrom("#renderCanvas");\n  if(!window) return 1; auto device = window->getDevice(); if(!device) return 2; auto context = device->lockContext(); if(!context) return 3; auto surface = window->getSurface(context); if(!surface) return 4; auto canvas = surface->getCanvas();\n  canvas->clear(tgfx::Color::White());\n  tgfx::Paint p; p.setColor(tgfx::Color::FromRGBA(255,0,0,128)); canvas->drawCircle(tgfx::Point::Make(140,120), 60, p);\n  p.setColor(tgfx::Color::FromRGBA(0,255,0,128)); canvas->drawCircle(tgfx::Point::Make(200,120), 60, p);\n  p.setColor(tgfx::Color::FromRGBA(0,0,255,128)); canvas->drawCircle(tgfx::Point::Make(170,180), 60, p);\n  window->present(context);\n  return 0;\n}`,
-            webgl_multi: `#include <tgfx/core/Color.h>\n#include <tgfx/core/Paint.h>\n#include <tgfx/core/Rect.h>\n#include <tgfx/core/Canvas.h>\n#include <tgfx/gpu/opengl/webgl/WebGLWindow.h>\n\nextern "C" int user_main(){\n  auto window = tgfx::WebGLWindow::MakeFrom("#renderCanvas");\n  if(!window) return 1; auto device = window->getDevice(); if(!device) return 2; auto context = device->lockContext(); if(!context) return 3; auto surface = window->getSurface(context); if(!surface) return 4; auto canvas = surface->getCanvas();\n  canvas->clear(tgfx::Color::White());\n  tgfx::Paint p;\n  p.setColor(tgfx::Color::FromRGBA(255,128,0,255)); canvas->drawRect(tgfx::Rect::MakeLTRB(20,20,120,80), p);\n  p.setColor(tgfx::Color::FromRGBA(0,128,255,200)); canvas->drawRect(tgfx::Rect::MakeLTRB(140,40,260,140), p);\n  p.setColor(tgfx::Color::FromRGBA(128,0,255,160)); canvas->drawRect(tgfx::Rect::MakeLTRB(280,60,380,160), p);\n  window->present(context);\n  return 0;\n}`
+            rect: `#include <tgfx/core/Color.h>
+#include <tgfx/core/Paint.h>
+#include <tgfx/core/Rect.h>
+
+extern "C" int user_main(){
+  tgfx::Paint p; p.setColor(tgfx::Color::FromRGBA(255,0,0,255));
+  auto rc = tgfx::Rect::MakeLTRB(50,50,200,150); (void)rc;
+  return 0;
+}`,
+            circle: `#include <tgfx/core/Color.h>
+#include <tgfx/core/Paint.h>
+#include <tgfx/core/Point.h>
+
+extern "C" int user_main(){
+  tgfx::Paint fill; fill.setColor(tgfx::Color::FromRGBA(0,0,255,255));
+  auto c = tgfx::Point::Make(200,150); (void)c;
+  return 0;
+}`,
+            simple: `#include <tgfx/core/Color.h>
+#include <tgfx/core/Paint.h>
+#include <tgfx/core/Rect.h>
+
+extern "C" int user_main(){
+  tgfx::Paint p; p.setColor(tgfx::Color::FromRGBA(128,0,128,255));
+  auto rc = tgfx::Rect::MakeLTRB(100,100,300,200); (void)rc;
+  return 0;
+}`,
+            improved: `#include <tgfx/core/Color.h>
+#include <tgfx/core/Paint.h>
+
+extern "C" int user_main(){
+  tgfx::Paint p1; p1.setColor(tgfx::Color::FromRGBA(255,51,51,204));
+  tgfx::Paint p2; p2.setColor(tgfx::Color::FromRGBA(51,255,51,204));
+  tgfx::Paint p3; p3.setColor(tgfx::Color::FromRGBA(51,51,255,204));
+  return 0;
+}`,
+            memory: `#include <tgfx/core/Color.h>
+#include <tgfx/core/Paint.h>
+
+extern "C" int user_main(){
+  tgfx::Paint r; r.setColor(tgfx::Color::FromRGBA(255,0,0,179));
+  tgfx::Paint g; g.setColor(tgfx::Color::FromRGBA(0,255,0,179));
+  tgfx::Paint b; b.setColor(tgfx::Color::FromRGBA(0,0,255,179));
+  return 0;
+}`,
+            webgl_basic: `#include <tgfx/core/Color.h>
+#include <tgfx/core/Paint.h>
+#include <tgfx/core/Rect.h>
+#include <tgfx/core/Point.h>
+#include <tgfx/core/Canvas.h>
+#include <tgfx/gpu/opengl/webgl/WebGLWindow.h>
+
+extern "C" int user_main(){
+  auto window = tgfx::WebGLWindow::MakeFrom("#renderCanvas");
+  if(!window) return 1; auto device = window->getDevice(); if(!device) return 2; auto context = device->lockContext(); if(!context) return 3; auto surface = window->getSurface(context); if(!surface) return 4; auto canvas = surface->getCanvas();
+  canvas->clear(tgfx::Color::White());
+  tgfx::Paint p; p.setColor(tgfx::Color::FromRGBA(255,0,0,255));
+  canvas->drawRect(tgfx::Rect::MakeLTRB(50,50,200,150), p);
+  p.setColor(tgfx::Color::FromRGBA(0,0,255,179));
+  canvas->drawCircle(tgfx::Point::Make(300,100), 40, p);
+  window->present(context);
+  return 0;
+}`,
+            webgl_blend: `#include <tgfx/core/Color.h>
+#include <tgfx/core/Paint.h>
+#include <tgfx/core/Point.h>
+#include <tgfx/core/Canvas.h>
+#include <tgfx/gpu/opengl/webgl/WebGLWindow.h>
+
+extern "C" int user_main(){
+  auto window = tgfx::WebGLWindow::MakeFrom("#renderCanvas");
+  if(!window) return 1; auto device = window->getDevice(); if(!device) return 2; auto context = device->lockContext(); if(!context) return 3; auto surface = window->getSurface(context); if(!surface) return 4; auto canvas = surface->getCanvas();
+  canvas->clear(tgfx::Color::White());
+  tgfx::Paint p; p.setColor(tgfx::Color::FromRGBA(255,0,0,128)); canvas->drawCircle(tgfx::Point::Make(140,120), 60, p);
+  p.setColor(tgfx::Color::FromRGBA(0,255,0,128)); canvas->drawCircle(tgfx::Point::Make(200,120), 60, p);
+  p.setColor(tgfx::Color::FromRGBA(0,0,255,128)); canvas->drawCircle(tgfx::Point::Make(170,180), 60, p);
+  window->present(context);
+  return 0;
+}`,
+            webgl_multi: `#include <tgfx/core/Color.h>
+#include <tgfx/core/Paint.h>
+#include <tgfx/core/Rect.h>
+#include <tgfx/core/Canvas.h>
+#include <tgfx/gpu/opengl/webgl/WebGLWindow.h>
+
+extern "C" int user_main(){
+  auto window = tgfx::WebGLWindow::MakeFrom("#renderCanvas");
+  if(!window) return 1; auto device = window->getDevice(); if(!device) return 2; auto context = device->lockContext(); if(!context) return 3; auto surface = window->getSurface(context); if(!surface) return 4; auto canvas = surface->getCanvas();
+  canvas->clear(tgfx::Color::White());
+  tgfx::Paint p;
+  p.setColor(tgfx::Color::FromRGBA(255,128,0,255)); canvas->drawRect(tgfx::Rect::MakeLTRB(20,20,120,80), p);
+  p.setColor(tgfx::Color::FromRGBA(0,128,255,200)); canvas->drawRect(tgfx::Rect::MakeLTRB(140,40,260,140), p);
+  p.setColor(tgfx::Color::FromRGBA(128,0,255,160)); canvas->drawRect(tgfx::Rect::MakeLTRB(280,60,380,160), p);
+  window->present(context);
+  return 0;
+}`
         };
 
         let compilationManager = null;
@@ -436,19 +581,16 @@ int main() {
 
         // 加载示例
         function loadExample(type) {
-            if (examples[type]) {
-                const editor = document.getElementById('codeEditor');
-                if (editor) {
-                    editor.value = examples[type];
-                    addConsoleOutput(`已加载${type}示例代码`, 'info');
-                }
+            if (examples[type] && monacoEditor) {
+                monacoEditor.setValue(examples[type]);
+                addConsoleOutput(`已加载${type}示例代码`, 'info');
             }
         }
 
         // 执行代码
         async function executeCode() {
             const runBtn = document.getElementById('runBtn');
-            const code = document.getElementById('codeEditor').value;
+            const code = monacoEditor ? monacoEditor.getValue() : '';
 
             runBtn.disabled = true;
             runBtn.textContent = '执行中...';
@@ -530,7 +672,14 @@ int main() {
         // DSL 模式与 wrapcode 功能已移除
 
         // 页面初始化
-        document.addEventListener('DOMContentLoaded', () => {
+        document.addEventListener('DOMContentLoaded', async () => {
+            // 初始化 Monaco Editor
+            try {
+                await initializeMonacoEditor();
+            } catch (error) {
+                addConsoleOutput(`Monaco Editor 初始化失败: ${error.message}`, 'error');
+            }
+
             // 绑定示例按钮
             const exampleButtons = document.querySelectorAll('.example-btn[data-example]');
             exampleButtons.forEach(button => {
@@ -550,6 +699,7 @@ int main() {
             addConsoleOutput('点击示例按钮加载代码，然后点击运行按钮执行', 'info');
         });
 
+        // 监听模块加载完成事件
         // 监听模块加载完成事件
         window.addEventListener('modulesLoaded', (event) => {
             if (event.detail.success) {

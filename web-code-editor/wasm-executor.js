@@ -49,9 +49,9 @@ class WasmExecutor {
      */
     async loadWasm(wasmBinary, imports = {}) {
         try {
-            console.log('📦 正在加载WebAssembly模块...');
+            console.log('正在加载WebAssembly模块...');
             if (imports && imports.env) {
-                console.log('📦 传入的导入对象(env keys):', Object.keys(imports.env));
+                console.log('传入的导入对象(env keys):', Object.keys(imports.env));
             }
 
             // 实例化WebAssembly模块
@@ -63,7 +63,7 @@ class WasmExecutor {
             this.isReady = true;
 
             console.log('✅ WebAssembly模块加载成功');
-            console.log('📋 可用导出:', Object.keys(this.wasmExports));
+            console.log('可用导出:', Object.keys(this.wasmExports));
 
             return true;
 
@@ -129,7 +129,7 @@ class WasmExecutor {
         this.wasmExports = null;
         this.wasmMemory = null;
         this.isReady = false;
-        console.log('🧹 WASM执行器已清理');
+        console.log('WASM执行器已清理');
     }
 
     /**
