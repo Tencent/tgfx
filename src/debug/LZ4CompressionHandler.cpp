@@ -59,7 +59,7 @@ std::unique_ptr<LZ4CompressionHandler> LZ4CompressionHandler::Make() {
 }
 
 size_t LZ4CompressionHandler::GetMaxOutputSize(size_t inputSize) {
-  return inputSize;
+  return inputSize + 12;
 }
 #else
 

@@ -27,6 +27,8 @@
 #include "TCPPortProvider.h"
 #include "core/utils/Log.h"
 #include "lz4.h"
+#include "core/codecs/jpeg/JpegCodec.h"
+#include "core/utils/PixelFormatUtil.h"
 #include "tgfx/core/Clock.h"
 
 namespace tgfx::debug {
@@ -225,10 +227,12 @@ void Inspector::compressWorker() {
     while (imageQueue.try_dequeue(imageItem)) {
       const auto width = imageItem.width;
       const auto height = imageItem.height;
-      const auto compressSize = static_cast<size_t>(width * height / 2);
-      auto compressBuffer = static_cast<uint8_t*>(malloc(compressSize));
-      CompressImage(imageItem.image->bytes(), compressBuffer, width, height);
-      imageItem.image->release();
+      auto colorType = PixelFormatToColorType(static_cast<PixelFormat>(imageItem.format));
+      auto imageInfo = ImageInfo::Make(width, height, colorType, AlphaType::Premultiplied, imageItem.rowBytes);
+      auto jpgBuffer = JpegCodec::Encode(Pixmap(imageInfo, imageItem.image->bytes()), 100);
+      auto size = jpgBuffer->size();
+      auto pxielsBuffer = static_cast<uint8_t*>(malloc(size));
+      memcpy(pxielsBuffer, jpgBuffer->bytes(), size);
 
       MsgItem item = {};
       item.hdr.type = MsgType::TextureData;
@@ -237,7 +241,8 @@ void Inspector::compressWorker() {
       item.textureData.height = imageItem.height;
       item.textureData.rowBytes = imageItem.rowBytes;
       item.textureData.format = imageItem.format;
-      item.textureData.pixels = reinterpret_cast<uint64_t>(compressBuffer);
+      item.textureData.pixels = reinterpret_cast<uint64_t>(pxielsBuffer);
+      item.textureData.pixelsSize = size;
       QueueSerialFinish(item);
     }
   }
@@ -258,6 +263,13 @@ bool Inspector::needDataSize(size_t len) {
 }
 
 void Inspector::appendDataUnsafe(const void* data, size_t len) {
+  if (dataBuffer.size() < len + static_cast<size_t>(dataBufferOffset)) {
+    Buffer tempDataBuffer(dataBuffer.size());
+    memcpy(tempDataBuffer.bytes(), dataBuffer.bytes(), dataBuffer.size());
+    dataBuffer.clear();
+    dataBuffer.alloc(len + static_cast<size_t>(dataBufferOffset));
+    memcpy(dataBuffer.bytes(), tempDataBuffer.bytes(), tempDataBuffer.size());
+  }
   memcpy(dataBuffer.bytes() + dataBufferOffset, data, len);
   dataBufferOffset += static_cast<int>(len);
 }
@@ -273,6 +285,9 @@ bool Inspector::commitData() {
 }
 
 bool Inspector::sendData(const uint8_t* data, size_t len) {
+  if (len == 0) {
+    return true;
+  }
   auto maxOutputSize = LZ4CompressionHandler::GetMaxOutputSize(len);
   if (lz4Buf.size() < maxOutputSize) {
     lz4Buf.clear();
@@ -284,6 +299,7 @@ bool Inspector::sendData(const uint8_t* data, size_t len) {
   }
   const auto lz4Size =
       lz4Handler->encode(lz4Buf.bytes() + sizeof(size_t), maxOutputSize, data, len);
+  LOGI("send data %ld, compress size %ld", len, lz4Size);
   memcpy(lz4Buf.bytes(), &lz4Size, sizeof(size_t));
   return sock->sendData(lz4Buf.bytes(), lz4Size + sizeof(size_t)) != -1;
 }
@@ -370,12 +386,10 @@ Inspector::DequeueStatus Inspector::dequeueSerial() {
       auto idx = item.hdr.idx;
       switch (static_cast<MsgType>(idx)) {
         case MsgType::TextureData: {
-          auto ptr = item.textureData.pixels;
-          const auto w = item.textureData.width;
-          const auto h = item.textureData.height;
-          const auto csz = static_cast<size_t>(w * h / 2);
-          sendLongString(ptr, (const char*)ptr, csz, MsgType::PixelsData);
-          free((void*)ptr);
+          auto pixels = item.textureData.pixels;
+          auto csz = item.textureData.pixelsSize;
+          sendLongString(pixels, (const char*)pixels, csz, MsgType::PixelsData);
+          free(reinterpret_cast<void*>(pixels));
           break;
         }
         case MsgType::OperateBegin: {

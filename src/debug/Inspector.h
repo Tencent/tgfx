@@ -78,10 +78,8 @@ class Inspector {
   static void SendTextureData(uint64_t texturePtr, int width, int height, size_t rowBytes,
                               uint8_t format, const void* pixels) {
     const auto sz = static_cast<size_t>(width) * rowBytes;
-    // std::shared_ptr<uint8_t> ptr(new uint8_t[sz]);
     auto imageBuffer = std::make_shared<Buffer>(sz);
     imageBuffer->writeRange(0, sz, pixels);
-    // memcpy(imageBuffer-, pixels, sz);
 
     auto imageItem = ImageItem();
     imageItem.image = std::move(imageBuffer);

@@ -110,6 +110,7 @@ struct TextureDataMsg : TextureSamplerMsg {
   int width;
   int height;
   size_t rowBytes;
+  size_t pixelsSize;
   uint64_t pixels;
 };
 
