@@ -28,7 +28,7 @@ std::shared_ptr<ColorFilter> ColorFilter::Luma() {
 bool LumaColorFilter::onFilterColor(const Color& srcColor, Color* dstColor) const {
   /** See ITU-R Recommendation BT.709 at http://www.itu.int/rec/R-REC-BT.709/ .*/
   // Must use premultiplied color to compute luma. Othereise, use 'MatrixColorFilter' instead.
-  const Color pmColor = srcColor.premultiply();
+  const auto pmColor = srcColor.premultiply();
   const float luma = pmColor.red * 0.2126f + pmColor.green * 0.7152f + pmColor.blue * 0.0722f;
   // Return non-premultiplied RGBA color.
   *dstColor = Color(1.0f, 1.0f, 1.0f, luma);

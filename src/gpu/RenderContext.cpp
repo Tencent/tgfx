@@ -140,14 +140,14 @@ Rect RenderContext::getClipBounds(const Path& clip) {
 
 void RenderContext::drawFill(const Fill& fill) {
   if (auto compositor = getOpsCompositor(fill.isOpaque())) {
-    const Fill filteredFill = ApplyFillColorFilter(fill);
+    const auto filteredFill = ApplyFillColorFilter(fill);
     compositor->fillRect(renderTarget->bounds(), {}, filteredFill);
   }
 }
 
 void RenderContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
   if (auto compositor = getOpsCompositor()) {
-    const Fill filteredFill = ApplyFillColorFilter(fill);
+    const auto filteredFill = ApplyFillColorFilter(fill);
     compositor->fillRect(rect, state, filteredFill);
   }
 }
@@ -155,7 +155,7 @@ void RenderContext::drawRect(const Rect& rect, const MCState& state, const Fill&
 void RenderContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
                               const Stroke* stroke) {
   if (auto compositor = getOpsCompositor()) {
-    const Fill filteredFill = ApplyFillColorFilter(fill);
+    const auto filteredFill = ApplyFillColorFilter(fill);
     compositor->drawRRect(rRect, state, filteredFill, stroke);
   }
 }
@@ -185,7 +185,7 @@ void RenderContext::drawImage(std::shared_ptr<Image> image, const SamplingOption
 void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                               const Fill& fill) {
   if (auto compositor = getOpsCompositor()) {
-    const Fill filteredFill = ApplyFillColorFilter(fill);
+    const auto filteredFill = ApplyFillColorFilter(fill);
     compositor->fillShape(std::move(shape), state, filteredFill);
   }
 }
@@ -371,7 +371,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
   auto atlasManager = getContext()->atlasManager();
   auto drawingManager = getContext()->drawingManager();
   auto nextFlushToken = atlasManager->nextFlushToken();
-  const Fill filteredFill = ApplyFillColorFilter(fill);
+  const auto filteredFill = ApplyFillColorFilter(fill);
   for (auto& glyphID : sourceGlyphRun.glyphs) {
     auto glyphPosition = sourceGlyphRun.positions[index++];
     auto bounds = font.getBounds(glyphID);
@@ -453,7 +453,7 @@ void RenderContext::drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList,
                                      Rect& localClipBounds) {
   auto maxScale = state.matrix.getMaxScale();
   Path clipPath = {};
-  const Fill filteredFill = ApplyFillColorFilter(fill);
+  const auto filteredFill = ApplyFillColorFilter(fill);
   if (filteredFill.antiAlias) {
     localClipBounds.outset(1.0f, 1.0f);
   }
@@ -506,7 +506,7 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
   auto atlasManager = getContext()->atlasManager();
   auto nextFlushToken = atlasManager->nextFlushToken();
   auto drawingManager = getContext()->drawingManager();
-  const Fill filteredFill = ApplyFillColorFilter(fill);
+  const auto filteredFill = ApplyFillColorFilter(fill);
   for (auto& glyphID : sourceGlyphRun.glyphs) {
     auto glyphPosition = sourceGlyphRun.positions[index++];
     auto bounds = font.getBounds(glyphID);
