@@ -18,30 +18,8 @@
 
 #pragma once
 
-#include "gpu/GPUResource.h"
-#include "tgfx/gpu/Backend.h"
-#include "tgfx/gpu/PixelFormat.h"
-
 namespace tgfx {
-/**
- * GPUFrameBuffer represents a frame buffer in the GPU backend that can be rendered to.
- */
-class GPUFrameBuffer : public GPUResource {
- public:
-  /**
-   * Returns the pixel format of the frame buffer.
-   */
-  virtual PixelFormat format() const = 0;
 
-  /**
-   * Returns the number of samples used by the frame buffer. Returns 1 if multisampling is disabled,
-   * or the number of samples per pixel if enabled.
-   */
-  virtual int sampleCount() const = 0;
+float NextPowerOfTwoScale(float scale);
 
-  /**
-   * Retrieves the backend render target.
-   */
-  virtual BackendRenderTarget getBackendRenderTarget(int width, int height) const = 0;
-};
-}  // namespace tgfx
+}

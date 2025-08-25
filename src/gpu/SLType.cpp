@@ -16,20 +16,38 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/opengl/GLGPU.h"
+#include "SLType.h"
+#include <cinttypes>
 
 namespace tgfx {
-class WGLGPU : public GLGPU {
- public:
-  explicit WGLGPU(std::shared_ptr<GLInterface> glInterface) : GLGPU(std::move(glInterface)) {
+size_t GetSLTypeSize(SLType type) {
+  switch (type) {
+    case SLType::Float:
+      return sizeof(float);
+    case SLType::Float2:
+      return 2 * sizeof(float);
+    case SLType::Float3:
+      return 3 * sizeof(float);
+    case SLType::Float4:
+      return 4 * sizeof(float);
+    case SLType::Int:
+      return sizeof(int32_t);
+    case SLType::Int2:
+      return 2 * sizeof(int32_t);
+    case SLType::Int3:
+      return 3 * sizeof(int32_t);
+    case SLType::Int4:
+      return 4 * sizeof(int32_t);
+    case SLType::UByte4Color:
+      return 4 * sizeof(uint8_t);
+    case SLType::Float2x2:
+      return 4 * sizeof(float);
+    case SLType::Float3x3:
+      return 9 * sizeof(float);
+    case SLType::Float4x4:
+      return 16 * sizeof(float);
+    default:
+      return 0;
   }
-
-  std::vector<PixelFormat> getHardwareTextureFormats(HardwareBufferRef hardwareBuffer,
-                                                     YUVFormat* yuvFormat) const override;
-
-  std::vector<std::unique_ptr<GPUTexture>> importHardwareTextures(HardwareBufferRef hardwareBuffer,
-                                                                  uint32_t usage) override;
-};
+}
 }  // namespace tgfx

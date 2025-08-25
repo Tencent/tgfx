@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,26 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/GPUFrameBuffer.h"
+#include "NextPowerOfTwoScale.h"
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
 
 namespace tgfx {
-/**
- * Represents an OpenGL 2D buffer of pixels that can be rendered to.
- */
-class GLFrameBuffer : public GPUFrameBuffer {
- public:
-  /**
-   * Returns the frame buffer ID used for reading pixels.
-   */
-  virtual unsigned readFrameBufferID() const = 0;
 
-  /**
-   * Returns the frame buffer ID used for drawing pixels.
-   */
-  virtual unsigned drawFrameBufferID() const = 0;
+float NextPowerOfTwoScale(float scale) {
+  scale = std::clamp(scale, 0.0f, 1.0f);
+  if (scale > 0.5f) {
+    return 1.0f;
+  }
+  float exactLevel = std::log2(1.0f / scale);
+  auto scaleLevel = static_cast<uint32_t>(std::floor(exactLevel));
+  return 1.0f / static_cast<float>(1 << scaleLevel);
+}
 
-  BackendRenderTarget getBackendRenderTarget(int width, int height) const override;
-};
 }  // namespace tgfx

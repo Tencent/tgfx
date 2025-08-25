@@ -16,41 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/opengl/GLFrameBuffer.h"
+#include "tgfx/gpu/RuntimeEffect.h"
 
 namespace tgfx {
-class GLExternalFrameBuffer : public GLFrameBuffer {
- public:
-  PixelFormat format() const override {
-    return _format;
-  }
+uint32_t RuntimeEffect::NextProgramID() {
 
-  int sampleCount() const override {
-    return 1;
-  }
+  static std::atomic<uint32_t> nextID{1};
+  static constexpr uint32_t InvalidUniqueID = 0;
+  uint32_t id;
+  do {
+    id = nextID.fetch_add(1, std::memory_order_relaxed);
+  } while (id == InvalidUniqueID);
+  return id;
+}
 
-  unsigned readFrameBufferID() const override {
-    return frameBufferID;
-  }
-
-  unsigned drawFrameBufferID() const override {
-    return frameBufferID;
-  }
-
-  void release(GPU*) override {
-    // Do nothing, the external FBO is not owned by us.
-  }
-
- private:
-  unsigned frameBufferID = 0;
-  PixelFormat _format = PixelFormat::RGBA_8888;
-
-  GLExternalFrameBuffer(unsigned frameBufferID, PixelFormat format)
-      : frameBufferID(frameBufferID), _format(format) {
-  }
-
-  friend class GLGPU;
-};
 }  // namespace tgfx

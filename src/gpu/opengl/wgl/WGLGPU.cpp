@@ -27,7 +27,8 @@ std::vector<PixelFormat> WGLGPU::getHardwareTextureFormats(HardwareBufferRef, YU
   return {};
 }
 
-std::vector<std::unique_ptr<GPUTexture>> WGLGPU::importHardwareTextures(HardwareBufferRef) {
+std::vector<std::unique_ptr<GPUTexture>> WGLGPU::importHardwareTextures(HardwareBufferRef,
+                                                                        uint32_t) {
   return {};
 }
 }  // namespace tgfx

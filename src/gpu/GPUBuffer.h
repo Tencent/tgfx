@@ -29,14 +29,12 @@ namespace tgfx {
 class GPUBufferUsage {
  public:
   /**
-   * The buffer can be used as an index buffer, for example as the buffer argument passed to
-   * RenderPass::setIndexBuffer().
+   * The buffer can be used as an index buffer.
    */
   static constexpr uint32_t INDEX = 0x10;
 
   /**
-   * The buffer can be used as a vertex buffer, for example as the buffer argument passed to
-   * RenderPass::setVertexBuffer().
+   * The buffer can be used as a vertex buffer.
    */
   static constexpr uint32_t VERTEX = 0x20;
 };
@@ -55,9 +53,9 @@ class GPUBuffer : public GPUResource {
   }
 
   /**
-   * Returns the usage flags for this buffer, which specify how it can be used in GPU operations.
-   * For example, a GPUBuffer with the GPUBufferUsage::VERTEX flag can be used as a vertex buffer in
-   * a RenderPass. See GPUBufferUsage for more details.
+   * Returns the bitwise flags that indicate the original usage options set when the GPUBuffer was
+   * created. The returned value is the sum of the decimal values for each flag. See GPUBufferUsage
+   * for more details.
    */
   uint32_t usage() const {
     return _usage;

@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "Pipeline.h"
-#include "gpu/GPUTexture.h"
 #include "gpu/ProgramBuilder.h"
+#include "gpu/RenderTarget.h"
 
 namespace tgfx {
 Pipeline::Pipeline(PlacementPtr<GeometryProcessor> geometryProcessor,
@@ -27,9 +27,8 @@ Pipeline::Pipeline(PlacementPtr<GeometryProcessor> geometryProcessor,
                    BlendMode blendMode, const Swizzle* outputSwizzle)
     : geometryProcessor(std::move(geometryProcessor)),
       fragmentProcessors(std::move(fragmentProcessors)), numColorProcessors(numColorProcessors),
-      xferProcessor(std::move(xferProcessor)), _outputSwizzle(outputSwizzle) {
+      xferProcessor(std::move(xferProcessor)), blendMode(blendMode), _outputSwizzle(outputSwizzle) {
   updateProcessorIndices();
-  BlendModeAsCoeff(blendMode, numColorProcessors < this->fragmentProcessors.size(), &_blendFormula);
 }
 
 void Pipeline::updateProcessorIndices() {
@@ -53,7 +52,33 @@ const XferProcessor* Pipeline::getXferProcessor() const {
   return xferProcessor.get();
 }
 
-void Pipeline::getUniforms(UniformBuffer* uniformBuffer) const {
+std::unique_ptr<BlendFormula> Pipeline::getBlendFormula() const {
+  if (xferProcessor != nullptr) {
+    return nullptr;
+  }
+  auto blendFormula = std::make_unique<BlendFormula>();
+  BlendModeAsCoeff(blendMode, numColorProcessors < fragmentProcessors.size(), blendFormula.get());
+  return blendFormula;
+}
+
+static std::array<float, 4> GetRTAdjustArray(const RenderTarget* renderTarget) {
+  std::array<float, 4> result = {};
+  result[0] = 2.f / static_cast<float>(renderTarget->width());
+  result[2] = 2.f / static_cast<float>(renderTarget->height());
+  result[1] = -1.f;
+  result[3] = -1.f;
+  if (renderTarget->origin() == ImageOrigin::BottomLeft) {
+    result[2] = -result[2];
+    result[3] = -result[3];
+  }
+  return result;
+}
+
+void Pipeline::getUniforms(const RenderTarget* renderTarget, UniformBuffer* uniformBuffer) const {
+  DEBUG_ASSERT(renderTarget != nullptr);
+  DEBUG_ASSERT(uniformBuffer != nullptr);
+  auto array = GetRTAdjustArray(renderTarget);
+  uniformBuffer->setData(RTAdjustName, array);
   uniformBuffer->nameSuffix = getMangledSuffix(geometryProcessor.get());
   FragmentProcessor::CoordTransformIter coordTransformIter(this);
   geometryProcessor->setData(uniformBuffer, &coordTransformIter);
@@ -102,7 +127,7 @@ void Pipeline::computeProgramKey(Context* context, BytesKey* programKey) const {
   }
   auto dstTextureView = xferProcessor != nullptr ? xferProcessor->dstTextureView() : nullptr;
   if (dstTextureView != nullptr) {
-    dstTextureView->getTexture()->computeTextureKey(context, programKey);
+    TextureView::ComputeTextureKey(dstTextureView->getTexture(), programKey);
   }
   getXferProcessor()->computeProcessorKey(context, programKey);
   programKey->write(static_cast<uint32_t>(_outputSwizzle->asKey()));

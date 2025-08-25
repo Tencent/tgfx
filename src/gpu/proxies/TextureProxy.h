@@ -20,7 +20,6 @@
 
 #include "ResourceProxy.h"
 #include "gpu/TextureView.h"
-#include "gpu/opengl/GLCaps.h"
 
 namespace tgfx {
 class RenderTargetProxy;

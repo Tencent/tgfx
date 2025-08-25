@@ -26,28 +26,24 @@
 
 namespace tgfx {
 struct RectRecord {
-  RectRecord(const Rect& rect, const Matrix& viewMatrix, const Color& color = {},
-             const Rect* uv = nullptr)
+  RectRecord(const Rect& rect, const Matrix& viewMatrix, const Color& color = {})
       : rect(rect), viewMatrix(viewMatrix), color(color) {
-    if (uv) {
-      uvRect = *uv;
-    } else {
-      uvRect = rect;
-    }
   }
 
   Rect rect;
-  Rect uvRect;
   Matrix viewMatrix;
   Color color;
 };
+
+enum class UVSubsetMode { None, SubsetOnly, RoundOutAndSubset };
+
+enum class UVCoordMode { Auto, Required, Disabled };
 
 /**
  * RectsVertexProvider is a VertexProvider that provides vertices for drawing rectangles.
  */
 class RectsVertexProvider : public VertexProvider {
  public:
-  enum class UVSubsetMode { None, SubsetOnly, RoundOutAndSubset };
   /**
    * Creates a new RectsVertexProvider from a single rect.
    */
@@ -59,7 +55,8 @@ class RectsVertexProvider : public VertexProvider {
    */
   static PlacementPtr<RectsVertexProvider> MakeFrom(BlockBuffer* buffer,
                                                     std::vector<PlacementPtr<RectRecord>>&& rects,
-                                                    AAType aaType, bool hasColor, bool hasUVCoord,
+                                                    std::vector<PlacementPtr<Rect>>&& uvRects,
+                                                    AAType aaType, bool needUVCoord,
                                                     UVSubsetMode subsetMode);
 
   /**
@@ -121,6 +118,7 @@ class RectsVertexProvider : public VertexProvider {
 
  protected:
   PlacementArray<RectRecord> rects = {};
+  PlacementArray<Rect> uvRects = {};
   struct {
     uint8_t aaType : 2;
     bool hasUVCoord : 1;
@@ -128,10 +126,8 @@ class RectsVertexProvider : public VertexProvider {
     uint8_t subsetMode : 2;
   } bitFields = {};
 
-  Rect getSubset(const Rect& rect) const;
-
-  RectsVertexProvider(PlacementArray<RectRecord>&& rects, AAType aaType, bool hasUVCoord,
-                      bool hasColor, UVSubsetMode subsetMode,
+  RectsVertexProvider(PlacementArray<RectRecord>&& rects, PlacementArray<Rect>&& uvRects,
+                      AAType aaType, bool hasUVCoord, bool hasColor, UVSubsetMode subsetMode,
                       std::shared_ptr<BlockBuffer> reference);
 };
 }  // namespace tgfx

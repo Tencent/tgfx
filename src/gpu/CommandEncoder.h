@@ -19,7 +19,6 @@
 #pragma once
 
 #include "gpu/CommandBuffer.h"
-#include "gpu/GPUFrameBuffer.h"
 #include "gpu/GPUTexture.h"
 #include "gpu/RenderPass.h"
 #include "gpu/Semaphore.h"
@@ -45,16 +44,16 @@ class CommandEncoder {
                                               bool resolveMSAA = true);
 
   /**
-   * Copies a region from the source GPUFrameBuffer to a region of the destination GPUTexture. If
+   * Copies a region from the source GPUTexture to a region of the destination GPUTexture. If
    * the texture has mipmaps, you should call the generateMipmapsForTexture() method after copying,
    * as mipmaps will not be generated automatically.
-   * @param frameBuffer The source frame buffer to copy from.
-   * @param srcOffset The starting point in the source frame buffer.
-   * @param texture The destination texture to copy to.
-   * @param dstRect The target rectangle in the destination texture.
+   * @param srcTexture The source frame buffer to copy from.
+   * @param srcRect The rectangle region of the source texture to copy from.
+   * @param dstTexture The destination texture to copy to.
+   * @param dstOffset The offset in the destination texture where the copied region will be placed.
    */
-  virtual void copyFrameBufferToTexture(GPUFrameBuffer* frameBuffer, const Point& srcOffset,
-                                        GPUTexture* texture, const Rect& dstRect) = 0;
+  virtual void copyTextureToTexture(GPUTexture* srcTexture, const Rect& srcRect,
+                                    GPUTexture* dstTexture, const Point& dstOffset) = 0;
 
   /**
    * Encodes a command that generates mipmaps for the specified GPUTexture from the base level to

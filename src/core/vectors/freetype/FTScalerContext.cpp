@@ -60,15 +60,26 @@ static FT_Fixed FloatToFTFixed(float x) {
 
 static void RenderOutLineGlyph(FT_Face face, const ImageInfo& dstInfo, void* dstPixels) {
   auto buffer = static_cast<unsigned char*>(dstPixels);
-  int rows = dstInfo.height();
-  int pitch = static_cast<int>(dstInfo.rowBytes());
-
+  auto pitch = static_cast<int>(dstInfo.rowBytes());
+  FT_Raster_Params params;
+  params.flags = FT_RASTER_FLAG_CLIP | FT_RASTER_FLAG_AA;
+#if defined(TGFX_USE_TEXT_GAMMA_CORRECTION)
+  auto rows = dstInfo.height();
+  params.flags |= FT_RASTER_FLAG_DIRECT;
+  params.gray_spans = GraySpanFunc;
   FTRasterTarget target = {buffer + (rows - 1) * pitch, pitch,
                            GammaCorrection::GammaTable().data()};
-  FT_Raster_Params params;
-  params.flags = FT_RASTER_FLAG_DIRECT | FT_RASTER_FLAG_CLIP | FT_RASTER_FLAG_AA;
-  params.gray_spans = GraySpanFunc;
   params.user = &target;
+#else
+  FT_Bitmap bitmap;
+  bitmap.width = static_cast<unsigned>(dstInfo.width());
+  bitmap.rows = static_cast<unsigned>(dstInfo.height());
+  bitmap.pitch = pitch;
+  bitmap.buffer = buffer;
+  bitmap.pixel_mode = FT_PIXEL_MODE_GRAY;
+  bitmap.num_grays = 256;
+  params.target = &bitmap;
+#endif
   params.clip_box = {0, 0, static_cast<FT_Pos>(dstInfo.width()),
                      static_cast<FT_Pos>(dstInfo.height())};
   auto outline = &face->glyph->outline;

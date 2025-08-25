@@ -67,20 +67,6 @@ std::vector<PixelFormat> EGLGPU::getHardwareTextureFormats(HardwareBufferRef har
   return formats;
 }
 
-std::vector<std::unique_ptr<GPUTexture>> EGLGPU::importHardwareTextures(
-    HardwareBufferRef hardwareBuffer) {
-  if (!HardwareBufferCheck(hardwareBuffer)) {
-    return {};
-  }
-  auto texture = EGLHardwareTexture::MakeFrom(this, hardwareBuffer);
-  if (texture == nullptr) {
-    return {};
-  }
-  std::vector<std::unique_ptr<GPUTexture>> textures = {};
-  textures.push_back(std::move(texture));
-  return textures;
-}
-
 #elif defined(__OHOS__)
 
 bool HardwareBufferAvailable() {
@@ -123,20 +109,6 @@ std::vector<PixelFormat> EGLGPU::getHardwareTextureFormats(HardwareBufferRef har
   return formats;
 }
 
-std::vector<std::unique_ptr<GPUTexture>> EGLGPU::importHardwareTextures(
-    HardwareBufferRef hardwareBuffer) {
-  if (!HardwareBufferCheck(hardwareBuffer)) {
-    return {};
-  }
-  auto texture = EGLHardwareTexture::MakeFrom(this, hardwareBuffer);
-  if (texture == nullptr) {
-    return {};
-  }
-  std::vector<std::unique_ptr<GPUTexture>> textures = {};
-  textures.push_back(std::move(texture));
-  return textures;
-}
-
 #else
 
 bool HardwareBufferAvailable() {
@@ -147,9 +119,31 @@ std::vector<PixelFormat> EGLGPU::getHardwareTextureFormats(HardwareBufferRef, YU
   return {};
 }
 
-std::vector<std::unique_ptr<GPUTexture>> EGLGPU::importHardwareTextures(HardwareBufferRef) {
+#endif
+
+#if defined(__ANDROID__) || defined(ANDROID) || defined(__OHOS__)
+
+std::vector<std::unique_ptr<GPUTexture>> EGLGPU::importHardwareTextures(
+    HardwareBufferRef hardwareBuffer, uint32_t usage) {
+  if (!HardwareBufferCheck(hardwareBuffer)) {
+    return {};
+  }
+  auto texture = EGLHardwareTexture::MakeFrom(this, hardwareBuffer, usage);
+  if (texture == nullptr) {
+    return {};
+  }
+  std::vector<std::unique_ptr<GPUTexture>> textures = {};
+  textures.push_back(std::move(texture));
+  return textures;
+}
+
+#else
+
+std::vector<std::unique_ptr<GPUTexture>> EGLGPU::importHardwareTextures(HardwareBufferRef,
+                                                                        uint32_t) {
   return {};
 }
 
 #endif
+
 }  // namespace tgfx

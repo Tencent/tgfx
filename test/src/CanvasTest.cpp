@@ -2917,4 +2917,77 @@ TGFX_TEST(CanvasTest, ScaleTest) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ScaleTest"));
 }
 
+TGFX_TEST(CanvasTest, drawScaleImage) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto imagePath = "resources/apitest/rotation.jpg";
+  auto codec = MakeImageCodec(imagePath);
+  ASSERT_TRUE(codec != nullptr);
+  auto image = Image::MakeFrom(codec);
+  ASSERT_TRUE(image != nullptr);
+  Recorder recorder = {};
+  auto canvas = recorder.beginRecording();
+  auto paint = Paint();
+  paint.setColor(Color::Red());
+  auto rect1 = Rect::MakeWH(1000, 1000);
+  auto rect2 = Rect::MakeXYWH(1000, 2000, 1000, 1000);
+  canvas->drawImage(image);
+  canvas->drawRect(rect1, paint);
+  canvas->drawRect(rect2, paint);
+  auto singleImageRecord = recorder.finishRecordingAsPicture();
+  auto pictureImage = Image::MakeFrom(singleImageRecord, image->width(), image->height());
+  pictureImage = pictureImage->makeRasterized();
+  auto scale = 0.5f;
+  auto width = static_cast<int>(image->width() * scale);
+  auto height = static_cast<int>(image->height() * scale);
+  auto matrix = Matrix::MakeScale(scale);
+  auto surface = Surface::Make(context, width, height);
+  canvas = surface->getCanvas();
+  canvas->setMatrix(matrix);
+  canvas->drawImage(pictureImage);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawScalePictureImage"));
+  auto scaleImage = image->makeScaled(width, height);
+  canvas->clear();
+  canvas->setMatrix(matrix);
+  canvas->drawImage(scaleImage);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawScaleCodecImage"));
+  auto rect = Rect::MakeXYWH(500, 1000, 2000, 1000);
+  auto subImage = image->makeSubset(rect)->makeRasterized();
+  canvas->clear();
+  canvas->setMatrix(matrix);
+  canvas->drawImage(subImage);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawScaleSubImage"));
+  Bitmap bitmap(codec->width(), codec->height(), false);
+  ASSERT_FALSE(bitmap.isEmpty());
+  Pixmap pixmap(bitmap);
+  auto result = codec->readPixels(pixmap.info(), pixmap.writablePixels());
+  pixmap.reset();
+  EXPECT_TRUE(result);
+  auto bufferImage = Image::MakeFrom(bitmap);
+  width = static_cast<int>(bufferImage->width() * scale);
+  height = static_cast<int>(bufferImage->height() * scale);
+  scaleImage = bufferImage->makeScaled(width, height);
+  canvas->clear();
+  canvas->setMatrix(matrix);
+  canvas->drawImage(scaleImage);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawScaleBufferImage"));
+}
+
+TGFX_TEST(CanvasTest, RRectBlendMode) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  Paint paint;
+  paint.setColor(Color::FromRGBA(255, 0, 0, 255));
+  paint.setBlendMode(BlendMode::Darken);
+  auto path = Path();
+  path.addRoundRect(Rect::MakeXYWH(25, 25, 150, 150), 20, 20);
+  canvas->drawPath(path, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/RRectBlendMode"));
+}
 }  // namespace tgfx

@@ -139,6 +139,10 @@ BackendTexture Image::getBackendTexture(Context*, ImageOrigin*) const {
   return {};
 }
 
+float Image::getRasterizedScale(float) const {
+  return 1.0f;
+}
+
 std::shared_ptr<Image> Image::makeDecoded(Context* context) const {
   if (isFullyDecoded()) {
     return weakThis.lock();
@@ -234,33 +238,5 @@ std::shared_ptr<Image> Image::makeRGBAAA(int displayWidth, int displayHeight, in
   }
   return RGBAAAImage::MakeFrom(weakThis.lock(), displayWidth, displayHeight, alphaStartX,
                                alphaStartY);
-}
-
-std::shared_ptr<TextureProxy> Image::lockTextureProxy(const TPArgs& args) const {
-  auto textureWidth = width();
-  auto textureHeight = height();
-  if (args.drawScale < 1.0) {
-    textureWidth = static_cast<int>(roundf(static_cast<float>(width()) * args.drawScale));
-    textureHeight = static_cast<int>(roundf(static_cast<float>(height()) * args.drawScale));
-  }
-  auto renderTarget =
-      RenderTargetProxy::MakeFallback(args.context, textureWidth, textureHeight, isAlphaOnly(), 1,
-                                      args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
-  if (renderTarget == nullptr) {
-    return nullptr;
-  }
-
-  auto textureScaleX = static_cast<float>(textureWidth) / static_cast<float>(width());
-  auto textureScaleY = static_cast<float>(textureHeight) / static_cast<float>(height());
-  auto uvMatrix = Matrix::MakeScale(1.0f / textureScaleX, 1.0f / textureScaleY);
-  auto drawRect = Rect::MakeWH(textureWidth, textureHeight);
-  FPArgs fpArgs(args.context, args.renderFlags, drawRect, std::max(textureScaleX, textureScaleY));
-  SamplingArgs samplingArgs = {TileMode::Clamp, TileMode::Clamp, {}, SrcRectConstraint::Fast};
-  auto processor = asFragmentProcessor(fpArgs, samplingArgs, &uvMatrix);
-  auto drawingManager = args.context->drawingManager();
-  if (!drawingManager->fillRTWithFP(renderTarget, std::move(processor), args.renderFlags)) {
-    return nullptr;
-  }
-  return renderTarget->asTextureProxy();
 }
 }  // namespace tgfx

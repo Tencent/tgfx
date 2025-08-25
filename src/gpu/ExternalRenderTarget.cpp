@@ -26,12 +26,11 @@ std::shared_ptr<RenderTarget> RenderTarget::MakeFrom(Context* context,
   if (context == nullptr) {
     return nullptr;
   }
-  auto frameBuffer = context->gpu()->importExternalFrameBuffer(backendRenderTarget);
-  if (!frameBuffer) {
+  auto texture = context->gpu()->importExternalTexture(backendRenderTarget);
+  if (!texture) {
     return nullptr;
   }
-  auto renderTarget = new ExternalRenderTarget(std::move(frameBuffer), backendRenderTarget.width(),
-                                               backendRenderTarget.height(), origin);
+  auto renderTarget = new ExternalRenderTarget(std::move(texture), origin);
   return Resource::AddToCache(context, renderTarget);
 }
 

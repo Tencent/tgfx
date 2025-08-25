@@ -87,7 +87,7 @@ void FragmentProcessor::computeProcessorKey(Context* context, BytesKey* bytesKey
   onComputeProcessorKey(bytesKey);
   auto textureSamplerCount = onCountTextureSamplers();
   for (size_t i = 0; i < textureSamplerCount; ++i) {
-    textureAt(i)->computeTextureKey(context, bytesKey);
+    TextureView::ComputeTextureKey(textureAt(i), bytesKey);
   }
   for (const auto& childProcessor : childProcessors) {
     childProcessor->computeProcessorKey(context, bytesKey);
