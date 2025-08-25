@@ -422,24 +422,24 @@ jobs:
           npm install depsync -g
           depsync
 
-      - name: Save Third-Party Cache
-        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
-        uses: actions/cache/save@v4
-        with:
-          path: third_party
-          key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
-
       - name: Install ohpm dependencies
         run: |
           cd ohos
           ohpm config set registry https://ohpm.openharmony.cn/ohpm/
           ohpm install --all
 
-      - name: Build Harmony (Release)
+      - name: Build Harmony
         run: |
           cd ohos
           hvigorw clean --no-daemon -Dohos.sdk.root=$DEVECO_SDK_HOME
           hvigorw assembleApp -Dohos.sdk.root=$DEVECO_SDK_HOME -p buildMode=release --no-daemon
+
+      - name: Save Third-Party Cache
+        if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
+        uses: actions/cache/save@v4
+        with:
+          path: third_party
+          key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
 
       - name: Job Failed
         if: ${{ failure() }}
