@@ -99,7 +99,10 @@ class ColorFilter {
     return false;
   }
 
-  // 对指定颜色应用滤镜，返回滤镜后的颜色
+  /**
+   * Apply the filter to the specified color and return the filtered color.
+   * All colors are in non-premultiplied alpha format.
+   */
   [[nodiscard]] virtual Color filterColor(const Color& src) const = 0;
 
  protected:

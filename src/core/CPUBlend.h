@@ -23,6 +23,10 @@
 
 namespace tgfx::CPUBlend {
 
+/**
+ * Blend srcColor and dstColor with the given blendMode, and store the result in outColor.
+ * All colors are in premultiplied alpha format.
+ */
 void Blend(const Color& srcColor, const Color& dstColor, BlendMode blendMode, Color& outColor);
 
 }  // namespace tgfx::CPUBlend

@@ -31,8 +31,11 @@ PlacementPtr<FragmentProcessor> LumaColorFilter::asFragmentProcessor(Context* co
 
 Color LumaColorFilter::filterColor(const Color& src) const {
   /** See ITU-R Recommendation BT.709 at http://www.itu.int/rec/R-REC-BT.709/ .*/
-  float luma = src.red * 0.2126f + src.green * 0.7152f + src.blue * 0.0722f;
-  return {luma, luma, luma, src.alpha};
+  // Must use premultiplied color to compute luma. Othereise, use 'MatrixColorFilter' instead.
+  const Color pmColor = src.premultiply();
+  float luma = pmColor.red * 0.2126f + pmColor.green * 0.7152f + pmColor.blue * 0.0722f;
+  // Return non-premultiplied RGBA color.
+  return {1.0f, 1.0f, 1.0f, luma};
 }
 
 }  // namespace tgfx
