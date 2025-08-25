@@ -49,10 +49,10 @@ void GLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
     fragBuilder->codeAppend("discard;");
     fragBuilder->codeAppend("}");
 
-    auto dstTopLeftName =
-        uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float2, "DstTextureUpperLeft");
-    auto dstCoordScaleName =
-        uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float2, "DstTextureCoordScale");
+    auto dstTopLeftName = uniformHandler->addUniform("DstTextureUpperLeft", UniformFormat::Float2,
+                                                     ShaderStage::Fragment);
+    auto dstCoordScaleName = uniformHandler->addUniform(
+        "DstTextureCoordScale", UniformFormat::Float2, ShaderStage::Fragment);
 
     fragBuilder->codeAppend("// Read color from copy of the destination.\n");
     std::string dstTexCoord = "_dstTexCoord";

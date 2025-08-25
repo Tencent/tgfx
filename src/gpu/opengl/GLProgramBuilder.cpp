@@ -17,21 +17,20 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLProgramBuilder.h"
-#include "gpu/opengl/GLUniformBuffer.h"
 #include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
 static std::string TypeModifierString(bool isDesktopGL, ShaderVar::TypeModifier t,
-                                      ShaderFlags flag) {
+                                      ShaderStage stage) {
   switch (t) {
     case ShaderVar::TypeModifier::None:
       return "";
     case ShaderVar::TypeModifier::Attribute:
       return isDesktopGL ? "in" : "attribute";
     case ShaderVar::TypeModifier::Varying:
-      return isDesktopGL ? (flag == ShaderFlags::Vertex ? "out" : "in") : "varying";
+      return isDesktopGL ? (stage == ShaderStage::Vertex ? "out" : "in") : "varying";
     case ShaderVar::TypeModifier::FlatVarying:
-      return isDesktopGL ? (flag == ShaderFlags::Vertex ? "flat out" : "flat in") : "varying";
+      return isDesktopGL ? (stage == ShaderStage::Vertex ? "flat out" : "flat in") : "varying";
     case ShaderVar::TypeModifier::Uniform:
       return "uniform";
     case ShaderVar::TypeModifier::Out:
@@ -48,11 +47,14 @@ static constexpr std::pair<SLType, const char*> SLTypes[] = {
     {SLType::Float2x2, "mat2"},
     {SLType::Float3x3, "mat3"},
     {SLType::Float4x4, "mat4"},
+    {SLType::Half, "float"},
+    {SLType::Half2, "vec2"},
+    {SLType::Half3, "vec3"},
+    {SLType::Half4, "vec4"},
     {SLType::Int, "int"},
     {SLType::Int2, "ivec2"},
     {SLType::Int3, "ivec3"},
     {SLType::Int4, "ivec4"},
-    {SLType::UByte4Color, "vec4"},
     {SLType::Texture2DRectSampler, "sampler2DRect"},
     {SLType::TextureExternalSampler, "samplerExternalOES"},
     {SLType::Texture2DSampler, "sampler2D"},
@@ -71,21 +73,20 @@ static std::string SLTypePrecision(SLType t) {
     case SLType::Int2:
     case SLType::Int3:
     case SLType::Int4:
-    case SLType::UByte4Color:
       return "highp";
-    // case SLType::Half:
-    // case SLType::Half2:
-    // case SLType::Half3:
-    // case SLType::Half4:
-    // case SLType::Short:
-    // case SLType::Short2:
-    // case SLType::Short3:
-    // case SLType::Short4:
-    // case SLType::UShort:
-    // case SLType::UShort2:
-    // case SLType::UShort3:
-    // case SLType::UShort4:
-    //   return "mediump";
+    case SLType::Half:
+    case SLType::Half2:
+    case SLType::Half3:
+    case SLType::Half4:
+      // case SLType::Short:
+      // case SLType::Short2:
+      // case SLType::Short3:
+      // case SLType::Short4:
+      // case SLType::UShort:
+      // case SLType::UShort2:
+      // case SLType::UShort3:
+      // case SLType::UShort4:
+      return "mediump";
     default:
       return "";
   }
@@ -122,10 +123,10 @@ std::string GLProgramBuilder::textureFuncName() const {
 }
 
 std::string GLProgramBuilder::getShaderVarDeclarations(const ShaderVar& var,
-                                                       ShaderFlags flag) const {
+                                                       ShaderStage stage) const {
   std::string ret;
-  if (var.typeModifier() != ShaderVar::TypeModifier::None) {
-    ret += TypeModifierString(isDesktopGL(), var.typeModifier(), flag);
+  if (var.modifier() != ShaderVar::TypeModifier::None) {
+    ret += TypeModifierString(isDesktopGL(), var.modifier(), stage);
     ret += " ";
   }
 
@@ -152,16 +153,8 @@ std::unique_ptr<GLProgram> GLProgramBuilder::finalize() {
   if (programID == 0) {
     return nullptr;
   }
-  computeCountsAndStrides(programID);
   gl->useProgram(programID);
-  auto& uniforms = _uniformHandler.getUniforms();
   auto& samplers = _uniformHandler.getSamplers();
-  std::vector<int> uniformLocations = {};
-  uniformLocations.reserve(uniforms.size());
-  for (auto& uniform : uniforms) {
-    auto location = gl->getUniformLocation(programID, uniform.name().c_str());
-    uniformLocations.push_back(location);
-  }
   // Assign texture units to sampler uniforms up front, just once.
   int textureUint = 0;
   for (auto& sampler : samplers) {
@@ -169,24 +162,8 @@ std::unique_ptr<GLProgram> GLProgramBuilder::finalize() {
     DEBUG_ASSERT(location != -1);
     gl->uniform1i(location, textureUint++);
   }
-  auto uniformBuffer = std::make_unique<GLUniformBuffer>(uniforms, std::move(uniformLocations));
-  return std::make_unique<GLProgram>(programID, std::move(uniformBuffer), attributes,
-                                     static_cast<int>(vertexStride));
-}
-
-void GLProgramBuilder::computeCountsAndStrides(unsigned int programID) {
-  auto gl = GLFunctions::Get(context);
-  vertexStride = 0;
-  for (const auto* attr : pipeline->getGeometryProcessor()->vertexAttributes()) {
-    GLProgram::Attribute attribute;
-    attribute.gpuType = attr->gpuType();
-    attribute.offset = vertexStride;
-    vertexStride += attr->sizeAlign4();
-    attribute.location = gl->getAttribLocation(programID, attr->name().c_str());
-    if (attribute.location >= 0) {
-      attributes.push_back(attribute);
-    }
-  }
+  return std::make_unique<GLProgram>(programID, _uniformHandler.makeUniformBuffer(),
+                                     pipeline->getVertexAttributes(), pipeline->getBlendFormula());
 }
 
 bool GLProgramBuilder::checkSamplerCounts() {

@@ -21,7 +21,6 @@
 #include "gpu/RenderPass.h"
 #include "gpu/opengl/GLBuffer.h"
 #include "gpu/opengl/GLInterface.h"
-#include "gpu/opengl/GLVertexArray.h"
 
 namespace tgfx {
 
@@ -42,10 +41,7 @@ class GLRenderPass : public RenderPass {
 
  private:
   std::shared_ptr<GLInterface> interface = nullptr;
-  std::shared_ptr<GLVertexArray> vertexArray = nullptr;
   bool resolveMSAA = true;
-
-  unsigned getVertexArrayID(Context* context);
 
   void bindTexture(int unitIndex, GPUTexture* texture, SamplerState samplerState = {});
 };

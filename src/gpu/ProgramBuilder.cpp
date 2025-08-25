@@ -52,7 +52,7 @@ bool ProgramBuilder::emitAndInstallProcessors() {
 void ProgramBuilder::emitAndInstallGeoProc(std::string* outputColor, std::string* outputCoverage) {
   // We don't want the RTAdjustName to be mangled, so we add it to the uniform handler before the
   // processor guard.
-  uniformHandler()->addUniform(ShaderFlags::Vertex, SLType::Float4, RTAdjustName);
+  uniformHandler()->addUniform(RTAdjustName, UniformFormat::Float4, ShaderStage::Vertex);
   auto geometryProcessor = pipeline->getGeometryProcessor();
   // Set the current processor so that all variable names will be mangled correctly.
   ProcessorGuard processorGuard(this, geometryProcessor);
@@ -193,7 +193,7 @@ void ProgramBuilder::nameExpression(std::string* output, const std::string& base
 
 void ProgramBuilder::finalizeShaders() {
   varyingHandler()->finalize();
-  vertexShaderBuilder()->finalize(ShaderFlags::Vertex);
-  fragmentShaderBuilder()->finalize(ShaderFlags::Fragment);
+  vertexShaderBuilder()->finalize();
+  fragmentShaderBuilder()->finalize();
 }
 }  // namespace tgfx

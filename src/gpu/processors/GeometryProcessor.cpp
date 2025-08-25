@@ -24,15 +24,18 @@ static constexpr char TRANSFORM_UNIFORM_PREFIX[] = "CoordTransformMatrix_";
 void GeometryProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) const {
   bytesKey->write(classID());
   onComputeProcessorKey(bytesKey);
-  for (const auto* attribute : attributes) {
-    attribute->computeKey(bytesKey);
+  for (auto& attribute : attributes) {
+    if (!attribute.empty()) {
+      bytesKey->write(static_cast<uint32_t>(attribute.format()));
+    }
   }
 }
 
 void GeometryProcessor::setVertexAttributes(const Attribute* attrs, int attrCount) {
   for (int i = 0; i < attrCount; ++i) {
-    if (attrs[i].isInitialized()) {
-      attributes.push_back(attrs + i);
+    auto& attribute = attrs[i];
+    if (!attribute.empty()) {
+      attributes.push_back(attribute);
     }
   }
 }
@@ -63,17 +66,15 @@ void GeometryProcessor::emitTransforms(EmitArgs& args, VertexShaderBuilder* vert
   while (transformHandler->nextCoordTransform() != nullptr) {
     std::string strUniName = TRANSFORM_UNIFORM_PREFIX;
     strUniName += std::to_string(i);
-    auto uniName = uniformHandler->addUniform(ShaderFlags::Vertex, SLType::Float3x3, strUniName);
+    auto uniName =
+        uniformHandler->addUniform(strUniName, UniformFormat::Float3x3, ShaderStage::Vertex);
     std::string strVaryingName = "TransformedCoords_";
     strVaryingName += std::to_string(i);
     SLType varyingType = SLType::Float2;
     auto varying = varyingHandler->addVarying(strVaryingName, varyingType);
-
     transformHandler->specifyCoordsForCurrCoordTransform(varying.name(), varyingType);
-
     vertexBuilder->codeAppendf("%s = (%s * %s).xy;", varying.vsOut().c_str(), uniName.c_str(),
                                uvCoords.c_str());
-
     onEmitTransform(args, vertexBuilder, varyingHandler, uniformHandler, uniName, i);
     ++i;
   }

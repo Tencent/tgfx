@@ -23,13 +23,13 @@ AtlasTextGeometryProcessor::AtlasTextGeometryProcessor(std::shared_ptr<TexturePr
                                                        AAType aa, std::optional<Color> commonColor)
     : GeometryProcessor(ClassID()), textureProxy(std::move(textureProxy)),
       commonColor(commonColor) {
-  position = {"aPosition", SLType::Float2};
+  position = {"aPosition", VertexFormat::Float2};
   if (aa == AAType::Coverage) {
-    coverage = {"inCoverage", SLType::Float};
+    coverage = {"inCoverage", VertexFormat::Float};
   }
-  maskCoord = {"maskCoord", SLType::Float2};
+  maskCoord = {"maskCoord", VertexFormat::Float2};
   if (!commonColor.has_value()) {
-    color = {"inColor", SLType::UByte4Color};
+    color = {"inColor", VertexFormat::UByte4Normalized};
   }
   setVertexAttributes(&position, 4);
   textures.emplace_back(this->textureProxy->getTextureView()->getTexture());
