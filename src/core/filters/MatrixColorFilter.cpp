@@ -52,7 +52,7 @@ std::optional<Color> MatrixColorFilter::tryFilterColor(const Color& input) const
   transformedColor.green = std::clamp(transformedColor.green, 0.0f, 1.0f);
   transformedColor.blue = std::clamp(transformedColor.blue, 0.0f, 1.0f);
   transformedColor.alpha = std::clamp(transformedColor.alpha, 0.0f, 1.0f);
-  return std::optional<Color>(transformedColor);
+  return std::make_optional<Color>(transformedColor);
 }
 
 bool MatrixColorFilter::isEqual(const ColorFilter* colorFilter) const {

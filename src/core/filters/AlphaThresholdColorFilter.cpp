@@ -29,7 +29,7 @@ std::shared_ptr<ColorFilter> ColorFilter::AlphaThreshold(float threshold) {
 
 std::optional<Color> AlphaThresholdColorFilter::tryFilterColor(const Color& input) const {
   if (input.alpha >= threshold) {
-    return Color(input.red, input.green, input.blue, 1.0f);
+    return std::make_optional<Color>(input.red, input.green, input.blue, 1.0f);
   } else {
     // When the generated color’s alpha is 0, premultiplication can zero out all channels, causing
     // data loss and computation errors.

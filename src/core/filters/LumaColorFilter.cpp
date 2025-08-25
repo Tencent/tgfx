@@ -33,9 +33,9 @@ std::optional<Color> LumaColorFilter::tryFilterColor(const Color& input) const {
   /** See ITU-R Recommendation BT.709 at http://www.itu.int/rec/R-REC-BT.709/ .*/
   // Must use premultiplied color to compute luma. Othereise, use 'MatrixColorFilter' instead.
   const Color pmColor = input.premultiply();
-  float luma = pmColor.red * 0.2126f + pmColor.green * 0.7152f + pmColor.blue * 0.0722f;
+  const float luma = pmColor.red * 0.2126f + pmColor.green * 0.7152f + pmColor.blue * 0.0722f;
   // Return non-premultiplied RGBA color.
-  return Color(1.0f, 1.0f, 1.0f, luma);
+  return std::make_optional<Color>(1.0f, 1.0f, 1.0f, luma);
 }
 
 }  // namespace tgfx
