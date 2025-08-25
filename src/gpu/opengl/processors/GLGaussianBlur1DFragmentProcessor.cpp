@@ -48,9 +48,9 @@ void GLGaussianBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
 
   std::string sigmaName =
-      args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float, "Sigma");
+      args.uniformHandler->addUniform("Sigma", UniformFormat::Float, ShaderStage::Fragment);
   std::string texelSizeName =
-      args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float2, "Step");
+      args.uniformHandler->addUniform("Step", UniformFormat::Float2, ShaderStage::Fragment);
 
   fragBuilder->codeAppendf("vec2 offset = %s;", texelSizeName.c_str());
 

@@ -21,47 +21,33 @@
 #include <optional>
 #include "gpu/Pipeline.h"
 #include "gpu/Program.h"
-#include "gpu/SLType.h"
-#include "gpu/opengl/GLUniformBuffer.h"
+#include "gpu/opengl/GLBuffer.h"
 
 namespace tgfx {
 class GLProgram : public Program {
  public:
-  struct Attribute {
-    SLType gpuType = SLType::Float;
-    size_t offset = 0;
-    int location = 0;
-  };
-
-  GLProgram(unsigned programID, std::unique_ptr<GLUniformBuffer> uniformBuffer,
-            std::vector<Attribute> attributes, int vertexStride);
+  GLProgram(unsigned programID, std::unique_ptr<UniformBuffer> uniformBuffer,
+            std::vector<Attribute> attributes);
 
   /**
    * Gets the GL program ID for this program.
    */
   unsigned programID() const {
-    return programId;
+    return _programID;
   }
 
-  GLUniformBuffer* uniformBuffer() const {
-    return _uniformBuffer.get();
-  }
+  void setVertexBuffer(GLBuffer* buffer, size_t offset);
 
-  int vertexStride() const {
-    return _vertexStride;
-  }
-
-  const std::vector<Attribute>& vertexAttributes() const {
-    return attributes;
-  }
+  void setUniformBytes(const void* data, size_t size);
 
  protected:
   void onReleaseGPU() override;
 
  private:
-  unsigned programId = 0;
-  std::unique_ptr<GLUniformBuffer> _uniformBuffer = nullptr;
-  std::vector<Attribute> attributes = {};
-  int _vertexStride = 0;
+  unsigned _programID = 0;
+  std::vector<int> uniformLocations = {};
+  std::vector<Attribute> _attributes = {};
+  std::vector<int> attributeLocations = {};
+  int vertexStride = 0;
 };
 }  // namespace tgfx

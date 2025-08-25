@@ -38,14 +38,7 @@ class UniformHandler {
    * be accessible. At least one bit must be set. The actual uniform name will be mangled. Returns
    * the final uniform name.
    */
-  std::string addUniform(ShaderFlags visibility, SLType type, const std::string& name);
-
-  /**
-   * Returns all uniforms added by addUniform().
-   */
-  const std::vector<Uniform>& getUniforms() const {
-    return uniforms;
-  }
+  std::string addUniform(const std::string& name, UniformFormat format, ShaderStage stage);
 
   /**
    * Returns all samplers added by addSampler().
@@ -71,15 +64,18 @@ class UniformHandler {
     return samplerSwizzles[samplerHandle.toIndex()];
   }
 
+  std::unique_ptr<UniformBuffer> makeUniformBuffer() const;
+
   /**
    * Returns the declarations of all uniforms that are visible in the given shader visibility.
    */
-  std::string getUniformDeclarations(ShaderFlags visibility) const;
+  std::string getUniformDeclarations(ShaderStage stage) const;
 
  private:
   // This is not owned by the class
   ProgramBuilder* programBuilder = nullptr;
-  std::vector<Uniform> uniforms = {};
+  std::vector<Uniform> vertexUniforms = {};
+  std::vector<Uniform> fragmentUniforms = {};
   std::vector<Uniform> samplers = {};
   std::vector<Swizzle> samplerSwizzles = {};
 };

@@ -25,18 +25,18 @@ QuadPerEdgeAAGeometryProcessor::QuadPerEdgeAAGeometryProcessor(int width, int he
                                                                bool hasSubset)
     : GeometryProcessor(ClassID()), width(width), height(height), aa(aa), commonColor(commonColor),
       uvMatrix(uvMatrix), hasSubset(hasSubset) {
-  position = {"aPosition", SLType::Float2};
+  position = {"aPosition", VertexFormat::Float2};
   if (aa == AAType::Coverage) {
-    coverage = {"inCoverage", SLType::Float};
+    coverage = {"inCoverage", VertexFormat::Float};
   }
   if (!uvMatrix.has_value()) {
-    uvCoord = {"uvCoord", SLType::Float2};
+    uvCoord = {"uvCoord", VertexFormat::Float2};
   }
   if (!commonColor.has_value()) {
-    color = {"inColor", SLType::UByte4Color};
+    color = {"inColor", VertexFormat::UByte4Normalized};
   }
   if (hasSubset) {
-    subset = {"texSubset", SLType::Float4};
+    subset = {"texSubset", VertexFormat::Float4};
   }
   setVertexAttributes(&position, 5);
 }

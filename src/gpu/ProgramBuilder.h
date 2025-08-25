@@ -47,7 +47,7 @@ class ProgramBuilder {
 
   virtual std::string textureFuncName() const = 0;
 
-  virtual std::string getShaderVarDeclarations(const ShaderVar& var, ShaderFlags flag) const = 0;
+  virtual std::string getShaderVarDeclarations(const ShaderVar& var, ShaderStage stage) const = 0;
 
   /**
    * Generates a name for a variable. The generated string will be mangled to be processor-specific.

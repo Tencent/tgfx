@@ -19,12 +19,11 @@
 #pragma once
 
 #include <vector>
-#include "core/utils/Algin.h"
+#include "gpu/Attribute.h"
 #include "gpu/FragmentShaderBuilder.h"
 #include "gpu/GPUTexture.h"
 #include "gpu/ShaderVar.h"
 #include "gpu/UniformBuffer.h"
-#include "gpu/UniformHandler.h"
 #include "gpu/VaryingHandler.h"
 #include "gpu/VertexShaderBuilder.h"
 #include "gpu/processors/FragmentProcessor.h"
@@ -36,46 +35,7 @@ class GeometryProcessor : public Processor {
   // Use only for easy-to-use aliases.
   using FPCoordTransformIter = FragmentProcessor::CoordTransformIter;
 
-  /**
-   * Describes a vertex attribute.
-   */
-  class Attribute {
-   public:
-    Attribute() = default;
-
-    Attribute(std::string name, SLType gpuType) : _name(std::move(name)), _gpuType(gpuType) {
-    }
-
-    bool isInitialized() const {
-      return !_name.empty();
-    }
-
-    const std::string& name() const {
-      return _name;
-    }
-
-    SLType gpuType() const {
-      return _gpuType;
-    }
-
-    size_t sizeAlign4() const {
-      return Align4(GetSLTypeSize(_gpuType));
-    }
-
-    ShaderVar asShaderVar() const {
-      return {_name, _gpuType, ShaderVar::TypeModifier::Attribute};
-    }
-
-    void computeKey(BytesKey* bytesKey) const {
-      bytesKey->write(isInitialized() ? static_cast<uint32_t>(_gpuType) : ~0u);
-    }
-
-   private:
-    std::string _name;
-    SLType _gpuType = SLType::Float;
-  };
-
-  const std::vector<const Attribute*>& vertexAttributes() const {
+  const std::vector<Attribute>& vertexAttributes() const {
     return attributes;
   }
 
@@ -183,7 +143,7 @@ class GeometryProcessor : public Processor {
   virtual void onSetTransformData(UniformBuffer*, const CoordTransform*, int) const {
   }
 
-  std::vector<const Attribute*> attributes = {};
+  std::vector<Attribute> attributes = {};
   size_t textureSamplerCount = 0;
 };
 }  // namespace tgfx

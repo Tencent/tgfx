@@ -31,8 +31,8 @@ GLConicGradientLayout::GLConicGradientLayout(Matrix matrix, float bias, float sc
 void GLConicGradientLayout::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
   auto* uniformHandler = args.uniformHandler;
-  auto biasName = uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float, "Bias");
-  auto scaleName = uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float, "Scale");
+  auto biasName = uniformHandler->addUniform("Bias", UniformFormat::Float, ShaderStage::Fragment);
+  auto scaleName = uniformHandler->addUniform("Scale", UniformFormat::Float, ShaderStage::Fragment);
   fragBuilder->codeAppendf("float angle = atan(-%s.y, -%s.x);",
                            (*args.transformedCoords)[0].name().c_str(),
                            (*args.transformedCoords)[0].name().c_str());

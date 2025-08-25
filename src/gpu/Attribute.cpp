@@ -16,38 +16,44 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "SLType.h"
-#include <cinttypes>
+#include "Attribute.h"
 
 namespace tgfx {
-size_t GetSLTypeSize(SLType type) {
-  switch (type) {
-    case SLType::Float:
+size_t Attribute::size() const {
+  switch (_format) {
+    case VertexFormat::Float:
       return sizeof(float);
-    case SLType::Float2:
+    case VertexFormat::Float2:
       return 2 * sizeof(float);
-    case SLType::Float3:
+    case VertexFormat::Float3:
       return 3 * sizeof(float);
-    case SLType::Float4:
+    case VertexFormat::Float4:
       return 4 * sizeof(float);
-    case SLType::Int:
+    case VertexFormat::Half:
+      return sizeof(uint16_t);
+    case VertexFormat::Half2:
+      return 2 * sizeof(uint16_t);
+    case VertexFormat::Half3:
+      return 3 * sizeof(uint16_t);
+    case VertexFormat::Half4:
+      return 4 * sizeof(uint16_t);
+    case VertexFormat::Int:
       return sizeof(int32_t);
-    case SLType::Int2:
+    case VertexFormat::Int2:
       return 2 * sizeof(int32_t);
-    case SLType::Int3:
+    case VertexFormat::Int3:
       return 3 * sizeof(int32_t);
-    case SLType::Int4:
+    case VertexFormat::Int4:
       return 4 * sizeof(int32_t);
-    case SLType::UByte4Color:
+    case VertexFormat::UByteNormalized:
+      return sizeof(uint8_t);
+    case VertexFormat::UByte2Normalized:
+      return 2 * sizeof(uint8_t);
+    case VertexFormat::UByte3Normalized:
+      return 3 * sizeof(uint8_t);
+    case VertexFormat::UByte4Normalized:
       return 4 * sizeof(uint8_t);
-    case SLType::Float2x2:
-      return 4 * sizeof(float);
-    case SLType::Float3x3:
-      return 9 * sizeof(float);
-    case SLType::Float4x4:
-      return 16 * sizeof(float);
-    default:
-      return 0;
   }
+  return 0;
 }
 }  // namespace tgfx

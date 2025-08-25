@@ -30,12 +30,15 @@ class Varying {
   const std::string& vsOut() const {
     return _name;
   }
+
   const std::string& fsIn() const {
     return _name;
   }
+
   const std::string& name() const {
     return _name;
   }
+
   SLType type() const {
     return _type;
   }
@@ -65,12 +68,10 @@ class VaryingHandler {
    */
   void finalize();
 
-  void getVertexDecls(std::string* inputDecls, std::string* outputDecls) const;
-
-  void getFragDecls(std::string* inputDecls) const;
+  void getDeclarations(std::string* inputDecls, std::string* outputDecls, ShaderStage stage) const;
 
  private:
-  void appendDecls(const std::vector<ShaderVar>& vars, std::string* out, ShaderFlags flag) const;
+  void appendDecls(const std::vector<ShaderVar>& vars, std::string* out, ShaderStage stage) const;
 
   void addAttribute(const ShaderVar& var);
 

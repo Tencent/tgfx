@@ -28,9 +28,10 @@ class VertexShaderBuilder : public ShaderBuilder {
   explicit VertexShaderBuilder(ProgramBuilder* program) : ShaderBuilder(program) {
   }
 
-  virtual void emitNormalizedPosition(const std::string& devPos) = 0;
+  ShaderStage shaderStage() const override {
+    return ShaderStage::Vertex;
+  }
 
- private:
-  void onFinalize() override;
+  virtual void emitNormalizedPosition(const std::string& devPos) = 0;
 };
 }  // namespace tgfx

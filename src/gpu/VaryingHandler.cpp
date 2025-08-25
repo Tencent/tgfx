@@ -30,8 +30,8 @@ Varying VaryingHandler::addVarying(const std::string& name, SLType type, bool is
 }
 
 void VaryingHandler::emitAttributes(const GeometryProcessor& processor) {
-  for (const auto* attr : processor.vertexAttributes()) {
-    addAttribute(attr->asShaderVar());
+  for (auto& attribute : processor.vertexAttributes()) {
+    addAttribute(ShaderVar(attribute));
   }
 }
 
@@ -57,19 +57,20 @@ void VaryingHandler::finalize() {
 }
 
 void VaryingHandler::appendDecls(const std::vector<ShaderVar>& vars, std::string* out,
-                                 ShaderFlags flag) const {
+                                 ShaderStage stage) const {
   for (const auto& var : vars) {
-    out->append(programBuilder->getShaderVarDeclarations(var, flag));
+    out->append(programBuilder->getShaderVarDeclarations(var, stage));
     out->append(";\n");
   }
 }
 
-void VaryingHandler::getVertexDecls(std::string* inputDecls, std::string* outputDecls) const {
-  appendDecls(vertexInputs, inputDecls, ShaderFlags::Vertex);
-  appendDecls(vertexOutputs, outputDecls, ShaderFlags::Vertex);
-}
-
-void VaryingHandler::getFragDecls(std::string* inputDecls) const {
-  appendDecls(fragInputs, inputDecls, ShaderFlags::Fragment);
+void VaryingHandler::getDeclarations(std::string* inputDecls, std::string* outputDecls,
+                                     ShaderStage stage) const {
+  if (stage == ShaderStage::Vertex) {
+    appendDecls(vertexInputs, inputDecls, ShaderStage::Vertex);
+    appendDecls(vertexOutputs, outputDecls, ShaderStage::Vertex);
+  } else {
+    appendDecls(fragInputs, inputDecls, ShaderStage::Fragment);
+  }
 }
 }  // namespace tgfx
