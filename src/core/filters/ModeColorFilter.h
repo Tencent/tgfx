@@ -31,6 +31,8 @@ class ModeColorFilter : public ColorFilter {
 
   bool asColorMode(Color* color, BlendMode* mode) const override;
 
+  [[nodiscard]] std::optional<Color> tryFilterColor(const Color& input) const override;
+
   Color color;
   BlendMode mode;
 

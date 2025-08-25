@@ -44,6 +44,14 @@ bool ComposeColorFilter::isAlphaUnchanged() const {
   return outer->isAlphaUnchanged() && inner->isAlphaUnchanged();
 }
 
+std::optional<Color> ComposeColorFilter::tryFilterColor(const Color& input) const {
+  std::optional<Color> innerResult = inner->tryFilterColor(input);
+  if (innerResult == std::nullopt) {
+    return std::nullopt;
+  }
+  return outer->tryFilterColor(*innerResult);
+}
+
 bool ComposeColorFilter::isEqual(const ColorFilter* colorFilter) const {
   auto type = Types::Get(colorFilter);
   if (type != Types::ColorFilterType::Compose) {

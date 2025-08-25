@@ -27,6 +27,16 @@ std::shared_ptr<ColorFilter> ColorFilter::AlphaThreshold(float threshold) {
   return std::make_shared<AlphaThresholdColorFilter>(threshold);
 }
 
+std::optional<Color> AlphaThresholdColorFilter::tryFilterColor(const Color& input) const {
+  if (input.alpha >= threshold) {
+    return Color(input.red, input.green, input.blue, 1.0f);
+  } else {
+    // When the generated color’s alpha is 0, premultiplication can zero out all channels, causing
+    // data loss and computation errors.
+    return std::nullopt;
+  }
+}
+
 bool AlphaThresholdColorFilter::isEqual(const ColorFilter* colorFilter) const {
   auto type = Types::Get(colorFilter);
   if (type != Types::ColorFilterType::AlphaThreshold) {

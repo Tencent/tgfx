@@ -59,6 +59,12 @@ bool ModeColorFilter::asColorMode(Color* color, BlendMode* mode) const {
   return true;
 }
 
+std::optional<Color> ModeColorFilter::tryFilterColor(const Color& input) const {
+  (void)input;
+  // Blend logic do not support to be applied immediately.
+  return std::nullopt;
+}
+
 bool ModeColorFilter::isEqual(const ColorFilter* colorFilter) const {
   auto type = Types::Get(colorFilter);
   if (type != Types::ColorFilterType::Blend) {

@@ -138,22 +138,42 @@ Rect RenderContext::getClipBounds(const Path& clip) {
   return bounds;
 }
 
+static Fill ApplyFillColorFilter(const Fill& fill) {
+  // Only solid colors can have color filters applied in advance during drawing. If a shader exists, it means the color
+  // is dynamically generated and cannot have the color filter applied at this stage.
+  if (fill.shader != nullptr || fill.colorFilter == nullptr) {
+    return fill;
+  }
+  std::optional<Color> filterdColor = fill.colorFilter->tryFilterColor(fill.color);
+  if (filterdColor == std::nullopt) {
+    return fill;
+  }
+
+  Fill filteredFill = fill;
+  filteredFill.color = *filterdColor;
+  filteredFill.colorFilter = nullptr;
+  return filteredFill;
+}
+
 void RenderContext::drawFill(const Fill& fill) {
   if (auto compositor = getOpsCompositor(fill.isOpaque())) {
-    compositor->fillRect(renderTarget->bounds(), {}, fill);
+    const Fill filteredFill = ApplyFillColorFilter(fill);
+    compositor->fillRect(renderTarget->bounds(), {}, filteredFill);
   }
 }
 
 void RenderContext::drawRect(const Rect& rect, const MCState& state, const Fill& fill) {
   if (auto compositor = getOpsCompositor()) {
-    compositor->fillRect(rect, state, fill);
+    const Fill filteredFill = ApplyFillColorFilter(fill);
+    compositor->fillRect(rect, state, filteredFill);
   }
 }
 
 void RenderContext::drawRRect(const RRect& rRect, const MCState& state, const Fill& fill,
                               const Stroke* stroke) {
   if (auto compositor = getOpsCompositor()) {
-    compositor->drawRRect(rRect, state, fill, stroke);
+    const Fill filteredFill = ApplyFillColorFilter(fill);
+    compositor->drawRRect(rRect, state, filteredFill, stroke);
   }
 }
 
@@ -182,7 +202,8 @@ void RenderContext::drawImage(std::shared_ptr<Image> image, const SamplingOption
 void RenderContext::drawShape(std::shared_ptr<Shape> shape, const MCState& state,
                               const Fill& fill) {
   if (auto compositor = getOpsCompositor()) {
-    compositor->fillShape(std::move(shape), state, fill);
+    const Fill filteredFill = ApplyFillColorFilter(fill);
+    compositor->fillShape(std::move(shape), state, filteredFill);
   }
 }
 
@@ -367,6 +388,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
   auto atlasManager = getContext()->atlasManager();
   auto drawingManager = getContext()->drawingManager();
   auto nextFlushToken = atlasManager->nextFlushToken();
+  const Fill filteredFill = ApplyFillColorFilter(fill);
   for (auto& glyphID : sourceGlyphRun.glyphs) {
     auto glyphPosition = sourceGlyphRun.positions[index++];
     auto bounds = font.getBounds(glyphID);
@@ -440,7 +462,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
     glyphState.matrix.postConcat(state.matrix);
     glyphState.matrix.preTranslate(-rect.x(), -rect.y());
     compositor->fillTextAtlas(std::move(textureProxy), rect, glyphState,
-                              fill.makeWithMatrix(state.matrix));
+                              filteredFill.makeWithMatrix(state.matrix));
   }
 }
 void RenderContext::drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList,
@@ -448,7 +470,8 @@ void RenderContext::drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList,
                                      Rect& localClipBounds) {
   auto maxScale = state.matrix.getMaxScale();
   Path clipPath = {};
-  if (fill.antiAlias) {
+  const Fill filteredFill = ApplyFillColorFilter(fill);
+  if (filteredFill.antiAlias) {
     localClipBounds.outset(1.0f, 1.0f);
   }
   clipPath.addRect(localClipBounds);
@@ -457,7 +480,7 @@ void RenderContext::drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList,
   shape = Shape::ApplyStroke(std::move(shape), stroke);
   shape = Shape::Merge(std::move(shape), Shape::MakeFrom(std::move(clipPath)), PathOp::Intersect);
   if (auto compositor = getOpsCompositor()) {
-    compositor->fillShape(std::move(shape), state, fill);
+    compositor->fillShape(std::move(shape), state, filteredFill);
   }
 }
 
@@ -500,6 +523,7 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
   auto atlasManager = getContext()->atlasManager();
   auto nextFlushToken = atlasManager->nextFlushToken();
   auto drawingManager = getContext()->drawingManager();
+  const Fill filteredFill = ApplyFillColorFilter(fill);
   for (auto& glyphID : sourceGlyphRun.glyphs) {
     auto glyphPosition = sourceGlyphRun.positions[index++];
     auto bounds = font.getBounds(glyphID);
@@ -554,7 +578,7 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
     glyphState.matrix.postConcat(state.matrix);
     glyphState.matrix.preTranslate(-rect.x(), -rect.y());
     compositor->fillTextAtlas(std::move(textureProxy), rect, glyphState,
-                              fill.makeWithMatrix(state.matrix));
+                              filteredFill.makeWithMatrix(state.matrix));
   }
 }
 }  // namespace tgfx

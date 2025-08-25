@@ -37,6 +37,24 @@ MatrixColorFilter::MatrixColorFilter(const std::array<float, 20>& matrix)
     : matrix(matrix), alphaIsUnchanged(IsAlphaUnchanged(matrix.data())) {
 }
 
+std::optional<Color> MatrixColorFilter::tryFilterColor(const Color& input) const {
+  Color transformedColor;
+  transformedColor.red = matrix[0] * input.red + matrix[1] * input.green + matrix[2] * input.blue +
+                         matrix[3] * input.alpha + matrix[4];
+  transformedColor.green = matrix[5] * input.red + matrix[6] * input.green +
+                           matrix[7] * input.blue + matrix[8] * input.alpha + matrix[9];
+  transformedColor.blue = matrix[10] * input.red + matrix[11] * input.green +
+                          matrix[12] * input.blue + matrix[13] * input.alpha + matrix[14];
+  transformedColor.alpha = matrix[15] * input.red + matrix[16] * input.green +
+                           matrix[17] * input.blue + matrix[18] * input.alpha + matrix[19];
+
+  transformedColor.red = std::clamp(transformedColor.red, 0.0f, 1.0f);
+  transformedColor.green = std::clamp(transformedColor.green, 0.0f, 1.0f);
+  transformedColor.blue = std::clamp(transformedColor.blue, 0.0f, 1.0f);
+  transformedColor.alpha = std::clamp(transformedColor.alpha, 0.0f, 1.0f);
+  return std::optional<Color>(transformedColor);
+}
+
 bool MatrixColorFilter::isEqual(const ColorFilter* colorFilter) const {
   auto type = Types::Get(colorFilter);
   if (type != Types::ColorFilterType::Matrix) {

@@ -29,6 +29,8 @@ class MatrixColorFilter : public ColorFilter {
     return alphaIsUnchanged;
   }
 
+  [[nodiscard]] std::optional<Color> tryFilterColor(const Color& input) const override;
+
   std::array<float, 20> matrix;
   bool alphaIsUnchanged;
 

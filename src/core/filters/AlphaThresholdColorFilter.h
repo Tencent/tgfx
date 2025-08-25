@@ -25,6 +25,8 @@ class AlphaThresholdColorFilter : public ColorFilter {
  public:
   explicit AlphaThresholdColorFilter(float threshold) : threshold(threshold){};
 
+  [[nodiscard]] std::optional<Color> tryFilterColor(const Color& input) const override;
+
   float threshold = 0.0f;
 
  protected:

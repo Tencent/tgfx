@@ -99,6 +99,12 @@ class ColorFilter {
     return false;
   }
 
+  /**
+   * Try apply the filter to the specified color and return the filtered color or nullopt when failed.
+   * All colors are in non-premultiplied alpha format.
+   */
+  [[nodiscard]] virtual std::optional<Color> tryFilterColor(const Color& input) const = 0;
+
  protected:
   enum class Type { Blend, Matrix, AlphaThreshold, Compose, Luma };
 
