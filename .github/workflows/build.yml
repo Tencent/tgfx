@@ -342,7 +342,7 @@ jobs:
           path: out
 
 
-  openharmony:
+  ohos:
     runs-on: macos-latest
     steps:
       - name: Check Out Repo
