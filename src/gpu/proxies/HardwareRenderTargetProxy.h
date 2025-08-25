@@ -25,6 +25,10 @@ class HardwareRenderTargetProxy : public TextureRenderTargetProxy {
  public:
   ~HardwareRenderTargetProxy() override;
 
+  HardwareBufferRef getHardwareBuffer() const override {
+    return hardwareBuffer;
+  }
+
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context) const override;
 

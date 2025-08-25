@@ -28,6 +28,10 @@ class HardwareTextureProxy final : public TextureProxy {
 
   ~HardwareTextureProxy() override;
 
+  HardwareBufferRef getHardwareBuffer() const override {
+    return hardwareBuffer;
+  }
+
  private:
   HardwareTextureProxy(HardwareBufferRef hardwareBuffer, int width, int height, PixelFormat format);
 

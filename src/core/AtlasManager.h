@@ -43,8 +43,6 @@ class AtlasManager : public AtlasGenerationCounter {
 
   AtlasToken nextFlushToken() const;
 
-  HardwareBufferRef getHardwareBuffer(MaskFormat maskFormat, const TextureProxy* proxy) const;
-
  private:
   bool initAtlas(MaskFormat format);
 

@@ -123,7 +123,6 @@ void DrawingManager::addResourceTask(PlacementPtr<ResourceTask> resourceTask) {
 }
 
 void DrawingManager::addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& textureProxy,
-                                           HardwareBufferRef hardwareBuffer,
                                            const Point& atlasOffset,
                                            std::shared_ptr<ImageCodec> codec) {
   if (textureProxy == nullptr || codec == nullptr) {
@@ -134,6 +133,7 @@ void DrawingManager::addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& 
   auto dstWidth = codec->width() + 2 * padding;
   auto dstHeight = codec->height() + 2 * padding;
   ImageInfo dstInfo = {};
+  auto hardwareBuffer = textureProxy->getHardwareBuffer();
   if (hardwareBuffer != nullptr) {
     auto hardwareInfo = HardwareBufferGetInfo(hardwareBuffer);
     dstInfo = hardwareInfo.makeIntersect(0, 0, dstWidth, dstHeight);

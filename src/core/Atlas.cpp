@@ -104,21 +104,11 @@ bool Atlas::activateNewPage() {
   }
   pages.push_back(std::move(page));
   std::shared_ptr<TextureProxy> proxy = nullptr;
-  do {
-    if (!HardwareBufferAvailable()) {
-      break;
-    }
-    auto pixelBuffer =
-        PixelBuffer::Make(textureWidth, textureHeight, pixelFormat == PixelFormat::ALPHA_8);
-    if (pixelBuffer == nullptr || !pixelBuffer->isHardwareBacked()) {
-      break;
-    }
-    proxy = proxyProvider->createTextureProxy(pixelBuffer->getHardwareBuffer());
-    if (proxy == nullptr) {
-      break;
-    }
-    hardwareBuffers.emplace(proxy.get(), std::move(pixelBuffer));
-  } while (false);
+  auto hardwareBuffer =
+      HardwareBufferAllocate(textureWidth, textureHeight, pixelFormat == PixelFormat::ALPHA_8);
+  if (hardwareBuffer != nullptr) {
+    proxy = proxyProvider->createTextureProxy(hardwareBuffer);
+  }
   if (proxy == nullptr) {
     proxy = proxyProvider->createTextureProxy(UniqueKey::Make(), textureWidth, textureHeight,
                                               pixelFormat);
@@ -186,7 +176,6 @@ void Atlas::deactivateLastPage() {
   DEBUG_ASSERT(!pages.empty());
   auto pageIndex = pages.size() - 1;
   pages.pop_back();
-  hardwareBuffers.erase(textureProxies.back().get());
   textureProxies.pop_back();
   for (const auto& [key, cellLocator] : cellLocators) {
     if (cellLocator.atlasLocator.pageIndex() == pageIndex) {
@@ -290,16 +279,6 @@ void Atlas::removeExpiredKeys() {
     }
   }
   expiredKeys.clear();
-}
-
-HardwareBufferRef Atlas::getHardwareBuffer(const TextureProxy* proxy) const {
-  if (proxy == nullptr) {
-    return nullptr;
-  }
-  if (auto it = hardwareBuffers.find(proxy); it != hardwareBuffers.end()) {
-    return it->second->getHardwareBuffer();
-  }
-  return nullptr;
 }
 
 AtlasConfig::AtlasConfig(int maxTextureSize) {

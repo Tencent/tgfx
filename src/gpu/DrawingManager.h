@@ -63,8 +63,7 @@ class DrawingManager {
   void addResourceTask(PlacementPtr<ResourceTask> resourceTask);
 
   void addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& textureProxy,
-                             HardwareBufferRef hardwareBuffer, const Point& atlasOffset,
-                             std::shared_ptr<ImageCodec> codec);
+                             const Point& atlasOffset, std::shared_ptr<ImageCodec> codec);
 
   void addSemaphoreWaitTask(std::shared_ptr<Semaphore> semaphore);
 

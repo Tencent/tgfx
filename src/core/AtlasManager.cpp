@@ -104,8 +104,4 @@ void AtlasManager::releaseAll() {
 AtlasToken AtlasManager::nextFlushToken() const {
   return atlasTokenTracker.nextToken();
 }
-HardwareBufferRef AtlasManager::getHardwareBuffer(MaskFormat maskFormat,
-                                                  const TextureProxy* proxy) const {
-  return getAtlas(maskFormat)->getHardwareBuffer(proxy);
-}
 }  // namespace tgfx

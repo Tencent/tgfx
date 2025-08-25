@@ -333,12 +333,8 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(HardwareBufferRe
   if (formats.size() != 1 || yuvFormat != YUVFormat::Unknown) {
     return nullptr;
   }
-  auto format = formats.front();
-  if (!context->caps()->isFormatRenderable(format)) {
-    return nullptr;
-  }
   auto proxy = std::shared_ptr<HardwareTextureProxy>(
-      new HardwareTextureProxy(hardwareBuffer, size.width, size.height, format));
+      new HardwareTextureProxy(hardwareBuffer, size.width, size.height, formats.front()));
   addResourceProxy(proxy);
   return proxy;
 }
