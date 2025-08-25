@@ -20,7 +20,6 @@
 
 #include <array>
 #include <memory>
-#include <optional>
 #include "tgfx/core/BlendMode.h"
 #include "tgfx/core/Color.h"
 
@@ -100,12 +99,6 @@ class ColorFilter {
     return false;
   }
 
-  /**
-   * Try apply the filter to the specified color and return the filtered color or nullopt when failed.
-   * All colors are in non-premultiplied alpha format.
-   */
-  [[nodiscard]] virtual std::optional<Color> tryFilterColor(const Color& input) const = 0;
-
  protected:
   enum class Type { Blend, Matrix, AlphaThreshold, Compose, Luma };
 
@@ -119,6 +112,13 @@ class ColorFilter {
    */
   virtual bool isEqual(const ColorFilter* colorFilter) const = 0;
 
+  /**
+   * Apply the current filter to the specified color. Returns true on success, with the filtered
+   * color stored in dstColor; otherwise returns false. All colors are in non-premultiplied alpha
+   * format.
+   */
+  virtual bool onFilterColor(const Color& srcColor, Color* dstColor) const = 0;
+
  private:
   virtual PlacementPtr<FragmentProcessor> asFragmentProcessor(Context* context) const = 0;
 
@@ -127,5 +127,6 @@ class ColorFilter {
   friend class ComposeColorFilter;
   friend class ColorImageFilter;
   friend class Types;
+  friend class RenderContext;
 };
 }  // namespace tgfx

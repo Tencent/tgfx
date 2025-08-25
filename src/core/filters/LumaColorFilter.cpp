@@ -25,17 +25,18 @@ std::shared_ptr<ColorFilter> ColorFilter::Luma() {
   return std::make_shared<LumaColorFilter>();
 }
 
-PlacementPtr<FragmentProcessor> LumaColorFilter::asFragmentProcessor(Context* context) const {
-  return LumaFragmentProcessor::Make(context->drawingBuffer());
-}
-
-std::optional<Color> LumaColorFilter::tryFilterColor(const Color& input) const {
+bool LumaColorFilter::onFilterColor(const Color& srcColor, Color* dstColor) const {
   /** See ITU-R Recommendation BT.709 at http://www.itu.int/rec/R-REC-BT.709/ .*/
   // Must use premultiplied color to compute luma. Othereise, use 'MatrixColorFilter' instead.
-  const Color pmColor = input.premultiply();
+  const Color pmColor = srcColor.premultiply();
   const float luma = pmColor.red * 0.2126f + pmColor.green * 0.7152f + pmColor.blue * 0.0722f;
   // Return non-premultiplied RGBA color.
-  return std::make_optional<Color>(1.0f, 1.0f, 1.0f, luma);
+  *dstColor = Color(1.0f, 1.0f, 1.0f, luma);
+  return true;
+}
+
+PlacementPtr<FragmentProcessor> LumaColorFilter::asFragmentProcessor(Context* context) const {
+  return LumaFragmentProcessor::Make(context->drawingBuffer());
 }
 
 }  // namespace tgfx

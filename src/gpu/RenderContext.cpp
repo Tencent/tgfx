@@ -138,23 +138,6 @@ Rect RenderContext::getClipBounds(const Path& clip) {
   return bounds;
 }
 
-static Fill ApplyFillColorFilter(const Fill& fill) {
-  // Only solid colors can have color filters applied in advance during drawing. If a shader exists, it means the color
-  // is dynamically generated and cannot have the color filter applied at this stage.
-  if (fill.shader != nullptr || fill.colorFilter == nullptr) {
-    return fill;
-  }
-  std::optional<Color> filterdColor = fill.colorFilter->tryFilterColor(fill.color);
-  if (filterdColor == std::nullopt) {
-    return fill;
-  }
-
-  Fill filteredFill = fill;
-  filteredFill.color = *filterdColor;
-  filteredFill.colorFilter = nullptr;
-  return filteredFill;
-}
-
 void RenderContext::drawFill(const Fill& fill) {
   if (auto compositor = getOpsCompositor(fill.isOpaque())) {
     const Fill filteredFill = ApplyFillColorFilter(fill);
@@ -580,5 +563,22 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
     compositor->fillTextAtlas(std::move(textureProxy), rect, glyphState,
                               filteredFill.makeWithMatrix(state.matrix));
   }
+}
+
+Fill RenderContext::ApplyFillColorFilter(const Fill& fill) {
+  // Only solid colors can have color filters applied in advance during drawing. If a shader exists, it means the color
+  // is dynamically generated and cannot have the color filter applied at this stage.
+  if (fill.shader != nullptr || fill.colorFilter == nullptr) {
+    return fill;
+  }
+  Color filteredColor{};
+  if (!fill.colorFilter->onFilterColor(fill.color, &filteredColor)) {
+    return fill;
+  }
+
+  Fill filteredFill = fill;
+  filteredFill.color = filteredColor;
+  filteredFill.colorFilter = nullptr;
+  return filteredFill;
 }
 }  // namespace tgfx

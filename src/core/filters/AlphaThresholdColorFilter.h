@@ -25,8 +25,6 @@ class AlphaThresholdColorFilter : public ColorFilter {
  public:
   explicit AlphaThresholdColorFilter(float threshold) : threshold(threshold){};
 
-  [[nodiscard]] std::optional<Color> tryFilterColor(const Color& input) const override;
-
   float threshold = 0.0f;
 
  protected:
@@ -35,6 +33,8 @@ class AlphaThresholdColorFilter : public ColorFilter {
   }
 
   bool isEqual(const ColorFilter* colorFilter) const override;
+
+  bool onFilterColor(const Color& srcColor, Color* dstColor) const override;
 
  private:
   PlacementPtr<FragmentProcessor> asFragmentProcessor(Context* context) const override;

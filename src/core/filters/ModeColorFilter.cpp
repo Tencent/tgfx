@@ -59,12 +59,6 @@ bool ModeColorFilter::asColorMode(Color* color, BlendMode* mode) const {
   return true;
 }
 
-std::optional<Color> ModeColorFilter::tryFilterColor(const Color& input) const {
-  (void)input;
-  // Blend logic do not support to be applied immediately.
-  return std::nullopt;
-}
-
 bool ModeColorFilter::isEqual(const ColorFilter* colorFilter) const {
   auto type = Types::Get(colorFilter);
   if (type != Types::ColorFilterType::Blend) {
@@ -72,6 +66,13 @@ bool ModeColorFilter::isEqual(const ColorFilter* colorFilter) const {
   }
   auto other = static_cast<const ModeColorFilter*>(colorFilter);
   return color == other->color && mode == other->mode;
+}
+
+bool ModeColorFilter::onFilterColor(const Color& srcColor, Color* dstColor) const {
+  (void)srcColor;
+  (void)dstColor;
+  // Blend logic do not support to be applied immediately.
+  return false;
 }
 
 PlacementPtr<FragmentProcessor> ModeColorFilter::asFragmentProcessor(Context* context) const {

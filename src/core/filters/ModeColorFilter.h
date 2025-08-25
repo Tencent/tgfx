@@ -31,8 +31,6 @@ class ModeColorFilter : public ColorFilter {
 
   bool asColorMode(Color* color, BlendMode* mode) const override;
 
-  [[nodiscard]] std::optional<Color> tryFilterColor(const Color& input) const override;
-
   Color color;
   BlendMode mode;
 
@@ -42,6 +40,8 @@ class ModeColorFilter : public ColorFilter {
   }
 
   bool isEqual(const ColorFilter* colorFilter) const override;
+
+  bool onFilterColor(const Color& srcColor, Color* dstColor) const override;
 
  private:
   PlacementPtr<FragmentProcessor> asFragmentProcessor(Context* context) const override;

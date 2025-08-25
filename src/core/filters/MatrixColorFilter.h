@@ -29,8 +29,6 @@ class MatrixColorFilter : public ColorFilter {
     return alphaIsUnchanged;
   }
 
-  [[nodiscard]] std::optional<Color> tryFilterColor(const Color& input) const override;
-
   std::array<float, 20> matrix;
   bool alphaIsUnchanged;
 
@@ -40,6 +38,8 @@ class MatrixColorFilter : public ColorFilter {
   }
 
   bool isEqual(const ColorFilter* colorFilter) const override;
+
+  bool onFilterColor(const Color& srcColor, Color* dstColor) const override;
 
  private:
   PlacementPtr<FragmentProcessor> asFragmentProcessor(Context* context) const override;

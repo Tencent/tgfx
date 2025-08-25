@@ -26,9 +26,6 @@ namespace tgfx {
  * while LumaFilter uses premultiplied RGBA.
  */
 class LumaColorFilter : public ColorFilter {
- public:
-  [[nodiscard]] std::optional<Color> tryFilterColor(const Color& input) const override;
-
  protected:
   Type type() const override {
     return Type::Luma;
@@ -38,6 +35,8 @@ class LumaColorFilter : public ColorFilter {
     auto type = Types::Get(colorFilter);
     return type == Type::Luma;
   }
+
+  bool onFilterColor(const Color& srcColor, Color* dstColor) const override;
 
   PlacementPtr<FragmentProcessor> asFragmentProcessor(Context* context) const override;
 };
