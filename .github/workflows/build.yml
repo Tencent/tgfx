@@ -6,14 +6,15 @@ on:
   push:
     branches: [ main ]
 
+
   workflow_dispatch:
-      inputs:
-        job:
-          description: 'Job to run (optional)'
-          required: false
-          default: 'all'
-          type: choice
-          options:
+  inputs:
+  job:
+      description: 'Job to run (optional)'
+      required: false
+      default: 'all'
+      type: choice
+      options:
             - all
             - ios
             - android
@@ -21,7 +22,7 @@ on:
             - win
             - linux
             - qt
-            - openharmony    
+            - openharmony
 
 jobs:
   ios:
@@ -432,7 +433,7 @@ jobs:
         run: |
           cd ohos
           hvigorw clean --no-daemon -Dohos.sdk.root=$DEVECO_SDK_HOME
-          hvigorw assembleApp -Dohos.sdk.root=$DEVECO_SDK_HOME -p buildMode=release --no-daemon
+          hvigorw assembleHap -Dohos.sdk.root=$DEVECO_SDK_HOME -p buildMode=release --no-daemon
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
