@@ -32,7 +32,7 @@ class GLAtlasTextGeometryProcessor : public AtlasTextGeometryProcessor {
                FPCoordTransformIter* coordTransformIter) const override;
 
   SamplerState onSamplerStateAt(size_t) const override {
-    return {SamplerState::WrapMode::Clamp, SamplerState::WrapMode::Clamp, FilterMode::Nearest};
+    return {SamplerState::WrapMode::Clamp, SamplerState::WrapMode::Clamp, FilterMode::Linear};
   }
 
  private:
