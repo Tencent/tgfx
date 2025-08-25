@@ -476,6 +476,8 @@ class Canvas {
   void drawFill(const MCState& state, const Fill& fill) const;
   void resetStateStack();
 
+  static Fill TryGetColorFilteredFill(const Paint& paint);
+
   friend class Surface;
   friend class Picture;
   friend class Recorder;

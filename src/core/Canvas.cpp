@@ -193,7 +193,7 @@ void Canvas::drawColor(const Color& color, BlendMode blendMode) {
 
 void Canvas::drawPaint(const Paint& paint) {
   SaveLayerForImageFilter(paint.getImageFilter());
-  drawFill(*mcState, paint.getFill());
+  drawFill(*mcState, TryGetColorFilteredFill(paint));
 }
 
 void Canvas::drawLine(float x0, float y0, float x1, float y1, const Paint& paint) {
@@ -216,7 +216,7 @@ void Canvas::drawRect(const Rect& rect, const Paint& paint) {
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
-  drawContext->drawRect(rect, *mcState, paint.getFill());
+  drawContext->drawRect(rect, *mcState, TryGetColorFilteredFill(paint));
 }
 
 void Canvas::drawOval(const Rect& oval, const Paint& paint) {
@@ -302,12 +302,12 @@ void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
-  drawContext->drawRRect(rRect, *mcState, paint.getFill(), paint.getStroke());
+  drawContext->drawRRect(rRect, *mcState, TryGetColorFilteredFill(paint), paint.getStroke());
 }
 
 void Canvas::drawPath(const Path& path, const Paint& paint) {
   SaveLayerForImageFilter(paint.getImageFilter());
-  drawPath(path, *mcState, paint.getFill(), paint.getStroke());
+  drawPath(path, *mcState, TryGetColorFilteredFill(paint), paint.getStroke());
 }
 
 /// Check if the line is axis-aligned and convert it to a rect
@@ -396,7 +396,7 @@ void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
     return;
   }
   SaveLayerForImageFilter(paint.getImageFilter());
-  auto fill = paint.getFill();
+  auto fill = TryGetColorFilteredFill(paint);
   auto state = *mcState;
   auto stroke = paint.getStroke();
   Path* path = nullptr;
@@ -535,7 +535,7 @@ void Canvas::drawGlyphs(const GlyphID glyphs[], const Point positions[], size_t 
   SaveLayerForImageFilter(paint.getImageFilter());
   GlyphRun glyphRun(font, {glyphs, glyphs + glyphCount}, {positions, positions + glyphCount});
   auto glyphRunList = std::make_shared<GlyphRunList>(std::move(glyphRun));
-  drawContext->drawGlyphRunList(std::move(glyphRunList), *mcState, paint.getFill(),
+  drawContext->drawGlyphRunList(std::move(glyphRunList), *mcState, TryGetColorFilteredFill(paint),
                                 paint.getStroke());
 }
 
@@ -549,7 +549,7 @@ void Canvas::drawTextBlob(std::shared_ptr<TextBlob> textBlob, float x, float y,
   state.matrix.preTranslate(x, y);
   auto stroke = paint.getStroke();
   for (auto& glyphRunList : textBlob->glyphRunLists) {
-    drawContext->drawGlyphRunList(glyphRunList, state, paint.getFill(), stroke);
+    drawContext->drawGlyphRunList(glyphRunList, state, TryGetColorFilteredFill(paint), stroke);
   }
 }
 
@@ -657,6 +657,24 @@ void Canvas::drawFill(const MCState& state, const Fill& fill) const {
   } else {
     drawPath(state.clip, {}, fill.makeWithMatrix(state.matrix), nullptr);
   }
+}
+
+Fill Canvas::TryGetColorFilteredFill(const Paint& paint) {
+  auto fill = paint.getFill();
+  // Only solid colors can have color filters applied in advance during drawing. If a shader exists, it means the color
+  // is dynamically generated and cannot have the color filter applied at this stage.
+  if (fill.shader != nullptr || fill.colorFilter == nullptr) {
+    return fill;
+  }
+  Color filteredColor{};
+  if (!fill.colorFilter->onFilterColor(fill.color, &filteredColor)) {
+    return fill;
+  }
+
+  Fill filteredFill = fill;
+  filteredFill.color = filteredColor;
+  filteredFill.colorFilter = nullptr;
+  return filteredFill;
 }
 
 }  // namespace tgfx

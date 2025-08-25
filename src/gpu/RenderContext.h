@@ -86,8 +86,6 @@ class RenderContext : public DrawContext {
   void replaceRenderTarget(std::shared_ptr<RenderTargetProxy> newRenderTarget,
                            std::shared_ptr<Image> oldContent);
 
-  static Fill ApplyFillColorFilter(const Fill& fill);
-
   friend class Surface;
 };
 }  // namespace tgfx

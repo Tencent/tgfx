@@ -68,9 +68,7 @@ bool ModeColorFilter::isEqual(const ColorFilter* colorFilter) const {
   return color == other->color && mode == other->mode;
 }
 
-bool ModeColorFilter::onFilterColor(const Color& srcColor, Color* dstColor) const {
-  (void)srcColor;
-  (void)dstColor;
+bool ModeColorFilter::onFilterColor(const Color&, Color*) const {
   // Blend logic do not support to be applied immediately.
   return false;
 }
