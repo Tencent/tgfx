@@ -38,10 +38,7 @@ class GLProgramBuilder : public ProgramBuilder {
  private:
   GLProgramBuilder(Context* context, const Pipeline* pipeline);
 
-  void collectAttributes(unsigned programID);
-
-  bool collectUniformsAndSamplers(unsigned programID, const std::string& vertex,
-                                  const std::string& fragment);
+  void computeCountsAndStrides(unsigned programID);
 
   std::unique_ptr<GLProgram> finalize();
 
@@ -71,9 +68,7 @@ class GLProgramBuilder : public ProgramBuilder {
   UniformHandler _uniformHandler;
   GLVertexShaderBuilder _vertexBuilder;
   GLFragmentShaderBuilder _fragBuilder;
-  std::vector<Uniform> uniforms = {};
-  std::vector<Uniform> samplers = {};
-  std::vector<Attribute> attributes = {};
+  std::vector<GLProgram::Attribute> attributes;
   size_t vertexStride = 0;
 
   friend class ProgramBuilder;

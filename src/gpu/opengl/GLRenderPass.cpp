@@ -168,7 +168,7 @@ bool GLRenderPass::onBindProgramAndScissorClip(const Pipeline* pipeline, const R
   }
   auto uniformBuffer = glProgram->uniformBuffer();
   pipeline->getUniforms(renderTarget.get(), uniformBuffer);
-  glProgram->setUniformBytes(uniformBuffer->data(), uniformBuffer->size());
+  uniformBuffer->uploadToGPU(context);
   return true;
 }
 
