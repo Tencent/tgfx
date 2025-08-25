@@ -3,19 +3,10 @@
   "version": "1.0.0",
   "main": "compilation-manager.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "http-server -p 8080 -c-1",
-    "build": "echo \"Build completed\""
+    "start": "bash start-server.sh"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "description": "",
-  "dependencies": {
-    "emception": "^1.0.15",
-    "monaco-editor": "^0.44.0"
-  },
-  "devDependencies": {
-    "http-server": "^14.1.1"
-  }
+  "description": ""
 }

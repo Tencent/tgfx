@@ -14,6 +14,7 @@ echo -e "${GREEN}🚀 启动 TGFX 在线编辑器...${NC}"
 
 # 获取脚本所在目录
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "$SCRIPT_DIR"
 
 echo -e "${BLUE}📁 工作目录: ${SCRIPT_DIR}${NC}"
@@ -57,7 +58,7 @@ echo -e "  静态库: tgfx.a (${STATIC_LIB_SIZE})"
 echo -e "  头文件: ${HEADER_COUNT} 个"
 
 # 检查并释放端口
-PORT=8081
+PORT=${PORT:-8081}
 echo -e "${YELLOW}检查端口 ${PORT}...${NC}"
 
 # 查找并停止占用端口的进程
@@ -68,9 +69,10 @@ if [ ! -z "$PIDS" ]; then
     sleep 2
 fi
 
-# 启动HTTP服务器
-echo -e "${BLUE}启动HTTP服务器在端口 ${PORT}...${NC}"
-python3 -m http.server ${PORT} &
+# 启动HTTP服务器（从仓库根目录起服，便于访问 /resources）
+echo -e "${BLUE}启动HTTP服务器在端口 ${PORT}...（根目录：${REPO_ROOT}）${NC}"
+# Python 3.7+ 支持 -d；若不支持，可改为 pushd "${REPO_ROOT}" 再起服
+python3 -m http.server ${PORT} -d "${REPO_ROOT}" &
 SERVER_PID=$!
 
 # 等待服务器启动
@@ -78,7 +80,7 @@ echo -e "${YELLOW}等待服务器启动...${NC}"
 sleep 3
 
 # 检查服务器是否启动成功
-if ! curl -s -I http://localhost:${PORT}/online-editor.html > /dev/null; then
+if ! curl -s -I http://localhost:${PORT}/web-code-editor/online-editor.html > /dev/null; then
     echo -e "${RED}服务器启动失败！${NC}"
     kill $SERVER_PID 2>/dev/null || true
     exit 1
@@ -86,8 +88,8 @@ fi
 
 echo -e "${GREEN}服务器启动成功！${NC}"
 
-# 自动在浏览器中打开新架构测试页面
-URL="http://localhost:${PORT}/online-editor.html"
+# 自动在浏览器中打开页面
+URL="http://localhost:${PORT}/web-code-editor/online-editor.html"
 
 # 根据操作系统选择打开命令
 if [[ "$OSTYPE" == "darwin"* ]]; then

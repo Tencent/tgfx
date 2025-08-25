@@ -13,10 +13,10 @@ export default class EmceptionAdapter {
 
         // 默认编译选项
         this.defaultCompileOptions = {
-            optimization: '-O2',
+            optimization: '-O1',
             target: 'wasm32',
             outputFormat: 'wasm',
-            enableExceptions: true
+            enableExceptions: false
         };
         this.compileOptions = { ...this.defaultCompileOptions };
     }
@@ -134,6 +134,7 @@ export default class EmceptionAdapter {
                 } else {
                     console.log('ℹ️ Static lib already present, skip writing');
                 }
+
             })();
 
             await __tgfxSingletons.headersPreparedPromise;
@@ -208,11 +209,8 @@ export default class EmceptionAdapter {
                 ...options
             };
 
-            // 根据源码判断导出入口（优先 user_main，否则 main）
-            const wantsUserMain = /\buser_main\s*\(/.test(sourceCode);
-            const compileOptions2 = { ...compileOptions, exportEntry: wantsUserMain ? 'user_main' : 'main' };
-
-            const result = await this.performCompilation(sourceFile, compileOptions2);
+            // 固定使用 main 作为导出入口
+            const result = await this.performCompilation(sourceFile, compileOptions);
 
             // 3. 缓存结果
             this.compilationCache.set(compileId, result);
@@ -237,7 +235,6 @@ export default class EmceptionAdapter {
 
         console.log('🔧 Using two-step compilation process...');
 
-        console.log("-------"+sourceFile);
 
         // 写入导出桩（弱符号，用户实现会覆盖）。提供可见的默认渲染，便于快速验证链路。
         const stubs = [
@@ -305,7 +302,7 @@ export default class EmceptionAdapter {
         const compileCommand = [
             'em++',
             '-std=c++17',
-            '-O2','-fno-exceptions','-fno-rtti','-DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0','-DTGFX_USE_EMBIND=0','-D_LIBCPP_ABI_NAMESPACE=__2',
+            options.optimization || '-O1','-fno-exceptions','-fno-rtti','-DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0','-D_LIBCPP_ABI_NAMESPACE=__2',
             '-Wno-error=version-check',
             '-c',
             '-I/usr/local/include',
@@ -332,7 +329,7 @@ export default class EmceptionAdapter {
         // 步骤1b：编译导出桩
         const compileStubCmd = [
             'em++',
-            '-std=c++17','-O2','-fno-exceptions','-fno-rtti','-DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0','-DTGFX_USE_EMBIND=0','-D_LIBCPP_ABI_NAMESPACE=__2',
+            '-std=c++17',options.optimization || '-O1','-fno-exceptions','-fno-rtti','-DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0','-D_LIBCPP_ABI_NAMESPACE=__2',
             '-I/usr/local/include',
             '-c', stubFile,
             '-o', stubObject
@@ -348,7 +345,7 @@ export default class EmceptionAdapter {
             'em++',
             objectFile, stubObject,
             '/usr/local/lib/tgfx.a',
-            '-O0',
+            options.optimization || '-O1',
             '-Wno-error=version-check',  // 忽略版本检查错误
             '-sMODULARIZE=1',
             '-sEXPORT_ES6=1',
@@ -357,7 +354,8 @@ export default class EmceptionAdapter {
             '-sASSERTIONS=0',
             '-sDISABLE_EXCEPTION_CATCHING=1',
             "-sEXPORTED_FUNCTIONS=['_" + (options.exportEntry || 'main') + "']",
-            '-sEXPORTED_RUNTIME_METHODS=["cwrap","ccall","HEAPU8"]',
+            '-sFORCE_FILESYSTEM=1',
+            '-sEXPORTED_RUNTIME_METHODS=["cwrap","ccall","HEAPU8","FS"]',
             '-sERROR_ON_UNDEFINED_SYMBOLS=0',
             '-o', outputJS
         ].join(' ');
@@ -399,7 +397,7 @@ export default class EmceptionAdapter {
             success: true,
             jsModuleCode,
             wasmBinary: linkedWasm,
-            exports: ['user_main','tgfx_init','tgfx_resize','tgfx_render','tgfx_present','tgfx_clear','tgfx_get_framebuffer_ptr','tgfx_get_width','tgfx_get_height'],
+            exports: ['main'],
             stderr: (compileResult.stderr || '') + (linkResult.stderr || ''),
             stdout: (compileResult.stdout || '') + (linkResult.stdout || '')
         };

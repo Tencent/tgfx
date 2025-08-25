@@ -1,716 +1,472 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="utf-8">
-    <title>TGFX 在线代码编辑器</title>
-    <script src="https://unpkg.com/monaco-editor@0.44.0/min/vs/loader.js"></script>
-    <style>
-        body {
-            font-family: 'Segoe WPC', 'Segoe UI', system-ui, -apple-system, 'Ubuntu', 'Droid Sans', sans-serif;
-            margin: 0;
-            padding: 0;
-            background-color: #1e1e1e;
-            color: #d4d4d4;
-        }
-        .container {
-            max-width: 100%;
-            height: 100vh;
-            margin: 0;
-            background: #252526;
-            border-radius: 0;
-            box-shadow: none;
-            overflow: hidden;
-            display: flex;
-            flex-direction: column;
-        }
-        .header {
-            background: #1f1f1f;
-            color: #d4d4d4;
-            padding: 10px 16px;
-            border-bottom: 1px solid #3c3c3c;
-            text-align: left;
-        }
-        .header h1 {
-            margin: 0;
-            font-size: 2em;
-        }
-        .content {
-            display: flex;
-            height: calc(100vh - 56px);
-            background: #252526;
-        }
-        .editor-panel {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            border-right: 1px solid #3c3c3c;
-            background: #252526;
-        }
-        .editor-header {
-            background: #2d2d2d;
-            padding: 8px 12px;
-            border-bottom: 1px solid #3c3c3c;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .editor-title {
-            font-weight: 600;
-            color: #cccccc;
-        }
-        .run-button {
-            background: #0e639c;
-            color: #ffffff;
-            border: 1px solid #0e639c;
-            padding: 6px 12px;
-            border-radius: 2px;
-            cursor: pointer;
-            font-size: 13px;
-        }
-        .run-button:hover { background: #1177bb; border-color: #1177bb; }
-        .run-button:disabled { background: #3c3c3c; border-color: #3c3c3c; color: #999999; cursor: not-allowed; }
-        .editor {
-            flex: 1;
-            border: none;
-            outline: none;
-            background: #1e1e1e;
-        }
-        
-        #monacoEditor {
-            width: 100%;
-            height: 100%;
-        }
-        .output-panel {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-            background: #252526;
-        }
-        .canvas-container {
-            flex: 1;
-            padding: 12px;
-            background: #252526;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            border-bottom: 1px solid #3c3c3c;
-        }
-        canvas {
-            border: 1px solid #3c3c3c;
-            background: #1e1e1e;
-            border-radius: 2px;
-        }
-        .console {
-            height: 160px;
-            border-top: 1px solid #3c3c3c;
-            padding: 10px;
-            background: #1e1e1e;
-            color: #d4d4d4;
-            font-family: 'Consolas', 'Courier New', monospace;
-            font-size: 12px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-        }
-        .console .info { color: #4fc1ff; }
-        .console .success { color: #6a9955; }
-        .console .error { color: #f14c4c; }
-        .console .warning { color: #cca700; }
-        .examples {
-            background: #2d2d2d;
-            padding: 8px 12px;
-            border-bottom: 1px solid #3c3c3c;
-        }
-        .example-btn {
-            background: #0e639c;
-            color: #ffffff;
-            border: 1px solid #0e639c;
-            padding: 4px 8px;
-            margin: 0 6px 6px 0;
-            border-radius: 2px;
-            cursor: pointer;
-            font-size: 12px;
-        }
-        .example-btn:hover { background: #1177bb; border-color: #1177bb; }
-
-        /* 编译模式选择器样式 */
-        .compile-mode-selector {
-            margin: 10px 0;
-            padding: 10px;
-            background: #f8f9fa;
-            border-radius: 5px;
-            border: 1px solid #e9ecef;
-        }
-
-        .mode-option {
-            margin: 5px 10px 5px 0;
-        }
-
-        .mode-option input {
-            margin-right: 5px;
-        }
-
-        .mode-description {
-            font-size: 12px;
-            color: #6c757d;
-            margin-left: 20px;
-        }
-
-        /* 编译状态显示 */
-        .compile-status {
-            margin: 8px 12px;
-            padding: 6px 8px;
-            border-radius: 2px;
-            font-size: 13px;
-            display: none;
-        }
-
-        .compile-status.compiling {
-            background: #3c3c3c;
-            border: 1px solid #6b6b6b;
-            color: #e5e5e5;
-            display: block;
-        }
-
-        .compile-status.success {
-            background: #1e5128;
-            border: 1px solid #2ea043;
-            color: #c9ffd8;
-            display: block;
-        }
-
-        .compile-status.error {
-            background: #512020;
-            border: 1px solid #f14c4c;
-            color: #ffd6d6;
-            display: block;
-        }
-
-        .progress-bar {
-            width: 100%;
-            height: 4px;
-            background: #3c3c3c;
-            border-radius: 2px;
-            overflow: hidden;
-            margin-top: 5px;
-        }
-
-        .progress-fill {
-            height: 100%;
-            background: #0e639c;
-            border-radius: 2px;
-            transition: width 0.3s ease;
-            width: 0%;
-        }
-    </style>
+  <meta charset="utf-8">
+  <title>TGFX Playground</title>
+  <script src="https://unpkg.com/monaco-editor@0.44.0/min/vs/loader.js"></script>
+  <style>
+    :root { --bg:#1e1e1e; --panel:#252526; --line:#3c3c3c; --text:#d4d4d4; --primary:#0e639c; }
+    html,body { height:100%; }
+    body { margin:0; background:var(--bg); color:var(--text); font-family:system-ui,-apple-system,Segoe UI,Roboto,Ubuntu,'Droid Sans',sans-serif; }
+    .container { display:flex; flex-direction:column; height:100%; }
+    .header { padding:10px 16px; border-bottom:1px solid var(--line); background:#1f1f1f; }
+    .content { display:flex; flex:1; min-height:0; }
+    .editor-panel, .output-panel { flex:1; display:flex; flex-direction:column; min-width:0; }
+    .editor-panel { border-right:1px solid var(--line); background:var(--panel); }
+    .bar { display:flex; align-items:center; gap:8px; padding:8px 12px; border-bottom:1px solid var(--line); background:#2d2d2d; flex-wrap: wrap; }
+    .example-btn, .run-button {
+      background:var(--primary); color:#fff; border:1px solid var(--primary);
+      padding:6px 10px; border-radius:2px; font-size:12px; cursor:pointer;
+    }
+    .example-btn:hover, .run-button:hover { filter:brightness(1.1); }
+    .run-button:disabled { background:#3c3c3c; border-color:#3c3c3c; color:#999; cursor:not-allowed; }
+    #monacoEditor { flex:1; min-height:0; }
+    .canvas-wrap { flex:1; display:flex; align-items:center; justify-content:center; padding:12px; border-bottom:1px solid var(--line); background:var(--panel); min-height:0; }
+    canvas { background:#111; border:1px solid var(--line); }
+    .console { height:160px; padding:10px; font:12px/1.5 Consolas, 'Courier New', monospace; background:#111; overflow:auto; border-top:1px solid var(--line); white-space:pre-wrap; }
+    .info { color:#4fc1ff; } .success { color:#6a9955; } .error { color:#f14c4c; } .warning { color:#cca700; }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>TGFX Playground</h1>
+  <div class="container">
+    <div class="header"><h2 style="margin:0">TGFX Playground</h2></div>
+
+    <div class="content">
+      <div class="editor-panel">
+        <div class="bar" id="examplesBar">
+          <button class="example-btn" data-example="path">Path</button>
+          <button class="example-btn" data-example="blendMode">BlendMode</button>
+          <button class="example-btn" data-example="colorfilter">ColorFilter</button>
+          <button class="example-btn" data-example="imagefilter">ImageFilter</button>
+          <button class="example-btn" data-example="mask">Mask</button>
+          <button class="example-btn" data-example="layer">Layer</button>
+          <button class="example-btn" data-example="text">Text</button>
+          <button class="example-btn" data-example="emoji">Emoji</button>
+          <button class="example-btn" data-example="image">Image</button>
+          <button class="example-btn" data-example="svg">SVG</button>
         </div>
-
-        <div class="content">
-            <div class="editor-panel">
-                <div class="examples">
-                    <button class="example-btn" data-example="rect">绘制矩形</button>
-                    <button class="example-btn" data-example="circle">绘制圆形</button>
-                    <button class="example-btn" data-example="webgl_basic">WebGL 基础</button>
-                    <button class="example-btn" data-example="webgl_blend">WebGL 叠加混合</button>
-                    <button class="example-btn" data-example="webgl_multi">WebGL 多图形</button>
-                </div>
-
-                <!-- 仅保留 Emception 模式，移除模式选择器 -->
-
-                <!-- 编译状态显示 -->
-                <div id="compileStatus" class="compile-status">
-                    <div id="statusMessage">准备就绪</div>
-                    <div class="progress-bar">
-                        <div id="progressFill" class="progress-fill"></div>
-                    </div>
-                </div>
-                <div class="editor-header">
-                    <span class="editor-title">C++ 代码编辑器</span>
-                    <button id="runBtn" class="run-button" data-action="execute">
-                        ▶️ 运行代码
-                    </button>
-                </div>
-                <div id="monacoEditor" class="editor"></div>
-            </div>
-
-            <div class="output-panel">
-                <div class="canvas-container">
-                    <canvas id="renderCanvas" width="640" height="480"></canvas>
-                </div>
-                <div id="console" class="console"></div>
-            </div>
+        <div class="bar">
+          <div style="flex:1;font-weight:600">C++ 代码</div>
+          <button id="runBtn" class="run-button">▶️ 运行</button>
         </div>
+        <div id="monacoEditor"></div>
+      </div>
+
+      <div class="output-panel">
+        <div class="canvas-wrap">
+          <canvas id="renderCanvas" width="640" height="480"></canvas>
+        </div>
+        <div id="console" class="console"></div>
+      </div>
     </div>
+  </div>
 
-    <script type="module">
-        // Monaco Editor 实例
-        let monacoEditor = null;
-        
-        // 默认代码
-        const defaultCode = `#include <tgfx/core/Color.h>
+  <script type="module">
+    let monacoEditor = null;
+    let compilationManager = null;
+    let currentExample = 'path';
+
+    function log(msg, type='info'){
+      const c = document.getElementById('console');
+      const span = document.createElement('span');
+      span.className = type;
+      span.textContent = `[${new Date().toLocaleTimeString()}] ${msg}\n`;
+      c.appendChild(span);
+      c.scrollTop = c.scrollHeight;
+    }
+
+    // 标准 API 示例：默认 path
+    const defaultCode = `#include <tgfx/core/Color.h>
 #include <tgfx/core/Paint.h>
 #include <tgfx/core/Rect.h>
-#include <tgfx/core/Point.h>
 #include <tgfx/core/Canvas.h>
+#include <tgfx/core/Path.h>
 #include <tgfx/gpu/opengl/webgl/WebGLWindow.h>
 
-int main() {
-    auto window = tgfx::WebGLWindow::MakeFrom("#renderCanvas");
-    if (!window) return 1;
-    auto device = window->getDevice();
-    if (!device) return 2;
-    auto context = device->lockContext();
-    if (!context) return 3;
-    auto surface = window->getSurface(context);
-    if (!surface) return 4;
-    auto canvas = surface->getCanvas();
+using namespace tgfx;
 
-    canvas->clear(tgfx::Color::White());
+int main(){
+  auto window = WebGLWindow::MakeFrom("#renderCanvas");
+  if(!window) return 1;
+  auto device = window->getDevice(); if(!device) return 2;
+  auto context = device->lockContext(); if(!context) return 3;
+  auto surface = window->getSurface(context); if(!surface) return 4;
+  auto canvas = surface->getCanvas();
 
-    tgfx::Paint paint;
-    paint.setColor(tgfx::Color::FromRGBA(255, 0, 0, 255));
-    canvas->drawRect(tgfx::Rect::MakeLTRB(50, 50, 200, 150), paint);
+  canvas->clear(Color::White());
 
-    paint.setColor(tgfx::Color::FromRGBA(0, 0, 255, 179));
-    canvas->drawCircle(tgfx::Point::Make(300, 100), 40, paint);
+  // 填充三角形轮廓（用 Path + drawPath）
+  Path tri;
+  tri.moveTo(60,60);
+  tri.lineTo(180,60);
+  tri.lineTo(120,140);
+  tri.close();
 
-    window->present(context);
-    return 0;
+  Paint fill; fill.setColor(Color::FromRGBA(255,165,0,220));
+  canvas->drawPath(tri, fill);
+
+  // 外轮廓描边
+  Paint stroke; stroke.setStyle(PaintStyle::Stroke);
+  stroke.setStrokeWidth(3.0f);
+  stroke.setColor(Color::FromRGBA(30,144,255,255));
+  canvas->drawPath(tri, stroke);
+
+  window->present(context);
+  return 0;
 }`;
 
-        // 初始化 Monaco Editor
-        function initializeMonacoEditor() {
-            return new Promise((resolve, reject) => {
-                require.config({ paths: { vs: 'https://unpkg.com/monaco-editor@0.44.0/min/vs' } });
-                require(['vs/editor/editor.main'], function () {
-                    try {
-                        monacoEditor = monaco.editor.create(document.getElementById('monacoEditor'), {
-                            value: defaultCode,
-                            language: 'cpp',
-                            theme: 'vs-dark',
-                            fontSize: 14,
-                            minimap: { enabled: true },
-                            scrollBeyondLastLine: false,
-                            automaticLayout: true,
-                            wordWrap: 'on',
-                            lineNumbers: 'on',
-                            folding: true,
-                            renderWhitespace: 'selection',
-                            contextmenu: true,
-                            mouseWheelZoom: true,
-                            cursorBlinking: 'blink',
-                            cursorSmoothCaretAnimation: true,
-                            smoothScrolling: true,
-                            selectOnLineNumbers: true,
-                            roundedSelection: false,
-                            readOnly: false,
-                            cursorStyle: 'line',
-                            fontLigatures: true,
-                            suggest: {
-                                showKeywords: true,
-                                showSnippets: true,
-                                showClasses: true,
-                                showFunctions: true,
-                                showVariables: true
-                            }
-                        });
-                        
-                        // 添加快捷键
-                        monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, function() {
-                            executeCode();
-                        });
-                        
-                        addConsoleOutput('Monaco Editor 已初始化', 'success');
-                        resolve(monacoEditor);
-                    } catch (error) {
-                        addConsoleOutput(`Monaco Editor 初始化失败: ${error.message}`, 'error');
-                        reject(error);
-                    }
-                });
-            });
-        }
+    // 10 个标准 API 示例
+    const examples = {
+      path: defaultCode,
 
-        // 示例代码
-        const examples = {
-            rect: `#include <tgfx/core/Color.h>
+      blendMode: `#include <tgfx/core/Color.h>
 #include <tgfx/core/Paint.h>
-#include <tgfx/core/Rect.h>
-
-extern "C" int user_main(){
-  tgfx::Paint p; p.setColor(tgfx::Color::FromRGBA(255,0,0,255));
-  auto rc = tgfx::Rect::MakeLTRB(50,50,200,150); (void)rc;
-  return 0;
-}`,
-            circle: `#include <tgfx/core/Color.h>
-#include <tgfx/core/Paint.h>
-#include <tgfx/core/Point.h>
-
-extern "C" int user_main(){
-  tgfx::Paint fill; fill.setColor(tgfx::Color::FromRGBA(0,0,255,255));
-  auto c = tgfx::Point::Make(200,150); (void)c;
-  return 0;
-}`,
-            simple: `#include <tgfx/core/Color.h>
-#include <tgfx/core/Paint.h>
-#include <tgfx/core/Rect.h>
-
-extern "C" int user_main(){
-  tgfx::Paint p; p.setColor(tgfx::Color::FromRGBA(128,0,128,255));
-  auto rc = tgfx::Rect::MakeLTRB(100,100,300,200); (void)rc;
-  return 0;
-}`,
-            improved: `#include <tgfx/core/Color.h>
-#include <tgfx/core/Paint.h>
-
-extern "C" int user_main(){
-  tgfx::Paint p1; p1.setColor(tgfx::Color::FromRGBA(255,51,51,204));
-  tgfx::Paint p2; p2.setColor(tgfx::Color::FromRGBA(51,255,51,204));
-  tgfx::Paint p3; p3.setColor(tgfx::Color::FromRGBA(51,51,255,204));
-  return 0;
-}`,
-            memory: `#include <tgfx/core/Color.h>
-#include <tgfx/core/Paint.h>
-
-extern "C" int user_main(){
-  tgfx::Paint r; r.setColor(tgfx::Color::FromRGBA(255,0,0,179));
-  tgfx::Paint g; g.setColor(tgfx::Color::FromRGBA(0,255,0,179));
-  tgfx::Paint b; b.setColor(tgfx::Color::FromRGBA(0,0,255,179));
-  return 0;
-}`,
-            webgl_basic: `#include <tgfx/core/Color.h>
-#include <tgfx/core/Paint.h>
-#include <tgfx/core/Rect.h>
-#include <tgfx/core/Point.h>
 #include <tgfx/core/Canvas.h>
+#include <tgfx/core/BlendMode.h>
 #include <tgfx/gpu/opengl/webgl/WebGLWindow.h>
+using namespace tgfx;
 
-extern "C" int user_main(){
-  auto window = tgfx::WebGLWindow::MakeFrom("#renderCanvas");
-  if(!window) return 1; auto device = window->getDevice(); if(!device) return 2; auto context = device->lockContext(); if(!context) return 3; auto surface = window->getSurface(context); if(!surface) return 4; auto canvas = surface->getCanvas();
-  canvas->clear(tgfx::Color::White());
-  tgfx::Paint p; p.setColor(tgfx::Color::FromRGBA(255,0,0,255));
-  canvas->drawRect(tgfx::Rect::MakeLTRB(50,50,200,150), p);
-  p.setColor(tgfx::Color::FromRGBA(0,0,255,179));
-  canvas->drawCircle(tgfx::Point::Make(300,100), 40, p);
+int main(){
+  auto window = WebGLWindow::MakeFrom("#renderCanvas");
+  if(!window) return 1;
+  auto device = window->getDevice(); if(!device) return 2;
+  auto context = device->lockContext(); if(!context) return 3;
+  auto surface = window->getSurface(context); if(!surface) return 4;
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // 多混合模式对照
+  const BlendMode modes[] = {
+    BlendMode::SrcOver, BlendMode::Multiply, BlendMode::Screen,
+    BlendMode::Overlay, BlendMode::SoftLight, BlendMode::Darken,
+    BlendMode::Lighten
+  };
+  const int count = (int)(sizeof(modes)/sizeof(modes[0]));
+  const int cols = 3;
+  const float cellW = 200.0f, cellH = 150.0f;
+  const float startX = 40.0f, startY = 40.0f;
+
+  for(int i=0;i<count;i++){
+    int r = i / cols, c = i % cols;
+    canvas->save();
+    canvas->translate(startX + c * cellW, startY + r * cellH);
+
+    Paint p1; p1.setColor(Color::FromRGBA(255,0,0,180));
+    Paint p2; p2.setColor(Color::FromRGBA(0,0,255,180));
+    p2.setBlendMode(modes[i]);
+
+    canvas->drawCircle(60,60, 50, p1);
+    canvas->drawCircle(100,60, 50, p2);
+
+    canvas->restore();
+  }
+
   window->present(context);
   return 0;
 }`,
-            webgl_blend: `#include <tgfx/core/Color.h>
-#include <tgfx/core/Paint.h>
-#include <tgfx/core/Point.h>
-#include <tgfx/core/Canvas.h>
-#include <tgfx/gpu/opengl/webgl/WebGLWindow.h>
 
-extern "C" int user_main(){
-  auto window = tgfx::WebGLWindow::MakeFrom("#renderCanvas");
-  if(!window) return 1; auto device = window->getDevice(); if(!device) return 2; auto context = device->lockContext(); if(!context) return 3; auto surface = window->getSurface(context); if(!surface) return 4; auto canvas = surface->getCanvas();
-  canvas->clear(tgfx::Color::White());
-  tgfx::Paint p; p.setColor(tgfx::Color::FromRGBA(255,0,0,128)); canvas->drawCircle(tgfx::Point::Make(140,120), 60, p);
-  p.setColor(tgfx::Color::FromRGBA(0,255,0,128)); canvas->drawCircle(tgfx::Point::Make(200,120), 60, p);
-  p.setColor(tgfx::Color::FromRGBA(0,0,255,128)); canvas->drawCircle(tgfx::Point::Make(170,180), 60, p);
+      colorfilter: `#include <tgfx/core/Color.h>
+#include <tgfx/core/Paint.h>
+#include <tgfx/core/Canvas.h>
+#include <tgfx/core/Rect.h>
+#include <tgfx/core/ColorFilter.h>
+#include <tgfx/gpu/opengl/webgl/WebGLWindow.h>
+using namespace tgfx;
+
+int main(){
+  auto window = WebGLWindow::MakeFrom("#renderCanvas");
+  if(!window) return 1;
+  auto device = window->getDevice(); if(!device) return 2;
+  auto context = device->lockContext(); if(!context) return 3;
+  auto surface = window->getSurface(context); if(!surface) return 4;
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // 矩阵颜色滤镜（降低绿色，提升蓝色）
+  std::array<float,20> mat = {
+    1,0,0,0,0,
+    0,0.7f,0,0,0,
+    0,0,1.3f,0,0,
+    0,0,0,1,0
+  };
+  Paint p; p.setColor(Color::FromRGBA(120,180,220,255));
+  p.setColorFilter(ColorFilter::Matrix(mat));
+  canvas->drawRect(Rect::MakeLTRB(60,60,300,180), p);
+
   window->present(context);
   return 0;
 }`,
-            webgl_multi: `#include <tgfx/core/Color.h>
-#include <tgfx/core/Paint.h>
-#include <tgfx/core/Rect.h>
-#include <tgfx/core/Canvas.h>
-#include <tgfx/gpu/opengl/webgl/WebGLWindow.h>
 
-extern "C" int user_main(){
-  auto window = tgfx::WebGLWindow::MakeFrom("#renderCanvas");
-  if(!window) return 1; auto device = window->getDevice(); if(!device) return 2; auto context = device->lockContext(); if(!context) return 3; auto surface = window->getSurface(context); if(!surface) return 4; auto canvas = surface->getCanvas();
-  canvas->clear(tgfx::Color::White());
-  tgfx::Paint p;
-  p.setColor(tgfx::Color::FromRGBA(255,128,0,255)); canvas->drawRect(tgfx::Rect::MakeLTRB(20,20,120,80), p);
-  p.setColor(tgfx::Color::FromRGBA(0,128,255,200)); canvas->drawRect(tgfx::Rect::MakeLTRB(140,40,260,140), p);
-  p.setColor(tgfx::Color::FromRGBA(128,0,255,160)); canvas->drawRect(tgfx::Rect::MakeLTRB(280,60,380,160), p);
+      imagefilter: `#include <tgfx/core/Color.h>
+#include <tgfx/core/Paint.h>
+#include <tgfx/core/Canvas.h>
+#include <tgfx/core/Rect.h>
+#include <tgfx/core/Image.h>
+#include <tgfx/core/ImageFilter.h>
+#include <tgfx/core/SamplingOptions.h>
+#include <tgfx/gpu/opengl/webgl/WebGLWindow.h>
+using namespace tgfx;
+
+int main(){
+  auto window = WebGLWindow::MakeFrom("#renderCanvas");
+  if(!window) return 1;
+  auto device = window->getDevice(); if(!device) return 2;
+  auto context = device->lockContext(); if(!context) return 3;
+  auto surface = window->getSurface(context); if(!surface) return 4;
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // 直接使用 MakeFromFile 加载图片
+  auto img = Image::MakeFromFile("/working/assets/image.webp");
+  if(img) {
+    // 在滤镜里做高斯模糊
+    Paint p; p.setImageFilter(ImageFilter::Blur(8.0f, 8.0f));
+    // 使用 saveLayer 应用滤镜到其间绘制的内容
+    canvas->saveLayer(&p);
+    canvas->drawImageRect(img, Rect::MakeLTRB(60,60,380,260), SamplingOptions{});
+    canvas->restore();
+  }
+
+  window->present(context);
+  return 0;
+}`,
+
+      mask: `#include <tgfx/core/Color.h>
+#include <tgfx/core/Paint.h>
+#include <tgfx/core/Canvas.h>
+#include <tgfx/core/Path.h>
+#include <tgfx/core/Rect.h>
+#include <tgfx/gpu/opengl/webgl/WebGLWindow.h>
+using namespace tgfx;
+
+int main(){
+  auto window = WebGLWindow::MakeFrom("#renderCanvas");
+  if(!window) return 1;
+  auto device = window->getDevice(); if(!device) return 2;
+  auto context = device->lockContext(); if(!context) return 3;
+  auto surface = window->getSurface(context); if(!surface) return 4;
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // 使用 clipPath 作为遮罩区域（标准 API）
+  Path clip;
+  clip.addOval(Rect::MakeLTRB(140,80,340,280)); // 椭圆作为遮罩
+  canvas->clipPath(clip);
+
+  // 在遮罩区域中绘制
+  Paint bg; bg.setColor(Color::FromRGBA(30,144,255,255));
+  canvas->drawRect(Rect::MakeLTRB(80,60,400,300), bg);
+
+  Paint fg; fg.setColor(Color::FromRGBA(255,255,255,200));
+  fg.setStyle(PaintStyle::Stroke);
+  fg.setStrokeWidth(6.0f);
+  canvas->drawOval(Rect::MakeLTRB(140,80,340,280), fg);
+
+  window->present(context);
+  return 0;
+}`,
+
+      layer: `#include <tgfx/core/Color.h>
+#include <tgfx/core/Paint.h>
+#include <tgfx/core/Canvas.h>
+#include <tgfx/core/Rect.h>
+#include <tgfx/gpu/opengl/webgl/WebGLWindow.h>
+using namespace tgfx;
+
+int main(){
+  auto window = WebGLWindow::MakeFrom("#renderCanvas");
+  if(!window) return 1;
+  auto device = window->getDevice(); if(!device) return 2;
+  auto context = device->lockContext(); if(!context) return 3;
+  auto surface = window->getSurface(context); if(!surface) return 4;
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // 使用 saveLayerAlpha 建立半透明图层
+  canvas->saveLayerAlpha(180); // 0-255
+  {
+    Paint p1; p1.setColor(Color::FromRGBA(255,128,0,255));
+    canvas->drawRect(Rect::MakeLTRB(60,60,260,200), p1);
+    Paint p2; p2.setColor(Color::FromRGBA(0,128,255,255));
+    canvas->drawRect(Rect::MakeLTRB(140,120,340,260), p2);
+  }
+  canvas->restore();
+
+  window->present(context);
+  return 0;
+}`,
+
+      text: `#include <tgfx/core/Color.h>
+#include <tgfx/core/Paint.h>
+#include <tgfx/core/Canvas.h>
+#include <tgfx/core/Font.h>
+#include <tgfx/core/Typeface.h>
+#include <tgfx/gpu/opengl/webgl/WebGLWindow.h>
+using namespace tgfx;
+
+int main(){
+  auto window = WebGLWindow::MakeFrom("#renderCanvas");
+  if(!window) return 1;
+  auto device = window->getDevice(); if(!device) return 2;
+  auto context = device->lockContext(); if(!context) return 3;
+  auto surface = window->getSurface(context); if(!surface) return 4;
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // 字体已在运行前写入到 /working/assets/NotoSansSC-Regular.otf
+  auto tf = Typeface::MakeFromPath("/working/assets/NotoSansSC-Regular.otf");
+  Font font(tf, 28.0f);
+
+  Paint p; p.setColor(Color::FromRGBA(30,30,30,255));
+  canvas->drawSimpleText("Hello, TGFX!", 80, 140, font, p);
+
+  window->present(context);
+  return 0;
+}`,
+
+      emoji: `#include <tgfx/core/Color.h>
+#include <tgfx/core/Paint.h>
+#include <tgfx/core/Canvas.h>
+#include <tgfx/core/Font.h>
+#include <tgfx/core/Typeface.h>
+#include <tgfx/gpu/opengl/webgl/WebGLWindow.h>
+using namespace tgfx;
+
+int main(){
+  auto window = WebGLWindow::MakeFrom("#renderCanvas");
+  if(!window) return 1;
+  auto device = window->getDevice(); if(!device) return 2;
+  auto context = device->lockContext(); if(!context) return 3;
+  auto surface = window->getSurface(context); if(!surface) return 4;
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // 彩色 Emoji 字体（已写入 /working/assets/NotoColorEmoji.ttf）
+  auto emojiTF = Typeface::MakeFromPath("/working/assets/NotoColorEmoji.ttf");
+  Font emojiFont(emojiTF, 48.0f);
+
+  Paint p; p.setColor(Color::FromRGBA(0,0,0,255)); // 对彩色字形通常不生效，但不影响
+  canvas->drawSimpleText("Hello 😄🎉 TGFX", 60, 160, emojiFont, p);
+
+  window->present(context);
+  return 0;
+}`,
+
+      image: `#include <tgfx/core/Color.h>
+#include <tgfx/core/Paint.h>
+#include <tgfx/core/Canvas.h>
+#include <tgfx/core/Rect.h>
+#include <tgfx/core/Image.h>
+#include <tgfx/core/SamplingOptions.h>
+#include <tgfx/gpu/opengl/webgl/WebGLWindow.h>
+using namespace tgfx;
+
+int main(){
+  auto window = WebGLWindow::MakeFrom("#renderCanvas");
+  if(!window) return 1;
+  auto device = window->getDevice(); if(!device) return 2;
+  auto context = device->lockContext(); if(!context) return 3;
+  auto surface = window->getSurface(context); if(!surface) return 4;
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  auto img = Image::MakeFromFile("/working/assets/image.webp");
+  if(img) {
+    Rect dst = Rect::MakeLTRB(60,60,380,260);
+    canvas->drawImageRect(img, dst, SamplingOptions{}, nullptr);
+  }
+
+  window->present(context);
+  return 0;
+}`,
+
+      svg: `#include <tgfx/core/Color.h>
+#include <tgfx/core/Paint.h>
+#include <tgfx/core/Canvas.h>
+#include <tgfx/core/Rect.h>
+#include <tgfx/gpu/opengl/webgl/WebGLWindow.h>
+#include <tgfx/svg/SVGDOM.h> // 假定头文件路径，如有不同请按项目实际调整
+using namespace tgfx;
+
+int main(){
+  auto window = WebGLWindow::MakeFrom("#renderCanvas");
+  if(!window) return 1;
+  auto device = window->getDevice(); if(!device) return 2;
+  auto context = device->lockContext(); if(!context) return 3;
+  auto surface = window->getSurface(context); if(!surface) return 4;
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  // 从文件加载 SVG（已写入 /working/assets/sample.svg）
+  auto dom = svg::SVGDOM::MakeFromFile("/working/assets/sample.svg");
+  if(dom){
+    // 以画布大小适配渲染（API 以工程实际为准）
+    dom->render(canvas, /*viewport*/ Rect::MakeLTRB(0,0,640,480));
+  }else{
+    Paint p; p.setColor(Color::FromRGBA(0,150,255,200));
+    canvas->drawRect(Rect::MakeLTRB(60,60,220,140), p);
+  }
+
   window->present(context);
   return 0;
 }`
-        };
+    };
 
-        let compilationManager = null;
-
-        // 控制台输出
-        function addConsoleOutput(message, type = 'info') {
-            const consoleElement = document.getElementById('console');
-            if (!consoleElement) return;
-            const span = document.createElement('span');
-            span.className = type;
-            span.textContent = `[${new Date().toLocaleTimeString()}] ${message}\n`;
-            consoleElement.appendChild(span);
-            consoleElement.scrollTop = consoleElement.scrollHeight;
-        }
-
-        window.addConsoleOutput = addConsoleOutput;
-
-        // Emception 与头文件加载缓存
-        // 1) Emception 动态导入单例缓存
-            const EmceptionLoader = (() => {
-                let emceptionPromise = null;
-                let packsPromise = null;
-                const base = new URL('./emception/', window.location.href).toString();
-                return {
-                    load() {
-                        if (!emceptionPromise) {
-                            emceptionPromise = import(new URL('./emception/emception.js', window.location.href).toString());
-                        }
-                        return emceptionPromise;
-                    },
-                    loadPacks() {
-                        if (!packsPromise) {
-                            packsPromise = import(new URL('./emception/packs.mjs', window.location.href).toString());
-                        }
-                        return packsPromise;
-                    },
-                    base
-                };
-            })();
-        window.EmceptionLoader = EmceptionLoader;
-
-        // 2) 头文件与静态资源 fetch 内存缓存（同源 GET + 白名单路径）
-        (function installFetchCacheOnce() {
-            if (window.__tgfxFetchCacheInstalled) return;
-            window.__tgfxFetchCacheInstalled = true;
-
-            const origin = window.location.origin;
-            const cache = new Map(); // key -> { body:ArrayBuffer|Text, type:string, isBinary:boolean }
-            const allowPatterns = [
-                /\/web-code-editor\/emception\//, // emception.js/wasm/packs.mjs 及其资源
-                /\/emception\//,           // 本目录 emception 资源
-                /\/include\//,                  // 头文件常见路径
-                /\/headers?\//,                 // headers 或 header
-                /\/tgfx\/include\//,            // 项目内 include 别名
-                /\/wasm-assets\//               // 头文件清单与静态库
-            ];
-
-            function shouldCache(url) {
-                try {
-                    const u = new URL(url, window.location.href);
-                    if (u.origin !== origin) return false;
-                    if (u.search) return false; // 带查询参数常用于变体/不缓存
-                    return allowPatterns.some(re => re.test(u.pathname));
-                } catch { return false; }
-            }
-
-            const originalFetch = window.fetch.bind(window);
-            window.fetch = async function cachedFetch(input, init) {
-                const req = typeof input === 'string' ? input : input.url;
-                const method = (init && init.method) ? init.method.toUpperCase() : 'GET';
-
-                if (method !== 'GET' || !shouldCache(req)) {
-                    return originalFetch(input, init);
-                }
-
-                const key = req;
-                const hit = cache.get(key);
-                if (hit) {
-                    const body = hit.isBinary ? hit.body.slice(0) : hit.body; // 复制二进制缓冲
-                    return new Response(body, { headers: { 'content-type': hit.type || 'application/octet-stream' } });
-                }
-
-                const resp = await originalFetch(input, init);
-                if (!resp.ok) return resp;
-
-                const ctype = resp.headers.get('content-type') || '';
-                const isText = ctype.includes('text') || ctype.includes('json') || ctype.includes('javascript');
-                if (isText) {
-                    const text = await resp.clone().text();
-                    cache.set(key, { body: text, type: ctype, isBinary: false });
-                    return new Response(text, { headers: { 'content-type': ctype } });
-                } else {
-                    const buf = await resp.clone().arrayBuffer();
-                    cache.set(key, { body: buf, type: ctype, isBinary: true });
-                    return new Response(buf.slice(0), { headers: { 'content-type': ctype } });
-                }
-            };
-        })();
-
-        // 模块加载
-        (async function initializeModules() {
-            try {
-                const compilationManagerModule = await import('./compilation-manager.js');
-                const CompilationManager = compilationManagerModule.default;
-
-                window.CompilationManager = CompilationManager;
-                window.dispatchEvent(new CustomEvent('modulesLoaded', { detail: { success: true } }));
-                // 预加载 Emception 相关模块（命中 ESModule 缓存）
-                try {
-                    EmceptionLoader.load().catch(()=>{});
-                    EmceptionLoader.loadPacks().catch(()=>{});
-                } catch {}
-            } catch (error) {
-                console.error('模块导入失败:', error);
-                window.CompilationManager = null;
-                window.dispatchEvent(new CustomEvent('modulesLoaded', { detail: { success: false, error } }));
-            }
-        })();
-
-        // 不再加载精简宿主模块，直接使用浏览器端编译与单WASM执行
-
-        // 初始化编译管理器
-        async function initializeCompilationManager() {
-            try {
-                const CompilationManagerClass = window.CompilationManager;
-                if (!CompilationManagerClass) {
-                    addConsoleOutput('编译器模块不可用', 'warning');
-                    return;
-                }
-
-                if (compilationManager) {
-                    addConsoleOutput('编译管理器已就绪（缓存）', 'success');
-                    return;
-                }
-                // 如编译器内部可利用全局缓存，可将 loader 提供给其使用
-                // 例如 CompilationManager 可选择读取 window.EmceptionLoader
-                compilationManager = new CompilationManagerClass();
-                addConsoleOutput('编译管理器已准备就绪', 'success');
-
-            } catch (error) {
-                addConsoleOutput(`编译管理器初始化失败: ${error.message}`, 'error');
-            }
-        }
-
-
-        // 仅保留 Emception 模式
-
-        // 加载示例
-        function loadExample(type) {
-            if (examples[type] && monacoEditor) {
-                monacoEditor.setValue(examples[type]);
-                addConsoleOutput(`已加载${type}示例代码`, 'info');
-            }
-        }
-
-        // 执行代码
-        async function executeCode() {
-            const runBtn = document.getElementById('runBtn');
-            const code = monacoEditor ? monacoEditor.getValue() : '';
-
-            runBtn.disabled = true;
-            runBtn.textContent = '执行中...';
-
-            try {
-                await initializeCompilationManager();
-                addConsoleOutput(`开始执行用户代码...`, 'info');
-                await executeWithEmception(code);
-
-                addConsoleOutput('代码执行完成!', 'success');
-
-            } catch (e) {
-                addConsoleOutput(`执行错误: ${e.message}`, 'error');
-            } finally {
-                runBtn.disabled = false;
-                runBtn.textContent = '▶️ 运行代码';
-            }
-        }
-
-        // 编译并执行代码
-        async function executeWithEmception(code) {
-            if (!compilationManager) {
-                throw new Error('编译管理器未初始化');
-            }
-
-            try {
-                if (!compilationManager.isInitialized) {
-                    await compilationManager.initialize();
-                }
-
-                const result = await compilationManager.compileAndExecute(code);
-                //addConsoleOutput(`编译成功! 会话ID: ${result.sessionId}`, 'success');
-
-                // 如果是单文件 em++ 模块，读取帧缓冲贴到 canvas
-                try {
-                    const mod = compilationManager.wasmExecutor?.wasmModule;
-                    if (mod && typeof mod.cwrap === 'function' && mod.HEAPU8) {
-                        const getPtr = mod.cwrap('tgfx_get_framebuffer_ptr','number',[]);
-                        const getW = mod.cwrap('tgfx_get_width','number',[]);
-                        const getH = mod.cwrap('tgfx_get_height','number',[]);
-                        // 若示例未调用初始化/渲染，可补一次
-                        const init = mod.cwrap('tgfx_init','number',['number','number']);
-                        const render = mod.cwrap('tgfx_render','void',[]);
-                        const present = mod.cwrap('tgfx_present','void',[]);
-
-                        const canvas = document.getElementById('renderCanvas');
-                        const ctx = canvas?.getContext('2d');
-                        if (ctx) {
-                            if (getW() === 0 || getH() === 0) {
-                                init(canvas.width, canvas.height);
-                                render();
-                                present();
-                            }
-                            const w = getW();
-                            const h = getH();
-                            if (w > 0 && h > 0) {
-                                if (canvas.width !== w || canvas.height !== h) {
-                                    canvas.width = w; canvas.height = h;
-                                }
-                                const ptr = getPtr();
-                                const view = new Uint8ClampedArray(mod.HEAPU8.buffer, ptr, w*h*4);
-                                const img = new ImageData(view, w, h);
-                                ctx.putImageData(img, 0, 0);
-                                addConsoleOutput(`已渲染到画布 (${w}x${h})`, 'success');
-                            }
-                        }
-                    }
-                } catch (postErr) {
-                    addConsoleOutput(` 贴图阶段警告: ${postErr.message}`, 'warning');
-                }
-
-            } catch (error) {
-                addConsoleOutput('Emception编译失败:', 'error');
-                addConsoleOutput(`   错误详情: ${error.message}`, 'error');
-                throw error;
-            }
-        }
-
-        // DSL 模式与 wrapcode 功能已移除
-
-        // 页面初始化
-        document.addEventListener('DOMContentLoaded', async () => {
-            // 初始化 Monaco Editor
-            try {
-                await initializeMonacoEditor();
-            } catch (error) {
-                addConsoleOutput(`Monaco Editor 初始化失败: ${error.message}`, 'error');
-            }
-
-            // 绑定示例按钮
-            const exampleButtons = document.querySelectorAll('.example-btn[data-example]');
-            exampleButtons.forEach(button => {
-                button.addEventListener('click', (e) => {
-                    const exampleType = e.target.getAttribute('data-example');
-                    loadExample(exampleType);
-                });
+    function initMonaco(){
+      return new Promise((resolve, reject) => {
+        require.config({ paths: { vs: 'https://unpkg.com/monaco-editor@0.44.0/min/vs' } });
+        require(['vs/editor/editor.main'], function(){
+          try{
+            monacoEditor = monaco.editor.create(document.getElementById('monacoEditor'), {
+              value: defaultCode, language:'cpp', theme:'vs-dark', fontSize:14,
+              minimap:{enabled:true}, automaticLayout:true, wordWrap:'on'
             });
-
-            // 绑定运行按钮
-            const runButton = document.getElementById('runBtn');
-            if (runButton) {
-                runButton.addEventListener('click', executeCode);
-            }
-
-            addConsoleOutput('欢迎使用 TGFX 在线代码编辑器!', 'info');
-            addConsoleOutput('点击示例按钮加载代码，然后点击运行按钮执行', 'info');
+            monacoEditor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.Enter, runCode);
+            log('Monaco Editor 就绪','success');
+            resolve();
+          }catch(e){ log(`Monaco 初始化失败: ${e.message}`,'error'); reject(e); }
         });
+      });
+    }
 
-        // 监听模块加载完成事件
-        // 监听模块加载完成事件
-        window.addEventListener('modulesLoaded', (event) => {
-            if (event.detail.success) {
-                addConsoleOutput('编译器模块已就绪', 'success');
-                // 再次尝试静默预热 emception（若首次失败）
-                EmceptionLoader.load().catch(()=>{});
-                EmceptionLoader.loadPacks().catch(()=>{});
-            } else {
-                addConsoleOutput('编译器模块加载失败', 'error');
-            }
-        });
-    </script>
+    async function ensureManager(){
+      if (compilationManager) return;
+      const { default: CompilationManager } = await import('./compilation-manager.js');
+      compilationManager = new CompilationManager();
+      await compilationManager.initialize();
+      log('编译器就绪','success');
+    }
+
+    async function runCode(){
+      const btn = document.getElementById('runBtn');
+      btn.disabled = true; btn.textContent = '执行中...';
+      try{
+        await ensureManager();
+        const code = monacoEditor ? monacoEditor.getValue() : '';
+        log('开始编译与执行...','info');
+        const result = await compilationManager.compileAndExecute(code);
+        if (result?.success) log('执行完成','success');
+      }catch(e){
+        log(`执行错误: ${e.message}`,'error');
+      }finally{
+        btn.disabled = false; btn.textContent = '▶️ 运行';
+      }
+    }
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      await initMonaco();
+      document.getElementById('runBtn').addEventListener('click', runCode);
+      document.getElementById('examplesBar').addEventListener('click', (ev) => {
+        const btn = ev.target.closest('[data-example]'); if(!btn) return;
+        const key = btn.getAttribute('data-example');
+        if (examples[key] && monacoEditor) {
+          currentExample = key;
+          monacoEditor.setValue(examples[key]);
+          log(`已加载示例: ${key}`,'info');
+        }
+      });
+      log('欢迎使用 TGFX 在线代码编辑器。Ctrl/Cmd+Enter 运行','info');
+    });
+  </script>
 </body>
 </html>

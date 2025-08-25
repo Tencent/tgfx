@@ -9,7 +9,7 @@ import { WasmExecutor } from './wasm-executor.js';
 class CompilationManager {
     constructor() {
         this.emceptionAdapter = new EmceptionAdapter();
-        this.wasmExecutor = new WasmExecutor(null);
+        this.wasmExecutor = new WasmExecutor();
 
         this.isInitialized = false;
         this.compilationHistory = [];
@@ -93,8 +93,6 @@ class CompilationManager {
                 throw new Error('无可用产物：既没有 jsModuleCode 也没有 wasmBinary');
             }
 
-            // 建立内存访问连接
-            this.wasmExecutor = this.wasmExecutor; // 确保可以访问内存
 
             // 第3阶段：执行
             this.updateStatus('executing', 80, '正在执行用户代码...');
@@ -240,7 +238,7 @@ class CompilationManager {
             wasmStatus: this.wasmExecutor.getStatus(),
             historyCount: this.compilationHistory.length,
             currentSession: this.currentSession,
-            embindSupport: true
+            embindSupport: false
         };
     }
 
