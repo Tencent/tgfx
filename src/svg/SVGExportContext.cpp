@@ -24,6 +24,9 @@
 #include "SVGUtils.h"
 #include "core/CanvasState.h"
 #include "core/images/CodecImage.h"
+#include "core/images/FilterImage.h"
+#include "core/images/PictureImage.h"
+#include "core/images/SubsetImage.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
@@ -37,8 +40,10 @@
 #include "tgfx/core/Path.h"
 #include "tgfx/core/PathTypes.h"
 #include "tgfx/core/Pixmap.h"
+#include "tgfx/core/Point.h"
 #include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/core/Size.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/TileMode.h"
@@ -145,12 +150,63 @@ void SVGExportContext::drawShape(std::shared_ptr<Shape> shape, const MCState& st
   drawPath(shape->getPath(), state, fill);
 }
 
-void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions&,
+void SVGExportContext::drawImage(std::shared_ptr<Image> image, const SamplingOptions& sampling,
                                  const MCState& state, const Fill& fill) {
   DEBUG_ASSERT(image != nullptr);
-  Bitmap bitmap = ImageExportToBitmap(context, image);
-  if (!bitmap.isEmpty()) {
-    exportPixmap(Pixmap(bitmap), state, fill);
+  auto type = Types::Get(image.get());
+  if (type == Types::ImageType::Picture) {
+    const auto* pictureImage = static_cast<const PictureImage*>(image.get());
+    auto newState = state;
+    if (pictureImage->matrix) {
+      newState.matrix.preConcat(*pictureImage->matrix);
+    }
+    drawPicture(pictureImage->picture, newState);
+  } else if (type == Types::ImageType::Filter) {
+    const auto* filterImage = static_cast<const FilterImage*>(image.get());
+    auto filter = filterImage->filter;
+    auto bound = Rect::MakeWH(filterImage->source->width(), filterImage->source->height());
+    auto filtBound = filterImage->bounds;
+    auto outer = Point::Make((filtBound.width() - bound.width()) / 2,
+                             (filtBound.height() - bound.height()) / 2);
+    auto offset =
+        Point::Make((filtBound.centerX() - bound.centerX()), filtBound.centerY() - bound.centerY());
+    bound = state.matrix.mapRect(bound);
+
+    Resources resources;
+    if (filter) {
+      ElementWriter defs("defs", writer, resourceBucket.get());
+      resources = defs.addImageFilterResource(filter, bound);
+    }
+    {
+      auto groupElement = std::make_unique<ElementWriter>("g", writer, resourceBucket.get());
+      if (!outer.isZero()) {
+        groupElement->addAttribute(
+            "transform", ToSVGTransform(Matrix::MakeTrans(outer.x - offset.x, outer.y - offset.y)));
+      }
+      if (filter) {
+        groupElement->addAttribute("filter", resources.filter);
+      }
+      drawImage(filterImage->source, sampling, state, fill);
+    }
+  } else if (type == Types::ImageType::Subset) {
+    const auto* subsetImage = static_cast<const SubsetImage*>(image.get());
+    auto bound = subsetImage->bounds.size();
+    auto offset = Point::Make(subsetImage->bounds.x(), subsetImage->bounds.y());
+
+    Path clipBound;
+    clipBound.addRect(Rect::MakeSize(bound));
+    applyClipPath(clipBound);
+    auto groupElement = std::make_unique<ElementWriter>("g", writer, resourceBucket.get());
+    if (!offset.isZero()) {
+      groupElement->addAttribute("transform",
+                                 ToSVGTransform(Matrix::MakeTrans(offset.x, offset.y)));
+    }
+    drawImage(subsetImage->source, sampling, state, fill);
+  } else {
+    Bitmap bitmap = ImageExportToBitmap(context, image);
+    if (!bitmap.isEmpty()) {
+      exportPixmap(Pixmap(bitmap), state, fill);
+    }
   }
 }
 
@@ -404,9 +460,10 @@ Bitmap SVGExportContext::ImageExportToBitmap(Context* context,
 }
 
 std::shared_ptr<Data> SVGExportContext::ImageToEncodedData(const std::shared_ptr<Image>& image) {
-  Types::ImageType type = Types::Get(image.get());
-  if (type != Types::ImageType::Codec) return nullptr;
-  auto codecImage = static_cast<const CodecImage*>(image.get());
+  if (Types::Get(image.get()) != Types::ImageType::Codec) {
+    return nullptr;
+  }
+  const auto* codecImage = static_cast<const CodecImage*>(image.get());
   auto imageCodec = codecImage->getCodec();
   return imageCodec->getEncodedData();
 }

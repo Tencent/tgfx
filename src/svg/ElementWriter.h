@@ -20,6 +20,7 @@
 
 #include <memory>
 #include <string>
+#include <tuple>
 #include "ResourceStore.h"
 #include "SVGUtils.h"
 #include "core/filters/DropShadowImageFilter.h"
@@ -105,6 +106,7 @@ class ElementWriter {
   std::string addRadialGradientDef(const GradientInfo& info, const Matrix& matrix);
   std::string addUnsupportedGradientDef(const GradientInfo& info, const Matrix& matrix);
 
+  std::string addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter, Rect bound);
   void addBlurImageFilter(const GaussianBlurImageFilter* filter);
   void addDropShadowImageFilter(const DropShadowImageFilter* filter);
   void addInnerShadowImageFilter(const InnerShadowImageFilter* filter);
