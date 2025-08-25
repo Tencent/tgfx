@@ -16,8 +16,35 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma once
+#include <cstdint>
+#include <memory>
+#include <mutex>
+#include <set>
 
-#include "LayerProfiler.h"
+namespace tgfx::debug {
+class TCPPortProvider {
+ public:
+  static TCPPortProvider& Get() {
+    static TCPPortProvider instance;
+    return instance;
+  }
 
-#define SEND_LAYER_DATA(data) inspector::LayerProfiler::Get().setData(data)
-#define LAYER_CALLBACK(func) inspector::LayerProfiler::Get().setCallBack(func)
+  TCPPortProvider() = default;
+
+  ~TCPPortProvider() = default;
+
+  uint16_t getValidPort();
+
+  TCPPortProvider(const TCPPortProvider& provider) = delete;
+
+  TCPPortProvider(TCPPortProvider&& provider) = delete;
+
+  TCPPortProvider& operator=(const TCPPortProvider& provider) = delete;
+
+  TCPPortProvider& operator=(TCPPortProvider&& provider) = delete;
+
+ private:
+  std::set<uint16_t> usedPortSet = {};
+  std::mutex mutex = {};
+};
+}  // namespace tgfx::debug

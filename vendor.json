@@ -252,15 +252,6 @@
       }
     },
     {
-      "name": "inspector",
-      "dir": "../inspector",
-      "cmake": {
-        "targets": [
-          "inspector"
-        ]
-      }
-    },
-    {
       "name": "highway",
       "cmake": {
         "targets": [

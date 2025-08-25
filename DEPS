@@ -84,6 +84,11 @@
         "url": "https://github.com/kerukuro/digestpp.git",
         "commit": "9a1afa1459fa71ab544775f1b1c0a6298978d9fd",
         "dir": "third_party/digestpp"
+      },
+      {
+        "url": "https://github.com/lz4/lz4.git",
+        "commit": "cacca37747572717ceb1f156eb9840644205ca4f",
+        "dir": "third_party/lz4"
       }
     ]
   },

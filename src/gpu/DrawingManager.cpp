@@ -21,6 +21,7 @@
 #include "ProxyProvider.h"
 #include "core/AtlasCellDecodeTask.h"
 #include "core/AtlasManager.h"
+#include "debug/Mark.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/tasks/GenerateMipmapsTask.h"
@@ -175,6 +176,7 @@ void DrawingManager::addSemaphoreWaitTask(std::shared_ptr<Semaphore> semaphore) 
 }
 
 std::shared_ptr<CommandBuffer> DrawingManager::flush(BackendSemaphore* signalSemaphore) {
+  TASK_MARK(tgfx::debug::OpTaskType::Flush);
   while (!compositors.empty()) {
     auto compositor = compositors.back();
     // The makeClosed() method may add more compositors to the list.
@@ -189,19 +191,27 @@ std::shared_ptr<CommandBuffer> DrawingManager::flush(BackendSemaphore* signalSem
     resetAtlasCache();
     return nullptr;
   }
-  for (auto& task : resourceTasks) {
-    task->execute(context);
-    task = nullptr;
+  {
+    TASK_MARK(tgfx::debug::OpTaskType::ResourceTask);
+    for (auto& task : resourceTasks) {
+      task->execute(context);
+      task = nullptr;
+    }
   }
   uploadAtlasToGPU();
   resourceTasks.clear();
   proxyProvider->clearSharedVertexBuffer();
   auto commandEncoder = context->gpu()->createCommandEncoder();
-  for (auto& task : renderTasks) {
-    task->execute(commandEncoder.get());
-    task = nullptr;
+
+  {
+    TASK_MARK(tgfx::debug::OpTaskType::RenderTask);
+    for (auto& task : renderTasks) {
+      task->execute(commandEncoder.get());
+      task = nullptr;
+    }
   }
   renderTasks.clear();
+
   if (signalSemaphore != nullptr) {
     *signalSemaphore = commandEncoder->insertSemaphore();
   }

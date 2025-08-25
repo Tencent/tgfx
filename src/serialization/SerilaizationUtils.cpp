@@ -16,7 +16,6 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#ifdef TGFX_USE_INSPECTOR
 #include "ColorSerialization.h"
 #include "LayerFilterSerialization.h"
 #include "LayerSerialization.h"
@@ -128,7 +127,7 @@ std::string SerializeUtils::RecordedContentTypeToString(Types::LayerContentType 
 }
 
 void SerializeUtils::SerializeBegin(flexbuffers::Builder& fbb,
-                                    inspector::LayerInspectorMsgType type, size_t& mapStart,
+                                    tgfx::debug::LayerInspectorMsgType type, size_t& mapStart,
                                     size_t& contentStart) {
   mapStart = fbb.StartMap();
   fbb.Key("Type");
@@ -164,7 +163,7 @@ void SerializeUtils::FillComplexObjSerMap(const std::vector<std::shared_ptr<Laye
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute,
+    SerializeUtils::SerializeBegin(fbb, tgfx::debug::LayerInspectorMsgType::LayerSubAttribute,
                                    startMap, contentMap);
     for (size_t i = 0; i < filters.size(); i++) {
       std::stringstream ss;
@@ -212,7 +211,7 @@ void SerializeUtils::FillComplexObjSerMap(const std::vector<std::shared_ptr<Laye
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute,
+    SerializeUtils::SerializeBegin(fbb, tgfx::debug::LayerInspectorMsgType::LayerSubAttribute,
                                    startMap, contentMap);
     for (size_t i = 0; i < children.size(); i++) {
       std::stringstream ss;
@@ -236,7 +235,7 @@ void SerializeUtils::FillComplexObjSerMap(
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute,
+    SerializeUtils::SerializeBegin(fbb, tgfx::debug::LayerInspectorMsgType::LayerSubAttribute,
                                    startMap, contentMap);
     for (size_t i = 0; i < layerStyles.size(); i++) {
       std::stringstream ss;
@@ -277,7 +276,7 @@ void SerializeUtils::FillComplexObjSerMap(const std::array<float, 20>& matrix, u
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute,
+    SerializeUtils::SerializeBegin(fbb, tgfx::debug::LayerInspectorMsgType::LayerSubAttribute,
                                    startMap, contentMap);
     for (size_t i = 0; i < 20; i++) {
       std::stringstream ss;
@@ -296,7 +295,7 @@ void SerializeUtils::FillComplexObjSerMap(const std::vector<Point>& points, uint
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute,
+    SerializeUtils::SerializeBegin(fbb, tgfx::debug::LayerInspectorMsgType::LayerSubAttribute,
                                    startMap, contentMap);
     for (size_t i = 0; i < points.size(); i++) {
       std::stringstream ss;
@@ -317,7 +316,7 @@ void SerializeUtils::FillComplexObjSerMap(const std::vector<Color>& colors, uint
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute,
+    SerializeUtils::SerializeBegin(fbb, tgfx::debug::LayerInspectorMsgType::LayerSubAttribute,
                                    startMap, contentMap);
     for (size_t i = 0; i < colors.size(); i++) {
       std::stringstream ss;
@@ -360,7 +359,7 @@ void SerializeUtils::FillRenderableObjSerMap(const std::shared_ptr<Picture>& pic
     flexbuffers::Builder fbb;
     size_t startMap;
     size_t contentMap;
-    SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::ImageData, startMap,
+    SerializeUtils::SerializeBegin(fbb, tgfx::debug::LayerInspectorMsgType::ImageData, startMap,
                                    contentMap);
     fbb.Int("width", width);
     fbb.Int("height", height);
@@ -495,4 +494,3 @@ void SerializeUtils::SetFlexBufferMap(flexbuffers::Builder& fbb, const char* key
   });
 }
 }  // namespace tgfx
-#endif

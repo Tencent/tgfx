@@ -15,7 +15,6 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#ifdef TGFX_USE_INSPECTOR
 
 #include "LayerFilterSerialization.h"
 #include <tgfx/layers/filters/BlendFilter.h>
@@ -108,8 +107,8 @@ std::shared_ptr<Data> LayerFilterSerialization::Serialize(const LayerFilter* lay
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, inspector::LayerInspectorMsgType::LayerSubAttribute, startMap,
-                                 contentMap);
+  SerializeUtils::SerializeBegin(fbb, tgfx::debug::LayerInspectorMsgType::LayerSubAttribute,
+                                 startMap, contentMap);
   auto type = Types::Get(layerFilter);
   switch (type) {
     case Types::LayerFilterType::LayerFilter:
@@ -135,4 +134,3 @@ std::shared_ptr<Data> LayerFilterSerialization::Serialize(const LayerFilter* lay
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }
 }  // namespace tgfx
-#endif

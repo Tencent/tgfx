@@ -17,13 +17,15 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "tgfx/debug/LayerViewer.h"
 #ifdef TGFX_USE_INSPECTOR
-#include "layers/LayerViewerManager.h"
+#include "debug/LayerViewerManager.h"
 #endif
 
-void tgfx::SetSelectedLayer(std::shared_ptr<Layer> layer) {
+namespace tgfx {
+void SetSelectedLayer(std::shared_ptr<Layer> layer) {
 #ifdef TGFX_USE_INSPECTOR
-  LayerViewerManager::Get().pickLayer(layer);
+  debug::LayerViewerManager::Get().pickLayer(layer);
 #else
   (void)layer;
 #endif
 }
+}  // namespace tgfx
