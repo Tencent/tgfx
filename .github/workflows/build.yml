@@ -6,15 +6,14 @@ on:
   push:
     branches: [ main ]
 
-
   workflow_dispatch:
-    inputs:
-    job:
-      description: 'Job to run (optional)'
-      required: false
-      default: 'all'
-      type: choice
-      options:
+      inputs:
+        job:
+          description: 'Job to run (optional)'
+          required: false
+          default: 'all'
+          type: choice
+          options:
             - all
             - ios
             - android
@@ -22,7 +21,7 @@ on:
             - win
             - linux
             - qt
-            - openharmony
+            - openharmony    
 
 jobs:
   ios:
