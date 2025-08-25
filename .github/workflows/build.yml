@@ -8,8 +8,8 @@ on:
 
 
   workflow_dispatch:
-  inputs:
-  job:
+    inputs:
+    job:
       description: 'Job to run (optional)'
       required: false
       default: 'all'
