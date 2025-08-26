@@ -32,6 +32,9 @@ std::shared_ptr<ImageCodec> CodecImage::getCodec() const {
 }
 
 float CodecImage::getRasterizedScale(float drawScale) const {
+  if (drawScale <= MinAllowedImageScale) {
+    return MinAllowedImageScale;
+  }
   return NextPowerOfTwoScale(drawScale);
 }
 

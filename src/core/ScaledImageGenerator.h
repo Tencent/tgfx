@@ -21,6 +21,11 @@
 #include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
+
+// Since the minimum fast scaling ratio supported by JPEG is 1/8, the minimum allowed image scaling
+// ratio is set to 1/8 here.
+constexpr float MinAllowedImageScale = 1.0f / 8.0f;
+
 class ScaledImageGenerator : public ImageGenerator {
  public:
   static std::shared_ptr<ScaledImageGenerator> MakeFrom(const std::shared_ptr<ImageCodec>& codec,

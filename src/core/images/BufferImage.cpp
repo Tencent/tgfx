@@ -41,6 +41,9 @@ BufferImage::BufferImage(std::shared_ptr<ImageBuffer> buffer, bool mipmapped)
 
 float BufferImage::getRasterizedScale(float drawScale) const {
   if (imageBuffer->isPixelBuffer()) {
+    if (drawScale <= MinAllowedImageScale) {
+      return MinAllowedImageScale;
+    }
     return NextPowerOfTwoScale(drawScale);
   }
   return 1.0f;
