@@ -21,7 +21,6 @@
 #include "core/PixelBufferCodec.h"
 #include "core/ScaledImageGenerator.h"
 #include "core/images/CodecImage.h"
-#include "core/utils/NextPowerOfTwoScale.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/TPArgs.h"
 
@@ -41,10 +40,7 @@ BufferImage::BufferImage(std::shared_ptr<ImageBuffer> buffer, bool mipmapped)
 
 float BufferImage::getRasterizedScale(float drawScale) const {
   if (imageBuffer->isPixelBuffer()) {
-    if (drawScale <= MinAllowedImageScale) {
-      return MinAllowedImageScale;
-    }
-    return NextPowerOfTwoScale(drawScale);
+    return ScaledImageGenerator::GetCodecScale(drawScale);
   }
   return 1.0f;
 }
