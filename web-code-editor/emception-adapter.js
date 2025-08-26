@@ -1,148 +1,106 @@
 /**
- * EmceptionAdapter - 真实 Emception 适配器
- * 目标：在浏览器端将 用户C++ 源码 与 预编译的 tgfx.a 静态库 链接为单一 WASM
- * 去除精简 API 与句柄式导入，允许直接使用原生 TGFX C++ 头文件与类型
+ * EmceptionAdapter - 浏览器端C++编译器适配器
  */
-const __tgfxSingletons = { emceptionModulePromise: null, emceptionModuleInstance: null, headersPreparedPromise: null };
+const __tgfxSingletons = {
+    emceptionModulePromise: null,
+    emceptionModuleInstance: null,
+    headersPreparedPromise: null
+};
 
 export default class EmceptionAdapter {
     constructor() {
         this.emceptionModule = null;
         this.isInitialized = false;
         this.compilationCache = new Map();
-
-        // 默认编译选项
-        this.defaultCompileOptions = {
-            optimization: '-O1',
-            target: 'wasm32',
-            outputFormat: 'wasm',
-            enableExceptions: false
-        };
-        this.compileOptions = { ...this.defaultCompileOptions };
+        this.compileOptions = { optimization: '-O1', target: 'wasm32', outputFormat: 'wasm', enableExceptions: false };
     }
 
     /**
      * 初始化Emception编译器
      */
     async initialize(options = {}) {
-        if (this.isInitialized) {
-            console.log('⚠️ Emception adapter already initialized');
-            return true;
-        }
+        if (this.isInitialized) return true;
 
         try {
-            console.log('🔄 Initializing EmceptionAdapter...');
-
-            // 1. 加载并初始化 Emception（完整版本，包含标准库与sysroot）
+            console.log('Initializing EmceptionAdapter...');
             await this.loadEmceptionCore();
-
-            // 2. 准备TGFX头文件环境
             await this.prepareTGFXEnvironment();
-
-            // 3. 配置编译器选项
-            this.configureCompiler(options);
-
+            Object.assign(this.compileOptions, options.compileOptions);
             this.isInitialized = true;
-            console.log('✅ EmceptionAdapter initialized successfully');
+            console.log('EmceptionAdapter initialized successfully');
             return true;
-
         } catch (error) {
-            console.error('❌ EmceptionAdapter initialization failed:', error);
+            console.error('EmceptionAdapter initialization failed:', error);
             throw new Error(`EmceptionAdapter initialization failed: ${error.message}`);
         }
     }
 
     /**
-     * 加载EmceptionCore模块并初始化
+     * 加载Emception
      */
     async loadEmceptionCore() {
-        try {
-            console.log('🔄 Loading Emception...');
-            if (__tgfxSingletons.emceptionModuleInstance) {
-                this.emceptionModule = __tgfxSingletons.emceptionModuleInstance;
-                return;
-            }
-            if (!__tgfxSingletons.emceptionModulePromise) {
-                __tgfxSingletons.emceptionModulePromise = (async () => {
-                    const EmceptionModule = await import('./emception/emception.js');
-                    const inst = new EmceptionModule.default();
-                    await inst.init();
-                    return inst;
-                })();
-            }
-            this.emceptionModule = await __tgfxSingletons.emceptionModulePromise;
-            __tgfxSingletons.emceptionModuleInstance = this.emceptionModule;
-            console.log('✅ Emception loaded and initialized successfully');
-        } catch (error) {
-            console.error('❌ Failed to load Emception:', error);
-            throw new Error(`Failed to load Emception: ${error.message}`);
+        if (__tgfxSingletons.emceptionModuleInstance) {
+            this.emceptionModule = __tgfxSingletons.emceptionModuleInstance;
+            return;
         }
+        if (!__tgfxSingletons.emceptionModulePromise) {
+            __tgfxSingletons.emceptionModulePromise = (async () => {
+                const EmceptionModule = await import('./emception/emception.js');
+                const inst = new EmceptionModule.default();
+                await inst.init();
+                return inst;
+            })();
+        }
+        this.emceptionModule = await __tgfxSingletons.emceptionModulePromise;
+        __tgfxSingletons.emceptionModuleInstance = this.emceptionModule;
+        console.log('Emception loaded successfully');
     }
 
     /**
-     * 准备TGFX环境：加载完整头文件与静态库
-     * - 头文件写入到 /usr/local/include
-     * - 静态库写入到 /usr/local/lib/tgfx.a
+     * 准备TGFX环境 - 头文件和静态库
      */
     async prepareTGFXEnvironment() {
-        console.log('📚 Preparing TGFX environment (headers + static lib)...');
+        console.log('Preparing TGFX environment...');
 
-        try {
-            if (__tgfxSingletons.headersPreparedPromise) {
-                await __tgfxSingletons.headersPreparedPromise;
-                return;
-            }
-            __tgfxSingletons.headersPreparedPromise = (async () => {
-                // 确保基本目录存在
-                this.ensureDir('/usr');
-                this.ensureDir('/usr/local');
-                this.ensureDir('/usr/local/include');
-                this.ensureDir('/usr/local/lib');
-
-                // 加载头文件清单
-                const manifestUrl = new URL('./wasm-assets/header-manifest.json', window.location.href).toString();
-                const manifestResp = await fetch(manifestUrl);
-                if (!manifestResp.ok) {
-                    throw new Error(`加载头文件清单失败: ${manifestResp.status} ${manifestResp.statusText}`);
-                }
-                const manifest = await manifestResp.json();
-                const files = Array.isArray(manifest.files) ? manifest.files : [];
-                console.log(`📄 header files: ${files.length}`);
-
-                // 批量加载与写入头文件（存在则跳过）
-                const baseHeadersUrl = new URL('./wasm-assets/headers/', window.location.href).toString();
-                for (const relPath of files) {
-                    const fileUrl = baseHeadersUrl + relPath;
-                    const targetPath = `/usr/local/include/${relPath}`;
-                    const dirPath = targetPath.substring(0, targetPath.lastIndexOf('/'));
-                    this.ensureDir(dirPath);
-
-                    if (!this.fsExists(targetPath)) {
-                        const text = await this.fetchText(fileUrl);
-                        this.fsWriteFile(targetPath, text);
-                    }
-                }
-                console.log('✅ All TGFX headers installed to /usr/local/include');
-
-                // 加载静态库 tgfx.a（存在则跳过）
-                const libPath = '/usr/local/lib/tgfx.a';
-                if (!this.fsExists(libPath)) {
-                    const libUrl = new URL('./wasm-assets/libs/tgfx.a', window.location.href).toString();
-                    const libBin = await this.fetchBinary(libUrl);
-                    this.fsWriteFile(libPath, new Uint8Array(libBin));
-                    console.log('✅ Static lib installed to ' + libPath + ' (size: ' + libBin.byteLength + ')');
-                } else {
-                    console.log('ℹ️ Static lib already present, skip writing');
-                }
-
-            })();
-
+        if (__tgfxSingletons.headersPreparedPromise) {
             await __tgfxSingletons.headersPreparedPromise;
-
-        } catch (error) {
-            console.error('❌ Failed to prepare TGFX environment:', error);
-            throw new Error(`Failed to prepare TGFX environment: ${error.message}`);
+            return;
         }
+
+        __tgfxSingletons.headersPreparedPromise = (async () => {
+            // 创建目录
+            ['/usr', '/usr/local', '/usr/local/include', '/usr/local/lib'].forEach(dir => this.ensureDir(dir));
+
+            const baseUrl = (typeof window !== 'undefined' ? window.location.href : self.location.href);
+
+            // 加载头文件
+            const manifestUrl = new URL('./wasm-assets/header-manifest.json', baseUrl).toString();
+            const manifest = await (await fetch(manifestUrl)).json();
+            const files = Array.isArray(manifest.files) ? manifest.files : [];
+
+            const baseHeadersUrl = new URL('./wasm-assets/headers/', baseUrl).toString();
+            await Promise.all(files.map(async (relPath) => {
+                const targetPath = `/usr/local/include/${relPath}`;
+                const dirPath = targetPath.substring(0, targetPath.lastIndexOf('/'));
+                this.ensureDir(dirPath);
+
+                if (!this.fsExists(targetPath)) {
+                    const text = await this.fetchText(baseHeadersUrl + relPath);
+                    this.fsWriteFile(targetPath, text);
+                }
+            }));
+
+            // 加载静态库
+            const libPath = '/usr/local/lib/tgfx.a';
+            if (!this.fsExists(libPath)) {
+                const libUrl = new URL('./wasm-assets/libs/tgfx.a', baseUrl).toString();
+                const libBin = await this.fetchBinary(libUrl);
+                this.fsWriteFile(libPath, new Uint8Array(libBin));
+                console.log('Static lib installed, size:', libBin.byteLength);
+            }
+        })();
+
+        await __tgfxSingletons.headersPreparedPromise;
     }
 
     ensureDir(path) {
@@ -164,60 +122,28 @@ export default class EmceptionAdapter {
     }
 
     /**
-     * 配置编译器选项
-     */
-    configureCompiler(options = {}) {
-        console.log('⚙️ Configuring compiler options...');
-
-        // 合并用户选项和默认选项
-        this.compileOptions = {
-            ...this.defaultCompileOptions,
-            ...options.compileOptions
-        };
-
-        console.log('✅ Compiler configuration complete');
-    }
-
-    /**
      * 编译C++代码到WebAssembly
      */
     async compile(sourceCode, options = {}) {
-        if (!this.isInitialized) {
-            throw new Error('EmceptionAdapter not initialized');
+        if (!this.isInitialized) throw new Error('EmceptionAdapter not initialized');
+
+        const compileId = this.generateCompileId(sourceCode, options);
+        if (this.compilationCache.has(compileId)) {
+            console.log('Using cached compilation result');
+            return this.compilationCache.get(compileId);
         }
 
         try {
-            console.log('🔨 Starting C++ compilation...');
-
-            // 生成编译缓存ID
-            const compileId = this.generateCompileId(sourceCode, options);
-
-            // 检查缓存
-            if (this.compilationCache.has(compileId)) {
-                console.log('🎯 Using cached compilation result');
-                return this.compilationCache.get(compileId);
-            }
-
-            // 1. 准备源文件
+            console.log('Starting C++ compilation...');
             const sourceFile = '/working/main.cpp';
             this.fsWriteFile(sourceFile, sourceCode);
-            console.log('📝 Source file written to:', sourceFile);
 
-            // 2. 执行编译
-            const compileOptions = {
-                ...this.compileOptions,
-                ...options
-            };
-
-            // 固定使用 main 作为导出入口
+            const compileOptions = { ...this.compileOptions, ...options };
             const result = await this.performCompilation(sourceFile, compileOptions);
 
-            // 3. 缓存结果
             this.compilationCache.set(compileId, result);
-
-            console.log('✅ Compilation completed successfully');
+            console.log('Compilation completed successfully');
             return result;
-
         } catch (error) {
             console.error('❌ Compilation failed:', error);
             throw new Error(`Compilation failed: ${error.message}`);
@@ -233,164 +159,59 @@ export default class EmceptionAdapter {
         const stubObject = '/working/export_stubs.o';
         const outputJS = '/working/output.mjs';
 
-        console.log('🔧 Using two-step compilation process...');
-
-
-        // 写入导出桩（弱符号，用户实现会覆盖）。提供可见的默认渲染，便于快速验证链路。
-        const stubs = [
-            '#include <cstdlib>',
-            '#include <cstdint>',
-            '#include <algorithm>',
-            '#include <memory>',
-            '#include <string>',
-            '#include <emscripten.h>',
-            '#include <emscripten/html5.h>',
-            '#include <tgfx/gpu/opengl/webgl/WebGLWindow.h>',
-            '#include <tgfx/gpu/opengl/webgl/WebGLDevice.h>',
-            'namespace tgfx { __attribute__((weak)) bool TGFXBindInit() { return true; } }',
-            'namespace tgfx {',
-            '__attribute__((weak)) std::shared_ptr<WebGLDevice> WebGLDevice::MakeFrom(const std::string& canvasID) {',
-            '  auto oldContext = emscripten_webgl_get_current_context();',
-            '  EmscriptenWebGLContextAttributes attrs;',
-            '  emscripten_webgl_init_context_attributes(&attrs);',
-            '  attrs.depth = EM_FALSE;',
-            '  attrs.stencil = EM_FALSE;',
-            '  attrs.antialias = EM_FALSE;',
-            '  attrs.powerPreference = EM_WEBGL_POWER_PREFERENCE_HIGH_PERFORMANCE;',
-            '  attrs.enableExtensionsByDefault = EM_TRUE;',
-            '  attrs.majorVersion = 2;',
-            '  attrs.minorVersion = 0;',
-            '  auto context = emscripten_webgl_create_context(canvasID.c_str(), &attrs);',
-            '  if (context == 0) {',
-            '    attrs.majorVersion = 1;',
-            '    context = emscripten_webgl_create_context(canvasID.c_str(), &attrs);',
-            '    if (context == 0) {',
-            '      return nullptr;',
-            '    }',
-            '  }',
-            '  auto result = emscripten_webgl_make_context_current(context);',
-            '  if (result != EMSCRIPTEN_RESULT_SUCCESS) {',
-            '    emscripten_webgl_destroy_context(context);',
-            '    if (oldContext) {',
-            '      emscripten_webgl_make_context_current(oldContext);',
-            '    }',
-            '    return nullptr;',
-            '  }',
-            '  emscripten_webgl_make_context_current(0);',
-            '  if (oldContext) {',
-            '    emscripten_webgl_make_context_current(oldContext);',
-            '  }',
-            '  return WebGLDevice::Wrap(context, false);',
-            '}',
-            '__attribute__((weak)) std::shared_ptr<WebGLWindow> WebGLWindow::MakeFrom(const std::string& canvasID) {',
-            '  if (canvasID.empty()) {',
-            '    return nullptr;',
-            '  }',
-            '  auto device = WebGLDevice::MakeFrom(canvasID);',
-            '  if (device == nullptr) {',
-            '    return nullptr;',
-            '  }',
-            '  auto window = std::shared_ptr<WebGLWindow>(new WebGLWindow(device));',
-            '  window->canvasID = canvasID;',
-            '  return window;',
-            '}',
-            '}',
-        ].join('\n');
+        // 生成导出桩代码
+        const stubs = this.generateStubCode();
         this.fsWriteFile(stubFile, stubs);
 
-        // 步骤1：编译到目标文件
-        const compileCommand = [
-            'em++',
-            '-std=c++17',
-            options.optimization || '-O1','-fno-exceptions','-fno-rtti','-DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0','-D_LIBCPP_ABI_NAMESPACE=__2',
-            '-Wno-error=version-check',
-            '-c',
-            '-I/usr/local/include',
-            sourceFile,
-            '-o',
-            objectFile
+        // 编译主文件
+        const compileCmd = [
+            'em++', '-std=c++17', options.optimization || '-O1', '-fno-exceptions', '-fno-rtti',
+            '-DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0', '-D_LIBCPP_ABI_NAMESPACE=__2',
+            '-Wno-error=version-check', '-c', '-I/usr/local/include', sourceFile, '-o', objectFile
         ].join(' ');
 
-        console.log('🔧 Step 1 - Compile to object:', compileCommand);
-
-        let compileResult;
-        try {
-            compileResult = await this.emceptionModule.run(compileCommand);
-            console.log('✅ Compilation completed, returncode:', compileResult.returncode);
-        } catch (error) {
-            console.error('❌ Compilation failed:', error);
-            throw new Error(`Compilation failed: ${error.message}`);
-        }
-
+        const compileResult = await this.emceptionModule.run(compileCmd);
         if (compileResult.returncode !== 0) {
-            throw new Error(`Compilation failed with return code ${compileResult.returncode}: ${compileResult.stderr || 'Unknown error'}`);
+            throw new Error(`Compilation failed: ${compileResult.stderr || 'Unknown error'}`);
         }
 
-        // 步骤1b：编译导出桩
-        const compileStubCmd = [
-            'em++',
-            '-std=c++17',options.optimization || '-O1','-fno-exceptions','-fno-rtti','-DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0','-D_LIBCPP_ABI_NAMESPACE=__2',
-            '-I/usr/local/include',
-            '-c', stubFile,
-            '-o', stubObject
-        ].join(' ');
-        console.log('🔧 Step 1b - Compile export stubs:', compileStubCmd);
-        const compileStubRes = await this.emceptionModule.run(compileStubCmd);
-        if (compileStubRes.returncode !== 0) {
-            throw new Error(`Stub compilation failed with return code ${compileStubRes.returncode}: ${compileStubRes.stderr || 'Unknown error'}`);
-        }
+        // 编译桩文件
+        if (!this.fsExists(stubObject)) {
+            const stubCmd = [
+                'em++', '-std=c++17', options.optimization || '-O1', '-fno-exceptions', '-fno-rtti',
+                '-DEMSCRIPTEN_HAS_UNBOUND_TYPE_NAMES=0', '-D_LIBCPP_ABI_NAMESPACE=__2',
+                '-I/usr/local/include', '-c', stubFile, '-o', stubObject
+            ].join(' ');
 
-        // 步骤2：使用 em++ 链接为单文件 ES6 模块（CPU 渲染，不启用 WebGL/HTML5 胶水）
-        const linkCommand = [
-            'em++',
-            objectFile, stubObject,
-            '/usr/local/lib/tgfx.a',
-            options.optimization || '-O1',
-            '-Wno-error=version-check',  // 忽略版本检查错误
-            '-sMODULARIZE=1',
-            '-sEXPORT_ES6=1',
-            '-sENVIRONMENT=web,worker',
-            '-sALLOW_MEMORY_GROWTH=1',
-            '-sASSERTIONS=0',
-            '-sDISABLE_EXCEPTION_CATCHING=1',
-            "-sEXPORTED_FUNCTIONS=['_" + (options.exportEntry || 'main') + "']",
-            '-sFORCE_FILESYSTEM=1',
-            '-sEXPORTED_RUNTIME_METHODS=["cwrap","ccall","HEAPU8","FS"]',
-            '-sERROR_ON_UNDEFINED_SYMBOLS=0',
-            '-o', outputJS
-        ].join(' ');
-
-        console.log('🔧 Step 2 - Link with em++ (JS runtime):', linkCommand);
-
-        let linkResult;
-        try {
-            linkResult = await this.emceptionModule.run(linkCommand);
-            console.log('✅ Linking completed, returncode:', linkResult.returncode);
-        } catch (error) {
-            console.error('❌ Linking failed:', error);
-            throw new Error(`Linking failed: ${error.message}`);
-        }
-
-        if (linkResult.returncode !== 0) {
-            throw new Error(`Linking failed with return code ${linkResult.returncode}: ${linkResult.stderr || 'Unknown error'}`);
-        }
-
-        // 读取生成的 .mjs 文本和 .wasm 二进制
-        let jsModuleCode;
-        let linkedWasm;
-        try {
-            const jsBytes = this.fsReadFile(outputJS);
-            jsModuleCode = new TextDecoder('utf-8').decode(jsBytes);
-            console.log('✅ JS module generated, length:', jsModuleCode.length);
-            // 尝试读取同名 wasm（SINGLE_FILE 已关闭）
-            const wasmPath = '/working/output.wasm';
-            if (this.fsExists(wasmPath)) {
-                linkedWasm = this.fsReadFile(wasmPath);
-                console.log('✅ WASM generated, size:', linkedWasm.length);
+            const stubResult = await this.emceptionModule.run(stubCmd);
+            if (stubResult.returncode !== 0) {
+                throw new Error(`Stub compilation failed: ${stubResult.stderr || 'Unknown error'}`);
             }
-        } catch (error) {
-            console.error('❌ Failed to read JS module:', error);
-            throw new Error(`Failed to read output JS module: ${error.message}`);
+        }
+
+        // 链接
+        const linkCmd = [
+            'em++', objectFile, stubObject, '/usr/local/lib/tgfx.a',
+            options.optimization || '-O1', '-Wno-error=version-check',
+            '-sMODULARIZE=1', '-sEXPORT_ES6=1', '-sSINGLE_FILE=1', '-sENVIRONMENT=web',
+            '-sALLOW_MEMORY_GROWTH=1', '-sASSERTIONS=0', '-sDISABLE_EXCEPTION_CATCHING=1',
+            "-sEXPORTED_FUNCTIONS=['_main']", '-sERROR_ON_UNDEFINED_SYMBOLS=0',
+            '-sFORCE_FILESYSTEM=1', '-sEXPORTED_RUNTIME_METHODS=["FS"]', '-o', outputJS
+        ].join(' ');
+
+        const linkResult = await this.emceptionModule.run(linkCmd);
+        if (linkResult.returncode !== 0) {
+            throw new Error(`Linking failed: ${linkResult.stderr || 'Unknown error'}`);
+        }
+
+        // 读取结果
+        const jsBytes = this.fsReadFile(outputJS);
+        const jsModuleCode = new TextDecoder('utf-8').decode(jsBytes);
+
+        let linkedWasm;
+        const wasmPath = '/working/output.wasm';
+        if (this.fsExists(wasmPath)) {
+            linkedWasm = this.fsReadFile(wasmPath);
         }
 
         return {
@@ -403,17 +224,31 @@ export default class EmceptionAdapter {
         };
     }
 
+    /**
+    /**
+     * 生成最小导出桩代码
+     */
+    generateStubCode() {
+        return 'namespace tgfx { __attribute__((weak)) bool TGFXBindInit() { return true; } }';
+    }
+
+    // 文件系统操作
     fsWriteFile(path, content) {
-        if (this.emceptionModule.writeFile) return this.emceptionModule.writeFile(path, content);
-        return this.emceptionModule.fileSystem.writeFile(path, content);
+        return this.emceptionModule.writeFile ?
+            this.emceptionModule.writeFile(path, content) :
+            this.emceptionModule.fileSystem.writeFile(path, content);
     }
+
     fsReadFile(path) {
-        if (this.emceptionModule.readFile) return this.emceptionModule.readFile(path);
-        return this.emceptionModule.fileSystem.readFile(path);
+        return this.emceptionModule.readFile ?
+            this.emceptionModule.readFile(path) :
+            this.emceptionModule.fileSystem.readFile(path);
     }
+
     fsExists(path) {
-        if (this.emceptionModule.exists) return this.emceptionModule.exists(path);
-        return this.emceptionModule.fileSystem.exists(path);
+        return this.emceptionModule.exists ?
+            this.emceptionModule.exists(path) :
+            this.emceptionModule.fileSystem.exists(path);
     }
 
     /**
@@ -421,13 +256,11 @@ export default class EmceptionAdapter {
      */
     generateCompileId(sourceCode, options) {
         const content = sourceCode + JSON.stringify(options);
-
-        // 使用简单哈希避免编码问题
         let hash = 0;
         for (let i = 0; i < content.length; i++) {
             const char = content.charCodeAt(i);
             hash = ((hash << 5) - hash) + char;
-            hash = hash & hash; // 转换为32位整数
+            hash = hash & hash;
         }
         return Math.abs(hash).toString(16).substring(0, 16);
     }
@@ -438,21 +271,5 @@ export default class EmceptionAdapter {
     clearCache() {
         this.compilationCache.clear();
         console.log('🗑️ Compilation cache cleared');
-    }
-
-    /**
-     * 获取编译器信息
-     */
-    getCompilerInfo() {
-        if (!this.isInitialized) {
-            return null;
-        }
-
-        return {
-            type: 'EmceptionCore',
-            initialized: this.isInitialized,
-            options: this.compileOptions,
-            cacheSize: this.compilationCache.size
-        };
     }
 }

@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <title>TGFX Playground</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎨</text></svg>">
   <script src="https://unpkg.com/monaco-editor@0.44.0/min/vs/loader.js"></script>
   <style>
     :root { --bg:#1e1e1e; --panel:#252526; --line:#3c3c3c; --text:#d4d4d4; --primary:#0e639c; }
@@ -40,9 +41,9 @@
           <button class="example-btn" data-example="imagefilter">ImageFilter</button>
           <button class="example-btn" data-example="mask">Mask</button>
           <button class="example-btn" data-example="layer">Layer</button>
+          <button class="example-btn" data-example="image">Image</button>
           <button class="example-btn" data-example="text">Text</button>
           <button class="example-btn" data-example="emoji">Emoji</button>
-          <button class="example-btn" data-example="image">Image</button>
           <button class="example-btn" data-example="svg">SVG</button>
         </div>
         <div class="bar">
@@ -270,31 +271,54 @@ int main(){
 #include <tgfx/core/Paint.h>
 #include <tgfx/core/Canvas.h>
 #include <tgfx/core/Rect.h>
+#include <tgfx/core/BlendMode.h>
+#include <tgfx/core/ImageFilter.h>
 #include <tgfx/gpu/opengl/webgl/WebGLWindow.h>
 using namespace tgfx;
 
 int main(){
-  auto window = WebGLWindow::MakeFrom("#renderCanvas");
+  auto window  = WebGLWindow::MakeFrom("#renderCanvas");
   if(!window) return 1;
-  auto device = window->getDevice(); if(!device) return 2;
-  auto context = device->lockContext(); if(!context) return 3;
+  auto device  = window->getDevice();      if(!device) return 2;
+  auto context = device->lockContext();    if(!context) return 3;
   auto surface = window->getSurface(context); if(!surface) return 4;
-  auto canvas = surface->getCanvas();
-  canvas->clear(Color::White());
+  auto canvas  = surface->getCanvas();
 
-  // 使用 saveLayerAlpha 建立半透明图层
-  canvas->saveLayerAlpha(180); // 0-255
+  // 背景：棋盘格，便于观察图层混合效果
+  canvas->clear(Color::White());
+  const float cell = 40.f;
+  Paint bg1; bg1.setColor(Color::FromRGBA(235,235,235,255));
+  Paint bg2; bg2.setColor(Color::FromRGBA(210,210,210,255));
+  for(int y=0;y<12;y++){
+    for(int x=0;x<16;x++){
+      bool dark = ((x+y)&1);
+      canvas->drawRect(Rect::MakeLTRB(x*cell, y*cell, (x+1)*cell, (y+1)*cell), dark?bg2:bg1);
+    }
+  }
+
+  // 图层：对组内内容应用模糊；合成到背景时使用统一的乘色混合和透明度
+  Paint layerPaint;
+  layerPaint.setImageFilter(ImageFilter::Blur(10.f, 10.f));
+  layerPaint.setBlendMode(BlendMode::Multiply); // 组整体的混合模式
+  layerPaint.setAlpha(0.8f);                    // 组整体透明度 [0..1]
+
+  canvas->saveLayer(&layerPaint);
   {
-    Paint p1; p1.setColor(Color::FromRGBA(255,128,0,255));
-    canvas->drawRect(Rect::MakeLTRB(60,60,260,200), p1);
-    Paint p2; p2.setColor(Color::FromRGBA(0,128,255,255));
-    canvas->drawRect(Rect::MakeLTRB(140,120,340,260), p2);
+    // 组内内容（普通绘制，不直接对背景生效）
+    Paint p1; p1.setColor(Color::FromRGBA(255,120,0,255));
+    Paint p2; p2.setColor(Color::FromRGBA(0,140,255,255));
+    Paint p3; p3.setColor(Color::FromRGBA(60,200,120,255));
+
+    canvas->drawRect(Rect::MakeLTRB(80,80, 300,220), p1);
+    canvas->drawRect(Rect::MakeLTRB(180,140, 420,300), p2);
+    canvas->drawCircle(420,140, 70, p3);
   }
   canvas->restore();
 
   window->present(context);
   return 0;
-}`,
+}
+`,
 
       text: `#include <tgfx/core/Color.h>
 #include <tgfx/core/Paint.h>
@@ -381,34 +405,35 @@ int main(){
 }`,
 
       svg: `#include <tgfx/core/Color.h>
-#include <tgfx/core/Paint.h>
 #include <tgfx/core/Canvas.h>
-#include <tgfx/core/Rect.h>
+#include <tgfx/core/Stream.h>
+#include <tgfx/core/Size.h>
+#include <tgfx/svg/SVGDOM.h>
 #include <tgfx/gpu/opengl/webgl/WebGLWindow.h>
-#include <tgfx/svg/SVGDOM.h> // 假定头文件路径，如有不同请按项目实际调整
 using namespace tgfx;
 
 int main(){
-  auto window = WebGLWindow::MakeFrom("#renderCanvas");
-  if(!window) return 1;
-  auto device = window->getDevice(); if(!device) return 2;
-  auto context = device->lockContext(); if(!context) return 3;
-  auto surface = window->getSurface(context); if(!surface) return 4;
-  auto canvas = surface->getCanvas();
-  canvas->clear(Color::White());
+auto window = WebGLWindow::MakeFrom("#renderCanvas");
+if(!window) return 1;
+auto dev = window->getDevice(); if(!dev) return 2;
+auto ctx = dev->lockContext(); if(!ctx) return 3;
+auto surface = window->getSurface(ctx); if(!surface) return 4;
+auto canvas = surface->getCanvas();
+canvas->clear(Color::White());
 
-  // 从文件加载 SVG（已写入 /working/assets/sample.svg）
-  auto dom = svg::SVGDOM::MakeFromFile("/working/assets/sample.svg");
-  if(dom){
-    // 以画布大小适配渲染（API 以工程实际为准）
-    dom->render(canvas, /*viewport*/ Rect::MakeLTRB(0,0,640,480));
-  }else{
-    Paint p; p.setColor(Color::FromRGBA(0,150,255,200));
-    canvas->drawRect(Rect::MakeLTRB(60,60,220,140), p);
+  auto stream = Stream::MakeFromFile("/working/assets/sample.svg");
+  if (stream) {
+    auto dom = SVGDOM::Make(*stream);
+    if (dom) {
+      dom->setContainerSize(Size{640, 480});
+      dom->render(canvas);
+    } else {
+      printf("SVGDOM creation failed\\n");
+    }
   }
 
-  window->present(context);
-  return 0;
+window->present(ctx);
+return 0;
 }`
     };
 
