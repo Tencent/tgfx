@@ -59,9 +59,4 @@ void RenderPass::drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size
   onDraw(primitiveType, baseIndex, indexCount, true);
   drawPipelineStatus = DrawPipelineStatus::NotConfigured;
 }
-
-void RenderPass::clear(const Rect& scissor, Color color) {
-  drawPipelineStatus = DrawPipelineStatus::NotConfigured;
-  onClear(scissor, color);
-}
 }  // namespace tgfx

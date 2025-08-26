@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,18 +16,26 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "ClearOp.h"
-#include "gpu/RenderPass.h"
+#include "HardwareTextureProxy.h"
 
 namespace tgfx {
-PlacementPtr<ClearOp> ClearOp::Make(Context* context, Color color, const Rect& scissor) {
-  if (scissor.isEmpty()) {
-    return nullptr;
-  }
-  return context->drawingBuffer()->make<ClearOp>(color, scissor);
+HardwareTextureProxy::HardwareTextureProxy(HardwareBufferRef hardwareBuffer, int width, int height,
+                                           PixelFormat format)
+    : TextureProxy(width, height, format), hardwareBuffer(hardwareBuffer) {
+  HardwareBufferRetain(hardwareBuffer);
 }
 
-void ClearOp::execute(RenderPass* renderPass, RenderTarget*) {
-  renderPass->clear(scissor, color);
+HardwareTextureProxy::~HardwareTextureProxy() {
+  HardwareBufferRelease(hardwareBuffer);
+}
+
+std::shared_ptr<TextureView> HardwareTextureProxy::getTextureView() const {
+  if (resource == nullptr) {
+    resource = TextureView::MakeFrom(context, hardwareBuffer);
+    if (resource == nullptr && !uniqueKey.empty()) {
+      resource->assignUniqueKey(uniqueKey);
+    }
+  }
+  return std::static_pointer_cast<TextureView>(resource);
 }
 }  // namespace tgfx

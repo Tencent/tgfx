@@ -126,9 +126,9 @@ void GLRenderPass::onDraw(PrimitiveType primitiveType, size_t offset, size_t cou
   }
 }
 
-void GLRenderPass::onClear(const Rect& scissor, Color color) {
+void GLRenderPass::onClear(Color color) {
   auto gl = interface->functions();
-  UpdateScissor(gl, scissor);
+  gl->disable(GL_SCISSOR_TEST);
   gl->clearColor(color.red, color.green, color.blue, color.alpha);
   gl->clear(GL_COLOR_BUFFER_BIT);
 }

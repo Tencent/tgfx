@@ -85,7 +85,7 @@ void RuntimeDrawTask::execute(CommandEncoder* encoder) {
   effect->onDraw(RuntimeProgramWrapper::Unwrap(program.get()), backendTextures,
                  renderTarget->getBackendRenderTarget(), offset);
   if (renderTarget->sampleCount() > 1) {
-    auto renderPass = encoder->beginRenderPass(renderTarget, true);
+    auto renderPass = encoder->beginRenderPass(renderTarget);
     DEBUG_ASSERT(renderPass != nullptr);
     renderPass->end();
   }
@@ -115,7 +115,7 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
     return nullptr;
   }
   auto renderTarget = renderTargetProxy->getRenderTarget();
-  auto renderPass = encoder->beginRenderPass(renderTarget, false);
+  auto renderPass = encoder->beginRenderPass(renderTarget, std::nullopt, false);
   if (renderPass == nullptr) {
     LOGE("RuntimeDrawTask::getFlatTexture() Failed to initialize the render pass!");
     return nullptr;
