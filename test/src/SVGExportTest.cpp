@@ -22,12 +22,18 @@
 #include "gtest/gtest.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Color.h"
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/WriteStream.h"
+#include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/ShapeLayer.h"
+#include "tgfx/layers/SolidColor.h"
+#include "tgfx/layers/layerstyles/DropShadowStyle.h"
+#include "tgfx/layers/layerstyles/InnerShadowStyle.h"
 #include "tgfx/svg/SVGExporter.h"
 #include "utils/TestUtils.h"
 
@@ -677,6 +683,44 @@ TGFX_TEST(SVGExportTest, DrawImageRect) {
   canvas->drawImageRect(image, srcRect, dstRect, SamplingOptions(FilterMode::Linear));
 
   exporter->close();
-  CompareSVG(SVGStream, "SVGExportTest/DrawImageRect");
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/DrawImageRect"));
+}
+
+TGFX_TEST(SVGExportTest, LayerShadow) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(400, 400));
+  auto* canvas = exporter->getCanvas();
+
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto rootLayer = Layer::Make();
+  rootLayer->setMatrix(Matrix::MakeTrans(30, 30));
+
+  auto dropShadowLayer = ShapeLayer::Make();
+  auto dropShadowStyle = DropShadowStyle::Make(10, 10, 10, 10, Color::White(), false);
+  Path rect;
+  rect.addRect(Rect::MakeWH(50, 50));
+  dropShadowLayer->setPath(rect);
+  dropShadowLayer->setFillStyle(SolidColor::Make(Color::Red()));
+  dropShadowLayer->setLayerStyles({dropShadowStyle});
+  rootLayer->addChild(dropShadowLayer);
+
+  auto innerShadowLayer = ShapeLayer::Make();
+  auto innerShadowStyle = InnerShadowStyle::Make(10, 10, 10, 10, Color::White());
+  innerShadowLayer->setMatrix(Matrix::MakeTrans(200, 0));
+  innerShadowLayer->setPath(rect);
+  innerShadowLayer->setFillStyle(SolidColor::Make(Color::Red()));
+  innerShadowLayer->setLayerStyles({innerShadowStyle});
+  rootLayer->addChild(innerShadowLayer);
+
+  displayList->root()->addChild(rootLayer);
+  displayList->root()->draw(canvas);
+
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/LayerDropShadow"));
 }
 }  // namespace tgfx
