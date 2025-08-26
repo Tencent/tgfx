@@ -21,6 +21,7 @@
 #include "core/PathRasterizer.h"
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
+#include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
 #include "core/utils/Types.h"
 #include "gpu/DrawingManager.h"
@@ -51,6 +52,13 @@ static bool HasDifferentViewMatrix(const std::vector<PlacementPtr<RectRecord>>& 
     }
   }
   return false;
+}
+
+static SamplingOptions GetAtlasSampling(const Matrix& matrix, bool isAlphaOnly) {
+  // A matrix is considered rotated if it has any skew or if it swaps the x and y axes.
+  bool hasRotated = !FloatNearlyZero(matrix.getSkewX()) || !FloatNearlyZero(matrix.getSkewY());
+  auto filterMode = (!isAlphaOnly || hasRotated) ? FilterMode::Linear : FilterMode::Nearest;
+  return SamplingOptions{filterMode, MipmapMode::None};
 }
 
 OpsCompositor::OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
@@ -684,11 +692,11 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
   ops.emplace_back(std::move(op));
 }
 
-void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy,
-                                  const SamplingOptions& sampling, const Rect& rect,
+void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,
                                   const MCState& state, const Fill& fill) {
   DEBUG_ASSERT(textureProxy != nullptr);
   DEBUG_ASSERT(!rect.isEmpty());
+  auto sampling = GetAtlasSampling(state.matrix, textureProxy->isAlphaOnly());
   if (!canAppend(PendingOpType::Atlas, state.clip, fill) || pendingAtlasTexture != textureProxy ||
       pendingSampling != sampling) {
     flushPendingOps(PendingOpType::Atlas, state.clip, fill);

@@ -116,14 +116,6 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(const Font& font, GlyphID glyph
   return glyphCodec;
 }
 
-static SamplingOptions GetSampling(const Matrix& matrix, MaskFormat format) {
-  // A matrix is considered rotated if it has any skew or if it swaps the x and y axes.
-  bool hasRotated = !FloatNearlyZero(matrix.getSkewX()) || !FloatNearlyZero(matrix.getSkewY());
-  auto filterMode =
-      (format != MaskFormat::A8 || hasRotated) ? FilterMode::Linear : FilterMode::Nearest;
-  return SamplingOptions{filterMode, MipmapMode::None};
-}
-
 static void ComputeGlyphMatrix(const Rect& atlasLocation, const Matrix& stateMatrix, float scale,
                                const Point& position, Matrix* glyphMatrix) {
   glyphMatrix->postScale(scale, scale);
@@ -449,8 +441,8 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
     }
     auto rect = atlasLocator.getLocation();
     ComputeGlyphMatrix(rect, state.matrix, 1.f / maxScale, glyphPosition, &glyphState.matrix);
-    compositor->fillTextAtlas(std::move(textureProxy), GetSampling(glyphState.matrix, maskFormat),
-                              rect, glyphState, fill.makeWithMatrix(state.matrix));
+    compositor->fillTextAtlas(std::move(textureProxy), rect, glyphState,
+                              fill.makeWithMatrix(state.matrix));
   }
 }
 void RenderContext::drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList,
@@ -559,8 +551,8 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
     auto rect = atlasLocator.getLocation();
     ComputeGlyphMatrix(rect, state.matrix, 1.f / (maxScale * cellScale), glyphPosition,
                        &glyphState.matrix);
-    compositor->fillTextAtlas(std::move(textureProxy), GetSampling(glyphState.matrix, maskFormat),
-                              rect, glyphState, fill.makeWithMatrix(state.matrix));
+    compositor->fillTextAtlas(std::move(textureProxy), rect, glyphState,
+                              fill.makeWithMatrix(state.matrix));
   }
 }
 }  // namespace tgfx
