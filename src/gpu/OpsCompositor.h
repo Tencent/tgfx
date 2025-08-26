@@ -44,7 +44,8 @@ class OpsCompositor {
   /**
    * Creates an OpsCompositor with the given render target proxy, render flags and render queue.
    */
-  OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags);
+  OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
+                std::optional<Color> clearColor = std::nullopt);
 
   /**
    * Fills the given image with the given sampling options, state and fill.
@@ -118,6 +119,7 @@ class OpsCompositor {
   std::vector<PlacementPtr<Rect>> pendingUVRects = {};
   std::vector<PlacementPtr<RRectRecord>> pendingRRects = {};
   std::vector<PlacementPtr<Stroke>> pendingStrokes = {};
+  std::optional<Color> clearColor = std::nullopt;
   std::vector<PlacementPtr<Op>> ops = {};
 
   static bool CompareFill(const Fill& a, const Fill& b);
