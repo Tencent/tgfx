@@ -191,7 +191,8 @@ bool FrameCapture::handleServerQuery() {
   return true;
 }
 
-void FrameCapture::sendString(uint64_t str, const char* ptr, size_t len, FrameCaptureMessageType type) {
+void FrameCapture::sendString(uint64_t str, const char* ptr, size_t len,
+                              FrameCaptureMessageType type) {
   FrameCaptureMessageItem item = {};
   item.hdr.type = type;
   item.stringTransfer.ptr = str;

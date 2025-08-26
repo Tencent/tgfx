@@ -126,9 +126,8 @@ std::string SerializeUtils::RecordedContentTypeToString(Types::LayerContentType 
   return m[type];
 }
 
-void SerializeUtils::SerializeBegin(flexbuffers::Builder& fbb,
-                                    tgfx::inspect::LayerTreeMessage type, size_t& mapStart,
-                                    size_t& contentStart) {
+void SerializeUtils::SerializeBegin(flexbuffers::Builder& fbb, tgfx::inspect::LayerTreeMessage type,
+                                    size_t& mapStart, size_t& contentStart) {
   mapStart = fbb.StartMap();
   fbb.Key("Type");
   fbb.UInt(static_cast<uint8_t>(type));

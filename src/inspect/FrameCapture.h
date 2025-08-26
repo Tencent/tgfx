@@ -74,8 +74,9 @@ class FrameCapture {
 
   static void SendAttributeData(const char* name, uint8_t val, uint8_t type);
 
-  static void SendAttributeData(const char* name, uint32_t val,
-                                FrameCaptureMessageType type = FrameCaptureMessageType::ValueDataUint32);
+  static void SendAttributeData(
+      const char* name, uint32_t val,
+      FrameCaptureMessageType type = FrameCaptureMessageType::ValueDataUint32);
 
   static void SendAttributeData(const char* name, float* val, int size);
 

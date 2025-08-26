@@ -35,8 +35,8 @@ std::shared_ptr<Data> MatrixSerialization::Serialize(const Matrix* matrix) {
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, tgfx::inspect::LayerTreeMessage::LayerSubAttribute,
-                                 startMap, contentMap);
+  SerializeUtils::SerializeBegin(fbb, tgfx::inspect::LayerTreeMessage::LayerSubAttribute, startMap,
+                                 contentMap);
   SerializeMatrixImpl(fbb, matrix);
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());

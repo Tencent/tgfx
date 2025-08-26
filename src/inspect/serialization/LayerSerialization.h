@@ -35,8 +35,7 @@ class LayerSerialization {
   static std::shared_ptr<Data> SerializeLayer(
       const Layer* layer, SerializeUtils::ComplexObjSerMap* map,
       SerializeUtils::RenderableObjSerMap* rosMap,
-      tgfx::inspect::LayerTreeMessage type =
-          tgfx::inspect::LayerTreeMessage::LayerSubAttribute);
+      tgfx::inspect::LayerTreeMessage type = tgfx::inspect::LayerTreeMessage::LayerSubAttribute);
 
  private:
   static void SerializeTreeNodeImpl(
