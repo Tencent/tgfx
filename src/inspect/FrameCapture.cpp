@@ -47,7 +47,7 @@ FrameCapture::~FrameCapture() {
   }
 }
 
-void FrameCapture::QueueSerialFinish(const MessageItem& item) {
+void FrameCapture::QueueSerialFinish(const FrameCaptureMessageItem& item) {
   GetInspector().serialConcurrentQueue.enqueue(item);
 }
 
@@ -81,7 +81,7 @@ void FrameCapture::SendAttributeData(const char* name, const Color& color) {
   auto b = static_cast<uint8_t>(color.blue * 255.f);
   auto a = static_cast<uint8_t>(color.alpha * 255.f);
   auto value = static_cast<uint32_t>(r | g << 8 | b << 16 | a << 24);
-  SendAttributeData(name, value, MessageType::ValueDataColor);
+  SendAttributeData(name, value, FrameCaptureMessageType::ValueDataColor);
 }
 
 void FrameCapture::SendAttributeData(const char* name, const std::optional<Color>& color) {
@@ -96,46 +96,46 @@ void FrameCapture::SendFrameMark(const char* name) {
   if (!name) {
     GetInspector().frameCount.fetch_add(1, std::memory_order_relaxed);
   }
-  auto item = MessageItem();
-  item.hdr.type = MessageType::FrameMarkMessage;
+  auto item = FrameCaptureMessageItem();
+  item.hdr.type = FrameCaptureMessageType::FrameMarkMessage;
   item.frameMark.usTime = Clock::Now();
   QueueSerialFinish(item);
 }
 
 void FrameCapture::SendAttributeData(const char* name, int val) {
-  auto item = MessageItem();
-  item.hdr.type = MessageType::ValueDataInt;
+  auto item = FrameCaptureMessageItem();
+  item.hdr.type = FrameCaptureMessageType::ValueDataInt;
   item.attributeDataInt.name = reinterpret_cast<uint64_t>(name);
   item.attributeDataInt.value = val;
   QueueSerialFinish(item);
 }
 
 void FrameCapture::SendAttributeData(const char* name, float val) {
-  auto item = MessageItem();
-  item.hdr.type = MessageType::ValueDataFloat;
+  auto item = FrameCaptureMessageItem();
+  item.hdr.type = FrameCaptureMessageType::ValueDataFloat;
   item.attributeDataFloat.name = reinterpret_cast<uint64_t>(name);
   item.attributeDataFloat.value = val;
   QueueSerialFinish(item);
 }
 
 void FrameCapture::SendAttributeData(const char* name, bool val) {
-  auto item = MessageItem();
-  item.hdr.type = MessageType::ValueDataBool;
+  auto item = FrameCaptureMessageItem();
+  item.hdr.type = FrameCaptureMessageType::ValueDataBool;
   item.attributeDataBool.name = reinterpret_cast<uint64_t>(name);
   item.attributeDataBool.value = val;
   QueueSerialFinish(item);
 }
 
 void FrameCapture::SendAttributeData(const char* name, uint8_t val, uint8_t type) {
-  auto item = MessageItem();
-  item.hdr.type = MessageType::ValueDataEnum;
+  auto item = FrameCaptureMessageItem();
+  item.hdr.type = FrameCaptureMessageType::ValueDataEnum;
   item.attributeDataEnum.name = reinterpret_cast<uint64_t>(name);
   item.attributeDataEnum.value = static_cast<uint16_t>(type << 8 | val);
   QueueSerialFinish(item);
 }
 
-void FrameCapture::SendAttributeData(const char* name, uint32_t val, MessageType type) {
-  auto item = MessageItem();
+void FrameCapture::SendAttributeData(const char* name, uint32_t val, FrameCaptureMessageType type) {
+  auto item = FrameCaptureMessageItem();
   item.hdr.type = type;
   item.attributeDataUint32.name = reinterpret_cast<uint64_t>(name);
   item.attributeDataUint32.value = val;
@@ -144,14 +144,14 @@ void FrameCapture::SendAttributeData(const char* name, uint32_t val, MessageType
 
 void FrameCapture::SendAttributeData(const char* name, float* val, int size) {
   if (size == 4) {
-    auto item = MessageItem();
-    item.hdr.type = MessageType::ValueDataFloat4;
+    auto item = FrameCaptureMessageItem();
+    item.hdr.type = FrameCaptureMessageType::ValueDataFloat4;
     item.attributeDataFloat4.name = reinterpret_cast<uint64_t>(name);
     memcpy(item.attributeDataFloat4.value, val, static_cast<size_t>(size) * sizeof(float));
     QueueSerialFinish(item);
   } else if (size == 6) {
-    auto item = MessageItem();
-    item.hdr.type = MessageType::ValueDataMat3;
+    auto item = FrameCaptureMessageItem();
+    item.hdr.type = FrameCaptureMessageType::ValueDataMat3;
     item.attributeDataMat4.name = reinterpret_cast<uint64_t>(name);
     memcpy(item.attributeDataMat4.value, val, static_cast<size_t>(size) * sizeof(float));
     QueueSerialFinish(item);
@@ -180,10 +180,10 @@ bool FrameCapture::handleServerQuery() {
   auto ptr = payload.ptr;
   switch (type) {
     case ServerQuery::String: {
-      sendString(ptr, reinterpret_cast<const char*>(ptr), MessageType::StringData);
+      sendString(ptr, reinterpret_cast<const char*>(ptr), FrameCaptureMessageType::StringData);
     }
     case ServerQuery::ValueName: {
-      sendString(ptr, reinterpret_cast<const char*>(ptr), MessageType::ValueName);
+      sendString(ptr, reinterpret_cast<const char*>(ptr), FrameCaptureMessageType::ValueName);
     }
     default:
       break;
@@ -191,19 +191,19 @@ bool FrameCapture::handleServerQuery() {
   return true;
 }
 
-void FrameCapture::sendString(uint64_t str, const char* ptr, size_t len, MessageType type) {
-  MessageItem item = {};
+void FrameCapture::sendString(uint64_t str, const char* ptr, size_t len, FrameCaptureMessageType type) {
+  FrameCaptureMessageItem item = {};
   item.hdr.type = type;
   item.stringTransfer.ptr = str;
 
   auto dataLen = static_cast<uint16_t>(len);
-  needDataSize(MessageDataSize[static_cast<int>(type)] + sizeof(uint16_t) + dataLen);
-  appendDataUnsafe(&item, MessageDataSize[static_cast<int>(type)]);
+  needDataSize(FrameCaptureMessageDataSize[static_cast<int>(type)] + sizeof(uint16_t) + dataLen);
+  appendDataUnsafe(&item, FrameCaptureMessageDataSize[static_cast<int>(type)]);
   appendDataUnsafe(&dataLen, sizeof(uint16_t));
   appendDataUnsafe(ptr, dataLen);
 }
 
-void FrameCapture::sendString(uint64_t str, const char* ptr, MessageType type) {
+void FrameCapture::sendString(uint64_t str, const char* ptr, FrameCaptureMessageType type) {
   sendString(str, ptr, strlen(ptr), type);
 }
 
@@ -394,9 +394,9 @@ void FrameCapture::handleConnect(const WelcomeMessage& welcome) {
           break;
         }
         if (keepAlive == 500) {
-          MessageItem ka = {};
-          ka.hdr.type = MessageType::KeepAlive;
-          appendData(&ka, MessageDataSize[ka.hdr.idx]);
+          FrameCaptureMessageItem ka = {};
+          ka.hdr.type = FrameCaptureMessageType::KeepAlive;
+          appendData(&ka, FrameCaptureMessageDataSize[ka.hdr.idx]);
           if (!commitData()) {
             break;
           }
@@ -427,18 +427,18 @@ FrameCapture::DequeueStatus FrameCapture::dequeueSerial() {
   const auto queueSize = serialConcurrentQueue.size_approx();
   if (queueSize > 0) {
     auto refThread = refTimeThread;
-    MessageItem item = {};
+    FrameCaptureMessageItem item = {};
     while (serialConcurrentQueue.try_dequeue(item)) {
       auto idx = item.hdr.idx;
-      switch (static_cast<MessageType>(idx)) {
-        case MessageType::OperateBegin: {
+      switch (static_cast<FrameCaptureMessageType>(idx)) {
+        case FrameCaptureMessageType::OperateBegin: {
           auto t = item.operateBegin.usTime;
           auto dt = t - refThread;
           refThread = t;
           item.operateBegin.usTime = dt;
           break;
         }
-        case MessageType::OperateEnd: {
+        case FrameCaptureMessageType::OperateEnd: {
           auto t = item.operateEnd.usTime;
           auto dt = t - refThread;
           refThread = t;
@@ -448,7 +448,7 @@ FrameCapture::DequeueStatus FrameCapture::dequeueSerial() {
         default:
           break;
       }
-      if (!appendData(&item, MessageDataSize[idx])) {
+      if (!appendData(&item, FrameCaptureMessageDataSize[idx])) {
         return DequeueStatus::ConnectionLost;
       }
     }

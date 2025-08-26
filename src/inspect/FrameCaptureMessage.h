@@ -19,7 +19,7 @@
 #pragma once
 #include <cstdint>
 namespace tgfx::inspect {
-enum class MessageType : uint8_t {
+enum class FrameCaptureMessageType : uint8_t {
   OperateBegin,
   OperateEnd,
   FrameMarkMessage,
@@ -37,9 +37,9 @@ enum class MessageType : uint8_t {
 };
 
 #pragma pack(push, 1)
-struct MessageHeader {
+struct FrameCaptureMessageHeader {
   union {
-    MessageType type;
+    FrameCaptureMessageType type;
     uint8_t idx;
   };
 };
@@ -96,8 +96,8 @@ struct StringTransferMessage {
   uint64_t ptr;
 };
 
-struct MessageItem {
-  MessageHeader hdr;
+struct FrameCaptureMessageItem {
+  FrameCaptureMessageHeader hdr;
   union {
     FrameMarkMessage frameMark;
     OperateBeginMessage operateBegin;
@@ -114,20 +114,20 @@ struct MessageItem {
 };
 #pragma pack(pop)
 
-static constexpr size_t MessageDataSize[] = {
-    sizeof(MessageHeader) + sizeof(OperateBeginMessage),
-    sizeof(MessageHeader) + sizeof(OperateEndMessage),
-    sizeof(MessageHeader) + sizeof(FrameMarkMessage),
-    sizeof(MessageHeader) + sizeof(AttributeDataUInt32Message),
-    sizeof(MessageHeader) + sizeof(AttributeDataFloat4Message),
-    sizeof(MessageHeader) + sizeof(AttributeDataMat4Message),
-    sizeof(MessageHeader) + sizeof(AttributeDataIntMessage),
-    sizeof(MessageHeader) + sizeof(AttributeDataUInt32Message),
-    sizeof(MessageHeader) + sizeof(AttributeDataFloatMessage),
-    sizeof(MessageHeader) + sizeof(AttributeDataBoolMessage),
-    sizeof(MessageHeader) + sizeof(AttributeDataEnumMessage),
-    sizeof(MessageHeader),
-    sizeof(MessageHeader) + sizeof(StringTransferMessage),
-    sizeof(MessageHeader) + sizeof(StringTransferMessage),
+static constexpr size_t FrameCaptureMessageDataSize[] = {
+    sizeof(FrameCaptureMessageHeader) + sizeof(OperateBeginMessage),
+    sizeof(FrameCaptureMessageHeader) + sizeof(OperateEndMessage),
+    sizeof(FrameCaptureMessageHeader) + sizeof(FrameMarkMessage),
+    sizeof(FrameCaptureMessageHeader) + sizeof(AttributeDataUInt32Message),
+    sizeof(FrameCaptureMessageHeader) + sizeof(AttributeDataFloat4Message),
+    sizeof(FrameCaptureMessageHeader) + sizeof(AttributeDataMat4Message),
+    sizeof(FrameCaptureMessageHeader) + sizeof(AttributeDataIntMessage),
+    sizeof(FrameCaptureMessageHeader) + sizeof(AttributeDataUInt32Message),
+    sizeof(FrameCaptureMessageHeader) + sizeof(AttributeDataFloatMessage),
+    sizeof(FrameCaptureMessageHeader) + sizeof(AttributeDataBoolMessage),
+    sizeof(FrameCaptureMessageHeader) + sizeof(AttributeDataEnumMessage),
+    sizeof(FrameCaptureMessageHeader),
+    sizeof(FrameCaptureMessageHeader) + sizeof(StringTransferMessage),
+    sizeof(FrameCaptureMessageHeader) + sizeof(StringTransferMessage),
 };
 }  // namespace tgfx::inspect

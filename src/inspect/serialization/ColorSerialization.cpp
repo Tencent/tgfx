@@ -31,7 +31,7 @@ std::shared_ptr<Data> ColorSerialization::Serialize(const Color* color) {
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, inspect::LayerViewerMessage::LayerSubAttribute, startMap,
+  SerializeUtils::SerializeBegin(fbb, inspect::LayerTreeMessage::LayerSubAttribute, startMap,
                                  contentMap);
   SerializeColorImpl(fbb, color);
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);

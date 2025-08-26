@@ -89,7 +89,7 @@ void LayerTree::serializingLayerTree() {
 void LayerTree::sendPickedLayerAddress(const std::shared_ptr<Layer>& layer) {
   flexbuffers::Builder fbb;
   auto startMap = fbb.StartMap();
-  fbb.UInt("Type", static_cast<uint8_t>(LayerViewerMessage::PickedLayerAddress));
+  fbb.UInt("Type", static_cast<uint8_t>(LayerTreeMessage::PickedLayerAddress));
   fbb.Key("Content");
   auto contentMap = fbb.StartMap();
   fbb.UInt("Address", reinterpret_cast<uint64_t>(layer.get()));
@@ -102,7 +102,7 @@ void LayerTree::sendPickedLayerAddress(const std::shared_ptr<Layer>& layer) {
 void LayerTree::sendFlushAttributeAck(uint64_t address) {
   flexbuffers::Builder fbb;
   auto startMap = fbb.StartMap();
-  fbb.UInt("Type", static_cast<uint8_t>(LayerViewerMessage::FlushAttributeAck));
+  fbb.UInt("Type", static_cast<uint8_t>(LayerTreeMessage::FlushAttributeAck));
   fbb.Key("Content");
   auto contentMap = fbb.StartMap();
   fbb.UInt("Address", address);
@@ -119,7 +119,7 @@ void LayerTree::serializingLayerAttribute(const std::shared_ptr<Layer>& layer) {
   auto& complexObjSerMap = layerComplexObjMap[reinterpret_cast<uint64_t>(layer.get())];
   auto& renderableObjSerMap = layerRenderableObjMap[reinterpret_cast<uint64_t>(layer.get())];
   auto data = LayerSerialization::SerializeLayer(
-      layer.get(), &complexObjSerMap, &renderableObjSerMap, LayerViewerMessage::LayerAttribute);
+      layer.get(), &complexObjSerMap, &renderableObjSerMap, LayerTreeMessage::LayerAttribute);
   std::vector<uint8_t> blob(data->bytes(), data->bytes() + data->size());
   SEND_LAYER_DATA(blob);
 }
@@ -129,9 +129,9 @@ void LayerTree::feedBackDataProcess(const std::vector<uint8_t>& data) {
     return;
   }
   auto map = flexbuffers::GetRoot(data.data(), data.size()).AsMap();
-  auto type = static_cast<LayerViewerMessage>(map["Type"].AsUInt8());
+  auto type = static_cast<LayerTreeMessage>(map["Type"].AsUInt8());
   switch (type) {
-    case LayerViewerMessage::EnableLayerInspector: {
+    case LayerTreeMessage::EnableLayerInspector: {
       hoverdSwitch = map["Value"].AsUInt64();
       if (!hoverdSwitch && hoverdLayer) {
         hoverdLayer->removeChildren(highLightLayerIndex);
@@ -139,22 +139,22 @@ void LayerTree::feedBackDataProcess(const std::vector<uint8_t>& data) {
       }
       break;
     }
-    case LayerViewerMessage::HoverLayerAddress: {
+    case LayerTreeMessage::HoverLayerAddress: {
       if (hoverdSwitch) {
         hoveredAddress = map["Value"].AsUInt64();
         addHighLightOverlay(Color::FromRGBA(111, 166, 219), layerMap[hoveredAddress]);
       }
       break;
     }
-    case LayerViewerMessage::SelectedLayerAddress: {
+    case LayerTreeMessage::SelectedLayerAddress: {
       selectedAddress = map["Value"].AsUInt64();
       break;
     }
-    case LayerViewerMessage::SerializeAttribute: {
+    case LayerTreeMessage::SerializeAttribute: {
       serializingLayerAttribute(layerMap[selectedAddress]);
       break;
     }
-    case LayerViewerMessage::SerializeSubAttribute: {
+    case LayerTreeMessage::SerializeSubAttribute: {
       expandID = map["Value"].AsUInt64();
       if (layerComplexObjMap.find(selectedAddress) != layerComplexObjMap.end() &&
           layerComplexObjMap[selectedAddress].find(expandID) !=
@@ -165,7 +165,7 @@ void LayerTree::feedBackDataProcess(const std::vector<uint8_t>& data) {
       }
       break;
     }
-    case LayerViewerMessage::FlushAttribute: {
+    case LayerTreeMessage::FlushAttribute: {
       uint64_t address = map["Value"].AsUInt64();
       if (layerComplexObjMap.find(address) != layerComplexObjMap.end()) {
         layerComplexObjMap.erase(address);
@@ -176,11 +176,11 @@ void LayerTree::feedBackDataProcess(const std::vector<uint8_t>& data) {
       sendFlushAttributeAck(address);
       break;
     }
-    case LayerViewerMessage::FlushLayerTree: {
+    case LayerTreeMessage::FlushLayerTree: {
       serializingLayerTree();
       break;
     }
-    case LayerViewerMessage::FlushImage: {
+    case LayerTreeMessage::FlushImage: {
       uint64_t imageId = map["Value"].AsUInt64();
       imageIDQueue.enqueue(imageId);
       break;

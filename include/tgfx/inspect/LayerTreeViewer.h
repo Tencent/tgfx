@@ -21,7 +21,7 @@
 namespace tgfx {
 
 class LayerTreeViewer {
-
+public:
   /**
   * In debug mode, this interface is used to set the layer to be inspected. The corresponding layer
   * will be selected in the Tgfx Inspector tool, displaying its related properties (e.g：it can be

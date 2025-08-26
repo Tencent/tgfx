@@ -107,7 +107,7 @@ std::shared_ptr<Data> LayerFilterSerialization::Serialize(const LayerFilter* lay
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, tgfx::inspect::LayerViewerMessage::LayerSubAttribute,
+  SerializeUtils::SerializeBegin(fbb, tgfx::inspect::LayerTreeMessage::LayerSubAttribute,
                                  startMap, contentMap);
   auto type = Types::Get(layerFilter);
   switch (type) {

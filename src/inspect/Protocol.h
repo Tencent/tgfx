@@ -105,7 +105,7 @@ enum class CustomEnumType : uint8_t {
   ImageOrigin,
 };
 
-enum class LayerViewerMessage : uint8_t {
+enum class LayerTreeMessage : uint8_t {
   EnableLayerInspector,
   HoverLayerAddress,
   SelectedLayerAddress,

@@ -27,8 +27,8 @@ class FunctionTimer {
     if (!active) {
       return;
     }
-    auto item = MessageItem();
-    item.hdr.type = MessageType::OperateBegin;
+    auto item = FrameCaptureMessageItem();
+    item.hdr.type = FrameCaptureMessageType::OperateBegin;
     item.operateBegin.usTime = Clock::Now();
     item.operateBegin.type = static_cast<uint8_t>(type);
     FrameCapture::QueueSerialFinish(item);
@@ -38,8 +38,8 @@ class FunctionTimer {
     if (!active) {
       return;
     }
-    auto item = MessageItem();
-    item.hdr.type = MessageType::OperateEnd;
+    auto item = FrameCaptureMessageItem();
+    item.hdr.type = FrameCaptureMessageType::OperateEnd;
     item.operateEnd.usTime = Clock::Now();
     item.operateEnd.type = static_cast<uint8_t>(type);
     FrameCapture::QueueSerialFinish(item);

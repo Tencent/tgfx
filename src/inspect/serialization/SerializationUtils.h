@@ -48,7 +48,7 @@ std::string LayerStyleExtraSourceTypeToString(LayerStyleExtraSourceType type);
 
 std::string RecordedContentTypeToString(Types::LayerContentType type);
 
-void SerializeBegin(flexbuffers::Builder& fbb, tgfx::inspect::LayerViewerMessage type,
+void SerializeBegin(flexbuffers::Builder& fbb, tgfx::inspect::LayerTreeMessage type,
                     size_t& mapStart, size_t& contentStart);
 
 void SerializeEnd(flexbuffers::Builder& fbb, size_t mapStart, size_t contentStart);

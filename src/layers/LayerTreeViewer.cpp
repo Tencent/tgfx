@@ -16,10 +16,15 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "tgfx/inspect/LayerTreeViewer.h"
+#include "core/utils/USE.h"
 #include "inspect/InspectorMark.h"
 
 namespace tgfx {
 void LayerTreeViewer::SetSelectedLayer(std::shared_ptr<Layer> layer) {
+#ifndef TGFX_USE_INSPECTOR
   SET_SLECTED_LAYER(layer);
+#else
+  USE(layer);
+#endif
 }
 }  // namespace tgfx

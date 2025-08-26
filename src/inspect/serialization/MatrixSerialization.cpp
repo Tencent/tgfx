@@ -16,25 +16,28 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "RectSerialization.h"
+#include "MatrixSerialization.h"
+#include <string>
 
 namespace tgfx {
-
-static void SerializeRectImpl(flexbuffers::Builder& fbb, const Rect* rect) {
-  SerializeUtils::SetFlexBufferMap(fbb, "left", rect->left);
-  SerializeUtils::SetFlexBufferMap(fbb, "top", rect->top);
-  SerializeUtils::SetFlexBufferMap(fbb, "right", rect->right);
-  SerializeUtils::SetFlexBufferMap(fbb, "bottom", rect->bottom);
+static void SerializeMatrixImpl(flexbuffers::Builder& fbb, const Matrix* matrix) {
+  float buffer[6] = {0.0f};
+  matrix->get6(buffer);
+  std::string key = "";
+  for (int i = 0; i < 6; i++) {
+    key = "[" + std::to_string(i) + "]";
+    SerializeUtils::SetFlexBufferMap(fbb, key.c_str(), buffer[i]);
+  }
 }
 
-std::shared_ptr<Data> RectSerialization::Serialize(const Rect* rect) {
-  DEBUG_ASSERT(rect != nullptr)
+std::shared_ptr<Data> MatrixSerialization::Serialize(const Matrix* matrix) {
+  DEBUG_ASSERT(matrix != nullptr)
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, tgfx::inspect::LayerViewerMessage::LayerSubAttribute,
+  SerializeUtils::SerializeBegin(fbb, tgfx::inspect::LayerTreeMessage::LayerSubAttribute,
                                  startMap, contentMap);
-  SerializeRectImpl(fbb, rect);
+  SerializeMatrixImpl(fbb, matrix);
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);
   return Data::MakeWithCopy(fbb.GetBuffer().data(), fbb.GetBuffer().size());
 }

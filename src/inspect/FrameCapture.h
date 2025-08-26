@@ -22,7 +22,7 @@
 #include <optional>
 #include <thread>
 #include <vector>
-#include "Message.h"
+#include "FrameCaptureMessage.h"
 #include "Protocol.h"
 #include "Socket.h"
 #include "concurrentqueue.h"
@@ -52,7 +52,7 @@ class FrameCapture {
 
   ~FrameCapture();
 
-  static void QueueSerialFinish(const MessageItem& item);
+  static void QueueSerialFinish(const FrameCaptureMessageItem& item);
 
   static void SendAttributeData(const char* name, const Rect& rect);
 
@@ -75,7 +75,7 @@ class FrameCapture {
   static void SendAttributeData(const char* name, uint8_t val, uint8_t type);
 
   static void SendAttributeData(const char* name, uint32_t val,
-                                MessageType type = MessageType::ValueDataUint32);
+                                FrameCaptureMessageType type = FrameCaptureMessageType::ValueDataUint32);
 
   static void SendAttributeData(const char* name, float* val, int size);
 
@@ -106,9 +106,9 @@ class FrameCapture {
 
   bool sendData(const char* data, size_t len);
 
-  void sendString(uint64_t str, const char* ptr, MessageType type);
+  void sendString(uint64_t str, const char* ptr, FrameCaptureMessageType type);
 
-  void sendString(uint64_t str, const char* ptr, size_t len, MessageType type);
+  void sendString(uint64_t str, const char* ptr, size_t len, FrameCaptureMessageType type);
 
   bool confirmProtocol();
 
@@ -126,7 +126,7 @@ class FrameCapture {
   std::atomic<bool> isConnect = false;
   std::shared_ptr<Socket> sock = nullptr;
   int64_t refTimeThread = 0;
-  moodycamel::ConcurrentQueue<MessageItem> serialConcurrentQueue;
+  moodycamel::ConcurrentQueue<FrameCaptureMessageItem> serialConcurrentQueue;
   std::unique_ptr<std::thread> messageThread = nullptr;
   std::vector<std::shared_ptr<UDPBroadcast>> broadcast = {};
   const char* programName = nullptr;
