@@ -16,21 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "NextPowerOfTwoScale.h"
-#include <algorithm>
-#include <cmath>
-#include <cstdint>
+#pragma once
 
 namespace tgfx {
 
-float NextPowerOfTwoScale(float scale) {
-  scale = std::clamp(scale, 0.0f, 1.0f);
-  if (scale > 0.5f) {
-    return 1.0f;
-  }
-  float exactLevel = std::log2(1.0f / scale);
-  auto scaleLevel = static_cast<uint32_t>(std::floor(exactLevel));
-  return 1.0f / static_cast<float>(1 << scaleLevel);
-}
+float NextCacheScaleLevel(float scale);
 
-}  // namespace tgfx
+}

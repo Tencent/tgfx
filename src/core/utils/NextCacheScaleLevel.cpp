@@ -16,10 +16,24 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
+#include "NextCacheScaleLevel.h"
+#include <algorithm>
+#include <cmath>
+#include <cstdint>
 
 namespace tgfx {
 
-float NextPowerOfTwoScale(float scale);
-
+float NextCacheScaleLevel(float scale) {
+  constexpr float MinAllowedImageScale = 1.0f / 8.0f;
+  if (scale <= MinAllowedImageScale) {
+    return MinAllowedImageScale;
+  }
+  if (scale > 0.5f) {
+    return 1.0f;
+  }
+  float exactLevel = std::log2(1.0f / scale);
+  auto scaleLevel = static_cast<uint32_t>(std::floor(exactLevel));
+  return 1.0f / static_cast<float>(1 << scaleLevel);
 }
+
+}  // namespace tgfx
