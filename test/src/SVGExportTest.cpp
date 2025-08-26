@@ -22,6 +22,7 @@
 #include "gtest/gtest.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Color.h"
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Recorder.h"
@@ -32,6 +33,7 @@
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/SolidColor.h"
 #include "tgfx/layers/layerstyles/DropShadowStyle.h"
+#include "tgfx/layers/layerstyles/InnerShadowStyle.h"
 #include "tgfx/svg/SVGExporter.h"
 #include "utils/TestUtils.h"
 
@@ -719,10 +721,7 @@ TGFX_TEST(SVGExportTest, LayerDropShadow) {
   EXPECT_TRUE(context != nullptr);
 
   auto SVGStream = MemoryWriteStream::Make();
-
-  int width = 400;
-  int height = 400;
-  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(width, height));
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(400, 400));
   auto* canvas = exporter->getCanvas();
 
   auto displayList = std::make_unique<DisplayList>();
@@ -730,14 +729,23 @@ TGFX_TEST(SVGExportTest, LayerDropShadow) {
   auto rootLayer = Layer::Make();
   rootLayer->setMatrix(Matrix::MakeTrans(30, 30));
 
-  auto rectLayer = ShapeLayer::Make();
-  auto style = DropShadowStyle::Make(10, 10, 10, 10, Color::White(), false);
+  auto dropShadowLayer = ShapeLayer::Make();
+  auto dropShadowStyle = DropShadowStyle::Make(10, 10, 10, 10, Color::White(), false);
+  // auto style = InnerShadowStyle::Make(10, 10, 10, 10, Color::White());
   Path rect;
   rect.addRect(Rect::MakeWH(50, 50));
-  rectLayer->setPath(rect);
-  rectLayer->setFillStyle(SolidColor::Make(Color::Red()));
-  rectLayer->setLayerStyles({style});
-  rootLayer->addChild(rectLayer);
+  dropShadowLayer->setPath(rect);
+  dropShadowLayer->setFillStyle(SolidColor::Make(Color::Red()));
+  dropShadowLayer->setLayerStyles({dropShadowStyle});
+  rootLayer->addChild(dropShadowLayer);
+
+  auto innerShadowLayer = ShapeLayer::Make();
+  auto innerShadowStyle = InnerShadowStyle::Make(10, 10, 10, 10, Color::White());
+  innerShadowLayer->setMatrix(Matrix::MakeTrans(200, 0));
+  innerShadowLayer->setPath(rect);
+  innerShadowLayer->setFillStyle(SolidColor::Make(Color::Red()));
+  innerShadowLayer->setLayerStyles({innerShadowStyle});
+  rootLayer->addChild(innerShadowLayer);
 
   displayList->root()->addChild(rootLayer);
   displayList->root()->draw(canvas);
