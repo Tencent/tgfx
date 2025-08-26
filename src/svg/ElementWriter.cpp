@@ -17,14 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ElementWriter.h"
-#include <iostream>
-#include <memory>
-#include <string>
-#include <tuple>
-#include <unordered_set>
 #include "SVGExportContext.h"
 #include "SVGUtils.h"
-#include "core/CanvasState.h"
 #include "core/codecs/jpeg/JpegCodec.h"
 #include "core/codecs/png/PngCodec.h"
 #include "core/filters/ComposeImageFilter.h"
@@ -40,7 +34,6 @@
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
-#include "tgfx/core/Size.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/svg/SVGPathParser.h"
