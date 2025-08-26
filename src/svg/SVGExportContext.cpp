@@ -17,12 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "SVGExportContext.h"
-#include <cstdlib>
-#include <memory>
-#include <string>
 #include "ElementWriter.h"
 #include "SVGUtils.h"
-#include "core/CanvasState.h"
 #include "core/images/CodecImage.h"
 #include "core/images/FilterImage.h"
 #include "core/images/PictureImage.h"
@@ -43,7 +39,6 @@
 #include "tgfx/core/Point.h"
 #include "tgfx/core/RRect.h"
 #include "tgfx/core/Rect.h"
-#include "tgfx/core/Size.h"
 #include "tgfx/core/Stroke.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/core/TileMode.h"
