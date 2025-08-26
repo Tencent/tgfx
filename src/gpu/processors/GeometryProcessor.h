@@ -43,8 +43,9 @@ class GeometryProcessor : public Processor {
 
   class FPCoordTransformHandler {
    public:
-    FPCoordTransformHandler(const Pipeline* pipeline, std::vector<ShaderVar>* transformedCoordVars)
-        : iter(pipeline), transformedCoordVars(transformedCoordVars) {
+    FPCoordTransformHandler(const ProgramInfo* programInfo,
+                            std::vector<ShaderVar>* transformedCoordVars)
+        : iter(programInfo), transformedCoordVars(transformedCoordVars) {
     }
 
     const CoordTransform* nextCoordTransform() {

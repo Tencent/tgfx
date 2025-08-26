@@ -18,7 +18,7 @@
 
 #include "RuntimeDrawTask.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/Pipeline.h"
+#include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
 #include "gpu/RectsVertexProvider.h"
@@ -133,9 +133,9 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
   const auto& swizzle = caps->getWriteSwizzle(format);
   std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors = {};
   fragmentProcessors.emplace_back(std::move(colorProcessor));
-  Pipeline pipeline(std::move(geometryProcessor), std::move(fragmentProcessors), 1, nullptr,
-                    BlendMode::Src, &swizzle);
-  renderPass->bindProgramAndScissorClip(&pipeline, {});
+  ProgramInfo programInfo(std::move(geometryProcessor), std::move(fragmentProcessors), 1, nullptr,
+                          BlendMode::Src, &swizzle);
+  renderPass->bindProgramAndScissorClip(&programInfo, {});
   renderPass->bindBuffers(nullptr, vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
   renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
   renderPass->end();

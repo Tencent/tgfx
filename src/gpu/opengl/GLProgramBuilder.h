@@ -36,7 +36,7 @@ class GLProgramBuilder : public ProgramBuilder {
   bool isDesktopGL() const;
 
  private:
-  GLProgramBuilder(Context* context, const Pipeline* pipeline);
+  GLProgramBuilder(Context* context, const ProgramInfo* programInfo);
 
   std::unique_ptr<GLProgram> finalize();
 

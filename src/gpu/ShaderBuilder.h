@@ -24,7 +24,7 @@
 
 namespace tgfx {
 class ProgramBuilder;
-class Pipeline;
+class ProgramInfo;
 
 /**
  * Features that should only be enabled internally by the builders.
@@ -39,7 +39,7 @@ class ShaderBuilder {
  public:
   explicit ShaderBuilder(ProgramBuilder* builder);
 
-  const Pipeline* getPipeline() const;
+  const ProgramInfo* getProgramInfo() const;
 
   virtual ~ShaderBuilder() = default;
 
