@@ -683,18 +683,10 @@ TGFX_TEST(SVGExportTest, DrawImageRect) {
   canvas->drawImageRect(image, srcRect, dstRect, SamplingOptions(FilterMode::Linear));
 
   exporter->close();
-  // EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/DrawImageRect"));
-
-  auto SVGString = SVGStream->readString();
-  auto path = ProjectPath::Absolute("resources/apitest/SVG/drawImageRect.svg");
-  auto readStream = Stream::MakeFromFile(path);
-  EXPECT_TRUE(readStream != nullptr);
-  Buffer buffer(readStream->size());
-  readStream->read(buffer.data(), buffer.size());
-  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), SVGString);
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/DrawImageRect"));
 }
 
-TGFX_TEST(SVGExportTest, LayerDropShadow) {
+TGFX_TEST(SVGExportTest, LayerShadow) {
   ContextScope scope;
   auto* context = scope.getContext();
   EXPECT_TRUE(context != nullptr);
@@ -710,7 +702,6 @@ TGFX_TEST(SVGExportTest, LayerDropShadow) {
 
   auto dropShadowLayer = ShapeLayer::Make();
   auto dropShadowStyle = DropShadowStyle::Make(10, 10, 10, 10, Color::White(), false);
-  // auto style = InnerShadowStyle::Make(10, 10, 10, 10, Color::White());
   Path rect;
   rect.addRect(Rect::MakeWH(50, 50));
   dropShadowLayer->setPath(rect);

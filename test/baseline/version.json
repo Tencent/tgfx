@@ -303,6 +303,7 @@
         "DrawImageRect": "9a80633b",
         "ImageMask": "9a80633b",
         "InvertPictureImageMask": "9a80633b",
+        "LayerDropShadow": "a78e535d",
         "PictureImageMask": "9a80633b"
     },
     "SVGTest": {

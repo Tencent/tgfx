@@ -18,11 +18,7 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
-#include <tuple>
 #include "ResourceStore.h"
-#include "SVGUtils.h"
 #include "core/filters/DropShadowImageFilter.h"
 #include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
