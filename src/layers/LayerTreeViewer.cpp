@@ -15,17 +15,11 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#pragma once
-#ifdef TGFX_USE_INSPECTOR
-#include "tgfx/layers/Layer.h"
+#include "tgfx/debug/LayerTreeViewer.h"
+#include "inspect/InspectorMark.h"
 
 namespace tgfx {
-/**
-  * In debug mode, this interface is used to set the layer to be inspected. The corresponding layer
-  * will be selected in the Tgfx Inspector tool, displaying its related properties (e.g：it can be
-  * set to select the layer at the cursor's position when the left mouse button is clicked). In
-  * release mode, the internal implementation is empty and does nothing.
-  */
-void SetSelectedLayer(std::shared_ptr<Layer> layer);
+void LayerTreeViewer::SetSelectedLayer(std::shared_ptr<Layer> layer) {
+  SET_SLECTED_LAYER(layer);
+}
 }  // namespace tgfx
-#endif

@@ -23,10 +23,7 @@
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
 #include "layers/TileCache.h"
-
-#ifdef TGFX_USE_INSPECTOR
-#include "inspect/LayerViewer.h"
-#endif
+#include "inspect/InspectorMark.h"
 
 namespace tgfx {
 static constexpr size_t MAX_DIRTY_REGION_FRAMES = 5;
@@ -116,10 +113,7 @@ static int64_t ChangeZoomScalePrecision(int64_t zoomScaleInt, int oldPrecision, 
 
 DisplayList::DisplayList() : _root(RootLayer::Make()) {
   _root->_root = _root.get();
-#ifdef TGFX_USE_INSPECTOR
-  auto& layerInspectorManager = inspect::LayerViewer::Get();
-  layerInspectorManager.setDisplayList(this);
-#endif
+  SET_DISPLAY_LIST(this);
 }
 
 DisplayList::~DisplayList() {
@@ -243,9 +237,7 @@ void DisplayList::render(Surface* surface, bool autoClear) {
   if (!surface) {
     return;
   }
-#ifdef TGFX_USE_INSPECTOR
-  inspect::LayerViewer::Get().renderImageAndSend(surface->getContext());
-#endif
+  RENDER_VISABLE_OBJECT(surface->getContext());
   _hasContentChanged = false;
   auto dirtyRegions = _root->updateDirtyRegions();
   if (_zoomScaleInt == 0) {

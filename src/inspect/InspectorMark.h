@@ -22,9 +22,11 @@
 #include "Inspector.h"
 #include "LayerTree.h"
 
-#define SEND_LAYER_DATA(data) tgfx::inspect::LayerTree::Get().setData(data)
-#define LAYER_CALLBACK(func) tgfx::inspect::LayerTree::Get().setCallBack(func)
-
+#define SEND_LAYER_DATA(data) tgfx::inspect::LayerTree::SocketAgent::Get().setData(data)
+#define LAYER_CALLBACK(func) tgfx::inspect::LayerTree::SocketAgent::Get().setCallBack(func)
+#define SET_DISPLAY_LIST(display) tgfx::inspect::LayerTree::Get().setDisplayList(display)
+#define RENDER_VISABLE_OBJECT(context) tgfx::inspect::LayerTree::Get().renderImageAndSend(context)
+#define SET_SLECTED_LAYER(layer) tgfx::inspect::LayerTree::Get().setSelectLayer(layer)
 #define FRAME_MARK tgfx::inspect::Inspector::SendFrameMark(nullptr)
 
 #define FUNCTION_MARK(type, active) tgfx::inspect::FunctionTimer functionTimer(type, active)
@@ -39,8 +41,11 @@
 
 #else
 
-#define SEND_LAYER_DATA(data)
-#define LAYER_CALLBACK(func)
+#define SEND_LAYER_DATA(data) (void)data
+#define LAYER_CALLBACK(func) (void)func
+#define SET_DISPLAY_LIST(display) (void)display
+#define RENDER_VISABLE_OBJECT(context) (void)context
+#define SET_SLECTED_LAYER(layer) (void)layer
 #define FRAME_MARK
 #define FUNCTION_MARK(type, active)
 #define OPERATE_MARK(type)
