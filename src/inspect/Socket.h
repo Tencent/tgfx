@@ -117,11 +117,11 @@ class ListenSocket {
   uint16_t listenPort = 0;
 };
 
-class UdpBroadcast {
+class UDPBroadcast {
  public:
-  UdpBroadcast();
+  UDPBroadcast();
 
-  ~UdpBroadcast();
+  ~UDPBroadcast();
 
   bool openConnect(const char* addr, uint16_t port);
 
@@ -129,13 +129,13 @@ class UdpBroadcast {
 
   int sendData(uint16_t port, const void* data, size_t len);
 
-  UdpBroadcast(const UdpBroadcast&) = delete;
+  UDPBroadcast(const UDPBroadcast&) = delete;
 
-  UdpBroadcast(UdpBroadcast&&) = delete;
+  UDPBroadcast(UDPBroadcast&&) = delete;
 
-  UdpBroadcast& operator=(const UdpBroadcast&) = delete;
+  UDPBroadcast& operator=(const UDPBroadcast&) = delete;
 
-  UdpBroadcast& operator=(UdpBroadcast&&) = delete;
+  UDPBroadcast& operator=(UDPBroadcast&&) = delete;
 
  private:
   int sock = 0;
@@ -171,11 +171,11 @@ class IpAddress {
   char text[17] = {};
 };
 
-class UdpListen {
+class UDPListen {
  public:
-  UdpListen();
+  UDPListen();
 
-  ~UdpListen();
+  ~UDPListen();
 
   bool listenSock(uint16_t port);
 
@@ -183,13 +183,13 @@ class UdpListen {
 
   const char* readData(size_t& len, IpAddress& addr, int timeout);
 
-  UdpListen(const UdpListen&) = delete;
+  UDPListen(const UDPListen&) = delete;
 
-  UdpListen(UdpListen&&) = delete;
+  UDPListen(UDPListen&&) = delete;
 
-  UdpListen& operator=(const UdpListen&) = delete;
+  UDPListen& operator=(const UDPListen&) = delete;
 
-  UdpListen& operator=(UdpListen&&) = delete;
+  UDPListen& operator=(UDPListen&&) = delete;
 
  private:
   int sock = 0;

@@ -15,7 +15,7 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#include "tgfx/debug/SetSelectedLayer.h"
+#include "tgfx/inspect/SetSelectedLayer.h"
 #include "LayerViewer.h"
 
 namespace tgfx {

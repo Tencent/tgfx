@@ -19,7 +19,6 @@
 #pragma once
 namespace tgfx::inspect {
 
-using lz4sz_t = int;
 static constexpr int Lz4CompressBound(int size) {
   return size + (size / 255) + 16;
 }
@@ -29,6 +28,8 @@ static constexpr int HandshakeShibbolethSize = 4;
 static constexpr char HandshakeShibboleth[HandshakeShibbolethSize] = {'T', 'G', 'F', 'X'};
 
 static constexpr size_t BroadcastCount = 5;
+static constexpr size_t BroadcastPort = 8086;
+static constexpr int64_t BroadcastHeartbeatUSTime = 3000000;
 static constexpr int WelcomeMessageProgramNameSize = 64;
 static constexpr int WelcomeMessageHostInfoSize = 1024;
 static constexpr uint8_t ProtocolVersion = 1;

@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include "Inspector.h"
+#include "FrameCapture.h"
 #include "tgfx/core/Clock.h"
 
 namespace tgfx::inspect {
@@ -27,22 +27,22 @@ class FunctionTimer {
     if (!active) {
       return;
     }
-    auto item = MsgItem();
-    item.hdr.type = MsgType::OperateBegin;
+    auto item = MessageItem();
+    item.hdr.type = MessageType::OperateBegin;
     item.operateBegin.usTime = Clock::Now();
     item.operateBegin.type = static_cast<uint8_t>(type);
-    Inspector::QueueSerialFinish(item);
+    FrameCapture::QueueSerialFinish(item);
   }
 
   ~FunctionTimer() {
     if (!active) {
       return;
     }
-    auto item = MsgItem();
-    item.hdr.type = MsgType::OperateEnd;
+    auto item = MessageItem();
+    item.hdr.type = MessageType::OperateEnd;
     item.operateEnd.usTime = Clock::Now();
     item.operateEnd.type = static_cast<uint8_t>(type);
-    Inspector::QueueSerialFinish(item);
+    FrameCapture::QueueSerialFinish(item);
   }
 
   FunctionTimer(const FunctionTimer&) = delete;

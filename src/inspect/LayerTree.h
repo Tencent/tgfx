@@ -61,7 +61,7 @@ class LayerTree {
   std::shared_ptr<ListenSocket> listenSocket = nullptr;
   std::shared_ptr<Socket> socket = nullptr;
   std::queue<std::vector<uint8_t>> messages = {};
-  std::array<std::shared_ptr<UdpBroadcast>, BroadcastCount> broadcasts = {};
+  std::array<std::shared_ptr<UDPBroadcast>, BroadcastCount> broadcasts = {};
   bool isUDPOpened = true;
 #endif
   int64_t epoch = 0;

@@ -37,7 +37,7 @@ class DrawOp : public Op {
     return blendMode;
   }
 
-  const AAType& getAAType() const {
+  AAType getAAType() const {
     return aaType;
   }
 
