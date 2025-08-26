@@ -33,15 +33,15 @@ struct SamplerInfo {
 };
 
 /**
- * Pipeline is a ProgramInfo that uses a list of Processors to assemble a shader program and set API
- * state for a draw.
+ * This immutable object contains information needed to build a shader program and set API state for
+ * a draw.
  */
-class Pipeline : public ProgramCreator {
+class ProgramInfo : public ProgramCreator {
  public:
-  Pipeline(PlacementPtr<GeometryProcessor> geometryProcessor,
-           std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors,
-           size_t numColorProcessors, PlacementPtr<XferProcessor> xferProcessor,
-           BlendMode blendMode, const Swizzle* outputSwizzle);
+  ProgramInfo(PlacementPtr<GeometryProcessor> geometryProcessor,
+              std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors,
+              size_t numColorProcessors, PlacementPtr<XferProcessor> xferProcessor,
+              BlendMode blendMode, const Swizzle* outputSwizzle);
 
   size_t numColorFragmentProcessors() const {
     return numColorProcessors;
@@ -80,8 +80,8 @@ class Pipeline : public ProgramCreator {
   std::unique_ptr<Program> createProgram(Context* context) const override;
 
   /**
-   * Returns the index of the processor in the pipeline. Returns -1 if the processor is not in the
-   * pipeline.
+   * Returns the index of the processor in the ProgramInfo. Returns -1 if the processor is not in
+   * the ProgramInfo.
    */
   int getProcessorIndex(const Processor* processor) const;
 

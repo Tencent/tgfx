@@ -79,7 +79,7 @@ class UniformBuffer {
 
   void onSetData(const std::string& name, const void* data, size_t size);
 
-  friend class Pipeline;
+  friend class ProgramInfo;
   friend class UniformHandler;
 };
 }  // namespace tgfx

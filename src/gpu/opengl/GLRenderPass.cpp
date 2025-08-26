@@ -71,9 +71,10 @@ void GLRenderPass::onEnd() {
   gl->bindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-bool GLRenderPass::onBindProgramAndScissorClip(const Pipeline* pipeline, const Rect& scissorRect) {
+bool GLRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
+                                               const Rect& scissorRect) {
   auto context = renderTarget->getContext();
-  program = context->globalCache()->getProgram(pipeline);
+  program = context->globalCache()->getProgram(programInfo);
   if (program == nullptr) {
     return false;
   }
@@ -83,7 +84,7 @@ bool GLRenderPass::onBindProgramAndScissorClip(const Pipeline* pipeline, const R
   glProgram->activate();
   UpdateScissor(gl, scissorRect);
   auto renderTexture = renderTarget->getRenderTexture();
-  auto samplers = pipeline->getSamplers();
+  auto samplers = programInfo->getSamplers();
   int textureUnit = 0;
   bool requiresBarrier = false;
   for (auto& info : samplers) {
@@ -96,7 +97,7 @@ bool GLRenderPass::onBindProgramAndScissorClip(const Pipeline* pipeline, const R
     gl->textureBarrier();
   }
   auto uniformBuffer = glProgram->uniformBuffer();
-  pipeline->getUniforms(renderTarget.get(), uniformBuffer);
+  programInfo->getUniforms(renderTarget.get(), uniformBuffer);
   glProgram->setUniformBytes(uniformBuffer->data(), uniformBuffer->size());
   return true;
 }
