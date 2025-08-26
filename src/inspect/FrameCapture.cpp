@@ -16,7 +16,7 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#include "Inspector.h"
+#include "FrameCapture.h"
 #include <atomic>
 #include <chrono>
 #include <iostream>
@@ -28,13 +28,13 @@
 #include "tgfx/core/Clock.h"
 
 namespace tgfx::inspect {
-Inspector::Inspector()
+FrameCapture::FrameCapture()
     : epoch(Clock::Now()), initTime(Clock::Now()), dataBuffer(TargetFrameSize * 3),
-      lz4Buf(LZ4Size + sizeof(lz4sz_t)), lz4Stream(LZ4_createStream()), broadcast(BroadcastCount) {
+      lz4Buf(LZ4Size + sizeof(int)), lz4Stream(LZ4_createStream()), broadcast(BroadcastCount) {
   spawnWorkerThreads();
 }
 
-Inspector::~Inspector() {
+FrameCapture::~FrameCapture() {
   shutdown.store(true, std::memory_order_relaxed);
   if (messageThread) {
     messageThread->join();
@@ -47,16 +47,16 @@ Inspector::~Inspector() {
   }
 }
 
-void Inspector::QueueSerialFinish(const MsgItem& item) {
+void FrameCapture::QueueSerialFinish(const MessageItem& item) {
   GetInspector().serialConcurrentQueue.enqueue(item);
 }
 
-void Inspector::SendAttributeData(const char* name, const Rect& rect) {
+void FrameCapture::SendAttributeData(const char* name, const Rect& rect) {
   float value[4] = {rect.left, rect.right, rect.top, rect.bottom};
   SendAttributeData(name, value, 4);
 }
 
-void Inspector::SendAttributeData(const char* name, const Matrix& matrix) {
+void FrameCapture::SendAttributeData(const char* name, const Matrix& matrix) {
   float value[6] = {1, 0, 0, 0, 1, 0};
   value[0] = matrix.getScaleX();
   value[1] = matrix.getSkewX();
@@ -67,7 +67,7 @@ void Inspector::SendAttributeData(const char* name, const Matrix& matrix) {
   SendAttributeData(name, value, 6);
 }
 
-void Inspector::SendAttributeData(const char* name, const std::optional<Matrix>& matrix) {
+void FrameCapture::SendAttributeData(const char* name, const std::optional<Matrix>& matrix) {
   auto value = Matrix::MakeAll(1, 0, 0, 0, 1, 0);
   if (matrix.has_value()) {
     value = matrix.value();
@@ -75,16 +75,16 @@ void Inspector::SendAttributeData(const char* name, const std::optional<Matrix>&
   SendAttributeData(name, value);
 }
 
-void Inspector::SendAttributeData(const char* name, const Color& color) {
+void FrameCapture::SendAttributeData(const char* name, const Color& color) {
   auto r = static_cast<uint8_t>(color.red * 255.f);
   auto g = static_cast<uint8_t>(color.green * 255.f);
   auto b = static_cast<uint8_t>(color.blue * 255.f);
   auto a = static_cast<uint8_t>(color.alpha * 255.f);
   auto value = static_cast<uint32_t>(r | g << 8 | b << 16 | a << 24);
-  SendAttributeData(name, value, MsgType::ValueDataColor);
+  SendAttributeData(name, value, MessageType::ValueDataColor);
 }
 
-void Inspector::SendAttributeData(const char* name, const std::optional<Color>& color) {
+void FrameCapture::SendAttributeData(const char* name, const std::optional<Color>& color) {
   auto value = Color::FromRGBA(255, 255, 255, 255);
   if (color.has_value()) {
     value = color.value();
@@ -92,86 +92,86 @@ void Inspector::SendAttributeData(const char* name, const std::optional<Color>& 
   SendAttributeData(name, value);
 }
 
-void Inspector::SendFrameMark(const char* name) {
+void FrameCapture::SendFrameMark(const char* name) {
   if (!name) {
     GetInspector().frameCount.fetch_add(1, std::memory_order_relaxed);
   }
-  auto item = MsgItem();
-  item.hdr.type = MsgType::FrameMarkMsg;
+  auto item = MessageItem();
+  item.hdr.type = MessageType::FrameMarkMessage;
   item.frameMark.usTime = Clock::Now();
   QueueSerialFinish(item);
 }
 
-void Inspector::SendAttributeData(const char* name, int val) {
-  auto item = MsgItem();
-  item.hdr.type = MsgType::ValueDataInt;
+void FrameCapture::SendAttributeData(const char* name, int val) {
+  auto item = MessageItem();
+  item.hdr.type = MessageType::ValueDataInt;
   item.attributeDataInt.name = reinterpret_cast<uint64_t>(name);
   item.attributeDataInt.value = val;
   QueueSerialFinish(item);
 }
 
-void Inspector::SendAttributeData(const char* name, float val) {
-  auto item = MsgItem();
-  item.hdr.type = MsgType::ValueDataFloat;
+void FrameCapture::SendAttributeData(const char* name, float val) {
+  auto item = MessageItem();
+  item.hdr.type = MessageType::ValueDataFloat;
   item.attributeDataFloat.name = reinterpret_cast<uint64_t>(name);
   item.attributeDataFloat.value = val;
   QueueSerialFinish(item);
 }
 
-void Inspector::SendAttributeData(const char* name, bool val) {
-  auto item = MsgItem();
-  item.hdr.type = MsgType::ValueDataBool;
+void FrameCapture::SendAttributeData(const char* name, bool val) {
+  auto item = MessageItem();
+  item.hdr.type = MessageType::ValueDataBool;
   item.attributeDataBool.name = reinterpret_cast<uint64_t>(name);
   item.attributeDataBool.value = val;
   QueueSerialFinish(item);
 }
 
-void Inspector::SendAttributeData(const char* name, uint8_t val, uint8_t type) {
-  auto item = MsgItem();
-  item.hdr.type = MsgType::ValueDataEnum;
+void FrameCapture::SendAttributeData(const char* name, uint8_t val, uint8_t type) {
+  auto item = MessageItem();
+  item.hdr.type = MessageType::ValueDataEnum;
   item.attributeDataEnum.name = reinterpret_cast<uint64_t>(name);
   item.attributeDataEnum.value = static_cast<uint16_t>(type << 8 | val);
   QueueSerialFinish(item);
 }
 
-void Inspector::SendAttributeData(const char* name, uint32_t val, MsgType type) {
-  auto item = MsgItem();
+void FrameCapture::SendAttributeData(const char* name, uint32_t val, MessageType type) {
+  auto item = MessageItem();
   item.hdr.type = type;
   item.attributeDataUint32.name = reinterpret_cast<uint64_t>(name);
   item.attributeDataUint32.value = val;
   QueueSerialFinish(item);
 }
 
-void Inspector::SendAttributeData(const char* name, float* val, int size) {
+void FrameCapture::SendAttributeData(const char* name, float* val, int size) {
   if (size == 4) {
-    auto item = MsgItem();
-    item.hdr.type = MsgType::ValueDataFloat4;
+    auto item = MessageItem();
+    item.hdr.type = MessageType::ValueDataFloat4;
     item.attributeDataFloat4.name = reinterpret_cast<uint64_t>(name);
     memcpy(item.attributeDataFloat4.value, val, static_cast<size_t>(size) * sizeof(float));
     QueueSerialFinish(item);
   } else if (size == 6) {
-    auto item = MsgItem();
-    item.hdr.type = MsgType::ValueDataMat3;
+    auto item = MessageItem();
+    item.hdr.type = MessageType::ValueDataMat3;
     item.attributeDataMat4.name = reinterpret_cast<uint64_t>(name);
     memcpy(item.attributeDataMat4.value, val, static_cast<size_t>(size) * sizeof(float));
     QueueSerialFinish(item);
   }
 }
 
-void Inspector::LaunchWorker(Inspector* inspector) {
+void FrameCapture::LaunchWorker(FrameCapture* inspector) {
   inspector->worker();
 }
 
-bool Inspector::ShouldExit() {
+bool FrameCapture::ShouldExit() {
   return GetInspector().shutdown.load(std::memory_order_relaxed);
 }
 
-void Inspector::spawnWorkerThreads() {
+void FrameCapture::spawnWorkerThreads() {
   messageThread = std::make_unique<std::thread>(LaunchWorker, this);
   timeBegin.store(Clock::Now(), std::memory_order_relaxed);
 }
 
-bool Inspector::handleServerQuery() {
+bool FrameCapture::handleServerQuery() {
   ServerQueryPacket payload = {};
   if (!sock->readData(&payload, sizeof(payload), 10)) {
     return false;
@@ -180,10 +180,10 @@ bool Inspector::handleServerQuery() {
   auto ptr = payload.ptr;
   switch (type) {
     case ServerQuery::String: {
-      sendString(ptr, reinterpret_cast<const char*>(ptr), MsgType::StringData);
+      sendString(ptr, reinterpret_cast<const char*>(ptr), MessageType::StringData);
     }
     case ServerQuery::ValueName: {
-      sendString(ptr, reinterpret_cast<const char*>(ptr), MsgType::ValueName);
+      sendString(ptr, reinterpret_cast<const char*>(ptr), MessageType::ValueName);
     }
     default:
       break;
@@ -191,23 +191,23 @@ bool Inspector::handleServerQuery() {
   return true;
 }
 
-void Inspector::sendString(uint64_t str, const char* ptr, size_t len, MsgType type) {
-  MsgItem item = {};
+void FrameCapture::sendString(uint64_t str, const char* ptr, size_t len, MessageType type) {
+  MessageItem item = {};
   item.hdr.type = type;
   item.stringTransfer.ptr = str;
 
   auto dataLen = static_cast<uint16_t>(len);
-  needDataSize(MsgDataSize[static_cast<int>(type)] + sizeof(uint16_t) + dataLen);
-  appendDataUnsafe(&item, MsgDataSize[static_cast<int>(type)]);
+  needDataSize(MessageDataSize[static_cast<int>(type)] + sizeof(uint16_t) + dataLen);
+  appendDataUnsafe(&item, MessageDataSize[static_cast<int>(type)]);
   appendDataUnsafe(&dataLen, sizeof(uint16_t));
   appendDataUnsafe(ptr, dataLen);
 }
 
-void Inspector::sendString(uint64_t str, const char* ptr, MsgType type) {
+void FrameCapture::sendString(uint64_t str, const char* ptr, MessageType type) {
   sendString(str, ptr, strlen(ptr), type);
 }
 
-void Inspector::worker() {
+void FrameCapture::worker() {
   std::string addr = "255.255.255.255";
   auto dataPort = TCPPortProvider::Get().getValidPort();
   if (dataPort == 0) {
@@ -243,14 +243,14 @@ void Inspector::worker() {
     }
   }
   for (uint16_t i = 0; i < BroadcastCount; i++) {
-    broadcast[i] = std::make_shared<UdpBroadcast>();
-    if (!broadcast[i]->openConnect(addr.c_str(), broadcastPort + i)) {
+    broadcast[i] = std::make_shared<UDPBroadcast>();
+    if (!broadcast[i]->openConnect(addr.c_str(), BroadcastPort + i)) {
       broadcast[i].reset();
     }
   }
 
   size_t broadcastLen = 0;
-  auto broadcastMsg =
+  auto broadcastMessage =
       GetBroadcastMessage(procname, pnsz, broadcastLen, dataPort, ToolType::FrameCapture);
   long long lastBroadcast = 0;
   while (true) {
@@ -259,8 +259,8 @@ void Inspector::worker() {
       if (ShouldExit()) {
         for (uint16_t i = 0; i < BroadcastCount; i++) {
           if (broadcast[i]) {
-            broadcastMsg.activeTime = -1;
-            broadcast[i]->sendData(broadcastPort + i, &broadcastMsg, broadcastLen);
+            broadcastMessage.activeTime = -1;
+            broadcast[i]->sendData(BroadcastPort + i, &broadcastMessage, broadcastLen);
           }
         }
         return;
@@ -271,24 +271,22 @@ void Inspector::worker() {
         break;
       }
 
-      const auto t = std::chrono::high_resolution_clock::now().time_since_epoch().count();
-      if (t - lastBroadcast > 3000000000) {
-        lastBroadcast = t;
+      const auto currentTime = Clock::Now();
+      if (currentTime - lastBroadcast > BroadcastHeartbeatUSTime) {
+        lastBroadcast = currentTime;
         for (uint16_t i = 0; i < BroadcastCount; i++) {
           if (broadcast[i]) {
             programNameLock.lock();
             if (programName) {
-              broadcastMsg = GetBroadcastMessage(programName, strlen(programName), broadcastLen,
-                                                 dataPort, ToolType::FrameCapture);
+              broadcastMessage = GetBroadcastMessage(programName, strlen(programName), broadcastLen,
+                                                     dataPort, ToolType::FrameCapture);
               programName = nullptr;
             }
             programNameLock.unlock();
 
-            const auto ts = std::chrono::duration_cast<std::chrono::seconds>(
-                                std::chrono::system_clock::now().time_since_epoch())
-                                .count();
-            broadcastMsg.activeTime = static_cast<int32_t>(ts - epoch);
-            broadcast[i]->sendData(broadcastPort + i, &broadcastMsg, broadcastLen);
+            const auto activeTime = Clock::Now();
+            broadcastMessage.activeTime = static_cast<int32_t>(activeTime - epoch);
+            broadcast[i]->sendData(BroadcastPort + i, &broadcastMessage, broadcastLen);
           }
         }
       }
@@ -297,8 +295,8 @@ void Inspector::worker() {
     for (uint16_t i = 0; i < BroadcastCount; i++) {
       if (broadcast[i]) {
         lastBroadcast = 0;
-        broadcastMsg.activeTime = -1;
-        broadcast[i]->sendData(broadcastPort + i, &broadcastMsg, broadcastLen);
+        broadcastMessage.activeTime = -1;
+        broadcast[i]->sendData(BroadcastPort + i, &broadcastMessage, broadcastLen);
       }
     }
 
@@ -315,13 +313,13 @@ void Inspector::worker() {
   }
 }
 
-bool Inspector::appendData(const void* data, size_t len) {
+bool FrameCapture::appendData(const void* data, size_t len) {
   const auto result = needDataSize(len);
   appendDataUnsafe(data, len);
   return result;
 }
 
-bool Inspector::needDataSize(size_t len) {
+bool FrameCapture::needDataSize(size_t len) {
   bool result = true;
   if (static_cast<size_t>(dataBufferOffset - dataBufferStart) + len > TargetFrameSize) {
     result = commitData();
@@ -329,12 +327,12 @@ bool Inspector::needDataSize(size_t len) {
   return result;
 }
 
-void Inspector::appendDataUnsafe(const void* data, size_t len) {
+void FrameCapture::appendDataUnsafe(const void* data, size_t len) {
   memcpy(dataBuffer.bytes() + dataBufferOffset, data, len);
   dataBufferOffset += static_cast<int>(len);
 }
 
-bool Inspector::commitData() {
+bool FrameCapture::commitData() {
   bool result = sendData(static_cast<const char*>(dataBuffer.data()) + dataBufferStart,
                          static_cast<size_t>(dataBufferOffset - dataBufferStart));
   if (dataBufferOffset > TargetFrameSize * 2) {
@@ -344,15 +342,15 @@ bool Inspector::commitData() {
   return result;
 }
 
-bool Inspector::sendData(const char* data, size_t len) {
-  const auto lz4sz = LZ4_compress_fast_continue(static_cast<LZ4_stream_t*>(lz4Stream), data,
-                                                static_cast<char*>(lz4Buf.data()) + sizeof(lz4sz_t),
-                                                static_cast<int>(len), LZ4Size, 1);
-  memcpy(lz4Buf.data(), &lz4sz, sizeof(lz4sz));
-  return sock->sendData(lz4Buf.bytes(), static_cast<size_t>(lz4sz) + sizeof(lz4sz_t)) != -1;
+bool FrameCapture::sendData(const char* data, size_t len) {
+  const auto lz4Size = LZ4_compress_fast_continue(static_cast<LZ4_stream_t*>(lz4Stream), data,
+                                                  static_cast<char*>(lz4Buf.data()) + sizeof(int),
+                                                  static_cast<int>(len), LZ4Size, 1);
+  memcpy(lz4Buf.data(), &lz4Size, sizeof(lz4Size));
+  return sock->sendData(lz4Buf.bytes(), static_cast<size_t>(lz4Size) + sizeof(int)) != -1;
 }
 
-bool Inspector::confirmProtocol() {
+bool FrameCapture::confirmProtocol() {
   char shibboleth[HandshakeShibbolethSize] = "";
   auto res = sock->readRaw(shibboleth, HandshakeShibbolethSize, 2000);
   if (!res || memcmp(shibboleth, HandshakeShibboleth, HandshakeShibbolethSize) != 0) {
@@ -374,7 +372,7 @@ bool Inspector::confirmProtocol() {
   return true;
 }
 
-void Inspector::handleConnect(const WelcomeMessage& welcome) {
+void FrameCapture::handleConnect(const WelcomeMessage& welcome) {
   isConnect.store(true, std::memory_order_release);
   auto handshake = HandshakeStatus::HandshakeWelcome;
   sock->sendData(&handshake, sizeof(handshake));
@@ -396,9 +394,9 @@ void Inspector::handleConnect(const WelcomeMessage& welcome) {
           break;
         }
         if (keepAlive == 500) {
-          MsgItem ka = {};
-          ka.hdr.type = MsgType::KeepAlive;
-          appendData(&ka, MsgDataSize[ka.hdr.idx]);
+          MessageItem ka = {};
+          ka.hdr.type = MessageType::KeepAlive;
+          appendData(&ka, MessageDataSize[ka.hdr.idx]);
           if (!commitData()) {
             break;
           }
@@ -425,22 +423,22 @@ void Inspector::handleConnect(const WelcomeMessage& welcome) {
   }
 }
 
-Inspector::DequeueStatus Inspector::dequeueSerial() {
+FrameCapture::DequeueStatus FrameCapture::dequeueSerial() {
   const auto queueSize = serialConcurrentQueue.size_approx();
   if (queueSize > 0) {
     auto refThread = refTimeThread;
-    MsgItem item = {};
+    MessageItem item = {};
     while (serialConcurrentQueue.try_dequeue(item)) {
       auto idx = item.hdr.idx;
-      switch (static_cast<MsgType>(idx)) {
-        case MsgType::OperateBegin: {
+      switch (static_cast<MessageType>(idx)) {
+        case MessageType::OperateBegin: {
           auto t = item.operateBegin.usTime;
           auto dt = t - refThread;
           refThread = t;
           item.operateBegin.usTime = dt;
           break;
         }
-        case MsgType::OperateEnd: {
+        case MessageType::OperateEnd: {
           auto t = item.operateEnd.usTime;
           auto dt = t - refThread;
           refThread = t;
@@ -450,7 +448,7 @@ Inspector::DequeueStatus Inspector::dequeueSerial() {
         default:
           break;
       }
-      if (!appendData(&item, MsgDataSize[idx])) {
+      if (!appendData(&item, MessageDataSize[idx])) {
         return DequeueStatus::ConnectionLost;
       }
     }

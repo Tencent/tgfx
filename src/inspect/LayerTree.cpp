@@ -219,13 +219,12 @@ void LayerTree::addHighLightOverlay(Color color, std::shared_ptr<Layer> layer) {
 }
 #ifndef __EMSCRIPTEN__
 static const char* addr = "255.255.255.255";
-static uint16_t BroadcastPort = 8086;
 #endif
 LayerTree::SocketAgent::SocketAgent() {
 #ifndef __EMSCRIPTEN__
   listenSocket = std::make_shared<ListenSocket>();
   for (uint16_t i = 0; i < BroadcastCount; i++) {
-    broadcasts[i] = std::make_shared<UdpBroadcast>();
+    broadcasts[i] = std::make_shared<UDPBroadcast>();
     isUDPOpened = isUDPOpened && broadcasts[i]->openConnect(addr, BroadcastPort + i);
   }
 
@@ -264,9 +263,9 @@ void LayerTree::SocketAgent::sendWork() {
   while (!stopFlag.load(std::memory_order_acquire)) {
     while (!stopFlag.load(std::memory_order_acquire)) {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
-      const auto t = std::chrono::high_resolution_clock::now().time_since_epoch().count();
-      if (t - lastBroadcast > 3000000000) {
-        lastBroadcast = t;
+      const auto currentTime = Clock::Now();
+      if (currentTime - lastBroadcast > BroadcastHeartbeatUSTime) {
+        lastBroadcast = currentTime;
         for (uint16_t i = 0; i < BroadcastCount; i++) {
           if (broadcasts[i]) {
             const auto ts = Clock::Now();

@@ -546,19 +546,19 @@ void ListenSocket::closeSock() {
   sock = -1;
 }
 
-UdpBroadcast::UdpBroadcast() : sock(-1) {
+UDPBroadcast::UDPBroadcast() : sock(-1) {
 #ifdef _WIN32
   initWinSock();
 #endif
 }
 
-UdpBroadcast::~UdpBroadcast() {
+UDPBroadcast::~UDPBroadcast() {
   if (this->sock != -1) {
     closeSock();
   }
 }
 
-bool UdpBroadcast::openConnect(const char* addr, uint16_t port) {
+bool UDPBroadcast::openConnect(const char* addr, uint16_t port) {
   assert(this->sock == -1);
 
   struct addrinfo hints = {};
@@ -612,7 +612,7 @@ bool UdpBroadcast::openConnect(const char* addr, uint16_t port) {
   return true;
 }
 
-void UdpBroadcast::closeSock() {
+void UDPBroadcast::closeSock() {
   assert(sock != -1);
 #ifdef _WIN32
   closesocket(sock);
@@ -622,7 +622,7 @@ void UdpBroadcast::closeSock() {
   sock = -1;
 }
 
-int UdpBroadcast::sendData(uint16_t port, const void* data, size_t len) {
+int UDPBroadcast::sendData(uint16_t port, const void* data, size_t len) {
   char strAddr[17] = {};
   inet_ntop(AF_INET, &this->addr, strAddr, 17);
   assert(this->sock != -1);
@@ -652,19 +652,19 @@ void IpAddress::setAddr(const struct sockaddr& addr) {
   number = addrIn->sin_addr.s_addr;
 }
 
-UdpListen::UdpListen() : sock(-1) {
+UDPListen::UDPListen() : sock(-1) {
 #ifdef _WIN32
   initWinSock();
 #endif
 }
 
-UdpListen::~UdpListen() {
+UDPListen::~UDPListen() {
   if (this->sock != -1) {
     closeSock();
   }
 }
 
-bool UdpListen::listenSock(uint16_t port) {
+bool UDPListen::listenSock(uint16_t port) {
   assert(this->sock == -1);
 
   int sock;
@@ -717,7 +717,7 @@ bool UdpListen::listenSock(uint16_t port) {
   return true;
 }
 
-void UdpListen::closeSock() {
+void UDPListen::closeSock() {
   assert(sock != -1);
 #ifdef _WIN32
   closesocket(sock);
@@ -727,7 +727,7 @@ void UdpListen::closeSock() {
   sock = -1;
 }
 
-const char* UdpListen::readData(size_t& len, IpAddress& addr, int timeout) {
+const char* UDPListen::readData(size_t& len, IpAddress& addr, int timeout) {
   static char buf[2048];
 
   struct pollfd fd = {};

@@ -22,7 +22,7 @@
 #include <optional>
 #include <thread>
 #include <vector>
-#include "InspectorMessage.h"
+#include "Message.h"
 #include "Protocol.h"
 #include "Socket.h"
 #include "concurrentqueue.h"
@@ -41,18 +41,18 @@
 #endif
 
 namespace tgfx::inspect {
-class Inspector {
+class FrameCapture {
  public:
-  static Inspector& GetInspector() {
-    static Inspector inspector;
+  static FrameCapture& GetInspector() {
+    static FrameCapture inspector;
     return inspector;
   }
 
-  Inspector();
+  FrameCapture();
 
-  ~Inspector();
+  ~FrameCapture();
 
-  static void QueueSerialFinish(const MsgItem& item);
+  static void QueueSerialFinish(const MessageItem& item);
 
   static void SendAttributeData(const char* name, const Rect& rect);
 
@@ -75,7 +75,7 @@ class Inspector {
   static void SendAttributeData(const char* name, uint8_t val, uint8_t type);
 
   static void SendAttributeData(const char* name, uint32_t val,
-                                MsgType type = MsgType::ValueDataUint32);
+                                MessageType type = MessageType::ValueDataUint32);
 
   static void SendAttributeData(const char* name, float* val, int size);
 
@@ -84,7 +84,7 @@ class Inspector {
 
   enum class ThreadCtxStatus { Same, Changed };
 
-  static void LaunchWorker(Inspector* inspector);
+  static void LaunchWorker(FrameCapture* inspector);
 
   static bool ShouldExit();
 
@@ -106,16 +106,15 @@ class Inspector {
 
   bool sendData(const char* data, size_t len);
 
-  void sendString(uint64_t str, const char* ptr, MsgType type);
+  void sendString(uint64_t str, const char* ptr, MessageType type);
 
-  void sendString(uint64_t str, const char* ptr, size_t len, MsgType type);
+  void sendString(uint64_t str, const char* ptr, size_t len, MessageType type);
 
   bool confirmProtocol();
 
   DequeueStatus dequeueSerial();
 
  private:
-  const uint16_t broadcastPort = 8086;
   int64_t epoch = 0;
   int64_t initTime = 0;
   Buffer dataBuffer = {};
@@ -127,9 +126,9 @@ class Inspector {
   std::atomic<bool> isConnect = false;
   std::shared_ptr<Socket> sock = nullptr;
   int64_t refTimeThread = 0;
-  moodycamel::ConcurrentQueue<MsgItem> serialConcurrentQueue;
+  moodycamel::ConcurrentQueue<MessageItem> serialConcurrentQueue;
   std::unique_ptr<std::thread> messageThread = nullptr;
-  std::vector<std::shared_ptr<UdpBroadcast>> broadcast = {};
+  std::vector<std::shared_ptr<UDPBroadcast>> broadcast = {};
   const char* programName = nullptr;
   std::mutex programNameLock;
   int dataBufferOffset = 0;

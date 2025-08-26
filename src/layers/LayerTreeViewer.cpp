@@ -15,7 +15,7 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#include "tgfx/debug/LayerTreeViewer.h"
+#include "tgfx/inspect/LayerTreeViewer.h"
 #include "inspect/InspectorMark.h"
 
 namespace tgfx {
