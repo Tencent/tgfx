@@ -21,11 +21,8 @@
 #include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
-
 class ScaledImageGenerator : public ImageGenerator {
  public:
-  static float GetCodecScale(float drawScale);
-
   static std::shared_ptr<ScaledImageGenerator> MakeFrom(const std::shared_ptr<ImageCodec>& codec,
                                                         int width, int height);
 

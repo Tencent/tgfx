@@ -19,20 +19,8 @@
 #include "ScaledImageGenerator.h"
 #include "PixelBuffer.h"
 #include "gpu/ProxyProvider.h"
-#include "utils/NextPowerOfTwoScale.h"
 
 namespace tgfx {
-
-float ScaledImageGenerator::GetCodecScale(float drawScale) {
-  // Since the minimum fast scaling ratio supported by JPEG is 1/8, the minimum allowed image
-  // scaling ratio is set to 1/8 here.
-  constexpr float MinAllowedImageScale = 1.0f / 8.0f;
-  if (drawScale <= MinAllowedImageScale) {
-    return MinAllowedImageScale;
-  }
-  return NextPowerOfTwoScale(drawScale);
-}
-
 std::shared_ptr<ScaledImageGenerator> ScaledImageGenerator::MakeFrom(
     const std::shared_ptr<ImageCodec>& codec, int width, int height) {
   if (!codec || width <= 0 || height <= 0) {
