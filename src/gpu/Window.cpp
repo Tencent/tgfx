@@ -18,6 +18,7 @@
 
 #include "tgfx/gpu/Window.h"
 #include "core/utils/Log.h"
+#include "inspect/InspectorMark.h"
 #include "tgfx/gpu/Device.h"
 
 namespace tgfx {
@@ -57,6 +58,7 @@ void Window::freeSurface() {
 }
 
 void Window::present(Context* context, int64_t presentationTime) {
+  FRAME_MARK;
   std::lock_guard<std::mutex> autoLock(locker);
   if (!checkContext(context)) {
     return;

@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -15,30 +15,19 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
-#include "OpsRenderTask.h"
-#include "gpu/RenderPass.h"
-#include "gpu/proxies/RenderTargetProxy.h"
-#include "inspect/InspectorMark.h"
+#pragma once
+#include "tgfx/layers/Layer.h"
 
 namespace tgfx {
-void OpsRenderTask::execute(CommandEncoder* encoder) {
-  TASK_MARK(tgfx::inspect::OpTaskType::OpsRenderTask);
-  auto renderTarget = renderTargetProxy->getRenderTarget();
-  if (renderTarget == nullptr) {
-    LOGE("OpsRenderTask::execute() Render target is null!");
-    return;
-  }
-  auto renderPass = encoder->beginRenderPass(renderTarget, clearColor, true);
-  if (renderPass == nullptr) {
-    LOGE("OpsRenderTask::execute() Failed to initialize the render pass!");
-    return;
-  }
-  for (auto& op : ops) {
-    op->execute(renderPass.get(), renderTarget.get());
-    // Release the Op immediately after execution to maximize GPU resource reuse.
-    op = nullptr;
-  }
-  renderPass->end();
-}
+
+class LayerTreeViewer {
+ public:
+  /**
+  * In debug mode, this interface is used to set the layer to be inspected. The corresponding layer
+  * will be selected in the Tgfx Inspector tool, displaying its related properties (e.g：it can be
+  * set to select the layer at the cursor's position when the left mouse button is clicked). In
+  * release mode, the internal implementation is empty and does nothing.
+  */
+  static void SetSelectedLayer(std::shared_ptr<Layer> layer);
+};
 }  // namespace tgfx

@@ -31,6 +31,10 @@ if (CMAKE_BUILD_TYPE MATCHES "Debug")
     option(TGFX_USE_INSPECTOR "Enable profiling support for the TGFX Inspector tool" ON)
 endif ()
 
+if (NOT TGFX_USE_THREADS)
+    set(TGFX_USE_INSPECTOR OFF)
+endif()
+
 if (APPLE OR (WEB AND NOT TGFX_USE_THREADS))
     option(TGFX_USE_FREETYPE "Use Freetype as the vector backend" OFF)
 else ()
@@ -157,6 +161,16 @@ if (TGFX_BUILD_LAYERS)
             src/layers/*.*)
     list(APPEND TGFX_FILES ${LAYERS_FILES})
 endif ()
+
+if (TGFX_USE_INSPECTOR)
+    list(APPEND LZ4File third_party/lz4/lib/lz4.c)
+    list(APPEND TGFX_INCLUDES third_party/lz4/lib)
+    file(GLOB_RECURSE INSPECTOR_FILES src/inspect/*.*)
+    list(APPEND TGFX_FILES ${INSPECTOR_FILES} ${LZ4File})
+    list(APPEND TGFX_DEFINES TGFX_USE_INSPECTOR)
+    list(APPEND TGFX_INCLUDES third_party/flatbuffers/include)
+    list(APPEND TGFX_STATIC_VENDORS flatbuffers)
+endif()
 
 if(TGFX_BUILD_PDF)
     file(GLOB_RECURSE PDF_FILES
@@ -298,18 +312,6 @@ elseif (APPLE)
 endif ()
 
 file(GLOB_RECURSE EGL_PLATFORM_FILES src/gpu/opengl/egl/*.*)
-
-if (TGFX_USE_INSPECTOR)
-    set(INSPECTOR_DIR ${CMAKE_CURRENT_LIST_DIR}/inspector)
-    list(APPEND TGFX_INCLUDES ${INSPECTOR_DIR}/client/include ${INSPECTOR_DIR}/client/src ${INSPECTOR_DIR}/common)
-    list(APPEND TGFX_STATIC_VENDORS inspector)
-
-    list(APPEND TGFX_DEFINES TGFX_USE_INSPECTOR)
-    list(APPEND TGFX_INCLUDES third_party/flatbuffers/include)
-    file(GLOB_RECURSE SERIALIZATION_FILE src/serialization/*.*)
-    list(APPEND TGFX_FILES ${SERIALIZATION_FILE})
-    list(APPEND TGFX_STATIC_VENDORS flatbuffers)
-endif ()
 
 if (TGFX_USE_QT)
     set(CMAKE_AUTOMOC ON)
