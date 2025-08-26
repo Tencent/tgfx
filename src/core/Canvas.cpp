@@ -188,7 +188,7 @@ void Canvas::clear(const Color& color) {
 }
 
 void Canvas::drawColor(const Color& color, BlendMode blendMode) {
-  drawFill(*mcState, {color, blendMode});
+  drawFill(*mcState, {color, blendMode, false});
 }
 
 void Canvas::drawPaint(const Paint& paint) {
@@ -307,6 +307,13 @@ void Canvas::drawRRect(const RRect& rRect, const Paint& paint) {
 
 void Canvas::drawPath(const Path& path, const Paint& paint) {
   SaveLayerForImageFilter(paint.getImageFilter());
+  if (path.isEmpty()) {
+    if (path.isInverseFillType()) {
+      // No geometry to draw, so draw the fill instead.
+      drawFill(*mcState, paint.getFill());
+    }
+    return;
+  }
   drawPath(path, *mcState, paint.getFill(), paint.getStroke());
 }
 
@@ -343,13 +350,7 @@ static bool StrokeLineIsRect(const Stroke& stroke, const Point line[2], Rect* re
 
 void Canvas::drawPath(const Path& path, const MCState& state, const Fill& fill,
                       const Stroke* stroke) const {
-  if (path.isEmpty()) {
-    if (path.isInverseFillType()) {
-      // No geometry to draw, so draw the fill instead.
-      drawFill(state, fill);
-    }
-    return;
-  }
+  DEBUG_ASSERT(!path.isEmpty());
   Rect rect = {};
   Point line[2] = {};
   if (path.isLine(line)) {
@@ -414,7 +415,14 @@ void Canvas::drawShape(std::shared_ptr<Shape> shape, const Paint& paint) {
     }
   }
   if (path) {
-    drawPath(*path, state, fill, stroke);
+    if (path->isEmpty()) {
+      if (path->isInverseFillType()) {
+        // No geometry to draw, so draw the fill instead.
+        drawFill(state, fill);
+      }
+    } else {
+      drawPath(*path, state, fill, stroke);
+    }
     return;
   }
   shape = Shape::ApplyStroke(std::move(shape), stroke);
@@ -649,13 +657,16 @@ void Canvas::drawAtlas(std::shared_ptr<Image> atlas, const Matrix matrix[], cons
 }
 
 void Canvas::drawFill(const MCState& state, const Fill& fill) const {
-  if (state.clip.isEmpty()) {
-    if (!state.clip.isInverseFillType()) {
-      return;
-    }
-    drawContext->drawFill(fill.makeWithMatrix(state.matrix));
+  auto& clip = state.clip;
+  if (clip.isEmpty() && !clip.isInverseFillType()) {
+    return;
+  }
+  auto clipFill = fill.makeWithMatrix(state.matrix);
+  clipFill.antiAlias = false;
+  if (clip.isEmpty()) {
+    drawContext->drawFill(clipFill);
   } else {
-    drawPath(state.clip, {}, fill.makeWithMatrix(state.matrix), nullptr);
+    drawPath(clip, {}, clipFill, nullptr);
   }
 }
 

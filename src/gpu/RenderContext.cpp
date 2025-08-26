@@ -137,9 +137,8 @@ RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t 
     : renderTarget(std::move(proxy)), renderFlags(renderFlags), surface(surface) {
   if (clearAll) {
     auto drawingManager = renderTarget->getContext()->drawingManager();
-    opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
-    opsCompositor->fillRect(renderTarget->bounds(), MCState{},
-                            {Color::Transparent(), BlendMode::Src});
+    opsCompositor =
+        drawingManager->addOpsCompositor(renderTarget, renderFlags, Color::Transparent());
   }
 }
 

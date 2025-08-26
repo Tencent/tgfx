@@ -41,7 +41,6 @@ class RenderPass {
   void bindBuffers(GPUBuffer* indexBuffer, GPUBuffer* vertexBuffer, size_t vertexOffset = 0);
   void draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount);
   void drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount);
-  void clear(const Rect& scissor, Color color);
 
  protected:
   explicit RenderPass(std::shared_ptr<RenderTarget> renderTarget)
@@ -53,7 +52,7 @@ class RenderPass {
                              size_t vertexOffset) = 0;
   virtual void onDraw(PrimitiveType primitiveType, size_t offset, size_t count,
                       bool drawIndexed) = 0;
-  virtual void onClear(const Rect& scissor, Color color) = 0;
+  virtual void onClear(Color color) = 0;
   virtual void onEnd() = 0;
 
   std::shared_ptr<RenderTarget> renderTarget = nullptr;

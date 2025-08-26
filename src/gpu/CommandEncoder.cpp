@@ -20,12 +20,15 @@
 
 namespace tgfx {
 std::shared_ptr<RenderPass> CommandEncoder::beginRenderPass(
-    std::shared_ptr<RenderTarget> renderTarget, bool resolveMSAA) {
+    std::shared_ptr<RenderTarget> renderTarget, std::optional<Color> clearColor, bool resolveMSAA) {
   if (activeRenderPass && !activeRenderPass->isEnd) {
     LOGE("CommandEncoder::beginRenderPass() Cannot begin a new render pass while one is active!");
     return nullptr;
   }
   activeRenderPass = onBeginRenderPass(std::move(renderTarget), resolveMSAA);
+  if (clearColor.has_value()) {
+    activeRenderPass->onClear(*clearColor);
+  }
   return activeRenderPass;
 }
 

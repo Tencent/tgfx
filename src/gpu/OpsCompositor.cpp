@@ -26,7 +26,6 @@
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/ops/AtlasTextOp.h"
-#include "gpu/ops/ClearOp.h"
 #include "gpu/ops/ShapeDrawOp.h"
 #include "gpu/processors/AARectEffect.h"
 #include "gpu/processors/DeviceSpaceTextureEffect.h"
@@ -54,8 +53,10 @@ static bool HasDifferentViewMatrix(const std::vector<PlacementPtr<RectRecord>>& 
   return false;
 }
 
-OpsCompositor::OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags)
-    : context(proxy->getContext()), renderTarget(std::move(proxy)), renderFlags(renderFlags) {
+OpsCompositor::OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
+                             std::optional<Color> clearColor)
+    : context(proxy->getContext()), renderTarget(std::move(proxy)), renderFlags(renderFlags),
+      clearColor(clearColor) {
   DEBUG_ASSERT(renderTarget != nullptr);
 }
 
@@ -181,6 +182,7 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
 
 void OpsCompositor::discardAll() {
   ops.clear();
+  clearColor.reset();
   if (pendingType != PendingOpType::Unknown) {
     resetPendingOps();
   }
@@ -426,19 +428,15 @@ bool OpsCompositor::drawAsClear(const Rect& rect, const MCState& state, const Fi
     return false;
   }
   bounds.round();
-  FlipYIfNeeded(&bounds, renderTarget.get());
-  if (bounds == deviceBounds) {
-    // discard all previous ops if the clear rect covers the entire render target.
-    ops.clear();
+  if (bounds != deviceBounds) {
+    return false;
   }
+  // discard all previous ops since the clear rect covers the entire render target.
+  ops.clear();
   auto format = renderTarget->format();
   auto caps = context->caps();
   auto& writeSwizzle = caps->getWriteSwizzle(format);
-  auto color = writeSwizzle.applyTo(fill.color.premultiply());
-  auto op = ClearOp::Make(context, color, bounds);
-  if (op != nullptr) {
-    ops.emplace_back(std::move(op));
-  }
+  clearColor = writeSwizzle.applyTo(fill.color.premultiply());
   return true;
 }
 
@@ -541,11 +539,9 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
       return nullptr;
     }
     clipTexture = clipRenderTarget->asTextureProxy();
-    auto clearOp = ClearOp::Make(context, Color::Transparent(), clipRenderTarget->bounds());
-    auto opList = drawingBuffer()->makeArray<Op>(2);
-    opList[0] = std::move(clearOp);
-    opList[1] = std::move(drawOp);
-    context->drawingManager()->addOpsRenderTask(std::move(clipRenderTarget), std::move(opList));
+    auto opList = drawingBuffer()->makeArray<Op>(&drawOp, 1);
+    context->drawingManager()->addOpsRenderTask(std::move(clipRenderTarget), std::move(opList),
+                                                Color::Transparent());
   } else {
     auto rasterizer =
         PathRasterizer::MakeFrom(width, height, clip, aaType != AAType::None, &rasterizeMatrix);
@@ -705,7 +701,8 @@ void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy,
 
 void OpsCompositor::submitDrawOps() {
   auto opArray = drawingBuffer()->makeArray(std::move(ops));
-  context->drawingManager()->addOpsRenderTask(renderTarget, std::move(opArray));
+  context->drawingManager()->addOpsRenderTask(renderTarget, std::move(opArray), clearColor);
+  clearColor.reset();
 }
 
 }  // namespace tgfx

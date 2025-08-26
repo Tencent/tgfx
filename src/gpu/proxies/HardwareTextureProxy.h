@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,23 +18,25 @@
 
 #pragma once
 
-#include "Op.h"
-#include "tgfx/core/Color.h"
+#include "gpu/proxies/TextureProxy.h"
+#include "tgfx/platform/HardwareBuffer.h"
 
 namespace tgfx {
-class ClearOp : public Op {
+class HardwareTextureProxy final : public TextureProxy {
  public:
-  static PlacementPtr<ClearOp> Make(Context* context, Color color, const Rect& scissor);
+  std::shared_ptr<TextureView> getTextureView() const override;
 
-  void execute(RenderPass* renderPass, RenderTarget* renderTarget) override;
+  ~HardwareTextureProxy() override;
 
- private:
-  Color color = Color::Transparent();
-  Rect scissor = {};
-
-  ClearOp(Color color, const Rect& scissor) : color(color), scissor(scissor) {
+  HardwareBufferRef getHardwareBuffer() const override {
+    return hardwareBuffer;
   }
 
-  friend class BlockBuffer;
+ private:
+  HardwareTextureProxy(HardwareBufferRef hardwareBuffer, int width, int height, PixelFormat format);
+
+  HardwareBufferRef hardwareBuffer = nullptr;
+
+  friend class ProxyProvider;
 };
 }  // namespace tgfx
