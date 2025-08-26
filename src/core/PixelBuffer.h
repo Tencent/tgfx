@@ -56,6 +56,10 @@ class PixelBuffer : public ImageBuffer {
     return _info.isAlphaOnly();
   }
 
+  std::shared_ptr<ColorSpace> colorSpace() const override {
+    return _info.colorSpace();
+  }
+
   /**
    * Returns an ImageInfo describing the width, height, color type, alpha type, and row bytes of the
    * PixelBuffer.
