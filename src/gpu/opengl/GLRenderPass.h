@@ -36,7 +36,7 @@ class GLRenderPass : public RenderPass {
   bool onBindBuffers(GPUBuffer* indexBuffer, GPUBuffer* vertexBuffer, size_t vertexOffset) override;
   void onDraw(PrimitiveType primitiveType, size_t baseVertex, size_t count,
               bool drawIndexed) override;
-  void onClear(const Rect& scissor, Color color) override;
+  void onClear(Color color) override;
   void onEnd() override;
 
  private:

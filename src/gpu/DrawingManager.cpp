@@ -57,27 +57,30 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   op->setBlendMode(BlendMode::Src);
   auto ops = drawingBuffer->makeArray<Op>(&op, 1);
   auto textureProxy = renderTarget->asTextureProxy();
-  auto task = drawingBuffer->make<OpsRenderTask>(std::move(renderTarget), std::move(ops));
+  auto task =
+      drawingBuffer->make<OpsRenderTask>(std::move(renderTarget), std::move(ops), std::nullopt);
   renderTasks.emplace_back(std::move(task));
   addGenerateMipmapsTask(std::move(textureProxy));
   return true;
 }
 
 std::shared_ptr<OpsCompositor> DrawingManager::addOpsCompositor(
-    std::shared_ptr<RenderTargetProxy> target, uint32_t renderFlags) {
-  auto compositor = std::make_shared<OpsCompositor>(std::move(target), renderFlags);
+    std::shared_ptr<RenderTargetProxy> target, uint32_t renderFlags,
+    std::optional<Color> clearColor) {
+  auto compositor = std::make_shared<OpsCompositor>(std::move(target), renderFlags, clearColor);
   compositors.push_back(compositor);
   compositor->cachedPosition = --compositors.end();
   return compositor;
 }
 
 void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget,
-                                      PlacementArray<Op> ops) {
-  if (renderTarget == nullptr || ops.empty()) {
+                                      PlacementArray<Op> ops, std::optional<Color> clearColor) {
+  if (renderTarget == nullptr || (ops.empty() && !clearColor.has_value())) {
     return;
   }
   auto textureProxy = renderTarget->asTextureProxy();
-  auto task = drawingBuffer->make<OpsRenderTask>(std::move(renderTarget), std::move(ops));
+  auto task =
+      drawingBuffer->make<OpsRenderTask>(std::move(renderTarget), std::move(ops), clearColor);
   renderTasks.emplace_back(std::move(task));
   addGenerateMipmapsTask(std::move(textureProxy));
 }

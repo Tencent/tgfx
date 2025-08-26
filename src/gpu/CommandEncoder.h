@@ -41,6 +41,7 @@ class CommandEncoder {
    * previous one.
    */
   std::shared_ptr<RenderPass> beginRenderPass(std::shared_ptr<RenderTarget> renderTarget,
+                                              std::optional<Color> clearColor = std::nullopt,
                                               bool resolveMSAA = true);
 
   /**

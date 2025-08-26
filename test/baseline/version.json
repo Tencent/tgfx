@@ -1,7 +1,7 @@
 {
     "CanvasTest": {
         "AdaptiveDashEffect": "330279d",
-        "BlendFormula": "80a4bd69",
+        "BlendFormula": "218540e0",
         "Clip": "d010fb8",
         "ClipAll": "d0e35c3",
         "CloseQuadShape": "ded7faef",
@@ -62,7 +62,7 @@
         "altas": "b1cfcd4",
         "blendMode": "67961560",
         "complexEmojiTextBlending": "6095b909",
-        "drawColor": "b7aefeb",
+        "drawColor": "218540e0",
         "drawImage": "e0ff0afe",
         "drawImageRect": "606f8195",
         "drawPaint": "b7aefeb",
