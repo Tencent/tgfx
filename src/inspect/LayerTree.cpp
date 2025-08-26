@@ -16,21 +16,20 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #include "LayerTree.h"
+#include <chrono>
+#include <cstring>
 #include <functional>
 #include <string>
+#include <thread>
+#include "ProcessUtils.h"
 #include "Protocol.h"
 #include "concurrentqueue.h"
 #include "inspect/InspectorMark.h"
 #include "serialization/LayerSerialization.h"
+#include "tgfx/core/Clock.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/ShapeLayer.h"
 #include "tgfx/layers/SolidColor.h"
-#include <chrono>
-#include <cstring>
-#include <thread>
-#include "ProcessUtils.h"
-#include "Protocol.h"
-#include "tgfx/core/Clock.h"
 
 namespace tgfx::inspect {
 static moodycamel::ConcurrentQueue<uint64_t> imageIDQueue;
@@ -331,7 +330,8 @@ void LayerTree::SocketAgent::spawnWorkTread() {
 void LayerTree::SocketAgent::setData(const std::vector<uint8_t>& data) {
   queue.enqueue(data);
 }
-void LayerTree::SocketAgent::setCallBack(std::function<void(const std::vector<uint8_t>&)> callback) {
+void LayerTree::SocketAgent::setCallBack(
+    std::function<void(const std::vector<uint8_t>&)> callback) {
   this->callback = std::move(callback);
 }
 }  // namespace tgfx::inspect

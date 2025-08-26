@@ -16,11 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 #pragma once
-#include <unordered_map>
-#include <vector>
 #include <functional>
 #include <queue>
 #include <thread>
+#include <unordered_map>
 #include <vector>
 #include "Protocol.h"
 #include "Socket.h"
@@ -58,7 +57,7 @@ class LayerTree final {
   LayerTree& operator=(LayerTree&&) = delete;
 
   class SocketAgent {
-  public:
+   public:
     static SocketAgent& Get() {
       static SocketAgent instance;
       return instance;
@@ -78,7 +77,7 @@ class LayerTree final {
 
     ~SocketAgent();
 
-  protected:
+   protected:
     SocketAgent();
 
     void sendWork();
@@ -87,7 +86,7 @@ class LayerTree final {
 
     void spawnWorkTread();
 
-  private:
+   private:
 #ifndef __EMSCRIPTEN__
     std::shared_ptr<ListenSocket> listenSocket = nullptr;
     std::shared_ptr<Socket> socket = nullptr;
