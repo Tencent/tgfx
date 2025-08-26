@@ -47,9 +47,11 @@ class DrawingManager {
                     PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags);
 
   std::shared_ptr<OpsCompositor> addOpsCompositor(std::shared_ptr<RenderTargetProxy> renderTarget,
-                                                  uint32_t renderFlags);
+                                                  uint32_t renderFlags,
+                                                  std::optional<Color> clearColor = std::nullopt);
 
-  void addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget, PlacementArray<Op> ops);
+  void addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget, PlacementArray<Op> ops,
+                        std::optional<Color> clearColor);
 
   void addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> renderTarget,
                           std::vector<std::shared_ptr<TextureProxy>> inputs,
