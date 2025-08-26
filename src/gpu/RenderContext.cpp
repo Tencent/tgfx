@@ -116,6 +116,22 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(const Font& font, GlyphID glyph
   return glyphCodec;
 }
 
+static SamplingOptions GetSampling(const Matrix& matrix, MaskFormat format) {
+  // A matrix is considered rotated if it has any skew or if it swaps the x and y axes.
+  bool hasRotated = !FloatNearlyZero(matrix.getSkewX()) || !FloatNearlyZero(matrix.getSkewY());
+  auto filterMode =
+      (format != MaskFormat::A8 || hasRotated) ? FilterMode::Linear : FilterMode::Nearest;
+  return SamplingOptions{filterMode, MipmapMode::None};
+}
+
+static void ComputeGlyphMatrix(const Rect& atlasLocation, const Matrix& stateMatrix, float scale,
+                               const Point& position, Matrix* glyphMatrix) {
+  glyphMatrix->postScale(scale, scale);
+  glyphMatrix->postTranslate(position.x, position.y);
+  glyphMatrix->postConcat(stateMatrix);
+  glyphMatrix->preTranslate(-atlasLocation.x(), -atlasLocation.y());
+}
+
 RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
                              bool clearAll, Surface* surface)
     : renderTarget(std::move(proxy)), renderFlags(renderFlags), surface(surface) {
@@ -409,11 +425,9 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
         rejectedGlyphRun->positions.push_back(glyphPosition);
         continue;
       }
-      atlasCell._key = std::move(glyphKey);
-      atlasCell._maskFormat = maskFormat;
-      atlasCell._width = static_cast<uint16_t>(glyphCodec->width());
-      atlasCell._height = static_cast<uint16_t>(glyphCodec->height());
-      atlasCell._matrix = glyphState.matrix;
+      atlasCell.updateAll(std::move(glyphKey), maskFormat,
+                          static_cast<uint16_t>(glyphCodec->width()),
+                          static_cast<uint16_t>(glyphCodec->height()), glyphState.matrix);
 
       if (atlasManager->addCellToAtlas(atlasCell, nextFlushToken, atlasLocator)) {
         auto pageIndex = atlasLocator.pageIndex();
@@ -435,12 +449,9 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
       continue;
     }
     auto rect = atlasLocator.getLocation();
-    glyphState.matrix.postScale(1.f / maxScale, 1.f / maxScale);
-    glyphState.matrix.postTranslate(glyphPosition.x, glyphPosition.y);
-    glyphState.matrix.postConcat(state.matrix);
-    glyphState.matrix.preTranslate(-rect.x(), -rect.y());
-    compositor->fillTextAtlas(std::move(textureProxy), rect, glyphState,
-                              fill.makeWithMatrix(state.matrix));
+    ComputeGlyphMatrix(rect, state.matrix, 1.f / maxScale, glyphPosition, &glyphState.matrix);
+    compositor->fillTextAtlas(std::move(textureProxy), GetSampling(glyphState.matrix, maskFormat),
+                              rect, glyphState, fill.makeWithMatrix(state.matrix));
   }
 }
 void RenderContext::drawGlyphsAsPath(std::shared_ptr<GlyphRunList> glyphRunList,
@@ -527,11 +538,9 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
       if (glyphCodec == nullptr) {
         continue;
       }
-      atlasCell._key = std::move(glyphKey);
-      atlasCell._maskFormat = maskFormat;
-      atlasCell._width = static_cast<uint16_t>(glyphCodec->width());
-      atlasCell._height = static_cast<uint16_t>(glyphCodec->height());
-      atlasCell._matrix = glyphState.matrix;
+      atlasCell.updateAll(std::move(glyphKey), maskFormat,
+                          static_cast<uint16_t>(glyphCodec->width()),
+                          static_cast<uint16_t>(glyphCodec->height()), glyphState.matrix);
       if (!atlasManager->addCellToAtlas(atlasCell, nextFlushToken, atlasLocator)) {
         continue;
       }
@@ -549,12 +558,10 @@ void RenderContext::drawGlyphsAsTransformedMask(const GlyphRun& sourceGlyphRun,
       continue;
     }
     auto rect = atlasLocator.getLocation();
-    glyphState.matrix.postScale(1.f / (maxScale * cellScale), 1.f / (maxScale * cellScale));
-    glyphState.matrix.postTranslate(glyphPosition.x, glyphPosition.y);
-    glyphState.matrix.postConcat(state.matrix);
-    glyphState.matrix.preTranslate(-rect.x(), -rect.y());
-    compositor->fillTextAtlas(std::move(textureProxy), rect, glyphState,
-                              fill.makeWithMatrix(state.matrix));
+    ComputeGlyphMatrix(rect, state.matrix, 1.f / (maxScale * cellScale), glyphPosition,
+                       &glyphState.matrix);
+    compositor->fillTextAtlas(std::move(textureProxy), GetSampling(glyphState.matrix, maskFormat),
+                              rect, glyphState, fill.makeWithMatrix(state.matrix));
   }
 }
 }  // namespace tgfx

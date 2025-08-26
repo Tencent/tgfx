@@ -375,7 +375,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
       auto provider = RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects), {},
                                                     AAType::None, true, UVSubsetMode::None);
       drawOp = AtlasTextOp::Make(context, std::move(provider), renderFlags,
-                                 std::move(pendingAtlasTexture));
+                                 std::move(pendingAtlasTexture), pendingSampling);
     } break;
     default:
       break;
@@ -688,13 +688,16 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
   ops.emplace_back(std::move(op));
 }
 
-void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,
+void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy,
+                                  const SamplingOptions& sampling, const Rect& rect,
                                   const MCState& state, const Fill& fill) {
   DEBUG_ASSERT(textureProxy != nullptr);
   DEBUG_ASSERT(!rect.isEmpty());
-  if (!canAppend(PendingOpType::Atlas, state.clip, fill) || pendingAtlasTexture != textureProxy) {
+  if (!canAppend(PendingOpType::Atlas, state.clip, fill) || pendingAtlasTexture != textureProxy ||
+      pendingSampling != sampling) {
     flushPendingOps(PendingOpType::Atlas, state.clip, fill);
     pendingAtlasTexture = std::move(textureProxy);
+    pendingSampling = sampling;
   }
   auto record = drawingBuffer()->make<RectRecord>(rect, state.matrix, fill.color.premultiply());
   pendingRects.emplace_back(std::move(record));
