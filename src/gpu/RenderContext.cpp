@@ -106,7 +106,7 @@ static std::shared_ptr<ImageCodec> GetGlyphCodec(const Font& font, GlyphID glyph
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
   glyphCodec = PathRasterizer::MakeFrom(width, height, std::move(shape), true,
-#ifdef TGFX_TEXT_GAMMA_CORRECTION
+#ifdef TGFX_USE_TEXT_GAMMA_CORRECTION
                                         true
 #else
                                         false
@@ -121,9 +121,8 @@ RenderContext::RenderContext(std::shared_ptr<RenderTargetProxy> proxy, uint32_t 
     : renderTarget(std::move(proxy)), renderFlags(renderFlags), surface(surface) {
   if (clearAll) {
     auto drawingManager = renderTarget->getContext()->drawingManager();
-    opsCompositor = drawingManager->addOpsCompositor(renderTarget, renderFlags);
-    opsCompositor->fillRect(renderTarget->bounds(), MCState{},
-                            {Color::Transparent(), BlendMode::Src});
+    opsCompositor =
+        drawingManager->addOpsCompositor(renderTarget, renderFlags, Color::Transparent());
   }
 }
 

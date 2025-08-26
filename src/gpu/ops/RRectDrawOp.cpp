@@ -74,8 +74,8 @@ void RRectDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   auto gp =
       EllipseGeometryProcessor::Make(drawingBuffer, renderTarget->width(), renderTarget->height(),
                                      hasStroke, useScale, commonColor);
-  auto pipeline = createPipeline(renderTarget, std::move(gp));
-  renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
+  auto programInfo = createProgramInfo(renderTarget, std::move(gp));
+  renderPass->bindProgramAndScissorClip(programInfo.get(), scissorRect());
   renderPass->bindBuffers(indexBuffer->gpuBuffer(), vertexBuffer->gpuBuffer(),
                           vertexBufferProxyView->offset());
   auto numIndicesPerRRect = hasStroke ? IndicesPerStrokeRRect : IndicesPerFillRRect;

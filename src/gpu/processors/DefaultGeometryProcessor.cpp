@@ -23,9 +23,9 @@ DefaultGeometryProcessor::DefaultGeometryProcessor(Color color, int width, int h
                                                    const Matrix& viewMatrix, const Matrix& uvMatrix)
     : GeometryProcessor(ClassID()), color(color), width(width), height(height), aa(aa),
       viewMatrix(viewMatrix), uvMatrix(uvMatrix) {
-  position = {"aPosition", SLType::Float2};
+  position = {"aPosition", VertexFormat::Float2};
   if (aa == AAType::Coverage) {
-    coverage = {"inCoverage", SLType::Float};
+    coverage = {"inCoverage", VertexFormat::Float};
   }
   setVertexAttributes(&position, 2);
 }

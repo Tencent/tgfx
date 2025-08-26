@@ -99,7 +99,7 @@ void GLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
   }
   std::string subsetName = "";
   if (needSubset()) {
-    subsetName = uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "Subset");
+    subsetName = uniformHandler->addUniform("Subset", UniformFormat::Float4, ShaderStage::Fragment);
   }
   std::string finalCoordName = "finalCoord";
   fragBuilder->codeAppendf("highp vec2 %s;", finalCoordName.c_str());
@@ -114,7 +114,7 @@ void GLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
   if (alphaStart != Point::Zero()) {
     fragBuilder->codeAppend("color = clamp(color, 0.0, 1.0);");
     auto alphaStartName =
-        uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float2, "AlphaStart");
+        uniformHandler->addUniform("AlphaStart", UniformFormat::Float2, ShaderStage::Fragment);
     std::string alphaVertexColor = "alphaVertexColor";
     fragBuilder->codeAppendf("vec2 %s = %s + %s;", alphaVertexColor.c_str(), finalCoordName.c_str(),
                              alphaStartName.c_str());
@@ -135,7 +135,7 @@ void GLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
   auto vertexColor = (*args.transformedCoords)[0].name();
   std::string subsetName = "";
   if (needSubset()) {
-    subsetName = uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "Subset");
+    subsetName = uniformHandler->addUniform("Subset", UniformFormat::Float4, ShaderStage::Fragment);
   }
   std::string extraSubsetName = "";
   if (SrcRectConstraint::Strict == constraint) {
@@ -167,14 +167,14 @@ void GLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
     fragBuilder->codeAppend("yuv.x -= (16.0 / 255.0);");
   }
   fragBuilder->codeAppend("yuv.yz -= vec2(0.5, 0.5);");
-  auto mat3Name =
-      uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float3x3, "Mat3ColorConversion");
+  auto mat3Name = uniformHandler->addUniform("Mat3ColorConversion", UniformFormat::Float3x3,
+                                             ShaderStage::Fragment);
   fragBuilder->codeAppendf("vec3 rgb = clamp(%s * yuv, 0.0, 1.0);", mat3Name.c_str());
   if (alphaStart == Point::Zero()) {
     fragBuilder->codeAppendf("%s = vec4(rgb, 1.0);", args.outputColor.c_str());
   } else {
     auto alphaStartName =
-        uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float2, "AlphaStart");
+        uniformHandler->addUniform("AlphaStart", UniformFormat::Float2, ShaderStage::Fragment);
     std::string alphaVertexColor = "alphaVertexColor";
     fragBuilder->codeAppendf("vec2 %s = %s + %s;", alphaVertexColor.c_str(), finalCoordName.c_str(),
                              alphaStartName.c_str());

@@ -81,6 +81,13 @@ class RenderTarget {
   }
 
   /**
+   * Returns the bounds of the render target.
+   */
+  Rect bounds() const {
+    return Rect::MakeWH(width(), height());
+  }
+
+  /**
    * Returns the sample count of the render target.
    */
   int sampleCount() const {

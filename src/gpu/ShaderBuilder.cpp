@@ -42,8 +42,8 @@ ShaderBuilder::ShaderBuilder(ProgramBuilder* builder) : programBuilder(builder) 
   atLineStart = true;
 }
 
-const Pipeline* ShaderBuilder::getPipeline() const {
-  return programBuilder->getPipeline();
+const ProgramInfo* ShaderBuilder::getProgramInfo() const {
+  return programBuilder->getProgramInfo();
 }
 
 void ShaderBuilder::setPrecisionQualifier(const std::string& precision) {
@@ -94,40 +94,40 @@ void ShaderBuilder::appendTextureLookup(SamplerHandle samplerHandle, const std::
   codeAppend(TextureSwizzleString(uniformHandler->getSamplerSwizzle(samplerHandle)));
 }
 
-void ShaderBuilder::addFeature(PrivateFeature featureBit, const std::string& extensionName) {
-  if ((featureBit & featuresAddedMask) == featureBit) {
+void ShaderBuilder::addFeature(uint32_t featureBit, const std::string& extensionName) {
+  if (featureBit & features) {
     return;
   }
   char buffer[ShaderBufferSize];
   auto length =
       snprintf(buffer, ShaderBufferSize, "#extension %s: require\n", extensionName.c_str());
   shaderStrings[Type::Extensions].append(buffer, static_cast<size_t>(length));
-  featuresAddedMask |= featureBit;
+  features |= featureBit;
 }
 
 std::string ShaderBuilder::getDeclarations(const std::vector<ShaderVar>& vars,
-                                           ShaderFlags flag) const {
+                                           ShaderStage stage) const {
   std::string ret;
   for (const auto& var : vars) {
-    ret += programBuilder->getShaderVarDeclarations(var, flag);
+    ret += programBuilder->getShaderVarDeclarations(var, stage);
     ret += ";\n";
   }
   return ret;
 }
 
-void ShaderBuilder::finalize(ShaderFlags visibility) {
+void ShaderBuilder::finalize() {
   if (finalized) {
     return;
   }
   shaderStrings[Type::VersionDecl] = programBuilder->versionDeclString();
-  shaderStrings[Type::Uniforms] +=
-      programBuilder->uniformHandler()->getUniformDeclarations(visibility);
-  shaderStrings[Type::Inputs] += getDeclarations(inputs, visibility);
-  shaderStrings[Type::Outputs] += getDeclarations(outputs, visibility);
-  onFinalize();
+  auto type = shaderStage();
+  shaderStrings[Type::Uniforms] += programBuilder->uniformHandler()->getUniformDeclarations(type);
+  shaderStrings[Type::Inputs] += getDeclarations(inputs, type);
+  shaderStrings[Type::Outputs] += getDeclarations(outputs, type);
+  programBuilder->varyingHandler()->getDeclarations(&shaderStrings[Type::Inputs],
+                                                    &shaderStrings[Type::Outputs], type);
   // append the 'footer' to code
   shaderStrings[Type::Code] += "}\n";
-
   finalized = true;
 }
 

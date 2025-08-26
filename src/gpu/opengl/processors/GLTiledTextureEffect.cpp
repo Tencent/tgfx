@@ -69,14 +69,14 @@ bool GLTiledTextureEffect::ShaderModeUsesSubset(TiledTextureEffect::ShaderMode m
   switch (m) {
     case TiledTextureEffect::ShaderMode::None:
     case TiledTextureEffect::ShaderMode::Clamp:
+    case TiledTextureEffect::ShaderMode::ClampToBorderNearest:
+    case TiledTextureEffect::ShaderMode::ClampToBorderLinear:
       return false;
     case TiledTextureEffect::ShaderMode::RepeatNearestNone:
     case TiledTextureEffect::ShaderMode::RepeatLinearNone:
     case TiledTextureEffect::ShaderMode::RepeatNearestMipmap:
     case TiledTextureEffect::ShaderMode::RepeatLinearMipmap:
     case TiledTextureEffect::ShaderMode::MirrorRepeat:
-    case TiledTextureEffect::ShaderMode::ClampToBorderNearest:
-    case TiledTextureEffect::ShaderMode::ClampToBorderLinear:
       return true;
   }
 }
@@ -197,10 +197,12 @@ GLTiledTextureEffect::UniformNames GLTiledTextureEffect::initUniform(EmitArgs& a
   UniformNames names = {};
   auto* uniformHandler = args.uniformHandler;
   if (ShaderModeUsesSubset(sampling.shaderModeX) || ShaderModeUsesSubset(sampling.shaderModeY)) {
-    names.subsetName = uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "Subset");
+    names.subsetName =
+        uniformHandler->addUniform("Subset", UniformFormat::Float4, ShaderStage::Fragment);
   }
   if (useClamp[0] || useClamp[1]) {
-    names.clampName = uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "Clamp");
+    names.clampName =
+        uniformHandler->addUniform("Clamp", UniformFormat::Float4, ShaderStage::Fragment);
   }
   bool unormCoordsRequiredForShaderMode = ShaderModeRequiresUnormCoord(sampling.shaderModeX) ||
                                           ShaderModeRequiresUnormCoord(sampling.shaderModeY);
@@ -208,7 +210,7 @@ GLTiledTextureEffect::UniformNames GLTiledTextureEffect::initUniform(EmitArgs& a
       textureView->getTexture()->type() != GPUTextureType::Rectangle;
   if (unormCoordsRequiredForShaderMode && sampleCoordsMustBeNormalized) {
     names.dimensionsName =
-        uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float2, "Dimension");
+        uniformHandler->addUniform("Dimension", UniformFormat::Float2, ShaderStage::Fragment);
   }
   return names;
 }

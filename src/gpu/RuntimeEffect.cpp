@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,28 +16,18 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLVertexArray.h"
-#include "tgfx/gpu/opengl/GLFunctions.h"
+#include "tgfx/gpu/RuntimeEffect.h"
 
 namespace tgfx {
-std::shared_ptr<GLVertexArray> GLVertexArray::Make(Context* context) {
-  auto gl = GLFunctions::Get(context);
-  unsigned id = 0;
-  gl->genVertexArrays(1, &id);
-  if (id == 0) {
-    return nullptr;
-  }
-  return Resource::AddToCache(context, new GLVertexArray(id));
+uint32_t RuntimeEffect::NextProgramID() {
+
+  static std::atomic<uint32_t> nextID{1};
+  static constexpr uint32_t InvalidUniqueID = 0;
+  uint32_t id;
+  do {
+    id = nextID.fetch_add(1, std::memory_order_relaxed);
+  } while (id == InvalidUniqueID);
+  return id;
 }
 
-GLVertexArray::GLVertexArray(unsigned int id) : _id(id) {
-}
-
-void GLVertexArray::onReleaseGPU() {
-  auto gl = GLFunctions::Get(context);
-  if (_id > 0) {
-    gl->deleteVertexArrays(1, &_id);
-    _id = 0;
-  }
-}
 }  // namespace tgfx

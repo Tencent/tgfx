@@ -40,11 +40,11 @@ void GLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
   varyingHandler->emitAttributes(*this);
 
   auto atlasName =
-      uniformHandler->addUniform(ShaderFlags::Vertex, SLType::Float2, atlasSizeUniformName);
+      uniformHandler->addUniform(atlasSizeUniformName, UniformFormat::Float2, ShaderStage::Vertex);
 
   auto samplerVarying = varyingHandler->addVarying("textureCoords", SLType::Float2);
-  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, position.asShaderVar());
-  auto uvName = maskCoord.asShaderVar().name();
+  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(position));
+  auto uvName = maskCoord.name();
   vertBuilder->codeAppendf("%s = %s * %s;", samplerVarying.vsOut().c_str(), uvName.c_str(),
                            atlasName.c_str());
 
@@ -59,7 +59,7 @@ void GLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
 
   if (commonColor.has_value()) {
     auto colorName =
-        args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "Color");
+        args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
   } else {
     auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);

@@ -29,7 +29,7 @@ void OpsRenderTask::execute(CommandEncoder* encoder) {
     LOGE("OpsRenderTask::execute() Render target is null!");
     return;
   }
-  auto renderPass = encoder->beginRenderPass(renderTarget, true);
+  auto renderPass = encoder->beginRenderPass(renderTarget, clearColor, true);
   if (renderPass == nullptr) {
     LOGE("OpsRenderTask::execute() Failed to initialize the render pass!");
     return;

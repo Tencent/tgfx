@@ -27,8 +27,9 @@ void RenderPass::end() {
   program = nullptr;
 }
 
-void RenderPass::bindProgramAndScissorClip(const Pipeline* pipeline, const Rect& scissorRect) {
-  if (!onBindProgramAndScissorClip(pipeline, scissorRect)) {
+void RenderPass::bindProgramAndScissorClip(const ProgramInfo* programInfo,
+                                           const Rect& scissorRect) {
+  if (!onBindProgramAndScissorClip(programInfo, scissorRect)) {
     drawPipelineStatus = DrawPipelineStatus::FailedToBind;
     return;
   }
@@ -58,10 +59,5 @@ void RenderPass::drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size
   }
   onDraw(primitiveType, baseIndex, indexCount, true);
   drawPipelineStatus = DrawPipelineStatus::NotConfigured;
-}
-
-void RenderPass::clear(const Rect& scissor, Color color) {
-  drawPipelineStatus = DrawPipelineStatus::NotConfigured;
-  onClear(scissor, color);
 }
 }  // namespace tgfx

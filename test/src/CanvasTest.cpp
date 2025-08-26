@@ -130,7 +130,7 @@ TGFX_TEST(CanvasTest, DiscardContent) {
   auto* drawingManager = context->drawingManager();
   ASSERT_TRUE(drawingManager->renderTasks.size() == 1);
   auto task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.front().get());
-  EXPECT_TRUE(task->ops.size() == 1);
+  EXPECT_TRUE(task->ops.size() == 0);
 
   Paint paint;
   paint.setColor(Color{0.8f, 0.8f, 0.8f, 0.8f});
@@ -140,7 +140,7 @@ TGFX_TEST(CanvasTest, DiscardContent) {
   surface->renderContext->flush();
   ASSERT_TRUE(drawingManager->renderTasks.size() == 2);
   task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.back().get());
-  EXPECT_TRUE(task->ops.size() == 1);
+  EXPECT_TRUE(task->ops.size() == 0);
 
   paint.setColor(Color{0.8f, 0.8f, 0.8f, 1.f});
   canvas->drawRect(Rect::MakeWH(50, 50), paint);
@@ -188,7 +188,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rect) {
   auto* drawingManager = context->drawingManager();
   EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
   auto task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.front().get());
-  ASSERT_TRUE(task->ops.size() == 2);
+  ASSERT_TRUE(task->ops.size() == 1);
   EXPECT_EQ(static_cast<RectDrawOp*>(task->ops.back().get())->rectCount, drawCallCount);
   context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rect"));
@@ -228,7 +228,7 @@ TGFX_TEST(CanvasTest, merge_draw_call_rrect) {
   auto* drawingManager = context->drawingManager();
   EXPECT_TRUE(drawingManager->renderTasks.size() == 1);
   auto task = static_cast<OpsRenderTask*>(drawingManager->renderTasks.front().get());
-  ASSERT_TRUE(task->ops.size() == 2);
+  ASSERT_TRUE(task->ops.size() == 1);
   EXPECT_EQ(static_cast<RRectDrawOp*>(task->ops.back().get())->rectCount, drawCallCount);
   context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/merge_draw_call_rrect"));
@@ -2917,7 +2917,7 @@ TGFX_TEST(CanvasTest, ScaleTest) {
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ScaleTest"));
 }
 
-TGFX_TEST(CanvassTest, drawScaleImage) {
+TGFX_TEST(CanvasTest, drawScaleImage) {
   ContextScope scope;
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
@@ -2972,5 +2972,22 @@ TGFX_TEST(CanvassTest, drawScaleImage) {
   canvas->setMatrix(matrix);
   canvas->drawImage(scaleImage);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/drawScaleBufferImage"));
+}
+
+TGFX_TEST(CanvasTest, RRectBlendMode) {
+  ContextScope scope;
+  auto context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  auto canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+  Paint paint;
+  paint.setColor(Color::FromRGBA(255, 0, 0, 255));
+  paint.setBlendMode(BlendMode::Darken);
+  auto path = Path();
+  path.addRoundRect(Rect::MakeXYWH(25, 25, 150, 150), 20, 20);
+  canvas->drawPath(path, paint);
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/RRectBlendMode"));
 }
 }  // namespace tgfx

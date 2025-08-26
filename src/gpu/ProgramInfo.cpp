@@ -16,22 +16,22 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "Pipeline.h"
+#include "ProgramInfo.h"
 #include "gpu/ProgramBuilder.h"
 #include "gpu/RenderTarget.h"
 
 namespace tgfx {
-Pipeline::Pipeline(PlacementPtr<GeometryProcessor> geometryProcessor,
-                   std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors,
-                   size_t numColorProcessors, PlacementPtr<XferProcessor> xferProcessor,
-                   BlendMode blendMode, const Swizzle* outputSwizzle)
+ProgramInfo::ProgramInfo(PlacementPtr<GeometryProcessor> geometryProcessor,
+                         std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors,
+                         size_t numColorProcessors, PlacementPtr<XferProcessor> xferProcessor,
+                         BlendMode blendMode, const Swizzle* outputSwizzle)
     : geometryProcessor(std::move(geometryProcessor)),
       fragmentProcessors(std::move(fragmentProcessors)), numColorProcessors(numColorProcessors),
       xferProcessor(std::move(xferProcessor)), blendMode(blendMode), _outputSwizzle(outputSwizzle) {
   updateProcessorIndices();
 }
 
-void Pipeline::updateProcessorIndices() {
+void ProgramInfo::updateProcessorIndices() {
   int index = 0;
   processorIndices[geometryProcessor.get()] = index++;
   for (auto& fragmentProcessor : fragmentProcessors) {
@@ -45,14 +45,14 @@ void Pipeline::updateProcessorIndices() {
   processorIndices[getXferProcessor()] = index++;
 }
 
-const XferProcessor* Pipeline::getXferProcessor() const {
+const XferProcessor* ProgramInfo::getXferProcessor() const {
   if (xferProcessor == nullptr) {
     return EmptyXferProcessor::GetInstance();
   }
   return xferProcessor.get();
 }
 
-std::unique_ptr<BlendFormula> Pipeline::getBlendFormula() const {
+std::unique_ptr<BlendFormula> ProgramInfo::getBlendFormula() const {
   if (xferProcessor != nullptr) {
     return nullptr;
   }
@@ -74,7 +74,8 @@ static std::array<float, 4> GetRTAdjustArray(const RenderTarget* renderTarget) {
   return result;
 }
 
-void Pipeline::getUniforms(const RenderTarget* renderTarget, UniformBuffer* uniformBuffer) const {
+void ProgramInfo::getUniforms(const RenderTarget* renderTarget,
+                              UniformBuffer* uniformBuffer) const {
   DEBUG_ASSERT(renderTarget != nullptr);
   DEBUG_ASSERT(uniformBuffer != nullptr);
   auto array = GetRTAdjustArray(renderTarget);
@@ -97,7 +98,7 @@ void Pipeline::getUniforms(const RenderTarget* renderTarget, UniformBuffer* unif
   uniformBuffer->nameSuffix = "";
 }
 
-std::vector<SamplerInfo> Pipeline::getSamplers() const {
+std::vector<SamplerInfo> ProgramInfo::getSamplers() const {
   std::vector<SamplerInfo> samplers = {};
   for (size_t i = 0; i < geometryProcessor->numTextureSamplers(); i++) {
     SamplerInfo sampler = {geometryProcessor->textureAt(i), geometryProcessor->samplerStateAt(i)};
@@ -120,24 +121,23 @@ std::vector<SamplerInfo> Pipeline::getSamplers() const {
   return samplers;
 }
 
-void Pipeline::computeProgramKey(Context* context, BytesKey* programKey) const {
+void ProgramInfo::computeProgramKey(Context* context, BytesKey* programKey) const {
   geometryProcessor->computeProcessorKey(context, programKey);
   for (const auto& processor : fragmentProcessors) {
     processor->computeProcessorKey(context, programKey);
   }
-  auto dstTextureView = xferProcessor != nullptr ? xferProcessor->dstTextureView() : nullptr;
-  if (dstTextureView != nullptr) {
-    TextureView::ComputeTextureKey(dstTextureView->getTexture(), programKey);
+  if (xferProcessor != nullptr) {
+    xferProcessor->computeProcessorKey(context, programKey);
   }
-  getXferProcessor()->computeProcessorKey(context, programKey);
+  programKey->write(static_cast<uint32_t>(blendMode));
   programKey->write(static_cast<uint32_t>(_outputSwizzle->asKey()));
 }
 
-std::unique_ptr<Program> Pipeline::createProgram(Context* context) const {
+std::unique_ptr<Program> ProgramInfo::createProgram(Context* context) const {
   return ProgramBuilder::CreateProgram(context, this);
 }
 
-int Pipeline::getProcessorIndex(const Processor* processor) const {
+int ProgramInfo::getProcessorIndex(const Processor* processor) const {
   auto result = processorIndices.find(processor);
   if (result == processorIndices.end()) {
     return -1;
@@ -145,7 +145,7 @@ int Pipeline::getProcessorIndex(const Processor* processor) const {
   return result->second;
 }
 
-std::string Pipeline::getMangledSuffix(const Processor* processor) const {
+std::string ProgramInfo::getMangledSuffix(const Processor* processor) const {
   auto processorIndex = getProcessorIndex(processor);
   if (processorIndex == -1) {
     return "";

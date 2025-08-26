@@ -18,7 +18,7 @@
 
 #include "RuntimeDrawTask.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/Pipeline.h"
+#include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
 #include "gpu/RectsVertexProvider.h"
@@ -87,7 +87,7 @@ void RuntimeDrawTask::execute(CommandEncoder* encoder) {
   effect->onDraw(RuntimeProgramWrapper::Unwrap(program.get()), backendTextures,
                  renderTarget->getBackendRenderTarget(), offset);
   if (renderTarget->sampleCount() > 1) {
-    auto renderPass = encoder->beginRenderPass(renderTarget, true);
+    auto renderPass = encoder->beginRenderPass(renderTarget);
     DEBUG_ASSERT(renderPass != nullptr);
     renderPass->end();
   }
@@ -117,7 +117,7 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
     return nullptr;
   }
   auto renderTarget = renderTargetProxy->getRenderTarget();
-  auto renderPass = encoder->beginRenderPass(renderTarget, false);
+  auto renderPass = encoder->beginRenderPass(renderTarget, std::nullopt, false);
   if (renderPass == nullptr) {
     LOGE("RuntimeDrawTask::getFlatTexture() Failed to initialize the render pass!");
     return nullptr;
@@ -135,9 +135,9 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
   const auto& swizzle = caps->getWriteSwizzle(format);
   std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors = {};
   fragmentProcessors.emplace_back(std::move(colorProcessor));
-  Pipeline pipeline(std::move(geometryProcessor), std::move(fragmentProcessors), 1, nullptr,
-                    BlendMode::Src, &swizzle);
-  renderPass->bindProgramAndScissorClip(&pipeline, {});
+  ProgramInfo programInfo(std::move(geometryProcessor), std::move(fragmentProcessors), 1, nullptr,
+                          BlendMode::Src, &swizzle);
+  renderPass->bindProgramAndScissorClip(&programInfo, {});
   renderPass->bindBuffers(nullptr, vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
   renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
   renderPass->end();
