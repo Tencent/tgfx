@@ -16,14 +16,16 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <utility>
+
 #include "tgfx/core/Bitmap.h"
 #include "core/PixelRef.h"
 #include "tgfx/core/ImageCodec.h"
 #include "tgfx/core/Pixmap.h"
 
 namespace tgfx {
-Bitmap::Bitmap(int width, int height, bool alphaOnly, bool tryHardware) {
-  allocPixels(width, height, alphaOnly, tryHardware);
+Bitmap::Bitmap(int width, int height, bool alphaOnly, bool tryHardware, std::shared_ptr<ColorSpace> colorSpace) {
+  allocPixels(width, height, alphaOnly, tryHardware, std::move(colorSpace));
 }
 
 Bitmap::Bitmap(const Bitmap& src) : _info(src._info), pixelRef(src.pixelRef) {
@@ -32,8 +34,8 @@ Bitmap::Bitmap(const Bitmap& src) : _info(src._info), pixelRef(src.pixelRef) {
 Bitmap::Bitmap(Bitmap&& src) : _info(src._info), pixelRef(std::move(src.pixelRef)) {
 }
 
-Bitmap::Bitmap(HardwareBufferRef hardwareBuffer) {
-  auto pixelBuffer = PixelBuffer::MakeFrom(hardwareBuffer);
+Bitmap::Bitmap(HardwareBufferRef hardwareBuffer, std::shared_ptr<ColorSpace> colorSpace) {
+  auto pixelBuffer = PixelBuffer::MakeFrom(hardwareBuffer, std::move(colorSpace));
   pixelRef = PixelRef::Wrap(pixelBuffer);
   if (pixelRef != nullptr) {
     _info = pixelRef->info();
@@ -56,8 +58,8 @@ Bitmap& Bitmap::operator=(Bitmap&& src) {
   return *this;
 }
 
-bool Bitmap::allocPixels(int width, int height, bool alphaOnly, bool tryHardware) {
-  pixelRef = PixelRef::Make(width, height, alphaOnly, tryHardware);
+bool Bitmap::allocPixels(int width, int height, bool alphaOnly, bool tryHardware, std::shared_ptr<ColorSpace> colorSpace) {
+  pixelRef = PixelRef::Make(width, height, alphaOnly, tryHardware, std::move(colorSpace));
   if (pixelRef != nullptr) {
     _info = pixelRef->info();
   }

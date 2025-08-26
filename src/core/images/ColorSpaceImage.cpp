@@ -16,31 +16,25 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-#include "tgfx/core/Image.h"
-#include "tgfx/core/ImageCodec.h"
+#include "ColorSpaceImage.h"
+#include "core/utils/PlacementPtr.h"
+#include "gpu/processors/TiledTextureEffect.h"
+#include "gpu/BackingFit.h"
+#include "gpu/TPArgs.h"
 
 namespace tgfx {
-class ScaledImageGenerator : public ImageGenerator {
- public:
-  static std::shared_ptr<ScaledImageGenerator> MakeFrom(const std::shared_ptr<ImageCodec>& codec,
-                                                        int width, int height);
 
-  ~ScaledImageGenerator() override = default;
+std::shared_ptr<TextureProxy> ColorSpaceImage::lockTextureProxy(const TPArgs& args) const {
+  return _sourceImage->lockTextureProxy(args);
+}
 
-  bool isAlphaOnly() const override {
-    return source->isAlphaOnly();
+PlacementPtr<FragmentProcessor> ColorSpaceImage::asFragmentProcessor(const FPArgs& args,
+    const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const {
+  auto textureProxy = lockTextureProxy(
+      TPArgs(args.context, args.renderFlags, hasMipmaps(), 1.0f, BackingFit::Exact, _colorSpace));
+  if (textureProxy == nullptr) {
+    return nullptr;
   }
-
-  bool asyncSupport() const override {
-    return source->asyncSupport();
-  }
-
-  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware, std::shared_ptr<ColorSpace> colorSpace = nullptr) const override;
-
- private:
-  std::shared_ptr<ImageCodec> source = nullptr;
-
-  explicit ScaledImageGenerator(int width, int height, const std::shared_ptr<ImageCodec>& codec);
-};
+  return TiledTextureEffect::Make(std::move(textureProxy), samplingArgs, uvMatrix, isAlphaOnly());
+}
 }  // namespace tgfx

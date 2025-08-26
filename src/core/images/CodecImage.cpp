@@ -47,6 +47,6 @@ std::shared_ptr<TextureProxy> CodecImage::lockTextureProxy(const TPArgs& args) c
     tempGenerator = ScaledImageGenerator::MakeFrom(getCodec(), width(), height());
   }
   return args.context->proxyProvider()->createTextureProxy(tempGenerator, args.mipmapped,
-                                                           args.renderFlags);
+                                                           args.renderFlags, args.colorSpace);
 }
 }  // namespace tgfx

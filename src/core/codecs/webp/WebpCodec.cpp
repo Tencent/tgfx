@@ -38,7 +38,7 @@ std::shared_ptr<ImageCodec> WebpCodec::MakeFrom(const std::string& filePath) {
     }
   }
   return std::shared_ptr<ImageCodec>(
-      new WebpCodec(info.width, info.height, info.orientation, filePath, nullptr));
+      new WebpCodec(info.width, info.height, info.orientation, filePath, nullptr, info.colorSpace));
 }
 
 std::shared_ptr<ImageCodec> WebpCodec::MakeFrom(std::shared_ptr<Data> imageBytes) {
@@ -50,21 +50,10 @@ std::shared_ptr<ImageCodec> WebpCodec::MakeFrom(std::shared_ptr<Data> imageBytes
     return nullptr;
   }
   return std::shared_ptr<ImageCodec>(
-      new WebpCodec(info.width, info.height, info.orientation, "", std::move(imageBytes)));
+      new WebpCodec(info.width, info.height, info.orientation, "", std::move(imageBytes), info.colorSpace));
 }
 
-static WEBP_CSP_MODE webp_decode_mode(ColorType dstCT, bool premultiply) {
-  switch (dstCT) {
-    case ColorType::BGRA_8888:
-      return premultiply ? MODE_bgrA : MODE_BGRA;
-    case ColorType::RGBA_8888:
-      return premultiply ? MODE_rgbA : MODE_RGBA;
-    default:
-      return MODE_LAST;
-  }
-}
-
-bool WebpCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+bool WebpCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,  std::shared_ptr<ColorSpace> colorSpace,
                              void* dstPixels) const {
   if (dstPixels == nullptr) {
     return false;
@@ -84,32 +73,21 @@ bool WebpCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t ds
     return false;
   }
   config.output.is_external_memory = 1;
-  config.output.colorspace = webp_decode_mode(colorType, alphaType == AlphaType::Premultiplied);
-  bool decodeSuccess = true;
-  if (config.output.colorspace == MODE_LAST) {
-    // decode to RGBA_8888
-    auto info = ImageInfo::Make(width(), height(), ColorType::RGBA_8888, alphaType);
-    config.output.colorspace =
-        webp_decode_mode(info.colorType(), info.alphaType() == AlphaType::Premultiplied);
-    config.output.u.RGBA.stride = static_cast<int>(info.rowBytes());
-    config.output.u.RGBA.size = info.byteSize();
-    Buffer buffer(info.byteSize());
-    auto pixels = buffer.bytes();
-    if (pixels) {
-      config.output.u.RGBA.rgba = pixels;
-      decodeSuccess = WebPDecode(byteData->bytes(), byteData->size(), &config) == VP8_STATUS_OK;
-      if (decodeSuccess) {
-        Pixmap pixmap(info, pixels);
-        auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
-        decodeSuccess = pixmap.readPixels(dstInfo, dstPixels);
-      }
+  config.output.colorspace = MODE_RGBA;
+  bool decodeSuccess = false;
+  auto info = ImageInfo::Make(width(), height(), ColorType::RGBA_8888, AlphaType::Unpremultiplied, 0, ImageGenerator::colorSpace());
+  config.output.u.RGBA.stride = static_cast<int>(info.rowBytes());
+  config.output.u.RGBA.size = info.byteSize();
+  Buffer buffer(info.byteSize());
+  auto pixels = buffer.bytes();
+  if(pixels) {
+    config.output.u.RGBA.rgba = pixels;
+    decodeSuccess = WebPDecode(byteData->bytes(), byteData->size(), &config) == VP8_STATUS_OK;
+    if (decodeSuccess) {
+      Pixmap pixmap(info, pixels);
+      auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes, colorSpace);
+      decodeSuccess = pixmap.readPixels(dstInfo, dstPixels);
     }
-  } else {
-    config.output.u.RGBA.rgba = reinterpret_cast<uint8_t*>(dstPixels);
-    config.output.u.RGBA.stride = static_cast<int>(dstRowBytes);
-    config.output.u.RGBA.size = dstRowBytes * static_cast<size_t>(height());
-    auto code = WebPDecode(byteData->bytes(), byteData->size(), &config);
-    decodeSuccess = (code == VP8_STATUS_OK);
   }
   WebPFreeDecBuffer(&config.output);
   return decodeSuccess;

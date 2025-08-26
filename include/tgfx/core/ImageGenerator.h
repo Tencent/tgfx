@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <utility>
+
 #include "tgfx/core/ImageBuffer.h"
 
 namespace tgfx {
@@ -41,6 +43,10 @@ class ImageGenerator {
    */
   int height() const {
     return _height;
+  }
+
+  std::shared_ptr<ColorSpace> colorSpace() const {
+    return _colorSpace;
   }
 
   /**
@@ -73,18 +79,19 @@ class ImageGenerator {
    * additional storage. Returns an ImageBuffer backed by hardware if tryHardware is true and
    * the current platform supports creating it. Otherwise, a raster ImageBuffer is returned.
    */
-  std::shared_ptr<ImageBuffer> makeBuffer(bool tryHardware = true) const {
-    return onMakeBuffer(tryHardware);
+  std::shared_ptr<ImageBuffer> makeBuffer(bool tryHardware = true, std::shared_ptr<ColorSpace> colorSpace = nullptr) const {
+    return onMakeBuffer(tryHardware, std::move(colorSpace));
   }
 
  protected:
-  ImageGenerator(int width, int height) : _width(width), _height(height) {
+  ImageGenerator(int width, int height, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB()) : _width(width), _height(height), _colorSpace(std::move(colorSpace)) {
   }
 
-  virtual std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const = 0;
+  virtual std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware, std::shared_ptr<ColorSpace> colorSpace = nullptr) const = 0;
 
  private:
   int _width = 0;
   int _height = 0;
+  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
 };
 }  // namespace tgfx

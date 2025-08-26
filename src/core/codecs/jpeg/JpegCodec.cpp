@@ -18,6 +18,9 @@
 
 #include "core/codecs/jpeg/JpegCodec.h"
 #include <csetjmp>
+#include <iostream>
+#include <utility>
+
 #include "core/utils/MathExtra.h"
 #include "core/utils/OrientationHelper.h"
 #include "skcms.h"
@@ -78,6 +81,23 @@ std::shared_ptr<ImageCodec> JpegCodec::MakeFrom(std::shared_ptr<Data> imageBytes
   return MakeFromData("", std::move(imageBytes));
 }
 
+bool ExtractICCProfile(jpeg_decompress_struct* cinfo, std::vector<uint8_t>& iccProfileData) {
+  jpeg_saved_marker_ptr marker = cinfo->marker_list;
+  while (marker) {
+    if (marker->marker == JPEG_APP0 + 2 && marker->data_length > 14 &&
+        std::memcmp(marker->data, "ICC_PROFILE", 12) == 0) {
+      iccProfileData.insert(iccProfileData.end(), marker->data + 14,
+                            marker->data + marker->data_length);
+        }
+    marker = marker->next;
+  }
+  return !iccProfileData.empty();
+}
+
+bool ParseICCProfile(const std::vector<uint8_t>& iccProfileData, gfx::skcms_ICCProfile* profile) {
+  return skcms_Parse(iccProfileData.data(), iccProfileData.size(), profile);
+}
+
 std::shared_ptr<ImageCodec> JpegCodec::MakeFromData(const std::string& filePath,
                                                     std::shared_ptr<Data> byteData) {
   FILE* infile = nullptr;
@@ -88,6 +108,7 @@ std::shared_ptr<ImageCodec> JpegCodec::MakeFromData(const std::string& filePath,
   my_error_mgr jerr = {};
   cinfo.err = jpeg_std_error(&jerr.pub);
   Orientation orientation = Orientation::TopLeft;
+  std::shared_ptr<ColorSpace> cs = nullptr;
   do {
     if (setjmp(jerr.setjmp_buffer)) break;
     jpeg_create_decompress(&cinfo);
@@ -97,8 +118,19 @@ std::shared_ptr<ImageCodec> JpegCodec::MakeFromData(const std::string& filePath,
       jpeg_mem_src(&cinfo, byteData->bytes(), byteData->size());
     }
     jpeg_save_markers(&cinfo, kExifMarker, 0xFFFF);
+    jpeg_save_markers(&cinfo, JPEG_APP0 + 2, 0xFFFF);
     if (jpeg_read_header(&cinfo, TRUE) != JPEG_HEADER_OK) break;
     orientation = get_exif_orientation(&cinfo);
+    std::vector<uint8_t> iccProfileData;
+    if(ExtractICCProfile(&cinfo, iccProfileData)) {
+      gfx::skcms_ICCProfile profile;
+      if(ParseICCProfile(iccProfileData, &profile)) {
+       cs = ColorSpace::Make(*reinterpret_cast<ICCProfile*>(&profile));
+      }
+    }
+    if(!cs) {
+      cs = ColorSpace::MakeSRGB();
+    }
   } while (false);
   jpeg_destroy_decompress(&cinfo);
   if (infile) fclose(infile);
@@ -107,24 +139,7 @@ std::shared_ptr<ImageCodec> JpegCodec::MakeFromData(const std::string& filePath,
   }
   return std::shared_ptr<ImageCodec>(new JpegCodec(static_cast<int>(cinfo.image_width),
                                                    static_cast<int>(cinfo.image_height),
-                                                   orientation, filePath, std::move(byteData)));
-}
-
-bool ExtractICCProfile(jpeg_decompress_struct* cinfo, std::vector<uint8_t>& iccProfileData) {
-  jpeg_saved_marker_ptr marker = cinfo->marker_list;
-  while (marker) {
-    if (marker->marker == JPEG_APP0 + 2 && marker->data_length > 14 &&
-        std::memcmp(marker->data, "ICC_PROFILE", 12) == 0) {
-      iccProfileData.insert(iccProfileData.end(), marker->data + 14,
-                            marker->data + marker->data_length);
-    }
-    marker = marker->next;
-  }
-  return !iccProfileData.empty();
-}
-
-bool ParseICCProfile(const std::vector<uint8_t>& iccProfileData, gfx::skcms_ICCProfile* profile) {
-  return skcms_Parse(iccProfileData.data(), iccProfileData.size(), profile);
+                                                   orientation, filePath, std::move(byteData), cs));
 }
 
 bool ConvertCMYKPixels(void* dst, const gfx::skcms_ICCProfile cmykProfile,
@@ -140,14 +155,19 @@ bool ConvertCMYKPixels(void* dst, const gfx::skcms_ICCProfile cmykProfile,
     default:
       return false;
   }
-  const gfx::skcms_ICCProfile* dstProfile = gfx::skcms_sRGB_profile();
+  const gfx::skcms_ICCProfile* dstProfilePtr = gfx::skcms_sRGB_profile();
+  gfx::skcms_ICCProfile dstProfile;
+  if(dstInfo.colorSpace()) {
+    dstInfo.colorSpace()->toProfile(reinterpret_cast<ICCProfile*>(&dstProfile));
+    dstProfilePtr = &dstProfile;
+  }
   auto width = dstInfo.width();
   auto height = dstInfo.height();
   auto src = dst;
   for (int i = 0; i < height; i++) {
     bool status = gfx::skcms_Transform(
         src, gfx::skcms_PixelFormat_RGBA_8888, gfx::skcms_AlphaFormat_Unpremul, &cmykProfile, dst,
-        dstPixelFormat, gfx::skcms_AlphaFormat_Unpremul, dstProfile, static_cast<size_t>(width));
+        dstPixelFormat, gfx::skcms_AlphaFormat_Unpremul, dstProfilePtr, static_cast<size_t>(width));
     if (!status) {
       return false;
     }
@@ -186,18 +206,18 @@ uint32_t JpegCodec::getScaledDimensions(int newWidth, int newHeight) const {
 bool JpegCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (auto scaleDimensions = getScaledDimensions(dstInfo.width(), dstInfo.height())) {
     return readScaledPixels(dstInfo.colorType(), dstInfo.alphaType(), dstInfo.rowBytes(), dstPixels,
-                            scaleDimensions);
+                            scaleDimensions, dstInfo.colorSpace());
   }
   return ImageCodec::readPixels(dstInfo, dstPixels);
 }
 
-bool JpegCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+bool JpegCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,  std::shared_ptr<ColorSpace>,
                              void* dstPixels) const {
   return readScaledPixels(colorType, alphaType, dstRowBytes, dstPixels, 8);
 }
 
 bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
-                                 void* dstPixels, uint32_t scaleNum) const {
+                                 void* dstPixels, uint32_t scaleNum, std::shared_ptr<ColorSpace> colorSpace) const {
   if (dstPixels == nullptr) {
     return false;
   }
@@ -205,37 +225,13 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
     memset(dstPixels, 255, dstRowBytes * static_cast<size_t>(height()));
     return true;
   }
-  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
-  Bitmap bitmap = {};
-  auto outPixels = dstPixels;
-  auto outRowBytes = dstRowBytes;
-  J_COLOR_SPACE out_color_space;
-  switch (colorType) {
-    case ColorType::RGBA_8888:
-      out_color_space = JCS_EXT_RGBA;
-      break;
-    case ColorType::BGRA_8888:
-      out_color_space = JCS_EXT_BGRA;
-      break;
-    case ColorType::Gray_8:
-      out_color_space = JCS_GRAYSCALE;
-      break;
-    case ColorType::RGB_565:
-      out_color_space = JCS_RGB565;
-      break;
-    default:
-      auto success = bitmap.allocPixels(width(), height(), false, false);
-      if (!success) {
-        return false;
-      }
-      out_color_space = JCS_EXT_RGBA;
-      break;
-  }
-  Pixmap pixmap(bitmap);
-  if (!pixmap.isEmpty()) {
-    outPixels = pixmap.writablePixels();
-    outRowBytes = pixmap.rowBytes();
-  }
+  int imageWidth = width() * static_cast<int>(scaleNum) / 8;
+  int imageHeight = height() * static_cast<int>(scaleNum) / 8;
+  auto dstInfo = ImageInfo::Make(imageWidth, imageHeight, colorType, alphaType, dstRowBytes, std::move(colorSpace));
+  auto info = ImageInfo::Make(imageWidth, imageHeight, ColorType::RGBA_8888, AlphaType::Unpremultiplied, 0, ImageGenerator::colorSpace());
+  uint8_t* data = (uint8_t*)malloc(info.byteSize());
+  J_COLOR_SPACE out_color_space = JCS_EXT_RGBA;
+
   FILE* infile = nullptr;
   if (fileData == nullptr && (infile = fopen(filePath.c_str(), "rb")) == nullptr) {
     return false;
@@ -269,22 +265,17 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
     JSAMPROW pRow[1];
     int line = 0;
     while (cinfo.output_scanline < cinfo.output_height) {
-      pRow[0] = (JSAMPROW)(static_cast<unsigned char*>(outPixels) +
-                           outRowBytes * static_cast<size_t>(line));
+      pRow[0] = (JSAMPROW)(data + info.rowBytes() * static_cast<size_t>(line));
       jpeg_read_scanlines(&cinfo, pRow, 1);
       line++;
     }
     if (cinfo.out_color_space == JCS_CMYK) {
-      std::vector<uint8_t> iccProfileData;
-      if (ExtractICCProfile(&cinfo, iccProfileData)) {
-        gfx::skcms_ICCProfile cmykProfile;
-        if (ParseICCProfile(iccProfileData, &cmykProfile)) {
-          if (!ConvertCMYKPixels(outPixels, cmykProfile, dstInfo)) {
-            result = false;
-            jpeg_finish_decompress(&cinfo);
-            break;
-          }
-        }
+      gfx::skcms_ICCProfile cmykProfile;
+      ImageGenerator::colorSpace()->toProfile(reinterpret_cast<ICCProfile*>(&cmykProfile));
+      if (!ConvertCMYKPixels(data, cmykProfile, dstInfo)) {
+        result = false;
+        jpeg_finish_decompress(&cinfo);
+        break;
       }
     }
     result = jpeg_finish_decompress(&cinfo);
@@ -293,9 +284,9 @@ bool JpegCodec::readScaledPixels(ColorType colorType, AlphaType alphaType, size_
   if (infile) {
     fclose(infile);
   }
-  if (result && !pixmap.isEmpty()) {
-    pixmap.readPixels(dstInfo, dstPixels);
-  }
+  Pixmap pixmap(info, data);
+  result = pixmap.readPixels(dstInfo, dstPixels);
+  free(data);
   return result;
 }
 

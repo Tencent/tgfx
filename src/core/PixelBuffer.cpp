@@ -16,6 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <utility>
+
 #include "core/PixelBuffer.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "tgfx/gpu/Device.h"
@@ -90,13 +92,13 @@ class HardwarePixelBuffer : public PixelBuffer {
 };
 
 std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alphaOnly,
-                                               bool tryHardware) {
+                                               bool tryHardware, std::shared_ptr<ColorSpace> colorSpace) {
   if (width <= 0 || height <= 0) {
     return nullptr;
   }
   if (tryHardware) {
     auto hardwareBuffer = HardwareBufferAllocate(width, height, alphaOnly);
-    auto pixelBuffer = PixelBuffer::MakeFrom(hardwareBuffer);
+    auto pixelBuffer = PixelBuffer::MakeFrom(hardwareBuffer, std::move(colorSpace));
     HardwareBufferRelease(hardwareBuffer);
     if (pixelBuffer != nullptr) {
       return pixelBuffer;
@@ -104,6 +106,7 @@ std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alpha
   }
   auto colorType = alphaOnly ? ColorType::ALPHA_8 : ColorType::RGBA_8888;
   auto info = ImageInfo::Make(width, height, colorType);
+  info = info.makeColorSpace(colorSpace);
   if (info.isEmpty()) {
     return nullptr;
   }
@@ -114,8 +117,9 @@ std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alpha
   return std::make_shared<RasterPixelBuffer>(info, pixels);
 }
 
-std::shared_ptr<PixelBuffer> PixelBuffer::MakeFrom(HardwareBufferRef hardwareBuffer) {
+std::shared_ptr<PixelBuffer> PixelBuffer::MakeFrom(HardwareBufferRef hardwareBuffer, std::shared_ptr<ColorSpace> colorSpace) {
   auto info = HardwareBufferGetInfo(hardwareBuffer);
+  info = info.makeColorSpace(std::move(colorSpace));
   return info.isEmpty() ? nullptr : std::make_shared<HardwarePixelBuffer>(info, hardwareBuffer);
 }
 

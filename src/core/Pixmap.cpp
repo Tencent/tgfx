@@ -20,6 +20,7 @@
 #include <unordered_map>
 #include "core/PixelRef.h"
 #include "skcms.h"
+#include "tgfx/core/ColorSpace.h"
 
 namespace tgfx {
 
@@ -62,7 +63,7 @@ static const std::unordered_map<AlphaType, gfx::skcms_AlphaFormat> AlphaMapper{
 
 static void ConvertPixels(const ImageInfo& srcInfo, const void* srcPixels, const ImageInfo& dstInfo,
                           void* dstPixels) {
-  if (srcInfo.colorType() == dstInfo.colorType() && srcInfo.alphaType() == dstInfo.alphaType()) {
+  if (srcInfo.colorType() == dstInfo.colorType() && srcInfo.alphaType() == dstInfo.alphaType() && ColorSpace::Equals(srcInfo.colorSpace().get(), dstInfo.colorSpace().get())) {
     CopyRectMemory(srcPixels, srcInfo.rowBytes(), dstPixels, dstInfo.rowBytes(),
                    dstInfo.minRowBytes(), static_cast<size_t>(dstInfo.height()));
     return;
@@ -73,9 +74,30 @@ static void ConvertPixels(const ImageInfo& srcInfo, const void* srcPixels, const
   auto dstAlpha = AlphaMapper.at(dstInfo.alphaType());
   auto width = dstInfo.width();
   auto height = dstInfo.height();
+  ICCProfile srcProfile;
+  ICCProfile* srcProfilePtr = nullptr;
+  if(srcInfo.colorSpace()) {
+    srcInfo.colorSpace()->toProfile(&srcProfile);
+    srcProfilePtr = &srcProfile;
+  }
+  ICCProfile dstProfile;
+  ICCProfile* dstProfilePtr = nullptr;
+  if(dstInfo.colorSpace()) {
+    dstInfo.colorSpace()->toProfile(&dstProfile);
+    dstProfilePtr = &dstProfile;
+  }
+
+  if(srcProfilePtr == nullptr) {
+    srcProfilePtr = dstProfilePtr;
+  }
+
+  if(dstProfilePtr == nullptr) {
+    dstProfilePtr = srcProfilePtr;
+  }
+
   for (int i = 0; i < height; i++) {
-    gfx::skcms_Transform(srcPixels, srcFormat, srcAlpha, nullptr, dstPixels, dstFormat, dstAlpha,
-                         nullptr, static_cast<size_t>(width));
+    gfx::skcms_Transform(srcPixels, srcFormat, srcAlpha, (gfx::skcms_ICCProfile*)srcProfilePtr, dstPixels, dstFormat, dstAlpha,
+                         (gfx::skcms_ICCProfile*)dstProfilePtr, static_cast<size_t>(width));
     dstPixels = AddOffset(dstPixels, dstInfo.rowBytes());
     srcPixels = AddOffset(srcPixels, srcInfo.rowBytes());
   }

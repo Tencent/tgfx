@@ -35,7 +35,7 @@ std::shared_ptr<Image> RasterizedImage::makeRasterized() const {
 
 std::shared_ptr<TextureProxy> RasterizedImage::lockTextureProxy(const TPArgs& args) const {
   auto proxyProvider = args.context->proxyProvider();
-  auto textureKey = getTextureKey();
+  auto textureKey = getTextureKey(args.colorSpace);
   auto textureProxy = proxyProvider->findOrWrapTextureProxy(textureKey);
   if (textureProxy != nullptr) {
     return textureProxy;
@@ -70,7 +70,7 @@ std::shared_ptr<Image> RasterizedImage::onMakeScaled(int newWidth, int newHeight
 }
 
 std::shared_ptr<Image> RasterizedImage::onMakeDecoded(Context* context, bool tryHardware) const {
-  auto key = getTextureKey();
+  auto key = getTextureKey(nullptr);
   if (context != nullptr) {
     auto proxy = context->proxyProvider()->findProxy(key);
     if (proxy != nullptr) {
@@ -94,12 +94,19 @@ std::shared_ptr<Image> RasterizedImage::onMakeMipmapped(bool enabled) const {
   return image;
 }
 
-UniqueKey RasterizedImage::getTextureKey() const {
+UniqueKey RasterizedImage::getTextureKey(std::shared_ptr<ColorSpace> colorSpace) const {
+  UniqueKey key = uniqueKey;
+  if(colorSpace) {
+    auto hash = colorSpace->hash();
+    uint32_t* hash32 = reinterpret_cast<uint32_t*>(&hash);
+    key = UniqueKey::Append(key, hash32, 2);
+  }
+
   if (hasMipmaps()) {
     static const auto MipmapFlag = UniqueID::Next();
-    return UniqueKey::Append(uniqueKey, &MipmapFlag, 1);
+    return UniqueKey::Append(key, &MipmapFlag, 1);
   }
-  return uniqueKey;
+  return key;
 }
 
 }  // namespace tgfx

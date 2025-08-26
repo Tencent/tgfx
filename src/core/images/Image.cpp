@@ -18,6 +18,8 @@
 
 #include "tgfx/core/Image.h"
 #include <memory>
+
+#include "ColorSpaceImage.h"
 #include "core/images/CodecImage.h"
 #include "core/images/FilterImage.h"
 #include "core/images/OrientImage.h"
@@ -121,6 +123,12 @@ std::shared_ptr<Image> Image::MakeAdopted(Context* context, const BackendTexture
   }
   auto textureProxy = context->proxyProvider()->wrapExternalTexture(backendTexture, origin, true);
   return TextureImage::Wrap(std::move(textureProxy));
+}
+
+std::shared_ptr<Image> Image::makeColorSpace(std::shared_ptr<ColorSpace> colorSpace) const {
+  auto result = std::make_shared<ColorSpaceImage>(std::move(colorSpace), weakThis.lock());
+  result->weakThis = result;
+  return result;
 }
 
 std::shared_ptr<Image> Image::makeTextureImage(Context* context) const {

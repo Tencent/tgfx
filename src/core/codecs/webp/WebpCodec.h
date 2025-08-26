@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <utility>
+
 #include "tgfx/core/ImageCodec.h"
 #include "webp/decode.h"
 #include "webp/demux.h"
@@ -35,7 +37,7 @@ class WebpCodec : public ImageCodec {
 #endif
 
  protected:
-  bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+  bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes, std::shared_ptr<ColorSpace> colorSpace,
                     void* dstPixels) const override;
 
   std::shared_ptr<Data> getEncodedData() const override;
@@ -45,8 +47,8 @@ class WebpCodec : public ImageCodec {
   std::string filePath;
 
   explicit WebpCodec(int width, int height, Orientation orientation, std::string filePath,
-                     std::shared_ptr<Data> fileData)
-      : ImageCodec(width, height, orientation), fileData(std::move(fileData)),
+                     std::shared_ptr<Data> fileData, std::shared_ptr<ColorSpace> colorSpace = nullptr)
+      : ImageCodec(width, height, orientation, std::move(colorSpace)), fileData(std::move(fileData)),
         filePath(std::move(filePath)) {
   }
 };

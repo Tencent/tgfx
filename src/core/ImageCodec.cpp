@@ -155,7 +155,7 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
     return false;
   }
   if (dstInfo.width() == width() && dstInfo.height() == height()) {
-    return onReadPixels(dstInfo.colorType(), dstInfo.alphaType(), dstInfo.rowBytes(), dstPixels);
+    return onReadPixels(dstInfo.colorType(), dstInfo.alphaType(), dstInfo.rowBytes(), dstInfo.colorSpace(), dstPixels);
   }
 
   Buffer buffer = {};
@@ -184,7 +184,7 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (!buffer.alloc(srcRowBytes * static_cast<size_t>(height()))) {
     return false;
   }
-  auto result = onReadPixels(colorType, dstInfo.alphaType(), srcRowBytes, buffer.data());
+  auto result = onReadPixels(colorType, dstInfo.alphaType(), srcRowBytes, dstInfo.colorSpace(), buffer.data());
   if (!result) {
     return false;
   }
@@ -200,8 +200,8 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   return true;
 }
 
-std::shared_ptr<ImageBuffer> ImageCodec::onMakeBuffer(bool tryHardware) const {
-  auto pixelBuffer = PixelBuffer::Make(width(), height(), isAlphaOnly(), tryHardware);
+std::shared_ptr<ImageBuffer> ImageCodec::onMakeBuffer(bool tryHardware, std::shared_ptr<ColorSpace> colorSpace) const {
+  auto pixelBuffer = PixelBuffer::Make(width(), height(), isAlphaOnly(), tryHardware, colorSpace);
   if (pixelBuffer == nullptr) {
     return nullptr;
   }

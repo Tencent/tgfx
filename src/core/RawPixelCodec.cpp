@@ -68,7 +68,7 @@ class RawPixelData : public ImageBuffer {
   std::shared_ptr<Data> pixels = nullptr;
 };
 
-std::shared_ptr<ImageBuffer> RawPixelCodec::onMakeBuffer(bool tryHardware) const {
+std::shared_ptr<ImageBuffer> RawPixelCodec::onMakeBuffer(bool tryHardware, std::shared_ptr<ColorSpace>) const {
   if (info.alphaType() != AlphaType::Unpremultiplied) {
     switch (info.colorType()) {
       case ColorType::ALPHA_8:

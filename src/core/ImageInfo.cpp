@@ -44,7 +44,7 @@ size_t ImageInfo::GetBytesPerPixel(ColorType colorType) {
 }
 
 ImageInfo ImageInfo::Make(int width, int height, ColorType colorType, AlphaType alphaType,
-                          size_t rowBytes) {
+                          size_t rowBytes, std::shared_ptr<ColorSpace> colorSpace) {
   static ImageInfo emptyInfo = {};
   if (colorType == ColorType::Unknown || alphaType == AlphaType::Unknown ||
       !IsValidSize(width, height)) {
@@ -63,7 +63,7 @@ ImageInfo ImageInfo::Make(int width, int height, ColorType colorType, AlphaType 
   } else if (colorType == ColorType::RGB_565) {
     alphaType = AlphaType::Opaque;
   }
-  return {width, height, colorType, alphaType, rowBytes};
+  return {width, height, colorType, alphaType, rowBytes, colorSpace};
 }
 
 size_t ImageInfo::bytesPerPixel() const {

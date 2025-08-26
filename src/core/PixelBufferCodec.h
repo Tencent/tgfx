@@ -33,7 +33,7 @@ class PixelBufferCodec : public ImageCodec {
     return source->isAlphaOnly();
   }
 
-  bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+  bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,  std::shared_ptr<ColorSpace> colorSpace,
                     void* dstPixels) const override;
 
  private:

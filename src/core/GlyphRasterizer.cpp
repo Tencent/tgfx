@@ -32,7 +32,7 @@ GlyphRasterizer::~GlyphRasterizer() {
   }
 }
 
-bool GlyphRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+bool GlyphRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,  std::shared_ptr<ColorSpace>,
                                    void* dstPixels) const {
   auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
   return scalerContext->readPixels(glyphID, fauxBold, stroke, dstInfo, dstPixels);

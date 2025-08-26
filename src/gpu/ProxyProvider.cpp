@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ProxyProvider.h"
+
+#include <utility>
 #include "core/ShapeRasterizer.h"
 #include "core/shapes/MatrixShape.h"
 #include "core/utils/MathExtra.h"
@@ -249,7 +251,7 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
-    std::shared_ptr<ImageGenerator> generator, bool mipmapped, uint32_t renderFlags) {
+    std::shared_ptr<ImageGenerator> generator, bool mipmapped, uint32_t renderFlags, std::shared_ptr<ColorSpace> colorSpace) {
   if (generator == nullptr) {
     return nullptr;
   }
@@ -263,7 +265,7 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
   auto asyncDecoding = false;
 #endif
   // Ensure the image source is retained so it won't be destroyed prematurely during async decoding.
-  auto source = ImageSource::MakeFrom(std::move(generator), !mipmapped, asyncDecoding);
+  auto source = ImageSource::MakeFrom(std::move(generator), !mipmapped, asyncDecoding, std::move(colorSpace));
   return createTextureProxyByImageSource(std::move(source), width, height, alphaOnly, mipmapped);
 }
 

@@ -32,11 +32,11 @@ class RawPixelCodec : public ImageCodec {
   }
 
  protected:
-  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
+  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware, std::shared_ptr<ColorSpace> colorSpace = nullptr) const override;
 
-  bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+  bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,  std::shared_ptr<ColorSpace> colorSpace,
                     void* dstPixels) const override {
-    auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
+    auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes, colorSpace);
     return Pixmap(info, pixels->data()).readPixels(dstInfo, dstPixels);
   }
 

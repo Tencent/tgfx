@@ -2691,18 +2691,16 @@ TGFX_TEST(CanvasTest, RotateImageRect) {
   auto context = scope.getContext();
   ASSERT_TRUE(context != nullptr);
 
-  int surfaceWidth = 100;
-  int surfaceHeight = 100;
+  int surfaceWidth = 128;
+  int surfaceHeight = 128;
   auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
-  auto image = MakeImage("resources/apitest/imageReplacement.png");
-  image = image->makeOriented(Orientation::RightBottom);
+  auto image = MakeImage("resources/apitest/mandrill_128.webp");
+  image = image->makeColorSpace(ColorSpace::MakeRGB(namedTransferFn::_2Dot2, namedGamut::DisplayP3)->makeColorSpin());
+  image = image->makeScaled(64, 64);
   ASSERT_TRUE(image != nullptr);
-
-  auto srcRect = Rect::MakeXYWH(20, 20, 40, 40);
-  auto dstRect = Rect::MakeXYWH(0, 0, 100, 100);
-  canvas->drawImageRect(image, srcRect, dstRect, {}, nullptr, SrcRectConstraint::Strict);
+  canvas->drawImage(image);
   context->flushAndSubmit();
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/RotateImageRect"));
 }

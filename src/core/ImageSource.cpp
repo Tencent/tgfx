@@ -18,26 +18,28 @@
 
 #include "ImageSource.h"
 
+#include <utility>
+
 namespace tgfx {
 std::unique_ptr<DataSource<ImageBuffer>> ImageSource::MakeFrom(
-    std::shared_ptr<ImageGenerator> generator, bool tryHardware, bool asyncDecoding) {
+    std::shared_ptr<ImageGenerator> generator, bool tryHardware, bool asyncDecoding, std::shared_ptr<ColorSpace> colorSpace) {
   if (generator == nullptr) {
     return nullptr;
   }
   if (asyncDecoding && !generator->asyncSupport()) {
     // The generator may have built-in async decoding support which will not block the main thread.
     // Therefore, we should trigger the decoding ASAP.
-    auto buffer = generator->makeBuffer(tryHardware);
+    auto buffer = generator->makeBuffer(tryHardware, std::move(colorSpace));
     return Wrap(std::move(buffer));
   }
-  auto imageSource = std::make_unique<ImageSource>(std::move(generator), tryHardware);
+  auto imageSource = std::make_unique<ImageSource>(std::move(generator), tryHardware, colorSpace);
   if (asyncDecoding) {
     return Async(std::move(imageSource));
   }
   return imageSource;
 }
 
-ImageSource::ImageSource(std::shared_ptr<ImageGenerator> generator, bool tryHardware)
-    : generator(std::move(generator)), tryHardware(tryHardware) {
+ImageSource::ImageSource(std::shared_ptr<ImageGenerator> generator, bool tryHardware, std::shared_ptr<ColorSpace> colorSpace)
+    : generator(std::move(generator)), tryHardware(tryHardware), colorSpace(std::move(colorSpace)) {
 }
 }  // namespace tgfx

@@ -56,7 +56,7 @@ std::shared_ptr<PathRasterizer> PathRasterizer::MakeFrom(int width, int height,
                                             needsGammaCorrection);
 }
 
-bool FTPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+bool FTPathRasterizer::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,  std::shared_ptr<ColorSpace>,
                                     void* dstPixels) const {
   if (dstPixels == nullptr) {
     return false;

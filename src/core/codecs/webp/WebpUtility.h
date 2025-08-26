@@ -20,6 +20,7 @@
 
 #include <string>
 #include "tgfx/core/Orientation.h"
+#include "tgfx/core/ColorSpace.h"
 
 namespace tgfx {
 
@@ -27,6 +28,7 @@ struct DecodeInfo {
   int width = 0;
   int height = 0;
   Orientation orientation = Orientation::TopLeft;
+  std::shared_ptr<ColorSpace> colorSpace = nullptr;
 };
 
 class WebpUtility {

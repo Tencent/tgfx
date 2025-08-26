@@ -28,7 +28,7 @@ std::shared_ptr<PixelBufferCodec> PixelBufferCodec::Make(std::shared_ptr<PixelBu
   return std::make_shared<PixelBufferCodec>(std::move(source));
 }
 
-bool PixelBufferCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+bool PixelBufferCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,  std::shared_ptr<ColorSpace>,
                                     void* dstPixels) const {
   auto pixels = source->lockPixels();
   if (pixels == nullptr) {

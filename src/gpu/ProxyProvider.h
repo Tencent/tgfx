@@ -84,7 +84,7 @@ class ProxyProvider {
    */
   std::shared_ptr<TextureProxy> createTextureProxy(std::shared_ptr<ImageGenerator> generator,
                                                    bool mipmapped = false,
-                                                   uint32_t renderFlags = 0);
+                                                   uint32_t renderFlags = 0, std::shared_ptr<ColorSpace> colorSpace = nullptr);
 
   /**
    * Creates a TextureProxy for the given image source.

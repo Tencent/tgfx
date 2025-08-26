@@ -18,6 +18,8 @@
 
 #pragma once
 
+#include <utility>
+
 #include "tgfx/core/ImageCodec.h"
 
 namespace tgfx {
@@ -34,13 +36,13 @@ class JpegCodec : public ImageCodec {
   uint32_t getScaledDimensions(int newWidth, int newHeight) const;
 
  protected:
-  bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
+  bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,  std::shared_ptr<ColorSpace> colorSpace,
                     void* dstPixels) const override;
 
   bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
 
   bool readScaledPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
-                        void* dstPixels, uint32_t scaleNum) const;
+                        void* dstPixels, uint32_t scaleNum, std::shared_ptr<ColorSpace> colorSpace = nullptr) const;
 
   std::shared_ptr<Data> getEncodedData() const override;
 
@@ -51,8 +53,8 @@ class JpegCodec : public ImageCodec {
   static std::shared_ptr<ImageCodec> MakeFromData(const std::string& filePath,
                                                   std::shared_ptr<Data> byteData);
   explicit JpegCodec(int width, int height, Orientation orientation, std::string filePath,
-                     std::shared_ptr<Data> fileData)
-      : ImageCodec(width, height, orientation), fileData(std::move(fileData)),
+                     std::shared_ptr<Data> fileData, std::shared_ptr<ColorSpace> colorSpace)
+      : ImageCodec(width, height, orientation, std::move(colorSpace)), fileData(std::move(fileData)),
         filePath(std::move(filePath)) {
   }
 };

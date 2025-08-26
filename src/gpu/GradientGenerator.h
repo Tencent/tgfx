@@ -33,7 +33,7 @@ class GradientGenerator : public ImageGenerator {
   }
 
  protected:
-  std::shared_ptr<ImageBuffer> onMakeBuffer(bool) const override;
+  std::shared_ptr<ImageBuffer> onMakeBuffer(bool, std::shared_ptr<ColorSpace> colorSpace = nullptr) const override;
 
  private:
   std::vector<Color> colors = {};

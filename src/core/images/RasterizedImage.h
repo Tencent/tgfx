@@ -50,6 +50,10 @@ class RasterizedImage : public Image {
     return source->hasMipmaps();
   }
 
+  std::shared_ptr<ColorSpace> colorSpace() const override {
+    return source->colorSpace();
+  }
+
   std::shared_ptr<Image> makeRasterized() const override;
 
  protected:
@@ -71,7 +75,7 @@ class RasterizedImage : public Image {
   std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
 
  private:
-  UniqueKey getTextureKey() const;
+  UniqueKey getTextureKey(std::shared_ptr<ColorSpace> colorSpace = nullptr) const;
 
   UniqueKey uniqueKey;
 
