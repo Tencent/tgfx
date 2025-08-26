@@ -1,6 +1,8 @@
 cmake_minimum_required(VERSION 3.13)
 project(TGFX)
 
+option(TGFX_USE_VCPKG "Enable vcpkg package manager support for installation" OFF)
+
 #set(CMAKE_VERBOSE_MAKEFILE ON)
 include(./third_party/vendor_tools/vendor.cmake)
 
@@ -26,7 +28,7 @@ if (NOT WEB OR EMSCRIPTEN_PTHREADS)
     option(TGFX_USE_THREADS "Enable support for multithreaded rendering" ON)
 endif ()
 
-if (CMAKE_BUILD_TYPE MATCHES "Debug")
+if (CMAKE_BUILD_TYPE MATCHES "Debug" AND NOT TGFX_USE_VCPKG)
     option(TGFX_USE_INSPECTOR "Enable profiling support for the TGFX Inspector tool" ON)
 endif ()
 
@@ -107,6 +109,7 @@ message("TGFX_USE_WEBP_ENCODE: ${TGFX_USE_WEBP_ENCODE}")
 message("TGFX_BUILD_TESTS: ${TGFX_BUILD_TESTS}")
 message("TGFX_USE_INSPECTOR: ${TGFX_USE_INSPECTOR}")
 message("TGFX_BUILD_FRAMEWORK: ${TGFX_BUILD_FRAMEWORK}")
+message("TGFX_USE_VCPKG: ${TGFX_USE_VCPKG}")
 
 if (NOT CMAKE_OSX_DEPLOYMENT_TARGET)
     if (DEPLOYMENT_TARGET)
@@ -533,7 +536,13 @@ add_library(tgfx STATIC ${TGFX_FILES})
 add_dependencies(tgfx tgfx-vendor)
 target_compile_definitions(tgfx PUBLIC ${TGFX_DEFINES})
 target_compile_options(tgfx PUBLIC ${TGFX_COMPILE_OPTIONS})
-target_include_directories(tgfx PUBLIC include PRIVATE src)
+target_include_directories(tgfx
+    PUBLIC
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:include>
+    PRIVATE
+        src
+)
 target_include_directories(tgfx SYSTEM PRIVATE ${TGFX_INCLUDES})
 merge_libraries_into(tgfx ${TGFX_STATIC_LIBS})
 target_link_libraries(tgfx ${TGFX_SHARED_LIBS})
@@ -570,6 +579,46 @@ if (TGFX_BUILD_DRAWERS)
     target_compile_options(tgfx-drawers PUBLIC ${TGFX_COMPILE_OPTIONS})
     target_include_directories(tgfx-drawers PUBLIC drawers/include PRIVATE include drawers/src)
     target_link_libraries(tgfx-drawers)
+endif ()
+
+if(TGFX_USE_VCPKG)
+    install(TARGETS tgfx
+        EXPORT tgfxTargets
+        LIBRARY DESTINATION lib
+        ARCHIVE DESTINATION lib
+        RUNTIME DESTINATION bin
+        INCLUDES DESTINATION include
+    )
+
+    install(DIRECTORY include/
+        DESTINATION include
+        FILES_MATCHING PATTERN "*.h" PATTERN "*.hpp"
+    )
+
+    install(EXPORT tgfxTargets
+        FILE tgfxTargets.cmake
+        NAMESPACE tgfx::
+        DESTINATION share/tgfx
+    )
+
+    include(CMakePackageConfigHelpers)
+    write_basic_package_version_file(
+        tgfxConfigVersion.cmake
+        VERSION ${TGFX_VERSION}
+        COMPATIBILITY AnyNewerVersion
+    )
+
+    configure_package_config_file(
+        ${CMAKE_CURRENT_SOURCE_DIR}/cmake/tgfxConfig.cmake.in
+        ${CMAKE_CURRENT_BINARY_DIR}/tgfxConfig.cmake
+        INSTALL_DESTINATION share/tgfx
+    )
+
+    install(FILES
+        ${CMAKE_CURRENT_BINARY_DIR}/tgfxConfig.cmake
+        ${CMAKE_CURRENT_BINARY_DIR}/tgfxConfigVersion.cmake
+        DESTINATION share/tgfx
+    )
 endif ()
 
 if (TGFX_BUILD_TESTS)
