@@ -446,12 +446,12 @@ static void CoeffHandler_ONE_MINUS_SRC1_COLOR(FragmentShaderBuilder* fsBuilder, 
 
 static void CoeffHandler_SRC1_ALPHA(FragmentShaderBuilder* fsBuilder, const char*,
                                     const char* src1ColorName, const char*) {
-  fsBuilder->codeAppendf(" * (vec4(1.0) - %s);", src1ColorName);
+  fsBuilder->codeAppendf(" * %s.a;", src1ColorName);
 }
 
 static void CoeffHandler_ONE_MINUS_SRC1_ALPHA(FragmentShaderBuilder* fsBuilder, const char*,
                                               const char* src1ColorName, const char*) {
-  fsBuilder->codeAppendf(" * (vec4(1.0) - %s);", src1ColorName);
+  fsBuilder->codeAppendf(" * (1.0 - %s.a);", src1ColorName);
 }
 
 using CoeffHandler = void (*)(FragmentShaderBuilder* fsBuilder, const char* srcColorName,
