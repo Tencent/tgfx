@@ -20,18 +20,18 @@
 #include <vector>
 #include "tgfx/layers/Layer.h"
 
-namespace tgfx::debug {
+namespace tgfx::inspect {
 
-class LayerViewerManager final {
+class LayerViewer final {
  public:
-  static LayerViewerManager& Get() {
-    static LayerViewerManager instance;
+  static LayerViewer& Get() {
+    static LayerViewer instance;
     return instance;
   }
 
-  void pickLayer(std::shared_ptr<Layer> layer);
+  void setSelectLayer(std::shared_ptr<Layer> layer);
 
-  void setDisplayList(DisplayList* displayList);
+  void setDisplayList(DisplayList* list);
 
   void serializingLayerTree();
 
@@ -41,24 +41,24 @@ class LayerViewerManager final {
 
   void renderImageAndSend(Context* context);
 
-  LayerViewerManager(const LayerViewerManager&) = delete;
+  LayerViewer(const LayerViewer&) = delete;
 
-  LayerViewerManager(LayerViewerManager&&) = delete;
+  LayerViewer(LayerViewer&&) = delete;
 
-  LayerViewerManager& operator=(const LayerViewerManager&) = delete;
+  LayerViewer& operator=(const LayerViewer&) = delete;
 
-  LayerViewerManager& operator=(LayerViewerManager&&) = delete;
+  LayerViewer& operator=(LayerViewer&&) = delete;
 
- private:
+ protected:
   void setCallBack();
 
-  void addHighLightOverlay(Color color, std::shared_ptr<Layer> hovedLayer);
+  void addHighLightOverlay(Color color, std::shared_ptr<Layer> layer);
 
   void sendPickedLayerAddress(const std::shared_ptr<Layer>& layer);
 
   void sendFlushAttributeAck(uint64_t address);
 
-  LayerViewerManager();
+  LayerViewer();
 
  private:
   std::unordered_map<uint64_t, std::shared_ptr<Layer>> layerMap = {};
@@ -76,4 +76,4 @@ class LayerViewerManager final {
   DisplayList* displayList = nullptr;
 };
 
-}  // namespace tgfx::debug
+}  // namespace tgfx::inspect

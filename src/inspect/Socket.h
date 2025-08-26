@@ -22,7 +22,7 @@
 #include <cstdint>
 #include <memory>
 
-namespace tgfx::debug {
+namespace tgfx::inspect {
 class Socket {
  public:
   explicit Socket(int sock);
@@ -114,7 +114,7 @@ class ListenSocket {
 
  private:
   int sock = 0;
-  uint16_t listenPort;
+  uint16_t listenPort = 0;
 };
 
 class UdpBroadcast {
@@ -168,7 +168,7 @@ class IpAddress {
 
  private:
   uint32_t number = 0;
-  char text[17] = "";
+  char text[17] = {};
 };
 
 class UdpListen {
@@ -195,4 +195,4 @@ class UdpListen {
   int sock = 0;
 };
 
-}  // namespace tgfx::debug
+}  // namespace tgfx::inspect

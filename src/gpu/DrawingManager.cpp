@@ -21,13 +21,13 @@
 #include "ProxyProvider.h"
 #include "core/AtlasCellDecodeTask.h"
 #include "core/AtlasManager.h"
-#include "debug/Mark.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/tasks/GenerateMipmapsTask.h"
 #include "gpu/tasks/RenderTargetCopyTask.h"
 #include "gpu/tasks/RuntimeDrawTask.h"
 #include "gpu/tasks/SemaphoreWaitTask.h"
+#include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -156,7 +156,7 @@ void DrawingManager::addSemaphoreWaitTask(std::shared_ptr<Semaphore> semaphore) 
 }
 
 std::shared_ptr<CommandBuffer> DrawingManager::flush(BackendSemaphore* signalSemaphore) {
-  TASK_MARK(tgfx::debug::OpTaskType::Flush);
+  TASK_MARK(tgfx::inspect::OpTaskType::Flush);
   while (!compositors.empty()) {
     auto compositor = compositors.back();
     // The makeClosed() method may add more compositors to the list.
@@ -172,7 +172,7 @@ std::shared_ptr<CommandBuffer> DrawingManager::flush(BackendSemaphore* signalSem
     return nullptr;
   }
   {
-    TASK_MARK(tgfx::debug::OpTaskType::ResourceTask);
+    TASK_MARK(tgfx::inspect::OpTaskType::ResourceTask);
     for (auto& task : resourceTasks) {
       task->execute(context);
       task = nullptr;
@@ -184,7 +184,7 @@ std::shared_ptr<CommandBuffer> DrawingManager::flush(BackendSemaphore* signalSem
   auto commandEncoder = context->gpu()->createCommandEncoder();
 
   {
-    TASK_MARK(tgfx::debug::OpTaskType::RenderTask);
+    TASK_MARK(tgfx::inspect::OpTaskType::RenderTask);
     for (auto& task : renderTasks) {
       task->execute(commandEncoder.get());
       task = nullptr;

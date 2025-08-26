@@ -17,8 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ClearOp.h"
-#include "debug/Mark.h"
 #include "gpu/RenderPass.h"
+#include "inspect/InspectorMark.h"
 
 namespace tgfx {
 PlacementPtr<ClearOp> ClearOp::Make(Context* context, Color color, const Rect& scissor) {
@@ -29,7 +29,7 @@ PlacementPtr<ClearOp> ClearOp::Make(Context* context, Color color, const Rect& s
 }
 
 void ClearOp::execute(RenderPass* renderPass, RenderTarget*) {
-  OPERATE_MARK(tgfx::debug::OpTaskType::ResolveOp);
+  OPERATE_MARK(tgfx::inspect::OpTaskType::ResolveOp);
   ATTRIBUTE_NAME("bounds", scissor);
   ATTRIBUTE_NAME("color", color);
   renderPass->clear(scissor, color);

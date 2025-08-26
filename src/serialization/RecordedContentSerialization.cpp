@@ -76,7 +76,7 @@ std::shared_ptr<Data> RecordedContentSerialization::Serialize(
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, tgfx::debug::LayerInspectorMsgType::LayerSubAttribute,
+  SerializeUtils::SerializeBegin(fbb, tgfx::inspect::LayerViewerMessage::LayerSubAttribute,
                                  startMap, contentMap);
   auto type = Types::Get(content);
   SerializeUtils::SetFlexBufferMap(fbb, "type", SerializeUtils::RecordedContentTypeToString(type));

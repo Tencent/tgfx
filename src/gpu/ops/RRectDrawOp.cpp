@@ -18,11 +18,11 @@
 
 #include "RRectDrawOp.h"
 #include "core/DataSource.h"
-#include "debug/Mark.h"
 #include "gpu/GPUBuffer.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"
+#include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -52,13 +52,13 @@ RRectDrawOp::RRectDrawOp(RRectsVertexProvider* provider)
 }
 
 void RRectDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
-  OPERATE_MARK(tgfx::debug::OpTaskType::RRectDrawOp);
+  OPERATE_MARK(tgfx::inspect::OpTaskType::RRectDrawOp);
   ATTRIBUTE_NAME("rectCount", static_cast<uint32_t>(rectCount));
   ATTRIBUTE_NAME("useScale", useScale);
   ATTRIBUTE_NAME("hasStroke", hasStroke);
   ATTRIBUTE_NAME("commonColor", commonColor);
-  ATTRIBUTE_NAME_ENUM("blenderMode", getBlendMode(), tgfx::debug::CustomEnumType::BlendMode);
-  ATTRIBUTE_NAME_ENUM("aaType", getAAType(), tgfx::debug::CustomEnumType::AAType);
+  ATTRIBUTE_NAME_ENUM("blenderMode", getBlendMode(), tgfx::inspect::CustomEnumType::BlendMode);
+  ATTRIBUTE_NAME_ENUM("aaType", getAAType(), tgfx::inspect::CustomEnumType::AAType);
   if (indexBufferProxy == nullptr || vertexBufferProxyView == nullptr) {
     return;
   }

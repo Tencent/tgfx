@@ -32,7 +32,7 @@ std::shared_ptr<Data> RectSerialization::Serialize(const Rect* rect) {
   flexbuffers::Builder fbb;
   size_t startMap;
   size_t contentMap;
-  SerializeUtils::SerializeBegin(fbb, tgfx::debug::LayerInspectorMsgType::LayerSubAttribute,
+  SerializeUtils::SerializeBegin(fbb, tgfx::inspect::LayerViewerMessage::LayerSubAttribute,
                                  startMap, contentMap);
   SerializeRectImpl(fbb, rect);
   SerializeUtils::SerializeEnd(fbb, startMap, contentMap);

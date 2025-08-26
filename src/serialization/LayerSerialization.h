@@ -20,7 +20,7 @@
 
 #include <functional>
 #include "SerializationUtils.h"
-#include "debug/LayerInspectorProtocol.h"
+#include "inspect/Protocol.h"
 #include "tgfx/core/Data.h"
 
 namespace tgfx {
@@ -35,8 +35,8 @@ class LayerSerialization {
   static std::shared_ptr<Data> SerializeLayer(
       const Layer* layer, SerializeUtils::ComplexObjSerMap* map,
       SerializeUtils::RenderableObjSerMap* rosMap,
-      tgfx::debug::LayerInspectorMsgType type =
-          tgfx::debug::LayerInspectorMsgType::LayerSubAttribute);
+      tgfx::inspect::LayerViewerMessage type =
+          tgfx::inspect::LayerViewerMessage::LayerSubAttribute);
 
  private:
   static void SerializeTreeNodeImpl(

@@ -27,10 +27,10 @@
 #include "lz4.h"
 #include "tgfx/core/Clock.h"
 
-namespace tgfx::debug {
+namespace tgfx::inspect {
 Inspector::Inspector()
     : epoch(Clock::Now()), initTime(Clock::Now()), dataBuffer(TargetFrameSize * 3),
-      lz4Buf(LZ4Size + sizeof(lz4sz_t)), lz4Stream(LZ4_createStream()), broadcast(BroadcastNum) {
+      lz4Buf(LZ4Size + sizeof(lz4sz_t)), lz4Stream(LZ4_createStream()), broadcast(BroadcastCount) {
   spawnWorkerThreads();
 }
 
@@ -45,6 +45,121 @@ Inspector::~Inspector() {
     LZ4_freeStream(static_cast<LZ4_stream_t*>(lz4Stream));
     lz4Stream = nullptr;
   }
+}
+
+void Inspector::QueueSerialFinish(const MsgItem& item) {
+  GetInspector().serialConcurrentQueue.enqueue(item);
+}
+
+void Inspector::SendAttributeData(const char* name, const Rect& rect) {
+  float value[4] = {rect.left, rect.right, rect.top, rect.bottom};
+  SendAttributeData(name, value, 4);
+}
+
+void Inspector::SendAttributeData(const char* name, const Matrix& matrix) {
+  float value[6] = {1, 0, 0, 0, 1, 0};
+  value[0] = matrix.getScaleX();
+  value[1] = matrix.getSkewX();
+  value[2] = matrix.getTranslateX();
+  value[3] = matrix.getSkewY();
+  value[4] = matrix.getScaleY();
+  value[5] = matrix.getTranslateY();
+  SendAttributeData(name, value, 6);
+}
+
+void Inspector::SendAttributeData(const char* name, const std::optional<Matrix>& matrix) {
+  auto value = Matrix::MakeAll(1, 0, 0, 0, 1, 0);
+  if (matrix.has_value()) {
+    value = matrix.value();
+  }
+  SendAttributeData(name, value);
+}
+
+void Inspector::SendAttributeData(const char* name, const Color& color) {
+  auto r = static_cast<uint8_t>(color.red * 255.f);
+  auto g = static_cast<uint8_t>(color.green * 255.f);
+  auto b = static_cast<uint8_t>(color.blue * 255.f);
+  auto a = static_cast<uint8_t>(color.alpha * 255.f);
+  auto value = static_cast<uint32_t>(r | g << 8 | b << 16 | a << 24);
+  SendAttributeData(name, value, MsgType::ValueDataColor);
+}
+
+void Inspector::SendAttributeData(const char* name, const std::optional<Color>& color) {
+  auto value = Color::FromRGBA(255, 255, 255, 255);
+  if (color.has_value()) {
+    value = color.value();
+  }
+  SendAttributeData(name, value);
+}
+
+void Inspector::SendFrameMark(const char* name) {
+  if (!name) {
+    GetInspector().frameCount.fetch_add(1, std::memory_order_relaxed);
+  }
+  auto item = MsgItem();
+  item.hdr.type = MsgType::FrameMarkMsg;
+  item.frameMark.usTime = Clock::Now();
+  QueueSerialFinish(item);
+}
+
+void Inspector::SendAttributeData(const char* name, int val) {
+  auto item = MsgItem();
+  item.hdr.type = MsgType::ValueDataInt;
+  item.attributeDataInt.name = reinterpret_cast<uint64_t>(name);
+  item.attributeDataInt.value = val;
+  QueueSerialFinish(item);
+}
+
+void Inspector::SendAttributeData(const char* name, float val) {
+  auto item = MsgItem();
+  item.hdr.type = MsgType::ValueDataFloat;
+  item.attributeDataFloat.name = reinterpret_cast<uint64_t>(name);
+  item.attributeDataFloat.value = val;
+  QueueSerialFinish(item);
+}
+
+void Inspector::SendAttributeData(const char* name, bool val) {
+  auto item = MsgItem();
+  item.hdr.type = MsgType::ValueDataBool;
+  item.attributeDataBool.name = reinterpret_cast<uint64_t>(name);
+  item.attributeDataBool.value = val;
+  QueueSerialFinish(item);
+}
+
+void Inspector::SendAttributeData(const char* name, uint8_t val, uint8_t type) {
+  auto item = MsgItem();
+  item.hdr.type = MsgType::ValueDataEnum;
+  item.attributeDataEnum.name = reinterpret_cast<uint64_t>(name);
+  item.attributeDataEnum.value = static_cast<uint16_t>(type << 8 | val);
+  QueueSerialFinish(item);
+}
+
+void Inspector::SendAttributeData(const char* name, uint32_t val, MsgType type) {
+  auto item = MsgItem();
+  item.hdr.type = type;
+  item.attributeDataUint32.name = reinterpret_cast<uint64_t>(name);
+  item.attributeDataUint32.value = val;
+  QueueSerialFinish(item);
+}
+
+void Inspector::SendAttributeData(const char* name, float* val, int size) {
+  if (size == 4) {
+    auto item = MsgItem();
+    item.hdr.type = MsgType::ValueDataFloat4;
+    item.attributeDataFloat4.name = reinterpret_cast<uint64_t>(name);
+    memcpy(item.attributeDataFloat4.value, val, static_cast<size_t>(size) * sizeof(float));
+    QueueSerialFinish(item);
+  } else if (size == 6) {
+    auto item = MsgItem();
+    item.hdr.type = MsgType::ValueDataMat3;
+    item.attributeDataMat4.name = reinterpret_cast<uint64_t>(name);
+    memcpy(item.attributeDataMat4.value, val, static_cast<size_t>(size) * sizeof(float));
+    QueueSerialFinish(item);
+  }
+}
+
+void Inspector::LaunchWorker(Inspector* inspector) {
+  inspector->worker();
 }
 
 bool Inspector::ShouldExit() {
@@ -127,7 +242,7 @@ void Inspector::worker() {
       std::this_thread::sleep_for(std::chrono::milliseconds(10));
     }
   }
-  for (uint16_t i = 0; i < BroadcastNum; i++) {
+  for (uint16_t i = 0; i < BroadcastCount; i++) {
     broadcast[i] = std::make_shared<UdpBroadcast>();
     if (!broadcast[i]->openConnect(addr.c_str(), broadcastPort + i)) {
       broadcast[i].reset();
@@ -142,7 +257,7 @@ void Inspector::worker() {
     welcome.refTime = refTimeThread;
     while (true) {
       if (ShouldExit()) {
-        for (uint16_t i = 0; i < BroadcastNum; i++) {
+        for (uint16_t i = 0; i < BroadcastCount; i++) {
           if (broadcast[i]) {
             broadcastMsg.activeTime = -1;
             broadcast[i]->sendData(broadcastPort + i, &broadcastMsg, broadcastLen);
@@ -159,7 +274,7 @@ void Inspector::worker() {
       const auto t = std::chrono::high_resolution_clock::now().time_since_epoch().count();
       if (t - lastBroadcast > 3000000000) {
         lastBroadcast = t;
-        for (uint16_t i = 0; i < BroadcastNum; i++) {
+        for (uint16_t i = 0; i < BroadcastCount; i++) {
           if (broadcast[i]) {
             programNameLock.lock();
             if (programName) {
@@ -179,7 +294,7 @@ void Inspector::worker() {
       }
     }
 
-    for (uint16_t i = 0; i < BroadcastNum; i++) {
+    for (uint16_t i = 0; i < BroadcastCount; i++) {
       if (broadcast[i]) {
         lastBroadcast = 0;
         broadcastMsg.activeTime = -1;
@@ -201,17 +316,17 @@ void Inspector::worker() {
 }
 
 bool Inspector::appendData(const void* data, size_t len) {
-  const auto ret = needDataSize(len);
+  const auto result = needDataSize(len);
   appendDataUnsafe(data, len);
-  return ret;
+  return result;
 }
 
 bool Inspector::needDataSize(size_t len) {
-  bool ret = true;
+  bool result = true;
   if (static_cast<size_t>(dataBufferOffset - dataBufferStart) + len > TargetFrameSize) {
-    ret = commitData();
+    result = commitData();
   }
-  return ret;
+  return result;
 }
 
 void Inspector::appendDataUnsafe(const void* data, size_t len) {
@@ -220,13 +335,13 @@ void Inspector::appendDataUnsafe(const void* data, size_t len) {
 }
 
 bool Inspector::commitData() {
-  bool ret = sendData(static_cast<const char*>(dataBuffer.data()) + dataBufferStart,
-                      static_cast<size_t>(dataBufferOffset - dataBufferStart));
+  bool result = sendData(static_cast<const char*>(dataBuffer.data()) + dataBufferStart,
+                         static_cast<size_t>(dataBufferOffset - dataBufferStart));
   if (dataBufferOffset > TargetFrameSize * 2) {
     dataBufferOffset = 0;
   }
   dataBufferStart = dataBufferOffset;
-  return ret;
+  return result;
 }
 
 bool Inspector::sendData(const char* data, size_t len) {
@@ -345,4 +460,4 @@ Inspector::DequeueStatus Inspector::dequeueSerial() {
   }
   return DequeueStatus::DataDequeued;
 }
-}  // namespace tgfx::debug
+}  // namespace tgfx::inspect

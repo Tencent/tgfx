@@ -15,17 +15,14 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#include "tgfx/debug/LayerViewer.h"
-#ifdef TGFX_USE_INSPECTOR
-#include "debug/LayerViewerManager.h"
-#endif
 
-namespace tgfx {
-void SetSelectedLayer(std::shared_ptr<Layer> layer) {
-#ifdef TGFX_USE_INSPECTOR
-  debug::LayerViewerManager::Get().pickLayer(layer);
-#else
-  (void)layer;
-#endif
-}
-}  // namespace tgfx
+#pragma once
+#include <cstdint>
+#include "Protocol.h"
+
+namespace tgfx::inspect {
+uint64_t GetPid();
+const char* GetProcessName();
+BroadcastMessage GetBroadcastMessage(const char* procname, size_t pnsz, size_t& len, uint16_t port,
+                                     ToolType type);
+}  // namespace tgfx::inspect

@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RuntimeDrawTask.h"
-#include "debug/Mark.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/Pipeline.h"
 #include "gpu/ProxyProvider.h"
@@ -28,6 +27,7 @@
 #include "gpu/RuntimeProgramWrapper.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
+#include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -53,7 +53,7 @@ RuntimeDrawTask::RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
 }
 
 void RuntimeDrawTask::execute(CommandEncoder* encoder) {
-  TASK_MARK(tgfx::debug::OpTaskType::RuntimeDrawTask);
+  TASK_MARK(tgfx::inspect::OpTaskType::RuntimeDrawTask);
   std::vector<std::shared_ptr<TextureView>> textures = {};
   textures.reserve(inputTextures.size());
   for (size_t i = 0; i < inputTextures.size(); i++) {

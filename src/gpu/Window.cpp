@@ -18,7 +18,7 @@
 
 #include "tgfx/gpu/Window.h"
 #include "core/utils/Log.h"
-#include "debug/Mark.h"
+#include "inspect/InspectorMark.h"
 #include "tgfx/gpu/Device.h"
 
 namespace tgfx {

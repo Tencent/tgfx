@@ -24,25 +24,36 @@
 #include "Socket.h"
 #include "TCPPortProvider.h"
 #include "concurrentqueue.h"
-namespace tgfx::debug {
-class LayerProfiler {
+
+namespace tgfx::inspect {
+class LayerTree {
  public:
-  static LayerProfiler& Get() {
-    static LayerProfiler instance;
+  static LayerTree& Get() {
+    static LayerTree instance;
     return instance;
   }
-  LayerProfiler(const LayerProfiler&) = delete;
-  LayerProfiler(LayerProfiler&&) = delete;
-  LayerProfiler& operator=(const LayerProfiler&) = delete;
-  LayerProfiler& operator=(LayerProfiler&&) = delete;
-  ~LayerProfiler();
+
   void setData(const std::vector<uint8_t>& data);
+
   void setCallBack(std::function<void(const std::vector<uint8_t>&)> callback);
 
- private:
-  LayerProfiler();
+  LayerTree(const LayerTree&) = delete;
+
+  LayerTree(LayerTree&&) = delete;
+
+  LayerTree& operator=(const LayerTree&) = delete;
+
+  LayerTree& operator=(LayerTree&&) = delete;
+
+  ~LayerTree();
+
+ protected:
+  LayerTree();
+
   void sendWork();
+
   void recvWork();
+
   void spawnWorkTread();
 
  private:
@@ -50,7 +61,7 @@ class LayerProfiler {
   std::shared_ptr<ListenSocket> listenSocket = nullptr;
   std::shared_ptr<Socket> socket = nullptr;
   std::queue<std::vector<uint8_t>> messages = {};
-  std::array<std::shared_ptr<UdpBroadcast>, BroadcastNum> broadcasts = {};
+  std::array<std::shared_ptr<UdpBroadcast>, BroadcastCount> broadcasts = {};
   bool isUDPOpened = true;
 #endif
   int64_t epoch = 0;
@@ -60,4 +71,4 @@ class LayerProfiler {
   std::function<void(const std::vector<uint8_t>&)> callback = nullptr;
   std::atomic<bool> stopFlag = false;
 };
-}  // namespace tgfx::debug
+}  // namespace tgfx::inspect

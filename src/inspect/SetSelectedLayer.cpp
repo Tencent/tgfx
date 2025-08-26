@@ -15,36 +15,11 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#pragma once
-#include <cstdint>
-#include <memory>
-#include <mutex>
-#include <set>
+#include "tgfx/debug/SetSelectedLayer.h"
+#include "LayerViewer.h"
 
-namespace tgfx::debug {
-class TCPPortProvider {
- public:
-  static TCPPortProvider& Get() {
-    static TCPPortProvider instance;
-    return instance;
-  }
-
-  TCPPortProvider() = default;
-
-  ~TCPPortProvider() = default;
-
-  uint16_t getValidPort();
-
-  TCPPortProvider(const TCPPortProvider& provider) = delete;
-
-  TCPPortProvider(TCPPortProvider&& provider) = delete;
-
-  TCPPortProvider& operator=(const TCPPortProvider& provider) = delete;
-
-  TCPPortProvider& operator=(TCPPortProvider&& provider) = delete;
-
- private:
-  std::set<uint16_t> usedPortSet = {};
-  std::mutex mutex = {};
-};
-}  // namespace tgfx::debug
+namespace tgfx {
+void SetSelectedLayer(std::shared_ptr<Layer> layer) {
+  inspect::LayerViewer::Get().setSelectLayer(layer);
+}
+}  // namespace tgfx

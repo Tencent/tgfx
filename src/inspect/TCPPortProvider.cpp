@@ -21,7 +21,7 @@
 #include <random>
 #include "Socket.h"
 
-namespace tgfx::debug {
+namespace tgfx::inspect {
 static constexpr uint16_t MaxPort = 65535;
 static constexpr uint16_t MinPort = 49152;
 
@@ -47,4 +47,4 @@ uint16_t TCPPortProvider::getValidPort() {
   }
   return randomPort;
 }
-}  // namespace tgfx::debug
+}  // namespace tgfx::inspect

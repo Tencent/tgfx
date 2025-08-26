@@ -17,10 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GPUBufferUploadTask.h"
-#include "debug/Mark.h"
 #include "gpu/GPU.h"
 #include "gpu/IndexBuffer.h"
 #include "gpu/VertexBuffer.h"
+#include "inspect/InspectorMark.h"
 
 namespace tgfx {
 GPUBufferUploadTask::GPUBufferUploadTask(std::shared_ptr<ResourceProxy> proxy,
@@ -30,8 +30,8 @@ GPUBufferUploadTask::GPUBufferUploadTask(std::shared_ptr<ResourceProxy> proxy,
 }
 
 std::shared_ptr<Resource> GPUBufferUploadTask::onMakeResource(Context* context) {
-  TASK_MARK(tgfx::debug::OpTaskType::GpuUploadTask);
-  ATTRIBUTE_ENUM(bufferType, tgfx::debug::CustomEnumType::BufferType);
+  TASK_MARK(tgfx::inspect::OpTaskType::GpuUploadTask);
+  ATTRIBUTE_ENUM(bufferType, tgfx::inspect::CustomEnumType::BufferType);
   if (source == nullptr) {
     return nullptr;
   }

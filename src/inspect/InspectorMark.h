@@ -18,23 +18,23 @@
 #pragma once
 #ifdef TGFX_USE_INSPECTOR
 
+#include "FunctionTimer.h"
 #include "Inspector.h"
-#include "LayerProfiler.h"
-#include "Scoped.h"
+#include "LayerTree.h"
 
-#define SEND_LAYER_DATA(data) tgfx::debug::LayerProfiler::Get().setData(data)
-#define LAYER_CALLBACK(func) tgfx::debug::LayerProfiler::Get().setCallBack(func)
+#define SEND_LAYER_DATA(data) tgfx::inspect::LayerTree::Get().setData(data)
+#define LAYER_CALLBACK(func) tgfx::inspect::LayerTree::Get().setCallBack(func)
 
-#define FRAME_MARK tgfx::debug::Inspector::SendFrameMark(nullptr)
+#define FRAME_MARK tgfx::inspect::Inspector::SendFrameMark(nullptr)
 
-#define SCOPED_MARK(type, active) tgfx::debug::Scoped scoped(type, active)
-#define OPERATE_MARK(type) SCOPED_MARK(type, true)
-#define TASK_MARK(type) SCOPED_MARK(type, true)
+#define FUNCTION_MARK(type, active) tgfx::inspect::FunctionTimer functionTimer(type, active)
+#define OPERATE_MARK(type) FUNCTION_MARK(type, true)
+#define TASK_MARK(type) FUNCTION_MARK(type, true)
 
-#define ATTRIBUTE_NAME(name, value) tgfx::debug::Inspector::SendAttributeData(name, value)
-#define ATTRIBUTE_NAME_ENUM(name, value, type)                                 \
-  tgfx::debug::Inspector::SendAttributeData(name, static_cast<uint8_t>(value), \
-                                            static_cast<uint8_t>(type))
+#define ATTRIBUTE_NAME(name, value) tgfx::inspect::Inspector::SendAttributeData(name, value)
+#define ATTRIBUTE_NAME_ENUM(name, value, type)                                   \
+  tgfx::inspect::Inspector::SendAttributeData(name, static_cast<uint8_t>(value), \
+                                              static_cast<uint8_t>(type))
 #define ATTRIBUTE_ENUM(value, type) ATTRIBUTE_NAME_ENUM(#value, value, type)
 
 #else
@@ -42,7 +42,7 @@
 #define SEND_LAYER_DATA(data)
 #define LAYER_CALLBACK(func)
 #define FRAME_MARK
-#define SCOPED_MARK(type, active)
+#define FUNCTION_MARK(type, active)
 #define OPERATE_MARK(type)
 #define TASK_MARK(type)
 #define ATTRIBUTE_NAME(name, value)

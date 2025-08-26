@@ -15,24 +15,36 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-
 #pragma once
 #include <cstdint>
-namespace tgfx::debug {
-enum class LayerInspectorMsgType : uint8_t {
-  EnableLayerInspector,
-  HoverLayerAddress,
-  SelectedLayerAddress,
-  SerializeAttribute,
-  SerializeSubAttribute,
-  FlushAttribute,
-  FlushLayerTree,
-  FlushImage,
-  PickedLayerAddress,
-  FlushAttributeAck,
-  LayerTree,
-  LayerAttribute,
-  LayerSubAttribute,
-  ImageData
+#include <memory>
+#include <mutex>
+#include <set>
+
+namespace tgfx::inspect {
+class TCPPortProvider {
+ public:
+  static TCPPortProvider& Get() {
+    static TCPPortProvider instance;
+    return instance;
+  }
+
+  TCPPortProvider() = default;
+
+  ~TCPPortProvider() = default;
+
+  uint16_t getValidPort();
+
+  TCPPortProvider(const TCPPortProvider& provider) = delete;
+
+  TCPPortProvider(TCPPortProvider&& provider) = delete;
+
+  TCPPortProvider& operator=(const TCPPortProvider& provider) = delete;
+
+  TCPPortProvider& operator=(TCPPortProvider&& provider) = delete;
+
+ private:
+  std::set<uint16_t> usedPortSet = {};
+  std::mutex mutex = {};
 };
-}  // namespace tgfx::debug
+}  // namespace tgfx::inspect

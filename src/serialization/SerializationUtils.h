@@ -22,7 +22,7 @@
 #define FLATBUFFERS_LOCALE_INDEPENDENT 0
 #include <flatbuffers/flexbuffers.h>
 #include <string>
-#include "debug/LayerInspectorProtocol.h"
+#include "inspect/Protocol.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/layers/Layer.h"
 
@@ -48,7 +48,7 @@ std::string LayerStyleExtraSourceTypeToString(LayerStyleExtraSourceType type);
 
 std::string RecordedContentTypeToString(Types::LayerContentType type);
 
-void SerializeBegin(flexbuffers::Builder& fbb, tgfx::debug::LayerInspectorMsgType type,
+void SerializeBegin(flexbuffers::Builder& fbb, tgfx::inspect::LayerViewerMessage type,
                     size_t& mapStart, size_t& contentStart);
 
 void SerializeEnd(flexbuffers::Builder& fbb, size_t mapStart, size_t contentStart);

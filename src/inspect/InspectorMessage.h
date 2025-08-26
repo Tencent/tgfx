@@ -18,7 +18,7 @@
 
 #pragma once
 #include <cstdint>
-namespace tgfx::debug {
+namespace tgfx::inspect {
 enum class MsgType : uint8_t {
   OperateBegin,
   OperateEnd,
@@ -130,4 +130,4 @@ static constexpr size_t MsgDataSize[] = {
     sizeof(MsgHeader) + sizeof(StringTransferMsg),
     sizeof(MsgHeader) + sizeof(StringTransferMsg),
 };
-}  // namespace tgfx::debug
+}  // namespace tgfx::inspect

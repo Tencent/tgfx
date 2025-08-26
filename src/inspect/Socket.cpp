@@ -56,7 +56,7 @@
 #define MSG_NOSIGNAL 0
 #endif
 
-namespace tgfx::debug {
+namespace tgfx::inspect {
 #ifdef _WIN32
 typedef SOCKET socket_t;
 #else
@@ -280,15 +280,15 @@ int Socket::sendData(const void* buffer, size_t len) {
   assert(sock != -1);
   auto start = buf;
   while (len > 0) {
-    auto ret = send(sock, buf, len, MSG_NOSIGNAL);
-    if (ret == -1) {
+    auto result = send(sock, buf, len, MSG_NOSIGNAL);
+    if (result == -1) {
       if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) {
         continue;
       }
       return -1;
     }
-    len -= static_cast<size_t>(ret);
-    buf += ret;
+    len -= static_cast<size_t>(result);
+    buf += result;
   }
   return int(buf - start);
 }
@@ -316,9 +316,9 @@ int Socket::recvBuffered(void* buffer, size_t len, int timeout) {
 
   if (bufLeft > 0) {
     memcpy(buffer, bufPtr, static_cast<size_t>(bufLeft));
-    const auto ret = bufLeft;
+    const auto result = bufLeft;
     bufLeft = 0;
-    return ret;
+    return result;
   }
 
   if (len >= BufSize) {
@@ -745,4 +745,4 @@ const char* UdpListen::readData(size_t& len, IpAddress& addr, int timeout) {
   return buf;
 }
 
-}  // namespace tgfx::debug
+}  // namespace tgfx::inspect

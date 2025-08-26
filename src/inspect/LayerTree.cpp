@@ -15,7 +15,7 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#include "LayerProfiler.h"
+#include "LayerTree.h"
 #include <chrono>
 #include <cstring>
 #include <thread>
@@ -23,17 +23,17 @@
 #include "Protocol.h"
 #include "tgfx/core/Clock.h"
 
-namespace tgfx::debug {
+namespace tgfx::inspect {
 
 #ifndef __EMSCRIPTEN__
 static const char* addr = "255.255.255.255";
 static uint16_t broadcastPort = 8086;
 #endif
 
-LayerProfiler::LayerProfiler() {
+LayerTree::LayerTree() {
 #ifndef __EMSCRIPTEN__
   listenSocket = std::make_shared<ListenSocket>();
-  for (uint16_t i = 0; i < BroadcastNum; i++) {
+  for (uint16_t i = 0; i < BroadcastCount; i++) {
     broadcasts[i] = std::make_shared<UdpBroadcast>();
     isUDPOpened = isUDPOpened && broadcasts[i]->openConnect(addr, broadcastPort + i);
   }
@@ -43,7 +43,7 @@ LayerProfiler::LayerProfiler() {
   spawnWorkTread();
 }
 
-LayerProfiler::~LayerProfiler() {
+LayerTree::~LayerTree() {
   stopFlag.store(true, std::memory_order_release);
   if (sendThread && sendThread->joinable()) {
     sendThread->join();
@@ -53,7 +53,7 @@ LayerProfiler::~LayerProfiler() {
   }
 }
 
-void LayerProfiler::sendWork() {
+void LayerTree::sendWork() {
 #ifndef __EMSCRIPTEN__
   if (!isUDPOpened) {
     return;
@@ -76,7 +76,7 @@ void LayerProfiler::sendWork() {
       const auto t = std::chrono::high_resolution_clock::now().time_since_epoch().count();
       if (t - lastBroadcast > 3000000000) {
         lastBroadcast = t;
-        for (uint16_t i = 0; i < BroadcastNum; i++) {
+        for (uint16_t i = 0; i < BroadcastCount; i++) {
           if (broadcasts[i]) {
             const auto ts = Clock::Now();
             broadcastMsg.activeTime = static_cast<int32_t>(ts - epoch);
@@ -108,7 +108,7 @@ void LayerProfiler::sendWork() {
 #endif
 }
 
-void LayerProfiler::recvWork() {
+void LayerTree::recvWork() {
 #ifndef __EMSCRIPTEN__
   while (!stopFlag.load(std::memory_order_acquire)) {
     std::this_thread::sleep_for(std::chrono::milliseconds(10));
@@ -132,16 +132,16 @@ void LayerProfiler::recvWork() {
 #endif
 }
 
-void LayerProfiler::spawnWorkTread() {
+void LayerTree::spawnWorkTread() {
   stopFlag.store(false, std::memory_order_release);
-  sendThread = std::make_shared<std::thread>(&LayerProfiler::sendWork, this);
-  recvThread = std::make_shared<std::thread>(&LayerProfiler::recvWork, this);
+  sendThread = std::make_shared<std::thread>(&LayerTree::sendWork, this);
+  recvThread = std::make_shared<std::thread>(&LayerTree::recvWork, this);
 }
 
-void LayerProfiler::setData(const std::vector<uint8_t>& data) {
+void LayerTree::setData(const std::vector<uint8_t>& data) {
   queue.enqueue(data);
 }
-void LayerProfiler::setCallBack(std::function<void(const std::vector<uint8_t>&)> callback) {
+void LayerTree::setCallBack(std::function<void(const std::vector<uint8_t>&)> callback) {
   this->callback = std::move(callback);
 }
-}  // namespace tgfx::debug
+}  // namespace tgfx::inspect

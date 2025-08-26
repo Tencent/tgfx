@@ -41,7 +41,7 @@
 #include <string>
 #include "ProcessUtils.h"
 
-namespace tgfx::debug {
+namespace tgfx::inspect {
 uint64_t GetPid() {
 #if defined _WIN32
   return uint64_t(GetCurrentProcessId());
@@ -92,4 +92,4 @@ BroadcastMessage GetBroadcastMessage(const char* procname, size_t pnsz, size_t& 
   return msg;
 }
 
-}  // namespace tgfx::debug
+}  // namespace tgfx::inspect

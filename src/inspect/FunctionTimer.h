@@ -20,10 +20,10 @@
 #include "Inspector.h"
 #include "tgfx/core/Clock.h"
 
-namespace tgfx::debug {
-class Scoped {
+namespace tgfx::inspect {
+class FunctionTimer {
  public:
-  Scoped(OpTaskType type, bool isActive) : active(isActive), type(type) {
+  FunctionTimer(OpTaskType type, bool isActive) : active(isActive), type(type) {
     if (!active) {
       return;
     }
@@ -34,7 +34,7 @@ class Scoped {
     Inspector::QueueSerialFinish(item);
   }
 
-  ~Scoped() {
+  ~FunctionTimer() {
     if (!active) {
       return;
     }
@@ -45,16 +45,16 @@ class Scoped {
     Inspector::QueueSerialFinish(item);
   }
 
-  Scoped(const Scoped&) = delete;
+  FunctionTimer(const FunctionTimer&) = delete;
 
-  Scoped(Scoped&&) = delete;
+  FunctionTimer(FunctionTimer&&) = delete;
 
-  Scoped& operator=(const Scoped&) = delete;
+  FunctionTimer& operator=(const FunctionTimer&) = delete;
 
-  Scoped& operator=(Scoped&&) = delete;
+  FunctionTimer& operator=(FunctionTimer&&) = delete;
 
  private:
   bool active = false;
   OpTaskType type = OpTaskType::Unknown;
 };
-}  // namespace tgfx::debug
+}  // namespace tgfx::inspect

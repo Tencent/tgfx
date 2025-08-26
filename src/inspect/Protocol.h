@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-namespace tgfx::debug {
+namespace tgfx::inspect {
 
 using lz4sz_t = int;
 static constexpr int Lz4CompressBound(int size) {
@@ -28,7 +28,7 @@ static constexpr int LZ4Size = Lz4CompressBound(TargetFrameSize);
 static constexpr int HandshakeShibbolethSize = 4;
 static constexpr char HandshakeShibboleth[HandshakeShibbolethSize] = {'T', 'G', 'F', 'X'};
 
-static constexpr size_t BroadcastNum = 5;
+static constexpr size_t BroadcastCount = 5;
 static constexpr int WelcomeMessageProgramNameSize = 64;
 static constexpr int WelcomeMessageHostInfoSize = 1024;
 static constexpr uint8_t ProtocolVersion = 1;
@@ -103,4 +103,21 @@ enum class CustomEnumType : uint8_t {
   PixelFormat,
   ImageOrigin,
 };
-}  // namespace tgfx::debug
+
+enum class LayerViewerMessage : uint8_t {
+  EnableLayerInspector,
+  HoverLayerAddress,
+  SelectedLayerAddress,
+  SerializeAttribute,
+  SerializeSubAttribute,
+  FlushAttribute,
+  FlushLayerTree,
+  FlushImage,
+  PickedLayerAddress,
+  FlushAttributeAck,
+  LayerTree,
+  LayerAttribute,
+  LayerSubAttribute,
+  ImageData
+};
+}  // namespace tgfx::inspect
