@@ -190,7 +190,7 @@
         "PartialBackgroundBlur": "ee2cc771",
         "PartialBackgroundBlur_move": "cebc420b",
         "PartialBackgroundBlur_partial": "cebc420b",
-        "PartialDrawLayer": "572ae96b",
+        "PartialDrawLayer": "f9b43f31",
         "PartialInnerShadow": "9a05dc38",
         "PassThoughAndNormal": "43cd416",
         "RasterizedCache": "cebc420b",
@@ -298,6 +298,12 @@
         "read_RGBA_1010102_scaled_codec": "29745c73",
         "read_RGBA_F16_scaled_codec": "29745c73",
         "read_RGB_565_scaled_codec": "29745c73"
+    },
+    "SVGExportTest": {
+        "DrawImageRect": "9a80633b",
+        "ImageMask": "9a80633b",
+        "InvertPictureImageMask": "9a80633b",
+        "PictureImageMask": "9a80633b"
     },
     "SVGTest": {
         "blur": "b1db872",
