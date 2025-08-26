@@ -574,14 +574,7 @@ TGFX_TEST(SVGExportTest, ImageMask) {
   }
 
   exporter->close();
-  auto SVGString = SVGStream->readString();
-
-  auto path = ProjectPath::Absolute("resources/apitest/mask_image.svg");
-  auto readStream = Stream::MakeFromFile(path);
-  EXPECT_TRUE(readStream != nullptr);
-  Buffer buffer(readStream->size());
-  readStream->read(buffer.data(), buffer.size());
-  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), SVGString);
+  CompareSVG(SVGStream, "SVGExportTest/ImageMask");
 }
 
 TGFX_TEST(SVGExportTest, PictureImageMask) {
@@ -620,14 +613,7 @@ TGFX_TEST(SVGExportTest, PictureImageMask) {
   }
 
   exporter->close();
-  auto SVGString = SVGStream->readString();
-
-  auto path = ProjectPath::Absolute("resources/apitest/mask_picture_image.svg");
-  auto readStream = Stream::MakeFromFile(path);
-  EXPECT_TRUE(readStream != nullptr);
-  Buffer buffer(readStream->size());
-  readStream->read(buffer.data(), buffer.size());
-  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), SVGString);
+  CompareSVG(SVGStream, "SVGExportTest/PictureImageMask");
 }
 
 TGFX_TEST(SVGExportTest, InvertPictureImageMask) {
@@ -666,14 +652,7 @@ TGFX_TEST(SVGExportTest, InvertPictureImageMask) {
   }
 
   exporter->close();
-  auto SVGString = SVGStream->readString();
-
-  auto path = ProjectPath::Absolute("resources/apitest/mask_invert_picture_image.svg");
-  auto readStream = Stream::MakeFromFile(path);
-  EXPECT_TRUE(readStream != nullptr);
-  Buffer buffer(readStream->size());
-  readStream->read(buffer.data(), buffer.size());
-  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), SVGString);
+  CompareSVG(SVGStream, "SVGExportTest/InvertPictureImageMask");
 }
 
 TGFX_TEST(SVGExportTest, DrawImageRect) {

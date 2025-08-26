@@ -73,8 +73,8 @@ void AtlasTextOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
   auto atlasGeometryProcessor =
       AtlasTextGeometryProcessor::Make(drawingBuffer, textureProxy, aaType, commonColor);
-  auto pipeline = createPipeline(renderTarget, std::move(atlasGeometryProcessor));
-  renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
+  auto programInfo = createProgramInfo(renderTarget, std::move(atlasGeometryProcessor));
+  renderPass->bindProgramAndScissorClip(programInfo.get(), scissorRect());
   renderPass->bindBuffers(indexBuffer ? indexBuffer->gpuBuffer() : nullptr,
                           vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
   if (indexBuffer != nullptr) {

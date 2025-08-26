@@ -101,16 +101,17 @@ static std::string SLTypeString(SLType t) {
   return "";
 }
 
-std::unique_ptr<Program> ProgramBuilder::CreateProgram(Context* context, const Pipeline* pipeline) {
-  GLProgramBuilder builder(context, pipeline);
+std::unique_ptr<Program> ProgramBuilder::CreateProgram(Context* context,
+                                                       const ProgramInfo* programInfo) {
+  GLProgramBuilder builder(context, programInfo);
   if (!builder.emitAndInstallProcessors()) {
     return nullptr;
   }
   return builder.finalize();
 }
 
-GLProgramBuilder::GLProgramBuilder(Context* context, const Pipeline* pipeline)
-    : ProgramBuilder(context, pipeline), _varyingHandler(this), _uniformHandler(this),
+GLProgramBuilder::GLProgramBuilder(Context* context, const ProgramInfo* programInfo)
+    : ProgramBuilder(context, programInfo), _varyingHandler(this), _uniformHandler(this),
       _vertexBuilder(this), _fragBuilder(this) {
 }
 
@@ -163,7 +164,8 @@ std::unique_ptr<GLProgram> GLProgramBuilder::finalize() {
     gl->uniform1i(location, textureUint++);
   }
   return std::make_unique<GLProgram>(programID, _uniformHandler.makeUniformBuffer(),
-                                     pipeline->getVertexAttributes(), pipeline->getBlendFormula());
+                                     programInfo->getVertexAttributes(),
+                                     programInfo->getBlendFormula());
 }
 
 bool GLProgramBuilder::checkSamplerCounts() {

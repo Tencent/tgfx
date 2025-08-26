@@ -79,7 +79,7 @@ void GLQuadPerEdgeAAGeometryProcessor::onSetTransformData(UniformBuffer* uniform
                                                           const CoordTransform* coordTransform,
                                                           int index) const {
   if (index == 0 && !subset.empty() && uvCoord.empty()) {
-    // Subset only applies to the first image in pipeline.
+    // Subset only applies to the first image in ProgramInfo.
     uniformBuffer->setData("texSubsetMatrix", coordTransform->getTotalMatrix());
   }
 }

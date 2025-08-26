@@ -42,8 +42,8 @@ ShaderBuilder::ShaderBuilder(ProgramBuilder* builder) : programBuilder(builder) 
   atLineStart = true;
 }
 
-const Pipeline* ShaderBuilder::getPipeline() const {
-  return programBuilder->getPipeline();
+const ProgramInfo* ShaderBuilder::getProgramInfo() const {
+  return programBuilder->getProgramInfo();
 }
 
 void ShaderBuilder::setPrecisionQualifier(const std::string& precision) {
