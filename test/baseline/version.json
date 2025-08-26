@@ -299,6 +299,12 @@
         "read_RGBA_F16_scaled_codec": "29745c73",
         "read_RGB_565_scaled_codec": "29745c73"
     },
+    "SVGExportTest": {
+        "DrawImageRect": "9a80633b",
+        "ImageMask": "9a80633b",
+        "InvertPictureImageMask": "9a80633b",
+        "PictureImageMask": "9a80633b"
+    },
     "SVGTest": {
         "blur": "b1db872",
         "complex1": "ba1c7c2",
