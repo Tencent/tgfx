@@ -122,15 +122,17 @@ unsigned LoadGLShader(const GLFunctions* gl, unsigned shaderType, const std::str
   const char* files[] = {source.c_str()};
   gl->shaderSource(shader, 1, files, nullptr);
   gl->compileShader(shader);
+#if defined(DEBUG) || !defined(TGFX_BUILD_FOR_WEB)
   int success;
   gl->getShaderiv(shader, GL_COMPILE_STATUS, &success);
   if (!success) {
     char infoLog[512];
     gl->getShaderInfoLog(shader, 512, nullptr, infoLog);
-    LOGE("Could not compile shader: %d %s", shaderType, infoLog);
+    LOGE("Could not compile shader:\n%s\ntype:%d info%s", source.c_str(), shaderType, infoLog);
     gl->deleteShader(shader);
     shader = 0;
   }
+#endif
   return shader;
 }
 
