@@ -31,7 +31,7 @@ class ProgramBuilder {
   /**
    * Generates a shader program.
    */
-  static std::unique_ptr<Program> CreateProgram(Context* context, const ProgramInfo* programInfo);
+  static std::shared_ptr<Program> CreateProgram(Context* context, const ProgramInfo* programInfo);
 
   virtual ~ProgramBuilder() = default;
 

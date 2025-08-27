@@ -38,8 +38,7 @@ class GLCommandEncoder : public CommandEncoder {
   void waitSemaphore(const BackendSemaphore& semaphore) override;
 
  protected:
-  std::shared_ptr<RenderPass> onBeginRenderPass(std::shared_ptr<RenderTarget> renderTarget,
-                                                bool resolveMSAA) override;
+  std::shared_ptr<RenderPass> onBeginRenderPass(const RenderPassDescriptor& descriptor) override;
 
   std::shared_ptr<CommandBuffer> onFinish() override;
 

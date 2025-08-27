@@ -24,15 +24,18 @@
 namespace tgfx {
 class RuntimeProgramWrapper : public Program {
  public:
+  static std::shared_ptr<Program> Wrap(std::unique_ptr<RuntimeProgram> program);
+
   static const RuntimeProgram* Unwrap(const Program* program);
 
-  explicit RuntimeProgramWrapper(std::unique_ptr<RuntimeProgram> program)
-      : Program(nullptr), runtimeProgram(std::move(program)) {
-  }
-
+ protected:
   void onReleaseGPU() override;
 
  private:
   std::unique_ptr<RuntimeProgram> runtimeProgram = nullptr;
+
+  explicit RuntimeProgramWrapper(std::unique_ptr<RuntimeProgram> program)
+      : Program(nullptr), runtimeProgram(std::move(program)) {
+  }
 };
 }  // namespace tgfx

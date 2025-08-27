@@ -17,17 +17,19 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "ProgramInfo.h"
+#include "gpu/GlobalCache.h"
 #include "gpu/ProgramBuilder.h"
 #include "gpu/RenderTarget.h"
 
 namespace tgfx {
-ProgramInfo::ProgramInfo(PlacementPtr<GeometryProcessor> geometryProcessor,
+ProgramInfo::ProgramInfo(RenderTarget* renderTarget,
+                         PlacementPtr<GeometryProcessor> geometryProcessor,
                          std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors,
                          size_t numColorProcessors, PlacementPtr<XferProcessor> xferProcessor,
-                         BlendMode blendMode, const Swizzle* outputSwizzle)
-    : geometryProcessor(std::move(geometryProcessor)),
+                         BlendMode blendMode)
+    : renderTarget(renderTarget), geometryProcessor(std::move(geometryProcessor)),
       fragmentProcessors(std::move(fragmentProcessors)), numColorProcessors(numColorProcessors),
-      xferProcessor(std::move(xferProcessor)), blendMode(blendMode), _outputSwizzle(outputSwizzle) {
+      xferProcessor(std::move(xferProcessor)), blendMode(blendMode) {
   updateProcessorIndices();
 }
 
@@ -52,6 +54,11 @@ const XferProcessor* ProgramInfo::getXferProcessor() const {
   return xferProcessor.get();
 }
 
+const Swizzle& ProgramInfo::getOutputSwizzle() const {
+  auto context = renderTarget->getContext();
+  return context->caps()->getWriteSwizzle(renderTarget->format());
+}
+
 std::unique_ptr<BlendFormula> ProgramInfo::getBlendFormula() const {
   if (xferProcessor != nullptr) {
     return nullptr;
@@ -74,8 +81,7 @@ static std::array<float, 4> GetRTAdjustArray(const RenderTarget* renderTarget) {
   return result;
 }
 
-void ProgramInfo::getUniforms(const RenderTarget* renderTarget,
-                              UniformBuffer* uniformBuffer) const {
+void ProgramInfo::getUniforms(UniformBuffer* uniformBuffer) const {
   DEBUG_ASSERT(renderTarget != nullptr);
   DEBUG_ASSERT(uniformBuffer != nullptr);
   auto array = GetRTAdjustArray(renderTarget);
@@ -121,22 +127,6 @@ std::vector<SamplerInfo> ProgramInfo::getSamplers() const {
   return samplers;
 }
 
-void ProgramInfo::computeProgramKey(Context* context, BytesKey* programKey) const {
-  geometryProcessor->computeProcessorKey(context, programKey);
-  for (const auto& processor : fragmentProcessors) {
-    processor->computeProcessorKey(context, programKey);
-  }
-  if (xferProcessor != nullptr) {
-    xferProcessor->computeProcessorKey(context, programKey);
-  }
-  programKey->write(static_cast<uint32_t>(blendMode));
-  programKey->write(static_cast<uint32_t>(_outputSwizzle->asKey()));
-}
-
-std::unique_ptr<Program> ProgramInfo::createProgram(Context* context) const {
-  return ProgramBuilder::CreateProgram(context, this);
-}
-
 int ProgramInfo::getProcessorIndex(const Processor* processor) const {
   auto result = processorIndices.find(processor);
   if (result == processorIndices.end()) {
@@ -152,4 +142,29 @@ std::string ProgramInfo::getMangledSuffix(const Processor* processor) const {
   }
   return "_P" + std::to_string(processorIndex);
 }
+
+std::shared_ptr<Program> ProgramInfo::getProgram() const {
+  auto context = renderTarget->getContext();
+  BytesKey programKey = {};
+  geometryProcessor->computeProcessorKey(context, &programKey);
+  for (const auto& processor : fragmentProcessors) {
+    processor->computeProcessorKey(context, &programKey);
+  }
+  if (xferProcessor != nullptr) {
+    xferProcessor->computeProcessorKey(context, &programKey);
+  }
+  programKey.write(static_cast<uint32_t>(blendMode));
+  programKey.write(static_cast<uint32_t>(getOutputSwizzle().asKey()));
+  auto program = context->globalCache()->findProgram(programKey);
+  if (program == nullptr) {
+    program = ProgramBuilder::CreateProgram(context, this);
+    if (program == nullptr) {
+      LOGE("ProgramInfo::getProgram() Failed to create the program!");
+      return nullptr;
+    }
+    context->globalCache()->addProgram(programKey, program);
+  }
+  return program;
+}
+
 }  // namespace tgfx

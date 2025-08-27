@@ -19,9 +19,9 @@
 #pragma once
 
 #include <unordered_map>
-#include "Swizzle.h"
+#include "RenderTarget.h"
 #include "gpu/Blend.h"
-#include "gpu/ProgramCreator.h"
+#include "gpu/Program.h"
 #include "gpu/processors/EmptyXferProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/GeometryProcessor.h"
@@ -36,12 +36,12 @@ struct SamplerInfo {
  * This immutable object contains information needed to build a shader program and set API state for
  * a draw.
  */
-class ProgramInfo : public ProgramCreator {
+class ProgramInfo {
  public:
-  ProgramInfo(PlacementPtr<GeometryProcessor> geometryProcessor,
+  ProgramInfo(RenderTarget* renderTarget, PlacementPtr<GeometryProcessor> geometryProcessor,
               std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors,
               size_t numColorProcessors, PlacementPtr<XferProcessor> xferProcessor,
-              BlendMode blendMode, const Swizzle* outputSwizzle);
+              BlendMode blendMode);
 
   size_t numColorFragmentProcessors() const {
     return numColorProcessors;
@@ -61,9 +61,7 @@ class ProgramInfo : public ProgramCreator {
 
   const XferProcessor* getXferProcessor() const;
 
-  const Swizzle* outputSwizzle() const {
-    return _outputSwizzle;
-  }
+  const Swizzle& getOutputSwizzle() const;
 
   const std::vector<Attribute>& getVertexAttributes() const {
     return geometryProcessor->vertexAttributes();
@@ -71,13 +69,9 @@ class ProgramInfo : public ProgramCreator {
 
   std::unique_ptr<BlendFormula> getBlendFormula() const;
 
-  void getUniforms(const RenderTarget* renderTarget, UniformBuffer* uniformBuffer) const;
+  void getUniforms(UniformBuffer* uniformBuffer) const;
 
   std::vector<SamplerInfo> getSamplers() const;
-
-  void computeProgramKey(Context* context, BytesKey* programKey) const override;
-
-  std::unique_ptr<Program> createProgram(Context* context) const override;
 
   /**
    * Returns the index of the processor in the ProgramInfo. Returns -1 if the processor is not in
@@ -87,7 +81,10 @@ class ProgramInfo : public ProgramCreator {
 
   std::string getMangledSuffix(const Processor* processor) const;
 
+  std::shared_ptr<Program> getProgram() const;
+
  private:
+  RenderTarget* renderTarget = nullptr;
   PlacementPtr<GeometryProcessor> geometryProcessor = nullptr;
   std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors = {};
   std::unordered_map<const Processor*, int> processorIndices = {};
@@ -95,7 +92,6 @@ class ProgramInfo : public ProgramCreator {
   size_t numColorProcessors = 0;
   PlacementPtr<XferProcessor> xferProcessor = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
-  const Swizzle* _outputSwizzle = nullptr;
 
   void updateProcessorIndices();
 };

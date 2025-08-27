@@ -17,8 +17,17 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RuntimeProgramWrapper.h"
+#include "core/utils/Log.h"
 
 namespace tgfx {
+std::shared_ptr<Program> RuntimeProgramWrapper::Wrap(std::unique_ptr<RuntimeProgram> program) {
+  if (program == nullptr) {
+    return nullptr;
+  }
+  auto context = program->getContext();
+  return Resource::AddToCache(context, new RuntimeProgramWrapper(std::move(program)));
+}
+
 const RuntimeProgram* RuntimeProgramWrapper::Unwrap(const Program* program) {
   return static_cast<const RuntimeProgramWrapper*>(program)->runtimeProgram.get();
 }
