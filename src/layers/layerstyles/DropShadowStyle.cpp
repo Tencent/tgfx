@@ -127,9 +127,23 @@ std::shared_ptr<ImageFilter> DropShadowStyle::getShadowFilter(float scale) {
   if (shadowFilter && scale == currentScale) {
     return shadowFilter;
   }
-
-  shadowFilter = ImageFilter::DropShadowOnly(_offsetX * scale, _offsetY * scale,
-                                             _blurrinessX * scale, _blurrinessY * scale, _color);
+  auto offsetX = _offsetX * scale;
+  auto offsetY = _offsetY * scale;
+  auto blurrinessX = _blurrinessX * scale;
+  auto blurrinessY = _blurrinessY * scale;
+  if (std::abs(offsetX) <= 0.1f) {
+    offsetX = 0.f;
+  }
+  if (std::abs(offsetY) <= 0.1f) {
+    offsetY = 0.f;
+  }
+  if (blurrinessX <= 0.1f) {
+    blurrinessX = 0.f;
+  }
+  if (blurrinessY <= 0.1f) {
+    blurrinessY = 0.f;
+  }
+  shadowFilter = ImageFilter::DropShadowOnly(offsetX, offsetY, blurrinessX, blurrinessY, _color);
   currentScale = scale;
 
   return shadowFilter;

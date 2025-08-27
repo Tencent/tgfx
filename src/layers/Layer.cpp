@@ -956,6 +956,9 @@ void Layer::drawContents(const DrawArgs& args, Canvas* canvas, float alpha,
       }
     }
   }
+  if (args.drawMode == DrawMode::Contour) {
+    return;
+  }
   if (!drawChildren(args, canvas, alpha, stopChild)) {
     return;
   }
