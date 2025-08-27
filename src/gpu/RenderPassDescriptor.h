@@ -124,7 +124,7 @@ class DepthStencilAttachment {
   DepthStencilAttachment(GPUTexture* texture, LoadAction loadAction = LoadAction::Clear,
                          StoreAction storeAction = StoreAction::DontCare,
                          float depthClearValue = 1.0f, bool depthReadOnly = false,
-                         float stencilClearValue = 0.0f, bool stencilReadOnly = false)
+                         uint32_t stencilClearValue = 0, bool stencilReadOnly = false)
       : texture(texture), loadAction(loadAction), storeAction(storeAction),
         depthClearValue(depthClearValue), depthReadOnly(depthReadOnly),
         stencilClearValue(stencilClearValue), stencilReadOnly(stencilReadOnly) {
