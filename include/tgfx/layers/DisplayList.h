@@ -262,6 +262,7 @@ class DisplayList {
   std::unordered_map<int64_t, TileCache*> tileCaches = {};
   std::vector<std::shared_ptr<Tile>> emptyTiles = {};
   std::deque<std::vector<Rect>> lastDirtyRegions = {};
+  std::vector<DrawTask> currentTasks = {};
 
   std::vector<Rect> renderDirect(Surface* surface, bool autoClear) const;
 
@@ -301,7 +302,7 @@ class DisplayList {
 
   void drawTileTask(const DrawTask& task) const;
 
-  void drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface, bool autoClear) const;
+  void drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface, bool autoClear);
 
   void renderDirtyRegions(Canvas* canvas, std::vector<Rect> dirtyRegions);
 

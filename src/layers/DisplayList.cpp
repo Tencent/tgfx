@@ -550,7 +550,7 @@ std::vector<std::pair<float, TileCache*>> DisplayList::getSortedTileCaches() con
   // Closest tile caches first, farthest last.
   std::sort(sortedTileCaches.begin(), sortedTileCaches.end(),
             [](const std::pair<float, TileCache*>& a, const std::pair<float, TileCache*>& b) {
-              return a.first < b.first;
+              return a.first > b.first;
             });
   return sortedTileCaches;
 }
@@ -560,8 +560,7 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
   auto tileRect = Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
   DEBUG_ASSERT(currentZoomScale != 0.0f);
-  for (auto& it = sortedCaches.rbegin() ; it != sortedCaches.rend() ; ++it) {
-    const auto& [scale, tileCache] = *it;
+  for (const auto& [scale, tileCache] : sortedCaches) {
     if (scale == currentZoomScale || tileCache->empty()) {
       continue;
     }
@@ -605,8 +604,7 @@ std::vector<std::shared_ptr<Tile>> DisplayList::getFreeTiles(
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
   DEBUG_ASSERT(currentZoomScale != 0.0f);
   // Reverse iterate through sorted caches to get the farest tiles first.
-  for (auto it = sortedCaches.rbegin(); it != sortedCaches.rend(); ++it) {
-    auto& [scale, tileCache] = *it;
+  for (const auto& [scale, tileCache] : sortedCaches) {
     auto centerX = static_cast<float>(renderSurface->width()) * 0.5f - _contentOffset.x;
     auto centerY = static_cast<float>(renderSurface->height()) * 0.5f - _contentOffset.y;
     centerX *= scale / currentZoomScale;
@@ -747,7 +745,7 @@ void DisplayList::drawTileTask(const DrawTask& task) const {
 }
 
 void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* surface,
-                                  bool autoClear) const {
+                                  bool autoClear) {
   // Sort tasks by surface index to ensure they are drawn in batches.
   std::sort(screenTasks.begin(), screenTasks.end(),
             [](const DrawTask& a, const DrawTask& b) { return a.sourceIndex() < b.sourceIndex(); });
@@ -760,13 +758,15 @@ void DisplayList::drawScreenTasks(std::vector<DrawTask> screenTasks, Surface* su
   }
   static SamplingOptions sampling(FilterMode::Nearest, MipmapMode::None);
   canvas->setMatrix(Matrix::MakeTrans(_contentOffset.x, _contentOffset.y));
-  for (auto& task : screenTasks) {
+  for (const auto& task : screenTasks) {
     auto surfaceCache = surfaceCaches[task.sourceIndex()];
     DEBUG_ASSERT(surfaceCache != nullptr);
     auto image = surfaceCache->makeImageSnapshot();
     canvas->drawImageRect(image, task.sourceRect(), task.tileRect(), sampling, &paint,
                           SrcRectConstraint::Strict);
   }
+  // hold the tasks for next frame to avoid free.
+  currentTasks = std::move(screenTasks);
 }
 
 void DisplayList::renderDirtyRegions(Canvas* canvas, std::vector<Rect> dirtyRegions) {
