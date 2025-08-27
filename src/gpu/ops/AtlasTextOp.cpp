@@ -20,7 +20,6 @@
 #include "RectDrawOp.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
-#include "gpu/RenderPass.h"
 #include "gpu/processors/AtlasTextGeometryProcessor.h"
 #include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
@@ -30,13 +29,14 @@ namespace tgfx {
 PlacementPtr<AtlasTextOp> AtlasTextOp::Make(Context* context,
                                             PlacementPtr<RectsVertexProvider> provider,
                                             uint32_t renderFlags,
-                                            std::shared_ptr<TextureProxy> textureProxy) {
+                                            std::shared_ptr<TextureProxy> textureProxy,
+                                            const SamplingOptions& sampling) {
   if (provider == nullptr || textureProxy == nullptr || textureProxy->width() <= 0 ||
       textureProxy->height() <= 0) {
     return nullptr;
   }
-  auto atlasTextOp =
-      context->drawingBuffer()->make<AtlasTextOp>(provider.get(), std::move(textureProxy));
+  auto atlasTextOp = context->drawingBuffer()->make<AtlasTextOp>(provider.get(),
+                                                                 std::move(textureProxy), sampling);
   if (provider->aaType() == AAType::Coverage || provider->rectCount() > 1) {
     atlasTextOp->indexBufferProxy =
         context->globalCache()->getRectIndexBuffer(provider->aaType() == AAType::Coverage);
@@ -50,9 +50,10 @@ PlacementPtr<AtlasTextOp> AtlasTextOp::Make(Context* context,
   return atlasTextOp;
 }
 
-AtlasTextOp::AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureProxy> textureProxy)
+AtlasTextOp::AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureProxy> textureProxy,
+                         const SamplingOptions& sampling)
     : DrawOp(provider->aaType()), rectCount(provider->rectCount()),
-      textureProxy(std::move(textureProxy)) {
+      textureProxy(std::move(textureProxy)), sampling(sampling) {
   if (!provider->hasColor()) {
     commonColor = provider->firstColor();
   }
@@ -78,7 +79,7 @@ void AtlasTextOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
 
   auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
   auto atlasGeometryProcessor =
-      AtlasTextGeometryProcessor::Make(drawingBuffer, textureProxy, aaType, commonColor);
+      AtlasTextGeometryProcessor::Make(drawingBuffer, textureProxy, aaType, commonColor, sampling);
   auto programInfo = createProgramInfo(renderTarget, std::move(atlasGeometryProcessor));
   renderPass->bindProgramAndScissorClip(programInfo.get(), scissorRect());
   renderPass->bindBuffers(indexBuffer ? indexBuffer->gpuBuffer() : nullptr,

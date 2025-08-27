@@ -21,6 +21,7 @@
 #include "core/PathRasterizer.h"
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
+#include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
 #include "core/utils/Types.h"
 #include "gpu/DrawingManager.h"
@@ -51,6 +52,13 @@ static bool HasDifferentViewMatrix(const std::vector<PlacementPtr<RectRecord>>& 
     }
   }
   return false;
+}
+
+static SamplingOptions GetAtlasSampling(const Matrix& matrix) {
+  // A matrix is considered rotated if it has any skew or if it swaps the x and y axes.
+  auto hasRotated = !FloatNearlyZero(matrix.getSkewX()) || !FloatNearlyZero(matrix.getSkewY());
+  auto filterMode = hasRotated ? FilterMode::Linear : FilterMode::Nearest;
+  return SamplingOptions{filterMode, MipmapMode::None};
 }
 
 OpsCompositor::OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
@@ -377,7 +385,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
       auto provider = RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects), {},
                                                     AAType::None, true, UVSubsetMode::None);
       drawOp = AtlasTextOp::Make(context, std::move(provider), renderFlags,
-                                 std::move(pendingAtlasTexture));
+                                 std::move(pendingAtlasTexture), pendingSampling);
     } break;
     default:
       break;
@@ -688,9 +696,12 @@ void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, co
                                   const MCState& state, const Fill& fill) {
   DEBUG_ASSERT(textureProxy != nullptr);
   DEBUG_ASSERT(!rect.isEmpty());
-  if (!canAppend(PendingOpType::Atlas, state.clip, fill) || pendingAtlasTexture != textureProxy) {
+  auto sampling = GetAtlasSampling(state.matrix);
+  if (!canAppend(PendingOpType::Atlas, state.clip, fill) || pendingAtlasTexture != textureProxy ||
+      pendingSampling != sampling) {
     flushPendingOps(PendingOpType::Atlas, state.clip, fill);
     pendingAtlasTexture = std::move(textureProxy);
+    pendingSampling = sampling;
   }
   auto record = drawingBuffer()->make<RectRecord>(rect, state.matrix, fill.color.premultiply());
   pendingRects.emplace_back(std::move(record));

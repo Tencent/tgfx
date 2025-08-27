@@ -184,7 +184,7 @@
         "LayerVisible1": "4edccb64",
         "Layer_drawRRect": "66aef718",
         "Layer_hitTestPoint": "99c36f0c",
-        "Layer_hitTestPointNested": "9060bdb6",
+        "Layer_hitTestPointNested": "d5f6e118",
         "MaskAlpha": "3dbeed5",
         "ModeColorFilter": "8bd149a4",
         "PartialBackgroundBlur": "ee2cc771",
@@ -201,12 +201,12 @@
         "backgroundLayerBlur": "cebc420b",
         "draw_shape": "80a4bd69",
         "draw_solid": "b4a1231",
-        "draw_text": "fe428880",
+        "draw_text": "d5f6e118",
         "dropShadow": "ee2cc771",
         "filterClip": "8bd149a4",
         "filterTest": "8bd149a4",
         "filters": "cebc420b",
-        "getBounds": "9060bdb6",
+        "getBounds": "d5f6e118",
         "getLayersUnderPoint": "6095b909",
         "getTightBounds": "ae4290b3",
         "greyColorMatrix": "a1605b2",
@@ -342,7 +342,7 @@
         "TruncateTextLineTest": "9060bdb6"
     },
     "TypefaceTest": {
-        "CustomImageTypeface": "fe428880",
+        "CustomImageTypeface": "d5f6e118",
         "CustomPathTypeface": "42ecc4c7"
     }
 }
