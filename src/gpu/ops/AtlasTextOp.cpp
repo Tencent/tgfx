@@ -63,8 +63,8 @@ void AtlasTextOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   OPERATE_MARK(tgfx::inspect::OpTaskType::RRectDrawOp);
   ATTRIBUTE_NAME("rectCount", static_cast<uint32_t>(rectCount));
   ATTRIBUTE_NAME("commonColor", commonColor);
-  ATTRIBUTE_NAME_ENUM("blenderMode", getBlendMode(), tgfx::inspect::CustomEnumType::BlendMode);
-  ATTRIBUTE_NAME_ENUM("aaType", getAAType(), tgfx::inspect::CustomEnumType::AAType);
+  ATTRIBUTE_NAME_ENUM("blenderMode", blendMode, tgfx::inspect::CustomEnumType::BlendMode);
+  ATTRIBUTE_NAME_ENUM("aaType", aaType, tgfx::inspect::CustomEnumType::AAType);
   std::shared_ptr<IndexBuffer> indexBuffer = nullptr;
   if (indexBufferProxy) {
     indexBuffer = indexBufferProxy->getBuffer();
@@ -81,7 +81,7 @@ void AtlasTextOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   auto atlasGeometryProcessor =
       AtlasTextGeometryProcessor::Make(drawingBuffer, textureProxy, aaType, commonColor, sampling);
   auto programInfo = createProgramInfo(renderTarget, std::move(atlasGeometryProcessor));
-  renderPass->bindProgramAndScissorClip(programInfo.get(), scissorRect());
+  renderPass->bindProgramAndScissorClip(programInfo.get(), scissorRect);
   renderPass->bindBuffers(indexBuffer ? indexBuffer->gpuBuffer() : nullptr,
                           vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
   if (indexBuffer != nullptr) {

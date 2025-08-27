@@ -189,7 +189,7 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
 }
 
 void OpsCompositor::discardAll() {
-  ops.clear();
+  drawOps.clear();
   clearColor.reset();
   if (pendingType != PendingOpType::Unknown) {
     resetPendingOps();
@@ -440,7 +440,7 @@ bool OpsCompositor::drawAsClear(const Rect& rect, const MCState& state, const Fi
     return false;
   }
   // discard all previous ops since the clear rect covers the entire render target.
-  ops.clear();
+  drawOps.clear();
   auto format = renderTarget->format();
   auto caps = context->caps();
   auto& writeSwizzle = caps->getWriteSwizzle(format);
@@ -547,7 +547,7 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
       return nullptr;
     }
     clipTexture = clipRenderTarget->asTextureProxy();
-    auto opList = drawingBuffer()->makeArray<Op>(&drawOp, 1);
+    auto opList = drawingBuffer()->makeArray<DrawOp>(&drawOp, 1);
     context->drawingManager()->addOpsRenderTask(std::move(clipRenderTarget), std::move(opList),
                                                 Color::Transparent());
   } else {
@@ -689,7 +689,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
         PorterDuffXferProcessor::Make(drawingBuffer(), fill.blendMode, std::move(dstTextureInfo));
     op->setXferProcessor(std::move(xferProcessor));
   }
-  ops.emplace_back(std::move(op));
+  drawOps.emplace_back(std::move(op));
 }
 
 void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,
@@ -708,7 +708,7 @@ void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, co
 }
 
 void OpsCompositor::submitDrawOps() {
-  auto opArray = drawingBuffer()->makeArray(std::move(ops));
+  auto opArray = drawingBuffer()->makeArray(std::move(drawOps));
   context->drawingManager()->addOpsRenderTask(renderTarget, std::move(opArray), clearColor);
   clearColor.reset();
 }

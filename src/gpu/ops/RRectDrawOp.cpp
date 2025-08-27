@@ -57,8 +57,8 @@ void RRectDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   ATTRIBUTE_NAME("useScale", useScale);
   ATTRIBUTE_NAME("hasStroke", hasStroke);
   ATTRIBUTE_NAME("commonColor", commonColor);
-  ATTRIBUTE_NAME_ENUM("blenderMode", getBlendMode(), tgfx::inspect::CustomEnumType::BlendMode);
-  ATTRIBUTE_NAME_ENUM("aaType", getAAType(), tgfx::inspect::CustomEnumType::AAType);
+  ATTRIBUTE_NAME_ENUM("blenderMode", blendMode, tgfx::inspect::CustomEnumType::BlendMode);
+  ATTRIBUTE_NAME_ENUM("aaType", aaType, tgfx::inspect::CustomEnumType::AAType);
   if (indexBufferProxy == nullptr || vertexBufferProxyView == nullptr) {
     return;
   }
@@ -75,7 +75,7 @@ void RRectDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
       EllipseGeometryProcessor::Make(drawingBuffer, renderTarget->width(), renderTarget->height(),
                                      hasStroke, useScale, commonColor);
   auto programInfo = createProgramInfo(renderTarget, std::move(gp));
-  renderPass->bindProgramAndScissorClip(programInfo.get(), scissorRect());
+  renderPass->bindProgramAndScissorClip(programInfo.get(), scissorRect);
   renderPass->bindBuffers(indexBuffer->gpuBuffer(), vertexBuffer->gpuBuffer(),
                           vertexBufferProxyView->offset());
   auto numIndicesPerRRect = hasStroke ? IndicesPerStrokeRRect : IndicesPerFillRRect;

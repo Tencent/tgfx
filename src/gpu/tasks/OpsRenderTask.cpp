@@ -39,7 +39,7 @@ void OpsRenderTask::execute(CommandEncoder* encoder) {
     LOGE("OpsRenderTask::execute() Failed to initialize the render pass!");
     return;
   }
-  for (auto& op : ops) {
+  for (auto& op : drawOps) {
     op->execute(renderPass.get(), renderTarget.get());
     // Release the Op immediately after execution to maximize GPU resource reuse.
     op = nullptr;
