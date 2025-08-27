@@ -497,7 +497,7 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   }
   size_t tileIndex = 0;
   std::vector<std::shared_ptr<Tile>> taskTiles = {};
-  for (auto& grid : dirtyGrids) {
+  for (const auto& grid : dirtyGrids) {
     auto& tile = freeTiles[tileIndex++];
     if (_allowZoomBlur) {
       auto fallbackTasks = getFallbackDrawTasks(grid.first, grid.second, sortedCaches);
@@ -530,13 +530,13 @@ std::vector<DrawTask> DisplayList::collectScreenTasks(const Surface* surface,
   return screenTasks;
 }
 
-static float ScaleRatio(float scaleA, float zoomScale) {
-  auto ratio = fabsf(scaleA / zoomScale);
-  if (ratio < 1.0f) {
-    ratio = 1.0f / ratio;
-  }
-  return ratio;
-}
+// static float ScaleRatio(float scaleA, float zoomScale) {
+//   auto ratio = fabsf(scaleA / zoomScale);
+//   if (ratio < 1.0f) {
+//     ratio = 1.0f / ratio;
+//   }
+//   return ratio;
+// }
 
 std::vector<std::pair<float, TileCache*>> DisplayList::getSortedTileCaches() const {
   std::vector<std::pair<float, TileCache*>> sortedTileCaches;
@@ -545,13 +545,12 @@ std::vector<std::pair<float, TileCache*>> DisplayList::getSortedTileCaches() con
     auto zoomScale = ToZoomScaleFloat(scaleInt, _zoomScalePrecision);
     sortedTileCaches.emplace_back(zoomScale, tileCache);
   }
-  auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
-  DEBUG_ASSERT(currentZoomScale != 0.0f);
+  // auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
+  // DEBUG_ASSERT(currentZoomScale != 0.0f);
   // Closest tile caches first, farthest last.
   std::sort(sortedTileCaches.begin(), sortedTileCaches.end(),
-            [currentZoomScale](const std::pair<float, TileCache*>& a,
-                               const std::pair<float, TileCache*>& b) {
-              return ScaleRatio(a.first, currentZoomScale) < ScaleRatio(b.first, currentZoomScale);
+            [](const std::pair<float, TileCache*>& a, const std::pair<float, TileCache*>& b) {
+              return a.first < b.first;
             });
   return sortedTileCaches;
 }
@@ -561,7 +560,8 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
   auto tileRect = Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
   DEBUG_ASSERT(currentZoomScale != 0.0f);
-  for (auto& [scale, tileCache] : sortedCaches) {
+  for (auto& it = sortedCaches.rbegin() ; it != sortedCaches.rend() ; ++it) {
+    const auto& [scale, tileCache] = *it;
     if (scale == currentZoomScale || tileCache->empty()) {
       continue;
     }
