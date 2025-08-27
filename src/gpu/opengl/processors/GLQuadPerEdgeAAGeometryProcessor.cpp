@@ -41,8 +41,8 @@ void GLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
 
   varyingHandler->emitAttributes(*this);
 
-  auto uvCoordsVar = uvCoord.isInitialized() ? uvCoord.asShaderVar() : position.asShaderVar();
-  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, uvCoordsVar);
+  auto& uvCoordsVar = uvCoord.empty() ? position : uvCoord;
+  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(uvCoordsVar));
 
   if (aa == AAType::Coverage) {
     auto coverageVar = varyingHandler->addVarying("Coverage", SLType::Float);
@@ -55,7 +55,7 @@ void GLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
 
   if (commonColor.has_value()) {
     auto colorName =
-        args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "Color");
+        args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
   } else {
     auto colorVar = varyingHandler->addVarying("Color", SLType::Float4);
@@ -78,8 +78,8 @@ void GLQuadPerEdgeAAGeometryProcessor::setData(UniformBuffer* uniformBuffer,
 void GLQuadPerEdgeAAGeometryProcessor::onSetTransformData(UniformBuffer* uniformBuffer,
                                                           const CoordTransform* coordTransform,
                                                           int index) const {
-  if (index == 0 && subset.isInitialized() && !uvCoord.isInitialized()) {
-    // Subset only applies to the first image in pipeline.
+  if (index == 0 && !subset.empty() && uvCoord.empty()) {
+    // Subset only applies to the first image in ProgramInfo.
     uniformBuffer->setData("texSubsetMatrix", coordTransform->getTotalMatrix());
   }
 }
@@ -87,12 +87,12 @@ void GLQuadPerEdgeAAGeometryProcessor::onSetTransformData(UniformBuffer* uniform
 void GLQuadPerEdgeAAGeometryProcessor::onEmitTransform(
     EmitArgs& args, VertexShaderBuilder* vertexBuilder, VaryingHandler* varyingHandler,
     UniformHandler* uniformHandler, const std::string& transformUniformName, int index) const {
-  if (index == 0 && subset.isInitialized()) {
+  if (index == 0 && !subset.empty()) {
     auto varying = varyingHandler->addVarying("vTexSubset", SLType::Float4, true);
     std::string subsetMatrixName = transformUniformName;
-    if (!uvCoord.isInitialized()) {
-      subsetMatrixName =
-          uniformHandler->addUniform(ShaderFlags::Vertex, SLType::Float3x3, "texSubsetMatrix");
+    if (uvCoord.empty()) {
+      subsetMatrixName = uniformHandler->addUniform("texSubsetMatrix", UniformFormat::Float3x3,
+                                                    ShaderStage::Vertex);
     }
     vertexBuilder->codeAppend("highp vec4 subset;");
     vertexBuilder->codeAppendf("subset.xy = (%s * vec3(%s.xy, 1)).xy;", subsetMatrixName.c_str(),

@@ -27,7 +27,7 @@ PlacementPtr<AlphaThresholdFragmentProcessor> AlphaThresholdFragmentProcessor::M
 void GLAlphaThresholdFragmentProcessor::emitCode(EmitArgs& args) const {
   auto* uniformHandler = args.uniformHandler;
   auto thresholdUniformName =
-      uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float, "Threshold");
+      uniformHandler->addUniform("Threshold", UniformFormat::Float, ShaderStage::Fragment);
 
   auto* fragBuilder = args.fragBuilder;
   fragBuilder->codeAppendf("%s.rgb = %s.rgb / %s.a;", args.outputColor.c_str(),

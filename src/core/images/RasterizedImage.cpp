@@ -34,7 +34,8 @@ std::shared_ptr<Image> RasterizedImage::makeRasterized() const {
 
 std::shared_ptr<TextureProxy> RasterizedImage::lockTextureProxy(const TPArgs& args) const {
   auto proxyProvider = args.context->proxyProvider();
-  auto newScale = source->getRasterizedScale(args.drawScale);
+  // If the image is mipmapped, we always cache the texture at the original scale.
+  auto newScale = args.mipmapped ? 1.0f : source->getRasterizedScale(args.drawScale);
   auto textureKey = getTextureKey(newScale);
   auto textureProxy = proxyProvider->findOrWrapTextureProxy(textureKey);
   if (textureProxy != nullptr) {

@@ -128,7 +128,7 @@ unsigned LoadGLShader(const GLFunctions* gl, unsigned shaderType, const std::str
   if (!success) {
     char infoLog[512];
     gl->getShaderInfoLog(shader, 512, nullptr, infoLog);
-    LOGE("Could not compile shader: %d %s", shaderType, infoLog);
+    LOGE("Could not compile shader:\n%s\ntype:%d info%s", source.c_str(), shaderType, infoLog);
     gl->deleteShader(shader);
     shader = 0;
   }

@@ -21,6 +21,7 @@
 #include "gpu/CommandBuffer.h"
 #include "gpu/GPUTexture.h"
 #include "gpu/RenderPass.h"
+#include "gpu/RenderPassDescriptor.h"
 #include "gpu/Semaphore.h"
 
 namespace tgfx {
@@ -33,15 +34,12 @@ class CommandEncoder {
   virtual ~CommandEncoder() = default;
 
   /**
-   * Begins a render pass for the specified render target. Returns a RenderPass object that can be
-   * used to control the rendering process. If the render target is null, it will return nullptr.
-   * If the resolveMSAA parameter is true, it will resolve the MSAA (multisampling antialiasing) for
-   * the render target (if it has MSAA) when the end() method is called. Note that only one render
-   * pass can be active at a time. To begin a new render pass, you must first call end() on the
-   * previous one.
+   * Begins a render pass using the specified RenderPassDescriptor. Returns a RenderPass object to
+   * control the rendering process, or nullptr if the descriptor is invalid. Only one render pass
+   * can be active at a time; to start a new one, you must first call end() on the previous render
+   * pass.
    */
-  std::shared_ptr<RenderPass> beginRenderPass(std::shared_ptr<RenderTarget> renderTarget,
-                                              bool resolveMSAA = true);
+  std::shared_ptr<RenderPass> beginRenderPass(const RenderPassDescriptor& descriptor);
 
   /**
    * Copies a region from the source GPUTexture to a region of the destination GPUTexture. If
@@ -76,16 +74,15 @@ class CommandEncoder {
   virtual void waitSemaphore(const BackendSemaphore& semaphore) = 0;
 
   /**
-   * Completes the command encoding process and returns a CommandBuffer containing all recorded
-   * commands. The CommandBuffer can then be submitted to the GPU for execution using the
-   * GPU::submit() method. Returns nullptr if no commands were recorded or if the encoding process
-   * failed.
+   * Finalizes command encoding and returns a CommandBuffer with all recorded commands. You can then
+   * submit the CommandBuffer to the GPU for execution using GPU::submit(). Returns nullptr if no
+   * commands were recorded or if encoding failed, for example, if an active render pass was not
+   * properly ended.
    */
   std::shared_ptr<CommandBuffer> finish();
 
  protected:
-  virtual std::shared_ptr<RenderPass> onBeginRenderPass(std::shared_ptr<RenderTarget> renderTarget,
-                                                        bool resolveMSAA) = 0;
+  virtual std::shared_ptr<RenderPass> onBeginRenderPass(const RenderPassDescriptor& descriptor) = 0;
 
   virtual std::shared_ptr<CommandBuffer> onFinish() = 0;
 

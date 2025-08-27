@@ -53,15 +53,15 @@ GLDualIntervalGradientColorizer::GLDualIntervalGradientColorizer(Color scale01, 
 void GLDualIntervalGradientColorizer::emitCode(EmitArgs& args) const {
   auto* fragBuilder = args.fragBuilder;
   auto scale01Name =
-      args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "scale01");
+      args.uniformHandler->addUniform("scale01", UniformFormat::Float4, ShaderStage::Fragment);
   auto bias01Name =
-      args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "bias01");
+      args.uniformHandler->addUniform("bias01", UniformFormat::Float4, ShaderStage::Fragment);
   auto scale23Name =
-      args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "scale23");
+      args.uniformHandler->addUniform("scale23", UniformFormat::Float4, ShaderStage::Fragment);
   auto bias23Name =
-      args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "bias23");
+      args.uniformHandler->addUniform("bias23", UniformFormat::Float4, ShaderStage::Fragment);
   auto thresholdName =
-      args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float, "threshold");
+      args.uniformHandler->addUniform("threshold", UniformFormat::Float, ShaderStage::Fragment);
   fragBuilder->codeAppendf("float t = %s.x;", args.inputColor.c_str());
   fragBuilder->codeAppend("vec4 scale, bias;");
   fragBuilder->codeAppendf("if (t < %s) {", thresholdName.c_str());

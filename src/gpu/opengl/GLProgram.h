@@ -19,49 +19,47 @@
 #pragma once
 
 #include <optional>
-#include "gpu/Pipeline.h"
 #include "gpu/Program.h"
-#include "gpu/SLType.h"
-#include "gpu/opengl/GLUniformBuffer.h"
+#include "gpu/ProgramInfo.h"
+#include "gpu/opengl/GLBuffer.h"
 
 namespace tgfx {
 class GLProgram : public Program {
  public:
-  struct Attribute {
-    SLType gpuType = SLType::Float;
-    size_t offset = 0;
-    int location = 0;
-  };
-
-  GLProgram(unsigned programID, std::unique_ptr<GLUniformBuffer> uniformBuffer,
-            std::vector<Attribute> attributes, int vertexStride);
+  GLProgram(unsigned programID, std::unique_ptr<UniformBuffer> uniformBuffer,
+            std::vector<Attribute> attributes, std::unique_ptr<BlendFormula> blendFormula);
 
   /**
-   * Gets the GL program ID for this program.
+   * Binds the program so that it is used in subsequent draw calls.
    */
-  unsigned programID() const {
-    return programId;
-  }
+  void activate();
 
-  GLUniformBuffer* uniformBuffer() const {
-    return _uniformBuffer.get();
-  }
+  /**
+   * Sets the uniform data to be used in subsequent draw calls.
+   */
+  void setUniformBytes(const void* data, size_t size);
 
-  int vertexStride() const {
-    return _vertexStride;
-  }
+  /**
+   * Binds the vertex buffer to be used in subsequent draw calls. The vertexOffset is the offset
+   * into the buffer where the vertex data begins.
+   */
+  void setVertexBuffer(GPUBuffer* vertexBuffer, size_t vertexOffset);
 
-  const std::vector<Attribute>& vertexAttributes() const {
-    return attributes;
-  }
+  /**
+   * Binds the index buffer to be used in subsequent draw calls.
+   */
+  void setIndexBuffer(GPUBuffer* indexBuffer);
 
  protected:
   void onReleaseGPU() override;
 
  private:
-  unsigned programId = 0;
-  std::unique_ptr<GLUniformBuffer> _uniformBuffer = nullptr;
-  std::vector<Attribute> attributes = {};
-  int _vertexStride = 0;
+  unsigned programID = 0;
+  unsigned vertexArray = 0;
+  std::vector<Attribute> _attributes = {};
+  std::vector<int> attributeLocations = {};
+  std::vector<int> uniformLocations = {};
+  int vertexStride = 0;
+  std::unique_ptr<BlendFormula> blendFormula = nullptr;
 };
 }  // namespace tgfx

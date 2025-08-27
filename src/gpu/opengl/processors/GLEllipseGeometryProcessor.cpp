@@ -51,7 +51,7 @@ void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   // setup pass through color
   if (commonColor.has_value()) {
     auto colorName =
-        args.uniformHandler->addUniform(ShaderFlags::Fragment, SLType::Float4, "Color");
+        args.uniformHandler->addUniform("Color", UniformFormat::Float4, ShaderStage::Fragment);
     fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), colorName.c_str());
   } else {
     auto color = varyingHandler->addVarying("Color", SLType::Float4);
@@ -62,7 +62,7 @@ void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   // Setup position
   args.vertBuilder->emitNormalizedPosition(inPosition.name());
   // emit transforms
-  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, inPosition.asShaderVar());
+  emitTransforms(args, vertBuilder, varyingHandler, uniformHandler, ShaderVar(inPosition));
   // For stroked ellipses, we use the full ellipse equation (x^2/a^2 + y^2/b^2 = 1)
   // to compute both the edges because we need two separate test equations for
   // the single offset.

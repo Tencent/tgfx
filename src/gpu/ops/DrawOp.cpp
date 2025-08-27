@@ -19,8 +19,8 @@
 #include "DrawOp.h"
 
 namespace tgfx {
-PlacementPtr<Pipeline> DrawOp::createPipeline(RenderTarget* renderTarget,
-                                              PlacementPtr<GeometryProcessor> geometryProcessor) {
+PlacementPtr<ProgramInfo> DrawOp::createProgramInfo(
+    RenderTarget* renderTarget, PlacementPtr<GeometryProcessor> geometryProcessor) {
   auto numColorProcessors = colors.size();
   auto fragmentProcessors = std::move(colors);
   fragmentProcessors.reserve(numColorProcessors + coverages.size());
@@ -28,9 +28,8 @@ PlacementPtr<Pipeline> DrawOp::createPipeline(RenderTarget* renderTarget,
     fragmentProcessors.emplace_back(std::move(coverage));
   }
   auto context = renderTarget->getContext();
-  const auto& swizzle = context->caps()->getWriteSwizzle(renderTarget->format());
-  return context->drawingBuffer()->make<Pipeline>(std::move(geometryProcessor),
-                                                  std::move(fragmentProcessors), numColorProcessors,
-                                                  std::move(xferProcessor), blendMode, &swizzle);
+  return context->drawingBuffer()->make<ProgramInfo>(
+      renderTarget, std::move(geometryProcessor), std::move(fragmentProcessors), numColorProcessors,
+      std::move(xferProcessor), blendMode);
 }
 }  // namespace tgfx

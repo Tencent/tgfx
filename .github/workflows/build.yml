@@ -5,24 +5,6 @@ on:
     branches: [ main ]
   push:
     branches: [ main ]
-  workflow_dispatch:
-    inputs:
-      platform:
-        description: 'Platform to build (optional, leave empty to build all)'
-        required: false
-        type: choice
-        options:
-          - all
-          - ios
-          - android
-          - web
-          - win
-          - linux
-          - qt
-          - openharmony
-        default: 'all'
-
-
 
 jobs:
   ios:
@@ -359,7 +341,8 @@ jobs:
           name: qt_build
           path: out
 
-  openharmony:
+
+  ohos:
     runs-on: macos-latest
     steps:
       - name: Check Out Repo
@@ -418,25 +401,6 @@ jobs:
           key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
           restore-keys: third-party-openharmony-
 
-
-      - name: Get Node Modules Cache
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ohos/node_modules
-            ~/.ohpm
-          key: ohpm-deps-${{ hashFiles('ohos/oh-package.json5') }}
-          restore-keys: ohpm-deps-
-
-      - name: Get Hvigor Cache
-        uses: actions/cache/restore@v4
-        with:
-          path: |
-            ohos/.hvigor
-            ohos/build
-          key: hvigor-build-${{ hashFiles('ohos/**/*.ets', 'ohos/**/*.ts', 'ohos/**/*.json') }}
-          restore-keys: hvigor-build-
-
       - name: Run depsync
         run: |
           npm install depsync -g
@@ -451,7 +415,8 @@ jobs:
       - name: Build Harmony
         run: |
           cd ohos
-          hvigorw assembleHap -Dohos.sdk.root=$DEVECO_SDK_HOME -p buildMode=release --no-daemon --parallel --max-workers=4
+          hvigorw clean --no-daemon -Dohos.sdk.root=$DEVECO_SDK_HOME
+          hvigorw assembleHap -Dohos.sdk.root=$DEVECO_SDK_HOME -p buildMode=release --no-daemon
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}

@@ -18,23 +18,20 @@
 
 #pragma once
 
-#include "Op.h"
 #include "gpu/AAType.h"
-#include "gpu/Pipeline.h"
+#include "gpu/ProgramInfo.h"
 #include "gpu/RenderPass.h"
 
 namespace tgfx {
-class DrawOp : public Op {
+class DrawOp {
  public:
-  PlacementPtr<Pipeline> createPipeline(RenderTarget* renderTarget,
-                                        PlacementPtr<GeometryProcessor> geometryProcessor);
+  virtual ~DrawOp() = default;
 
-  const Rect& scissorRect() const {
-    return _scissorRect;
-  }
+  PlacementPtr<ProgramInfo> createProgramInfo(RenderTarget* renderTarget,
+                                              PlacementPtr<GeometryProcessor> geometryProcessor);
 
-  void setScissorRect(Rect scissorRect) {
-    _scissorRect = scissorRect;
+  void setScissorRect(const Rect& rect) {
+    scissorRect = rect;
   }
 
   void setBlendMode(BlendMode mode) {
@@ -57,17 +54,17 @@ class DrawOp : public Op {
     return !coverages.empty();
   }
 
+  virtual void execute(RenderPass* renderPass, RenderTarget* renderTarget) = 0;
+
  protected:
   AAType aaType = AAType::None;
-
-  explicit DrawOp(AAType aaType) : aaType(aaType) {
-  }
-
- private:
-  Rect _scissorRect = {};
+  Rect scissorRect = {};
   std::vector<PlacementPtr<FragmentProcessor>> colors = {};
   std::vector<PlacementPtr<FragmentProcessor>> coverages = {};
   PlacementPtr<XferProcessor> xferProcessor = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
+
+  explicit DrawOp(AAType aaType) : aaType(aaType) {
+  }
 };
 }  // namespace tgfx

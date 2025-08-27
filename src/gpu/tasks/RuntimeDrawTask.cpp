@@ -18,15 +18,15 @@
 
 #include "RuntimeDrawTask.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/Pipeline.h"
+#include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
 #include "gpu/RectsVertexProvider.h"
 #include "gpu/RenderPass.h"
-#include "gpu/RuntimeProgramCreator.h"
 #include "gpu/RuntimeProgramWrapper.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
+#include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -52,6 +52,7 @@ RuntimeDrawTask::RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
 }
 
 void RuntimeDrawTask::execute(CommandEncoder* encoder) {
+  TASK_MARK(tgfx::inspect::OpTaskType::RuntimeDrawTask);
   std::vector<std::shared_ptr<TextureView>> textures = {};
   textures.reserve(inputTextures.size());
   for (size_t i = 0; i < inputTextures.size(); i++) {
@@ -71,11 +72,18 @@ void RuntimeDrawTask::execute(CommandEncoder* encoder) {
     return;
   }
   auto context = renderTarget->getContext();
-  RuntimeProgramCreator programCreator(effect);
-  auto program = context->globalCache()->getProgram(&programCreator);
+  static auto RuntimeProgramType = UniqueID::Next();
+  BytesKey programKey = {};
+  programKey.write(RuntimeProgramType);
+  programKey.write(effect->programID());
+  auto program = context->globalCache()->findProgram(programKey);
   if (program == nullptr) {
-    LOGE("RuntimeDrawTask::execute() Failed to create the runtime program!");
-    return;
+    program = RuntimeProgramWrapper::Wrap(effect->onCreateProgram(context));
+    if (program == nullptr) {
+      LOGE("RuntimeDrawTask::execute() Failed to create the runtime program!");
+      return;
+    }
+    context->globalCache()->addProgram(programKey, program);
   }
   std::vector<BackendTexture> backendTextures = {};
   backendTextures.reserve(textures.size());
@@ -85,7 +93,9 @@ void RuntimeDrawTask::execute(CommandEncoder* encoder) {
   effect->onDraw(RuntimeProgramWrapper::Unwrap(program.get()), backendTextures,
                  renderTarget->getBackendRenderTarget(), offset);
   if (renderTarget->sampleCount() > 1) {
-    auto renderPass = encoder->beginRenderPass(renderTarget, true);
+    RenderPassDescriptor descriptor(renderTarget->getRenderTexture(),
+                                    renderTarget->getSampleTexture());
+    auto renderPass = encoder->beginRenderPass(descriptor);
     DEBUG_ASSERT(renderPass != nullptr);
     renderPass->end();
   }
@@ -115,7 +125,8 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
     return nullptr;
   }
   auto renderTarget = renderTargetProxy->getRenderTarget();
-  auto renderPass = encoder->beginRenderPass(renderTarget, false);
+  RenderPassDescriptor descriptor(renderTarget->getRenderTexture());
+  auto renderPass = encoder->beginRenderPass(descriptor);
   if (renderPass == nullptr) {
     LOGE("RuntimeDrawTask::getFlatTexture() Failed to initialize the render pass!");
     return nullptr;
@@ -128,14 +139,11 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
   auto geometryProcessor =
       DefaultGeometryProcessor::Make(context->drawingBuffer(), {}, renderTarget->width(),
                                      renderTarget->height(), AAType::None, {}, {});
-  auto format = renderTarget->format();
-  auto caps = renderTarget->getContext()->caps();
-  const auto& swizzle = caps->getWriteSwizzle(format);
   std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors = {};
   fragmentProcessors.emplace_back(std::move(colorProcessor));
-  Pipeline pipeline(std::move(geometryProcessor), std::move(fragmentProcessors), 1, nullptr,
-                    BlendMode::Src, &swizzle);
-  renderPass->bindProgramAndScissorClip(&pipeline, {});
+  ProgramInfo programInfo(renderTarget.get(), std::move(geometryProcessor),
+                          std::move(fragmentProcessors), 1, nullptr, BlendMode::Src);
+  renderPass->bindProgramAndScissorClip(&programInfo, {});
   renderPass->bindBuffers(nullptr, vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
   renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
   renderPass->end();
