@@ -19,7 +19,7 @@
 #pragma once
 
 #include "gpu/GPUBuffer.h"
-#include "gpu/Pipeline.h"
+#include "gpu/ProgramInfo.h"
 #include "gpu/RenderTarget.h"
 #include "tgfx/core/Color.h"
 
@@ -37,7 +37,7 @@ class RenderPass {
   virtual ~RenderPass() = default;
 
   void end();
-  void bindProgramAndScissorClip(const Pipeline* pipeline, const Rect& scissorRect);
+  void bindProgramAndScissorClip(const ProgramInfo* programInfo, const Rect& scissorRect);
   void bindBuffers(GPUBuffer* indexBuffer, GPUBuffer* vertexBuffer, size_t vertexOffset = 0);
   void draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount);
   void drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount);
@@ -47,7 +47,8 @@ class RenderPass {
       : renderTarget(std::move(renderTarget)) {
   }
 
-  virtual bool onBindProgramAndScissorClip(const Pipeline* pipeline, const Rect& drawBounds) = 0;
+  virtual bool onBindProgramAndScissorClip(const ProgramInfo* programInfo,
+                                           const Rect& drawBounds) = 0;
   virtual bool onBindBuffers(GPUBuffer* indexBuffer, GPUBuffer* vertexBuffer,
                              size_t vertexOffset) = 0;
   virtual void onDraw(PrimitiveType primitiveType, size_t offset, size_t count,

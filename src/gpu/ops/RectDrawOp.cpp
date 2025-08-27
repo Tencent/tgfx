@@ -21,6 +21,7 @@
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
 #include "gpu/processors/QuadPerEdgeAAGeometryProcessor.h"
+#include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -58,6 +59,13 @@ RectDrawOp::RectDrawOp(RectsVertexProvider* provider)
 }
 
 void RectDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
+  OPERATE_MARK(tgfx::inspect::OpTaskType::RectDrawOp);
+  ATTRIBUTE_NAME("rectCount", static_cast<int>(rectCount));
+  ATTRIBUTE_NAME("commonColor", commonColor);
+  ATTRIBUTE_NAME("uvMatrix", uvMatrix);
+  ATTRIBUTE_NAME("scissorRect", scissorRect());
+  ATTRIBUTE_NAME_ENUM("blenderMode", getBlendMode(), tgfx::inspect::CustomEnumType::BlendMode);
+  ATTRIBUTE_NAME_ENUM("aaType", getAAType(), tgfx::inspect::CustomEnumType::AAType);
   std::shared_ptr<IndexBuffer> indexBuffer = nullptr;
   if (indexBufferProxy) {
     indexBuffer = indexBufferProxy->getBuffer();
@@ -73,8 +81,8 @@ void RectDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   auto gp = QuadPerEdgeAAGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
                                                  renderTarget->height(), aaType, commonColor,
                                                  uvMatrix, hasSubset);
-  auto pipeline = createPipeline(renderTarget, std::move(gp));
-  renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
+  auto programInfo = createProgramInfo(renderTarget, std::move(gp));
+  renderPass->bindProgramAndScissorClip(programInfo.get(), scissorRect());
   renderPass->bindBuffers(indexBuffer ? indexBuffer->gpuBuffer() : nullptr,
                           vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
   if (indexBuffer != nullptr) {

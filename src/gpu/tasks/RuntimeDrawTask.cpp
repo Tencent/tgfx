@@ -18,7 +18,7 @@
 
 #include "RuntimeDrawTask.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/Pipeline.h"
+#include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
 #include "gpu/RectsVertexProvider.h"
@@ -27,6 +27,7 @@
 #include "gpu/RuntimeProgramWrapper.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
+#include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -52,6 +53,7 @@ RuntimeDrawTask::RuntimeDrawTask(std::shared_ptr<RenderTargetProxy> target,
 }
 
 void RuntimeDrawTask::execute(CommandEncoder* encoder) {
+  TASK_MARK(tgfx::inspect::OpTaskType::RuntimeDrawTask);
   std::vector<std::shared_ptr<TextureView>> textures = {};
   textures.reserve(inputTextures.size());
   for (size_t i = 0; i < inputTextures.size(); i++) {
@@ -133,9 +135,9 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
   const auto& swizzle = caps->getWriteSwizzle(format);
   std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors = {};
   fragmentProcessors.emplace_back(std::move(colorProcessor));
-  Pipeline pipeline(std::move(geometryProcessor), std::move(fragmentProcessors), 1, nullptr,
-                    BlendMode::Src, &swizzle);
-  renderPass->bindProgramAndScissorClip(&pipeline, {});
+  ProgramInfo programInfo(std::move(geometryProcessor), std::move(fragmentProcessors), 1, nullptr,
+                          BlendMode::Src, &swizzle);
+  renderPass->bindProgramAndScissorClip(&programInfo, {});
   renderPass->bindBuffers(nullptr, vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
   renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
   renderPass->end();

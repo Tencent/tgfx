@@ -69,7 +69,6 @@ bool GLTiledTextureEffect::ShaderModeUsesSubset(TiledTextureEffect::ShaderMode m
   switch (m) {
     case TiledTextureEffect::ShaderMode::None:
     case TiledTextureEffect::ShaderMode::Clamp:
-    case TiledTextureEffect::ShaderMode::ClampToBorderNearest:
     case TiledTextureEffect::ShaderMode::ClampToBorderLinear:
       return false;
     case TiledTextureEffect::ShaderMode::RepeatNearestNone:
@@ -77,6 +76,7 @@ bool GLTiledTextureEffect::ShaderModeUsesSubset(TiledTextureEffect::ShaderMode m
     case TiledTextureEffect::ShaderMode::RepeatNearestMipmap:
     case TiledTextureEffect::ShaderMode::RepeatLinearMipmap:
     case TiledTextureEffect::ShaderMode::MirrorRepeat:
+    case TiledTextureEffect::ShaderMode::ClampToBorderNearest:
       return true;
   }
 }

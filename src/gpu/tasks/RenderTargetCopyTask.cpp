@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RenderTargetCopyTask.h"
+#include "inspect/InspectorMark.h"
 
 namespace tgfx {
 RenderTargetCopyTask::RenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
@@ -25,6 +26,7 @@ RenderTargetCopyTask::RenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> so
 }
 
 void RenderTargetCopyTask::execute(CommandEncoder* encoder) {
+  TASK_MARK(tgfx::inspect::OpTaskType::RenderTargetCopyTask);
   auto renderTarget = source->getRenderTarget();
   if (renderTarget == nullptr) {
     LOGE("RenderTargetCopyTask::execute() Failed to get the source render target!");

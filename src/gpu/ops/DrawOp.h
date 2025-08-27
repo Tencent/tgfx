@@ -20,17 +20,25 @@
 
 #include "Op.h"
 #include "gpu/AAType.h"
-#include "gpu/Pipeline.h"
+#include "gpu/ProgramInfo.h"
 #include "gpu/RenderPass.h"
 
 namespace tgfx {
 class DrawOp : public Op {
  public:
-  PlacementPtr<Pipeline> createPipeline(RenderTarget* renderTarget,
-                                        PlacementPtr<GeometryProcessor> geometryProcessor);
+  PlacementPtr<ProgramInfo> createProgramInfo(RenderTarget* renderTarget,
+                                              PlacementPtr<GeometryProcessor> geometryProcessor);
 
   const Rect& scissorRect() const {
     return _scissorRect;
+  }
+
+  BlendMode getBlendMode() const {
+    return blendMode;
+  }
+
+  AAType getAAType() const {
+    return aaType;
   }
 
   void setScissorRect(Rect scissorRect) {

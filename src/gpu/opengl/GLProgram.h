@@ -19,8 +19,8 @@
 #pragma once
 
 #include <optional>
-#include "gpu/Pipeline.h"
 #include "gpu/Program.h"
+#include "gpu/ProgramInfo.h"
 #include "gpu/opengl/GLBuffer.h"
 
 namespace tgfx {

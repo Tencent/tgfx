@@ -32,7 +32,8 @@ class GLRenderPass : public RenderPass {
   void begin();
 
  protected:
-  bool onBindProgramAndScissorClip(const Pipeline* pipeline, const Rect& scissorRect) override;
+  bool onBindProgramAndScissorClip(const ProgramInfo* programInfo,
+                                   const Rect& scissorRect) override;
   bool onBindBuffers(GPUBuffer* indexBuffer, GPUBuffer* vertexBuffer, size_t vertexOffset) override;
   void onDraw(PrimitiveType primitiveType, size_t baseVertex, size_t count,
               bool drawIndexed) override;

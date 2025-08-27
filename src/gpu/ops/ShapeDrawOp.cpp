@@ -18,11 +18,13 @@
 
 #include "ShapeDrawOp.h"
 #include "core/PathTriangulator.h"
+#include "core/utils/Log.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
 #include "gpu/RectsVertexProvider.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
+#include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -49,6 +51,11 @@ ShapeDrawOp::ShapeDrawOp(std::shared_ptr<GPUShapeProxy> proxy, Color color, cons
 }
 
 void ShapeDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
+  OPERATE_MARK(tgfx::inspect::OpTaskType::ShapeDrawOp);
+  ATTRIBUTE_NAME("color", color);
+  ATTRIBUTE_NAME("uvMatrix", uvMatrix);
+  ATTRIBUTE_NAME_ENUM("blenderMode", getBlendMode(), tgfx::inspect::CustomEnumType::BlendMode);
+  ATTRIBUTE_NAME_ENUM("aaType", getAAType(), tgfx::inspect::CustomEnumType::AAType);
   if (shapeProxy == nullptr) {
     return;
   }
@@ -80,8 +87,8 @@ void ShapeDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
   auto gp = DefaultGeometryProcessor::Make(drawingBuffer, color, renderTarget->width(),
                                            renderTarget->height(), aa, viewMatrix, realUVMatrix);
-  auto pipeline = createPipeline(renderTarget, std::move(gp));
-  renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
+  auto programInfo = createProgramInfo(renderTarget, std::move(gp));
+  renderPass->bindProgramAndScissorClip(programInfo.get(), scissorRect());
   if (vertexBuffer != nullptr) {
     renderPass->bindBuffers(nullptr, vertexBuffer->gpuBuffer());
     auto vertexCount = aa == AAType::Coverage
