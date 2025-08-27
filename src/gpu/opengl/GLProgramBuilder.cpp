@@ -101,13 +101,17 @@ static std::string SLTypeString(SLType t) {
   return "";
 }
 
-std::unique_ptr<Program> ProgramBuilder::CreateProgram(Context* context,
+std::shared_ptr<Program> ProgramBuilder::CreateProgram(Context* context,
                                                        const ProgramInfo* programInfo) {
   GLProgramBuilder builder(context, programInfo);
   if (!builder.emitAndInstallProcessors()) {
     return nullptr;
   }
-  return builder.finalize();
+  auto program = builder.finalize();
+  if (program == nullptr) {
+    return nullptr;
+  }
+  return Resource::AddToCache(context, program.release());
 }
 
 GLProgramBuilder::GLProgramBuilder(Context* context, const ProgramInfo* programInfo)

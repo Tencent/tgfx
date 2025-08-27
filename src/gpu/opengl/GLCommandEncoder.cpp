@@ -23,11 +23,33 @@
 
 namespace tgfx {
 std::shared_ptr<RenderPass> GLCommandEncoder::onBeginRenderPass(
-    std::shared_ptr<RenderTarget> renderTarget, bool resolveMSAA) {
-  if (renderTarget == nullptr) {
+    const RenderPassDescriptor& descriptor) {
+  if (descriptor.colorAttachments.empty()) {
+    LOGE(
+        "GLCommandEncoder::beginRenderPass() Invalid render pass descriptor, no color "
+        "attachments!");
     return nullptr;
   }
-  auto renderPass = std::make_shared<GLRenderPass>(interface, std::move(renderTarget), resolveMSAA);
+  if (descriptor.colorAttachments.size() > 1) {
+    LOGE(
+        "GLCommandEncoder::onBeginRenderPass() Multiple color attachments are not yet supported in "
+        "OpenGL!");
+    return nullptr;
+  }
+  auto& colorAttachment = descriptor.colorAttachments[0];
+  if (colorAttachment.texture == nullptr) {
+    LOGE(
+        "GLCommandEncoder::beginRenderPass() Invalid render pass descriptor, color attachment "
+        "texture is null!");
+    return nullptr;
+  }
+  if (colorAttachment.texture == colorAttachment.resolveTexture) {
+    LOGE(
+        "GLCommandEncoder::beginRenderPass() Invalid render pass descriptor, color attachment "
+        "texture and resolve texture cannot be the same!");
+    return nullptr;
+  }
+  auto renderPass = std::make_shared<GLRenderPass>(interface, descriptor);
   renderPass->begin();
   return renderPass;
 }
