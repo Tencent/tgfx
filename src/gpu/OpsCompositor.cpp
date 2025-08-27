@@ -54,10 +54,10 @@ static bool HasDifferentViewMatrix(const std::vector<PlacementPtr<RectRecord>>& 
   return false;
 }
 
-static SamplingOptions GetAtlasSampling(const Matrix& matrix, bool isAlphaOnly) {
+static SamplingOptions GetAtlasSampling(const Matrix& matrix) {
   // A matrix is considered rotated if it has any skew or if it swaps the x and y axes.
-  bool hasRotated = !FloatNearlyZero(matrix.getSkewX()) || !FloatNearlyZero(matrix.getSkewY());
-  auto filterMode = (!isAlphaOnly || hasRotated) ? FilterMode::Linear : FilterMode::Nearest;
+  auto hasRotated = !FloatNearlyZero(matrix.getSkewX()) || !FloatNearlyZero(matrix.getSkewY());
+  auto filterMode = hasRotated ? FilterMode::Linear : FilterMode::Nearest;
   return SamplingOptions{filterMode, MipmapMode::None};
 }
 
@@ -696,7 +696,7 @@ void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, co
                                   const MCState& state, const Fill& fill) {
   DEBUG_ASSERT(textureProxy != nullptr);
   DEBUG_ASSERT(!rect.isEmpty());
-  auto sampling = GetAtlasSampling(state.matrix, textureProxy->isAlphaOnly());
+  auto sampling = GetAtlasSampling(state.matrix);
   if (!canAppend(PendingOpType::Atlas, state.clip, fill) || pendingAtlasTexture != textureProxy ||
       pendingSampling != sampling) {
     flushPendingOps(PendingOpType::Atlas, state.clip, fill);
