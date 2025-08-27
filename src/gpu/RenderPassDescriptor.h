@@ -158,7 +158,7 @@ class DepthStencilAttachment {
   /**
    * The value to use when clearing the stencil attachment if the loadAction is LoadAction::Clear.
    */
-  float stencilClearValue = 0.0f;
+  uint32_t stencilClearValue = 0;
 
   /**
    * If set to true, the stencil component is read-only during the render pass.

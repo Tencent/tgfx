@@ -84,6 +84,7 @@ bool GLRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
                                                const Rect& scissorRect) {
   program = programInfo->getProgram();
   if (program == nullptr) {
+    LOGE("GLRenderPass::onBindProgramAndScissorClip() Failed to get the program!");
     return false;
   }
   auto gl = interface->functions();
