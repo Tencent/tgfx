@@ -54,6 +54,8 @@ class DrawOp {
     return !coverages.empty();
   }
 
+  virtual void execute(RenderPass* renderPass, RenderTarget* renderTarget) = 0;
+
  protected:
   AAType aaType = AAType::None;
   Rect scissorRect = {};
@@ -64,10 +66,5 @@ class DrawOp {
 
   explicit DrawOp(AAType aaType) : aaType(aaType) {
   }
-
- private:
-  virtual void execute(RenderPass* renderPass, RenderTarget* renderTarget) = 0;
-
-  friend class OpsRenderTask;
 };
 }  // namespace tgfx
