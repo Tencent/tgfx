@@ -28,7 +28,7 @@ if (NOT WEB OR EMSCRIPTEN_PTHREADS)
     option(TGFX_USE_THREADS "Enable support for multithreaded rendering" ON)
 endif ()
 
-if (CMAKE_BUILD_TYPE MATCHES "Debug" AND NOT TGFX_USE_VCPKG)
+if (CMAKE_BUILD_TYPE MATCHES "Debug")
     option(TGFX_USE_INSPECTOR "Enable profiling support for the TGFX Inspector tool" ON)
 endif ()
 
