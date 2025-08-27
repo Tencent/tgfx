@@ -59,6 +59,7 @@ class Drawer {
    * Build the contents.
    */
   void build(const AppHost* host);
+  virtual std::shared_ptr<tgfx::Layer> buildLayerTree(const AppHost* host) = 0;
 
   tgfx::DisplayList displayList = {};
 
@@ -66,7 +67,6 @@ class Drawer {
   float padding = 30.f;
   std::shared_ptr<tgfx::Layer> _root = nullptr;
 
-  virtual std::shared_ptr<tgfx::Layer> buildLayerTree(const AppHost* host) = 0;
 
  private:
   std::string _name;

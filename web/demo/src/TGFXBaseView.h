@@ -28,11 +28,15 @@ class TGFXBaseView {
  public:
   TGFXBaseView(const std::string& canvasID);
 
-  void setImage(const std::string& name, tgfx::NativeImageRef nativeImage);
+  void setImagePath(const std::string& name, tgfx::NativeImageRef nativeImage);
 
   void updateSize(float devicePixelRatio);
 
   bool draw(int drawIndex, float zoom, float offsetX, float offsetY);
+
+  void onWheelEvent();
+  void onClickEvent( );
+
 
  protected:
   std::shared_ptr<drawers::AppHost> appHost;

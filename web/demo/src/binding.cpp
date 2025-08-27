@@ -26,9 +26,12 @@ using namespace emscripten;
 EMSCRIPTEN_BINDINGS(TGFXDemo) {
 
   class_<TGFXBaseView>("TGFXBaseView")
-      .function("setImage", &TGFXBaseView::setImage)
+      .function("setImagePath", &TGFXBaseView::setImagePath)
       .function("updateSize", &TGFXBaseView::updateSize)
+      .function("onWheelEvent", &TGFXBaseView::onWheelEvent)
+      .function("onClickEvent", &TGFXBaseView::onClickEvent)
       .function("draw", &TGFXBaseView::draw);
+      
 
   class_<TGFXView, base<TGFXBaseView>>("TGFXView")
       .smart_ptr<std::shared_ptr<TGFXView>>("TGFXView")
@@ -37,8 +40,7 @@ EMSCRIPTEN_BINDINGS(TGFXDemo) {
                           return std::shared_ptr<TGFXView>(nullptr);
                         }
                         return std::make_shared<TGFXView>(canvasID);
-                      }))
-      .function("registerFonts", &TGFXView::registerFonts);
+                      }));
 
   class_<TGFXThreadsView, base<TGFXBaseView>>("TGFXThreadsView")
       .smart_ptr<std::shared_ptr<TGFXThreadsView>>("TGFXThreadsView")

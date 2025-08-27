@@ -18,11 +18,18 @@
 
 #include "drawers/AppHost.h"
 #include "tgfx/platform/Print.h"
+#include "tgfx/layers/DisplayList.h"
+#include "drawers/Drawer.h"
+
 
 namespace drawers {
 AppHost::AppHost(int width, int height, float density)
     : _width(width), _height(height), _density(density) {
 }
+bool AppHost::isDirty() const { return _dirty; }
+void AppHost::markDirty() const { _dirty = true; }
+void AppHost::resetDirty() const { _dirty = false; }
+
 
 std::shared_ptr<tgfx::Image> AppHost::getImage(const std::string& name) const {
   auto result = images.find(name);
@@ -55,6 +62,17 @@ bool AppHost::updateScreen(int width, int height, float density) {
   _width = width;
   _height = height;
   _density = density;
+  markDirty();
+  return true;
+}
+
+bool AppHost::updateZoomAndOffset(float zoomScale, const tgfx::Point& contentOffset) {
+  if (zoomScale == _zoomScale && contentOffset == _contentOffset) {
+    return false;
+  }
+  _zoomScale = zoomScale;
+  _contentOffset = contentOffset;
+  markDirty();
   return true;
 }
 
@@ -72,6 +90,7 @@ void AppHost::addImage(const std::string& name, std::shared_ptr<tgfx::Image> ima
     return;
   }
   images[name] = std::move(image);
+  markDirty();
 }
 
 void AppHost::addTypeface(const std::string& name, std::shared_ptr<tgfx::Typeface> typeface) {
@@ -88,5 +107,73 @@ void AppHost::addTypeface(const std::string& name, std::shared_ptr<tgfx::Typefac
     return;
   }
   typefaces[name] = std::move(typeface);
+  markDirty();
 }
+void AppHost::draw(tgfx::Canvas* canvas, int drawIndex) const {
+  if (drawIndex < 0 || drawIndex >= static_cast<int>(Drawer::Count())) {
+    return;
+  }
+  drawers::Drawer::DrawBackground(canvas, this);
+
+    auto currentDrawer = drawers::Drawer::GetByIndex(drawIndex);
+    printf("apphost drawer is %s\n", currentDrawer->name().c_str());
+    if (!currentDrawer) {
+      tgfx::PrintError("AppHost::draw() The drawer for index %d is null!", drawIndex);
+      return;
+    }
+  
+    if (drawIndex != lastDrawIndex || !root) {
+      printf("drawer changed!!!\n");
+      displayList.root()->removeChildren();
+      
+      root = currentDrawer->buildLayerTree(this);
+      
+      if (root) {
+        displayList.root()->addChild(root);
+        displayList.setRenderMode(tgfx::RenderMode::Tiled);
+        displayList.setMaxTileCount(512);
+      }
+      lastDrawIndex = drawIndex;
+    } 
+  auto drawer = drawers::Drawer::GetByIndex(drawIndex % drawers::Drawer::Count());
+  if (drawer == nullptr) {
+  return;
+  }
+
+    updateRootMatrix();
+    drawer->displayList.setZoomScale(zoomScale());
+    drawer->displayList.setContentOffset(contentOffset().x, contentOffset().y);
+    drawer->build(this);
+    drawer->displayList.render(canvas->getSurface(), false);
+    printf("drawer finish*(0V0)*\n");
+}
+
+void AppHost::updateRootMatrix()const {
+  if (!root) {
+    return;
+  }
+  auto bounds = root->getBounds();
+  if (bounds.isEmpty()) {
+    return;
+  }
+  constexpr float padding = 30.0f;
+  float w = static_cast<float>(width());
+  float h = static_cast<float>(height());
+
+  const float totalScale = std::min(
+      w / (padding * 2.0f + bounds.width()),
+      h / (padding * 2.0f + bounds.height()));
+
+  tgfx::Matrix rootMatrix = tgfx::Matrix::MakeScale(totalScale);
+  rootMatrix.postTranslate(
+      (w  - bounds.width()  * totalScale) * 0.5f,
+      (h - bounds.height() * totalScale) * 0.5f);
+
+  root->setMatrix(rootMatrix);
+}
+
+std::vector<std::shared_ptr<tgfx::Layer>> AppHost::getLayersUnderPoint(float x, float y) const {
+  return displayList.root()->getLayersUnderPoint(x, y);
+}
+
 }  // namespace drawers

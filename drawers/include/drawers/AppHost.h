@@ -19,8 +19,11 @@
 #pragma once
 
 #include <unordered_map>
+#include "tgfx/core/Data.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/Typeface.h"
+#include "tgfx/layers/DisplayList.h"
+
 
 namespace drawers {
 /**
@@ -58,6 +61,22 @@ class AppHost {
   }
 
   /**
+   * Returns the current scale factor applied to the view. The default value is 1.0, which means no
+   * zooming is applied.
+   */
+  float zoomScale() const {
+    return _zoomScale;
+  }
+
+  /**
+   * Returns the current content offset of the view after applying the zoomScale. The default value
+   * is (0, 0).
+   */
+  const tgfx::Point& contentOffset() const {
+    return _contentOffset;
+  }
+
+  /**
    * Returns an image with the given name.
    */
   std::shared_ptr<tgfx::Image> getImage(const std::string& name) const;
@@ -75,6 +94,11 @@ class AppHost {
   bool updateScreen(int width, int height, float density);
 
   /**
+   * Updates the zoom scale and content offset.
+   */
+  bool updateZoomAndOffset(float zoomScale, const tgfx::Point& contentOffset);
+
+  /**
    * Add an image for the given resource name.
    */
   void addImage(const std::string& name, std::shared_ptr<tgfx::Image> image);
@@ -84,11 +108,39 @@ class AppHost {
    */
   void addTypeface(const std::string& name, std::shared_ptr<tgfx::Typeface> typeface);
 
+  //  Check and set dirty flags (can be called on const objects)
+  bool isDirty() const;
+  void markDirty() const;
+  void resetDirty() const;
+  /**
+  * Draws the content of the corresponding LayerTreeDrawer based on the index.
+  * @param canvas The target canvas
+  * @param drawIndex The index of the Drawer to be drawn
+  * @param zoom The zoom ratio
+  * @param offsetY The vertical offset
+  */
+  void draw(tgfx::Canvas* canvas, int drawIndex) const;
+  /**
+  * Calculates and sets the transformation matrix for the current root layer (displayList.root()->firstChild()),
+  * centering it in the window, scaling it proportionally, and leaving a 30px padding on all sides.
+  */
+  void updateRootMatrix() const;
+
+  /**
+  * Returns all layers hit at the specified logical coordinates (sorted by depth then by level).
+  */
+  std::vector<std::shared_ptr<tgfx::Layer>> getLayersUnderPoint(float x, float y) const;
  private:
   int _width = 1280;
   int _height = 720;
   float _density = 1.0f;
+  float _zoomScale = 1.0f;
+  tgfx::Point _contentOffset = {};
   std::unordered_map<std::string, std::shared_ptr<tgfx::Image>> images = {};
   std::unordered_map<std::string, std::shared_ptr<tgfx::Typeface>> typefaces = {};
+  mutable bool _dirty = true;
+  mutable tgfx::DisplayList displayList = {};
+  mutable int lastDrawIndex = -1;
+  mutable std::shared_ptr<tgfx::Layer> root = nullptr;
 };
 }  // namespace drawers

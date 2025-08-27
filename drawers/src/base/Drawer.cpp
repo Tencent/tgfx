@@ -25,7 +25,8 @@
 namespace drawers {
 static std::vector<Drawer*> drawers = {new ConicGradient(), new ImageWithMipmap(),
                                        new ImageWithShadow(), new RichText(),
-                                       new SimpleLayerTree()};
+                                       new SimpleLayerTree(),
+                                          };
 
 static std::vector<std::string> GetDrawerNames() {
   std::vector<std::string> names;
@@ -99,4 +100,5 @@ void Drawer::build(const AppHost* host) {
                            (static_cast<float>(host->height()) - bounds.height() * totalScale) / 2);
   _root->setMatrix(rootMatrix);
 }
+
 }  // namespace drawers

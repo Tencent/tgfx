@@ -37,17 +37,34 @@ void TGFXBaseView::updateSize(float devicePixelRatio) {
     if (sizeChanged && window) {
       window->invalidSize();
     }
+    appHost->markDirty();
   }
 }
 
-void TGFXBaseView::setImage(const std::string& name, tgfx::NativeImageRef nativeImage) {
+void TGFXBaseView::setImagePath(const std::string& name, tgfx::NativeImageRef nativeImage) {
   auto image = tgfx::Image::MakeFrom(nativeImage);
   if (image) {
     appHost->addImage(name, std::move(image));
   }
+  appHost->markDirty();
 }
 
+void TGFXBaseView::onWheelEvent() {
+  appHost->markDirty();
+}
+
+void TGFXBaseView::onClickEvent() {
+  appHost->updateZoomAndOffset(1.0, tgfx::Point(0, 0));
+  appHost->markDirty();
+}
+
+
 bool TGFXBaseView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
+  if (!appHost->isDirty()) {
+    return false;
+  }
+  appHost->resetDirty();
+
   if (appHost->width() <= 0 || appHost->height() <= 0) {
     return true;
   }
@@ -67,17 +84,17 @@ bool TGFXBaseView::draw(int drawIndex, float zoom, float offsetX, float offsetY)
     device->unlock();
     return true;
   }
+  appHost->updateZoomAndOffset(zoom, tgfx::Point(offsetX, offsetY));
   auto canvas = surface->getCanvas();
   canvas->clear();
-  drawers::Drawer::DrawBackground(canvas, appHost.get());
-  auto drawer = drawers::Drawer::GetByIndex(drawIndex % drawers::Drawer::Count());
-  drawer->displayList.setZoomScale(zoom);
-  drawer->displayList.setContentOffset(offsetX, offsetY);
-  drawer->build(appHost.get());
-  drawer->displayList.render(canvas->getSurface(), false);
+  auto numDrawers = drawers::Drawer::Count();
+  auto index = (drawIndex % numDrawers);
+  appHost->draw(canvas, index);
+  appHost->draw(canvas, index);
   context->flushAndSubmit();
   window->present(context);
   device->unlock();
+
   return true;
 }
 }  // namespace hello2d

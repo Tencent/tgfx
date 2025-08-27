@@ -27,7 +27,6 @@ namespace drawers {
     DrawerName() : drawers::Drawer(#DrawerName) {                              \
     }                                                                          \
                                                                                \
-   protected:                                                                  \
     std::shared_ptr<tgfx::Layer> buildLayerTree(const AppHost* host) override; \
   }
 
