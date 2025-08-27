@@ -122,7 +122,6 @@ unsigned LoadGLShader(const GLFunctions* gl, unsigned shaderType, const std::str
   const char* files[] = {source.c_str()};
   gl->shaderSource(shader, 1, files, nullptr);
   gl->compileShader(shader);
-#if defined(DEBUG) || !defined(TGFX_BUILD_FOR_WEB)
   int success;
   gl->getShaderiv(shader, GL_COMPILE_STATUS, &success);
   if (!success) {
@@ -132,7 +131,6 @@ unsigned LoadGLShader(const GLFunctions* gl, unsigned shaderType, const std::str
     gl->deleteShader(shader);
     shader = 0;
   }
-#endif
   return shader;
 }
 
