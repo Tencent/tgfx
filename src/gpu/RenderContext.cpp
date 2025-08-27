@@ -382,6 +382,7 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
   auto atlasManager = getContext()->atlasManager();
   auto drawingManager = getContext()->drawingManager();
   auto nextFlushToken = atlasManager->nextFlushToken();
+  auto fontFauxItalic = font.isFauxItalic();
   for (auto& glyphID : sourceGlyphRun.glyphs) {
     auto glyphPosition = sourceGlyphRun.positions[index++];
     auto bounds = font.getBounds(glyphID);
@@ -453,6 +454,11 @@ void RenderContext::drawGlyphsAsDirectMask(const GlyphRun& sourceGlyphRun, const
       rejectedGlyphRun->glyphs.push_back(glyphID);
       rejectedGlyphRun->positions.push_back(glyphPosition);
       continue;
+    }
+    auto glyphFauxItalic = !FloatNearlyZero(glyphState.matrix.getSkewX());
+    if (fontFauxItalic != glyphFauxItalic) {
+      auto skew = glyphFauxItalic ? -ITALIC_SKEW : ITALIC_SKEW;
+      glyphState.matrix.postSkew(skew, 0);
     }
     auto rect = atlasLocator.getLocation();
     ComputeGlyphMatrix(rect, state.matrix, 1.f / maxScale, glyphPosition, &glyphState.matrix);
