@@ -21,6 +21,7 @@
 
 namespace hello2d {
 static jfieldID TGFXView_nativePtr;
+bool isFristDraw = true;
 
 void JTGFXView::updateSize() {
   auto width = ANativeWindow_getWidth(nativeWindow);
@@ -31,33 +32,46 @@ void JTGFXView::updateSize() {
   }
 }
 
-void JTGFXView::draw(int index, float zoom, float offsetX, float offsetY) {
+void JTGFXView::localMarkDirty() {
+  appHost->markDirty();
+}
+
+bool JTGFXView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
+  if (isFristDraw) {
+    isFristDraw = false;
+    appHost->markDirty();
+  }
+  if (!appHost->isDirty()) {
+    printf("draw() isDirty() == false.\n");
+    return false;
+  }
+  appHost->resetDirty();
+
   if (appHost->width() <= 0 || appHost->height() <= 0) {
-    return;
+    return true;
   }
   auto device = window->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {
-    return;
+    return true;
   }
   auto surface = window->getSurface(context);
   if (surface == nullptr) {
     device->unlock();
-    return;
+    return true;
   }
+
+  appHost->updateZoomAndOffset(zoom, tgfx::Point(offsetX, offsetY));
   auto canvas = surface->getCanvas();
   canvas->clear();
-  canvas->save();
-  drawers::Drawer::DrawBackground(canvas, appHost.get());
-  auto drawer = drawers::Drawer::GetByIndex(index % drawers::Drawer::Count());
-  drawer->displayList.setZoomScale(zoom);
-  drawer->displayList.setContentOffset(offsetX, offsetY);
-  drawer->build(appHost.get());
-  drawer->displayList.render(canvas->getSurface(), false);
-  canvas->restore();
+  auto numDrawers = drawers::Drawer::Count();
+  auto index = (drawIndex % numDrawers);
+  appHost->draw(canvas, index);
+  appHost->draw(canvas, index);
   context->flushAndSubmit();
   window->present(context);
   device->unlock();
+  return true;
 }
 }  // namespace hello2d
 
@@ -71,9 +85,12 @@ static std::unique_ptr<drawers::AppHost> CreateAppHost(ANativeWindow* nativeWind
   auto width = ANativeWindow_getWidth(nativeWindow);
   auto height = ANativeWindow_getHeight(nativeWindow);
   host->updateScreen(width, height, density);
-  static const std::string FallbackFontFileNames[] = {"/system/fonts/NotoSansCJK-Regular.ttc",
-                                                      "/system/fonts/NotoSansSC-Regular.otf",
-                                                      "/system/fonts/DroidSansFallback.ttf"};
+
+  static const std::string FallbackFontFileNames[] = {
+      "/system/fonts/NotoSansCJK-Regular.ttc",
+      "/system/fonts/NotoSansSC-Regular.otf",
+      "/system/fonts/DroidSansFallback.ttf"
+  };
   for (auto& fileName : FallbackFontFileNames) {
     auto typeface = tgfx::Typeface::MakeFromPath(fileName);
     if (typeface != nullptr) {
@@ -95,8 +112,11 @@ JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_nativeInit(
                                                                                 jobject) {
   auto clazz = env->FindClass("org/tgfx/hello2d/TGFXView");
   hello2d::TGFXView_nativePtr = env->GetFieldID(clazz, "nativePtr", "J");
+
 }
 
+// 初始化 native 端，传入 Surface、图片数组、emoji 字体数据及屏幕密度
+// 返回 jlong 形式的 JTGFXView 指针给 Java 层持有
 JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromSurface(
     JNIEnv* env, jobject, jobject surface, jobjectArray imageBytesArrays, jbyteArray fontBytes,
     jfloat density) {
@@ -104,13 +124,19 @@ JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromS
     printf("SetupFromSurface() Invalid surface specified.\n");
     return 0;
   }
+
+  // 将 Java Surface 转成 ANativeWindow 并创建 EGL 窗口
   auto nativeWindow = ANativeWindow_fromSurface(env, surface);
   auto window = tgfx::EGLWindow::MakeFrom(nativeWindow);
   if (window == nullptr) {
     printf("SetupFromSurface() Invalid surface specified.\n");
     return 0;
   }
+
+  // 创建并初始化 AppHost
   auto appHost = CreateAppHost(nativeWindow, density);
+
+  // 解码并添加 Java 层传进来的所有图片
   jsize numArrays = env->GetArrayLength(imageBytesArrays);
   for (jsize i = 0; i < numArrays; i++) {
     jbyteArray imageBytes =
@@ -124,6 +150,8 @@ JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromS
       appHost->addImage(i == 0 ? "bridge" : "TGFX", std::move(image));
     }
   }
+
+  // 解码并添加 emoji 字体
   auto bytes = env->GetByteArrayElements(fontBytes, nullptr);
   auto size = static_cast<size_t>(env->GetArrayLength(fontBytes));
   auto data = tgfx::Data::MakeWithCopy(bytes, size);
@@ -132,20 +160,28 @@ JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromS
   if (typeface) {
     appHost->addTypeface("emoji", std::move(typeface));
   }
+
+  // 创建并返回 JTGFXView 实例
   return reinterpret_cast<jlong>(
       new hello2d::JTGFXView(nativeWindow, std::move(window), std::move(appHost)));
+
 }
 
+// Java 层主动触发绘制，传入要展示的 Drawer 索引及缩放/偏移参数
 JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_nativeDraw(JNIEnv* env, jobject thiz,
                                                                  jint drawIndex, jfloat zoom,
                                                                  jfloat offsetX, jfloat offsetY) {
+                              
+                                                                  
   auto* view = GetJTGFXView(env, thiz);
   if (view == nullptr) {
     return;
   }
+  view->localMarkDirty();
   view->draw(drawIndex, zoom, offsetX, offsetY);
 }
 
+// Java 层在 Surface 尺寸变化后通知 native 更新尺寸
 JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_updateSize(JNIEnv* env, jobject thiz) {
   auto* view = GetJTGFXView(env, thiz);
   if (view == nullptr) {
