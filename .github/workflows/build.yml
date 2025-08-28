@@ -5,15 +5,14 @@ on:
     branches: [ main ]
   push:
     branches: [ main ]
-
-
   workflow_dispatch:
     inputs:
-      platform:
-      description: 'Platform to build (optional, leave empty to build all)'
-      required: false
-      type: choice
-      options:
+      job:
+        description: 'Platform to build (optional, leave empty to build all)'
+        required: false
+        default: 'all'
+        type: choice
+        options:
           - all
           - ios
           - android
@@ -21,8 +20,7 @@ on:
           - win
           - linux
           - qt
-          - openharmony
-      default: 'all'
+          - ohos
 
 jobs:
   ios:
