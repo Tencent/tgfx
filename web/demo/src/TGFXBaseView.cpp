@@ -90,7 +90,6 @@ bool TGFXBaseView::draw(int drawIndex, float zoom, float offsetX, float offsetY)
   auto numDrawers = drawers::Drawer::Count();
   auto index = (drawIndex % numDrawers);
   appHost->draw(canvas, index);
-  appHost->draw(canvas, index);
   context->flushAndSubmit();
   window->present(context);
   device->unlock();

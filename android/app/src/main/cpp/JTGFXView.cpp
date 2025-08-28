@@ -67,7 +67,6 @@ bool JTGFXView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
   auto numDrawers = drawers::Drawer::Count();
   auto index = (drawIndex % numDrawers);
   appHost->draw(canvas, index);
-  appHost->draw(canvas, index);
   context->flushAndSubmit();
   window->present(context);
   device->unlock();
@@ -115,8 +114,7 @@ JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_nativeInit(
 
 }
 
-// 初始化 native 端，传入 Surface、图片数组、emoji 字体数据及屏幕密度
-// 返回 jlong 形式的 JTGFXView 指针给 Java 层持有
+
 JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromSurface(
     JNIEnv* env, jobject, jobject surface, jobjectArray imageBytesArrays, jbyteArray fontBytes,
     jfloat density) {
@@ -125,7 +123,6 @@ JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromS
     return 0;
   }
 
-  // 将 Java Surface 转成 ANativeWindow 并创建 EGL 窗口
   auto nativeWindow = ANativeWindow_fromSurface(env, surface);
   auto window = tgfx::EGLWindow::MakeFrom(nativeWindow);
   if (window == nullptr) {
@@ -133,10 +130,8 @@ JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromS
     return 0;
   }
 
-  // 创建并初始化 AppHost
   auto appHost = CreateAppHost(nativeWindow, density);
 
-  // 解码并添加 Java 层传进来的所有图片
   jsize numArrays = env->GetArrayLength(imageBytesArrays);
   for (jsize i = 0; i < numArrays; i++) {
     jbyteArray imageBytes =
@@ -151,7 +146,6 @@ JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromS
     }
   }
 
-  // 解码并添加 emoji 字体
   auto bytes = env->GetByteArrayElements(fontBytes, nullptr);
   auto size = static_cast<size_t>(env->GetArrayLength(fontBytes));
   auto data = tgfx::Data::MakeWithCopy(bytes, size);
@@ -161,13 +155,11 @@ JNIEXPORT jlong JNICALL Java_org_tgfx_hello2d_TGFXView_00024Companion_setupFromS
     appHost->addTypeface("emoji", std::move(typeface));
   }
 
-  // 创建并返回 JTGFXView 实例
   return reinterpret_cast<jlong>(
       new hello2d::JTGFXView(nativeWindow, std::move(window), std::move(appHost)));
 
 }
 
-// Java 层主动触发绘制，传入要展示的 Drawer 索引及缩放/偏移参数
 JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_nativeDraw(JNIEnv* env, jobject thiz,
                                                                  jint drawIndex, jfloat zoom,
                                                                  jfloat offsetX, jfloat offsetY) {
@@ -181,7 +173,6 @@ JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_nativeDraw(JNIEnv* env, jo
   view->draw(drawIndex, zoom, offsetX, offsetY);
 }
 
-// Java 层在 Surface 尺寸变化后通知 native 更新尺寸
 JNIEXPORT void JNICALL Java_org_tgfx_hello2d_TGFXView_updateSize(JNIEnv* env, jobject thiz) {
   auto* view = GetJTGFXView(env, thiz);
   if (view == nullptr) {

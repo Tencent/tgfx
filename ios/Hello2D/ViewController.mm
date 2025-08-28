@@ -1,21 +1,3 @@
-/////////////////////////////////////////////////////////////////////////////////////////////////
-//
-//  Tencent is pleased to support the open source community by making tgfx available.
-//
-//  Copyright (C) 2023 Tencent. All rights reserved.
-//
-//  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
-//  in compliance with the License. You may obtain a copy of the License at
-//
-//      https://opensource.org/licenses/BSD-3-Clause
-//
-//  unless required by applicable law or agreed to in writing, software distributed under the
-//  license is distributed on an "as is" basis, without warranties or conditions of any kind,
-//  either express or implied. see the license for the specific language governing permissions
-//  and limitations under the license.
-//
-/////////////////////////////////////////////////////////////////////////////////////////////////
-
 #import "ViewController.h"
 #import "TGFXView.h"
 
@@ -82,6 +64,7 @@ static const float MaxZoom = 1000.0f;
 
 - (void)appWillEnterForeground:(NSNotification*)notification {
   [self.displayLink setPaused:NO];
+  [self requestDraw];
 }
 
 - (void)dealloc {
@@ -90,6 +73,7 @@ static const float MaxZoom = 1000.0f;
 
 - (void)viewDidLayoutSubviews {
   [super viewDidLayoutSubviews];
+  [self requestDraw];
 }
 
 - (void)tgfxViewClicked {
@@ -102,6 +86,7 @@ static const float MaxZoom = 1000.0f;
   self.currentZoom = 1.0f;
   self.currentPanOffset = CGPointZero;
   self.currentPinchOffset = CGPointZero;
+  [self requestDraw];
 }
 
 - (void)handlePan:(UIPanGestureRecognizer*)gesture {
@@ -120,10 +105,9 @@ static const float MaxZoom = 1000.0f;
                   self.contentOffset.y +
                       (translation.y - self.currentPanOffset.y) * self.tgfxView.contentScaleFactor);
   self.currentPanOffset = translation;
+  [self requestDraw];
 }
-- (void)update:(CADisplayLink*)displayLink {
-  [self.tgfxView draw:self.drawIndex zoom:self.zoomScale offset:self.contentOffset];
-}
+
 - (void)handlePinch:(UIPinchGestureRecognizer*)gesture {
   self.isTapEnabled = false;
 
@@ -149,12 +133,25 @@ static const float MaxZoom = 1000.0f;
   offset.y = (self.currentPinchOffset.y - self.pinchCenter.y) * scale / self.currentZoom + center.y;
   self.zoomScale = scale;
   self.contentOffset = offset;
+  [self requestDraw];
 }
 
 - (BOOL)gestureRecognizer:(UIGestureRecognizer*)gestureRecognizer
     shouldRecognizeSimultaneouslyWithGestureRecognizer:
         (UIGestureRecognizer*)otherGestureRecognizer {
   return YES;
+}
+
+- (void)update:(CADisplayLink*)displayLink {
+    if (![self.tgfxView draw:self.drawIndex zoom:self.zoomScale offset:self.contentOffset]) {
+        [displayLink setPaused:YES];
+    }
+}
+
+
+- (void)requestDraw {
+   [self.tgfxView markDirty];
+    [self.displayLink setPaused:NO];
 }
 
 @end
