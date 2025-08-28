@@ -134,42 +134,49 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     }
   }
 }
+-(void)markDirty{
+  appHost->markDirty();
+}
 
-- (void)draw {
+- (BOOL)draw {
+  if (!appHost->isDirty()) {
+    return false;
+  }
+  appHost->resetDirty();
   if (self.window == nil) {
-    return;
+    return true;
   }
   if (appHost->width() <= 0 || appHost->height() <= 0) {
-    return;
+    return true;
   }
   if (tgfxWindow == nullptr) {
     tgfxWindow = tgfx::CGLWindow::MakeFrom(self);
   }
   if (tgfxWindow == nullptr) {
-    return;
+    return true;
   }
   auto device = tgfxWindow->getDevice();
   auto context = device->lockContext();
   if (context == nullptr) {
-    return;
+    return true;
   }
   auto surface = tgfxWindow->getSurface(context);
   if (surface == nullptr) {
     device->unlock();
-    return;
+    return true;
   }
+
+  appHost->updateZoomAndOffset(self.zoomScale, tgfx::Point(static_cast<float>(self.contentOffset.x), static_cast<float>(self.contentOffset.y)));
   auto canvas = surface->getCanvas();
   canvas->clear();
-  drawers::Drawer::DrawBackground(canvas, appHost.get());
-  auto drawer = drawers::Drawer::GetByIndex(self.drawIndex % drawers::Drawer::Count());
-  drawer->displayList.setZoomScale(self.zoomScale);
-  drawer->displayList.setContentOffset(static_cast<float>(self.contentOffset.x),
-                                       static_cast<float>(self.contentOffset.y));
-  drawer->build(appHost.get());
-  drawer->displayList.render(canvas->getSurface(), false);
+  auto numDrawers = drawers::Drawer::Count();
+  auto index = (self.drawIndex % numDrawers);
+  appHost->draw(canvas, index);
   context->flushAndSubmit();
   tgfxWindow->present(context);
   device->unlock();
+
+  return true;
 }
 
 @end

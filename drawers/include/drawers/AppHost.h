@@ -114,10 +114,6 @@ class AppHost {
   void resetDirty() const;
   /**
   * Draws the content of the corresponding LayerTreeDrawer based on the index.
-  * @param canvas The target canvas
-  * @param drawIndex The index of the Drawer to be drawn
-  * @param zoom The zoom ratio
-  * @param offsetY The vertical offset
   */
   void draw(tgfx::Canvas* canvas, int drawIndex) const;
   /**
