@@ -409,6 +409,16 @@ jobs:
           npm install -g pnpm@8.13.1
           echo "$(npm prefix -g)/bin" >> $GITHUB_PATH
 
+      - name: Cache hvigor & ohpm
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.hvigor
+            ~/.ohpm
+          key: hvigor-${{ runner.os }}-${{ hashFiles('**/oh-package.json5', '**/hvigorfile.ts') }}
+          restore-keys: |
+            hvigor-${{ runner.os }}-
+
       - name: Get Third-Party Cache
         id: third-party-cache
         uses: actions/cache/restore@v4
@@ -432,7 +442,7 @@ jobs:
         run: |
           cd ohos
           hvigorw clean --no-daemon -Dohos.sdk.root=$DEVECO_SDK_HOME
-          hvigorw assembleHap -Dohos.sdk.root=$DEVECO_SDK_HOME -p buildMode=release --no-daemon
+          hvigorw assembleHar -p module=yourlib@default --no-daemon
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
