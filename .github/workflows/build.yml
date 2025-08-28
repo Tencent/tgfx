@@ -442,7 +442,8 @@ jobs:
         run: |
           cd ohos
           hvigorw clean --no-daemon -Dohos.sdk.root=$DEVECO_SDK_HOME
-          hvigorw assembleHap --mode module -p module=${MODULE_NAME} -p product=default --stacktrace
+          hvigorw assembleHar -p module=hello2d@default --no-daemon
+
 
       - name: Save Third-Party Cache
         if: ${{ (github.event_name == 'push') && (steps.third-party-cache.outputs.cache-hit != 'true') }}
