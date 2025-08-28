@@ -6,6 +6,24 @@ on:
   push:
     branches: [ main ]
 
+
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: 'Platform to build (optional, leave empty to build all)'
+        required: false
+        type: choice
+        options:
+          - all
+          - ios
+          - android
+          - web
+          - win
+          - linux
+          - qt
+          - openharmony
+        default: 'all'
+
 jobs:
   ios:
     runs-on: macos-latest
@@ -343,7 +361,7 @@ jobs:
 
 
   ohos:
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     steps:
       - name: Check Out Repo
         uses: actions/checkout@v4
@@ -355,13 +373,13 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: /opt/ohos-cmd-tools
-          key: ohos-cli-5.0.9.310-mac-arm64
+          key: ohos-cli-5.0.9.310-linux-x64
           restore-keys: ohos-cli-
 
       - name: Install CLI Tools
         if: steps.cli-tools-cache.outputs.cache-hit != 'true'
         run: |
-          TOOLS_URL="https://github.com/libpag/ohos-sdk/releases/download/5.0.9/commandline-tools-mac-arm64-5.0.9.310.zip"
+          TOOLS_URL="https://github.com/libpag/ohos-sdk/releases/download/5.0.9/commandline-tools-linux-x64-5.0.9.310.zip"
           curl -L -o /tmp/cmdtools.zip "$TOOLS_URL"
           unzip -q /tmp/cmdtools.zip -d /tmp
           sudo mv /tmp/command-line-tools /opt/ohos-cmd-tools
@@ -371,7 +389,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: /opt/ohos-cmd-tools
-          key: ohos-cli-5.0.9.310-mac-arm64
+          key: ohos-cli-5.0.9.310-linux-x64
 
       - name: Configure Environment
         run: |
@@ -423,7 +441,7 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: third_party
-          key: third-party-openharmony-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
+          key: third-party-linux-${{ hashFiles('DEPS') }}-${{ hashFiles('vendor.json') }}
 
       - name: Job Failed
         if: ${{ failure() }}
