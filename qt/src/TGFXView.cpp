@@ -105,34 +105,39 @@ void TGFXView::createAppHost() {
   appHost->addTypeface("default", defaultTypeface);
   appHost->addTypeface("emoji", emojiTypeface);
 }
+void TGFXView::markDirty() {
+  appHost->markDirty();
+}
 
-void TGFXView::draw() {
+bool TGFXView::draw() {
+  if (!appHost->isDirty()) {
+    return false;
+  }
+  appHost->resetDirty();
   auto device = tgfxWindow->getDevice();
   if (device == nullptr) {
-    return;
+    return true;
   }
   auto context = device->lockContext();
   if (context == nullptr) {
-    return;
+    return true;
   }
   auto surface = tgfxWindow->getSurface(context);
   if (surface == nullptr) {
     device->unlock();
-    return;
+    return true;
   }
+  appHost->updateZoomAndOffset(zoom, tgfx::Point(static_cast<float>(offset.x()), static_cast<float>(offset.y())));
   auto canvas = surface->getCanvas();
   canvas->clear();
-  canvas->save();
-  drawers::Drawer::DrawBackground(canvas, appHost.get());
-  auto drawer = drawers::Drawer::GetByIndex(currentDrawerIndex % drawers::Drawer::Count());
-  drawer->displayList.setZoomScale(zoom);
-  drawer->displayList.setContentOffset(static_cast<float>(offset.x()),
-                                       static_cast<float>(offset.y()));
-  drawer->build(appHost.get());
-  drawer->displayList.render(canvas->getSurface(), false);
-  canvas->restore();
+  auto numDrawers = drawers::Drawer::Count();
+  auto index = (currentDrawerIndex % numDrawers);
+  appHost->draw(canvas, index);
   context->flushAndSubmit();
   tgfxWindow->present(context);
   device->unlock();
+
+  return true;
+
 }
 }  // namespace hello2d

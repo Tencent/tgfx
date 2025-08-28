@@ -27,6 +27,12 @@ Window {
         currentZoom = newZoom
     }
 
+    function requestDraw() {
+        tgfxView.updateTransform(currentZoom, currentOffset)
+        tgfxView.markDirty()
+
+    }
+
     PinchArea {
         id: pinchArea
         anchors.fill: parent
@@ -40,8 +46,8 @@ Window {
         onPinchUpdated: function(pinch) {
             var scaleDelta = pinch.scale / lastScale
             calculateTransform(scaleDelta)
-            tgfxView.updateTransform(currentZoom, currentOffset)
             lastScale = pinch.scale
+            requestDraw()
         }
 
         TGFXView {
@@ -61,9 +67,11 @@ Window {
             }
 
             onClicked: function(mouse) {
-                tgfxView.onClicked()
                 currentZoom = 1.0
                 currentOffset = Qt.point(0, 0)
+                tgfxView.onClicked()
+
+                requestDraw()
             }
 
             onWheel: function(wheel) {
@@ -81,9 +89,13 @@ Window {
                     }
                     currentOffset = Qt.point(currentOffset.x + deltaX, currentOffset.y + deltaY)
                 }
-                tgfxView.updateTransform(currentZoom, currentOffset)
                 wheel.accepted = true
+                requestDraw()
             }
         }
+    }
+
+    Component.onCompleted: {
+        requestDraw()
     }
 }
