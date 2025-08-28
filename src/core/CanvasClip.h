@@ -18,8 +18,41 @@
 
 #pragma once
 
+#include "tgfx/core/CanvasClipOp.h"
+#include "tgfx/core/Path.h"
+
 namespace tgfx {
-class CanvasClip {
-public:
+
+/**
+ * CanvasClipElement represents a single clipping element in the clip stack, which consists of a path, an operation
+ * type, and whether to force anti-aliasing.
+ */
+class CanvasClipElement {
+ public:
+  CanvasClipElement(const Path& clip, CanvasClipOp op, bool forceAntiAlias);
+
+ private:
+  /**
+   * The path of the clipping element
+   */
+  Path clip = {};
+
+  /**
+   * The operation type between the clipping element and the current entire clipping area, default is intersection
+   * operation
+   */
+  CanvasClipOp op = CanvasClipOp::Intersect;
+
+  /**
+   * Whether anti-aliasing should be forcibly enabled on the edges of the clipping region, enabled by default. If the
+   * Surface supports multisampling, anti-aliasing will be automatically enabled on the edges of the clipping region.
+   * Set this value to true if you need to forcibly enable anti-aliasing when multisampling is not enabled.
+  */
+  bool forceAntiAlias = true;
 };
+
+class CanvasClip {
+ public:
+};
+
 }  // namespace tgfx

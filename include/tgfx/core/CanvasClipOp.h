@@ -16,12 +16,20 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "core/CanvasClip.h"
+#pragma once
 
 namespace tgfx {
-
-CanvasClipElement::CanvasClipElement(const Path& clip, CanvasClipOp op, bool forceAntiAlias)
-    : clip(clip), op(op), forceAntiAlias(forceAntiAlias) {
-}
-
+/**
+ * The logical operations that can be performed when combining two clip element.
+ */
+enum class CanvasClipOp {
+  /**
+   * Subtract the current clipping region from the target clipping region.
+   */
+  Difference,
+  /**
+   * Intersect the two clip region.
+   */
+  Intersect,
+};
 }  // namespace tgfx
