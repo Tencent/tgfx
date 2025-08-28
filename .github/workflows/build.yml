@@ -445,5 +445,5 @@ jobs:
         if: ${{ failure() }}
         uses: actions/upload-artifact@v4
         with:
-          name: openharmony_build
+          name: ohos_build
           path: ohos/out
