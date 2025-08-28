@@ -10,10 +10,10 @@ on:
   workflow_dispatch:
     inputs:
       platform:
-        description: 'Platform to build (optional, leave empty to build all)'
-        required: false
-        type: choice
-        options:
+      description: 'Platform to build (optional, leave empty to build all)'
+      required: false
+      type: choice
+      options:
           - all
           - ios
           - android
