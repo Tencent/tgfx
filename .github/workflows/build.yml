@@ -22,7 +22,7 @@ on:
           - linux
           - qt
           - openharmony
-        default: 'all'
+      default: 'all'
 
 jobs:
   ios:
