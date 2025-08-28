@@ -64,10 +64,12 @@ int main() {
   auto canvas = surface->getCanvas();
   auto drawerNames = drawers::Drawer::Names();
   for (auto& name : drawerNames) {
-    auto drawer = drawers::Drawer::GetByName(name);
+    auto index = 0;
     canvas->clear();
-    drawer->build(&appHost);
-    drawer->displayList.render(canvas->getSurface(), false);
+    // drawer->build(&appHost);
+    //drawer->displayList.render(canvas->getSurface(), false);
+    appHost->draw(canvas, index);
+
     tgfx::Bitmap bitmap = {};
     bitmap.allocPixels(surface->width(), surface->height());
     auto pixels = bitmap.lockPixels();
@@ -83,6 +85,7 @@ int main() {
       return -1;
     }
     SaveFile(data, "out/" + name + ".png");
+    index++;
   }
   device->unlock();
   tgfx::PrintLog("All images have been saved to the 'out/' directory");
