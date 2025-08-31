@@ -438,7 +438,7 @@ void PDFExportContext::exportGlyphRunAsText(const GlyphRun& glyphRun, const MCSt
   float textScaleX = advanceScale;
 
   const auto clipStackBounds =
-      state.clip.isEmpty() ? Rect::MakeSize(_pageSize) : state.clip.getBounds();
+      state.clip.isEmpty() ? Rect::MakeSize(_pageSize) : state.clip.path.getBounds();
 
   // Clear everything from the runPaint that will be applied by the strike.
   Fill fillPaint(fill);
@@ -803,7 +803,7 @@ void PDFExportContext::onDrawImageRect(std::shared_ptr<Image> image, const Rect&
     {
       auto canvas = PDFDocumentImpl::MakeCanvas(&maskContext);
       // This clip prevents the mask image shader from covering entire device if unnecessary.
-      canvas->clipRect(state.clip.getBounds());
+      canvas->clipRect(state.clip.path.getBounds());
       if (modifiedFill.maskFilter) {
         Paint tmpPaint;
         auto imageShader =

@@ -42,7 +42,7 @@ void HitTestContext::drawRect(const Rect& rect, const MCState& state, const Fill
   if (!GetLocalPoint(state.matrix, deviceX, deviceY, &local)) {
     return;
   }
-  if (rect.contains(local.x, local.y) && checkClipAndFill(state.clip, fill, local)) {
+  if (rect.contains(local.x, local.y) && checkClipAndFill(state.clip.path, fill, local)) {
     hit = true;
   }
 }
@@ -71,7 +71,7 @@ void HitTestContext::drawRRect(const RRect& rRect, const MCState& state, const F
       return;
     }
   }
-  if (checkClipAndFill(state.clip, fill, local)) {
+  if (checkClipAndFill(state.clip.path, fill, local)) {
     hit = true;
   }
 }
@@ -91,7 +91,7 @@ void HitTestContext::drawPath(const Path& path, const MCState& state, const Fill
       return;
     }
   }
-  if (checkClipAndFill(state.clip, fill, local)) {
+  if (checkClipAndFill(state.clip.path, fill, local)) {
     hit = true;
   }
 }
@@ -114,7 +114,7 @@ void HitTestContext::drawShape(std::shared_ptr<Shape> shape, const MCState& stat
       return;
     }
   }
-  if (checkClipAndFill(state.clip, fill, local)) {
+  if (checkClipAndFill(state.clip.path, fill, local)) {
     hit = true;
   }
 }
@@ -127,7 +127,7 @@ void HitTestContext::drawImage(std::shared_ptr<Image> image, const SamplingOptio
     return;
   }
   auto imageBounds = Rect::MakeWH(image->width(), image->height());
-  if (imageBounds.contains(local.x, local.y) && checkClipAndFill(state.clip, fill, local)) {
+  if (imageBounds.contains(local.x, local.y) && checkClipAndFill(state.clip.path, fill, local)) {
     hit = true;
   }
 }
@@ -140,7 +140,7 @@ void HitTestContext::drawImageRect(std::shared_ptr<Image>, const Rect&, const Re
   if (!GetLocalPoint(state.matrix, deviceX, deviceY, &local)) {
     return;
   }
-  if (dstRect.contains(local.x, local.y) && checkClipAndFill(state.clip, fill, local)) {
+  if (dstRect.contains(local.x, local.y) && checkClipAndFill(state.clip.path, fill, local)) {
     hit = true;
   }
 }
@@ -179,7 +179,7 @@ void HitTestContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList
   if (!GetLocalPoint(state.matrix, deviceX, deviceY, &local)) {
     return;
   }
-  if (checkClipAndFill(state.clip, fill, local)) {
+  if (checkClipAndFill(state.clip.path, fill, local)) {
     hit = true;
   }
 }
@@ -203,7 +203,7 @@ void HitTestContext::drawLayer(std::shared_ptr<Picture> picture,
       return;
     }
   }
-  if (checkClipAndFill(state.clip, fill, local)) {
+  if (checkClipAndFill(state.clip.path, fill, local)) {
     hit = true;
   }
 }
@@ -218,20 +218,20 @@ void HitTestContext::drawPicture(std::shared_ptr<Picture> picture, const MCState
   if (!picture->hitTestPoint(local.x, local.y, shapeHitTest)) {
     return;
   }
-  if (checkClipAndFill(state.clip, {}, local)) {
+  if (checkClipAndFill(state.clip.path, {}, local)) {
     hit = true;
   }
 }
 
-bool HitTestContext::checkClipAndFill(const Path& clip, const Fill& fill,
+bool HitTestContext::checkClipAndFill(const Path& clipPath, const Fill& fill,
                                       const Point& local) const {
-  if (fill.nothingToDraw() || (!clip.isInverseFillType() && clip.isEmpty())) {
+  if (fill.nothingToDraw() || (!clipPath.isInverseFillType() && clipPath.isEmpty())) {
     return false;
   }
-  if (shapeHitTest || clip.isInverseFillType()) {
-    return clip.contains(local.x, local.y);
+  if (shapeHitTest || clipPath.isInverseFillType()) {
+    return clipPath.contains(local.x, local.y);
   }
-  auto clipBounds = clip.getBounds();
+  auto clipBounds = clipPath.getBounds();
   return clipBounds.contains(local.x, local.y);
 }
 

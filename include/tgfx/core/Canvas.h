@@ -196,6 +196,11 @@ class Canvas {
   const Path& getTotalClip() const;
 
   /**
+   * Returns whether forced anti-aliasing is enabled on the edges of the current clipping region.
+   */
+  bool getForceClipAntialias() const;
+
+  /**
    * Replaces the current clip with the intersection of the clip and the rectangle. The resulting
    * clip is aliased, meaning pixels are fully contained by the clip. The rectangle is transformed
    * by the current matrix before being combined with the clip.
@@ -209,6 +214,14 @@ class Canvas {
    * @param path  the path to clip to.
    */
   void clipPath(const Path& path);
+
+  /**
+   * Set whether anti-aliasing should be forcibly enabled on the edges of the clipping region,
+   * disabled by default. If the Surface supports multisampling, anti-aliasing will be automatically
+   * enabled on the edges of the clipping region. Set this value to true if you need to forcibly
+   * enable anti-aliasing when multisampling is not enabled.
+   */
+  void setForceClipAntialias(bool forceAntiAlias);
 
   /**
    * Fills the current clip with the specified color, using BlendMode::Src. This replaces all pixels

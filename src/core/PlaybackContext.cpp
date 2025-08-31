@@ -37,14 +37,15 @@ void PlaybackContext::setMatrix(const Matrix& matrix) {
   }
 }
 
-void PlaybackContext::setClip(const Path& clip) {
+void PlaybackContext::setClip(const Clip& clip) {
   _state.clip = clip;
   if (hasInitMatrix) {
-    _state.clip.transform(initState.matrix);
+    _state.clip.path.transform(initState.matrix);
   }
   if (hasInitClip) {
-    _state.clip.addPath(initState.clip, PathOp::Intersect);
+    _state.clip.path.addPath(initState.clip.path, PathOp::Intersect);
   }
+  _state.clip.forceAntiAlias = clip.forceAntiAlias;
 }
 
 void PlaybackContext::setColor(const Color& color) {
@@ -81,7 +82,9 @@ void PlaybackContext::setHasStroke(bool value) {
 
 void PlaybackContext::drawFill(DrawContext* context) {
   if (hasInitClip) {
-    context->drawPath(initState.clip, {}, _fill.makeWithMatrix(initState.matrix));
+    auto fill = _fill.makeWithMatrix(initState.matrix);
+    fill.antiAlias = initState.clip.forceAntiAlias;
+    context->drawPath(initState.clip.path, {}, fill);
   } else if (hasInitMatrix) {
     context->drawFill(_fill.makeWithMatrix(initState.matrix));
   } else {

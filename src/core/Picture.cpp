@@ -154,7 +154,7 @@ std::shared_ptr<Image> Picture::asImage(Point* offset, const Matrix* matrix,
     return nullptr;
   }
   Rect clipRect = {};
-  if (!GetClipRect(state.clip, matrix, &clipRect)) {
+  if (!GetClipRect(state.clip.path, matrix, &clipRect)) {
     return nullptr;
   }
   Rect subset = {};

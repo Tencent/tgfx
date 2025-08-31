@@ -87,8 +87,8 @@ void SVGExportContext::drawRect(const Rect& rect, const MCState& state, const Fi
     svg->addRectAttributes(rect);
   }
 
-  if (!state.clip.contains(rect)) {
-    applyClipPath(state.clip);
+  if (!state.clip.path.contains(rect)) {
+    applyClipPath(state.clip.path);
   }
 
   ElementWriter rectElement("rect", context, this, writer.get(), resourceBucket.get(),
@@ -106,8 +106,8 @@ void SVGExportContext::drawRect(const Rect& rect, const MCState& state, const Fi
 
 void SVGExportContext::drawRRect(const RRect& roundRect, const MCState& state, const Fill& fill,
                                  const Stroke*) {
-  if (!state.clip.contains(roundRect.rect)) {
-    applyClipPath(state.clip);
+  if (!state.clip.path.contains(roundRect.rect)) {
+    applyClipPath(state.clip.path);
   }
   if (roundRect.isOval()) {
     if (roundRect.rect.width() == roundRect.rect.height()) {
@@ -128,8 +128,8 @@ void SVGExportContext::drawRRect(const RRect& roundRect, const MCState& state, c
 }
 
 void SVGExportContext::drawPath(const Path& path, const MCState& state, const Fill& fill) {
-  if (!state.clip.contains(path.getBounds())) {
-    applyClipPath(state.clip);
+  if (!state.clip.path.contains(path.getBounds())) {
+    applyClipPath(state.clip.path);
   }
   ElementWriter pathElement("path", context, this, writer.get(), resourceBucket.get(),
                             exportFlags & SVGExportFlags::DisableWarnings, state, fill);
@@ -264,8 +264,8 @@ void SVGExportContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunLi
   // If the font needs to be converted to a path but lacks outlines (e.g., emoji font, web font),
   // it cannot be converted.
   auto deviceBounds = state.matrix.mapRect(glyphRunList->getBounds());
-  if (!state.clip.contains(deviceBounds)) {
-    applyClipPath(state.clip);
+  if (!state.clip.path.contains(deviceBounds)) {
+    applyClipPath(state.clip.path);
   }
   if (!typeface->isCustom()) {
     if (glyphRunList->hasOutlines() && !glyphRunList->hasColor() &&
@@ -361,8 +361,8 @@ void SVGExportContext::drawLayer(std::shared_ptr<Picture> picture,
     resources = defs.addImageFilterResource(imageFilter, bound);
   }
   {
-    if (!state.clip.contains(picture->getBounds())) {
-      applyClipPath(state.clip);
+    if (!state.clip.path.contains(picture->getBounds())) {
+      applyClipPath(state.clip.path);
     }
     auto groupElement = std::make_unique<ElementWriter>("g", writer, resourceBucket.get());
     if (imageFilter) {

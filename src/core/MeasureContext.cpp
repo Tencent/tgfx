@@ -97,7 +97,7 @@ void MeasureContext::drawLayer(std::shared_ptr<Picture> picture,
       deviceBounds = picture->getBounds();
       state.matrix.mapRect(&deviceBounds);
     }
-    addDeviceBounds(state.clip, fill, deviceBounds, picture->hasUnboundedFill());
+    addDeviceBounds(state.clip.path, fill, deviceBounds, picture->hasUnboundedFill());
   }
 }
 
@@ -110,13 +110,13 @@ void MeasureContext::addTightBounds(const Path& path, const MCState& state, cons
   auto tempPath = path;
   tempPath.transform(state.matrix);
   auto deviceBounds = tempPath.getBounds();
-  addDeviceBounds(state.clip, fill, deviceBounds, path.isInverseFillType());
+  addDeviceBounds(state.clip.path, fill, deviceBounds, path.isInverseFillType());
 }
 
 void MeasureContext::addLocalBounds(const MCState& state, const Fill& fill, const Rect& localBounds,
                                     bool unbounded) {
   auto deviceBounds = state.matrix.mapRect(localBounds);
-  addDeviceBounds(state.clip, fill, deviceBounds, unbounded);
+  addDeviceBounds(state.clip.path, fill, deviceBounds, unbounded);
 }
 
 void MeasureContext::addDeviceBounds(const Path& clip, const Fill& fill, const Rect& deviceBounds,

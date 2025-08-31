@@ -235,7 +235,7 @@ void RenderContext::drawGlyphRunList(std::shared_ptr<GlyphRunList> glyphRunList,
     ApplyStrokeToBounds(*stroke, &bounds);
   }
   state.matrix.mapRect(&bounds);  // To device space
-  auto clipBounds = getClipBounds(state.clip);
+  auto clipBounds = getClipBounds(state.clip.path);
   if (clipBounds.isEmpty() || !clipBounds.intersect(bounds)) {
     return;
   }
@@ -287,7 +287,7 @@ void RenderContext::drawLayer(std::shared_ptr<Picture> picture, std::shared_ptr<
   Matrix viewMatrix = {};
   Rect bounds = {};
   if (picture->hasUnboundedFill()) {
-    bounds = ToLocalBounds(getClipBounds(state.clip), state.matrix);
+    bounds = ToLocalBounds(getClipBounds(state.clip.path), state.matrix);
   } else {
     bounds = picture->getBounds();
   }

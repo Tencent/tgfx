@@ -40,13 +40,13 @@ void EmitPDFColor(Color color, const std::shared_ptr<WriteStream>& result) {
 }
 
 void AppendClip(const MCState& state, const std::shared_ptr<MemoryWriteStream>& stream) {
-  if (state.clip.isRect()) {
-    auto bound = state.clip.getBounds();
+  if (state.clip.path.isRect()) {
+    auto bound = state.clip.path.getBounds();
     PDFUtils::AppendRectangle(bound, stream);
     stream->writeText("W* n\n");
   } else {
-    PDFUtils::EmitPath(state.clip, false, stream);
-    auto clipFill = state.clip.getFillType();
+    PDFUtils::EmitPath(state.clip.path, false, stream);
+    auto clipFill = state.clip.path.getFillType();
     if (clipFill == PathFillType::EvenOdd) {
       stream->writeText("W* n\n");
     } else {

@@ -74,7 +74,7 @@ class SetMatrix : public Record {
 
 class SetClip : public Record {
  public:
-  explicit SetClip(Path clip) : clip(std::move(clip)) {
+  explicit SetClip(Clip clip) : clip(std::move(clip)) {
   }
 
   RecordType type() const override {
@@ -90,7 +90,7 @@ class SetClip : public Record {
     playback->setClip(clip);
   }
 
-  Path clip = {};
+  Clip clip = {};
 };
 
 class SetColor : public Record {

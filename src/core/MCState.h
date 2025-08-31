@@ -23,23 +23,52 @@
 #include "tgfx/core/Path.h"
 
 namespace tgfx {
+class Clip {
+  public:
+  Clip() = default;
+
+  friend bool operator==(const Clip& a, const Clip& b) {
+    return a.path == b.path && a.forceAntiAlias == b.forceAntiAlias;
+  }
+
+  friend bool operator!=(const Clip& a, const Clip& b) {
+    return a.path != b.path || a.forceAntiAlias != b.forceAntiAlias;
+  }
+
+  bool isSame(const Clip& other) const {
+    return path.isSame(other.path) && forceAntiAlias == other.forceAntiAlias;
+  }
+
+  bool isEmpty() const {
+    return path.isEmpty();
+  }
+
+  bool isInverseFillType() const {
+    return path.isInverseFillType();
+  }
+
+  Path path = {};
+
+  bool forceAntiAlias = false;
+};
+
 class MCState {
  public:
   explicit MCState(const Matrix& matrix) : matrix(matrix) {
-    clip.toggleInverseFillType();
+    clip.path.toggleInverseFillType();
   }
 
-  explicit MCState(Path initClip) : clip(std::move(initClip)) {
+  explicit MCState(Clip initClip) : clip(std::move(initClip)) {
   }
 
-  MCState(const Matrix& matrix, Path clip) : matrix(matrix), clip(std::move(clip)) {
+  MCState(const Matrix& matrix, Clip clip) : matrix(matrix), clip(std::move(clip)) {
   }
 
   MCState() {
-    clip.toggleInverseFillType();
+    clip.path.toggleInverseFillType();
   }
 
   Matrix matrix = {};
-  Path clip = {};
+  Clip clip = {};
 };
 }  // namespace tgfx

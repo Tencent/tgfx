@@ -167,7 +167,7 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
   float drawScale = 1.0f;
   auto [needLocalBounds, needDeviceBounds] = needComputeBounds(fill, true);
   auto& clip = state.clip;
-  auto clipBounds = getClipBounds(clip);
+  auto clipBounds = getClipBounds(clip.path);
   if (needLocalBounds) {
     if (shape->isInverseFillType()) {
       localBounds = ToLocalBounds(clipBounds, state.matrix);
@@ -181,7 +181,7 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
   if (needDeviceBounds) {
     deviceBounds = shape->isInverseFillType() ? clipBounds : shape->getBounds();
   }
-  auto aaType = getAAType(fill);
+  auto aaType = getAAType(fill.antiAlias);
   auto shapeProxy = proxyProvider()->createGPUShapeProxy(shape, aaType, clipBounds, renderFlags);
   auto drawOp =
       ShapeDrawOp::Make(std::move(shapeProxy), fill.color.premultiply(), uvMatrix, aaType);
@@ -196,7 +196,7 @@ void OpsCompositor::discardAll() {
   }
 }
 
-void OpsCompositor::resetPendingOps(PendingOpType type, Path clip, Fill fill) {
+void OpsCompositor::resetPendingOps(PendingOpType type, Clip clip, Fill fill) {
   hasRectToRectDraw = false;
   pendingType = type;
   pendingClip = std::move(clip);
@@ -234,7 +234,7 @@ bool OpsCompositor::CompareFill(const Fill& a, const Fill& b) {
   return true;
 }
 
-bool OpsCompositor::canAppend(PendingOpType type, const Path& clip, const Fill& fill) const {
+bool OpsCompositor::canAppend(PendingOpType type, const Clip& clip, const Fill& fill) const {
   if (pendingType != type || !pendingClip.isSame(clip) || !CompareFill(pendingFill, fill)) {
     return false;
   }
@@ -267,7 +267,7 @@ static bool RRectUseScale(Context* context) {
 
 class PendingOpsAutoReset {
  public:
-  PendingOpsAutoReset(OpsCompositor* compositor, PendingOpType type, Path clip, Fill fill)
+  PendingOpsAutoReset(OpsCompositor* compositor, PendingOpType type, Clip clip, Fill fill)
       : compositor(compositor), type(type), clip(std::move(clip)), fill(std::move(fill)) {
   }
 
@@ -278,11 +278,11 @@ class PendingOpsAutoReset {
  private:
   OpsCompositor* compositor;
   PendingOpType type;
-  Path clip;
+  Clip clip;
   Fill fill;
 };
 
-void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
+void OpsCompositor::flushPendingOps(PendingOpType type, Clip clip, Fill fill) {
   if (pendingType == PendingOpType::Unknown) {
     if (type != PendingOpType::Unknown) {
       pendingType = type;
@@ -301,10 +301,10 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
   bool hasImageFill = pendingType == PendingOpType::Image || pendingType == PendingOpType::Atlas;
   auto [needLocalBounds, needDeviceBounds] =
       needComputeBounds(pendingFill, hasCoverage, hasImageFill);
-  auto aaType = getAAType(pendingFill);
+  auto aaType = getAAType(pendingFill.antiAlias);
   Rect clipBounds = {};
   if (needLocalBounds) {
-    clipBounds = getClipBounds(pendingClip);
+    clipBounds = getClipBounds(pendingClip.path);
     localBounds = Rect::MakeEmpty();
     drawScale = 0.0f;
   }
@@ -427,7 +427,7 @@ bool OpsCompositor::drawAsClear(const Rect& rect, const MCState& state, const Fi
     } else {
       return false;
     }
-  } else if (!clip.isRect(&clipRect)) {
+  } else if (!clip.path.isRect(&clipRect)) {
     return false;
   }
   auto bounds = rect;
@@ -459,14 +459,11 @@ void OpsCompositor::makeClosed() {
   context->drawingManager()->compositors.erase(cachedPosition);
 }
 
-AAType OpsCompositor::getAAType(const Fill& fill) const {
+AAType OpsCompositor::getAAType(bool forceAntiAlias) const {
   if (renderTarget->sampleCount() > 1) {
     return AAType::MSAA;
   }
-  if (fill.antiAlias) {
-    return AAType::Coverage;
-  }
-  return AAType::None;
+  return forceAntiAlias ? AAType::Coverage : AAType::None;
 }
 
 std::pair<bool, bool> OpsCompositor::needComputeBounds(const Fill& fill, bool hasCoverage,
@@ -518,8 +515,9 @@ std::pair<std::optional<Rect>, bool> OpsCompositor::getClipRect(const Path& clip
   return {rect, false};
 }
 
-std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AAType aaType) {
-  auto uniqueKey = PathRef::GetUniqueKey(clip);
+std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Clip& clip) {
+  auto uniqueKey = PathRef::GetUniqueKey(clip.path);
+  auto aaType = getAAType(clip.forceAntiAlias);
   if (aaType != AAType::None) {
     static const auto AntialiasFlag = UniqueID::Next();
     uniqueKey = UniqueKey::Append(uniqueKey, &AntialiasFlag, 1);
@@ -527,16 +525,16 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
   if (uniqueKey == clipKey) {
     return clipTexture;
   }
-  auto bounds = getClipBounds(clip);
+  auto bounds = getClipBounds(clip.path);
   if (bounds.isEmpty()) {
     return nullptr;
   }
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
   auto rasterizeMatrix = Matrix::MakeTrans(-bounds.left, -bounds.top);
-  if (PathTriangulator::ShouldTriangulatePath(clip)) {
+  if (PathTriangulator::ShouldTriangulatePath(clip.path)) {
     auto clipBounds = Rect::MakeWH(width, height);
-    auto shape = Shape::MakeFrom(clip);
+    auto shape = Shape::MakeFrom(clip.path);
     shape = Shape::ApplyMatrix(std::move(shape), rasterizeMatrix);
     auto shapeProxy = proxyProvider()->createGPUShapeProxy(shape, aaType, clipBounds, renderFlags);
     auto uvMatrix = Matrix::MakeTrans(bounds.left, bounds.top);
@@ -552,21 +550,19 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
                                                 Color::Transparent());
   } else {
     auto rasterizer =
-        PathRasterizer::MakeFrom(width, height, clip, aaType != AAType::None, &rasterizeMatrix);
+        PathRasterizer::MakeFrom(width, height, clip.path, aaType != AAType::None, &rasterizeMatrix);
     clipTexture = proxyProvider()->createTextureProxy(rasterizer, false, renderFlags);
   }
   clipKey = uniqueKey;
   return clipTexture;
 }
 
-std::pair<PlacementPtr<FragmentProcessor>, bool> OpsCompositor::getClipMaskFP(const Path& clip,
-                                                                              AAType aaType,
-                                                                              Rect* scissorRect) {
+std::pair<PlacementPtr<FragmentProcessor>, bool> OpsCompositor::getClipMaskFP(const Clip& clip, Rect* scissorRect) {
   if (clip.isEmpty() && clip.isInverseFillType()) {
     return {nullptr, false};
   }
   auto buffer = context->drawingBuffer();
-  auto [rect, useScissor] = getClipRect(clip);
+  auto [rect, useScissor] = getClipRect(clip.path);
   if (rect.has_value()) {
     if (!rect->isEmpty()) {
       *scissorRect = *rect;
@@ -577,11 +573,11 @@ std::pair<PlacementPtr<FragmentProcessor>, bool> OpsCompositor::getClipMaskFP(co
     }
     return {nullptr, false};
   }
-  auto clipBounds = getClipBounds(clip);
+  auto clipBounds = getClipBounds(clip.path);
   *scissorRect = clipBounds;
   FlipYIfNeeded(scissorRect, renderTarget.get());
   scissorRect->roundOut();
-  auto textureProxy = getClipTexture(clip, aaType);
+  auto textureProxy = getClipTexture(clip);
   auto uvMatrix = Matrix::MakeTrans(-clipBounds.left, -clipBounds.top);
   if (renderTarget->origin() == ImageOrigin::BottomLeft) {
     uvMatrix.preConcat(renderTarget->getOriginTransform());
@@ -634,11 +630,11 @@ DstTextureInfo OpsCompositor::makeDstTextureInfo(const Rect& deviceBounds, AATyp
   return dstTextureInfo;
 }
 
-void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const Fill& fill,
+void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Clip& clip, const Fill& fill,
                               const std::optional<Rect>& localBounds,
                               const std::optional<Rect>& deviceBounds, float drawScale) {
 
-  if (op == nullptr || fill.nothingToDraw() || (clip.isEmpty() && !clip.isInverseFillType())) {
+  if (op == nullptr || fill.nothingToDraw() || (clip.path.isEmpty() && !clip.path.isInverseFillType())) {
     return;
   }
   DEBUG_ASSERT(renderTarget != nullptr);
@@ -670,8 +666,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
     }
   }
   Rect scissorRect = {};
-  auto aaType = getAAType(fill);
-  auto [clipMask, hasMask] = getClipMaskFP(clip, aaType, &scissorRect);
+  auto [clipMask, hasMask] = getClipMaskFP(clip, &scissorRect);
   if (hasMask) {
     if (!clipMask) {
       return;
@@ -681,7 +676,8 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
   op->setScissorRect(scissorRect);
   op->setBlendMode(fill.blendMode);
   if (BlendModeNeedDstTexture(fill.blendMode, op->hasCoverage())) {
-    auto dstTextureInfo = makeDstTextureInfo(deviceBounds.value_or(Rect::MakeEmpty()), aaType);
+    auto fillAAType = getAAType(fill.antiAlias);
+    auto dstTextureInfo = makeDstTextureInfo(deviceBounds.value_or(Rect::MakeEmpty()), fillAAType);
     if (!context->caps()->frameBufferFetchSupport && dstTextureInfo.textureProxy == nullptr) {
       return;
     }

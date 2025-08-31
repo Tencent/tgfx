@@ -43,7 +43,7 @@ class PlaybackContext {
 
   void setMatrix(const Matrix& matrix);
 
-  void setClip(const Path& clip);
+  void setClip(const Clip& clip);
 
   void setColor(const Color& color);
 

@@ -163,7 +163,11 @@ const Matrix& Canvas::getMatrix() const {
 }
 
 const Path& Canvas::getTotalClip() const {
-  return mcState->clip;
+  return mcState->clip.path;
+}
+
+bool Canvas::getForceClipAntialias() const {
+  return mcState->clip.forceAntiAlias;
 }
 
 void Canvas::clipRect(const tgfx::Rect& rect) {
@@ -175,7 +179,11 @@ void Canvas::clipRect(const tgfx::Rect& rect) {
 void Canvas::clipPath(const Path& path) {
   auto clipPath = path;
   clipPath.transform(mcState->matrix);
-  mcState->clip.addPath(clipPath, PathOp::Intersect);
+  mcState->clip.path.addPath(clipPath, PathOp::Intersect);
+}
+
+void Canvas::setForceClipAntialias(bool forceAntiAlias) {
+  mcState->clip.forceAntiAlias = forceAntiAlias;
 }
 
 void Canvas::resetStateStack() {
@@ -662,11 +670,11 @@ void Canvas::drawFill(const MCState& state, const Fill& fill) const {
     return;
   }
   auto clipFill = fill.makeWithMatrix(state.matrix);
-  clipFill.antiAlias = false;
+  clipFill.antiAlias = state.clip.forceAntiAlias;
   if (clip.isEmpty()) {
     drawContext->drawFill(clipFill);
   } else {
-    drawPath(clip, {}, clipFill, nullptr);
+    drawPath(clip.path, {}, clipFill, nullptr);
   }
 }
 

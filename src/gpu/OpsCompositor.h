@@ -108,7 +108,7 @@ class OpsCompositor {
   std::shared_ptr<TextureProxy> clipTexture = nullptr;
   bool hasRectToRectDraw = false;
   PendingOpType pendingType = PendingOpType::Unknown;
-  Path pendingClip = {};
+  Clip pendingClip = {};
   Fill pendingFill = {};
   std::shared_ptr<Image> pendingImage = nullptr;
   SrcRectConstraint pendingConstraint = SrcRectConstraint::Fast;
@@ -132,21 +132,20 @@ class OpsCompositor {
   }
 
   bool drawAsClear(const Rect& rect, const MCState& state, const Fill& fill);
-  bool canAppend(PendingOpType type, const Path& clip, const Fill& fill) const;
-  void flushPendingOps(PendingOpType currentType = PendingOpType::Unknown, Path currentClip = {},
+  bool canAppend(PendingOpType type, const Clip& clip, const Fill& fill) const;
+  void flushPendingOps(PendingOpType currentType = PendingOpType::Unknown, Clip currentClip = {},
                        Fill currentFill = {});
-  void resetPendingOps(PendingOpType currentType = PendingOpType::Unknown, Path currentClip = {},
+  void resetPendingOps(PendingOpType currentType = PendingOpType::Unknown, Clip currentClip = {},
                        Fill currentFill = {});
-  AAType getAAType(const Fill& fill) const;
+  AAType getAAType(bool forceAntiAlias) const;
   std::pair<bool, bool> needComputeBounds(const Fill& fill, bool hasCoverage,
                                           bool hasImageFill = false);
   Rect getClipBounds(const Path& clip);
-  std::shared_ptr<TextureProxy> getClipTexture(const Path& clip, AAType aaType);
+  std::shared_ptr<TextureProxy> getClipTexture(const Clip& clip);
   std::pair<std::optional<Rect>, bool> getClipRect(const Path& clip);
-  std::pair<PlacementPtr<FragmentProcessor>, bool> getClipMaskFP(const Path& clip, AAType aaType,
-                                                                 Rect* scissorRect);
+  std::pair<PlacementPtr<FragmentProcessor>, bool> getClipMaskFP(const Clip& clip, Rect* scissorRect);
   DstTextureInfo makeDstTextureInfo(const Rect& deviceBounds, AAType aaType);
-  void addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const Fill& fill,
+  void addDrawOp(PlacementPtr<DrawOp> op, const Clip& clip, const Fill& fill,
                  const std::optional<Rect>& localBounds, const std::optional<Rect>& deviceBounds,
                  float drawScale);
 
