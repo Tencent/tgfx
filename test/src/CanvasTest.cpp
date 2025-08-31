@@ -82,6 +82,48 @@ TGFX_TEST(CanvasTest, clip) {
   gl->deleteTextures(1, &textureInfo.id);
 }
 
+TGFX_TEST(CanvasTest, clipAntiAlias) {
+  const ContextScope scope;
+  Context* context = scope.getContext();
+  ASSERT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 200, 200);
+  ASSERT_TRUE(surface != nullptr);
+  Canvas* canvas = surface->getCanvas();
+  canvas->clear(Color::White());
+
+  {
+    Path path;
+    path.moveTo(0, 0);
+    path.lineTo(200, 0);
+    path.lineTo(150, 100);
+    path.lineTo(200, 200);
+    path.lineTo(0, 200);
+    path.close();
+    canvas->clipPath(path);
+    const Rect drawRect = Rect::MakeXYWH(20, 20, 180, 180);
+    Paint paint;
+    paint.setColor(Color::Red());
+    canvas->drawRect(drawRect, paint);
+  }
+
+  {
+    Path path;
+    path.moveTo(0, 0);
+    path.lineTo(100, 0);
+    path.lineTo(50, 100);
+    path.lineTo(100, 100);
+    path.lineTo(0, 200);
+    path.close();
+    canvas->clipPath(path);
+    const Rect drawRect = Rect::MakeXYWH(20, 20, 180, 180);
+    Paint paint;
+    paint.setColor(Color::Red());
+    canvas->drawRect(drawRect, paint);
+  }
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ClipAntiAlias"));
+}
+
 TGFX_TEST(CanvasTest, TileMode) {
   ContextScope scope;
   auto context = scope.getContext();

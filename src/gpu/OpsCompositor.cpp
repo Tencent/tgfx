@@ -549,15 +549,16 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Clip& clip) {
     context->drawingManager()->addOpsRenderTask(std::move(clipRenderTarget), std::move(opList),
                                                 Color::Transparent());
   } else {
-    auto rasterizer =
-        PathRasterizer::MakeFrom(width, height, clip.path, aaType != AAType::None, &rasterizeMatrix);
+    auto rasterizer = PathRasterizer::MakeFrom(width, height, clip.path, aaType != AAType::None,
+                                               &rasterizeMatrix);
     clipTexture = proxyProvider()->createTextureProxy(rasterizer, false, renderFlags);
   }
   clipKey = uniqueKey;
   return clipTexture;
 }
 
-std::pair<PlacementPtr<FragmentProcessor>, bool> OpsCompositor::getClipMaskFP(const Clip& clip, Rect* scissorRect) {
+std::pair<PlacementPtr<FragmentProcessor>, bool> OpsCompositor::getClipMaskFP(const Clip& clip,
+                                                                              Rect* scissorRect) {
   if (clip.isEmpty() && clip.isInverseFillType()) {
     return {nullptr, false};
   }
@@ -634,7 +635,8 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Clip& clip, const F
                               const std::optional<Rect>& localBounds,
                               const std::optional<Rect>& deviceBounds, float drawScale) {
 
-  if (op == nullptr || fill.nothingToDraw() || (clip.path.isEmpty() && !clip.path.isInverseFillType())) {
+  if (op == nullptr || fill.nothingToDraw() ||
+      (clip.path.isEmpty() && !clip.path.isInverseFillType())) {
     return;
   }
   DEBUG_ASSERT(renderTarget != nullptr);

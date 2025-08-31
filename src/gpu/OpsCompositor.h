@@ -143,7 +143,8 @@ class OpsCompositor {
   Rect getClipBounds(const Path& clip);
   std::shared_ptr<TextureProxy> getClipTexture(const Clip& clip);
   std::pair<std::optional<Rect>, bool> getClipRect(const Path& clip);
-  std::pair<PlacementPtr<FragmentProcessor>, bool> getClipMaskFP(const Clip& clip, Rect* scissorRect);
+  std::pair<PlacementPtr<FragmentProcessor>, bool> getClipMaskFP(const Clip& clip,
+                                                                 Rect* scissorRect);
   DstTextureInfo makeDstTextureInfo(const Rect& deviceBounds, AAType aaType);
   void addDrawOp(PlacementPtr<DrawOp> op, const Clip& clip, const Fill& fill,
                  const std::optional<Rect>& localBounds, const std::optional<Rect>& deviceBounds,

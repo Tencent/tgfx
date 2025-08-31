@@ -24,7 +24,7 @@
 
 namespace tgfx {
 class Clip {
-  public:
+ public:
   Clip() = default;
 
   friend bool operator==(const Clip& a, const Clip& b) {
