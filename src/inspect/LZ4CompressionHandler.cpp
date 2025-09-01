@@ -17,12 +17,12 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "LZ4CompressionHandler.h"
-#include <compression.h>
 #include "Protocol.h"
-#include "lz4.h"
 
 namespace tgfx::inspect {
 #ifdef INSPECTOR_USE_SYSTEM_LZ4
+#include <compression.h>
+
 class AppleLZ4CompressionHandler : public LZ4CompressionHandler {
  public:
   AppleLZ4CompressionHandler() {
@@ -63,6 +63,7 @@ size_t LZ4CompressionHandler::GetMaxOutputSize(size_t inputSize) {
   return inputSize + LZ4HeaderSize;
 }
 #else
+#include "lz4.h"
 
 class DefaultLZ4CompressionHandler : public LZ4CompressionHandler {
  public:
