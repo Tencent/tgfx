@@ -63,6 +63,7 @@ size_t LZ4CompressionHandler::GetMaxOutputSize(size_t inputSize) {
   return inputSize + LZ4HeaderSize;
 }
 #else
+
 #include "lz4.h"
 
 class DefaultLZ4CompressionHandler : public LZ4CompressionHandler {
