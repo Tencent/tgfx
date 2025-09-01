@@ -19,6 +19,7 @@
 #pragma once
 
 #include "gpu/RenderPass.h"
+#include "gpu/RenderPassDescriptor.h"
 #include "gpu/opengl/GLBuffer.h"
 #include "gpu/opengl/GLInterface.h"
 
@@ -26,8 +27,7 @@ namespace tgfx {
 
 class GLRenderPass : public RenderPass {
  public:
-  GLRenderPass(std::shared_ptr<GLInterface> interface, std::shared_ptr<RenderTarget> renderTarget,
-               bool resolveMSAA);
+  GLRenderPass(std::shared_ptr<GLInterface> interface, RenderPassDescriptor descriptor);
 
   void begin();
 
@@ -37,12 +37,10 @@ class GLRenderPass : public RenderPass {
   bool onBindBuffers(GPUBuffer* indexBuffer, GPUBuffer* vertexBuffer, size_t vertexOffset) override;
   void onDraw(PrimitiveType primitiveType, size_t baseVertex, size_t count,
               bool drawIndexed) override;
-  void onClear(Color color) override;
   void onEnd() override;
 
  private:
   std::shared_ptr<GLInterface> interface = nullptr;
-  bool resolveMSAA = true;
 
   void bindTexture(int unitIndex, GPUTexture* texture, SamplerState samplerState = {});
 };

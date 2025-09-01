@@ -18,10 +18,10 @@
 
 #pragma once
 
+#include <utility>
 #include "gpu/GPUBuffer.h"
 #include "gpu/ProgramInfo.h"
-#include "gpu/RenderTarget.h"
-#include "tgfx/core/Color.h"
+#include "gpu/RenderPassDescriptor.h"
 
 namespace tgfx {
 /**
@@ -43,8 +43,10 @@ class RenderPass {
   void drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount);
 
  protected:
-  explicit RenderPass(std::shared_ptr<RenderTarget> renderTarget)
-      : renderTarget(std::move(renderTarget)) {
+  RenderPassDescriptor descriptor = {};
+  std::shared_ptr<Program> program = nullptr;
+
+  explicit RenderPass(RenderPassDescriptor descriptor) : descriptor(std::move(descriptor)) {
   }
 
   virtual bool onBindProgramAndScissorClip(const ProgramInfo* programInfo,
@@ -53,11 +55,7 @@ class RenderPass {
                              size_t vertexOffset) = 0;
   virtual void onDraw(PrimitiveType primitiveType, size_t offset, size_t count,
                       bool drawIndexed) = 0;
-  virtual void onClear(Color color) = 0;
   virtual void onEnd() = 0;
-
-  std::shared_ptr<RenderTarget> renderTarget = nullptr;
-  std::shared_ptr<Program> program = nullptr;
 
  private:
   enum class DrawPipelineStatus { Ok = 0, NotConfigured, FailedToBind };

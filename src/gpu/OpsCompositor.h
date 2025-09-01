@@ -76,8 +76,7 @@ class OpsCompositor {
   void fillShape(std::shared_ptr<Shape> shape, const MCState& state, const Fill& fill);
 
   /**
-   * Fills the given rect with the given fill, using the provided texture proxy and sampling
-   * options.
+   * Fills the given rect with the given atlas textureProxy, state and fill.
    */
   void fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,
                      const MCState& state, const Fill& fill);
@@ -120,7 +119,7 @@ class OpsCompositor {
   std::vector<PlacementPtr<RRectRecord>> pendingRRects = {};
   std::vector<PlacementPtr<Stroke>> pendingStrokes = {};
   std::optional<Color> clearColor = std::nullopt;
-  std::vector<PlacementPtr<Op>> ops = {};
+  std::vector<PlacementPtr<DrawOp>> drawOps = {};
 
   static bool CompareFill(const Fill& a, const Fill& b);
 

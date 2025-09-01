@@ -17,9 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <memory>
 
 namespace tgfx {
 
-float NextPowerOfTwoScale(float scale);
+float NextCacheScaleLevel(float scale);
 
 }

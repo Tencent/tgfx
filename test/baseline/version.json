@@ -80,11 +80,11 @@
         "inversePath_text": "cebc420b",
         "merge_draw_call_rect": "d010fb8",
         "merge_draw_call_rrect": "d010fb8",
-        "mipmap_linear": "a4c64919",
-        "mipmap_linear_hardware": "a4c64919",
+        "mipmap_linear": "3e0f58ab",
+        "mipmap_linear_hardware": "3e0f58ab",
         "mipmap_linear_texture_effect": "a4c64919",
-        "mipmap_nearest": "a4c64919",
-        "mipmap_none": "a4c64919",
+        "mipmap_nearest": "3e0f58ab",
+        "mipmap_none": "3e0f58ab",
         "path": "f37b222",
         "pic_scaled_image": "8bd149a4",
         "pic_scaled_image_origin": "8bd149a4",
@@ -140,7 +140,7 @@
         "ModeColorFilter": "8bd149a4",
         "OpacityShadowTest": "ee2cc771",
         "RuntimeEffect": "aac25365",
-        "blur": "c26ff3d9",
+        "blur": "3e0f58ab",
         "blur-large-pixel": "c26ff3d9",
         "dropShadow": "ee2cc771",
         "greyColorMatrix": "a30de8b",
@@ -184,7 +184,7 @@
         "LayerVisible1": "4edccb64",
         "Layer_drawRRect": "66aef718",
         "Layer_hitTestPoint": "99c36f0c",
-        "Layer_hitTestPointNested": "9060bdb6",
+        "Layer_hitTestPointNested": "d5f6e118",
         "MaskAlpha": "3dbeed5",
         "ModeColorFilter": "8bd149a4",
         "PartialBackgroundBlur": "ee2cc771",
@@ -201,12 +201,12 @@
         "backgroundLayerBlur": "cebc420b",
         "draw_shape": "80a4bd69",
         "draw_solid": "b4a1231",
-        "draw_text": "fe428880",
+        "draw_text": "d5f6e118",
         "dropShadow": "ee2cc771",
         "filterClip": "8bd149a4",
         "filterTest": "8bd149a4",
         "filters": "cebc420b",
-        "getBounds": "9060bdb6",
+        "getBounds": "d5f6e118",
         "getLayersUnderPoint": "6095b909",
         "getTightBounds": "ae4290b3",
         "greyColorMatrix": "a1605b2",
@@ -303,6 +303,7 @@
         "DrawImageRect": "9a80633b",
         "ImageMask": "9a80633b",
         "InvertPictureImageMask": "9a80633b",
+        "LayerDropShadow": "a78e535d",
         "PictureImageMask": "9a80633b"
     },
     "SVGTest": {
@@ -341,7 +342,7 @@
         "TruncateTextLineTest": "9060bdb6"
     },
     "TypefaceTest": {
-        "CustomImageTypeface": "fe428880",
+        "CustomImageTypeface": "d5f6e118",
         "CustomPathTypeface": "42ecc4c7"
     }
 }

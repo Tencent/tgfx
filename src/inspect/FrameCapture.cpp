@@ -25,6 +25,8 @@
 #include "Socket.h"
 #include "TCPPortProvider.h"
 #include "core/codecs/jpeg/JpegCodec.h"
+#include "core/codecs/png/PngCodec.h"
+#include "core/codecs/webp/WebpCodec.h"
 #include "core/utils/Log.h"
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/RenderTarget.h"
@@ -495,7 +497,7 @@ void FrameCapture::encodeWorker() {
       auto imageInfo =
           ImageInfo::Make(width, height, colorType, AlphaType::Premultiplied, imageItem.rowBytes);
 #ifdef TGFX_USE_JPEG_ENCODE
-      auto encodedFormat = EncodedFormat::PNG;
+      auto encodedFormat = EncodedFormat::JPEG;
 #elif TGFX_USE_WEBP_ENCODE
       auto encodeFormat = EncodedFormat::WEBP;
 #elif TGFX_USE_PNG_ENCODE
@@ -557,12 +559,11 @@ bool FrameCapture::commitData() {
   return result;
 }
 
-static bool IsJPEG(const uint8_t* data, size_t size) {
+static bool IsEncodeImage(const uint8_t* data, size_t size) {
   auto offset =
       sizeof(FrameCaptureMessageHeader) + sizeof(StringTransferMessage) + sizeof(uint32_t);
-  const auto pixelsData = data + offset;
-  return (size >= 3 + offset && pixelsData[0] == 0xFF && pixelsData[1] == 0xD8 &&
-          pixelsData[2] == 0xFF);
+  const auto pixelsData = Data::MakeWithoutCopy(data + offset, size);
+  return JpegCodec::IsJpeg(pixelsData) || WebpCodec::IsWebp(pixelsData) || PngCodec::IsPng(pixelsData);
 }
 
 bool FrameCapture::sendData(const uint8_t* data, size_t len) {
@@ -579,7 +580,7 @@ bool FrameCapture::sendData(const uint8_t* data, size_t len) {
     }
   }
   auto lz4Size = len;
-  if (IsJPEG(data, len)) {
+  if (IsEncodeImage(data, len)) {
     memcpy(lz4Buf.bytes() + sizeof(size_t), data, len);
   } else {
     lz4Size = lz4Handler->encode(lz4Buf.bytes() + sizeof(size_t), maxOutputSize, data, len);

@@ -22,13 +22,15 @@
 namespace tgfx {
 PlacementPtr<AtlasTextGeometryProcessor> AtlasTextGeometryProcessor::Make(
     BlockBuffer* buffer, std::shared_ptr<TextureProxy> textureProxy, AAType aa,
-    std::optional<Color> commonColor) {
-  return buffer->make<GLAtlasTextGeometryProcessor>(std::move(textureProxy), aa, commonColor);
+    std::optional<Color> commonColor, const SamplingOptions& sampling) {
+  return buffer->make<GLAtlasTextGeometryProcessor>(std::move(textureProxy), aa, commonColor,
+                                                    sampling);
 }
 
 GLAtlasTextGeometryProcessor::GLAtlasTextGeometryProcessor(
-    std::shared_ptr<TextureProxy> textureProxy, AAType aa, std::optional<Color> commonColor)
-    : AtlasTextGeometryProcessor(std::move(textureProxy), aa, commonColor) {
+    std::shared_ptr<TextureProxy> textureProxy, AAType aa, std::optional<Color> commonColor,
+    const SamplingOptions& sampling)
+    : AtlasTextGeometryProcessor(std::move(textureProxy), aa, commonColor, sampling) {
 }
 
 void GLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {

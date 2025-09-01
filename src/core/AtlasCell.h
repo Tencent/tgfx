@@ -45,15 +45,21 @@ class AtlasCell {
     return _matrix;
   }
 
+  void updateAll(BytesKey key, MaskFormat maskFormat, uint16_t width, uint16_t height,
+                 const Matrix& matrix) {
+    _key = std::move(key);
+    _maskFormat = maskFormat;
+    _width = width;
+    _height = height;
+    _matrix = matrix;
+  }
+
  private:
   BytesKey _key;
   Matrix _matrix = {};
   MaskFormat _maskFormat = MaskFormat::A8;
   uint16_t _width = 0;
   uint16_t _height = 0;
-
-  friend class AtlasSource;
-  friend class RenderContext;
 };
 
 struct AtlasCellLocator {

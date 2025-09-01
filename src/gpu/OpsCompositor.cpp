@@ -21,6 +21,7 @@
 #include "core/PathRasterizer.h"
 #include "core/PathRef.h"
 #include "core/PathTriangulator.h"
+#include "core/utils/MathExtra.h"
 #include "core/utils/RectToRectMatrix.h"
 #include "core/utils/Types.h"
 #include "gpu/DrawingManager.h"
@@ -51,6 +52,13 @@ static bool HasDifferentViewMatrix(const std::vector<PlacementPtr<RectRecord>>& 
     }
   }
   return false;
+}
+
+static SamplingOptions GetAtlasSampling(const Matrix& matrix) {
+  // A matrix is considered rotated if it has any skew or if it swaps the x and y axes.
+  auto hasRotated = !FloatNearlyZero(matrix.getSkewX()) || !FloatNearlyZero(matrix.getSkewY());
+  auto filterMode = hasRotated ? FilterMode::Linear : FilterMode::Nearest;
+  return SamplingOptions{filterMode, MipmapMode::None};
 }
 
 OpsCompositor::OpsCompositor(std::shared_ptr<RenderTargetProxy> proxy, uint32_t renderFlags,
@@ -181,7 +189,7 @@ void OpsCompositor::fillShape(std::shared_ptr<Shape> shape, const MCState& state
 }
 
 void OpsCompositor::discardAll() {
-  ops.clear();
+  drawOps.clear();
   clearColor.reset();
   if (pendingType != PendingOpType::Unknown) {
     resetPendingOps();
@@ -377,7 +385,7 @@ void OpsCompositor::flushPendingOps(PendingOpType type, Path clip, Fill fill) {
       auto provider = RectsVertexProvider::MakeFrom(drawingBuffer(), std::move(pendingRects), {},
                                                     AAType::None, true, UVSubsetMode::None);
       drawOp = AtlasTextOp::Make(context, std::move(provider), renderFlags,
-                                 std::move(pendingAtlasTexture));
+                                 std::move(pendingAtlasTexture), pendingSampling);
     } break;
     default:
       break;
@@ -432,7 +440,7 @@ bool OpsCompositor::drawAsClear(const Rect& rect, const MCState& state, const Fi
     return false;
   }
   // discard all previous ops since the clear rect covers the entire render target.
-  ops.clear();
+  drawOps.clear();
   auto format = renderTarget->format();
   auto caps = context->caps();
   auto& writeSwizzle = caps->getWriteSwizzle(format);
@@ -539,7 +547,7 @@ std::shared_ptr<TextureProxy> OpsCompositor::getClipTexture(const Path& clip, AA
       return nullptr;
     }
     clipTexture = clipRenderTarget->asTextureProxy();
-    auto opList = drawingBuffer()->makeArray<Op>(&drawOp, 1);
+    auto opList = drawingBuffer()->makeArray<DrawOp>(&drawOp, 1);
     context->drawingManager()->addOpsRenderTask(std::move(clipRenderTarget), std::move(opList),
                                                 Color::Transparent());
   } else {
@@ -681,23 +689,26 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
         PorterDuffXferProcessor::Make(drawingBuffer(), fill.blendMode, std::move(dstTextureInfo));
     op->setXferProcessor(std::move(xferProcessor));
   }
-  ops.emplace_back(std::move(op));
+  drawOps.emplace_back(std::move(op));
 }
 
 void OpsCompositor::fillTextAtlas(std::shared_ptr<TextureProxy> textureProxy, const Rect& rect,
                                   const MCState& state, const Fill& fill) {
   DEBUG_ASSERT(textureProxy != nullptr);
   DEBUG_ASSERT(!rect.isEmpty());
-  if (!canAppend(PendingOpType::Atlas, state.clip, fill) || pendingAtlasTexture != textureProxy) {
+  auto sampling = GetAtlasSampling(state.matrix);
+  if (!canAppend(PendingOpType::Atlas, state.clip, fill) || pendingAtlasTexture != textureProxy ||
+      pendingSampling != sampling) {
     flushPendingOps(PendingOpType::Atlas, state.clip, fill);
     pendingAtlasTexture = std::move(textureProxy);
+    pendingSampling = sampling;
   }
   auto record = drawingBuffer()->make<RectRecord>(rect, state.matrix, fill.color.premultiply());
   pendingRects.emplace_back(std::move(record));
 }
 
 void OpsCompositor::submitDrawOps() {
-  auto opArray = drawingBuffer()->makeArray(std::move(ops));
+  auto opArray = drawingBuffer()->makeArray(std::move(drawOps));
   context->drawingManager()->addOpsRenderTask(renderTarget, std::move(opArray), clearColor);
   clearColor.reset();
 }

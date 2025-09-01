@@ -30,9 +30,8 @@ PlacementPtr<ProgramInfo> DrawOp::createProgramInfo(
   }
   OPERATE_FRARGMENT_PROCESSORS(fragmentProcessors);
   auto context = renderTarget->getContext();
-  const auto& swizzle = context->caps()->getWriteSwizzle(renderTarget->format());
   return context->drawingBuffer()->make<ProgramInfo>(
-      std::move(geometryProcessor), std::move(fragmentProcessors), numColorProcessors,
-      std::move(xferProcessor), blendMode, &swizzle);
+      renderTarget, std::move(geometryProcessor), std::move(fragmentProcessors), numColorProcessors,
+      std::move(xferProcessor), blendMode);
 }
 }  // namespace tgfx

@@ -54,13 +54,13 @@ bool DrawingManager::fillRTWithFP(std::shared_ptr<RenderTargetProxy> renderTarge
   }
   auto bounds = Rect::MakeWH(renderTarget->width(), renderTarget->height());
   auto provider = RectsVertexProvider::MakeFrom(drawingBuffer, bounds, AAType::None);
-  auto op = RectDrawOp::Make(renderTarget->getContext(), std::move(provider), renderFlags);
-  op->addColorFP(std::move(processor));
-  op->setBlendMode(BlendMode::Src);
-  auto ops = drawingBuffer->makeArray<Op>(&op, 1);
+  auto drawOp = RectDrawOp::Make(renderTarget->getContext(), std::move(provider), renderFlags);
+  drawOp->addColorFP(std::move(processor));
+  drawOp->setBlendMode(BlendMode::Src);
+  auto drawOps = drawingBuffer->makeArray<DrawOp>(&drawOp, 1);
   auto textureProxy = renderTarget->asTextureProxy();
   auto task =
-      drawingBuffer->make<OpsRenderTask>(std::move(renderTarget), std::move(ops), std::nullopt);
+      drawingBuffer->make<OpsRenderTask>(std::move(renderTarget), std::move(drawOps), std::nullopt);
   renderTasks.emplace_back(std::move(task));
   addGenerateMipmapsTask(std::move(textureProxy));
   return true;
@@ -76,13 +76,14 @@ std::shared_ptr<OpsCompositor> DrawingManager::addOpsCompositor(
 }
 
 void DrawingManager::addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget,
-                                      PlacementArray<Op> ops, std::optional<Color> clearColor) {
-  if (renderTarget == nullptr || (ops.empty() && !clearColor.has_value())) {
+                                      PlacementArray<DrawOp> drawOps,
+                                      std::optional<Color> clearColor) {
+  if (renderTarget == nullptr || (drawOps.empty() && !clearColor.has_value())) {
     return;
   }
   auto textureProxy = renderTarget->asTextureProxy();
   auto task =
-      drawingBuffer->make<OpsRenderTask>(std::move(renderTarget), std::move(ops), clearColor);
+      drawingBuffer->make<OpsRenderTask>(std::move(renderTarget), std::move(drawOps), clearColor);
   renderTasks.emplace_back(std::move(task));
   addGenerateMipmapsTask(std::move(textureProxy));
 }
