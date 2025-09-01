@@ -102,7 +102,8 @@ class FrameCapture {
   static void SendInputTextureData(const GPUTexture* texturePtr, int width, int height,
                                    size_t rowBytes, PixelFormat format, const void* pixels);
 
-  static void SendFragmentProcessor(const std::vector<PlacementPtr<FragmentProcessor>>& programInfo);
+  static void SendFragmentProcessor(
+      const std::vector<PlacementPtr<FragmentProcessor>>& programInfo);
 
   static void SendInputTextureData(const CommandQueue* commandQueue, GPUTexture* texturePtr);
 

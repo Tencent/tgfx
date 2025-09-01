@@ -188,8 +188,7 @@ void FrameCapture::SendOpTexture(uint64_t texturePtr, FrameCaptureMessageType ty
   auto texturePtrToTextureIdIter = textureIds.find(GetTextureHash(texturePtr));
   if (texturePtrToTextureIdIter != textureIds.end()) {
     textureId = texturePtrToTextureIdIter->second;
-  }
-  else {
+  } else {
     auto currentFrame = GetFrameCapture().frameCount.load(std::memory_order_relaxed) + 1;
     texturePtrToTextureIdIter = textureIds.find(GetTextureHash(texturePtr, currentFrame));
     if (texturePtrToTextureIdIter != textureIds.end()) {
@@ -286,7 +285,7 @@ void FrameCapture::SendOutputTextureData(const RenderTarget* renderTarget) {
   renderTarget->readPixels(imageInfo, imageBuffer->bytes());
 
   auto& textureIds = GetFrameCapture().textureIds;
-  auto renderTexurePtr =reinterpret_cast<uint64_t>(renderTarget->getRenderTexture());
+  auto renderTexurePtr = reinterpret_cast<uint64_t>(renderTarget->getRenderTexture());
   auto currentFrame = GetFrameCapture().frameCount.load(std::memory_order_relaxed) + 1;
   ImageItem imageItem = {};
   imageItem.isInput = false;
@@ -503,7 +502,8 @@ void FrameCapture::encodeWorker() {
 #elif TGFX_USE_PNG_ENCODE
       auto encodeFormat = EncodedFormat::PNG;
 #endif
-      auto jpgBuffer = ImageCodec::Encode(Pixmap(imageInfo, imageItem.image->bytes()), encodedFormat, 100);
+      auto jpgBuffer =
+          ImageCodec::Encode(Pixmap(imageInfo, imageItem.image->bytes()), encodedFormat, 100);
       auto size = jpgBuffer->size();
       auto pxielsBuffer = static_cast<uint8_t*>(malloc(size));
       memcpy(pxielsBuffer, jpgBuffer->bytes(), size);
@@ -563,7 +563,8 @@ static bool IsEncodeImage(const uint8_t* data, size_t size) {
   auto offset =
       sizeof(FrameCaptureMessageHeader) + sizeof(StringTransferMessage) + sizeof(uint32_t);
   const auto pixelsData = Data::MakeWithoutCopy(data + offset, size);
-  return JpegCodec::IsJpeg(pixelsData) || WebpCodec::IsWebp(pixelsData) || PngCodec::IsPng(pixelsData);
+  return JpegCodec::IsJpeg(pixelsData) || WebpCodec::IsWebp(pixelsData) ||
+         PngCodec::IsPng(pixelsData);
 }
 
 bool FrameCapture::sendData(const uint8_t* data, size_t len) {
