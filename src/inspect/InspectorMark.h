@@ -63,6 +63,7 @@
 #define ATTRIBUTE_NAME(name, value)
 #define ATTRIBUTE_NAME_ENUM(name, value, type)
 #define ATTRIBUTE_ENUM(value, type)
+#define TEXTURE_DATA(texturePtr, width, height, rowBytes, format, pixels)
 #define TEXTURE(commandQueue, texturePtr)
 #define OPERATE_FRARGMENT_PROCESSORS(pipline)
 #define OPERATE_TASK_OUTPUT_TEXTURE(texturePtr)
