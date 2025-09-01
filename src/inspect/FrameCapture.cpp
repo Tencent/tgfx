@@ -218,7 +218,7 @@ void FrameCapture::SendOpOutputTexture(const GPUTexture* texturePtr) {
 
 void FrameCapture::SendInputTextureData(uint64_t texturePtr, int width, int height, size_t rowBytes,
                                         uint8_t format, const void* pixels) {
-  const auto sz = static_cast<size_t>(width) * rowBytes;
+  const auto sz = static_cast<size_t>(height) * rowBytes;
   auto imageBuffer = std::make_shared<Buffer>(sz);
   imageBuffer->writeRange(0, sz, pixels);
   SendInputTextureData(texturePtr, width, height, rowBytes, format, std::move(imageBuffer));
