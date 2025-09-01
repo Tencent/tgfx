@@ -37,6 +37,17 @@
   tgfx::inspect::FrameCapture::SendAttributeData(name, static_cast<uint8_t>(value), \
                                                  static_cast<uint8_t>(type))
 #define ATTRIBUTE_ENUM(value, type) ATTRIBUTE_NAME_ENUM(#value, value, type)
+#define TEXTURE_DATA(texturePtr, width, height, rowBytes, format, pixels)                        \
+  tgfx::inspect::FrameCapture::SendInputTextureData(texturePtr, width, height, rowBytes, format, \
+                                                    pixels)
+#define TEXTURE(commandQueue, texturePtr) \
+  tgfx::inspect::FrameCapture::SendInputTextureData(commandQueue, texturePtr)
+#define OPERATE_FRARGMENT_PROCESSORS(fragmentProcessors) \
+  tgfx::inspect::FrameCapture::SendFragmentProcessor(fragmentProcessors)
+#define OPERATE_TASK_OUTPUT_TEXTURE(texturePtr) \
+  tgfx::inspect::FrameCapture::SendOpOutputTexture(texturePtr)
+#define OPERATE_RENDER_TARGET(renderTarget) \
+  tgfx::inspect::FrameCapture::SendOutputTextureData(renderTarget)
 
 #else
 
@@ -52,5 +63,9 @@
 #define ATTRIBUTE_NAME(name, value)
 #define ATTRIBUTE_NAME_ENUM(name, value, type)
 #define ATTRIBUTE_ENUM(value, type)
+#define TEXTURE_DATA(texturePtr, width, height, rowBytes, format, pixels)
+#define OPERATE_FRARGMENT_PROCESSORS(pipline)
+#define OPERATE_TASK_OUTPUT_TEXTURE(texturePtr)
+#define OPERATE_RENDER_TARGET(renderTarget)
 
 #endif

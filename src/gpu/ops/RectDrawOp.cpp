@@ -91,5 +91,6 @@ void RectDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   } else {
     renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
   }
+  OPERATE_RENDER_TARGET(renderTarget);
 }
 }  // namespace tgfx

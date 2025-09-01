@@ -31,9 +31,13 @@ enum class FrameCaptureMessageType : uint8_t {
   ValueDataFloat,
   ValueDataBool,
   ValueDataEnum,
+  InputTexture,
+  OutputTexture,
+  TextureData,
   KeepAlive,
   StringData,
-  ValueName
+  ValueName,
+  PixelsData
 };
 
 #pragma pack(push, 1)
@@ -57,6 +61,7 @@ struct OperateEndMessage : OperateBaseMessage {
 };
 
 struct FrameMarkMessage {
+  bool captured;
   int64_t usTime;
 };
 
@@ -96,6 +101,20 @@ struct StringTransferMessage {
   uint64_t ptr;
 };
 
+struct TextureSamplerMsg {
+  uint64_t texturePtr;
+};
+
+struct TextureDataMsg : TextureSamplerMsg {
+  bool isInput;
+  uint8_t format;
+  int width;
+  int height;
+  size_t rowBytes;
+  size_t pixelsSize;
+  uint64_t pixels;
+};
+
 struct FrameCaptureMessageItem {
   FrameCaptureMessageHeader hdr;
   union {
@@ -110,6 +129,8 @@ struct FrameCaptureMessageItem {
     AttributeDataFloatMessage attributeDataFloat;
     AttributeDataBoolMessage attributeDataBool;
     AttributeDataEnumMessage attributeDataEnum;
+    TextureSamplerMsg textureSampler;
+    TextureDataMsg textureData;
   };
 };
 #pragma pack(pop)
@@ -126,8 +147,12 @@ static constexpr size_t FrameCaptureMessageDataSize[] = {
     sizeof(FrameCaptureMessageHeader) + sizeof(AttributeDataFloatMessage),
     sizeof(FrameCaptureMessageHeader) + sizeof(AttributeDataBoolMessage),
     sizeof(FrameCaptureMessageHeader) + sizeof(AttributeDataEnumMessage),
+    sizeof(FrameCaptureMessageHeader) + sizeof(TextureSamplerMsg),
+    sizeof(FrameCaptureMessageHeader) + sizeof(TextureSamplerMsg),
+    sizeof(FrameCaptureMessageHeader) + sizeof(TextureDataMsg),
     sizeof(FrameCaptureMessageHeader),
     sizeof(FrameCaptureMessageHeader) + sizeof(StringTransferMessage),
     sizeof(FrameCaptureMessageHeader) + sizeof(StringTransferMessage),
+    sizeof(FrameCaptureMessageHeader) + sizeof(TextureSamplerMsg),
 };
 }  // namespace tgfx::inspect

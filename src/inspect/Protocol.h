@@ -19,11 +19,8 @@
 #pragma once
 namespace tgfx::inspect {
 
-static constexpr int Lz4CompressBound(int size) {
-  return size + (size / 255) + 16;
-}
+static constexpr int LZ4HeaderSize = 12;
 static constexpr int TargetFrameSize = 256 * 1024;
-static constexpr int LZ4Size = Lz4CompressBound(TargetFrameSize);
 static constexpr int HandshakeShibbolethSize = 4;
 static constexpr char HandshakeShibboleth[HandshakeShibbolethSize] = {'T', 'G', 'F', 'X'};
 
@@ -65,6 +62,7 @@ enum class ServerQuery : uint8_t {
   String,
   ValueName,
   Disconnect,
+  CaptureFrame,
 };
 
 struct ServerQueryPacket {
