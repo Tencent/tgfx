@@ -598,6 +598,11 @@ if (TGFX_BUILD_TESTS)
         endif ()
     endif ()
 
+    if (APPLE)
+        find_library(COMPRESSION_LIBRARIES NAMES compression)
+        list(APPEND TGFX_TEST_LIBS ${COMPRESSION_LIBRARIES})
+    endif ()
+
     file(GLOB_RECURSE TGFX_TEST_FILES test/src/*.*)
     list(APPEND TGFX_TEST_LIBS tgfx-drawers tgfx ${TGFX_SHARED_LIBS})
     list(APPEND TGFX_TEST_INCLUDES src test/src third_party/json/include)
