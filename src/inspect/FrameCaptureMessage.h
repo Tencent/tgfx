@@ -101,11 +101,11 @@ struct StringTransferMessage {
   uint64_t ptr;
 };
 
-struct TextureSamplerMsg {
+struct TextureSamplerMessage {
   uint64_t texturePtr;
 };
 
-struct TextureDataMsg : TextureSamplerMsg {
+struct TextureDataMessage : TextureSamplerMessage {
   bool isInput;
   uint8_t format;
   int width;
@@ -129,8 +129,8 @@ struct FrameCaptureMessageItem {
     AttributeDataFloatMessage attributeDataFloat;
     AttributeDataBoolMessage attributeDataBool;
     AttributeDataEnumMessage attributeDataEnum;
-    TextureSamplerMsg textureSampler;
-    TextureDataMsg textureData;
+    TextureSamplerMessage textureSampler;
+    TextureDataMessage textureData;
   };
 };
 #pragma pack(pop)
@@ -147,12 +147,12 @@ static constexpr size_t FrameCaptureMessageDataSize[] = {
     sizeof(FrameCaptureMessageHeader) + sizeof(AttributeDataFloatMessage),
     sizeof(FrameCaptureMessageHeader) + sizeof(AttributeDataBoolMessage),
     sizeof(FrameCaptureMessageHeader) + sizeof(AttributeDataEnumMessage),
-    sizeof(FrameCaptureMessageHeader) + sizeof(TextureSamplerMsg),
-    sizeof(FrameCaptureMessageHeader) + sizeof(TextureSamplerMsg),
-    sizeof(FrameCaptureMessageHeader) + sizeof(TextureDataMsg),
+    sizeof(FrameCaptureMessageHeader) + sizeof(TextureSamplerMessage),
+    sizeof(FrameCaptureMessageHeader) + sizeof(TextureSamplerMessage),
+    sizeof(FrameCaptureMessageHeader) + sizeof(TextureDataMessage),
     sizeof(FrameCaptureMessageHeader),
     sizeof(FrameCaptureMessageHeader) + sizeof(StringTransferMessage),
     sizeof(FrameCaptureMessageHeader) + sizeof(StringTransferMessage),
-    sizeof(FrameCaptureMessageHeader) + sizeof(TextureSamplerMsg),
+    sizeof(FrameCaptureMessageHeader) + sizeof(TextureSamplerMessage),
 };
 }  // namespace tgfx::inspect
