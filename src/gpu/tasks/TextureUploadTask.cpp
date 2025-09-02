@@ -39,7 +39,7 @@ std::shared_ptr<Resource> TextureUploadTask::onMakeResource(Context* context) {
     return nullptr;
   }
   auto textureView = TextureView::MakeFrom(context, imageBuffer, mipmapped);
-  OPERATE_TASK_OUTPUT_TEXTURE(textureView->getTexture());
+  SEND_OUTPUT_TEXUTRE_ID(textureView->getTexture());
   if (textureView == nullptr) {
     LOGE("TextureUploadTask::onMakeResource() Failed to upload the texture view!");
   } else {

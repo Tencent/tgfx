@@ -37,17 +37,27 @@
   tgfx::inspect::FrameCapture::SendAttributeData(name, static_cast<uint8_t>(value), \
                                                  static_cast<uint8_t>(type))
 #define ATTRIBUTE_ENUM(value, type) ATTRIBUTE_NAME_ENUM(#value, value, type)
-#define TEXTURE_DATA(texturePtr, width, height, rowBytes, format, pixels)                        \
-  tgfx::inspect::FrameCapture::SendInputTextureData(texturePtr, width, height, rowBytes, format, \
-                                                    pixels)
-#define TEXTURE(commandQueue, texturePtr) \
-  tgfx::inspect::FrameCapture::SendInputTextureData(commandQueue, texturePtr)
-#define OPERATE_FRARGMENT_PROCESSORS(fragmentProcessors) \
+
+#define TEXTURE_DATA(texturePtr, width, height, rowBytes, format, pixels)                      \
+  auto frameCapture = inspect::FrameCaptureTexture::MakeFrom(texture, width, height, rowBytes, \
+                                                             pixelFormat, pixels);             \
+  tgfx::inspect::FrameCapture::SendFrameCaptureTexture(frameCapture, false);
+
+#define TEXTURE(commandQueue, texture)                                                          \
+  auto frameCapture = inspect::FrameCaptureTexture::MakeFrom(textureView->getTexture(), queue); \
+  tgfx::inspect::FrameCapture::SendFrameCaptureTexture(frameCapture, false);
+
+#define OPERATE_RENDER_TARGET(renderTarget)                                              \
+  if (inspect::FrameCapture::CurrentFrameShouldCaptrue()) {                              \
+    auto frameCapture = inspect::FrameCaptureTexture::MakeFrom(renderTarget);            \
+    tgfx::inspect::FrameCapture::SendFrameCaptureTexture(std::move(frameCapture), true); \
+    tgfx::inspect::FrameCapture::SendOutputTextureID(renderTarget->getRenderTexture());  \
+  }
+
+#define SEND_FRARGMENT_PROCESSORS(fragmentProcessors) \
   tgfx::inspect::FrameCapture::SendFragmentProcessor(fragmentProcessors)
-#define OPERATE_TASK_OUTPUT_TEXTURE(texturePtr) \
-  tgfx::inspect::FrameCapture::SendOpOutputTexture(texturePtr)
-#define OPERATE_RENDER_TARGET(renderTarget) \
-  tgfx::inspect::FrameCapture::SendOutputTextureData(renderTarget)
+#define SEND_OUTPUT_TEXUTRE_ID(texturePtr) \
+  tgfx::inspect::FrameCapture::SendOutputTextureID(texturePtr)
 
 #else
 
@@ -65,8 +75,8 @@
 #define ATTRIBUTE_ENUM(value, type)
 #define TEXTURE_DATA(texturePtr, width, height, rowBytes, format, pixels)
 #define TEXTURE(commandQueue, texturePtr)
-#define OPERATE_FRARGMENT_PROCESSORS(pipline)
-#define OPERATE_TASK_OUTPUT_TEXTURE(texturePtr)
+#define SEND_FRARGMENT_PROCESSORS(pipline)
+#define SEND_OUTPUT_TEXUTRE_ID(texturePtr)
 #define OPERATE_RENDER_TARGET(renderTarget)
 
 #endif

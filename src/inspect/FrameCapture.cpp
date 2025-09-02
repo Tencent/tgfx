@@ -63,7 +63,7 @@ uint64_t FrameCapture::NextTextureID() {
 }
 
 void FrameCapture::QueueSerialFinish(const FrameCaptureMessageItem& item) {
-  GetFrameCapture().serialConcurrentQueue.enqueue(item);
+  GetInstance().serialConcurrentQueue.enqueue(item);
 }
 
 void FrameCapture::SendAttributeData(const char* name, const Rect& rect) {
@@ -109,12 +109,12 @@ void FrameCapture::SendAttributeData(const char* name, const std::optional<Color
 
 void FrameCapture::SendFrameMark(const char* name) {
   if (!name) {
-    GetFrameCapture().frameCount.fetch_add(1, std::memory_order_relaxed);
+    GetInstance().frameCount.fetch_add(1, std::memory_order_relaxed);
   }
-  GetFrameCapture().currentFrameShouldCaptrue.store(false, std::memory_order_relaxed);
-  if (GetFrameCapture().captureFrameCount > 0) {
-    GetFrameCapture().captureFrameCount--;
-    GetFrameCapture().currentFrameShouldCaptrue.store(true, std::memory_order_relaxed);
+  GetInstance().currentFrameShouldCaptrue.store(false, std::memory_order_relaxed);
+  if (GetInstance().captureFrameCount > 0) {
+    GetInstance().captureFrameCount--;
+    GetInstance().currentFrameShouldCaptrue.store(true, std::memory_order_relaxed);
   }
   FrameCaptureMessageItem item = {};
   item.hdr.type = FrameCaptureMessageType::FrameMarkMessage;
@@ -179,65 +179,41 @@ void FrameCapture::SendAttributeData(const char* name, float* val, int size) {
   }
 }
 
-void FrameCapture::SendOpTexture(uint64_t texturePtr, FrameCaptureMessageType type) {
+void FrameCapture::SendOpTextureID(uint64_t texturePtr, FrameCaptureMessageType type) {
   if (!CurrentFrameShouldCaptrue()) {
     return;
   }
-  auto textureId = texturePtr;
-  auto& textureIds = GetFrameCapture().textureIds;
-  auto texturePtrToTextureIdIter = textureIds.find(GetTextureHash(texturePtr));
-  if (texturePtrToTextureIdIter != textureIds.end()) {
-    textureId = texturePtrToTextureIdIter->second;
-  } else {
-    auto currentFrame = GetFrameCapture().frameCount.load(std::memory_order_relaxed) + 1;
-    texturePtrToTextureIdIter = textureIds.find(GetTextureHash(texturePtr, currentFrame));
-    if (texturePtrToTextureIdIter != textureIds.end()) {
-      textureId = texturePtrToTextureIdIter->second;
-    }
-  }
+  auto textureId = GetInstance().getTextureId(texturePtr);
   FrameCaptureMessageItem item = {};
   item.hdr.type = type;
-  item.textureSampler.texturePtr = textureId;
+  item.textureSampler.textureId = textureId;
   QueueSerialFinish(item);
 }
 
-void FrameCapture::SendOpInputTexture(uint64_t texturePtr) {
-  SendOpTexture(texturePtr, FrameCaptureMessageType::InputTexture);
+void FrameCapture::SendOpInputTextureID(const GPUTexture* texture) {
+  SendOpTextureID(reinterpret_cast<uint64_t>(texture), FrameCaptureMessageType::InputTexture);
 }
 
-void FrameCapture::SendOpOutputTexture(uint64_t texturePtr) {
-  SendOpTexture(texturePtr, FrameCaptureMessageType::OutputTexture);
-}
-
-void FrameCapture::SendOpOutputTexture(const GPUTexture* texturePtr) {
+void FrameCapture::SendOutputTextureID(const GPUTexture* texture) {
   if (!CurrentFrameShouldCaptrue()) {
     return;
   }
-  SendOpOutputTexture(reinterpret_cast<uint64_t>(texturePtr));
+  SendOpTextureID(reinterpret_cast<uint64_t>(texture), FrameCaptureMessageType::OutputTexture);
 }
 
-void FrameCapture::SendInputTextureData(uint64_t texturePtr, int width, int height, size_t rowBytes,
-                                        uint8_t format, const void* pixels) {
-  const auto sz = static_cast<size_t>(height) * rowBytes;
-  auto imageBuffer = std::make_shared<Buffer>(sz);
-  imageBuffer->writeRange(0, sz, pixels);
-  SendInputTextureData(texturePtr, width, height, rowBytes, format, std::move(imageBuffer));
-}
+void FrameCapture::SendFrameCaptureTexture(std::shared_ptr<FrameCaptureTexture> frameCaptureTexture,
+                                           bool differentEachFrame) {
 
-void FrameCapture::SendInputTextureData(uint64_t texturePtr, int width, int height, size_t rowBytes,
-                                        uint8_t format, std::shared_ptr<Buffer> imageBuffer) {
-
-  auto& textureIds = GetFrameCapture().textureIds;
-  ImageItem imageItem = {};
-  imageItem.isInput = true;
-  imageItem.image = std::move(imageBuffer);
-  imageItem.texturePtr = NextTextureID();
-  imageItem.width = width;
-  imageItem.height = height;
-  imageItem.format = format;
-  imageItem.rowBytes = rowBytes;
-  GetFrameCapture().imageQueue.enqueue(imageItem);
-  textureIds[GetTextureHash(texturePtr)] = imageItem.texturePtr;
+  uint64_t currentFrame = 0;
+  if (differentEachFrame) {
+    currentFrame = GetInstance().frameCount.load(std::memory_order_relaxed) + 1;
+  }
+  auto& textureIds = GetInstance().textureIds;
+  auto texture = reinterpret_cast<uint64_t>(frameCaptureTexture->texture());
+  auto textureId = NextTextureID();
+  textureIds[GetTextureHash(texture, currentFrame)] = textureId;
+  frameCaptureTexture->setTextureId(textureId);
+  GetInstance().imageQueue.enqueue(std::move(frameCaptureTexture));
 }
 
 void FrameCapture::SendFragmentProcessor(
@@ -247,57 +223,10 @@ void FrameCapture::SendFragmentProcessor(
     while (const auto* subFP = fpIter.next()) {
       for (size_t j = 0; j < subFP->numTextureSamplers(); ++j) {
         auto texture = subFP->textureAt(j);
-        SendOpInputTexture(reinterpret_cast<uint64_t>(texture));
+        SendOpInputTextureID(texture);
       }
     }
   }
-}
-
-void FrameCapture::SendInputTextureData(const GPUTexture* texturePtr, int width, int height,
-                                        size_t rowBytes, PixelFormat format, const void* pixels) {
-  SendInputTextureData(reinterpret_cast<uint64_t>(texturePtr), width, height, rowBytes,
-                       static_cast<uint8_t>(format), pixels);
-}
-
-void FrameCapture::SendInputTextureData(const CommandQueue* commandQueue, GPUTexture* texturePtr) {
-  auto width = texturePtr->width();
-  auto height = texturePtr->height();
-  auto colorType = PixelFormatToColorType(texturePtr->format());
-  auto rowBytes = ImageInfo::GetBytesPerPixel(colorType) * static_cast<size_t>(width);
-  auto buffer = std::make_shared<Buffer>(rowBytes * static_cast<size_t>(height));
-  if (!commandQueue->readTexture(texturePtr, Rect::MakeWH(width, height), buffer->bytes(),
-                                 rowBytes)) {
-    return;
-  }
-  SendInputTextureData(reinterpret_cast<uint64_t>(texturePtr), width, height, rowBytes,
-                       static_cast<uint8_t>(texturePtr->format()), std::move(buffer));
-}
-
-void FrameCapture::SendOutputTextureData(const RenderTarget* renderTarget) {
-  if (!CurrentFrameShouldCaptrue()) {
-    return;
-  }
-  auto width = renderTarget->width();
-  auto height = renderTarget->height();
-  auto format = renderTarget->format();
-  auto imageInfo = ImageInfo::Make(width, height, PixelFormatToColorType(format));
-  auto imageBuffer = std::make_shared<Buffer>(imageInfo.byteSize());
-  renderTarget->readPixels(imageInfo, imageBuffer->bytes());
-
-  auto& textureIds = GetFrameCapture().textureIds;
-  auto renderTexurePtr = reinterpret_cast<uint64_t>(renderTarget->getRenderTexture());
-  auto currentFrame = GetFrameCapture().frameCount.load(std::memory_order_relaxed) + 1;
-  ImageItem imageItem = {};
-  imageItem.isInput = false;
-  imageItem.image = std::move(imageBuffer);
-  imageItem.texturePtr = NextTextureID();
-  imageItem.width = width;
-  imageItem.height = height;
-  imageItem.format = static_cast<uint8_t>(format);
-  imageItem.rowBytes = imageInfo.rowBytes();
-  GetFrameCapture().imageQueue.enqueue(imageItem);
-  textureIds[GetTextureHash(renderTexurePtr, currentFrame)] = imageItem.texturePtr;
-  SendOpOutputTexture(imageItem.texturePtr);
 }
 
 void FrameCapture::LaunchWorker(FrameCapture* inspector) {
@@ -305,11 +234,11 @@ void FrameCapture::LaunchWorker(FrameCapture* inspector) {
 }
 
 bool FrameCapture::ShouldExit() {
-  return GetFrameCapture().shutdown.load(std::memory_order_relaxed);
+  return GetInstance().shutdown.load(std::memory_order_relaxed);
 }
 
 bool FrameCapture::CurrentFrameShouldCaptrue() {
-  return GetFrameCapture().currentFrameShouldCaptrue.load(std::memory_order_relaxed);
+  return GetInstance().currentFrameShouldCaptrue.load(std::memory_order_relaxed);
 }
 
 uint64_t FrameCapture::GetTextureHash(uint64_t texturePtr, uint64_t currentFrame) {
@@ -363,7 +292,7 @@ void FrameCapture::sendString(uint64_t str, const char* ptr, FrameCaptureMessage
   sendString(str, ptr, strlen(ptr), type);
 }
 
-void FrameCapture::sendPixelsData(uint64_t str, const char* ptr, size_t len,
+void FrameCapture::sendPixelsData(uint64_t str, const char* pixels, size_t len,
                                   FrameCaptureMessageType type) {
   ASSERT(type == FrameCaptureMessageType::PixelsData);
   FrameCaptureMessageItem item = {};
@@ -374,7 +303,7 @@ void FrameCapture::sendPixelsData(uint64_t str, const char* ptr, size_t len,
   needDataSize(FrameCaptureMessageDataSize[static_cast<int>(type)] + sizeof(uint32_t) + dataLen);
   appendDataUnsafe(&item, FrameCaptureMessageDataSize[static_cast<int>(type)]);
   appendDataUnsafe(&dataLen, sizeof(uint32_t));
-  appendDataUnsafe(ptr, dataLen);
+  appendDataUnsafe(pixels, dataLen);
 }
 
 void FrameCapture::worker() {
@@ -391,7 +320,7 @@ void FrameCapture::worker() {
   }
 
   auto welcome = WelcomeMessage();
-  welcome.initBegin = GetFrameCapture().initTime;
+  welcome.initBegin = GetInstance().initTime;
   welcome.initEnd = timeBegin.load(std::memory_order_relaxed);
 
   auto listen = ListenSocket{};
@@ -488,13 +417,13 @@ void FrameCapture::encodeWorker() {
     if (ShouldExit()) {
       return;
     }
-    ImageItem imageItem = {};
-    while (imageQueue.try_dequeue(imageItem)) {
-      const auto width = imageItem.width;
-      const auto height = imageItem.height;
-      auto colorType = PixelFormatToColorType(static_cast<PixelFormat>(imageItem.format));
-      auto imageInfo =
-          ImageInfo::Make(width, height, colorType, AlphaType::Premultiplied, imageItem.rowBytes);
+    std::shared_ptr<FrameCaptureTexture> frameCaputreTexture = nullptr;
+    while (imageQueue.try_dequeue(frameCaputreTexture)) {
+      const auto width = frameCaputreTexture->width();
+      const auto height = frameCaputreTexture->height();
+      auto colorType = PixelFormatToColorType(frameCaputreTexture->format());
+      auto imageInfo = ImageInfo::Make(width, height, colorType, AlphaType::Premultiplied,
+                                       frameCaputreTexture->rowBytes());
 #ifdef TGFX_USE_JPEG_ENCODE
       auto encodedFormat = EncodedFormat::JPEG;
 #elif TGFX_USE_WEBP_ENCODE
@@ -502,20 +431,20 @@ void FrameCapture::encodeWorker() {
 #elif TGFX_USE_PNG_ENCODE
       auto encodeFormat = EncodedFormat::PNG;
 #endif
-      auto jpgBuffer =
-          ImageCodec::Encode(Pixmap(imageInfo, imageItem.image->bytes()), encodedFormat, 100);
+      auto jpgBuffer = ImageCodec::Encode(
+          Pixmap(imageInfo, frameCaputreTexture->imageBuffer()->bytes()), encodedFormat, 100);
       auto size = jpgBuffer->size();
       auto pxielsBuffer = static_cast<uint8_t*>(malloc(size));
       memcpy(pxielsBuffer, jpgBuffer->bytes(), size);
 
       FrameCaptureMessageItem item = {};
       item.hdr.type = FrameCaptureMessageType::TextureData;
-      item.textureData.isInput = imageItem.isInput;
-      item.textureData.texturePtr = imageItem.texturePtr;
-      item.textureData.width = imageItem.width;
-      item.textureData.height = imageItem.height;
-      item.textureData.rowBytes = imageItem.rowBytes;
-      item.textureData.format = imageItem.format;
+      item.textureData.isInput = frameCaputreTexture->isInput();
+      item.textureData.textureId = frameCaputreTexture->textureId();
+      item.textureData.width = frameCaputreTexture->width();
+      item.textureData.height = frameCaputreTexture->height();
+      item.textureData.rowBytes = frameCaputreTexture->rowBytes();
+      item.textureData.format = frameCaputreTexture->format();
       item.textureData.pixels = reinterpret_cast<uint64_t>(pxielsBuffer);
       item.textureData.pixelsSize = size;
       QueueSerialFinish(item);
@@ -610,6 +539,21 @@ bool FrameCapture::confirmProtocol() {
     return false;
   }
   return true;
+}
+
+uint64_t FrameCapture::getTextureId(uint64_t texturePtr) {
+  uint64_t textureId = texturePtr;
+  auto texturePtrToTextureIdIter = textureIds.find(GetTextureHash(texturePtr));
+  if (texturePtrToTextureIdIter != textureIds.end()) {
+    textureId = texturePtrToTextureIdIter->second;
+  } else {
+    auto currentFrame = GetInstance().frameCount.load(std::memory_order_relaxed) + 1;
+    texturePtrToTextureIdIter = textureIds.find(GetTextureHash(texturePtr, currentFrame));
+    if (texturePtrToTextureIdIter != textureIds.end()) {
+      textureId = texturePtrToTextureIdIter->second;
+    }
+  }
+  return textureId;
 }
 
 void FrameCapture::handleConnect(const WelcomeMessage& welcome) {

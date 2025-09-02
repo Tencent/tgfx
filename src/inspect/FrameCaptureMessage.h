@@ -17,7 +17,9 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
+#include <tgfx/gpu/PixelFormat.h>
 #include <cstdint>
+
 namespace tgfx::inspect {
 enum class FrameCaptureMessageType : uint8_t {
   OperateBegin,
@@ -102,12 +104,12 @@ struct StringTransferMessage {
 };
 
 struct TextureSamplerMessage {
-  uint64_t texturePtr;
+  uint64_t textureId;
 };
 
 struct TextureDataMessage : TextureSamplerMessage {
   bool isInput;
-  uint8_t format;
+  PixelFormat format;
   int width;
   int height;
   size_t rowBytes;
