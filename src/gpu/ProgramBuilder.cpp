@@ -161,7 +161,7 @@ SamplerHandle ProgramBuilder::emitSampler(GPUTexture* texture, const std::string
 
 void ProgramBuilder::emitFSOutputSwizzle() {
   // Swizzle the fragment shader outputs if necessary.
-  const auto& swizzle = *programInfo->outputSwizzle();
+  auto& swizzle = programInfo->getOutputSwizzle();
   if (swizzle == Swizzle::RGBA()) {
     return;
   }

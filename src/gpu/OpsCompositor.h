@@ -119,7 +119,7 @@ class OpsCompositor {
   std::vector<PlacementPtr<RRectRecord>> pendingRRects = {};
   std::vector<PlacementPtr<Stroke>> pendingStrokes = {};
   std::optional<Color> clearColor = std::nullopt;
-  std::vector<PlacementPtr<Op>> ops = {};
+  std::vector<PlacementPtr<DrawOp>> drawOps = {};
 
   static bool CompareFill(const Fill& a, const Fill& b);
 

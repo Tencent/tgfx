@@ -24,10 +24,8 @@
 #include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
-GLRenderPass::GLRenderPass(std::shared_ptr<GLInterface> interface,
-                           std::shared_ptr<RenderTarget> renderTarget, bool resolveMSAA)
-    : RenderPass(std::move(renderTarget)), interface(std::move(interface)),
-      resolveMSAA(resolveMSAA) {
+GLRenderPass::GLRenderPass(std::shared_ptr<GLInterface> interface, RenderPassDescriptor descriptor)
+    : RenderPass(std::move(descriptor)), interface(std::move(interface)) {
 }
 
 static void UpdateScissor(const GLFunctions* gl, const Rect& scissorRect) {
@@ -41,18 +39,29 @@ static void UpdateScissor(const GLFunctions* gl, const Rect& scissorRect) {
 }
 
 void GLRenderPass::begin() {
+  DEBUG_ASSERT(!descriptor.colorAttachments.empty());
+  auto& colorAttachment = descriptor.colorAttachments[0];
+  DEBUG_ASSERT(colorAttachment.texture != nullptr);
+  auto renderTexture = static_cast<GLTexture*>(colorAttachment.texture);
   auto gl = interface->functions();
-  auto renderTexture = static_cast<GLTexture*>(renderTarget->getRenderTexture());
   gl->bindFramebuffer(GL_FRAMEBUFFER, renderTexture->frameBufferID());
-  gl->viewport(0, 0, renderTarget->width(), renderTarget->height());
+  gl->viewport(0, 0, renderTexture->width(), renderTexture->height());
+  if (colorAttachment.loadAction == LoadAction::Clear) {
+    gl->disable(GL_SCISSOR_TEST);
+    auto& color = colorAttachment.clearValue;
+    gl->clearColor(color.red, color.green, color.blue, color.alpha);
+    gl->clear(GL_COLOR_BUFFER_BIT);
+  }
 }
 
 void GLRenderPass::onEnd() {
   auto gl = interface->functions();
   auto caps = interface->caps();
-  if (resolveMSAA && renderTarget->sampleCount() > 1) {
-    auto renderTexture = static_cast<GLTexture*>(renderTarget->getRenderTexture());
-    auto sampleTexture = static_cast<GLTexture*>(renderTarget->getSampleTexture());
+  auto& attachment = descriptor.colorAttachments[0];
+  if (attachment.resolveTexture) {
+    auto renderTexture = static_cast<GLTexture*>(attachment.texture);
+    auto sampleTexture = static_cast<GLTexture*>(attachment.resolveTexture);
+    DEBUG_ASSERT(renderTexture != sampleTexture);
     gl->bindFramebuffer(GL_READ_FRAMEBUFFER, renderTexture->frameBufferID());
     gl->bindFramebuffer(GL_DRAW_FRAMEBUFFER, sampleTexture->frameBufferID());
     // MSAA resolve may be affected by the scissor test, so disable it here.
@@ -60,8 +69,8 @@ void GLRenderPass::onEnd() {
     if (caps->msFBOType == MSFBOType::ES_Apple) {
       gl->resolveMultisampleFramebuffer();
     } else {
-      gl->blitFramebuffer(0, 0, renderTarget->width(), renderTarget->height(), 0, 0,
-                          renderTarget->width(), renderTarget->height(), GL_COLOR_BUFFER_BIT,
+      gl->blitFramebuffer(0, 0, renderTexture->width(), renderTexture->height(), 0, 0,
+                          sampleTexture->width(), sampleTexture->height(), GL_COLOR_BUFFER_BIT,
                           GL_NEAREST);
     }
   }
@@ -73,9 +82,9 @@ void GLRenderPass::onEnd() {
 
 bool GLRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
                                                const Rect& scissorRect) {
-  auto context = renderTarget->getContext();
-  program = context->globalCache()->getProgram(programInfo);
+  program = programInfo->getProgram();
   if (program == nullptr) {
+    LOGE("GLRenderPass::onBindProgramAndScissorClip() Failed to get the program!");
     return false;
   }
   auto gl = interface->functions();
@@ -83,7 +92,7 @@ bool GLRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
   auto glProgram = static_cast<GLProgram*>(program.get());
   glProgram->activate();
   UpdateScissor(gl, scissorRect);
-  auto renderTexture = renderTarget->getRenderTexture();
+  auto renderTexture = descriptor.colorAttachments[0].texture;
   auto samplers = programInfo->getSamplers();
   int textureUnit = 0;
   bool requiresBarrier = false;
@@ -97,7 +106,7 @@ bool GLRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
     gl->textureBarrier();
   }
   auto uniformBuffer = glProgram->uniformBuffer();
-  programInfo->getUniforms(renderTarget.get(), uniformBuffer);
+  programInfo->getUniforms(uniformBuffer);
   glProgram->setUniformBytes(uniformBuffer->data(), uniformBuffer->size());
   return true;
 }
@@ -125,13 +134,6 @@ void GLRenderPass::onDraw(PrimitiveType primitiveType, size_t offset, size_t cou
     gl->drawArrays(gPrimitiveType[static_cast<int>(primitiveType)], static_cast<int>(offset),
                    static_cast<int>(count));
   }
-}
-
-void GLRenderPass::onClear(Color color) {
-  auto gl = interface->functions();
-  gl->disable(GL_SCISSOR_TEST);
-  gl->clearColor(color.red, color.green, color.blue, color.alpha);
-  gl->clear(GL_COLOR_BUFFER_BIT);
 }
 
 static int FilterToGLMagFilter(FilterMode filterMode) {

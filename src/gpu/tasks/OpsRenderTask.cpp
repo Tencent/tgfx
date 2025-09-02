@@ -29,12 +29,17 @@ void OpsRenderTask::execute(CommandEncoder* encoder) {
     LOGE("OpsRenderTask::execute() Render target is null!");
     return;
   }
-  auto renderPass = encoder->beginRenderPass(renderTarget, clearColor, true);
+  auto loadOp = clearColor.has_value() ? LoadAction::Clear : LoadAction::Load;
+  auto resolveTexture =
+      renderTarget->sampleCount() > 1 ? renderTarget->getSampleTexture() : nullptr;
+  RenderPassDescriptor descriptor(renderTarget->getRenderTexture(), loadOp, StoreAction::Store,
+                                  clearColor.value_or(Color::Transparent()), resolveTexture);
+  auto renderPass = encoder->beginRenderPass(descriptor);
   if (renderPass == nullptr) {
     LOGE("OpsRenderTask::execute() Failed to initialize the render pass!");
     return;
   }
-  for (auto& op : ops) {
+  for (auto& op : drawOps) {
     op->execute(renderPass.get(), renderTarget.get());
     // Release the Op immediately after execution to maximize GPU resource reuse.
     op = nullptr;
