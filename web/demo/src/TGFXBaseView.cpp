@@ -18,14 +18,14 @@
 
 #include "TGFXBaseView.h"
 #include <cmath>
-#include "drawers/Drawer.h"
+#include "hello2d/LayerBuilder.h"
 #include "tgfx/core/Point.h"
 
 using namespace emscripten;
 namespace hello2d {
 
 TGFXBaseView::TGFXBaseView(const std::string& canvasID) : canvasID(canvasID) {
-  appHost = std::make_shared<drawers::AppHost>();
+  appHost = std::make_shared<hello2d::AppHost>();
 }
 
 void TGFXBaseView::updateSize(float devicePixelRatio) {
@@ -58,7 +58,6 @@ void TGFXBaseView::onClickEvent() {
   appHost->markDirty();
 }
 
-
 bool TGFXBaseView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
   if (!appHost->isDirty()) {
     return false;
@@ -87,8 +86,8 @@ bool TGFXBaseView::draw(int drawIndex, float zoom, float offsetX, float offsetY)
   appHost->updateZoomAndOffset(zoom, tgfx::Point(offsetX, offsetY));
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto numDrawers = drawers::Drawer::Count();
-  auto index = (drawIndex % numDrawers);
+  auto numhello2d = hello2d::LayerBuilder::Count();
+  auto index = (drawIndex % numhello2d);
   appHost->draw(canvas, index);
   context->flushAndSubmit();
   window->present(context);
@@ -96,6 +95,7 @@ bool TGFXBaseView::draw(int drawIndex, float zoom, float offsetX, float offsetY)
 
   return true;
 }
+
 }  // namespace hello2d
 
 int main(int, const char*[]) {

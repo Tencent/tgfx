@@ -19,7 +19,9 @@
 #pragma once
 
 #include <emscripten/bind.h>
-#include "drawers/Drawer.h"
+#include "hello2d/AppHost.h"
+
+#include "hello2d/LayerBuilder.h"
 #include "tgfx/gpu/opengl/webgl/WebGLWindow.h"
 
 namespace hello2d {
@@ -39,7 +41,7 @@ class TGFXBaseView {
 
 
  protected:
-  std::shared_ptr<drawers::AppHost> appHost;
+  std::shared_ptr<hello2d::AppHost> appHost;
 
  private:
   std::string canvasID = "";
