@@ -141,7 +141,8 @@ std::shared_ptr<ImageCodec> Font::getImage(GlyphID glyphID, const Stroke* stroke
   }
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
-  return std::make_shared<GlyphRasterizer>(width, height, scalerContext, glyphID, hasFauxBold, stroke);
+  return std::make_shared<GlyphRasterizer>(width, height, scalerContext, glyphID, hasFauxBold,
+                                           stroke);
 }
 
 bool Font::operator==(const Font& font) const {

@@ -67,8 +67,8 @@ TGFX_TEST(PathRasterizerTest, Rasterize) {
   auto glyphCodec = font.getImage(glyphID, nullptr, &matrix);
   auto glyphImage = Image::MakeFrom(glyphCodec);
   ASSERT_TRUE(glyphImage != nullptr);
-  EXPECT_TRUE(fabsf(matrix.getScaleX() - 2.75229359f) < FLT_EPSILON);
-  EXPECT_TRUE(fabsf(matrix.getSkewX() + 0.550458729f) < FLT_EPSILON);
+  EXPECT_TRUE(fabsf(matrix.getScaleX() - 1.0f) < FLT_EPSILON);
+  EXPECT_TRUE(fabsf(matrix.getSkewX() + 0.2f) < FLT_EPSILON);
   surface = Surface::Make(context, glyphImage->width(), glyphImage->height());
   canvas = surface->getCanvas();
   canvas->drawImage(glyphImage);

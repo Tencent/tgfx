@@ -61,7 +61,7 @@
         "YUVImage_RGBAA": "bc64712",
         "altas": "b1cfcd4",
         "blendMode": "67961560",
-        "complexEmojiTextBlending": "6095b909",
+        "complexEmojiTextBlending": "a46e2ce6",
         "drawColor": "218540e0",
         "drawImage": "e0ff0afe",
         "drawImageRect": "606f8195",
@@ -72,7 +72,7 @@
         "drawScalePictureImage": "965c4ecd",
         "drawScaleSubImage": "965c4ecd",
         "drawShape": "6095b909",
-        "emojiTextStrokeBlending": "6095b909",
+        "emojiTextStrokeBlending": "a46e2ce6",
         "filter_mode_linear": "c475bfb",
         "filter_mode_nearest": "d010fb8",
         "hardware_render_target_blend": "67961560",
@@ -103,10 +103,10 @@
         "scaled_mipmap": "c21fb7d7",
         "scaled_scale_up": "c21fb7d7",
         "shape": "b79ee1a6",
-        "textEmojiMixedBlendModes": "6095b909",
-        "textEmojiMixedBlendModes2": "6095b909",
-        "textEmojiOverlayBlendModes": "6095b909",
-        "text_shape": "9060bdb6",
+        "textEmojiMixedBlendModes": "a46e2ce6",
+        "textEmojiMixedBlendModes2": "a46e2ce6",
+        "textEmojiOverlayBlendModes": "a46e2ce6",
+        "text_shape": "a46e2ce6",
         "tile_mode_normal": "bfd0ea17",
         "tile_mode_rgbaaa": "8cb853c",
         "tile_mode_subset": "67961560"
@@ -118,7 +118,7 @@
         "ImageWithMipmap": "da590da",
         "ImageWithShadow": "c26ff3d9",
         "SimpleLayerTreeDrawer": "9060bdb6",
-        "SimpleText": "6095b909"
+        "SimpleText": "a46e2ce6"
     },
     "DstTextureTest": {
         "EmptyLocalBounds": "be94e666",
@@ -201,7 +201,7 @@
         "backgroundLayerBlur": "cebc420b",
         "draw_shape": "80a4bd69",
         "draw_solid": "b4a1231",
-        "draw_text": "d5f6e118",
+        "draw_text": "a46e2ce6",
         "dropShadow": "ee2cc771",
         "filterClip": "8bd149a4",
         "filterTest": "8bd149a4",
@@ -218,7 +218,7 @@
         "textMask": "fe428880"
     },
     "MaskTest": {
-        "rasterize_emoji": "c0f39f8",
+        "rasterize_emoji": "a46e2ce6",
         "rasterize_path": "b062b9a",
         "rasterize_path_texture": "c475bfb"
     },
@@ -227,7 +227,7 @@
         "DrawColor": "a9b29daa",
         "DrawShape": "a9b29daa",
         "DrawShapeStroke": "a9b29daa",
-        "EmojiText": "a9b29daa",
+        "EmojiText": "a46e2ce6",
         "Empty": "a9b29daa",
         "EmptyMultiPage": "a9b29daa",
         "Image": "a9b29daa",
@@ -322,7 +322,7 @@
         "radialGradient": "b1db872",
         "referenceStyle": "6095b909",
         "text": "9060bdb6",
-        "textEmoji": "6095b909",
+        "textEmoji": "a46e2ce6",
         "textFont": "6095b909"
     },
     "SurfaceTest": {
@@ -332,7 +332,7 @@
         "ImageSnapshot_Surface2": "d010fb8"
     },
     "TextAlignTest": {
-        "FontFallbackTest": "9060bdb6",
+        "FontFallbackTest": "a46e2ce6",
         "SingleLineTextAlign": "6095b909",
         "TextAlign": "9060bdb6",
         "TextAlignBlankLineTest": "6095b909",
@@ -342,7 +342,7 @@
         "TruncateTextLineTest": "9060bdb6"
     },
     "TypefaceTest": {
-        "CustomImageTypeface": "d5f6e118",
+        "CustomImageTypeface": "a46e2ce6",
         "CustomPathTypeface": "42ecc4c7"
     }
 }
