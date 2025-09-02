@@ -670,10 +670,12 @@ void Canvas::drawFill(const MCState& state, const Fill& fill) const {
     return;
   }
   auto clipFill = fill.makeWithMatrix(state.matrix);
-  clipFill.antiAlias = state.clip.forceAntiAlias;
   if (clip.isEmpty()) {
     drawContext->drawFill(clipFill);
   } else {
+    // Inherit the anti-aliasing property of the clipping region when the filled area is the
+    // clipping region.
+    clipFill.antiAlias = state.clip.forceAntiAlias;
     drawPath(clip.path, {}, clipFill, nullptr);
   }
 }

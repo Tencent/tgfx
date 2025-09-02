@@ -818,7 +818,12 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
     canvas->clipRect(drawRect);
   }
   if (autoClear) {
+    // Forcibly disable anti-aliasing for the clipping region to avoid causing black edges due to
+    // modifications of pixels outside the clipping region.
+    const bool oldAntialias = canvas->getForceClipAntialias();
+    canvas->setForceClipAntialias(false);
     canvas->clear();
+    canvas->setForceClipAntialias(oldAntialias);
   }
   canvas->setMatrix(viewMatrix);
   DrawArgs args(context);

@@ -49,7 +49,7 @@ class Clip {
 
   Path path = {};
 
-  bool forceAntiAlias = false;
+  bool forceAntiAlias = true;
 };
 
 class MCState {

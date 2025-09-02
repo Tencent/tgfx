@@ -111,13 +111,14 @@ TGFX_TEST(CanvasTest, clipAntiAlias) {
     path.moveTo(0, 0);
     path.lineTo(100, 0);
     path.lineTo(50, 100);
-    path.lineTo(100, 100);
+    path.lineTo(100, 200);
     path.lineTo(0, 200);
     path.close();
     canvas->clipPath(path);
+    canvas->setForceClipAntialias(false);
     const Rect drawRect = Rect::MakeXYWH(20, 20, 180, 180);
     Paint paint;
-    paint.setColor(Color::Red());
+    paint.setColor(Color::Blue());
     canvas->drawRect(drawRect, paint);
   }
 

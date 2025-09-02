@@ -217,7 +217,7 @@ class Canvas {
 
   /**
    * Set whether anti-aliasing should be forcibly enabled on the edges of the clipping region,
-   * disabled by default. If the Surface supports multisampling, anti-aliasing will be automatically
+   * enabled by default. If the Surface supports multisampling, anti-aliasing will be automatically
    * enabled on the edges of the clipping region. Set this value to true if you need to forcibly
    * enable anti-aliasing when multisampling is not enabled.
    */
