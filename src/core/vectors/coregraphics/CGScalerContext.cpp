@@ -216,7 +216,7 @@ bool CGScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItal
   return true;
 }
 
-bool CGScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
+bool CGScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*,
                                  const ImageInfo& dstInfo, void* dstPixels) const {
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
