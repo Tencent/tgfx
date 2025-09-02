@@ -59,11 +59,10 @@ class ScalerContext {
 
   virtual bool generatePath(GlyphID glyphID, bool fauxBold, bool fauxItalic, Path* path) const = 0;
 
-  virtual Rect getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
-                                 Matrix* matrix) const = 0;
-
   virtual bool readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
                           const ImageInfo& dstInfo, void* dstPixels) const = 0;
+
+  virtual bool imageValid(const Stroke* stroke, bool fauxBold) const = 0;
 
  protected:
   // Note: This could be nullptr.

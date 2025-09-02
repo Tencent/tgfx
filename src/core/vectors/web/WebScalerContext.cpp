@@ -53,22 +53,6 @@ bool WebScalerContext::generatePath(GlyphID, bool, bool, Path*) const {
   return false;
 }
 
-Rect WebScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
-                                         Matrix* matrix) const {
-  auto bounds =
-      scalerContext.call<Rect>("getBounds", getText(glyphID), !hasColor() && fauxBold, false);
-  if (bounds.isEmpty()) {
-    return {};
-  }
-  if (!hasColor() && stroke != nullptr) {
-    ApplyStrokeToBounds(*stroke, &bounds);
-  }
-  if (matrix) {
-    matrix->setTranslate(bounds.left, bounds.top);
-  }
-  return bounds;
-}
-
 bool WebScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
                                   const ImageInfo& dstInfo, void* dstPixels) const {
   if (dstInfo.isEmpty() || dstPixels == nullptr) {

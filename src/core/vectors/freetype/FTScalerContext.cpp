@@ -29,7 +29,8 @@
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
 #include "skcms.h"
-#include "tgfx/core/Pixmap.h"
+#define STB_IMAGE_RESIZE2_IMPLEMENTATION
+#include "stb_image_resize2.h"
 
 namespace tgfx {
 //  See http://freetype.sourceforge.net/freetype2/docs/reference/ft2-bitmap_handling.html#FT_Bitmap_Embolden
@@ -580,34 +581,34 @@ static gfx::skcms_PixelFormat ToPixelFormat(ColorType colorType) {
   }
 }
 
-Rect FTScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
-                                        Matrix* matrix) const {
-  if (!hasColor() && stroke != nullptr) {
-    return {};
+static stbir_pixel_layout ToPixelLayout(ColorType colorType) {
+  switch (colorType) {
+    case ColorType::ALPHA_8:
+      return STBIR_1CHANNEL;
+    case ColorType::BGRA_8888:
+      return STBIR_BGRA_PM;
+    default:
+      return STBIR_RGBA_PM;
   }
-  if (!hasColor()) {
-    const auto bounds = getBounds(glyphID, fauxBold, false);
-    if (matrix) {
-      matrix->setTranslate(bounds.x(), bounds.y());
-    }
-    return bounds;
-  }
+}
 
-  std::lock_guard<std::mutex> autoLock(ftTypeface()->locker);
-  auto glyphFlags = loadGlyphFlags | static_cast<FT_Int32>(FT_LOAD_BITMAP_METRICS_ONLY);
-  glyphFlags &= ~FT_LOAD_NO_BITMAP;
-  if (!loadBitmapGlyph(glyphID, glyphFlags)) {
-    return {};
+void TransformColorFormat(const uint8_t* src, int width, int height, int srcRB,
+                          gfx::skcms_PixelFormat srcFormat, uint8_t* dst, int dstRB,
+                          gfx::skcms_PixelFormat dstFormat) {
+  for (auto i = 0; i < height; i++) {
+    gfx::skcms_Transform(src, srcFormat, gfx::skcms_AlphaFormat_PremulAsEncoded, nullptr, dst,
+                         dstFormat, gfx::skcms_AlphaFormat_PremulAsEncoded, nullptr,
+                         static_cast<size_t>(width));
+    src += srcRB;
+    dst += dstRB;
   }
-  auto face = ftTypeface()->face;
-  if (matrix) {
-    matrix->setTranslate(static_cast<float>(face->glyph->bitmap_left),
-                         -static_cast<float>(face->glyph->bitmap_top));
-    matrix->postScale(extraScale.x, extraScale.y);
-  }
-  return Rect::MakeXYWH(
-      static_cast<float>(face->glyph->bitmap_left), -static_cast<float>(face->glyph->bitmap_top),
-      static_cast<float>(face->glyph->bitmap.width), static_cast<float>(face->glyph->bitmap.rows));
+}
+
+void ScaleImage(const uint8_t* src, int srcWidth, int srcHeight, int srcRB, uint8_t* dst,
+                int dstWidth, int dstHeight, int dstRB, ColorType colorType) {
+  auto pixelLayout = ToPixelLayout(colorType);
+  stbir_resize_uint8_linear(src, srcWidth, srcHeight, srcRB, dst, dstWidth, dstHeight, dstRB,
+                            pixelLayout);
 }
 
 bool FTScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*,
@@ -635,23 +636,43 @@ bool FTScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*,
     return false;
   }
   auto ftBitmap = ftTypeface()->face->glyph->bitmap;
-  auto width = ftBitmap.width;
-  auto height = ftBitmap.rows;
+  auto width = static_cast<int>(ftBitmap.width);
+  auto height = static_cast<int>(ftBitmap.rows);
   auto src = reinterpret_cast<const uint8_t*>(ftBitmap.buffer);
   // FT_Bitmap::pitch is an int and allowed to be negative.
   auto srcRB = ftBitmap.pitch;
   auto srcFormat = ftBitmap.pixel_mode == FT_PIXEL_MODE_GRAY ? gfx::skcms_PixelFormat_A_8
                                                              : gfx::skcms_PixelFormat_BGRA_8888;
-
   auto dst = static_cast<uint8_t*>(dstPixels);
-  auto dstRB = dstInfo.rowBytes();
+  auto dstRB = static_cast<int>(dstInfo.rowBytes());
   auto dstFormat = ToPixelFormat(dstInfo.colorType());
-  for (size_t i = 0; i < height; i++) {
-    gfx::skcms_Transform(src, srcFormat, gfx::skcms_AlphaFormat_PremulAsEncoded, nullptr, dst,
-                         dstFormat, gfx::skcms_AlphaFormat_PremulAsEncoded, nullptr, width);
-    src += srcRB;
-    dst += dstRB;
+  if (width == dstInfo.width() && height == dstInfo.height()) {
+    TransformColorFormat(src, width, height, srcRB, srcFormat, dst, dstRB, dstFormat);
+    return true;
   }
+
+  auto zoomOut = width * height > dstInfo.width() * dstInfo.height();
+  auto scaleRB = zoomOut ? dstRB : srcRB;
+  auto scaleHeight = zoomOut ? dstInfo.height() : height;
+  auto pixelSize = static_cast<size_t>(scaleRB * scaleHeight);
+  auto scalePixels = new (std::nothrow) uint8_t[pixelSize];
+  if (scalePixels == nullptr) {
+    return false;
+  }
+
+  if (zoomOut) {
+
+    ScaleImage(src, width, height, srcRB, scalePixels, dstInfo.width(), dstInfo.height(), scaleRB,
+               dstInfo.colorType());
+
+    TransformColorFormat(scalePixels, dstInfo.width(), dstInfo.height(), scaleRB, srcFormat, dst,
+                         dstRB, dstFormat);
+  } else {
+    TransformColorFormat(src, width, height, srcRB, srcFormat, scalePixels, scaleRB, dstFormat);
+    ScaleImage(scalePixels, width, height, srcRB, dst, dstInfo.width(), dstInfo.height(), dstRB,
+               dstInfo.colorType());
+  }
+  delete[] scalePixels;
   return true;
 }
 
@@ -698,4 +719,12 @@ bool FTScalerContext::loadOutlineGlyph(FT_Face face, GlyphID glyphID, bool fauxB
   }
   return true;
 }
+
+bool FTScalerContext::imageValid(const Stroke* stroke, bool) const {
+  if (hasColor()) {
+    return true;
+  }
+  return stroke == nullptr;
+}
+
 }  // namespace tgfx

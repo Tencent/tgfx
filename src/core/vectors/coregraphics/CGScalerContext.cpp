@@ -83,7 +83,7 @@ Rect CGScalerContext::getBounds(GlyphID glyphID, bool fauxBold, bool fauxItalic)
                                static_cast<float>(cgBounds.size.width),
                                static_cast<float>(cgBounds.size.height));
 
-  if (fauxBold) {
+  if (!hasColor() && fauxBold) {
     auto fauxBoldSize = textSize * fauxBoldScale;
     bounds.outset(fauxBoldSize, fauxBoldSize);
   }
@@ -216,35 +216,12 @@ bool CGScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItal
   return true;
 }
 
-Rect CGScalerContext::getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
-                                        Matrix* matrix) const {
-  if (!hasColor() && (stroke != nullptr || fauxBold)) {
-    return {};
-  }
-
-  CGRect cgBounds;
-  CTFontGetBoundingRectsForGlyphs(ctFont, kCTFontOrientationHorizontal, &glyphID, &cgBounds, 1);
-  if (CGRectIsEmpty(cgBounds)) {
-    return {};
-  }
-  // Convert cgBounds to Glyph units (pixels, y down).
-  auto bounds = Rect::MakeXYWH(static_cast<float>(cgBounds.origin.x),
-                               static_cast<float>(-cgBounds.origin.y - cgBounds.size.height),
-                               static_cast<float>(cgBounds.size.width),
-                               static_cast<float>(cgBounds.size.height));
-  bounds.roundOut();
-  if (matrix) {
-    matrix->setTranslate(bounds.left, bounds.top);
-  }
-  return bounds;
-}
-
 bool CGScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
                                  const ImageInfo& dstInfo, void* dstPixels) const {
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }
-  auto bounds = getImageTransform(glyphID, fauxBold, stroke, nullptr);
+  auto bounds = getBounds(glyphID, fauxBold, false);
   auto width = static_cast<int>(bounds.width());
   auto height = static_cast<int>(bounds.height());
   if (width <= 0 || height <= 0) {
@@ -263,5 +240,11 @@ bool CGScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke* s
   CTFontDrawGlyphs(ctFont, &glyphID, &point, 1, cgContext);
   CGContextRelease(cgContext);
   return true;
+}
+bool CGScalerContext::imageValid(const Stroke* stroke, bool fauxBold) const {
+  if (hasColor()) {
+    return true;
+  }
+  return stroke == nullptr && !fauxBold;
 }
 }  // namespace tgfx

@@ -89,6 +89,11 @@
         "url": "https://github.com/lz4/lz4.git",
         "commit": "cacca37747572717ceb1f156eb9840644205ca4f",
         "dir": "third_party/lz4"
+      },
+      {
+        "url": "https://github.com/nothings/stb.git",
+        "commit": "f58f558c120e9b32c217290b80bad1a0729fbb2c",
+        "dir": "third_party/stb"
       }
     ]
   },

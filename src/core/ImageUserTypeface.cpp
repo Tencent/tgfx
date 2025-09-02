@@ -48,20 +48,6 @@ class ImageUserScalerContext final : public UserScalerContext {
     return false;
   }
 
-  Rect getImageTransform(GlyphID glyphID, bool, const Stroke*, Matrix* matrix) const override {
-    auto record = imageTypeface()->getGlyphRecord(glyphID);
-    if (record == nullptr || record->image == nullptr) {
-      return {};
-    }
-    if (matrix) {
-      matrix->setTranslate(record->offset.x, record->offset.y);
-      matrix->postScale(textSize, textSize);
-    }
-    return Rect::MakeXYWH(record->offset.x, record->offset.y,
-                          static_cast<float>(record->image->width()),
-                          static_cast<float>(record->image->height()));
-  }
-
   bool readPixels(GlyphID glyphID, bool, const Stroke*, const ImageInfo& dstInfo,
                   void* dstPixels) const override {
     if (dstInfo.isEmpty() || dstPixels == nullptr) {
@@ -72,6 +58,10 @@ class ImageUserScalerContext final : public UserScalerContext {
       return false;
     }
     return record->image->readPixels(dstInfo, dstPixels);
+  }
+
+  bool imageValid(const Stroke*, bool) const override {
+    return true;
   }
 
  private:

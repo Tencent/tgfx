@@ -81,24 +81,6 @@ class PathUserScalerContext final : public UserScalerContext {
     return true;
   }
 
-  Rect getImageTransform(GlyphID glyphID, bool fauxBold, const Stroke* stroke,
-                         Matrix* matrix) const override {
-    if (pathTypeFace()->getPathProvider(glyphID) == nullptr) {
-      return {};
-    }
-    auto bounds = getBounds(glyphID, fauxBold, false);
-    if (bounds.isEmpty()) {
-      return {};
-    }
-    if (stroke != nullptr) {
-      ApplyStrokeToBounds(*stroke, &bounds);
-    }
-    if (matrix) {
-      matrix->setTranslate(bounds.x(), bounds.y());
-    }
-    return bounds;
-  }
-
   bool readPixels(GlyphID glyphID, bool fauxBold, const Stroke* stroke, const ImageInfo& dstInfo,
                   void* dstPixels) const override {
     if (dstInfo.isEmpty() || dstPixels == nullptr || dstInfo.colorType() != ColorType::ALPHA_8) {
@@ -108,8 +90,13 @@ class PathUserScalerContext final : public UserScalerContext {
     if (pathProvider == nullptr) {
       return false;
     }
-    auto bounds = getImageTransform(glyphID, fauxBold, stroke, nullptr);
-    bounds.roundOut();
+    auto bounds = getBounds(glyphID, fauxBold, false);
+    if (bounds.isEmpty()) {
+      return false;
+    }
+    if (stroke != nullptr) {
+      ApplyStrokeToBounds(*stroke, &bounds);
+    }
     auto width = static_cast<int>(bounds.width());
     auto height = static_cast<int>(bounds.height());
     if (width <= 0 || height <= 0) {
@@ -131,6 +118,10 @@ class PathUserScalerContext final : public UserScalerContext {
       return false;
     }
     rasterizer->readPixels(dstInfo, dstPixels);
+    return true;
+  }
+
+  bool imageValid(const Stroke*, bool) const override {
     return true;
   }
 

@@ -20,6 +20,7 @@
 #include "ScalerContext.h"
 #include "core/GlyphRasterizer.h"
 #include "core/PixelBuffer.h"
+#include "core/utils/ApplyStrokeToBounds.h"
 
 namespace tgfx {
 Font::Font() : scalerContext(ScalerContext::MakeEmpty(0.0f)) {
@@ -120,17 +121,27 @@ std::shared_ptr<ImageCodec> Font::getImage(GlyphID glyphID, const Stroke* stroke
   if (glyphID == 0) {
     return nullptr;
   }
-
-  auto bounds = scalerContext->getImageTransform(glyphID, fauxBold, stroke, matrix);
+  auto hasFauxBold = !hasColor() && isFauxBold();
+  if (!scalerContext->imageValid(stroke, hasFauxBold)) {
+    return nullptr;
+  }
+  auto hasStroke = !hasColor() && stroke != nullptr;
+  auto bounds = scalerContext->getBounds(glyphID, hasFauxBold, false);
   if (bounds.isEmpty()) {
     return nullptr;
   }
-  if (matrix && fauxItalic) {
-    matrix->postSkew(ITALIC_SKEW, 0);
+  if (hasStroke) {
+    ApplyStrokeToBounds(*stroke, &bounds);
+  }
+  if (matrix) {
+    matrix->setTranslate(bounds.x(), bounds.y());
+    if (fauxItalic) {
+      matrix->postSkew(ITALIC_SKEW, 0);
+    }
   }
   auto width = static_cast<int>(ceilf(bounds.width()));
   auto height = static_cast<int>(ceilf(bounds.height()));
-  return std::make_shared<GlyphRasterizer>(width, height, scalerContext, glyphID, fauxBold, stroke);
+  return std::make_shared<GlyphRasterizer>(width, height, scalerContext, glyphID, hasFauxBold, stroke);
 }
 
 bool Font::operator==(const Font& font) const {
