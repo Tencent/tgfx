@@ -36,7 +36,30 @@
 #define ATTRIBUTE_NAME_ENUM(name, value, type)                                      \
   tgfx::inspect::FrameCapture::SendAttributeData(name, static_cast<uint8_t>(value), \
                                                  static_cast<uint8_t>(type))
+
 #define ATTRIBUTE_ENUM(value, type) ATTRIBUTE_NAME_ENUM(#value, value, type)
+
+#define CAPUTRE_PIXELS_DATA(texturePtr, width, height, rowBytes, format, pixels)               \
+  auto frameCapture = inspect::FrameCaptureTexture::MakeFrom(texture, width, height, rowBytes, \
+                                                             pixelFormat, pixels);             \
+  tgfx::inspect::FrameCapture::SendFrameCaptureTexture(frameCapture, false);
+
+#define CAPUTRE_TEXTURE(commandQueue, texture)                                                  \
+  auto frameCapture = inspect::FrameCaptureTexture::MakeFrom(textureView->getTexture(), queue); \
+  tgfx::inspect::FrameCapture::SendFrameCaptureTexture(frameCapture, false);
+
+#define CAPUTRE_RENDER_TARGET(renderTarget)                                              \
+  if (inspect::FrameCapture::CurrentFrameShouldCaptrue()) {                              \
+    auto frameCapture = inspect::FrameCaptureTexture::MakeFrom(renderTarget);            \
+    tgfx::inspect::FrameCapture::SendFrameCaptureTexture(std::move(frameCapture), true); \
+    tgfx::inspect::FrameCapture::SendOutputTextureID(renderTarget->getRenderTexture());  \
+  }
+
+#define CAPUTRE_FRARGMENT_PROCESSORS(fragmentProcessors) \
+  tgfx::inspect::FrameCapture::SendFragmentProcessor(fragmentProcessors)
+
+#define SEND_OUTPUT_TEXUTRE_ID(texturePtr) \
+  tgfx::inspect::FrameCapture::SendOutputTextureID(texturePtr)
 
 #else
 
@@ -52,5 +75,10 @@
 #define ATTRIBUTE_NAME(name, value)
 #define ATTRIBUTE_NAME_ENUM(name, value, type)
 #define ATTRIBUTE_ENUM(value, type)
+#define CAPUTRE_PIXELS_DATA(texturePtr, width, height, rowBytes, format, pixels)
+#define CAPUTRE_TEXTURE(commandQueue, texturePtr)
+#define CAPUTRE_FRARGMENT_PROCESSORS(pipline)
+#define SEND_OUTPUT_TEXUTRE_ID(texturePtr)
+#define CAPUTRE_RENDER_TARGET(renderTarget)
 
 #endif

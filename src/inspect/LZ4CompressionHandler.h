@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,22 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "DrawOp.h"
-#include "inspect/InspectorMark.h"
+#pragma once
+#include <memory>
 
-namespace tgfx {
-PlacementPtr<ProgramInfo> DrawOp::createProgramInfo(
-    RenderTarget* renderTarget, PlacementPtr<GeometryProcessor> geometryProcessor) {
-  auto numColorProcessors = colors.size();
-  auto fragmentProcessors = std::move(colors);
-  fragmentProcessors.reserve(numColorProcessors + coverages.size());
-  for (auto& coverage : coverages) {
-    fragmentProcessors.emplace_back(std::move(coverage));
-  }
-  CAPUTRE_FRARGMENT_PROCESSORS(fragmentProcessors);
-  auto context = renderTarget->getContext();
-  return context->drawingBuffer()->make<ProgramInfo>(
-      renderTarget, std::move(geometryProcessor), std::move(fragmentProcessors), numColorProcessors,
-      std::move(xferProcessor), blendMode);
-}
-}  // namespace tgfx
+namespace tgfx::inspect {
+class LZ4CompressionHandler {
+ public:
+  static std::unique_ptr<LZ4CompressionHandler> Make();
+
+  static size_t GetMaxOutputSize(size_t inputSize);
+
+  virtual ~LZ4CompressionHandler() = default;
+
+  virtual size_t encode(uint8_t* dstBuffer, size_t dstSize, const uint8_t* srcBuffer,
+                        size_t srcSize) const = 0;
+
+  virtual void reset() = 0;
+};
+}  // namespace tgfx::inspect

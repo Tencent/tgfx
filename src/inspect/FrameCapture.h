@@ -23,9 +23,15 @@
 #include <thread>
 #include <vector>
 #include "FrameCaptureMessage.h"
+#include "FrameCaptureTexture.h"
+#include "LZ4CompressionHandler.h"
 #include "Protocol.h"
 #include "Socket.h"
 #include "concurrentqueue.h"
+#include "gpu/CommandQueue.h"
+#include "gpu/GPUTexture.h"
+#include "gpu/ProgramInfo.h"
+#include "gpu/processors/FragmentProcessor.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Clock.h"
 #include "tgfx/core/Color.h"
@@ -43,7 +49,7 @@
 namespace tgfx::inspect {
 class FrameCapture {
  public:
-  static FrameCapture& GetInspector() {
+  static FrameCapture& GetInstance() {
     static FrameCapture inspector;
     return inspector;
   }
@@ -51,6 +57,10 @@ class FrameCapture {
   FrameCapture();
 
   ~FrameCapture();
+
+  static bool CurrentFrameShouldCaptrue();
+
+  static uint64_t NextTextureID();
 
   static void QueueSerialFinish(const FrameCaptureMessageItem& item);
 
@@ -80,6 +90,16 @@ class FrameCapture {
 
   static void SendAttributeData(const char* name, float* val, int size);
 
+  static void SendInputTextureID(const GPUTexture* texture);
+
+  static void SendOutputTextureID(const GPUTexture* texture);
+
+  static void SendFragmentProcessor(
+      const std::vector<PlacementPtr<FragmentProcessor>>& programInfo);
+
+  static void SendFrameCaptureTexture(std::shared_ptr<FrameCaptureTexture> frameCaptureTexture,
+                                      bool differentEachFrame);
+
  protected:
   enum class DequeueStatus { DataDequeued, ConnectionLost, QueueEmpty };
 
@@ -87,9 +107,19 @@ class FrameCapture {
 
   static void LaunchWorker(FrameCapture* inspector);
 
+  static void LaunchEncodeWorker(FrameCapture* inspector) {
+    inspector->encodeWorker();
+  }
+
   static bool ShouldExit();
 
+  static void SendTextureID(uint64_t texturePtr, FrameCaptureMessageType type);
+
+  static uint64_t GetTextureHash(uint64_t texturePtr, uint64_t currentFrame = 0);
+
   void worker();
+
+  void encodeWorker();
 
   void spawnWorkerThreads();
 
@@ -105,13 +135,17 @@ class FrameCapture {
 
   bool commitData();
 
-  bool sendData(const char* data, size_t len);
+  bool sendData(const uint8_t* data, size_t len);
 
   void sendString(uint64_t str, const char* ptr, FrameCaptureMessageType type);
 
   void sendString(uint64_t str, const char* ptr, size_t len, FrameCaptureMessageType type);
 
+  void sendPixelsData(uint64_t str, const char* pixels, size_t len, FrameCaptureMessageType type);
+
   bool confirmProtocol();
+
+  uint64_t getTextureId(uint64_t texturePtr);
 
   DequeueStatus dequeueSerial();
 
@@ -120,7 +154,7 @@ class FrameCapture {
   int64_t initTime = 0;
   Buffer dataBuffer = {};
   Buffer lz4Buf = {};
-  void* lz4Stream = nullptr;
+  std::unique_ptr<LZ4CompressionHandler> lz4Handler = nullptr;
   std::atomic<bool> shutdown = false;
   std::atomic<int64_t> timeBegin = 0;
   std::atomic<uint64_t> frameCount = 0;
@@ -128,11 +162,16 @@ class FrameCapture {
   std::shared_ptr<Socket> sock = nullptr;
   int64_t refTimeThread = 0;
   moodycamel::ConcurrentQueue<FrameCaptureMessageItem> serialConcurrentQueue;
+  moodycamel::ConcurrentQueue<std::shared_ptr<FrameCaptureTexture>> imageQueue;
   std::unique_ptr<std::thread> messageThread = nullptr;
+  std::unique_ptr<std::thread> decodeThread = nullptr;
   std::vector<std::shared_ptr<UDPBroadcast>> broadcast = {};
   const char* programName = nullptr;
   std::mutex programNameLock;
   int dataBufferOffset = 0;
   int dataBufferStart = 0;
+  uint32_t captureFrameCount = 0;
+  std::atomic<bool> currentFrameShouldCaptrue = false;
+  std::unordered_map<uint64_t, uint64_t> textureIds = {};
 };
 }  // namespace tgfx::inspect
