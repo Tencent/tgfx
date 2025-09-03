@@ -110,8 +110,8 @@ class UniformBuffer {
   std::string nameSuffix = "";
   size_t _vertexUniformBufferSize = 0;
   size_t _fragmentUniformBufferSize = 0;
-  std::shared_ptr<UniformBufferLayout> vertexUniformBufferLayout = nullptr;
-  std::shared_ptr<UniformBufferLayout> fragmentUniformBufferLayout = nullptr;
+  std::unique_ptr<UniformBufferLayout> vertexUniformBufferLayout = nullptr;
+  std::unique_ptr<UniformBufferLayout> fragmentUniformBufferLayout = nullptr;
   bool _uboSupport = false;
 
   UniformBuffer(const std::vector<Uniform>& vertexUniforms,

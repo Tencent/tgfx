@@ -53,11 +53,6 @@ class UniformBufferLayout final {
   const Field* findField(const std::string& key) const;
 
   /**
-   * Returns the number of fields in UniformBuffer.
-   */
-  size_t size() const;
-
-  /**
    * Dump UniformBuffer's memory layout information is printed to the console for debugging.
    */
 #if DEBUG

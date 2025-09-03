@@ -56,10 +56,6 @@ const UniformBufferLayout::Field* UniformBufferLayout::findField(const std::stri
   return nullptr;
 }
 
-size_t UniformBufferLayout::size() const {
-  return fieldMap.size();
-}
-
 #if DEBUG
 void UniformBufferLayout::dump() const {
   LOGI("\n-------------- Std140Layout dump begin --------------");
