@@ -592,23 +592,23 @@ static stbir_pixel_layout ToPixelLayout(ColorType colorType) {
   }
 }
 
-void TransformColorFormat(const uint8_t* src, int width, int height, int srcRB,
-                          gfx::skcms_PixelFormat srcFormat, uint8_t* dst, int dstRB,
+void TransformColorFormat(const uint8_t* src, int width, int height, int srcRowBytes,
+                          gfx::skcms_PixelFormat srcFormat, uint8_t* dst, int dstRowBytes,
                           gfx::skcms_PixelFormat dstFormat) {
   for (auto i = 0; i < height; i++) {
     gfx::skcms_Transform(src, srcFormat, gfx::skcms_AlphaFormat_PremulAsEncoded, nullptr, dst,
                          dstFormat, gfx::skcms_AlphaFormat_PremulAsEncoded, nullptr,
                          static_cast<size_t>(width));
-    src += srcRB;
-    dst += dstRB;
+    src += srcRowBytes;
+    dst += dstRowBytes;
   }
 }
 
-void ScaleImage(const uint8_t* src, int srcWidth, int srcHeight, int srcRB, uint8_t* dst,
-                int dstWidth, int dstHeight, int dstRB, ColorType colorType) {
+void ScaleImage(const uint8_t* src, int srcWidth, int srcHeight, int srcRowBytes, uint8_t* dst,
+                int dstWidth, int dstHeight, int dstRowBytes, ColorType colorType) {
   auto pixelLayout = ToPixelLayout(colorType);
-  stbir_resize_uint8_linear(src, srcWidth, srcHeight, srcRB, dst, dstWidth, dstHeight, dstRB,
-                            pixelLayout);
+  stbir_resize_uint8_linear(src, srcWidth, srcHeight, srcRowBytes, dst, dstWidth, dstHeight,
+                            dstRowBytes, pixelLayout);
 }
 
 bool FTScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*,
@@ -661,10 +661,8 @@ bool FTScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*,
   }
 
   if (zoomOut) {
-
     ScaleImage(src, width, height, srcRB, scalePixels, dstInfo.width(), dstInfo.height(), scaleRB,
                dstInfo.colorType());
-
     TransformColorFormat(scalePixels, dstInfo.width(), dstInfo.height(), scaleRB, srcFormat, dst,
                          dstRB, dstFormat);
   } else {
