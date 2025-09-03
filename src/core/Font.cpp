@@ -125,15 +125,14 @@ std::shared_ptr<ImageCodec> Font::getImage(GlyphID glyphID, const Stroke* stroke
   if (!scalerContext->imageValid(stroke, hasFauxBold)) {
     return nullptr;
   }
-  auto hasStroke = !hasColor() && stroke != nullptr;
   auto bounds = scalerContext->getBounds(glyphID, hasFauxBold, false);
   if (bounds.isEmpty()) {
     return nullptr;
   }
-  if (hasStroke) {
+  if (stroke != nullptr && !hasColor()) {
     ApplyStrokeToBounds(*stroke, &bounds);
   }
-  if (matrix) {
+  if (matrix != nullptr) {
     matrix->setTranslate(bounds.x(), bounds.y());
     if (fauxItalic) {
       matrix->postSkew(ITALIC_SKEW, 0);
