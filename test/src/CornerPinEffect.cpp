@@ -16,14 +16,14 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <string>
 #include "CornerPinEffect.h"
 
 namespace tgfx {
-static const char CORNER_PIN_VERTEX_SHADER[] = R"(
-        #version 100
-        attribute vec2 aPosition;
-        attribute vec3 aTextureCoord;
-        varying vec3 vertexColor;
+static constexpr char CORNER_PIN_VERTEX_SHADER[] = R"(
+        in vec2 aPosition;
+        in vec3 aTextureCoord;
+        out vec3 vertexColor;
         void main() {
             vec3 position = vec3(aPosition, 1);
             gl_Position = vec4(position.xy, 0, 1);
@@ -31,15 +31,23 @@ static const char CORNER_PIN_VERTEX_SHADER[] = R"(
         }
     )";
 
-static const char CORNER_PIN_FRAGMENT_SHADER[] = R"(
-        #version 100
+static constexpr char CORNER_PIN_FRAGMENT_SHADER[] = R"(
         precision mediump float;
-        varying vec3 vertexColor;
+        in vec3 vertexColor;
         uniform sampler2D sTexture;
+        out vec4 tgfx_FragColor;
         void main() {
-            gl_FragColor = texture2D(sTexture, vertexColor.xy / vertexColor.z);
+            tgfx_FragColor = texture(sTexture, vertexColor.xy / vertexColor.z);
         }
     )";
+
+static std::string GetFinalShaderCode(const char* codeSnippet, bool isDesktop) {
+  if (isDesktop) {
+    return std::string("#version 140\n\n") + codeSnippet;
+  } else {
+    return std::string("#version 300 es\n\n") + codeSnippet;
+  }
+}
 
 std::shared_ptr<CornerPinEffect> CornerPinEffect::Make(const Point& upperLeft,
                                                        const Point& upperRight,
@@ -74,8 +82,10 @@ std::unique_ptr<RuntimeProgram> CornerPinEffect::onCreateProgram(Context* contex
   // Clear the previously generated GLError, causing the subsequent CheckGLError to return an
   // incorrect result.
   ClearGLError(gl);
+  const auto* caps = GLCaps::Get(context);
+  const auto isDesktop = caps->standard == GLStandard::GL;
   auto filterProgram =
-      FilterProgram::Make(context, CORNER_PIN_VERTEX_SHADER, CORNER_PIN_FRAGMENT_SHADER);
+      FilterProgram::Make(context, GetFinalShaderCode(CORNER_PIN_VERTEX_SHADER, isDesktop), GetFinalShaderCode(CORNER_PIN_FRAGMENT_SHADER, isDesktop));
   if (filterProgram == nullptr) {
     return nullptr;
   }

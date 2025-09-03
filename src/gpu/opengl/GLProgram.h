@@ -37,7 +37,9 @@ class GLProgram : public Program {
   /**
    * Sets the uniform data to be used in subsequent draw calls.
    */
-  void setUniformBytes(const void* data, size_t size);
+  void setUniformBytes();
+
+  void setUniformBuffer() const;
 
   /**
    * Binds the vertex buffer to be used in subsequent draw calls. The vertexOffset is the offset
@@ -61,5 +63,9 @@ class GLProgram : public Program {
   std::vector<int> uniformLocations = {};
   int vertexStride = 0;
   std::unique_ptr<BlendFormula> blendFormula = nullptr;
+  unsigned int vertexUBO = 0;
+  unsigned int fragmentUBO = 0;
+  unsigned int vertexUniformBlockIndex = 0;
+  unsigned int fragmentUniformBlockIndex = 0;
 };
 }  // namespace tgfx

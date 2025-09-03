@@ -20,46 +20,69 @@
 #include "core/utils/Log.h"
 
 namespace tgfx {
-UniformBuffer::UniformBuffer(std::vector<Uniform> uniforms,
-                             std::unordered_map<std::string, size_t> uniformMap)
-    : _uniforms(std::move(uniforms)), uniformMap(std::move(uniformMap)) {
-  DEBUG_ASSERT(uniforms.size() == uniformMap.size());
-  size_t offset = 0;
-  offsets.push_back(offset);
-  for (auto& uniform : _uniforms) {
-    offset += uniform.size();
-    offsets.push_back(offset);
+UniformBuffer::UniformBuffer(const std::vector<Uniform>& vertexUniforms, const std::vector<Uniform>& fragmentUniforms, bool uboSupport) : _uboSupport(uboSupport){
+  if (vertexUniforms.empty() && fragmentUniforms.empty()) {
+    LOGE("UniformBuffer::UniformBuffer no uniforms");
+    return;
   }
-  if (offset > 0) {
-    _buffer = new (std::nothrow) uint8_t[offset];
-    if (_buffer == nullptr) {
-      offsets.resize(1);
-      LOGE("UniformBuffer::UniformBuffer() failed to allocate memory for uniform buffer!");
-    }
-  }
-}
 
-UniformBuffer::~UniformBuffer() {
-  delete[] _buffer;
+  printf("UniformBuffer::UniformBuffer -> uboSupport = %d\n", _uboSupport);
+
+  _uniforms.reserve(vertexUniforms.size() + fragmentUniforms.size());
+  _uniforms.insert(_uniforms.begin(), vertexUniforms.begin(), vertexUniforms.end());
+  _uniforms.insert(_uniforms.end(), fragmentUniforms.begin(), fragmentUniforms.end());
+
+  vertexUniformBufferLayout = std::make_unique<UniformBufferLayout>(_uboSupport);
+  fragmentUniformBufferLayout = std::make_unique<UniformBufferLayout>(_uboSupport);
+
+  for (const auto& uniform : vertexUniforms) {
+    vertexUniformBufferLayout->add(uniform, 0);
+  }
+  _vertexUniformBufferSize = vertexUniformBufferLayout->totalSize();
+
+  for (const auto& uniform : fragmentUniforms) {
+    fragmentUniformBufferLayout->add(uniform, _vertexUniformBufferSize);
+  }
+  _fragmentUniformBufferSize = fragmentUniformBufferLayout->totalSize();
+
+  if (const size_t totalSize = _vertexUniformBufferSize + _fragmentUniformBufferSize; totalSize > 0) {
+    buffer.resize(totalSize);
+  }
 }
 
 void UniformBuffer::setData(const std::string& name, const Matrix& matrix) {
-  float values[6];
+  float values[6] = {};
   matrix.get6(values);
-  float data[] = {values[0], values[3], 0, values[1], values[4], 0, values[2], values[5], 1};
-  onSetData(name, data, sizeof(data));
+
+  if (_uboSupport) {
+    const float data[] = {
+      values[0], values[3], 0, 0,
+      values[1], values[4], 0, 0,
+      values[2], values[5], 1, 0,
+    };
+    onSetData(name, data, sizeof(data));
+  } else {
+    const float data[] = {
+      values[0], values[3], 0,
+      values[1], values[4], 0,
+      values[2], values[5], 1
+    };
+    onSetData(name, data, sizeof(data));
+  }
 }
 
 void UniformBuffer::onSetData(const std::string& name, const void* data, size_t size) {
-  auto key = name + nameSuffix;
-  auto result = uniformMap.find(key);
-  if (result == uniformMap.end()) {
+  const auto& key = name + nameSuffix;
+  auto* filed = vertexUniformBufferLayout->findField(key);
+  if (filed == nullptr) {
+    filed = fragmentUniformBufferLayout->findField(key);
+  }
+  if (filed == nullptr) {
     LOGE("UniformBuffer::onSetData() uniform '%s' not found!", name.c_str());
     return;
   }
-  auto index = result->second;
-  DEBUG_ASSERT(_uniforms[index].size() == size);
-  memcpy(_buffer + offsets[index], data, size);
-}
+  DEBUG_ASSERT(filed->size == size);
 
+  memcpy(buffer.data() + filed->offset, data, size);
+}
 }  // namespace tgfx

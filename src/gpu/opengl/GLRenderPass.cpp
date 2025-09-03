@@ -107,7 +107,13 @@ bool GLRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
   }
   auto uniformBuffer = glProgram->uniformBuffer();
   programInfo->getUniforms(uniformBuffer);
-  glProgram->setUniformBytes(uniformBuffer->data(), uniformBuffer->size());
+
+  if (const auto& caps = interface->caps(); caps->uboSupport) {
+    glProgram->setUniformBuffer();
+  } else {
+    glProgram->setUniformBytes();
+  }
+
   return true;
 }
 

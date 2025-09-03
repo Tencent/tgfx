@@ -37,6 +37,9 @@ static const unsigned XfermodeEquation2Blend[] = {
     GL_FUNC_REVERSE_SUBTRACT,
 };
 
+static constexpr int VERTEX_UBO_BINDING_POINT = 0;
+static constexpr int FRAGMENT_UBO_BINDING_POINT = 1;
+
 struct AttribLayout {
   bool normalized = false;
   int count = 0;
@@ -86,13 +89,46 @@ void GLProgram::activate() {
       gl->bindVertexArray(vertexArray);
     }
   }
+
+  auto setupUBO = [&](unsigned& ubo, const size_t bufferSize) -> bool {
+    if (ubo == 0) {
+      gl->genBuffers(1, &ubo);
+    }
+    if (ubo <= 0) {
+      return false;
+    }
+    gl->bindBuffer(GL_UNIFORM_BUFFER, ubo);
+    gl->bufferData(GL_UNIFORM_BUFFER, static_cast<int64_t>(bufferSize), nullptr, GL_STATIC_DRAW);
+    return true;
+  };
+
+  if (caps->uboSupport) {
+    if (setupUBO(vertexUBO, uniformBuffer()->vertexUniformBufferSize())) {
+      vertexUniformBlockIndex = gl->getUniformBlockIndex(programID, VertexUniformBlockName.c_str());
+      if (vertexUniformBlockIndex != GL_INVALID_INDEX) {
+        gl->uniformBlockBinding(programID, vertexUniformBlockIndex, VERTEX_UBO_BINDING_POINT);
+        gl->bindBufferBase(GL_UNIFORM_BUFFER, VERTEX_UBO_BINDING_POINT, vertexUBO);
+      }
+    }
+    if (setupUBO(fragmentUBO, uniformBuffer()->fragmentUniformBufferSize())) {
+      fragmentUniformBlockIndex = gl->getUniformBlockIndex(programID, FragmentUniformBlockName.c_str());
+      if (fragmentUniformBlockIndex != GL_INVALID_INDEX) {
+        gl->uniformBlockBinding(programID, fragmentUniformBlockIndex, FRAGMENT_UBO_BINDING_POINT);
+        gl->bindBufferBase(GL_UNIFORM_BUFFER, FRAGMENT_UBO_BINDING_POINT, fragmentUBO);
+      }
+    }
+    gl->bindBuffer(GL_UNIFORM_BUFFER, 0);
+  }
 }
 
-void GLProgram::setUniformBytes(const void* data, size_t size) {
+void GLProgram::setUniformBytes() {
+  DEBUG_ASSERT(_uniformBuffer != nullptr);
+  const auto* data = _uniformBuffer->data();
+  const auto size = _uniformBuffer->size();
   if (data == nullptr || size == 0) {
     return;
   }
-  DEBUG_ASSERT(_uniformBuffer != nullptr);
+
   auto& uniforms = _uniformBuffer->uniforms();
   if (uniforms.empty()) {
     return;
@@ -152,9 +188,33 @@ void GLProgram::setUniformBytes(const void* data, size_t size) {
       case UniformFormat::TextureExternalSampler:
       case UniformFormat::Texture2DRectSampler:
         gl->uniform1iv(location, 1, reinterpret_cast<int*>(buffer + offset));
+        break;
     }
     index++;
     offset += uniform.size();
+  }
+}
+
+void GLProgram::setUniformBuffer() const {
+  DEBUG_ASSERT(_uniformBuffer != nullptr);
+  DEBUG_ASSERT(vertexUBO > 0);
+  DEBUG_ASSERT(fragmentUBO > 0);
+
+  const auto* vertexData = _uniformBuffer->vertexUniformBufferData();
+  const auto vertexSize = static_cast<int>(_uniformBuffer->vertexUniformBufferSize());
+  const auto* fragmentData = _uniformBuffer->fragmentUniformBufferData();
+  const auto fragmentSize = static_cast<int>(_uniformBuffer->fragmentUniformBufferSize());
+
+  const auto* gl = GLFunctions::Get(context);
+  if (vertexData != nullptr && vertexSize > 0) {
+    gl->bindBuffer(GL_UNIFORM_BUFFER, vertexUBO);
+    gl->bufferSubData(GL_UNIFORM_BUFFER, 0, vertexSize, vertexData);
+    gl->bindBuffer(GL_UNIFORM_BUFFER, 0);
+  }
+  if (fragmentData != nullptr && fragmentSize > 0) {
+    gl->bindBuffer(GL_UNIFORM_BUFFER, fragmentUBO);
+    gl->bufferSubData(GL_UNIFORM_BUFFER, 0, fragmentSize, fragmentData);
+    gl->bindBuffer(GL_UNIFORM_BUFFER, 0);
   }
 }
 
@@ -235,8 +295,18 @@ void GLProgram::onReleaseGPU() {
   if (programID > 0) {
     gl->deleteProgram(programID);
   }
+
   if (vertexArray > 0) {
     gl->deleteVertexArrays(1, &vertexArray);
+  }
+
+  if (vertexUBO > 0) {
+    gl->deleteBuffers(1, &vertexUBO);
+    vertexUBO = 0;
+  }
+  if (fragmentUBO > 0) {
+    gl->deleteBuffers(1, &fragmentUBO);
+    fragmentUBO = 0;
   }
 }
 }  // namespace tgfx

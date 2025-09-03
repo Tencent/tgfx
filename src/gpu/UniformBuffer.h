@@ -19,19 +19,20 @@
 #pragma once
 
 #include <string>
-#include <unordered_map>
 #include <vector>
+#include <memory>
 #include "gpu/Uniform.h"
 #include "tgfx/core/Matrix.h"
+#include "gpu/UniformBufferLayout.h"
 
 namespace tgfx {
+static const std::string VertexUniformBlockName = "VertexUniformBlock";
+static const std::string FragmentUniformBlockName = "FragmentUniformBlock";
 /**
  * An object representing the collection of uniform variables in a GPU program.
  */
 class UniformBuffer {
  public:
-  ~UniformBuffer();
-
   /**
    * Copies value into the uniform buffer. The data must have the same size as the uniform specified
    * by name.
@@ -51,14 +52,14 @@ class UniformBuffer {
    * Returns a pointer to the start of the uniform buffer in memory.
    */
   const void* data() const {
-    return _buffer;
+    return buffer.data();
   }
 
   /**
    * Returns the size of the uniform buffer in bytes.
    */
   size_t size() const {
-    return offsets.back();
+    return buffer.size();
   }
 
   /**
@@ -68,14 +69,52 @@ class UniformBuffer {
     return _uniforms;
   }
 
- private:
-  uint8_t* _buffer = nullptr;
-  std::vector<Uniform> _uniforms = {};
-  std::unordered_map<std::string, size_t> uniformMap = {};
-  std::vector<size_t> offsets = {};
-  std::string nameSuffix = "";
+  /**
+   * Returns a pointer to the start of the vertex uniform buffer in memory.
+   */
+  const void *vertexUniformBufferData() const {
+    return buffer.data();
+  }
 
-  UniformBuffer(std::vector<Uniform> uniforms, std::unordered_map<std::string, size_t> uniformMap);
+  /**
+   * Returns the size of the vertex uniform buffer in bytes.
+   */
+  size_t vertexUniformBufferSize() const {
+    return _vertexUniformBufferSize;
+  }
+
+  /**
+   * Returns a pointer to the start of the fragment uniform buffer in memory.
+   */
+  const void *fragmentUniformBufferData() const {
+    return buffer.data() + _vertexUniformBufferSize;
+  }
+
+  /**
+   * Returns the size of the fragment uniform buffer in bytes.
+   */
+  size_t fragmentUniformBufferSize() const {
+    return _fragmentUniformBufferSize;
+  }
+
+  /**
+   * Returns true if UBO is supported in the current context.
+   */
+  bool uboSupport() const {
+    return _uboSupport;
+  }
+
+ private:
+  std::vector<uint8_t> buffer = {};
+  std::vector<Uniform> _uniforms = {};
+  std::string nameSuffix = "";
+  size_t _vertexUniformBufferSize = 0;
+  size_t _fragmentUniformBufferSize = 0;
+  std::shared_ptr<UniformBufferLayout> vertexUniformBufferLayout = nullptr;
+  std::shared_ptr<UniformBufferLayout> fragmentUniformBufferLayout = nullptr;
+  bool _uboSupport = false;
+
+  UniformBuffer(const std::vector<Uniform>& vertexUniforms, const std::vector<Uniform>& fragmentUniforms, bool uboSupport = false);
 
   void onSetData(const std::string& name, const void* data, size_t size);
 
