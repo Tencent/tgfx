@@ -80,6 +80,6 @@ void RRectDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
                           vertexBufferProxyView->offset());
   auto numIndicesPerRRect = hasStroke ? IndicesPerStrokeRRect : IndicesPerFillRRect;
   renderPass->drawIndexed(PrimitiveType::Triangles, 0, rectCount * numIndicesPerRRect);
-  OPERATE_RENDER_TARGET(renderTarget);
+  CAPUTRE_RENDER_TARGET(renderTarget);
 }
 }  // namespace tgfx

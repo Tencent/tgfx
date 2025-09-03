@@ -100,7 +100,7 @@ void ShapeDrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
     renderPass->bindBuffers(nullptr, maskBuffer->gpuBuffer(), maskBufferProxy->offset());
     renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
   }
-  OPERATE_RENDER_TARGET(renderTarget);
+  CAPUTRE_RENDER_TARGET(renderTarget);
 }
 
 bool ShapeDrawOp::hasCoverage() const {

@@ -261,7 +261,7 @@ void DrawingManager::uploadAtlasToGPU() {
       queue->writeTexture(textureView->getTexture(), rect, data->data(), info.rowBytes());
       // Text atlas has no mipmaps, so we don't need to regenerate mipmaps.
     }
-    TEXTURE(queue, textureView->getTexture());
+    CAPUTRE_TEXTURE(queue, textureView->getTexture());
   }
   resetAtlasCache();
 }
