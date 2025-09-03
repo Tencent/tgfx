@@ -28,16 +28,6 @@ GLRenderPass::GLRenderPass(std::shared_ptr<GLInterface> interface, RenderPassDes
     : RenderPass(std::move(descriptor)), interface(std::move(interface)) {
 }
 
-static void UpdateScissor(const GLFunctions* gl, const Rect& scissorRect) {
-  if (scissorRect.isEmpty()) {
-    gl->disable(GL_SCISSOR_TEST);
-  } else {
-    gl->enable(GL_SCISSOR_TEST);
-    gl->scissor(static_cast<int>(scissorRect.x()), static_cast<int>(scissorRect.y()),
-                static_cast<int>(scissorRect.width()), static_cast<int>(scissorRect.height()));
-  }
-}
-
 void GLRenderPass::begin() {
   DEBUG_ASSERT(!descriptor.colorAttachments.empty());
   auto& colorAttachment = descriptor.colorAttachments[0];
@@ -45,12 +35,25 @@ void GLRenderPass::begin() {
   auto renderTexture = static_cast<GLTexture*>(colorAttachment.texture);
   auto gl = interface->functions();
   gl->bindFramebuffer(GL_FRAMEBUFFER, renderTexture->frameBufferID());
+  // Set the viewport to cover the entire color attachment by default.
   gl->viewport(0, 0, renderTexture->width(), renderTexture->height());
+  // Disable scissor test by default.
+  gl->disable(GL_SCISSOR_TEST);
   if (colorAttachment.loadAction == LoadAction::Clear) {
-    gl->disable(GL_SCISSOR_TEST);
     auto& color = colorAttachment.clearValue;
     gl->clearColor(color.red, color.green, color.blue, color.alpha);
     gl->clear(GL_COLOR_BUFFER_BIT);
+  }
+}
+
+void GLRenderPass::setScissorRect(int x, int y, int width, int height) {
+  auto gl = interface->functions();
+  auto texture = descriptor.colorAttachments[0].texture;
+  if (x == 0 && y == 0 && width == texture->width() && height == texture->height()) {
+    gl->disable(GL_SCISSOR_TEST);
+  } else {
+    gl->enable(GL_SCISSOR_TEST);
+    gl->scissor(x, y, width, height);
   }
 }
 
@@ -80,18 +83,16 @@ void GLRenderPass::onEnd() {
   gl->bindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-bool GLRenderPass::onBindProgramAndScissorClip(const ProgramInfo* programInfo,
-                                               const Rect& scissorRect) {
+bool GLRenderPass::onBindProgram(const ProgramInfo* programInfo) {
   program = programInfo->getProgram();
   if (program == nullptr) {
-    LOGE("GLRenderPass::onBindProgramAndScissorClip() Failed to get the program!");
+    LOGE("GLRenderPass::onBindProgram() Failed to get the program!");
     return false;
   }
   auto gl = interface->functions();
   ClearGLError(gl);
   auto glProgram = static_cast<GLProgram*>(program.get());
   glProgram->activate();
-  UpdateScissor(gl, scissorRect);
   auto renderTexture = descriptor.colorAttachments[0].texture;
   auto samplers = programInfo->getSamplers();
   int textureUnit = 0;
