@@ -28,8 +28,6 @@ UniformBuffer::UniformBuffer(const std::vector<Uniform>& vertexUniforms,
     return;
   }
 
-  printf("UniformBuffer::UniformBuffer -> uboSupport = %d\n", _uboSupport);
-
   _uniforms.reserve(vertexUniforms.size() + fragmentUniforms.size());
   _uniforms.insert(_uniforms.begin(), vertexUniforms.begin(), vertexUniforms.end());
   _uniforms.insert(_uniforms.end(), fragmentUniforms.begin(), fragmentUniforms.end());
