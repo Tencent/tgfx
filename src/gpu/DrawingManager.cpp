@@ -21,7 +21,6 @@
 #include "ProxyProvider.h"
 #include "core/AtlasCellDecodeTask.h"
 #include "core/AtlasManager.h"
-#include "core/utils/PixelFormatUtil.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/tasks/GenerateMipmapsTask.h"
@@ -261,7 +260,6 @@ void DrawingManager::uploadAtlasToGPU() {
       queue->writeTexture(textureView->getTexture(), rect, data->data(), info.rowBytes());
       // Text atlas has no mipmaps, so we don't need to regenerate mipmaps.
     }
-    CAPUTRE_TEXTURE(queue, textureView->getTexture());
   }
   resetAtlasCache();
 }

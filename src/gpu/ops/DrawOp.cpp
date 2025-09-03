@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawOp.h"
-#include "inspect/InspectorMark.h"
 
 namespace tgfx {
 PlacementPtr<ProgramInfo> DrawOp::createProgramInfo(
@@ -28,7 +27,6 @@ PlacementPtr<ProgramInfo> DrawOp::createProgramInfo(
   for (auto& coverage : coverages) {
     fragmentProcessors.emplace_back(std::move(coverage));
   }
-  CAPUTRE_FRARGMENT_PROCESSORS(fragmentProcessors);
   auto context = renderTarget->getContext();
   return context->drawingBuffer()->make<ProgramInfo>(
       renderTarget, std::move(geometryProcessor), std::move(fragmentProcessors), numColorProcessors,

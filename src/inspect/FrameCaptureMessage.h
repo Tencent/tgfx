@@ -17,9 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <tgfx/gpu/PixelFormat.h>
 #include <cstdint>
-
 namespace tgfx::inspect {
 enum class FrameCaptureMessageType : uint8_t {
   OperateBegin,
@@ -33,13 +31,9 @@ enum class FrameCaptureMessageType : uint8_t {
   ValueDataFloat,
   ValueDataBool,
   ValueDataEnum,
-  InputTexture,
-  OutputTexture,
-  TextureData,
   KeepAlive,
   StringData,
-  ValueName,
-  PixelsData
+  ValueName
 };
 
 #pragma pack(push, 1)
@@ -63,7 +57,6 @@ struct OperateEndMessage : OperateBaseMessage {
 };
 
 struct FrameMarkMessage {
-  bool captured;
   int64_t usTime;
 };
 
@@ -103,20 +96,6 @@ struct StringTransferMessage {
   uint64_t ptr;
 };
 
-struct TextureSamplerMessage {
-  uint64_t textureId;
-};
-
-struct TextureDataMessage : TextureSamplerMessage {
-  bool isInput;
-  PixelFormat format;
-  int width;
-  int height;
-  size_t rowBytes;
-  size_t pixelsSize;
-  uint64_t pixels;
-};
-
 struct FrameCaptureMessageItem {
   FrameCaptureMessageHeader hdr;
   union {
@@ -131,8 +110,6 @@ struct FrameCaptureMessageItem {
     AttributeDataFloatMessage attributeDataFloat;
     AttributeDataBoolMessage attributeDataBool;
     AttributeDataEnumMessage attributeDataEnum;
-    TextureSamplerMessage textureSampler;
-    TextureDataMessage textureData;
   };
 };
 #pragma pack(pop)
@@ -149,12 +126,8 @@ static constexpr size_t FrameCaptureMessageDataSize[] = {
     sizeof(FrameCaptureMessageHeader) + sizeof(AttributeDataFloatMessage),
     sizeof(FrameCaptureMessageHeader) + sizeof(AttributeDataBoolMessage),
     sizeof(FrameCaptureMessageHeader) + sizeof(AttributeDataEnumMessage),
-    sizeof(FrameCaptureMessageHeader) + sizeof(TextureSamplerMessage),
-    sizeof(FrameCaptureMessageHeader) + sizeof(TextureSamplerMessage),
-    sizeof(FrameCaptureMessageHeader) + sizeof(TextureDataMessage),
     sizeof(FrameCaptureMessageHeader),
     sizeof(FrameCaptureMessageHeader) + sizeof(StringTransferMessage),
     sizeof(FrameCaptureMessageHeader) + sizeof(StringTransferMessage),
-    sizeof(FrameCaptureMessageHeader) + sizeof(TextureSamplerMessage),
 };
 }  // namespace tgfx::inspect

@@ -22,7 +22,6 @@
 #include "gpu/DefaultTextureView.h"
 #include "gpu/GPU.h"
 #include "gpu/YUVTextureView.h"
-#include "inspect/InspectorMark.h"
 #if defined(__OHOS__)
 #include <native_buffer/native_buffer.h>
 #endif
@@ -85,7 +84,6 @@ std::shared_ptr<TextureView> TextureView::MakeFormat(Context* context, int width
   if (pixels != nullptr) {
     auto texture = textureView->getTexture();
     gpu->queue()->writeTexture(texture, Rect::MakeWH(width, height), pixels, rowBytes);
-    CAPUTRE_PIXELS_DATA(texture, width, height, rowBytes, pixelFormat, pixels);
   }
   return textureView;
 }
