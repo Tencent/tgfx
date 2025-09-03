@@ -23,7 +23,12 @@
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "layers/RootLayer.h"
 #include "layers/contents/RasterizedContent.h"
+#include "tgfx/core/Color.h"
+#include "tgfx/core/Paint.h"
+#include "tgfx/core/Path.h"
 #include "tgfx/core/PathEffect.h"
+#include "tgfx/core/Rect.h"
+#include "tgfx/core/Shape.h"
 #include "tgfx/layers/DisplayList.h"
 #include "tgfx/layers/Gradient.h"
 #include "tgfx/layers/ImageLayer.h"
@@ -2991,5 +2996,69 @@ TGFX_TEST(LayerTest, PartialDrawLayer) {
   rootLayer->draw(canvas);
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialDrawLayer"));
   EXPECT_EQ(layerInvisible->rasterizedContent, nullptr);
+}
+
+TGFX_TEST(LayerTest, ZoomUpStrokeLayer) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  DisplayList displayList;
+  auto surface = Surface::Make(context, 200, 200);
+  auto rootLayer = Layer::Make();
+  rootLayer->setMatrix(Matrix::MakeTrans(5, 5));
+  displayList.root()->addChild(rootLayer);
+
+  // Path path;
+  // path.addRoundRect(Rect::MakeWH(8, 6), 2, 2);
+  // path.transform(Matrix::MakeScale(20, 20));
+  // auto shape = Shape::MakeFrom(path);
+
+  Path path;
+  path.addRoundRect(Rect::MakeWH(8, 6), 2, 2);
+  auto shape = Shape::MakeFrom(path);
+  shape = Shape::ApplyMatrix(shape, Matrix::MakeScale(20, 20));
+
+  auto shapeLayer = ShapeLayer::Make();
+  shapeLayer->setShape(shape);
+  shapeLayer->setStrokeStyles({tgfx::SolidColor::Make(Color::Red())});
+  shapeLayer->setLineWidth(1.f);
+
+  rootLayer->addChild(shapeLayer);
+  auto* canvas = surface->getCanvas();
+  canvas->clear(Color::Black());
+  rootLayer->draw(canvas);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "AAADebug/ZoomUpStrokeLayer"));
+}
+
+TGFX_TEST(LayerTest, ZoomUpStrokeShape) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  DisplayList displayList;
+  auto surface = Surface::Make(context, 512, 512);
+
+  // Path path;
+  // path.addRoundRect(Rect::MakeWH(8, 6), 2, 2);
+  // path.transform(Matrix::MakeScale(20, 20));
+  // auto shape = Shape::MakeFrom(path);
+
+  Path path;
+  path.addRoundRect(Rect::MakeWH(10, 10), 2, 2);
+  auto shape = Shape::MakeFrom(path);
+  shape = Shape::ApplyMatrix(shape, Matrix::MakeScale(40, 40));
+
+  Paint paint;
+  paint.setColor(Color::Red());
+  paint.setStyle(PaintStyle::Stroke);
+  paint.setStrokeWidth(20.f);
+
+  auto* canvas = surface->getCanvas();
+  canvas->clear(Color::Black());
+  canvas->translate(50, 50);
+
+  canvas->drawShape(shape, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "AAADebug/ZoomUpStrokeShape"));
 }
 }  // namespace tgfx
