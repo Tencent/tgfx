@@ -216,12 +216,12 @@ bool CGScalerContext::generatePath(GlyphID glyphID, bool fauxBold, bool fauxItal
   return true;
 }
 
-bool CGScalerContext::readPixels(GlyphID glyphID, bool fauxBold, const Stroke*,
-                                 const ImageInfo& dstInfo, void* dstPixels) const {
+bool CGScalerContext::readPixels(GlyphID glyphID, bool, const Stroke*, const ImageInfo& dstInfo,
+                                 void* dstPixels) const {
   if (dstInfo.isEmpty() || dstPixels == nullptr) {
     return false;
   }
-  auto bounds = getBounds(glyphID, fauxBold, false);
+  auto bounds = getBounds(glyphID, false, false);
   auto width = static_cast<int>(bounds.width());
   auto height = static_cast<int>(bounds.height());
   if (width <= 0 || height <= 0) {
