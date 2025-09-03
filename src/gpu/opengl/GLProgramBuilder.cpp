@@ -19,7 +19,6 @@
 #include "GLProgramBuilder.h"
 #include <iostream>
 #include <sstream>
-
 #include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
@@ -156,14 +155,15 @@ std::string GLProgramBuilder::getShaderVarDeclarations(const ShaderVar& var,
   return ret;
 }
 
-std::string GLProgramBuilder::getUniformBlockDeclaration(ShaderStage stage,
-    const std::vector<Uniform>& uniforms) const {
+std::string GLProgramBuilder::getUniformBlockDeclaration(
+    ShaderStage stage, const std::vector<Uniform>& uniforms) const {
   if (uniforms.empty()) {
     return "";
   }
 
   std::ostringstream os;
-  const std::string& uniformBlockName = stage == ShaderStage::Vertex ? VertexUniformBlockName : FragmentUniformBlockName;
+  const std::string& uniformBlockName =
+      stage == ShaderStage::Vertex ? VertexUniformBlockName : FragmentUniformBlockName;
   constexpr std::string_view INDENT_STR = "    ";  // 4 spaces
   os << "layout(std140) uniform " << uniformBlockName << " {" << std::endl;
   std::string precision = "";
@@ -174,7 +174,8 @@ std::string GLProgramBuilder::getUniformBlockDeclaration(ShaderStage stage,
     } else {
       precision = "";
     }
-    os << INDENT_STR << precision << " " << SLTypeString(var.type()) << " " << uniform.name() << ";" << std::endl;
+    os << INDENT_STR << precision << " " << SLTypeString(var.type()) << " " << uniform.name() << ";"
+       << std::endl;
   }
   os << "};" << std::endl;
   return os.str();

@@ -16,8 +16,8 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <string>
 #include "CornerPinEffect.h"
+#include <string>
 
 namespace tgfx {
 static constexpr char CORNER_PIN_VERTEX_SHADER[] = R"(
@@ -85,7 +85,8 @@ std::unique_ptr<RuntimeProgram> CornerPinEffect::onCreateProgram(Context* contex
   const auto* caps = GLCaps::Get(context);
   const auto isDesktop = caps->standard == GLStandard::GL;
   auto filterProgram =
-      FilterProgram::Make(context, GetFinalShaderCode(CORNER_PIN_VERTEX_SHADER, isDesktop), GetFinalShaderCode(CORNER_PIN_FRAGMENT_SHADER, isDesktop));
+      FilterProgram::Make(context, GetFinalShaderCode(CORNER_PIN_VERTEX_SHADER, isDesktop),
+                          GetFinalShaderCode(CORNER_PIN_FRAGMENT_SHADER, isDesktop));
   if (filterProgram == nullptr) {
     return nullptr;
   }

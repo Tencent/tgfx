@@ -21,11 +21,8 @@
 
 namespace tgfx {
 static std::array<float, 12> AlignMat3(const float* mat3) {
-  return {
-      mat3[0], mat3[1], mat3[2], 0.0f,
-      mat3[3], mat3[4], mat3[5], 0.0f,
-      mat3[6], mat3[7], mat3[8], 0.0f
-  };
+  return {mat3[0], mat3[1], mat3[2], 0.0f,    mat3[3], mat3[4],
+          mat3[5], 0.0f,    mat3[6], mat3[7], mat3[8], 0.0f};
 }
 
 static constexpr float ColorConversion601LimitRange[] = {
@@ -214,8 +211,7 @@ void GLTextureEffect::onSetData(UniformBuffer* uniformBuffer) const {
         } else {
           uniformBuffer->setData(mat3ColorConversion, ColorConversion601LimitRange);
         }
-      }
-      break;
+      } break;
       case YUVColorSpace::BT601_FULL:
         if (uniformBuffer->uboSupport()) {
           uniformBuffer->setData(mat3ColorConversion, AlignMat3(ColorConversion601FullRange));

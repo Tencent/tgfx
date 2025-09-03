@@ -20,12 +20,11 @@
 
 #include <string>
 #include <unordered_map>
-
 #include "Uniform.h"
 
 namespace tgfx {
 class UniformBufferLayout final {
-public:
+ public:
   struct Field {
     std::string name = "";
     UniformFormat format = UniformFormat::Float;
@@ -34,7 +33,8 @@ public:
     size_t align = 0;
   };
 
-  explicit UniformBufferLayout(bool uboSupport) : _uboSupport(uboSupport) {}
+  explicit UniformBufferLayout(bool uboSupport) : _uboSupport(uboSupport) {
+  }
 
   /**
    * Add a Uniform field to return its offset in UniformBuffer.
@@ -64,7 +64,7 @@ public:
   void dump() const;
 #endif
 
-  private:
+ private:
   struct Entry {
     size_t size;
     size_t align;
@@ -78,4 +78,4 @@ public:
   size_t cursor = 0;
   bool _uboSupport = false;
 };
-} // namespace tgfx
+}  // namespace tgfx

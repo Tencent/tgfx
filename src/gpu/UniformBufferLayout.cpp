@@ -15,9 +15,8 @@
 //  and limitations under the license.
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
-#include <vector>
-
 #include "UniformBufferLayout.h"
+#include <vector>
 #include "core/utils/Log.h"
 
 namespace tgfx {
@@ -48,8 +47,7 @@ size_t UniformBufferLayout::totalSize() const {
   return alignCursor(_uboSupport ? 16 : 1);
 }
 
-const UniformBufferLayout::Field*
-UniformBufferLayout::findField(const std::string& key) const {
+const UniformBufferLayout::Field* UniformBufferLayout::findField(const std::string& key) const {
   const auto& iter = fieldMap.find(key);
   if (iter != fieldMap.end()) {
     return &iter->second;
@@ -69,13 +67,12 @@ void UniformBufferLayout::dump() const {
   for (const auto& [name, field] : fieldMap) {
     sortedFields.push_back(field);
   }
-  std::sort(sortedFields.begin(), sortedFields.end(), [](const Field& a, const Field& b) {
-    return a.offset < b.offset;
-  });
+  std::sort(sortedFields.begin(), sortedFields.end(),
+            [](const Field& a, const Field& b) { return a.offset < b.offset; });
   for (size_t i = 0; i < sortedFields.size(); ++i) {
-    LOGI("%4zu: %-10s offset=%4zu, size=%4zu, align=%2zu, name=%s",
-           i, ToUniformFormatName(sortedFields[i].format), sortedFields[i].offset,
-           sortedFields[i].size, sortedFields[i].align, sortedFields[i].name.c_str());
+    LOGI("%4zu: %-10s offset=%4zu, size=%4zu, align=%2zu, name=%s", i,
+         ToUniformFormatName(sortedFields[i].format), sortedFields[i].offset, sortedFields[i].size,
+         sortedFields[i].align, sortedFields[i].name.c_str());
   }
   LOGI("Total buffer size = %zu bytes", totalSize());
   LOGI("-------------- Std140Layout dump end --------------\n");
@@ -118,4 +115,4 @@ UniformBufferLayout::Entry UniformBufferLayout::EntryOf(UniformFormat format) {
 size_t UniformBufferLayout::alignCursor(size_t alignment) const {
   return (cursor + alignment - 1) / alignment * alignment;
 }
-} // namespace tgfx
+}  // namespace tgfx

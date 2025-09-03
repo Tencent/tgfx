@@ -42,6 +42,7 @@ std::string GLFragmentShaderBuilder::dstColor() {
 }
 
 std::string GLFragmentShaderBuilder::colorOutputName() {
-  return static_cast<GLProgramBuilder*>(programBuilder)->isLegacyES() ? "gl_FragColor" : CustomColorOutputName();
+  return static_cast<GLProgramBuilder*>(programBuilder)->isLegacyES() ? "gl_FragColor"
+                                                                      : CustomColorOutputName();
 }
 }  // namespace tgfx

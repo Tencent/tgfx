@@ -136,8 +136,10 @@ using GLGetVertexAttribPointerv = void GL_FUNCTION_TYPE(unsigned index, unsigned
                                                         void** pointer);
 using GLGetAttribLocation = int GL_FUNCTION_TYPE(unsigned program, const char* name);
 using GLGetUniformLocation = int GL_FUNCTION_TYPE(unsigned program, const char* name);
-using GLGetUniformBlockIndex = unsigned GL_FUNCTION_TYPE(unsigned program, const char *uniformBlockName);
-using GLUniformBlockBinding = void GL_FUNCTION_TYPE(unsigned program, unsigned uniformBlockIndex, unsigned uniformBlockBinding);
+using GLGetUniformBlockIndex = unsigned GL_FUNCTION_TYPE(unsigned program,
+                                                         const char* uniformBlockName);
+using GLUniformBlockBinding = void GL_FUNCTION_TYPE(unsigned program, unsigned uniformBlockIndex,
+                                                    unsigned uniformBlockBinding);
 using GLBindBufferBase = void GL_FUNCTION_TYPE(unsigned target, unsigned index, unsigned buffer);
 using GLIsTexture = unsigned char GL_FUNCTION_TYPE(unsigned texture);
 using GLLineWidth = void GL_FUNCTION_TYPE(float width);

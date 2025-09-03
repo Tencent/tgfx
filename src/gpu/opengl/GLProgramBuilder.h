@@ -34,7 +34,7 @@ class GLProgramBuilder : public ProgramBuilder {
   std::string getShaderVarDeclarations(const ShaderVar& var, ShaderStage stage) const override;
 
   std::string getUniformBlockDeclaration(ShaderStage stage,
-                                          const std::vector<Uniform>& uniforms) const override;
+                                         const std::vector<Uniform>& uniforms) const override;
   bool isLegacyES() const;
 
  private:

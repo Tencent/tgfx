@@ -18,12 +18,12 @@
 
 #pragma once
 
+#include <memory>
 #include <string>
 #include <vector>
-#include <memory>
 #include "gpu/Uniform.h"
-#include "tgfx/core/Matrix.h"
 #include "gpu/UniformBufferLayout.h"
+#include "tgfx/core/Matrix.h"
 
 namespace tgfx {
 static const std::string VertexUniformBlockName = "VertexUniformBlock";
@@ -72,7 +72,7 @@ class UniformBuffer {
   /**
    * Returns a pointer to the start of the vertex uniform buffer in memory.
    */
-  const void *vertexUniformBufferData() const {
+  const void* vertexUniformBufferData() const {
     return buffer.data();
   }
 
@@ -86,7 +86,7 @@ class UniformBuffer {
   /**
    * Returns a pointer to the start of the fragment uniform buffer in memory.
    */
-  const void *fragmentUniformBufferData() const {
+  const void* fragmentUniformBufferData() const {
     return buffer.data() + _vertexUniformBufferSize;
   }
 
@@ -114,7 +114,8 @@ class UniformBuffer {
   std::shared_ptr<UniformBufferLayout> fragmentUniformBufferLayout = nullptr;
   bool _uboSupport = false;
 
-  UniformBuffer(const std::vector<Uniform>& vertexUniforms, const std::vector<Uniform>& fragmentUniforms, bool uboSupport = false);
+  UniformBuffer(const std::vector<Uniform>& vertexUniforms,
+                const std::vector<Uniform>& fragmentUniforms, bool uboSupport = false);
 
   void onSetData(const std::string& name, const void* data, size_t size);
 

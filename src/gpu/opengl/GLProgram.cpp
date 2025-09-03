@@ -111,7 +111,8 @@ void GLProgram::activate() {
       }
     }
     if (setupUBO(fragmentUBO, uniformBuffer()->fragmentUniformBufferSize())) {
-      fragmentUniformBlockIndex = gl->getUniformBlockIndex(programID, FragmentUniformBlockName.c_str());
+      fragmentUniformBlockIndex =
+          gl->getUniformBlockIndex(programID, FragmentUniformBlockName.c_str());
       if (fragmentUniformBlockIndex != GL_INVALID_INDEX) {
         gl->uniformBlockBinding(programID, fragmentUniformBlockIndex, FRAGMENT_UBO_BINDING_POINT);
         gl->bindBufferBase(GL_UNIFORM_BUFFER, FRAGMENT_UBO_BINDING_POINT, fragmentUBO);

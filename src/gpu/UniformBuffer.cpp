@@ -20,7 +20,9 @@
 #include "core/utils/Log.h"
 
 namespace tgfx {
-UniformBuffer::UniformBuffer(const std::vector<Uniform>& vertexUniforms, const std::vector<Uniform>& fragmentUniforms, bool uboSupport) : _uboSupport(uboSupport){
+UniformBuffer::UniformBuffer(const std::vector<Uniform>& vertexUniforms,
+                             const std::vector<Uniform>& fragmentUniforms, bool uboSupport)
+    : _uboSupport(uboSupport) {
   if (vertexUniforms.empty() && fragmentUniforms.empty()) {
     LOGE("UniformBuffer::UniformBuffer no uniforms");
     return;
@@ -45,7 +47,8 @@ UniformBuffer::UniformBuffer(const std::vector<Uniform>& vertexUniforms, const s
   }
   _fragmentUniformBufferSize = fragmentUniformBufferLayout->totalSize();
 
-  if (const size_t totalSize = _vertexUniformBufferSize + _fragmentUniformBufferSize; totalSize > 0) {
+  if (const size_t totalSize = _vertexUniformBufferSize + _fragmentUniformBufferSize;
+      totalSize > 0) {
     buffer.resize(totalSize);
   }
 }
@@ -56,17 +59,12 @@ void UniformBuffer::setData(const std::string& name, const Matrix& matrix) {
 
   if (_uboSupport) {
     const float data[] = {
-      values[0], values[3], 0, 0,
-      values[1], values[4], 0, 0,
-      values[2], values[5], 1, 0,
+        values[0], values[3], 0, 0, values[1], values[4], 0, 0, values[2], values[5], 1, 0,
     };
     onSetData(name, data, sizeof(data));
   } else {
-    const float data[] = {
-      values[0], values[3], 0,
-      values[1], values[4], 0,
-      values[2], values[5], 1
-    };
+    const float data[] = {values[0], values[3], 0,         values[1], values[4],
+                          0,         values[2], values[5], 1};
     onSetData(name, data, sizeof(data));
   }
 }
