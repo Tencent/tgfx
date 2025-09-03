@@ -22,8 +22,7 @@
 namespace tgfx::inspect {
 class DefaultLZ4CompressionHandler : public LZ4CompressionHandler {
  public:
-  DefaultLZ4CompressionHandler()
-      : lz4EncodeStream(LZ4_createStream()) {
+  DefaultLZ4CompressionHandler() : lz4EncodeStream(LZ4_createStream()) {
   }
 
   ~DefaultLZ4CompressionHandler() override {

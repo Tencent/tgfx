@@ -39,12 +39,12 @@
 
 #define ATTRIBUTE_ENUM(value, type) ATTRIBUTE_NAME_ENUM(#value, value, type)
 
-#define CAPUTRE_PIXELS_DATA(texturePtr, width, height, rowBytes, format, pixels)                      \
+#define CAPUTRE_PIXELS_DATA(texturePtr, width, height, rowBytes, format, pixels)               \
   auto frameCapture = inspect::FrameCaptureTexture::MakeFrom(texture, width, height, rowBytes, \
                                                              pixelFormat, pixels);             \
   tgfx::inspect::FrameCapture::SendFrameCaptureTexture(frameCapture, false);
 
-#define CAPUTRE_TEXTURE(commandQueue, texture)                                                          \
+#define CAPUTRE_TEXTURE(commandQueue, texture)                                                  \
   auto frameCapture = inspect::FrameCaptureTexture::MakeFrom(textureView->getTexture(), queue); \
   tgfx::inspect::FrameCapture::SendFrameCaptureTexture(frameCapture, false);
 
