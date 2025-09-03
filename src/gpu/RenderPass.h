@@ -32,12 +32,29 @@ enum class PrimitiveType {
   TriangleStrip,
 };
 
+/**
+ * RenderPass represents an interface for encoding a sequence of rendering commands into a command
+ * buffer. A RenderPass is begun by calling CommandEncoder::beginRenderPass() with a valid
+ * RenderPassDescriptor, and must be ended by calling end() before beginning a new render pass.
+ */
 class RenderPass {
  public:
   virtual ~RenderPass() = default;
 
+  /**
+   * Sets the scissor rectangle used during the rasterization stage. After transformation into
+   * viewport coordinates any fragments that fall outside the scissor rectangle will be discarded.
+   */
+  virtual void setScissorRect(int x, int y, int width, int height) = 0;
+
+  /**
+   * Completes the current render pass. After calling this method, no further commands can be added
+   * to the render pass, and a new render pass can be started by calling
+   * CommandEncoder::beginRenderPass() again.
+   */
   void end();
-  void bindProgramAndScissorClip(const ProgramInfo* programInfo, const Rect& scissorRect);
+
+  void bindProgram(const ProgramInfo* programInfo);
   void bindBuffers(GPUBuffer* indexBuffer, GPUBuffer* vertexBuffer, size_t vertexOffset = 0);
   void draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount);
   void drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount);
@@ -49,8 +66,7 @@ class RenderPass {
   explicit RenderPass(RenderPassDescriptor descriptor) : descriptor(std::move(descriptor)) {
   }
 
-  virtual bool onBindProgramAndScissorClip(const ProgramInfo* programInfo,
-                                           const Rect& drawBounds) = 0;
+  virtual bool onBindProgram(const ProgramInfo* programInfo) = 0;
   virtual bool onBindBuffers(GPUBuffer* indexBuffer, GPUBuffer* vertexBuffer,
                              size_t vertexOffset) = 0;
   virtual void onDraw(PrimitiveType primitiveType, size_t offset, size_t count,

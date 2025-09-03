@@ -17,19 +17,35 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawOp.h"
+#include "inspect/InspectorMark.h"
 
 namespace tgfx {
-PlacementPtr<ProgramInfo> DrawOp::createProgramInfo(
-    RenderTarget* renderTarget, PlacementPtr<GeometryProcessor> geometryProcessor) {
-  auto numColorProcessors = colors.size();
-  auto fragmentProcessors = std::move(colors);
-  fragmentProcessors.reserve(numColorProcessors + coverages.size());
-  for (auto& coverage : coverages) {
-    fragmentProcessors.emplace_back(std::move(coverage));
+void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
+  auto geometryProcessor = onMakeGeometryProcessor(renderTarget);
+  ATTRIBUTE_NAME("scissorRect", scissorRect);
+  ATTRIBUTE_NAME_ENUM("blenderMode", blendMode, tgfx::inspect::CustomEnumType::BlendMode);
+  ATTRIBUTE_NAME_ENUM("aaType", aaType, tgfx::inspect::CustomEnumType::AAType);
+  if (geometryProcessor == nullptr) {
+    return;
   }
-  auto context = renderTarget->getContext();
-  return context->drawingBuffer()->make<ProgramInfo>(
-      renderTarget, std::move(geometryProcessor), std::move(fragmentProcessors), numColorProcessors,
-      std::move(xferProcessor), blendMode);
+  std::vector<FragmentProcessor*> fragmentProcessors = {};
+  fragmentProcessors.reserve(colors.size() + coverages.size());
+  for (auto& color : colors) {
+    fragmentProcessors.emplace_back(color.get());
+  }
+  for (auto& coverage : coverages) {
+    fragmentProcessors.emplace_back(coverage.get());
+  }
+  ProgramInfo programInfo(renderTarget, geometryProcessor.get(), std::move(fragmentProcessors),
+                          colors.size(), xferProcessor.get(), blendMode);
+  renderPass->bindProgram(&programInfo);
+  if (scissorRect.isEmpty()) {
+    renderPass->setScissorRect(0, 0, renderTarget->width(), renderTarget->height());
+  } else {
+    renderPass->setScissorRect(static_cast<int>(scissorRect.x()), static_cast<int>(scissorRect.y()),
+                               static_cast<int>(scissorRect.width()),
+                               static_cast<int>(scissorRect.height()));
+  }
+  onDraw(renderPass);
 }
 }  // namespace tgfx

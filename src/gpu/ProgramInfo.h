@@ -38,10 +38,9 @@ struct SamplerInfo {
  */
 class ProgramInfo {
  public:
-  ProgramInfo(RenderTarget* renderTarget, PlacementPtr<GeometryProcessor> geometryProcessor,
-              std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors,
-              size_t numColorProcessors, PlacementPtr<XferProcessor> xferProcessor,
-              BlendMode blendMode);
+  ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometryProcessor,
+              std::vector<FragmentProcessor*> fragmentProcessors, size_t numColorProcessors,
+              XferProcessor* xferProcessor, BlendMode blendMode);
 
   size_t numColorFragmentProcessors() const {
     return numColorProcessors;
@@ -52,11 +51,11 @@ class ProgramInfo {
   }
 
   const GeometryProcessor* getGeometryProcessor() const {
-    return geometryProcessor.get();
+    return geometryProcessor;
   }
 
   const FragmentProcessor* getFragmentProcessor(size_t idx) const {
-    return fragmentProcessors[idx].get();
+    return fragmentProcessors[idx];
   }
 
   const XferProcessor* getXferProcessor() const;
@@ -85,12 +84,12 @@ class ProgramInfo {
 
  private:
   RenderTarget* renderTarget = nullptr;
-  PlacementPtr<GeometryProcessor> geometryProcessor = nullptr;
-  std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors = {};
+  GeometryProcessor* geometryProcessor = nullptr;
+  std::vector<FragmentProcessor*> fragmentProcessors = {};
   std::unordered_map<const Processor*, int> processorIndices = {};
   // This value is also the index in fragmentProcessors where coverage processors begin.
   size_t numColorProcessors = 0;
-  PlacementPtr<XferProcessor> xferProcessor = nullptr;
+  XferProcessor* xferProcessor = nullptr;
   BlendMode blendMode = BlendMode::SrcOver;
 
   void updateProcessorIndices();
