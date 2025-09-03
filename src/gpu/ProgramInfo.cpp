@@ -22,10 +22,9 @@
 #include "gpu/RenderTarget.h"
 
 namespace tgfx {
-ProgramInfo::ProgramInfo(RenderTarget* renderTarget,
-                         PlacementPtr<GeometryProcessor> geometryProcessor,
-                         std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors,
-                         size_t numColorProcessors, PlacementPtr<XferProcessor> xferProcessor,
+ProgramInfo::ProgramInfo(RenderTarget* renderTarget, GeometryProcessor* geometryProcessor,
+                         std::vector<FragmentProcessor*> fragmentProcessors,
+                         size_t numColorProcessors, XferProcessor* xferProcessor,
                          BlendMode blendMode)
     : renderTarget(renderTarget), geometryProcessor(std::move(geometryProcessor)),
       fragmentProcessors(std::move(fragmentProcessors)), numColorProcessors(numColorProcessors),
@@ -35,9 +34,9 @@ ProgramInfo::ProgramInfo(RenderTarget* renderTarget,
 
 void ProgramInfo::updateProcessorIndices() {
   int index = 0;
-  processorIndices[geometryProcessor.get()] = index++;
+  processorIndices[geometryProcessor] = index++;
   for (auto& fragmentProcessor : fragmentProcessors) {
-    FragmentProcessor::Iter iter(fragmentProcessor.get());
+    FragmentProcessor::Iter iter(fragmentProcessor);
     const FragmentProcessor* fp = iter.next();
     while (fp) {
       processorIndices[fp] = index++;
@@ -51,7 +50,7 @@ const XferProcessor* ProgramInfo::getXferProcessor() const {
   if (xferProcessor == nullptr) {
     return EmptyXferProcessor::GetInstance();
   }
-  return xferProcessor.get();
+  return xferProcessor;
 }
 
 const Swizzle& ProgramInfo::getOutputSwizzle() const {
@@ -86,11 +85,11 @@ void ProgramInfo::getUniforms(UniformBuffer* uniformBuffer) const {
   DEBUG_ASSERT(uniformBuffer != nullptr);
   auto array = GetRTAdjustArray(renderTarget);
   uniformBuffer->setData(RTAdjustName, array);
-  uniformBuffer->nameSuffix = getMangledSuffix(geometryProcessor.get());
+  uniformBuffer->nameSuffix = getMangledSuffix(geometryProcessor);
   FragmentProcessor::CoordTransformIter coordTransformIter(this);
   geometryProcessor->setData(uniformBuffer, &coordTransformIter);
   for (auto& fragmentProcessor : fragmentProcessors) {
-    FragmentProcessor::Iter iter(fragmentProcessor.get());
+    FragmentProcessor::Iter iter(fragmentProcessor);
     const FragmentProcessor* fp = iter.next();
     while (fp) {
       uniformBuffer->nameSuffix = getMangledSuffix(fp);

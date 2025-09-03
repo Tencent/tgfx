@@ -139,11 +139,10 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
   auto geometryProcessor =
       DefaultGeometryProcessor::Make(context->drawingBuffer(), {}, renderTarget->width(),
                                      renderTarget->height(), AAType::None, {}, {});
-  std::vector<PlacementPtr<FragmentProcessor>> fragmentProcessors = {};
-  fragmentProcessors.emplace_back(std::move(colorProcessor));
-  ProgramInfo programInfo(renderTarget.get(), std::move(geometryProcessor),
+  std::vector fragmentProcessors = {colorProcessor.get()};
+  ProgramInfo programInfo(renderTarget.get(), geometryProcessor.get(),
                           std::move(fragmentProcessors), 1, nullptr, BlendMode::Src);
-  renderPass->bindProgramAndScissorClip(&programInfo, {});
+  renderPass->bindProgram(&programInfo);
   renderPass->bindBuffers(nullptr, vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
   renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
   renderPass->end();
