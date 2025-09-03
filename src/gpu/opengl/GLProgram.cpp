@@ -98,7 +98,7 @@ void GLProgram::activate() {
       return false;
     }
     gl->bindBuffer(GL_UNIFORM_BUFFER, ubo);
-    gl->bufferData(GL_UNIFORM_BUFFER, static_cast<int64_t>(bufferSize), nullptr, GL_STATIC_DRAW);
+    gl->bufferData(GL_UNIFORM_BUFFER, static_cast<int32_t>(bufferSize), nullptr, GL_STATIC_DRAW);
     return true;
   };
 
