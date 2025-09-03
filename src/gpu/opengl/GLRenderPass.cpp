@@ -86,7 +86,7 @@ void GLRenderPass::onEnd() {
 bool GLRenderPass::onBindProgram(const ProgramInfo* programInfo) {
   program = programInfo->getProgram();
   if (program == nullptr) {
-    LOGE("GLRenderPass::onBindProgramAndScissorClip() Failed to get the program!");
+    LOGE("GLRenderPass::onBindProgram() Failed to get the program!");
     return false;
   }
   auto gl = interface->functions();
