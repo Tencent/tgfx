@@ -25,7 +25,9 @@
 
 namespace tgfx {
 Bitmap::Bitmap(int width, int height, bool alphaOnly, bool tryHardware, std::shared_ptr<ColorSpace> colorSpace) {
-  allocPixels(width, height, alphaOnly, tryHardware, std::move(colorSpace));
+  allocPixels(width, height, alphaOnly, tryHardware);
+  _info.setColorSpace(colorSpace);
+  pixelRef->info().setColorSpace(colorSpace);
 }
 
 Bitmap::Bitmap(const Bitmap& src) : _info(src._info), pixelRef(src.pixelRef) {
@@ -35,9 +37,10 @@ Bitmap::Bitmap(Bitmap&& src) : _info(src._info), pixelRef(std::move(src.pixelRef
 }
 
 Bitmap::Bitmap(HardwareBufferRef hardwareBuffer, std::shared_ptr<ColorSpace> colorSpace) {
-  auto pixelBuffer = PixelBuffer::MakeFrom(hardwareBuffer, std::move(colorSpace));
+  auto pixelBuffer = PixelBuffer::MakeFrom(hardwareBuffer);
   pixelRef = PixelRef::Wrap(pixelBuffer);
   if (pixelRef != nullptr) {
+    pixelRef->info().setColorSpace(std::move(colorSpace));
     _info = pixelRef->info();
   }
 }
@@ -58,8 +61,8 @@ Bitmap& Bitmap::operator=(Bitmap&& src) {
   return *this;
 }
 
-bool Bitmap::allocPixels(int width, int height, bool alphaOnly, bool tryHardware, std::shared_ptr<ColorSpace> colorSpace) {
-  pixelRef = PixelRef::Make(width, height, alphaOnly, tryHardware, std::move(colorSpace));
+bool Bitmap::allocPixels(int width, int height, bool alphaOnly, bool tryHardware) {
+  pixelRef = PixelRef::Make(width, height, alphaOnly, tryHardware);
   if (pixelRef != nullptr) {
     _info = pixelRef->info();
   }
@@ -83,6 +86,13 @@ const void* Bitmap::lockPixels() const {
 void Bitmap::unlockPixels() const {
   if (pixelRef != nullptr) {
     pixelRef->unlockPixels();
+  }
+}
+
+void Bitmap::setColorSpace(const std::shared_ptr<ColorSpace>& colorSpace) const {
+  _info.setColorSpace(colorSpace);
+  if(pixelRef) {
+    pixelRef->info().setColorSpace(colorSpace);
   }
 }
 

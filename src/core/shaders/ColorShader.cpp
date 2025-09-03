@@ -21,8 +21,8 @@
 #include "gpu/processors/ConstColorProcessor.h"
 
 namespace tgfx {
-std::shared_ptr<Shader> Shader::MakeColorShader(Color color) {
-  auto shader = std::make_shared<ColorShader>(color);
+std::shared_ptr<Shader> Shader::MakeColorShader(Color color, const std::shared_ptr<ColorSpace>& colorSpace) {
+  auto shader = std::make_shared<ColorShader>(color, colorSpace);
   shader->weakThis = shader;
   return shader;
 }
@@ -31,8 +31,11 @@ bool ColorShader::isOpaque() const {
   return color.isOpaque();
 }
 
-bool ColorShader::asColor(Color* output) const {
+bool ColorShader::asColor(Color* output, std::shared_ptr<ColorSpace>* colorSpace) const {
   *output = color;
+  if(colorSpace) {
+    *colorSpace = this->colorSpace;
+  }
   return true;
 }
 

@@ -94,16 +94,19 @@ class ImageInfo {
     return _alphaType;
   }
 
-
- std::shared_ptr<ColorSpace> colorSpace() const {
-   return _colorSpace;
-  }
-
   /**
    * Returns the rowBytes of the pixels.
    */
   size_t rowBytes() const {
     return _rowBytes;
+  }
+
+  std::shared_ptr<ColorSpace> colorSpace() const {
+    return _colorSpace;
+  }
+
+  void setColorSpace(std::shared_ptr<ColorSpace> colorSpace) const {
+    _colorSpace = std::move(colorSpace);
   }
 
   /**
@@ -130,7 +133,7 @@ class ImageInfo {
    * same.
    */
   ImageInfo makeWH(int newWidth, int newHeight) const {
-    return Make(newWidth, newHeight, _colorType, _alphaType, _rowBytes, _colorSpace);
+    return Make(newWidth, newHeight, _colorType, _alphaType, _rowBytes);
   }
 
   /**
@@ -144,7 +147,7 @@ class ImageInfo {
    * Creates a new ImageInfo with alphaType set to newAlphaType, and keep other properties the same.
    */
   ImageInfo makeAlphaType(AlphaType newAlphaType) const {
-    return Make(_width, _height, _colorType, newAlphaType, _rowBytes, _colorSpace);
+    return Make(_width, _height, _colorType, newAlphaType, _rowBytes);
   }
 
   /**
@@ -152,11 +155,11 @@ class ImageInfo {
    * other properties the same.
    */
   ImageInfo makeColorType(ColorType newColorType, size_t newRowBytes = 0) const {
-    return Make(_width, _height, newColorType, _alphaType, newRowBytes, _colorSpace);
+    return Make(_width, _height, newColorType, _alphaType, newRowBytes);
   }
 
-  ImageInfo makeColorSpace(std::shared_ptr<ColorSpace> newColorSpace) const {
-    return Make(_width, _height, _colorType, _alphaType, _rowBytes, newColorSpace);
+  ImageInfo makeColorSpace(std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB()) const {
+    return Make(_width, _height, _colorType, _alphaType, _rowBytes, std::move(colorSpace));
   }
 
   /**
@@ -188,9 +191,9 @@ class ImageInfo {
   }
 
  private:
-  ImageInfo(int width, int height, ColorType colorType, AlphaType alphaType, size_t rowBytes, std::shared_ptr<ColorSpace> colorSpace)
+  ImageInfo(int width, int height, ColorType colorType, AlphaType alphaType, size_t rowBytes, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
       : _width(width), _height(height), _colorType(colorType), _alphaType(alphaType),
-        _rowBytes(rowBytes), _colorSpace(colorSpace) {
+        _rowBytes(rowBytes), _colorSpace(std::move(colorSpace)){
   }
 
   int _width = 0;
@@ -198,6 +201,6 @@ class ImageInfo {
   ColorType _colorType = ColorType::Unknown;
   AlphaType _alphaType = AlphaType::Unknown;
   size_t _rowBytes = 0;
-  std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
+  mutable std::shared_ptr<ColorSpace> _colorSpace = ColorSpace::MakeSRGB();
 };
 }  // namespace tgfx

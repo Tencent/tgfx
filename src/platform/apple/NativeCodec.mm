@@ -123,7 +123,7 @@ NativeCodec::~NativeCodec() {
   }
 }
 
-bool NativeCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,  std::shared_ptr<ColorSpace>,
+bool NativeCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
                                void* dstPixels) const {
   if (dstPixels == nullptr) {
     return false;

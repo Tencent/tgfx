@@ -264,7 +264,7 @@ static void UpdateReadInfo(png_structp p, png_infop pi) {
   png_read_update_info(p, pi);
 }
 
-bool PngCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes, std::shared_ptr<ColorSpace> colorSpace,
+bool PngCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
                             void* dstPixels) const {
   auto readInfo = ReadInfo::Make(filePath, fileData);
   if (readInfo == nullptr) {
@@ -276,7 +276,6 @@ bool PngCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dst
     return false;
   }
   UpdateReadInfo(readInfo->p, readInfo->pi);
-
   readInfo->rowPtrs = (unsigned char**)malloc(sizeof(unsigned char*) * (size_t)h);
   if (readInfo->rowPtrs == nullptr) {
     return false;
@@ -284,8 +283,14 @@ bool PngCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dst
   if (setjmp(png_jmpbuf(readInfo->p))) {
     return false;
   }
-  auto cs = ImageGenerator::colorSpace();
-  ImageInfo info = ImageInfo::Make(w, h, ColorType::RGBA_8888, AlphaType::Unpremultiplied, 0, cs);
+  if (colorType == ColorType::RGBA_8888 && alphaType == AlphaType::Unpremultiplied) {
+    for (size_t i = 0; i < static_cast<size_t>(h); i++) {
+      readInfo->rowPtrs[i] = static_cast<unsigned char*>(dstPixels) + (dstRowBytes * i);
+    }
+    png_read_image(readInfo->p, readInfo->rowPtrs);
+    return true;
+  }
+  ImageInfo info = ImageInfo::Make(w, h, ColorType::RGBA_8888, AlphaType::Unpremultiplied);
   readInfo->data = (unsigned char*)malloc(info.byteSize());
   if (readInfo->data == nullptr) {
     return false;
@@ -295,7 +300,7 @@ bool PngCodec::onReadPixels(ColorType colorType, AlphaType alphaType, size_t dst
   }
   png_read_image(readInfo->p, readInfo->rowPtrs);
   Pixmap pixmap(info, readInfo->data);
-  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes, colorSpace);
+  auto dstInfo = ImageInfo::Make(width(), height(), colorType, alphaType, dstRowBytes);
   return pixmap.readPixels(dstInfo, dstPixels);
 }
 

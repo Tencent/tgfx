@@ -46,6 +46,10 @@ class RawPixelData : public ImageBuffer {
     return info.isAlphaOnly();
   }
 
+  std::shared_ptr<ColorSpace> colorSpace() const override {
+    return info.colorSpace();
+  }
+
  protected:
   std::shared_ptr<TextureView> onMakeTexture(Context* context, bool mipmapped) const override {
     switch (info.colorType()) {
@@ -68,7 +72,7 @@ class RawPixelData : public ImageBuffer {
   std::shared_ptr<Data> pixels = nullptr;
 };
 
-std::shared_ptr<ImageBuffer> RawPixelCodec::onMakeBuffer(bool tryHardware, std::shared_ptr<ColorSpace>) const {
+std::shared_ptr<ImageBuffer> RawPixelCodec::onMakeBuffer(bool tryHardware) const {
   if (info.alphaType() != AlphaType::Unpremultiplied) {
     switch (info.colorType()) {
       case ColorType::ALPHA_8:

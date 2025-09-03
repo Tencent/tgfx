@@ -18,6 +18,7 @@
 
 #include "GLProgramBuilder.h"
 #include "GLUtil.h"
+//#include <fstream>
 
 namespace tgfx {
 static std::string TypeModifierString(bool isDesktopGL, ShaderVar::TypeModifier t,
@@ -146,6 +147,12 @@ std::unique_ptr<GLProgram> GLProgramBuilder::finalize() {
   finalizeShaders();
   auto vertex = vertexShaderBuilder()->shaderString();
   auto fragment = fragmentShaderBuilder()->shaderString();
+  // std::ofstream file("vertex.glsl");
+  // std::ofstream file1("fragment.glsl");
+  // file << vertex;
+  // file.close();
+  // file1 << fragment;
+  // file1.close();
   auto gl = GLFunctions::Get(context);
   auto programID = CreateGLProgram(gl, vertex, fragment);
   if (programID == 0) {

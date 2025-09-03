@@ -30,9 +30,9 @@ class TPArgs {
   TPArgs() = default;
 
   TPArgs(Context* context, uint32_t renderFlags, bool mipmapped, float drawScale,
-         BackingFit backingFit = BackingFit::Approx, std::shared_ptr<ColorSpace> colorSpace = nullptr)
+         BackingFit backingFit = BackingFit::Approx)
       : context(context), renderFlags(renderFlags), mipmapped(mipmapped), backingFit(backingFit),
-        drawScale(drawScale), colorSpace(colorSpace) {
+        drawScale(drawScale) {
   }
 
   /**
@@ -60,7 +60,5 @@ class TPArgs {
    * Recommended scales for creating the TextureProxy.
    */
   float drawScale = 1.0f;
-
-  std::shared_ptr<ColorSpace> colorSpace = nullptr;
 };
 }  // namespace tgfx

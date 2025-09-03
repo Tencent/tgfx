@@ -43,7 +43,7 @@ struct GradientInfo {
 class GradientShader : public Shader {
  public:
   GradientShader(const std::vector<Color>& colors, const std::vector<float>& positions,
-                 const Matrix& pointsToUnit);
+                 const Matrix& pointsToUnit, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   bool isOpaque() const override {
     return colorsAreOpaque;
@@ -55,6 +55,7 @@ class GradientShader : public Shader {
   std::vector<float> originalPositions = {};
   const Matrix pointsToUnit;
   bool colorsAreOpaque = false;
+  std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB();
 
  protected:
   Type type() const override {
@@ -71,7 +72,7 @@ class GradientShader : public Shader {
 class LinearGradientShader : public GradientShader {
  public:
   LinearGradientShader(const Point& startPoint, const Point& endPoint,
-                       const std::vector<Color>& colors, const std::vector<float>& positions);
+                       const std::vector<Color>& colors, const std::vector<float>& positions, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   GradientType asGradient(GradientInfo*) const override;
 
@@ -83,7 +84,7 @@ class LinearGradientShader : public GradientShader {
 class RadialGradientShader : public GradientShader {
  public:
   RadialGradientShader(const Point& center, float radius, const std::vector<Color>& colors,
-                       const std::vector<float>& positions);
+                       const std::vector<float>& positions, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   GradientType asGradient(GradientInfo*) const override;
 
@@ -95,7 +96,7 @@ class RadialGradientShader : public GradientShader {
 class ConicGradientShader : public GradientShader {
  public:
   ConicGradientShader(const Point& center, float t0, float t1, const std::vector<Color>& colors,
-                      const std::vector<float>& positions);
+                      const std::vector<float>& positions, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   GradientType asGradient(GradientInfo*) const override;
 
@@ -111,7 +112,7 @@ class ConicGradientShader : public GradientShader {
 class DiamondGradientShader : public GradientShader {
  public:
   DiamondGradientShader(const Point& center, float halfDiagonal, const std::vector<Color>& colors,
-                        const std::vector<float>& positions);
+                        const std::vector<float>& positions, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   GradientType asGradient(GradientInfo* info) const override;
 

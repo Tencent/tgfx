@@ -48,6 +48,8 @@ bool ImageShader::isEqual(const Shader* shader) const {
 PlacementPtr<FragmentProcessor> ImageShader::asFragmentProcessor(const FPArgs& args,
                                                                  const Matrix* uvMatrix) const {
   SamplingArgs samplingArgs = {tileModeX, tileModeY, sampling, SrcRectConstraint::Fast};
-  return image->asFragmentProcessor(args, samplingArgs, uvMatrix);
+  auto dstColorSpace = args.dstColorSpace;
+  auto dstImage = image->makeColorSpace(std::move(dstColorSpace));
+  return dstImage->asFragmentProcessor(args, samplingArgs, uvMatrix);
 }
 }  // namespace tgfx

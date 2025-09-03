@@ -21,6 +21,7 @@
 #include <cstdint>
 #include "SamplerHandle.h"
 #include "ShaderVar.h"
+#include "gpu/ColorSpaceXformHelper.h"
 
 namespace tgfx {
 class ProgramBuilder;
@@ -52,6 +53,8 @@ class ShaderBuilder {
    */
   void appendTextureLookup(SamplerHandle samplerHandle, const std::string& coordName);
 
+  void appendColorGamutXform(std::string* out, const char* srcColor, ColorSpaceXformHelper* colorXformHelper);
+
   /**
    * Called by Processors to add code to one of the shaders.
    */
@@ -60,6 +63,8 @@ class ShaderBuilder {
   void codeAppend(const std::string& str);
 
   void addFunction(const std::string& str);
+
+  std::string getMangledFunctionName(const char* baseName);
 
   /**
    * Combines the various parts of the shader to create a single finalized shader string.

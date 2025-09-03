@@ -126,6 +126,9 @@ std::shared_ptr<Image> Image::MakeAdopted(Context* context, const BackendTexture
 }
 
 std::shared_ptr<Image> Image::makeColorSpace(std::shared_ptr<ColorSpace> colorSpace) const {
+  if(isAlphaOnly()) {
+    return weakThis.lock();
+  }
   auto result = std::make_shared<ColorSpaceImage>(std::move(colorSpace), weakThis.lock());
   result->weakThis = result;
   return result;

@@ -36,13 +36,13 @@ class JpegCodec : public ImageCodec {
   uint32_t getScaledDimensions(int newWidth, int newHeight) const;
 
  protected:
-  bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,  std::shared_ptr<ColorSpace> colorSpace,
+  bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
                     void* dstPixels) const override;
 
-  bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const override;
+  bool readPixels(const ImageInfo& dstInfo, void* dstPixels, bool isConvertColorSpace) const override;
 
   bool readScaledPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
-                        void* dstPixels, uint32_t scaleNum, std::shared_ptr<ColorSpace> colorSpace = nullptr) const;
+                        void* dstPixels, uint32_t scaleNum) const;
 
   std::shared_ptr<Data> getEncodedData() const override;
 

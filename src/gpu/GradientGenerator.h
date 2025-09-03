@@ -26,14 +26,14 @@ namespace tgfx {
 
 class GradientGenerator : public ImageGenerator {
  public:
-  GradientGenerator(const Color* colors, const float* positions, int count);
+  GradientGenerator(const Color* colors, const float* positions, int count, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   bool isAlphaOnly() const override {
     return false;
   }
 
  protected:
-  std::shared_ptr<ImageBuffer> onMakeBuffer(bool, std::shared_ptr<ColorSpace> colorSpace = nullptr) const override;
+  std::shared_ptr<ImageBuffer> onMakeBuffer(bool) const override;
 
  private:
   std::vector<Color> colors = {};

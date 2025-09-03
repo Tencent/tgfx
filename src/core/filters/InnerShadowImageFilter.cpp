@@ -24,30 +24,30 @@
 #include "gpu/processors/XfermodeFragmentProcessor.h"
 namespace tgfx {
 std::shared_ptr<ImageFilter> ImageFilter::InnerShadow(float dx, float dy, float blurrinessX,
-                                                      float blurrinessY, const Color& color) {
+                                                      float blurrinessY, const Color& color, std::shared_ptr<ColorSpace> colorSpace) {
   if (color.alpha <= 0) {
     return nullptr;
   }
-  return std::make_shared<InnerShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, false);
+  return std::make_shared<InnerShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, false, std::move(colorSpace));
 }
 
 std::shared_ptr<ImageFilter> ImageFilter::InnerShadowOnly(float dx, float dy, float blurrinessX,
-                                                          float blurrinessY, const Color& color) {
+                                                          float blurrinessY, const Color& color, std::shared_ptr<ColorSpace> colorSpace) {
   // If color is transparent, the image after applying the filter will be transparent.
   // So we should not return nullptr when color is transparent.
-  return std::make_shared<InnerShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, true);
+  return std::make_shared<InnerShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, true, std::move(colorSpace));
 }
 
 InnerShadowImageFilter::InnerShadowImageFilter(float dx, float dy, float blurrinessX,
                                                float blurrinessY, const Color& color,
-                                               bool shadowOnly)
+                                               bool shadowOnly, std::shared_ptr<ColorSpace> colorSpace)
 
     : dx(dx), dy(dy), blurFilter(ImageFilter::Blur(blurrinessX, blurrinessY)), color(color),
-      shadowOnly(shadowOnly) {
+      shadowOnly(shadowOnly), colorSpace(std::move(colorSpace)) {
 }
 
 PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowFragmentProcessor(
-    std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
+    const std::shared_ptr<Image>& source, const FPArgs& args, const SamplingOptions& sampling,
     SrcRectConstraint constraint, const Matrix* uvMatrix) const {
   auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);
   if (uvMatrix) {
@@ -56,11 +56,11 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowFragmentProcess
 
   PlacementPtr<FragmentProcessor> invertShadowMask;
   if (blurFilter != nullptr) {
-    invertShadowMask = blurFilter->asFragmentProcessor(std::move(source), args, sampling,
+    invertShadowMask = blurFilter->asFragmentProcessor(source, args, sampling,
                                                        constraint, &shadowMatrix);
   } else {
     invertShadowMask =
-        FragmentProcessor::Make(std::move(source), args, TileMode::Decal, TileMode::Decal, sampling,
+        FragmentProcessor::Make(source, args, TileMode::Decal, TileMode::Decal, sampling,
                                 constraint, &shadowMatrix);
   }
 
@@ -69,7 +69,10 @@ PlacementPtr<FragmentProcessor> InnerShadowImageFilter::getShadowFragmentProcess
     invertShadowMask =
         ConstColorProcessor::Make(buffer, Color::Transparent().premultiply(), InputMode::Ignore);
   }
-  auto colorProcessor = ConstColorProcessor::Make(buffer, color.premultiply(), InputMode::Ignore);
+  auto dstColor = color;
+  ColorSpaceXformSteps steps(colorSpace.get(), AlphaType::Unpremultiplied, source->colorSpace().get(), AlphaType::Premultiplied);
+  steps.apply(dstColor.array());
+  auto colorProcessor = ConstColorProcessor::Make(buffer, dstColor, InputMode::Ignore);
 
   // get shadow mask and fill it with color
   auto colorShadowProcessor = XfermodeFragmentProcessor::MakeFromTwoProcessors(

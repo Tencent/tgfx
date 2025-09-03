@@ -17,6 +17,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "tgfx/core/ImageCodec.h"
+#include <src/skcms_public.h>
+
 #include "BoxFilterDownsample.h"
 #include "core/PixelBuffer.h"
 #include "core/utils/USE.h"
@@ -25,6 +27,7 @@
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Stream.h"
+#include "PixelsConvert.h"
 
 #if defined(TGFX_USE_WEBP_DECODE) || defined(TGFX_USE_WEBP_ENCODE)
 #include "core/codecs/webp/WebpCodec.h"
@@ -150,12 +153,19 @@ std::shared_ptr<Data> ImageCodec::Encode(const Pixmap& pixmap, EncodedFormat for
   return nullptr;
 }
 
-bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
+bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels, bool isConvertColorSpace) const {
+  if(!isConvertColorSpace) {
+   dstInfo.setColorSpace(colorSpace());
+  }
   if (dstInfo.width() > width() || dstInfo.height() > height()) {
     return false;
   }
   if (dstInfo.width() == width() && dstInfo.height() == height()) {
-    return onReadPixels(dstInfo.colorType(), dstInfo.alphaType(), dstInfo.rowBytes(), dstInfo.colorSpace(), dstPixels);
+    bool result = onReadPixels(dstInfo.colorType(), dstInfo.alphaType(), dstInfo.rowBytes(), dstPixels);
+    if(isConvertColorSpace) {
+      ConvertPixels(dstInfo.makeColorSpace(colorSpace()), dstPixels, dstInfo, dstPixels, true);
+    }
+    return result;
   }
 
   Buffer buffer = {};
@@ -184,7 +194,12 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
   if (!buffer.alloc(srcRowBytes * static_cast<size_t>(height()))) {
     return false;
   }
-  auto result = onReadPixels(colorType, dstInfo.alphaType(), srcRowBytes, dstInfo.colorSpace(), buffer.data());
+  auto result = onReadPixels(colorType, dstInfo.alphaType(), srcRowBytes, buffer.data());
+  if(isConvertColorSpace) {
+    auto srcColorSpace = colorSpace();
+    auto srcInfo = dstInfo.makeColorType(colorType, srcRowBytes);
+    ConvertPixels(srcInfo.makeColorSpace(srcColorSpace), dstPixels, dstInfo, dstPixels, true);
+  }
   if (!result) {
     return false;
   }
@@ -195,13 +210,13 @@ bool ImageCodec::readPixels(const ImageInfo& dstInfo, void* dstPixels) const {
                                   static_cast<int>(dstImageInfo.rowBytes())};
   BoxFilterDownsample(buffer.data(), inputLayout, dstData, outputLayout, isOneComponent);
   if (!dstTempBuffer.isEmpty()) {
-    Pixmap(dstImageInfo, dstData).readPixels(dstInfo, dstPixels);
+    Pixmap(dstImageInfo, dstData).readPixels(dstInfo, dstPixels, isConvertColorSpace);
   }
   return true;
 }
 
-std::shared_ptr<ImageBuffer> ImageCodec::onMakeBuffer(bool tryHardware, std::shared_ptr<ColorSpace> colorSpace) const {
-  auto pixelBuffer = PixelBuffer::Make(width(), height(), isAlphaOnly(), tryHardware, colorSpace);
+std::shared_ptr<ImageBuffer> ImageCodec::onMakeBuffer(bool tryHardware) const {
+  auto pixelBuffer = PixelBuffer::Make(width(), height(), isAlphaOnly(), tryHardware, colorSpace());
   if (pixelBuffer == nullptr) {
     return nullptr;
   }

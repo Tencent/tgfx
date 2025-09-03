@@ -34,8 +34,8 @@ class MatrixShader final : public Shader {
     return source->isAImage();
   }
 
-  bool asColor(Color* color) const override {
-    return source->asColor(color);
+  bool asColor(Color* color, std::shared_ptr<ColorSpace>* colorSpace) const override {
+    return source->asColor(color, colorSpace);
   }
 
   std::shared_ptr<Shader> makeWithMatrix(const Matrix& viewMatrix) const override;

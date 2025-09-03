@@ -98,15 +98,14 @@ std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alpha
   }
   if (tryHardware) {
     auto hardwareBuffer = HardwareBufferAllocate(width, height, alphaOnly);
-    auto pixelBuffer = PixelBuffer::MakeFrom(hardwareBuffer, std::move(colorSpace));
+    auto pixelBuffer = PixelBuffer::MakeFrom(hardwareBuffer);
     HardwareBufferRelease(hardwareBuffer);
     if (pixelBuffer != nullptr) {
       return pixelBuffer;
     }
   }
   auto colorType = alphaOnly ? ColorType::ALPHA_8 : ColorType::RGBA_8888;
-  auto info = ImageInfo::Make(width, height, colorType);
-  info = info.makeColorSpace(colorSpace);
+  auto info = ImageInfo::Make(width, height, colorType, AlphaType::Premultiplied, 0, std::move(colorSpace));
   if (info.isEmpty()) {
     return nullptr;
   }
@@ -117,9 +116,8 @@ std::shared_ptr<PixelBuffer> PixelBuffer::Make(int width, int height, bool alpha
   return std::make_shared<RasterPixelBuffer>(info, pixels);
 }
 
-std::shared_ptr<PixelBuffer> PixelBuffer::MakeFrom(HardwareBufferRef hardwareBuffer, std::shared_ptr<ColorSpace> colorSpace) {
+std::shared_ptr<PixelBuffer> PixelBuffer::MakeFrom(HardwareBufferRef hardwareBuffer) {
   auto info = HardwareBufferGetInfo(hardwareBuffer);
-  info = info.makeColorSpace(std::move(colorSpace));
   return info.isEmpty() ? nullptr : std::make_shared<HardwarePixelBuffer>(info, hardwareBuffer);
 }
 

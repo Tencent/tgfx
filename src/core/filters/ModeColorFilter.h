@@ -24,7 +24,7 @@
 namespace tgfx {
 class ModeColorFilter : public ColorFilter {
  public:
-  ModeColorFilter(Color color, BlendMode mode) : color(color), mode(mode) {
+  ModeColorFilter(Color color, BlendMode mode, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB()) : color(color), mode(mode), colorSpace(std::move(colorSpace)) {
   }
 
   bool isAlphaUnchanged() const override;
@@ -33,6 +33,7 @@ class ModeColorFilter : public ColorFilter {
 
   Color color;
   BlendMode mode;
+  std::shared_ptr<ColorSpace> colorSpace;
 
  protected:
   Type type() const override {
@@ -42,6 +43,6 @@ class ModeColorFilter : public ColorFilter {
   bool isEqual(const ColorFilter* colorFilter) const override;
 
  private:
-  PlacementPtr<FragmentProcessor> asFragmentProcessor(Context* context) const override;
+  PlacementPtr<FragmentProcessor> asFragmentProcessor(Context* context, std::shared_ptr<ColorSpace> dstColorSpace) const override;
 };
 }  // namespace tgfx

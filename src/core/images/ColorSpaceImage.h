@@ -47,6 +47,10 @@ public:
     return _sourceImage->isFullyDecoded();
   }
 
+  bool isTextureBacked() const override {
+    return _sourceImage->isTextureBacked();
+  }
+
   std::shared_ptr<ColorSpace> colorSpace() const override {
     return _colorSpace;
   }
@@ -57,15 +61,49 @@ public:
     result->weakThis = result;
     return result;
   }
+
+  std::shared_ptr<Image> makeTextureImage(Context* context) const override {
+    auto image = _sourceImage->makeTextureImage(context);
+    return image->makeColorSpace(_colorSpace);
+  }
+
+  BackendTexture getBackendTexture(Context* context, ImageOrigin* origin) const override {
+    return _sourceImage->getBackendTexture(context, origin);
+  }
+
+  std::shared_ptr<Image> makeRasterized() const override {
+    auto image = _sourceImage->makeRasterized();
+    return image->makeColorSpace(_colorSpace);
+  }
+
 protected:
   Type type() const override {
     return Type::ColorSpace;
   }
 
+  std::shared_ptr<Image> onMakeDecoded(Context* context, bool tryHardware) const override {
+    auto image = _sourceImage->onMakeDecoded(context, tryHardware);
+    return image->makeColorSpace(_colorSpace);
+  }
+
   std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override {
-    auto newSource =  _sourceImage->onMakeMipmapped(enabled);
-    auto image = std::make_shared<ColorSpaceImage>(_colorSpace, std::move(newSource));
-    return newSource;
+    auto image =  _sourceImage->onMakeMipmapped(enabled);
+    return image->makeColorSpace(_colorSpace);
+  }
+
+  std::shared_ptr<Image> onMakeSubset(const Rect& subset) const override {
+    auto image = _sourceImage->onMakeSubset(subset);
+    return image->makeColorSpace(_colorSpace);
+  }
+
+  std::shared_ptr<Image> onMakeOriented(Orientation orientation) const override {
+    auto image = _sourceImage->onMakeOriented(orientation);
+    return image->makeColorSpace(_colorSpace);
+  }
+
+  std::shared_ptr<Image> onMakeWithFilter(std::shared_ptr<ImageFilter> filter, Point* offset, const Rect* clipRect) const override {
+    auto image = _sourceImage->onMakeWithFilter(filter, offset, clipRect);
+    return image->makeColorSpace(_colorSpace);
   }
 
   std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,

@@ -58,6 +58,8 @@ struct ColorSpaceXformSteps {
 
   void apply(float rgba[4]) const;
 
+  static uint32_t xformKey(const ColorSpaceXformSteps* xform);
+
   Flags fFlags;
 
   TransferFunction fSrcTF,     // Apply for linearize.

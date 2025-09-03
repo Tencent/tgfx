@@ -24,24 +24,24 @@
 
 namespace tgfx {
 std::shared_ptr<ImageFilter> ImageFilter::DropShadow(float dx, float dy, float blurrinessX,
-                                                     float blurrinessY, const Color& color) {
+                                                     float blurrinessY, const Color& color, std::shared_ptr<ColorSpace> colorSpace) {
   if (color.alpha <= 0) {
     return nullptr;
   }
-  return std::make_shared<DropShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, false);
+  return std::make_shared<DropShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, false, std::move(colorSpace));
 }
 
 std::shared_ptr<ImageFilter> ImageFilter::DropShadowOnly(float dx, float dy, float blurrinessX,
-                                                         float blurrinessY, const Color& color) {
+                                                         float blurrinessY, const Color& color, std::shared_ptr<ColorSpace> colorSpace) {
   // If color is transparent, the image after applying the filter will be transparent.
   // So we should not return nullptr when color is transparent.
-  return std::make_shared<DropShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, true);
+  return std::make_shared<DropShadowImageFilter>(dx, dy, blurrinessX, blurrinessY, color, true, std::move(colorSpace));
 }
 
 DropShadowImageFilter::DropShadowImageFilter(float dx, float dy, float blurrinessX,
-                                             float blurrinessY, const Color& color, bool shadowOnly)
+                                             float blurrinessY, const Color& color, bool shadowOnly, std::shared_ptr<ColorSpace> colorSpace)
     : dx(dx), dy(dy), blurFilter(ImageFilter::Blur(blurrinessX, blurrinessY)), color(color),
-      shadowOnly(shadowOnly) {
+      shadowOnly(shadowOnly), colorSpace(std::move(colorSpace)) {
 }
 
 Rect DropShadowImageFilter::onFilterBounds(const Rect& srcRect) const {
@@ -69,7 +69,7 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::getSourceFragmentProcesso
 }
 
 PlacementPtr<FragmentProcessor> DropShadowImageFilter::getShadowFragmentProcessor(
-    std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
+    const std::shared_ptr<Image>& source, const FPArgs& args, const SamplingOptions& sampling,
     SrcRectConstraint constraint, const Matrix* uvMatrix) const {
   auto shadowMatrix = Matrix::MakeTrans(-dx, -dy);
   if (uvMatrix) {
@@ -78,17 +78,20 @@ PlacementPtr<FragmentProcessor> DropShadowImageFilter::getShadowFragmentProcesso
 
   PlacementPtr<FragmentProcessor> shadowProcessor;
   if (blurFilter != nullptr) {
-    shadowProcessor = blurFilter->asFragmentProcessor(std::move(source), args, sampling, constraint,
+    shadowProcessor = blurFilter->asFragmentProcessor(source, args, sampling, constraint,
                                                       &shadowMatrix);
   } else {
-    shadowProcessor = FragmentProcessor::Make(std::move(source), args, TileMode::Decal,
+    shadowProcessor = FragmentProcessor::Make(source, args, TileMode::Decal,
                                               TileMode::Decal, sampling, constraint, &shadowMatrix);
   }
   if (shadowProcessor == nullptr) {
     return nullptr;
   }
   auto buffer = args.context->drawingBuffer();
-  auto colorProcessor = ConstColorProcessor::Make(buffer, color.premultiply(), InputMode::Ignore);
+  auto dstColor = color;
+  ColorSpaceXformSteps steps(colorSpace.get(), AlphaType::Unpremultiplied, source->colorSpace().get(), AlphaType::Premultiplied);
+  steps.apply(dstColor.array());
+  auto colorProcessor = ConstColorProcessor::Make(buffer, dstColor, InputMode::Ignore);
   return XfermodeFragmentProcessor::MakeFromTwoProcessors(
       buffer, std::move(colorProcessor), std::move(shadowProcessor), BlendMode::SrcIn);
 }

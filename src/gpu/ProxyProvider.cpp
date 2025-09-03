@@ -251,7 +251,7 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
 }
 
 std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
-    std::shared_ptr<ImageGenerator> generator, bool mipmapped, uint32_t renderFlags, std::shared_ptr<ColorSpace> colorSpace) {
+    std::shared_ptr<ImageGenerator> generator, bool mipmapped, uint32_t renderFlags) {
   if (generator == nullptr) {
     return nullptr;
   }
@@ -265,7 +265,7 @@ std::shared_ptr<TextureProxy> ProxyProvider::createTextureProxy(
   auto asyncDecoding = false;
 #endif
   // Ensure the image source is retained so it won't be destroyed prematurely during async decoding.
-  auto source = ImageSource::MakeFrom(std::move(generator), !mipmapped, asyncDecoding, std::move(colorSpace));
+  auto source = ImageSource::MakeFrom(std::move(generator), !mipmapped, asyncDecoding);
   return createTextureProxyByImageSource(std::move(source), width, height, alphaOnly, mipmapped);
 }
 
@@ -340,7 +340,7 @@ std::shared_ptr<TextureProxy> ProxyProvider::wrapExternalTexture(
 }
 
 std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
-    const BackendTexture& backendTexture, int sampleCount, ImageOrigin origin, bool adopted) {
+    const BackendTexture& backendTexture, int sampleCount, ImageOrigin origin, bool adopted, std::shared_ptr<ColorSpace> colorSpace) {
   auto format = context->gpu()->getExternalTextureFormat(backendTexture);
   if (format == PixelFormat::Unknown) {
     return nullptr;
@@ -351,13 +351,13 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
   }
   sampleCount = caps->getSampleCount(sampleCount, format);
   auto proxy = std::shared_ptr<TextureRenderTargetProxy>(
-      new ExternalTextureRenderTargetProxy(backendTexture, format, sampleCount, origin, adopted));
+      new ExternalTextureRenderTargetProxy(backendTexture, format, sampleCount, origin, adopted, std::move(colorSpace)));
   addResourceProxy(proxy);
   return proxy;
 }
 
 std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
-    HardwareBufferRef hardwareBuffer, int sampleCount) {
+    HardwareBufferRef hardwareBuffer, int sampleCount, std::shared_ptr<ColorSpace> colorSpace) {
   auto size = HardwareBufferGetSize(hardwareBuffer);
   if (size.isEmpty()) {
     return nullptr;
@@ -373,14 +373,14 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
   }
   sampleCount = caps->getSampleCount(sampleCount, formats.front());
   auto proxy = std::shared_ptr<TextureRenderTargetProxy>(new HardwareRenderTargetProxy(
-      hardwareBuffer, size.width, size.height, formats.front(), sampleCount));
+      hardwareBuffer, size.width, size.height, formats.front(), sampleCount, std::move(colorSpace)));
   addResourceProxy(proxy);
   return proxy;
 }
 
 std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
     const UniqueKey& uniqueKey, int width, int height, PixelFormat format, int sampleCount,
-    bool mipmapped, ImageOrigin origin, BackingFit backingFit, uint32_t renderFlags) {
+    bool mipmapped, ImageOrigin origin, BackingFit backingFit, uint32_t renderFlags, std::shared_ptr<ColorSpace> colorSpace) {
   if (!TextureView::CheckSizeAndFormat(context, width, height, format)) {
     return nullptr;
   }
@@ -396,7 +396,7 @@ std::shared_ptr<RenderTargetProxy> ProxyProvider::createRenderTargetProxy(
   sampleCount = caps->getSampleCount(sampleCount, format);
   auto hasMipmaps = caps->mipmapSupport ? mipmapped : false;
   auto proxy = std::shared_ptr<TextureRenderTargetProxy>(
-      new TextureRenderTargetProxy(width, height, format, sampleCount, hasMipmaps, origin));
+      new TextureRenderTargetProxy(width, height, format, sampleCount, hasMipmaps, origin, false, std::move(colorSpace)));
   if (backingFit == BackingFit::Approx) {
     proxy->_backingStoreWidth = GetApproxSize(width);
     proxy->_backingStoreHeight = GetApproxSize(height);

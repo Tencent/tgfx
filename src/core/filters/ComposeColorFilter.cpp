@@ -53,9 +53,9 @@ bool ComposeColorFilter::isEqual(const ColorFilter* colorFilter) const {
   return inner->isEqual(other->inner.get()) && outer->isEqual(other->outer.get());
 }
 
-PlacementPtr<FragmentProcessor> ComposeColorFilter::asFragmentProcessor(Context* context) const {
-  auto innerProcessor = inner->asFragmentProcessor(context);
-  auto outerProcessor = outer->asFragmentProcessor(context);
+PlacementPtr<FragmentProcessor> ComposeColorFilter::asFragmentProcessor(Context* context, std::shared_ptr<ColorSpace> colorSpace) const {
+  auto innerProcessor = inner->asFragmentProcessor(context, colorSpace);
+  auto outerProcessor = outer->asFragmentProcessor(context, colorSpace);
   return FragmentProcessor::Compose(context->drawingBuffer(), std::move(innerProcessor),
                                     std::move(outerProcessor));
 }

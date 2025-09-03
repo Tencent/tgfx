@@ -43,6 +43,10 @@ class FilterImage : public SubsetImage {
     return static_cast<int>(bounds.height());
   }
 
+  std::shared_ptr<ColorSpace> colorSpace() const override {
+    return source->colorSpace();
+  }
+
  protected:
   Type type() const override {
     return Type::Filter;

@@ -40,14 +40,15 @@ class FPArgs {
  public:
   FPArgs() = default;
 
-  FPArgs(Context* context, uint32_t renderFlags, const Rect& drawRect, float drawScale = 1.0f)
-      : context(context), renderFlags(renderFlags), drawRect(drawRect), drawScale(drawScale) {
+  FPArgs(Context* context, uint32_t renderFlags, const Rect& drawRect, float drawScale = 1.0f, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
+      : context(context), renderFlags(renderFlags), drawRect(drawRect), drawScale(drawScale), dstColorSpace(std::move(colorSpace)) {
   }
 
   Context* context = nullptr;
   uint32_t renderFlags = 0;
   Rect drawRect = {};
   float drawScale = 1.0f;
+  std::shared_ptr<ColorSpace> dstColorSpace = nullptr;
 };
 
 class FragmentProcessor : public Processor {

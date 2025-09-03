@@ -30,7 +30,7 @@ static bool IsNoOps(float alpha, BlendMode mode) {
          (1.f == alpha && BlendMode::DstIn == mode);
 }
 
-std::shared_ptr<ColorFilter> ColorFilter::Blend(Color color, BlendMode mode) {
+std::shared_ptr<ColorFilter> ColorFilter::Blend(Color color, BlendMode mode, std::shared_ptr<ColorSpace> colorSpace) {
   float alpha = color.alpha;
   if (BlendMode::Clear == mode) {
     color = Color::Transparent();
@@ -46,7 +46,7 @@ std::shared_ptr<ColorFilter> ColorFilter::Blend(Color color, BlendMode mode) {
   if (IsNoOps(alpha, mode)) {
     return nullptr;
   }
-  return std::make_shared<ModeColorFilter>(color, mode);
+  return std::make_shared<ModeColorFilter>(color, mode, std::move(colorSpace));
 }
 
 bool ModeColorFilter::asColorMode(Color* color, BlendMode* mode) const {
@@ -68,9 +68,12 @@ bool ModeColorFilter::isEqual(const ColorFilter* colorFilter) const {
   return color == other->color && mode == other->mode;
 }
 
-PlacementPtr<FragmentProcessor> ModeColorFilter::asFragmentProcessor(Context* context) const {
+PlacementPtr<FragmentProcessor> ModeColorFilter::asFragmentProcessor(Context* context, std::shared_ptr<ColorSpace> dstColorSpace) const {
+  auto dstColor = color;
+  ColorSpaceXformSteps steps(colorSpace.get(), AlphaType::Unpremultiplied, dstColorSpace.get(), AlphaType::Premultiplied);
+  steps.apply(dstColor.array());
   auto processor =
-      ConstColorProcessor::Make(context->drawingBuffer(), color.premultiply(), InputMode::Ignore);
+      ConstColorProcessor::Make(context->drawingBuffer(), dstColor, InputMode::Ignore);
   return XfermodeFragmentProcessor::MakeFromSrcProcessor(context->drawingBuffer(),
                                                          std::move(processor), mode);
 }

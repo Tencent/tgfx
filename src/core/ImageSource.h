@@ -33,17 +33,16 @@ class ImageSource : public DataSource<ImageBuffer> {
    * image will be decoded synchronously when the getData() method is called.
    */
   static std::unique_ptr<DataSource> MakeFrom(std::shared_ptr<ImageGenerator> generator,
-                                              bool tryHardware = true, bool asyncDecoding = true, std::shared_ptr<ColorSpace> colorSpace = nullptr);
+                                              bool tryHardware = true, bool asyncDecoding = true);
 
-  ImageSource(std::shared_ptr<ImageGenerator> generator, bool tryHardware, std::shared_ptr<ColorSpace> colorSpace = nullptr);
+  ImageSource(std::shared_ptr<ImageGenerator> generator, bool tryHardware);
 
   std::shared_ptr<ImageBuffer> getData() const override {
-    return generator->makeBuffer(tryHardware, colorSpace);
+    return generator->makeBuffer(tryHardware);
   }
 
  private:
   std::shared_ptr<ImageGenerator> generator = nullptr;
   bool tryHardware = true;
-  std::shared_ptr<ColorSpace> colorSpace = nullptr;
 };
 }  // namespace tgfx

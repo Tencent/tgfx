@@ -36,7 +36,7 @@ class ScaledImageGenerator : public ImageGenerator {
     return source->asyncSupport();
   }
 
-  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware, std::shared_ptr<ColorSpace> colorSpace = nullptr) const override;
+  std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const override;
 
  private:
   std::shared_ptr<ImageCodec> source = nullptr;

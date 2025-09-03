@@ -195,7 +195,7 @@ class Pixmap {
    * does not exceed Pixmap (width(), height()). Pixels are copied only if pixel conversion is
    * possible. Returns true if pixels are copied to dstPixels.
    */
-  bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0, int srcY = 0) const;
+  bool readPixels(const ImageInfo& dstInfo, void* dstPixels, int srcX = 0, int srcY = 0, bool isConvertColorSpace = false) const;
 
   /**
    * Copies a rect of pixels from src. Copy starts at (dstX, dstY), and does not exceed

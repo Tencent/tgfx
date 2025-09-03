@@ -24,8 +24,8 @@
 namespace tgfx {
 class BackendRenderTargetWrapper : public RenderTargetProxy {
  public:
-  explicit BackendRenderTargetWrapper(std::shared_ptr<RenderTarget> renderTarget)
-      : renderTarget(std::move(renderTarget)) {
+  explicit BackendRenderTargetWrapper(std::shared_ptr<RenderTarget> renderTarget, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
+      : renderTarget(std::move(renderTarget)), colorSpace(std::move(colorSpace)) {
   }
 
   Context* getContext() const override {
@@ -64,17 +64,22 @@ class BackendRenderTargetWrapper : public RenderTargetProxy {
     return renderTarget;
   }
 
+  std::shared_ptr<ColorSpace> getColorSpace() const override {
+    return colorSpace;
+  }
+
  private:
   std::shared_ptr<RenderTarget> renderTarget = nullptr;
+  std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB();
 };
 
 std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFrom(
-    Context* context, const BackendRenderTarget& backendRenderTarget, ImageOrigin origin) {
+    Context* context, const BackendRenderTarget& backendRenderTarget, ImageOrigin origin, std::shared_ptr<ColorSpace> colorSpace) {
   auto renderTarget = RenderTarget::MakeFrom(context, backendRenderTarget, origin);
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  return std::make_shared<BackendRenderTargetWrapper>(std::move(renderTarget));
+  return std::make_shared<BackendRenderTargetWrapper>(std::move(renderTarget), std::move(colorSpace));
 }
 
 std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFallback(Context* context, int width,

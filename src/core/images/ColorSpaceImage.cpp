@@ -19,6 +19,7 @@
 #include "ColorSpaceImage.h"
 #include "core/utils/PlacementPtr.h"
 #include "gpu/processors/TiledTextureEffect.h"
+#include "gpu/processors/ColorSpaceXformEffect.h"
 #include "gpu/BackingFit.h"
 #include "gpu/TPArgs.h"
 
@@ -30,11 +31,10 @@ std::shared_ptr<TextureProxy> ColorSpaceImage::lockTextureProxy(const TPArgs& ar
 
 PlacementPtr<FragmentProcessor> ColorSpaceImage::asFragmentProcessor(const FPArgs& args,
     const SamplingArgs& samplingArgs, const Matrix* uvMatrix) const {
-  auto textureProxy = lockTextureProxy(
-      TPArgs(args.context, args.renderFlags, hasMipmaps(), 1.0f, BackingFit::Exact, _colorSpace));
-  if (textureProxy == nullptr) {
-    return nullptr;
+  auto fragmentProcessor = _sourceImage->asFragmentProcessor(args, samplingArgs, uvMatrix);
+  if(fragmentProcessor) {
+    return ColorSpaceXformEffect::Make(args.context->drawingBuffer(), std::move(fragmentProcessor), _sourceImage->colorSpace().get(), AlphaType::Premultiplied, _colorSpace.get(), AlphaType::Premultiplied);
   }
-  return TiledTextureEffect::Make(std::move(textureProxy), samplingArgs, uvMatrix, isAlphaOnly());
+  return fragmentProcessor;
 }
 }  // namespace tgfx

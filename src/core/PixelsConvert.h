@@ -17,33 +17,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-
-#include "core/ScalerContext.h"
-#include "tgfx/core/ImageCodec.h"
+#include "tgfx/core/ImageInfo.h"
 
 namespace tgfx {
-/**
- * A Rasterizer that rasterizes a give Glyph.
- */
-class GlyphRasterizer : public ImageCodec {
- public:
-  GlyphRasterizer(int width, int height, std::shared_ptr<ScalerContext> scalerContext,
-                  GlyphID glyphID, bool fauxBold, const Stroke* stroke);
 
-  ~GlyphRasterizer() override;
-
-  bool isAlphaOnly() const override {
-    return !scalerContext->hasColor();
-  }
-
- protected:
-  bool onReadPixels(ColorType colorType, AlphaType alphaType, size_t dstRowBytes,
-                    void* dstPixels) const override;
-
- private:
-  std::shared_ptr<ScalerContext> scalerContext = nullptr;
-  GlyphID glyphID = 0;
-  bool fauxBold = false;
-  Stroke* stroke = nullptr;
-};
+void ConvertPixels(const ImageInfo& srcInfo, const void* srcPixels, const ImageInfo& dstInfo,
+                          void* dstPixels, bool isConvertColorSpace = false);
 }  // namespace tgfx

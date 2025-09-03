@@ -449,7 +449,7 @@ void ElementWriter::addShaderResources(const std::shared_ptr<Shader>& shader, Co
 
 void ElementWriter::addColorShaderResources(const ColorShader* shader, Resources* resources) {
   Color color;
-  if (shader->asColor(&color)) {
+  if (shader->asColor(&color, nullptr)) {
     resources->paintColor = ToSVGColor(color);
   }
 }

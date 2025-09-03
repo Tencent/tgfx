@@ -63,7 +63,7 @@ ImageInfo ImageInfo::Make(int width, int height, ColorType colorType, AlphaType 
   } else if (colorType == ColorType::RGB_565) {
     alphaType = AlphaType::Opaque;
   }
-  return {width, height, colorType, alphaType, rowBytes, colorSpace};
+  return {width, height, colorType, alphaType, rowBytes, std::move(colorSpace)};
 }
 
 size_t ImageInfo::bytesPerPixel() const {

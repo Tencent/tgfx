@@ -79,15 +79,15 @@ class ImageGenerator {
    * additional storage. Returns an ImageBuffer backed by hardware if tryHardware is true and
    * the current platform supports creating it. Otherwise, a raster ImageBuffer is returned.
    */
-  std::shared_ptr<ImageBuffer> makeBuffer(bool tryHardware = true, std::shared_ptr<ColorSpace> colorSpace = nullptr) const {
-    return onMakeBuffer(tryHardware, std::move(colorSpace));
+  std::shared_ptr<ImageBuffer> makeBuffer(bool tryHardware = true) const {
+    return onMakeBuffer(tryHardware);
   }
 
  protected:
   ImageGenerator(int width, int height, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB()) : _width(width), _height(height), _colorSpace(std::move(colorSpace)) {
   }
 
-  virtual std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware, std::shared_ptr<ColorSpace> colorSpace = nullptr) const = 0;
+  virtual std::shared_ptr<ImageBuffer> onMakeBuffer(bool tryHardware) const = 0;
 
  private:
   int _width = 0;

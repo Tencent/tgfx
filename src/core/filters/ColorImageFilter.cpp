@@ -36,13 +36,13 @@ PlacementPtr<FragmentProcessor> ColorImageFilter::asFragmentProcessor(
     std::shared_ptr<Image> source, const FPArgs& args, const SamplingOptions& sampling,
     SrcRectConstraint constraint, const Matrix* uvMatrix) const {
   auto imageProcessor =
-      FragmentProcessor::Make(std::move(source), args, sampling, constraint, uvMatrix);
+      FragmentProcessor::Make(source, args, sampling, constraint, uvMatrix);
   if (imageProcessor == nullptr) {
     return nullptr;
   }
   auto drawingBuffer = args.context->drawingBuffer();
   auto processor = ComposeFragmentProcessor::Make(drawingBuffer, std::move(imageProcessor),
-                                                  filter->asFragmentProcessor(args.context));
+                                                  filter->asFragmentProcessor(args.context, source->colorSpace()));
   return FragmentProcessor::MulChildByInputAlpha(drawingBuffer, std::move(processor));
 }
 }  // namespace tgfx

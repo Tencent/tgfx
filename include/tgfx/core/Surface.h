@@ -23,6 +23,7 @@
 #include "tgfx/core/RenderFlags.h"
 #include "tgfx/gpu/Backend.h"
 #include "tgfx/gpu/ImageOrigin.h"
+#include "tgfx/core/ColorSpace.h"
 
 namespace tgfx {
 class Canvas;
@@ -47,7 +48,7 @@ class Surface {
    */
   static std::shared_ptr<Surface> Make(Context* context, int width, int height,
                                        bool alphaOnly = false, int sampleCount = 1,
-                                       bool mipmapped = false, uint32_t renderFlags = 0);
+                                       bool mipmapped = false, uint32_t renderFlags = 0, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Creates a new Surface on GPU indicated by context. Allocates memory for pixels based on the
@@ -57,7 +58,7 @@ class Surface {
    */
   static std::shared_ptr<Surface> Make(Context* context, int width, int height, ColorType colorType,
                                        int sampleCount = 1, bool mipmapped = false,
-                                       uint32_t renderFlags = 0);
+                                       uint32_t renderFlags = 0, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Wraps a backend render target into Surface. The caller must ensure the renderTarget is valid
@@ -66,7 +67,7 @@ class Surface {
    */
   static std::shared_ptr<Surface> MakeFrom(Context* context,
                                            const BackendRenderTarget& renderTarget,
-                                           ImageOrigin origin, uint32_t renderFlags = 0);
+                                           ImageOrigin origin, uint32_t renderFlags = 0, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Wraps a BackendTexture into the Surface. The caller must ensure the texture is valid for the
@@ -76,7 +77,7 @@ class Surface {
    */
   static std::shared_ptr<Surface> MakeFrom(Context* context, const BackendTexture& backendTexture,
                                            ImageOrigin origin, int sampleCount = 1,
-                                           uint32_t renderFlags = 0);
+                                           uint32_t renderFlags = 0, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   /**
    * Creates a Surface from the platform-specific hardware buffer. For example, the hardware buffer
@@ -85,7 +86,7 @@ class Surface {
    * context is nullptr or the hardwareBuffer is not renderable.
    */
   static std::shared_ptr<Surface> MakeFrom(Context* context, HardwareBufferRef hardwareBuffer,
-                                           int sampleCount = 1, uint32_t renderFlags = 0);
+                                           int sampleCount = 1, uint32_t renderFlags = 0, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB());
 
   virtual ~Surface();
 

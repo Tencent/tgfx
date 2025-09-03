@@ -34,8 +34,8 @@ ScaledImageGenerator::ScaledImageGenerator(int width, int height,
     : ImageGenerator(width, height, codec->colorSpace()), source(codec) {
 }
 
-std::shared_ptr<ImageBuffer> ScaledImageGenerator::onMakeBuffer(bool tryHardware, std::shared_ptr<ColorSpace> colorSpace) const {
-  auto pixelBuffer = PixelBuffer::Make(width(), height(), isAlphaOnly(), tryHardware, colorSpace);
+std::shared_ptr<ImageBuffer> ScaledImageGenerator::onMakeBuffer(bool tryHardware) const {
+  auto pixelBuffer = PixelBuffer::Make(width(), height(), isAlphaOnly(), tryHardware, colorSpace());
   if (pixelBuffer == nullptr) {
     return nullptr;
   }

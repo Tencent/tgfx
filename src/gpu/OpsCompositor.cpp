@@ -641,8 +641,8 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
   if (localBounds.has_value() && localBounds->isEmpty()) {
     return;
   }
-
-  FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()), drawScale};
+  auto colorSpace = renderTarget->getColorSpace();
+  FPArgs args = {context, renderFlags, localBounds.value_or(Rect::MakeEmpty()), drawScale, colorSpace};
   if (fill.shader) {
     if (auto processor = FragmentProcessor::Make(fill.shader, args)) {
       op->addColorFP(std::move(processor));
@@ -653,7 +653,7 @@ void OpsCompositor::addDrawOp(PlacementPtr<DrawOp> op, const Path& clip, const F
     }
   }
   if (fill.colorFilter) {
-    if (auto processor = fill.colorFilter->asFragmentProcessor(context)) {
+    if (auto processor = fill.colorFilter->asFragmentProcessor(context, colorSpace)) {
       op->addColorFP(std::move(processor));
     }
   }
