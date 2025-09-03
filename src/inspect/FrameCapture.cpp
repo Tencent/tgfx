@@ -179,7 +179,7 @@ void FrameCapture::SendAttributeData(const char* name, float* val, int size) {
   }
 }
 
-void FrameCapture::SendOpTextureID(uint64_t texturePtr, FrameCaptureMessageType type) {
+void FrameCapture::SendTextureID(uint64_t texturePtr, FrameCaptureMessageType type) {
   if (!CurrentFrameShouldCaptrue()) {
     return;
   }
@@ -190,15 +190,15 @@ void FrameCapture::SendOpTextureID(uint64_t texturePtr, FrameCaptureMessageType 
   QueueSerialFinish(item);
 }
 
-void FrameCapture::SendOpInputTextureID(const GPUTexture* texture) {
-  SendOpTextureID(reinterpret_cast<uint64_t>(texture), FrameCaptureMessageType::InputTexture);
+void FrameCapture::SendInputTextureID(const GPUTexture* texture) {
+  SendTextureID(reinterpret_cast<uint64_t>(texture), FrameCaptureMessageType::InputTexture);
 }
 
 void FrameCapture::SendOutputTextureID(const GPUTexture* texture) {
   if (!CurrentFrameShouldCaptrue()) {
     return;
   }
-  SendOpTextureID(reinterpret_cast<uint64_t>(texture), FrameCaptureMessageType::OutputTexture);
+  SendTextureID(reinterpret_cast<uint64_t>(texture), FrameCaptureMessageType::OutputTexture);
 }
 
 void FrameCapture::SendFrameCaptureTexture(std::shared_ptr<FrameCaptureTexture> frameCaptureTexture,
@@ -223,7 +223,7 @@ void FrameCapture::SendFragmentProcessor(
     while (const auto* subFP = fpIter.next()) {
       for (size_t j = 0; j < subFP->numTextureSamplers(); ++j) {
         auto texture = subFP->textureAt(j);
-        SendOpInputTextureID(texture);
+        SendInputTextureID(texture);
       }
     }
   }

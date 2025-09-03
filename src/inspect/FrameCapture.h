@@ -90,7 +90,7 @@ class FrameCapture {
 
   static void SendAttributeData(const char* name, float* val, int size);
 
-  static void SendOpInputTextureID(const GPUTexture* texture);
+  static void SendInputTextureID(const GPUTexture* texture);
 
   static void SendOutputTextureID(const GPUTexture* texture);
 
@@ -113,7 +113,7 @@ class FrameCapture {
 
   static bool ShouldExit();
 
-  static void SendOpTextureID(uint64_t texturePtr, FrameCaptureMessageType type);
+  static void SendTextureID(uint64_t texturePtr, FrameCaptureMessageType type);
 
   static uint64_t GetTextureHash(uint64_t texturePtr, uint64_t currentFrame = 0);
 
