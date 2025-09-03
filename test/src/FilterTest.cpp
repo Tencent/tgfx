@@ -336,9 +336,16 @@ TGFX_TEST(FilterTest, RuntimeEffect) {
   image = image->makeMipmapped(true);
   image = ScaleImage(image, 0.5f, SamplingOptions(FilterMode::Linear, MipmapMode::Linear));
   image = image->makeRasterized();
-  auto effect = CornerPinEffect::Make({484, 54}, {764, 80}, {764, 504}, {482, 512});
-  auto filter = ImageFilter::Runtime(std::move(effect));
-  image = image->makeWithFilter(std::move(filter));
+
+  auto effect1 = CornerPinEffect::Make(
+      {0, 0}, {static_cast<float>(image->width()), 0},
+      {static_cast<float>(image->width()), static_cast<float>(image->height())},
+      {0, static_cast<float>(image->height())});
+  auto effect2 = CornerPinEffect::Make({484, 54}, {764, 80}, {764, 504}, {482, 512});
+  auto filter1 = ImageFilter::Runtime(std::move(effect1));
+  auto filter2 = ImageFilter::Runtime(effect2);
+  auto composeFilter = ImageFilter::Compose(filter1, filter2);
+  image = image->makeWithFilter(std::move(composeFilter));
   canvas->drawImage(image, 200, 100);
   EXPECT_TRUE(Baseline::Compare(surface, "FilterTest/RuntimeEffect"));
 }
