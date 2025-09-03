@@ -2696,7 +2696,7 @@ TGFX_TEST(CanvasTest, RotateImageRect) {
   auto surface = Surface::Make(context, surfaceWidth, surfaceHeight);
   ASSERT_TRUE(surface != nullptr);
   auto canvas = surface->getCanvas();
-  auto image = MakeImage("resources/apitest/mandrill_128.webp");
+  auto image = MakeImage("resources/apitest/imageReplacement.png");
   image = image->makeColorSpace(ColorSpace::MakeRGB(namedTransferFn::_2Dot2, namedGamut::DisplayP3)->makeColorSpin());
   image = image->makeScaled(64, 64);
   ASSERT_TRUE(image != nullptr);
