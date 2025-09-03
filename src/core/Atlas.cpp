@@ -58,8 +58,8 @@ bool Atlas::addToAtlas(const AtlasCell& cell, AtlasToken nextFlushToken,
       DEBUG_ASSERT(plot != nullptr);
       if (plot->lastUseToken() < nextFlushToken) {
         evictionPlot(plot);
-        if (plot->addRect(cell.width(), cell.height(), atlasLocator)) {
-          cellLocators[cell.key()] = {cell.matrix(), atlasLocator};
+        if (plot->addRect(cell.width, cell.height, atlasLocator)) {
+          cellLocators[cell.key] = {cell.offset, atlasLocator};
           return true;
         }
         return false;
@@ -77,8 +77,8 @@ bool Atlas::addToPage(const AtlasCell& cell, size_t pageIndex, AtlasLocator& atl
   auto& page = pages[pageIndex];
   auto& plotList = page.plotList;
   for (auto& plot : plotList) {
-    if (plot->addRect(cell.width(), cell.height(), atlasLocator)) {
-      cellLocators[cell.key()] = {cell.matrix(), atlasLocator};
+    if (plot->addRect(cell.width, cell.height, atlasLocator)) {
+      cellLocators[cell.key] = {cell.offset, atlasLocator};
       return true;
     }
   }

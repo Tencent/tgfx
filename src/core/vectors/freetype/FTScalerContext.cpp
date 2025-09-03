@@ -698,4 +698,11 @@ bool FTScalerContext::loadOutlineGlyph(FT_Face face, GlyphID glyphID, bool fauxB
   }
   return true;
 }
+
+float FTScalerContext::getNativeSize() const {
+  if (!hasColor() || FloatNearlyZero(extraScale.x)) {
+    return textSize;
+  }
+  return textSize / extraScale.x;
+}
 }  // namespace tgfx
