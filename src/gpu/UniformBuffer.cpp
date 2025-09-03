@@ -24,7 +24,7 @@ UniformBuffer::UniformBuffer(const std::vector<Uniform>& vertexUniforms,
                              const std::vector<Uniform>& fragmentUniforms, bool uboSupport)
     : _uboSupport(uboSupport) {
   if (vertexUniforms.empty() && fragmentUniforms.empty()) {
-    LOGE("UniformBuffer::UniformBuffer no uniforms");
+    LOGE("UniformBuffer constructor called with no uniforms provided.");
     return;
   }
 
