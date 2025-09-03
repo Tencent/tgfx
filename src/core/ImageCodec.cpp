@@ -27,7 +27,7 @@
 #include "tgfx/core/ImageInfo.h"
 #include "tgfx/core/Pixmap.h"
 #include "tgfx/core/Stream.h"
-#include "PixelsConvert.h"
+#include "core/utils/PixelsConvertUtil.h"
 
 #if defined(TGFX_USE_WEBP_DECODE) || defined(TGFX_USE_WEBP_ENCODE)
 #include "core/codecs/webp/WebpCodec.h"

@@ -24,7 +24,7 @@
 #include "core/utils/MathExtra.h"
 #include "core/utils/OrientationHelper.h"
 #include "skcms.h"
-#include "../../PixelsConvert.h"
+#include "core/utils/PixelsConvertUtil.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Data.h"
 #include "tgfx/core/Pixmap.h"

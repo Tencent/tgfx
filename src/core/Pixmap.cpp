@@ -21,7 +21,7 @@
 #include "core/PixelRef.h"
 #include "skcms.h"
 #include "tgfx/core/ColorSpace.h"
-#include "PixelsConvert.h"
+#include "utils/PixelsConvertUtil.h"
 
 namespace tgfx {
 
