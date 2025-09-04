@@ -41,7 +41,7 @@ std::shared_ptr<Shape> Shape::ApplyStroke(std::shared_ptr<Shape> shape, const St
   // do some optimization.
   auto matrixShape = std::static_pointer_cast<MatrixShape>(shape);
   auto scales = matrixShape->matrix.getAxisScales();
-  if (scales.x != scales.y || scales.x > 1.f) {
+  if (scales.x != scales.y) {
     return std::make_shared<StrokeShape>(std::move(shape), *stroke);
   }
   auto scaleStroke = *stroke;
