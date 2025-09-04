@@ -16,19 +16,21 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "base/Drawers.h"
+#include "GridBackground.h"
 
-namespace drawers {
-void GridBackground::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) {
-  auto width = host->width();
-  auto height = host->height();
+namespace hello2d {
+std::shared_ptr<GridBackgroundLayer> GridBackgroundLayer::Make() {
+  return std::shared_ptr<GridBackgroundLayer>(new GridBackgroundLayer());
+}
+void GridBackgroundLayer::onUpdateContent(tgfx::LayerRecorder* recorder) {
+  auto canvas = recorder->getCanvas();
   canvas->clear(tgfx::Color::White());
   tgfx::Paint paint = {};
   paint.setColor(tgfx::Color{0.8f, 0.8f, 0.8f, 1.f});
-  int tileSize = 8 * static_cast<int>(host->density());
-  for (int y = 0; y < height; y += tileSize) {
+  int tileSize = 8 * static_cast<int>(_density);
+  for (int y = 0; y < static_cast<int>(_height); y += tileSize) {
     bool draw = (y / tileSize) % 2 == 1;
-    for (int x = 0; x < width; x += tileSize) {
+    for (int x = 0; x < static_cast<int>(_width); x += tileSize) {
       if (draw) {
         auto rect =
             tgfx::Rect::MakeXYWH(static_cast<float>(x), static_cast<float>(y),
@@ -39,4 +41,4 @@ void GridBackground::onDraw(tgfx::Canvas* canvas, const drawers::AppHost* host) 
     }
   }
 }
-}  // namespace drawers
+}  // namespace hello2d

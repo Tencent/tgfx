@@ -11,12 +11,13 @@
 		857B02AD2455D81200E533CF /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 857B02AC2455D81200E533CF /* Assets.xcassets */; };
 		857B02B02455D81200E533CF /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 857B02AE2455D81200E533CF /* Main.storyboard */; };
 		857B02B32455D81200E533CF /* main.m in Sources */ = {isa = PBXBuildFile; fileRef = 857B02B22455D81200E533CF /* main.m */; };
+		E105D3952E4098B800F4831B /* tgfx.png in Resources */ = {isa = PBXBuildFile; fileRef = E105D3942E4098B800F4831B /* tgfx.png */; };
 		F201BD722B046BB30020C0FA /* tgfx.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F201BD712B046BB30020C0FA /* tgfx.a */; };
 		F201BD752B0471C00020C0FA /* TGFXView.mm in Sources */ = {isa = PBXBuildFile; fileRef = F201BD742B0471C00020C0FA /* TGFXView.mm */; };
 		F201BD772B0472B40020C0FA /* bridge.jpg in Resources */ = {isa = PBXBuildFile; fileRef = F201BD762B0472B40020C0FA /* bridge.jpg */; };
 		F2B5D47B2B0484E8000A1CEC /* ViewController.mm in Sources */ = {isa = PBXBuildFile; fileRef = F2B5D4792B0484E8000A1CEC /* ViewController.mm */; };
 		F2B5D47C2B0484E8000A1CEC /* WindowController.mm in Sources */ = {isa = PBXBuildFile; fileRef = F2B5D47A2B0484E8000A1CEC /* WindowController.mm */; };
-		F2F2CEFC2B0B5C510092BD3B /* tgfx-drawers.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F2F2CEFB2B0B5C510092BD3B /* tgfx-drawers.a */; };
+		F2F2CEFC2B0B5C510092BD3B /* tgfx-hello2d.a in Frameworks */ = {isa = PBXBuildFile; fileRef = F2F2CEFB2B0B5C510092BD3B /* tgfx-hello2d.a */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -30,13 +31,14 @@
 		857B02B12455D81200E533CF /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		857B02B22455D81200E533CF /* main.m */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.objc; path = main.m; sourceTree = "<group>"; };
 		857B02B42455D81200E533CF /* Hello2D.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = Hello2D.entitlements; sourceTree = "<group>"; };
+		E105D3942E4098B800F4831B /* tgfx.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = tgfx.png; path = ../resources/assets/tgfx.png; sourceTree = SOURCE_ROOT; };
 		F201BD712B046BB30020C0FA /* tgfx.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = tgfx.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		F201BD732B0471C00020C0FA /* TGFXView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TGFXView.h; sourceTree = "<group>"; };
 		F201BD742B0471C00020C0FA /* TGFXView.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = TGFXView.mm; sourceTree = "<group>"; };
 		F201BD762B0472B40020C0FA /* bridge.jpg */ = {isa = PBXFileReference; lastKnownFileType = image.jpeg; name = bridge.jpg; path = ../../resources/assets/bridge.jpg; sourceTree = "<group>"; };
 		F2B5D4792B0484E8000A1CEC /* ViewController.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = ViewController.mm; sourceTree = "<group>"; };
 		F2B5D47A2B0484E8000A1CEC /* WindowController.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = WindowController.mm; sourceTree = "<group>"; };
-		F2F2CEFB2B0B5C510092BD3B /* tgfx-drawers.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = "tgfx-drawers.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		F2F2CEFB2B0B5C510092BD3B /* tgfx-hello2d.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; path = "tgfx-hello2d.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -44,7 +46,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				F2F2CEFC2B0B5C510092BD3B /* tgfx-drawers.a in Frameworks */,
+				F2F2CEFC2B0B5C510092BD3B /* tgfx-hello2d.a in Frameworks */,
 				F201BD722B046BB30020C0FA /* tgfx.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -72,6 +74,7 @@
 		857B02A52455D81100E533CF /* Hello2D */ = {
 			isa = PBXGroup;
 			children = (
+				E105D3942E4098B800F4831B /* tgfx.png */,
 				F201BD762B0472B40020C0FA /* bridge.jpg */,
 				857B02A62455D81100E533CF /* AppDelegate.h */,
 				857B02A72455D81100E533CF /* AppDelegate.m */,
@@ -93,7 +96,7 @@
 		EBC250D9EF61A8E129790DCC /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
-				F2F2CEFB2B0B5C510092BD3B /* tgfx-drawers.a */,
+				F2F2CEFB2B0B5C510092BD3B /* tgfx-hello2d.a */,
 				F201BD712B046BB30020C0FA /* tgfx.a */,
 			);
 			name = Frameworks;
@@ -157,6 +160,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				E105D3952E4098B800F4831B /* tgfx.png in Resources */,
 				F201BD772B0472B40020C0FA /* bridge.jpg in Resources */,
 				857B02AD2455D81200E533CF /* Assets.xcassets in Resources */,
 				857B02B02455D81200E533CF /* Main.storyboard in Resources */,
@@ -334,7 +338,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				USER_HEADER_SEARCH_PATHS = (
 					../include,
-					../drawers/include,
+					../hello2d/include,
 				);
 			};
 			name = Debug;
@@ -366,7 +370,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				USER_HEADER_SEARCH_PATHS = (
 					../include,
-					../drawers/include,
+					../hello2d/include,
 				);
 			};
 			name = Release;

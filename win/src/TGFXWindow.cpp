@@ -245,12 +245,14 @@ float TGFXWindow::getPixelRatio() {
 }
 
 void TGFXWindow::createAppHost() {
-  appHost = std::make_unique<drawers::AppHost>();
+  appHost = std::make_unique<hello2d::AppHost>();
   std::filesystem::path filePath = __FILE__;
   auto rootPath = filePath.parent_path().parent_path().parent_path().string();
   auto imagePath = rootPath + R"(\resources\assets\bridge.jpg)";
   auto image = tgfx::Image::MakeFromFile(imagePath);
   appHost->addImage("bridge", image);
+  imagePath = rootPath + R"(\resources\assets\tgfx.png)";
+  appHost->addImage("TGFX", tgfx::Image::MakeFromFile(imagePath));
   auto typeface = tgfx::Typeface::MakeFromName("Microsoft YaHei", "");
   appHost->addTypeface("default", typeface);
   auto emojiPath = rootPath + R"(\resources\font\NotoColorEmoji.ttf)";
@@ -287,19 +289,19 @@ void TGFXWindow::draw() {
     device->unlock();
     return;
   }
-  appHost->updateZoomAndOffset(zoomScale, contentOffset);
   auto canvas = surface->getCanvas();
   canvas->clear();
   canvas->save();
-  auto numDrawers = drawers::Drawer::Count() - 1;
-  auto index = (currentDrawerIndex % numDrawers) + 1;
-  auto drawer = drawers::Drawer::GetByName("GridBackground");
-  drawer->draw(canvas, appHost.get());
-  drawer = drawers::Drawer::GetByIndex(index);
-  drawer->draw(canvas, appHost.get());
+  hello2d::LayerBuilder::DrawBackground(canvas, appHost.get());
+  auto builder = hello2d::LayerBuilder::GetByIndex(currentDrawerIndex % hello2d::LayerBuilder::Count());
+  builder->displayList.setZoomScale(zoomScale);
+  builder->displayList.setContentOffset(contentOffset.x, contentOffset.y);
+  builder->build(appHost.get());
+  builder->displayList.render(canvas->getSurface(), false);
   canvas->restore();
   context->flushAndSubmit();
   tgfxWindow->present(context);
   device->unlock();
 }
+
 }  // namespace hello2d

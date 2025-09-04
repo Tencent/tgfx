@@ -21,7 +21,6 @@
 #import "TGFXView.h"
 @interface ViewController ()
 @property(strong, nonatomic) TGFXView* tgfxView;
-- (void)updateContentView;
 @end
 
 @implementation ViewController
@@ -46,21 +45,21 @@ static const float ScrollWheelZoomSensitivity = 120.0f;
                                                name:NSApplicationWillBecomeActiveNotification
                                              object:nil];
 }
+
 - (void)viewDidAppear {
   [super viewDidAppear];
-  [self updateContentView];
-  [self.tgfxView startDisplayLink];
+  // 视图出现时，强制请求一帧绘制以初始化内容
+  [self requestDraw];
 }
+
 - (void)appDidEnterBackground:(NSNotification*)notification {
+  // 进入后台时停止 DisplayLink
   [self.tgfxView stopDisplayLink];
 }
 
 - (void)appWillEnterForeground:(NSNotification*)notification {
-  [self.tgfxView startDisplayLink];
-}
-
-- (void)updateContentView {
-  [self.tgfxView draw];
+  // 从后台返回前台时，强制请求一帧绘制来更新内容
+  [self requestDraw];
 }
 
 - (void)dealloc {
@@ -71,6 +70,7 @@ static const float ScrollWheelZoomSensitivity = 120.0f;
   self.tgfxView.drawIndex++;
   self.tgfxView.zoomScale = 1.0f;
   self.tgfxView.contentOffset = CGPointZero;
+  [self requestDraw];
 }
 
 - (void)scrollWheel:(NSEvent*)event {
@@ -107,6 +107,7 @@ static const float ScrollWheelZoomSensitivity = 120.0f;
                       self.tgfxView.contentOffset.y + event.scrollingDeltaY * 5);
     }
   }
+  [self requestDraw];
 }
 
 - (void)magnifyWithEvent:(NSEvent*)event {
@@ -124,6 +125,14 @@ static const float ScrollWheelZoomSensitivity = 120.0f;
   }
   self.tgfxView.contentOffset = CGPointMake(mouseInView.x - contentX * self.tgfxView.zoomScale,
                                             mouseInView.y - contentY * self.tgfxView.zoomScale);
+
+  [self requestDraw];
+}
+
+
+- (void)requestDraw {
+    [self.tgfxView markDirty];
+    [self.tgfxView startDisplayLink];
 }
 
 @end
