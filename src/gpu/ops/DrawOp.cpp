@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "DrawOp.h"
+#include "gpu/PipelineProgram.h"
 #include "inspect/InspectorMark.h"
 
 namespace tgfx {
@@ -38,7 +39,13 @@ void DrawOp::execute(RenderPass* renderPass, RenderTarget* renderTarget) {
   }
   ProgramInfo programInfo(renderTarget, geometryProcessor.get(), std::move(fragmentProcessors),
                           colors.size(), xferProcessor.get(), blendMode);
-  renderPass->bindProgram(&programInfo);
+  auto program = std::static_pointer_cast<PipelineProgram>(programInfo.getProgram());
+  if (program == nullptr) {
+    LOGE("DrawOp::execute() Failed to get the program!");
+    return;
+  }
+  renderPass->setPipeline(program->getPipeline());
+  programInfo.setUniformsAndSamplers(renderPass, program.get());
   if (scissorRect.isEmpty()) {
     renderPass->setScissorRect(0, 0, renderTarget->width(), renderTarget->height());
   } else {

@@ -19,23 +19,28 @@
 #pragma once
 
 #include "gpu/Program.h"
-#include "tgfx/gpu/RuntimeProgram.h"
 
 namespace tgfx {
-class RuntimeProgramWrapper : public Program {
+class PipelineProgram : public Program {
  public:
-  static std::shared_ptr<Program> Wrap(std::unique_ptr<RuntimeProgram> program);
+  explicit PipelineProgram(std::unique_ptr<GPURenderPipeline> pipeline,
+                           std::unique_ptr<UniformBuffer> uniformBuffer)
+      : pipeline(std::move(pipeline)), uniformBuffer(std::move(uniformBuffer)) {
+  }
 
-  static const RuntimeProgram* Unwrap(const Program* program);
+  GPURenderPipeline* getPipeline() const {
+    return pipeline.get();
+  }
 
  protected:
-  void onReleaseGPU() override;
+  void onReleaseGPU() override {
+    pipeline->release(context->gpu());
+  }
 
  private:
-  std::unique_ptr<RuntimeProgram> runtimeProgram = nullptr;
+  std::unique_ptr<GPURenderPipeline> pipeline = nullptr;
+  std::unique_ptr<UniformBuffer> uniformBuffer = nullptr;
 
-  explicit RuntimeProgramWrapper(std::unique_ptr<RuntimeProgram> program)
-      : runtimeProgram(std::move(program)) {
-  }
+  friend class ProgramInfo;
 };
 }  // namespace tgfx

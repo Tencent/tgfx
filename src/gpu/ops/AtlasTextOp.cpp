@@ -80,8 +80,8 @@ void AtlasTextOp::onDraw(RenderPass* renderPass) {
   if (vertexBuffer == nullptr) {
     return;
   }
-  renderPass->bindBuffers(indexBuffer ? indexBuffer->gpuBuffer() : nullptr,
-                          vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
+  renderPass->setVertexBuffer(vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
+  renderPass->setIndexBuffer(indexBuffer ? indexBuffer->gpuBuffer() : nullptr);
   if (indexBuffer != nullptr) {
     uint16_t numIndicesPerQuad;
     if (aaType == AAType::Coverage) {

@@ -90,14 +90,14 @@ PlacementPtr<GeometryProcessor> ShapeDrawOp::onMakeGeometryProcessor(RenderTarge
 void ShapeDrawOp::onDraw(RenderPass* renderPass) {
   auto vertexBuffer = shapeProxy->getTriangles();
   if (vertexBuffer != nullptr) {
-    renderPass->bindBuffers(nullptr, vertexBuffer->gpuBuffer());
+    renderPass->setVertexBuffer(vertexBuffer->gpuBuffer());
     auto vertexCount = aaType == AAType::Coverage
                            ? PathTriangulator::GetAATriangleCount(vertexBuffer->size())
                            : PathTriangulator::GetTriangleCount(vertexBuffer->size());
     renderPass->draw(PrimitiveType::Triangles, 0, vertexCount);
   } else {
     auto maskBuffer = maskBufferProxy->getBuffer();
-    renderPass->bindBuffers(nullptr, maskBuffer->gpuBuffer(), maskBufferProxy->offset());
+    renderPass->setVertexBuffer(maskBuffer->gpuBuffer(), maskBufferProxy->offset());
     renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
   }
 }

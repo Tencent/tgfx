@@ -16,7 +16,7 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "GLProgram.h"
+#include "GLRenderPipeline.h"
 #include "gpu/opengl/GLGPU.h"
 
 namespace tgfx {
@@ -43,21 +43,22 @@ struct AttribLayout {
   unsigned type = 0;
 };
 
-GLProgram::GLProgram(unsigned programID, std::unique_ptr<UniformBuffer> uniformBuffer,
-                     std::vector<Attribute> attributes, std::unique_ptr<BlendFormula> blendFormula)
-    : Program(std::move(uniformBuffer)), programID(programID), _attributes(std::move(attributes)),
+GLRenderPipeline::GLRenderPipeline(unsigned programID, std::vector<Uniform> uniforms,
+                                   std::vector<Attribute> attribs,
+                                   std::unique_ptr<BlendFormula> blendFormula)
+    : programID(programID), uniforms(std::move(uniforms)), attributes(std::move(attribs)),
       blendFormula(std::move(blendFormula)) {
-  DEBUG_ASSERT(!_attributes.empty());
+  DEBUG_ASSERT(!attributes.empty());
   size_t offset = 0;
-  for (auto& attribute : _attributes) {
+  for (auto& attribute : attributes) {
     offset += attribute.size();
   }
   vertexStride = static_cast<int>(offset);
 }
 
-void GLProgram::activate() {
-  auto gl = GLFunctions::Get(context);
-  auto caps = GLCaps::Get(context);
+void GLRenderPipeline::activate(GLInterface* interface) {
+  auto gl = interface->functions();
+  auto caps = interface->caps();
   gl->useProgram(programID);
   if (caps->frameBufferFetchSupport && caps->frameBufferFetchRequiresEnablePerSample) {
     if (blendFormula == nullptr) {
@@ -88,16 +89,14 @@ void GLProgram::activate() {
   }
 }
 
-void GLProgram::setUniformBytes(const void* data, size_t size) {
+void GLRenderPipeline::setUniformBytes(GLInterface* interface, const void* data, size_t size) {
   if (data == nullptr || size == 0) {
     return;
   }
-  DEBUG_ASSERT(_uniformBuffer != nullptr);
-  auto& uniforms = _uniformBuffer->uniforms();
   if (uniforms.empty()) {
     return;
   }
-  auto gl = GLFunctions::Get(context);
+  auto gl = interface->functions();
   if (uniformLocations.empty()) {
     uniformLocations.reserve(uniforms.size());
     for (auto& uniform : uniforms) {
@@ -196,21 +195,23 @@ static AttribLayout GetAttribLayout(VertexFormat format) {
   return {false, 0, 0};
 }
 
-void GLProgram::setVertexBuffer(GPUBuffer* vertexBuffer, size_t vertexOffset) {
+void GLRenderPipeline::setVertexBuffer(GLInterface* interface, GPUBuffer* vertexBuffer,
+                                       size_t vertexOffset) {
+  auto gl = interface->functions();
   if (vertexBuffer == nullptr) {
+    gl->bindBuffer(GL_ARRAY_BUFFER, 0);
     return;
   }
-  auto gl = GLFunctions::Get(context);
   gl->bindBuffer(GL_ARRAY_BUFFER, static_cast<GLBuffer*>(vertexBuffer)->bufferID());
   if (attributeLocations.empty()) {
-    for (auto& attribute : _attributes) {
+    for (auto& attribute : attributes) {
       auto location = gl->getAttribLocation(programID, attribute.name().c_str());
       attributeLocations.push_back(location);
     }
   }
   size_t index = 0;
   size_t offset = vertexOffset;
-  for (auto& attribute : _attributes) {
+  for (auto& attribute : attributes) {
     auto location = attributeLocations[index++];
     if (location >= 0) {
       auto layout = GetAttribLayout(attribute.format());
@@ -222,16 +223,9 @@ void GLProgram::setVertexBuffer(GPUBuffer* vertexBuffer, size_t vertexOffset) {
   }
 }
 
-void GLProgram::setIndexBuffer(GPUBuffer* indexBuffer) {
-  if (indexBuffer == nullptr) {
-    return;
-  }
-  auto gl = GLFunctions::Get(context);
-  gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLBuffer*>(indexBuffer)->bufferID());
-}
-
-void GLProgram::onReleaseGPU() {
-  auto gl = GLFunctions::Get(context);
+void GLRenderPipeline::release(GPU* gpu) {
+  DEBUG_ASSERT(gpu != nullptr);
+  auto gl = static_cast<GLGPU*>(gpu)->functions();
   if (programID > 0) {
     gl->deleteProgram(programID);
   }
