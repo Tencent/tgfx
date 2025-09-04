@@ -17,7 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "JTGFXView.h"
-#include "drawers/Drawer.h"
+#include "hello2d/LayerBuilder.h"
 
 namespace hello2d {
 static jfieldID TGFXView_nativePtr;
@@ -64,7 +64,7 @@ bool JTGFXView::draw(int drawIndex, float zoom, float offsetX, float offsetY) {
   appHost->updateZoomAndOffset(zoom, tgfx::Point(offsetX, offsetY));
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto numDrawers = drawers::Drawer::Count();
+  auto numDrawers = hello2d::LayerBuilder::Count();
   auto index = (drawIndex % numDrawers);
   appHost->draw(canvas, index);
   context->flushAndSubmit();
@@ -79,8 +79,8 @@ static hello2d::JTGFXView* GetJTGFXView(JNIEnv* env, jobject thiz) {
       env->GetLongField(thiz, hello2d::TGFXView_nativePtr));
 }
 
-static std::unique_ptr<drawers::AppHost> CreateAppHost(ANativeWindow* nativeWindow, float density) {
-  auto host = std::make_unique<drawers::AppHost>();
+static std::unique_ptr<hello2d::AppHost> CreateAppHost(ANativeWindow* nativeWindow, float density) {
+  auto host = std::make_unique<hello2d::AppHost>();
   auto width = ANativeWindow_getWidth(nativeWindow);
   auto height = ANativeWindow_getHeight(nativeWindow);
   host->updateScreen(width, height, density);

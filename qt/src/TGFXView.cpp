@@ -22,7 +22,7 @@
 #include <QQuickWindow>
 #include <QSGImageNode>
 #include <QThread>
-#include "drawers/Drawer.h"
+#include "hello2d/LayerBuilder.h"
 
 namespace hello2d {
 TGFXView::TGFXView(QQuickItem* parent) : QQuickItem(parent) {
@@ -86,7 +86,7 @@ void TGFXView::onSceneGraphInvalidated() {
 }
 
 void TGFXView::createAppHost() {
-  appHost = std::make_unique<drawers::AppHost>();
+  appHost = std::make_unique<hello2d::AppHost>();
   auto rootPath = QApplication::applicationDirPath();
   rootPath = QFileInfo(rootPath + "/../../").absolutePath();
   auto imagePath = rootPath + "/resources/assets/bridge.jpg";
@@ -130,8 +130,8 @@ bool TGFXView::draw() {
   appHost->updateZoomAndOffset(zoom, tgfx::Point(static_cast<float>(offset.x()), static_cast<float>(offset.y())));
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto numDrawers = drawers::Drawer::Count();
-  auto index = (currentDrawerIndex % numDrawers);
+  auto numBuilders = hello2d::LayerBuilder::Count();
+  auto index = (currentDrawerIndex % numBuilders);
   appHost->draw(canvas, index);
   context->flushAndSubmit();
   tgfxWindow->present(context);

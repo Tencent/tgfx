@@ -19,7 +19,7 @@
 #import "TGFXView.h"
 #import <QuartzCore/CADisplayLink.h>
 #include <cmath>
-#include "drawers/Drawer.h"
+#include "hello2d/LayerBuilder.h"
 #include "tgfx/core/Point.h"
 
 static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, const CVTimeStamp*,
@@ -31,7 +31,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
 
 @implementation TGFXView {
   std::shared_ptr<tgfx::CGLWindow> tgfxWindow;
-  std::unique_ptr<drawers::AppHost> appHost;
+  std::unique_ptr<hello2d::AppHost> appHost;
 }
 
 - (BOOL)acceptsFirstResponder {
@@ -59,7 +59,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   auto width = static_cast<int>(roundf(size.width));
   auto height = static_cast<int>(roundf(size.height));
   if (appHost == nullptr) {
-    appHost = std::make_unique<drawers::AppHost>();
+    appHost = std::make_unique<hello2d::AppHost>();
     NSString* imagePath = [[NSBundle mainBundle] pathForResource:@"bridge" ofType:@"jpg"];
     auto image = tgfx::Image::MakeFromFile(imagePath.UTF8String);
     appHost->addImage("bridge", image);
@@ -169,8 +169,8 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
   appHost->updateZoomAndOffset(self.zoomScale, tgfx::Point(static_cast<float>(self.contentOffset.x), static_cast<float>(self.contentOffset.y)));
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto numDrawers = drawers::Drawer::Count();
-  auto index = (self.drawIndex % numDrawers);
+  auto numBuilders = hello2d::LayerBuilder::Count();
+  auto index = (self.drawIndex % numBuilders);
   appHost->draw(canvas, index);
   context->flushAndSubmit();
   tgfxWindow->present(context);

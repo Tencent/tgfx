@@ -18,7 +18,7 @@
 
 #include <filesystem>
 #include <fstream>
-#include "drawers/Drawer.h"
+#include "hello2d/LayerBuilder.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/GLDevice.h"
 #include "tgfx/platform/Print.h"
@@ -40,7 +40,7 @@ static void SaveFile(std::shared_ptr<tgfx::Data> data, const std::string& output
 
 int main() {
   auto rootPath = GetRootPath();
-  drawers::AppHost appHost(720, 720, 2.0f);
+  hello2d::AppHost appHost(720, 720, 2.0f);
   auto image = tgfx::Image::MakeFromFile(rootPath + "resources/assets/bridge.jpg");
   appHost.addImage("bridge", std::move(image));
   auto image2 = tgfx::Image::MakeFromFile(rootPath + "resources/assets/tgfx.png");
@@ -62,8 +62,8 @@ int main() {
   }
   auto surface = tgfx::Surface::Make(context, appHost.width(), appHost.height());
   auto canvas = surface->getCanvas();
-  auto drawerNames = drawers::Drawer::Names();
-  for (auto& name : drawerNames) {
+  auto builderNames = hello2d::LayerBuilder::Names();
+  for (auto& name : builderNames) {
     auto index = 0;
     canvas->clear();
     // drawer->build(&appHost);

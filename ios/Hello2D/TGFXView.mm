@@ -18,11 +18,11 @@
 
 #import "TGFXView.h"
 #include <cmath>
-#include "drawers/Drawer.h"
+#include "hello2d/LayerBuilder.h"
 
 @implementation TGFXView {
   std::shared_ptr<tgfx::EAGLWindow> tgfxWindow;
-  std::unique_ptr<drawers::AppHost> appHost;
+  std::unique_ptr<hello2d::AppHost> appHost;
 }
 
 + (Class)layerClass {
@@ -57,7 +57,7 @@
   auto width = static_cast<int>(roundf(self.layer.bounds.size.width * self.layer.contentsScale));
   auto height = static_cast<int>(roundf(self.layer.bounds.size.height * self.layer.contentsScale));
   if (appHost == nullptr) {
-    appHost = std::make_unique<drawers::AppHost>();
+    appHost = std::make_unique<hello2d::AppHost>();
     NSString* imagePath = [[NSBundle mainBundle] pathForResource:@"bridge" ofType:@"jpg"];
     auto image = tgfx::Image::MakeFromFile(imagePath.UTF8String);
     appHost->addImage("bridge", image);
@@ -112,8 +112,8 @@
   appHost->updateZoomAndOffset(zoom, tgfx::Point(static_cast<float>(offset.x), static_cast<float>(offset.y)));
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto numDrawers = drawers::Drawer::Count();
-  auto index = (drawIndex % numDrawers);
+  auto numBuilders = hello2d::LayerBuilder::Count();
+  auto index = (drawIndex % numBuilders);
   appHost->draw(canvas, index);
   context->flushAndSubmit();
   tgfxWindow->present(context);

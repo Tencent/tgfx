@@ -245,7 +245,7 @@ float TGFXWindow::getPixelRatio() {
 }
 
 void TGFXWindow::createAppHost() {
-  appHost = std::make_unique<drawers::AppHost>();
+  appHost = std::make_unique<hello2d::AppHost>();
   std::filesystem::path filePath = __FILE__;
   auto rootPath = filePath.parent_path().parent_path().parent_path().string();
   auto imagePath = rootPath + R"(\resources\assets\bridge.jpg)";
@@ -292,15 +292,16 @@ void TGFXWindow::draw() {
   auto canvas = surface->getCanvas();
   canvas->clear();
   canvas->save();
-  drawers::Drawer::DrawBackground(canvas, appHost.get());
-  auto drawer = drawers::Drawer::GetByIndex(currentDrawerIndex % drawers::Drawer::Count());
-  drawer->displayList.setZoomScale(zoomScale);
-  drawer->displayList.setContentOffset(contentOffset.x, contentOffset.y);
-  drawer->build(appHost.get());
-  drawer->displayList.render(canvas->getSurface(), false);
+  hello2d::LayerBuilder::DrawBackground(canvas, appHost.get());
+  auto builder = hello2d::LayerBuilder::GetByIndex(currentDrawerIndex % hello2d::LayerBuilder::Count());
+  builder->displayList.setZoomScale(zoomScale);
+  builder->displayList.setContentOffset(contentOffset.x, contentOffset.y);
+  builder->build(appHost.get());
+  builder->displayList.render(canvas->getSurface(), false);
   canvas->restore();
   context->flushAndSubmit();
   tgfxWindow->present(context);
   device->unlock();
 }
+
 }  // namespace hello2d

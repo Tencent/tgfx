@@ -1,8 +1,8 @@
 #include "napi/native_api.h"
 #include <ace/xcomponent/native_interface_xcomponent.h>
 #include "tgfx/gpu/opengl/egl/EGLWindow.h"
-#include "drawers/AppHost.h"
-#include "drawers/Drawer.h"
+#include "hello2d/AppHost.h"
+#include "hello2d/LayerBuilder.h"
 #include "DisplayLink.h"
 
 static float screenDensity = 1.0f;
@@ -10,11 +10,11 @@ static double drawIndex = 0;
 static double zoomScale = 1;
 static double contentOffsetX = 0;
 static double contentOffsetY = 0;
-static std::shared_ptr<drawers::AppHost> appHost = nullptr;
+static std::shared_ptr<hello2d::AppHost> appHost = nullptr;
 static std::shared_ptr<tgfx::Window> window = nullptr;
 static std::shared_ptr<DisplayLink> displayLink = nullptr;
 
-static std::shared_ptr<drawers::AppHost> CreateAppHost();
+static std::shared_ptr<hello2d::AppHost> CreateAppHost();
 
 static napi_value OnUpdateDensity(napi_env env, napi_callback_info info) {
   size_t argc = 1;
@@ -73,8 +73,8 @@ static bool Draw(int drawIndex, float zoom = 1.0f, float offsetX = 0.0f, float o
   appHost->updateZoomAndOffset(zoom, tgfx::Point(offsetX, offsetY));
   auto canvas = surface->getCanvas();
   canvas->clear();
-  auto numDrawers = drawers::Drawer::Count();
-  auto index = (drawIndex % numDrawers);
+
+  auto index = (drawIndex % hello2d::LayerBuilder::Count());
   appHost->draw(canvas, index);
   context->flushAndSubmit();
   window->present(context);
@@ -128,8 +128,8 @@ static napi_value StopDrawLoop(napi_env, napi_callback_info) {
 }
 
 
-static std::shared_ptr<drawers::AppHost> CreateAppHost() {
-  auto appHost = std::make_shared<drawers::AppHost>();
+static std::shared_ptr<hello2d::AppHost> CreateAppHost() {
+  auto appHost = std::make_shared<hello2d::AppHost>();
   static const std::string FallbackFontFileNames[] = {"/system/fonts/HarmonyOS_Sans.ttf",
                                                       "/system/fonts/HarmonyOS_Sans_SC.ttf",
                                                       "/system/fonts/HarmonyOS_Sans_TC.ttf"};

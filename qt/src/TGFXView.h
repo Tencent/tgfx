@@ -20,7 +20,7 @@
 
 #include <QOpenGLContext>
 #include <QQuickItem>
-#include "drawers/AppHost.h"
+#include "hello2d/AppHost.h"
 #include "tgfx/gpu/opengl/qt/QGLWindow.h"
 
 namespace hello2d {
@@ -40,7 +40,7 @@ class TGFXView : public QQuickItem {
  private:
   int currentDrawerIndex = 0;
   std::shared_ptr<tgfx::QGLWindow> tgfxWindow = nullptr;
-  std::shared_ptr<drawers::AppHost> appHost = nullptr;
+  std::shared_ptr<hello2d::AppHost> appHost = nullptr;
   float zoom = 1.0f;
   QPointF offset = {0, 0};
 
