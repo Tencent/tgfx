@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,31 +18,26 @@
 
 #pragma once
 
-#include "gpu/CommandEncoder.h"
-#include "gpu/opengl/GLInterface.h"
+#include "gpu/GPUFence.h"
 
 namespace tgfx {
-class GLCommandEncoder : public CommandEncoder {
+/**
+ * GLSemaphore is a wrapper class for an OpenGL sync object.
+ */
+class GLFence : public GPUFence {
  public:
-  explicit GLCommandEncoder(std::shared_ptr<GLInterface> interface)
-      : interface(std::move(interface)) {
+  explicit GLFence(void* glSync) : _glSync(glSync) {
   }
 
-  void copyTextureToTexture(GPUTexture* srcTexture, const Rect& srcRect, GPUTexture* dstTexture,
-                            const Point& dstOffset) override;
+  void* glSync() const {
+    return _glSync;
+  }
 
-  void generateMipmapsForTexture(GPUTexture* texture) override;
+  BackendSemaphore getBackendSemaphore() const override;
 
-  std::unique_ptr<GPUFence> insertFence() override;
-
-  void waitForFence(GPUFence* fence) override;
-
- protected:
-  std::shared_ptr<RenderPass> onBeginRenderPass(const RenderPassDescriptor& descriptor) override;
-
-  std::shared_ptr<CommandBuffer> onFinish() override;
+  void release(GPU* gpu) override;
 
  private:
-  std::shared_ptr<GLInterface> interface = nullptr;
+  void* _glSync = nullptr;
 };
 }  // namespace tgfx

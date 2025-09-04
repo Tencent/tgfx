@@ -225,7 +225,10 @@ std::shared_ptr<CommandBuffer> DrawingManager::flush(BackendSemaphore* signalSem
   renderTasks.clear();
 
   if (signalSemaphore != nullptr) {
-    *signalSemaphore = commandEncoder->insertSemaphore();
+    auto fence = commandEncoder->insertFence();
+    if (fence != nullptr) {
+      *signalSemaphore = fence->getBackendSemaphore();
+    }
   }
   return commandEncoder->finish();
 }

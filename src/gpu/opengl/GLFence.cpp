@@ -16,29 +16,26 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "gpu/Semaphore.h"
+#include "GLFence.h"
+#include "gpu/opengl/GLGPU.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace tgfx {
-/**
- * Types for interacting with OpenGL semaphore object.
- */
-class GLSemaphore : public Semaphore {
- public:
-  explicit GLSemaphore(void* glSync) : _glSync(glSync) {
+BackendSemaphore GLFence::getBackendSemaphore() const {
+  if (_glSync == nullptr) {
+    return {};
   }
+  GLSyncInfo glSyncInfo = {};
+  glSyncInfo.sync = _glSync;
+  return {glSyncInfo};
+}
 
-  void* glSync() const {
-    return _glSync;
+void GLFence::release(GPU* gpu) {
+  if (_glSync != nullptr) {
+    auto gl = static_cast<const GLGPU*>(gpu)->functions();
+    gl->deleteSync(_glSync);
+    _glSync = nullptr;
   }
+}
 
-  BackendSemaphore getBackendSemaphore() const override;
-
- protected:
-  void onReleaseGPU() override;
-
- private:
-  void* _glSync = nullptr;
-};
 }  // namespace tgfx

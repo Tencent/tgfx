@@ -18,31 +18,19 @@
 
 #pragma once
 
-#include "gpu/CommandEncoder.h"
-#include "gpu/opengl/GLInterface.h"
+#include "gpu/GPUResource.h"
+#include "tgfx/gpu/Backend.h"
 
 namespace tgfx {
-class GLCommandEncoder : public CommandEncoder {
+/**
+ * GPUFence is a synchronization primitive to capture, track, and manage resource dependencies
+ * across command encoders.
+ */
+class GPUFence : public GPUResource {
  public:
-  explicit GLCommandEncoder(std::shared_ptr<GLInterface> interface)
-      : interface(std::move(interface)) {
-  }
-
-  void copyTextureToTexture(GPUTexture* srcTexture, const Rect& srcRect, GPUTexture* dstTexture,
-                            const Point& dstOffset) override;
-
-  void generateMipmapsForTexture(GPUTexture* texture) override;
-
-  std::unique_ptr<GPUFence> insertFence() override;
-
-  void waitForFence(GPUFence* fence) override;
-
- protected:
-  std::shared_ptr<RenderPass> onBeginRenderPass(const RenderPassDescriptor& descriptor) override;
-
-  std::shared_ptr<CommandBuffer> onFinish() override;
-
- private:
-  std::shared_ptr<GLInterface> interface = nullptr;
+  /**
+   * Returns the backend semaphore object.
+   */
+  virtual BackendSemaphore getBackendSemaphore() const = 0;
 };
 }  // namespace tgfx
