@@ -21,7 +21,9 @@
 #include <unordered_map>
 #include "RenderTarget.h"
 #include "gpu/Blend.h"
+#include "gpu/PipelineProgram.h"
 #include "gpu/Program.h"
+#include "gpu/RenderPass.h"
 #include "gpu/processors/EmptyXferProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"
 #include "gpu/processors/GeometryProcessor.h"
@@ -68,10 +70,6 @@ class ProgramInfo {
 
   std::unique_ptr<BlendFormula> getBlendFormula() const;
 
-  void getUniforms(UniformBuffer* uniformBuffer) const;
-
-  std::vector<SamplerInfo> getSamplers() const;
-
   /**
    * Returns the index of the processor in the ProgramInfo. Returns -1 if the processor is not in
    * the ProgramInfo.
@@ -81,6 +79,11 @@ class ProgramInfo {
   std::string getMangledSuffix(const Processor* processor) const;
 
   std::shared_ptr<Program> getProgram() const;
+
+  /**
+   * Sets the uniform data and texture samplers on the render pass for the given program.
+   */
+  void setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram* program) const;
 
  private:
   RenderTarget* renderTarget = nullptr;
@@ -93,5 +96,7 @@ class ProgramInfo {
   BlendMode blendMode = BlendMode::SrcOver;
 
   void updateProcessorIndices();
+
+  std::vector<SamplerInfo> getSamplers() const;
 };
 }  // namespace tgfx

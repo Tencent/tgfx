@@ -19,8 +19,9 @@
 #pragma once
 
 #include "GLFragmentShaderBuilder.h"
-#include "GLProgram.h"
+#include "GLRenderPipeline.h"
 #include "GLVertexShaderBuilder.h"
+#include "gpu/PipelineProgram.h"
 #include "gpu/ProgramBuilder.h"
 #include "gpu/UniformHandler.h"
 
@@ -38,7 +39,7 @@ class GLProgramBuilder : public ProgramBuilder {
  private:
   GLProgramBuilder(Context* context, const ProgramInfo* programInfo);
 
-  std::unique_ptr<GLProgram> finalize();
+  std::unique_ptr<PipelineProgram> finalize();
 
   UniformHandler* uniformHandler() override {
     return &_uniformHandler;

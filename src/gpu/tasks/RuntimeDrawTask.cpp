@@ -18,6 +18,7 @@
 
 #include "RuntimeDrawTask.h"
 #include "gpu/GlobalCache.h"
+#include "gpu/PipelineProgram.h"
 #include "gpu/ProgramInfo.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
@@ -142,8 +143,14 @@ std::shared_ptr<TextureView> RuntimeDrawTask::GetFlatTextureView(
   std::vector fragmentProcessors = {colorProcessor.get()};
   ProgramInfo programInfo(renderTarget.get(), geometryProcessor.get(),
                           std::move(fragmentProcessors), 1, nullptr, BlendMode::Src);
-  renderPass->bindProgram(&programInfo);
-  renderPass->bindBuffers(nullptr, vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
+  auto program = std::static_pointer_cast<PipelineProgram>(programInfo.getProgram());
+  if (program == nullptr) {
+    LOGE("RuntimeDrawTask::GetFlatTextureView() Failed to get the program!");
+    return nullptr;
+  }
+  renderPass->setPipeline(program->getPipeline());
+  programInfo.setUniformsAndSamplers(renderPass.get(), program.get());
+  renderPass->setVertexBuffer(vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
   renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
   renderPass->end();
   return renderTarget->asTextureView();

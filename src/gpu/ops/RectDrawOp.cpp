@@ -81,8 +81,8 @@ void RectDrawOp::onDraw(RenderPass* renderPass) {
   if (vertexBuffer == nullptr) {
     return;
   }
-  renderPass->bindBuffers(indexBuffer ? indexBuffer->gpuBuffer() : nullptr,
-                          vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
+  renderPass->setVertexBuffer(vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
+  renderPass->setIndexBuffer(indexBuffer ? indexBuffer->gpuBuffer() : nullptr);
   if (indexBuffer != nullptr) {
     auto numIndicesPerQuad = aaType == AAType::Coverage ? IndicesPerAAQuad : IndicesPerNonAAQuad;
     renderPass->drawIndexed(PrimitiveType::Triangles, 0, rectCount * numIndicesPerQuad);
