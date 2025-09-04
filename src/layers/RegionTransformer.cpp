@@ -107,7 +107,7 @@ std::shared_ptr<RegionTransformer> RegionTransformer::MakeFromClip(
   if (!outClipRect.intersect(clipRect)) {
     outClipRect = {};
   }
-  return std::make_unique<ClipRegionTransformer>(outClipRect, nullptr);
+  return std::make_unique<ClipRegionTransformer>(outClipRect, outer->outer);
 }
 
 std::shared_ptr<RegionTransformer> RegionTransformer::MakeFromFilters(
