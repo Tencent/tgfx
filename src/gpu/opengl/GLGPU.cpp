@@ -20,6 +20,7 @@
 #include "gpu/opengl/GLBuffer.h"
 #include "gpu/opengl/GLCommandEncoder.h"
 #include "gpu/opengl/GLExternalTexture.h"
+#include "gpu/opengl/GLFence.h"
 #include "gpu/opengl/GLMultisampleTexture.h"
 #include "gpu/opengl/GLUtil.h"
 
@@ -171,6 +172,14 @@ std::unique_ptr<GPUTexture> GLGPU::importExternalTexture(const BackendRenderTarg
                                      1,
                                      GPUTextureUsage::RENDER_ATTACHMENT};
   return std::make_unique<GLExternalTexture>(descriptor, GL_TEXTURE_2D, 0, frameBufferInfo.id);
+}
+
+std::unique_ptr<GPUFence> GLGPU::importExternalFence(const BackendSemaphore& semaphore) {
+  GLSyncInfo glSyncInfo = {};
+  if (!caps()->semaphoreSupport || !semaphore.getGLSync(&glSyncInfo)) {
+    return nullptr;
+  }
+  return std::make_unique<GLFence>(glSyncInfo.sync);
 }
 
 std::shared_ptr<CommandEncoder> GLGPU::createCommandEncoder() {

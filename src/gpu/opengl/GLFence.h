@@ -18,49 +18,26 @@
 
 #pragma once
 
-#include <memory>
 #include "gpu/GPUFence.h"
-#include "gpu/Resource.h"
 
 namespace tgfx {
 /**
- * Wrapper class for a GPUFence object.
+ * GLSemaphore is a wrapper class for an OpenGL sync object.
  */
-class Semaphore : public Resource {
+class GLFence : public GPUFence {
  public:
-  /**
-   * Wraps a backend semaphore object into a Semaphore instance.
-   */
-  static std::shared_ptr<Semaphore> Wrap(Context* context,
-                                         const BackendSemaphore& backendSemaphore);
-
-  size_t memoryUsage() const override {
-    return 0;
+  explicit GLFence(void* glSync) : _glSync(glSync) {
   }
 
-  /**
-   * Returns the GPUFence object associated with this Semaphore instance.
-   */
-  GPUFence* getFence() {
-    return fence.get();
+  void* glSync() const {
+    return _glSync;
   }
 
-  /**
-   * Returns the backend semaphore object associated with this Semaphore instance.
-   */
-  BackendSemaphore getBackendSemaphore() const {
-    return fence->getBackendSemaphore();
-  }
+  BackendSemaphore getBackendSemaphore() const override;
 
- protected:
-  void onReleaseGPU() override {
-    fence->release(context->gpu());
-  }
+  void release(GPU* gpu) override;
 
  private:
-  std::unique_ptr<GPUFence> fence = nullptr;
-
-  explicit Semaphore(std::unique_ptr<GPUFence> fence) : fence(std::move(fence)) {
-  }
+  void* _glSync = nullptr;
 };
 }  // namespace tgfx

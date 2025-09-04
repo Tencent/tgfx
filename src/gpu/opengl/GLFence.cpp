@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2025 Tencent. All rights reserved.
+//  Copyright (C) 2023 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -16,23 +16,26 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#pragma once
-
-#include "RenderTask.h"
-#include "gpu/Semaphore.h"
+#include "GLFence.h"
+#include "gpu/opengl/GLGPU.h"
+#include "tgfx/gpu/opengl/GLFunctions.h"
 
 namespace tgfx {
-class SemaphoreWaitTask : public RenderTask {
- public:
-  explicit SemaphoreWaitTask(std::shared_ptr<Semaphore> semaphore)
-      : semaphore(std::move(semaphore)) {
+BackendSemaphore GLFence::getBackendSemaphore() const {
+  if (_glSync == nullptr) {
+    return {};
   }
+  GLSyncInfo glSyncInfo = {};
+  glSyncInfo.sync = _glSync;
+  return {glSyncInfo};
+}
 
-  void execute(CommandEncoder* encoder) override {
-    encoder->waitForFence(semaphore->getFence());
+void GLFence::release(GPU* gpu) {
+  if (_glSync != nullptr) {
+    auto gl = static_cast<const GLGPU*>(gpu)->functions();
+    gl->deleteSync(_glSync);
+    _glSync = nullptr;
   }
+}
 
- private:
-  std::shared_ptr<Semaphore> semaphore = nullptr;
-};
 }  // namespace tgfx

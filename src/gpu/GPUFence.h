@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,27 +18,19 @@
 
 #pragma once
 
-#include "gpu/Semaphore.h"
+#include "gpu/GPUResource.h"
+#include "tgfx/gpu/Backend.h"
 
 namespace tgfx {
 /**
- * Types for interacting with OpenGL semaphore object.
+ * GPUFence is a synchronization primitive to capture, track, and manager resource dependencies
+ * across command encoders.
  */
-class GLSemaphore : public Semaphore {
+class GPUFence : public GPUResource {
  public:
-  explicit GLSemaphore(void* glSync) : _glSync(glSync) {
-  }
-
-  void* glSync() const {
-    return _glSync;
-  }
-
-  BackendSemaphore getBackendSemaphore() const override;
-
- protected:
-  void onReleaseGPU() override;
-
- private:
-  void* _glSync = nullptr;
+  /**
+   * Returns the backend semaphore object.
+   */
+  virtual BackendSemaphore getBackendSemaphore() const = 0;
 };
 }  // namespace tgfx
