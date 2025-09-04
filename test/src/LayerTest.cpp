@@ -2997,28 +2997,4 @@ TGFX_TEST(LayerTest, PartialDrawLayer) {
   EXPECT_TRUE(Baseline::Compare(surface, "LayerTest/PartialDrawLayer"));
   EXPECT_EQ(layerInvisible->rasterizedContent, nullptr);
 }
-
-TGFX_TEST(LayerTest, ZoomUpStrokeShape) {
-  ContextScope scope;
-  auto* context = scope.getContext();
-  EXPECT_TRUE(context != nullptr);
-  auto surface = Surface::Make(context, 512, 512);
-
-  Path path;
-  path.addRoundRect(Rect::MakeWH(10, 10), 2, 2);
-  auto shape = Shape::MakeFrom(path);
-  shape = Shape::ApplyMatrix(shape, Matrix::MakeScale(40, 40));
-
-  Paint paint;
-  paint.setColor(Color::Red());
-  paint.setStyle(PaintStyle::Stroke);
-  paint.setStrokeWidth(20.f);
-
-  auto* canvas = surface->getCanvas();
-  canvas->clear(Color::Black());
-  canvas->translate(50, 50);
-  canvas->drawShape(shape, paint);
-
-  EXPECT_TRUE(Baseline::Compare(surface, "AAADebug/ZoomUpStrokeShape"));
-}
 }  // namespace tgfx

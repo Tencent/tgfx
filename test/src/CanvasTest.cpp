@@ -43,6 +43,7 @@
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Rect.h"
 #include "tgfx/core/Shader.h"
+#include "tgfx/core/Stroke.h"
 #include "tgfx/core/Surface.h"
 #include "tgfx/gpu/opengl/GLFunctions.h"
 #include "tgfx/platform/ImageReader.h"
@@ -2989,5 +2990,30 @@ TGFX_TEST(CanvasTest, RRectBlendMode) {
   path.addRoundRect(Rect::MakeXYWH(25, 25, 150, 150), 20, 20);
   canvas->drawPath(path, paint);
   EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/RRectBlendMode"));
+}
+
+TGFX_TEST(LayerTest, ZoomUpStrokeShape) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+  auto surface = Surface::Make(context, 512, 512);
+
+  Path path;
+  path.addRoundRect(Rect::MakeWH(10, 10), 2, 2);
+  auto shape = Shape::MakeFrom(path);
+  Stroke stroke;
+  stroke.width = 3.0f;
+  shape = Shape::ApplyMatrix(shape, Matrix::MakeScale(40, 40));
+  shape = Shape::ApplyStroke(shape, &stroke);
+
+  Paint paint;
+  paint.setColor(Color::Red());
+
+  auto* canvas = surface->getCanvas();
+  canvas->clear(Color::Black());
+  canvas->translate(50, 50);
+  canvas->drawShape(shape, paint);
+
+  EXPECT_TRUE(Baseline::Compare(surface, "CanvasTest/ZoomUpStrokeShape"));
 }
 }  // namespace tgfx

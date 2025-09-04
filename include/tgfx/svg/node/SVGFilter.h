@@ -19,13 +19,14 @@
 #pragma once
 
 #include <memory>
-#include "svg/SVGFilterContext.h"
 #include "tgfx/core/ImageFilter.h"
 #include "tgfx/svg/SVGTypes.h"
 #include "tgfx/svg/node/SVGHiddenContainer.h"
 #include "tgfx/svg/node/SVGNode.h"
 
 namespace tgfx {
+
+class SVGFilterContext;
 
 class SVGFilter final : public SVGHiddenContainer {
  public:
