@@ -23,7 +23,7 @@
 
 namespace tgfx {
 /**
- * GPUFence is a synchronization primitive to capture, track, and manager resource dependencies
+ * GPUFence is a synchronization primitive to capture, track, and manage resource dependencies
  * across command encoders.
  */
 class GPUFence : public GPUResource {

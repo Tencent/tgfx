@@ -20,8 +20,8 @@
 #include "GPU.h"
 
 namespace tgfx {
-std::shared_ptr<Semaphore> Semaphore::Wrap(Context* context,
-                                           const BackendSemaphore& backendSemaphore) {
+std::shared_ptr<Semaphore> Semaphore::MakeAdopted(Context* context,
+                                                  const BackendSemaphore& backendSemaphore) {
   auto fence = context->gpu()->importExternalFence(backendSemaphore);
   if (fence == nullptr) {
     return nullptr;

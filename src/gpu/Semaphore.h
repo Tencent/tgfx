@@ -29,10 +29,10 @@ namespace tgfx {
 class Semaphore : public Resource {
  public:
   /**
-   * Wraps a backend semaphore object into a Semaphore instance.
+   * Wraps a backend semaphore object into a Semaphore instance and takes ownership of it.
    */
-  static std::shared_ptr<Semaphore> Wrap(Context* context,
-                                         const BackendSemaphore& backendSemaphore);
+  static std::shared_ptr<Semaphore> MakeAdopted(Context* context,
+                                                const BackendSemaphore& backendSemaphore);
 
   size_t memoryUsage() const override {
     return 0;
