@@ -1260,7 +1260,8 @@ void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, b
     auto childMatrix = child->getMatrixWithScrollRect();
     auto childTransformer = RegionTransformer::MakeFromMatrix(childMatrix, transformer);
     if (child->_scrollRect) {
-      childTransformer = RegionTransformer::MakeFromClip(*child->_scrollRect, childTransformer);
+      childTransformer =
+          RegionTransformer::MakeFromClip(*child->_scrollRect, std::move(childTransformer));
     }
     auto childForceDirty = forceDirty || child->bitFields.dirtyTransform;
     child->updateRenderBounds(childTransformer, childForceDirty);

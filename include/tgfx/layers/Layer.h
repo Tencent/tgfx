@@ -596,7 +596,7 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool hasValidMask() const;
 
-  void updateRenderBounds(std::shared_ptr<RegionTransformer> transformersh = nullptr,
+  void updateRenderBounds(std::shared_ptr<RegionTransformer> transformer = nullptr,
                           bool forceDirty = false);
 
   void checkBackgroundStyles(std::shared_ptr<RegionTransformer> transformer);
