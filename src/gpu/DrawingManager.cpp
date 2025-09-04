@@ -21,7 +21,6 @@
 #include "ProxyProvider.h"
 #include "core/AtlasCellDecodeTask.h"
 #include "core/AtlasManager.h"
-#include "core/utils/PixelFormatUtil.h"
 #include "gpu/proxies/RenderTargetProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 #include "gpu/tasks/GenerateMipmapsTask.h"
@@ -32,8 +31,8 @@
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
-static ColorType GetAtlasColorType(bool isAplhaOnly) {
-  if (isAplhaOnly) {
+static ColorType GetAtlasColorType(bool isAlphaOnly) {
+  if (isAlphaOnly) {
     return ColorType::ALPHA_8;
   }
 #ifdef __APPLE__
@@ -41,6 +40,15 @@ static ColorType GetAtlasColorType(bool isAplhaOnly) {
 #else
   return ColorType::RGBA_8888;
 #endif
+}
+
+static ImageInfo GetAtlasImageInfo(int width, int height, bool isAlphaOnly) {
+  auto colorType = GetAtlasColorType(isAlphaOnly);
+  auto rowBytes = static_cast<size_t>(width * (isAlphaOnly ? 1 : 4));
+  // Align to 4 bytes
+  constexpr size_t ALIGNMENT = 4;
+  rowBytes = (rowBytes + ALIGNMENT - 1) & ~(ALIGNMENT - 1);
+  return ImageInfo::Make(width, height, colorType, AlphaType::Premultiplied, rowBytes);
 }
 
 DrawingManager::DrawingManager(Context* context)
@@ -155,8 +163,7 @@ void DrawingManager::addAtlasCellCodecTask(const std::shared_ptr<TextureProxy>& 
     auto offsetY = static_cast<int>(atlasOffset.y) - padding;
     dstPixels = hardwareInfo.computeOffset(pixels, offsetX, offsetY);
   } else {
-    auto colorType = GetAtlasColorType(codec->isAlphaOnly());
-    dstInfo = ImageInfo::Make(dstWidth, dstHeight, colorType);
+    dstInfo = GetAtlasImageInfo(dstWidth, dstHeight, codec->isAlphaOnly());
     auto length = dstInfo.byteSize();
     dstPixels = drawingBuffer->allocate(length);
     if (dstPixels == nullptr) {
@@ -261,7 +268,6 @@ void DrawingManager::uploadAtlasToGPU() {
       queue->writeTexture(textureView->getTexture(), rect, data->data(), info.rowBytes());
       // Text atlas has no mipmaps, so we don't need to regenerate mipmaps.
     }
-    CAPUTRE_TEXTURE(queue, textureView->getTexture());
   }
   resetAtlasCache();
 }

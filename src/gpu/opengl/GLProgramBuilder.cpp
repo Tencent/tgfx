@@ -146,7 +146,7 @@ std::string GLProgramBuilder::getShaderVarDeclarations(const ShaderVar& var,
   return ret;
 }
 
-std::unique_ptr<GLProgram> GLProgramBuilder::finalize() {
+std::unique_ptr<PipelineProgram> GLProgramBuilder::finalize() {
   if (isDesktopGL()) {
     fragmentShaderBuilder()->declareCustomOutputColor();
   }
@@ -167,9 +167,11 @@ std::unique_ptr<GLProgram> GLProgramBuilder::finalize() {
     DEBUG_ASSERT(location != -1);
     gl->uniform1i(location, textureUint++);
   }
-  return std::make_unique<GLProgram>(programID, _uniformHandler.makeUniformBuffer(),
-                                     programInfo->getVertexAttributes(),
-                                     programInfo->getBlendFormula());
+  auto uniformBuffer = _uniformHandler.makeUniformBuffer();
+  auto pipeline = std::make_unique<GLRenderPipeline>(programID, uniformBuffer->uniforms(),
+                                                     programInfo->getVertexAttributes(),
+                                                     programInfo->getBlendFormula());
+  return std::make_unique<PipelineProgram>(std::move(pipeline), std::move(uniformBuffer));
 }
 
 bool GLProgramBuilder::checkSamplerCounts() {

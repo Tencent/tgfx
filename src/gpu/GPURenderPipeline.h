@@ -18,24 +18,14 @@
 
 #pragma once
 
-#include "gpu/Program.h"
-#include "tgfx/gpu/RuntimeProgram.h"
+#include "gpu/GPUResource.h"
 
 namespace tgfx {
-class RuntimeProgramWrapper : public Program {
+/**
+ * GPURenderPipeline represents a graphics pipeline configuration for a render pass, which the pass
+ * applies to the draw commands you encode.
+ */
+class GPURenderPipeline : public GPUResource {
  public:
-  static std::shared_ptr<Program> Wrap(std::unique_ptr<RuntimeProgram> program);
-
-  static const RuntimeProgram* Unwrap(const Program* program);
-
- protected:
-  void onReleaseGPU() override;
-
- private:
-  std::unique_ptr<RuntimeProgram> runtimeProgram = nullptr;
-
-  explicit RuntimeProgramWrapper(std::unique_ptr<RuntimeProgram> program)
-      : runtimeProgram(std::move(program)) {
-  }
 };
 }  // namespace tgfx

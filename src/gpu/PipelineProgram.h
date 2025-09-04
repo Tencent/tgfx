@@ -17,20 +17,30 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <memory>
 
-namespace tgfx::inspect {
-class LZ4CompressionHandler {
+#include "gpu/Program.h"
+
+namespace tgfx {
+class PipelineProgram : public Program {
  public:
-  static std::unique_ptr<LZ4CompressionHandler> Make();
+  explicit PipelineProgram(std::unique_ptr<GPURenderPipeline> pipeline,
+                           std::unique_ptr<UniformBuffer> uniformBuffer)
+      : pipeline(std::move(pipeline)), uniformBuffer(std::move(uniformBuffer)) {
+  }
 
-  static size_t GetMaxOutputSize(size_t inputSize);
+  GPURenderPipeline* getPipeline() const {
+    return pipeline.get();
+  }
 
-  virtual ~LZ4CompressionHandler() = default;
+ protected:
+  void onReleaseGPU() override {
+    pipeline->release(context->gpu());
+  }
 
-  virtual size_t encode(uint8_t* dstBuffer, size_t dstSize, const uint8_t* srcBuffer,
-                        size_t srcSize) const = 0;
+ private:
+  std::unique_ptr<GPURenderPipeline> pipeline = nullptr;
+  std::unique_ptr<UniformBuffer> uniformBuffer = nullptr;
 
-  virtual void reset() = 0;
+  friend class ProgramInfo;
 };
-}  // namespace tgfx::inspect
+}  // namespace tgfx

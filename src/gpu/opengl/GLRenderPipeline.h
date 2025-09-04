@@ -18,45 +18,46 @@
 
 #pragma once
 
-#include <optional>
-#include "gpu/Program.h"
-#include "gpu/ProgramInfo.h"
+#include "gpu/Attribute.h"
+#include "gpu/Blend.h"
+#include "gpu/GPURenderPipeline.h"
+#include "gpu/Uniform.h"
 #include "gpu/opengl/GLBuffer.h"
 
 namespace tgfx {
-class GLProgram : public Program {
+/**
+ * GLRenderPipeline is the OpenGL implementation of the GPURenderPipeline interface. It encapsulates
+ * an OpenGL shader program along with its associated state, such as vertex attributes and blending
+ * settings.
+ */
+class GLRenderPipeline : public GPURenderPipeline {
  public:
-  GLProgram(unsigned programID, std::unique_ptr<UniformBuffer> uniformBuffer,
-            std::vector<Attribute> attributes, std::unique_ptr<BlendFormula> blendFormula);
+  GLRenderPipeline(unsigned programID, std::vector<Uniform> uniforms,
+                   std::vector<Attribute> attribs, std::unique_ptr<BlendFormula> blendFormula);
 
   /**
-   * Binds the program so that it is used in subsequent draw calls.
+   * Binds the shader program so that it is used in subsequent draw calls.
    */
-  void activate();
+  void activate(GLInterface* interface);
 
   /**
    * Sets the uniform data to be used in subsequent draw calls.
    */
-  void setUniformBytes(const void* data, size_t size);
+  void setUniformBytes(GLInterface* interface, const void* data, size_t size);
 
   /**
    * Binds the vertex buffer to be used in subsequent draw calls. The vertexOffset is the offset
    * into the buffer where the vertex data begins.
    */
-  void setVertexBuffer(GPUBuffer* vertexBuffer, size_t vertexOffset);
+  void setVertexBuffer(GLInterface* interface, GPUBuffer* vertexBuffer, size_t vertexOffset);
 
-  /**
-   * Binds the index buffer to be used in subsequent draw calls.
-   */
-  void setIndexBuffer(GPUBuffer* indexBuffer);
-
- protected:
-  void onReleaseGPU() override;
+  void release(GPU* gpu) override;
 
  private:
   unsigned programID = 0;
   unsigned vertexArray = 0;
-  std::vector<Attribute> _attributes = {};
+  std::vector<Uniform> uniforms = {};
+  std::vector<Attribute> attributes = {};
   std::vector<int> attributeLocations = {};
   std::vector<int> uniformLocations = {};
   int vertexStride = 0;

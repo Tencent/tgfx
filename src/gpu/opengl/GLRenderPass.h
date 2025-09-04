@@ -22,6 +22,7 @@
 #include "gpu/RenderPassDescriptor.h"
 #include "gpu/opengl/GLBuffer.h"
 #include "gpu/opengl/GLInterface.h"
+#include "gpu/opengl/GLRenderPipeline.h"
 
 namespace tgfx {
 
@@ -31,17 +32,28 @@ class GLRenderPass : public RenderPass {
 
   void begin();
 
+  void setScissorRect(int x, int y, int width, int height) override;
+
+  void setPipeline(GPURenderPipeline* pipeline) override;
+
+  void setUniformBytes(unsigned binding, const void* data, size_t size) override;
+
+  void setTexture(unsigned binding, GPUTexture* texture, const SamplerState& state) override;
+
+  void setVertexBuffer(GPUBuffer* buffer, size_t offset) override;
+
+  void setIndexBuffer(GPUBuffer* buffer, IndexFormat format) override;
+
+  void draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) override;
+
+  void drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) override;
+
  protected:
-  bool onBindProgramAndScissorClip(const ProgramInfo* programInfo,
-                                   const Rect& scissorRect) override;
-  bool onBindBuffers(GPUBuffer* indexBuffer, GPUBuffer* vertexBuffer, size_t vertexOffset) override;
-  void onDraw(PrimitiveType primitiveType, size_t baseVertex, size_t count,
-              bool drawIndexed) override;
   void onEnd() override;
 
  private:
   std::shared_ptr<GLInterface> interface = nullptr;
-
-  void bindTexture(int unitIndex, GPUTexture* texture, SamplerState samplerState = {});
+  GLRenderPipeline* renderPipeline = nullptr;
+  IndexFormat indexFormat = IndexFormat::UInt16;
 };
 }  // namespace tgfx
