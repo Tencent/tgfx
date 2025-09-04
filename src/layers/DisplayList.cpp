@@ -545,13 +545,9 @@ std::vector<std::pair<float, TileCache*>> DisplayList::getSortedTileCaches() con
     auto zoomScale = ToZoomScaleFloat(scaleInt, _zoomScalePrecision);
     sortedTileCaches.emplace_back(zoomScale, tileCache);
   }
-  auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
-  DEBUG_ASSERT(currentZoomScale != 0.0f);
-  // Closest tile caches first, farthest last.
   std::sort(sortedTileCaches.begin(), sortedTileCaches.end(),
-            [currentZoomScale](const std::pair<float, TileCache*>& a,
-                               const std::pair<float, TileCache*>& b) {
-              return ScaleRatio(a.first, currentZoomScale) < ScaleRatio(b.first, currentZoomScale);
+            [](const std::pair<float, TileCache*>& a, const std::pair<float, TileCache*>& b) {
+              return a.first < b.first;
             });
   return sortedTileCaches;
 }
@@ -561,9 +557,15 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
   auto tileRect = Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
   DEBUG_ASSERT(currentZoomScale != 0.0f);
-  for (auto& [scale, tileCache] : sortedCaches) {
+  auto firstZoomOutTiled =
+      std::find_if(sortedCaches.begin(), sortedCaches.end(),
+                   [currentZoomScale](const std::pair<float, TileCache*>& item) {
+                     return item.first > currentZoomScale;
+                   });
+  auto findFallbackTasks = [](float scale, TileCache* tileCache, float currentZoomScale,
+                              const Rect& tileRect, int tileSize) -> std::vector<DrawTask> {
     if (scale == currentZoomScale || tileCache->empty()) {
-      continue;
+      return {};
     }
     auto scaleRatio = scale / currentZoomScale;
     DEBUG_ASSERT(scaleRatio != 0.0f);
@@ -571,16 +573,30 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
     zoomedRect.scale(scaleRatio, scaleRatio);
     auto tiles = tileCache->getTilesUnderRect(zoomedRect, true);
     if (tiles.empty()) {
-      continue;
+      return {};
     }
     std::vector<DrawTask> tasks = {};
-    for (auto& tile : tiles) {
-      auto drawRect = tile->getTileRect(_tileSize);
+    for (const auto& tile : tiles) {
+      auto drawRect = tile->getTileRect(tileSize);
       if (drawRect.intersect(zoomedRect)) {
-        tasks.emplace_back(tile, _tileSize, drawRect, 1.0f / scaleRatio);
+        tasks.emplace_back(tile, tileSize, drawRect, 1.0f / scaleRatio);
       }
     }
     return tasks;
+  };
+  for (auto index = firstZoomOutTiled; index < sortedCaches.end(); index++) {
+    const auto& [scale, tileCache] = *index;
+    auto tasks = findFallbackTasks(scale, tileCache, currentZoomScale, tileRect, _tileSize);
+    if (!tasks.empty()) {
+      return tasks;
+    }
+  }
+  for (auto index = firstZoomOutTiled - 1; index >= sortedCaches.begin(); index--) {
+    const auto& [scale, tileCache] = *index;
+    auto tasks = findFallbackTasks(scale, tileCache, currentZoomScale, tileRect, _tileSize);
+    if (!tasks.empty()) {
+      return tasks;
+    }
   }
   return {};
 }
@@ -605,8 +621,18 @@ std::vector<std::shared_ptr<Tile>> DisplayList::getFreeTiles(
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
   DEBUG_ASSERT(currentZoomScale != 0.0f);
   // Reverse iterate through sorted caches to get the farest tiles first.
-  for (auto it = sortedCaches.rbegin(); it != sortedCaches.rend(); ++it) {
-    auto& [scale, tileCache] = *it;
+  for (size_t i = 0, j = sortedCaches.size() - 1; i <= j;) {
+    auto& [scaleS, tileCacheS] = sortedCaches.at(i);
+    auto& [scaleL, tileCacheL] = sortedCaches.at(j);
+    auto scale = scaleS;
+    auto tileCache = tileCacheS;
+    if (ScaleRatio(scaleS, currentZoomScale) < ScaleRatio(scaleL, currentZoomScale)) {
+      scale = scaleL;
+      tileCache = tileCacheL;
+      j--;
+    } else {
+      i++;
+    }
     auto centerX = static_cast<float>(renderSurface->width()) * 0.5f - _contentOffset.x;
     auto centerY = static_cast<float>(renderSurface->height()) * 0.5f - _contentOffset.y;
     centerX *= scale / currentZoomScale;
