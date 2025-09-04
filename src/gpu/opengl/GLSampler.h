@@ -2,7 +2,7 @@
 //
 //  Tencent is pleased to support the open source community by making tgfx available.
 //
-//  Copyright (C) 2023 Tencent. All rights reserved.
+//  Copyright (C) 2025 Tencent. All rights reserved.
 //
 //  Licensed under the BSD 3-Clause License (the "License"); you may not use this file except
 //  in compliance with the License. You may obtain a copy of the License at
@@ -18,26 +18,38 @@
 
 #pragma once
 
-#include "tgfx/gpu/FilterMode.h"
-#include "tgfx/gpu/MipmapMode.h"
+#include "gpu/GPUSampler.h"
 
 namespace tgfx {
-struct SamplingOptions {
-  SamplingOptions() = default;
-
-  explicit SamplingOptions(FilterMode filterMode, MipmapMode mipmapMode = MipmapMode::Linear)
-      : filterMode(filterMode), mipmapMode(mipmapMode) {
+class GLSampler : public GPUSampler {
+ public:
+  explicit GLSampler(const GPUSamplerDescriptor& descriptor) : descriptor(descriptor) {
   }
 
-  friend bool operator==(const SamplingOptions& a, const SamplingOptions& b) {
-    return a.filterMode == b.filterMode && a.mipmapMode == b.mipmapMode;
+  AddressMode addressModeX() const {
+    return descriptor.addressModeX;
   }
 
-  friend bool operator!=(const SamplingOptions& a, const SamplingOptions& b) {
-    return !(a == b);
+  AddressMode addressModeY() const {
+    return descriptor.addressModeY;
   }
 
-  FilterMode filterMode = FilterMode::Linear;
-  MipmapMode mipmapMode = MipmapMode::Linear;
+  FilterMode minFilter() const {
+    return descriptor.minFilter;
+  }
+
+  FilterMode magFilter() const {
+    return descriptor.magFilter;
+  }
+
+  MipmapMode mipmapMode() const {
+    return descriptor.mipmapMode;
+  }
+
+  void release(GPU*) override {
+  }
+
+ private:
+  GPUSamplerDescriptor descriptor = {};
 };
 }  // namespace tgfx

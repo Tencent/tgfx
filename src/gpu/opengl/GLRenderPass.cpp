@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLRenderPass.h"
+#include "GLSampler.h"
 #include "GLUtil.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/GlobalCache.h"
@@ -104,43 +105,44 @@ static int FilterToGLMinFilter(FilterMode filterMode, MipmapMode mipmapMode) {
   return 0;
 }
 
-static int GetGLWrap(unsigned target, SamplerState::WrapMode wrapMode) {
+static int GetGLWrap(unsigned target, AddressMode wrapMode) {
   if (target == GL_TEXTURE_RECTANGLE) {
-    if (wrapMode == SamplerState::WrapMode::ClampToBorder) {
+    if (wrapMode == AddressMode::ClampToBorder) {
       return GL_CLAMP_TO_BORDER;
     }
     return GL_CLAMP_TO_EDGE;
   }
   switch (wrapMode) {
-    case SamplerState::WrapMode::Clamp:
+    case AddressMode::ClampToEdge:
       return GL_CLAMP_TO_EDGE;
-    case SamplerState::WrapMode::Repeat:
+    case AddressMode::Repeat:
       return GL_REPEAT;
-    case SamplerState::WrapMode::MirrorRepeat:
+    case AddressMode::MirrorRepeat:
       return GL_MIRRORED_REPEAT;
-    case SamplerState::WrapMode::ClampToBorder:
+    case AddressMode::ClampToBorder:
       return GL_CLAMP_TO_BORDER;
   }
   return 0;
 }
 
-void GLRenderPass::setTexture(unsigned binding, GPUTexture* texture, const SamplerState& state) {
+void GLRenderPass::setTexture(unsigned binding, GPUTexture* texture, GPUSampler* sampler) {
   DEBUG_ASSERT(texture != nullptr);
   auto gl = interface->functions();
   auto caps = interface->caps();
   auto glTexture = static_cast<const GLTexture*>(texture);
+  auto glSampler = static_cast<const GLSampler*>(sampler);
   auto target = glTexture->target();
   gl->activeTexture(static_cast<unsigned>(GL_TEXTURE0) + binding);
   gl->bindTexture(target, glTexture->textureID());
-  gl->texParameteri(target, GL_TEXTURE_WRAP_S, GetGLWrap(target, state.wrapModeX));
-  gl->texParameteri(target, GL_TEXTURE_WRAP_T, GetGLWrap(target, state.wrapModeY));
-  auto mipmapMode = state.mipmapMode;
-  if (state.mipmapped() && (!caps->mipmapSupport || glTexture->mipLevelCount() <= 1)) {
+  gl->texParameteri(target, GL_TEXTURE_WRAP_S, GetGLWrap(target, glSampler->addressModeX()));
+  gl->texParameteri(target, GL_TEXTURE_WRAP_T, GetGLWrap(target, glSampler->addressModeY()));
+  auto mipmapMode = glSampler->mipmapMode();
+  if (mipmapMode != MipmapMode::None && (!caps->mipmapSupport || glTexture->mipLevelCount() <= 1)) {
     mipmapMode = MipmapMode::None;
   }
   gl->texParameteri(target, GL_TEXTURE_MIN_FILTER,
-                    FilterToGLMinFilter(state.filterMode, mipmapMode));
-  gl->texParameteri(target, GL_TEXTURE_MAG_FILTER, FilterToGLMagFilter(state.filterMode));
+                    FilterToGLMinFilter(glSampler->minFilter(), mipmapMode));
+  gl->texParameteri(target, GL_TEXTURE_MAG_FILTER, FilterToGLMagFilter(glSampler->magFilter()));
   auto renderTexture = descriptor.colorAttachments[0].texture;
   if (texture == renderTexture && interface->caps()->textureRedSupport) {
     gl->textureBarrier();

@@ -22,6 +22,7 @@
 #include "gpu/opengl/GLExternalTexture.h"
 #include "gpu/opengl/GLFence.h"
 #include "gpu/opengl/GLMultisampleTexture.h"
+#include "gpu/opengl/GLSampler.h"
 #include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
@@ -180,6 +181,10 @@ std::unique_ptr<GPUFence> GLGPU::importExternalFence(const BackendSemaphore& sem
     return nullptr;
   }
   return std::make_unique<GLFence>(glSyncInfo.sync);
+}
+
+std::unique_ptr<GPUSampler> GLGPU::createSampler(const GPUSamplerDescriptor& descriptor) {
+  return std::make_unique<GLSampler>(descriptor);
 }
 
 std::shared_ptr<CommandEncoder> GLGPU::createCommandEncoder() {
