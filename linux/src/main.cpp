@@ -63,11 +63,11 @@ int main() {
   auto surface = tgfx::Surface::Make(context, appHost.width(), appHost.height());
   auto canvas = surface->getCanvas();
   auto builderNames = hello2d::LayerBuilder::Names();
+  auto index = 0;
+
   for (auto& name : builderNames) {
-    auto index = 0;
     canvas->clear();
-    // drawer->build(&appHost);
-    //drawer->displayList.render(canvas->getSurface(), false);
+
     appHost->draw(canvas, index);
 
     tgfx::Bitmap bitmap = {};
