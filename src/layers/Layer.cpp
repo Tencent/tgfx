@@ -1203,21 +1203,23 @@ bool Layer::hasValidMask() const {
   return _mask && _mask->root() == root() && _mask->bitFields.visible;
 }
 
-void Layer::updateRenderBounds(const Matrix& renderMatrix,
-                               std::shared_ptr<RegionTransformer> transformer, bool forceDirty) {
+void Layer::updateRenderBounds(std::shared_ptr<RegionTransformer> transformer, bool forceDirty) {
   if (!forceDirty && !bitFields.dirtyDescendents) {
     if (maxBackgroundOutset > 0) {
       propagateBackgroundStyleOutset();
       if (_root->hasDirtyRegions()) {
-        checkBackgroundStyles(renderMatrix);
+        checkBackgroundStyles(transformer);
       }
     }
     return;
   }
   maxBackgroundOutset = 0;
   minBackgroundOutset = std::numeric_limits<float>::max();
+  auto contentScale = 1.0f;
   if (!_layerStyles.empty() || !_filters.empty()) {
-    auto contentScale = renderMatrix.getMaxScale();
+    if (transformer) {
+      contentScale = transformer->getMaxScale();
+    }
     transformer =
         RegionTransformer::MakeFromFilters(_filters, contentScale, std::move(transformer));
     transformer =
@@ -1231,7 +1233,7 @@ void Layer::updateRenderBounds(const Matrix& renderMatrix,
       contentBounds = new Rect();
     }
     if (content) {
-      *contentBounds = renderMatrix.mapRect(content->getBounds());
+      *contentBounds = content->getBounds();
       if (transformer) {
         transformer->transform(contentBounds);
       }
@@ -1256,14 +1258,12 @@ void Layer::updateRenderBounds(const Matrix& renderMatrix,
       continue;
     }
     auto childMatrix = child->getMatrixWithScrollRect();
-    childMatrix.postConcat(renderMatrix);
-    auto childTransformer = transformer;
+    auto childTransformer = RegionTransformer::MakeFromMatrix(childMatrix, transformer);
     if (child->_scrollRect) {
-      auto childScrollRect = childMatrix.mapRect(*child->_scrollRect);
-      childTransformer = RegionTransformer::MakeFromClip(childScrollRect, childTransformer);
+      childTransformer = RegionTransformer::MakeFromClip(*child->_scrollRect, childTransformer);
     }
     auto childForceDirty = forceDirty || child->bitFields.dirtyTransform;
-    child->updateRenderBounds(childMatrix, childTransformer, childForceDirty);
+    child->updateRenderBounds(childTransformer, childForceDirty);
     child->bitFields.dirtyTransform = false;
     if (!child->maskOwner) {
       renderBounds.join(child->renderBounds);
@@ -1274,7 +1274,7 @@ void Layer::updateRenderBounds(const Matrix& renderMatrix,
     if (style->extraSourceType() != LayerStyleExtraSourceType::Background) {
       continue;
     }
-    auto outset = style->filterBackground(Rect::MakeEmpty(), renderMatrix.getMaxScale());
+    auto outset = style->filterBackground(Rect::MakeEmpty(), contentScale);
     backOutset = std::max(backOutset, outset.right);
     backOutset = std::max(backOutset, outset.bottom);
   }
@@ -1282,25 +1282,24 @@ void Layer::updateRenderBounds(const Matrix& renderMatrix,
     maxBackgroundOutset = std::max(backOutset, maxBackgroundOutset);
     minBackgroundOutset = std::min(backOutset, minBackgroundOutset);
     propagateBackgroundStyleOutset();
-    updateBackgroundBounds(renderMatrix);
+    updateBackgroundBounds(contentScale);
   }
   bitFields.dirtyDescendents = false;
 }
 
-void Layer::checkBackgroundStyles(const Matrix& renderMatrix) {
+void Layer::checkBackgroundStyles(std::shared_ptr<RegionTransformer> transformer) {
   for (auto& child : _children) {
     if (child->maxBackgroundOutset <= 0 || !child->bitFields.visible || child->_alpha <= 0) {
       continue;
     }
     auto childMatrix = child->getMatrixWithScrollRect();
-    childMatrix.postConcat(renderMatrix);
-    child->checkBackgroundStyles(childMatrix);
+    auto childTransformer = RegionTransformer::MakeFromMatrix(childMatrix, transformer);
+    child->checkBackgroundStyles(childTransformer);
   }
-  updateBackgroundBounds(renderMatrix);
+  updateBackgroundBounds(transformer ? transformer->getMaxScale() : 1.0f);
 }
 
-void Layer::updateBackgroundBounds(const Matrix& renderMatrix) {
-  auto contentScale = renderMatrix.getMaxScale();
+void Layer::updateBackgroundBounds(float contentScale) {
   auto backgroundChanged = false;
   for (auto& style : _layerStyles) {
     if (style->extraSourceType() != LayerStyleExtraSourceType::Background) {

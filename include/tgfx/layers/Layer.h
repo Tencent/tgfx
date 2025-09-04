@@ -596,13 +596,12 @@ class Layer : public std::enable_shared_from_this<Layer> {
 
   bool hasValidMask() const;
 
-  void updateRenderBounds(const Matrix& renderMatrix = {},
-                          std::shared_ptr<RegionTransformer> transformer = nullptr,
+  void updateRenderBounds(std::shared_ptr<RegionTransformer> transformersh = nullptr,
                           bool forceDirty = false);
 
-  void checkBackgroundStyles(const Matrix& renderMatrix);
+  void checkBackgroundStyles(std::shared_ptr<RegionTransformer> transformer);
 
-  void updateBackgroundBounds(const Matrix& renderMatrix);
+  void updateBackgroundBounds(float contentScale);
 
   void propagateBackgroundStyleOutset();
 
