@@ -133,11 +133,13 @@ std::shared_ptr<RegionTransformer> RegionTransformer::MakeFromMatrix(
   if (matrix.isIdentity()) {
     return outer;
   }
-  if (outer && outer->isMatrix()) {
-    static_cast<MatrixRegionTransformer*>(outer.get())->matrix.preConcat(matrix);
-    return outer;
+  if (!outer || !outer->isMatrix()) {
+    return std::make_shared<MatrixRegionTransformer>(matrix, std::move(outer));
   }
-  return std::make_shared<MatrixRegionTransformer>(matrix, std::move(outer));
+
+  auto combineMatrix = matrix;
+  combineMatrix.postConcat(static_cast<MatrixRegionTransformer*>(outer.get())->matrix);
+  return std::make_shared<MatrixRegionTransformer>(combineMatrix, outer->outer);
 }
 
 RegionTransformer::RegionTransformer(std::shared_ptr<RegionTransformer> outer)
