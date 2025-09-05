@@ -28,7 +28,7 @@ GLDiamondGradientLayout::GLDiamondGradientLayout(Matrix matrix) : DiamondGradien
 }
 
 void GLDiamondGradientLayout::emitCode(EmitArgs& args) const {
-  auto* fragBuilder = args.fragBuilder;
+  auto fragBuilder = args.fragBuilder;
   const auto coord = (*args.transformedCoords)[0].name();
   fragBuilder->codeAppendf("vec2 rotated = %s;", coord.c_str());
   fragBuilder->codeAppendf("float t = max(abs(rotated.x), abs(rotated.y));");

@@ -16,8 +16,11 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
+#include <string>
+
 #include "GLProgramBuilder.h"
-#include <sstream>
+#include <ostream>
+
 #include "gpu/UniformBuffer.h"
 #include "gpu/UniformLayout.h"
 #include "gpu/opengl/GLUtil.h"
@@ -125,7 +128,7 @@ GLProgramBuilder::GLProgramBuilder(Context* context, const ProgramInfo* programI
 }
 
 std::string GLProgramBuilder::versionDeclString() {
-  if (const auto* caps = GLCaps::Get(context); caps->standard == GLStandard::GL) {
+  if (const auto caps = GLCaps::Get(context); caps->standard == GLStandard::GL) {
     // #version 140 - OpenGL 3.1
     return "#version 140\n";
   }
@@ -162,11 +165,11 @@ std::string GLProgramBuilder::getUniformBlockDeclaration(
     return "";
   }
 
-  std::ostringstream os;
+  std::string result = "";
   const std::string& uniformBlockName =
       stage == ShaderStage::Vertex ? VertexUniformBlockName : FragmentUniformBlockName;
-  constexpr std::string_view INDENT_STR = "    ";  // 4 spaces
-  os << "layout(std140) uniform " << uniformBlockName << " {" << std::endl;
+  static const std::string INDENT_STR = "    ";  // 4 spaces
+  result += "layout(std140) uniform " + uniformBlockName + " {\n";
   std::string precision = "";
   for (const auto& uniform : uniforms) {
     const auto& var = ShaderVar(uniform);
@@ -175,11 +178,10 @@ std::string GLProgramBuilder::getUniformBlockDeclaration(
     } else {
       precision = "";
     }
-    os << INDENT_STR << precision << " " << SLTypeString(var.type()) << " " << uniform.name() << ";"
-       << std::endl;
+    result += INDENT_STR + precision + " " + SLTypeString(var.type()) + " " + uniform.name() + ";\n";
   }
-  os << "};" << std::endl;
-  return os.str();
+  result += "};\n";
+  return result;
 }
 
 std::unique_ptr<PipelineProgram> GLProgramBuilder::finalize() {
@@ -213,15 +215,17 @@ std::unique_ptr<PipelineProgram> GLProgramBuilder::finalize() {
   auto fragmentUniformBuffer = _uniformHandler.makeUniformBuffer(ShaderStage::Fragment);
 
   std::unique_ptr<UniformLayout> uniformLayout = nullptr;
-  const auto* caps = GLCaps::Get(context);
+  auto caps = GLCaps::Get(context);
+  std::vector<std::string> blockNames = {};
+  std::vector<Uniform> emptyUniforms = {};
   if (caps->uboSupport) {
-    uniformLayout = std::make_unique<UniformLayout>(
-        std::vector<std::string>{VertexUniformBlockName, FragmentUniformBlockName},
-        vertexUniformBuffer.get(), fragmentUniformBuffer.get());
-  } else {
-    uniformLayout = std::make_unique<UniformLayout>(
-        std::vector<std::string>{}, vertexUniformBuffer.get(), fragmentUniformBuffer.get());
+    blockNames = {VertexUniformBlockName, FragmentUniformBlockName};
   }
+  uniformLayout = std::make_unique<UniformLayout>(
+      std::move(blockNames),
+      vertexUniformBuffer ? vertexUniformBuffer->uniforms() : emptyUniforms,
+      fragmentUniformBuffer ? fragmentUniformBuffer->uniforms() : emptyUniforms
+  );
 
   auto pipeline = std::make_unique<GLRenderPipeline>(programID, std::move(uniformLayout),
                                                      programInfo->getVertexAttributes(),
@@ -241,7 +245,7 @@ bool GLProgramBuilder::checkSamplerCounts() {
 }
 
 bool GLProgramBuilder::isLegacyES() const {
-  const auto* caps = GLCaps::Get(context);
+  const auto caps = GLCaps::Get(context);
   return (caps->standard == GLStandard::GLES && caps->version < GL_VER(3, 0)) ||
          (caps->standard == GLStandard::WebGL && caps->version < GL_VER(2, 0));
 }

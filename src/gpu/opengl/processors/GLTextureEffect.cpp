@@ -100,8 +100,8 @@ void GLTextureEffect::emitCode(EmitArgs& args) const {
 }
 
 void GLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
-  auto* fragBuilder = args.fragBuilder;
-  auto* uniformHandler = args.uniformHandler;
+  auto fragBuilder = args.fragBuilder;
+  auto uniformHandler = args.uniformHandler;
   auto& textureSampler = (*args.textureSamplers)[0];
   auto vertexColor = (*args.transformedCoords)[0].name();
   if (args.coordFunc) {
@@ -138,8 +138,8 @@ void GLTextureEffect::emitDefaultTextureCode(EmitArgs& args) const {
 }
 
 void GLTextureEffect::emitYUVTextureCode(EmitArgs& args) const {
-  auto* fragBuilder = args.fragBuilder;
-  auto* uniformHandler = args.uniformHandler;
+  auto fragBuilder = args.fragBuilder;
+  auto uniformHandler = args.uniformHandler;
   auto yuvTexture = getYUVTexture();
   auto& textureSamplers = *args.textureSamplers;
   auto vertexColor = (*args.transformedCoords)[0].name();

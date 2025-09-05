@@ -82,7 +82,7 @@ std::unique_ptr<RuntimeProgram> CornerPinEffect::onCreateProgram(Context* contex
   // Clear the previously generated GLError, causing the subsequent CheckGLError to return an
   // incorrect result.
   ClearGLError(gl);
-  const auto* caps = GLCaps::Get(context);
+  const auto caps = GLCaps::Get(context);
   const auto isDesktop = caps->standard == GLStandard::GL;
   auto filterProgram =
       FilterProgram::Make(context, GetFinalShaderCode(CORNER_PIN_VERTEX_SHADER, isDesktop),

@@ -45,7 +45,7 @@ GLGaussianBlur1DFragmentProcessor::GLGaussianBlur1DFragmentProcessor(
 }
 
 void GLGaussianBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
-  auto* fragBuilder = args.fragBuilder;
+  auto fragBuilder = args.fragBuilder;
 
   std::string sigmaName =
       args.uniformHandler->addUniform("Sigma", UniformFormat::Float, ShaderStage::Fragment);
@@ -77,7 +77,7 @@ void GLGaussianBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
 
 void GLGaussianBlur1DFragmentProcessor::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
                                                   UniformBuffer* fragmentUniformBuffer) const {
-  auto* processor = childProcessor(0);
+  auto processor = childProcessor(0);
   Point stepVectors[] = {{0, 0}, {stepLength, 0}};
   if (direction == GaussianBlurDirection::Vertical) {
     stepVectors[1] = {0, stepLength};

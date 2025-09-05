@@ -60,7 +60,8 @@ class GLRenderPipeline : public GPURenderPipeline {
   std::unique_ptr<UniformLayout> uniformLayout = nullptr;
   std::vector<Attribute> attributes = {};
   std::vector<int> attributeLocations = {};
-  std::vector<int> uniformLocations = {};
+  std::vector<int> vertexUniformLocations = {};
+  std::vector<int> fragmentUniformLocations = {};
   int vertexStride = 0;
   std::unique_ptr<BlendFormula> blendFormula = nullptr;
   unsigned int vertexUBO = 0;

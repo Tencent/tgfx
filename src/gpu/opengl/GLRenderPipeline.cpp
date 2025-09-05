@@ -95,49 +95,42 @@ void GLRenderPipeline::activate(GLInterface* interface) {
 
 void GLRenderPipeline::setUniformBytesForUBO(GLInterface* interface, unsigned binding,
                                              const void* data, size_t size) {
-  if (data == nullptr || size == 0) {
+  auto gl = interface->functions();
+
+  unsigned ubo = 0;
+
+  if (binding == VERTEX_UBO_BINDING_POINT) {
+    if (vertexUBO == 0) {
+      gl->genBuffers(1, &vertexUBO);
+
+      unsigned vertexUniformBlockIndex = gl->getUniformBlockIndex(programID, VertexUniformBlockName.c_str());
+      if (vertexUniformBlockIndex != GL_INVALID_INDEX) {
+        gl->uniformBlockBinding(programID, vertexUniformBlockIndex, VERTEX_UBO_BINDING_POINT);
+      }
+    }
+
+    ubo = vertexUBO;
+  } else if (binding == FRAGMENT_UBO_BINDING_POINT) {
+    if (fragmentUBO == 0) {
+      gl->genBuffers(1, &fragmentUBO);
+
+      unsigned fragmentUniformBlockIndex = gl->getUniformBlockIndex(programID, FragmentUniformBlockName.c_str());
+      if (fragmentUniformBlockIndex != GL_INVALID_INDEX) {
+        gl->uniformBlockBinding(programID, fragmentUniformBlockIndex, FRAGMENT_UBO_BINDING_POINT);
+      }
+    }
+
+    ubo = fragmentUBO;
+  }
+
+  if (ubo <= 0) {
     return;
   }
 
-  const auto* gl = interface->functions();
-
-  auto setupUBO = [&](unsigned& ubo, const size_t bufferSize) -> bool {
-    if (ubo == 0) {
-      gl->genBuffers(1, &ubo);
-    }
-    if (ubo <= 0) {
-      return false;
-    }
-    gl->bindBuffer(GL_UNIFORM_BUFFER, ubo);
-    gl->bufferData(GL_UNIFORM_BUFFER, static_cast<int32_t>(bufferSize), nullptr, GL_STATIC_DRAW);
-    return true;
-  };
-
-  if (binding == FRAGMENT_UBO_BINDING_POINT && fragmentUBO > 0) {
-    gl->deleteBuffers(1, &fragmentUBO);
-    fragmentUBO = 0;
-  } else if (binding == VERTEX_UBO_BINDING_POINT && vertexUBO > 0) {
-    gl->deleteBuffers(1, &vertexUBO);
-    vertexUBO = 0;
-  }
-
-  if (unsigned& ubo = (binding == FRAGMENT_UBO_BINDING_POINT ? fragmentUBO : vertexUBO);
-      setupUBO(ubo, size)) {
-    unsigned int uniformBlockIndex = 0;
-    const std::string uniformBlockName =
-        binding == FRAGMENT_UBO_BINDING_POINT ? FragmentUniformBlockName : VertexUniformBlockName;
-    uniformBlockIndex = gl->getUniformBlockIndex(programID, uniformBlockName.c_str());
-    if (uniformBlockIndex != GL_INVALID_INDEX) {
-      const unsigned uniformBlockBindingPoint = binding == FRAGMENT_UBO_BINDING_POINT
-                                                    ? FRAGMENT_UBO_BINDING_POINT
-                                                    : VERTEX_UBO_BINDING_POINT;
-      gl->uniformBlockBinding(programID, uniformBlockIndex, uniformBlockBindingPoint);
-      gl->bindBufferBase(GL_UNIFORM_BUFFER, uniformBlockBindingPoint, ubo);
-    }
-
-    gl->bufferSubData(GL_UNIFORM_BUFFER, 0, static_cast<int32_t>(size), data);
-    gl->bindBuffer(GL_UNIFORM_BUFFER, 0);
-  }
+  gl->bindBuffer(GL_UNIFORM_BUFFER, ubo);
+  gl->bufferData(GL_UNIFORM_BUFFER, static_cast<int32_t>(size), data, GL_STATIC_DRAW);
+  gl->bindBuffer(GL_UNIFORM_BUFFER, 0);
+  gl->bindBufferBase(GL_UNIFORM_BUFFER, binding, binding == VERTEX_UBO_BINDING_POINT ? vertexUBO : fragmentUBO);
 }
 
 void GLRenderPipeline::setUniformBytes(GLInterface* interface, unsigned binding, const void* data,
@@ -146,19 +139,21 @@ void GLRenderPipeline::setUniformBytes(GLInterface* interface, unsigned binding,
     return;
   }
 
-  const auto* caps = interface->caps();
-  if (caps->uboSupport && !uniformLayout->uniformBlockNames().empty()) {
+  const auto caps = interface->caps();
+  if (caps->uboSupport && !uniformLayout->uniformBlockNames.empty()) {
     setUniformBytesForUBO(interface, binding, data, size);
     return;
   }
 
-  if (uniformLayout->vertexUniforms().empty() && uniformLayout->fragmentUniforms().empty()) {
+  if (uniformLayout->vertexUniforms.empty() && uniformLayout->fragmentUniforms.empty()) {
     return;
   }
 
-  const auto& uniforms = binding == FRAGMENT_UBO_BINDING_POINT ? uniformLayout->fragmentUniforms()
-                                                               : uniformLayout->vertexUniforms();
-  const auto* gl = interface->functions();
+  const auto& uniforms = binding == FRAGMENT_UBO_BINDING_POINT ? uniformLayout->fragmentUniforms
+                                                               : uniformLayout->vertexUniforms;
+  const auto gl = interface->functions();
+  auto& uniformLocations =
+      binding == FRAGMENT_UBO_BINDING_POINT ? fragmentUniformLocations : vertexUniformLocations;
   if (uniformLocations.empty()) {
     uniformLocations.reserve(uniforms.size());
     for (auto& uniform : uniforms) {
@@ -218,7 +213,6 @@ void GLRenderPipeline::setUniformBytes(GLInterface* interface, unsigned binding,
     index++;
     offset += uniform.size();
   }
-  uniformLocations.clear();
 }
 
 static AttribLayout GetAttribLayout(VertexFormat format) {

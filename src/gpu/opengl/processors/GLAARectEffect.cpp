@@ -27,8 +27,8 @@ GLAARectEffect::GLAARectEffect(const Rect& rect) : AARectEffect(rect) {
 }
 
 void GLAARectEffect::emitCode(EmitArgs& args) const {
-  auto* fragBuilder = args.fragBuilder;
-  auto* uniformHandler = args.uniformHandler;
+  auto fragBuilder = args.fragBuilder;
+  auto uniformHandler = args.uniformHandler;
 
   auto rectName = uniformHandler->addUniform("Rect", UniformFormat::Float4, ShaderStage::Fragment);
   fragBuilder->codeAppendf(

@@ -34,7 +34,7 @@ GLClampedGradientEffect::GLClampedGradientEffect(PlacementPtr<FragmentProcessor>
 }
 
 void GLClampedGradientEffect::emitCode(EmitArgs& args) const {
-  auto* fragBuilder = args.fragBuilder;
+  auto fragBuilder = args.fragBuilder;
   auto leftBorderColorName = args.uniformHandler->addUniform(
       "leftBorderColor", UniformFormat::Float4, ShaderStage::Fragment);
   auto rightBorderColorName = args.uniformHandler->addUniform(

@@ -67,7 +67,15 @@ ShaderVar UniformHandler::getSamplerVariable(SamplerHandle handle) const {
 }
 
 std::unique_ptr<UniformBuffer> UniformHandler::makeUniformBuffer(ShaderStage stage) const {
-  const auto* caps = programBuilder->getContext()->caps();
+  if (stage == ShaderStage::Vertex && vertexUniforms.empty()) {
+    return nullptr;
+  }
+
+  if (stage == ShaderStage::Fragment && fragmentUniforms.empty() && samplers.empty()) {
+    return nullptr;
+  }
+
+  auto caps = programBuilder->getContext()->caps();
   return std::unique_ptr<UniformBuffer>(new UniformBuffer(
       stage == ShaderStage::Vertex ? vertexUniforms : fragmentUniforms, caps->uboSupport));
 }
@@ -75,7 +83,7 @@ std::unique_ptr<UniformBuffer> UniformHandler::makeUniformBuffer(ShaderStage sta
 std::string UniformHandler::getUniformDeclarations(ShaderStage stage) const {
   std::string ret;
   auto& uniforms = stage == ShaderStage::Vertex ? vertexUniforms : fragmentUniforms;
-  const auto* caps = programBuilder->getContext()->caps();
+  auto caps = programBuilder->getContext()->caps();
   if (caps->uboSupport) {
     ret += programBuilder->getUniformBlockDeclaration(stage, uniforms);
   } else {

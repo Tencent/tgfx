@@ -19,41 +19,22 @@
 #pragma once
 #include <string>
 #include <vector>
+
 #include "Uniform.h"
-#include "UniformBuffer.h"
 
 namespace tgfx {
 class UniformLayout final {
  public:
-  UniformLayout(const std::vector<std::string>& uniformBlockNames,
-                UniformBuffer* vertexUniformBuffer, UniformBuffer* fragmentUniformBuffer)
-      : _uniformBlockNames(uniformBlockNames), _vertexUniformBuffer(vertexUniformBuffer),
-        _fragmentUniformBuffer(fragmentUniformBuffer) {
+  UniformLayout(std::vector<std::string> uniformBlockNames,
+                std::vector<Uniform> vertexUniforms,
+                std::vector<Uniform> fragmentUniforms)
+      : uniformBlockNames(std::move(uniformBlockNames)),
+        vertexUniforms(std::move(vertexUniforms)),
+        fragmentUniforms(std::move(fragmentUniforms)) {
   }
 
-  std::vector<std::string>& uniformBlockNames() {
-    return _uniformBlockNames;
-  }
-
-  const std::vector<Uniform> vertexUniforms() const {
-    if (_vertexUniformBuffer == nullptr) {
-      return {};
-    } else {
-      return _vertexUniformBuffer->uniforms();
-    }
-  }
-
-  const std::vector<Uniform> fragmentUniforms() const {
-    if (_fragmentUniformBuffer == nullptr) {
-      return {};
-    } else {
-      return _fragmentUniformBuffer->uniforms();
-    }
-  }
-
- private:
-  std::vector<std::string> _uniformBlockNames = {};
-  UniformBuffer* _vertexUniformBuffer = nullptr;
-  UniformBuffer* _fragmentUniformBuffer = nullptr;
+  std::vector<std::string> uniformBlockNames = {};
+  std::vector<Uniform> vertexUniforms = {};
+  std::vector<Uniform> fragmentUniforms = {};
 };
 }  // namespace tgfx

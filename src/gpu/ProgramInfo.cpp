@@ -135,16 +135,14 @@ static AddressMode ToAddressMode(TileMode tileMode) {
 
 void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram* program) const {
   DEBUG_ASSERT(renderTarget != nullptr);
-  auto* vertexUniformBuffer = program->vertexUniformBuffer.get();
-  auto* fragmentUniformBuffer = program->fragmentUniformBuffer.get();
-
-  DEBUG_ASSERT(vertexUniformBuffer != nullptr);
-  DEBUG_ASSERT(fragmentUniformBuffer != nullptr);
+  auto vertexUniformBuffer = program->vertexUniformBuffer.get();
+  auto fragmentUniformBuffer = program->fragmentUniformBuffer.get();
 
   auto array = GetRTAdjustArray(renderTarget);
-  vertexUniformBuffer->setData(RTAdjustName, array);
-  vertexUniformBuffer->nameSuffix = getMangledSuffix(geometryProcessor);
-  fragmentUniformBuffer->nameSuffix = getMangledSuffix(geometryProcessor);
+  if (vertexUniformBuffer != nullptr) {
+    vertexUniformBuffer->setData(RTAdjustName, array);
+  }
+  updateUniformBufferSuffix(vertexUniformBuffer, fragmentUniformBuffer, geometryProcessor);
 
   FragmentProcessor::CoordTransformIter coordTransformIter(this);
   geometryProcessor->setData(vertexUniformBuffer, fragmentUniformBuffer, &coordTransformIter);
@@ -153,23 +151,25 @@ void ProgramInfo::setUniformsAndSamplers(RenderPass* renderPass, PipelineProgram
     FragmentProcessor::Iter iter(fragmentProcessor);
     const FragmentProcessor* fp = iter.next();
     while (fp) {
-      vertexUniformBuffer->nameSuffix = getMangledSuffix(fp);
-      fragmentUniformBuffer->nameSuffix = getMangledSuffix(fp);
+      updateUniformBufferSuffix(vertexUniformBuffer, fragmentUniformBuffer, fp);
       fp->setData(vertexUniformBuffer, fragmentUniformBuffer);
       fp = iter.next();
     }
   }
   const auto* processor = getXferProcessor();
-  vertexUniformBuffer->nameSuffix = getMangledSuffix(processor);
-  fragmentUniformBuffer->nameSuffix = getMangledSuffix(processor);
+  updateUniformBufferSuffix(vertexUniformBuffer, fragmentUniformBuffer, processor);
   processor->setData(vertexUniformBuffer, fragmentUniformBuffer);
-  vertexUniformBuffer->nameSuffix = "";
-  fragmentUniformBuffer->nameSuffix = "";
+  updateUniformBufferSuffix(vertexUniformBuffer, fragmentUniformBuffer, nullptr);
 
-  renderPass->setUniformBytes(0, vertexUniformBuffer->data(), vertexUniformBuffer->size());
-  renderPass->setUniformBytes(1, fragmentUniformBuffer->data(), fragmentUniformBuffer->size());
+  if (vertexUniformBuffer != nullptr) {
+    renderPass->setUniformBytes(0, vertexUniformBuffer->data(), vertexUniformBuffer->size());
+  }
 
-  const auto& samplers = getSamplers();
+  if (fragmentUniformBuffer != nullptr) {
+    renderPass->setUniformBytes(1, fragmentUniformBuffer->data(), fragmentUniformBuffer->size());
+  }
+
+  auto samplers = getSamplers();
   unsigned textureIndex = 0;
   auto gpu = renderTarget->getContext()->gpu();
   for (auto& [texture, state] : samplers) {
@@ -201,5 +201,16 @@ std::vector<SamplerInfo> ProgramInfo::getSamplers() const {
     samplers.push_back(sampler);
   }
   return samplers;
+}
+
+void ProgramInfo::updateUniformBufferSuffix(UniformBuffer* vertexUniformBuffer, UniformBuffer* fragmentUniformBuffer, const Processor* processor)const {
+  auto suffix = getMangledSuffix(processor);
+  if (vertexUniformBuffer != nullptr) {
+    vertexUniformBuffer->nameSuffix = suffix;
+  }
+
+  if (fragmentUniformBuffer != nullptr) {
+    fragmentUniformBuffer->nameSuffix = suffix;
+  }
 }
 }  // namespace tgfx

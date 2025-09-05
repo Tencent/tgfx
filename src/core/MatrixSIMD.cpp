@@ -34,8 +34,8 @@ namespace HWY_NAMESPACE {
 namespace hn = hwy::HWY_NAMESPACE;
 void TransPointsHWYImpl(const Matrix& m, Point* dst, const Point* src, int count) {
   if (count > 0) {
-    auto* fdst = reinterpret_cast<float*>(&dst[0]);
-    const auto* fsrc = reinterpret_cast<const float*>(&src[0]);
+    auto fdst = reinterpret_cast<float*>(&dst[0]);
+    const auto fsrc = reinterpret_cast<const float*>(&src[0]);
     float tx = m.getTranslateX();
     float ty = m.getTranslateY();
     const HWY_FULL(float) d;
@@ -57,8 +57,8 @@ void TransPointsHWYImpl(const Matrix& m, Point* dst, const Point* src, int count
 
 void ScalePointsHWYImpl(const Matrix& m, Point* dst, const Point* src, int count) {
   if (count > 0) {
-    auto* fdst = reinterpret_cast<float*>(&dst[0]);
-    const auto* fsrc = reinterpret_cast<const float*>(&src[0]);
+    auto fdst = reinterpret_cast<float*>(&dst[0]);
+    const auto fsrc = reinterpret_cast<const float*>(&src[0]);
     float tx = m.getTranslateX();
     float ty = m.getTranslateY();
     float sx = m.getScaleX();
@@ -85,8 +85,8 @@ void ScalePointsHWYImpl(const Matrix& m, Point* dst, const Point* src, int count
 
 void AffinePointsHWYImpl(const Matrix& m, Point* dst, const Point* src, int count) {
   if (count > 0) {
-    auto* fdst = reinterpret_cast<float*>(&dst[0]);
-    const auto* fsrc = reinterpret_cast<const float*>(&src[0]);
+    auto fdst = reinterpret_cast<float*>(&dst[0]);
+    const auto fsrc = reinterpret_cast<const float*>(&src[0]);
     float tx = m.getTranslateX();
     float ty = m.getTranslateY();
     float sx = m.getScaleX();

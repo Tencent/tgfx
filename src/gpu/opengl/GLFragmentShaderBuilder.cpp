@@ -32,7 +32,7 @@ GLFragmentShaderBuilder::GLFragmentShaderBuilder(ProgramBuilder* program)
 }
 
 std::string GLFragmentShaderBuilder::dstColor() {
-  const auto* caps = GLCaps::Get(programBuilder->getContext());
+  const auto caps = GLCaps::Get(programBuilder->getContext());
   if (caps->frameBufferFetchSupport) {
     addFeature(PrivateFeature::FramebufferFetch, caps->frameBufferFetchExtensionString);
     const bool isLegacyES = static_cast<GLProgramBuilder*>(programBuilder)->isLegacyES();

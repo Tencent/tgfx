@@ -32,9 +32,9 @@ GLEllipseGeometryProcessor::GLEllipseGeometryProcessor(int width, int height, bo
 }
 
 void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
-  auto* vertBuilder = args.vertBuilder;
-  auto* varyingHandler = args.varyingHandler;
-  auto* uniformHandler = args.uniformHandler;
+  auto vertBuilder = args.vertBuilder;
+  auto varyingHandler = args.varyingHandler;
+  auto uniformHandler = args.uniformHandler;
 
   // emit attributes
   varyingHandler->emitAttributes(*this);
@@ -47,7 +47,7 @@ void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   auto ellipseRadii = varyingHandler->addVarying("EllipseRadii", SLType::Float4);
   vertBuilder->codeAppendf("%s = %s;", ellipseRadii.vsOut().c_str(), inEllipseRadii.name().c_str());
 
-  auto* fragBuilder = args.fragBuilder;
+  auto fragBuilder = args.fragBuilder;
   // setup pass through color
   if (commonColor.has_value()) {
     auto colorName =

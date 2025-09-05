@@ -31,8 +31,8 @@ GLPorterDuffXferProcessor::GLPorterDuffXferProcessor(BlendMode blend, DstTexture
 }
 
 void GLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
-  auto* fragBuilder = args.fragBuilder;
-  auto* uniformHandler = args.uniformHandler;
+  auto fragBuilder = args.fragBuilder;
+  auto uniformHandler = args.uniformHandler;
   const auto& dstColor = fragBuilder->dstColor();
 
   if (args.dstTextureSamplerHandle.isValid()) {

@@ -34,10 +34,10 @@ GLDefaultGeometryProcessor::GLDefaultGeometryProcessor(Color color, int width, i
 }
 
 void GLDefaultGeometryProcessor::emitCode(EmitArgs& args) const {
-  auto* vertBuilder = args.vertBuilder;
-  auto* fragBuilder = args.fragBuilder;
-  auto* varyingHandler = args.varyingHandler;
-  auto* uniformHandler = args.uniformHandler;
+  auto vertBuilder = args.vertBuilder;
+  auto fragBuilder = args.fragBuilder;
+  auto varyingHandler = args.varyingHandler;
+  auto uniformHandler = args.uniformHandler;
 
   varyingHandler->emitAttributes(*this);
 

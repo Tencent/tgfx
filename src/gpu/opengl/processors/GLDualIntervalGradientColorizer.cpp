@@ -51,7 +51,7 @@ GLDualIntervalGradientColorizer::GLDualIntervalGradientColorizer(Color scale01, 
 }
 
 void GLDualIntervalGradientColorizer::emitCode(EmitArgs& args) const {
-  auto* fragBuilder = args.fragBuilder;
+  auto fragBuilder = args.fragBuilder;
   auto scale01Name =
       args.uniformHandler->addUniform("scale01", UniformFormat::Float4, ShaderStage::Fragment);
   auto bias01Name =

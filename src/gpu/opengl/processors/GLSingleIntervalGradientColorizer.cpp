@@ -29,7 +29,7 @@ GLSingleIntervalGradientColorizer::GLSingleIntervalGradientColorizer(Color start
 }
 
 void GLSingleIntervalGradientColorizer::emitCode(EmitArgs& args) const {
-  auto* fragBuilder = args.fragBuilder;
+  auto fragBuilder = args.fragBuilder;
   auto startName =
       args.uniformHandler->addUniform("start", UniformFormat::Float4, ShaderStage::Fragment);
   auto endName =

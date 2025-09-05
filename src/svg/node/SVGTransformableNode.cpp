@@ -49,7 +49,7 @@ bool SVGTransformableNode::onPrepareToRender(SVGRenderContext* context) const {
 void SVGTransformableNode::onSetAttribute(SVGAttribute attr, const SVGValue& v) {
   switch (attr) {
     case SVGAttribute::Transform:
-      if (const auto* matrix = v.as<SVGTransformValue>()) {
+      if (const auto matrix = v.as<SVGTransformValue>()) {
         this->setTransform(*matrix);
       }
       break;

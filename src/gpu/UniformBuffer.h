@@ -23,7 +23,6 @@
 #include <unordered_map>
 #include <vector>
 #include "gpu/Uniform.h"
-#include "gpu/UniformBufferLayout.h"
 #include "tgfx/core/Matrix.h"
 
 namespace tgfx {
@@ -79,15 +78,44 @@ class UniformBuffer {
   }
 
  private:
+  struct Field {
+    std::string name = "";
+    UniformFormat format = UniformFormat::Float;
+    size_t offset = 0;
+    size_t size = 0;
+    size_t align = 0;
+  };
+
+  struct Entry {
+    size_t size;
+    size_t align;
+  };
+
   std::vector<uint8_t> buffer = {};
   std::vector<Uniform> _uniforms = {};
   std::string nameSuffix = "";
-  std::unique_ptr<UniformBufferLayout> uniformBufferLayout = nullptr;
+  std::unordered_map<std::string, Field> fieldMap = {};
+  size_t cursor = 0;
   bool _uboSupport = false;
 
   explicit UniformBuffer(std::vector<Uniform> uniforms, bool uboSupport = false);
 
   void onSetData(const std::string& name, const void* data, size_t size);
+
+  const Field* findField(const std::string& key) const;
+
+  size_t alignCursor(size_t alignment) const;
+
+  static Entry EntryOf(UniformFormat format);
+
+  /**
+   * Dump UniformBuffer's memory layout information is printed to the console for debugging.
+   */
+#if DEBUG
+  static const char* ToUniformFormatName(UniformFormat format);
+
+  void dump() const;
+#endif
 
   friend class ProgramInfo;
   friend class UniformHandler;

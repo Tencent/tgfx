@@ -218,8 +218,8 @@ void AppendCode2(FragmentShaderBuilder* fragBuilder, int intervalCount,
 }
 
 void GLUnrolledBinaryGradientColorizer::emitCode(EmitArgs& args) const {
-  auto* fragBuilder = args.fragBuilder;
-  auto* uniformHandler = args.uniformHandler;
+  auto fragBuilder = args.fragBuilder;
+  auto uniformHandler = args.uniformHandler;
   UnrolledBinaryUniformName uniformNames = {};
   uniformNames.scale0_1 = AddUniform(uniformHandler, "scale0_1", intervalCount, 0);
   uniformNames.scale2_3 = AddUniform(uniformHandler, "scale2_3", intervalCount, 1);

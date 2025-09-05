@@ -32,7 +32,7 @@ GLTextureGradientColorizer::GLTextureGradientColorizer(std::shared_ptr<TexturePr
 }
 
 void GLTextureGradientColorizer::emitCode(EmitArgs& args) const {
-  auto* fragBuilder = args.fragBuilder;
+  auto fragBuilder = args.fragBuilder;
   fragBuilder->codeAppendf("vec2 coord = vec2(%s.x, 0.5);", args.inputColor.c_str());
   fragBuilder->codeAppendf("%s = ", args.outputColor.c_str());
   fragBuilder->appendTextureLookup((*args.textureSamplers)[0], "coord");
