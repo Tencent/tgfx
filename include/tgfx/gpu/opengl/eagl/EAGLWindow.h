@@ -22,6 +22,8 @@
 #include "tgfx/gpu/Window.h"
 
 namespace tgfx {
+class EAGLLayerTexture;
+
 class EAGLWindow : public Window {
  public:
   /**
@@ -37,9 +39,8 @@ class EAGLWindow : public Window {
   void onPresent(Context* context, int64_t presentationTime) override;
 
  private:
-  unsigned frameBufferID = 0;
-  GLuint colorBuffer = 0;
   CAEAGLLayer* layer = nil;
+  std::unique_ptr<EAGLLayerTexture> layerTexture;
 
   EAGLWindow(std::shared_ptr<Device> device, CAEAGLLayer* layer);
 };

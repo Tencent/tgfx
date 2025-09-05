@@ -65,7 +65,7 @@ class GLTexture : public GPUTexture {
   /**
    * Binds the texture to the specified texture unit and applies the sampler parameters.
    */
-  void bindTexture(GLInterface* interface, unsigned textureUnit, const GLSampler* sampler);
+  void updateSampler(GLGPU* gpu, const GLSampler* sampler);
 
   GPUTextureType type() const override;
 
@@ -82,10 +82,13 @@ class GLTexture : public GPUTexture {
   virtual void onRelease(GLGPU* gpu);
 
  private:
+  uint32_t uniqueID = 0;
   unsigned textureFrameBuffer = 0;
   int lastWrapS = 0;
   int lastWrapT = 0;
   int lastMinFilter = 0;
   int lastMagFilter = 0;
+
+  friend class GLGPU;
 };
 }  // namespace tgfx

@@ -56,9 +56,9 @@ GLRenderPipeline::GLRenderPipeline(unsigned programID, std::vector<Uniform> unif
   vertexStride = static_cast<int>(offset);
 }
 
-void GLRenderPipeline::activate(GLInterface* interface) {
-  auto gl = interface->functions();
-  auto caps = interface->caps();
+void GLRenderPipeline::activate(GLGPU* gpu) {
+  auto gl = gpu->functions();
+  auto caps = static_cast<const GLCaps*>(gpu->caps());
   gl->useProgram(programID);
   if (caps->frameBufferFetchSupport && caps->frameBufferFetchRequiresEnablePerSample) {
     if (blendFormula == nullptr) {
@@ -89,14 +89,14 @@ void GLRenderPipeline::activate(GLInterface* interface) {
   }
 }
 
-void GLRenderPipeline::setUniformBytes(GLInterface* interface, const void* data, size_t size) {
+void GLRenderPipeline::setUniformBytes(GLGPU* gpu, const void* data, size_t size) {
   if (data == nullptr || size == 0) {
     return;
   }
   if (uniforms.empty()) {
     return;
   }
-  auto gl = interface->functions();
+  auto gl = gpu->functions();
   if (uniformLocations.empty()) {
     uniformLocations.reserve(uniforms.size());
     for (auto& uniform : uniforms) {
@@ -195,9 +195,8 @@ static AttribLayout GetAttribLayout(VertexFormat format) {
   return {false, 0, 0};
 }
 
-void GLRenderPipeline::setVertexBuffer(GLInterface* interface, GPUBuffer* vertexBuffer,
-                                       size_t vertexOffset) {
-  auto gl = interface->functions();
+void GLRenderPipeline::setVertexBuffer(GLGPU* gpu, GPUBuffer* vertexBuffer, size_t vertexOffset) {
+  auto gl = gpu->functions();
   if (vertexBuffer == nullptr) {
     gl->bindBuffer(GL_ARRAY_BUFFER, 0);
     return;

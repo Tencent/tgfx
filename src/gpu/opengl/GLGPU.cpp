@@ -27,7 +27,8 @@
 
 namespace tgfx {
 GLGPU::GLGPU(std::shared_ptr<GLInterface> glInterface) : interface(std::move(glInterface)) {
-  commandQueue = std::make_unique<GLCommandQueue>(interface);
+  commandQueue = std::make_unique<GLCommandQueue>(this);
+  textureUnits.resize(static_cast<size_t>(interface->caps()->maxFragmentSamplers), INVALID_VALUE);
 }
 
 std::unique_ptr<GPUBuffer> GLGPU::createBuffer(size_t size, uint32_t usage) {
@@ -84,7 +85,8 @@ std::unique_ptr<GPUTexture> GLGPU::createTexture(const GPUTextureDescriptor& des
   if (textureID == 0) {
     return nullptr;
   }
-  gl->bindTexture(target, textureID);
+  auto texture = std::make_unique<GLTexture>(descriptor, target, textureID);
+  bindTexture(texture.get());
   auto& textureFormat = interface->caps()->getTextureFormat(descriptor.format);
   bool success = true;
   // Texture memory must be allocated first on the web platform then can write pixels.
@@ -98,10 +100,9 @@ std::unique_ptr<GPUTexture> GLGPU::createTexture(const GPUTextureDescriptor& des
     success = CheckGLError(gl);
   }
   if (!success) {
-    gl->deleteTextures(1, &textureID);
+    texture->release(this);
     return nullptr;
   }
-  auto texture = std::make_unique<GLTexture>(descriptor, target, textureID);
   if (!texture->checkFrameBuffer(this)) {
     texture->release(this);
     return nullptr;
@@ -214,6 +215,63 @@ std::unique_ptr<GPUSampler> GLGPU::createSampler(const GPUSamplerDescriptor& des
 }
 
 std::shared_ptr<CommandEncoder> GLGPU::createCommandEncoder() {
-  return std::make_shared<GLCommandEncoder>(interface);
+  return std::make_shared<GLCommandEncoder>(this);
 }
+
+void GLGPU::resetGLState() {
+  activeTextureUint = INVALID_VALUE;
+  textureUnits.assign(textureUnits.size(), INVALID_VALUE);
+  readFramebuffer = INVALID_VALUE;
+  drawFramebuffer = INVALID_VALUE;
+}
+
+void GLGPU::bindTexture(GLTexture* texture, unsigned textureUnit) {
+  DEBUG_ASSERT(texture != nullptr);
+  DEBUG_ASSERT(texture->usage() & GPUTextureUsage::TEXTURE_BINDING);
+  auto& uniqueID = textureUnits[textureUnit];
+  if (uniqueID == texture->uniqueID) {
+    return;
+  }
+
+  auto gl = interface->functions();
+  if (activeTextureUint != textureUnit) {
+    gl->activeTexture(static_cast<unsigned>(GL_TEXTURE0) + textureUnit);
+    activeTextureUint = textureUnit;
+  }
+  gl->bindTexture(texture->target(), texture->textureID());
+  uniqueID = texture->uniqueID;
+}
+
+void GLGPU::bindFramebuffer(GLTexture* texture, FrameBufferTarget target) {
+  DEBUG_ASSERT(texture != nullptr);
+  DEBUG_ASSERT(texture->usage() & GPUTextureUsage::RENDER_ATTACHMENT);
+  auto uniqueID = texture->uniqueID;
+  unsigned frameBufferTarget = GL_FRAMEBUFFER;
+  switch (target) {
+    case FrameBufferTarget::Read:
+      if (uniqueID == readFramebuffer) {
+        return;
+      }
+      frameBufferTarget = GL_READ_FRAMEBUFFER;
+      readFramebuffer = texture->uniqueID;
+      break;
+    case FrameBufferTarget::Draw:
+      if (uniqueID == drawFramebuffer) {
+        return;
+      }
+      frameBufferTarget = GL_DRAW_FRAMEBUFFER;
+      drawFramebuffer = texture->uniqueID;
+      break;
+    case FrameBufferTarget::Both:
+      if (uniqueID == drawFramebuffer && uniqueID == readFramebuffer) {
+        return;
+      }
+      frameBufferTarget = GL_FRAMEBUFFER;
+      readFramebuffer = drawFramebuffer = texture->uniqueID;
+      break;
+  }
+  auto gl = interface->functions();
+  gl->bindFramebuffer(frameBufferTarget, texture->frameBufferID());
+}
+
 }  // namespace tgfx

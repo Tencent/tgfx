@@ -19,13 +19,13 @@
 #pragma once
 
 #include "gpu/CommandEncoder.h"
-#include "gpu/opengl/GLInterface.h"
 
 namespace tgfx {
+class GLGPU;
+
 class GLCommandEncoder : public CommandEncoder {
  public:
-  explicit GLCommandEncoder(std::shared_ptr<GLInterface> interface)
-      : interface(std::move(interface)) {
+  explicit GLCommandEncoder(GLGPU* gpu) : gpu(gpu) {
   }
 
   void copyTextureToTexture(GPUTexture* srcTexture, const Rect& srcRect, GPUTexture* dstTexture,
@@ -43,6 +43,6 @@ class GLCommandEncoder : public CommandEncoder {
   std::shared_ptr<CommandBuffer> onFinish() override;
 
  private:
-  std::shared_ptr<GLInterface> interface = nullptr;
+  GLGPU* gpu = nullptr;
 };
 }  // namespace tgfx

@@ -18,16 +18,21 @@
 
 #pragma once
 
+#import <UIKit/UIKit.h>
+#include "gpu/opengl/GLGPU.h"
 #include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
-class GLMultisampleTexture : public GLTexture {
+class EAGLLayerTexture : public GLTexture {
  public:
-  static std::unique_ptr<GLMultisampleTexture> MakeFrom(GLGPU* gpu,
-                                                        const GPUTextureDescriptor& descriptor);
+  static std::unique_ptr<EAGLLayerTexture> MakeFrom(GLGPU* gpu, CAEAGLLayer* layer);
 
   unsigned frameBufferID() const override {
     return _frameBufferID;
+  }
+
+  unsigned colorBufferID() const {
+    return renderBufferID;
   }
 
  protected:
@@ -37,7 +42,7 @@ class GLMultisampleTexture : public GLTexture {
   unsigned _frameBufferID = 0;
   unsigned renderBufferID = 0;
 
-  GLMultisampleTexture(const GPUTextureDescriptor& descriptor, unsigned frameBufferID)
+  EAGLLayerTexture(const GPUTextureDescriptor& descriptor, unsigned frameBufferID)
       : GLTexture(descriptor, GL_TEXTURE_2D, 0), _frameBufferID(frameBufferID) {
   }
 };
