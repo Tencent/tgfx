@@ -73,78 +73,13 @@ void GLRenderPass::setUniformBytes(unsigned, const void* data, size_t size) {
   renderPipeline->setUniformBytes(interface.get(), data, size);
 }
 
-static int FilterToGLMagFilter(FilterMode filterMode) {
-  switch (filterMode) {
-    case FilterMode::Nearest:
-      return GL_NEAREST;
-    case FilterMode::Linear:
-      return GL_LINEAR;
-  }
-  return 0;
-}
-
-static int FilterToGLMinFilter(FilterMode filterMode, MipmapMode mipmapMode) {
-  switch (mipmapMode) {
-    case MipmapMode::None:
-      return FilterToGLMagFilter(filterMode);
-    case MipmapMode::Nearest:
-      switch (filterMode) {
-        case FilterMode::Nearest:
-          return GL_NEAREST_MIPMAP_NEAREST;
-        case FilterMode::Linear:
-          return GL_LINEAR_MIPMAP_NEAREST;
-      }
-    case MipmapMode::Linear:
-      switch (filterMode) {
-        case FilterMode::Nearest:
-          return GL_NEAREST_MIPMAP_LINEAR;
-        case FilterMode::Linear:
-          return GL_LINEAR_MIPMAP_LINEAR;
-      }
-  }
-  return 0;
-}
-
-static int GetGLWrap(unsigned target, AddressMode wrapMode) {
-  if (target == GL_TEXTURE_RECTANGLE) {
-    if (wrapMode == AddressMode::ClampToBorder) {
-      return GL_CLAMP_TO_BORDER;
-    }
-    return GL_CLAMP_TO_EDGE;
-  }
-  switch (wrapMode) {
-    case AddressMode::ClampToEdge:
-      return GL_CLAMP_TO_EDGE;
-    case AddressMode::Repeat:
-      return GL_REPEAT;
-    case AddressMode::MirrorRepeat:
-      return GL_MIRRORED_REPEAT;
-    case AddressMode::ClampToBorder:
-      return GL_CLAMP_TO_BORDER;
-  }
-  return 0;
-}
-
 void GLRenderPass::setTexture(unsigned binding, GPUTexture* texture, GPUSampler* sampler) {
   DEBUG_ASSERT(texture != nullptr);
-  auto gl = interface->functions();
-  auto caps = interface->caps();
-  auto glTexture = static_cast<const GLTexture*>(texture);
-  auto glSampler = static_cast<const GLSampler*>(sampler);
-  auto target = glTexture->target();
-  gl->activeTexture(static_cast<unsigned>(GL_TEXTURE0) + binding);
-  gl->bindTexture(target, glTexture->textureID());
-  gl->texParameteri(target, GL_TEXTURE_WRAP_S, GetGLWrap(target, glSampler->addressModeX()));
-  gl->texParameteri(target, GL_TEXTURE_WRAP_T, GetGLWrap(target, glSampler->addressModeY()));
-  auto mipmapMode = glSampler->mipmapMode();
-  if (mipmapMode != MipmapMode::None && (!caps->mipmapSupport || glTexture->mipLevelCount() <= 1)) {
-    mipmapMode = MipmapMode::None;
-  }
-  gl->texParameteri(target, GL_TEXTURE_MIN_FILTER,
-                    FilterToGLMinFilter(glSampler->minFilter(), mipmapMode));
-  gl->texParameteri(target, GL_TEXTURE_MAG_FILTER, FilterToGLMagFilter(glSampler->magFilter()));
+  auto glSampler = static_cast<GLSampler*>(sampler);
+  static_cast<GLTexture*>(texture)->bindTexture(interface.get(), binding, glSampler);
   auto renderTexture = descriptor.colorAttachments[0].texture;
   if (texture == renderTexture && interface->caps()->textureRedSupport) {
+    auto gl = interface->functions();
     gl->textureBarrier();
   }
 }
@@ -188,7 +123,7 @@ void GLRenderPass::onEnd() {
   gl->bindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-static const unsigned PrimitiveTypes[] = {GL_TRIANGLES, GL_TRIANGLE_STRIP};
+static constexpr unsigned PrimitiveTypes[] = {GL_TRIANGLES, GL_TRIANGLE_STRIP};
 
 void GLRenderPass::draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) {
   auto gl = interface->functions();

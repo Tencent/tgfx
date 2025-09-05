@@ -183,8 +183,38 @@ std::unique_ptr<GPUFence> GLGPU::importExternalFence(const BackendSemaphore& sem
   return std::make_unique<GLFence>(glSyncInfo.sync);
 }
 
+static int ToGLWrap(AddressMode wrapMode) {
+  switch (wrapMode) {
+    case AddressMode::ClampToEdge:
+      return GL_CLAMP_TO_EDGE;
+    case AddressMode::Repeat:
+      return GL_REPEAT;
+    case AddressMode::MirrorRepeat:
+      return GL_MIRRORED_REPEAT;
+    case AddressMode::ClampToBorder:
+      return GL_CLAMP_TO_BORDER;
+  }
+  return GL_REPEAT;
+}
+
 std::unique_ptr<GPUSampler> GLGPU::createSampler(const GPUSamplerDescriptor& descriptor) {
-  return std::make_unique<GLSampler>(descriptor);
+  int minFilter = GL_LINEAR;
+  switch (descriptor.mipmapMode) {
+    case MipmapMode::None:
+      minFilter = descriptor.minFilter == FilterMode::Nearest ? GL_NEAREST : GL_LINEAR;
+      break;
+    case MipmapMode::Nearest:
+      minFilter = descriptor.minFilter == FilterMode::Nearest ? GL_NEAREST_MIPMAP_NEAREST
+                                                              : GL_LINEAR_MIPMAP_NEAREST;
+      break;
+    case MipmapMode::Linear:
+      minFilter = descriptor.minFilter == FilterMode::Nearest ? GL_NEAREST_MIPMAP_LINEAR
+                                                              : GL_LINEAR_MIPMAP_LINEAR;
+      break;
+  }
+  int magFilter = descriptor.magFilter == FilterMode::Nearest ? GL_NEAREST : GL_LINEAR;
+  return std::make_unique<GLSampler>(ToGLWrap(descriptor.addressModeX),
+                                     ToGLWrap(descriptor.addressModeY), minFilter, magFilter);
 }
 
 std::shared_ptr<CommandEncoder> GLGPU::createCommandEncoder() {

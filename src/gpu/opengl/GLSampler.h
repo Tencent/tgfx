@@ -19,37 +19,38 @@
 #pragma once
 
 #include "gpu/GPUSampler.h"
+#include "tgfx/gpu/opengl/GLDefines.h"
 
 namespace tgfx {
 class GLSampler : public GPUSampler {
  public:
-  explicit GLSampler(const GPUSamplerDescriptor& descriptor) : descriptor(descriptor) {
+  explicit GLSampler(int wrapS, int wrapT, int minFilter, int magFilter)
+      : _wrapS(wrapS), _wrapT(wrapT), _minFilter(minFilter), _magFilter(magFilter) {
   }
 
-  AddressMode addressModeX() const {
-    return descriptor.addressModeX;
+  int wrapS() const {
+    return _wrapS;
   }
 
-  AddressMode addressModeY() const {
-    return descriptor.addressModeY;
+  int wrapT() const {
+    return _wrapT;
   }
 
-  FilterMode minFilter() const {
-    return descriptor.minFilter;
+  int minFilter() const {
+    return _minFilter;
   }
 
-  FilterMode magFilter() const {
-    return descriptor.magFilter;
-  }
-
-  MipmapMode mipmapMode() const {
-    return descriptor.mipmapMode;
+  int magFilter() const {
+    return _magFilter;
   }
 
   void release(GPU*) override {
   }
 
  private:
-  GPUSamplerDescriptor descriptor = {};
+  int _wrapS = 0;
+  int _wrapT = 0;
+  int _minFilter = 0;
+  int _magFilter = 0;
 };
 }  // namespace tgfx
