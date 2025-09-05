@@ -93,9 +93,9 @@ void GLRenderPipeline::activate(GLGPU* gpu) {
   }
 }
 
-void GLRenderPipeline::setUniformBytesForUBO(GLInterface* interface, unsigned binding,
+void GLRenderPipeline::setUniformBytesForUBO(GLGPU* gpu, unsigned binding,
                                              const void* data, size_t size) {
-  auto gl = interface->functions();
+  auto gl = gpu->functions();
 
   unsigned ubo = 0;
 
@@ -126,8 +126,6 @@ void GLRenderPipeline::setUniformBytesForUBO(GLInterface* interface, unsigned bi
   }
 
   if (ubo <= 0) {
-void GLRenderPipeline::setUniformBytes(GLGPU* gpu, const void* data, size_t size) {
-  if (data == nullptr || size == 0) {
     return;
   }
 
@@ -138,16 +136,14 @@ void GLRenderPipeline::setUniformBytes(GLGPU* gpu, const void* data, size_t size
                      binding == VERTEX_UBO_BINDING_POINT ? vertexUBO : fragmentUBO);
 }
 
-void GLRenderPipeline::setUniformBytes(GLInterface* interface, unsigned binding, const void* data,
-                                       size_t size) {
+void GLRenderPipeline::setUniformBytes(GLGPU* gpu, unsigned binding, const void* data, size_t size) {
   if (data == nullptr || size == 0 || uniformLayout == nullptr) {
     return;
   }
-  auto gl = gpu->functions();
 
-  const auto caps = interface->caps();
+  const auto caps = gpu->caps();
   if (caps->uboSupport && !uniformLayout->uniformBlockNames.empty()) {
-    setUniformBytesForUBO(interface, binding, data, size);
+    setUniformBytesForUBO(gpu, binding, data, size);
     return;
   }
 
@@ -157,7 +153,8 @@ void GLRenderPipeline::setUniformBytes(GLInterface* interface, unsigned binding,
 
   const auto& uniforms = binding == FRAGMENT_UBO_BINDING_POINT ? uniformLayout->fragmentUniforms
                                                                : uniformLayout->vertexUniforms;
-  const auto gl = interface->functions();
+
+  auto gl = gpu->functions();
   auto& uniformLocations =
       binding == FRAGMENT_UBO_BINDING_POINT ? fragmentUniformLocations : vertexUniformLocations;
   if (uniformLocations.empty()) {

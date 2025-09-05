@@ -46,7 +46,7 @@ class GLRenderPipeline : public GPURenderPipeline {
   /**
    * Sets the uniform data to be used in subsequent draw calls.
    */
-  void setUniformBytes(GLGPU* gpu, const void* data, size_t size);
+  void setUniformBytes(GLGPU* gpu, unsigned binding, const void* data, size_t size);
 
   /**
    * Binds the vertex buffer to be used in subsequent draw calls. The vertexOffset is the offset
@@ -69,7 +69,7 @@ class GLRenderPipeline : public GPURenderPipeline {
   unsigned int vertexUBO = 0;
   unsigned int fragmentUBO = 0;
 
-  void setUniformBytesForUBO(GLInterface* interface, unsigned binding, const void* data,
+  void setUniformBytesForUBO(GLGPU* gpu, unsigned binding, const void* data,
                              size_t size);
 };
 }  // namespace tgfx
