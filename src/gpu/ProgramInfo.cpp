@@ -203,7 +203,9 @@ std::vector<SamplerInfo> ProgramInfo::getSamplers() const {
   return samplers;
 }
 
-void ProgramInfo::updateUniformBufferSuffix(UniformBuffer* vertexUniformBuffer, UniformBuffer* fragmentUniformBuffer, const Processor* processor)const {
+void ProgramInfo::updateUniformBufferSuffix(UniformBuffer* vertexUniformBuffer,
+                                            UniformBuffer* fragmentUniformBuffer,
+                                            const Processor* processor) const {
   auto suffix = getMangledSuffix(processor);
   if (vertexUniformBuffer != nullptr) {
     vertexUniformBuffer->nameSuffix = suffix;

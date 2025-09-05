@@ -93,7 +93,8 @@ uint32_t GetNeighborAvgColor(const Pixmap& pixmap, int xOrig, int yOrig) {
   const auto pixelPointer = reinterpret_cast<const uint8_t*>(pixmap.pixels());
   auto rowBytes = pixmap.rowBytes();
   for (int y = ymin; y <= ymax; ++y) {
-    auto scanline = reinterpret_cast<const uint32_t*>(pixelPointer + (static_cast<size_t>(y) * rowBytes));
+    auto scanline =
+        reinterpret_cast<const uint32_t*>(pixelPointer + (static_cast<size_t>(y) * rowBytes));
     for (int x = xmin; x <= xmax; ++x) {
       uint32_t color = *scanline++;
       if (color != 0x00000000) {
@@ -170,7 +171,8 @@ void DoDeflatedAlpha(const Pixmap& pixmap, PDFDocumentImpl* document, PDFIndirec
     uint8_t* bufferStop = byteBuffer + std::size(byteBuffer);
     uint8_t* bufferPointer = byteBuffer;
     for (int y = 0; y < pixmap.height(); ++y) {
-      auto scanline = reinterpret_cast<const uint32_t*>(pixelPointer + (static_cast<size_t>(y) * rowBytes));
+      auto scanline =
+          reinterpret_cast<const uint32_t*>(pixelPointer + (static_cast<size_t>(y) * rowBytes));
       for (int x = 0; x < pixmap.width(); ++x) {
         uint32_t color = *scanline++;
         *bufferPointer++ = (((color) >> 24) & 0xFF);
@@ -255,7 +257,8 @@ void DoDeflatedImage(const Pixmap& pixmap, PDFDocumentImpl* document, bool isOpa
       uint8_t* bufferStop = byteBuffer + std::size(byteBuffer);
       uint8_t* bufferPointer = byteBuffer;
       for (int y = 0; y < pixmap.height(); ++y) {
-        auto scanline = reinterpret_cast<const uint32_t*>(pixelPointer + (static_cast<size_t>(y) * rowBytes));
+        auto scanline =
+            reinterpret_cast<const uint32_t*>(pixelPointer + (static_cast<size_t>(y) * rowBytes));
         for (int x = 0; x < pixmap.width(); ++x) {
           uint32_t color = *scanline++;
           if ((((color) >> 24) & 0xFF) == 0x00) {

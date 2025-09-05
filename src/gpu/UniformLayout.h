@@ -19,17 +19,14 @@
 #pragma once
 #include <string>
 #include <vector>
-
 #include "Uniform.h"
 
 namespace tgfx {
 class UniformLayout final {
  public:
-  UniformLayout(std::vector<std::string> uniformBlockNames,
-                std::vector<Uniform> vertexUniforms,
+  UniformLayout(std::vector<std::string> uniformBlockNames, std::vector<Uniform> vertexUniforms,
                 std::vector<Uniform> fragmentUniforms)
-      : uniformBlockNames(std::move(uniformBlockNames)),
-        vertexUniforms(std::move(vertexUniforms)),
+      : uniformBlockNames(std::move(uniformBlockNames)), vertexUniforms(std::move(vertexUniforms)),
         fragmentUniforms(std::move(fragmentUniforms)) {
   }
 

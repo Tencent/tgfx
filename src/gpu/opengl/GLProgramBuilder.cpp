@@ -16,11 +16,9 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include <string>
-
 #include "GLProgramBuilder.h"
 #include <ostream>
-
+#include <string>
 #include "gpu/UniformBuffer.h"
 #include "gpu/UniformLayout.h"
 #include "gpu/opengl/GLUtil.h"
@@ -178,7 +176,8 @@ std::string GLProgramBuilder::getUniformBlockDeclaration(
     } else {
       precision = "";
     }
-    result += INDENT_STR + precision + " " + SLTypeString(var.type()) + " " + uniform.name() + ";\n";
+    result +=
+        INDENT_STR + precision + " " + SLTypeString(var.type()) + " " + uniform.name() + ";\n";
   }
   result += "};\n";
   return result;
@@ -222,10 +221,8 @@ std::unique_ptr<PipelineProgram> GLProgramBuilder::finalize() {
     blockNames = {VertexUniformBlockName, FragmentUniformBlockName};
   }
   uniformLayout = std::make_unique<UniformLayout>(
-      std::move(blockNames),
-      vertexUniformBuffer ? vertexUniformBuffer->uniforms() : emptyUniforms,
-      fragmentUniformBuffer ? fragmentUniformBuffer->uniforms() : emptyUniforms
-  );
+      std::move(blockNames), vertexUniformBuffer ? vertexUniformBuffer->uniforms() : emptyUniforms,
+      fragmentUniformBuffer ? fragmentUniformBuffer->uniforms() : emptyUniforms);
 
   auto pipeline = std::make_unique<GLRenderPipeline>(programID, std::move(uniformLayout),
                                                      programInfo->getVertexAttributes(),
