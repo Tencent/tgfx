@@ -28,8 +28,12 @@
 #define RENDER_VISABLE_OBJECT(context) tgfx::inspect::LayerTree::Get().renderImageAndSend(context)
 #define SET_SLECTED_LAYER(layer) tgfx::inspect::LayerTree::Get().setSelectLayer(layer)
 
+#define MARE_CONCAT(x, y) MARE_CONCAT_INDIRECT(x, y)
+#define MARE_CONCAT_INDIRECT(x, y) x##y
+#define MARK_LINE __LINE__
 #define FRAME_MARK tgfx::inspect::FrameCapture::SendFrameMark(nullptr)
-#define FUNCTION_MARK(type, active) tgfx::inspect::FunctionTimer functionTimer(type, active)
+#define FUNCTION_MARK(type, active) \
+  tgfx::inspect::FunctionTimer MARE_CONCAT(functionTimer, MARK_LINE) = {type, active}
 #define OPERATE_MARK(type) FUNCTION_MARK(type, true)
 #define TASK_MARK(type) FUNCTION_MARK(type, true)
 #define ATTRIBUTE_NAME(name, value) tgfx::inspect::FrameCapture::SendAttributeData(name, value)
