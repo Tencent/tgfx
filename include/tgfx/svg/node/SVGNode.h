@@ -238,7 +238,7 @@ class SVGNode {
   friend class SVGRenderContext;
 };
 
-//NOLINTBEGIN
+// NOLINTBEGIN
 #undef SVG_PRES_ATTR  // presentation attributes are only defined for the base class
 
 #define SVG_ATTR_SETTERS(attr_name, attr_type, attr_default, set_cp, set_mv) \
@@ -287,6 +287,6 @@ class SVGNode {
   SVG_ATTR_SETTERS(                                                                            \
       attr_name, attr_type, attr_default, [this](const attr_type& a) { this->attr_name = a; }, \
       [this](attr_type&& a) { this->attr_name = a; })
-//NOLINTEND
+// NOLINTEND
 
 }  // namespace tgfx

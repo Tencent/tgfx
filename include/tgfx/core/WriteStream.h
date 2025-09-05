@@ -127,7 +127,7 @@ class MemoryWriteStream : public WriteStream {
    */
   std::shared_ptr<Data> readData();
 
-  /** 
+  /**
    * Return the buffer as string.
    */
   std::string readString();

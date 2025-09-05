@@ -28,7 +28,7 @@ class SVGHiddenContainer : public SVGContainer {
   }
 
   void onRender(const SVGRenderContext& /*context*/) const final {
-    //abort rendering children nodes
+    // abort rendering children nodes
   }
 
  private:

@@ -70,8 +70,8 @@ class ColorAttachment {
   ColorAttachment() = default;
 
   /**
-   * Constructs a ColorAttachment with the specified texture, load action, store action, clear value,
-   * and resolve texture.
+   * Constructs a ColorAttachment with the specified texture, load action, store action, clear
+   * value, and resolve texture.
    */
   ColorAttachment(GPUTexture* texture, LoadAction loadAction = LoadAction::DontCare,
                   StoreAction storeAction = StoreAction::Store,
@@ -177,7 +177,8 @@ class RenderPassDescriptor {
   RenderPassDescriptor() = default;
 
   /**
-   * A convenience constructor that initializes a RenderPassDescriptor with a single color attachment.
+   * A convenience constructor that initializes a RenderPassDescriptor with a single color
+   * attachment.
    * @param texture The texture to render to.
    * @param loadAction The action to perform at the start of the render pass.
    * @param storeAction The action to perform at the end of the render pass.

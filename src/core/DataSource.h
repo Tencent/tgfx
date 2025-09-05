@@ -46,7 +46,7 @@ class DataSource {
 
   /**
    * Wraps the existing data source into an asynchronous DataSource and starts loading the data
-	 * immediately.
+   * immediately.
    */
   static std::unique_ptr<DataSource> Async(std::unique_ptr<DataSource> source) {
 #ifndef TGFX_USE_THREADS

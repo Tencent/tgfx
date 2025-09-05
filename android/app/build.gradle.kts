@@ -68,7 +68,9 @@ android {
     }
 
     sourceSets.getByName("main") {
-        assets.setSrcDirs(listOf("../../resources/assets"))
+        assets.setSrcDirs(listOf("../../resources/assets",
+         "../../resources/font"
+        ))
     }
 }
 

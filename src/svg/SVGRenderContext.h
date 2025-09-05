@@ -96,8 +96,8 @@ class CopyOnWrite {
   }
 
   /**
-     * Operators for treating this as though it were a const pointer.
-     */
+   * Operators for treating this as though it were a const pointer.
+   */
 
   const T* operator->() const {
     return object;

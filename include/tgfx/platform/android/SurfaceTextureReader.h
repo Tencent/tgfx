@@ -47,8 +47,9 @@ class SurfaceTextureReader : public ImageReader {
 
   /**
    * Notifies that the previously returned ImageBuffer is now available for texture generation.
-   * Otherwise, the previous ImageBuffer will remain blocked for texture generation until this method
-   * is called. This method should be invoked by the listener provided when creating the reader.
+   * Otherwise, the previous ImageBuffer will remain blocked for texture generation until this
+   * method is called. This method should be invoked by the listener provided when creating the
+   * reader.
    */
   void notifyFrameAvailable();
 

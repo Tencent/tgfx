@@ -85,11 +85,11 @@ class ImageCodec : public ImageGenerator {
   }
 
   /**
-  * Decodes the image into the given pixel buffer using the specified image info. If the size
-  * in dstInfo differs from the codec's size, this method will attempt to downscale the image
-  * using a box filter algorithm to fit dstInfo. Only downscaling is supported. Returns true
-  * if decoding succeeds, false otherwise.
-  */
+   * Decodes the image into the given pixel buffer using the specified image info. If the size
+   * in dstInfo differs from the codec's size, this method will attempt to downscale the image
+   * using a box filter algorithm to fit dstInfo. Only downscaling is supported. Returns true
+   * if decoding succeeds, false otherwise.
+   */
   virtual bool readPixels(const ImageInfo& dstInfo, void* dstPixels) const;
 
  protected:

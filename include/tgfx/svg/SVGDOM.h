@@ -33,13 +33,13 @@ using SVGIDMapper = std::unordered_map<std::string, std::shared_ptr<SVGNode>>;
 using CSSMapper = std::unordered_map<std::string, std::string>;
 
 /**
- * The SVGDOM class represents an SVG Document Object Model (DOM). It provides functionality to 
+ * The SVGDOM class represents an SVG Document Object Model (DOM). It provides functionality to
  * traverse the SVG DOM tree and render the SVG.
- * 
+ *
  * Usage:
- * 
+ *
  * 1. Traversing the SVG DOM tree:
- *    - Use getRoot() to obtain the root node. From the root node, you can access its attributes 
+ *    - Use getRoot() to obtain the root node. From the root node, you can access its attributes
  *      and child nodes, and then visit the child nodes.
  *
  * 2. Rendering the SVG:
@@ -65,8 +65,8 @@ class SVGDOM {
   /**
    * Renders the SVG to the provided canvas.
    * @param canvas The canvas to render to.
-   * @param fontManager The font manager for rendering SVG text. If no text rendering is needed, 
-   * this can be nullptr, and text will not be rendered. If no specific font is set, the default 
+   * @param fontManager The font manager for rendering SVG text. If no text rendering is needed,
+   * this can be nullptr, and text will not be rendered. If no specific font is set, the default
    * font will be used for rendering.
    */
   void render(Canvas* canvas);

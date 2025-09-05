@@ -63,7 +63,8 @@ class AdvancedTypefaceInfo {
 
   /**
    * Font flags.
-   * Whether the font can be embedded and subset in the file during PDF export depends on these flags.
+   * Whether the font can be embedded and subset in the file during PDF export depends on these
+   * flags.
    */
   enum FontFlags {
     // May be true for Type1, CFF, or TrueType fonts.

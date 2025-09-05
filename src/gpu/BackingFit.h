@@ -22,7 +22,7 @@ namespace tgfx {
 /**
  * Indicates whether a backing store needs to be an exact match or can be larger than is strictly
  * necessary.
-*/
+ */
 enum class BackingFit {
   /**
    * The backing store must be an exact match for the requested size.

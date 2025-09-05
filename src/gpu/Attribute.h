@@ -45,8 +45,8 @@ enum class VertexFormat {
 };
 
 /**
-  * Represents a vertex attribute. in a GPU program.
-  */
+ * Represents a vertex attribute. in a GPU program.
+ */
 class Attribute {
  public:
   Attribute() = default;

@@ -60,11 +60,11 @@ class Picture {
   Rect getBounds() const;
 
   /**
-   * Returns the tight bounding box of the Picture when drawn with the given Matrix. Since the Picture
-   * may contain glyph drawing commands whose outlines can change with different scale factors,
-   * it's best to use the final drawing matrix to calculate the bounds for accuracy.
-   * Note that the bounds only include the combined geometry of each drawing command, but some
-   * commands may draw outside these bounds. Use the hasUnboundedFill() method to check for this.
+   * Returns the tight bounding box of the Picture when drawn with the given Matrix. Since the
+   * Picture may contain glyph drawing commands whose outlines can change with different scale
+   * factors, it's best to use the final drawing matrix to calculate the bounds for accuracy. Note
+   * that the bounds only include the combined geometry of each drawing command, but some commands
+   * may draw outside these bounds. Use the hasUnboundedFill() method to check for this.
    * @param matrix The Matrix to apply to the bounds of each drawing command. If null, the identity
    * matrix is used.
    */

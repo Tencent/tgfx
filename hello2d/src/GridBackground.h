@@ -16,30 +16,30 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-#include "drawers/Drawer.h"
-#include "tgfx/layers/DisplayList.h"
-
 #pragma once
 
-namespace drawers {
+#include "tgfx/layers/Layer.h"
 
-class LayerTreeDrawer : public Drawer {
+namespace hello2d {
+class GridBackgroundLayer : public tgfx::Layer {
  public:
-  LayerTreeDrawer(const std::string& treeName);
-
-  std::vector<std::shared_ptr<tgfx::Layer>> getLayersUnderPoint(float x, float y) const;
+  static std::shared_ptr<GridBackgroundLayer> Make();
+  void setSize(float width, float height, float density) {
+    _width = width;
+    _height = height;
+    _density = density;
+    invalidateContent();
+  }
 
  protected:
-  virtual std::shared_ptr<tgfx::Layer> buildLayerTree(const AppHost* host) = 0;
+  GridBackgroundLayer() = default;
 
-  void onDraw(tgfx::Canvas* canvas, const AppHost* host) override;
+  void onUpdateContent(tgfx::LayerRecorder* recorder) override;
 
  private:
-  void updateRootMatrix(const AppHost* host);
-
-  // used to update matrix
-  std::shared_ptr<tgfx::Layer> root = nullptr;
-  tgfx::DisplayList displayList = {};
+  float _width = 0.f;
+  float _height = 0.f;
+  float _density = 1.f;
 };
 
-}  // namespace drawers
+}  // namespace hello2d

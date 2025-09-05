@@ -49,8 +49,8 @@ class XMLParser {
 
  public:
   /**
-    * public for internal parser library calls, not intended for client call
-    */
+   * public for internal parser library calls, not intended for client call
+   */
   bool startElement(const std::string& element);
   bool addAttribute(const std::string& name, const std::string& value);
   bool endElement(const std::string& element);

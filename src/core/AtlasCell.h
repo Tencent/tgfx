@@ -66,4 +66,4 @@ struct AtlasCellLocator {
   Matrix matrix = {};  // The cell's transformation matrix
   AtlasLocator atlasLocator;
 };
-}  //namespace tgfx
+}  // namespace tgfx

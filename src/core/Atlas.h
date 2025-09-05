@@ -45,7 +45,7 @@ class Atlas {
 
   void compact(AtlasToken);
 
-  //To ensure the atlas does not evict a given entry, the client must set the use token
+  // To ensure the atlas does not evict a given entry, the client must set the use token
   void setLastUseToken(const PlotLocator& plotLocator, AtlasToken token);
 
   void removeExpiredKeys();
@@ -98,4 +98,4 @@ class AtlasConfig {
   static constexpr int MaxTextureSize = 2048;
   ISize RGBADimensions = {MaxTextureSize, MaxTextureSize};
 };
-}  //namespace tgfx
+}  // namespace tgfx

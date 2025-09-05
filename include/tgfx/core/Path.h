@@ -183,17 +183,17 @@ class Path {
 
   /**
    * Appends an arc to the Path. The arc is represented by one or more conic sections that describe
-   * part of an oval with radii (rx, ry) rotated by xAxisRotate degrees. The arc curves from the 
-   * last point in the Path to (x, y), choosing one of four possible routes: clockwise or 
+   * part of an oval with radii (rx, ry) rotated by xAxisRotate degrees. The arc curves from the
+   * last point in the Path to (x, y), choosing one of four possible routes: clockwise or
    * counterclockwise, and smaller or larger.
-   * The arc sweep is always less than 360 degrees. If either radius is zero, or if the last point 
-   * in the Path equals (x, y), a line to (x, y) is appended instead. If both radii are greater 
+   * The arc sweep is always less than 360 degrees. If either radius is zero, or if the last point
+   * in the Path equals (x, y), a line to (x, y) is appended instead. If both radii are greater
    * than zero but too small to fit the arc, they are scaled to fit.
    * This method appends up to four conic curves to represent the arc.
-   * It implements the functionality of the SVG arc, although the SVG sweep-flag value is the 
-   * opposite of the integer value of the sweep parameter; SVG uses 1 for clockwise, while 
+   * It implements the functionality of the SVG arc, although the SVG sweep-flag value is the
+   * opposite of the integer value of the sweep parameter; SVG uses 1 for clockwise, while
    * counterclockwise is represented by zero.
-   * 
+   *
    * @param rx            x radius before x-axis rotation
    * @param ry            y radius before x-axis rotation
    * @param xAxisRotate   x-axis rotation in degrees; positive values are clockwise

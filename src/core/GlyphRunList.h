@@ -82,9 +82,9 @@ class GlyphRunList {
   Rect getTightBounds(const Matrix* matrix = nullptr) const;
 
   /**
-   * Creates a Path for the glyphs in this run. If a matrix is provided, the path will be transformed
-   * accordingly. Returns true if the path was successfully created. Otherwise,
-   * returns false and leaves the path unchanged.
+   * Creates a Path for the glyphs in this run. If a matrix is provided, the path will be
+   * transformed accordingly. Returns true if the path was successfully created. Otherwise, returns
+   * false and leaves the path unchanged.
    */
   bool getPath(Path* path, const Matrix* matrix = nullptr) const;
 

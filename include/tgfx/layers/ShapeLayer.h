@@ -28,16 +28,16 @@ namespace tgfx {
  */
 enum class StrokeAlign {
   /**
-  * Draw a stroke centered along the shape boundary.
-  */
+   * Draw a stroke centered along the shape boundary.
+   */
   Center,
   /**
-  * Draw a stroke inside the shape boundary.
-  */
+   * Draw a stroke inside the shape boundary.
+   */
   Inside,
   /**
-  * Draw a stroke outside the shape boundary.
-  */
+   * Draw a stroke outside the shape boundary.
+   */
   Outside
 };
 
@@ -275,7 +275,8 @@ class ShapeLayer : public Layer {
   void setStrokeEnd(float end);
 
   /**
-   * Returns the stroke alignment applied to the shape’s path when stroked. The default stroke alignment is Center.
+   * Returns the stroke alignment applied to the shape’s path when stroked. The default stroke
+   * alignment is Center.
    */
   StrokeAlign strokeAlign() const {
     return static_cast<StrokeAlign>(shapeBitFields.strokeAlign);
