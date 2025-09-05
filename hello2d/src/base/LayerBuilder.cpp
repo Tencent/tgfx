@@ -85,11 +85,13 @@ void LayerBuilder::build(const AppHost* host) {
     return;
   }
   if (!_root) {
-    _root = buildLayerTree(host);
-    displayList.root()->addChild(_root);
-    displayList.setRenderMode(tgfx::RenderMode::Tiled);
-    displayList.setAllowZoomBlur(true);
-    displayList.setMaxTileCount(512);
+        _root = buildLayerTree(host);
+
+    // _root = buildLayerTree(host);
+    // displayList.root()->addChild(_root);
+    // displayList.setRenderMode(tgfx::RenderMode::Tiled);
+    // displayList.setAllowZoomBlur(true);
+    // displayList.setMaxTileCount(512);
   }
   auto bounds = _root->getBounds(nullptr, true);
   auto totalScale = std::min(static_cast<float>(host->width()) / (padding * 2 + bounds.width()),

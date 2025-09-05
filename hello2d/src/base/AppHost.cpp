@@ -132,6 +132,7 @@ void AppHost::draw(tgfx::Canvas* canvas, int drawIndex) const {
     if (root) {
       displayList.root()->addChild(root);
       displayList.setRenderMode(tgfx::RenderMode::Tiled);
+       displayList.setAllowZoomBlur(true);
       displayList.setMaxTileCount(512);
     }
     lastDrawIndex = drawIndex;
@@ -142,10 +143,10 @@ void AppHost::draw(tgfx::Canvas* canvas, int drawIndex) const {
   }
 
   updateRootMatrix();
-  builder->displayList.setZoomScale(zoomScale());
-  builder->displayList.setContentOffset(contentOffset().x, contentOffset().y);
-  builder->build(this);
-  builder->displayList.render(canvas->getSurface(), false);
+  displayList.setZoomScale(zoomScale());
+  displayList.setContentOffset(contentOffset().x, contentOffset().y);
+  currentBuilder->build(this);
+ displayList.render(canvas->getSurface(), false);
 }
 
 void AppHost::updateRootMatrix() const {
