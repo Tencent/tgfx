@@ -18,8 +18,8 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "TGFXWindow.h"
-#include <cmath>
 #include <algorithm>
+#include <cmath>
 #include <filesystem>
 #if WINVER >= 0x0603  // Windows 8.1
 #include <shellscalingapi.h>
