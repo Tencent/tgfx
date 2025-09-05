@@ -30,26 +30,26 @@ public:
     ColorSpaceXformHelper()= default;
 
     void emitCode(UniformHandler* uniformHandler, const ColorSpaceXformSteps* colorSpaceXform,
-                  ShaderFlags visibility = ShaderFlags::Fragment) {
+                  ShaderStage visibility = ShaderStage::Fragment) {
         if (colorSpaceXform) {
             fFlags = colorSpaceXform->fFlags;
             if (this->applySrcTF()) {
-              srcTFVar0 = uniformHandler->addUniform(visibility, SLType::Float4, "SrcTF0");
-              srcTFVar1 = uniformHandler->addUniform(visibility, SLType::Float4, "SrcTF1");
+              srcTFVar0 = uniformHandler->addUniform("SrcTF0", UniformFormat::Float4, visibility);
+              srcTFVar1 = uniformHandler->addUniform("SrcTF1", UniformFormat::Float4, visibility);
               _srcTFType = gfx::skcms_TransferFunction_getType(reinterpret_cast<const gfx::skcms_TransferFunction*>(&colorSpaceXform->fSrcTF));
             }
             if (this->applySrcOOTF()) {
-              srcOOTFVar = uniformHandler->addUniform(visibility, SLType::Float4, "SrcOOTF");
+              srcOOTFVar = uniformHandler->addUniform("SrcOOTF", UniformFormat::Float4, visibility);
             }
             if (this->applyGamutXform()) {
-              gamutXformVar = uniformHandler->addUniform(visibility, SLType::Float3x3, "ColorXform");
+              gamutXformVar = uniformHandler->addUniform("ColorXform", UniformFormat::Float3x3, visibility);
             }
             if (this->applyDstOOTF()) {
-              dstOOTFVar = uniformHandler->addUniform(visibility, SLType::Float4, "DstOOTF");
+              dstOOTFVar = uniformHandler->addUniform("DstOOTF", UniformFormat::Float4, visibility);
             }
             if (this->applyDstTF()) {
-              dstTFVar0 = uniformHandler->addUniform(visibility, SLType::Float4, "DstTF0");
-              dstTFVar1 = uniformHandler->addUniform(visibility, SLType::Float4, "DstTF1");
+              dstTFVar0 = uniformHandler->addUniform("DstTF0", UniformFormat::Float4, visibility);
+              dstTFVar1 = uniformHandler->addUniform("DstTF1", UniformFormat::Float4, visibility);
               _dstTFType = gfx::skcms_TransferFunction_getType(reinterpret_cast<const gfx::skcms_TransferFunction*>(&colorSpaceXform->fDstTFInv));
             }
         }
