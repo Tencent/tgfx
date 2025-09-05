@@ -75,7 +75,7 @@ class RasterizedImage : public Image {
   std::shared_ptr<Image> onMakeMipmapped(bool enabled) const override;
 
  private:
-  UniqueKey getTextureKey() const;
+  UniqueKey getTextureKey(float cacheScale = 1.0f) const;
 
   UniqueKey uniqueKey;
 

@@ -79,8 +79,8 @@ class YUVTextureView : public TextureView {
   }
 
  protected:
-  YUVTextureView(std::vector<std::unique_ptr<GPUTexture>> yuvTextures, int width, int height,
-                 YUVFormat yuvFormat, YUVColorSpace colorSpace);
+  YUVTextureView(std::vector<std::unique_ptr<GPUTexture>> yuvTextures, YUVFormat yuvFormat,
+                 YUVColorSpace colorSpace);
 
   void onReleaseGPU() override;
 

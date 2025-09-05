@@ -26,6 +26,8 @@ const TextureView* PorterDuffXferProcessor::dstTextureView() const {
 
 void PorterDuffXferProcessor::computeProcessorKey(Context*, BytesKey* bytesKey) const {
   bytesKey->write(classID());
-  bytesKey->write(static_cast<uint32_t>(blendMode));
+  if (auto textureView = dstTextureView()) {
+    TextureView::ComputeTextureKey(textureView->getTexture(), bytesKey);
+  }
 }
 }  // namespace tgfx

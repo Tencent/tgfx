@@ -21,50 +21,16 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+#include "gpu/Uniform.h"
 #include "tgfx/core/Matrix.h"
 
 namespace tgfx {
-/**
- * Reflected description of a uniform variable in the GPU program.
- */
-struct Uniform {
-  /**
-   * Possible types of a uniform variable.
-   */
-  enum class Type {
-    Float,
-    Float2,
-    Float3,
-    Float4,
-    Float2x2,
-    Float3x3,
-    Float4x4,
-    Int,
-    Int2,
-    Int3,
-    Int4,
-  };
-
-  std::string name;
-  Type type;
-
-  /**
-   * Returns the size of the uniform in bytes.
-   */
-  size_t size() const;
-};
-
 /**
  * An object representing the collection of uniform variables in a GPU program.
  */
 class UniformBuffer {
  public:
-  /**
-   * Constructs a uniform buffer with the specified uniforms.
-   */
-  explicit UniformBuffer(std::vector<Uniform> uniforms);
-
-  virtual ~UniformBuffer() = default;
+  ~UniformBuffer();
 
   /**
    * Copies value into the uniform buffer. The data must have the same size as the uniform specified
@@ -81,22 +47,39 @@ class UniformBuffer {
    */
   void setData(const std::string& name, const Matrix& matrix);
 
- protected:
-  std::vector<Uniform> uniforms = {};
-  std::vector<size_t> offsets = {};
+  /**
+   * Returns a pointer to the start of the uniform buffer in memory.
+   */
+  const void* data() const {
+    return _buffer;
+  }
 
   /**
-   * Copies data into the uniform buffer. The data must have the same size as the uniform specified
-   * by name.
+   * Returns the size of the uniform buffer in bytes.
    */
-  virtual void onCopyData(size_t index, size_t offset, size_t size, const void* data) = 0;
+  size_t size() const {
+    return offsets.back();
+  }
+
+  /**
+   * Returns the list of uniforms in this buffer.
+   */
+  const std::vector<Uniform>& uniforms() const {
+    return _uniforms;
+  }
 
  private:
-  std::string nameSuffix = "";
+  uint8_t* _buffer = nullptr;
+  std::vector<Uniform> _uniforms = {};
   std::unordered_map<std::string, size_t> uniformMap = {};
+  std::vector<size_t> offsets = {};
+  std::string nameSuffix = "";
+
+  UniformBuffer(std::vector<Uniform> uniforms, std::unordered_map<std::string, size_t> uniformMap);
 
   void onSetData(const std::string& name, const void* data, size_t size);
 
-  friend class Pipeline;
+  friend class ProgramInfo;
+  friend class UniformHandler;
 };
 }  // namespace tgfx

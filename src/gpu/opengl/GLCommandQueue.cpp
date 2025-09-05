@@ -21,6 +21,7 @@
 #include "core/utils/PixelFormatUtil.h"
 #include "gpu/opengl/GLBuffer.h"
 #include "gpu/opengl/GLUtil.h"
+#include "tgfx/core/Buffer.h"
 
 namespace tgfx {
 bool GLCommandQueue::writeBuffer(GPUBuffer* buffer, size_t bufferOffset, const void* data,
@@ -46,7 +47,8 @@ bool GLCommandQueue::writeBuffer(GPUBuffer* buffer, size_t bufferOffset, const v
 
 void GLCommandQueue::writeTexture(GPUTexture* texture, const Rect& rect, const void* pixels,
                                   size_t rowBytes) {
-  if (texture == nullptr || rect.isEmpty()) {
+  if (texture == nullptr || rect.isEmpty() ||
+      !(texture->usage() & GPUTextureUsage::TEXTURE_BINDING)) {
     return;
   }
   auto gl = interface->functions();
@@ -55,7 +57,7 @@ void GLCommandQueue::writeTexture(GPUTexture* texture, const Rect& rect, const v
     gl->flush();
   }
   auto glTexture = static_cast<const GLTexture*>(texture);
-  gl->bindTexture(glTexture->target(), glTexture->id());
+  gl->bindTexture(glTexture->target(), glTexture->textureID());
   const auto& textureFormat = caps->getTextureFormat(glTexture->format());
   auto bytesPerPixel = PixelFormatBytesPerPixel(glTexture->format());
   gl->pixelStorei(GL_UNPACK_ALIGNMENT, static_cast<int>(bytesPerPixel));
@@ -82,6 +84,63 @@ void GLCommandQueue::writeTexture(GPUTexture* texture, const Rect& rect, const v
       }
     }
   }
+}
+
+bool GLCommandQueue::readTexture(GPUTexture* texture, const Rect& rect, void* pixels,
+                                 size_t rowBytes) const {
+  if (texture == nullptr || rect.isEmpty() || pixels == nullptr) {
+    return false;
+  }
+  if (!(texture->usage() & GPUTextureUsage::RENDER_ATTACHMENT)) {
+    LOGE("GLCommandQueue::readTexture() texture usage does not support readback!");
+    return false;
+  }
+  auto format = texture->format();
+  auto bytesPerPixel = PixelFormatBytesPerPixel(format);
+  auto minRowBytes = static_cast<size_t>(rect.width()) * bytesPerPixel;
+  if (rowBytes < minRowBytes) {
+    LOGE("GLCommandQueue::readTexture() rowBytes is too small!");
+    return false;
+  }
+  auto gl = interface->functions();
+  auto caps = interface->caps();
+  ClearGLError(gl);
+  auto glTexture = static_cast<GLTexture*>(texture);
+  gl->bindFramebuffer(GL_FRAMEBUFFER, glTexture->frameBufferID());
+  void* outPixels = nullptr;
+  Buffer tempBuffer = {};
+  auto restoreGLRowLength = false;
+  if (rowBytes == minRowBytes) {
+    outPixels = pixels;
+  } else if (caps->packRowLengthSupport) {
+    outPixels = pixels;
+    gl->pixelStorei(GL_PACK_ROW_LENGTH, static_cast<int>(rowBytes / bytesPerPixel));
+    restoreGLRowLength = true;
+  } else {
+    tempBuffer.alloc(minRowBytes * static_cast<size_t>(rect.height()));
+    outPixels = tempBuffer.data();
+  }
+  gl->pixelStorei(GL_PACK_ALIGNMENT, static_cast<int>(bytesPerPixel));
+  auto x = static_cast<int>(rect.left);
+  auto y = static_cast<int>(rect.top);
+  auto width = static_cast<int>(rect.width());
+  auto height = static_cast<int>(rect.height());
+  auto textureFormat = caps->getTextureFormat(format);
+  gl->readPixels(x, y, width, height, textureFormat.externalFormat, GL_UNSIGNED_BYTE, outPixels);
+  if (restoreGLRowLength) {
+    gl->pixelStorei(GL_PACK_ROW_LENGTH, 0);
+  }
+  if (!tempBuffer.isEmpty()) {
+    auto srcPixels = static_cast<const uint8_t*>(outPixels);
+    auto dstPixels = static_cast<uint8_t*>(pixels);
+    auto rowCount = static_cast<size_t>(rect.height());
+    for (size_t row = 0; row < rowCount; ++row) {
+      memcpy(dstPixels, srcPixels, minRowBytes);
+      dstPixels += rowBytes;
+      srcPixels += minRowBytes;
+    }
+  }
+  return CheckGLError(gl);
 }
 
 void GLCommandQueue::submit(std::shared_ptr<CommandBuffer>) {

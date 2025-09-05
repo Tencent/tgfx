@@ -43,10 +43,14 @@ class BufferImage : public PixelImage {
     return imageBuffer->colorSpace();
   }
 
+  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
+
  protected:
   Type type() const override {
     return Type::Buffer;
   }
+
+  float getRasterizedScale(float drawScale) const override;
 
   std::shared_ptr<TextureProxy> lockTextureProxy(const TPArgs& args) const override;
 
@@ -54,8 +58,5 @@ class BufferImage : public PixelImage {
 
   std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
                                       const SamplingOptions& sampling) const override;
-
- private:
-  std::shared_ptr<ImageBuffer> imageBuffer = nullptr;
 };
 }  // namespace tgfx

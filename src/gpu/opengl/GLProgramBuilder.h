@@ -19,10 +19,11 @@
 #pragma once
 
 #include "GLFragmentShaderBuilder.h"
-#include "GLProgram.h"
-#include "GLUniformHandler.h"
+#include "GLRenderPipeline.h"
 #include "GLVertexShaderBuilder.h"
+#include "gpu/PipelineProgram.h"
 #include "gpu/ProgramBuilder.h"
+#include "gpu/UniformHandler.h"
 
 namespace tgfx {
 class GLProgramBuilder : public ProgramBuilder {
@@ -31,18 +32,14 @@ class GLProgramBuilder : public ProgramBuilder {
 
   std::string textureFuncName() const override;
 
-  std::string getShaderVarDeclarations(const ShaderVar& var, ShaderFlags flag) const override;
+  std::string getShaderVarDeclarations(const ShaderVar& var, ShaderStage stage) const override;
 
   bool isDesktopGL() const;
 
  private:
-  GLProgramBuilder(Context* context, const Pipeline* pipeline);
+  GLProgramBuilder(Context* context, const ProgramInfo* programInfo);
 
-  void computeCountsAndStrides(unsigned programID);
-
-  std::unique_ptr<GLProgram> finalize();
-
-  void resolveProgramResourceLocations(unsigned programID);
+  std::unique_ptr<PipelineProgram> finalize();
 
   UniformHandler* uniformHandler() override {
     return &_uniformHandler;
@@ -67,10 +64,9 @@ class GLProgramBuilder : public ProgramBuilder {
   bool checkSamplerCounts() override;
 
   VaryingHandler _varyingHandler;
-  GLUniformHandler _uniformHandler;
+  UniformHandler _uniformHandler;
   GLVertexShaderBuilder _vertexBuilder;
   GLFragmentShaderBuilder _fragBuilder;
-  std::vector<GLProgram::Attribute> attributes;
   size_t vertexStride = 0;
 
   friend class ProgramBuilder;

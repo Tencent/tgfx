@@ -19,7 +19,9 @@
 #include "BufferImage.h"
 #include "core/PixelBuffer.h"
 #include "core/PixelBufferCodec.h"
+#include "core/ScaledImageGenerator.h"
 #include "core/images/CodecImage.h"
+#include "core/utils/NextCacheScaleLevel.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/TPArgs.h"
 
@@ -37,7 +39,23 @@ BufferImage::BufferImage(std::shared_ptr<ImageBuffer> buffer, bool mipmapped)
     : PixelImage(mipmapped), imageBuffer(std::move(buffer)) {
 }
 
+float BufferImage::getRasterizedScale(float drawScale) const {
+  if (imageBuffer->isPixelBuffer()) {
+    return NextCacheScaleLevel(drawScale);
+  }
+  return 1.0f;
+}
+
 std::shared_ptr<TextureProxy> BufferImage::lockTextureProxy(const TPArgs& args) const {
+  auto scaleWidth = static_cast<int>(roundf(static_cast<float>(width()) * args.drawScale));
+  auto scaleHeight = static_cast<int>(roundf(static_cast<float>(height()) * args.drawScale));
+  if (imageBuffer->isPixelBuffer() && scaleWidth < imageBuffer->width() &&
+      scaleHeight < imageBuffer->height()) {
+    auto codec = PixelBufferCodec::Make(std::static_pointer_cast<PixelBuffer>(imageBuffer));
+    auto generator = ScaledImageGenerator::MakeFrom(codec, scaleWidth, scaleHeight);
+    return args.context->proxyProvider()->createTextureProxy(generator, args.mipmapped,
+                                                             args.renderFlags);
+  }
   return args.context->proxyProvider()->createTextureProxy(imageBuffer, args.mipmapped);
 }
 

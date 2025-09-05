@@ -17,211 +17,125 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLRenderPass.h"
+#include "GLSampler.h"
 #include "GLUtil.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/GlobalCache.h"
-#include "gpu/opengl/GLProgram.h"
-#include "gpu/opengl/GLRenderTarget.h"
+#include "gpu/opengl/GLRenderPipeline.h"
+#include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
-struct AttribLayout {
-  bool normalized = false;  // Only used by floating point types.
-  int count = 0;
-  unsigned type = 0;
-};
-
-static constexpr std::pair<SLType, AttribLayout> attribLayoutPair[] = {
-    {SLType::Float, {false, 1, GL_FLOAT}},
-    {SLType::Float2, {false, 2, GL_FLOAT}},
-    {SLType::Float3, {false, 3, GL_FLOAT}},
-    {SLType::Float4, {false, 4, GL_FLOAT}},
-    {SLType::Int, {false, 1, GL_INT}},
-    {SLType::Int2, {false, 2, GL_INT}},
-    {SLType::Int3, {false, 3, GL_INT}},
-    {SLType::Int4, {false, 4, GL_INT}},
-    {SLType::UByte4Color, {true, 4, GL_UNSIGNED_BYTE}}};
-
-static AttribLayout GetAttribLayout(SLType type) {
-  for (const auto& pair : attribLayoutPair) {
-    if (pair.first == type) {
-      return pair.second;
-    }
-  }
-  return {false, 0, 0};
-}
-
-GLRenderPass::GLRenderPass(std::shared_ptr<GLInterface> interface,
-                           std::shared_ptr<RenderTarget> renderTarget, bool resolveMSAA)
-    : RenderPass(std::move(renderTarget)), interface(std::move(interface)),
-      resolveMSAA(resolveMSAA) {
-}
-
-static void UpdateScissor(Context* context, const Rect& scissorRect) {
-  auto gl = GLFunctions::Get(context);
-  if (scissorRect.isEmpty()) {
-    gl->disable(GL_SCISSOR_TEST);
-  } else {
-    gl->enable(GL_SCISSOR_TEST);
-    gl->scissor(static_cast<int>(scissorRect.x()), static_cast<int>(scissorRect.y()),
-                static_cast<int>(scissorRect.width()), static_cast<int>(scissorRect.height()));
-  }
-}
-
-static const unsigned gXfermodeCoeff2Blend[] = {
-    GL_ZERO,       GL_ONE,
-    GL_SRC_COLOR,  GL_ONE_MINUS_SRC_COLOR,
-    GL_DST_COLOR,  GL_ONE_MINUS_DST_COLOR,
-    GL_SRC_ALPHA,  GL_ONE_MINUS_SRC_ALPHA,
-    GL_DST_ALPHA,  GL_ONE_MINUS_DST_ALPHA,
-    GL_SRC1_COLOR, GL_ONE_MINUS_SRC1_COLOR,
-    GL_SRC1_ALPHA, GL_ONE_MINUS_SRC1_ALPHA,
-};
-
-static const unsigned gXfermodeEquation2Blend[] = {
-    GL_FUNC_ADD,
-    GL_FUNC_SUBTRACT,
-    GL_FUNC_REVERSE_SUBTRACT,
-};
-
-static void UpdateBlend(Context* context, const BlendFormula* blendFactors) {
-  auto gl = GLFunctions::Get(context);
-  auto caps = GLCaps::Get(context);
-  if (caps->frameBufferFetchSupport && caps->frameBufferFetchRequiresEnablePerSample) {
-    if (blendFactors == nullptr) {
-      gl->enable(GL_FETCH_PER_SAMPLE_ARM);
-    } else {
-      gl->disable(GL_FETCH_PER_SAMPLE_ARM);
-    }
-  }
-  if (blendFactors == nullptr || (blendFactors->srcCoeff() == BlendModeCoeff::One &&
-                                  blendFactors->dstCoeff() == BlendModeCoeff::Zero &&
-                                  (blendFactors->equation() == BlendEquation::Add ||
-                                   blendFactors->equation() == BlendEquation::Subtract))) {
-    // There is no need to enable blending if the blend mode is src.
-    gl->disable(GL_BLEND);
-  } else {
-    gl->enable(GL_BLEND);
-    gl->blendFunc(gXfermodeCoeff2Blend[static_cast<int>(blendFactors->srcCoeff())],
-                  gXfermodeCoeff2Blend[static_cast<int>(blendFactors->dstCoeff())]);
-    gl->blendEquation(gXfermodeEquation2Blend[static_cast<int>(blendFactors->equation())]);
-  }
+GLRenderPass::GLRenderPass(std::shared_ptr<GLInterface> interface, RenderPassDescriptor descriptor)
+    : RenderPass(std::move(descriptor)), interface(std::move(interface)) {
 }
 
 void GLRenderPass::begin() {
-  auto context = getContext();
-  auto gl = GLFunctions::Get(context);
-  auto glRT = static_cast<GLRenderTarget*>(renderTarget.get());
-  gl->bindFramebuffer(GL_FRAMEBUFFER, glRT->drawFrameBufferID());
-  gl->viewport(0, 0, glRT->width(), glRT->height());
-  if (auto vertexArrayID = getVertexArrayID(renderTarget->getContext())) {
-    gl->bindVertexArray(vertexArrayID);
+  DEBUG_ASSERT(!descriptor.colorAttachments.empty());
+  auto& colorAttachment = descriptor.colorAttachments[0];
+  DEBUG_ASSERT(colorAttachment.texture != nullptr);
+  auto renderTexture = static_cast<GLTexture*>(colorAttachment.texture);
+  auto gl = interface->functions();
+  ClearGLError(gl);
+  gl->bindFramebuffer(GL_FRAMEBUFFER, renderTexture->frameBufferID());
+  // Set the viewport to cover the entire color attachment by default.
+  gl->viewport(0, 0, renderTexture->width(), renderTexture->height());
+  // Disable scissor test by default.
+  gl->disable(GL_SCISSOR_TEST);
+  if (colorAttachment.loadAction == LoadAction::Clear) {
+    auto& color = colorAttachment.clearValue;
+    gl->clearColor(color.red, color.green, color.blue, color.alpha);
+    gl->clear(GL_COLOR_BUFFER_BIT);
   }
 }
 
+void GLRenderPass::setScissorRect(int x, int y, int width, int height) {
+  auto gl = interface->functions();
+  auto texture = descriptor.colorAttachments[0].texture;
+  if (x == 0 && y == 0 && width == texture->width() && height == texture->height()) {
+    gl->disable(GL_SCISSOR_TEST);
+  } else {
+    gl->enable(GL_SCISSOR_TEST);
+    gl->scissor(x, y, width, height);
+  }
+}
+
+void GLRenderPass::setPipeline(GPURenderPipeline* pipeline) {
+  DEBUG_ASSERT(pipeline != nullptr);
+  if (renderPipeline == pipeline) {
+    return;
+  }
+  renderPipeline = static_cast<GLRenderPipeline*>(pipeline);
+  renderPipeline->activate(interface.get());
+}
+
+void GLRenderPass::setUniformBytes(unsigned, const void* data, size_t size) {
+  DEBUG_ASSERT(renderPipeline != nullptr);
+  renderPipeline->setUniformBytes(interface.get(), data, size);
+}
+
+void GLRenderPass::setTexture(unsigned binding, GPUTexture* texture, GPUSampler* sampler) {
+  DEBUG_ASSERT(texture != nullptr);
+  auto glSampler = static_cast<GLSampler*>(sampler);
+  static_cast<GLTexture*>(texture)->bindTexture(interface.get(), binding, glSampler);
+  auto renderTexture = descriptor.colorAttachments[0].texture;
+  if (texture == renderTexture && interface->caps()->textureRedSupport) {
+    auto gl = interface->functions();
+    gl->textureBarrier();
+  }
+}
+
+void GLRenderPass::setVertexBuffer(GPUBuffer* buffer, size_t offset) {
+  DEBUG_ASSERT(renderPipeline != nullptr);
+  renderPipeline->setVertexBuffer(interface.get(), buffer, offset);
+}
+
+void GLRenderPass::setIndexBuffer(GPUBuffer* buffer, IndexFormat format) {
+  DEBUG_ASSERT(renderPipeline != nullptr);
+  auto bufferID = buffer ? static_cast<GLBuffer*>(buffer)->bufferID() : 0;
+  auto gl = interface->functions();
+  gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, bufferID);
+  indexFormat = format;
+}
+
 void GLRenderPass::onEnd() {
-  auto context = getContext();
-  auto gl = GLFunctions::Get(context);
-  auto caps = GLCaps::Get(context);
-  if (resolveMSAA && renderTarget->sampleCount() > 1 && caps->usesMSAARenderBuffers()) {
-    auto glRT = static_cast<GLRenderTarget*>(renderTarget.get());
-    gl->bindFramebuffer(GL_READ_FRAMEBUFFER, glRT->drawFrameBufferID());
-    gl->bindFramebuffer(GL_DRAW_FRAMEBUFFER, glRT->readFrameBufferID());
+  auto gl = interface->functions();
+  auto caps = interface->caps();
+  auto& attachment = descriptor.colorAttachments[0];
+  if (attachment.resolveTexture) {
+    auto renderTexture = static_cast<GLTexture*>(attachment.texture);
+    auto sampleTexture = static_cast<GLTexture*>(attachment.resolveTexture);
+    DEBUG_ASSERT(renderTexture != sampleTexture);
+    gl->bindFramebuffer(GL_READ_FRAMEBUFFER, renderTexture->frameBufferID());
+    gl->bindFramebuffer(GL_DRAW_FRAMEBUFFER, sampleTexture->frameBufferID());
     // MSAA resolve may be affected by the scissor test, so disable it here.
     gl->disable(GL_SCISSOR_TEST);
     if (caps->msFBOType == MSFBOType::ES_Apple) {
       gl->resolveMultisampleFramebuffer();
     } else {
-      gl->blitFramebuffer(0, 0, glRT->width(), glRT->height(), 0, 0, glRT->width(), glRT->height(),
-                          GL_COLOR_BUFFER_BIT, GL_NEAREST);
+      gl->blitFramebuffer(0, 0, renderTexture->width(), renderTexture->height(), 0, 0,
+                          sampleTexture->width(), sampleTexture->height(), GL_COLOR_BUFFER_BIT,
+                          GL_NEAREST);
     }
   }
-  if (vertexArray != nullptr) {
+  if (caps->vertexArrayObjectSupport) {
     gl->bindVertexArray(0);
   }
   gl->bindFramebuffer(GL_FRAMEBUFFER, 0);
 }
 
-bool GLRenderPass::onBindProgramAndScissorClip(const Pipeline* pipeline, const Rect& scissorRect) {
-  auto context = getContext();
-  program = context->globalCache()->getProgram(pipeline);
-  if (program == nullptr) {
-    return false;
-  }
-  auto gl = GLFunctions::Get(context);
-  ClearGLError(gl);
-  auto glProgram = static_cast<GLProgram*>(program.get());
-  gl->useProgram(glProgram->programID());
-  UpdateScissor(context, scissorRect);
-  UpdateBlend(context, pipeline->blendFormula());
-  if (pipeline->requiresBarrier()) {
-    gl->textureBarrier();
-  }
-  glProgram->updateUniformsAndTextureBindings(renderTarget.get(), pipeline);
-  return true;
+static constexpr unsigned PrimitiveTypes[] = {GL_TRIANGLES, GL_TRIANGLE_STRIP};
+
+void GLRenderPass::draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) {
+  auto gl = interface->functions();
+  gl->drawArrays(PrimitiveTypes[static_cast<int>(primitiveType)], static_cast<int>(baseVertex),
+                 static_cast<int>(vertexCount));
 }
 
-bool GLRenderPass::onBindBuffers(GPUBuffer* indexBuffer, GPUBuffer* vertexBuffer,
-                                 size_t vertexOffset) {
-  auto context = getContext();
-  auto gl = GLFunctions::Get(context);
-  if (vertexBuffer) {
-    gl->bindBuffer(GL_ARRAY_BUFFER, static_cast<const GLBuffer*>(vertexBuffer)->bufferID());
-  } else {
-    return false;
-  }
-  auto glProgram = static_cast<GLProgram*>(program.get());
-  for (const auto& attribute : glProgram->vertexAttributes()) {
-    const AttribLayout& layout = GetAttribLayout(attribute.gpuType);
-    auto offset = vertexOffset + attribute.offset;
-    gl->vertexAttribPointer(static_cast<unsigned>(attribute.location), layout.count, layout.type,
-                            layout.normalized, glProgram->vertexStride(),
-                            reinterpret_cast<void*>(offset));
-    gl->enableVertexAttribArray(static_cast<unsigned>(attribute.location));
-  }
-  if (indexBuffer) {
-    gl->bindBuffer(GL_ELEMENT_ARRAY_BUFFER, static_cast<const GLBuffer*>(indexBuffer)->bufferID());
-  }
-  return true;
+void GLRenderPass::drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) {
+  auto gl = interface->functions();
+  unsigned indexType = (indexFormat == IndexFormat::UInt16) ? GL_UNSIGNED_SHORT : GL_UNSIGNED_INT;
+  size_t indexSize = (indexFormat == IndexFormat::UInt16) ? sizeof(uint16_t) : sizeof(uint32_t);
+  gl->drawElements(PrimitiveTypes[static_cast<int>(primitiveType)], static_cast<int>(indexCount),
+                   indexType, reinterpret_cast<void*>(baseIndex * indexSize));
 }
-
-static const unsigned gPrimitiveType[] = {GL_TRIANGLES, GL_TRIANGLE_STRIP};
-
-void GLRenderPass::onDraw(PrimitiveType primitiveType, size_t offset, size_t count,
-                          bool drawIndexed) {
-  auto gl = GLFunctions::Get(getContext());
-  if (drawIndexed) {
-    gl->drawElements(gPrimitiveType[static_cast<int>(primitiveType)], static_cast<int>(count),
-                     GL_UNSIGNED_SHORT, reinterpret_cast<void*>(offset * sizeof(uint16_t)));
-  } else {
-    gl->drawArrays(gPrimitiveType[static_cast<int>(primitiveType)], static_cast<int>(offset),
-                   static_cast<int>(count));
-  }
-}
-
-void GLRenderPass::onClear(const Rect& scissor, Color color) {
-  auto context = getContext();
-  auto gl = GLFunctions::Get(context);
-  UpdateScissor(context, scissor);
-  gl->clearColor(color.red, color.green, color.blue, color.alpha);
-  gl->clear(GL_COLOR_BUFFER_BIT);
-}
-
-unsigned GLRenderPass::getVertexArrayID(Context* context) {
-  if (!interface->caps()->vertexArrayObjectSupport) {
-    return 0;
-  }
-  if (vertexArray == nullptr) {
-    static const auto VertexArrayKey = UniqueKey::Make();
-    auto resource = context->globalCache()->findStaticResource(VertexArrayKey);
-    if (resource != nullptr) {
-      vertexArray = std::static_pointer_cast<GLVertexArray>(resource);
-    } else {
-      vertexArray = GLVertexArray::Make(context);
-      DEBUG_ASSERT(vertexArray != nullptr);
-      context->globalCache()->addStaticResource(VertexArrayKey, vertexArray);
-    }
-  }
-  return vertexArray->id();
-}
-
 }  // namespace tgfx

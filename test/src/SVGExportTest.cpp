@@ -17,28 +17,43 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include <filesystem>
-#include <iostream>
-#include <sstream>
 #include <string>
 #include "base/TGFXTest.h"
-#include "core/images/TransformImage.h"
-#include "gpu/opengl/GLCaps.h"
-#include "gpu/opengl/GLUtil.h"
 #include "gtest/gtest.h"
 #include "tgfx/core/Buffer.h"
 #include "tgfx/core/Color.h"
+#include "tgfx/core/Matrix.h"
 #include "tgfx/core/Paint.h"
 #include "tgfx/core/Path.h"
 #include "tgfx/core/Recorder.h"
 #include "tgfx/core/Rect.h"
-#include "tgfx/core/Size.h"
 #include "tgfx/core/Stream.h"
 #include "tgfx/core/WriteStream.h"
-#include "tgfx/gpu/opengl/GLDevice.h"
+#include "tgfx/layers/DisplayList.h"
+#include "tgfx/layers/ShapeLayer.h"
+#include "tgfx/layers/SolidColor.h"
+#include "tgfx/layers/layerstyles/DropShadowStyle.h"
+#include "tgfx/layers/layerstyles/InnerShadowStyle.h"
 #include "tgfx/svg/SVGExporter.h"
 #include "utils/TestUtils.h"
 
 namespace tgfx {
+
+namespace {
+bool CompareSVG(const std::shared_ptr<MemoryWriteStream>& stream, const std::string& key) {
+  auto data = stream->readData();
+#ifdef GENERATE_BASELINE_IMAGES
+  SaveFile(data, key + "_base.svg");
+#endif
+  auto result = Baseline::Compare(data, key);
+  if (result) {
+    RemoveFile(key + ".svg");
+  } else {
+    SaveFile(data, key + ".svg");
+  }
+  return result;
+}
+}  // namespace
 
 TGFX_TEST(SVGExportTest, PureColor) {
   std::string compareString =
@@ -559,14 +574,7 @@ TGFX_TEST(SVGExportTest, ImageMask) {
   }
 
   exporter->close();
-  auto SVGString = SVGStream->readString();
-
-  auto path = ProjectPath::Absolute("resources/apitest/mask_image.svg");
-  auto readStream = Stream::MakeFromFile(path);
-  EXPECT_TRUE(readStream != nullptr);
-  Buffer buffer(readStream->size());
-  readStream->read(buffer.data(), buffer.size());
-  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), SVGString);
+  CompareSVG(SVGStream, "SVGExportTest/ImageMask");
 }
 
 TGFX_TEST(SVGExportTest, PictureImageMask) {
@@ -605,14 +613,7 @@ TGFX_TEST(SVGExportTest, PictureImageMask) {
   }
 
   exporter->close();
-  auto SVGString = SVGStream->readString();
-
-  auto path = ProjectPath::Absolute("resources/apitest/mask_picture_image.svg");
-  auto readStream = Stream::MakeFromFile(path);
-  EXPECT_TRUE(readStream != nullptr);
-  Buffer buffer(readStream->size());
-  readStream->read(buffer.data(), buffer.size());
-  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), SVGString);
+  CompareSVG(SVGStream, "SVGExportTest/PictureImageMask");
 }
 
 TGFX_TEST(SVGExportTest, InvertPictureImageMask) {
@@ -651,14 +652,7 @@ TGFX_TEST(SVGExportTest, InvertPictureImageMask) {
   }
 
   exporter->close();
-  auto SVGString = SVGStream->readString();
-
-  auto path = ProjectPath::Absolute("resources/apitest/mask_invert_picture_image.svg");
-  auto readStream = Stream::MakeFromFile(path);
-  EXPECT_TRUE(readStream != nullptr);
-  Buffer buffer(readStream->size());
-  readStream->read(buffer.data(), buffer.size());
-  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), SVGString);
+  CompareSVG(SVGStream, "SVGExportTest/InvertPictureImageMask");
 }
 
 TGFX_TEST(SVGExportTest, DrawImageRect) {
@@ -689,12 +683,44 @@ TGFX_TEST(SVGExportTest, DrawImageRect) {
   canvas->drawImageRect(image, srcRect, dstRect, SamplingOptions(FilterMode::Linear));
 
   exporter->close();
-  auto SVGString = SVGStream->readString();
-  auto path = ProjectPath::Absolute("resources/apitest/SVG/drawImageRect.svg");
-  auto readStream = Stream::MakeFromFile(path);
-  EXPECT_TRUE(readStream != nullptr);
-  Buffer buffer(readStream->size());
-  readStream->read(buffer.data(), buffer.size());
-  EXPECT_EQ(std::string((char*)buffer.data(), buffer.size()), SVGString);
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/DrawImageRect"));
+}
+
+TGFX_TEST(SVGExportTest, LayerShadow) {
+  ContextScope scope;
+  auto* context = scope.getContext();
+  EXPECT_TRUE(context != nullptr);
+
+  auto SVGStream = MemoryWriteStream::Make();
+  auto exporter = SVGExporter::Make(SVGStream, context, Rect::MakeWH(400, 400));
+  auto* canvas = exporter->getCanvas();
+
+  auto displayList = std::make_unique<DisplayList>();
+
+  auto rootLayer = Layer::Make();
+  rootLayer->setMatrix(Matrix::MakeTrans(30, 30));
+
+  auto dropShadowLayer = ShapeLayer::Make();
+  auto dropShadowStyle = DropShadowStyle::Make(10, 10, 10, 10, Color::White(), false);
+  Path rect;
+  rect.addRect(Rect::MakeWH(50, 50));
+  dropShadowLayer->setPath(rect);
+  dropShadowLayer->setFillStyle(SolidColor::Make(Color::Red()));
+  dropShadowLayer->setLayerStyles({dropShadowStyle});
+  rootLayer->addChild(dropShadowLayer);
+
+  auto innerShadowLayer = ShapeLayer::Make();
+  auto innerShadowStyle = InnerShadowStyle::Make(10, 10, 10, 10, Color::White());
+  innerShadowLayer->setMatrix(Matrix::MakeTrans(200, 0));
+  innerShadowLayer->setPath(rect);
+  innerShadowLayer->setFillStyle(SolidColor::Make(Color::Red()));
+  innerShadowLayer->setLayerStyles({innerShadowStyle});
+  rootLayer->addChild(innerShadowLayer);
+
+  displayList->root()->addChild(rootLayer);
+  displayList->root()->draw(canvas);
+
+  exporter->close();
+  EXPECT_TRUE(CompareSVG(SVGStream, "SVGExportTest/LayerDropShadow"));
 }
 }  // namespace tgfx

@@ -19,7 +19,7 @@
 #pragma once
 
 #include "gpu/GPUResource.h"
-#include "tgfx/core/BytesKey.h"
+#include "gpu/GPUTextureDescriptor.h"
 #include "tgfx/gpu/Context.h"
 #include "tgfx/gpu/PixelFormat.h"
 #include "tgfx/platform/HardwareBuffer.h"
@@ -30,7 +30,7 @@ namespace tgfx {
  * be known at the API-neutral layer to determine the legality of mipmapped, renderable, and
  * sampling parameters for proxies instantiated with wrapped textures.
  */
-enum class TextureType { None, TwoD, Rectangle, External };
+enum class GPUTextureType { None, TwoD, Rectangle, External };
 
 /**
  * GPUTexture represents a texture in the GPU backend for rendering operations.
@@ -38,37 +38,67 @@ enum class TextureType { None, TwoD, Rectangle, External };
 class GPUTexture : public GPUResource {
  public:
   /**
+   * Returns the width of the texture in pixels.
+   */
+  int width() const {
+    return descriptor.width;
+  }
+
+  /**
+   * Returns the height of the texture in pixels.
+   */
+  int height() const {
+    return descriptor.height;
+  }
+
+  /**
    * Returns the pixel format of the texture.
    */
   PixelFormat format() const {
-    return _format;
+    return descriptor.format;
   }
 
   /**
-   * Returns the maximum mipmap level of the texture.
+   * Returns The number of samples per pixel in the texture. A value of 1 indicates no multisampling.
    */
-  int maxMipmapLevel() const {
-    return _maxMipmapLevel;
+  int sampleCount() const {
+    return descriptor.sampleCount;
   }
 
   /**
-   * Returns true if the texture has mipmap levels.
+   * Returns the number of mipmap levels in the texture.
    */
-  bool hasMipmaps() const {
-    return _maxMipmapLevel > 0;
+  int mipLevelCount() const {
+    return descriptor.mipLevelCount;
+  }
+
+  /**
+   * Returns the bitwise flags that indicate the original usage options set when the GPUTexture was
+   * created. The returned value is the sum of the decimal values for each flag. See GPUTextureUsage
+   * for more details.
+   */
+  uint32_t usage() const {
+    return descriptor.usage;
   }
 
   /**
    * The type of the texture.
    */
-  virtual TextureType type() const {
-    return TextureType::TwoD;
+  virtual GPUTextureType type() const {
+    return GPUTextureType::TwoD;
   }
 
   /**
-   * Retrieves the backend texture with the specified size.
+   * Retrieves the backend texture. An invalid BackendTexture will be returned if the texture
+   * is not created with GPUTextureUsage::TEXTURE_BINDING.
    */
-  virtual BackendTexture getBackendTexture(int width, int height) const = 0;
+  virtual BackendTexture getBackendTexture() const = 0;
+
+  /**
+   * Retrieves the backend render target. An invalid BackendRenderTarget will be returned if the
+   * texture is not created with GPUTextureUsage::RENDER_ATTACHMENT.
+   */
+  virtual BackendRenderTarget getBackendRenderTarget() const = 0;
 
   /**
    * Retrieves the backing hardware buffer. This method does not acquire any additional reference to
@@ -79,18 +109,10 @@ class GPUTexture : public GPUResource {
     return nullptr;
   }
 
-  /**
-   * Computes a key for the texture that can be used to identify it in a cache. The key is written
-   * to the provided BytesKey object.
-   */
-  virtual void computeTextureKey(Context* context, BytesKey* bytesKey) const = 0;
-
  protected:
-  PixelFormat _format = PixelFormat::RGBA_8888;
-  int _maxMipmapLevel = 0;
+  GPUTextureDescriptor descriptor = {};
 
-  GPUTexture(PixelFormat format, int maxMipmapLevel)
-      : _format(format), _maxMipmapLevel(maxMipmapLevel) {
+  explicit GPUTexture(const GPUTextureDescriptor& descriptor) : descriptor(descriptor) {
   }
 };
 }  // namespace tgfx

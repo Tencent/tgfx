@@ -23,6 +23,8 @@
 #include "gpu/opengl/GLInterface.h"
 
 namespace tgfx {
+class GLTexture;
+
 class GLGPU : public GPU {
  public:
   Backend backend() const override {
@@ -43,13 +45,21 @@ class GLGPU : public GPU {
 
   std::unique_ptr<GPUBuffer> createBuffer(size_t size, uint32_t usage) override;
 
-  std::unique_ptr<GPUTexture> createTexture(int width, int height, PixelFormat format,
-                                            bool mipmapped) override;
+  std::unique_ptr<GPUTexture> createTexture(const GPUTextureDescriptor& descriptor) override;
 
   PixelFormat getExternalTextureFormat(const BackendTexture& backendTexture) const override;
 
+  PixelFormat getExternalTextureFormat(const BackendRenderTarget& renderTarget) const override;
+
   std::unique_ptr<GPUTexture> importExternalTexture(const BackendTexture& backendTexture,
-                                                    bool adopted) override;
+                                                    uint32_t usage, bool adopted) override;
+
+  std::unique_ptr<GPUFence> importExternalFence(const BackendSemaphore& semaphore) override;
+
+  std::unique_ptr<GPUTexture> importExternalTexture(
+      const BackendRenderTarget& renderTarget) override;
+
+  std::unique_ptr<GPUSampler> createSampler(const GPUSamplerDescriptor& descriptor) override;
 
   std::shared_ptr<CommandEncoder> createCommandEncoder() override;
 

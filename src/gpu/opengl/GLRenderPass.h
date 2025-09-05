@@ -19,32 +19,41 @@
 #pragma once
 
 #include "gpu/RenderPass.h"
+#include "gpu/RenderPassDescriptor.h"
 #include "gpu/opengl/GLBuffer.h"
 #include "gpu/opengl/GLInterface.h"
-#include "gpu/opengl/GLVertexArray.h"
+#include "gpu/opengl/GLRenderPipeline.h"
 
 namespace tgfx {
 
 class GLRenderPass : public RenderPass {
  public:
-  GLRenderPass(std::shared_ptr<GLInterface> interface, std::shared_ptr<RenderTarget> renderTarget,
-               bool resolveMSAA);
+  GLRenderPass(std::shared_ptr<GLInterface> interface, RenderPassDescriptor descriptor);
 
   void begin();
 
+  void setScissorRect(int x, int y, int width, int height) override;
+
+  void setPipeline(GPURenderPipeline* pipeline) override;
+
+  void setUniformBytes(unsigned binding, const void* data, size_t size) override;
+
+  void setTexture(unsigned binding, GPUTexture* texture, GPUSampler* sampler) override;
+
+  void setVertexBuffer(GPUBuffer* buffer, size_t offset) override;
+
+  void setIndexBuffer(GPUBuffer* buffer, IndexFormat format) override;
+
+  void draw(PrimitiveType primitiveType, size_t baseVertex, size_t vertexCount) override;
+
+  void drawIndexed(PrimitiveType primitiveType, size_t baseIndex, size_t indexCount) override;
+
  protected:
-  bool onBindProgramAndScissorClip(const Pipeline* pipeline, const Rect& scissorRect) override;
-  bool onBindBuffers(GPUBuffer* indexBuffer, GPUBuffer* vertexBuffer, size_t vertexOffset) override;
-  void onDraw(PrimitiveType primitiveType, size_t baseVertex, size_t count,
-              bool drawIndexed) override;
-  void onClear(const Rect& scissor, Color color) override;
   void onEnd() override;
 
  private:
   std::shared_ptr<GLInterface> interface = nullptr;
-  std::shared_ptr<GLVertexArray> vertexArray = nullptr;
-  bool resolveMSAA = true;
-
-  unsigned getVertexArrayID(Context* context);
+  GLRenderPipeline* renderPipeline = nullptr;
+  IndexFormat indexFormat = IndexFormat::UInt16;
 };
 }  // namespace tgfx

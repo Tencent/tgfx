@@ -45,13 +45,23 @@ class CommandQueue {
                            size_t size) = 0;
 
   /**
-   * Writes pixel data to the texture within the specified rectangle. The pixel data must match the
-   * texture's pixel format, and the rectangle must be fully contained within the texture's
-   * dimensions. If the texture has mipmaps, you must call regenerateMipmapLevels() after writing
-   * pixels; this will not happen automatically.
+   * Writes pixel data to the GPUTexture within the specified rectangle. The pixel data must match
+   * the texture's pixel format, and the rectangle must be fully contained within the texture's
+   * dimensions. If the texture has mipmaps, you should call CommandEncoder's
+   * generateMipmapsForTexture() method after writing the pixels, as mipmaps will not be generated
+   * automatically.
    */
   virtual void writeTexture(GPUTexture* texture, const Rect& rect, const void* pixels,
                             size_t rowBytes) = 0;
+
+  /**
+   * Copies pixel data from the GPUTexture within the specified rectangle into the provided memory
+   * buffer. The buffer must be large enough to hold all the data for the rectangle. The rectangle
+   * must be entirely within the frame buffer's dimensions. Returns true if the read operation
+   * succeeds, false otherwise.
+   */
+  virtual bool readTexture(GPUTexture* texture, const Rect& rect, void* pixels,
+                           size_t rowBytes) const = 0;
 
   /**
    * Schedules the execution of the specified command buffer on the GPU.

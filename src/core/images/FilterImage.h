@@ -47,6 +47,8 @@ class FilterImage : public SubsetImage {
     return source->colorSpace();
   }
 
+  std::shared_ptr<ImageFilter> filter = nullptr;
+
  protected:
   Type type() const override {
     return Type::Filter;
@@ -72,8 +74,6 @@ class FilterImage : public SubsetImage {
                                                       const Matrix* uvMatrix) const override;
 
  private:
-  std::shared_ptr<ImageFilter> filter = nullptr;
-
   static std::shared_ptr<Image> Wrap(std::shared_ptr<Image> source, const Rect& bounds,
                                      std::shared_ptr<ImageFilter> filter);
 };

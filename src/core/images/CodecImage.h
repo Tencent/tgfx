@@ -21,6 +21,7 @@
 #include <memory>
 #include "core/images/BufferImage.h"
 #include "core/images/GeneratorImage.h"
+#include "core/utils/NextCacheScaleLevel.h"
 #include "tgfx/core/Image.h"
 #include "tgfx/core/ImageCodec.h"
 
@@ -44,6 +45,8 @@ class CodecImage : public GeneratorImage {
   Type type() const override {
     return Type::Codec;
   }
+
+  float getRasterizedScale(float drawScale) const override;
 
   std::shared_ptr<Image> onMakeScaled(int newWidth, int newHeight,
                                       const SamplingOptions& sampling) const override;

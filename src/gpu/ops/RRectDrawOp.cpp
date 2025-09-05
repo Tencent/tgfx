@@ -17,10 +17,11 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RRectDrawOp.h"
-#include "gpu/GPUBuffer.h"
+#include "core/DataSource.h"
 #include "gpu/GlobalCache.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/processors/EllipseGeometryProcessor.h"
+#include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -49,7 +50,18 @@ RRectDrawOp::RRectDrawOp(RRectsVertexProvider* provider)
   hasStroke = provider->hasStroke();
 }
 
-void RRectDrawOp::execute(RenderPass* renderPass) {
+PlacementPtr<GeometryProcessor> RRectDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
+  OPERATE_MARK(tgfx::inspect::OpTaskType::RRectDrawOp);
+  ATTRIBUTE_NAME("rectCount", static_cast<uint32_t>(rectCount));
+  ATTRIBUTE_NAME("useScale", useScale);
+  ATTRIBUTE_NAME("hasStroke", hasStroke);
+  ATTRIBUTE_NAME("commonColor", commonColor);
+  auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
+  return EllipseGeometryProcessor::Make(drawingBuffer, renderTarget->width(),
+                                        renderTarget->height(), hasStroke, useScale, commonColor);
+}
+
+void RRectDrawOp::onDraw(RenderPass* renderPass) {
   if (indexBufferProxy == nullptr || vertexBufferProxyView == nullptr) {
     return;
   }
@@ -61,15 +73,8 @@ void RRectDrawOp::execute(RenderPass* renderPass) {
   if (vertexBuffer == nullptr) {
     return;
   }
-  auto renderTarget = renderPass->getRenderTarget();
-  auto drawingBuffer = renderPass->getContext()->drawingBuffer();
-  auto gp =
-      EllipseGeometryProcessor::Make(drawingBuffer, renderTarget->width(), renderTarget->height(),
-                                     hasStroke, useScale, commonColor);
-  auto pipeline = createPipeline(renderPass, std::move(gp));
-  renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
-  renderPass->bindBuffers(indexBuffer->gpuBuffer(), vertexBuffer->gpuBuffer(),
-                          vertexBufferProxyView->offset());
+  renderPass->setVertexBuffer(vertexBuffer->gpuBuffer(), vertexBufferProxyView->offset());
+  renderPass->setIndexBuffer(indexBuffer->gpuBuffer());
   auto numIndicesPerRRect = hasStroke ? IndicesPerStrokeRRect : IndicesPerFillRRect;
   renderPass->drawIndexed(PrimitiveType::Triangles, 0, rectCount * numIndicesPerRRect);
 }

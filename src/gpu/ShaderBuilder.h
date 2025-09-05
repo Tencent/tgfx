@@ -25,25 +25,26 @@
 
 namespace tgfx {
 class ProgramBuilder;
-class Pipeline;
+class ProgramInfo;
 
 /**
  * Features that should only be enabled internally by the builders.
  */
-enum class PrivateFeature : unsigned {
-  None = 0,
-  OESTexture = 1 << 0,
-  FramebufferFetch = 1 << 1,
-  TGFX_MARK_AS_BITMASK_ENUM(FramebufferFetch)
+class PrivateFeature {
+ public:
+  static constexpr uint32_t OESTexture = 1 << 0;
+  static constexpr uint32_t FramebufferFetch = 1 << 1;
 };
 
 class ShaderBuilder {
  public:
   explicit ShaderBuilder(ProgramBuilder* builder);
 
-  const Pipeline* getPipeline() const;
+  const ProgramInfo* getProgramInfo() const;
 
   virtual ~ShaderBuilder() = default;
+
+  virtual ShaderStage shaderStage() const = 0;
 
   void setPrecisionQualifier(const std::string& precision);
 
@@ -69,7 +70,7 @@ class ShaderBuilder {
   /**
    * Combines the various parts of the shader to create a single finalized shader string.
    */
-  void finalize(ShaderFlags visibility);
+  void finalize();
 
   std::string shaderString();
 
@@ -91,27 +92,24 @@ class ShaderBuilder {
   /**
    * A general function which enables an extension in a shader if the feature bit is not present
    */
-  void addFeature(PrivateFeature featureBit, const std::string& extensionName);
-
-  virtual void onFinalize() = 0;
+  void addFeature(uint32_t featureBit, const std::string& extensionName);
 
   void appendEnterIfNotEmpty(uint8_t type);
 
   void appendIndentationIfNeeded(const std::string& code);
 
-  std::string getDeclarations(const std::vector<ShaderVar>& vars, ShaderFlags flag) const;
+  std::string getDeclarations(const std::vector<ShaderVar>& vars, ShaderStage stage) const;
 
   std::vector<std::string> shaderStrings;
   ProgramBuilder* programBuilder = nullptr;
   std::vector<ShaderVar> inputs;
   std::vector<ShaderVar> outputs;
-  PrivateFeature featuresAddedMask = PrivateFeature::None;
+  uint32_t features = 0;
   bool finalized = false;
   int indentation = 0;
   bool atLineStart = false;
 
   friend class ProgramBuilder;
-
-  friend class GLUniformHandler;
+  friend class UniformHandler;
 };
 }  // namespace tgfx

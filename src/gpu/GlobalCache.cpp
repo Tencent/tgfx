@@ -33,9 +33,7 @@ static constexpr uint16_t VerticesPerAAQuad = 8;
 GlobalCache::GlobalCache(Context* context) : context(context) {
 }
 
-std::shared_ptr<Program> GlobalCache::getProgram(const ProgramCreator* programCreator) {
-  BytesKey programKey = {};
-  programCreator->computeProgramKey(context, &programKey);
+std::shared_ptr<Program> GlobalCache::findProgram(const BytesKey& programKey) {
   auto result = programMap.find(programKey);
   if (result != programMap.end()) {
     auto program = result->second;
@@ -44,21 +42,22 @@ std::shared_ptr<Program> GlobalCache::getProgram(const ProgramCreator* programCr
     program->cachedPosition = programLRU.begin();
     return program;
   }
-  auto newProgram = programCreator->createProgram(context);
-  if (newProgram == nullptr) {
-    return nullptr;
+  return nullptr;
+}
+
+void GlobalCache::addProgram(const BytesKey& programKey, std::shared_ptr<Program> program) {
+  if (program == nullptr) {
+    return;
   }
-  auto program = Resource::AddToCache(context, newProgram.release());
   program->programKey = programKey;
   programLRU.push_front(program.get());
   program->cachedPosition = programLRU.begin();
-  programMap[programKey] = program;
+  programMap[programKey] = std::move(program);
   while (programLRU.size() > MAX_PROGRAM_COUNT) {
     auto oldProgram = programLRU.back();
     programLRU.pop_back();
     programMap.erase(oldProgram->programKey);
   }
-  return program;
 }
 
 void GlobalCache::releaseAll() {

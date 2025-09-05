@@ -34,7 +34,7 @@ std::shared_ptr<WebImageBuffer> WebImageBuffer::MakeFrom(emscripten::val nativeI
   if (width < 1 || height < 1) {
     return nullptr;
   }
-  return std::shared_ptr<WebImageBuffer>(new WebImageBuffer(width, height, nativeImage, false));
+  return std::shared_ptr<WebImageBuffer>(new WebImageBuffer(width, height, nativeImage));
 }
 
 std::shared_ptr<WebImageBuffer> WebImageBuffer::MakeAdopted(emscripten::val nativeImage) {
@@ -45,8 +45,8 @@ std::shared_ptr<WebImageBuffer> WebImageBuffer::MakeAdopted(emscripten::val nati
   return imageBuffer;
 }
 
-WebImageBuffer::WebImageBuffer(int width, int height, emscripten::val nativeImage, bool usePromise)
-    : _width(width), _height(height), nativeImage(nativeImage), usePromise(usePromise) {
+WebImageBuffer::WebImageBuffer(int width, int height, emscripten::val nativeImage)
+    : _width(width), _height(height), nativeImage(nativeImage) {
 }
 
 WebImageBuffer::~WebImageBuffer() {
@@ -62,14 +62,11 @@ std::shared_ptr<TextureView> WebImageBuffer::onMakeTexture(Context* context, boo
   }
   auto glTexture = static_cast<const GLTexture*>(textureView->getTexture());
   val::module_property("tgfx").call<void>("uploadToTexture", emscripten::val::module_property("GL"),
-                                          getImage(), glTexture->id(), false);
+                                          getImage(), glTexture->textureID(), false);
   return textureView;
 }
 
 emscripten::val WebImageBuffer::getImage() const {
-  if (usePromise) {
-    return nativeImage.await();
-  }
   return nativeImage;
 }
 }  // namespace tgfx

@@ -16,11 +16,10 @@
 //
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
-import {destroyVerify, wasmAwaitRewind} from '../utils/decorators';
+import {destroyVerify} from '../utils/decorators';
 import {MatrixIndex} from '../types';
 
 @destroyVerify
-@wasmAwaitRewind
 export class Matrix {
     public wasmIns;
     public isDestroyed = false;

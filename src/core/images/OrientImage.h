@@ -53,5 +53,7 @@ class OrientImage : public TransformImage {
                                                       const Matrix* uvMatrix) const override;
 
   Orientation concatOrientation(Orientation newOrientation) const;
+
+  std::optional<Matrix> concatUVMatrix(const Matrix* uvMatrix) const override;
 };
 }  // namespace tgfx

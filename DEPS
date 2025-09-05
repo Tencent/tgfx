@@ -79,6 +79,16 @@
         "url": "https://github.com/google/highway.git",
         "commit": "a523516d35e22a4ba8e2e70a319062cb87352de6",
         "dir": "third_party/highway"
+      },
+      {
+        "url": "https://github.com/kerukuro/digestpp.git",
+        "commit": "9a1afa1459fa71ab544775f1b1c0a6298978d9fd",
+        "dir": "third_party/digestpp"
+      },
+      {
+        "url": "https://github.com/lz4/lz4.git",
+        "commit": "cacca37747572717ceb1f156eb9840644205ca4f",
+        "dir": "third_party/lz4"
       }
     ]
   },

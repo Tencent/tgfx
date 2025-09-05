@@ -21,7 +21,6 @@
 #include <list>
 #include <unordered_map>
 #include "gpu/Program.h"
-#include "gpu/ProgramCreator.h"
 #include "gpu/proxies/IndexBufferProxy.h"
 #include "gpu/proxies/TextureProxy.h"
 
@@ -34,11 +33,16 @@ class GlobalCache {
   explicit GlobalCache(Context* context);
 
   /**
-   * Returns a program cache of specified ProgramMaker. If there is no associated cache available,
-   * a new program will be created by programMaker. Returns null if the programMaker fails to make a
-   * new program.
+   * Finds a program in the cache by its key. Returns nullptr if no program is found. The program
+   * will be kept alive for the lifetime of the GlobalCache.
    */
-  std::shared_ptr<Program> getProgram(const ProgramCreator* programCreator);
+  std::shared_ptr<Program> findProgram(const BytesKey& programKey);
+
+  /**
+   * Adds a program to the cache with the specified key. If a program with the same key already
+   * exists, it will be replaced with the new program.
+   */
+  void addProgram(const BytesKey& programKey, std::shared_ptr<Program> program);
 
   /**
    * Returns a texture that represents a gradient created from the specified colors and positions.

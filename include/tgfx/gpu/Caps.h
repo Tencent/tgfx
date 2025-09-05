@@ -30,13 +30,13 @@ class Caps {
  public:
   virtual ~Caps() = default;
 
+  virtual const Swizzle& getReadSwizzle(PixelFormat pixelFormat) const = 0;
+
   virtual const Swizzle& getWriteSwizzle(PixelFormat pixelFormat) const = 0;
 
   virtual bool isFormatRenderable(PixelFormat pixelFormat) const = 0;
 
   virtual int getSampleCount(int requestedCount, PixelFormat pixelFormat) const = 0;
-
-  virtual int getMaxMipmapLevel(int width, int height) const = 0;
 
   bool floatIs32Bits = true;
   int maxTextureSize = 0;

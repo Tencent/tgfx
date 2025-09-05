@@ -91,7 +91,7 @@ PlacementPtr<FragmentProcessor> PictureImage::asFragmentProcessor(const FPArgs& 
   }
   auto clipRect = rect;
   rect.scale(args.drawScale, args.drawScale);
-  rect.roundOut();
+  rect.round();
   // recalculate the scale factor to avoid the precision loss of floating point numbers
   auto scaleX = rect.width() / clipRect.width();
   auto scaleY = rect.height() / clipRect.height();

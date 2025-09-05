@@ -51,8 +51,8 @@ struct ConfigInfo {
 enum class GLVendor { ARM, Google, Imagination, Intel, Qualcomm, NVIDIA, ATI, Other };
 
 /**
- * The type of MSAA for FBOs supported. Different extensions have different
- * semantics of how / when a resolve is performed.
+ * The type of MSAA for FBOs supported. Different extensions have different semantics of how / when
+ * a resolve is performed.
  */
 enum class MSFBOType {
   /**
@@ -68,19 +68,7 @@ enum class MSFBOType {
   /**
    * GL_APPLE_framebuffer_multisample ES extension
    */
-  ES_Apple,
-  /**
-   * GL_IMG_multisampled_render_to_texture. This variation does not have MSAA renderbuffers.
-   * Instead the texture is multisampled when bound to the FBO and then resolved automatically
-   * when read. It also defines an alternate value for GL_MAX_SAMPLES (which we call
-   * GL_MAX_SAMPLES_IMG).
-   */
-  ES_IMG_MsToTexture,
-  /**
-   * GL_EXT_multisampled_render_to_texture. Same as the IMG one above but uses the standard
-   * GL_MAX_SAMPLES value.
-   */
-  ES_EXT_MsToTexture
+  ES_Apple
 };
 
 class GLInfo {
@@ -127,26 +115,13 @@ class GLCaps : public Caps {
 
   const GLTextureFormat& getTextureFormat(PixelFormat pixelFormat) const;
 
-  const Swizzle& getReadSwizzle(PixelFormat pixelFormat) const;
+  const Swizzle& getReadSwizzle(PixelFormat pixelFormat) const override;
 
   const Swizzle& getWriteSwizzle(PixelFormat pixelFormat) const override;
 
   bool isFormatRenderable(PixelFormat pixelFormat) const override;
 
   int getSampleCount(int requestedCount, PixelFormat pixelFormat) const override;
-
-  int getMaxMipmapLevel(int width, int height) const override;
-
-  /**
-   * Does the preferred MSAA FBO extension have MSAA renderBuffers?
-   */
-  bool usesMSAARenderBuffers() const;
-
-  /**
-   * Is the MSAA FBO extension one where the texture is multisampled when bound to an FBO and
-   * then implicitly resolved when read.
-   */
-  bool usesImplicitMSAAResolve() const;
 
  private:
   std::unordered_map<PixelFormat, ConfigInfo, EnumHasher> pixelFormatMap = {};

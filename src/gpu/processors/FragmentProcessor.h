@@ -32,7 +32,7 @@
 #include "tgfx/core/Image.h"
 
 namespace tgfx {
-class Pipeline;
+class ProgramInfo;
 class Image;
 class Shader;
 
@@ -147,8 +147,8 @@ class FragmentProcessor : public Processor {
   }
 
   /**
-   * Pre-order traversal of a FP hierarchy, or of the forest of FPs in a Pipeline. In the latter
-   * case the tree rooted at each FP in the Pipeline is visited successively.
+   * Pre-order traversal of a FP hierarchy, or of the forest of FPs in a ProgramInfo. In the latter
+   * case the tree rooted at each FP in the ProgramInfo is visited successively.
    */
   class Iter {
    public:
@@ -156,7 +156,7 @@ class FragmentProcessor : public Processor {
       fpStack.push_back(fp);
     }
 
-    explicit Iter(const Pipeline* pipeline);
+    explicit Iter(const ProgramInfo* programInfo);
 
     const FragmentProcessor* next();
 
@@ -165,11 +165,12 @@ class FragmentProcessor : public Processor {
   };
 
   /**
-   * Iterates over all the CoordTransforms owned by the forest of FragmentProcessors in a Pipeline.
+   * Iterates over all the CoordTransforms owned by the forest of FragmentProcessors in a
+   * ProgramInfo.
    */
   class CoordTransformIter {
    public:
-    explicit CoordTransformIter(const Pipeline* pipeline);
+    explicit CoordTransformIter(const ProgramInfo* programInfo);
 
     const CoordTransform* next();
 

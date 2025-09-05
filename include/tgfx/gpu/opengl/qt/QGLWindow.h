@@ -27,7 +27,6 @@
 #include "tgfx/gpu/Window.h"
 
 namespace tgfx {
-class GLRenderTarget;
 class QGLDeviceCreator;
 
 class QGLWindow : public Window {

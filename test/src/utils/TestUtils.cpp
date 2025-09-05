@@ -41,10 +41,6 @@ bool CreateGLTexture(Context* context, int width, int height, GLTextureInfo* tex
     return false;
   }
   gl->bindTexture(texture->target, texture->id);
-  gl->texParameteri(texture->target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-  gl->texParameteri(texture->target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-  gl->texParameteri(texture->target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-  gl->texParameteri(texture->target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   gl->texImage2D(texture->target, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
   gl->bindTexture(texture->target, 0);
   return true;
@@ -77,12 +73,16 @@ std::shared_ptr<Data> ReadFile(const std::string& path) {
 }
 
 void SaveFile(std::shared_ptr<Data> data, const std::string& key) {
-  std::filesystem::path path = OUT_ROOT + "/" + key + WEBP_FILE_EXT;
+  std::filesystem::path path = OUT_ROOT + "/" + key;
   std::filesystem::create_directories(path.parent_path());
   std::ofstream out(path);
   out.write(reinterpret_cast<const char*>(data->data()),
             static_cast<std::streamsize>(data->size()));
   out.close();
+}
+
+void SaveWebpFile(std::shared_ptr<Data> data, const std::string& key) {
+  SaveFile(data, key + WEBP_FILE_EXT);
 }
 
 void SaveImage(const std::shared_ptr<PixelBuffer> pixelBuffer, const std::string& key) {
@@ -106,11 +106,15 @@ void SaveImage(const Pixmap& pixmap, const std::string& key) {
   if (data == nullptr) {
     return;
   }
-  SaveFile(data, key);
+  SaveWebpFile(data, key);
 }
 
 void RemoveImage(const std::string& key) {
-  std::filesystem::remove(OUT_ROOT + "/" + key + WEBP_FILE_EXT);
+  RemoveFile(key + WEBP_FILE_EXT);
+}
+
+void RemoveFile(const std::string& key) {
+  std::filesystem::remove(OUT_ROOT + "/" + key);
 }
 
 std::shared_ptr<Image> ScaleImage(const std::shared_ptr<Image>& image, float scale,

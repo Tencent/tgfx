@@ -17,69 +17,97 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLCommandEncoder.h"
+#include "gpu/opengl/GLFence.h"
 #include "gpu/opengl/GLRenderPass.h"
-#include "gpu/opengl/GLRenderTarget.h"
-#include "gpu/opengl/GLSemaphore.h"
 #include "gpu/opengl/GLTexture.h"
 
 namespace tgfx {
 std::shared_ptr<RenderPass> GLCommandEncoder::onBeginRenderPass(
-    std::shared_ptr<RenderTarget> renderTarget, bool resolveMSAA) {
-  if (renderTarget == nullptr) {
+    const RenderPassDescriptor& descriptor) {
+  if (descriptor.colorAttachments.empty()) {
+    LOGE(
+        "GLCommandEncoder::beginRenderPass() Invalid render pass descriptor, no color "
+        "attachments!");
     return nullptr;
   }
-  auto renderPass = std::make_shared<GLRenderPass>(interface, std::move(renderTarget), resolveMSAA);
+  if (descriptor.colorAttachments.size() > 1) {
+    LOGE(
+        "GLCommandEncoder::onBeginRenderPass() Multiple color attachments are not yet supported in "
+        "OpenGL!");
+    return nullptr;
+  }
+  auto& colorAttachment = descriptor.colorAttachments[0];
+  if (colorAttachment.texture == nullptr) {
+    LOGE(
+        "GLCommandEncoder::beginRenderPass() Invalid render pass descriptor, color attachment "
+        "texture is null!");
+    return nullptr;
+  }
+  if (colorAttachment.texture == colorAttachment.resolveTexture) {
+    LOGE(
+        "GLCommandEncoder::beginRenderPass() Invalid render pass descriptor, color attachment "
+        "texture and resolve texture cannot be the same!");
+    return nullptr;
+  }
+  auto renderPass = std::make_shared<GLRenderPass>(interface, descriptor);
   renderPass->begin();
   return renderPass;
 }
 
-void GLCommandEncoder::copyRenderTargetToTexture(const RenderTarget* renderTarget,
-                                                 TextureView* textureView, int srcX, int srcY) {
-  DEBUG_ASSERT(renderTarget != nullptr);
-  DEBUG_ASSERT(textureView != nullptr);
-  auto width = std::min(textureView->width(), renderTarget->width() - srcX);
-  auto height = std::min(textureView->height(), renderTarget->height() - srcY);
+void GLCommandEncoder::copyTextureToTexture(GPUTexture* srcTexture, const Rect& srcRect,
+                                            GPUTexture* dstTexture, const Point& dstOffset) {
+  if (srcTexture == nullptr || dstTexture == nullptr || srcRect.isEmpty()) {
+    return;
+  }
+  if (!(srcTexture->usage() & GPUTextureUsage::RENDER_ATTACHMENT)) {
+    LOGE("GLCommandEncoder::copyTextureToTexture() source texture is not copyable!");
+    return;
+  }
   auto gl = interface->functions();
-  auto glRenderTarget = static_cast<const GLRenderTarget*>(renderTarget);
-  gl->bindFramebuffer(GL_FRAMEBUFFER, glRenderTarget->readFrameBufferID());
-  auto glTexture = static_cast<const GLTexture*>(textureView->getTexture());
+  gl->bindFramebuffer(GL_FRAMEBUFFER, static_cast<GLTexture*>(srcTexture)->frameBufferID());
+  auto glTexture = static_cast<const GLTexture*>(dstTexture);
   auto target = glTexture->target();
-  gl->bindTexture(target, glTexture->id());
-  gl->copyTexSubImage2D(target, 0, 0, 0, srcX, srcY, width, height);
+  gl->bindTexture(target, glTexture->textureID());
+  auto offsetX = static_cast<int>(dstOffset.x);
+  auto offsetY = static_cast<int>(dstOffset.y);
+  auto x = static_cast<int>(srcRect.left);
+  auto y = static_cast<int>(srcRect.top);
+  auto width = static_cast<int>(srcRect.width());
+  auto height = static_cast<int>(srcRect.height());
+  gl->copyTexSubImage2D(target, 0, offsetX, offsetY, x, y, width, height);
 }
 
 void GLCommandEncoder::generateMipmapsForTexture(GPUTexture* texture) {
   auto glTexture = static_cast<GLTexture*>(texture);
-  if (!glTexture->hasMipmaps() || glTexture->target() != GL_TEXTURE_2D) {
+  if (glTexture->mipLevelCount() <= 1 || glTexture->target() != GL_TEXTURE_2D) {
     return;
   }
   auto gl = interface->functions();
-  gl->bindTexture(glTexture->target(), glTexture->id());
+  gl->bindTexture(glTexture->target(), glTexture->textureID());
   gl->generateMipmap(glTexture->target());
 }
 
-BackendSemaphore GLCommandEncoder::insertSemaphore() {
+std::unique_ptr<GPUFence> GLCommandEncoder::insertFence() {
   if (!interface->caps()->semaphoreSupport) {
-    return {};
+    return nullptr;
   }
   auto gl = interface->functions();
-  GLSyncInfo glSync = {};
-  glSync.sync = gl->fenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
-  if (glSync.sync) {
-    // If we inserted semaphores during the flush, we need to call glFlush.
-    gl->flush();
-    return {glSync};
+  auto glSync = gl->fenceSync(GL_SYNC_GPU_COMMANDS_COMPLETE, 0);
+  if (glSync == nullptr) {
+    return nullptr;
   }
-  return {};
+  // If we inserted semaphores during the flush, we need to call glFlush.
+  gl->flush();
+  return std::make_unique<GLFence>(glSync);
 }
 
-void GLCommandEncoder::waitSemaphore(const BackendSemaphore& semaphore) {
-  GLSyncInfo glSync = {};
-  if (!semaphore.getGLSync(&glSync)) {
+void GLCommandEncoder::waitForFence(GPUFence* fence) {
+  if (fence == nullptr) {
     return;
   }
   auto gl = interface->functions();
-  gl->waitSync(glSync.sync, 0, GL_TIMEOUT_IGNORED);
+  auto glSync = static_cast<GLFence*>(fence)->glSync();
+  gl->waitSync(glSync, 0, GL_TIMEOUT_IGNORED);
 }
 
 std::shared_ptr<CommandBuffer> GLCommandEncoder::onFinish() {

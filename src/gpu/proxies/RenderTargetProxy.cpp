@@ -17,69 +17,19 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RenderTargetProxy.h"
-#include "core/PixelBuffer.h"
 #include "gpu/DrawingManager.h"
 #include "gpu/ProxyProvider.h"
+#include "gpu/proxies/ExternalRenderTargetProxy.h"
 
 namespace tgfx {
-class BackendRenderTargetWrapper : public RenderTargetProxy {
- public:
-  explicit BackendRenderTargetWrapper(std::shared_ptr<RenderTarget> renderTarget, std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB())
-      : renderTarget(std::move(renderTarget)), colorSpace(std::move(colorSpace)) {
-  }
-
-  Context* getContext() const override {
-    return renderTarget->getContext();
-  }
-
-  int width() const override {
-    return renderTarget->width();
-  }
-
-  int height() const override {
-    return renderTarget->height();
-  }
-
-  PixelFormat format() const override {
-    return renderTarget->format();
-  }
-
-  int sampleCount() const override {
-    return renderTarget->sampleCount();
-  }
-
-  ImageOrigin origin() const override {
-    return renderTarget->origin();
-  }
-
-  bool externallyOwned() const override {
-    return true;
-  }
-
-  std::shared_ptr<TextureView> getTextureView() const override {
-    return nullptr;
-  }
-
-  std::shared_ptr<RenderTarget> getRenderTarget() const override {
-    return renderTarget;
-  }
-
-  std::shared_ptr<ColorSpace> getColorSpace() const override {
-    return colorSpace;
-  }
-
- private:
-  std::shared_ptr<RenderTarget> renderTarget = nullptr;
-  std::shared_ptr<ColorSpace> colorSpace = ColorSpace::MakeSRGB();
-};
-
 std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFrom(
     Context* context, const BackendRenderTarget& backendRenderTarget, ImageOrigin origin, std::shared_ptr<ColorSpace> colorSpace) {
   auto renderTarget = RenderTarget::MakeFrom(context, backendRenderTarget, origin);
   if (renderTarget == nullptr) {
     return nullptr;
   }
-  return std::make_shared<BackendRenderTargetWrapper>(std::move(renderTarget), std::move(colorSpace));
+  return std::shared_ptr<ExternalRenderTargetProxy>(
+      new ExternalRenderTargetProxy(std::move(renderTarget), std::move(colorSpace)));
 }
 
 std::shared_ptr<RenderTargetProxy> RenderTargetProxy::MakeFallback(Context* context, int width,

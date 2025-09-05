@@ -40,6 +40,12 @@ bool TextureView::CheckSizeAndFormat(Context* context, int width, int height, Pi
   return width <= maxTextureSize && height <= maxTextureSize;
 }
 
+void TextureView::ComputeTextureKey(const GPUTexture* texture, BytesKey* bytesKey) {
+  DEBUG_ASSERT(texture != nullptr);
+  bytesKey->write(static_cast<uint32_t>(texture->format()) << 16 |
+                  static_cast<uint32_t>(texture->type()));
+}
+
 static ScratchKey ComputeTextureScratchKey(int width, int height, PixelFormat format,
                                            bool mipmapped) {
   static const uint32_t DefaultTextureType = UniqueID::Next();
@@ -61,18 +67,19 @@ std::shared_ptr<TextureView> TextureView::MakeFormat(Context* context, int width
     return nullptr;
   }
   auto gpu = context->gpu();
-  auto hasMipmaps = context->caps()->mipmapSupport ? mipmapped : false;
-  auto scratchKey = ComputeTextureScratchKey(width, height, pixelFormat, hasMipmaps);
+  mipmapped = context->caps()->mipmapSupport && mipmapped;
+  auto scratchKey = ComputeTextureScratchKey(width, height, pixelFormat, mipmapped);
   auto textureView = Resource::Find<TextureView>(context, scratchKey);
   if (textureView) {
     textureView->_origin = origin;
   } else {
-    auto texture = gpu->createTexture(width, height, pixelFormat, hasMipmaps);
+    GPUTextureDescriptor descriptor = {width, height, pixelFormat, mipmapped};
+    auto texture = gpu->createTexture(descriptor);
     if (texture == nullptr) {
       return nullptr;
     }
-    textureView = Resource::AddToCache(
-        context, new DefaultTextureView(std::move(texture), width, height, origin), scratchKey);
+    textureView = Resource::AddToCache(context, new DefaultTextureView(std::move(texture), origin),
+                                       scratchKey);
   }
   if (pixels != nullptr) {
     auto texture = textureView->getTexture();
@@ -87,17 +94,17 @@ std::shared_ptr<TextureView> TextureView::MakeFrom(Context* context,
   if (context == nullptr) {
     return nullptr;
   }
-  auto texture = context->gpu()->importExternalTexture(backendTexture, adopted);
+  auto texture = context->gpu()->importExternalTexture(backendTexture,
+                                                       GPUTextureUsage::TEXTURE_BINDING, adopted);
   if (texture == nullptr) {
     return nullptr;
   }
   ScratchKey scratchKey = {};
   if (adopted) {
     scratchKey = ComputeTextureScratchKey(backendTexture.width(), backendTexture.height(),
-                                          texture->format(), texture->hasMipmaps());
+                                          texture->format(), texture->mipLevelCount() > 1);
   }
-  auto textureView = new DefaultTextureView(std::move(texture), backendTexture.width(),
-                                            backendTexture.height(), origin);
+  auto textureView = new DefaultTextureView(std::move(texture), origin);
   return Resource::AddToCache(context, textureView, scratchKey);
 }
 
@@ -114,10 +121,6 @@ std::shared_ptr<TextureView> TextureView::MakeFrom(Context* context,
                                                    HardwareBufferRef hardwareBuffer,
                                                    YUVColorSpace colorSpace) {
   if (context == nullptr) {
-    return nullptr;
-  }
-  auto size = HardwareBufferGetSize(hardwareBuffer);
-  if (size.isEmpty()) {
     return nullptr;
   }
 
@@ -153,25 +156,25 @@ std::shared_ptr<TextureView> TextureView::MakeFrom(Context* context,
   }
 #endif
 
-  auto textures = context->gpu()->importHardwareTextures(hardwareBuffer);
+  auto textures =
+      context->gpu()->importHardwareTextures(hardwareBuffer, GPUTextureUsage::TEXTURE_BINDING);
   if (textures.empty()) {
     return nullptr;
   }
   TextureView* textureView = nullptr;
   if (textures.size() == 1) {
-    textureView = new DefaultTextureView(std::move(textures.front()), size.width, size.height);
+    textureView = new DefaultTextureView(std::move(textures.front()));
   } else {
     YUVFormat yuvFormat = YUVFormat::Unknown;
     context->gpu()->getHardwareTextureFormats(hardwareBuffer, &yuvFormat);
     DEBUG_ASSERT(yuvFormat != YUVFormat::Unknown);
-    textureView =
-        new YUVTextureView(std::move(textures), size.width, size.height, yuvFormat, colorSpace);
+    textureView = new YUVTextureView(std::move(textures), yuvFormat, colorSpace);
   }
   return Resource::AddToCache(context, textureView);
 }
 
 Point TextureView::getTextureCoord(float x, float y) const {
-  if (getTexture()->type() == TextureType::Rectangle) {
+  if (getTexture()->type() == GPUTextureType::Rectangle) {
     return {x, y};
   }
   return {x / static_cast<float>(width()), y / static_cast<float>(height())};

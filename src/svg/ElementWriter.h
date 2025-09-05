@@ -18,12 +18,9 @@
 
 #pragma once
 
-#include <memory>
-#include <string>
 #include "ResourceStore.h"
-#include "SVGUtils.h"
-#include "core/filters/BlurImageFilter.h"
 #include "core/filters/DropShadowImageFilter.h"
+#include "core/filters/GaussianBlurImageFilter.h"
 #include "core/filters/InnerShadowImageFilter.h"
 #include "core/filters/MatrixColorFilter.h"
 #include "core/filters/ModeColorFilter.h"
@@ -105,7 +102,8 @@ class ElementWriter {
   std::string addRadialGradientDef(const GradientInfo& info, const Matrix& matrix);
   std::string addUnsupportedGradientDef(const GradientInfo& info, const Matrix& matrix);
 
-  void addBlurImageFilter(const BlurImageFilter* filter);
+  std::string addImageFilter(const std::shared_ptr<ImageFilter>& imageFilter, Rect bound);
+  void addBlurImageFilter(const GaussianBlurImageFilter* filter);
   void addDropShadowImageFilter(const DropShadowImageFilter* filter);
   void addInnerShadowImageFilter(const InnerShadowImageFilter* filter);
 

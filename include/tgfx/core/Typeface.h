@@ -18,12 +18,14 @@
 
 #pragma once
 
+#include <memory>
 #include <mutex>
 #include <unordered_map>
 #include <vector>
 #include "tgfx/core/Data.h"
 #include "tgfx/core/FontStyle.h"
 #include "tgfx/core/Rect.h"
+#include "tgfx/core/Stream.h"
 
 namespace tgfx {
 /**
@@ -39,6 +41,7 @@ typedef int32_t Unichar;
 typedef uint32_t FontTableTag;
 
 class ScalerContext;
+class AdvancedTypefaceInfo;
 
 /**
  * A set of character glyphs and layout information for drawing text.
@@ -132,7 +135,11 @@ class Typeface {
    */
   virtual GlyphID getGlyphID(Unichar unichar) const = 0;
 
-  virtual std::shared_ptr<Data> getBytes() const = 0;
+  /**
+   * Returns a Stream object containing the font data, or nullptr if unavailable.
+   * For local file fonts, this will return a stream object of the file
+   */
+  virtual std::unique_ptr<Stream> openStream() const = 0;
 
   /**
    * Returns an immutable copy of the requested font table, or nullptr if that table was not found.
@@ -155,6 +162,11 @@ class Typeface {
   virtual std::vector<Unichar> getGlyphToUnicodeMap() const;
 
   virtual std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const = 0;
+
+  /**
+   * Returns advanced information about the typeface. This method is used by the PDF backend.
+   */
+  virtual AdvancedTypefaceInfo getAdvancedInfo() const;
 
   mutable std::mutex locker = {};
 
@@ -181,5 +193,7 @@ class Typeface {
   friend class WebMask;
   friend class SVGExportContext;
   friend class RenderContext;
+  friend class PDFExportContext;
+  friend class PDFFont;
 };
 }  // namespace tgfx

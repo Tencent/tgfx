@@ -20,7 +20,6 @@
 
 #include "ResourceProxy.h"
 #include "gpu/TextureView.h"
-#include "gpu/opengl/GLCaps.h"
 
 namespace tgfx {
 class RenderTargetProxy;
@@ -94,6 +93,15 @@ class TextureProxy : public ResourceProxy {
    */
   virtual std::shared_ptr<TextureView> getTextureView() const {
     return std::static_pointer_cast<TextureView>(resource);
+  }
+
+  /**
+   * Retrieves the backing hardware buffer. This method does not acquire any additional reference to
+   * the returned hardware buffer. Returns nullptr if the texture is not created from a hardware
+   * buffer.
+   */
+  virtual HardwareBufferRef getHardwareBuffer() const {
+    return nullptr;
   }
 
  protected:

@@ -21,6 +21,7 @@
 #include <map>
 #include <vector>
 #include "gpu/OpsCompositor.h"
+#include "gpu/Semaphore.h"
 #include "gpu/tasks/OpsRenderTask.h"
 #include "gpu/tasks/RenderTask.h"
 #include "gpu/tasks/ResourceTask.h"
@@ -47,9 +48,11 @@ class DrawingManager {
                     PlacementPtr<FragmentProcessor> processor, uint32_t renderFlags);
 
   std::shared_ptr<OpsCompositor> addOpsCompositor(std::shared_ptr<RenderTargetProxy> renderTarget,
-                                                  uint32_t renderFlags);
+                                                  uint32_t renderFlags,
+                                                  std::optional<Color> clearColor = std::nullopt);
 
-  void addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget, PlacementArray<Op> ops);
+  void addOpsRenderTask(std::shared_ptr<RenderTargetProxy> renderTarget,
+                        PlacementArray<DrawOp> drawOps, std::optional<Color> clearColor);
 
   void addRuntimeDrawTask(std::shared_ptr<RenderTargetProxy> renderTarget,
                           std::vector<std::shared_ptr<TextureProxy>> inputs,
@@ -88,10 +91,11 @@ class DrawingManager {
   std::list<std::shared_ptr<OpsCompositor>> compositors = {};
   std::vector<std::shared_ptr<Task>> atlasCellCodecTasks = {};
   std::map<std::shared_ptr<TextureProxy>, std::vector<AtlasCellData>> atlasCellDatas = {};
+  std::map<const TextureProxy*, std::pair<HardwareBufferRef, void*>> atlasHardwareBuffers = {};
 
   void uploadAtlasToGPU();
 
-  void clearAtlasCellCodecTasks();
+  void resetAtlasCache();
 
   friend class OpsCompositor;
 };

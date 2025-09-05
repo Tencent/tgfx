@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "InnerShadowImageFilter.h"
-#include "BlurImageFilter.h"
 #include "core/images/TextureImage.h"
 #include "gpu/processors/ConstColorProcessor.h"
 #include "gpu/processors/FragmentProcessor.h"

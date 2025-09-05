@@ -18,11 +18,13 @@
 
 #include "ShapeDrawOp.h"
 #include "core/PathTriangulator.h"
+#include "core/utils/Log.h"
 #include "gpu/ProxyProvider.h"
 #include "gpu/Quad.h"
 #include "gpu/RectsVertexProvider.h"
 #include "gpu/processors/DefaultGeometryProcessor.h"
 #include "gpu/processors/TextureEffect.h"
+#include "inspect/InspectorMark.h"
 #include "tgfx/core/RenderFlags.h"
 
 namespace tgfx {
@@ -48,9 +50,12 @@ ShapeDrawOp::ShapeDrawOp(std::shared_ptr<GPUShapeProxy> proxy, Color color, cons
   }
 }
 
-void ShapeDrawOp::execute(RenderPass* renderPass) {
+PlacementPtr<GeometryProcessor> ShapeDrawOp::onMakeGeometryProcessor(RenderTarget* renderTarget) {
+  OPERATE_MARK(tgfx::inspect::OpTaskType::ShapeDrawOp);
+  ATTRIBUTE_NAME("color", color);
+  ATTRIBUTE_NAME("uvMatrix", uvMatrix);
   if (shapeProxy == nullptr) {
-    return;
+    return nullptr;
   }
   auto viewMatrix = shapeProxy->getDrawingMatrix();
   auto realUVMatrix = uvMatrix;
@@ -62,33 +67,37 @@ void ShapeDrawOp::execute(RenderPass* renderPass) {
     auto textureProxy = shapeProxy->getTextureProxy();
     if (textureProxy == nullptr || maskBufferProxy == nullptr ||
         maskBufferProxy->getBuffer() == nullptr) {
-      return;
+      return nullptr;
     }
     Matrix maskMatrix = {};
     if (!realUVMatrix.invert(&maskMatrix)) {
-      return;
+      return nullptr;
     }
-    auto maskFP = TextureEffect::Make(std::move(textureProxy), {}, &maskMatrix, true);
+    static SamplingArgs args(TileMode::Clamp, TileMode::Clamp,
+                             SamplingOptions(FilterMode::Nearest, MipmapMode::None),
+                             SrcRectConstraint::Fast);
+    auto maskFP = TextureEffect::Make(std::move(textureProxy), args, &maskMatrix, true);
     if (maskFP == nullptr) {
-      return;
+      return nullptr;
     }
     addCoverageFP(std::move(maskFP));
   }
-  auto drawingBuffer = renderPass->getContext()->drawingBuffer();
-  auto renderTarget = renderPass->getRenderTarget();
-  auto gp = DefaultGeometryProcessor::Make(drawingBuffer, color, renderTarget->width(),
-                                           renderTarget->height(), aa, viewMatrix, realUVMatrix);
-  auto pipeline = createPipeline(renderPass, std::move(gp));
-  renderPass->bindProgramAndScissorClip(pipeline.get(), scissorRect());
+  auto drawingBuffer = renderTarget->getContext()->drawingBuffer();
+  return DefaultGeometryProcessor::Make(drawingBuffer, color, renderTarget->width(),
+                                        renderTarget->height(), aa, viewMatrix, realUVMatrix);
+}
+
+void ShapeDrawOp::onDraw(RenderPass* renderPass) {
+  auto vertexBuffer = shapeProxy->getTriangles();
   if (vertexBuffer != nullptr) {
-    renderPass->bindBuffers(nullptr, vertexBuffer->gpuBuffer());
-    auto vertexCount = aa == AAType::Coverage
+    renderPass->setVertexBuffer(vertexBuffer->gpuBuffer());
+    auto vertexCount = aaType == AAType::Coverage
                            ? PathTriangulator::GetAATriangleCount(vertexBuffer->size())
                            : PathTriangulator::GetTriangleCount(vertexBuffer->size());
     renderPass->draw(PrimitiveType::Triangles, 0, vertexCount);
   } else {
     auto maskBuffer = maskBufferProxy->getBuffer();
-    renderPass->bindBuffers(nullptr, maskBuffer->gpuBuffer(), maskBufferProxy->offset());
+    renderPass->setVertexBuffer(maskBuffer->gpuBuffer(), maskBufferProxy->offset());
     renderPass->draw(PrimitiveType::TriangleStrip, 0, 4);
   }
 }

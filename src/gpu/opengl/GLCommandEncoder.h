@@ -28,18 +28,17 @@ class GLCommandEncoder : public CommandEncoder {
       : interface(std::move(interface)) {
   }
 
-  void copyRenderTargetToTexture(const RenderTarget* renderTarget, TextureView* textureView,
-                                 int srcX, int srcY) override;
+  void copyTextureToTexture(GPUTexture* srcTexture, const Rect& srcRect, GPUTexture* dstTexture,
+                            const Point& dstOffset) override;
 
   void generateMipmapsForTexture(GPUTexture* texture) override;
 
-  BackendSemaphore insertSemaphore() override;
+  std::unique_ptr<GPUFence> insertFence() override;
 
-  void waitSemaphore(const BackendSemaphore& semaphore) override;
+  void waitForFence(GPUFence* fence) override;
 
  protected:
-  std::shared_ptr<RenderPass> onBeginRenderPass(std::shared_ptr<RenderTarget> renderTarget,
-                                                bool resolveMSAA) override;
+  std::shared_ptr<RenderPass> onBeginRenderPass(const RenderPassDescriptor& descriptor) override;
 
   std::shared_ptr<CommandBuffer> onFinish() override;
 

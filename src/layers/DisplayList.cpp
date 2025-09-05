@@ -20,13 +20,10 @@
 #include "core/utils/DecomposeRects.h"
 #include "core/utils/Log.h"
 #include "core/utils/MathExtra.h"
+#include "inspect/InspectorMark.h"
 #include "layers/DrawArgs.h"
 #include "layers/RootLayer.h"
 #include "layers/TileCache.h"
-
-#ifdef TGFX_USE_INSPECTOR
-#include "layers/LayerViewerManager.h"
-#endif
 
 namespace tgfx {
 static constexpr size_t MAX_DIRTY_REGION_FRAMES = 5;
@@ -116,10 +113,7 @@ static int64_t ChangeZoomScalePrecision(int64_t zoomScaleInt, int oldPrecision, 
 
 DisplayList::DisplayList() : _root(RootLayer::Make()) {
   _root->_root = _root.get();
-#ifdef TGFX_USE_INSPECTOR
-  auto& layerInspectorManager = LayerViewerManager::Get();
-  layerInspectorManager.setDisplayList(this);
-#endif
+  SET_DISPLAY_LIST(this);
 }
 
 DisplayList::~DisplayList() {
@@ -243,9 +237,7 @@ void DisplayList::render(Surface* surface, bool autoClear) {
   if (!surface) {
     return;
   }
-#ifdef TGFX_USE_INSPECTOR
-  LayerViewerManager::Get().RenderImageAndSend(surface->getContext());
-#endif
+  RENDER_VISABLE_OBJECT(surface->getContext());
   _hasContentChanged = false;
   auto dirtyRegions = _root->updateDirtyRegions();
   if (_zoomScaleInt == 0) {
@@ -553,13 +545,9 @@ std::vector<std::pair<float, TileCache*>> DisplayList::getSortedTileCaches() con
     auto zoomScale = ToZoomScaleFloat(scaleInt, _zoomScalePrecision);
     sortedTileCaches.emplace_back(zoomScale, tileCache);
   }
-  auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
-  DEBUG_ASSERT(currentZoomScale != 0.0f);
-  // Closest tile caches first, farthest last.
   std::sort(sortedTileCaches.begin(), sortedTileCaches.end(),
-            [currentZoomScale](const std::pair<float, TileCache*>& a,
-                               const std::pair<float, TileCache*>& b) {
-              return ScaleRatio(a.first, currentZoomScale) < ScaleRatio(b.first, currentZoomScale);
+            [](const std::pair<float, TileCache*>& a, const std::pair<float, TileCache*>& b) {
+              return a.first < b.first;
             });
   return sortedTileCaches;
 }
@@ -569,9 +557,15 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
   auto tileRect = Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
   DEBUG_ASSERT(currentZoomScale != 0.0f);
-  for (auto& [scale, tileCache] : sortedCaches) {
+  auto firstGreaterTileCache =
+      std::find_if(sortedCaches.begin(), sortedCaches.end(),
+                   [currentZoomScale](const std::pair<float, TileCache*>& item) {
+                     return item.first > currentZoomScale;
+                   });
+  auto findFallbackTasks = [](float scale, TileCache* tileCache, float currentZoomScale,
+                              const Rect& tileRect, int tileSize) -> std::vector<DrawTask> {
     if (scale == currentZoomScale || tileCache->empty()) {
-      continue;
+      return {};
     }
     auto scaleRatio = scale / currentZoomScale;
     DEBUG_ASSERT(scaleRatio != 0.0f);
@@ -579,16 +573,33 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
     zoomedRect.scale(scaleRatio, scaleRatio);
     auto tiles = tileCache->getTilesUnderRect(zoomedRect, true);
     if (tiles.empty()) {
-      continue;
+      return {};
     }
     std::vector<DrawTask> tasks = {};
-    for (auto& tile : tiles) {
-      auto drawRect = tile->getTileRect(_tileSize);
+    for (const auto& tile : tiles) {
+      auto drawRect = tile->getTileRect(tileSize);
       if (drawRect.intersect(zoomedRect)) {
-        tasks.emplace_back(tile, _tileSize, drawRect, 1.0f / scaleRatio);
+        tasks.emplace_back(tile, tileSize, drawRect, 1.0f / scaleRatio);
       }
     }
     return tasks;
+  };
+  for (auto iterator = firstGreaterTileCache; iterator < sortedCaches.end(); iterator++) {
+    auto tasks =
+        findFallbackTasks(iterator->first, iterator->second, currentZoomScale, tileRect, _tileSize);
+    if (!tasks.empty()) {
+      return tasks;
+    }
+  }
+  if (firstGreaterTileCache == sortedCaches.begin()) {
+    return {};
+  }
+  for (auto iterator = firstGreaterTileCache - 1; iterator >= sortedCaches.begin(); iterator--) {
+    auto tasks =
+        findFallbackTasks(iterator->first, iterator->second, currentZoomScale, tileRect, _tileSize);
+    if (!tasks.empty()) {
+      return tasks;
+    }
   }
   return {};
 }
@@ -613,8 +624,18 @@ std::vector<std::shared_ptr<Tile>> DisplayList::getFreeTiles(
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
   DEBUG_ASSERT(currentZoomScale != 0.0f);
   // Reverse iterate through sorted caches to get the farest tiles first.
-  for (auto it = sortedCaches.rbegin(); it != sortedCaches.rend(); ++it) {
-    auto& [scale, tileCache] = *it;
+  for (size_t i = 0, j = sortedCaches.size(); i < j;) {
+    auto& [scaleS, tileCacheS] = sortedCaches.at(i);
+    auto& [scaleL, tileCacheL] = sortedCaches.at(j - 1);
+    auto scale = scaleS;
+    auto tileCache = tileCacheS;
+    if (ScaleRatio(scaleS, currentZoomScale) < ScaleRatio(scaleL, currentZoomScale)) {
+      scale = scaleL;
+      tileCache = tileCacheL;
+      j--;
+    } else {
+      i++;
+    }
     auto centerX = static_cast<float>(renderSurface->width()) * 0.5f - _contentOffset.x;
     auto centerY = static_cast<float>(renderSurface->height()) * 0.5f - _contentOffset.y;
     centerX *= scale / currentZoomScale;
@@ -836,16 +857,7 @@ void DisplayList::drawRootLayer(Surface* surface, const Rect& drawRect, const Ma
   auto renderRect = inverse.mapRect(drawRect);
   renderRect.roundOut();
   args.renderRect = &renderRect;
-  if (_root->maxBackgroundOutset > 0.0f) {
-    if (fullScreen) {
-      args.backgroundContext = BackgroundContext::Make(context, drawRect, 0, 0, viewMatrix);
-    } else {
-      auto scale = viewMatrix.getMaxScale();
-      args.backgroundContext =
-          BackgroundContext::Make(context, drawRect, _root->maxBackgroundOutset * scale,
-                                  _root->minBackgroundOutset * scale, viewMatrix);
-    }
-  }
+  args.backgroundContext = _root->createBackgroundContext(context, drawRect, viewMatrix);
   _root->drawLayer(args, canvas, 1.0f, BlendMode::SrcOver);
 }
 

@@ -19,9 +19,10 @@
 #pragma once
 
 #include "gpu/CommandBuffer.h"
+#include "gpu/GPUFence.h"
+#include "gpu/GPUTexture.h"
 #include "gpu/RenderPass.h"
-#include "gpu/RenderTarget.h"
-#include "gpu/Semaphore.h"
+#include "gpu/RenderPassDescriptor.h"
 
 namespace tgfx {
 /**
@@ -33,52 +34,55 @@ class CommandEncoder {
   virtual ~CommandEncoder() = default;
 
   /**
-   * Begins a render pass for the specified render target. Returns a RenderPass object that can be
-   * used to control the rendering process. If the render target is null, it will return nullptr.
-   * If the resolveMSAA parameter is true, it will resolve the MSAA (multisampling antialiasing) for
-   * the render target (if it has MSAA) when the end() method is called. Note that only one render
-   * pass can be active at a time. To begin a new render pass, you must first call end() on the
-   * previous one.
+   * Begins a render pass using the specified RenderPassDescriptor. Returns a RenderPass object to
+   * control the rendering process, or nullptr if the descriptor is invalid. Only one render pass
+   * can be active at a time; to start a new one, you must first call end() on the previous render
+   * pass.
    */
-  std::shared_ptr<RenderPass> beginRenderPass(std::shared_ptr<RenderTarget> renderTarget,
-                                              bool resolveMSAA = true);
+  std::shared_ptr<RenderPass> beginRenderPass(const RenderPassDescriptor& descriptor);
 
   /**
-   * Copy the contents of the specified render target to a texture view at the specified source
-   * coordinates.
+   * Copies a region from the source GPUTexture to a region of the destination GPUTexture. If
+   * the texture has mipmaps, you should call the generateMipmapsForTexture() method after copying,
+   * as mipmaps will not be generated automatically.
+   * @param srcTexture The source frame buffer to copy from.
+   * @param srcRect The rectangle region of the source texture to copy from.
+   * @param dstTexture The destination texture to copy to.
+   * @param dstOffset The offset in the destination texture where the copied region will be placed.
    */
-  virtual void copyRenderTargetToTexture(const RenderTarget* renderTarget, TextureView* textureView,
-                                         int srcX, int srcY) = 0;
+  virtual void copyTextureToTexture(GPUTexture* srcTexture, const Rect& srcRect,
+                                    GPUTexture* dstTexture, const Point& dstOffset) = 0;
 
   /**
-   * Generates mipmaps for the given texture based on its current content.
+   * Encodes a command that generates mipmaps for the specified GPUTexture from the base level to
+   * the highest level. This method only has an effect if the texture was created with mipmap
+   * enabled.
    */
   virtual void generateMipmapsForTexture(GPUTexture* texture) = 0;
 
   /**
-   * Inserts a signal semaphore into the command encoder. This is used to notify other
+   * Inserts a signal GPUFence into the command encoder. This is used to notify other
    * synchronization points once the preceding GPU commands have finished executing. Returns nullptr
-   * if the semaphore cannot be created or inserted.
+   * if the GPUFence cannot be created or inserted.
    */
-  virtual BackendSemaphore insertSemaphore() = 0;
+  virtual std::unique_ptr<GPUFence> insertFence() = 0;
 
   /**
-   * Makes subsequent commands added to the command encoder to wait until the specified semaphore is
+   * Makes subsequent commands added to the command encoder to wait until the specified GPUFence is
    * signaled.
    */
-  virtual void waitSemaphore(const BackendSemaphore& semaphore) = 0;
+  virtual void waitForFence(GPUFence* fence) = 0;
 
   /**
-   * Completes the command encoding process and returns a CommandBuffer containing all recorded
-   * commands. The CommandBuffer can then be submitted to the GPU for execution using the
-   * GPU::submit() method. Returns nullptr if no commands were recorded or if the encoding process
-   * failed.
+   * Finalizes command encoding and returns a CommandBuffer with all recorded commands. You can then
+   * submit the CommandBuffer to the GPU for execution using GPU::submit(). Returns nullptr if no
+   * commands were recorded or if encoding failed, for example, if an active render pass was not
+   * properly ended.
    */
   std::shared_ptr<CommandBuffer> finish();
 
  protected:
-  virtual std::shared_ptr<RenderPass> onBeginRenderPass(std::shared_ptr<RenderTarget> renderTarget,
-                                                        bool resolveMSAA) = 0;
+  virtual std::shared_ptr<RenderPass> onBeginRenderPass(const RenderPassDescriptor& descriptor) = 0;
 
   virtual std::shared_ptr<CommandBuffer> onFinish() = 0;
 

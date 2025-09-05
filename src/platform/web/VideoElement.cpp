@@ -36,15 +36,6 @@ VideoElement::VideoElement(emscripten::val video, int width, int height)
     : ImageStream(width, height), source(video) {
 }
 
-void VideoElement::markFrameChanged(emscripten::val promise) {
-  currentPromise = promise;
-#ifndef TGFX_USE_ASYNC_PROMISE
-  if (currentPromise != val::null()) {
-    currentPromise.await();
-  }
-#endif
-}
-
 std::shared_ptr<TextureView> VideoElement::onMakeTexture(Context* context, bool mipmapped) {
   static auto isAndroidMiniprogram =
       val::module_property("tgfx").call<bool>("isAndroidMiniprogram");
@@ -71,14 +62,9 @@ std::shared_ptr<TextureView> VideoElement::onMakeTexture(Context* context, bool 
 }
 
 bool VideoElement::onUpdateTexture(std::shared_ptr<TextureView> textureView) {
-#ifdef TGFX_USE_ASYNC_PROMISE
-  if (currentPromise != val::null()) {
-    currentPromise.await();
-  }
-#endif
   auto glTexture = static_cast<const GLTexture*>(textureView->getTexture());
   val::module_property("tgfx").call<void>("uploadToTexture", emscripten::val::module_property("GL"),
-                                          source, glTexture->id(), false);
+                                          source, glTexture->textureID(), false);
   return true;
 }
 }  // namespace tgfx

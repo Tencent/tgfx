@@ -48,17 +48,6 @@ std::shared_ptr<CornerPinEffect> CornerPinEffect::Make(const Point& upperLeft,
   return std::make_shared<CornerPinEffect>(upperLeft, upperRight, lowerRight, lowerLeft);
 }
 
-static constexpr uint32_t InvalidUniqueID = 0;
-
-static uint32_t NextProgramID() {
-  static std::atomic<uint32_t> nextID{1};
-  uint32_t id;
-  do {
-    id = nextID.fetch_add(1, std::memory_order_relaxed);
-  } while (id == InvalidUniqueID);
-  return id;
-}
-
 CornerPinEffect::CornerPinEffect(const Point& upperLeft, const Point& upperRight,
                                  const Point& lowerRight, const Point& lowerLeft) {
   cornerPoints[0] = lowerLeft;
@@ -66,11 +55,6 @@ CornerPinEffect::CornerPinEffect(const Point& upperLeft, const Point& upperRight
   cornerPoints[2] = upperLeft;
   cornerPoints[3] = upperRight;
   calculateVertexQs();
-}
-
-uint32_t CornerPinEffect::programID() const {
-  static auto CornerPinEffectID = NextProgramID();
-  return CornerPinEffectID;
 }
 
 Rect CornerPinEffect::filterBounds(const Rect&) const {
@@ -133,6 +117,10 @@ bool CornerPinEffect::onDraw(const RuntimeProgram* program,
   inputTextures[0].getGLTextureInfo(&glInfo);
   gl->activeTexture(GL_TEXTURE0);
   gl->bindTexture(glInfo.target, glInfo.id);
+  gl->texParameteri(glInfo.target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  gl->texParameteri(glInfo.target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  gl->texParameteri(glInfo.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  gl->texParameteri(glInfo.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   auto vertices = computeVertices(inputTextures[0], target, offset);
   if (filterProgram->vertexArray > 0) {
     gl->bindVertexArray(filterProgram->vertexArray);

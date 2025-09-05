@@ -17,6 +17,7 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "RenderTargetCopyTask.h"
+#include "inspect/InspectorMark.h"
 
 namespace tgfx {
 RenderTargetCopyTask::RenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> source,
@@ -25,6 +26,7 @@ RenderTargetCopyTask::RenderTargetCopyTask(std::shared_ptr<RenderTargetProxy> so
 }
 
 void RenderTargetCopyTask::execute(CommandEncoder* encoder) {
+  TASK_MARK(tgfx::inspect::OpTaskType::RenderTargetCopyTask);
   auto renderTarget = source->getRenderTarget();
   if (renderTarget == nullptr) {
     LOGE("RenderTargetCopyTask::execute() Failed to get the source render target!");
@@ -35,7 +37,9 @@ void RenderTargetCopyTask::execute(CommandEncoder* encoder) {
     LOGE("RenderTargetCopyTask::execute() Failed to get the dest texture view!");
     return;
   }
-  encoder->copyRenderTargetToTexture(renderTarget.get(), textureView.get(), srcX, srcY);
+  auto srcRect = Rect::MakeXYWH(srcX, srcY, textureView->width(), textureView->height());
+  encoder->copyTextureToTexture(renderTarget->getSampleTexture(), srcRect,
+                                textureView->getTexture(), Point::Zero());
   encoder->generateMipmapsForTexture(textureView->getTexture());
 }
 

@@ -18,7 +18,9 @@
 
 #pragma once
 
+#include "gpu/GPURenderPipeline.h"
 #include "gpu/Resource.h"
+#include "gpu/UniformBuffer.h"
 #include "tgfx/core/BytesKey.h"
 
 namespace tgfx {

@@ -20,6 +20,7 @@
 
 #include <mutex>
 #include "ft2build.h"
+#include "tgfx/core/Stream.h"
 #include FT_FREETYPE_H
 #include "FTFontData.h"
 #include "tgfx/core/Font.h"
@@ -50,13 +51,17 @@ class FTTypeface : public Typeface {
 
   GlyphID getGlyphID(Unichar unichar) const override;
 
-  std::shared_ptr<Data> getBytes() const override;
+  std::unique_ptr<Stream> openStream() const override;
 
   std::shared_ptr<Data> copyTableData(FontTableTag tag) const override;
 
  protected:
 #ifdef TGFX_USE_GLYPH_TO_UNICODE
   std::vector<Unichar> getGlyphToUnicodeMap() const override;
+#endif
+
+#ifdef TGFX_USE_ADVANCED_TYPEFACE_PROPERTY
+  AdvancedTypefaceInfo getAdvancedInfo() const override;
 #endif
 
   std::shared_ptr<ScalerContext> onCreateScalerContext(float size) const override;
@@ -69,6 +74,10 @@ class FTTypeface : public Typeface {
   FTTypeface(FTFontData data, FT_Face face);
 
   int unitsPerEmInternal() const;
+
+#ifdef TGFX_USE_ADVANCED_TYPEFACE_PROPERTY
+  bool isOpentypeFontDataStandardFormat() const;
+#endif
 
   friend class FTScalerContext;
 };

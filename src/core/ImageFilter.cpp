@@ -37,18 +37,17 @@ Rect ImageFilter::onFilterBounds(const Rect& srcRect) const {
 }
 
 std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Image> source,
-                                                            const Rect& clipBounds,
+                                                            const Rect& renderBounds,
                                                             const TPArgs& args) const {
 
-  auto scaledBounds = clipBounds;
+  auto scaledBounds = renderBounds;
   if (args.drawScale < 1.0f) {
     scaledBounds.scale(args.drawScale, args.drawScale);
   }
   scaledBounds.roundOut();
 
-  auto textureScaleX = scaledBounds.width() / clipBounds.width();
-  auto textureScaleY = scaledBounds.height() / clipBounds.height();
-
+  auto textureScaleX = scaledBounds.width() / renderBounds.width();
+  auto textureScaleY = scaledBounds.height() / renderBounds.height();
   auto renderTarget = RenderTargetProxy::MakeFallback(
       args.context, static_cast<int>(scaledBounds.width()), static_cast<int>(scaledBounds.height()),
       source->isAlphaOnly(), 1, args.mipmapped, ImageOrigin::TopLeft, args.backingFit);
@@ -58,7 +57,7 @@ std::shared_ptr<TextureProxy> ImageFilter::lockTextureProxy(std::shared_ptr<Imag
   FPArgs fpArgs(args.context, args.renderFlags,
                 Rect::MakeWH(renderTarget->width(), renderTarget->height()),
                 std::max(textureScaleX, textureScaleY));
-  Matrix matrix = Matrix::MakeTrans(clipBounds.left, clipBounds.top);
+  Matrix matrix = Matrix::MakeTrans(renderBounds.left, renderBounds.top);
   matrix.preScale(1.0f / textureScaleX, 1.0f / textureScaleY);
   auto processor =
       asFragmentProcessor(std::move(source), fpArgs, {}, SrcRectConstraint::Fast, &matrix);

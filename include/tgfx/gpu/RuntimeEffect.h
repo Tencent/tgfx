@@ -21,13 +21,26 @@
 #include "tgfx/core/Image.h"
 #include "tgfx/gpu/RuntimeProgram.h"
 
+#define DEFINE_RUNTIME_EFFECT_PROGRAM_ID                             \
+  uint32_t programID() const override {                              \
+    static uint32_t UniqueID = tgfx::RuntimeEffect::NextProgramID(); \
+    return UniqueID;                                                 \
+  }
+
 namespace tgfx {
+
 /**
  * RuntimeEffect supports creating custom ImageFilter objects using the shading language of the
  * current GPU backend.
  */
 class RuntimeEffect {
  public:
+  /**
+   * Generates a globally unique program ID for the custom runtime effect. This ID is used by the
+   * RuntimeEffect::programID() method.
+   */
+  static uint32_t NextProgramID();
+
   /**
    * Constructs a RuntimeEffect with the given extra input images.
    * @param extraInputs A collection of additional input images used during rendering. When the
@@ -45,6 +58,9 @@ class RuntimeEffect {
    * Returns the unique program ID for this effect. This ID identifies the RuntimeProgram created
    * by the effect and is used to cache it in the GPU context. Make sure the program ID stays the
    * same for all instances of the same effect class so the GPU context can reuse the program.
+   *
+   * Use the DEFINE_RUNTIME_EFFECT_PROGRAM_ID macro to implement the programID() method for
+   * subclasses.
    */
   virtual uint32_t programID() const = 0;
 

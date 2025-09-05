@@ -64,7 +64,7 @@ const Caps* Context::caps() const {
 }
 
 bool Context::wait(const BackendSemaphore& waitSemaphore) {
-  auto semaphore = Semaphore::Wrap(this, waitSemaphore);
+  auto semaphore = Semaphore::MakeAdopted(this, waitSemaphore);
   if (semaphore == nullptr) {
     return false;
   }

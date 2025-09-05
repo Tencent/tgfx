@@ -20,17 +20,16 @@
 #include "core/utils/PixelFormatUtil.h"
 
 namespace tgfx {
-DefaultTextureView::DefaultTextureView(std::unique_ptr<GPUTexture> texture, int width, int height,
-                                       ImageOrigin origin)
-    : TextureView(width, height, origin), _texture(std::move(texture)) {
+DefaultTextureView::DefaultTextureView(std::unique_ptr<GPUTexture> texture, ImageOrigin origin)
+    : TextureView(origin), _texture(std::move(texture)) {
 }
 
 size_t DefaultTextureView::memoryUsage() const {
   if (auto hardwareBuffer = _texture->getHardwareBuffer()) {
     return HardwareBufferGetInfo(hardwareBuffer).byteSize();
   }
-  auto colorSize = static_cast<size_t>(_width) * static_cast<size_t>(_height) *
+  auto colorSize = static_cast<size_t>(width()) * static_cast<size_t>(height()) *
                    PixelFormatBytesPerPixel(_texture->format());
-  return _texture->hasMipmaps() ? colorSize * 4 / 3 : colorSize;
+  return _texture->mipLevelCount() > 1 ? colorSize * 4 / 3 : colorSize;
 }
 }  // namespace tgfx

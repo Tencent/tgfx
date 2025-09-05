@@ -23,6 +23,7 @@
 #include "gpu/RectsVertexProvider.h"
 #include "gpu/ops/DrawOp.h"
 #include "gpu/proxies/VertexBufferProxyView.h"
+#include "tgfx/core/SamplingOptions.h"
 #include "tgfx/gpu/Context.h"
 
 namespace tgfx {
@@ -31,11 +32,15 @@ class AtlasTextOp final : public DrawOp {
   static PlacementPtr<AtlasTextOp> Make(Context* context,
                                         PlacementPtr<RectsVertexProvider> provider,
                                         uint32_t renderFlags,
-                                        std::shared_ptr<TextureProxy> textureProxy);
-
-  void execute(RenderPass* renderPass) override;
+                                        std::shared_ptr<TextureProxy> textureProxy,
+                                        const SamplingOptions& sampling);
 
   bool hasCoverage() const override;
+
+ protected:
+  PlacementPtr<GeometryProcessor> onMakeGeometryProcessor(RenderTarget* renderTarget) override;
+
+  void onDraw(RenderPass* renderPass) override;
 
  private:
   size_t rectCount = 0;
@@ -43,8 +48,10 @@ class AtlasTextOp final : public DrawOp {
   std::shared_ptr<IndexBufferProxy> indexBufferProxy = nullptr;
   std::shared_ptr<VertexBufferProxyView> vertexBufferProxyView = {};
   std::shared_ptr<TextureProxy> textureProxy = nullptr;
+  SamplingOptions sampling{FilterMode::Nearest, MipmapMode::None};
 
-  explicit AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureProxy> textureProxy);
+  explicit AtlasTextOp(RectsVertexProvider* provider, std::shared_ptr<TextureProxy> textureProxy,
+                       const SamplingOptions& sampling);
 
   friend class BlockBuffer;
 };
