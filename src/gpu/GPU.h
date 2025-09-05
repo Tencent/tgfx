@@ -105,15 +105,15 @@ class GPU {
       const BackendRenderTarget& backendRenderTarget) const = 0;
 
   /**
-   * Creates a GPUTexture that wraps the specified backend texture.
-   * @param backendTexture The backend texture to be wrapped.
-   * @param usage A bitmask of GPUTextureUsage flags specifying how the texture will be used.
-   * @param adopted If true, the returned GPUTexture takes ownership of the backend texture and will
-   * destroy it when no longer needed. If false, the backend texture must remain valid for the
-   * lifetime of the GPUTexture.
-   * @return A unique pointer to the created GPUTexture. Returns nullptr if the backend texture is
-   * invalid or not supported by the GPU backend.
-   */
+  * Creates a GPUTexture that wraps the specified backend texture.
+  * @param backendTexture The backend texture to be wrapped.
+  * @param usage A bitmask of GPUTextureUsage flags specifying how the texture will be used.
+  * @param adopted If true, the returned GPUTexture takes ownership of the backend texture and will
+  * destroy it when no longer needed. If false, the backend texture must remain valid for the
+  * lifetime of the GPUTexture.
+  * @return A unique pointer to the created GPUTexture. Returns nullptr if the backend texture is
+  * invalid or not supported by the GPU backend.
+  */
   virtual std::unique_ptr<GPUTexture> importExternalTexture(const BackendTexture& backendTexture,
                                                             uint32_t usage,
                                                             bool adopted = false) = 0;

@@ -68,8 +68,7 @@ class RenderPass {
   virtual void setUniformBytes(unsigned binding, const void* data, size_t size) = 0;
 
   /**
-   * Sets a texture and its sampler state to a specified binding index in the shader's texture
-   * table.
+   * Sets a texture and its sampler state to a specified binding index in the shader's texture table.
    */
   virtual void setTexture(unsigned binding, GPUTexture* texture, GPUSampler* sampler) = 0;
 
