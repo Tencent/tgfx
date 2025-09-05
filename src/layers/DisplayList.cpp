@@ -591,6 +591,9 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
       return tasks;
     }
   }
+  if (findFallbackTasks == sortedCaches.begin()) {
+    return {};
+  }
   for (auto index = firstZoomOutTiled - 1; index >= sortedCaches.begin(); index--) {
     const auto& [scale, tileCache] = *index;
     auto tasks = findFallbackTasks(scale, tileCache, currentZoomScale, tileRect, _tileSize);
@@ -621,9 +624,9 @@ std::vector<std::shared_ptr<Tile>> DisplayList::getFreeTiles(
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
   DEBUG_ASSERT(currentZoomScale != 0.0f);
   // Reverse iterate through sorted caches to get the farest tiles first.
-  for (size_t i = 0, j = sortedCaches.size() - 1; i <= j;) {
+  for (size_t i = 0, j = sortedCaches.size(); i < j;) {
     auto& [scaleS, tileCacheS] = sortedCaches.at(i);
-    auto& [scaleL, tileCacheL] = sortedCaches.at(j);
+    auto& [scaleL, tileCacheL] = sortedCaches.at(j - 1);
     auto scale = scaleS;
     auto tileCache = tileCacheS;
     if (ScaleRatio(scaleS, currentZoomScale) < ScaleRatio(scaleL, currentZoomScale)) {
