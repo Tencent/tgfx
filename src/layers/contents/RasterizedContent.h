@@ -25,7 +25,9 @@ class RasterizedContent {
  public:
   RasterizedContent(uint32_t contextID, float contentScale, std::shared_ptr<Image> image,
                     const Matrix& matrix)
-      : _contextID(contextID), _contentScale(contentScale), image(std::move(image)),
+      : _contextID(contextID),
+        _contentScale(contentScale),
+        image(std::move(image)),
         matrix(matrix) {
   }
 

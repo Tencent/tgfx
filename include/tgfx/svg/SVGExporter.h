@@ -41,7 +41,7 @@ class SVGExportFlags {
   static constexpr uint32_t ConvertTextToPaths = 1 << 0;
 
   /**
-   * Disable pretty XML formatting in the exported SVG. By default, spaces ('\t') and 
+   * Disable pretty XML formatting in the exported SVG. By default, spaces ('\t') and
    * newlines ('\n') are added to the exported SVG text for better readability.
    */
   static constexpr uint32_t DisablePrettyXML = 1 << 1;
@@ -55,12 +55,12 @@ class SVGExportFlags {
 
 /**
  * SVGExporter is used to convert drawing commands from the Canvas into SVG text.
- *  
+ *
  * Some features are not supported when exporting to SVG:
  * - Blend modes:
  * Clear, Src, Dst, DstOver, SrcIn, DstIn, SrcOut, DstOut, SrcATop, DstATop, Xor, and Modulate are
  * not supported.
- * 
+ *
  * - Image filters:
  * Compose and Runtime are not supported.
  *
@@ -70,7 +70,7 @@ class SVGExportFlags {
  *
  * - Shaders:
  * ColorFilter, Blend, and Matrix are not supported. Gradient shaders are partially supported.
- * 
+ *
  * - Gradient shaders:
  * Conic gradients are not supported.
  *
@@ -96,18 +96,18 @@ class SVGExporter {
                                            uint32_t exportFlags = 0);
 
   /**
-   * Destroys the SVG exporter object. If close() hasn't been called, it will be invoked 
-   * automatically. 
+   * Destroys the SVG exporter object. If close() hasn't been called, it will be invoked
+   * automatically.
    */
   ~SVGExporter();
 
   /**
-   * Returns the canvas for exporting if the SVGExporter is not closed; otherwise, returns nullptr. 
+   * Returns the canvas for exporting if the SVGExporter is not closed; otherwise, returns nullptr.
    */
   Canvas* getCanvas() const;
 
   /**
-   * Closes the SVG exporter, finalizing any unfinished drawing commands and writing the SVG end 
+   * Closes the SVG exporter, finalizing any unfinished drawing commands and writing the SVG end
    * tag.
    */
   void close();

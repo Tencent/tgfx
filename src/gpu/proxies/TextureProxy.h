@@ -115,8 +115,13 @@ class TextureProxy : public ResourceProxy {
 
   TextureProxy(int width, int height, PixelFormat pixelFormat, bool mipmapped = false,
                ImageOrigin origin = ImageOrigin::TopLeft)
-      : _width(width), _height(height), _backingStoreWidth(width), _backingStoreHeight(height),
-        _format(pixelFormat), _mipmapped(mipmapped), _origin(origin) {
+      : _width(width),
+        _height(height),
+        _backingStoreWidth(width),
+        _backingStoreHeight(height),
+        _format(pixelFormat),
+        _mipmapped(mipmapped),
+        _origin(origin) {
   }
 
   friend class ProxyProvider;

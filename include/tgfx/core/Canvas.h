@@ -39,7 +39,7 @@ class CanvasState;
  * SrcRectConstraint controls the behavior at the edge of source rect, provided to drawImageRect()
  * when there is any filtering. If Strict is set, then extra code is used to ensure it never samples
  * outside the src-rect. Strict disables the use of mipmaps.
-*/
+ */
 enum class SrcRectConstraint {
   /**
    * sample only inside bounds; slower
@@ -404,7 +404,8 @@ class Canvas {
                       const Paint& paint);
 
   /**
-   * Draws an array of glyphs at specified positions using the current clip, matrix, font, and paint.
+   * Draws an array of glyphs at specified positions using the current clip, matrix, font, and
+   * paint.
    * @param glyphs the array of glyph IDs to draw.
    * @param positions the positions where each glyph should be drawn.
    * @param glyphCount the number of glyphs to draw.
@@ -425,7 +426,8 @@ class Canvas {
 
   /**
    * Draws a Picture using the current clip and matrix. The clip and matrix remain unchanged by the
-   * picture's contents, as if save() was called before and restore() was called after drawPicture().
+   * picture's contents, as if save() was called before and restore() was called after
+   * drawPicture().
    * @param picture The recorded drawing commands to play back.
    */
   void drawPicture(std::shared_ptr<Picture> picture);

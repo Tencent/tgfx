@@ -30,7 +30,7 @@ struct PDFMetadata;
 static constexpr float ScalarDefaultRasterDPI = 72.0f;
 
 /**
- * Supports writing custom PDF objects. 
+ * Supports writing custom PDF objects.
  * Users need to construct element node objects and their attribute lists according to their own
  * requirements. The object structure is as follows:
  *
@@ -44,7 +44,7 @@ static constexpr float ScalarDefaultRasterDPI = 72.0f;
  */
 
 /**
- * PDFAttributeList is a helper class to manage the attributes of a PDF structure element node. 
+ * PDFAttributeList is a helper class to manage the attributes of a PDF structure element node.
  * Each attribute must have an owner (e.g. "Layout", "List", "Table", etc) and an attribute name
  * (e.g. "BBox", "RowSpan", etc.) from PDF32000_2008 14.8.5, and then a value of the proper type
  * according to the spec.
@@ -65,7 +65,7 @@ class PDFAttributeList {
   void appendFloat(const std::string& owner, const std::string& name, float value);
 
   /**
-   * Appends a name attribute to the list. 
+   * Appends a name attribute to the list.
    * Note: this is not a string attribute, but the name of another attribute.
    */
   void appendName(const std::string& owner, const std::string& attrName, const std::string& value);
@@ -89,7 +89,7 @@ class PDFAttributeList {
 };
 
 /**
- * A custom class representing a PDF structure element node. It includes details such as the node 
+ * A custom class representing a PDF structure element node. It includes details such as the node
  * type, child nodes, and associated attributes.
  */
 struct PDFStructureElementNode {
@@ -120,34 +120,34 @@ struct DateTime {
 };
 
 struct PDFMetadata {
-  /** 
+  /**
    * The document's title.
    */
   std::string title;
 
-  /** 
+  /**
    * The name of the person who created the document.
    */
   std::string author;
 
-  /** 
+  /**
    * The subject of the document.
    */
   std::string subject;
 
-  /** 
+  /**
    * Keywords associated with the document.  Commas may be used to delineate keywords within the
    * string.
    */
   std::string keywords;
 
-  /** 
+  /**
    * If the document was converted to PDF from another format, the name of the conforming product
    * that created the original document from which it was converted.
    */
   std::string creator;
 
-  /** 
+  /**
    * The product that is converting this document to PDF.
    */
   std::string producer = "TGFX/PDF";
@@ -158,20 +158,20 @@ struct PDFMetadata {
    */
   DateTime creation = {0, 0, 0, 0, 0, 0, 0, 0};
 
-  /** 
+  /**
    * The date and time the document was most recently modified. The zero default value represents
    * an unknown/unset time.
    */
   DateTime modified = {0, 0, 0, 0, 0, 0, 0, 0};
 
-  /** 
-   * The natural language of the text in the PDF. If fLang is empty, the root 
+  /**
+   * The natural language of the text in the PDF. If fLang is empty, the root
    * StructureElementNode::lang will be used (if not empty). Text not in this language should be
    * marked with StructureElementNode::lang.
    */
   std::string lang;
 
-  /** 
+  /**
    * The DPI (pixels-per-inch) at which features without native PDF support will be rasterized
    * (e.g. draw image with perspective, draw text with perspective, ...)
    * A larger DPI would create a PDF that reflects the original intent with better fidelity, but it
@@ -180,22 +180,22 @@ struct PDFMetadata {
    */
   float rasterDPI = ScalarDefaultRasterDPI;
 
-  /** 
+  /**
    * If true, include XMP metadata, a document UUID, and sRGB output intent information.  This adds
    * length to the document and makes it non-reproducable, but are necessary features for PDF/A-2b
    * conformance
    */
   bool PDFA = false;
 
-  /** 
+  /**
    * Encoding quality controls the trade-off between size and quality. By default this is set to 101
    * percent, which corresponds to lossless encoding. If this value is set to a value <= 100, and
    * the image is opaque, it will be encoded (using JPEG) with that quality setting.
    */
   int encodingQuality = 101;
 
-  /** 
-   * An optional tree of structured document tags that provide a semantic representation of the 
+  /**
+   * An optional tree of structured document tags that provide a semantic representation of the
    * content. The caller should retain ownership.
    */
   PDFStructureElementNode* structureElementTreeRoot = nullptr;
@@ -207,7 +207,7 @@ struct PDFMetadata {
 
   Outline outline = Outline::None;
 
-  /** 
+  /**
    * PDF streams may be compressed to save space. Use this to specify the desired compression vs
    * time tradeoff.
    */

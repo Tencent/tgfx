@@ -91,9 +91,9 @@ enum class BlendEquation {
 
 struct BlendFormula {
   /**
-    * Values the shader can write to primary and secondary outputs. These are all modulated by
-    * coverage. We will ignore the multiplies when not using coverage.
-    */
+   * Values the shader can write to primary and secondary outputs. These are all modulated by
+   * coverage. We will ignore the multiplies when not using coverage.
+   */
   enum class OutputType {
     None,         //<! 0
     Coverage,     //<! inputCoverage

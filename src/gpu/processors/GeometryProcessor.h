@@ -68,9 +68,14 @@ class GeometryProcessor : public Processor {
              VaryingHandler* varyingHandler, UniformHandler* uniformHandler, const Caps* caps,
              std::string outputColor, std::string outputCoverage,
              FPCoordTransformHandler* transformHandler, std::string* outputSubset)
-        : vertBuilder(vertBuilder), fragBuilder(fragBuilder), varyingHandler(varyingHandler),
-          uniformHandler(uniformHandler), caps(caps), outputColor(std::move(outputColor)),
-          outputCoverage(std::move(outputCoverage)), fpCoordTransformHandler(transformHandler),
+        : vertBuilder(vertBuilder),
+          fragBuilder(fragBuilder),
+          varyingHandler(varyingHandler),
+          uniformHandler(uniformHandler),
+          caps(caps),
+          outputColor(std::move(outputColor)),
+          outputCoverage(std::move(outputCoverage)),
+          fpCoordTransformHandler(transformHandler),
           outputSubset(outputSubset) {
     }
     VertexShaderBuilder* vertBuilder;

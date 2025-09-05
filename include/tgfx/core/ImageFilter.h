@@ -84,8 +84,8 @@ class ImageFilter {
                                                      float blurrinessY, const Color& color);
 
   /**
-   * Create a filter that draws an inner shadow over the input content. This filter produces an image
-   * that includes the inputs' content.
+   * Create a filter that draws an inner shadow over the input content. This filter produces an
+   * image that includes the inputs' content.
    * @param dx            The X offset of the shadow.
    * @param dy            The Y offset of the shadow.
    * @param blurrinessX   The blur radius for the shadow, along the X axis.

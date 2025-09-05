@@ -90,7 +90,7 @@ class ColorFilter {
     return false;
   }
 
-  /** 
+  /**
    * If the filter can be represented by a source color plus Mode, this returns true, and sets (if
    * not NULL) the color and mode appropriately.If not, this returns false and ignores the
    * parameters.

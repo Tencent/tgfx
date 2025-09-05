@@ -29,13 +29,13 @@ namespace tgfx {
 class ImagePattern : public ShapeStyle {
  public:
   /**
-    * Creates a new ImagePattern with the given image, tile modes, and sampling options.
-    * @param image The image to use for the pattern.
-    * @param tileModeX The tile mode for the x direction.
-    * @param tileModeY The tile mode for the y direction.
-    * @param sampling The sampling options to use when sampling the image.
-    * @return A new ImagePattern, nullptr if the image is nullptr.
-    */
+   * Creates a new ImagePattern with the given image, tile modes, and sampling options.
+   * @param image The image to use for the pattern.
+   * @param tileModeX The tile mode for the x direction.
+   * @param tileModeY The tile mode for the y direction.
+   * @param sampling The sampling options to use when sampling the image.
+   * @return A new ImagePattern, nullptr if the image is nullptr.
+   */
   static std::shared_ptr<ImagePattern> Make(std::shared_ptr<Image> image,
                                             TileMode tileModeX = TileMode::Clamp,
                                             TileMode tileModeY = TileMode::Clamp,

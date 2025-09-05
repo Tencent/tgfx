@@ -70,9 +70,9 @@ class PDFFont {
   PDFFont(const PDFFont&) = delete;
   PDFFont& operator=(const PDFFont&) = delete;
 
-  /** 
+  /**
    * Returns the font type represented in this font. For Type0 fonts, returns the type of the
-   * descendant font. 
+   * descendant font.
    */
   AdvancedTypefaceInfo::FontType getType() const {
     return fontType;
@@ -87,21 +87,21 @@ class PDFFont {
            type == AdvancedTypefaceInfo::FontType::CFF;
   }
 
-  /** 
+  /**
    * Returns true if this font encoding supports glyph IDs above 255.
    */
   bool multiByteGlyphs() const {
     return PDFFont::IsMultiByte(this->getType());
   }
 
-  /** 
+  /**
    * Return true if this font has an encoding for the passed glyph id.
    */
   bool hasGlyph(GlyphID gid) const {
     return (gid >= this->firstGlyphID() && gid <= this->lastGlyphID()) || gid == 0;
   }
 
-  /** 
+  /**
    * Convert the input glyph ID into the font encoding.
    */
   GlyphID glyphToPDFFontEncoding(GlyphID gid) const {
@@ -122,7 +122,7 @@ class PDFFont {
     return _indirectReference;
   }
 
-  /** 
+  /**
    * Gets SkAdvancedTypefaceMetrics, and caches the result.
    */
   static const AdvancedTypefaceInfo* GetAdvancedInfo(const std::shared_ptr<Typeface>& typeface,
@@ -140,7 +140,7 @@ class PDFFont {
 
   void emitSubset(PDFDocumentImpl* document) const;
 
-  /** 
+  /**
    * Return false iff the typeface has its NotEmbeddable flag set.
    */
   static bool CanEmbedTypeface(const Typeface& typeface, PDFDocumentImpl* document);

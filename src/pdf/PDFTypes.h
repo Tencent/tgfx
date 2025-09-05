@@ -51,7 +51,7 @@ class PDFObject {
   PDFObject& operator=(PDFObject&&) = delete;
   PDFObject& operator=(const PDFObject&) = delete;
 
-  /* 
+  /*
    * Subclasses must implement this method to print the object to the PDF file.
    */
   virtual void emitObject(const std::shared_ptr<WriteStream>& stream) const = 0;

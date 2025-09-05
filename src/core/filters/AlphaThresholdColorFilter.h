@@ -23,7 +23,7 @@
 namespace tgfx {
 class AlphaThresholdColorFilter : public ColorFilter {
  public:
-  explicit AlphaThresholdColorFilter(float threshold) : threshold(threshold){};
+  explicit AlphaThresholdColorFilter(float threshold) : threshold(threshold) {};
 
   float threshold = 0.0f;
 

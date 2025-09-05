@@ -67,7 +67,6 @@ class LayerBuilder {
   float padding = 30.f;
   std::shared_ptr<tgfx::Layer> _root = nullptr;
 
-
  private:
   std::string _name;
 };

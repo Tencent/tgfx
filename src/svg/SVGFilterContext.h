@@ -30,7 +30,8 @@ namespace tgfx {
 class SVGFilterContext {
  public:
   SVGFilterContext(const Rect& filterEffectsRegion, const SVGObjectBoundingBoxUnits& primitiveUnits)
-      : _filterEffectsRegion(filterEffectsRegion), _primitiveUnits(primitiveUnits),
+      : _filterEffectsRegion(filterEffectsRegion),
+        _primitiveUnits(primitiveUnits),
         previousResult({nullptr, filterEffectsRegion, SVGColorspace::SRGB}) {
   }
 

@@ -47,8 +47,8 @@ class DropShadowFilter : public LayerFilter {
   void setOffsetX(float offsetX);
 
   /**
-     * The y offset of the shadow.
-     */
+   * The y offset of the shadow.
+   */
   float offsetY() const {
     return _offsetY;
   }

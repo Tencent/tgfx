@@ -22,12 +22,11 @@ import android.graphics.PointF
 import android.graphics.SurfaceTexture
 import android.view.Surface
 import android.view.TextureView
-import java.io.ByteArrayOutputStream
-
 import java.io.InputStream
 
-
 open class TGFXView : TextureView, TextureView.SurfaceTextureListener {
+
+
     constructor(context: android.content.Context) : super(context) {
         setupSurfaceTexture()
     }
@@ -47,59 +46,106 @@ open class TGFXView : TextureView, TextureView.SurfaceTextureListener {
         setupSurfaceTexture()
     }
 
+
     private fun setupSurfaceTexture() {
         surfaceTextureListener = this
     }
 
-    override fun onSurfaceTextureAvailable(p0: SurfaceTexture, p1: Int, p2: Int) {
+
+    override fun onSurfaceTextureAvailable(
+        surfaceTexture: SurfaceTexture,
+        width: Int,
+        height: Int
+    ) {
         release()
-        val stream: InputStream = context.assets.open("bridge.jpg")
-        val imageBytes: ByteArray = ByteArray(stream.available())
-        stream.read(imageBytes)
-        stream.close();
+
+        val streamBridge: InputStream = context.assets.open("bridge.jpg")
+        val imageBytesBridge = ByteArray(streamBridge.available())
+        streamBridge.read(imageBytesBridge)
+        streamBridge.close()
+
+        val streamTGFX: InputStream = context.assets.open("tgfx.png")
+        val imageBytesTGFX = ByteArray(streamTGFX.available())
+        streamTGFX.read(imageBytesTGFX)
+        streamTGFX.close()
+
+        val streamFont: InputStream = context.assets.open("NotoColorEmoji.ttf")
+        val fontBytes = ByteArray(streamFont.available())
+        streamFont.read(fontBytes)
+        streamFont.close()
+
         val metrics = resources.displayMetrics
-        surface = Surface(p0)
-        nativePtr = setupFromSurface(surface!!, imageBytes, metrics.density)
+
+        surface = Surface(surfaceTexture)
+        val imageBytesArray = arrayOf(imageBytesBridge, imageBytesTGFX)
+        nativePtr = setupFromSurface(
+            surface!!,
+            imageBytesArray,
+            fontBytes,
+            metrics.density
+        )
+
+        draw(0, 1.0f, PointF(0f, 0f))
     }
 
-    override fun onSurfaceTextureSizeChanged(p0: SurfaceTexture, p1: Int, p2: Int) {
+
+    override fun onSurfaceTextureSizeChanged(
+        surfaceTexture: SurfaceTexture,
+        width: Int,
+        height: Int
+    ) {
         updateSize()
     }
 
-    override fun onSurfaceTextureDestroyed(p0: SurfaceTexture): Boolean {
+    override fun onSurfaceTextureDestroyed(surfaceTexture: SurfaceTexture): Boolean {
         return true
     }
 
-    override fun onSurfaceTextureUpdated(p0: SurfaceTexture) {
+
+    override fun onSurfaceTextureUpdated(surfaceTexture: SurfaceTexture) {
     }
 
+
     fun release() {
-        if (surface != null) {
-            surface!!.release()
+        surface?.let {
+            it.release()
             surface = null
         }
         nativeRelease()
     }
 
-    fun draw(index: Int, zoom: Float, offset: PointF) {
-        nativeDraw(index, zoom, offset.x, offset.y)
+
+    fun draw(index: Int, zoom: Float, offset: PointF): Boolean {
+        return nativeDraw(index, zoom, offset.x, offset.y)
     }
+
 
     private external fun updateSize()
 
     private external fun nativeRelease()
 
-    private external fun nativeDraw(drawIndex: Int, zoom: Float, offsetX: Float, offsetY: Float)
+    private external fun nativeDraw(
+        drawIndex: Int,
+        zoom: Float,
+        offsetX: Float,
+        offsetY: Float
+    ): Boolean
+
 
     private var surface: Surface? = null
 
     private var nativePtr: Long = 0
 
+
     companion object {
+
         private external fun nativeInit()
 
+
         private external fun setupFromSurface(
-            surface: Surface, imageBytes: ByteArray,
+            surface: Surface,
+            imageBytes: Array<ByteArray>,
+            fontBytes: ByteArray,
             density: Float
         ): Long
 

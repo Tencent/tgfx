@@ -127,7 +127,8 @@ bool TGFXView::draw() {
     device->unlock();
     return true;
   }
-  appHost->updateZoomAndOffset(zoom, tgfx::Point(static_cast<float>(offset.x()), static_cast<float>(offset.y())));
+  appHost->updateZoomAndOffset(
+      zoom, tgfx::Point(static_cast<float>(offset.x()), static_cast<float>(offset.y())));
   auto canvas = surface->getCanvas();
   canvas->clear();
   auto numBuilders = hello2d::LayerBuilder::Count();
@@ -138,6 +139,5 @@ bool TGFXView::draw() {
   device->unlock();
 
   return true;
-
 }
 }  // namespace hello2d

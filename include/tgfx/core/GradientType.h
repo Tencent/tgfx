@@ -25,7 +25,7 @@ namespace tgfx {
 enum class GradientType {
   /*
    * None is used to indicate that the gradient type is not defined.
-  */
+   */
   None,
   /**
    * Linear gradients are defined by an axis, which is a line that the color gradient is aligned

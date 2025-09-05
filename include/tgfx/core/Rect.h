@@ -70,26 +70,26 @@ struct Rect {
   }
 
   /**
-  * Returns a Rect constructed as (x, y, x + w, y + h). Input is not validated; w or h may be
-  * negative.
-  */
+   * Returns a Rect constructed as (x, y, x + w, y + h). Input is not validated; w or h may be
+   * negative.
+   */
   static constexpr Rect MakeXYWH(int x, int y, int w, int h) {
     return {static_cast<float>(x), static_cast<float>(y), static_cast<float>(x + w),
             static_cast<float>(y + h)};
   }
 
   /**
-  * Returns a Rect constructed as (0, 0, size.width, size.height). Input is not validated;
-  * size.width or size.height may be negative.
-  */
+   * Returns a Rect constructed as (0, 0, size.width, size.height). Input is not validated;
+   * size.width or size.height may be negative.
+   */
   static constexpr Rect MakeSize(const ISize& size) {
     return Rect{0, 0, static_cast<float>(size.width), static_cast<float>(size.height)};
   }
 
   /**
-  * Returns a Rect constructed as (0, 0, size.width, size.height). Input is not validated;
-  * size.width or size.height may be negative.
-  */
+   * Returns a Rect constructed as (0, 0, size.width, size.height). Input is not validated;
+   * size.width or size.height may be negative.
+   */
   static constexpr Rect MakeSize(const Size& size) {
     return Rect{0, 0, size.width, size.height};
   }
@@ -155,9 +155,9 @@ struct Rect {
   }
 
   /**
-  * Returns the top edge of the Rect if it is sorted.
-  * Use isEmpty() to check if the Rect may be invalid, and sort() to swap top and bottom if needed.
-  */
+   * Returns the top edge of the Rect if it is sorted.
+   * Use isEmpty() to check if the Rect may be invalid, and sort() to swap top and bottom if needed.
+   */
   float y() const {
     return top;
   }

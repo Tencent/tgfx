@@ -27,7 +27,7 @@ fi
 echo "----begin to scan code format----"
 find include -name "*.cpp" -print -o -name "*.c" -print -o -name "*.h" -print  -o -name "*.mm" -print  -o -name "*.m" -print | xargs clang-format -i
 find src -name "*.cpp" -print -o -name "*.c" -print -o -name "*.h" -print  -o -name "*.mm" -print  -o -name "*.m" -print | xargs clang-format -i
-find drawers -name "*.cpp" -print -o -name "*.c" -print -o -name "*.h" -print  -o -name "*.mm" -print  -o -name "*.m" -print | xargs clang-format -i
+find hello2d -name "*.cpp" -print -o -name "*.c" -print -o -name "*.h" -print  -o -name "*.mm" -print  -o -name "*.m" -print | xargs clang-format -i
 find test/src -name "*.cpp" -print -o -name "*.c" -print -o -name "*.h" -print  -o -name "*.mm" -print  -o -name "*.m" -print | xargs clang-format -i
 find qt/src -name "*.cpp" -print -o -name "*.c" -print -o -name "*.h" -print  -o -name "*.mm" -print  -o -name "*.m" -print | xargs clang-format -i
 find ios/Hello2D -name "*.cpp" -print -o -name "*.c" -print -o -name "*.h" -print  -o -name "*.mm" -print  -o -name "*.m" -print | xargs clang-format -i

@@ -51,7 +51,7 @@ std::string PDFData(const DateTime& dateTime) {
 
 struct MetadataKey {
   const char* const key;
-  std::string PDFMetadata::*const valuePointer;
+  std::string PDFMetadata::* const valuePointer;
 };
 
 const std::vector<MetadataKey> MetadataKeyList = {

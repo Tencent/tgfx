@@ -55,13 +55,14 @@ class LayerContent {
   virtual void drawDefault(Canvas* canvas, const FillModifier* modifier) const = 0;
 
   /**
-   * Draws the foreground content of the layer to the specified canvas using the provided layer fill.
+   * Draws the foreground content of the layer to the specified canvas using the provided layer
+   * fill.
    */
   virtual void drawForeground(Canvas* canvas, const FillModifier* modifier) const = 0;
 
   /**
-    * Draws the contour content of the layer to the specified canvas using the provided layer fill.
-    */
+   * Draws the contour content of the layer to the specified canvas using the provided layer fill.
+   */
   virtual void drawContour(Canvas* canvas, const FillModifier* modifier) const = 0;
 
  protected:

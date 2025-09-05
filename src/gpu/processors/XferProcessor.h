@@ -37,9 +37,12 @@ class XferProcessor : public Processor {
     EmitArgs(FragmentShaderBuilder* fragBuilder, UniformHandler* uniformHandler,
              std::string inputColor, std::string inputCoverage, std::string outputColor,
              const SamplerHandle dstTextureSamplerHandle)
-        : fragBuilder(fragBuilder), uniformHandler(uniformHandler),
-          inputColor(std::move(inputColor)), inputCoverage(std::move(inputCoverage)),
-          outputColor(std::move(outputColor)), dstTextureSamplerHandle(dstTextureSamplerHandle) {
+        : fragBuilder(fragBuilder),
+          uniformHandler(uniformHandler),
+          inputColor(std::move(inputColor)),
+          inputCoverage(std::move(inputCoverage)),
+          outputColor(std::move(outputColor)),
+          dstTextureSamplerHandle(dstTextureSamplerHandle) {
     }
     FragmentShaderBuilder* fragBuilder;
     UniformHandler* uniformHandler;

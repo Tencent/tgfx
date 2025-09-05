@@ -54,8 +54,8 @@ class Typeface {
   static std::shared_ptr<Typeface> MakeEmpty();
 
   /**
-   * Returns a typeface object for the specified font family and style name. If an exact match is not
-   * found, the closest match is returned, or nullptr if no match is found.
+   * Returns a typeface object for the specified font family and style name. If an exact match is
+   * not found, the closest match is returned, or nullptr if no match is found.
    */
   static std::shared_ptr<Typeface> MakeFromName(const std::string& fontFamily,
                                                 const std::string& fontStyle);
@@ -156,7 +156,7 @@ class Typeface {
  protected:
   /**
    * Gets the mapping from GlyphID to unicode. The array index is GlyphID, and the array value is
-   * unicode. The array length is glyphsCount(). 
+   * unicode. The array length is glyphsCount().
    * This method is only implemented when compiling the SVG or PDF export module.
    */
   virtual std::vector<Unichar> getGlyphToUnicodeMap() const;

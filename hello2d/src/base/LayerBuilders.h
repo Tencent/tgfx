@@ -21,10 +21,10 @@
 #include "hello2d/LayerBuilder.h"
 
 namespace hello2d {
-#define DEFINE_LAYER_BUILDER(BuilderName)                                              \
-  class BuilderName : public hello2d::LayerBuilder {                                  \
+#define DEFINE_LAYER_BUILDER(BuilderName)                                      \
+  class BuilderName : public hello2d::LayerBuilder {                           \
    public:                                                                     \
-    BuilderName() : hello2d::LayerBuilder(#BuilderName) {                              \
+    BuilderName() : hello2d::LayerBuilder(#BuilderName) {                      \
     }                                                                          \
                                                                                \
     std::shared_ptr<tgfx::Layer> buildLayerTree(const AppHost* host) override; \

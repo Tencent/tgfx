@@ -28,8 +28,8 @@
 #include <functional>
 #include <memory>
 #include <string>
-#include "hello2d/LayerBuilder.h"
 #include "hello2d/AppHost.h"
+#include "hello2d/LayerBuilder.h"
 #include "tgfx/core/Point.h"
 #include "tgfx/gpu/opengl/wgl/WGLWindow.h"
 

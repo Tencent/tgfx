@@ -25,7 +25,7 @@ namespace tgfx {
 
 /**
  * SVGLengthContext is a utility class for converting SVGLength values to pixel values.
- * An SVGLength represents a numeric value paired with a unit. This class provides the context 
+ * An SVGLength represents a numeric value paired with a unit. This class provides the context
  * needed to resolve these lengths, taking into account factors such as viewport size, DPI, and
  * object bounding box units. It supports resolving various length types, including percentages,
  * absolute units, centimeters, and more.

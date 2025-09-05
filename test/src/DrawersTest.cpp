@@ -47,6 +47,5 @@ TGFX_TEST(Hello2DTest, Compare) {
     }
   }
   canvas->clear();
-
 }
 }  // namespace tgfx

@@ -49,7 +49,8 @@ class RegionTransformer {
       std::shared_ptr<RegionTransformer> outer = nullptr);
 
   /**
-   * Creates a RegionTransformer that applies the given matrix transformation to the given rectangle.
+   * Creates a RegionTransformer that applies the given matrix transformation to the given
+   * rectangle.
    */
   static std::shared_ptr<RegionTransformer> MakeFromMatrix(
       const Matrix& matrix, std::shared_ptr<RegionTransformer> outer = nullptr);

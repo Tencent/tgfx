@@ -134,7 +134,7 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     }
   }
 }
--(void)markDirty{
+- (void)markDirty {
   appHost->markDirty();
 }
 
@@ -166,7 +166,9 @@ static CVReturn OnDisplayLinkCallback(CVDisplayLinkRef, const CVTimeStamp*, cons
     return true;
   }
 
-  appHost->updateZoomAndOffset(self.zoomScale, tgfx::Point(static_cast<float>(self.contentOffset.x), static_cast<float>(self.contentOffset.y)));
+  appHost->updateZoomAndOffset(self.zoomScale,
+                               tgfx::Point(static_cast<float>(self.contentOffset.x),
+                                           static_cast<float>(self.contentOffset.y)));
   auto canvas = surface->getCanvas();
   canvas->clear();
   auto numBuilders = hello2d::LayerBuilder::Count();

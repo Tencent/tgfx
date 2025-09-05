@@ -37,8 +37,7 @@ class TGFXBaseView {
   bool draw(int drawIndex, float zoom, float offsetX, float offsetY);
 
   void onWheelEvent();
-  void onClickEvent( );
-
+  void onClickEvent();
 
  protected:
   std::shared_ptr<hello2d::AppHost> appHost;

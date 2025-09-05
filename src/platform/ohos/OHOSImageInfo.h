@@ -33,8 +33,8 @@ class OHOSImageInfo {
   static Orientation ToTGFXOrientation(const char* value, size_t size);
 
   /**
-   * Convert the pixelFormat attribute returned from Openharmony to the colorType attribute of TGFX. If the corresponding
-   * attribute is not defined in TGFX, it will return tgfx::ColorType::Unknown.
+   * Convert the pixelFormat attribute returned from Openharmony to the colorType attribute of TGFX.
+   * If the corresponding attribute is not defined in TGFX, it will return tgfx::ColorType::Unknown.
    */
   static ColorType ToTGFXColorType(int ohPixelFormat);
 
@@ -44,8 +44,9 @@ class OHOSImageInfo {
   static AlphaType ToTGFXAlphaType(int ohAlphaType);
 
   /**
-   * Convert the pixelFormat attribute returned from TGFX to the colorType attribute of Openharmony. If the corresponding
-   * attribute is not defined in HarmonyOS, it will return PIXEL_FORMAT_UNKNOWN.
+   * Convert the pixelFormat attribute returned from TGFX to the colorType attribute of Openharmony.
+   * If the corresponding attribute is not defined in HarmonyOS, it will return
+   * PIXEL_FORMAT_UNKNOWN.
    * */
   static int ToOHPixelFormat(ColorType colorType);
 };

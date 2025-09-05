@@ -186,7 +186,10 @@ class ImageInfo {
 
  private:
   ImageInfo(int width, int height, ColorType colorType, AlphaType alphaType, size_t rowBytes)
-      : _width(width), _height(height), _colorType(colorType), _alphaType(alphaType),
+      : _width(width),
+        _height(height),
+        _colorType(colorType),
+        _alphaType(alphaType),
         _rowBytes(rowBytes) {
   }
 

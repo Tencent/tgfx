@@ -59,7 +59,8 @@ class GPUTexture : public GPUResource {
   }
 
   /**
-   * Returns The number of samples per pixel in the texture. A value of 1 indicates no multisampling.
+   * Returns The number of samples per pixel in the texture. A value of 1 indicates no
+   * multisampling.
    */
   int sampleCount() const {
     return descriptor.sampleCount;

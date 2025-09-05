@@ -61,8 +61,8 @@ class GlobalCache {
   std::shared_ptr<IndexBufferProxy> getRRectIndexBuffer(bool stroke);
 
   /**
-   * Finds a static resource in the cache by its unique key. Returns nullptr if no resource is found.
-   * The resource will be kept alive for the lifetime of the GlobalCache.
+   * Finds a static resource in the cache by its unique key. Returns nullptr if no resource is
+   * found. The resource will be kept alive for the lifetime of the GlobalCache.
    */
   std::shared_ptr<Resource> findStaticResource(const UniqueKey& uniqueKey);
 

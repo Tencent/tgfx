@@ -293,7 +293,8 @@ void TGFXWindow::draw() {
   canvas->clear();
   canvas->save();
   hello2d::LayerBuilder::DrawBackground(canvas, appHost.get());
-  auto builder = hello2d::LayerBuilder::GetByIndex(currentDrawerIndex % hello2d::LayerBuilder::Count());
+  auto builder =
+      hello2d::LayerBuilder::GetByIndex(currentDrawerIndex % hello2d::LayerBuilder::Count());
   builder->displayList.setZoomScale(zoomScale);
   builder->displayList.setContentOffset(contentOffset.x, contentOffset.y);
   builder->build(appHost.get());

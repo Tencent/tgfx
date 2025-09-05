@@ -23,10 +23,10 @@
 #include "tgfx/platform/Print.h"
 
 namespace hello2d {
-static std::vector<LayerBuilder*> layerBuilders = {new ConicGradient(), new ImageWithMipmap(),
-                                       new ImageWithShadow(), new RichText(),
-                                       new SimpleLayerTree(),
-                                          };
+static std::vector<LayerBuilder*> layerBuilders = {
+    new ConicGradient(), new ImageWithMipmap(), new ImageWithShadow(),
+    new RichText(),      new SimpleLayerTree(),
+};
 
 static std::vector<std::string> GetLayerBuilderNames() {
   std::vector<std::string> names;

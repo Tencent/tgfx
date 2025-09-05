@@ -31,7 +31,6 @@ EMSCRIPTEN_BINDINGS(TGFXDemo) {
       .function("onWheelEvent", &TGFXBaseView::onWheelEvent)
       .function("onClickEvent", &TGFXBaseView::onClickEvent)
       .function("draw", &TGFXBaseView::draw);
-      
 
   class_<TGFXView, base<TGFXBaseView>>("TGFXView")
       .smart_ptr<std::shared_ptr<TGFXView>>("TGFXView")

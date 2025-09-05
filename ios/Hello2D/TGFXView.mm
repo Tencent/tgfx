@@ -73,15 +73,12 @@
   if (sizeChanged && tgfxWindow != nullptr) {
     tgfxWindow->invalidSize();
   }
-
-
 }
--(void)markDirty{
+- (void)markDirty {
   appHost->markDirty();
 }
 
 - (BOOL)draw:(int)drawIndex zoom:(float)zoom offset:(CGPoint)offset {
-  
   if (!appHost->isDirty()) {
     return false;
   }
@@ -109,7 +106,8 @@
     return true;
   }
 
-  appHost->updateZoomAndOffset(zoom, tgfx::Point(static_cast<float>(offset.x), static_cast<float>(offset.y)));
+  appHost->updateZoomAndOffset(
+      zoom, tgfx::Point(static_cast<float>(offset.x), static_cast<float>(offset.y)));
   auto canvas = surface->getCanvas();
   canvas->clear();
   auto numBuilders = hello2d::LayerBuilder::Count();
