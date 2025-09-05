@@ -557,7 +557,7 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
   auto tileRect = Rect::MakeXYWH(tileX * _tileSize, tileY * _tileSize, _tileSize, _tileSize);
   auto currentZoomScale = ToZoomScaleFloat(_zoomScaleInt, _zoomScalePrecision);
   DEBUG_ASSERT(currentZoomScale != 0.0f);
-  auto firstZoomOutTiled =
+  auto firstGreaterTileCache =
       std::find_if(sortedCaches.begin(), sortedCaches.end(),
                    [currentZoomScale](const std::pair<float, TileCache*>& item) {
                      return item.first > currentZoomScale;
@@ -584,18 +584,18 @@ std::vector<DrawTask> DisplayList::getFallbackDrawTasks(
     }
     return tasks;
   };
-  for (auto index = firstZoomOutTiled; index < sortedCaches.end(); index++) {
-    const auto& [scale, tileCache] = *index;
+  for (auto iterator = firstGreaterTileCache; iterator < sortedCaches.end(); iterator++) {
+    const auto& [scale, tileCache] = *iterator;
     auto tasks = findFallbackTasks(scale, tileCache, currentZoomScale, tileRect, _tileSize);
     if (!tasks.empty()) {
       return tasks;
     }
   }
-  if (firstZoomOutTiled == sortedCaches.begin()) {
+  if (firstGreaterTileCache == sortedCaches.begin()) {
     return {};
   }
-  for (auto index = firstZoomOutTiled - 1; index >= sortedCaches.begin(); index--) {
-    const auto& [scale, tileCache] = *index;
+  for (auto iterator = firstGreaterTileCache - 1; iterator >= sortedCaches.begin(); iterator--) {
+    const auto& [scale, tileCache] = *iterator;
     auto tasks = findFallbackTasks(scale, tileCache, currentZoomScale, tileRect, _tileSize);
     if (!tasks.empty()) {
       return tasks;
