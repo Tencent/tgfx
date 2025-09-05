@@ -117,6 +117,10 @@ bool CornerPinEffect::onDraw(const RuntimeProgram* program,
   inputTextures[0].getGLTextureInfo(&glInfo);
   gl->activeTexture(GL_TEXTURE0);
   gl->bindTexture(glInfo.target, glInfo.id);
+  gl->texParameteri(glInfo.target, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+  gl->texParameteri(glInfo.target, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+  gl->texParameteri(glInfo.target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+  gl->texParameteri(glInfo.target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
   auto vertices = computeVertices(inputTextures[0], target, offset);
   if (filterProgram->vertexArray > 0) {
     gl->bindVertexArray(filterProgram->vertexArray);
