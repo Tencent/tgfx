@@ -256,7 +256,12 @@ void GLCaps::initGLSupport(const GLInfo& info) {
     clampToBorderSupport = false;
   }
 
+  // TODO UBO currently does not do merge processing, and the performance is slightly worse than
+  // the traditional Uniform variable, and it will be enabled after
+  // the performance optimization is completed
+#if ENABLE_UBO
   uboSupport = version >= GL_VER(3, 1);
+#endif
 }
 
 void GLCaps::initGLESSupport(const GLInfo& info) {
@@ -296,7 +301,12 @@ void GLCaps::initGLESSupport(const GLInfo& info) {
   mipmapSupport = npotTextureTileSupport || info.hasExtension("GL_IMG_texture_npot");
   usesPrecisionModifiers = true;
 
+  // TODO UBO currently does not do merge processing, and the performance is slightly worse than
+  // the traditional Uniform variable, and it will be enabled after
+  // the performance optimization is completed
+#if ENABLE_UBO
   uboSupport = version >= GL_VER(3, 0);
+#endif
 }
 
 void GLCaps::initWebGLSupport(const GLInfo& info) {
@@ -315,8 +325,13 @@ void GLCaps::initWebGLSupport(const GLInfo& info) {
   mipmapSupport = npotTextureTileSupport;
   usesPrecisionModifiers = true;
 
+  // TODO UBO currently does not do merge processing, and the performance is slightly worse than
+  // the traditional Uniform variable, and it will be enabled after
+  // the performance optimization is completed
   // WebGL 1.0 doesn't support UBOs, but WebGL 2.0 does.
+#if ENABLE_UBO
   uboSupport = version >= GL_VER(2, 0);
+#endif
 }
 
 void GLCaps::initFormatMap(const GLInfo& info) {

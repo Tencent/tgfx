@@ -83,15 +83,6 @@ void UniformBuffer::onSetData(const std::string& name, const void* data, size_t 
   }
   DEBUG_ASSERT(field->size == size);
 
-#if 0
-  LOGI("------ UniformBuffer::onSetData ------");
-  LOGI("name: %-20s, format: %-10s, size: %zu", name.c_str(), ToUniformFormatName(field->format), size);
-  for (size_t i = 0; i < size; i++) {
-    printf("%02X ", ((const uint8_t*)data)[i]);
-  }
-  LOGI("");
-#endif
-
   memcpy(buffer.data() + field->offset, data, size);
 }
 
