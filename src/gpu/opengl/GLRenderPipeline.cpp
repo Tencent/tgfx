@@ -93,8 +93,8 @@ void GLRenderPipeline::activate(GLGPU* gpu) {
   }
 }
 
-void GLRenderPipeline::setUniformBytesForUBO(GLGPU* gpu, unsigned binding,
-                                             const void* data, size_t size) {
+void GLRenderPipeline::setUniformBytesForUBO(GLGPU* gpu, unsigned binding, const void* data,
+                                             size_t size) {
   auto gl = gpu->functions();
 
   unsigned ubo = 0;
@@ -136,7 +136,8 @@ void GLRenderPipeline::setUniformBytesForUBO(GLGPU* gpu, unsigned binding,
                      binding == VERTEX_UBO_BINDING_POINT ? vertexUBO : fragmentUBO);
 }
 
-void GLRenderPipeline::setUniformBytes(GLGPU* gpu, unsigned binding, const void* data, size_t size) {
+void GLRenderPipeline::setUniformBytes(GLGPU* gpu, unsigned binding, const void* data,
+                                       size_t size) {
   if (data == nullptr || size == 0 || uniformLayout == nullptr) {
     return;
   }

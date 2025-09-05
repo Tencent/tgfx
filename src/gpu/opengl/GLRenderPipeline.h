@@ -69,7 +69,6 @@ class GLRenderPipeline : public GPURenderPipeline {
   unsigned int vertexUBO = 0;
   unsigned int fragmentUBO = 0;
 
-  void setUniformBytesForUBO(GLGPU* gpu, unsigned binding, const void* data,
-                             size_t size);
+  void setUniformBytesForUBO(GLGPU* gpu, unsigned binding, const void* data, size_t size);
 };
 }  // namespace tgfx
