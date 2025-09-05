@@ -17,7 +17,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #include "GLRenderPipeline.h"
-
 #include "gpu/UniformBuffer.h"
 #include "gpu/opengl/GLGPU.h"
 
@@ -94,7 +93,8 @@ void GLRenderPipeline::activate(GLInterface* interface) {
   }
 }
 
-void GLRenderPipeline::setUniformBytesForUBO(GLInterface* interface, unsigned binding, const void* data, size_t size) {
+void GLRenderPipeline::setUniformBytesForUBO(GLInterface* interface, unsigned binding,
+                                             const void* data, size_t size) {
   if (data == nullptr || size == 0) {
     return;
   }
@@ -121,12 +121,16 @@ void GLRenderPipeline::setUniformBytesForUBO(GLInterface* interface, unsigned bi
     vertexUBO = 0;
   }
 
-  if (unsigned& ubo = (binding == FRAGMENT_UBO_BINDING_POINT ? fragmentUBO : vertexUBO); setupUBO(ubo, size)) {
+  if (unsigned& ubo = (binding == FRAGMENT_UBO_BINDING_POINT ? fragmentUBO : vertexUBO);
+      setupUBO(ubo, size)) {
     unsigned int uniformBlockIndex = 0;
-    const std::string uniformBlockName = binding == FRAGMENT_UBO_BINDING_POINT ? FragmentUniformBlockName : VertexUniformBlockName;
+    const std::string uniformBlockName =
+        binding == FRAGMENT_UBO_BINDING_POINT ? FragmentUniformBlockName : VertexUniformBlockName;
     uniformBlockIndex = gl->getUniformBlockIndex(programID, uniformBlockName.c_str());
     if (uniformBlockIndex != GL_INVALID_INDEX) {
-      const unsigned uniformBlockBindingPoint = binding == FRAGMENT_UBO_BINDING_POINT ? FRAGMENT_UBO_BINDING_POINT : VERTEX_UBO_BINDING_POINT;
+      const unsigned uniformBlockBindingPoint = binding == FRAGMENT_UBO_BINDING_POINT
+                                                    ? FRAGMENT_UBO_BINDING_POINT
+                                                    : VERTEX_UBO_BINDING_POINT;
       gl->uniformBlockBinding(programID, uniformBlockIndex, uniformBlockBindingPoint);
       gl->bindBufferBase(GL_UNIFORM_BUFFER, uniformBlockBindingPoint, ubo);
     }
@@ -136,7 +140,8 @@ void GLRenderPipeline::setUniformBytesForUBO(GLInterface* interface, unsigned bi
   }
 }
 
-void GLRenderPipeline::setUniformBytes(GLInterface* interface, unsigned binding, const void* data, size_t size) {
+void GLRenderPipeline::setUniformBytes(GLInterface* interface, unsigned binding, const void* data,
+                                       size_t size) {
   if (data == nullptr || size == 0 || uniformLayout == nullptr) {
     return;
   }
@@ -151,7 +156,8 @@ void GLRenderPipeline::setUniformBytes(GLInterface* interface, unsigned binding,
     return;
   }
 
-  const auto& uniforms = binding == FRAGMENT_UBO_BINDING_POINT ? uniformLayout->fragmentUniforms() : uniformLayout->vertexUniforms();
+  const auto& uniforms = binding == FRAGMENT_UBO_BINDING_POINT ? uniformLayout->fragmentUniforms()
+                                                               : uniformLayout->vertexUniforms();
   const auto* gl = interface->functions();
   if (uniformLocations.empty()) {
     uniformLocations.reserve(uniforms.size());

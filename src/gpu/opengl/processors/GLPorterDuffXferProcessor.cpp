@@ -76,7 +76,8 @@ void GLPorterDuffXferProcessor::emitCode(const EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = %s;", args.outputColor.c_str(), outColor);
 }
 
-void GLPorterDuffXferProcessor::setData(UniformBuffer* /*vertexUniformBuffer*/, UniformBuffer* fragmentUniformBuffer) const {
+void GLPorterDuffXferProcessor::setData(UniformBuffer* /*vertexUniformBuffer*/,
+                                        UniformBuffer* fragmentUniformBuffer) const {
   if (dstTextureInfo.textureProxy == nullptr) {
     return;
   }

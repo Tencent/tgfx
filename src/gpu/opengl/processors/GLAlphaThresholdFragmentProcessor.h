@@ -29,6 +29,7 @@ class GLAlphaThresholdFragmentProcessor : public AlphaThresholdFragmentProcessor
 
   void emitCode(EmitArgs& args) const override;
 
-  void onSetData(UniformBuffer* vertexUniformBuffer, UniformBuffer* fragmentUniformBuffer) const override;
+  void onSetData(UniformBuffer* vertexUniformBuffer,
+                 UniformBuffer* fragmentUniformBuffer) const override;
 };
 }  // namespace tgfx

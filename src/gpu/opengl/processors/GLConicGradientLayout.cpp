@@ -41,7 +41,8 @@ void GLConicGradientLayout::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = vec4(t, 1.0, 0.0, 0.0);", args.outputColor.c_str());
 }
 
-void GLConicGradientLayout::onSetData(UniformBuffer* /*vertexUniformBuffer*/, UniformBuffer* fragmentUniformBuffer) const {
+void GLConicGradientLayout::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
+                                      UniformBuffer* fragmentUniformBuffer) const {
   fragmentUniformBuffer->setData("Bias", bias);
   fragmentUniformBuffer->setData("Scale", scale);
 }

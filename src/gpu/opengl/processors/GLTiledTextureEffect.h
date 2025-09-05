@@ -37,7 +37,8 @@ class GLTiledTextureEffect : public TiledTextureEffect {
     std::string dimensionsName;
   };
 
-  void onSetData(UniformBuffer* vertexUniformBuffer, UniformBuffer* fragmentUniformBuffer) const override;
+  void onSetData(UniformBuffer* vertexUniformBuffer,
+                 UniformBuffer* fragmentUniformBuffer) const override;
 
   static bool ShaderModeRequiresUnormCoord(TiledTextureEffect::ShaderMode m);
 

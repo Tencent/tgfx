@@ -32,11 +32,11 @@ void FragmentShaderBuilder::declareCustomOutputColor() {
   outputs.emplace_back(CustomColorOutputName(), SLType::Float4, typeModifier);
 }
 
-void FragmentShaderBuilder::onBeforeChildProcEmitCode(const FragmentProcessor* child)const {
+void FragmentShaderBuilder::onBeforeChildProcEmitCode(const FragmentProcessor* child) const {
   programBuilder->currentProcessors.push_back(child);
 }
 
-void FragmentShaderBuilder::onAfterChildProcEmitCode()const {
+void FragmentShaderBuilder::onAfterChildProcEmitCode() const {
   programBuilder->currentProcessors.pop_back();
 }
 }  // namespace tgfx

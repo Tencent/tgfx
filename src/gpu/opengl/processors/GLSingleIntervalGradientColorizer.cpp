@@ -39,7 +39,8 @@ void GLSingleIntervalGradientColorizer::emitCode(EmitArgs& args) const {
                            startName.c_str(), endName.c_str());
 }
 
-void GLSingleIntervalGradientColorizer::onSetData(UniformBuffer* /*vertexUniformBuffer*/, UniformBuffer* fragmentUniformBuffer) const {
+void GLSingleIntervalGradientColorizer::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
+                                                  UniformBuffer* fragmentUniformBuffer) const {
   fragmentUniformBuffer->setData("start", start);
   fragmentUniformBuffer->setData("end", end);
 }

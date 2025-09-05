@@ -47,7 +47,8 @@ void GLColorMatrixFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s.rgb *= %s.a;", args.outputColor.c_str(), args.outputColor.c_str());
 }
 
-void GLColorMatrixFragmentProcessor::onSetData(UniformBuffer* /*vertexUniformBuffer*/, UniformBuffer* fragmentUniformBuffer) const {
+void GLColorMatrixFragmentProcessor::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
+                                               UniformBuffer* fragmentUniformBuffer) const {
   float m[] = {
       matrix[0], matrix[5], matrix[10], matrix[15], matrix[1], matrix[6], matrix[11], matrix[16],
       matrix[2], matrix[7], matrix[12], matrix[17], matrix[3], matrix[8], matrix[13], matrix[18],

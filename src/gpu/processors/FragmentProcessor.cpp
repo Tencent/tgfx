@@ -137,7 +137,8 @@ const CoordTransform* FragmentProcessor::CoordTransformIter::next() {
   return currFP->coordTransform(currentIndex++);
 }
 
-void FragmentProcessor::setData(UniformBuffer* vertexUniformBuffer, UniformBuffer* fragmentUniformBuffer) const {
+void FragmentProcessor::setData(UniformBuffer* vertexUniformBuffer,
+                                UniformBuffer* fragmentUniformBuffer) const {
   onSetData(vertexUniformBuffer, fragmentUniformBuffer);
 }
 

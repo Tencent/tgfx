@@ -415,7 +415,8 @@ void GLTiledTextureEffect::emitCode(EmitArgs& args) const {
   }
 }
 
-void GLTiledTextureEffect::onSetData(UniformBuffer* /*vertexUniformBuffer*/, UniformBuffer* fragmentUniformBuffer) const {
+void GLTiledTextureEffect::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
+                                     UniformBuffer* fragmentUniformBuffer) const {
   auto textureView = getTextureView();
   if (textureView == nullptr) {
     return;

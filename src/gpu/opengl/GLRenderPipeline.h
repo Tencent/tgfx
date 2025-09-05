@@ -19,12 +19,11 @@
 #pragma once
 
 #include <memory>
-
 #include "gpu/Attribute.h"
 #include "gpu/Blend.h"
 #include "gpu/GPURenderPipeline.h"
-#include "gpu/opengl/GLBuffer.h"
 #include "gpu/UniformLayout.h"
+#include "gpu/opengl/GLBuffer.h"
 
 namespace tgfx {
 /**
@@ -67,6 +66,7 @@ class GLRenderPipeline : public GPURenderPipeline {
   unsigned int vertexUBO = 0;
   unsigned int fragmentUBO = 0;
 
-  void setUniformBytesForUBO(GLInterface* interface, unsigned binding, const void* data, size_t size);
+  void setUniformBytesForUBO(GLInterface* interface, unsigned binding, const void* data,
+                             size_t size);
 };
 }  // namespace tgfx

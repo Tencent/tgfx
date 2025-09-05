@@ -75,7 +75,8 @@ void GLGaussianBlur1DFragmentProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = sum / total;", args.outputColor.c_str());
 }
 
-void GLGaussianBlur1DFragmentProcessor::onSetData(UniformBuffer* /*vertexUniformBuffer*/, UniformBuffer* fragmentUniformBuffer) const {
+void GLGaussianBlur1DFragmentProcessor::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
+                                                  UniformBuffer* fragmentUniformBuffer) const {
   auto* processor = childProcessor(0);
   Point stepVectors[] = {{0, 0}, {stepLength, 0}};
   if (direction == GaussianBlurDirection::Vertical) {

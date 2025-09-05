@@ -38,7 +38,8 @@ void GLAlphaThresholdFragmentProcessor::emitCode(EmitArgs& args) const {
                            args.outputColor.c_str());
 }
 
-void GLAlphaThresholdFragmentProcessor::onSetData(UniformBuffer* /*vertexUniformBuffer*/, UniformBuffer* fragmentUniformBuffer) const {
+void GLAlphaThresholdFragmentProcessor::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
+                                                  UniformBuffer* fragmentUniformBuffer) const {
   fragmentUniformBuffer->setData("Threshold", threshold);
 }
 

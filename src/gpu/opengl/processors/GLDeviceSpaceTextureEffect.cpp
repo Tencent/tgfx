@@ -52,7 +52,8 @@ void GLDeviceSpaceTextureEffect::emitCode(EmitArgs& args) const {
   }
 }
 
-void GLDeviceSpaceTextureEffect::onSetData(UniformBuffer* /*vertexUniformBuffer*/, UniformBuffer* fragmentUniformBuffer) const {
+void GLDeviceSpaceTextureEffect::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
+                                           UniformBuffer* fragmentUniformBuffer) const {
   auto textureView = textureProxy->getTextureView();
   if (textureView == nullptr) {
     return;

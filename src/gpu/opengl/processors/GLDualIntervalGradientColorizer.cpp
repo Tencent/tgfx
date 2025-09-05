@@ -74,7 +74,8 @@ void GLDualIntervalGradientColorizer::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = vec4(t * scale + bias);", args.outputColor.c_str());
 }
 
-void GLDualIntervalGradientColorizer::onSetData(UniformBuffer* /*vertexUniformBuffer*/, UniformBuffer* fragmentUniformBuffer) const {
+void GLDualIntervalGradientColorizer::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
+                                                UniformBuffer* fragmentUniformBuffer) const {
   fragmentUniformBuffer->setData("scale01", scale01);
   fragmentUniformBuffer->setData("bias01", bias01);
   fragmentUniformBuffer->setData("scale23", scale23);

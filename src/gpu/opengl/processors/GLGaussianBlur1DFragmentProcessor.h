@@ -31,7 +31,8 @@ class GLGaussianBlur1DFragmentProcessor : public GaussianBlur1DFragmentProcessor
   void emitCode(EmitArgs& args) const override;
 
  private:
-  void onSetData(UniformBuffer* vertexUniformBuffer, UniformBuffer* fragmentUniformBuffer) const override;
+  void onSetData(UniformBuffer* vertexUniformBuffer,
+                 UniformBuffer* fragmentUniformBuffer) const override;
 };
 
 }  // namespace tgfx

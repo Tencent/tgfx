@@ -67,7 +67,8 @@ void GLQuadPerEdgeAAGeometryProcessor::emitCode(EmitArgs& args) const {
   args.vertBuilder->emitNormalizedPosition(position.name());
 }
 
-void GLQuadPerEdgeAAGeometryProcessor::setData(UniformBuffer* vertexUniformBuffer, UniformBuffer* fragmentUniformBuffer,
+void GLQuadPerEdgeAAGeometryProcessor::setData(UniformBuffer* vertexUniformBuffer,
+                                               UniformBuffer* fragmentUniformBuffer,
                                                FPCoordTransformIter* transformIter) const {
   setTransformDataHelper(uvMatrix.value_or(Matrix::I()), vertexUniformBuffer, transformIter);
   if (commonColor.has_value()) {

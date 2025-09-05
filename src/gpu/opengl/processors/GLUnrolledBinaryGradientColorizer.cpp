@@ -269,7 +269,8 @@ void SetUniformData(UniformBuffer* uniformBuffer, const std::string& name, int i
   }
 }
 
-void GLUnrolledBinaryGradientColorizer::onSetData(UniformBuffer* /*vertexUniformBuffer*/, UniformBuffer* fragmentUniformBuffer) const {
+void GLUnrolledBinaryGradientColorizer::onSetData(UniformBuffer* /*vertexUniformBuffer*/,
+                                                  UniformBuffer* fragmentUniformBuffer) const {
   SetUniformData(fragmentUniformBuffer, "scale0_1", intervalCount, 0, scale0_1);
   SetUniformData(fragmentUniformBuffer, "scale2_3", intervalCount, 1, scale2_3);
   SetUniformData(fragmentUniformBuffer, "scale4_5", intervalCount, 2, scale4_5);

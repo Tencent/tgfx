@@ -18,9 +18,9 @@
 
 #include "GLProgramBuilder.h"
 #include <sstream>
-#include "gpu/opengl/GLUtil.h"
-#include "gpu/UniformLayout.h"
 #include "gpu/UniformBuffer.h"
+#include "gpu/UniformLayout.h"
+#include "gpu/opengl/GLUtil.h"
 
 namespace tgfx {
 static std::string TypeModifierString(bool isLegacyES, ShaderVar::TypeModifier t,
@@ -215,16 +215,20 @@ std::unique_ptr<PipelineProgram> GLProgramBuilder::finalize() {
   std::unique_ptr<UniformLayout> uniformLayout = nullptr;
   const auto* caps = GLCaps::Get(context);
   if (caps->uboSupport) {
-    uniformLayout = std::make_unique<UniformLayout>(std::vector<std::string>{VertexUniformBlockName, FragmentUniformBlockName}, vertexUniformBuffer.get(), fragmentUniformBuffer.get());
+    uniformLayout = std::make_unique<UniformLayout>(
+        std::vector<std::string>{VertexUniformBlockName, FragmentUniformBlockName},
+        vertexUniformBuffer.get(), fragmentUniformBuffer.get());
   } else {
-    uniformLayout = std::make_unique<UniformLayout>( std::vector<std::string>{}, vertexUniformBuffer.get(), fragmentUniformBuffer.get());
+    uniformLayout = std::make_unique<UniformLayout>(
+        std::vector<std::string>{}, vertexUniformBuffer.get(), fragmentUniformBuffer.get());
   }
 
   auto pipeline = std::make_unique<GLRenderPipeline>(programID, std::move(uniformLayout),
                                                      programInfo->getVertexAttributes(),
                                                      programInfo->getBlendFormula());
 
-  return std::make_unique<PipelineProgram>(std::move(pipeline), std::move(vertexUniformBuffer), std::move(fragmentUniformBuffer));
+  return std::make_unique<PipelineProgram>(std::move(pipeline), std::move(vertexUniformBuffer),
+                                           std::move(fragmentUniformBuffer));
 }
 
 bool GLProgramBuilder::checkSamplerCounts() {

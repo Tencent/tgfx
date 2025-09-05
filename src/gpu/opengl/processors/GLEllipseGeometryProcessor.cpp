@@ -129,7 +129,8 @@ void GLEllipseGeometryProcessor::emitCode(EmitArgs& args) const {
   fragBuilder->codeAppendf("%s = vec4(edgeAlpha);", args.outputCoverage.c_str());
 }
 
-void GLEllipseGeometryProcessor::setData(UniformBuffer* vertexUniformBuffer, UniformBuffer* fragmentUniformBuffer,
+void GLEllipseGeometryProcessor::setData(UniformBuffer* vertexUniformBuffer,
+                                         UniformBuffer* fragmentUniformBuffer,
                                          FPCoordTransformIter* transformIter) const {
   setTransformDataHelper(Matrix::I(), vertexUniformBuffer, transformIter);
   if (commonColor.has_value()) {

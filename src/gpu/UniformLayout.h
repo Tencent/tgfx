@@ -17,21 +17,19 @@
 /////////////////////////////////////////////////////////////////////////////////////////////////
 
 #pragma once
-#include <vector>
 #include <string>
-
+#include <vector>
 #include "Uniform.h"
 #include "UniformBuffer.h"
 
 namespace tgfx {
 class UniformLayout final {
-public:
+ public:
   UniformLayout(const std::vector<std::string>& uniformBlockNames,
-                UniformBuffer* vertexUniformBuffer,
-                UniformBuffer* fragmentUniformBuffer)
-      : _uniformBlockNames(uniformBlockNames),
-        _vertexUniformBuffer(vertexUniformBuffer),
-        _fragmentUniformBuffer(fragmentUniformBuffer) {}
+                UniformBuffer* vertexUniformBuffer, UniformBuffer* fragmentUniformBuffer)
+      : _uniformBlockNames(uniformBlockNames), _vertexUniformBuffer(vertexUniformBuffer),
+        _fragmentUniformBuffer(fragmentUniformBuffer) {
+  }
 
   std::vector<std::string>& uniformBlockNames() {
     return _uniformBlockNames;
@@ -53,10 +51,9 @@ public:
     }
   }
 
-private:
+ private:
   std::vector<std::string> _uniformBlockNames = {};
   UniformBuffer* _vertexUniformBuffer = nullptr;
   UniformBuffer* _fragmentUniformBuffer = nullptr;
 };
-} // namespace tgfx
-
+}  // namespace tgfx

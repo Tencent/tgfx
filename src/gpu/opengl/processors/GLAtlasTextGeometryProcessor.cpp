@@ -87,7 +87,8 @@ void GLAtlasTextGeometryProcessor::emitCode(EmitArgs& args) const {
   args.vertBuilder->emitNormalizedPosition(position.name());
 }
 
-void GLAtlasTextGeometryProcessor::setData(UniformBuffer* vertexUniformBuffer, UniformBuffer* fragmentUniformBuffer,
+void GLAtlasTextGeometryProcessor::setData(UniformBuffer* vertexUniformBuffer,
+                                           UniformBuffer* fragmentUniformBuffer,
                                            FPCoordTransformIter* transformIter) const {
   auto atlasSizeInv = textureProxy->getTextureView()->getTextureCoord(1.f, 1.f);
   vertexUniformBuffer->setData(atlasSizeUniformName, atlasSizeInv);
